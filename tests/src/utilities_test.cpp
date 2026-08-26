@@ -719,6 +719,9 @@ TEST(EqualizerPersist, SelectedPresetAndStereoBalancer) {
   EXPECT_FALSE(EqualizerPersist::MigrateBalancerEnabled(true, false, 40));
   EXPECT_TRUE(EqualizerPersist::MigrateBalancerEnabled(false, false, 40));
   EXPECT_FALSE(EqualizerPersist::MigrateBalancerEnabled(false, false, 0));
+  EXPECT_EQ("0 dB", EqualizerPersist::DbLabel(0));
+  EXPECT_EQ("6 dB", EqualizerPersist::DbLabel(6));
+  EXPECT_EQ("-12 dB", EqualizerPersist::DbLabel(-12));
 
   Equalizer eq;
   eq.set_stereo_balancer_enabled(true);

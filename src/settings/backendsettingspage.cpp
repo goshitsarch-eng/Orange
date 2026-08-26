@@ -50,18 +50,29 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
 
   AdwPreferencesGroup *buffer = SettingsPage::AddGroup(page, "Buffer");
   const auto buffer_ms = SettingsControls::BufferDurationMs();
-  SettingsPage::AddIntScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferDuration, "Buffer duration (ms)",
-                           static_cast<int>(BackendSettings::kDefaultBufferDuration), static_cast<int>(buffer_ms.min),
-                           static_cast<int>(buffer_ms.max), static_cast<int>(buffer_ms.step));
+  GtkWidget *duration_scale =
+      SettingsPage::AddIntScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferDuration, "Buffer duration (ms)",
+                                static_cast<int>(BackendSettings::kDefaultBufferDuration), static_cast<int>(buffer_ms.min),
+                                static_cast<int>(buffer_ms.max), static_cast<int>(buffer_ms.step));
   const auto watermark = SettingsControls::BufferWatermark();
-  SettingsPage::AddDoubleScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferLowWatermark, "Low watermark",
-                              BackendSettings::kDefaultBufferLowWatermark, watermark.min, watermark.max, watermark.step);
-  SettingsPage::AddDoubleScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferHighWatermark, "High watermark",
-                              BackendSettings::kDefaultBufferHighWatermark, watermark.min, watermark.max, watermark.step);
+  GtkWidget *low_scale =
+      SettingsPage::AddDoubleScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferLowWatermark, "Low watermark",
+                                   BackendSettings::kDefaultBufferLowWatermark, watermark.min, watermark.max, watermark.step);
+  GtkWidget *high_scale =
+      SettingsPage::AddDoubleScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferHighWatermark, "High watermark",
+                                   BackendSettings::kDefaultBufferHighWatermark, watermark.min, watermark.max, watermark.step);
   const auto warmup = SettingsControls::DeviceWarmupMs();
-  SettingsPage::AddIntScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kDeviceWarmupDuration, "Device warmup (ms)",
-                           BackendSettings::kDefaultDeviceWarmupDuration, static_cast<int>(warmup.min), static_cast<int>(warmup.max),
-                           static_cast<int>(warmup.step));
+  GtkWidget *warmup_scale = SettingsPage::AddIntScale(
+      buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kDeviceWarmupDuration, "Device warmup (ms)",
+      BackendSettings::kDefaultDeviceWarmupDuration, static_cast<int>(warmup.min), static_cast<int>(warmup.max),
+      static_cast<int>(warmup.step));
+  SettingsPage::AddButtonRow(buffer, "", "Defaults", [duration_scale, low_scale, high_scale, warmup_scale]() {
+    const SettingsControls::BufferValues defaults = SettingsControls::BufferDefaults();
+    gtk_range_set_value(GTK_RANGE(duration_scale), defaults.duration_ms);
+    gtk_range_set_value(GTK_RANGE(low_scale), defaults.low_watermark);
+    gtk_range_set_value(GTK_RANGE(high_scale), defaults.high_watermark);
+    gtk_range_set_value(GTK_RANGE(warmup_scale), defaults.warmup_ms);
+  });
 
   AdwPreferencesGroup *rg = SettingsPage::AddGroup(page, "ReplayGain / EBU R128");
   SettingsPage::AddChoiceRadios(rg, settings, nullptr, "Normalization",

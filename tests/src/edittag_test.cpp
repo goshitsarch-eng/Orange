@@ -3,6 +3,7 @@
 #include "dialogs/dialoglistkeyboard.h"
 #include "dialogs/edittagcover.h"
 #include "dialogs/edittagcoverdrop.h"
+#include "dialogs/edittagfieldreset.h"
 #include "dialogs/edittagfields.h"
 #include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagtabs.h"
@@ -69,6 +70,15 @@ TEST(EditTagFields, ApplyChangedFieldsUpdatesAllSongs) {
   EXPECT_EQ("Trip Hop", songs[0].genre());
   EXPECT_EQ("Trip Hop", songs[1].genre());
   EXPECT_EQ(1994, songs[1].year());
+}
+
+TEST(EditTagFieldReset, ShowsOnlyWhenValueChanged) {
+  EXPECT_FALSE(EditTagFieldReset::ShouldShowReset("Roads", "Roads"));
+  EXPECT_TRUE(EditTagFieldReset::ShouldShowReset("Glory Box", "Roads"));
+  EXPECT_FALSE(EditTagFieldReset::ShouldShowReset(4.0, 4.0));
+  EXPECT_TRUE(EditTagFieldReset::ShouldShowReset(2.5, 4.0));
+  EXPECT_EQ("Roads", EditTagFieldReset::ResetValue("Roads"));
+  EXPECT_STREQ("Reset this field", EditTagFieldReset::ResetTooltip());
 }
 
 TEST(EditTagFields, ResetPlayStatisticsClearsCounts) {

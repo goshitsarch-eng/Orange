@@ -1,7 +1,11 @@
 #ifndef STRAWBERRY_SETTINGSCONTROLS_H
 #define STRAWBERRY_SETTINGSCONTROLS_H
 
+#include "constants/backendsettings.h"
+#include "constants/collectionsettings.h"
+
 #include <algorithm>
+#include <limits>
 #include <string>
 
 namespace SettingsControls {
@@ -49,6 +53,26 @@ inline std::string PlaylistPlayingSongColor(bool system, const std::string &cust
   }
   return custom.empty() ? (fallback ? fallback : "#6696e3") : custom;
 }
+
+struct BufferValues {
+  int duration_ms = static_cast<int>(BackendSettings::kDefaultBufferDuration);
+  double low_watermark = BackendSettings::kDefaultBufferLowWatermark;
+  double high_watermark = BackendSettings::kDefaultBufferHighWatermark;
+  int warmup_ms = BackendSettings::kDefaultDeviceWarmupDuration;
+};
+
+inline BufferValues BufferDefaults() { return {}; }
+
+inline int IconCacheSizeMax(int unit) {
+  return unit == static_cast<int>(CollectionSettings::CacheSizeUnit::MB) ? std::numeric_limits<int>::max() / 1024
+                                                                        : std::numeric_limits<int>::max();
+}
+
+inline int DiskCacheSizeMax(int unit) {
+  return unit == static_cast<int>(CollectionSettings::CacheSizeUnit::GB) ? 4 : std::numeric_limits<int>::max();
+}
+
+inline int ClampCacheSize(int value, int max) { return std::max(0, std::min(value, max)); }
 
 }  // namespace SettingsControls
 

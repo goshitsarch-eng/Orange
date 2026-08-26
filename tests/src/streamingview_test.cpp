@@ -10,6 +10,7 @@
 #include "streaming/streamingcover.h"
 #include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchgroup.h"
+#include "streaming/streamingsearchhelp.h"
 #include "tidal/tidalservice.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "streaming/streamingsearchmodel.h"
@@ -51,6 +52,13 @@ TEST(StreamingSearchModel, FiltersAndSorts) {
   model.SetSort(StreamingSearchModel::SortField::Title);
   visible = sort.Visible();
   EXPECT_EQ("Helplessness Blues", visible.front().title());
+}
+
+TEST(StreamingSearchHelp, IdleUntilFirstSearch) {
+  EXPECT_STREQ("Enter search terms above to find music", StreamingSearchHelp::IdleText());
+  EXPECT_STREQ("No results", StreamingSearchHelp::EmptyResultsText());
+  EXPECT_STREQ(StreamingSearchHelp::IdleText(), StreamingSearchHelp::LabelFor(false));
+  EXPECT_STREQ(StreamingSearchHelp::EmptyResultsText(), StreamingSearchHelp::LabelFor(true));
 }
 
 TEST(StreamingCover, UrlCacheAndPrettyCovers) {

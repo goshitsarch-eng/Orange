@@ -26,6 +26,7 @@
 #include "streaming/streamingchoices.h"
 
 #include <gtest/gtest.h>
+#include <limits>
 
 TEST(BehaviourSettings, OriginalKeysAndDefaults) {
   EXPECT_STREQ("Behaviour", BehaviourSettings::kSettingsGroup);
@@ -71,6 +72,24 @@ TEST(SettingsControls, NormalizationAndScales) {
   EXPECT_TRUE(SettingsControls::PlaylistPlayingSongColor(true, "#6696e3").empty());
   EXPECT_EQ("#6696e3", SettingsControls::PlaylistPlayingSongColor(false, {}));
   EXPECT_EQ("#abcabc", SettingsControls::PlaylistPlayingSongColor(false, "#abcabc"));
+}
+
+TEST(SettingsControls, BufferDefaultsAndCacheUnitMax) {
+  const SettingsControls::BufferValues defaults = SettingsControls::BufferDefaults();
+  EXPECT_EQ(4000, defaults.duration_ms);
+  EXPECT_DOUBLE_EQ(0.33, defaults.low_watermark);
+  EXPECT_DOUBLE_EQ(0.99, defaults.high_watermark);
+  EXPECT_EQ(500, defaults.warmup_ms);
+  EXPECT_EQ(std::numeric_limits<int>::max() / 1024,
+            SettingsControls::IconCacheSizeMax(static_cast<int>(CollectionSettings::CacheSizeUnit::MB)));
+  EXPECT_EQ(std::numeric_limits<int>::max(),
+            SettingsControls::IconCacheSizeMax(static_cast<int>(CollectionSettings::CacheSizeUnit::KB)));
+  EXPECT_EQ(4, SettingsControls::DiskCacheSizeMax(static_cast<int>(CollectionSettings::CacheSizeUnit::GB)));
+  EXPECT_EQ(std::numeric_limits<int>::max(),
+            SettingsControls::DiskCacheSizeMax(static_cast<int>(CollectionSettings::CacheSizeUnit::MB)));
+  EXPECT_EQ(4, SettingsControls::ClampCacheSize(16, 4));
+  EXPECT_EQ(0, SettingsControls::ClampCacheSize(-3, 4));
+  EXPECT_EQ(2, SettingsControls::ClampCacheSize(2, 4));
 }
 
 TEST(BackendSettings, OriginalFadeAndReplayGainKeys) {

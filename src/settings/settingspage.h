@@ -20,12 +20,12 @@ AdwPreferencesGroup *AddGroup(AdwPreferencesPage *page, const char *title = null
 GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *subtitle, bool fallback,
                      const char *group_name = nullptr);
 GtkWidget *AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback = "");
-void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback);
+GtkWidget *AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback);
 GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
                     const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
                     const std::function<void(const std::string &)> &changed = {}, const char *group_name = nullptr);
-void AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
-                 const std::vector<std::pair<std::string, std::string>> &choices, int fallback);
+GtkWidget *AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                       const std::vector<std::pair<std::string, std::string>> &choices, int fallback);
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked);
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
                   const std::function<void(GtkWidget *button)> &clicked);
@@ -35,10 +35,10 @@ void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *g
                    const char *fallback);
 void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
                      double fallback);
-void AddDoubleScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
-                    double fallback, double min, double max, double step);
-void AddIntScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title, int fallback,
-                 int min, int max, int step);
+GtkWidget *AddDoubleScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                          double fallback, double min, double max, double step);
+GtkWidget *AddIntScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                       int fallback, int min, int max, int step);
 void AddBoolRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *false_title, const char *true_title,
                    bool fallback);
 void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,

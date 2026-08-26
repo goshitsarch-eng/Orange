@@ -98,6 +98,7 @@ class StreamingSearchView {
   std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
   std::map<std::string, std::string> cover_cache_;
   bool has_error_ = false;
+  bool has_searched_ = false;
 };
 
 #endif

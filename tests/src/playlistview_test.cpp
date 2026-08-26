@@ -1,5 +1,6 @@
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistmoodcolumn.h"
 #include "playlist/playlistheadersort.h"
 #include "playlist/playlistautoscroll.h"
 #include "playlist/playlistclipboard.h"
@@ -76,6 +77,17 @@ TEST(PlaylistColumnLayout, DefaultOrderAlignmentAndReset) {
   EXPECT_EQ(PlaylistColumnAlign::Left, PlaylistColumnLayout::Alignment(PlaylistColumn::Title));
   EXPECT_TRUE(PlaylistColumnLayout::StretchEnabled());
   EXPECT_FALSE(PlaylistColumnLayout::RatingLocked());
+}
+
+TEST(PlaylistMoodColumn, HiddenWhenMoodbarUnavailable) {
+  EXPECT_TRUE(PlaylistMoodColumn::IsMoodFeatureColumn(PlaylistColumn::Mood));
+  EXPECT_TRUE(PlaylistMoodColumn::IsMoodFeatureColumn(PlaylistColumn::Moodbar));
+  EXPECT_FALSE(PlaylistMoodColumn::IsMoodFeatureColumn(PlaylistColumn::Title));
+  EXPECT_TRUE(PlaylistMoodColumn::ShouldOffer(PlaylistColumn::Title, false));
+  EXPECT_FALSE(PlaylistMoodColumn::ShouldOffer(PlaylistColumn::Mood, false));
+  EXPECT_FALSE(PlaylistMoodColumn::ShouldOffer(PlaylistColumn::Moodbar, false));
+  EXPECT_TRUE(PlaylistMoodColumn::ShouldOffer(PlaylistColumn::Mood, true));
+  EXPECT_TRUE(PlaylistMoodColumn::ShouldOffer(PlaylistColumn::Moodbar, true));
 }
 
 TEST(PlaylistDelegates, ColumnTitleAndText) {

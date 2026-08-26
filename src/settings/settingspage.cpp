@@ -76,7 +76,7 @@ GtkWidget *AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *
   return GTK_WIDGET(row);
 }
 
-void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback) {
+GtkWidget *AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback) {
   AdwEntryRow *row = ADW_ENTRY_ROW(adw_entry_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   gtk_editable_set_text(GTK_EDITABLE(row), std::to_string(settings->IntValue(key, fallback)).c_str());
@@ -89,6 +89,7 @@ void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key
                    }),
                    settings);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  return GTK_WIDGET(row);
 }
 
 GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
@@ -146,10 +147,10 @@ GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *
   return GTK_WIDGET(row);
 }
 
-void AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
-                 const std::vector<std::pair<std::string, std::string>> &choices, int fallback) {
+GtkWidget *AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                       const std::vector<std::pair<std::string, std::string>> &choices, int fallback) {
   const int current = settings ? settings->IntValue(key, fallback) : fallback;
-  AddCombo(group, settings, key, title, choices, std::to_string(current), [settings, group_name, key](const std::string &id) {
+  return AddCombo(group, settings, key, title, choices, std::to_string(current), [settings, group_name, key](const std::string &id) {
     if (!settings || !key) {
       return;
     }
@@ -249,8 +250,8 @@ void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *g
   adw_preferences_group_add(group, GTK_WIDGET(row));
 }
 
-void AddDoubleScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
-                    double fallback, double min, double max, double step) {
+GtkWidget *AddDoubleScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                          double fallback, double min, double max, double step) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   GtkWidget *scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, min, max, step);
@@ -279,10 +280,11 @@ void AddDoubleScale(AdwPreferencesGroup *group, Settings *settings, const char *
                    settings);
   adw_action_row_add_suffix(row, scale);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  return scale;
 }
 
-void AddIntScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title, int fallback,
-                 int min, int max, int step) {
+GtkWidget *AddIntScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                       int fallback, int min, int max, int step) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   GtkWidget *scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, min, max, step);
@@ -311,6 +313,7 @@ void AddIntScale(AdwPreferencesGroup *group, Settings *settings, const char *gro
                    settings);
   adw_action_row_add_suffix(row, scale);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  return scale;
 }
 
 void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,

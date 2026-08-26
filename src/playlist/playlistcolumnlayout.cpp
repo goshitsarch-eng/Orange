@@ -1,9 +1,12 @@
+#include "config.h"
+
 #include "playlist/playlistcolumnlayout.h"
 
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "playlist/playlistcolumnwidths.h"
 #include "playlist/playlistheaderreorder.h"
+#include "playlist/playlistmoodcolumn.h"
 #include "utilities/strutils.h"
 
 #include <algorithm>
@@ -65,7 +68,7 @@ std::vector<PlaylistColumn> PlaylistColumnLayout::DefaultVisible() {
   std::vector<PlaylistColumn> columns;
   for (const std::string &part : StrUtils::Split(kDefaultColumns, ',')) {
     const PlaylistColumn column = FromTitle(part);
-    if (column != PlaylistColumn::Count) {
+    if (column != PlaylistColumn::Count && PlaylistMoodColumn::ShouldOffer(column)) {
       columns.push_back(column);
     }
   }
@@ -79,7 +82,8 @@ std::vector<PlaylistColumn> PlaylistColumnLayout::Visible() {
   std::vector<PlaylistColumn> columns;
   for (const std::string &part : StrUtils::Split(enabled, ',')) {
     const PlaylistColumn column = FromTitle(part);
-    if (column != PlaylistColumn::Count && std::find(columns.begin(), columns.end(), column) == columns.end()) {
+    if (column != PlaylistColumn::Count && PlaylistMoodColumn::ShouldOffer(column) &&
+        std::find(columns.begin(), columns.end(), column) == columns.end()) {
       columns.push_back(column);
     }
   }
@@ -97,7 +101,8 @@ bool PlaylistColumnLayout::IsVisible(PlaylistColumn column) {
 void PlaylistColumnLayout::SetVisibleColumns(const std::vector<PlaylistColumn> &columns) {
   std::vector<PlaylistColumn> unique;
   for (PlaylistColumn column : columns) {
-    if (column == PlaylistColumn::Count || PlaylistDelegates::ColumnTitle(column).empty()) {
+    if (column == PlaylistColumn::Count || PlaylistDelegates::ColumnTitle(column).empty() ||
+        !PlaylistMoodColumn::ShouldOffer(column)) {
       continue;
     }
     if (std::find(unique.begin(), unique.end(), column) == unique.end()) {

@@ -1589,13 +1589,6 @@ void MainWindow::BuildPlayerBar() {
   gtk_box_append(GTK_BOX(controls), next);
   gtk_box_append(GTK_BOX(controls), scrobble_button_);
   gtk_box_append(GTK_BOX(controls), love_button_);
-  GtkGesture *analyzer_click = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(analyzer_click), GDK_BUTTON_PRIMARY);
-  gtk_widget_add_controller(analyzer_drawing_, GTK_EVENT_CONTROLLER(analyzer_click));
-  g_signal_connect(analyzer_click, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
-                     static_cast<MainWindow *>(data)->CycleAnalyzer();
-                   }),
-                   this);
   GtkGesture *analyzer_menu = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(analyzer_menu), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(analyzer_drawing_, GTK_EVENT_CONTROLLER(analyzer_menu));

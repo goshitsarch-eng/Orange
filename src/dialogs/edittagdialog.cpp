@@ -8,6 +8,7 @@
 #include "dialogs/dialoglistkeyboard.h"
 #include "dialogs/edittagcover.h"
 #include "dialogs/edittagcoverdrop.h"
+#include "dialogs/edittagfieldreset.h"
 #include "dialogs/edittagfields.h"
 #include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagtabs.h"
@@ -38,7 +39,10 @@ struct State {
   size_t index = 0;
   GtkWidget *cover = nullptr;
   GtkWidget *lyrics = nullptr;
+  GtkWidget *lyrics_reset = nullptr;
   GtkWidget *rating = nullptr;
+  GtkWidget *rating_reset = nullptr;
+  double initial_rating = 0;
   GtkWidget *compilation = nullptr;
   GtkWidget *stats_label = nullptr;
   GtkWidget *stats_plays = nullptr;
@@ -81,6 +85,40 @@ void SetText(GtkWidget *widget, const std::string &value) {
     return;
   }
   gtk_editable_set_text(GTK_EDITABLE(widget), value.c_str());
+}
+
+GtkWidget *MakeFieldResetButton() {
+  GtkWidget *reset = gtk_button_new_from_icon_name("edit-undo-symbolic");
+  gtk_widget_add_css_class(reset, "flat");
+  gtk_widget_set_tooltip_text(reset, Translations::CStr(EditTagFieldReset::ResetTooltip()));
+  gtk_widget_set_valign(reset, GTK_ALIGN_CENTER);
+  return reset;
+}
+
+void AttachEntryReset(AdwEntryRow *entry, const std::string &initial) {
+  GtkWidget *reset = MakeFieldResetButton();
+  adw_entry_row_add_suffix(entry, reset);
+  g_object_set_data(G_OBJECT(entry), "reset-btn", reset);
+  g_object_set_data_full(G_OBJECT(entry), "initial-text", g_strdup(initial.c_str()), g_free);
+  g_object_set_data(G_OBJECT(reset), "entry", entry);
+  gtk_widget_set_visible(reset, FALSE);
+  g_signal_connect(entry, "changed", G_CALLBACK(+[](AdwEntryRow *row, gpointer) {
+                     auto *btn = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "reset-btn"));
+                     const char *initial_text = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "initial-text"));
+                     if (btn) {
+                       gtk_widget_set_visible(btn, EditTagFieldReset::ShouldShowReset(gtk_editable_get_text(GTK_EDITABLE(row)),
+                                                                                    initial_text ? initial_text : ""));
+                     }
+                   }),
+                   nullptr);
+  g_signal_connect(reset, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer) {
+                     auto *field = GTK_WIDGET(g_object_get_data(G_OBJECT(btn), "entry"));
+                     const char *initial_text = field ? static_cast<const char *>(g_object_get_data(G_OBJECT(field), "initial-text")) : nullptr;
+                     if (field) {
+                       gtk_editable_set_text(GTK_EDITABLE(field), initial_text ? initial_text : "");
+                     }
+                   }),
+                   nullptr);
 }
 
 std::string TechnicalLine(const Song &song) {
@@ -260,6 +298,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
       }
       state->fields.emplace_back(row.first, GTK_WIDGET(entry));
       state->initial.push_back(row.second.first);
+      AttachEntryReset(entry, row.second.first);
       gtk_box_append(GTK_BOX(page), GTK_WIDGET(entry));
     }
   };
@@ -335,13 +374,36 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_label_set_xalign(GTK_LABEL(state->stats_label), 0);
   gtk_widget_add_css_class(state->stats_label, "dim-label");
   gtk_box_append(GTK_BOX(summary), state->stats_label);
+  GtkWidget *rating_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   GtkWidget *rating_label = gtk_label_new(Translations::CStr("Rating"));
   gtk_label_set_xalign(GTK_LABEL(rating_label), 0);
-  gtk_box_append(GTK_BOX(summary), rating_label);
+  gtk_widget_set_hexpand(rating_label, TRUE);
+  state->rating_reset = MakeFieldResetButton();
+  gtk_widget_set_visible(state->rating_reset, FALSE);
+  gtk_box_append(GTK_BOX(rating_header), rating_label);
+  gtk_box_append(GTK_BOX(rating_header), state->rating_reset);
+  gtk_box_append(GTK_BOX(summary), rating_header);
   state->rating = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 5, 0.5);
   gtk_scale_set_digits(GTK_SCALE(state->rating), 1);
   gtk_scale_set_draw_value(GTK_SCALE(state->rating), TRUE);
-  gtk_range_set_value(GTK_RANGE(state->rating), state->song.rating() >= 0 ? state->song.rating() * 5.0 : 0);
+  state->initial_rating = state->song.rating() >= 0 ? state->song.rating() * 5.0 : 0;
+  gtk_range_set_value(GTK_RANGE(state->rating), state->initial_rating);
+  g_object_set_data(G_OBJECT(state->rating), "state", state);
+  g_signal_connect(state->rating, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer) {
+                     auto *self = static_cast<State *>(g_object_get_data(G_OBJECT(range), "state"));
+                     if (self && self->rating_reset) {
+                       gtk_widget_set_visible(self->rating_reset,
+                                              EditTagFieldReset::ShouldShowReset(gtk_range_get_value(range), self->initial_rating));
+                     }
+                   }),
+                   nullptr);
+  g_signal_connect(state->rating_reset, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     if (self && self->rating) {
+                       gtk_range_set_value(GTK_RANGE(self->rating), self->initial_rating);
+                     }
+                   }),
+                   state);
   gtk_box_append(GTK_BOX(summary), state->rating);
   add_entries(summary, {{"Title", EditTagFields::CommonValue(targets, [](const Song &s) { return s.title(); })},
                         {"Artist", EditTagFields::CommonValue(targets, [](const Song &s) { return s.artist(); })},
@@ -400,7 +462,36 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(state->lyrics)), lyrics_common.first.c_str(), -1);
   state->fields.emplace_back("Lyrics", state->lyrics);
   state->initial.push_back(lyrics_common.first);
-  gtk_box_append(GTK_BOX(lyrics_page), gtk_label_new(Translations::CStr("Lyrics")));
+  GtkWidget *lyrics_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  GtkWidget *lyrics_label = gtk_label_new(Translations::CStr("Lyrics"));
+  gtk_label_set_xalign(GTK_LABEL(lyrics_label), 0);
+  gtk_widget_set_hexpand(lyrics_label, TRUE);
+  state->lyrics_reset = MakeFieldResetButton();
+  gtk_widget_set_visible(state->lyrics_reset, FALSE);
+  gtk_box_append(GTK_BOX(lyrics_header), lyrics_label);
+  gtk_box_append(GTK_BOX(lyrics_header), state->lyrics_reset);
+  g_object_set_data(G_OBJECT(state->lyrics), "state", state);
+  g_object_set_data_full(G_OBJECT(state->lyrics), "initial-text", g_strdup(lyrics_common.first.c_str()), g_free);
+  g_signal_connect(gtk_text_view_get_buffer(GTK_TEXT_VIEW(state->lyrics)), "changed", G_CALLBACK(+[](GtkTextBuffer *, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     if (!self || !self->lyrics_reset || !self->lyrics) {
+                       return;
+                     }
+                     const char *initial_text = static_cast<const char *>(g_object_get_data(G_OBJECT(self->lyrics), "initial-text"));
+                     gtk_widget_set_visible(self->lyrics_reset,
+                                            EditTagFieldReset::ShouldShowReset(TextOf(self->lyrics), initial_text ? initial_text : ""));
+                   }),
+                   state);
+  g_signal_connect(state->lyrics_reset, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     if (!self || !self->lyrics) {
+                       return;
+                     }
+                     const char *initial_text = static_cast<const char *>(g_object_get_data(G_OBJECT(self->lyrics), "initial-text"));
+                     SetText(self->lyrics, initial_text ? initial_text : "");
+                   }),
+                   state);
+  gtk_box_append(GTK_BOX(lyrics_page), lyrics_header);
   gtk_box_append(GTK_BOX(lyrics_page), state->lyrics);
   adw_view_stack_add_titled(stack, lyrics_page, "Lyrics", Translations::CStr("Lyrics"));
 
@@ -498,6 +589,9 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      auto *self = static_cast<State *>(data);
                      for (size_t i = 0; i < self->fields.size() && i < self->initial.size(); ++i) {
                        SetText(self->fields[i].second, self->initial[i]);
+                     }
+                     if (self->rating) {
+                       gtk_range_set_value(GTK_RANGE(self->rating), self->initial_rating);
                      }
                    })),
                    state);

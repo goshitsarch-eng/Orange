@@ -1,7 +1,10 @@
+#include "config.h"
+
 #include "playlist/playlistcolumnsdialog.h"
 
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistmoodcolumn.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
@@ -68,11 +71,14 @@ void PlaylistColumnsDialog::Show(GtkWindow *parent, const std::function<void()> 
       gtk_box_append(GTK_BOX(list_box), row);
     };
     for (PlaylistColumn column : visible) {
-      add_row(column, true);
+      if (PlaylistMoodColumn::ShouldOffer(column)) {
+        add_row(column, true);
+      }
     }
     for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
       const auto column = static_cast<PlaylistColumn>(i);
-      if (PlaylistDelegates::ColumnTitle(column).empty() || PlaylistColumnLayout::IsVisible(column)) {
+      if (PlaylistDelegates::ColumnTitle(column).empty() || PlaylistColumnLayout::IsVisible(column) ||
+          !PlaylistMoodColumn::ShouldOffer(column)) {
         continue;
       }
       add_row(column, false);
@@ -114,6 +120,9 @@ void PlaylistColumnsDialog::Show(GtkWindow *parent, const std::function<void()> 
                      }
                      std::vector<PlaylistColumn> visible = PlaylistColumnLayout::DefaultVisible();
                      for (PlaylistColumn column : visible) {
+                       if (!PlaylistMoodColumn::ShouldOffer(column)) {
+                         continue;
+                       }
                        GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
                        GtkWidget *check = gtk_check_button_new_with_label(PlaylistDelegates::ColumnTitle(column).c_str());
                        gtk_check_button_set_active(GTK_CHECK_BUTTON(check), TRUE);
@@ -125,7 +134,8 @@ void PlaylistColumnsDialog::Show(GtkWindow *parent, const std::function<void()> 
                      }
                      for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
                        const auto column = static_cast<PlaylistColumn>(i);
-                       if (PlaylistDelegates::ColumnTitle(column).empty() || PlaylistColumnLayout::IsVisible(column)) {
+                       if (PlaylistDelegates::ColumnTitle(column).empty() || PlaylistColumnLayout::IsVisible(column) ||
+                           !PlaylistMoodColumn::ShouldOffer(column)) {
                          continue;
                        }
                        GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);

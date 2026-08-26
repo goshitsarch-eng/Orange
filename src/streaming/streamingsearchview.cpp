@@ -14,6 +14,7 @@
 #include "streaming/streamingsearchopts.h"
 #include "streaming/streamingsearchgroup.h"
 #include "utilities/fileutils.h"
+#include "streaming/streamingsearchhelp.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "translations/translations.h"
 #include "utilities/jsonutils.h"
@@ -207,6 +208,7 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
                      return static_cast<StreamingSearchView *>(data)->OnKeyPressed(keyval);
                    })),
                    this);
+  Rebuild();
 }
 
 StreamingSearchView::~StreamingSearchView() {
@@ -392,12 +394,16 @@ void StreamingSearchView::ApplyProgress(int value, int maximum) {
 void StreamingSearchView::Search(const std::string &query) {
   if (!service_ || !StreamingProgress::HasQuery(query)) {
     last_search_id_ = -1;
+    has_searched_ = false;
     if (service_) {
       service_->CancelSearch();
     }
     HideProgress();
+    model_.SetSongs({});
+    Rebuild();
     return;
   }
+  has_searched_ = true;
   const StreamingService::SearchType type = CurrentType();
   model_.SetSearchType(type);
   ++cover_gen_;
@@ -496,7 +502,7 @@ void StreamingSearchView::Rebuild() {
   const SongList visible = sort_model_.Visible();
   tree_model_.Reset(visible, grouping_, CollectionGrouping::SeparateAlbumsByGrouping(), false, false);
   if (visible.empty()) {
-    gtk_list_box_append(GTK_LIST_BOX(list_), gtk_label_new(Translations::CStr("No results")));
+    gtk_list_box_append(GTK_LIST_BOX(list_), gtk_label_new(Translations::CStr(StreamingSearchHelp::LabelFor(has_searched_))));
     return;
   }
   ++cover_gen_;

@@ -5,10 +5,13 @@
 #include "collection/collectioniconcache.h"
 #include "collection/collectionstats.h"
 #include "core/application.h"
+#include "settings/settingscontrols.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
 
 #include <gio/gio.h>
+
+#include <string>
 
 namespace {
 
@@ -110,16 +113,18 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
   SettingsPage::AddToggle(display, settings, CollectionSettings::kUseSortTags, "Use sort tags", nullptr, CollectionSettings::kDefaultUseSortTags);
 
   AdwPreferencesGroup *cache = SettingsPage::AddGroup(page, "Cache");
-  SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsCacheSize, "Icon cache size", CollectionSettings::kSettingsCacheSizeDefault);
+  GtkWidget *icon_size =
+      SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsCacheSize, "Icon cache size", CollectionSettings::kSettingsCacheSizeDefault);
   const std::vector<std::pair<std::string, std::string>> units = {{"0", "KB"}, {"1", "MB"}, {"2", "GB"}, {"3", "TB"}};
-  SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsCacheSizeUnit, "Icon cache unit",
-                            units, static_cast<int>(CollectionSettings::kDefaultSettingsCacheSizeUnit));
+  GtkWidget *icon_unit =
+      SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsCacheSizeUnit, "Icon cache unit",
+                                units, static_cast<int>(CollectionSettings::kDefaultSettingsCacheSizeUnit));
   GtkWidget *disk_enable = SettingsPage::AddToggle(cache, settings, CollectionSettings::kSettingsDiskCacheEnable, "Enable disk cache",
                                                    nullptr, CollectionSettings::kDefaultSettingsDiskCacheEnable);
-  SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsDiskCacheSize, "Disk cache size",
-                            CollectionSettings::kSettingsDiskCacheSizeDefault);
-  SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsDiskCacheSizeUnit,
-                            "Disk cache unit", units, static_cast<int>(CollectionSettings::kDefaultSettingsDiskCacheSizeUnit));
+  GtkWidget *disk_size = SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsDiskCacheSize, "Disk cache size",
+                                                   CollectionSettings::kSettingsDiskCacheSizeDefault);
+  GtkWidget *disk_unit = SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsDiskCacheSizeUnit,
+                                                   "Disk cache unit", units, static_cast<int>(CollectionSettings::kDefaultSettingsDiskCacheSizeUnit));
   AdwActionRow *in_use = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(in_use), Translations::CStr(CollectionStats::CacheInUseTitle()));
   adw_action_row_set_subtitle(in_use, CollectionIconCache::InUseLabel().c_str());
@@ -135,12 +140,70 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
                    nullptr);
   adw_action_row_add_suffix(in_use, clear_cache);
   adw_preferences_group_add(cache, GTK_WIDGET(in_use));
-  gtk_widget_set_sensitive(GTK_WIDGET(in_use), settings->BoolValue(CollectionSettings::kSettingsDiskCacheEnable,
-                                                                  CollectionSettings::kDefaultSettingsDiskCacheEnable));
-  g_signal_connect(disk_enable, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
-                     gtk_widget_set_sensitive(GTK_WIDGET(data), adw_switch_row_get_active(row));
+  auto clamp_cache_entry = [](GtkWidget *combo, GtkWidget *entry, bool disk) {
+    if (!GTK_IS_EDITABLE(entry) || !ADW_IS_COMBO_ROW(combo)) {
+      return;
+    }
+    const int unit = static_cast<int>(adw_combo_row_get_selected(ADW_COMBO_ROW(combo)));
+    const int max = disk ? SettingsControls::DiskCacheSizeMax(unit) : SettingsControls::IconCacheSizeMax(unit);
+    const int value = static_cast<int>(g_ascii_strtoll(gtk_editable_get_text(GTK_EDITABLE(entry)), nullptr, 10));
+    const int clamped = SettingsControls::ClampCacheSize(value, max);
+    if (clamped != value) {
+      gtk_editable_set_text(GTK_EDITABLE(entry), std::to_string(clamped).c_str());
+    }
+  };
+  g_object_set_data(G_OBJECT(icon_unit), "size-entry", icon_size);
+  g_signal_connect(icon_unit, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer) {
+                     auto *entry = GTK_WIDGET(g_object_get_data(G_OBJECT(combo), "size-entry"));
+                     if (!GTK_IS_EDITABLE(entry)) {
+                       return;
+                     }
+                     const int unit = static_cast<int>(adw_combo_row_get_selected(combo));
+                     const int max = SettingsControls::IconCacheSizeMax(unit);
+                     const int value = static_cast<int>(g_ascii_strtoll(gtk_editable_get_text(GTK_EDITABLE(entry)), nullptr, 10));
+                     const int clamped = SettingsControls::ClampCacheSize(value, max);
+                     if (clamped != value) {
+                       gtk_editable_set_text(GTK_EDITABLE(entry), std::to_string(clamped).c_str());
+                     }
                    }),
-                   in_use);
+                   nullptr);
+  g_object_set_data(G_OBJECT(disk_unit), "size-entry", disk_size);
+  g_signal_connect(disk_unit, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer) {
+                     auto *entry = GTK_WIDGET(g_object_get_data(G_OBJECT(combo), "size-entry"));
+                     if (!GTK_IS_EDITABLE(entry)) {
+                       return;
+                     }
+                     const int unit = static_cast<int>(adw_combo_row_get_selected(combo));
+                     const int max = SettingsControls::DiskCacheSizeMax(unit);
+                     const int value = static_cast<int>(g_ascii_strtoll(gtk_editable_get_text(GTK_EDITABLE(entry)), nullptr, 10));
+                     const int clamped = SettingsControls::ClampCacheSize(value, max);
+                     if (clamped != value) {
+                       gtk_editable_set_text(GTK_EDITABLE(entry), std::to_string(clamped).c_str());
+                     }
+                   }),
+                   nullptr);
+  clamp_cache_entry(icon_unit, icon_size, false);
+  clamp_cache_entry(disk_unit, disk_size, true);
+  const bool disk_on = settings->BoolValue(CollectionSettings::kSettingsDiskCacheEnable, CollectionSettings::kDefaultSettingsDiskCacheEnable);
+  gtk_widget_set_sensitive(disk_size, disk_on);
+  gtk_widget_set_sensitive(disk_unit, disk_on);
+  gtk_widget_set_sensitive(GTK_WIDGET(in_use), disk_on);
+  g_object_set_data(G_OBJECT(disk_enable), "disk-size", disk_size);
+  g_object_set_data(G_OBJECT(disk_enable), "disk-unit", disk_unit);
+  g_object_set_data(G_OBJECT(disk_enable), "in-use", in_use);
+  g_signal_connect(disk_enable, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
+                     const bool enabled = adw_switch_row_get_active(row);
+                     if (auto *size = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "disk-size"))) {
+                       gtk_widget_set_sensitive(size, enabled);
+                     }
+                     if (auto *unit = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "disk-unit"))) {
+                       gtk_widget_set_sensitive(unit, enabled);
+                     }
+                     if (auto *use = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "in-use"))) {
+                       gtk_widget_set_sensitive(use, enabled);
+                     }
+                   }),
+                   nullptr);
 
   AdwPreferencesGroup *tags = SettingsPage::AddGroup(page, "Tags");
   SettingsPage::AddToggle(tags, settings, CollectionSettings::kSavePlayCounts, "Save playcounts to files", nullptr,

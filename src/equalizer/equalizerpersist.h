@@ -36,6 +36,8 @@ inline bool MigrateBalancerEnabled(bool has_key, bool stored, int legacy_balance
   return legacy_balance != 0;
 }
 
+inline std::string DbLabel(int gain) { return std::to_string(gain) + " dB"; }
+
 }  // namespace EqualizerPersist
 
 #endif

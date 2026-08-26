@@ -3,6 +3,7 @@
 #include "core/application.h"
 #include "core/player.h"
 #include "equalizer/equalizer.h"
+#include "equalizer/equalizerpersist.h"
 #include "equalizer/equalizerpresets.h"
 #include "translations/translations.h"
 
@@ -95,14 +96,30 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   gtk_box_append(GTK_BOX(preset_row), save_preset);
   gtk_box_append(GTK_BOX(preset_row), delete_preset);
   gtk_box_append(GTK_BOX(box), preset_row);
+  GtkWidget *preamp_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+  GtkWidget *preamp_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  GtkWidget *preamp_title = gtk_label_new(Translations::CStr("Preamp"));
+  gtk_widget_set_hexpand(preamp_title, TRUE);
+  gtk_label_set_xalign(GTK_LABEL(preamp_title), 0);
+  GtkWidget *preamp_db = gtk_label_new(EqualizerPersist::DbLabel(equalizer->preamp()).c_str());
+  gtk_widget_add_css_class(preamp_db, "dim-label");
+  gtk_box_append(GTK_BOX(preamp_header), preamp_title);
+  gtk_box_append(GTK_BOX(preamp_header), preamp_db);
   GtkWidget *preamp = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, -12, 12, 1);
   gtk_range_set_value(GTK_RANGE(preamp), equalizer->preamp());
   gtk_widget_set_tooltip_text(preamp, "Preamp");
+  g_object_set_data(G_OBJECT(preamp), "db-label", preamp_db);
   g_signal_connect(preamp, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer data) {
-                     static_cast<class Equalizer *>(data)->set_preamp(static_cast<int>(gtk_range_get_value(range)));
+                     const int value = static_cast<int>(gtk_range_get_value(range));
+                     static_cast<class Equalizer *>(data)->set_preamp(value);
+                     if (auto *label = GTK_LABEL(g_object_get_data(G_OBJECT(range), "db-label"))) {
+                       gtk_label_set_text(label, EqualizerPersist::DbLabel(value).c_str());
+                     }
                    }),
                    equalizer);
-  gtk_box_append(GTK_BOX(box), preamp);
+  gtk_box_append(GTK_BOX(preamp_box), preamp_header);
+  gtk_box_append(GTK_BOX(preamp_box), preamp);
+  gtk_box_append(GTK_BOX(box), preamp_box);
   GtkWidget *bands = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   static const char *kHz[] = {"60", "170", "310", "600", "1k", "3k", "6k", "12k", "14k", "16k"};
   for (int i = 0; i < 10; ++i) {
@@ -112,12 +129,20 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
     gtk_range_set_value(GTK_RANGE(scale), equalizer->gains()[static_cast<size_t>(i)]);
     gtk_widget_set_size_request(scale, -1, 160);
     g_object_set_data(G_OBJECT(scale), "band", GINT_TO_POINTER(i));
+    GtkWidget *db = gtk_label_new(EqualizerPersist::DbLabel(equalizer->gains()[static_cast<size_t>(i)]).c_str());
+    gtk_widget_add_css_class(db, "dim-label");
+    g_object_set_data(G_OBJECT(scale), "db-label", db);
     g_signal_connect(scale, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer data) {
                        const int band = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(range), "band"));
-                       static_cast<class Equalizer *>(data)->set_gain(band, static_cast<int>(gtk_range_get_value(range)));
+                       const int value = static_cast<int>(gtk_range_get_value(range));
+                       static_cast<class Equalizer *>(data)->set_gain(band, value);
+                       if (auto *label = GTK_LABEL(g_object_get_data(G_OBJECT(range), "db-label"))) {
+                         gtk_label_set_text(label, EqualizerPersist::DbLabel(value).c_str());
+                       }
                      }),
                      equalizer);
     gtk_box_append(GTK_BOX(col), scale);
+    gtk_box_append(GTK_BOX(col), db);
     gtk_box_append(GTK_BOX(col), gtk_label_new(kHz[i]));
     gtk_box_append(GTK_BOX(bands), col);
   }

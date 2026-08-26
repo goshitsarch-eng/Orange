@@ -1,9 +1,12 @@
+#include "config.h"
+
 #include "playlist/playlistheader.h"
 
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistcolumnwidths.h"
 #include "playlist/playlistheaderreorder.h"
 #include "playlist/playlistheadersort.h"
+#include "playlist/playlistmoodcolumn.h"
 #include "translations/translations.h"
 
 #include <algorithm>
@@ -403,7 +406,7 @@ void PlaylistHeader::ShowMenu(PlaylistColumn column) {
   for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
     const auto toggle = static_cast<PlaylistColumn>(i);
     const std::string title = PlaylistDelegates::ColumnTitle(toggle);
-    if (title.empty()) {
+    if (title.empty() || !PlaylistMoodColumn::ShouldOffer(toggle)) {
       continue;
     }
     GtkWidget *check = gtk_check_button_new_with_label(title.c_str());
