@@ -6,11 +6,14 @@
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "dialogs/dialoghelpers.h"
 #include "dialogs/dialoglistkeyboard.h"
+#include "dialogs/edittagcompleter.h"
 #include "dialogs/edittagcover.h"
 #include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfieldreset.h"
 #include "dialogs/edittagfields.h"
 #include "dialogs/edittagid3v2.h"
+#include "dialogs/edittagsummaryfields.h"
+#include "dialogs/edittagsummarylabels.h"
 #include "dialogs/edittagtabs.h"
 #include "tagreader/savetagsoptions.h"
 #include "tagreader/tagid3v2version.h"
@@ -45,6 +48,9 @@ struct State {
   double initial_rating = 0;
   GtkWidget *compilation = nullptr;
   GtkWidget *stats_label = nullptr;
+  GtkWidget *summary_title = nullptr;
+  GtkWidget *summary_grid = nullptr;
+  GtkWidget *tags_summary = nullptr;
   GtkWidget *stats_plays = nullptr;
   GtkWidget *stats_skips = nullptr;
   GtkWidget *stats_last = nullptr;
@@ -121,6 +127,94 @@ void AttachEntryReset(AdwEntryRow *entry, const std::string &initial) {
                    nullptr);
 }
 
+void AttachFieldCompletion(AdwEntryRow *entry, const std::string &name, const SongList &library) {
+  if (!entry || !EditTagCompleter::CompletesField(name)) {
+    return;
+  }
+  auto *values = new std::vector<std::string>(EditTagCompleter::ValuesFor(library, name));
+  GtkWidget *popover = gtk_popover_new();
+  GtkWidget *list = gtk_list_box_new();
+  gtk_popover_set_child(GTK_POPOVER(popover), list);
+  gtk_widget_set_parent(popover, GTK_WIDGET(entry));
+  g_object_set_data_full(G_OBJECT(entry), "complete-values", values, [](gpointer p) { delete static_cast<std::vector<std::string> *>(p); });
+  g_object_set_data(G_OBJECT(entry), "complete-popover", popover);
+  g_object_set_data(G_OBJECT(entry), "complete-list", list);
+  g_signal_connect(entry, "changed", G_CALLBACK(+[](AdwEntryRow *row, gpointer) {
+                     auto *values = static_cast<std::vector<std::string> *>(g_object_get_data(G_OBJECT(row), "complete-values"));
+                     auto *popover = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "complete-popover"));
+                     auto *list = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "complete-list"));
+                     if (!values || !popover || !list) {
+                       return;
+                     }
+                     gtk_list_box_remove_all(GTK_LIST_BOX(list));
+                     const std::vector<std::string> matches =
+                         EditTagCompleter::Suggestions(*values, gtk_editable_get_text(GTK_EDITABLE(row)));
+                     for (const std::string &match : matches) {
+                       GtkWidget *label = gtk_label_new(match.c_str());
+                       gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+                       gtk_list_box_append(GTK_LIST_BOX(list), label);
+                     }
+                     if (matches.empty()) {
+                       gtk_popover_popdown(GTK_POPOVER(popover));
+                     } else {
+                       gtk_popover_popup(GTK_POPOVER(popover));
+                     }
+                   }),
+                   nullptr);
+  g_signal_connect(list, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     GtkWidget *label = gtk_list_box_row_get_child(row);
+                     auto *entry = GTK_WIDGET(data);
+                     if (label && GTK_IS_LABEL(label) && entry) {
+                       gtk_editable_set_text(GTK_EDITABLE(entry), gtk_label_get_text(GTK_LABEL(label)));
+                     }
+                     if (auto *popover = GTK_WIDGET(g_object_get_data(G_OBJECT(entry), "complete-popover"))) {
+                       gtk_popover_popdown(GTK_POPOVER(popover));
+                     }
+                   }),
+                   entry);
+  g_signal_connect(entry, "destroy", G_CALLBACK(+[](GtkWidget *widget, gpointer) {
+                     if (GtkWidget *popover = GTK_WIDGET(g_object_get_data(G_OBJECT(widget), "complete-popover"))) {
+                       gtk_widget_unparent(popover);
+                     }
+                   }),
+                   nullptr);
+}
+
+void FillSummaryGrid(State *state) {
+  if (!state) {
+    return;
+  }
+  if (state->summary_title) {
+    gtk_label_set_text(GTK_LABEL(state->summary_title), state->song.PrettyTitleWithArtist().c_str());
+  }
+  if (!state->summary_grid) {
+    return;
+  }
+  GtkWidget *child = gtk_widget_get_first_child(state->summary_grid);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_grid_remove(GTK_GRID(state->summary_grid), child);
+    child = next;
+  }
+  int row = 0;
+  for (const EditTagSummaryFields::Row &info : EditTagSummaryFields::Rows(state->song)) {
+    if (info.value.empty()) {
+      continue;
+    }
+    GtkWidget *key = gtk_label_new(Translations::CStr(info.label));
+    gtk_widget_add_css_class(key, "dim-label");
+    gtk_label_set_xalign(GTK_LABEL(key), 0.0f);
+    GtkWidget *value = gtk_label_new(info.value.c_str());
+    gtk_label_set_xalign(GTK_LABEL(value), 0.0f);
+    gtk_label_set_wrap(GTK_LABEL(value), TRUE);
+    gtk_label_set_selectable(GTK_LABEL(value), TRUE);
+    gtk_widget_set_hexpand(value, TRUE);
+    gtk_grid_attach(GTK_GRID(state->summary_grid), key, 0, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(state->summary_grid), value, 1, row, 1, 1);
+    ++row;
+  }
+}
+
 std::string TechnicalLine(const Song &song) {
   std::string line = PrettyBytes(song.filesize()) + " · " + Utilities::PrettyTimeNanosec(song.length_nanosec());
   if (song.bitrate() > 0) {
@@ -144,6 +238,7 @@ void UpdateDisplay(State *state) {
   if (state->cover && state->app) {
     SetImageFromBytes(state->cover, state->app->albumcover_loader()->LoadData(state->song), 160);
   }
+  FillSummaryGrid(state);
   if (state->stats_label) {
     const std::string stats = "Plays: " + std::to_string(state->song.playcount()) + "   Skips: " + std::to_string(state->song.skipcount()) +
                               "   Last played: " + PrettyUnixTime(state->song.lastplayed()) + "\n" + FileUtils::PathFromUri(state->song.url()) +
@@ -288,6 +383,14 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   GtkWidget *switcher = adw_view_switcher_new();
   adw_view_switcher_set_stack(ADW_VIEW_SWITCHER(switcher), stack);
 
+  SongList library = targets;
+  if (app && app->collection()) {
+    const SongList collection = app->collection()->Songs();
+    if (!collection.empty()) {
+      library = collection;
+    }
+  }
+
   auto add_entries = [&](GtkWidget *page, const std::vector<std::pair<const char *, std::pair<std::string, bool>>> &rows) {
     for (const auto &row : rows) {
       AdwEntryRow *entry = ADW_ENTRY_ROW(adw_entry_row_new());
@@ -299,6 +402,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
       state->fields.emplace_back(row.first, GTK_WIDGET(entry));
       state->initial.push_back(row.second.first);
       AttachEntryReset(entry, row.second.first);
+      AttachFieldCompletion(entry, row.first, library);
       gtk_box_append(GTK_BOX(page), GTK_WIDGET(entry));
     }
   };
@@ -369,11 +473,20 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      }
                    }),
                    state);
+  state->summary_title = gtk_label_new("");
+  gtk_widget_add_css_class(state->summary_title, "title-3");
+  gtk_label_set_wrap(GTK_LABEL(state->summary_title), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(state->summary_title), 0.0f);
+  gtk_box_append(GTK_BOX(summary), state->summary_title);
+  state->summary_grid = gtk_grid_new();
+  gtk_grid_set_column_spacing(GTK_GRID(state->summary_grid), 12);
+  gtk_grid_set_row_spacing(GTK_GRID(state->summary_grid), 4);
+  gtk_box_append(GTK_BOX(summary), state->summary_grid);
   state->stats_label = gtk_label_new("");
   gtk_label_set_wrap(GTK_LABEL(state->stats_label), TRUE);
   gtk_label_set_xalign(GTK_LABEL(state->stats_label), 0);
   gtk_widget_add_css_class(state->stats_label, "dim-label");
-  gtk_box_append(GTK_BOX(summary), state->stats_label);
+  gtk_widget_set_visible(state->stats_label, FALSE);
   GtkWidget *rating_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   GtkWidget *rating_label = gtk_label_new(Translations::CStr("Rating"));
   gtk_label_set_xalign(GTK_LABEL(rating_label), 0);
@@ -420,6 +533,13 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_widget_set_margin_start(tags, 12);
   gtk_widget_set_margin_end(tags, 12);
   gtk_widget_set_margin_top(tags, 12);
+  const std::string tags_summary = EditTagCompleter::TagsSummary(static_cast<int>(targets.size()));
+  if (!tags_summary.empty()) {
+    state->tags_summary = gtk_label_new(tags_summary.c_str());
+    gtk_widget_add_css_class(state->tags_summary, "dim-label");
+    gtk_label_set_xalign(GTK_LABEL(state->tags_summary), 0.0f);
+    gtk_box_append(GTK_BOX(tags), state->tags_summary);
+  }
   state->compilation = gtk_check_button_new_with_label(Translations::CStr("Compilation"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(state->compilation), state->song.compilation());
   gtk_box_append(GTK_BOX(tags), state->compilation);
@@ -434,7 +554,9 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      {"Title sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.titlesort(); })},
                      {"Artist sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.artistsort(); })},
                      {"Album sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumsort(); })},
-                     {"Album artist sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumartistsort(); })}});
+                     {"Album artist sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumartistsort(); })},
+                     {"Composer sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.composersort(); })},
+                     {"Performer sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.performersort(); })}});
   if (EditTagId3v2::AnySupported(targets)) {
     GtkWidget *id3_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     GtkWidget *id3_label = gtk_label_new(Translations::CStr("ID3v2 version:"));
@@ -536,8 +658,8 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save"));
   gtk_widget_add_css_class(save, "suggested-action");
   GtkWidget *reset_fields = gtk_button_new_with_label(Translations::CStr("Reset fields"));
-  GtkWidget *fetch_tags = gtk_button_new_with_label(Translations::CStr("Fetch tags"));
-  GtkWidget *fetch_lyrics = gtk_button_new_with_label(Translations::CStr("Fetch lyrics"));
+  GtkWidget *fetch_tags = gtk_button_new_with_label(Translations::CStr(EditTagSummaryLabels::FetchTags()));
+  GtkWidget *fetch_lyrics = gtk_button_new_with_label(Translations::CStr(EditTagSummaryLabels::FetchLyrics()));
   gtk_box_append(GTK_BOX(actions), save);
   gtk_box_append(GTK_BOX(actions), reset_fields);
   gtk_box_append(GTK_BOX(actions), fetch_tags);

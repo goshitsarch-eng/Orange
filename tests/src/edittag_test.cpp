@@ -1,7 +1,10 @@
 #include "constants/edittagdialogsettings.h"
 #include "covermanager/coveroptions.h"
 #include "dialogs/dialoglistkeyboard.h"
+#include "dialogs/edittagcompleter.h"
 #include "dialogs/edittagcover.h"
+#include "dialogs/edittagsummaryfields.h"
+#include "dialogs/edittagsummarylabels.h"
 #include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfieldreset.h"
 #include "dialogs/edittagfields.h"
@@ -227,4 +230,89 @@ TEST(LyricsProviderOrder, ParseJoinMoveAndRank) {
   EXPECT_EQ("Genius", moved[0]);
   EXPECT_EQ("LrcLib", moved[1]);
   EXPECT_EQ(parsed, LyricsProviderOrder::Move(parsed, 0, -1));
+}
+
+TEST(EditTagCompleter, CompletesQtFieldsAndSuggestsPrefixes) {
+  EXPECT_TRUE(EditTagCompleter::CompletesField("Artist"));
+  EXPECT_TRUE(EditTagCompleter::CompletesField("Title sort"));
+  EXPECT_TRUE(EditTagCompleter::CompletesField("Composer sort"));
+  EXPECT_TRUE(EditTagCompleter::CompletesField("Performer sort"));
+  EXPECT_FALSE(EditTagCompleter::CompletesField("Year"));
+  EXPECT_FALSE(EditTagCompleter::CompletesField("Comment"));
+  EXPECT_EQ(PlaylistColumn::AlbumArtist, EditTagCompleter::FieldColumn("Album artist"));
+  EXPECT_EQ(PlaylistColumn::Grouping, EditTagCompleter::FieldColumn("Grouping"));
+
+  Song a = MakeTagged("Roads", "Portishead", "Dummy");
+  a.set_genre("Trip Hop");
+  Song b = MakeTagged("Glory Box", "Portishead", "Dummy");
+  b.set_genre("Electronic");
+  const auto artists = EditTagCompleter::ValuesFor({a, b}, "Artist");
+  ASSERT_EQ(1u, artists.size());
+  EXPECT_EQ("Portishead", artists.front());
+  const auto genres = EditTagCompleter::ValuesFor({a, b}, "Genre");
+  ASSERT_EQ(2u, genres.size());
+  const auto suggestions = EditTagCompleter::Suggestions({"Portishead", "Pulp", "Radiohead"}, "Po");
+  ASSERT_EQ(1u, suggestions.size());
+  EXPECT_EQ("Portishead", suggestions.front());
+  EXPECT_TRUE(EditTagCompleter::Suggestions({"Portishead"}, "Portishead").empty());
+  EXPECT_TRUE(EditTagCompleter::TagsSummary(1).empty());
+  EXPECT_EQ("3 songs selected.", EditTagCompleter::TagsSummary(3));
+}
+
+TEST(EditTagSummaryFields, RowsMatchQtSummaryLabels) {
+  EXPECT_STREQ("Date created", EditTagSummaryLabels::DateCreated());
+  EXPECT_STREQ("Art Embedded", EditTagSummaryLabels::ArtEmbedded());
+  EXPECT_STREQ("Bit rate", EditTagSummaryLabels::BitRate());
+  EXPECT_STREQ("EBU R 128 integrated loudness", EditTagSummaryLabels::EbuIntegrated());
+  EXPECT_STREQ("Complete tags automatically", EditTagSummaryLabels::FetchTags());
+  EXPECT_STREQ("Complete lyrics automatically", EditTagSummaryLabels::FetchLyrics());
+
+  Song song = MakeTagged("Roads", "Portishead", "Dummy");
+  song.set_filetype(Song::FileType::FLAC);
+  song.set_length_nanosec(30000000000LL);
+  song.set_bitrate(320);
+  song.set_samplerate(44100);
+  song.set_bitdepth(16);
+  song.set_filesize(1024);
+  song.set_art_embedded(true);
+  song.set_art_unset(false);
+  song.set_ebur128_integrated_loudness_lufs(-14.0);
+  const auto rows = EditTagSummaryFields::Rows(song);
+  ASSERT_FALSE(rows.empty());
+  EXPECT_EQ("Filename", rows.front().label);
+  EXPECT_EQ("Roads.flac", rows.front().value);
+  bool found_embedded = false;
+  bool found_rate = false;
+  for (const auto &row : rows) {
+    if (std::string(row.label) == EditTagSummaryLabels::ArtEmbedded()) {
+      found_embedded = true;
+      EXPECT_EQ("Yes", row.value);
+    }
+    if (std::string(row.label) == EditTagSummaryLabels::BitRate()) {
+      found_rate = true;
+      EXPECT_EQ("320 kbps", row.value);
+    }
+  }
+  EXPECT_TRUE(found_embedded);
+  EXPECT_TRUE(found_rate);
+
+  Song missing;
+  missing.set_filesize(-1);
+  const auto unknown = EditTagSummaryFields::Rows(missing);
+  bool found_unknown = false;
+  for (const auto &row : unknown) {
+    if (std::string(row.label) == "File size") {
+      found_unknown = true;
+      EXPECT_EQ("Unknown", row.value);
+    }
+  }
+  EXPECT_TRUE(found_unknown);
+}
+
+TEST(EditTagFields, ApplyFieldWritesSortTags) {
+  Song song;
+  EditTagFields::ApplyField(&song, "Composer sort", "Bowie, David");
+  EditTagFields::ApplyField(&song, "Performer sort", "Eno, Brian");
+  EXPECT_EQ("Bowie, David", song.composersort());
+  EXPECT_EQ("Eno, Brian", song.performersort());
 }

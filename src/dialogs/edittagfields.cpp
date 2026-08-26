@@ -38,6 +38,8 @@ void ApplyField(Song *song, const std::string &name, const std::string &value) {
   else if (name == "Artist sort") song->set_artistsort(value);
   else if (name == "Album sort") song->set_albumsort(value);
   else if (name == "Album artist sort") song->set_albumartistsort(value);
+  else if (name == "Composer sort") song->set_composersort(value);
+  else if (name == "Performer sort") song->set_performersort(value);
   else if (name == "Year") song->set_year(as_int());
   else if (name == "Original year") song->set_originalyear(as_int());
   else if (name == "Track") song->set_track(as_int());
