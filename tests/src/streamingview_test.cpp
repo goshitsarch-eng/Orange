@@ -120,6 +120,14 @@ TEST(StreamingSearchGroup, DefaultFlattenAndHeaders) {
   EXPECT_EQ("Dummy", rows[4].label);
   EXPECT_EQ("Mysterons", rows[5].song.title());
   EXPECT_EQ("Roads", rows[6].song.title());
+
+  const auto grouped = StreamingSearchGroup::RowsFor({a, b, c}, StreamingSearchGroup::DefaultGrouping());
+  EXPECT_EQ(4, StreamingSearchGroup::HeaderCount(grouped));
+  EXPECT_EQ(3, StreamingSearchGroup::SongCount(grouped));
+  const auto flat = StreamingSearchGroup::RowsFor({a, b, c}, {G::None, G::None, G::None});
+  EXPECT_EQ(0, StreamingSearchGroup::HeaderCount(flat));
+  EXPECT_EQ(3, StreamingSearchGroup::SongCount(flat));
+  EXPECT_EQ("Roads", flat[0].song.title());
 }
 
 TEST(StreamingSearchItemDelegate, PrimaryAndSecondary) {

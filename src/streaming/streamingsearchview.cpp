@@ -340,18 +340,8 @@ void StreamingSearchView::Rebuild() {
     return;
   }
   ++cover_gen_;
-  std::vector<StreamingSearchGroup::Row> rows;
-  if (StreamingSearchGroup::HasLevels(grouping_)) {
-    const CollectionGrouping::Node tree =
-        CollectionGrouping::BuildTree(visible, grouping_, CollectionGrouping::SeparateAlbumsByGrouping(), true, false);
-    rows = StreamingSearchGroup::Flatten(tree);
-  } else {
-    for (const Song &song : visible) {
-      StreamingSearchGroup::Row row;
-      row.song = song;
-      rows.push_back(row);
-    }
-  }
+  const std::vector<StreamingSearchGroup::Row> rows =
+      StreamingSearchGroup::RowsFor(visible, grouping_, CollectionGrouping::SeparateAlbumsByGrouping());
   for (const StreamingSearchGroup::Row &entry : rows) {
     GtkWidget *row = gtk_list_box_row_new();
     GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);

@@ -1,5 +1,6 @@
 #include "streaming/streamingtabsview.h"
 
+#include "collection/collectiongrouping.h"
 #include "streaming/streamingbrowse.h"
 #include "streaming/streamingprogress.h"
 
@@ -27,6 +28,16 @@ StreamingTabsView::StreamingTabsView(StreamingService *service, Database *databa
   albums_->view()->SetRefreshCallback([this]() { GetAlbums(); });
   songs_->view()->SetRefreshCallback([this]() { GetSongs(); });
   favorites_->view()->SetRefreshCallback([this]() { GetFavorites(); });
+  const auto sync_grouping = [this](const CollectionGrouping::Grouping &grouping) {
+    artists_->view()->SetGrouping(grouping);
+    albums_->view()->SetGrouping(grouping);
+    songs_->view()->SetGrouping(grouping);
+    favorites_->view()->SetGrouping(grouping);
+  };
+  artists_->view()->SetGroupingChangedCallback(sync_grouping);
+  albums_->view()->SetGroupingChangedCallback(sync_grouping);
+  songs_->view()->SetGroupingChangedCallback(sync_grouping);
+  favorites_->view()->SetGroupingChangedCallback(sync_grouping);
   artists_->SetAbortCallback([this]() { AbortGetArtists(); });
   albums_->SetAbortCallback([this]() { AbortGetAlbums(); });
   songs_->SetAbortCallback([this]() { AbortGetSongs(); });

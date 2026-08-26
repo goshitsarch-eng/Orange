@@ -74,6 +74,22 @@ inline int HeaderCount(const std::vector<Row> &rows) {
 
 inline int IndentPixels(int indent) { return 8 + indent * 16; }
 
+inline int SongCount(const std::vector<Row> &rows) { return static_cast<int>(rows.size()) - HeaderCount(rows); }
+
+inline std::vector<Row> RowsFor(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping = false) {
+  if (!HasLevels(grouping)) {
+    std::vector<Row> rows;
+    rows.reserve(songs.size());
+    for (const Song &song : songs) {
+      Row row;
+      row.song = song;
+      rows.push_back(row);
+    }
+    return rows;
+  }
+  return Flatten(CollectionGrouping::BuildTree(songs, grouping, separate_albums_by_grouping, true, false));
+}
+
 }  // namespace StreamingSearchGroup
 
 #endif

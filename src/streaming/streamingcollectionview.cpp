@@ -1,7 +1,11 @@
 #include "streaming/streamingcollectionview.h"
 
+#include "collection/collectionfiltermenu.h"
+#include "collection/groupbydialog.h"
 #include "streaming/streamingdrag.h"
+#include "streaming/streamingsearchgroup.h"
 #include "streaming/streamingsearchitemdelegate.h"
+#include "translations/translations.h"
 #include "utilities/strutils.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
@@ -30,8 +34,14 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
                      }
                    }),
                    this);
+  grouping_ = CollectionGrouping::LoadCurrent();
+  group_button_ = gtk_menu_button_new();
+  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(group_button_), "view-list-symbolic");
+  gtk_widget_set_tooltip_text(group_button_, Translations::CStr("Group by"));
+  BuildGroupMenu();
   gtk_box_append(GTK_BOX(header), back_);
   gtk_box_append(GTK_BOX(header), label);
+  gtk_box_append(GTK_BOX(header), group_button_);
   gtk_box_append(GTK_BOX(header), refresh);
   filter_entry_ = gtk_search_entry_new();
   gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter_entry_), "Filter");
@@ -91,6 +101,23 @@ void StreamingCollectionView::SetActivateCallback(ActivateCallback callback) { a
 void StreamingCollectionView::SetRefreshCallback(RefreshCallback callback) { refresh_ = std::move(callback); }
 
 void StreamingCollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+
+void StreamingCollectionView::SetGrouping(const CollectionGrouping::Grouping &grouping) {
+  if (grouping_ == grouping) {
+    return;
+  }
+  grouping_ = grouping;
+  Rebuild();
+}
+
+void StreamingCollectionView::ApplyGrouping(const CollectionGrouping::Grouping &grouping) {
+  grouping_ = grouping;
+  CollectionGrouping::SaveCurrent(grouping);
+  if (grouping_changed_) {
+    grouping_changed_(grouping_);
+  }
+  Rebuild();
+}
 
 void StreamingCollectionView::SetFilter(const std::string &filter) {
   filter_ = filter;
@@ -167,17 +194,30 @@ void StreamingCollectionView::Rebuild() {
     SetStatus(songs_.empty() ? "0 items" : "0 shown");
     return;
   }
-  for (const Song &song : visible) {
+  const std::vector<StreamingSearchGroup::Row> rows =
+      StreamingSearchGroup::RowsFor(visible, grouping_, CollectionGrouping::SeparateAlbumsByGrouping());
+  for (const StreamingSearchGroup::Row &entry : rows) {
     GtkWidget *row = gtk_list_box_row_new();
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_margin_start(box, 8);
+    gtk_widget_set_margin_start(box, StreamingSearchGroup::IndentPixels(entry.indent));
     gtk_widget_set_margin_end(box, 8);
     gtk_widget_set_margin_top(box, 4);
     gtk_widget_set_margin_bottom(box, 4);
-    GtkWidget *primary = gtk_label_new(StreamingSearchItemDelegate::PrimaryText(song).c_str());
+    if (entry.header) {
+      GtkWidget *label = gtk_label_new(entry.label.c_str());
+      gtk_widget_set_halign(label, GTK_ALIGN_START);
+      gtk_widget_add_css_class(label, "heading");
+      gtk_box_append(GTK_BOX(box), label);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+      gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(row), FALSE);
+      gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(row), FALSE);
+      gtk_list_box_append(GTK_LIST_BOX(list_), row);
+      continue;
+    }
+    GtkWidget *primary = gtk_label_new(StreamingSearchItemDelegate::PrimaryText(entry.song).c_str());
     gtk_widget_set_halign(primary, GTK_ALIGN_START);
     gtk_box_append(GTK_BOX(box), primary);
-    const std::string secondary = StreamingSearchItemDelegate::SecondaryText(song);
+    const std::string secondary = StreamingSearchItemDelegate::SecondaryText(entry.song);
     if (!secondary.empty()) {
       GtkWidget *sub = gtk_label_new(secondary.c_str());
       gtk_widget_add_css_class(sub, "dim-label");
@@ -185,12 +225,57 @@ void StreamingCollectionView::Rebuild() {
       gtk_box_append(GTK_BOX(box), sub);
     }
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
-    auto *copy = new Song(song);
+    auto *copy = new Song(entry.song);
     g_object_set_data_full(G_OBJECT(row), "row-data", copy, [](gpointer p) { delete static_cast<Song *>(p); });
-    SetupRowDrag(row, song);
+    SetupRowDrag(row, entry.song);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
-  SetStatus(std::to_string(visible.size()) + " items");
+  SetStatus(std::to_string(StreamingSearchGroup::SongCount(rows)) + " items");
+}
+
+void StreamingCollectionView::BuildGroupMenu() {
+  if (!group_button_) {
+    return;
+  }
+  GMenu *menu = g_menu_new();
+  const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
+  for (size_t i = 0; i < presets.size(); ++i) {
+    if (presets[i].advanced) {
+      continue;
+    }
+    char action[64];
+    g_snprintf(action, sizeof(action), "streamcoll.preset(%d)", static_cast<int>(i));
+    g_menu_append(menu, Translations::CStr(presets[i].label), action);
+  }
+  g_menu_append(menu, Translations::CStr("Advanced grouping…"), "streamcoll.advanced");
+  GSimpleActionGroup *group = g_simple_action_group_new();
+  GSimpleAction *preset = g_simple_action_new("preset", G_VARIANT_TYPE_INT32);
+  g_signal_connect(preset, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
+                     auto *self = static_cast<StreamingCollectionView *>(data);
+                     const std::vector<CollectionFilterMenu::Preset> items = CollectionFilterMenu::BuiltinPresets();
+                     const int index = g_variant_get_int32(param);
+                     if (index < 0 || static_cast<size_t>(index) >= items.size() || items[static_cast<size_t>(index)].advanced) {
+                       return;
+                     }
+                     self->ApplyGrouping(items[static_cast<size_t>(index)].grouping);
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(preset));
+  GSimpleAction *advanced = g_simple_action_new("advanced", nullptr);
+  g_signal_connect(advanced, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+                     auto *self = static_cast<StreamingCollectionView *>(data);
+                     GtkRoot *root = gtk_widget_get_root(self->widget_);
+                     GtkWindow *parent = GTK_IS_WINDOW(root) ? GTK_WINDOW(root) : nullptr;
+                     GroupByDialog::Show(parent, self->grouping_, [self](const CollectionGrouping::Grouping &grouping) {
+                       self->ApplyGrouping(grouping);
+                     });
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(advanced));
+  gtk_widget_insert_action_group(group_button_, "streamcoll", G_ACTION_GROUP(group));
+  gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(group_button_), G_MENU_MODEL(menu));
+  g_object_unref(group);
+  g_object_unref(menu);
 }
 
 void StreamingCollectionView::SetupRowDrag(GtkWidget *row, const Song &song) {
