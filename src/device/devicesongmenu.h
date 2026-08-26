@@ -37,8 +37,8 @@ inline bool IsPlaylistAction(Action action) {
 
 inline bool IncludeItem(const Item &item, bool can_copy) { return item.action != Action::Copy || can_copy; }
 
-inline std::vector<Item> VisibleItems(const SongList &songs) {
-  const bool can_copy = DeviceCopy::CanCopyToCollection(songs);
+inline std::vector<Item> VisibleItems(const SongList &songs, bool filesystem = true) {
+  const bool can_copy = DeviceCopy::CanCopyToCollection(songs, filesystem);
   std::vector<Item> visible;
   for (const Item &item : Items()) {
     if (IncludeItem(item, can_copy)) {

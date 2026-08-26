@@ -3,6 +3,7 @@
 #include "core/application.h"
 #include "device/copytodevicedialog.h"
 #include "device/devicecopy.h"
+#include "device/devicemenu.h"
 #include "device/deviceproperties.h"
 #include "device/devicesongmenu.h"
 #include "organize/organizedialog.h"
@@ -66,12 +67,12 @@ void DeviceViewContainer::ShowDeviceMenu(const ConnectedDevice &device) {
   if (!app_) {
     return;
   }
+  const bool remembered = app_->device_manager()->StoredDevice(device.unique_id).id != -1;
+  const DeviceMenu::DeviceState state = DeviceMenu::FromDevice(device, remembered);
   GMenu *menu = g_menu_new();
-  g_menu_append(menu, Translations::CStr("Browse"), "device.browse");
-  g_menu_append(menu, Translations::CStr("Copy playlist…"), "device.copy");
-  g_menu_append(menu, Translations::CStr("Properties…"), "device.properties");
-  g_menu_append(menu, Translations::CStr("Unmount"), "device.unmount");
-  g_menu_append(menu, Translations::CStr("Forget"), "device.forget");
+  for (const DeviceMenu::Item &item : DeviceMenu::VisibleItems(state)) {
+    g_menu_append(menu, Translations::CStr(item.label), (std::string("device.") + item.id).c_str());
+  }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, view_->list());
   auto *owned = new ConnectedDevice(device);
@@ -123,8 +124,17 @@ void DeviceViewContainer::ShowSongMenu(const Song &song) {
   if (songs.empty()) {
     songs.push_back(song);
   }
+  bool filesystem = true;
+  if (app_) {
+    for (const ConnectedDevice &device : app_->device_manager()->devices()) {
+      if (device.unique_id == browse_id_) {
+        filesystem = DeviceCopy::IsFilesystemDevice(device);
+        break;
+      }
+    }
+  }
   GMenu *menu = g_menu_new();
-  for (const DeviceSongMenu::Item &item : DeviceSongMenu::VisibleItems(songs)) {
+  for (const DeviceSongMenu::Item &item : DeviceSongMenu::VisibleItems(songs, filesystem)) {
     g_menu_append(menu, Translations::CStr(item.label), (std::string("devicesong.") + item.id).c_str());
   }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));

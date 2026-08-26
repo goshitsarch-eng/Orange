@@ -2,11 +2,14 @@
 #define STRAWBERRY_DEVICECOPY_H
 
 #include "core/song.h"
+#include "device/connecteddevice.h"
 #include "organize/organizedialog.h"
 
 namespace DeviceCopy {
 
-inline bool CanCopyToCollection(const SongList &songs) { return !songs.empty(); }
+inline bool IsFilesystemDevice(const ConnectedDevice &device) { return !device.mount_path.empty(); }
+
+inline bool CanCopyToCollection(const SongList &songs, bool filesystem = true) { return filesystem && !songs.empty(); }
 
 inline OrganizeDialog::Request CollectionRequest(const SongList &songs) {
   OrganizeDialog::Request request;

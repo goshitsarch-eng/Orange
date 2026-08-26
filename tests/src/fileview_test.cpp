@@ -1,6 +1,7 @@
 #include "collection/collectionmodel.h"
 #include "collection/collectiontree.h"
 #include "device/devicecopy.h"
+#include "device/devicemenu.h"
 #include "device/devicesongmenu.h"
 #include "device/devicedrag.h"
 #include "device/devicekeyboard.h"
@@ -288,6 +289,7 @@ TEST(DeviceSongMenu, PlaylistActionsMatchQt) {
   Song song(Song::Source::Device);
   song.set_url("gphoto2://phone/Music/roads.mp3");
   EXPECT_EQ(5u, DeviceSongMenu::VisibleItems({song}).size());
+  EXPECT_EQ(4u, DeviceSongMenu::VisibleItems({song}, false).size());
   const CollectionBehaviour::Plan append = DeviceSongMenu::PlanFor(DeviceSongMenu::Action::Append, BehaviourSettings::PlayBehaviour::Never, true);
   EXPECT_FALSE(append.clear_current);
   EXPECT_EQ(CollectionBehaviour::Destination::Current, append.destination);
@@ -302,6 +304,14 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   Song song(Song::Source::Device);
   song.set_url("gphoto2://phone/Music/roads.mp3");
   song.set_title("Roads");
+  EXPECT_TRUE(DeviceCopy::CanCopyToCollection({song}));
+  EXPECT_FALSE(DeviceCopy::CanCopyToCollection({song}, false));
+  ConnectedDevice filesystem;
+  filesystem.mount_path = "/run/media/usb";
+  EXPECT_TRUE(DeviceCopy::IsFilesystemDevice(filesystem));
+  ConnectedDevice mtp;
+  mtp.backend = "mtp";
+  EXPECT_FALSE(DeviceCopy::IsFilesystemDevice(mtp));
   const OrganizeDialog::Request request = DeviceCopy::CollectionRequest({song});
   ASSERT_EQ(1u, request.songs.size());
   EXPECT_EQ("Roads", request.songs.front().title());
@@ -337,6 +347,39 @@ TEST(DeviceCollectionTree, GroupsDeviceSongsUntilExpanded) {
   EXPECT_EQ(2u, CollectionTree::SongsFromItem(model.root()).size());
   CollectionTree::CollectExpandableKeys(model.root(), &expanded);
   EXPECT_EQ(2, CollectionTree::VisibleSongCount(model.root(), false, expanded));
+}
+
+TEST(DeviceMenu, UnmountAndForgetFollowQtRules) {
+  EXPECT_EQ(5, DeviceMenu::ItemCount());
+  EXPECT_EQ(DeviceMenu::Action::Unmount, DeviceMenu::FromId("unmount"));
+  EXPECT_EQ(DeviceMenu::Action::Forget, DeviceMenu::FromId("forget"));
+  ConnectedDevice plugged;
+  plugged.unique_id = "usb:1";
+  plugged.mount_path = "/run/media/usb";
+  const DeviceMenu::DeviceState connected = DeviceMenu::FromDevice(plugged, false);
+  EXPECT_TRUE(connected.connected);
+  EXPECT_TRUE(connected.filesystem);
+  EXPECT_TRUE(DeviceMenu::UnmountEnabled(connected));
+  EXPECT_FALSE(DeviceMenu::ForgetEnabled(connected));
+  const auto plugged_items = DeviceMenu::VisibleItems(connected);
+  EXPECT_TRUE(DeviceMenu::Contains(plugged_items, DeviceMenu::Action::Browse));
+  EXPECT_TRUE(DeviceMenu::Contains(plugged_items, DeviceMenu::Action::Unmount));
+  EXPECT_TRUE(DeviceMenu::Contains(plugged_items, DeviceMenu::Action::Properties));
+  EXPECT_FALSE(DeviceMenu::Contains(plugged_items, DeviceMenu::Action::Forget));
+
+  ConnectedDevice remembered;
+  remembered.unique_id = "usb:1";
+  const DeviceMenu::DeviceState stored = DeviceMenu::FromDevice(remembered, true);
+  EXPECT_TRUE(DeviceMenu::ForgetEnabled(stored));
+  EXPECT_TRUE(DeviceMenu::UnmountEnabled(stored));
+  EXPECT_TRUE(DeviceMenu::Contains(DeviceMenu::VisibleItems(stored), DeviceMenu::Action::Forget));
+
+  const DeviceMenu::DeviceState offline = DeviceMenu::FromDevice(ConnectedDevice{}, true);
+  EXPECT_FALSE(DeviceMenu::UnmountEnabled(offline));
+  EXPECT_TRUE(DeviceMenu::ForgetEnabled(offline));
+  const auto offline_items = DeviceMenu::VisibleItems(offline);
+  EXPECT_FALSE(DeviceMenu::Contains(offline_items, DeviceMenu::Action::Unmount));
+  EXPECT_TRUE(DeviceMenu::Contains(offline_items, DeviceMenu::Action::Properties));
 }
 
 TEST(DeviceDrag, JoinsSongUrls) {
