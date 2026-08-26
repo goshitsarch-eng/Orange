@@ -106,6 +106,8 @@ std::string OrganizeFormat::TokenValue(const std::string &token, const Song &son
 
 bool OrganizeFormat::TokenHasValue(const std::string &token, const Song &song) { return !TokenValue(token, song).empty(); }
 
+bool OrganizeFormat::IsUniqueTag(const std::string &token) { return token == "%title" || token == "%track"; }
+
 bool OrganizeFormat::IsValid() const {
   int depth = 0;
   for (char ch : format_) {
@@ -146,14 +148,22 @@ std::string OrganizeFormat::ApplyFilenameFixes(std::string path, const Song &son
   return OrganizeFilename::Apply(path, FilenameOptions());
 }
 
-std::string OrganizeFormat::GetFilenameForSong(const Song &song) const {
-  std::string result;
-  result.reserve(format_.size());
+std::string OrganizeFormat::GetFilenameForSong(const Song &song) const { return GetFilenameForSongResult(song).path; }
+
+OrganizeFormat::GetFilenameResult OrganizeFormat::GetFilenameForSongResult(const Song &song, const std::string &extension) const {
+  GetFilenameResult result;
+  std::string expanded;
+  expanded.reserve(format_.size());
+  auto mark_unique = [&](const std::string &token) {
+    if (IsUniqueTag(token) && TokenHasValue(token, song)) {
+      result.unique_filename = true;
+    }
+  };
   for (size_t i = 0; i < format_.size();) {
     if (format_[i] == '{') {
       const size_t end = format_.find('}', i);
       if (end == std::string::npos) {
-        result += format_[i++];
+        expanded += format_[i++];
         continue;
       }
       const std::string inner = format_.substr(i + 1, end - i - 1);
@@ -164,19 +174,45 @@ std::string OrganizeFormat::GetFilenameForSong(const Song &song) const {
         while (pos + len < inner.size() && std::isalpha(static_cast<unsigned char>(inner[pos + len]))) {
           ++len;
         }
-        if (!TokenHasValue(inner.substr(pos, len), song)) {
+        const std::string token = inner.substr(pos, len);
+        if (!TokenHasValue(token, song)) {
           keep = false;
           break;
         }
         pos += len;
       }
       if (keep) {
-        result += ExpandTokens(inner, song);
+        pos = 0;
+        while ((pos = inner.find('%', pos)) != std::string::npos) {
+          size_t len = 1;
+          while (pos + len < inner.size() && std::isalpha(static_cast<unsigned char>(inner[pos + len]))) {
+            ++len;
+          }
+          mark_unique(inner.substr(pos, len));
+          pos += len;
+        }
+        expanded += ExpandTokens(inner, song);
       }
       i = end + 1;
       continue;
     }
-    result += format_[i++];
+    if (format_[i] == '%') {
+      size_t len = 1;
+      while (i + len < format_.size() && std::isalpha(static_cast<unsigned char>(format_[i + len]))) {
+        ++len;
+      }
+      mark_unique(format_.substr(i, len));
+    }
+    expanded += format_[i++];
   }
-  return ApplyFilenameFixes(ExpandTokens(result, song), song);
+  result.path = ApplyFilenameFixes(ExpandTokens(expanded, song), song);
+  if (!extension.empty() && !result.path.empty()) {
+    const std::string current = FileUtils::Extension(result.path);
+    if (!current.empty() && result.path.size() > current.size() + 1) {
+      result.path = result.path.substr(0, result.path.size() - current.size() - 1) + "." + extension;
+    } else {
+      result.path += "." + extension;
+    }
+  }
+  return result;
 }

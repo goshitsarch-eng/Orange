@@ -16,7 +16,8 @@ constexpr char kAllowAsciiExt[] = "allow_ascii_ext";
 constexpr char kAlbumCover[] = "albumcover";
 constexpr char kEjectAfter[] = "eject_after";
 
-constexpr char kDefaultFormat[] = "%albumartist/%album/{%track - }%title";
+constexpr char kDefaultFormat[] =
+    "%albumartist/%album{ (Disc %disc)}/{%track - }{%albumartist - }%album{ (Disc %disc)} - %title.%extension";
 constexpr bool kDefaultMove = false;
 constexpr bool kDefaultOverwrite = false;
 constexpr bool kDefaultReplaceSpaces = true;

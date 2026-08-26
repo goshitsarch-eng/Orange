@@ -5,17 +5,135 @@
 #include "core/application.h"
 #include "core/settings.h"
 #include "organize/organize.h"
-#include "organize/organizetranscode.h"
 #include "organize/organizeerrordialog.h"
 #include "organize/organizeformat.h"
 #include "organize/organizeformatvalidator.h"
+#include "organize/organizepreview.h"
 #include "organize/organizesyntaxhighlighter.h"
+#include "organize/organizetranscode.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
+#include "widgets/freespacebar.h"
 
 #include <adwaita.h>
 
 #include <vector>
+
+namespace {
+
+struct DialogState {
+  Application *app = nullptr;
+  SongList songs;
+  GtkTextBuffer *buffer = nullptr;
+  GtkWidget *dest = nullptr;
+  GtkWidget *remove_problematic = nullptr;
+  GtkWidget *remove_non_fat = nullptr;
+  GtkWidget *remove_non_ascii = nullptr;
+  GtkWidget *allow_ascii_ext = nullptr;
+  GtkWidget *replace_spaces = nullptr;
+  GtkWidget *preview_list = nullptr;
+  GtkWidget *run = nullptr;
+  GtkWidget *status = nullptr;
+  GtkWidget *after_copy = nullptr;
+  FreeSpaceBar *space = nullptr;
+  MusicStorage::TranscodeMode transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
+  Song::FileType transcode_format = Song::FileType::Unknown;
+  std::vector<Song::FileType> supported;
+};
+
+OrganizeFormat FormatFromState(const DialogState *state) {
+  OrganizeFormat format;
+  if (state && state->buffer) {
+    GtkTextIter start;
+    GtkTextIter end;
+    gtk_text_buffer_get_bounds(state->buffer, &start, &end);
+    gchar *text = gtk_text_buffer_get_text(state->buffer, &start, &end, FALSE);
+    format.set_format(text ? text : "");
+    g_free(text);
+  }
+  if (state) {
+    format.set_remove_problematic(state->remove_problematic && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->remove_problematic)));
+    format.set_remove_non_fat(state->remove_non_fat && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->remove_non_fat)));
+    format.set_remove_non_ascii(state->remove_non_ascii && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->remove_non_ascii)));
+    format.set_allow_ascii_ext(state->allow_ascii_ext && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->allow_ascii_ext)));
+    format.set_replace_spaces(state->replace_spaces && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->replace_spaces)));
+  }
+  return format;
+}
+
+SongList SongsFromState(const DialogState *state) {
+  if (!state) {
+    return {};
+  }
+  if (!state->songs.empty()) {
+    return state->songs;
+  }
+  if (state->app && state->app->playlist_manager() && state->app->playlist_manager()->current()) {
+    return state->app->playlist_manager()->current()->songs();
+  }
+  return {};
+}
+
+void ClearPreview(GtkWidget *list) {
+  if (!list) {
+    return;
+  }
+  GtkWidget *child = gtk_widget_get_first_child(list);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_list_box_remove(GTK_LIST_BOX(list), child);
+    child = next;
+  }
+}
+
+void RefreshPreview(DialogState *state) {
+  if (!state) {
+    return;
+  }
+  const OrganizeFormat format = FormatFromState(state);
+  std::string error;
+  const bool valid = OrganizeFormatValidator::IsValid(format.format(), &error);
+  const std::string dest = state->dest ? gtk_editable_get_text(GTK_EDITABLE(state->dest)) : "";
+  const SongList songs = SongsFromState(state);
+  std::vector<OrganizePreview::Entry> entries =
+      valid ? OrganizePreview::Compute(songs, format, state->transcode_mode, state->transcode_format, state->supported)
+            : std::vector<OrganizePreview::Entry>{};
+  if (OrganizePreview::AnyEmptyPath(entries)) {
+    entries.clear();
+  }
+  ClearPreview(state->preview_list);
+  if (state->preview_list) {
+    for (const OrganizePreview::Entry &entry : entries) {
+      GtkWidget *row = gtk_list_box_row_new();
+      GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+      gtk_widget_set_margin_start(box, 8);
+      gtk_widget_set_margin_end(box, 8);
+      gtk_widget_set_margin_top(box, 4);
+      gtk_widget_set_margin_bottom(box, 4);
+      gtk_box_append(GTK_BOX(box), gtk_image_new_from_icon_name(OrganizePreview::PreviewIconName(entry)));
+      GtkWidget *label = gtk_label_new(FileUtils::Join(dest, entry.relative_path).c_str());
+      gtk_widget_set_halign(label, GTK_ALIGN_START);
+      gtk_widget_set_hexpand(label, TRUE);
+      gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_MIDDLE);
+      gtk_box_append(GTK_BOX(box), label);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+      gtk_list_box_append(GTK_LIST_BOX(state->preview_list), row);
+    }
+  }
+  if (state->space) {
+    state->space->SetPath(dest);
+    if (state->space->total() > 0) {
+      state->space->SetBytes(state->space->used(), OrganizePreview::TotalBytes(songs), state->space->total());
+    }
+  }
+  if (state->run) {
+    const bool fits = !state->space || OrganizePreview::FitsOnDevice(OrganizePreview::TotalBytes(songs), state->space->used(),
+                                                                    state->space->total());
+    gtk_widget_set_sensitive(state->run, valid && OrganizePreview::CanProceed(entries) && fits);
+  }
+}
+
+}  // namespace
 
 void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &songs, bool move) {
   Request request;
@@ -159,9 +277,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      nullptr);
   }
 
-  GtkWidget *move_btn = gtk_check_button_new_with_label(Translations::CStr("Move files instead of copying"));
-  gtk_check_button_set_active(GTK_CHECK_BUTTON(move_btn),
-                              request.move || settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove));
+  const char *after_labels[] = {Translations::CStr("Keep the original files"), Translations::CStr("Delete the original files"), nullptr};
+  GtkWidget *after_copy = gtk_drop_down_new_from_strings(after_labels);
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(after_copy),
+                             request.move || settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove) ? 1 : 0);
   GtkWidget *overwrite = gtk_check_button_new_with_label(Translations::CStr("Overwrite existing files"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(overwrite), settings.BoolValue(OrganizeSettings::kOverwrite, OrganizeSettings::kDefaultOverwrite));
   GtkWidget *remove_problematic = gtk_check_button_new_with_label(Translations::CStr("Remove problematic characters from filenames"));
@@ -197,16 +316,41 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   GtkWidget *status = gtk_label_new(owned_songs->empty() ? Translations::CStr("Uses the current playlist as the source.")
                                                          : (std::to_string(owned_songs->size()) + " selected song(s).").c_str());
   gtk_label_set_wrap(GTK_LABEL(status), TRUE);
-  GtkWidget *preview = gtk_label_new("");
-  gtk_label_set_wrap(GTK_LABEL(preview), TRUE);
-  gtk_label_set_xalign(GTK_LABEL(preview), 0.0f);
-  GtkWidget *preview_btn = gtk_button_new_with_label(Translations::CStr("Preview"));
+  GtkWidget *preview_scroll = gtk_scrolled_window_new();
+  gtk_widget_set_size_request(preview_scroll, -1, 140);
+  gtk_widget_set_vexpand(preview_scroll, TRUE);
+  GtkWidget *preview_list = gtk_list_box_new();
+  gtk_widget_add_css_class(preview_list, "boxed-list");
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(preview_scroll), preview_list);
+  auto *space = new FreeSpaceBar();
+  space->SetPath(saved_dest);
   GtkWidget *run = gtk_button_new_with_label(Translations::CStr("Organize"));
   gtk_widget_add_css_class(run, "suggested-action");
 
+  auto *state = new DialogState;
+  state->app = app;
+  state->songs = *owned_songs;
+  state->buffer = buffer;
+  state->dest = dest;
+  state->remove_problematic = remove_problematic;
+  state->remove_non_fat = remove_non_fat;
+  state->remove_non_ascii = remove_non_ascii;
+  state->allow_ascii_ext = allow_ascii_ext;
+  state->replace_spaces = replace_spaces;
+  state->preview_list = preview_list;
+  state->run = run;
+  state->status = status;
+  state->after_copy = after_copy;
+  state->space = space;
+  state->transcode_mode = request.transcode_mode;
+  state->transcode_format = request.transcode_format;
+  state->supported = request.supported_filetypes;
+  g_signal_connect(space->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) { delete static_cast<FreeSpaceBar *>(data); }), space);
+  g_object_set_data_full(G_OBJECT(run), "state", state, [](gpointer p) { delete static_cast<DialogState *>(p); });
+
   g_object_set_data(G_OBJECT(run), "buffer", buffer);
   g_object_set_data(G_OBJECT(run), "dest", dest);
-  g_object_set_data(G_OBJECT(run), "move", move_btn);
+  g_object_set_data(G_OBJECT(run), "after-copy", after_copy);
   g_object_set_data(G_OBJECT(run), "overwrite", overwrite);
   g_object_set_data(G_OBJECT(run), "remove-problematic", remove_problematic);
   g_object_set_data(G_OBJECT(run), "remove-non-fat", remove_non_fat);
@@ -228,19 +372,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
     g_object_set_data_full(G_OBJECT(run), "device-id", g_strdup(request.device_id.c_str()), g_free);
   }
   g_object_set_data_full(G_OBJECT(run), "songs", owned_songs, [](gpointer p) { delete static_cast<SongList *>(p); });
-  g_object_set_data(G_OBJECT(preview_btn), "songs", owned_songs);
-  g_object_set_data(G_OBJECT(preview_btn), "buffer", buffer);
-  g_object_set_data(G_OBJECT(preview_btn), "dest", dest);
-  g_object_set_data(G_OBJECT(preview_btn), "remove-problematic", remove_problematic);
-  g_object_set_data(G_OBJECT(preview_btn), "remove-non-fat", remove_non_fat);
-  g_object_set_data(G_OBJECT(preview_btn), "remove-non-ascii", remove_non_ascii);
-  g_object_set_data(G_OBJECT(preview_btn), "allow-ascii-ext", allow_ascii_ext);
-  g_object_set_data(G_OBJECT(preview_btn), "replace-spaces", replace_spaces);
-  g_object_set_data(G_OBJECT(preview_btn), "preview", preview);
   g_object_set_data(G_OBJECT(buffer), "error", format_error);
-  g_object_set_data(G_OBJECT(buffer), "run", run);
+  g_object_set_data(G_OBJECT(buffer), "state", state);
 
-  g_signal_connect(buffer, "changed", G_CALLBACK(+[](GtkTextBuffer *buf, gpointer) {
+  g_signal_connect(buffer, "changed", G_CALLBACK(+[](GtkTextBuffer *buf, gpointer data) {
                      GtkTextIter start;
                      GtkTextIter end;
                      gtk_text_buffer_get_bounds(buf, &start, &end);
@@ -252,41 +387,14 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      std::string error;
                      const bool valid = OrganizeFormatValidator::IsValid(format, &error);
                      gtk_label_set_text(GTK_LABEL(g_object_get_data(G_OBJECT(buf), "error")), valid ? "" : error.c_str());
-                     gtk_widget_set_sensitive(GTK_WIDGET(g_object_get_data(G_OBJECT(buf), "run")), valid);
+                     RefreshPreview(static_cast<DialogState *>(data));
                    }),
-                   nullptr);
-
-  g_signal_connect(preview_btn, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
-                     auto *application = static_cast<Application *>(data);
-                     auto *buf = GTK_TEXT_BUFFER(g_object_get_data(G_OBJECT(button), "buffer"));
-                     GtkTextIter start;
-                     GtkTextIter end;
-                     gtk_text_buffer_get_bounds(buf, &start, &end);
-                     gchar *text = gtk_text_buffer_get_text(buf, &start, &end, FALSE);
-                     OrganizeFormat format(text ? text : "");
-                     g_free(text);
-                     format.set_remove_problematic(
-                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-problematic"))));
-                     format.set_remove_non_fat(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-non-fat"))));
-                     format.set_remove_non_ascii(
-                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-non-ascii"))));
-                     format.set_allow_ascii_ext(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "allow-ascii-ext"))));
-                     format.set_replace_spaces(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "replace-spaces"))));
-                     const std::string dest_dir = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "dest")));
-                     std::string preview_text;
-                     auto *owned = static_cast<SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
-                     SongList songs = owned && !owned->empty() ? *owned
-                                      : application->playlist_manager()->current() ? application->playlist_manager()->current()->songs()
-                                                                                   : SongList{};
-                     for (size_t i = 0; i < songs.size() && i < 8; ++i) {
-                       preview_text += FileUtils::Join(dest_dir, format.GetFilenameForSong(songs[i])) + "\n";
-                     }
-                     if (songs.size() > 8) {
-                       preview_text += "… " + std::to_string(songs.size() - 8) + " more";
-                     }
-                     gtk_label_set_text(GTK_LABEL(g_object_get_data(G_OBJECT(button), "preview")), preview_text.c_str());
-                   }),
-                   app);
+                   state);
+  g_signal_connect(dest, "changed", G_CALLBACK(+[](GtkEditable *, gpointer data) { RefreshPreview(static_cast<DialogState *>(data)); }), state);
+  for (GtkWidget *toggle : {remove_problematic, remove_non_fat, remove_non_ascii, allow_ascii_ext, replace_spaces}) {
+    g_signal_connect(toggle, "toggled", G_CALLBACK(+[](GtkCheckButton *, gpointer data) { RefreshPreview(static_cast<DialogState *>(data)); }),
+                     state);
+  }
   g_signal_connect(run, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
                      auto *buf = GTK_TEXT_BUFFER(g_object_get_data(G_OBJECT(button), "buffer"));
@@ -311,7 +419,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      format.set_replace_spaces(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "replace-spaces"))));
                      const std::string dest_dir = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "dest")));
                      Organize::Options options;
-                     options.move = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "move")));
+                     options.move = gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "after-copy"))) == 1;
                      options.overwrite = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "overwrite")));
                      options.albumcover = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "albumcover")));
                      options.transcode_mode = static_cast<MusicStorage::TranscodeMode>(
@@ -371,7 +479,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
     gtk_box_append(GTK_BOX(box), dest_drop);
   }
   gtk_box_append(GTK_BOX(box), dest_row);
-  gtk_box_append(GTK_BOX(box), move_btn);
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("After copying")));
+  gtk_box_append(GTK_BOX(box), after_copy);
+  gtk_box_append(GTK_BOX(box), space->widget());
   gtk_box_append(GTK_BOX(box), overwrite);
   gtk_box_append(GTK_BOX(box), remove_problematic);
   gtk_box_append(GTK_BOX(box), remove_non_fat);
@@ -382,10 +492,13 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   if (eject) {
     gtk_box_append(GTK_BOX(box), eject);
   }
-  gtk_box_append(GTK_BOX(box), preview_btn);
-  gtk_box_append(GTK_BOX(box), preview);
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Preview")));
+  gtk_box_append(GTK_BOX(box), preview_scroll);
   gtk_box_append(GTK_BOX(box), run);
   gtk_box_append(GTK_BOX(box), status);
   adw_dialog_set_child(dialog, box);
+  std::string format_error_text;
+  gtk_label_set_text(GTK_LABEL(format_error), OrganizeFormatValidator::IsValid(saved_format, &format_error_text) ? "" : format_error_text.c_str());
+  RefreshPreview(state);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

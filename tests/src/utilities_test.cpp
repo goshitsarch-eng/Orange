@@ -25,7 +25,9 @@
 #include "organize/organize.h"
 #include "organize/organizefilename.h"
 #include "organize/organizeformatvalidator.h"
+#include "organize/organizepreview.h"
 #include "organize/organizetranscode.h"
+#include "constants/organizesettings.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/fht.h"
 #include "constants/behavioursettings.h"
@@ -432,6 +434,119 @@ TEST(Organize, OverwriteAndAlbumCover) {
   FileUtils::Remove(cover);
   FileUtils::Remove(dest);
   FileUtils::Remove(FileUtils::Join(dest_dir, "cover.jpg"));
+  rmdir(src_dir.c_str());
+  rmdir(dest_dir.c_str());
+  rmdir(dir.c_str());
+}
+
+TEST(OrganizePreview, AfterCopyChoicesAndUniqueTags) {
+  const auto choices = OrganizePreview::AfterCopyChoices();
+  ASSERT_EQ(2u, choices.size());
+  EXPECT_EQ("keep", choices[0].first);
+  EXPECT_EQ("Keep the original files", choices[0].second);
+  EXPECT_EQ("delete", choices[1].first);
+  EXPECT_EQ("Delete the original files", choices[1].second);
+  EXPECT_STREQ("keep", OrganizePreview::AfterCopyId(false));
+  EXPECT_STREQ("delete", OrganizePreview::AfterCopyId(true));
+  EXPECT_FALSE(OrganizePreview::DeleteOriginals("keep"));
+  EXPECT_TRUE(OrganizePreview::DeleteOriginals("delete"));
+  EXPECT_TRUE(OrganizeFormat::IsUniqueTag("%title"));
+  EXPECT_TRUE(OrganizeFormat::IsUniqueTag("%track"));
+  EXPECT_FALSE(OrganizeFormat::IsUniqueTag("%album"));
+  EXPECT_STREQ("%albumartist/%album{ (Disc %disc)}/{%track - }{%albumartist - }%album{ (Disc %disc)} - %title.%extension",
+               OrganizeSettings::kDefaultFormat);
+}
+
+TEST(OrganizeFormat, UniqueFilenameFromTitleAndTrack) {
+  Song song;
+  song.set_title("Roads");
+  song.set_album("Dummy");
+  song.set_track(3);
+  EXPECT_TRUE(OrganizeFormat("%title").GetFilenameForSongResult(song).unique_filename);
+  EXPECT_TRUE(OrganizeFormat("%track").GetFilenameForSongResult(song).unique_filename);
+  EXPECT_FALSE(OrganizeFormat("%album").GetFilenameForSongResult(song).unique_filename);
+  EXPECT_TRUE(OrganizeFormat("{%title}").GetFilenameForSongResult(song).unique_filename);
+  Song untitled;
+  untitled.set_album("Dummy");
+  EXPECT_FALSE(OrganizeFormat("{%title}").GetFilenameForSongResult(untitled).unique_filename);
+  EXPECT_FALSE(OrganizeFormat("%album/{%track - }%title").GetFilenameForSongResult(untitled).unique_filename);
+}
+
+TEST(OrganizePreview, DisambiguatesOnlyWhenUnique) {
+  std::map<std::string, int> counts;
+  EXPECT_EQ("foo.mp3", OrganizePreview::Disambiguate("foo.mp3", &counts));
+  EXPECT_EQ("foo(2).mp3", OrganizePreview::Disambiguate("foo.mp3", &counts));
+  EXPECT_EQ("foo(3).mp3", OrganizePreview::Disambiguate("foo.mp3", &counts));
+
+  Song a;
+  a.set_title("Same");
+  a.set_album("Dummy");
+  a.set_url("file:///tmp/a.flac");
+  a.set_filesize(100);
+  Song b;
+  b.set_title("Same");
+  b.set_album("Dummy");
+  b.set_url("file:///tmp/b.flac");
+  b.set_filesize(50);
+  const auto unique = OrganizePreview::Compute({a, b}, OrganizeFormat("%title"));
+  ASSERT_EQ(2u, unique.size());
+  EXPECT_TRUE(unique[0].ok);
+  EXPECT_TRUE(unique[1].ok);
+  EXPECT_EQ("Same.flac", unique[0].relative_path);
+  EXPECT_EQ("Same(2).flac", unique[1].relative_path);
+  EXPECT_TRUE(OrganizePreview::CanProceed(unique));
+  EXPECT_STREQ("dialog-ok-apply-symbolic", OrganizePreview::PreviewIconName(unique[0]));
+
+  const auto album = OrganizePreview::Compute({a, b}, OrganizeFormat("%album"));
+  ASSERT_EQ(2u, album.size());
+  EXPECT_FALSE(album[0].ok);
+  EXPECT_FALSE(album[1].ok);
+  EXPECT_EQ(album[0].relative_path, album[1].relative_path);
+  EXPECT_FALSE(OrganizePreview::CanProceed(album));
+  EXPECT_STREQ("dialog-warning-symbolic", OrganizePreview::PreviewIconName(album[0]));
+
+  Song empty;
+  const auto missing = OrganizePreview::Compute({empty}, OrganizeFormat("%title"));
+  ASSERT_EQ(1u, missing.size());
+  EXPECT_TRUE(missing[0].relative_path.empty());
+  EXPECT_TRUE(OrganizePreview::AnyEmptyPath(missing));
+  EXPECT_FALSE(OrganizePreview::CanProceed(missing));
+  EXPECT_EQ(150, OrganizePreview::TotalBytes({a, b}));
+  EXPECT_TRUE(OrganizePreview::FitsOnDevice(50, 40, 100));
+  EXPECT_FALSE(OrganizePreview::FitsOnDevice(70, 40, 100));
+  EXPECT_TRUE(OrganizePreview::FitsOnDevice(999, 0, 0));
+}
+
+TEST(Organize, CopiesDisambiguatedCollisions) {
+  char dir_template[] = "/tmp/strawberry-organize-dup-XXXXXX";
+  const std::string dir = mkdtemp(dir_template);
+  const std::string src_dir = FileUtils::Join(dir, "src");
+  const std::string dest_dir = FileUtils::Join(dir, "dest");
+  g_mkdir_with_parents(src_dir.c_str(), 0755);
+  g_mkdir_with_parents(dest_dir.c_str(), 0755);
+  const std::string src_a = FileUtils::Join(src_dir, "a.flac");
+  const std::string src_b = FileUtils::Join(src_dir, "b.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(src_a, "audio-a"));
+  ASSERT_TRUE(FileUtils::WriteFile(src_b, "audio-b"));
+
+  Song a;
+  a.set_valid(true);
+  a.set_title("Same");
+  a.set_url(FileUtils::UriFromPath(src_a));
+  Song b;
+  b.set_valid(true);
+  b.set_title("Same");
+  b.set_url(FileUtils::UriFromPath(src_b));
+
+  const auto errors = Organize().Copy({a, b}, dest_dir, OrganizeFormat("%title"), Organize::Options{});
+  EXPECT_TRUE(errors.empty());
+  EXPECT_EQ("audio-a", FileUtils::ReadFile(FileUtils::Join(dest_dir, "Same.flac")));
+  EXPECT_EQ("audio-b", FileUtils::ReadFile(FileUtils::Join(dest_dir, "Same(2).flac")));
+
+  FileUtils::Remove(src_a);
+  FileUtils::Remove(src_b);
+  FileUtils::Remove(FileUtils::Join(dest_dir, "Same.flac"));
+  FileUtils::Remove(FileUtils::Join(dest_dir, "Same(2).flac"));
   rmdir(src_dir.c_str());
   rmdir(dest_dir.c_str());
   rmdir(dir.c_str());

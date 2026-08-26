@@ -2,6 +2,7 @@
 
 #include "core/filesystemmusicstorage.h"
 #include "core/standardpaths.h"
+#include "organize/organizepreview.h"
 #include "organize/organizetranscode.h"
 #include "transcoder/transcoder.h"
 #include "utilities/fileutils.h"
@@ -43,20 +44,21 @@ std::vector<Organize::Error> Organize::Copy(const SongList &songs, const std::st
     return errors;
   }
   FilesystemMusicStorage storage(destination);
-  for (const Song &song : songs) {
+  const std::vector<OrganizePreview::Entry> entries =
+      OrganizePreview::Compute(songs, format, options.transcode_mode, options.transcode_format, options.supported_filetypes);
+  for (const OrganizePreview::Entry &entry : entries) {
+    const Song &song = entry.song;
     const std::string src = FileUtils::PathFromUri(song.url());
-    const std::string relative = format.GetFilenameForSong(song);
-    if (relative.empty()) {
+    if (entry.relative_path.empty()) {
       errors.push_back({song.PrettyTitleWithArtist(), "Filename format produced an empty path"});
       continue;
     }
-    std::string dest = FileUtils::Join(destination, relative);
+    std::string dest = FileUtils::Join(destination, entry.relative_path);
     const Song::FileType dest_type =
         OrganizeTranscode::Check(song.filetype(), options.transcode_mode, options.transcode_format, options.supported_filetypes);
     std::string temp;
     std::string copy_src = src;
     if (dest_type != Song::FileType::Unknown && OrganizeTranscode::CanTranscode(dest_type)) {
-      dest = OrganizeTranscode::FiddleExtension(dest, OrganizeTranscode::ExtensionForFileType(dest_type));
       temp = OrganizeTranscode::FiddleExtension(FileUtils::Join(StandardPaths::CacheDir(), "organize-" + FileUtils::BaseName(src)),
                                                 OrganizeTranscode::ExtensionForFileType(dest_type));
       Transcoder transcoder;
