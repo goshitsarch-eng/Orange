@@ -82,6 +82,9 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AddToggle(group, settings, "prettycovers", "Use pretty covers", nullptr, true);
     AddToggle(group, settings, "variousartists", "Group various artists albums", nullptr, true);
     AddToggle(group, settings, "show_dividers", "Show artist / album dividers", nullptr, true);
+    AddToggle(group, settings, "separate_albums_by_grouping", "Separate albums by grouping tag", nullptr, false);
+    AddToggle(group, settings, "sort_skip_articles_for_artists", "Skip “The / A / An” when sorting artists", nullptr, false);
+    AddToggle(group, settings, "sort_skip_articles_for_albums", "Skip “The / A / An” when sorting albums", nullptr, false);
     AdwPreferencesGroup *dirs = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     adw_preferences_group_set_title(dirs, "Folders");
     for (const CollectionDirectory &directory : app->collection()->backend()->Directories()) {

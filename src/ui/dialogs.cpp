@@ -1,5 +1,6 @@
 #include "ui/dialogs.h"
 
+#include "collection/collectiongrouping.h"
 #include "core/application.h"
 #include "core/settings.h"
 #include "playlistparsers/playlistparser.h"
@@ -137,13 +138,11 @@ void Dialogs::Equalizer(GtkWindow *parent, class Equalizer *equalizer) {
                    }),
                    equalizer);
   gtk_box_append(GTK_BOX(box), enable);
-  const auto presets = equalizer->Presets();
-  std::vector<const char *> names;
-  for (const std::string &name : presets) {
-    names.push_back(name.c_str());
+  GtkStringList *preset_names = gtk_string_list_new(nullptr);
+  for (const std::string &name : equalizer->Presets()) {
+    gtk_string_list_append(preset_names, name.c_str());
   }
-  names.push_back(nullptr);
-  GtkWidget *preset = gtk_drop_down_new_from_strings(names.data());
+  GtkWidget *preset = gtk_drop_down_new(G_LIST_MODEL(preset_names), nullptr);
   g_signal_connect(preset, "notify::selected", G_CALLBACK(+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
                      auto *eq = static_cast<class Equalizer *>(data);
                      GtkStringObject *item = GTK_STRING_OBJECT(gtk_drop_down_get_selected_item(drop));
@@ -153,6 +152,36 @@ void Dialogs::Equalizer(GtkWindow *parent, class Equalizer *equalizer) {
                    }),
                    equalizer);
   gtk_box_append(GTK_BOX(box), preset);
+  GtkWidget *preset_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  GtkWidget *preset_name = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(preset_name), "Custom preset name");
+  GtkWidget *save_preset = gtk_button_new_with_label("Save");
+  GtkWidget *delete_preset = gtk_button_new_with_label("Delete");
+  g_object_set_data(G_OBJECT(save_preset), "name", preset_name);
+  g_object_set_data(G_OBJECT(save_preset), "list", preset_names);
+  g_signal_connect(save_preset, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *eq = static_cast<class Equalizer *>(data);
+                     GtkWidget *entry = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "name"));
+                     const char *name = gtk_editable_get_text(GTK_EDITABLE(entry));
+                     if (eq->SavePreset(name ? name : "")) {
+                       gtk_string_list_append(GTK_STRING_LIST(g_object_get_data(G_OBJECT(button), "list")), name);
+                     }
+                   }),
+                   equalizer);
+  g_object_set_data(G_OBJECT(delete_preset), "drop", preset);
+  g_signal_connect(delete_preset, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *eq = static_cast<class Equalizer *>(data);
+                     GtkDropDown *drop = GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "drop"));
+                     GtkStringObject *item = GTK_STRING_OBJECT(gtk_drop_down_get_selected_item(drop));
+                     if (item) {
+                       eq->DeletePreset(gtk_string_object_get_string(item));
+                     }
+                   }),
+                   equalizer);
+  gtk_box_append(GTK_BOX(preset_row), preset_name);
+  gtk_box_append(GTK_BOX(preset_row), save_preset);
+  gtk_box_append(GTK_BOX(preset_row), delete_preset);
+  gtk_box_append(GTK_BOX(box), preset_row);
   GtkWidget *preamp = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, -12, 12, 1);
   gtk_range_set_value(GTK_RANGE(preamp), equalizer->preamp());
   gtk_widget_set_tooltip_text(preamp, "Preamp");
@@ -252,12 +281,38 @@ void Dialogs::Organize(GtkWindow *parent, Application *app) {
   gtk_editable_set_text(GTK_EDITABLE(dest), g_get_user_special_dir(G_USER_DIRECTORY_MUSIC) ? g_get_user_special_dir(G_USER_DIRECTORY_MUSIC) : g_get_home_dir());
   GtkWidget *move = gtk_check_button_new_with_label("Move files instead of copying");
   GtkWidget *status = gtk_label_new("Uses the current playlist as the source.");
+  gtk_label_set_wrap(GTK_LABEL(status), TRUE);
+  GtkWidget *preview = gtk_label_new("");
+  gtk_label_set_wrap(GTK_LABEL(preview), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(preview), 0.0f);
+  GtkWidget *preview_btn = gtk_button_new_with_label("Preview");
   GtkWidget *run = gtk_button_new_with_label("Organize");
   gtk_widget_add_css_class(run, "suggested-action");
   g_object_set_data(G_OBJECT(run), "format", entry);
   g_object_set_data(G_OBJECT(run), "dest", dest);
   g_object_set_data(G_OBJECT(run), "move", move);
   g_object_set_data(G_OBJECT(run), "status", status);
+  g_object_set_data(G_OBJECT(preview_btn), "format", entry);
+  g_object_set_data(G_OBJECT(preview_btn), "dest", dest);
+  g_object_set_data(G_OBJECT(preview_btn), "preview", preview);
+  g_signal_connect(preview_btn, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     if (!application->playlist_manager()->active()) {
+                       return;
+                     }
+                     OrganizeFormat format(gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "format"))));
+                     const std::string dest_dir = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "dest")));
+                     std::string text;
+                     const SongList songs = application->playlist_manager()->active()->songs();
+                     for (size_t i = 0; i < songs.size() && i < 8; ++i) {
+                       text += FileUtils::Join(dest_dir, format.GetFilenameForSong(songs[i])) + "\n";
+                     }
+                     if (songs.size() > 8) {
+                       text += "… " + std::to_string(songs.size() - 8) + " more";
+                     }
+                     gtk_label_set_text(GTK_LABEL(g_object_get_data(G_OBJECT(button), "preview")), text.c_str());
+                   }),
+                   app);
   g_signal_connect(run, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
                      if (!application->playlist_manager()->active()) {
@@ -267,8 +322,17 @@ void Dialogs::Organize(GtkWindow *parent, Application *app) {
                      const std::string dest_dir = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "dest")));
                      const bool move_files = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "move")));
                      class Organize organize;
-                     organize.Copy(application->playlist_manager()->active()->songs(), dest_dir, format, move_files);
-                     gtk_label_set_text(GTK_LABEL(g_object_get_data(G_OBJECT(button), "status")), "Organize finished.");
+                     const auto errors = organize.Copy(application->playlist_manager()->active()->songs(), dest_dir, format, move_files);
+                     GtkWidget *status_label = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
+                     if (errors.empty()) {
+                       gtk_label_set_text(GTK_LABEL(status_label), "Organize finished.");
+                       return;
+                     }
+                     std::string text = std::to_string(errors.size()) + " file(s) failed:\n";
+                     for (size_t i = 0; i < errors.size() && i < 12; ++i) {
+                       text += errors[i].song + " — " + errors[i].message + "\n";
+                     }
+                     gtk_label_set_text(GTK_LABEL(status_label), text.c_str());
                    }),
                    app);
   gtk_box_append(GTK_BOX(box), gtk_label_new("Filename format"));
@@ -276,6 +340,8 @@ void Dialogs::Organize(GtkWindow *parent, Application *app) {
   gtk_box_append(GTK_BOX(box), gtk_label_new("Destination"));
   gtk_box_append(GTK_BOX(box), dest);
   gtk_box_append(GTK_BOX(box), move);
+  gtk_box_append(GTK_BOX(box), preview_btn);
+  gtk_box_append(GTK_BOX(box), preview);
   gtk_box_append(GTK_BOX(box), run);
   gtk_box_append(GTK_BOX(box), status);
   adw_dialog_set_child(dialog, box);
@@ -579,25 +645,151 @@ void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app) {
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }
 
-void Dialogs::GroupBy(GtkWindow *parent, const std::function<void(const std::string &)> &callback) {
-  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new("Collection grouping", "Choose how albums are grouped."));
-  static const char *group_labels[] = {"Artist – Album", "Album", "Genre", "Year", "Artist", nullptr};
-  GtkWidget *drop = gtk_drop_down_new_from_strings(group_labels);
-  adw_alert_dialog_set_extra_child(dialog, drop);
-  adw_alert_dialog_add_responses(dialog, "cancel", "Cancel", "apply", "Apply", nullptr);
-  auto *cb = new std::function<void(const std::string &)>(callback);
-  g_object_set_data(G_OBJECT(dialog), "drop", drop);
-  g_signal_connect(dialog, "response", G_CALLBACK((+[](AdwAlertDialog *alert, const char *response, gpointer data) {
-                     auto *fn = static_cast<std::function<void(const std::string &)> *>(data);
-                     if (g_strcmp0(response, "apply") == 0) {
-                       static const char *values[] = {"artist-album", "album", "genre", "year", "artist"};
-                       const guint selected = gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(alert), "drop")));
-                       (*fn)(values[selected]);
-                     }
-                     delete fn;
-                   })),
+void Dialogs::GroupBy(GtkWindow *parent, const CollectionGrouping::Grouping &current,
+                      const std::function<void(const CollectionGrouping::Grouping &)> &callback) {
+  AdwDialog *dialog = adw_dialog_new();
+  adw_dialog_set_title(dialog, "Collection grouping");
+  adw_dialog_set_content_width(dialog, 420);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  gtk_widget_set_margin_start(box, 16);
+  gtk_widget_set_margin_end(box, 16);
+  gtk_widget_set_margin_top(box, 16);
+  gtk_widget_set_margin_bottom(box, 16);
+  GtkWidget *first = gtk_drop_down_new_from_strings(CollectionGrouping::kComboLabels);
+  GtkWidget *second = gtk_drop_down_new_from_strings(CollectionGrouping::kComboLabels);
+  GtkWidget *third = gtk_drop_down_new_from_strings(CollectionGrouping::kComboLabels);
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(first), CollectionGrouping::ComboIndex(current.first));
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(second), CollectionGrouping::ComboIndex(current.second));
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(third), CollectionGrouping::ComboIndex(current.third));
+  GtkWidget *separate = gtk_check_button_new_with_label("Separate albums by grouping tag");
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(separate), CollectionGrouping::SeparateAlbumsByGrouping());
+  GtkWidget *name = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(name), "Save as…");
+  GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  GtkWidget *apply = gtk_button_new_with_label("Apply");
+  gtk_widget_add_css_class(apply, "suggested-action");
+  GtkWidget *save = gtk_button_new_with_label("Save");
+  GtkWidget *manage = gtk_button_new_with_label("Manage");
+  gtk_box_append(GTK_BOX(buttons), apply);
+  gtk_box_append(GTK_BOX(buttons), save);
+  gtk_box_append(GTK_BOX(buttons), manage);
+  auto *cb = new std::function<void(const CollectionGrouping::Grouping &)>(callback);
+  g_object_set_data_full(G_OBJECT(dialog), "callback", cb, [](gpointer p) {
+    delete static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(p);
+  });
+  g_object_set_data(G_OBJECT(dialog), "first", first);
+  g_object_set_data(G_OBJECT(dialog), "second", second);
+  g_object_set_data(G_OBJECT(dialog), "third", third);
+  g_object_set_data(G_OBJECT(dialog), "separate", separate);
+  g_object_set_data(G_OBJECT(dialog), "name", name);
+  g_object_set_data(G_OBJECT(apply), "dialog", dialog);
+  g_signal_connect(apply, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *fn = static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(data);
+                     GtkWidget *dlg = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "dialog"));
+                     CollectionGrouping::Grouping grouping;
+                     grouping.first = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "first")))));
+                     grouping.second = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "second")))));
+                     grouping.third = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "third")))));
+                     CollectionGrouping::SetSeparateAlbumsByGrouping(
+                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(dlg), "separate"))));
+                     (*fn)(grouping);
+                     adw_dialog_close(ADW_DIALOG(dlg));
+                   }),
                    cb);
-  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
+  g_object_set_data(G_OBJECT(save), "dialog", dialog);
+  g_signal_connect(save, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
+                     GtkWidget *dlg = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "dialog"));
+                     const char *title = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(dlg), "name")));
+                     CollectionGrouping::Grouping grouping;
+                     grouping.first = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "first")))));
+                     grouping.second = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "second")))));
+                     grouping.third = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "third")))));
+                     CollectionGrouping::AddSaved(title ? title : "", grouping);
+                   }),
+                   nullptr);
+  g_object_set_data(G_OBJECT(manage), "parent", parent);
+  g_signal_connect(manage, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *fn = static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(data);
+                     Dialogs::ManageSavedGroupings(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), *fn);
+                   }),
+                   cb);
+  gtk_box_append(GTK_BOX(box), gtk_label_new("First level"));
+  gtk_box_append(GTK_BOX(box), first);
+  gtk_box_append(GTK_BOX(box), gtk_label_new("Second level"));
+  gtk_box_append(GTK_BOX(box), second);
+  gtk_box_append(GTK_BOX(box), gtk_label_new("Third level"));
+  gtk_box_append(GTK_BOX(box), third);
+  gtk_box_append(GTK_BOX(box), separate);
+  gtk_box_append(GTK_BOX(box), name);
+  gtk_box_append(GTK_BOX(box), buttons);
+  adw_dialog_set_child(dialog, box);
+  adw_dialog_present(dialog, GTK_WIDGET(parent));
+}
+
+void Dialogs::ManageSavedGroupings(GtkWindow *parent, const std::function<void(const CollectionGrouping::Grouping &)> &callback) {
+  AdwDialog *dialog = adw_dialog_new();
+  adw_dialog_set_title(dialog, "Saved groupings");
+  adw_dialog_set_content_width(dialog, 420);
+  adw_dialog_set_content_height(dialog, 360);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_start(box, 12);
+  gtk_widget_set_margin_end(box, 12);
+  gtk_widget_set_margin_top(box, 12);
+  gtk_widget_set_margin_bottom(box, 12);
+  GtkWidget *scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(scroll, TRUE);
+  GtkWidget *list = gtk_list_box_new();
+  gtk_widget_add_css_class(list, "boxed-list");
+  auto *cb = new std::function<void(const CollectionGrouping::Grouping &)>(callback);
+  g_object_set_data_full(G_OBJECT(dialog), "callback", cb, [](gpointer p) {
+    delete static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(p);
+  });
+  for (const auto &entry : CollectionGrouping::LoadSaved()) {
+    GtkWidget *row = adw_action_row_new();
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), entry.first.c_str());
+    const std::string subtitle = CollectionGrouping::Label(entry.second.first) + " / " + CollectionGrouping::Label(entry.second.second) +
+                                 " / " + CollectionGrouping::Label(entry.second.third);
+    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), subtitle.c_str());
+    GtkWidget *apply = gtk_button_new_with_label("Apply");
+    GtkWidget *remove = gtk_button_new_with_label("Remove");
+    auto *grouping = new CollectionGrouping::Grouping(entry.second);
+    g_object_set_data_full(G_OBJECT(row), "name", g_strdup(entry.first.c_str()), g_free);
+    g_object_set_data_full(G_OBJECT(apply), "grouping", grouping, [](gpointer p) { delete static_cast<CollectionGrouping::Grouping *>(p); });
+    g_object_set_data(G_OBJECT(apply), "callback", cb);
+    g_object_set_data(G_OBJECT(apply), "dialog", dialog);
+    g_signal_connect(apply, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
+                       auto *fn = static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(
+                           g_object_get_data(G_OBJECT(button), "callback"));
+                       auto *grouping = static_cast<CollectionGrouping::Grouping *>(g_object_get_data(G_OBJECT(button), "grouping"));
+                       if (fn && grouping) {
+                         (*fn)(*grouping);
+                       }
+                       adw_dialog_close(ADW_DIALOG(g_object_get_data(G_OBJECT(button), "dialog")));
+                     }),
+                     nullptr);
+    g_object_set_data(G_OBJECT(remove), "row", row);
+    g_object_set_data(G_OBJECT(remove), "list", list);
+    g_signal_connect(remove, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
+                       GtkWidget *row = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "row"));
+                       const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "name"));
+                       CollectionGrouping::RemoveSaved(name ? name : "");
+                       gtk_list_box_remove(GTK_LIST_BOX(g_object_get_data(G_OBJECT(button), "list")), row);
+                     }),
+                     nullptr);
+    adw_action_row_add_suffix(ADW_ACTION_ROW(row), apply);
+    adw_action_row_add_suffix(ADW_ACTION_ROW(row), remove);
+    gtk_list_box_append(GTK_LIST_BOX(list), row);
+  }
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list);
+  gtk_box_append(GTK_BOX(box), scroll);
+  adw_dialog_set_child(dialog, box);
+  adw_dialog_present(dialog, GTK_WIDGET(parent));
 }
 
 void Dialogs::Console(GtkWindow *parent) {

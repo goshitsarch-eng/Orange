@@ -1,5 +1,6 @@
 #include "ui/mainwindow.h"
 
+#include "collection/collectiongrouping.h"
 #include "core/settings.h"
 #include "playlistparsers/playlistparser.h"
 #include "smartplaylists/smartplaylist.h"
@@ -97,9 +98,7 @@ const char *HomeOrMusic() {
 
 MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const CommandlineOptions &options)
     : gtk_app_(gtk_app), app_(app), files_path_(HomeOrMusic() ? HomeOrMusic() : ".") {
-  Settings settings;
-  settings.BeginGroup("Collection");
-  collection_group_ = settings.Value("groupby", "artist-album");
+  grouping_ = CollectionGrouping::LoadCurrent();
   BuildUi();
   ConnectSignals();
   RefreshCollection();
@@ -264,12 +263,9 @@ void MainWindow::BuildUi() {
              }));
   add_action("group-by", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               Dialogs::GroupBy(GTK_WINDOW(self->window_), [self](const std::string &group) {
-                 self->collection_group_ = group;
-                 Settings settings;
-                 settings.BeginGroup("Collection");
-                 settings.SetValue("groupby", group);
-                 settings.Sync();
+               Dialogs::GroupBy(GTK_WINDOW(self->window_), self->grouping_, [self](const CollectionGrouping::Grouping &grouping) {
+                 self->grouping_ = grouping;
+                 CollectionGrouping::SaveCurrent(grouping);
                  self->RefreshCollection();
                });
              }));
@@ -660,44 +656,58 @@ void MainWindow::ConnectSignals() {
   }, this);
 }
 
+void MainWindow::AppendCollectionNode(GtkWidget *parent, const CollectionGrouping::Node &node, int depth) {
+  for (const CollectionGrouping::Node &child : node.children) {
+    GtkWidget *expander = gtk_expander_new(child.display.c_str());
+    gtk_expander_set_expanded(GTK_EXPANDER(expander), depth < 1);
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_margin_start(box, 8);
+    gtk_expander_set_child(GTK_EXPANDER(expander), box);
+    if (GTK_IS_LIST_BOX(parent)) {
+      GtkWidget *row = gtk_list_box_row_new();
+      gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(row), FALSE);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), expander);
+      gtk_list_box_append(GTK_LIST_BOX(parent), row);
+    } else {
+      gtk_box_append(GTK_BOX(parent), expander);
+    }
+    AppendCollectionNode(box, child, depth + 1);
+  }
+  for (const Song &song : node.songs) {
+    auto *copy = new Song(song);
+    const std::string text = (song.track() > 0 ? std::to_string(song.track()) + ". " : "") + song.PrettyTitle();
+    GtkWidget *button = gtk_button_new_with_label(text.c_str());
+    gtk_widget_add_css_class(button, "flat");
+    gtk_widget_set_halign(button, GTK_ALIGN_START);
+    g_object_set_data_full(G_OBJECT(button), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                       auto *self = static_cast<MainWindow *>(data);
+                       if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(btn), "song"))) {
+                         self->app_->playlist_manager()->AppendSongs({*song});
+                         self->RefreshPlaylist();
+                       }
+                     }),
+                     this);
+    if (GTK_IS_LIST_BOX(parent)) {
+      GtkWidget *row = gtk_list_box_row_new();
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), button);
+      gtk_list_box_append(GTK_LIST_BOX(parent), row);
+    } else {
+      gtk_box_append(GTK_BOX(parent), button);
+    }
+  }
+}
+
 void MainWindow::RefreshCollection(const std::string &filter) {
   ClearList(collection_list_);
   const SongList songs = app_->collection()->Songs(filter);
-  std::string last_header;
-  GtkWidget *current_box = nullptr;
-  for (const Song &song : songs) {
-    const std::string header = CollectionHeader(song);
-    if (header != last_header) {
-      GtkWidget *expander = gtk_expander_new(header.c_str());
-      gtk_expander_set_expanded(GTK_EXPANDER(expander), TRUE);
-      current_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-      gtk_expander_set_child(GTK_EXPANDER(expander), current_box);
-      GtkWidget *header_row = gtk_list_box_row_new();
-      gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(header_row), FALSE);
-      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(header_row), expander);
-      gtk_list_box_append(GTK_LIST_BOX(collection_list_), header_row);
-      last_header = header;
-    }
-    auto *copy = new Song(song);
-    const std::string text = (song.track() > 0 ? std::to_string(song.track()) + ". " : "") + song.PrettyTitle();
-    if (current_box) {
-      GtkWidget *button = gtk_button_new_with_label(text.c_str());
-      gtk_widget_add_css_class(button, "flat");
-      gtk_widget_set_halign(button, GTK_ALIGN_START);
-      g_object_set_data_full(G_OBJECT(button), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
-      g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
-                         auto *self = static_cast<MainWindow *>(data);
-                         if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(btn), "song"))) {
-                           self->app_->playlist_manager()->AppendSongs({*song});
-                           self->RefreshPlaylist();
-                         }
-                       }),
-                       this);
-      gtk_box_append(GTK_BOX(current_box), button);
-    } else {
-      AppendStringRow(GTK_LIST_BOX(collection_list_), text, copy, [](gpointer p) { delete static_cast<Song *>(p); });
-    }
-  }
+  Settings settings;
+  settings.BeginGroup("Collection");
+  const CollectionGrouping::Node tree =
+      CollectionGrouping::BuildTree(songs, grouping_, CollectionGrouping::SeparateAlbumsByGrouping(),
+                                    settings.BoolValue("sort_skip_articles_for_artists", false),
+                                    settings.BoolValue("sort_skip_articles_for_albums", false));
+  AppendCollectionNode(collection_list_, tree, 0);
   gtk_label_set_text(GTK_LABEL(status_label_), (std::to_string(songs.size()) + " songs").c_str());
 }
 
@@ -1017,22 +1027,6 @@ void MainWindow::RefreshPlaylistTabs() {
                      this);
     gtk_box_append(GTK_BOX(playlist_tabs_), button);
   }
-}
-
-std::string MainWindow::CollectionHeader(const Song &song) const {
-  if (collection_group_ == "album") {
-    return song.album().empty() ? "Unknown album" : song.album();
-  }
-  if (collection_group_ == "genre") {
-    return song.genre().empty() ? "Unknown genre" : song.genre();
-  }
-  if (collection_group_ == "year") {
-    return song.year() > 0 ? std::to_string(song.year()) : "Unknown year";
-  }
-  if (collection_group_ == "artist") {
-    return song.EffectiveAlbumartist().empty() ? "Unknown artist" : song.EffectiveAlbumartist();
-  }
-  return song.EffectiveAlbumartist() + " – " + song.album();
 }
 
 void MainWindow::RefreshSmartPlaylists() {

@@ -1,6 +1,8 @@
 #ifndef STRAWBERRY_DIALOGS_H
 #define STRAWBERRY_DIALOGS_H
 
+#include "collection/collectiongrouping.h"
+
 #include <functional>
 #include <string>
 
@@ -23,7 +25,9 @@ class Dialogs {
   static void GrabShortcut(GtkWindow *parent, const std::function<void(const std::string &)> &callback);
   static void Login(GtkWindow *parent, const std::string &service, const std::function<void(const std::string &, const std::string &)> &callback);
   static void SmartPlaylistWizard(GtkWindow *parent, Application *app);
-  static void GroupBy(GtkWindow *parent, const std::function<void(const std::string &)> &callback);
+  static void GroupBy(GtkWindow *parent, const CollectionGrouping::Grouping &current,
+                      const std::function<void(const CollectionGrouping::Grouping &)> &callback);
+  static void ManageSavedGroupings(GtkWindow *parent, const std::function<void(const CollectionGrouping::Grouping &)> &callback);
   static void PlaylistColumns(GtkWindow *parent, const std::function<void()> &callback);
   static void DeleteFiles(GtkWindow *parent, Application *app);
   static void CopyToDevice(GtkWindow *parent, Application *app);

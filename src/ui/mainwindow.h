@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_MAINWINDOW_H
 #define STRAWBERRY_MAINWINDOW_H
 
+#include "collection/collectiongrouping.h"
 #include "core/application.h"
 #include "core/commandlineoptions.h"
 
@@ -92,7 +93,7 @@ class MainWindow {
   void CycleAnalyzer();
   void RunSmartPlaylist(const std::string &kind);
   void RefreshPlaylistTabs();
-  std::string CollectionHeader(const Song &song) const;
+  void AppendCollectionNode(GtkWidget *parent, const CollectionGrouping::Node &node, int depth);
   void PlayRadioChannel(const RadioChannel &channel);
   void ShowPlaylistMenu(double x, double y);
   std::vector<int> SelectedPlaylistRows() const;
@@ -153,7 +154,7 @@ class MainWindow {
   GtkWidget *playlist_tabs_ = nullptr;
   std::string files_path_;
   std::string device_browse_id_;
-  std::string collection_group_ = "artist-album";
+  CollectionGrouping::Grouping grouping_;
   std::string playlist_filter_;
   PlaylistColumn sort_column_ = PlaylistColumn::Title;
   bool sort_descending_ = false;

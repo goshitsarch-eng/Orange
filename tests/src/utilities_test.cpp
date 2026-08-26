@@ -2,8 +2,10 @@
 #include "utilities/timeutils.h"
 #include "utilities/fileutils.h"
 #include "utilities/audioanalysis.h"
+#include "collection/collectiongrouping.h"
 #include "core/oauthenticator.h"
 #include "device/devicemanager.h"
+#include "equalizer/equalizer.h"
 #include "organize/organize.h"
 #include "analyzer/analyzer.h"
 
@@ -60,6 +62,104 @@ TEST(OrganizeFormat, ExpandsTokens) {
   song.set_title("Title");
   song.set_track(3);
   EXPECT_EQ("Artist/Album/03 - Title", format.GetFilenameForSong(song));
+}
+
+TEST(OrganizeFormat, OptionalBlocks) {
+  OrganizeFormat format("%albumartist/%album{ - Disc %disc}/{%track - }%title");
+  Song with_disc;
+  with_disc.set_albumartist("Artist");
+  with_disc.set_album("Album");
+  with_disc.set_title("Title");
+  with_disc.set_track(3);
+  with_disc.set_disc(2);
+  EXPECT_EQ("Artist/Album - Disc 2/03 - Title", format.GetFilenameForSong(with_disc));
+  Song without;
+  without.set_albumartist("Artist");
+  without.set_album("Album");
+  without.set_title("Title");
+  EXPECT_EQ("Artist/Album/Title", format.GetFilenameForSong(without));
+  EXPECT_FALSE(OrganizeFormat::TokenHasValue("%disc", without));
+}
+
+TEST(Organize, ReportsMissingSource) {
+  Song song;
+  song.set_title("Missing");
+  song.set_url("file:///tmp/does-not-exist-strawberry-organize.flac");
+  song.set_valid(true);
+  const auto errors = Organize().Copy({song}, "/tmp", OrganizeFormat("%title"), false);
+  ASSERT_EQ(1u, errors.size());
+  EXPECT_NE(std::string::npos, errors[0].message.find("missing"));
+}
+
+TEST(CollectionGrouping, DisplayAndKeys) {
+  Song song;
+  song.set_albumartist("Fleet Foxes");
+  song.set_album("Helplessness Blues");
+  song.set_year(2011);
+  song.set_disc(1);
+  song.set_track(2);
+  song.set_title("Montezuma");
+  song.set_genre("Folk");
+  song.set_filetype(Song::FileType::FLAC);
+  EXPECT_EQ("Fleet Foxes", CollectionGrouping::DisplayText(CollectionGrouping::GroupBy::AlbumArtist, song));
+  EXPECT_EQ("2011 - Helplessness Blues", CollectionGrouping::DisplayText(CollectionGrouping::GroupBy::YearAlbum, song));
+  EXPECT_EQ("Helplessness Blues - (Disc 1)", CollectionGrouping::DisplayText(CollectionGrouping::GroupBy::AlbumDisc, song));
+  EXPECT_EQ("Unknown", CollectionGrouping::TextOrUnknown({}));
+  EXPECT_EQ("Folk", CollectionGrouping::DisplayText(CollectionGrouping::GroupBy::Genre, song));
+  bool unique = false;
+  const std::string key = CollectionGrouping::ContainerKey(CollectionGrouping::GroupBy::Album, song, &unique, false);
+  EXPECT_NE(std::string::npos, key.find("Helplessness Blues"));
+  EXPECT_TRUE(CollectionGrouping::IsAlbumGroupBy(CollectionGrouping::GroupBy::YearAlbumDisc));
+  EXPECT_EQ(CollectionGrouping::GroupBy::AlbumArtist, CollectionGrouping::FromLegacy("artist-album").first);
+  EXPECT_EQ(2, CollectionGrouping::ComboIndex(CollectionGrouping::GroupBy::AlbumArtist));
+}
+
+TEST(CollectionGrouping, BuildTreeThreeLevels) {
+  Song a;
+  a.set_albumartist("A");
+  a.set_album("One");
+  a.set_title("First");
+  a.set_track(1);
+  a.set_valid(true);
+  Song b;
+  b.set_albumartist("A");
+  b.set_album("Two");
+  b.set_title("Second");
+  b.set_track(1);
+  b.set_valid(true);
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::Album;
+  grouping.third = CollectionGrouping::GroupBy::None;
+  const auto tree = CollectionGrouping::BuildTree({a, b}, grouping, false, false, false);
+  ASSERT_EQ(1u, tree.children.size());
+  EXPECT_EQ("A", tree.children[0].display);
+  ASSERT_EQ(2u, tree.children[0].children.size());
+}
+
+TEST(CollectionGrouping, SavedRoundTrip) {
+  CollectionGrouping::Grouping grouping{CollectionGrouping::GroupBy::Genre, CollectionGrouping::GroupBy::Year, CollectionGrouping::GroupBy::Album};
+  CollectionGrouping::AddSaved("GTK test grouping", grouping);
+  const auto saved = CollectionGrouping::LoadSaved();
+  bool found = false;
+  for (const auto &entry : saved) {
+    if (entry.first == "GTK test grouping") {
+      found = entry.second == grouping;
+    }
+  }
+  EXPECT_TRUE(found);
+  CollectionGrouping::RemoveSaved("GTK test grouping");
+}
+
+TEST(Equalizer, BuiltinPresets) {
+  const auto names = Equalizer::BuiltinPresetNames();
+  EXPECT_NE(names.end(), std::find(names.begin(), names.end(), "Rock"));
+  EXPECT_NE(names.end(), std::find(names.begin(), names.end(), "Techno"));
+  EXPECT_NE(names.end(), std::find(names.begin(), names.end(), "Laptop/Headphones"));
+  EXPECT_GE(names.size(), 14u);
+  Equalizer eq;
+  eq.LoadPreset("Rock");
+  EXPECT_NE(0, eq.gains()[0]);
 }
 
 TEST(Analyzer, Types) {

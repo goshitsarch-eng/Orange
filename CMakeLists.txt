@@ -161,6 +161,7 @@ set(STRAWBERRY_SOURCES
   src/collection/collectionbackend.cpp
   src/collection/collectionwatcher.cpp
   src/collection/collectionlibrary.cpp
+  src/collection/collectiongrouping.cpp
   src/playlist/playlist.cpp
   src/playlist/playlistbackend.cpp
   src/playlist/playlistmanager.cpp
@@ -289,6 +290,8 @@ if(GTest_FOUND)
     src/filterparser/filterparser.cpp
     src/playlist/playlist.cpp
     src/collection/collectionbackend.cpp
+    src/collection/collectiongrouping.cpp
+    src/equalizer/equalizer.cpp
     src/organize/organize.cpp
     src/analyzer/analyzer.cpp
   )
