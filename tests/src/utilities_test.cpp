@@ -37,6 +37,8 @@
 #include "moodbar/moodbarbuilder.h"
 #include "transcoder/transcoder.h"
 #include "waveform/waveformbuilder.h"
+#include "transcoder/transcoderoptionsinterface.h"
+#include "widgets/playingwidget.h"
 #include "widgets/stretchheaderview.h"
 
 #include <algorithm>
@@ -355,6 +357,17 @@ TEST(Transcoder, PresetAndPipelineFor) {
   EXPECT_NE(std::string::npos, mp3.find("xingmux"));
   const std::string opus = Transcoder::PipelineFor(Transcoder::Format::Opus, 5);
   EXPECT_NE(std::string::npos, opus.find("opusenc"));
+  EXPECT_NE(std::string::npos, opus.find("bitrate="));
+  const std::string aac = Transcoder::PipelineFor(Transcoder::Format::AAC, 5);
+  EXPECT_NE(std::string::npos, aac.find("avenc_aac"));
+  EXPECT_NE(std::string::npos, aac.find("mp4mux"));
+  const std::string speex = Transcoder::PipelineFor(Transcoder::Format::Speex, 8);
+  EXPECT_NE(std::string::npos, speex.find("speexenc quality=8"));
+  const std::string wavpack = Transcoder::PipelineFor(Transcoder::Format::WavPack, 9);
+  EXPECT_NE(std::string::npos, wavpack.find("wavpackenc mode=2"));
+  const std::string asf = Transcoder::PipelineFor(Transcoder::Format::ASF, 5);
+  EXPECT_NE(std::string::npos, asf.find("avenc_wmav2"));
+  EXPECT_EQ(192, TranscoderOptionsInterface::BitrateKbps(5, 64, 320));
   Transcoder transcoder;
   transcoder.set_quality(8);
   EXPECT_EQ(8, transcoder.quality());
@@ -638,6 +651,17 @@ TEST(Appearance, BackgroundCssForTypesAndUrls) {
   EXPECT_NE(std::string::npos, custom.find("file:///tmp/wall.jpg"));
   EXPECT_NE(std::string::npos, custom.find("top left"));
   EXPECT_NE(std::string::npos, custom.find("blur(8px)"));
+}
+
+TEST(PlayingWidget, CoverSizeAndFade) {
+  EXPECT_EQ(PlayingWidget::kSmallCover, PlayingWidget::CoverSize(PlayingWidget::Mode::SmallSongDetails, true, 400));
+  EXPECT_EQ(PlayingWidget::kLargeCover, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, false, 400));
+  EXPECT_EQ(320, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, true, 800));
+  EXPECT_EQ(80, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, true, 20));
+  EXPECT_EQ(0.0, PlayingWidget::FadeInOpacity(0));
+  EXPECT_EQ(1.0, PlayingWidget::FadeInOpacity(PlayingWidget::kFadeTimelineMs));
+  EXPECT_NEAR(0.5, PlayingWidget::FadeInOpacity(500), 0.001);
+  EXPECT_NEAR(0.5, PlayingWidget::FadeOutOpacity(500), 0.001);
 }
 
 TEST(ContextFormatTokens, InsertsKnownTokens) {

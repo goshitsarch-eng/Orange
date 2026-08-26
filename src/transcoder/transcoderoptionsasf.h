@@ -9,6 +9,7 @@ class TranscoderOptionsAsf : public TranscoderOptionsInterface {
   std::string EncoderElement() const override { return "avenc_wmav2"; }
   std::string MuxerElement() const override { return "asfmux"; }
   void ApplyQuality(int quality) override { quality_ = quality; }
+  std::string PipelineFragment() const override;
   int quality() const { return quality_; }
 
  private:

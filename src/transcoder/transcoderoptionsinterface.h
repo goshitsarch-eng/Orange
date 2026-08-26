@@ -13,6 +13,7 @@ class TranscoderOptionsInterface {
   virtual std::string MuxerElement() const = 0;
   virtual void ApplyQuality(int quality) = 0;
   virtual std::string PipelineFragment() const;
+  static int BitrateKbps(int quality, int min_kbps = 64, int max_kbps = 320);
 };
 
 #endif

@@ -9,6 +9,7 @@ class TranscoderOptionsSpeex : public TranscoderOptionsInterface {
   std::string EncoderElement() const override { return "speexenc"; }
   std::string MuxerElement() const override { return "oggmux"; }
   void ApplyQuality(int quality) override { quality_ = quality; }
+  std::string PipelineFragment() const override;
   int quality() const { return quality_; }
 
  private:

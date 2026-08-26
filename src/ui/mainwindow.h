@@ -89,6 +89,7 @@ class MainWindow {
   void ApplyAppearance();
   void RestoreGeometry();
   void SaveGeometry();
+  void PlacePlayingWidget();
   void SelectPlaylistRow(int index, bool add);
   std::vector<int> SelectedPlaylistRows() const;
   SongList SelectedSongs() const;

@@ -4,8 +4,10 @@
 #include "core/logging.h"
 
 #include <cstring>
+#include "constants/coverssettings.h"
 #include "core/settings.h"
 #include "core/standardpaths.h"
+#include "lyrics/lyricsproviderorder.h"
 #include "covermanager/deezercoverprovider.h"
 #include "covermanager/discogscoverprovider.h"
 #include "covermanager/lastfmcoverprovider.h"
@@ -52,10 +54,40 @@ CoverProviders::CoverProviders(NetworkAccessManager *network) : network_(network
 
 void CoverProviders::ReloadSettings() {
   Settings settings;
-  settings.BeginGroup("Covers");
-  for (auto &provider : providers_) {
+  settings.BeginGroup(CoversSettings::kSettingsGroup);
+  const std::vector<std::string> order = LyricsProviderOrder::Parse(settings.Value(CoversSettings::kProviders, ""));
+  for (size_t i = 0; i < providers_.size(); ++i) {
+    auto &provider = providers_[i];
     provider->set_enabled(settings.BoolValue(provider->name(), true));
+    provider->set_order(LyricsProviderOrder::Rank(order, provider->name(), static_cast<int>(1000 + i)));
   }
+  std::sort(providers_.begin(), providers_.end(), [](const std::unique_ptr<CoverProvider> &a, const std::unique_ptr<CoverProvider> &b) {
+    return a->order() < b->order();
+  });
+}
+
+void CoverProviders::SaveOrder() {
+  std::vector<std::string> names;
+  names.reserve(providers_.size());
+  for (const auto &provider : providers_) {
+    names.push_back(provider->name());
+  }
+  Settings settings;
+  settings.BeginGroup(CoversSettings::kSettingsGroup);
+  settings.SetValue(CoversSettings::kProviders, LyricsProviderOrder::Join(names));
+  settings.Sync();
+}
+
+void CoverProviders::Move(int index, int delta) {
+  const int dest = index + delta;
+  if (index < 0 || dest < 0 || dest >= static_cast<int>(providers_.size())) {
+    return;
+  }
+  std::swap(providers_[static_cast<size_t>(index)], providers_[static_cast<size_t>(dest)]);
+  for (size_t i = 0; i < providers_.size(); ++i) {
+    providers_[i]->set_order(static_cast<int>(i));
+  }
+  SaveOrder();
 }
 
 void CoverProviders::Fetch(const Song &song, CoverProvider::Callback callback) {

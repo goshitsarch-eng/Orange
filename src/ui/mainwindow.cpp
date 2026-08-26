@@ -870,6 +870,7 @@ void MainWindow::BuildPlayerBar() {
   gtk_widget_set_margin_end(box, 12);
   gtk_widget_set_margin_bottom(box, 12);
   gtk_box_append(GTK_BOX(box), playing_widget_->widget());
+  playing_widget_->AboveStatusBarChanged.Connect([this](bool) { PlacePlayingWidget(); });
 
   waveform_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(waveform_drawing_, -1, 28);
@@ -950,6 +951,25 @@ void MainWindow::BuildPlayerBar() {
   g_signal_connect(love_button_, "clicked", G_CALLBACK(OnLove), this);
   UpdateScrobblerButtons();
   g_object_set_data(G_OBJECT(play_button_), "player-box", box);
+  PlacePlayingWidget();
+}
+
+void MainWindow::PlacePlayingWidget() {
+  if (!playing_widget_ || !play_button_) {
+    return;
+  }
+  GtkWidget *box = GTK_WIDGET(g_object_get_data(G_OBJECT(play_button_), "player-box"));
+  if (!box) {
+    return;
+  }
+  GtkWidget *playing = playing_widget_->widget();
+  if (playing_widget_->above_status_bar() && status_label_) {
+    GtkWidget *before = loading_indicator_ ? loading_indicator_->widget() : nullptr;
+    gtk_box_reorder_child_after(GTK_BOX(box), playing, before);
+    gtk_box_reorder_child_after(GTK_BOX(box), status_label_, playing);
+  } else {
+    gtk_box_reorder_child_after(GTK_BOX(box), playing, nullptr);
+  }
 }
 
 void MainWindow::ConnectSignals() {
@@ -972,15 +992,23 @@ void MainWindow::ConnectSignals() {
   app_->player()->SongChanged.Connect([this](const Song &) { UpdateNowPlaying(); });
   app_->player()->Stopped.Connect([this]() {
     if (playing_widget_) {
-      playing_widget_->SongChanged(Song());
-      playing_widget_->SetCover({});
+      playing_widget_->Stopped();
     }
     if (context_view_) {
       context_view_->Stopped();
     }
     UpdatePlaybackButtons();
   });
-  app_->player()->StateChanged.Connect([this](GstEngine::State) { UpdatePlaybackButtons(); });
+  app_->player()->StateChanged.Connect([this](GstEngine::State state) {
+    if (playing_widget_) {
+      if (state == GstEngine::State::Playing) {
+        playing_widget_->Playing();
+      } else if (state == GstEngine::State::Error) {
+        playing_widget_->Error();
+      }
+    }
+    UpdatePlaybackButtons();
+  });
   app_->player()->VolumeChanged.Connect([this](unsigned volume) {
     if (volume_slider_) {
       volume_slider_->SetVolume(volume);
@@ -1268,6 +1296,9 @@ void MainWindow::UpdateNowPlaying() {
       }
     });
     if (cover_controller_) {
+      if (playing_widget_) {
+        playing_widget_->SearchCoverInProgress();
+      }
       Song mutable_song = song;
       cover_controller_->SearchCoverAutomatically(&mutable_song, playing_widget_ ? playing_widget_->cover() : nullptr);
     }

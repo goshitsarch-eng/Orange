@@ -1016,6 +1016,11 @@ if(GTest_FOUND)
     src/transcoder/transcoderoptionsmp3.cpp
     src/transcoder/transcoderoptionsflac.cpp
     src/transcoder/transcoderoptionsvorbis.cpp
+    src/transcoder/transcoderoptionsaac.cpp
+    src/transcoder/transcoderoptionsopus.cpp
+    src/transcoder/transcoderoptionsspeex.cpp
+    src/transcoder/transcoderoptionswavpack.cpp
+    src/transcoder/transcoderoptionsasf.cpp
     src/transcoder/transcoderoptionsdialog.cpp
   )
   target_compile_options(strawberry_tests PRIVATE -Wno-overlength-strings)
