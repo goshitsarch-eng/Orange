@@ -872,10 +872,10 @@ TEST(Transcoder, PresetAndPipelineFor) {
   EXPECT_EQ("Transcoder/ffenc_wmav2", TranscoderOptionsFields::GroupFor(Transcoder::Format::ASF));
   EXPECT_STREQ("Transcoder/avenc_aac", TranscoderOptionsFields::LegacyGroupFor(Transcoder::Format::AAC));
   EXPECT_STREQ("Transcoder/avenc_wmav2", TranscoderOptionsFields::LegacyGroupFor(Transcoder::Format::ASF));
-  TranscoderOptionsFields::Opus opus;
-  EXPECT_EQ(320000, opus.bitrate_bps);
-  opus.ApplyQuality(5);
-  EXPECT_NE(std::string::npos, opus.Pipeline().find("opusenc bitrate="));
+  TranscoderOptionsFields::Opus opus_opts;
+  EXPECT_EQ(320000, opus_opts.bitrate_bps);
+  opus_opts.ApplyQuality(5);
+  EXPECT_NE(std::string::npos, opus_opts.Pipeline().find("opusenc bitrate="));
   TranscoderOptionsFields::Asf asf_opts;
   EXPECT_EQ(320000, asf_opts.bitrate_bps);
   asf_opts.ApplyQuality(5);
