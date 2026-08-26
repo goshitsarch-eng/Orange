@@ -4,11 +4,15 @@
 #include "core/seekbarsettings.h"
 #include "core/settings.h"
 #include "core/standardpaths.h"
+#include "utilities/analysisasync.h"
 #include "utilities/fileutils.h"
 #include "waveform/waveformpipeline.h"
 #include "waveform/waveformstyle.h"
 
+#include <glib.h>
+
 #include <cstdlib>
+#include <memory>
 
 namespace {
 
@@ -45,12 +49,33 @@ std::vector<float> ReadPeaks(const std::string &path) {
   return ParsePeaks(FileUtils::ReadFile(path));
 }
 
+struct WaveJob {
+  WaveformController *controller = nullptr;
+  std::shared_ptr<bool> alive;
+  int generation = 0;
+  Song song;
+  bool save = false;
+  std::string cache_dir;
+  std::vector<float> data;
+};
+
+gpointer WaveformGenerateThread(gpointer data) {
+  auto *job = static_cast<WaveJob *>(data);
+  job->data = WaveformLoader().Generate(job->song, job->save, job->cache_dir);
+  g_idle_add(+[](gpointer idle_data) -> gboolean {
+    std::unique_ptr<WaveJob> job(static_cast<WaveJob *>(idle_data));
+    if (!job->alive || !*job->alive || !job->controller) {
+      return G_SOURCE_REMOVE;
+    }
+    job->controller->ApplyGenerated(job->generation, std::move(job->data));
+    return G_SOURCE_REMOVE;
+  }, job);
+  return nullptr;
+}
+
 }  // namespace
 
-std::vector<float> WaveformLoader::Load(const Song &song) {
-  Settings settings;
-  settings.BeginGroup(WaveformSettings::kSettingsGroup);
-  const bool save = settings.BoolValue(WaveformSettings::kSave, WaveformSettings::kDefaultSave);
+std::vector<float> WaveformLoader::LoadCached(const Song &song) const {
   const std::string path = FileUtils::PathFromUri(song.url());
   for (const std::string &sidecar : WaveformStyle::Sidecars(path)) {
     const std::vector<float> data = ReadPeaks(sidecar);
@@ -58,34 +83,80 @@ std::vector<float> WaveformLoader::Load(const Song &song) {
       return data;
     }
   }
-  const std::string cache = WaveformStyle::CacheFile(StandardPaths::WaveformCacheDir(), song.url());
-  const std::vector<float> cached = ReadPeaks(cache);
-  if (!cached.empty()) {
-    return cached;
-  }
+  return ReadPeaks(WaveformStyle::CacheFile(StandardPaths::WaveformCacheDir(), song.url()));
+}
+
+std::vector<float> WaveformLoader::Generate(const Song &song, bool save, const std::string &cache_dir) const {
   const std::vector<float> peaks = WaveformPipeline::Run(song.url());
   if (peaks.empty()) {
     return peaks;
   }
   const std::string serialized = SerializePeaks(peaks);
+  const std::string cache = WaveformStyle::CacheFile(cache_dir.empty() ? StandardPaths::WaveformCacheDir() : cache_dir, song.url());
   FileUtils::WriteFile(cache, serialized);
+  const std::string path = FileUtils::PathFromUri(song.url());
   if (save && !path.empty()) {
     FileUtils::WriteFile(WaveformStyle::HiddenSidecar(path), serialized);
   }
   return peaks;
 }
 
+std::vector<float> WaveformLoader::Load(const Song &song) {
+  Settings settings;
+  settings.BeginGroup(WaveformSettings::kSettingsGroup);
+  const bool save = settings.BoolValue(WaveformSettings::kSave, WaveformSettings::kDefaultSave);
+  const std::vector<float> cached = LoadCached(song);
+  if (!cached.empty()) {
+    return cached;
+  }
+  return Generate(song, save, StandardPaths::WaveformCacheDir());
+}
+
 WaveformController::WaveformController(WaveformLoader *loader) : loader_(loader) {}
+
+WaveformController::~WaveformController() { *alive_ = false; }
+
+void WaveformController::ApplyGenerated(int generation, std::vector<float> data) {
+  if (!AnalysisAsync::AcceptGeneration(generation, generation_, alive_ && *alive_)) {
+    return;
+  }
+  data_ = std::move(data);
+  busy_ = false;
+  Ready.Emit(data_);
+}
 
 void WaveformController::Load(const Song &song) {
   Settings settings;
   settings.BeginGroup(SeekbarSettings::kSettingsGroup);
-  if (static_cast<SeekbarSettings::Mode>(settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode))) !=
-      SeekbarSettings::Mode::Waveform) {
+  const bool enabled = static_cast<SeekbarSettings::Mode>(settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode))) ==
+                       SeekbarSettings::Mode::Waveform;
+  settings.EndGroup();
+  ++generation_;
+  busy_ = false;
+  if (!enabled) {
     data_.clear();
     Ready.Emit(data_);
     return;
   }
-  data_ = loader_ ? loader_->Load(song) : std::vector<float>{};
+  const std::vector<float> cached = loader_ ? loader_->LoadCached(song) : std::vector<float>{};
+  if (!AnalysisAsync::NeedsGenerate(true, !cached.empty())) {
+    data_ = cached;
+    Ready.Emit(data_);
+    return;
+  }
+  data_.clear();
   Ready.Emit(data_);
+  if (!loader_) {
+    return;
+  }
+  settings.BeginGroup(WaveformSettings::kSettingsGroup);
+  auto *job = new WaveJob;
+  job->controller = this;
+  job->alive = alive_;
+  job->generation = generation_;
+  job->song = song;
+  job->save = settings.BoolValue(WaveformSettings::kSave, WaveformSettings::kDefaultSave);
+  job->cache_dir = StandardPaths::WaveformCacheDir();
+  busy_ = true;
+  g_thread_unref(g_thread_new("waveform-generate", WaveformGenerateThread, job));
 }

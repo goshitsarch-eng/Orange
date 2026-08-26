@@ -2,6 +2,7 @@
 #include "constants/waveformsettings.h"
 #include "moodbar/moodbarpaths.h"
 #include "moodbar/moodbarstyle.h"
+#include "utilities/analysisasync.h"
 #include "waveform/waveformstyle.h"
 
 #include <gtest/gtest.h>
@@ -65,4 +66,13 @@ TEST(WaveformStyle, ColorCurveAndSidecars) {
   EXPECT_EQ("/music/.song.flac.waveform", WaveformStyle::HiddenSidecar("/music/song.flac"));
   EXPECT_EQ("/music/song.flac.waveform", WaveformStyle::VisibleSidecar("/music/song.flac"));
   EXPECT_EQ("/tmp/cache/song.flac.wave", WaveformStyle::CacheFile("/tmp/cache", "file:///music/song.flac"));
+}
+
+TEST(AnalysisAsync, GenerateOnlyWhenEnabledAndCacheMisses) {
+  EXPECT_TRUE(AnalysisAsync::NeedsGenerate(true, false));
+  EXPECT_FALSE(AnalysisAsync::NeedsGenerate(true, true));
+  EXPECT_FALSE(AnalysisAsync::NeedsGenerate(false, false));
+  EXPECT_TRUE(AnalysisAsync::AcceptGeneration(3, 3, true));
+  EXPECT_FALSE(AnalysisAsync::AcceptGeneration(2, 3, true));
+  EXPECT_FALSE(AnalysisAsync::AcceptGeneration(3, 3, false));
 }
