@@ -31,6 +31,8 @@ class CollectionLibrary {
   void RemoveDirectory(int id);
   SongList Songs(const std::string &filter = {}) const;
   SongList Songs(const CollectionFilterOptions &options) const;
+  void SyncPlaycountAndRatingToFiles();
+  void SyncPlaycountAndRatingToFilesAsync();
 
   Signal<> ScanFinished;
 

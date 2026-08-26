@@ -2,6 +2,8 @@
 
 #include "constants/collectionsettings.h"
 #include "collection/collectionbackend.h"
+#include "collection/collectioniconcache.h"
+#include "collection/collectionstats.h"
 #include "core/application.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
@@ -111,12 +113,33 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
   const std::vector<std::pair<std::string, std::string>> units = {{"0", "KB"}, {"1", "MB"}, {"2", "GB"}, {"3", "TB"}};
   SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsCacheSizeUnit, "Icon cache unit",
                             units, static_cast<int>(CollectionSettings::kDefaultSettingsCacheSizeUnit));
-  SettingsPage::AddToggle(cache, settings, CollectionSettings::kSettingsDiskCacheEnable, "Enable disk cache", nullptr,
-                          CollectionSettings::kDefaultSettingsDiskCacheEnable);
+  GtkWidget *disk_enable = SettingsPage::AddToggle(cache, settings, CollectionSettings::kSettingsDiskCacheEnable, "Enable disk cache",
+                                                   nullptr, CollectionSettings::kDefaultSettingsDiskCacheEnable);
   SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsDiskCacheSize, "Disk cache size",
                             CollectionSettings::kSettingsDiskCacheSizeDefault);
   SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsDiskCacheSizeUnit,
                             "Disk cache unit", units, static_cast<int>(CollectionSettings::kDefaultSettingsDiskCacheSizeUnit));
+  AdwActionRow *in_use = ADW_ACTION_ROW(adw_action_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(in_use), Translations::CStr(CollectionStats::CacheInUseTitle()));
+  adw_action_row_set_subtitle(in_use, CollectionIconCache::InUseLabel().c_str());
+  GtkWidget *clear_cache = gtk_button_new_with_label(Translations::CStr(CollectionStats::ClearCacheLabel()));
+  gtk_widget_add_css_class(clear_cache, "destructive-action");
+  g_object_set_data(G_OBJECT(clear_cache), "in-use-row", in_use);
+  g_signal_connect(clear_cache, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
+                     CollectionIconCache::Clear();
+                     if (auto *row = ADW_ACTION_ROW(g_object_get_data(G_OBJECT(button), "in-use-row"))) {
+                       adw_action_row_set_subtitle(row, CollectionIconCache::InUseLabel().c_str());
+                     }
+                   }),
+                   nullptr);
+  adw_action_row_add_suffix(in_use, clear_cache);
+  adw_preferences_group_add(cache, GTK_WIDGET(in_use));
+  gtk_widget_set_sensitive(GTK_WIDGET(in_use), settings->BoolValue(CollectionSettings::kSettingsDiskCacheEnable,
+                                                                  CollectionSettings::kDefaultSettingsDiskCacheEnable));
+  g_signal_connect(disk_enable, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
+                     gtk_widget_set_sensitive(GTK_WIDGET(data), adw_switch_row_get_active(row));
+                   }),
+                   in_use);
 
   AdwPreferencesGroup *tags = SettingsPage::AddGroup(page, "Tags");
   SettingsPage::AddToggle(tags, settings, CollectionSettings::kSavePlayCounts, "Save playcounts to files", nullptr,
@@ -126,6 +149,25 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
                           CollectionSettings::kDefaultOverwritePlaycount);
   SettingsPage::AddToggle(tags, settings, CollectionSettings::kOverwriteRating, "Overwrite existing ratings", nullptr,
                           CollectionSettings::kDefaultOverwriteRating);
+  if (app) {
+    SettingsPage::AddButtonRow(tags, "", CollectionStats::SaveNowLabel(), [app](GtkWidget *button) {
+      AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(CollectionStats::ConfirmTitle()),
+                                                                    Translations::CStr(CollectionStats::ConfirmText())));
+      adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "write", Translations::CStr("Write"), nullptr);
+      adw_alert_dialog_set_response_appearance(dialog, "write", ADW_RESPONSE_SUGGESTED);
+      g_object_set_data(G_OBJECT(dialog), "app", app);
+      g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
+                         if (g_strcmp0(response, "write") != 0) {
+                           return;
+                         }
+                         if (auto *application = static_cast<Application *>(data)) {
+                           application->collection()->SyncPlaycountAndRatingToFilesAsync();
+                         }
+                       }),
+                       app);
+      adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(WindowForWidget(button)));
+    });
+  }
   SettingsPage::AddToggle(tags, settings, CollectionSettings::kDeleteFiles, "Allow deleting files from collection", nullptr,
                           CollectionSettings::kDefaultDeleteFiles);
 

@@ -1,6 +1,8 @@
 #include "collection/collectionbackend.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectioncover.h"
+#include "collection/collectioniconcache.h"
+#include "collection/collectionstats.h"
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
 #include "collection/collectionwatcher.h"
@@ -613,4 +615,39 @@ TEST(CollectionMenu, MixedEditableHidesOrganize) {
   EXPECT_TRUE(CollectionMenu::Contains(mixed, CollectionMenu::Action::Rescan));
   EXPECT_TRUE(CollectionMenu::Contains(mixed, CollectionMenu::Action::EditTrack));
   EXPECT_FALSE(CollectionMenu::CopyToDeviceEnabled(CollectionMenu::Analyze({editable}, true, false)));
+}
+
+TEST(CollectionIconCache, SizeLabelsSafeKeysAndTempStore) {
+  EXPECT_STREQ("pixmapcache", CollectionIconCache::kPixmapDiskCacheDir);
+  EXPECT_EQ(160 * 1024, CollectionIconCache::MaximumCacheSize(160, 0));
+  EXPECT_EQ(360LL * 1024 * 1024, CollectionIconCache::MaximumCacheSize(360, 1));
+  EXPECT_EQ("empty", CollectionIconCache::InUseLabel(0));
+  EXPECT_NE(std::string("empty"), CollectionIconCache::InUseLabel(2048));
+  EXPECT_EQ("cover", CollectionIconCache::SafeKey(""));
+  EXPECT_NE(std::string::npos, CollectionIconCache::SafeKey("a|b").find("%7C"));
+  const std::string dir = FileUtils::Join("/tmp", "strawberry-icon-cache-" + std::to_string(getpid()));
+  CollectionIconCache::Clear(dir);
+  EXPECT_EQ(0, CollectionIconCache::DiskCacheBytes(dir));
+  EXPECT_TRUE(CollectionIconCache::Write("album", "imagedata", dir, 1024));
+  EXPECT_EQ("imagedata", CollectionIconCache::Read("album", dir));
+  EXPECT_GT(CollectionIconCache::DiskCacheBytes(dir), 0);
+  EXPECT_FALSE(CollectionIconCache::Write("other", "xxxxxxxxxxxxxxxx", dir, 8));
+  CollectionIconCache::Clear(dir);
+  EXPECT_EQ(0, CollectionIconCache::DiskCacheBytes(dir));
+}
+
+TEST(CollectionStats, WritesLocalSongsAndKeepsQtCopy) {
+  EXPECT_STREQ("Write all playcounts and ratings to files", CollectionStats::ConfirmTitle());
+  EXPECT_STREQ("Are you sure you want to write song playcounts and ratings to file for all songs in your collection?",
+               CollectionStats::ConfirmText());
+  EXPECT_STREQ("Save playcounts and ratings to files now", CollectionStats::SaveNowLabel());
+  EXPECT_STREQ("Saving playcounts and ratings", CollectionStats::TaskName());
+  EXPECT_STREQ("Current disk cache in use:", CollectionStats::CacheInUseTitle());
+  EXPECT_STREQ("Clear Disk Cache", CollectionStats::ClearCacheLabel());
+  const Song local = MakeSong("Roads", "Portishead", "Dummy");
+  EXPECT_TRUE(CollectionStats::ShouldWriteStatistics(local));
+  Song stream(Song::Source::Stream);
+  stream.set_url("https://example/a.mp3");
+  EXPECT_FALSE(CollectionStats::ShouldWriteStatistics(stream));
+  EXPECT_EQ(1, CollectionStats::SongsToWrite({local, stream}));
 }

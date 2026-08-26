@@ -1,6 +1,7 @@
 #include "collection/collectionview.h"
 
 #include "collection/collectionbehaviour.h"
+#include "collection/collectioniconcache.h"
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectionkeyboard.h"
 #include "collection/collectiontree.h"
@@ -57,7 +58,12 @@ void CollectionView::SetActivateCallback(ActivateCallback callback) { activate_ 
 
 void CollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
-void CollectionView::ApplyLook() { pretty_covers_ = CollectionCover::LoadPrettyCovers(); }
+void CollectionView::ApplyLook() {
+  pretty_covers_ = CollectionCover::LoadPrettyCovers();
+  if (!CollectionIconCache::DiskCacheEnabled()) {
+    CollectionIconCache::Clear();
+  }
+}
 
 void CollectionView::SetFilterString(const std::string &filter) {
   filter_.SetFilterString(filter);
@@ -150,6 +156,14 @@ void CollectionView::LoadCover(GtkWidget *image, const Song &song) {
                                      CollectionCover::kArtHeight);
     return;
   }
+  if (CollectionIconCache::DiskCacheEnabled()) {
+    const std::string disk = CollectionIconCache::Read(key);
+    if (!disk.empty()) {
+      cover_cache_[key] = disk;
+      DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(disk.begin(), disk.end()), CollectionCover::kArtHeight);
+      return;
+    }
+  }
   if (!cover_loader_) {
     return;
   }
@@ -158,6 +172,9 @@ void CollectionView::LoadCover(GtkWidget *image, const Song &song) {
     return;
   }
   cover_cache_[key] = std::string(data.begin(), data.end());
+  if (CollectionIconCache::DiskCacheEnabled()) {
+    CollectionIconCache::Write(key, cover_cache_[key]);
+  }
   DialogHelpers::SetImageFromBytes(image, data, CollectionCover::kArtHeight);
 }
 

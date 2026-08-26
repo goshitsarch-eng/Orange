@@ -1,9 +1,13 @@
 #include "collection/collectionlibrary.h"
 
 #include "collection/collectiondirectory.h"
+#include "collection/collectionstats.h"
 #include "core/logging.h"
+#include "core/taskmanager.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
+
+#include <thread>
 
 CollectionLibrary::CollectionLibrary(Database *database, TaskManager *task_manager, TagReader *tagreader)
     : database_(database),
@@ -69,3 +73,26 @@ void CollectionLibrary::RemoveDirectory(int id) { backend_->RemoveDirectory(id);
 SongList CollectionLibrary::Songs(const std::string &filter) const { return backend_->Songs(filter); }
 
 SongList CollectionLibrary::Songs(const CollectionFilterOptions &options) const { return backend_->Songs(options); }
+
+void CollectionLibrary::SyncPlaycountAndRatingToFiles() {
+  if (!tagreader_ || !backend_ || !task_manager_) {
+    return;
+  }
+  const int task_id = task_manager_->StartTask(CollectionStats::TaskName());
+  const SongList songs = backend_->Songs();
+  int i = 0;
+  for (const Song &song : songs) {
+    ++i;
+    if (CollectionStats::ShouldWriteStatistics(song)) {
+      const std::string path = FileUtils::PathFromUri(song.url());
+      tagreader_->SavePlaycount(path, song.playcount());
+      tagreader_->SaveRating(path, song.rating());
+    }
+    task_manager_->SetTaskProgress(task_id, i, static_cast<int>(songs.size()));
+  }
+  task_manager_->SetTaskFinished(task_id);
+}
+
+void CollectionLibrary::SyncPlaycountAndRatingToFilesAsync() {
+  std::thread([this]() { SyncPlaycountAndRatingToFiles(); }).detach();
+}
