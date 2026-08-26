@@ -2,6 +2,7 @@
 
 #include "constants/appearancesettings.h"
 #include "core/appearancecolors.h"
+#include "settings/settingscontrols.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
 
@@ -14,8 +15,8 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
   SettingsPage::AddToggle(theme, settings, AppearanceSettings::kDarkMode, "Dark mode", nullptr, AppearanceSettings::kDefaultDarkMode);
   SettingsPage::AddToggle(theme, settings, AppearanceSettings::kSystemThemeIcons, "Use system icons", nullptr, AppearanceSettings::kDefaultSystemIcons);
   SettingsPage::AddEntry(theme, settings, AppearanceSettings::kStyle, "Style");
-  SettingsPage::AddToggle(theme, settings, AppearanceSettings::kUseCustomColorSet, "Use a custom color set", nullptr,
-                          AppearanceSettings::kDefaultUseCustomColorSet);
+  SettingsPage::AddBoolRadios(theme, settings, AppearanceSettings::kUseCustomColorSet, "System colors", "Custom color set",
+                             AppearanceSettings::kDefaultUseCustomColorSet);
   SettingsPage::AddButtonRow(theme, Translations::CStr("Custom colors"), Translations::CStr("Set dark colors"), [settings]() {
     settings->BeginGroup(AppearanceSettings::kSettingsGroup);
     settings->SetBoolValue(AppearanceSettings::kUseCustomColorSet, true);
@@ -39,20 +40,33 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
   }
 
   AdwPreferencesGroup *tabbar = SettingsPage::AddGroup(page, "Tab bar");
-  SettingsPage::AddToggle(tabbar, settings, AppearanceSettings::kTabBarSystemColor, "System-colored tab bar", nullptr,
-                          AppearanceSettings::kDefaultTabBarSystemColor);
+  SettingsPage::AddBoolRadios(tabbar, settings, AppearanceSettings::kTabBarSystemColor, "Custom color", "System color",
+                             AppearanceSettings::kDefaultTabBarSystemColor);
   SettingsPage::AddToggle(tabbar, settings, AppearanceSettings::kTabBarGradient, "Tab bar gradient", nullptr, AppearanceSettings::kDefaultTabBarGradient);
   SettingsPage::AddColorButton(tabbar, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kTabBarColor, "Tab bar color",
                               "#404040");
 
   AdwPreferencesGroup *playlist = SettingsPage::AddGroup(page, "Playlist");
+  const std::string playlist_color = settings->Value(AppearanceSettings::kPlaylistPlayingSongColor, "#6696e3");
+  SettingsPage::AddChoiceRadios(playlist, settings, nullptr, "Playlist playing song color",
+                               {{"system", "System color"}, {"custom", "Custom color"}},
+                               SettingsControls::PlaylistColorIsSystem(settings->Value(AppearanceSettings::kPlaylistPlayingSongColor))
+                                   ? "system"
+                                   : "custom",
+                               [settings](const std::string &id) {
+                                 settings->BeginGroup(AppearanceSettings::kSettingsGroup);
+                                 const std::string current = settings->Value(AppearanceSettings::kPlaylistPlayingSongColor);
+                                 settings->SetValue(AppearanceSettings::kPlaylistPlayingSongColor,
+                                                    SettingsControls::PlaylistPlayingSongColor(id == "system", current));
+                                 settings->Sync();
+                               });
   SettingsPage::AddColorButton(playlist, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kPlaylistPlayingSongColor,
-                              "Playlist playing song color", "#6696e3");
+                              "Custom color", playlist_color.empty() ? "#6696e3" : playlist_color.c_str());
 
   AdwPreferencesGroup *background = SettingsPage::AddGroup(page, "Background");
-  SettingsPage::AddCombo(background, settings, AppearanceSettings::kBackgroundImageType, "Background",
-                         {{"0", "Default"}, {"1", "None"}, {"2", "Custom image"}, {"3", "Album cover"}, {"4", "Strawberry"}},
-                         std::to_string(static_cast<int>(AppearanceSettings::kDefaultBackgroundImageType)));
+  SettingsPage::AddChoiceRadios(background, settings, AppearanceSettings::kBackgroundImageType, "Background",
+                               {{"0", "Default"}, {"1", "None"}, {"2", "Custom image"}, {"3", "Album cover"}, {"4", "Strawberry"}},
+                               std::to_string(static_cast<int>(AppearanceSettings::kDefaultBackgroundImageType)));
   SettingsPage::AddEntry(background, settings, AppearanceSettings::kBackgroundImageFilename, "Custom background file");
   SettingsPage::AddButtonRow(background, "Custom background file", "Choose image…", [settings]() {
     GtkFileDialog *chooser = gtk_file_dialog_new();
@@ -89,10 +103,14 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
                           AppearanceSettings::kDefaultBackgroundImageDoNotCut);
   SettingsPage::AddIntEntry(background, settings, AppearanceSettings::kBackgroundImageMaxSize, "Maximum size",
                             AppearanceSettings::kDefaultBackgroundImageMaxSize);
-  SettingsPage::AddIntEntry(background, settings, AppearanceSettings::kBackgroundImageBlurRadius, "Blur radius",
-                            AppearanceSettings::kDefaultBackgroundImageBlurRadius);
-  SettingsPage::AddIntEntry(background, settings, AppearanceSettings::kBackgroundImageOpacityLevel, "Opacity",
-                            AppearanceSettings::kDefaultBackgroundImageOpacityLevel);
+  const auto blur = SettingsControls::BackgroundBlur();
+  SettingsPage::AddIntScale(background, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kBackgroundImageBlurRadius,
+                           "Blur radius", AppearanceSettings::kDefaultBackgroundImageBlurRadius, static_cast<int>(blur.min),
+                           static_cast<int>(blur.max), static_cast<int>(blur.step));
+  const auto opacity = SettingsControls::BackgroundOpacity();
+  SettingsPage::AddIntScale(background, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kBackgroundImageOpacityLevel,
+                           "Opacity", AppearanceSettings::kDefaultBackgroundImageOpacityLevel, static_cast<int>(opacity.min),
+                           static_cast<int>(opacity.max), static_cast<int>(opacity.step));
 
   AdwPreferencesGroup *icons = SettingsPage::AddGroup(page, "Icon sizes");
   SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeTabbarSmallMode, "Tab bar (small)",

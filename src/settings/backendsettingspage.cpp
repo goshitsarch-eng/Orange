@@ -3,6 +3,7 @@
 #include "constants/backendsettings.h"
 #include "core/application.h"
 #include "engine/devicefinders.h"
+#include "settings/settingscontrols.h"
 #include "settings/settingspage.h"
 
 AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application *app) {
@@ -34,8 +35,8 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
     settings->SetValue(BackendSettings::kDevice, device);
     settings->Sync();
   });
-  SettingsPage::AddCombo(output, settings, BackendSettings::kALSAPlugin, "ALSA plugin",
-                         {{"hw", "hw"}, {"plughw", "plughw"}, {"pcm", "pcm"}}, "hw");
+  SettingsPage::AddChoiceRadios(output, settings, BackendSettings::kALSAPlugin, "ALSA plugin",
+                               {{"hw", "hw"}, {"plughw", "plughw"}, {"pcm", "pcm"}}, "hw");
   SettingsPage::AddToggle(output, settings, BackendSettings::kExclusiveMode, "Exclusive mode", nullptr, BackendSettings::kDefaultExclusiveMode);
   SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeControl, "Software volume control", nullptr, BackendSettings::kDefaultVolumeControl);
   SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeExponential, "Exponential volume scale", nullptr,
@@ -48,23 +49,43 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
   SettingsPage::AddToggle(output, settings, BackendSettings::kStrictSSL, "Strict SSL", nullptr, BackendSettings::kDefaultStrictSSL);
 
   AdwPreferencesGroup *buffer = SettingsPage::AddGroup(page, "Buffer");
-  SettingsPage::AddIntEntry(buffer, settings, BackendSettings::kBufferDuration, "Buffer duration (ms)",
-                            static_cast<int>(BackendSettings::kDefaultBufferDuration));
-  SettingsPage::AddEntry(buffer, settings, BackendSettings::kBufferLowWatermark, "Low watermark", "0.33");
-  SettingsPage::AddEntry(buffer, settings, BackendSettings::kBufferHighWatermark, "High watermark", "0.99");
-  SettingsPage::AddIntEntry(buffer, settings, BackendSettings::kDeviceWarmupDuration, "Device warmup (ms)",
-                            BackendSettings::kDefaultDeviceWarmupDuration);
+  const auto buffer_ms = SettingsControls::BufferDurationMs();
+  SettingsPage::AddIntScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferDuration, "Buffer duration (ms)",
+                           static_cast<int>(BackendSettings::kDefaultBufferDuration), static_cast<int>(buffer_ms.min),
+                           static_cast<int>(buffer_ms.max), static_cast<int>(buffer_ms.step));
+  const auto watermark = SettingsControls::BufferWatermark();
+  SettingsPage::AddDoubleScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferLowWatermark, "Low watermark",
+                              BackendSettings::kDefaultBufferLowWatermark, watermark.min, watermark.max, watermark.step);
+  SettingsPage::AddDoubleScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferHighWatermark, "High watermark",
+                              BackendSettings::kDefaultBufferHighWatermark, watermark.min, watermark.max, watermark.step);
+  const auto warmup = SettingsControls::DeviceWarmupMs();
+  SettingsPage::AddIntScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kDeviceWarmupDuration, "Device warmup (ms)",
+                           BackendSettings::kDefaultDeviceWarmupDuration, static_cast<int>(warmup.min), static_cast<int>(warmup.max),
+                           static_cast<int>(warmup.step));
 
   AdwPreferencesGroup *rg = SettingsPage::AddGroup(page, "ReplayGain / EBU R128");
-  SettingsPage::AddToggle(rg, settings, BackendSettings::kRgEnabled, "Enable ReplayGain", nullptr, BackendSettings::kDefaultRgEnabled);
+  SettingsPage::AddChoiceRadios(rg, settings, nullptr, "Normalization",
+                               {{"none", "None"}, {"rg", "ReplayGain"}, {"ebu", "EBU R128"}},
+                               SettingsControls::NormalizationChoice(settings->BoolValue(BackendSettings::kRgEnabled, BackendSettings::kDefaultRgEnabled),
+                                                                    settings->BoolValue(BackendSettings::kEBUR128LoudnessNormalization,
+                                                                                        BackendSettings::kDefaultEBUR128LoudnessNormalization)),
+                               [settings](const std::string &id) {
+                                 settings->BeginGroup(BackendSettings::kSettingsGroup);
+                                 settings->SetBoolValue(BackendSettings::kRgEnabled, SettingsControls::NormalizationUsesReplayGain(id));
+                                 settings->SetBoolValue(BackendSettings::kEBUR128LoudnessNormalization, SettingsControls::NormalizationUsesEbu(id));
+                                 settings->Sync();
+                               });
   SettingsPage::AddIntCombo(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgMode, "ReplayGain mode",
                             {{"0", "Album"}, {"1", "Track"}}, BackendSettings::kDefaultRgMode);
-  SettingsPage::AddEntry(rg, settings, BackendSettings::kRgPreamp, "ReplayGain preamp (dB)", "0");
+  const auto rg_db = SettingsControls::ReplayGainDb();
+  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgPreamp, "ReplayGain preamp (dB)",
+                              BackendSettings::kDefaultRgPreamp, rg_db.min, rg_db.max, rg_db.step);
   SettingsPage::AddToggle(rg, settings, BackendSettings::kRgCompression, "Prevent clipping", nullptr, BackendSettings::kDefaultRgCompression);
-  SettingsPage::AddEntry(rg, settings, BackendSettings::kRgFallbackGain, "Fallback gain (dB)", "0");
-  SettingsPage::AddToggle(rg, settings, BackendSettings::kEBUR128LoudnessNormalization, "EBU R128 loudness normalization", nullptr,
-                          BackendSettings::kDefaultEBUR128LoudnessNormalization);
-  SettingsPage::AddEntry(rg, settings, BackendSettings::kEBUR128TargetLevelLUFS, "EBU R128 target (LUFS)", "-23");
+  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgFallbackGain, "Fallback gain (dB)",
+                              BackendSettings::kDefaultRgFallbackGain, rg_db.min, rg_db.max, rg_db.step);
+  const auto ebu = SettingsControls::EbuTargetLufs();
+  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kEBUR128TargetLevelLUFS, "EBU R128 target (LUFS)",
+                              BackendSettings::kDefaultEBUR128TargetLevelLUFS, ebu.min, ebu.max, ebu.step);
 
   AdwPreferencesGroup *fade = SettingsPage::AddGroup(page, "Fading");
   SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutEnabled, "Fade out when stopping", nullptr, BackendSettings::kDefaultFadeoutEnabled);
@@ -76,9 +97,13 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
                           BackendSettings::kDefaultNoCrossfadeSameAlbum);
   SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutPauseEnabled, "Fade on pause / resume", nullptr,
                           BackendSettings::kDefaultFadeoutPauseEnabled);
-  SettingsPage::AddIntEntry(fade, settings, BackendSettings::kFadeoutDuration, "Fade duration (ms)",
-                            static_cast<int>(BackendSettings::kDefaultFadeoutDuration));
-  SettingsPage::AddIntEntry(fade, settings, BackendSettings::kFadeoutPauseDuration, "Pause fade duration (ms)",
-                            static_cast<int>(BackendSettings::kDefaultFadeoutPauseDuration));
+  const auto fade_ms = SettingsControls::FadeDurationMs();
+  SettingsPage::AddIntScale(fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutDuration, "Fade duration (ms)",
+                           static_cast<int>(BackendSettings::kDefaultFadeoutDuration), static_cast<int>(fade_ms.min),
+                           static_cast<int>(fade_ms.max), static_cast<int>(fade_ms.step));
+  const auto pause_ms = SettingsControls::FadePauseDurationMs();
+  SettingsPage::AddIntScale(fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutPauseDuration, "Pause fade duration (ms)",
+                           static_cast<int>(BackendSettings::kDefaultFadeoutPauseDuration), static_cast<int>(pause_ms.min),
+                           static_cast<int>(pause_ms.max), static_cast<int>(pause_ms.step));
   return page;
 }

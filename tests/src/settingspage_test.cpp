@@ -19,6 +19,7 @@
 #include "constants/tidalsettings.h"
 #include "constants/transcodersettings.h"
 #include "constants/waveformsettings.h"
+#include "settings/settingscontrols.h"
 #include "streaming/streamingchoices.h"
 
 #include <gtest/gtest.h>
@@ -47,6 +48,26 @@ TEST(CollectionSettings, OriginalKeysAndDefaults) {
   EXPECT_TRUE(CollectionSettings::kDefaultPrettyCovers);
   EXPECT_TRUE(CollectionSettings::kDefaultSkipArticlesForArtists);
   EXPECT_EQ(60, CollectionSettings::kDefaultExpireUnavailableSongs);
+}
+
+TEST(SettingsControls, NormalizationAndScales) {
+  EXPECT_STREQ("none", SettingsControls::NormalizationChoice(false, false));
+  EXPECT_STREQ("rg", SettingsControls::NormalizationChoice(true, false));
+  EXPECT_STREQ("ebu", SettingsControls::NormalizationChoice(false, true));
+  EXPECT_STREQ("ebu", SettingsControls::NormalizationChoice(true, true));
+  EXPECT_TRUE(SettingsControls::NormalizationUsesReplayGain("rg"));
+  EXPECT_FALSE(SettingsControls::NormalizationUsesReplayGain("none"));
+  EXPECT_TRUE(SettingsControls::NormalizationUsesEbu("ebu"));
+  EXPECT_EQ(0.01, SettingsControls::ApplyRange(-1.0, SettingsControls::BufferWatermark()));
+  EXPECT_EQ(1.0, SettingsControls::ApplyRange(2.0, SettingsControls::BufferWatermark()));
+  EXPECT_EQ(4000.0, SettingsControls::ApplyRange(4000.0, SettingsControls::BufferDurationMs()));
+  EXPECT_EQ(-15.0, SettingsControls::ApplyRange(-40.0, SettingsControls::ReplayGainDb()));
+  EXPECT_EQ(-23.0, SettingsControls::ApplyRange(-23.0, SettingsControls::EbuTargetLufs()));
+  EXPECT_TRUE(SettingsControls::PlaylistColorIsSystem({}));
+  EXPECT_FALSE(SettingsControls::PlaylistColorIsSystem("#6696e3"));
+  EXPECT_TRUE(SettingsControls::PlaylistPlayingSongColor(true, "#6696e3").empty());
+  EXPECT_EQ("#6696e3", SettingsControls::PlaylistPlayingSongColor(false, {}));
+  EXPECT_EQ("#abcabc", SettingsControls::PlaylistPlayingSongColor(false, "#abcabc"));
 }
 
 TEST(BackendSettings, OriginalFadeAndReplayGainKeys) {

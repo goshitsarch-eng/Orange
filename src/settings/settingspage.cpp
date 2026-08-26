@@ -228,14 +228,14 @@ void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *g
   adw_preferences_group_add(group, GTK_WIDGET(row));
 }
 
-void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
-                     double fallback) {
+void AddDoubleScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                    double fallback, double min, double max, double step) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
-  GtkWidget *scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0.2, 1.0, 0.05);
+  GtkWidget *scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, min, max, step);
   gtk_widget_set_size_request(scale, 180, -1);
   gtk_scale_set_draw_value(GTK_SCALE(scale), TRUE);
-  gtk_range_set_value(GTK_RANGE(scale), settings ? settings->DoubleValue(key, fallback) : fallback);
+  gtk_range_set_value(GTK_RANGE(scale), settings && key ? settings->DoubleValue(key, fallback) : fallback);
   if (group_name) {
     g_object_set_data_full(G_OBJECT(scale), "settings-group", g_strdup(group_name), g_free);
   }
@@ -258,6 +258,125 @@ void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char 
                    settings);
   adw_action_row_add_suffix(row, scale);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+}
+
+void AddIntScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title, int fallback,
+                 int min, int max, int step) {
+  AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
+  GtkWidget *scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, min, max, step);
+  gtk_widget_set_size_request(scale, 180, -1);
+  gtk_scale_set_draw_value(GTK_SCALE(scale), TRUE);
+  gtk_range_set_value(GTK_RANGE(scale), settings && key ? settings->IntValue(key, fallback) : fallback);
+  if (group_name) {
+    g_object_set_data_full(G_OBJECT(scale), "settings-group", g_strdup(group_name), g_free);
+  }
+  if (key) {
+    g_object_set_data_full(G_OBJECT(scale), "settings-key", g_strdup(key), g_free);
+  }
+  g_signal_connect(scale, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     const char *settings_group = static_cast<const char *>(g_object_get_data(G_OBJECT(range), "settings-group"));
+                     const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(range), "settings-key"));
+                     if (!s || !settings_key) {
+                       return;
+                     }
+                     if (settings_group) {
+                       s->BeginGroup(settings_group);
+                     }
+                     s->SetIntValue(settings_key, static_cast<int>(gtk_range_get_value(range)));
+                     s->Sync();
+                   }),
+                   settings);
+  adw_action_row_add_suffix(row, scale);
+  adw_preferences_group_add(group, GTK_WIDGET(row));
+}
+
+void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                     double fallback) {
+  AddDoubleScale(group, settings, group_name, key, title, fallback, 0.2, 1.0, 0.05);
+}
+
+void AddBoolRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *false_title, const char *true_title,
+                   bool fallback) {
+  const bool value = settings && key ? settings->BoolValue(key, fallback) : fallback;
+  GtkWidget *false_btn = gtk_check_button_new_with_label(Translations::CStr(false_title));
+  GtkWidget *true_btn = gtk_check_button_new_with_label(Translations::CStr(true_title));
+  gtk_check_button_set_group(GTK_CHECK_BUTTON(true_btn), GTK_CHECK_BUTTON(false_btn));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(value ? true_btn : false_btn), TRUE);
+  if (key) {
+    g_object_set_data_full(G_OBJECT(true_btn), "settings-key", g_strdup(key), g_free);
+  }
+  g_signal_connect(true_btn, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "settings-key"));
+                     if (!s || !settings_key) {
+                       return;
+                     }
+                     s->SetBoolValue(settings_key, gtk_check_button_get_active(button));
+                     s->Sync();
+                   }),
+                   settings);
+  AdwActionRow *false_row = ADW_ACTION_ROW(adw_action_row_new());
+  adw_action_row_add_prefix(false_row, false_btn);
+  adw_action_row_set_activatable_widget(false_row, false_btn);
+  AdwActionRow *true_row = ADW_ACTION_ROW(adw_action_row_new());
+  adw_action_row_add_prefix(true_row, true_btn);
+  adw_action_row_set_activatable_widget(true_row, true_btn);
+  adw_preferences_group_add(group, GTK_WIDGET(false_row));
+  adw_preferences_group_add(group, GTK_WIDGET(true_row));
+}
+
+void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
+                     const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
+                     const std::function<void(const std::string &)> &changed) {
+  if (title && title[0]) {
+    AdwActionRow *header = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(header), Translations::CStr(title));
+    adw_preferences_group_add(group, GTK_WIDGET(header));
+  }
+  const std::string current = key && settings ? settings->Value(key, fallback) : fallback;
+  GtkCheckButton *first = nullptr;
+  auto *fn = changed ? new std::function<void(const std::string &)>(changed) : nullptr;
+  for (const auto &choice : choices) {
+    GtkWidget *button = gtk_check_button_new_with_label(Translations::CStr(choice.second.c_str()));
+    if (first) {
+      gtk_check_button_set_group(GTK_CHECK_BUTTON(button), first);
+    } else {
+      first = GTK_CHECK_BUTTON(button);
+    }
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(button), choice.first == current);
+    if (key) {
+      g_object_set_data_full(G_OBJECT(button), "settings-key", g_strdup(key), g_free);
+    }
+    g_object_set_data_full(G_OBJECT(button), "choice-id", g_strdup(choice.first.c_str()), g_free);
+    if (fn) {
+      g_object_set_data(G_OBJECT(button), "choice-changed", fn);
+    }
+    g_signal_connect(button, "toggled", G_CALLBACK(+[](GtkCheckButton *check, gpointer data) {
+                       if (!gtk_check_button_get_active(check)) {
+                         return;
+                       }
+                       auto *s = static_cast<Settings *>(data);
+                       const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(check), "settings-key"));
+                       const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(check), "choice-id"));
+                       if (s && settings_key && id) {
+                         s->SetValue(settings_key, id);
+                         s->Sync();
+                       }
+                       if (auto *changed_fn = static_cast<std::function<void(const std::string &)> *>(g_object_get_data(G_OBJECT(check), "choice-changed"))) {
+                         (*changed_fn)(id ? id : "");
+                       }
+                     }),
+                     settings);
+    AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+    adw_action_row_add_prefix(row, button);
+    adw_action_row_set_activatable_widget(row, button);
+    adw_preferences_group_add(group, GTK_WIDGET(row));
+  }
+  if (fn) {
+    g_object_set_data_full(G_OBJECT(group), "choice-changed-fn", fn, [](gpointer p) { delete static_cast<std::function<void(const std::string &)> *>(p); });
+  }
 }
 
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked) {

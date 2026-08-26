@@ -37,7 +37,7 @@ bool GstEngine::Init() {
     const std::string mode = settings.Value("rgmode");
     replaygain_mode_ = (mode == "track" || mode == "1") ? 1 : settings.IntValue("rgmode", 0);
   }
-  replaygain_preamp_ = settings.IntValue("rgpreamp", 0);
+  replaygain_preamp_ = settings.DoubleValue("rgpreamp", 0);
   Settings eq;
   eq.BeginGroup(EqualizerPersist::kSettingsGroup);
   if (eq.Contains(EqualizerPersist::kEnableStereoBalancer) || eq.Contains(EqualizerPersist::kStereoBalance)) {
