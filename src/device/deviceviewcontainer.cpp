@@ -2,7 +2,9 @@
 
 #include "core/application.h"
 #include "device/copytodevicedialog.h"
+#include "device/devicecopy.h"
 #include "device/deviceproperties.h"
+#include "organize/organizedialog.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
@@ -120,6 +122,9 @@ void DeviceViewContainer::ShowSongMenu(const Song &song) {
   }
   GMenu *menu = g_menu_new();
   g_menu_append(menu, Translations::CStr("Add to playlist"), "devicesong.add");
+  if (DeviceCopy::CanCopyToCollection(songs)) {
+    g_menu_append(menu, Translations::CStr("Copy to collection…"), "devicesong.copy-collection");
+  }
   g_menu_append(menu, Translations::CStr("Delete from device"), "devicesong.delete");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, view_->list());
@@ -143,6 +148,8 @@ void DeviceViewContainer::ShowSongMenu(const Song &song) {
                              self->song_cb_(selected);
                            }
                          }
+                       } else if (g_strcmp0(name, "copy-collection") == 0 && self->app_) {
+                         OrganizeDialog::Show(self->ParentWindow(), self->app_, DeviceCopy::CollectionRequest(*songs));
                        } else if (g_strcmp0(name, "delete") == 0 && self->app_ && !self->browse_id_.empty()) {
                          for (const Song &selected : *songs) {
                            self->app_->device_manager()->DeleteSong(self->browse_id_, selected);
@@ -154,6 +161,7 @@ void DeviceViewContainer::ShowSongMenu(const Song &song) {
     g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
   };
   add("add");
+  add("copy-collection");
   add("delete");
   gtk_widget_insert_action_group(popover, "devicesong", G_ACTION_GROUP(group));
   g_object_set_data_full(G_OBJECT(popover), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });

@@ -1,3 +1,4 @@
+#include "device/devicecopy.h"
 #include "device/devicedrag.h"
 #include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
@@ -232,6 +233,19 @@ TEST(DeviceKeyboard, FromKeyBackAndSpecialRows) {
   EXPECT_TRUE(DeviceKeyboard::IsSpecialRowKind("add-all"));
   EXPECT_FALSE(DeviceKeyboard::IsSpecialRowKind("song"));
   EXPECT_FALSE(DeviceKeyboard::IsSpecialRowKind(nullptr));
+}
+
+TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
+  EXPECT_FALSE(DeviceCopy::CanCopyToCollection({}));
+  Song song(Song::Source::Device);
+  song.set_url("gphoto2://phone/Music/roads.mp3");
+  song.set_title("Roads");
+  const OrganizeDialog::Request request = DeviceCopy::CollectionRequest({song});
+  ASSERT_EQ(1u, request.songs.size());
+  EXPECT_EQ("Roads", request.songs.front().title());
+  EXPECT_FALSE(request.move);
+  EXPECT_TRUE(request.destination.empty());
+  EXPECT_TRUE(DeviceCopy::CanCopyToCollection(request.songs));
 }
 
 TEST(DeviceDrag, JoinsSongUrls) {
