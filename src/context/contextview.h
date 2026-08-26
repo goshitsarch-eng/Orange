@@ -26,6 +26,7 @@ class ContextView {
   GtkWidget *widget() const { return widget_; }
   ContextAlbum *album_widget() { return album_.get(); }
   bool album_enabled() const { return show_album_; }
+  bool search_cover_enabled() const { return search_cover_; }
   const Song &song_playing() const { return song_playing_; }
 
   void Playing();
@@ -66,6 +67,7 @@ class ContextView {
   GtkWidget *lyrics_source_ = nullptr;
   GtkWidget *search_lyrics_btn_ = nullptr;
   GtkWidget *auto_lyrics_btn_ = nullptr;
+  GtkWidget *auto_cover_btn_ = nullptr;
   GtkWidget *show_album_btn_ = nullptr;
   GtkWidget *show_data_btn_ = nullptr;
   GtkWidget *show_lyrics_btn_ = nullptr;
@@ -74,6 +76,7 @@ class ContextView {
   bool show_data_ = true;
   bool show_lyrics_ = true;
   bool search_lyrics_ = true;
+  bool search_cover_ = true;
   bool lyrics_tried_ = false;
   int totals_songs_ = 0;
   int totals_artists_ = 0;

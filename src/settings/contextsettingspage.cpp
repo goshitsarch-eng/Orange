@@ -1,6 +1,7 @@
 #include "settings/contextsettingspage.h"
 
 #include "constants/contextsettings.h"
+#include "context/contextcover.h"
 #include "context/contextfont.h"
 #include "context/contextformattokens.h"
 #include "settings/settingspage.h"
@@ -34,7 +35,16 @@ AdwPreferencesPage *ContextSettingsPage::Create(Settings *settings, Application 
   SettingsPage::AddToggle(group, settings, ContextSettings::kAlbum, "Show album", nullptr, ContextSettings::kDefaultAlbum);
   SettingsPage::AddToggle(group, settings, ContextSettings::kTechnicalData, "Show technical data", nullptr, ContextSettings::kDefaultTechnicalData);
   SettingsPage::AddToggle(group, settings, ContextSettings::kSongLyrics, "Show lyrics", nullptr, ContextSettings::kDefaultSongLyrics);
-  SettingsPage::AddToggle(group, settings, ContextSettings::kSearchCover, "Search for covers", nullptr, true);
+  AdwSwitchRow *search_cover = ADW_SWITCH_ROW(adw_switch_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(search_cover), Translations::CStr("Automatically search for album cover"));
+  adw_switch_row_set_active(search_cover, ContextCover::LoadEnabled(*settings));
+  g_signal_connect(search_cover, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     ContextCover::PersistEnabled(*s, adw_switch_row_get_active(row));
+                   }),
+                   settings);
+  adw_preferences_group_add(group, GTK_WIDGET(search_cover));
+  settings->BeginGroup(ContextSettings::kSettingsGroup);
   SettingsPage::AddToggle(group, settings, ContextSettings::kSearchLyrics, "Search for lyrics", nullptr, ContextSettings::kDefaultSearchLyrics);
 
   const FontUtils::Font headline =

@@ -17,6 +17,7 @@
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistlook.h"
 #include "context/contextalbum.h"
+#include "context/contextcover.h"
 #include "context/contextfont.h"
 #include "context/contexttechnical.h"
 #include "dialogs/deletefilespolicy.h"
@@ -1057,6 +1058,29 @@ TEST(ContextFormatTokens, InsertsKnownTokens) {
   EXPECT_EQ("%title%%artist%", ContextFormatTokens::Insert("%title%", "%artist%"));
   EXPECT_EQ("%title%", ContextFormatTokens::Insert("%title%", {}));
   EXPECT_FALSE(ContextFormatTokens::All().empty());
+}
+
+TEST(ContextCover, ShouldSearch) {
+  EXPECT_TRUE(ContextCover::ShouldSearch(true, true, false, false));
+  EXPECT_FALSE(ContextCover::ShouldSearch(false, true, false, false));
+  EXPECT_FALSE(ContextCover::ShouldSearch(true, false, false, false));
+  EXPECT_FALSE(ContextCover::ShouldSearch(true, true, true, false));
+  EXPECT_FALSE(ContextCover::ShouldSearch(true, true, false, true));
+  EXPECT_EQ("Dummy", ContextCover::EffectiveAlbum("Dummy", "Roads"));
+  EXPECT_EQ("Roads", ContextCover::EffectiveAlbum({}, "Roads"));
+  EXPECT_TRUE(ContextCover::HasAlbumIdentity("Portishead", "Dummy"));
+  EXPECT_FALSE(ContextCover::HasAlbumIdentity({}, "Dummy"));
+  EXPECT_FALSE(ContextCover::HasAlbumIdentity("Portishead", {}));
+  EXPECT_TRUE(ContextCover::HasExistingCover(true, false, false));
+  EXPECT_TRUE(ContextCover::HasExistingCover(false, true, false));
+  EXPECT_FALSE(ContextCover::HasExistingCover(false, false, false));
+  EXPECT_TRUE(ContextCover::ArtPathLooksValid("file:///tmp/cover.jpg"));
+  EXPECT_FALSE(ContextCover::ArtPathLooksValid({}));
+  EXPECT_TRUE(ContextCover::ShouldSearchForSong(true, true, false, false, {}, {}, "Portishead", "Dummy"));
+  EXPECT_FALSE(ContextCover::ShouldSearchForSong(true, true, false, true, {}, {}, "Portishead", "Dummy"));
+  EXPECT_FALSE(ContextCover::ShouldSearchForSong(true, true, false, false, "/cover.jpg", {}, "Portishead", "Dummy"));
+  EXPECT_FALSE(ContextCover::ShouldSearchForSong(true, true, false, false, {}, {}, {}, "Dummy"));
+  EXPECT_FALSE(ContextCover::ShouldSearchForSong(false, true, false, false, {}, {}, "Portishead", "Dummy"));
 }
 
 TEST(ContextFont, UsesFallbackSizeForFamilyOnly) {

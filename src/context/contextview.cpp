@@ -1,6 +1,7 @@
 #include "context/contextview.h"
 
 #include "constants/contextsettings.h"
+#include "context/contextcover.h"
 #include "context/contextfont.h"
 #include "context/contextlyrics.h"
 #include "context/contexttechnical.h"
@@ -68,6 +69,8 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   search_lyrics_btn_ = gtk_button_new_with_label(Translations::CStr("Search lyrics"));
   auto_lyrics_btn_ = gtk_check_button_new_with_label(Translations::CStr("Search automatically"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_lyrics_btn_), TRUE);
+  auto_cover_btn_ = gtk_check_button_new_with_label(Translations::CStr("Search automatically"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_cover_btn_), TRUE);
   GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save lyrics to tag"));
   gtk_box_append(GTK_BOX(lyrics_actions), search_lyrics_btn_);
   gtk_box_append(GTK_BOX(lyrics_actions), auto_lyrics_btn_);
@@ -79,6 +82,12 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   g_signal_connect(auto_lyrics_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
                      auto *self = static_cast<ContextView *>(data);
                      self->search_lyrics_ = gtk_check_button_get_active(button);
+                     self->PersistVisibility();
+                   }),
+                   this);
+  g_signal_connect(auto_cover_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *self = static_cast<ContextView *>(data);
+                     self->search_cover_ = gtk_check_button_get_active(button);
                      self->PersistVisibility();
                    }),
                    this);
@@ -107,6 +116,7 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
 
   gtk_box_append(GTK_BOX(box), toggles);
   gtk_box_append(GTK_BOX(box), album_->widget());
+  gtk_box_append(GTK_BOX(box), auto_cover_btn_);
   gtk_box_append(GTK_BOX(box), title_);
   gtk_box_append(GTK_BOX(box), artist_);
   gtk_box_append(GTK_BOX(box), album_label_);
@@ -149,6 +159,8 @@ void ContextView::ReloadSettings() {
   show_data_ = settings.BoolValue(ContextSettings::kTechnicalData, ContextSettings::kDefaultTechnicalData);
   show_lyrics_ = settings.BoolValue(ContextSettings::kSongLyrics, ContextSettings::kDefaultSongLyrics);
   search_lyrics_ = settings.BoolValue(ContextSettings::kSearchLyrics, ContextSettings::kDefaultSearchLyrics);
+  search_cover_ = ContextCover::LoadEnabled(settings);
+  settings.BeginGroup(ContextSettings::kSettingsGroup);
   title_fmt_ = settings.Value(ContextSettings::kSettingsTitleFmt, ContextSettings::kDefaultTitleFmt);
   summary_fmt_ = settings.Value(ContextSettings::kSettingsSummaryFmt, ContextSettings::kDefaultSummaryFmt);
   const FontUtils::Font headline = ContextFont::Load(settings.Value(ContextSettings::kFontHeadline, ContextSettings::kDefaultFontFamily),
@@ -170,6 +182,7 @@ void ContextView::ReloadSettings() {
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), show_data_);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), show_lyrics_);
   gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_lyrics_btn_), search_lyrics_);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_cover_btn_), search_cover_);
   ApplyVisibility();
 }
 
@@ -323,7 +336,7 @@ void ContextView::PersistVisibility() {
   settings.SetBoolValue(ContextSettings::kTechnicalData, show_data_);
   settings.SetBoolValue(ContextSettings::kSongLyrics, show_lyrics_);
   settings.SetBoolValue(ContextSettings::kSearchLyrics, search_lyrics_);
-  settings.Sync();
+  ContextCover::PersistEnabled(settings, search_cover_);
 }
 
 void ContextView::ApplyVisibility() {
@@ -332,6 +345,7 @@ void ContextView::ApplyVisibility() {
   show_lyrics_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_));
   const bool playing = song_playing_.is_valid() || !song_playing_.url().empty();
   gtk_widget_set_visible(album_->widget(), show_album_);
+  gtk_widget_set_visible(auto_cover_btn_, show_album_);
   gtk_widget_set_visible(totals_, !playing);
   gtk_widget_set_visible(data_box_, show_data_ && playing && gtk_widget_get_first_child(data_grid_) != nullptr);
   gtk_widget_set_visible(lyrics_view_, show_lyrics_);

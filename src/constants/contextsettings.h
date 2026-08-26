@@ -44,6 +44,7 @@ constexpr char kDefaultSummaryFmt[] = "%album%";
 constexpr bool kDefaultAlbum = true;
 constexpr bool kDefaultTechnicalData = false;
 constexpr bool kDefaultSongLyrics = true;
+constexpr bool kDefaultSearchCover = true;
 constexpr bool kDefaultSearchLyrics = true;
 
 constexpr char kDefaultFontFamily[] = "Noto Sans";

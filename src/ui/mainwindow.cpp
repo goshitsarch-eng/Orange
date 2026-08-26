@@ -5,6 +5,8 @@
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
+#include "constants/coverssettings.h"
+#include "context/contextcover.h"
 #include "context/contextview.h"
 #include "covermanager/coverproviders.h"
 #include "device/deviceviewcontainer.h"
@@ -1656,11 +1658,19 @@ void MainWindow::UpdateNowPlaying() {
       }
     });
     if (cover_controller_) {
-      if (playing_widget_) {
-        playing_widget_->SearchCoverInProgress();
+      Settings settings;
+      settings.BeginGroup(CoversSettings::kSettingsGroup);
+      const bool covers_automatic = settings.BoolValue(CoversSettings::kAutomaticSearch, CoversSettings::kDefaultAutomaticSearch);
+      const bool context_enabled = context_view_ ? context_view_->search_cover_enabled() : ContextCover::LoadEnabled(settings);
+      if (ContextCover::ShouldSearchForSong(context_enabled, covers_automatic, song.art_unset(), song.art_embedded(),
+                                            song.art_automatic(), song.art_manual(), song.EffectiveAlbumartist(),
+                                            ContextCover::EffectiveAlbum(song.album(), song.title()))) {
+        if (playing_widget_) {
+          playing_widget_->SearchCoverInProgress();
+        }
+        Song mutable_song = song;
+        cover_controller_->SearchCoverAutomatically(&mutable_song, playing_widget_ ? playing_widget_->cover() : nullptr);
       }
-      Song mutable_song = song;
-      cover_controller_->SearchCoverAutomatically(&mutable_song, playing_widget_ ? playing_widget_->cover() : nullptr);
     }
   }
 }

@@ -1,6 +1,7 @@
 #include "covermanager/albumcoverchoicecontroller.h"
 
 #include "constants/coverssettings.h"
+#include "context/contextcover.h"
 #include "core/application.h"
 #include "core/settings.h"
 #include "covermanager/albumcoversearcher.h"
@@ -211,12 +212,15 @@ void AlbumCoverChoiceController::ShowCover(GtkWindow *parent, const Song &song) 
 }
 
 void AlbumCoverChoiceController::SearchCoverAutomatically(Song *song, GtkWidget *image) {
-  if (!app_ || !song || song->art_unset()) {
+  if (!app_ || !song) {
     return;
   }
   Settings settings;
   settings.BeginGroup(CoversSettings::kSettingsGroup);
-  if (!settings.BoolValue(CoversSettings::kAutomaticSearch, CoversSettings::kDefaultAutomaticSearch)) {
+  const bool covers_automatic = settings.BoolValue(CoversSettings::kAutomaticSearch, CoversSettings::kDefaultAutomaticSearch);
+  if (!ContextCover::ShouldSearchForSong(ContextCover::LoadEnabled(settings), covers_automatic, song->art_unset(), song->art_embedded(),
+                                         song->art_automatic(), song->art_manual(), song->EffectiveAlbumartist(),
+                                         ContextCover::EffectiveAlbum(song->album(), song->title()))) {
     return;
   }
   if (!app_->albumcover_loader()->LoadData(*song).empty()) {
