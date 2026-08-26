@@ -44,6 +44,15 @@ inline std::string SummaryText(int tracks, int64_t length_nanosec) {
 
 inline std::string SummaryText(const SongList &songs) { return SummaryText(static_cast<int>(songs.size()), TotalLengthNanosec(songs)); }
 
+inline const char *MoveDownIcon() { return "go-down-symbolic"; }
+inline const char *MoveUpIcon() { return "go-up-symbolic"; }
+inline const char *RemoveIcon() { return "list-remove-symbolic"; }
+inline const char *ClearIcon() { return "edit-clear-symbolic"; }
+inline const char *MoveDownTooltip() { return "Move down"; }
+inline const char *MoveUpTooltip() { return "Move up"; }
+inline const char *RemoveTooltip() { return "Remove"; }
+inline const char *ClearTooltip() { return "Clear"; }
+
 inline ButtonState Buttons(const std::vector<int> &selected, int count) {
   ButtonState state;
   state.clear = count > 0;

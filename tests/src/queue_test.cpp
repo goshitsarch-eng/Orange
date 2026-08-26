@@ -57,6 +57,17 @@ TEST(QueueUi, ButtonStateMatchesQt) {
   EXPECT_FALSE(ends.move_down);
 }
 
+TEST(QueueUi, ToolbuttonIconsMatchQt) {
+  EXPECT_STREQ("go-down-symbolic", QueueUi::MoveDownIcon());
+  EXPECT_STREQ("go-up-symbolic", QueueUi::MoveUpIcon());
+  EXPECT_STREQ("list-remove-symbolic", QueueUi::RemoveIcon());
+  EXPECT_STREQ("edit-clear-symbolic", QueueUi::ClearIcon());
+  EXPECT_STREQ("Move down", QueueUi::MoveDownTooltip());
+  EXPECT_STREQ("Move up", QueueUi::MoveUpTooltip());
+  EXPECT_STREQ("Remove", QueueUi::RemoveTooltip());
+  EXPECT_STREQ("Clear", QueueUi::ClearTooltip());
+}
+
 TEST(QueueKeyboard, MatchesQtShortcuts) {
   EXPECT_EQ(QueueKeyboard::Action::Remove, QueueKeyboard::FromKey(QueueKeyboard::kDelete, 0));
   EXPECT_EQ(QueueKeyboard::Action::Clear, QueueKeyboard::FromKey('k', QueueKeyboard::kControlMask));
