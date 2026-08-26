@@ -30,6 +30,12 @@ inline const char *Label(SeekbarSettings::Mode mode) {
   }
 }
 
+inline bool IsChecked(SeekbarSettings::Mode mode, SeekbarSettings::Mode current) { return mode == current; }
+
+inline bool StyleMenuEnabled(SeekbarSettings::Mode mode) { return mode == SeekbarSettings::Mode::Moodbar; }
+
+inline const char *StyleSubmenuTitle() { return "Moodbar style"; }
+
 }  // namespace SeekbarModeMenu
 
 #endif

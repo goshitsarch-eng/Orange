@@ -17,7 +17,9 @@
 #include "context/contextview.h"
 #include "covermanager/coverproviders.h"
 #include "device/deviceviewcontainer.h"
+#include "constants/moodbarsettings.h"
 #include "moodbar/moodbarrenderer.h"
+#include "moodbar/moodbarstyle.h"
 #include "waveform/waveformrenderer.h"
 #include "fileview/fileview.h"
 #include "fileview/fileviewsongs.h"
@@ -1575,6 +1577,14 @@ void MainWindow::BuildPlayerBar() {
   attach_seek(moodbar_drawing_, true);
   attach_seek(waveform_drawing_, true);
   attach_seek(track_slider_->slider()->widget(), false);
+  GtkGesture *slider_box_menu = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(slider_box_menu), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(track_slider_->widget(), GTK_EVENT_CONTROLLER(slider_box_menu));
+  g_signal_connect(slider_box_menu, "pressed", G_CALLBACK(+[](GtkGestureClick *gesture, gint, gdouble, gdouble, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     self->ShowSeekbarMenu(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture)));
+                   }),
+                   this);
   ApplySeekbarMode();
 
   GtkWidget *controls = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
@@ -3764,6 +3774,16 @@ void MainWindow::SetSeekbarMode(SeekbarSettings::Mode mode) {
   app_->waveform()->Load(app_->player()->current_song());
 }
 
+void MainWindow::SetMoodbarStyle(MoodbarSettings::Style style) {
+  Settings settings;
+  settings.BeginGroup(MoodbarSettings::kSettingsGroup);
+  settings.SetIntValue(MoodbarSettings::kStyle, static_cast<int>(MoodbarStyle::ClampStyle(static_cast<int>(style))));
+  settings.Sync();
+  if (moodbar_drawing_) {
+    gtk_widget_queue_draw(moodbar_drawing_);
+  }
+}
+
 void MainWindow::CycleSeekbarMode() {
   Settings settings;
   settings.BeginGroup(SeekbarSettings::kSettingsGroup);
@@ -3780,24 +3800,58 @@ void MainWindow::ShowSeekbarMenu(GtkWidget *relative) {
     gtk_widget_unparent(seekbar_menu_);
     seekbar_menu_ = nullptr;
   }
+  Settings settings;
+  settings.BeginGroup(SeekbarSettings::kSettingsGroup);
+  const auto current_mode = SeekbarModeMenu::Clamp(settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode)));
+  settings.BeginGroup(MoodbarSettings::kSettingsGroup);
+  const auto current_style =
+      MoodbarStyle::ClampStyle(settings.IntValue(MoodbarSettings::kStyle, static_cast<int>(MoodbarSettings::kDefaultStyle)));
+
   GMenu *menu = g_menu_new();
+  GMenu *modes = g_menu_new();
   for (int i = 0; i < SeekbarModeMenu::kCount; ++i) {
     char action[32];
     g_snprintf(action, sizeof(action), "seekbar.mode(%d)", i);
-    g_menu_append(menu, SeekbarModeMenu::Label(static_cast<SeekbarSettings::Mode>(i)), action);
+    g_menu_append(modes, SeekbarModeMenu::Label(static_cast<SeekbarSettings::Mode>(i)), action);
   }
+  g_menu_append_section(menu, nullptr, G_MENU_MODEL(modes));
+  GMenu *styles = g_menu_new();
+  for (int i = 0; i < static_cast<int>(MoodbarSettings::Style::StyleCount); ++i) {
+    char action[32];
+    g_snprintf(action, sizeof(action), "seekbar.style(%d)", i);
+    g_menu_append(styles, MoodbarStyle::StyleName(static_cast<MoodbarSettings::Style>(i)), action);
+  }
+  g_menu_append_submenu(menu, SeekbarModeMenu::StyleSubmenuTitle(), G_MENU_MODEL(styles));
+
   GSimpleActionGroup *group = g_simple_action_group_new();
-  GSimpleAction *mode_action = g_simple_action_new("mode", G_VARIANT_TYPE_INT32);
-  g_signal_connect(mode_action, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
-                     static_cast<MainWindow *>(data)->SetSeekbarMode(SeekbarModeMenu::Clamp(g_variant_get_int32(param)));
+  GSimpleAction *mode_action = g_simple_action_new_stateful("mode", G_VARIANT_TYPE_INT32, g_variant_new_int32(static_cast<gint32>(current_mode)));
+  GSimpleAction *style_action =
+      g_simple_action_new_stateful("style", G_VARIANT_TYPE_INT32, g_variant_new_int32(static_cast<gint32>(current_style)));
+  g_simple_action_set_enabled(style_action, SeekbarModeMenu::StyleMenuEnabled(current_mode) ? TRUE : FALSE);
+  g_object_set_data(G_OBJECT(mode_action), "style-action", style_action);
+  g_signal_connect(mode_action, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
+                     g_simple_action_set_state(action, param);
+                     const auto mode = SeekbarModeMenu::Clamp(g_variant_get_int32(param));
+                     static_cast<MainWindow *>(data)->SetSeekbarMode(mode);
+                     if (auto *style = static_cast<GSimpleAction *>(g_object_get_data(G_OBJECT(action), "style-action"))) {
+                       g_simple_action_set_enabled(style, SeekbarModeMenu::StyleMenuEnabled(mode) ? TRUE : FALSE);
+                     }
+                   }),
+                   this);
+  g_signal_connect(style_action, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
+                     g_simple_action_set_state(action, param);
+                     static_cast<MainWindow *>(data)->SetMoodbarStyle(MoodbarStyle::ClampStyle(g_variant_get_int32(param)));
                    }),
                    this);
   g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(mode_action));
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(style_action));
   seekbar_menu_ = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_insert_action_group(seekbar_menu_, "seekbar", G_ACTION_GROUP(group));
   gtk_widget_set_parent(seekbar_menu_, relative);
   gtk_popover_popup(GTK_POPOVER(seekbar_menu_));
   g_object_unref(group);
+  g_object_unref(modes);
+  g_object_unref(styles);
   g_object_unref(menu);
 }
 

@@ -20,6 +20,7 @@
 #include "constants/transcodersettings.h"
 #include "constants/waveformsettings.h"
 #include "core/appearancestyle.h"
+#include "settings/networkproxylabels.h"
 #include "settings/settingscontrols.h"
 #include "settings/transcodersettingspage.h"
 #include "covermanager/coverproviderauth.h"
@@ -154,6 +155,35 @@ TEST(StreamingAndOsdSettings, OriginalGroups) {
   EXPECT_STREQ("color", WaveformSettings::kColor);
   EXPECT_EQ(8080u, NetworkProxySettings::kDefaultPort);
   EXPECT_STREQ("audio/x-vorbis", TranscoderSettings::kDefaultLastOutputFormat);
+}
+
+TEST(NetworkProxyLabels, MatchQtRadiosAndTypeOrder) {
+  EXPECT_STREQ("Network Proxy", NetworkProxyLabels::PageTitle());
+  EXPECT_STREQ("Use the system proxy settings", NetworkProxyLabels::SystemMode());
+  EXPECT_STREQ("Direct internet connection", NetworkProxyLabels::DirectMode());
+  EXPECT_STREQ("Manual proxy configuration", NetworkProxyLabels::ManualMode());
+  EXPECT_STREQ("HTTP proxy", NetworkProxyLabels::HttpType());
+  EXPECT_STREQ("SOCKS proxy", NetworkProxyLabels::SocksType());
+  EXPECT_STREQ("Use authentication", NetworkProxyLabels::AuthTitle());
+  EXPECT_STREQ("Use proxy settings for streaming", NetworkProxyLabels::EngineLabel());
+  EXPECT_STREQ("Only HTTP proxy is supported for streaming.", NetworkProxyLabels::EngineTooltip());
+  EXPECT_FALSE(NetworkProxyLabels::ManualEnabled(0));
+  EXPECT_FALSE(NetworkProxyLabels::ManualEnabled(1));
+  EXPECT_TRUE(NetworkProxyLabels::ManualEnabled(2));
+  EXPECT_TRUE(NetworkProxyLabels::ManualEnabled(std::string("2")));
+  EXPECT_FALSE(NetworkProxyLabels::ManualEnabled(std::string("0")));
+  const auto modes = NetworkProxyLabels::ModeChoices();
+  ASSERT_EQ(3u, modes.size());
+  EXPECT_EQ("0", modes[0].first);
+  EXPECT_EQ("2", modes[2].first);
+  const auto types = NetworkProxyLabels::TypeChoices();
+  ASSERT_EQ(2u, types.size());
+  EXPECT_EQ(std::to_string(static_cast<int>(NetworkProxySettings::ProxyType::HttpProxy)), types[0].first);
+  EXPECT_EQ(std::to_string(static_cast<int>(NetworkProxySettings::ProxyType::Socks5Proxy)), types[1].first);
+  EXPECT_EQ(0, NetworkProxyLabels::ComboIndexFromType(NetworkProxySettings::ProxyType::HttpProxy));
+  EXPECT_EQ(1, NetworkProxyLabels::ComboIndexFromType(NetworkProxySettings::ProxyType::Socks5Proxy));
+  EXPECT_EQ(NetworkProxySettings::ProxyType::HttpProxy, NetworkProxyLabels::TypeFromComboIndex(0));
+  EXPECT_EQ(NetworkProxySettings::ProxyType::Socks5Proxy, NetworkProxyLabels::TypeFromComboIndex(1));
 }
 
 TEST(TranscoderSettingsPage, TabsMatchQtOrderAndGroups) {

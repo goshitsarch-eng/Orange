@@ -30,7 +30,7 @@ void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *but
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
                   const std::function<void(GtkWidget *button)> &clicked);
 void AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
-                    const char *fallback);
+                    const char *fallback, const char *tooltip = nullptr);
 void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
                    const char *fallback);
 void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,

@@ -9,6 +9,7 @@
 #include "context/contextview.h"
 #include "core/application.h"
 #include "core/commandlineoptions.h"
+#include "constants/moodbarsettings.h"
 #include "core/seekbarsettings.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistcontainer.h"
@@ -160,6 +161,7 @@ class MainWindow {
   void ApplySeekbarMode();
   void CycleSeekbarMode();
   void SetSeekbarMode(SeekbarSettings::Mode mode);
+  void SetMoodbarStyle(MoodbarSettings::Style style);
   void ShowSeekbarMenu(GtkWidget *relative);
   void OnSeekbarScroll(double dy);
   void SeekFromBar(double x, int width);

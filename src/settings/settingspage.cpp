@@ -163,12 +163,15 @@ GtkWidget *AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const cha
 }
 
 void AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
-                    const char *fallback) {
+                    const char *fallback, const char *tooltip) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   GtkColorDialog *dialog = gtk_color_dialog_new();
   GtkWidget *button = gtk_color_dialog_button_new(dialog);
   g_object_unref(dialog);
+  if (tooltip && tooltip[0]) {
+    gtk_widget_set_tooltip_text(button, Translations::CStr(tooltip));
+  }
   const ColorUtils::Rgb rgb = ColorUtils::RgbFromHex(settings ? settings->Value(key, fallback ? fallback : "#ffffff") : (fallback ? fallback : "#ffffff"));
   GdkRGBA rgba;
   rgba.red = rgb.r / 255.0;

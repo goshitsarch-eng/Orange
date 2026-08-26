@@ -1,5 +1,7 @@
 #include "constants/moodbarsettings.h"
 #include "constants/waveformsettings.h"
+#include "settings/moodbarsettingslabels.h"
+#include "settings/waveformsettingslabels.h"
 #include "widgets/seekbarmode.h"
 #include "widgets/tracksliderwheel.h"
 #include "core/song.h"
@@ -169,4 +171,25 @@ TEST(SeekbarModeMenu, LabelsAndCycleMatchQt) {
   EXPECT_EQ(SeekbarSettings::Mode::Normal, SeekbarModeMenu::Next(SeekbarSettings::Mode::Waveform));
   EXPECT_EQ(SeekbarSettings::Mode::Normal, SeekbarModeMenu::Clamp(-1));
   EXPECT_EQ(SeekbarSettings::Mode::Waveform, SeekbarModeMenu::Clamp(2));
+  EXPECT_TRUE(SeekbarModeMenu::IsChecked(SeekbarSettings::Mode::Moodbar, SeekbarSettings::Mode::Moodbar));
+  EXPECT_FALSE(SeekbarModeMenu::IsChecked(SeekbarSettings::Mode::Normal, SeekbarSettings::Mode::Waveform));
+  EXPECT_TRUE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Moodbar));
+  EXPECT_FALSE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Normal));
+  EXPECT_STREQ("Moodbar style", SeekbarModeMenu::StyleSubmenuTitle());
+}
+
+TEST(MoodbarSettingsLabels, MatchQtStyleMenuAndSaveCopy) {
+  EXPECT_STREQ("Moodbar style", MoodbarSettingsLabels::StyleLabel());
+  EXPECT_STREQ("Save the .mood files directly in the songs folders", MoodbarSettingsLabels::SaveLabel());
+  const auto choices = MoodbarSettingsLabels::StyleChoices();
+  ASSERT_EQ(static_cast<size_t>(MoodbarSettings::Style::StyleCount), choices.size());
+  EXPECT_EQ("0", choices.front().first);
+  EXPECT_STREQ("Normal", choices.front().second.c_str());
+  EXPECT_STREQ("System colors", choices.back().second.c_str());
+}
+
+TEST(WaveformSettingsLabels, MatchQtColorAndSaveCopy) {
+  EXPECT_STREQ("Color", WaveformSettingsLabels::ColorTitle());
+  EXPECT_STREQ("Select waveform color", WaveformSettingsLabels::ColorTooltip());
+  EXPECT_STREQ("Save the .waveform files directly in the songs folders", WaveformSettingsLabels::SaveLabel());
 }
