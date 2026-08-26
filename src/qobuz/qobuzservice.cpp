@@ -2,6 +2,7 @@
 
 #include "constants/qobuzsettings.h"
 #include "core/settings.h"
+#include "streaming/streamingalbum.h"
 #include "streaming/streamingauth.h"
 #include "streaming/streamingsearchopts.h"
 #include "qobuz/qobuzfavoriterequest.h"
@@ -166,7 +167,11 @@ void QobuzService::GetAlbumSongs(const Song &album, SearchCallback callback) {
   QobuzRequest::GetAll(
       network_, [this, id](int offset, int limit) { return QobuzRequest::AlbumSongsUrl(kApiUrl, id, app_id_, user_auth_token_, offset, limit); },
       AuthHeaders(), QobuzRequest::Type::SearchSongs,
-      [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); },
+      [this, album, callback](const SongList &songs) {
+        SongList copy = songs;
+        StreamingAlbum::ApplyParent(copy, album);
+        DeliverWithCovers(network_, AuthHeaders(), copy, callback);
+      },
       [this](int received, int total) { ReportSongsProgress(received, total); }, {}, StreamingPage::kDefaultLimit, 0,
       [this](const std::string &error) { NotifySongsFailed(error); });
 }

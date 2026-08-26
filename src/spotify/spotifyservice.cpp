@@ -2,6 +2,7 @@
 
 #include "constants/spotifysettings.h"
 #include "core/settings.h"
+#include "streaming/streamingalbum.h"
 #include "streaming/streamingauth.h"
 #include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchopts.h"
@@ -231,10 +232,13 @@ void SpotifyService::GetAlbumSongs(const Song &album, SearchCallback callback) {
     }
     return;
   }
-  EnsureFreshToken([this, id, callback]() {
+  EnsureFreshToken([this, id, album, callback]() {
     SpotifyRequest::GetAll(network_, [id](int offset, int limit) { return SpotifyRequest::AlbumSongsUrl(SpotifyService::kApiUrl, id, offset, limit); },
-                           AuthHeaders(), SpotifyRequest::Type::SearchSongs,
-                           [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); });
+                           AuthHeaders(), SpotifyRequest::Type::SearchSongs, [this, album, callback](const SongList &songs) {
+                             SongList copy = songs;
+                             StreamingAlbum::ApplyParent(copy, album);
+                             DeliverWithCovers(network_, AuthHeaders(), copy, callback);
+                           });
   });
 }
 

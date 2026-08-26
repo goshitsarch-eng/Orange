@@ -2,6 +2,7 @@
 
 #include "constants/tidalsettings.h"
 #include "core/settings.h"
+#include "streaming/streamingalbum.h"
 #include "streaming/streamingauth.h"
 #include "streaming/streamingcover.h"
 #include "streaming/streamingprogress.h"
@@ -255,11 +256,14 @@ void TidalService::GetAlbumSongs(const Song &album, SearchCallback callback) {
     }
     return;
   }
-  EnsureFreshToken([this, id, callback]() {
+  EnsureFreshToken([this, id, album, callback]() {
     TidalRequest::GetAll(network_,
                          [this, id](int offset, int limit) { return TidalRequest::AlbumSongsUrl(kApiUrl, id, country_code_, offset, limit); },
-                         AuthHeaders(), TidalRequest::Type::SearchSongs,
-                         [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(songs), callback); });
+                         AuthHeaders(), TidalRequest::Type::SearchSongs, [this, album, callback](const SongList &songs) {
+                           SongList copy = songs;
+                           StreamingAlbum::ApplyParent(copy, album);
+                           DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(copy), callback);
+                         });
   });
 }
 

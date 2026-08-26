@@ -130,6 +130,64 @@ TEST(JsonUtils, QobuzTracks) {
   ASSERT_EQ(1u, songs.size());
   EXPECT_EQ("Song", songs.front().title());
   EXPECT_EQ("qobuz://7", songs.front().url());
+  EXPECT_EQ("Album", songs.front().album());
+}
+
+TEST(JsonUtils, QobuzAlbumGetFillsParentAlbum) {
+  const std::string json = R"json({
+    "id": 88,
+    "title": "Dummy",
+    "release_date_original": "1994-10-17",
+    "artist": {"id": 5, "name": "Portishead"},
+    "image": {"large": "https://static.qobuz.com/images/covers/dummy_large.jpg"},
+    "genre": {"name": "Electronic"},
+    "tracks": {
+      "items": [
+        {"id": 7, "title": "Roads", "performer": {"name": "Portishead"}, "duration": 300}
+      ]
+    }
+  })json";
+  const SongList songs = JsonUtils::ParseQobuzTracks(json);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Roads", songs.front().title());
+  EXPECT_EQ("Dummy", songs.front().album());
+  EXPECT_EQ("88", songs.front().album_id());
+  EXPECT_EQ("Portishead", songs.front().artist());
+  EXPECT_EQ("Portishead", songs.front().albumartist());
+  EXPECT_EQ("5", songs.front().artist_id());
+  EXPECT_EQ("https://static.qobuz.com/images/covers/dummy_large.jpg", songs.front().art_automatic());
+  EXPECT_EQ("Electronic", songs.front().genre());
+  EXPECT_EQ(1994, songs.front().year());
+}
+
+TEST(JsonUtils, SubsonicAlbumGetFillsParentAlbum) {
+  const std::string json = R"json({
+    "subsonic-response": {
+      "album": {
+        "id": "al-1",
+        "name": "Fleet Foxes",
+        "artist": "Fleet Foxes",
+        "artistId": "ar-1",
+        "coverArt": "al-1",
+        "genre": "Folk",
+        "year": 2008,
+        "song": [
+          {"id": "42", "title": "Ragged Wood", "artist": "Fleet Foxes", "duration": 301}
+        ]
+      }
+    }
+  })json";
+  const SongList songs = JsonUtils::ParseSubsonicSongs(json);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Ragged Wood", songs.front().title());
+  EXPECT_EQ("Fleet Foxes", songs.front().album());
+  EXPECT_EQ("al-1", songs.front().album_id());
+  EXPECT_EQ("Fleet Foxes", songs.front().artist());
+  EXPECT_EQ("Fleet Foxes", songs.front().albumartist());
+  EXPECT_EQ("ar-1", songs.front().artist_id());
+  EXPECT_EQ("al-1", songs.front().art_automatic());
+  EXPECT_EQ("Folk", songs.front().genre());
+  EXPECT_EQ(2008, songs.front().year());
 }
 
 TEST(JsonUtils, MusicBrainzRecordings) {

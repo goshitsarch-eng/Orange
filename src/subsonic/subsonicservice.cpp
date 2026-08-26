@@ -4,6 +4,7 @@
 #include "core/settings.h"
 #include "subsonic/subsonicfavoriterequest.h"
 #include "subsonic/subsonicrequest.h"
+#include "streaming/streamingalbum.h"
 #include "streaming/streamingcoverdownload.h"
 #include "streaming/streamingsearchopts.h"
 #include "subsonic/subsonicurlhandler.h"
@@ -218,8 +219,11 @@ void SubsonicService::GetAlbumSongs(const Song &album, SearchCallback callback) 
   SubsonicRequest::Get(network_,
                        CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::AlbumSongs),
                                  SubsonicRequest::AlbumSongsParams(album.album_id()), hex_auth_),
-                       SubsonicRequest::Type::AlbumSongs,
-                       [this, callback](const SongList &songs) { DeliverWithCovers(network_, {}, WithCoverUrls(songs), callback); });
+                       SubsonicRequest::Type::AlbumSongs, [this, album, callback](const SongList &songs) {
+                         SongList copy = songs;
+                         StreamingAlbum::ApplyParent(copy, album);
+                         DeliverWithCovers(network_, {}, WithCoverUrls(copy), callback);
+                       });
 }
 
 UrlHandler::LoadResult SubsonicService::Load(const std::string &url, AsyncCallback callback) {

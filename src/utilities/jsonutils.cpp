@@ -1,5 +1,6 @@
 #include "utilities/jsonutils.h"
 
+#include "streaming/streamingalbum.h"
 #include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <ctime>
 #include <functional>
 
 namespace {
@@ -645,6 +647,47 @@ JsonArray *FindNamedArray(JsonNode *root, const std::vector<std::string> &path) 
   return nullptr;
 }
 
+JsonObject *FindNamedObject(JsonNode *root, const std::vector<std::string> &path) {
+  JsonNode *node = root;
+  for (const std::string &part : path) {
+    if (!node || !JSON_NODE_HOLDS_OBJECT(node)) {
+      return nullptr;
+    }
+    node = json_object_get_member(json_node_get_object(node), part.c_str());
+  }
+  if (node && JSON_NODE_HOLDS_OBJECT(node)) {
+    return json_node_get_object(node);
+  }
+  return nullptr;
+}
+
+int QobuzAlbumYear(JsonObject *object) {
+  const int year = std::atoi(ObjectString(object, "year").c_str());
+  if (year > 0) {
+    return year;
+  }
+  const std::string date = ObjectString(object, "release_date_original");
+  if (date.size() >= 4) {
+    const int from_date = std::atoi(date.c_str());
+    if (from_date > 0) {
+      return from_date;
+    }
+  }
+  const std::string released = ObjectString(object, "released_at");
+  if (released.empty()) {
+    return 0;
+  }
+  const time_t timestamp = static_cast<time_t>(std::strtoll(released.c_str(), nullptr, 10));
+  if (timestamp <= 0) {
+    return 0;
+  }
+  struct tm tm {};
+  if (!gmtime_r(&timestamp, &tm)) {
+    return 0;
+  }
+  return tm.tm_year + 1900;
+}
+
 }  // namespace
 
 SongList ParseSubsonicSongs(const std::string &json) {
@@ -684,6 +727,28 @@ SongList ParseSubsonicSongs(const std::string &json) {
       song->set_art_automatic(cover);
     }
   });
+  JsonObject *album_object = FindNamedObject(root, {"subsonic-response", "album"});
+  if (album_object && json_object_has_member(album_object, "song")) {
+    Song album(Song::Source::Subsonic);
+    album.set_album(ObjectString(album_object, "name"));
+    if (album.album().empty()) {
+      album.set_album(ObjectString(album_object, "album"));
+    }
+    album.set_album_id(ObjectString(album_object, "id"));
+    album.set_artist(ObjectString(album_object, "artist"));
+    album.set_albumartist(ObjectString(album_object, "albumArtist"));
+    if (album.albumartist().empty()) {
+      album.set_albumartist(album.artist());
+    }
+    album.set_artist_id(ObjectString(album_object, "artistId"));
+    album.set_genre(ObjectString(album_object, "genre"));
+    album.set_year(std::atoi(ObjectString(album_object, "year").c_str()));
+    const std::string cover = ObjectString(album_object, "coverArt");
+    if (!cover.empty()) {
+      album.set_art_automatic(cover);
+    }
+    StreamingAlbum::ApplyParent(songs, album);
+  }
   json_node_unref(root);
   return songs;
 }
@@ -811,6 +876,26 @@ SongList ParseQobuzTracks(const std::string &json) {
       }
     }
   });
+  // album/get puts album title/artist/art on the root object, not on each track.
+  if (root && JSON_NODE_HOLDS_OBJECT(root) && FindNamedArray(root, {"tracks", "items"})) {
+    JsonObject *object = json_node_get_object(root);
+    const std::string title = ObjectString(object, "title");
+    if (!title.empty()) {
+      Song album(Song::Source::Qobuz);
+      album.set_album(title);
+      album.set_album_id(ObjectString(object, "id"));
+      album.set_artist(NestedName(object, "artist", "name"));
+      album.set_albumartist(album.artist());
+      album.set_artist_id(NestedName(object, "artist", "id"));
+      album.set_genre(NestedName(object, "genre", "name"));
+      album.set_year(QobuzAlbumYear(object));
+      const std::string image = NestedName(object, "image", "large");
+      if (!image.empty()) {
+        album.set_art_automatic(image);
+      }
+      StreamingAlbum::ApplyParent(songs, album);
+    }
+  }
   json_node_unref(root);
   return songs;
 }

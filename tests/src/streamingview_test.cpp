@@ -1,4 +1,5 @@
 #include "streaming/streamingabort.h"
+#include "streaming/streamingalbum.h"
 #include "streaming/streamingcoverdownload.h"
 #include "streaming/streamingpage.h"
 #include "streaming/streamingsearchopts.h"
@@ -407,6 +408,46 @@ TEST(StreamingCoverDownload, HelpersAndSettings) {
   settings.SetBoolValue(StreamingCoverDownload::kDownloadAlbumCovers, true);
   settings.Sync();
   EXPECT_TRUE(StreamingCoverDownload::Enabled("Tidal"));
+}
+
+TEST(StreamingAlbum, EffectiveTitleAndApplyParent) {
+  Song album(Song::Source::Qobuz);
+  album.set_album("Dummy");
+  album.set_title("Should ignore");
+  album.set_album_id("88");
+  album.set_artist("Portishead");
+  album.set_albumartist("Portishead");
+  album.set_artist_id("5");
+  album.set_art_automatic("https://example.com/a.jpg");
+  album.set_genre("Electronic");
+  album.set_year(2008);
+  EXPECT_EQ("Dummy", StreamingAlbum::EffectiveTitle(album));
+  Song titled;
+  titled.set_title("Only Title");
+  EXPECT_EQ("Only Title", StreamingAlbum::EffectiveTitle(titled));
+
+  Song empty(Song::Source::Qobuz);
+  empty.set_title("Roads");
+  SongList songs = {empty};
+  StreamingAlbum::ApplyParent(songs, album);
+  EXPECT_EQ("Dummy", songs[0].album());
+  EXPECT_EQ("88", songs[0].album_id());
+  EXPECT_EQ("Portishead", songs[0].artist());
+  EXPECT_EQ("Portishead", songs[0].albumartist());
+  EXPECT_EQ("5", songs[0].artist_id());
+  EXPECT_EQ("https://example.com/a.jpg", songs[0].art_automatic());
+  EXPECT_EQ("Electronic", songs[0].genre());
+  EXPECT_EQ(2008, songs[0].year());
+
+  Song kept(Song::Source::Qobuz);
+  kept.set_album("Child");
+  kept.set_artist("Child Artist");
+  kept.set_year(1994);
+  SongList existing = {kept};
+  StreamingAlbum::ApplyParent(existing, album);
+  EXPECT_EQ("Child", existing[0].album());
+  EXPECT_EQ("Child Artist", existing[0].artist());
+  EXPECT_EQ(1994, existing[0].year());
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {
