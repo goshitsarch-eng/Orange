@@ -21,6 +21,7 @@
 #include "context/contexttechnical.h"
 #include "dialogs/deletefilespolicy.h"
 #include "organize/organize.h"
+#include "organize/organizefilename.h"
 #include "organize/organizeformatvalidator.h"
 #include "organize/organizetranscode.h"
 #include "analyzer/analyzer.h"
@@ -338,6 +339,57 @@ TEST(OrganizeFormat, ReplaceSpacesAndEmptyFallback) {
   Song empty;
   empty.set_basefilename("fallback.ogg");
   EXPECT_EQ("fallback.ogg", OrganizeFormat("%title").GetFilenameForSong(empty));
+}
+
+TEST(OrganizeFilename, ProblematicFatAsciiAndPrefixes) {
+  EXPECT_EQ("ABCDEFGH", OrganizeFilename::RemoveProblematic("A:B?C*D\"E<F>G|H"));
+  EXPECT_EQ("Mr Brightside", OrganizeFilename::RemoveDots("Mr. Brightside"));
+  EXPECT_TRUE(OrganizeFilename::IsFatAllowed('A'));
+  EXPECT_TRUE(OrganizeFilename::IsFatAllowed('/'));
+  EXPECT_FALSE(OrganizeFilename::IsFatAllowed(':'));
+  EXPECT_EQ("AB", OrganizeFilename::RemoveNonFat("A:B"));
+  EXPECT_EQ("Artist/Album", OrganizeFilename::StripInvalidPrefixes("Artist/.Album"));
+  EXPECT_EQ("hidden", OrganizeFilename::StripInvalidPrefixes(".hidden"));
+  EXPECT_EQ("A B", OrganizeFilename::CollapseWhitespace("A   B"));
+  EXPECT_EQ("A_B", OrganizeFilename::ReplaceSpaces("A B"));
+  EXPECT_TRUE(OrganizeFilename::ShouldTransliterate({false, true, false, false, false}));
+  EXPECT_TRUE(OrganizeFilename::ShouldTransliterate({false, false, true, false, false}));
+  EXPECT_FALSE(OrganizeFilename::ShouldTransliterate({false, false, true, true, false}));
+
+  OrganizeFilename::Options options;
+  options.remove_problematic = true;
+  options.replace_spaces = true;
+  EXPECT_EQ("Track_Name", OrganizeFilename::Apply("Track: Name", options));
+  options = {};
+  options.remove_non_ascii = true;
+  const std::string ascii = OrganizeFilename::Apply(StrUtils::Transliterate("Café"), options);
+  EXPECT_EQ("Cafe", ascii);
+}
+
+TEST(OrganizeFormat, SanitizesFilenames) {
+  OrganizeFormat format("%artist/%title");
+  format.set_remove_problematic(true);
+  Song song;
+  song.set_artist("AC/DC");
+  song.set_title("Hells Bells?");
+  EXPECT_EQ("AC_DC/Hells Bells", format.GetFilenameForSong(song));
+
+  song.set_title("Mr. Brightside");
+  EXPECT_EQ("AC_DC/Mr Brightside", format.GetFilenameForSong(song));
+
+  format.set_replace_spaces(true);
+  EXPECT_EQ("AC_DC/Mr_Brightside", format.GetFilenameForSong(song));
+
+  OrganizeFormat fat("%title");
+  fat.set_remove_non_fat(true);
+  Song fat_song;
+  fat_song.set_title("Hello*World");
+  EXPECT_EQ("HelloWorld", fat.GetFilenameForSong(fat_song));
+
+  const OrganizeFilename::Options flags = format.FilenameOptions();
+  EXPECT_TRUE(flags.remove_problematic);
+  EXPECT_TRUE(flags.replace_spaces);
+  EXPECT_FALSE(flags.remove_non_fat);
 }
 
 TEST(Organize, OverwriteAndAlbumCover) {

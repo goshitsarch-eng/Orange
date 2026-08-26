@@ -164,6 +164,25 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                               request.move || settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove));
   GtkWidget *overwrite = gtk_check_button_new_with_label(Translations::CStr("Overwrite existing files"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(overwrite), settings.BoolValue(OrganizeSettings::kOverwrite, OrganizeSettings::kDefaultOverwrite));
+  GtkWidget *remove_problematic = gtk_check_button_new_with_label(Translations::CStr("Remove problematic characters from filenames"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(remove_problematic),
+                              settings.BoolValue(OrganizeSettings::kRemoveProblematic, OrganizeSettings::kDefaultRemoveProblematic));
+  GtkWidget *remove_non_fat = gtk_check_button_new_with_label(Translations::CStr("Restrict to characters allowed on FAT filesystems"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(remove_non_fat),
+                              settings.BoolValue(OrganizeSettings::kRemoveNonFat, OrganizeSettings::kDefaultRemoveNonFat));
+  GtkWidget *remove_non_ascii = gtk_check_button_new_with_label(Translations::CStr("Restrict characters to ASCII"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(remove_non_ascii),
+                              settings.BoolValue(OrganizeSettings::kRemoveNonAscii, OrganizeSettings::kDefaultRemoveNonAscii));
+  GtkWidget *allow_ascii_ext = gtk_check_button_new_with_label(Translations::CStr("Allow extended ASCII characters"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(allow_ascii_ext),
+                              settings.BoolValue(OrganizeSettings::kAllowAsciiExt, OrganizeSettings::kDefaultAllowAsciiExt));
+  gtk_widget_set_sensitive(allow_ascii_ext, gtk_check_button_get_active(GTK_CHECK_BUTTON(remove_non_ascii)));
+  g_object_set_data(G_OBJECT(remove_non_ascii), "allow-ascii-ext", allow_ascii_ext);
+  g_signal_connect(remove_non_ascii, "toggled", G_CALLBACK((+[](GtkCheckButton *button, gpointer) {
+                     gtk_widget_set_sensitive(GTK_WIDGET(g_object_get_data(G_OBJECT(button), "allow-ascii-ext")),
+                                              gtk_check_button_get_active(button));
+                   })),
+                   nullptr);
   GtkWidget *replace_spaces = gtk_check_button_new_with_label(Translations::CStr("Replace spaces with underscores"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(replace_spaces),
                               settings.BoolValue(OrganizeSettings::kReplaceSpaces, OrganizeSettings::kDefaultReplaceSpaces));
@@ -189,6 +208,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   g_object_set_data(G_OBJECT(run), "dest", dest);
   g_object_set_data(G_OBJECT(run), "move", move_btn);
   g_object_set_data(G_OBJECT(run), "overwrite", overwrite);
+  g_object_set_data(G_OBJECT(run), "remove-problematic", remove_problematic);
+  g_object_set_data(G_OBJECT(run), "remove-non-fat", remove_non_fat);
+  g_object_set_data(G_OBJECT(run), "remove-non-ascii", remove_non_ascii);
+  g_object_set_data(G_OBJECT(run), "allow-ascii-ext", allow_ascii_ext);
   g_object_set_data(G_OBJECT(run), "replace-spaces", replace_spaces);
   g_object_set_data(G_OBJECT(run), "albumcover", albumcover);
   g_object_set_data(G_OBJECT(run), "status", status);
@@ -208,6 +231,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   g_object_set_data(G_OBJECT(preview_btn), "songs", owned_songs);
   g_object_set_data(G_OBJECT(preview_btn), "buffer", buffer);
   g_object_set_data(G_OBJECT(preview_btn), "dest", dest);
+  g_object_set_data(G_OBJECT(preview_btn), "remove-problematic", remove_problematic);
+  g_object_set_data(G_OBJECT(preview_btn), "remove-non-fat", remove_non_fat);
+  g_object_set_data(G_OBJECT(preview_btn), "remove-non-ascii", remove_non_ascii);
+  g_object_set_data(G_OBJECT(preview_btn), "allow-ascii-ext", allow_ascii_ext);
   g_object_set_data(G_OBJECT(preview_btn), "replace-spaces", replace_spaces);
   g_object_set_data(G_OBJECT(preview_btn), "preview", preview);
   g_object_set_data(G_OBJECT(buffer), "error", format_error);
@@ -238,6 +265,12 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      gchar *text = gtk_text_buffer_get_text(buf, &start, &end, FALSE);
                      OrganizeFormat format(text ? text : "");
                      g_free(text);
+                     format.set_remove_problematic(
+                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-problematic"))));
+                     format.set_remove_non_fat(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-non-fat"))));
+                     format.set_remove_non_ascii(
+                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-non-ascii"))));
+                     format.set_allow_ascii_ext(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "allow-ascii-ext"))));
                      format.set_replace_spaces(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "replace-spaces"))));
                      const std::string dest_dir = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "dest")));
                      std::string preview_text;
@@ -269,6 +302,12 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                        return;
                      }
                      OrganizeFormat format(format_text);
+                     format.set_remove_problematic(
+                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-problematic"))));
+                     format.set_remove_non_fat(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-non-fat"))));
+                     format.set_remove_non_ascii(
+                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-non-ascii"))));
+                     format.set_allow_ascii_ext(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "allow-ascii-ext"))));
                      format.set_replace_spaces(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "replace-spaces"))));
                      const std::string dest_dir = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "dest")));
                      Organize::Options options;
@@ -290,6 +329,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      persist.SetBoolValue(OrganizeSettings::kMove, options.move);
                      persist.SetBoolValue(OrganizeSettings::kOverwrite, options.overwrite);
                      persist.SetBoolValue(OrganizeSettings::kReplaceSpaces, format.replace_spaces());
+                     persist.SetBoolValue(OrganizeSettings::kRemoveProblematic, format.remove_problematic());
+                     persist.SetBoolValue(OrganizeSettings::kRemoveNonFat, format.remove_non_fat());
+                     persist.SetBoolValue(OrganizeSettings::kRemoveNonAscii, format.remove_non_ascii());
+                     persist.SetBoolValue(OrganizeSettings::kAllowAsciiExt, format.allow_ascii_ext());
                      persist.SetBoolValue(OrganizeSettings::kAlbumCover, options.albumcover);
                      if (gpointer eject_ptr = g_object_get_data(G_OBJECT(button), "eject")) {
                        persist.SetBoolValue(OrganizeSettings::kEjectAfter, gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)));
@@ -330,6 +373,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   gtk_box_append(GTK_BOX(box), dest_row);
   gtk_box_append(GTK_BOX(box), move_btn);
   gtk_box_append(GTK_BOX(box), overwrite);
+  gtk_box_append(GTK_BOX(box), remove_problematic);
+  gtk_box_append(GTK_BOX(box), remove_non_fat);
+  gtk_box_append(GTK_BOX(box), remove_non_ascii);
+  gtk_box_append(GTK_BOX(box), allow_ascii_ext);
   gtk_box_append(GTK_BOX(box), replace_spaces);
   gtk_box_append(GTK_BOX(box), albumcover);
   if (eject) {

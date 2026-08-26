@@ -1,6 +1,7 @@
 #include "organize/organizeformat.h"
 
 #include "constants/timeconstants.h"
+#include "organize/organizefilename.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
 
@@ -123,7 +124,11 @@ bool OrganizeFormat::IsValid() const {
 std::string OrganizeFormat::ExpandTokens(const std::string &pattern, const Song &song) const {
   std::string result = pattern;
   for (int i = 0; kKnownTags[i]; ++i) {
-    result = StrUtils::Replace(result, kKnownTags[i], Safe(TokenValue(kKnownTags[i], song)));
+    std::string value = Safe(TokenValue(kKnownTags[i], song));
+    if (remove_problematic_) {
+      value = OrganizeFilename::RemoveDots(value);
+    }
+    result = StrUtils::Replace(result, kKnownTags[i], value);
   }
   return result;
 }
@@ -138,14 +143,7 @@ std::string OrganizeFormat::ApplyFilenameFixes(std::string path, const Song &son
       path += "." + ext;
     }
   }
-  if (replace_spaces_) {
-    for (char &c : path) {
-      if (std::isspace(static_cast<unsigned char>(c))) {
-        c = '_';
-      }
-    }
-  }
-  return path;
+  return OrganizeFilename::Apply(path, FilenameOptions());
 }
 
 std::string OrganizeFormat::GetFilenameForSong(const Song &song) const {
