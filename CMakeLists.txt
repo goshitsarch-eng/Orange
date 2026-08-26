@@ -635,6 +635,7 @@ set(STRAWBERRY_SOURCES
   src/settings/globalshortcutssettingspage.cpp
   src/settings/moodbarsettingspage.cpp
   src/settings/waveformsettingspage.cpp
+  src/settings/analyzersettingspage.cpp
   src/settings/subsonicsettingspage.cpp
   src/settings/tidalsettingspage.cpp
   src/settings/qobuzsettingspage.cpp

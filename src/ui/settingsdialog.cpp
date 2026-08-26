@@ -3,6 +3,7 @@
 #include "config.h"
 #include "core/application.h"
 #include "core/settings.h"
+#include "settings/analyzersettingspage.h"
 #include "settings/appearancesettingspage.h"
 #include "settings/backendsettingspage.h"
 #include "settings/behavioursettingspage.h"
@@ -48,6 +49,7 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::functi
   adw_preferences_dialog_add(dialog, GlobalShortcutsSettingsPage::Create(settings, app));
   adw_preferences_dialog_add(dialog, MoodbarSettingsPage::Create(settings, app));
   adw_preferences_dialog_add(dialog, WaveformSettingsPage::Create(settings, app));
+  adw_preferences_dialog_add(dialog, AnalyzerSettingsPage::Create(settings, app));
 #ifdef HAVE_SUBSONIC
   adw_preferences_dialog_add(dialog, SubsonicSettingsPage::Create(settings, app));
 #endif

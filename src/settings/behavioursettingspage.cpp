@@ -3,6 +3,7 @@
 #include "constants/behavioursettings.h"
 #include "settings/settingspage.h"
 #include "translations/languagechoices.h"
+#include "translations/translations.h"
 
 AdwPreferencesPage *BehaviourSettingsPage::Create(Settings *settings, Application *) {
   settings->BeginGroup(BehaviourSettings::kSettingsGroup);
@@ -19,6 +20,14 @@ AdwPreferencesPage *BehaviourSettingsPage::Create(Settings *settings, Applicatio
                            settings->SetValue(BehaviourSettings::kLanguage, id);
                            settings->Sync();
                          });
+  GtkWidget *language_note = gtk_label_new(Translations::CStr("You will need to restart Strawberry if you change the language."));
+  gtk_widget_add_css_class(language_note, "dim-label");
+  gtk_label_set_wrap(GTK_LABEL(language_note), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(language_note), 0.0f);
+  gtk_widget_set_margin_start(language_note, 12);
+  gtk_widget_set_margin_end(language_note, 12);
+  gtk_widget_set_margin_bottom(language_note, 8);
+  adw_preferences_group_add(startup, language_note);
 
   AdwPreferencesGroup *tray = SettingsPage::AddGroup(page, "System tray");
   SettingsPage::AddToggle(tray, settings, BehaviourSettings::kShowTrayIcon, "Show system tray icon", nullptr, BehaviourSettings::kDefaultShowTrayIcon);

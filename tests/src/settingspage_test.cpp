@@ -1,3 +1,5 @@
+#include "analyzer/analyzer.h"
+#include "constants/analyzersettings.h"
 #include "constants/backendsettings.h"
 #include "constants/behavioursettings.h"
 #include "constants/collectionsettings.h"
@@ -95,6 +97,20 @@ TEST(StreamingAndOsdSettings, OriginalGroups) {
   EXPECT_STREQ("color", WaveformSettings::kColor);
   EXPECT_EQ(8080u, NetworkProxySettings::kDefaultPort);
   EXPECT_STREQ("audio/x-vorbis", TranscoderSettings::kDefaultLastOutputFormat);
+}
+
+TEST(AnalyzerSettings, KeysDefaultsAndTypes) {
+  EXPECT_STREQ("Analyzer", AnalyzerSettings::kSettingsGroup);
+  EXPECT_STREQ("type", AnalyzerSettings::kType);
+  EXPECT_STREQ("enabled", AnalyzerSettings::kEnabled);
+  EXPECT_STREQ("framerate", AnalyzerSettings::kFramerate);
+  EXPECT_STREQ("Bar", AnalyzerSettings::kDefaultType);
+  EXPECT_TRUE(AnalyzerSettings::kDefaultEnabled);
+  EXPECT_EQ(25, AnalyzerSettings::kDefaultFramerate);
+  const auto types = Analyzer::Types();
+  EXPECT_EQ("Bar", types.front());
+  EXPECT_EQ("Block", types.back());
+  EXPECT_EQ(8u, types.size());
 }
 
 TEST(StreamingChoices, QualityAndAuthLabels) {

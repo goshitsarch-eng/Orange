@@ -1570,6 +1570,8 @@ void MainWindow::OpenSettings() {
     ApplySeekbarMode();
     ApplyBehaviourSettings();
     ApplyPlaylistBehaviour();
+    app_->analyzer()->ReloadSettings();
+    ApplyAnalyzer();
     app_->moodbar()->Load(app_->player()->current_song());
     app_->waveform()->Load(app_->player()->current_song());
   });
