@@ -93,13 +93,14 @@ std::string Url(const std::string &api_url, Type type, const std::string &query,
 }
 
 std::string ArtistAlbumsUrl(const std::string &api_url, const std::string &artist_id, const std::string &app_id,
-                            const std::string &user_auth_token) {
-  return AppendAuth(api_url + "/artist/get?artist_id=" + StrUtils::UriEscape(artist_id) + "&extra=albums", app_id, user_auth_token, 0, 0);
+                            const std::string &user_auth_token, int offset, int limit) {
+  return AppendAuth(api_url + "/artist/get?artist_id=" + StrUtils::UriEscape(artist_id) + "&extra=albums", app_id, user_auth_token,
+                    offset, limit);
 }
 
 std::string AlbumSongsUrl(const std::string &api_url, const std::string &album_id, const std::string &app_id,
-                          const std::string &user_auth_token) {
-  return AppendAuth(api_url + "/album/get?album_id=" + StrUtils::UriEscape(album_id), app_id, user_auth_token, 0, 0);
+                          const std::string &user_auth_token, int offset, int limit) {
+  return AppendAuth(api_url + "/album/get?album_id=" + StrUtils::UriEscape(album_id), app_id, user_auth_token, offset, limit);
 }
 
 SongList Parse(Type type, const std::string &json) {

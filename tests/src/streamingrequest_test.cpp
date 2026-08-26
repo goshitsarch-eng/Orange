@@ -100,6 +100,28 @@ TEST(QobuzRequest, UrlsAndParse) {
   EXPECT_NE(std::string::npos, search.find("/track/search?query=roads"));
   EXPECT_NE(std::string::npos, QobuzRequest::ArtistAlbumsUrl("https://www.qobuz.com/api.json/0.2", "7", "app", "tok").find("/artist/get?artist_id=7"));
   EXPECT_NE(std::string::npos, QobuzRequest::AlbumSongsUrl("https://www.qobuz.com/api.json/0.2", "8", "app", "tok").find("/album/get?album_id=8"));
+  const std::string artist_page =
+      QobuzRequest::ArtistAlbumsUrl("https://www.qobuz.com/api.json/0.2", "7", "app", "tok", 50, 50);
+  EXPECT_NE(std::string::npos, artist_page.find("offset=50"));
+  EXPECT_NE(std::string::npos, artist_page.find("limit=50"));
+  const std::string album_page = QobuzRequest::AlbumSongsUrl("https://www.qobuz.com/api.json/0.2", "8", "app", "tok", 50, 50);
+  EXPECT_NE(std::string::npos, album_page.find("offset=50"));
+  EXPECT_NE(std::string::npos, album_page.find("limit=50"));
+  const auto artist_meta = QobuzRequest::ParsePage(
+      QobuzRequest::Type::SearchAlbums, R"json({"albums":{"offset":0,"limit":50,"total":120,"items":[{"id":8,"title":"Dummy"}]}})json", 0,
+      50);
+  EXPECT_EQ(0, artist_meta.offset);
+  EXPECT_EQ(50, artist_meta.limit);
+  EXPECT_EQ(120, artist_meta.total);
+  ASSERT_EQ(1u, artist_meta.songs.size());
+  EXPECT_TRUE(StreamingPage::NeedAnotherPage(artist_meta));
+  const auto album_meta = QobuzRequest::ParsePage(
+      QobuzRequest::Type::SearchSongs, R"json({"tracks":{"offset":50,"limit":50,"total":51,"items":[{"id":9,"title":"Roads"}]}})json", 50,
+      50);
+  EXPECT_EQ(50, album_meta.offset);
+  EXPECT_EQ(51, album_meta.total);
+  ASSERT_EQ(1u, album_meta.songs.size());
+  EXPECT_FALSE(StreamingPage::NeedAnotherPage(album_meta));
 
   const SongList artists =
       QobuzRequest::Parse(QobuzRequest::Type::SearchArtists, R"json({"artists":{"items":[{"id":7,"name":"Portishead"}]}})json");

@@ -146,9 +146,13 @@ void QobuzService::GetArtistAlbums(const Song &artist, SearchCallback callback) 
     }
     return;
   }
-  QobuzRequest::Get(network_, QobuzRequest::ArtistAlbumsUrl(kApiUrl, artist.artist_id(), app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::SearchAlbums,
-                    [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); });
+  const std::string id = artist.artist_id();
+  QobuzRequest::GetAll(
+      network_, [this, id](int offset, int limit) { return QobuzRequest::ArtistAlbumsUrl(kApiUrl, id, app_id_, user_auth_token_, offset, limit); },
+      AuthHeaders(), QobuzRequest::Type::SearchAlbums,
+      [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); },
+      [this](int received, int total) { ReportAlbumsProgress(received, total); }, {}, StreamingPage::kDefaultLimit, 0,
+      [this](const std::string &error) { NotifyAlbumsFailed(error); });
 }
 
 void QobuzService::GetAlbumSongs(const Song &album, SearchCallback callback) {
@@ -158,9 +162,13 @@ void QobuzService::GetAlbumSongs(const Song &album, SearchCallback callback) {
     }
     return;
   }
-  QobuzRequest::Get(network_, QobuzRequest::AlbumSongsUrl(kApiUrl, album.album_id(), app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::SearchSongs,
-                    [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); });
+  const std::string id = album.album_id();
+  QobuzRequest::GetAll(
+      network_, [this, id](int offset, int limit) { return QobuzRequest::AlbumSongsUrl(kApiUrl, id, app_id_, user_auth_token_, offset, limit); },
+      AuthHeaders(), QobuzRequest::Type::SearchSongs,
+      [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); },
+      [this](int received, int total) { ReportSongsProgress(received, total); }, {}, StreamingPage::kDefaultLimit, 0,
+      [this](const std::string &error) { NotifySongsFailed(error); });
 }
 
 UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback callback) {

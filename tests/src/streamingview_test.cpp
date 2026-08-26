@@ -371,6 +371,16 @@ TEST(StreamingCoverDownload, HelpersAndSettings) {
   EXPECT_TRUE(StreamingCover::IsLocalUrl("/tmp/a.jpg"));
   EXPECT_TRUE(StreamingCover::CanLoad("/tmp/a.jpg"));
   EXPECT_FALSE(StreamingCover::IsLocalUrl("https://example.com/a.jpg"));
+  EXPECT_TRUE(StreamingCover::ValidTidalCoverSize("640x640"));
+  EXPECT_FALSE(StreamingCover::ValidTidalCoverSize("99x99"));
+  EXPECT_EQ("640x640", StreamingCover::ClampTidalCoverSize("nope"));
+  EXPECT_EQ("https://resources.tidal.com/images/aa/640x640.jpg",
+            StreamingCover::WithTidalCoverSize("https://resources.tidal.com/images/aa/1280x1280.jpg", "640x640"));
+  Song sized(Song::Source::Tidal);
+  sized.set_art_automatic("https://resources.tidal.com/images/aa/1280x1280.jpg");
+  SongList sized_songs = {sized};
+  StreamingCover::ApplyTidalCoverSize(sized_songs, "320x320");
+  EXPECT_EQ("https://resources.tidal.com/images/aa/320x320.jpg", sized_songs[0].art_automatic());
   Song song(Song::Source::Tidal);
   song.set_album_id("42");
   song.set_art_automatic("https://example.com/a.jpg");

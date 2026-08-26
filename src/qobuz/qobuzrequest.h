@@ -35,9 +35,9 @@ std::string Resource(Type type);
 std::string Url(const std::string &api_url, Type type, const std::string &query, const std::string &app_id,
                 const std::string &user_auth_token, int offset = 0, int limit = 50);
 std::string ArtistAlbumsUrl(const std::string &api_url, const std::string &artist_id, const std::string &app_id,
-                            const std::string &user_auth_token);
+                            const std::string &user_auth_token, int offset = 0, int limit = StreamingPage::kDefaultLimit);
 std::string AlbumSongsUrl(const std::string &api_url, const std::string &album_id, const std::string &app_id,
-                          const std::string &user_auth_token);
+                          const std::string &user_auth_token, int offset = 0, int limit = StreamingPage::kDefaultLimit);
 
 SongList Parse(Type type, const std::string &json);
 

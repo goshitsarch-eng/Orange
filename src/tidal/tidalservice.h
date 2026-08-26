@@ -54,8 +54,11 @@ class TidalService : public StreamingService {
   gint64 login_time_ = 0;
   std::string country_code_ = "US";
   std::string quality_ = TidalSettings::kDefaultQuality;
+  std::string coversize_ = TidalSettings::kDefaultCoverSize;
   TidalSettings::StreamUrlMethod stream_url_method_ = TidalSettings::kDefaultStreamUrl;
   uint64_t user_id_ = 0;
+
+  SongList WithCoverSize(SongList songs) const;
 };
 
 #endif
