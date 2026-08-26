@@ -6,6 +6,7 @@
 #include <cstring>
 #include "core/settings.h"
 #include "core/standardpaths.h"
+#include "covermanager/lastfmcoverprovider.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
@@ -63,12 +64,6 @@ class JsonCoverProvider : public CoverProvider {
   std::string url_template_;
 };
 
-class LastFmCoverProvider : public JsonCoverProvider {
- public:
-  LastFmCoverProvider()
-      : JsonCoverProvider("Last.fm",
-                          "https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=211990b4c96782c05d1536e7219eb56e&artist={artist}&album={album}&format=json") {}
-};
 class MusicbrainzCoverProvider : public JsonCoverProvider {
  public:
   MusicbrainzCoverProvider()

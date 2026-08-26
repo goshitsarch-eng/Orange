@@ -431,7 +431,7 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     settings->BeginGroup("SomaFM");
     AdwPreferencesGroup *soma = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     adw_preferences_group_set_title(soma, "SomaFM");
-    AddEntry(soma, settings, "quality", "Quality (64/128/256)", "128");
+    AddEntry(soma, settings, "quality", "Quality (highest/high/low)", "highest");
     adw_preferences_page_add(page, soma);
     settings->BeginGroup("RadioParadise");
     AdwPreferencesGroup *rp = ADW_PREFERENCES_GROUP(adw_preferences_group_new());

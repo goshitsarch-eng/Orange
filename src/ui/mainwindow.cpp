@@ -355,7 +355,23 @@ void MainWindow::BuildSidebar() {
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&playlists_list_), "playlists", "Playlists", "view-list-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&smart_list_), "smart", "Smart playlists", "view-refresh-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&files_list_), "files", "Files", "folder-symbolic");
-  adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&radio_list_), "radio", "Internet radio", "network-wireless-symbolic");
+  GtkWidget *radio_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  GtkWidget *radio_search = gtk_search_entry_new();
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(radio_search), "Search Radio Browser");
+  gtk_widget_set_margin_start(radio_search, 8);
+  gtk_widget_set_margin_end(radio_search, 8);
+  gtk_widget_set_margin_top(radio_search, 6);
+  gtk_widget_set_margin_bottom(radio_search, 4);
+  gtk_box_append(GTK_BOX(radio_page), radio_search);
+  gtk_box_append(GTK_BOX(radio_page), MakeScrolledList(&radio_list_));
+  gtk_widget_set_vexpand(gtk_widget_get_last_child(radio_page), TRUE);
+  g_signal_connect(radio_search, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
+                     self->SearchRadio(text ? text : "");
+                   }),
+                   this);
+  adw_view_stack_add_titled_with_icon(sidebar_stack_, radio_page, "radio", "Internet radio", "network-wireless-symbolic");
   GtkWidget *streaming_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   GtkWidget *streaming_search = gtk_search_entry_new();
   gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(streaming_search), "Search streaming service");
@@ -1217,6 +1233,24 @@ void MainWindow::RefreshQueue() {
 
 void MainWindow::RefreshRadio() {
   ClearList(radio_list_);
+  if (!radio_query_.empty()) {
+    const std::vector<RadioChannel> &results = app_->radio_services()->search_results();
+    for (const RadioChannel &channel : results) {
+      std::string label = channel.name.empty() ? channel.url : channel.name;
+      if (!channel.country.empty()) {
+        label += " · " + channel.country;
+      }
+      if (!channel.codec.empty()) {
+        label += " (" + channel.codec + ")";
+      }
+      auto *copy = new RadioChannel(channel);
+      AppendStringRow(GTK_LIST_BOX(radio_list_), label, copy, [](gpointer p) { delete static_cast<RadioChannel *>(p); });
+    }
+    if (results.empty()) {
+      AppendStringRow(GTK_LIST_BOX(radio_list_), "Searching Radio Browser…", nullptr);
+    }
+    return;
+  }
   if (app_->radio_services()->channels().empty()) {
     app_->radio_services()->FetchSomaFM();
     app_->radio_services()->FetchRadioParadise();
@@ -1226,10 +1260,19 @@ void MainWindow::RefreshRadio() {
     AppendStringRow(GTK_LIST_BOX(radio_list_), channel.name.empty() ? channel.url : channel.name, copy, [](gpointer p) { delete static_cast<RadioChannel *>(p); });
   }
   if (app_->radio_services()->channels().empty()) {
-    AppendStringRow(GTK_LIST_BOX(radio_list_), "Radio Paradise", nullptr);
     AppendStringRow(GTK_LIST_BOX(radio_list_), "SomaFM", nullptr);
-    AppendStringRow(GTK_LIST_BOX(radio_list_), "Radio Browser", nullptr);
+    AppendStringRow(GTK_LIST_BOX(radio_list_), "Radio Paradise", nullptr);
+    AppendStringRow(GTK_LIST_BOX(radio_list_), "Search Radio Browser above", nullptr);
   }
+}
+
+void MainWindow::SearchRadio(const std::string &query) {
+  radio_query_ = StrUtils::Trim(query);
+  if (radio_query_.empty()) {
+    RefreshRadio();
+    return;
+  }
+  app_->radio_services()->FetchRadioBrowser(radio_query_);
 }
 
 void MainWindow::RefreshStreaming() {
@@ -1603,6 +1646,8 @@ void MainWindow::PlayRadioChannel(const RadioChannel &channel) {
   Song song(channel.source);
   song.set_title(channel.name);
   song.set_url(channel.url);
+  song.set_art_automatic(channel.thumbnail_url);
+  song.set_genre(channel.tags);
   song.set_valid(true);
   app_->playlist_manager()->AppendSongs({song});
   RefreshPlaylist();

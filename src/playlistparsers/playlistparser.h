@@ -9,6 +9,7 @@
 class PlaylistParser {
  public:
   SongList Load(const std::string &path) const;
+  SongList LoadFromData(const std::string &data, const std::string &hint = {}) const;
   bool Save(const std::string &path, const SongList &songs) const;
 
   static bool IsPlaylist(const std::string &path);

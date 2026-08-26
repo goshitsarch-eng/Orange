@@ -75,6 +75,7 @@ class MainWindow {
   void RefreshFiles();
   void RefreshStreaming();
   void SearchStreaming(const std::string &query);
+  void SearchRadio(const std::string &query);
   void RefreshSmartPlaylists();
   void UpdateNowPlaying();
   void UpdatePlaybackButtons();
@@ -157,6 +158,7 @@ class MainWindow {
   std::string files_path_;
   std::string device_browse_id_;
   std::string streaming_service_name_;
+  std::string radio_query_;
   CollectionGrouping::Grouping grouping_;
   std::string playlist_filter_;
   std::string collection_text_filter_;

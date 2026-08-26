@@ -1,6 +1,7 @@
 #include "tagreader/tagreader.h"
 
 #include "core/logging.h"
+#include "tagreader/tagreadergme.h"
 #include "utilities/fileutils.h"
 
 #include <taglib/fileref.h>
@@ -45,12 +46,22 @@ bool TagReader::IsMediaFile(const std::string &filename) const {
   if (!Song::IsAudioFile(filename)) {
     return false;
   }
+  if (TagReaderGME::IsSupported(filename)) {
+    return true;
+  }
   TagLib::FileRef file(filename.c_str(), false);
   return !file.isNull() && file.file() && file.file()->isValid();
 }
 
 Song TagReader::ReadFile(const std::string &filename) const {
   Song song(Song::Source::LocalFile);
+  if (TagReaderGME::IsSupported(filename) && TagReaderGME::ReadFile(filename, &song)) {
+    ApplyFileInfo(&song, filename);
+    if (song.title().empty()) {
+      song.set_title(FileUtils::BaseName(filename));
+    }
+    return song;
+  }
   TagLib::FileRef file(filename.c_str(), true, TagLib::AudioProperties::Accurate);
   if (file.isNull() || !file.tag()) {
     ApplyFileInfo(&song, filename);

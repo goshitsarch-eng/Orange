@@ -159,6 +159,7 @@ set(STRAWBERRY_SOURCES
   src/engine/devicefinders.cpp
   src/core/player.cpp
   src/tagreader/tagreader.cpp
+  src/tagreader/tagreadergme.cpp
   src/collection/collectionbackend.cpp
   src/collection/collectionwatcher.cpp
   src/collection/collectionlibrary.cpp
@@ -171,6 +172,7 @@ set(STRAWBERRY_SOURCES
   src/smartplaylists/smartplaylist.cpp
   src/filterparser/filterparser.cpp
   src/covermanager/coverproviders.cpp
+  src/covermanager/lastfmcoverprovider.cpp
   src/lyrics/htmllyricsprovider.cpp
   src/lyrics/azlyricscomlyricsprovider.cpp
   src/lyrics/elyricsnetlyricsprovider.cpp
@@ -188,6 +190,9 @@ set(STRAWBERRY_SOURCES
   src/spotify/spotifyservice.cpp
   src/qobuz/qobuzservice.cpp
   src/radios/radioservices.cpp
+  src/radios/somafmservice.cpp
+  src/radios/radioparadiseservice.cpp
+  src/radios/radiobrowserservice.cpp
   src/device/devicemanager.cpp
   src/device/gpodloader.cpp
   src/device/gpoddevice.cpp
@@ -288,6 +293,9 @@ if(GTest_FOUND)
     tests/src/lyrics_test.cpp
     tests/src/gpod_test.cpp
     tests/src/streaming_test.cpp
+    tests/src/radio_test.cpp
+    tests/src/tagreader_gme_test.cpp
+    tests/src/lastfmcover_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
     tests/src/jsonutils_test.cpp
@@ -311,6 +319,11 @@ if(GTest_FOUND)
     src/filterparser/filterparser.cpp
     src/lyrics/htmllyricsprovider.cpp
     src/subsonic/subsonicservice.cpp
+    src/radios/somafmservice.cpp
+    src/radios/radioparadiseservice.cpp
+    src/radios/radiobrowserservice.cpp
+    src/covermanager/lastfmcoverprovider.cpp
+    src/tagreader/tagreadergme.cpp
     src/playlist/playlist.cpp
     src/collection/collectionbackend.cpp
     src/collection/collectiongrouping.cpp

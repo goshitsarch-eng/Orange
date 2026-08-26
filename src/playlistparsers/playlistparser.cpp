@@ -301,16 +301,25 @@ void PlaylistParser::EnrichFromAudioFile(SongList *songs, const Song &file) {
   }
 }
 
-SongList PlaylistParser::Load(const std::string &path) const {
-  const std::string data = FileUtils::ReadFile(path);
-  const std::string ext = StrUtils::ToLower(FileUtils::Extension(path));
-  if (ext == "m3u" || ext == "m3u8") return LoadM3U(path, data);
+SongList PlaylistParser::LoadFromData(const std::string &data, const std::string &hint) const {
+  const std::string ext = StrUtils::ToLower(FileUtils::Extension(hint));
+  if (ext == "m3u" || ext == "m3u8") return LoadM3U(hint, data);
   if (ext == "pls") return LoadPLS(data);
   if (ext == "xspf") return LoadXSPF(data);
   if (ext == "asx" || ext == "asxini") return LoadASX(data);
   if (ext == "wpl") return LoadWPL(data);
-  if (ext == "cue") return LoadCUE(path, data);
-  return {};
+  if (ext == "cue") return LoadCUE(hint, data);
+  if (StrUtils::ContainsInsensitive(data, "[playlist]")) {
+    return LoadPLS(data);
+  }
+  if (StrUtils::ContainsInsensitive(data, "#extm3u") || StrUtils::ContainsInsensitive(data, "#extinf")) {
+    return LoadM3U(hint, data);
+  }
+  return LoadM3U(hint, data);
+}
+
+SongList PlaylistParser::Load(const std::string &path) const {
+  return LoadFromData(FileUtils::ReadFile(path), path);
 }
 
 bool PlaylistParser::SaveM3U(const std::string &path, const SongList &songs) const {
