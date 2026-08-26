@@ -21,6 +21,7 @@
 #include "widgets/trackslider.h"
 #include "widgets/volumeslider.h"
 #include "collection/collectiondirectory.h"
+#include "constants/behavioursettings.h"
 #include "core/settings.h"
 #include "device/cddasongloader.h"
 #include "organize/organize.h"
@@ -234,6 +235,30 @@ void MainWindow::BuildUi() {
   adw_toast_overlay_set_child(toast_overlay_, split);
   adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(toolbar), GTK_WIDGET(toast_overlay_));
   adw_application_window_set_content(window_, toolbar);
+  g_signal_connect(window_, "close-request", G_CALLBACK(+[](GtkWindow *, gpointer data) -> gboolean {
+                     auto *self = static_cast<MainWindow *>(data);
+                     Settings settings;
+                     settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+                     if (settings.BoolValue(BehaviourSettings::kKeepRunning, BehaviourSettings::kDefaultKeepRunning) &&
+                         self->app_->tray()->available()) {
+                       gtk_widget_set_visible(GTK_WIDGET(self->window_), FALSE);
+                       return TRUE;
+                     }
+                     self->app_->Exit();
+                     return FALSE;
+                   }),
+                   this);
+  app_->tray()->ShowHide.Connect([this]() {
+    if (gtk_widget_get_visible(GTK_WIDGET(window_))) {
+      gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
+    } else {
+      Present();
+    }
+  });
+  app_->tray()->Quit.Connect([this]() {
+    app_->Exit();
+    gtk_window_close(GTK_WINDOW(window_));
+  });
 
   auto add_action = [this](const char *name, GCallback callback) {
     GSimpleAction *action = g_simple_action_new(name, nullptr);
@@ -307,7 +332,10 @@ void MainWindow::BuildUi() {
   add_action("transcode", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Transcode(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("organize", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Organize(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("tagfetch", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::TagFetcher(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
-  add_action("edittag", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::EditTag(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("edittag", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::EditTag(GTK_WINDOW(self->window_), self->app_, self->SelectedSongs());
+             }));
   add_action("shortcuts", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Shortcuts(GTK_WINDOW(static_cast<MainWindow *>(data)->window_)); }));
   add_action("undo", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->UndoPlaylist(); }));
   add_action("redo", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RedoPlaylist(); }));
@@ -534,6 +562,7 @@ void MainWindow::BuildSidebar() {
 
 void MainWindow::BuildContext() {
   context_view_ = std::make_unique<ContextView>(app_->lyrics_providers(), app_->lyrics_fetcher());
+  context_view_->ReloadSettings();
   context_view_->SetSaveLyricsCallback([this](const std::string &lyrics) {
     Song song = app_->player()->current_song();
     song.set_lyrics(lyrics);
@@ -541,6 +570,18 @@ void MainWindow::BuildContext() {
       app_->collection()->backend()->AddOrUpdateSong(song);
     }
   });
+  if (!cover_controller_) {
+    cover_controller_ = std::make_unique<AlbumCoverChoiceController>(app_);
+  }
+  context_view_->album_widget()->SetSearchCallback([this]() {
+    if (cover_controller_) {
+      Song song = app_->player()->current_song();
+      cover_controller_->SearchCoverAutomatically(&song, context_view_->album_widget()->image());
+      cover_controller_->SearchForCover(GTK_WINDOW(window_));
+    }
+  });
+  cover_controller_->AttachMenu(context_view_->album_widget()->image(), GTK_WINDOW(window_),
+                                [this]() { return app_->player()->current_song(); });
 }
 
 void MainWindow::BuildPlaylist() {
@@ -587,6 +628,10 @@ void MainWindow::BuildPlaylist() {
 
 void MainWindow::BuildPlayerBar() {
   playing_widget_ = std::make_unique<PlayingWidget>();
+  if (!cover_controller_) {
+    cover_controller_ = std::make_unique<AlbumCoverChoiceController>(app_);
+  }
+  cover_controller_->AttachMenu(playing_widget_->cover(), GTK_WINDOW(window_), [this]() { return app_->player()->current_song(); });
   track_slider_ = std::make_unique<TrackSlider>();
   volume_slider_ = std::make_unique<VolumeSlider>();
   track_slider_->SetSeekCallback([this](int64_t pos) { app_->player()->Seek(pos); });
@@ -696,6 +741,9 @@ void MainWindow::ConnectSignals() {
     const int64_t len = self->app_->player()->engine()->length_nanosec();
     if (self->track_slider_) {
       self->track_slider_->SetTimes(pos, len);
+    }
+    if (len > 0) {
+      self->app_->tray()->SetProgress(static_cast<int>(pos * 100 / len));
     }
     return G_SOURCE_CONTINUE;
   }, this);
@@ -909,6 +957,10 @@ void MainWindow::UpdateNowPlaying() {
         UpdateCover(std::vector<unsigned char>(data.begin(), data.end()));
       }
     });
+    if (cover_controller_) {
+      Song mutable_song = song;
+      cover_controller_->SearchCoverAutomatically(&mutable_song, playing_widget_ ? playing_widget_->cover() : nullptr);
+    }
   }
 }
 

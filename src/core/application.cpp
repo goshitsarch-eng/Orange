@@ -64,6 +64,18 @@ void Application::Init() {
   shortcuts_->Init();
   discord_->ReloadSettings();
   tray_->SetupStatusNotifier();
+  tray_->PlayPause.Connect([this]() { player_->PlayPause(); });
+  tray_->Stop.Connect([this]() { player_->Stop(); });
+  tray_->Next.Connect([this]() { player_->Next(); });
+  tray_->Previous.Connect([this]() { player_->Previous(); });
+  tray_->Quit.Connect([this]() { Exit(); });
+  tray_->VolumeScroll.Connect([this](int delta) {
+    if (delta > 0) {
+      player_->VolumeUp();
+    } else if (delta < 0) {
+      player_->VolumeDown();
+    }
+  });
   mpris_ = std::make_unique<Mpris2>(this);
 
   player_->SongChanged.Connect([this](const Song &song) {
@@ -73,12 +85,19 @@ void Application::Init() {
     moodbar_->Load(song);
     waveform_->Load(song);
     discord_->UpdatePresence(song, player_->GetState() == GstEngine::State::Playing);
+    tray_->SetNowPlaying(song);
     if (song.id() > 0) {
       collection_->backend()->IncrementPlayCount(song.id());
     }
   });
   player_->ForceShowOSD.Connect([this](const Song &song) { osd_->SongChanged(song, current_albumcover_loader_->current()); });
-  player_->Stopped.Connect([this]() { discord_->Clear(); });
+  player_->Playing.Connect([this]() { tray_->SetPlaying(true); });
+  player_->Paused.Connect([this]() { tray_->SetPlaying(false); });
+  player_->Stopped.Connect([this]() {
+    discord_->Clear();
+    tray_->SetPlaying(false);
+    tray_->ClearNowPlaying();
+  });
   equalizer_->ParametersChanged.Connect([this](bool enabled, int preamp, const std::vector<int> &gains) {
     player_->engine()->SetEqualizerEnabled(enabled);
     player_->engine()->SetEqualizerParameters(preamp, gains);

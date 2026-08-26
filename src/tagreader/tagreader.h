@@ -21,6 +21,7 @@ class TagReader : public TagReaderBase {
   bool WriteFile(const Song &song) const override;
   CoverData LoadCoverData(const std::string &filename) const override;
   bool SaveCover(const std::string &filename, const CoverData &cover) const override;
+  bool ClearCover(const std::string &filename) const;
   bool SavePlaycount(const std::string &filename, unsigned playcount) const override;
   bool SaveRating(const std::string &filename, float rating) const override;
 

@@ -9,16 +9,34 @@
 #include <adwaita.h>
 #include <cstdlib>
 #include <memory>
+#include <utility>
 
 using DialogHelpers::PrettyBytes;
 using DialogHelpers::PrettyUnixTime;
 using DialogHelpers::SetImageFromBytes;
 using DialogHelpers::SongForDialog;
 
-void EditTagDialog::Show(GtkWindow *parent, Application *app) {
-  const Song song = SongForDialog(app);
+void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
+  SongList targets = songs;
+  if (targets.empty()) {
+    targets.push_back(SongForDialog(app));
+  }
+  const Song song = targets.front();
+  auto common = [&](const auto &getter) -> std::pair<std::string, bool> {
+    std::string value = getter(targets.front());
+    bool mixed = false;
+    for (const Song &item : targets) {
+      if (getter(item) != value) {
+        mixed = true;
+        value.clear();
+        break;
+      }
+    }
+    return {value, mixed};
+  };
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Edit tags");
+  const std::string dialog_title = targets.size() > 1 ? "Edit tags (" + std::to_string(targets.size()) + " songs)" : "Edit tags";
+  adw_dialog_set_title(dialog, dialog_title.c_str());
   adw_dialog_set_content_width(dialog, 520);
   adw_dialog_set_content_height(dialog, 720);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -28,23 +46,30 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app) {
 
   struct State {
     Song song;
+    SongList songs;
     GtkWidget *cover = nullptr;
     GtkWidget *lyrics = nullptr;
     GtkWidget *rating = nullptr;
     GtkWidget *compilation = nullptr;
     std::unique_ptr<AlbumCoverChoiceController> covers;
     std::vector<std::pair<std::string, GtkWidget *>> fields;
+    std::vector<std::string> initial;
   };
   auto *state = new State();
   state->song = song;
+  state->songs = targets;
   state->covers = std::make_unique<AlbumCoverChoiceController>(app);
 
-  auto add_entries = [&](GtkWidget *page, const std::vector<std::pair<const char *, std::string>> &rows) {
+  auto add_entries = [&](GtkWidget *page, const std::vector<std::pair<const char *, std::pair<std::string, bool>>> &rows) {
     for (const auto &row : rows) {
       AdwEntryRow *entry = ADW_ENTRY_ROW(adw_entry_row_new());
       adw_preferences_row_set_title(ADW_PREFERENCES_ROW(entry), row.first);
-      gtk_editable_set_text(GTK_EDITABLE(entry), row.second.c_str());
+      gtk_editable_set_text(GTK_EDITABLE(entry), row.second.first.c_str());
+      if (row.second.second) {
+        gtk_widget_set_tooltip_text(GTK_WIDGET(entry), "Multiple values — type to set all selected songs");
+      }
       state->fields.emplace_back(row.first, GTK_WIDGET(entry));
+      state->initial.push_back(row.second.first);
       gtk_box_append(GTK_BOX(page), GTK_WIDGET(entry));
     }
   };
@@ -93,14 +118,14 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app) {
   gtk_scale_set_draw_value(GTK_SCALE(state->rating), TRUE);
   gtk_range_set_value(GTK_RANGE(state->rating), song.rating() >= 0 ? song.rating() * 5.0 : 0);
   gtk_box_append(GTK_BOX(summary), state->rating);
-  add_entries(summary, {{"Title", song.title()},
-                        {"Artist", song.artist()},
-                        {"Album", song.album()},
-                        {"Album artist", song.albumartist()},
-                        {"Year", song.year() > 0 ? std::to_string(song.year()) : ""},
-                        {"Original year", song.originalyear() > 0 ? std::to_string(song.originalyear()) : ""},
-                        {"Track", song.track() > 0 ? std::to_string(song.track()) : ""},
-                        {"Genre", song.genre()}});
+  add_entries(summary, {{"Title", common([](const Song &s) { return s.title(); })},
+                        {"Artist", common([](const Song &s) { return s.artist(); })},
+                        {"Album", common([](const Song &s) { return s.album(); })},
+                        {"Album artist", common([](const Song &s) { return s.albumartist(); })},
+                        {"Year", common([](const Song &s) { return s.year() > 0 ? std::to_string(s.year()) : std::string(); })},
+                        {"Original year", common([](const Song &s) { return s.originalyear() > 0 ? std::to_string(s.originalyear()) : std::string(); })},
+                        {"Track", common([](const Song &s) { return s.track() > 0 ? std::to_string(s.track()) : std::string(); })},
+                        {"Genre", common([](const Song &s) { return s.genre(); })}});
   adw_view_stack_add_titled(stack, summary, "Summary", "Summary");
 
   GtkWidget *tags = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
@@ -110,18 +135,18 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app) {
   state->compilation = gtk_check_button_new_with_label("Compilation");
   gtk_check_button_set_active(GTK_CHECK_BUTTON(state->compilation), song.compilation());
   gtk_box_append(GTK_BOX(tags), state->compilation);
-  add_entries(tags, {{"Composer", song.composer()},
-                     {"Performer", song.performer()},
-                     {"Grouping", song.grouping()},
-                     {"Comment", song.comment()},
-                     {"Disc", song.disc() > 0 ? std::to_string(song.disc()) : ""},
-                     {"BPM", song.bpm() > 0 ? std::to_string(song.bpm()) : ""},
-                     {"Mood", song.mood()},
-                     {"Initial key", song.initial_key()},
-                     {"Title sort", song.titlesort()},
-                     {"Artist sort", song.artistsort()},
-                     {"Album sort", song.albumsort()},
-                     {"Album artist sort", song.albumartistsort()}});
+  add_entries(tags, {{"Composer", common([](const Song &s) { return s.composer(); })},
+                     {"Performer", common([](const Song &s) { return s.performer(); })},
+                     {"Grouping", common([](const Song &s) { return s.grouping(); })},
+                     {"Comment", common([](const Song &s) { return s.comment(); })},
+                     {"Disc", common([](const Song &s) { return s.disc() > 0 ? std::to_string(s.disc()) : std::string(); })},
+                     {"BPM", common([](const Song &s) { return s.bpm() > 0 ? std::to_string(s.bpm()) : std::string(); })},
+                     {"Mood", common([](const Song &s) { return s.mood(); })},
+                     {"Initial key", common([](const Song &s) { return s.initial_key(); })},
+                     {"Title sort", common([](const Song &s) { return s.titlesort(); })},
+                     {"Artist sort", common([](const Song &s) { return s.artistsort(); })},
+                     {"Album sort", common([](const Song &s) { return s.albumsort(); })},
+                     {"Album artist sort", common([](const Song &s) { return s.albumartistsort(); })}});
   adw_view_stack_add_titled(stack, tags, "Tags", "Tags");
 
   GtkWidget *lyrics_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
@@ -133,6 +158,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app) {
   gtk_widget_set_vexpand(state->lyrics, TRUE);
   gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(state->lyrics)), song.lyrics().c_str(), -1);
   state->fields.emplace_back("Lyrics", state->lyrics);
+  state->initial.push_back(song.lyrics());
   gtk_box_append(GTK_BOX(lyrics_page), gtk_label_new("Lyrics"));
   gtk_box_append(GTK_BOX(lyrics_page), state->lyrics);
   adw_view_stack_add_titled(stack, lyrics_page, "Lyrics", "Lyrics");
@@ -156,44 +182,62 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app) {
                        }
                        return gtk_editable_get_text(GTK_EDITABLE(widget));
                      };
-                     for (const auto &field : state->fields) {
-                       const std::string value = text_of(field.second);
-                       if (field.first == "Title") state->song.set_title(value);
-                       else if (field.first == "Artist") state->song.set_artist(value);
-                       else if (field.first == "Album") state->song.set_album(value);
-                       else if (field.first == "Album artist") state->song.set_albumartist(value);
-                       else if (field.first == "Composer") state->song.set_composer(value);
-                       else if (field.first == "Performer") state->song.set_performer(value);
-                       else if (field.first == "Grouping") state->song.set_grouping(value);
-                       else if (field.first == "Comment") state->song.set_comment(value);
-                       else if (field.first == "Genre") state->song.set_genre(value);
-                       else if (field.first == "Lyrics") state->song.set_lyrics(value);
-                       else if (field.first == "Mood") state->song.set_mood(value);
-                       else if (field.first == "Initial key") state->song.set_initial_key(value);
-                       else if (field.first == "Title sort") state->song.set_titlesort(value);
-                       else if (field.first == "Artist sort") state->song.set_artistsort(value);
-                       else if (field.first == "Album sort") state->song.set_albumsort(value);
-                       else if (field.first == "Album artist sort") state->song.set_albumartistsort(value);
-                       else if (field.first == "Year") state->song.set_year(std::atoi(value.c_str()));
-                       else if (field.first == "Original year") state->song.set_originalyear(std::atoi(value.c_str()));
-                       else if (field.first == "Track") state->song.set_track(std::atoi(value.c_str()));
-                       else if (field.first == "Disc") state->song.set_disc(std::atoi(value.c_str()));
-                       else if (field.first == "BPM") state->song.set_bpm(std::strtof(value.c_str(), nullptr));
+                     auto apply_field = [](Song *song, const std::string &name, const std::string &value) {
+                       if (name == "Title") song->set_title(value);
+                       else if (name == "Artist") song->set_artist(value);
+                       else if (name == "Album") song->set_album(value);
+                       else if (name == "Album artist") song->set_albumartist(value);
+                       else if (name == "Composer") song->set_composer(value);
+                       else if (name == "Performer") song->set_performer(value);
+                       else if (name == "Grouping") song->set_grouping(value);
+                       else if (name == "Comment") song->set_comment(value);
+                       else if (name == "Genre") song->set_genre(value);
+                       else if (name == "Lyrics") song->set_lyrics(value);
+                       else if (name == "Mood") song->set_mood(value);
+                       else if (name == "Initial key") song->set_initial_key(value);
+                       else if (name == "Title sort") song->set_titlesort(value);
+                       else if (name == "Artist sort") song->set_artistsort(value);
+                       else if (name == "Album sort") song->set_albumsort(value);
+                       else if (name == "Album artist sort") song->set_albumartistsort(value);
+                       else if (name == "Year") song->set_year(std::atoi(value.c_str()));
+                       else if (name == "Original year") song->set_originalyear(std::atoi(value.c_str()));
+                       else if (name == "Track") song->set_track(std::atoi(value.c_str()));
+                       else if (name == "Disc") song->set_disc(std::atoi(value.c_str()));
+                       else if (name == "BPM") song->set_bpm(std::strtof(value.c_str(), nullptr));
+                     };
+                     std::vector<std::pair<std::string, std::string>> changed;
+                     for (size_t i = 0; i < state->fields.size(); ++i) {
+                       const std::string value = text_of(state->fields[i].second);
+                       const std::string initial = i < state->initial.size() ? state->initial[i] : std::string();
+                       if (value == initial) {
+                         continue;
+                       }
+                       changed.emplace_back(state->fields[i].first, value);
                      }
-                     if (state->compilation) {
-                       state->song.set_compilation(gtk_check_button_get_active(GTK_CHECK_BUTTON(state->compilation)));
+                     const bool write_compilation = state->compilation != nullptr;
+                     const bool write_rating = state->rating != nullptr;
+                     for (Song &song : state->songs) {
+                       for (const auto &field : changed) {
+                         apply_field(&song, field.first, field.second);
+                       }
+                       if (write_compilation) {
+                         song.set_compilation(gtk_check_button_get_active(GTK_CHECK_BUTTON(state->compilation)));
+                       }
+                       if (write_rating) {
+                         song.set_rating(static_cast<float>(gtk_range_get_value(GTK_RANGE(state->rating)) / 5.0));
+                       }
+                       application->tagreader()->WriteFile(song);
+                       const std::string path = FileUtils::PathFromUri(song.url());
+                       if (!path.empty() && song.rating() >= 0) {
+                         application->tagreader()->SaveRating(path, song.rating());
+                       }
+                       if (song.id() > 0) {
+                         application->collection()->backend()->AddOrUpdateSong(song);
+                         application->collection()->backend()->SetRating(song.id(), song.rating());
+                       }
                      }
-                     if (state->rating) {
-                       state->song.set_rating(static_cast<float>(gtk_range_get_value(GTK_RANGE(state->rating)) / 5.0));
-                     }
-                     application->tagreader()->WriteFile(state->song);
-                     const std::string path = FileUtils::PathFromUri(state->song.url());
-                     if (!path.empty() && state->song.rating() >= 0) {
-                       application->tagreader()->SaveRating(path, state->song.rating());
-                     }
-                     if (state->song.id() > 0) {
-                       application->collection()->backend()->AddOrUpdateSong(state->song);
-                       application->collection()->backend()->SetRating(state->song.id(), state->song.rating());
+                     if (!state->songs.empty()) {
+                       state->song = state->songs.front();
                      }
                      gtk_button_set_label(button, "Saved");
                    })),

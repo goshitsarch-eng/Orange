@@ -2,6 +2,7 @@
 #define STRAWBERRY_MAINWINDOW_H
 
 #include "collection/collectiongrouping.h"
+#include "covermanager/albumcoverchoicecontroller.h"
 #include "collection/collectionviewcontainer.h"
 #include "context/contextview.h"
 #include "core/application.h"
@@ -131,6 +132,7 @@ class MainWindow {
   std::unique_ptr<DeviceViewContainer> device_container_;
   std::unique_ptr<MultiLoadingIndicator> loading_indicator_;
   std::unique_ptr<QueueView> queue_view_;
+  std::unique_ptr<AlbumCoverChoiceController> cover_controller_;
   GtkWidget *queue_list_ = nullptr;
   GtkWidget *streaming_list_ = nullptr;
   GtkWidget *streaming_stack_ = nullptr;

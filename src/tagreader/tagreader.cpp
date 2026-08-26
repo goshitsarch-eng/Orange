@@ -257,9 +257,29 @@ TagReader::CoverData TagReader::LoadCoverData(const std::string &filename) const
   return cover;
 }
 
+bool TagReader::ClearCover(const std::string &filename) const {
+  {
+    TagLib::MPEG::File mpeg(filename.c_str());
+    if (mpeg.isValid()) {
+      if (TagLib::ID3v2::Tag *tag = mpeg.ID3v2Tag(true)) {
+        tag->removeFrames("APIC");
+      }
+      return mpeg.save();
+    }
+  }
+  {
+    TagLib::FLAC::File flac(filename.c_str());
+    if (flac.isValid()) {
+      flac.removePictures();
+      return flac.save();
+    }
+  }
+  return false;
+}
+
 bool TagReader::SaveCover(const std::string &filename, const CoverData &cover) const {
   if (cover.data.empty()) {
-    return false;
+    return ClearCover(filename);
   }
   TagLib::ByteVector bytes(reinterpret_cast<const char *>(cover.data.data()), static_cast<unsigned>(cover.data.size()));
   {

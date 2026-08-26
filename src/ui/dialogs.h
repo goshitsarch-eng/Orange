@@ -2,6 +2,7 @@
 #define STRAWBERRY_DIALOGS_H
 
 #include "collection/collectiongrouping.h"
+#include "core/song.h"
 
 #include <functional>
 #include <string>
@@ -22,7 +23,7 @@ class Dialogs {
   static void Transcode(GtkWindow *parent, Application *app);
   static void Organize(GtkWindow *parent, Application *app);
   static void TagFetcher(GtkWindow *parent, Application *app);
-  static void EditTag(GtkWindow *parent, Application *app);
+  static void EditTag(GtkWindow *parent, Application *app, const SongList &songs = {});
   static void Shortcuts(GtkWindow *parent);
   static void GrabShortcut(GtkWindow *parent, const std::function<void(const std::string &)> &callback);
   static void Login(GtkWindow *parent, const std::string &service, const std::function<void(const std::string &, const std::string &)> &callback);

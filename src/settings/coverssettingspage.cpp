@@ -16,6 +16,8 @@ AdwPreferencesPage *CoversSettingsPage::Create(Settings *settings, Application *
   SettingsPage::AddToggle(save, settings, CoversSettings::kSaveReplaceSpaces, "Replace spaces in filenames", nullptr,
                           CoversSettings::kDefaultSaveReplaceSpaces);
   SettingsPage::AddEntry(save, settings, CoversSettings::kTypes, "Cover types", "art_embedded,art_automatic,art_manual");
+  SettingsPage::AddToggle(save, settings, CoversSettings::kAutomaticSearch, "Search for missing covers automatically", nullptr,
+                          CoversSettings::kDefaultAutomaticSearch);
 
   AdwPreferencesGroup *providers = SettingsPage::AddGroup(page, "Providers");
   if (app) {

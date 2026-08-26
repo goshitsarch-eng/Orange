@@ -19,9 +19,15 @@ class AlbumCoverChoiceController {
   void FetchCover(Song *song, GtkWidget *image = nullptr, GtkWidget *status = nullptr);
   void SearchForCover(GtkWindow *parent);
   void UnsetCover(Song *song, GtkWidget *image = nullptr);
+  void ClearCover(Song *song, GtkWidget *image = nullptr);
+  void DeleteCover(Song *song, GtkWidget *image = nullptr);
   void LoadCoverFromURL(GtkWindow *parent, Song *song, GtkWidget *image = nullptr);
   void LoadCoverFromFile(GtkWindow *parent, Song *song, GtkWidget *image = nullptr);
+  void SaveCoverToFile(GtkWindow *parent, const Song &song);
+  void ShowCover(GtkWindow *parent, const Song &song);
+  void SearchCoverAutomatically(Song *song, GtkWidget *image = nullptr);
   void ShowStatistics(GtkWindow *parent);
+  void AttachMenu(GtkWidget *widget, GtkWindow *parent, const std::function<Song()> &song_for_menu);
 
   const CoverSearchStatistics &statistics() const { return statistics_; }
 

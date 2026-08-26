@@ -31,11 +31,13 @@ constexpr char kSavePattern[] = "save_pattern";
 constexpr char kSaveOverwrite[] = "save_overwrite";
 constexpr char kSaveLowercase[] = "save_lowercase";
 constexpr char kSaveReplaceSpaces[] = "save_replace_spaces";
+constexpr char kAutomaticSearch[] = "automatic_search";
 
 constexpr char kDefaultSavePattern[] = "%albumartist-%album";
 constexpr bool kDefaultSaveOverwrite = false;
 constexpr bool kDefaultSaveLowercase = false;
 constexpr bool kDefaultSaveReplaceSpaces = false;
+constexpr bool kDefaultAutomaticSearch = true;
 
 }  // namespace CoversSettings
 

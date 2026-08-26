@@ -739,6 +739,7 @@ if(GTest_FOUND)
     tests/src/scrobbler_test.cpp
     tests/src/playlist_test.cpp
     tests/src/playlistmanager_test.cpp
+    tests/src/systemtrayicon_test.cpp
     tests/src/settings_test.cpp
     tests/src/settingspage_test.cpp
     tests/src/jsonutils_test.cpp
@@ -938,6 +939,7 @@ if(GTest_FOUND)
     src/playlist/playlistmanager.cpp
     src/playlist/playlistbackend.cpp
     src/queue/queue.cpp
+    src/systemtrayicon/systemtrayicon.cpp
     src/playlist/playlistitem.cpp
     src/playlist/songplaylistitem.cpp
     src/playlist/streamplaylistitem.cpp

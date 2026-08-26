@@ -1,5 +1,7 @@
 #include "context/contextview.h"
 
+#include "constants/contextsettings.h"
+#include "core/settings.h"
 #include "core/song.h"
 #include "lyrics/lyricsfetcher.h"
 #include "lyrics/lyricsproviders.h"
@@ -85,7 +87,17 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
 
 void ContextView::SetSaveLyricsCallback(SaveLyricsCallback callback) { save_lyrics_ = std::move(callback); }
 
-void ContextView::ReloadSettings() {}
+void ContextView::ReloadSettings() {
+  Settings settings;
+  settings.BeginGroup(ContextSettings::kSettingsGroup);
+  show_album_ = settings.BoolValue(ContextSettings::kAlbum, ContextSettings::kDefaultAlbum);
+  show_data_ = settings.BoolValue(ContextSettings::kTechnicalData, ContextSettings::kDefaultTechnicalData);
+  show_lyrics_ = settings.BoolValue(ContextSettings::kSongLyrics, ContextSettings::kDefaultSongLyrics);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), show_album_);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), show_data_);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), show_lyrics_);
+  ApplyVisibility();
+}
 
 void ContextView::Playing() { SetSong(); }
 
@@ -129,6 +141,11 @@ void ContextView::SetLyrics(const std::string &lyrics) {
 }
 
 void ContextView::SearchLyrics() {
+  Settings settings;
+  settings.BeginGroup(ContextSettings::kSettingsGroup);
+  if (!settings.BoolValue(ContextSettings::kSearchLyrics, ContextSettings::kDefaultSearchLyrics)) {
+    return;
+  }
   if (!song_playing_.is_valid()) {
     SetLyrics({});
     return;
