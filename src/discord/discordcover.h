@@ -17,6 +17,9 @@ inline std::string PathFromArtUrl(const std::string &url) {
     if (path.rfind("//", 0) == 0) {
       const size_t slash = path.find('/', 2);
       path = slash == std::string::npos ? path : path.substr(slash);
+    } else if (!path.empty() && path[0] != '/') {
+      const size_t slash = path.find('/');
+      path = slash == std::string::npos ? std::string() : path.substr(slash);
     }
     return path;
   }
