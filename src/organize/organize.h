@@ -14,7 +14,15 @@ class Organize {
     std::string message;
   };
 
+  struct Options {
+    bool move = false;
+    bool overwrite = false;
+    bool albumcover = false;
+  };
+
   std::vector<Error> Copy(const SongList &songs, const std::string &destination, const OrganizeFormat &format, bool move);
+  std::vector<Error> Copy(const SongList &songs, const std::string &destination, const OrganizeFormat &format, const Options &options);
+  static std::string CoverPathForSong(const Song &song);
 };
 
 #endif

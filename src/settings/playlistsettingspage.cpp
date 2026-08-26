@@ -26,7 +26,8 @@ AdwPreferencesPage *PlaylistSettingsPage::Create(Settings *settings, Application
   SettingsPage::AddToggle(behaviour, settings, PlaylistSettings::kPlaylistClear, "Allow clearing the playlist", nullptr,
                           PlaylistSettings::kDefaultPlaylistClear);
   SettingsPage::AddToggle(behaviour, settings, PlaylistSettings::kAutoSort, "Auto-sort the playlist", nullptr, PlaylistSettings::kDefaultAutoSort);
-  SettingsPage::AddIntEntry(behaviour, settings, PlaylistSettings::kPathType, "Path type (0 automatic / 1 absolute / 2 relative / 3 ask)",
+  SettingsPage::AddIntCombo(behaviour, settings, PlaylistSettings::kSettingsGroup, PlaylistSettings::kPathType, "Path type",
+                            {{"0", "Automatic"}, {"1", "Absolute"}, {"2", "Relative"}, {"3", "Ask"}},
                             static_cast<int>(PlaylistSettings::kDefaultPathType));
 
   AdwPreferencesGroup *meta = SettingsPage::AddGroup(page, "Metadata");

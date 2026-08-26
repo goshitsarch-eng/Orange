@@ -8,7 +8,8 @@ AdwPreferencesPage *WaveformSettingsPage::Create(Settings *settings, Application
   AdwPreferencesPage *page = SettingsPage::MakePage("Waveform", "weather-showers-symbolic");
   settings->BeginGroup(SeekbarSettings::kSettingsGroup);
   AdwPreferencesGroup *seek = SettingsPage::AddGroup(page, "Seek bar");
-  SettingsPage::AddIntEntry(seek, settings, SeekbarSettings::kMode, "Mode (0 normal / 1 moodbar / 2 waveform)",
+  SettingsPage::AddIntCombo(seek, settings, SeekbarSettings::kSettingsGroup, SeekbarSettings::kMode, "Mode",
+                            {{"0", "Normal"}, {"1", "Moodbar"}, {"2", "Waveform"}},
                             static_cast<int>(SeekbarSettings::kDefaultMode));
   settings->BeginGroup(WaveformSettings::kSettingsGroup);
   AdwPreferencesGroup *group = SettingsPage::AddGroup(page, "Waveform");

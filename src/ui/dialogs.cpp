@@ -42,7 +42,7 @@ void Dialogs::Equalizer(GtkWindow *parent, Application *app) {
 
 void Dialogs::Transcode(GtkWindow *parent, Application *app) { TranscodeDialog::Show(parent, app); }
 
-void Dialogs::Organize(GtkWindow *parent, Application *app, const SongList &songs) { OrganizeDialog::Show(parent, app, songs); }
+void Dialogs::Organize(GtkWindow *parent, Application *app, const SongList &songs, bool move) { OrganizeDialog::Show(parent, app, songs, move); }
 
 void Dialogs::TagFetcher(GtkWindow *parent, Application *app) { TrackSelectionDialog::Show(parent, app); }
 

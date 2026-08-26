@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <glib.h>
+#include <glib/gstdio.h>
 #include <gst/gst.h>
 #include <unistd.h>
 #include <gtest/gtest.h>
@@ -228,6 +229,88 @@ TEST(Organize, ReportsMissingSource) {
   const auto errors = Organize().Copy({song}, "/tmp", OrganizeFormat("%title"), false);
   ASSERT_EQ(1u, errors.size());
   EXPECT_NE(std::string::npos, errors[0].message.find("missing"));
+}
+
+TEST(OrganizeFormat, ExtraTokensArtistInitialAndExtension) {
+  Song song;
+  song.set_albumartist("The Beatles");
+  song.set_album("Abbey Road");
+  song.set_title("Come Together");
+  song.set_track(1);
+  song.set_bitrate(320);
+  song.set_samplerate(44100);
+  song.set_bitdepth(16);
+  song.set_length_nanosec(4 * 1000000000LL);
+  song.set_url("file:///tmp/come-together.flac");
+  song.set_lyrics("here come old flat top");
+  EXPECT_EQ("B", OrganizeFormat::ArtistInitial("The Beatles"));
+  EXPECT_EQ("P", OrganizeFormat::ArtistInitial("portishead"));
+  EXPECT_EQ("B", OrganizeFormat::TokenValue("%artistinitial", song));
+  EXPECT_EQ("flac", OrganizeFormat::TokenValue("%extension", song));
+  EXPECT_EQ("320", OrganizeFormat::TokenValue("%bitrate", song));
+  EXPECT_EQ("44100", OrganizeFormat::TokenValue("%samplerate", song));
+  EXPECT_EQ("16", OrganizeFormat::TokenValue("%bitdepth", song));
+  EXPECT_EQ("4", OrganizeFormat::TokenValue("%length", song));
+  EXPECT_EQ("here come old flat top", OrganizeFormat::TokenValue("%lyrics", song));
+  EXPECT_EQ("B/Abbey Road/01 - Come Together.flac",
+            OrganizeFormat("%artistinitial/%album/{%track - }%title").GetFilenameForSong(song));
+  song.set_compilation(true);
+  EXPECT_EQ("Various Artists", OrganizeFormat::TokenValue("%albumartist", song));
+}
+
+TEST(OrganizeFormat, ReplaceSpacesAndEmptyFallback) {
+  OrganizeFormat format("%album/%title");
+  format.set_replace_spaces(true);
+  Song song;
+  song.set_album("Helplessness Blues");
+  song.set_title("The Shrine / An Argument");
+  EXPECT_EQ("Helplessness_Blues/The_Shrine___An_Argument", format.GetFilenameForSong(song));
+  Song empty;
+  empty.set_basefilename("fallback.ogg");
+  EXPECT_EQ("fallback.ogg", OrganizeFormat("%title").GetFilenameForSong(empty));
+}
+
+TEST(Organize, OverwriteAndAlbumCover) {
+  char dir_template[] = "/tmp/strawberry-organize-XXXXXX";
+  const std::string dir = mkdtemp(dir_template);
+  const std::string src_dir = FileUtils::Join(dir, "src");
+  const std::string dest_dir = FileUtils::Join(dir, "dest");
+  g_mkdir_with_parents(src_dir.c_str(), 0755);
+  g_mkdir_with_parents(dest_dir.c_str(), 0755);
+  const std::string src = FileUtils::Join(src_dir, "song.flac");
+  const std::string cover = FileUtils::Join(src_dir, "cover.jpg");
+  const std::string dest = FileUtils::Join(dest_dir, "Title.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(src, "audio-v1"));
+  ASSERT_TRUE(FileUtils::WriteFile(cover, "cover-bytes"));
+  ASSERT_TRUE(FileUtils::WriteFile(dest, "old"));
+
+  Song song;
+  song.set_valid(true);
+  song.set_title("Title");
+  song.set_url(FileUtils::UriFromPath(src));
+  EXPECT_EQ(cover, Organize::CoverPathForSong(song));
+
+  OrganizeFormat format("%title");
+  const auto skipped = Organize().Copy({song}, dest_dir, format, Organize::Options{});
+  ASSERT_EQ(1u, skipped.size());
+  EXPECT_NE(std::string::npos, skipped[0].message.find("exists"));
+  EXPECT_EQ("old", FileUtils::ReadFile(dest));
+
+  Organize::Options options;
+  options.overwrite = true;
+  options.albumcover = true;
+  const auto copied = Organize().Copy({song}, dest_dir, format, options);
+  EXPECT_TRUE(copied.empty());
+  EXPECT_EQ("audio-v1", FileUtils::ReadFile(dest));
+  EXPECT_EQ("cover-bytes", FileUtils::ReadFile(FileUtils::Join(dest_dir, "cover.jpg")));
+
+  FileUtils::Remove(src);
+  FileUtils::Remove(cover);
+  FileUtils::Remove(dest);
+  FileUtils::Remove(FileUtils::Join(dest_dir, "cover.jpg"));
+  rmdir(src_dir.c_str());
+  rmdir(dest_dir.c_str());
+  rmdir(dir.c_str());
 }
 
 TEST(CollectionGrouping, DisplayAndKeys) {

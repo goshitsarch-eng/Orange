@@ -22,7 +22,7 @@ class Dialogs {
   static void CoverExport(GtkWindow *parent, Application *app);
   static void Equalizer(GtkWindow *parent, Application *app);
   static void Transcode(GtkWindow *parent, Application *app);
-  static void Organize(GtkWindow *parent, Application *app, const SongList &songs = {});
+  static void Organize(GtkWindow *parent, Application *app, const SongList &songs = {}, bool move = false);
   static void TagFetcher(GtkWindow *parent, Application *app);
   static void EditTag(GtkWindow *parent, Application *app, const SongList &songs = {});
   static void Shortcuts(GtkWindow *parent);

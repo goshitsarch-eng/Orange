@@ -101,6 +101,8 @@ class MainWindow {
   void QueuePlayNext();
   void ShowInCollection();
   void OpenSelectedInFileManager();
+  SongList SongsFromFilePaths(const std::vector<std::string> &paths) const;
+  void CopyFileViewToCollection(const std::vector<std::string> &paths, bool move);
   void CopySelectedToCollection(bool move);
   void AddSelectedToTranscoder();
   void RenumberTracks();

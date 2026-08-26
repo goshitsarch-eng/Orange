@@ -120,6 +120,21 @@ void AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, c
   adw_preferences_group_add(group, GTK_WIDGET(row));
 }
 
+void AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                 const std::vector<std::pair<std::string, std::string>> &choices, int fallback) {
+  const int current = settings ? settings->IntValue(key, fallback) : fallback;
+  AddCombo(group, settings, key, title, choices, std::to_string(current), [settings, group_name, key](const std::string &id) {
+    if (!settings || !key) {
+      return;
+    }
+    if (group_name) {
+      settings->BeginGroup(group_name);
+    }
+    settings->SetIntValue(key, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
+    settings->Sync();
+  });
+}
+
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));

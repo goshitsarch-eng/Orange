@@ -34,6 +34,7 @@ class FileView {
   FileViewHistory *history() { return &history_; }
   void SetAddToPlaylistCallback(PathsCallback callback);
   void SetCopyToCollectionCallback(PathsCallback callback);
+  void SetMoveToCollectionCallback(PathsCallback callback);
   void SetCopyToDeviceCallback(PathsCallback callback);
   void SetEditTagsCallback(PathsCallback callback);
   void SetDeleteCallback(PathsCallback callback);
@@ -55,6 +56,7 @@ class FileView {
   std::string home_;
   PathsCallback add_to_playlist_;
   PathsCallback copy_to_collection_;
+  PathsCallback move_to_collection_;
   PathsCallback copy_to_device_;
   PathsCallback edit_tags_;
   PathsCallback delete_;

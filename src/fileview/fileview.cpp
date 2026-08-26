@@ -112,6 +112,8 @@ void FileView::SetAddToPlaylistCallback(PathsCallback callback) { add_to_playlis
 
 void FileView::SetCopyToCollectionCallback(PathsCallback callback) { copy_to_collection_ = std::move(callback); }
 
+void FileView::SetMoveToCollectionCallback(PathsCallback callback) { move_to_collection_ = std::move(callback); }
+
 void FileView::SetCopyToDeviceCallback(PathsCallback callback) { copy_to_device_ = std::move(callback); }
 
 void FileView::SetEditTagsCallback(PathsCallback callback) { edit_tags_ = std::move(callback); }
@@ -132,8 +134,9 @@ void FileView::ShowMenu(const std::vector<std::string> &paths) {
   GMenu *menu = g_menu_new();
   g_menu_append(menu, "Add to playlist", "fileview.add");
   g_menu_append(menu, "Copy to collection", "fileview.copy-collection");
+  g_menu_append(menu, "Move to collection", "fileview.move-collection");
   g_menu_append(menu, "Copy to device", "fileview.copy-device");
-  g_menu_append(menu, "Edit tags…", "fileview.edit-tags");
+  g_menu_append(menu, "Edit track information…", "fileview.edit-tags");
   g_menu_append(menu, "Delete", "fileview.delete");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, list_->widget());
@@ -142,7 +145,7 @@ void FileView::ShowMenu(const std::vector<std::string> &paths) {
     delete static_cast<std::pair<FileView *, std::vector<std::string>> *>(p);
   });
   GSimpleActionGroup *group = g_simple_action_group_new();
-  const char *names[] = {"add", "copy-collection", "copy-device", "edit-tags", "delete", nullptr};
+  const char *names[] = {"add", "copy-collection", "move-collection", "copy-device", "edit-tags", "delete", nullptr};
   for (int i = 0; names[i]; ++i) {
     GSimpleAction *action = g_simple_action_new(names[i], nullptr);
     g_object_set_data(G_OBJECT(action), "popover", popover);
@@ -159,6 +162,8 @@ void FileView::ShowMenu(const std::vector<std::string> &paths) {
                          self->add_to_playlist_(pair->second);
                        } else if (g_strcmp0(n, "copy-collection") == 0 && self->copy_to_collection_) {
                          self->copy_to_collection_(pair->second);
+                       } else if (g_strcmp0(n, "move-collection") == 0 && self->move_to_collection_) {
+                         self->move_to_collection_(pair->second);
                        } else if (g_strcmp0(n, "copy-device") == 0 && self->copy_to_device_) {
                          self->copy_to_device_(pair->second);
                        } else if (g_strcmp0(n, "edit-tags") == 0 && self->edit_tags_) {

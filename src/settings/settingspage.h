@@ -23,6 +23,8 @@ void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key
 void AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
               const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
               const std::function<void(const std::string &)> &changed = {});
+void AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                 const std::vector<std::pair<std::string, std::string>> &choices, int fallback);
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked);
 void AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name);
 

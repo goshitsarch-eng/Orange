@@ -21,6 +21,12 @@ bool FilesystemMusicStorage::CopyToStorage(const CopyJob &job, std::string &erro
   if (job.remove_original) {
     FileUtils::Remove(job.source);
   }
+  if (job.albumcover && !job.cover_source.empty() && FileUtils::IsFile(job.cover_source)) {
+    const std::string cover_dest = job.cover_dest.empty() ? FileUtils::Join(FileUtils::DirName(dest), "cover.jpg") : job.cover_dest;
+    if ((job.overwrite || !FileUtils::Exists(cover_dest)) && cover_dest != job.cover_source) {
+      FileUtils::CopyFile(job.cover_source, cover_dest);
+    }
+  }
   if (job.progress) {
     job.progress(1.0f);
   }

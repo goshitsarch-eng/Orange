@@ -9,7 +9,7 @@ class Application;
 
 class OrganizeDialog {
  public:
-  static void Show(GtkWindow *parent, Application *app, const SongList &songs = {});
+  static void Show(GtkWindow *parent, Application *app, const SongList &songs = {}, bool move = false);
 };
 
 #endif

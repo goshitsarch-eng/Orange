@@ -25,15 +25,20 @@ AdwPreferencesPage *BehaviourSettingsPage::Create(Settings *settings, Applicatio
   SettingsPage::AddToggle(tray, settings, BehaviourSettings::kPlayingWidget, "Show playing widget", nullptr, BehaviourSettings::kDefaultPlayingWidget);
 
   AdwPreferencesGroup *playback = SettingsPage::AddGroup(page, "Playback");
-  SettingsPage::AddIntEntry(playback, settings, BehaviourSettings::kMenuPlayMode, "Menu play mode (1 never / 2 if stopped / 3 always)",
+  SettingsPage::AddIntCombo(playback, settings, BehaviourSettings::kSettingsGroup, BehaviourSettings::kMenuPlayMode, "Menu play mode",
+                            {{"1", "Never"}, {"2", "If stopped"}, {"3", "Always"}},
                             static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode));
-  SettingsPage::AddIntEntry(playback, settings, BehaviourSettings::kMenuPreviousMode, "Previous mode (1 don't restart / 2 restart)",
+  SettingsPage::AddIntCombo(playback, settings, BehaviourSettings::kSettingsGroup, BehaviourSettings::kMenuPreviousMode, "Previous mode",
+                            {{"1", "Don't restart"}, {"2", "Restart"}},
                             static_cast<int>(BehaviourSettings::kDefaultMenuPreviousMode));
-  SettingsPage::AddIntEntry(playback, settings, BehaviourSettings::kDoubleClickAddMode, "Double-click add (1 append / 2 enqueue / 3 load / 4 new)",
+  SettingsPage::AddIntCombo(playback, settings, BehaviourSettings::kSettingsGroup, BehaviourSettings::kDoubleClickAddMode, "Double-click add",
+                            {{"1", "Append"}, {"2", "Enqueue"}, {"3", "Load"}, {"4", "Open in new playlist"}},
                             static_cast<int>(BehaviourSettings::kDefaultDoubleClickAddMode));
-  SettingsPage::AddIntEntry(playback, settings, BehaviourSettings::kDoubleClickPlayMode, "Double-click play (1 never / 2 if stopped / 3 always)",
+  SettingsPage::AddIntCombo(playback, settings, BehaviourSettings::kSettingsGroup, BehaviourSettings::kDoubleClickPlayMode, "Double-click play",
+                            {{"1", "Never"}, {"2", "If stopped"}, {"3", "Always"}},
                             static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlayMode));
-  SettingsPage::AddIntEntry(playback, settings, BehaviourSettings::kDoubleClickPlaylistAddMode, "Double-click playlist (1 play / 2 enqueue)",
+  SettingsPage::AddIntCombo(playback, settings, BehaviourSettings::kSettingsGroup, BehaviourSettings::kDoubleClickPlaylistAddMode,
+                            "Double-click playlist", {{"1", "Play"}, {"2", "Enqueue"}},
                             static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlaylistAddMode));
   SettingsPage::AddIntEntry(playback, settings, BehaviourSettings::kSeekStepSec, "Seek step (seconds)", BehaviourSettings::kDefaultSeekStepSec);
   SettingsPage::AddIntEntry(playback, settings, BehaviourSettings::kVolumeIncrement, "Volume increment",

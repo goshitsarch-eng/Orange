@@ -10,6 +10,7 @@
 #include "moodbar/moodbarrenderer.h"
 #include "waveform/waveformrenderer.h"
 #include "fileview/fileview.h"
+#include "fileview/fileviewsongs.h"
 #include "playlist/playlistcontainer.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/radioviewcontainer.h"
@@ -620,41 +621,21 @@ void MainWindow::BuildSidebar() {
     app_->playlist_manager()->InsertUrls(urls);
     RefreshPlaylist();
   });
-  file_view_->SetCopyToCollectionCallback([this](const std::vector<std::string> &paths) {
-    for (const std::string &path : paths) {
-      if (FileUtils::IsDirectory(path)) {
-        app_->collection()->AddDirectory(path, true);
-        continue;
-      }
-      const auto dirs = app_->collection()->backend()->Directories();
-      if (!dirs.empty()) {
-        FileUtils::CopyFile(path, FileUtils::Join(dirs.front().path, FileUtils::BaseName(path)));
-      } else {
-        app_->collection()->AddDirectory(FileUtils::DirName(path), false);
-      }
-    }
-    RefreshCollection();
-  });
-  file_view_->SetCopyToDeviceCallback([this](const std::vector<std::string> &) {
-    Dialogs::CopyToDevice(GTK_WINDOW(window_), app_);
+  file_view_->SetCopyToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, false); });
+  file_view_->SetMoveToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, true); });
+  file_view_->SetCopyToDeviceCallback([this](const std::vector<std::string> &paths) {
+    Dialogs::CopyToDevice(GTK_WINDOW(window_), app_, SongsFromFilePaths(paths));
   });
   file_view_->SetEditTagsCallback([this](const std::vector<std::string> &paths) {
-    if (!paths.empty()) {
-      app_->playlist_manager()->InsertUrls({FileUtils::UriFromPath(paths.front())});
-      RefreshPlaylist();
+    const SongList songs = SongsFromFilePaths(paths);
+    if (songs.empty()) {
+      ShowToast("No files selected");
+      return;
     }
-    Dialogs::EditTag(GTK_WINDOW(window_), app_);
+    Dialogs::EditTag(GTK_WINDOW(window_), app_, songs);
   });
   file_view_->SetDeleteCallback([this](const std::vector<std::string> &paths) {
-    SongList songs;
-    songs.reserve(paths.size());
-    for (const std::string &path : paths) {
-      Song song(Song::Source::LocalFile);
-      song.set_valid(true);
-      song.set_url(FileUtils::UriFromPath(path));
-      song.set_title(FileUtils::BaseName(path));
-      songs.push_back(song);
-    }
+    const SongList songs = FileViewSongs::FromPaths(paths);
     Dialogs::DeleteFiles(GTK_WINDOW(window_), app_, songs);
     if (file_view_) {
       g_timeout_add(800, [](gpointer data) -> gboolean {
@@ -1949,27 +1930,38 @@ void MainWindow::OpenSelectedInFileManager() {
   }
 }
 
+SongList MainWindow::SongsFromFilePaths(const std::vector<std::string> &paths) const {
+  return FileViewSongs::FromPaths(paths, [this](const std::string &path) { return app_->tagreader()->ReadFile(path); });
+}
+
+void MainWindow::CopyFileViewToCollection(const std::vector<std::string> &paths, bool move) {
+  std::vector<std::string> files;
+  for (const std::string &path : paths) {
+    if (FileUtils::IsDirectory(path)) {
+      app_->collection()->AddDirectory(path, true);
+      continue;
+    }
+    files.push_back(path);
+  }
+  const SongList songs = SongsFromFilePaths(files);
+  if (songs.empty()) {
+    if (files.empty() && !paths.empty()) {
+      RefreshCollection();
+    } else {
+      ShowToast("No files selected");
+    }
+    return;
+  }
+  Dialogs::Organize(GTK_WINDOW(window_), app_, songs, move);
+}
+
 void MainWindow::CopySelectedToCollection(bool move) {
   SongList songs = SelectedSongs();
   if (songs.empty()) {
     ShowToast("No songs selected");
     return;
   }
-  const std::vector<CollectionDirectory> dirs = app_->collection()->backend()->Directories();
-  if (dirs.empty()) {
-    ShowToast("Add a collection folder first");
-    return;
-  }
-  Organize organize;
-  OrganizeFormat format("%albumartist/%album/{%track - }%title");
-  const auto errors = organize.Copy(songs, dirs.front().path, format, move);
-  app_->collection()->IncrementalScan();
-  RefreshCollection();
-  if (errors.empty()) {
-    ShowToast(std::string(move ? "Moved " : "Copied ") + std::to_string(songs.size()) + " file(s) to the collection");
-  } else {
-    ShowToast(std::to_string(errors.size()) + " file(s) failed to organize");
-  }
+  Dialogs::Organize(GTK_WINDOW(window_), app_, songs, move);
 }
 
 void MainWindow::AddSelectedToTranscoder() {

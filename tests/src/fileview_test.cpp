@@ -1,4 +1,5 @@
 #include "fileview/fileviewhistory.h"
+#include "fileview/fileviewsongs.h"
 #include "fileview/fileviewtreemodel.h"
 #include "utilities/fileutils.h"
 
@@ -65,6 +66,40 @@ TEST(FileViewTreeModel, MissingRootIsIgnored) {
   FileViewTreeModel model;
   model.SetRootPaths({"/tmp/does-not-exist-strawberry-fileview"});
   EXPECT_EQ(0, model.DirectoryCount());
+}
+
+TEST(FileViewSongs, FromPathsSkipsDirectoriesAndReadsTags) {
+  const std::string dir = TempDir();
+  const std::string audio = FileUtils::Join(dir, "roads.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "x"));
+
+  const SongList bare = FileViewSongs::FromPaths({audio, dir, ""});
+  ASSERT_EQ(1u, bare.size());
+  EXPECT_TRUE(bare[0].is_valid());
+  EXPECT_EQ(FileUtils::UriFromPath(audio), bare[0].url());
+  EXPECT_EQ("roads.flac", bare[0].title());
+  EXPECT_EQ(Song::Source::LocalFile, bare[0].source());
+
+  const SongList tagged = FileViewSongs::FromPaths({audio}, [](const std::string &path) {
+    Song song(Song::Source::LocalFile);
+    song.set_valid(true);
+    song.set_url(FileUtils::UriFromPath(path));
+    song.set_title("Roads");
+    song.set_artist("Portishead");
+    return song;
+  });
+  ASSERT_EQ(1u, tagged.size());
+  EXPECT_EQ("Roads", tagged[0].title());
+  EXPECT_EQ("Portishead", tagged[0].artist());
+
+  Song invalid(Song::Source::LocalFile);
+  const SongList fallback = FileViewSongs::FromPaths({audio}, [&](const std::string &) { return invalid; });
+  ASSERT_EQ(1u, fallback.size());
+  EXPECT_TRUE(fallback[0].is_valid());
+  EXPECT_EQ("roads.flac", fallback[0].title());
+
+  FileUtils::Remove(audio);
+  rmdir(dir.c_str());
 }
 
 TEST(FileViewHistory, BackForwardAndTruncate) {
