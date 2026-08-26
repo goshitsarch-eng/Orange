@@ -6,7 +6,10 @@
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
+#include "constants/backendsettings.h"
 #include "constants/coverssettings.h"
+#include "core/mainwindowsettings.h"
+#include "ui/mainwindowlook.h"
 #include "context/contextcover.h"
 #include "context/contextview.h"
 #include "covermanager/coverproviders.h"
@@ -190,6 +193,7 @@ void MainWindow::BuildUi() {
   g_menu_append(music, Translations::Tr("Rescan collection").c_str(), "win.rescan");
   g_menu_append(music, Translations::Tr("Full collection scan").c_str(), "win.full-scan");
   g_menu_append(music, Translations::Tr("Stop collection scan").c_str(), "win.stop-scan");
+  g_menu_append(music, Translations::Tr("Mute").c_str(), "win.mute");
   g_menu_append_section(menu, Translations::Tr("Music").c_str(), G_MENU_MODEL(music));
   GMenu *playlist = g_menu_new();
   g_menu_append(playlist, Translations::Tr("New playlist").c_str(), "win.new-playlist");
@@ -255,6 +259,7 @@ void MainWindow::BuildUi() {
   g_menu_append(tools, Translations::Tr("Collection grouping…").c_str(), "win.group-by");
   g_menu_append(tools, Translations::Tr("Cycle analyzer").c_str(), "win.cycle-analyzer");
   g_menu_append(tools, Translations::Tr("Debug console").c_str(), "win.console");
+  g_menu_append(tools, Translations::Tr("Show sidebar").c_str(), "win.show-sidebar");
   g_menu_append_section(menu, Translations::Tr("Tools").c_str(), G_MENU_MODEL(tools));
   GMenu *appmenu = g_menu_new();
   g_menu_append(appmenu, Translations::Tr("Preferences").c_str(), "win.preferences");
@@ -297,8 +302,8 @@ void MainWindow::BuildUi() {
   adw_toolbar_view_add_top_bar(ADW_TOOLBAR_VIEW(toolbar), header);
 
   toast_overlay_ = ADW_TOAST_OVERLAY(adw_toast_overlay_new());
-  GtkWidget *split = adw_overlay_split_view_new();
-  adw_overlay_split_view_set_sidebar_width_fraction(ADW_OVERLAY_SPLIT_VIEW(split), 0.30);
+  split_view_ = adw_overlay_split_view_new();
+  adw_overlay_split_view_set_sidebar_width_fraction(ADW_OVERLAY_SPLIT_VIEW(split_view_), 0.30);
 
   BuildSidebar();
   GtkWidget *sidebar_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -310,16 +315,17 @@ void MainWindow::BuildUi() {
   gtk_box_append(GTK_BOX(sidebar_box), switcher);
   gtk_box_append(GTK_BOX(sidebar_box), GTK_WIDGET(sidebar_stack_));
   gtk_widget_set_vexpand(GTK_WIDGET(sidebar_stack_), TRUE);
-  adw_overlay_split_view_set_sidebar(ADW_OVERLAY_SPLIT_VIEW(split), sidebar_box);
+  adw_overlay_split_view_set_sidebar(ADW_OVERLAY_SPLIT_VIEW(split_view_), sidebar_box);
 
   GtkWidget *content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   BuildPlaylist();
   gtk_box_append(GTK_BOX(content), playlist_container_->widget());
   BuildPlayerBar();
   gtk_box_append(GTK_BOX(content), GTK_WIDGET(g_object_get_data(G_OBJECT(play_button_), "player-box")));
-  adw_overlay_split_view_set_content(ADW_OVERLAY_SPLIT_VIEW(split), content);
+  adw_overlay_split_view_set_content(ADW_OVERLAY_SPLIT_VIEW(split_view_), content);
 
-  adw_toast_overlay_set_child(toast_overlay_, split);
+  adw_toast_overlay_set_child(toast_overlay_, split_view_);
+  ApplySidebar();
   adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(toolbar), GTK_WIDGET(toast_overlay_));
   adw_application_window_set_content(window_, toolbar);
   g_signal_connect(window_, "close-request", G_CALLBACK(+[](GtkWindow *, gpointer data) -> gboolean {
@@ -412,6 +418,29 @@ void MainWindow::BuildUi() {
   add_action("previous-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->PreviousPlaylistTab(); }));
   add_action("last-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->LastPlaylistTab(); }));
   add_action("active-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ActivePlaylistTab(); }));
+  {
+    Settings settings;
+    settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+    const bool show = settings.BoolValue(MainWindowSettings::kShowSidebar, MainWindowSettings::kDefaultShowSidebar);
+    sidebar_action_ = g_simple_action_new_stateful("show-sidebar", nullptr, g_variant_new_boolean(show));
+    g_signal_connect(sidebar_action_, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *, gpointer data) {
+                       GVariant *state = g_action_get_state(G_ACTION(action));
+                       const bool current = state && g_variant_get_boolean(state);
+                       if (state) {
+                         g_variant_unref(state);
+                       }
+                       static_cast<MainWindow *>(data)->SetShowSidebar(!current);
+                     }),
+                     this);
+    g_action_map_add_action(G_ACTION_MAP(window_), G_ACTION(sidebar_action_));
+  }
+  mute_action_ = g_simple_action_new_stateful("mute", nullptr, g_variant_new_boolean(false));
+  g_signal_connect(mute_action_, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+                     static_cast<MainWindow *>(data)->ToggleMute();
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(window_), G_ACTION(mute_action_));
+  ApplyMuteUi(app_->player()->GetVolume());
   add_action("rescan-selected", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RescanSelected(); }));
   add_action("fetch-metadata", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->FetchStreamingMetadata(); }));
   add_action("autocomplete-tags", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AutoCompleteTags(); }));
@@ -812,6 +841,7 @@ void MainWindow::BuildUi() {
   gtk_application_set_accels_for_action(GTK_APPLICATION(gtk_app_), "win.previous-playlist", prev_accels);
   set_accels("win.last-playlist", "<Control>9");
   set_accels("win.active-playlist", "<Control><Shift>p");
+  set_accels("win.mute", MainWindowLook::MuteAccel());
 }
 
 void MainWindow::BuildSidebar() {
@@ -1398,7 +1428,13 @@ void MainWindow::BuildPlayerBar() {
                    this);
   gtk_box_append(GTK_BOX(controls), analyzer_drawing_);
   ApplyAnalyzer();
+  mute_button_ = gtk_button_new_from_icon_name(MainWindowLook::MuteIconName(false));
+  gtk_widget_set_tooltip_text(mute_button_, Translations::CStr(MainWindowLook::MuteTooltip(false)));
+  gtk_widget_add_css_class(mute_button_, "flat");
+  g_signal_connect(mute_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->ToggleMute(); }), this);
+  gtk_box_append(GTK_BOX(controls), mute_button_);
   gtk_box_append(GTK_BOX(controls), volume_slider_->widget());
+  ApplyMuteUi(app_->player()->GetVolume());
   gtk_box_append(GTK_BOX(box), controls);
 
   loading_indicator_ = std::make_unique<MultiLoadingIndicator>();
@@ -1510,6 +1546,7 @@ void MainWindow::ConnectSignals() {
     if (volume_slider_) {
       volume_slider_->SetVolume(volume);
     }
+    ApplyMuteUi(volume);
   });
   app_->playlist_manager()->PlaylistsLoaded.Connect([this]() {
     ApplyPlaylistBehaviour();
@@ -2387,6 +2424,50 @@ void MainWindow::RestoreGeometry() {
     gtk_window_minimize(GTK_WINDOW(window_));
   } else if (action == 3) {
     gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
+  }
+}
+
+void MainWindow::SetShowSidebar(bool show) {
+  Settings settings;
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  settings.SetBoolValue(MainWindowSettings::kShowSidebar, show);
+  settings.Sync();
+  if (sidebar_action_) {
+    g_simple_action_set_state(sidebar_action_, g_variant_new_boolean(show));
+  }
+  ApplySidebar();
+}
+
+void MainWindow::ApplySidebar() {
+  if (!split_view_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  const bool show = MainWindowLook::ShowSidebar(settings.BoolValue(MainWindowSettings::kShowSidebar, MainWindowSettings::kDefaultShowSidebar));
+  adw_overlay_split_view_set_show_sidebar(ADW_OVERLAY_SPLIT_VIEW(split_view_), show);
+}
+
+void MainWindow::ToggleMute() { app_->player()->Mute(); }
+
+void MainWindow::ApplyMuteUi(unsigned volume) {
+  Settings settings;
+  settings.BeginGroup(BackendSettings::kSettingsGroup);
+  const bool visible = MainWindowLook::MuteVisible(settings.BoolValue(BackendSettings::kVolumeControl, BackendSettings::kDefaultVolumeControl));
+  const bool muted = MainWindowLook::IsMuted(volume);
+  if (mute_button_) {
+    gtk_widget_set_visible(mute_button_, visible);
+    gtk_button_set_icon_name(GTK_BUTTON(mute_button_), MainWindowLook::MuteIconName(muted));
+    gtk_widget_set_tooltip_text(mute_button_, Translations::CStr(MainWindowLook::MuteTooltip(muted)));
+    if (muted) {
+      gtk_widget_add_css_class(mute_button_, "accent");
+    } else {
+      gtk_widget_remove_css_class(mute_button_, "accent");
+    }
+  }
+  if (mute_action_) {
+    g_simple_action_set_enabled(mute_action_, visible);
+    g_simple_action_set_state(mute_action_, g_variant_new_boolean(muted));
   }
 }
 

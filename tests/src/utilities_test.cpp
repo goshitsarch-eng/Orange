@@ -39,6 +39,8 @@
 #include "core/deletefiles.h"
 #include "core/enginemetadata.h"
 #include "core/windowgeometry.h"
+#include "core/mainwindowsettings.h"
+#include "ui/mainwindowlook.h"
 #include "core/filesystemmusicstorage.h"
 #include "core/memorydatabase.h"
 #include "core/scopedtransaction.h"
@@ -1099,6 +1101,27 @@ TEST(WindowGeometry, ClampsAndMapsStartup) {
   EXPECT_EQ(2, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Remember), false));
   EXPECT_EQ(3, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Hide), false));
   EXPECT_EQ(5, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::ShowMinimized), true));
+}
+
+TEST(MainWindowLook, SidebarAndMuteMatchQt) {
+  EXPECT_TRUE(MainWindowSettings::kDefaultShowSidebar);
+  EXPECT_STREQ("MainWindow", MainWindowSettings::kSettingsGroup);
+  EXPECT_STREQ("show_sidebar", MainWindowSettings::kShowSidebar);
+  EXPECT_TRUE(MainWindowLook::ShowSidebar(true));
+  EXPECT_FALSE(MainWindowLook::ShowSidebar(false));
+  EXPECT_TRUE(MainWindowLook::DefaultShowSidebar());
+  EXPECT_TRUE(MainWindowLook::MuteVisible(true));
+  EXPECT_FALSE(MainWindowLook::MuteVisible(false));
+  EXPECT_TRUE(MainWindowLook::MuteVisibleFromSettings(true));
+  EXPECT_FALSE(MainWindowLook::MuteVisibleFromSettings(false));
+  EXPECT_TRUE(MainWindowLook::IsMuted(0));
+  EXPECT_FALSE(MainWindowLook::IsMuted(1));
+  EXPECT_FALSE(MainWindowLook::IsMuted(50));
+  EXPECT_STREQ("audio-volume-muted-symbolic", MainWindowLook::MuteIconName(true));
+  EXPECT_STREQ("audio-volume-high-symbolic", MainWindowLook::MuteIconName(false));
+  EXPECT_STREQ("Unmute", MainWindowLook::MuteTooltip(true));
+  EXPECT_STREQ("Mute", MainWindowLook::MuteTooltip(false));
+  EXPECT_STREQ("<Control>m", MainWindowLook::MuteAccel());
 }
 
 TEST(Appearance, BackgroundCssForTypesAndUrls) {

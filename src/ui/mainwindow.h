@@ -155,6 +155,10 @@ class MainWindow {
   void ApplySeekbarMode();
   void CycleSeekbarMode();
   void SeekFromBar(double x, int width);
+  void SetShowSidebar(bool show);
+  void ApplySidebar();
+  void ToggleMute();
+  void ApplyMuteUi(unsigned volume);
 
   static void OnPlayPause(GtkButton *button, gpointer data);
   static void OnStop(GtkButton *button, gpointer data);
@@ -170,6 +174,10 @@ class MainWindow {
   AdwApplicationWindow *window_ = nullptr;
   AdwToastOverlay *toast_overlay_ = nullptr;
   AdwViewStack *sidebar_stack_ = nullptr;
+  GtkWidget *split_view_ = nullptr;
+  GtkWidget *mute_button_ = nullptr;
+  GSimpleAction *sidebar_action_ = nullptr;
+  GSimpleAction *mute_action_ = nullptr;
   std::unique_ptr<CollectionViewContainer> collection_container_;
   std::unique_ptr<PlaylistContainer> playlist_container_;
   std::unique_ptr<PlaylistListContainer> playlist_list_container_;
