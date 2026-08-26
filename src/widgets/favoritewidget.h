@@ -17,8 +17,13 @@ class FavoriteWidget {
   void SetChangedCallback(ChangedCallback callback);
   int tab_index() const { return tab_index_; }
 
+  static const char *TooltipText() {
+    return "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar";
+  }
+
  private:
   void Refresh();
+  void Toggle();
 
   GtkWidget *widget_ = nullptr;
   int tab_index_ = -1;

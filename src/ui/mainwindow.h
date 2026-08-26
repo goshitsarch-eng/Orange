@@ -68,15 +68,18 @@ class MainWindow {
   void AddCdTracks();
   void LoadPlaylistFile();
   void SavePlaylistFile();
+  void SavePlaylistById(int id);
   void NewPlaylist();
   void ClearPlaylist();
   void CloseCurrentPlaylist();
   void TryClosePlaylist(int id);
   void FinishClosePlaylist(int id);
+  void HideToTray();
   void SelectPlayingTrack();
   void ApplyPlaylistBehaviour();
   void DeleteCurrentPlaylist();
   void RenameCurrentPlaylist();
+  void RenamePlaylist(int id);
   void UndoPlaylist();
   void RedoPlaylist();
   void CycleRepeat();

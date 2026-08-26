@@ -10,7 +10,9 @@
 #include "playlist/playlistlistsortfiltermodel.h"
 #include "playlist/playlistsaveoptionsdialog.h"
 #include "playlist/playlisttabnav.h"
+#include "playlist/playlisttabmenu.h"
 #include "playlist/playlisttagcompletion.h"
+#include "widgets/favoritewidget.h"
 #include "playlist/songloaderinserter.h"
 #include "playlist/playlistratingclick.h"
 #include "widgets/listboxkeyboard.h"
@@ -431,6 +433,61 @@ TEST(PlaylistListModel, StoresIdsThroughFilter) {
   EXPECT_EQ(4, rows[0].id);
   EXPECT_EQ("Queue", rows[1].name);
   EXPECT_EQ(7, rows[1].id);
+}
+
+TEST(PlaylistTabMenu, ContextActionsMatchQt) {
+  const std::vector<PlaylistTabMenu::Item> items = PlaylistTabMenu::Items();
+  ASSERT_EQ(6u, items.size());
+  EXPECT_STREQ("Star playlist", items[0].label);
+  EXPECT_STREQ("Close playlist", items[1].label);
+  EXPECT_STREQ("Rename playlist...", items[2].label);
+  EXPECT_STREQ("Save playlist...", items[3].label);
+  EXPECT_STREQ("New playlist", items[4].label);
+  EXPECT_STREQ("Load playlist...", items[5].label);
+  EXPECT_TRUE(items[4].separator_before);
+  EXPECT_TRUE(items[5].separator_before);
+  EXPECT_TRUE(PlaylistTabMenu::ActionEnabled(PlaylistTabMenu::Action::Star, 0, 2));
+  EXPECT_FALSE(PlaylistTabMenu::ActionEnabled(PlaylistTabMenu::Action::Star, 0, 1));
+  EXPECT_FALSE(PlaylistTabMenu::ActionEnabled(PlaylistTabMenu::Action::Close, -1, 3));
+  EXPECT_TRUE(PlaylistTabMenu::ActionEnabled(PlaylistTabMenu::Action::Rename, 0, 1));
+  EXPECT_FALSE(PlaylistTabMenu::ActionEnabled(PlaylistTabMenu::Action::Save, -1, 2));
+  EXPECT_TRUE(PlaylistTabMenu::ActionEnabled(PlaylistTabMenu::Action::New, -1, 0));
+  EXPECT_TRUE(PlaylistTabMenu::ActionEnabled(PlaylistTabMenu::Action::Load, -1, 1));
+  EXPECT_EQ(PlaylistTabMenu::Click::Close, PlaylistTabMenu::FromRelease(1, 2));
+  EXPECT_EQ(PlaylistTabMenu::Click::None, PlaylistTabMenu::FromRelease(-1, 2));
+  EXPECT_EQ(PlaylistTabMenu::Click::None, PlaylistTabMenu::FromRelease(0, 1));
+  EXPECT_EQ(PlaylistTabMenu::Click::None, PlaylistTabMenu::FromPress(0, 2, 2));
+  EXPECT_EQ(PlaylistTabMenu::Click::Rename, PlaylistTabMenu::FromPress(0, 1, 2));
+  EXPECT_EQ(PlaylistTabMenu::Click::New, PlaylistTabMenu::FromPress(-1, 1, 2));
+  EXPECT_EQ(PlaylistTabMenu::Click::None, PlaylistTabMenu::FromPress(0, 1, 1));
+  EXPECT_TRUE(PlaylistTabMenu::ShouldApplyRename("Inbox", "Shows"));
+  EXPECT_FALSE(PlaylistTabMenu::ShouldApplyRename("Inbox", "Inbox"));
+  EXPECT_FALSE(PlaylistTabMenu::ShouldApplyRename("Inbox", ""));
+  EXPECT_TRUE(PlaylistTabMenu::CloseCurrentHidesWindow(1));
+  EXPECT_FALSE(PlaylistTabMenu::CloseCurrentHidesWindow(2));
+  EXPECT_TRUE(PlaylistTabMenu::ToggledFavorite(false));
+  EXPECT_FALSE(PlaylistTabMenu::ToggledFavorite(true));
+  EXPECT_STREQ(FavoriteWidget::TooltipText(), PlaylistTabMenu::FavoriteTooltip());
+  EXPECT_EQ("strawberry-playlist-tab:7", PlaylistTabMenu::TabPayload(7));
+  EXPECT_TRUE(PlaylistTabMenu::IsTabPayload("strawberry-playlist-tab:7"));
+  EXPECT_EQ(7, PlaylistTabMenu::ParseTabId("strawberry-playlist-tab:7"));
+  EXPECT_EQ(-1, PlaylistTabMenu::ParseTabId("strawberry-playlist-rows:1"));
+  EXPECT_TRUE(PlaylistTabMenu::ShouldHoverForPayload("strawberry-playlist-rows:1,2"));
+  EXPECT_TRUE(PlaylistTabMenu::ShouldHoverForPayload("file:///tmp/a.mp3"));
+  EXPECT_FALSE(PlaylistTabMenu::ShouldHoverForPayload("strawberry-playlist-tab:3"));
+  EXPECT_FALSE(PlaylistTabMenu::ShouldHoverForPayload(""));
+  EXPECT_TRUE(PlaylistTabMenu::DropOnEmptyCreatesPlaylist());
+  EXPECT_EQ(500, PlaylistTabMenu::kDragHoverTimeoutMs);
+  const std::vector<int> moved = PlaylistTabMenu::ReorderIds({1, 2, 3}, 0, 2);
+  ASSERT_EQ(3u, moved.size());
+  EXPECT_EQ(2, moved[0]);
+  EXPECT_EQ(1, moved[1]);
+  EXPECT_EQ(3, moved[2]);
+  const std::vector<int> last = PlaylistTabMenu::ReorderIds({1, 2, 3}, 2, 0);
+  ASSERT_EQ(3u, last.size());
+  EXPECT_EQ(3, last[0]);
+  EXPECT_EQ(1, last[1]);
+  EXPECT_EQ(2, last[2]);
 }
 
 TEST(PlaylistTabNavigation, WrapsLikeQtShortcuts) {

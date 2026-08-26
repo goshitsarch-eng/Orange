@@ -21,6 +21,7 @@
 #include "playlist/playlistcontainer.h"
 #include "playlist/playlistfolders.h"
 #include "playlist/playlisttabnav.h"
+#include "playlist/playlisttabmenu.h"
 #include "playlist/playlistlistdrop.h"
 #include "radios/radiodrag.h"
 #include "radios/radiomenu.h"
@@ -1285,6 +1286,35 @@ void MainWindow::BuildPlaylist() {
     }
   });
   playlist_container_->tab_bar()->SetCloseCallback([this](int id) { TryClosePlaylist(id); });
+  playlist_container_->tab_bar()->SetRenameCallback([this](int id, const std::string &name) {
+    if (name.empty()) {
+      RenamePlaylist(id);
+      return;
+    }
+    app_->playlist_manager()->Rename(id, name);
+    RefreshPlaylistsList();
+    RefreshPlaylist();
+  });
+  playlist_container_->tab_bar()->SetSaveCallback([this](int id) { SavePlaylistById(id); });
+  playlist_container_->tab_bar()->SetNewCallback([this] { NewPlaylist(); });
+  playlist_container_->tab_bar()->SetLoadCallback([this] { LoadPlaylistFile(); });
+  playlist_container_->tab_bar()->SetReorderCallback([this](const std::vector<int> &ids) {
+    app_->playlist_manager()->ChangePlaylistOrder(ids);
+    RefreshPlaylistsList();
+    RefreshPlaylistTabs();
+  });
+  playlist_container_->tab_bar()->SetLastTabCloseCallback([this] { HideToTray(); });
+  playlist_container_->tab_bar()->SetDropCallback([this](int id, const std::string &payload) {
+    if (id >= 0) {
+      app_->playlist_manager()->SetCurrentPlaylist(id);
+    }
+    const std::vector<std::string> urls = PlaylistListDrop::ParseUrls(payload);
+    if (!urls.empty()) {
+      app_->playlist_manager()->InsertUrls(urls, -1);
+    }
+    RefreshPlaylist();
+    RefreshPlaylistTabs();
+  });
 
   repeat_button_ = playlist_container_->repeat_button();
   shuffle_button_ = playlist_container_->shuffle_button();
@@ -2044,6 +2074,16 @@ void MainWindow::LoadPlaylistFile() {
   }, this);
 }
 
+void MainWindow::SavePlaylistById(int id) {
+  if (id < 0) {
+    return;
+  }
+  app_->playlist_manager()->SetCurrentPlaylist(id);
+  RefreshPlaylist();
+  RefreshPlaylistTabs();
+  SavePlaylistFile();
+}
+
 void MainWindow::SavePlaylistFile() {
   GtkFileDialog *dialog = gtk_file_dialog_new();
   gtk_file_dialog_set_title(dialog, Translations::CStr("Save playlist"));
@@ -2107,7 +2147,21 @@ void MainWindow::ClearPlaylist() {
   RefreshPlaylist();
 }
 
-void MainWindow::CloseCurrentPlaylist() { TryClosePlaylist(app_->playlist_manager()->current_id()); }
+void MainWindow::HideToTray() {
+  if (app_->tray() && app_->tray()->available()) {
+    SaveGeometry();
+    gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
+  }
+}
+
+void MainWindow::CloseCurrentPlaylist() {
+  const int count = static_cast<int>(app_->playlist_manager()->playlists().size());
+  if (PlaylistTabMenu::CloseCurrentHidesWindow(count)) {
+    HideToTray();
+    return;
+  }
+  TryClosePlaylist(app_->playlist_manager()->current_id());
+}
 
 void MainWindow::FinishClosePlaylist(int id) {
   if (id < 0) {
@@ -2186,8 +2240,10 @@ void MainWindow::DeleteCurrentPlaylist() {
   }
 }
 
-void MainWindow::RenameCurrentPlaylist() {
-  Playlist *playlist = app_->playlist_manager()->current();
+void MainWindow::RenameCurrentPlaylist() { RenamePlaylist(app_->playlist_manager()->current_id()); }
+
+void MainWindow::RenamePlaylist(int id) {
+  Playlist *playlist = app_->playlist_manager()->playlist(id);
   if (!playlist) {
     return;
   }
@@ -2199,6 +2255,7 @@ void MainWindow::RenameCurrentPlaylist() {
   adw_alert_dialog_set_response_appearance(dialog, "rename", ADW_RESPONSE_SUGGESTED);
   adw_alert_dialog_set_default_response(dialog, "rename");
   g_object_set_data(G_OBJECT(dialog), "entry", entry);
+  g_object_set_data(G_OBJECT(dialog), "playlist-id", GINT_TO_POINTER(id + 1));
   g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
                      if (g_strcmp0(response, "rename") != 0) {
                        return;
@@ -2206,8 +2263,9 @@ void MainWindow::RenameCurrentPlaylist() {
                      auto *self = static_cast<MainWindow *>(data);
                      auto *name_entry = GTK_EDITABLE(g_object_get_data(G_OBJECT(alert), "entry"));
                      const std::string name = gtk_editable_get_text(name_entry);
-                     if (!name.empty() && self->app_->playlist_manager()->current()) {
-                       self->app_->playlist_manager()->Rename(self->app_->playlist_manager()->current_id(), name);
+                     const int playlist_id = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(alert), "playlist-id")) - 1;
+                     if (!name.empty() && playlist_id >= 0) {
+                       self->app_->playlist_manager()->Rename(playlist_id, name);
                        self->RefreshPlaylistsList();
                        self->RefreshPlaylist();
                      }
