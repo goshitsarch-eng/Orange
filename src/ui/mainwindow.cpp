@@ -22,7 +22,9 @@
 #include "widgets/volumeslider.h"
 #include "collection/collectiondirectory.h"
 #include "constants/behavioursettings.h"
+#include "constants/collectionsettings.h"
 #include "constants/playlistsettings.h"
+#include "constants/scrobblersettings.h"
 #include "core/settings.h"
 #include "device/cddasongloader.h"
 #include "organize/organize.h"
@@ -168,6 +170,8 @@ void MainWindow::BuildUi() {
   GMenu *playback = g_menu_new();
   g_menu_append(playback, "Stop after this track", "win.stop-after");
   g_menu_append(playback, "Queue play next", "win.queue-next");
+  g_menu_append(playback, "Scrobble current track", "win.scrobble");
+  g_menu_append(playback, "Love current track", "win.love");
   g_menu_append_section(menu, "Playback", G_MENU_MODEL(playback));
   GMenu *tools = g_menu_new();
   g_menu_append(tools, "Cover manager", "win.covers");
@@ -298,6 +302,10 @@ void MainWindow::BuildUi() {
   add_action("remove-unavailable", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RemoveUnavailable(); }));
   add_action("renumber-tracks", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RenumberTracks(); }));
   add_action("stop-after", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->StopAfterCurrent(); }));
+  add_action("scrobble", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ScrobbleCurrent(); }));
+  add_action("love", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               MainWindow::OnLove(nullptr, data);
+             }));
   add_action("queue-next", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->QueuePlayNext(); }));
   add_action("transcode-selected", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddSelectedToTranscoder(); }));
   add_action("copy-collection", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CopySelectedToCollection(false); }));
@@ -699,7 +707,10 @@ void MainWindow::BuildPlayerBar() {
   gtk_widget_add_css_class(play_button_, "circular");
   GtkWidget *stop = gtk_button_new_from_icon_name("media-playback-stop-symbolic");
   GtkWidget *next = gtk_button_new_from_icon_name("media-skip-forward-symbolic");
-  GtkWidget *love = gtk_button_new_from_icon_name("emblem-favorite-symbolic");
+  scrobble_button_ = gtk_button_new_from_icon_name("document-send-symbolic");
+  gtk_widget_set_tooltip_text(scrobble_button_, "Scrobble current track");
+  love_button_ = gtk_button_new_from_icon_name("emblem-favorite-symbolic");
+  gtk_widget_set_tooltip_text(love_button_, "Love current track");
   analyzer_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(analyzer_drawing_, 160, 36);
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(analyzer_drawing_), DrawAnalyzer, this, nullptr);
@@ -707,7 +718,8 @@ void MainWindow::BuildPlayerBar() {
   gtk_box_append(GTK_BOX(controls), play_button_);
   gtk_box_append(GTK_BOX(controls), stop);
   gtk_box_append(GTK_BOX(controls), next);
-  gtk_box_append(GTK_BOX(controls), love);
+  gtk_box_append(GTK_BOX(controls), scrobble_button_);
+  gtk_box_append(GTK_BOX(controls), love_button_);
   gtk_widget_set_tooltip_text(analyzer_drawing_, "Click to cycle analyzer type");
   GtkGesture *analyzer_click = gtk_gesture_click_new();
   gtk_widget_add_controller(analyzer_drawing_, GTK_EVENT_CONTROLLER(analyzer_click));
@@ -729,7 +741,10 @@ void MainWindow::BuildPlayerBar() {
   g_signal_connect(stop, "clicked", G_CALLBACK(OnStop), this);
   g_signal_connect(next, "clicked", G_CALLBACK(OnNext), this);
   g_signal_connect(prev, "clicked", G_CALLBACK(OnPrevious), this);
-  g_signal_connect(love, "clicked", G_CALLBACK(OnLove), this);
+  g_signal_connect(scrobble_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->ScrobbleCurrent(); }),
+                   this);
+  g_signal_connect(love_button_, "clicked", G_CALLBACK(OnLove), this);
+  UpdateScrobblerButtons();
   g_object_set_data(G_OBJECT(play_button_), "player-box", box);
 }
 
@@ -977,6 +992,7 @@ void MainWindow::RefreshFiles() {
 }
 
 void MainWindow::UpdateNowPlaying() {
+  UpdateScrobblerButtons();
   const Song song = app_->player()->current_song();
   if (playing_widget_) {
     playing_widget_->SongChanged(song);
@@ -1015,7 +1031,12 @@ void MainWindow::UpdatePlaybackButtons() {
   gtk_button_set_icon_name(GTK_BUTTON(play_button_), playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic");
 }
 
-void MainWindow::OpenSettings() { SettingsDialog::Show(GTK_WINDOW(window_), app_); }
+void MainWindow::OpenSettings() {
+  SettingsDialog::Show(GTK_WINDOW(window_), app_, [this]() {
+    app_->scrobbler()->ReloadSettings();
+    UpdateScrobblerButtons();
+  });
+}
 
 void MainWindow::OpenAbout() { AboutDialog::Show(GTK_WINDOW(window_)); }
 
@@ -1439,11 +1460,53 @@ void MainWindow::ShuffleCurrent() {
 }
 
 void MainWindow::RateSelected(int stars) {
-  app_->playlist_manager()->RateCurrentSong2(stars);
-  if (const Song song = app_->playlist_manager()->current_song(); song.id() > 0) {
-    app_->collection()->backend()->SetRating(song.id(), static_cast<float>(std::clamp(stars, 0, 5)) / 5.0f);
+  const float rating = static_cast<float>(std::clamp(stars, 0, 5)) / 5.0f;
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (!playlist) {
+    return;
+  }
+  std::vector<int> rows = SelectedPlaylistRows();
+  if (rows.empty() && playlist->current_row() >= 0) {
+    rows.push_back(playlist->current_row());
+  }
+  Settings settings;
+  settings.BeginGroup(CollectionSettings::kSettingsGroup);
+  const bool save_ratings = settings.BoolValue(CollectionSettings::kSaveRatings, CollectionSettings::kDefaultSaveRatings);
+  for (int row : rows) {
+    Song song = playlist->song(row);
+    song.set_rating(rating);
+    playlist->ReplaceRow(row, song);
+    if (song.id() > 0) {
+      app_->collection()->backend()->SetRating(song.id(), rating);
+    }
+    if (save_ratings && song.IsEditable()) {
+      app_->tagreader()->SaveRating(FileUtils::PathFromUri(song.url()), rating);
+    }
   }
   RefreshPlaylist();
+}
+
+void MainWindow::ScrobbleCurrent() {
+  const Song song = app_->player()->current_song();
+  if (!song.is_valid() && song.url().empty()) {
+    ShowToast("Nothing to scrobble");
+    return;
+  }
+  app_->scrobbler()->Scrobble(song);
+  ShowToast("Scrobbled “" + song.PrettyTitleWithArtist() + "”");
+}
+
+void MainWindow::UpdateScrobblerButtons() {
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  const bool show_scrobble = settings.BoolValue(ScrobblerSettings::kScrobbleButton, ScrobblerSettings::kDefaultScrobbleButton);
+  const bool show_love = settings.BoolValue(ScrobblerSettings::kLoveButton, ScrobblerSettings::kDefaultLoveButton);
+  if (scrobble_button_) {
+    gtk_widget_set_visible(scrobble_button_, show_scrobble);
+  }
+  if (love_button_) {
+    gtk_widget_set_visible(love_button_, show_love);
+  }
 }
 
 void MainWindow::SkipSelected() {

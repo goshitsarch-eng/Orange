@@ -1,3 +1,4 @@
+#include "scrobbler/scrobblereligibility.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
 #include "scrobbler/scrobblercache.h"
@@ -72,4 +73,32 @@ TEST(SubsonicScrobbler, ScrobbleUrlUsesRestEndpoint) {
   EXPECT_NE(std::string::npos, url.find("id=12"));
   EXPECT_NE(std::string::npos, url.find("submission=true"));
   EXPECT_NE(std::string::npos, url.find("p=enc:"));
+}
+
+TEST(ScrobblerEligibility, LastFmHalfOrFourMinutes) {
+  Song song;
+  song.set_valid(true);
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_length_nanosec(300LL * 1000000000LL);
+  EXPECT_FALSE(ScrobblerEligibility::ShouldScrobble(song, 10LL * 1000000000LL));
+  EXPECT_TRUE(ScrobblerEligibility::ShouldScrobble(song, 150LL * 1000000000LL));
+  EXPECT_TRUE(ScrobblerEligibility::ShouldScrobble(song, 240LL * 1000000000LL));
+
+  Song short_song;
+  short_song.set_valid(true);
+  short_song.set_title("Intro");
+  short_song.set_artist("Band");
+  short_song.set_length_nanosec(20LL * 1000000000LL);
+  EXPECT_FALSE(ScrobblerEligibility::ShouldScrobble(short_song, 20LL * 1000000000LL));
+
+  Song unknown;
+  unknown.set_valid(true);
+  unknown.set_title("Live");
+  unknown.set_artist("Band");
+  EXPECT_FALSE(ScrobblerEligibility::ShouldScrobble(unknown, 60LL * 1000000000LL));
+  EXPECT_TRUE(ScrobblerEligibility::ShouldScrobble(unknown, 240LL * 1000000000LL));
+
+  EXPECT_TRUE(ScrobblerEligibility::ShouldScrobble(song, 30LL * 1000000000LL, 10));
+  EXPECT_FALSE(ScrobblerEligibility::ShouldScrobble(song, 20LL * 1000000000LL, 10));
 }

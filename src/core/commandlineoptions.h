@@ -41,6 +41,7 @@ class CommandlineOptions {
   const std::string &log_levels() const { return log_levels_; }
   const std::string &playlist_name() const { return playlist_name_; }
   bool debug() const { return debug_; }
+  void set_urls(const std::vector<std::string> &urls) { urls_ = urls; }
 
  private:
   UrlListAction url_list_action_ = UrlListAction::Append;

@@ -26,9 +26,10 @@
 
 #include <adwaita.h>
 
-void SettingsDialog::Show(GtkWindow *parent, Application *app) {
+void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::function<void()> &closed) {
   AdwPreferencesDialog *dialog = ADW_PREFERENCES_DIALOG(adw_preferences_dialog_new());
   auto *settings = new Settings();
+  auto *on_closed = new std::function<void()>(closed);
 
   adw_preferences_dialog_add(dialog, BehaviourSettingsPage::Create(settings, app));
   adw_preferences_dialog_add(dialog, CollectionSettingsPage::Create(settings, app));
@@ -59,6 +60,15 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
 #endif
   adw_preferences_dialog_add(dialog, RadioSettingsPage::Create(settings, app));
 
-  g_signal_connect(dialog, "closed", G_CALLBACK(+[](AdwDialog *, gpointer data) { delete static_cast<Settings *>(data); }), settings);
+  g_object_set_data_full(G_OBJECT(dialog), "settings", settings, [](gpointer p) { delete static_cast<Settings *>(p); });
+  g_object_set_data_full(G_OBJECT(dialog), "closed", on_closed, [](gpointer p) { delete static_cast<std::function<void()> *>(p); });
+  g_signal_connect(dialog, "closed", G_CALLBACK(+[](AdwDialog *alert, gpointer) {
+                     if (auto *fn = static_cast<std::function<void()> *>(g_object_get_data(G_OBJECT(alert), "closed"))) {
+                       if (*fn) {
+                         (*fn)();
+                       }
+                     }
+                   }),
+                   nullptr);
   adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
 }

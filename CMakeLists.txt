@@ -737,6 +737,7 @@ if(GTest_FOUND)
     tests/src/songloader_test.cpp
     tests/src/fileview_test.cpp
     tests/src/scrobbler_test.cpp
+    tests/src/commandlineoptions_test.cpp
     tests/src/playlist_test.cpp
     tests/src/playlistmanager_test.cpp
     tests/src/systemtrayicon_test.cpp
@@ -746,6 +747,7 @@ if(GTest_FOUND)
     src/core/logging.cpp
     src/core/standardpaths.cpp
     src/core/settings.cpp
+    src/core/commandlineoptions.cpp
     src/core/song.cpp
     src/core/database.cpp
     src/core/taskmanager.cpp

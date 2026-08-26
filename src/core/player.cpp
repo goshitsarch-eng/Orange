@@ -93,6 +93,7 @@ void Player::Pause() {
 void Player::Stop(bool stop_after) {
   stop_after_current_ = stop_after;
   if (!stop_after) {
+    FinishCurrentPlayback();
     engine_->Stop();
     if (playlist_manager_) {
       playlist_manager_->SetActiveStopped();
@@ -104,6 +105,7 @@ void Player::Stop(bool stop_after) {
 void Player::StopAfterCurrent() { stop_after_current_ = !stop_after_current_; }
 
 void Player::Next() {
+  FinishCurrentPlayback();
   if (queue_ && !queue_->empty()) {
     current_song_ = queue_->TakeNext();
     PlayLoadedSong(false);
@@ -124,6 +126,7 @@ void Player::Previous() {
     SeekTo(0);
     return;
   }
+  FinishCurrentPlayback();
   playlist_manager_->Previous();
   PlayCurrent(false);
 }
@@ -186,6 +189,7 @@ void Player::PlayCurrent(bool pause) {
   if (!playlist_manager_) {
     return;
   }
+  FinishCurrentPlayback();
   current_song_ = playlist_manager_->current_song();
   PlayLoadedSong(pause);
 }
@@ -226,7 +230,20 @@ void ApplyLoadResult(Song *song, const UrlHandler::LoadResult &result) {
 
 }  // namespace
 
+void Player::FinishCurrentPlayback() {
+  if (finished_current_) {
+    return;
+  }
+  finished_current_ = true;
+  int64_t listened = engine_ ? engine_->position_nanosec() : 0;
+  if (listened <= 0 && current_song_.length_nanosec() > 0) {
+    listened = current_song_.length_nanosec();
+  }
+  PlaybackFinished.Emit(current_song_, listened);
+}
+
 void Player::PlayLoadedSong(bool pause, int track_change_flags) {
+  finished_current_ = false;
   if (!current_song_.is_valid() && current_song_.url().empty()) {
     Stop();
     return;
@@ -258,6 +275,7 @@ void Player::PreloadNext() {
   if (stop_after_current_) {
     return;
   }
+  FinishCurrentPlayback();
   Song next_song;
   if (queue_ && !queue_->empty()) {
     next_song = queue_->songs().front();
@@ -300,6 +318,7 @@ void Player::HandleTrackEnded() {
     preloaded_ = false;
     return;
   }
+  FinishCurrentPlayback();
   if (stop_after_current_) {
     stop_after_current_ = false;
     Stop();

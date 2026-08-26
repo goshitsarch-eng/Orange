@@ -55,6 +55,7 @@ class Player : public PlayerInterface {
   Signal<EngineBase::State> StateChanged;
   Signal<int64_t, int64_t> PositionChanged;
   Signal<Song> ForceShowOSD;
+  Signal<Song, int64_t> PlaybackFinished;
   Signal<> Paused;
   Signal<> Playing;
   Signal<> Stopped;
@@ -65,6 +66,7 @@ class Player : public PlayerInterface {
   void PreloadNext();
   void PlayCurrent(bool pause);
   void PlayLoadedSong(bool pause, int track_change_flags = GstEngine::Manual);
+  void FinishCurrentPlayback();
 
   TaskManager *task_manager_;
   UrlHandlers *url_handlers_;
@@ -76,6 +78,7 @@ class Player : public PlayerInterface {
   unsigned volume_before_mute_ = 100;
   bool stop_after_current_ = false;
   bool preloaded_ = false;
+  bool finished_current_ = true;
   int seek_step_sec_ = 10;
   unsigned volume_increment_ = 5;
 };

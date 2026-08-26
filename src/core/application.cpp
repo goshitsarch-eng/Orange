@@ -1,8 +1,12 @@
 #include "core/application.h"
 
+#include "constants/collectionsettings.h"
+#include "constants/scrobblersettings.h"
 #include "core/appearance.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "scrobbler/scrobblereligibility.h"
+#include "utilities/fileutils.h"
 
 Application::Application()
     : task_manager_(std::make_unique<TaskManager>()),
@@ -86,8 +90,24 @@ void Application::Init() {
     waveform_->Load(song);
     discord_->UpdatePresence(song, player_->GetState() == GstEngine::State::Playing);
     tray_->SetNowPlaying(song);
-    if (song.id() > 0) {
-      collection_->backend()->IncrementPlayCount(song.id());
+  });
+  player_->PlaybackFinished.Connect([this](const Song &song, int64_t listened_nanosec) {
+    Settings settings;
+    settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+    const int submit_percent = settings.IntValue(ScrobblerSettings::kSubmit, ScrobblerSettings::kDefaultSubmit);
+    settings.EndGroup();
+    const bool played = ScrobblerEligibility::ShouldScrobble(song, listened_nanosec, submit_percent);
+    if (played) {
+      scrobbler_->Scrobble(song);
+      if (song.id() > 0) {
+        collection_->backend()->IncrementPlayCount(song.id());
+      }
+      settings.BeginGroup(CollectionSettings::kSettingsGroup);
+      if (settings.BoolValue(CollectionSettings::kSavePlayCounts, CollectionSettings::kDefaultSavePlayCounts) && song.IsEditable()) {
+        tagreader_->SavePlaycount(FileUtils::PathFromUri(song.url()), song.playcount() + 1);
+      }
+    } else if (song.id() > 0 && listened_nanosec > 0) {
+      collection_->backend()->IncrementSkipCount(song.id());
     }
   });
   player_->ForceShowOSD.Connect([this](const Song &song) { osd_->SongChanged(song, current_albumcover_loader_->current()); });

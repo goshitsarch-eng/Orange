@@ -96,6 +96,8 @@ class MainWindow {
   void RemoveUnavailable();
   void ShuffleCurrent();
   void RateSelected(int stars);
+  void ScrobbleCurrent();
+  void UpdateScrobblerButtons();
   void CopySelectedUrl();
   void SkipSelected();
   void JumpToPlaying();
@@ -144,6 +146,8 @@ class MainWindow {
   GtkWidget *streaming_service_drop_ = nullptr;
   std::vector<std::unique_ptr<StreamingTabsView>> streaming_views_;
   GtkWidget *play_button_ = nullptr;
+  GtkWidget *love_button_ = nullptr;
+  GtkWidget *scrobble_button_ = nullptr;
   GtkWidget *status_label_ = nullptr;
   GtkWidget *analyzer_drawing_ = nullptr;
   GtkWidget *moodbar_drawing_ = nullptr;

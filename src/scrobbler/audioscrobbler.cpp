@@ -1,6 +1,7 @@
 #include "scrobbler/audioscrobbler.h"
 
 #include "config.h"
+#include "constants/scrobblersettings.h"
 #include "core/settings.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
@@ -19,10 +20,24 @@ AudioScrobbler::AudioScrobbler(NetworkAccessManager *network) : network_(network
 
 void AudioScrobbler::ReloadSettings() {
   Settings settings;
-  settings.BeginGroup("Scrobbler");
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
   for (auto &service : services_) {
     service->set_enabled(settings.BoolValue(service->name(), false));
   }
+}
+
+bool AudioScrobbler::enabled() const {
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  if (settings.BoolValue(ScrobblerSettings::kEnabled, ScrobblerSettings::kDefaultEnabled)) {
+    return true;
+  }
+  for (const auto &service : services_) {
+    if (service->enabled()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void AudioScrobbler::NowPlaying(const Song &song) {

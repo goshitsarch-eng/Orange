@@ -44,7 +44,7 @@ void Open(GApplication *gapp, gpointer files, gint n_files, const gchar *, gpoin
     urls.emplace_back(uri);
     g_free(uri);
   }
-  (void)urls;
+  options.set_urls(urls);
   runtime->window->CommandlineReceived(options);
 }
 
