@@ -1,6 +1,7 @@
 #include "equalizer/equalizer.h"
 
 #include "core/settings.h"
+#include "equalizer/equalizerpersist.h"
 #include "utilities/strutils.h"
 
 #include <algorithm>
@@ -89,9 +90,10 @@ std::vector<std::string> Equalizer::BuiltinPresetNames() {
 
 void Equalizer::ReloadSettings() {
   Settings s;
-  s.BeginGroup("Equalizer");
+  s.BeginGroup(EqualizerPersist::kSettingsGroup);
   enabled_ = s.BoolValue("enabled", false);
   preamp_ = s.IntValue("preamp", 0);
+  selected_preset_ = EqualizerPersist::PresetOrDefault(s.Value(EqualizerPersist::kSelectedPreset, EqualizerPersist::kDefaultPreset));
   for (int i = 0; i < 10; ++i) {
     if (static_cast<int>(gains_.size()) < 10) {
       gains_.resize(10, 0);
@@ -109,13 +111,24 @@ void Equalizer::ReloadSettings() {
     presets_[name] = ParseGains(entry.substr(colon + 1));
     user_names_.push_back(name);
   }
+  Settings backend;
+  backend.BeginGroup("Backend");
+  const int legacy_balance = backend.IntValue("stereobalance", 0);
+  stereo_balance_ = EqualizerPersist::ClampBalance(
+      s.Contains(EqualizerPersist::kStereoBalance) ? s.IntValue(EqualizerPersist::kStereoBalance, 0) : legacy_balance);
+  stereo_balancer_enabled_ = EqualizerPersist::MigrateBalancerEnabled(s.Contains(EqualizerPersist::kEnableStereoBalancer),
+                                                                      s.BoolValue(EqualizerPersist::kEnableStereoBalancer, false),
+                                                                      stereo_balance_);
 }
 
 void Equalizer::Save() {
   Settings s;
-  s.BeginGroup("Equalizer");
+  s.BeginGroup(EqualizerPersist::kSettingsGroup);
   s.SetBoolValue("enabled", enabled_);
   s.SetIntValue("preamp", preamp_);
+  s.SetValue(EqualizerPersist::kSelectedPreset, selected_preset_);
+  s.SetBoolValue(EqualizerPersist::kEnableStereoBalancer, stereo_balancer_enabled_);
+  s.SetIntValue(EqualizerPersist::kStereoBalance, stereo_balance_);
   for (int i = 0; i < 10; ++i) {
     s.SetIntValue("band" + std::to_string(i), gains_[i]);
   }
@@ -127,24 +140,43 @@ void Equalizer::Save() {
     blob += user_names_[i] + ":" + JoinGains(presets_[user_names_[i]]);
   }
   s.SetValue("user_presets", blob);
+  s.BeginGroup("Backend");
+  s.SetIntValue("stereobalance", EqualizerPersist::EffectiveBalance(stereo_balancer_enabled_, stereo_balance_));
   s.Sync();
 }
 
 void Equalizer::set_enabled(bool enabled) {
   enabled_ = enabled;
+  Save();
   ParametersChanged.Emit(enabled_, preamp_, gains_);
 }
 
 void Equalizer::set_preamp(int preamp) {
   preamp_ = preamp;
+  selected_preset_ = EqualizerPersist::kDefaultPreset;
+  Save();
   ParametersChanged.Emit(enabled_, preamp_, gains_);
 }
 
 void Equalizer::set_gain(int band, int gain) {
   if (band >= 0 && band < 10) {
     gains_[band] = gain;
+    selected_preset_ = EqualizerPersist::kDefaultPreset;
+    Save();
     ParametersChanged.Emit(enabled_, preamp_, gains_);
   }
+}
+
+void Equalizer::set_stereo_balancer_enabled(bool enabled) {
+  stereo_balancer_enabled_ = enabled;
+  Save();
+  StereoBalanceChanged.Emit(EffectiveBalanceFraction());
+}
+
+void Equalizer::set_stereo_balance(int balance) {
+  stereo_balance_ = EqualizerPersist::ClampBalance(balance);
+  Save();
+  StereoBalanceChanged.Emit(EffectiveBalanceFraction());
 }
 
 void Equalizer::LoadPreset(const std::string &name) {
@@ -153,6 +185,8 @@ void Equalizer::LoadPreset(const std::string &name) {
     return;
   }
   gains_ = it->second;
+  selected_preset_ = name;
+  Save();
   ParametersChanged.Emit(enabled_, preamp_, gains_);
 }
 

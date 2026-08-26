@@ -808,6 +808,7 @@ void MainWindow::BuildPlaylist() {
   });
   playlist_container_->view()->SetActivateCallback([this](int index) { app_->player()->PlayAt(index); });
   playlist_container_->view()->SetSelectCallback([this](int index, bool add) { SelectPlaylistRow(index, add); });
+  playlist_container_->view()->SetRateCallback([this](int row, float rating) { RateRow(row, rating); });
   playlist_container_->view()->SetSortCallback([this](PlaylistColumn column, PlaylistSortOrder order) { SortPlaylistBy(column, order); });
   playlist_container_->view()->SetMenuCallback([this](double x, double y) { ShowPlaylistMenu(x, y); });
   playlist_container_->view()->SetEditRequestCallback([this]() { EditColumnValue(); });
@@ -2150,11 +2151,6 @@ void MainWindow::ShuffleCurrent() {
 }
 
 void MainWindow::RateSelected(int stars) {
-  if (PlaylistColumnLayout::RatingLocked()) {
-    ShowToast(Translations::Tr("Rating is locked"));
-    return;
-  }
-  const float rating = static_cast<float>(std::clamp(stars, 0, 5)) / 5.0f;
   Playlist *playlist = app_->playlist_manager()->current();
   if (!playlist) {
     return;
@@ -2162,6 +2158,20 @@ void MainWindow::RateSelected(int stars) {
   std::vector<int> rows = SelectedPlaylistRows();
   if (rows.empty() && playlist->current_row() >= 0) {
     rows.push_back(playlist->current_row());
+  }
+  RateRows(rows, static_cast<float>(std::clamp(stars, 0, 5)) / 5.0f);
+}
+
+void MainWindow::RateRow(int row, float rating) { RateRows({row}, rating); }
+
+void MainWindow::RateRows(const std::vector<int> &rows, float rating) {
+  if (PlaylistColumnLayout::RatingLocked()) {
+    ShowToast(Translations::Tr("Rating is locked"));
+    return;
+  }
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (!playlist) {
+    return;
   }
   Settings settings;
   settings.BeginGroup(CollectionSettings::kSettingsGroup);

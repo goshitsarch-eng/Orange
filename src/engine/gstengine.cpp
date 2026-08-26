@@ -4,6 +4,7 @@
 #include "core/logging.h"
 #include "core/settings.h"
 #include "engine/backendoptions.h"
+#include "equalizer/equalizerpersist.h"
 
 #include <algorithm>
 
@@ -35,7 +36,15 @@ bool GstEngine::Init() {
     replaygain_mode_ = (mode == "track" || mode == "1") ? 1 : settings.IntValue("rgmode", 0);
   }
   replaygain_preamp_ = settings.IntValue("rgpreamp", 0);
-  stereo_balance_ = static_cast<float>(settings.IntValue("stereobalance", 0)) / 100.0f;
+  Settings eq;
+  eq.BeginGroup(EqualizerPersist::kSettingsGroup);
+  if (eq.Contains(EqualizerPersist::kEnableStereoBalancer) || eq.Contains(EqualizerPersist::kStereoBalance)) {
+    stereo_balance_ = EqualizerPersist::EffectiveBalanceFraction(eq.BoolValue(EqualizerPersist::kEnableStereoBalancer, false),
+                                                                 eq.IntValue(EqualizerPersist::kStereoBalance, 0));
+  } else {
+    stereo_balance_ = static_cast<float>(settings.IntValue("stereobalance", 0)) / 100.0f;
+  }
+  eq_enabled_ = eq.BoolValue("enabled", false);
   fading_enabled_ = settings.Contains("FadeoutEnabled") ? settings.BoolValue("FadeoutEnabled") : settings.BoolValue("fading", false);
   autocrossfade_enabled_ = settings.Contains("AutoCrossfadeEnabled") ? settings.BoolValue("AutoCrossfadeEnabled")
                                                                     : settings.BoolValue("autocrossfade", fading_enabled_);
@@ -56,7 +65,7 @@ std::unique_ptr<GstEnginePipeline> GstEngine::CreatePipeline(const std::string &
                         replaygain_preamp_, stereo_balance_, playbin3_)) {
     return nullptr;
   }
-  pipeline->SetEqualizer(eq_preamp_, eq_gains_);
+  pipeline->SetEqualizer(eq_enabled_ ? eq_preamp_ : 0, eq_enabled_ ? eq_gains_ : std::vector<int>(10, 0));
   pipeline->SetVolume(volume_percent_ / 100.0);
   WirePipeline(pipeline.get());
   return pipeline;
@@ -355,16 +364,28 @@ void GstEngine::SetOutput(const std::string &output, const std::string &device) 
   device_ = device;
 }
 
-void GstEngine::SetEqualizerEnabled(bool enabled) { eq_enabled_ = enabled; }
+void GstEngine::SetEqualizerEnabled(bool enabled) {
+  eq_enabled_ = enabled;
+  const int preamp = eq_enabled_ ? eq_preamp_ : 0;
+  const std::vector<int> gains = eq_enabled_ ? eq_gains_ : std::vector<int>(10, 0);
+  if (current_) {
+    current_->SetEqualizer(preamp, gains);
+  }
+  if (next_) {
+    next_->SetEqualizer(preamp, gains);
+  }
+}
 
 void GstEngine::SetEqualizerParameters(int preamp, const std::vector<int> &band_gains) {
   eq_preamp_ = preamp;
   eq_gains_ = band_gains;
+  const int applied_preamp = eq_enabled_ ? eq_preamp_ : 0;
+  const std::vector<int> applied = eq_enabled_ ? eq_gains_ : std::vector<int>(10, 0);
   if (current_) {
-    current_->SetEqualizer(preamp, band_gains);
+    current_->SetEqualizer(applied_preamp, applied);
   }
   if (next_) {
-    next_->SetEqualizer(preamp, band_gains);
+    next_->SetEqualizer(applied_preamp, applied);
   }
 }
 

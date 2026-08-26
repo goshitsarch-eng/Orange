@@ -9,6 +9,7 @@
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "equalizer/equalizer.h"
+#include "equalizer/equalizerpersist.h"
 #include "constants/filefilterconstants.h"
 #include "constants/collectionsettings.h"
 #include "analyzer/analyzerframerate.h"
@@ -390,9 +391,43 @@ TEST(Equalizer, BuiltinPresets) {
   Equalizer eq;
   eq.LoadPreset("Rock");
   EXPECT_NE(0, eq.gains()[0]);
+  EXPECT_EQ("Rock", eq.selected_preset());
   EXPECT_EQ(-100, Equalizer::ClampBalance(-250));
   EXPECT_EQ(100, Equalizer::ClampBalance(250));
   EXPECT_EQ(0, Equalizer::ClampBalance(0));
+}
+
+TEST(EqualizerPersist, SelectedPresetAndStereoBalancer) {
+  EXPECT_EQ("Custom", EqualizerPersist::PresetOrDefault({}));
+  EXPECT_EQ("Rock", EqualizerPersist::PresetOrDefault("Rock"));
+  EXPECT_EQ(0, EqualizerPersist::EffectiveBalance(false, 80));
+  EXPECT_EQ(80, EqualizerPersist::EffectiveBalance(true, 80));
+  EXPECT_EQ(-100, EqualizerPersist::EffectiveBalance(true, -250));
+  EXPECT_FLOAT_EQ(0.0f, EqualizerPersist::EffectiveBalanceFraction(false, 50));
+  EXPECT_FLOAT_EQ(0.5f, EqualizerPersist::EffectiveBalanceFraction(true, 50));
+  EXPECT_EQ(0, EqualizerPersist::EffectivePreamp(false, 6));
+  EXPECT_EQ(6, EqualizerPersist::EffectivePreamp(true, 6));
+  const std::vector<int> rock(10, 4);
+  EXPECT_EQ(std::vector<int>(10, 0), EqualizerPersist::EffectiveGains(false, rock));
+  EXPECT_EQ(rock, EqualizerPersist::EffectiveGains(true, rock));
+  EXPECT_TRUE(EqualizerPersist::MigrateBalancerEnabled(true, true, 0));
+  EXPECT_FALSE(EqualizerPersist::MigrateBalancerEnabled(true, false, 40));
+  EXPECT_TRUE(EqualizerPersist::MigrateBalancerEnabled(false, false, 40));
+  EXPECT_FALSE(EqualizerPersist::MigrateBalancerEnabled(false, false, 0));
+
+  Equalizer eq;
+  eq.set_stereo_balancer_enabled(true);
+  eq.set_stereo_balance(250);
+  EXPECT_TRUE(eq.stereo_balancer_enabled());
+  EXPECT_EQ(100, eq.stereo_balance());
+  EXPECT_FLOAT_EQ(1.0f, eq.EffectiveBalanceFraction());
+  eq.set_stereo_balancer_enabled(false);
+  EXPECT_FLOAT_EQ(0.0f, eq.EffectiveBalanceFraction());
+  eq.set_enabled(false);
+  eq.set_preamp(8);
+  EXPECT_EQ("Custom", eq.selected_preset());
+  EXPECT_EQ(0, eq.EffectivePreamp());
+  EXPECT_EQ(std::vector<int>(10, 0), eq.EffectiveGains());
 }
 
 TEST(Analyzer, Types) {

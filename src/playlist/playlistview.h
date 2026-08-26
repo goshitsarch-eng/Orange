@@ -22,6 +22,7 @@ class PlaylistView {
   using EditCommitCallback = std::function<void(int, PlaylistColumn, const std::string &)>;
   using DropUrlsCallback = std::function<void(const std::vector<std::string> &, int)>;
   using ReorderCallback = std::function<void(const std::vector<int> &, int)>;
+  using RateCallback = std::function<void(int, float)>;
 
   PlaylistView();
 
@@ -39,9 +40,12 @@ class PlaylistView {
   void SetEditCommitCallback(EditCommitCallback callback);
   void SetDropUrlsCallback(DropUrlsCallback callback);
   void SetReorderCallback(ReorderCallback callback);
+  void SetRateCallback(RateCallback callback);
   int RowAtY(double y) const;
   PlaylistColumn last_clicked_column() const { return last_clicked_column_; }
   void SetLastClickedColumn(PlaylistColumn column) { last_clicked_column_ = column; }
+  double last_click_cell_x() const { return last_click_cell_x_; }
+  double last_click_cell_width() const { return last_click_cell_width_; }
   void StartInlineEdit(int row, PlaylistColumn column);
   int visible_count() const { return visible_count_; }
   void SetPlaybackProgress(double progress);
@@ -66,7 +70,10 @@ class PlaylistView {
   EditCommitCallback edit_commit_;
   DropUrlsCallback drop_urls_;
   ReorderCallback reorder_;
+  RateCallback rate_;
   PlaylistColumn last_clicked_column_ = PlaylistColumn::Title;
+  double last_click_cell_x_ = 0;
+  double last_click_cell_width_ = 0;
   int visible_count_ = 0;
   double playback_progress_ = 0;
 };

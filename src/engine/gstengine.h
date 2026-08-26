@@ -93,7 +93,7 @@ class GstEngine : public EngineBase {
   float stereo_balance_ = 0.0f;
   int eq_preamp_ = 0;
   std::vector<int> eq_gains_ = std::vector<int>(10, 0);
-  bool eq_enabled_ = true;
+  bool eq_enabled_ = false;
   State state_ = State::Empty;
   std::string output_ = "autoaudiosink";
   std::string device_;

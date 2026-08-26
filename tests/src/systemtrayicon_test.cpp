@@ -2,6 +2,8 @@
 
 #include "core/song.h"
 
+#include <algorithm>
+
 #include <gtest/gtest.h>
 
 TEST(SystemTrayIcon, NowPlayingUpdatesTooltip) {
@@ -23,25 +25,53 @@ TEST(SystemTrayIcon, NowPlayingUpdatesTooltip) {
 }
 
 TEST(SystemTrayIcon, DBusMenuLabelsAndActions) {
-  EXPECT_STREQ("Play", SystemTrayIcon::MenuLabel(1, false));
-  EXPECT_STREQ("Pause", SystemTrayIcon::MenuLabel(1, true));
-  EXPECT_STREQ("Stop", SystemTrayIcon::MenuLabel(2, false));
-  EXPECT_STREQ("Next", SystemTrayIcon::MenuLabel(3, false));
-  EXPECT_STREQ("Previous", SystemTrayIcon::MenuLabel(4, false));
-  EXPECT_STREQ("Show / Hide", SystemTrayIcon::MenuLabel(6, false));
-  EXPECT_STREQ("Quit", SystemTrayIcon::MenuLabel(7, false));
-  EXPECT_STREQ("", SystemTrayIcon::MenuLabel(5, false));
+  EXPECT_STREQ("Play", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuPlayPause, false));
+  EXPECT_STREQ("Pause", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuPlayPause, true));
+  EXPECT_STREQ("Stop", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuStop, false));
+  EXPECT_STREQ("Next", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuNext, false));
+  EXPECT_STREQ("Previous", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuPrevious, false));
+  EXPECT_STREQ("Mute", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuMute, false));
+  EXPECT_STREQ("Stop after this track", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuStopAfter, false));
+  EXPECT_STREQ("Love", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuLove, false));
+  EXPECT_STREQ("Show / Hide", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuShowHide, false));
+  EXPECT_STREQ("Quit", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuQuit, false));
+  EXPECT_STREQ("", SystemTrayIcon::MenuLabel(SystemTrayIcon::kMenuSeparator, false));
+  EXPECT_TRUE(SystemTrayIcon::IsSeparatorId(SystemTrayIcon::kMenuSeparator));
+  EXPECT_FALSE(SystemTrayIcon::IsSeparatorId(SystemTrayIcon::kMenuMute));
+  const auto ids = SystemTrayIcon::RootMenuIds();
+  EXPECT_EQ(10u, ids.size());
+  EXPECT_NE(ids.end(), std::find(ids.begin(), ids.end(), SystemTrayIcon::kMenuMute));
+  EXPECT_NE(ids.end(), std::find(ids.begin(), ids.end(), SystemTrayIcon::kMenuStopAfter));
+  EXPECT_NE(ids.end(), std::find(ids.begin(), ids.end(), SystemTrayIcon::kMenuLove));
 
   SystemTrayIcon tray;
   int play = 0;
   int quit = 0;
+  int mute = 0;
+  int stop_after = 0;
+  int love = 0;
   tray.PlayPause.Connect([&]() { ++play; });
   tray.Quit.Connect([&]() { ++quit; });
-  EXPECT_TRUE(SystemTrayIcon::ActivateMenuId(1, &tray.PlayPause, &tray.Stop, &tray.Next, &tray.Previous, &tray.ShowHide, &tray.Quit));
-  EXPECT_TRUE(SystemTrayIcon::ActivateMenuId(7, &tray.PlayPause, &tray.Stop, &tray.Next, &tray.Previous, &tray.ShowHide, &tray.Quit));
-  EXPECT_FALSE(SystemTrayIcon::ActivateMenuId(5, &tray.PlayPause, &tray.Stop, &tray.Next, &tray.Previous, &tray.ShowHide, &tray.Quit));
+  tray.Mute.Connect([&]() { ++mute; });
+  tray.StopAfter.Connect([&]() { ++stop_after; });
+  tray.Love.Connect([&]() { ++love; });
+  EXPECT_TRUE(SystemTrayIcon::ActivateMenuId(SystemTrayIcon::kMenuPlayPause, &tray.PlayPause, &tray.Stop, &tray.Next, &tray.Previous,
+                                            &tray.ShowHide, &tray.Quit, &tray.Mute, &tray.StopAfter, &tray.Love));
+  EXPECT_TRUE(SystemTrayIcon::ActivateMenuId(SystemTrayIcon::kMenuQuit, &tray.PlayPause, &tray.Stop, &tray.Next, &tray.Previous,
+                                            &tray.ShowHide, &tray.Quit, &tray.Mute, &tray.StopAfter, &tray.Love));
+  EXPECT_TRUE(SystemTrayIcon::ActivateMenuId(SystemTrayIcon::kMenuMute, &tray.PlayPause, &tray.Stop, &tray.Next, &tray.Previous,
+                                            &tray.ShowHide, &tray.Quit, &tray.Mute, &tray.StopAfter, &tray.Love));
+  EXPECT_TRUE(SystemTrayIcon::ActivateMenuId(SystemTrayIcon::kMenuStopAfter, &tray.PlayPause, &tray.Stop, &tray.Next, &tray.Previous,
+                                            &tray.ShowHide, &tray.Quit, &tray.Mute, &tray.StopAfter, &tray.Love));
+  EXPECT_TRUE(SystemTrayIcon::ActivateMenuId(SystemTrayIcon::kMenuLove, &tray.PlayPause, &tray.Stop, &tray.Next, &tray.Previous,
+                                            &tray.ShowHide, &tray.Quit, &tray.Mute, &tray.StopAfter, &tray.Love));
+  EXPECT_FALSE(SystemTrayIcon::ActivateMenuId(SystemTrayIcon::kMenuSeparator, &tray.PlayPause, &tray.Stop, &tray.Next, &tray.Previous,
+                                             &tray.ShowHide, &tray.Quit, &tray.Mute, &tray.StopAfter, &tray.Love));
   EXPECT_EQ(1, play);
   EXPECT_EQ(1, quit);
+  EXPECT_EQ(1, mute);
+  EXPECT_EQ(1, stop_after);
+  EXPECT_EQ(1, love);
   EXPECT_EQ("/NO_DBUSMENU", tray.menu_path());
   EXPECT_EQ(1u, tray.menu_revision());
 }

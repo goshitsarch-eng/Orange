@@ -4,6 +4,7 @@
 #include "constants/notificationssettings.h"
 #include "constants/scrobblersettings.h"
 #include "core/appearance.h"
+#include "equalizer/equalizerpersist.h"
 #include "playlist/playlistsequence.h"
 #include "core/logging.h"
 #include "core/settings.h"
@@ -75,7 +76,13 @@ void Application::Init() {
   tray_->Stop.Connect([this]() { player_->Stop(); });
   tray_->Next.Connect([this]() { player_->Next(); });
   tray_->Previous.Connect([this]() { player_->Previous(); });
+  tray_->Mute.Connect([this]() { player_->Mute(); });
+  tray_->StopAfter.Connect([this]() { player_->StopAfterCurrent(); });
+  tray_->Love.Connect([this]() { scrobbler_->Love(player_->current_song()); });
   tray_->Quit.Connect([this]() { Exit(); });
+  player_->engine()->SetEqualizerEnabled(equalizer_->enabled());
+  player_->engine()->SetEqualizerParameters(equalizer_->EffectivePreamp(), equalizer_->EffectiveGains());
+  player_->engine()->SetStereoBalance(equalizer_->EffectiveBalanceFraction());
   tray_->VolumeScroll.Connect([this](int delta) {
     if (delta > 0) {
       player_->VolumeUp();
@@ -145,8 +152,10 @@ void Application::Init() {
   });
   equalizer_->ParametersChanged.Connect([this](bool enabled, int preamp, const std::vector<int> &gains) {
     player_->engine()->SetEqualizerEnabled(enabled);
-    player_->engine()->SetEqualizerParameters(preamp, gains);
+    player_->engine()->SetEqualizerParameters(EqualizerPersist::EffectivePreamp(enabled, preamp),
+                                              EqualizerPersist::EffectiveGains(enabled, gains));
   });
+  equalizer_->StereoBalanceChanged.Connect([this](float balance) { player_->engine()->SetStereoBalance(balance); });
   shortcuts_->Play.Connect([this]() { player_->Play(); });
   shortcuts_->Pause.Connect([this]() { player_->Pause(); });
   shortcuts_->PlayPause.Connect([this]() { player_->PlayPause(); });

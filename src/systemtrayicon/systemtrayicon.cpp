@@ -286,6 +286,9 @@ void SystemTrayIcon::ShowMenu(int, int) {
   connect(box, gtk_button_new_with_label(Translations::CStr("Stop")), &Stop);
   connect(box, gtk_button_new_with_label(Translations::CStr("Next")), &Next);
   connect(box, gtk_button_new_with_label(Translations::CStr("Previous")), &Previous);
+  connect(box, gtk_button_new_with_label(Translations::CStr("Mute")), &Mute);
+  connect(box, gtk_button_new_with_label(Translations::CStr("Stop after this track")), &StopAfter);
+  connect(box, gtk_button_new_with_label(Translations::CStr("Love")), &Love);
   connect(box, gtk_button_new_with_label(Translations::CStr("Show / Hide")), &ShowHide);
   connect(box, gtk_button_new_with_label(Translations::CStr("Quit")), &Quit);
   gtk_window_set_child(GTK_WINDOW(window), box);
@@ -294,54 +297,75 @@ void SystemTrayIcon::ShowMenu(int, int) {
 
 const char *SystemTrayIcon::MenuLabel(int id, bool playing) {
   switch (id) {
-    case 1:
+    case kMenuPlayPause:
       return playing ? Translations::CStr("Pause") : Translations::CStr("Play");
-    case 2:
+    case kMenuStop:
       return Translations::CStr("Stop");
-    case 3:
+    case kMenuNext:
       return Translations::CStr("Next");
-    case 4:
+    case kMenuPrevious:
       return Translations::CStr("Previous");
-    case 6:
+    case kMenuShowHide:
       return Translations::CStr("Show / Hide");
-    case 7:
+    case kMenuQuit:
       return Translations::CStr("Quit");
+    case kMenuMute:
+      return Translations::CStr("Mute");
+    case kMenuStopAfter:
+      return Translations::CStr("Stop after this track");
+    case kMenuLove:
+      return Translations::CStr("Love");
     default:
       return "";
   }
 }
 
 bool SystemTrayIcon::ActivateMenuId(int id, Signal<> *play_pause, Signal<> *stop, Signal<> *next, Signal<> *previous,
-                                   Signal<> *show_hide, Signal<> *quit) {
+                                   Signal<> *show_hide, Signal<> *quit, Signal<> *mute, Signal<> *stop_after, Signal<> *love) {
   switch (id) {
-    case 1:
+    case kMenuPlayPause:
       if (play_pause) {
         play_pause->Emit();
       }
       return true;
-    case 2:
+    case kMenuStop:
       if (stop) {
         stop->Emit();
       }
       return true;
-    case 3:
+    case kMenuNext:
       if (next) {
         next->Emit();
       }
       return true;
-    case 4:
+    case kMenuPrevious:
       if (previous) {
         previous->Emit();
       }
       return true;
-    case 6:
+    case kMenuShowHide:
       if (show_hide) {
         show_hide->Emit();
       }
       return true;
-    case 7:
+    case kMenuQuit:
       if (quit) {
         quit->Emit();
+      }
+      return true;
+    case kMenuMute:
+      if (mute) {
+        mute->Emit();
+      }
+      return true;
+    case kMenuStopAfter:
+      if (stop_after) {
+        stop_after->Emit();
+      }
+      return true;
+    case kMenuLove:
+      if (love) {
+        love->Emit();
       }
       return true;
     default:
@@ -362,11 +386,11 @@ GVariant *SystemTrayIcon::MenuLayout(int parent_id) const {
   g_variant_builder_add(&root_props, "{sv}", "children-display", g_variant_new_string("submenu"));
   GVariantBuilder children;
   g_variant_builder_init(&children, G_VARIANT_TYPE("av"));
-  const int ids[] = {1, 2, 3, 4, 5, 6, 7};
+  const std::vector<int> ids = RootMenuIds();
   for (int id : ids) {
     GVariantBuilder empty;
     g_variant_builder_init(&empty, G_VARIANT_TYPE("av"));
-    const char *type = id == 5 ? "separator" : "standard";
+    const char *type = IsSeparatorId(id) ? "separator" : "standard";
     GVariant *item = g_variant_new("(i@a{sv}av)", id, ItemProps(MenuLabel(id, playing_), type), &empty);
     g_variant_builder_add(&children, "v", item);
   }
@@ -529,7 +553,7 @@ void SystemTrayIcon::HandleMenuMethod(GDBusConnection *, const gchar *, const gc
     g_variant_get(parameters, "(i&s)", &id, &name);
     GVariant *value = g_variant_new_string(MenuLabel(id, self->playing_));
     if (g_strcmp0(name, "type") == 0) {
-      value = g_variant_new_string(id == 5 ? "separator" : "standard");
+      value = g_variant_new_string(IsSeparatorId(id) ? "separator" : "standard");
     } else if (g_strcmp0(name, "enabled") == 0 || g_strcmp0(name, "visible") == 0) {
       value = g_variant_new_boolean(TRUE);
     }
@@ -541,7 +565,8 @@ void SystemTrayIcon::HandleMenuMethod(GDBusConnection *, const gchar *, const gc
     const gchar *event_id = nullptr;
     g_variant_get(parameters, "(i&svu)", &id, &event_id, nullptr, nullptr);
     if (g_strcmp0(event_id, "clicked") == 0) {
-      ActivateMenuId(id, &self->PlayPause, &self->Stop, &self->Next, &self->Previous, &self->ShowHide, &self->Quit);
+      ActivateMenuId(id, &self->PlayPause, &self->Stop, &self->Next, &self->Previous, &self->ShowHide, &self->Quit, &self->Mute,
+                     &self->StopAfter, &self->Love);
     }
     g_dbus_method_invocation_return_value(invocation, nullptr);
     return;
@@ -553,7 +578,8 @@ void SystemTrayIcon::HandleMenuMethod(GDBusConnection *, const gchar *, const gc
     const gchar *event_id = nullptr;
     while (g_variant_iter_next(iter, "(i&svu)", &id, &event_id, nullptr, nullptr)) {
       if (g_strcmp0(event_id, "clicked") == 0) {
-        ActivateMenuId(id, &self->PlayPause, &self->Stop, &self->Next, &self->Previous, &self->ShowHide, &self->Quit);
+        ActivateMenuId(id, &self->PlayPause, &self->Stop, &self->Next, &self->Previous, &self->ShowHide, &self->Quit, &self->Mute,
+                     &self->StopAfter, &self->Love);
       }
     }
     g_variant_iter_free(iter);

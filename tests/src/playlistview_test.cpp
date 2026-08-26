@@ -5,6 +5,7 @@
 #include "playlist/playlistlistsortfiltermodel.h"
 #include "playlist/playlistsaveoptionsdialog.h"
 #include "playlist/songloaderinserter.h"
+#include "playlist/playlistratingclick.h"
 #include "widgets/ratingpainter.h"
 
 #include <gtest/gtest.h>
@@ -138,6 +139,20 @@ TEST(RatingPainter, MapsPositionAndStars) {
   EXPECT_EQ(3, RatingPainter::StarCount(0.6f));
   EXPECT_TRUE(RatingPainter::Stars(-1.0f).empty());
   EXPECT_EQ("★★★★★", RatingPainter::Stars(1.0f));
+}
+
+TEST(PlaylistRatingClick, HonorsLockAndMapsStars) {
+  EXPECT_TRUE(PlaylistRatingClick::IsRatingColumn(PlaylistColumn::Rating));
+  EXPECT_FALSE(PlaylistRatingClick::IsRatingColumn(PlaylistColumn::Title));
+  EXPECT_TRUE(PlaylistRatingClick::CanApply(false));
+  EXPECT_FALSE(PlaylistRatingClick::CanApply(true));
+  EXPECT_FLOAT_EQ(1.0f, PlaylistRatingClick::RatingFromClick(100, 100));
+  float rating = -1.0f;
+  EXPECT_TRUE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Rating, false, 100, 100, &rating));
+  EXPECT_FLOAT_EQ(1.0f, rating);
+  EXPECT_FALSE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Rating, true, 100, 100, &rating));
+  EXPECT_FALSE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Title, false, 100, 100, &rating));
+  EXPECT_FALSE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Rating, false, 10, 0, &rating));
 }
 
 TEST(PlaylistListModel, ReloadAndLookup) {

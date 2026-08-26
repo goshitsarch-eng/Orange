@@ -8,6 +8,7 @@
 #include <gtk/gtk.h>
 
 #include <string>
+#include <vector>
 
 class SystemTrayIcon {
  public:
@@ -35,9 +36,24 @@ class SystemTrayIcon {
   unsigned menu_revision() const { return menu_revision_; }
 
   static constexpr const char *kMenuObjectPath = "/MenuBar";
+  static constexpr int kMenuPlayPause = 1;
+  static constexpr int kMenuStop = 2;
+  static constexpr int kMenuNext = 3;
+  static constexpr int kMenuPrevious = 4;
+  static constexpr int kMenuSeparator = 5;
+  static constexpr int kMenuShowHide = 6;
+  static constexpr int kMenuQuit = 7;
+  static constexpr int kMenuMute = 8;
+  static constexpr int kMenuStopAfter = 9;
+  static constexpr int kMenuLove = 10;
   static const char *MenuLabel(int id, bool playing);
+  static bool IsSeparatorId(int id) { return id == kMenuSeparator; }
+  static std::vector<int> RootMenuIds() {
+    return {kMenuPlayPause, kMenuStop, kMenuNext, kMenuPrevious, kMenuMute, kMenuStopAfter, kMenuLove, kMenuSeparator, kMenuShowHide,
+            kMenuQuit};
+  }
   static bool ActivateMenuId(int id, Signal<> *play_pause, Signal<> *stop, Signal<> *next, Signal<> *previous, Signal<> *show_hide,
-                             Signal<> *quit);
+                             Signal<> *quit, Signal<> *mute = nullptr, Signal<> *stop_after = nullptr, Signal<> *love = nullptr);
 
   Signal<> PlayPause;
   Signal<> Stop;
@@ -45,6 +61,9 @@ class SystemTrayIcon {
   Signal<> Previous;
   Signal<> ShowHide;
   Signal<> Quit;
+  Signal<> Mute;
+  Signal<> StopAfter;
+  Signal<> Love;
   Signal<int> VolumeScroll;
 
   static void OnBusAcquired(GDBusConnection *connection, const gchar *name, gpointer data);

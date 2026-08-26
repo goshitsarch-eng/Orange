@@ -115,6 +115,8 @@ class MainWindow {
   void RemoveUnavailable();
   void ShuffleCurrent();
   void RateSelected(int stars);
+  void RateRow(int row, float rating);
+  void RateRows(const std::vector<int> &rows, float rating);
   void ScrobbleCurrent();
   void UpdateScrobblerButtons();
   void CopySelectedUrl();

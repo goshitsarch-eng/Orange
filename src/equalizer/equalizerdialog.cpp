@@ -2,7 +2,6 @@
 
 #include "core/application.h"
 #include "core/player.h"
-#include "core/settings.h"
 #include "equalizer/equalizer.h"
 #include "translations/translations.h"
 
@@ -27,10 +26,17 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
                    equalizer);
   gtk_box_append(GTK_BOX(box), enable);
   GtkStringList *preset_names = gtk_string_list_new(nullptr);
+  guint selected_preset = 0;
+  guint preset_index = 0;
   for (const std::string &name : equalizer->Presets()) {
     gtk_string_list_append(preset_names, name.c_str());
+    if (name == equalizer->selected_preset()) {
+      selected_preset = preset_index;
+    }
+    ++preset_index;
   }
   GtkWidget *preset = gtk_drop_down_new(G_LIST_MODEL(preset_names), nullptr);
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(preset), selected_preset);
   g_signal_connect(preset, "notify::selected", G_CALLBACK(+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
                      auto *eq = static_cast<class Equalizer *>(data);
                      GtkStringObject *item = GTK_STRING_OBJECT(gtk_drop_down_get_selected_item(drop));
@@ -97,27 +103,36 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
     gtk_box_append(GTK_BOX(bands), col);
   }
   gtk_box_append(GTK_BOX(box), bands);
-  Settings settings;
-  settings.BeginGroup("Backend");
-  const int balance = Equalizer::ClampBalance(settings.IntValue("stereobalance", 0));
+  GtkWidget *enable_balance = gtk_check_button_new_with_label(Translations::CStr("Enable stereo balancer"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(enable_balance), equalizer->stereo_balancer_enabled());
   GtkWidget *balance_label = gtk_label_new(Translations::CStr("Stereo balance"));
   gtk_widget_set_halign(balance_label, GTK_ALIGN_START);
   GtkWidget *balance_scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, -100, 100, 1);
-  gtk_range_set_value(GTK_RANGE(balance_scale), balance);
+  gtk_range_set_value(GTK_RANGE(balance_scale), equalizer->stereo_balance());
   gtk_scale_add_mark(GTK_SCALE(balance_scale), 0, GTK_POS_BOTTOM, Translations::CStr("Center"));
   gtk_widget_set_tooltip_text(balance_scale, Translations::CStr("Left / Right"));
-  g_object_set_data(G_OBJECT(balance_scale), "equalizer-app", app);
-  g_signal_connect(balance_scale, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer) {
-                     const int value = Equalizer::ClampBalance(static_cast<int>(gtk_range_get_value(range)));
-                     Settings saved;
-                     saved.BeginGroup("Backend");
-                     saved.SetIntValue("stereobalance", value);
-                     saved.Sync();
-                     if (auto *application = static_cast<Application *>(g_object_get_data(G_OBJECT(range), "equalizer-app"))) {
-                       application->player()->engine()->SetStereoBalance(static_cast<float>(value) / 100.0f);
+  gtk_widget_set_sensitive(balance_scale, equalizer->stereo_balancer_enabled());
+  g_object_set_data(G_OBJECT(enable_balance), "scale", balance_scale);
+  g_object_set_data(G_OBJECT(enable_balance), "equalizer-app", app);
+  g_signal_connect(enable_balance, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *eq = static_cast<class Equalizer *>(data);
+                     eq->set_stereo_balancer_enabled(gtk_check_button_get_active(button));
+                     gtk_widget_set_sensitive(GTK_WIDGET(g_object_get_data(G_OBJECT(button), "scale")), eq->stereo_balancer_enabled());
+                     if (auto *application = static_cast<Application *>(g_object_get_data(G_OBJECT(button), "equalizer-app"))) {
+                       application->player()->engine()->SetStereoBalance(eq->EffectiveBalanceFraction());
                      }
                    }),
-                   nullptr);
+                   equalizer);
+  g_object_set_data(G_OBJECT(balance_scale), "equalizer-app", app);
+  g_signal_connect(balance_scale, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer data) {
+                     auto *eq = static_cast<class Equalizer *>(data);
+                     eq->set_stereo_balance(static_cast<int>(gtk_range_get_value(range)));
+                     if (auto *application = static_cast<Application *>(g_object_get_data(G_OBJECT(range), "equalizer-app"))) {
+                       application->player()->engine()->SetStereoBalance(eq->EffectiveBalanceFraction());
+                     }
+                   }),
+                   equalizer);
+  gtk_box_append(GTK_BOX(box), enable_balance);
   gtk_box_append(GTK_BOX(box), balance_label);
   gtk_box_append(GTK_BOX(box), balance_scale);
   adw_dialog_set_child(dialog, box);

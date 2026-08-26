@@ -4,6 +4,7 @@
 #include "core/settings.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistcolumnlayout.h"
+#include "playlist/playlistratingclick.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistlook.h"
 #include "utilities/strutils.h"
@@ -63,6 +64,8 @@ PlaylistView::PlaylistView() {
 void PlaylistView::SetDropUrlsCallback(DropUrlsCallback callback) { drop_urls_ = std::move(callback); }
 
 void PlaylistView::SetReorderCallback(ReorderCallback callback) { reorder_ = std::move(callback); }
+
+void PlaylistView::SetRateCallback(RateCallback callback) { rate_ = std::move(callback); }
 
 int PlaylistView::RowAtY(double y) const {
   if (!grid_) {
@@ -183,6 +186,8 @@ void PlaylistView::SetEditRequestCallback(EditRequestCallback callback) { edit_r
 void PlaylistView::SetEditCommitCallback(EditCommitCallback callback) { edit_commit_ = std::move(callback); }
 
 void PlaylistView::RecordClickedColumn(GtkWidget *row, double x) {
+  last_click_cell_x_ = 0;
+  last_click_cell_width_ = 0;
   for (GtkWidget *child = gtk_widget_get_first_child(row); child; child = gtk_widget_get_next_sibling(child)) {
     const int stored = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "column"));
     if (stored <= 0) {
@@ -194,6 +199,8 @@ void PlaylistView::RecordClickedColumn(GtkWidget *row, double x) {
     }
     if (x >= bounds.origin.x && x < bounds.origin.x + bounds.size.width) {
       last_clicked_column_ = static_cast<PlaylistColumn>(stored - 1);
+      last_click_cell_x_ = x - bounds.origin.x;
+      last_click_cell_width_ = bounds.size.width;
       return;
     }
   }
@@ -284,7 +291,16 @@ void PlaylistView::Refresh(Playlist *playlist) {
                        if (self->select_) {
                          self->select_(index, (mods & GDK_CONTROL_MASK) != 0);
                        }
-                       if (n_press >= 2 && self->activate_) {
+                       bool rated = false;
+                       float rating = -1.0f;
+                       if (self->rate_ &&
+                           PlaylistRatingClick::ShouldRate(self->last_clicked_column_, PlaylistColumnLayout::RatingLocked(),
+                                                           static_cast<int>(self->last_click_cell_x_),
+                                                           static_cast<int>(self->last_click_cell_width_), &rating)) {
+                         self->rate_(index, rating);
+                         rated = true;
+                       }
+                       if (!rated && n_press >= 2 && self->activate_) {
                          self->activate_(index);
                        }
                      }),
