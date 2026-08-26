@@ -3,6 +3,8 @@
 #include "config.h"
 #include "core/logging.h"
 #include "core/standardpaths.h"
+#include "device/gpoddevice.h"
+#include "device/gpodloader.h"
 #include "utilities/fileutils.h"
 #ifdef HAVE_GIO
 #include <gio/gio.h>
@@ -195,14 +197,19 @@ SongList DeviceManager::Songs(const std::string &device_id) const {
   if (device->backend == "mtp") {
     return SongsFromMtp(*device);
   }
-  std::string root = device->mount_path;
   if (device->backend == "gpod") {
+    SongList songs = GPodLoader::LoadSongs(device->mount_path);
+    if (!songs.empty()) {
+      return songs;
+    }
+    std::string root = device->mount_path;
     const std::string music = FileUtils::Join(root, "iPod_Control/Music");
     if (FileUtils::IsDirectory(music)) {
       root = music;
     }
+    return SongsFromDirectory(root);
   }
-  return SongsFromDirectory(root);
+  return SongsFromDirectory(device->mount_path);
 }
 
 SongList DeviceManager::SongsFromCdda() const {
@@ -428,8 +435,13 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
     LogInfo("Device %s has no mount path", device_id.c_str());
     return false;
   }
+#ifdef HAVE_GPOD
+  if (target.backend == "gpod") {
+    return GPodDevice::CopySongs(target.mount_path, songs);
+  }
+#endif
 #ifdef HAVE_GIO
-  const std::string music = FileUtils::Join(target.mount_path, target.backend == "gpod" ? "iPod_Control/Music" : "Music");
+  const std::string music = FileUtils::Join(target.mount_path, "Music");
   g_mkdir_with_parents(music.c_str(), 0755);
   int copied = 0;
   for (const Song &song : songs) {
@@ -437,15 +449,7 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
     if (src.empty() || !FileUtils::Exists(src)) {
       continue;
     }
-    std::string dest_dir = music;
-    if (target.backend == "gpod") {
-      const size_t bucket = std::hash<std::string>{}(FileUtils::BaseName(src)) % 20;
-      char folder[8];
-      g_snprintf(folder, sizeof(folder), "F%02zu", bucket);
-      dest_dir = FileUtils::Join(music, folder);
-      g_mkdir_with_parents(dest_dir.c_str(), 0755);
-    }
-    const std::string dest = FileUtils::Join(dest_dir, FileUtils::BaseName(src));
+    const std::string dest = FileUtils::Join(music, FileUtils::BaseName(src));
     if (FileUtils::CopyFile(src, dest)) {
       ++copied;
     }

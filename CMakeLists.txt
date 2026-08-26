@@ -185,6 +185,8 @@ set(STRAWBERRY_SOURCES
   src/streaming/streamingservices.cpp
   src/radios/radioservices.cpp
   src/device/devicemanager.cpp
+  src/device/gpodloader.cpp
+  src/device/gpoddevice.cpp
   src/equalizer/equalizer.cpp
   src/analyzer/analyzer.cpp
   src/moodbar/moodbar.cpp
@@ -280,6 +282,7 @@ if(GTest_FOUND)
     tests/src/smartplaylist_test.cpp
     tests/src/filterparser_test.cpp
     tests/src/lyrics_test.cpp
+    tests/src/gpod_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
     tests/src/jsonutils_test.cpp
@@ -296,6 +299,8 @@ if(GTest_FOUND)
     src/utilities/jsonutils.cpp
     src/utilities/audioanalysis.cpp
     src/device/devicemanager.cpp
+    src/device/gpodloader.cpp
+    src/device/gpoddevice.cpp
     src/playlistparsers/playlistparser.cpp
     src/smartplaylists/smartplaylist.cpp
     src/filterparser/filterparser.cpp
@@ -328,6 +333,9 @@ if(GTest_FOUND)
   )
   if(HAVE_MTP)
     target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBMTP)
+  endif()
+  if(HAVE_GPOD)
+    target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBGPOD)
   endif()
   if(HAVE_AUDIOCD)
     target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBCDIO)
