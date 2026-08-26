@@ -9,7 +9,7 @@ class Application;
 
 class SettingsDialog {
  public:
-  static void Show(GtkWindow *parent, Application *app, const std::function<void()> &closed = {});
+  static void Show(GtkWindow *parent, Application *app, const std::function<void()> &closed = {}, const char *page_name = nullptr);
 };
 
 #endif

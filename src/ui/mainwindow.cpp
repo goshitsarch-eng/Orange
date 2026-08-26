@@ -62,6 +62,7 @@
 #include "transcoder/transcodedialog.h"
 #include "translations/translations.h"
 #include "ui/dialogs.h"
+#include "settings/settingspages.h"
 #include "ui/settingsdialog.h"
 #include "filterparser/filterparser.h"
 #include "utilities/filefilters.h"
@@ -950,7 +951,8 @@ void MainWindow::BuildSidebar() {
     auto view = std::make_unique<StreamingTabsView>(service, app_->database());
     view->SetActivateCallback(activate_stream);
     view->SetMenuCallback([this](const SongList &songs) { ShowStreamingMenu(songs); });
-    view->SetConfigureCallback([this]() { OpenSettings(); });
+    const char *page = SettingsPages::ForService(service->name());
+    view->SetConfigureCallback([this, page]() { OpenSettings(page); });
     gtk_stack_add_titled(GTK_STACK(streaming_stack_), view->widget(), service->name().c_str(), service->name().c_str());
     streaming_views_.push_back(std::move(view));
   }
@@ -1694,7 +1696,7 @@ void MainWindow::UpdatePlaybackButtons() {
   gtk_button_set_icon_name(GTK_BUTTON(play_button_), playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic");
 }
 
-void MainWindow::OpenSettings() {
+void MainWindow::OpenSettings(const char *page_name) {
   SettingsDialog::Show(GTK_WINDOW(window_), app_, [this]() {
     app_->scrobbler()->ReloadSettings();
     app_->shortcuts()->ReloadSettings();
@@ -1714,7 +1716,7 @@ void MainWindow::OpenSettings() {
     ApplyAnalyzer();
     app_->moodbar()->Load(app_->player()->current_song());
     app_->waveform()->Load(app_->player()->current_song());
-  });
+  }, page_name);
 }
 
 void MainWindow::OpenAbout() { AboutDialog::Show(GTK_WINDOW(window_)); }

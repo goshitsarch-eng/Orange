@@ -18,6 +18,9 @@ AdwPreferencesPage *MakePage(const char *name, const char *icon) {
   AdwPreferencesPage *page = ADW_PREFERENCES_PAGE(adw_preferences_page_new());
   adw_preferences_page_set_title(page, Translations::CStr(name));
   adw_preferences_page_set_icon_name(page, icon);
+  if (name && name[0] != '\0') {
+    adw_preferences_page_set_name(page, name);
+  }
   return page;
 }
 

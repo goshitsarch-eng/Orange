@@ -28,7 +28,7 @@
 
 #include <adwaita.h>
 
-void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::function<void()> &closed) {
+void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::function<void()> &closed, const char *page_name) {
   AdwPreferencesDialog *dialog = ADW_PREFERENCES_DIALOG(adw_preferences_dialog_new());
   adw_dialog_set_title(ADW_DIALOG(dialog), Translations::CStr("Preferences"));
   auto *settings = new Settings();
@@ -63,6 +63,10 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::functi
   adw_preferences_dialog_add(dialog, SpotifySettingsPage::Create(settings, app));
 #endif
   adw_preferences_dialog_add(dialog, RadioSettingsPage::Create(settings, app));
+
+  if (page_name && page_name[0] != '\0') {
+    adw_preferences_dialog_set_visible_page_name(dialog, page_name);
+  }
 
   g_object_set_data_full(G_OBJECT(dialog), "settings", settings, [](gpointer p) { delete static_cast<Settings *>(p); });
   g_object_set_data_full(G_OBJECT(dialog), "closed", on_closed, [](gpointer p) { delete static_cast<std::function<void()> *>(p); });

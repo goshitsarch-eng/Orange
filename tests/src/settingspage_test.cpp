@@ -20,6 +20,7 @@
 #include "constants/transcodersettings.h"
 #include "constants/waveformsettings.h"
 #include "settings/settingscontrols.h"
+#include "settings/settingspages.h"
 #include "streaming/streamingchoices.h"
 
 #include <gtest/gtest.h>
@@ -132,6 +133,24 @@ TEST(AnalyzerSettings, KeysDefaultsAndTypes) {
   EXPECT_EQ("Bar", types.front());
   EXPECT_EQ("Block", types.back());
   EXPECT_EQ(8u, types.size());
+}
+
+TEST(SettingsPages, ServicePageNames) {
+  EXPECT_STREQ("Tidal", SettingsPages::ForService("Tidal"));
+  EXPECT_STREQ("Qobuz", SettingsPages::ForService("Qobuz"));
+  EXPECT_STREQ("Spotify", SettingsPages::ForService("Spotify"));
+  EXPECT_STREQ("Subsonic", SettingsPages::ForService("Subsonic"));
+  EXPECT_EQ(nullptr, SettingsPages::ForService("Unknown"));
+  EXPECT_STREQ("Tidal", SettingsPages::ForSource(Song::Source::Tidal));
+  EXPECT_STREQ("Qobuz", SettingsPages::ForSource(Song::Source::Qobuz));
+  EXPECT_STREQ("Spotify", SettingsPages::ForSource(Song::Source::Spotify));
+  EXPECT_STREQ("Subsonic", SettingsPages::ForSource(Song::Source::Subsonic));
+  EXPECT_STREQ("Collection", SettingsPages::ForSource(Song::Source::Collection));
+  EXPECT_STREQ("Radio", SettingsPages::ForSource(Song::Source::RadioBrowser));
+  EXPECT_EQ(nullptr, SettingsPages::ForSource(Song::Source::LocalFile));
+  EXPECT_TRUE(SettingsPages::CanOpenAt(SettingsPages::Tidal()));
+  EXPECT_FALSE(SettingsPages::CanOpenAt(nullptr));
+  EXPECT_FALSE(SettingsPages::CanOpenAt(""));
 }
 
 TEST(StreamingChoices, QualityAndAuthLabels) {

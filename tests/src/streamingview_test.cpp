@@ -376,6 +376,8 @@ TEST(StreamingSearchOpts, FetchAlbumsRemasteredAndExplicit) {
 TEST(StreamingSearchOpts, DelayLimitsAndConfigure) {
   using T = StreamingService::SearchType;
   EXPECT_STREQ("Configure…", StreamingSearchOpts::ConfigureLabel());
+  EXPECT_EQ("Configure Tidal…", StreamingSearchOpts::ConfigureServiceLabel("Tidal"));
+  EXPECT_EQ("Configure…", StreamingSearchOpts::ConfigureServiceLabel({}));
   EXPECT_EQ(1500, StreamingSearchOpts::kDefaultDelayMs);
   EXPECT_EQ(4, StreamingSearchOpts::DefaultLimitFor(T::Artists));
   EXPECT_EQ(10, StreamingSearchOpts::DefaultLimitFor(T::Albums));

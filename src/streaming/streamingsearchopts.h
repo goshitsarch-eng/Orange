@@ -31,6 +31,13 @@ constexpr bool kDefaultAlbumExplicit = false;
 
 inline const char *ConfigureLabel() { return "Configure…"; }
 
+inline std::string ConfigureServiceLabel(const std::string &service) {
+  if (service.empty()) {
+    return ConfigureLabel();
+  }
+  return std::string("Configure ") + service + "…";
+}
+
 inline bool HasSearchLimits(const std::string &group) {
   return group == "Tidal" || group == "Qobuz" || group == "Spotify";
 }

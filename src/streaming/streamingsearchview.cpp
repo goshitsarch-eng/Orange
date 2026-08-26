@@ -68,7 +68,8 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   gtk_box_append(GTK_BOX(types), group_button_);
   BuildGroupMenu();
   configure_button_ = gtk_button_new_from_icon_name("emblem-system-symbolic");
-  gtk_widget_set_tooltip_text(configure_button_, Translations::CStr(StreamingSearchOpts::ConfigureLabel()));
+  const std::string configure_tip = StreamingSearchOpts::ConfigureServiceLabel(service_ ? service_->name() : std::string());
+  gtk_widget_set_tooltip_text(configure_button_, Translations::CStr(configure_tip.c_str()));
   gtk_box_append(GTK_BOX(types), configure_button_);
   g_signal_connect(configure_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<StreamingSearchView *>(data);

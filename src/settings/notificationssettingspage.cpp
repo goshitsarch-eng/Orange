@@ -11,7 +11,7 @@
 
 AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(OSDSettings::kSettingsGroup);
-  AdwPreferencesPage *page = SettingsPage::MakePage(Translations::CStr("Notifications"), "preferences-system-notifications-symbolic");
+  AdwPreferencesPage *page = SettingsPage::MakePage("Notifications", "preferences-system-notifications-symbolic");
   AdwPreferencesGroup *osd = SettingsPage::AddGroup(page, Translations::CStr("On-screen display"));
   const std::string type_id = std::to_string(settings->IntValue(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType)));
   SettingsPage::AddCombo(osd, settings, OSDSettings::kType, Translations::CStr("Notification type"),

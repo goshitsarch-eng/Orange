@@ -61,7 +61,7 @@ class MainWindow {
   void UpdateNowPlaying();
   void UpdatePlaybackButtons();
   void UpdateCover(const std::vector<unsigned char> &data);
-  void OpenSettings();
+  void OpenSettings(const char *page_name = nullptr);
   void OpenAbout();
   void AddFiles();
   void AddCollectionFolder();
