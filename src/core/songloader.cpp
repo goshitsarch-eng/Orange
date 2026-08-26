@@ -2,6 +2,7 @@
 
 #include "collection/collectionbackend.h"
 #include "core/urlhandlers.h"
+#include "device/cddasongloader.h"
 #include "playlistparsers/playlistparser.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
@@ -83,8 +84,14 @@ void SongLoader::LoadMetadataBlocking() {
 }
 
 SongLoader::Result SongLoader::LoadAudioCD() {
-  errors_.push_back("Audio CD loading is handled by the device manager");
-  return Result::Error;
+  const SongList songs = CddaSongLoader().LoadDevice({});
+  if (songs.empty()) {
+    errors_.push_back("No audio CD found");
+    return Result::Error;
+  }
+  songs_.insert(songs_.end(), songs.begin(), songs.end());
+  playlist_name_ = "Audio CD";
+  return Result::Success;
 }
 
 SongLoader::Result SongLoader::LoadLocal(const std::string &path) {

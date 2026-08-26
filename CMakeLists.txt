@@ -738,6 +738,7 @@ if(GTest_FOUND)
     tests/src/fileview_test.cpp
     tests/src/scrobbler_test.cpp
     tests/src/playlist_test.cpp
+    tests/src/playlistmanager_test.cpp
     tests/src/settings_test.cpp
     tests/src/settingspage_test.cpp
     tests/src/jsonutils_test.cpp
@@ -933,6 +934,9 @@ if(GTest_FOUND)
     src/tagreader/tagreaderresult.cpp
     src/tagreader/tagreaderclient.cpp
     src/playlist/playlist.cpp
+    src/playlist/playlistmanagerinterface.cpp
+    src/playlist/playlistmanager.cpp
+    src/playlist/playlistbackend.cpp
     src/playlist/playlistitem.cpp
     src/playlist/songplaylistitem.cpp
     src/playlist/streamplaylistitem.cpp

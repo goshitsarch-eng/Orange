@@ -62,10 +62,14 @@ class MainWindow {
   void OpenAbout();
   void AddFiles();
   void AddCollectionFolder();
+  void AddCdTracks();
   void LoadPlaylistFile();
   void SavePlaylistFile();
   void NewPlaylist();
   void ClearPlaylist();
+  void CloseCurrentPlaylist();
+  void DeleteCurrentPlaylist();
+  void RenameCurrentPlaylist();
   void UndoPlaylist();
   void RedoPlaylist();
   void CycleRepeat();
@@ -77,7 +81,22 @@ class MainWindow {
   void ShowPlaylistMenu(double x, double y);
   void SelectPlaylistRow(int index, bool add);
   std::vector<int> SelectedPlaylistRows() const;
+  SongList SelectedSongs() const;
   void SortPlaylistBy(PlaylistColumn column);
+  void RescanCollection(bool full);
+  void StopAfterCurrent();
+  void QueuePlayNext();
+  void ShowInCollection();
+  void OpenSelectedInFileManager();
+  void CopySelectedToCollection(bool move);
+  void AddSelectedToTranscoder();
+  void RenumberTracks();
+  void RemoveDuplicates();
+  void RemoveUnavailable();
+  void ShuffleCurrent();
+  void RateSelected(int stars);
+  void CopySelectedUrl();
+  void ShowToast(const std::string &text);
 
   static void OnPlayPause(GtkButton *button, gpointer data);
   static void OnStop(GtkButton *button, gpointer data);

@@ -1,5 +1,7 @@
 #include "playlist/playlist.h"
 
+#include "utilities/fileutils.h"
+
 #include <algorithm>
 #include <numeric>
 #include <random>
@@ -135,6 +137,55 @@ void Playlist::Shuffle() {
   std::random_device rd;
   std::mt19937 gen(rd());
   std::shuffle(songs_.begin(), songs_.end(), gen);
+  Changed.Emit();
+}
+
+void Playlist::RemoveDuplicates() {
+  PushUndo();
+  SongList unique;
+  for (const Song &song : songs_) {
+    const bool exists = std::any_of(unique.begin(), unique.end(), [&](const Song &other) {
+      return !song.url().empty() && other.url() == song.url();
+    });
+    if (!exists) {
+      unique.push_back(song);
+    }
+  }
+  songs_ = std::move(unique);
+  if (current_row_ >= static_cast<int>(songs_.size())) {
+    current_row_ = songs_.empty() ? -1 : static_cast<int>(songs_.size()) - 1;
+  }
+  Changed.Emit();
+}
+
+void Playlist::RemoveUnavailable() {
+  PushUndo();
+  songs_.erase(std::remove_if(songs_.begin(), songs_.end(),
+                              [](const Song &song) {
+                                const std::string path = FileUtils::PathFromUri(song.url());
+                                return !path.empty() && !FileUtils::Exists(path);
+                              }),
+               songs_.end());
+  if (current_row_ >= static_cast<int>(songs_.size())) {
+    current_row_ = songs_.empty() ? -1 : static_cast<int>(songs_.size()) - 1;
+  }
+  Changed.Emit();
+}
+
+void Playlist::RenumberTracks() {
+  PushUndo();
+  for (size_t i = 0; i < songs_.size(); ++i) {
+    songs_[i].set_track(static_cast<int>(i) + 1);
+  }
+  Changed.Emit();
+}
+
+void Playlist::RateCurrentSong(float rating) {
+  if (current_row_ < 0 || current_row_ >= static_cast<int>(songs_.size())) {
+    return;
+  }
+  PushUndo();
+  songs_[static_cast<size_t>(current_row_)].set_rating(rating);
   Changed.Emit();
 }
 

@@ -7,7 +7,7 @@
 
 #include <adwaita.h>
 
-void TranscodeDialog::Show(GtkWindow *parent, Application *app) {
+void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, "Transcode");
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
@@ -37,6 +37,7 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app) {
   g_object_set_data(G_OBJECT(start), "dest", dest);
   g_object_set_data(G_OBJECT(start), "log", log);
   g_object_set_data(G_OBJECT(start), "quality", quality);
+  g_object_set_data_full(G_OBJECT(start), "songs", new SongList(songs), [](gpointer data) { delete static_cast<SongList *>(data); });
   g_object_set_data(G_OBJECT(options), "formats", formats);
   g_object_set_data(G_OBJECT(options), "quality", quality);
   g_signal_connect(options, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
@@ -59,14 +60,21 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app) {
                      application->transcoder()->Cancel();
                      application->transcoder()->set_quality(static_cast<int>(gtk_spin_button_get_value(quality_w)));
                      int count = 0;
-                     if (application->playlist_manager()->active()) {
-                       for (const Song &song : application->playlist_manager()->active()->songs()) {
-                         const std::string name = FileUtils::BaseName(FileUtils::PathFromUri(song.url()));
-                         const auto dot = name.rfind('.');
-                         const std::string stem = dot == std::string::npos ? name : name.substr(0, dot);
-                         application->transcoder()->AddJob(song, FileUtils::Join(dest_dir, stem + "." + Transcoder::Extension(format)), format);
-                         ++count;
-                       }
+                     const SongList *selected = static_cast<const SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
+                     SongList source;
+                     if (selected && !selected->empty()) {
+                       source = *selected;
+                     } else if (application->playlist_manager()->current()) {
+                       source = application->playlist_manager()->current()->songs();
+                     }
+                     for (const Song &song : source) {
+                       const std::string name = FileUtils::BaseName(FileUtils::PathFromUri(song.url()));
+                       const auto dot = name.rfind('.');
+                       const std::string stem = dot == std::string::npos ? name : name.substr(0, dot);
+                       application->transcoder()->AddJob(song, FileUtils::Join(dest_dir, stem + "." + Transcoder::Extension(format)), format);
+                       ++count;
+                     }
+                     if (count > 0) {
                        application->transcoder()->Start();
                      }
                      std::string text = std::to_string(count) + " jobs as " + Transcoder::FormatName(format);

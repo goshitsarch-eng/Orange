@@ -38,6 +38,10 @@ class Playlist {
   void Clear();
   void Move(int from, int to);
   void Shuffle();
+  void RemoveDuplicates();
+  void RemoveUnavailable();
+  void RenumberTracks();
+  void RateCurrentSong(float rating);
   void ReplaceSongs(const SongList &songs);
   void Undo();
   void Redo();

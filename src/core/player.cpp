@@ -59,7 +59,15 @@ void Player::SaveVolume() {
   settings.Sync();
 }
 
-void Player::Play() { PlayAt(playlist_manager_ ? playlist_manager_->current_row() : 0, false); }
+void Player::Play() {
+  if (playlist_manager_) {
+    playlist_manager_->SetActiveToCurrent();
+  }
+  PlayAt(playlist_manager_ ? playlist_manager_->current_row() : 0, false);
+  if (playlist_manager_) {
+    playlist_manager_->SetActivePlaying();
+  }
+}
 
 void Player::PlayPause() {
   switch (engine_->state()) {
@@ -75,12 +83,20 @@ void Player::PlayPause() {
   }
 }
 
-void Player::Pause() { engine_->Pause(); }
+void Player::Pause() {
+  engine_->Pause();
+  if (playlist_manager_) {
+    playlist_manager_->SetActivePaused();
+  }
+}
 
 void Player::Stop(bool stop_after) {
   stop_after_current_ = stop_after;
   if (!stop_after) {
     engine_->Stop();
+    if (playlist_manager_) {
+      playlist_manager_->SetActiveStopped();
+    }
     Stopped.Emit();
   }
 }

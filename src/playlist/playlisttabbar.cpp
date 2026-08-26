@@ -21,7 +21,7 @@ void PlaylistTabBar::Refresh(PlaylistManager *manager) {
   for (const auto &playlist : manager->playlists()) {
     GtkWidget *tab = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
     GtkWidget *button = gtk_toggle_button_new_with_label(playlist->name().c_str());
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), playlist.get() == manager->active());
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), playlist.get() == manager->current());
     g_object_set_data_full(G_OBJECT(button), "playlist-name", g_strdup(playlist->name().c_str()), g_free);
     g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
                        auto *self = static_cast<PlaylistTabBar *>(data);
