@@ -223,6 +223,42 @@ void AlbumCoverChoiceController::SearchCoverAutomatically(Song *song, GtkWidget 
   FetchCover(song, image, nullptr);
 }
 
+void AlbumCoverChoiceController::Perform(CoverChoiceMenu::Action action, GtkWindow *parent, Song *song, GtkWidget *image) {
+  switch (action) {
+    case CoverChoiceMenu::Action::Show:
+      if (song) {
+        ShowCover(parent, *song);
+      }
+      break;
+    case CoverChoiceMenu::Action::Search:
+      SearchForCover(parent);
+      break;
+    case CoverChoiceMenu::Action::File:
+      LoadCoverFromFile(parent, song, image);
+      break;
+    case CoverChoiceMenu::Action::Url:
+      LoadCoverFromURL(parent, song, image);
+      break;
+    case CoverChoiceMenu::Action::Save:
+      if (song) {
+        SaveCoverToFile(parent, *song);
+      }
+      break;
+    case CoverChoiceMenu::Action::Fetch:
+      FetchCover(song, image, nullptr);
+      break;
+    case CoverChoiceMenu::Action::Unset:
+      UnsetCover(song, image);
+      break;
+    case CoverChoiceMenu::Action::Clear:
+      ClearCover(song, image);
+      break;
+    case CoverChoiceMenu::Action::Delete:
+      DeleteCover(song, image);
+      break;
+  }
+}
+
 void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent, const std::function<Song()> &song_for_menu) {
   if (!widget) {
     return;
@@ -244,19 +280,13 @@ void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent
                      Song song = (*fn)();
                      auto *owned = new Song(song);
                      GMenu *menu = g_menu_new();
-                     g_menu_append(menu, Translations::CStr("Show cover"), "cover.show");
-                     g_menu_append(menu, Translations::CStr("Search for cover…"), "cover.search");
-                     g_menu_append(menu, Translations::CStr("Load from file…"), "cover.file");
-                     g_menu_append(menu, Translations::CStr("Load from URL…"), "cover.url");
-                     g_menu_append(menu, Translations::CStr("Save cover to file…"), "cover.save");
-                     g_menu_append(menu, Translations::CStr("Fetch cover"), "cover.fetch");
-                     g_menu_append(menu, Translations::CStr("Unset cover"), "cover.unset");
-                     g_menu_append(menu, Translations::CStr("Clear cover"), "cover.clear");
-                     g_menu_append(menu, Translations::CStr("Delete cover"), "cover.delete");
+                     for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
+                       g_menu_append(menu, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
+                     }
                      GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
                      gtk_widget_set_parent(popover, widget);
                      GSimpleActionGroup *group = g_simple_action_group_new();
-                     auto add = [&](const char *name, void (*fn_action)(AlbumCoverChoiceController *, GtkWindow *, Song *)) {
+                     auto add = [&](const char *name) {
                        GSimpleAction *action = g_simple_action_new(name, nullptr);
                        g_object_set_data(G_OBJECT(action), "song", owned);
                        g_object_set_data(G_OBJECT(action), "parent", parent);
@@ -265,32 +295,17 @@ void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent
                                           auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(act), "song"));
                                           auto *parent = GTK_WINDOW(g_object_get_data(G_OBJECT(act), "parent"));
                                           const char *name = g_action_get_name(G_ACTION(act));
-                                          if (!song || !name) {
+                                          if (!name) {
                                             return;
                                           }
-                                          if (g_strcmp0(name, "show") == 0) self->ShowCover(parent, *song);
-                                          else if (g_strcmp0(name, "search") == 0) self->SearchForCover(parent);
-                                          else if (g_strcmp0(name, "file") == 0) self->LoadCoverFromFile(parent, song, nullptr);
-                                          else if (g_strcmp0(name, "url") == 0) self->LoadCoverFromURL(parent, song, nullptr);
-                                          else if (g_strcmp0(name, "save") == 0) self->SaveCoverToFile(parent, *song);
-                                          else if (g_strcmp0(name, "fetch") == 0) self->FetchCover(song, nullptr, nullptr);
-                                          else if (g_strcmp0(name, "unset") == 0) self->UnsetCover(song, nullptr);
-                                          else if (g_strcmp0(name, "clear") == 0) self->ClearCover(song, nullptr);
-                                          else if (g_strcmp0(name, "delete") == 0) self->DeleteCover(song, nullptr);
+                                          self->Perform(CoverChoiceMenu::FromId(name), parent, song, nullptr);
                                         }),
                                         self);
                        g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
-                       (void)fn_action;
                      };
-                     add("show", nullptr);
-                     add("search", nullptr);
-                     add("file", nullptr);
-                     add("url", nullptr);
-                     add("save", nullptr);
-                     add("fetch", nullptr);
-                     add("unset", nullptr);
-                     add("clear", nullptr);
-                     add("delete", nullptr);
+                     for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
+                       add(item.id);
+                     }
                      gtk_widget_insert_action_group(popover, "cover", G_ACTION_GROUP(group));
                      g_object_set_data_full(G_OBJECT(popover), "song", owned, [](gpointer p) { delete static_cast<Song *>(p); });
                      gtk_popover_popup(GTK_POPOVER(popover));

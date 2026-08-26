@@ -2,6 +2,7 @@
 #define STRAWBERRY_ALBUMCOVERCHOICECONTROLLER_H
 
 #include "core/song.h"
+#include "covermanager/coverchoicemenu.h"
 #include "covermanager/coveroptions.h"
 #include "covermanager/coversearchstatistics.h"
 
@@ -29,6 +30,7 @@ class AlbumCoverChoiceController {
   void SearchCoverAutomatically(Song *song, GtkWidget *image = nullptr);
   void ShowStatistics(GtkWindow *parent);
   void AttachMenu(GtkWidget *widget, GtkWindow *parent, const std::function<Song()> &song_for_menu);
+  void Perform(CoverChoiceMenu::Action action, GtkWindow *parent, Song *song, GtkWidget *image = nullptr);
 
   const CoverSearchStatistics &statistics() const { return statistics_; }
 

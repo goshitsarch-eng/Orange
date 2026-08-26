@@ -1,3 +1,4 @@
+#include "covermanager/coverchoicemenu.h"
 #include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverexport.h"
 #include "covermanager/coverarttypes.h"
@@ -330,4 +331,21 @@ TEST(AlbumCoverBatch, ProgressAbortAndStatus) {
   EXPECT_TRUE(batch.cancelled());
   EXPECT_TRUE(batch.finished());
   EXPECT_NE(std::string::npos, batch.StatusText().find("cancelled"));
+}
+
+TEST(CoverChoiceMenu, ItemsAndWhenToShow) {
+  const auto items = CoverChoiceMenu::Items();
+  ASSERT_EQ(9u, items.size());
+  EXPECT_EQ(9, CoverChoiceMenu::ItemCount());
+  EXPECT_EQ("Show cover", items.front().label);
+  EXPECT_EQ("show", items.front().id);
+  EXPECT_EQ(CoverChoiceMenu::Action::Show, items.front().action);
+  EXPECT_EQ("Delete cover", items.back().label);
+  EXPECT_EQ(CoverChoiceMenu::Action::Search, CoverChoiceMenu::FromId("search"));
+  EXPECT_EQ(CoverChoiceMenu::Action::Fetch, CoverChoiceMenu::FromId("fetch"));
+  EXPECT_EQ(CoverChoiceMenu::Action::Show, CoverChoiceMenu::FromId("nope"));
+  EXPECT_EQ("cover.save", CoverChoiceMenu::ActionPath("cover", "save"));
+  EXPECT_TRUE(CoverChoiceMenu::HasCoverActions(true, true));
+  EXPECT_FALSE(CoverChoiceMenu::HasCoverActions(true, false));
+  EXPECT_FALSE(CoverChoiceMenu::HasCoverActions(false, true));
 }

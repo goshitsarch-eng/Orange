@@ -4,6 +4,7 @@
 #include "constants/filefilterconstants.h"
 #include "core/signal.h"
 #include "core/song.h"
+#include "covermanager/coverchoicemenu.h"
 
 #include <gtk/gtk.h>
 
@@ -16,6 +17,7 @@ class PlayingWidget {
  public:
   enum class Mode { SmallSongDetails = 0, LargeSongDetails = 1 };
   using DropCallback = std::function<void(const std::vector<unsigned char> &)>;
+  using CoverActionCallback = std::function<void(CoverChoiceMenu::Action)>;
 
   static constexpr int kSmallCover = 48;
   static constexpr int kLargeCover = 160;
@@ -43,6 +45,7 @@ class PlayingWidget {
   void SetAboveStatusBar(bool above);
   void SetFitCoverWidth(bool fit);
   void SetDropCallback(DropCallback callback);
+  void SetCoverActionCallback(CoverActionCallback callback);
   void Playing();
   void Stopped();
   void Error();
@@ -151,6 +154,7 @@ class PlayingWidget {
   GtkWidget *labels_ = nullptr;
   GtkWidget *spinner_ = nullptr;
   DropCallback drop_;
+  CoverActionCallback cover_action_;
   bool enabled_ = true;
   bool playing_ = false;
   bool active_ = false;

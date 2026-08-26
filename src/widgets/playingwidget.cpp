@@ -2,6 +2,7 @@
 
 #include "constants/playingwidgetsettings.h"
 #include "core/settings.h"
+#include "covermanager/coverchoicemenu.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
 #include "utilities/jsonutils.h"
@@ -95,6 +96,8 @@ void PlayingWidget::SetEnabled(bool enabled) {
 }
 
 void PlayingWidget::SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
+
+void PlayingWidget::SetCoverActionCallback(CoverActionCallback callback) { cover_action_ = std::move(callback); }
 
 void PlayingWidget::SetMode(Mode mode) {
   mode_ = mode;
@@ -360,6 +363,15 @@ void PlayingWidget::ShowMenu(double x, double y) {
   g_menu_append(menu, Translations::CStr("Large album cover"), "playing.large");
   g_menu_append(menu, Translations::CStr("Show above status bar"), "playing.above");
   g_menu_append(menu, Translations::CStr("Fit cover width"), "playing.fit");
+  const bool show_cover = CoverChoiceMenu::HasCoverActions(static_cast<bool>(cover_action_), song_.is_valid());
+  if (show_cover) {
+    GMenu *cover = g_menu_new();
+    for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
+      g_menu_append(cover, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
+    }
+    g_menu_append_section(menu, Translations::CStr("Cover"), G_MENU_MODEL(cover));
+    g_object_unref(cover);
+  }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, widget_);
   GdkRectangle rect{static_cast<int>(x), static_cast<int>(y), 1, 1};
@@ -388,6 +400,23 @@ void PlayingWidget::ShowMenu(double x, double y) {
         }
       })));
   gtk_widget_insert_action_group(popover, "playing", G_ACTION_GROUP(group));
+  if (show_cover) {
+    GSimpleActionGroup *cover_group = g_simple_action_group_new();
+    for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
+      GSimpleAction *action = g_simple_action_new(item.id, nullptr);
+      g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer data) {
+                         auto *self = static_cast<PlayingWidget *>(data);
+                         if (self->cover_action_) {
+                           self->cover_action_(CoverChoiceMenu::FromId(g_action_get_name(G_ACTION(act))));
+                         }
+                       }),
+                       this);
+      g_action_map_add_action(G_ACTION_MAP(cover_group), G_ACTION(action));
+      g_object_unref(action);
+    }
+    gtk_widget_insert_action_group(popover, "cover", G_ACTION_GROUP(cover_group));
+    g_object_unref(cover_group);
+  }
   g_object_unref(group);
   g_object_unref(menu);
   gtk_popover_popup(GTK_POPOVER(popover));
