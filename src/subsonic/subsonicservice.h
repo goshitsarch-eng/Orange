@@ -35,6 +35,7 @@ class SubsonicService : public StreamingService {
   static std::string Md5Hex(const std::string &value);
   static std::string HexEncode(const std::string &value);
   static std::string RandomSalt(int length = 20);
+  SongList WithCoverUrls(SongList songs) const;
 
  private:
   NetworkAccessManager *network_ = nullptr;

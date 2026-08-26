@@ -129,13 +129,19 @@ void TidalService::Search(const std::string &query, SearchType type, SearchCallb
         AuthHeaders(), request_type,
         [this, type, guarded, gen](const SongList &songs) {
           const SongList cleaned = StreamingSearchOpts::Finish(songs, name());
+          auto deliver = [this, guarded, gen](const SongList &ready) {
+            DeliverWithCovers(network_, AuthHeaders(), ready, guarded,
+                              [this](const std::string &text) { SearchUpdateStatus.Emit(last_search_id_, text); },
+                              [this](int received, int total) { ReportSearchProgress(received, total); },
+                              [this, gen]() { return SearchRequestCurrent(gen); });
+          };
           if (!StreamingSearchOpts::ShouldFetchAlbums(name(), type)) {
-            guarded(cleaned);
+            deliver(cleaned);
             return;
           }
           const std::vector<std::string> ids = StreamingSearchOpts::UniqueAlbumIds(cleaned);
           if (ids.empty()) {
-            guarded(cleaned);
+            deliver(cleaned);
             return;
           }
           SearchUpdateStatus.Emit(last_search_id_, StreamingProgress::RetrievingSongsForAlbums(static_cast<int>(ids.size())));
@@ -150,8 +156,7 @@ void TidalService::Search(const std::string &query, SearchType type, SearchCallb
                     network_, [this, id](int offset, int page_limit) { return TidalRequest::AlbumSongsUrl(kApiUrl, id, country_code_, offset, page_limit); },
                     AuthHeaders(), TidalRequest::Type::SearchSongs, std::move(done));
               },
-              [this, guarded](const SongList &album_songs) { guarded(StreamingSearchOpts::Finish(album_songs, name())); },
-              [this, gen]() { return SearchRequestCurrent(gen); },
+              deliver, [this, gen]() { return SearchRequestCurrent(gen); },
               [this](int received, int total) { ReportSearchProgress(received, total); });
         },
         [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit,
@@ -169,7 +174,11 @@ void TidalService::GetArtists(SearchCallback callback) {
           return TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteArtists, {}, country_code_, user_id_, offset, limit);
         },
         AuthHeaders(), TidalRequest::Type::FavouriteArtists,
-        [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+        [this, guarded, gen](const SongList &songs) {
+          DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { ArtistsUpdateStatus.Emit(text); },
+                            [this](int received, int total) { ReportArtistsProgress(received, total); },
+                            [this, gen]() { return ArtistsRequestCurrent(gen); });
+        },
         [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); },
         StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyArtistsFailed(error); });
   });
@@ -185,7 +194,11 @@ void TidalService::GetAlbums(SearchCallback callback) {
           return TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteAlbums, {}, country_code_, user_id_, offset, limit);
         },
         AuthHeaders(), TidalRequest::Type::FavouriteAlbums,
-        [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+        [this, guarded, gen](const SongList &songs) {
+          DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { AlbumsUpdateStatus.Emit(text); },
+                            [this](int received, int total) { ReportAlbumsProgress(received, total); },
+                            [this, gen]() { return AlbumsRequestCurrent(gen); });
+        },
         [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); },
         StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyAlbumsFailed(error); });
   });
@@ -201,7 +214,11 @@ void TidalService::GetSongs(SearchCallback callback) {
           return TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteSongs, {}, country_code_, user_id_, offset, limit);
         },
         AuthHeaders(), TidalRequest::Type::FavouriteSongs,
-        [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+        [this, guarded, gen](const SongList &songs) {
+          DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { SongsUpdateStatus.Emit(text); },
+                            [this](int received, int total) { ReportSongsProgress(received, total); },
+                            [this, gen]() { return SongsRequestCurrent(gen); });
+        },
         [this](int received, int total) { ReportSongsProgress(received, total); }, [this, gen]() { return SongsRequestCurrent(gen); },
         StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifySongsFailed(error); });
   });
@@ -219,11 +236,7 @@ void TidalService::GetArtistAlbums(const Song &artist, SearchCallback callback) 
     TidalRequest::GetAll(network_,
                          [this, id](int offset, int limit) { return TidalRequest::ArtistAlbumsUrl(kApiUrl, id, country_code_, offset, limit); },
                          AuthHeaders(), TidalRequest::Type::SearchAlbums,
-                         [this, callback](const SongList &songs) {
-                           if (callback) {
-                             callback(StreamingSearchOpts::Finish(songs, name()));
-                           }
-                         });
+                         [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); });
   });
 }
 
@@ -239,11 +252,7 @@ void TidalService::GetAlbumSongs(const Song &album, SearchCallback callback) {
     TidalRequest::GetAll(network_,
                          [this, id](int offset, int limit) { return TidalRequest::AlbumSongsUrl(kApiUrl, id, country_code_, offset, limit); },
                          AuthHeaders(), TidalRequest::Type::SearchSongs,
-                         [this, callback](const SongList &songs) {
-                           if (callback) {
-                             callback(StreamingSearchOpts::Finish(songs, name()));
-                           }
-                         });
+                         [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); });
   });
 }
 
@@ -278,9 +287,11 @@ UrlHandler::LoadResult TidalService::Load(const std::string &url, AsyncCallback 
 
 void TidalService::GetFavorites(FavoriteType type, SearchCallback callback) {
   EnsureFreshToken([this, type, callback]() {
-    TidalFavoriteRequest::Get(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, callback,
-                              [this](int received, int total) { ReportSongsProgress(received, total); }, {},
-                              [this](const std::string &error) { NotifyFavoritesFailed(error); });
+    TidalFavoriteRequest::Get(
+        network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type,
+        [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); },
+        [this](int received, int total) { ReportSongsProgress(received, total); }, {},
+        [this](const std::string &error) { NotifyFavoritesFailed(error); });
   });
 }
 

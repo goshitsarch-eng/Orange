@@ -4,8 +4,10 @@
 #include "core/signal.h"
 #include "core/song.h"
 #include "core/urlhandler.h"
+#include "streaming/streamingpage.h"
 
 #include <functional>
+#include <map>
 #include <string>
 
 class NetworkAccessManager;
@@ -67,6 +69,9 @@ class StreamingService : public UrlHandler {
   void NotifyAlbumsFailed(const std::string &error);
   void NotifySongsFailed(const std::string &error);
   void NotifyFavoritesFailed(const std::string &error);
+  void DeliverWithCovers(NetworkAccessManager *network, const std::map<std::string, std::string> &headers, const SongList &songs,
+                         SearchCallback callback, std::function<void(const std::string &)> status = {},
+                         StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {});
   virtual void GetFavorites(FavoriteType type, SearchCallback callback);
   virtual void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
   virtual void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});

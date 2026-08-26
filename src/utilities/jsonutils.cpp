@@ -679,6 +679,10 @@ SongList ParseSubsonicSongs(const std::string &json) {
     song->set_bitrate(std::atoi(ObjectString(object, "bitRate").c_str()));
     song->set_filesize(std::strtoll(ObjectString(object, "size").c_str(), nullptr, 10));
     ApplyDurationSeconds(song, ObjectString(object, "duration"));
+    const std::string cover = ObjectString(object, "coverArt");
+    if (!cover.empty()) {
+      song->set_art_automatic(cover);
+    }
   });
   json_node_unref(root);
   return songs;
@@ -1042,6 +1046,10 @@ SongList ParseSubsonicAlbums(const std::string &json) {
     song->set_artist_id(ObjectString(object, "artistId"));
     song->set_url(id.empty() ? std::string() : "subsonic://album/" + id);
     song->set_year(std::atoi(ObjectString(object, "year").c_str()));
+    const std::string cover = ObjectString(object, "coverArt");
+    if (!cover.empty()) {
+      song->set_art_automatic(cover);
+    }
   });
   json_node_unref(root);
   return songs;

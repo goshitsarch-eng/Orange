@@ -4,6 +4,7 @@
 #include "core/settings.h"
 #include "subsonic/subsonicfavoriterequest.h"
 #include "subsonic/subsonicrequest.h"
+#include "streaming/streamingcoverdownload.h"
 #include "streaming/streamingsearchopts.h"
 #include "subsonic/subsonicurlhandler.h"
 #include "utilities/jsonutils.h"
@@ -72,6 +73,13 @@ std::string SubsonicService::CreateUrl(const std::string &server_url, const std:
   return url;
 }
 
+SongList SubsonicService::WithCoverUrls(SongList songs) const {
+  StreamingCoverDownload::ApplyCoverArtIds(songs, [this](const std::string &id) {
+    return CreateUrl(server_url_, username_, password_, "getCoverArt", {{"id", id}}, hex_auth_);
+  });
+  return songs;
+}
+
 void SubsonicService::ReloadSettings() {
   Settings settings;
   settings.BeginGroup(SubsonicSettings::kSettingsGroup);
@@ -114,8 +122,15 @@ void SubsonicService::Search(const std::string &query, SearchType type, SearchCa
         return CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(request_type),
                          SubsonicRequest::Params(request_type, query, offset, page_limit), hex_auth_);
       },
-      request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
-      [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit, [this](const std::string &error) { NotifySearchFailed(error); });
+      request_type,
+      [this, guarded, gen](const SongList &songs) {
+        DeliverWithCovers(network_, {}, WithCoverUrls(songs), guarded,
+                          [this](const std::string &text) { SearchUpdateStatus.Emit(last_search_id_, text); },
+                          [this](int received, int total) { ReportSearchProgress(received, total); },
+                          [this, gen]() { return SearchRequestCurrent(gen); });
+      },
+      [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit,
+      [this](const std::string &error) { NotifySearchFailed(error); });
 }
 
 void SubsonicService::GetArtists(SearchCallback callback) {
@@ -126,7 +141,8 @@ void SubsonicService::GetArtists(SearchCallback callback) {
   }
   SubsonicRequest::Get(network_, CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::ArtistsList),
                                            {}, hex_auth_),
-                       SubsonicRequest::Type::ArtistsList, std::move(guarded),
+                       SubsonicRequest::Type::ArtistsList,
+                       [this, guarded](const SongList &songs) { DeliverWithCovers(network_, {}, WithCoverUrls(songs), guarded); },
                        [this](const std::string &error) { NotifyArtistsFailed(error); });
 }
 
@@ -143,8 +159,14 @@ void SubsonicService::GetAlbums(SearchCallback callback) {
         return CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::AlbumList),
                          SubsonicRequest::Params(SubsonicRequest::Type::AlbumList, {}, offset, limit), hex_auth_);
       },
-      SubsonicRequest::Type::AlbumList, guarded, [this](int received, int total) { ReportAlbumsProgress(received, total); },
-      [this, gen]() { return AlbumsRequestCurrent(gen); }, StreamingPage::kDefaultLimit, 0,
+      SubsonicRequest::Type::AlbumList,
+      [this, guarded, gen](const SongList &songs) {
+        DeliverWithCovers(network_, {}, WithCoverUrls(songs), guarded, [this](const std::string &text) { AlbumsUpdateStatus.Emit(text); },
+                          [this](int received, int total) { ReportAlbumsProgress(received, total); },
+                          [this, gen]() { return AlbumsRequestCurrent(gen); });
+      },
+      [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); },
+      StreamingPage::kDefaultLimit, 0,
       [this](const std::string &error) { NotifyAlbumsFailed(error); });
 }
 
@@ -161,8 +183,14 @@ void SubsonicService::GetSongs(SearchCallback callback) {
         return CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::SearchSongs),
                          SubsonicRequest::Params(SubsonicRequest::Type::SearchSongs, ".", offset, limit), hex_auth_);
       },
-      SubsonicRequest::Type::SearchSongs, guarded, [this](int received, int total) { ReportSongsProgress(received, total); },
-      [this, gen]() { return SongsRequestCurrent(gen); }, StreamingPage::kDefaultLimit, 0,
+      SubsonicRequest::Type::SearchSongs,
+      [this, guarded, gen](const SongList &songs) {
+        DeliverWithCovers(network_, {}, WithCoverUrls(songs), guarded, [this](const std::string &text) { SongsUpdateStatus.Emit(text); },
+                          [this](int received, int total) { ReportSongsProgress(received, total); },
+                          [this, gen]() { return SongsRequestCurrent(gen); });
+      },
+      [this](int received, int total) { ReportSongsProgress(received, total); }, [this, gen]() { return SongsRequestCurrent(gen); },
+      StreamingPage::kDefaultLimit, 0,
       [this](const std::string &error) { NotifySongsFailed(error); });
 }
 
@@ -176,7 +204,8 @@ void SubsonicService::GetArtistAlbums(const Song &artist, SearchCallback callbac
   SubsonicRequest::Get(network_,
                        CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::ArtistAlbums),
                                  SubsonicRequest::ArtistAlbumsParams(artist.artist_id()), hex_auth_),
-                       SubsonicRequest::Type::ArtistAlbums, std::move(callback));
+                       SubsonicRequest::Type::ArtistAlbums,
+                       [this, callback](const SongList &songs) { DeliverWithCovers(network_, {}, WithCoverUrls(songs), callback); });
 }
 
 void SubsonicService::GetAlbumSongs(const Song &album, SearchCallback callback) {
@@ -189,7 +218,8 @@ void SubsonicService::GetAlbumSongs(const Song &album, SearchCallback callback) 
   SubsonicRequest::Get(network_,
                        CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::AlbumSongs),
                                  SubsonicRequest::AlbumSongsParams(album.album_id()), hex_auth_),
-                       SubsonicRequest::Type::AlbumSongs, std::move(callback));
+                       SubsonicRequest::Type::AlbumSongs,
+                       [this, callback](const SongList &songs) { DeliverWithCovers(network_, {}, WithCoverUrls(songs), callback); });
 }
 
 UrlHandler::LoadResult SubsonicService::Load(const std::string &url, AsyncCallback callback) {
@@ -218,8 +248,10 @@ void SubsonicService::GetFavorites(FavoriteType, SearchCallback callback) {
     }
     return;
   }
-  SubsonicFavoriteRequest::Get(network_, CreateUrl(server_url_, username_, password_, "getStarred2", {}, hex_auth_), std::move(callback),
-                               [this](const std::string &error) { NotifyFavoritesFailed(error); });
+  SubsonicFavoriteRequest::Get(
+      network_, CreateUrl(server_url_, username_, password_, "getStarred2", {}, hex_auth_),
+      [this, callback](const SongList &songs) { DeliverWithCovers(network_, {}, WithCoverUrls(songs), callback); },
+      [this](const std::string &error) { NotifyFavoritesFailed(error); });
 }
 
 void SubsonicService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {

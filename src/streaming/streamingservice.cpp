@@ -1,6 +1,7 @@
 #include "streaming/streamingservice.h"
 
 #include "streaming/streamingabort.h"
+#include "streaming/streamingcoverdownload.h"
 #include "streaming/streamingprogress.h"
 
 void StreamingService::Search(const std::string &query, SearchType type, SearchCallback callback) {
@@ -191,6 +192,13 @@ void StreamingService::NotifySongsFailed(const std::string &error) {
 }
 
 void StreamingService::NotifyFavoritesFailed(const std::string &error) { FavoritesFailed.Emit(error); }
+
+void StreamingService::DeliverWithCovers(NetworkAccessManager *network, const std::map<std::string, std::string> &headers,
+                                         const SongList &songs, SearchCallback callback, std::function<void(const std::string &)> status,
+                                         StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current) {
+  StreamingCoverDownload::AfterList(network, headers, name(), songs, std::move(callback), std::move(status), std::move(progress),
+                                    std::move(still_current));
+}
 
 StreamingService::SearchCallback StreamingService::GuardSearch(SearchCallback callback) {
   const int generation = BeginSearchRequest();

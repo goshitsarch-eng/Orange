@@ -10,6 +10,7 @@
 #include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchopts.h"
 #include "streaming/streamingsearchgroup.h"
+#include "utilities/fileutils.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "translations/translations.h"
 #include "utilities/jsonutils.h"
@@ -481,7 +482,19 @@ void StreamingSearchView::LoadCover(GtkWidget *image, const Song &song) {
     return;
   }
   const std::string url = StreamingCover::CoverUrl(song);
-  if (!StreamingCover::CanLoad(url) || !service_ || !service_->network()) {
+  if (!StreamingCover::CanLoad(url)) {
+    return;
+  }
+  if (StreamingCover::IsLocalUrl(url)) {
+    const std::string body = FileUtils::ReadFile(FileUtils::PathFromUri(url));
+    if (body.empty() || !JsonUtils::LooksLikeImage(body)) {
+      return;
+    }
+    cover_cache_[key] = body;
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(body.begin(), body.end()), StreamingCover::kArtHeight);
+    return;
+  }
+  if (!service_ || !service_->network()) {
     return;
   }
   const int gen = cover_gen_;

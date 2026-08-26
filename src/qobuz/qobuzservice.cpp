@@ -74,7 +74,13 @@ void QobuzService::Search(const std::string &query, SearchType type, SearchCallb
       [this, request_type, query](int offset, int page_limit) {
         return QobuzRequest::Url(kApiUrl, request_type, query, app_id_, user_auth_token_, offset, page_limit);
       },
-      AuthHeaders(), request_type, [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+      AuthHeaders(), request_type,
+      [this, guarded, gen](const SongList &songs) {
+        DeliverWithCovers(network_, AuthHeaders(), songs, guarded,
+                          [this](const std::string &text) { SearchUpdateStatus.Emit(last_search_id_, text); },
+                          [this](int received, int total) { ReportSearchProgress(received, total); },
+                          [this, gen]() { return SearchRequestCurrent(gen); });
+      },
       [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit,
       limit, [this](const std::string &error) { NotifySearchFailed(error); });
 }
@@ -88,7 +94,11 @@ void QobuzService::GetArtists(SearchCallback callback) {
         return QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteArtists, {}, app_id_, user_auth_token_, offset, limit);
       },
       AuthHeaders(), QobuzRequest::Type::FavouriteArtists,
-      [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+      [this, guarded, gen](const SongList &songs) {
+        DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { ArtistsUpdateStatus.Emit(text); },
+                          [this](int received, int total) { ReportArtistsProgress(received, total); },
+                          [this, gen]() { return ArtistsRequestCurrent(gen); });
+      },
       [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); },
       StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyArtistsFailed(error); });
 }
@@ -102,7 +112,11 @@ void QobuzService::GetAlbums(SearchCallback callback) {
         return QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteAlbums, {}, app_id_, user_auth_token_, offset, limit);
       },
       AuthHeaders(), QobuzRequest::Type::FavouriteAlbums,
-      [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+      [this, guarded, gen](const SongList &songs) {
+        DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { AlbumsUpdateStatus.Emit(text); },
+                          [this](int received, int total) { ReportAlbumsProgress(received, total); },
+                          [this, gen]() { return AlbumsRequestCurrent(gen); });
+      },
       [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); },
       StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyAlbumsFailed(error); });
 }
@@ -116,7 +130,11 @@ void QobuzService::GetSongs(SearchCallback callback) {
         return QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteSongs, {}, app_id_, user_auth_token_, offset, limit);
       },
       AuthHeaders(), QobuzRequest::Type::FavouriteSongs,
-      [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+      [this, guarded, gen](const SongList &songs) {
+        DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { SongsUpdateStatus.Emit(text); },
+                          [this](int received, int total) { ReportSongsProgress(received, total); },
+                          [this, gen]() { return SongsRequestCurrent(gen); });
+      },
       [this](int received, int total) { ReportSongsProgress(received, total); }, [this, gen]() { return SongsRequestCurrent(gen); },
       StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifySongsFailed(error); });
 }
@@ -129,11 +147,8 @@ void QobuzService::GetArtistAlbums(const Song &artist, SearchCallback callback) 
     return;
   }
   QobuzRequest::Get(network_, QobuzRequest::ArtistAlbumsUrl(kApiUrl, artist.artist_id(), app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::SearchAlbums, [this, callback](const SongList &songs) {
-                      if (callback) {
-                        callback(StreamingSearchOpts::Finish(songs, name()));
-                      }
-                    });
+                    QobuzRequest::Type::SearchAlbums,
+                    [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); });
 }
 
 void QobuzService::GetAlbumSongs(const Song &album, SearchCallback callback) {
@@ -144,11 +159,8 @@ void QobuzService::GetAlbumSongs(const Song &album, SearchCallback callback) {
     return;
   }
   QobuzRequest::Get(network_, QobuzRequest::AlbumSongsUrl(kApiUrl, album.album_id(), app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::SearchSongs, [this, callback](const SongList &songs) {
-                      if (callback) {
-                        callback(StreamingSearchOpts::Finish(songs, name()));
-                      }
-                    });
+                    QobuzRequest::Type::SearchSongs,
+                    [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); });
 }
 
 UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback callback) {
@@ -171,7 +183,8 @@ UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback 
 }
 
 void QobuzService::GetFavorites(FavoriteType type, SearchCallback callback) {
-  QobuzFavoriteRequest::Get(network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type, std::move(callback),
+  QobuzFavoriteRequest::Get(network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type,
+                            [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); },
                             [this](int received, int total) { ReportSongsProgress(received, total); }, {},
                             [this](const std::string &error) { NotifyFavoritesFailed(error); });
 }

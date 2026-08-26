@@ -24,7 +24,11 @@ inline bool IsHttpUrl(const std::string &url) {
   return StrUtils::StartsWith(url, "http://") || StrUtils::StartsWith(url, "https://");
 }
 
-inline bool CanLoad(const std::string &url) { return IsHttpUrl(url); }
+inline bool IsLocalUrl(const std::string &url) {
+  return StrUtils::StartsWith(url, "file://") || (!url.empty() && url.front() == '/');
+}
+
+inline bool CanLoad(const std::string &url) { return IsHttpUrl(url) || IsLocalUrl(url); }
 
 inline bool CanLoad(const Song &song) { return CanLoad(CoverUrl(song)); }
 

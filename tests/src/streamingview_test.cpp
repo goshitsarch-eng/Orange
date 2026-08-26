@@ -1,4 +1,5 @@
 #include "streaming/streamingabort.h"
+#include "streaming/streamingcoverdownload.h"
 #include "streaming/streamingpage.h"
 #include "streaming/streamingsearchopts.h"
 #include "streaming/streamingcover.h"
@@ -11,6 +12,8 @@
 #include "streaming/streamserviceplaylistitem.h"
 #include "streaming/streamingdrag.h"
 #include "streaming/streamsongmimedata.h"
+#include "core/settings.h"
+#include "utilities/fileutils.h"
 
 #include <gtest/gtest.h>
 
@@ -346,6 +349,54 @@ TEST(StreamingSearchOpts, DelayLimitsAndConfigure) {
   EXPECT_TRUE(StreamingPage::ReachedMax(10, 10));
   EXPECT_FALSE(StreamingPage::ReachedMax(9, 10));
   EXPECT_FALSE(StreamingPage::ReachedMax(10, 0));
+}
+
+TEST(StreamingCoverDownload, HelpersAndSettings) {
+  EXPECT_TRUE(StreamingCoverDownload::HasDownloadSetting("Tidal"));
+  EXPECT_TRUE(StreamingCoverDownload::HasDownloadSetting("Qobuz"));
+  EXPECT_TRUE(StreamingCoverDownload::HasDownloadSetting("Spotify"));
+  EXPECT_TRUE(StreamingCoverDownload::HasDownloadSetting("Subsonic"));
+  EXPECT_FALSE(StreamingCoverDownload::HasDownloadSetting("Radio"));
+  EXPECT_STREQ("Tidal", StreamingCoverDownload::SourceGroup(Song::Source::Tidal));
+  EXPECT_EQ("1280x1280.jpg", StreamingCoverDownload::FileNameFromUrl("https://resources.tidal.com/images/aa/1280x1280.jpg?token=1"));
+  EXPECT_EQ("42-cover.jpg", StreamingCoverDownload::CacheFilename("Tidal", "42", "https://example.com/cover.jpg"));
+  EXPECT_EQ("42", StreamingCoverDownload::CacheFilename("Spotify", "42", "https://example.com/img.png"));
+  EXPECT_TRUE(StreamingCoverDownload::CacheFilename("Tidal", "", "https://example.com/a.jpg").empty());
+  EXPECT_EQ("Receiving album cover for 1 album...", StreamingCoverDownload::Receiving(1));
+  EXPECT_EQ("Receiving album covers for 3 albums...", StreamingCoverDownload::Receiving(3));
+  EXPECT_TRUE(StreamingCoverDownload::IsCoverArtId("al-12"));
+  EXPECT_FALSE(StreamingCoverDownload::IsCoverArtId("https://example.com/a.jpg"));
+  EXPECT_FALSE(StreamingCoverDownload::IsCoverArtId("/tmp/a.jpg"));
+  EXPECT_TRUE(StreamingCover::IsLocalUrl("file:///tmp/a.jpg"));
+  EXPECT_TRUE(StreamingCover::IsLocalUrl("/tmp/a.jpg"));
+  EXPECT_TRUE(StreamingCover::CanLoad("/tmp/a.jpg"));
+  EXPECT_FALSE(StreamingCover::IsLocalUrl("https://example.com/a.jpg"));
+  Song song(Song::Source::Tidal);
+  song.set_album_id("42");
+  song.set_art_automatic("https://example.com/a.jpg");
+  EXPECT_TRUE(StreamingCoverDownload::NeedsDownload(song));
+  EXPECT_EQ(1u, StreamingCoverDownload::UniqueAlbums({song}).size());
+  EXPECT_TRUE(StreamingCoverDownload::ShouldDownload(true, {song}));
+  EXPECT_FALSE(StreamingCoverDownload::ShouldDownload(false, {song}));
+  song.set_art_automatic("/tmp/a.jpg");
+  EXPECT_FALSE(StreamingCoverDownload::NeedsDownload(song));
+  SongList songs = {song};
+  songs[0].set_art_automatic("https://example.com/a.jpg");
+  StreamingCoverDownload::ApplyLocalCover(songs, "42", "/tmp/cover.jpg");
+  EXPECT_EQ(FileUtils::UriFromPath("/tmp/cover.jpg"), songs[0].art_automatic());
+  Song sub(Song::Source::Subsonic);
+  sub.set_art_automatic("al-9");
+  SongList sub_songs = {sub};
+  StreamingCoverDownload::ApplyCoverArtIds(sub_songs, [](const std::string &id) { return "https://server/getCoverArt?id=" + id; });
+  EXPECT_EQ("https://server/getCoverArt?id=al-9", sub_songs[0].art_automatic());
+  Settings settings;
+  settings.BeginGroup("Tidal");
+  settings.SetBoolValue(StreamingCoverDownload::kDownloadAlbumCovers, false);
+  settings.Sync();
+  EXPECT_FALSE(StreamingCoverDownload::Enabled("Tidal"));
+  settings.SetBoolValue(StreamingCoverDownload::kDownloadAlbumCovers, true);
+  settings.Sync();
+  EXPECT_TRUE(StreamingCoverDownload::Enabled("Tidal"));
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {
