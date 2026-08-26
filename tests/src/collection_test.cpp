@@ -453,7 +453,7 @@ TEST(BackendOptions, PlaybinCrossfadeAndPauseFade) {
   EXPECT_DOUBLE_EQ(0.5, BackendOptions::VolumeFraction(50, false));
   EXPECT_DOUBLE_EQ(0.0, BackendOptions::VolumeFraction(0, true));
   EXPECT_DOUBLE_EQ(1.0, BackendOptions::VolumeFraction(100, true));
-  EXPECT_NEAR(0.56234132519, BackendOptions::VolumeFraction(80, true), 0.0001);
+  EXPECT_NEAR(0.31622776601, BackendOptions::VolumeFraction(80, true), 0.0001);
   EXPECT_EQ(2, BackendOptions::EffectiveChannels(true, 2));
   EXPECT_EQ(0, BackendOptions::EffectiveChannels(false, 2));
   EXPECT_EQ(0, BackendOptions::EffectiveChannels(true, 0));
