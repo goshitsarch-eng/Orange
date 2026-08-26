@@ -28,6 +28,36 @@ TEST(Song, FiletypeAndAudio) {
   EXPECT_EQ("Collection", Song::SourceToString(Song::Source::Collection));
 }
 
+TEST(Song, ExoticFiletypesMatchQt) {
+  EXPECT_EQ(Song::FileType::OggSpeex, Song::FiletypeByExtension("spx"));
+  EXPECT_EQ(Song::FileType::OggSpeex, Song::FiletypeByExtension("speex"));
+  EXPECT_EQ(Song::FileType::OggSpeex, Song::FiletypeByMimeType("audio/x-speex"));
+  EXPECT_EQ(Song::FileType::TrueAudio, Song::FiletypeByExtension("tta"));
+  EXPECT_EQ(Song::FileType::DSF, Song::FiletypeByExtension("dsf"));
+  EXPECT_EQ(Song::FileType::DSDIFF, Song::FiletypeByExtension("dsd"));
+  EXPECT_EQ(Song::FileType::DSDIFF, Song::FiletypeByExtension("dff"));
+  EXPECT_EQ(Song::FileType::MOD, Song::FiletypeByExtension("mod"));
+  EXPECT_EQ(Song::FileType::MOD, Song::FiletypeByExtension("module"));
+  EXPECT_EQ(Song::FileType::S3M, Song::FiletypeByExtension("s3m"));
+  EXPECT_EQ(Song::FileType::XM, Song::FiletypeByExtension("xm"));
+  EXPECT_EQ(Song::FileType::IT, Song::FiletypeByExtension("it"));
+  EXPECT_EQ(Song::FileType::WAV, Song::FiletypeByExtension("wave"));
+  EXPECT_EQ(Song::FileType::WavPack, Song::FiletypeByExtension("wavpack"));
+  EXPECT_EQ(Song::FileType::MPC, Song::FiletypeByExtension("mpp"));
+  EXPECT_EQ(Song::FileType::AIFF, Song::FiletypeByExtension("aifc"));
+  EXPECT_TRUE(Song::IsAudioFile("chip.mod"));
+  EXPECT_TRUE(Song::IsAudioFile("track.spx"));
+  EXPECT_TRUE(Song::IsAudioFile("album.dff"));
+  EXPECT_FALSE(Song::IsAudioFile("notes.lrc"));
+  EXPECT_FALSE(Song::IsAudioFile("temp.wvc"));
+  EXPECT_EQ("Speex", Song::FiletypeToString(Song::FileType::OggSpeex));
+  EXPECT_EQ("DSF", Song::FiletypeToString(Song::FileType::DSF));
+  EXPECT_EQ("DSDIFF", Song::FiletypeToString(Song::FileType::DSDIFF));
+  EXPECT_EQ("Module Music Format", Song::FiletypeToString(Song::FileType::MOD));
+  EXPECT_EQ("SNES SPC700", Song::FiletypeToString(Song::FileType::SPC));
+  EXPECT_EQ("VGM", Song::FiletypeToString(Song::FileType::VGM));
+}
+
 TEST(Song, AlbumRemoveDiscMisc) {
   EXPECT_EQ("Dummy", Song::AlbumRemoveDiscMisc("Dummy - Disc 2"));
   EXPECT_EQ("Dummy", Song::AlbumRemoveDiscMisc("Dummy (CD 1)"));

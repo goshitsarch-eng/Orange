@@ -10,10 +10,11 @@
 const std::vector<std::string> Song::kAcceptedExtensions = {
     "wav", "flac", "wv",  "ogg",  "oga", "opus", "spx", "ape", "mpc", "mp2",
     "mp3", "m4a",  "mp4", "aac",  "asf", "asx",  "wma", "aif", "aiff", "mka",
-    "tta", "dsf",  "dsd", "webm", "ac3", "dts",  "spc", "vgm", "tak"};
+    "tta", "dsf",  "dsd", "dff",  "webm", "ac3", "dts",  "spc", "vgm", "tak",
+    "mod", "s3m",  "xm",  "it"};
 
 const std::vector<std::string> Song::kRejectedExtensions = {
-    "tmp", "tar", "gz", "bz2", "xz", "tbz", "tgz", "z", "zip", "rar"};
+    "tmp", "tar", "gz", "bz2", "xz", "tbz", "tgz", "z", "zip", "rar", "wvc", "zst", "lrc"};
 
 const std::vector<std::string> Song::kColumns = {
     "title", "titlesort", "album", "albumsort", "artist", "artistsort", "albumartist", "albumartistsort",
@@ -97,21 +98,25 @@ bool Song::IsEditable() const {
 Song::FileType Song::FiletypeByExtension(const std::string &extension) {
   std::string ext = extension;
   std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
-  if (ext == "wav") return FileType::WAV;
+  if (ext == "wav" || ext == "wave") return FileType::WAV;
   if (ext == "flac") return FileType::FLAC;
-  if (ext == "wv") return FileType::WavPack;
+  if (ext == "wv" || ext == "wavpack") return FileType::WavPack;
   if (ext == "ogg" || ext == "oga") return FileType::OggVorbis;
   if (ext == "opus") return FileType::OggOpus;
-  if (ext == "spx") return FileType::OggSpeex;
+  if (ext == "spx" || ext == "speex") return FileType::OggSpeex;
   if (ext == "mp3" || ext == "mp2") return FileType::MPEG;
   if (ext == "m4a" || ext == "mp4" || ext == "aac") return FileType::MP4;
   if (ext == "wma" || ext == "asf" || ext == "asx") return FileType::ASF;
-  if (ext == "aif" || ext == "aiff") return FileType::AIFF;
-  if (ext == "mpc") return FileType::MPC;
+  if (ext == "aif" || ext == "aiff" || ext == "aifc") return FileType::AIFF;
+  if (ext == "mpc" || ext == "mp+" || ext == "mpp") return FileType::MPC;
   if (ext == "tta") return FileType::TrueAudio;
   if (ext == "dsf") return FileType::DSF;
-  if (ext == "dsd") return FileType::DSDIFF;
+  if (ext == "dsd" || ext == "dff") return FileType::DSDIFF;
   if (ext == "ape") return FileType::APE;
+  if (ext == "mod" || ext == "module" || ext == "nst" || ext == "wow") return FileType::MOD;
+  if (ext == "s3m") return FileType::S3M;
+  if (ext == "xm") return FileType::XM;
+  if (ext == "it") return FileType::IT;
   if (ext == "spc") return FileType::SPC;
   if (ext == "vgm") return FileType::VGM;
   return FileType::Unknown;
@@ -133,6 +138,14 @@ Song::FileType Song::FiletypeByMimeType(const std::string &mimetype) {
   if (mime == "audio/x-wavpack") return FileType::WavPack;
   if (mime == "audio/x-ms-wma" || mime == "audio/wma") return FileType::ASF;
   if (mime == "audio/aiff" || mime == "audio/x-aiff") return FileType::AIFF;
+  if (mime == "audio/x-speex" || mime == "audio/speex") return FileType::OggSpeex;
+  if (mime == "audio/x-dsf" || mime == "audio/dsf") return FileType::DSF;
+  if (mime == "audio/x-dsd" || mime == "audio/x-dff" || mime == "audio/dsd") return FileType::DSDIFF;
+  if (mime == "audio/x-mod" || mime == "audio/mod") return FileType::MOD;
+  if (mime == "audio/x-s3m" || mime == "audio/s3m") return FileType::S3M;
+  if (mime == "audio/x-xm") return FileType::XM;
+  if (mime == "audio/x-it") return FileType::IT;
+  if (mime == "audio/x-tta" || mime == "audio/tta") return FileType::TrueAudio;
   const auto slash = mime.rfind('/');
   if (slash != std::string::npos) {
     const FileType by_suffix = FiletypeByExtension(mime.substr(slash + 1));
@@ -235,9 +248,11 @@ std::string Song::FiletypeToString(FileType type) {
     case FileType::S3M:
     case FileType::XM:
     case FileType::IT:
+      return "Module Music Format";
     case FileType::SPC:
+      return "SNES SPC700";
     case FileType::VGM:
-      return "Module";
+      return "VGM";
     case FileType::Unknown:
     default:
       return "Unknown";

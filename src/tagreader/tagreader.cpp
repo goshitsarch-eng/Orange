@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "tagreader/tagreader.h"
 
 #include "core/filewriteguard.h"
@@ -27,6 +29,7 @@
 #include <taglib/vorbisfile.h>
 #include <taglib/opusfile.h>
 #include <taglib/speexfile.h>
+#include <taglib/oggflacfile.h>
 #include <taglib/wavfile.h>
 #include <taglib/aifffile.h>
 #include <taglib/apefile.h>
@@ -35,8 +38,16 @@
 #include <taglib/mpcfile.h>
 #include <taglib/asffile.h>
 #include <taglib/asftag.h>
+#include <taglib/trueaudiofile.h>
+#include <taglib/modfile.h>
+#include <taglib/s3mfile.h>
+#include <taglib/xmfile.h>
+#include <taglib/itfile.h>
 #ifdef HAVE_TAGLIB_DSFFILE
 #  include <taglib/dsffile.h>
+#endif
+#ifdef HAVE_TAGLIB_DSDIFFFILE
+#  include <taglib/dsdifffile.h>
 #endif
 
 #include <sys/stat.h>
@@ -91,6 +102,8 @@ std::string FromTagLib(const TagLib::String &value) { return value.to8Bit(true);
 TagLib::String ToTagLib(const std::string &value) { return TagLib::String(value, TagLib::String::UTF8); }
 
 void ReadFromFileRef(TagLib::FileRef *file, Song *song);
+Song::FileType GuessFileType(TagLib::File *file);
+int BitsPerSample(TagLib::File *file);
 
 float ParseRatingString(const std::string &value) {
   if (value.empty()) {
@@ -221,6 +234,28 @@ TagReader::CoverData CoverFromFile(TagLib::File *file) {
       return cover;
     }
   }
+  if (auto *tta = dynamic_cast<TagLib::TrueAudio::File *>(file)) {
+    TagReader::CoverData cover = CoverFromId3v2(tta->ID3v2Tag());
+    if (!cover.data.empty()) {
+      return cover;
+    }
+  }
+#ifdef HAVE_TAGLIB_DSFFILE
+  if (auto *dsf = dynamic_cast<TagLib::DSF::File *>(file)) {
+    TagReader::CoverData cover = CoverFromId3v2(dynamic_cast<TagLib::ID3v2::Tag *>(dsf->tag()));
+    if (!cover.data.empty()) {
+      return cover;
+    }
+  }
+#endif
+#ifdef HAVE_TAGLIB_DSDIFFFILE
+  if (auto *dsdiff = dynamic_cast<TagLib::DSDIFF::File *>(file)) {
+    TagReader::CoverData cover = CoverFromId3v2(dynamic_cast<TagLib::ID3v2::Tag *>(dsdiff->tag()));
+    if (!cover.data.empty()) {
+      return cover;
+    }
+  }
+#endif
   if (auto *mp4 = dynamic_cast<TagLib::MP4::File *>(file)) {
     TagReader::CoverData cover = CoverFromMp4(mp4->tag());
     if (!cover.data.empty()) {
@@ -631,7 +666,9 @@ bool SaveFileRef(TagLib::FileRef *file, TagID3v2Version version) {
 void TagReader::ApplyFileInfo(Song *song, const std::string &filename) const {
   song->set_url(FileUtils::UriFromPath(filename));
   song->set_basefilename(FileUtils::BaseName(filename));
-  song->set_filetype(Song::FiletypeByFilename(filename));
+  if (song->filetype() == Song::FileType::Unknown) {
+    song->set_filetype(Song::FiletypeByFilename(filename));
+  }
   struct stat st {};
   if (stat(filename.c_str(), &st) == 0) {
     song->set_filesize(st.st_size);
@@ -675,12 +712,85 @@ Song TagReader::ReadFile(const std::string &filename) const {
 
 namespace {
 
+Song::FileType GuessFileType(TagLib::File *file) {
+  if (!file) {
+    return Song::FileType::Unknown;
+  }
+  if (dynamic_cast<TagLib::RIFF::WAV::File *>(file)) return Song::FileType::WAV;
+  if (dynamic_cast<TagLib::FLAC::File *>(file)) return Song::FileType::FLAC;
+  if (dynamic_cast<TagLib::WavPack::File *>(file)) return Song::FileType::WavPack;
+  if (dynamic_cast<TagLib::Ogg::FLAC::File *>(file)) return Song::FileType::OggFlac;
+  if (dynamic_cast<TagLib::Ogg::Vorbis::File *>(file)) return Song::FileType::OggVorbis;
+  if (dynamic_cast<TagLib::Ogg::Opus::File *>(file)) return Song::FileType::OggOpus;
+  if (dynamic_cast<TagLib::Ogg::Speex::File *>(file)) return Song::FileType::OggSpeex;
+  if (dynamic_cast<TagLib::MPEG::File *>(file)) return Song::FileType::MPEG;
+  if (dynamic_cast<TagLib::MP4::File *>(file)) return Song::FileType::MP4;
+  if (dynamic_cast<TagLib::ASF::File *>(file)) return Song::FileType::ASF;
+  if (dynamic_cast<TagLib::RIFF::AIFF::File *>(file)) return Song::FileType::AIFF;
+  if (dynamic_cast<TagLib::MPC::File *>(file)) return Song::FileType::MPC;
+  if (dynamic_cast<TagLib::TrueAudio::File *>(file)) return Song::FileType::TrueAudio;
+  if (dynamic_cast<TagLib::APE::File *>(file)) return Song::FileType::APE;
+  if (dynamic_cast<TagLib::Mod::File *>(file)) return Song::FileType::MOD;
+  if (dynamic_cast<TagLib::S3M::File *>(file)) return Song::FileType::S3M;
+  if (dynamic_cast<TagLib::XM::File *>(file)) return Song::FileType::XM;
+  if (dynamic_cast<TagLib::IT::File *>(file)) return Song::FileType::IT;
+#ifdef HAVE_TAGLIB_DSFFILE
+  if (dynamic_cast<TagLib::DSF::File *>(file)) return Song::FileType::DSF;
+#endif
+#ifdef HAVE_TAGLIB_DSDIFFFILE
+  if (dynamic_cast<TagLib::DSDIFF::File *>(file)) return Song::FileType::DSDIFF;
+#endif
+  return Song::FileType::Unknown;
+}
+
+int BitsPerSample(TagLib::File *file) {
+  if (!file) {
+    return 0;
+  }
+  if (auto *flac = dynamic_cast<TagLib::FLAC::File *>(file)) {
+    return flac->audioProperties() ? flac->audioProperties()->bitsPerSample() : 0;
+  }
+  if (auto *wavpack = dynamic_cast<TagLib::WavPack::File *>(file)) {
+    return wavpack->audioProperties() ? wavpack->audioProperties()->bitsPerSample() : 0;
+  }
+  if (auto *ape = dynamic_cast<TagLib::APE::File *>(file)) {
+    return ape->audioProperties() ? ape->audioProperties()->bitsPerSample() : 0;
+  }
+  if (auto *mp4 = dynamic_cast<TagLib::MP4::File *>(file)) {
+    return mp4->audioProperties() ? mp4->audioProperties()->bitsPerSample() : 0;
+  }
+  if (auto *asf = dynamic_cast<TagLib::ASF::File *>(file)) {
+    return asf->audioProperties() ? asf->audioProperties()->bitsPerSample() : 0;
+  }
+  if (auto *wav = dynamic_cast<TagLib::RIFF::WAV::File *>(file)) {
+    return wav->audioProperties() ? wav->audioProperties()->bitsPerSample() : 0;
+  }
+  if (auto *aiff = dynamic_cast<TagLib::RIFF::AIFF::File *>(file)) {
+    return aiff->audioProperties() ? aiff->audioProperties()->bitsPerSample() : 0;
+  }
+  if (auto *tta = dynamic_cast<TagLib::TrueAudio::File *>(file)) {
+    return tta->audioProperties() ? tta->audioProperties()->bitsPerSample() : 0;
+  }
+#ifdef HAVE_TAGLIB_DSFFILE
+  if (auto *dsf = dynamic_cast<TagLib::DSF::File *>(file)) {
+    return dsf->audioProperties() ? dsf->audioProperties()->bitsPerSample() : 0;
+  }
+#endif
+#ifdef HAVE_TAGLIB_DSDIFFFILE
+  if (auto *dsdiff = dynamic_cast<TagLib::DSDIFF::File *>(file)) {
+    return dsdiff->audioProperties() ? dsdiff->audioProperties()->bitsPerSample() : 0;
+  }
+#endif
+  return 0;
+}
+
 void ReadFromFileRef(TagLib::FileRef *file, Song *song) {
   if (!file || file->isNull() || !file->tag()) {
     return;
   }
   const TagLib::Tag *tag = file->tag();
   song->set_valid(true);
+  song->set_filetype(GuessFileType(file->file()));
   song->set_title(FromTagLib(tag->title()));
   song->set_artist(FromTagLib(tag->artist()));
   song->set_album(FromTagLib(tag->album()));
@@ -745,6 +855,16 @@ void ReadFromFileRef(TagLib::FileRef *file, Song *song) {
 
   if (auto *mpeg = dynamic_cast<TagLib::MPEG::File *>(file->file())) {
     ReadId3v2Extras(mpeg->ID3v2Tag(), song);
+  } else if (auto *tta = dynamic_cast<TagLib::TrueAudio::File *>(file->file())) {
+    ReadId3v2Extras(tta->ID3v2Tag(), song);
+#ifdef HAVE_TAGLIB_DSFFILE
+  } else if (auto *dsf = dynamic_cast<TagLib::DSF::File *>(file->file())) {
+    ReadId3v2Extras(dynamic_cast<TagLib::ID3v2::Tag *>(dsf->tag()), song);
+#endif
+#ifdef HAVE_TAGLIB_DSDIFFFILE
+  } else if (auto *dsdiff = dynamic_cast<TagLib::DSDIFF::File *>(file->file())) {
+    ReadId3v2Extras(dynamic_cast<TagLib::ID3v2::Tag *>(dsdiff->tag()), song);
+#endif
   } else if (auto *wav = dynamic_cast<TagLib::RIFF::WAV::File *>(file->file())) {
     if (wav->hasID3v2Tag()) {
       ReadId3v2Extras(wav->ID3v2Tag(), song);
@@ -773,6 +893,10 @@ void ReadFromFileRef(TagLib::FileRef *file, Song *song) {
     song->set_length_nanosec(static_cast<int64_t>(properties_audio->lengthInMilliseconds()) * 1000000LL);
     song->set_bitrate(properties_audio->bitrate());
     song->set_samplerate(properties_audio->sampleRate());
+    const int bitdepth = BitsPerSample(file->file());
+    if (bitdepth > 0) {
+      song->set_bitdepth(bitdepth);
+    }
   }
 }
 
@@ -903,6 +1027,52 @@ bool TagReader::WriteFile(const std::string &filename, const Song &song, SaveTag
     if (save_rating) {
       SetAPERating(tag, song.rating());
     }
+  } else if (auto *tta = dynamic_cast<TagLib::TrueAudio::File *>(file.file())) {
+    TagLib::ID3v2::Tag *tag = tta->ID3v2Tag(true);
+    if (save_tags) {
+      SetId3v2Tag(tag, song);
+    }
+    if (save_playcount) {
+      SetId3v2Playcount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetId3v2Rating(tag, song.rating());
+    }
+    if (save_cover) {
+      SetId3v2Cover(tag, cover_bytes, cover_mime);
+    }
+#ifdef HAVE_TAGLIB_DSFFILE
+  } else if (auto *dsf = dynamic_cast<TagLib::DSF::File *>(file.file())) {
+    auto *tag = dynamic_cast<TagLib::ID3v2::Tag *>(dsf->tag());
+    if (save_tags) {
+      SetId3v2Tag(tag, song);
+    }
+    if (save_playcount) {
+      SetId3v2Playcount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetId3v2Rating(tag, song.rating());
+    }
+    if (save_cover) {
+      SetId3v2Cover(tag, cover_bytes, cover_mime);
+    }
+#endif
+#ifdef HAVE_TAGLIB_DSDIFFFILE
+  } else if (auto *dsdiff = dynamic_cast<TagLib::DSDIFF::File *>(file.file())) {
+    auto *tag = dynamic_cast<TagLib::ID3v2::Tag *>(dsdiff->tag());
+    if (save_tags) {
+      SetId3v2Tag(tag, song);
+    }
+    if (save_playcount) {
+      SetId3v2Playcount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetId3v2Rating(tag, song.rating());
+    }
+    if (save_cover) {
+      SetId3v2Cover(tag, cover_bytes, cover_mime);
+    }
+#endif
   } else if (auto *mpeg = dynamic_cast<TagLib::MPEG::File *>(file.file())) {
     TagLib::ID3v2::Tag *tag = mpeg->ID3v2Tag(true);
     if (save_tags) {
@@ -1089,6 +1259,38 @@ bool TagReader::SaveCover(const std::string &filename, const CoverData &cover) c
       return opus.save();
     }
   }
+  {
+    TagLib::Ogg::Speex::File speex(filename.c_str());
+    if (speex.isValid() && speex.tag()) {
+      SetXiphCover(speex.tag(), bytes, mime);
+      return speex.save();
+    }
+  }
+  {
+    TagLib::TrueAudio::File tta(filename.c_str());
+    if (tta.isValid()) {
+      SetId3v2Cover(tta.ID3v2Tag(true), bytes, mime);
+      return tta.save();
+    }
+  }
+#ifdef HAVE_TAGLIB_DSFFILE
+  {
+    TagLib::DSF::File dsf(filename.c_str());
+    if (dsf.isValid()) {
+      SetId3v2Cover(dynamic_cast<TagLib::ID3v2::Tag *>(dsf.tag()), bytes, mime);
+      return dsf.save();
+    }
+  }
+#endif
+#ifdef HAVE_TAGLIB_DSDIFFFILE
+  {
+    TagLib::DSDIFF::File dsdiff(filename.c_str());
+    if (dsdiff.isValid()) {
+      SetId3v2Cover(dynamic_cast<TagLib::ID3v2::Tag *>(dsdiff.tag()), bytes, mime);
+      return dsdiff.save();
+    }
+  }
+#endif
   return false;
 }
 
