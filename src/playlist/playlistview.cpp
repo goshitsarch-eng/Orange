@@ -1,6 +1,7 @@
 #include "playlist/playlistview.h"
 
 #include "constants/playlistsettings.h"
+#include "moodbar/moodbarcell.h"
 #include "core/settings.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistcolumnlayout.h"
@@ -18,6 +19,8 @@
 #include <cstring>
 
 PlaylistView::PlaylistView() {
+  moodbar_ = std::make_unique<MoodbarItemDelegate>();
+  moodbar_->SetUpdatedCallback([this]() { QueueDrawMoodbars(); });
   header_ = std::make_unique<PlaylistHeader>();
   header_->SetSortCallback([this](PlaylistColumn column, PlaylistSortOrder order) {
     if (sort_) {
@@ -279,6 +282,23 @@ void PlaylistView::RecordClickedColumn(GtkWidget *row, double x) {
   }
 }
 
+void PlaylistView::QueueDrawMoodbars() {
+  if (!grid_) {
+    return;
+  }
+  GtkWidget *row = gtk_widget_get_first_child(grid_);
+  while (row) {
+    GtkWidget *cell = gtk_widget_get_first_child(row);
+    while (cell) {
+      if (g_object_get_data(G_OBJECT(cell), "mood-url")) {
+        gtk_widget_queue_draw(cell);
+      }
+      cell = gtk_widget_get_next_sibling(cell);
+    }
+    row = gtk_widget_get_next_sibling(row);
+  }
+}
+
 void PlaylistView::Clear() {
   GtkWidget *child = gtk_widget_get_first_child(grid_);
   while (child) {
@@ -341,23 +361,48 @@ void PlaylistView::Refresh(Playlist *playlist) {
       gtk_widget_add_css_class(row, "card");
     }
     for (PlaylistColumn column : PlaylistColumnLayout::Visible()) {
-      std::string text = PlaylistDelegates::ColumnText(song, column);
-      if (column == PlaylistColumn::Queue && queue_position_) {
-        const int position = queue_position_(index);
-        text = position > 0 ? std::to_string(position) : "";
-      }
-      GtkWidget *label = gtk_label_new(text.c_str());
-      gtk_label_set_xalign(GTK_LABEL(label), PlaylistColumnLayout::XAlign(column));
-      gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
-      gtk_widget_set_margin_start(label, 6);
-      gtk_widget_set_margin_end(label, 6);
-      if (PlaylistColumnLayout::StretchColumn(column)) {
-        gtk_widget_set_hexpand(label, TRUE);
+      GtkWidget *cell = nullptr;
+      if (column == PlaylistColumn::Moodbar && moodbar_) {
+        moodbar_->Ensure(song);
+        GtkWidget *area = gtk_drawing_area_new();
+        gtk_widget_set_size_request(area, PlaylistDelegates::ColumnWidth(column), MoodbarCell::ColumnHeight());
+        gtk_widget_set_hexpand(area, FALSE);
+        gtk_widget_set_margin_start(area, 6);
+        gtk_widget_set_margin_end(area, 6);
+        g_object_set_data_full(G_OBJECT(area), "mood-url", g_strdup(song.url().c_str()), g_free);
+        gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(area),
+                                       +[](GtkDrawingArea *widget, cairo_t *cr, int width, int height, gpointer data) {
+                                         auto *self = static_cast<PlaylistView *>(data);
+                                         const char *url = static_cast<const char *>(g_object_get_data(G_OBJECT(widget), "mood-url"));
+                                         if (!self->moodbar_ || !url) {
+                                           return;
+                                         }
+                                         if (const std::vector<uint8_t> *bytes = self->moodbar_->Peek(url)) {
+                                           MoodbarItemDelegate::Paint(cr, width, height, *bytes);
+                                         }
+                                       },
+                                       this, nullptr);
+        cell = area;
       } else {
-        gtk_widget_set_size_request(label, PlaylistDelegates::ColumnWidth(column), -1);
+        std::string text = PlaylistDelegates::ColumnText(song, column);
+        if (column == PlaylistColumn::Queue && queue_position_) {
+          const int position = queue_position_(index);
+          text = position > 0 ? std::to_string(position) : "";
+        }
+        GtkWidget *label = gtk_label_new(text.c_str());
+        gtk_label_set_xalign(GTK_LABEL(label), PlaylistColumnLayout::XAlign(column));
+        gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+        gtk_widget_set_margin_start(label, 6);
+        gtk_widget_set_margin_end(label, 6);
+        if (PlaylistColumnLayout::StretchColumn(column)) {
+          gtk_widget_set_hexpand(label, TRUE);
+        } else {
+          gtk_widget_set_size_request(label, PlaylistDelegates::ColumnWidth(column), -1);
+        }
+        cell = label;
       }
-      g_object_set_data(G_OBJECT(label), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
-      gtk_box_append(GTK_BOX(row), label);
+      g_object_set_data(G_OBJECT(cell), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
+      gtk_box_append(GTK_BOX(row), cell);
     }
     g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index));
     visible_titles_.push_back(song.PrettyTitle());

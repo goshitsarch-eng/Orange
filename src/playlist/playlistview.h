@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_PLAYLISTVIEW_H
 #define STRAWBERRY_PLAYLISTVIEW_H
 
+#include "moodbar/moodbaritemdelegate.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistheader.h"
@@ -57,6 +58,7 @@ class PlaylistView {
 
  private:
   void Clear();
+  void QueueDrawMoodbars();
   void RecordClickedColumn(GtkWidget *row, double x);
   void SetupRowDrag(GtkWidget *row, int index);
   gboolean OnDrop(const GValue *value, double y);
@@ -64,6 +66,7 @@ class PlaylistView {
   GtkWidget *widget_ = nullptr;
   GtkWidget *grid_ = nullptr;
   std::unique_ptr<PlaylistHeader> header_;
+  std::unique_ptr<MoodbarItemDelegate> moodbar_;
   Playlist *playlist_ = nullptr;
   std::string filter_;
   std::vector<int> selected_rows_;

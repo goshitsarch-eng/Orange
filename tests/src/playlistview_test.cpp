@@ -91,6 +91,10 @@ TEST(PlaylistDelegates, ColumnTitleAndText) {
   EXPECT_EQ("320", PlaylistDelegates::ColumnText(song, PlaylistColumn::Bitrate));
   EXPECT_EQ("★★★★★", PlaylistDelegates::ColumnText(song, PlaylistColumn::Rating));
   EXPECT_EQ("roads.flac", PlaylistDelegates::ColumnText(song, PlaylistColumn::Filename));
+  song.set_mood("melancholy");
+  EXPECT_TRUE(PlaylistDelegates::ColumnText(song, PlaylistColumn::Moodbar).empty());
+  EXPECT_EQ("melancholy", PlaylistDelegates::ColumnText(song, PlaylistColumn::Mood));
+  EXPECT_EQ(120, PlaylistDelegates::ColumnWidth(PlaylistColumn::Moodbar));
 }
 
 TEST(PlaylistDelegates, EditableColumnsMatchQt) {

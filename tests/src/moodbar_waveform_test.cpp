@@ -1,5 +1,7 @@
 #include "constants/moodbarsettings.h"
 #include "constants/waveformsettings.h"
+#include "core/song.h"
+#include "moodbar/moodbarcell.h"
 #include "moodbar/moodbarpaths.h"
 #include "moodbar/moodbarstyle.h"
 #include "utilities/analysisasync.h"
@@ -66,6 +68,54 @@ TEST(WaveformStyle, ColorCurveAndSidecars) {
   EXPECT_EQ("/music/.song.flac.waveform", WaveformStyle::HiddenSidecar("/music/song.flac"));
   EXPECT_EQ("/music/song.flac.waveform", WaveformStyle::VisibleSidecar("/music/song.flac"));
   EXPECT_EQ("/tmp/cache/song.flac.wave", WaveformStyle::CacheFile("/tmp/cache", "file:///music/song.flac"));
+}
+
+TEST(MoodbarCell, LoadRulesMatchQtDelegate) {
+  EXPECT_FALSE(MoodbarCell::IsLocalUrl(""));
+  EXPECT_FALSE(MoodbarCell::IsLocalUrl("https://example.com/a.mp3"));
+  EXPECT_TRUE(MoodbarCell::IsLocalUrl("file:///tmp/a.flac"));
+  EXPECT_TRUE(MoodbarCell::IsLocalUrl("/tmp/a.flac"));
+  EXPECT_EQ(16, MoodbarCell::ColumnHeight());
+  EXPECT_EQ(120, MoodbarCell::ColumnWidth());
+  EXPECT_EQ(1, MoodbarCell::BorderInset());
+  EXPECT_STREQ("", MoodbarCell::PlaceholderText());
+
+  Song local;
+  local.set_source(Song::Source::LocalFile);
+  local.set_url("file:///tmp/a.flac");
+  EXPECT_TRUE(MoodbarCell::CanLoad(local));
+  EXPECT_EQ("file:///tmp/a.flac", MoodbarCell::CacheKey(local));
+
+  Song collection;
+  collection.set_source(Song::Source::Collection);
+  collection.set_url("file:///music/b.flac");
+  EXPECT_TRUE(MoodbarCell::CanLoad(collection));
+
+  Song cue;
+  cue.set_source(Song::Source::LocalFile);
+  cue.set_url("file:///tmp/album.flac");
+  cue.set_cue_path("/tmp/album.cue");
+  EXPECT_FALSE(MoodbarCell::CanLoad(cue));
+
+  Song stream;
+  stream.set_source(Song::Source::Stream);
+  stream.set_url("http://example.com/radio");
+  EXPECT_FALSE(MoodbarCell::CanLoad(stream));
+
+  Song tidal;
+  tidal.set_source(Song::Source::Tidal);
+  tidal.set_url("tidal://track/1");
+  EXPECT_FALSE(MoodbarCell::CanLoad(tidal));
+
+  Song cdda;
+  cdda.set_source(Song::Source::CDDA);
+  cdda.set_url("cdda://1");
+  EXPECT_FALSE(MoodbarCell::CanLoad(cdda));
+
+  EXPECT_EQ(MoodbarCell::State::CannotLoad, MoodbarCell::NextState(MoodbarCell::State::None, false, false, false));
+  EXPECT_EQ(MoodbarCell::State::Loaded, MoodbarCell::NextState(MoodbarCell::State::Loading, true, true, false));
+  EXPECT_EQ(MoodbarCell::State::Loading, MoodbarCell::NextState(MoodbarCell::State::None, true, false, true));
+  EXPECT_EQ(MoodbarCell::State::None, MoodbarCell::NextState(MoodbarCell::State::None, true, false, false));
 }
 
 TEST(AnalysisAsync, GenerateOnlyWhenEnabledAndCacheMisses) {

@@ -1,5 +1,6 @@
 #include "playlist/playlistdelegates.h"
 
+#include "moodbar/moodbarcell.h"
 #include "playlist/playlistcolumnlayout.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
@@ -119,6 +120,8 @@ int PlaylistDelegates::ColumnWidth(PlaylistColumn column) {
     case PlaylistColumn::Composer:
     case PlaylistColumn::ComposerSort:
       return 150;
+    case PlaylistColumn::Moodbar:
+      return MoodbarCell::ColumnWidth();
     default:
       return 80;
   }
@@ -197,7 +200,7 @@ std::string PlaylistDelegates::ColumnText(const Song &song, PlaylistColumn colum
     case PlaylistColumn::Source:
       return Song::SourceToString(song.source());
     case PlaylistColumn::Moodbar:
-      return song.mood().empty() ? "" : "●";
+      return MoodbarCell::PlaceholderText();
     case PlaylistColumn::Rating:
       return RatingStars(song.rating());
     case PlaylistColumn::HasCUE:
