@@ -478,7 +478,19 @@ SongList SongsFromArray(JsonArray *array, Song::Source source, const std::functi
       continue;
     }
     Song song(source);
-    fill(&song, json_node_get_object(item));
+    JsonObject *object = json_node_get_object(item);
+    if (json_object_has_member(object, "item") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, "item"))) {
+      object = json_object_get_object_member(object, "item");
+    } else if (json_object_has_member(object, "track") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, "track"))) {
+      object = json_object_get_object_member(object, "track");
+    } else if (!json_object_has_member(object, "name") && !json_object_has_member(object, "title") && json_object_has_member(object, "album") &&
+               JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, "album"))) {
+      object = json_object_get_object_member(object, "album");
+    }
+    fill(&song, object);
+    if (song.title().empty()) {
+      song.set_title(ObjectString(object, "name"));
+    }
     if (!song.title().empty()) {
       song.set_valid(true);
       songs.push_back(song);
@@ -510,6 +522,12 @@ SongList ParseSubsonicSongs(const std::string &json) {
   }
   JsonArray *songs_array = FindNamedArray(root, {"subsonic-response", "searchResult3", "song"});
   if (!songs_array) {
+    songs_array = FindNamedArray(root, {"subsonic-response", "starred2", "song"});
+  }
+  if (!songs_array) {
+    songs_array = FindNamedArray(root, {"subsonic-response", "starred", "song"});
+  }
+  if (!songs_array) {
     songs_array = FindNamedArray(root, {"subsonic-response", "album", "song"});
   }
   SongList songs = SongsFromArray(songs_array, Song::Source::Subsonic, [](Song *song, JsonObject *object) {
@@ -520,6 +538,8 @@ SongList ParseSubsonicSongs(const std::string &json) {
     song->set_genre(ObjectString(object, "genre"));
     const std::string id = ObjectString(object, "id");
     song->set_song_id(id);
+    song->set_artist_id(ObjectString(object, "artistId"));
+    song->set_album_id(ObjectString(object, "albumId"));
     song->set_url(id.empty() ? std::string() : "subsonic://" + id);
     song->set_year(std::atoi(ObjectString(object, "year").c_str()));
     song->set_track(std::atoi(ObjectString(object, "track").c_str()));
@@ -550,6 +570,8 @@ SongList ParseTidalTracks(const std::string &json) {
     }
     const std::string id = ObjectString(object, "id");
     song->set_song_id(id);
+    song->set_artist_id(NestedName(object, "artist", "id"));
+    song->set_album_id(NestedName(object, "album", "id"));
     song->set_url(id.empty() ? std::string() : "tidal://" + id);
     ApplyDurationSeconds(song, ObjectString(object, "duration"));
     const std::string cover = NestedName(object, "album", "cover");
@@ -568,6 +590,9 @@ SongList ParseSpotifyTracks(const std::string &json) {
   }
   JsonArray *items = FindNamedArray(root, {"tracks", "items"});
   if (!items) {
+    items = FindNamedArray(root, {"artists", "items"});
+  }
+  if (!items) {
     items = FindNamedArray(root, {"items"});
   }
   SongList songs = SongsFromArray(items, Song::Source::Spotify, [](Song *song, JsonObject *object) {
@@ -576,9 +601,11 @@ SongList ParseSpotifyTracks(const std::string &json) {
       JsonArray *artists = json_object_get_array_member(object, "artists");
       if (json_array_get_length(artists) > 0) {
         song->set_artist(ObjectString(json_array_get_object_element(artists, 0), "name"));
+        song->set_artist_id(ObjectString(json_array_get_object_element(artists, 0), "id"));
       }
     }
     song->set_album(NestedName(object, "album", "name"));
+    song->set_album_id(NestedName(object, "album", "id"));
     const std::string id = ObjectString(object, "id");
     song->set_song_id(id);
     song->set_url(id.empty() ? std::string() : "spotify://" + id);
@@ -611,6 +638,12 @@ SongList ParseQobuzTracks(const std::string &json) {
   }
   JsonArray *items = FindNamedArray(root, {"tracks", "items"});
   if (!items) {
+    items = FindNamedArray(root, {"albums", "items"});
+  }
+  if (!items) {
+    items = FindNamedArray(root, {"artists", "items"});
+  }
+  if (!items) {
     items = FindNamedArray(root, {"items"});
   }
   SongList songs = SongsFromArray(items, Song::Source::Qobuz, [](Song *song, JsonObject *object) {
@@ -622,6 +655,11 @@ SongList ParseQobuzTracks(const std::string &json) {
     song->set_album(NestedName(object, "album", "title"));
     const std::string id = ObjectString(object, "id");
     song->set_song_id(id);
+    song->set_artist_id(NestedName(object, "performer", "id"));
+    if (song->artist_id().empty()) {
+      song->set_artist_id(NestedName(object, "artist", "id"));
+    }
+    song->set_album_id(NestedName(object, "album", "id"));
     song->set_url(id.empty() ? std::string() : "qobuz://" + id);
     ApplyDurationSeconds(song, ObjectString(object, "duration"));
     const std::string image = NestedName(object, "album", "image");

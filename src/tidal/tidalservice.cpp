@@ -1,8 +1,11 @@
 #include "tidal/tidalservice.h"
 
 #include "core/settings.h"
+#include "tidal/tidalfavoriterequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
+
+#include <cstdlib>
 
 const char TidalService::kApiUrl[] = "https://api.tidalhifi.com/v1";
 const char TidalService::kResourcesUrl[] = "https://resources.tidal.com";
@@ -17,6 +20,8 @@ void TidalService::ReloadSettings() {
     token_ = settings.Value("access_token");
   }
   country_code_ = settings.Value("countrycode", "US");
+  const std::string user_id = settings.Value("user_id");
+  user_id_ = user_id.empty() ? 0 : static_cast<uint64_t>(std::strtoull(user_id.c_str(), nullptr, 10));
   logged_in_ = !token_.empty();
 }
 
@@ -99,4 +104,16 @@ UrlHandler::LoadResult TidalService::Load(const std::string &url, AsyncCallback 
     }
   }, AuthHeaders());
   return result;
+}
+
+void TidalService::GetFavorites(FavoriteType type, SearchCallback callback) {
+  TidalFavoriteRequest::Get(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, std::move(callback));
+}
+
+void TidalService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  TidalFavoriteRequest::Add(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, songs, std::move(callback));
+}
+
+void TidalService::RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  TidalFavoriteRequest::Remove(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, songs, std::move(callback));
 }

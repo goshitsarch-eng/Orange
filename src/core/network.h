@@ -29,6 +29,10 @@ class NetworkAccessManager {
   void Post(const std::string &url, const std::string &body, Callback callback,
             const std::string &content_type = "application/json",
             const std::map<std::string, std::string> &headers = {});
+  void Put(const std::string &url, const std::string &body, Callback callback,
+           const std::string &content_type = "application/json",
+           const std::map<std::string, std::string> &headers = {});
+  void Delete(const std::string &url, Callback callback, const std::map<std::string, std::string> &headers = {});
   Response GetSync(const std::string &url, const std::map<std::string, std::string> &headers = {});
 
   void SetProxy(const std::string &proxy_uri);

@@ -1,6 +1,7 @@
 #include "subsonic/subsonicservice.h"
 
 #include "core/settings.h"
+#include "subsonic/subsonicfavoriterequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -130,4 +131,42 @@ UrlHandler::LoadResult SubsonicService::Load(const std::string &url, AsyncCallba
     callback(result);
   }
   return result;
+}
+
+void SubsonicService::GetFavorites(FavoriteType, SearchCallback callback) {
+  if (!logged_in_) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  SubsonicFavoriteRequest::Get(network_, CreateUrl(server_url_, username_, password_, "getStarred2", {}, hex_auth_), std::move(callback));
+}
+
+void SubsonicService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  const auto ids = SubsonicFavoriteRequest::IdsFromSongs(type, songs);
+  if (!logged_in_ || ids.empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  SubsonicFavoriteRequest::Mutate(network_,
+                                  CreateUrl(server_url_, username_, password_, SubsonicFavoriteRequest::StarResource(false),
+                                            SubsonicFavoriteRequest::StarParams(type, ids.front()), hex_auth_),
+                                  songs, std::move(callback));
+}
+
+void SubsonicService::RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  const auto ids = SubsonicFavoriteRequest::IdsFromSongs(type, songs);
+  if (!logged_in_ || ids.empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  SubsonicFavoriteRequest::Mutate(network_,
+                                  CreateUrl(server_url_, username_, password_, SubsonicFavoriteRequest::StarResource(true),
+                                            SubsonicFavoriteRequest::StarParams(type, ids.front()), hex_auth_),
+                                  songs, std::move(callback));
 }

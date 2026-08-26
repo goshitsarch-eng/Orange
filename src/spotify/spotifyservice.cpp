@@ -1,6 +1,7 @@
 #include "spotify/spotifyservice.h"
 
 #include "core/settings.h"
+#include "spotify/spotifyfavoriterequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -90,4 +91,16 @@ UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallbac
     }
   }, AuthHeaders());
   return result;
+}
+
+void SpotifyService::GetFavorites(FavoriteType type, SearchCallback callback) {
+  SpotifyFavoriteRequest::Get(network_, kApiUrl, AuthHeaders(), type, std::move(callback));
+}
+
+void SpotifyService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  SpotifyFavoriteRequest::Add(network_, kApiUrl, AuthHeaders(), type, songs, std::move(callback));
+}
+
+void SpotifyService::RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  SpotifyFavoriteRequest::Remove(network_, kApiUrl, AuthHeaders(), type, songs, std::move(callback));
 }

@@ -108,6 +108,42 @@ void NetworkAccessManager::Post(const std::string &url, const std::string &body,
   g_object_unref(message);
 }
 
+void NetworkAccessManager::Put(const std::string &url, const std::string &body, Callback callback, const std::string &content_type,
+                               const std::map<std::string, std::string> &headers) {
+  SoupMessage *message = soup_message_new("PUT", url.c_str());
+  if (!message) {
+    Response response;
+    response.error = "Invalid URL";
+    callback(response);
+    return;
+  }
+  GBytes *bytes = g_bytes_new(body.data(), body.size());
+  soup_message_set_request_body_from_bytes(message, content_type.c_str(), bytes);
+  g_bytes_unref(bytes);
+  SoupMessageHeaders *request_headers = soup_message_get_request_headers(message);
+  for (const auto &header : headers) {
+    soup_message_headers_append(request_headers, header.first.c_str(), header.second.c_str());
+  }
+  Send(message, std::move(callback));
+  g_object_unref(message);
+}
+
+void NetworkAccessManager::Delete(const std::string &url, Callback callback, const std::map<std::string, std::string> &headers) {
+  SoupMessage *message = soup_message_new("DELETE", url.c_str());
+  if (!message) {
+    Response response;
+    response.error = "Invalid URL";
+    callback(response);
+    return;
+  }
+  SoupMessageHeaders *request_headers = soup_message_get_request_headers(message);
+  for (const auto &header : headers) {
+    soup_message_headers_append(request_headers, header.first.c_str(), header.second.c_str());
+  }
+  Send(message, std::move(callback));
+  g_object_unref(message);
+}
+
 NetworkAccessManager::Response NetworkAccessManager::GetSync(const std::string &url, const std::map<std::string, std::string> &headers) {
   Response response;
   SoupMessage *message = soup_message_new("GET", url.c_str());

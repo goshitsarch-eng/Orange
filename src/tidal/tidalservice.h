@@ -3,6 +3,7 @@
 
 #include "streaming/streamingservices.h"
 
+#include <cstdint>
 #include <map>
 #include <string>
 
@@ -19,6 +20,12 @@ class TidalService : public StreamingService {
   void Login(const std::string &username, const std::string &password_or_token) override;
   void ReloadSettings() override;
   LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;
+  void GetFavorites(FavoriteType type, SearchCallback callback) override;
+  void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;
+  void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;
+
+  uint64_t user_id() const { return user_id_; }
+  const std::string &country_code() const { return country_code_; }
 
  private:
   std::map<std::string, std::string> AuthHeaders() const;
@@ -27,6 +34,7 @@ class TidalService : public StreamingService {
   NetworkAccessManager *network_ = nullptr;
   std::string token_;
   std::string country_code_ = "US";
+  uint64_t user_id_ = 0;
 };
 
 #endif

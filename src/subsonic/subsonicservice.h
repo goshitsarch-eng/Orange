@@ -19,6 +19,9 @@ class SubsonicService : public StreamingService {
   void Login(const std::string &username, const std::string &password_or_token) override;
   void ReloadSettings() override;
   LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;
+  void GetFavorites(FavoriteType type, SearchCallback callback) override;
+  void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;
+  void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;
 
   static std::string CreateUrl(const std::string &server_url, const std::string &username, const std::string &password,
                                const std::string &resource, const std::map<std::string, std::string> &params = {}, bool hex_auth = false);

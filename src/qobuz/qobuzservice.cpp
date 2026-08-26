@@ -1,6 +1,7 @@
 #include "qobuz/qobuzservice.h"
 
 #include "core/settings.h"
+#include "qobuz/qobuzfavoriterequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -100,4 +101,16 @@ UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback 
     }
   }, AuthHeaders());
   return result;
+}
+
+void QobuzService::GetFavorites(FavoriteType type, SearchCallback callback) {
+  QobuzFavoriteRequest::Get(network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type, std::move(callback));
+}
+
+void QobuzService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  QobuzFavoriteRequest::Add(network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type, songs, std::move(callback));
+}
+
+void QobuzService::RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  QobuzFavoriteRequest::Remove(network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type, songs, std::move(callback));
 }
