@@ -42,7 +42,7 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   if (service_) {
     Settings settings;
     settings.BeginGroup(service_->name());
-    pretty_covers_ = settings.BoolValue(StreamingCover::kPrettyCovers, StreamingCover::kDefaultPrettyCovers);
+    pretty_covers_ = StreamingCover::LoadPrettyCovers(service_->name());
     grouping_ = StreamingSearchGroup::FromSaved(settings.IntValue(StreamingSearchGroup::kSearchGroupBy1, 0),
                                                 settings.IntValue(StreamingSearchGroup::kSearchGroupBy2, 0),
                                                 settings.IntValue(StreamingSearchGroup::kSearchGroupBy3, 0),
@@ -388,13 +388,7 @@ void StreamingSearchView::Rebuild() {
 }
 
 void StreamingSearchView::PersistPrettyCovers() {
-  if (!service_) {
-    return;
-  }
-  Settings settings;
-  settings.BeginGroup(service_->name());
-  settings.SetBoolValue(StreamingCover::kPrettyCovers, pretty_covers_);
-  settings.Sync();
+  StreamingCover::SavePrettyCovers(service_ ? service_->name() : std::string(), pretty_covers_);
 }
 
 void StreamingSearchView::PersistGrouping() {

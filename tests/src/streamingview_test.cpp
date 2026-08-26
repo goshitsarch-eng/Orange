@@ -73,6 +73,11 @@ TEST(StreamingCover, UrlCacheAndPrettyCovers) {
   EXPECT_TRUE(StreamingCover::CoverUrl(no_art).empty());
   EXPECT_FALSE(StreamingCover::CanLoad(no_art));
   EXPECT_EQ("qobuz://track/9", StreamingCover::CacheKey(no_art));
+  EXPECT_TRUE(StreamingCover::LoadPrettyCovers(""));
+  StreamingCover::SavePrettyCovers("Tidal", false);
+  EXPECT_FALSE(StreamingCover::LoadPrettyCovers("Tidal"));
+  StreamingCover::SavePrettyCovers("Tidal", true);
+  EXPECT_TRUE(StreamingCover::LoadPrettyCovers("Tidal"));
 }
 
 TEST(StreamingSearchGroup, DefaultFlattenAndHeaders) {

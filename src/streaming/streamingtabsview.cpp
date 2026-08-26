@@ -24,6 +24,10 @@ StreamingTabsView::StreamingTabsView(StreamingService *service, Database *databa
   gtk_widget_set_vexpand(stack, TRUE);
   gtk_box_append(GTK_BOX(widget_), switcher);
   gtk_box_append(GTK_BOX(widget_), stack);
+  artists_->view()->SetService(service_);
+  albums_->view()->SetService(service_);
+  songs_->view()->SetService(service_);
+  favorites_->view()->SetService(service_);
   artists_->view()->SetRefreshCallback([this]() { GetArtists(); });
   albums_->view()->SetRefreshCallback([this]() { GetAlbums(); });
   songs_->view()->SetRefreshCallback([this]() { GetSongs(); });

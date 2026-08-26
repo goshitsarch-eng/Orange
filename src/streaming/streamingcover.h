@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_STREAMINGCOVER_H
 #define STRAWBERRY_STREAMINGCOVER_H
 
+#include "core/settings.h"
 #include "core/song.h"
 #include "utilities/strutils.h"
 
@@ -41,6 +42,25 @@ inline std::string CacheKey(const Song &song) {
 }
 
 inline bool ShouldShowThumb(bool pretty_covers) { return pretty_covers; }
+
+inline bool LoadPrettyCovers(const std::string &group) {
+  if (group.empty()) {
+    return kDefaultPrettyCovers;
+  }
+  Settings settings;
+  settings.BeginGroup(group);
+  return settings.BoolValue(kPrettyCovers, kDefaultPrettyCovers);
+}
+
+inline void SavePrettyCovers(const std::string &group, bool pretty) {
+  if (group.empty()) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(group);
+  settings.SetBoolValue(kPrettyCovers, pretty);
+  settings.Sync();
+}
 
 inline bool ValidTidalCoverSize(const std::string &size) {
   return size == "160x160" || size == "320x320" || size == "640x640" || size == "1280x1280";

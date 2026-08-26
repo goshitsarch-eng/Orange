@@ -4,6 +4,7 @@
 
 StreamingSongsView::StreamingSongsView(StreamingService *service)
     : service_(service), container_(std::make_unique<StreamingCollectionViewContainer>("Songs")) {
+  container_->view()->SetService(service_);
   container_->view()->SetRefreshCallback([this]() { Reload(); });
   container_->SetAbortCallback([this]() { AbortGetSongs(); });
   if (service_) {

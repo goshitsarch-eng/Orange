@@ -2,11 +2,17 @@
 
 #include "collection/collectionfiltermenu.h"
 #include "collection/groupbydialog.h"
+#include "dialogs/dialoghelpers.h"
+#include "streaming/streamingcover.h"
 #include "streaming/streamingdrag.h"
 #include "streaming/streamingsearchgroup.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "translations/translations.h"
+#include "utilities/fileutils.h"
+#include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
+
+#include <vector>
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 
@@ -35,12 +41,22 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
                    }),
                    this);
   grouping_ = CollectionGrouping::LoadCurrent();
+  pretty_covers_btn_ = gtk_check_button_new_with_label(Translations::CStr("Pretty covers"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(pretty_covers_btn_), pretty_covers_);
+  g_signal_connect(pretty_covers_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *self = static_cast<StreamingCollectionView *>(data);
+                     self->pretty_covers_ = gtk_check_button_get_active(button);
+                     self->PersistPrettyCovers();
+                     self->Rebuild();
+                   }),
+                   this);
   group_button_ = gtk_menu_button_new();
   gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(group_button_), "view-list-symbolic");
   gtk_widget_set_tooltip_text(group_button_, Translations::CStr("Group by"));
   BuildGroupMenu();
   gtk_box_append(GTK_BOX(header), back_);
   gtk_box_append(GTK_BOX(header), label);
+  gtk_box_append(GTK_BOX(header), pretty_covers_btn_);
   gtk_box_append(GTK_BOX(header), group_button_);
   gtk_box_append(GTK_BOX(header), refresh);
   filter_entry_ = gtk_search_entry_new();
@@ -94,13 +110,31 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
                    this);
 }
 
-StreamingCollectionView::~StreamingCollectionView() { ResetTypeAhead(); }
+StreamingCollectionView::~StreamingCollectionView() {
+  if (alive_) {
+    *alive_ = false;
+  }
+  ResetTypeAhead();
+}
 
 void StreamingCollectionView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
 void StreamingCollectionView::SetRefreshCallback(RefreshCallback callback) { refresh_ = std::move(callback); }
 
 void StreamingCollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+
+void StreamingCollectionView::SetService(StreamingService *service) {
+  service_ = service;
+  pretty_covers_ = StreamingCover::LoadPrettyCovers(service_ ? service_->name() : std::string());
+  if (pretty_covers_btn_) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(pretty_covers_btn_), pretty_covers_);
+  }
+  Rebuild();
+}
+
+void StreamingCollectionView::PersistPrettyCovers() {
+  StreamingCover::SavePrettyCovers(service_ ? service_->name() : std::string(), pretty_covers_);
+}
 
 void StreamingCollectionView::SetGrouping(const CollectionGrouping::Grouping &grouping) {
   if (grouping_ == grouping) {
@@ -194,26 +228,36 @@ void StreamingCollectionView::Rebuild() {
     SetStatus(songs_.empty() ? "0 items" : "0 shown");
     return;
   }
+  ++cover_gen_;
   const std::vector<StreamingSearchGroup::Row> rows =
       StreamingSearchGroup::RowsFor(visible, grouping_, CollectionGrouping::SeparateAlbumsByGrouping());
   for (const StreamingSearchGroup::Row &entry : rows) {
     GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_margin_start(box, StreamingSearchGroup::IndentPixels(entry.indent));
-    gtk_widget_set_margin_end(box, 8);
-    gtk_widget_set_margin_top(box, 4);
-    gtk_widget_set_margin_bottom(box, 4);
+    GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_widget_set_margin_start(row_box, StreamingSearchGroup::IndentPixels(entry.indent));
+    gtk_widget_set_margin_end(row_box, 8);
+    gtk_widget_set_margin_top(row_box, 4);
+    gtk_widget_set_margin_bottom(row_box, 4);
     if (entry.header) {
       GtkWidget *label = gtk_label_new(entry.label.c_str());
       gtk_widget_set_halign(label, GTK_ALIGN_START);
       gtk_widget_add_css_class(label, "heading");
-      gtk_box_append(GTK_BOX(box), label);
-      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+      gtk_box_append(GTK_BOX(row_box), label);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
       gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(row), FALSE);
       gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(row), FALSE);
       gtk_list_box_append(GTK_LIST_BOX(list_), row);
       continue;
     }
+    if (StreamingCover::ShouldShowThumb(pretty_covers_)) {
+      GtkWidget *image = gtk_image_new_from_icon_name(StreamingCover::kPlaceholderIcon);
+      gtk_image_set_pixel_size(GTK_IMAGE(image), StreamingCover::kArtHeight);
+      gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
+      gtk_box_append(GTK_BOX(row_box), image);
+      LoadCover(image, entry.song);
+    }
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_hexpand(box, TRUE);
     GtkWidget *primary = gtk_label_new(StreamingSearchItemDelegate::PrimaryText(entry.song).c_str());
     gtk_widget_set_halign(primary, GTK_ALIGN_START);
     gtk_box_append(GTK_BOX(box), primary);
@@ -224,13 +268,56 @@ void StreamingCollectionView::Rebuild() {
       gtk_widget_set_halign(sub, GTK_ALIGN_START);
       gtk_box_append(GTK_BOX(box), sub);
     }
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+    gtk_box_append(GTK_BOX(row_box), box);
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
     auto *copy = new Song(entry.song);
     g_object_set_data_full(G_OBJECT(row), "row-data", copy, [](gpointer p) { delete static_cast<Song *>(p); });
     SetupRowDrag(row, entry.song);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
   SetStatus(std::to_string(StreamingSearchGroup::SongCount(rows)) + " items");
+}
+
+void StreamingCollectionView::LoadCover(GtkWidget *image, const Song &song) {
+  if (!image) {
+    return;
+  }
+  const std::string key = StreamingCover::CacheKey(song);
+  const auto cached = cover_cache_.find(key);
+  if (cached != cover_cache_.end()) {
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(cached->second.begin(), cached->second.end()),
+                                     StreamingCover::kArtHeight);
+    return;
+  }
+  const std::string url = StreamingCover::CoverUrl(song);
+  if (!StreamingCover::CanLoad(url)) {
+    return;
+  }
+  if (StreamingCover::IsLocalUrl(url)) {
+    const std::string body = FileUtils::ReadFile(FileUtils::PathFromUri(url));
+    if (body.empty() || !JsonUtils::LooksLikeImage(body)) {
+      return;
+    }
+    cover_cache_[key] = body;
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(body.begin(), body.end()), StreamingCover::kArtHeight);
+    return;
+  }
+  if (!service_ || !service_->network()) {
+    return;
+  }
+  const int gen = cover_gen_;
+  const auto alive = alive_;
+  service_->network()->Get(url, [this, alive, gen, image, key](const NetworkAccessManager::Response &response) {
+    if (!alive || !*alive || gen != cover_gen_ || !image) {
+      return;
+    }
+    if (!response.ok() || !JsonUtils::LooksLikeImage(response.body)) {
+      return;
+    }
+    cover_cache_[key] = response.body;
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(response.body.begin(), response.body.end()),
+                                     StreamingCover::kArtHeight);
+  });
 }
 
 void StreamingCollectionView::BuildGroupMenu() {
