@@ -100,6 +100,35 @@ TEST(PlaylistSequence, CyclesOriginalRepeatAndShuffleModes) {
   EXPECT_STREQ("Shuffle all", PlaylistSequence::ShuffleLabel(PlaylistSequence::ShuffleMode::All));
 }
 
+TEST(PlaylistSequence, MenuModesMatchQtOrder) {
+  const auto repeat = PlaylistSequence::RepeatModes();
+  ASSERT_EQ(6u, repeat.size());
+  EXPECT_EQ(PlaylistSequence::RepeatMode::Off, repeat[0]);
+  EXPECT_EQ(PlaylistSequence::RepeatMode::Track, repeat[1]);
+  EXPECT_EQ(PlaylistSequence::RepeatMode::Album, repeat[2]);
+  EXPECT_EQ(PlaylistSequence::RepeatMode::Playlist, repeat[3]);
+  EXPECT_EQ(PlaylistSequence::RepeatMode::OneByOne, repeat[4]);
+  EXPECT_EQ(PlaylistSequence::RepeatMode::Intro, repeat[5]);
+  const auto shuffle = PlaylistSequence::ShuffleModes();
+  ASSERT_EQ(5u, shuffle.size());
+  EXPECT_EQ(PlaylistSequence::ShuffleMode::Off, shuffle[0]);
+  EXPECT_EQ(PlaylistSequence::ShuffleMode::All, shuffle[1]);
+  EXPECT_EQ(PlaylistSequence::ShuffleMode::InsideAlbum, shuffle[2]);
+  EXPECT_EQ(PlaylistSequence::ShuffleMode::Albums, shuffle[3]);
+  EXPECT_EQ(PlaylistSequence::ShuffleMode::Grouping, shuffle[4]);
+  EXPECT_FALSE(PlaylistSequence::RepeatActive(PlaylistSequence::RepeatMode::Off));
+  EXPECT_TRUE(PlaylistSequence::RepeatActive(PlaylistSequence::RepeatMode::Track));
+  EXPECT_FALSE(PlaylistSequence::ShuffleActive(PlaylistSequence::ShuffleMode::Off));
+  EXPECT_TRUE(PlaylistSequence::ShuffleActive(PlaylistSequence::ShuffleMode::All));
+  EXPECT_STREQ("Don't repeat", PlaylistSequence::RepeatLabel(PlaylistSequence::RepeatMode::Off));
+  EXPECT_STREQ("Stop after every track", PlaylistSequence::RepeatLabel(PlaylistSequence::RepeatMode::OneByOne));
+  EXPECT_STREQ("Intro tracks", PlaylistSequence::RepeatLabel(PlaylistSequence::RepeatMode::Intro));
+  EXPECT_STREQ("Don't shuffle", PlaylistSequence::ShuffleLabel(PlaylistSequence::ShuffleMode::Off));
+  EXPECT_STREQ("Shuffle tracks in this album", PlaylistSequence::ShuffleLabel(PlaylistSequence::ShuffleMode::InsideAlbum));
+  EXPECT_STREQ("Repeat", PlaylistSequence::RepeatButtonTooltip());
+  EXPECT_STREQ("Shuffle", PlaylistSequence::ShuffleButtonTooltip());
+}
+
 TEST(PlaylistUndoCommand, StoresInsertRemoveMoveSort) {
   Song song;
   song.set_title("Roads");

@@ -2,6 +2,7 @@
 #define STRAWBERRY_PLAYLISTCONTAINER_H
 
 #include "playlist/dynamicplaylistcontrols.h"
+#include "playlist/playlistsequence.h"
 #include "playlist/playlisttabbar.h"
 #include "playlist/playlistview.h"
 
@@ -10,6 +11,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 class PlaylistManager;
 
@@ -30,6 +32,10 @@ class PlaylistContainer {
 
   void SetFilterChangedCallback(const std::function<void(const std::string &)> &callback);
   void SetActionCallback(const char *name, ActionCallback callback);
+  void SetRepeatChangedCallback(const std::function<void(PlaylistSequence::RepeatMode)> &callback);
+  void SetShuffleChangedCallback(const std::function<void(PlaylistSequence::ShuffleMode)> &callback);
+  void SetRepeatMode(PlaylistSequence::RepeatMode mode);
+  void SetShuffleMode(PlaylistSequence::ShuffleMode mode);
   void SetSummary(const std::string &text);
   void ApplyLook();
 
@@ -40,6 +46,11 @@ class PlaylistContainer {
   GtkWidget *summary_ = nullptr;
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;
+  std::vector<GtkWidget *> repeat_items_;
+  std::vector<GtkWidget *> shuffle_items_;
+  bool updating_sequence_ = false;
+  std::function<void(PlaylistSequence::RepeatMode)> repeat_changed_;
+  std::function<void(PlaylistSequence::ShuffleMode)> shuffle_changed_;
   std::unique_ptr<PlaylistTabBar> tab_bar_;
   std::unique_ptr<PlaylistView> view_;
   std::unique_ptr<DynamicPlaylistControls> dynamic_controls_;

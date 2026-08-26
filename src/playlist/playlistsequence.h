@@ -2,6 +2,7 @@
 #define STRAWBERRY_PLAYLISTSEQUENCE_H
 
 #include <string>
+#include <vector>
 
 class PlaylistSequence {
  public:
@@ -37,6 +38,16 @@ class PlaylistSequence {
 
   static const char *RepeatLabel(RepeatMode mode);
   static const char *ShuffleLabel(ShuffleMode mode);
+  static const char *RepeatButtonTooltip() { return "Repeat"; }
+  static const char *ShuffleButtonTooltip() { return "Shuffle"; }
+  static bool RepeatActive(RepeatMode mode) { return mode != RepeatMode::Off; }
+  static bool ShuffleActive(ShuffleMode mode) { return mode != ShuffleMode::Off; }
+  static std::vector<RepeatMode> RepeatModes() {
+    return {RepeatMode::Off, RepeatMode::Track, RepeatMode::Album, RepeatMode::Playlist, RepeatMode::OneByOne, RepeatMode::Intro};
+  }
+  static std::vector<ShuffleMode> ShuffleModes() {
+    return {ShuffleMode::Off, ShuffleMode::All, ShuffleMode::InsideAlbum, ShuffleMode::Albums, ShuffleMode::Grouping};
+  }
 
  private:
   RepeatMode repeat_mode_ = RepeatMode::Off;

@@ -1243,14 +1243,20 @@ void MainWindow::BuildPlaylist() {
 
   repeat_button_ = playlist_container_->repeat_button();
   shuffle_button_ = playlist_container_->shuffle_button();
-  g_signal_connect(repeat_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     static_cast<MainWindow *>(data)->CycleRepeat();
-                   }),
-                   this);
-  g_signal_connect(shuffle_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     static_cast<MainWindow *>(data)->CycleShuffle();
-                   }),
-                   this);
+  playlist_container_->SetRepeatChangedCallback([this](PlaylistSequence::RepeatMode mode) {
+    playlist_sequence_.SetRepeatMode(mode);
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      playlist->SetRepeatMode(mode);
+    }
+  });
+  playlist_container_->SetShuffleChangedCallback([this](PlaylistSequence::ShuffleMode mode) {
+    playlist_sequence_.SetShuffleMode(mode);
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      playlist->SetShuffleMode(mode);
+    }
+  });
+  playlist_container_->SetRepeatMode(playlist_sequence_.repeat_mode());
+  playlist_container_->SetShuffleMode(playlist_sequence_.shuffle_mode());
 }
 
 void MainWindow::BuildPlayerBar() {
@@ -1425,11 +1431,9 @@ void MainWindow::ConnectSignals() {
     }
     playlist_sequence_.SetRepeatMode(playlist->repeat_mode());
     playlist_sequence_.SetShuffleMode(playlist->shuffle_mode());
-    if (repeat_button_) {
-      gtk_widget_set_tooltip_text(repeat_button_, PlaylistSequence::RepeatLabel(playlist_sequence_.repeat_mode()));
-    }
-    if (shuffle_button_) {
-      gtk_widget_set_tooltip_text(shuffle_button_, PlaylistSequence::ShuffleLabel(playlist_sequence_.shuffle_mode()));
+    if (playlist_container_) {
+      playlist_container_->SetRepeatMode(playlist_sequence_.repeat_mode());
+      playlist_container_->SetShuffleMode(playlist_sequence_.shuffle_mode());
     }
     RefreshPlaylist();
   });
@@ -2198,7 +2202,9 @@ void MainWindow::CycleRepeat() {
   }
   playlist_sequence_.CycleRepeatMode();
   playlist->SetRepeatMode(playlist_sequence_.repeat_mode());
-  gtk_widget_set_tooltip_text(repeat_button_, PlaylistSequence::RepeatLabel(playlist_sequence_.repeat_mode()));
+  if (playlist_container_) {
+    playlist_container_->SetRepeatMode(playlist_sequence_.repeat_mode());
+  }
 }
 
 void MainWindow::CycleShuffle() {
@@ -2208,7 +2214,9 @@ void MainWindow::CycleShuffle() {
   }
   playlist_sequence_.CycleShuffleMode();
   playlist->SetShuffleMode(playlist_sequence_.shuffle_mode());
-  gtk_widget_set_tooltip_text(shuffle_button_, PlaylistSequence::ShuffleLabel(playlist_sequence_.shuffle_mode()));
+  if (playlist_container_) {
+    playlist_container_->SetShuffleMode(playlist_sequence_.shuffle_mode());
+  }
   if (playlist_sequence_.shuffle_mode() == PlaylistSequence::ShuffleMode::All) {
     app_->playlist_manager()->ShuffleCurrent();
     RefreshPlaylist();

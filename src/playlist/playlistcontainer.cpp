@@ -36,10 +36,82 @@ PlaylistContainer::PlaylistContainer()
   clear_button_ = add_tool("edit-clear-all-symbolic", Translations::Tr("Clear playlist").c_str(), "clear");
   add_tool("edit-undo-symbolic", Translations::Tr("Undo").c_str(), "undo");
   add_tool("edit-redo-symbolic", Translations::Tr("Redo").c_str(), "redo");
-  repeat_button_ = gtk_button_new_from_icon_name("media-playlist-repeat-symbolic");
-  gtk_widget_set_tooltip_text(repeat_button_, Translations::Tr("Cycle repeat").c_str());
-  shuffle_button_ = gtk_button_new_from_icon_name("media-playlist-shuffle-symbolic");
-  gtk_widget_set_tooltip_text(shuffle_button_, Translations::Tr("Shuffle playlist").c_str());
+
+  auto make_menu_button = [](const char *icon, const char *tooltip) {
+    GtkWidget *button = gtk_menu_button_new();
+    gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(button), icon);
+    gtk_menu_button_set_always_show_arrow(GTK_MENU_BUTTON(button), FALSE);
+    gtk_widget_add_css_class(button, "flat");
+    gtk_widget_set_tooltip_text(button, tooltip);
+    return button;
+  };
+  repeat_button_ = make_menu_button("media-playlist-repeat-symbolic", Translations::CStr(PlaylistSequence::RepeatButtonTooltip()));
+  shuffle_button_ = make_menu_button("media-playlist-shuffle-symbolic", Translations::CStr(PlaylistSequence::ShuffleButtonTooltip()));
+
+  GtkWidget *repeat_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  GtkWidget *repeat_group = nullptr;
+  for (PlaylistSequence::RepeatMode mode : PlaylistSequence::RepeatModes()) {
+    GtkWidget *item = gtk_check_button_new_with_label(PlaylistSequence::RepeatLabel(mode));
+    gtk_check_button_set_group(GTK_CHECK_BUTTON(item), repeat_group ? GTK_CHECK_BUTTON(repeat_group) : nullptr);
+    if (!repeat_group) {
+      repeat_group = item;
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(item), TRUE);
+    }
+    g_object_set_data(G_OBJECT(item), "mode", GINT_TO_POINTER(static_cast<int>(mode) + 1));
+    g_signal_connect(item, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                       if (!gtk_check_button_get_active(button)) {
+                         return;
+                       }
+                       auto *self = static_cast<PlaylistContainer *>(data);
+                       if (self->updating_sequence_) {
+                         return;
+                       }
+                       const int mode = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "mode")) - 1;
+                       self->SetRepeatMode(static_cast<PlaylistSequence::RepeatMode>(mode));
+                       if (self->repeat_changed_) {
+                         self->repeat_changed_(static_cast<PlaylistSequence::RepeatMode>(mode));
+                       }
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(repeat_box), item);
+    repeat_items_.push_back(item);
+  }
+  GtkWidget *repeat_popover = gtk_popover_new();
+  gtk_popover_set_child(GTK_POPOVER(repeat_popover), repeat_box);
+  gtk_menu_button_set_popover(GTK_MENU_BUTTON(repeat_button_), repeat_popover);
+
+  GtkWidget *shuffle_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  GtkWidget *shuffle_group = nullptr;
+  for (PlaylistSequence::ShuffleMode mode : PlaylistSequence::ShuffleModes()) {
+    GtkWidget *item = gtk_check_button_new_with_label(PlaylistSequence::ShuffleLabel(mode));
+    gtk_check_button_set_group(GTK_CHECK_BUTTON(item), shuffle_group ? GTK_CHECK_BUTTON(shuffle_group) : nullptr);
+    if (!shuffle_group) {
+      shuffle_group = item;
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(item), TRUE);
+    }
+    g_object_set_data(G_OBJECT(item), "mode", GINT_TO_POINTER(static_cast<int>(mode) + 1));
+    g_signal_connect(item, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                       if (!gtk_check_button_get_active(button)) {
+                         return;
+                       }
+                       auto *self = static_cast<PlaylistContainer *>(data);
+                       if (self->updating_sequence_) {
+                         return;
+                       }
+                       const int mode = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "mode")) - 1;
+                       self->SetShuffleMode(static_cast<PlaylistSequence::ShuffleMode>(mode));
+                       if (self->shuffle_changed_) {
+                         self->shuffle_changed_(static_cast<PlaylistSequence::ShuffleMode>(mode));
+                       }
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(shuffle_box), item);
+    shuffle_items_.push_back(item);
+  }
+  GtkWidget *shuffle_popover = gtk_popover_new();
+  gtk_popover_set_child(GTK_POPOVER(shuffle_popover), shuffle_box);
+  gtk_menu_button_set_popover(GTK_MENU_BUTTON(shuffle_button_), shuffle_popover);
+
   gtk_box_append(GTK_BOX(toolbar_), repeat_button_);
   gtk_box_append(GTK_BOX(toolbar_), shuffle_button_);
   GtkWidget *filter = gtk_search_entry_new();
@@ -73,6 +145,48 @@ void PlaylistContainer::SetFilterChangedCallback(const std::function<void(const 
 void PlaylistContainer::SetActionCallback(const char *name, ActionCallback callback) {
   auto *cb = new ActionCallback(std::move(callback));
   g_object_set_data_full(G_OBJECT(widget_), name, cb, [](gpointer p) { delete static_cast<ActionCallback *>(p); });
+}
+
+void PlaylistContainer::SetRepeatChangedCallback(const std::function<void(PlaylistSequence::RepeatMode)> &callback) {
+  repeat_changed_ = callback;
+}
+
+void PlaylistContainer::SetShuffleChangedCallback(const std::function<void(PlaylistSequence::ShuffleMode)> &callback) {
+  shuffle_changed_ = callback;
+}
+
+void PlaylistContainer::SetRepeatMode(PlaylistSequence::RepeatMode mode) {
+  updating_sequence_ = true;
+  for (GtkWidget *item : repeat_items_) {
+    const int item_mode = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(item), "mode")) - 1;
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(item), item_mode == static_cast<int>(mode));
+  }
+  if (repeat_button_) {
+    gtk_widget_set_tooltip_text(repeat_button_, PlaylistSequence::RepeatLabel(mode));
+    if (PlaylistSequence::RepeatActive(mode)) {
+      gtk_widget_add_css_class(repeat_button_, "accent");
+    } else {
+      gtk_widget_remove_css_class(repeat_button_, "accent");
+    }
+  }
+  updating_sequence_ = false;
+}
+
+void PlaylistContainer::SetShuffleMode(PlaylistSequence::ShuffleMode mode) {
+  updating_sequence_ = true;
+  for (GtkWidget *item : shuffle_items_) {
+    const int item_mode = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(item), "mode")) - 1;
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(item), item_mode == static_cast<int>(mode));
+  }
+  if (shuffle_button_) {
+    gtk_widget_set_tooltip_text(shuffle_button_, PlaylistSequence::ShuffleLabel(mode));
+    if (PlaylistSequence::ShuffleActive(mode)) {
+      gtk_widget_add_css_class(shuffle_button_, "accent");
+    } else {
+      gtk_widget_remove_css_class(shuffle_button_, "accent");
+    }
+  }
+  updating_sequence_ = false;
 }
 
 void PlaylistContainer::SetSummary(const std::string &text) { gtk_label_set_text(GTK_LABEL(summary_), text.c_str()); }
