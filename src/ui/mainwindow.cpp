@@ -936,7 +936,7 @@ void MainWindow::BuildSidebar() {
     RefreshPlaylist();
   };
   for (StreamingService *service : app_->streaming_services()->All()) {
-    auto view = std::make_unique<StreamingTabsView>(service);
+    auto view = std::make_unique<StreamingTabsView>(service, app_->database());
     view->SetActivateCallback(activate_stream);
     view->SetMenuCallback([this](const SongList &songs) { ShowStreamingMenu(songs); });
     view->SetConfigureCallback([this]() { OpenSettings(); });

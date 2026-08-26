@@ -3,7 +3,7 @@
 #include "streaming/streamingbrowse.h"
 #include "streaming/streamingprogress.h"
 
-StreamingTabsView::StreamingTabsView(StreamingService *service) : service_(service) {
+StreamingTabsView::StreamingTabsView(StreamingService *service, Database *database) : service_(service), database_(database) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   GtkWidget *stack = gtk_stack_new();
   GtkWidget *switcher = gtk_stack_switcher_new();
@@ -206,10 +206,28 @@ void StreamingTabsView::ReloadSettings() {
   }
 }
 
+void StreamingTabsView::ShowCached(StreamingCollectionView *view, StreamingCollectionStore::List list) {
+  if (!view || !service_ || !database_) {
+    return;
+  }
+  const SongList cached = StreamingCollectionStore::Load(database_, StreamingCollectionStore::TableName(service_->name(), list));
+  if (!cached.empty()) {
+    view->SetSongs(cached);
+  }
+}
+
+void StreamingTabsView::PersistList(StreamingCollectionStore::List list, const SongList &songs) {
+  if (!service_ || !database_) {
+    return;
+  }
+  StreamingCollectionStore::Replace(database_, StreamingCollectionStore::TableName(service_->name(), list), songs);
+}
+
 void StreamingTabsView::GetArtists() {
   if (!service_) {
     return;
   }
+  ShowCached(artists_->view(), StreamingCollectionStore::List::Artists);
   if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
     artists_->ShowProgress(StreamingProgress::ReceivingArtists());
     service_->StartArtistsProgress();
@@ -217,6 +235,12 @@ void StreamingTabsView::GetArtists() {
   artists_->view()->SetStatus("Loading artists…");
   service_->GetArtists([this](const SongList &songs) {
     artists_->HideProgressUnlessError();
+    if (StreamingCollectionStore::ShouldKeepCache(artists_->has_error(), songs)) {
+      return;
+    }
+    if (StreamingCollectionStore::ShouldPersist(artists_->has_error(), service_->logged_in(), songs)) {
+      PersistList(StreamingCollectionStore::List::Artists, songs);
+    }
     artists_->view()->SetSongs(songs);
     if (songs.empty()) {
       artists_->view()->SetStatus(service_->logged_in() ? "No artists" : "Sign in in Preferences");
@@ -228,6 +252,7 @@ void StreamingTabsView::GetAlbums() {
   if (!service_) {
     return;
   }
+  ShowCached(albums_->view(), StreamingCollectionStore::List::Albums);
   if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
     albums_->ShowProgress(StreamingProgress::ReceivingAlbums());
     service_->StartAlbumsProgress();
@@ -235,6 +260,12 @@ void StreamingTabsView::GetAlbums() {
   albums_->view()->SetStatus("Loading albums…");
   service_->GetAlbums([this](const SongList &songs) {
     albums_->HideProgressUnlessError();
+    if (StreamingCollectionStore::ShouldKeepCache(albums_->has_error(), songs)) {
+      return;
+    }
+    if (StreamingCollectionStore::ShouldPersist(albums_->has_error(), service_->logged_in(), songs)) {
+      PersistList(StreamingCollectionStore::List::Albums, songs);
+    }
     albums_->view()->SetSongs(songs);
     if (songs.empty()) {
       albums_->view()->SetStatus(service_->logged_in() ? "No albums" : "Sign in in Preferences");
@@ -246,6 +277,7 @@ void StreamingTabsView::GetSongs() {
   if (!service_) {
     return;
   }
+  ShowCached(songs_->view(), StreamingCollectionStore::List::Songs);
   if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
     songs_->ShowProgress(StreamingProgress::ReceivingSongs());
     service_->StartSongsProgress();
@@ -253,6 +285,12 @@ void StreamingTabsView::GetSongs() {
   songs_->view()->SetStatus("Loading songs…");
   service_->GetSongs([this](const SongList &songs) {
     songs_->HideProgressUnlessError();
+    if (StreamingCollectionStore::ShouldKeepCache(songs_->has_error(), songs)) {
+      return;
+    }
+    if (StreamingCollectionStore::ShouldPersist(songs_->has_error(), service_->logged_in(), songs)) {
+      PersistList(StreamingCollectionStore::List::Songs, songs);
+    }
     songs_->view()->SetSongs(songs);
     if (songs.empty()) {
       songs_->view()->SetStatus(service_->logged_in() ? "No songs" : "Sign in in Preferences");

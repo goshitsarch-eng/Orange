@@ -1,5 +1,6 @@
 #include "streaming/streamingabort.h"
 #include "streaming/streamingalbum.h"
+#include "streaming/streamingcollectionstore.h"
 #include "streaming/streamingcoverdownload.h"
 #include "streaming/streamingpage.h"
 #include "streaming/streamingsearchopts.h"
@@ -13,10 +14,12 @@
 #include "streaming/streamserviceplaylistitem.h"
 #include "streaming/streamingdrag.h"
 #include "streaming/streamsongmimedata.h"
+#include "core/database.h"
 #include "core/settings.h"
 #include "utilities/fileutils.h"
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <string>
 
@@ -448,6 +451,61 @@ TEST(StreamingAlbum, EffectiveTitleAndApplyParent) {
   EXPECT_EQ("Child", existing[0].album());
   EXPECT_EQ("Child Artist", existing[0].artist());
   EXPECT_EQ(1994, existing[0].year());
+}
+
+TEST(StreamingCollectionStore, TableNamesAndPersistRules) {
+  EXPECT_EQ("tidal_artists_songs", StreamingCollectionStore::TableName("Tidal", StreamingCollectionStore::List::Artists));
+  EXPECT_EQ("qobuz_albums_songs", StreamingCollectionStore::TableName("Qobuz", StreamingCollectionStore::List::Albums));
+  EXPECT_EQ("spotify_songs", StreamingCollectionStore::TableName("Spotify", StreamingCollectionStore::List::Songs));
+  EXPECT_EQ("subsonic_songs", StreamingCollectionStore::TableName("Subsonic", StreamingCollectionStore::List::Songs));
+  EXPECT_TRUE(StreamingCollectionStore::TableName("Subsonic", StreamingCollectionStore::List::Artists).empty());
+  EXPECT_TRUE(StreamingCollectionStore::TableName("Radio", StreamingCollectionStore::List::Songs).empty());
+  EXPECT_TRUE(StreamingCollectionStore::ValidTable("tidal_songs"));
+  EXPECT_FALSE(StreamingCollectionStore::ValidTable("songs; DROP TABLE songs"));
+  EXPECT_FALSE(StreamingCollectionStore::ShouldPersist(true, true, {}));
+  EXPECT_TRUE(StreamingCollectionStore::ShouldPersist(false, true, {}));
+  EXPECT_TRUE(StreamingCollectionStore::ShouldKeepCache(true, {}));
+  EXPECT_FALSE(StreamingCollectionStore::ShouldKeepCache(false, {}));
+  Song song(Song::Source::Tidal);
+  song.set_song_id("99");
+  EXPECT_EQ("99", StreamingCollectionStore::PersistUrl(song));
+  song.set_url("tidal://99");
+  EXPECT_EQ("tidal://99", StreamingCollectionStore::PersistUrl(song));
+}
+
+TEST(StreamingCollectionStore, ReplaceAndLoad) {
+  const std::string path = "/tmp/strawberry-streaming-store-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  Song song(Song::Source::Tidal);
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_album("Dummy");
+  song.set_albumartist("Portishead");
+  song.set_url("tidal://99");
+  song.set_song_id("99");
+  song.set_album_id("88");
+  song.set_artist_id("5");
+  song.set_art_automatic("https://example.com/a.jpg");
+  song.set_year(1994);
+  song.set_genre("Electronic");
+  StreamingCollectionStore::Replace(&db, "tidal_songs", {song});
+  const SongList loaded = StreamingCollectionStore::Load(&db, "tidal_songs");
+  ASSERT_EQ(1u, loaded.size());
+  EXPECT_EQ("Roads", loaded.front().title());
+  EXPECT_EQ("Dummy", loaded.front().album());
+  EXPECT_EQ("Portishead", loaded.front().artist());
+  EXPECT_EQ("tidal://99", loaded.front().url());
+  EXPECT_EQ("99", loaded.front().song_id());
+  EXPECT_EQ("88", loaded.front().album_id());
+  EXPECT_EQ("https://example.com/a.jpg", loaded.front().art_automatic());
+  EXPECT_EQ(1994, loaded.front().year());
+  EXPECT_EQ(Song::Source::Tidal, loaded.front().source());
+  StreamingCollectionStore::Replace(&db, "tidal_songs", {});
+  EXPECT_TRUE(StreamingCollectionStore::Load(&db, "tidal_songs").empty());
+  EXPECT_TRUE(StreamingCollectionStore::Load(&db, "not_a_table").empty());
+  unlink(path.c_str());
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {

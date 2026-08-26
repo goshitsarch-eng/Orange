@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_STREAMINGTABSVIEW_H
 #define STRAWBERRY_STREAMINGTABSVIEW_H
 
+#include "streaming/streamingcollectionstore.h"
 #include "streaming/streamingcollectionviewcontainer.h"
 #include "streaming/streamingsearchview.h"
 #include "streaming/streamingservices.h"
@@ -11,13 +12,15 @@
 #include <memory>
 #include <string>
 
+class Database;
+
 class StreamingTabsView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
   using MenuCallback = std::function<void(const SongList &)>;
   using ConfigureCallback = std::function<void()>;
 
-  explicit StreamingTabsView(StreamingService *service);
+  explicit StreamingTabsView(StreamingService *service, Database *database = nullptr);
   ~StreamingTabsView();
 
   GtkWidget *widget() const { return widget_; }
@@ -42,10 +45,13 @@ class StreamingTabsView {
   void HandleActivate(StreamingCollectionView *view, const Song &song);
   void BrowseArtist(StreamingCollectionView *view, const Song &artist);
   void BrowseAlbum(StreamingCollectionView *view, const Song &album);
+  void ShowCached(StreamingCollectionView *view, StreamingCollectionStore::List list);
+  void PersistList(StreamingCollectionStore::List list, const SongList &songs);
 
   void ConnectBrowseProgress();
 
   StreamingService *service_ = nullptr;
+  Database *database_ = nullptr;
   ActivateCallback activate_;
   std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
   GtkWidget *widget_ = nullptr;

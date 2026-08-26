@@ -464,6 +464,7 @@ set(STRAWBERRY_SOURCES
   src/streaming/streamingservice.cpp
   src/streaming/streamingpage.cpp
   src/streaming/streamingcoverdownload.cpp
+  src/streaming/streamingcollectionstore.cpp
   src/streaming/streamingservices.cpp
   src/streaming/streamsongmimedata.cpp
   src/streaming/streamingsearchmodel.cpp
@@ -839,6 +840,7 @@ if(GTest_FOUND)
     src/streaming/streamingservice.cpp
     src/streaming/streamingpage.cpp
     src/streaming/streamingcoverdownload.cpp
+    src/streaming/streamingcollectionstore.cpp
     src/utilities/styleutils.cpp
     src/engine/enginebase.cpp
     src/engine/gstbusmessageevent.cpp
