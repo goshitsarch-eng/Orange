@@ -149,6 +149,8 @@ TEST(SettingsPages, ServicePageNames) {
   EXPECT_STREQ("Radio", SettingsPages::ForSource(Song::Source::RadioBrowser));
   EXPECT_EQ(nullptr, SettingsPages::ForSource(Song::Source::LocalFile));
   EXPECT_TRUE(SettingsPages::CanOpenAt(SettingsPages::Tidal()));
+  EXPECT_TRUE(SettingsPages::CanOpenAt(SettingsPages::Collection()));
+  EXPECT_STREQ("Configure collection…", SettingsPages::ConfigureCollectionLabel());
   EXPECT_FALSE(SettingsPages::CanOpenAt(nullptr));
   EXPECT_FALSE(SettingsPages::CanOpenAt(""));
 }

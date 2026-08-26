@@ -16,6 +16,8 @@ inline const char *Radio() { return "Radio"; }
 inline const char *Context() { return "Context"; }
 inline const char *Notifications() { return "Notifications"; }
 
+inline const char *ConfigureCollectionLabel() { return "Configure collection…"; }
+
 inline bool CanOpenAt(const char *page) { return page && page[0] != '\0'; }
 
 inline const char *ForService(const std::string &name) {

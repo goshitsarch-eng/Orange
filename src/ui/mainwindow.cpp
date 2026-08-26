@@ -587,6 +587,9 @@ void MainWindow::BuildUi() {
                  self->collection_container_->view()->CollapseAll();
                }
              }));
+  add_action("collection-configure", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->OpenSettings(SettingsPages::Collection());
+             }));
   add_action("collection-various-on", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                static_cast<MainWindow *>(data)->ForceCompilationSelected(true);
              }));
@@ -2253,6 +2256,7 @@ void MainWindow::ShowCollectionMenu() {
   GMenu *menu = g_menu_new();
   g_menu_append(menu, Translations::Tr("Expand all").c_str(), "win.collection-expand-all");
   g_menu_append(menu, Translations::Tr("Collapse all").c_str(), "win.collection-collapse-all");
+  g_menu_append(menu, Translations::Tr(SettingsPages::ConfigureCollectionLabel()).c_str(), "win.collection-configure");
   if (CollectionSongs().empty()) {
     GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
     gtk_widget_set_parent(popover, collection_container_ ? collection_container_->view()->list() : GTK_WIDGET(window_));
