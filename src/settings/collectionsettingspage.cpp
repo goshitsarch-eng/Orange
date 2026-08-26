@@ -96,7 +96,8 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
   SettingsPage::AddEntry(scan, settings, CollectionSettings::kCoverArtPatterns, "Cover art filename patterns", "cover.jpg,folder.jpg,front.jpg,album.jpg");
 
   AdwPreferencesGroup *display = SettingsPage::AddGroup(page, "Display");
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kAutoOpen, "Auto-open collection items", nullptr, CollectionSettings::kDefaultAutoOpen);
+  SettingsPage::AddToggle(display, settings, CollectionSettings::kAutoOpen,
+                          "Automatically open single categories in the collection tree", nullptr, CollectionSettings::kDefaultAutoOpen);
   SettingsPage::AddToggle(display, settings, CollectionSettings::kShowDividers, "Show artist / album dividers", nullptr,
                           CollectionSettings::kDefaultShowDividers);
   SettingsPage::AddToggle(display, settings, CollectionSettings::kPrettyCovers, "Use pretty covers", nullptr, CollectionSettings::kDefaultPrettyCovers);

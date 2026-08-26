@@ -1,3 +1,4 @@
+#include "collection/collectionautoopen.h"
 #include "collection/collectionbackend.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectioncover.h"
@@ -682,6 +683,64 @@ TEST(CollectionIconCache, SizeLabelsSafeKeysAndTempStore) {
   EXPECT_FALSE(CollectionIconCache::Write("other", "xxxxxxxxxxxxxxxx", dir, 8));
   CollectionIconCache::Clear(dir);
   EXPECT_EQ(0, CollectionIconCache::DiskCacheBytes(dir));
+}
+
+TEST(CollectionAutoOpen, DrillsSingleChildAndMatchesQtBudget) {
+  EXPECT_EQ(50, CollectionAutoOpen::kRowsToShow);
+  EXPECT_FALSE(CollectionSettings::kDefaultAutoOpen);
+
+  CollectionItem root(CollectionItem::Type::Root);
+  CollectionItem *artist = root.AddChild(CollectionItem::Type::Container);
+  artist->key = "Portishead";
+  artist->container_level = 0;
+  CollectionItem *album = artist->AddChild(CollectionItem::Type::Container);
+  album->key = "Dummy";
+  album->container_level = 1;
+  CollectionItem *song = album->AddChild(CollectionItem::Type::Song);
+  song->metadata = MakeSong("Roads", "Portishead", "Dummy");
+
+  EXPECT_EQ(1, CollectionAutoOpen::ChildCount(artist));
+  EXPECT_FALSE(CollectionAutoOpen::ShouldDrillInto(false, artist));
+  EXPECT_TRUE(CollectionAutoOpen::ShouldDrillInto(true, artist));
+  EXPECT_TRUE(CollectionAutoOpen::ShouldDrillInto(true, album));
+  EXPECT_EQ(album, CollectionAutoOpen::SoleChild(artist));
+  EXPECT_EQ(song, CollectionAutoOpen::SoleChild(album));
+
+  const std::vector<std::string> drilled = CollectionAutoOpen::DrillKeys(true, artist);
+  ASSERT_EQ(1U, drilled.size());
+  EXPECT_EQ(CollectionTree::Key(album), drilled.front());
+  EXPECT_TRUE(CollectionAutoOpen::DrillKeys(false, artist).empty());
+
+  std::set<std::string> expanded;
+  CollectionTree::Toggle(&expanded, artist);
+  CollectionAutoOpen::ApplyDrill(&expanded, true, artist);
+  EXPECT_TRUE(expanded.count(CollectionTree::Key(artist)));
+  EXPECT_TRUE(expanded.count(CollectionTree::Key(album)));
+  EXPECT_FALSE(expanded.count(CollectionTree::Key(song)));
+
+  CollectionItem wide(CollectionItem::Type::Root);
+  for (int i = 0; i < 3; ++i) {
+    CollectionItem *node = wide.AddChild(CollectionItem::Type::Container);
+    node->key = "Artist" + std::to_string(i);
+    node->container_level = 0;
+    CollectionItem *child = node->AddChild(CollectionItem::Type::Container);
+    child->key = "Album" + std::to_string(i);
+    child->container_level = 1;
+    child->AddChild(CollectionItem::Type::Song)->metadata = MakeSong("Track", node->key, child->key);
+  }
+  EXPECT_TRUE(CollectionAutoOpen::RecursivelyExpandKeys(&wide, false).empty());
+  const std::vector<std::string> opened = CollectionAutoOpen::RecursivelyExpandKeys(&wide, true);
+  ASSERT_EQ(6U, opened.size());
+  EXPECT_EQ(CollectionTree::Key(wide.children.front().get()), opened.front());
+
+  CollectionItem crowded(CollectionItem::Type::Root);
+  for (int i = 0; i < 30; ++i) {
+    CollectionItem *node = crowded.AddChild(CollectionItem::Type::Container);
+    node->key = "N" + std::to_string(i);
+    node->container_level = 0;
+    node->AddChild(CollectionItem::Type::Song)->metadata = MakeSong("T", node->key, "A");
+  }
+  EXPECT_TRUE(CollectionAutoOpen::RecursivelyExpandKeys(&crowded, true).empty());
 }
 
 TEST(CollectionStats, WritesLocalSongsAndKeepsQtCopy) {

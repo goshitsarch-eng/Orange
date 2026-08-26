@@ -65,6 +65,7 @@ class CollectionView {
   std::set<std::string> expanded_;
   std::map<std::string, std::string> cover_cache_;
   bool pretty_covers_ = CollectionSettings::kDefaultPrettyCovers;
+  bool auto_open_ = CollectionSettings::kDefaultAutoOpen;
   std::string typeahead_;
   guint typeahead_timeout_id_ = 0;
 };

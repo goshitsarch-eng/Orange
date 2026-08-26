@@ -1,5 +1,6 @@
 #include "collection/collectionview.h"
 
+#include "collection/collectionautoopen.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectiondivider.h"
 #include "collection/collectioniconcache.h"
@@ -61,6 +62,7 @@ void CollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(
 
 void CollectionView::ApplyLook() {
   pretty_covers_ = CollectionCover::LoadPrettyCovers();
+  auto_open_ = CollectionAutoOpen::LoadAutoOpen();
   if (!CollectionIconCache::DiskCacheEnabled()) {
     CollectionIconCache::Clear();
   }
@@ -225,11 +227,14 @@ void CollectionView::CollapseAll() {
 }
 
 void CollectionView::ToggleExpanded(const CollectionItem *item) {
-  if (CollectionTree::Toggle(&expanded_, item)) {
-    Rebuild();
-  } else if (CollectionTree::IsExpandable(item)) {
-    Rebuild();
+  if (!CollectionTree::IsExpandable(item)) {
+    return;
   }
+  const bool now_expanded = CollectionTree::Toggle(&expanded_, item);
+  if (now_expanded) {
+    CollectionAutoOpen::ApplyDrill(&expanded_, auto_open_, item);
+  }
+  Rebuild();
 }
 
 bool CollectionView::IsExpanded(const CollectionItem *item) const {
