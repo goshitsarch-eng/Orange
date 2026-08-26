@@ -81,7 +81,10 @@ void PlaylistView::SetQueuePositionCallback(QueuePositionCallback callback) { qu
 
 void PlaylistView::SetDeleteCallback(DeleteCallback callback) { delete_ = std::move(callback); }
 
-PlaylistView::~PlaylistView() { ResetTypeAhead(); }
+PlaylistView::~PlaylistView() {
+  StopGlowTimer();
+  ResetTypeAhead();
+}
 
 void PlaylistView::ResetTypeAhead() {
   typeahead_.clear();
@@ -379,7 +382,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
   const bool alternating = look.BoolValue(PlaylistSettings::kAlternatingRowColors, PlaylistSettings::kDefaultAlternatingRowColors);
   const bool glow = look.BoolValue(PlaylistSettings::kGlowEffect, PlaylistSettings::kDefaultGlowEffect);
   const bool bars = look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars);
-  StyleUtils::LoadCss(PlaylistLook::CombinedCss(alternating, glow, bars, playback_progress_));
+  StyleUtils::LoadCss(PlaylistLook::CombinedCss(alternating, glow, bars, playback_progress_, glow_step_));
   visible_count_ = 0;
   visible_titles_.clear();
   visible_rows_.clear();
@@ -583,13 +586,55 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
   }
 }
 
-void PlaylistView::SetPlaybackProgress(double progress) {
-  playback_progress_ = std::clamp(progress, 0.0, 1.0);
+void PlaylistView::ReloadLookCss() {
   Settings look;
   look.BeginGroup(PlaylistSettings::kSettingsGroup);
   StyleUtils::LoadCss(PlaylistLook::CombinedCss(look.BoolValue(PlaylistSettings::kAlternatingRowColors, PlaylistSettings::kDefaultAlternatingRowColors),
                                                 look.BoolValue(PlaylistSettings::kGlowEffect, PlaylistSettings::kDefaultGlowEffect),
-                                                look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars), playback_progress_));
+                                                look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars), playback_progress_,
+                                                glow_step_));
+}
+
+void PlaylistView::StopGlowTimer() {
+  if (glow_timeout_) {
+    g_source_remove(glow_timeout_);
+    glow_timeout_ = 0;
+  }
+}
+
+void PlaylistView::StartGlowTimer() {
+  if (glow_timeout_) {
+    return;
+  }
+  glow_timeout_ = g_timeout_add(PlaylistLook::GlowIntervalMs(), +[](gpointer data) -> gboolean {
+    return static_cast<PlaylistView *>(data)->OnGlowTick();
+  }, this);
+}
+
+gboolean PlaylistView::OnGlowTick() {
+  glow_step_ = PlaylistLook::NextGlowStep(glow_step_);
+  ReloadLookCss();
+  return G_SOURCE_CONTINUE;
+}
+
+void PlaylistView::SetGlowing(bool glowing) {
+  glowing_ = glowing;
+  Settings look;
+  look.BeginGroup(PlaylistSettings::kSettingsGroup);
+  const bool glow = look.BoolValue(PlaylistSettings::kGlowEffect, PlaylistSettings::kDefaultGlowEffect);
+  const bool bars = look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars);
+  if (!PlaylistLook::ShouldAnimateGlow(glow, bars, glowing_)) {
+    StopGlowTimer();
+    glow_step_ = PlaylistLook::StopGlowStep();
+    ReloadLookCss();
+    return;
+  }
+  StartGlowTimer();
+}
+
+void PlaylistView::SetPlaybackProgress(double progress) {
+  playback_progress_ = std::clamp(progress, 0.0, 1.0);
+  ReloadLookCss();
 }
 
 void PlaylistView::ScrollToRow(int row) {

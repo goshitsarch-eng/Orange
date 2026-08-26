@@ -1318,6 +1318,28 @@ TEST(PlaylistLook, CombinedCssCoversAlternatingGlowAndBars) {
   EXPECT_NE(std::string::npos, css.find("playlist-unavailable"));
 }
 
+TEST(PlaylistLook, GlowPulseMatchesQtSteps) {
+  EXPECT_EQ(24, PlaylistLook::kGlowIntensitySteps);
+  EXPECT_EQ(48, PlaylistLook::GlowPeriod());
+  EXPECT_EQ(62, PlaylistLook::GlowIntervalMs());
+  EXPECT_EQ(0, PlaylistLook::GlowFrame(0));
+  EXPECT_EQ(23, PlaylistLook::GlowFrame(23));
+  EXPECT_EQ(23, PlaylistLook::GlowFrame(24));
+  EXPECT_EQ(22, PlaylistLook::GlowFrame(25));
+  EXPECT_EQ(0, PlaylistLook::GlowFrame(47));
+  EXPECT_EQ(1, PlaylistLook::NextGlowStep(0));
+  EXPECT_EQ(0, PlaylistLook::NextGlowStep(47));
+  EXPECT_EQ(24, PlaylistLook::StopGlowStep());
+  EXPECT_NEAR(0.4, PlaylistLook::GlowOverlay(0), 0.0001);
+  EXPECT_LT(PlaylistLook::GlowOverlay(23), PlaylistLook::GlowOverlay(0));
+  EXPECT_TRUE(PlaylistLook::ShouldAnimateGlow(true, true, true));
+  EXPECT_FALSE(PlaylistLook::ShouldAnimateGlow(true, false, true));
+  EXPECT_FALSE(PlaylistLook::ShouldAnimateGlow(true, true, false));
+  const std::string dim = PlaylistLook::GlowCss(true, 0);
+  const std::string bright = PlaylistLook::GlowCss(true, 23);
+  EXPECT_NE(dim, bright);
+}
+
 TEST(PlaylistBehaviour, CloseErrorGreyoutAndSort) {
   EXPECT_TRUE(PlaylistBehaviour::UrlsMatch("file:///tmp/a.flac", "/tmp/a.flac"));
   EXPECT_TRUE(PlaylistBehaviour::IsLocalUrl("file:///tmp/a.flac"));

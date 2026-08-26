@@ -59,6 +59,7 @@ class PlaylistView {
   void StartInlineEdit(int row, PlaylistColumn column);
   int visible_count() const { return visible_count_; }
   void SetPlaybackProgress(double progress);
+  void SetGlowing(bool glowing);
 
  private:
   void Clear();
@@ -67,6 +68,10 @@ class PlaylistView {
   void SetupRowDrag(GtkWidget *row, int index);
   gboolean OnDrop(const GValue *value, double y);
   void ApplyColumnWidths();
+  void ReloadLookCss();
+  void StartGlowTimer();
+  void StopGlowTimer();
+  gboolean OnGlowTick();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *grid_ = nullptr;
@@ -92,6 +97,9 @@ class PlaylistView {
   double last_click_cell_width_ = 0;
   int visible_count_ = 0;
   double playback_progress_ = 0;
+  int glow_step_ = 0;
+  bool glowing_ = false;
+  guint glow_timeout_ = 0;
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
   std::vector<std::string> visible_titles_;

@@ -1575,11 +1575,17 @@ void MainWindow::ConnectSignals() {
     if (playlist_list_container_) {
       playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Playing);
     }
+    if (playlist_container_) {
+      playlist_container_->view()->SetGlowing(true);
+    }
     RefreshPlaylistTabs();
   });
   app_->player()->Paused.Connect([this]() {
     if (playlist_list_container_) {
       playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Paused);
+    }
+    if (playlist_container_) {
+      playlist_container_->view()->SetGlowing(false);
     }
     RefreshPlaylistTabs();
   });
@@ -1592,6 +1598,9 @@ void MainWindow::ConnectSignals() {
     }
     if (playlist_list_container_) {
       playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Stopped);
+    }
+    if (playlist_container_) {
+      playlist_container_->view()->SetGlowing(false);
     }
     UpdatePlaybackButtons();
     RefreshPlaylistTabs();
