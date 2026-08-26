@@ -17,12 +17,13 @@ namespace SettingsPage {
 AdwPreferencesPage *MakePage(const char *name, const char *icon);
 AdwPreferencesGroup *AddGroup(AdwPreferencesPage *page, const char *title = nullptr);
 
-GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *subtitle, bool fallback);
+GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *subtitle, bool fallback,
+                     const char *group_name = nullptr);
 GtkWidget *AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback = "");
 void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback);
 GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
                     const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
-                    const std::function<void(const std::string &)> &changed = {});
+                    const std::function<void(const std::string &)> &changed = {}, const char *group_name = nullptr);
 void AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
                  const std::vector<std::pair<std::string, std::string>> &choices, int fallback);
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked);

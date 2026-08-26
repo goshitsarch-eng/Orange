@@ -20,6 +20,7 @@
 #include "constants/transcodersettings.h"
 #include "constants/waveformsettings.h"
 #include "settings/settingscontrols.h"
+#include "settings/transcodersettingspage.h"
 #include "covermanager/coverproviderauth.h"
 #include "settings/settingspages.h"
 #include "streaming/streamingchoices.h"
@@ -120,6 +121,38 @@ TEST(StreamingAndOsdSettings, OriginalGroups) {
   EXPECT_STREQ("color", WaveformSettings::kColor);
   EXPECT_EQ(8080u, NetworkProxySettings::kDefaultPort);
   EXPECT_STREQ("audio/x-vorbis", TranscoderSettings::kDefaultLastOutputFormat);
+}
+
+TEST(TranscoderSettingsPage, TabsMatchQtOrderAndGroups) {
+  const std::vector<Transcoder::Format> tabs = TranscoderSettingsPage::TabFormats();
+  ASSERT_EQ(8u, tabs.size());
+  EXPECT_EQ(Transcoder::Format::FLAC, tabs[0]);
+  EXPECT_EQ(Transcoder::Format::WavPack, tabs[1]);
+  EXPECT_EQ(Transcoder::Format::OggVorbis, tabs[2]);
+  EXPECT_EQ(Transcoder::Format::Opus, tabs[3]);
+  EXPECT_EQ(Transcoder::Format::Speex, tabs[4]);
+  EXPECT_EQ(Transcoder::Format::AAC, tabs[5]);
+  EXPECT_EQ(Transcoder::Format::ASF, tabs[6]);
+  EXPECT_EQ(Transcoder::Format::MP3, tabs[7]);
+  EXPECT_STREQ("FLAC", TranscoderSettingsPage::TabLabel(Transcoder::Format::FLAC));
+  EXPECT_STREQ("Vorbis", TranscoderSettingsPage::TabLabel(Transcoder::Format::OggVorbis));
+  EXPECT_STREQ("ASF", TranscoderSettingsPage::TabLabel(Transcoder::Format::ASF));
+  EXPECT_STREQ("flac", TranscoderSettingsPage::TabId(Transcoder::Format::FLAC));
+  EXPECT_STREQ("mp3", TranscoderSettingsPage::TabId(Transcoder::Format::MP3));
+  EXPECT_EQ(TranscoderSettingsPage::FieldKind::Quality, TranscoderSettingsPage::FieldsFor(Transcoder::Format::FLAC));
+  EXPECT_EQ(TranscoderSettingsPage::FieldKind::Quality, TranscoderSettingsPage::FieldsFor(Transcoder::Format::OggVorbis));
+  EXPECT_EQ(TranscoderSettingsPage::FieldKind::Bitrate, TranscoderSettingsPage::FieldsFor(Transcoder::Format::Opus));
+  EXPECT_EQ(TranscoderSettingsPage::FieldKind::Bitrate, TranscoderSettingsPage::FieldsFor(Transcoder::Format::AAC));
+  EXPECT_EQ(TranscoderSettingsPage::FieldKind::Mp3, TranscoderSettingsPage::FieldsFor(Transcoder::Format::MP3));
+  EXPECT_EQ(8, TranscoderSettingsPage::QualityMax(Transcoder::Format::FLAC));
+  EXPECT_EQ(10, TranscoderSettingsPage::QualityMax(Transcoder::Format::OggVorbis));
+  EXPECT_STREQ("Compression (0–8)", TranscoderSettingsPage::QualityTitle(Transcoder::Format::FLAC));
+  EXPECT_TRUE(std::string(TranscoderSettingsPage::IntroText()).find("Transcode Music") != std::string::npos);
+  for (Transcoder::Format format : tabs) {
+    EXPECT_TRUE(TranscoderSettingsPage::GroupMatches(format));
+  }
+  EXPECT_STREQ("audio/x-vorbis", TranscoderSettingsPage::FormatKeyFor(Transcoder::Format::OggVorbis));
+  EXPECT_EQ(8u, TranscoderSettingsPage::DefaultFormatChoices().size());
 }
 
 TEST(AnalyzerSettings, KeysDefaultsAndTypes) {

@@ -33,7 +33,8 @@ AdwPreferencesGroup *AddGroup(AdwPreferencesPage *page, const char *title) {
   return group;
 }
 
-GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *subtitle, bool fallback) {
+GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *subtitle, bool fallback,
+                     const char *group_name) {
   AdwSwitchRow *row = ADW_SWITCH_ROW(adw_switch_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   if (subtitle) {
@@ -41,9 +42,16 @@ GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char 
   }
   adw_switch_row_set_active(row, settings->BoolValue(key, fallback));
   g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
+  if (group_name) {
+    g_object_set_data_full(G_OBJECT(row), "settings-group", g_strdup(group_name), g_free);
+  }
   g_signal_connect(row, "notify::active", G_CALLBACK(+[](AdwSwitchRow *switch_row, GParamSpec *, gpointer data) {
                      auto *s = static_cast<Settings *>(data);
                      const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(switch_row), "settings-key"));
+                     const char *settings_group = static_cast<const char *>(g_object_get_data(G_OBJECT(switch_row), "settings-group"));
+                     if (settings_group) {
+                       s->BeginGroup(settings_group);
+                     }
                      s->SetBoolValue(settings_key, adw_switch_row_get_active(switch_row));
                      s->Sync();
                    }),
@@ -85,7 +93,7 @@ void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key
 
 GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
                     const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
-                    const std::function<void(const std::string &)> &changed) {
+                    const std::function<void(const std::string &)> &changed, const char *group_name) {
   AdwComboRow *row = ADW_COMBO_ROW(adw_combo_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   GtkStringList *model = gtk_string_list_new(nullptr);
@@ -104,6 +112,9 @@ GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *
   if (key) {
     g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
   }
+  if (group_name) {
+    g_object_set_data_full(G_OBJECT(row), "settings-group", g_strdup(group_name), g_free);
+  }
   g_object_set_data_full(G_OBJECT(row), "choice-ids", ids, [](gpointer p) { delete static_cast<std::vector<std::string> *>(p); });
   if (changed) {
     auto *fn = new std::function<void(const std::string &)>(changed);
@@ -118,7 +129,11 @@ GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *
                        return;
                      }
                      const std::string &id = (*choice_ids)[index];
+                     const char *settings_group = static_cast<const char *>(g_object_get_data(G_OBJECT(combo), "settings-group"));
                      if (s && settings_key) {
+                       if (settings_group) {
+                         s->BeginGroup(settings_group);
+                       }
                        s->SetValue(settings_key, id);
                        s->Sync();
                      }
