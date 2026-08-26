@@ -8,6 +8,18 @@
 
 namespace FileViewDrag {
 
+inline std::vector<std::string> PathsForDrag(const std::vector<std::string> &selected, const std::string &dragged) {
+  if (dragged.empty()) {
+    return {};
+  }
+  for (const std::string &path : selected) {
+    if (path == dragged) {
+      return selected;
+    }
+  }
+  return {dragged};
+}
+
 inline std::string DragPayload(const std::vector<std::string> &paths) {
   std::string text;
   for (const std::string &path : paths) {

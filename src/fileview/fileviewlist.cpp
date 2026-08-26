@@ -104,14 +104,8 @@ void FileViewList::SetupRowDrag(GtkWidget *row, const std::string &path) {
   g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
                      auto *self = static_cast<FileViewList *>(data);
                      const char *dragged = static_cast<const char *>(g_object_get_data(G_OBJECT(s), "file-path"));
-                     std::vector<std::string> paths = self->SelectedPaths();
-                     if (!dragged) {
-                       return nullptr;
-                     }
-                     if (std::find(paths.begin(), paths.end(), dragged) == paths.end()) {
-                       paths = {dragged};
-                     }
-                     const std::string payload = FileViewDrag::DragPayload(paths);
+                     const std::string payload =
+                         FileViewDrag::DragPayload(FileViewDrag::PathsForDrag(self->SelectedPaths(), dragged ? dragged : ""));
                      if (payload.empty()) {
                        return nullptr;
                      }

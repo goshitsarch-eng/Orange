@@ -1,6 +1,9 @@
 #include "fileview/fileviewtree.h"
 
+#include "fileview/fileviewdrag.h"
+
 #include <string>
+#include <vector>
 
 FileViewTree::FileViewTree() {
   widget_ = gtk_scrolled_window_new();
@@ -58,6 +61,7 @@ void FileViewTree::AppendItem(GtkWidget *parent, FileViewTreeItem *item, int dep
     gtk_widget_set_margin_bottom(label, 6);
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
     g_object_set_data_full(G_OBJECT(row), "file-path", g_strdup(item->path.c_str()), g_free);
+    SetupRowDrag(row, item->path);
     gtk_list_box_append(GTK_LIST_BOX(parent), row);
   }
   for (const auto &child : item->children) {
@@ -79,6 +83,30 @@ void FileViewTree::Reload(FileViewTreeModel *model) {
     model->LazyLoad(item.get());
     AppendItem(list_, item.get(), 0);
   }
+}
+
+void FileViewTree::SetupRowDrag(GtkWidget *row, const std::string &path) {
+  GtkDragSource *src = gtk_drag_source_new();
+  gtk_drag_source_set_actions(src, GDK_ACTION_COPY);
+  g_object_set_data_full(G_OBJECT(src), "file-path", g_strdup(path.c_str()), g_free);
+  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
+                     auto *self = static_cast<FileViewTree *>(data);
+                     const char *dragged = static_cast<const char *>(g_object_get_data(G_OBJECT(s), "file-path"));
+                     const std::string selected = self->SelectedPath();
+                     const std::vector<std::string> selected_paths = selected.empty() ? std::vector<std::string>{} : std::vector<std::string>{selected};
+                     const std::string payload = FileViewDrag::DragPayload(FileViewDrag::PathsForDrag(selected_paths, dragged ? dragged : ""));
+                     if (payload.empty()) {
+                       return nullptr;
+                     }
+                     GValue v = G_VALUE_INIT;
+                     g_value_init(&v, G_TYPE_STRING);
+                     g_value_set_string(&v, payload.c_str());
+                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
+                     g_value_unset(&v);
+                     return provider;
+                   })),
+                   this);
+  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
 }
 
 std::string FileViewTree::SelectedPath() const {

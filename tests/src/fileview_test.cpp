@@ -208,6 +208,17 @@ TEST(FileViewHistory, BackForwardAndTruncate) {
   EXPECT_EQ("/music/radiohead", history.items().back());
 }
 
+TEST(FileViewDrag, PathsForDragUsesSelectionOrDraggedRow) {
+  EXPECT_TRUE(FileViewDrag::PathsForDrag({"/a", "/b"}, "").empty());
+  const std::vector<std::string> selected = FileViewDrag::PathsForDrag({"/a", "/b"}, "/b");
+  ASSERT_EQ(2u, selected.size());
+  EXPECT_EQ("/a", selected[0]);
+  EXPECT_EQ("/b", selected[1]);
+  const std::vector<std::string> dragged = FileViewDrag::PathsForDrag({"/a", "/b"}, "/c");
+  ASSERT_EQ(1u, dragged.size());
+  EXPECT_EQ("/c", dragged[0]);
+}
+
 TEST(FileViewDrag, SkipsDirectoriesAndEmitsFileUris) {
   const std::string dir = TempDir();
   const std::string audio = FileUtils::Join(dir, "roads.flac");
