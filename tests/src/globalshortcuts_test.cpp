@@ -1,3 +1,4 @@
+#include "globalshortcuts/globalshortcutgrab.h"
 #include "globalshortcuts/globalshortcuts.h"
 #include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
 #include "globalshortcuts/globalshortcutsbackend-portal.h"
@@ -144,6 +145,24 @@ TEST(KeyMapperX11, QtShortcutToKey) {
   EXPECT_EQ(0u, KeyMapperX11::QtShortcutToKey(""));
   EXPECT_TRUE(KeyMapperX11::IsMediaKeyName("MediaPlay"));
   EXPECT_FALSE(KeyMapperX11::IsMediaKeyName("Ctrl+P"));
+}
+
+TEST(GlobalShortcutGrab, AcceptsCompleteCombosOnly) {
+  EXPECT_STREQ("Press a key", GlobalShortcutGrab::WindowTitle());
+  EXPECT_STREQ("Waiting…", GlobalShortcutGrab::WaitingLabel());
+  EXPECT_EQ("Press a key combination.", GlobalShortcutGrab::Prompt(""));
+  EXPECT_EQ("Press a key combination to use for Play/Pause...", GlobalShortcutGrab::Prompt("Play/Pause"));
+  EXPECT_TRUE(GlobalShortcutGrab::IsModifier(GDK_KEY_Control_L));
+  EXPECT_TRUE(GlobalShortcutGrab::IsModifier(GDK_KEY_Shift_R));
+  EXPECT_TRUE(GlobalShortcutGrab::IsModifier(GDK_KEY_Alt_L));
+  EXPECT_TRUE(GlobalShortcutGrab::IsModifier(GDK_KEY_ISO_Level3_Shift));
+  EXPECT_FALSE(GlobalShortcutGrab::IsModifier(GDK_KEY_p));
+  EXPECT_FALSE(GlobalShortcutGrab::ShouldAccept(GDK_KEY_Control_L));
+  EXPECT_TRUE(GlobalShortcutGrab::ShouldAccept(GDK_KEY_space));
+  EXPECT_EQ("<b>Ctrl+P</b>", GlobalShortcutGrab::PreviewMarkup("Ctrl+P"));
+  EXPECT_TRUE(GlobalShortcutGrab::PreviewMarkup("").empty());
+  EXPECT_TRUE(GlobalShortcutGrab::RejectClears(""));
+  EXPECT_FALSE(GlobalShortcutGrab::RejectClears("<b>Ctrl</b>"));
 }
 
 TEST(PlaylistManager, CycleRepeatAndShuffleModes) {

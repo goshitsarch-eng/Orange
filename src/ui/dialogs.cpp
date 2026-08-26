@@ -50,8 +50,8 @@ void Dialogs::EditTag(GtkWindow *parent, Application *app, const SongList &songs
 
 void Dialogs::Shortcuts(GtkWindow *parent) { ShortcutsDialog::Show(parent); }
 
-void Dialogs::GrabShortcut(GtkWindow *parent, const std::function<void(const std::string &)> &callback) {
-  GlobalShortcutGrabber::Show(parent, callback);
+void Dialogs::GrabShortcut(GtkWindow *parent, const std::function<void(const std::string &)> &callback, const std::string &action) {
+  GlobalShortcutGrabber::Show(parent, callback, action);
 }
 
 void Dialogs::Login(GtkWindow *parent, const std::string &service, const std::function<void(const std::string &, const std::string &)> &callback) {

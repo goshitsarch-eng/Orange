@@ -1,5 +1,6 @@
 #include "covermanager/coverchoicemenu.h"
 #include "covermanager/covermanagermenu.h"
+#include "covermanager/covermanagerview.h"
 #include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverexport.h"
 #include "covermanager/coverarttypes.h"
@@ -439,4 +440,20 @@ TEST(AlbumCoverSearcher, PrefersRequestedSong) {
   const Song missing = AlbumCoverSearcher::PreferredSong(Song(), fallback);
   EXPECT_EQ("Fleet Foxes", missing.artist());
   EXPECT_EQ("Helplessness Blues", missing.album());
+}
+
+TEST(CoverManagerView, LabelsAndHideIndexMatchQt) {
+  EXPECT_STREQ("View", CoverManagerView::ButtonLabel());
+  EXPECT_EQ(3, CoverManagerView::kCount);
+  EXPECT_STREQ("All albums", CoverManagerView::kLabels[0]);
+  EXPECT_STREQ("Albums with covers", CoverManagerView::kLabels[1]);
+  EXPECT_STREQ("Albums without covers", CoverManagerView::kLabels[2]);
+  EXPECT_EQ(AlbumCoverManagerList::HideCovers::None, CoverManagerView::HideFromIndex(0));
+  EXPECT_EQ(AlbumCoverManagerList::HideCovers::WithoutCovers, CoverManagerView::HideFromIndex(1));
+  EXPECT_EQ(AlbumCoverManagerList::HideCovers::WithCovers, CoverManagerView::HideFromIndex(2));
+  EXPECT_EQ(0, CoverManagerView::IndexFromHide(AlbumCoverManagerList::HideCovers::None));
+  EXPECT_EQ(1, CoverManagerView::IndexFromHide(AlbumCoverManagerList::HideCovers::WithoutCovers));
+  EXPECT_EQ(2, CoverManagerView::IndexFromHide(AlbumCoverManagerList::HideCovers::WithCovers));
+  EXPECT_EQ(0, CoverManagerView::ClampIndex(-3));
+  EXPECT_EQ(2, CoverManagerView::ClampIndex(9));
 }

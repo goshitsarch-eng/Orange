@@ -8,7 +8,7 @@
 
 class GlobalShortcutGrabber {
  public:
-  static void Show(GtkWindow *parent, const std::function<void(const std::string &)> &callback);
+  static void Show(GtkWindow *parent, const std::function<void(const std::string &)> &callback, const std::string &action = {});
 };
 
 #endif

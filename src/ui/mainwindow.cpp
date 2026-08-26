@@ -42,6 +42,7 @@
 #include "queue/queuerows.h"
 #include "queue/queueview.h"
 #include "widgets/multiloadingindicator.h"
+#include "widgets/multiloadingtext.h"
 #include "widgets/playingwidget.h"
 #include "widgets/seekbarmode.h"
 #include "widgets/trackslider.h"
@@ -1756,11 +1757,16 @@ void MainWindow::ConnectSignals() {
     if (!loading_indicator_) {
       return;
     }
-    std::vector<std::string> names;
-    for (const auto &task : app_->task_manager()->GetTasks()) {
-      names.push_back(task.name);
+    const std::vector<TaskManager::Task> tasks = app_->task_manager()->GetTasks();
+    std::vector<MultiLoadingText::Task> infos;
+    infos.reserve(tasks.size());
+    for (const auto &task : tasks) {
+      infos.push_back({task.name, task.progress, task.progress_max});
     }
-    loading_indicator_->SetTasks(names);
+    loading_indicator_->SetTasks(infos);
+    if (status_label_) {
+      gtk_widget_set_visible(status_label_, !StatusBarStack::ShowLoading(static_cast<int>(tasks.size())));
+    }
   });
   app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &, const std::vector<unsigned char> &data) {
     if (!data.empty()) {

@@ -1,5 +1,6 @@
 #include "utilities/strutils.h"
 #include "utilities/timeutils.h"
+#include "widgets/multiloadingtext.h"
 #include "widgets/trackslidertime.h"
 #include "widgets/volumesliderwheel.h"
 #include "utilities/fileutils.h"
@@ -1483,6 +1484,20 @@ TEST(TaskbarProgressHelpers, FractionAndVisibility) {
   EXPECT_STREQ("application://org.strawberrymusicplayer.strawberry.desktop", TaskbarProgressHelpers::AppUri());
   EXPECT_STREQ("com.canonical.Unity.LauncherEntry", TaskbarProgressHelpers::Interface());
   EXPECT_EQ("/com/canonical/unity/launcherentry/strawberry", TaskbarProgressHelpers::ObjectPath());
+}
+
+TEST(MultiLoadingText, FormatsQtStatusBarCopy) {
+  EXPECT_TRUE(MultiLoadingText::Format({}).empty());
+  EXPECT_FALSE(MultiLoadingText::ShowIndicator(0));
+  EXPECT_TRUE(MultiLoadingText::ShowIndicator(1));
+  EXPECT_FALSE(StatusBarStack::ShowLoading(0));
+  EXPECT_TRUE(StatusBarStack::ShowLoading(2));
+  EXPECT_EQ("Scanning collection...", MultiLoadingText::Format({{"Scanning collection", 0, 0}}));
+  EXPECT_EQ("Updating 40%...", MultiLoadingText::Format({{"Updating", 2, 5}}));
+  EXPECT_EQ("Loading tags, fetching covers 50%...",
+            MultiLoadingText::Format({{"Loading tags", 0, 0}, {"Fetching covers", 1, 2}}));
+  EXPECT_EQ(40, MultiLoadingText::Percent(2, 5));
+  EXPECT_EQ(0, MultiLoadingText::Percent(3, 0));
 }
 
 TEST(CollectionSettings, CacheSizeUnitsMatchQt) {

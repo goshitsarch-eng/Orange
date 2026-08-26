@@ -7,6 +7,7 @@
 #include "covermanager/albumcoverexportdialog.h"
 #include "covermanager/albumcovermanagerlist.h"
 #include "covermanager/coverfromurldialog.h"
+#include "covermanager/covermanagerview.h"
 #include "covermanager/covermanagermenu.h"
 #include "covermanager/coverproviders.h"
 #include "dialogs/dialoghelpers.h"
@@ -31,7 +32,8 @@ struct CoverManagerState {
   GtkWidget *artist_list = nullptr;
   GtkWidget *flow = nullptr;
   GtkWidget *filter = nullptr;
-  GtkWidget *hide = nullptr;
+  GtkWidget *view = nullptr;
+  int hide_index = 0;
   GtkWidget *status = nullptr;
   GtkWidget *progress = nullptr;
   GtkWidget *abort = nullptr;
@@ -46,7 +48,7 @@ void RebuildAlbums(CoverManagerState *state);
 void UpdateBatchUi(CoverManagerState *state);
 void FinishBatch(CoverManagerState *state);
 void PumpBatch(CoverManagerState *state);
-AlbumCoverManagerList::HideCovers HideMode(GtkWidget *combo);
+AlbumCoverManagerList::HideCovers HideMode(CoverManagerState *state);
 void ResetTypeAhead(CoverManagerState *state);
 void AppendTypeAhead(CoverManagerState *state, gunichar ch);
 void SelectArtistRow(CoverManagerState *state, int index);
@@ -140,7 +142,7 @@ std::vector<AlbumCoverManagerList::Album> VisibleAlbums(CoverManagerState *state
     return {};
   }
   const char *filter_text = state->filter ? gtk_editable_get_text(GTK_EDITABLE(state->filter)) : "";
-  return state->catalog.Filtered(state->artist_filter, HideMode(state->hide), filter_text ? filter_text : "");
+  return state->catalog.Filtered(state->artist_filter, HideMode(state), filter_text ? filter_text : "");
 }
 
 std::vector<AlbumCoverManagerList::Album> AlbumsForAction(CoverManagerState *state) {
@@ -180,18 +182,8 @@ void AddAlbumToPlaylist(CoverManagerState *state, const AlbumCoverManagerList::A
   state->app->playlist_manager()->AppendSongs(songs);
 }
 
-AlbumCoverManagerList::HideCovers HideMode(GtkWidget *combo) {
-  if (!GTK_IS_DROP_DOWN(combo)) {
-    return AlbumCoverManagerList::HideCovers::None;
-  }
-  switch (gtk_drop_down_get_selected(GTK_DROP_DOWN(combo))) {
-    case 1:
-      return AlbumCoverManagerList::HideCovers::WithoutCovers;
-    case 2:
-      return AlbumCoverManagerList::HideCovers::WithCovers;
-    default:
-      return AlbumCoverManagerList::HideCovers::None;
-  }
+AlbumCoverManagerList::HideCovers HideMode(CoverManagerState *state) {
+  return CoverManagerView::HideFromIndex(state ? state->hide_index : 0);
 }
 
 void ResetTypeAhead(CoverManagerState *state) {
@@ -497,7 +489,7 @@ void RebuildAlbums(CoverManagerState *state) {
     child = next;
   }
   const char *filter_text = state->filter ? gtk_editable_get_text(GTK_EDITABLE(state->filter)) : "";
-  const auto albums = state->catalog.Filtered(state->artist_filter, HideMode(state->hide), filter_text ? filter_text : "");
+  const auto albums = state->catalog.Filtered(state->artist_filter, HideMode(state), filter_text ? filter_text : "");
   for (const auto &album : albums) {
     GtkWidget *card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
     gtk_widget_set_size_request(card, 140, -1);
@@ -632,10 +624,31 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   state->filter = gtk_search_entry_new();
   gtk_widget_set_hexpand(state->filter, TRUE);
   gtk_box_append(GTK_BOX(toolbar), state->filter);
-  const char *hide_labels[] = {Translations::CStr("All albums"), Translations::CStr("Albums with covers"),
-                               Translations::CStr("Albums without covers"), nullptr};
-  state->hide = gtk_drop_down_new_from_strings(hide_labels);
-  gtk_box_append(GTK_BOX(toolbar), state->hide);
+  state->view = gtk_menu_button_new();
+  gtk_menu_button_set_label(GTK_MENU_BUTTON(state->view), Translations::CStr(CoverManagerView::ButtonLabel()));
+  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(state->view), "view-list-symbolic");
+  gtk_widget_set_tooltip_text(state->view, Translations::CStr(CoverManagerView::ButtonLabel()));
+  GMenu *view_menu = g_menu_new();
+  for (int i = 0; i < CoverManagerView::kCount; ++i) {
+    char action[64];
+    g_snprintf(action, sizeof(action), "coverview.hide(%d)", i);
+    g_menu_append(view_menu, Translations::CStr(CoverManagerView::kLabels[i]), action);
+  }
+  GSimpleActionGroup *view_group = g_simple_action_group_new();
+  GSimpleAction *hide_action = g_simple_action_new_stateful("hide", G_VARIANT_TYPE_INT32, g_variant_new_int32(state->hide_index));
+  g_signal_connect(hide_action, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
+                     auto *self = static_cast<CoverManagerState *>(data);
+                     g_simple_action_set_state(action, param);
+                     self->hide_index = g_variant_get_int32(param);
+                     RebuildAlbums(self);
+                   }),
+                   state);
+  g_action_map_add_action(G_ACTION_MAP(view_group), G_ACTION(hide_action));
+  gtk_widget_insert_action_group(state->view, "coverview", G_ACTION_GROUP(view_group));
+  gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(state->view), G_MENU_MODEL(view_menu));
+  g_object_unref(view_group);
+  g_object_unref(view_menu);
+  gtk_box_append(GTK_BOX(toolbar), state->view);
   gtk_box_append(GTK_BOX(box), toolbar);
 
   GtkWidget *split = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
@@ -689,10 +702,6 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
 
   auto refresh = +[](GtkWidget *, gpointer data) { RebuildAlbums(static_cast<CoverManagerState *>(data)); };
   g_signal_connect(state->filter, "search-changed", G_CALLBACK(refresh), state);
-  g_signal_connect(state->hide, "notify::selected", G_CALLBACK(+[](GObject *, GParamSpec *, gpointer data) {
-                     RebuildAlbums(static_cast<CoverManagerState *>(data));
-                   }),
-                   state);
   g_signal_connect(state->artist_list, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<CoverManagerState *>(data);
                      const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "artist-id"));
