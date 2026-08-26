@@ -37,6 +37,7 @@ void CollectionModel::AppendNode(CollectionItem *parent, const CollectionGroupin
 
 void CollectionModel::Reset(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
                             bool skip_artist_articles, bool skip_album_articles) {
+  grouping_ = grouping;
   root_ = std::make_unique<CollectionItem>(CollectionItem::Type::Root);
   const CollectionGrouping::Node tree =
       CollectionGrouping::BuildTree(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles);

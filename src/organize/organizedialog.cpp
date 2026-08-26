@@ -12,7 +12,7 @@
 
 #include <adwaita.h>
 
-void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
+void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr("Organize files"));
   adw_dialog_set_content_width(dialog, 520);
@@ -42,7 +42,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
   gtk_editable_set_text(GTK_EDITABLE(dest), saved_dest.c_str());
   GtkWidget *move = gtk_check_button_new_with_label(Translations::CStr("Move files instead of copying"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(move), settings.BoolValue("move", false));
-  GtkWidget *status = gtk_label_new(Translations::CStr("Uses the current playlist as the source."));
+  auto *owned_songs = new SongList(songs);
+  GtkWidget *status = gtk_label_new(owned_songs->empty() ? Translations::CStr("Uses the current playlist as the source.")
+                                                         : (std::to_string(owned_songs->size()) + " selected song(s).").c_str());
   gtk_label_set_wrap(GTK_LABEL(status), TRUE);
   GtkWidget *preview = gtk_label_new("");
   gtk_label_set_wrap(GTK_LABEL(preview), TRUE);
@@ -56,6 +58,8 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
   g_object_set_data(G_OBJECT(run), "move", move);
   g_object_set_data(G_OBJECT(run), "status", status);
   g_object_set_data(G_OBJECT(run), "parent", parent);
+  g_object_set_data_full(G_OBJECT(run), "songs", owned_songs, [](gpointer p) { delete static_cast<SongList *>(p); });
+  g_object_set_data(G_OBJECT(preview_btn), "songs", owned_songs);
   g_object_set_data(G_OBJECT(preview_btn), "buffer", buffer);
   g_object_set_data(G_OBJECT(preview_btn), "dest", dest);
   g_object_set_data(G_OBJECT(preview_btn), "preview", preview);
@@ -80,9 +84,6 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
 
   g_signal_connect(preview_btn, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
-                     if (!application->playlist_manager()->active()) {
-                       return;
-                     }
                      auto *buf = GTK_TEXT_BUFFER(g_object_get_data(G_OBJECT(button), "buffer"));
                      GtkTextIter start;
                      GtkTextIter end;
@@ -92,7 +93,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
                      g_free(text);
                      const std::string dest_dir = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "dest")));
                      std::string preview_text;
-                     const SongList songs = application->playlist_manager()->active()->songs();
+                     auto *owned = static_cast<SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
+                     SongList songs = owned && !owned->empty() ? *owned
+                                      : application->playlist_manager()->current() ? application->playlist_manager()->current()->songs()
+                                                                                   : SongList{};
                      for (size_t i = 0; i < songs.size() && i < 8; ++i) {
                        preview_text += FileUtils::Join(dest_dir, format.GetFilenameForSong(songs[i])) + "\n";
                      }
@@ -104,9 +108,6 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
                    app);
   g_signal_connect(run, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
-                     if (!application->playlist_manager()->active()) {
-                       return;
-                     }
                      auto *buf = GTK_TEXT_BUFFER(g_object_get_data(G_OBJECT(button), "buffer"));
                      GtkTextIter start;
                      GtkTextIter end;
@@ -128,8 +129,12 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
                      persist.SetValue("destination", dest_dir);
                      persist.SetBoolValue("move", move_files);
                      persist.Sync();
+                     auto *owned = static_cast<SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
+                     SongList songs = owned && !owned->empty() ? *owned
+                                      : application->playlist_manager()->current() ? application->playlist_manager()->current()->songs()
+                                                                                   : SongList{};
                      class Organize organize;
-                     const auto errors = organize.Copy(application->playlist_manager()->active()->songs(), dest_dir, format, move_files);
+                     const auto errors = organize.Copy(songs, dest_dir, format, move_files);
                      GtkWidget *status_label = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
                      if (errors.empty()) {
                        gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));

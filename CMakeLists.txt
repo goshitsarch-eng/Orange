@@ -268,6 +268,7 @@ set(STRAWBERRY_SOURCES
   src/collection/collectionfilterwidget.cpp
   src/collection/collectionview.cpp
   src/collection/collectionviewcontainer.cpp
+  src/collection/collectionbehaviour.cpp
   src/collection/groupbydialog.cpp
   src/collection/savedgroupingmanager.cpp
   src/playlist/playlist.cpp
@@ -991,6 +992,7 @@ if(GTest_FOUND)
     src/collection/collectiondirectorymodel.cpp
     src/collection/collectiontask.cpp
     src/collection/collectionitemdelegate.cpp
+    src/collection/collectionbehaviour.cpp
     ${GRESOURCE_C}
     src/equalizer/equalizer.cpp
     src/organize/organize.cpp

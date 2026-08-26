@@ -25,6 +25,7 @@ class CollectionModel {
   int TotalSongs() const { return total_songs_; }
   int TotalArtists() const { return total_artists_; }
   int TotalAlbums() const { return total_albums_; }
+  const CollectionGrouping::Grouping &grouping() const { return grouping_; }
   SongList Songs() const;
   SongList SongsFromItem(const CollectionItem *item) const;
 
@@ -33,6 +34,7 @@ class CollectionModel {
   static void Count(const CollectionItem *item, int *songs, int *artists, int *albums);
 
   CollectionBackend *backend_ = nullptr;
+  CollectionGrouping::Grouping grouping_;
   std::unique_ptr<CollectionItem> root_;
   int total_songs_ = 0;
   int total_artists_ = 0;

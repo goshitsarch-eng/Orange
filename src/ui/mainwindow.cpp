@@ -1,5 +1,6 @@
 #include "ui/mainwindow.h"
 
+#include "collection/collectionbehaviour.h"
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
@@ -116,6 +117,7 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
   RefreshFiles();
   RefreshStreaming();
   RefreshQueue();
+  ApplyBehaviourSettings();
   app_->ApplyCommandline(options);
 }
 
@@ -378,6 +380,62 @@ void MainWindow::BuildUi() {
   add_action("equalizer", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Equalizer(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_->equalizer()); }));
   add_action("transcode", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Transcode(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("organize", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Organize(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("collection-append", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Settings settings;
+               settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+               const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+                   settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+               self->ApplyCollectionPlan(CollectionBehaviour::Append(play, self->EngineStopped()), self->CollectionSongs());
+             }));
+  add_action("collection-new", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Settings settings;
+               settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+               const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+                   settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+               self->ApplyCollectionPlan(CollectionBehaviour::OpenInNew(play, self->EngineStopped()), self->CollectionSongs());
+             }));
+  add_action("collection-enqueue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->ApplyCollectionPlan(CollectionBehaviour::Enqueue(), self->CollectionSongs());
+             }));
+  add_action("collection-enqueue-next", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->ApplyCollectionPlan(CollectionBehaviour::EnqueueNext(), self->CollectionSongs());
+             }));
+  add_action("collection-search", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               if (!self->collection_container_) {
+                 return;
+               }
+               const CollectionItem *item = self->collection_container_->view()->SelectedItem();
+               const std::string query = CollectionBehaviour::SearchQuery(item, self->collection_container_->view()->model()->grouping());
+               if (query.empty()) {
+                 return;
+               }
+               adw_view_stack_set_visible_child_name(self->sidebar_stack_, "collection");
+               self->RefreshCollection(query, true);
+             }));
+  add_action("collection-organize", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::Organize(GTK_WINDOW(self->window_), self->app_, self->CollectionSongs());
+             }));
+  add_action("collection-edittag", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::EditTag(GTK_WINDOW(self->window_), self->app_, self->CollectionSongs());
+             }));
+  add_action("collection-browse", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               const SongList songs = self->CollectionSongs();
+               if (songs.empty() || !FileManagerUtils::OpenInFileManager(FileUtils::PathFromUri(songs.front().url()))) {
+                 self->ShowToast("Could not open the file manager");
+               }
+             }));
+  add_action("collection-delete", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::DeleteFiles(GTK_WINDOW(self->window_), self->app_, self->CollectionSongs());
+             }));
   add_action("tagfetch", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::TagFetcher(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("edittag", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
@@ -465,9 +523,15 @@ void MainWindow::BuildSidebar() {
   gtk_widget_set_vexpand(collection_container_->widget(), TRUE);
   collection_container_->filter_widget()->SetChangedCallback([this]() { RefreshCollection(); });
   collection_container_->view()->SetActivateCallback([this](const SongList &songs) {
-    app_->playlist_manager()->AppendSongs(songs);
-    RefreshPlaylist();
+    Settings settings;
+    settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+    const auto add = static_cast<BehaviourSettings::AddBehaviour>(
+        settings.IntValue(BehaviourSettings::kDoubleClickAddMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickAddMode)));
+    const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+        settings.IntValue(BehaviourSettings::kDoubleClickPlayMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlayMode)));
+    ApplyCollectionPlan(CollectionBehaviour::FromDoubleClick(add, play, EngineStopped()), songs);
   });
+  collection_container_->view()->SetMenuCallback([this](double, double) { ShowCollectionMenu(); });
   gtk_box_append(GTK_BOX(collection_page), collection_container_->widget());
   adw_view_stack_add_titled_with_icon(sidebar_stack_, collection_page, "collection", "Collection",
                                       "media-optical-cd-audio-symbolic");
@@ -1224,6 +1288,7 @@ void MainWindow::OpenSettings() {
     ApplySeekbarMode();
     app_->moodbar()->Load(app_->player()->current_song());
     app_->waveform()->Load(app_->player()->current_song());
+    ApplyBehaviourSettings();
   });
 }
 
@@ -1460,6 +1525,79 @@ void MainWindow::PlayRadioChannel(const RadioChannel &channel) {
   if (app_->playlist_manager()->active()) {
     app_->player()->PlayAt(app_->playlist_manager()->active()->row_count() - 1);
   }
+}
+
+void MainWindow::ApplyBehaviourSettings() {
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  if (playing_widget_) {
+    playing_widget_->SetEnabled(settings.BoolValue(BehaviourSettings::kPlayingWidget, BehaviourSettings::kDefaultPlayingWidget));
+  }
+}
+
+bool MainWindow::EngineStopped() const {
+  const GstEngine::State state = app_->player()->GetState();
+  return state != GstEngine::State::Playing && state != GstEngine::State::Paused;
+}
+
+SongList MainWindow::CollectionSongs() const {
+  return collection_container_ ? collection_container_->view()->SelectedSongs() : SongList{};
+}
+
+void MainWindow::ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, const SongList &songs) {
+  if (songs.empty()) {
+    return;
+  }
+  int play_at = 0;
+  if (plan.destination == CollectionBehaviour::Destination::New) {
+    app_->playlist_manager()->New(CollectionBehaviour::NewPlaylistName(songs), songs);
+  } else {
+    if (plan.clear_current) {
+      app_->playlist_manager()->ClearCurrent();
+    }
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      play_at = plan.clear_current ? 0 : playlist->row_count();
+    }
+    app_->playlist_manager()->AppendSongs(songs);
+  }
+  if (plan.queue == CollectionBehaviour::QueueMode::Append) {
+    for (const Song &song : songs) {
+      app_->queue()->Append(song);
+    }
+  } else if (plan.queue == CollectionBehaviour::QueueMode::Next) {
+    for (auto it = songs.rbegin(); it != songs.rend(); ++it) {
+      app_->queue()->InsertNext(*it);
+    }
+  }
+  RefreshPlaylistsList();
+  RefreshPlaylist();
+  RefreshQueue();
+  if (plan.should_play) {
+    if (plan.destination == CollectionBehaviour::Destination::New && app_->playlist_manager()->current()) {
+      app_->player()->PlayPlaylist(app_->playlist_manager()->current()->name());
+    } else {
+      app_->player()->PlayAt(play_at);
+    }
+  }
+}
+
+void MainWindow::ShowCollectionMenu() {
+  if (CollectionSongs().empty()) {
+    return;
+  }
+  GMenu *menu = g_menu_new();
+  g_menu_append(menu, Translations::Tr("Append to current playlist").c_str(), "win.collection-append");
+  g_menu_append(menu, Translations::Tr("Open in new playlist").c_str(), "win.collection-new");
+  g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.collection-enqueue");
+  g_menu_append(menu, Translations::Tr("Queue to play next").c_str(), "win.collection-enqueue-next");
+  g_menu_append(menu, Translations::Tr("Search for this").c_str(), "win.collection-search");
+  g_menu_append(menu, Translations::Tr("Organize files…").c_str(), "win.collection-organize");
+  g_menu_append(menu, Translations::Tr("Edit track information…").c_str(), "win.collection-edittag");
+  g_menu_append(menu, Translations::Tr("Show in file browser…").c_str(), "win.collection-browse");
+  g_menu_append(menu, Translations::Tr("Delete from disk…").c_str(), "win.collection-delete");
+  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  gtk_widget_set_parent(popover, collection_container_ ? collection_container_->view()->list() : GTK_WIDGET(window_));
+  gtk_popover_popup(GTK_POPOVER(popover));
 }
 
 void MainWindow::ShowPlaylistMenu(double, double) {

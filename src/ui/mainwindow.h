@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_MAINWINDOW_H
 #define STRAWBERRY_MAINWINDOW_H
 
+#include "collection/collectionbehaviour.h"
 #include "collection/collectiongrouping.h"
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "collection/collectionviewcontainer.h"
@@ -80,6 +81,11 @@ class MainWindow {
   void RefreshPlaylistTabs();
   void PlayRadioChannel(const RadioChannel &channel);
   void ShowPlaylistMenu(double x, double y);
+  void ShowCollectionMenu();
+  void ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, const SongList &songs);
+  SongList CollectionSongs() const;
+  bool EngineStopped() const;
+  void ApplyBehaviourSettings();
   void SelectPlaylistRow(int index, bool add);
   std::vector<int> SelectedPlaylistRows() const;
   SongList SelectedSongs() const;

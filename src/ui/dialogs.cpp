@@ -39,7 +39,7 @@ void Dialogs::Equalizer(GtkWindow *parent, class Equalizer *equalizer) { Equaliz
 
 void Dialogs::Transcode(GtkWindow *parent, Application *app) { TranscodeDialog::Show(parent, app); }
 
-void Dialogs::Organize(GtkWindow *parent, Application *app) { OrganizeDialog::Show(parent, app); }
+void Dialogs::Organize(GtkWindow *parent, Application *app, const SongList &songs) { OrganizeDialog::Show(parent, app, songs); }
 
 void Dialogs::TagFetcher(GtkWindow *parent, Application *app) { TrackSelectionDialog::Show(parent, app); }
 
@@ -74,7 +74,7 @@ void Dialogs::PlaylistColumns(GtkWindow *parent, const std::function<void()> &ca
   PlaylistColumnsDialog::Show(parent, callback);
 }
 
-void Dialogs::DeleteFiles(GtkWindow *parent, Application *app) { DeleteConfirmationDialog::Show(parent, app); }
+void Dialogs::DeleteFiles(GtkWindow *parent, Application *app, const SongList &songs) { DeleteConfirmationDialog::Show(parent, app, songs); }
 
 void Dialogs::CopyToDevice(GtkWindow *parent, Application *app) { CopyToDeviceDialog::Show(parent, app); }
 

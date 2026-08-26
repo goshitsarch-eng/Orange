@@ -22,7 +22,7 @@ class Dialogs {
   static void CoverExport(GtkWindow *parent, Application *app);
   static void Equalizer(GtkWindow *parent, class Equalizer *equalizer);
   static void Transcode(GtkWindow *parent, Application *app);
-  static void Organize(GtkWindow *parent, Application *app);
+  static void Organize(GtkWindow *parent, Application *app, const SongList &songs = {});
   static void TagFetcher(GtkWindow *parent, Application *app);
   static void EditTag(GtkWindow *parent, Application *app, const SongList &songs = {});
   static void Shortcuts(GtkWindow *parent);
@@ -34,7 +34,7 @@ class Dialogs {
                       const std::function<void(const CollectionGrouping::Grouping &)> &callback);
   static void ManageSavedGroupings(GtkWindow *parent, const std::function<void(const CollectionGrouping::Grouping &)> &callback);
   static void PlaylistColumns(GtkWindow *parent, const std::function<void()> &callback);
-  static void DeleteFiles(GtkWindow *parent, Application *app);
+  static void DeleteFiles(GtkWindow *parent, Application *app, const SongList &songs = {});
   static void CopyToDevice(GtkWindow *parent, Application *app);
   static void SaveAllPlaylists(GtkWindow *parent, Application *app);
   static void Console(GtkWindow *parent);

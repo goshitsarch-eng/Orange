@@ -1,4 +1,5 @@
 #include "collection/collectionbackend.h"
+#include "collection/collectionbehaviour.h"
 #include "collection/collectionwatcher.h"
 #include "collection/collectiondirectorymodel.h"
 #include "collection/collectionfilter.h"
@@ -322,4 +323,57 @@ TEST(CollectionBackend, PersistsRatingPlaycountAndEmbeddedArt) {
   EXPECT_EQ(7u, kept.playcount());
   EXPECT_TRUE(kept.art_embedded());
   unlink(path.c_str());
+}
+
+TEST(CollectionBehaviour, DoubleClickAndMenuPlans) {
+  using AB = BehaviourSettings::AddBehaviour;
+  using PB = BehaviourSettings::PlayBehaviour;
+  EXPECT_FALSE(CollectionBehaviour::ShouldPlay(PB::Never, true));
+  EXPECT_TRUE(CollectionBehaviour::ShouldPlay(PB::IfStopped, true));
+  EXPECT_FALSE(CollectionBehaviour::ShouldPlay(PB::IfStopped, false));
+  EXPECT_TRUE(CollectionBehaviour::ShouldPlay(PB::Always, false));
+
+  const auto append = CollectionBehaviour::FromDoubleClick(AB::Append, PB::Never, true);
+  EXPECT_EQ(CollectionBehaviour::Destination::Current, append.destination);
+  EXPECT_FALSE(append.clear_current);
+  EXPECT_EQ(CollectionBehaviour::QueueMode::None, append.queue);
+  EXPECT_FALSE(append.should_play);
+
+  const auto load = CollectionBehaviour::FromDoubleClick(AB::Load, PB::Always, false);
+  EXPECT_TRUE(load.clear_current);
+  EXPECT_TRUE(load.should_play);
+
+  const auto enqueue = CollectionBehaviour::FromDoubleClick(AB::Enqueue, PB::Never, true);
+  EXPECT_EQ(CollectionBehaviour::QueueMode::Append, enqueue.queue);
+
+  const auto created = CollectionBehaviour::FromDoubleClick(AB::OpenInNew, PB::IfStopped, true);
+  EXPECT_EQ(CollectionBehaviour::Destination::New, created.destination);
+  EXPECT_TRUE(created.should_play);
+
+  EXPECT_EQ(CollectionBehaviour::QueueMode::Next, CollectionBehaviour::EnqueueNext().queue);
+}
+
+TEST(CollectionBehaviour, SearchQueryUniqueAndPlaylistName) {
+  CollectionItem artist(CollectionItem::Type::Container);
+  artist.container_level = 0;
+  artist.display_text = "Portishead";
+  CollectionItem *album = artist.AddChild(CollectionItem::Type::Container);
+  album->container_level = 1;
+  album->display_text = "Dummy";
+  CollectionItem *track = album->AddChild(CollectionItem::Type::Song);
+  track->metadata = MakeSong("Roads", "Portishead", "Dummy");
+  track->metadata.set_albumartist("Portishead");
+
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::Album;
+  EXPECT_EQ("albumartist:\"Portishead\"", CollectionBehaviour::SearchQuery(&artist, grouping));
+  EXPECT_EQ("album:\"Dummy\"", CollectionBehaviour::SearchQuery(album, grouping));
+  EXPECT_EQ("title:\"Roads\"", CollectionBehaviour::SearchQuery(track, grouping));
+
+  Song other = MakeSong("Glory Box", "Portishead", "Dummy");
+  other.set_url("file:///tmp/music/Roads.flac");
+  const SongList unique = CollectionBehaviour::UniqueByUrl({track->metadata, other, track->metadata});
+  ASSERT_EQ(1u, unique.size());
+  EXPECT_EQ("Dummy", CollectionBehaviour::NewPlaylistName(unique));
 }

@@ -8,12 +8,15 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 class CollectionView {
  public:
   using ActivateCallback = std::function<void(const SongList &)>;
+  using MenuCallback = std::function<void(double x, double y)>;
 
   CollectionView();
+  ~CollectionView();
 
   GtkWidget *widget() const { return widget_; }
   GtkWidget *list() const { return list_; }
@@ -24,16 +27,28 @@ class CollectionView {
                      bool skip_artist_articles, bool skip_album_articles);
   void SetFilterString(const std::string &filter);
   void SetActivateCallback(ActivateCallback callback);
+  void SetMenuCallback(MenuCallback callback);
   void Rebuild();
+
+  SongList SelectedSongs() const;
+  const CollectionItem *SelectedItem() const;
+  std::vector<const CollectionItem *> SelectedItems() const;
 
  private:
   void AppendItem(GtkWidget *parent, const CollectionItem *item, int depth);
+  void TypeAhead(gunichar ch);
+  void ResetTypeAhead();
+  gboolean OnKeyPressed(guint keyval);
+  void ActivateRow(GtkListBoxRow *row);
 
   CollectionModel model_;
   CollectionFilter filter_;
   ActivateCallback activate_;
+  MenuCallback menu_;
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
+  std::string typeahead_;
+  guint typeahead_timeout_id_ = 0;
 };
 
 #endif
