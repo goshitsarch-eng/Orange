@@ -1,4 +1,5 @@
 #include "scrobbler/scrobblereligibility.h"
+#include "scrobbler/scrobblersubmittiming.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
 #include "scrobbler/scrobblemetadata.h"
@@ -150,4 +151,13 @@ TEST(ScrobblerEligibility, LastFmHalfOrFourMinutes) {
 
   EXPECT_TRUE(ScrobblerEligibility::ShouldScrobble(song, 30LL * 1000000000LL, 10));
   EXPECT_FALSE(ScrobblerEligibility::ShouldScrobble(song, 20LL * 1000000000LL, 10));
+}
+
+TEST(ScrobblerSubmitTiming, UsesConfiguredDelayWithErrorFloor) {
+  EXPECT_EQ(0, ScrobblerSubmitTiming::DelaySeconds(0, false));
+  EXPECT_EQ(0, ScrobblerSubmitTiming::DelaySeconds(-1, true));
+  EXPECT_EQ(10, ScrobblerSubmitTiming::DelaySeconds(10, false));
+  EXPECT_EQ(30, ScrobblerSubmitTiming::DelaySeconds(10, true));
+  EXPECT_EQ(5, ScrobblerSubmitTiming::DelaySeconds(3, false));
+  EXPECT_EQ(45, ScrobblerSubmitTiming::DelaySeconds(45, true));
 }

@@ -18,6 +18,7 @@ class LastFmScrobbler : public ScrobblerService {
   static const char *kCacheFile;
 
   explicit LastFmScrobbler(NetworkAccessManager *network);
+  ~LastFmScrobbler() override;
 
   std::string name() const override { return "Last.fm"; }
   void NowPlaying(const Song &song) override;
@@ -42,6 +43,7 @@ class LastFmScrobbler : public ScrobblerService {
  private:
   void Post(const std::map<std::string, std::string> &params);
   void SubmitCache();
+  void ScheduleSubmit(bool had_error);
   void SaveSession();
 
   NetworkAccessManager *network_ = nullptr;
@@ -49,6 +51,7 @@ class LastFmScrobbler : public ScrobblerService {
   std::string username_;
   std::string pending_token_;
   ScrobblerCache cache_;
+  unsigned submit_timeout_id_ = 0;
 };
 
 #endif

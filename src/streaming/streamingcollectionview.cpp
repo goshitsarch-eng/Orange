@@ -1,6 +1,8 @@
 #include "streaming/streamingcollectionview.h"
 
 #include "collection/collectionempty.h"
+#include "collection/collectionsearchlabels.h"
+#include "filterparser/filterparser.h"
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectiontree.h"
@@ -67,7 +69,8 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   gtk_box_append(GTK_BOX(header), group_button_);
   gtk_box_append(GTK_BOX(header), refresh);
   filter_entry_ = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter_entry_), "Filter");
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter_entry_), Translations::CStr(CollectionSearchLabels::Placeholder()));
+  gtk_widget_set_tooltip_text(filter_entry_, Translations::CStr(FilterParser::ToolTip().c_str()));
   gtk_widget_set_margin_start(filter_entry_, 8);
   gtk_widget_set_margin_end(filter_entry_, 8);
   g_signal_connect(filter_entry_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {

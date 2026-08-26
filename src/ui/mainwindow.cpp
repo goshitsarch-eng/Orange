@@ -7,6 +7,7 @@
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
 #include "playlist/playlistsummary.h"
+#include "collection/collectionsearchlabels.h"
 #include "collection/collectionviewcontainer.h"
 #include "constants/backendsettings.h"
 #include "constants/coverssettings.h"
@@ -292,8 +293,9 @@ void MainWindow::BuildUi() {
   adw_header_bar_pack_end(ADW_HEADER_BAR(header), menu_button);
 
   collection_search_ = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(collection_search_), "Filter collection (artist:name, -term)");
-  gtk_widget_set_tooltip_text(collection_search_, "Field filters: artist: title: album: genre: year: rating:  Use -term to exclude.");
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(collection_search_),
+                                        Translations::CStr(CollectionSearchLabels::Placeholder()));
+  gtk_widget_set_tooltip_text(collection_search_, Translations::CStr(FilterParser::ToolTip().c_str()));
   adw_header_bar_pack_start(ADW_HEADER_BAR(header), collection_search_);
   g_signal_connect(collection_search_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);

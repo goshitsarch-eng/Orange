@@ -3,6 +3,7 @@
 #include "constants/scrobblersettings.h"
 #include "core/settings.h"
 #include "scrobbler/scrobblemetadata.h"
+#include "scrobbler/scrobblersubmittiming.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -41,6 +42,13 @@ LastFmScrobbler::LastFmScrobbler(NetworkAccessManager *network) : network_(netwo
   settings.BeginGroup("Last.fm");
   session_key_ = settings.Value("session_key");
   username_ = settings.Value("username");
+}
+
+LastFmScrobbler::~LastFmScrobbler() {
+  if (submit_timeout_id_ != 0) {
+    g_source_remove(submit_timeout_id_);
+    submit_timeout_id_ = 0;
+  }
 }
 
 std::string LastFmScrobbler::AuthorizationUrl(const std::string &token) {
@@ -124,7 +132,29 @@ void LastFmScrobbler::NowPlaying(const Song &song) {
 
 void LastFmScrobbler::Scrobble(const Song &song) {
   cache_.Add(SongFromMetadata(song, ScrobbleMetadata::FromSongSettings(song)), static_cast<uint64_t>(std::time(nullptr)));
-  SubmitCache();
+  ScheduleSubmit(false);
+}
+
+void LastFmScrobbler::ScheduleSubmit(bool had_error) {
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  const int delay = ScrobblerSubmitTiming::DelaySeconds(settings.IntValue(ScrobblerSettings::kSubmit, ScrobblerSettings::kDefaultSubmit),
+                                                        had_error);
+  if (submit_timeout_id_ != 0) {
+    g_source_remove(submit_timeout_id_);
+    submit_timeout_id_ = 0;
+  }
+  if (delay <= 0) {
+    SubmitCache();
+    return;
+  }
+  submit_timeout_id_ = g_timeout_add_seconds(static_cast<guint>(delay), +[](gpointer data) -> gboolean {
+                                               auto *self = static_cast<LastFmScrobbler *>(data);
+                                               self->submit_timeout_id_ = 0;
+                                               self->SubmitCache();
+                                               return G_SOURCE_REMOVE;
+                                             },
+                                             this);
 }
 
 void LastFmScrobbler::SubmitCache() {
@@ -139,6 +169,8 @@ void LastFmScrobbler::SubmitCache() {
   network_->Post(kApiUrl, FormBody(params), [this](const NetworkAccessManager::Response &response) {
     if (response.ok()) {
       cache_.RemoveSent();
+    } else {
+      ScheduleSubmit(true);
     }
   }, "application/x-www-form-urlencoded");
 }

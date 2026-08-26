@@ -25,25 +25,28 @@ AdwPreferencesPage *QobuzSettingsPage::Create(Settings *settings, Application *a
       [settings, app, app_id, app_secret, private_key](GtkWidget *button) {
         gtk_widget_set_sensitive(button, FALSE);
         gtk_button_set_label(GTK_BUTTON(button), Translations::CStr(QobuzSettingsLabels::Fetching()));
-        QobuzCredentialFetcher::Fetch(app ? app->network() : nullptr, [settings, button, app_id, app_secret, private_key](
-                                                                          const std::string &id, const std::string &secret, const std::string &error) {
-          gtk_button_set_label(GTK_BUTTON(button), Translations::CStr(QobuzSettingsLabels::FetchCredentials()));
-          gtk_widget_set_sensitive(button, TRUE);
-          if (!error.empty()) {
-            MessageDialog::Show(nullptr, QobuzSettingsLabels::CredentialFetchFailed(), error);
-            return;
-          }
-          gtk_editable_set_text(GTK_EDITABLE(app_id), id.c_str());
-          gtk_editable_set_text(GTK_EDITABLE(app_secret), secret.c_str());
-          if (settings) {
-            settings->BeginGroup(QobuzSettings::kSettingsGroup);
-            settings->SetValue(QobuzSettings::kAppId, id);
-            settings->SetValue(QobuzSettings::kAppSecret, secret);
-            settings->Sync();
-          }
-          (void)private_key;
-          MessageDialog::Show(nullptr, QobuzSettingsLabels::CredentialsFetched(), QobuzSettingsLabels::CredentialsFetchedBody());
-        });
+        QobuzCredentialFetcher::Fetch(app ? app->network() : nullptr,
+                                      [settings, button, app_id, app_secret, private_key](const std::string &id, const std::string &secret,
+                                                                                          const std::string &key, const std::string &error) {
+                                        gtk_button_set_label(GTK_BUTTON(button), Translations::CStr(QobuzSettingsLabels::FetchCredentials()));
+                                        gtk_widget_set_sensitive(button, TRUE);
+                                        if (!error.empty()) {
+                                          MessageDialog::Show(nullptr, QobuzSettingsLabels::CredentialFetchFailed(), error);
+                                          return;
+                                        }
+                                        gtk_editable_set_text(GTK_EDITABLE(app_id), id.c_str());
+                                        gtk_editable_set_text(GTK_EDITABLE(app_secret), secret.c_str());
+                                        gtk_editable_set_text(GTK_EDITABLE(private_key), key.c_str());
+                                        if (settings) {
+                                          settings->BeginGroup(QobuzSettings::kSettingsGroup);
+                                          settings->SetValue(QobuzSettings::kAppId, id);
+                                          settings->SetValue(QobuzSettings::kAppSecret, secret);
+                                          settings->SetValue(QobuzSettings::kPrivateKey, key);
+                                          settings->Sync();
+                                        }
+                                        MessageDialog::Show(nullptr, QobuzSettingsLabels::CredentialsFetched(),
+                                                            QobuzSettingsLabels::CredentialsFetchedBody());
+                                      });
       },
       QobuzSettingsLabels::FetchTooltip());
   if (app) {

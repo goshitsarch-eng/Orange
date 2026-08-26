@@ -83,4 +83,9 @@ TEST(FilterParser, BuildsFilterTree) {
   folk.set_artist("Other");
   EXPECT_TRUE(tree->accept(folk));
   EXPECT_FALSE(FilterParser::ToolTip().empty());
+  EXPECT_NE(std::string::npos, FilterParser::ToolTip().find("artist:Strawbs"));
+  EXPECT_NE(std::string::npos, FilterParser::ToolTip().find("AND"));
+  EXPECT_NE(std::string::npos, FilterParser::ToolTip().find("OR"));
+  EXPECT_NE(std::string::npos, FilterParser::ToolTip().find("rating"));
+  EXPECT_NE(std::string::npos, FilterParser::ToolTip().find("title, album, artist"));
 }

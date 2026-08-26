@@ -6,6 +6,7 @@
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
 #include "scrobbler/scrobblersources.h"
+#include "settings/scrobblersettingslabels.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
 #include "ui/dialogs.h"
@@ -78,24 +79,32 @@ AdwPreferencesPage *ScrobblerSettingsPage::Create(Settings *settings, Applicatio
   settings->BeginGroup(ScrobblerSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Scrobbler", "send-to-symbolic");
   AdwPreferencesGroup *group = SettingsPage::AddGroup(page, "Services");
-  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kEnabled, "Enable scrobbling", nullptr, ScrobblerSettings::kDefaultEnabled);
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kEnabled, ScrobblerSettingsLabels::Enable(), nullptr,
+                          ScrobblerSettings::kDefaultEnabled);
+  SettingsPage::AddDescription(group, ScrobblerSettingsLabels::ScrobbleInfo());
   SettingsPage::AddToggle(group, settings, "Last.fm", "Last.fm", nullptr, false);
   SettingsPage::AddToggle(group, settings, "ListenBrainz", "ListenBrainz", nullptr, false);
 #ifdef HAVE_SUBSONIC
   SettingsPage::AddToggle(group, settings, "Subsonic", "Subsonic scrobble", nullptr, false);
 #endif
-  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kScrobbleButton, "Show scrobble button", nullptr,
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kScrobbleButton, ScrobblerSettingsLabels::ScrobbleButton(), nullptr,
                           ScrobblerSettings::kDefaultScrobbleButton);
-  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kLoveButton, "Show love button", nullptr, ScrobblerSettings::kDefaultLoveButton);
-  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kOffline, "Offline mode", nullptr, ScrobblerSettings::kDefaultOffline);
-  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kAlbumArtist, "Prefer album artist", nullptr, ScrobblerSettings::kDefaultAlbumArtist);
-  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kShowErrorDialog, "Show error dialog", nullptr,
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kLoveButton, ScrobblerSettingsLabels::LoveButton(), nullptr,
+                          ScrobblerSettings::kDefaultLoveButton);
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kOffline, ScrobblerSettingsLabels::Offline(),
+                          ScrobblerSettingsLabels::OfflineInfo(), ScrobblerSettings::kDefaultOffline);
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kAlbumArtist, ScrobblerSettingsLabels::AlbumArtist(), nullptr,
+                          ScrobblerSettings::kDefaultAlbumArtist);
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kShowErrorDialog, ScrobblerSettingsLabels::ShowErrors(), nullptr,
                           ScrobblerSettings::kDefaultShowErrorDialog);
-  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kStripRemastered, "Strip remastered from titles", nullptr,
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kStripRemastered, ScrobblerSettingsLabels::StripRemastered(), nullptr,
                           ScrobblerSettings::kDefaultStripRemastered);
-  SettingsPage::AddIntEntry(group, settings, ScrobblerSettings::kSubmit, "Submit after percent played", ScrobblerSettings::kDefaultSubmit);
+  SettingsPage::AddDescription(group, ScrobblerSettingsLabels::SubmitInfo());
+  SettingsPage::AddIntEntry(group, settings, ScrobblerSettings::kSubmit, ScrobblerSettingsLabels::SubmitEvery(),
+                            ScrobblerSettings::kDefaultSubmit);
+  SettingsPage::AddDescription(group, ScrobblerSettingsLabels::SubmitSeconds());
 
-  AdwPreferencesGroup *sources = SettingsPage::AddGroup(page, "Sources");
+  AdwPreferencesGroup *sources = SettingsPage::AddGroup(page, ScrobblerSettingsLabels::SourcesTitle());
   GtkWidget *hint = gtk_label_new(Translations::CStr("Leave every source enabled to scrobble everything."));
   gtk_label_set_wrap(GTK_LABEL(hint), TRUE);
   gtk_label_set_xalign(GTK_LABEL(hint), 0);
@@ -181,7 +190,8 @@ AdwPreferencesPage *ScrobblerSettingsPage::Create(Settings *settings, Applicatio
     if (auto *listenbrainz = dynamic_cast<ListenBrainzScrobbler *>(app->scrobbler()->ServiceByName("ListenBrainz"))) {
       AdwPreferencesGroup *lb_group = SettingsPage::AddGroup(page, "ListenBrainz account");
       AdwEntryRow *user_row = AddGroupedEntry(lb_group, settings, "ListenBrainz", "username", "Username");
-      AdwEntryRow *token_row = AddGroupedEntry(lb_group, settings, "ListenBrainz", "token", "User token");
+      AdwEntryRow *token_row = AddGroupedEntry(lb_group, settings, "ListenBrainz", "token", ScrobblerSettingsLabels::UserToken());
+      SettingsPage::AddDescription(lb_group, ScrobblerSettingsLabels::ListenBrainzTokenHint());
       auto *login = new LoginStateWidget();
       login->SetLoggedIn(listenbrainz->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut,
                          listenbrainz->username());

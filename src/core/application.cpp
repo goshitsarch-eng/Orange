@@ -2,7 +2,6 @@
 
 #include "constants/collectionsettings.h"
 #include "constants/notificationssettings.h"
-#include "constants/scrobblersettings.h"
 #include "core/appearance.h"
 #include "equalizer/equalizerpersist.h"
 #include "playlist/playlistsequence.h"
@@ -103,10 +102,7 @@ void Application::Init() {
   });
   player_->PlaybackFinished.Connect([this](const Song &song, int64_t listened_nanosec) {
     Settings settings;
-    settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
-    const int submit_percent = settings.IntValue(ScrobblerSettings::kSubmit, ScrobblerSettings::kDefaultSubmit);
-    settings.EndGroup();
-    const bool played = ScrobblerEligibility::ShouldScrobble(song, listened_nanosec, submit_percent);
+    const bool played = ScrobblerEligibility::ShouldScrobble(song, listened_nanosec);
     if (played) {
       scrobbler_->Scrobble(song);
       if (song.id() > 0) {

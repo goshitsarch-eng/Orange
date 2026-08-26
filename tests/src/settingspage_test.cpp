@@ -24,6 +24,9 @@
 #include "settings/behaviourstartupchoices.h"
 #include "settings/networkproxylabels.h"
 #include "settings/settingscontrols.h"
+#include "dialogs/aboutcredits.h"
+#include "qobuz/qobuzcredentialparser.h"
+#include "settings/scrobblersettingslabels.h"
 #include "settings/streamingsettingslabels.h"
 #include "subsonic/subsonicping.h"
 #include "subsonic/subsonicsettingsactions.h"
@@ -432,4 +435,54 @@ TEST(LoginStateVisibility, HidesCredentialsWhileSignedIn) {
   EXPECT_TRUE(LoginStateVisibility::ShowLogin(LoginStateWidget::State::LoggedOut));
   EXPECT_TRUE(LoginStateVisibility::ShowLogout(LoginStateWidget::State::LoggedIn));
   EXPECT_TRUE(LoginStateVisibility::ShowProgress(LoginStateWidget::State::LoginInProgress));
+}
+
+TEST(AboutCredits, MatchesQtSectionsAndContributorCounts) {
+  EXPECT_STREQ("About Strawberry", AboutCredits::WindowTitle());
+  EXPECT_STREQ("Jonas Kvinge", AboutCredits::AuthorName());
+  EXPECT_STREQ("Author and maintainer", AboutCredits::AuthorSection());
+  EXPECT_STREQ("Contributors", AboutCredits::ContributorsSection());
+  EXPECT_STREQ("Clementine authors", AboutCredits::ClementineAuthorsSection());
+  EXPECT_STREQ("Clementine contributors", AboutCredits::ClementineContributorsSection());
+  EXPECT_STREQ("Thanks to", AboutCredits::ThanksSection());
+  EXPECT_STREQ("Thanks to all the other Amarok and Clementine contributors.", AboutCredits::ThanksOthers());
+  EXPECT_STREQ("Jonas Kvinge", AboutCredits::Developers()[0]);
+  EXPECT_EQ(55u, AboutCredits::Count(AboutCredits::StrawberryContributors()));
+  EXPECT_STREQ("Gavin D. Howard", AboutCredits::StrawberryContributors()[0]);
+  EXPECT_STREQ("Alex Bikadorov", AboutCredits::StrawberryContributors()[54]);
+  EXPECT_EQ(4u, AboutCredits::Count(AboutCredits::ClementineAuthors()));
+  EXPECT_STREQ("David Sansome", AboutCredits::ClementineAuthors()[0]);
+  EXPECT_STREQ("Arnaud Bienner", AboutCredits::ClementineAuthors()[3]);
+  EXPECT_EQ(19u, AboutCredits::Count(AboutCredits::ClementineContributors()));
+  EXPECT_EQ(6u, AboutCredits::Count(AboutCredits::ThanksTo()));
+  EXPECT_STREQ("https://github.com/strawberrymusicplayer/strawberry", AboutCredits::SourceUrl());
+  EXPECT_NE(std::string::npos, std::string(AboutCredits::Comments()).find(AboutCredits::ForkNote()));
+  EXPECT_NE(std::string::npos, std::string(AboutCredits::Comments()).find(AboutCredits::SponsorNote()));
+}
+
+TEST(QobuzCredentialParser, ExtractsBundlePathIdsSecretAndPrivateKey) {
+  EXPECT_STREQ("https://play.qobuz.com/login", QobuzCredentialParser::LoginPageUrl());
+  EXPECT_EQ("https://play.qobuz.com/resources/7.13.0-b123/bundle.js",
+            QobuzCredentialParser::BundleUrl("/resources/7.13.0-b123/bundle.js"));
+  EXPECT_EQ("/resources/7.13.0-b123/bundle.js",
+            QobuzCredentialParser::ExtractBundlePath(R"(<script src="/resources/7.13.0-b123/bundle.js"></script>)"));
+  EXPECT_TRUE(QobuzCredentialParser::ExtractBundlePath("<html></html>").empty());
+  EXPECT_STREQ("Failed to find bundle.js URL in login page", QobuzCredentialParser::MissingBundle());
+  EXPECT_EQ("123456789", QobuzCredentialParser::ExtractAppId(R"(production:{api:{appId:"123456789")"));
+  EXPECT_EQ("98765432", QobuzCredentialParser::ExtractLoginAppId(R"({appId:"98765432"})"));
+  EXPECT_EQ("6lz8C03UDIC7", QobuzCredentialParser::ExtractPrivateKey(R"(privateKey:"6lz8C03UDIC7")"));
+  const std::string bundle =
+      R"(a.initialSeed("MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",window.utimezone.berlin))"
+      R"(name:"Europe/Berlin",info:"X",extras:"YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")";
+  EXPECT_EQ("0123456789abcdef0123456789abcdef", QobuzCredentialParser::ExtractAppSecret(bundle));
+  EXPECT_TRUE(QobuzCredentialParser::ExtractAppSecret("no seeds").empty());
+}
+
+TEST(ScrobblerSettingsLabels, MatchQtSubmitDelayCopy) {
+  EXPECT_STREQ("Submit scrobbles every", ScrobblerSettingsLabels::SubmitEvery());
+  EXPECT_STREQ(" seconds", ScrobblerSettingsLabels::SubmitSeconds());
+  EXPECT_STREQ("Offline mode (Only cache scrobbles)", ScrobblerSettingsLabels::Offline());
+  EXPECT_STREQ("User token:", ScrobblerSettingsLabels::UserToken());
+  EXPECT_STREQ("https://listenbrainz.org/profile/", ScrobblerSettingsLabels::ListenBrainzProfileUrl());
+  EXPECT_NE(std::string::npos, std::string(ScrobblerSettingsLabels::ListenBrainzTokenHint()).find("listenbrainz.org/profile"));
 }

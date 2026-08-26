@@ -7,6 +7,7 @@
 #include "collection/collectioncover.h"
 #include "collection/collectiondivider.h"
 #include "collection/collectioniconcache.h"
+#include "collection/collectionsearchlabels.h"
 #include "collection/collectionstats.h"
 #include "subsonic/subsonicsettingsactions.h"
 #include "collection/collectioncompilation.h"
@@ -915,6 +916,10 @@ TEST(CollectionBackend, DeleteSongsBySourceRemovesOnlyThatSource) {
   EXPECT_EQ("Roads", remaining.front().title());
   EXPECT_EQ(0, backend.DeleteSongsBySource(Song::Source::Subsonic));
   unlink(path.c_str());
+}
+
+TEST(CollectionSearchLabels, UsesQtPlaceholder) {
+  EXPECT_STREQ("Enter search terms here", CollectionSearchLabels::Placeholder());
 }
 
 TEST(CollectionStats, WritesLocalSongsAndKeepsQtCopy) {
