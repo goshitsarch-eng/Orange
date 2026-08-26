@@ -1,6 +1,9 @@
 #include "organize/organize.h"
 
 #include "core/filesystemmusicstorage.h"
+#include "core/standardpaths.h"
+#include "organize/organizetranscode.h"
+#include "transcoder/transcoder.h"
 #include "utilities/fileutils.h"
 
 #include <glib.h>
@@ -47,22 +50,40 @@ std::vector<Organize::Error> Organize::Copy(const SongList &songs, const std::st
       errors.push_back({song.PrettyTitleWithArtist(), "Filename format produced an empty path"});
       continue;
     }
-    const std::string dest = FileUtils::Join(destination, relative);
-    if (src.empty() || !FileUtils::Exists(src)) {
+    std::string dest = FileUtils::Join(destination, relative);
+    const Song::FileType dest_type =
+        OrganizeTranscode::Check(song.filetype(), options.transcode_mode, options.transcode_format, options.supported_filetypes);
+    std::string temp;
+    std::string copy_src = src;
+    if (dest_type != Song::FileType::Unknown && OrganizeTranscode::CanTranscode(dest_type)) {
+      dest = OrganizeTranscode::FiddleExtension(dest, OrganizeTranscode::ExtensionForFileType(dest_type));
+      temp = OrganizeTranscode::FiddleExtension(FileUtils::Join(StandardPaths::CacheDir(), "organize-" + FileUtils::BaseName(src)),
+                                                OrganizeTranscode::ExtensionForFileType(dest_type));
+      Transcoder transcoder;
+      if (!transcoder.TranscodeFile(song, temp, OrganizeTranscode::FormatFromFileType(dest_type))) {
+        errors.push_back({song.PrettyTitleWithArtist(), "Transcode failed"});
+        continue;
+      }
+      copy_src = temp;
+    }
+    if (src.empty() || !FileUtils::Exists(copy_src)) {
       errors.push_back({song.PrettyTitleWithArtist(), "Source file is missing"});
       continue;
     }
     if (!options.overwrite && FileUtils::Exists(dest)) {
       errors.push_back({song.PrettyTitleWithArtist(), "Destination already exists"});
+      if (!temp.empty()) {
+        FileUtils::Remove(temp);
+      }
       continue;
     }
     g_mkdir_with_parents(FileUtils::DirName(dest).c_str(), 0755);
     MusicStorage::CopyJob job;
-    job.source = src;
+    job.source = copy_src;
     job.destination = dest;
     job.metadata = song;
     job.overwrite = options.overwrite;
-    job.remove_original = options.move;
+    job.remove_original = options.move && temp.empty();
     job.albumcover = options.albumcover;
     if (options.albumcover) {
       job.cover_source = CoverPathForSong(song);
@@ -71,6 +92,11 @@ std::vector<Organize::Error> Organize::Copy(const SongList &songs, const std::st
     std::string error_text;
     if (!storage.CopyToStorage(job, error_text)) {
       errors.push_back({song.PrettyTitleWithArtist(), error_text.empty() ? ("Could not write " + dest) : error_text});
+    } else if (options.move && !temp.empty()) {
+      FileUtils::Remove(src);
+    }
+    if (!temp.empty()) {
+      FileUtils::Remove(temp);
     }
   }
   return errors;

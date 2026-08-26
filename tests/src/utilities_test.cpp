@@ -14,6 +14,7 @@
 #include "context/contexttechnical.h"
 #include "organize/organize.h"
 #include "organize/organizeformatvalidator.h"
+#include "organize/organizetranscode.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/fht.h"
 #include "constants/behavioursettings.h"
@@ -620,6 +621,64 @@ TEST(FileUtils, ListDirectoryRecursive) {
   FileUtils::Remove(FileUtils::Join(root, "skip.txt"));
   rmdir(nested.c_str());
   rmdir(root.c_str());
+}
+
+TEST(OrganizeTranscode, CheckModesAndBestFormat) {
+  EXPECT_EQ(Song::FileType::Unknown, OrganizeTranscode::Check(Song::FileType::FLAC, MusicStorage::TranscodeMode::Transcode_Never,
+                                                              Song::FileType::MPEG, {Song::FileType::MPEG}));
+  EXPECT_EQ(Song::FileType::MPEG, OrganizeTranscode::Check(Song::FileType::FLAC, MusicStorage::TranscodeMode::Transcode_Always,
+                                                          Song::FileType::MPEG, {}));
+  EXPECT_EQ(Song::FileType::Unknown, OrganizeTranscode::Check(Song::FileType::MPEG, MusicStorage::TranscodeMode::Transcode_Always,
+                                                              Song::FileType::MPEG, {}));
+  EXPECT_EQ(Song::FileType::Unknown, OrganizeTranscode::Check(Song::FileType::MPEG, MusicStorage::TranscodeMode::Transcode_Unsupported,
+                                                              Song::FileType::MPEG, {Song::FileType::MPEG, Song::FileType::MP4}));
+  EXPECT_EQ(Song::FileType::MPEG, OrganizeTranscode::Check(Song::FileType::FLAC, MusicStorage::TranscodeMode::Transcode_Unsupported,
+                                                          Song::FileType::MPEG, {Song::FileType::MPEG, Song::FileType::MP4}));
+  EXPECT_EQ(Song::FileType::Unknown, OrganizeTranscode::Check(Song::FileType::FLAC, MusicStorage::TranscodeMode::Transcode_Unsupported,
+                                                              Song::FileType::MPEG, {}));
+  EXPECT_EQ(Song::FileType::FLAC, OrganizeTranscode::PickBestFormat({Song::FileType::MPEG, Song::FileType::FLAC}));
+  EXPECT_EQ(Song::FileType::MPEG, OrganizeTranscode::PickBestFormat({Song::FileType::MPEG, Song::FileType::MP4}));
+  EXPECT_EQ(Song::FileType::Unknown, OrganizeTranscode::PickBestFormat({}));
+  EXPECT_EQ(MusicStorage::TranscodeMode::Transcode_Never,
+            OrganizeTranscode::FromDeviceMode(DeviceDatabaseBackend::TranscodeMode::Transcode_Never));
+  EXPECT_EQ(MusicStorage::TranscodeMode::Transcode_Always,
+            OrganizeTranscode::FromDeviceMode(DeviceDatabaseBackend::TranscodeMode::Transcode_Always));
+  EXPECT_EQ(MusicStorage::TranscodeMode::Transcode_Unsupported,
+            OrganizeTranscode::FromDeviceMode(DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported));
+  EXPECT_EQ(Transcoder::Format::MP3, OrganizeTranscode::FormatFromFileType(Song::FileType::MPEG));
+  EXPECT_EQ(Transcoder::Format::AAC, OrganizeTranscode::FormatFromFileType(Song::FileType::ALAC));
+  EXPECT_EQ("mp3", OrganizeTranscode::ExtensionForFileType(Song::FileType::MPEG));
+  EXPECT_EQ("/tmp/song.mp3", OrganizeTranscode::FiddleExtension("/tmp/song.flac", "mp3"));
+  EXPECT_EQ("song.m4a", OrganizeTranscode::FiddleExtension("song", "m4a"));
+  EXPECT_TRUE(OrganizeTranscode::SupportedForBackend("gio").empty());
+  EXPECT_TRUE(OrganizeTranscode::Contains(OrganizeTranscode::SupportedForBackend("gpod"), Song::FileType::MPEG));
+  EXPECT_TRUE(OrganizeTranscode::Contains(OrganizeTranscode::SupportedForBackend("mtp"), Song::FileType::ASF));
+}
+
+TEST(DeviceManager, MusicPathAndPassthroughPrepare) {
+  ConnectedDevice usb;
+  usb.backend = "gio";
+  usb.mount_path = "/media/usb";
+  EXPECT_EQ("/media/usb/Music", DeviceManager::MusicPath(usb));
+  ConnectedDevice ipod;
+  ipod.backend = "gpod";
+  ipod.mount_path = "/media/ipod";
+  EXPECT_EQ("/media/ipod", DeviceManager::MusicPath(ipod));
+  EXPECT_TRUE(DeviceManager::MusicPath(ConnectedDevice{}).empty());
+
+  DeviceManager manager;
+  Song song;
+  song.set_valid(true);
+  song.set_title("Roads");
+  song.set_filetype(Song::FileType::FLAC);
+  song.set_url("file:///tmp/roads.flac");
+  ConnectedDevice device;
+  device.backend = "gio";
+  device.unique_id = "test-usb";
+  const SongList prepared = manager.TranscodeForDevice({song}, device);
+  ASSERT_EQ(1u, prepared.size());
+  EXPECT_EQ(song.url(), prepared[0].url());
+  EXPECT_EQ(Song::FileType::FLAC, prepared[0].filetype());
 }
 
 TEST(DeviceManager, SongsFromDirectoryAndCdda) {

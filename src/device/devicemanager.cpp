@@ -16,6 +16,10 @@
 #include "device/mtpconnection.h"
 #include "device/mtpdevice.h"
 #include "device/mtploader.h"
+#include "organize/organize.h"
+#include "organize/organizeformat.h"
+#include "organize/organizetranscode.h"
+#include "transcoder/transcoder.h"
 #include "utilities/fileutils.h"
 #include <glib.h>
 #ifdef HAVE_GIO
@@ -344,15 +348,57 @@ UrlHandler::LoadResult DeviceManager::DeviceUrlHandler::Load(const std::string &
   return result;
 }
 
+std::string DeviceManager::MusicPath(const ConnectedDevice &device) {
+  if (device.mount_path.empty()) {
+    return {};
+  }
+  if (device.backend == "gpod") {
+    return device.mount_path;
+  }
+  return FileUtils::Join(device.mount_path, "Music");
+}
+
+SongList DeviceManager::TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const {
+  const DeviceDatabaseBackend::Device stored = StoredDevice(device.unique_id);
+  const MusicStorage::TranscodeMode mode =
+      OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported);
+  const Song::FileType format = stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG;
+  const std::vector<Song::FileType> supported = OrganizeTranscode::SupportedForBackend(device.backend);
+  SongList prepared;
+  prepared.reserve(songs.size());
+  for (const Song &song : songs) {
+    const Song::FileType dest_type = OrganizeTranscode::Check(song.filetype(), mode, format, supported);
+    if (dest_type == Song::FileType::Unknown || !OrganizeTranscode::CanTranscode(dest_type)) {
+      prepared.push_back(song);
+      continue;
+    }
+    const std::string src = FileUtils::PathFromUri(song.url());
+    const std::string temp = OrganizeTranscode::FiddleExtension(
+        FileUtils::Join(StandardPaths::CacheDir(), "device-" + FileUtils::BaseName(src)), OrganizeTranscode::ExtensionForFileType(dest_type));
+    Transcoder transcoder;
+    if (!transcoder.TranscodeFile(song, temp, OrganizeTranscode::FormatFromFileType(dest_type))) {
+      LogWarning("Could not transcode %s for device %s", src.c_str(), device.unique_id.c_str());
+      continue;
+    }
+    Song copy = song;
+    copy.set_url(FileUtils::UriFromPath(temp));
+    copy.set_filetype(dest_type);
+    copy.set_basefilename(FileUtils::BaseName(temp));
+    prepared.push_back(copy);
+  }
+  return prepared;
+}
+
 bool DeviceManager::CopySongs(const std::string &device_id, const SongList &songs) {
   const ConnectedDevice *found = FindDevice(device_id);
   if (!found) {
     return false;
   }
   const ConnectedDevice target = *found;
+  const SongList prepared = TranscodeForDevice(songs, target);
 #ifdef HAVE_MTP
   if (target.backend == "mtp") {
-    return MtpDevice::CopySongs(MtpSerial(target.unique_id), songs);
+    return MtpDevice::CopySongs(MtpSerial(target.unique_id), prepared);
   }
 #endif
   if (target.mount_path.empty()) {
@@ -361,27 +407,24 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
   }
 #ifdef HAVE_GPOD
   if (target.backend == "gpod") {
-    return GPodDevice::CopySongs(target.mount_path, songs);
+    return GPodDevice::CopySongs(target.mount_path, prepared);
   }
 #endif
 #ifdef HAVE_GIO
-  const std::string music = FileUtils::Join(target.mount_path, "Music");
+  const std::string music = MusicPath(target);
   g_mkdir_with_parents(music.c_str(), 0755);
-  int copied = 0;
-  for (const Song &song : songs) {
-    const std::string src = FileUtils::PathFromUri(song.url());
-    if (src.empty() || !FileUtils::Exists(src)) {
-      continue;
-    }
-    const std::string dest = FileUtils::Join(music, FileUtils::BaseName(src));
-    if (FileUtils::CopyFile(src, dest)) {
-      ++copied;
-    }
-  }
-  LogInfo("Copied %d songs to %s", copied, music.c_str());
-  return copied > 0;
+  const DeviceDatabaseBackend::Device stored = StoredDevice(target.unique_id);
+  OrganizeFormat format("%albumartist/%album/{%track - }%title");
+  Organize::Options options;
+  options.albumcover = true;
+  options.transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
+  options.transcode_format = stored.id >= 0 ? stored.transcode_format : Song::FileType::Unknown;
+  class Organize organize;
+  const auto errors = organize.Copy(prepared, music, format, options);
+  LogInfo("Copied %d songs to %s (%zu failed)", static_cast<int>(prepared.size() - errors.size()), music.c_str(), errors.size());
+  return !prepared.empty() && errors.size() < prepared.size();
 #else
-  (void)songs;
+  (void)prepared;
   return false;
 #endif
 }

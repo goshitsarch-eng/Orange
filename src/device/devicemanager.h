@@ -34,6 +34,8 @@ class DeviceManager {
 
   static SongList SongsFromDirectory(const std::string &path);
   static SongList MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec);
+  static std::string MusicPath(const ConnectedDevice &device);
+  SongList TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const;
 
   Signal<> DevicesChanged;
 

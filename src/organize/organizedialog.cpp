@@ -5,6 +5,7 @@
 #include "core/application.h"
 #include "core/settings.h"
 #include "organize/organize.h"
+#include "organize/organizetranscode.h"
 #include "organize/organizeerrordialog.h"
 #include "organize/organizeformat.h"
 #include "organize/organizeformatvalidator.h"
@@ -17,6 +18,13 @@
 #include <vector>
 
 void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &songs, bool move) {
+  Request request;
+  request.songs = songs;
+  request.move = move;
+  Show(parent, app, request);
+}
+
+void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &request) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr("Organize files"));
   adw_dialog_set_content_width(dialog, 560);
@@ -31,7 +39,8 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
   const std::string saved_format = settings.Value(OrganizeSettings::kFormat, OrganizeSettings::kDefaultFormat);
   const std::string music_dir = g_get_user_special_dir(G_USER_DIRECTORY_MUSIC) ? g_get_user_special_dir(G_USER_DIRECTORY_MUSIC)
                                                                               : g_get_home_dir();
-  std::string saved_dest = settings.Value(OrganizeSettings::kDestination, music_dir);
+  std::string saved_dest = request.destination.empty() ? settings.Value(OrganizeSettings::kDestination, music_dir)
+                                                       : request.destination;
   const std::vector<CollectionDirectory> dirs = app && app->collection() && app->collection()->backend()
                                                    ? app->collection()->backend()->Directories()
                                                    : std::vector<CollectionDirectory>{};
@@ -151,7 +160,8 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
   }
 
   GtkWidget *move_btn = gtk_check_button_new_with_label(Translations::CStr("Move files instead of copying"));
-  gtk_check_button_set_active(GTK_CHECK_BUTTON(move_btn), move || settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(move_btn),
+                              request.move || settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove));
   GtkWidget *overwrite = gtk_check_button_new_with_label(Translations::CStr("Overwrite existing files"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(overwrite), settings.BoolValue(OrganizeSettings::kOverwrite, OrganizeSettings::kDefaultOverwrite));
   GtkWidget *replace_spaces = gtk_check_button_new_with_label(Translations::CStr("Replace spaces with underscores"));
@@ -159,7 +169,12 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
                               settings.BoolValue(OrganizeSettings::kReplaceSpaces, OrganizeSettings::kDefaultReplaceSpaces));
   GtkWidget *albumcover = gtk_check_button_new_with_label(Translations::CStr("Copy album cover art"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(albumcover), settings.BoolValue(OrganizeSettings::kAlbumCover, OrganizeSettings::kDefaultAlbumCover));
-  auto *owned_songs = new SongList(songs);
+  GtkWidget *eject = nullptr;
+  if (request.show_eject) {
+    eject = gtk_check_button_new_with_label(Translations::CStr("Eject device afterwards"));
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(eject), settings.BoolValue(OrganizeSettings::kEjectAfter, OrganizeSettings::kDefaultEjectAfter));
+  }
+  auto *owned_songs = new SongList(request.songs);
   GtkWidget *status = gtk_label_new(owned_songs->empty() ? Translations::CStr("Uses the current playlist as the source.")
                                                          : (std::to_string(owned_songs->size()) + " selected song(s).").c_str());
   gtk_label_set_wrap(GTK_LABEL(status), TRUE);
@@ -178,6 +193,17 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
   g_object_set_data(G_OBJECT(run), "albumcover", albumcover);
   g_object_set_data(G_OBJECT(run), "status", status);
   g_object_set_data(G_OBJECT(run), "parent", parent);
+  g_object_set_data(G_OBJECT(run), "transcode-mode", GINT_TO_POINTER(static_cast<int>(request.transcode_mode)));
+  g_object_set_data(G_OBJECT(run), "transcode-format", GINT_TO_POINTER(static_cast<int>(request.transcode_format)));
+  g_object_set_data(G_OBJECT(run), "persist-dest", GINT_TO_POINTER(request.destination.empty() ? 1 : 2));
+  auto *supported = new std::vector<Song::FileType>(request.supported_filetypes);
+  g_object_set_data_full(G_OBJECT(run), "supported", supported, [](gpointer p) { delete static_cast<std::vector<Song::FileType> *>(p); });
+  if (eject) {
+    g_object_set_data(G_OBJECT(run), "eject", eject);
+  }
+  if (!request.device_id.empty()) {
+    g_object_set_data_full(G_OBJECT(run), "device-id", g_strdup(request.device_id.c_str()), g_free);
+  }
   g_object_set_data_full(G_OBJECT(run), "songs", owned_songs, [](gpointer p) { delete static_cast<SongList *>(p); });
   g_object_set_data(G_OBJECT(preview_btn), "songs", owned_songs);
   g_object_set_data(G_OBJECT(preview_btn), "buffer", buffer);
@@ -249,14 +275,25 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
                      options.move = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "move")));
                      options.overwrite = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "overwrite")));
                      options.albumcover = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "albumcover")));
+                     options.transcode_mode = static_cast<MusicStorage::TranscodeMode>(
+                         GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "transcode-mode")));
+                     options.transcode_format = static_cast<Song::FileType>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "transcode-format")));
+                     if (auto *supported = static_cast<std::vector<Song::FileType> *>(g_object_get_data(G_OBJECT(button), "supported"))) {
+                       options.supported_filetypes = *supported;
+                     }
                      Settings persist;
                      persist.BeginGroup(OrganizeSettings::kSettingsGroup);
                      persist.SetValue(OrganizeSettings::kFormat, format_text);
-                     persist.SetValue(OrganizeSettings::kDestination, dest_dir);
+                     if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "persist-dest")) == 1) {
+                       persist.SetValue(OrganizeSettings::kDestination, dest_dir);
+                     }
                      persist.SetBoolValue(OrganizeSettings::kMove, options.move);
                      persist.SetBoolValue(OrganizeSettings::kOverwrite, options.overwrite);
                      persist.SetBoolValue(OrganizeSettings::kReplaceSpaces, format.replace_spaces());
                      persist.SetBoolValue(OrganizeSettings::kAlbumCover, options.albumcover);
+                     if (gpointer eject_ptr = g_object_get_data(G_OBJECT(button), "eject")) {
+                       persist.SetBoolValue(OrganizeSettings::kEjectAfter, gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)));
+                     }
                      persist.Sync();
                      auto *owned = static_cast<SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
                      SongList songs = owned && !owned->empty() ? *owned
@@ -270,6 +307,12 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
                      }
                      if (errors.empty()) {
                        gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
+                       gpointer eject_ptr = g_object_get_data(G_OBJECT(button), "eject");
+                       const char *device_id = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "device-id"));
+                       if (eject_ptr && device_id && gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)) && application &&
+                           application->device_manager()) {
+                         application->device_manager()->Unmount(device_id);
+                       }
                        return;
                      }
                      OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), errors);
@@ -289,6 +332,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
   gtk_box_append(GTK_BOX(box), overwrite);
   gtk_box_append(GTK_BOX(box), replace_spaces);
   gtk_box_append(GTK_BOX(box), albumcover);
+  if (eject) {
+    gtk_box_append(GTK_BOX(box), eject);
+  }
   gtk_box_append(GTK_BOX(box), preview_btn);
   gtk_box_append(GTK_BOX(box), preview);
   gtk_box_append(GTK_BOX(box), run);
