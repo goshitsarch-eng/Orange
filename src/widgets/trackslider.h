@@ -21,11 +21,14 @@ class TrackSlider {
   void SetTimes(int64_t position_nanosec, int64_t length_nanosec);
   void SetSeekCallback(SeekCallback callback);
   void SetSliderVisible(bool visible);
+  void ToggleRemaining();
+  bool show_remaining() const { return show_remaining_; }
   const std::string &position_text() const { return position_text_; }
   const std::string &duration_text() const { return duration_text_; }
 
  private:
   void UpdateLabels();
+  void PersistRemaining();
 
   PrettySlider slider_;
   GtkWidget *widget_ = nullptr;
@@ -33,6 +36,7 @@ class TrackSlider {
   GtkWidget *duration_label_ = nullptr;
   int64_t position_nanosec_ = 0;
   int64_t length_nanosec_ = 0;
+  bool show_remaining_ = false;
   SeekCallback seek_;
   std::string position_text_;
   std::string duration_text_;

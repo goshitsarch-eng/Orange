@@ -1,17 +1,32 @@
 #include "widgets/trackslider.h"
 
-#include "utilities/timeutils.h"
+#include "core/settings.h"
+#include "widgets/trackslidertime.h"
 
 TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
+  Settings settings;
+  settings.BeginGroup(TrackSliderTime::SettingsGroup());
+  show_remaining_ = settings.BoolValue(TrackSliderTime::SettingsKey(), TrackSliderTime::DefaultShowRemaining());
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   position_label_ = gtk_label_new("0:00");
   duration_label_ = gtk_label_new("0:00");
   gtk_widget_add_css_class(position_label_, "dim-label");
   gtk_widget_add_css_class(duration_label_, "dim-label");
+  gtk_widget_set_tooltip_text(duration_label_, TrackSliderTime::DurationTooltip());
+  gtk_widget_set_cursor_from_name(duration_label_, "pointer");
   gtk_widget_set_hexpand(slider_.widget(), TRUE);
   gtk_box_append(GTK_BOX(widget_), position_label_);
   gtk_box_append(GTK_BOX(widget_), slider_.widget());
   gtk_box_append(GTK_BOX(widget_), duration_label_);
+  GtkGesture *click = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
+  gtk_widget_add_controller(duration_label_, GTK_EVENT_CONTROLLER(click));
+  g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint n_press, gdouble, gdouble, gpointer data) {
+                     if (n_press == 1) {
+                       static_cast<TrackSlider *>(data)->ToggleRemaining();
+                     }
+                   }),
+                   this);
   slider_.SetChangedCallback([this](double value) {
     if (length_nanosec_ <= 0 || !seek_) {
       return;
@@ -37,10 +52,22 @@ void TrackSlider::SetSeekCallback(SeekCallback callback) { seek_ = std::move(cal
 
 void TrackSlider::SetSliderVisible(bool visible) { gtk_widget_set_visible(slider_.widget(), visible); }
 
+void TrackSlider::ToggleRemaining() {
+  show_remaining_ = !show_remaining_;
+  PersistRemaining();
+  UpdateLabels();
+}
+
+void TrackSlider::PersistRemaining() {
+  Settings settings;
+  settings.BeginGroup(TrackSliderTime::SettingsGroup());
+  settings.SetBoolValue(TrackSliderTime::SettingsKey(), show_remaining_);
+}
+
 void TrackSlider::UpdateLabels() {
-  position_text_ = Utilities::PrettyTimeNanosec(position_nanosec_);
-  duration_text_ = Utilities::PrettyTimeNanosec(length_nanosec_);
+  position_text_ = TrackSliderTime::PositionLabel(position_nanosec_);
+  duration_text_ = TrackSliderTime::DurationLabel(show_remaining_, position_nanosec_, length_nanosec_);
   gtk_label_set_text(GTK_LABEL(position_label_), position_text_.c_str());
   gtk_label_set_text(GTK_LABEL(duration_label_), duration_text_.c_str());
-  slider_.SetPopupText(position_text_ + " / " + duration_text_);
+  slider_.SetPopupText(TrackSliderTime::PopupText(show_remaining_, position_nanosec_, length_nanosec_));
 }

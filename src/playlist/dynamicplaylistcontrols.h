@@ -25,6 +25,7 @@ class DynamicPlaylistControls {
 
  private:
   GtkWidget *widget_ = nullptr;
+  GtkWidget *summary_label_ = nullptr;
   SmartPlaylistSearch search_;
   ExpandCallback expand_;
   RepopulateCallback repopulate_;

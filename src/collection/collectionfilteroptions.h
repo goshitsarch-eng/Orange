@@ -26,6 +26,9 @@ class CollectionFilterOptions {
   void set_min_rating(float min_rating) { min_rating_ = min_rating; }
   void set_filter_text(const std::string &filter_text);
 
+  bool TextSearchEnabled() const { return filter_mode_ == FilterMode::All; }
+  static bool TextSearchEnabled(FilterMode filter_mode) { return filter_mode == FilterMode::All; }
+
   bool Matches(const Song &song) const;
 
  private:

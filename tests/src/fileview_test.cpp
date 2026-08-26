@@ -4,6 +4,7 @@
 #include "device/devicemenu.h"
 #include "device/devicesongmenu.h"
 #include "device/devicedrag.h"
+#include "device/deviceviewlook.h"
 #include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
 #include "fileview/fileviewicons.h"
@@ -499,6 +500,40 @@ TEST(FileViewTreeModel, LazyLoadIncludesAudioFiles) {
   FileUtils::Remove(notes);
   rmdir(nested.c_str());
   rmdir(dir.c_str());
+}
+
+TEST(DeviceViewLook, IconsAndStatusMatchQtDelegate) {
+  EXPECT_EQ(32, DeviceViewLook::kIconSize);
+  ConnectedDevice mtp;
+  mtp.backend = "mtp";
+  mtp.icon = "multimedia-player-symbolic";
+  EXPECT_STREQ("multimedia-player-symbolic", DeviceViewLook::IconName(mtp));
+  EXPECT_EQ(DeviceViewLook::Status::NotConnected, DeviceViewLook::InferStatus(mtp));
+  EXPECT_EQ("Double click to open", DeviceViewLook::StatusText(mtp));
+
+  ConnectedDevice volume;
+  volume.backend = "udisks2";
+  volume.friendly_name = "USB Drive";
+  EXPECT_STREQ("drive-harddisk-usb-symbolic", DeviceViewLook::IconName(volume));
+  EXPECT_EQ(DeviceViewLook::Status::NotMounted, DeviceViewLook::InferStatus(volume));
+  EXPECT_EQ("Not mounted - double click to mount", DeviceViewLook::StatusText(volume));
+
+  volume.mount_path = "/run/media/usb";
+  EXPECT_EQ(DeviceViewLook::Status::Connected, DeviceViewLook::InferStatus(volume));
+  EXPECT_EQ("/run/media/usb", DeviceViewLook::StatusText(volume));
+  EXPECT_EQ("1 song", DeviceViewLook::StatusText(volume, 1));
+  EXPECT_EQ("12 songs", DeviceViewLook::StatusText(volume, 12));
+  EXPECT_EQ("Not connected", DeviceViewLook::StatusText(volume, -1, true));
+
+  ConnectedDevice cd;
+  cd.backend = "cdda";
+  EXPECT_STREQ("media-optical-symbolic", DeviceViewLook::IconName(cd));
+
+  CollectionItem folder(CollectionItem::Type::Container);
+  EXPECT_STREQ("folder-symbolic", DeviceViewLook::ItemIconName(&folder));
+  CollectionItem song(CollectionItem::Type::Song);
+  song.metadata.set_url("file:///music/roads.flac");
+  EXPECT_STREQ("audio-x-generic-symbolic", DeviceViewLook::ItemIconName(&song));
 }
 
 TEST(DeviceDrag, JoinsSongUrls) {

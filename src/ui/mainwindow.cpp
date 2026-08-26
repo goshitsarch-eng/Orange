@@ -927,7 +927,19 @@ void MainWindow::BuildSidebar() {
   collection_container_ = std::make_unique<CollectionViewContainer>();
   collection_container_->view()->SetCoverLoader(app_->albumcover_loader());
   gtk_widget_set_vexpand(collection_container_->widget(), TRUE);
-  collection_container_->filter_widget()->SetChangedCallback([this]() { RefreshCollection(); });
+  collection_container_->filter_widget()->SetChangedCallback([this]() {
+    const bool enabled = collection_container_->filter_widget()->options().TextSearchEnabled();
+    if (collection_search_) {
+      gtk_widget_set_sensitive(collection_search_, enabled);
+      if (!enabled) {
+        gtk_editable_set_text(GTK_EDITABLE(collection_search_), "");
+      }
+    }
+    if (!enabled) {
+      collection_text_filter_.clear();
+    }
+    RefreshCollection();
+  });
   collection_container_->filter_widget()->SetGrouping(grouping_);
   collection_container_->filter_widget()->SetGroupingChangedCallback([this](const CollectionGrouping::Grouping &grouping) {
     grouping_ = grouping;

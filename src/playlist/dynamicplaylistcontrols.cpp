@@ -1,5 +1,6 @@
 #include "playlist/dynamicplaylistcontrols.h"
 
+#include "smartplaylists/smartplaylistsummary.h"
 #include "translations/translations.h"
 
 DynamicPlaylistControls::DynamicPlaylistControls() {
@@ -9,7 +10,17 @@ DynamicPlaylistControls::DynamicPlaylistControls() {
   GtkWidget *expand = gtk_button_new_with_label(Translations::CStr("Expand"));
   GtkWidget *repopulate = gtk_button_new_with_label(Translations::CStr("Repopulate"));
   GtkWidget *off = gtk_button_new_with_label(Translations::CStr("Turn off"));
-  gtk_box_append(GTK_BOX(widget_), gtk_label_new(Translations::CStr("Dynamic playlist")));
+  GtkWidget *labels = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_set_hexpand(labels, TRUE);
+  GtkWidget *title = gtk_label_new(Translations::CStr(SmartPlaylistSummary::Title()));
+  gtk_widget_set_halign(title, GTK_ALIGN_START);
+  summary_label_ = gtk_label_new(Translations::CStr(SmartPlaylistSummary::EmptyTerms()));
+  gtk_widget_add_css_class(summary_label_, "dim-label");
+  gtk_widget_set_halign(summary_label_, GTK_ALIGN_START);
+  gtk_label_set_ellipsize(GTK_LABEL(summary_label_), PANGO_ELLIPSIZE_END);
+  gtk_box_append(GTK_BOX(labels), title);
+  gtk_box_append(GTK_BOX(labels), summary_label_);
+  gtk_box_append(GTK_BOX(widget_), labels);
   gtk_box_append(GTK_BOX(widget_), expand);
   gtk_box_append(GTK_BOX(widget_), repopulate);
   gtk_box_append(GTK_BOX(widget_), off);
@@ -37,7 +48,12 @@ DynamicPlaylistControls::DynamicPlaylistControls() {
   gtk_widget_set_visible(widget_, FALSE);
 }
 
-void DynamicPlaylistControls::SetSearch(const SmartPlaylistSearch &search) { search_ = search; }
+void DynamicPlaylistControls::SetSearch(const SmartPlaylistSearch &search) {
+  search_ = search;
+  if (summary_label_) {
+    gtk_label_set_text(GTK_LABEL(summary_label_), SmartPlaylistSummary::Summary(search_).c_str());
+  }
+}
 
 void DynamicPlaylistControls::SetExpandCallback(ExpandCallback callback) { expand_ = std::move(callback); }
 

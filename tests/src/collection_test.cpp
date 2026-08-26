@@ -87,6 +87,18 @@ TEST(CollectionFilterOptions, FilterModeClearsText) {
   EXPECT_TRUE(options.filter_text().empty());
 }
 
+TEST(CollectionFilterOptions, TextSearchEnabledOnlyForAll) {
+  CollectionFilterOptions options;
+  EXPECT_TRUE(options.TextSearchEnabled());
+  EXPECT_TRUE(CollectionFilterOptions::TextSearchEnabled(CollectionFilterOptions::FilterMode::All));
+  options.set_filter_mode(CollectionFilterOptions::FilterMode::Duplicates);
+  EXPECT_FALSE(options.TextSearchEnabled());
+  options.set_filter_mode(CollectionFilterOptions::FilterMode::Untagged);
+  EXPECT_FALSE(options.TextSearchEnabled());
+  EXPECT_FALSE(CollectionFilterOptions::TextSearchEnabled(CollectionFilterOptions::FilterMode::Duplicates));
+  EXPECT_FALSE(CollectionFilterOptions::TextSearchEnabled(CollectionFilterOptions::FilterMode::Untagged));
+}
+
 TEST(CollectionQuery, BuildsSqlForAgeUntaggedDuplicatesAndUnavailable) {
   CollectionFilterOptions age;
   age.set_max_age(86400);

@@ -5,6 +5,7 @@
 #include "collection/collectiontree.h"
 #include "device/devicekeyboard.h"
 #include "device/devicedrag.h"
+#include "device/deviceviewlook.h"
 #include "translations/translations.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
@@ -185,13 +186,28 @@ void DeviceView::ShowDevices(const std::vector<ConnectedDevice> &devices) {
   }
   for (const ConnectedDevice &device : devices) {
     GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *label = gtk_label_new((device.friendly_name + " · " + device.backend).c_str());
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_margin_start(label, 12);
-    gtk_widget_set_margin_end(label, 12);
-    gtk_widget_set_margin_top(label, 8);
-    gtk_widget_set_margin_bottom(label, 8);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+    GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_widget_set_margin_start(row_box, 12);
+    gtk_widget_set_margin_end(row_box, 12);
+    gtk_widget_set_margin_top(row_box, 8);
+    gtk_widget_set_margin_bottom(row_box, 8);
+    GtkWidget *icon = gtk_image_new_from_icon_name(DeviceViewLook::IconName(device));
+    gtk_image_set_pixel_size(GTK_IMAGE(icon), DeviceViewLook::kIconSize);
+    gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
+    GtkWidget *text = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_hexpand(text, TRUE);
+    GtkWidget *primary = gtk_label_new(device.friendly_name.c_str());
+    gtk_widget_set_halign(primary, GTK_ALIGN_START);
+    gtk_widget_add_css_class(primary, "heading");
+    GtkWidget *status = gtk_label_new(DeviceViewLook::StatusText(device).c_str());
+    gtk_widget_add_css_class(status, "dim-label");
+    gtk_widget_set_halign(status, GTK_ALIGN_START);
+    gtk_label_set_ellipsize(GTK_LABEL(status), PANGO_ELLIPSIZE_END);
+    gtk_box_append(GTK_BOX(text), primary);
+    gtk_box_append(GTK_BOX(text), status);
+    gtk_box_append(GTK_BOX(row_box), icon);
+    gtk_box_append(GTK_BOX(row_box), text);
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
     auto *copy = new ConnectedDevice(device);
     g_object_set_data_full(G_OBJECT(row), "device", copy, [](gpointer p) { delete static_cast<ConnectedDevice *>(p); });
     AttachMenu(row);
@@ -230,6 +246,10 @@ void DeviceView::AppendItem(const CollectionItem *item, int depth) {
                      this);
     gtk_box_append(GTK_BOX(row_box), toggle);
   }
+  GtkWidget *icon = gtk_image_new_from_icon_name(DeviceViewLook::ItemIconName(item));
+  gtk_image_set_pixel_size(GTK_IMAGE(icon), 16);
+  gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(row_box), icon);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_widget_set_hexpand(box, TRUE);
   GtkWidget *primary = gtk_label_new(CollectionItemDelegate::PrimaryText(item).c_str());

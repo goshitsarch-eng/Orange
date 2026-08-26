@@ -5,6 +5,7 @@
 #include "smartplaylists/playlistgeneratorinserter.h"
 #include "smartplaylists/playlistquerygenerator.h"
 #include "smartplaylists/smartplaylist.h"
+#include "smartplaylists/smartplaylistsummary.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
 #include "smartplaylists/smartplaylistdrag.h"
 #include "smartplaylists/smartplaylistsmodel.h"
@@ -158,6 +159,28 @@ TEST(SmartPlaylist, SerializeRoundTrip) {
   EXPECT_EQ(10, parsed_saved.limit);
   SmartPlaylistSearch::RemoveSaved("Fleet years renamed");
   EXPECT_FALSE(SmartPlaylistSearch::FindSaved("Fleet years renamed", &parsed_saved));
+}
+
+TEST(SmartPlaylistSummary, DescribesTermsLimitAndEmpty) {
+  EXPECT_STREQ("Dynamic mode is on", SmartPlaylistSummary::Title());
+  EXPECT_STREQ("New tracks will be added automatically.", SmartPlaylistSummary::EmptyTerms());
+  SmartPlaylistSearch empty;
+  EXPECT_EQ(SmartPlaylistSummary::EmptyTerms(), SmartPlaylistSummary::Summary(empty));
+
+  SmartPlaylistSearch search;
+  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "Portishead"});
+  search.terms.push_back({SmartPlaylistField::Year, SmartPlaylistOp::GreaterThan, "1990"});
+  search.limit = 50;
+  EXPECT_EQ("Artist Contains Portishead and Year Greater than 1990 · limit 50", SmartPlaylistSummary::Summary(search));
+
+  search.type = SmartPlaylistSearch::SearchType::Or;
+  search.limit = 0;
+  EXPECT_EQ("Artist Contains Portishead or Year Greater than 1990", SmartPlaylistSummary::Summary(search));
+
+  SmartPlaylistTerm empty_comment;
+  empty_comment.field = SmartPlaylistField::Comment;
+  empty_comment.op = SmartPlaylistOp::Empty;
+  EXPECT_EQ("Comment Empty", SmartPlaylistSummary::TermText(empty_comment));
 }
 
 TEST(SmartPlaylist, FieldAndOpIndex) {

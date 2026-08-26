@@ -1,5 +1,6 @@
 #include "utilities/strutils.h"
 #include "utilities/timeutils.h"
+#include "widgets/trackslidertime.h"
 #include "utilities/fileutils.h"
 #include "utilities/audioanalysis.h"
 #include "collection/collectiongrouping.h"
@@ -79,6 +80,18 @@ TEST(TimeUtils, PrettyTime) {
 
 TEST(TimeUtils, PrettyTimeNanosec) {
   EXPECT_EQ("0:05", Utilities::PrettyTimeNanosec(5000000000LL));
+}
+
+TEST(TrackSliderTime, DurationTogglesRemainingLikeQt) {
+  EXPECT_STREQ("Seekbar", TrackSliderTime::SettingsGroup());
+  EXPECT_STREQ("show_remaining", TrackSliderTime::SettingsKey());
+  EXPECT_FALSE(TrackSliderTime::DefaultShowRemaining());
+  EXPECT_EQ("1:30", TrackSliderTime::PositionLabel(90000000000LL));
+  EXPECT_EQ("3:00", TrackSliderTime::DurationLabel(false, 90000000000LL, 180000000000LL));
+  EXPECT_EQ("-1:30", TrackSliderTime::DurationLabel(true, 90000000000LL, 180000000000LL));
+  EXPECT_EQ("-0:00", TrackSliderTime::DurationLabel(true, 180000000000LL, 180000000000LL));
+  EXPECT_EQ("1:30 / -1:30", TrackSliderTime::PopupText(true, 90000000000LL, 180000000000LL));
+  EXPECT_STREQ("Click to toggle remaining time", TrackSliderTime::DurationTooltip());
 }
 
 TEST(StrUtils, SplitJoin) {
