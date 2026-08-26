@@ -1,12 +1,14 @@
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlist.h"
+#include "playlist/playlisteditorder.h"
 #include "playlist/playlistfolders.h"
 #include "playlist/playlistlistdrop.h"
 #include "playlist/playlistlistkeyboard.h"
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
 #include "playlist/playlistsaveoptionsdialog.h"
+#include "playlist/playlisttagcompletion.h"
 #include "playlist/songloaderinserter.h"
 #include "playlist/playlistratingclick.h"
 #include "widgets/listboxkeyboard.h"
@@ -308,4 +310,77 @@ TEST(SongLoaderInserter, NullTagReaderReturnsEmpty) {
   Playlist playlist;
   EXPECT_EQ(0, loader.Insert(&playlist, {"file:///tmp/missing.flac"}));
   EXPECT_EQ(0, playlist.row_count());
+}
+
+TEST(PlaylistEditOrder, FromKeyAndWrap) {
+  EXPECT_EQ(PlaylistEditOrder::TabAction::Next, PlaylistEditOrder::FromKey(PlaylistEditOrder::kTab, false));
+  EXPECT_EQ(PlaylistEditOrder::TabAction::Previous, PlaylistEditOrder::FromKey(PlaylistEditOrder::kTab, true));
+  EXPECT_EQ(PlaylistEditOrder::TabAction::Previous, PlaylistEditOrder::FromKey(PlaylistEditOrder::kISOLeftTab, false));
+  EXPECT_EQ(PlaylistEditOrder::TabAction::None, PlaylistEditOrder::FromKey('a', false));
+
+  const std::vector<int> rows = {0, 2, 5};
+  const std::vector<PlaylistColumn> visible = {PlaylistColumn::Queue, PlaylistColumn::Title, PlaylistColumn::Artist, PlaylistColumn::Length};
+  const std::vector<PlaylistColumn> editable = PlaylistEditOrder::EditableVisible(visible);
+  ASSERT_EQ(2u, editable.size());
+  EXPECT_EQ(PlaylistColumn::Title, editable[0]);
+  EXPECT_EQ(PlaylistColumn::Artist, editable[1]);
+
+  const PlaylistEditOrder::Cell next = PlaylistEditOrder::Next(0, PlaylistColumn::Title, rows, editable);
+  EXPECT_TRUE(next.valid);
+  EXPECT_EQ(0, next.row);
+  EXPECT_EQ(PlaylistColumn::Artist, next.column);
+
+  const PlaylistEditOrder::Cell wrap_row = PlaylistEditOrder::Next(0, PlaylistColumn::Artist, rows, editable);
+  EXPECT_TRUE(wrap_row.valid);
+  EXPECT_EQ(2, wrap_row.row);
+  EXPECT_EQ(PlaylistColumn::Title, wrap_row.column);
+
+  const PlaylistEditOrder::Cell wrap_end = PlaylistEditOrder::Next(5, PlaylistColumn::Artist, rows, editable);
+  EXPECT_TRUE(wrap_end.valid);
+  EXPECT_EQ(0, wrap_end.row);
+  EXPECT_EQ(PlaylistColumn::Title, wrap_end.column);
+
+  const PlaylistEditOrder::Cell prev = PlaylistEditOrder::Previous(2, PlaylistColumn::Title, rows, editable);
+  EXPECT_TRUE(prev.valid);
+  EXPECT_EQ(0, prev.row);
+  EXPECT_EQ(PlaylistColumn::Artist, prev.column);
+
+  const PlaylistEditOrder::Cell wrap_start = PlaylistEditOrder::Previous(0, PlaylistColumn::Title, rows, editable);
+  EXPECT_TRUE(wrap_start.valid);
+  EXPECT_EQ(5, wrap_start.row);
+  EXPECT_EQ(PlaylistColumn::Artist, wrap_start.column);
+
+  EXPECT_FALSE(PlaylistEditOrder::Next(0, PlaylistColumn::Title, {}, editable).valid);
+  EXPECT_FALSE(PlaylistEditOrder::Previous(0, PlaylistColumn::Title, rows, {}).valid);
+}
+
+TEST(PlaylistTagCompletion, ColumnsAndUniqueValues) {
+  EXPECT_TRUE(PlaylistTagCompletion::CompletesColumn(PlaylistColumn::Album));
+  EXPECT_TRUE(PlaylistTagCompletion::CompletesColumn(PlaylistColumn::Artist));
+  EXPECT_TRUE(PlaylistTagCompletion::CompletesColumn(PlaylistColumn::Genre));
+  EXPECT_TRUE(PlaylistTagCompletion::CompletesColumn(PlaylistColumn::TitleSort));
+  EXPECT_FALSE(PlaylistTagCompletion::CompletesColumn(PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistTagCompletion::CompletesColumn(PlaylistColumn::Year));
+  EXPECT_FALSE(PlaylistTagCompletion::CompletesColumn(PlaylistColumn::Comment));
+
+  Song a;
+  a.set_artist("Portishead");
+  a.set_album("Dummy");
+  a.set_genre("Trip Hop");
+  Song b;
+  b.set_artist("portishead");
+  b.set_album("Third");
+  b.set_genre("Trip Hop");
+  Song c;
+  c.set_artist("Massive Attack");
+  c.set_album("");
+  const std::vector<std::string> albums = PlaylistTagCompletion::UniqueValues({a, b, c}, PlaylistColumn::Album);
+  ASSERT_EQ(2u, albums.size());
+  EXPECT_EQ("Dummy", albums[0]);
+  EXPECT_EQ("Third", albums[1]);
+  EXPECT_TRUE(PlaylistTagCompletion::UniqueValues({a, b, c}, PlaylistColumn::Title).empty());
+  EXPECT_EQ(0, PlaylistTagCompletion::FirstPrefixIndex(albums, "du"));
+  EXPECT_EQ(1, PlaylistTagCompletion::FirstPrefixIndex(albums, "Thi"));
+  EXPECT_EQ(-1, PlaylistTagCompletion::FirstPrefixIndex(albums, "Roads"));
+  EXPECT_EQ(-1, PlaylistTagCompletion::FirstPrefixIndex(albums, ""));
 }

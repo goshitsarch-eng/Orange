@@ -4,9 +4,11 @@
 #include "core/settings.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistcolumnlayout.h"
+#include "playlist/playlisteditorder.h"
 #include "playlist/playlistratingclick.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistlook.h"
+#include "playlist/playlisttagcompletion.h"
 #include "utilities/strutils.h"
 #include "utilities/styleutils.h"
 #include "widgets/listboxkeyboard.h"
@@ -427,6 +429,55 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
                              self->edit_commit_(edited_row, edited_column, gtk_editable_get_text(GTK_EDITABLE(widget)));
                            }
                          }),
+                         this);
+        if (playlist_ && PlaylistTagCompletion::CompletesColumn(column)) {
+          GtkEntryCompletion *completion = gtk_entry_completion_new();
+          GtkListStore *store = gtk_list_store_new(1, G_TYPE_STRING);
+          for (const std::string &value : PlaylistTagCompletion::UniqueValues(playlist_->songs(), column)) {
+            GtkTreeIter iter;
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, value.c_str(), -1);
+          }
+          gtk_entry_completion_set_model(completion, GTK_TREE_MODEL(store));
+          gtk_entry_completion_set_text_column(completion, 0);
+          gtk_entry_set_completion(GTK_ENTRY(entry), completion);
+          g_object_unref(store);
+          g_object_unref(completion);
+        }
+        GtkEventController *tabs = gtk_event_controller_key_new();
+        gtk_event_controller_set_propagation_phase(tabs, GTK_PHASE_CAPTURE);
+        gtk_widget_add_controller(entry, tabs);
+        g_signal_connect(tabs, "key-pressed",
+                         G_CALLBACK((+[](GtkEventControllerKey *controller, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                           auto *self = static_cast<PlaylistView *>(data);
+                           const PlaylistEditOrder::TabAction tab =
+                               PlaylistEditOrder::FromKey(keyval, (state & GDK_SHIFT_MASK) != 0);
+                           if (tab == PlaylistEditOrder::TabAction::None) {
+                             return FALSE;
+                           }
+                           GtkWidget *edited = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+                           const int edited_row = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(edited), "row-index"));
+                           const PlaylistColumn edited_column =
+                               static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(edited), "column")) - 1);
+                           if (self->edit_commit_) {
+                             self->edit_commit_(edited_row, edited_column, gtk_editable_get_text(GTK_EDITABLE(edited)));
+                           }
+                           std::vector<int> rows = self->visible_rows_;
+                           if (rows.empty() && self->playlist_) {
+                             for (int i = 0; i < self->playlist_->row_count(); ++i) {
+                               rows.push_back(i);
+                             }
+                           }
+                           const std::vector<PlaylistColumn> editable = PlaylistEditOrder::EditableVisible(PlaylistColumnLayout::Visible());
+                           const PlaylistEditOrder::Cell cell =
+                               tab == PlaylistEditOrder::TabAction::Next
+                                   ? PlaylistEditOrder::Next(edited_row, edited_column, rows, editable)
+                                   : PlaylistEditOrder::Previous(edited_row, edited_column, rows, editable);
+                           if (cell.valid) {
+                             self->StartInlineEdit(cell.row, cell.column);
+                           }
+                           return TRUE;
+                         })),
                          this);
         gtk_widget_grab_focus(entry);
         return;
