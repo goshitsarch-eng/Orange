@@ -934,6 +934,8 @@ if(GTest_FOUND)
     src/qobuz/qobuzmetadatarequest.cpp
     src/tagreader/tagreadergme.cpp
     src/tagreader/tagreader.cpp
+    src/tagreader/tagreaderbase.cpp
+    src/tagreader/albumcovertagdata.cpp
     src/tagreader/streamtagreader.cpp
     src/tagreader/tagreaderresult.cpp
     src/tagreader/tagreaderclient.cpp

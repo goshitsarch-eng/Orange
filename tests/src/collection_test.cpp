@@ -288,3 +288,38 @@ TEST(CollectionBackend, MarkMissingUnavailableLeavesSeenSongs) {
   EXPECT_TRUE(backend.SongById(gone_id).unavailable());
   unlink(path.c_str());
 }
+
+TEST(CollectionBackend, PersistsRatingPlaycountAndEmbeddedArt) {
+  const std::string path = "/tmp/strawberry-collection-rating-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  ASSERT_GE(directory, 0);
+
+  Song song = MakeSong("Rated", "Artist", "Album", std::time(nullptr));
+  song.set_directory_id(directory);
+  song.set_rating(0.6f);
+  song.set_playcount(7);
+  song.set_art_embedded(true);
+  const int id = backend.AddOrUpdateSong(song);
+  ASSERT_GT(id, 0);
+
+  const Song loaded = backend.SongByUrl(song.url());
+  EXPECT_NEAR(0.6f, loaded.rating(), 0.001f);
+  EXPECT_EQ(7u, loaded.playcount());
+  EXPECT_TRUE(loaded.art_embedded());
+
+  Song update = loaded;
+  update.set_title("Rated Again");
+  update.set_rating(-1.0f);
+  update.set_playcount(0);
+  backend.AddOrUpdateSong(update);
+  const Song kept = backend.SongByUrl(song.url());
+  EXPECT_EQ("Rated Again", kept.title());
+  EXPECT_NEAR(0.6f, kept.rating(), 0.001f);
+  EXPECT_EQ(7u, kept.playcount());
+  EXPECT_TRUE(kept.art_embedded());
+  unlink(path.c_str());
+}

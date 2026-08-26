@@ -12,6 +12,9 @@ class AlbumCoverTagData {
   std::vector<unsigned char> data;
   std::string mimetype;
   std::string error;
+
+  static std::string GuessMimeType(const std::vector<unsigned char> &data);
+  static AlbumCoverTagData FromBytes(const std::vector<unsigned char> &data, const std::string &mimetype = {});
 };
 
 #endif

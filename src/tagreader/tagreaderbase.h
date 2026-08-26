@@ -22,6 +22,9 @@ class TagReaderBase {
   virtual bool SaveCover(const std::string &filename, const CoverData &cover) const = 0;
   virtual bool SavePlaycount(const std::string &filename, unsigned playcount) const = 0;
   virtual bool SaveRating(const std::string &filename, float rating) const = 0;
+
+  static float ConvertPOPMRating(int popm_rating);
+  static int ConvertToPOPMRating(float rating);
 };
 
 #endif

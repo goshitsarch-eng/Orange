@@ -76,6 +76,7 @@ Song CollectionBackend::SongFromQuery(const SqlQuery &query) const {
   song.set_playcount(static_cast<unsigned>(query.ColumnInt(39)));
   song.set_skipcount(static_cast<unsigned>(query.ColumnInt(40)));
   song.set_lastplayed(query.ColumnInt64(41));
+  song.set_art_embedded(query.ColumnInt(47) != 0);
   song.set_rating(static_cast<float>(query.ColumnInt(54)) / 100.0f);
   song.set_valid(true);
   return song;
@@ -142,7 +143,9 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
     SqlQuery query(database_,
                    "UPDATE songs SET title=?, album=?, artist=?, albumartist=?, track=?, disc=?, year=?, genre=?, "
                    "composer=?, performer=?, grouping=?, comment=?, lyrics=?, length=?, bitrate=?, samplerate=?, "
-                   "bitdepth=?, filetype=?, filesize=?, mtime=?, unavailable=0 WHERE url=?");
+                   "bitdepth=?, filetype=?, filesize=?, mtime=?, unavailable=0, art_embedded=?, "
+                   "playcount=CASE WHEN ? > 0 THEN ? ELSE playcount END, "
+                   "rating=CASE WHEN ? >= 0 THEN ? ELSE rating END WHERE url=?");
     query.Bind(1, song.title());
     query.Bind(2, song.album());
     query.Bind(3, song.artist());
@@ -163,7 +166,12 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
     query.Bind(18, static_cast<int>(song.filetype()));
     query.Bind(19, song.filesize());
     query.Bind(20, song.mtime());
-    query.Bind(21, song.url());
+    query.Bind(21, song.art_embedded() ? 1 : 0);
+    query.Bind(22, static_cast<int>(song.playcount()));
+    query.Bind(23, static_cast<int>(song.playcount()));
+    query.Bind(24, song.rating() >= 0 ? static_cast<int>(song.rating() * 100.0f) : -1);
+    query.Bind(25, song.rating() >= 0 ? static_cast<int>(song.rating() * 100.0f) : -1);
+    query.Bind(26, song.url());
     query.Exec();
     return existing.id();
   }
@@ -173,8 +181,8 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
                  "grouping, comment, lyrics, beginning, length, bitrate, samplerate, bitdepth, source, directory_id, url, "
                  "filetype, filesize, mtime, ctime, unavailable, playcount, skipcount, lastplayed, lastseen, "
                  "compilation, compilation_detected, compilation_on, compilation_off, compilation_effective, "
-                 "effective_albumartist, effective_originalyear, rating) "
-                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,0,0,-1,-1,0,0,0,0,0,?,?, -1)");
+                 "art_embedded, effective_albumartist, effective_originalyear, rating) "
+                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,0,-1,-1,0,0,0,0,0,?,?,?,?)");
   query.Bind(1, song.title());
   query.Bind(2, song.album());
   query.Bind(3, song.artist());
@@ -200,8 +208,11 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
   query.Bind(23, song.filesize());
   query.Bind(24, song.mtime());
   query.Bind(25, song.ctime());
-  query.Bind(26, song.EffectiveAlbumartist());
-  query.Bind(27, song.originalyear() > 0 ? song.originalyear() : song.year());
+  query.Bind(26, static_cast<int>(song.playcount()));
+  query.Bind(27, song.art_embedded() ? 1 : 0);
+  query.Bind(28, song.EffectiveAlbumartist());
+  query.Bind(29, song.originalyear() > 0 ? song.originalyear() : song.year());
+  query.Bind(30, song.rating() >= 0 ? static_cast<int>(song.rating() * 100.0f) : -1);
   query.Exec();
   return static_cast<int>(database_->LastInsertRowId());
 }

@@ -1,3 +1,5 @@
+#include "tagreader/albumcovertagdata.h"
+#include "tagreader/tagreaderbase.h"
 #include "tagreader/tagreaderclient.h"
 #include "utilities/fileutils.h"
 
@@ -184,6 +186,55 @@ TEST(TagReaderClient, QueueAndClearAndBatchSave) {
   EXPECT_TRUE(client.HaveRequests());
   client.Clear();
   EXPECT_FALSE(client.HaveRequests());
+}
+
+TEST(TagReaderBase, ConvertPOPMRatingMatchesQt) {
+  EXPECT_FLOAT_EQ(0.0f, TagReaderBase::ConvertPOPMRating(0));
+  EXPECT_FLOAT_EQ(0.20f, TagReaderBase::ConvertPOPMRating(1));
+  EXPECT_FLOAT_EQ(0.20f, TagReaderBase::ConvertPOPMRating(0x3F));
+  EXPECT_FLOAT_EQ(0.40f, TagReaderBase::ConvertPOPMRating(0x40));
+  EXPECT_FLOAT_EQ(0.60f, TagReaderBase::ConvertPOPMRating(0x80));
+  EXPECT_FLOAT_EQ(0.80f, TagReaderBase::ConvertPOPMRating(0xC0));
+  EXPECT_FLOAT_EQ(1.0f, TagReaderBase::ConvertPOPMRating(0xFC));
+  EXPECT_FLOAT_EQ(1.0f, TagReaderBase::ConvertPOPMRating(0xFF));
+  EXPECT_EQ(0x00, TagReaderBase::ConvertToPOPMRating(0.0f));
+  EXPECT_EQ(0x01, TagReaderBase::ConvertToPOPMRating(0.20f));
+  EXPECT_EQ(0x40, TagReaderBase::ConvertToPOPMRating(0.40f));
+  EXPECT_EQ(0x80, TagReaderBase::ConvertToPOPMRating(0.60f));
+  EXPECT_EQ(0xC0, TagReaderBase::ConvertToPOPMRating(0.80f));
+  EXPECT_EQ(0xFF, TagReaderBase::ConvertToPOPMRating(1.0f));
+}
+
+TEST(AlbumCoverTagData, GuessMimeTypeFromMagic) {
+  EXPECT_EQ("image/jpeg", AlbumCoverTagData::GuessMimeType({0xFF, 0xD8, 0xFF, 0xE0}));
+  EXPECT_EQ("image/png", AlbumCoverTagData::GuessMimeType({0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}));
+  EXPECT_EQ("image/gif", AlbumCoverTagData::GuessMimeType({'G', 'I', 'F', '8', '9', 'a'}));
+}
+
+TEST(TagReaderClient, SaveAndReadRatingAndCoverOnMpeg) {
+  TagReaderClient client;
+  const std::string path = TempPath("rated.mp3");
+  FileUtils::WriteFile(path, MakeId3Mpeg("Rated", "Artist", "Album"));
+
+  EXPECT_TRUE(client.SaveSongRatingBlocking(path, 0.8f).success());
+  Song song;
+  ASSERT_TRUE(client.ReadFileBlocking(path, &song).success());
+  EXPECT_NEAR(0.8f, song.rating(), 0.001f);
+
+  SaveTagCoverData cover;
+  cover.cover_data = {0xFF, 0xD8, 0xFF, 0xE0};
+  cover.cover_mimetype = "image/jpeg";
+  EXPECT_TRUE(client.SaveCoverBlocking(path, cover).success());
+  std::vector<unsigned char> embedded;
+  EXPECT_TRUE(client.LoadCoverDataBlocking(path, &embedded).success());
+  ASSERT_FALSE(embedded.empty());
+  EXPECT_EQ(0xFF, embedded.front());
+
+  Song reread;
+  ASSERT_TRUE(client.ReadFileBlocking(path, &reread).success());
+  EXPECT_TRUE(reread.art_embedded());
+
+  FileUtils::Remove(path);
 }
 
 TEST(SaveTagsOptions, CombinesFlags) {
