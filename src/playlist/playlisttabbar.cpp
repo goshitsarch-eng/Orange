@@ -6,7 +6,7 @@ void PlaylistTabBar::SetChangedCallback(ChangedCallback callback) { changed_ = s
 
 void PlaylistTabBar::SetFavoriteCallback(FavoriteCallback callback) { favorite_ = std::move(callback); }
 
-void PlaylistTabBar::Refresh(PlaylistManager *manager) {
+void PlaylistTabBar::Refresh(PlaylistManager *manager, const std::string &active_name, PlaylistListLook::Playback playback) {
   favorites_.clear();
   GtkWidget *child = gtk_widget_get_first_child(widget_);
   while (child) {
@@ -20,6 +20,9 @@ void PlaylistTabBar::Refresh(PlaylistManager *manager) {
   int index = 0;
   for (const auto &playlist : manager->playlists()) {
     GtkWidget *tab = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+    if (const char *icon_name = PlaylistListLook::PlaybackIconName(PlaylistListLook::IsActiveName(playlist->name(), active_name), playback)) {
+      gtk_box_append(GTK_BOX(tab), gtk_image_new_from_icon_name(icon_name));
+    }
     GtkWidget *button = gtk_toggle_button_new_with_label(playlist->name().c_str());
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), playlist.get() == manager->current());
     g_object_set_data_full(G_OBJECT(button), "playlist-name", g_strdup(playlist->name().c_str()), g_free);

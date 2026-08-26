@@ -15,6 +15,7 @@ struct Row {
   std::string path;
   int depth = 0;
   bool expanded = true;
+  int id = -1;
 };
 
 inline constexpr const char *kMovePrefix = "strawberry-playlist-move:";

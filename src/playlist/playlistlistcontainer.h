@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_PLAYLISTLISTCONTAINER_H
 #define STRAWBERRY_PLAYLISTLISTCONTAINER_H
 
+#include "playlist/playlistlistlook.h"
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
 #include "playlist/playlistlistview.h"
@@ -42,6 +43,12 @@ class PlaylistListContainer {
   void AddExtraFolder(const std::string &path);
   void RemoveExtraFolder(const std::string &path);
   void RenameExtraFolder(const std::string &old_path, const std::string &new_path);
+  void SetPlayback(PlaylistListLook::Playback playback);
+  void SetActive(const std::string &name, int id);
+  void SelectName(const std::string &name);
+  PlaylistListLook::Playback playback() const { return playback_; }
+  const std::string &active_name() const { return active_name_; }
+  int active_id() const { return active_id_; }
   const std::vector<std::string> &extra_folders() const { return extra_folders_; }
 
  private:
@@ -66,6 +73,9 @@ class PlaylistListContainer {
   NameCallback menu_;
   std::vector<std::string> extra_folders_;
   std::set<std::string> collapsed_;
+  std::string active_name_;
+  int active_id_ = -1;
+  PlaylistListLook::Playback playback_ = PlaylistListLook::Playback::Stopped;
 };
 
 #endif

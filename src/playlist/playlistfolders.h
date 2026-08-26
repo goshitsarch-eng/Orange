@@ -15,6 +15,7 @@ struct PlaylistRef {
   std::string name;
   bool favorite = false;
   std::string ui_path;
+  int id = -1;
 };
 
 inline std::string SanitizeName(std::string name) {
@@ -213,6 +214,7 @@ inline std::vector<PlaylistListDrop::Row> Flatten(const std::vector<PlaylistRef>
         row.path = child.path;
         row.depth = depth;
         row.expanded = child.folder && (filtering || collapsed->count(child.path) == 0);
+        row.id = child.playlist.id;
         rows->push_back(row);
         if (child.folder && row.expanded) {
           Walk(child.path, depth + 1);

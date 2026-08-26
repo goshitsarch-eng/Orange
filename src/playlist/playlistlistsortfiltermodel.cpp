@@ -20,6 +20,9 @@ std::vector<PlaylistListDrop::Row> PlaylistListSortFilterModel::VisibleRows() co
     if (i < static_cast<int>(source_->paths().size())) {
       playlist.ui_path = source_->paths()[static_cast<size_t>(i)];
     }
+    if (i < static_cast<int>(source_->ids().size())) {
+      playlist.id = source_->ids()[static_cast<size_t>(i)];
+    }
     playlists.push_back(playlist);
   }
   return PlaylistFolders::Flatten(playlists, extra_folders_, collapsed_, filter_, favorites_only_);

@@ -4,6 +4,7 @@ void PlaylistListModel::Reload(PlaylistManager *manager) {
   names_.clear();
   favorites_.clear();
   paths_.clear();
+  ids_.clear();
   if (!manager) {
     return;
   }
@@ -11,18 +12,24 @@ void PlaylistListModel::Reload(PlaylistManager *manager) {
     names_.push_back(playlist->name());
     favorites_.push_back(playlist->favorite());
     paths_.push_back(playlist->ui_path());
+    ids_.push_back(playlist->id());
   }
 }
 
-void PlaylistListModel::SetRows(const std::vector<std::string> &names, const std::vector<bool> &favorites, const std::vector<std::string> &paths) {
+void PlaylistListModel::SetRows(const std::vector<std::string> &names, const std::vector<bool> &favorites, const std::vector<std::string> &paths,
+                               const std::vector<int> &ids) {
   names_ = names;
   favorites_ = favorites;
   paths_ = paths;
+  ids_ = ids;
   if (favorites_.size() < names_.size()) {
     favorites_.resize(names_.size(), false);
   }
   if (paths_.size() < names_.size()) {
     paths_.resize(names_.size());
+  }
+  if (ids_.size() < names_.size()) {
+    ids_.resize(names_.size(), -1);
   }
 }
 

@@ -54,7 +54,10 @@ PlaylistListView::PlaylistListView() {
                    this);
 }
 
-PlaylistListView::~PlaylistListView() { ResetTypeAhead(); }
+PlaylistListView::~PlaylistListView() {
+  CancelDragHover();
+  ResetTypeAhead();
+}
 
 void PlaylistListView::ResetTypeAhead() {
   typeahead_.clear();
@@ -119,12 +122,80 @@ gboolean PlaylistListView::OnKeyPressed(guint keyval) {
 
 void PlaylistListView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
-void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, const std::string &current) {
+void PlaylistListView::CancelDragHover() {
+  hover_name_.clear();
+  if (hover_timeout_) {
+    g_source_remove(hover_timeout_);
+    hover_timeout_ = 0;
+  }
+}
+
+void PlaylistListView::StartDragHover(const std::string &name) {
+  if (!PlaylistListLook::ShouldRestartDragHover(name, current_)) {
+    CancelDragHover();
+    return;
+  }
+  if (name == hover_name_ && hover_timeout_) {
+    return;
+  }
+  CancelDragHover();
+  hover_name_ = name;
+  hover_timeout_ = g_timeout_add(PlaylistListLook::kDragHoverTimeoutMs, [](gpointer data) -> gboolean {
+    auto *self = static_cast<PlaylistListView *>(data);
+    self->hover_timeout_ = 0;
+    const std::string hovered = self->hover_name_;
+    self->hover_name_.clear();
+    if (self->activate_ && !hovered.empty()) {
+      self->activate_(hovered);
+    }
+    return G_SOURCE_REMOVE;
+  }, this);
+}
+
+void PlaylistListView::SelectName(const std::string &name) {
+  if (name.empty()) {
+    return;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    const char *row_name = static_cast<const char *>(g_object_get_data(G_OBJECT(child), "playlist-name"));
+    if (!row_name || name != row_name) {
+      continue;
+    }
+    gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+    gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
+    gtk_widget_grab_focus(child);
+    return;
+  }
+}
+
+void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, const std::string &current, const std::string &active,
+                              PlaylistListLook::Playback playback) {
+  CancelDragHover();
+  current_ = current;
   GtkWidget *child = gtk_widget_get_first_child(list_);
   while (child) {
     GtkWidget *next = gtk_widget_get_next_sibling(child);
     gtk_list_box_remove(GTK_LIST_BOX(list_), child);
     child = next;
+  }
+  if (PlaylistListLook::ShouldShowEmptyHint(rows.size())) {
+    GtkWidget *row = gtk_list_box_row_new();
+    gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(row), FALSE);
+    gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(row), FALSE);
+    GtkWidget *label = gtk_label_new(Translations::CStr(PlaylistListLook::EmptyHint()));
+    gtk_label_set_wrap(GTK_LABEL(label), TRUE);
+    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
+    gtk_widget_add_css_class(label, "dim-label");
+    gtk_widget_set_margin_start(label, 16);
+    gtk_widget_set_margin_end(label, 16);
+    gtk_widget_set_margin_top(label, 24);
+    gtk_widget_set_margin_bottom(label, 24);
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+    gtk_list_box_append(GTK_LIST_BOX(list_), row);
+    return;
   }
   for (const PlaylistListDrop::Row &item : rows) {
     GtkWidget *row = gtk_list_box_row_new();
@@ -150,6 +221,10 @@ void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, c
       gtk_box_append(GTK_BOX(outer), toggle);
       GtkWidget *icon = gtk_image_new_from_icon_name("folder-symbolic");
       gtk_box_append(GTK_BOX(outer), icon);
+    } else if (const char *icon_name =
+                   PlaylistListLook::PlaybackIconName(PlaylistListLook::IsActiveName(item.name, active), playback)) {
+      GtkWidget *icon = gtk_image_new_from_icon_name(icon_name);
+      gtk_box_append(GTK_BOX(outer), icon);
     }
     GtkWidget *label = gtk_label_new(item.folder ? item.name.c_str() : PlaylistListDrop::DisplayName(item.name, item.favorite).c_str());
     gtk_widget_set_halign(label, GTK_ALIGN_START);
@@ -159,6 +234,7 @@ void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, c
     g_object_set_data_full(G_OBJECT(row), "playlist-name", g_strdup(item.folder ? "" : item.name.c_str()), g_free);
     g_object_set_data_full(G_OBJECT(row), "playlist-path", g_strdup(item.path.c_str()), g_free);
     g_object_set_data(G_OBJECT(row), "playlist-folder", GINT_TO_POINTER(item.folder ? 1 : 2));
+    g_object_set_data(G_OBJECT(row), "playlist-id", GINT_TO_POINTER(item.id + 1));
     if (!item.folder && item.name == current) {
       gtk_widget_add_css_class(row, "accent");
     }
@@ -168,15 +244,39 @@ void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, c
     }
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
+  SelectName(current);
 }
 
 void PlaylistListView::SetupRowDrop(GtkWidget *row, const PlaylistListDrop::Row &item) {
   GtkDropTarget *target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
   gtk_drop_target_set_actions(target, static_cast<GdkDragAction>(GDK_ACTION_COPY | GDK_ACTION_MOVE));
+  gtk_drop_target_set_preload(target, TRUE);
   g_object_set_data_full(G_OBJECT(target), "playlist-name", g_strdup(item.folder ? item.path.c_str() : item.name.c_str()), g_free);
   g_object_set_data(G_OBJECT(target), "playlist-folder", GINT_TO_POINTER(item.folder ? 1 : 2));
+  g_signal_connect(target, "motion", G_CALLBACK((+[](GtkDropTarget *t, gdouble, gdouble, gpointer data) -> GdkDragAction {
+                     auto *self = static_cast<PlaylistListView *>(data);
+                     const GValue *value = gtk_drop_target_get_value(t);
+                     if (!value || !G_VALUE_HOLDS_STRING(value)) {
+                       return static_cast<GdkDragAction>(0);
+                     }
+                     const char *text = g_value_get_string(value);
+                     const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(t), "playlist-name"));
+                     const bool folder = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(t), "playlist-folder")) == 1;
+                     if (!folder && name && PlaylistListLook::ShouldStartDragHover(text ? text : "")) {
+                       self->StartDragHover(name);
+                       return GDK_ACTION_COPY;
+                     }
+                     self->CancelDragHover();
+                     return GDK_ACTION_COPY;
+                   })),
+                   this);
+  g_signal_connect(target, "leave", G_CALLBACK(+[](GtkDropTarget *, gpointer data) {
+                     static_cast<PlaylistListView *>(data)->CancelDragHover();
+                   }),
+                   this);
   g_signal_connect(target, "drop", G_CALLBACK((+[](GtkDropTarget *t, const GValue *value, gdouble, gdouble, gpointer data) -> gboolean {
                      auto *self = static_cast<PlaylistListView *>(data);
+                     self->CancelDragHover();
                      const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(t), "playlist-name"));
                      const bool folder = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(t), "playlist-folder")) == 1;
                      if (!self->drop_ || !name || !G_VALUE_HOLDS_STRING(value)) {

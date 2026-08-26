@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_PLAYLISTTABBAR_H
 #define STRAWBERRY_PLAYLISTTABBAR_H
 
+#include "playlist/playlistlistlook.h"
 #include "playlist/playlistmanager.h"
 #include "widgets/favoritewidget.h"
 
@@ -20,7 +21,8 @@ class PlaylistTabBar {
   PlaylistTabBar();
 
   GtkWidget *widget() const { return widget_; }
-  void Refresh(PlaylistManager *manager);
+  void Refresh(PlaylistManager *manager, const std::string &active_name = {},
+               PlaylistListLook::Playback playback = PlaylistListLook::Playback::Stopped);
   void SetChangedCallback(ChangedCallback callback);
   void SetFavoriteCallback(FavoriteCallback callback);
   void SetCloseCallback(CloseCallback callback) { close_ = std::move(callback); }

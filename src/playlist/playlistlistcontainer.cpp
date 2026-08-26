@@ -133,9 +133,30 @@ void PlaylistListContainer::Rebuild() {
   if (manager_ && manager_->current()) {
     current = manager_->current()->name();
   }
+  if (active_name_.empty() && manager_ && manager_->active()) {
+    active_name_ = manager_->active()->name();
+    active_id_ = manager_->active()->id();
+  }
   filter_.SetExtraFolders(extra_folders_);
   filter_.SetCollapsed(collapsed_);
-  view_->Refresh(filter_.VisibleRows(), current);
+  view_->Refresh(filter_.VisibleRows(), current, active_name_, playback_);
+}
+
+void PlaylistListContainer::SetPlayback(PlaylistListLook::Playback playback) {
+  playback_ = playback;
+  Rebuild();
+}
+
+void PlaylistListContainer::SetActive(const std::string &name, int id) {
+  active_name_ = name;
+  active_id_ = id;
+  Rebuild();
+}
+
+void PlaylistListContainer::SelectName(const std::string &name) {
+  if (view_) {
+    view_->SelectName(name);
+  }
 }
 
 void PlaylistListContainer::SetActivateCallback(const std::function<void(const std::string &)> &callback) {

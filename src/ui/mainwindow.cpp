@@ -28,6 +28,7 @@
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistmenu.h"
 #include "playlist/playlistlistcontainer.h"
+#include "playlist/playlistlistlook.h"
 #include "playlist/playlistsequence.h"
 #include "queue/queuerows.h"
 #include "queue/queueview.h"
@@ -1436,6 +1437,18 @@ void MainWindow::ConnectSignals() {
     UpdateNowPlaying();
     SelectPlayingTrack();
   });
+  app_->player()->Playing.Connect([this]() {
+    if (playlist_list_container_) {
+      playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Playing);
+    }
+    RefreshPlaylistTabs();
+  });
+  app_->player()->Paused.Connect([this]() {
+    if (playlist_list_container_) {
+      playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Paused);
+    }
+    RefreshPlaylistTabs();
+  });
   app_->player()->Stopped.Connect([this]() {
     if (playing_widget_) {
       playing_widget_->Stopped();
@@ -1443,7 +1456,26 @@ void MainWindow::ConnectSignals() {
     if (context_view_) {
       context_view_->Stopped();
     }
+    if (playlist_list_container_) {
+      playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Stopped);
+    }
     UpdatePlaybackButtons();
+    RefreshPlaylistTabs();
+  });
+  app_->playlist_manager()->ActiveChanged.Connect([this](Playlist *playlist) {
+    if (playlist_list_container_) {
+      playlist_list_container_->SetActive(playlist ? playlist->name() : "", playlist ? playlist->id() : -1);
+    }
+    RefreshPlaylistTabs();
+  });
+  app_->playlist_manager()->CurrentChanged.Connect([this](Playlist *playlist) {
+    if (playlist_list_container_) {
+      playlist_list_container_->Reload(app_->playlist_manager());
+      if (playlist) {
+        playlist_list_container_->SelectName(playlist->name());
+      }
+    }
+    RefreshPlaylistTabs();
   });
   app_->player()->StateChanged.Connect([this](GstEngine::State state) {
     if (playing_widget_) {
@@ -1654,7 +1686,10 @@ void MainWindow::RefreshPlaylistsList() {
 
 void MainWindow::RefreshPlaylistTabs() {
   if (playlist_container_) {
-    playlist_container_->tab_bar()->Refresh(app_->playlist_manager());
+    playlist_container_->tab_bar()->Refresh(app_->playlist_manager(),
+                                            playlist_list_container_ ? playlist_list_container_->active_name() : std::string(),
+                                            playlist_list_container_ ? playlist_list_container_->playback()
+                                                                     : PlaylistListLook::Playback::Stopped);
   }
 }
 
@@ -2549,6 +2584,9 @@ void MainWindow::DropOnPlaylistList(const std::string &name, const std::string &
     return;
   }
   if (PlaylistListDrop::IsPlaylistRows(payload)) {
+    if (!PlaylistListLook::ShouldAcceptPlaylistRowsDrop(target->id(), app_->playlist_manager()->active_id())) {
+      return;
+    }
     SongList songs;
     Playlist *source = app_->playlist_manager()->current();
     for (int row : PlaylistListDrop::ParsePlaylistRows(payload)) {

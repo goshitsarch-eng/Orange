@@ -5,6 +5,7 @@
 #include "playlist/playlistfolders.h"
 #include "playlist/playlistlistdrop.h"
 #include "playlist/playlistlistkeyboard.h"
+#include "playlist/playlistlistlook.h"
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
 #include "playlist/playlistsaveoptionsdialog.h"
@@ -383,4 +384,46 @@ TEST(PlaylistTagCompletion, ColumnsAndUniqueValues) {
   EXPECT_EQ(1, PlaylistTagCompletion::FirstPrefixIndex(albums, "Thi"));
   EXPECT_EQ(-1, PlaylistTagCompletion::FirstPrefixIndex(albums, "Roads"));
   EXPECT_EQ(-1, PlaylistTagCompletion::FirstPrefixIndex(albums, ""));
+}
+
+TEST(PlaylistListLook, PlaybackIconsAndDropRules) {
+  EXPECT_EQ(500, PlaylistListLook::kDragHoverTimeoutMs);
+  EXPECT_EQ(nullptr, PlaylistListLook::PlaybackIconName(false, PlaylistListLook::Playback::Playing));
+  EXPECT_EQ(nullptr, PlaylistListLook::PlaybackIconName(true, PlaylistListLook::Playback::Stopped));
+  EXPECT_STREQ("media-playback-start-symbolic", PlaylistListLook::PlaybackIconName(true, PlaylistListLook::Playback::Playing));
+  EXPECT_STREQ("media-playback-pause-symbolic", PlaylistListLook::PlaybackIconName(true, PlaylistListLook::Playback::Paused));
+  EXPECT_TRUE(PlaylistListLook::IsActiveName("Inbox", "Inbox"));
+  EXPECT_FALSE(PlaylistListLook::IsActiveName("Inbox", "Queue"));
+  EXPECT_FALSE(PlaylistListLook::IsActiveName("", "Inbox"));
+
+  EXPECT_TRUE(PlaylistListLook::ShouldStartDragHover("strawberry-playlist-rows:0,2"));
+  EXPECT_FALSE(PlaylistListLook::ShouldStartDragHover("strawberry-playlist-move:Inbox"));
+  EXPECT_FALSE(PlaylistListLook::ShouldStartDragHover("file:///a"));
+  EXPECT_TRUE(PlaylistListLook::ShouldRestartDragHover("Queue", "Inbox"));
+  EXPECT_FALSE(PlaylistListLook::ShouldRestartDragHover("Inbox", "Inbox"));
+  EXPECT_FALSE(PlaylistListLook::ShouldRestartDragHover("", "Inbox"));
+  EXPECT_FALSE(PlaylistListLook::DragHoverShouldActivate(499));
+  EXPECT_TRUE(PlaylistListLook::DragHoverShouldActivate(500));
+
+  EXPECT_TRUE(PlaylistListLook::ShouldAcceptPlaylistRowsDrop(2, 1));
+  EXPECT_FALSE(PlaylistListLook::ShouldAcceptPlaylistRowsDrop(1, 1));
+  EXPECT_FALSE(PlaylistListLook::ShouldAcceptPlaylistRowsDrop(-1, 1));
+  EXPECT_TRUE(PlaylistListLook::ShouldShowEmptyHint(0));
+  EXPECT_FALSE(PlaylistListLook::ShouldShowEmptyHint(1));
+  EXPECT_NE(std::string::npos, std::string(PlaylistListLook::EmptyHint()).find("favorite playlists"));
+}
+
+TEST(PlaylistListModel, StoresIdsThroughFilter) {
+  PlaylistListModel model;
+  model.SetRows({"Inbox", "Queue"}, {false, true}, {"", ""}, {4, 7});
+  ASSERT_EQ(2u, model.ids().size());
+  EXPECT_EQ(4, model.ids()[0]);
+  EXPECT_EQ(7, model.ids()[1]);
+  PlaylistListSortFilterModel filter(&model);
+  const std::vector<PlaylistListDrop::Row> rows = filter.VisibleRows();
+  ASSERT_EQ(2u, rows.size());
+  EXPECT_EQ("Inbox", rows[0].name);
+  EXPECT_EQ(4, rows[0].id);
+  EXPECT_EQ("Queue", rows[1].name);
+  EXPECT_EQ(7, rows[1].id);
 }
