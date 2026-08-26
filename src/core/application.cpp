@@ -1,6 +1,7 @@
 #include "core/application.h"
 
 #include "constants/collectionsettings.h"
+#include "constants/notificationssettings.h"
 #include "constants/scrobblersettings.h"
 #include "core/appearance.h"
 #include "core/logging.h"
@@ -122,14 +123,35 @@ void Application::Init() {
     player_->engine()->SetEqualizerEnabled(enabled);
     player_->engine()->SetEqualizerParameters(preamp, gains);
   });
+  shortcuts_->Play.Connect([this]() { player_->Play(); });
+  shortcuts_->Pause.Connect([this]() { player_->Pause(); });
   shortcuts_->PlayPause.Connect([this]() { player_->PlayPause(); });
   shortcuts_->Stop.Connect([this]() { player_->Stop(); });
+  shortcuts_->StopAfter.Connect([this]() { player_->StopAfterCurrent(); });
   shortcuts_->Next.Connect([this]() { player_->Next(); });
   shortcuts_->Previous.Connect([this]() { player_->Previous(); });
+  shortcuts_->RestartOrPrevious.Connect([this]() { player_->RestartOrPrevious(); });
   shortcuts_->VolumeUp.Connect([this]() { player_->VolumeUp(); });
   shortcuts_->VolumeDown.Connect([this]() { player_->VolumeDown(); });
   shortcuts_->Mute.Connect([this]() { player_->Mute(); });
+  shortcuts_->SeekForward.Connect([this]() { player_->SeekForward(); });
+  shortcuts_->SeekBackward.Connect([this]() { player_->SeekBackward(); });
+  shortcuts_->ShowHide.Connect([this]() { RaiseRequested.Emit(); });
   shortcuts_->ShowOSD.Connect([this]() { player_->ShowOSD(); });
+  shortcuts_->TogglePrettyOSD.Connect([this]() {
+    Settings settings;
+    settings.BeginGroup(OSDSettings::kSettingsGroup);
+    const int type = settings.IntValue(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType));
+    const int next = type == static_cast<int>(OSDSettings::Type::Pretty) ? static_cast<int>(OSDSettings::Type::Native)
+                                                                         : static_cast<int>(OSDSettings::Type::Pretty);
+    settings.SetIntValue(OSDSettings::kType, next);
+    settings.Sync();
+    osd_->ReloadSettings();
+  });
+  shortcuts_->CycleShuffle.Connect([this]() { playlist_manager_->CycleShuffleMode(); });
+  shortcuts_->CycleRepeat.Connect([this]() { playlist_manager_->CycleRepeatMode(); });
+  shortcuts_->ToggleScrobbling.Connect([this]() { scrobbler_->ToggleScrobbling(); });
+  shortcuts_->Love.Connect([this]() { scrobbler_->Love(player_->current_song()); });
 }
 
 void Application::Exit() {

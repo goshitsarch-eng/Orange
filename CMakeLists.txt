@@ -742,6 +742,7 @@ if(GTest_FOUND)
     tests/src/playlistmanager_test.cpp
     tests/src/systemtrayicon_test.cpp
     tests/src/discord_test.cpp
+    tests/src/globalshortcuts_test.cpp
     tests/src/mpris2_test.cpp
     tests/src/settings_test.cpp
     tests/src/settingspage_test.cpp
@@ -799,6 +800,11 @@ if(GTest_FOUND)
     src/core/filesystemwatcherinotify.cpp
     src/core/networkproxyfactory.cpp
     src/globalshortcuts/globalshortcut.cpp
+    src/globalshortcuts/globalshortcuts.cpp
+    src/globalshortcuts/globalshortcutsbackend.cpp
+    src/globalshortcuts/globalshortcutsbackend-kglobalaccel.cpp
+    src/globalshortcuts/globalshortcutsbackend-x11.cpp
+    src/globalshortcuts/keymapper_x11.cpp
     src/core/networktimeouts.cpp
     src/core/httpbaserequest.cpp
     src/core/jsonbaserequest.cpp

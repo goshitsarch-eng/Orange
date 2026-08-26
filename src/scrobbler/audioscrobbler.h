@@ -18,6 +18,7 @@ class AudioScrobbler {
   void NowPlaying(const Song &song);
   void Scrobble(const Song &song);
   void Love(const Song &song);
+  void ToggleScrobbling();
   std::vector<ScrobblerService *> All() const;
   Signal<std::string> Error;
 

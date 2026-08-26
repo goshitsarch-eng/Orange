@@ -6,6 +6,8 @@ std::string GlobalShortcutsBackend::name() const {
   switch (type_) {
     case Type::KGlobalAccel:
       return "KGlobalAccel";
+    case Type::Gnome:
+      return "Gnome";
     case Type::X11:
       return "X11";
     case Type::macOS:

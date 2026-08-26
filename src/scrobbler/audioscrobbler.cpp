@@ -64,6 +64,14 @@ void AudioScrobbler::Love(const Song &song) {
   }
 }
 
+void AudioScrobbler::ToggleScrobbling() {
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  const bool enabled = settings.BoolValue(ScrobblerSettings::kEnabled, ScrobblerSettings::kDefaultEnabled);
+  settings.SetBoolValue(ScrobblerSettings::kEnabled, !enabled);
+  settings.Sync();
+}
+
 std::vector<ScrobblerService *> AudioScrobbler::All() const {
   std::vector<ScrobblerService *> result;
   for (const auto &service : services_) {

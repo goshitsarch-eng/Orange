@@ -76,6 +76,8 @@ class PlaylistManager : public PlaylistManagerInterface {
   void SetActivePlaying() override;
   void SetActivePaused() override;
   void SetActiveStopped() override;
+  void CycleRepeatMode();
+  void CycleShuffleMode();
 
   Signal<Playlist *> PlaylistAdded;
   Signal<int> PlaylistClosed;
@@ -85,6 +87,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   Signal<Playlist *> CurrentChanged;
   Signal<Playlist *> ActiveChanged;
   Signal<> PlaylistsLoaded;
+  Signal<> SequenceChanged;
 
  private:
   Playlist *FindByName(const std::string &name) const;

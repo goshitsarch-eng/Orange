@@ -439,6 +439,33 @@ void PlaylistManager::SetActiveStopped() {
   }
 }
 
+void PlaylistManager::CycleRepeatMode() {
+  Playlist *playlist = Visible();
+  if (!playlist) {
+    return;
+  }
+  PlaylistSequence sequence;
+  sequence.SetRepeatMode(playlist->repeat_mode());
+  sequence.CycleRepeatMode();
+  playlist->SetRepeatMode(sequence.repeat_mode());
+  SequenceChanged.Emit();
+}
+
+void PlaylistManager::CycleShuffleMode() {
+  Playlist *playlist = Visible();
+  if (!playlist) {
+    return;
+  }
+  PlaylistSequence sequence;
+  sequence.SetShuffleMode(playlist->shuffle_mode());
+  sequence.CycleShuffleMode();
+  playlist->SetShuffleMode(sequence.shuffle_mode());
+  if (sequence.shuffle_mode() == PlaylistSequence::ShuffleMode::All) {
+    ShuffleCurrent();
+  }
+  SequenceChanged.Emit();
+}
+
 void PlaylistManager::Persist(Playlist *playlist) {
   if (playlist && backend_) {
     backend_->SavePlaylist(playlist);

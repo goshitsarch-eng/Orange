@@ -117,7 +117,12 @@ MainWindow::~MainWindow() {
   }
 }
 
-void MainWindow::Present() { gtk_window_present(GTK_WINDOW(window_)); }
+void MainWindow::Present() {
+  gtk_window_present(GTK_WINDOW(window_));
+  if (app_ && app_->shortcuts()) {
+    app_->shortcuts()->Raise();
+  }
+}
 
 void MainWindow::CommandlineReceived(const CommandlineOptions &options) {
   app_->ApplyCommandline(options);
@@ -767,6 +772,21 @@ void MainWindow::BuildPlayerBar() {
 
 void MainWindow::ConnectSignals() {
   app_->RaiseRequested.Connect([this]() { Present(); });
+  app_->playlist_manager()->SequenceChanged.Connect([this]() {
+    Playlist *playlist = app_->playlist_manager()->current();
+    if (!playlist) {
+      return;
+    }
+    playlist_sequence_.SetRepeatMode(playlist->repeat_mode());
+    playlist_sequence_.SetShuffleMode(playlist->shuffle_mode());
+    if (repeat_button_) {
+      gtk_widget_set_tooltip_text(repeat_button_, PlaylistSequence::RepeatLabel(playlist_sequence_.repeat_mode()));
+    }
+    if (shuffle_button_) {
+      gtk_widget_set_tooltip_text(shuffle_button_, PlaylistSequence::ShuffleLabel(playlist_sequence_.shuffle_mode()));
+    }
+    RefreshPlaylist();
+  });
   app_->player()->SongChanged.Connect([this](const Song &) { UpdateNowPlaying(); });
   app_->player()->StateChanged.Connect([this](GstEngine::State) { UpdatePlaybackButtons(); });
   app_->player()->VolumeChanged.Connect([this](unsigned volume) {
@@ -1056,6 +1076,7 @@ void MainWindow::UpdatePlaybackButtons() {
 void MainWindow::OpenSettings() {
   SettingsDialog::Show(GTK_WINDOW(window_), app_, [this]() {
     app_->scrobbler()->ReloadSettings();
+    app_->shortcuts()->ReloadSettings();
     UpdateScrobblerButtons();
   });
 }
