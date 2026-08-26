@@ -741,6 +741,7 @@ if(GTest_FOUND)
     tests/src/playlist_test.cpp
     tests/src/playlistmanager_test.cpp
     tests/src/systemtrayicon_test.cpp
+    tests/src/discord_test.cpp
     tests/src/mpris2_test.cpp
     tests/src/settings_test.cpp
     tests/src/settingspage_test.cpp
@@ -945,6 +946,7 @@ if(GTest_FOUND)
     src/playlist/playlistbackend.cpp
     src/queue/queue.cpp
     src/systemtrayicon/systemtrayicon.cpp
+    src/discord/discord.cpp
     src/playlist/playlistitem.cpp
     src/playlist/songplaylistitem.cpp
     src/playlist/streamplaylistitem.cpp
