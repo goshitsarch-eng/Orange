@@ -47,6 +47,7 @@
 #include "core/mainwindowsettings.h"
 #include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
+#include "ui/mainwindowmenu.h"
 #include "widgets/filtersearchkeyboard.h"
 #include "core/filesystemmusicstorage.h"
 #include "core/memorydatabase.h"
@@ -1163,6 +1164,15 @@ TEST(WindowGeometry, ClampsAndMapsStartup) {
   EXPECT_EQ(2, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Remember), false));
   EXPECT_EQ(3, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Hide), false));
   EXPECT_EQ(5, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::ShowMinimized), true));
+}
+
+TEST(MainWindowMenu, MatchesQtDailyActionLabels) {
+  EXPECT_STREQ("Update changed collection folders", MainWindowMenu::UpdateCollection());
+  EXPECT_STREQ("Edit track information...", MainWindowMenu::EditTrack());
+  EXPECT_STREQ("Toggle scrobbling", MainWindowMenu::ToggleScrobbling());
+  EXPECT_STREQ("Shuffle mode", MainWindowMenu::ShuffleMode());
+  EXPECT_STREQ("Repeat mode", MainWindowMenu::RepeatMode());
+  EXPECT_STREQ("win.toggle-scrobbling", MainWindowMenu::ToggleScrobblingAction());
 }
 
 TEST(MainWindowLook, SidebarAndMuteMatchQt) {

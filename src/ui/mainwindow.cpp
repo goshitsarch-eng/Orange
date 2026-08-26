@@ -11,7 +11,10 @@
 #include "collection/collectionviewcontainer.h"
 #include "constants/backendsettings.h"
 #include "constants/coverssettings.h"
+#include "core/mainwindowsponsor.h"
 #include "core/mainwindowsettings.h"
+#include "dialogs/messagedialog.h"
+#include "ui/mainwindowmenu.h"
 #include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
 #include "context/contextcover.h"
@@ -184,6 +187,25 @@ void MainWindow::Present() {
   if (app_ && app_->shortcuts()) {
     app_->shortcuts()->Raise();
   }
+  MaybeShowSponsor();
+}
+
+void MainWindow::MaybeShowSponsor() {
+  if (sponsor_prompted_) {
+    return;
+  }
+  sponsor_prompted_ = true;
+  Settings settings;
+  if (!MainWindowSponsor::ShouldShowFromSettings(settings)) {
+    return;
+  }
+  MessageDialog::Show(GTK_WINDOW(window_), MainWindowSponsor::Title(), MainWindowSponsor::Message(), MainWindowSponsor::DoNotShowAgain(), false,
+                      [](bool do_not_show) {
+                        if (do_not_show) {
+                          Settings persist;
+                          MainWindowSponsor::PersistDoNotShow(persist, true);
+                        }
+                      });
 }
 
 void MainWindow::CommandlineReceived(const CommandlineOptions &options) {
@@ -208,7 +230,7 @@ void MainWindow::BuildUi() {
   g_menu_append(music, Translations::Tr("Add collection folder…").c_str(), "win.add-folder");
   g_menu_append(music, Translations::Tr("Add audio CD").c_str(), "win.add-cd");
   g_menu_append(music, Translations::Tr("Add stream…").c_str(), "win.add-stream");
-  g_menu_append(music, Translations::Tr("Rescan collection").c_str(), "win.rescan");
+  g_menu_append(music, Translations::Tr(MainWindowMenu::UpdateCollection()).c_str(), "win.rescan");
   g_menu_append(music, Translations::Tr("Full collection scan").c_str(), "win.full-scan");
   g_menu_append(music, Translations::Tr("Stop collection scan").c_str(), "win.stop-scan");
   g_menu_append(music, Translations::Tr("Mute").c_str(), "win.mute");
@@ -236,6 +258,7 @@ void MainWindow::BuildUi() {
   g_menu_append(playlist, Translations::Tr("Go to active playlist tab").c_str(), "win.active-playlist");
   g_menu_append(playlist, Translations::Tr("Rescan selected songs").c_str(), "win.rescan-selected");
   g_menu_append(playlist, Translations::Tr("Fetch streaming metadata").c_str(), "win.fetch-metadata");
+  g_menu_append(playlist, Translations::Tr(MainWindowMenu::EditTrack()).c_str(), "win.edittag");
   g_menu_append(playlist, Translations::Tr("Auto-complete tags…").c_str(), "win.autocomplete-tags");
   g_menu_append(playlist, Translations::Tr("Edit value").c_str(), "win.edit-value");
   g_menu_append(playlist, Translations::Tr("Set column to…").c_str(), "win.set-column");
@@ -251,7 +274,10 @@ void MainWindow::BuildUi() {
   g_menu_append(playback, Translations::Tr("Stop after this track").c_str(), "win.stop-after");
   g_menu_append(playback, Translations::Tr("Queue play next").c_str(), "win.queue-next");
   g_menu_append(playback, Translations::Tr("Scrobble current track").c_str(), "win.scrobble");
+  g_menu_append(playback, Translations::Tr(MainWindowMenu::ToggleScrobbling()).c_str(), "win.toggle-scrobbling");
   g_menu_append(playback, Translations::Tr("Love current track").c_str(), "win.love");
+  g_menu_append(playback, Translations::Tr(MainWindowMenu::ShuffleMode()).c_str(), "win.shuffle-mode");
+  g_menu_append(playback, Translations::Tr(MainWindowMenu::RepeatMode()).c_str(), "win.repeat-mode");
   g_menu_append_section(menu, Translations::Tr("Playback").c_str(), G_MENU_MODEL(playback));
   GMenu *tools = g_menu_new();
   g_menu_append(tools, Translations::Tr("Cover manager").c_str(), "win.covers");
@@ -440,6 +466,14 @@ void MainWindow::BuildUi() {
   add_action("renumber-tracks", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RenumberTracks(); }));
   add_action("stop-after", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->StopAfterCurrent(); }));
   add_action("scrobble", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ScrobbleCurrent(); }));
+  add_action("toggle-scrobbling", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               if (self->app_ && self->app_->scrobbler()) {
+                 self->app_->scrobbler()->ToggleScrobbling();
+               }
+             }));
+  add_action("shuffle-mode", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CycleShuffle(); }));
+  add_action("repeat-mode", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CycleRepeat(); }));
   add_action("love", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                MainWindow::OnLove(nullptr, data);
              }));

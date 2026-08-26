@@ -5,6 +5,8 @@
 #include "core/application.h"
 #include "core/song.h"
 #include "osd/osdpretty.h"
+#include "settings/notificationscontrols.h"
+#include "settings/notificationssettingslabels.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
 #include "utilities/colorutils.h"
@@ -12,32 +14,83 @@
 AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(OSDSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Notifications", "preferences-system-notifications-symbolic");
-  AdwPreferencesGroup *osd = SettingsPage::AddGroup(page, Translations::CStr("On-screen display"));
-  const std::string type_id = std::to_string(settings->IntValue(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType)));
-  SettingsPage::AddCombo(osd, settings, OSDSettings::kType, Translations::CStr("Notification type"),
-                         {{"0", Translations::Tr("Disabled")},
-                          {"1", Translations::Tr("Native")},
-                          {"2", Translations::Tr("Tray popup")},
-                          {"3", Translations::Tr("Pretty OSD")}},
-                         type_id, [settings](const std::string &id) {
-                           settings->BeginGroup(OSDSettings::kSettingsGroup);
-                           settings->SetIntValue(OSDSettings::kType, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
-                           settings->Sync();
-                         });
-  SettingsPage::AddIntEntry(osd, settings, OSDSettings::kTimeout, Translations::CStr("Timeout (ms)"), OSDSettings::kDefaultTimeout);
-  SettingsPage::AddToggle(osd, settings, OSDSettings::kShowArt, Translations::CStr("Show album art"), nullptr, OSDSettings::kDefaultShowArt);
-  SettingsPage::AddToggle(osd, settings, OSDSettings::kShowOnVolumeChange, Translations::CStr("Show on volume change"), nullptr,
+  SettingsPage::AddDescription(SettingsPage::AddGroup(page), NotificationsSettingsLabels::Intro());
+  AdwPreferencesGroup *osd = SettingsPage::AddGroup(page, NotificationsSettingsLabels::TypeGroup());
+  const int type_value = settings->IntValue(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType));
+  const std::string type_id = std::to_string(type_value);
+  GtkWidget *type = SettingsPage::AddCombo(osd, settings, OSDSettings::kType, NotificationsSettingsLabels::TypeGroup(),
+                                           {{"0", NotificationsSettingsLabels::Disabled()},
+                                            {"1", NotificationsSettingsLabels::Native()},
+                                            {"2", NotificationsSettingsLabels::TrayPopup()},
+                                            {"3", NotificationsSettingsLabels::Pretty()}},
+                                           type_id, [settings](const std::string &id) {
+                                             settings->BeginGroup(OSDSettings::kSettingsGroup);
+                                             settings->SetIntValue(OSDSettings::kType, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
+                                             settings->Sync();
+                                           });
+  AdwPreferencesGroup *general = SettingsPage::AddGroup(page, NotificationsSettingsLabels::General());
+  GtkWidget *duration = SettingsPage::AddIntScale(general, settings, nullptr, nullptr, NotificationsSettingsLabels::PopupDuration(),
+                                                  NotificationsControls::SecondsFromMs(settings->IntValue(OSDSettings::kTimeout, OSDSettings::kDefaultTimeout)),
+                                                  NotificationsControls::MinSeconds(), NotificationsControls::MaxSeconds(), 1);
+  g_object_set_data(G_OBJECT(duration), "settings", settings);
+  g_signal_connect(duration, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer) {
+                     auto *s = static_cast<Settings *>(g_object_get_data(G_OBJECT(range), "settings"));
+                     if (!s) {
+                       return;
+                     }
+                     s->BeginGroup(OSDSettings::kSettingsGroup);
+                     s->SetIntValue(OSDSettings::kTimeout, NotificationsControls::MsFromSeconds(static_cast<int>(gtk_range_get_value(range))));
+                     s->Sync();
+                   }),
+                   nullptr);
+  settings->BeginGroup(OSDPrettySettings::kSettingsGroup);
+  GtkWidget *disable_duration =
+      SettingsPage::AddToggle(general, settings, OSDPrettySettings::kDisableDuration, NotificationsSettingsLabels::DisableDuration(), nullptr,
+                              OSDPrettySettings::kDefaultDisableDuration, OSDPrettySettings::kSettingsGroup);
+  settings->BeginGroup(OSDSettings::kSettingsGroup);
+  gtk_widget_set_sensitive(duration, NotificationsControls::DurationSpinSensitive(type_value, adw_switch_row_get_active(ADW_SWITCH_ROW(disable_duration)))
+                                         ? TRUE
+                                         : FALSE);
+  g_object_set_data(G_OBJECT(type), "duration-scale", duration);
+  g_object_set_data(G_OBJECT(type), "disable-duration", disable_duration);
+  g_object_set_data(G_OBJECT(disable_duration), "duration-scale", duration);
+  g_object_set_data(G_OBJECT(disable_duration), "type-row", type);
+  g_signal_connect(type, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer) {
+                     auto *scale = GTK_WIDGET(g_object_get_data(G_OBJECT(combo), "duration-scale"));
+                     auto *disable = GTK_WIDGET(g_object_get_data(G_OBJECT(combo), "disable-duration"));
+                     if (scale && disable) {
+                       gtk_widget_set_sensitive(scale, NotificationsControls::DurationSpinSensitive(static_cast<int>(adw_combo_row_get_selected(combo)),
+                                                                                                    adw_switch_row_get_active(ADW_SWITCH_ROW(disable)))
+                                                           ? TRUE
+                                                           : FALSE);
+                     }
+                   }),
+                   nullptr);
+  g_signal_connect(disable_duration, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
+                     auto *scale = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "duration-scale"));
+                     auto *combo = ADW_COMBO_ROW(g_object_get_data(G_OBJECT(row), "type-row"));
+                     if (scale && combo) {
+                       gtk_widget_set_sensitive(scale, NotificationsControls::DurationSpinSensitive(static_cast<int>(adw_combo_row_get_selected(combo)),
+                                                                                                    adw_switch_row_get_active(row))
+                                                           ? TRUE
+                                                           : FALSE);
+                     }
+                   }),
+                   nullptr);
+  SettingsPage::AddToggle(general, settings, OSDSettings::kShowArt, NotificationsSettingsLabels::ShowArt(), nullptr, OSDSettings::kDefaultShowArt);
+  SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnVolumeChange, NotificationsSettingsLabels::ShowVolume(), nullptr,
                           OSDSettings::kDefaultShowOnVolumeChange);
-  SettingsPage::AddToggle(osd, settings, OSDSettings::kShowOnPlayModeChange, Translations::CStr("Show on play mode change"), nullptr,
+  SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnPlayModeChange, NotificationsSettingsLabels::ShowPlayMode(), nullptr,
                           OSDSettings::kDefaultShowOnPlayModeChange);
-  SettingsPage::AddToggle(osd, settings, OSDSettings::kShowOnPausePlayback, Translations::CStr("Show on pause"), nullptr,
+  SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnPausePlayback, NotificationsSettingsLabels::ShowPause(), nullptr,
                           OSDSettings::kDefaultShowOnPausePlayback);
-  SettingsPage::AddToggle(osd, settings, OSDSettings::kShowOnResumePlayback, Translations::CStr("Show on resume"), nullptr,
+  SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnResumePlayback, NotificationsSettingsLabels::ShowResume(), nullptr,
                           OSDSettings::kDefaultShowOnResumePlayback);
-  SettingsPage::AddToggle(osd, settings, OSDSettings::kCustomTextEnabled, Translations::CStr("Custom notification text"), nullptr,
+  AdwPreferencesGroup *custom = SettingsPage::AddGroup(page, NotificationsSettingsLabels::CustomGroup());
+  SettingsPage::AddToggle(custom, settings, OSDSettings::kCustomTextEnabled, NotificationsSettingsLabels::CustomEnabled(), nullptr,
                           OSDSettings::kDefaultCustomTextEnabled);
-  SettingsPage::AddEntry(osd, settings, OSDSettings::kCustomText1, Translations::CStr("Custom text line 1"));
-  SettingsPage::AddEntry(osd, settings, OSDSettings::kCustomText2, Translations::CStr("Custom text line 2"));
+  SettingsPage::AddEntry(custom, settings, OSDSettings::kCustomText1, NotificationsSettingsLabels::Summary());
+  SettingsPage::AddEntry(custom, settings, OSDSettings::kCustomText2, NotificationsSettingsLabels::Body());
   SettingsPage::AddIntEntry(osd, settings, "posx", Translations::CStr("Pretty OSD X position"), 40);
   SettingsPage::AddIntEntry(osd, settings, "posy", Translations::CStr("Pretty OSD Y position"), 40);
 
@@ -61,7 +114,7 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
   }
 
   if (app) {
-    SettingsPage::AddButtonRow(osd, Translations::CStr("Preview"), Translations::CStr("Show preview"), [settings, app]() {
+    SettingsPage::AddButtonRow(osd, NotificationsSettingsLabels::Preview(), NotificationsSettingsLabels::Preview(), [settings, app]() {
       settings->BeginGroup(OSDSettings::kSettingsGroup);
       settings->Sync();
       app->osd()->ReloadSettings();
@@ -116,8 +169,6 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
                            settings->SetValue(OSDPrettySettings::kPopupScreen, id);
                            settings->Sync();
                          });
-  SettingsPage::AddToggle(pretty, settings, OSDPrettySettings::kDisableDuration, Translations::CStr("Disable timeout"), nullptr,
-                          OSDPrettySettings::kDefaultDisableDuration);
   SettingsPage::AddToggle(pretty, settings, OSDPrettySettings::kFading, Translations::CStr("Fade the popup"), nullptr, true);
   SettingsPage::AddButtonRow(pretty, Translations::CStr("Position preview"), Translations::CStr("Show"), [settings, page]() {
     settings->BeginGroup(OSDPrettySettings::kSettingsGroup);
@@ -133,14 +184,14 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
 
   settings->BeginGroup(DiscordRPCSettings::kSettingsGroup);
   AdwPreferencesGroup *discord = SettingsPage::AddGroup(page, Translations::CStr("Discord"));
-  SettingsPage::AddToggle(discord, settings, DiscordRPCSettings::kEnabled, Translations::CStr("Enable Discord Rich Presence"), nullptr,
+  SettingsPage::AddToggle(discord, settings, DiscordRPCSettings::kEnabled, NotificationsSettingsLabels::DiscordEnable(), nullptr,
                           DiscordRPCSettings::kDefaultEnabled);
   const std::string discord_id =
       std::to_string(settings->IntValue(DiscordRPCSettings::kStatusDisplayType, static_cast<int>(DiscordRPCSettings::kDefaultStatusDisplayType)));
-  SettingsPage::AddCombo(discord, settings, DiscordRPCSettings::kStatusDisplayType, Translations::CStr("Status display"),
-                         {{"0", Translations::Tr("Application")},
-                          {"1", Translations::Tr("Artist")},
-                          {"2", Translations::Tr("Song")}},
+  SettingsPage::AddCombo(discord, settings, DiscordRPCSettings::kStatusDisplayType, NotificationsSettingsLabels::DiscordListening(),
+                         {{"0", NotificationsSettingsLabels::DiscordApp()},
+                          {"1", NotificationsSettingsLabels::DiscordArtist()},
+                          {"2", NotificationsSettingsLabels::DiscordSong()}},
                          discord_id, [settings](const std::string &id) {
                            settings->BeginGroup(DiscordRPCSettings::kSettingsGroup);
                            settings->SetIntValue(DiscordRPCSettings::kStatusDisplayType,

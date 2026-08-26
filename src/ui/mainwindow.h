@@ -65,6 +65,7 @@ class MainWindow {
   void UpdateCover(const std::vector<unsigned char> &data);
   void OpenSettings(const char *page_name = nullptr);
   void OpenAbout();
+  void MaybeShowSponsor();
   void AddFiles();
   void AddCollectionFolder();
   void AddCdTracks();
@@ -241,6 +242,7 @@ class MainWindow {
   std::string selection_playlist_name_;
   guint position_timeout_ = 0;
   guint collection_filter_timeout_ = 0;
+  bool sponsor_prompted_ = false;
   gint64 analyzer_last_draw_us_ = 0;
   TaskbarProgress taskbar_;
 };

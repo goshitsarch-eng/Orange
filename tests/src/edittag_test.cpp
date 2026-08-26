@@ -11,6 +11,7 @@
 #include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagtabs.h"
 #include "lyrics/lyricsproviderorder.h"
+#include "lyrics/lyricsprovidersettings.h"
 #include "widgets/listboxkeyboard.h"
 
 #include <gtest/gtest.h>
@@ -230,6 +231,23 @@ TEST(LyricsProviderOrder, ParseJoinMoveAndRank) {
   EXPECT_EQ("Genius", moved[0]);
   EXPECT_EQ("LrcLib", moved[1]);
   EXPECT_EQ(parsed, LyricsProviderOrder::Move(parsed, 0, -1));
+}
+
+TEST(LyricsProviderSettings, EnabledListAndStoredSemantics) {
+  EXPECT_STREQ("Lyrics providers", LyricsProviderSettings::ProvidersGroup());
+  EXPECT_STREQ("Choose the providers you want to use when searching for lyrics.", LyricsProviderSettings::ProvidersHint());
+  EXPECT_STREQ("Move up", LyricsProviderSettings::MoveUp());
+  EXPECT_STREQ("Move down", LyricsProviderSettings::MoveDown());
+  EXPECT_FALSE(LyricsProviderSettings::EnabledFromStored(true, false, true, true));
+  EXPECT_TRUE(LyricsProviderSettings::EnabledFromStored(true, true, true, false));
+  EXPECT_TRUE(LyricsProviderSettings::EnabledFromStored(false, true, true, true));
+  EXPECT_FALSE(LyricsProviderSettings::EnabledFromStored(false, true, true, false));
+  EXPECT_TRUE(LyricsProviderSettings::EnabledFromStored(false, true, false, false));
+  const std::vector<std::string> enabled =
+      LyricsProviderSettings::EnabledNames({{"LrcLib", true}, {"Genius", false}, {"OVH", true}});
+  ASSERT_EQ(2u, enabled.size());
+  EXPECT_EQ("LrcLib", enabled.front());
+  EXPECT_EQ("OVH", enabled.back());
 }
 
 TEST(EditTagCompleter, CompletesQtFieldsAndSuggestsPrefixes) {

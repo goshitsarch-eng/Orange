@@ -26,6 +26,12 @@
 #include "settings/settingscontrols.h"
 #include "dialogs/aboutcredits.h"
 #include "qobuz/qobuzcredentialparser.h"
+#include "core/mainwindowsponsor.h"
+#include "settings/collectionsettingslabels.h"
+#include "settings/notificationscontrols.h"
+#include "settings/notificationssettingslabels.h"
+#include "settings/playlistsettingscontrols.h"
+#include "settings/playlistsettingslabels.h"
 #include "settings/scrobblersettingslabels.h"
 #include "settings/streamingsettingslabels.h"
 #include "subsonic/subsonicping.h"
@@ -476,6 +482,51 @@ TEST(QobuzCredentialParser, ExtractsBundlePathIdsSecretAndPrivateKey) {
       R"(name:"Europe/Berlin",info:"X",extras:"YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY")";
   EXPECT_EQ("0123456789abcdef0123456789abcdef", QobuzCredentialParser::ExtractAppSecret(bundle));
   EXPECT_TRUE(QobuzCredentialParser::ExtractAppSecret("no seeds").empty());
+}
+
+TEST(MainWindowSponsor, MatchesQtFirstRunCopy) {
+  EXPECT_TRUE(MainWindowSponsor::ShouldShow(false));
+  EXPECT_FALSE(MainWindowSponsor::ShouldShow(true));
+  EXPECT_STREQ("Sponsoring Strawberry", MainWindowSponsor::Title());
+  EXPECT_STREQ("Do not show this message again.", MainWindowSponsor::DoNotShowAgain());
+  EXPECT_STREQ("https://www.strawberrymusicplayer.org/", MainWindowSponsor::WebsiteUrl());
+  EXPECT_NE(std::string::npos, MainWindowSponsor::Message().find("please consider sponsoring the project"));
+  EXPECT_STREQ("MainWindow", MainWindowSettings::kSettingsGroup);
+  EXPECT_STREQ("do_not_show_sponsor_message", MainWindowSettings::kDoNotShowSponsorMessage);
+}
+
+TEST(NotificationsControls, ConvertsTimeoutAndGatesDuration) {
+  EXPECT_STREQ("Strawberry can show a message when the track changes.", NotificationsSettingsLabels::Intro());
+  EXPECT_STREQ("Show a native desktop notification", NotificationsSettingsLabels::Native());
+  EXPECT_STREQ("Show a pretty OSD", NotificationsSettingsLabels::Pretty());
+  EXPECT_STREQ("Popup duration", NotificationsSettingsLabels::PopupDuration());
+  EXPECT_STREQ(" seconds", NotificationsSettingsLabels::Seconds());
+  EXPECT_EQ(5, NotificationsControls::SecondsFromMs(5000));
+  EXPECT_EQ(5000, NotificationsControls::MsFromSeconds(5));
+  EXPECT_EQ(1, NotificationsControls::SecondsFromMs(100));
+  EXPECT_EQ(20, NotificationsControls::SecondsFromMs(60000));
+  EXPECT_FALSE(NotificationsControls::DurationSpinSensitive(OSDSettings::Type::Disabled, false));
+  EXPECT_FALSE(NotificationsControls::DurationSpinSensitive(OSDSettings::Type::Pretty, true));
+  EXPECT_TRUE(NotificationsControls::DurationSpinSensitive(OSDSettings::Type::Native, true));
+}
+
+TEST(PlaylistSettingsControls, GlowRequiresBars) {
+  EXPECT_STREQ("Use alternating row colors", PlaylistSettingsLabels::Alternating());
+  EXPECT_STREQ("Show a glowing animation on the currently playing track", PlaylistSettingsLabels::Glow());
+  EXPECT_STREQ("When saving a playlist, file paths should be", PlaylistSettingsLabels::PathsGroup());
+  EXPECT_FALSE(PlaylistSettingsControls::GlowToggleEnabled(false));
+  EXPECT_TRUE(PlaylistSettingsControls::GlowToggleEnabled(true));
+  EXPECT_FALSE(PlaylistSettingsControls::EffectiveGlow(false, true));
+  EXPECT_TRUE(PlaylistSettingsControls::EffectiveGlow(true, true));
+}
+
+TEST(CollectionSettingsLabels, MatchQtCollectionCopy) {
+  EXPECT_STREQ("These folders will be scanned for music to make up your collection", CollectionSettingsLabels::Intro());
+  EXPECT_STREQ("Automatic updating", CollectionSettingsLabels::AutomaticUpdating());
+  EXPECT_STREQ("Update the collection when Strawberry starts", CollectionSettingsLabels::StartupScan());
+  EXPECT_STREQ("Display options", CollectionSettingsLabels::DisplayOptions());
+  EXPECT_STREQ("Show album cover art in collection", CollectionSettingsLabels::PrettyCovers());
+  EXPECT_STREQ("Album cover pixmap cache", CollectionSettingsLabels::CacheGroup());
 }
 
 TEST(ScrobblerSettingsLabels, MatchQtSubmitDelayCopy) {

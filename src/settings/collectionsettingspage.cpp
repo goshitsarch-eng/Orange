@@ -5,6 +5,7 @@
 #include "collection/collectioniconcache.h"
 #include "collection/collectionstats.h"
 #include "core/application.h"
+#include "settings/collectionsettingslabels.h"
 #include "settings/settingscontrols.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
@@ -84,35 +85,40 @@ void RefreshFolderList(FolderListState *state) {
 AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(CollectionSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Collection", "media-optical-cd-audio-symbolic");
-  AdwPreferencesGroup *scan = SettingsPage::AddGroup(page, "Scanning");
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kStartupScan, "Scan collection on startup", nullptr,
+  SettingsPage::AddDescription(SettingsPage::AddGroup(page), CollectionSettingsLabels::Intro());
+  AdwPreferencesGroup *scan = SettingsPage::AddGroup(page, CollectionSettingsLabels::AutomaticUpdating());
+  SettingsPage::AddToggle(scan, settings, CollectionSettings::kStartupScan, CollectionSettingsLabels::StartupScan(), nullptr,
                           CollectionSettings::kDefaultStartupScan);
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kMonitor, "Watch folders for changes", nullptr, CollectionSettings::kDefaultMonitor);
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kSongTracking, "Track songs with Chromaprint / AcoustID", nullptr,
+  SettingsPage::AddToggle(scan, settings, CollectionSettings::kMonitor, CollectionSettingsLabels::Monitor(), nullptr, CollectionSettings::kDefaultMonitor);
+  SettingsPage::AddToggle(scan, settings, CollectionSettings::kSongTracking, CollectionSettingsLabels::SongTracking(), nullptr,
                           CollectionSettings::kDefaultSongTracking);
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kMarkSongsUnavailable, "Mark missing songs as unavailable", nullptr,
+  SettingsPage::AddToggle(scan, settings, CollectionSettings::kMarkSongsUnavailable, CollectionSettingsLabels::MarkUnavailable(), nullptr,
                           CollectionSettings::kDefaultMarkSongsUnavailable);
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kSongENUR128LoudnessAnalysis, "EBU R128 loudness analysis", nullptr,
+  SettingsPage::AddToggle(scan, settings, CollectionSettings::kSongENUR128LoudnessAnalysis, CollectionSettingsLabels::EbuAnalysis(), nullptr,
                           CollectionSettings::kDefaultSongENUR128LoudnessAnalysis);
-  SettingsPage::AddIntEntry(scan, settings, CollectionSettings::kExpireUnavailableSongs, "Expire unavailable songs (days)",
+  SettingsPage::AddIntEntry(scan, settings, CollectionSettings::kExpireUnavailableSongs, CollectionSettingsLabels::ExpireUnavailable(),
                             CollectionSettings::kDefaultExpireUnavailableSongs);
-  SettingsPage::AddEntry(scan, settings, CollectionSettings::kCoverArtPatterns, "Cover art filename patterns", "cover.jpg,folder.jpg,front.jpg,album.jpg");
+  SettingsPage::AddDescription(scan, CollectionSettingsLabels::Days());
+  SettingsPage::AddEntry(scan, settings, CollectionSettings::kCoverArtPatterns, CollectionSettingsLabels::CoverPatterns(),
+                         "cover.jpg,folder.jpg,front.jpg,album.jpg");
 
-  AdwPreferencesGroup *display = SettingsPage::AddGroup(page, "Display");
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kAutoOpen,
-                          "Automatically open single categories in the collection tree", nullptr, CollectionSettings::kDefaultAutoOpen);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kShowDividers, "Show artist / album dividers", nullptr,
+  AdwPreferencesGroup *display = SettingsPage::AddGroup(page, CollectionSettingsLabels::DisplayOptions());
+  SettingsPage::AddToggle(display, settings, CollectionSettings::kAutoOpen, CollectionSettingsLabels::AutoOpen(), nullptr,
+                          CollectionSettings::kDefaultAutoOpen);
+  SettingsPage::AddToggle(display, settings, CollectionSettings::kShowDividers, CollectionSettingsLabels::ShowDividers(), nullptr,
                           CollectionSettings::kDefaultShowDividers);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kPrettyCovers, "Use pretty covers", nullptr, CollectionSettings::kDefaultPrettyCovers);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kVariousArtists, "Group various artists albums", nullptr,
+  SettingsPage::AddToggle(display, settings, CollectionSettings::kPrettyCovers, CollectionSettingsLabels::PrettyCovers(), nullptr,
+                          CollectionSettings::kDefaultPrettyCovers);
+  SettingsPage::AddToggle(display, settings, CollectionSettings::kVariousArtists, CollectionSettingsLabels::VariousArtists(), nullptr,
                           CollectionSettings::kDefaultVariousArtists);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kSkipArticlesForArtists, "Skip “The / A / An” when sorting artists", nullptr,
+  SettingsPage::AddToggle(display, settings, CollectionSettings::kSkipArticlesForArtists, CollectionSettingsLabels::SkipArtistArticles(), nullptr,
                           CollectionSettings::kDefaultSkipArticlesForArtists);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kSkipArticlesForAlbums, "Skip “The / A / An” when sorting albums", nullptr,
+  SettingsPage::AddToggle(display, settings, CollectionSettings::kSkipArticlesForAlbums, CollectionSettingsLabels::SkipAlbumArticles(), nullptr,
                           CollectionSettings::kDefaultSkipArticlesForAlbums);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kUseSortTags, "Use sort tags", nullptr, CollectionSettings::kDefaultUseSortTags);
+  SettingsPage::AddToggle(display, settings, CollectionSettings::kUseSortTags, CollectionSettingsLabels::UseSortTags(), nullptr,
+                          CollectionSettings::kDefaultUseSortTags);
 
-  AdwPreferencesGroup *cache = SettingsPage::AddGroup(page, "Cache");
+  AdwPreferencesGroup *cache = SettingsPage::AddGroup(page, CollectionSettingsLabels::CacheGroup());
   GtkWidget *icon_size =
       SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsCacheSize, "Icon cache size", CollectionSettings::kSettingsCacheSizeDefault);
   const std::vector<std::pair<std::string, std::string>> units = {{"0", "KB"}, {"1", "MB"}, {"2", "GB"}, {"3", "TB"}};
@@ -205,13 +211,14 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
                    }),
                    nullptr);
 
-  AdwPreferencesGroup *tags = SettingsPage::AddGroup(page, "Tags");
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kSavePlayCounts, "Save playcounts to files", nullptr,
+  AdwPreferencesGroup *tags = SettingsPage::AddGroup(page, CollectionSettingsLabels::PlaycountsGroup());
+  SettingsPage::AddToggle(tags, settings, CollectionSettings::kSavePlayCounts, "Save playcounts to song tags when possible", nullptr,
                           CollectionSettings::kDefaultSavePlayCounts);
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kSaveRatings, "Save ratings to files", nullptr, CollectionSettings::kDefaultSaveRatings);
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kOverwritePlaycount, "Overwrite existing playcounts", nullptr,
-                          CollectionSettings::kDefaultOverwritePlaycount);
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kOverwriteRating, "Overwrite existing ratings", nullptr,
+  SettingsPage::AddToggle(tags, settings, CollectionSettings::kSaveRatings, "Save ratings to song tags when possible", nullptr,
+                          CollectionSettings::kDefaultSaveRatings);
+  SettingsPage::AddToggle(tags, settings, CollectionSettings::kOverwritePlaycount, "Overwrite database playcount when songs are re-read from disk",
+                          nullptr, CollectionSettings::kDefaultOverwritePlaycount);
+  SettingsPage::AddToggle(tags, settings, CollectionSettings::kOverwriteRating, "Overwrite database rating when songs are re-read from disk", nullptr,
                           CollectionSettings::kDefaultOverwriteRating);
   if (app) {
     SettingsPage::AddButtonRow(tags, "", CollectionStats::SaveNowLabel(), [app](GtkWidget *button) {

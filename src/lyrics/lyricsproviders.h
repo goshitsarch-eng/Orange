@@ -14,6 +14,7 @@ class LyricsProviders {
   explicit LyricsProviders(NetworkAccessManager *network);
   void ReloadSettings();
   void Move(int index, int delta);
+  void SetEnabled(LyricsProvider *provider, bool enabled);
   void SaveOrder();
   void Fetch(const Song &song, LyricsProvider::Callback callback);
   LyricsProvider *ProviderByName(const std::string &name) const;

@@ -5,6 +5,7 @@
 #include "constants/lyricssettings.h"
 #include "core/settings.h"
 #include "lyrics/lyricsproviderorder.h"
+#include "lyrics/lyricsprovidersettings.h"
 #include "lyrics/azlyricscomlyricsprovider.h"
 #include "lyrics/elyricsnetlyricsprovider.h"
 #include "lyrics/geniuslyricsprovider.h"
@@ -32,6 +33,7 @@ void LyricsProviders::ReloadSettings() {
   Settings settings;
   settings.BeginGroup(LyricsSettings::kSettingsGroup);
   const std::vector<std::string> order = LyricsProviderOrder::Parse(settings.Value(LyricsSettings::kProviders, ""));
+  const bool has_providers = settings.Contains(LyricsSettings::kProviders);
   for (size_t i = 0; i < providers_.size(); ++i) {
     auto &provider = providers_[i];
     const std::string legacy = [&]() {
@@ -43,10 +45,14 @@ void LyricsProviders::ReloadSettings() {
       if (provider->name() == "LrcLib") return std::string("lrclib");
       return std::string();
     }();
+    const bool has_name_key = settings.Contains(provider->name()) || (!legacy.empty() && settings.Contains(legacy));
     bool enabled = settings.BoolValue(provider->name(), true);
     if (!legacy.empty() && settings.Contains(legacy)) {
       enabled = settings.BoolValue(legacy, enabled);
     }
+    enabled = LyricsProviderSettings::EnabledFromStored(has_name_key, enabled, has_providers,
+                                                        LyricsProviderSettings::InList(order, provider->name()) ||
+                                                            LyricsProviderSettings::InList(order, legacy));
     provider->set_enabled(enabled);
     provider->set_order(LyricsProviderOrder::Rank(order, provider->name(), static_cast<int>(1000 + i)));
   }
@@ -56,15 +62,23 @@ void LyricsProviders::ReloadSettings() {
 }
 
 void LyricsProviders::SaveOrder() {
-  std::vector<std::string> names;
-  names.reserve(providers_.size());
-  for (const auto &provider : providers_) {
-    names.push_back(provider->name());
-  }
+  const std::vector<std::string> names = LyricsProviderSettings::EnabledNames(All());
   Settings settings;
   settings.BeginGroup(LyricsSettings::kSettingsGroup);
   settings.SetValue(LyricsSettings::kProviders, LyricsProviderOrder::Join(names));
   settings.Sync();
+}
+
+void LyricsProviders::SetEnabled(LyricsProvider *provider, bool enabled) {
+  if (!provider) {
+    return;
+  }
+  provider->set_enabled(enabled);
+  Settings settings;
+  settings.BeginGroup(LyricsSettings::kSettingsGroup);
+  settings.SetBoolValue(provider->name(), enabled);
+  settings.Sync();
+  SaveOrder();
 }
 
 void LyricsProviders::Move(int index, int delta) {
