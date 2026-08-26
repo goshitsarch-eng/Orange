@@ -3,6 +3,8 @@
 #include "config.h"
 #include "constants/notificationssettings.h"
 #include "core/settings.h"
+#include "osd/osdprettyfade.h"
+#include "osd/osdprettylimits.h"
 #include "osd/osdprettyplacement.h"
 #include "osd/osdprettywayland.h"
 #include "utilities/fontutils.h"
@@ -105,11 +107,26 @@ void MoveWindow(GtkWidget *window, int x, int y) {
 #endif
 }
 
+OSDPrettyPlacement::Rect CurrentWorkarea(const std::string &screen) {
+  const auto monitors = ListMonitors();
+  std::vector<std::string> names;
+  names.reserve(monitors.size());
+  for (const auto &monitor : monitors) {
+    names.push_back(monitor.name);
+  }
+  const int index = OSDPrettyPlacement::ResolveIndex(screen, names);
+  if (index >= 0 && static_cast<size_t>(index) < monitors.size()) {
+    return monitors[static_cast<size_t>(index)].workarea;
+  }
+  return {0, 0, 1920, 1080};
+}
+
 }  // namespace
 
 OSDPretty::OSDPretty(Mode mode) : mode_(mode) { ReloadSettings(); }
 
 OSDPretty::~OSDPretty() {
+  StopFade();
   if (timeout_id_) {
     g_source_remove(timeout_id_);
   }
@@ -173,6 +190,106 @@ std::vector<std::pair<std::string, std::string>> OSDPretty::MonitorChoices() {
     choices.emplace_back("", "Primary");
   }
   return choices;
+}
+
+void OSDPretty::ApplyLimits() {
+  if (!window_) {
+    return;
+  }
+  const OSDPrettyPlacement::Rect workarea = CurrentWorkarea(popup_screen_);
+  const int label_width = OSDPrettyLimits::MaxLabelWidth(workarea.width);
+  const int window_width = OSDPrettyLimits::MaxWindowWidth(workarea.width);
+  const int window_height = OSDPrettyLimits::MaxWindowHeight(workarea.height);
+  if (title_) {
+    gtk_label_set_wrap(GTK_LABEL(title_), TRUE);
+    gtk_label_set_ellipsize(GTK_LABEL(title_), PANGO_ELLIPSIZE_END);
+    gtk_widget_set_hexpand(title_, TRUE);
+  }
+  if (body_) {
+    gtk_label_set_wrap(GTK_LABEL(body_), TRUE);
+    gtk_label_set_ellipsize(GTK_LABEL(body_), PANGO_ELLIPSIZE_END);
+    gtk_widget_set_hexpand(body_, TRUE);
+  }
+  GtkCssProvider *css = gtk_css_provider_new();
+  const std::string sheet = ".osd-pretty { max-width: " + std::to_string(window_width) + "px; max-height: " +
+                            std::to_string(window_height) + "px; } .osd-pretty label { max-width: " +
+                            std::to_string(label_width) + "px; }";
+#if GTK_CHECK_VERSION(4, 12, 0)
+  gtk_css_provider_load_from_string(css, sheet.c_str());
+#else
+  gtk_css_provider_load_from_data(css, sheet.c_str(), static_cast<gssize>(sheet.size()));
+#endif
+  gtk_style_context_add_provider_for_display(gdk_display_get_default(), GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+  g_object_unref(css);
+}
+
+void OSDPretty::StopFade() {
+  if (fade_id_) {
+    g_source_remove(fade_id_);
+    fade_id_ = 0;
+  }
+}
+
+void OSDPretty::StartHideTimeout() {
+  if (timeout_id_) {
+    g_source_remove(timeout_id_);
+    timeout_id_ = 0;
+  }
+  if (mode_ != Mode::Popup || timeout_ms_ <= 0 || disable_duration_) {
+    return;
+  }
+  timeout_id_ = g_timeout_add(timeout_ms_, +[](gpointer data) -> gboolean {
+    auto *self = static_cast<OSDPretty *>(data);
+    self->timeout_id_ = 0;
+    self->StartFade(false);
+    return G_SOURCE_REMOVE;
+  }, this);
+}
+
+void OSDPretty::StartFade(bool fading_in) {
+  StopFade();
+  if (!window_) {
+    return;
+  }
+  if (!fading_) {
+    gtk_widget_set_opacity(window_, fading_in ? 1.0 : 0.0);
+    if (!fading_in) {
+      gtk_widget_set_visible(window_, FALSE);
+    } else {
+      StartHideTimeout();
+    }
+    return;
+  }
+  gtk_widget_set_opacity(window_, fading_in ? 0.0 : 1.0);
+  struct FadeTick {
+    OSDPretty *self = nullptr;
+    bool fading_in = true;
+    gint64 start_us = 0;
+  };
+  auto *job = new FadeTick{this, fading_in, g_get_monotonic_time()};
+  fade_id_ = g_timeout_add_full(
+      G_PRIORITY_DEFAULT, OSDPrettyFade::kTickMs,
+      +[](gpointer data) -> gboolean {
+        auto *job = static_cast<FadeTick *>(data);
+        if (!job->self->window_) {
+          job->self->fade_id_ = 0;
+          return G_SOURCE_REMOVE;
+        }
+        const int elapsed = static_cast<int>((g_get_monotonic_time() - job->start_us) / 1000);
+        gtk_widget_set_opacity(job->self->window_, OSDPrettyFade::OpacityAt(elapsed, OSDPrettyFade::kDurationMs, job->fading_in));
+        if (!OSDPrettyFade::Finished(elapsed, OSDPrettyFade::kDurationMs)) {
+          return G_SOURCE_CONTINUE;
+        }
+        gtk_widget_set_opacity(job->self->window_, job->fading_in ? 1.0 : 0.0);
+        if (!job->fading_in) {
+          gtk_widget_set_visible(job->self->window_, FALSE);
+        } else {
+          job->self->StartHideTimeout();
+        }
+        job->self->fade_id_ = 0;
+        return G_SOURCE_REMOVE;
+      },
+      job, +[](gpointer data) { delete static_cast<FadeTick *>(data); });
 }
 
 void OSDPretty::ApplyPosition() {
@@ -337,26 +454,14 @@ void OSDPretty::ShowMessage(const std::string &summary, const std::string &messa
     g_source_remove(timeout_id_);
     timeout_id_ = 0;
   }
+  StopFade();
   SetMessage(summary, message, image);
+  ApplyLimits();
   if (fading_) {
     gtk_widget_set_opacity(window_, 0.0);
   }
   gtk_window_present(GTK_WINDOW(window_));
   ApplyPosition();
-  if (fading_) {
-    gtk_widget_set_opacity(window_, 1.0);
-  }
-  if (mode_ == Mode::Popup && timeout_ms_ > 0 && !disable_duration_) {
-    timeout_id_ = g_timeout_add(timeout_ms_, [](gpointer data) -> gboolean {
-      auto *self = static_cast<OSDPretty *>(data);
-      if (self->window_) {
-        if (self->fading_) {
-          gtk_widget_set_opacity(self->window_, 0.0);
-        }
-        gtk_widget_set_visible(self->window_, FALSE);
-      }
-      self->timeout_id_ = 0;
-      return G_SOURCE_REMOVE;
-    }, this);
-  }
+  ApplyLimits();
+  StartFade(true);
 }

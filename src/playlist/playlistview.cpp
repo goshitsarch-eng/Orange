@@ -3,9 +3,12 @@
 #include "constants/playlistsettings.h"
 #include "moodbar/moodbarcell.h"
 #include "core/settings.h"
+#include "playlist/playlistautoscroll.h"
 #include "playlist/playlistbehaviour.h"
+#include "playlist/playlistclipboard.h"
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlisteditorder.h"
+#include "playlist/playlistplayingicon.h"
 #include "playlist/playlistratingclick.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistlook.h"
@@ -50,8 +53,8 @@ PlaylistView::PlaylistView() {
   gtk_widget_add_controller(widget_, keys);
   gtk_widget_set_focusable(widget_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<PlaylistView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<PlaylistView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
   GtkDropTarget *target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
@@ -83,6 +86,9 @@ void PlaylistView::SetDeleteCallback(DeleteCallback callback) { delete_ = std::m
 
 PlaylistView::~PlaylistView() {
   StopGlowTimer();
+  if (inhibit_timeout_) {
+    g_source_remove(inhibit_timeout_);
+  }
   ResetTypeAhead();
 }
 
@@ -106,10 +112,14 @@ void PlaylistView::FilterReturnPressed() {
 
 void PlaylistView::FocusAndMove(unsigned keyval) {
   gtk_widget_grab_focus(widget_);
-  OnKeyPressed(keyval);
+  OnKeyPressed(keyval, static_cast<GdkModifierType>(0));
 }
 
-gboolean PlaylistView::OnKeyPressed(guint keyval) {
+gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (PlaylistClipboard::IsCopyShortcut(keyval, state, GDK_CONTROL_MASK)) {
+    CopyCurrentToClipboard();
+    return TRUE;
+  }
   if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
     ResetTypeAhead();
     if (focus_filter_) {
@@ -143,6 +153,7 @@ gboolean PlaylistView::OnKeyPressed(guint keyval) {
     }
     const int next = ListBoxKeyboard::NextIndex(current, static_cast<int>(visible_rows_.size()), action);
     if (next >= 0 && select_) {
+      InhibitAutoscroll();
       select_(visible_rows_[static_cast<size_t>(next)], false);
       ScrollToRow(visible_rows_[static_cast<size_t>(next)]);
     }
@@ -406,6 +417,13 @@ void PlaylistView::Refresh(Playlist *playlist) {
       if (bars) {
         gtk_widget_add_css_class(row, "playlist-bars");
       }
+      if (PlaylistPlayingIcon::ShowOnCurrentRow(true)) {
+        GtkWidget *icon = gtk_image_new_from_icon_name(PlaylistPlayingIcon::Name(paused_));
+        gtk_image_set_pixel_size(GTK_IMAGE(icon), PlaylistPlayingIcon::kPixelSize);
+        gtk_widget_set_margin_start(icon, 6);
+        gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
+        gtk_box_append(GTK_BOX(row), icon);
+      }
     }
     if (song.skipped() || PlaylistBehaviour::ShouldGreyout(song)) {
       gtk_widget_add_css_class(row, "dim-label");
@@ -469,6 +487,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
                        const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "row-index"));
                        const GdkModifierType mods = gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
                        self->RecordClickedColumn(widget, x);
+                       self->InhibitAutoscroll();
                        if (self->select_) {
                          self->select_(index, (mods & GDK_CONTROL_MASK) != 0);
                        }
@@ -637,14 +656,79 @@ void PlaylistView::SetPlaybackProgress(double progress) {
   ReloadLookCss();
 }
 
-void PlaylistView::ScrollToRow(int row) {
+void PlaylistView::SetPaused(bool paused) { paused_ = paused; }
+
+void PlaylistView::InhibitAutoscroll() {
+  inhibit_autoscroll_ = true;
+  if (inhibit_timeout_) {
+    g_source_remove(inhibit_timeout_);
+  }
+  inhibit_timeout_ = g_timeout_add(PlaylistAutoscroll::kGraceMs, +[](gpointer data) -> gboolean {
+    auto *self = static_cast<PlaylistView *>(data);
+    self->inhibit_autoscroll_ = false;
+    self->inhibit_timeout_ = 0;
+    return G_SOURCE_REMOVE;
+  }, this);
+}
+
+bool PlaylistView::IsRowVisible(int row) const {
+  GtkWidget *child = gtk_widget_get_first_child(grid_);
+  while (child) {
+    if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index")) == row) {
+      graphene_rect_t bounds{};
+      if (!gtk_widget_compute_bounds(child, widget_, &bounds)) {
+        return false;
+      }
+      const int view_h = gtk_widget_get_height(widget_);
+      return bounds.origin.y >= 0 && bounds.origin.y + bounds.size.height <= static_cast<float>(view_h);
+    }
+    child = gtk_widget_get_next_sibling(child);
+  }
+  return false;
+}
+
+void PlaylistView::MaybeScrollToRow(int row, Playlist::AutoScroll mode) {
+  if (!PlaylistAutoscroll::ShouldScroll(mode, inhibit_autoscroll_)) {
+    return;
+  }
+  if (mode != Playlist::AutoScroll::Always && PlaylistAutoscroll::ShouldSkipIfVisible(IsRowVisible(row))) {
+    return;
+  }
+  if (mode == Playlist::AutoScroll::Always) {
+    inhibit_autoscroll_ = false;
+  }
+  ScrollToRow(row, true);
+}
+
+void PlaylistView::CopyCurrentToClipboard() {
+  if (!playlist_ || selected_rows_.empty()) {
+    return;
+  }
+  const int row = selected_rows_.front();
+  if (row < 0 || row >= playlist_->row_count()) {
+    return;
+  }
+  const Song &song = playlist_->songs()[static_cast<size_t>(row)];
+  std::vector<std::string> texts;
+  for (PlaylistColumn column : PlaylistColumnLayout::Visible()) {
+    texts.push_back(PlaylistDelegates::ColumnText(song, column));
+  }
+  gdk_clipboard_set_text(gtk_widget_get_clipboard(widget_), PlaylistClipboard::DisplayText(texts).c_str());
+}
+
+void PlaylistView::ScrollToRow(int row, bool center) {
   GtkWidget *child = gtk_widget_get_first_child(grid_);
   while (child) {
     if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index")) == row) {
       graphene_rect_t bounds;
       if (gtk_widget_compute_bounds(child, widget_, &bounds)) {
         GtkAdjustment *adjust = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(widget_));
-        gtk_adjustment_set_value(adjust, bounds.origin.y);
+        double value = bounds.origin.y;
+        if (center) {
+          value = PlaylistAutoscroll::CenteredOffset(static_cast<int>(bounds.origin.y), static_cast<int>(bounds.size.height),
+                                                     gtk_widget_get_height(widget_));
+        }
+        gtk_adjustment_set_value(adjust, value);
       }
       return;
     }

@@ -38,7 +38,11 @@ class OSDPretty {
   void EnsureWindow();
   void ApplyStyle();
   void ApplyPosition();
+  void ApplyLimits();
   void ConnectDrag();
+  void StopFade();
+  void StartFade(bool fading_in);
+  void StartHideTimeout();
   static void OnDragBegin(GtkGestureDrag *gesture, double x, double y, gpointer data);
   static void OnDragUpdate(GtkGestureDrag *gesture, double x, double y, gpointer data);
   static void OnDragEnd(GtkGestureDrag *gesture, double x, double y, gpointer data);
@@ -60,6 +64,7 @@ class OSDPretty {
   GtkWidget *body_ = nullptr;
   GtkWidget *image_ = nullptr;
   guint timeout_id_ = 0;
+  guint fade_id_ = 0;
   double drag_start_x_ = 0;
   double drag_start_y_ = 0;
 };

@@ -68,7 +68,10 @@ inline State ApplyOrder(const State current, const PlaylistColumn column, const 
     return {column, true};
   }
   if (current.column == column) {
-    return {column, !current.descending};
+    if (current.descending) {
+      return {PlaylistColumn::Count, false};
+    }
+    return {column, true};
   }
   return {column, false};
 }

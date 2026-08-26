@@ -1,7 +1,10 @@
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistheadersort.h"
+#include "playlist/playlistautoscroll.h"
+#include "playlist/playlistclipboard.h"
 #include "playlist/playlistcolumnwidths.h"
+#include "playlist/playlistplayingicon.h"
 #include "playlist/playlist.h"
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlistfolders.h"
@@ -28,6 +31,7 @@ TEST(PlaylistColumnLayout, DefaultOrderAlignmentAndReset) {
   ASSERT_GE(defaults.size(), 5u);
   EXPECT_EQ(PlaylistColumn::Queue, defaults.front());
   EXPECT_EQ(defaults, PlaylistColumnLayout::Visible());
+  EXPECT_TRUE(PlaylistColumnLayout::CanHide());
   EXPECT_TRUE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Title));
   EXPECT_TRUE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Queue));
   EXPECT_FALSE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Comment));
@@ -60,6 +64,7 @@ TEST(PlaylistColumnLayout, DefaultOrderAlignmentAndReset) {
   EXPECT_NE(PlaylistColumn::Title, PlaylistColumnLayout::Visible().front());
 
   PlaylistColumnLayout::SetVisibleColumns({PlaylistColumn::Title});
+  EXPECT_FALSE(PlaylistColumnLayout::CanHide());
   PlaylistColumnLayout::Hide(PlaylistColumn::Title);
   EXPECT_TRUE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Title));
 
@@ -534,6 +539,9 @@ TEST(PlaylistHeaderSort, ApplyOrderAndSkipRedundantExplicitSort) {
   EXPECT_FALSE(title_asc.descending);
   const PlaylistHeaderSort::State title_desc = PlaylistHeaderSort::ApplyOrder(title_asc, PlaylistColumn::Title, PlaylistSortOrder::Toggle);
   EXPECT_TRUE(title_desc.descending);
+  const PlaylistHeaderSort::State title_cleared = PlaylistHeaderSort::ApplyOrder(title_desc, PlaylistColumn::Title, PlaylistSortOrder::Toggle);
+  EXPECT_EQ(PlaylistColumn::Count, title_cleared.column);
+  EXPECT_FALSE(title_cleared.descending);
   const PlaylistHeaderSort::State artist = PlaylistHeaderSort::ApplyOrder(title_desc, PlaylistColumn::Artist, PlaylistSortOrder::Toggle);
   EXPECT_EQ(PlaylistColumn::Artist, artist.column);
   EXPECT_FALSE(artist.descending);
@@ -624,4 +632,32 @@ TEST(PlaylistColumnLayout, PixelWidthsFollowSavedProportions) {
   EXPECT_EQ(220, PlaylistColumnLayout::PixelWidth(PlaylistColumn::Title, 800));
   EXPECT_EQ(180, PlaylistColumnLayout::PixelWidth(PlaylistColumn::Artist, 800));
   PlaylistColumnLayout::Reset();
+}
+
+TEST(PlaylistAutoscroll, MaybeAlwaysNeverAndCenter) {
+  EXPECT_EQ(30000, PlaylistAutoscroll::kGraceMs);
+  EXPECT_TRUE(PlaylistAutoscroll::ShouldScroll(Playlist::AutoScroll::Always, true));
+  EXPECT_FALSE(PlaylistAutoscroll::ShouldScroll(Playlist::AutoScroll::Never, false));
+  EXPECT_TRUE(PlaylistAutoscroll::ShouldScroll(Playlist::AutoScroll::Maybe, false));
+  EXPECT_FALSE(PlaylistAutoscroll::ShouldScroll(Playlist::AutoScroll::Maybe, true));
+  EXPECT_TRUE(PlaylistAutoscroll::ShouldSkipIfVisible(true));
+  EXPECT_FALSE(PlaylistAutoscroll::ShouldSkipIfVisible(false));
+  EXPECT_EQ(80, PlaylistAutoscroll::CenteredOffset(200, 40, 280));
+}
+
+TEST(PlaylistClipboard, JoinsVisibleColumnsAndCopyShortcut) {
+  EXPECT_EQ("Roads - Portishead", PlaylistClipboard::DisplayText({"Roads", "", "Portishead"}));
+  EXPECT_TRUE(PlaylistClipboard::DisplayText({}).empty());
+  EXPECT_TRUE(PlaylistClipboard::IsCopyShortcut('c', 4, 4));
+  EXPECT_TRUE(PlaylistClipboard::IsCopyShortcut('C', 4, 4));
+  EXPECT_FALSE(PlaylistClipboard::IsCopyShortcut('c', 0, 4));
+  EXPECT_FALSE(PlaylistClipboard::IsCopyShortcut('x', 4, 4));
+}
+
+TEST(PlaylistPlayingIcon, PauseAndPlayNames) {
+  EXPECT_STREQ("media-playback-pause-symbolic", PlaylistPlayingIcon::Name(true));
+  EXPECT_STREQ("media-playback-start-symbolic", PlaylistPlayingIcon::Name(false));
+  EXPECT_TRUE(PlaylistPlayingIcon::ShowOnCurrentRow(true));
+  EXPECT_FALSE(PlaylistPlayingIcon::ShowOnCurrentRow(false));
+  EXPECT_EQ(12, PlaylistPlayingIcon::kPixelSize);
 }

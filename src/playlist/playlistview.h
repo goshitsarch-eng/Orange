@@ -36,7 +36,10 @@ class PlaylistView {
   void SetFilterString(const std::string &filter);
   void SetSelectedRows(const std::vector<int> &rows);
   void Refresh(Playlist *playlist);
-  void ScrollToRow(int row);
+  void ScrollToRow(int row, bool center = false);
+  void MaybeScrollToRow(int row, Playlist::AutoScroll mode);
+  void InhibitAutoscroll();
+  void SetPaused(bool paused);
   void SetActivateCallback(ActivateCallback callback);
   void SetSelectCallback(SelectCallback callback);
   void SetSortCallback(SortCallback callback);
@@ -99,14 +102,19 @@ class PlaylistView {
   double playback_progress_ = 0;
   int glow_step_ = 0;
   bool glowing_ = false;
+  bool paused_ = false;
   guint glow_timeout_ = 0;
+  bool inhibit_autoscroll_ = false;
+  guint inhibit_timeout_ = 0;
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
   std::vector<std::string> visible_titles_;
   std::vector<int> visible_rows_;
 
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
   void ResetTypeAhead();
+  void CopyCurrentToClipboard();
+  bool IsRowVisible(int row) const;
 };
 
 #endif

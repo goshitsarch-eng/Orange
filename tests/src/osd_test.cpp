@@ -7,6 +7,8 @@
 #include "osd/osdprettywayland.h"
 #include "osd/osdbase.h"
 #include "osd/osdpretty.h"
+#include "osd/osdprettyfade.h"
+#include "osd/osdprettylimits.h"
 #include "osd/osdprettyplacement.h"
 #include "utilities/colorutils.h"
 #include "utilities/fontutils.h"
@@ -243,4 +245,25 @@ TEST(Translations, GermanCatalogContainsAbout) {
   const std::string mo = std::string(STRAWBERRY_LOCALE_DIR) + "/de_DE/LC_MESSAGES/strawberry.mo";
   EXPECT_EQ(0, access(mo.c_str(), R_OK)) << mo;
 #endif
+}
+
+TEST(OSDPrettyLimits, LeaveQtMarginsOnWorkarea) {
+  EXPECT_EQ(200, OSDPrettyLimits::kLabelMargin);
+  EXPECT_EQ(100, OSDPrettyLimits::kWindowMargin);
+  EXPECT_EQ(1720, OSDPrettyLimits::MaxLabelWidth(1920));
+  EXPECT_EQ(1820, OSDPrettyLimits::MaxWindowWidth(1920));
+  EXPECT_EQ(980, OSDPrettyLimits::MaxWindowHeight(1080));
+  EXPECT_EQ(OSDPrettyLimits::kMinLabelWidth, OSDPrettyLimits::MaxLabelWidth(50));
+  EXPECT_EQ(OSDPrettyLimits::kMinWindowWidth, OSDPrettyLimits::MaxWindowWidth(50));
+}
+
+TEST(OSDPrettyFade, Linear300msInAndOut) {
+  EXPECT_EQ(300, OSDPrettyFade::kDurationMs);
+  EXPECT_NEAR(0.0, OSDPrettyFade::OpacityAt(0, 300, true), 0.0001);
+  EXPECT_NEAR(1.0, OSDPrettyFade::OpacityAt(300, 300, true), 0.0001);
+  EXPECT_NEAR(0.5, OSDPrettyFade::OpacityAt(150, 300, true), 0.0001);
+  EXPECT_NEAR(1.0, OSDPrettyFade::OpacityAt(0, 300, false), 0.0001);
+  EXPECT_NEAR(0.0, OSDPrettyFade::OpacityAt(300, 300, false), 0.0001);
+  EXPECT_FALSE(OSDPrettyFade::Finished(299, 300));
+  EXPECT_TRUE(OSDPrettyFade::Finished(300, 300));
 }

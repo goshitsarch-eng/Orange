@@ -228,11 +228,13 @@ void PlaylistHeader::ShowMenu(PlaylistColumn column) {
     gtk_box_append(GTK_BOX(box), button);
   };
 
-  const std::string hide_label = std::string(Translations::CStr("Hide")) + " " + PlaylistDelegates::ColumnTitle(column);
-  add_button(hide_label.c_str(), [this, column]() {
-    PlaylistColumnLayout::Hide(column);
-    NotifyLayoutChanged();
-  });
+  if (PlaylistColumnLayout::CanHide()) {
+    const std::string hide_label = std::string(Translations::CStr("Hide")) + " " + PlaylistDelegates::ColumnTitle(column);
+    add_button(hide_label.c_str(), [this, column]() {
+      PlaylistColumnLayout::Hide(column);
+      NotifyLayoutChanged();
+    });
+  }
 
   GtkWidget *stretch = gtk_check_button_new_with_label(Translations::CStr("Stretch columns to fit window"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(stretch), PlaylistColumnLayout::StretchEnabled());

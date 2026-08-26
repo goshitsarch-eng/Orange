@@ -1576,6 +1576,7 @@ void MainWindow::ConnectSignals() {
       playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Playing);
     }
     if (playlist_container_) {
+      playlist_container_->view()->SetPaused(false);
       playlist_container_->view()->SetGlowing(true);
     }
     RefreshPlaylistTabs();
@@ -1585,6 +1586,7 @@ void MainWindow::ConnectSignals() {
       playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Paused);
     }
     if (playlist_container_) {
+      playlist_container_->view()->SetPaused(true);
       playlist_container_->view()->SetGlowing(false);
     }
     RefreshPlaylistTabs();
@@ -1600,6 +1602,7 @@ void MainWindow::ConnectSignals() {
       playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Stopped);
     }
     if (playlist_container_) {
+      playlist_container_->view()->SetPaused(false);
       playlist_container_->view()->SetGlowing(false);
     }
     UpdatePlaybackButtons();
@@ -2260,22 +2263,21 @@ void MainWindow::TryClosePlaylist(int id) {
 }
 
 void MainWindow::SelectPlayingTrack() {
-  Settings settings;
-  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
-  if (!settings.BoolValue(PlaylistSettings::kSelectTrack, PlaylistSettings::kDefaultSelectTrack)) {
-    return;
-  }
   Playlist *active = app_->playlist_manager()->active();
   Playlist *current = app_->playlist_manager()->current();
   if (!active || active != current || active->current_row() < 0 || !playlist_container_) {
     return;
   }
   const int row = active->current_row();
-  selected_playlist_rows_ = {row};
-  selection_playlist_name_ = current->name();
-  playlist_container_->view()->SetSelectedRows(selected_playlist_rows_);
-  playlist_container_->view()->Refresh(current);
-  playlist_container_->view()->ScrollToRow(row);
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  if (settings.BoolValue(PlaylistSettings::kSelectTrack, PlaylistSettings::kDefaultSelectTrack)) {
+    selected_playlist_rows_ = {row};
+    selection_playlist_name_ = current->name();
+    playlist_container_->view()->SetSelectedRows(selected_playlist_rows_);
+    playlist_container_->view()->Refresh(current);
+  }
+  playlist_container_->view()->MaybeScrollToRow(row, Playlist::AutoScroll::Maybe);
 }
 
 void MainWindow::DeleteCurrentPlaylist() {
@@ -3317,7 +3319,7 @@ void MainWindow::JumpToPlaying() {
   const int row = playlist->current_row();
   if (row >= 0) {
     SelectPlaylistRow(row, false);
-    playlist_container_->view()->ScrollToRow(row);
+    playlist_container_->view()->MaybeScrollToRow(row, Playlist::AutoScroll::Always);
   }
   RefreshPlaylist();
 }

@@ -123,6 +123,8 @@ void PlaylistColumnLayout::ToggleVisible(PlaylistColumn column) {
   SetVisibleColumns(columns);
 }
 
+bool PlaylistColumnLayout::CanHide() { return Visible().size() > 1; }
+
 void PlaylistColumnLayout::Hide(PlaylistColumn column) {
   auto columns = Visible();
   if (columns.size() <= 1) {

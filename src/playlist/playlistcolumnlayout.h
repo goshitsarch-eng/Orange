@@ -13,6 +13,7 @@ class PlaylistColumnLayout {
   static bool IsVisible(PlaylistColumn column);
   static void SetVisibleColumns(const std::vector<PlaylistColumn> &columns);
   static void ToggleVisible(PlaylistColumn column);
+  static bool CanHide();
   static void Hide(PlaylistColumn column);
   static bool Move(PlaylistColumn column, int delta);
 
