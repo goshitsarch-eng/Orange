@@ -170,6 +170,14 @@ set(STRAWBERRY_SOURCES
   src/playlist/playlistbackend.cpp
   src/playlist/playlistmanager.cpp
   src/queue/queue.cpp
+  src/playlistparsers/parserbase.cpp
+  src/playlistparsers/m3uparser.cpp
+  src/playlistparsers/plsparser.cpp
+  src/playlistparsers/xspfparser.cpp
+  src/playlistparsers/asxparser.cpp
+  src/playlistparsers/asxiniparser.cpp
+  src/playlistparsers/wplparser.cpp
+  src/playlistparsers/cueparser.cpp
   src/playlistparsers/playlistparser.cpp
   src/smartplaylists/smartplaylist.cpp
   src/filterparser/filterparser.cpp
@@ -332,6 +340,14 @@ if(GTest_FOUND)
     src/device/devicemanager.cpp
     src/device/gpodloader.cpp
     src/device/gpoddevice.cpp
+    src/playlistparsers/parserbase.cpp
+    src/playlistparsers/m3uparser.cpp
+    src/playlistparsers/plsparser.cpp
+    src/playlistparsers/xspfparser.cpp
+    src/playlistparsers/asxparser.cpp
+    src/playlistparsers/asxiniparser.cpp
+    src/playlistparsers/wplparser.cpp
+    src/playlistparsers/cueparser.cpp
     src/playlistparsers/playlistparser.cpp
     src/smartplaylists/smartplaylist.cpp
     src/filterparser/filterparser.cpp
