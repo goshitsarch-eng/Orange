@@ -419,6 +419,18 @@ void MainWindow::BuildUi() {
                    settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
                self->ApplyCollectionPlan(CollectionBehaviour::Replace(play, self->EngineStopped()), self->CollectionSongs());
              }));
+  add_action("collection-expand-all", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               if (self->collection_container_) {
+                 self->collection_container_->view()->ExpandAll();
+               }
+             }));
+  add_action("collection-collapse-all", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               if (self->collection_container_) {
+                 self->collection_container_->view()->CollapseAll();
+               }
+             }));
   add_action("collection-various-on", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                static_cast<MainWindow *>(data)->ForceCompilationSelected(true);
              }));
@@ -1904,10 +1916,15 @@ void MainWindow::ForceCompilationSelected(bool on) {
 }
 
 void MainWindow::ShowCollectionMenu() {
+  GMenu *menu = g_menu_new();
+  g_menu_append(menu, Translations::Tr("Expand all").c_str(), "win.collection-expand-all");
+  g_menu_append(menu, Translations::Tr("Collapse all").c_str(), "win.collection-collapse-all");
   if (CollectionSongs().empty()) {
+    GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+    gtk_widget_set_parent(popover, collection_container_ ? collection_container_->view()->list() : GTK_WIDGET(window_));
+    gtk_popover_popup(GTK_POPOVER(popover));
     return;
   }
-  GMenu *menu = g_menu_new();
   g_menu_append(menu, Translations::Tr("Append to current playlist").c_str(), "win.collection-append");
   g_menu_append(menu, Translations::Tr("Replace current playlist").c_str(), "win.collection-replace");
   g_menu_append(menu, Translations::Tr("Open in new playlist").c_str(), "win.collection-new");

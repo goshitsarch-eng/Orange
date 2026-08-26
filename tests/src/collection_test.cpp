@@ -10,6 +10,7 @@
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectionmodel.h"
 #include "collection/collectionplaylistitem.h"
+#include "collection/collectiontree.h"
 #include "collection/collectionquery.h"
 #include "collection/collectiontask.h"
 #include "core/database.h"
@@ -19,6 +20,7 @@
 #include <unistd.h>
 
 #include <ctime>
+#include <set>
 #include <string>
 
 namespace {
@@ -165,6 +167,44 @@ TEST(CollectionItemDelegate, PrimarySecondaryAndIndent) {
   EXPECT_EQ(2, CollectionItemDelegate::Indent(&song));
   CollectionItem loading(CollectionItem::Type::LoadingIndicator);
   EXPECT_EQ("Loading…", CollectionItemDelegate::PrimaryText(&loading));
+}
+
+TEST(CollectionTree, ExpandKeysAndDragPayload) {
+  CollectionItem root(CollectionItem::Type::Root);
+  CollectionItem *artist = root.AddChild(CollectionItem::Type::Container);
+  artist->key = "portishead";
+  artist->display_text = "Portishead";
+  artist->container_level = 0;
+  CollectionItem *album = artist->AddChild(CollectionItem::Type::Container);
+  album->key = "dummy";
+  album->display_text = "Dummy";
+  album->container_level = 1;
+  CollectionItem *song = album->AddChild(CollectionItem::Type::Song);
+  song->metadata = MakeSong("Roads", "Portishead", "Dummy");
+  song->display_text = "Roads";
+
+  EXPECT_TRUE(CollectionTree::IsExpandable(artist));
+  EXPECT_TRUE(CollectionTree::IsExpandable(album));
+  EXPECT_FALSE(CollectionTree::IsExpandable(song));
+  EXPECT_EQ("portishead:0", CollectionTree::Key(artist));
+  EXPECT_EQ("dummy:1", CollectionTree::Key(album));
+
+  std::set<std::string> expanded;
+  EXPECT_FALSE(CollectionTree::ShowChildren(artist, false, expanded));
+  EXPECT_TRUE(CollectionTree::ShowChildren(artist, true, expanded));
+  EXPECT_TRUE(CollectionTree::Toggle(&expanded, artist));
+  EXPECT_TRUE(CollectionTree::ShowChildren(artist, false, expanded));
+  EXPECT_FALSE(CollectionTree::Toggle(&expanded, artist));
+  EXPECT_FALSE(CollectionTree::ShowChildren(artist, false, expanded));
+
+  CollectionTree::CollectExpandableKeys(&root, &expanded);
+  EXPECT_EQ(2u, expanded.size());
+  EXPECT_NE(expanded.end(), expanded.find(CollectionTree::Key(artist)));
+  EXPECT_NE(expanded.end(), expanded.find(CollectionTree::Key(album)));
+
+  SongList songs = {song->metadata};
+  EXPECT_EQ(song->metadata.url(), CollectionTree::DragPayload(songs));
+  EXPECT_TRUE(CollectionTree::DragPayload({}).empty());
 }
 
 TEST(CollectionTask, StartsAndFinishesTaskManagerEntry) {

@@ -2,6 +2,7 @@
 
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionitemdelegate.h"
+#include "collection/collectiontree.h"
 #include "translations/translations.h"
 #include "utilities/strutils.h"
 
@@ -73,12 +74,30 @@ void CollectionView::AppendItem(GtkWidget *parent, const CollectionItem *item, i
   if (!item || !filter_.AcceptsItem(item)) {
     return;
   }
+  const bool expandable = CollectionTree::IsExpandable(item);
+  const bool expanded = CollectionTree::ShowChildren(item, !filter_.filter_string().empty(), expanded_);
   GtkWidget *row = gtk_list_box_row_new();
+  GtkWidget *outer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+  gtk_widget_set_margin_start(outer, 8 + depth * 12);
+  gtk_widget_set_margin_end(outer, 8);
+  gtk_widget_set_margin_top(outer, 4);
+  gtk_widget_set_margin_bottom(outer, 4);
+  if (expandable) {
+    GtkWidget *toggle = gtk_button_new_from_icon_name(expanded ? "pan-down-symbolic" : "pan-end-symbolic");
+    gtk_widget_add_css_class(toggle, "flat");
+    gtk_widget_add_css_class(toggle, "circular");
+    gtk_widget_set_tooltip_text(toggle, expanded ? Translations::CStr("Collapse") : Translations::CStr("Expand"));
+    g_object_set_data(G_OBJECT(toggle), "item", const_cast<CollectionItem *>(item));
+    g_signal_connect(toggle, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                       auto *self = static_cast<CollectionView *>(data);
+                       auto *clicked = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(button), "item"));
+                       self->ToggleExpanded(clicked);
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(outer), toggle);
+  }
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  gtk_widget_set_margin_start(box, 8 + depth * 12);
-  gtk_widget_set_margin_end(box, 8);
-  gtk_widget_set_margin_top(box, 4);
-  gtk_widget_set_margin_bottom(box, 4);
+  gtk_widget_set_hexpand(box, TRUE);
   GtkWidget *primary = gtk_label_new(CollectionItemDelegate::PrimaryText(item).c_str());
   gtk_widget_set_halign(primary, GTK_ALIGN_START);
   gtk_box_append(GTK_BOX(box), primary);
@@ -89,14 +108,70 @@ void CollectionView::AppendItem(GtkWidget *parent, const CollectionItem *item, i
     gtk_widget_set_halign(sub, GTK_ALIGN_START);
     gtk_box_append(GTK_BOX(box), sub);
   }
-  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+  gtk_box_append(GTK_BOX(outer), box);
+  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), outer);
   g_object_set_data(G_OBJECT(row), "item", const_cast<CollectionItem *>(item));
+  SetupRowDrag(row, item);
   if (GTK_IS_LIST_BOX(parent)) {
     gtk_list_box_append(GTK_LIST_BOX(parent), row);
   }
-  for (const auto &child : item->children) {
-    AppendItem(parent, child.get(), depth + 1);
+  if (expanded) {
+    for (const auto &child : item->children) {
+      AppendItem(parent, child.get(), depth + 1);
+    }
   }
+}
+
+void CollectionView::SetupRowDrag(GtkWidget *row, const CollectionItem *item) {
+  GtkDragSource *src = gtk_drag_source_new();
+  gtk_drag_source_set_actions(src, GDK_ACTION_COPY);
+  g_object_set_data(G_OBJECT(src), "item", const_cast<CollectionItem *>(item));
+  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
+                     auto *self = static_cast<CollectionView *>(data);
+                     auto *dragged = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(s), "item"));
+                     SongList songs = self->model_.SongsFromItem(dragged);
+                     for (const CollectionItem *selected : self->SelectedItems()) {
+                       if (selected == dragged) {
+                         songs = self->SelectedSongs();
+                         break;
+                       }
+                     }
+                     const std::string payload = CollectionTree::DragPayload(songs);
+                     if (payload.empty()) {
+                       return nullptr;
+                     }
+                     GValue v = G_VALUE_INIT;
+                     g_value_init(&v, G_TYPE_STRING);
+                     g_value_set_string(&v, payload.c_str());
+                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
+                     g_value_unset(&v);
+                     return provider;
+                   })),
+                   this);
+  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
+}
+
+void CollectionView::ExpandAll() {
+  expanded_.clear();
+  CollectionTree::CollectExpandableKeys(model_.root(), &expanded_);
+  Rebuild();
+}
+
+void CollectionView::CollapseAll() {
+  expanded_.clear();
+  Rebuild();
+}
+
+void CollectionView::ToggleExpanded(const CollectionItem *item) {
+  if (CollectionTree::Toggle(&expanded_, item)) {
+    Rebuild();
+  } else if (CollectionTree::IsExpandable(item)) {
+    Rebuild();
+  }
+}
+
+bool CollectionView::IsExpanded(const CollectionItem *item) const {
+  return CollectionTree::ShowChildren(item, !filter_.filter_string().empty(), expanded_);
 }
 
 void CollectionView::Rebuild() {
@@ -189,6 +264,16 @@ void CollectionView::TypeAhead(gunichar ch) {
 }
 
 gboolean CollectionView::OnKeyPressed(guint keyval) {
+  if (keyval == GDK_KEY_Right || keyval == GDK_KEY_Left) {
+    const CollectionItem *item = SelectedItem();
+    if (CollectionTree::IsExpandable(item) && filter_.filter_string().empty()) {
+      const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
+      if ((keyval == GDK_KEY_Right && !expanded) || (keyval == GDK_KEY_Left && expanded)) {
+        ToggleExpanded(item);
+      }
+      return TRUE;
+    }
+  }
   if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
     if (GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_))) {
       ActivateRow(row);
