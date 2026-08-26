@@ -249,7 +249,7 @@ void MainWindow::BuildUi() {
   g_menu_append(playlist, Translations::Tr("Shuffle playlist").c_str(), "win.shuffle-playlist");
   g_menu_append(playlist, Translations::Tr("Remove duplicates").c_str(), "win.remove-duplicates");
   g_menu_append(playlist, Translations::Tr("Remove unavailable").c_str(), "win.remove-unavailable");
-  g_menu_append(playlist, Translations::Tr("Renumber tracks").c_str(), "win.renumber-tracks");
+  g_menu_append(playlist, Translations::Tr(MainWindowMenu::RenumberTracks()).c_str(), "win.renumber-tracks");
   g_menu_append(playlist, Translations::Tr("Skip selected tracks").c_str(), "win.playlist-skip");
   g_menu_append(playlist, Translations::Tr("Jump to playing track").c_str(), "win.jump-playing");
   g_menu_append(playlist, Translations::Tr("Go to next playlist tab").c_str(), "win.next-playlist");
@@ -261,7 +261,7 @@ void MainWindow::BuildUi() {
   g_menu_append(playlist, Translations::Tr(MainWindowMenu::EditTrack()).c_str(), "win.edittag");
   g_menu_append(playlist, Translations::Tr("Auto-complete tags…").c_str(), "win.autocomplete-tags");
   g_menu_append(playlist, Translations::Tr("Edit value").c_str(), "win.edit-value");
-  g_menu_append(playlist, Translations::Tr("Set column to…").c_str(), "win.set-column");
+  g_menu_append(playlist, Translations::Tr(MainWindowMenu::SetValue()).c_str(), "win.set-column");
   g_menu_append(playlist, Translations::Tr("Undo").c_str(), "win.undo");
   g_menu_append(playlist, Translations::Tr("Redo").c_str(), "win.redo");
   g_menu_append(playlist, Translations::Tr("Smart playlist wizard…").c_str(), "win.smart-wizard");
@@ -275,7 +275,7 @@ void MainWindow::BuildUi() {
   g_menu_append(playback, Translations::Tr("Queue play next").c_str(), "win.queue-next");
   g_menu_append(playback, Translations::Tr("Scrobble current track").c_str(), "win.scrobble");
   g_menu_append(playback, Translations::Tr(MainWindowMenu::ToggleScrobbling()).c_str(), "win.toggle-scrobbling");
-  g_menu_append(playback, Translations::Tr("Love current track").c_str(), "win.love");
+  g_menu_append(playback, Translations::Tr(MainWindowMenu::Love()).c_str(), "win.love");
   g_menu_append(playback, Translations::Tr(MainWindowMenu::ShuffleMode()).c_str(), "win.shuffle-mode");
   g_menu_append(playback, Translations::Tr(MainWindowMenu::RepeatMode()).c_str(), "win.repeat-mode");
   g_menu_append_section(menu, Translations::Tr("Playback").c_str(), G_MENU_MODEL(playback));
@@ -1634,7 +1634,7 @@ void MainWindow::BuildPlayerBar() {
   scrobble_button_ = gtk_button_new_from_icon_name("document-send-symbolic");
   gtk_widget_set_tooltip_text(scrobble_button_, "Scrobble current track");
   love_button_ = gtk_button_new_from_icon_name("emblem-favorite-symbolic");
-  gtk_widget_set_tooltip_text(love_button_, "Love current track");
+  gtk_widget_set_tooltip_text(love_button_, Translations::CStr(MainWindowMenu::Love()));
   analyzer_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(analyzer_drawing_, 160, 36);
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(analyzer_drawing_), DrawAnalyzer, this, nullptr);

@@ -1171,6 +1171,9 @@ TEST(WindowGeometry, ClampsAndMapsStartup) {
 TEST(MainWindowMenu, MatchesQtDailyActionLabels) {
   EXPECT_STREQ("Update changed collection folders", MainWindowMenu::UpdateCollection());
   EXPECT_STREQ("Edit track information...", MainWindowMenu::EditTrack());
+  EXPECT_STREQ("Renumber tracks in this order...", MainWindowMenu::RenumberTracks());
+  EXPECT_STREQ("Set value for all selected tracks...", MainWindowMenu::SetValue());
+  EXPECT_STREQ("Love", MainWindowMenu::Love());
   EXPECT_STREQ("Toggle scrobbling", MainWindowMenu::ToggleScrobbling());
   EXPECT_STREQ("Shuffle mode", MainWindowMenu::ShuffleMode());
   EXPECT_STREQ("Repeat mode", MainWindowMenu::RepeatMode());

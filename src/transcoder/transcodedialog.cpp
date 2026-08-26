@@ -33,6 +33,8 @@ struct State {
   GtkWidget *quality = nullptr;
   GtkWidget *dest = nullptr;
   GtkWidget *preserve = nullptr;
+  std::vector<std::string> dest_paths;
+  int dest_index = 0;
   GtkWidget *progress = nullptr;
   GtkWidget *status = nullptr;
   GtkWidget *log = nullptr;
@@ -141,6 +143,46 @@ void AddPath(State *state, const std::string &path, const std::string &import_ro
   state->files.push_back({path, import_root});
 }
 
+std::string SelectedDest(State *state) {
+  if (!state) {
+    return {};
+  }
+  if (state->dest) {
+    state->dest_index = static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(state->dest)));
+  }
+  return TranscodeUi::DestinationPath(state->dest_paths, state->dest_index);
+}
+
+void ApplyPreserveSensitivity(State *state) {
+  if (!state || !state->preserve) {
+    return;
+  }
+  if (state->dest) {
+    state->dest_index = static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(state->dest)));
+  }
+  gtk_widget_set_sensitive(state->preserve, TranscodeUi::PreserveSensitive(state->dest_index) ? TRUE : FALSE);
+}
+
+void RefreshDestinations(State *state) {
+  if (!state || !state->dest) {
+    return;
+  }
+  GtkStringList *list = gtk_string_list_new(nullptr);
+  gtk_string_list_append(list, TranscodeUi::Alongside());
+  for (const std::string &path : state->dest_paths) {
+    gtk_string_list_append(list, path.c_str());
+  }
+  gtk_drop_down_set_model(GTK_DROP_DOWN(state->dest), G_LIST_MODEL(list));
+  const guint n = g_list_model_get_n_items(G_LIST_MODEL(list));
+  guint selected = state->dest_index < 0 ? 0 : static_cast<guint>(state->dest_index);
+  if (selected >= n) {
+    selected = 0;
+  }
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(state->dest), selected);
+  g_object_unref(list);
+  ApplyPreserveSensitivity(state);
+}
+
 void Persist(State *state) {
   if (!state) {
     return;
@@ -151,9 +193,7 @@ void Persist(State *state) {
     settings.SetValue(TranscoderSettings::kLastOutputFormat,
                       TranscodeUi::FormatKey(static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(state->formats)))));
   }
-  if (state->dest) {
-    settings.SetValue(TranscoderSettings::kLastDestDir, gtk_editable_get_text(GTK_EDITABLE(state->dest)));
-  }
+  settings.SetValue(TranscoderSettings::kLastDestDir, SelectedDest(state));
   if (state->preserve) {
     settings.SetBoolValue(TranscoderSettings::kPreserveDirStructure, gtk_check_button_get_active(GTK_CHECK_BUTTON(state->preserve)));
   }
@@ -170,8 +210,8 @@ void StartJobs(State *state) {
   transcoder->Finished.Clear();
   transcoder->LogLine.Clear();
   const auto format = static_cast<Transcoder::Format>(gtk_drop_down_get_selected(GTK_DROP_DOWN(state->formats)));
-  const std::string dest_dir = gtk_editable_get_text(GTK_EDITABLE(state->dest));
-  const bool preserve = gtk_check_button_get_active(GTK_CHECK_BUTTON(state->preserve));
+  const std::string dest_dir = SelectedDest(state);
+  const bool preserve = TranscodeUi::PreserveSensitive(state->dest_index) && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->preserve));
   transcoder->set_quality(static_cast<int>(gtk_spin_button_get_value(GTK_SPIN_BUTTON(state->quality))));
   std::vector<TranscodeUi::QueueItem> source = state->files;
   if (source.empty() && state->app->playlist_manager() && state->app->playlist_manager()->current()) {
@@ -344,10 +384,10 @@ void OpenDestination(State *state) {
     return;
   }
   GtkFileDialog *chooser = gtk_file_dialog_new();
-  gtk_file_dialog_set_title(chooser, Translations::CStr("Destination folder"));
-  const char *current = gtk_editable_get_text(GTK_EDITABLE(state->dest));
-  if (current && *current) {
-    GFile *initial = g_file_new_for_path(current);
+  gtk_file_dialog_set_title(chooser, Translations::CStr(TranscodeUi::AddFolder()));
+  const std::string current = SelectedDest(state);
+  if (!current.empty()) {
+    GFile *initial = g_file_new_for_path(current.c_str());
     gtk_file_dialog_set_initial_folder(chooser, initial);
     g_object_unref(initial);
   }
@@ -364,8 +404,10 @@ void OpenDestination(State *state) {
     }
     gchar *path = g_file_get_path(file);
     g_object_unref(file);
-    if (path && *job->alive && job->state && job->state->dest) {
-      gtk_editable_set_text(GTK_EDITABLE(job->state->dest), path);
+    if (path && *job->alive && job->state) {
+      job->state->dest_paths = TranscodeUi::AddDestinationFolder(job->state->dest_paths, path);
+      job->state->dest_index = TranscodeUi::DestinationIndex(job->state->dest_paths, path);
+      RefreshDestinations(job->state);
       Settings save;
       save.BeginGroup(TranscoderSettings::kSettingsGroup);
       save.SetValue(TranscoderSettings::kLastDestDir, path);
@@ -395,7 +437,7 @@ void RemoveSelected(State *state) {
 
 void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, Translations::CStr("Transcode Music"));
+  adw_dialog_set_title(dialog, Translations::CStr(TranscodeUi::Title()));
   adw_dialog_set_content_width(dialog, 640);
   adw_dialog_set_content_height(dialog, 620);
 
@@ -407,9 +449,7 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
 
   Settings settings;
   settings.BeginGroup(TranscoderSettings::kSettingsGroup);
-  const std::string music_dir = g_get_user_special_dir(G_USER_DIRECTORY_MUSIC) ? g_get_user_special_dir(G_USER_DIRECTORY_MUSIC)
-                                                                              : g_get_home_dir();
-  const std::string dest_dir = settings.Value(TranscoderSettings::kLastDestDir, music_dir);
+  const std::string dest_dir = settings.Value(TranscoderSettings::kLastDestDir);
   const int format_index = TranscodeUi::FormatIndexFromKey(settings.Value(TranscoderSettings::kLastOutputFormat, TranscoderSettings::kDefaultLastOutputFormat));
   const bool preserve = settings.BoolValue(TranscoderSettings::kPreserveDirStructure, false);
 
@@ -419,7 +459,7 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   gtk_widget_set_margin_top(box, 18);
   gtk_widget_set_margin_bottom(box, 18);
 
-  GtkWidget *queue_header = gtk_label_new(Translations::CStr("Files"));
+  GtkWidget *queue_header = gtk_label_new(Translations::CStr(TranscodeUi::FilesGroup()));
   gtk_widget_set_halign(queue_header, GTK_ALIGN_START);
   gtk_widget_add_css_class(queue_header, "heading");
   gtk_box_append(GTK_BOX(box), queue_header);
@@ -433,9 +473,10 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   gtk_box_append(GTK_BOX(box), scroll);
 
   GtkWidget *queue_buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  state->add = gtk_button_new_with_label(Translations::CStr("Add files…"));
-  state->import = gtk_button_new_with_label(Translations::CStr("Import folder…"));
-  state->remove = gtk_button_new_with_label(Translations::CStr("Remove"));
+  state->add = gtk_button_new_with_label(Translations::CStr(TranscodeUi::AddFiles()));
+  state->import = gtk_button_new_with_label(Translations::CStr(TranscodeUi::Import()));
+  state->remove = gtk_button_new_with_label(Translations::CStr(TranscodeUi::Remove()));
+  gtk_widget_set_tooltip_text(state->import, Translations::CStr(TranscodeUi::ImportTooltip()));
   gtk_box_append(GTK_BOX(queue_buttons), state->add);
   gtk_box_append(GTK_BOX(queue_buttons), state->import);
   gtk_box_append(GTK_BOX(queue_buttons), state->remove);
@@ -446,21 +487,34 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   gtk_drop_down_set_selected(GTK_DROP_DOWN(state->formats), static_cast<guint>(format_index));
   state->quality = gtk_spin_button_new_with_range(0, 10, 1);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(state->quality), 5);
-  state->options = gtk_button_new_with_label(Translations::CStr("Format options…"));
-  state->dest = gtk_entry_new();
-  gtk_editable_set_text(GTK_EDITABLE(state->dest), dest_dir.c_str());
-  state->browse = gtk_button_new_with_label(Translations::CStr("Browse…"));
-  state->preserve = gtk_check_button_new_with_label(Translations::CStr("Preserve directory structure"));
+  state->options = gtk_button_new_with_label(Translations::CStr(TranscodeUi::Options()));
+  state->dest = gtk_drop_down_new(nullptr, nullptr);
+  gtk_widget_set_hexpand(state->dest, TRUE);
+  if (!dest_dir.empty()) {
+    state->dest_paths = TranscodeUi::AddDestinationFolder({}, dest_dir);
+  }
+  state->dest_index = TranscodeUi::DestinationIndex(state->dest_paths, dest_dir);
+  RefreshDestinations(state);
+  g_signal_connect(state->dest, "notify::selected", G_CALLBACK(+[](GtkDropDown *, GParamSpec *, gpointer data) {
+                     ApplyPreserveSensitivity(static_cast<State *>(data));
+                   }),
+                   state);
+  state->browse = gtk_button_new_with_label(Translations::CStr(TranscodeUi::Select()));
+  state->preserve = gtk_check_button_new_with_label(Translations::CStr(TranscodeUi::Preserve()));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(state->preserve), preserve ? TRUE : FALSE);
+  ApplyPreserveSensitivity(state);
 
-  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Output format")));
+  GtkWidget *output_header = gtk_label_new(Translations::CStr(TranscodeUi::OutputOptions()));
+  gtk_widget_set_halign(output_header, GTK_ALIGN_START);
+  gtk_widget_add_css_class(output_header, "heading");
+  gtk_box_append(GTK_BOX(box), output_header);
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(TranscodeUi::AudioFormat())));
   gtk_box_append(GTK_BOX(box), state->formats);
   gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Quality")));
   gtk_box_append(GTK_BOX(box), state->quality);
   gtk_box_append(GTK_BOX(box), state->options);
-  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Destination folder")));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(TranscodeUi::Destination())));
   GtkWidget *dest_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  gtk_widget_set_hexpand(state->dest, TRUE);
   gtk_box_append(GTK_BOX(dest_row), state->dest);
   gtk_box_append(GTK_BOX(dest_row), state->browse);
   gtk_box_append(GTK_BOX(box), dest_row);
@@ -470,7 +524,7 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   state->status = gtk_label_new("");
   gtk_widget_set_halign(state->status, GTK_ALIGN_START);
   gtk_widget_set_hexpand(state->status, TRUE);
-  state->details = gtk_button_new_with_label(Translations::CStr("Details…"));
+  state->details = gtk_button_new_with_label(Translations::CStr(TranscodeUi::Details()));
   GtkWidget *status_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_box_append(GTK_BOX(status_row), state->status);
   gtk_box_append(GTK_BOX(status_row), state->details);

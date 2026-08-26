@@ -7,6 +7,65 @@
 
 namespace TranscodeUi {
 
+inline const char *Title() { return "Transcode Music"; }
+inline const char *FilesGroup() { return "Files to transcode"; }
+inline const char *AddFiles() { return "Add..."; }
+inline const char *Import() { return "Import..."; }
+inline const char *ImportTooltip() { return "Add all tracks from a directory and all its subdirectories"; }
+inline const char *Remove() { return "Remove"; }
+inline const char *OutputOptions() { return "Output options"; }
+inline const char *AudioFormat() { return "Audio format"; }
+inline const char *Options() { return "Options..."; }
+inline const char *Destination() { return "Destination"; }
+inline const char *Alongside() { return "Alongside the originals"; }
+inline const char *Select() { return "Select..."; }
+inline const char *AddFolder() { return "Add folder"; }
+inline const char *Preserve() { return "Preserve directory structure in output directory (import only)"; }
+inline const char *Details() { return "Details..."; }
+
+inline constexpr int kMaxDestinationItems = 10;
+
+inline int MaxDestinationFolders() { return kMaxDestinationItems - 1; }
+
+inline bool IsAlongside(int dest_index) { return dest_index <= 0; }
+
+inline bool PreserveSensitive(int dest_index) { return !IsAlongside(dest_index); }
+
+inline std::string DestinationPath(const std::vector<std::string> &folders, int index) {
+  if (index <= 0 || index > static_cast<int>(folders.size())) {
+    return {};
+  }
+  return folders[static_cast<size_t>(index - 1)];
+}
+
+inline int DestinationIndex(const std::vector<std::string> &folders, const std::string &path) {
+  if (path.empty()) {
+    return 0;
+  }
+  for (size_t i = 0; i < folders.size(); ++i) {
+    if (folders[i] == path) {
+      return static_cast<int>(i + 1);
+    }
+  }
+  return 0;
+}
+
+inline std::vector<std::string> AddDestinationFolder(std::vector<std::string> folders, const std::string &path) {
+  if (path.empty()) {
+    return folders;
+  }
+  for (const std::string &existing : folders) {
+    if (existing == path) {
+      return folders;
+    }
+  }
+  if (static_cast<int>(folders.size()) >= MaxDestinationFolders()) {
+    folders.erase(folders.begin());
+  }
+  folders.push_back(path);
+  return folders;
+}
+
 struct QueueItem {
   std::string path;
   std::string import_root;

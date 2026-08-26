@@ -77,6 +77,32 @@ TEST(TranscodeLog, FormatJoinLastAndClear) {
   EXPECT_TRUE(TranscodeLog::LastLine(lines).empty());
 }
 
+TEST(TranscodeUi, DestinationAlongsideMatchesQt) {
+  EXPECT_STREQ("Transcode Music", TranscodeUi::Title());
+  EXPECT_STREQ("Files to transcode", TranscodeUi::FilesGroup());
+  EXPECT_STREQ("Add...", TranscodeUi::AddFiles());
+  EXPECT_STREQ("Import...", TranscodeUi::Import());
+  EXPECT_STREQ("Alongside the originals", TranscodeUi::Alongside());
+  EXPECT_STREQ("Select...", TranscodeUi::Select());
+  EXPECT_STREQ("Preserve directory structure in output directory (import only)", TranscodeUi::Preserve());
+  EXPECT_TRUE(TranscodeUi::IsAlongside(0));
+  EXPECT_FALSE(TranscodeUi::PreserveSensitive(0));
+  EXPECT_TRUE(TranscodeUi::PreserveSensitive(1));
+  EXPECT_TRUE(TranscodeUi::DestinationPath({}, 0).empty());
+  EXPECT_EQ(0, TranscodeUi::DestinationIndex({}, "/music"));
+  std::vector<std::string> folders = TranscodeUi::AddDestinationFolder({}, "/music/out");
+  EXPECT_EQ(1u, folders.size());
+  EXPECT_EQ(1, TranscodeUi::DestinationIndex(folders, "/music/out"));
+  EXPECT_EQ("/music/out", TranscodeUi::DestinationPath(folders, 1));
+  folders = TranscodeUi::AddDestinationFolder(folders, "/music/out");
+  EXPECT_EQ(1u, folders.size());
+  for (int i = 0; i < TranscodeUi::MaxDestinationFolders() + 3; ++i) {
+    folders = TranscodeUi::AddDestinationFolder(folders, "/music/out-" + std::to_string(i));
+  }
+  EXPECT_EQ(TranscodeUi::MaxDestinationFolders(), static_cast<int>(folders.size()));
+  EXPECT_EQ("/music/out-3", folders.front());
+}
+
 TEST(Transcoder, CancelClearsQueuedJobs) {
   Transcoder transcoder;
   Song song;

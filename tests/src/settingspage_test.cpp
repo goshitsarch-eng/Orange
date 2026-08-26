@@ -435,9 +435,12 @@ TEST(LoginStateVisibility, HidesCredentialsWhileSignedIn) {
   EXPECT_TRUE(LoginStateVisibility::ShowCredentials(LoginStateWidget::State::LoginInProgress));
   EXPECT_FALSE(LoginStateVisibility::CredentialsEnabled(LoginStateWidget::State::LoginInProgress));
   EXPECT_TRUE(LoginStateVisibility::CredentialsEnabled(LoginStateWidget::State::LoggedOut));
-  EXPECT_STREQ("Signed in", LoginStateVisibility::StatusText(LoginStateWidget::State::LoggedIn));
-  EXPECT_STREQ("Signing in…", LoginStateVisibility::StatusText(LoginStateWidget::State::LoginInProgress));
-  EXPECT_STREQ("Not signed in", LoginStateVisibility::StatusText(LoginStateWidget::State::LoggedOut));
+  EXPECT_STREQ("You are signed in.", LoginStateVisibility::StatusText(LoginStateWidget::State::LoggedIn));
+  EXPECT_STREQ("Signing in...", LoginStateVisibility::StatusText(LoginStateWidget::State::LoginInProgress));
+  EXPECT_STREQ("You are not signed in.", LoginStateVisibility::StatusText(LoginStateWidget::State::LoggedOut));
+  EXPECT_STREQ("Sign out", LoginStateVisibility::SignOut());
+  EXPECT_EQ("You are signed in.", LoginStateVisibility::SignedInAs({}));
+  EXPECT_EQ("You are signed in as Jonas.", LoginStateVisibility::SignedInAs("Jonas"));
   EXPECT_TRUE(LoginStateVisibility::ShowLogin(LoginStateWidget::State::LoggedOut));
   EXPECT_TRUE(LoginStateVisibility::ShowLogout(LoginStateWidget::State::LoggedIn));
   EXPECT_TRUE(LoginStateVisibility::ShowProgress(LoginStateWidget::State::LoginInProgress));

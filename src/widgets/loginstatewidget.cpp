@@ -28,7 +28,7 @@ LoginStateWidget::LoginStateWidget() {
 
   GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   login_ = gtk_button_new_with_label(Translations::CStr("Log in"));
-  logout_ = gtk_button_new_with_label(Translations::CStr("Log out"));
+  logout_ = gtk_button_new_with_label(Translations::CStr(LoginStateVisibility::SignOut()));
   gtk_box_append(GTK_BOX(buttons), login_);
   gtk_box_append(GTK_BOX(buttons), logout_);
   gtk_box_append(GTK_BOX(root_), buttons);
@@ -100,6 +100,7 @@ void LoginStateWidget::ApplyState() {
   gtk_widget_set_visible(progress_, LoginStateVisibility::ShowProgress(state_) ? TRUE : FALSE);
   switch (state_) {
     case State::LoggedIn:
+      gtk_label_set_text(GTK_LABEL(status_), Translations::CStr(LoginStateVisibility::SignedInAs(account_name_).c_str()));
       gtk_label_set_text(GTK_LABEL(account_), account_name_.c_str());
       gtk_spinner_stop(GTK_SPINNER(progress_));
       break;
