@@ -132,19 +132,19 @@ TEST(RadioBrowserService, ParseCountriesSkipsEmptyAndZero) {
 
 TEST(RadioBrowserSearchOpts, SortStatusAndPagingMatchQt) {
   EXPECT_EQ(4, RadioBrowserSearchOpts::SortCount());
-  EXPECT_EQ("votes", RadioBrowserSearchOpts::DefaultSort());
+  EXPECT_STREQ("votes", RadioBrowserSearchOpts::DefaultSort());
   EXPECT_EQ(0, RadioBrowserSearchOpts::SortIndex("votes"));
   EXPECT_EQ(2, RadioBrowserSearchOpts::SortIndex("name"));
-  EXPECT_EQ("clickcount", RadioBrowserSearchOpts::SortId(1));
+  EXPECT_STREQ("clickcount", RadioBrowserSearchOpts::SortId(1));
   EXPECT_TRUE(RadioBrowserSearchOpts::ReverseOrder("votes"));
   EXPECT_FALSE(RadioBrowserSearchOpts::ReverseOrder("name"));
   EXPECT_TRUE(RadioBrowserSearchOpts::IsAllCountries("all"));
   EXPECT_TRUE(RadioBrowserSearchOpts::IsAllCountries(""));
   EXPECT_FALSE(RadioBrowserSearchOpts::IsAllCountries("NO"));
-  EXPECT_EQ("Search radio stations...", RadioBrowserSearchOpts::SearchPlaceholder());
-  EXPECT_EQ("Load more...", RadioBrowserSearchOpts::LoadMoreLabel());
-  EXPECT_EQ("Radio Browser", RadioBrowserSearchOpts::BrowserTab());
-  EXPECT_EQ("Channels", RadioBrowserSearchOpts::ChannelsTab());
+  EXPECT_STREQ("Search radio stations...", RadioBrowserSearchOpts::SearchPlaceholder());
+  EXPECT_STREQ("Load more...", RadioBrowserSearchOpts::LoadMoreLabel());
+  EXPECT_STREQ("Radio Browser", RadioBrowserSearchOpts::BrowserTab());
+  EXPECT_STREQ("Channels", RadioBrowserSearchOpts::ChannelsTab());
   EXPECT_EQ(300, RadioBrowserSearchOpts::DebounceMs());
   EXPECT_TRUE(RadioBrowserSearchOpts::HasMore(100, 100));
   EXPECT_FALSE(RadioBrowserSearchOpts::HasMore(40, 100));
