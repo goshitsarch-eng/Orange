@@ -2,6 +2,8 @@
 
 #include "utilities/fileutils.h"
 
+#include <glib.h>
+
 #include <algorithm>
 #include <cctype>
 
@@ -214,4 +216,39 @@ std::string Song::FiletypeToString(FileType type) {
 
 const char *Song::TextSearchColumnsSql() {
   return "title LIKE ? OR album LIKE ? OR artist LIKE ? OR albumartist LIKE ? OR composer LIKE ? OR performer LIKE ? OR grouping LIKE ? OR genre LIKE ? OR comment LIKE ?";
+}
+
+std::string Song::AlbumRemoveDiscMisc(const std::string &album) {
+  static const char *kPatterns[] = {
+      "\\s+-*\\s*(Disc|CD)\\s*([0-9]{1,2})$",
+      "\\s+-*\\s*\\(\\s*(Disc|CD)\\s*([0-9]{1,2})\\)$",
+      "\\s+-*\\s*\\[\\s*(Disc|CD)\\s*([0-9]{1,2})\\]$",
+      "\\s+-*\\s*(([0-9]{4})*\\s*Remastered|([0-9]{4})*\\s*Remaster)\\s*(Version)*\\s*$",
+      "\\s+-*\\s*\\(\\s*(([0-9]{4})*\\s*Remastered|([0-9]{4})*\\s*Remaster)\\s*(Version)*\\s*\\)\\s*$",
+      "\\s+-*\\s*\\[\\s*(([0-9]{4})*\\s*Remastered|([0-9]{4})*\\s*Remaster)\\s*(Version)*\\s*\\]\\s*$",
+      "\\s+-*\\s*Explicit\\s*$",
+      "\\s+-*\\s*\\(\\s*Explicit\\s*\\)\\s*$",
+      "\\s+-*\\s*\\[\\s*Explicit\\s*\\]\\s*$",
+  };
+  std::string result = album;
+  for (const char *pattern : kPatterns) {
+    GError *error = nullptr;
+    GRegex *regex = g_regex_new(pattern, static_cast<GRegexCompileFlags>(G_REGEX_CASELESS | G_REGEX_OPTIMIZE), static_cast<GRegexMatchFlags>(0), &error);
+    if (!regex) {
+      if (error) {
+        g_error_free(error);
+      }
+      continue;
+    }
+    gchar *replaced = g_regex_replace(regex, result.c_str(), -1, 0, "", static_cast<GRegexMatchFlags>(0), nullptr);
+    if (replaced) {
+      result = replaced;
+      g_free(replaced);
+    }
+    g_regex_unref(regex);
+  }
+  while (!result.empty() && std::isspace(static_cast<unsigned char>(result.back()))) {
+    result.pop_back();
+  }
+  return result;
 }

@@ -173,6 +173,9 @@ set(STRAWBERRY_SOURCES
   src/filterparser/filterparser.cpp
   src/covermanager/coverproviders.cpp
   src/covermanager/lastfmcoverprovider.cpp
+  src/covermanager/musicbrainzcoverprovider.cpp
+  src/covermanager/deezercoverprovider.cpp
+  src/covermanager/discogscoverprovider.cpp
   src/lyrics/htmllyricsprovider.cpp
   src/lyrics/azlyricscomlyricsprovider.cpp
   src/lyrics/elyricsnetlyricsprovider.cpp
@@ -296,6 +299,7 @@ if(GTest_FOUND)
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
     tests/src/lastfmcover_test.cpp
+    tests/src/coverprovider_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
     tests/src/jsonutils_test.cpp
@@ -323,6 +327,9 @@ if(GTest_FOUND)
     src/radios/radioparadiseservice.cpp
     src/radios/radiobrowserservice.cpp
     src/covermanager/lastfmcoverprovider.cpp
+    src/covermanager/musicbrainzcoverprovider.cpp
+    src/covermanager/deezercoverprovider.cpp
+    src/covermanager/discogscoverprovider.cpp
     src/tagreader/tagreadergme.cpp
     src/playlist/playlist.cpp
     src/collection/collectionbackend.cpp

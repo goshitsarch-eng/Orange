@@ -228,6 +228,7 @@ class Song {
   static bool IsAudioFile(const std::string &filename);
   static std::string SourceToString(Source source);
   static std::string FiletypeToString(FileType type);
+  static std::string AlbumRemoveDiscMisc(const std::string &album);
   static const char *TextSearchColumnsSql();
 
  private:

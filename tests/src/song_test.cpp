@@ -27,6 +27,13 @@ TEST(Song, FiletypeAndAudio) {
   EXPECT_EQ("Collection", Song::SourceToString(Song::Source::Collection));
 }
 
+TEST(Song, AlbumRemoveDiscMisc) {
+  EXPECT_EQ("Dummy", Song::AlbumRemoveDiscMisc("Dummy - Disc 2"));
+  EXPECT_EQ("Dummy", Song::AlbumRemoveDiscMisc("Dummy (CD 1)"));
+  EXPECT_EQ("Dummy", Song::AlbumRemoveDiscMisc("Dummy [Remastered]"));
+  EXPECT_EQ("Dummy", Song::AlbumRemoveDiscMisc("Dummy (Explicit)"));
+}
+
 TEST(Song, EqualityByUrl) {
   Song a;
   a.set_url("file:///tmp/a.flac");

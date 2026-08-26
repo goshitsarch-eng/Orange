@@ -6,7 +6,10 @@
 #include <cstring>
 #include "core/settings.h"
 #include "core/standardpaths.h"
+#include "covermanager/deezercoverprovider.h"
+#include "covermanager/discogscoverprovider.h"
 #include "covermanager/lastfmcoverprovider.h"
+#include "covermanager/musicbrainzcoverprovider.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
@@ -64,20 +67,6 @@ class JsonCoverProvider : public CoverProvider {
   std::string url_template_;
 };
 
-class MusicbrainzCoverProvider : public JsonCoverProvider {
- public:
-  MusicbrainzCoverProvider()
-      : JsonCoverProvider("MusicBrainz",
-                          "https://musicbrainz.org/ws/2/release/?query=release:%22{album}%22%20AND%20artist:%22{artist}%22&fmt=json&limit=8") {}
-};
-class DiscogsCoverProvider : public JsonCoverProvider {
- public:
-  DiscogsCoverProvider() : JsonCoverProvider("Discogs", "https://api.discogs.com/database/search?type=release&artist={artist}&release_title={album}") {}
-};
-class DeezerCoverProvider : public JsonCoverProvider {
- public:
-  DeezerCoverProvider() : JsonCoverProvider("Deezer", "https://api.deezer.com/search/album?q={artist}%20{album}&limit=10") {}
-};
 class MusixmatchCoverProvider : public JsonCoverProvider {
  public:
   MusixmatchCoverProvider() : JsonCoverProvider("Musixmatch", "https://apic-desktop.musixmatch.com/ws/1.1/album.search?q_artist={artist}&q_album={album}") {}
