@@ -191,8 +191,31 @@ set(STRAWBERRY_SOURCES
   src/playlist/playlistfilter.cpp
   src/playlist/playlistsequence.cpp
   src/playlist/playlistundocommandbase.cpp
+  src/playlist/playlistdelegates.cpp
+  src/playlist/playlistheader.cpp
+  src/playlist/playlistview.cpp
+  src/playlist/playlisttabbar.cpp
+  src/playlist/playlistcontainer.cpp
+  src/playlist/playlistlistmodel.cpp
+  src/playlist/playlistlistsortfiltermodel.cpp
+  src/playlist/playlistlistview.cpp
+  src/playlist/playlistlistcontainer.cpp
+  src/playlist/songloaderinserter.cpp
+  src/playlist/dynamicplaylistcontrols.cpp
+  src/playlist/playlistsaveoptionsdialog.cpp
   src/playlist/playlistbackend.cpp
   src/playlist/playlistmanager.cpp
+  src/widgets/ratingpainter.cpp
+  src/widgets/ratingwidget.cpp
+  src/widgets/sliderslider.cpp
+  src/widgets/stickyslider.cpp
+  src/widgets/prettyslider.cpp
+  src/widgets/trackslider.cpp
+  src/widgets/volumeslider.cpp
+  src/widgets/favoritewidget.cpp
+  src/widgets/playingwidget.cpp
+  src/context/contextalbum.cpp
+  src/context/contextview.cpp
   src/queue/queue.cpp
   src/playlistparsers/parserbase.cpp
   src/playlistparsers/m3uparser.cpp
@@ -403,6 +426,7 @@ if(GTest_FOUND)
     tests/src/streamingview_test.cpp
     tests/src/collection_test.cpp
     tests/src/playlistitem_test.cpp
+    tests/src/playlistview_test.cpp
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
     tests/src/streamtagreader_test.cpp
@@ -509,6 +533,12 @@ if(GTest_FOUND)
     src/playlist/playlistfilter.cpp
     src/playlist/playlistsequence.cpp
     src/playlist/playlistundocommandbase.cpp
+    src/playlist/playlistdelegates.cpp
+    src/playlist/playlistlistmodel.cpp
+    src/playlist/playlistlistsortfiltermodel.cpp
+    src/playlist/playlistsaveoptionsdialog.cpp
+    src/playlist/songloaderinserter.cpp
+    src/widgets/ratingpainter.cpp
     src/collection/collectionbackend.cpp
     src/collection/collectiongrouping.cpp
     src/collection/collectionfilteroptions.cpp
@@ -536,6 +566,7 @@ if(GTest_FOUND)
     PkgConfig::GOBJECT
     PkgConfig::GIO
     PkgConfig::GTK4
+    PkgConfig::ADWAITA
     PkgConfig::SQLITE
     PkgConfig::JSONGLIB
     PkgConfig::SOUP

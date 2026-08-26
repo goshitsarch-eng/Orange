@@ -120,7 +120,9 @@ void Player::RestartOrPrevious() {
   }
 }
 
-void Player::SeekTo(int64_t seconds) { engine_->Seek(static_cast<uint64_t>(seconds) * 1000000000ULL); }
+void Player::SeekTo(int64_t seconds) { Seek(seconds * 1000000000LL); }
+
+void Player::Seek(int64_t nanosec) { engine_->Seek(static_cast<uint64_t>(std::max<int64_t>(0, nanosec))); }
 
 void Player::SeekForward() { SeekTo(engine_->position_nanosec() / 1000000000LL + seek_step_sec_); }
 

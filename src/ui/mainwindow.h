@@ -3,10 +3,17 @@
 
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
+#include "context/contextview.h"
 #include "core/application.h"
-#include "playlist/playlistsequence.h"
 #include "core/commandlineoptions.h"
+#include "playlist/playlistdelegates.h"
+#include "playlist/playlistcontainer.h"
+#include "playlist/playlistlistcontainer.h"
+#include "playlist/playlistsequence.h"
 #include "streaming/streamingtabsview.h"
+#include "widgets/playingwidget.h"
+#include "widgets/trackslider.h"
+#include "widgets/volumeslider.h"
 
 #include <adwaita.h>
 #include <gtk/gtk.h>
@@ -25,45 +32,6 @@ class MainWindow {
   void CommandlineReceived(const CommandlineOptions &options);
 
  private:
-  enum class PlaylistColumn {
-    Track,
-    Title,
-    Artist,
-    Album,
-    AlbumArtist,
-    Performer,
-    Composer,
-    Year,
-    OriginalYear,
-    Disc,
-    Length,
-    Genre,
-    Samplerate,
-    Bitdepth,
-    Bitrate,
-    URL,
-    Filename,
-    Filesize,
-    Filetype,
-    DateCreated,
-    DateModified,
-    PlayCount,
-    SkipCount,
-    LastPlayed,
-    Comment,
-    Grouping,
-    Source,
-    Moodbar,
-    Rating,
-    HasCUE,
-    EBUR128I,
-    EBUR128LRA,
-    BPM,
-    Mood,
-    InitialKey,
-    Count
-  };
-
   void BuildUi();
   void BuildSidebar();
   void BuildPlaylist();
@@ -103,20 +71,13 @@ class MainWindow {
   void ShowPlaylistMenu(double x, double y);
   void SelectPlaylistRow(int index, bool add);
   std::vector<int> SelectedPlaylistRows() const;
-  static std::string ColumnTitle(PlaylistColumn column);
-  static std::string ColumnText(const Song &song, PlaylistColumn column);
-  static int ColumnWidth(PlaylistColumn column);
-  bool ColumnVisible(PlaylistColumn column) const;
   void SortPlaylistBy(PlaylistColumn column);
-  void SetImageFromBytes(GtkWidget *image, const std::vector<unsigned char> &data, int pixel_size);
 
   static void OnPlayPause(GtkButton *button, gpointer data);
   static void OnStop(GtkButton *button, gpointer data);
   static void OnNext(GtkButton *button, gpointer data);
   static void OnPrevious(GtkButton *button, gpointer data);
   static void OnLove(GtkButton *button, gpointer data);
-  static void OnVolume(GtkRange *range, gpointer data);
-  static void OnSeek(GtkRange *range, gpointer data);
   static void DrawAnalyzer(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data);
   static void DrawMoodbar(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data);
   static void DrawWaveform(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data);
@@ -127,9 +88,12 @@ class MainWindow {
   AdwToastOverlay *toast_overlay_ = nullptr;
   AdwViewStack *sidebar_stack_ = nullptr;
   std::unique_ptr<CollectionViewContainer> collection_container_;
-  GtkWidget *playlist_grid_ = nullptr;
-  GtkWidget *playlist_scroll_ = nullptr;
-  GtkWidget *playlists_list_ = nullptr;
+  std::unique_ptr<PlaylistContainer> playlist_container_;
+  std::unique_ptr<PlaylistListContainer> playlist_list_container_;
+  std::unique_ptr<ContextView> context_view_;
+  std::unique_ptr<PlayingWidget> playing_widget_;
+  std::unique_ptr<TrackSlider> track_slider_;
+  std::unique_ptr<VolumeSlider> volume_slider_;
   GtkWidget *queue_list_ = nullptr;
   GtkWidget *radio_list_ = nullptr;
   GtkWidget *files_list_ = nullptr;
@@ -139,28 +103,13 @@ class MainWindow {
   GtkWidget *streaming_stack_ = nullptr;
   GtkWidget *streaming_service_drop_ = nullptr;
   std::vector<std::unique_ptr<StreamingTabsView>> streaming_views_;
-  GtkWidget *lyrics_view_ = nullptr;
-  GtkWidget *context_title_ = nullptr;
-  GtkWidget *context_artist_ = nullptr;
-  GtkWidget *context_album_ = nullptr;
-  GtkWidget *context_cover_ = nullptr;
-  GtkWidget *context_meta_ = nullptr;
-  GtkWidget *title_label_ = nullptr;
-  GtkWidget *artist_label_ = nullptr;
-  GtkWidget *cover_image_ = nullptr;
   GtkWidget *play_button_ = nullptr;
-  GtkWidget *position_label_ = nullptr;
-  GtkWidget *duration_label_ = nullptr;
-  GtkWidget *seek_scale_ = nullptr;
-  GtkWidget *volume_scale_ = nullptr;
   GtkWidget *status_label_ = nullptr;
   GtkWidget *analyzer_drawing_ = nullptr;
   GtkWidget *moodbar_drawing_ = nullptr;
   GtkWidget *waveform_drawing_ = nullptr;
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;
-  GtkWidget *playlist_summary_ = nullptr;
-  GtkWidget *playlist_tabs_ = nullptr;
   std::string files_path_;
   std::string device_browse_id_;
   std::string streaming_service_name_;

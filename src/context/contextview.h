@@ -1,0 +1,61 @@
+#ifndef STRAWBERRY_CONTEXTVIEW_H
+#define STRAWBERRY_CONTEXTVIEW_H
+
+#include "context/contextalbum.h"
+#include "core/song.h"
+
+#include <gtk/gtk.h>
+
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+class LyricsProviders;
+
+class ContextView {
+ public:
+  using SaveLyricsCallback = std::function<void(const std::string &)>;
+
+  explicit ContextView(LyricsProviders *lyrics_providers = nullptr);
+
+  GtkWidget *widget() const { return widget_; }
+  ContextAlbum *album_widget() { return album_.get(); }
+  bool album_enabled() const { return show_album_; }
+  const Song &song_playing() const { return song_playing_; }
+
+  void Playing();
+  void Stopped();
+  void Error();
+  void SongChanged(const Song &song);
+  void AlbumCoverLoaded(const std::vector<unsigned char> &data);
+  void SetLyrics(const std::string &lyrics);
+  void SearchLyrics();
+  void SetSaveLyricsCallback(SaveLyricsCallback callback);
+  void ReloadSettings();
+
+ private:
+  void NoSong();
+  void SetSong();
+  void ApplyVisibility();
+
+  LyricsProviders *lyrics_providers_ = nullptr;
+  std::unique_ptr<ContextAlbum> album_;
+  GtkWidget *widget_ = nullptr;
+  GtkWidget *title_ = nullptr;
+  GtkWidget *artist_ = nullptr;
+  GtkWidget *album_label_ = nullptr;
+  GtkWidget *meta_ = nullptr;
+  GtkWidget *data_box_ = nullptr;
+  GtkWidget *lyrics_view_ = nullptr;
+  GtkWidget *show_album_btn_ = nullptr;
+  GtkWidget *show_data_btn_ = nullptr;
+  GtkWidget *show_lyrics_btn_ = nullptr;
+  Song song_playing_;
+  bool show_album_ = true;
+  bool show_data_ = true;
+  bool show_lyrics_ = true;
+  SaveLyricsCallback save_lyrics_;
+};
+
+#endif

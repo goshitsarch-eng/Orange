@@ -34,6 +34,7 @@ class Player {
   void Previous();
   void RestartOrPrevious();
   void SeekTo(int64_t seconds);
+  void Seek(int64_t nanosec);
   void SeekForward();
   void SeekBackward();
   void SetVolume(unsigned volume);
