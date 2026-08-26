@@ -88,8 +88,9 @@ inline std::string StatusText(const ConnectedDevice &device, int song_count = -1
 }
 
 inline std::string RowStatusText(const ConnectedDevice &device, int song_count = -1, int updating_percent = -1, bool remembered_only = false) {
-  if (updating_percent >= 0) {
-    return UpdatingText(updating_percent);
+  const int percent = updating_percent >= 0 ? updating_percent : device.updating_percent;
+  if (percent >= 0) {
+    return UpdatingText(percent);
   }
   return StatusText(device, song_count >= 0 ? song_count : device.song_count, remembered_only || device.remembered);
 }
