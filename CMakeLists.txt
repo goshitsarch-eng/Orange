@@ -171,6 +171,15 @@ set(STRAWBERRY_SOURCES
   src/smartplaylists/smartplaylist.cpp
   src/filterparser/filterparser.cpp
   src/covermanager/coverproviders.cpp
+  src/lyrics/htmllyricsprovider.cpp
+  src/lyrics/azlyricscomlyricsprovider.cpp
+  src/lyrics/elyricsnetlyricsprovider.cpp
+  src/lyrics/letraslyricsprovider.cpp
+  src/lyrics/songlyricscomlyricsprovider.cpp
+  src/lyrics/ovhlyricsprovider.cpp
+  src/lyrics/lrcliblyricsprovider.cpp
+  src/lyrics/musixmatchlyricsprovider.cpp
+  src/lyrics/geniuslyricsprovider.cpp
   src/lyrics/lyricsproviders.cpp
   src/scrobbler/audioscrobbler.cpp
   src/streaming/streamingservices.cpp
@@ -270,6 +279,7 @@ if(GTest_FOUND)
     tests/src/m3uparser_test.cpp
     tests/src/smartplaylist_test.cpp
     tests/src/filterparser_test.cpp
+    tests/src/lyrics_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
     tests/src/jsonutils_test.cpp
@@ -289,6 +299,7 @@ if(GTest_FOUND)
     src/playlistparsers/playlistparser.cpp
     src/smartplaylists/smartplaylist.cpp
     src/filterparser/filterparser.cpp
+    src/lyrics/htmllyricsprovider.cpp
     src/playlist/playlist.cpp
     src/collection/collectionbackend.cpp
     src/collection/collectiongrouping.cpp
@@ -312,6 +323,8 @@ if(GTest_FOUND)
     PkgConfig::GSTREAMER
     PkgConfig::GSTREAMER_APP
     ${TAGLIB_LIBRARIES}
+    ICU::uc
+    ICU::i18n
   )
   if(HAVE_MTP)
     target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBMTP)

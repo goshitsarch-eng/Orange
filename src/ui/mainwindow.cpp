@@ -6,6 +6,7 @@
 #include "smartplaylists/smartplaylist.h"
 #include "ui/dialogs.h"
 #include "ui/settingsdialog.h"
+#include "filterparser/filterparser.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
 #include "utilities/timeutils.h"
@@ -1058,7 +1059,7 @@ void MainWindow::RefreshPlaylist() {
   int visible = 0;
   for (int index = 0; index < playlist->row_count(); ++index) {
     const Song &song = playlist->songs()[static_cast<size_t>(index)];
-    if (!playlist_filter_.empty() && !StrUtils::ContainsInsensitive(song.PrettyTitleWithArtist() + " " + song.album(), playlist_filter_)) {
+    if (!playlist_filter_.empty() && !FilterParser(playlist_filter_).Matches(song)) {
       continue;
     }
     GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);

@@ -33,3 +33,42 @@ TEST(FilterParser, AgeAndLastPlayed) {
   EXPECT_TRUE(FilterParser("lastplayed:1").Matches(recent));
   EXPECT_FALSE(FilterParser("lastplayed:1").Matches(old));
 }
+
+TEST(FilterParser, NumericOperators) {
+  Song song;
+  song.set_title("Track");
+  song.set_year(2011);
+  song.set_rating(0.8f);
+  song.set_playcount(12);
+  song.set_bitrate(320);
+  EXPECT_TRUE(FilterParser("year:>=2010").Matches(song));
+  EXPECT_TRUE(FilterParser("year>=2010").Matches(song));
+  EXPECT_FALSE(FilterParser("year:<2010").Matches(song));
+  EXPECT_TRUE(FilterParser("rating:>=0.5").Matches(song));
+  EXPECT_TRUE(FilterParser("playcount:>10").Matches(song));
+  EXPECT_TRUE(FilterParser("bitrate:=320").Matches(song));
+}
+
+TEST(FilterParser, QuotesAndOrNot) {
+  Song foxes;
+  foxes.set_title("Helplessness Blues");
+  foxes.set_artist("Fleet Foxes");
+  foxes.set_genre("Folk");
+  Song radio;
+  radio.set_title("Weird Fishes");
+  radio.set_artist("Radiohead");
+  radio.set_genre("Rock");
+  EXPECT_TRUE(FilterParser("title:\"Helplessness Blues\"").Matches(foxes));
+  EXPECT_TRUE(FilterParser("artist:Fleet OR artist:Radiohead").Matches(foxes));
+  EXPECT_TRUE(FilterParser("artist:Fleet OR artist:Radiohead").Matches(radio));
+  EXPECT_TRUE(FilterParser("genre:Folk AND -artist:Radiohead").Matches(foxes));
+  EXPECT_FALSE(FilterParser("genre:Folk AND -artist:Fleet").Matches(foxes));
+}
+
+TEST(FilterParser, ToSqlContainsColumnsAndOperators) {
+  const std::string sql = FilterParser("genre:Folk year:>=2010 -title:Demo").ToSql();
+  EXPECT_NE(std::string::npos, sql.find("genre"));
+  EXPECT_NE(std::string::npos, sql.find("year"));
+  EXPECT_NE(std::string::npos, sql.find(">="));
+  EXPECT_NE(std::string::npos, sql.find("NOT"));
+}

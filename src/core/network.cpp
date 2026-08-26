@@ -7,6 +7,7 @@
 
 NetworkAccessManager::NetworkAccessManager() {
   session_ = soup_session_new();
+  g_object_set(session_, "user-agent", "Strawberry/1.2.0 (+https://www.strawberrymusicplayer.org)", nullptr);
   Settings settings;
   settings.BeginGroup("NetworkProxy");
   const std::string type = settings.Value("type");
@@ -37,12 +38,21 @@ void NetworkAccessManager::SetProxy(const std::string &proxy_uri) {
 }
 
 void NetworkAccessManager::Send(SoupMessage *message, Callback callback) {
+  struct PendingRequest {
+    Callback callback;
+    SoupMessage *message = nullptr;
+  };
+  auto *pending = new PendingRequest{std::move(callback), message};
+  g_object_ref(message);
   soup_session_send_and_read_async(session_, message, G_PRIORITY_DEFAULT, nullptr,
                                    +[](GObject *source, GAsyncResult *result, gpointer user_data) {
-                                     auto *cb = static_cast<Callback *>(user_data);
+                                     auto *pending = static_cast<PendingRequest *>(user_data);
                                      GError *error = nullptr;
                                      GBytes *bytes = soup_session_send_and_read_finish(SOUP_SESSION(source), result, &error);
                                      Response response;
+                                     if (pending->message) {
+                                       response.status = soup_message_get_status(pending->message);
+                                     }
                                      if (error) {
                                        response.error = error->message;
                                        g_error_free(error);
@@ -53,10 +63,13 @@ void NetworkAccessManager::Send(SoupMessage *message, Callback callback) {
                                        response.body.assign(data, size);
                                        g_bytes_unref(bytes);
                                      }
-                                     (*cb)(response);
-                                     delete cb;
+                                     pending->callback(response);
+                                     if (pending->message) {
+                                       g_object_unref(pending->message);
+                                     }
+                                     delete pending;
                                    },
-                                   new Callback(std::move(callback)));
+                                   pending);
 }
 
 void NetworkAccessManager::Get(const std::string &url, Callback callback, const std::map<std::string, std::string> &headers) {

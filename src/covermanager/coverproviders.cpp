@@ -65,11 +65,15 @@ class JsonCoverProvider : public CoverProvider {
 
 class LastFmCoverProvider : public JsonCoverProvider {
  public:
-  LastFmCoverProvider() : JsonCoverProvider("Last.fm", "https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=de1c2d1adc2a2a95f6f8c8b1c2a6a0d0&artist={artist}&album={album}&format=json") {}
+  LastFmCoverProvider()
+      : JsonCoverProvider("Last.fm",
+                          "https://ws.audioscrobbler.com/2.0/?method=album.getinfo&api_key=211990b4c96782c05d1536e7219eb56e&artist={artist}&album={album}&format=json") {}
 };
 class MusicbrainzCoverProvider : public JsonCoverProvider {
  public:
-  MusicbrainzCoverProvider() : JsonCoverProvider("MusicBrainz", "https://musicbrainz.org/ws/2/release/?query=release:{album}%20AND%20artist:{artist}&fmt=json") {}
+  MusicbrainzCoverProvider()
+      : JsonCoverProvider("MusicBrainz",
+                          "https://musicbrainz.org/ws/2/release/?query=release:%22{album}%22%20AND%20artist:%22{artist}%22&fmt=json&limit=8") {}
 };
 class DiscogsCoverProvider : public JsonCoverProvider {
  public:
@@ -77,7 +81,7 @@ class DiscogsCoverProvider : public JsonCoverProvider {
 };
 class DeezerCoverProvider : public JsonCoverProvider {
  public:
-  DeezerCoverProvider() : JsonCoverProvider("Deezer", "https://api.deezer.com/search/album?q=artist:\"{artist}\"%20album:\"{album}\"") {}
+  DeezerCoverProvider() : JsonCoverProvider("Deezer", "https://api.deezer.com/search/album?q={artist}%20{album}&limit=10") {}
 };
 class MusixmatchCoverProvider : public JsonCoverProvider {
  public:

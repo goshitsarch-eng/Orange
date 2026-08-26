@@ -1,5 +1,10 @@
 #include "utilities/strutils.h"
 
+#include <unicode/translit.h>
+#include <unicode/unistr.h>
+
+#include <glib.h>
+
 #include <algorithm>
 #include <cctype>
 
@@ -87,6 +92,31 @@ std::string SqlLikeEscape(const std::string &value) {
     }
     result.push_back(c);
   }
+  return result;
+}
+
+std::string SqlQuote(const std::string &value) {
+  return "'" + Replace(value, "'", "''") + "'";
+}
+
+std::string UriEscape(const std::string &value) {
+  gchar *escaped = g_uri_escape_string(value.c_str(), nullptr, TRUE);
+  std::string result = escaped ? escaped : value;
+  g_free(escaped);
+  return result;
+}
+
+std::string Transliterate(const std::string &value) {
+  UErrorCode status = U_ZERO_ERROR;
+  icu::Transliterator *transliterator = icu::Transliterator::createInstance("Any-Latin; Latin-ASCII", UTRANS_FORWARD, status);
+  if (U_FAILURE(status) || !transliterator) {
+    return value;
+  }
+  icu::UnicodeString unicode = icu::UnicodeString::fromUTF8(value);
+  transliterator->transliterate(unicode);
+  delete transliterator;
+  std::string result;
+  unicode.toUTF8String(result);
   return result;
 }
 
