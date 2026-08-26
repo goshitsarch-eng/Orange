@@ -527,6 +527,12 @@ TEST(CollectionSettingsLabels, MatchQtCollectionCopy) {
   EXPECT_STREQ("Display options", CollectionSettingsLabels::DisplayOptions());
   EXPECT_STREQ("Show album cover art in collection", CollectionSettingsLabels::PrettyCovers());
   EXPECT_STREQ("Album cover pixmap cache", CollectionSettingsLabels::CacheGroup());
+  EXPECT_STREQ("Add new folder...", CollectionSettingsLabels::AddFolder());
+  EXPECT_STREQ("Remove folder", CollectionSettingsLabels::RemoveFolder());
+  EXPECT_STREQ("Enable delete files in the right click context menu", CollectionSettingsLabels::DeleteFiles());
+  EXPECT_STREQ("Size", CollectionSettingsLabels::CacheSize());
+  EXPECT_STREQ("Enable Disk Cache", CollectionSettingsLabels::EnableDiskCache());
+  EXPECT_STREQ("Disk Cache Size", CollectionSettingsLabels::DiskCacheSize());
 }
 
 TEST(ScrobblerSettingsLabels, MatchQtSubmitDelayCopy) {

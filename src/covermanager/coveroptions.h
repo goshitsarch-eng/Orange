@@ -77,7 +77,7 @@ struct CoverOptions {
     CoverOptions options;
     Settings settings;
     settings.BeginGroup(CoversSettings::kSettingsGroup);
-    options.cover_type = TypeFromValue(settings.Value(CoversSettings::kSaveType, "2"));
+    options.cover_type = TypeFromValue(settings.Value(CoversSettings::kSaveType, "1"));
     options.cover_filename = FilenameModeFromValue(settings.Value(CoversSettings::kSaveFilename, "2"));
     options.cover_pattern = settings.Value(CoversSettings::kSavePattern, CoversSettings::kDefaultSavePattern);
     options.cover_overwrite = settings.BoolValue(CoversSettings::kSaveOverwrite, CoversSettings::kDefaultSaveOverwrite);

@@ -5,7 +5,8 @@
 #include "covermanager/coverarttypes.h"
 #include "covermanager/coverproviderauth.h"
 #include "covermanager/coverproviders.h"
-#include "lyrics/lyricsproviderorder.h"
+#include "covermanager/coverprovidersettings.h"
+#include "settings/coverssettingslabels.h"
 #include "settings/settingspage.h"
 #include "streaming/streamingservices.h"
 #include "translations/translations.h"
@@ -46,9 +47,28 @@ void RefreshProviderList(ProviderListState *state) {
     CoverProvider *provider = providers[i];
     AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), provider->name().c_str());
-    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), provider->enabled() ? Translations::CStr("Enabled") : Translations::CStr("Disabled"));
+    GtkWidget *enabled = gtk_switch_new();
+    gtk_switch_set_active(GTK_SWITCH(enabled), provider->enabled() ? TRUE : FALSE);
+    gtk_widget_set_valign(enabled, GTK_ALIGN_CENTER);
+    g_object_set_data(G_OBJECT(enabled), "provider-state", state);
+    g_object_set_data(G_OBJECT(enabled), "provider-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+    g_signal_connect(enabled, "notify::active", G_CALLBACK(+[](GtkSwitch *toggle, GParamSpec *, gpointer) {
+                       auto *self = static_cast<ProviderListState *>(g_object_get_data(G_OBJECT(toggle), "provider-state"));
+                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(toggle), "provider-index")) - 1;
+                       if (!self || !self->app) {
+                         return;
+                       }
+                       const std::vector<CoverProvider *> providers = self->app->cover_providers()->All();
+                       if (index < 0 || static_cast<size_t>(index) >= providers.size()) {
+                         return;
+                       }
+                       self->app->cover_providers()->SetEnabled(providers[static_cast<size_t>(index)], gtk_switch_get_active(toggle));
+                     }),
+                     nullptr);
     GtkWidget *up = gtk_button_new_from_icon_name("go-up-symbolic");
     GtkWidget *down = gtk_button_new_from_icon_name("go-down-symbolic");
+    gtk_widget_set_tooltip_text(up, Translations::CStr(CoverProviderSettings::MoveUp()));
+    gtk_widget_set_tooltip_text(down, Translations::CStr(CoverProviderSettings::MoveDown()));
     gtk_widget_set_sensitive(up, i > 0);
     gtk_widget_set_sensitive(down, i + 1 < providers.size());
     g_object_set_data(G_OBJECT(up), "provider-state", state);
@@ -60,15 +80,6 @@ void RefreshProviderList(ProviderListState *state) {
                        const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "provider-index")) - 1;
                        if (self && self->app) {
                          self->app->cover_providers()->Move(index, -1);
-                         if (self->settings) {
-                           std::vector<std::string> names;
-                           for (CoverProvider *item : self->app->cover_providers()->All()) {
-                             names.push_back(item->name());
-                           }
-                           self->settings->BeginGroup(CoversSettings::kSettingsGroup);
-                           self->settings->SetValue(CoversSettings::kProviders, LyricsProviderOrder::Join(names));
-                           self->settings->Sync();
-                         }
                          RefreshProviderList(self);
                        }
                      })),
@@ -78,19 +89,11 @@ void RefreshProviderList(ProviderListState *state) {
                        const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "provider-index")) - 1;
                        if (self && self->app) {
                          self->app->cover_providers()->Move(index, 1);
-                         if (self->settings) {
-                           std::vector<std::string> names;
-                           for (CoverProvider *item : self->app->cover_providers()->All()) {
-                             names.push_back(item->name());
-                           }
-                           self->settings->BeginGroup(CoversSettings::kSettingsGroup);
-                           self->settings->SetValue(CoversSettings::kProviders, LyricsProviderOrder::Join(names));
-                           self->settings->Sync();
-                         }
                          RefreshProviderList(self);
                        }
                      })),
                      nullptr);
+    adw_action_row_add_suffix(row, enabled);
     adw_action_row_add_suffix(row, up);
     adw_action_row_add_suffix(row, down);
     gtk_list_box_append(GTK_LIST_BOX(state->list), GTK_WIDGET(row));
@@ -195,35 +198,21 @@ void ApplySaveFilenameSensitivity(SaveFilenameState *state) {
 AdwPreferencesPage *CoversSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(CoversSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Covers", "image-x-generic-symbolic");
-  AdwPreferencesGroup *save = SettingsPage::AddGroup(page, "Saving");
-  auto *filename_state = new SaveFilenameState();
-  filename_state->save_type = settings->Value(CoversSettings::kSaveType, "2");
-  filename_state->filename_mode = settings->Value(CoversSettings::kSaveFilename, "2");
-  g_object_set_data_full(G_OBJECT(page), "cover-filename-state", filename_state, [](gpointer p) { delete static_cast<SaveFilenameState *>(p); });
+  AdwPreferencesGroup *providers = SettingsPage::AddGroup(page, CoversSettingsLabels::ProvidersGroup());
+  SettingsPage::AddDescription(providers, CoversSettingsLabels::ProvidersHint());
+  if (app) {
+    GtkWidget *list = gtk_list_box_new();
+    gtk_widget_add_css_class(list, "boxed-list");
+    auto *state = new ProviderListState();
+    state->app = app;
+    state->settings = settings;
+    state->list = list;
+    g_object_set_data_full(G_OBJECT(page), "cover-provider-state", state, [](gpointer p) { delete static_cast<ProviderListState *>(p); });
+    adw_preferences_group_add(providers, list);
+    RefreshProviderList(state);
+  }
 
-  SettingsPage::AddCombo(save, settings, CoversSettings::kSaveType, "Save destination",
-                         {{"1", "Cache"}, {"2", "Album directory"}, {"3", "Embedded"}}, "2", [filename_state](const std::string &id) {
-                           filename_state->save_type = id;
-                           ApplySaveFilenameSensitivity(filename_state);
-                         });
-  filename_state->filename = SettingsPage::AddCombo(save, settings, CoversSettings::kSaveFilename, "Filename",
-                                                   {{"1", "Hash"}, {"2", "Pattern"}}, "2", [filename_state](const std::string &id) {
-                                                     filename_state->filename_mode = id;
-                                                     ApplySaveFilenameSensitivity(filename_state);
-                                                   });
-  filename_state->pattern = SettingsPage::AddEntry(save, settings, CoversSettings::kSavePattern, "Cover filename pattern",
-                                                  CoversSettings::kDefaultSavePattern);
-  filename_state->overwrite =
-      SettingsPage::AddToggle(save, settings, CoversSettings::kSaveOverwrite, "Overwrite existing covers", nullptr, CoversSettings::kDefaultSaveOverwrite);
-  filename_state->lowercase =
-      SettingsPage::AddToggle(save, settings, CoversSettings::kSaveLowercase, "Lowercase filenames", nullptr, CoversSettings::kDefaultSaveLowercase);
-  filename_state->replace_spaces = SettingsPage::AddToggle(save, settings, CoversSettings::kSaveReplaceSpaces, "Replace spaces in filenames", nullptr,
-                                                          CoversSettings::kDefaultSaveReplaceSpaces);
-  ApplySaveFilenameSensitivity(filename_state);
-  SettingsPage::AddToggle(save, settings, CoversSettings::kAutomaticSearch, "Search for missing covers automatically", nullptr,
-                          CoversSettings::kDefaultAutomaticSearch);
-
-  AdwPreferencesGroup *types = SettingsPage::AddGroup(page, "Cover types");
+  AdwPreferencesGroup *types = SettingsPage::AddGroup(page, CoversSettingsLabels::TypesGroup());
   GtkWidget *types_hint = gtk_label_new(Translations::CStr("Checked types are tried in this order when loading album art."));
   gtk_label_set_wrap(GTK_LABEL(types_hint), TRUE);
   gtk_label_set_xalign(GTK_LABEL(types_hint), 0);
@@ -239,36 +228,36 @@ AdwPreferencesPage *CoversSettingsPage::Create(Settings *settings, Application *
   adw_preferences_group_add(types, types_list);
   RefreshTypeList(type_state);
 
-  AdwPreferencesGroup *enabled = SettingsPage::AddGroup(page, "Enabled providers");
-  if (app) {
-    for (CoverProvider *provider : app->cover_providers()->All()) {
-      SettingsPage::AddToggle(enabled, settings, provider->name().c_str(), provider->name().c_str(), nullptr, provider->enabled());
-    }
-  }
-  AdwPreferencesGroup *order = SettingsPage::AddGroup(page, "Fetch order");
-  GtkWidget *hint = gtk_label_new(Translations::CStr("The first enabled provider is tried first."));
-  gtk_label_set_wrap(GTK_LABEL(hint), TRUE);
-  gtk_label_set_xalign(GTK_LABEL(hint), 0);
-  gtk_widget_add_css_class(hint, "dim-label");
-  adw_preferences_group_add(order, hint);
-  if (app) {
-    GtkWidget *list = gtk_list_box_new();
-    gtk_widget_add_css_class(list, "boxed-list");
-    auto *state = new ProviderListState();
-    state->app = app;
-    state->settings = settings;
-    state->list = list;
-    g_object_set_data_full(G_OBJECT(page), "cover-provider-state", state, [](gpointer p) { delete static_cast<ProviderListState *>(p); });
-    adw_preferences_group_add(order, list);
-    RefreshProviderList(state);
-  }
+  AdwPreferencesGroup *save = SettingsPage::AddGroup(page, CoversSettingsLabels::SavingGroup());
+  auto *filename_state = new SaveFilenameState();
+  filename_state->save_type = settings->Value(CoversSettings::kSaveType, CoversSettingsLabels::DefaultSaveType());
+  filename_state->filename_mode = settings->Value(CoversSettings::kSaveFilename, CoversSettingsLabels::DefaultFilename());
+  g_object_set_data_full(G_OBJECT(page), "cover-filename-state", filename_state, [](gpointer p) { delete static_cast<SaveFilenameState *>(p); });
+  SettingsPage::AddChoiceRadios(save, settings, CoversSettings::kSaveType, nullptr, CoversSettingsLabels::SaveTypeChoices(),
+                               CoversSettingsLabels::DefaultSaveType(), [filename_state](const std::string &id) {
+                                 filename_state->save_type = id;
+                                 ApplySaveFilenameSensitivity(filename_state);
+                               });
+  filename_state->filename = SettingsPage::AddCombo(save, settings, CoversSettings::kSaveFilename, CoversSettingsLabels::FilenameGroup(),
+                                                   CoversSettingsLabels::FilenameChoices(), CoversSettingsLabels::DefaultFilename(),
+                                                   [filename_state](const std::string &id) {
+                                                     filename_state->filename_mode = id;
+                                                     ApplySaveFilenameSensitivity(filename_state);
+                                                   });
+  filename_state->pattern = SettingsPage::AddEntry(save, settings, CoversSettings::kSavePattern, CoversSettingsLabels::FilenamePattern(),
+                                                  CoversSettings::kDefaultSavePattern);
+  filename_state->overwrite = SettingsPage::AddToggle(save, settings, CoversSettings::kSaveOverwrite, CoversSettingsLabels::Overwrite(), nullptr,
+                                                     CoversSettings::kDefaultSaveOverwrite);
+  filename_state->lowercase = SettingsPage::AddToggle(save, settings, CoversSettings::kSaveLowercase, CoversSettingsLabels::Lowercase(), nullptr,
+                                                     CoversSettings::kDefaultSaveLowercase);
+  filename_state->replace_spaces = SettingsPage::AddToggle(save, settings, CoversSettings::kSaveReplaceSpaces, CoversSettingsLabels::ReplaceSpaces(),
+                                                          nullptr, CoversSettings::kDefaultSaveReplaceSpaces);
+  ApplySaveFilenameSensitivity(filename_state);
+  SettingsPage::AddToggle(save, settings, CoversSettings::kAutomaticSearch, CoversSettingsLabels::AutomaticSearch(), nullptr,
+                          CoversSettings::kDefaultAutomaticSearch);
 
-  AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, "Authentication");
-  GtkWidget *auth_hint = gtk_label_new(Translations::CStr("Streaming cover providers authenticate from their service settings pages."));
-  gtk_label_set_wrap(GTK_LABEL(auth_hint), TRUE);
-  gtk_label_set_xalign(GTK_LABEL(auth_hint), 0);
-  gtk_widget_add_css_class(auth_hint, "dim-label");
-  adw_preferences_group_add(auth, auth_hint);
+  AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, CoversSettingsLabels::Authentication());
+  SettingsPage::AddDescription(auth, CoversSettingsLabels::AuthHint());
   for (const char *name : CoverProviderAuth::ServiceSettingsProviders()) {
     bool authenticated = false;
     if (app && app->streaming_services()) {

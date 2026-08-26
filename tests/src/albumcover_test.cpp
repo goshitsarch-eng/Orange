@@ -15,7 +15,9 @@
 #include "covermanager/coverexportrunnable.h"
 #include "covermanager/coversearchstatistics.h"
 #include "covermanager/coversearchstatisticsdialog.h"
+#include "covermanager/coverprovidersettings.h"
 #include "covermanager/currentalbumcoverloader.h"
+#include "settings/coverssettingslabels.h"
 #include "utilities/fileutils.h"
 
 #include <glib/gstdio.h>
@@ -495,9 +497,50 @@ TEST(CoverManagerView, LabelsAndHideIndexMatchQt) {
 TEST(CoverManagerStats, TotalAndWithoutCoverMatchQt) {
   EXPECT_STREQ("Total albums:", CoverManagerStats::TotalLabel());
   EXPECT_STREQ("Without cover:", CoverManagerStats::WithoutLabel());
+  EXPECT_STREQ("Fetch Missing Covers", CoverManagerStats::FetchMissing());
+  EXPECT_STREQ("Export Covers", CoverManagerStats::Export());
   EXPECT_EQ(1, CoverManagerStats::WithoutCover(3, 2));
   EXPECT_EQ(0, CoverManagerStats::WithoutCover(2, 5));
   EXPECT_EQ(0, CoverManagerStats::WithoutCover(-1, 0));
   EXPECT_EQ("12", CoverManagerStats::CountText(12));
   EXPECT_EQ("0", CoverManagerStats::CountText(-4));
+}
+
+TEST(CoverProviderSettings, EnabledListMatchesQtSave) {
+  EXPECT_STREQ("Cover providers", CoverProviderSettings::ProvidersGroup());
+  EXPECT_STREQ("Choose the providers you want to use when searching for covers.", CoverProviderSettings::ProvidersHint());
+  EXPECT_STREQ("Move up", CoverProviderSettings::MoveUp());
+  EXPECT_STREQ("Move down", CoverProviderSettings::MoveDown());
+  EXPECT_FALSE(CoverProviderSettings::EnabledFromStored(true, false, true, true));
+  EXPECT_TRUE(CoverProviderSettings::EnabledFromStored(false, true, true, true));
+  EXPECT_FALSE(CoverProviderSettings::EnabledFromStored(false, true, true, false));
+  EXPECT_FALSE(CoverProviderSettings::EnabledFromStored(false, true, false, false, false));
+  const std::vector<std::string> enabled =
+      CoverProviderSettings::EnabledNames({{"Last.fm", true}, {"Discogs", false}, {"MusicBrainz", true}});
+  ASSERT_EQ(2u, enabled.size());
+  EXPECT_EQ("Last.fm", enabled.front());
+  EXPECT_EQ("MusicBrainz", enabled.back());
+}
+
+TEST(CoversSettingsLabels, MatchQtCoverPage) {
+  EXPECT_STREQ("Cover providers", CoversSettingsLabels::ProvidersGroup());
+  EXPECT_STREQ("Choose the providers you want to use when searching for covers.", CoversSettingsLabels::ProvidersHint());
+  EXPECT_STREQ("Album cover types", CoversSettingsLabels::TypesGroup());
+  EXPECT_STREQ("Saving album covers", CoversSettingsLabels::SavingGroup());
+  EXPECT_STREQ("Filename:", CoversSettingsLabels::FilenameGroup());
+  EXPECT_STREQ("Save album covers in album directory", CoversSettingsLabels::SaveAlbumDir());
+  EXPECT_STREQ("Save album covers in cache directory", CoversSettingsLabels::SaveCache());
+  EXPECT_STREQ("Save album covers as embedded cover", CoversSettingsLabels::SaveEmbedded());
+  EXPECT_STREQ("Pattern", CoversSettingsLabels::FilenamePattern());
+  EXPECT_STREQ("Random", CoversSettingsLabels::FilenameRandom());
+  EXPECT_STREQ("Overwrite existing file", CoversSettingsLabels::Overwrite());
+  EXPECT_STREQ("Lowercase filename", CoversSettingsLabels::Lowercase());
+  EXPECT_STREQ("Replace spaces with dashes", CoversSettingsLabels::ReplaceSpaces());
+  EXPECT_STREQ("1", CoversSettingsLabels::DefaultSaveType());
+  EXPECT_STREQ("2", CoversSettingsLabels::DefaultFilename());
+  ASSERT_EQ(3u, CoversSettingsLabels::SaveTypeChoices().size());
+  EXPECT_EQ("2", CoversSettingsLabels::SaveTypeChoices().front().first);
+  EXPECT_EQ("1", CoversSettingsLabels::SaveTypeChoices()[1].first);
+  ASSERT_EQ(2u, CoversSettingsLabels::FilenameChoices().size());
+  EXPECT_EQ("2", CoversSettingsLabels::FilenameChoices().front().first);
 }

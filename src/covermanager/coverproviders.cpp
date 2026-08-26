@@ -8,6 +8,7 @@
 #include "core/settings.h"
 #include "core/standardpaths.h"
 #include "lyrics/lyricsproviderorder.h"
+#include "covermanager/coverprovidersettings.h"
 #include "covermanager/albumcoverfetchersearch.h"
 #include "covermanager/deezercoverprovider.h"
 #include "covermanager/discogscoverprovider.h"
@@ -58,9 +59,13 @@ void CoverProviders::ReloadSettings() {
   Settings settings;
   settings.BeginGroup(CoversSettings::kSettingsGroup);
   const std::vector<std::string> order = LyricsProviderOrder::Parse(settings.Value(CoversSettings::kProviders, ""));
+  const bool has_providers = settings.Contains(CoversSettings::kProviders);
   for (size_t i = 0; i < providers_.size(); ++i) {
     auto &provider = providers_[i];
-    provider->set_enabled(settings.BoolValue(provider->name(), provider->enabled()));
+    const bool has_name_key = settings.Contains(provider->name());
+    const bool stored = settings.BoolValue(provider->name(), provider->enabled());
+    provider->set_enabled(CoverProviderSettings::EnabledFromStored(has_name_key, stored, has_providers,
+                                                                   CoverProviderSettings::InList(order, provider->name()), provider->enabled()));
     provider->set_order(LyricsProviderOrder::Rank(order, provider->name(), static_cast<int>(1000 + i)));
   }
   std::sort(providers_.begin(), providers_.end(), [](const std::unique_ptr<CoverProvider> &a, const std::unique_ptr<CoverProvider> &b) {
@@ -69,15 +74,23 @@ void CoverProviders::ReloadSettings() {
 }
 
 void CoverProviders::SaveOrder() {
-  std::vector<std::string> names;
-  names.reserve(providers_.size());
-  for (const auto &provider : providers_) {
-    names.push_back(provider->name());
-  }
+  const std::vector<std::string> names = CoverProviderSettings::EnabledNames(All());
   Settings settings;
   settings.BeginGroup(CoversSettings::kSettingsGroup);
   settings.SetValue(CoversSettings::kProviders, LyricsProviderOrder::Join(names));
   settings.Sync();
+}
+
+void CoverProviders::SetEnabled(CoverProvider *provider, bool enabled) {
+  if (!provider) {
+    return;
+  }
+  provider->set_enabled(enabled);
+  Settings settings;
+  settings.BeginGroup(CoversSettings::kSettingsGroup);
+  settings.SetBoolValue(provider->name(), enabled);
+  settings.Sync();
+  SaveOrder();
 }
 
 void CoverProviders::Move(int index, int delta) {

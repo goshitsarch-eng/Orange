@@ -725,7 +725,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   gtk_box_append(GTK_BOX(box), state->progress);
 
   GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  GtkWidget *fetch_missing = gtk_button_new_with_label(Translations::CStr("Fetch all missing"));
+  GtkWidget *fetch_missing = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::FetchMissing()));
   gtk_widget_add_css_class(fetch_missing, "suggested-action");
   state->fetch_missing = fetch_missing;
   state->abort = gtk_button_new_with_label(Translations::CStr("Abort"));
@@ -733,7 +733,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   GtkWidget *add_playlist = gtk_button_new_with_label(Translations::CStr("Add to playlist"));
   GtkWidget *load_playlist = gtk_button_new_with_label(Translations::CStr("Load to playlist"));
   GtkWidget *from_url = gtk_button_new_with_label(Translations::CStr("Load cover from URL…"));
-  GtkWidget *export_btn = gtk_button_new_with_label(Translations::CStr("Export covers…"));
+  GtkWidget *export_btn = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::Export()));
   GtkWidget *stats = gtk_button_new_with_label(Translations::CStr("Statistics"));
   gtk_box_append(GTK_BOX(actions), fetch_missing);
   gtk_box_append(GTK_BOX(actions), state->abort);

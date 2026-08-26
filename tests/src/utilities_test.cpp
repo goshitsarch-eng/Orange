@@ -1332,11 +1332,22 @@ TEST(PlayingWidget, DetailsAndHeight) {
 
 TEST(ContextFormatTokens, InsertsKnownTokens) {
   EXPECT_TRUE(ContextFormatTokens::IsKnown("%title%"));
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%length%"));
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%playcount%"));
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%skipcount%"));
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%rating%"));
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%filename%"));
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%url%"));
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%originalyear%"));
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%newline%"));
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%grouping%"));
   EXPECT_FALSE(ContextFormatTokens::IsKnown("%unknown%"));
   EXPECT_EQ("%title%", ContextFormatTokens::Insert({}, "%title%"));
   EXPECT_EQ("%title%%artist%", ContextFormatTokens::Insert("%title%", "%artist%"));
   EXPECT_EQ("%title%", ContextFormatTokens::Insert("%title%", {}));
-  EXPECT_FALSE(ContextFormatTokens::All().empty());
+  EXPECT_EQ(19u, ContextFormatTokens::All().size());
+  EXPECT_EQ("%artist%", ContextFormatTokens::All().front().first);
+  EXPECT_EQ("%originalyear%", ContextFormatTokens::All().back().first);
 }
 
 TEST(ContextCover, ShouldSearch) {

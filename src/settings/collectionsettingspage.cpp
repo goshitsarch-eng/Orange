@@ -51,7 +51,7 @@ void RefreshFolderList(FolderListState *state) {
     adw_action_row_set_subtitle(ADW_ACTION_ROW(row), directory.subdirs ? Translations::CStr("Including subfolders")
                                                                       : Translations::CStr("This folder only"));
     GtkWidget *rescan = gtk_button_new_with_label(Translations::CStr("Rescan"));
-    GtkWidget *remove = gtk_button_new_with_label(Translations::CStr("Remove"));
+    GtkWidget *remove = gtk_button_new_with_label(Translations::CStr(CollectionSettingsLabels::RemoveFolder()));
     gtk_widget_add_css_class(remove, "destructive-action");
     g_object_set_data(G_OBJECT(rescan), "folder-state", state);
     g_object_set_data(G_OBJECT(remove), "folder-state", state);
@@ -101,6 +101,7 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
   SettingsPage::AddDescription(scan, CollectionSettingsLabels::Days());
   SettingsPage::AddEntry(scan, settings, CollectionSettings::kCoverArtPatterns, CollectionSettingsLabels::CoverPatterns(),
                          "cover.jpg,folder.jpg,front.jpg,album.jpg");
+  SettingsPage::AddDescription(scan, CollectionSettingsLabels::CoverPatternsHint());
 
   AdwPreferencesGroup *display = SettingsPage::AddGroup(page, CollectionSettingsLabels::DisplayOptions());
   SettingsPage::AddToggle(display, settings, CollectionSettings::kAutoOpen, CollectionSettingsLabels::AutoOpen(), nullptr,
@@ -120,15 +121,16 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
 
   AdwPreferencesGroup *cache = SettingsPage::AddGroup(page, CollectionSettingsLabels::CacheGroup());
   GtkWidget *icon_size =
-      SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsCacheSize, "Icon cache size", CollectionSettings::kSettingsCacheSizeDefault);
+      SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsCacheSize, CollectionSettingsLabels::CacheSize(), CollectionSettings::kSettingsCacheSizeDefault);
   const std::vector<std::pair<std::string, std::string>> units = {{"0", "KB"}, {"1", "MB"}, {"2", "GB"}, {"3", "TB"}};
   GtkWidget *icon_unit =
       SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsCacheSizeUnit, "Icon cache unit",
                                 units, static_cast<int>(CollectionSettings::kDefaultSettingsCacheSizeUnit));
-  GtkWidget *disk_enable = SettingsPage::AddToggle(cache, settings, CollectionSettings::kSettingsDiskCacheEnable, "Enable disk cache",
-                                                   nullptr, CollectionSettings::kDefaultSettingsDiskCacheEnable);
-  GtkWidget *disk_size = SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsDiskCacheSize, "Disk cache size",
-                                                   CollectionSettings::kSettingsDiskCacheSizeDefault);
+  GtkWidget *disk_enable = SettingsPage::AddToggle(cache, settings, CollectionSettings::kSettingsDiskCacheEnable,
+                                                   CollectionSettingsLabels::EnableDiskCache(), nullptr,
+                                                   CollectionSettings::kDefaultSettingsDiskCacheEnable);
+  GtkWidget *disk_size = SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsDiskCacheSize,
+                                                   CollectionSettingsLabels::DiskCacheSize(), CollectionSettings::kSettingsDiskCacheSizeDefault);
   GtkWidget *disk_unit = SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsDiskCacheSizeUnit,
                                                    "Disk cache unit", units, static_cast<int>(CollectionSettings::kDefaultSettingsDiskCacheSizeUnit));
   AdwActionRow *in_use = ADW_ACTION_ROW(adw_action_row_new());
@@ -239,7 +241,7 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
       adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(WindowForWidget(button)));
     });
   }
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kDeleteFiles, "Allow deleting files from collection", nullptr,
+  SettingsPage::AddToggle(tags, settings, CollectionSettings::kDeleteFiles, CollectionSettingsLabels::DeleteFiles(), nullptr,
                           CollectionSettings::kDefaultDeleteFiles);
 
   AdwPreferencesGroup *dirs = SettingsPage::AddGroup(page, "Folders");
@@ -256,7 +258,7 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
   if (app) {
     RefreshFolderList(folder_state);
     GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    GtkWidget *add = gtk_button_new_with_label(Translations::CStr("Add folder…"));
+    GtkWidget *add = gtk_button_new_with_label(Translations::CStr(CollectionSettingsLabels::AddFolder()));
     GtkWidget *rescan_all = gtk_button_new_with_label(Translations::CStr("Rescan all"));
     GtkWidget *full_scan = gtk_button_new_with_label(Translations::CStr("Full rescan"));
     gtk_widget_add_css_class(add, "suggested-action");

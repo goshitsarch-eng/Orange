@@ -17,6 +17,7 @@ class CoverProviders {
   explicit CoverProviders(NetworkAccessManager *network);
   void ReloadSettings();
   void Move(int index, int delta);
+  void SetEnabled(CoverProvider *provider, bool enabled);
   void SaveOrder();
   void Fetch(const Song &song, CoverProvider::Callback callback);
   void FetchAll(const Song &song, const std::function<void(const std::string &provider, const std::string &image_data)> &callback);

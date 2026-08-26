@@ -9,16 +9,25 @@ namespace ContextFormatTokens {
 
 inline const std::vector<std::pair<std::string, std::string>> &All() {
   static const std::vector<std::pair<std::string, std::string>> tokens = {
-      {"%title%", "Title"},
       {"%artist%", "Artist"},
       {"%album%", "Album"},
+      {"%title%", "Title"},
       {"%albumartist%", "Album artist"},
-      {"%track%", "Track"},
-      {"%disc%", "Disc"},
       {"%year%", "Year"},
-      {"%genre%", "Genre"},
       {"%composer%", "Composer"},
       {"%performer%", "Performer"},
+      {"%grouping%", "Grouping"},
+      {"%disc%", "Disc"},
+      {"%track%", "Track"},
+      {"%genre%", "Genre"},
+      {"%length%", "Length"},
+      {"%playcount%", "Play count"},
+      {"%skipcount%", "Skip count"},
+      {"%rating%", "Rating"},
+      {"%newline%", "New line"},
+      {"%filename%", "Filename"},
+      {"%url%", "URL"},
+      {"%originalyear%", "Original year"},
   };
   return tokens;
 }
