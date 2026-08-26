@@ -25,6 +25,7 @@
 #include "analyzer/analyzer.h"
 #include "analyzer/fht.h"
 #include "constants/behavioursettings.h"
+#include "desktop/taskbarprogress.h"
 #include "context/contextformattokens.h"
 #include "constants/appearancesettings.h"
 #include "core/appearance.h"
@@ -1031,6 +1032,21 @@ TEST(AnalyzerFramerate, QtDiscretePresets) {
   EXPECT_EQ("Medium (25 fps)", AnalyzerFramerate::LabelFor(25));
   EXPECT_EQ(25, AnalyzerFramerate::Nearest(24));
   EXPECT_EQ(60, AnalyzerFramerate::Nearest(55));
+}
+
+TEST(TaskbarProgressHelpers, FractionAndVisibility) {
+  EXPECT_DOUBLE_EQ(0.0, TaskbarProgressHelpers::Fraction(0, 0));
+  EXPECT_DOUBLE_EQ(0.0, TaskbarProgressHelpers::Fraction(10, -1));
+  EXPECT_DOUBLE_EQ(0.25, TaskbarProgressHelpers::Fraction(25, 100));
+  EXPECT_DOUBLE_EQ(1.0, TaskbarProgressHelpers::Fraction(200, 100));
+  EXPECT_DOUBLE_EQ(0.0, TaskbarProgressHelpers::Fraction(-5, 100));
+  EXPECT_TRUE(TaskbarProgressHelpers::ShouldShow(true, true, 100));
+  EXPECT_FALSE(TaskbarProgressHelpers::ShouldShow(false, true, 100));
+  EXPECT_FALSE(TaskbarProgressHelpers::ShouldShow(true, false, 100));
+  EXPECT_FALSE(TaskbarProgressHelpers::ShouldShow(true, true, 0));
+  EXPECT_STREQ("application://org.strawberrymusicplayer.strawberry.desktop", TaskbarProgressHelpers::AppUri());
+  EXPECT_STREQ("com.canonical.Unity.LauncherEntry", TaskbarProgressHelpers::Interface());
+  EXPECT_EQ("/com/canonical/unity/launcherentry/strawberry", TaskbarProgressHelpers::ObjectPath());
 }
 
 TEST(CollectionSettings, CacheSizeUnitsMatchQt) {

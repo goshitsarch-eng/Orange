@@ -3,6 +3,7 @@
 #include "constants/behavioursettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "systemtrayicon/trayprogressoverlay.h"
 #include "translations/translations.h"
 
 #include <algorithm>
@@ -45,6 +46,7 @@ const gchar kSniXml[] =
     "    </method>"
     "    <signal name='NewTitle'/>"
     "    <signal name='NewIcon'/>"
+    "    <signal name='NewOverlayIcon'/>"
     "    <signal name='NewToolTip'/>"
     "    <signal name='NewStatus'><arg type='s' name='status'/></signal>"
     "  </interface>"
@@ -208,6 +210,7 @@ void SystemTrayIcon::SetPlaying(bool playing) {
   playing_ = playing;
   UpdateTooltip();
   EmitNewStatus();
+  EmitNewOverlayIcon();
   ++menu_revision_;
   EmitLayoutUpdated();
 }
@@ -219,7 +222,15 @@ void SystemTrayIcon::SetProgress(int percentage) {
   if (settings.BoolValue(BehaviourSettings::kTrayIconProgress, BehaviourSettings::kDefaultTrayIconProgress)) {
     UpdateTooltip();
     EmitNewToolTip();
+    EmitNewOverlayIcon();
   }
+}
+
+std::string SystemTrayIcon::OverlayIconName() const {
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const bool enabled = settings.BoolValue(BehaviourSettings::kTrayIconProgress, BehaviourSettings::kDefaultTrayIconProgress);
+  return TrayProgressOverlay::IconName(progress_, enabled, playing_);
 }
 
 void SystemTrayIcon::SetNowPlaying(const Song &song) {
@@ -263,6 +274,13 @@ void SystemTrayIcon::EmitNewStatus() {
   }
   g_dbus_connection_emit_signal(connection_, nullptr, kSniPath, kSniInterface, "NewStatus",
                                 g_variant_new("(s)", visible_ ? "Active" : "Passive"), nullptr);
+}
+
+void SystemTrayIcon::EmitNewOverlayIcon() {
+  if (!connection_ || registration_id_ == 0) {
+    return;
+  }
+  g_dbus_connection_emit_signal(connection_, nullptr, kSniPath, kSniInterface, "NewOverlayIcon", nullptr, nullptr);
 }
 
 void SystemTrayIcon::ShowMenu(int, int) {
@@ -515,7 +533,11 @@ GVariant *SystemTrayIcon::HandleGetProperty(GDBusConnection *, const gchar *, co
   if (g_strcmp0(property_name, "IconName") == 0) {
     return g_variant_new_string(self->playing_ ? "media-playback-start" : "strawberry");
   }
-  if (g_strcmp0(property_name, "OverlayIconName") == 0 || g_strcmp0(property_name, "AttentionIconName") == 0) {
+  if (g_strcmp0(property_name, "OverlayIconName") == 0) {
+    const std::string overlay = self->OverlayIconName();
+    return g_variant_new_string(overlay.c_str());
+  }
+  if (g_strcmp0(property_name, "AttentionIconName") == 0) {
     return g_variant_new_string("");
   }
   if (g_strcmp0(property_name, "ItemIsMenu") == 0) {

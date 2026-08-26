@@ -2,6 +2,8 @@
 
 #include "fileview/fileviewdrag.h"
 #include "utilities/fileutils.h"
+#include "widgets/listboxkeyboard.h"
+#include "widgets/listboxkeyboardgtk.h"
 
 #include <algorithm>
 
@@ -31,7 +33,19 @@ FileViewList::FileViewList() {
                      }
                    }),
                    this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(list_, keys);
+  gtk_widget_set_focusable(list_, TRUE);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType mods, gpointer data) -> gboolean {
+                     return static_cast<FileViewList *>(data)->OnKeyPressed(keyval, mods);
+                   })),
+                   this);
 }
+
+FileViewList::~FileViewList() { ResetTypeAhead(); }
+
+void FileViewList::SetNavigateCallback(NavigateCallback callback) { navigate_ = std::move(callback); }
 
 void FileViewList::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
@@ -55,6 +69,7 @@ void FileViewList::Reload(const std::vector<std::string> &paths) {
     gtk_widget_set_margin_bottom(label, 8);
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
     g_object_set_data_full(G_OBJECT(row), "file-path", g_strdup(path.c_str()), g_free);
+    g_object_set_data_full(G_OBJECT(row), "file-label", g_strdup(FileUtils::BaseName(path).c_str()), g_free);
     SetupRowDrag(row, path);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
@@ -101,4 +116,85 @@ std::vector<std::string> FileViewList::SelectedPaths() const {
       },
       &paths);
   return paths;
+}
+
+void FileViewList::ResetTypeAhead() {
+  typeahead_.clear();
+  if (typeahead_timeout_) {
+    g_source_remove(typeahead_timeout_);
+    typeahead_timeout_ = 0;
+  }
+}
+
+std::vector<std::string> FileViewList::Labels() const {
+  std::vector<std::string> labels;
+  if (!list_) {
+    return labels;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    const char *label = static_cast<const char *>(g_object_get_data(G_OBJECT(child), "file-label"));
+    labels.emplace_back(label ? label : "");
+  }
+  return labels;
+}
+
+gboolean FileViewList::OnKeyPressed(guint keyval, GdkModifierType mods) {
+  const bool alt = (mods & GDK_ALT_MASK) != 0;
+  const FileViewKeyboard::Action action = FileViewKeyboard::FromKey(keyval, alt);
+  if (action == FileViewKeyboard::Action::Activate) {
+    ListBoxKeyboardGtk::ActivateSelected(list_);
+    return TRUE;
+  }
+  if (action == FileViewKeyboard::Action::MoveUp || action == FileViewKeyboard::Action::MoveDown ||
+      action == FileViewKeyboard::Action::First || action == FileViewKeyboard::Action::Last) {
+    const int count = ListBoxKeyboardGtk::Count(list_);
+    const int current = ListBoxKeyboardGtk::SelectedIndex(list_);
+    ListBoxKeyboard::Action move = ListBoxKeyboard::Action::None;
+    if (action == FileViewKeyboard::Action::MoveUp) {
+      move = ListBoxKeyboard::Action::MoveUp;
+    } else if (action == FileViewKeyboard::Action::MoveDown) {
+      move = ListBoxKeyboard::Action::MoveDown;
+    } else if (action == FileViewKeyboard::Action::First) {
+      move = ListBoxKeyboard::Action::Home;
+    } else {
+      move = ListBoxKeyboard::Action::End;
+    }
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(current, count, move));
+    return TRUE;
+  }
+  if (action == FileViewKeyboard::Action::UpDir || action == FileViewKeyboard::Action::HistoryBack ||
+      action == FileViewKeyboard::Action::HistoryForward || action == FileViewKeyboard::Action::Home) {
+    if (navigate_) {
+      navigate_(action);
+    }
+    return TRUE;
+  }
+  if (keyval == ListBoxKeyboard::kEscape) {
+    ResetTypeAhead();
+    return TRUE;
+  }
+  const gunichar ch = gdk_keyval_to_unicode(keyval);
+  if (ch && g_unichar_isprint(ch) && !alt) {
+    gchar utf8[8] = {};
+    const gint len = g_unichar_to_utf8(ch, utf8);
+    typeahead_.append(utf8, static_cast<size_t>(len));
+    if (typeahead_timeout_) {
+      g_source_remove(typeahead_timeout_);
+    }
+    typeahead_timeout_ = g_timeout_add(1000, [](gpointer data) -> gboolean {
+      auto *self = static_cast<FileViewList *>(data);
+      self->typeahead_timeout_ = 0;
+      self->typeahead_.clear();
+      return G_SOURCE_REMOVE;
+    }, this);
+    const int index = ListBoxKeyboard::FirstPrefixIndex(Labels(), typeahead_);
+    if (index >= 0) {
+      ListBoxKeyboardGtk::SelectIndex(list_, index);
+    }
+    return TRUE;
+  }
+  return FALSE;
 }

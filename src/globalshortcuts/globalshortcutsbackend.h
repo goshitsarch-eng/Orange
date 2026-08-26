@@ -7,7 +7,7 @@ class GlobalShortcutsManager;
 
 class GlobalShortcutsBackend {
  public:
-  enum class Type { None = 0, KGlobalAccel, Gnome, X11, macOS, Win };
+  enum class Type { None = 0, KGlobalAccel, Gnome, X11, Portal, macOS, Win };
 
   GlobalShortcutsBackend(GlobalShortcutsManager *manager, Type type);
   virtual ~GlobalShortcutsBackend() = default;

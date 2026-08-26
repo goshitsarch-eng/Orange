@@ -24,8 +24,10 @@ class PlaylistView {
   using ReorderCallback = std::function<void(const std::vector<int> &, int)>;
   using RateCallback = std::function<void(int, float)>;
   using QueuePositionCallback = std::function<int(int)>;
+  using DeleteCallback = std::function<void()>;
 
   PlaylistView();
+  ~PlaylistView();
 
   GtkWidget *widget() const { return widget_; }
   GtkWidget *grid() const { return grid_; }
@@ -43,6 +45,7 @@ class PlaylistView {
   void SetReorderCallback(ReorderCallback callback);
   void SetRateCallback(RateCallback callback);
   void SetQueuePositionCallback(QueuePositionCallback callback);
+  void SetDeleteCallback(DeleteCallback callback);
   int RowAtY(double y) const;
   PlaylistColumn last_clicked_column() const { return last_clicked_column_; }
   void SetLastClickedColumn(PlaylistColumn column) { last_clicked_column_ = column; }
@@ -74,11 +77,19 @@ class PlaylistView {
   ReorderCallback reorder_;
   RateCallback rate_;
   QueuePositionCallback queue_position_;
+  DeleteCallback delete_;
   PlaylistColumn last_clicked_column_ = PlaylistColumn::Title;
   double last_click_cell_x_ = 0;
   double last_click_cell_width_ = 0;
   int visible_count_ = 0;
   double playback_progress_ = 0;
+  std::string typeahead_;
+  guint typeahead_timeout_ = 0;
+  std::vector<std::string> visible_titles_;
+  std::vector<int> visible_rows_;
+
+  gboolean OnKeyPressed(guint keyval);
+  void ResetTypeAhead();
 };
 
 #endif

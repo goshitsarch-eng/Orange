@@ -29,6 +29,8 @@ class StreamingSearchView {
  private:
   void Rebuild();
   void SetupRowDrag(GtkWidget *row, const Song &song);
+  gboolean OnKeyPressed(guint keyval);
+  void ResetTypeAhead();
 
   StreamingService *service_ = nullptr;
   StreamingSearchModel model_;
@@ -41,6 +43,8 @@ class StreamingSearchView {
   GtkWidget *type_albums_ = nullptr;
   GtkWidget *type_songs_ = nullptr;
   GtkWidget *list_ = nullptr;
+  std::string typeahead_;
+  guint typeahead_timeout_ = 0;
 };
 
 #endif

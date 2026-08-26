@@ -43,6 +43,8 @@ class StreamingCollectionView {
   void SetupRowDrag(GtkWidget *row, const Song &song);
   void UpdateBack();
   void ActivateSong(const Song &song);
+  gboolean OnKeyPressed(guint keyval);
+  void ResetTypeAhead();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *back_ = nullptr;
@@ -55,6 +57,8 @@ class StreamingCollectionView {
   ActivateCallback activate_;
   RefreshCallback refresh_;
   MenuCallback menu_;
+  std::string typeahead_;
+  guint typeahead_timeout_ = 0;
 };
 
 #endif

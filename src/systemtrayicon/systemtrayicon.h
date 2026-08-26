@@ -28,6 +28,7 @@ class SystemTrayIcon {
   bool visible() const { return visible_; }
   bool playing() const { return playing_; }
   int progress() const { return progress_; }
+  std::string OverlayIconName() const;
   const std::string &tooltip() const { return tooltip_; }
   const std::string &popup_summary() const { return popup_summary_; }
   const std::string &popup_message() const { return popup_message_; }
@@ -81,6 +82,7 @@ class SystemTrayIcon {
   void UpdateTooltip();
   void EmitNewToolTip();
   void EmitNewStatus();
+  void EmitNewOverlayIcon();
   void EmitLayoutUpdated();
   GVariant *MenuLayout(int parent_id) const;
   void RegisterMenu(GDBusConnection *connection);

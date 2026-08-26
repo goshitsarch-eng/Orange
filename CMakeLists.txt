@@ -584,11 +584,13 @@ set(STRAWBERRY_SOURCES
   src/osd/osd.cpp
   src/systemtrayicon/systemtrayicon.cpp
   src/systemtrayicon/qtsystemtrayicon.cpp
+  src/desktop/taskbarprogress.cpp
   src/mpris2/mpris2.cpp
   src/globalshortcuts/globalshortcut.cpp
   src/globalshortcuts/globalshortcutsbackend.cpp
   src/globalshortcuts/keymapper_x11.cpp
   src/globalshortcuts/globalshortcutsbackend-x11.cpp
+  src/globalshortcuts/globalshortcutsbackend-portal.cpp
   src/globalshortcuts/globalshortcutsbackend-kglobalaccel.cpp
   src/globalshortcuts/globalshortcuts.cpp
   src/globalshortcuts/globalshortcutsmanager.cpp
@@ -816,7 +818,9 @@ if(GTest_FOUND)
     src/globalshortcuts/globalshortcutsbackend.cpp
     src/globalshortcuts/globalshortcutsbackend-kglobalaccel.cpp
     src/globalshortcuts/globalshortcutsbackend-x11.cpp
+    src/globalshortcuts/globalshortcutsbackend-portal.cpp
     src/globalshortcuts/keymapper_x11.cpp
+    src/desktop/taskbarprogress.cpp
     src/core/networktimeouts.cpp
     src/core/httpbaserequest.cpp
     src/core/jsonbaserequest.cpp

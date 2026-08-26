@@ -1,5 +1,7 @@
 #include "globalshortcuts/globalshortcuts.h"
 #include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
+#include "globalshortcuts/globalshortcutsbackend-portal.h"
+#include "globalshortcuts/globalshortcutsportal.h"
 #include "globalshortcuts/keymapper_x11.h"
 #include "core/settings.h"
 #include "playlist/playlistmanager.h"
@@ -94,12 +96,37 @@ TEST(GlobalShortcuts, BackendTypeNames) {
   GlobalShortcutsManager manager;
   GlobalShortcutsBackendKGlobalAccel kde(&manager);
   GlobalShortcutsBackendGnome gnome(&manager);
+  GlobalShortcutsBackendPortal portal(&manager);
   EXPECT_EQ(GlobalShortcutsBackend::Type::KGlobalAccel, kde.type());
   EXPECT_EQ("KGlobalAccel", kde.name());
   EXPECT_EQ(GlobalShortcutsBackend::Type::Gnome, gnome.type());
   EXPECT_EQ("Gnome", gnome.name());
+  EXPECT_EQ(GlobalShortcutsBackend::Type::Portal, portal.type());
+  EXPECT_EQ("Portal", portal.name());
   EXPECT_FALSE(manager.HasActiveBackend(GlobalShortcutsBackend::Type::KGlobalAccel));
   EXPECT_FALSE(manager.HasActiveBackend(GlobalShortcutsBackend::Type::Gnome));
+  EXPECT_FALSE(manager.HasActiveBackend(GlobalShortcutsBackend::Type::Portal));
+}
+
+TEST(GlobalShortcutsPortal, AcceleratorAndBindings) {
+  EXPECT_EQ("XF86AudioPlay", GlobalShortcutsPortal::Accelerator("MediaPlay"));
+  EXPECT_EQ("XF86AudioStop", GlobalShortcutsPortal::Accelerator("MediaStop"));
+  EXPECT_EQ("XF86AudioNext", GlobalShortcutsPortal::Accelerator("MediaNext"));
+  EXPECT_EQ("XF86AudioPrev", GlobalShortcutsPortal::Accelerator("MediaPrevious"));
+  EXPECT_EQ("Ctrl+L", GlobalShortcutsPortal::Accelerator("Ctrl+L"));
+  EXPECT_TRUE(GlobalShortcutsPortal::Accelerator("").empty());
+
+  GlobalShortcutsManager manager;
+  const auto bindings = GlobalShortcutsPortal::Bindings(manager);
+  bool found_play = false;
+  for (const auto &binding : bindings) {
+    if (binding.first == "play_pause") {
+      found_play = true;
+      EXPECT_EQ("XF86AudioPlay", binding.second);
+    }
+    EXPECT_FALSE(binding.second.empty());
+  }
+  EXPECT_TRUE(found_play);
 }
 
 TEST(KeyMapperX11, QtShortcutToKey) {

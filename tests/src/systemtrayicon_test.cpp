@@ -1,6 +1,9 @@
 #include "systemtrayicon/systemtrayicon.h"
 
+#include "constants/behavioursettings.h"
+#include "core/settings.h"
 #include "core/song.h"
+#include "systemtrayicon/trayprogressoverlay.h"
 
 #include <algorithm>
 
@@ -74,4 +77,32 @@ TEST(SystemTrayIcon, DBusMenuLabelsAndActions) {
   EXPECT_EQ(1, love);
   EXPECT_EQ("/NO_DBUSMENU", tray.menu_path());
   EXPECT_EQ(1u, tray.menu_revision());
+}
+
+TEST(TrayProgressOverlay, DecadeAndIconName) {
+  EXPECT_EQ(0, TrayProgressOverlay::Decade(-10));
+  EXPECT_EQ(0, TrayProgressOverlay::Decade(9));
+  EXPECT_EQ(40, TrayProgressOverlay::Decade(44));
+  EXPECT_EQ(100, TrayProgressOverlay::Decade(100));
+  EXPECT_EQ(100, TrayProgressOverlay::Decade(140));
+  EXPECT_TRUE(TrayProgressOverlay::IconName(40, false, true).empty());
+  EXPECT_TRUE(TrayProgressOverlay::IconName(40, true, false).empty());
+  EXPECT_TRUE(TrayProgressOverlay::IconName(0, true, true).empty());
+  EXPECT_EQ("strawberry-progress-40", TrayProgressOverlay::IconName(44, true, true));
+}
+
+TEST(SystemTrayIcon, OverlayIconNameHonorsProgressSetting) {
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  settings.SetBoolValue(BehaviourSettings::kTrayIconProgress, true);
+  settings.Sync();
+
+  SystemTrayIcon tray;
+  tray.SetPlaying(true);
+  tray.SetProgress(44);
+  EXPECT_EQ("strawberry-progress-40", tray.OverlayIconName());
+
+  settings.SetBoolValue(BehaviourSettings::kTrayIconProgress, false);
+  settings.Sync();
+  EXPECT_TRUE(tray.OverlayIconName().empty());
 }

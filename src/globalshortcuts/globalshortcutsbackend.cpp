@@ -10,6 +10,8 @@ std::string GlobalShortcutsBackend::name() const {
       return "Gnome";
     case Type::X11:
       return "X11";
+    case Type::Portal:
+      return "Portal";
     case Type::macOS:
       return "macOS";
     case Type::Win:

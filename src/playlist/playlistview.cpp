@@ -9,6 +9,7 @@
 #include "playlist/playlistlook.h"
 #include "utilities/strutils.h"
 #include "utilities/styleutils.h"
+#include "widgets/listboxkeyboard.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -39,14 +40,11 @@ PlaylistView::PlaylistView() {
                    this);
   GtkEventController *keys = gtk_event_controller_key_new();
   gtk_widget_add_controller(widget_, keys);
-  g_signal_connect(keys, "key-pressed", G_CALLBACK(+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     auto *self = static_cast<PlaylistView *>(data);
-                     if (keyval == GDK_KEY_F2 && self->edit_request_) {
-                       self->edit_request_();
-                       return TRUE;
-                     }
-                     return FALSE;
-                   }),
+  gtk_widget_set_focusable(widget_, TRUE);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<PlaylistView *>(data)->OnKeyPressed(keyval);
+                   })),
                    this);
   GtkDropTarget *target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
 #ifdef GDK_TYPE_FILE_LIST
@@ -68,6 +66,77 @@ void PlaylistView::SetReorderCallback(ReorderCallback callback) { reorder_ = std
 void PlaylistView::SetRateCallback(RateCallback callback) { rate_ = std::move(callback); }
 
 void PlaylistView::SetQueuePositionCallback(QueuePositionCallback callback) { queue_position_ = std::move(callback); }
+
+void PlaylistView::SetDeleteCallback(DeleteCallback callback) { delete_ = std::move(callback); }
+
+PlaylistView::~PlaylistView() { ResetTypeAhead(); }
+
+void PlaylistView::ResetTypeAhead() {
+  typeahead_.clear();
+  if (typeahead_timeout_) {
+    g_source_remove(typeahead_timeout_);
+    typeahead_timeout_ = 0;
+  }
+}
+
+gboolean PlaylistView::OnKeyPressed(guint keyval) {
+  if (keyval == GDK_KEY_F2 && edit_request_) {
+    edit_request_();
+    return TRUE;
+  }
+  const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
+  if (action == ListBoxKeyboard::Action::Activate && activate_ && !selected_rows_.empty()) {
+    activate_(selected_rows_.front());
+    return TRUE;
+  }
+  if (action == ListBoxKeyboard::Action::Delete && delete_) {
+    delete_();
+    return TRUE;
+  }
+  if (action == ListBoxKeyboard::Action::MoveUp || action == ListBoxKeyboard::Action::MoveDown || action == ListBoxKeyboard::Action::Home ||
+      action == ListBoxKeyboard::Action::End) {
+    int current = -1;
+    if (!selected_rows_.empty() && !visible_rows_.empty()) {
+      for (size_t i = 0; i < visible_rows_.size(); ++i) {
+        if (visible_rows_[i] == selected_rows_.front()) {
+          current = static_cast<int>(i);
+          break;
+        }
+      }
+    }
+    const int next = ListBoxKeyboard::NextIndex(current, static_cast<int>(visible_rows_.size()), action);
+    if (next >= 0 && select_) {
+      select_(visible_rows_[static_cast<size_t>(next)], false);
+      ScrollToRow(visible_rows_[static_cast<size_t>(next)]);
+    }
+    return TRUE;
+  }
+  if (action == ListBoxKeyboard::Action::Escape) {
+    ResetTypeAhead();
+    return TRUE;
+  }
+  const gunichar ch = gdk_keyval_to_unicode(keyval);
+  if (ch && g_unichar_isprint(ch)) {
+    gchar utf8[8] = {};
+    typeahead_.append(utf8, static_cast<size_t>(g_unichar_to_utf8(ch, utf8)));
+    if (typeahead_timeout_) {
+      g_source_remove(typeahead_timeout_);
+    }
+    typeahead_timeout_ = g_timeout_add(1000, [](gpointer data) -> gboolean {
+      auto *self = static_cast<PlaylistView *>(data);
+      self->typeahead_timeout_ = 0;
+      self->typeahead_.clear();
+      return G_SOURCE_REMOVE;
+    }, this);
+    const int index = ListBoxKeyboard::FirstPrefixIndex(visible_titles_, typeahead_);
+    if (index >= 0 && select_) {
+      select_(visible_rows_[static_cast<size_t>(index)], false);
+      ScrollToRow(visible_rows_[static_cast<size_t>(index)]);
+    }
+    return TRUE;
+  }
+  return FALSE;
+}
 
 int PlaylistView::RowAtY(double y) const {
   if (!grid_) {
@@ -237,6 +306,8 @@ void PlaylistView::Refresh(Playlist *playlist) {
   const bool bars = look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars);
   StyleUtils::LoadCss(PlaylistLook::CombinedCss(alternating, glow, bars, playback_progress_));
   visible_count_ = 0;
+  visible_titles_.clear();
+  visible_rows_.clear();
   for (int index = 0; index < playlist->row_count(); ++index) {
     const Song &song = playlist->songs()[static_cast<size_t>(index)];
     if (!filter.Accepts(song)) {
@@ -287,6 +358,8 @@ void PlaylistView::Refresh(Playlist *playlist) {
       gtk_box_append(GTK_BOX(row), label);
     }
     g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index));
+    visible_titles_.push_back(song.PrettyTitle());
+    visible_rows_.push_back(index);
     GtkGesture *click = gtk_gesture_click_new();
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
     gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(click));

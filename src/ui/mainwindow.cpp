@@ -1037,6 +1037,17 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->view()->SetSortCallback([this](PlaylistColumn column, PlaylistSortOrder order) { SortPlaylistBy(column, order); });
   playlist_container_->view()->SetMenuCallback([this](double x, double y) { ShowPlaylistMenu(x, y); });
   playlist_container_->view()->SetEditRequestCallback([this]() { EditColumnValue(); });
+  playlist_container_->view()->SetDeleteCallback([this]() {
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      const std::vector<int> rows = SelectedPlaylistRows();
+      app_->queue()->RemapAfterPlaylistRemove(playlist->id(), rows);
+      playlist->RemoveRows(rows);
+      selected_playlist_rows_.clear();
+      app_->playlist_manager()->SaveCurrent();
+      RefreshPlaylist();
+      RefreshQueue();
+    }
+  });
   playlist_container_->view()->SetEditCommitCallback([this](int row, PlaylistColumn column, const std::string &value) {
     ApplyColumnValue(column, value, {row});
   });
@@ -1331,6 +1342,13 @@ void MainWindow::ConnectSignals() {
     }
     if (len > 0) {
       self->app_->tray()->SetProgress(static_cast<int>(pos * 100 / len));
+    }
+    {
+      Settings settings;
+      settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+      const bool enabled = settings.BoolValue(BehaviourSettings::kTaskbarProgress, BehaviourSettings::kDefaultTaskbarProgress);
+      const bool playing = self->app_->player()->GetState() == EngineBase::State::Playing;
+      self->taskbar_.Set(TaskbarProgressHelpers::Fraction(pos, len), TaskbarProgressHelpers::ShouldShow(enabled, playing, len));
     }
     if (self->playlist_container_ && self->playlist_container_->view()) {
       self->playlist_container_->view()->SetPlaybackProgress(len > 0 ? static_cast<double>(pos) / static_cast<double>(len) : 0.0);

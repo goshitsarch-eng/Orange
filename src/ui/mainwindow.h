@@ -4,6 +4,7 @@
 #include "collection/collectionbehaviour.h"
 #include "collection/collectiongrouping.h"
 #include "covermanager/albumcoverchoicecontroller.h"
+#include "desktop/taskbarprogress.h"
 #include "collection/collectionviewcontainer.h"
 #include "context/contextview.h"
 #include "core/application.h"
@@ -208,6 +209,7 @@ class MainWindow {
   std::string selection_playlist_name_;
   guint position_timeout_ = 0;
   gint64 analyzer_last_draw_us_ = 0;
+  TaskbarProgress taskbar_;
 };
 
 #endif

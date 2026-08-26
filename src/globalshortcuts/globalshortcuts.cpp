@@ -3,6 +3,7 @@
 #include "constants/globalshortcutssettings.h"
 #include "core/settings.h"
 #include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
+#include "globalshortcuts/globalshortcutsbackend-portal.h"
 #include "globalshortcuts/globalshortcutsbackend-x11.h"
 
 namespace {
@@ -214,6 +215,11 @@ void GlobalShortcutsManager::RegisterBackends() {
   auto gnome = std::make_unique<GlobalShortcutsBackendGnome>(this);
   if (gnome->IsAvailable() && gnome->Register()) {
     backends_.push_back(std::move(gnome));
+  }
+
+  auto portal = std::make_unique<GlobalShortcutsBackendPortal>(this);
+  if (portal->IsAvailable() && portal->Register()) {
+    backends_.push_back(std::move(portal));
   }
 
   if (use_x11 || backends_.empty()) {

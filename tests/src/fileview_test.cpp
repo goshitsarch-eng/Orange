@@ -1,9 +1,11 @@
 #include "device/devicedrag.h"
 #include "fileview/fileviewdrag.h"
 #include "fileview/fileviewhistory.h"
+#include "fileview/fileviewkeyboard.h"
 #include "fileview/fileviewsongs.h"
 #include "fileview/fileviewtreemodel.h"
 #include "utilities/fileutils.h"
+#include "widgets/listboxkeyboard.h"
 
 #include <algorithm>
 #include <gtest/gtest.h>
@@ -135,6 +137,43 @@ TEST(FileViewDrag, SkipsDirectoriesAndEmitsFileUris) {
   EXPECT_TRUE(FileViewDrag::DragPayload({dir}).empty());
   FileUtils::Remove(audio);
   rmdir(dir.c_str());
+}
+
+TEST(ListBoxKeyboard, FromKeyAndWrapAround) {
+  EXPECT_EQ(ListBoxKeyboard::Action::Activate, ListBoxKeyboard::FromKey(ListBoxKeyboard::kReturn));
+  EXPECT_EQ(ListBoxKeyboard::Action::Activate, ListBoxKeyboard::FromKey(ListBoxKeyboard::kKPEnter));
+  EXPECT_EQ(ListBoxKeyboard::Action::MoveUp, ListBoxKeyboard::FromKey(ListBoxKeyboard::kUp));
+  EXPECT_EQ(ListBoxKeyboard::Action::MoveDown, ListBoxKeyboard::FromKey(ListBoxKeyboard::kDown));
+  EXPECT_EQ(ListBoxKeyboard::Action::Home, ListBoxKeyboard::FromKey(ListBoxKeyboard::kHome));
+  EXPECT_EQ(ListBoxKeyboard::Action::End, ListBoxKeyboard::FromKey(ListBoxKeyboard::kEnd));
+  EXPECT_EQ(ListBoxKeyboard::Action::Escape, ListBoxKeyboard::FromKey(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(ListBoxKeyboard::Action::Delete, ListBoxKeyboard::FromKey(ListBoxKeyboard::kDelete));
+  EXPECT_EQ(ListBoxKeyboard::Action::Backspace, ListBoxKeyboard::FromKey(ListBoxKeyboard::kBackSpace));
+  EXPECT_EQ(ListBoxKeyboard::Action::None, ListBoxKeyboard::FromKey('a'));
+  EXPECT_EQ(-1, ListBoxKeyboard::NextIndex(0, 0, ListBoxKeyboard::Action::MoveDown));
+  EXPECT_EQ(0, ListBoxKeyboard::NextIndex(2, 3, ListBoxKeyboard::Action::Home));
+  EXPECT_EQ(2, ListBoxKeyboard::NextIndex(0, 3, ListBoxKeyboard::Action::End));
+  EXPECT_EQ(2, ListBoxKeyboard::NextIndex(0, 3, ListBoxKeyboard::Action::MoveUp));
+  EXPECT_EQ(0, ListBoxKeyboard::NextIndex(2, 3, ListBoxKeyboard::Action::MoveDown));
+  EXPECT_EQ(1, ListBoxKeyboard::NextIndex(-1, 3, ListBoxKeyboard::Action::MoveDown));
+  EXPECT_EQ(1, ListBoxKeyboard::FirstPrefixIndex({"Roads", "Dummy", "Glory Box"}, "du"));
+  EXPECT_EQ(2, ListBoxKeyboard::FirstPrefixIndex({"Roads", "Dummy", "Glory Box"}, "G"));
+  EXPECT_EQ(-1, ListBoxKeyboard::FirstPrefixIndex({"Roads"}, "z"));
+  EXPECT_EQ(-1, ListBoxKeyboard::FirstPrefixIndex({"Roads"}, ""));
+}
+
+TEST(FileViewKeyboard, AltAndHistoryBack) {
+  EXPECT_EQ(FileViewKeyboard::Action::Activate, FileViewKeyboard::FromKey(ListBoxKeyboard::kReturn, false));
+  EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::FromKey(ListBoxKeyboard::kUp, true));
+  EXPECT_EQ(FileViewKeyboard::Action::MoveUp, FileViewKeyboard::FromKey(ListBoxKeyboard::kUp, false));
+  EXPECT_EQ(FileViewKeyboard::Action::HistoryBack, FileViewKeyboard::FromKey(ListBoxKeyboard::kLeft, true));
+  EXPECT_EQ(FileViewKeyboard::Action::HistoryForward, FileViewKeyboard::FromKey(ListBoxKeyboard::kRight, true));
+  EXPECT_EQ(FileViewKeyboard::Action::Home, FileViewKeyboard::FromKey(ListBoxKeyboard::kHome, true));
+  EXPECT_EQ(FileViewKeyboard::Action::First, FileViewKeyboard::FromKey(ListBoxKeyboard::kHome, false));
+  EXPECT_EQ(FileViewKeyboard::Action::HistoryBack, FileViewKeyboard::FromKey(ListBoxKeyboard::kBackSpace, false));
+  EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::HistoryBack, false));
+  EXPECT_EQ(FileViewKeyboard::Action::HistoryBack, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::HistoryBack, true));
+  EXPECT_EQ(FileViewKeyboard::Action::Home, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::Home, false));
 }
 
 TEST(DeviceDrag, JoinsSongUrls) {

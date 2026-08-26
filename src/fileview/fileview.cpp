@@ -53,6 +53,25 @@ FileView::FileView() {
   tree_->SetActivateCallback([this](const std::string &path) { SetPath(path); });
   list_->SetActivateCallback([this](const std::string &path) { Activate(path); });
   list_->SetMenuCallback([this](const std::vector<std::string> &paths) { ShowMenu(paths); });
+  list_->SetNavigateCallback([this](FileViewKeyboard::Action action) {
+    action = FileViewKeyboard::ResolveHistoryBack(action, history_.CanBack());
+    switch (action) {
+      case FileViewKeyboard::Action::UpDir:
+        FileUp();
+        break;
+      case FileViewKeyboard::Action::HistoryBack:
+        FileBack();
+        break;
+      case FileViewKeyboard::Action::HistoryForward:
+        FileForward();
+        break;
+      case FileViewKeyboard::Action::Home:
+        FileHome();
+        break;
+      default:
+        break;
+    }
+  });
   model_.SetRootPaths({home_});
   history_.Push(path_);
   Reload();
