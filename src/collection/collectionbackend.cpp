@@ -1,5 +1,6 @@
 #include "collection/collectionbackend.h"
 
+#include "collection/collectionquery.h"
 #include "filterparser/filterparser.h"
 #include "utilities/strutils.h"
 
@@ -50,24 +51,30 @@ Song CollectionBackend::SongFromQuery(const SqlQuery &query) const {
   song.set_track(query.ColumnInt(9));
   song.set_disc(query.ColumnInt(10));
   song.set_year(query.ColumnInt(11));
+  song.set_originalyear(query.ColumnInt(12));
   song.set_genre(query.ColumnText(13));
   song.set_composer(query.ColumnText(15));
   song.set_performer(query.ColumnText(17));
   song.set_grouping(query.ColumnText(19));
   song.set_comment(query.ColumnText(20));
   song.set_lyrics(query.ColumnText(21));
-  song.set_length_nanosec(query.ColumnInt64(25));
-  song.set_bitrate(query.ColumnInt(26));
-  song.set_samplerate(query.ColumnInt(27));
-  song.set_bitdepth(query.ColumnInt(28));
-  song.set_source(static_cast<Song::Source>(query.ColumnInt(29)));
-  song.set_directory_id(query.ColumnInt(30));
-  song.set_url(query.ColumnText(31));
-  song.set_filetype(static_cast<Song::FileType>(query.ColumnInt(32)));
-  song.set_filesize(query.ColumnInt64(33));
-  song.set_playcount(static_cast<unsigned>(query.ColumnInt(38)));
-  song.set_skipcount(static_cast<unsigned>(query.ColumnInt(39)));
-  song.set_rating(static_cast<float>(query.ColumnInt(53)) / 100.0f);
+  song.set_beginning_nanosec(query.ColumnInt64(25));
+  song.set_length_nanosec(query.ColumnInt64(26));
+  song.set_bitrate(query.ColumnInt(27));
+  song.set_samplerate(query.ColumnInt(28));
+  song.set_bitdepth(query.ColumnInt(29));
+  song.set_source(static_cast<Song::Source>(query.ColumnInt(30)));
+  song.set_directory_id(query.ColumnInt(31));
+  song.set_url(query.ColumnText(32));
+  song.set_filetype(static_cast<Song::FileType>(query.ColumnInt(33)));
+  song.set_filesize(query.ColumnInt64(34));
+  song.set_mtime(query.ColumnInt64(35));
+  song.set_ctime(query.ColumnInt64(36));
+  song.set_unavailable(query.ColumnInt(37) != 0);
+  song.set_playcount(static_cast<unsigned>(query.ColumnInt(39)));
+  song.set_skipcount(static_cast<unsigned>(query.ColumnInt(40)));
+  song.set_lastplayed(query.ColumnInt64(41));
+  song.set_rating(static_cast<float>(query.ColumnInt(54)) / 100.0f);
   song.set_valid(true);
   return song;
 }
@@ -85,6 +92,26 @@ SongList CollectionBackend::Songs(const std::string &filter) const {
   SqlQuery query(database_, sql);
   while (query.Step()) {
     songs.push_back(SongFromQuery(query));
+  }
+  return songs;
+}
+
+SongList CollectionBackend::Songs(const CollectionFilterOptions &options) const {
+  SongList songs;
+  if (!database_ || !database_->handle()) {
+    return songs;
+  }
+  CollectionQuery query(database_, "songs", options);
+  query.SetColumnSpec("ROWID, " + std::string(Song::kColumnSpec));
+  query.SetOrderBy("effective_albumartist, album, disc, track, title");
+  if (!query.Exec()) {
+    return songs;
+  }
+  while (query.Next()) {
+    const Song song = SongFromQuery(*query.query());
+    if (options.Matches(song)) {
+      songs.push_back(song);
+    }
   }
   return songs;
 }

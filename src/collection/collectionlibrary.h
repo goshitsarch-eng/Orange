@@ -2,6 +2,7 @@
 #define STRAWBERRY_COLLECTIONLIBRARY_H
 
 #include "collection/collectionbackend.h"
+#include "collection/collectionfilteroptions.h"
 #include "collection/collectionwatcher.h"
 #include "core/signal.h"
 
@@ -25,6 +26,7 @@ class CollectionLibrary {
   void AddDirectory(const std::string &path, bool subdirs = true);
   void RemoveDirectory(int id);
   SongList Songs(const std::string &filter = {}) const;
+  SongList Songs(const CollectionFilterOptions &options) const;
 
   Signal<> ScanFinished;
 

@@ -33,3 +33,5 @@ void CollectionLibrary::AddDirectory(const std::string &path, bool subdirs) {
 void CollectionLibrary::RemoveDirectory(int id) { backend_->RemoveDirectory(id); }
 
 SongList CollectionLibrary::Songs(const std::string &filter) const { return backend_->Songs(filter); }
+
+SongList CollectionLibrary::Songs(const CollectionFilterOptions &options) const { return backend_->Songs(options); }

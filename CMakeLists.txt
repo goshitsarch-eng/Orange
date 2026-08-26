@@ -168,6 +168,20 @@ set(STRAWBERRY_SOURCES
   src/collection/collectionwatcher.cpp
   src/collection/collectionlibrary.cpp
   src/collection/collectiongrouping.cpp
+  src/collection/collectionfilteroptions.cpp
+  src/collection/collectionquery.cpp
+  src/collection/collectionitem.cpp
+  src/collection/collectionfilter.cpp
+  src/collection/collectionmodel.cpp
+  src/collection/collectionplaylistitem.cpp
+  src/collection/collectiondirectorymodel.cpp
+  src/collection/collectiontask.cpp
+  src/collection/collectionitemdelegate.cpp
+  src/collection/collectionfilterwidget.cpp
+  src/collection/collectionview.cpp
+  src/collection/collectionviewcontainer.cpp
+  src/collection/groupbydialog.cpp
+  src/collection/savedgroupingmanager.cpp
   src/playlist/playlist.cpp
   src/playlist/playlistbackend.cpp
   src/playlist/playlistmanager.cpp
@@ -379,6 +393,7 @@ if(GTest_FOUND)
     tests/src/streamingrequest_test.cpp
     tests/src/streamurl_test.cpp
     tests/src/streamingview_test.cpp
+    tests/src/collection_test.cpp
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
     tests/src/streamtagreader_test.cpp
@@ -479,6 +494,16 @@ if(GTest_FOUND)
     src/playlist/playlist.cpp
     src/collection/collectionbackend.cpp
     src/collection/collectiongrouping.cpp
+    src/collection/collectionfilteroptions.cpp
+    src/collection/collectionquery.cpp
+    src/collection/collectionitem.cpp
+    src/collection/collectionfilter.cpp
+    src/collection/collectionmodel.cpp
+    src/collection/collectionplaylistitem.cpp
+    src/collection/collectiondirectorymodel.cpp
+    src/collection/collectiontask.cpp
+    src/collection/collectionitemdelegate.cpp
+    ${GRESOURCE_C}
     src/equalizer/equalizer.cpp
     src/organize/organize.cpp
     src/analyzer/analyzer.cpp

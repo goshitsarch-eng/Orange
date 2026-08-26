@@ -1,18 +1,14 @@
 #ifndef STRAWBERRY_COLLECTIONBACKEND_H
 #define STRAWBERRY_COLLECTIONBACKEND_H
 
+#include "collection/collectiondirectory.h"
+#include "collection/collectionfilteroptions.h"
 #include "core/database.h"
 #include "core/signal.h"
 #include "core/song.h"
 
 #include <string>
 #include <vector>
-
-struct CollectionDirectory {
-  int id = -1;
-  std::string path;
-  bool subdirs = true;
-};
 
 class CollectionBackend {
  public:
@@ -23,6 +19,7 @@ class CollectionBackend {
   void RemoveDirectory(int id);
 
   SongList Songs(const std::string &filter = {}) const;
+  SongList Songs(const CollectionFilterOptions &options) const;
   Song SongById(int id) const;
   Song SongByUrl(const std::string &url) const;
   int AddOrUpdateSong(const Song &song);
