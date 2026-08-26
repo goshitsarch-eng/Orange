@@ -56,11 +56,93 @@ const GDBusInterfaceVTable kVtable = {
     {nullptr},
 };
 
+constexpr char kMenuInterface[] = "com.canonical.dbusmenu";
+
+const gchar kMenuXml[] =
+    "<node>"
+    "  <interface name='com.canonical.dbusmenu'>"
+    "    <property name='Version' type='u' access='read'/>"
+    "    <property name='TextDirection' type='s' access='read'/>"
+    "    <property name='Status' type='s' access='read'/>"
+    "    <property name='IconThemePath' type='as' access='read'/>"
+    "    <method name='GetLayout'>"
+    "      <arg type='i' name='parentId' direction='in'/>"
+    "      <arg type='i' name='recursionDepth' direction='in'/>"
+    "      <arg type='as' name='propertyNames' direction='in'/>"
+    "      <arg type='u' name='revision' direction='out'/>"
+    "      <arg type='(ia{sv}av)' name='layout' direction='out'/>"
+    "    </method>"
+    "    <method name='GetGroupProperties'>"
+    "      <arg type='ai' name='ids' direction='in'/>"
+    "      <arg type='as' name='propertyNames' direction='in'/>"
+    "      <arg type='a(ia{sv})' name='properties' direction='out'/>"
+    "    </method>"
+    "    <method name='GetProperty'>"
+    "      <arg type='i' name='id' direction='in'/>"
+    "      <arg type='s' name='name' direction='in'/>"
+    "      <arg type='v' name='value' direction='out'/>"
+    "    </method>"
+    "    <method name='Event'>"
+    "      <arg type='i' name='id' direction='in'/>"
+    "      <arg type='s' name='eventId' direction='in'/>"
+    "      <arg type='v' name='data' direction='in'/>"
+    "      <arg type='u' name='timestamp' direction='in'/>"
+    "    </method>"
+    "    <method name='EventGroup'>"
+    "      <arg type='a(isvu)' name='events' direction='in'/>"
+    "      <arg type='ai' name='idErrors' direction='out'/>"
+    "    </method>"
+    "    <method name='AboutToShow'>"
+    "      <arg type='i' name='id' direction='in'/>"
+    "      <arg type='b' name='needUpdate' direction='out'/>"
+    "    </method>"
+    "    <method name='AboutToShowGroup'>"
+    "      <arg type='ai' name='ids' direction='in'/>"
+    "      <arg type='ai' name='updatesNeeded' direction='out'/>"
+    "      <arg type='ai' name='idErrors' direction='out'/>"
+    "    </method>"
+    "    <signal name='ItemsPropertiesUpdated'>"
+    "      <arg type='a(ia{sv})' name='updatedProps'/>"
+    "      <arg type='a(ias)' name='removedProps'/>"
+    "    </signal>"
+    "    <signal name='LayoutUpdated'>"
+    "      <arg type='u' name='revision'/>"
+    "      <arg type='i' name='parent'/>"
+    "    </signal>"
+    "    <signal name='ItemActivationRequested'>"
+    "      <arg type='i' name='id'/>"
+    "      <arg type='u' name='timestamp'/>"
+    "    </signal>"
+    "  </interface>"
+    "</node>";
+
+const GDBusInterfaceVTable kMenuVtable = {
+    SystemTrayIcon::HandleMenuMethod,
+    SystemTrayIcon::HandleMenuGetProperty,
+    nullptr,
+    {nullptr},
+};
+
+GVariant *ItemProps(const char *label, const char *type = "standard") {
+  GVariantBuilder props;
+  g_variant_builder_init(&props, G_VARIANT_TYPE("a{sv}"));
+  g_variant_builder_add(&props, "{sv}", "type", g_variant_new_string(type));
+  if (label && *label) {
+    g_variant_builder_add(&props, "{sv}", "label", g_variant_new_string(label));
+    g_variant_builder_add(&props, "{sv}", "enabled", g_variant_new_boolean(TRUE));
+    g_variant_builder_add(&props, "{sv}", "visible", g_variant_new_boolean(TRUE));
+  }
+  return g_variant_builder_end(&props);
+}
+
 }  // namespace
 
 SystemTrayIcon::SystemTrayIcon() = default;
 
 SystemTrayIcon::~SystemTrayIcon() {
+  if (connection_ && menu_registration_id_ != 0) {
+    g_dbus_connection_unregister_object(connection_, menu_registration_id_);
+  }
   if (owner_id_ != 0) {
     g_bus_unown_name(owner_id_);
   }
@@ -70,6 +152,8 @@ void SystemTrayIcon::SetPlaying(bool playing) {
   playing_ = playing;
   UpdateTooltip();
   EmitNewStatus();
+  ++menu_revision_;
+  EmitLayoutUpdated();
 }
 
 void SystemTrayIcon::SetProgress(int percentage) {
@@ -152,6 +236,116 @@ void SystemTrayIcon::ShowMenu(int, int) {
   gtk_window_present(GTK_WINDOW(window));
 }
 
+const char *SystemTrayIcon::MenuLabel(int id, bool playing) {
+  switch (id) {
+    case 1:
+      return playing ? "Pause" : "Play";
+    case 2:
+      return "Stop";
+    case 3:
+      return "Next";
+    case 4:
+      return "Previous";
+    case 6:
+      return "Show / Hide";
+    case 7:
+      return "Quit";
+    default:
+      return "";
+  }
+}
+
+bool SystemTrayIcon::ActivateMenuId(int id, Signal<> *play_pause, Signal<> *stop, Signal<> *next, Signal<> *previous,
+                                   Signal<> *show_hide, Signal<> *quit) {
+  switch (id) {
+    case 1:
+      if (play_pause) {
+        play_pause->Emit();
+      }
+      return true;
+    case 2:
+      if (stop) {
+        stop->Emit();
+      }
+      return true;
+    case 3:
+      if (next) {
+        next->Emit();
+      }
+      return true;
+    case 4:
+      if (previous) {
+        previous->Emit();
+      }
+      return true;
+    case 6:
+      if (show_hide) {
+        show_hide->Emit();
+      }
+      return true;
+    case 7:
+      if (quit) {
+        quit->Emit();
+      }
+      return true;
+    default:
+      return false;
+  }
+}
+
+GVariant *SystemTrayIcon::MenuLayout(int parent_id) const {
+  if (parent_id != 0) {
+    GVariantBuilder props;
+    g_variant_builder_init(&props, G_VARIANT_TYPE("a{sv}"));
+    GVariantBuilder children;
+    g_variant_builder_init(&children, G_VARIANT_TYPE("av"));
+    return g_variant_new("(ia{sv}av)", parent_id, &props, &children);
+  }
+  GVariantBuilder root_props;
+  g_variant_builder_init(&root_props, G_VARIANT_TYPE("a{sv}"));
+  g_variant_builder_add(&root_props, "{sv}", "children-display", g_variant_new_string("submenu"));
+  GVariantBuilder children;
+  g_variant_builder_init(&children, G_VARIANT_TYPE("av"));
+  const int ids[] = {1, 2, 3, 4, 5, 6, 7};
+  for (int id : ids) {
+    GVariantBuilder empty;
+    g_variant_builder_init(&empty, G_VARIANT_TYPE("av"));
+    const char *type = id == 5 ? "separator" : "standard";
+    GVariant *item = g_variant_new("(i@a{sv}av)", id, ItemProps(MenuLabel(id, playing_), type), &empty);
+    g_variant_builder_add(&children, "v", item);
+  }
+  return g_variant_new("(ia{sv}av)", 0, &root_props, &children);
+}
+
+void SystemTrayIcon::EmitLayoutUpdated() {
+  if (!connection_ || menu_registration_id_ == 0) {
+    return;
+  }
+  g_dbus_connection_emit_signal(connection_, nullptr, kMenuObjectPath, kMenuInterface, "LayoutUpdated",
+                                g_variant_new("(ui)", menu_revision_, 0), nullptr);
+}
+
+void SystemTrayIcon::RegisterMenu(GDBusConnection *connection) {
+  GError *error = nullptr;
+  GDBusNodeInfo *info = g_dbus_node_info_new_for_xml(kMenuXml, &error);
+  if (!info) {
+    if (error) {
+      LogError("DBusMenu XML: %s", error->message);
+      g_error_free(error);
+    }
+    return;
+  }
+  menu_registration_id_ =
+      g_dbus_connection_register_object(connection, kMenuObjectPath, info->interfaces[0], &kMenuVtable, this, nullptr, &error);
+  g_dbus_node_info_unref(info);
+  if (error) {
+    LogError("DBusMenu register: %s", error->message);
+    g_error_free(error);
+    return;
+  }
+  menu_path_ = kMenuObjectPath;
+}
+
 void SystemTrayIcon::SetupStatusNotifier() {
   Settings settings;
   settings.BeginGroup(BehaviourSettings::kSettingsGroup);
@@ -185,6 +379,7 @@ void SystemTrayIcon::OnBusAcquired(GDBusConnection *connection, const gchar *, g
     g_error_free(error);
     return;
   }
+  self->RegisterMenu(connection);
   self->available_ = true;
   self->visible_ = true;
   g_dbus_connection_call(connection, "org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher",
@@ -244,13 +439,101 @@ GVariant *SystemTrayIcon::HandleGetProperty(GDBusConnection *, const gchar *, co
     return g_variant_new_string("");
   }
   if (g_strcmp0(property_name, "ItemIsMenu") == 0) {
-    return g_variant_new_boolean(FALSE);
+    return g_variant_new_boolean(self->menu_path_ == kMenuObjectPath);
   }
   if (g_strcmp0(property_name, "Menu") == 0) {
-    return g_variant_new_object_path("/NO_DBUSMENU");
+    return g_variant_new_object_path(self->menu_path_.c_str());
   }
   if (g_strcmp0(property_name, "ToolTip") == 0) {
     return g_variant_new_parsed("(%s, @a(iiay) [], %s, %s)", "", "Strawberry", self->tooltip_.c_str());
+  }
+  g_set_error(error, G_DBUS_ERROR, G_DBUS_ERROR_UNKNOWN_PROPERTY, "Unknown property %s", property_name);
+  return nullptr;
+}
+
+void SystemTrayIcon::HandleMenuMethod(GDBusConnection *, const gchar *, const gchar *, const gchar *, const gchar *method_name,
+                                      GVariant *parameters, GDBusMethodInvocation *invocation, gpointer data) {
+  auto *self = static_cast<SystemTrayIcon *>(data);
+  if (g_strcmp0(method_name, "GetLayout") == 0) {
+    gint parent = 0;
+    gint depth = 0;
+    g_variant_get(parameters, "(iias)", &parent, &depth, nullptr);
+    g_dbus_method_invocation_return_value(invocation, g_variant_new("(u@(ia{sv}av))", self->menu_revision_, self->MenuLayout(parent)));
+    return;
+  }
+  if (g_strcmp0(method_name, "GetGroupProperties") == 0) {
+    GVariantBuilder builder;
+    g_variant_builder_init(&builder, G_VARIANT_TYPE("a(ia{sv})"));
+    g_dbus_method_invocation_return_value(invocation, g_variant_new("(a(ia{sv}))", &builder));
+    return;
+  }
+  if (g_strcmp0(method_name, "GetProperty") == 0) {
+    gint id = 0;
+    const gchar *name = nullptr;
+    g_variant_get(parameters, "(i&s)", &id, &name);
+    GVariant *value = g_variant_new_string(MenuLabel(id, self->playing_));
+    if (g_strcmp0(name, "type") == 0) {
+      value = g_variant_new_string(id == 5 ? "separator" : "standard");
+    } else if (g_strcmp0(name, "enabled") == 0 || g_strcmp0(name, "visible") == 0) {
+      value = g_variant_new_boolean(TRUE);
+    }
+    g_dbus_method_invocation_return_value(invocation, g_variant_new("(v)", value));
+    return;
+  }
+  if (g_strcmp0(method_name, "Event") == 0) {
+    gint id = 0;
+    const gchar *event_id = nullptr;
+    g_variant_get(parameters, "(i&svu)", &id, &event_id, nullptr, nullptr);
+    if (g_strcmp0(event_id, "clicked") == 0) {
+      ActivateMenuId(id, &self->PlayPause, &self->Stop, &self->Next, &self->Previous, &self->ShowHide, &self->Quit);
+    }
+    g_dbus_method_invocation_return_value(invocation, nullptr);
+    return;
+  }
+  if (g_strcmp0(method_name, "EventGroup") == 0) {
+    GVariantIter *iter = nullptr;
+    g_variant_get(parameters, "(a(isvu))", &iter);
+    gint id = 0;
+    const gchar *event_id = nullptr;
+    while (g_variant_iter_next(iter, "(i&svu)", &id, &event_id, nullptr, nullptr)) {
+      if (g_strcmp0(event_id, "clicked") == 0) {
+        ActivateMenuId(id, &self->PlayPause, &self->Stop, &self->Next, &self->Previous, &self->ShowHide, &self->Quit);
+      }
+    }
+    g_variant_iter_free(iter);
+    GVariantBuilder errors;
+    g_variant_builder_init(&errors, G_VARIANT_TYPE("ai"));
+    g_dbus_method_invocation_return_value(invocation, g_variant_new("(ai)", &errors));
+    return;
+  }
+  if (g_strcmp0(method_name, "AboutToShow") == 0) {
+    g_dbus_method_invocation_return_value(invocation, g_variant_new("(b)", FALSE));
+    return;
+  }
+  if (g_strcmp0(method_name, "AboutToShowGroup") == 0) {
+    GVariantBuilder needed;
+    GVariantBuilder errors;
+    g_variant_builder_init(&needed, G_VARIANT_TYPE("ai"));
+    g_variant_builder_init(&errors, G_VARIANT_TYPE("ai"));
+    g_dbus_method_invocation_return_value(invocation, g_variant_new("(aiai)", &needed, &errors));
+    return;
+  }
+  g_dbus_method_invocation_return_error(invocation, G_DBUS_ERROR, G_DBUS_ERROR_UNKNOWN_METHOD, "Unknown method %s", method_name);
+}
+
+GVariant *SystemTrayIcon::HandleMenuGetProperty(GDBusConnection *, const gchar *, const gchar *, const gchar *, const gchar *property_name,
+                                                GError **error, gpointer) {
+  if (g_strcmp0(property_name, "Version") == 0) {
+    return g_variant_new_uint32(3);
+  }
+  if (g_strcmp0(property_name, "TextDirection") == 0) {
+    return g_variant_new_string("ltr");
+  }
+  if (g_strcmp0(property_name, "Status") == 0) {
+    return g_variant_new_string("normal");
+  }
+  if (g_strcmp0(property_name, "IconThemePath") == 0) {
+    return g_variant_new_strv(nullptr, 0);
   }
   g_set_error(error, G_DBUS_ERROR, G_DBUS_ERROR_UNKNOWN_PROPERTY, "Unknown property %s", property_name);
   return nullptr;
