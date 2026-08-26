@@ -4,6 +4,7 @@
 #include "covermanager/covermanagerview.h"
 #include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverexport.h"
+#include "covermanager/albumcoverexportlabels.h"
 #include "covermanager/coverarttypes.h"
 #include "covermanager/albumcoverexporter.h"
 #include "covermanager/albumcoverfetcher.h"
@@ -198,6 +199,36 @@ TEST(AlbumCoverExport, DialogResultFlags) {
   result.forcesize = false;
   result.overwrite = AlbumCoverExport::OverwriteMode::Smaller;
   EXPECT_TRUE(result.RequiresCoverProcessing());
+}
+
+TEST(AlbumCoverExportLabels, MatchQtExportDialog) {
+  EXPECT_STREQ("Export covers", AlbumCoverExportLabels::Title());
+  EXPECT_STREQ("Enter a filename for exported covers (no extension):", AlbumCoverExportLabels::FilenamePrompt());
+  EXPECT_STREQ("Export downloaded covers", AlbumCoverExportLabels::ExportDownloaded());
+  EXPECT_STREQ("Export embedded covers", AlbumCoverExportLabels::ExportEmbedded());
+  EXPECT_STREQ("Do not overwrite", AlbumCoverExportLabels::DoNotOverwrite());
+  EXPECT_STREQ("Overwrite all", AlbumCoverExportLabels::OverwriteAll());
+  EXPECT_STREQ("Overwrite smaller ones only", AlbumCoverExportLabels::OverwriteSmaller());
+  EXPECT_STREQ("Scale size", AlbumCoverExportLabels::ScaleSize());
+  EXPECT_STREQ("cover", AlbumCoverExportLabels::DefaultFilename());
+  EXPECT_STREQ("Do not overwrite", AlbumCoverExportLabels::OverwriteLabel(AlbumCoverExport::OverwriteMode::None));
+  EXPECT_EQ(AlbumCoverExport::OverwriteMode::Smaller, AlbumCoverExportLabels::OverwriteFromInt(2));
+  EXPECT_EQ(0, AlbumCoverExportLabels::OverwriteRadioIndex(AlbumCoverExport::OverwriteMode::None));
+  EXPECT_FALSE(AlbumCoverExportLabels::ForceSizeEnabled(false));
+  EXPECT_TRUE(AlbumCoverExportLabels::ForceSizeEnabled(true));
+  const AlbumCoverExport::DialogResult defaults = AlbumCoverExportLabels::Defaults();
+  EXPECT_TRUE(defaults.export_downloaded);
+  EXPECT_FALSE(defaults.export_embedded);
+  const auto types = AlbumCoverExportLabels::TypesFor(defaults);
+  ASSERT_EQ(2u, types.size());
+  EXPECT_EQ(AlbumCoverLoaderOptions::Type::Automatic, types[0]);
+  EXPECT_EQ(AlbumCoverLoaderOptions::Type::Manual, types[1]);
+  AlbumCoverExport::DialogResult embedded = defaults;
+  embedded.export_downloaded = false;
+  embedded.export_embedded = true;
+  const auto embedded_types = AlbumCoverExportLabels::TypesFor(embedded);
+  ASSERT_EQ(1u, embedded_types.size());
+  EXPECT_EQ(AlbumCoverLoaderOptions::Type::Embedded, embedded_types[0]);
 }
 
 TEST(CoverExportRunnable, CopiesManualCoverAndSkipsExisting) {

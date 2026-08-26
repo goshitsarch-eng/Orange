@@ -8,6 +8,7 @@
 #include "settings/streamingsettingslabels.h"
 #include "streaming/streamingchoices.h"
 #include "ui/dialogs.h"
+#include "widgets/loginstatewidget.h"
 
 AdwPreferencesPage *SubsonicSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(SubsonicSettings::kSettingsGroup);
@@ -35,7 +36,10 @@ AdwPreferencesPage *SubsonicSettingsPage::Create(Settings *settings, Application
     MessageDialog::Show(nullptr, SubsonicConnectionCheck::Title(result), SubsonicConnectionCheck::Body(result));
   });
   if (app) {
-    SettingsPage::AddLoginState(auth, app, "Subsonic");
+    if (LoginStateWidget *login = SettingsPage::AddLoginState(auth, app, "Subsonic")) {
+      login->AddCredentialGroup(username);
+      login->AddCredentialGroup(password);
+    }
   }
 
   AdwPreferencesGroup *prefs = SettingsPage::AddGroup(page, StreamingSettingsLabels::Preferences());

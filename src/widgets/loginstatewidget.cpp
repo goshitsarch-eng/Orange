@@ -1,11 +1,12 @@
 #include "loginstatewidget.h"
 
 #include "translations/translations.h"
+#include "widgets/loginstatevisibility.h"
 
 LoginStateWidget::LoginStateWidget() {
   root_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
 
-  status_ = gtk_label_new(Translations::CStr("Not signed in"));
+  status_ = gtk_label_new(Translations::CStr(LoginStateVisibility::StatusText(state_)));
   gtk_widget_set_halign(status_, GTK_ALIGN_START);
   gtk_box_append(GTK_BOX(root_), status_);
 
@@ -16,6 +17,11 @@ LoginStateWidget::LoginStateWidget() {
   account_type_ = gtk_label_new("");
   gtk_widget_set_halign(account_type_, GTK_ALIGN_START);
   gtk_box_append(GTK_BOX(root_), account_type_);
+
+  expires_ = gtk_label_new("");
+  gtk_widget_set_halign(expires_, GTK_ALIGN_START);
+  gtk_widget_set_visible(expires_, FALSE);
+  gtk_box_append(GTK_BOX(root_), expires_);
 
   progress_ = gtk_spinner_new();
   gtk_box_append(GTK_BOX(root_), progress_);
@@ -50,43 +56,60 @@ void LoginStateWidget::SetLoggedIn(State state, const std::string &account_name)
 }
 
 void LoginStateWidget::AddCredentialField(GtkWidget *widget) {
-  if (widget) gtk_box_append(GTK_BOX(root_), widget);
+  if (!widget) {
+    return;
+  }
+  credentials_.push_back(widget);
+  if (!gtk_widget_get_parent(widget)) {
+    gtk_box_append(GTK_BOX(root_), widget);
+  }
+  ApplyCredentials();
 }
 
 void LoginStateWidget::AddCredentialGroup(GtkWidget *widget) {
-  AddCredentialField(widget);
+  if (!widget) {
+    return;
+  }
+  credentials_.push_back(widget);
+  ApplyCredentials();
 }
 
-void LoginStateWidget::HideExpires() {}
+void LoginStateWidget::HideExpires() {
+  if (expires_) {
+    gtk_widget_set_visible(expires_, FALSE);
+  }
+}
 
 void LoginStateWidget::SetAccountTypeVisible(bool visible) {
   gtk_widget_set_visible(account_type_, visible);
 }
 
+void LoginStateWidget::ApplyCredentials() {
+  const gboolean show = LoginStateVisibility::ShowCredentials(state_) ? TRUE : FALSE;
+  const gboolean enable = LoginStateVisibility::CredentialsEnabled(state_) ? TRUE : FALSE;
+  for (GtkWidget *widget : credentials_) {
+    gtk_widget_set_visible(widget, show);
+    gtk_widget_set_sensitive(widget, enable);
+  }
+}
+
 void LoginStateWidget::ApplyState() {
+  gtk_label_set_text(GTK_LABEL(status_), Translations::CStr(LoginStateVisibility::StatusText(state_)));
+  gtk_widget_set_visible(login_, LoginStateVisibility::ShowLogin(state_) ? TRUE : FALSE);
+  gtk_widget_set_visible(logout_, LoginStateVisibility::ShowLogout(state_) ? TRUE : FALSE);
+  gtk_widget_set_visible(progress_, LoginStateVisibility::ShowProgress(state_) ? TRUE : FALSE);
   switch (state_) {
     case State::LoggedIn:
-      gtk_label_set_text(GTK_LABEL(status_), Translations::CStr("Signed in"));
       gtk_label_set_text(GTK_LABEL(account_), account_name_.c_str());
-      gtk_widget_set_visible(login_, FALSE);
-      gtk_widget_set_visible(logout_, TRUE);
       gtk_spinner_stop(GTK_SPINNER(progress_));
-      gtk_widget_set_visible(progress_, FALSE);
       break;
     case State::LoginInProgress:
-      gtk_label_set_text(GTK_LABEL(status_), Translations::CStr("Signing in…"));
-      gtk_widget_set_visible(login_, FALSE);
-      gtk_widget_set_visible(logout_, FALSE);
-      gtk_widget_set_visible(progress_, TRUE);
       gtk_spinner_start(GTK_SPINNER(progress_));
       break;
     case State::LoggedOut:
-      gtk_label_set_text(GTK_LABEL(status_), Translations::CStr("Not signed in"));
       gtk_label_set_text(GTK_LABEL(account_), "");
-      gtk_widget_set_visible(login_, TRUE);
-      gtk_widget_set_visible(logout_, FALSE);
       gtk_spinner_stop(GTK_SPINNER(progress_));
-      gtk_widget_set_visible(progress_, FALSE);
       break;
   }
+  ApplyCredentials();
 }

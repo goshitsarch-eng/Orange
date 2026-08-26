@@ -466,9 +466,9 @@ void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *but
   adw_preferences_group_add(group, GTK_WIDGET(row));
 }
 
-void AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name) {
+LoginStateWidget *AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name) {
   if (!app || !service_name) {
-    return;
+    return nullptr;
   }
   StreamingService *service = app->streaming_services()->ServiceByName(service_name);
   auto *login = new LoginStateWidget();
@@ -511,6 +511,7 @@ void AddLoginState(AdwPreferencesGroup *group, Application *app, const char *ser
                      delete static_cast<LoginStateWidget *>(data);
                    }),
                    login);
+  return login;
 }
 
 }  // namespace SettingsPage

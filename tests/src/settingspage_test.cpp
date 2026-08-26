@@ -20,9 +20,12 @@
 #include "constants/transcodersettings.h"
 #include "constants/waveformsettings.h"
 #include "core/appearancestyle.h"
+#include "settings/backendoutputchoices.h"
+#include "settings/behaviourstartupchoices.h"
 #include "settings/networkproxylabels.h"
 #include "settings/settingscontrols.h"
 #include "settings/streamingsettingslabels.h"
+#include "widgets/loginstatevisibility.h"
 #include "settings/transcodersettingspage.h"
 #include "covermanager/coverproviderauth.h"
 #include "settings/settingspages.h"
@@ -75,6 +78,14 @@ TEST(SettingsControls, NormalizationAndScales) {
   EXPECT_TRUE(SettingsControls::PlaylistPlayingSongColor(true, "#6696e3").empty());
   EXPECT_EQ("#6696e3", SettingsControls::PlaylistPlayingSongColor(false, {}));
   EXPECT_EQ("#abcabc", SettingsControls::PlaylistPlayingSongColor(false, "#abcabc"));
+  EXPECT_FALSE(SettingsControls::FadeDurationEnabled(false, false, false));
+  EXPECT_TRUE(SettingsControls::FadeDurationEnabled(true, false, false));
+  EXPECT_TRUE(SettingsControls::FadeDurationEnabled(false, true, false));
+  EXPECT_TRUE(SettingsControls::FadeDurationEnabled(false, false, true));
+  EXPECT_FALSE(SettingsControls::PauseFadeEnabled(false));
+  EXPECT_TRUE(SettingsControls::PauseFadeEnabled(true));
+  EXPECT_FALSE(SettingsControls::ChannelsSpinEnabled(false));
+  EXPECT_TRUE(SettingsControls::ChannelsSpinEnabled(true));
 }
 
 TEST(AppearanceStyle, GtkThemeChoicesAndCss) {
@@ -326,4 +337,58 @@ TEST(StreamingSettingsLabels, MatchQtStreamingAndRadioCopy) {
   EXPECT_STREQ("Search results limit:", RadioSettingsLabels::SearchResultsLimit());
   EXPECT_STREQ("Default sort order:", RadioSettingsLabels::DefaultSortOrder());
   EXPECT_STREQ("Default country:", RadioSettingsLabels::DefaultCountry());
+}
+
+TEST(BackendOutputChoices, AppendsCustomAndDetectsUnlistedDevice) {
+  EXPECT_STREQ("Custom", BackendOutputChoices::CustomLabel());
+  EXPECT_STREQ("__custom__", BackendOutputChoices::CustomChoiceKey());
+  EXPECT_TRUE(BackendOutputChoices::IsCustomKey(BackendOutputChoices::CustomChoiceKey()));
+  EXPECT_FALSE(BackendOutputChoices::IsCustomKey("alsasink|hw:0,0"));
+
+  const std::vector<AudioDevice> listed = {{"hw:0,0", "Card", "audio-card-symbolic", "alsasink"}};
+  EXPECT_FALSE(BackendOutputChoices::DeviceIsCustom("alsasink", "", listed));
+  EXPECT_FALSE(BackendOutputChoices::DeviceIsCustom("alsasink", "hw:0,0", listed));
+  EXPECT_TRUE(BackendOutputChoices::DeviceIsCustom("alsasink", "hw:1,0", listed));
+  EXPECT_EQ(BackendOutputChoices::CustomChoiceKey(), BackendOutputChoices::ComboKey("alsasink", "hw:1,0", listed));
+  EXPECT_EQ("alsasink|hw:0,0", BackendOutputChoices::ComboKey("alsasink", "hw:0,0", listed));
+
+  std::vector<std::pair<std::string, std::string>> devices = {{"alsasink|hw:0,0", "Card"}};
+  BackendOutputChoices::AppendCustom(&devices);
+  EXPECT_EQ(BackendOutputChoices::CustomChoiceKey(), devices.back().first);
+  EXPECT_EQ("Custom", devices.back().second);
+}
+
+TEST(BehaviourStartupChoices, HideAndTrayInterlocksMatchQt) {
+  const auto with_hide = BehaviourStartupChoices::StartupChoices(true, true);
+  ASSERT_EQ(5u, with_hide.size());
+  EXPECT_EQ("3", with_hide[2].first);
+  EXPECT_EQ("Hide", with_hide[2].second);
+  EXPECT_TRUE(BehaviourStartupChoices::IncludesHide(true, true));
+
+  const auto no_hide = BehaviourStartupChoices::StartupChoices(true, false);
+  ASSERT_EQ(4u, no_hide.size());
+  EXPECT_EQ("2", no_hide[1].first);
+  EXPECT_EQ("4", no_hide[2].first);
+  EXPECT_FALSE(BehaviourStartupChoices::IncludesHide(false, true));
+  EXPECT_FALSE(BehaviourStartupChoices::IncludesHide(true, false));
+
+  EXPECT_EQ("1", BehaviourStartupChoices::EffectiveStartup("3", false, true));
+  EXPECT_EQ("3", BehaviourStartupChoices::EffectiveStartup("3", true, true));
+  EXPECT_TRUE(BehaviourStartupChoices::TrayDependentSensitive(true, true));
+  EXPECT_FALSE(BehaviourStartupChoices::TrayDependentSensitive(true, false));
+  EXPECT_FALSE(BehaviourStartupChoices::TrayDependentSensitive(false, true));
+}
+
+TEST(LoginStateVisibility, HidesCredentialsWhileSignedIn) {
+  EXPECT_FALSE(LoginStateVisibility::ShowCredentials(LoginStateWidget::State::LoggedIn));
+  EXPECT_TRUE(LoginStateVisibility::ShowCredentials(LoginStateWidget::State::LoggedOut));
+  EXPECT_TRUE(LoginStateVisibility::ShowCredentials(LoginStateWidget::State::LoginInProgress));
+  EXPECT_FALSE(LoginStateVisibility::CredentialsEnabled(LoginStateWidget::State::LoginInProgress));
+  EXPECT_TRUE(LoginStateVisibility::CredentialsEnabled(LoginStateWidget::State::LoggedOut));
+  EXPECT_STREQ("Signed in", LoginStateVisibility::StatusText(LoginStateWidget::State::LoggedIn));
+  EXPECT_STREQ("Signing in…", LoginStateVisibility::StatusText(LoginStateWidget::State::LoginInProgress));
+  EXPECT_STREQ("Not signed in", LoginStateVisibility::StatusText(LoginStateWidget::State::LoggedOut));
+  EXPECT_TRUE(LoginStateVisibility::ShowLogin(LoginStateWidget::State::LoggedOut));
+  EXPECT_TRUE(LoginStateVisibility::ShowLogout(LoginStateWidget::State::LoggedIn));
+  EXPECT_TRUE(LoginStateVisibility::ShowProgress(LoginStateWidget::State::LoginInProgress));
 }

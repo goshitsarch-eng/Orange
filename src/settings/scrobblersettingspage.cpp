@@ -202,6 +202,8 @@ AdwPreferencesPage *ScrobblerSettingsPage::Create(Settings *settings, Applicatio
           login->SetLoggedIn(LoginStateWidget::State::LoggedOut);
         }
       });
+      login->AddCredentialGroup(GTK_WIDGET(user_row));
+      login->AddCredentialGroup(GTK_WIDGET(token_row));
       g_signal_connect(user_row, "changed", G_CALLBACK(+[](AdwEntryRow *, gpointer data) {
                          (*static_cast<std::function<void()> *>(data))();
                        }),

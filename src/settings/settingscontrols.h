@@ -45,6 +45,12 @@ inline const char *NormalizationChoice(bool replaygain, bool ebu) {
 inline bool NormalizationUsesReplayGain(const std::string &choice) { return choice == "rg"; }
 inline bool NormalizationUsesEbu(const std::string &choice) { return choice == "ebu"; }
 
+inline bool FadeDurationEnabled(bool stop, bool cross, bool auto_cross) { return stop || cross || auto_cross; }
+
+inline bool PauseFadeEnabled(bool pause) { return pause; }
+
+inline bool ChannelsSpinEnabled(bool force_channels) { return force_channels; }
+
 inline bool PlaylistColorIsSystem(const std::string &color) { return color.empty(); }
 
 inline std::string PlaylistPlayingSongColor(bool system, const std::string &custom, const char *fallback = "#6696e3") {

@@ -3,8 +3,33 @@
 #include "constants/backendsettings.h"
 #include "core/application.h"
 #include "engine/devicefinders.h"
+#include "settings/backendoutputchoices.h"
 #include "settings/settingscontrols.h"
 #include "settings/settingspage.h"
+
+namespace {
+
+struct FadeWidgets {
+  GtkWidget *stop = nullptr;
+  GtkWidget *cross = nullptr;
+  GtkWidget *auto_cross = nullptr;
+  GtkWidget *same = nullptr;
+  GtkWidget *pause = nullptr;
+  GtkWidget *duration = nullptr;
+  GtkWidget *pause_duration = nullptr;
+};
+
+void ApplyFadeSensitivity(FadeWidgets *state) {
+  const bool fade_on = SettingsControls::FadeDurationEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(state->stop)),
+                                                            adw_switch_row_get_active(ADW_SWITCH_ROW(state->cross)),
+                                                            adw_switch_row_get_active(ADW_SWITCH_ROW(state->auto_cross)));
+  gtk_widget_set_sensitive(state->same, fade_on ? TRUE : FALSE);
+  gtk_widget_set_sensitive(state->duration, fade_on ? TRUE : FALSE);
+  gtk_widget_set_sensitive(state->pause_duration,
+                           SettingsControls::PauseFadeEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(state->pause))) ? TRUE : FALSE);
+}
+
+}  // namespace
 
 AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(BackendSettings::kSettingsGroup);
@@ -18,31 +43,54 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
   }
   SettingsPage::AddCombo(output, settings, BackendSettings::kOutput, "GStreamer output", outputs, "autoaudiosink");
 
+  const std::vector<AudioDevice> listed = finders ? finders->ListDevices() : std::vector<AudioDevice>{};
   std::vector<std::pair<std::string, std::string>> devices = {{DeviceFinders::ChoiceKey("autoaudiosink", ""), "Default"}};
   if (finders) {
     devices.clear();
-    for (const AudioDevice &device : finders->ListDevices()) {
+    for (const AudioDevice &device : listed) {
       devices.emplace_back(DeviceFinders::ChoiceKey(device.output, device.id), device.description);
     }
   }
-  const std::string current_choice =
-      DeviceFinders::ChoiceKey(settings->Value(BackendSettings::kOutput, "autoaudiosink"), settings->Value(BackendSettings::kDevice));
-  SettingsPage::AddCombo(output, settings, nullptr, "Device", devices, current_choice, [settings](const std::string &key) {
+  BackendOutputChoices::AppendCustom(&devices);
+  const std::string current_output = settings->Value(BackendSettings::kOutput, "autoaudiosink");
+  const std::string current_device = settings->Value(BackendSettings::kDevice);
+  const bool custom_device = BackendOutputChoices::DeviceIsCustom(current_output, current_device, listed);
+  const std::string current_choice = BackendOutputChoices::ComboKey(current_output, current_device, listed);
+  auto *custom_entry = new GtkWidget *(nullptr);
+  g_object_set_data_full(G_OBJECT(page), "custom-device-entry", custom_entry, [](gpointer p) { delete static_cast<GtkWidget **>(p); });
+  SettingsPage::AddCombo(output, settings, nullptr, "Device", devices, current_choice, [settings, custom_entry](const std::string &key) {
+    if (BackendOutputChoices::IsCustomKey(key)) {
+      if (*custom_entry) {
+        gtk_widget_set_sensitive(*custom_entry, TRUE);
+      }
+      return;
+    }
     std::string sink;
     std::string device;
     DeviceFinders::SplitChoiceKey(key, &sink, &device);
     settings->SetValue(BackendSettings::kOutput, sink);
     settings->SetValue(BackendSettings::kDevice, device);
     settings->Sync();
+    if (*custom_entry) {
+      gtk_widget_set_sensitive(*custom_entry, FALSE);
+    }
   });
+  *custom_entry = SettingsPage::AddEntry(output, settings, BackendSettings::kDevice, BackendOutputChoices::CustomDeviceTitle());
+  gtk_widget_set_sensitive(*custom_entry, custom_device ? TRUE : FALSE);
   SettingsPage::AddChoiceRadios(output, settings, BackendSettings::kALSAPlugin, "ALSA plugin",
                                {{"hw", "hw"}, {"plughw", "plughw"}, {"pcm", "pcm"}}, "hw");
   SettingsPage::AddToggle(output, settings, BackendSettings::kExclusiveMode, "Exclusive mode", nullptr, BackendSettings::kDefaultExclusiveMode);
   SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeControl, "Software volume control", nullptr, BackendSettings::kDefaultVolumeControl);
   SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeExponential, "Exponential volume scale", nullptr,
                           BackendSettings::kDefaultVolumeExponential);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kChannelsEnabled, "Force channel count", nullptr, BackendSettings::kDefaultChannelsEnabled);
-  SettingsPage::AddIntEntry(output, settings, BackendSettings::kChannels, "Channels", BackendSettings::kDefaultChannels);
+  GtkWidget *force_channels =
+      SettingsPage::AddToggle(output, settings, BackendSettings::kChannelsEnabled, "Force channel count", nullptr, BackendSettings::kDefaultChannelsEnabled);
+  GtkWidget *channels = SettingsPage::AddIntEntry(output, settings, BackendSettings::kChannels, "Channels", BackendSettings::kDefaultChannels);
+  gtk_widget_set_sensitive(channels, SettingsControls::ChannelsSpinEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(force_channels))) ? TRUE : FALSE);
+  g_signal_connect(force_channels, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
+                     gtk_widget_set_sensitive(GTK_WIDGET(data), SettingsControls::ChannelsSpinEnabled(adw_switch_row_get_active(row)) ? TRUE : FALSE);
+                   }),
+                   channels);
   SettingsPage::AddToggle(output, settings, BackendSettings::kBS2B, "Bauer stereo-to-binaural", nullptr, BackendSettings::kDefaultBS2B);
   SettingsPage::AddToggle(output, settings, BackendSettings::kPlaybin3, "Use playbin3", nullptr, BackendSettings::kDefaultPlaybin3);
   SettingsPage::AddToggle(output, settings, BackendSettings::kHTTP2, "HTTP/2", nullptr, BackendSettings::kDefaultHTTP2);
@@ -99,22 +147,38 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
                               BackendSettings::kDefaultEBUR128TargetLevelLUFS, ebu.min, ebu.max, ebu.step);
 
   AdwPreferencesGroup *fade = SettingsPage::AddGroup(page, "Fading");
-  SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutEnabled, "Fade out when stopping", nullptr, BackendSettings::kDefaultFadeoutEnabled);
-  SettingsPage::AddToggle(fade, settings, BackendSettings::kCrossfadeEnabled, "Cross-fade on manual track change", nullptr,
-                          BackendSettings::kDefaultCrossfadeEnabled);
-  SettingsPage::AddToggle(fade, settings, BackendSettings::kAutoCrossfadeEnabled, "Auto cross-fade between tracks", nullptr,
-                          BackendSettings::kDefaultAutoCrossfadeEnabled);
-  SettingsPage::AddToggle(fade, settings, BackendSettings::kNoCrossfadeSameAlbum, "No cross-fade on the same album", nullptr,
-                          BackendSettings::kDefaultNoCrossfadeSameAlbum);
-  SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutPauseEnabled, "Fade on pause / resume", nullptr,
-                          BackendSettings::kDefaultFadeoutPauseEnabled);
+  GtkWidget *fade_stop =
+      SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutEnabled, "Fade out when stopping", nullptr, BackendSettings::kDefaultFadeoutEnabled);
+  GtkWidget *fade_cross = SettingsPage::AddToggle(fade, settings, BackendSettings::kCrossfadeEnabled, "Cross-fade on manual track change",
+                                                 nullptr, BackendSettings::kDefaultCrossfadeEnabled);
+  GtkWidget *fade_auto = SettingsPage::AddToggle(fade, settings, BackendSettings::kAutoCrossfadeEnabled, "Auto cross-fade between tracks",
+                                                nullptr, BackendSettings::kDefaultAutoCrossfadeEnabled);
+  GtkWidget *fade_same = SettingsPage::AddToggle(fade, settings, BackendSettings::kNoCrossfadeSameAlbum, "No cross-fade on the same album",
+                                                nullptr, BackendSettings::kDefaultNoCrossfadeSameAlbum);
+  GtkWidget *fade_pause = SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutPauseEnabled, "Fade on pause / resume", nullptr,
+                                                 BackendSettings::kDefaultFadeoutPauseEnabled);
   const auto fade_ms = SettingsControls::FadeDurationMs();
-  SettingsPage::AddIntScale(fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutDuration, "Fade duration (ms)",
-                           static_cast<int>(BackendSettings::kDefaultFadeoutDuration), static_cast<int>(fade_ms.min),
-                           static_cast<int>(fade_ms.max), static_cast<int>(fade_ms.step));
+  GtkWidget *fade_duration =
+      SettingsPage::AddIntScale(fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutDuration, "Fade duration (ms)",
+                                static_cast<int>(BackendSettings::kDefaultFadeoutDuration), static_cast<int>(fade_ms.min),
+                                static_cast<int>(fade_ms.max), static_cast<int>(fade_ms.step));
   const auto pause_ms = SettingsControls::FadePauseDurationMs();
-  SettingsPage::AddIntScale(fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutPauseDuration, "Pause fade duration (ms)",
-                           static_cast<int>(BackendSettings::kDefaultFadeoutPauseDuration), static_cast<int>(pause_ms.min),
-                           static_cast<int>(pause_ms.max), static_cast<int>(pause_ms.step));
+  GtkWidget *pause_duration = SettingsPage::AddIntScale(
+      fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutPauseDuration, "Pause fade duration (ms)",
+      static_cast<int>(BackendSettings::kDefaultFadeoutPauseDuration), static_cast<int>(pause_ms.min), static_cast<int>(pause_ms.max),
+      static_cast<int>(pause_ms.step));
+  auto *fade_widgets = new FadeWidgets{fade_stop, fade_cross, fade_auto, fade_same, fade_pause, fade_duration, pause_duration};
+  ApplyFadeSensitivity(fade_widgets);
+  g_object_set_data_full(G_OBJECT(page), "fade-widgets", fade_widgets, [](gpointer p) { delete static_cast<FadeWidgets *>(p); });
+  auto connect_fade = [&](GtkWidget *row) {
+    g_signal_connect(row, "notify::active", G_CALLBACK(+[](AdwSwitchRow *, GParamSpec *, gpointer data) {
+                       ApplyFadeSensitivity(static_cast<FadeWidgets *>(data));
+                     }),
+                     fade_widgets);
+  };
+  connect_fade(fade_stop);
+  connect_fade(fade_cross);
+  connect_fade(fade_auto);
+  connect_fade(fade_pause);
   return page;
 }

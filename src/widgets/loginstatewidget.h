@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 #include <gtk/gtk.h>
 
@@ -33,6 +34,7 @@ class LoginStateWidget {
 
  private:
   void ApplyState();
+  void ApplyCredentials();
 
   GtkWidget *root_ = nullptr;
   GtkWidget *status_ = nullptr;
@@ -41,6 +43,8 @@ class LoginStateWidget {
   GtkWidget *logout_ = nullptr;
   GtkWidget *progress_ = nullptr;
   GtkWidget *account_type_ = nullptr;
+  GtkWidget *expires_ = nullptr;
+  std::vector<GtkWidget *> credentials_;
   State state_ = State::LoggedOut;
   std::string account_name_;
   std::function<void()> login_cb_;

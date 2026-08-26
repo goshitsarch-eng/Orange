@@ -469,19 +469,31 @@ bool DeviceManager::Unmount(const std::string &device_id) {
 }
 
 bool DeviceManager::SetDeviceOptions(const std::string &device_id, const std::string &friendly_name,
-                                     DeviceDatabaseBackend::TranscodeMode mode, Song::FileType format) {
+                                     DeviceDatabaseBackend::TranscodeMode mode, Song::FileType format, const std::string &icon_name) {
   if (!device_db_) {
     return false;
   }
   DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device_id);
+  const std::string icon = icon_name.empty() ? stored.icon_name : icon_name;
   if (stored.id < 0) {
     stored.unique_id = device_id;
     stored.friendly_name = friendly_name;
+    stored.icon_name = icon;
     stored.transcode_mode = mode;
     stored.transcode_format = format;
     return device_db_->AddDevice(stored) >= 0;
   }
-  device_db_->SetDeviceOptions(stored.id, friendly_name.empty() ? stored.friendly_name : friendly_name, stored.icon_name, mode, format);
+  device_db_->SetDeviceOptions(stored.id, friendly_name.empty() ? stored.friendly_name : friendly_name, icon, mode, format);
+  for (ConnectedDevice &device : devices_) {
+    if (device.unique_id == device_id) {
+      if (!friendly_name.empty()) {
+        device.friendly_name = friendly_name;
+      }
+      if (!icon.empty()) {
+        device.icon = icon;
+      }
+    }
+  }
   return true;
 }
 

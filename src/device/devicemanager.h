@@ -26,7 +26,7 @@ class DeviceManager {
   bool Forget(const std::string &device_id);
   bool Unmount(const std::string &device_id);
   bool SetDeviceOptions(const std::string &device_id, const std::string &friendly_name, DeviceDatabaseBackend::TranscodeMode mode,
-                        Song::FileType format);
+                        Song::FileType format, const std::string &icon_name = {});
   DeviceDatabaseBackend::Device StoredDevice(const std::string &device_id) const;
   SongList Songs(const std::string &device_id) const;
   UrlHandler *url_handler() const { return url_handler_.get(); }

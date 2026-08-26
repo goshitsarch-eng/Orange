@@ -11,6 +11,7 @@
 #include <vector>
 
 class Application;
+class LoginStateWidget;
 
 namespace SettingsPage {
 
@@ -47,7 +48,7 @@ void AddBoolRadios(AdwPreferencesGroup *group, Settings *settings, const char *k
 void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
                      const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
                      const std::function<void(const std::string &)> &changed = {});
-void AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name);
+LoginStateWidget *AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name);
 
 }  // namespace SettingsPage
 

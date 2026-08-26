@@ -1,19 +1,40 @@
 #include "settings/behavioursettingspage.h"
 
 #include "constants/behavioursettings.h"
+#include "core/application.h"
+#include "settings/behaviourstartupchoices.h"
 #include "settings/settingspage.h"
+#include "systemtrayicon/systemtrayicon.h"
 #include "translations/languagechoices.h"
 #include "translations/translations.h"
 
-AdwPreferencesPage *BehaviourSettingsPage::Create(Settings *settings, Application *) {
+namespace {
+
+struct TrayWidgets {
+  bool available = true;
+  GtkWidget *keep = nullptr;
+  GtkWidget *progress = nullptr;
+};
+
+}  // namespace
+
+AdwPreferencesPage *BehaviourSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(BehaviourSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Behaviour", "preferences-system-symbolic");
+  const bool tray_available = app && app->tray() ? app->tray()->available() : true;
+  bool show_tray = settings->BoolValue(BehaviourSettings::kShowTrayIcon, BehaviourSettings::kDefaultShowTrayIcon);
+  if (!tray_available) {
+    show_tray = false;
+  }
   AdwPreferencesGroup *startup = SettingsPage::AddGroup(page, "Startup");
   SettingsPage::AddToggle(startup, settings, BehaviourSettings::kResumePlayback, "Resume playback on startup", nullptr,
                           BehaviourSettings::kDefaultResumePlayback);
   SettingsPage::AddCombo(startup, settings, BehaviourSettings::kStartupBehaviour, "Startup behaviour",
-                         {{"1", "Remember"}, {"2", "Show"}, {"3", "Hide"}, {"4", "Show maximized"}, {"5", "Show minimized"}},
-                         std::to_string(static_cast<int>(BehaviourSettings::kDefaultStartupBehaviour)));
+                         BehaviourStartupChoices::StartupChoices(tray_available, show_tray),
+                         BehaviourStartupChoices::EffectiveStartup(
+                             settings->Value(BehaviourSettings::kStartupBehaviour,
+                                             std::to_string(static_cast<int>(BehaviourSettings::kDefaultStartupBehaviour))),
+                             tray_available, show_tray));
   SettingsPage::AddCombo(startup, settings, nullptr, "Language", LanguageChoices::All(), settings->Value(BehaviourSettings::kLanguage),
                          [settings](const std::string &id) {
                            settings->BeginGroup(BehaviourSettings::kSettingsGroup);
@@ -30,11 +51,26 @@ AdwPreferencesPage *BehaviourSettingsPage::Create(Settings *settings, Applicatio
   adw_preferences_group_add(startup, language_note);
 
   AdwPreferencesGroup *tray = SettingsPage::AddGroup(page, "System tray");
-  SettingsPage::AddToggle(tray, settings, BehaviourSettings::kShowTrayIcon, "Show system tray icon", nullptr, BehaviourSettings::kDefaultShowTrayIcon);
-  SettingsPage::AddToggle(tray, settings, BehaviourSettings::kKeepRunning, "Keep running in the tray when the window is closed", nullptr,
-                          BehaviourSettings::kDefaultKeepRunning);
-  SettingsPage::AddToggle(tray, settings, BehaviourSettings::kTrayIconProgress, "Show progress on the tray icon", nullptr,
-                          BehaviourSettings::kDefaultTrayIconProgress);
+  GtkWidget *show_tray_row =
+      SettingsPage::AddToggle(tray, settings, BehaviourSettings::kShowTrayIcon, "Show system tray icon", nullptr, BehaviourSettings::kDefaultShowTrayIcon);
+  gtk_widget_set_sensitive(show_tray_row, tray_available ? TRUE : FALSE);
+  GtkWidget *keep_running = SettingsPage::AddToggle(tray, settings, BehaviourSettings::kKeepRunning,
+                                                   "Keep running in the tray when the window is closed", nullptr,
+                                                   BehaviourSettings::kDefaultKeepRunning);
+  GtkWidget *tray_progress = SettingsPage::AddToggle(tray, settings, BehaviourSettings::kTrayIconProgress, "Show progress on the tray icon",
+                                                    nullptr, BehaviourSettings::kDefaultTrayIconProgress);
+  const bool tray_sensitive = BehaviourStartupChoices::TrayDependentSensitive(tray_available, show_tray);
+  gtk_widget_set_sensitive(keep_running, tray_sensitive ? TRUE : FALSE);
+  gtk_widget_set_sensitive(tray_progress, tray_sensitive ? TRUE : FALSE);
+  auto *tray_widgets = new TrayWidgets{tray_available, keep_running, tray_progress};
+  g_object_set_data_full(G_OBJECT(page), "tray-widgets", tray_widgets, [](gpointer p) { delete static_cast<TrayWidgets *>(p); });
+  g_signal_connect(show_tray_row, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
+                     auto *state = static_cast<TrayWidgets *>(data);
+                     const bool sensitive = BehaviourStartupChoices::TrayDependentSensitive(state->available, adw_switch_row_get_active(row));
+                     gtk_widget_set_sensitive(state->keep, sensitive ? TRUE : FALSE);
+                     gtk_widget_set_sensitive(state->progress, sensitive ? TRUE : FALSE);
+                   }),
+                   tray_widgets);
   SettingsPage::AddToggle(tray, settings, BehaviourSettings::kTaskbarProgress, "Show progress on the taskbar", nullptr,
                           BehaviourSettings::kDefaultTaskbarProgress);
   SettingsPage::AddToggle(tray, settings, BehaviourSettings::kPlayingWidget, "Show playing widget", nullptr, BehaviourSettings::kDefaultPlayingWidget);

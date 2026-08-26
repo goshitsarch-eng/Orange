@@ -1,5 +1,8 @@
 #include "collection/collectionmodel.h"
 #include "collection/collectiontree.h"
+#include "device/devicepropertiesicons.h"
+#include "device/devicepropertiesinfo.h"
+#include "device/devicepropertieslabels.h"
 #include "device/devicecopy.h"
 #include "device/devicemenu.h"
 #include "device/devicesongmenu.h"
@@ -544,4 +547,65 @@ TEST(DeviceDrag, JoinsSongUrls) {
   Song empty;
   EXPECT_EQ("gphoto2://phone/Music/a.mp3\ngphoto2://phone/Music/b.mp3", DeviceDrag::DragPayload({a, b, empty}));
   EXPECT_TRUE(DeviceDrag::DragPayload({}).empty());
+}
+
+TEST(DevicePropertiesIcons, MatchQtIconList) {
+  ASSERT_EQ(7u, DevicePropertiesIcons::Names().size());
+  EXPECT_STREQ("device", DevicePropertiesIcons::Names().front());
+  EXPECT_STREQ("device-phone", DevicePropertiesIcons::Names().back());
+  EXPECT_EQ(0, DevicePropertiesIcons::IndexOf("device"));
+  EXPECT_EQ(6, DevicePropertiesIcons::IndexOf("device-phone"));
+  EXPECT_EQ(-1, DevicePropertiesIcons::IndexOf("unknown-icon"));
+  EXPECT_STREQ("device-usb-flash", DevicePropertiesIcons::IconAt(2));
+  EXPECT_EQ("device", DevicePropertiesIcons::EffectiveIcon("missing"));
+  EXPECT_EQ("device-ipod", DevicePropertiesIcons::EffectiveIcon("device-ipod"));
+  EXPECT_STREQ("drive-harddisk-symbolic", DevicePropertiesIcons::GtkName("device"));
+  EXPECT_STREQ("phone-symbolic", DevicePropertiesIcons::GtkName("device-phone"));
+}
+
+TEST(DevicePropertiesLabels, TabsModesAndSortedFormats) {
+  EXPECT_STREQ("Information", DevicePropertiesLabels::InformationTab());
+  EXPECT_STREQ("File formats", DevicePropertiesLabels::FileFormatsTab());
+  EXPECT_STREQ("Do not convert any music", DevicePropertiesLabels::Never());
+  EXPECT_STREQ("Convert any music that the device can't play", DevicePropertiesLabels::Unsupported());
+  EXPECT_STREQ("Convert all music", DevicePropertiesLabels::Always());
+  EXPECT_STREQ("Preferred format", DevicePropertiesLabels::PreferredFormat());
+  EXPECT_STREQ("Open device", DevicePropertiesLabels::OpenDevice());
+  EXPECT_EQ(0, DevicePropertiesLabels::RadioIndex(DeviceDatabaseBackend::TranscodeMode::Transcode_Never));
+  EXPECT_EQ(1, DevicePropertiesLabels::RadioIndex(DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported));
+  EXPECT_EQ(2, DevicePropertiesLabels::RadioIndex(DeviceDatabaseBackend::TranscodeMode::Transcode_Always));
+  EXPECT_EQ(DeviceDatabaseBackend::TranscodeMode::Transcode_Never, DevicePropertiesLabels::ModeFromRadio(0));
+  EXPECT_EQ(DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported, DevicePropertiesLabels::ModeFromRadio(1));
+  EXPECT_EQ(DeviceDatabaseBackend::TranscodeMode::Transcode_Always, DevicePropertiesLabels::ModeFromRadio(2));
+  EXPECT_EQ(Song::FileType::MPEG, DevicePropertiesLabels::FileTypeFor(Transcoder::Format::MP3));
+  EXPECT_EQ(Song::FileType::MP4, DevicePropertiesLabels::FileTypeFor(Transcoder::Format::AAC));
+  EXPECT_EQ(Song::FileType::OggOpus, DevicePropertiesLabels::FileTypeFor(Transcoder::Format::Opus));
+  const auto formats = DevicePropertiesLabels::FormatChoices();
+  ASSERT_EQ(8u, formats.size());
+  EXPECT_EQ("AAC", formats.front().second);
+  EXPECT_EQ("WavPack", formats.back().second);
+  EXPECT_EQ(Song::FileType::MP4, DevicePropertiesLabels::FormatAt(0));
+  EXPECT_GE(DevicePropertiesLabels::IndexOfFormat(Song::FileType::FLAC), 0);
+}
+
+TEST(DevicePropertiesInfo, HardwareRowsAndOpenRule) {
+  ConnectedDevice empty;
+  EXPECT_FALSE(DevicePropertiesInfo::HasHardwareInfo(empty));
+  EXPECT_FALSE(DevicePropertiesInfo::OpenEnabled(empty));
+  EXPECT_TRUE(DevicePropertiesInfo::Rows(empty).empty());
+  EXPECT_FALSE(DevicePropertiesInfo::SpaceFor(empty).available);
+
+  ConnectedDevice device;
+  device.unique_id = "usb:1234";
+  device.backend = "gio";
+  device.mount_path = "/media/music";
+  device.size = 1024;
+  device.icon = "device-usb-drive";
+  EXPECT_TRUE(DevicePropertiesInfo::HasHardwareInfo(device));
+  EXPECT_TRUE(DevicePropertiesInfo::OpenEnabled(device));
+  const auto rows = DevicePropertiesInfo::Rows(device);
+  ASSERT_EQ(5u, rows.size());
+  EXPECT_EQ("Backend", rows.front().key);
+  EXPECT_EQ("Unique ID", rows.back().key);
+  EXPECT_EQ("usb:1234", rows.back().value);
 }
