@@ -1,6 +1,8 @@
 #ifndef STRAWBERRY_MULTILOADINGTEXT_H
 #define STRAWBERRY_MULTILOADINGTEXT_H
 
+#include "ui/statusbarstack.h"
+
 #include <string>
 #include <vector>
 
@@ -55,14 +57,8 @@ inline std::string Format(const std::vector<Task> &tasks) {
   return UpperFirst(text) + "...";
 }
 
-inline bool ShowIndicator(int task_count) { return task_count > 0; }
+inline bool ShowIndicator(int task_count) { return StatusBarStack::ShowLoading(task_count); }
 
 }  // namespace MultiLoadingText
-
-namespace StatusBarStack {
-
-inline bool ShowLoading(int task_count) { return MultiLoadingText::ShowIndicator(task_count); }
-
-}  // namespace StatusBarStack
 
 #endif  // STRAWBERRY_MULTILOADINGTEXT_H

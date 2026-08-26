@@ -1492,6 +1492,10 @@ TEST(MultiLoadingText, FormatsQtStatusBarCopy) {
   EXPECT_TRUE(MultiLoadingText::ShowIndicator(1));
   EXPECT_FALSE(StatusBarStack::ShowLoading(0));
   EXPECT_TRUE(StatusBarStack::ShowLoading(2));
+  EXPECT_EQ(StatusBarStack::Page::Summary, StatusBarStack::PageForTaskCount(0));
+  EXPECT_EQ(StatusBarStack::Page::Loading, StatusBarStack::PageForTaskCount(3));
+  EXPECT_STREQ("summary", StatusBarStack::ChildName(StatusBarStack::Page::Summary));
+  EXPECT_STREQ("loading", StatusBarStack::ChildName(StatusBarStack::Page::Loading));
   EXPECT_EQ("Scanning collection...", MultiLoadingText::Format({{"Scanning collection", 0, 0}}));
   EXPECT_EQ("Updating 40%...", MultiLoadingText::Format({{"Updating", 2, 5}}));
   EXPECT_EQ("Loading tags, fetching covers 50%...",

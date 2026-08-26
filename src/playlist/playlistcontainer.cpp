@@ -151,6 +151,7 @@ PlaylistContainer::PlaylistContainer()
   view_->SetFocusFilterCallback([this]() { FocusFilter(); });
   summary_ = gtk_label_new("");
   gtk_widget_add_css_class(summary_, "dim-label");
+  gtk_widget_set_visible(summary_, FALSE);
   gtk_box_append(GTK_BOX(toolbar_), summary_);
   gtk_widget_set_margin_start(tab_bar_->widget(), 8);
   gtk_widget_set_margin_end(tab_bar_->widget(), 8);

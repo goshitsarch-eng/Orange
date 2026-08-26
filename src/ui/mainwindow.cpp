@@ -43,6 +43,7 @@
 #include "queue/queueview.h"
 #include "widgets/multiloadingindicator.h"
 #include "widgets/multiloadingtext.h"
+#include "ui/statusbarstack.h"
 #include "widgets/playingwidget.h"
 #include "widgets/seekbarmode.h"
 #include "widgets/trackslider.h"
@@ -1622,10 +1623,20 @@ void MainWindow::BuildPlayerBar() {
   gtk_box_append(GTK_BOX(box), controls);
 
   loading_indicator_ = std::make_unique<MultiLoadingIndicator>();
-  gtk_box_append(GTK_BOX(box), loading_indicator_->widget());
-  status_label_ = gtk_label_new(Translations::CStr("Ready"));
+  status_label_ = gtk_label_new("");
   gtk_widget_add_css_class(status_label_, "dim-label");
-  gtk_box_append(GTK_BOX(box), status_label_);
+  gtk_widget_set_hexpand(status_label_, TRUE);
+  gtk_widget_set_halign(status_label_, GTK_ALIGN_END);
+  gtk_label_set_xalign(GTK_LABEL(status_label_), 1.0f);
+  gtk_label_set_ellipsize(GTK_LABEL(status_label_), PANGO_ELLIPSIZE_END);
+  status_bar_stack_ = gtk_stack_new();
+  gtk_widget_set_hexpand(status_bar_stack_, TRUE);
+  gtk_stack_set_hhomogeneous(GTK_STACK(status_bar_stack_), TRUE);
+  gtk_stack_add_named(GTK_STACK(status_bar_stack_), loading_indicator_->widget(),
+                      StatusBarStack::ChildName(StatusBarStack::Page::Loading));
+  gtk_stack_add_named(GTK_STACK(status_bar_stack_), status_label_, StatusBarStack::ChildName(StatusBarStack::Page::Summary));
+  gtk_stack_set_visible_child_name(GTK_STACK(status_bar_stack_), StatusBarStack::ChildName(StatusBarStack::Page::Summary));
+  gtk_box_append(GTK_BOX(box), status_bar_stack_);
 
   g_signal_connect(play_button_, "clicked", G_CALLBACK(OnPlayPause), this);
   g_signal_connect(stop, "clicked", G_CALLBACK(OnStop), this);
@@ -1648,10 +1659,9 @@ void MainWindow::PlacePlayingWidget() {
     return;
   }
   GtkWidget *playing = playing_widget_->widget();
-  if (playing_widget_->above_status_bar() && status_label_) {
-    GtkWidget *before = loading_indicator_ ? loading_indicator_->widget() : nullptr;
-    gtk_box_reorder_child_after(GTK_BOX(box), playing, before);
-    gtk_box_reorder_child_after(GTK_BOX(box), status_label_, playing);
+  if (playing_widget_->above_status_bar() && status_bar_stack_) {
+    gtk_box_reorder_child_after(GTK_BOX(box), playing, status_bar_stack_);
+    gtk_box_reorder_child_after(GTK_BOX(box), status_bar_stack_, playing);
   } else {
     gtk_box_reorder_child_after(GTK_BOX(box), playing, nullptr);
   }
@@ -1764,8 +1774,9 @@ void MainWindow::ConnectSignals() {
       infos.push_back({task.name, task.progress, task.progress_max});
     }
     loading_indicator_->SetTasks(infos);
-    if (status_label_) {
-      gtk_widget_set_visible(status_label_, !StatusBarStack::ShowLoading(static_cast<int>(tasks.size())));
+    if (status_bar_stack_) {
+      gtk_stack_set_visible_child_name(GTK_STACK(status_bar_stack_),
+                                       StatusBarStack::ChildName(StatusBarStack::PageForTaskCount(static_cast<int>(tasks.size()))));
     }
   });
   app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &, const std::vector<unsigned char> &data) {
@@ -1839,9 +1850,6 @@ void MainWindow::RefreshCollection(const std::string &filter, bool update_text) 
       settings.BoolValue("skip_articles_for_artists", settings.BoolValue("sort_skip_articles_for_artists", true)),
       settings.BoolValue("skip_articles_for_albums", settings.BoolValue("sort_skip_articles_for_albums", false)));
   collection_container_->view()->SetFilterString(collection_text_filter_);
-  if (status_label_) {
-    gtk_label_set_text(GTK_LABEL(status_label_), (std::to_string(collection_container_->view()->model()->TotalSongs()) + " songs").c_str());
-  }
   if (context_view_) {
     context_view_->SetCollectionTotals(collection_container_->view()->model()->TotalSongs(),
                                       collection_container_->view()->model()->TotalArtists(),
@@ -1917,16 +1925,18 @@ void MainWindow::RefreshPlaylist() {
 }
 
 void MainWindow::RefreshPlaylistSummary() {
-  if (!playlist_container_) {
-    return;
+  std::string text;
+  Playlist *playlist = app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  if (playlist) {
+    text = PlaylistSummary::Format(
+        PlaylistSummary::FromPlaylist(playlist->row_count(), playlist->total_length_nanosec(), playlist->songs(), selected_playlist_rows_));
   }
-  Playlist *playlist = app_->playlist_manager()->current();
-  if (!playlist) {
-    playlist_container_->SetSummary("");
-    return;
+  if (status_label_) {
+    gtk_label_set_text(GTK_LABEL(status_label_), text.c_str());
   }
-  playlist_container_->SetSummary(PlaylistSummary::Format(
-      PlaylistSummary::FromPlaylist(playlist->row_count(), playlist->total_length_nanosec(), playlist->songs(), selected_playlist_rows_)));
+  if (playlist_container_) {
+    playlist_container_->SetSummary(text);
+  }
 }
 
 void MainWindow::GoToPlaylistIndex(int index) {

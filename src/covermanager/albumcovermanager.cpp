@@ -45,6 +45,7 @@ struct CoverManagerState {
 };
 
 void RebuildAlbums(CoverManagerState *state);
+void ApplySearchPlaceholder(GtkWidget *widget, const char *text);
 void UpdateBatchUi(CoverManagerState *state);
 void FinishBatch(CoverManagerState *state);
 void PumpBatch(CoverManagerState *state);
@@ -184,6 +185,19 @@ void AddAlbumToPlaylist(CoverManagerState *state, const AlbumCoverManagerList::A
 
 AlbumCoverManagerList::HideCovers HideMode(CoverManagerState *state) {
   return CoverManagerView::HideFromIndex(state ? state->hide_index : 0);
+}
+
+void ApplySearchPlaceholder(GtkWidget *widget, const char *text) {
+  if (!widget || !text) {
+    return;
+  }
+  if (GTK_IS_TEXT(widget)) {
+    gtk_text_set_placeholder_text(GTK_TEXT(widget), text);
+    return;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child)) {
+    ApplySearchPlaceholder(child, text);
+  }
 }
 
 void ResetTypeAhead(CoverManagerState *state) {
@@ -623,10 +637,11 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   GtkWidget *toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   state->filter = gtk_search_entry_new();
   gtk_widget_set_hexpand(state->filter, TRUE);
+  ApplySearchPlaceholder(state->filter, Translations::CStr(CoverManagerView::SearchPlaceholder()));
   gtk_box_append(GTK_BOX(toolbar), state->filter);
   state->view = gtk_menu_button_new();
   gtk_menu_button_set_label(GTK_MENU_BUTTON(state->view), Translations::CStr(CoverManagerView::ButtonLabel()));
-  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(state->view), "view-list-symbolic");
+  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(state->view), CoverManagerView::ButtonIcon());
   gtk_widget_set_tooltip_text(state->view, Translations::CStr(CoverManagerView::ButtonLabel()));
   GMenu *view_menu = g_menu_new();
   for (int i = 0; i < CoverManagerView::kCount; ++i) {

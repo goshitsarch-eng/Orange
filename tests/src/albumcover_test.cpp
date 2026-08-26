@@ -444,6 +444,8 @@ TEST(AlbumCoverSearcher, PrefersRequestedSong) {
 
 TEST(CoverManagerView, LabelsAndHideIndexMatchQt) {
   EXPECT_STREQ("View", CoverManagerView::ButtonLabel());
+  EXPECT_STREQ("view-grid-symbolic", CoverManagerView::ButtonIcon());
+  EXPECT_STREQ("Enter search terms here", CoverManagerView::SearchPlaceholder());
   EXPECT_EQ(3, CoverManagerView::kCount);
   EXPECT_STREQ("All albums", CoverManagerView::kLabels[0]);
   EXPECT_STREQ("Albums with covers", CoverManagerView::kLabels[1]);

@@ -211,6 +211,7 @@ class MainWindow {
   GtkWidget *play_button_ = nullptr;
   GtkWidget *love_button_ = nullptr;
   GtkWidget *scrobble_button_ = nullptr;
+  GtkWidget *status_bar_stack_ = nullptr;
   GtkWidget *status_label_ = nullptr;
   GtkWidget *analyzer_drawing_ = nullptr;
   GtkWidget *moodbar_drawing_ = nullptr;

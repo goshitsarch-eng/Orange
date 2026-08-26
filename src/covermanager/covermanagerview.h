@@ -6,6 +6,8 @@
 namespace CoverManagerView {
 
 inline const char *ButtonLabel() { return "View"; }
+inline const char *ButtonIcon() { return "view-grid-symbolic"; }
+inline const char *SearchPlaceholder() { return "Enter search terms here"; }
 
 inline constexpr const char *kLabels[] = {"All albums", "Albums with covers", "Albums without covers"};
 inline constexpr int kCount = 3;
