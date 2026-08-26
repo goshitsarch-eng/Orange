@@ -4,6 +4,7 @@
 #include "core/settings.h"
 
 #ifdef HAVE_X11
+#include <X11/Xlib.h>
 #include <X11/XF86keysym.h>
 #include <X11/keysym.h>
 #include <glib-unix.h>

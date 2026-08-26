@@ -283,7 +283,7 @@ void PlaylistParser::EnrichFromAudioFile(SongList *songs, const Song &file) {
     if (file.art_embedded()) {
       song.set_art_embedded(true);
     }
-    if (song.year() == 0 && file.year() > 0) {
+    if (song.year() <= 0 && file.year() > 0) {
       song.set_year(file.year());
     }
     if (song.genre().empty() && !file.genre().empty()) {
