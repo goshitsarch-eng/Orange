@@ -333,21 +333,21 @@ void MainWindow::BuildSidebar() {
   gtk_box_append(GTK_BOX(collection_page), collection_filters);
   gtk_box_append(GTK_BOX(collection_page), MakeScrolledList(&collection_list_));
   gtk_widget_set_vexpand(gtk_widget_get_last_child(collection_page), TRUE);
-  g_signal_connect(age_drop, "notify::selected", G_CALLBACK(+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
+  g_signal_connect(age_drop, "notify::selected", G_CALLBACK((+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
                      static const int days[] = {-1, 1, 7, 30, 90, 365};
                      const guint selected = gtk_drop_down_get_selected(drop);
                      self->collection_age_days_ = selected < G_N_ELEMENTS(days) ? days[selected] : -1;
                      self->RefreshCollection();
-                   }),
+                   })),
                    this);
-  g_signal_connect(rating_drop, "notify::selected", G_CALLBACK(+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
+  g_signal_connect(rating_drop, "notify::selected", G_CALLBACK((+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
                      static const float ratings[] = {-1.0f, -2.0f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f};
                      const guint selected = gtk_drop_down_get_selected(drop);
                      self->collection_min_rating_ = selected < G_N_ELEMENTS(ratings) ? ratings[selected] : -1.0f;
                      self->RefreshCollection();
-                   }),
+                   })),
                    this);
   adw_view_stack_add_titled_with_icon(sidebar_stack_, collection_page, "collection", "Collection",
                                       "media-optical-cd-audio-symbolic");
