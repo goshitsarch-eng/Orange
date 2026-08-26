@@ -20,6 +20,7 @@ class PlaylistContainer {
   using ActionCallback = std::function<void()>;
 
   PlaylistContainer();
+  ~PlaylistContainer();
 
   GtkWidget *widget() const { return widget_; }
   PlaylistView *view() { return view_.get(); }
@@ -31,6 +32,7 @@ class PlaylistContainer {
   const std::string &filter_string() const { return filter_; }
 
   void SetFilterChangedCallback(const std::function<void(const std::string &)> &callback);
+  void SetFilterRowCountCallback(const std::function<int()> &callback);
   void SetActionCallback(const char *name, ActionCallback callback);
   void SetRepeatChangedCallback(const std::function<void(PlaylistSequence::RepeatMode)> &callback);
   void SetShuffleChangedCallback(const std::function<void(PlaylistSequence::ShuffleMode)> &callback);
@@ -65,6 +67,14 @@ class PlaylistContainer {
   std::unique_ptr<DynamicPlaylistControls> dynamic_controls_;
   std::string filter_;
   std::function<void(const std::string &)> filter_changed_;
+  std::function<int()> filter_row_count_;
+  guint filter_timeout_ = 0;
+  int filter_timeout_gen_ = 0;
+
+  void CancelFilterTimer();
+  void ScheduleFilter();
+  void ApplyPendingFilter();
+  int FilterRowCount() const;
 };
 
 #endif

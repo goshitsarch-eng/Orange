@@ -3,10 +3,20 @@
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "filterparser/filterparser.h"
+#include "playlist/playlistfilterdelay.h"
 #include "playlist/playlistfiltersync.h"
 #include "playlist/playlistundostate.h"
 #include "translations/translations.h"
 #include "widgets/filtersearchkeyboard.h"
+
+namespace {
+
+struct PlaylistFilterJob {
+  PlaylistContainer *self = nullptr;
+  int generation = 0;
+};
+
+}  // namespace
 
 PlaylistContainer::PlaylistContainer()
     : widget_(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0)),
@@ -129,8 +139,11 @@ PlaylistContainer::PlaylistContainer()
                        return;
                      }
                      self->filter_ = gtk_editable_get_text(GTK_EDITABLE(entry));
-                     if (self->filter_changed_) {
-                       self->filter_changed_(self->filter_);
+                     if (PlaylistFilterDelay::ShouldDelay(self->FilterRowCount(), self->filter_.empty())) {
+                       self->ScheduleFilter();
+                     } else {
+                       self->CancelFilterTimer();
+                       self->ApplyPendingFilter();
                      }
                    }),
                    this);
@@ -170,8 +183,49 @@ PlaylistContainer::PlaylistContainer()
   gtk_box_append(GTK_BOX(widget_), view_->widget());
 }
 
+PlaylistContainer::~PlaylistContainer() { CancelFilterTimer(); }
+
 void PlaylistContainer::SetFilterChangedCallback(const std::function<void(const std::string &)> &callback) {
   filter_changed_ = callback;
+}
+
+void PlaylistContainer::SetFilterRowCountCallback(const std::function<int()> &callback) {
+  filter_row_count_ = callback;
+}
+
+int PlaylistContainer::FilterRowCount() const { return filter_row_count_ ? filter_row_count_() : 0; }
+
+void PlaylistContainer::CancelFilterTimer() {
+  ++filter_timeout_gen_;
+  if (filter_timeout_ != 0) {
+    g_source_remove(filter_timeout_);
+    filter_timeout_ = 0;
+  }
+}
+
+void PlaylistContainer::ScheduleFilter() {
+  CancelFilterTimer();
+  auto *job = new PlaylistFilterJob{this, filter_timeout_gen_};
+  filter_timeout_ = g_timeout_add_full(
+      G_PRIORITY_DEFAULT, static_cast<guint>(PlaylistFilterDelay::kFilterDelayMs),
+      +[](gpointer data) -> gboolean {
+        auto *job = static_cast<PlaylistFilterJob *>(data);
+        if (job->self && job->generation == job->self->filter_timeout_gen_) {
+          job->self->filter_timeout_ = 0;
+          job->self->ApplyPendingFilter();
+        }
+        return G_SOURCE_REMOVE;
+      },
+      job, +[](gpointer data) { delete static_cast<PlaylistFilterJob *>(data); });
+}
+
+void PlaylistContainer::ApplyPendingFilter() {
+  if (filter_changed_) {
+    filter_changed_(filter_);
+  }
+  if (view_) {
+    view_->JumpToCurrentlyPlayingTrack();
+  }
 }
 
 void PlaylistContainer::FocusFilter() {

@@ -1,4 +1,5 @@
 #include "covermanager/coverchoicemenu.h"
+#include "covermanager/covermanageractions.h"
 #include "covermanager/covermanagermenu.h"
 #include "covermanager/covermanagerstats.h"
 #include "covermanager/covermanagerview.h"
@@ -504,6 +505,15 @@ TEST(CoverManagerView, LabelsAndHideIndexMatchQt) {
   EXPECT_EQ(2, CoverManagerView::IndexFromHide(AlbumCoverManagerList::HideCovers::WithCovers));
   EXPECT_EQ(0, CoverManagerView::ClampIndex(-3));
   EXPECT_EQ(2, CoverManagerView::ClampIndex(9));
+}
+
+TEST(CoverManagerActions, DoubleClickAndFetchFinishMatchQt) {
+  EXPECT_STREQ("Cover Manager", CoverManagerActions::WindowTitle());
+  EXPECT_TRUE(CoverManagerActions::DoubleClickShowsCover());
+  EXPECT_FALSE(CoverManagerActions::ShowStatisticsWhenFetchFinishes(false, false, 3));
+  EXPECT_FALSE(CoverManagerActions::ShowStatisticsWhenFetchFinishes(true, true, 3));
+  EXPECT_FALSE(CoverManagerActions::ShowStatisticsWhenFetchFinishes(true, false, 0));
+  EXPECT_TRUE(CoverManagerActions::ShowStatisticsWhenFetchFinishes(true, false, 2));
 }
 
 TEST(CoverManagerStats, TotalAndWithoutCoverMatchQt) {

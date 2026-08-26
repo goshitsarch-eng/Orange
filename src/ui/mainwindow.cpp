@@ -1382,6 +1382,10 @@ void MainWindow::BuildPlaylist() {
     }
     RefreshPlaylist();
   });
+  playlist_container_->SetFilterRowCountCallback([this]() {
+    Playlist *playlist = app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+    return playlist ? playlist->row_count() : 0;
+  });
   playlist_container_->view()->SetActivateCallback([this](int index) { app_->player()->PlayAt(index); });
   playlist_container_->view()->SetPlayPauseCallback([this]() { app_->player()->PlayPause(); });
   playlist_container_->view()->SetSeekBackwardCallback([this]() { app_->player()->SeekBackward(); });

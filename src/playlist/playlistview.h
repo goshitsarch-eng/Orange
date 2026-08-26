@@ -40,6 +40,7 @@ class PlaylistView {
   void SetSelectedRows(const std::vector<int> &rows);
   void Refresh(Playlist *playlist);
   void ScrollToRow(int row, bool center = false);
+  void JumpToCurrentlyPlayingTrack();
   void MaybeScrollToRow(int row, Playlist::AutoScroll mode);
   void InhibitAutoscroll();
   void SetPaused(bool paused);

@@ -83,7 +83,7 @@ const char *PlaylistSequence::RepeatLabel(RepeatMode mode) {
     case RepeatMode::Playlist:
       return Translations::CStr("Repeat playlist");
     case RepeatMode::OneByOne:
-      return Translations::CStr("Stop after every track");
+      return Translations::CStr("Stop after each track");
     case RepeatMode::Intro:
       return Translations::CStr("Intro tracks");
     case RepeatMode::Off:

@@ -1,6 +1,7 @@
 #include "core/playerrepeat.h"
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistfilterdelay.h"
 #include "playlist/playlistfilterempty.h"
 #include "playlist/playlistfiltersync.h"
 #include "playlist/playlistplayed.h"
@@ -492,6 +493,18 @@ TEST(PlaylistSummary, UsesSelectionWhenMoreThanOneRow) {
   EXPECT_EQ(2, input.selected_tracks);
   EXPECT_EQ(240000000000LL, input.selected_length_ns);
   EXPECT_EQ("2 selected of 3 tracks - [ 4 minutes ]", PlaylistSummary::Format(input));
+}
+
+TEST(PlaylistFilterDelay, MatchesQtLargePlaylistDebounce) {
+  EXPECT_EQ(100, PlaylistFilterDelay::kFilterDelayMs);
+  EXPECT_EQ(5000, PlaylistFilterDelay::kFilterDelayPlaylistSizeThreshold);
+  EXPECT_FALSE(PlaylistFilterDelay::ShouldDelay(0, false));
+  EXPECT_FALSE(PlaylistFilterDelay::ShouldDelay(4999, false));
+  EXPECT_FALSE(PlaylistFilterDelay::ShouldDelay(5000, true));
+  EXPECT_TRUE(PlaylistFilterDelay::ShouldDelay(5000, false));
+  EXPECT_TRUE(PlaylistFilterDelay::ShouldDelay(8000, false));
+  EXPECT_FALSE(PlaylistFilterDelay::ShouldJumpToPlaying(-1));
+  EXPECT_TRUE(PlaylistFilterDelay::ShouldJumpToPlaying(0));
 }
 
 TEST(PlaylistFilterEmpty, ShowsOnlyWhenPlaylistHasRowsButNoneVisible) {

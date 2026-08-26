@@ -121,7 +121,7 @@ TEST(PlaylistSequence, MenuModesMatchQtOrder) {
   EXPECT_FALSE(PlaylistSequence::ShuffleActive(PlaylistSequence::ShuffleMode::Off));
   EXPECT_TRUE(PlaylistSequence::ShuffleActive(PlaylistSequence::ShuffleMode::All));
   EXPECT_STREQ("Don't repeat", PlaylistSequence::RepeatLabel(PlaylistSequence::RepeatMode::Off));
-  EXPECT_STREQ("Stop after every track", PlaylistSequence::RepeatLabel(PlaylistSequence::RepeatMode::OneByOne));
+  EXPECT_STREQ("Stop after each track", PlaylistSequence::RepeatLabel(PlaylistSequence::RepeatMode::OneByOne));
   EXPECT_STREQ("Intro tracks", PlaylistSequence::RepeatLabel(PlaylistSequence::RepeatMode::Intro));
   EXPECT_STREQ("Don't shuffle", PlaylistSequence::ShuffleLabel(PlaylistSequence::ShuffleMode::Off));
   EXPECT_STREQ("Shuffle tracks in this album", PlaylistSequence::ShuffleLabel(PlaylistSequence::ShuffleMode::InsideAlbum));

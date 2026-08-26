@@ -6,7 +6,7 @@
 #include "covermanager/albumcovermanagerselection.h"
 #include "covermanager/albumcoverexportdialog.h"
 #include "covermanager/albumcovermanagerlist.h"
-#include "covermanager/coverfromurldialog.h"
+#include "covermanager/covermanageractions.h"
 #include "covermanager/covermanagerstats.h"
 #include "covermanager/covermanagerview.h"
 #include "covermanager/covermanagermenu.h"
@@ -91,6 +91,9 @@ void FinishBatch(CoverManagerState *state) {
   }
   UpdateBatchUi(state);
   RebuildAlbums(state);
+  if (state->covers && CoverManagerActions::ShowStatisticsWhenFetchFinishes(state->batch.started(), state->batch.cancelled(), state->batch.total())) {
+    state->covers->ShowStatistics(state->parent);
+  }
 }
 
 void PumpBatch(CoverManagerState *state) {
@@ -568,8 +571,8 @@ void RebuildAlbums(CoverManagerState *state) {
                        }
                        auto *self = static_cast<CoverManagerState *>(data);
                        auto *entry = static_cast<AlbumCoverManagerList::Album *>(g_object_get_data(G_OBJECT(click), "album"));
-                       if (self && entry) {
-                         AddAlbumToPlaylist(self, *entry, false);
+                       if (self && entry && self->covers && CoverManagerActions::DoubleClickShowsCover()) {
+                         self->covers->ShowCover(self->parent, entry->song);
                        }
                      }),
                      state);
@@ -612,7 +615,7 @@ void RebuildArtists(CoverManagerState *state) {
 
 void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, Translations::CStr("Cover manager"));
+  adw_dialog_set_title(dialog, Translations::CStr(CoverManagerActions::WindowTitle()));
   adw_dialog_set_content_width(dialog, 860);
   adw_dialog_set_content_height(dialog, 680);
 
@@ -730,18 +733,10 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   state->fetch_missing = fetch_missing;
   state->abort = gtk_button_new_with_label(Translations::CStr("Abort"));
   gtk_widget_set_visible(state->abort, FALSE);
-  GtkWidget *add_playlist = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::AddToPlaylist()));
-  GtkWidget *load_playlist = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::Load()));
-  GtkWidget *from_url = gtk_button_new_with_label(Translations::CStr("Load cover from URL…"));
   GtkWidget *export_btn = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::Export()));
-  GtkWidget *stats = gtk_button_new_with_label(Translations::CStr("Statistics"));
   gtk_box_append(GTK_BOX(actions), fetch_missing);
   gtk_box_append(GTK_BOX(actions), state->abort);
-  gtk_box_append(GTK_BOX(actions), add_playlist);
-  gtk_box_append(GTK_BOX(actions), load_playlist);
-  gtk_box_append(GTK_BOX(actions), from_url);
   gtk_box_append(GTK_BOX(actions), export_btn);
-  gtk_box_append(GTK_BOX(actions), stats);
   gtk_box_append(GTK_BOX(box), actions);
 
   auto refresh = +[](GtkWidget *, gpointer data) { RebuildAlbums(static_cast<CoverManagerState *>(data)); };
@@ -773,6 +768,9 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                      if (self->batch.running()) {
                        return;
                      }
+                     if (self->covers) {
+                       self->covers->ResetStatistics();
+                     }
                      self->batch.Reset();
                      for (const auto &album : AlbumsForAction(self)) {
                        if (album.has_cover) {
@@ -794,39 +792,13 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                      FinishBatch(self);
                    }),
                    state);
-  g_signal_connect(add_playlist, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *self = static_cast<CoverManagerState *>(data);
-                     for (const auto &album : AlbumsForAction(self)) {
-                       AddAlbumToPlaylist(self, album, false);
-                     }
-                   }),
-                   state);
-  g_signal_connect(load_playlist, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *self = static_cast<CoverManagerState *>(data);
-                     bool first = true;
-                     for (const auto &album : AlbumsForAction(self)) {
-                       AddAlbumToPlaylist(self, album, first);
-                       first = false;
-                     }
-                   }),
-                   state);
   g_signal_connect(state->flow, "selected-children-changed", G_CALLBACK(+[](GtkFlowBox *, gpointer data) {
                      UpdateAlbumStatus(static_cast<CoverManagerState *>(data));
-                   }),
-                   state);
-  g_signal_connect(from_url, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *self = static_cast<CoverManagerState *>(data);
-                     CoverFromUrlDialog::Show(self->parent, self->app);
                    }),
                    state);
   g_signal_connect(export_btn, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<CoverManagerState *>(data);
                      AlbumCoverExportDialog::Show(self->parent, self->app);
-                   }),
-                   state);
-  g_signal_connect(stats, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *self = static_cast<CoverManagerState *>(data);
-                     self->covers->ShowStatistics(self->parent);
                    }),
                    state);
 

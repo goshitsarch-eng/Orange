@@ -12,6 +12,7 @@
 #include "playlist/playlistratingclick.h"
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistfilter.h"
+#include "playlist/playlistfilterdelay.h"
 #include "playlist/playlistfilterempty.h"
 #include "playlist/playlistkeyboard.h"
 #include "playlist/playlistlook.h"
@@ -838,6 +839,13 @@ void PlaylistView::CopyCurrentToClipboard() {
     texts.push_back(PlaylistDelegates::ColumnText(song, column));
   }
   gdk_clipboard_set_text(gtk_widget_get_clipboard(widget_), PlaylistClipboard::DisplayText(texts).c_str());
+}
+
+void PlaylistView::JumpToCurrentlyPlayingTrack() {
+  if (!playlist_ || !PlaylistFilterDelay::ShouldJumpToPlaying(playlist_->current_row())) {
+    return;
+  }
+  ScrollToRow(playlist_->current_row(), true);
 }
 
 void PlaylistView::ScrollToRow(int row, bool center) {

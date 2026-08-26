@@ -35,6 +35,7 @@ class AlbumCoverChoiceController {
   void Perform(CoverChoiceMenu::Action action, GtkWindow *parent, Song *song, GtkWidget *image = nullptr);
 
   const CoverSearchStatistics &statistics() const { return statistics_; }
+  void ResetStatistics() { statistics_ = {}; }
 
   void ReloadSettings();
   void set_save_embedded_cover_override(bool value) { save_embedded_cover_override_ = value; }
