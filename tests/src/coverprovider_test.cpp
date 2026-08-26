@@ -121,7 +121,7 @@ TEST(MusixmatchProvider, StringFixup) {
   EXPECT_EQ("portishead", MusixmatchProvider::StringFixup("Portishead"));
   EXPECT_EQ("dummy", MusixmatchProvider::StringFixup("Dummy"));
   EXPECT_EQ("ac-dc", MusixmatchProvider::StringFixup("AC/DC"));
-  EXPECT_EQ("dont-look-back", MusixmatchProvider::StringFixup("Don't Look Back"));
+  EXPECT_EQ("don-t-look-back", MusixmatchProvider::StringFixup("Don't Look Back"));
 }
 
 TEST(MusixmatchCoverProvider, ParsesNextDataCover) {
