@@ -19,6 +19,9 @@ TEST(StreamingFavoriteAction, TypeAndStoreHelpers) {
   EXPECT_EQ(StreamingCollectionStore::List::Artists, StreamingFavoriteAction::StoreList(Type::Artists));
   EXPECT_EQ(StreamingCollectionStore::List::Albums, StreamingFavoriteAction::StoreList(Type::Albums));
   EXPECT_EQ(StreamingCollectionStore::List::Songs, StreamingFavoriteAction::StoreList(Type::Songs));
+  EXPECT_EQ(Type::Artists, StreamingFavoriteAction::TypeFromList(StreamingCollectionStore::List::Artists));
+  EXPECT_EQ(Type::Albums, StreamingFavoriteAction::TypeFromList(StreamingCollectionStore::List::Albums));
+  EXPECT_EQ(Type::Songs, StreamingFavoriteAction::TypeFromList(StreamingCollectionStore::List::Songs));
   EXPECT_STREQ("Artists", StreamingFavoriteAction::Label(Type::Artists));
   EXPECT_STREQ("Receiving albums...", StreamingFavoriteAction::Receiving(Type::Albums));
   EXPECT_STREQ("No favorite artists", StreamingFavoriteAction::EmptyStatus(Type::Artists, true));

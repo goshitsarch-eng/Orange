@@ -33,6 +33,7 @@ class StreamingTabsView {
   void GetAlbums();
   void GetSongs();
   void GetFavorites();
+  void AddToCollection(StreamingCollectionStore::List list, const SongList &songs);
   void AbortGetArtists();
   void AbortGetAlbums();
   void AbortGetSongs();

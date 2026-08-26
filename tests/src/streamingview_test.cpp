@@ -517,6 +517,13 @@ TEST(StreamingCollectionStore, TableNamesAndPersistRules) {
   EXPECT_EQ("99", StreamingCollectionStore::PersistUrl(song));
   song.set_url("tidal://99");
   EXPECT_EQ("tidal://99", StreamingCollectionStore::PersistUrl(song));
+  EXPECT_TRUE(StreamingCollectionStore::CanStore("Tidal", StreamingCollectionStore::List::Artists));
+  EXPECT_FALSE(StreamingCollectionStore::CanStore("Subsonic", StreamingCollectionStore::List::Artists));
+  EXPECT_TRUE(StreamingCollectionStore::CanStore("Subsonic", StreamingCollectionStore::List::Songs));
+  EXPECT_EQ(3u, StreamingCollectionStore::AddableLists("Tidal").size());
+  EXPECT_EQ(1u, StreamingCollectionStore::AddableLists("Subsonic").size());
+  EXPECT_STREQ("Add to artists", StreamingCollectionStore::AddLabel(StreamingCollectionStore::List::Artists));
+  EXPECT_STREQ("Added to songs", StreamingCollectionStore::AddedStatus(StreamingCollectionStore::List::Songs));
 }
 
 TEST(StreamingCollectionStore, ReplaceAndLoad) {
@@ -551,6 +558,48 @@ TEST(StreamingCollectionStore, ReplaceAndLoad) {
   StreamingCollectionStore::Replace(&db, "tidal_songs", {});
   EXPECT_TRUE(StreamingCollectionStore::Load(&db, "tidal_songs").empty());
   EXPECT_TRUE(StreamingCollectionStore::Load(&db, "not_a_table").empty());
+  unlink(path.c_str());
+}
+
+TEST(StreamingCollectionStore, MergeAppendsAndUpdatesByUrl) {
+  const std::string path = "/tmp/strawberry-streaming-merge-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  Song first(Song::Source::Tidal);
+  first.set_title("Roads");
+  first.set_url("tidal://99");
+  first.set_song_id("99");
+  Song second(Song::Source::Tidal);
+  second.set_title("Mysterons");
+  second.set_url("tidal://100");
+  second.set_song_id("100");
+  StreamingCollectionStore::Replace(&db, "tidal_songs", {first});
+  Song updated = first;
+  updated.set_title("Roads (Remastered)");
+  EXPECT_EQ(1, StreamingCollectionStore::Merge(&db, "tidal_songs", {updated, second}));
+  const SongList loaded = StreamingCollectionStore::Load(&db, "tidal_songs");
+  ASSERT_EQ(2u, loaded.size());
+  bool saw_updated = false;
+  bool saw_second = false;
+  for (const Song &song : loaded) {
+    if (song.song_id() == "99") {
+      EXPECT_EQ("Roads (Remastered)", song.title());
+      saw_updated = true;
+    }
+    if (song.song_id() == "100") {
+      saw_second = true;
+    }
+  }
+  EXPECT_TRUE(saw_updated);
+  EXPECT_TRUE(saw_second);
+  EXPECT_EQ(0, StreamingCollectionStore::Merge(&db, "tidal_songs", {}));
+  EXPECT_EQ(0, StreamingCollectionStore::Merge(&db, "not_a_table", {second}));
+  Song missing;
+  missing.set_title("No key");
+  const SongList merged = StreamingCollectionStore::MergeSongs({first}, {missing, second});
+  EXPECT_EQ(2u, merged.size());
+  EXPECT_EQ(1, StreamingCollectionStore::AddedCount({first}, merged));
   unlink(path.c_str());
 }
 

@@ -83,4 +83,14 @@ void Replace(Database *database, const std::string &table, const SongList &songs
   transaction.Commit();
 }
 
+int Merge(Database *database, const std::string &table, const SongList &songs) {
+  if (!database || !database->handle() || !ValidTable(table) || songs.empty()) {
+    return 0;
+  }
+  const SongList existing = Load(database, table);
+  const SongList merged = MergeSongs(existing, songs);
+  Replace(database, table, merged);
+  return AddedCount(existing, merged);
+}
+
 }  // namespace StreamingCollectionStore

@@ -327,6 +327,20 @@ void StreamingTabsView::ShowCached(StreamingCollectionView *view, StreamingColle
   }
 }
 
+void StreamingTabsView::AddToCollection(StreamingCollectionStore::List list, const SongList &songs) {
+  if (!service_ || !database_ || songs.empty() || !StreamingCollectionStore::CanStore(service_->name(), list)) {
+    return;
+  }
+  StreamingCollectionStore::Merge(database_, StreamingCollectionStore::TableName(service_->name(), list), songs);
+  StreamingCollectionView *view = songs_->view();
+  if (list == StreamingCollectionStore::List::Artists) {
+    view = artists_->view();
+  } else if (list == StreamingCollectionStore::List::Albums) {
+    view = albums_->view();
+  }
+  ShowCached(view, list);
+}
+
 void StreamingTabsView::PersistList(StreamingCollectionStore::List list, const SongList &songs) {
   if (!service_ || !database_) {
     return;

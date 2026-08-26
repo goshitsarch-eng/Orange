@@ -34,6 +34,18 @@ inline StreamingCollectionStore::List StoreList(StreamingService::FavoriteType t
   }
 }
 
+inline StreamingService::FavoriteType TypeFromList(StreamingCollectionStore::List list) {
+  switch (list) {
+    case StreamingCollectionStore::List::Artists:
+      return StreamingService::FavoriteType::Artists;
+    case StreamingCollectionStore::List::Albums:
+      return StreamingService::FavoriteType::Albums;
+    case StreamingCollectionStore::List::Songs:
+    default:
+      return StreamingService::FavoriteType::Songs;
+  }
+}
+
 inline const char *Label(StreamingService::FavoriteType type) {
   switch (type) {
     case StreamingService::FavoriteType::Artists:

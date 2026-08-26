@@ -487,6 +487,15 @@ void MainWindow::BuildUi() {
   add_action("streaming-unfavorite", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                static_cast<MainWindow *>(data)->StreamingFavorite(false);
              }));
+  add_action("streaming-add-artists", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->StreamingAddToList(StreamingCollectionStore::List::Artists);
+             }));
+  add_action("streaming-add-albums", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->StreamingAddToList(StreamingCollectionStore::List::Albums);
+             }));
+  add_action("streaming-add-songs", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->StreamingAddToList(StreamingCollectionStore::List::Songs);
+             }));
   add_action("radio-append", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                Settings settings;
@@ -2267,6 +2276,15 @@ void MainWindow::ShowStreamingMenu(const SongList &songs) {
   g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.streaming-enqueue");
   g_menu_append(menu, Translations::Tr("Add to favorites").c_str(), "win.streaming-favorite");
   g_menu_append(menu, Translations::Tr("Remove from favorites").c_str(), "win.streaming-unfavorite");
+  for (StreamingCollectionStore::List list : StreamingCollectionStore::AddableLists(streaming_service_name_)) {
+    const char *action = "win.streaming-add-songs";
+    if (list == StreamingCollectionStore::List::Artists) {
+      action = "win.streaming-add-artists";
+    } else if (list == StreamingCollectionStore::List::Albums) {
+      action = "win.streaming-add-albums";
+    }
+    g_menu_append(menu, Translations::Tr(StreamingCollectionStore::AddLabel(list)).c_str(), action);
+  }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   GtkWidget *parent = streaming_stack_ ? streaming_stack_ : GTK_WIDGET(window_);
   gtk_widget_set_parent(popover, parent);
@@ -2292,6 +2310,23 @@ void MainWindow::StreamingFavorite(bool add) {
   } else {
     service->RemoveFavorites(type, streaming_menu_songs_, done);
   }
+}
+
+void MainWindow::StreamingAddToList(StreamingCollectionStore::List list) {
+  if (streaming_menu_songs_.empty() || !StreamingCollectionStore::CanStore(streaming_service_name_, list)) {
+    return;
+  }
+  StreamingService *service = app_->streaming_services()->ServiceByName(streaming_service_name_);
+  for (const auto &view : streaming_views_) {
+    if (view && view->service() && view->service()->name() == streaming_service_name_) {
+      view->AddToCollection(list, streaming_menu_songs_);
+      break;
+    }
+  }
+  if (service) {
+    service->AddFavorites(StreamingFavoriteAction::TypeFromList(list), streaming_menu_songs_, {});
+  }
+  ShowToast(StreamingCollectionStore::AddedStatus(list));
 }
 
 void MainWindow::ShowRadioMenu(const std::vector<RadioChannel> &channels) {

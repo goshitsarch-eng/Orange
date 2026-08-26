@@ -4,6 +4,7 @@
 #include "core/song.h"
 
 #include <string>
+#include <vector>
 
 class Database;
 
@@ -80,8 +81,74 @@ inline bool ShouldPersist(bool has_error, bool logged_in, const SongList &songs)
 
 inline bool ShouldKeepCache(bool has_error, const SongList &songs) { return has_error && songs.empty(); }
 
+inline bool CanStore(const std::string &service, List list) { return ValidTable(TableName(service, list)); }
+
+inline const char *AddLabel(List list) {
+  switch (list) {
+    case List::Artists:
+      return "Add to artists";
+    case List::Albums:
+      return "Add to albums";
+    case List::Songs:
+    default:
+      return "Add to songs";
+  }
+}
+
+inline const char *AddedStatus(List list) {
+  switch (list) {
+    case List::Artists:
+      return "Added to artists";
+    case List::Albums:
+      return "Added to albums";
+    case List::Songs:
+    default:
+      return "Added to songs";
+  }
+}
+
+inline std::vector<List> AddableLists(const std::string &service) {
+  std::vector<List> lists;
+  for (List list : {List::Artists, List::Albums, List::Songs}) {
+    if (CanStore(service, list)) {
+      lists.push_back(list);
+    }
+  }
+  return lists;
+}
+
+inline SongList MergeSongs(const SongList &existing, const SongList &added) {
+  SongList out = existing;
+  for (const Song &song : added) {
+    const std::string key = PersistUrl(song);
+    if (key.empty()) {
+      continue;
+    }
+    bool found = false;
+    for (Song &have : out) {
+      if (PersistUrl(have) == key) {
+        have = song;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      out.push_back(song);
+    }
+  }
+  return out;
+}
+
+inline int AddedCount(const SongList &existing, const SongList &merged) {
+  if (merged.size() <= existing.size()) {
+    return 0;
+  }
+  return static_cast<int>(merged.size() - existing.size());
+}
+
 SongList Load(Database *database, const std::string &table);
 void Replace(Database *database, const std::string &table, const SongList &songs);
+int Merge(Database *database, const std::string &table, const SongList &songs);
 
 }  // namespace StreamingCollectionStore
 
