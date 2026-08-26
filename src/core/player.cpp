@@ -3,8 +3,10 @@
 #include <algorithm>
 
 #include "constants/backendsettings.h"
+#include "constants/behavioursettings.h"
 #include "constants/playlistsettings.h"
 #include "core/logging.h"
+#include "core/playerresume.h"
 #include "core/settings.h"
 #include "core/urlhandlers.h"
 #include "playlist/playlistbehaviour.h"
@@ -75,6 +77,43 @@ void Player::SaveVolume() {
   settings.BeginGroup("Player");
   settings.SetIntValue("volume", static_cast<int>(volume_));
   settings.Sync();
+}
+
+void Player::SavePlaybackStatus() {
+  Settings settings;
+  settings.BeginGroup(PlayerResume::kSettingsGroup);
+  const int state = static_cast<int>(GetState());
+  settings.SetIntValue(PlayerResume::kPlaybackState, state);
+  if (PlayerResume::IsResumableState(state) && playlist_manager_ && playlist_manager_->active()) {
+    settings.SetIntValue(PlayerResume::kPlaybackPlaylist, playlist_manager_->active()->id());
+    settings.SetIntValue(PlayerResume::kPlaybackPosition, static_cast<int>(engine_->position_nanosec() / 1000000000LL));
+  } else {
+    settings.SetIntValue(PlayerResume::kPlaybackPlaylist, -1);
+    settings.SetIntValue(PlayerResume::kPlaybackPosition, 0);
+  }
+  settings.Sync();
+}
+
+void Player::ResumePlayback() {
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const bool enabled = settings.BoolValue(BehaviourSettings::kResumePlayback, BehaviourSettings::kDefaultResumePlayback);
+  settings.EndGroup();
+  settings.BeginGroup(PlayerResume::kSettingsGroup);
+  const int state = settings.IntValue(PlayerResume::kPlaybackState, static_cast<int>(EngineBase::State::Empty));
+  const int playlist_id = settings.IntValue(PlayerResume::kPlaybackPlaylist, -1);
+  const int position_sec = settings.IntValue(PlayerResume::kPlaybackPosition, 0);
+  settings.SetIntValue(PlayerResume::kPlaybackState, static_cast<int>(EngineBase::State::Empty));
+  settings.SetIntValue(PlayerResume::kPlaybackPlaylist, -1);
+  settings.SetIntValue(PlayerResume::kPlaybackPosition, 0);
+  settings.Sync();
+  if (!PlayerResume::ShouldResume(enabled, state) || !playlist_manager_ || playlist_id < 0 || !playlist_manager_->playlist(playlist_id)) {
+    return;
+  }
+  playlist_manager_->SetCurrentPlaylist(playlist_id);
+  playlist_manager_->SetActiveToCurrent();
+  const int row = playlist_manager_->current_row();
+  PlayAt(row < 0 ? 0 : row, PlayerResume::ShouldPause(state), static_cast<uint64_t>(PlayerResume::PositionToNanosec(position_sec)));
 }
 
 void Player::Play() {
@@ -187,11 +226,11 @@ void Player::Mute() {
   }
 }
 
-void Player::PlayAt(int index, bool pause) {
+void Player::PlayAt(int index, bool pause, uint64_t offset_nanosec) {
   if (playlist_manager_) {
     playlist_manager_->SetCurrentRow(index);
   }
-  PlayCurrent(pause);
+  PlayCurrent(pause, offset_nanosec);
 }
 
 void Player::PlayPlaylist(const std::string &name) {
@@ -203,13 +242,13 @@ void Player::PlayPlaylist(const std::string &name) {
 
 void Player::ShowOSD() { ForceShowOSD.Emit(current_song_); }
 
-void Player::PlayCurrent(bool pause) {
+void Player::PlayCurrent(bool pause, uint64_t offset_nanosec) {
   if (!playlist_manager_) {
     return;
   }
   FinishCurrentPlayback();
   current_song_ = playlist_manager_->current_song();
-  PlayLoadedSong(pause);
+  PlayLoadedSong(pause, GstEngine::Manual, offset_nanosec);
 }
 
 namespace {
@@ -260,7 +299,7 @@ void Player::FinishCurrentPlayback() {
   PlaybackFinished.Emit(current_song_, listened);
 }
 
-void Player::PlayLoadedSong(bool pause, int track_change_flags) {
+void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_nanosec) {
   finished_current_ = false;
   if (!current_song_.is_valid() && current_song_.url().empty()) {
     Stop();
@@ -268,7 +307,7 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags) {
   }
   if (url_handlers_) {
     if (UrlHandler *handler = url_handlers_->HandlerForUrl(current_song_.url())) {
-      const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause, track_change_flags](const UrlHandler::LoadResult &async) {
+      const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause, track_change_flags, offset_nanosec](const UrlHandler::LoadResult &async) {
         ApplyLoadResult(&current_song_, async);
         if (!async.stream_url.empty()) {
           engine_->SetNextAlbum(current_song_.album());
@@ -276,7 +315,7 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags) {
                         current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                         current_song_.ebur128_integrated_loudness_lufs());
           engine_->SetCurrentAlbum(current_song_.album());
-          engine_->Play(pause, 0);
+          engine_->Play(pause, offset_nanosec);
         }
       });
       if (result.type == UrlHandler::LoadResult::Type::TrackAvailable) {
@@ -289,7 +328,7 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags) {
                 current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                 current_song_.ebur128_integrated_loudness_lufs());
   engine_->SetCurrentAlbum(current_song_.album());
-  engine_->Play(pause, 0);
+  engine_->Play(pause, offset_nanosec);
   error_count_ = 0;
   if (greyout_ && playlist_manager_) {
     playlist_manager_->SongChangeRequestProcessed(current_song_.url(), true);

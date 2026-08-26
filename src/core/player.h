@@ -43,11 +43,13 @@ class Player : public PlayerInterface {
   void VolumeUp();
   void VolumeDown();
   void Mute();
-  void PlayAt(int index, bool pause = false);
+  void PlayAt(int index, bool pause = false, uint64_t offset_nanosec = 0);
   void PlayPlaylist(const std::string &name);
   void ReloadSettings();
   void LoadVolume();
   void SaveVolume();
+  void SavePlaybackStatus();
+  void ResumePlayback();
   void ShowOSD();
 
   Signal<Song> SongChanged;
@@ -65,8 +67,8 @@ class Player : public PlayerInterface {
   void HandleEngineState(EngineBase::State state);
   void HandleTrackEnded();
   void PreloadNext();
-  void PlayCurrent(bool pause);
-  void PlayLoadedSong(bool pause, int track_change_flags = GstEngine::Manual);
+  void PlayCurrent(bool pause, uint64_t offset_nanosec = 0);
+  void PlayLoadedSong(bool pause, int track_change_flags = GstEngine::Manual, uint64_t offset_nanosec = 0);
   void FinishCurrentPlayback();
 
   TaskManager *task_manager_;

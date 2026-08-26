@@ -1,5 +1,6 @@
 #include "smartplaylists/smartplaylistsview.h"
 
+#include "smartplaylists/smartplaylistdrag.h"
 #include "translations/translations.h"
 
 SmartPlaylistsView::SmartPlaylistsView() {
@@ -14,6 +15,23 @@ SmartPlaylistsView::SmartPlaylistsView() {
                      if (item) {
                        self->Emit(*item, SmartPlaylistsAction::Activate);
                      }
+                   }),
+                   this);
+  GtkGesture *menu = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(menu));
+  g_signal_connect(menu, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble y, gpointer data) {
+                     auto *self = static_cast<SmartPlaylistsView *>(data);
+                     const SmartPlaylistsItem *item = nullptr;
+                     if (GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(self->list_), static_cast<int>(y))) {
+                       if (!gtk_list_box_row_is_selected(row)) {
+                         gtk_list_box_unselect_all(GTK_LIST_BOX(self->list_));
+                         gtk_list_box_select_row(GTK_LIST_BOX(self->list_), row);
+                       }
+                       item = static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(row), "item"));
+                     }
+                     self->ShowMenu(GTK_WIDGET(self->list_), item);
+                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
 }
@@ -32,7 +50,7 @@ void SmartPlaylistsView::Emit(const SmartPlaylistsItem &item, SmartPlaylistsActi
   }
 }
 
-void SmartPlaylistsView::ShowMenu(GtkWidget *relative, const SmartPlaylistsItem &item) {
+void SmartPlaylistsView::ShowMenu(GtkWidget *relative, const SmartPlaylistsItem *item) {
   GtkWidget *popover = gtk_popover_new();
   gtk_widget_set_parent(popover, relative);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
@@ -43,7 +61,7 @@ void SmartPlaylistsView::ShowMenu(GtkWidget *relative, const SmartPlaylistsItem 
   auto add_button = [&](const char *label, SmartPlaylistsAction action) {
     GtkWidget *button = gtk_button_new_with_label(label);
     gtk_widget_add_css_class(button, "flat");
-    auto *copy = new SmartPlaylistsItem(item);
+    auto *copy = new SmartPlaylistsItem(item ? *item : SmartPlaylistsItem{});
     g_object_set_data_full(G_OBJECT(button), "item", copy, [](gpointer p) { delete static_cast<SmartPlaylistsItem *>(p); });
     g_object_set_data(G_OBJECT(button), "action", GINT_TO_POINTER(static_cast<int>(action) + 1));
     g_object_set_data(G_OBJECT(button), "popover", popover);
@@ -60,15 +78,19 @@ void SmartPlaylistsView::ShowMenu(GtkWidget *relative, const SmartPlaylistsItem 
                      this);
     gtk_box_append(GTK_BOX(box), button);
   };
-  if (item.kind != SmartPlaylistsItem::Kind::Wizard) {
-    add_button(Translations::CStr("Append to current"), SmartPlaylistsAction::Append);
-    add_button(Translations::CStr("Replace current"), SmartPlaylistsAction::Replace);
-    add_button(Translations::CStr("Add to queue"), SmartPlaylistsAction::Queue);
+  if (item && item->kind != SmartPlaylistsItem::Kind::Wizard) {
+    add_button(Translations::CStr("Append to current playlist"), SmartPlaylistsAction::Append);
+    add_button(Translations::CStr("Replace current playlist"), SmartPlaylistsAction::Replace);
+    add_button(Translations::CStr("Open in new playlist"), SmartPlaylistsAction::OpenInNew);
+    add_button(Translations::CStr("Queue track"), SmartPlaylistsAction::Queue);
+    add_button(Translations::CStr("Play next"), SmartPlaylistsAction::QueueNext);
   }
-  if (item.kind == SmartPlaylistsItem::Kind::Saved) {
-    add_button(Translations::CStr("Edit"), SmartPlaylistsAction::Edit);
-    add_button(Translations::CStr("Delete"), SmartPlaylistsAction::Delete);
+  add_button(Translations::CStr("New smart playlist…"), SmartPlaylistsAction::New);
+  if (item && item->kind == SmartPlaylistsItem::Kind::Saved) {
+    add_button(Translations::CStr("Edit smart playlist…"), SmartPlaylistsAction::Edit);
+    add_button(Translations::CStr("Delete smart playlist"), SmartPlaylistsAction::Delete);
   }
+  add_button(Translations::CStr("Restore defaults"), SmartPlaylistsAction::RestoreDefaults);
   gtk_popover_set_child(GTK_POPOVER(popover), box);
   gtk_popover_popup(GTK_POPOVER(popover));
 }
@@ -95,38 +117,54 @@ void SmartPlaylistsView::Reload(SmartPlaylistsModel *model) {
     gtk_widget_set_margin_bottom(label, 8);
     gtk_box_append(GTK_BOX(box), label);
     auto *copy = new SmartPlaylistsItem(item);
-    if (item.kind != SmartPlaylistsItem::Kind::Wizard) {
-      GtkWidget *menu = gtk_button_new_from_icon_name("view-more-symbolic");
-      gtk_widget_set_tooltip_text(menu, Translations::CStr("Actions"));
-      gtk_widget_set_valign(menu, GTK_ALIGN_CENTER);
-      g_object_set_data(G_OBJECT(menu), "item", copy);
-      g_signal_connect(menu, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
-                         auto *self = static_cast<SmartPlaylistsView *>(data);
-                         auto *saved = static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(button), "item"));
-                         if (saved) {
-                           self->ShowMenu(GTK_WIDGET(button), *saved);
-                         }
-                       }),
-                       this);
-      gtk_box_append(GTK_BOX(box), menu);
-    }
-    if (item.kind == SmartPlaylistsItem::Kind::Saved) {
-      GtkWidget *remove = gtk_button_new_from_icon_name("edit-delete-symbolic");
-      gtk_widget_set_tooltip_text(remove, Translations::CStr("Delete"));
-      gtk_widget_set_valign(remove, GTK_ALIGN_CENTER);
-      g_object_set_data(G_OBJECT(remove), "item", copy);
-      g_signal_connect(remove, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
-                         auto *self = static_cast<SmartPlaylistsView *>(data);
-                         auto *saved = static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(button), "item"));
-                         if (saved) {
-                           self->Emit(*saved, SmartPlaylistsAction::Delete);
-                         }
-                       }),
-                       this);
-      gtk_box_append(GTK_BOX(box), remove);
-    }
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
     g_object_set_data_full(G_OBJECT(row), "item", copy, [](gpointer p) { delete static_cast<SmartPlaylistsItem *>(p); });
+    if (SmartPlaylistDrag::CanDrag(item.kind == SmartPlaylistsItem::Kind::Wizard)) {
+      SetupRowDrag(row, item);
+    }
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
+}
+
+void SmartPlaylistsView::SetupRowDrag(GtkWidget *row, const SmartPlaylistsItem &item) {
+  GtkDragSource *src = gtk_drag_source_new();
+  gtk_drag_source_set_actions(src, GDK_ACTION_COPY);
+  auto *copy = new SmartPlaylistsItem(item);
+  g_object_set_data_full(G_OBJECT(src), "item", copy, [](gpointer p) { delete static_cast<SmartPlaylistsItem *>(p); });
+  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
+                     auto *self = static_cast<SmartPlaylistsView *>(data);
+                     auto *dragged = static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(s), "item"));
+                     if (!dragged || !self->songs_ || !SmartPlaylistDrag::CanDrag(dragged->kind == SmartPlaylistsItem::Kind::Wizard)) {
+                       return nullptr;
+                     }
+                     const std::string payload = SmartPlaylistDrag::DragPayload(self->songs_(*dragged));
+                     if (payload.empty()) {
+                       return nullptr;
+                     }
+                     GValue v = G_VALUE_INIT;
+                     g_value_init(&v, G_TYPE_STRING);
+                     g_value_set_string(&v, payload.c_str());
+                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
+                     g_value_unset(&v);
+                     return provider;
+                   })),
+                   this);
+  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
+}
+
+const SmartPlaylistsItem *SmartPlaylistsView::SelectedItem() const {
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  if (!row) {
+    return nullptr;
+  }
+  return static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(row), "item"));
+}
+
+void SmartPlaylistsView::Trigger(SmartPlaylistsAction action) {
+  const SmartPlaylistsItem *item = SelectedItem();
+  SmartPlaylistsItem fallback;
+  fallback.kind = SmartPlaylistsItem::Kind::Wizard;
+  fallback.title = "Custom wizard…";
+  fallback.key = "wizard";
+  Emit(item ? *item : fallback, action);
 }

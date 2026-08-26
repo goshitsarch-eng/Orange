@@ -193,6 +193,7 @@ void Application::Init() {
 void Application::Exit() {
   if (player_) {
     player_->SaveVolume();
+    player_->SavePlaybackStatus();
     player_->Stop();
   }
   if (playlist_manager_) {

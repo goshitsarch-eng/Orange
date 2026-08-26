@@ -24,6 +24,11 @@ std::vector<SmartPlaylistsItem> SmartPlaylistsModel::BuiltinItems() {
   return items;
 }
 
+void SmartPlaylistsModel::RestoreDefaults() {
+  SmartPlaylistSearch::SaveAll({});
+  Reload();
+}
+
 void SmartPlaylistsModel::Reload() {
   items_ = BuiltinItems();
   for (const auto &preset : SmartPlaylistSearch::LoadSaved()) {

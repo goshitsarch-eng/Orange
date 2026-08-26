@@ -6,6 +6,7 @@
 #include "smartplaylists/playlistquerygenerator.h"
 #include "smartplaylists/smartplaylist.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
+#include "smartplaylists/smartplaylistdrag.h"
 #include "smartplaylists/smartplaylistsmodel.h"
 
 #include <algorithm>
@@ -286,9 +287,31 @@ TEST(SmartPlaylistsModel, BuiltinSavedAndWizardKeys) {
   EXPECT_FALSE(model.ItemByKey("missing"));
   SmartPlaylistSearch::RemoveSaved("Live tracks");
 
+  SmartPlaylistSearch leftover;
+  leftover.terms.push_back({SmartPlaylistField::Title, SmartPlaylistOp::Contains, "tmp"});
+  SmartPlaylistSearch::AddSaved("Temporary", leftover);
+  SmartPlaylistsModel restored;
+  restored.Reload();
+  ASSERT_TRUE(restored.ItemByKey("saved:Temporary"));
+  restored.RestoreDefaults();
+  EXPECT_FALSE(restored.ItemByKey("saved:Temporary"));
+  EXPECT_TRUE(restored.ItemByKey("all"));
+  EXPECT_TRUE(SmartPlaylistSearch::LoadSaved().empty());
+
   SmartPlaylistQueryWizardPlugin plugin(custom);
   auto generated = plugin.CreateGenerator("From wizard", true);
   ASSERT_TRUE(generated);
   EXPECT_EQ("From wizard", generated->name());
   EXPECT_TRUE(generated->is_dynamic());
+}
+
+TEST(SmartPlaylistDrag, JoinsSongUrlsAndSkipsWizard) {
+  Song a;
+  a.set_url("file:///a");
+  Song b;
+  b.set_url("file:///b");
+  Song empty;
+  EXPECT_EQ("file:///a\nfile:///b", SmartPlaylistDrag::DragPayload({a, b, empty}));
+  EXPECT_TRUE(SmartPlaylistDrag::CanDrag(false));
+  EXPECT_FALSE(SmartPlaylistDrag::CanDrag(true));
 }

@@ -26,11 +26,13 @@ std::vector<PlaylistMetadata> PlaylistBackend::GetAllPlaylists() {
 std::unique_ptr<Playlist> PlaylistBackend::LoadPlaylist(int id) {
   auto playlist = std::make_unique<Playlist>();
   playlist->set_id(id);
-  SqlQuery meta(database_, "SELECT name, is_favorite FROM playlists WHERE ROWID = ?");
+  SqlQuery meta(database_, "SELECT name, is_favorite, last_played FROM playlists WHERE ROWID = ?");
   meta.Bind(1, id);
+  int last_played = -1;
   if (meta.Step()) {
     playlist->set_name(meta.ColumnText(0));
     playlist->set_favorite(meta.ColumnInt(1) != 0);
+    last_played = meta.ColumnInt(2);
   }
   SqlQuery items(database_, "SELECT collection_id, url, title, album, artist, albumartist, track, length FROM playlist_items WHERE playlist = ?");
   items.Bind(1, id);
@@ -54,6 +56,9 @@ std::unique_ptr<Playlist> PlaylistBackend::LoadPlaylist(int id) {
     songs.push_back(song);
   }
   playlist->AppendSongs(songs);
+  if (last_played >= 0 && last_played < playlist->row_count()) {
+    playlist->set_current_row(last_played);
+  }
   return playlist;
 }
 
@@ -62,16 +67,18 @@ int PlaylistBackend::SavePlaylist(Playlist *playlist) {
     return -1;
   }
   if (playlist->id() < 0) {
-    SqlQuery query(database_, "INSERT INTO playlists (name, last_played, ui_order, is_favorite) VALUES (?, -1, 0, ?)");
+    SqlQuery query(database_, "INSERT INTO playlists (name, last_played, ui_order, is_favorite) VALUES (?, ?, 0, ?)");
     query.Bind(1, playlist->name());
-    query.Bind(2, playlist->favorite() ? 1 : 0);
+    query.Bind(2, playlist->current_row());
+    query.Bind(3, playlist->favorite() ? 1 : 0);
     query.Exec();
     playlist->set_id(static_cast<int>(database_->LastInsertRowId()));
   } else {
-    SqlQuery query(database_, "UPDATE playlists SET name = ?, is_favorite = ? WHERE ROWID = ?");
+    SqlQuery query(database_, "UPDATE playlists SET name = ?, is_favorite = ?, last_played = ? WHERE ROWID = ?");
     query.Bind(1, playlist->name());
     query.Bind(2, playlist->favorite() ? 1 : 0);
-    query.Bind(3, playlist->id());
+    query.Bind(3, playlist->current_row());
+    query.Bind(4, playlist->id());
     query.Exec();
     SqlQuery clear(database_, "DELETE FROM playlist_items WHERE playlist = ?");
     clear.Bind(1, playlist->id());

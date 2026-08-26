@@ -9,6 +9,7 @@
 class SmartPlaylistsModel {
  public:
   void Reload();
+  void RestoreDefaults();
   const std::vector<SmartPlaylistsItem> &items() const { return items_; }
   const SmartPlaylistsItem *ItemByKey(const std::string &key) const;
   int row_count() const { return static_cast<int>(items_.size()); }

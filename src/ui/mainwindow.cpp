@@ -129,6 +129,7 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
   RefreshStreaming();
   RefreshQueue();
   ApplyBehaviourSettings();
+  app_->player()->ResumePlayback();
   app_->ApplyCommandline(options);
 }
 
@@ -714,6 +715,7 @@ void MainWindow::BuildSidebar() {
     SmartPlaylistSearch::RemoveSaved(item.title);
     smart_container_->Reload();
   });
+  smart_container_->SetSongsCallback([this](const SmartPlaylistsItem &item) { return item.search.Search(app_->collection()->Songs()); });
   smart_container_->SetActionCallback([this](const SmartPlaylistsItem &item, SmartPlaylistsAction action) {
     switch (action) {
       case SmartPlaylistsAction::Activate:
@@ -729,10 +731,23 @@ void MainWindow::BuildSidebar() {
         RefreshPlaylistsList();
         RefreshPlaylist();
         break;
+      case SmartPlaylistsAction::OpenInNew:
+        app_->playlist_manager()->PlaySmartPlaylist(item.key, true, true);
+        RefreshPlaylistsList();
+        RefreshPlaylist();
+        break;
       case SmartPlaylistsAction::Queue: {
         const SongList songs = item.search.Search(app_->collection()->Songs());
         for (const Song &song : songs) {
           app_->queue()->Append(song);
+        }
+        RefreshQueue();
+        break;
+      }
+      case SmartPlaylistsAction::QueueNext: {
+        const SongList songs = item.search.Search(app_->collection()->Songs());
+        for (auto it = songs.rbegin(); it != songs.rend(); ++it) {
+          app_->queue()->InsertNext(*it);
         }
         RefreshQueue();
         break;
@@ -750,6 +765,32 @@ void MainWindow::BuildSidebar() {
           smart_container_->Reload();
         }
         break;
+      case SmartPlaylistsAction::New:
+        Dialogs::SmartPlaylistWizard(GTK_WINDOW(window_), app_);
+        smart_container_->Reload();
+        RefreshPlaylistsList();
+        RefreshPlaylist();
+        break;
+      case SmartPlaylistsAction::RestoreDefaults: {
+        AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(
+            Translations::CStr("Restore defaults"),
+            Translations::CStr("Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists")));
+        adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "restore", Translations::CStr("Restore"), nullptr);
+        adw_alert_dialog_set_response_appearance(dialog, "restore", ADW_RESPONSE_DESTRUCTIVE);
+        g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
+                           if (g_strcmp0(response, "restore") != 0) {
+                             return;
+                           }
+                           auto *self = static_cast<MainWindow *>(data);
+                           if (self->smart_container_) {
+                             self->smart_container_->model()->RestoreDefaults();
+                             self->smart_container_->Reload();
+                           }
+                         }),
+                         this);
+        adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
+        break;
+      }
     }
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, smart_container_->widget(), "smart", "Smart playlists", "view-refresh-symbolic");
