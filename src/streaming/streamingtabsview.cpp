@@ -177,6 +177,8 @@ void StreamingTabsView::SetMenuCallback(MenuCallback callback) {
   search_->SetMenuCallback(std::move(callback));
 }
 
+void StreamingTabsView::SetConfigureCallback(ConfigureCallback callback) { search_->SetConfigureCallback(std::move(callback)); }
+
 void StreamingTabsView::ReloadSettings() {
   if (service_) {
     service_->ReloadSettings();

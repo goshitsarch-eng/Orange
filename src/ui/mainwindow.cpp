@@ -939,6 +939,7 @@ void MainWindow::BuildSidebar() {
     auto view = std::make_unique<StreamingTabsView>(service);
     view->SetActivateCallback(activate_stream);
     view->SetMenuCallback([this](const SongList &songs) { ShowStreamingMenu(songs); });
+    view->SetConfigureCallback([this]() { OpenSettings(); });
     gtk_stack_add_titled(GTK_STACK(streaming_stack_), view->widget(), service->name().c_str(), service->name().c_str());
     streaming_views_.push_back(std::move(view));
   }

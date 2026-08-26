@@ -46,7 +46,7 @@ StreamingPage::Page ParsePage(Type type, const std::string &json, int offset, in
 void Get(NetworkAccessManager *network, const std::string &url, Type type, SearchCallback callback);
 void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, Type type, SearchCallback callback,
             StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {},
-            int limit = StreamingPage::kDefaultLimit);
+            int limit = StreamingPage::kDefaultLimit, int max_items = 0);
 
 }  // namespace SubsonicRequest
 

@@ -15,6 +15,7 @@ class StreamingTabsView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
   using MenuCallback = std::function<void(const SongList &)>;
+  using ConfigureCallback = std::function<void()>;
 
   explicit StreamingTabsView(StreamingService *service);
   ~StreamingTabsView();
@@ -23,6 +24,7 @@ class StreamingTabsView {
   StreamingService *service() const { return service_; }
   void SetActivateCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  void SetConfigureCallback(ConfigureCallback callback);
   void ReloadSettings();
   void GetArtists();
   void GetAlbums();

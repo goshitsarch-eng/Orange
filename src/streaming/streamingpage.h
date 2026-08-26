@@ -75,8 +75,26 @@ inline bool NeedAnotherPage(const Page &page) {
   return page.limit > 0 && static_cast<int>(page.songs.size()) >= page.limit;
 }
 
+inline int Remaining(int max_items, int received) {
+  if (max_items <= 0) {
+    return -1;
+  }
+  return max_items - received;
+}
+
+inline int PageLimit(int configured_limit, int max_items, int received) {
+  const int remaining = Remaining(max_items, received);
+  if (remaining >= 0 && remaining < configured_limit) {
+    return remaining;
+  }
+  return configured_limit;
+}
+
+inline bool ReachedMax(int received, int max_items) { return max_items > 0 && received >= max_items; }
+
 void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<std::string, std::string> &headers, ParsePage parse,
-            DoneCallback callback, ProgressCallback progress = {}, StillCurrent still_current = {}, int limit = kDefaultLimit);
+            DoneCallback callback, ProgressCallback progress = {}, StillCurrent still_current = {}, int limit = kDefaultLimit,
+            int max_items = 0);
 
 }  // namespace StreamingPage
 

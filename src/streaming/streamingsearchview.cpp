@@ -7,6 +7,7 @@
 #include "streaming/streamingcover.h"
 #include "streaming/streamingdrag.h"
 #include "streaming/streamingprogress.h"
+#include "streaming/streamingsearchopts.h"
 #include "streaming/streamingsearchgroup.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "translations/translations.h"
@@ -61,6 +62,16 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   gtk_widget_set_tooltip_text(group_button_, Translations::CStr("Group by"));
   gtk_box_append(GTK_BOX(types), group_button_);
   BuildGroupMenu();
+  configure_button_ = gtk_button_new_from_icon_name("emblem-system-symbolic");
+  gtk_widget_set_tooltip_text(configure_button_, Translations::CStr(StreamingSearchOpts::ConfigureLabel()));
+  gtk_box_append(GTK_BOX(types), configure_button_);
+  g_signal_connect(configure_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     if (self->configure_) {
+                       self->configure_();
+                     }
+                   }),
+                   this);
   GtkWidget *scroll = gtk_scrolled_window_new();
   gtk_widget_set_vexpand(scroll, TRUE);
   list_ = gtk_list_box_new();
@@ -69,16 +80,23 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   auto search_now = +[](GtkWidget *, gpointer data) {
     auto *self = static_cast<StreamingSearchView *>(data);
     const char *text = gtk_editable_get_text(GTK_EDITABLE(self->search_entry_));
-    self->Search(text ? text : "");
+    self->ScheduleSearch(text ? text : "", true);
   };
   g_signal_connect(search_entry_, "activate", G_CALLBACK(search_now), this);
   g_signal_connect(search_entry_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<StreamingSearchView *>(data);
                      const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
                      const std::string query = text ? text : "";
-                     if (query.size() >= 2) {
-                       self->Search(query);
+                     if (!StreamingProgress::HasQuery(query)) {
+                       self->CancelPendingSearch();
+                       self->Search({});
+                       return;
                      }
+                     if (!StreamingSearchOpts::ShouldSearchOnChange(query)) {
+                       self->CancelPendingSearch();
+                       return;
+                     }
+                     self->ScheduleSearch(query, false);
                    }),
                    this);
   g_signal_connect(type_artists_, "toggled", G_CALLBACK(search_now), this);
@@ -152,12 +170,49 @@ StreamingSearchView::~StreamingSearchView() {
   if (alive_) {
     *alive_ = false;
   }
+  CancelPendingSearch();
   ResetTypeAhead();
 }
 
 void StreamingSearchView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
 void StreamingSearchView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+
+void StreamingSearchView::SetConfigureCallback(ConfigureCallback callback) { configure_ = std::move(callback); }
+
+void StreamingSearchView::CancelPendingSearch() {
+  ++search_timer_gen_;
+  if (search_timer_ != 0) {
+    g_source_remove(search_timer_);
+    search_timer_ = 0;
+  }
+}
+
+void StreamingSearchView::ScheduleSearch(const std::string &query, bool immediate) {
+  CancelPendingSearch();
+  pending_query_ = query;
+  const int delay = service_ ? StreamingSearchOpts::DelayMs(service_->name()) : 0;
+  if (!StreamingSearchOpts::ShouldDelay(delay, immediate)) {
+    Search(query);
+    return;
+  }
+  struct Job {
+    StreamingSearchView *view = nullptr;
+    int generation = 0;
+  };
+  auto *job = new Job{this, search_timer_gen_};
+  search_timer_ = g_timeout_add_full(
+      G_PRIORITY_DEFAULT, static_cast<guint>(delay),
+      +[](gpointer data) -> gboolean {
+        auto *job = static_cast<Job *>(data);
+        if (job->view && job->generation == job->view->search_timer_gen_) {
+          job->view->search_timer_ = 0;
+          job->view->Search(job->view->pending_query_);
+        }
+        return G_SOURCE_REMOVE;
+      },
+      job, +[](gpointer data) { delete static_cast<Job *>(data); });
+}
 
 void StreamingSearchView::HideProgress() {
   if (progress_) {

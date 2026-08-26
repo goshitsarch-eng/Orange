@@ -1,4 +1,6 @@
 #include "streaming/streamingabort.h"
+#include "streaming/streamingpage.h"
+#include "streaming/streamingsearchopts.h"
 #include "streaming/streamingcover.h"
 #include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchgroup.h"
@@ -252,6 +254,38 @@ TEST(StreamingService, ResetDropsInFlightCallbacks) {
   EXPECT_EQ(1, searches);
   EXPECT_FALSE(service.ArtistsRequestCurrent(service.artists_generation() - 1));
   EXPECT_TRUE(service.ArtistsRequestCurrent(service.artists_generation()));
+}
+
+TEST(StreamingSearchOpts, DelayLimitsAndConfigure) {
+  using T = StreamingService::SearchType;
+  EXPECT_STREQ("Configure…", StreamingSearchOpts::ConfigureLabel());
+  EXPECT_EQ(1500, StreamingSearchOpts::kDefaultDelayMs);
+  EXPECT_EQ(4, StreamingSearchOpts::DefaultLimitFor(T::Artists));
+  EXPECT_EQ(10, StreamingSearchOpts::DefaultLimitFor(T::Albums));
+  EXPECT_EQ(10, StreamingSearchOpts::DefaultLimitFor(T::Songs));
+  EXPECT_STREQ("artistssearchlimit", StreamingSearchOpts::LimitKey(T::Artists));
+  EXPECT_STREQ("albumssearchlimit", StreamingSearchOpts::LimitKey(T::Albums));
+  EXPECT_STREQ("songssearchlimit", StreamingSearchOpts::LimitKey(T::Songs));
+  EXPECT_TRUE(StreamingSearchOpts::HasSearchLimits("Tidal"));
+  EXPECT_TRUE(StreamingSearchOpts::HasSearchLimits("Qobuz"));
+  EXPECT_TRUE(StreamingSearchOpts::HasSearchLimits("Spotify"));
+  EXPECT_FALSE(StreamingSearchOpts::HasSearchLimits("Subsonic"));
+  EXPECT_EQ(0, StreamingSearchOpts::ClampDelay(-20));
+  EXPECT_EQ(1500, StreamingSearchOpts::ClampDelay(1500));
+  EXPECT_EQ(4, StreamingSearchOpts::ClampLimit(0, 4));
+  EXPECT_EQ(8, StreamingSearchOpts::ClampLimit(8, 4));
+  EXPECT_TRUE(StreamingSearchOpts::ShouldDelay(1500, false));
+  EXPECT_FALSE(StreamingSearchOpts::ShouldDelay(1500, true));
+  EXPECT_FALSE(StreamingSearchOpts::ShouldDelay(0, false));
+  EXPECT_TRUE(StreamingSearchOpts::ShouldSearchOnChange("ab"));
+  EXPECT_FALSE(StreamingSearchOpts::ShouldSearchOnChange("a"));
+  EXPECT_EQ(-1, StreamingPage::Remaining(0, 10));
+  EXPECT_EQ(6, StreamingPage::Remaining(10, 4));
+  EXPECT_EQ(50, StreamingPage::PageLimit(50, 0, 10));
+  EXPECT_EQ(6, StreamingPage::PageLimit(50, 10, 4));
+  EXPECT_TRUE(StreamingPage::ReachedMax(10, 10));
+  EXPECT_FALSE(StreamingPage::ReachedMax(9, 10));
+  EXPECT_FALSE(StreamingPage::ReachedMax(10, 0));
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {

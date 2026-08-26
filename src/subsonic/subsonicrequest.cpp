@@ -128,10 +128,10 @@ void Get(NetworkAccessManager *network, const std::string &url, Type type, Searc
 }
 
 void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, Type type, SearchCallback callback,
-            StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current, int limit) {
+            StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current, int limit, int max_items) {
   StreamingPage::GetAll(
       network, std::move(url_for), {}, [type](const std::string &json, int offset, int page_limit) { return ParsePage(type, json, offset, page_limit); },
-      std::move(callback), std::move(progress), std::move(still_current), limit);
+      std::move(callback), std::move(progress), std::move(still_current), limit, max_items);
 }
 
 }  // namespace SubsonicRequest

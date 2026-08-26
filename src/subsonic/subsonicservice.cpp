@@ -4,6 +4,7 @@
 #include "core/settings.h"
 #include "subsonic/subsonicfavoriterequest.h"
 #include "subsonic/subsonicrequest.h"
+#include "streaming/streamingsearchopts.h"
 #include "subsonic/subsonicurlhandler.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
@@ -106,14 +107,15 @@ void SubsonicService::Search(const std::string &query, SearchType type, SearchCa
   }
   const int gen = search_generation();
   const auto request_type = SubsonicRequest::FromSearchType(type);
+  const int limit = StreamingSearchOpts::LimitFor(name(), type);
   SubsonicRequest::GetAll(
       network_,
-      [this, request_type, query](int offset, int limit) {
+      [this, request_type, query](int offset, int page_limit) {
         return CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(request_type),
-                         SubsonicRequest::Params(request_type, query, offset, limit), hex_auth_);
+                         SubsonicRequest::Params(request_type, query, offset, page_limit), hex_auth_);
       },
       request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
-      [this, gen]() { return SearchRequestCurrent(gen); });
+      [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit);
 }
 
 void SubsonicService::GetArtists(SearchCallback callback) {

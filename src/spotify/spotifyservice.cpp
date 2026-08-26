@@ -3,6 +3,7 @@
 #include "constants/spotifysettings.h"
 #include "core/settings.h"
 #include "streaming/streamingauth.h"
+#include "streaming/streamingsearchopts.h"
 #include "spotify/spotifyfavoriterequest.h"
 #include "spotify/spotifymetadatarequest.h"
 #include "spotify/spotifyrequest.h"
@@ -111,10 +112,11 @@ void SpotifyService::Search(const std::string &query, SearchType type, SearchCal
   const int gen = search_generation();
   EnsureFreshToken([this, query, type, guarded, gen]() {
     const auto request_type = SpotifyRequest::FromSearchType(type);
+    const int limit = StreamingSearchOpts::LimitFor(name(), type);
     SpotifyRequest::GetAll(
-        network_, [request_type, query](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, request_type, query, offset, limit); },
+        network_, [request_type, query](int offset, int page_limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, request_type, query, offset, page_limit); },
         AuthHeaders(), request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
-        [this, gen]() { return SearchRequestCurrent(gen); });
+        [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit);
   });
 }
 

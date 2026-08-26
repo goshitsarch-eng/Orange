@@ -3,6 +3,7 @@
 #include "constants/tidalsettings.h"
 #include "core/settings.h"
 #include "streaming/streamingauth.h"
+#include "streaming/streamingsearchopts.h"
 #include "tidal/tidalfavoriterequest.h"
 #include "tidal/tidalrequest.h"
 #include "tidal/tidalstreamurlrequest.h"
@@ -118,13 +119,14 @@ void TidalService::Search(const std::string &query, SearchType type, SearchCallb
   const int gen = search_generation();
   EnsureFreshToken([this, query, type, guarded, gen]() {
     const auto request_type = TidalRequest::FromSearchType(type);
+    const int limit = StreamingSearchOpts::LimitFor(name(), type);
     TidalRequest::GetAll(
         network_,
-        [this, request_type, query](int offset, int limit) {
-          return TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_, offset, limit);
+        [this, request_type, query](int offset, int page_limit) {
+          return TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_, offset, page_limit);
         },
         AuthHeaders(), request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
-        [this, gen]() { return SearchRequestCurrent(gen); });
+        [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit);
   });
 }
 

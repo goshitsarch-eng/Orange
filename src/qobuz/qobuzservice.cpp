@@ -3,6 +3,7 @@
 #include "constants/qobuzsettings.h"
 #include "core/settings.h"
 #include "streaming/streamingauth.h"
+#include "streaming/streamingsearchopts.h"
 #include "qobuz/qobuzfavoriterequest.h"
 #include "qobuz/qobuzrequest.h"
 #include "qobuz/qobuzstreamurlrequest.h"
@@ -67,13 +68,14 @@ void QobuzService::Search(const std::string &query, SearchType type, SearchCallb
   auto guarded = GuardSearch(std::move(callback));
   const int gen = search_generation();
   const auto request_type = QobuzRequest::FromSearchType(type);
+  const int limit = StreamingSearchOpts::LimitFor(name(), type);
   QobuzRequest::GetAll(
       network_,
-      [this, request_type, query](int offset, int limit) {
-        return QobuzRequest::Url(kApiUrl, request_type, query, app_id_, user_auth_token_, offset, limit);
+      [this, request_type, query](int offset, int page_limit) {
+        return QobuzRequest::Url(kApiUrl, request_type, query, app_id_, user_auth_token_, offset, page_limit);
       },
       AuthHeaders(), request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
-      [this, gen]() { return SearchRequestCurrent(gen); });
+      [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit);
 }
 
 void QobuzService::GetArtists(SearchCallback callback) {

@@ -19,6 +19,7 @@ class StreamingSearchView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
   using MenuCallback = std::function<void(const SongList &)>;
+  using ConfigureCallback = std::function<void()>;
 
   explicit StreamingSearchView(StreamingService *service);
   ~StreamingSearchView();
@@ -27,6 +28,7 @@ class StreamingSearchView {
   void Search(const std::string &query);
   void SetActivateCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  void SetConfigureCallback(ConfigureCallback callback);
   StreamingSearchModel *model() { return &model_; }
   const SongList &results() const { return model_.songs(); }
   SongList SelectedSongs() const;
@@ -42,6 +44,8 @@ class StreamingSearchView {
   void HideProgress();
   void ApplyStatus(const std::string &text);
   void ApplyProgress(int value, int maximum);
+  void ScheduleSearch(const std::string &query, bool immediate);
+  void CancelPendingSearch();
   gboolean OnKeyPressed(guint keyval);
   void ResetTypeAhead();
 
@@ -50,6 +54,7 @@ class StreamingSearchView {
   StreamingSearchSortModel sort_model_{&model_};
   ActivateCallback activate_;
   MenuCallback menu_;
+  ConfigureCallback configure_;
   GtkWidget *widget_ = nullptr;
   GtkWidget *search_entry_ = nullptr;
   GtkWidget *type_artists_ = nullptr;
@@ -57,6 +62,7 @@ class StreamingSearchView {
   GtkWidget *type_songs_ = nullptr;
   GtkWidget *pretty_covers_btn_ = nullptr;
   GtkWidget *group_button_ = nullptr;
+  GtkWidget *configure_button_ = nullptr;
   GtkWidget *list_ = nullptr;
   GtkWidget *progress_ = nullptr;
   GtkWidget *status_ = nullptr;
@@ -67,6 +73,9 @@ class StreamingSearchView {
   guint typeahead_timeout_ = 0;
   bool pretty_covers_ = true;
   int cover_gen_ = 0;
+  std::string pending_query_;
+  guint search_timer_ = 0;
+  int search_timer_gen_ = 0;
   std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
   std::map<std::string, std::string> cover_cache_;
 };

@@ -5,7 +5,7 @@
 namespace StreamingPage {
 
 void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<std::string, std::string> &headers, ParsePage parse,
-            DoneCallback callback, ProgressCallback progress, StillCurrent still_current, int limit) {
+            DoneCallback callback, ProgressCallback progress, StillCurrent still_current, int limit, int max_items) {
   if (!network || !url_for || !parse) {
     if (callback) {
       callback({});
@@ -21,6 +21,7 @@ void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<
     ProgressCallback progress;
     StillCurrent still_current;
     int limit = kDefaultLimit;
+    int max_items = 0;
     int offset = 0;
     int pages = 0;
     std::string next_url;
@@ -35,6 +36,7 @@ void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<
   state->progress = std::move(progress);
   state->still_current = std::move(still_current);
   state->limit = limit > 0 ? limit : kDefaultLimit;
+  state->max_items = max_items;
 
   auto fetch = std::make_shared<std::function<void()>>();
   *fetch = [state, fetch]() {
@@ -47,7 +49,14 @@ void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<
       }
       return;
     }
-    const std::string url = state->next_url.empty() ? state->url_for(state->offset, state->limit) : state->next_url;
+    const int page_limit = PageLimit(state->limit, state->max_items, static_cast<int>(state->songs.size()));
+    if (page_limit <= 0) {
+      if (state->callback) {
+        state->callback(state->songs);
+      }
+      return;
+    }
+    const std::string url = state->next_url.empty() ? state->url_for(state->offset, page_limit) : state->next_url;
     state->next_url.clear();
     if (url.empty()) {
       if (state->callback) {
@@ -68,11 +77,15 @@ void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<
             page = state->parse(response.body, requested_offset, state->limit);
           }
           state->songs.insert(state->songs.end(), page.songs.begin(), page.songs.end());
+          if (ReachedMax(static_cast<int>(state->songs.size()), state->max_items)) {
+            state->songs.resize(static_cast<size_t>(state->max_items));
+          }
           if (state->progress) {
             state->progress(static_cast<int>(state->songs.size()), page.total);
           }
           const int next = NextOffset(page);
-          if (NeedAnotherPage(page) && next > requested_offset && state->pages < kMaxPages) {
+          if (!ReachedMax(static_cast<int>(state->songs.size()), state->max_items) && NeedAnotherPage(page) && next > requested_offset &&
+              state->pages < kMaxPages) {
             state->offset = next;
             state->next_url = page.next_url;
             (*fetch)();
