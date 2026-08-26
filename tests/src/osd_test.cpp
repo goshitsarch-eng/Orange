@@ -4,6 +4,7 @@
 #include "core/standardpaths.h"
 #include "covermanager/coverfromurldialog.h"
 #include "osd/osdart.h"
+#include "osd/osdprettywayland.h"
 #include "osd/osdbase.h"
 #include "osd/osdpretty.h"
 #include "osd/osdprettyplacement.h"
@@ -98,6 +99,11 @@ TEST(OSDBase, CustomTextAndPlaylistFinished) {
   osd.PlaylistFinished();
   EXPECT_EQ("Strawberry", tray.popup_summary());
   EXPECT_EQ("Playlist finished", tray.popup_message());
+}
+
+TEST(OSDPrettyWayland, SupportedWhenADisplayExists) {
+  EXPECT_TRUE(OSDPrettyWayland::SupportedOnDisplay(true));
+  EXPECT_FALSE(OSDPrettyWayland::SupportedOnDisplay(false));
 }
 
 TEST(OSDPretty, SupportedRequiresX11Display) {

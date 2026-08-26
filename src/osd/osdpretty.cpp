@@ -4,6 +4,7 @@
 #include "constants/notificationssettings.h"
 #include "core/settings.h"
 #include "osd/osdprettyplacement.h"
+#include "osd/osdprettywayland.h"
 #include "utilities/fontutils.h"
 
 #include <algorithm>
@@ -133,14 +134,7 @@ void OSDPretty::ReloadSettings() {
   }
 }
 
-bool OSDPretty::Supported() {
-#ifdef HAVE_X11
-  GdkDisplay *display = gdk_display_get_default();
-  return display && GDK_IS_X11_DISPLAY(display);
-#else
-  return false;
-#endif
-}
+bool OSDPretty::Supported() { return OSDPrettyWayland::SupportedOnDisplay(gdk_display_get_default() != nullptr); }
 
 void OSDPretty::set_pos(int x, int y) {
   pos_x_ = x;

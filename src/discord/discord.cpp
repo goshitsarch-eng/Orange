@@ -1,6 +1,7 @@
 #include "discord/discord.h"
 
 #include "constants/notificationssettings.h"
+#include "discord/discordart.h"
 #include "core/logging.h"
 #include "core/settings.h"
 
@@ -85,7 +86,9 @@ std::string DiscordRichPresence::SetActivityJson(const Song &song, bool playing,
   std::string json = "{\"cmd\":\"SET_ACTIVITY\",\"nonce\":\"" + std::to_string(nonce) + "\",\"args\":{\"pid\":" +
                      std::to_string(pid) + ",\"activity\":{\"type\":2,\"status_display_type\":" + std::to_string(status_display_type) +
                      ",\"name\":\"Strawberry\",\"details\":\"" + title + "\",\"state\":\"" + artist +
-                     "\",\"assets\":{\"large_image\":\"embedded_cover\",\"small_image\":\"embedded_cover\",\"small_text\":\"Strawberry Music Player\"";
+                     "\",\"assets\":{\"large_image\":\"" +
+                     JsonEscape(DiscordArt::ArtKey(DiscordArt::SongArtUrl(song.art_manual(), song.art_automatic()))) +
+                     "\",\"small_image\":\"embedded_cover\",\"small_text\":\"Strawberry Music Player\"";
   if (!album.empty()) {
     json += ",\"large_text\":\"on " + album + "\"";
   }

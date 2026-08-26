@@ -1,6 +1,7 @@
 #include "playlist/playlist.h"
 
 #include "playlist/playlistbehaviour.h"
+#include "playlist/playlistshuffle.h"
 #include "playlist/playlistdelegates.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
@@ -14,10 +15,12 @@ Playlist::Playlist() = default;
 void Playlist::set_current_row(int row) {
   if (songs_.empty()) {
     current_row_ = -1;
+    current_virtual_index_ = -1;
     CurrentChanged.Emit(current_row_);
     return;
   }
   current_row_ = std::clamp(row, 0, static_cast<int>(songs_.size()) - 1);
+  SyncVirtualIndex();
   CurrentChanged.Emit(current_row_);
 }
 
@@ -48,6 +51,7 @@ void Playlist::Undo() {
   songs_ = undo_.back().songs;
   current_row_ = undo_.back().current_row;
   undo_.pop_back();
+  RebuildVirtualItems();
   Changed.Emit();
 }
 
@@ -59,6 +63,7 @@ void Playlist::Redo() {
   songs_ = redo_.back().songs;
   current_row_ = redo_.back().current_row;
   redo_.pop_back();
+  RebuildVirtualItems();
   Changed.Emit();
 }
 
@@ -70,6 +75,7 @@ void Playlist::ReplaceSongs(const SongList &songs) {
   } else if (current_row_ < 0 || current_row_ >= static_cast<int>(songs_.size())) {
     current_row_ = 0;
   }
+  RebuildVirtualItems();
   Changed.Emit();
 }
 
@@ -86,6 +92,7 @@ void Playlist::InsertSongs(int row, const SongList &songs) {
     current_row_ = 0;
   }
   MaybeAutoSort();
+  RebuildVirtualItems();
   Changed.Emit();
 }
 
@@ -106,6 +113,7 @@ void Playlist::RemoveRows(const std::vector<int> &rows) {
       }
     }
   }
+  RebuildVirtualItems();
   Changed.Emit();
 }
 
@@ -116,6 +124,7 @@ void Playlist::Clear() {
   PushUndo();
   songs_.clear();
   current_row_ = -1;
+  RebuildVirtualItems();
   Changed.Emit();
 }
 
@@ -155,6 +164,7 @@ void Playlist::MoveRows(const std::vector<int> &rows, int to) {
       }
     }
   }
+  RebuildVirtualItems();
   Changed.Emit();
 }
 
@@ -166,6 +176,7 @@ void Playlist::Shuffle() {
   std::random_device rd;
   std::mt19937 gen(rd());
   std::shuffle(songs_.begin(), songs_.end(), gen);
+  RebuildVirtualItems();
   Changed.Emit();
 }
 
@@ -416,6 +427,55 @@ void Playlist::SetShuffleMode(PlaylistSequence::ShuffleMode mode) {
   } else if (mode == PlaylistSequence::ShuffleMode::InsideAlbum) {
     mode_ = SequenceMode::AlbumShuffle;
   }
+  RebuildVirtualItems();
+}
+
+void Playlist::Reshuffle(unsigned seed) { RebuildVirtualItems(seed == 0 ? std::random_device{}() : seed); }
+
+void Playlist::SyncVirtualIndex() {
+  current_virtual_index_ = -1;
+  for (int i = 0; i < static_cast<int>(virtual_items_.size()); ++i) {
+    if (virtual_items_[static_cast<size_t>(i)] == current_row_) {
+      current_virtual_index_ = i;
+      return;
+    }
+  }
+}
+
+bool Playlist::SameAlbum(int left, int right) const {
+  return PlaylistShuffle::AlbumKey(song(left)) == PlaylistShuffle::AlbumKey(song(right));
+}
+
+void Playlist::RebuildVirtualItems(unsigned seed) {
+  const int n = row_count();
+  if (seed == 0 && shuffle_mode_ != PlaylistSequence::ShuffleMode::Off) {
+    seed = std::random_device{}();
+  }
+  std::vector<std::string> keys;
+  keys.reserve(static_cast<size_t>(n));
+  switch (shuffle_mode_) {
+    case PlaylistSequence::ShuffleMode::All:
+    case PlaylistSequence::ShuffleMode::InsideAlbum:
+      virtual_items_ = PlaylistShuffle::ShuffleAll(n, seed, current_row_);
+      break;
+    case PlaylistSequence::ShuffleMode::Albums:
+      for (int i = 0; i < n; ++i) {
+        keys.push_back(PlaylistShuffle::AlbumKey(song(i)));
+      }
+      virtual_items_ = PlaylistShuffle::ShuffleByKey(keys, seed, current_row_);
+      break;
+    case PlaylistSequence::ShuffleMode::Grouping:
+      for (int i = 0; i < n; ++i) {
+        keys.push_back(PlaylistShuffle::GroupingKey(song(i)));
+      }
+      virtual_items_ = PlaylistShuffle::ShuffleByKey(keys, seed, current_row_);
+      break;
+    case PlaylistSequence::ShuffleMode::Off:
+    default:
+      virtual_items_ = PlaylistShuffle::Identity(n);
+      break;
+  }
+  SyncVirtualIndex();
 }
 
 int Playlist::NextIndex() const {
@@ -425,49 +485,82 @@ int Playlist::NextIndex() const {
   if (mode_ == SequenceMode::RepeatTrack || repeat_mode_ == PlaylistSequence::RepeatMode::Track) {
     return current_row_;
   }
-  const bool wrap = mode_ == SequenceMode::RepeatAll || repeat_mode_ == PlaylistSequence::RepeatMode::Playlist;
-  if (repeat_mode_ == PlaylistSequence::RepeatMode::Album && current_row_ >= 0) {
-    const std::string album = song(current_row_).album();
-    for (int i = 1; i <= row_count(); ++i) {
-      const int row = (current_row_ + i) % row_count();
-      if (!song(row).skipped() && song(row).album() == album) {
-        return row;
-      }
-    }
+  if (static_cast<int>(virtual_items_.size()) != row_count()) {
+    const_cast<Playlist *>(this)->RebuildVirtualItems();
   }
-  const int start = current_row_ < 0 ? -1 : current_row_;
-  const int n = row_count();
-  for (int i = 1; i <= n; ++i) {
-    int row = start + i;
-    if (row >= n) {
-      if (!wrap) {
-        return -1;
-      }
-      row %= n;
+  const bool wrap = mode_ == SequenceMode::RepeatAll || repeat_mode_ == PlaylistSequence::RepeatMode::Playlist;
+  const bool album_only = repeat_mode_ == PlaylistSequence::RepeatMode::Album ||
+                          shuffle_mode_ == PlaylistSequence::ShuffleMode::InsideAlbum;
+  const int n = static_cast<int>(virtual_items_.size());
+  const int start = current_virtual_index_ >= 0 ? current_virtual_index_ : -1;
+  auto accept = [&](int virt) -> int {
+    if (virt < 0 || virt >= n) {
+      return -1;
     }
-    if (!song(row).skipped()) {
+    const int row = virtual_items_[static_cast<size_t>(virt)];
+    if (song(row).skipped()) {
+      return -1;
+    }
+    if (album_only && current_row_ >= 0 && !SameAlbum(row, current_row_)) {
+      return -1;
+    }
+    return row;
+  };
+  for (int i = start + 1; i < n; ++i) {
+    const int row = accept(i);
+    if (row >= 0) {
       return row;
     }
   }
-  return wrap ? current_row_ : -1;
+  if (!wrap) {
+    return -1;
+  }
+  for (int i = 0; i < n; ++i) {
+    const int row = accept(i);
+    if (row >= 0 && row != current_row_) {
+      return row;
+    }
+  }
+  return current_row_;
 }
 
 int Playlist::PreviousIndex() const {
   if (songs_.empty()) {
     return -1;
   }
-  const bool wrap = mode_ == SequenceMode::RepeatAll;
-  const int start = current_row_ < 0 ? 0 : current_row_;
-  const int n = row_count();
-  for (int i = 1; i <= n; ++i) {
-    int row = start - i;
-    if (row < 0) {
-      if (!wrap) {
-        return current_row_;
-      }
-      row += n;
+  if (static_cast<int>(virtual_items_.size()) != row_count()) {
+    const_cast<Playlist *>(this)->RebuildVirtualItems();
+  }
+  const bool wrap = mode_ == SequenceMode::RepeatAll || repeat_mode_ == PlaylistSequence::RepeatMode::Playlist;
+  const bool album_only = repeat_mode_ == PlaylistSequence::RepeatMode::Album ||
+                          shuffle_mode_ == PlaylistSequence::ShuffleMode::InsideAlbum;
+  const int n = static_cast<int>(virtual_items_.size());
+  const int start = current_virtual_index_ >= 0 ? current_virtual_index_ : 0;
+  auto accept = [&](int virt) -> int {
+    if (virt < 0 || virt >= n) {
+      return -1;
     }
-    if (!song(row).skipped()) {
+    const int row = virtual_items_[static_cast<size_t>(virt)];
+    if (song(row).skipped()) {
+      return -1;
+    }
+    if (album_only && current_row_ >= 0 && !SameAlbum(row, current_row_)) {
+      return -1;
+    }
+    return row;
+  };
+  for (int i = start - 1; i >= 0; --i) {
+    const int row = accept(i);
+    if (row >= 0) {
+      return row;
+    }
+  }
+  if (!wrap) {
+    return current_row_;
+  }
+  for (int i = n - 1; i >= 0; --i) {
+    const int row = accept(i);
+    if (row >= 0) {
       return row;
     }
   }

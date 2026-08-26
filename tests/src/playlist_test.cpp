@@ -1,5 +1,6 @@
 #include "playlist/playlist.h"
 #include "playlist/playlistbehaviour.h"
+#include "playlist/playlistshuffle.h"
 #include "utilities/fileutils.h"
 
 #include <gtest/gtest.h>
@@ -316,4 +317,59 @@ TEST(Playlist, SetColumnValuesUpdatesSongsAndUndo) {
   playlist.Undo();
   EXPECT_EQ("One", playlist.songs()[0].artist());
   EXPECT_EQ("Two", playlist.songs()[1].artist());
+}
+
+TEST(PlaylistShuffle, AlbumAndGroupingKeys) {
+  Song song;
+  song.set_albumartist("Portishead");
+  song.set_album("Dummy");
+  EXPECT_EQ("Portishead\nDummy", PlaylistShuffle::AlbumKey(song));
+  EXPECT_EQ("Portishead\nDummy", PlaylistShuffle::GroupingKey(song));
+  song.set_grouping("Trip hop");
+  EXPECT_EQ("Trip hop", PlaylistShuffle::GroupingKey(song));
+}
+
+TEST(PlaylistShuffle, AllUsesVirtualOrder) {
+  Playlist playlist;
+  for (const char *title : {"A", "B", "C", "D", "E"}) {
+    Song song;
+    song.set_title(title);
+    song.set_url(std::string("file:///") + title);
+    song.set_valid(true);
+    playlist.AppendSongs({song});
+  }
+  playlist.set_current_row(0);
+  playlist.SetShuffleMode(PlaylistSequence::ShuffleMode::All);
+  playlist.Reshuffle(7);
+  ASSERT_EQ(5u, playlist.virtual_items().size());
+  EXPECT_EQ(0, playlist.virtual_items().front());
+  EXPECT_NE((std::vector<int>{0, 1, 2, 3, 4}), playlist.virtual_items());
+  playlist.Next();
+  EXPECT_EQ(playlist.virtual_items()[1], playlist.current_row());
+}
+
+TEST(PlaylistShuffle, AlbumsKeepsTracksTogether) {
+  Playlist playlist;
+  auto add = [&](const char *title, const char *album) {
+    Song song;
+    song.set_title(title);
+    song.set_album(album);
+    song.set_albumartist("Artist");
+    song.set_url(std::string("file:///") + title);
+    song.set_valid(true);
+    playlist.AppendSongs({song});
+  };
+  add("A1", "Alpha");
+  add("A2", "Alpha");
+  add("B1", "Beta");
+  add("B2", "Beta");
+  playlist.set_current_row(0);
+  playlist.SetShuffleMode(PlaylistSequence::ShuffleMode::Albums);
+  playlist.Reshuffle(3);
+  const auto &order = playlist.virtual_items();
+  ASSERT_EQ(4u, order.size());
+  const std::string first = PlaylistShuffle::AlbumKey(playlist.song(order[0]));
+  EXPECT_EQ(first, PlaylistShuffle::AlbumKey(playlist.song(order[1])));
+  EXPECT_NE(first, PlaylistShuffle::AlbumKey(playlist.song(order[2])));
+  EXPECT_EQ(PlaylistShuffle::AlbumKey(playlist.song(order[2])), PlaylistShuffle::AlbumKey(playlist.song(order[3])));
 }

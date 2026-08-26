@@ -1,4 +1,5 @@
 #include "discord/discord.h"
+#include "discord/discordart.h"
 #include "core/song.h"
 
 #include <gtest/gtest.h>
@@ -35,6 +36,13 @@ TEST(DiscordRichPresence, JsonEscapeAndShortArtist) {
   const std::string json = DiscordRichPresence::SetActivityJson(song, false, 0, 0, 1, 1);
   EXPECT_NE(std::string::npos, json.find("\"state\":\"A \""));
   EXPECT_EQ(std::string::npos, json.find("timestamps"));
+}
+
+TEST(DiscordArt, UsesHttpCoverOrEmbedded) {
+  EXPECT_EQ("embedded_cover", DiscordArt::ArtKey({}));
+  EXPECT_EQ("embedded_cover", DiscordArt::ArtKey("file:///covers/a.jpg"));
+  EXPECT_EQ("https://example.com/a.jpg", DiscordArt::ArtKey("https://example.com/a.jpg"));
+  EXPECT_EQ("https://cdn.example/a.jpg", DiscordArt::SongArtUrl("https://cdn.example/a.jpg", "file:///local.jpg"));
 }
 
 TEST(DiscordRichPresence, DisabledDoesNotConnect) {

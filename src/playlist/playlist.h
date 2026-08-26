@@ -66,6 +66,8 @@ class Playlist {
   bool CanRedo() const { return !redo_.empty(); }
   void Next();
   void Previous();
+  void Reshuffle(unsigned seed = 0);
+  const std::vector<int> &virtual_items() const { return virtual_items_; }
   void SetSequenceMode(SequenceMode mode);
   SequenceMode sequence_mode() const { return mode_; }
   void SetRepeatMode(PlaylistSequence::RepeatMode mode);
@@ -92,6 +94,9 @@ class Playlist {
 
   int NextIndex() const;
   int PreviousIndex() const;
+  void RebuildVirtualItems(unsigned seed = 0);
+  void SyncVirtualIndex();
+  bool SameAlbum(int left, int right) const;
   void PushUndo();
   void MaybeAutoSort();
   void SortInPlace();
@@ -112,6 +117,8 @@ class Playlist {
   bool auto_sort_ = false;
   PlaylistColumn sort_column_ = PlaylistColumn::Count;
   bool sort_descending_ = false;
+  std::vector<int> virtual_items_;
+  int current_virtual_index_ = -1;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H
