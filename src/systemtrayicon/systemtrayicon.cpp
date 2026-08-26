@@ -3,7 +3,7 @@
 #include "constants/behavioursettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
-#include "systemtrayicon/trayprogressoverlay.h"
+#include "systemtrayicon/trayiconcomposite.h"
 #include "translations/translations.h"
 
 #include <algorithm>
@@ -207,7 +207,33 @@ void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &me
 }
 
 void SystemTrayIcon::SetPlaying(bool playing) {
-  playing_ = playing;
+  if (playing) {
+    playing_ = true;
+    paused_ = false;
+  } else {
+    SetStopped();
+    return;
+  }
+  UpdateTooltip();
+  EmitNewStatus();
+  EmitNewOverlayIcon();
+  ++menu_revision_;
+  EmitLayoutUpdated();
+}
+
+void SystemTrayIcon::SetPaused() {
+  playing_ = false;
+  paused_ = true;
+  UpdateTooltip();
+  EmitNewStatus();
+  EmitNewOverlayIcon();
+  ++menu_revision_;
+  EmitLayoutUpdated();
+}
+
+void SystemTrayIcon::SetStopped() {
+  playing_ = false;
+  paused_ = false;
   UpdateTooltip();
   EmitNewStatus();
   EmitNewOverlayIcon();
@@ -230,7 +256,7 @@ std::string SystemTrayIcon::OverlayIconName() const {
   Settings settings;
   settings.BeginGroup(BehaviourSettings::kSettingsGroup);
   const bool enabled = settings.BoolValue(BehaviourSettings::kTrayIconProgress, BehaviourSettings::kDefaultTrayIconProgress);
-  return TrayProgressOverlay::IconName(progress_, enabled, playing_);
+  return TrayIconComposite::OverlayName(progress_, enabled, TrayIconComposite::StateFrom(playing_, paused_));
 }
 
 void SystemTrayIcon::SetNowPlaying(const Song &song) {
@@ -531,7 +557,7 @@ GVariant *SystemTrayIcon::HandleGetProperty(GDBusConnection *, const gchar *, co
     return g_variant_new_int32(0);
   }
   if (g_strcmp0(property_name, "IconName") == 0) {
-    return g_variant_new_string(self->playing_ ? "media-playback-start" : "strawberry");
+    return g_variant_new_string(TrayIconComposite::BaseIconName());
   }
   if (g_strcmp0(property_name, "OverlayIconName") == 0) {
     const std::string overlay = self->OverlayIconName();

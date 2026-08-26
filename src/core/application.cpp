@@ -130,13 +130,13 @@ void Application::Init() {
   });
   player_->Paused.Connect([this]() {
     playback_was_paused_ = true;
-    tray_->SetPlaying(false);
+    tray_->SetPaused();
     osd_->Paused();
   });
   player_->Stopped.Connect([this]() {
     playback_was_paused_ = false;
     discord_->Clear();
-    tray_->SetPlaying(false);
+    tray_->SetStopped();
     tray_->ClearNowPlaying();
     osd_->Stopped();
   });

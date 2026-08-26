@@ -16,6 +16,8 @@ class SystemTrayIcon {
   ~SystemTrayIcon();
 
   void SetPlaying(bool playing);
+  void SetPaused();
+  void SetStopped();
   void SetProgress(int percentage);
   void SetNowPlaying(const Song &song);
   void ClearNowPlaying();
@@ -27,6 +29,7 @@ class SystemTrayIcon {
   bool available() const { return available_; }
   bool visible() const { return visible_; }
   bool playing() const { return playing_; }
+  bool paused() const { return paused_; }
   int progress() const { return progress_; }
   std::string OverlayIconName() const;
   const std::string &tooltip() const { return tooltip_; }
@@ -97,6 +100,7 @@ class SystemTrayIcon {
   bool available_ = false;
   bool visible_ = false;
   bool playing_ = false;
+  bool paused_ = false;
   int progress_ = 0;
   Song song_;
   std::string tooltip_ = "Strawberry";
