@@ -245,7 +245,14 @@ void DeviceManager::Rescan() {
   cd.backend = "cdda";
   devices_.push_back(cd);
 #endif
+  devices_.erase(std::remove_if(devices_.begin(), devices_.end(),
+                                [this](const ConnectedDevice &device) { return IsForgotten(device.unique_id); }),
+                 devices_.end());
   DevicesChanged.Emit();
+}
+
+bool DeviceManager::IsForgotten(const std::string &device_id) const {
+  return std::find(forgotten_.begin(), forgotten_.end(), device_id) != forgotten_.end();
 }
 
 SongList DeviceManager::Songs(const std::string &device_id) const {
@@ -377,6 +384,69 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
   (void)songs;
   return false;
 #endif
+}
+
+bool DeviceManager::Forget(const std::string &device_id) {
+  if (device_id.empty()) {
+    return false;
+  }
+  if (!IsForgotten(device_id)) {
+    forgotten_.push_back(device_id);
+  }
+  if (device_db_) {
+    const DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device_id);
+    if (stored.id >= 0) {
+      device_db_->RemoveDevice(stored.id);
+    }
+  }
+  Rescan();
+  return true;
+}
+
+bool DeviceManager::Unmount(const std::string &device_id) {
+#ifdef HAVE_GIO
+  const ConnectedDevice *found = FindDevice(device_id);
+  if (!found || found->mount_path.empty()) {
+    return false;
+  }
+  GFile *file = g_file_new_for_path(found->mount_path.c_str());
+  if (!file) {
+    return false;
+  }
+  g_file_unmount_mountable_with_operation(file, G_MOUNT_UNMOUNT_NONE, nullptr, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+    g_file_unmount_mountable_with_operation_finish(G_FILE(source), result, nullptr);
+    static_cast<DeviceManager *>(data)->Rescan();
+    g_object_unref(source);
+  }, this);
+  return true;
+#else
+  (void)device_id;
+  return false;
+#endif
+}
+
+bool DeviceManager::SetDeviceOptions(const std::string &device_id, const std::string &friendly_name,
+                                     DeviceDatabaseBackend::TranscodeMode mode, Song::FileType format) {
+  if (!device_db_) {
+    return false;
+  }
+  DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device_id);
+  if (stored.id < 0) {
+    stored.unique_id = device_id;
+    stored.friendly_name = friendly_name;
+    stored.transcode_mode = mode;
+    stored.transcode_format = format;
+    return device_db_->AddDevice(stored) >= 0;
+  }
+  device_db_->SetDeviceOptions(stored.id, friendly_name.empty() ? stored.friendly_name : friendly_name, stored.icon_name, mode, format);
+  return true;
+}
+
+DeviceDatabaseBackend::Device DeviceManager::StoredDevice(const std::string &device_id) const {
+  if (!device_db_) {
+    return {};
+  }
+  return device_db_->FindByUniqueId(device_id);
 }
 
 bool DeviceManager::DeleteSong(const std::string &device_id, const Song &song) {

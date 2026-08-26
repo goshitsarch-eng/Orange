@@ -682,7 +682,7 @@ void MainWindow::BuildSidebar() {
                    }),
                    this);
   adw_view_stack_add_titled_with_icon(sidebar_stack_, streaming_page, "streaming", "Streaming", "emblem-shared-symbolic");
-  device_container_ = std::make_unique<DeviceViewContainer>(app_->device_manager());
+  device_container_ = std::make_unique<DeviceViewContainer>(app_);
   device_container_->SetSongCallback([this](const Song &song) {
     app_->playlist_manager()->AppendSongs({song});
     RefreshPlaylist();

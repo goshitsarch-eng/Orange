@@ -66,6 +66,40 @@ TEST(AlbumCoverManagerList, GroupsAlbums) {
   list.SetSongs({a, b, c});
   EXPECT_EQ(2, list.album_count());
   EXPECT_EQ(1, list.with_cover_count());
+  EXPECT_EQ(1, list.without_cover_count());
+}
+
+TEST(AlbumCoverManagerList, FiltersArtistHideAndText) {
+  Song covered;
+  covered.set_album("Dummy");
+  covered.set_albumartist("Portishead");
+  covered.set_art_embedded(true);
+  Song missing;
+  missing.set_album("Helplessness Blues");
+  missing.set_albumartist("Fleet Foxes");
+  Song various;
+  various.set_album("Now 12");
+  various.set_albumartist("Various Artists");
+  various.set_compilation(true);
+  AlbumCoverManagerList list;
+  list.SetSongs({covered, missing, various});
+  ASSERT_EQ(3, list.album_count());
+  const auto artists = list.Artists();
+  EXPECT_FALSE(artists.empty());
+  EXPECT_EQ(AlbumCoverManagerList::kVariousArtists, artists.front());
+
+  EXPECT_EQ(1u, list.Filtered("Portishead", AlbumCoverManagerList::HideCovers::None, {}).size());
+  EXPECT_EQ(1u, list.Filtered(AlbumCoverManagerList::kVariousArtists, AlbumCoverManagerList::HideCovers::None, {}).size());
+  EXPECT_EQ(1u, list.Filtered({}, AlbumCoverManagerList::HideCovers::WithoutCovers, {}).size());
+  EXPECT_EQ(2u, list.Filtered({}, AlbumCoverManagerList::HideCovers::WithCovers, {}).size());
+  EXPECT_EQ(1u, list.Filtered({}, AlbumCoverManagerList::HideCovers::None, "helplessness").size());
+
+  AlbumCoverManagerList::Album album;
+  album.artist = "Portishead";
+  album.album = "Dummy";
+  const SongList songs = AlbumCoverManagerList::SongsInAlbum({covered, missing}, album);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Dummy", songs.front().album());
 }
 
 TEST(DeviceStateFilterModel, FiltersConnected) {

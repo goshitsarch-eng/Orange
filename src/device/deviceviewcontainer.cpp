@@ -1,8 +1,13 @@
 #include "device/deviceviewcontainer.h"
 
-#include "device/devicemanager.h"
+#include "core/application.h"
+#include "device/copytodevicedialog.h"
+#include "device/deviceproperties.h"
+#include "translations/translations.h"
 
-DeviceViewContainer::DeviceViewContainer(DeviceManager *manager) : manager_(manager) {
+#include <adwaita.h>
+
+DeviceViewContainer::DeviceViewContainer(Application *app) : app_(app) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   view_ = std::make_unique<DeviceView>();
   gtk_widget_set_vexpand(view_->widget(), TRUE);
@@ -13,29 +18,126 @@ DeviceViewContainer::DeviceViewContainer(DeviceManager *manager) : manager_(mana
     Reload();
   });
   view_->SetSongCallback([this](const Song &song) {
-    if (song_cb_) song_cb_(song);
-  });
-  view_->SetAddAllCallback([this]() {
-    if (add_all_cb_ && manager_ && !browse_id_.empty()) {
-      add_all_cb_(manager_->Songs(browse_id_));
+    if (song_cb_) {
+      song_cb_(song);
     }
   });
+  view_->SetAddAllCallback([this]() {
+    if (add_all_cb_ && app_ && !browse_id_.empty()) {
+      add_all_cb_(app_->device_manager()->Songs(browse_id_));
+    }
+  });
+  view_->SetDeviceMenuCallback([this](const ConnectedDevice &device) { ShowDeviceMenu(device); });
+  view_->SetSongMenuCallback([this](const Song &song) { ShowSongMenu(song); });
   Reload();
 }
 
 void DeviceViewContainer::Reload() {
-  if (!manager_) {
+  if (!app_ || !app_->device_manager()) {
     return;
   }
-  manager_->Rescan();
+  app_->device_manager()->Rescan();
   if (browse_id_.empty()) {
-    view_->ShowDevices(manager_->devices());
+    view_->ShowDevices(app_->device_manager()->devices());
   } else {
-    view_->ShowSongs(manager_->Songs(browse_id_));
+    view_->ShowSongs(app_->device_manager()->Songs(browse_id_));
   }
 }
 
 void DeviceViewContainer::OpenDevice(const std::string &id) {
   browse_id_ = id;
   Reload();
+}
+
+void DeviceViewContainer::ShowDeviceMenu(const ConnectedDevice &device) {
+  if (!app_) {
+    return;
+  }
+  GMenu *menu = g_menu_new();
+  g_menu_append(menu, Translations::CStr("Browse"), "device.browse");
+  g_menu_append(menu, Translations::CStr("Copy playlist…"), "device.copy");
+  g_menu_append(menu, Translations::CStr("Properties…"), "device.properties");
+  g_menu_append(menu, Translations::CStr("Unmount"), "device.unmount");
+  g_menu_append(menu, Translations::CStr("Forget"), "device.forget");
+  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  gtk_widget_set_parent(popover, view_->list());
+  auto *owned = new ConnectedDevice(device);
+  GSimpleActionGroup *group = g_simple_action_group_new();
+  auto add = [&](const char *name) {
+    GSimpleAction *action = g_simple_action_new(name, nullptr);
+    g_object_set_data(G_OBJECT(action), "device", owned);
+    g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer data) {
+                       auto *self = static_cast<DeviceViewContainer *>(data);
+                       auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(act), "device"));
+                       if (!self || !device || !self->app_) {
+                         return;
+                       }
+                       const char *name = g_action_get_name(G_ACTION(act));
+                       if (g_strcmp0(name, "browse") == 0) {
+                         self->OpenDevice(device->unique_id);
+                       } else if (g_strcmp0(name, "copy") == 0) {
+                         SongList songs;
+                         if (self->app_->playlist_manager()->current()) {
+                           songs = self->app_->playlist_manager()->current()->songs();
+                         }
+                         CopyToDeviceDialog::Show(nullptr, self->app_, songs);
+                       } else if (g_strcmp0(name, "properties") == 0) {
+                         DeviceProperties::Show(nullptr, self->app_, *device);
+                       } else if (g_strcmp0(name, "unmount") == 0) {
+                         self->app_->device_manager()->Unmount(device->unique_id);
+                         self->Reload();
+                       } else if (g_strcmp0(name, "forget") == 0) {
+                         self->app_->device_manager()->Forget(device->unique_id);
+                         self->browse_id_.clear();
+                         self->Reload();
+                       }
+                     }),
+                     this);
+    g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
+  };
+  add("browse");
+  add("copy");
+  add("properties");
+  add("unmount");
+  add("forget");
+  gtk_widget_insert_action_group(popover, "device", G_ACTION_GROUP(group));
+  g_object_set_data_full(G_OBJECT(popover), "device", owned, [](gpointer p) { delete static_cast<ConnectedDevice *>(p); });
+  gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+void DeviceViewContainer::ShowSongMenu(const Song &song) {
+  GMenu *menu = g_menu_new();
+  g_menu_append(menu, Translations::CStr("Add to playlist"), "devicesong.add");
+  g_menu_append(menu, Translations::CStr("Delete from device"), "devicesong.delete");
+  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  gtk_widget_set_parent(popover, view_->list());
+  auto *owned = new Song(song);
+  GSimpleActionGroup *group = g_simple_action_group_new();
+  auto add = [&](const char *name) {
+    GSimpleAction *action = g_simple_action_new(name, nullptr);
+    g_object_set_data(G_OBJECT(action), "song", owned);
+    g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer data) {
+                       auto *self = static_cast<DeviceViewContainer *>(data);
+                       auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(act), "song"));
+                       if (!self || !song) {
+                         return;
+                       }
+                       const char *name = g_action_get_name(G_ACTION(act));
+                       if (g_strcmp0(name, "add") == 0) {
+                         if (self->song_cb_) {
+                           self->song_cb_(*song);
+                         }
+                       } else if (g_strcmp0(name, "delete") == 0 && self->app_ && !self->browse_id_.empty()) {
+                         self->app_->device_manager()->DeleteSong(self->browse_id_, *song);
+                         self->Reload();
+                       }
+                     }),
+                     this);
+    g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
+  };
+  add("add");
+  add("delete");
+  gtk_widget_insert_action_group(popover, "devicesong", G_ACTION_GROUP(group));
+  g_object_set_data_full(G_OBJECT(popover), "song", owned, [](gpointer p) { delete static_cast<Song *>(p); });
+  gtk_popover_popup(GTK_POPOVER(popover));
 }

@@ -9,6 +9,7 @@ DeviceView::DeviceView() {
   gtk_widget_set_vexpand(widget_, TRUE);
   list_ = gtk_list_box_new();
   gtk_widget_add_css_class(list_, "boxed-list");
+  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<DeviceView *>(data);
@@ -22,12 +23,39 @@ DeviceView::DeviceView() {
                        return;
                      }
                      if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
-                       if (self->song_cb_) self->song_cb_(*song);
+                       if (self->song_cb_) {
+                         self->song_cb_(*song);
+                       }
                        return;
                      }
-                     const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "device-id"));
-                     if (id && self->device_cb_) {
-                       self->device_cb_(id);
+                     if (auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"))) {
+                       if (self->device_cb_) {
+                         self->device_cb_(device->unique_id);
+                       }
+                     }
+                   }),
+                   this);
+}
+
+void DeviceView::AttachMenu(GtkWidget *row) {
+  GtkGesture *menu = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(menu));
+  g_signal_connect(menu, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble, gpointer data) {
+                     auto *self = static_cast<DeviceView *>(data);
+                     GtkWidget *row = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(click));
+                     if (GTK_IS_LIST_BOX_ROW(row) && !gtk_list_box_row_is_selected(GTK_LIST_BOX_ROW(row))) {
+                       gtk_list_box_unselect_all(GTK_LIST_BOX(self->list_));
+                       gtk_list_box_select_row(GTK_LIST_BOX(self->list_), GTK_LIST_BOX_ROW(row));
+                     }
+                     if (auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"))) {
+                       if (self->device_menu_cb_) {
+                         self->device_menu_cb_(*device);
+                       }
+                     } else if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
+                       if (self->song_menu_cb_) {
+                         self->song_menu_cb_(*song);
+                       }
                      }
                    }),
                    this);
@@ -59,7 +87,9 @@ void DeviceView::ShowDevices(const std::vector<ConnectedDevice> &devices) {
     gtk_widget_set_margin_top(label, 8);
     gtk_widget_set_margin_bottom(label, 8);
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
-    g_object_set_data_full(G_OBJECT(row), "device-id", g_strdup(device.unique_id.c_str()), g_free);
+    auto *copy = new ConnectedDevice(device);
+    g_object_set_data_full(G_OBJECT(row), "device", copy, [](gpointer p) { delete static_cast<ConnectedDevice *>(p); });
+    AttachMenu(row);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
 }
@@ -88,6 +118,33 @@ void DeviceView::ShowSongs(const SongList &songs) {
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
     auto *copy = new Song(song);
     g_object_set_data_full(G_OBJECT(row), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+    AttachMenu(row);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
+}
+
+const ConnectedDevice *DeviceView::SelectedDevice() const {
+  const ConnectedDevice *selected = nullptr;
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        if (auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"))) {
+          *static_cast<const ConnectedDevice **>(data) = device;
+        }
+      },
+      &selected);
+  return selected;
+}
+
+SongList DeviceView::SelectedSongs() const {
+  SongList songs;
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
+          static_cast<SongList *>(data)->push_back(*song);
+        }
+      },
+      &songs);
+  return songs;
 }

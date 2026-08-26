@@ -9,11 +9,11 @@
 
 #include <gtk/gtk.h>
 
-class DeviceManager;
+class Application;
 
 class DeviceViewContainer {
  public:
-  explicit DeviceViewContainer(DeviceManager *manager);
+  explicit DeviceViewContainer(Application *app);
 
   GtkWidget *widget() const { return widget_; }
   DeviceView *view() { return view_.get(); }
@@ -23,8 +23,10 @@ class DeviceViewContainer {
 
  private:
   void OpenDevice(const std::string &id);
+  void ShowDeviceMenu(const ConnectedDevice &device);
+  void ShowSongMenu(const Song &song);
 
-  DeviceManager *manager_ = nullptr;
+  Application *app_ = nullptr;
   GtkWidget *widget_ = nullptr;
   std::unique_ptr<DeviceView> view_;
   std::string browse_id_;

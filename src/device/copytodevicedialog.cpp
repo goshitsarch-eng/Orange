@@ -6,7 +6,7 @@
 
 #include <adwaita.h>
 
-void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app) {
+void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr("Copy to device"));
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -22,13 +22,19 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app) {
     GtkWidget *row = adw_action_row_new();
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), device.friendly_name.c_str());
     adw_action_row_set_subtitle(ADW_ACTION_ROW(row), device.mount_path.empty() ? device.backend.c_str() : device.mount_path.c_str());
-    GtkWidget *copy = gtk_button_new_with_label(Translations::CStr("Copy playlist"));
+    GtkWidget *copy = gtk_button_new_with_label(songs.empty() ? Translations::CStr("Copy playlist") : Translations::CStr("Copy songs"));
+    auto *owned = new SongList(songs);
     g_object_set_data_full(G_OBJECT(copy), "device-id", g_strdup(device.unique_id.c_str()), g_free);
+    g_object_set_data_full(G_OBJECT(copy), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });
     g_signal_connect(copy, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
                        auto *application = static_cast<Application *>(data);
                        const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "device-id"));
-                       if (id && application->playlist_manager()->active()) {
-                         const bool ok = application->device_manager()->CopySongs(id, application->playlist_manager()->active()->songs());
+                       auto *songs = static_cast<SongList *>(g_object_get_data(G_OBJECT(btn), "songs"));
+                       SongList source = songs && !songs->empty() ? *songs
+                                         : application->playlist_manager()->current() ? application->playlist_manager()->current()->songs()
+                                                                                      : SongList{};
+                       if (id && !source.empty()) {
+                         const bool ok = application->device_manager()->CopySongs(id, source);
                          gtk_button_set_label(btn, ok ? "Copied" : "Failed");
                        }
                      }),

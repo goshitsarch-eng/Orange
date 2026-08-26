@@ -532,6 +532,20 @@ TEST(DeviceManager, SongsFromDirectoryAndCdda) {
   EXPECT_TRUE(DeviceManager::MakeCddaSongs(0, 0, {}).empty());
 }
 
+TEST(DeviceManager, ForgetHidesDeviceFromRescan) {
+  DeviceManager manager;
+  manager.Rescan();
+  if (manager.devices().empty()) {
+    EXPECT_FALSE(manager.Forget(""));
+    return;
+  }
+  const std::string id = manager.devices().front().unique_id;
+  EXPECT_TRUE(manager.Forget(id));
+  for (const ConnectedDevice &device : manager.devices()) {
+    EXPECT_NE(id, device.unique_id);
+  }
+}
+
 TEST(OAuthenticator, BuildAuthorizeUrl) {
   const std::string url = OAuthenticator::BuildAuthorizeUrl("https://example.com/oauth", "client", "http://127.0.0.1:9/callback", "scope");
   EXPECT_NE(std::string::npos, url.find("response_type=code"));

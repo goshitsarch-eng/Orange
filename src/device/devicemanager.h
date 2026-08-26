@@ -23,6 +23,11 @@ class DeviceManager {
   const std::vector<ConnectedDevice> &devices() const { return devices_; }
   bool CopySongs(const std::string &device_id, const SongList &songs);
   bool DeleteSong(const std::string &device_id, const Song &song);
+  bool Forget(const std::string &device_id);
+  bool Unmount(const std::string &device_id);
+  bool SetDeviceOptions(const std::string &device_id, const std::string &friendly_name, DeviceDatabaseBackend::TranscodeMode mode,
+                        Song::FileType format);
+  DeviceDatabaseBackend::Device StoredDevice(const std::string &device_id) const;
   SongList Songs(const std::string &device_id) const;
   UrlHandler *url_handler() const { return url_handler_.get(); }
   DeviceDatabaseBackend *device_database() const { return device_db_.get(); }
@@ -53,7 +58,10 @@ class DeviceManager {
   void StopVolumeMonitor();
   void ScheduleRescan();
 
+  bool IsForgotten(const std::string &device_id) const;
+
   std::vector<ConnectedDevice> devices_;
+  std::vector<std::string> forgotten_;
   std::unique_ptr<DeviceUrlHandler> url_handler_;
   std::unique_ptr<DeviceDatabaseBackend> device_db_;
   void *volume_monitor_ = nullptr;

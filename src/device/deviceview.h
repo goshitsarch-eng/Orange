@@ -15,15 +15,22 @@ class DeviceView {
   DeviceView();
 
   GtkWidget *widget() const { return widget_; }
+  GtkWidget *list() const { return list_; }
   void ShowDevices(const std::vector<ConnectedDevice> &devices);
   void ShowSongs(const SongList &songs);
   void SetDeviceCallback(std::function<void(const std::string &)> callback) { device_cb_ = std::move(callback); }
   void SetSongCallback(std::function<void(const Song &)> callback) { song_cb_ = std::move(callback); }
   void SetBackCallback(std::function<void()> callback) { back_cb_ = std::move(callback); }
   void SetAddAllCallback(std::function<void()> callback) { add_all_cb_ = std::move(callback); }
+  void SetDeviceMenuCallback(std::function<void(const ConnectedDevice &)> callback) { device_menu_cb_ = std::move(callback); }
+  void SetSongMenuCallback(std::function<void(const Song &)> callback) { song_menu_cb_ = std::move(callback); }
+
+  const ConnectedDevice *SelectedDevice() const;
+  SongList SelectedSongs() const;
 
  private:
   void Clear();
+  void AttachMenu(GtkWidget *row);
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
@@ -31,6 +38,8 @@ class DeviceView {
   std::function<void(const Song &)> song_cb_;
   std::function<void()> back_cb_;
   std::function<void()> add_all_cb_;
+  std::function<void(const ConnectedDevice &)> device_menu_cb_;
+  std::function<void(const Song &)> song_menu_cb_;
 };
 
 #endif

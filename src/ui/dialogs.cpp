@@ -76,7 +76,7 @@ void Dialogs::PlaylistColumns(GtkWindow *parent, const std::function<void()> &ca
 
 void Dialogs::DeleteFiles(GtkWindow *parent, Application *app, const SongList &songs) { DeleteConfirmationDialog::Show(parent, app, songs); }
 
-void Dialogs::CopyToDevice(GtkWindow *parent, Application *app) { CopyToDeviceDialog::Show(parent, app); }
+void Dialogs::CopyToDevice(GtkWindow *parent, Application *app, const SongList &songs) { CopyToDeviceDialog::Show(parent, app, songs); }
 
 void Dialogs::SaveAllPlaylists(GtkWindow *parent, Application *app) { SavePlaylistsDialog::Show(parent, app); }
 

@@ -5,9 +5,11 @@
 
 #include <gtk/gtk.h>
 
+class Application;
+
 class DeviceProperties {
  public:
-  static void Show(GtkWindow *parent, const ConnectedDevice &device);
+  static void Show(GtkWindow *parent, Application *app, const ConnectedDevice &device);
 };
 
 #endif
