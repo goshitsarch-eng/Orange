@@ -1,4 +1,6 @@
 #include "core/song.h"
+#include "playlist/playlistdropindicator.h"
+#include "queue/queuekeyboard.h"
 #include "queue/queueui.h"
 
 #include <gtest/gtest.h>
@@ -53,4 +55,26 @@ TEST(QueueUi, ButtonStateMatchesQt) {
   const QueueUi::ButtonState ends = QueueUi::Buttons({0, 2}, 3);
   EXPECT_FALSE(ends.move_up);
   EXPECT_FALSE(ends.move_down);
+}
+
+TEST(QueueKeyboard, MatchesQtShortcuts) {
+  EXPECT_EQ(QueueKeyboard::Action::Remove, QueueKeyboard::FromKey(QueueKeyboard::kDelete, 0));
+  EXPECT_EQ(QueueKeyboard::Action::Clear, QueueKeyboard::FromKey('k', QueueKeyboard::kControlMask));
+  EXPECT_EQ(QueueKeyboard::Action::Clear, QueueKeyboard::FromKey('K', QueueKeyboard::kControlMask));
+  EXPECT_EQ(QueueKeyboard::Action::None, QueueKeyboard::FromKey('k', 0));
+  EXPECT_EQ(QueueKeyboard::Action::MoveDown, QueueKeyboard::FromKey(QueueKeyboard::kUp, QueueKeyboard::kControlMask));
+  EXPECT_EQ(QueueKeyboard::Action::MoveUp, QueueKeyboard::FromKey(QueueKeyboard::kDown, QueueKeyboard::kControlMask));
+  EXPECT_EQ(QueueKeyboard::Action::None, QueueKeyboard::FromKey(QueueKeyboard::kUp, 0));
+  EXPECT_EQ(QueueKeyboard::Action::None, QueueKeyboard::FromKey(QueueKeyboard::kDown, 0));
+}
+
+TEST(QueueDropIndicator, ReusesPlaylistMidpointInsert) {
+  const auto empty = PlaylistDropIndicator::FromPointer(10, -1, 0, 0, false, 0);
+  EXPECT_EQ(0, empty.insert_row);
+  EXPECT_EQ(PlaylistDropIndicator::Position::Empty, empty.pos);
+  EXPECT_EQ(1, empty.line_y);
+  const auto above = PlaylistDropIndicator::FromPointer(10, 1, 0, 40, true, 40);
+  EXPECT_EQ(1, PlaylistDropIndicator::InsertRow(above, 0));
+  const auto below = PlaylistDropIndicator::FromPointer(30, 1, 0, 40, true, 40);
+  EXPECT_EQ(2, PlaylistDropIndicator::InsertRow(below, 0));
 }

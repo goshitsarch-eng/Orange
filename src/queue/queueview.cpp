@@ -1,7 +1,9 @@
 #include "queue/queueview.h"
 
+#include "playlist/playlistdropindicator.h"
 #include "queue/queue.h"
 #include "queue/queuedrop.h"
+#include "queue/queuekeyboard.h"
 #include "queue/queueui.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
@@ -17,8 +19,37 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
   list_ = gtk_list_box_new();
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_widget_set_vexpand(list_, TRUE);
+  GtkWidget *overlay = gtk_overlay_new();
+  gtk_overlay_set_child(GTK_OVERLAY(overlay), list_);
+  drop_overlay_ = gtk_drawing_area_new();
+  gtk_widget_set_can_target(drop_overlay_, FALSE);
+  gtk_widget_set_hexpand(drop_overlay_, TRUE);
+  gtk_widget_set_vexpand(drop_overlay_, TRUE);
+  gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drop_overlay_),
+                                 +[](GtkDrawingArea *, cairo_t *cr, int width, int, gpointer data) {
+                                   auto *self = static_cast<QueueView *>(data);
+                                   if (!PlaylistDropIndicator::Active(self->drop_state_)) {
+                                     return;
+                                   }
+                                   const double y = self->drop_state_.line_y;
+                                   cairo_pattern_t *grad = cairo_pattern_create_linear(0, y - PlaylistDropIndicator::kGradientWidth, 0,
+                                                                                       y + PlaylistDropIndicator::kGradientWidth);
+                                   cairo_pattern_add_color_stop_rgba(grad, 0.0, 0.2, 0.5, 1.0, 0.0);
+                                   cairo_pattern_add_color_stop_rgba(grad, 0.5, 0.2, 0.5, 1.0, 0.35);
+                                   cairo_pattern_add_color_stop_rgba(grad, 1.0, 0.2, 0.5, 1.0, 0.0);
+                                   cairo_set_source(cr, grad);
+                                   cairo_rectangle(cr, 0, y - PlaylistDropIndicator::kGradientWidth, width,
+                                                   PlaylistDropIndicator::kGradientWidth * 2);
+                                   cairo_fill(cr);
+                                   cairo_pattern_destroy(grad);
+                                   cairo_set_source_rgb(cr, 0.2, 0.5, 1.0);
+                                   cairo_rectangle(cr, 0, y, width, PlaylistDropIndicator::kLineWidth);
+                                   cairo_fill(cr);
+                                 },
+                                 this, nullptr);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay), drop_overlay_);
   GtkWidget *scrolled = gtk_scrolled_window_new();
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled), list_);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled), overlay);
   gtk_widget_set_vexpand(scrolled, TRUE);
   gtk_box_append(GTK_BOX(widget_), scrolled);
   GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
@@ -62,7 +93,17 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
   gtk_drop_target_set_gtypes(target, types, 2);
 #endif
   gtk_drop_target_set_actions(target, static_cast<GdkDragAction>(GDK_ACTION_COPY | GDK_ACTION_MOVE));
+  gtk_drop_target_set_preload(target, TRUE);
   gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(target));
+  g_signal_connect(target, "motion", G_CALLBACK(+[](GtkDropTarget *, gdouble, gdouble y, gpointer data) -> GdkDragAction {
+                     static_cast<QueueView *>(data)->UpdateDropIndicator(y);
+                     return GDK_ACTION_COPY;
+                   }),
+                   this);
+  g_signal_connect(target, "leave", G_CALLBACK(+[](GtkDropTarget *, gpointer data) {
+                     static_cast<QueueView *>(data)->ClearDropIndicator();
+                   }),
+                   this);
   g_signal_connect(target, "drop", G_CALLBACK((+[](GtkDropTarget *, const GValue *value, gdouble, gdouble y, gpointer data) -> gboolean {
                      return static_cast<QueueView *>(data)->OnDrop(value, y);
                    })),
@@ -71,8 +112,8 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<QueueView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<QueueView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
   if (queue_) {
@@ -91,7 +132,23 @@ void QueueView::ResetTypeAhead() {
   }
 }
 
-gboolean QueueView::OnKeyPressed(guint keyval) {
+gboolean QueueView::OnKeyPressed(guint keyval, GdkModifierType modifiers) {
+  switch (QueueKeyboard::FromKey(keyval, static_cast<unsigned>(modifiers), GDK_CONTROL_MASK)) {
+    case QueueKeyboard::Action::Remove:
+      Remove();
+      return TRUE;
+    case QueueKeyboard::Action::Clear:
+      Clear();
+      return TRUE;
+    case QueueKeyboard::Action::MoveUp:
+      MoveUp();
+      return TRUE;
+    case QueueKeyboard::Action::MoveDown:
+      MoveDown();
+      return TRUE;
+    case QueueKeyboard::Action::None:
+      break;
+  }
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
   if (action == ListBoxKeyboard::Action::Activate) {
     ListBoxKeyboardGtk::ActivateSelected(list_);
@@ -248,8 +305,44 @@ int QueueView::RowAtY(double y) const {
   return last_index;
 }
 
+void QueueView::ClearDropIndicator() {
+  drop_state_ = {};
+  if (drop_overlay_) {
+    gtk_widget_queue_draw(drop_overlay_);
+  }
+}
+
+void QueueView::UpdateDropIndicator(double y) {
+  GtkWidget *child = gtk_widget_get_first_child(list_);
+  double last_bottom = 0;
+  int found = -1;
+  double row_y = 0;
+  double row_h = 0;
+  bool has_rows = false;
+  while (child) {
+    graphene_rect_t bounds{};
+    const int stored = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
+    if (stored > 0 && gtk_widget_compute_bounds(child, list_, &bounds)) {
+      has_rows = true;
+      last_bottom = bounds.origin.y + bounds.size.height;
+      if (y < last_bottom && found < 0) {
+        found = stored - 1;
+        row_y = bounds.origin.y;
+        row_h = bounds.size.height;
+      }
+    }
+    child = gtk_widget_get_next_sibling(child);
+  }
+  drop_state_ = PlaylistDropIndicator::FromPointer(y, found, row_y, row_h, has_rows, last_bottom);
+  if (drop_overlay_) {
+    gtk_widget_queue_draw(drop_overlay_);
+  }
+}
+
 gboolean QueueView::OnDrop(const GValue *value, double y) {
-  const int dest = RowAtY(y);
+  UpdateDropIndicator(y);
+  const int dest = PlaylistDropIndicator::InsertRow(drop_state_, RowAtY(y));
+  ClearDropIndicator();
   if (G_VALUE_HOLDS_STRING(value)) {
     const char *text = g_value_get_string(value);
     const std::string payload = text ? text : "";

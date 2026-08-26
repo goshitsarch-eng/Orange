@@ -2,6 +2,7 @@
 #define STRAWBERRY_QUEUEVIEW_H
 
 #include "core/song.h"
+#include "playlist/playlistdropindicator.h"
 
 #include <functional>
 #include <string>
@@ -36,14 +37,18 @@ class QueueView {
   void Rebuild();
   void SetupRowDrag(GtkWidget *row, int index);
   int RowAtY(double y) const;
+  void UpdateDropIndicator(double y);
+  void ClearDropIndicator();
   gboolean OnDrop(const GValue *value, double y);
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType modifiers);
   void ResetTypeAhead();
   void UpdateChrome();
 
   Queue *queue_ = nullptr;
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
+  GtkWidget *drop_overlay_ = nullptr;
+  PlaylistDropIndicator::State drop_state_;
   GtkWidget *summary_ = nullptr;
   GtkWidget *move_up_ = nullptr;
   GtkWidget *move_down_ = nullptr;
