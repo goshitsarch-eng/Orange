@@ -30,8 +30,10 @@
 #include "constants/collectionsettings.h"
 #include "constants/playlistsettings.h"
 #include "constants/scrobblersettings.h"
+#include "analyzer/analyzerframerate.h"
 #include "constants/analyzersettings.h"
 #include "constants/appearancesettings.h"
+#include "playlist/playlistbehaviour.h"
 #include "core/appearance.h"
 #include "core/song.h"
 #include "core/seekbarsettings.h"
@@ -825,6 +827,7 @@ void MainWindow::BuildPlaylist() {
       }
     }
   });
+  playlist_container_->tab_bar()->SetCloseCallback([this](int id) { TryClosePlaylist(id); });
 
   repeat_button_ = playlist_container_->repeat_button();
   shuffle_button_ = playlist_container_->shuffle_button();
@@ -996,7 +999,10 @@ void MainWindow::ConnectSignals() {
     }
     RefreshPlaylist();
   });
-  app_->player()->SongChanged.Connect([this](const Song &) { UpdateNowPlaying(); });
+  app_->player()->SongChanged.Connect([this](const Song &) {
+    UpdateNowPlaying();
+    SelectPlayingTrack();
+  });
   app_->player()->Stopped.Connect([this]() {
     if (playing_widget_) {
       playing_widget_->Stopped();
@@ -1022,6 +1028,7 @@ void MainWindow::ConnectSignals() {
     }
   });
   app_->playlist_manager()->PlaylistsLoaded.Connect([this]() {
+    ApplyPlaylistBehaviour();
     RefreshPlaylistsList();
     RefreshPlaylist();
   });
@@ -1135,21 +1142,9 @@ void MainWindow::SortPlaylistBy(PlaylistColumn column, PlaylistSortOrder order) 
   if (!playlist) {
     return;
   }
-  SongList songs = playlist->songs();
-  std::stable_sort(songs.begin(), songs.end(), [this](const Song &a, const Song &b) {
-    const std::string left = PlaylistDelegates::ColumnText(a, sort_column_);
-    const std::string right = PlaylistDelegates::ColumnText(b, sort_column_);
-    if (sort_column_ == PlaylistColumn::Track || sort_column_ == PlaylistColumn::Year || sort_column_ == PlaylistColumn::OriginalYear ||
-        sort_column_ == PlaylistColumn::Disc || sort_column_ == PlaylistColumn::Bitrate || sort_column_ == PlaylistColumn::Samplerate ||
-        sort_column_ == PlaylistColumn::Bitdepth || sort_column_ == PlaylistColumn::PlayCount || sort_column_ == PlaylistColumn::SkipCount ||
-        sort_column_ == PlaylistColumn::Length || sort_column_ == PlaylistColumn::Filesize || sort_column_ == PlaylistColumn::BPM) {
-      const double ln = std::strtod(left.c_str(), nullptr);
-      const double rn = std::strtod(right.c_str(), nullptr);
-      return sort_descending_ ? ln > rn : ln < rn;
-    }
-    return sort_descending_ ? left > right : left < right;
-  });
-  playlist->ReplaceSongs(songs);
+  ApplyPlaylistBehaviour();
+  playlist->SetSort(sort_column_, sort_descending_);
+  playlist->SortNow();
   app_->playlist_manager()->SaveCurrent();
   RefreshPlaylist();
 }
@@ -1358,6 +1353,7 @@ void MainWindow::OpenSettings() {
     UpdateScrobblerButtons();
     ApplySeekbarMode();
     ApplyBehaviourSettings();
+    ApplyPlaylistBehaviour();
     app_->moodbar()->Load(app_->player()->current_song());
     app_->waveform()->Load(app_->player()->current_song());
   });
@@ -1484,16 +1480,84 @@ void MainWindow::NewPlaylist() {
 }
 
 void MainWindow::ClearPlaylist() {
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  if (!settings.BoolValue(PlaylistSettings::kPlaylistClear, PlaylistSettings::kDefaultPlaylistClear)) {
+    return;
+  }
   app_->playlist_manager()->ClearCurrent();
   RefreshPlaylist();
 }
 
-void MainWindow::CloseCurrentPlaylist() {
-  if (app_->playlist_manager()->current_id() >= 0) {
-    app_->playlist_manager()->Close(app_->playlist_manager()->current_id());
-    RefreshPlaylistsList();
-    RefreshPlaylist();
+void MainWindow::CloseCurrentPlaylist() { TryClosePlaylist(app_->playlist_manager()->current_id()); }
+
+void MainWindow::FinishClosePlaylist(int id) {
+  if (id < 0) {
+    return;
   }
+  app_->playlist_manager()->Close(id);
+  RefreshPlaylistsList();
+  RefreshPlaylist();
+}
+
+void MainWindow::TryClosePlaylist(int id) {
+  Playlist *playlist = app_->playlist_manager()->playlist(id);
+  if (!playlist) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  const bool warn = settings.BoolValue(PlaylistSettings::kWarnClosePlaylist, PlaylistSettings::kDefaultWarnClosePlaylist);
+  if (!PlaylistBehaviour::ShouldPromptClose(warn, playlist->favorite(), playlist->songs().empty())) {
+    FinishClosePlaylist(id);
+    return;
+  }
+  AdwAlertDialog *dialog =
+      ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Remove playlist"),
+                                           Translations::CStr("You are about to remove a playlist which is not part of your favorite "
+                                                              "playlists: the playlist will be deleted (this action cannot be undone).\n"
+                                                              "Are you sure you want to continue?")));
+  GtkWidget *dont_warn = gtk_check_button_new_with_label(Translations::CStr("Warn me when closing a playlist tab"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(dont_warn), TRUE);
+  adw_alert_dialog_set_extra_child(dialog, dont_warn);
+  adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "close", Translations::CStr("Close"), nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "close", ADW_RESPONSE_DESTRUCTIVE);
+  g_object_set_data(G_OBJECT(dialog), "playlist-id", GINT_TO_POINTER(id + 1));
+  g_object_set_data(G_OBJECT(dialog), "dont-warn", dont_warn);
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+                     if (g_strcmp0(response, "close") != 0) {
+                       return;
+                     }
+                     auto *self = static_cast<MainWindow *>(data);
+                     auto *check = GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(alert), "dont-warn"));
+                     Settings persist;
+                     persist.BeginGroup(PlaylistSettings::kSettingsGroup);
+                     persist.SetBoolValue(PlaylistSettings::kWarnClosePlaylist, gtk_check_button_get_active(check));
+                     persist.Sync();
+                     const int playlist_id = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(alert), "playlist-id")) - 1;
+                     self->FinishClosePlaylist(playlist_id);
+                   }),
+                   this);
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
+}
+
+void MainWindow::SelectPlayingTrack() {
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  if (!settings.BoolValue(PlaylistSettings::kSelectTrack, PlaylistSettings::kDefaultSelectTrack)) {
+    return;
+  }
+  Playlist *active = app_->playlist_manager()->active();
+  Playlist *current = app_->playlist_manager()->current();
+  if (!active || active != current || active->current_row() < 0 || !playlist_container_) {
+    return;
+  }
+  const int row = active->current_row();
+  selected_playlist_rows_ = {row};
+  selection_playlist_name_ = current->name();
+  playlist_container_->view()->SetSelectedRows(selected_playlist_rows_);
+  playlist_container_->view()->Refresh(current);
+  playlist_container_->view()->ScrollToRow(row);
 }
 
 void MainWindow::DeleteCurrentPlaylist() {
@@ -1601,15 +1665,31 @@ void MainWindow::ShowAnalyzerMenu() {
   }
   GtkWidget *fps_label = gtk_label_new(Translations::CStr("Framerate"));
   gtk_widget_set_halign(fps_label, GTK_ALIGN_START);
-  GtkWidget *fps = gtk_spin_button_new_with_range(AnalyzerSettings::kMinFramerate, AnalyzerSettings::kMaxFramerate, 1);
-  gtk_spin_button_set_value(GTK_SPIN_BUTTON(fps), app_->analyzer()->framerate());
-  g_signal_connect(fps, "value-changed", G_CALLBACK(+[](GtkSpinButton *spin, gpointer data) {
-                     static_cast<MainWindow *>(data)->app_->analyzer()->set_framerate(
-                         static_cast<int>(gtk_spin_button_get_value(spin)));
-                   }),
-                   this);
   gtk_box_append(GTK_BOX(box), fps_label);
-  gtk_box_append(GTK_BOX(box), fps);
+  GtkWidget *fps_group = nullptr;
+  for (const AnalyzerFramerate::Preset &preset : AnalyzerFramerate::Presets()) {
+    GtkWidget *choice = gtk_check_button_new_with_label(preset.label);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(choice), app_->analyzer()->framerate() == preset.fps);
+    if (fps_group) {
+      gtk_check_button_set_group(GTK_CHECK_BUTTON(choice), GTK_CHECK_BUTTON(fps_group));
+    } else {
+      fps_group = choice;
+    }
+    g_object_set_data(G_OBJECT(choice), "fps", GINT_TO_POINTER(preset.fps));
+    g_object_set_data(G_OBJECT(choice), "popover", popover);
+    g_signal_connect(choice, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                       if (!gtk_check_button_get_active(button)) {
+                         return;
+                       }
+                       auto *self = static_cast<MainWindow *>(data);
+                       self->app_->analyzer()->set_framerate(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "fps")));
+                       if (auto *pop = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "popover"))) {
+                         gtk_popover_popdown(GTK_POPOVER(pop));
+                       }
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(box), choice);
+  }
   gtk_popover_set_child(GTK_POPOVER(popover), box);
   gtk_popover_popup(GTK_POPOVER(popover));
 }
@@ -1658,6 +1738,25 @@ void MainWindow::ApplyBehaviourSettings() {
   settings.BeginGroup(BehaviourSettings::kSettingsGroup);
   if (playing_widget_) {
     playing_widget_->SetEnabled(settings.BoolValue(BehaviourSettings::kPlayingWidget, BehaviourSettings::kDefaultPlayingWidget));
+  }
+  ApplyPlaylistBehaviour();
+}
+
+void MainWindow::ApplyPlaylistBehaviour() {
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  const bool auto_sort = settings.BoolValue(PlaylistSettings::kAutoSort, PlaylistSettings::kDefaultAutoSort);
+  for (Playlist *playlist : app_->playlist_manager()->GetAllPlaylists()) {
+    playlist->set_auto_sort(auto_sort);
+    if (sort_column_ != PlaylistColumn::Count) {
+      playlist->SetSort(sort_column_, sort_descending_);
+    }
+  }
+  if (app_->player()) {
+    app_->player()->ReloadSettings();
+  }
+  if (playlist_container_) {
+    playlist_container_->ApplyLook();
   }
 }
 

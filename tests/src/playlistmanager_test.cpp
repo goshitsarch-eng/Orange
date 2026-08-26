@@ -123,3 +123,14 @@ TEST(PlaylistManager, ChangeOrderAndFavorite) {
   EXPECT_EQ(nullptr, manager.playlist(second));
   EXPECT_FALSE(manager.GetAllPlaylists().empty());
 }
+
+TEST(PlaylistManager, SongChangeRequestProcessedGreysCurrent) {
+  PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
+  manager.Init();
+  manager.AppendSongs({MakeSong("A", "file:///a")});
+  manager.SetCurrentRow(0);
+  manager.SongChangeRequestProcessed("file:///a", false);
+  EXPECT_TRUE(manager.current()->current_song().unavailable());
+  manager.SongChangeRequestProcessed("file:///a", true);
+  EXPECT_FALSE(manager.current()->current_song().unavailable());
+}

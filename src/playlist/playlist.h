@@ -42,6 +42,14 @@ class Playlist {
   void Shuffle();
   void RemoveDuplicates();
   void RemoveUnavailable();
+  void InvalidateDeletedSongs();
+  bool ApplyValidityOnCurrentSong(const std::string &url, bool valid);
+  void set_auto_sort(bool auto_sort) { auto_sort_ = auto_sort; }
+  bool auto_sort() const { return auto_sort_; }
+  void SetSort(PlaylistColumn column, bool descending);
+  PlaylistColumn sort_column() const { return sort_column_; }
+  bool sort_descending() const { return sort_descending_; }
+  void SortNow();
   void RenumberTracks();
   void RateCurrentSong(float rating);
   void SkipTracks(const std::vector<int> &rows);
@@ -83,6 +91,8 @@ class Playlist {
   int NextIndex() const;
   int PreviousIndex() const;
   void PushUndo();
+  void MaybeAutoSort();
+  void SortInPlace();
 
   int id_ = -1;
   std::string name_ = "Playlist";
@@ -96,6 +106,9 @@ class Playlist {
   std::vector<Snapshot> redo_;
   bool dynamic_ = false;
   SmartPlaylistSearch dynamic_search_;
+  bool auto_sort_ = false;
+  PlaylistColumn sort_column_ = PlaylistColumn::Count;
+  bool sort_descending_ = false;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H

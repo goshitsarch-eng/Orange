@@ -2,6 +2,7 @@
 
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
+#include "playlist/playlistbehaviour.h"
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistlook.h"
@@ -247,8 +248,11 @@ void PlaylistView::Refresh(Playlist *playlist) {
         gtk_widget_add_css_class(row, "playlist-bars");
       }
     }
-    if (song.skipped()) {
+    if (song.skipped() || PlaylistBehaviour::ShouldGreyout(song)) {
       gtk_widget_add_css_class(row, "dim-label");
+    }
+    if (PlaylistBehaviour::ShouldGreyout(song)) {
+      gtk_widget_add_css_class(row, "playlist-unavailable");
     }
     if (std::find(selected_rows_.begin(), selected_rows_.end(), index) != selected_rows_.end()) {
       gtk_widget_add_css_class(row, "card");

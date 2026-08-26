@@ -1,4 +1,5 @@
 #include "playlist/playlist.h"
+#include "playlist/playlistbehaviour.h"
 #include "utilities/fileutils.h"
 
 #include <gtest/gtest.h>
@@ -229,6 +230,65 @@ TEST(Playlist, MoveRowsKeepsPlayingTrack) {
   EXPECT_EQ(0, playlist.current_row());
   playlist.MoveRows({99}, 0);
   EXPECT_EQ("A", playlist.songs()[0].title());
+}
+
+TEST(Playlist, InvalidateDeletedSongsGreysMissingLocalFiles) {
+  Playlist playlist;
+  const std::string existing = "/tmp/strawberry-playlist-greyout-exists.txt";
+  FileUtils::WriteFile(existing, "ok");
+  Song keep;
+  keep.set_title("Keep");
+  keep.set_url(FileUtils::UriFromPath(existing));
+  keep.set_valid(true);
+  Song gone;
+  gone.set_title("Gone");
+  gone.set_url("file:///tmp/strawberry-playlist-greyout-missing.mp3");
+  gone.set_valid(true);
+  Song stream;
+  stream.set_title("Stream");
+  stream.set_url("http://example.invalid/live");
+  stream.set_source(Song::Source::Stream);
+  stream.set_valid(true);
+  playlist.AppendSongs({keep, gone, stream});
+  playlist.InvalidateDeletedSongs();
+  ASSERT_EQ(3, playlist.row_count());
+  EXPECT_FALSE(playlist.songs()[0].unavailable());
+  EXPECT_TRUE(playlist.songs()[1].unavailable());
+  EXPECT_FALSE(playlist.songs()[2].unavailable());
+  FileUtils::Remove(existing);
+}
+
+TEST(Playlist, ApplyValidityOnCurrentSong) {
+  Playlist playlist;
+  Song song;
+  song.set_title("A");
+  song.set_url("file:///a");
+  song.set_valid(true);
+  playlist.AppendSongs({song});
+  playlist.set_current_row(0);
+  EXPECT_TRUE(playlist.ApplyValidityOnCurrentSong("file:///a", false));
+  EXPECT_TRUE(playlist.current_song().unavailable());
+  EXPECT_TRUE(playlist.ApplyValidityOnCurrentSong("file:///a", true));
+  EXPECT_FALSE(playlist.current_song().unavailable());
+}
+
+TEST(Playlist, AutoSortAfterInsert) {
+  Playlist playlist;
+  playlist.set_auto_sort(true);
+  playlist.SetSort(PlaylistColumn::Title, false);
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  playlist.AppendSongs({b});
+  playlist.AppendSongs({a});
+  ASSERT_EQ(2, playlist.row_count());
+  EXPECT_EQ("A", playlist.songs()[0].title());
+  EXPECT_EQ("B", playlist.songs()[1].title());
 }
 
 TEST(Playlist, SetColumnValuesUpdatesSongsAndUndo) {

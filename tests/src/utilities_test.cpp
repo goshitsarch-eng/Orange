@@ -11,6 +11,8 @@
 #include "equalizer/equalizer.h"
 #include "constants/filefilterconstants.h"
 #include "constants/collectionsettings.h"
+#include "analyzer/analyzerframerate.h"
+#include "playlist/playlistbehaviour.h"
 #include "playlist/playlistlook.h"
 #include "context/contextalbum.h"
 #include "context/contextfont.h"
@@ -876,10 +878,57 @@ TEST(PlaylistLook, CombinedCssCoversAlternatingGlowAndBars) {
   EXPECT_NE(std::string::npos, PlaylistLook::AlternatingCss(true).find("playlist-alt"));
   EXPECT_NE(std::string::npos, PlaylistLook::GlowCss(true).find("playlist-glow"));
   EXPECT_NE(std::string::npos, PlaylistLook::BarsCss(true, 0.4).find("40%"));
+  EXPECT_NE(std::string::npos, PlaylistLook::UnavailableCss().find("playlist-unavailable"));
   const std::string css = PlaylistLook::CombinedCss(true, true, true, 0.25);
   EXPECT_NE(std::string::npos, css.find("playlist-alt"));
   EXPECT_NE(std::string::npos, css.find("playlist-glow"));
   EXPECT_NE(std::string::npos, css.find("25%"));
+  EXPECT_NE(std::string::npos, css.find("playlist-unavailable"));
+}
+
+TEST(PlaylistBehaviour, CloseErrorGreyoutAndSort) {
+  EXPECT_TRUE(PlaylistBehaviour::UrlsMatch("file:///tmp/a.flac", "/tmp/a.flac"));
+  EXPECT_TRUE(PlaylistBehaviour::IsLocalUrl("file:///tmp/a.flac"));
+  EXPECT_FALSE(PlaylistBehaviour::IsLocalUrl("http://example.invalid/live"));
+  Song local;
+  local.set_url("file:///tmp/a.flac");
+  local.set_source(Song::Source::LocalFile);
+  EXPECT_TRUE(PlaylistBehaviour::IsLocalMedia(local));
+  Song stream;
+  stream.set_url("http://example.invalid/live");
+  stream.set_source(Song::Source::Stream);
+  EXPECT_FALSE(PlaylistBehaviour::IsLocalMedia(stream));
+  EXPECT_TRUE(PlaylistBehaviour::ApplyValidity(&local, false));
+  EXPECT_TRUE(local.unavailable());
+  EXPECT_TRUE(PlaylistBehaviour::ShouldGreyout(local));
+  EXPECT_FALSE(PlaylistBehaviour::ApplyValidity(&local, false));
+  EXPECT_TRUE(PlaylistBehaviour::ShouldPromptClose(true, false, false));
+  EXPECT_FALSE(PlaylistBehaviour::ShouldPromptClose(true, true, false));
+  EXPECT_FALSE(PlaylistBehaviour::ShouldPromptClose(true, false, true));
+  EXPECT_FALSE(PlaylistBehaviour::ShouldPromptClose(false, false, false));
+  EXPECT_TRUE(PlaylistBehaviour::ShouldStopAfterError(false, 1, 10));
+  EXPECT_FALSE(PlaylistBehaviour::ShouldStopAfterError(true, 1, 10));
+  EXPECT_TRUE(PlaylistBehaviour::ShouldStopAfterError(true, 10, 10));
+  EXPECT_TRUE(PlaylistBehaviour::ColumnIsNumeric(PlaylistColumn::Year));
+  EXPECT_FALSE(PlaylistBehaviour::ColumnIsNumeric(PlaylistColumn::Title));
+  EXPECT_TRUE(PlaylistBehaviour::LessThanText("A", "B", false, false));
+  EXPECT_TRUE(PlaylistBehaviour::LessThanText("10", "2", true, true));
+}
+
+TEST(AnalyzerFramerate, QtDiscretePresets) {
+  const auto presets = AnalyzerFramerate::Presets();
+  ASSERT_EQ(4u, presets.size());
+  EXPECT_EQ(AnalyzerSettings::kLowFramerate, presets[0].fps);
+  EXPECT_EQ(AnalyzerSettings::kMediumFramerate, presets[1].fps);
+  EXPECT_EQ(AnalyzerSettings::kHighFramerate, presets[2].fps);
+  EXPECT_EQ(AnalyzerSettings::kSuperHighFramerate, presets[3].fps);
+  EXPECT_EQ(20, AnalyzerSettings::kLowFramerate);
+  EXPECT_EQ(25, AnalyzerSettings::kMediumFramerate);
+  EXPECT_EQ(30, AnalyzerSettings::kHighFramerate);
+  EXPECT_EQ(60, AnalyzerSettings::kSuperHighFramerate);
+  EXPECT_EQ("Medium (25 fps)", AnalyzerFramerate::LabelFor(25));
+  EXPECT_EQ(25, AnalyzerFramerate::Nearest(24));
+  EXPECT_EQ(60, AnalyzerFramerate::Nearest(55));
 }
 
 TEST(CollectionSettings, CacheSizeUnitsMatchQt) {

@@ -2,9 +2,11 @@
 
 #include <algorithm>
 
+#include "constants/playlistsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
 #include "core/urlhandlers.h"
+#include "playlist/playlistbehaviour.h"
 #include "playlist/playlistmanager.h"
 #include "queue/queue.h"
 
@@ -16,7 +18,7 @@ void Player::Init() {
   engine_->StateChanged.Connect([this](EngineBase::State state) { HandleEngineState(state); });
   engine_->TrackEnded.Connect([this]() { HandleTrackEnded(); });
   engine_->TrackAboutToEnd.Connect([this]() { PreloadNext(); });
-  engine_->Error.Connect([](const std::string &error) { LogError("%s", error.c_str()); });
+  engine_->Error.Connect([this](const std::string &error) { HandleEngineError(error); });
   engine_->MetadataReceived.Connect([this](const Song &song) {
     if (current_song_.title().empty() && song.is_valid()) {
       if (!song.title().empty()) current_song_.set_title(song.title());
@@ -32,6 +34,10 @@ EngineBase::State Player::GetState() const { return engine_->state(); }
 
 void Player::ReloadSettings() {
   Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  continue_on_error_ = settings.BoolValue(PlaylistSettings::kContinueOnError, PlaylistSettings::kDefaultContinueOnError);
+  greyout_ = settings.BoolValue(PlaylistSettings::kGreyoutSongsPlay, PlaylistSettings::kDefaultGreyoutSongsPlay);
+  settings.EndGroup();
   settings.BeginGroup("Behaviour");
   seek_step_sec_ = settings.Contains("seek_step_sec") ? settings.IntValue("seek_step_sec", 10) : settings.IntValue("seekstep", 10);
   volume_increment_ = static_cast<unsigned>(settings.Contains("volume_increment") ? settings.IntValue("volume_increment", 5)
@@ -270,7 +276,26 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags) {
                 current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                 current_song_.ebur128_integrated_loudness_lufs());
   engine_->Play(pause, 0);
+  error_count_ = 0;
+  if (greyout_ && playlist_manager_) {
+    playlist_manager_->SongChangeRequestProcessed(current_song_.url(), true);
+  }
   SongChanged.Emit(current_song_);
+}
+
+void Player::HandleEngineError(const std::string &error) {
+  LogError("%s", error.c_str());
+  if (greyout_ && playlist_manager_) {
+    playlist_manager_->SongChangeRequestProcessed(current_song_.url(), false);
+  }
+  const int rows = playlist_manager_ && playlist_manager_->active() ? playlist_manager_->active()->row_count() : 0;
+  ++error_count_;
+  if (PlaylistBehaviour::ShouldStopAfterError(continue_on_error_, error_count_, rows)) {
+    error_count_ = 0;
+    Stop();
+    return;
+  }
+  Next();
 }
 
 void Player::PreloadNext() {

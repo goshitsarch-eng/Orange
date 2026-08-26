@@ -15,6 +15,7 @@ class PlaylistTabBar {
  public:
   using ChangedCallback = std::function<void(const std::string &)>;
   using FavoriteCallback = std::function<void(const std::string &, bool)>;
+  using CloseCallback = std::function<void(int)>;
 
   PlaylistTabBar();
 
@@ -22,11 +23,13 @@ class PlaylistTabBar {
   void Refresh(PlaylistManager *manager);
   void SetChangedCallback(ChangedCallback callback);
   void SetFavoriteCallback(FavoriteCallback callback);
+  void SetCloseCallback(CloseCallback callback) { close_ = std::move(callback); }
 
  private:
   GtkWidget *widget_ = nullptr;
   ChangedCallback changed_;
   FavoriteCallback favorite_;
+  CloseCallback close_;
   std::vector<std::unique_ptr<FavoriteWidget>> favorites_;
 };
 

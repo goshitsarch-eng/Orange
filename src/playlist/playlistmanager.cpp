@@ -1,6 +1,8 @@
 #include "playlist/playlistmanager.h"
 
 #include "collection/collectionbackend.h"
+#include "constants/playlistsettings.h"
+#include "core/settings.h"
 #include "core/songloader.h"
 #include "playlistparsers/playlistparser.h"
 #include "smartplaylists/playlistgeneratorinserter.h"
@@ -38,6 +40,13 @@ void PlaylistManager::LoadAll() {
     for (const auto &playlist : playlists_) {
       if (playlist->id() >= next_id_) {
         next_id_ = playlist->id() + 1;
+      }
+    }
+    Settings settings;
+    settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+    if (settings.BoolValue(PlaylistSettings::kGreyoutSongsStartup, PlaylistSettings::kDefaultGreyoutSongsStartup)) {
+      for (const auto &playlist : playlists_) {
+        playlist->InvalidateDeletedSongs();
       }
     }
   }
@@ -155,17 +164,23 @@ void PlaylistManager::Favorite(int id, bool favorite) {
 }
 
 void PlaylistManager::Delete(int id) {
-  Close(id);
-  if (backend_) {
-    backend_->DeletePlaylist(id);
+  if (Playlist *found = FindById(id)) {
+    found->set_favorite(false);
   }
-  PlaylistDeleted.Emit(id);
+  if (!Close(id)) {
+    if (backend_) {
+      backend_->DeletePlaylist(id);
+    }
+    PlaylistDeleted.Emit(id);
+  }
 }
 
 bool PlaylistManager::Close(int id) {
-  if (!FindById(id)) {
+  Playlist *found = FindById(id);
+  if (!found) {
     return false;
   }
+  const bool favorite = found->favorite();
   playlists_.erase(std::remove_if(playlists_.begin(), playlists_.end(),
                                   [id](const std::unique_ptr<Playlist> &playlist) { return playlist->id() == id; }),
                    playlists_.end());
@@ -181,6 +196,10 @@ bool PlaylistManager::Close(int id) {
     CurrentChanged.Emit(current_);
   }
   PlaylistClosed.Emit(id);
+  if (!favorite && backend_) {
+    backend_->DeletePlaylist(id);
+    PlaylistDeleted.Emit(id);
+  }
   return true;
 }
 
@@ -400,6 +419,15 @@ void PlaylistManager::RemoveUnavailableCurrent() {
   if (Playlist *playlist = Visible()) {
     playlist->RemoveUnavailable();
     Persist(playlist);
+  }
+}
+
+void PlaylistManager::SongChangeRequestProcessed(const std::string &url, bool valid) {
+  for (const auto &playlist : playlists_) {
+    if (playlist->ApplyValidityOnCurrentSong(url, valid)) {
+      Persist(playlist.get());
+      return;
+    }
   }
 }
 

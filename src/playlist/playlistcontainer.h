@@ -36,6 +36,7 @@ class PlaylistContainer {
  private:
   GtkWidget *widget_ = nullptr;
   GtkWidget *toolbar_ = nullptr;
+  GtkWidget *clear_button_ = nullptr;
   GtkWidget *summary_ = nullptr;
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;

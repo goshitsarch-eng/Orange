@@ -14,7 +14,7 @@ PlaylistContainer::PlaylistContainer()
   gtk_widget_set_margin_end(toolbar_, 8);
   gtk_widget_set_margin_top(toolbar_, 8);
   gtk_widget_set_margin_bottom(toolbar_, 4);
-  auto add_tool = [&](const char *icon, const char *tooltip, const char *name) {
+  auto add_tool = [&](const char *icon, const char *tooltip, const char *name) -> GtkWidget * {
     GtkWidget *button = gtk_button_new_from_icon_name(icon);
     gtk_widget_set_tooltip_text(button, tooltip);
     g_object_set_data_full(G_OBJECT(button), "action", g_strdup(name), g_free);
@@ -28,11 +28,12 @@ PlaylistContainer::PlaylistContainer()
                        }
                      }),
                      this);
+    return button;
   };
   add_tool("document-new-symbolic", Translations::Tr("New playlist").c_str(), "new");
   add_tool("document-open-symbolic", Translations::Tr("Load playlist").c_str(), "load");
   add_tool("document-save-symbolic", Translations::Tr("Save playlist").c_str(), "save");
-  add_tool("edit-clear-all-symbolic", Translations::Tr("Clear playlist").c_str(), "clear");
+  clear_button_ = add_tool("edit-clear-all-symbolic", Translations::Tr("Clear playlist").c_str(), "clear");
   add_tool("edit-undo-symbolic", Translations::Tr("Undo").c_str(), "undo");
   add_tool("edit-redo-symbolic", Translations::Tr("Redo").c_str(), "redo");
   repeat_button_ = gtk_button_new_from_icon_name("media-playlist-repeat-symbolic");
@@ -81,5 +82,8 @@ void PlaylistContainer::ApplyLook() {
   settings.BeginGroup(PlaylistSettings::kSettingsGroup);
   if (toolbar_) {
     gtk_widget_set_visible(toolbar_, settings.BoolValue(PlaylistSettings::kShowToolbar, PlaylistSettings::kDefaultShowToolbar));
+  }
+  if (clear_button_) {
+    gtk_widget_set_visible(clear_button_, settings.BoolValue(PlaylistSettings::kPlaylistClear, PlaylistSettings::kDefaultPlaylistClear));
   }
 }

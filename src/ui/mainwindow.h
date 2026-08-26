@@ -70,6 +70,10 @@ class MainWindow {
   void NewPlaylist();
   void ClearPlaylist();
   void CloseCurrentPlaylist();
+  void TryClosePlaylist(int id);
+  void FinishClosePlaylist(int id);
+  void SelectPlayingTrack();
+  void ApplyPlaylistBehaviour();
   void DeleteCurrentPlaylist();
   void RenameCurrentPlaylist();
   void UndoPlaylist();

@@ -1,5 +1,6 @@
 #include "playlist/playlist.h"
 
+#include "playlist/playlistbehaviour.h"
 #include "playlist/playlistdelegates.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
@@ -84,6 +85,7 @@ void Playlist::InsertSongs(int row, const SongList &songs) {
   if (current_row_ < 0 && !songs_.empty()) {
     current_row_ = 0;
   }
+  MaybeAutoSort();
   Changed.Emit();
 }
 
@@ -183,6 +185,77 @@ void Playlist::RemoveDuplicates() {
     current_row_ = songs_.empty() ? -1 : static_cast<int>(songs_.size()) - 1;
   }
   Changed.Emit();
+}
+
+void Playlist::InvalidateDeletedSongs() {
+  bool changed = false;
+  for (Song &song : songs_) {
+    if (!PlaylistBehaviour::IsLocalMedia(song)) {
+      continue;
+    }
+    const std::string path = FileUtils::PathFromUri(song.url());
+    const bool exists = !path.empty() && FileUtils::Exists(path);
+    if (PlaylistBehaviour::ApplyLocalExistence(&song, exists)) {
+      changed = true;
+    }
+  }
+  if (changed) {
+    Changed.Emit();
+  }
+}
+
+bool Playlist::ApplyValidityOnCurrentSong(const std::string &url, bool valid) {
+  (void)url;
+  if (current_row_ < 0 || current_row_ >= row_count()) {
+    return false;
+  }
+  if (PlaylistBehaviour::ApplyValidity(&songs_[static_cast<size_t>(current_row_)], valid)) {
+    Changed.Emit();
+  }
+  return true;
+}
+
+void Playlist::SetSort(PlaylistColumn column, bool descending) {
+  sort_column_ = column;
+  sort_descending_ = descending;
+}
+
+void Playlist::SortNow() {
+  if (sort_column_ == PlaylistColumn::Count) {
+    return;
+  }
+  PushUndo();
+  SortInPlace();
+  Changed.Emit();
+}
+
+void Playlist::MaybeAutoSort() {
+  if (auto_sort_ && sort_column_ != PlaylistColumn::Count) {
+    SortInPlace();
+  }
+}
+
+void Playlist::SortInPlace() {
+  if (sort_column_ == PlaylistColumn::Count || songs_.size() < 2) {
+    return;
+  }
+  const Song playing = current_song();
+  const bool numeric = PlaylistBehaviour::ColumnIsNumeric(sort_column_);
+  const PlaylistColumn column = sort_column_;
+  const bool descending = sort_descending_;
+  std::stable_sort(songs_.begin(), songs_.end(), [column, numeric, descending](const Song &a, const Song &b) {
+    return PlaylistBehaviour::LessThanText(PlaylistDelegates::ColumnText(a, column), PlaylistDelegates::ColumnText(b, column), numeric,
+                                           descending);
+  });
+  current_row_ = -1;
+  if (playing.is_valid() || !playing.url().empty()) {
+    for (int i = 0; i < row_count(); ++i) {
+      if (songs_[static_cast<size_t>(i)] == playing) {
+        current_row_ = i;
+        break;
+      }
+    }
+  }
 }
 
 void Playlist::RemoveUnavailable() {

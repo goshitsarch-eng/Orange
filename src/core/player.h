@@ -82,6 +82,11 @@ class Player : public PlayerInterface {
   bool finished_current_ = true;
   int seek_step_sec_ = 10;
   unsigned volume_increment_ = 5;
+  bool continue_on_error_ = false;
+  bool greyout_ = true;
+  int error_count_ = 0;
+
+  void HandleEngineError(const std::string &error);
 };
 
 #endif  // STRAWBERRY_PLAYER_H

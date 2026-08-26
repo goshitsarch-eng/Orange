@@ -37,8 +37,22 @@ void PlaylistTabBar::Refresh(PlaylistManager *manager) {
         favorite_(name, on);
       }
     });
+    GtkWidget *close = gtk_button_new_from_icon_name("window-close-symbolic");
+    gtk_widget_add_css_class(close, "flat");
+    gtk_widget_add_css_class(close, "circular");
+    gtk_widget_set_tooltip_text(close, "Close playlist");
+    g_object_set_data(G_OBJECT(close), "playlist-id", GINT_TO_POINTER(playlist->id() + 1));
+    g_signal_connect(close, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                       auto *self = static_cast<PlaylistTabBar *>(data);
+                       const int id = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(btn), "playlist-id")) - 1;
+                       if (self->close_) {
+                         self->close_(id);
+                       }
+                     }),
+                     this);
     gtk_box_append(GTK_BOX(tab), button);
     gtk_box_append(GTK_BOX(tab), favorite->widget());
+    gtk_box_append(GTK_BOX(tab), close);
     gtk_box_append(GTK_BOX(widget_), tab);
     favorites_.push_back(std::move(favorite));
     ++index;

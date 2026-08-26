@@ -54,6 +54,7 @@ class PlaylistManagerInterface {
   virtual void ShuffleCurrent() = 0;
   virtual void RemoveDuplicatesCurrent() = 0;
   virtual void RemoveUnavailableCurrent() = 0;
+  virtual void SongChangeRequestProcessed(const std::string &url, bool valid) = 0;
   virtual void RateCurrentSong(float rating) = 0;
   virtual void RateCurrentSong2(int rating) = 0;
   virtual void PlaySmartPlaylist(const std::string &name, bool as_new, bool clear) = 0;

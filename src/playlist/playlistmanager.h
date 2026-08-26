@@ -73,6 +73,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   void ShuffleCurrent() override;
   void RemoveDuplicatesCurrent() override;
   void RemoveUnavailableCurrent() override;
+  void SongChangeRequestProcessed(const std::string &url, bool valid) override;
   void RateCurrentSong(float rating) override;
   void RateCurrentSong2(int rating) override;
   void PlaySmartPlaylist(const std::string &name, bool as_new, bool clear) override;
