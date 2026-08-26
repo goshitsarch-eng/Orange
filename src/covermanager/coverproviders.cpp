@@ -10,6 +10,10 @@
 #include "covermanager/discogscoverprovider.h"
 #include "covermanager/lastfmcoverprovider.h"
 #include "covermanager/musicbrainzcoverprovider.h"
+#include "covermanager/musixmatchcoverprovider.h"
+#include "covermanager/qobuzcoverprovider.h"
+#include "covermanager/spotifycoverprovider.h"
+#include "covermanager/tidalcoverprovider.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
@@ -67,25 +71,9 @@ class JsonCoverProvider : public CoverProvider {
   std::string url_template_;
 };
 
-class MusixmatchCoverProvider : public JsonCoverProvider {
- public:
-  MusixmatchCoverProvider() : JsonCoverProvider("Musixmatch", "https://apic-desktop.musixmatch.com/ws/1.1/album.search?q_artist={artist}&q_album={album}") {}
-};
 class OpenTidalCoverProvider : public JsonCoverProvider {
  public:
-  OpenTidalCoverProvider() : JsonCoverProvider("Tidal (open)", "https://listen.tidal.com/v1/search?query={artist}%20{album}&types=ALBUMS") {}
-};
-class TidalCoverProvider : public JsonCoverProvider {
- public:
-  TidalCoverProvider() : JsonCoverProvider("Tidal", "https://listen.tidal.com/v1/search?query={artist}%20{album}&types=ALBUMS") {}
-};
-class SpotifyCoverProvider : public JsonCoverProvider {
- public:
-  SpotifyCoverProvider() : JsonCoverProvider("Spotify", "https://api.spotify.com/v1/search?type=album&q=album:{album}%20artist:{artist}") {}
-};
-class QobuzCoverProvider : public JsonCoverProvider {
- public:
-  QobuzCoverProvider() : JsonCoverProvider("Qobuz", "https://www.qobuz.com/api.json/0.2/album/search?query={artist}%20{album}") {}
+  OpenTidalCoverProvider() : JsonCoverProvider("OpenTidal", "https://openapi.tidal.com/v2/searchResults/%7Bquery%7D/relationships/albums") {}
 };
 
 }  // namespace

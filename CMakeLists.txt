@@ -153,6 +153,7 @@ set(STRAWBERRY_SOURCES
   src/utilities/fileutils.cpp
   src/utilities/strutils.cpp
   src/utilities/jsonutils.cpp
+  src/utilities/musixmatchprovider.cpp
   src/utilities/audioanalysis.cpp
   src/engine/gstengine.cpp
   src/engine/gstenginepipeline.cpp
@@ -176,6 +177,10 @@ set(STRAWBERRY_SOURCES
   src/covermanager/musicbrainzcoverprovider.cpp
   src/covermanager/deezercoverprovider.cpp
   src/covermanager/discogscoverprovider.cpp
+  src/covermanager/musixmatchcoverprovider.cpp
+  src/covermanager/tidalcoverprovider.cpp
+  src/covermanager/spotifycoverprovider.cpp
+  src/covermanager/qobuzcoverprovider.cpp
   src/lyrics/htmllyricsprovider.cpp
   src/lyrics/azlyricscomlyricsprovider.cpp
   src/lyrics/elyricsnetlyricsprovider.cpp
@@ -187,6 +192,10 @@ set(STRAWBERRY_SOURCES
   src/lyrics/geniuslyricsprovider.cpp
   src/lyrics/lyricsproviders.cpp
   src/scrobbler/audioscrobbler.cpp
+  src/scrobbler/scrobblercache.cpp
+  src/scrobbler/lastfmscrobbler.cpp
+  src/scrobbler/listenbrainzscrobbler.cpp
+  src/scrobbler/subsonicscrobbler.cpp
   src/streaming/streamingservices.cpp
   src/subsonic/subsonicservice.cpp
   src/tidal/tidalservice.cpp
@@ -300,6 +309,7 @@ if(GTest_FOUND)
     tests/src/tagreader_gme_test.cpp
     tests/src/lastfmcover_test.cpp
     tests/src/coverprovider_test.cpp
+    tests/src/scrobbler_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
     tests/src/jsonutils_test.cpp
@@ -313,6 +323,7 @@ if(GTest_FOUND)
     src/utilities/timeutils.cpp
     src/utilities/fileutils.cpp
     src/utilities/strutils.cpp
+    src/utilities/musixmatchprovider.cpp
     src/utilities/jsonutils.cpp
     src/utilities/audioanalysis.cpp
     src/device/devicemanager.cpp
@@ -330,6 +341,16 @@ if(GTest_FOUND)
     src/covermanager/musicbrainzcoverprovider.cpp
     src/covermanager/deezercoverprovider.cpp
     src/covermanager/discogscoverprovider.cpp
+    src/covermanager/musixmatchcoverprovider.cpp
+    src/covermanager/tidalcoverprovider.cpp
+    src/covermanager/spotifycoverprovider.cpp
+    src/covermanager/qobuzcoverprovider.cpp
+    src/scrobbler/scrobblercache.cpp
+    src/scrobbler/lastfmscrobbler.cpp
+    src/scrobbler/listenbrainzscrobbler.cpp
+    src/scrobbler/subsonicscrobbler.cpp
+    src/tidal/tidalservice.cpp
+    src/qobuz/qobuzservice.cpp
     src/tagreader/tagreadergme.cpp
     src/playlist/playlist.cpp
     src/collection/collectionbackend.cpp

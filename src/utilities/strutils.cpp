@@ -106,6 +106,32 @@ std::string UriEscape(const std::string &value) {
   return result;
 }
 
+std::string JsonEscape(const std::string &value) {
+  std::string result;
+  result.reserve(value.size());
+  for (unsigned char ch : value) {
+    switch (ch) {
+      case '"': result += "\\\""; break;
+      case '\\': result += "\\\\"; break;
+      case '\b': result += "\\b"; break;
+      case '\f': result += "\\f"; break;
+      case '\n': result += "\\n"; break;
+      case '\r': result += "\\r"; break;
+      case '\t': result += "\\t"; break;
+      default:
+        if (ch < 0x20) {
+          char buf[8];
+          g_snprintf(buf, sizeof(buf), "\\u%04x", ch);
+          result += buf;
+        } else {
+          result.push_back(static_cast<char>(ch));
+        }
+        break;
+    }
+  }
+  return result;
+}
+
 std::string Transliterate(const std::string &value) {
   UErrorCode status = U_ZERO_ERROR;
   icu::Transliterator *transliterator = icu::Transliterator::createInstance("Any-Latin; Latin-ASCII", UTRANS_FORWARD, status);

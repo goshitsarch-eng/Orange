@@ -38,6 +38,12 @@ TEST(StrUtils, CaseAndTrim) {
   EXPECT_TRUE(StrUtils::ContainsInsensitive("Album Artist", "artist"));
 }
 
+TEST(StrUtils, JsonEscape) {
+  EXPECT_EQ("say \\\"hi\\\"", StrUtils::JsonEscape("say \"hi\""));
+  EXPECT_EQ("a\\\\b", StrUtils::JsonEscape("a\\b"));
+  EXPECT_EQ("line\\nbreak", StrUtils::JsonEscape("line\nbreak"));
+}
+
 TEST(FileUtils, BaseAndExtension) {
   EXPECT_EQ("song.mp3", FileUtils::BaseName("/tmp/music/song.mp3"));
   EXPECT_EQ("mp3", FileUtils::Extension("/tmp/music/song.mp3"));

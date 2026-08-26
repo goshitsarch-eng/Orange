@@ -5,6 +5,7 @@
 #include "utilities/strutils.h"
 
 const char TidalService::kApiUrl[] = "https://api.tidalhifi.com/v1";
+const char TidalService::kResourcesUrl[] = "https://resources.tidal.com";
 
 TidalService::TidalService(NetworkAccessManager *network) : network_(network) { ReloadSettings(); }
 

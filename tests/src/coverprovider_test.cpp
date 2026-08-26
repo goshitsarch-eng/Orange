@@ -1,6 +1,11 @@
 #include "covermanager/deezercoverprovider.h"
 #include "covermanager/discogscoverprovider.h"
 #include "covermanager/musicbrainzcoverprovider.h"
+#include "covermanager/musixmatchcoverprovider.h"
+#include "covermanager/qobuzcoverprovider.h"
+#include "covermanager/spotifycoverprovider.h"
+#include "covermanager/tidalcoverprovider.h"
+#include "utilities/musixmatchprovider.h"
 
 #include <gtest/gtest.h>
 
@@ -110,4 +115,70 @@ TEST(DiscogsCoverProvider, RejectsSmallOrNonSquareImages) {
   EXPECT_FALSE(DiscogsCoverProvider::AcceptImage(200, 200));
   EXPECT_FALSE(DiscogsCoverProvider::AcceptImage(1000, 100));
   EXPECT_TRUE(DiscogsCoverProvider::AcceptImage(600, 600));
+}
+
+TEST(MusixmatchProvider, StringFixup) {
+  EXPECT_EQ("portishead", MusixmatchProvider::StringFixup("Portishead"));
+  EXPECT_EQ("dummy", MusixmatchProvider::StringFixup("Dummy"));
+  EXPECT_EQ("ac-dc", MusixmatchProvider::StringFixup("AC/DC"));
+  EXPECT_EQ("dont-look-back", MusixmatchProvider::StringFixup("Don't Look Back"));
+}
+
+TEST(MusixmatchCoverProvider, ParsesNextDataCover) {
+  const std::string html = R"(<html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"data":{"albumGet":{"data":{"artistName":"Portishead","name":"Dummy","coverImage500x500":"https://s.mxmcdn.net/500.jpg","coverImage800x800":"https://s.mxmcdn.net/800.jpg"}}}}}}</script></html>)";
+  const auto results = MusixmatchCoverProvider::ParseAlbumPage(html, "Portishead", "Dummy");
+  ASSERT_EQ(1u, results.size());
+  EXPECT_EQ("https://s.mxmcdn.net/800.jpg", results.front().image_url);
+}
+
+TEST(TidalCoverProvider, BuildsImageAndParsesItems) {
+  EXPECT_EQ("https://resources.tidal.com/images/aa/bb/cc/1280x1280.jpg", TidalCoverProvider::ImageUrl("aa-bb-cc"));
+  const std::string json = R"({
+    "items": [
+      {"artist":{"name":"Portishead"},"title":"Dummy - Disc 1","cover":"aa-bb-cc"}
+    ]
+  })";
+  const auto results = TidalCoverProvider::ParseItems(json);
+  ASSERT_EQ(1u, results.size());
+  EXPECT_EQ("Dummy", results.front().album);
+  EXPECT_EQ("https://resources.tidal.com/images/aa/bb/cc/1280x1280.jpg", results.front().image_url);
+}
+
+TEST(SpotifyCoverProvider, ParsesAlbumImagesAtLeast300) {
+  const std::string json = R"({
+    "albums": {
+      "items": [
+        {
+          "name": "Dummy",
+          "artists": [{"name": "Portishead"}],
+          "images": [
+            {"url": "https://i.scdn.co/small.jpg", "width": 64, "height": 64},
+            {"url": "https://i.scdn.co/large.jpg", "width": 640, "height": 640}
+          ]
+        }
+      ]
+    }
+  })";
+  const auto results = SpotifyCoverProvider::ParseResults(json, "albums");
+  ASSERT_EQ(1u, results.size());
+  EXPECT_EQ("https://i.scdn.co/large.jpg", results.front().image_url);
+  EXPECT_EQ("Portishead", results.front().artist);
+}
+
+TEST(QobuzCoverProvider, ParsesAlbumLargeImage) {
+  const std::string json = R"json({
+    "albums": {
+      "items": [
+        {
+          "title": "Dummy (Remastered)",
+          "artist": {"name": "Portishead"},
+          "image": {"large": "https://static.qobuz.com/large.jpg", "small": "https://static.qobuz.com/small.jpg"}
+        }
+      ]
+    }
+  })json";
+  const auto results = QobuzCoverProvider::ParseResults(json);
+  ASSERT_EQ(1u, results.size());
+  EXPECT_EQ("Dummy", results.front().album);
+  EXPECT_EQ("https://static.qobuz.com/large.jpg", results.front().image_url);
 }

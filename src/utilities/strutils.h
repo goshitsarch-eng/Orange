@@ -18,6 +18,7 @@ std::string Replace(const std::string &value, const std::string &from, const std
 std::string SqlLikeEscape(const std::string &value);
 std::string SqlQuote(const std::string &value);
 std::string UriEscape(const std::string &value);
+std::string JsonEscape(const std::string &value);
 std::string Transliterate(const std::string &value);
 
 }  // namespace StrUtils

@@ -9,6 +9,7 @@
 class TidalService : public StreamingService {
  public:
   static const char kApiUrl[];
+  static const char kResourcesUrl[];
 
   explicit TidalService(NetworkAccessManager *network);
 
