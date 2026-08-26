@@ -3,6 +3,7 @@
 #include "core/application.h"
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "dialogs/dialoghelpers.h"
+#include "translations/translations.h"
 #include "utilities/fileutils.h"
 #include "utilities/timeutils.h"
 
@@ -35,7 +36,9 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
     return {value, mixed};
   };
   AdwDialog *dialog = adw_dialog_new();
-  const std::string dialog_title = targets.size() > 1 ? "Edit tags (" + std::to_string(targets.size()) + " songs)" : "Edit tags";
+  const std::string dialog_title = targets.size() > 1
+                                      ? Translations::Tr("Edit tags") + " (" + std::to_string(targets.size()) + " " + Translations::Tr("songs") + ")"
+                                      : Translations::Tr("Edit tags");
   adw_dialog_set_title(dialog, dialog_title.c_str());
   adw_dialog_set_content_width(dialog, 520);
   adw_dialog_set_content_height(dialog, 720);
@@ -63,10 +66,10 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   auto add_entries = [&](GtkWidget *page, const std::vector<std::pair<const char *, std::pair<std::string, bool>>> &rows) {
     for (const auto &row : rows) {
       AdwEntryRow *entry = ADW_ENTRY_ROW(adw_entry_row_new());
-      adw_preferences_row_set_title(ADW_PREFERENCES_ROW(entry), row.first);
+      adw_preferences_row_set_title(ADW_PREFERENCES_ROW(entry), Translations::CStr(row.first));
       gtk_editable_set_text(GTK_EDITABLE(entry), row.second.first.c_str());
       if (row.second.second) {
-        gtk_widget_set_tooltip_text(GTK_WIDGET(entry), "Multiple values — type to set all selected songs");
+        gtk_widget_set_tooltip_text(GTK_WIDGET(entry), Translations::CStr("Multiple values — type to set all selected songs"));
       }
       state->fields.emplace_back(row.first, GTK_WIDGET(entry));
       state->initial.push_back(row.second.first);
@@ -84,12 +87,12 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_box_append(GTK_BOX(summary), state->cover);
   GtkWidget *cover_buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_widget_set_halign(cover_buttons, GTK_ALIGN_CENTER);
-  GtkWidget *fetch_cover = gtk_button_new_with_label("Fetch cover");
-  GtkWidget *search_cover = gtk_button_new_with_label("Search…");
-  GtkWidget *url_cover = gtk_button_new_with_label("From URL");
-  GtkWidget *file_cover = gtk_button_new_with_label("From file");
-  GtkWidget *unset_cover = gtk_button_new_with_label("Unset");
-  GtkWidget *stats_cover = gtk_button_new_with_label("Statistics");
+  GtkWidget *fetch_cover = gtk_button_new_with_label(Translations::CStr("Fetch cover"));
+  GtkWidget *search_cover = gtk_button_new_with_label(Translations::CStr("Search…"));
+  GtkWidget *url_cover = gtk_button_new_with_label(Translations::CStr("From URL"));
+  GtkWidget *file_cover = gtk_button_new_with_label(Translations::CStr("From file"));
+  GtkWidget *unset_cover = gtk_button_new_with_label(Translations::CStr("Unset"));
+  GtkWidget *stats_cover = gtk_button_new_with_label(Translations::CStr("Statistics"));
   gtk_box_append(GTK_BOX(cover_buttons), fetch_cover);
   gtk_box_append(GTK_BOX(cover_buttons), search_cover);
   gtk_box_append(GTK_BOX(cover_buttons), url_cover);
@@ -110,7 +113,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_label_set_xalign(GTK_LABEL(stats_label), 0);
   gtk_widget_add_css_class(stats_label, "dim-label");
   gtk_box_append(GTK_BOX(summary), stats_label);
-  GtkWidget *rating_label = gtk_label_new("Rating");
+  GtkWidget *rating_label = gtk_label_new(Translations::CStr("Rating"));
   gtk_label_set_xalign(GTK_LABEL(rating_label), 0);
   gtk_box_append(GTK_BOX(summary), rating_label);
   state->rating = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 5, 0.5);
@@ -126,13 +129,13 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                         {"Original year", common([](const Song &s) { return s.originalyear() > 0 ? std::to_string(s.originalyear()) : std::string(); })},
                         {"Track", common([](const Song &s) { return s.track() > 0 ? std::to_string(s.track()) : std::string(); })},
                         {"Genre", common([](const Song &s) { return s.genre(); })}});
-  adw_view_stack_add_titled(stack, summary, "Summary", "Summary");
+  adw_view_stack_add_titled(stack, summary, "Summary", Translations::CStr("Summary"));
 
   GtkWidget *tags = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   gtk_widget_set_margin_start(tags, 12);
   gtk_widget_set_margin_end(tags, 12);
   gtk_widget_set_margin_top(tags, 12);
-  state->compilation = gtk_check_button_new_with_label("Compilation");
+  state->compilation = gtk_check_button_new_with_label(Translations::CStr("Compilation"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(state->compilation), song.compilation());
   gtk_box_append(GTK_BOX(tags), state->compilation);
   add_entries(tags, {{"Composer", common([](const Song &s) { return s.composer(); })},
@@ -147,7 +150,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      {"Artist sort", common([](const Song &s) { return s.artistsort(); })},
                      {"Album sort", common([](const Song &s) { return s.albumsort(); })},
                      {"Album artist sort", common([](const Song &s) { return s.albumartistsort(); })}});
-  adw_view_stack_add_titled(stack, tags, "Tags", "Tags");
+  adw_view_stack_add_titled(stack, tags, "Tags", Translations::CStr("Tags"));
 
   GtkWidget *lyrics_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   gtk_widget_set_margin_start(lyrics_page, 12);
@@ -159,11 +162,11 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(state->lyrics)), song.lyrics().c_str(), -1);
   state->fields.emplace_back("Lyrics", state->lyrics);
   state->initial.push_back(song.lyrics());
-  gtk_box_append(GTK_BOX(lyrics_page), gtk_label_new("Lyrics"));
+  gtk_box_append(GTK_BOX(lyrics_page), gtk_label_new(Translations::CStr("Lyrics")));
   gtk_box_append(GTK_BOX(lyrics_page), state->lyrics);
-  adw_view_stack_add_titled(stack, lyrics_page, "Lyrics", "Lyrics");
+  adw_view_stack_add_titled(stack, lyrics_page, "Lyrics", Translations::CStr("Lyrics"));
 
-  GtkWidget *save = gtk_button_new_with_label("Save");
+  GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save"));
   gtk_widget_add_css_class(save, "suggested-action");
   g_object_set_data_full(G_OBJECT(save), "state", state, [](gpointer p) { delete static_cast<State *>(p); });
   g_signal_connect(save, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
@@ -280,7 +283,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                    }),
                    parent);
 
-  GtkWidget *fetch_lyrics = gtk_button_new_with_label("Fetch lyrics");
+  GtkWidget *fetch_lyrics = gtk_button_new_with_label(Translations::CStr("Fetch lyrics"));
   g_object_set_data(G_OBJECT(fetch_lyrics), "state", state);
   g_signal_connect(fetch_lyrics, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);

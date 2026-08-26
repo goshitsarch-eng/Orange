@@ -87,6 +87,7 @@ TEST(Translations, AvailableLanguagesIncludeGerman) {
   EXPECT_NE(std::find(languages.begin(), languages.end(), "de_DE"), languages.end());
   EXPECT_EQ(31u, languages.size());
   EXPECT_FALSE(StandardPaths::LocaleDir().empty());
+  EXPECT_STREQ("Preferences", Translations::CStr("Preferences"));
 }
 
 TEST(Translations, GermanCatalogContainsAbout) {

@@ -23,11 +23,13 @@
 #include "settings/tidalsettingspage.h"
 #include "settings/transcodersettingspage.h"
 #include "settings/waveformsettingspage.h"
+#include "translations/translations.h"
 
 #include <adwaita.h>
 
 void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::function<void()> &closed) {
   AdwPreferencesDialog *dialog = ADW_PREFERENCES_DIALOG(adw_preferences_dialog_new());
+  adw_dialog_set_title(ADW_DIALOG(dialog), Translations::CStr("Preferences"));
   auto *settings = new Settings();
   auto *on_closed = new std::function<void()>(closed);
 

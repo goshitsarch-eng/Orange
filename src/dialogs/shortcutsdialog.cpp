@@ -1,10 +1,12 @@
 #include "dialogs/shortcutsdialog.h"
 
+#include "translations/translations.h"
+
 #include <adwaita.h>
 
 void ShortcutsDialog::Show(GtkWindow *parent) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Keyboard shortcuts");
+  adw_dialog_set_title(dialog, Translations::CStr("Keyboard shortcuts"));
   GtkWidget *label = gtk_label_new(
       "Space  Play/Pause\nCtrl+Right  Next\nCtrl+Left  Previous\nCtrl+Up  Volume up\nCtrl+Down  Volume down\n"
       "Ctrl+Z  Undo\nCtrl+Shift+Z  Redo\nCtrl+N  New playlist\nCtrl+O  Open files\nCtrl+S  Save playlist\n"

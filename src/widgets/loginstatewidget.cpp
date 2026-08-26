@@ -1,9 +1,11 @@
 #include "loginstatewidget.h"
 
+#include "translations/translations.h"
+
 LoginStateWidget::LoginStateWidget() {
   root_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
 
-  status_ = gtk_label_new("Not signed in");
+  status_ = gtk_label_new(Translations::CStr("Not signed in"));
   gtk_widget_set_halign(status_, GTK_ALIGN_START);
   gtk_box_append(GTK_BOX(root_), status_);
 
@@ -19,8 +21,8 @@ LoginStateWidget::LoginStateWidget() {
   gtk_box_append(GTK_BOX(root_), progress_);
 
   GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  login_ = gtk_button_new_with_label("Log in");
-  logout_ = gtk_button_new_with_label("Log out");
+  login_ = gtk_button_new_with_label(Translations::CStr("Log in"));
+  logout_ = gtk_button_new_with_label(Translations::CStr("Log out"));
   gtk_box_append(GTK_BOX(buttons), login_);
   gtk_box_append(GTK_BOX(buttons), logout_);
   gtk_box_append(GTK_BOX(root_), buttons);
@@ -64,7 +66,7 @@ void LoginStateWidget::SetAccountTypeVisible(bool visible) {
 void LoginStateWidget::ApplyState() {
   switch (state_) {
     case State::LoggedIn:
-      gtk_label_set_text(GTK_LABEL(status_), "Signed in");
+      gtk_label_set_text(GTK_LABEL(status_), Translations::CStr("Signed in"));
       gtk_label_set_text(GTK_LABEL(account_), account_name_.c_str());
       gtk_widget_set_visible(login_, FALSE);
       gtk_widget_set_visible(logout_, TRUE);
@@ -72,14 +74,14 @@ void LoginStateWidget::ApplyState() {
       gtk_widget_set_visible(progress_, FALSE);
       break;
     case State::LoginInProgress:
-      gtk_label_set_text(GTK_LABEL(status_), "Signing in…");
+      gtk_label_set_text(GTK_LABEL(status_), Translations::CStr("Signing in…"));
       gtk_widget_set_visible(login_, FALSE);
       gtk_widget_set_visible(logout_, FALSE);
       gtk_widget_set_visible(progress_, TRUE);
       gtk_spinner_start(GTK_SPINNER(progress_));
       break;
     case State::LoggedOut:
-      gtk_label_set_text(GTK_LABEL(status_), "Not signed in");
+      gtk_label_set_text(GTK_LABEL(status_), Translations::CStr("Not signed in"));
       gtk_label_set_text(GTK_LABEL(account_), "");
       gtk_widget_set_visible(login_, TRUE);
       gtk_widget_set_visible(logout_, FALSE);

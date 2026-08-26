@@ -2,11 +2,12 @@
 
 #include "core/application.h"
 #include "playlistparsers/playlistparser.h"
+#include "translations/translations.h"
 #include "utilities/fileutils.h"
 
 void SavePlaylistsDialog::Show(GtkWindow *parent, Application *app) {
   GtkFileDialog *chooser = gtk_file_dialog_new();
-  gtk_file_dialog_set_title(chooser, "Save all playlists");
+  gtk_file_dialog_set_title(chooser, Translations::CStr("Save all playlists"));
   gtk_file_dialog_select_folder(chooser, parent, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *application = static_cast<Application *>(data);
     GError *error = nullptr;

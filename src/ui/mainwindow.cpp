@@ -199,11 +199,11 @@ void MainWindow::BuildUi() {
   g_menu_append(tools, Translations::Tr("Fetch tags…").c_str(), "win.tagfetch");
   g_menu_append(tools, Translations::Tr("Edit tags…").c_str(), "win.edittag");
   GMenu *rate = g_menu_new();
-  g_menu_append(rate, "1 star", "win.rate(1)");
-  g_menu_append(rate, "2 stars", "win.rate(2)");
-  g_menu_append(rate, "3 stars", "win.rate(3)");
-  g_menu_append(rate, "4 stars", "win.rate(4)");
-  g_menu_append(rate, "5 stars", "win.rate(5)");
+  g_menu_append(rate, Translations::Tr("1 star").c_str(), "win.rate(1)");
+  g_menu_append(rate, Translations::Tr("2 stars").c_str(), "win.rate(2)");
+  g_menu_append(rate, Translations::Tr("3 stars").c_str(), "win.rate(3)");
+  g_menu_append(rate, Translations::Tr("4 stars").c_str(), "win.rate(4)");
+  g_menu_append(rate, Translations::Tr("5 stars").c_str(), "win.rate(5)");
   g_menu_append_submenu(tools, Translations::Tr("Rate").c_str(), G_MENU_MODEL(rate));
   g_menu_append(tools, Translations::Tr("Collection grouping…").c_str(), "win.group-by");
   g_menu_append(tools, Translations::Tr("Cycle analyzer").c_str(), "win.cycle-analyzer");
@@ -756,7 +756,7 @@ void MainWindow::BuildPlayerBar() {
 
   loading_indicator_ = std::make_unique<MultiLoadingIndicator>();
   gtk_box_append(GTK_BOX(box), loading_indicator_->widget());
-  status_label_ = gtk_label_new("Ready");
+  status_label_ = gtk_label_new(Translations::CStr("Ready"));
   gtk_widget_add_css_class(status_label_, "dim-label");
   gtk_box_append(GTK_BOX(box), status_label_);
 
@@ -1086,7 +1086,7 @@ void MainWindow::OpenAbout() { AboutDialog::Show(GTK_WINDOW(window_)); }
 
 void MainWindow::AddFiles() {
   GtkFileDialog *dialog = gtk_file_dialog_new();
-  gtk_file_dialog_set_title(dialog, "Open audio files");
+  gtk_file_dialog_set_title(dialog, Translations::CStr("Open audio files"));
   gtk_file_dialog_open_multiple(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *self = static_cast<MainWindow *>(data);
     GError *error = nullptr;
@@ -1112,7 +1112,7 @@ void MainWindow::AddFiles() {
 
 void MainWindow::AddCollectionFolder() {
   GtkFileDialog *dialog = gtk_file_dialog_new();
-  gtk_file_dialog_set_title(dialog, "Add collection folder");
+  gtk_file_dialog_set_title(dialog, Translations::CStr("Add collection folder"));
   gtk_file_dialog_select_folder(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *self = static_cast<MainWindow *>(data);
     GError *error = nullptr;
@@ -1133,7 +1133,7 @@ void MainWindow::AddCollectionFolder() {
 
 void MainWindow::LoadPlaylistFile() {
   GtkFileDialog *dialog = gtk_file_dialog_new();
-  gtk_file_dialog_set_title(dialog, "Load playlist");
+  gtk_file_dialog_set_title(dialog, Translations::CStr("Load playlist"));
   gtk_file_dialog_open(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *self = static_cast<MainWindow *>(data);
     GError *error = nullptr;
@@ -1155,7 +1155,7 @@ void MainWindow::LoadPlaylistFile() {
 
 void MainWindow::SavePlaylistFile() {
   GtkFileDialog *dialog = gtk_file_dialog_new();
-  gtk_file_dialog_set_title(dialog, "Save playlist");
+  gtk_file_dialog_set_title(dialog, Translations::CStr("Save playlist"));
   gtk_file_dialog_save(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *self = static_cast<MainWindow *>(data);
     GError *error = nullptr;
@@ -1296,7 +1296,7 @@ void MainWindow::PlayRadioChannel(const RadioChannel &channel) {
 
 void MainWindow::ShowPlaylistMenu(double, double) {
   GMenu *menu = g_menu_new();
-  g_menu_append(menu, "Play", "win.playlist-play");
+  g_menu_append(menu, Translations::Tr("Play").c_str(), "win.playlist-play");
   const SongList selected = SelectedSongs();
   bool queued = !selected.empty();
   for (const Song &song : selected) {
@@ -1305,17 +1305,17 @@ void MainWindow::ShowPlaylistMenu(double, double) {
       break;
     }
   }
-  g_menu_append(menu, queued ? "Dequeue" : "Queue", "win.playlist-queue");
-  g_menu_append(menu, "Play next", "win.queue-next");
-  g_menu_append(menu, "Skip / unskip", "win.playlist-skip");
-  g_menu_append(menu, "Jump to playing track", "win.jump-playing");
-  g_menu_append(menu, "Stop after this track", "win.stop-after");
-  g_menu_append(menu, "Remove", "win.playlist-remove");
-  g_menu_append(menu, "Rescan selected songs", "win.rescan-selected");
-  g_menu_append(menu, "Fetch streaming metadata", "win.fetch-metadata");
-  g_menu_append(menu, "Auto-complete tags…", "win.autocomplete-tags");
-  g_menu_append(menu, "Edit value", "win.edit-value");
-  g_menu_append(menu, "Set column to…", "win.set-column");
+  g_menu_append(menu, queued ? Translations::Tr("Dequeue").c_str() : Translations::Tr("Queue").c_str(), "win.playlist-queue");
+  g_menu_append(menu, Translations::Tr("Play next").c_str(), "win.queue-next");
+  g_menu_append(menu, Translations::Tr("Skip / unskip").c_str(), "win.playlist-skip");
+  g_menu_append(menu, Translations::Tr("Jump to playing track").c_str(), "win.jump-playing");
+  g_menu_append(menu, Translations::Tr("Stop after this track").c_str(), "win.stop-after");
+  g_menu_append(menu, Translations::Tr("Remove").c_str(), "win.playlist-remove");
+  g_menu_append(menu, Translations::Tr("Rescan selected songs").c_str(), "win.rescan-selected");
+  g_menu_append(menu, Translations::Tr("Fetch streaming metadata").c_str(), "win.fetch-metadata");
+  g_menu_append(menu, Translations::Tr("Auto-complete tags…").c_str(), "win.autocomplete-tags");
+  g_menu_append(menu, Translations::Tr("Edit value").c_str(), "win.edit-value");
+  g_menu_append(menu, Translations::Tr("Set column to…").c_str(), "win.set-column");
   GMenu *add_to = g_menu_new();
   for (Playlist *playlist : app_->playlist_manager()->GetAllPlaylists()) {
     if (!playlist || playlist == app_->playlist_manager()->current()) {
@@ -1325,24 +1325,24 @@ void MainWindow::ShowPlaylistMenu(double, double) {
     g_menu_append(add_to, playlist->name().c_str(), target.c_str());
   }
   if (g_menu_model_get_n_items(G_MENU_MODEL(add_to)) > 0) {
-    g_menu_append_submenu(menu, "Add to playlist", G_MENU_MODEL(add_to));
+    g_menu_append_submenu(menu, Translations::Tr("Add to playlist").c_str(), G_MENU_MODEL(add_to));
   }
-  g_menu_append(menu, "Show in collection", "win.show-in-collection");
-  g_menu_append(menu, "Open in file manager", "win.open-file-manager");
-  g_menu_append(menu, "Copy to collection", "win.copy-collection");
-  g_menu_append(menu, "Move to collection", "win.move-collection");
-  g_menu_append(menu, "Add to transcoder…", "win.transcode-selected");
-  g_menu_append(menu, "Copy song URL", "win.copy-url");
+  g_menu_append(menu, Translations::Tr("Show in collection").c_str(), "win.show-in-collection");
+  g_menu_append(menu, Translations::Tr("Open in file manager").c_str(), "win.open-file-manager");
+  g_menu_append(menu, Translations::Tr("Copy to collection").c_str(), "win.copy-collection");
+  g_menu_append(menu, Translations::Tr("Move to collection").c_str(), "win.move-collection");
+  g_menu_append(menu, Translations::Tr("Add to transcoder…").c_str(), "win.transcode-selected");
+  g_menu_append(menu, Translations::Tr("Copy song URL").c_str(), "win.copy-url");
   GMenu *rate_menu = g_menu_new();
-  g_menu_append(rate_menu, "1 star", "win.rate(1)");
-  g_menu_append(rate_menu, "2 stars", "win.rate(2)");
-  g_menu_append(rate_menu, "3 stars", "win.rate(3)");
-  g_menu_append(rate_menu, "4 stars", "win.rate(4)");
-  g_menu_append(rate_menu, "5 stars", "win.rate(5)");
-  g_menu_append_submenu(menu, "Rate", G_MENU_MODEL(rate_menu));
-  g_menu_append(menu, "Edit tags…", "win.edittag");
-  g_menu_append(menu, "Cover search…", "win.cover-search");
-  g_menu_append(menu, "Delete file…", "win.delete-files");
+  g_menu_append(rate_menu, Translations::Tr("1 star").c_str(), "win.rate(1)");
+  g_menu_append(rate_menu, Translations::Tr("2 stars").c_str(), "win.rate(2)");
+  g_menu_append(rate_menu, Translations::Tr("3 stars").c_str(), "win.rate(3)");
+  g_menu_append(rate_menu, Translations::Tr("4 stars").c_str(), "win.rate(4)");
+  g_menu_append(rate_menu, Translations::Tr("5 stars").c_str(), "win.rate(5)");
+  g_menu_append_submenu(menu, Translations::Tr("Rate").c_str(), G_MENU_MODEL(rate_menu));
+  g_menu_append(menu, Translations::Tr("Edit tags…").c_str(), "win.edittag");
+  g_menu_append(menu, Translations::Tr("Cover search…").c_str(), "win.cover-search");
+  g_menu_append(menu, Translations::Tr("Delete file…").c_str(), "win.delete-files");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, playlist_container_ ? playlist_container_->view()->grid() : GTK_WIDGET(window_));
   gtk_popover_popup(GTK_POPOVER(popover));
