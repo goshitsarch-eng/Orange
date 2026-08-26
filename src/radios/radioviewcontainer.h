@@ -19,6 +19,7 @@ class RadioViewContainer {
 
   GtkWidget *widget() const { return widget_; }
   RadioView *view() { return view_.get(); }
+  RadioBrowserSearchView *search_view() { return search_view_.get(); }
   void Reload();
   void Search(const std::string &query);
   void SetActivateCallback(std::function<void(const RadioChannel &)> callback);

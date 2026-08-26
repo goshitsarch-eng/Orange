@@ -3,6 +3,7 @@
 #include "playlistparsers/playlistparser.h"
 #include "radios/radiobackend.h"
 #include "radios/radiobrowsersearchmodel.h"
+#include "radios/radiobrowsersearchopts.h"
 #include "radios/radiobrowserservice.h"
 #include "radios/radiochannel.h"
 #include "radios/radiodrag.h"
@@ -108,6 +109,49 @@ TEST(RadioBrowserService, SearchUrlUsesVotesAndHideBroken) {
   EXPECT_NE(std::string::npos, url.find("offset=10"));
   EXPECT_NE(std::string::npos, url.find("order=votes"));
   EXPECT_NE(std::string::npos, url.find("reverse=true"));
+  const std::string by_name = RadioBrowserService::SearchUrl("de1.api.radio-browser.info", "x", {}, true, 10, 0, "name");
+  EXPECT_NE(std::string::npos, by_name.find("order=name"));
+  EXPECT_EQ(std::string::npos, by_name.find("reverse=true"));
+  EXPECT_EQ("https://de1.api.radio-browser.info/json/countrycodes",
+            RadioBrowserService::CountriesUrl("https://de1.api.radio-browser.info/"));
+}
+
+TEST(RadioBrowserService, ParseCountriesSkipsEmptyAndZero) {
+  const std::string json = R"([
+    {"name": "no", "stationcount": 12},
+    {"name": "US", "stationcount": 0},
+    {"name": "", "stationcount": 4},
+    {"name": "de", "stationcount": 3}
+  ])";
+  const std::vector<RadioBrowserService::Country> countries = RadioBrowserService::ParseCountries(json);
+  ASSERT_EQ(2u, countries.size());
+  EXPECT_EQ("DE", countries[0].code);
+  EXPECT_EQ("NO", countries[1].code);
+  EXPECT_EQ(12, countries[1].stationcount);
+}
+
+TEST(RadioBrowserSearchOpts, SortStatusAndPagingMatchQt) {
+  EXPECT_EQ(4, RadioBrowserSearchOpts::SortCount());
+  EXPECT_EQ("votes", RadioBrowserSearchOpts::DefaultSort());
+  EXPECT_EQ(0, RadioBrowserSearchOpts::SortIndex("votes"));
+  EXPECT_EQ(2, RadioBrowserSearchOpts::SortIndex("name"));
+  EXPECT_EQ("clickcount", RadioBrowserSearchOpts::SortId(1));
+  EXPECT_TRUE(RadioBrowserSearchOpts::ReverseOrder("votes"));
+  EXPECT_FALSE(RadioBrowserSearchOpts::ReverseOrder("name"));
+  EXPECT_TRUE(RadioBrowserSearchOpts::IsAllCountries("all"));
+  EXPECT_TRUE(RadioBrowserSearchOpts::IsAllCountries(""));
+  EXPECT_FALSE(RadioBrowserSearchOpts::IsAllCountries("NO"));
+  EXPECT_EQ("Search radio stations...", RadioBrowserSearchOpts::SearchPlaceholder());
+  EXPECT_EQ("Load more...", RadioBrowserSearchOpts::LoadMoreLabel());
+  EXPECT_EQ("Radio Browser", RadioBrowserSearchOpts::BrowserTab());
+  EXPECT_EQ("Channels", RadioBrowserSearchOpts::ChannelsTab());
+  EXPECT_EQ(300, RadioBrowserSearchOpts::DebounceMs());
+  EXPECT_TRUE(RadioBrowserSearchOpts::HasMore(100, 100));
+  EXPECT_FALSE(RadioBrowserSearchOpts::HasMore(40, 100));
+  EXPECT_EQ(100, RadioBrowserSearchOpts::NextOffset(0, 100));
+  EXPECT_EQ("No stations found.", RadioBrowserSearchOpts::StatusText(0, true));
+  EXPECT_EQ("12 stations found", RadioBrowserSearchOpts::StatusText(12, false));
+  EXPECT_EQ("Radio Browser search failed.", RadioBrowserSearchOpts::SearchFailed({}));
 }
 
 TEST(RadioServices, PlaylistParserResolvesSomaFMPls) {
@@ -172,6 +216,16 @@ TEST(RadioModel, LabelsAndSearchResults) {
   RadioBrowserSearchModel search;
   search.SetResults({channel, other});
   EXPECT_EQ(2, search.row_count());
+  EXPECT_EQ("Name", RadioBrowserSearchModel::ColumnLabel(RadioBrowserSearchModel::Column::Name));
+  EXPECT_EQ("Country", RadioBrowserSearchModel::ColumnLabel(RadioBrowserSearchModel::Column::Country));
+  EXPECT_EQ("US", RadioBrowserSearchModel::CellText(channel, RadioBrowserSearchModel::Column::Country));
+  EXPECT_EQ("mp3", RadioBrowserSearchModel::CellText(channel, RadioBrowserSearchModel::Column::Codec));
+  EXPECT_EQ("Groove Salad · US (mp3)", RadioBrowserSearchModel::RowSummary(channel));
+  search.AddChannels({channel});
+  EXPECT_EQ(3, search.row_count());
+  EXPECT_EQ("Search hit", search.ChannelForRow(1).name);
+  search.Clear();
+  EXPECT_EQ(0, search.row_count());
 }
 
 TEST(RadioBackend, PersistAndRemoveSource) {

@@ -6,6 +6,7 @@
 #include "core/song.h"
 #include "radios/radiochannel.h"
 #include "radios/radiobackend.h"
+#include "radios/radiobrowserservice.h"
 
 #include <functional>
 #include <memory>
@@ -14,11 +15,17 @@
 
 class RadioServices {
  public:
+  using SearchDone = std::function<void(const std::vector<RadioChannel> &, bool, const std::string &)>;
+  using CountriesDone = std::function<void(const std::vector<RadioBrowserService::Country> &)>;
+
   RadioServices(Database *database, NetworkAccessManager *network);
   void Reload();
   void FetchSomaFM();
   void FetchRadioParadise();
   void FetchRadioBrowser(const std::string &query);
+  void SearchRadioBrowser(const std::string &query, const std::string &country, const std::string &order, int limit, int offset,
+                          bool hide_broken, SearchDone done);
+  void FetchCountries(CountriesDone done);
   void AddCustomStream(const std::string &name, const std::string &url);
   const std::vector<RadioChannel> &channels() const { return channels_; }
   const std::vector<RadioChannel> &search_results() const { return search_results_; }

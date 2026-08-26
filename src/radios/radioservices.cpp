@@ -1,9 +1,11 @@
 #include "radios/radioservices.h"
 
+#include "constants/radiobrowsersettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
 #include "playlistparsers/playlistparser.h"
 #include "radios/radiobackend.h"
+#include "radios/radiobrowsersearchopts.h"
 #include "radios/radiobrowserservice.h"
 #include "radios/radioparadiseservice.h"
 #include "radios/somafmservice.h"
@@ -144,21 +146,57 @@ void RadioServices::FetchRadioParadise() {
 }
 
 void RadioServices::FetchRadioBrowser(const std::string &query) {
-  search_results_.clear();
-  if (!network_ || query.empty()) {
-    NotifyUpdated();
+  Settings settings;
+  settings.BeginGroup(RadioBrowserSettings::kSettingsGroup);
+  SearchRadioBrowser(query, settings.Value(RadioBrowserSettings::kDefaultCountry),
+                     settings.Value(RadioBrowserSettings::kDefaultSort, RadioBrowserSettings::kDefaultSortDefault),
+                     settings.IntValue(RadioBrowserSettings::kSearchLimit, RadioBrowserSettings::kSearchLimitDefault), 0,
+                     settings.BoolValue(RadioBrowserSettings::kHideBroken, RadioBrowserSettings::kHideBrokenDefault),
+                     [this](const std::vector<RadioChannel> &channels, bool, const std::string &) {
+                       search_results_ = channels;
+                       NotifyUpdated();
+                     });
+}
+
+void RadioServices::SearchRadioBrowser(const std::string &query, const std::string &country, const std::string &order, int limit,
+                                       int offset, bool hide_broken, SearchDone done) {
+  if (!network_) {
+    if (done) {
+      done({}, false, {});
+    }
     return;
   }
   Settings settings;
-  settings.BeginGroup("RadioBrowser");
-  const std::string url = RadioBrowserService::SearchUrl(settings.Value("server", RadioBrowserService::DefaultServer()), query,
-                                                         settings.Value("country"), settings.BoolValue("hidebroken", true));
-  network_->Get(url, [this](const NetworkAccessManager::Response &response) {
+  settings.BeginGroup(RadioBrowserSettings::kSettingsGroup);
+  const std::string url = RadioBrowserService::SearchUrl(settings.Value("server", RadioBrowserService::DefaultServer()), query, country,
+                                                         hide_broken, limit, offset, order);
+  network_->Get(url, [done, limit](const NetworkAccessManager::Response &response) {
     if (!response.ok()) {
-      NotifyUpdated();
+      if (done) {
+        done({}, false, RadioBrowserSearchOpts::SearchFailed(response.error));
+      }
       return;
     }
-    search_results_ = RadioBrowserService::ParseStations(response.body);
-    NotifyUpdated();
+    const RadioBrowserService::StationPage page = RadioBrowserService::ParseStationPage(response.body);
+    if (done) {
+      done(page.channels, RadioBrowserSearchOpts::HasMore(page.raw_count, limit), {});
+    }
+  });
+}
+
+void RadioServices::FetchCountries(CountriesDone done) {
+  if (!network_) {
+    if (done) {
+      done({});
+    }
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(RadioBrowserSettings::kSettingsGroup);
+  const std::string url = RadioBrowserService::CountriesUrl(settings.Value("server", RadioBrowserService::DefaultServer()));
+  network_->Get(url, [done](const NetworkAccessManager::Response &response) {
+    if (done) {
+      done(response.ok() ? RadioBrowserService::ParseCountries(response.body) : std::vector<RadioBrowserService::Country>{});
+    }
   });
 }
