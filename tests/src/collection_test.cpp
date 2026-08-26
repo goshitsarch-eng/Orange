@@ -8,6 +8,7 @@
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectionitem.h"
 #include "collection/collectionitemdelegate.h"
+#include "collection/collectionfiltermenu.h"
 #include "collection/collectionkeyboard.h"
 #include "collection/collectionmodel.h"
 #include "collection/collectionplaylistitem.h"
@@ -502,6 +503,29 @@ TEST(BackendOptions, PlaybinCrossfadeAndPauseFade) {
   EXPECT_STREQ("1", BackendOptions::SoupForceHttp1(false));
   EXPECT_EQ(500, BackendOptions::WarmupMs(true, 500));
   EXPECT_EQ(0, BackendOptions::WarmupMs(false, 500));
+}
+
+TEST(CollectionFilterMenu, DelayAndBuiltinPresets) {
+  EXPECT_FALSE(CollectionFilterMenu::ShouldDelay(CollectionFilterMenu::DelayBehaviour::AlwaysInstant, 1, 200000));
+  EXPECT_TRUE(CollectionFilterMenu::ShouldDelay(CollectionFilterMenu::DelayBehaviour::AlwaysDelayed, 1, 10));
+  EXPECT_TRUE(CollectionFilterMenu::ShouldDelay(CollectionFilterMenu::DelayBehaviour::DelayedOnLargeLibraries, 2, 100000));
+  EXPECT_FALSE(CollectionFilterMenu::ShouldDelay(CollectionFilterMenu::DelayBehaviour::DelayedOnLargeLibraries, 3, 100000));
+  EXPECT_FALSE(CollectionFilterMenu::ShouldDelay(CollectionFilterMenu::DelayBehaviour::DelayedOnLargeLibraries, 1, 10));
+  EXPECT_EQ(500, CollectionFilterMenu::kFilterDelayMs);
+  const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
+  ASSERT_EQ(15u, presets.size());
+  EXPECT_TRUE(CollectionFilterMenu::IsAdvancedAction(presets.back()));
+  EXPECT_EQ("Group by Album artist/Album", std::string(presets.front().label));
+  CollectionGrouping::Grouping album_disc;
+  album_disc.first = CollectionGrouping::GroupBy::AlbumArtist;
+  album_disc.second = CollectionGrouping::GroupBy::AlbumDisc;
+  album_disc.third = CollectionGrouping::GroupBy::None;
+  EXPECT_EQ(1, CollectionFilterMenu::MatchingPresetIndex(album_disc, presets));
+  CollectionGrouping::Grouping custom;
+  custom.first = CollectionGrouping::GroupBy::Year;
+  custom.second = CollectionGrouping::GroupBy::Composer;
+  custom.third = CollectionGrouping::GroupBy::None;
+  EXPECT_EQ(-1, CollectionFilterMenu::MatchingPresetIndex(custom, presets));
 }
 
 TEST(CollectionKeyboard, FromKeyAndMoveAction) {

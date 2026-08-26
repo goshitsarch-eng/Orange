@@ -1,6 +1,7 @@
 #include "ui/mainwindow.h"
 
 #include "collection/collectionbehaviour.h"
+#include "collection/collectionfiltermenu.h"
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
@@ -142,6 +143,9 @@ MainWindow::~MainWindow() {
   if (position_timeout_) {
     g_source_remove(position_timeout_);
   }
+  if (collection_filter_timeout_) {
+    g_source_remove(collection_filter_timeout_);
+  }
 }
 
 void MainWindow::Present() {
@@ -253,7 +257,25 @@ void MainWindow::BuildUi() {
   adw_header_bar_pack_start(ADW_HEADER_BAR(header), collection_search_);
   g_signal_connect(collection_search_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
-                     self->RefreshCollection(gtk_editable_get_text(GTK_EDITABLE(entry)), true);
+                     const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
+                     const int length = text ? static_cast<int>(g_utf8_strlen(text, -1)) : 0;
+                     const int songs = self->collection_container_ ? self->collection_container_->view()->model()->TotalSongs() : 0;
+                     if (self->collection_filter_timeout_) {
+                       g_source_remove(self->collection_filter_timeout_);
+                       self->collection_filter_timeout_ = 0;
+                     }
+                     if (CollectionFilterMenu::ShouldDelay(CollectionFilterMenu::DelayBehaviour::DelayedOnLargeLibraries, length, songs)) {
+                       self->collection_filter_timeout_ = g_timeout_add(CollectionFilterMenu::kFilterDelayMs, [](gpointer data) -> gboolean {
+                         auto *self = static_cast<MainWindow *>(data);
+                         self->collection_filter_timeout_ = 0;
+                         if (self->collection_search_) {
+                           self->RefreshCollection(gtk_editable_get_text(GTK_EDITABLE(self->collection_search_)), true);
+                         }
+                         return G_SOURCE_REMOVE;
+                       }, self);
+                       return;
+                     }
+                     self->RefreshCollection(text ? text : "", true);
                    }),
                    this);
 
@@ -623,6 +645,9 @@ void MainWindow::BuildUi() {
                Dialogs::GroupBy(GTK_WINDOW(self->window_), self->grouping_, [self](const CollectionGrouping::Grouping &grouping) {
                  self->grouping_ = grouping;
                  CollectionGrouping::SaveCurrent(grouping);
+                 if (self->collection_container_) {
+                   self->collection_container_->filter_widget()->SetGrouping(grouping);
+                 }
                  self->RefreshCollection();
                });
              }));
@@ -704,6 +729,30 @@ void MainWindow::BuildSidebar() {
   collection_container_ = std::make_unique<CollectionViewContainer>();
   gtk_widget_set_vexpand(collection_container_->widget(), TRUE);
   collection_container_->filter_widget()->SetChangedCallback([this]() { RefreshCollection(); });
+  collection_container_->filter_widget()->SetGrouping(grouping_);
+  collection_container_->filter_widget()->SetGroupingChangedCallback([this](const CollectionGrouping::Grouping &grouping) {
+    grouping_ = grouping;
+    CollectionGrouping::SaveCurrent(grouping);
+    RefreshCollection();
+  });
+  collection_container_->filter_widget()->SetMenuActionCallback([this](CollectionFilterMenu::ActionKind kind) {
+    auto apply = [this](const CollectionGrouping::Grouping &grouping) {
+      grouping_ = grouping;
+      CollectionGrouping::SaveCurrent(grouping);
+      if (collection_container_) {
+        collection_container_->filter_widget()->SetGrouping(grouping);
+      }
+      RefreshCollection();
+    };
+    if (kind == CollectionFilterMenu::ActionKind::Advanced || kind == CollectionFilterMenu::ActionKind::Save) {
+      Dialogs::GroupBy(GTK_WINDOW(window_), grouping_, apply);
+    } else if (kind == CollectionFilterMenu::ActionKind::Manage) {
+      Dialogs::ManageSavedGroupings(GTK_WINDOW(window_), apply);
+      if (collection_container_) {
+        collection_container_->filter_widget()->ReloadMenu();
+      }
+    }
+  });
   collection_container_->view()->SetActivateCallback([this](const SongList &songs) {
     Settings settings;
     settings.BeginGroup(BehaviourSettings::kSettingsGroup);
