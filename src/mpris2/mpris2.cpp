@@ -42,25 +42,48 @@ static const gchar *kMprisXml =
 "  </interface>"
 "</node>";
 
-static void HandleMethod(GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar *method, GVariant*, GDBusMethodInvocation *invocation, gpointer user_data) {
+static void HandleMethod(GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar *method, GVariant *parameters, GDBusMethodInvocation *invocation, gpointer user_data) {
   auto *self = static_cast<Mpris2*>(user_data);
-  (void)self;
-  Application *app = nullptr;
-  (void)app;
+  Application *app = self ? self->app() : nullptr;
+  if (app && app->player()) {
+    if (g_strcmp0(method, "Play") == 0) app->player()->Play();
+    else if (g_strcmp0(method, "Pause") == 0) app->player()->Pause();
+    else if (g_strcmp0(method, "PlayPause") == 0) app->player()->PlayPause();
+    else if (g_strcmp0(method, "Stop") == 0) app->player()->Stop();
+    else if (g_strcmp0(method, "Next") == 0) app->player()->Next();
+    else if (g_strcmp0(method, "Previous") == 0) app->player()->Previous();
+    else if (g_strcmp0(method, "Seek") == 0) {
+      gint64 offset = 0;
+      g_variant_get(parameters, "(x)", &offset);
+      app->player()->SeekTo(app->player()->engine()->position_nanosec() / 1000000000LL + offset / 1000000);
+    }
+  }
   g_dbus_method_invocation_return_value(invocation, nullptr);
-  (void)method;
 }
 
-static GVariant *HandleGet(GDBusConnection*, const gchar*, const gchar*, const gchar *interface, const gchar *property, GError**, gpointer) {
+static GVariant *HandleGet(GDBusConnection*, const gchar*, const gchar*, const gchar *interface, const gchar *property, GError**, gpointer user_data) {
+  auto *self = static_cast<Mpris2*>(user_data);
+  Application *app = self ? self->app() : nullptr;
   if (g_strcmp0(property, "Identity") == 0) return g_variant_new_string("Strawberry");
   if (g_strcmp0(property, "DesktopEntry") == 0) return g_variant_new_string("org.strawberrymusicplayer.strawberry");
   if (g_strcmp0(property, "CanQuit") == 0 || g_strcmp0(property, "CanRaise") == 0 || g_strcmp0(property, "CanPlay") == 0 ||
       g_strcmp0(property, "CanPause") == 0 || g_strcmp0(property, "CanGoNext") == 0 || g_strcmp0(property, "CanGoPrevious") == 0 ||
       g_strcmp0(property, "CanSeek") == 0 || g_strcmp0(property, "CanControl") == 0) return g_variant_new_boolean(TRUE);
   if (g_strcmp0(property, "HasTrackList") == 0) return g_variant_new_boolean(FALSE);
-  if (g_strcmp0(property, "PlaybackStatus") == 0) return g_variant_new_string("Stopped");
-  if (g_strcmp0(property, "Rate") == 0 || g_strcmp0(property, "Volume") == 0) return g_variant_new_double(1.0);
-  if (g_strcmp0(property, "Position") == 0) return g_variant_new_int64(0);
+  if (g_strcmp0(property, "PlaybackStatus") == 0) {
+    if (!app || !app->player()) return g_variant_new_string("Stopped");
+    switch (app->player()->GetState()) {
+      case GstEngine::State::Playing: return g_variant_new_string("Playing");
+      case GstEngine::State::Paused: return g_variant_new_string("Paused");
+      default: return g_variant_new_string("Stopped");
+    }
+  }
+  if (g_strcmp0(property, "Rate") == 0) return g_variant_new_double(1.0);
+  if (g_strcmp0(property, "Volume") == 0) return g_variant_new_double(app && app->player() ? app->player()->GetVolume() / 100.0 : 1.0);
+  if (g_strcmp0(property, "Position") == 0) {
+    const int64_t pos = app && app->player() ? app->player()->engine()->position_nanosec() / 1000 : 0;
+    return g_variant_new_int64(pos);
+  }
   if (g_strcmp0(property, "SupportedUriSchemes") == 0 || g_strcmp0(property, "SupportedMimeTypes") == 0) {
     GVariantBuilder b; g_variant_builder_init(&b, G_VARIANT_TYPE("as"));
     if (g_strcmp0(property, "SupportedUriSchemes") == 0) g_variant_builder_add(&b, "s", "file");
@@ -69,6 +92,13 @@ static GVariant *HandleGet(GDBusConnection*, const gchar*, const gchar*, const g
   }
   if (g_strcmp0(property, "Metadata") == 0) {
     GVariantBuilder b; g_variant_builder_init(&b, G_VARIANT_TYPE("a{sv}"));
+    if (app && app->player()) {
+      const Song song = app->player()->current_song();
+      g_variant_builder_add(&b, "{sv}", "xesam:title", g_variant_new_string(song.title().c_str()));
+      g_variant_builder_add(&b, "{sv}", "xesam:album", g_variant_new_string(song.album().c_str()));
+      g_variant_builder_add(&b, "{sv}", "xesam:artist", g_variant_new_strv((const gchar *[]){song.artist().c_str(), nullptr}, -1));
+      g_variant_builder_add(&b, "{sv}", "xesam:url", g_variant_new_string(song.url().c_str()));
+    }
     return g_variant_builder_end(&b);
   }
   (void)interface;

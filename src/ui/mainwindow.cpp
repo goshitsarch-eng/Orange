@@ -324,15 +324,31 @@ void MainWindow::ConnectSignals() {
 void MainWindow::RefreshCollection(const std::string &filter) {
   ClearList(collection_list_);
   const SongList songs = app_->collection()->Songs(filter);
+  std::string last_header;
   for (const Song &song : songs) {
+    const std::string header = song.EffectiveAlbumartist() + " – " + song.album();
+    if (header != last_header) {
+      GtkWidget *header_row = gtk_list_box_row_new();
+      gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(header_row), FALSE);
+      GtkWidget *header_label = gtk_label_new(header.c_str());
+      gtk_widget_add_css_class(header_label, "heading");
+      gtk_widget_set_halign(header_label, GTK_ALIGN_START);
+      gtk_widget_set_margin_start(header_label, 12);
+      gtk_widget_set_margin_top(header_label, 10);
+      gtk_widget_set_margin_bottom(header_label, 4);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(header_row), header_label);
+      gtk_list_box_append(GTK_LIST_BOX(collection_list_), header_row);
+      last_header = header;
+    }
     auto *copy = new Song(song);
     GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *label = gtk_label_new(song.PrettyTitleWithArtist().c_str());
+    const std::string text = (song.track() > 0 ? std::to_string(song.track()) + ". " : "") + song.PrettyTitle();
+    GtkWidget *label = gtk_label_new(text.c_str());
     gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_margin_start(label, 12);
+    gtk_widget_set_margin_start(label, 24);
     gtk_widget_set_margin_end(label, 12);
-    gtk_widget_set_margin_top(label, 6);
-    gtk_widget_set_margin_bottom(label, 6);
+    gtk_widget_set_margin_top(label, 4);
+    gtk_widget_set_margin_bottom(label, 4);
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
     g_object_set_data_full(G_OBJECT(row), "row-data", copy, [](gpointer p) { delete static_cast<Song *>(p); });
     gtk_list_box_append(GTK_LIST_BOX(collection_list_), row);

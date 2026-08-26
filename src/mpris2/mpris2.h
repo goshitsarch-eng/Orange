@@ -8,6 +8,7 @@ class Mpris2 {
   ~Mpris2();
   void EmitSeeked(int64_t position_us);
   void EmitPlaybackStatus();
+  Application *app() const { return app_; }
  private:
   static void OnBusAcquired(GDBusConnection *connection, const gchar *name, gpointer user_data);
   Application *app_;
