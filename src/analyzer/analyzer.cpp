@@ -1,5 +1,11 @@
 #include "analyzer/analyzer.h"
+
+#include "utilities/audioanalysis.h"
+
 #include <cmath>
+
+void Analyzer::SetMagnitudes(const std::vector<float> &db) { SetEngineScope(AudioAnalysis::ScopeFromMagnitudes(db)); }
+
 void Analyzer::SetEngineScope(const std::vector<int16_t> &scope) {
   if (scope.empty()) return;
   const size_t n = bands_.size();

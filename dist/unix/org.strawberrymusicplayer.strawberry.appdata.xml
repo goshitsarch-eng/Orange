@@ -15,11 +15,11 @@
   <developer id="net.jkvinge.jonas">
     <name>Jonas Kvinge</name>
   </developer>
-  ​<translation type="qt">strawberry</translation>
+  <translation type="gettext">strawberry</translation>
   <content_rating type="oars-1.1" />
   <description>
     <p>
-      Strawberry is a music player and music collection organizer. It is aimed at music collectors and audiophiles. Strawberry is free software released under GPL. It's written in C++ using the Qt framework and GStreamer.
+      Strawberry is a music player and music collection organizer. It is aimed at music collectors and audiophiles. Strawberry is free software released under GPL. It's written in C++ using GTK 4, libadwaita, and GStreamer.
     </p>
     <p>Features:</p>
     <ul>

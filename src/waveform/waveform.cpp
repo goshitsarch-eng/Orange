@@ -1,11 +1,48 @@
 #include "waveform/waveform.h"
+
 #include "core/standardpaths.h"
+#include "utilities/audioanalysis.h"
 #include "utilities/fileutils.h"
+
+#include <cstdlib>
+
 std::vector<float> WaveformLoader::Load(const Song &song) {
-  (void)song;
-  return std::vector<float>(512, 0.2f);
+  const std::string cache = FileUtils::Join(StandardPaths::WaveformCacheDir(), FileUtils::BaseName(song.url()) + ".wave");
+  if (FileUtils::Exists(cache)) {
+    const std::string data = FileUtils::ReadFile(cache);
+    std::vector<float> peaks;
+    size_t pos = 0;
+    while (pos < data.size()) {
+      const size_t end = data.find('\n', pos);
+      const std::string line = data.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
+      if (!line.empty()) {
+        peaks.push_back(std::strtof(line.c_str(), nullptr));
+      }
+      if (end == std::string::npos) {
+        break;
+      }
+      pos = end + 1;
+    }
+    if (!peaks.empty()) {
+      return peaks;
+    }
+  }
+  const std::vector<int16_t> pcm = AudioAnalysis::DecodePcm(song.url());
+  if (pcm.empty()) {
+    return {};
+  }
+  const std::vector<float> peaks = AudioAnalysis::PeaksFromPcm(pcm.data(), pcm.size(), 1, 512);
+  std::string serialized;
+  serialized.reserve(peaks.size() * 8);
+  for (float peak : peaks) {
+    serialized += std::to_string(peak) + "\n";
+  }
+  FileUtils::WriteFile(cache, serialized);
+  return peaks;
 }
+
 WaveformController::WaveformController(WaveformLoader *loader) : loader_(loader) {}
+
 void WaveformController::Load(const Song &song) {
   data_ = loader_ ? loader_->Load(song) : std::vector<float>{};
   Ready.Emit(data_);

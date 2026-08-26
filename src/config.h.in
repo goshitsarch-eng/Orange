@@ -36,6 +36,7 @@
 #cmakedefine INSTALL_TRANSLATIONS
 #cmakedefine HAVE_GTK4
 #cmakedefine HAVE_ADWAITA
+#cmakedefine HAVE_X11
 
 #define TRANSLATIONS_DIR "${CMAKE_INSTALL_PREFIX}/share/strawberry/translations"
 #define STRAWBERRY_APPLICATION_ID "org.strawberrymusicplayer.Strawberry"

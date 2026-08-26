@@ -267,6 +267,40 @@ SongList PlaylistParser::LoadCUE(const std::string &path, const std::string &dat
   return songs;
 }
 
+void PlaylistParser::EnrichFromAudioFile(SongList *songs, const Song &file) {
+  if (!songs) {
+    return;
+  }
+  for (Song &song : *songs) {
+    song.set_bitrate(file.bitrate());
+    song.set_samplerate(file.samplerate());
+    song.set_bitdepth(file.bitdepth());
+    song.set_filesize(file.filesize());
+    song.set_filetype(file.filetype());
+    if (song.basefilename().empty()) {
+      song.set_basefilename(file.basefilename());
+    }
+    if (file.art_embedded()) {
+      song.set_art_embedded(true);
+    }
+    if (song.year() == 0 && file.year() > 0) {
+      song.set_year(file.year());
+    }
+    if (song.genre().empty() && !file.genre().empty()) {
+      song.set_genre(file.genre());
+    }
+    if (song.albumartist().empty() && !file.albumartist().empty()) {
+      song.set_albumartist(file.albumartist());
+    }
+    if (song.album().empty() && !file.album().empty()) {
+      song.set_album(file.album());
+    }
+  }
+  if (!songs->empty() && songs->back().length_nanosec() <= 0 && file.length_nanosec() > songs->back().beginning_nanosec()) {
+    songs->back().set_length_nanosec(file.length_nanosec() - songs->back().beginning_nanosec());
+  }
+}
+
 SongList PlaylistParser::Load(const std::string &path) const {
   const std::string data = FileUtils::ReadFile(path);
   const std::string ext = StrUtils::ToLower(FileUtils::Extension(path));

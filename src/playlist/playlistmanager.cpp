@@ -4,6 +4,7 @@
 #include "playlistparsers/playlistparser.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
+#include "utilities/strutils.h"
 
 #include <algorithm>
 
@@ -101,17 +102,29 @@ void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row) 
   }
   SongList songs;
   PlaylistParser parser;
+  auto enrich_cue = [&](SongList loaded) {
+    if (!loaded.empty()) {
+      const std::string audio = FileUtils::PathFromUri(loaded.front().url());
+      if (FileUtils::IsFile(audio)) {
+        PlaylistParser::EnrichFromAudioFile(&loaded, tagreader_->ReadFile(audio));
+      }
+    }
+    return loaded;
+  };
   for (const std::string &url : urls) {
     const std::string path = FileUtils::PathFromUri(url);
     if (FileUtils::IsFile(path) && PlaylistParser::IsPlaylist(path)) {
       SongList loaded = parser.Load(path);
+      if (StrUtils::ToLower(FileUtils::Extension(path)) == "cue") {
+        loaded = enrich_cue(loaded);
+      }
       songs.insert(songs.end(), loaded.begin(), loaded.end());
       continue;
     }
     if (FileUtils::IsFile(path) && Song::IsAudioFile(path)) {
       const std::string cue = PlaylistParser::FindCueForAudio(path);
       if (!cue.empty()) {
-        SongList loaded = parser.Load(cue);
+        SongList loaded = enrich_cue(parser.Load(cue));
         songs.insert(songs.end(), loaded.begin(), loaded.end());
         continue;
       }

@@ -108,6 +108,13 @@ optional_component(DISCORD_RPC ON "Discord Rich Presence")
 optional_component(GLOBALSHORTCUTS ON "Global keyboard shortcuts")
 optional_component(TRANSLATIONS OFF "Translations")
 
+if(LINUX)
+  find_package(X11)
+  if(X11_FOUND)
+    set(HAVE_X11 ON)
+  endif()
+endif()
+
 set(HAVE_DBUS ON)
 set(HAVE_GTK4 ON)
 set(HAVE_ADWAITA ON)
@@ -146,6 +153,7 @@ set(STRAWBERRY_SOURCES
   src/utilities/fileutils.cpp
   src/utilities/strutils.cpp
   src/utilities/jsonutils.cpp
+  src/utilities/audioanalysis.cpp
   src/engine/gstengine.cpp
   src/engine/devicefinders.cpp
   src/core/player.cpp
@@ -241,6 +249,10 @@ if(LIBSECRET_FOUND)
   target_link_libraries(strawberry PRIVATE PkgConfig::LIBSECRET)
   target_compile_definitions(strawberry PRIVATE HAVE_LIBSECRET)
 endif()
+if(HAVE_X11)
+  target_include_directories(strawberry PRIVATE ${X11_INCLUDE_DIR})
+  target_link_libraries(strawberry PRIVATE ${X11_LIBRARIES})
+endif()
 
 install(TARGETS strawberry RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES dist/unix/org.strawberrymusicplayer.strawberry.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
@@ -270,6 +282,8 @@ if(GTest_FOUND)
     src/utilities/fileutils.cpp
     src/utilities/strutils.cpp
     src/utilities/jsonutils.cpp
+    src/utilities/audioanalysis.cpp
+    src/device/devicemanager.cpp
     src/playlistparsers/playlistparser.cpp
     src/smartplaylists/smartplaylist.cpp
     src/filterparser/filterparser.cpp
@@ -291,8 +305,16 @@ if(GTest_FOUND)
     PkgConfig::SQLITE
     PkgConfig::JSONGLIB
     PkgConfig::SOUP
+    PkgConfig::GSTREAMER
+    PkgConfig::GSTREAMER_APP
     ${TAGLIB_LIBRARIES}
   )
+  if(HAVE_MTP)
+    target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBMTP)
+  endif()
+  if(HAVE_AUDIOCD)
+    target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBCDIO)
+  endif()
   add_test(NAME strawberry_tests COMMAND strawberry_tests)
   add_custom_target(build_tests DEPENDS strawberry_tests)
   add_custom_target(run_strawberry_tests

@@ -56,3 +56,32 @@ TEST(PlaylistParser, CueIndexAndTracks) {
   EXPECT_FALSE(songs[0].cue_path().empty());
   unlink(path.c_str());
 }
+
+TEST(PlaylistParser, EnrichCueFromAudioFile) {
+  SongList songs;
+  Song track;
+  track.set_title("One");
+  track.set_beginning_nanosec(1000000000LL);
+  track.set_valid(true);
+  songs.push_back(track);
+  Song file;
+  file.set_bitrate(1411);
+  file.set_samplerate(44100);
+  file.set_bitdepth(16);
+  file.set_filesize(12345);
+  file.set_year(2008);
+  file.set_genre("Folk");
+  file.set_albumartist("Fleet Foxes");
+  file.set_length_nanosec(5000000000LL);
+  file.set_art_embedded(true);
+  PlaylistParser::EnrichFromAudioFile(&songs, file);
+  EXPECT_EQ(1411, songs[0].bitrate());
+  EXPECT_EQ(44100, songs[0].samplerate());
+  EXPECT_EQ(16, songs[0].bitdepth());
+  EXPECT_EQ(12345, songs[0].filesize());
+  EXPECT_EQ(2008, songs[0].year());
+  EXPECT_EQ("Folk", songs[0].genre());
+  EXPECT_EQ("Fleet Foxes", songs[0].albumartist());
+  EXPECT_TRUE(songs[0].art_embedded());
+  EXPECT_EQ(4000000000LL, songs[0].length_nanosec());
+}

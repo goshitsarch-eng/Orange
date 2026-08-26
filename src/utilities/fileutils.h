@@ -15,6 +15,7 @@ bool Exists(const std::string &path);
 bool IsDirectory(const std::string &path);
 bool IsFile(const std::string &path);
 std::vector<std::string> ListDirectory(const std::string &path);
+std::vector<std::string> ListDirectoryRecursive(const std::string &path);
 std::string PathFromUri(const std::string &uri);
 std::string UriFromPath(const std::string &path);
 std::string ReadFile(const std::string &path);

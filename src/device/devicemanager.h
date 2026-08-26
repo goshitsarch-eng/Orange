@@ -1,9 +1,14 @@
 #ifndef STRAWBERRY_DEVICEMANAGER_H
 #define STRAWBERRY_DEVICEMANAGER_H
-#include "core/song.h"
+
 #include "core/signal.h"
+#include "core/song.h"
+#include "core/urlhandlers.h"
+
+#include <memory>
 #include <string>
 #include <vector>
+
 struct ConnectedDevice {
   std::string unique_id;
   std::string friendly_name;
@@ -12,14 +17,42 @@ struct ConnectedDevice {
   std::string backend;
   std::string mount_path;
 };
+
 class DeviceManager {
  public:
+  DeviceManager();
+  ~DeviceManager();
+
   void Init();
   void Rescan();
   const std::vector<ConnectedDevice> &devices() const { return devices_; }
   bool CopySongs(const std::string &device_id, const SongList &songs);
+  SongList Songs(const std::string &device_id) const;
+  UrlHandler *url_handler() const { return url_handler_.get(); }
+
+  static SongList SongsFromDirectory(const std::string &path);
+  static SongList MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec);
+
   Signal<> DevicesChanged;
+
  private:
+  class DeviceUrlHandler : public UrlHandler {
+   public:
+    explicit DeviceUrlHandler(DeviceManager *manager) : manager_(manager) {}
+    std::string scheme() const override { return "mtp"; }
+    LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;
+
+   private:
+    DeviceManager *manager_;
+  };
+
+  const ConnectedDevice *FindDevice(const std::string &device_id) const;
+  SongList SongsFromMtp(const ConnectedDevice &device) const;
+  SongList SongsFromCdda() const;
+  std::string DownloadMtpTrack(const std::string &url) const;
+
   std::vector<ConnectedDevice> devices_;
+  std::unique_ptr<DeviceUrlHandler> url_handler_;
 };
+
 #endif

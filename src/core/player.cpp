@@ -34,6 +34,10 @@ void Player::ReloadSettings() {
   settings.BeginGroup("Behaviour");
   seek_step_sec_ = settings.IntValue("seekstep", 10);
   volume_increment_ = static_cast<unsigned>(settings.IntValue("volumeincrement", 5));
+  settings.EndGroup();
+  settings.BeginGroup("Backend");
+  engine_->SetFadingEnabled(settings.BoolValue("fading", false));
+  engine_->SetFadeDurationMs(settings.IntValue("fadeduration", 2000));
 }
 
 void Player::LoadVolume() {

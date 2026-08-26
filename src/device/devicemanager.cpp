@@ -1,6 +1,8 @@
 #include "device/devicemanager.h"
+
 #include "config.h"
 #include "core/logging.h"
+#include "core/standardpaths.h"
 #include "utilities/fileutils.h"
 #ifdef HAVE_GIO
 #include <gio/gio.h>
@@ -10,8 +12,67 @@
 #include <libmtp.h>
 #include <cstdlib>
 #endif
+#ifdef HAVE_AUDIOCD
+#include <cdio/cdio.h>
+#endif
+
+#include <algorithm>
+
+DeviceManager::DeviceManager() : url_handler_(std::make_unique<DeviceUrlHandler>(this)) {}
+
+DeviceManager::~DeviceManager() = default;
 
 void DeviceManager::Init() { Rescan(); }
+
+const ConnectedDevice *DeviceManager::FindDevice(const std::string &device_id) const {
+  for (const ConnectedDevice &device : devices_) {
+    if (device.unique_id == device_id || device.friendly_name == device_id) {
+      return &device;
+    }
+  }
+  return nullptr;
+}
+
+SongList DeviceManager::SongsFromDirectory(const std::string &path) {
+  SongList songs;
+  if (path.empty()) {
+    return songs;
+  }
+  for (const std::string &entry : FileUtils::ListDirectoryRecursive(path)) {
+    if (!Song::IsAudioFile(entry)) {
+      continue;
+    }
+    Song song(Song::Source::Device);
+    song.set_url(FileUtils::UriFromPath(entry));
+    song.set_title(FileUtils::BaseName(entry));
+    song.set_basefilename(FileUtils::BaseName(entry));
+    song.set_valid(true);
+    songs.push_back(song);
+  }
+  std::sort(songs.begin(), songs.end(), [](const Song &a, const Song &b) { return a.title() < b.title(); });
+  return songs;
+}
+
+SongList DeviceManager::MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec) {
+  SongList songs;
+  if (first_track <= 0 || last_track < first_track) {
+    return songs;
+  }
+  for (int track = first_track; track <= last_track; ++track) {
+    Song song(Song::Source::CDDA);
+    song.set_url("cdda://" + std::to_string(track));
+    song.set_title("Track " + std::to_string(track));
+    song.set_track(track);
+    song.set_filetype(Song::FileType::CDDA);
+    const size_t index = static_cast<size_t>(track - first_track);
+    if (index < lengths_nanosec.size()) {
+      song.set_length_nanosec(lengths_nanosec[index]);
+    }
+    song.set_valid(true);
+    songs.push_back(song);
+  }
+  return songs;
+}
 
 void DeviceManager::Rescan() {
   devices_.clear();
@@ -101,14 +162,176 @@ void DeviceManager::Rescan() {
   DevicesChanged.Emit();
 }
 
-bool DeviceManager::CopySongs(const std::string &device_id, const SongList &songs) {
-  ConnectedDevice target;
-  for (const ConnectedDevice &device : devices_) {
-    if (device.unique_id == device_id || device.friendly_name == device_id) {
-      target = device;
-      break;
+SongList DeviceManager::Songs(const std::string &device_id) const {
+  const ConnectedDevice *device = FindDevice(device_id);
+  if (!device) {
+    return {};
+  }
+  if (device->backend == "cdda") {
+    return SongsFromCdda();
+  }
+  if (device->backend == "mtp") {
+    return SongsFromMtp(*device);
+  }
+  std::string root = device->mount_path;
+  if (device->backend == "gpod") {
+    const std::string music = FileUtils::Join(root, "iPod_Control/Music");
+    if (FileUtils::IsDirectory(music)) {
+      root = music;
     }
   }
+  return SongsFromDirectory(root);
+}
+
+SongList DeviceManager::SongsFromCdda() const {
+#ifdef HAVE_AUDIOCD
+  CdIo_t *cdio = cdio_open(nullptr, DRIVER_DEVICE);
+  if (!cdio) {
+    cdio = cdio_open(nullptr, DRIVER_UNKNOWN);
+  }
+  if (!cdio) {
+    return {};
+  }
+  const track_t first = cdio_get_first_track_num(cdio);
+  const track_t last = cdio_get_last_track_num(cdio);
+  std::vector<int64_t> lengths;
+  for (track_t track = first; track <= last; ++track) {
+    if (cdio_get_track_format(cdio, track) != TRACK_FORMAT_AUDIO) {
+      lengths.push_back(0);
+      continue;
+    }
+    const lsn_t start = cdio_get_track_lsn(cdio, track);
+    const lsn_t end = cdio_get_track_last_lsn(cdio, track);
+    const int64_t sectors = end >= start ? static_cast<int64_t>(end - start + 1) : 0;
+    lengths.push_back(sectors * 1000000000LL / 75);
+  }
+  cdio_destroy(cdio);
+  return MakeCddaSongs(first, last, lengths);
+#else
+  return {};
+#endif
+}
+
+SongList DeviceManager::SongsFromMtp(const ConnectedDevice &device) const {
+  SongList songs;
+#ifdef HAVE_MTP
+  LIBMTP_raw_device_t *raw = nullptr;
+  int count = 0;
+  if (LIBMTP_Detect_Raw_Devices(&raw, &count) != LIBMTP_ERROR_NONE || !raw) {
+    return songs;
+  }
+  LIBMTP_mtpdevice_t *mtp = nullptr;
+  std::string serial;
+  for (int i = 0; i < count; ++i) {
+    LIBMTP_mtpdevice_t *opened = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
+    if (!opened) {
+      continue;
+    }
+    char *value = LIBMTP_Get_Serialnumber(opened);
+    serial = value ? value : "";
+    free(value);
+    const std::string id = std::string("mtp:") + serial;
+    if (id == device.unique_id || count == 1) {
+      mtp = opened;
+      break;
+    }
+    LIBMTP_Release_Device(opened);
+  }
+  free(raw);
+  if (!mtp) {
+    return songs;
+  }
+  LIBMTP_file_t *file = LIBMTP_Get_Filelisting_With_Callback(mtp, nullptr, nullptr);
+  while (file) {
+    LIBMTP_file_t *next = file->next;
+    if (LIBMTP_FILETYPE_IS_AUDIO(file->filetype) && file->filename) {
+      Song song(Song::Source::Device);
+      song.set_url("mtp://" + serial + "/" + std::to_string(file->item_id));
+      song.set_title(file->filename);
+      song.set_basefilename(file->filename);
+      song.set_filesize(static_cast<int64_t>(file->filesize));
+      song.set_valid(true);
+      songs.push_back(song);
+    }
+    LIBMTP_destroy_file_t(file);
+    file = next;
+  }
+  LIBMTP_Release_Device(mtp);
+#else
+  (void)device;
+#endif
+  return songs;
+}
+
+std::string DeviceManager::DownloadMtpTrack(const std::string &url) const {
+#ifdef HAVE_MTP
+  if (url.rfind("mtp://", 0) != 0) {
+    return {};
+  }
+  const std::string rest = url.substr(6);
+  const auto slash = rest.find('/');
+  if (slash == std::string::npos) {
+    return {};
+  }
+  const std::string serial = rest.substr(0, slash);
+  const uint32_t item_id = static_cast<uint32_t>(std::strtoul(rest.substr(slash + 1).c_str(), nullptr, 10));
+  const std::string dest = FileUtils::Join(StandardPaths::CacheDir(), "mtp-" + rest.substr(slash + 1));
+  if (FileUtils::Exists(dest)) {
+    return dest;
+  }
+  LIBMTP_raw_device_t *raw = nullptr;
+  int count = 0;
+  if (LIBMTP_Detect_Raw_Devices(&raw, &count) != LIBMTP_ERROR_NONE || !raw) {
+    return {};
+  }
+  LIBMTP_mtpdevice_t *mtp = nullptr;
+  for (int i = 0; i < count; ++i) {
+    LIBMTP_mtpdevice_t *opened = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
+    if (!opened) {
+      continue;
+    }
+    char *value = LIBMTP_Get_Serialnumber(opened);
+    const std::string id = value ? value : "";
+    free(value);
+    if (id == serial || count == 1) {
+      mtp = opened;
+      break;
+    }
+    LIBMTP_Release_Device(opened);
+  }
+  free(raw);
+  if (!mtp) {
+    return {};
+  }
+  const int ok = LIBMTP_Get_File_To_File(mtp, item_id, dest.c_str(), nullptr, nullptr);
+  LIBMTP_Release_Device(mtp);
+  return ok == 0 ? dest : std::string();
+#else
+  (void)url;
+  return {};
+#endif
+}
+
+UrlHandler::LoadResult DeviceManager::DeviceUrlHandler::Load(const std::string &url, AsyncCallback) {
+  UrlHandler::LoadResult result;
+  const std::string path = manager_->DownloadMtpTrack(url);
+  if (path.empty()) {
+    result.type = UrlHandler::LoadResult::Type::Error;
+    result.error = "Could not copy the MTP track";
+    return result;
+  }
+  result.type = UrlHandler::LoadResult::Type::TrackAvailable;
+  result.media_url = url;
+  result.stream_url = FileUtils::UriFromPath(path);
+  return result;
+}
+
+bool DeviceManager::CopySongs(const std::string &device_id, const SongList &songs) {
+  const ConnectedDevice *found = FindDevice(device_id);
+  if (!found) {
+    return false;
+  }
+  const ConnectedDevice target = *found;
 #ifdef HAVE_MTP
   if (target.backend == "mtp") {
     LIBMTP_raw_device_t *raw = nullptr;

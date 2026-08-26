@@ -1,11 +1,16 @@
 #include "utilities/strutils.h"
 #include "utilities/timeutils.h"
 #include "utilities/fileutils.h"
+#include "utilities/audioanalysis.h"
 #include "core/oauthenticator.h"
+#include "device/devicemanager.h"
 #include "organize/organize.h"
 #include "analyzer/analyzer.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <glib.h>
+#include <unistd.h>
 #include <gtest/gtest.h>
 
 TEST(TimeUtils, PrettyTime) {
@@ -65,6 +70,62 @@ TEST(Analyzer, Types) {
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Wave"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Sonic"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Block"));
+}
+
+TEST(AudioAnalysis, PeaksMoodAndScope) {
+  int16_t samples[8] = {0, 32767, 0, -16384, 1000, 2000, 3000, 0};
+  const auto peaks = AudioAnalysis::PeaksFromPcm(samples, 8, 1, 4);
+  ASSERT_EQ(4u, peaks.size());
+  EXPECT_GT(peaks[0], 0.9f);
+  EXPECT_NEAR(peaks[1], 0.5f, 0.02f);
+  const auto mood = AudioAnalysis::MoodFromPeaks(peaks);
+  ASSERT_EQ(12u, mood.size());
+  EXPECT_GT(mood[0], mood[3]);
+  const auto scope = AudioAnalysis::ScopeFromMagnitudes({0.0f, -40.0f, -80.0f});
+  ASSERT_EQ(3u, scope.size());
+  EXPECT_GT(scope[0], scope[1]);
+  EXPECT_EQ(0, scope[2]);
+  EXPECT_TRUE(AudioAnalysis::DecodePcm({}).empty());
+}
+
+TEST(Analyzer, MagnitudesFillBands) {
+  Analyzer analyzer;
+  analyzer.SetMagnitudes(std::vector<float>(64, -20.0f));
+  EXPECT_FALSE(analyzer.bands().empty());
+  EXPECT_GT(analyzer.bands().front(), 0.0f);
+}
+
+TEST(FileUtils, ListDirectoryRecursive) {
+  const std::string root = "/tmp/strawberry-recursive-" + std::to_string(getpid());
+  const std::string nested = FileUtils::Join(root, "album");
+  g_mkdir_with_parents(nested.c_str(), 0755);
+  ASSERT_TRUE(FileUtils::WriteFile(FileUtils::Join(nested, "track.flac"), "x"));
+  ASSERT_TRUE(FileUtils::WriteFile(FileUtils::Join(root, "skip.txt"), "x"));
+  const auto files = FileUtils::ListDirectoryRecursive(root);
+  EXPECT_NE(files.end(), std::find(files.begin(), files.end(), FileUtils::Join(nested, "track.flac")));
+  FileUtils::Remove(FileUtils::Join(nested, "track.flac"));
+  FileUtils::Remove(FileUtils::Join(root, "skip.txt"));
+  rmdir(nested.c_str());
+  rmdir(root.c_str());
+}
+
+TEST(DeviceManager, SongsFromDirectoryAndCdda) {
+  const std::string root = "/tmp/strawberry-device-" + std::to_string(getpid());
+  g_mkdir_with_parents(root.c_str(), 0755);
+  ASSERT_TRUE(FileUtils::WriteFile(FileUtils::Join(root, "song.mp3"), "x"));
+  const SongList files = DeviceManager::SongsFromDirectory(root);
+  ASSERT_EQ(1u, files.size());
+  EXPECT_EQ(Song::Source::Device, files[0].source());
+  EXPECT_TRUE(files[0].is_valid());
+  FileUtils::Remove(FileUtils::Join(root, "song.mp3"));
+  rmdir(root.c_str());
+
+  const SongList cd = DeviceManager::MakeCddaSongs(1, 2, {180000000000LL, 200000000000LL});
+  ASSERT_EQ(2u, cd.size());
+  EXPECT_EQ("cdda://1", cd[0].url());
+  EXPECT_EQ(Song::Source::CDDA, cd[0].source());
+  EXPECT_EQ(180000000000LL, cd[0].length_nanosec());
+  EXPECT_TRUE(DeviceManager::MakeCddaSongs(0, 0, {}).empty());
 }
 
 TEST(OAuthenticator, BuildAuthorizeUrl) {

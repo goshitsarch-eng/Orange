@@ -54,6 +54,7 @@ void Application::Init() {
   player_->SetQueue(queue_.get());
   device_finders_->Init();
   device_manager_->Init();
+  url_handlers_->AddHandler(device_manager_->url_handler());
   osd_->ReloadSettings();
   shortcuts_->Init();
   discord_->ReloadSettings();

@@ -15,6 +15,7 @@ class PlaylistParser {
   static std::vector<std::string> SupportedExtensions();
   static std::string FindCueForAudio(const std::string &audio_path);
   static int64_t CueIndexToNanosec(const std::string &index);
+  static void EnrichFromAudioFile(SongList *songs, const Song &file);
 
  private:
   SongList LoadM3U(const std::string &path, const std::string &data) const;

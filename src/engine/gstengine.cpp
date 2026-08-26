@@ -2,16 +2,19 @@
 
 #include "core/logging.h"
 #include "core/settings.h"
+#include "utilities/audioanalysis.h"
 
 #include <gst/audio/audio.h>
 #include <gst/pbutils/pbutils.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
 GstEngine::GstEngine() = default;
 
 GstEngine::~GstEngine() {
+  CancelFade();
   Stop();
   if (bus_watch_id_) {
     g_source_remove(bus_watch_id_);
@@ -39,6 +42,8 @@ bool GstEngine::Init() {
   replaygain_mode_ = settings.Value("rgmode", "album") == "track" ? 1 : 0;
   replaygain_preamp_ = settings.IntValue("rgpreamp", 0);
   stereo_balance_ = static_cast<float>(settings.IntValue("stereobalance", 0)) / 100.0f;
+  fading_enabled_ = settings.BoolValue("fading", false);
+  fade_duration_ms_ = std::max(100, settings.IntValue("fadeduration", 2000));
   return true;
 }
 
@@ -59,10 +64,17 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   end_offset_nanosec_ = end_offset_nanosec;
 
   if (pipeline_) {
+    CancelFade();
     gst_element_set_state(pipeline_, GST_STATE_NULL);
     gst_object_unref(pipeline_);
     pipeline_ = nullptr;
     playbin_ = nullptr;
+    volume_ = nullptr;
+    equalizer_ = nullptr;
+    rgvolume_ = nullptr;
+    rglimiter_ = nullptr;
+    panorama_ = nullptr;
+    spectrum_ = nullptr;
   }
 
   playbin_ = gst_element_factory_make("playbin", "playbin");
@@ -84,6 +96,11 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
     rgvolume_ = replaygain_enabled_ ? gst_element_factory_make("rgvolume", "rgvolume") : nullptr;
     rglimiter_ = replaygain_enabled_ ? gst_element_factory_make("rglimiter", "rglimiter") : nullptr;
     panorama_ = gst_element_factory_make("audiopanorama", "panorama");
+    spectrum_ = gst_element_factory_make("spectrum", "spectrum");
+    if (spectrum_) {
+      g_object_set(spectrum_, "bands", 64, "threshold", -80, "interval", GST_SECOND / 10, "post-messages", TRUE, "message-phase", FALSE,
+                   nullptr);
+    }
     std::vector<GstElement *> chain;
     auto add = [&](GstElement *element) {
       if (element) {
@@ -96,6 +113,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
     add(rgvolume_);
     add(rglimiter_);
     add(panorama_);
+    add(spectrum_);
     add(sink);
     for (size_t i = 0; i + 1 < chain.size(); ++i) {
       gst_element_link(chain[i], chain[i + 1]);
@@ -139,6 +157,10 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
   if (offset_nanosec + beginning_offset_nanosec_ > 0) {
     Seek(offset_nanosec);
   }
+  if (fading_enabled_ && !pause) {
+    ApplyVolume(0.0);
+    StartFade(1);
+  }
   SetState(pause ? State::Paused : State::Playing);
   return true;
 }
@@ -173,13 +195,61 @@ void GstEngine::Seek(uint64_t offset_nanosec) {
                           position);
 }
 
+void GstEngine::ApplyVolume(double fraction) {
+  fraction = std::clamp(fraction, 0.0, 1.0);
+  if (volume_) {
+    g_object_set(volume_, "volume", fraction, nullptr);
+  } else if (playbin_) {
+    g_object_set(playbin_, "volume", fraction, nullptr);
+  }
+}
+
 void GstEngine::SetVolumeSW(unsigned percent) {
   volume_percent_ = std::min(percent, 100u);
-  if (volume_) {
-    g_object_set(volume_, "volume", volume_percent_ / 100.0, nullptr);
-  } else if (playbin_) {
-    g_object_set(playbin_, "volume", volume_percent_ / 100.0, nullptr);
+  if (fade_direction_ == 0) {
+    ApplyVolume(volume_percent_ / 100.0);
   }
+}
+
+void GstEngine::SetFadingEnabled(bool enabled) { fading_enabled_ = enabled; }
+
+void GstEngine::SetFadeDurationMs(int milliseconds) { fade_duration_ms_ = std::max(100, milliseconds); }
+
+void GstEngine::CancelFade() {
+  if (fade_timeout_id_) {
+    g_source_remove(fade_timeout_id_);
+    fade_timeout_id_ = 0;
+  }
+  fade_direction_ = 0;
+}
+
+void GstEngine::StartFade(int direction) {
+  if (!fading_enabled_ || direction == 0) {
+    return;
+  }
+  CancelFade();
+  fade_direction_ = direction;
+  fade_step_ = 0;
+  fade_steps_ = std::max(1, fade_duration_ms_ / 50);
+  fade_timeout_id_ = g_timeout_add(50, FadeTick, this);
+}
+
+gboolean GstEngine::FadeTick(gpointer data) {
+  auto *self = static_cast<GstEngine *>(data);
+  ++self->fade_step_;
+  const double t = static_cast<double>(self->fade_step_) / static_cast<double>(self->fade_steps_);
+  const double target = self->volume_percent_ / 100.0;
+  if (self->fade_direction_ < 0) {
+    self->ApplyVolume(target * std::max(0.0, 1.0 - t));
+  } else {
+    self->ApplyVolume(target * std::min(1.0, t));
+  }
+  if (self->fade_step_ >= self->fade_steps_) {
+    self->fade_timeout_id_ = 0;
+    self->fade_direction_ = 0;
+    return G_SOURCE_REMOVE;
+  }
+  return G_SOURCE_CONTINUE;
 }
 
 int64_t GstEngine::position_nanosec() const {
@@ -273,6 +343,9 @@ gboolean GstEngine::BusCallback(GstBus *, GstMessage *message, gpointer data) {
       self->SetState(State::Idle);
       self->TrackEnded.Emit();
       break;
+    case GST_MESSAGE_ELEMENT:
+      self->HandleSpectrum(message);
+      break;
     case GST_MESSAGE_ERROR:
       self->HandleError(message);
       break;
@@ -304,7 +377,30 @@ gboolean GstEngine::BusCallback(GstBus *, GstMessage *message, gpointer data) {
 }
 
 void GstEngine::AboutToFinish(GstElement *, gpointer data) {
-  static_cast<GstEngine *>(data)->TrackAboutToEnd.Emit();
+  auto *self = static_cast<GstEngine *>(data);
+  if (self->fading_enabled_) {
+    self->StartFade(-1);
+  }
+  self->TrackAboutToEnd.Emit();
+}
+
+void GstEngine::HandleSpectrum(GstMessage *message) {
+  const GstStructure *structure = gst_message_get_structure(message);
+  if (!structure || !gst_structure_has_name(structure, "spectrum")) {
+    return;
+  }
+  const GValue *magnitudes = gst_structure_get_value(structure, "magnitude");
+  if (!magnitudes) {
+    return;
+  }
+  const guint n = gst_value_list_get_size(magnitudes);
+  std::vector<float> db(n);
+  for (guint i = 0; i < n; ++i) {
+    const GValue *mag = gst_value_list_get_value(magnitudes, i);
+    db[i] = mag ? g_value_get_float(mag) : -80.0f;
+  }
+  last_scope_ = AudioAnalysis::ScopeFromMagnitudes(db);
+  ScopeUpdated.Emit(last_scope_);
 }
 
 void GstEngine::HandleError(GstMessage *message) {

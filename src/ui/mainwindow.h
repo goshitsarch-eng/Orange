@@ -152,6 +152,7 @@ class MainWindow {
   GtkWidget *playlist_summary_ = nullptr;
   GtkWidget *playlist_tabs_ = nullptr;
   std::string files_path_;
+  std::string device_browse_id_;
   std::string collection_group_ = "artist-album";
   std::string playlist_filter_;
   PlaylistColumn sort_column_ = PlaylistColumn::Title;

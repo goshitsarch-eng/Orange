@@ -70,6 +70,27 @@ std::vector<std::string> ListDirectory(const std::string &path) {
   return result;
 }
 
+std::vector<std::string> ListDirectoryRecursive(const std::string &path) {
+  std::vector<std::string> result;
+  std::vector<std::string> stack = {path};
+  while (!stack.empty()) {
+    const std::string dir = stack.back();
+    stack.pop_back();
+    for (const std::string &entry : ListDirectory(dir)) {
+      const std::string name = BaseName(entry);
+      if (name.empty() || name == "." || name == ".." || name[0] == '.') {
+        continue;
+      }
+      if (IsDirectory(entry)) {
+        stack.push_back(entry);
+      } else {
+        result.push_back(entry);
+      }
+    }
+  }
+  return result;
+}
+
 std::string PathFromUri(const std::string &uri) {
   if (uri.rfind("file://", 0) != 0) {
     return uri;

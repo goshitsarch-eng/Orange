@@ -16,7 +16,7 @@
 
 namespace {
 
-void AppendStringRow(GtkListBox *list, const std::string &text, gpointer user_data, GDestroyNotify destroy = nullptr) {
+GtkWidget *AppendStringRow(GtkListBox *list, const std::string &text, gpointer user_data, GDestroyNotify destroy = nullptr) {
   GtkWidget *row = gtk_list_box_row_new();
   GtkWidget *label = gtk_label_new(text.c_str());
   gtk_widget_set_halign(label, GTK_ALIGN_START);
@@ -35,6 +35,7 @@ void AppendStringRow(GtkListBox *list, const std::string &text, gpointer user_da
     }
   }
   gtk_list_box_append(list, row);
+  return row;
 }
 
 void ClearList(GtkWidget *list) {
@@ -373,6 +374,36 @@ void MainWindow::BuildSidebar() {
                      }
                    }),
                    this);
+  g_signal_connect(devices_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     const char *kind = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-kind"));
+                     if (kind && std::string(kind) == "back") {
+                       self->device_browse_id_.clear();
+                       self->RefreshDevices();
+                       return;
+                     }
+                     if (kind && std::string(kind) == "add-all" && !self->device_browse_id_.empty()) {
+                       self->app_->playlist_manager()->AppendSongs(self->app_->device_manager()->Songs(self->device_browse_id_));
+                       self->RefreshPlaylist();
+                       return;
+                     }
+                     if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"))) {
+                       if (kind && std::string(kind) == "song") {
+                         self->app_->playlist_manager()->AppendSongs({*song});
+                         self->RefreshPlaylist();
+                         if (self->app_->playlist_manager()->active()) {
+                           self->app_->player()->PlayAt(self->app_->playlist_manager()->active()->row_count() - 1);
+                         }
+                         return;
+                       }
+                     }
+                     const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-data"));
+                     if (id && *id) {
+                       self->device_browse_id_ = id;
+                       self->RefreshDevices();
+                     }
+                   }),
+                   this);
   g_signal_connect(queue_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
                      const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
@@ -607,6 +638,10 @@ void MainWindow::ConnectSignals() {
   app_->radio_services()->set_updated_callback([this]() { RefreshRadio(); });
   app_->waveform()->Ready.Connect([this](const std::vector<float> &) { gtk_widget_queue_draw(waveform_drawing_); });
   app_->moodbar()->Ready.Connect([this](const std::vector<uint8_t> &) { gtk_widget_queue_draw(moodbar_drawing_); });
+  app_->player()->engine()->ScopeUpdated.Connect([this](const std::vector<int16_t> &scope) {
+    app_->analyzer()->SetEngineScope(scope);
+    gtk_widget_queue_draw(analyzer_drawing_);
+  });
   position_timeout_ = g_timeout_add(200, [](gpointer data) -> gboolean {
     auto *self = static_cast<MainWindow *>(data);
     if (!self->app_->player()->engine()) {
@@ -620,14 +655,6 @@ void MainWindow::ConnectSignals() {
       g_signal_handlers_block_by_func(self->seek_scale_, reinterpret_cast<gpointer>(OnSeek), self);
       gtk_range_set_value(GTK_RANGE(self->seek_scale_), 1000.0 * static_cast<double>(pos) / static_cast<double>(len));
       g_signal_handlers_unblock_by_func(self->seek_scale_, reinterpret_cast<gpointer>(OnSeek), self);
-    }
-    if (self->app_->player()->GetState() == GstEngine::State::Playing) {
-      std::vector<int16_t> scope(256);
-      for (size_t i = 0; i < scope.size(); ++i) {
-        scope[i] = static_cast<int16_t>(std::sin((pos / 8000000.0) + static_cast<double>(i) / 8.0) * 20000.0);
-      }
-      self->app_->analyzer()->SetEngineScope(scope);
-      gtk_widget_queue_draw(self->analyzer_drawing_);
     }
     return G_SOURCE_CONTINUE;
   }, this);
@@ -1073,8 +1100,28 @@ void MainWindow::RefreshStreaming() {
 
 void MainWindow::RefreshDevices() {
   ClearList(devices_list_);
+  if (!device_browse_id_.empty()) {
+    GtkWidget *back = AppendStringRow(GTK_LIST_BOX(devices_list_), "← Devices", nullptr);
+    g_object_set_data(G_OBJECT(back), "row-kind", const_cast<char *>("back"));
+    GtkWidget *add_all = AppendStringRow(GTK_LIST_BOX(devices_list_), "Add all to playlist", nullptr);
+    g_object_set_data(G_OBJECT(add_all), "row-kind", const_cast<char *>("add-all"));
+    const SongList songs = app_->device_manager()->Songs(device_browse_id_);
+    for (const Song &song : songs) {
+      auto *copy = new Song(song);
+      GtkWidget *row = AppendStringRow(GTK_LIST_BOX(devices_list_), song.PrettyTitleWithArtist(), copy, [](gpointer p) {
+        delete static_cast<Song *>(p);
+      });
+      g_object_set_data(G_OBJECT(row), "row-kind", const_cast<char *>("song"));
+    }
+    if (songs.empty()) {
+      AppendStringRow(GTK_LIST_BOX(devices_list_), "No songs found on this device", nullptr);
+    }
+    return;
+  }
   for (const ConnectedDevice &device : app_->device_manager()->devices()) {
-    AppendStringRow(GTK_LIST_BOX(devices_list_), device.friendly_name, nullptr);
+    GtkWidget *row = AppendStringRow(GTK_LIST_BOX(devices_list_), device.friendly_name + " · " + device.backend,
+                                     g_strdup(device.unique_id.c_str()), g_free);
+    g_object_set_data(G_OBJECT(row), "row-kind", const_cast<char *>("device"));
   }
   if (app_->device_manager()->devices().empty()) {
     AppendStringRow(GTK_LIST_BOX(devices_list_), "No devices found", nullptr);

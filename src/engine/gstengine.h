@@ -52,6 +52,9 @@ class GstEngine {
   void SetReplayGainMode(int mode);
   void SetReplayGainPreamp(double preamp);
   void SetStereoBalance(float value);
+  void SetFadingEnabled(bool enabled);
+  void SetFadeDurationMs(int milliseconds);
+  const std::vector<int16_t> &last_scope() const { return last_scope_; }
 
   Signal<State> StateChanged;
   Signal<int64_t, int64_t> PositionChanged;
@@ -59,13 +62,19 @@ class GstEngine {
   Signal<> TrackAboutToEnd;
   Signal<std::string> Error;
   Signal<Song> MetadataReceived;
+  Signal<std::vector<int16_t>> ScopeUpdated;
 
  private:
   static gboolean BusCallback(GstBus *bus, GstMessage *message, gpointer data);
   static void AboutToFinish(GstElement *playbin, gpointer data);
+  static gboolean FadeTick(gpointer data);
   void HandleError(GstMessage *message);
+  void HandleSpectrum(GstMessage *message);
   void SetState(State state);
   GstElement *MakeAudioSink() const;
+  void ApplyVolume(double fraction);
+  void StartFade(int direction);
+  void CancelFade();
 
   GstElement *pipeline_ = nullptr;
   GstElement *playbin_ = nullptr;
@@ -74,6 +83,7 @@ class GstEngine {
   GstElement *rgvolume_ = nullptr;
   GstElement *rglimiter_ = nullptr;
   GstElement *panorama_ = nullptr;
+  GstElement *spectrum_ = nullptr;
   int replaygain_mode_ = 0;
   double replaygain_preamp_ = 0.0;
   float stereo_balance_ = 0.0f;
@@ -85,6 +95,13 @@ class GstEngine {
   int64_t end_offset_nanosec_ = -1;
   unsigned volume_percent_ = 100;
   bool replaygain_enabled_ = false;
+  bool fading_enabled_ = false;
+  int fade_duration_ms_ = 2000;
+  int fade_direction_ = 0;
+  int fade_step_ = 0;
+  int fade_steps_ = 1;
+  guint fade_timeout_id_ = 0;
+  std::vector<int16_t> last_scope_;
 };
 
 #endif  // STRAWBERRY_GSTENGINE_H

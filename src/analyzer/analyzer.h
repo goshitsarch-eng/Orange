@@ -6,6 +6,7 @@
 class Analyzer {
  public:
   void SetEngineScope(const std::vector<int16_t> &scope);
+  void SetMagnitudes(const std::vector<float> &db);
   const std::vector<float> &bands() const { return bands_; }
   void set_type(const std::string &type) { type_ = type; }
   const std::string &type() const { return type_; }
