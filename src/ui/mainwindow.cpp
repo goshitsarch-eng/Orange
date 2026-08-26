@@ -1604,6 +1604,16 @@ void MainWindow::BuildPlayerBar() {
                    }),
                    this);
   gtk_box_append(GTK_BOX(controls), analyzer_drawing_);
+  GtkEventController *analyzer_scroll = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_VERTICAL);
+  gtk_widget_add_controller(analyzer_drawing_, analyzer_scroll);
+  g_signal_connect(analyzer_scroll, "scroll", G_CALLBACK((+[](GtkEventControllerScroll *, gdouble, gdouble dy, gpointer data) -> gboolean {
+                     auto *self = static_cast<MainWindow *>(data);
+                     if (self->volume_slider_) {
+                       self->volume_slider_->HandleGtkScroll(dy);
+                     }
+                     return TRUE;
+                   })),
+                   this);
   ApplyAnalyzer();
   mute_button_ = gtk_button_new_from_icon_name(MainWindowLook::MuteIconName(false));
   gtk_widget_set_tooltip_text(mute_button_, Translations::CStr(MainWindowLook::MuteTooltip(false)));

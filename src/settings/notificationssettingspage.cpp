@@ -41,12 +41,21 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
   SettingsPage::AddIntEntry(osd, settings, "posx", Translations::CStr("Pretty OSD X position"), 40);
   SettingsPage::AddIntEntry(osd, settings, "posy", Translations::CStr("Pretty OSD Y position"), 40);
 
-  AdwPreferencesGroup *tokens = SettingsPage::AddGroup(page, Translations::CStr("Insert format token"));
+  AdwPreferencesGroup *tokens1 = SettingsPage::AddGroup(page, Translations::CStr("Insert format token into line 1"));
   for (const auto &token : ContextFormatTokens::All()) {
-    SettingsPage::AddButtonRow(tokens, token.second.c_str(), token.first.c_str(), [settings, token]() {
+    SettingsPage::AddButtonRow(tokens1, token.second.c_str(), token.first.c_str(), [settings, token]() {
       settings->BeginGroup(OSDSettings::kSettingsGroup);
       const std::string current = settings->Value(OSDSettings::kCustomText1);
       settings->SetValue(OSDSettings::kCustomText1, ContextFormatTokens::Insert(current, token.first));
+      settings->Sync();
+    });
+  }
+  AdwPreferencesGroup *tokens2 = SettingsPage::AddGroup(page, Translations::CStr("Insert format token into line 2"));
+  for (const auto &token : ContextFormatTokens::All()) {
+    SettingsPage::AddButtonRow(tokens2, token.second.c_str(), token.first.c_str(), [settings, token]() {
+      settings->BeginGroup(OSDSettings::kSettingsGroup);
+      const std::string current = settings->Value(OSDSettings::kCustomText2);
+      settings->SetValue(OSDSettings::kCustomText2, ContextFormatTokens::Insert(current, token.first));
       settings->Sync();
     });
   }

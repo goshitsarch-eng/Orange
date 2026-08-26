@@ -243,8 +243,13 @@ void CollectionView::AppendItem(GtkWidget *parent, const CollectionItem *item, i
   }
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_widget_set_hexpand(box, TRUE);
-  GtkWidget *primary = gtk_label_new(CollectionItemDelegate::PrimaryText(item).c_str());
+  const std::string primary_text = CollectionItemDelegate::PrimaryText(item);
+  GtkWidget *primary = gtk_label_new(primary_text.c_str());
   gtk_widget_set_halign(primary, GTK_ALIGN_START);
+  gtk_label_set_ellipsize(GTK_LABEL(primary), PANGO_ELLIPSIZE_END);
+  if (CollectionItemDelegate::ShouldShowTooltip(primary_text)) {
+    gtk_widget_set_tooltip_text(primary, CollectionItemDelegate::TooltipText(primary_text).c_str());
+  }
   if (CollectionItemDelegate::IsDivider(item)) {
     gtk_widget_add_css_class(primary, "heading");
     gtk_widget_add_css_class(row, "collection-divider");
@@ -255,6 +260,10 @@ void CollectionView::AppendItem(GtkWidget *parent, const CollectionItem *item, i
     GtkWidget *sub = gtk_label_new(secondary.c_str());
     gtk_widget_add_css_class(sub, "dim-label");
     gtk_widget_set_halign(sub, GTK_ALIGN_START);
+    gtk_label_set_ellipsize(GTK_LABEL(sub), PANGO_ELLIPSIZE_END);
+    if (CollectionItemDelegate::ShouldShowTooltip(secondary)) {
+      gtk_widget_set_tooltip_text(sub, CollectionItemDelegate::TooltipText(secondary).c_str());
+    }
     gtk_box_append(GTK_BOX(box), sub);
   }
   gtk_box_append(GTK_BOX(outer), box);

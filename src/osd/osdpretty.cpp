@@ -6,6 +6,7 @@
 #include "osd/osdprettyfade.h"
 #include "osd/osdprettylimits.h"
 #include "osd/osdprettyplacement.h"
+#include "osd/osdprettypopup.h"
 #include "osd/osdprettywayland.h"
 #include "utilities/fontutils.h"
 
@@ -316,8 +317,7 @@ void OSDPretty::ApplyStyle() {
     return;
   }
   GtkCssProvider *css = gtk_css_provider_new();
-  const std::string sheet = ".osd-pretty { background-color: alpha(" + bg_ + ", " + std::to_string(std::clamp(opacity_, 0.2, 1.0)) +
-                            "); color: " + fg_ + "; font: " + FontUtils::ToCss(FontUtils::Parse(font_)) + "; border-radius: 10px; }";
+  const std::string sheet = OSDPrettyPopup::ChromeCss(bg_, fg_, opacity_, FontUtils::ToCss(FontUtils::Parse(font_)));
 #if GTK_CHECK_VERSION(4, 12, 0)
   gtk_css_provider_load_from_string(css, sheet.c_str());
 #else
@@ -328,7 +328,7 @@ void OSDPretty::ApplyStyle() {
 }
 
 void OSDPretty::ConnectDrag() {
-  if (!window_) {
+  if (!window_ || !OSDPrettyPopup::DragEnabled(mode_ == Mode::Draggable)) {
     return;
   }
   GtkGesture *drag = gtk_gesture_drag_new();
@@ -336,6 +336,60 @@ void OSDPretty::ConnectDrag() {
   g_signal_connect(drag, "drag-begin", G_CALLBACK(OnDragBegin), this);
   g_signal_connect(drag, "drag-update", G_CALLBACK(OnDragUpdate), this);
   g_signal_connect(drag, "drag-end", G_CALLBACK(OnDragEnd), this);
+}
+
+void OSDPretty::ConnectPopup() {
+  if (!window_ || !OSDPrettyPopup::ClickDismisses(mode_ == Mode::Popup)) {
+    return;
+  }
+  GtkGesture *click = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
+  gtk_widget_add_controller(window_, GTK_EVENT_CONTROLLER(click));
+  g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
+                     static_cast<OSDPretty *>(data)->HideNow();
+                   }),
+                   this);
+  GtkEventController *motion = gtk_event_controller_motion_new();
+  gtk_widget_add_controller(window_, motion);
+  g_signal_connect(motion, "enter", G_CALLBACK(+[](GtkEventControllerMotion *, gdouble, gdouble, gpointer data) {
+                     static_cast<OSDPretty *>(data)->SetHoverDim(true);
+                   }),
+                   this);
+  g_signal_connect(motion, "leave", G_CALLBACK(+[](GtkEventControllerMotion *, gpointer data) {
+                     static_cast<OSDPretty *>(data)->SetHoverDim(false);
+                   }),
+                   this);
+}
+
+void OSDPretty::HideNow() {
+  if (timeout_id_) {
+    g_source_remove(timeout_id_);
+    timeout_id_ = 0;
+  }
+  StopFade();
+  if (window_) {
+    gtk_widget_set_visible(window_, FALSE);
+  }
+}
+
+void OSDPretty::SetHoverDim(bool dimmed) {
+  if (!window_ || !OSDPrettyPopup::HoverDims(mode_ == Mode::Popup)) {
+    return;
+  }
+  hover_dimmed_ = dimmed;
+  gtk_widget_set_opacity(window_, dimmed ? OSDPrettyPopup::kHoverOpacity : 1.0);
+}
+
+void OSDPretty::SetSnapHighlight(bool snapped) {
+  if (!window_ || snap_highlight_ == snapped) {
+    return;
+  }
+  snap_highlight_ = snapped;
+  if (snapped) {
+    gtk_widget_add_css_class(window_, OSDPrettyPopup::kSnapClass);
+  } else {
+    gtk_widget_remove_css_class(window_, OSDPrettyPopup::kSnapClass);
+  }
 }
 
 void OSDPretty::OnDragBegin(GtkGestureDrag *, double, double, gpointer data) {
@@ -374,6 +428,8 @@ void OSDPretty::OnDragUpdate(GtkGestureDrag *, double offset_x, double offset_y,
                                                 : OSDPrettyPlacement::Rect{0, 0, 1920, 1080};
   const OSDPrettyPlacement::Rect size = WindowSize(self->window_);
   const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::DragPosition(workarea, raw, size.width, size.height);
+  const int center = workarea.x + workarea.width / 2 - size.width / 2;
+  self->SetSnapHighlight(OSDPrettyPlacement::IsSnappedToCenter(abs.x, center));
   const OSDPrettyPlacement::Point rel = OSDPrettyPlacement::RelativePosition(workarea, abs, size.width, size.height);
   self->pos_x_ = rel.x;
   self->pos_y_ = rel.y;
@@ -385,6 +441,7 @@ void OSDPretty::OnDragUpdate(GtkGestureDrag *, double offset_x, double offset_y,
 
 void OSDPretty::OnDragEnd(GtkGestureDrag *, double, double, gpointer data) {
   auto *self = static_cast<OSDPretty *>(data);
+  self->SetSnapHighlight(false);
   self->SavePosition();
 }
 
@@ -425,13 +482,17 @@ void OSDPretty::EnsureWindow() {
   gtk_box_append(GTK_BOX(box), text);
   gtk_window_set_child(GTK_WINDOW(window_), box);
   ConnectDrag();
+  ConnectPopup();
 }
 
 void OSDPretty::SetMessage(const std::string &summary, const std::string &message, const std::vector<unsigned char> &image) {
   EnsureWindow();
   gtk_label_set_text(GTK_LABEL(title_), summary.c_str());
   gtk_label_set_text(GTK_LABEL(body_), message.c_str());
-  if (show_art_ && !image.empty()) {
+  if (OSDPrettyPopup::HideArtWhenEmpty(show_art_, !image.empty())) {
+    gtk_widget_set_visible(image_, FALSE);
+  } else {
+    gtk_widget_set_visible(image_, TRUE);
     GdkPixbufLoader *loader = gdk_pixbuf_loader_new();
     if (gdk_pixbuf_loader_write(loader, image.data(), image.size(), nullptr) && gdk_pixbuf_loader_close(loader, nullptr)) {
       GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf(loader);
@@ -444,19 +505,29 @@ void OSDPretty::SetMessage(const std::string &summary, const std::string &messag
       }
     }
     g_object_unref(loader);
-  } else {
-    gtk_image_set_from_icon_name(GTK_IMAGE(image_), "audio-x-generic-symbolic");
   }
 }
 
 void OSDPretty::ShowMessage(const std::string &summary, const std::string &message, const std::vector<unsigned char> &image) {
+  EnsureWindow();
+  const bool visible = gtk_widget_get_visible(window_);
+  if (OSDPrettyPopup::ShouldHideOnRepeat(visible, mode_ == Mode::Popup, toggle_mode_)) {
+    toggle_mode_ = false;
+    HideNow();
+    return;
+  }
+  SetMessage(summary, message, image);
+  ApplyLimits();
+  if (OSDPrettyPopup::ShouldRestartTimeout(visible, mode_ == Mode::Popup, toggle_mode_)) {
+    StartHideTimeout();
+    return;
+  }
+  toggle_mode_ = false;
   if (timeout_id_) {
     g_source_remove(timeout_id_);
     timeout_id_ = 0;
   }
   StopFade();
-  SetMessage(summary, message, image);
-  ApplyLimits();
   if (fading_) {
     gtk_widget_set_opacity(window_, 0.0);
   }

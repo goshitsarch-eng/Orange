@@ -25,8 +25,12 @@ struct Point {
 
 inline int Clamp(int value, int min, int max) { return std::max(min, std::min(value, max)); }
 
+inline bool IsSnappedToCenter(int value, int center, int proximity = 20) {
+  return value > center - proximity && value < center + proximity;
+}
+
 inline int SnapCenter(int value, int center, int proximity = 20) {
-  if (value > center - proximity && value < center + proximity) {
+  if (IsSnappedToCenter(value, center, proximity)) {
     return center;
   }
   return value;

@@ -40,9 +40,13 @@ class OSDPretty {
   void ApplyPosition();
   void ApplyLimits();
   void ConnectDrag();
+  void ConnectPopup();
   void StopFade();
   void StartFade(bool fading_in);
   void StartHideTimeout();
+  void HideNow();
+  void SetHoverDim(bool dimmed);
+  void SetSnapHighlight(bool snapped);
   static void OnDragBegin(GtkGestureDrag *gesture, double x, double y, gpointer data);
   static void OnDragUpdate(GtkGestureDrag *gesture, double x, double y, gpointer data);
   static void OnDragEnd(GtkGestureDrag *gesture, double x, double y, gpointer data);
@@ -67,6 +71,9 @@ class OSDPretty {
   guint fade_id_ = 0;
   double drag_start_x_ = 0;
   double drag_start_y_ = 0;
+  bool toggle_mode_ = false;
+  bool hover_dimmed_ = false;
+  bool snap_highlight_ = false;
 };
 
 #endif

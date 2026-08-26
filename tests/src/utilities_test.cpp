@@ -1,6 +1,7 @@
 #include "utilities/strutils.h"
 #include "utilities/timeutils.h"
 #include "widgets/trackslidertime.h"
+#include "widgets/volumesliderwheel.h"
 #include "utilities/fileutils.h"
 #include "utilities/audioanalysis.h"
 #include "collection/collectiongrouping.h"
@@ -92,6 +93,25 @@ TEST(TrackSliderTime, DurationTogglesRemainingLikeQt) {
   EXPECT_EQ("-0:00", TrackSliderTime::DurationLabel(true, 180000000000LL, 180000000000LL));
   EXPECT_EQ("1:30 / -1:30", TrackSliderTime::PopupText(true, 90000000000LL, 180000000000LL));
   EXPECT_STREQ("Click to toggle remaining time", TrackSliderTime::DurationTooltip());
+}
+
+TEST(VolumeSliderWheel, AccumulatesNotchesAndPresets) {
+  EXPECT_EQ(30, VolumeSliderWheel::kRotationPerStep);
+  const VolumeSliderWheel::Result none = VolumeSliderWheel::FromAngleDelta(0, 0);
+  EXPECT_EQ(0, none.steps);
+  const VolumeSliderWheel::Result up = VolumeSliderWheel::FromAngleDelta(0, 30);
+  EXPECT_EQ(1, up.steps);
+  const VolumeSliderWheel::Result down = VolumeSliderWheel::FromAngleDelta(0, -30);
+  EXPECT_EQ(-1, down.steps);
+  const VolumeSliderWheel::Result gtk_up = VolumeSliderWheel::FromGtkScroll(0, -1.0);
+  EXPECT_EQ(1, gtk_up.steps);
+  EXPECT_EQ(55u, VolumeSliderWheel::ApplySteps(50, 5));
+  EXPECT_EQ(0u, VolumeSliderWheel::ApplySteps(2, -5));
+  EXPECT_EQ(100u, VolumeSliderWheel::ApplySteps(98, 5));
+  EXPECT_EQ("73%", VolumeSliderWheel::PercentLabel(73));
+  const auto presets = VolumeSliderWheel::Presets();
+  EXPECT_EQ(100, presets[0]);
+  EXPECT_EQ(0, presets[5]);
 }
 
 TEST(StrUtils, SplitJoin) {

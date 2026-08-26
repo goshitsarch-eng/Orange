@@ -260,6 +260,9 @@ TEST(CollectionItemDelegate, PrimarySecondaryAndIndent) {
   EXPECT_EQ(2, CollectionItemDelegate::Indent(&song));
   CollectionItem loading(CollectionItem::Type::LoadingIndicator);
   EXPECT_EQ("Loading…", CollectionItemDelegate::PrimaryText(&loading));
+  EXPECT_TRUE(CollectionItemDelegate::ShouldShowTooltip("Roads"));
+  EXPECT_FALSE(CollectionItemDelegate::ShouldShowTooltip({}));
+  EXPECT_EQ("Roads", CollectionItemDelegate::TooltipText("Roads"));
 }
 
 TEST(CollectionTree, ExpandKeysAndDragPayload) {

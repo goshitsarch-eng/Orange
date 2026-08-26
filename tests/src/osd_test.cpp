@@ -10,6 +10,7 @@
 #include "osd/osdprettyfade.h"
 #include "osd/osdprettylimits.h"
 #include "osd/osdprettyplacement.h"
+#include "osd/osdprettypopup.h"
 #include "utilities/colorutils.h"
 #include "utilities/fontutils.h"
 #include "queue/queueview.h"
@@ -165,6 +166,26 @@ TEST(OSDPrettyPlacement, RelativePosMarksDockedEdgesAndParsesSavedPoint) {
   EXPECT_EQ(50, parsed.y);
   const OSDPrettyPlacement::Point snapped = OSDPrettyPlacement::DragPosition(monitor, {790, 40}, 320, 80);
   EXPECT_EQ(800, snapped.x);
+  EXPECT_TRUE(OSDPrettyPlacement::IsSnappedToCenter(800, 800));
+  EXPECT_FALSE(OSDPrettyPlacement::IsSnappedToCenter(700, 800));
+}
+
+TEST(OSDPrettyPopup, ClickHoverArtAndRepeatMatchQt) {
+  EXPECT_TRUE(OSDPrettyPopup::ClickDismisses(true));
+  EXPECT_FALSE(OSDPrettyPopup::ClickDismisses(false));
+  EXPECT_TRUE(OSDPrettyPopup::HoverDims(true));
+  EXPECT_FALSE(OSDPrettyPopup::DragEnabled(false));
+  EXPECT_TRUE(OSDPrettyPopup::DragEnabled(true));
+  EXPECT_TRUE(OSDPrettyPopup::HideArtWhenEmpty(true, false));
+  EXPECT_FALSE(OSDPrettyPopup::HideArtWhenEmpty(true, true));
+  EXPECT_TRUE(OSDPrettyPopup::ShouldHideOnRepeat(true, true, true));
+  EXPECT_TRUE(OSDPrettyPopup::ShouldRestartTimeout(true, true, false));
+  EXPECT_FALSE(OSDPrettyPopup::ShouldRestartTimeout(false, true, false));
+  EXPECT_DOUBLE_EQ(0.25, OSDPrettyPopup::kHoverOpacity);
+  EXPECT_STREQ("osd-pretty-snapped", OSDPrettyPopup::kSnapClass);
+  const std::string css = OSDPrettyPopup::ChromeCss("#202020", "#ffffff", 0.92, "12pt \"Sans\"");
+  EXPECT_NE(std::string::npos, css.find("box-shadow"));
+  EXPECT_NE(std::string::npos, css.find(".osd-pretty-snapped"));
 }
 
 TEST(FontUtils, ParsesQtAndPangoAndWritesCss) {
