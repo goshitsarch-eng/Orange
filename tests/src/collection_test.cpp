@@ -1,4 +1,5 @@
 #include "collection/collectionautoopen.h"
+#include "collection/collectionempty.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectionbackend.h"
 #include "collection/collectionbehaviour.h"
@@ -742,6 +743,20 @@ TEST(CollectionAutoOpen, DrillsSingleChildAndMatchesQtBudget) {
     node->AddChild(CollectionItem::Type::Song)->metadata = MakeSong("T", node->key, "A");
   }
   EXPECT_TRUE(CollectionAutoOpen::RecursivelyExpandKeys(&crowded, true).empty());
+}
+
+TEST(CollectionEmpty, UsesQtCopyAndOpensOnPrimaryClick) {
+  EXPECT_STREQ("Your collection is empty!", CollectionEmpty::Title());
+  EXPECT_STREQ("Click here to add some music", CollectionEmpty::Hint());
+  EXPECT_STREQ("The streaming collection is empty!", CollectionEmpty::StreamingTitle());
+  EXPECT_STREQ("Click here to retrieve music", CollectionEmpty::StreamingHint());
+  EXPECT_STREQ("No matches", CollectionEmpty::NoMatches());
+  EXPECT_STREQ("/org/strawberrymusicplayer/Strawberry/pictures/nomusic.png", CollectionEmpty::kResourcePath);
+  EXPECT_TRUE(CollectionEmpty::IsEmptyCollection(0));
+  EXPECT_FALSE(CollectionEmpty::IsEmptyCollection(1));
+  EXPECT_TRUE(CollectionEmpty::OpensOnPrimaryClick(true, CollectionTreeClick::kPrimaryButton));
+  EXPECT_FALSE(CollectionEmpty::OpensOnPrimaryClick(true, CollectionTreeClick::kMiddleButton));
+  EXPECT_FALSE(CollectionEmpty::OpensOnPrimaryClick(false, CollectionTreeClick::kPrimaryButton));
 }
 
 TEST(CollectionTreeClick, MatchesQtAutoExpandingTreeView) {

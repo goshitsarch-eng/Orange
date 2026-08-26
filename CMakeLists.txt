@@ -133,7 +133,7 @@ add_custom_command(
           --sourcedir=${CMAKE_CURRENT_SOURCE_DIR}/data
           --generate-source
           ${GRESOURCE_XML}
-  DEPENDS ${GRESOURCE_XML} ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema.sql
+  DEPENDS ${GRESOURCE_XML} ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema.sql ${CMAKE_CURRENT_SOURCE_DIR}/data/pictures/nomusic.png
   VERBATIM
 )
 

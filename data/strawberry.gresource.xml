@@ -2,5 +2,6 @@
 <gresources>
   <gresource prefix="/org/strawberrymusicplayer/Strawberry">
     <file>schema/schema.sql</file>
+    <file>pictures/nomusic.png</file>
   </gresource>
 </gresources>

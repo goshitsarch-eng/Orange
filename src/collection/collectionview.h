@@ -19,6 +19,7 @@ class CollectionView {
  public:
   using ActivateCallback = std::function<void(const SongList &)>;
   using EnqueueCallback = std::function<void(const SongList &)>;
+  using EmptyCallback = std::function<void()>;
   using MenuCallback = std::function<void(double x, double y)>;
 
   CollectionView();
@@ -34,6 +35,7 @@ class CollectionView {
   void SetFilterString(const std::string &filter);
   void SetActivateCallback(ActivateCallback callback);
   void SetEnqueueCallback(EnqueueCallback callback);
+  void SetEmptyCallback(EmptyCallback callback);
   void SetMenuCallback(MenuCallback callback);
   void SetCoverLoader(AlbumCoverLoader *loader) { cover_loader_ = loader; }
   void ApplyLook();
@@ -56,12 +58,15 @@ class CollectionView {
   gboolean OnKeyPressed(guint keyval);
   void ActivateRow(GtkListBoxRow *row);
   void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
+  GtkWidget *CreateEmptyPlaceholder(bool collection_empty) const;
+  void OpenEmptyIfNeeded(GtkListBoxRow *row, guint button);
 
   CollectionModel model_;
   CollectionFilter filter_;
   CollectionGrouping::Grouping grouping_;
   ActivateCallback activate_;
   EnqueueCallback enqueue_;
+  EmptyCallback empty_;
   MenuCallback menu_;
   AlbumCoverLoader *cover_loader_ = nullptr;
   GtkWidget *widget_ = nullptr;

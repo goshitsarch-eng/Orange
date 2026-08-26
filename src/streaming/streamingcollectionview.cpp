@@ -1,5 +1,6 @@
 #include "streaming/streamingcollectionview.h"
 
+#include "collection/collectionempty.h"
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectiontree.h"
@@ -83,6 +84,10 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list_);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<StreamingCollectionView *>(data);
+                     if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "empty-streaming")) && self->refresh_) {
+                       self->refresh_();
+                       return;
+                     }
                      auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
                      if (CollectionTree::IsExpandable(item)) {
                        self->ToggleExpanded(item);
@@ -302,7 +307,40 @@ void StreamingCollectionView::Rebuild() {
   model_.Reset(visible, grouping_, CollectionGrouping::SeparateAlbumsByGrouping(), false, false);
   if (visible.empty()) {
     GtkWidget *row = gtk_list_box_row_new();
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), gtk_label_new(songs_.empty() ? "No items. Refresh to load." : "No matches"));
+    const bool collection_empty = CollectionEmpty::IsEmptyCollection(static_cast<int>(songs_.size()));
+    if (collection_empty) {
+      GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+      gtk_widget_set_margin_top(box, 24);
+      gtk_widget_set_margin_bottom(box, 24);
+      gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
+      GtkWidget *image = gtk_image_new_from_resource(CollectionEmpty::kResourcePath);
+      gtk_image_set_pixel_size(GTK_IMAGE(image), 75);
+      gtk_widget_set_halign(image, GTK_ALIGN_CENTER);
+      GtkWidget *title = gtk_label_new(Translations::CStr(CollectionEmpty::StreamingTitle()));
+      gtk_widget_add_css_class(title, "heading");
+      gtk_widget_set_halign(title, GTK_ALIGN_CENTER);
+      GtkWidget *hint = gtk_label_new(Translations::CStr(CollectionEmpty::StreamingHint()));
+      gtk_widget_add_css_class(hint, "dim-label");
+      gtk_widget_set_halign(hint, GTK_ALIGN_CENTER);
+      gtk_box_append(GTK_BOX(box), image);
+      gtk_box_append(GTK_BOX(box), title);
+      gtk_box_append(GTK_BOX(box), hint);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+      g_object_set_data(G_OBJECT(row), "empty-streaming", GINT_TO_POINTER(1));
+      gtk_widget_set_cursor_from_name(row, "pointer");
+      GtkGesture *click = gtk_gesture_click_new();
+      gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
+      gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(click));
+      g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
+                         auto *self = static_cast<StreamingCollectionView *>(data);
+                         if (self->refresh_) {
+                           self->refresh_();
+                         }
+                       }),
+                       this);
+    } else {
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), gtk_label_new(Translations::CStr(CollectionEmpty::NoMatches())));
+    }
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
     SetStatus(songs_.empty() ? "0 items" : "0 shown");
     return;

@@ -2,6 +2,7 @@
 
 #include "collection/collectionautoopen.h"
 #include "collection/collectionbehaviour.h"
+#include "collection/collectionempty.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectiondivider.h"
 #include "collection/collectioniconcache.h"
@@ -80,11 +81,47 @@ void CollectionView::SetActivateCallback(ActivateCallback callback) { activate_ 
 
 void CollectionView::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
 
+void CollectionView::SetEmptyCallback(EmptyCallback callback) { empty_ = std::move(callback); }
+
 void CollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
+GtkWidget *CollectionView::CreateEmptyPlaceholder(bool collection_empty) const {
+  if (!collection_empty) {
+    return gtk_label_new(Translations::CStr(CollectionEmpty::NoMatches()));
+  }
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_top(box, 24);
+  gtk_widget_set_margin_bottom(box, 24);
+  gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
+  GtkWidget *image = gtk_image_new_from_resource(CollectionEmpty::kResourcePath);
+  gtk_image_set_pixel_size(GTK_IMAGE(image), 75);
+  gtk_widget_set_halign(image, GTK_ALIGN_CENTER);
+  GtkWidget *title = gtk_label_new(Translations::CStr(CollectionEmpty::Title()));
+  gtk_widget_add_css_class(title, "heading");
+  gtk_widget_set_halign(title, GTK_ALIGN_CENTER);
+  GtkWidget *hint = gtk_label_new(Translations::CStr(CollectionEmpty::Hint()));
+  gtk_widget_add_css_class(hint, "dim-label");
+  gtk_widget_set_halign(hint, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(box), image);
+  gtk_box_append(GTK_BOX(box), title);
+  gtk_box_append(GTK_BOX(box), hint);
+  return box;
+}
+
+void CollectionView::OpenEmptyIfNeeded(GtkListBoxRow *row, guint button) {
+  if (!row || !empty_) {
+    return;
+  }
+  const bool empty_collection = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "empty-collection")) != 0;
+  if (CollectionEmpty::OpensOnPrimaryClick(empty_collection, button)) {
+    empty_();
+  }
+}
+
 void CollectionView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
-  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
   GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(list_), static_cast<int>(y));
+  OpenEmptyIfNeeded(row, button);
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
   if (action == CollectionTreeClick::Action::Enqueue) {
     if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
       gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
@@ -129,6 +166,7 @@ void CollectionView::SetModelSongs(const SongList &songs, const CollectionGroupi
 }
 
 void CollectionView::ActivateRow(GtkListBoxRow *row) {
+  OpenEmptyIfNeeded(row, CollectionTreeClick::kPrimaryButton);
   auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
   if (item && !CollectionItemDelegate::IsDivider(item) && activate_) {
     activate_(model_.SongsFromItem(item));
@@ -295,15 +333,19 @@ void CollectionView::Rebuild() {
     gtk_list_box_remove(GTK_LIST_BOX(list_), child);
     child = next;
   }
-  if (!model_.root()) {
-    return;
-  }
-  for (const auto &child : model_.root()->children) {
-    AppendItem(list_, child.get(), 0);
+  if (model_.root()) {
+    for (const auto &child : model_.root()->children) {
+      AppendItem(list_, child.get(), 0);
+    }
   }
   if (!gtk_widget_get_first_child(list_)) {
+    const bool collection_empty = CollectionEmpty::IsEmptyCollection(model_.TotalSongs());
     GtkWidget *row = gtk_list_box_row_new();
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), gtk_label_new(Translations::CStr("Collection is empty")));
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), CreateEmptyPlaceholder(collection_empty));
+    if (collection_empty) {
+      g_object_set_data(G_OBJECT(row), "empty-collection", GINT_TO_POINTER(1));
+      gtk_widget_set_cursor_from_name(row, "pointer");
+    }
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
 }
