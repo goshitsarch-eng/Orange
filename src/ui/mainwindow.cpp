@@ -17,6 +17,7 @@
 #include "fileview/fileviewsongs.h"
 #include "playlist/playlistcontainer.h"
 #include "playlist/playlistfolders.h"
+#include "playlist/playlisttabnav.h"
 #include "playlist/playlistlistdrop.h"
 #include "radios/radiodrag.h"
 #include "radios/radiomenu.h"
@@ -207,6 +208,10 @@ void MainWindow::BuildUi() {
   g_menu_append(playlist, Translations::Tr("Renumber tracks").c_str(), "win.renumber-tracks");
   g_menu_append(playlist, Translations::Tr("Skip selected tracks").c_str(), "win.playlist-skip");
   g_menu_append(playlist, Translations::Tr("Jump to playing track").c_str(), "win.jump-playing");
+  g_menu_append(playlist, Translations::Tr("Go to next playlist tab").c_str(), "win.next-playlist");
+  g_menu_append(playlist, Translations::Tr("Go to previous playlist tab").c_str(), "win.previous-playlist");
+  g_menu_append(playlist, Translations::Tr("Go to last playlist tab").c_str(), "win.last-playlist");
+  g_menu_append(playlist, Translations::Tr("Go to active playlist tab").c_str(), "win.active-playlist");
   g_menu_append(playlist, Translations::Tr("Rescan selected songs").c_str(), "win.rescan-selected");
   g_menu_append(playlist, Translations::Tr("Fetch streaming metadata").c_str(), "win.fetch-metadata");
   g_menu_append(playlist, Translations::Tr("Auto-complete tags…").c_str(), "win.autocomplete-tags");
@@ -403,6 +408,10 @@ void MainWindow::BuildUi() {
   add_action("focus-search", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->FocusCollectionSearch(); }));
   add_action("playlist-skip", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SkipSelected(); }));
   add_action("jump-playing", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->JumpToPlaying(); }));
+  add_action("next-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->NextPlaylistTab(); }));
+  add_action("previous-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->PreviousPlaylistTab(); }));
+  add_action("last-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->LastPlaylistTab(); }));
+  add_action("active-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ActivePlaylistTab(); }));
   add_action("rescan-selected", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RescanSelected(); }));
   add_action("fetch-metadata", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->FetchStreamingMetadata(); }));
   add_action("autocomplete-tags", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AutoCompleteTags(); }));
@@ -797,6 +806,12 @@ void MainWindow::BuildUi() {
   set_accels("win.save-playlist", "<Control>s");
   set_accels("win.preferences", "<Control>comma");
   set_accels("win.quit", "<Control>q");
+  const char *next_accels[] = {"<Control>Tab", "<Control>Page_Down", nullptr};
+  gtk_application_set_accels_for_action(GTK_APPLICATION(gtk_app_), "win.next-playlist", next_accels);
+  const char *prev_accels[] = {"<Control><Shift>Tab", "<Control>Page_Up", nullptr};
+  gtk_application_set_accels_for_action(GTK_APPLICATION(gtk_app_), "win.previous-playlist", prev_accels);
+  set_accels("win.last-playlist", "<Control>9");
+  set_accels("win.active-playlist", "<Control><Shift>p");
 }
 
 void MainWindow::BuildSidebar() {
@@ -1679,6 +1694,71 @@ void MainWindow::RefreshPlaylist() {
     playlist_container_->SetSummary("");
     playlist_container_->dynamic_controls()->SetVisible(false);
   }
+}
+
+void MainWindow::GoToPlaylistIndex(int index) {
+  if (!app_ || !app_->playlist_manager() || index < 0) {
+    return;
+  }
+  const auto &playlists = app_->playlist_manager()->playlists();
+  if (index >= static_cast<int>(playlists.size())) {
+    return;
+  }
+  app_->playlist_manager()->SetCurrentPlaylist(playlists[static_cast<size_t>(index)]->id());
+  RefreshPlaylistsList();
+  RefreshPlaylist();
+}
+
+void MainWindow::NextPlaylistTab() {
+  if (!app_ || !app_->playlist_manager()) {
+    return;
+  }
+  const auto &playlists = app_->playlist_manager()->playlists();
+  int current = -1;
+  for (size_t i = 0; i < playlists.size(); ++i) {
+    if (playlists[i].get() == app_->playlist_manager()->current()) {
+      current = static_cast<int>(i);
+      break;
+    }
+  }
+  GoToPlaylistIndex(PlaylistTabNavigation::NextIndex(current, static_cast<int>(playlists.size())));
+}
+
+void MainWindow::PreviousPlaylistTab() {
+  if (!app_ || !app_->playlist_manager()) {
+    return;
+  }
+  const auto &playlists = app_->playlist_manager()->playlists();
+  int current = -1;
+  for (size_t i = 0; i < playlists.size(); ++i) {
+    if (playlists[i].get() == app_->playlist_manager()->current()) {
+      current = static_cast<int>(i);
+      break;
+    }
+  }
+  GoToPlaylistIndex(PlaylistTabNavigation::PreviousIndex(current, static_cast<int>(playlists.size())));
+}
+
+void MainWindow::LastPlaylistTab() {
+  if (!app_ || !app_->playlist_manager()) {
+    return;
+  }
+  GoToPlaylistIndex(PlaylistTabNavigation::LastIndex(static_cast<int>(app_->playlist_manager()->playlists().size())));
+}
+
+void MainWindow::ActivePlaylistTab() {
+  if (!app_ || !app_->playlist_manager()) {
+    return;
+  }
+  const auto &playlists = app_->playlist_manager()->playlists();
+  int active = -1;
+  for (size_t i = 0; i < playlists.size(); ++i) {
+    if (playlists[i].get() == app_->playlist_manager()->active()) {
+      active = static_cast<int>(i);
+      break;
+    }
+  }
+  GoToPlaylistIndex(PlaylistTabNavigation::ActiveIndex(active, static_cast<int>(playlists.size())));
 }
 
 void MainWindow::RefreshPlaylistsList() {

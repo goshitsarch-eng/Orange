@@ -9,6 +9,7 @@
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
 #include "playlist/playlistsaveoptionsdialog.h"
+#include "playlist/playlisttabnav.h"
 #include "playlist/playlisttagcompletion.h"
 #include "playlist/songloaderinserter.h"
 #include "playlist/playlistratingclick.h"
@@ -430,4 +431,19 @@ TEST(PlaylistListModel, StoresIdsThroughFilter) {
   EXPECT_EQ(4, rows[0].id);
   EXPECT_EQ("Queue", rows[1].name);
   EXPECT_EQ(7, rows[1].id);
+}
+
+TEST(PlaylistTabNavigation, WrapsLikeQtShortcuts) {
+  EXPECT_EQ(-1, PlaylistTabNavigation::NextIndex(0, 0));
+  EXPECT_EQ(1, PlaylistTabNavigation::NextIndex(0, 3));
+  EXPECT_EQ(0, PlaylistTabNavigation::NextIndex(2, 3));
+  EXPECT_EQ(0, PlaylistTabNavigation::NextIndex(-1, 3));
+  EXPECT_EQ(1, PlaylistTabNavigation::PreviousIndex(2, 3));
+  EXPECT_EQ(2, PlaylistTabNavigation::PreviousIndex(0, 3));
+  EXPECT_EQ(2, PlaylistTabNavigation::PreviousIndex(-1, 3));
+  EXPECT_EQ(2, PlaylistTabNavigation::LastIndex(3));
+  EXPECT_EQ(-1, PlaylistTabNavigation::LastIndex(0));
+  EXPECT_EQ(1, PlaylistTabNavigation::ActiveIndex(1, 3));
+  EXPECT_EQ(-1, PlaylistTabNavigation::ActiveIndex(5, 3));
+  EXPECT_EQ(-1, PlaylistTabNavigation::ActiveIndex(-1, 3));
 }

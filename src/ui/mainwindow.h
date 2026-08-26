@@ -86,6 +86,11 @@ class MainWindow {
   void ApplyAnalyzer();
   void RunSmartPlaylist(const std::string &kind);
   void RefreshPlaylistTabs();
+  void GoToPlaylistIndex(int index);
+  void NextPlaylistTab();
+  void PreviousPlaylistTab();
+  void LastPlaylistTab();
+  void ActivePlaylistTab();
   void PlayRadioChannel(const RadioChannel &channel);
   void ShowPlaylistMenu(double x, double y);
   void ShowCollectionMenu();
