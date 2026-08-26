@@ -1152,6 +1152,20 @@ TEST(MainWindowKeyboard, MatchesQtTransportKeys) {
   EXPECT_STREQ("F6", MainWindowKeyboard::PlayPauseAccel());
   EXPECT_STREQ("F7", MainWindowKeyboard::StopAccel());
   EXPECT_STREQ("F8", MainWindowKeyboard::NextAccel());
+  EXPECT_STREQ("F1", MainWindowKeyboard::AboutAccel());
+  EXPECT_STREQ("<Control>l", MainWindowKeyboard::LoveAccel());
+  EXPECT_STREQ("<Control><Alt>v", MainWindowKeyboard::StopAfterAccel());
+  EXPECT_STREQ("<Control><Shift>h", MainWindowKeyboard::ShuffleAccel());
+  EXPECT_STREQ("<Control><Shift>a", MainWindowKeyboard::AddFileAccel());
+  EXPECT_STREQ("<Control>o", MainWindowKeyboard::OpenFilesAccel());
+  EXPECT_STREQ("<Control>j", MainWindowKeyboard::JumpAccel());
+  EXPECT_STREQ("<Control><Shift>o", MainWindowKeyboard::LoadPlaylistAccel());
+  EXPECT_STREQ("<Control>t", MainWindowKeyboard::AutoCompleteTagsAccel());
+  EXPECT_STREQ("<Control><Shift>t", MainWindowKeyboard::TranscodeSelectedAccel());
+  EXPECT_STREQ("<Control>k", MainWindowKeyboard::ClearPlaylistAccel());
+  EXPECT_STREQ("<Control>e", MainWindowKeyboard::EditTrackAccel());
+  EXPECT_STREQ("<Control>p", MainWindowKeyboard::SettingsAccel());
+  EXPECT_STREQ("<Control>comma", MainWindowKeyboard::SettingsCommaAccel());
 }
 
 TEST(FilterSearchKeyboard, MatchesCollectionFilterKeys) {

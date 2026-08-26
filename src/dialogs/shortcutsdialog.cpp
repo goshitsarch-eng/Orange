@@ -11,7 +11,9 @@ void ShortcutsDialog::Show(GtkWindow *parent) {
       "Space  Play/Pause\nLeft  Seek backward\nRight  Seek forward\n"
       "F5  Previous track\nF6  Play/Pause\nF7  Stop\nF8  Next track\n"
       "Ctrl+Z  Undo\nCtrl+Shift+Z  Redo\nCtrl+N  New playlist\nCtrl+O  Open files\nCtrl+S  Save playlist\n"
-      "F2  Edit playlist value\nCtrl+F  Focus collection search\nCtrl+Q  Quit\nCtrl+,  Preferences");
+      "Ctrl+Shift+O  Load playlist\nCtrl+K  Clear playlist\nCtrl+J  Jump to playing track\n"
+      "Ctrl+L  Love\nCtrl+E  Edit tags\nCtrl+T  Auto-complete tags\n"
+      "F2  Edit playlist value\nCtrl+F  Focus collection search\nF1  About\nCtrl+Q  Quit\nCtrl+,  Preferences");
   gtk_widget_set_margin_start(label, 24);
   gtk_widget_set_margin_end(label, 24);
   gtk_widget_set_margin_top(label, 24);

@@ -51,6 +51,20 @@ inline const char *PlayPauseAccel() { return "F6"; }
 inline const char *StopAccel() { return "F7"; }
 inline const char *PreviousAccel() { return "F5"; }
 inline const char *NextAccel() { return "F8"; }
+inline const char *AboutAccel() { return "F1"; }
+inline const char *LoveAccel() { return "<Control>l"; }
+inline const char *StopAfterAccel() { return "<Control><Alt>v"; }
+inline const char *ShuffleAccel() { return "<Control><Shift>h"; }
+inline const char *AddFileAccel() { return "<Control><Shift>a"; }
+inline const char *OpenFilesAccel() { return "<Control>o"; }
+inline const char *JumpAccel() { return "<Control>j"; }
+inline const char *LoadPlaylistAccel() { return "<Control><Shift>o"; }
+inline const char *AutoCompleteTagsAccel() { return "<Control>t"; }
+inline const char *TranscodeSelectedAccel() { return "<Control><Shift>t"; }
+inline const char *ClearPlaylistAccel() { return "<Control>k"; }
+inline const char *EditTrackAccel() { return "<Control>e"; }
+inline const char *SettingsAccel() { return "<Control>p"; }
+inline const char *SettingsCommaAccel() { return "<Control>comma"; }
 
 }  // namespace MainWindowKeyboard
 

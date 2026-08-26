@@ -869,9 +869,11 @@ void MainWindow::BuildUi() {
   set_accels("win.undo", "<Control>z");
   set_accels("win.redo", "<Control><Shift>z");
   set_accels("win.new-playlist", "<Control>n");
-  set_accels("win.open-files", "<Control>o");
+  const char *open_accels[] = {MainWindowKeyboard::OpenFilesAccel(), MainWindowKeyboard::AddFileAccel(), nullptr};
+  gtk_application_set_accels_for_action(GTK_APPLICATION(gtk_app_), "win.open-files", open_accels);
   set_accels("win.save-playlist", "<Control>s");
-  set_accels("win.preferences", "<Control>comma");
+  const char *pref_accels[] = {MainWindowKeyboard::SettingsCommaAccel(), MainWindowKeyboard::SettingsAccel(), nullptr};
+  gtk_application_set_accels_for_action(GTK_APPLICATION(gtk_app_), "win.preferences", pref_accels);
   set_accels("win.quit", "<Control>q");
   const char *next_accels[] = {"<Control>Tab", "<Control>Page_Down", nullptr};
   gtk_application_set_accels_for_action(GTK_APPLICATION(gtk_app_), "win.next-playlist", next_accels);
@@ -887,6 +889,16 @@ void MainWindow::BuildUi() {
   set_accels("win.stop", MainWindowKeyboard::StopAccel());
   set_accels("win.previous-track", MainWindowKeyboard::PreviousAccel());
   set_accels("win.next-track", MainWindowKeyboard::NextAccel());
+  set_accels("win.about", MainWindowKeyboard::AboutAccel());
+  set_accels("win.love", MainWindowKeyboard::LoveAccel());
+  set_accels("win.stop-after", MainWindowKeyboard::StopAfterAccel());
+  set_accels("win.shuffle-playlist", MainWindowKeyboard::ShuffleAccel());
+  set_accels("win.jump-playing", MainWindowKeyboard::JumpAccel());
+  set_accels("win.load-playlist", MainWindowKeyboard::LoadPlaylistAccel());
+  set_accels("win.autocomplete-tags", MainWindowKeyboard::AutoCompleteTagsAccel());
+  set_accels("win.transcode-selected", MainWindowKeyboard::TranscodeSelectedAccel());
+  set_accels("win.clear-playlist", MainWindowKeyboard::ClearPlaylistAccel());
+  set_accels("win.edittag", MainWindowKeyboard::EditTrackAccel());
 
   GtkEventController *capture_keys = gtk_event_controller_key_new();
   gtk_event_controller_set_propagation_phase(capture_keys, GTK_PHASE_CAPTURE);
