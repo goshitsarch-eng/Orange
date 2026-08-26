@@ -74,7 +74,7 @@ std::string CollectionQuery::Sql() const {
   std::string sql = "SELECT " + column_spec_ + " FROM " + songs_table_ + GetInnerQuery();
   std::vector<std::string> where = where_clauses_;
   if (!include_unavailable_) {
-    where.push_back("unavailable = 0");
+    where.push_back(songs_table_ + ".unavailable = 0");
   }
   if (!where.empty()) {
     sql += " WHERE " + StrUtils::Join(where, " AND ");

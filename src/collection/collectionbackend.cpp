@@ -102,7 +102,7 @@ SongList CollectionBackend::Songs(const CollectionFilterOptions &options) const 
     return songs;
   }
   CollectionQuery query(database_, "songs", options);
-  query.SetColumnSpec("ROWID, " + std::string(Song::kColumnSpec));
+  query.SetColumnSpec("songs.ROWID, " + std::string(Song::kColumnSpec));
   query.SetOrderBy("effective_albumartist, album, disc, track, title");
   if (!query.Exec()) {
     return songs;

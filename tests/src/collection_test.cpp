@@ -103,10 +103,10 @@ TEST(CollectionQuery, BindsStringsAndInlinesIntegers) {
   query.SetLimit(10);
   const std::string sql = query.Sql();
   EXPECT_EQ("SELECT ROWID, title FROM songs WHERE artist = ? AND year = 1994 AND length = 180000000000 AND "
-            "+compilation_effective = 1 AND unavailable = 0 ORDER BY title LIMIT 10",
+            "+compilation_effective = 1 AND songs.unavailable = 0 ORDER BY title LIMIT 10",
             sql);
   query.AddWhereIn("title", {});
-  EXPECT_NE(std::string::npos, query.Sql().find(" AND 0 AND unavailable = 0"));
+  EXPECT_NE(std::string::npos, query.Sql().find(" AND 0 AND songs.unavailable = 0"));
 }
 
 TEST(CollectionFilter, UsesFilterParserOnSongsAndItems) {
