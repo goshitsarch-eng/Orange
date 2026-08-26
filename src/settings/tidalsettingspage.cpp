@@ -62,6 +62,7 @@ AdwPreferencesPage *TidalSettingsPage::Create(Settings *settings, Application *a
                                   }
                                 });
     });
+    SettingsPage::AddLoginState(group, app, "Tidal");
   }
   return page;
 }

@@ -9,8 +9,10 @@
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistcontainer.h"
 #include "playlist/playlistlistcontainer.h"
+#include "fileview/fileview.h"
 #include "playlist/playlistsequence.h"
 #include "streaming/streamingtabsview.h"
+#include "widgets/multiloadingindicator.h"
 #include "widgets/playingwidget.h"
 #include "widgets/trackslider.h"
 #include "widgets/volumeslider.h"
@@ -94,9 +96,10 @@ class MainWindow {
   std::unique_ptr<PlayingWidget> playing_widget_;
   std::unique_ptr<TrackSlider> track_slider_;
   std::unique_ptr<VolumeSlider> volume_slider_;
+  std::unique_ptr<FileView> file_view_;
+  std::unique_ptr<MultiLoadingIndicator> loading_indicator_;
   GtkWidget *queue_list_ = nullptr;
   GtkWidget *radio_list_ = nullptr;
-  GtkWidget *files_list_ = nullptr;
   GtkWidget *devices_list_ = nullptr;
   GtkWidget *smart_list_ = nullptr;
   GtkWidget *streaming_list_ = nullptr;
@@ -110,7 +113,6 @@ class MainWindow {
   GtkWidget *waveform_drawing_ = nullptr;
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;
-  std::string files_path_;
   std::string device_browse_id_;
   std::string streaming_service_name_;
   std::string radio_query_;

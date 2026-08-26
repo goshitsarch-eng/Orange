@@ -6,6 +6,7 @@
 #include "covermanager/albumcoverloaderoptions.h"
 #include "covermanager/coverexportrunnable.h"
 #include "covermanager/coversearchstatistics.h"
+#include "covermanager/coversearchstatisticsdialog.h"
 #include "covermanager/currentalbumcoverloader.h"
 #include "utilities/fileutils.h"
 
@@ -14,6 +15,19 @@
 #include <unistd.h>
 
 #include <string>
+
+TEST(CoverSearchStatisticsDialog, SummaryIncludesCounts) {
+  CoverSearchStatistics stats;
+  stats.network_requests_made = 3;
+  stats.chosen_images = 2;
+  stats.missing_images = 1;
+  stats.total_images_by_provider["Last.fm"] = 4;
+  stats.chosen_images_by_provider["Last.fm"] = 2;
+  const std::string text = CoverSearchStatisticsDialog::SummaryText(stats);
+  EXPECT_NE(std::string::npos, text.find("Network requests: 3"));
+  EXPECT_NE(std::string::npos, text.find("Chosen images: 2"));
+  EXPECT_NE(std::string::npos, text.find("Last.fm"));
+}
 
 TEST(CoverSearchStatistics, AverageDimensionsAndAccumulate) {
   CoverSearchStatistics empty;

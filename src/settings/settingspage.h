@@ -19,6 +19,7 @@ void AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, 
 void AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback = "");
 void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback);
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked);
+void AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name);
 
 }  // namespace SettingsPage
 

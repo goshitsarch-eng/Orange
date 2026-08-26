@@ -149,6 +149,7 @@ set(STRAWBERRY_SOURCES
   src/core/application.cpp
   src/core/urlhandlers.cpp
   src/core/oauthenticator.cpp
+  src/core/songloader.cpp
   src/utilities/timeutils.cpp
   src/utilities/fileutils.cpp
   src/utilities/strutils.cpp
@@ -204,6 +205,10 @@ set(STRAWBERRY_SOURCES
   src/playlist/dynamicplaylistcontrols.cpp
   src/playlist/playlistsaveoptionsdialog.cpp
   src/playlist/playlistcolumnsdialog.cpp
+  src/fileview/fileviewtreemodel.cpp
+  src/fileview/fileviewlist.cpp
+  src/fileview/fileviewtree.cpp
+  src/fileview/fileview.cpp
   src/playlist/playlistbackend.cpp
   src/playlist/playlistmanager.cpp
   src/widgets/ratingpainter.cpp
@@ -215,6 +220,13 @@ set(STRAWBERRY_SOURCES
   src/widgets/volumeslider.cpp
   src/widgets/favoritewidget.cpp
   src/widgets/playingwidget.cpp
+  src/widgets/loginstatewidget.cpp
+  src/widgets/busyindicator.cpp
+  src/widgets/searchfield.cpp
+  src/widgets/clickablelabel.cpp
+  src/widgets/freespacebar.cpp
+  src/widgets/groupediconview.cpp
+  src/widgets/multiloadingindicator.cpp
   src/context/contextalbum.cpp
   src/context/contextview.cpp
   src/queue/queue.cpp
@@ -243,6 +255,8 @@ set(STRAWBERRY_SOURCES
   src/covermanager/albumcoversearcher.cpp
   src/covermanager/albumcoverexportdialog.cpp
   src/covermanager/coverfromurldialog.cpp
+  src/covermanager/albumcoverchoicecontroller.cpp
+  src/covermanager/coversearchstatisticsdialog.cpp
   src/covermanager/lastfmcoverprovider.cpp
   src/covermanager/musicbrainzcoverprovider.cpp
   src/covermanager/deezercoverprovider.cpp
@@ -456,6 +470,8 @@ if(GTest_FOUND)
     tests/src/lastfmcover_test.cpp
     tests/src/coverprovider_test.cpp
     tests/src/albumcover_test.cpp
+    tests/src/songloader_test.cpp
+    tests/src/fileview_test.cpp
     tests/src/scrobbler_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
@@ -469,6 +485,8 @@ if(GTest_FOUND)
     src/core/taskmanager.cpp
     src/core/network.cpp
     src/core/oauthenticator.cpp
+    src/core/songloader.cpp
+    src/core/urlhandlers.cpp
     src/utilities/timeutils.cpp
     src/utilities/fileutils.cpp
     src/utilities/strutils.cpp
@@ -560,6 +578,8 @@ if(GTest_FOUND)
     src/playlist/playlistlistsortfiltermodel.cpp
     src/playlist/playlistsaveoptionsdialog.cpp
     src/playlist/songloaderinserter.cpp
+    src/fileview/fileviewtreemodel.cpp
+    src/covermanager/coversearchstatisticsdialog.cpp
     src/widgets/ratingpainter.cpp
     src/collection/collectionbackend.cpp
     src/collection/collectiongrouping.cpp

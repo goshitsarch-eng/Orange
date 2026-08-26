@@ -4,10 +4,12 @@
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
 #include "context/contextview.h"
+#include "fileview/fileview.h"
 #include "playlist/playlistcontainer.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistsequence.h"
+#include "widgets/multiloadingindicator.h"
 #include "widgets/playingwidget.h"
 #include "widgets/trackslider.h"
 #include "widgets/volumeslider.h"
@@ -72,18 +74,10 @@ GtkWidget *MakeScrolledList(GtkWidget **list_out) {
   return scroll;
 }
 
-const char *HomeOrMusic() {
-  const char *music = g_get_user_special_dir(G_USER_DIRECTORY_MUSIC);
-  if (music && *music) {
-    return music;
-  }
-  return g_get_home_dir();
-}
-
 }  // namespace
 
 MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const CommandlineOptions &options)
-    : gtk_app_(gtk_app), app_(app), files_path_(HomeOrMusic() ? HomeOrMusic() : ".") {
+    : gtk_app_(gtk_app), app_(app) {
   grouping_ = CollectionGrouping::LoadCurrent();
   BuildUi();
   ConnectSignals();
@@ -319,7 +313,50 @@ void MainWindow::BuildSidebar() {
   adw_view_stack_add_titled_with_icon(sidebar_stack_, playlist_list_container_->widget(), "playlists", "Playlists",
                                       "view-list-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&smart_list_), "smart", "Smart playlists", "view-refresh-symbolic");
-  adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&files_list_), "files", "Files", "folder-symbolic");
+  file_view_ = std::make_unique<FileView>();
+  file_view_->SetAddToPlaylistCallback([this](const std::vector<std::string> &paths) {
+    std::vector<std::string> urls;
+    urls.reserve(paths.size());
+    for (const std::string &path : paths) {
+      urls.push_back(FileUtils::UriFromPath(path));
+    }
+    app_->playlist_manager()->InsertUrls(urls);
+    RefreshPlaylist();
+  });
+  file_view_->SetCopyToCollectionCallback([this](const std::vector<std::string> &paths) {
+    for (const std::string &path : paths) {
+      if (FileUtils::IsDirectory(path)) {
+        app_->collection()->AddDirectory(path, true);
+        continue;
+      }
+      const auto dirs = app_->collection()->backend()->Directories();
+      if (!dirs.empty()) {
+        FileUtils::CopyFile(path, FileUtils::Join(dirs.front().path, FileUtils::BaseName(path)));
+      } else {
+        app_->collection()->AddDirectory(FileUtils::DirName(path), false);
+      }
+    }
+    RefreshCollection();
+  });
+  file_view_->SetCopyToDeviceCallback([this](const std::vector<std::string> &) {
+    Dialogs::CopyToDevice(GTK_WINDOW(window_), app_);
+  });
+  file_view_->SetEditTagsCallback([this](const std::vector<std::string> &paths) {
+    if (!paths.empty()) {
+      app_->playlist_manager()->InsertUrls({FileUtils::UriFromPath(paths.front())});
+      RefreshPlaylist();
+    }
+    Dialogs::EditTag(GTK_WINDOW(window_), app_);
+  });
+  file_view_->SetDeleteCallback([this](const std::vector<std::string> &paths) {
+    for (const std::string &path : paths) {
+      FileUtils::Remove(path);
+    }
+    if (file_view_) {
+      file_view_->Reload();
+    }
+  });
+  adw_view_stack_add_titled_with_icon(sidebar_stack_, file_view_->widget(), "files", "Files", "folder-symbolic");
   GtkWidget *radio_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   GtkWidget *radio_search = gtk_search_entry_new();
   gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(radio_search), "Search Radio Browser");
@@ -384,25 +421,6 @@ void MainWindow::BuildSidebar() {
                      } else if (kind) {
                        self->RunSmartPlaylist(kind);
                      }
-                   }),
-                   this);
-  g_signal_connect(files_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-                     auto *self = static_cast<MainWindow *>(data);
-                     const char *path = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-data"));
-                     if (!path) {
-                       return;
-                     }
-                     if (FileUtils::IsDirectory(path)) {
-                       self->files_path_ = path;
-                       self->RefreshFiles();
-                       return;
-                     }
-                     if (PlaylistParser::IsPlaylist(path)) {
-                       self->app_->playlist_manager()->AppendSongs(PlaylistParser().Load(path));
-                     } else {
-                       self->app_->playlist_manager()->InsertUrls({FileUtils::UriFromPath(path)});
-                     }
-                     self->RefreshPlaylist();
                    }),
                    this);
   if (streaming_list_) {
@@ -590,6 +608,8 @@ void MainWindow::BuildPlayerBar() {
   gtk_box_append(GTK_BOX(controls), volume_slider_->widget());
   gtk_box_append(GTK_BOX(box), controls);
 
+  loading_indicator_ = std::make_unique<MultiLoadingIndicator>();
+  gtk_box_append(GTK_BOX(box), loading_indicator_->widget());
   status_label_ = gtk_label_new("Ready");
   gtk_widget_add_css_class(status_label_, "dim-label");
   gtk_box_append(GTK_BOX(box), status_label_);
@@ -615,6 +635,16 @@ void MainWindow::ConnectSignals() {
     RefreshPlaylist();
   });
   app_->collection()->ScanFinished.Connect([this]() { RefreshCollection(); });
+  app_->task_manager()->TasksChanged.Connect([this](int) {
+    if (!loading_indicator_) {
+      return;
+    }
+    std::vector<std::string> names;
+    for (const auto &task : app_->task_manager()->GetTasks()) {
+      names.push_back(task.name);
+    }
+    loading_indicator_->SetTasks(names);
+  });
   app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &, const std::vector<unsigned char> &data) {
     if (!data.empty()) {
       UpdateCover(data);
@@ -906,20 +936,8 @@ void MainWindow::RefreshDevices() {
 }
 
 void MainWindow::RefreshFiles() {
-  ClearList(files_list_);
-  AppendStringRow(GTK_LIST_BOX(files_list_), "..", g_strdup(FileUtils::DirName(files_path_).c_str()), g_free);
-  std::vector<std::string> entries = FileUtils::ListDirectory(files_path_);
-  std::sort(entries.begin(), entries.end());
-  for (const std::string &path : entries) {
-    const std::string name = FileUtils::BaseName(path);
-    if (name.empty() || name[0] == '.') {
-      continue;
-    }
-    const bool dir = FileUtils::IsDirectory(path);
-    if (!dir && !Song::IsAudioFile(path) && !PlaylistParser::IsPlaylist(path)) {
-      continue;
-    }
-    AppendStringRow(GTK_LIST_BOX(files_list_), (dir ? "📁 " : "🎵 ") + name, g_strdup(path.c_str()), g_free);
+  if (file_view_) {
+    file_view_->Reload();
   }
 }
 

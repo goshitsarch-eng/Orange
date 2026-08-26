@@ -1,6 +1,7 @@
 #include "device/copytodevicedialog.h"
 
 #include "core/application.h"
+#include "widgets/freespacebar.h"
 
 #include <adwaita.h>
 
@@ -15,6 +16,7 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app) {
   app->device_manager()->Rescan();
   GtkWidget *list = gtk_list_box_new();
   gtk_widget_add_css_class(list, "boxed-list");
+  gtk_box_append(GTK_BOX(box), list);
   for (const ConnectedDevice &device : app->device_manager()->devices()) {
     GtkWidget *row = adw_action_row_new();
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), device.friendly_name.c_str());
@@ -32,8 +34,16 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app) {
                      app);
     adw_action_row_add_suffix(ADW_ACTION_ROW(row), copy);
     gtk_list_box_append(GTK_LIST_BOX(list), row);
+    if (!device.mount_path.empty()) {
+      auto *space = new FreeSpaceBar();
+      space->SetPath(device.mount_path);
+      gtk_box_append(GTK_BOX(box), space->widget());
+      g_signal_connect(space->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                         delete static_cast<FreeSpaceBar *>(data);
+                       }),
+                       space);
+    }
   }
-  gtk_box_append(GTK_BOX(box), list);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

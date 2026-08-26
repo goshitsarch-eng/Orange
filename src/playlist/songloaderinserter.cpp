@@ -1,29 +1,21 @@
 #include "playlist/songloaderinserter.h"
 
+#include "core/songloader.h"
 #include "playlist/playlist.h"
-#include "tagreader/tagreader.h"
-#include "utilities/fileutils.h"
 
 SongLoaderInserter::SongLoaderInserter(TagReader *tagreader) : tagreader_(tagreader) {}
 
 SongList SongLoaderInserter::Load(const std::vector<std::string> &urls) const {
-  SongList songs;
   if (!tagreader_) {
-    return songs;
+    return {};
   }
-  for (const std::string &url : urls) {
-    const std::string path = FileUtils::PathFromUri(url);
-    Song song = tagreader_->ReadFile(path.empty() ? url : path);
-    if (!song.is_valid() && !url.empty()) {
-      song.set_url(url);
-      song.set_title(FileUtils::BaseName(path.empty() ? url : path));
-      song.set_valid(true);
-    }
-    if (song.is_valid()) {
-      songs.push_back(song);
-    }
+  SongLoader loader(nullptr, nullptr, tagreader_);
+  const SongLoader::Result result = loader.LoadMany(urls);
+  if (result == SongLoader::Result::BlockingLoadRequired) {
+    loader.LoadFilenamesBlocking();
   }
-  return songs;
+  loader.LoadMetadataBlocking();
+  return loader.songs();
 }
 
 int SongLoaderInserter::Insert(Playlist *playlist, const std::vector<std::string> &urls, int row) const {

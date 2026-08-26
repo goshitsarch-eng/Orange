@@ -1,5 +1,9 @@
 #include "settings/settingspage.h"
 
+#include "core/application.h"
+#include "ui/dialogs.h"
+#include "widgets/loginstatewidget.h"
+
 #include <string>
 
 namespace SettingsPage {
@@ -80,6 +84,34 @@ void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *but
   g_object_set_data_full(G_OBJECT(button), "clicked-fn", fn, +[](gpointer data) { delete static_cast<std::function<void()> *>(data); });
   adw_action_row_add_suffix(row, button);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+}
+
+void AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name) {
+  if (!app || !service_name) {
+    return;
+  }
+  StreamingService *service = app->streaming_services()->ServiceByName(service_name);
+  auto *login = new LoginStateWidget();
+  login->SetLoggedIn(service && service->logged_in() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut,
+                     service_name);
+  login->SetLoginCallback([app, service_name]() {
+    Dialogs::Login(nullptr, service_name, [app, service_name](const std::string &user, const std::string &token) {
+      if (StreamingService *svc = app->streaming_services()->ServiceByName(service_name)) {
+        svc->Login(user, token);
+      }
+    });
+  });
+  login->SetLogoutCallback([service]() {
+    if (service) {
+      service->Logout();
+    }
+  });
+  adw_preferences_group_add(group, login->widget());
+  g_signal_connect(login->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     auto *widget = static_cast<LoginStateWidget *>(data);
+                     delete widget;
+                   }),
+                   login);
 }
 
 }  // namespace SettingsPage

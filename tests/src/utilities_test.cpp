@@ -49,6 +49,19 @@ TEST(FileUtils, BaseAndExtension) {
   EXPECT_EQ("mp3", FileUtils::Extension("/tmp/music/song.mp3"));
 }
 
+TEST(FileUtils, PrettySize) {
+  EXPECT_EQ("0 B", FileUtils::PrettySize(0));
+  EXPECT_EQ("512 B", FileUtils::PrettySize(512));
+  EXPECT_EQ("2 KB", FileUtils::PrettySize(2048));
+  EXPECT_FALSE(FileUtils::PrettySize(2 * 1024 * 1024).empty());
+  EXPECT_TRUE(FileUtils::PrettySize(-1).empty());
+}
+
+TEST(FileUtils, FreeAndTotalSpace) {
+  EXPECT_GE(FileUtils::FreeSpaceBytes("/tmp"), 0);
+  EXPECT_GE(FileUtils::TotalSpaceBytes("/tmp"), FileUtils::FreeSpaceBytes("/tmp"));
+}
+
 TEST(FileUtils, CopyAndRemove) {
   const std::string src = "/tmp/strawberry-copy-src.txt";
   const std::string dest = "/tmp/strawberry-copy-dest.txt";

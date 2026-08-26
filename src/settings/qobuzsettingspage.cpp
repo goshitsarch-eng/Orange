@@ -29,6 +29,7 @@ AdwPreferencesPage *QobuzSettingsPage::Create(Settings *settings, Application *a
         }
       });
     });
+    SettingsPage::AddLoginState(group, app, "Qobuz");
   }
   return page;
 }

@@ -147,4 +147,52 @@ bool CopyFile(const std::string &source, const std::string &destination) {
 
 bool Remove(const std::string &path) { return g_unlink(path.c_str()) == 0; }
 
+std::string PrettySize(int64_t bytes) {
+  if (bytes < 0) {
+    return {};
+  }
+  if (bytes < 1024) {
+    return std::to_string(bytes) + " B";
+  }
+  if (bytes < 1024 * 1024) {
+    return std::to_string(bytes / 1024) + " KB";
+  }
+  if (bytes < 1024LL * 1024 * 1024) {
+    char buf[32];
+    g_snprintf(buf, sizeof(buf), "%.1f MB", static_cast<double>(bytes) / (1024.0 * 1024.0));
+    return buf;
+  }
+  char buf[32];
+  g_snprintf(buf, sizeof(buf), "%.1f GB", static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0));
+  return buf;
+}
+
+namespace {
+
+int64_t QueryFilesystemAttribute(const std::string &path, const char *attribute) {
+  GFile *file = g_file_new_for_path(path.c_str());
+  GError *error = nullptr;
+  GFileInfo *info = g_file_query_filesystem_info(file, attribute, nullptr, &error);
+  int64_t result = -1;
+  if (info) {
+    result = static_cast<int64_t>(g_file_info_get_attribute_uint64(info, attribute));
+    g_object_unref(info);
+  }
+  if (error) {
+    g_error_free(error);
+  }
+  g_object_unref(file);
+  return result;
+}
+
+}  // namespace
+
+int64_t FreeSpaceBytes(const std::string &path) {
+  return QueryFilesystemAttribute(path, G_FILE_ATTRIBUTE_FILESYSTEM_FREE);
+}
+
+int64_t TotalSpaceBytes(const std::string &path) {
+  return QueryFilesystemAttribute(path, G_FILE_ATTRIBUTE_FILESYSTEM_SIZE);
+}
+
 }  // namespace FileUtils

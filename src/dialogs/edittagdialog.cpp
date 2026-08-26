@@ -1,15 +1,15 @@
 #include "dialogs/edittagdialog.h"
 
 #include "core/application.h"
-#include "covermanager/albumcoversearcher.h"
+#include "covermanager/albumcoverchoicecontroller.h"
 #include "dialogs/dialoghelpers.h"
 #include "utilities/fileutils.h"
 #include "utilities/timeutils.h"
 
 #include <adwaita.h>
 #include <cstdlib>
+#include <memory>
 
-using DialogHelpers::ApplyCover;
 using DialogHelpers::PrettyBytes;
 using DialogHelpers::PrettyUnixTime;
 using DialogHelpers::SetImageFromBytes;
@@ -32,10 +32,12 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app) {
     GtkWidget *lyrics = nullptr;
     GtkWidget *rating = nullptr;
     GtkWidget *compilation = nullptr;
+    std::unique_ptr<AlbumCoverChoiceController> covers;
     std::vector<std::pair<std::string, GtkWidget *>> fields;
   };
   auto *state = new State();
   state->song = song;
+  state->covers = std::make_unique<AlbumCoverChoiceController>(app);
 
   auto add_entries = [&](GtkWidget *page, const std::vector<std::pair<const char *, std::string>> &rows) {
     for (const auto &row : rows) {
@@ -59,10 +61,16 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app) {
   gtk_widget_set_halign(cover_buttons, GTK_ALIGN_CENTER);
   GtkWidget *fetch_cover = gtk_button_new_with_label("Fetch cover");
   GtkWidget *search_cover = gtk_button_new_with_label("Search…");
+  GtkWidget *url_cover = gtk_button_new_with_label("From URL");
+  GtkWidget *file_cover = gtk_button_new_with_label("From file");
   GtkWidget *unset_cover = gtk_button_new_with_label("Unset");
+  GtkWidget *stats_cover = gtk_button_new_with_label("Statistics");
   gtk_box_append(GTK_BOX(cover_buttons), fetch_cover);
   gtk_box_append(GTK_BOX(cover_buttons), search_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), url_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), file_cover);
   gtk_box_append(GTK_BOX(cover_buttons), unset_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), stats_cover);
   gtk_box_append(GTK_BOX(summary), cover_buttons);
   const std::string stats = "Plays: " + std::to_string(song.playcount()) + "   Skips: " + std::to_string(song.skipcount()) +
                             "   Last played: " + PrettyUnixTime(song.lastplayed()) + "\n" +
@@ -192,39 +200,41 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app) {
                    app);
 
   g_object_set_data(G_OBJECT(fetch_cover), "state", state);
-  g_signal_connect(fetch_cover, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
-                     auto *application = static_cast<Application *>(data);
+  g_signal_connect(fetch_cover, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
                      auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
-                     application->cover_providers()->Fetch(state->song, [button, application, state](const std::string &image, const std::string &) {
-                       if (ApplyCover(application, &state->song, image)) {
-                         SetImageFromBytes(state->cover, std::vector<unsigned char>(image.begin(), image.end()), 160);
-                         gtk_button_set_label(button, "Saved");
-                       } else {
-                         gtk_button_set_label(button, "Failed");
-                       }
-                     });
-                   })),
-                   app);
-  g_signal_connect(search_cover, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *application = static_cast<Application *>(data);
-                     AlbumCoverSearcher::Show(nullptr, application);
+                     state->covers->FetchCover(&state->song, state->cover, GTK_WIDGET(button));
                    }),
-                   app);
-  g_object_set_data(G_OBJECT(unset_cover), "state", state);
-  g_signal_connect(unset_cover, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
-                     auto *application = static_cast<Application *>(data);
+                   nullptr);
+  g_signal_connect(search_cover, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
                      auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
-                     state->song.set_art_unset(true);
-                     state->song.set_art_manual({});
-                     state->song.set_art_automatic({});
-                     state->song.set_art_embedded(false);
-                     if (state->song.id() > 0) {
-                       application->collection()->backend()->AddOrUpdateSong(state->song);
-                     }
-                     SetImageFromBytes(state->cover, {}, 160);
+                     state->covers->SearchForCover(GTK_WINDOW(data));
+                   }),
+                   parent);
+  g_object_set_data(G_OBJECT(url_cover), "state", state);
+  g_signal_connect(url_cover, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
+                     state->covers->LoadCoverFromURL(GTK_WINDOW(data), &state->song, state->cover);
+                   }),
+                   parent);
+  g_object_set_data(G_OBJECT(file_cover), "state", state);
+  g_signal_connect(file_cover, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
+                     state->covers->LoadCoverFromFile(GTK_WINDOW(data), &state->song, state->cover);
+                   }),
+                   parent);
+  g_object_set_data(G_OBJECT(unset_cover), "state", state);
+  g_signal_connect(unset_cover, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
+                     auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
+                     state->covers->UnsetCover(&state->song, state->cover);
                      gtk_button_set_label(button, "Unset");
-                   })),
-                   app);
+                   }),
+                   nullptr);
+  g_object_set_data(G_OBJECT(stats_cover), "state", state);
+  g_signal_connect(stats_cover, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
+                     state->covers->ShowStatistics(GTK_WINDOW(data));
+                   }),
+                   parent);
 
   GtkWidget *fetch_lyrics = gtk_button_new_with_label("Fetch lyrics");
   g_object_set_data(G_OBJECT(fetch_lyrics), "state", state);

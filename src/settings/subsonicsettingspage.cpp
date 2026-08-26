@@ -32,6 +32,7 @@ AdwPreferencesPage *SubsonicSettingsPage::Create(Settings *settings, Application
         }
       });
     });
+    SettingsPage::AddLoginState(group, app, "Subsonic");
   }
   return page;
 }

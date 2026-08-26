@@ -57,6 +57,7 @@ AdwPreferencesPage *SpotifySettingsPage::Create(Settings *settings, Application 
                                                       });
                                 });
     });
+    SettingsPage::AddLoginState(group, app, "Spotify");
   }
   return page;
 }

@@ -48,6 +48,7 @@ class StreamingService : public UrlHandler {
     }
   }
   virtual void Login(const std::string &username, const std::string &password_or_token) = 0;
+  virtual void Logout() { logged_in_ = false; }
   virtual void ReloadSettings() {}
   virtual bool logged_in() const { return logged_in_; }
   virtual void GetFavorites(FavoriteType, SearchCallback callback) {

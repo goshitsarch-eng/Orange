@@ -1,10 +1,8 @@
 #include "playlist/playlistmanager.h"
 
 #include "collection/collectionbackend.h"
-#include "playlistparsers/playlistparser.h"
+#include "core/songloader.h"
 #include "tagreader/tagreader.h"
-#include "utilities/fileutils.h"
-#include "utilities/strutils.h"
 
 #include <algorithm>
 
@@ -99,45 +97,18 @@ void PlaylistManager::AppendSongs(const SongList &songs) {
 }
 
 void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row) {
-  if (!active_ || !tagreader_) {
+  if (!active_) {
     return;
   }
-  SongList songs;
-  PlaylistParser parser;
-  auto enrich_cue = [&](SongList loaded) {
-    if (!loaded.empty()) {
-      const std::string audio = FileUtils::PathFromUri(loaded.front().url());
-      if (FileUtils::IsFile(audio)) {
-        PlaylistParser::EnrichFromAudioFile(&loaded, tagreader_->ReadFile(audio));
-      }
-    }
-    return loaded;
-  };
-  for (const std::string &url : urls) {
-    const std::string path = FileUtils::PathFromUri(url);
-    if (FileUtils::IsFile(path) && PlaylistParser::IsPlaylist(path)) {
-      SongList loaded = parser.Load(path);
-      if (StrUtils::ToLower(FileUtils::Extension(path)) == "cue") {
-        loaded = enrich_cue(loaded);
-      }
-      songs.insert(songs.end(), loaded.begin(), loaded.end());
-      continue;
-    }
-    if (FileUtils::IsFile(path) && Song::IsAudioFile(path)) {
-      const std::string cue = PlaylistParser::FindCueForAudio(path);
-      if (!cue.empty()) {
-        SongList loaded = enrich_cue(parser.Load(cue));
-        songs.insert(songs.end(), loaded.begin(), loaded.end());
-        continue;
-      }
-      songs.push_back(tagreader_->ReadFile(path));
-      continue;
-    }
-    Song song(Song::Source::Stream);
-    song.set_url(url);
-    song.set_title(url);
-    song.set_valid(true);
-    songs.push_back(song);
+  SongLoader loader(url_handlers_, collection_backend_, tagreader_);
+  const SongLoader::Result result = loader.LoadMany(urls);
+  if (result == SongLoader::Result::BlockingLoadRequired) {
+    loader.LoadFilenamesBlocking();
+  }
+  loader.LoadMetadataBlocking();
+  const SongList &songs = loader.songs();
+  if (songs.empty()) {
+    return;
   }
   if (row < 0) {
     active_->AppendSongs(songs);
