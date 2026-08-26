@@ -44,6 +44,8 @@ void Player::ReloadSettings() {
                                                                             : settings.BoolValue("autocrossfade", fading));
   engine_->SetFadeDurationMs(settings.Contains("FadeoutDuration") ? settings.IntValue("FadeoutDuration", 2000)
                                                                  : settings.IntValue("fadeduration", 2000));
+  engine_->SetOutput(settings.Contains("output") ? settings.Value("output", "autoaudiosink") : settings.Value("Output", "autoaudiosink"),
+                     settings.Contains("device") ? settings.Value("device") : settings.Value("Device"));
 }
 
 void Player::LoadVolume() {

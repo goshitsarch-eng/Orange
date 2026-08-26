@@ -25,6 +25,10 @@ class DeviceFinders {
   std::vector<AudioDevice> ListDevices() const;
   std::vector<std::string> Outputs() const;
 
+  static std::string ChoiceKey(const std::string &output, const std::string &device);
+  static void SplitChoiceKey(const std::string &key, std::string *output, std::string *device);
+  static std::string OutputLabel(const std::string &output);
+
  private:
   std::vector<std::unique_ptr<DeviceFinder>> finders_;
   std::vector<AudioDevice> devices_;

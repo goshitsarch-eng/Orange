@@ -568,3 +568,28 @@ TEST(OAuthenticator, AccessTokenExpiredUsesSkew) {
   EXPECT_FALSE(OAuthenticator::AccessTokenExpired(0, 3600, 5000));
   EXPECT_FALSE(OAuthenticator::AccessTokenExpired(1000, 0, 5000));
 }
+
+TEST(DeviceFinders, ChoiceKeyAndOutputLabels) {
+  EXPECT_EQ("pulsesink|alsa_output.pci", DeviceFinders::ChoiceKey("pulsesink", "alsa_output.pci"));
+  std::string output;
+  std::string device;
+  DeviceFinders::SplitChoiceKey("alsasink|hw:0,0", &output, &device);
+  EXPECT_EQ("alsasink", output);
+  EXPECT_EQ("hw:0,0", device);
+  DeviceFinders::SplitChoiceKey("pipewiresink|", &output, &device);
+  EXPECT_EQ("pipewiresink", output);
+  EXPECT_TRUE(device.empty());
+  DeviceFinders::SplitChoiceKey("autoaudiosink", &output, &device);
+  EXPECT_EQ("autoaudiosink", output);
+  EXPECT_TRUE(device.empty());
+  EXPECT_EQ("Automatic", DeviceFinders::OutputLabel("autoaudiosink"));
+  EXPECT_EQ("PulseAudio", DeviceFinders::OutputLabel("pulsesink"));
+  EXPECT_EQ("PipeWire", DeviceFinders::OutputLabel("pipewiresink"));
+  EXPECT_EQ("ALSA", DeviceFinders::OutputLabel("alsasink"));
+
+  DeviceFinders finders;
+  finders.Init();
+  const auto outputs = finders.Outputs();
+  EXPECT_NE(outputs.end(), std::find(outputs.begin(), outputs.end(), "autoaudiosink"));
+  EXPECT_FALSE(finders.ListDevices().empty());
+}

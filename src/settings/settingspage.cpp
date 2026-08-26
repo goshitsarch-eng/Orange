@@ -73,6 +73,53 @@ void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key
   adw_preferences_group_add(group, GTK_WIDGET(row));
 }
 
+void AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
+              const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
+              const std::function<void(const std::string &)> &changed) {
+  AdwComboRow *row = ADW_COMBO_ROW(adw_combo_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
+  GtkStringList *model = gtk_string_list_new(nullptr);
+  auto *ids = new std::vector<std::string>();
+  const std::string current = key && settings ? settings->Value(key, fallback) : fallback;
+  guint selected = 0;
+  for (size_t i = 0; i < choices.size(); ++i) {
+    gtk_string_list_append(model, choices[i].second.c_str());
+    ids->push_back(choices[i].first);
+    if (choices[i].first == current) {
+      selected = static_cast<guint>(i);
+    }
+  }
+  adw_combo_row_set_model(row, G_LIST_MODEL(model));
+  adw_combo_row_set_selected(row, selected);
+  if (key) {
+    g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
+  }
+  g_object_set_data_full(G_OBJECT(row), "choice-ids", ids, [](gpointer p) { delete static_cast<std::vector<std::string> *>(p); });
+  if (changed) {
+    auto *fn = new std::function<void(const std::string &)>(changed);
+    g_object_set_data_full(G_OBJECT(row), "choice-changed", fn, [](gpointer p) { delete static_cast<std::function<void(const std::string &)> *>(p); });
+  }
+  g_signal_connect(row, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(combo), "settings-key"));
+                     auto *choice_ids = static_cast<std::vector<std::string> *>(g_object_get_data(G_OBJECT(combo), "choice-ids"));
+                     const guint index = adw_combo_row_get_selected(combo);
+                     if (!choice_ids || index >= choice_ids->size()) {
+                       return;
+                     }
+                     const std::string &id = (*choice_ids)[index];
+                     if (s && settings_key) {
+                       s->SetValue(settings_key, id);
+                       s->Sync();
+                     }
+                     if (auto *fn = static_cast<std::function<void(const std::string &)> *>(g_object_get_data(G_OBJECT(combo), "choice-changed"))) {
+                       (*fn)(id);
+                     }
+                   }),
+                   settings);
+  adw_preferences_group_add(group, GTK_WIDGET(row));
+}
+
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));

@@ -29,6 +29,7 @@
 #include "constants/collectionsettings.h"
 #include "constants/playlistsettings.h"
 #include "constants/scrobblersettings.h"
+#include "core/appearance.h"
 #include "core/seekbarsettings.h"
 #include "core/settings.h"
 #include "playlist/playlistsaveoptionsdialog.h"
@@ -1284,11 +1285,19 @@ void MainWindow::OpenSettings() {
   SettingsDialog::Show(GTK_WINDOW(window_), app_, [this]() {
     app_->scrobbler()->ReloadSettings();
     app_->shortcuts()->ReloadSettings();
+    app_->player()->ReloadSettings();
+    app_->osd()->ReloadSettings();
+    app_->cover_providers()->ReloadSettings();
+    app_->lyrics_providers()->ReloadSettings();
+    Appearance().Apply();
+    if (context_view_) {
+      context_view_->ReloadSettings();
+    }
     UpdateScrobblerButtons();
     ApplySeekbarMode();
+    ApplyBehaviourSettings();
     app_->moodbar()->Load(app_->player()->current_song());
     app_->waveform()->Load(app_->player()->current_song());
-    ApplyBehaviourSettings();
   });
 }
 

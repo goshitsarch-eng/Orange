@@ -1,15 +1,41 @@
 #include "settings/backendsettingspage.h"
 
 #include "constants/backendsettings.h"
+#include "core/application.h"
+#include "engine/devicefinders.h"
 #include "settings/settingspage.h"
 
-AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application *) {
+AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(BackendSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Backend", "audio-card-symbolic");
   AdwPreferencesGroup *output = SettingsPage::AddGroup(page, "Output");
-  SettingsPage::AddEntry(output, settings, BackendSettings::kOutput, "GStreamer output", "autoaudiosink");
-  SettingsPage::AddEntry(output, settings, BackendSettings::kDevice, "Device");
-  SettingsPage::AddEntry(output, settings, BackendSettings::kALSAPlugin, "ALSA plugin (hw/plughw/pcm)", "hw");
+  std::vector<std::pair<std::string, std::string>> outputs;
+  DeviceFinders *finders = app ? app->device_finders() : nullptr;
+  const std::vector<std::string> sink_names = finders ? finders->Outputs() : std::vector<std::string>{"autoaudiosink", "pulsesink", "pipewiresink", "alsasink"};
+  for (const std::string &sink : sink_names) {
+    outputs.emplace_back(sink, DeviceFinders::OutputLabel(sink));
+  }
+  SettingsPage::AddCombo(output, settings, BackendSettings::kOutput, "GStreamer output", outputs, "autoaudiosink");
+
+  std::vector<std::pair<std::string, std::string>> devices = {{DeviceFinders::ChoiceKey("autoaudiosink", ""), "Default"}};
+  if (finders) {
+    devices.clear();
+    for (const AudioDevice &device : finders->ListDevices()) {
+      devices.emplace_back(DeviceFinders::ChoiceKey(device.output, device.id), device.description);
+    }
+  }
+  const std::string current_choice =
+      DeviceFinders::ChoiceKey(settings->Value(BackendSettings::kOutput, "autoaudiosink"), settings->Value(BackendSettings::kDevice));
+  SettingsPage::AddCombo(output, settings, nullptr, "Device", devices, current_choice, [settings](const std::string &key) {
+    std::string sink;
+    std::string device;
+    DeviceFinders::SplitChoiceKey(key, &sink, &device);
+    settings->SetValue(BackendSettings::kOutput, sink);
+    settings->SetValue(BackendSettings::kDevice, device);
+    settings->Sync();
+  });
+  SettingsPage::AddCombo(output, settings, BackendSettings::kALSAPlugin, "ALSA plugin",
+                         {{"hw", "hw"}, {"plughw", "plughw"}, {"pcm", "pcm"}}, "hw");
   SettingsPage::AddToggle(output, settings, BackendSettings::kExclusiveMode, "Exclusive mode", nullptr, BackendSettings::kDefaultExclusiveMode);
   SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeControl, "Software volume control", nullptr, BackendSettings::kDefaultVolumeControl);
   SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeExponential, "Exponential volume scale", nullptr,

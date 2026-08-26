@@ -52,3 +52,40 @@ std::vector<AudioDevice> DeviceFinders::ListDevices() const { return devices_; }
 std::vector<std::string> DeviceFinders::Outputs() const {
   return {"autoaudiosink", "pulsesink", "pipewiresink", "alsasink"};
 }
+
+std::string DeviceFinders::ChoiceKey(const std::string &output, const std::string &device) { return output + "|" + device; }
+
+void DeviceFinders::SplitChoiceKey(const std::string &key, std::string *output, std::string *device) {
+  const auto pos = key.find('|');
+  if (pos == std::string::npos) {
+    if (output) {
+      *output = key;
+    }
+    if (device) {
+      device->clear();
+    }
+    return;
+  }
+  if (output) {
+    *output = key.substr(0, pos);
+  }
+  if (device) {
+    *device = key.substr(pos + 1);
+  }
+}
+
+std::string DeviceFinders::OutputLabel(const std::string &output) {
+  if (output == "autoaudiosink") {
+    return "Automatic";
+  }
+  if (output == "pulsesink") {
+    return "PulseAudio";
+  }
+  if (output == "pipewiresink") {
+    return "PipeWire";
+  }
+  if (output == "alsasink") {
+    return "ALSA";
+  }
+  return output;
+}
