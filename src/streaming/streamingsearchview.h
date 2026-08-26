@@ -8,6 +8,8 @@
 #include <gtk/gtk.h>
 
 #include <functional>
+#include <map>
+#include <memory>
 #include <string>
 
 class StreamingSearchView {
@@ -29,6 +31,8 @@ class StreamingSearchView {
  private:
   void Rebuild();
   void SetupRowDrag(GtkWidget *row, const Song &song);
+  void LoadCover(GtkWidget *image, const Song &song);
+  void PersistPrettyCovers();
   gboolean OnKeyPressed(guint keyval);
   void ResetTypeAhead();
 
@@ -42,9 +46,14 @@ class StreamingSearchView {
   GtkWidget *type_artists_ = nullptr;
   GtkWidget *type_albums_ = nullptr;
   GtkWidget *type_songs_ = nullptr;
+  GtkWidget *pretty_covers_btn_ = nullptr;
   GtkWidget *list_ = nullptr;
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
+  bool pretty_covers_ = true;
+  int cover_gen_ = 0;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
+  std::map<std::string, std::string> cover_cache_;
 };
 
 #endif

@@ -15,6 +15,7 @@ class SubsonicService : public StreamingService {
 
   std::string name() const override { return "Subsonic"; }
   std::string scheme() const override { return "subsonic"; }
+  NetworkAccessManager *network() const override { return network_; }
   void Search(const std::string &query, SearchCallback callback) override;
   void Search(const std::string &query, SearchType type, SearchCallback callback) override;
   void GetArtists(SearchCallback callback) override;

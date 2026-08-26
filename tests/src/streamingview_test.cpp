@@ -1,3 +1,4 @@
+#include "streaming/streamingcover.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "streaming/streamingsearchmodel.h"
 #include "streaming/streamingsearchsortmodel.h"
@@ -31,6 +32,32 @@ TEST(StreamingSearchModel, FiltersAndSorts) {
   model.SetSort(StreamingSearchModel::SortField::Title);
   visible = sort.Visible();
   EXPECT_EQ("Helplessness Blues", visible.front().title());
+}
+
+TEST(StreamingCover, UrlCacheAndPrettyCovers) {
+  EXPECT_EQ(32, StreamingCover::kArtHeight);
+  EXPECT_TRUE(StreamingCover::kDefaultPrettyCovers);
+  EXPECT_TRUE(StreamingCover::ShouldShowThumb(true));
+  EXPECT_FALSE(StreamingCover::ShouldShowThumb(false));
+  EXPECT_TRUE(StreamingCover::IsHttpUrl("https://resources.tidal.com/images/abc/1280x1280.jpg"));
+  EXPECT_TRUE(StreamingCover::CanLoad("http://example.com/cover.jpg"));
+  EXPECT_FALSE(StreamingCover::CanLoad("tidal://track/1"));
+  EXPECT_FALSE(StreamingCover::CanLoad(""));
+
+  Song song;
+  song.set_url("tidal://track/1");
+  song.set_art_automatic("https://resources.tidal.com/images/auto.jpg");
+  EXPECT_EQ("https://resources.tidal.com/images/auto.jpg", StreamingCover::CoverUrl(song));
+  EXPECT_TRUE(StreamingCover::CanLoad(song));
+  EXPECT_EQ("https://resources.tidal.com/images/auto.jpg", StreamingCover::CacheKey(song));
+  song.set_art_manual("https://cdn.example.com/manual.png");
+  EXPECT_EQ("https://cdn.example.com/manual.png", StreamingCover::CoverUrl(song));
+  EXPECT_EQ("https://cdn.example.com/manual.png", StreamingCover::CacheKey(song));
+  Song no_art;
+  no_art.set_url("qobuz://track/9");
+  EXPECT_TRUE(StreamingCover::CoverUrl(no_art).empty());
+  EXPECT_FALSE(StreamingCover::CanLoad(no_art));
+  EXPECT_EQ("qobuz://track/9", StreamingCover::CacheKey(no_art));
 }
 
 TEST(StreamingSearchItemDelegate, PrimaryAndSecondary) {

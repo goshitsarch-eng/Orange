@@ -1,8 +1,12 @@
 #include "streaming/streamingsearchview.h"
 
+#include "core/settings.h"
+#include "dialogs/dialoghelpers.h"
+#include "streaming/streamingcover.h"
 #include "streaming/streamingdrag.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "translations/translations.h"
+#include "utilities/jsonutils.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 
@@ -27,6 +31,23 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   gtk_box_append(GTK_BOX(types), type_artists_);
   gtk_box_append(GTK_BOX(types), type_albums_);
   gtk_box_append(GTK_BOX(types), type_songs_);
+  pretty_covers_btn_ = gtk_check_button_new_with_label(Translations::CStr("Pretty covers"));
+  if (service_) {
+    Settings settings;
+    settings.BeginGroup(service_->name());
+    pretty_covers_ = settings.BoolValue(StreamingCover::kPrettyCovers, StreamingCover::kDefaultPrettyCovers);
+  }
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(pretty_covers_btn_), pretty_covers_);
+  gtk_widget_set_hexpand(pretty_covers_btn_, TRUE);
+  gtk_widget_set_halign(pretty_covers_btn_, GTK_ALIGN_END);
+  gtk_box_append(GTK_BOX(types), pretty_covers_btn_);
+  g_signal_connect(pretty_covers_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     self->pretty_covers_ = gtk_check_button_get_active(button);
+                     self->PersistPrettyCovers();
+                     self->Rebuild();
+                   }),
+                   this);
   GtkWidget *scroll = gtk_scrolled_window_new();
   gtk_widget_set_vexpand(scroll, TRUE);
   list_ = gtk_list_box_new();
@@ -82,7 +103,12 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
                    this);
 }
 
-StreamingSearchView::~StreamingSearchView() { ResetTypeAhead(); }
+StreamingSearchView::~StreamingSearchView() {
+  if (alive_) {
+    *alive_ = false;
+  }
+  ResetTypeAhead();
+}
 
 void StreamingSearchView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
@@ -99,7 +125,13 @@ void StreamingSearchView::Search(const std::string &query) {
     type = StreamingService::SearchType::Albums;
   }
   model_.SetSearchType(type);
-  service_->Search(query, type, [this](const SongList &songs) {
+  ++cover_gen_;
+  const int gen = cover_gen_;
+  const auto alive = alive_;
+  service_->Search(query, type, [this, alive, gen](const SongList &songs) {
+    if (!alive || !*alive || gen != cover_gen_) {
+      return;
+    }
     model_.SetSongs(songs);
     Rebuild();
   });
@@ -117,13 +149,23 @@ void StreamingSearchView::Rebuild() {
     gtk_list_box_append(GTK_LIST_BOX(list_), gtk_label_new(Translations::CStr("No results")));
     return;
   }
+  ++cover_gen_;
   for (const Song &song : visible) {
     GtkWidget *row = gtk_list_box_row_new();
+    GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_widget_set_margin_start(row_box, 8);
+    gtk_widget_set_margin_end(row_box, 8);
+    gtk_widget_set_margin_top(row_box, 4);
+    gtk_widget_set_margin_bottom(row_box, 4);
+    if (StreamingCover::ShouldShowThumb(pretty_covers_)) {
+      GtkWidget *image = gtk_image_new_from_icon_name(StreamingCover::kPlaceholderIcon);
+      gtk_image_set_pixel_size(GTK_IMAGE(image), StreamingCover::kArtHeight);
+      gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
+      gtk_box_append(GTK_BOX(row_box), image);
+      LoadCover(image, song);
+    }
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_margin_start(box, 8);
-    gtk_widget_set_margin_end(box, 8);
-    gtk_widget_set_margin_top(box, 4);
-    gtk_widget_set_margin_bottom(box, 4);
+    gtk_widget_set_hexpand(box, TRUE);
     GtkWidget *primary = gtk_label_new(StreamingSearchItemDelegate::PrimaryText(song).c_str());
     gtk_widget_set_halign(primary, GTK_ALIGN_START);
     gtk_box_append(GTK_BOX(box), primary);
@@ -134,11 +176,52 @@ void StreamingSearchView::Rebuild() {
       gtk_widget_set_halign(sub, GTK_ALIGN_START);
       gtk_box_append(GTK_BOX(box), sub);
     }
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+    gtk_box_append(GTK_BOX(row_box), box);
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
     g_object_set_data_full(G_OBJECT(row), "row-data", new Song(song), [](gpointer p) { delete static_cast<Song *>(p); });
     SetupRowDrag(row, song);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
+}
+
+void StreamingSearchView::PersistPrettyCovers() {
+  if (!service_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(service_->name());
+  settings.SetBoolValue(StreamingCover::kPrettyCovers, pretty_covers_);
+  settings.Sync();
+}
+
+void StreamingSearchView::LoadCover(GtkWidget *image, const Song &song) {
+  if (!image) {
+    return;
+  }
+  const std::string key = StreamingCover::CacheKey(song);
+  const auto cached = cover_cache_.find(key);
+  if (cached != cover_cache_.end()) {
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(cached->second.begin(), cached->second.end()),
+                                     StreamingCover::kArtHeight);
+    return;
+  }
+  const std::string url = StreamingCover::CoverUrl(song);
+  if (!StreamingCover::CanLoad(url) || !service_ || !service_->network()) {
+    return;
+  }
+  const int gen = cover_gen_;
+  const auto alive = alive_;
+  service_->network()->Get(url, [this, alive, gen, image, key](const NetworkAccessManager::Response &response) {
+    if (!alive || !*alive || gen != cover_gen_ || !image) {
+      return;
+    }
+    if (!response.ok() || !JsonUtils::LooksLikeImage(response.body)) {
+      return;
+    }
+    cover_cache_[key] = response.body;
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(response.body.begin(), response.body.end()),
+                                     StreamingCover::kArtHeight);
+  });
 }
 
 void StreamingSearchView::SetupRowDrag(GtkWidget *row, const Song &song) {

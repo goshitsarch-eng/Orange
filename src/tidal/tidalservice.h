@@ -19,6 +19,7 @@ class TidalService : public StreamingService {
 
   std::string name() const override { return "Tidal"; }
   std::string scheme() const override { return "tidal"; }
+  NetworkAccessManager *network() const override { return network_; }
   const std::string &quality() const { return quality_; }
   TidalSettings::StreamUrlMethod stream_url_method() const { return stream_url_method_; }
   void Search(const std::string &query, SearchCallback callback) override;

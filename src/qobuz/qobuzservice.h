@@ -14,6 +14,7 @@ class QobuzService : public StreamingService {
 
   std::string name() const override { return "Qobuz"; }
   std::string scheme() const override { return "qobuz"; }
+  NetworkAccessManager *network() const override { return network_; }
   void Search(const std::string &query, SearchCallback callback) override;
   void Search(const std::string &query, SearchType type, SearchCallback callback) override;
   void GetArtists(SearchCallback callback) override;

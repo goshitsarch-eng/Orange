@@ -8,6 +8,8 @@
 #include <functional>
 #include <string>
 
+class NetworkAccessManager;
+
 class StreamingService : public UrlHandler {
  public:
   using SearchCallback = std::function<void(const SongList &)>;
@@ -15,6 +17,7 @@ class StreamingService : public UrlHandler {
   enum class SearchType { Artists = 1, Albums = 2, Songs = 3 };
 
   virtual std::string name() const = 0;
+  virtual NetworkAccessManager *network() const { return nullptr; }
   virtual void Search(const std::string &query, SearchCallback callback) = 0;
   virtual void Search(const std::string &query, SearchType type, SearchCallback callback);
   virtual void GetArtists(SearchCallback callback);
