@@ -21,6 +21,17 @@ PlaylistView::PlaylistView() {
                      }
                    }),
                    this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(widget_, keys);
+  g_signal_connect(keys, "key-pressed", G_CALLBACK(+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<PlaylistView *>(data);
+                     if (keyval == GDK_KEY_F2 && self->edit_request_) {
+                       self->edit_request_();
+                       return TRUE;
+                     }
+                     return FALSE;
+                   }),
+                   this);
 }
 
 void PlaylistView::SetFilterString(const std::string &filter) { filter_ = filter; }
@@ -34,6 +45,27 @@ void PlaylistView::SetSelectCallback(SelectCallback callback) { select_ = std::m
 void PlaylistView::SetSortCallback(SortCallback callback) { sort_ = std::move(callback); }
 
 void PlaylistView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+
+void PlaylistView::SetEditRequestCallback(EditRequestCallback callback) { edit_request_ = std::move(callback); }
+
+void PlaylistView::SetEditCommitCallback(EditCommitCallback callback) { edit_commit_ = std::move(callback); }
+
+void PlaylistView::RecordClickedColumn(GtkWidget *row, double x) {
+  for (GtkWidget *child = gtk_widget_get_first_child(row); child; child = gtk_widget_get_next_sibling(child)) {
+    const int stored = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "column"));
+    if (stored <= 0) {
+      continue;
+    }
+    graphene_rect_t bounds;
+    if (!gtk_widget_compute_bounds(child, row, &bounds)) {
+      continue;
+    }
+    if (x >= bounds.origin.x && x < bounds.origin.x + bounds.size.width) {
+      last_clicked_column_ = static_cast<PlaylistColumn>(stored - 1);
+      return;
+    }
+  }
+}
 
 void PlaylistView::Clear() {
   GtkWidget *child = gtk_widget_get_first_child(grid_);
@@ -92,17 +124,19 @@ void PlaylistView::Refresh(Playlist *playlist) {
       } else {
         gtk_widget_set_size_request(label, PlaylistDelegates::ColumnWidth(column), -1);
       }
+      g_object_set_data(G_OBJECT(label), "column", GINT_TO_POINTER(i + 1));
       gtk_box_append(GTK_BOX(row), label);
     }
     g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index));
     GtkGesture *click = gtk_gesture_click_new();
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
     gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(click));
-    g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *gesture, gint n_press, gdouble, gdouble, gpointer data) {
+    g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *gesture, gint n_press, gdouble x, gdouble, gpointer data) {
                        auto *self = static_cast<PlaylistView *>(data);
                        GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
                        const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "row-index"));
                        const GdkModifierType mods = gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
+                       self->RecordClickedColumn(widget, x);
                        if (self->select_) {
                          self->select_(index, (mods & GDK_CONTROL_MASK) != 0);
                        }
@@ -113,6 +147,50 @@ void PlaylistView::Refresh(Playlist *playlist) {
                      this);
     gtk_box_append(GTK_BOX(grid_), row);
     ++visible_count_;
+  }
+}
+
+void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
+  if (!PlaylistDelegates::ColumnIsEditable(column)) {
+    return;
+  }
+  GtkWidget *child = gtk_widget_get_first_child(grid_);
+  while (child) {
+    if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index")) == row) {
+      for (GtkWidget *cell = gtk_widget_get_first_child(child); cell; cell = gtk_widget_get_next_sibling(cell)) {
+        const int stored = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(cell), "column"));
+        if (stored - 1 != static_cast<int>(column)) {
+          continue;
+        }
+        const char *current = GTK_IS_LABEL(cell) ? gtk_label_get_text(GTK_LABEL(cell)) : "";
+        GtkWidget *entry = gtk_entry_new();
+        gtk_editable_set_text(GTK_EDITABLE(entry), current);
+        gtk_widget_set_hexpand(entry, column == PlaylistColumn::Title);
+        gtk_widget_set_size_request(entry, PlaylistDelegates::ColumnWidth(column), -1);
+        g_object_set_data(G_OBJECT(entry), "column", GINT_TO_POINTER(stored));
+        g_object_set_data(G_OBJECT(entry), "row-index", GINT_TO_POINTER(row));
+        GtkWidget *prev = gtk_widget_get_prev_sibling(cell);
+        gtk_widget_unparent(cell);
+        if (prev) {
+          gtk_box_insert_child_after(GTK_BOX(child), entry, prev);
+        } else {
+          gtk_box_prepend(GTK_BOX(child), entry);
+        }
+        g_signal_connect(entry, "activate", G_CALLBACK(+[](GtkEntry *widget, gpointer data) {
+                           auto *self = static_cast<PlaylistView *>(data);
+                           const int edited_row = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "row-index"));
+                           const PlaylistColumn edited_column =
+                               static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "column")) - 1);
+                           if (self->edit_commit_) {
+                             self->edit_commit_(edited_row, edited_column, gtk_editable_get_text(GTK_EDITABLE(widget)));
+                           }
+                         }),
+                         this);
+        gtk_widget_grab_focus(entry);
+        return;
+      }
+    }
+    child = gtk_widget_get_next_sibling(child);
   }
 }
 

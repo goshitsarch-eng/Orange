@@ -186,3 +186,30 @@ TEST(Playlist, RenumberAndRateCurrent) {
   playlist.RateCurrentSong(0.8f);
   EXPECT_NEAR(0.8f, playlist.current_song().rating(), 0.001f);
 }
+
+TEST(Playlist, SetColumnValuesUpdatesSongsAndUndo) {
+  Playlist playlist;
+  Song a;
+  a.set_title("A");
+  a.set_artist("One");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("B");
+  b.set_artist("Two");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  playlist.AppendSongs({a, b});
+  EXPECT_EQ(2, playlist.SetColumnValues({0, 1}, PlaylistColumn::Artist, "Shared"));
+  EXPECT_EQ("Shared", playlist.songs()[0].artist());
+  EXPECT_EQ("Shared", playlist.songs()[1].artist());
+  EXPECT_TRUE(playlist.SetColumnValue(0, PlaylistColumn::Title, "Renamed"));
+  EXPECT_EQ("Renamed", playlist.songs()[0].title());
+  EXPECT_FALSE(playlist.SetColumnValue(0, PlaylistColumn::Bitrate, "128"));
+  playlist.Undo();
+  EXPECT_EQ("A", playlist.songs()[0].title());
+  EXPECT_EQ("Shared", playlist.songs()[0].artist());
+  playlist.Undo();
+  EXPECT_EQ("One", playlist.songs()[0].artist());
+  EXPECT_EQ("Two", playlist.songs()[1].artist());
+}

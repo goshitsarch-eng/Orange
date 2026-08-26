@@ -8,11 +8,17 @@
 enum class PlaylistColumn {
   Track,
   Title,
+  TitleSort,
   Artist,
+  ArtistSort,
   Album,
+  AlbumSort,
   AlbumArtist,
+  AlbumArtistSort,
   Performer,
+  PerformerSort,
   Composer,
+  ComposerSort,
   Year,
   OriginalYear,
   Disc,
@@ -50,6 +56,8 @@ std::string ColumnTitle(PlaylistColumn column);
 std::string ColumnText(const Song &song, PlaylistColumn column);
 int ColumnWidth(PlaylistColumn column);
 bool ColumnVisible(PlaylistColumn column);
+bool ColumnIsEditable(PlaylistColumn column);
+bool SetColumnValue(Song &song, PlaylistColumn column, const std::string &value);
 std::string RatingStars(float rating);
 
 }  // namespace PlaylistDelegates

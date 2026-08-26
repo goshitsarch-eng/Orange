@@ -224,6 +224,7 @@ class Song {
   bool is_cdda() const { return source_ == Source::CDDA || filetype_ == FileType::CDDA; }
   bool is_collection_song() const { return source_ == Source::Collection; }
   bool is_local_file() const { return source_ == Source::LocalFile || source_ == Source::Collection; }
+  bool IsEditable() const;
 
   static FileType FiletypeByExtension(const std::string &extension);
   static FileType FiletypeByMimeType(const std::string &mimetype);

@@ -42,3 +42,39 @@ TEST(Song, EqualityByUrl) {
   b.set_url("file:///tmp/a.flac");
   EXPECT_EQ(a, b);
 }
+
+TEST(Song, IsEditableRequiresLocalWritableFile) {
+  Song local;
+  local.set_valid(true);
+  local.set_source(Song::Source::LocalFile);
+  local.set_url("file:///tmp/song.flac");
+  EXPECT_TRUE(local.IsEditable());
+
+  Song collection;
+  collection.set_valid(true);
+  collection.set_source(Song::Source::Collection);
+  collection.set_url("file:///music/album/track.flac");
+  EXPECT_TRUE(collection.IsEditable());
+
+  Song stream;
+  stream.set_valid(true);
+  stream.set_source(Song::Source::Stream);
+  stream.set_url("http://example.invalid/live");
+  EXPECT_FALSE(stream.IsEditable());
+
+  Song cdda;
+  cdda.set_valid(true);
+  cdda.set_source(Song::Source::CDDA);
+  EXPECT_FALSE(cdda.IsEditable());
+
+  Song cue;
+  cue.set_valid(true);
+  cue.set_source(Song::Source::LocalFile);
+  cue.set_url("file:///tmp/album.flac");
+  cue.set_cue_path("/tmp/album.cue");
+  EXPECT_FALSE(cue.IsEditable());
+
+  Song invalid;
+  invalid.set_source(Song::Source::LocalFile);
+  EXPECT_FALSE(invalid.IsEditable());
+}

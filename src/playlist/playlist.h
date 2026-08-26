@@ -3,6 +3,7 @@
 
 #include "core/signal.h"
 #include "core/song.h"
+#include "playlist/playlistdelegates.h"
 #include "playlist/playlistsequence.h"
 #include "smartplaylists/smartplaylist.h"
 
@@ -44,6 +45,8 @@ class Playlist {
   void RateCurrentSong(float rating);
   void SkipTracks(const std::vector<int> &rows);
   void ReplaceRow(int row, const Song &song);
+  bool SetColumnValue(int row, PlaylistColumn column, const std::string &value);
+  int SetColumnValues(const std::vector<int> &rows, PlaylistColumn column, const std::string &value);
   void ReloadRow(int row, class TagReader *tagreader);
   void ReplaceSongs(const SongList &songs);
   void Undo();

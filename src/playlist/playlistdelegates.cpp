@@ -6,22 +6,36 @@
 #include "utilities/timeutils.h"
 #include "widgets/ratingpainter.h"
 
+#include <cstdlib>
+
 std::string PlaylistDelegates::ColumnTitle(PlaylistColumn column) {
   switch (column) {
     case PlaylistColumn::Track:
       return "Track";
     case PlaylistColumn::Title:
       return "Title";
+    case PlaylistColumn::TitleSort:
+      return "Title sort";
     case PlaylistColumn::Artist:
       return "Artist";
+    case PlaylistColumn::ArtistSort:
+      return "Artist sort";
     case PlaylistColumn::Album:
       return "Album";
+    case PlaylistColumn::AlbumSort:
+      return "Album sort";
     case PlaylistColumn::AlbumArtist:
       return "Album artist";
+    case PlaylistColumn::AlbumArtistSort:
+      return "Album artist sort";
     case PlaylistColumn::Performer:
       return "Performer";
+    case PlaylistColumn::PerformerSort:
+      return "Performer sort";
     case PlaylistColumn::Composer:
       return "Composer";
+    case PlaylistColumn::ComposerSort:
+      return "Composer sort";
     case PlaylistColumn::Year:
       return "Year";
     case PlaylistColumn::OriginalYear:
@@ -87,15 +101,21 @@ std::string PlaylistDelegates::ColumnTitle(PlaylistColumn column) {
 int PlaylistDelegates::ColumnWidth(PlaylistColumn column) {
   switch (column) {
     case PlaylistColumn::Title:
+    case PlaylistColumn::TitleSort:
     case PlaylistColumn::URL:
     case PlaylistColumn::Filename:
     case PlaylistColumn::Comment:
       return 200;
     case PlaylistColumn::Artist:
+    case PlaylistColumn::ArtistSort:
     case PlaylistColumn::Album:
+    case PlaylistColumn::AlbumSort:
     case PlaylistColumn::AlbumArtist:
+    case PlaylistColumn::AlbumArtistSort:
     case PlaylistColumn::Performer:
+    case PlaylistColumn::PerformerSort:
     case PlaylistColumn::Composer:
+    case PlaylistColumn::ComposerSort:
       return 150;
     default:
       return 80;
@@ -124,16 +144,28 @@ std::string PlaylistDelegates::ColumnText(const Song &song, PlaylistColumn colum
       return song.track() > 0 ? std::to_string(song.track()) : "";
     case PlaylistColumn::Title:
       return song.PrettyTitle();
+    case PlaylistColumn::TitleSort:
+      return song.titlesort();
     case PlaylistColumn::Artist:
       return song.artist();
+    case PlaylistColumn::ArtistSort:
+      return song.artistsort();
     case PlaylistColumn::Album:
       return song.album();
+    case PlaylistColumn::AlbumSort:
+      return song.albumsort();
     case PlaylistColumn::AlbumArtist:
       return song.EffectiveAlbumartist();
+    case PlaylistColumn::AlbumArtistSort:
+      return song.albumartistsort();
     case PlaylistColumn::Performer:
       return song.performer();
+    case PlaylistColumn::PerformerSort:
+      return song.performersort();
     case PlaylistColumn::Composer:
       return song.composer();
+    case PlaylistColumn::ComposerSort:
+      return song.composersort();
     case PlaylistColumn::Year:
       return song.year() > 0 ? std::to_string(song.year()) : "";
     case PlaylistColumn::OriginalYear:
@@ -194,4 +226,105 @@ std::string PlaylistDelegates::ColumnText(const Song &song, PlaylistColumn colum
       break;
   }
   return {};
+}
+
+bool PlaylistDelegates::ColumnIsEditable(PlaylistColumn column) {
+  switch (column) {
+    case PlaylistColumn::Title:
+    case PlaylistColumn::TitleSort:
+    case PlaylistColumn::Artist:
+    case PlaylistColumn::ArtistSort:
+    case PlaylistColumn::Album:
+    case PlaylistColumn::AlbumSort:
+    case PlaylistColumn::AlbumArtist:
+    case PlaylistColumn::AlbumArtistSort:
+    case PlaylistColumn::Composer:
+    case PlaylistColumn::ComposerSort:
+    case PlaylistColumn::Performer:
+    case PlaylistColumn::PerformerSort:
+    case PlaylistColumn::Grouping:
+    case PlaylistColumn::Track:
+    case PlaylistColumn::Disc:
+    case PlaylistColumn::Year:
+    case PlaylistColumn::Genre:
+    case PlaylistColumn::Comment:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool PlaylistDelegates::SetColumnValue(Song &song, PlaylistColumn column, const std::string &value) {
+  if (!ColumnIsEditable(column)) {
+    return false;
+  }
+  auto parse_int = [](const std::string &text) {
+    if (text.empty()) {
+      return -1;
+    }
+    char *end = nullptr;
+    const long parsed = std::strtol(text.c_str(), &end, 10);
+    if (!end || end == text.c_str()) {
+      return -1;
+    }
+    return static_cast<int>(parsed);
+  };
+  switch (column) {
+    case PlaylistColumn::Title:
+      song.set_title(value);
+      return true;
+    case PlaylistColumn::TitleSort:
+      song.set_titlesort(value);
+      return true;
+    case PlaylistColumn::Artist:
+      song.set_artist(value);
+      return true;
+    case PlaylistColumn::ArtistSort:
+      song.set_artistsort(value);
+      return true;
+    case PlaylistColumn::Album:
+      song.set_album(value);
+      return true;
+    case PlaylistColumn::AlbumSort:
+      song.set_albumsort(value);
+      return true;
+    case PlaylistColumn::AlbumArtist:
+      song.set_albumartist(value);
+      return true;
+    case PlaylistColumn::AlbumArtistSort:
+      song.set_albumartistsort(value);
+      return true;
+    case PlaylistColumn::Composer:
+      song.set_composer(value);
+      return true;
+    case PlaylistColumn::ComposerSort:
+      song.set_composersort(value);
+      return true;
+    case PlaylistColumn::Performer:
+      song.set_performer(value);
+      return true;
+    case PlaylistColumn::PerformerSort:
+      song.set_performersort(value);
+      return true;
+    case PlaylistColumn::Grouping:
+      song.set_grouping(value);
+      return true;
+    case PlaylistColumn::Track:
+      song.set_track(parse_int(value));
+      return true;
+    case PlaylistColumn::Disc:
+      song.set_disc(parse_int(value));
+      return true;
+    case PlaylistColumn::Year:
+      song.set_year(parse_int(value));
+      return true;
+    case PlaylistColumn::Genre:
+      song.set_genre(value);
+      return true;
+    case PlaylistColumn::Comment:
+      song.set_comment(value);
+      return true;
+    default:
+      return false;
+  }
 }

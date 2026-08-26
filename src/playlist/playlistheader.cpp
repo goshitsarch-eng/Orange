@@ -23,11 +23,11 @@ void PlaylistHeader::Rebuild(const SortCallback &callback) {
     gtk_widget_add_css_class(button, "flat");
     gtk_widget_set_hexpand(button, column == PlaylistColumn::Title);
     gtk_widget_set_size_request(button, PlaylistDelegates::ColumnWidth(column), -1);
-    g_object_set_data(G_OBJECT(button), "column", GINT_TO_POINTER(i));
+    g_object_set_data(G_OBJECT(button), "column", GINT_TO_POINTER(i + 1));
     g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
                        auto *fn = static_cast<SortCallback *>(data);
                        if (fn && *fn) {
-                         (*fn)(static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(btn), "column"))));
+                         (*fn)(static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(btn), "column")) - 1));
                        }
                      }),
                      cb);

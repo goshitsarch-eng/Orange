@@ -16,6 +16,8 @@ class PlaylistView {
   using SelectCallback = std::function<void(int, bool)>;
   using SortCallback = std::function<void(PlaylistColumn)>;
   using MenuCallback = std::function<void(double, double)>;
+  using EditRequestCallback = std::function<void()>;
+  using EditCommitCallback = std::function<void(int, PlaylistColumn, const std::string &)>;
 
   PlaylistView();
 
@@ -29,10 +31,16 @@ class PlaylistView {
   void SetSelectCallback(SelectCallback callback);
   void SetSortCallback(SortCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  void SetEditRequestCallback(EditRequestCallback callback);
+  void SetEditCommitCallback(EditCommitCallback callback);
+  PlaylistColumn last_clicked_column() const { return last_clicked_column_; }
+  void SetLastClickedColumn(PlaylistColumn column) { last_clicked_column_ = column; }
+  void StartInlineEdit(int row, PlaylistColumn column);
   int visible_count() const { return visible_count_; }
 
  private:
   void Clear();
+  void RecordClickedColumn(GtkWidget *row, double x);
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *grid_ = nullptr;
@@ -42,6 +50,9 @@ class PlaylistView {
   SelectCallback select_;
   SortCallback sort_;
   MenuCallback menu_;
+  EditRequestCallback edit_request_;
+  EditCommitCallback edit_commit_;
+  PlaylistColumn last_clicked_column_ = PlaylistColumn::Title;
   int visible_count_ = 0;
 };
 

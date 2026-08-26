@@ -90,6 +90,10 @@ bool Song::is_stream() const {
          source_ == Source::RadioParadise || source_ == Source::RadioBrowser || filetype_ == FileType::Stream;
 }
 
+bool Song::IsEditable() const {
+  return valid_ && is_local_file() && !is_stream() && !is_cdda() && !unavailable_ && cue_path_.empty();
+}
+
 Song::FileType Song::FiletypeByExtension(const std::string &extension) {
   std::string ext = extension;
   std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });

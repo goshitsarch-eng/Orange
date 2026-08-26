@@ -22,6 +22,7 @@
 #include "widgets/volumeslider.h"
 #include "collection/collectiondirectory.h"
 #include "constants/behavioursettings.h"
+#include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "device/cddasongloader.h"
 #include "organize/organize.h"
@@ -158,6 +159,8 @@ void MainWindow::BuildUi() {
   g_menu_append(playlist, "Rescan selected songs", "win.rescan-selected");
   g_menu_append(playlist, "Fetch streaming metadata", "win.fetch-metadata");
   g_menu_append(playlist, "Auto-complete tags…", "win.autocomplete-tags");
+  g_menu_append(playlist, "Edit value", "win.edit-value");
+  g_menu_append(playlist, "Set column to…", "win.set-column");
   g_menu_append(playlist, "Undo", "win.undo");
   g_menu_append(playlist, "Redo", "win.redo");
   g_menu_append(playlist, "Smart playlist wizard…", "win.smart-wizard");
@@ -184,7 +187,13 @@ void MainWindow::BuildUi() {
   g_menu_append(tools, "Delete files…", "win.delete-files");
   g_menu_append(tools, "Fetch tags…", "win.tagfetch");
   g_menu_append(tools, "Edit tags…", "win.edittag");
-  g_menu_append(tools, "Rate 5 stars", "win.rate-5");
+  GMenu *rate = g_menu_new();
+  g_menu_append(rate, "1 star", "win.rate(1)");
+  g_menu_append(rate, "2 stars", "win.rate(2)");
+  g_menu_append(rate, "3 stars", "win.rate(3)");
+  g_menu_append(rate, "4 stars", "win.rate(4)");
+  g_menu_append(rate, "5 stars", "win.rate(5)");
+  g_menu_append_submenu(tools, "Rate", G_MENU_MODEL(rate));
   g_menu_append(tools, "Collection grouping…", "win.group-by");
   g_menu_append(tools, "Cycle analyzer", "win.cycle-analyzer");
   g_menu_append(tools, "Debug console", "win.console");
@@ -198,11 +207,11 @@ void MainWindow::BuildUi() {
   gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(menu_button), G_MENU_MODEL(menu));
   adw_header_bar_pack_end(ADW_HEADER_BAR(header), menu_button);
 
-  GtkWidget *search = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search), "Filter collection (artist:name, -term)");
-  gtk_widget_set_tooltip_text(search, "Field filters: artist: title: album: genre: year: rating:  Use -term to exclude.");
-  adw_header_bar_pack_start(ADW_HEADER_BAR(header), search);
-  g_signal_connect(search, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
+  collection_search_ = gtk_search_entry_new();
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(collection_search_), "Filter collection (artist:name, -term)");
+  gtk_widget_set_tooltip_text(collection_search_, "Field filters: artist: title: album: genre: year: rating:  Use -term to exclude.");
+  adw_header_bar_pack_start(ADW_HEADER_BAR(header), collection_search_);
+  g_signal_connect(collection_search_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
                      self->RefreshCollection(gtk_editable_get_text(GTK_EDITABLE(entry)), true);
                    }),
@@ -297,6 +306,17 @@ void MainWindow::BuildUi() {
   add_action("open-file-manager", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->OpenSelectedInFileManager(); }));
   add_action("copy-url", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CopySelectedUrl(); }));
   add_action("rate-5", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RateSelected(5); }));
+  {
+    GSimpleAction *rate = g_simple_action_new("rate", G_VARIANT_TYPE_INT32);
+    g_signal_connect(rate, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
+                       static_cast<MainWindow *>(data)->RateSelected(g_variant_get_int32(param));
+                     }),
+                     this);
+    g_action_map_add_action(G_ACTION_MAP(window_), G_ACTION(rate));
+  }
+  add_action("edit-value", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->EditColumnValue(); }));
+  add_action("set-column", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SetColumnTo(); }));
+  add_action("focus-search", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->FocusCollectionSearch(); }));
   add_action("playlist-skip", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SkipSelected(); }));
   add_action("jump-playing", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->JumpToPlaying(); }));
   add_action("rescan-selected", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RescanSelected(); }));
@@ -392,6 +412,19 @@ void MainWindow::BuildUi() {
                  self->RefreshPlaylist();
                }
              }));
+  auto set_accels = [this](const char *action, const char *accel) {
+    const char *accels[] = {accel, nullptr};
+    gtk_application_set_accels_for_action(GTK_APPLICATION(gtk_app_), action, accels);
+  };
+  set_accels("win.edit-value", "F2");
+  set_accels("win.focus-search", "<Control>f");
+  set_accels("win.undo", "<Control>z");
+  set_accels("win.redo", "<Control><Shift>z");
+  set_accels("win.new-playlist", "<Control>n");
+  set_accels("win.open-files", "<Control>o");
+  set_accels("win.save-playlist", "<Control>s");
+  set_accels("win.preferences", "<Control>comma");
+  set_accels("win.quit", "<Control>q");
 }
 
 void MainWindow::BuildSidebar() {
@@ -600,6 +633,10 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->view()->SetSelectCallback([this](int index, bool add) { SelectPlaylistRow(index, add); });
   playlist_container_->view()->SetSortCallback([this](PlaylistColumn column) { SortPlaylistBy(column); });
   playlist_container_->view()->SetMenuCallback([this](double x, double y) { ShowPlaylistMenu(x, y); });
+  playlist_container_->view()->SetEditRequestCallback([this]() { EditColumnValue(); });
+  playlist_container_->view()->SetEditCommitCallback([this](int row, PlaylistColumn column, const std::string &value) {
+    ApplyColumnValue(column, value, {row});
+  });
   playlist_container_->tab_bar()->SetChangedCallback([this](const std::string &name) {
     app_->playlist_manager()->SetCurrentPlaylist(name);
     RefreshPlaylist();
@@ -1212,6 +1249,8 @@ void MainWindow::ShowPlaylistMenu(double, double) {
   g_menu_append(menu, "Rescan selected songs", "win.rescan-selected");
   g_menu_append(menu, "Fetch streaming metadata", "win.fetch-metadata");
   g_menu_append(menu, "Auto-complete tags…", "win.autocomplete-tags");
+  g_menu_append(menu, "Edit value", "win.edit-value");
+  g_menu_append(menu, "Set column to…", "win.set-column");
   GMenu *add_to = g_menu_new();
   for (Playlist *playlist : app_->playlist_manager()->GetAllPlaylists()) {
     if (!playlist || playlist == app_->playlist_manager()->current()) {
@@ -1229,7 +1268,13 @@ void MainWindow::ShowPlaylistMenu(double, double) {
   g_menu_append(menu, "Move to collection", "win.move-collection");
   g_menu_append(menu, "Add to transcoder…", "win.transcode-selected");
   g_menu_append(menu, "Copy song URL", "win.copy-url");
-  g_menu_append(menu, "Rate 5 stars", "win.rate-5");
+  GMenu *rate_menu = g_menu_new();
+  g_menu_append(rate_menu, "1 star", "win.rate(1)");
+  g_menu_append(rate_menu, "2 stars", "win.rate(2)");
+  g_menu_append(rate_menu, "3 stars", "win.rate(3)");
+  g_menu_append(rate_menu, "4 stars", "win.rate(4)");
+  g_menu_append(rate_menu, "5 stars", "win.rate(5)");
+  g_menu_append_submenu(menu, "Rate", G_MENU_MODEL(rate_menu));
   g_menu_append(menu, "Edit tags…", "win.edittag");
   g_menu_append(menu, "Cover search…", "win.cover-search");
   g_menu_append(menu, "Delete file…", "win.delete-files");
@@ -1503,6 +1548,140 @@ void MainWindow::AddSelectedToPlaylist(int id) {
 
 void MainWindow::AutoCompleteTags() {
   TrackSelectionDialog::Show(GTK_WINDOW(window_), app_, SelectedSongs());
+}
+
+void MainWindow::FocusCollectionSearch() {
+  if (collection_search_) {
+    gtk_widget_grab_focus(collection_search_);
+  }
+}
+
+void MainWindow::PersistEditedSongs(const std::vector<int> &rows) {
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (!playlist || !app_->tagreader()) {
+    return;
+  }
+  for (int row : rows) {
+    Song song = playlist->song(row);
+    if (!song.IsEditable()) {
+      continue;
+    }
+    app_->tagreader()->WriteFile(song);
+    if (song.id() > 0 || song.is_collection_song()) {
+      app_->collection()->backend()->AddOrUpdateSong(song);
+    }
+  }
+}
+
+void MainWindow::ApplyColumnValue(PlaylistColumn column, const std::string &value, const std::vector<int> &rows) {
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (!playlist || rows.empty()) {
+    return;
+  }
+  std::vector<int> editable_rows;
+  for (int row : rows) {
+    if (playlist->song(row).IsEditable()) {
+      editable_rows.push_back(row);
+    }
+  }
+  if (editable_rows.empty()) {
+    ShowToast("Selected songs cannot be edited");
+    return;
+  }
+  if (playlist->SetColumnValues(editable_rows, column, value) <= 0) {
+    ShowToast("This column is not editable");
+    return;
+  }
+  PersistEditedSongs(editable_rows);
+  app_->playlist_manager()->SaveCurrent();
+  RefreshPlaylist();
+  UpdateNowPlaying();
+  ShowToast("Updated " + PlaylistDelegates::ColumnTitle(column));
+}
+
+void MainWindow::EditColumnValue() {
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  if (!settings.BoolValue(PlaylistSettings::kEditMetadataInline, PlaylistSettings::kDefaultEditMetadataInline)) {
+    ShowToast("Enable “Edit metadata inline” in playlist preferences");
+    return;
+  }
+  Playlist *playlist = app_->playlist_manager()->current();
+  const std::vector<int> rows = SelectedPlaylistRows();
+  if (!playlist || rows.empty()) {
+    return;
+  }
+  const PlaylistColumn column = playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Title;
+  if (!PlaylistDelegates::ColumnIsEditable(column)) {
+    ShowToast("This column is not editable");
+    return;
+  }
+  if (rows.size() == 1 && playlist_container_) {
+    playlist_container_->view()->StartInlineEdit(rows.front(), column);
+    return;
+  }
+  const std::string current = PlaylistDelegates::ColumnText(playlist->song(rows.front()), column);
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new("Edit value", PlaylistDelegates::ColumnTitle(column).c_str()));
+  GtkWidget *entry = gtk_entry_new();
+  gtk_editable_set_text(GTK_EDITABLE(entry), current.c_str());
+  adw_alert_dialog_set_extra_child(dialog, entry);
+  adw_alert_dialog_add_responses(dialog, "cancel", "Cancel", "apply", "Apply", nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "apply", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response(dialog, "apply");
+  g_object_set_data(G_OBJECT(dialog), "entry", entry);
+  g_object_set_data(G_OBJECT(dialog), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+                     if (g_strcmp0(response, "apply") != 0) {
+                       return;
+                     }
+                     auto *self = static_cast<MainWindow *>(data);
+                     auto *value_entry = GTK_EDITABLE(g_object_get_data(G_OBJECT(alert), "entry"));
+                     const PlaylistColumn edited =
+                         static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(alert), "column")) - 1);
+                     self->ApplyColumnValue(edited, gtk_editable_get_text(value_entry), self->SelectedPlaylistRows());
+                   }),
+                   this);
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
+}
+
+void MainWindow::SetColumnTo() {
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  if (!settings.BoolValue(PlaylistSettings::kEditMetadataInline, PlaylistSettings::kDefaultEditMetadataInline)) {
+    ShowToast("Enable “Edit metadata inline” in playlist preferences");
+    return;
+  }
+  Playlist *playlist = app_->playlist_manager()->current();
+  const std::vector<int> rows = SelectedPlaylistRows();
+  if (!playlist || rows.empty()) {
+    return;
+  }
+  const PlaylistColumn column = playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Title;
+  if (!PlaylistDelegates::ColumnIsEditable(column)) {
+    ShowToast("This column is not editable");
+    return;
+  }
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new("Set column to…", PlaylistDelegates::ColumnTitle(column).c_str()));
+  GtkWidget *entry = gtk_entry_new();
+  gtk_editable_set_text(GTK_EDITABLE(entry), PlaylistDelegates::ColumnText(playlist->song(rows.front()), column).c_str());
+  adw_alert_dialog_set_extra_child(dialog, entry);
+  adw_alert_dialog_add_responses(dialog, "cancel", "Cancel", "apply", "Apply", nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "apply", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response(dialog, "apply");
+  g_object_set_data(G_OBJECT(dialog), "entry", entry);
+  g_object_set_data(G_OBJECT(dialog), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+                     if (g_strcmp0(response, "apply") != 0) {
+                       return;
+                     }
+                     auto *self = static_cast<MainWindow *>(data);
+                     auto *value_entry = GTK_EDITABLE(g_object_get_data(G_OBJECT(alert), "entry"));
+                     const PlaylistColumn edited =
+                         static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(alert), "column")) - 1);
+                     self->ApplyColumnValue(edited, gtk_editable_get_text(value_entry), self->SelectedPlaylistRows());
+                   }),
+                   this);
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
 }
 
 void MainWindow::CopySelectedUrl() {

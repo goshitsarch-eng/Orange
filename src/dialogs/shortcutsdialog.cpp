@@ -8,7 +8,7 @@ void ShortcutsDialog::Show(GtkWindow *parent) {
   GtkWidget *label = gtk_label_new(
       "Space  Play/Pause\nCtrl+Right  Next\nCtrl+Left  Previous\nCtrl+Up  Volume up\nCtrl+Down  Volume down\n"
       "Ctrl+Z  Undo\nCtrl+Shift+Z  Redo\nCtrl+N  New playlist\nCtrl+O  Open files\nCtrl+S  Save playlist\n"
-      "Ctrl+Q  Quit\nCtrl+,  Preferences");
+      "F2  Edit playlist value\nCtrl+F  Focus collection search\nCtrl+Q  Quit\nCtrl+,  Preferences");
   gtk_widget_set_margin_start(label, 24);
   gtk_widget_set_margin_end(label, 24);
   gtk_widget_set_margin_top(label, 24);

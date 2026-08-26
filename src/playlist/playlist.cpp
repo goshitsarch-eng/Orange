@@ -1,5 +1,6 @@
 #include "playlist/playlist.h"
 
+#include "playlist/playlistdelegates.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
@@ -224,6 +225,37 @@ void Playlist::ReplaceRow(int row, const Song &song) {
   songs_[static_cast<size_t>(row)] = song;
   songs_[static_cast<size_t>(row)].set_skipped(skipped);
   Changed.Emit();
+}
+
+bool Playlist::SetColumnValue(int row, PlaylistColumn column, const std::string &value) {
+  return SetColumnValues({row}, column, value) > 0;
+}
+
+int Playlist::SetColumnValues(const std::vector<int> &rows, PlaylistColumn column, const std::string &value) {
+  if (!PlaylistDelegates::ColumnIsEditable(column)) {
+    return 0;
+  }
+  PushUndo();
+  int updated = 0;
+  for (int row : rows) {
+    if (row < 0 || row >= row_count()) {
+      continue;
+    }
+    Song song = songs_[static_cast<size_t>(row)];
+    if (!PlaylistDelegates::SetColumnValue(song, column, value)) {
+      continue;
+    }
+    const bool skipped = songs_[static_cast<size_t>(row)].skipped();
+    songs_[static_cast<size_t>(row)] = song;
+    songs_[static_cast<size_t>(row)].set_skipped(skipped);
+    ++updated;
+  }
+  if (updated == 0) {
+    undo_.pop_back();
+    return 0;
+  }
+  Changed.Emit();
+  return updated;
 }
 
 void Playlist::ReloadRow(int row, TagReader *tagreader) {

@@ -1,9 +1,12 @@
 #include "playlist/playlistcolumnsdialog.h"
 
 #include "core/settings.h"
+#include "playlist/playlistdelegates.h"
+#include "utilities/strutils.h"
 
 #include <adwaita.h>
 #include <string>
+#include <vector>
 
 void PlaylistColumnsDialog::Show(GtkWindow *parent, const std::function<void()> &callback) {
   AdwDialog *dialog = adw_dialog_new();
@@ -14,17 +17,26 @@ void PlaylistColumnsDialog::Show(GtkWindow *parent, const std::function<void()> 
   gtk_widget_set_margin_end(box, 16);
   gtk_widget_set_margin_top(box, 16);
   gtk_widget_set_margin_bottom(box, 16);
-  static const char *columns[] = {"Track", "Title", "Artist", "Album", "Album artist", "Performer", "Composer", "Year", "Original year",
-                                  "Disc", "Length", "Genre", "Sample rate", "Bit depth", "Bitrate", "URL", "Filename", "Filesize",
-                                  "Filetype", "Date created", "Date modified", "Plays", "Skips", "Last played", "Comment", "Grouping",
-                                  "Source", "Moodbar", "Rating", "CUE", "EBU R128 I", "EBU R128 LRA", "BPM", "Mood", "Initial key", nullptr};
   Settings settings;
   settings.BeginGroup("Playlist");
   const std::string enabled = settings.Value("columns", "Track,Title,Artist,Album,Album artist,Length,Year,Genre,Bitrate,Sample rate,Plays,Rating,Filename");
+  const std::vector<std::string> enabled_parts = StrUtils::Split(enabled, ',');
+  auto is_enabled = [&enabled_parts](const std::string &title) {
+    for (const std::string &part : enabled_parts) {
+      if (part == title) {
+        return true;
+      }
+    }
+    return false;
+  };
   GtkWidget *list = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-  for (int i = 0; columns[i]; ++i) {
-    GtkWidget *check = gtk_check_button_new_with_label(columns[i]);
-    gtk_check_button_set_active(GTK_CHECK_BUTTON(check), enabled.find(columns[i]) != std::string::npos);
+  for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
+    const std::string title = PlaylistDelegates::ColumnTitle(static_cast<PlaylistColumn>(i));
+    if (title.empty()) {
+      continue;
+    }
+    GtkWidget *check = gtk_check_button_new_with_label(title.c_str());
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(check), is_enabled(title));
     gtk_box_append(GTK_BOX(list), check);
   }
   GtkWidget *scroll = gtk_scrolled_window_new();

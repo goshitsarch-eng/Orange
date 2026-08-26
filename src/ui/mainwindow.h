@@ -103,6 +103,11 @@ class MainWindow {
   void FetchStreamingMetadata();
   void AddSelectedToPlaylist(int id);
   void AutoCompleteTags();
+  void EditColumnValue();
+  void SetColumnTo();
+  void ApplyColumnValue(PlaylistColumn column, const std::string &value, const std::vector<int> &rows);
+  void PersistEditedSongs(const std::vector<int> &rows);
+  void FocusCollectionSearch();
   void ShowToast(const std::string &text);
 
   static void OnPlayPause(GtkButton *button, gpointer data);
@@ -145,6 +150,7 @@ class MainWindow {
   GtkWidget *waveform_drawing_ = nullptr;
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;
+  GtkWidget *collection_search_ = nullptr;
   std::string device_browse_id_;
   std::string streaming_service_name_;
   std::string radio_query_;
