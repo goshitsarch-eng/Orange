@@ -40,6 +40,7 @@
 #include "core/enginemetadata.h"
 #include "core/windowgeometry.h"
 #include "core/mainwindowsettings.h"
+#include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
 #include "widgets/filtersearchkeyboard.h"
 #include "core/filesystemmusicstorage.h"
@@ -1133,6 +1134,24 @@ TEST(MainWindowLook, SidebarAndMuteMatchQt) {
   EXPECT_STREQ("<Control>w", MainWindowLook::ClosePlaylistAccel());
   EXPECT_STREQ("<Control>d", MainWindowLook::PlaylistQueueAccel());
   EXPECT_STREQ("<Control><Shift>d", MainWindowLook::QueuePlayNextAccel());
+}
+
+TEST(MainWindowKeyboard, MatchesQtTransportKeys) {
+  EXPECT_EQ(MainWindowKeyboard::Action::PlayPause, MainWindowKeyboard::FromWindowKey(MainWindowKeyboard::kSpace));
+  EXPECT_EQ(MainWindowKeyboard::Action::PlayPause, MainWindowKeyboard::FromWindowKey(MainWindowKeyboard::kKPSpace));
+  EXPECT_EQ(MainWindowKeyboard::Action::SeekBack, MainWindowKeyboard::FromWindowKey(MainWindowKeyboard::kLeft));
+  EXPECT_EQ(MainWindowKeyboard::Action::SeekForward, MainWindowKeyboard::FromWindowKey(MainWindowKeyboard::kRight));
+  EXPECT_EQ(MainWindowKeyboard::Action::None, MainWindowKeyboard::FromWindowKey('k'));
+  EXPECT_FALSE(MainWindowKeyboard::ShouldHandleWindowKey(true));
+  EXPECT_TRUE(MainWindowKeyboard::ShouldHandleWindowKey(false));
+  EXPECT_EQ(MainWindowKeyboard::Action::Previous, MainWindowKeyboard::FromAccelKey(MainWindowKeyboard::kF5));
+  EXPECT_EQ(MainWindowKeyboard::Action::PlayPause, MainWindowKeyboard::FromAccelKey(MainWindowKeyboard::kF6));
+  EXPECT_EQ(MainWindowKeyboard::Action::Stop, MainWindowKeyboard::FromAccelKey(MainWindowKeyboard::kF7));
+  EXPECT_EQ(MainWindowKeyboard::Action::Next, MainWindowKeyboard::FromAccelKey(MainWindowKeyboard::kF8));
+  EXPECT_STREQ("F5", MainWindowKeyboard::PreviousAccel());
+  EXPECT_STREQ("F6", MainWindowKeyboard::PlayPauseAccel());
+  EXPECT_STREQ("F7", MainWindowKeyboard::StopAccel());
+  EXPECT_STREQ("F8", MainWindowKeyboard::NextAccel());
 }
 
 TEST(FilterSearchKeyboard, MatchesCollectionFilterKeys) {

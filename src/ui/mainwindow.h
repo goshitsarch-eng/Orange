@@ -162,6 +162,9 @@ class MainWindow {
   void ApplySidebar();
   void ToggleMute();
   void ApplyMuteUi(unsigned volume);
+  bool FocusIsEditable() const;
+  gboolean OnWindowKeyCapture(guint keyval);
+  gboolean OnWindowKeyBubble(guint keyval);
 
   static void OnPlayPause(GtkButton *button, gpointer data);
   static void OnStop(GtkButton *button, gpointer data);

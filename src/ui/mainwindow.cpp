@@ -10,6 +10,7 @@
 #include "constants/backendsettings.h"
 #include "constants/coverssettings.h"
 #include "core/mainwindowsettings.h"
+#include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
 #include "context/contextcover.h"
 #include "context/contextview.h"
@@ -229,6 +230,10 @@ void MainWindow::BuildUi() {
   g_menu_append(playlist, Translations::Tr("Smart playlist wizard…").c_str(), "win.smart-wizard");
   g_menu_append_section(menu, Translations::Tr("Playlist").c_str(), G_MENU_MODEL(playlist));
   GMenu *playback = g_menu_new();
+  g_menu_append(playback, Translations::Tr("Play/Pause").c_str(), "win.play-pause");
+  g_menu_append(playback, Translations::Tr("Stop").c_str(), "win.stop");
+  g_menu_append(playback, Translations::Tr("Previous track").c_str(), "win.previous-track");
+  g_menu_append(playback, Translations::Tr("Next track").c_str(), "win.next-track");
   g_menu_append(playback, Translations::Tr("Stop after this track").c_str(), "win.stop-after");
   g_menu_append(playback, Translations::Tr("Queue play next").c_str(), "win.queue-next");
   g_menu_append(playback, Translations::Tr("Scrobble current track").c_str(), "win.scrobble");
@@ -515,6 +520,9 @@ void MainWindow::BuildUi() {
                Dialogs::Organize(GTK_WINDOW(self->window_), self->app_, self->SelectedSongs(), true);
              }));
   add_action("stop", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->Stop(); }));
+  add_action("play-pause", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->PlayPause(); }));
+  add_action("previous-track", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->Previous(); }));
+  add_action("next-track", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->Next(); }));
   add_action("collection-append", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                Settings settings;
@@ -875,6 +883,26 @@ void MainWindow::BuildUi() {
   set_accels("win.close-playlist", MainWindowLook::ClosePlaylistAccel());
   set_accels("win.playlist-queue", MainWindowLook::PlaylistQueueAccel());
   set_accels("win.queue-next", MainWindowLook::QueuePlayNextAccel());
+  set_accels("win.play-pause", MainWindowKeyboard::PlayPauseAccel());
+  set_accels("win.stop", MainWindowKeyboard::StopAccel());
+  set_accels("win.previous-track", MainWindowKeyboard::PreviousAccel());
+  set_accels("win.next-track", MainWindowKeyboard::NextAccel());
+
+  GtkEventController *capture_keys = gtk_event_controller_key_new();
+  gtk_event_controller_set_propagation_phase(capture_keys, GTK_PHASE_CAPTURE);
+  gtk_widget_add_controller(GTK_WIDGET(window_), capture_keys);
+  g_signal_connect(capture_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<MainWindow *>(data)->OnWindowKeyCapture(keyval);
+                   })),
+                   this);
+  GtkEventController *bubble_keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(GTK_WIDGET(window_), bubble_keys);
+  g_signal_connect(bubble_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<MainWindow *>(data)->OnWindowKeyBubble(keyval);
+                   })),
+                   this);
 }
 
 void MainWindow::BuildSidebar() {
@@ -3532,6 +3560,35 @@ void MainWindow::CopySelectedUrl() {
   }
   gdk_clipboard_set_text(gtk_widget_get_clipboard(GTK_WIDGET(window_)), songs.front().url().c_str());
   ShowToast("Copied URL");
+}
+
+bool MainWindow::FocusIsEditable() const {
+  GtkWidget *focus = gtk_window_get_focus(GTK_WINDOW(window_));
+  return focus && GTK_IS_EDITABLE(focus);
+}
+
+gboolean MainWindow::OnWindowKeyCapture(guint keyval) {
+  if (MainWindowKeyboard::FromWindowKey(keyval) != MainWindowKeyboard::Action::PlayPause) {
+    return FALSE;
+  }
+  if (!MainWindowKeyboard::ShouldHandleWindowKey(FocusIsEditable())) {
+    return FALSE;
+  }
+  app_->player()->PlayPause();
+  return TRUE;
+}
+
+gboolean MainWindow::OnWindowKeyBubble(guint keyval) {
+  const MainWindowKeyboard::Action action = MainWindowKeyboard::FromWindowKey(keyval);
+  if (action == MainWindowKeyboard::Action::SeekBack) {
+    app_->player()->SeekBackward();
+    return TRUE;
+  }
+  if (action == MainWindowKeyboard::Action::SeekForward) {
+    app_->player()->SeekForward();
+    return TRUE;
+  }
+  return FALSE;
 }
 
 void MainWindow::OnPlayPause(GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->PlayPause(); }
