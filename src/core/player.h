@@ -66,6 +66,7 @@ class Player : public PlayerInterface {
  private:
   void HandleEngineState(EngineBase::State state);
   void HandleTrackEnded();
+  void PlayQueueHead(int track_change_flags = GstEngine::Manual);
   void PreloadNext();
   void PlayCurrent(bool pause, uint64_t offset_nanosec = 0);
   void PlayLoadedSong(bool pause, int track_change_flags = GstEngine::Manual, uint64_t offset_nanosec = 0);

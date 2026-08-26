@@ -67,6 +67,8 @@ void PlaylistView::SetReorderCallback(ReorderCallback callback) { reorder_ = std
 
 void PlaylistView::SetRateCallback(RateCallback callback) { rate_ = std::move(callback); }
 
+void PlaylistView::SetQueuePositionCallback(QueuePositionCallback callback) { queue_position_ = std::move(callback); }
+
 int PlaylistView::RowAtY(double y) const {
   if (!grid_) {
     return 0;
@@ -266,7 +268,12 @@ void PlaylistView::Refresh(Playlist *playlist) {
       gtk_widget_add_css_class(row, "card");
     }
     for (PlaylistColumn column : PlaylistColumnLayout::Visible()) {
-      GtkWidget *label = gtk_label_new(PlaylistDelegates::ColumnText(song, column).c_str());
+      std::string text = PlaylistDelegates::ColumnText(song, column);
+      if (column == PlaylistColumn::Queue && queue_position_) {
+        const int position = queue_position_(index);
+        text = position > 0 ? std::to_string(position) : "";
+      }
+      GtkWidget *label = gtk_label_new(text.c_str());
       gtk_label_set_xalign(GTK_LABEL(label), PlaylistColumnLayout::XAlign(column));
       gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
       gtk_widget_set_margin_start(label, 6);

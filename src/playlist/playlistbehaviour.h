@@ -88,6 +88,7 @@ inline bool ColumnIsNumeric(PlaylistColumn column) {
     case PlaylistColumn::Filesize:
     case PlaylistColumn::BPM:
     case PlaylistColumn::Rating:
+    case PlaylistColumn::Queue:
       return true;
     default:
       return false;

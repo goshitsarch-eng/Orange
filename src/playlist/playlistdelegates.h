@@ -51,6 +51,7 @@ enum class PlaylistColumn {
   BPM,
   Mood,
   InitialKey,
+  Queue,
   Count
 };
 

@@ -1,6 +1,8 @@
 #include "playlist/playlistmanager.h"
+#include "playlist/playlistdelegates.h"
 #include "queue/queue.h"
 #include "queue/queuedrop.h"
+#include "queue/queuerows.h"
 
 #include "utilities/fileutils.h"
 
@@ -169,4 +171,39 @@ TEST(PlaylistManager, SongChangeRequestProcessedGreysCurrent) {
   EXPECT_TRUE(manager.current()->current_song().unavailable());
   manager.SongChangeRequestProcessed("file:///a", true);
   EXPECT_FALSE(manager.current()->current_song().unavailable());
+}
+
+TEST(QueueRows, RemapsAndPositionsPlaylistSources) {
+  const std::vector<QueueRows::Source> sources = {{1, 0}, {1, 2}, {2, 1}, {-1, -1}};
+  EXPECT_EQ(1, QueueRows::PositionForRow(sources, 1, 0));
+  EXPECT_EQ(2, QueueRows::PositionForRow(sources, 1, 2));
+  EXPECT_EQ(0, QueueRows::PositionForRow(sources, 1, 1));
+  const auto removed = QueueRows::AfterRemove(sources, 1, {0});
+  ASSERT_EQ(3u, removed.size());
+  EXPECT_EQ(1, removed[0].row);
+  EXPECT_EQ(2, removed[1].playlist_id);
+  const auto inserted = QueueRows::AfterInsert({{1, 2}}, 1, 1, 2);
+  ASSERT_EQ(1u, inserted.size());
+  EXPECT_EQ(4, inserted.front().row);
+}
+
+TEST(Queue, TracksPlaylistRowsAndToggle) {
+  Queue queue;
+  Song a = MakeSong("A", "file:///a");
+  Song b = MakeSong("B", "file:///b");
+  queue.Append(a, 4, 1);
+  queue.Append(b, 4, 3);
+  EXPECT_EQ(1, queue.PositionForPlaylistRow(4, 1));
+  EXPECT_EQ(2, queue.PositionForPlaylistRow(4, 3));
+  EXPECT_TRUE(queue.ContainsPlaylistRow(4, 1));
+  queue.TogglePlaylistRow(4, 1, a);
+  EXPECT_FALSE(queue.ContainsPlaylistRow(4, 1));
+  EXPECT_EQ(1, queue.PositionForPlaylistRow(4, 3));
+  queue.RemapAfterPlaylistRemove(4, {3});
+  EXPECT_TRUE(queue.empty());
+}
+
+TEST(PlaylistDelegates, QueueColumnTitle) {
+  EXPECT_EQ("Queue", PlaylistDelegates::ColumnTitle(PlaylistColumn::Queue));
+  EXPECT_TRUE(PlaylistDelegates::ColumnText(MakeSong("A", "file:///a"), PlaylistColumn::Queue).empty());
 }

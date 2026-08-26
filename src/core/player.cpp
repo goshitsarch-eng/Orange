@@ -10,10 +10,12 @@
 #include "core/playerresume.h"
 #include "core/settings.h"
 #include "core/urlhandlers.h"
+#include "playlist/playlist.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistmanager.h"
 #include "playlist/playlistsequence.h"
 #include "queue/queue.h"
+#include "queue/queuerows.h"
 
 Player::Player(TaskManager *task_manager, UrlHandlers *url_handlers, PlaylistManager *playlist_manager)
     : task_manager_(task_manager), url_handlers_(url_handlers), playlist_manager_(playlist_manager), engine_(std::make_unique<GstEngine>()) {}
@@ -163,11 +165,29 @@ void Player::Stop(bool stop_after) {
 
 void Player::StopAfterCurrent() { stop_after_current_ = !stop_after_current_; }
 
+void Player::PlayQueueHead(int track_change_flags) {
+  if (!queue_ || queue_->empty()) {
+    return;
+  }
+  const QueueRows::Source source = queue_->PeekSource();
+  current_song_ = queue_->TakeNext();
+  if (source.valid() && playlist_manager_) {
+    if (Playlist *playlist = playlist_manager_->playlist(source.playlist_id)) {
+      playlist_manager_->SetActivePlaylist(source.playlist_id);
+      playlist->set_current_row(source.row);
+      const Song from_playlist = playlist->song(source.row);
+      if (from_playlist.is_valid() || !from_playlist.url().empty()) {
+        current_song_ = from_playlist;
+      }
+    }
+  }
+  PlayLoadedSong(false, track_change_flags);
+}
+
 void Player::Next() {
   FinishCurrentPlayback();
   if (queue_ && !queue_->empty()) {
-    current_song_ = queue_->TakeNext();
-    PlayLoadedSong(false);
+    PlayQueueHead();
     return;
   }
   if (!playlist_manager_) {
@@ -369,7 +389,9 @@ void Player::PreloadNext() {
     return;
   }
   if (queue_ && !queue_->empty()) {
-    current_song_ = queue_->TakeNext();
+    PlayQueueHead(GstEngine::Auto);
+    preloaded_ = true;
+    return;
   } else if (playlist_manager_) {
     playlist_manager_->Next();
     current_song_ = playlist_manager_->current_song();

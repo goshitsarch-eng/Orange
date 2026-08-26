@@ -162,6 +162,7 @@ PlaylistColumnAlign PlaylistColumnLayout::DefaultAlignment(PlaylistColumn column
     case PlaylistColumn::PlayCount:
     case PlaylistColumn::SkipCount:
     case PlaylistColumn::BPM:
+    case PlaylistColumn::Queue:
       return PlaylistColumnAlign::Right;
     default:
       return PlaylistColumnAlign::Left;

@@ -92,6 +92,8 @@ std::string PlaylistDelegates::ColumnTitle(PlaylistColumn column) {
       return "Mood";
     case PlaylistColumn::InitialKey:
       return "Initial key";
+    case PlaylistColumn::Queue:
+      return "Queue";
     case PlaylistColumn::Count:
       break;
   }
@@ -210,6 +212,8 @@ std::string PlaylistDelegates::ColumnText(const Song &song, PlaylistColumn colum
       return song.mood();
     case PlaylistColumn::InitialKey:
       return song.initial_key();
+    case PlaylistColumn::Queue:
+      return {};
     case PlaylistColumn::Count:
       break;
   }

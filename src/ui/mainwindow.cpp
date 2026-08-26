@@ -23,6 +23,7 @@
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistsequence.h"
+#include "queue/queuerows.h"
 #include "queue/queueview.h"
 #include "widgets/multiloadingindicator.h"
 #include "widgets/playingwidget.h"
@@ -629,31 +630,42 @@ void MainWindow::BuildUi() {
              }));
   add_action("playlist-queue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               const SongList songs = self->SelectedSongs();
-               bool all_queued = !songs.empty();
-               for (const Song &song : songs) {
-                 if (!self->app_->queue()->Contains(song)) {
+               Playlist *playlist = self->app_->playlist_manager()->current();
+               const std::vector<int> rows = self->SelectedPlaylistRows();
+               if (!playlist || rows.empty()) {
+                 return;
+               }
+               bool all_queued = true;
+               for (int row : rows) {
+                 if (!self->app_->queue()->ContainsPlaylistRow(playlist->id(), row)) {
                    all_queued = false;
                    break;
                  }
                }
-               for (const Song &song : songs) {
+               for (int row : rows) {
+                 if (row < 0 || row >= playlist->row_count()) {
+                   continue;
+                 }
                  if (all_queued) {
-                   self->app_->queue()->RemoveSong(song);
-                 } else {
-                   self->app_->queue()->Append(song);
+                   self->app_->queue()->TogglePlaylistRow(playlist->id(), row, playlist->song(row));
+                 } else if (!self->app_->queue()->ContainsPlaylistRow(playlist->id(), row)) {
+                   self->app_->queue()->Append(playlist->song(row), playlist->id(), row);
                  }
                }
                self->RefreshQueue();
+               self->RefreshPlaylist();
                self->ShowToast(all_queued ? "Removed from queue" : "Added to queue");
              }));
   add_action("playlist-remove", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                if (Playlist *playlist = self->app_->playlist_manager()->current()) {
-                 playlist->RemoveRows(self->SelectedPlaylistRows());
+                 const std::vector<int> rows = self->SelectedPlaylistRows();
+                 self->app_->queue()->RemapAfterPlaylistRemove(playlist->id(), rows);
+                 playlist->RemoveRows(rows);
                  self->selected_playlist_rows_.clear();
                  self->app_->playlist_manager()->SaveCurrent();
                  self->RefreshPlaylist();
+                 self->RefreshQueue();
                }
              }));
   auto set_accels = [this](const char *action, const char *accel) {
@@ -907,6 +919,7 @@ void MainWindow::BuildSidebar() {
   });
   queue_view_->SetPlaylistRowsDropCallback([this](const std::vector<int> &rows, int dest) {
     SongList songs;
+    std::vector<QueueRows::Source> sources;
     Playlist *playlist = app_->playlist_manager()->current();
     if (!playlist) {
       return;
@@ -914,10 +927,12 @@ void MainWindow::BuildSidebar() {
     for (int row : rows) {
       if (row >= 0 && row < playlist->row_count()) {
         songs.push_back(playlist->song(row));
+        sources.push_back({playlist->id(), row});
       }
     }
-    app_->queue()->Insert(dest, songs);
+    app_->queue()->Insert(dest, songs, sources);
     RefreshQueue();
+    RefreshPlaylist();
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, queue_view_->widget(), "queue", "Queue", "view-list-ordered-symbolic");
 
@@ -1001,6 +1016,13 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->view()->SetActivateCallback([this](int index) { app_->player()->PlayAt(index); });
   playlist_container_->view()->SetSelectCallback([this](int index, bool add) { SelectPlaylistRow(index, add); });
   playlist_container_->view()->SetRateCallback([this](int row, float rating) { RateRow(row, rating); });
+  playlist_container_->view()->SetQueuePositionCallback([this](int row) {
+    Playlist *playlist = app_->playlist_manager()->current();
+    if (!playlist) {
+      return 0;
+    }
+    return app_->queue()->PositionForPlaylistRow(playlist->id(), row);
+  });
   playlist_container_->view()->SetSortCallback([this](PlaylistColumn column, PlaylistSortOrder order) { SortPlaylistBy(column, order); });
   playlist_container_->view()->SetMenuCallback([this](double x, double y) { ShowPlaylistMenu(x, y); });
   playlist_container_->view()->SetEditRequestCallback([this]() { EditColumnValue(); });
@@ -2381,11 +2403,22 @@ void MainWindow::ShowPlaylistMenu(double, double) {
   GMenu *menu = g_menu_new();
   g_menu_append(menu, Translations::Tr("Play").c_str(), "win.playlist-play");
   const SongList selected = SelectedSongs();
-  bool queued = !selected.empty();
-  for (const Song &song : selected) {
-    if (!app_->queue()->Contains(song)) {
-      queued = false;
-      break;
+  bool queued = !SelectedPlaylistRows().empty();
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (playlist) {
+    for (int row : SelectedPlaylistRows()) {
+      if (!app_->queue()->ContainsPlaylistRow(playlist->id(), row)) {
+        queued = false;
+        break;
+      }
+    }
+  } else {
+    queued = !selected.empty();
+    for (const Song &song : selected) {
+      if (!app_->queue()->Contains(song)) {
+        queued = false;
+        break;
+      }
     }
   }
   g_menu_append(menu, queued ? Translations::Tr("Dequeue").c_str() : Translations::Tr("Queue").c_str(), "win.playlist-queue");
@@ -2502,10 +2535,21 @@ void MainWindow::StopAfterCurrent() {
 }
 
 void MainWindow::QueuePlayNext() {
-  for (const Song &song : SelectedSongs()) {
-    app_->queue()->InsertNext(song);
+  Playlist *playlist = app_->playlist_manager()->current();
+  const std::vector<int> rows = SelectedPlaylistRows();
+  if (playlist && !rows.empty()) {
+    for (auto it = rows.rbegin(); it != rows.rend(); ++it) {
+      if (*it >= 0 && *it < playlist->row_count()) {
+        app_->queue()->InsertNext(playlist->song(*it), playlist->id(), *it);
+      }
+    }
+  } else {
+    for (const Song &song : SelectedSongs()) {
+      app_->queue()->InsertNext(song);
+    }
   }
   RefreshQueue();
+  RefreshPlaylist();
   ShowToast("Queued to play next");
 }
 
