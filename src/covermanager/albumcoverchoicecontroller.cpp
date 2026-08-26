@@ -7,6 +7,7 @@
 #include "covermanager/coverproviders.h"
 #include "covermanager/coversearchstatisticsdialog.h"
 #include "dialogs/dialoghelpers.h"
+#include "translations/translations.h"
 #include "utilities/fileutils.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
@@ -214,15 +215,15 @@ void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent
                      Song song = (*fn)();
                      auto *owned = new Song(song);
                      GMenu *menu = g_menu_new();
-                     g_menu_append(menu, "Show cover", "cover.show");
-                     g_menu_append(menu, "Search for cover…", "cover.search");
-                     g_menu_append(menu, "Load from file…", "cover.file");
-                     g_menu_append(menu, "Load from URL…", "cover.url");
-                     g_menu_append(menu, "Save cover to file…", "cover.save");
-                     g_menu_append(menu, "Fetch cover", "cover.fetch");
-                     g_menu_append(menu, "Unset cover", "cover.unset");
-                     g_menu_append(menu, "Clear cover", "cover.clear");
-                     g_menu_append(menu, "Delete cover", "cover.delete");
+                     g_menu_append(menu, Translations::CStr("Show cover"), "cover.show");
+                     g_menu_append(menu, Translations::CStr("Search for cover…"), "cover.search");
+                     g_menu_append(menu, Translations::CStr("Load from file…"), "cover.file");
+                     g_menu_append(menu, Translations::CStr("Load from URL…"), "cover.url");
+                     g_menu_append(menu, Translations::CStr("Save cover to file…"), "cover.save");
+                     g_menu_append(menu, Translations::CStr("Fetch cover"), "cover.fetch");
+                     g_menu_append(menu, Translations::CStr("Unset cover"), "cover.unset");
+                     g_menu_append(menu, Translations::CStr("Clear cover"), "cover.clear");
+                     g_menu_append(menu, Translations::CStr("Delete cover"), "cover.delete");
                      GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
                      gtk_widget_set_parent(popover, widget);
                      GSimpleActionGroup *group = g_simple_action_group_new();

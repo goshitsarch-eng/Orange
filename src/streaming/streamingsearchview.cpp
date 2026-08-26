@@ -1,11 +1,12 @@
 #include "streaming/streamingsearchview.h"
 
 #include "streaming/streamingsearchitemdelegate.h"
+#include "translations/translations.h"
 
 StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(service) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   search_entry_ = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search_entry_), "Search");
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search_entry_), Translations::CStr("Search"));
   gtk_widget_set_margin_start(search_entry_, 8);
   gtk_widget_set_margin_end(search_entry_, 8);
   gtk_widget_set_margin_top(search_entry_, 6);
@@ -88,7 +89,7 @@ void StreamingSearchView::Rebuild() {
   }
   const SongList visible = sort_model_.Visible();
   if (visible.empty()) {
-    gtk_list_box_append(GTK_LIST_BOX(list_), gtk_label_new("No results"));
+    gtk_list_box_append(GTK_LIST_BOX(list_), gtk_label_new(Translations::CStr("No results")));
     return;
   }
   for (const Song &song : visible) {

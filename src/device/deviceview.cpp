@@ -1,5 +1,7 @@
 #include "device/deviceview.h"
 
+#include "translations/translations.h"
+
 #include <string>
 
 DeviceView::DeviceView() {
@@ -44,7 +46,7 @@ void DeviceView::ShowDevices(const std::vector<ConnectedDevice> &devices) {
   Clear();
   if (devices.empty()) {
     GtkWidget *row = gtk_list_box_row_new();
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), gtk_label_new("No devices found"));
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), gtk_label_new(Translations::CStr("No devices found")));
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
     return;
   }
@@ -65,16 +67,16 @@ void DeviceView::ShowDevices(const std::vector<ConnectedDevice> &devices) {
 void DeviceView::ShowSongs(const SongList &songs) {
   Clear();
   GtkWidget *back = gtk_list_box_row_new();
-  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(back), gtk_label_new("← Devices"));
+  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(back), gtk_label_new(Translations::CStr("← Devices")));
   g_object_set_data(G_OBJECT(back), "row-kind", const_cast<char *>("back"));
   gtk_list_box_append(GTK_LIST_BOX(list_), back);
   GtkWidget *add_all = gtk_list_box_row_new();
-  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(add_all), gtk_label_new("Add all to playlist"));
+  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(add_all), gtk_label_new(Translations::CStr("Add all to playlist")));
   g_object_set_data(G_OBJECT(add_all), "row-kind", const_cast<char *>("add-all"));
   gtk_list_box_append(GTK_LIST_BOX(list_), add_all);
   if (songs.empty()) {
     GtkWidget *empty = gtk_list_box_row_new();
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(empty), gtk_label_new("No songs found on this device"));
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(empty), gtk_label_new(Translations::CStr("No songs found on this device")));
     gtk_list_box_append(GTK_LIST_BOX(list_), empty);
     return;
   }

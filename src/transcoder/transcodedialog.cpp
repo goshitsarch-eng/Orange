@@ -3,13 +3,14 @@
 #include "core/application.h"
 #include "transcoder/transcoder.h"
 #include "transcoder/transcoderoptionsdialog.h"
+#include "translations/translations.h"
 #include "utilities/fileutils.h"
 
 #include <adwaita.h>
 
 void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Transcode");
+  adw_dialog_set_title(dialog, Translations::CStr("Transcode"));
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
   gtk_widget_set_margin_start(box, 18);
   gtk_widget_set_margin_end(box, 18);
@@ -19,20 +20,20 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   GtkWidget *formats = gtk_drop_down_new_from_strings(format_names);
   GtkWidget *quality = gtk_spin_button_new_with_range(0, 10, 1);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(quality), 5);
-  GtkWidget *options = gtk_button_new_with_label("Format options…");
+  GtkWidget *options = gtk_button_new_with_label(Translations::CStr("Format options…"));
   GtkWidget *dest = gtk_entry_new();
   gtk_editable_set_text(GTK_EDITABLE(dest), g_get_user_special_dir(G_USER_DIRECTORY_MUSIC) ? g_get_user_special_dir(G_USER_DIRECTORY_MUSIC) : g_get_home_dir());
-  gtk_box_append(GTK_BOX(box), gtk_label_new("Output format"));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Output format")));
   gtk_box_append(GTK_BOX(box), formats);
-  gtk_box_append(GTK_BOX(box), gtk_label_new("Quality"));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Quality")));
   gtk_box_append(GTK_BOX(box), quality);
   gtk_box_append(GTK_BOX(box), options);
-  gtk_box_append(GTK_BOX(box), gtk_label_new("Destination folder"));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Destination folder")));
   gtk_box_append(GTK_BOX(box), dest);
   GtkWidget *log = gtk_label_new("");
   gtk_label_set_wrap(GTK_LABEL(log), TRUE);
   gtk_box_append(GTK_BOX(box), log);
-  GtkWidget *start = gtk_button_new_with_label("Start");
+  GtkWidget *start = gtk_button_new_with_label(Translations::CStr("Start"));
   g_object_set_data(G_OBJECT(start), "formats", formats);
   g_object_set_data(G_OBJECT(start), "dest", dest);
   g_object_set_data(G_OBJECT(start), "log", log);

@@ -2,6 +2,7 @@
 
 #include "core/application.h"
 #include "dialogs/dialoghelpers.h"
+#include "translations/translations.h"
 
 #include <adwaita.h>
 
@@ -13,7 +14,7 @@ using DialogHelpers::SongForDialog;
 void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) {
   Song song = SongForDialog(app);
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Cover search");
+  adw_dialog_set_title(dialog, Translations::CStr("Cover search"));
   adw_dialog_set_content_width(dialog, 480);
   adw_dialog_set_content_height(dialog, 560);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -52,7 +53,7 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) {
     GtkWidget *thumb = gtk_image_new();
     SetImageFromBytes(thumb, std::vector<unsigned char>(image.begin(), image.end()), 48);
     adw_action_row_add_prefix(ADW_ACTION_ROW(row), thumb);
-    GtkWidget *apply = gtk_button_new_with_label("Save");
+    GtkWidget *apply = gtk_button_new_with_label(Translations::CStr("Save"));
     gtk_widget_add_css_class(apply, "suggested-action");
     auto *image_copy = new std::string(image);
     g_object_set_data_full(G_OBJECT(apply), "image", image_copy, [](gpointer p) { delete static_cast<std::string *>(p); });

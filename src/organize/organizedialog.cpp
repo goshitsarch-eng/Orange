@@ -2,13 +2,14 @@
 
 #include "core/application.h"
 #include "organize/organize.h"
+#include "translations/translations.h"
 #include "utilities/fileutils.h"
 
 #include <adwaita.h>
 
 void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Organize files");
+  adw_dialog_set_title(dialog, Translations::CStr("Organize files"));
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
   gtk_widget_set_margin_start(box, 18);
   gtk_widget_set_margin_end(box, 18);
@@ -19,13 +20,13 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
   GtkWidget *dest = gtk_entry_new();
   gtk_editable_set_text(GTK_EDITABLE(dest), g_get_user_special_dir(G_USER_DIRECTORY_MUSIC) ? g_get_user_special_dir(G_USER_DIRECTORY_MUSIC) : g_get_home_dir());
   GtkWidget *move = gtk_check_button_new_with_label("Move files instead of copying");
-  GtkWidget *status = gtk_label_new("Uses the current playlist as the source.");
+  GtkWidget *status = gtk_label_new(Translations::CStr("Uses the current playlist as the source."));
   gtk_label_set_wrap(GTK_LABEL(status), TRUE);
   GtkWidget *preview = gtk_label_new("");
   gtk_label_set_wrap(GTK_LABEL(preview), TRUE);
   gtk_label_set_xalign(GTK_LABEL(preview), 0.0f);
-  GtkWidget *preview_btn = gtk_button_new_with_label("Preview");
-  GtkWidget *run = gtk_button_new_with_label("Organize");
+  GtkWidget *preview_btn = gtk_button_new_with_label(Translations::CStr("Preview"));
+  GtkWidget *run = gtk_button_new_with_label(Translations::CStr("Organize"));
   gtk_widget_add_css_class(run, "suggested-action");
   g_object_set_data(G_OBJECT(run), "format", entry);
   g_object_set_data(G_OBJECT(run), "dest", dest);
@@ -74,9 +75,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app) {
                      gtk_label_set_text(GTK_LABEL(status_label), text.c_str());
                    }),
                    app);
-  gtk_box_append(GTK_BOX(box), gtk_label_new("Filename format"));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Filename format")));
   gtk_box_append(GTK_BOX(box), entry);
-  gtk_box_append(GTK_BOX(box), gtk_label_new("Destination"));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Destination")));
   gtk_box_append(GTK_BOX(box), dest);
   gtk_box_append(GTK_BOX(box), move);
   gtk_box_append(GTK_BOX(box), preview_btn);

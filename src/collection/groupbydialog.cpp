@@ -1,13 +1,14 @@
 #include "collection/groupbydialog.h"
 
 #include "collection/savedgroupingmanager.h"
+#include "translations/translations.h"
 
 #include <adwaita.h>
 
 void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &current,
                          const std::function<void(const CollectionGrouping::Grouping &)> &callback) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Collection grouping");
+  adw_dialog_set_title(dialog, Translations::CStr("Collection grouping"));
   adw_dialog_set_content_width(dialog, 420);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
   gtk_widget_set_margin_start(box, 16);
@@ -25,10 +26,10 @@ void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &
   GtkWidget *name = gtk_entry_new();
   gtk_entry_set_placeholder_text(GTK_ENTRY(name), "Save as…");
   GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  GtkWidget *apply = gtk_button_new_with_label("Apply");
+  GtkWidget *apply = gtk_button_new_with_label(Translations::CStr("Apply"));
   gtk_widget_add_css_class(apply, "suggested-action");
-  GtkWidget *save = gtk_button_new_with_label("Save");
-  GtkWidget *manage = gtk_button_new_with_label("Manage");
+  GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save"));
+  GtkWidget *manage = gtk_button_new_with_label(Translations::CStr("Manage"));
   gtk_box_append(GTK_BOX(buttons), apply);
   gtk_box_append(GTK_BOX(buttons), save);
   gtk_box_append(GTK_BOX(buttons), manage);
@@ -78,11 +79,11 @@ void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &
                      SavedGroupingManager::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), *fn);
                    }),
                    cb);
-  gtk_box_append(GTK_BOX(box), gtk_label_new("First level"));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("First level")));
   gtk_box_append(GTK_BOX(box), first);
-  gtk_box_append(GTK_BOX(box), gtk_label_new("Second level"));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Second level")));
   gtk_box_append(GTK_BOX(box), second);
-  gtk_box_append(GTK_BOX(box), gtk_label_new("Third level"));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Third level")));
   gtk_box_append(GTK_BOX(box), third);
   gtk_box_append(GTK_BOX(box), separate);
   gtk_box_append(GTK_BOX(box), name);

@@ -2,6 +2,7 @@
 
 #include "core/application.h"
 #include "dialogs/dialoghelpers.h"
+#include "translations/translations.h"
 #include "utilities/fileutils.h"
 
 #include <adwaita.h>
@@ -23,7 +24,7 @@ struct CoverExportJob {
 
 void AlbumCoverExportDialog::Show(GtkWindow *parent, Application *app) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Export album covers");
+  adw_dialog_set_title(dialog, Translations::CStr("Export album covers"));
   adw_dialog_set_content_width(dialog, 420);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
   gtk_widget_set_margin_start(box, 16);
@@ -35,9 +36,9 @@ void AlbumCoverExportDialog::Show(GtkWindow *parent, Application *app) {
   gtk_editable_set_text(GTK_EDITABLE(filename), "cover.jpg");
   GtkWidget *overwrite = gtk_check_button_new_with_label("Overwrite existing files");
   gtk_check_button_set_active(GTK_CHECK_BUTTON(overwrite), TRUE);
-  GtkWidget *status = gtk_label_new("Exports each album’s artwork into Artist - Album folders.");
+  GtkWidget *status = gtk_label_new(Translations::CStr("Exports each album’s artwork into Artist - Album folders."));
   gtk_label_set_wrap(GTK_LABEL(status), TRUE);
-  GtkWidget *export_btn = gtk_button_new_with_label("Choose folder…");
+  GtkWidget *export_btn = gtk_button_new_with_label(Translations::CStr("Choose folder…"));
   gtk_widget_add_css_class(export_btn, "suggested-action");
   g_object_set_data(G_OBJECT(export_btn), "filename", filename);
   g_object_set_data(G_OBJECT(export_btn), "overwrite", overwrite);

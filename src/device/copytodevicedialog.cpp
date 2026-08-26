@@ -1,13 +1,14 @@
 #include "device/copytodevicedialog.h"
 
 #include "core/application.h"
+#include "translations/translations.h"
 #include "widgets/freespacebar.h"
 
 #include <adwaita.h>
 
 void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Copy to device");
+  adw_dialog_set_title(dialog, Translations::CStr("Copy to device"));
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   gtk_widget_set_margin_start(box, 16);
   gtk_widget_set_margin_end(box, 16);
@@ -21,7 +22,7 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app) {
     GtkWidget *row = adw_action_row_new();
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), device.friendly_name.c_str());
     adw_action_row_set_subtitle(ADW_ACTION_ROW(row), device.mount_path.empty() ? device.backend.c_str() : device.mount_path.c_str());
-    GtkWidget *copy = gtk_button_new_with_label("Copy playlist");
+    GtkWidget *copy = gtk_button_new_with_label(Translations::CStr("Copy playlist"));
     g_object_set_data_full(G_OBJECT(copy), "device-id", g_strdup(device.unique_id.c_str()), g_free);
     g_signal_connect(copy, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
                        auto *application = static_cast<Application *>(data);

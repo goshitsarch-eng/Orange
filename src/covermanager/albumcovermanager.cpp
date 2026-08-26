@@ -5,6 +5,7 @@
 #include "covermanager/coverfromurldialog.h"
 #include "covermanager/coverproviders.h"
 #include "dialogs/dialoghelpers.h"
+#include "translations/translations.h"
 
 #include <adwaita.h>
 
@@ -13,7 +14,7 @@ using DialogHelpers::SetImageFromBytes;
 
 void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Cover manager");
+  adw_dialog_set_title(dialog, Translations::CStr("Cover manager"));
   adw_dialog_set_content_width(dialog, 640);
   adw_dialog_set_content_height(dialog, 640);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -92,7 +93,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                          .c_str());
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), flow);
   gtk_box_append(GTK_BOX(box), scroll);
-  GtkWidget *batch = gtk_button_new_with_label("Fetch all missing");
+  GtkWidget *batch = gtk_button_new_with_label(Translations::CStr("Fetch all missing"));
   gtk_widget_add_css_class(batch, "suggested-action");
   g_object_set_data(G_OBJECT(batch), "dialog", dialog);
   g_signal_connect(batch, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer) {
@@ -109,7 +110,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                      gtk_button_set_label(btn, "Fetching…");
                    }),
                    nullptr);
-  GtkWidget *current = gtk_button_new_with_label("Fetch cover for current song");
+  GtkWidget *current = gtk_button_new_with_label(Translations::CStr("Fetch cover for current song"));
   g_signal_connect(current, "clicked", G_CALLBACK((+[](GtkButton *btn, gpointer data) {
                      auto *application = static_cast<Application *>(data);
                      Song song = application->player()->current_song();
@@ -120,13 +121,13 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                      });
                    })),
                    app);
-  GtkWidget *from_url = gtk_button_new_with_label("Load cover from URL…");
+  GtkWidget *from_url = gtk_button_new_with_label(Translations::CStr("Load cover from URL…"));
   g_signal_connect(from_url, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *application = static_cast<Application *>(data);
                      CoverFromUrlDialog::Show(nullptr, application);
                    }),
                    app);
-  GtkWidget *export_btn = gtk_button_new_with_label("Export covers…");
+  GtkWidget *export_btn = gtk_button_new_with_label(Translations::CStr("Export covers…"));
   g_signal_connect(export_btn, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *application = static_cast<Application *>(data);
                      AlbumCoverExportDialog::Show(nullptr, application);

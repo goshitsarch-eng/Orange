@@ -1,18 +1,19 @@
 #include "equalizer/equalizerdialog.h"
 
 #include "equalizer/equalizer.h"
+#include "translations/translations.h"
 
 #include <adwaita.h>
 
 void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Equalizer");
+  adw_dialog_set_title(dialog, Translations::CStr("Equalizer"));
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
   gtk_widget_set_margin_start(box, 18);
   gtk_widget_set_margin_end(box, 18);
   gtk_widget_set_margin_top(box, 18);
   gtk_widget_set_margin_bottom(box, 18);
-  GtkWidget *enable = gtk_check_button_new_with_label("Enable equalizer");
+  GtkWidget *enable = gtk_check_button_new_with_label(Translations::CStr("Enable equalizer"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(enable), equalizer->enabled());
   g_signal_connect(enable, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
                      static_cast<class Equalizer *>(data)->set_enabled(gtk_check_button_get_active(button));

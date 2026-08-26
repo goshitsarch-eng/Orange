@@ -1,6 +1,7 @@
 #include "collection/collectionview.h"
 
 #include "collection/collectionitemdelegate.h"
+#include "translations/translations.h"
 
 CollectionView::CollectionView() {
   widget_ = gtk_scrolled_window_new();
@@ -77,7 +78,7 @@ void CollectionView::Rebuild() {
   }
   if (!gtk_widget_get_first_child(list_)) {
     GtkWidget *row = gtk_list_box_row_new();
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), gtk_label_new("Collection is empty"));
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), gtk_label_new(Translations::CStr("Collection is empty")));
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
 }
