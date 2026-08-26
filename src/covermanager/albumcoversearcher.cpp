@@ -8,6 +8,7 @@
 
 #include <adwaita.h>
 
+#include <functional>
 #include <memory>
 
 using DialogHelpers::ApplyCover;
@@ -26,6 +27,7 @@ struct SearcherState {
   GtkWidget *grid = nullptr;
   std::unique_ptr<AlbumCoverFetcher> fetcher;
   std::shared_ptr<bool> alive = std::make_shared<bool>(true);
+  std::function<void(bool)> done;
   int search_gen = 0;
 };
 
@@ -47,8 +49,16 @@ void SaveResult(SearcherState *state, CoverProviderSearchResult *result, GtkWidg
     if (status_label) {
       gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Saved"));
     }
+    if (state->done) {
+      state->done(true);
+    }
   } else if (status_label) {
     gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Failed"));
+    if (state->done) {
+      state->done(false);
+    }
+  } else if (state->done) {
+    state->done(false);
   }
 }
 
@@ -124,8 +134,10 @@ void StartSearch(SearcherState *state) {
 
 }  // namespace
 
-void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) {
-  Song song = SongForDialog(app);
+void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) { Show(parent, app, Song(), {}); }
+
+void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &song, std::function<void(bool)> done) {
+  const Song target = PreferredSong(song, SongForDialog(app));
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr("Cover search"));
   adw_dialog_set_content_width(dialog, 640);
@@ -138,7 +150,8 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) {
 
   auto *state = new SearcherState();
   state->app = app;
-  state->song = song;
+  state->song = target;
+  state->done = std::move(done);
   state->fetcher = std::make_unique<AlbumCoverFetcher>(app->cover_providers(), app->network());
 
   auto add_entry = [&](const char *label, const std::string &value) {
@@ -148,15 +161,15 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) {
     gtk_box_append(GTK_BOX(box), GTK_WIDGET(row));
     return GTK_WIDGET(row);
   };
-  state->artist = add_entry("Artist", song.EffectiveAlbumartist());
-  state->album = add_entry("Album", song.album());
-  state->title = add_entry("Title", song.title());
+  state->artist = add_entry("Artist", target.EffectiveAlbumartist());
+  state->album = add_entry("Album", target.album());
+  state->title = add_entry("Title", target.title());
 
   GtkWidget *search = gtk_button_new_with_label(Translations::CStr("Search"));
   gtk_widget_add_css_class(search, "suggested-action");
   gtk_box_append(GTK_BOX(box), search);
 
-  state->status = gtk_label_new(AlbumCoverFetcherSearch::StatusSearching(song.album()).c_str());
+  state->status = gtk_label_new(AlbumCoverFetcherSearch::StatusSearching(target.album()).c_str());
   gtk_label_set_wrap(GTK_LABEL(state->status), TRUE);
   gtk_label_set_xalign(GTK_LABEL(state->status), 0);
   gtk_box_append(GTK_BOX(box), state->status);

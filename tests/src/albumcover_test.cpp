@@ -1,4 +1,5 @@
 #include "covermanager/coverchoicemenu.h"
+#include "covermanager/covermanagermenu.h"
 #include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverexport.h"
 #include "covermanager/coverarttypes.h"
@@ -348,4 +349,42 @@ TEST(CoverChoiceMenu, ItemsAndWhenToShow) {
   EXPECT_TRUE(CoverChoiceMenu::HasCoverActions(true, true));
   EXPECT_FALSE(CoverChoiceMenu::HasCoverActions(true, false));
   EXPECT_FALSE(CoverChoiceMenu::HasCoverActions(false, true));
+}
+
+TEST(CoverManagerMenu, UsesCoverChoiceAndPlaylist) {
+  const auto covers = CoverManagerMenu::CoverItems();
+  const auto playlist = CoverManagerMenu::PlaylistItems();
+  ASSERT_EQ(9u, covers.size());
+  ASSERT_EQ(2u, playlist.size());
+  EXPECT_EQ(11, CoverManagerMenu::ItemCount());
+  EXPECT_TRUE(CoverManagerMenu::HasSearch());
+  EXPECT_TRUE(CoverManagerMenu::IsCoverId("search"));
+  EXPECT_TRUE(CoverManagerMenu::IsCoverId("fetch"));
+  EXPECT_TRUE(CoverManagerMenu::IsCoverId("show"));
+  EXPECT_FALSE(CoverManagerMenu::IsCoverId("append"));
+  EXPECT_TRUE(CoverManagerMenu::IsPlaylistId("append"));
+  EXPECT_TRUE(CoverManagerMenu::IsPlaylistId("load"));
+  EXPECT_FALSE(CoverManagerMenu::IsPlaylistId("search"));
+  EXPECT_EQ("Add to playlist", playlist.front().label);
+  EXPECT_EQ("Load to playlist", playlist.back().label);
+  EXPECT_FALSE(CoverManagerMenu::LoadReplacesPlaylist("append"));
+  EXPECT_TRUE(CoverManagerMenu::LoadReplacesPlaylist("load"));
+  EXPECT_EQ(CoverChoiceMenu::Action::Search, CoverChoiceMenu::FromId("search"));
+}
+
+TEST(AlbumCoverSearcher, PrefersRequestedSong) {
+  Song requested;
+  requested.set_valid(true);
+  requested.set_artist("Portishead");
+  requested.set_album("Dummy");
+  Song fallback;
+  fallback.set_valid(true);
+  fallback.set_artist("Fleet Foxes");
+  fallback.set_album("Helplessness Blues");
+  const Song chosen = AlbumCoverSearcher::PreferredSong(requested, fallback);
+  EXPECT_EQ("Portishead", chosen.artist());
+  EXPECT_EQ("Dummy", chosen.album());
+  const Song missing = AlbumCoverSearcher::PreferredSong(Song(), fallback);
+  EXPECT_EQ("Fleet Foxes", missing.artist());
+  EXPECT_EQ("Helplessness Blues", missing.album());
 }

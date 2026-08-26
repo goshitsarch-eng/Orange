@@ -4,9 +4,12 @@
 #include "covermanager/albumcoverfetcher.h"
 #include "covermanager/albumcoverfetchersearch.h"
 
+#include "core/song.h"
+
 #include <gtk/gtk.h>
 
 #include <algorithm>
+#include <functional>
 #include <string>
 
 class Application;
@@ -19,6 +22,9 @@ class AlbumCoverSearcher {
   static constexpr int kCellPadding = 24;
 
   static void Show(GtkWindow *parent, Application *app);
+  static void Show(GtkWindow *parent, Application *app, const Song &song, std::function<void(bool)> done = {});
+
+  static Song PreferredSong(const Song &requested, const Song &fallback) { return requested.is_valid() ? requested : fallback; }
 
   static int ColumnsForWidth(int width) {
     if (width <= 0) {

@@ -7,6 +7,7 @@
 #include "covermanager/albumcoverexportdialog.h"
 #include "covermanager/albumcovermanagerlist.h"
 #include "covermanager/coverfromurldialog.h"
+#include "covermanager/covermanagermenu.h"
 #include "covermanager/coverproviders.h"
 #include "dialogs/dialoghelpers.h"
 #include "translations/translations.h"
@@ -404,16 +405,14 @@ void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album,
     return;
   }
   GMenu *menu = g_menu_new();
-  g_menu_append(menu, Translations::CStr("Fetch cover"), "cover.fetch");
-  g_menu_append(menu, Translations::CStr("Load from file…"), "cover.file");
-  g_menu_append(menu, Translations::CStr("Load from URL…"), "cover.url");
-  g_menu_append(menu, Translations::CStr("Show cover"), "cover.show");
-  g_menu_append(menu, Translations::CStr("Unset cover"), "cover.unset");
-  g_menu_append(menu, Translations::CStr("Clear cover"), "cover.clear");
-  g_menu_append(menu, Translations::CStr("Delete cover"), "cover.delete");
-  g_menu_append(menu, Translations::CStr("Add to playlist"), "cover.append");
-  g_menu_append(menu, Translations::CStr("Load to playlist"), "cover.load");
-  g_menu_append(menu, Translations::CStr("Save cover to file…"), "cover.save");
+  for (const CoverChoiceMenu::Item &item : CoverManagerMenu::CoverItems()) {
+    g_menu_append(menu, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
+  }
+  GMenu *playlist = g_menu_new();
+  for (const CoverManagerMenu::Extra &item : CoverManagerMenu::PlaylistItems()) {
+    g_menu_append(playlist, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
+  }
+  g_menu_append_section(menu, nullptr, G_MENU_MODEL(playlist));
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, image);
   GSimpleActionGroup *group = g_simple_action_group_new();
@@ -443,42 +442,40 @@ void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album,
                            RebuildAlbums(self);
                          });
                          return;
-                       } else if (g_strcmp0(name, "file") == 0) {
-                         self->covers->LoadCoverFromFile(self->parent, &entry->song, image_widget);
-                       } else if (g_strcmp0(name, "url") == 0) {
-                         self->covers->LoadCoverFromURL(self->parent, &entry->song, image_widget);
-                       } else if (g_strcmp0(name, "show") == 0) {
-                         self->covers->ShowCover(self->parent, entry->song);
-                       } else if (g_strcmp0(name, "unset") == 0) {
-                         self->covers->UnsetCover(&entry->song, image_widget);
-                         self->catalog.SetCoverFlag(entry->artist, entry->album, false);
-                       } else if (g_strcmp0(name, "clear") == 0) {
-                         self->covers->ClearCover(&entry->song, image_widget);
-                       } else if (g_strcmp0(name, "delete") == 0) {
-                         self->covers->DeleteCover(&entry->song, image_widget);
-                         self->catalog.SetCoverFlag(entry->artist, entry->album, false);
-                       } else if (g_strcmp0(name, "append") == 0) {
-                         AddAlbumToPlaylist(self, *entry, false);
-                       } else if (g_strcmp0(name, "load") == 0) {
-                         AddAlbumToPlaylist(self, *entry, true);
-                       } else if (g_strcmp0(name, "save") == 0) {
-                         self->covers->SaveCoverToFile(self->parent, entry->song);
+                       }
+                       if (g_strcmp0(name, "search") == 0) {
+                         const std::string artist = entry->artist;
+                         const std::string album = entry->album;
+                         self->covers->SearchForCover(self->parent, entry->song, [self, artist, album](bool ok) {
+                           if (!self->alive || !*self->alive) {
+                             return;
+                           }
+                           if (ok) {
+                             self->catalog.SetCoverFlag(artist, album, true);
+                           }
+                           RebuildAlbums(self);
+                         });
+                         return;
+                       }
+                       if (CoverManagerMenu::IsPlaylistId(name)) {
+                         AddAlbumToPlaylist(self, *entry, CoverManagerMenu::LoadReplacesPlaylist(name));
+                       } else if (CoverManagerMenu::IsCoverId(name)) {
+                         self->covers->Perform(CoverChoiceMenu::FromId(name), self->parent, &entry->song, image_widget);
+                         if (g_strcmp0(name, "unset") == 0 || g_strcmp0(name, "delete") == 0) {
+                           self->catalog.SetCoverFlag(entry->artist, entry->album, false);
+                         }
                        }
                        RebuildAlbums(self);
                      }),
                      state);
     g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
   };
-  add("fetch");
-  add("file");
-  add("url");
-  add("show");
-  add("unset");
-  add("clear");
-  add("delete");
-  add("append");
-  add("load");
-  add("save");
+  for (const CoverChoiceMenu::Item &item : CoverManagerMenu::CoverItems()) {
+    add(item.id);
+  }
+  for (const CoverManagerMenu::Extra &item : CoverManagerMenu::PlaylistItems()) {
+    add(item.id);
+  }
   gtk_widget_insert_action_group(popover, "cover", G_ACTION_GROUP(group));
   g_object_set_data_full(G_OBJECT(popover), "album", owned, [](gpointer p) { delete static_cast<AlbumCoverManagerList::Album *>(p); });
   gtk_popover_popup(GTK_POPOVER(popover));

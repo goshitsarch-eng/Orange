@@ -96,9 +96,11 @@ void AlbumCoverChoiceController::FetchCover(Song *song, GtkWidget *image, GtkWid
   });
 }
 
-void AlbumCoverChoiceController::SearchForCover(GtkWindow *parent) {
+void AlbumCoverChoiceController::SearchForCover(GtkWindow *parent) { SearchForCover(parent, Song(), {}); }
+
+void AlbumCoverChoiceController::SearchForCover(GtkWindow *parent, const Song &song, std::function<void(bool)> done) {
   if (app_) {
-    AlbumCoverSearcher::Show(parent, app_);
+    AlbumCoverSearcher::Show(parent, app_, song, std::move(done));
   }
 }
 
@@ -231,7 +233,7 @@ void AlbumCoverChoiceController::Perform(CoverChoiceMenu::Action action, GtkWind
       }
       break;
     case CoverChoiceMenu::Action::Search:
-      SearchForCover(parent);
+      SearchForCover(parent, song ? *song : Song());
       break;
     case CoverChoiceMenu::Action::File:
       LoadCoverFromFile(parent, song, image);
