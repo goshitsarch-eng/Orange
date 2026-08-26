@@ -22,7 +22,9 @@ enum class Type {
   SearchAlbums,
   SearchSongs,
   AlbumList,
-  ArtistsList
+  ArtistsList,
+  ArtistAlbums,
+  AlbumSongs
 };
 
 Type FromSearchType(SearchType type);
@@ -34,6 +36,7 @@ bool IsAlbums(Type type);
 std::string Resource(Type type);
 std::map<std::string, std::string> Params(Type type, const std::string &query, int offset = 0, int size = 50);
 std::map<std::string, std::string> AlbumSongsParams(const std::string &album_id);
+std::map<std::string, std::string> ArtistAlbumsParams(const std::string &artist_id);
 
 SongList Parse(Type type, const std::string &json);
 

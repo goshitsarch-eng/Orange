@@ -20,6 +20,8 @@ class StreamingService : public UrlHandler {
   virtual void GetArtists(SearchCallback callback);
   virtual void GetAlbums(SearchCallback callback);
   virtual void GetSongs(SearchCallback callback);
+  virtual void GetArtistAlbums(const Song &artist, SearchCallback callback);
+  virtual void GetAlbumSongs(const Song &album, SearchCallback callback);
   virtual void Login(const std::string &username, const std::string &password_or_token) = 0;
   virtual void Logout();
   virtual void ReloadSettings() {}

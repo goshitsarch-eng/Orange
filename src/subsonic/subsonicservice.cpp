@@ -138,7 +138,42 @@ void SubsonicService::GetAlbums(SearchCallback callback) {
 }
 
 void SubsonicService::GetSongs(SearchCallback callback) {
-  GetAlbums(std::move(callback));
+  if (!logged_in_) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  SubsonicRequest::Get(network_,
+                       CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::SearchSongs),
+                                 SubsonicRequest::Params(SubsonicRequest::Type::SearchSongs, ".", 0, 500), hex_auth_),
+                       SubsonicRequest::Type::SearchSongs, std::move(callback));
+}
+
+void SubsonicService::GetArtistAlbums(const Song &artist, SearchCallback callback) {
+  if (!logged_in_ || artist.artist_id().empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  SubsonicRequest::Get(network_,
+                       CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::ArtistAlbums),
+                                 SubsonicRequest::ArtistAlbumsParams(artist.artist_id()), hex_auth_),
+                       SubsonicRequest::Type::ArtistAlbums, std::move(callback));
+}
+
+void SubsonicService::GetAlbumSongs(const Song &album, SearchCallback callback) {
+  if (!logged_in_ || album.album_id().empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  SubsonicRequest::Get(network_,
+                       CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::AlbumSongs),
+                                 SubsonicRequest::AlbumSongsParams(album.album_id()), hex_auth_),
+                       SubsonicRequest::Type::AlbumSongs, std::move(callback));
 }
 
 UrlHandler::LoadResult SubsonicService::Load(const std::string &url, AsyncCallback callback) {

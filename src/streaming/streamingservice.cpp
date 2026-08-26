@@ -28,6 +28,18 @@ void StreamingService::GetSongs(SearchCallback callback) {
   }
 }
 
+void StreamingService::GetArtistAlbums(const Song &, SearchCallback callback) {
+  if (callback) {
+    callback({});
+  }
+}
+
+void StreamingService::GetAlbumSongs(const Song &, SearchCallback callback) {
+  if (callback) {
+    callback({});
+  }
+}
+
 void StreamingService::Logout() {
   logged_in_ = false;
   NotifyAuthenticationChanged();

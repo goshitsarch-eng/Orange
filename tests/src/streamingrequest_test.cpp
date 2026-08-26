@@ -110,6 +110,14 @@ TEST(SubsonicRequest, ResourcesParamsAndParse) {
   EXPECT_EQ("getAlbumList2", SubsonicRequest::Resource(SubsonicRequest::Type::AlbumList));
   EXPECT_EQ("getArtists", SubsonicRequest::Resource(SubsonicRequest::Type::ArtistsList));
   EXPECT_EQ("getStarred2", SubsonicRequest::Resource(SubsonicRequest::Type::FavouriteSongs));
+  EXPECT_EQ("search3", SubsonicRequest::Resource(SubsonicRequest::Type::SearchSongs));
+  EXPECT_EQ("getArtist", SubsonicRequest::Resource(SubsonicRequest::Type::ArtistAlbums));
+  EXPECT_EQ("getAlbum", SubsonicRequest::Resource(SubsonicRequest::Type::AlbumSongs));
+  EXPECT_EQ("7", SubsonicRequest::ArtistAlbumsParams("7").at("id"));
+  const auto songs = SubsonicRequest::Params(SubsonicRequest::Type::SearchSongs, ".", 0, 500);
+  EXPECT_EQ(".", songs.at("query"));
+  EXPECT_EQ("500", songs.at("songCount"));
+  EXPECT_EQ("0", songs.at("albumCount"));
   const auto search = SubsonicRequest::Params(SubsonicRequest::Type::SearchArtists, "foxes");
   EXPECT_EQ("foxes", search.at("query"));
   EXPECT_EQ("50", search.at("artistCount"));
@@ -133,6 +141,20 @@ TEST(SubsonicRequest, ResourcesParamsAndParse) {
   EXPECT_EQ("Helplessness Blues", album_list.front().album());
   EXPECT_EQ("8", album_list.front().album_id());
   EXPECT_EQ(2011, album_list.front().year());
+
+  const SongList artist_albums = SubsonicRequest::Parse(
+      SubsonicRequest::Type::ArtistAlbums,
+      R"json({"subsonic-response":{"artist":{"id":"1","name":"Fleet Foxes","album":[{"id":"8","name":"Helplessness Blues","artist":"Fleet Foxes","artistId":"1"}]}}})json");
+  ASSERT_EQ(1u, artist_albums.size());
+  EXPECT_EQ("Helplessness Blues", artist_albums.front().album());
+  EXPECT_EQ("8", artist_albums.front().album_id());
+
+  const SongList album_songs = SubsonicRequest::Parse(
+      SubsonicRequest::Type::AlbumSongs,
+      R"json({"subsonic-response":{"album":{"id":"8","song":[{"id":"42","title":"Helplessness Blues","artist":"Fleet Foxes"}]}}})json");
+  ASSERT_EQ(1u, album_songs.size());
+  EXPECT_EQ("Helplessness Blues", album_songs.front().title());
+  EXPECT_EQ("42", album_songs.front().song_id());
 }
 
 TEST(StreamingAuth, EnsureActionMatchesExpiryAndRefresh) {

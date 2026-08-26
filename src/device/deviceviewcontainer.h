@@ -22,6 +22,7 @@ class DeviceViewContainer {
   void SetAddAllCallback(std::function<void(const SongList &)> callback) { add_all_cb_ = std::move(callback); }
 
  private:
+  GtkWindow *ParentWindow() const;
   void OpenDevice(const std::string &id);
   void ShowDeviceMenu(const ConnectedDevice &device);
   void ShowSongMenu(const Song &song);

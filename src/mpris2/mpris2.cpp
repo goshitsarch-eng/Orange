@@ -416,6 +416,16 @@ void Mpris2::EmitPropertiesChanged(const char *interface_name, const char *prope
 #endif
 }
 
+void Mpris2::EmitPosition() {
+#ifdef HAVE_MPRIS2
+  if (!app_ || !app_->player() || !app_->player()->engine()) {
+    return;
+  }
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Position",
+                        g_variant_new_int64(Mpris2Helpers::PositionUsec(app_->player()->engine()->position_nanosec())));
+#endif
+}
+
 void Mpris2::EmitSeeked(int64_t position_us) {
 #ifdef HAVE_MPRIS2
   if (!connection_) {

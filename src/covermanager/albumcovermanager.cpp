@@ -13,7 +13,9 @@
 
 #include <adwaita.h>
 
+#include <algorithm>
 #include <memory>
+#include <vector>
 
 using DialogHelpers::SetImageFromBytes;
 
@@ -35,6 +37,8 @@ struct CoverManagerState {
   GtkWidget *fetch_missing = nullptr;
   std::shared_ptr<bool> alive = std::make_shared<bool>(true);
   std::string artist_filter;
+  std::string typeahead;
+  guint typeahead_timeout = 0;
 };
 
 void RebuildAlbums(CoverManagerState *state);
@@ -42,6 +46,18 @@ void UpdateBatchUi(CoverManagerState *state);
 void FinishBatch(CoverManagerState *state);
 void PumpBatch(CoverManagerState *state);
 AlbumCoverManagerList::HideCovers HideMode(GtkWidget *combo);
+void ResetTypeAhead(CoverManagerState *state);
+void AppendTypeAhead(CoverManagerState *state, gunichar ch);
+void SelectArtistRow(CoverManagerState *state, int index);
+void SelectAlbumChild(CoverManagerState *state, int index);
+int SelectedArtistIndex(CoverManagerState *state);
+int SelectedAlbumIndex(CoverManagerState *state);
+int ArtistCount(CoverManagerState *state);
+int AlbumCount(CoverManagerState *state);
+int FlowColumns(CoverManagerState *state);
+std::vector<std::string> ArtistLabels(CoverManagerState *state);
+std::vector<std::string> AlbumLabels(CoverManagerState *state);
+gboolean OnCoverKey(CoverManagerState *state, guint keyval, bool albums);
 
 void UpdateBatchUi(CoverManagerState *state) {
   if (!state) {
@@ -175,6 +191,212 @@ AlbumCoverManagerList::HideCovers HideMode(GtkWidget *combo) {
     default:
       return AlbumCoverManagerList::HideCovers::None;
   }
+}
+
+void ResetTypeAhead(CoverManagerState *state) {
+  if (!state) {
+    return;
+  }
+  state->typeahead.clear();
+  if (state->typeahead_timeout) {
+    g_source_remove(state->typeahead_timeout);
+    state->typeahead_timeout = 0;
+  }
+}
+
+void AppendTypeAhead(CoverManagerState *state, gunichar ch) {
+  if (!state) {
+    return;
+  }
+  gchar utf8[8] = {};
+  const gint len = g_unichar_to_utf8(ch, utf8);
+  state->typeahead.append(utf8, static_cast<size_t>(len));
+  if (state->typeahead_timeout) {
+    g_source_remove(state->typeahead_timeout);
+  }
+  state->typeahead_timeout = g_timeout_add(1000, [](gpointer data) -> gboolean {
+    auto *self = static_cast<CoverManagerState *>(data);
+    self->typeahead_timeout = 0;
+    self->typeahead.clear();
+    return G_SOURCE_REMOVE;
+  }, state);
+}
+
+int ArtistCount(CoverManagerState *state) {
+  int count = 0;
+  if (!state || !state->artist_list) {
+    return count;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(state->artist_list); child; child = gtk_widget_get_next_sibling(child)) {
+    if (GTK_IS_LIST_BOX_ROW(child)) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+int AlbumCount(CoverManagerState *state) {
+  int count = 0;
+  if (!state || !state->flow) {
+    return count;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(state->flow); child; child = gtk_widget_get_next_sibling(child)) {
+    ++count;
+  }
+  return count;
+}
+
+int SelectedArtistIndex(CoverManagerState *state) {
+  if (!state || !state->artist_list) {
+    return -1;
+  }
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(state->artist_list));
+  return row ? gtk_list_box_row_get_index(row) : -1;
+}
+
+int SelectedAlbumIndex(CoverManagerState *state) {
+  if (!state || !state->flow) {
+    return -1;
+  }
+  GList *selected = gtk_flow_box_get_selected_children(GTK_FLOW_BOX(state->flow));
+  if (!selected) {
+    return -1;
+  }
+  int index = -1;
+  if (GTK_IS_FLOW_BOX_CHILD(selected->data)) {
+    index = gtk_flow_box_child_get_index(GTK_FLOW_BOX_CHILD(selected->data));
+  }
+  g_list_free(selected);
+  return index;
+}
+
+void SelectArtistRow(CoverManagerState *state, int index) {
+  if (!state || !state->artist_list || index < 0) {
+    return;
+  }
+  GtkListBoxRow *row = gtk_list_box_get_row_at_index(GTK_LIST_BOX(state->artist_list), index);
+  if (!row) {
+    return;
+  }
+  gtk_list_box_select_row(GTK_LIST_BOX(state->artist_list), row);
+  gtk_widget_grab_focus(GTK_WIDGET(row));
+  const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "artist-id"));
+  state->artist_filter = id ? id : "";
+  RebuildAlbums(state);
+}
+
+void SelectAlbumChild(CoverManagerState *state, int index) {
+  if (!state || !state->flow || index < 0) {
+    return;
+  }
+  GtkFlowBoxChild *child = gtk_flow_box_get_child_at_index(GTK_FLOW_BOX(state->flow), index);
+  if (!child) {
+    return;
+  }
+  gtk_flow_box_unselect_all(GTK_FLOW_BOX(state->flow));
+  gtk_flow_box_select_child(GTK_FLOW_BOX(state->flow), child);
+  gtk_widget_grab_focus(GTK_WIDGET(child));
+}
+
+int FlowColumns(CoverManagerState *state) {
+  if (!state || !state->flow) {
+    return 1;
+  }
+  const int max = static_cast<int>(gtk_flow_box_get_max_children_per_line(GTK_FLOW_BOX(state->flow)));
+  GtkWidget *first = gtk_widget_get_first_child(state->flow);
+  if (!first) {
+    return std::max(1, max);
+  }
+  const int width = gtk_widget_get_width(state->flow);
+  const int child_w = gtk_widget_get_width(first);
+  if (width <= 0 || child_w <= 0) {
+    return std::max(1, max);
+  }
+  return std::max(1, std::min(max, width / child_w));
+}
+
+std::vector<std::string> ArtistLabels(CoverManagerState *state) {
+  std::vector<std::string> labels;
+  if (!state || !state->artist_list) {
+    return labels;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(state->artist_list); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    GtkWidget *label = gtk_list_box_row_get_child(GTK_LIST_BOX_ROW(child));
+    labels.push_back(GTK_IS_LABEL(label) ? gtk_label_get_text(GTK_LABEL(label)) : "");
+  }
+  return labels;
+}
+
+std::vector<std::string> AlbumLabels(CoverManagerState *state) {
+  std::vector<std::string> labels;
+  if (!state) {
+    return labels;
+  }
+  for (const auto &album : VisibleAlbums(state)) {
+    labels.push_back(album.album);
+  }
+  return labels;
+}
+
+gboolean OnCoverKey(CoverManagerState *state, guint keyval, bool albums) {
+  if (!state) {
+    return FALSE;
+  }
+  if (keyval == GDK_KEY_Escape) {
+    ResetTypeAhead(state);
+    return TRUE;
+  }
+  if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
+    if (albums) {
+      const auto selected = SelectedAlbums(state);
+      if (!selected.empty()) {
+        AddAlbumToPlaylist(state, selected.front(), false);
+        return TRUE;
+      }
+    } else if (SelectedArtistIndex(state) >= 0) {
+      return TRUE;
+    }
+  }
+  int horizontal = 0;
+  int vertical = 0;
+  if (keyval == GDK_KEY_Right) {
+    horizontal = 1;
+  } else if (keyval == GDK_KEY_Left) {
+    horizontal = -1;
+  } else if (keyval == GDK_KEY_Down) {
+    vertical = 1;
+  } else if (keyval == GDK_KEY_Up) {
+    vertical = -1;
+  }
+  if (horizontal != 0 || vertical != 0) {
+    if (albums) {
+      const int count = AlbumCount(state);
+      const int current = std::max(0, SelectedAlbumIndex(state));
+      SelectAlbumChild(state, AlbumCoverManagerSelection::WrapIndex(current, count, AlbumCoverManagerSelection::FlowDelta(FlowColumns(state), horizontal, vertical)));
+    } else if (horizontal == 0) {
+      const int count = ArtistCount(state);
+      const int current = std::max(0, SelectedArtistIndex(state));
+      SelectArtistRow(state, AlbumCoverManagerSelection::WrapIndex(current, count, vertical));
+    }
+    return TRUE;
+  }
+  const gunichar ch = gdk_keyval_to_unicode(keyval);
+  if (ch && g_unichar_isprint(ch)) {
+    AppendTypeAhead(state, ch);
+    const int index = AlbumCoverManagerSelection::FirstPrefixIndex(albums ? AlbumLabels(state) : ArtistLabels(state), state->typeahead);
+    if (index >= 0) {
+      if (albums) {
+        SelectAlbumChild(state, index);
+      } else {
+        SelectArtistRow(state, index);
+      }
+    }
+    return TRUE;
+  }
+  return FALSE;
 }
 
 void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album, GtkWidget *image) {
@@ -387,6 +609,10 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   g_object_set_data_full(G_OBJECT(dialog), "state", state, [](gpointer p) {
     auto *self = static_cast<CoverManagerState *>(p);
     self->batch.Cancel();
+    if (self->typeahead_timeout) {
+      g_source_remove(self->typeahead_timeout);
+      self->typeahead_timeout = 0;
+    }
     if (self->alive) {
       *self->alive = false;
     }
@@ -416,6 +642,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   gtk_widget_set_vexpand(artist_scroll, TRUE);
   state->artist_list = gtk_list_box_new();
   gtk_widget_add_css_class(state->artist_list, "navigation-sidebar");
+  gtk_widget_set_focusable(state->artist_list, TRUE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(artist_scroll), state->artist_list);
   gtk_box_append(GTK_BOX(split), artist_scroll);
 
@@ -426,6 +653,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(state->flow), 2);
   gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(state->flow), 5);
   gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(state->flow), GTK_SELECTION_MULTIPLE);
+  gtk_widget_set_focusable(state->flow, TRUE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(album_scroll), state->flow);
   gtk_box_append(GTK_BOX(split), album_scroll);
   gtk_box_append(GTK_BOX(box), split);
@@ -469,6 +697,20 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                      self->artist_filter = id ? id : "";
                      RebuildAlbums(self);
                    }),
+                   state);
+  GtkEventController *artist_keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(state->artist_list, artist_keys);
+  g_signal_connect(artist_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return OnCoverKey(static_cast<CoverManagerState *>(data), keyval, false);
+                   })),
+                   state);
+  GtkEventController *album_keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(state->flow, album_keys);
+  g_signal_connect(album_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return OnCoverKey(static_cast<CoverManagerState *>(data), keyval, true);
+                   })),
                    state);
 
   g_signal_connect(fetch_missing, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
@@ -535,6 +777,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
 
   RebuildArtists(state);
   RebuildAlbums(state);
+  SelectArtistRow(state, 0);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

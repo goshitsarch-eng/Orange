@@ -14,6 +14,11 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   GtkWidget *label = gtk_label_new(title.c_str());
   gtk_widget_set_hexpand(label, TRUE);
   gtk_widget_set_halign(label, GTK_ALIGN_START);
+  back_ = gtk_button_new_from_icon_name("go-previous-symbolic");
+  gtk_widget_set_tooltip_text(back_, "Back");
+  gtk_widget_set_visible(back_, FALSE);
+  g_signal_connect(back_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<StreamingCollectionView *>(data)->PopBrowse(); }),
+                   this);
   GtkWidget *refresh = gtk_button_new_from_icon_name("view-refresh-symbolic");
   gtk_widget_set_tooltip_text(refresh, "Refresh");
   g_signal_connect(refresh, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
@@ -23,6 +28,7 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
                      }
                    }),
                    this);
+  gtk_box_append(GTK_BOX(header), back_);
   gtk_box_append(GTK_BOX(header), label);
   gtk_box_append(GTK_BOX(header), refresh);
   filter_entry_ = gtk_search_entry_new();
@@ -46,8 +52,8 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<StreamingCollectionView *>(data);
                      auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
-                     if (song && self->activate_) {
-                       self->activate_(*song);
+                     if (song) {
+                       self->ActivateSong(*song);
                      }
                    }),
                    this);
@@ -84,8 +90,43 @@ void StreamingCollectionView::SetFilter(const std::string &filter) {
 void StreamingCollectionView::SetStatus(const std::string &status) { gtk_label_set_text(GTK_LABEL(status_label_), status.c_str()); }
 
 void StreamingCollectionView::SetSongs(const SongList &songs) {
+  stack_.clear();
   songs_ = songs;
   Rebuild();
+  UpdateBack();
+}
+
+void StreamingCollectionView::PushSongs(const SongList &songs) {
+  stack_.push_back({songs_, status_label_ ? gtk_label_get_text(GTK_LABEL(status_label_)) : ""});
+  songs_ = songs;
+  Rebuild();
+  UpdateBack();
+}
+
+void StreamingCollectionView::PopBrowse() {
+  if (stack_.empty()) {
+    return;
+  }
+  songs_ = stack_.back().songs;
+  const std::string status = stack_.back().status;
+  stack_.pop_back();
+  Rebuild();
+  if (status_label_) {
+    gtk_label_set_text(GTK_LABEL(status_label_), status.c_str());
+  }
+  UpdateBack();
+}
+
+void StreamingCollectionView::UpdateBack() {
+  if (back_) {
+    gtk_widget_set_visible(back_, !stack_.empty());
+  }
+}
+
+void StreamingCollectionView::ActivateSong(const Song &song) {
+  if (activate_) {
+    activate_(song);
+  }
 }
 
 SongList StreamingCollectionView::Visible() const {

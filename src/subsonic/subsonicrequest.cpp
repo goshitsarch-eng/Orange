@@ -34,7 +34,9 @@ bool IsSearch(Type type) {
 
 bool IsArtists(Type type) { return type == Type::FavouriteArtists || type == Type::SearchArtists || type == Type::ArtistsList; }
 
-bool IsAlbums(Type type) { return type == Type::FavouriteAlbums || type == Type::SearchAlbums || type == Type::AlbumList; }
+bool IsAlbums(Type type) {
+  return type == Type::FavouriteAlbums || type == Type::SearchAlbums || type == Type::AlbumList || type == Type::ArtistAlbums;
+}
 
 std::string Resource(Type type) {
   switch (type) {
@@ -50,6 +52,10 @@ std::string Resource(Type type) {
       return "getAlbumList2";
     case Type::ArtistsList:
       return "getArtists";
+    case Type::ArtistAlbums:
+      return "getArtist";
+    case Type::AlbumSongs:
+      return "getAlbum";
     case Type::None:
       break;
   }
@@ -76,6 +82,8 @@ std::map<std::string, std::string> Params(Type type, const std::string &query, i
 }
 
 std::map<std::string, std::string> AlbumSongsParams(const std::string &album_id) { return {{"id", album_id}}; }
+
+std::map<std::string, std::string> ArtistAlbumsParams(const std::string &artist_id) { return {{"id", artist_id}}; }
 
 SongList Parse(Type type, const std::string &json) {
   if (IsArtists(type)) {

@@ -18,6 +18,7 @@
 #include "context/contextalbum.h"
 #include "context/contextfont.h"
 #include "context/contexttechnical.h"
+#include "dialogs/deletefilespolicy.h"
 #include "organize/organize.h"
 #include "organize/organizeformatvalidator.h"
 #include "organize/organizetranscode.h"
@@ -165,7 +166,7 @@ TEST(ContextTechnical, RowsAndFormats) {
   song.set_filetype(Song::FileType::FLAC);
   song.set_valid(true);
   const auto rows = ContextTechnical::Rows(song);
-  ASSERT_EQ(5u, rows.size());
+  ASSERT_GE(rows.size(), 5u);
   EXPECT_EQ("Filetype", rows[0].first);
   EXPECT_EQ("FLAC", rows[0].second);
   EXPECT_EQ("Length", rows[1].first);
@@ -199,6 +200,63 @@ TEST(ContextAlbum, FadeOpacitiesMatchQtTimeline) {
   EXPECT_DOUBLE_EQ(1.0, ContextAlbum::FadeInOpacity(ContextAlbum::kFadeTimelineMs));
   EXPECT_DOUBLE_EQ(0.0, ContextAlbum::FadeOutOpacity(ContextAlbum::kFadeTimelineMs));
   EXPECT_DOUBLE_EQ(1.0, ContextAlbum::FadeInOpacity(ContextAlbum::kFadeTimelineMs + 50));
+}
+
+TEST(ContextTechnical, ExtraMetadataRows) {
+  Song song;
+  song.set_valid(true);
+  song.set_title("Roads");
+  song.set_year(1994);
+  song.set_genre("Trip hop");
+  song.set_composer("Beth Gibbons");
+  song.set_performer("Portishead");
+  song.set_grouping("Dummy");
+  song.set_comment("Remaster");
+  song.set_disc(1);
+  song.set_track(3);
+  song.set_playcount(12);
+  song.set_skipcount(2);
+  song.set_rating(0.8f);
+  song.set_basefilename("roads.flac");
+  song.set_filesize(123456);
+  const auto rows = ContextTechnical::Rows(song);
+  auto value = [&](const char *key) {
+    for (const auto &row : rows) {
+      if (row.first == key) {
+        return row.second;
+      }
+    }
+    return std::string();
+  };
+  EXPECT_EQ("1994", value("Year"));
+  EXPECT_EQ("Trip hop", value("Genre"));
+  EXPECT_EQ("Beth Gibbons", value("Composer"));
+  EXPECT_EQ("Portishead", value("Performer"));
+  EXPECT_EQ("Dummy", value("Grouping"));
+  EXPECT_EQ("Remaster", value("Comment"));
+  EXPECT_EQ("1", value("Disc"));
+  EXPECT_EQ("3", value("Track"));
+  EXPECT_EQ("12", value("Play count"));
+  EXPECT_EQ("2", value("Skip count"));
+  EXPECT_EQ("4 / 5", value("Rating"));
+  EXPECT_EQ("roads.flac", value("Filename"));
+  EXPECT_FALSE(value("Filesize").empty());
+}
+
+TEST(DeleteFilesPolicy, SourceAndAllowFlags) {
+  EXPECT_FALSE(DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Collection, false, true));
+  EXPECT_TRUE(DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Collection, true, false));
+  EXPECT_FALSE(DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Playlist, true, false));
+  EXPECT_TRUE(DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Playlist, false, true));
+  EXPECT_EQ(DeleteFilesPolicy::Source::Playlist, DeleteFilesPolicy::SourceForSongs({}));
+  Song collection;
+  collection.set_source(Song::Source::Collection);
+  collection.set_url("file:///tmp/a.flac");
+  EXPECT_EQ(DeleteFilesPolicy::Source::Collection, DeleteFilesPolicy::SourceForSongs({collection}));
+  Song local;
+  local.set_source(Song::Source::LocalFile);
+  local.set_url("file:///tmp/b.flac");
+  EXPECT_EQ(DeleteFilesPolicy::Source::Playlist, DeleteFilesPolicy::SourceForSongs({collection, local}));
 }
 
 TEST(ContextTechnical, CollectionTotalsMatchQtSingularPlural) {

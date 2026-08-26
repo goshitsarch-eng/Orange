@@ -950,6 +950,9 @@ SongList ParseSubsonicAlbums(const std::string &json) {
   if (!items) {
     items = FindNamedArray(root, {"subsonic-response", "albumList", "album"});
   }
+  if (!items) {
+    items = FindNamedArray(root, {"subsonic-response", "artist", "album"});
+  }
   SongList songs = SongsFromArray(items, Song::Source::Subsonic, [](Song *song, JsonObject *object) {
     const std::string name = ObjectString(object, "name");
     song->set_title(name);

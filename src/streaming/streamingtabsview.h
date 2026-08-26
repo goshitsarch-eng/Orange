@@ -20,6 +20,7 @@ class StreamingTabsView {
   ~StreamingTabsView();
 
   GtkWidget *widget() const { return widget_; }
+  StreamingService *service() const { return service_; }
   void SetActivateCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback);
   void ReloadSettings();
@@ -33,6 +34,10 @@ class StreamingTabsView {
   StreamingSearchView *search_view() const { return search_.get(); }
 
  private:
+  void HandleActivate(StreamingCollectionView *view, const Song &song);
+  void BrowseArtist(StreamingCollectionView *view, const Song &artist);
+  void BrowseAlbum(StreamingCollectionView *view, const Song &album);
+
   StreamingService *service_ = nullptr;
   ActivateCallback activate_;
   GtkWidget *widget_ = nullptr;

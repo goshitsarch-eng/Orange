@@ -4,6 +4,7 @@
 #include "core/song.h"
 #include "playlist/playlistsequence.h"
 
+#include <cstdint>
 #include <cstdlib>
 #include <string>
 
@@ -49,6 +50,8 @@ inline std::string LoopStatus(PlaylistSequence::RepeatMode mode) {
       return "None";
   }
 }
+
+inline int64_t PositionUsec(int64_t position_nanosec) { return position_nanosec / 1000; }
 
 inline PlaylistSequence::RepeatMode RepeatFromLoopStatus(const std::string &status) {
   if (status == "Track") {

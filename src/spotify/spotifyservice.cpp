@@ -134,6 +134,32 @@ void SpotifyService::GetSongs(SearchCallback callback) {
   });
 }
 
+void SpotifyService::GetArtistAlbums(const Song &artist, SearchCallback callback) {
+  const std::string id = artist.artist_id();
+  if (id.empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  EnsureFreshToken([this, id, callback]() {
+    SpotifyRequest::Get(network_, SpotifyRequest::ArtistAlbumsUrl(kApiUrl, id), AuthHeaders(), SpotifyRequest::Type::SearchAlbums, callback);
+  });
+}
+
+void SpotifyService::GetAlbumSongs(const Song &album, SearchCallback callback) {
+  const std::string id = album.album_id();
+  if (id.empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  EnsureFreshToken([this, id, callback]() {
+    SpotifyRequest::Get(network_, SpotifyRequest::AlbumSongsUrl(kApiUrl, id), AuthHeaders(), SpotifyRequest::Type::SearchSongs, callback);
+  });
+}
+
 UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallback callback) {
   LoadResult result;
   result.media_url = url;

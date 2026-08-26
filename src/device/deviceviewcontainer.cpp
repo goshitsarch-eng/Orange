@@ -44,6 +44,14 @@ void DeviceViewContainer::Reload() {
   }
 }
 
+GtkWindow *DeviceViewContainer::ParentWindow() const {
+  if (!widget_) {
+    return nullptr;
+  }
+  GtkRoot *root = gtk_widget_get_root(widget_);
+  return root && GTK_IS_WINDOW(root) ? GTK_WINDOW(root) : nullptr;
+}
+
 void DeviceViewContainer::OpenDevice(const std::string &id) {
   browse_id_ = id;
   Reload();
@@ -80,9 +88,9 @@ void DeviceViewContainer::ShowDeviceMenu(const ConnectedDevice &device) {
                          if (self->app_->playlist_manager()->current()) {
                            songs = self->app_->playlist_manager()->current()->songs();
                          }
-                         CopyToDeviceDialog::Show(nullptr, self->app_, songs);
+                         CopyToDeviceDialog::Show(self->ParentWindow(), self->app_, songs);
                        } else if (g_strcmp0(name, "properties") == 0) {
-                         DeviceProperties::Show(nullptr, self->app_, *device);
+                         DeviceProperties::Show(self->ParentWindow(), self->app_, *device);
                        } else if (g_strcmp0(name, "unmount") == 0) {
                          self->app_->device_manager()->Unmount(device->unique_id);
                          self->Reload();

@@ -1,5 +1,6 @@
 #include "fileview/fileview.h"
 
+#include "translations/translations.h"
 #include "utilities/fileutils.h"
 
 #include <adwaita.h>
@@ -15,13 +16,13 @@ FileView::FileView() {
   gtk_widget_set_margin_top(toolbar, 6);
   gtk_widget_set_margin_bottom(toolbar, 4);
   back_ = gtk_button_new_from_icon_name("go-previous-symbolic");
-  gtk_widget_set_tooltip_text(back_, "Back");
+  gtk_widget_set_tooltip_text(back_, Translations::CStr("Back"));
   forward_ = gtk_button_new_from_icon_name("go-next-symbolic");
-  gtk_widget_set_tooltip_text(forward_, "Forward");
+  gtk_widget_set_tooltip_text(forward_, Translations::CStr("Forward"));
   GtkWidget *up = gtk_button_new_from_icon_name("go-up-symbolic");
-  gtk_widget_set_tooltip_text(up, "Up");
+  gtk_widget_set_tooltip_text(up, Translations::CStr("Up"));
   GtkWidget *home = gtk_button_new_from_icon_name("go-home-symbolic");
-  gtk_widget_set_tooltip_text(home, "Home");
+  gtk_widget_set_tooltip_text(home, Translations::CStr("Home"));
   path_entry_ = gtk_entry_new();
   gtk_editable_set_text(GTK_EDITABLE(path_entry_), path_.c_str());
   gtk_widget_set_hexpand(path_entry_, TRUE);
@@ -132,12 +133,12 @@ void FileView::Activate(const std::string &path) {
 
 void FileView::ShowMenu(const std::vector<std::string> &paths) {
   GMenu *menu = g_menu_new();
-  g_menu_append(menu, "Add to playlist", "fileview.add");
-  g_menu_append(menu, "Copy to collection", "fileview.copy-collection");
-  g_menu_append(menu, "Move to collection", "fileview.move-collection");
-  g_menu_append(menu, "Copy to device", "fileview.copy-device");
-  g_menu_append(menu, "Edit track information…", "fileview.edit-tags");
-  g_menu_append(menu, "Delete", "fileview.delete");
+  g_menu_append(menu, Translations::CStr("Add to playlist"), "fileview.add");
+  g_menu_append(menu, Translations::CStr("Copy to collection"), "fileview.copy-collection");
+  g_menu_append(menu, Translations::CStr("Move to collection"), "fileview.move-collection");
+  g_menu_append(menu, Translations::CStr("Copy to device"), "fileview.copy-device");
+  g_menu_append(menu, Translations::CStr("Edit track information…"), "fileview.edit-tags");
+  g_menu_append(menu, Translations::CStr("Delete"), "fileview.delete");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, list_->widget());
   auto *state = new std::pair<FileView *, std::vector<std::string>>(this, paths);

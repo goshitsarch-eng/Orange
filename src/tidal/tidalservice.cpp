@@ -141,6 +141,34 @@ void TidalService::GetSongs(SearchCallback callback) {
   });
 }
 
+void TidalService::GetArtistAlbums(const Song &artist, SearchCallback callback) {
+  const std::string id = artist.artist_id();
+  if (id.empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  EnsureFreshToken([this, id, callback]() {
+    TidalRequest::Get(network_, TidalRequest::ArtistAlbumsUrl(kApiUrl, id, country_code_), AuthHeaders(), TidalRequest::Type::SearchAlbums,
+                      callback);
+  });
+}
+
+void TidalService::GetAlbumSongs(const Song &album, SearchCallback callback) {
+  const std::string id = album.album_id();
+  if (id.empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  EnsureFreshToken([this, id, callback]() {
+    TidalRequest::Get(network_, TidalRequest::AlbumSongsUrl(kApiUrl, id, country_code_), AuthHeaders(), TidalRequest::Type::SearchSongs,
+                      callback);
+  });
+}
+
 UrlHandler::LoadResult TidalService::Load(const std::string &url, AsyncCallback callback) {
   LoadResult result;
   result.media_url = url;

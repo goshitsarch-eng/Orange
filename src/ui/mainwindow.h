@@ -89,6 +89,7 @@ class MainWindow {
   void ShowPlaylistMenu(double x, double y);
   void ShowCollectionMenu();
   void ShowStreamingMenu(const SongList &songs);
+  void StreamingFavorite(bool add);
   void ShowRadioMenu(const std::vector<RadioChannel> &channels);
   void ShowPlaylistListMenu(const std::string &name);
   void DropOnPlaylistList(const std::string &name, const std::string &payload, bool folder);

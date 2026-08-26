@@ -9,7 +9,11 @@
 
 #include <adwaita.h>
 
-void DeleteConfirmationDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
+void DeleteConfirmationDialog::Show(GtkWindow *parent, Application *app, const SongList &songs, DeleteFilesPolicy::Source source) {
+  if (!DeleteFilesPolicy::Allowed(source)) {
+    ErrorDialog::Show(parent, Translations::CStr(DeleteFilesPolicy::DeniedMessage(source)));
+    return;
+  }
   SongList targets = songs;
   if (targets.empty()) {
     Playlist *playlist = app->playlist_manager()->current();

@@ -33,6 +33,8 @@
 #include "constants/behavioursettings.h"
 #include "constants/collectionsettings.h"
 #include "constants/playlistsettings.h"
+#include "dialogs/deletefilespolicy.h"
+#include "streaming/streamingfavoriteaction.h"
 #include "constants/scrobblersettings.h"
 #include "analyzer/analyzerframerate.h"
 #include "constants/analyzersettings.h"
@@ -393,7 +395,10 @@ void MainWindow::BuildUi() {
   add_action("cover-from-url", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverFromUrl(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("cover-export", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverExport(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("copy-device", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CopyToDevice(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
-  add_action("delete-files", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::DeleteFiles(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("delete-files", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::DeleteFiles(GTK_WINDOW(self->window_), self->app_, {}, DeleteFilesPolicy::Source::Playlist);
+             }));
   add_action("save-all-playlists", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::SaveAllPlaylists(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("playlist-columns", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
@@ -453,6 +458,12 @@ void MainWindow::BuildUi() {
   add_action("streaming-enqueue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                self->ApplyCollectionPlan(CollectionBehaviour::Enqueue(), self->streaming_menu_songs_);
+             }));
+  add_action("streaming-favorite", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->StreamingFavorite(true);
+             }));
+  add_action("streaming-unfavorite", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->StreamingFavorite(false);
              }));
   add_action("radio-append", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
@@ -591,7 +602,7 @@ void MainWindow::BuildUi() {
              }));
   add_action("collection-delete", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               Dialogs::DeleteFiles(GTK_WINDOW(self->window_), self->app_, self->CollectionSongs());
+               Dialogs::DeleteFiles(GTK_WINDOW(self->window_), self->app_, self->CollectionSongs(), DeleteFilesPolicy::Source::Collection);
              }));
   add_action("tagfetch", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::TagFetcher(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("edittag", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
@@ -850,7 +861,7 @@ void MainWindow::BuildSidebar() {
   });
   file_view_->SetDeleteCallback([this](const std::vector<std::string> &paths) {
     const SongList songs = FileViewSongs::FromPaths(paths);
-    Dialogs::DeleteFiles(GTK_WINDOW(window_), app_, songs);
+    Dialogs::DeleteFiles(GTK_WINDOW(window_), app_, songs, DeleteFilesPolicy::SourceForSongs(songs));
     if (file_view_) {
       g_timeout_add(800, [](gpointer data) -> gboolean {
         static_cast<FileView *>(data)->Reload();
@@ -1323,6 +1334,9 @@ void MainWindow::ConnectSignals() {
     }
     if (self->playlist_container_ && self->playlist_container_->view()) {
       self->playlist_container_->view()->SetPlaybackProgress(len > 0 ? static_cast<double>(pos) / static_cast<double>(len) : 0.0);
+    }
+    if (self->app_->mpris() && self->app_->player()->GetState() == EngineBase::State::Playing) {
+      self->app_->mpris()->EmitPosition();
     }
     return G_SOURCE_CONTINUE;
   }, this);
@@ -2150,7 +2164,9 @@ void MainWindow::ShowCollectionMenu() {
   g_menu_append(menu, Translations::Tr("Organize files…").c_str(), "win.collection-organize");
   g_menu_append(menu, Translations::Tr("Edit track information…").c_str(), "win.collection-edittag");
   g_menu_append(menu, Translations::Tr("Show in file browser…").c_str(), "win.collection-browse");
-  g_menu_append(menu, Translations::Tr("Delete from disk…").c_str(), "win.collection-delete");
+  if (DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Collection)) {
+    g_menu_append(menu, Translations::Tr("Delete from disk…").c_str(), "win.collection-delete");
+  }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, collection_container_ ? collection_container_->view()->list() : GTK_WIDGET(window_));
   gtk_popover_popup(GTK_POPOVER(popover));
@@ -2166,10 +2182,33 @@ void MainWindow::ShowStreamingMenu(const SongList &songs) {
   g_menu_append(menu, Translations::Tr("Replace current playlist").c_str(), "win.streaming-replace");
   g_menu_append(menu, Translations::Tr("Open in new playlist").c_str(), "win.streaming-new");
   g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.streaming-enqueue");
+  g_menu_append(menu, Translations::Tr("Add to favorites").c_str(), "win.streaming-favorite");
+  g_menu_append(menu, Translations::Tr("Remove from favorites").c_str(), "win.streaming-unfavorite");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   GtkWidget *parent = streaming_stack_ ? streaming_stack_ : GTK_WIDGET(window_);
   gtk_widget_set_parent(popover, parent);
   gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+void MainWindow::StreamingFavorite(bool add) {
+  StreamingService *service = app_->streaming_services()->ServiceByName(streaming_service_name_);
+  if (!service || streaming_menu_songs_.empty()) {
+    return;
+  }
+  const auto type = StreamingFavoriteAction::TypeForSongs(streaming_menu_songs_);
+  auto done = [this, add](const SongList &) {
+    ShowToast(add ? "Added to favorites" : "Removed from favorites");
+    for (const auto &view : streaming_views_) {
+      if (view && view->service() && view->service()->name() == streaming_service_name_) {
+        view->GetFavorites();
+      }
+    }
+  };
+  if (add) {
+    service->AddFavorites(type, streaming_menu_songs_, done);
+  } else {
+    service->RemoveFavorites(type, streaming_menu_songs_, done);
+  }
 }
 
 void MainWindow::ShowRadioMenu(const std::vector<RadioChannel> &channels) {
@@ -2460,7 +2499,9 @@ void MainWindow::ShowPlaylistMenu(double, double) {
   g_menu_append_submenu(menu, Translations::Tr("Rate").c_str(), G_MENU_MODEL(rate_menu));
   g_menu_append(menu, Translations::Tr("Edit tags…").c_str(), "win.edittag");
   g_menu_append(menu, Translations::Tr("Cover search…").c_str(), "win.cover-search");
-  g_menu_append(menu, Translations::Tr("Delete file…").c_str(), "win.delete-files");
+  if (DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Playlist)) {
+    g_menu_append(menu, Translations::Tr("Delete file…").c_str(), "win.delete-files");
+  }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, playlist_container_ ? playlist_container_->view()->grid() : GTK_WIDGET(window_));
   gtk_popover_popup(GTK_POPOVER(popover));

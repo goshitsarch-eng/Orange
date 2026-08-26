@@ -16,6 +16,11 @@ TEST(Mpris2Helpers, TrackIdAndArtUrl) {
   EXPECT_EQ(-1, Mpris2Helpers::RowFromTrackId(Mpris2Helpers::TrackId(song)));
 }
 
+TEST(Mpris2Helpers, PositionUsec) {
+  EXPECT_EQ(0, Mpris2Helpers::PositionUsec(0));
+  EXPECT_EQ(1500000, Mpris2Helpers::PositionUsec(1500000000LL));
+}
+
 TEST(Mpris2Helpers, LoopStatusRoundTrip) {
   EXPECT_EQ("None", Mpris2Helpers::LoopStatus(PlaylistSequence::RepeatMode::Off));
   EXPECT_EQ("Track", Mpris2Helpers::LoopStatus(PlaylistSequence::RepeatMode::Track));

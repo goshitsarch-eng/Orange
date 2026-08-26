@@ -1,5 +1,7 @@
 #include "streaming/streamingtabsview.h"
 
+#include "streaming/streamingbrowse.h"
+
 StreamingTabsView::StreamingTabsView(StreamingService *service) : service_(service) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   GtkWidget *stack = gtk_stack_new();
@@ -30,11 +32,53 @@ StreamingTabsView::~StreamingTabsView() = default;
 
 void StreamingTabsView::SetActivateCallback(ActivateCallback callback) {
   activate_ = std::move(callback);
-  artists_->view()->SetActivateCallback(activate_);
-  albums_->view()->SetActivateCallback(activate_);
-  songs_->view()->SetActivateCallback(activate_);
-  favorites_->view()->SetActivateCallback(activate_);
+  artists_->view()->SetActivateCallback([this](const Song &song) { HandleActivate(artists_->view(), song); });
+  albums_->view()->SetActivateCallback([this](const Song &song) { HandleActivate(albums_->view(), song); });
+  songs_->view()->SetActivateCallback([this](const Song &song) { HandleActivate(songs_->view(), song); });
+  favorites_->view()->SetActivateCallback([this](const Song &song) { HandleActivate(favorites_->view(), song); });
   search_->SetActivateCallback(activate_);
+}
+
+void StreamingTabsView::HandleActivate(StreamingCollectionView *view, const Song &song) {
+  if (!view) {
+    return;
+  }
+  const StreamingBrowse::Kind kind = StreamingBrowse::KindOf(song);
+  if (kind == StreamingBrowse::Kind::Artist) {
+    BrowseArtist(view, song);
+    return;
+  }
+  if (kind == StreamingBrowse::Kind::Album) {
+    BrowseAlbum(view, song);
+    return;
+  }
+  if (activate_) {
+    activate_(song);
+  }
+}
+
+void StreamingTabsView::BrowseArtist(StreamingCollectionView *view, const Song &artist) {
+  if (!service_) {
+    return;
+  }
+  service_->GetArtistAlbums(artist, [this, view](const SongList &albums) {
+    view->PushSongs(albums);
+    if (albums.empty()) {
+      view->SetStatus(service_->logged_in() ? "No albums" : "Sign in in Preferences");
+    }
+  });
+}
+
+void StreamingTabsView::BrowseAlbum(StreamingCollectionView *view, const Song &album) {
+  if (!service_) {
+    return;
+  }
+  service_->GetAlbumSongs(album, [this, view](const SongList &songs) {
+    view->PushSongs(songs);
+    if (songs.empty()) {
+      view->SetStatus(service_->logged_in() ? "No songs" : "Sign in in Preferences");
+    }
+  });
 }
 
 void StreamingTabsView::SetMenuCallback(MenuCallback callback) {

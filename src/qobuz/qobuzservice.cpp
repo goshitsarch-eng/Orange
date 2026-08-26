@@ -84,6 +84,28 @@ void QobuzService::GetSongs(SearchCallback callback) {
                     QobuzRequest::Type::FavouriteSongs, std::move(callback));
 }
 
+void QobuzService::GetArtistAlbums(const Song &artist, SearchCallback callback) {
+  if (artist.artist_id().empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  QobuzRequest::Get(network_, QobuzRequest::ArtistAlbumsUrl(kApiUrl, artist.artist_id(), app_id_, user_auth_token_), AuthHeaders(),
+                    QobuzRequest::Type::SearchAlbums, std::move(callback));
+}
+
+void QobuzService::GetAlbumSongs(const Song &album, SearchCallback callback) {
+  if (album.album_id().empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  QobuzRequest::Get(network_, QobuzRequest::AlbumSongsUrl(kApiUrl, album.album_id(), app_id_, user_auth_token_), AuthHeaders(),
+                    QobuzRequest::Type::SearchSongs, std::move(callback));
+}
+
 UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback callback) {
   LoadResult result;
   result.media_url = url;

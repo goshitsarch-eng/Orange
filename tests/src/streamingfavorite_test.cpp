@@ -1,11 +1,45 @@
 #include "qobuz/qobuzfavoriterequest.h"
 #include "spotify/spotifyfavoriterequest.h"
+#include "streaming/streamingbrowse.h"
+#include "streaming/streamingfavoriteaction.h"
 #include "subsonic/subsonicfavoriterequest.h"
 #include "subsonic/subsonicservice.h"
 #include "tidal/tidalfavoriterequest.h"
 #include "utilities/jsonutils.h"
 
 #include <gtest/gtest.h>
+
+TEST(StreamingFavoriteAction, TypeForSongs) {
+  Song track(Song::Source::Tidal);
+  track.set_song_id("99");
+  track.set_album_id("8");
+  track.set_artist_id("7");
+  EXPECT_EQ(StreamingService::FavoriteType::Songs, StreamingFavoriteAction::TypeForSongs({track}));
+  Song album(Song::Source::Tidal);
+  album.set_album_id("8");
+  album.set_artist_id("7");
+  EXPECT_EQ(StreamingService::FavoriteType::Albums, StreamingFavoriteAction::TypeForSongs({album}));
+  Song artist(Song::Source::Tidal);
+  artist.set_artist_id("7");
+  EXPECT_EQ(StreamingService::FavoriteType::Artists, StreamingFavoriteAction::TypeForSongs({artist}));
+}
+
+TEST(StreamingBrowse, KindFromIds) {
+  Song track;
+  track.set_song_id("99");
+  track.set_album_id("8");
+  EXPECT_EQ(StreamingBrowse::Kind::Song, StreamingBrowse::KindOf(track));
+  EXPECT_FALSE(StreamingBrowse::CanBrowse(StreamingBrowse::KindOf(track)));
+  Song album;
+  album.set_album_id("8");
+  album.set_title("Dummy");
+  EXPECT_EQ(StreamingBrowse::Kind::Album, StreamingBrowse::KindOf(album));
+  EXPECT_TRUE(StreamingBrowse::CanBrowse(StreamingBrowse::KindOf(album)));
+  Song artist;
+  artist.set_artist_id("7");
+  artist.set_title("Portishead");
+  EXPECT_EQ(StreamingBrowse::Kind::Artist, StreamingBrowse::KindOf(artist));
+}
 
 TEST(TidalFavoriteRequest, TextMethodAndUrls) {
   using Type = StreamingService::FavoriteType;

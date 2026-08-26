@@ -13,6 +13,7 @@ class Mpris2 {
   explicit Mpris2(Application *app);
   ~Mpris2();
   void EmitSeeked(int64_t position_us);
+  void EmitPosition();
   void EmitPlaybackStatus();
   void EmitMetadata();
   void EmitVolume();

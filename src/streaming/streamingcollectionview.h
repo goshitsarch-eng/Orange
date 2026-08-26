@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 class StreamingCollectionView {
  public:
@@ -20,6 +21,9 @@ class StreamingCollectionView {
 
   GtkWidget *widget() const { return widget_; }
   void SetSongs(const SongList &songs);
+  void PushSongs(const SongList &songs);
+  void PopBrowse();
+  bool CanGoBack() const { return !stack_.empty(); }
   void SetStatus(const std::string &status);
   void SetFilter(const std::string &filter);
   void SetActivateCallback(ActivateCallback callback);
@@ -30,14 +34,23 @@ class StreamingCollectionView {
   SongList SelectedSongs() const;
 
  private:
+  struct Level {
+    SongList songs;
+    std::string status;
+  };
+
   void Rebuild();
   void SetupRowDrag(GtkWidget *row, const Song &song);
+  void UpdateBack();
+  void ActivateSong(const Song &song);
 
   GtkWidget *widget_ = nullptr;
+  GtkWidget *back_ = nullptr;
   GtkWidget *filter_entry_ = nullptr;
   GtkWidget *status_label_ = nullptr;
   GtkWidget *list_ = nullptr;
   SongList songs_;
+  std::vector<Level> stack_;
   std::string filter_;
   ActivateCallback activate_;
   RefreshCallback refresh_;

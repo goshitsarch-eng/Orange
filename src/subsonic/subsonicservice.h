@@ -20,6 +20,8 @@ class SubsonicService : public StreamingService {
   void GetArtists(SearchCallback callback) override;
   void GetAlbums(SearchCallback callback) override;
   void GetSongs(SearchCallback callback) override;
+  void GetArtistAlbums(const Song &artist, SearchCallback callback) override;
+  void GetAlbumSongs(const Song &album, SearchCallback callback) override;
   void Login(const std::string &username, const std::string &password_or_token) override;
   void ReloadSettings() override;
   LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;

@@ -110,6 +110,19 @@ TEST(AlbumCoverManagerSelection, StatusAndPreferSelection) {
   EXPECT_EQ("3 albums · 2 with artwork · 1 missing · 2 selected", AlbumCoverManagerSelection::StatusText(3, 2, 2));
 }
 
+TEST(AlbumCoverManagerSelection, KeyboardWrapAndTypeAhead) {
+  EXPECT_EQ(-1, AlbumCoverManagerSelection::WrapIndex(0, 0, 1));
+  EXPECT_EQ(1, AlbumCoverManagerSelection::WrapIndex(0, 3, 1));
+  EXPECT_EQ(2, AlbumCoverManagerSelection::WrapIndex(0, 3, -1));
+  EXPECT_EQ(0, AlbumCoverManagerSelection::WrapIndex(2, 3, 1));
+  EXPECT_EQ(1, AlbumCoverManagerSelection::FlowDelta(5, 1, 0));
+  EXPECT_EQ(5, AlbumCoverManagerSelection::FlowDelta(5, 0, 1));
+  EXPECT_EQ(-5, AlbumCoverManagerSelection::FlowDelta(5, 0, -1));
+  EXPECT_EQ(1, AlbumCoverManagerSelection::FirstPrefixIndex({"Dummy", "Third"}, "th"));
+  EXPECT_EQ(0, AlbumCoverManagerSelection::FirstPrefixIndex({"Dummy", "Third"}, "du"));
+  EXPECT_EQ(-1, AlbumCoverManagerSelection::FirstPrefixIndex({"Dummy", "Third"}, "z"));
+}
+
 TEST(DeviceStateFilterModel, FiltersConnected) {
   ConnectedDevice mounted;
   mounted.mount_path = "/media/usb";
