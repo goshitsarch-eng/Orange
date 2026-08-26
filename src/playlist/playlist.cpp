@@ -1,5 +1,6 @@
 #include "playlist/playlist.h"
 
+#include "playlist/playliststopafter.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistplayed.h"
@@ -25,6 +26,17 @@ void Playlist::set_current_row(int row) {
   SyncVirtualIndex();
   CurrentChanged.Emit(current_row_);
 }
+
+void Playlist::set_stop_after_row(int row) {
+  if (row < 0 || row >= row_count()) {
+    stop_after_row_ = -1;
+  } else {
+    stop_after_row_ = row;
+  }
+  Changed.Emit();
+}
+
+void Playlist::ToggleStopAfter(int row) { set_stop_after_row(PlaylistStopAfter::ToggleRow(stop_after_row_, row)); }
 
 Song Playlist::current_song() const { return song(current_row_); }
 

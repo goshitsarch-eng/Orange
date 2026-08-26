@@ -61,6 +61,8 @@ void Analyzer::Draw(cairo_t *cr, int width, int height) const {
   if (!enabled_) {
     return;
   }
+  last_width_ = width;
+  last_height_ = height;
   container_.Draw(cr, width, height, bands_);
 }
 
@@ -79,6 +81,9 @@ void Analyzer::SetEngineScope(const std::vector<int16_t> &scope) {
     double sum = 0;
     for (size_t j = 0; j < chunk && i * chunk + j < windowed.size(); ++j) sum += std::abs(windowed[i * chunk + j]);
     bands_[i] = static_cast<float>(sum / static_cast<double>(chunk));
+  }
+  if (!paused_ && last_width_ > 0 && last_height_ > 0) {
+    container_.Advance(last_width_, last_height_, bands_);
   }
 }
 

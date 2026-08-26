@@ -169,7 +169,17 @@ void Player::Stop(bool stop_after) {
   }
 }
 
-void Player::StopAfterCurrent() { stop_after_current_ = !stop_after_current_; }
+void Player::StopAfterCurrent() {
+  stop_after_current_ = !stop_after_current_;
+  if (playlist_manager_ && playlist_manager_->current()) {
+    Playlist *playlist = playlist_manager_->current();
+    if (stop_after_current_) {
+      playlist->set_stop_after_row(playlist->current_row());
+    } else {
+      playlist->set_stop_after_row(-1);
+    }
+  }
+}
 
 void Player::PlayQueueHead(int track_change_flags) {
   if (!queue_ || queue_->empty()) {
@@ -485,6 +495,9 @@ void Player::HandleTrackEnded() {
                                                  : PlaylistSequence::RepeatMode::Off;
   if (PlayerRepeat::ShouldStopAfterTrack(repeat, stop_after_current_)) {
     stop_after_current_ = false;
+    if (playlist_manager_ && playlist_manager_->current()) {
+      playlist_manager_->current()->set_stop_after_row(-1);
+    }
     Stop();
     return;
   }

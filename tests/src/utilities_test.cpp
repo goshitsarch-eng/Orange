@@ -42,6 +42,7 @@
 #include "constants/organizesettings.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/fht.h"
+#include "analyzer/sonogramcanvas.h"
 #include "constants/behavioursettings.h"
 #include "desktop/taskbarprogress.h"
 #include "context/contextformattokens.h"
@@ -802,6 +803,19 @@ TEST(Analyzer, Types) {
   EXPECT_EQ("Bar", Analyzer::NextType("Block"));
 }
 
+TEST(SonogramCanvas, ScrollsLeftAndUsesQtColorThresholds) {
+  EXPECT_EQ(SonogramCanvas::kBackground, SonogramCanvas::ColorFromValue(0.0f));
+  EXPECT_NE(SonogramCanvas::kBackground, SonogramCanvas::ColorFromValue(0.02f));
+  EXPECT_EQ(SonogramCanvas::kHot, SonogramCanvas::ColorFromValue(1.2f));
+  SonogramCanvas::Buffer canvas;
+  canvas.EnsureSize(4, 3);
+  canvas.WriteRightColumn({0.0f, 0.06f, 1.2f});
+  EXPECT_EQ(SonogramCanvas::kHot, canvas.At(3, 0));
+  canvas.ShiftLeft();
+  EXPECT_EQ(SonogramCanvas::kHot, canvas.At(2, 0));
+  EXPECT_EQ(SonogramCanvas::kBackground, canvas.At(3, 0));
+}
+
 TEST(AudioAnalysis, PeaksMoodAndScope) {
   int16_t samples[8] = {0, 32767, 0, -16384, 1000, 2000, 3000, 0};
   const auto peaks = AudioAnalysis::PeaksFromPcm(samples, 8, 1, 4);
@@ -1532,6 +1546,7 @@ TEST(PlaylistLook, CombinedCssCoversAlternatingGlowAndBars) {
   EXPECT_NE(std::string::npos, css.find("playlist-glow"));
   EXPECT_NE(std::string::npos, css.find("25%"));
   EXPECT_NE(std::string::npos, css.find("playlist-unavailable"));
+  EXPECT_NE(std::string::npos, css.find("playlist-stop-after"));
 }
 
 TEST(PlaylistLook, GlowPulseMatchesQtSteps) {

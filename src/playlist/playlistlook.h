@@ -76,8 +76,13 @@ inline std::string UnavailableCss() {
   return ".playlist-row.playlist-unavailable, .playlist-row.playlist-unavailable label { color: #c0c0c0; }";
 }
 
+inline std::string StopAfterCss() {
+  return ".playlist-row.playlist-stop-after { box-shadow: inset 3px 0 0 @destructive_color; }";
+}
+
 inline std::string CombinedCss(bool alternating, bool glow, bool bars, double progress, int glow_step = 0) {
-  return AlternatingCss(alternating) + GlowCss(glow, glow_step) + BarsCss(bars, progress, glow ? glow_step : -1) + UnavailableCss();
+  return AlternatingCss(alternating) + GlowCss(glow, glow_step) + BarsCss(bars, progress, glow ? glow_step : -1) + UnavailableCss() +
+         StopAfterCss();
 }
 
 }  // namespace PlaylistLook

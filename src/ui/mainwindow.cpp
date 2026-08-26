@@ -1847,6 +1847,7 @@ void MainWindow::ConnectSignals() {
     if (!app_->analyzer()->enabled()) {
       return;
     }
+    app_->analyzer()->set_paused(app_->player()->GetState() == GstEngine::State::Paused);
     app_->analyzer()->SetEngineScope(scope);
     const gint64 now = g_get_monotonic_time();
     const gint64 interval = 1000000LL / std::max(1, app_->analyzer()->framerate());
@@ -3345,7 +3346,8 @@ void MainWindow::RescanCollection(bool full) {
 
 void MainWindow::StopAfterCurrent() {
   app_->player()->StopAfterCurrent();
-  ShowToast("Will stop after the current track");
+  RefreshPlaylist();
+  ShowToast(app_->player()->stop_after_current() ? "Will stop after the current track" : "Stop after this track cancelled");
 }
 
 void MainWindow::QueuePlayNext() {

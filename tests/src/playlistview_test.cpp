@@ -22,6 +22,7 @@
 #include "playlist/playlisttabnav.h"
 #include "playlist/playlisttabmenu.h"
 #include "playlist/playlisttabbarvisibility.h"
+#include "playlist/playliststopafter.h"
 #include "playlist/playlisttagcompletion.h"
 #include "widgets/favoritewidget.h"
 #include "playlist/songloaderinserter.h"
@@ -476,6 +477,25 @@ TEST(PlaylistListModel, StoresIdsThroughFilter) {
   EXPECT_EQ(4, rows[0].id);
   EXPECT_EQ("Queue", rows[1].name);
   EXPECT_EQ(7, rows[1].id);
+}
+
+TEST(PlaylistStopAfter, TogglesRowAndMarksTitle) {
+  EXPECT_EQ(5, PlaylistStopAfter::ToggleRow(-1, 5));
+  EXPECT_EQ(-1, PlaylistStopAfter::ToggleRow(5, 5));
+  EXPECT_TRUE(PlaylistStopAfter::IsRow(3, 3));
+  EXPECT_FALSE(PlaylistStopAfter::IsRow(-1, 3));
+  EXPECT_EQ(std::string("Roads") + PlaylistStopAfter::TitleSuffix(), PlaylistStopAfter::TitleText("Roads", true));
+  EXPECT_EQ("Roads", PlaylistStopAfter::TitleText("Roads", false));
+  Playlist playlist;
+  Song song;
+  song.set_title("Roads");
+  song.set_valid(true);
+  playlist.AppendSongs({song, song});
+  playlist.set_current_row(0);
+  playlist.ToggleStopAfter(0);
+  EXPECT_EQ(0, playlist.stop_after_row());
+  playlist.ToggleStopAfter(0);
+  EXPECT_EQ(-1, playlist.stop_after_row());
 }
 
 TEST(PlaylistTabBarVisibility, HidesSinglePlaylistAndAnimates500Ms) {

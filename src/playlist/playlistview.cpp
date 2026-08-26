@@ -16,6 +16,7 @@
 #include "playlist/playlistfilterempty.h"
 #include "playlist/playlistkeyboard.h"
 #include "playlist/playlistlook.h"
+#include "playlist/playliststopafter.h"
 #include "playlist/playlisttagcompletion.h"
 #include "translations/translations.h"
 #include "utilities/strutils.h"
@@ -524,6 +525,9 @@ void PlaylistView::Refresh(Playlist *playlist) {
     if (alternating && (visible_count_ % 2) == 1) {
       gtk_widget_add_css_class(row, "playlist-alt");
     }
+    if (PlaylistStopAfter::IsRow(playlist->stop_after_row(), index)) {
+      gtk_widget_add_css_class(row, PlaylistStopAfter::CssClass());
+    }
     if (index == current) {
       gtk_widget_add_css_class(row, "accent");
       gtk_widget_add_css_class(row, "playlist-playing");
@@ -575,6 +579,9 @@ void PlaylistView::Refresh(Playlist *playlist) {
         cell = area;
       } else {
         std::string text = PlaylistDelegates::ColumnText(song, column);
+        if (column == PlaylistColumn::Title) {
+          text = PlaylistStopAfter::TitleText(text, PlaylistStopAfter::IsRow(playlist->stop_after_row(), index));
+        }
         if (column == PlaylistColumn::Queue && queue_position_) {
           const int position = queue_position_(index);
           text = position > 0 ? std::to_string(position) : "";

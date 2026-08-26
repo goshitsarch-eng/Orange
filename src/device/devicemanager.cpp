@@ -34,6 +34,8 @@
 #include <cdio/cdio.h>
 #endif
 #include "device/cddahelpers.h"
+#include "device/devicescanprogress.h"
+#include "core/taskmanager.h"
 
 #include <algorithm>
 #include <functional>
@@ -41,8 +43,9 @@
 #include <taglib/tag.h>
 #include <taglib/audioproperties.h>
 
-DeviceManager::DeviceManager(Database *database)
-    : url_handler_(std::make_unique<DeviceUrlHandler>(this)),
+DeviceManager::DeviceManager(Database *database, TaskManager *task_manager)
+    : task_manager_(task_manager),
+      url_handler_(std::make_unique<DeviceUrlHandler>(this)),
       device_db_(database ? std::make_unique<DeviceDatabaseBackend>(database) : nullptr) {}
 
 DeviceManager::~DeviceManager() { StopVolumeMonitor(); }
@@ -116,15 +119,24 @@ const ConnectedDevice *DeviceManager::FindDevice(const std::string &device_id) c
   return nullptr;
 }
 
-SongList DeviceManager::SongsFromDirectory(const std::string &path) {
+SongList DeviceManager::SongsFromDirectory(const std::string &path, const std::function<void(int, int)> &progress) {
   SongList songs;
   if (path.empty()) {
     return songs;
   }
-  for (const std::string &entry : FileUtils::ListDirectoryRecursive(path)) {
-    if (!Song::IsAudioFile(entry)) {
-      continue;
+  const std::vector<std::string> entries = FileUtils::ListDirectoryRecursive(path);
+  std::vector<std::string> audio;
+  for (const std::string &entry : entries) {
+    if (Song::IsAudioFile(entry)) {
+      audio.push_back(entry);
     }
+  }
+  int done = 0;
+  const int total = static_cast<int>(audio.size());
+  if (progress) {
+    progress(0, total);
+  }
+  for (const std::string &entry : audio) {
     Song song(Song::Source::Device);
     song.set_url(FileUtils::UriFromPath(entry));
     song.set_basefilename(FileUtils::BaseName(entry));
@@ -149,6 +161,10 @@ SongList DeviceManager::SongsFromDirectory(const std::string &path) {
       song.set_title(FileUtils::BaseName(entry));
     }
     songs.push_back(song);
+    ++done;
+    if (progress) {
+      progress(done, total);
+    }
   }
   std::sort(songs.begin(), songs.end(), [](const Song &a, const Song &b) { return a.PrettyTitleWithArtist() < b.PrettyTitleWithArtist(); });
   return songs;
@@ -280,30 +296,54 @@ bool DeviceManager::IsForgotten(const std::string &device_id) const {
   return std::find(forgotten_.begin(), forgotten_.end(), device_id) != forgotten_.end();
 }
 
-SongList DeviceManager::Songs(const std::string &device_id) const {
+SongList DeviceManager::Songs(const std::string &device_id) {
   const ConnectedDevice *device = FindDevice(device_id);
   if (!device) {
     return {};
   }
+  scan_device_id_ = device_id;
+  last_scan_percent_ = -1;
+  if (task_manager_) {
+    scan_task_id_ = task_manager_->StartTask(DeviceScanProgress::TaskName());
+  }
+  SetUpdatingPercent(device_id, 0);
+  auto progress = [this, device_id](int done, int total) {
+    const int percent = DeviceScanProgress::Percent(done, total);
+    if (!DeviceScanProgress::ShouldReport(last_scan_percent_, percent)) {
+      return;
+    }
+    last_scan_percent_ = percent;
+    if (task_manager_ && scan_task_id_) {
+      task_manager_->SetTaskProgress(scan_task_id_, done, total);
+    }
+    SetUpdatingPercent(device_id, percent);
+  };
+  SongList songs;
   if (device->backend == "cdda") {
-    return SongsFromCdda();
-  }
-  if (device->backend == "mtp") {
-    return SongsFromMtp(*device);
-  }
-  if (device->backend == "gpod") {
-    SongList songs = GPodLoader::LoadSongs(device->mount_path);
-    if (!songs.empty()) {
-      return songs;
+    songs = SongsFromCdda();
+  } else if (device->backend == "mtp") {
+    songs = SongsFromMtp(*device);
+  } else if (device->backend == "gpod") {
+    songs = GPodLoader::LoadSongs(device->mount_path);
+    if (songs.empty()) {
+      std::string root = device->mount_path;
+      const std::string music = FileUtils::Join(root, "iPod_Control/Music");
+      if (FileUtils::IsDirectory(music)) {
+        root = music;
+      }
+      songs = SongsFromDirectory(root, progress);
     }
-    std::string root = device->mount_path;
-    const std::string music = FileUtils::Join(root, "iPod_Control/Music");
-    if (FileUtils::IsDirectory(music)) {
-      root = music;
-    }
-    return SongsFromDirectory(root);
+  } else {
+    songs = SongsFromDirectory(device->mount_path, progress);
   }
-  return SongsFromDirectory(device->mount_path);
+  RememberSongCount(device_id, static_cast<int>(songs.size()));
+  SetUpdatingPercent(device_id, DeviceScanProgress::FinishedPercent());
+  if (task_manager_ && scan_task_id_) {
+    task_manager_->SetTaskFinished(scan_task_id_);
+    scan_task_id_ = 0;
+  }
+  scan_device_id_.clear();
+  return songs;
 }
 
 SongList DeviceManager::SongsFromCdda() const {
@@ -476,6 +516,16 @@ void DeviceManager::RememberSongCount(const std::string &device_id, const int co
   for (ConnectedDevice &device : devices_) {
     if (device.unique_id == device_id) {
       device.song_count = count;
+      return;
+    }
+  }
+}
+
+void DeviceManager::SetUpdatingPercent(const std::string &device_id, const int percent) {
+  for (ConnectedDevice &device : devices_) {
+    if (device.unique_id == device_id) {
+      device.updating_percent = percent;
+      DevicesChanged.Emit();
       return;
     }
   }

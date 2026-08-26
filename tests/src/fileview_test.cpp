@@ -12,6 +12,7 @@
 #include "device/deviceforgetdialog.h"
 #include "device/deviceviewlook.h"
 #include "device/deviceviewreload.h"
+#include "device/devicescanprogress.h"
 #include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
 #include "fileview/fileviewicons.h"
@@ -557,6 +558,17 @@ TEST(DeviceViewLook, IconsAndStatusMatchQtDelegate) {
   CollectionItem song(CollectionItem::Type::Song);
   song.metadata.set_url("file:///music/roads.flac");
   EXPECT_STREQ("audio-x-generic-symbolic", DeviceViewLook::ItemIconName(&song));
+}
+
+TEST(DeviceScanProgress, MapsTaskToPercent) {
+  EXPECT_STREQ("Scanning device", DeviceScanProgress::TaskName());
+  EXPECT_TRUE(DeviceScanProgress::IsScanTask("Scanning device"));
+  EXPECT_EQ(0, DeviceScanProgress::Percent(0, 0));
+  EXPECT_EQ(40, DeviceScanProgress::Percent(40, 100));
+  EXPECT_EQ(100, DeviceScanProgress::Percent(12, 10));
+  EXPECT_TRUE(DeviceScanProgress::ShouldReport(-1, 0));
+  EXPECT_FALSE(DeviceScanProgress::ShouldReport(40, 40));
+  EXPECT_EQ(-1, DeviceScanProgress::FinishedPercent());
 }
 
 TEST(DeviceViewReload, DoesNotRescanOnRefresh) {

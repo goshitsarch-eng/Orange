@@ -17,6 +17,8 @@ class Analyzer {
   void Save() const;
   void SetEngineScope(const std::vector<int16_t> &scope);
   void SetMagnitudes(const std::vector<float> &db);
+  void set_paused(bool paused) { paused_ = paused; }
+  bool paused() const { return paused_; }
   const std::vector<float> &bands() const { return bands_; }
   void set_type(const std::string &type);
   const std::string &type() const { return type_; }
@@ -36,6 +38,9 @@ class Analyzer {
   int framerate_ = 25;
   FHT fht_{64};
   AnalyzerContainer container_;
+  bool paused_ = false;
+  mutable int last_width_ = 0;
+  mutable int last_height_ = 0;
 };
 
 #endif

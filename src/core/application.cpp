@@ -31,7 +31,7 @@ Application::Application()
       scrobbler_(std::make_unique<AudioScrobbler>(network_.get())),
       streaming_services_(std::make_unique<StreamingServices>(network_.get(), url_handlers_.get(), task_manager_.get())),
       radio_services_(std::make_unique<RadioServices>(database_.get(), network_.get())),
-      device_manager_(std::make_unique<DeviceManager>(database_.get())),
+      device_manager_(std::make_unique<DeviceManager>(database_.get(), task_manager_.get())),
       device_finders_(std::make_unique<DeviceFinders>()),
       equalizer_(std::make_unique<Equalizer>()),
       analyzer_(std::make_unique<Analyzer>()),

@@ -85,6 +85,9 @@ class Playlist {
   void RefillDynamic(const SongList &pool, bool force = false);
   void ExpandDynamic(const SongList &pool);
   void RepopulateDynamic(const SongList &pool);
+  void set_stop_after_row(int row);
+  void ToggleStopAfter(int row);
+  int stop_after_row() const { return stop_after_row_; }
 
   int64_t total_length_nanosec() const;
 
@@ -126,6 +129,7 @@ class Playlist {
   int current_virtual_index_ = -1;
   std::string filter_string_;
   std::vector<int> played_indexes_;
+  int stop_after_row_ = -1;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H
