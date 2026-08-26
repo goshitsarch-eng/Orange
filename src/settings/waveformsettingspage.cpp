@@ -13,7 +13,7 @@ AdwPreferencesPage *WaveformSettingsPage::Create(Settings *settings, Application
                             static_cast<int>(SeekbarSettings::kDefaultMode));
   settings->BeginGroup(WaveformSettings::kSettingsGroup);
   AdwPreferencesGroup *group = SettingsPage::AddGroup(page, "Waveform");
-  SettingsPage::AddEntry(group, settings, WaveformSettings::kColor, "Color");
+  SettingsPage::AddColorButton(group, settings, WaveformSettings::kSettingsGroup, WaveformSettings::kColor, "Color", "#6696e3");
   SettingsPage::AddToggle(group, settings, WaveformSettings::kSave, "Save generated waveforms", nullptr, WaveformSettings::kDefaultSave);
   return page;
 }

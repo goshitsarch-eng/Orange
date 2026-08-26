@@ -19,7 +19,9 @@
 #include "analyzer/fht.h"
 #include "constants/behavioursettings.h"
 #include "context/contextformattokens.h"
+#include "constants/appearancesettings.h"
 #include "core/appearance.h"
+#include "core/appearancecolors.h"
 #include "core/deletefiles.h"
 #include "core/enginemetadata.h"
 #include "core/windowgeometry.h"
@@ -802,6 +804,37 @@ TEST(Appearance, BackgroundCssForTypesAndUrls) {
   EXPECT_NE(std::string::npos, custom.find("file:///tmp/wall.jpg"));
   EXPECT_NE(std::string::npos, custom.find("top left"));
   EXPECT_NE(std::string::npos, custom.find("blur(8px)"));
+  EXPECT_NE(std::string::npos, custom.find("background-size: auto"));
+  const std::string stretched = Appearance::BuildBackgroundCss(2, "/tmp/wall.jpg", 1, 0, 40, true, true, false, 0);
+  EXPECT_NE(std::string::npos, stretched.find("background-size: cover"));
+  const std::string contained = Appearance::BuildBackgroundCss(2, "/tmp/wall.jpg", 1, 0, 40, true, true, true, 0);
+  EXPECT_NE(std::string::npos, contained.find("background-size: contain"));
+}
+
+TEST(AppearanceColors, PaletteTabPlayingAndIconCss) {
+  EXPECT_EQ("#353535", std::string(AppearanceColors::DarkHex(AppearanceSettings::kColorWindow)));
+  EXPECT_TRUE(AppearanceColors::BuildPaletteCss(false, {{AppearanceSettings::kColorWindow, "#111111"}}).empty());
+  const std::string palette = AppearanceColors::BuildPaletteCss(true, {{AppearanceSettings::kColorWindow, "#111111"},
+                                                                      {AppearanceSettings::kColorWindowText, "#eeeeee"}});
+  EXPECT_NE(std::string::npos, palette.find("background-color: #111111"));
+  EXPECT_NE(std::string::npos, palette.find("color: #eeeeee"));
+  EXPECT_TRUE(AppearanceColors::BuildTabBarCss(true, true, "#404040").empty());
+  const std::string tab = AppearanceColors::BuildTabBarCss(false, true, "#404040");
+  EXPECT_NE(std::string::npos, tab.find("background-color: #404040"));
+  EXPECT_NE(std::string::npos, tab.find("linear-gradient"));
+  EXPECT_EQ(".playlist-playing, .playlist-playing label { color: #6696e3; }", AppearanceColors::BuildPlayingSongCss("#6696e3"));
+  EXPECT_EQ("auto", AppearanceColors::BackgroundSizeCss(false, true, true, 0));
+  EXPECT_EQ("320px auto", AppearanceColors::BackgroundSizeCss(false, true, true, 320));
+  EXPECT_EQ("contain", AppearanceColors::BackgroundSizeCss(true, true, true, 0));
+  EXPECT_EQ("cover", AppearanceColors::BackgroundSizeCss(true, true, false, 0));
+  EXPECT_EQ("100% 100%", AppearanceColors::BackgroundSizeCss(true, false, false, 0));
+  AppearanceColors::IconSizes sizes;
+  sizes.play_controls = 2;
+  sizes.tabbar_small = 200;
+  const AppearanceColors::IconSizes clamped = AppearanceColors::ClampIconSizes(sizes);
+  EXPECT_EQ(AppearanceSettings::kDefaultIconSizePlayControlButtons, clamped.play_controls);
+  EXPECT_EQ(128, clamped.tabbar_small);
+  EXPECT_NE(std::string::npos, AppearanceColors::BuildIconSizeCss(sizes).find("32px"));
 }
 
 TEST(PlayingWidget, CoverSizeAndFade) {

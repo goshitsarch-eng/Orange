@@ -8,6 +8,7 @@
 PlaylistHeader::PlaylistHeader() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_css_class(widget_, "toolbar");
+  gtk_widget_add_css_class(widget_, "strawberry-playlist-buttons");
   GtkGesture *gesture = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(gesture));

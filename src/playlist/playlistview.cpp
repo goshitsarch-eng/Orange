@@ -225,6 +225,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
     gtk_widget_add_css_class(row, "activatable");
     if (index == current) {
       gtk_widget_add_css_class(row, "accent");
+      gtk_widget_add_css_class(row, "playlist-playing");
     }
     if (song.skipped()) {
       gtk_widget_add_css_class(row, "dim-label");

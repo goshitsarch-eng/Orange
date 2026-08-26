@@ -257,6 +257,8 @@ void MainWindow::BuildUi() {
   BuildSidebar();
   GtkWidget *sidebar_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   GtkWidget *switcher = adw_view_switcher_new();
+  gtk_widget_add_css_class(switcher, "strawberry-tabbar");
+  gtk_widget_add_css_class(sidebar_box, "strawberry-left-panel");
   adw_view_switcher_set_policy(ADW_VIEW_SWITCHER(switcher), ADW_VIEW_SWITCHER_POLICY_NARROW);
   adw_view_switcher_set_stack(ADW_VIEW_SWITCHER(switcher), sidebar_stack_);
   gtk_box_append(GTK_BOX(sidebar_box), switcher);
@@ -901,6 +903,7 @@ void MainWindow::BuildPlayerBar() {
   ApplySeekbarMode();
 
   GtkWidget *controls = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_add_css_class(controls, "strawberry-play-controls");
   gtk_widget_set_halign(controls, GTK_ALIGN_CENTER);
   GtkWidget *prev = gtk_button_new_from_icon_name("media-skip-backward-symbolic");
   play_button_ = gtk_button_new_from_icon_name("media-playback-start-symbolic");
@@ -1665,6 +1668,17 @@ void MainWindow::ApplyAppearance() {
   const std::string css = appearance.BackgroundCss(cover_path);
   if (!css.empty()) {
     StyleUtils::LoadCss(css);
+  }
+  if (play_button_) {
+    const int size = appearance.icon_sizes().play_controls;
+    for (GtkWidget *child = gtk_widget_get_first_child(gtk_widget_get_parent(play_button_)); child; child = gtk_widget_get_next_sibling(child)) {
+      if (!GTK_IS_BUTTON(child)) {
+        continue;
+      }
+      if (GtkWidget *image = gtk_button_get_child(GTK_BUTTON(child)); image && GTK_IS_IMAGE(image)) {
+        gtk_image_set_pixel_size(GTK_IMAGE(image), size);
+      }
+    }
   }
 }
 
