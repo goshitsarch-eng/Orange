@@ -16,11 +16,13 @@ TEST(PlaylistColumnLayout, DefaultOrderAlignmentAndReset) {
   PlaylistColumnLayout::Reset();
   const std::vector<PlaylistColumn> defaults = PlaylistColumnLayout::DefaultVisible();
   ASSERT_GE(defaults.size(), 5u);
-  EXPECT_EQ(PlaylistColumn::Track, defaults.front());
+  EXPECT_EQ(PlaylistColumn::Queue, defaults.front());
   EXPECT_EQ(defaults, PlaylistColumnLayout::Visible());
   EXPECT_TRUE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Title));
+  EXPECT_TRUE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Queue));
   EXPECT_FALSE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Comment));
   EXPECT_EQ(PlaylistColumnAlign::Right, PlaylistColumnLayout::DefaultAlignment(PlaylistColumn::Track));
+  EXPECT_EQ(PlaylistColumnAlign::Right, PlaylistColumnLayout::DefaultAlignment(PlaylistColumn::Queue));
   EXPECT_EQ(PlaylistColumnAlign::Right, PlaylistColumnLayout::Alignment(PlaylistColumn::Year));
   EXPECT_EQ(PlaylistColumnAlign::Left, PlaylistColumnLayout::Alignment(PlaylistColumn::Title));
   EXPECT_FLOAT_EQ(1.0f, PlaylistColumnLayout::XAlign(PlaylistColumn::Bitrate));
@@ -41,7 +43,7 @@ TEST(PlaylistColumnLayout, DefaultOrderAlignmentAndReset) {
 
   PlaylistColumnLayout::Hide(PlaylistColumn::Track);
   EXPECT_FALSE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Track));
-  EXPECT_EQ(PlaylistColumn::Title, PlaylistColumnLayout::Visible().front());
+  EXPECT_EQ(PlaylistColumn::Queue, PlaylistColumnLayout::Visible().front());
   PlaylistColumnLayout::ToggleVisible(PlaylistColumn::Comment);
   EXPECT_TRUE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Comment));
   ASSERT_TRUE(PlaylistColumnLayout::Move(PlaylistColumn::Title, 1));
