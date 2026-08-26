@@ -2,6 +2,7 @@
 
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
+#include "playlist/playlistcolumnwidths.h"
 #include "utilities/strutils.h"
 
 #include <algorithm>
@@ -16,6 +17,8 @@ using PlaylistSettings::kDefaultRatingLocked;
 using PlaylistSettings::kDefaultStretchColumns;
 using PlaylistSettings::kRatingLocked;
 using PlaylistSettings::kSettingsGroup;
+using PlaylistSettings::kState;
+using PlaylistSettings::kStateVersion;
 using PlaylistSettings::kStretchColumns;
 
 std::string AlignName(PlaylistColumnAlign align) {
@@ -241,6 +244,13 @@ void PlaylistColumnLayout::SetStretchEnabled(bool enabled) {
   Settings settings;
   settings.BeginGroup(kSettingsGroup);
   settings.SetBoolValue(kStretchColumns, enabled);
+  PlaylistColumnWidths::State state = PlaylistColumnWidths::Decode(settings.Value(kState));
+  if (!PlaylistColumnWidths::VersionSupported(state.version) || settings.Value(kState).empty()) {
+    state = PlaylistColumnWidths::State{};
+  }
+  state.stretch = enabled;
+  settings.SetIntValue(kStateVersion, PlaylistColumnWidths::kHeaderStateVersion);
+  settings.SetValue(kState, PlaylistColumnWidths::Encode(state));
   settings.Sync();
 }
 
@@ -255,6 +265,73 @@ bool PlaylistColumnLayout::StretchColumn(PlaylistColumn column) {
     }
   }
   return !columns.empty() && columns.front() == column;
+}
+
+namespace {
+
+PlaylistColumnWidths::State LoadWidthState() {
+  Settings settings;
+  settings.BeginGroup(kSettingsGroup);
+  if (settings.IntValue(kStateVersion, PlaylistSettings::kDefaultStateVersion) != PlaylistColumnWidths::kHeaderStateVersion) {
+    return PlaylistColumnWidths::State{};
+  }
+  return PlaylistColumnWidths::Decode(settings.Value(kState));
+}
+
+void SaveWidthState(PlaylistColumnWidths::State state) {
+  state.version = PlaylistColumnWidths::kHeaderStateVersion;
+  state.stretch = PlaylistColumnLayout::StretchEnabled();
+  Settings settings;
+  settings.BeginGroup(kSettingsGroup);
+  settings.SetIntValue(kStateVersion, PlaylistColumnWidths::kHeaderStateVersion);
+  settings.SetValue(kState, PlaylistColumnWidths::Encode(state));
+  settings.Sync();
+}
+
+}  // namespace
+
+std::vector<int> PlaylistColumnLayout::PixelWidths(int total_width) {
+  const auto columns = Visible();
+  const PlaylistColumnWidths::State state = LoadWidthState();
+  if (!StretchEnabled() || total_width <= 0) {
+    std::vector<int> pixels;
+    pixels.reserve(columns.size());
+    for (PlaylistColumn column : columns) {
+      const auto it = state.pixels.find(column);
+      pixels.push_back(it != state.pixels.end() ? std::max(PlaylistColumnWidths::kMinSectionSize, it->second)
+                                                : PlaylistDelegates::ColumnWidth(column));
+    }
+    return pixels;
+  }
+  std::vector<double> proportions;
+  proportions.reserve(columns.size());
+  for (PlaylistColumn column : columns) {
+    const auto it = state.proportions.find(column);
+    proportions.push_back(it != state.proportions.end() ? it->second : PlaylistColumnWidths::DefaultProportion(column));
+  }
+  return PlaylistColumnWidths::Distribute(PlaylistColumnWidths::Normalize(proportions), total_width);
+}
+
+int PlaylistColumnLayout::PixelWidth(PlaylistColumn column, int total_width) {
+  const auto columns = Visible();
+  const auto widths = PixelWidths(total_width);
+  for (size_t i = 0; i < columns.size() && i < widths.size(); ++i) {
+    if (columns[i] == column) {
+      return widths[i];
+    }
+  }
+  return PlaylistDelegates::ColumnWidth(column);
+}
+
+void PlaylistColumnLayout::ResizePair(PlaylistColumn left, int left_px, PlaylistColumn right, int right_px, int total_width) {
+  PlaylistColumnWidths::State state = LoadWidthState();
+  state.pixels[left] = std::max(PlaylistColumnWidths::kMinSectionSize, left_px);
+  state.pixels[right] = std::max(PlaylistColumnWidths::kMinSectionSize, right_px);
+  if (total_width > 0) {
+    state.proportions[left] = static_cast<double>(left_px) / static_cast<double>(total_width);
+    state.proportions[right] = static_cast<double>(right_px) / static_cast<double>(total_width);
+  }
+  SaveWidthState(state);
 }
 
 bool PlaylistColumnLayout::RatingLocked() {
@@ -275,6 +352,8 @@ void PlaylistColumnLayout::Reset() {
   settings.BeginGroup(kSettingsGroup);
   settings.SetValue(kColumns, kDefaultColumns);
   settings.Remove(kColumnAlignments);
+  settings.Remove(kState);
+  settings.Remove(kStateVersion);
   settings.SetBoolValue(kStretchColumns, kDefaultStretchColumns);
   settings.SetBoolValue(kRatingLocked, kDefaultRatingLocked);
   settings.Sync();

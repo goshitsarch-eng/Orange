@@ -66,6 +66,7 @@ class PlaylistView {
   void RecordClickedColumn(GtkWidget *row, double x);
   void SetupRowDrag(GtkWidget *row, int index);
   gboolean OnDrop(const GValue *value, double y);
+  void ApplyColumnWidths();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *grid_ = nullptr;

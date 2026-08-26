@@ -1,6 +1,7 @@
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistheadersort.h"
+#include "playlist/playlistcolumnwidths.h"
 #include "playlist/playlist.h"
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlistfolders.h"
@@ -550,4 +551,77 @@ TEST(PlaylistHeaderSort, ApplyOrderAndSkipRedundantExplicitSort) {
   EXPECT_TRUE(PlaylistHeaderSort::ShouldApplyExplicit(PlaylistColumn::Title, PlaylistColumn::Artist, true, PlaylistSortOrder::Toggle));
   EXPECT_TRUE(PlaylistHeaderSort::ShouldSortNow(PlaylistColumn::Title));
   EXPECT_FALSE(PlaylistHeaderSort::ShouldSortNow(PlaylistColumn::Count));
+}
+
+TEST(PlaylistColumnWidths, QtDefaultsNormalizeAndNeighborResize) {
+  EXPECT_EQ(2, PlaylistColumnWidths::kHeaderStateVersion);
+  EXPECT_EQ(30, PlaylistColumnWidths::kMinSectionSize);
+  EXPECT_DOUBLE_EQ(0.06, PlaylistColumnWidths::DefaultProportion(PlaylistColumn::Track));
+  EXPECT_DOUBLE_EQ(0.23, PlaylistColumnWidths::DefaultProportion(PlaylistColumn::Title));
+  EXPECT_DOUBLE_EQ(0.23, PlaylistColumnWidths::DefaultProportion(PlaylistColumn::Artist));
+  EXPECT_DOUBLE_EQ(0.23, PlaylistColumnWidths::DefaultProportion(PlaylistColumn::Album));
+  EXPECT_DOUBLE_EQ(0.05, PlaylistColumnWidths::DefaultProportion(PlaylistColumn::Samplerate));
+  EXPECT_DOUBLE_EQ(0.04, PlaylistColumnWidths::DefaultProportion(PlaylistColumn::Length));
+  EXPECT_TRUE(PlaylistColumnWidths::VersionSupported(2));
+  EXPECT_FALSE(PlaylistColumnWidths::VersionSupported(1));
+  const auto normalized = PlaylistColumnWidths::Normalize({0.23, 0.23});
+  ASSERT_EQ(2u, normalized.size());
+  EXPECT_NEAR(0.5, normalized[0], 0.0001);
+  EXPECT_NEAR(0.5, normalized[1], 0.0001);
+  const auto empty = PlaylistColumnWidths::Normalize({0.0, 0.0});
+  ASSERT_EQ(2u, empty.size());
+  EXPECT_NEAR(0.5, empty[0], 0.0001);
+  const auto pixels = PlaylistColumnWidths::Distribute({0.25, 0.75}, 400);
+  ASSERT_EQ(2u, pixels.size());
+  EXPECT_EQ(100, pixels[0]);
+  EXPECT_EQ(300, pixels[1]);
+  int right = 0;
+  EXPECT_TRUE(PlaylistColumnWidths::NeighborResize(100, 140, 200, &right));
+  EXPECT_EQ(160, right);
+  EXPECT_FALSE(PlaylistColumnWidths::NeighborResize(100, 280, 200, &right));
+  EXPECT_TRUE(PlaylistColumnWidths::OnResizeHandle(96, 100));
+  EXPECT_FALSE(PlaylistColumnWidths::OnResizeHandle(40, 100));
+  EXPECT_TRUE(PlaylistColumnWidths::OnResizeHandleAbsolute(204, 100, 100));
+}
+
+TEST(PlaylistColumnWidths, EncodeDecodeRoundTripAndRejectQtBlob) {
+  PlaylistColumnWidths::State state;
+  state.stretch = true;
+  state.proportions[PlaylistColumn::Title] = 0.23;
+  state.proportions[PlaylistColumn::Artist] = 0.23;
+  state.pixels[PlaylistColumn::Title] = 184;
+  const std::string blob = PlaylistColumnWidths::Encode(state);
+  const PlaylistColumnWidths::State loaded = PlaylistColumnWidths::Decode(blob);
+  EXPECT_EQ(PlaylistColumnWidths::kHeaderStateVersion, loaded.version);
+  EXPECT_TRUE(loaded.stretch);
+  ASSERT_EQ(1u, loaded.proportions.count(PlaylistColumn::Title));
+  ASSERT_EQ(1u, loaded.proportions.count(PlaylistColumn::Artist));
+  EXPECT_NEAR(0.23, loaded.proportions.at(PlaylistColumn::Title), 0.0001);
+  EXPECT_NEAR(0.23, loaded.proportions.at(PlaylistColumn::Artist), 0.0001);
+  ASSERT_EQ(1u, loaded.pixels.count(PlaylistColumn::Title));
+  EXPECT_EQ(184, loaded.pixels.at(PlaylistColumn::Title));
+  EXPECT_TRUE(PlaylistColumnWidths::Decode({}).proportions.empty());
+  EXPECT_TRUE(PlaylistColumnWidths::Decode("not-a-header-state").proportions.empty());
+  EXPECT_TRUE(PlaylistColumnWidths::Decode("1;1;Title=0.23;").proportions.empty());
+}
+
+TEST(PlaylistColumnLayout, PixelWidthsFollowSavedProportions) {
+  PlaylistColumnLayout::Reset();
+  PlaylistColumnLayout::SetVisibleColumns({PlaylistColumn::Title, PlaylistColumn::Artist});
+  EXPECT_TRUE(PlaylistColumnLayout::StretchEnabled());
+  const auto stretched = PlaylistColumnLayout::PixelWidths(1000);
+  ASSERT_EQ(2u, stretched.size());
+  EXPECT_EQ(500, stretched[0]);
+  EXPECT_EQ(500, stretched[1]);
+  EXPECT_EQ(500, PlaylistColumnLayout::PixelWidth(PlaylistColumn::Title, 1000));
+  PlaylistColumnLayout::ResizePair(PlaylistColumn::Title, 600, PlaylistColumn::Artist, 400, 1000);
+  const auto resized = PlaylistColumnLayout::PixelWidths(1000);
+  ASSERT_EQ(2u, resized.size());
+  EXPECT_EQ(600, resized[0]);
+  EXPECT_EQ(400, resized[1]);
+  PlaylistColumnLayout::SetStretchEnabled(false);
+  PlaylistColumnLayout::ResizePair(PlaylistColumn::Title, 220, PlaylistColumn::Artist, 180, 0);
+  EXPECT_EQ(220, PlaylistColumnLayout::PixelWidth(PlaylistColumn::Title, 800));
+  EXPECT_EQ(180, PlaylistColumnLayout::PixelWidth(PlaylistColumn::Artist, 800));
+  PlaylistColumnLayout::Reset();
 }

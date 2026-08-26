@@ -24,6 +24,9 @@ class PlaylistColumnLayout {
   static bool StretchEnabled();
   static void SetStretchEnabled(bool enabled);
   static bool StretchColumn(PlaylistColumn column);
+  static int PixelWidth(PlaylistColumn column, int total_width);
+  static std::vector<int> PixelWidths(int total_width);
+  static void ResizePair(PlaylistColumn left, int left_px, PlaylistColumn right, int right_px, int total_width);
 
   static bool RatingLocked();
   static void SetRatingLocked(bool locked);

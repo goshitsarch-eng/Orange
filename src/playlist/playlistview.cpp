@@ -29,6 +29,7 @@ PlaylistView::PlaylistView() {
     }
   });
   header_->SetLayoutChangedCallback([this]() { Refresh(playlist_); });
+  header_->SetWidthsChangedCallback([this]() { ApplyColumnWidths(); });
   widget_ = gtk_scrolled_window_new();
   gtk_widget_add_css_class(widget_, "strawberry-playlist-viewport");
   gtk_widget_set_hexpand(widget_, TRUE);
@@ -62,6 +63,10 @@ PlaylistView::PlaylistView() {
   gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(target));
   g_signal_connect(target, "drop", G_CALLBACK(+[](GtkDropTarget *, const GValue *value, gdouble, gdouble y, gpointer data) -> gboolean {
                      return static_cast<PlaylistView *>(data)->OnDrop(value, y);
+                   }),
+                   this);
+  g_signal_connect(widget_, "notify::width", G_CALLBACK(+[](GObject *, GParamSpec *, gpointer data) {
+                     static_cast<PlaylistView *>(data)->ApplyColumnWidths();
                    }),
                    this);
 }
@@ -332,9 +337,32 @@ void PlaylistView::Clear() {
   }
 }
 
+void PlaylistView::ApplyColumnWidths() {
+  const int total = gtk_widget_get_width(widget_);
+  header_->SetViewportWidth(total);
+  header_->ApplyWidths();
+  if (!grid_) {
+    return;
+  }
+  for (GtkWidget *row = gtk_widget_get_first_child(grid_); row; row = gtk_widget_get_next_sibling(row)) {
+    if (row == header_->widget()) {
+      continue;
+    }
+    for (GtkWidget *cell = gtk_widget_get_first_child(row); cell; cell = gtk_widget_get_next_sibling(cell)) {
+      const int stored = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(cell), "column"));
+      if (stored <= 0) {
+        continue;
+      }
+      gtk_widget_set_hexpand(cell, FALSE);
+      gtk_widget_set_size_request(cell, PlaylistColumnLayout::PixelWidth(static_cast<PlaylistColumn>(stored - 1), total), -1);
+    }
+  }
+}
+
 void PlaylistView::Refresh(Playlist *playlist) {
   playlist_ = playlist;
   Clear();
+  header_->SetViewportWidth(gtk_widget_get_width(widget_));
   header_->SetSortState(playlist ? playlist->sort_column() : PlaylistColumn::Count, playlist && playlist->sort_descending());
   header_->Rebuild();
   gtk_box_append(GTK_BOX(grid_), header_->widget());
@@ -390,7 +418,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
       if (column == PlaylistColumn::Moodbar && moodbar_) {
         moodbar_->Ensure(song);
         GtkWidget *area = gtk_drawing_area_new();
-        gtk_widget_set_size_request(area, PlaylistDelegates::ColumnWidth(column), MoodbarCell::ColumnHeight());
+        gtk_widget_set_size_request(area, PlaylistColumnLayout::PixelWidth(column, gtk_widget_get_width(widget_)), MoodbarCell::ColumnHeight());
         gtk_widget_set_hexpand(area, FALSE);
         gtk_widget_set_margin_start(area, 6);
         gtk_widget_set_margin_end(area, 6);
@@ -419,11 +447,8 @@ void PlaylistView::Refresh(Playlist *playlist) {
         gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
         gtk_widget_set_margin_start(label, 6);
         gtk_widget_set_margin_end(label, 6);
-        if (PlaylistColumnLayout::StretchColumn(column)) {
-          gtk_widget_set_hexpand(label, TRUE);
-        } else {
-          gtk_widget_set_size_request(label, PlaylistDelegates::ColumnWidth(column), -1);
-        }
+        gtk_widget_set_hexpand(label, FALSE);
+        gtk_widget_set_size_request(label, PlaylistColumnLayout::PixelWidth(column, gtk_widget_get_width(widget_)), -1);
         cell = label;
       }
       g_object_set_data(G_OBJECT(cell), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
@@ -462,6 +487,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
     gtk_box_append(GTK_BOX(grid_), row);
     ++visible_count_;
   }
+  ApplyColumnWidths();
 }
 
 void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
@@ -479,8 +505,8 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
         const char *current = GTK_IS_LABEL(cell) ? gtk_label_get_text(GTK_LABEL(cell)) : "";
         GtkWidget *entry = gtk_entry_new();
         gtk_editable_set_text(GTK_EDITABLE(entry), current);
-        gtk_widget_set_hexpand(entry, PlaylistColumnLayout::StretchColumn(column));
-        gtk_widget_set_size_request(entry, PlaylistDelegates::ColumnWidth(column), -1);
+        gtk_widget_set_hexpand(entry, FALSE);
+        gtk_widget_set_size_request(entry, PlaylistColumnLayout::PixelWidth(column, gtk_widget_get_width(widget_)), -1);
         g_object_set_data(G_OBJECT(entry), "column", GINT_TO_POINTER(stored));
         g_object_set_data(G_OBJECT(entry), "row-index", GINT_TO_POINTER(row));
         GtkWidget *prev = gtk_widget_get_prev_sibling(cell);
