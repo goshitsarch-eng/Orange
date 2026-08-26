@@ -27,6 +27,8 @@
 #include "dialogs/aboutcredits.h"
 #include "qobuz/qobuzcredentialparser.h"
 #include "core/mainwindowsponsor.h"
+#include "settings/appearancesettingslabels.h"
+#include "settings/backendsettingslabels.h"
 #include "settings/collectionsettingslabels.h"
 #include "settings/notificationscontrols.h"
 #include "settings/notificationssettingslabels.h"
@@ -130,6 +132,49 @@ TEST(SettingsControls, BufferDefaultsAndCacheUnitMax) {
   EXPECT_EQ(4, SettingsControls::ClampCacheSize(16, 4));
   EXPECT_EQ(0, SettingsControls::ClampCacheSize(-3, 4));
   EXPECT_EQ(2, SettingsControls::ClampCacheSize(2, 4));
+}
+
+TEST(AppearanceSettingsLabels, QtCopy) {
+  EXPECT_STREQ("System icons", AppearanceSettingsLabels::SystemIcons());
+  EXPECT_STREQ("You need to restart Strawberry for this setting to take affect", AppearanceSettingsLabels::DarkRestart());
+  EXPECT_STREQ("You might need to restart Strawberry for this setting to fully apply", AppearanceSettingsLabels::StyleRestart());
+  EXPECT_STREQ("Use the system default color set", AppearanceSettingsLabels::SystemColorSet());
+  EXPECT_STREQ("Use a custom color set", AppearanceSettingsLabels::CustomColorSet());
+  EXPECT_STREQ("Dark colors", AppearanceSettingsLabels::DarkColors());
+  EXPECT_STREQ("Reset to default", AppearanceSettingsLabels::ResetColors());
+  EXPECT_STREQ("Use gradient background", AppearanceSettingsLabels::TabBarGradient());
+  EXPECT_STREQ("System highlight color", AppearanceSettingsLabels::PlaylistSystem());
+  EXPECT_STREQ("Default background image", AppearanceSettingsLabels::DefaultBackground());
+  EXPECT_STREQ("Upper Left", AppearanceSettingsLabels::UpperLeft());
+  EXPECT_STREQ("Stretch image to fill playlist", AppearanceSettingsLabels::Stretch());
+  EXPECT_STREQ("Do not cut image", AppearanceSettingsLabels::DoNotCut());
+  EXPECT_STREQ("Max cover size", AppearanceSettingsLabels::MaxCoverSize());
+  EXPECT_STREQ("Blur amount", AppearanceSettingsLabels::BlurAmount());
+  EXPECT_STREQ("Play control buttons", AppearanceSettingsLabels::PlayControls());
+  EXPECT_STREQ("Files, playlists and queue buttons", AppearanceSettingsLabels::FilesPlaylistsQueue());
+  EXPECT_STREQ("Tabbar small mode", AppearanceSettingsLabels::TabbarSmall());
+}
+
+TEST(BackendSettingsLabels, QtCopy) {
+  EXPECT_STREQ("Exclusive mode (Experimental)", BackendSettingsLabels::Exclusive());
+  EXPECT_STREQ("Enable volume control", BackendSettingsLabels::VolumeControl());
+  EXPECT_STREQ("Exponential volume scaling", BackendSettingsLabels::Exponential());
+  EXPECT_STREQ("Upmix / downmix to", BackendSettingsLabels::ForceChannels());
+  EXPECT_STREQ("Improve headphone listening of stereo audio records (bs2b)", BackendSettingsLabels::BS2B());
+  EXPECT_STREQ("Use playbin3 when available", BackendSettingsLabels::Playbin3());
+  EXPECT_STREQ("You need to restart Strawberry for this setting to take affect", BackendSettingsLabels::RestartHint());
+  EXPECT_STREQ("Enable HTTP/2 for streaming", BackendSettingsLabels::HTTP2());
+  EXPECT_STREQ("Use strict SSL mode", BackendSettingsLabels::StrictSSL());
+  EXPECT_STREQ("No audio normalization", BackendSettingsLabels::NoNormalization());
+  EXPECT_STREQ("Replay Gain", BackendSettingsLabels::ReplayGain());
+  EXPECT_STREQ("Radio (equal loudness for all tracks)", BackendSettingsLabels::RadioMode());
+  EXPECT_STREQ("Album (ideal loudness for all tracks)", BackendSettingsLabels::AlbumMode());
+  EXPECT_STREQ("Apply compression to prevent clipping", BackendSettingsLabels::PreventClipping());
+  EXPECT_STREQ("EBU R 128 Loudness Normalization", BackendSettingsLabels::Ebu());
+  EXPECT_STREQ("Fade out when stopping a track", BackendSettingsLabels::FadeStop());
+  EXPECT_STREQ("Cross-fade when changing tracks manually", BackendSettingsLabels::FadeManual());
+  EXPECT_STREQ("Except between tracks on the same album or in the same CUE sheet", BackendSettingsLabels::FadeSameAlbum());
+  EXPECT_STREQ("Fade out on pause / fade in on resume", BackendSettingsLabels::FadePause());
 }
 
 TEST(BackendSettings, OriginalFadeAndReplayGainKeys) {

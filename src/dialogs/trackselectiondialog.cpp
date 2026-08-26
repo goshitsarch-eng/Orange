@@ -2,6 +2,7 @@
 
 #include "core/application.h"
 #include "dialogs/dialoglistkeyboard.h"
+#include "dialogs/trackselectionlabels.h"
 #include "playlist/playlistmanager.h"
 #include "tagfetcher/tagfetcher.h"
 #include "tagfetcher/tagfetchhelpers.h"
@@ -153,8 +154,14 @@ void RefreshResults(State *state) {
   PendingSong &pending = state->songs[static_cast<size_t>(state->current)];
   if (pending.results.empty()) {
     GtkWidget *empty = adw_action_row_new();
+    const bool no_results = TrackSelectionLabels::ShowEmptyResults(pending.status != Translations::Tr("No matches"), false);
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(empty),
-                                  pending.status.empty() ? Translations::CStr("Waiting for results…") : pending.status.c_str());
+                                  no_results ? TrackSelectionLabels::NoResults() : Translations::CStr("Waiting for results…"));
+    if (no_results) {
+      adw_action_row_set_subtitle(ADW_ACTION_ROW(empty), TrackSelectionLabels::UnableToFind());
+    } else if (!pending.status.empty()) {
+      adw_action_row_set_subtitle(ADW_ACTION_ROW(empty), pending.status.c_str());
+    }
     gtk_list_box_append(GTK_LIST_BOX(state->results), empty);
     if (state->apply) {
       gtk_widget_set_sensitive(state->apply, FALSE);
@@ -229,7 +236,7 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
     }
   }
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, Translations::CStr("Fetch tags"));
+  adw_dialog_set_title(dialog, Translations::CStr(TrackSelectionLabels::Title()));
   adw_dialog_set_content_width(dialog, 720);
   adw_dialog_set_content_height(dialog, 560);
 
@@ -267,7 +274,7 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
 
   GtkWidget *right = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   gtk_widget_set_hexpand(right, TRUE);
-  GtkWidget *right_label = gtk_label_new(Translations::CStr("Matches"));
+  GtkWidget *right_label = gtk_label_new(Translations::CStr(TrackSelectionLabels::SelectBest()));
   gtk_widget_set_halign(right_label, GTK_ALIGN_START);
   gtk_widget_add_css_class(right_label, "heading");
   state->results = gtk_list_box_new();

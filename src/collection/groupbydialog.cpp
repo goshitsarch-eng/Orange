@@ -1,5 +1,6 @@
 #include "collection/groupbydialog.h"
 
+#include "collection/groupbydialoglabels.h"
 #include "collection/savedgroupingmanager.h"
 #include "translations/translations.h"
 
@@ -8,7 +9,7 @@
 void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &current,
                          const std::function<void(const CollectionGrouping::Grouping &)> &callback) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, Translations::CStr("Collection grouping"));
+  adw_dialog_set_title(dialog, Translations::CStr(GroupByDialogLabels::Title()));
   adw_dialog_set_content_width(dialog, 420);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
   gtk_widget_set_margin_start(box, 16);
@@ -79,11 +80,16 @@ void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &
                      SavedGroupingManager::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), *fn);
                    }),
                    cb);
-  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("First level")));
+  GtkWidget *intro = gtk_label_new(Translations::CStr(GroupByDialogLabels::Intro()));
+  gtk_label_set_wrap(GTK_LABEL(intro), TRUE);
+  gtk_widget_set_halign(intro, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(box), intro);
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(GroupByDialogLabels::GroupBy())));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(GroupByDialogLabels::FirstLevel())));
   gtk_box_append(GTK_BOX(box), first);
-  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Second level")));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(GroupByDialogLabels::SecondLevel())));
   gtk_box_append(GTK_BOX(box), second);
-  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Third level")));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(GroupByDialogLabels::ThirdLevel())));
   gtk_box_append(GTK_BOX(box), third);
   gtk_box_append(GTK_BOX(box), separate);
   gtk_box_append(GTK_BOX(box), name);

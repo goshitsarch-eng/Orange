@@ -6,6 +6,7 @@
 #include "utilities/fileutils.h"
 #include "utilities/audioanalysis.h"
 #include "collection/collectiongrouping.h"
+#include "collection/groupbydialoglabels.h"
 #include "core/oauthenticator.h"
 #include "device/cddasongloader.h"
 #include "device/devicemanager.h"
@@ -657,6 +658,12 @@ TEST(CollectionGrouping, DisplayAndKeys) {
   EXPECT_TRUE(CollectionGrouping::IsAlbumGroupBy(CollectionGrouping::GroupBy::YearAlbumDisc));
   EXPECT_EQ(CollectionGrouping::GroupBy::AlbumArtist, CollectionGrouping::FromLegacy("artist-album").first);
   EXPECT_EQ(2, CollectionGrouping::ComboIndex(CollectionGrouping::GroupBy::AlbumArtist));
+  EXPECT_STREQ("Collection advanced grouping", GroupByDialogLabels::Title());
+  EXPECT_STREQ("You can change the way the songs in the collection are organized.", GroupByDialogLabels::Intro());
+  EXPECT_STREQ("Group Collection by...", GroupByDialogLabels::GroupBy());
+  EXPECT_STREQ("First level", GroupByDialogLabels::FirstLevel());
+  EXPECT_STREQ("Second level", GroupByDialogLabels::SecondLevel());
+  EXPECT_STREQ("Third level", GroupByDialogLabels::ThirdLevel());
 }
 
 TEST(CollectionGrouping, BuildTreeThreeLevels) {

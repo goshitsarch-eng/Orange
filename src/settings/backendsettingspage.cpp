@@ -4,6 +4,7 @@
 #include "core/application.h"
 #include "engine/devicefinders.h"
 #include "settings/backendoutputchoices.h"
+#include "settings/backendsettingslabels.h"
 #include "settings/settingscontrols.h"
 #include "settings/settingspage.h"
 
@@ -79,22 +80,27 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
   gtk_widget_set_sensitive(*custom_entry, custom_device ? TRUE : FALSE);
   SettingsPage::AddChoiceRadios(output, settings, BackendSettings::kALSAPlugin, "ALSA plugin",
                                {{"hw", "hw"}, {"plughw", "plughw"}, {"pcm", "pcm"}}, "hw");
-  SettingsPage::AddToggle(output, settings, BackendSettings::kExclusiveMode, "Exclusive mode", nullptr, BackendSettings::kDefaultExclusiveMode);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeControl, "Software volume control", nullptr, BackendSettings::kDefaultVolumeControl);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeExponential, "Exponential volume scale", nullptr,
-                          BackendSettings::kDefaultVolumeExponential);
-  GtkWidget *force_channels =
-      SettingsPage::AddToggle(output, settings, BackendSettings::kChannelsEnabled, "Force channel count", nullptr, BackendSettings::kDefaultChannelsEnabled);
-  GtkWidget *channels = SettingsPage::AddIntEntry(output, settings, BackendSettings::kChannels, "Channels", BackendSettings::kDefaultChannels);
+  SettingsPage::AddToggle(output, settings, BackendSettings::kExclusiveMode, BackendSettingsLabels::Exclusive(), nullptr,
+                          BackendSettings::kDefaultExclusiveMode);
+  SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeControl, BackendSettingsLabels::VolumeControl(), nullptr,
+                          BackendSettings::kDefaultVolumeControl);
+  SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeExponential, BackendSettingsLabels::Exponential(),
+                          BackendSettingsLabels::ExponentialHint(), BackendSettings::kDefaultVolumeExponential);
+  GtkWidget *force_channels = SettingsPage::AddToggle(output, settings, BackendSettings::kChannelsEnabled,
+                                                      BackendSettingsLabels::ForceChannels(), nullptr, BackendSettings::kDefaultChannelsEnabled);
+  GtkWidget *channels =
+      SettingsPage::AddIntEntry(output, settings, BackendSettings::kChannels, BackendSettingsLabels::Channels(), BackendSettings::kDefaultChannels);
   gtk_widget_set_sensitive(channels, SettingsControls::ChannelsSpinEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(force_channels))) ? TRUE : FALSE);
   g_signal_connect(force_channels, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
                      gtk_widget_set_sensitive(GTK_WIDGET(data), SettingsControls::ChannelsSpinEnabled(adw_switch_row_get_active(row)) ? TRUE : FALSE);
                    }),
                    channels);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kBS2B, "Bauer stereo-to-binaural", nullptr, BackendSettings::kDefaultBS2B);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kPlaybin3, "Use playbin3", nullptr, BackendSettings::kDefaultPlaybin3);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kHTTP2, "HTTP/2", nullptr, BackendSettings::kDefaultHTTP2);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kStrictSSL, "Strict SSL", nullptr, BackendSettings::kDefaultStrictSSL);
+  SettingsPage::AddToggle(output, settings, BackendSettings::kBS2B, BackendSettingsLabels::BS2B(), nullptr, BackendSettings::kDefaultBS2B);
+  SettingsPage::AddToggle(output, settings, BackendSettings::kPlaybin3, BackendSettingsLabels::Playbin3(), BackendSettingsLabels::RestartHint(),
+                          BackendSettings::kDefaultPlaybin3);
+  SettingsPage::AddToggle(output, settings, BackendSettings::kHTTP2, BackendSettingsLabels::HTTP2(), nullptr, BackendSettings::kDefaultHTTP2);
+  SettingsPage::AddToggle(output, settings, BackendSettings::kStrictSSL, BackendSettingsLabels::StrictSSL(), nullptr,
+                          BackendSettings::kDefaultStrictSSL);
 
   AdwPreferencesGroup *buffer = SettingsPage::AddGroup(page, "Buffer");
   const auto buffer_ms = SettingsControls::BufferDurationMs();
@@ -124,7 +130,9 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
 
   AdwPreferencesGroup *rg = SettingsPage::AddGroup(page, "ReplayGain / EBU R128");
   SettingsPage::AddChoiceRadios(rg, settings, nullptr, "Normalization",
-                               {{"none", "None"}, {"rg", "ReplayGain"}, {"ebu", "EBU R128"}},
+                               {{"none", BackendSettingsLabels::NoNormalization()},
+                                {"rg", BackendSettingsLabels::ReplayGain()},
+                                {"ebu", BackendSettingsLabels::Ebu()}},
                                SettingsControls::NormalizationChoice(settings->BoolValue(BackendSettings::kRgEnabled, BackendSettings::kDefaultRgEnabled),
                                                                     settings->BoolValue(BackendSettings::kEBUR128LoudnessNormalization,
                                                                                         BackendSettings::kDefaultEBUR128LoudnessNormalization)),
@@ -134,37 +142,40 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
                                  settings->SetBoolValue(BackendSettings::kEBUR128LoudnessNormalization, SettingsControls::NormalizationUsesEbu(id));
                                  settings->Sync();
                                });
-  SettingsPage::AddIntCombo(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgMode, "ReplayGain mode",
-                            {{"0", "Album"}, {"1", "Track"}}, BackendSettings::kDefaultRgMode);
+  SettingsPage::AddIntCombo(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgMode, BackendSettingsLabels::ReplayGainMode(),
+                            {{"0", BackendSettingsLabels::AlbumMode()}, {"1", BackendSettingsLabels::RadioMode()}},
+                            BackendSettings::kDefaultRgMode);
   const auto rg_db = SettingsControls::ReplayGainDb();
-  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgPreamp, "ReplayGain preamp (dB)",
+  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgPreamp, BackendSettingsLabels::Preamp(),
                               BackendSettings::kDefaultRgPreamp, rg_db.min, rg_db.max, rg_db.step);
-  SettingsPage::AddToggle(rg, settings, BackendSettings::kRgCompression, "Prevent clipping", nullptr, BackendSettings::kDefaultRgCompression);
-  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgFallbackGain, "Fallback gain (dB)",
+  SettingsPage::AddToggle(rg, settings, BackendSettings::kRgCompression, BackendSettingsLabels::PreventClipping(), nullptr,
+                          BackendSettings::kDefaultRgCompression);
+  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgFallbackGain, BackendSettingsLabels::FallbackGain(),
                               BackendSettings::kDefaultRgFallbackGain, rg_db.min, rg_db.max, rg_db.step);
   const auto ebu = SettingsControls::EbuTargetLufs();
-  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kEBUR128TargetLevelLUFS, "EBU R128 target (LUFS)",
-                              BackendSettings::kDefaultEBUR128TargetLevelLUFS, ebu.min, ebu.max, ebu.step);
+  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kEBUR128TargetLevelLUFS,
+                              BackendSettingsLabels::TargetLevel(), BackendSettings::kDefaultEBUR128TargetLevelLUFS, ebu.min, ebu.max, ebu.step);
 
   AdwPreferencesGroup *fade = SettingsPage::AddGroup(page, "Fading");
   GtkWidget *fade_stop =
-      SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutEnabled, "Fade out when stopping", nullptr, BackendSettings::kDefaultFadeoutEnabled);
-  GtkWidget *fade_cross = SettingsPage::AddToggle(fade, settings, BackendSettings::kCrossfadeEnabled, "Cross-fade on manual track change",
+      SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutEnabled, BackendSettingsLabels::FadeStop(), nullptr,
+                              BackendSettings::kDefaultFadeoutEnabled);
+  GtkWidget *fade_cross = SettingsPage::AddToggle(fade, settings, BackendSettings::kCrossfadeEnabled, BackendSettingsLabels::FadeManual(),
                                                  nullptr, BackendSettings::kDefaultCrossfadeEnabled);
-  GtkWidget *fade_auto = SettingsPage::AddToggle(fade, settings, BackendSettings::kAutoCrossfadeEnabled, "Auto cross-fade between tracks",
+  GtkWidget *fade_auto = SettingsPage::AddToggle(fade, settings, BackendSettings::kAutoCrossfadeEnabled, BackendSettingsLabels::FadeAuto(),
                                                 nullptr, BackendSettings::kDefaultAutoCrossfadeEnabled);
-  GtkWidget *fade_same = SettingsPage::AddToggle(fade, settings, BackendSettings::kNoCrossfadeSameAlbum, "No cross-fade on the same album",
+  GtkWidget *fade_same = SettingsPage::AddToggle(fade, settings, BackendSettings::kNoCrossfadeSameAlbum, BackendSettingsLabels::FadeSameAlbum(),
                                                 nullptr, BackendSettings::kDefaultNoCrossfadeSameAlbum);
-  GtkWidget *fade_pause = SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutPauseEnabled, "Fade on pause / resume", nullptr,
-                                                 BackendSettings::kDefaultFadeoutPauseEnabled);
+  GtkWidget *fade_pause = SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutPauseEnabled, BackendSettingsLabels::FadePause(),
+                                                 nullptr, BackendSettings::kDefaultFadeoutPauseEnabled);
   const auto fade_ms = SettingsControls::FadeDurationMs();
   GtkWidget *fade_duration =
-      SettingsPage::AddIntScale(fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutDuration, "Fade duration (ms)",
+      SettingsPage::AddIntScale(fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutDuration, BackendSettingsLabels::FadeDuration(),
                                 static_cast<int>(BackendSettings::kDefaultFadeoutDuration), static_cast<int>(fade_ms.min),
                                 static_cast<int>(fade_ms.max), static_cast<int>(fade_ms.step));
   const auto pause_ms = SettingsControls::FadePauseDurationMs();
   GtkWidget *pause_duration = SettingsPage::AddIntScale(
-      fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutPauseDuration, "Pause fade duration (ms)",
+      fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutPauseDuration, BackendSettingsLabels::FadeDuration(),
       static_cast<int>(BackendSettings::kDefaultFadeoutPauseDuration), static_cast<int>(pause_ms.min), static_cast<int>(pause_ms.max),
       static_cast<int>(pause_ms.step));
   auto *fade_widgets = new FadeWidgets{fade_stop, fade_cross, fade_auto, fade_same, fade_pause, fade_duration, pause_duration};

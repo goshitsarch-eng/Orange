@@ -1,3 +1,4 @@
+#include "dialogs/trackselectionlabels.h"
 #include "tagfetcher/musicbrainzclient.h"
 #include "tagfetcher/tagfetchhelpers.h"
 
@@ -90,4 +91,16 @@ TEST(MusicBrainzClient, ParseResultsCopiesIdsFromJson) {
   EXPECT_EQ("rec-parse", results.front().musicbrainz_recording_id);
   EXPECT_EQ("art-parse", results.front().musicbrainz_artist_id);
   EXPECT_EQ("rel-parse", results.front().musicbrainz_album_id);
+}
+
+TEST(TrackSelectionLabels, QtCopyAndEmptyResults) {
+  EXPECT_STREQ("Tag fetcher", TrackSelectionLabels::Title());
+  EXPECT_STREQ("Select best possible match", TrackSelectionLabels::SelectBest());
+  EXPECT_STREQ("No results", TrackSelectionLabels::NoResults());
+  EXPECT_STREQ("Strawberry was unable to find results for this file", TrackSelectionLabels::UnableToFind());
+  EXPECT_STREQ("Error", TrackSelectionLabels::Error());
+  EXPECT_STREQ("Original tags", TrackSelectionLabels::OriginalTags());
+  EXPECT_TRUE(TrackSelectionLabels::ShowEmptyResults(false, false));
+  EXPECT_FALSE(TrackSelectionLabels::ShowEmptyResults(true, false));
+  EXPECT_FALSE(TrackSelectionLabels::ShowEmptyResults(false, true));
 }

@@ -3,6 +3,7 @@
 #include "constants/appearancesettings.h"
 #include "core/appearancecolors.h"
 #include "core/appearancestyle.h"
+#include "settings/appearancesettingslabels.h"
 #include "settings/settingscontrols.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
@@ -13,12 +14,15 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
   settings->BeginGroup(AppearanceSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Appearance", "applications-graphics-symbolic");
   AdwPreferencesGroup *theme = SettingsPage::AddGroup(page, "Theme");
-  SettingsPage::AddToggle(theme, settings, AppearanceSettings::kDarkMode, "Dark mode", nullptr, AppearanceSettings::kDefaultDarkMode);
-  SettingsPage::AddToggle(theme, settings, AppearanceSettings::kSystemThemeIcons, "Use system icons", nullptr, AppearanceSettings::kDefaultSystemIcons);
+  SettingsPage::AddToggle(theme, settings, AppearanceSettings::kDarkMode, AppearanceSettingsLabels::DarkMode(),
+                          AppearanceSettingsLabels::DarkRestart(), AppearanceSettings::kDefaultDarkMode);
+  SettingsPage::AddToggle(theme, settings, AppearanceSettings::kSystemThemeIcons, AppearanceSettingsLabels::SystemIcons(), nullptr,
+                          AppearanceSettings::kDefaultSystemIcons);
   SettingsPage::AddCombo(theme, settings, AppearanceSettings::kStyle, "Style", AppearanceStyle::Choices(), "");
-  SettingsPage::AddBoolRadios(theme, settings, AppearanceSettings::kUseCustomColorSet, "System colors", "Custom color set",
-                             AppearanceSettings::kDefaultUseCustomColorSet);
-  SettingsPage::AddButtonRow(theme, Translations::CStr("Custom colors"), Translations::CStr("Set dark colors"), [settings]() {
+  SettingsPage::AddDescription(theme, AppearanceSettingsLabels::StyleRestart());
+  SettingsPage::AddBoolRadios(theme, settings, AppearanceSettings::kUseCustomColorSet, AppearanceSettingsLabels::SystemColorSet(),
+                             AppearanceSettingsLabels::CustomColorSet(), AppearanceSettings::kDefaultUseCustomColorSet);
+  SettingsPage::AddButtonRow(theme, Translations::CStr("Custom colors"), Translations::CStr(AppearanceSettingsLabels::DarkColors()), [settings]() {
     settings->BeginGroup(AppearanceSettings::kSettingsGroup);
     settings->SetBoolValue(AppearanceSettings::kUseCustomColorSet, true);
     for (const auto &role : AppearanceColors::Roles()) {
@@ -26,7 +30,7 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
     }
     settings->Sync();
   });
-  SettingsPage::AddButtonRow(theme, Translations::CStr("Custom colors"), Translations::CStr("Reset colors"), [settings]() {
+  SettingsPage::AddButtonRow(theme, Translations::CStr("Custom colors"), Translations::CStr(AppearanceSettingsLabels::ResetColors()), [settings]() {
     settings->BeginGroup(AppearanceSettings::kSettingsGroup);
     settings->SetBoolValue(AppearanceSettings::kUseCustomColorSet, false);
     for (const auto &role : AppearanceColors::Roles()) {
@@ -41,16 +45,17 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
   }
 
   AdwPreferencesGroup *tabbar = SettingsPage::AddGroup(page, "Tab bar");
-  SettingsPage::AddBoolRadios(tabbar, settings, AppearanceSettings::kTabBarSystemColor, "Custom color", "System color",
-                             AppearanceSettings::kDefaultTabBarSystemColor);
-  SettingsPage::AddToggle(tabbar, settings, AppearanceSettings::kTabBarGradient, "Tab bar gradient", nullptr, AppearanceSettings::kDefaultTabBarGradient);
+  SettingsPage::AddBoolRadios(tabbar, settings, AppearanceSettings::kTabBarSystemColor, AppearanceSettingsLabels::TabBarCustom(),
+                             AppearanceSettingsLabels::TabBarSystem(), AppearanceSettings::kDefaultTabBarSystemColor);
+  SettingsPage::AddToggle(tabbar, settings, AppearanceSettings::kTabBarGradient, AppearanceSettingsLabels::TabBarGradient(), nullptr,
+                          AppearanceSettings::kDefaultTabBarGradient);
   SettingsPage::AddColorButton(tabbar, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kTabBarColor, "Tab bar color",
                               "#404040");
 
   AdwPreferencesGroup *playlist = SettingsPage::AddGroup(page, "Playlist");
   const std::string playlist_color = settings->Value(AppearanceSettings::kPlaylistPlayingSongColor, "#6696e3");
   SettingsPage::AddChoiceRadios(playlist, settings, nullptr, "Playlist playing song color",
-                               {{"system", "System color"}, {"custom", "Custom color"}},
+                               {{"system", AppearanceSettingsLabels::PlaylistSystem()}, {"custom", AppearanceSettingsLabels::PlaylistCustom()}},
                                SettingsControls::PlaylistColorIsSystem(settings->Value(AppearanceSettings::kPlaylistPlayingSongColor))
                                    ? "system"
                                    : "custom",
@@ -66,7 +71,11 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
 
   AdwPreferencesGroup *background = SettingsPage::AddGroup(page, "Background");
   SettingsPage::AddChoiceRadios(background, settings, AppearanceSettings::kBackgroundImageType, "Background",
-                               {{"0", "Default"}, {"1", "None"}, {"2", "Custom image"}, {"3", "Album cover"}, {"4", "Strawberry"}},
+                               {{"0", AppearanceSettingsLabels::DefaultBackground()},
+                                {"1", AppearanceSettingsLabels::NoBackground()},
+                                {"2", "Custom image"},
+                                {"3", AppearanceSettingsLabels::AlbumCover()},
+                                {"4", "Strawberry"}},
                                std::to_string(static_cast<int>(AppearanceSettings::kDefaultBackgroundImageType)));
   SettingsPage::AddEntry(background, settings, AppearanceSettings::kBackgroundImageFilename, "Custom background file");
   SettingsPage::AddButtonRow(background, "Custom background file", "Choose image…", [settings]() {
@@ -94,19 +103,23 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
     }, settings);
   });
   SettingsPage::AddCombo(background, settings, AppearanceSettings::kBackgroundImagePosition, "Position",
-                         {{"1", "Upper left"}, {"2", "Upper right"}, {"3", "Middle"}, {"4", "Bottom left"}, {"5", "Bottom right"}},
+                         {{"1", AppearanceSettingsLabels::UpperLeft()},
+                          {"2", AppearanceSettingsLabels::UpperRight()},
+                          {"3", AppearanceSettingsLabels::Middle()},
+                          {"4", AppearanceSettingsLabels::BottomLeft()},
+                          {"5", AppearanceSettingsLabels::BottomRight()}},
                          std::to_string(static_cast<int>(AppearanceSettings::kDefaultBackgroundImagePosition)));
-  SettingsPage::AddToggle(background, settings, AppearanceSettings::kBackgroundImageStretch, "Stretch background", nullptr,
+  SettingsPage::AddToggle(background, settings, AppearanceSettings::kBackgroundImageStretch, AppearanceSettingsLabels::Stretch(), nullptr,
                           AppearanceSettings::kDefaultBackgroundImageStretch);
-  SettingsPage::AddToggle(background, settings, AppearanceSettings::kBackgroundImageKeepAspectRatio, "Keep aspect ratio", nullptr,
-                          AppearanceSettings::kDefaultBackgroundImageKeepAspectRatio);
-  SettingsPage::AddToggle(background, settings, AppearanceSettings::kBackgroundImageDoNotCut, "Do not crop", nullptr,
+  SettingsPage::AddToggle(background, settings, AppearanceSettings::kBackgroundImageKeepAspectRatio, AppearanceSettingsLabels::KeepAspect(),
+                          nullptr, AppearanceSettings::kDefaultBackgroundImageKeepAspectRatio);
+  SettingsPage::AddToggle(background, settings, AppearanceSettings::kBackgroundImageDoNotCut, AppearanceSettingsLabels::DoNotCut(), nullptr,
                           AppearanceSettings::kDefaultBackgroundImageDoNotCut);
-  SettingsPage::AddIntEntry(background, settings, AppearanceSettings::kBackgroundImageMaxSize, "Maximum size",
+  SettingsPage::AddIntEntry(background, settings, AppearanceSettings::kBackgroundImageMaxSize, AppearanceSettingsLabels::MaxCoverSize(),
                             AppearanceSettings::kDefaultBackgroundImageMaxSize);
   const auto blur = SettingsControls::BackgroundBlur();
   SettingsPage::AddIntScale(background, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kBackgroundImageBlurRadius,
-                           "Blur radius", AppearanceSettings::kDefaultBackgroundImageBlurRadius, static_cast<int>(blur.min),
+                           AppearanceSettingsLabels::BlurAmount(), AppearanceSettings::kDefaultBackgroundImageBlurRadius, static_cast<int>(blur.min),
                            static_cast<int>(blur.max), static_cast<int>(blur.step));
   const auto opacity = SettingsControls::BackgroundOpacity();
   SettingsPage::AddIntScale(background, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kBackgroundImageOpacityLevel,
@@ -114,17 +127,17 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
                            static_cast<int>(opacity.max), static_cast<int>(opacity.step));
 
   AdwPreferencesGroup *icons = SettingsPage::AddGroup(page, "Icon sizes");
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeTabbarSmallMode, "Tab bar (small)",
+  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeTabbarSmallMode, AppearanceSettingsLabels::TabbarSmall(),
                             AppearanceSettings::kDefaultIconSizeTabbarSmallMode);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeTabbarLargeMode, "Tab bar (large)",
+  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeTabbarLargeMode, AppearanceSettingsLabels::TabbarLarge(),
                             AppearanceSettings::kDefaultIconSizeTabbarLargeMode);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizePlayControlButtons, "Play controls",
+  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizePlayControlButtons, AppearanceSettingsLabels::PlayControls(),
                             AppearanceSettings::kDefaultIconSizePlayControlButtons);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizePlaylistButtons, "Playlist buttons",
+  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizePlaylistButtons, AppearanceSettingsLabels::PlaylistButtons(),
                             AppearanceSettings::kDefaultIconSizePlaylistButtons);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeLeftPanelButtons, "Left panel buttons",
+  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeLeftPanelButtons, AppearanceSettingsLabels::FilesPlaylistsQueue(),
                             AppearanceSettings::kDefaultIconSizeLeftPanelButtons);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeConfigureButtons, "Configure buttons",
+  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeConfigureButtons, AppearanceSettingsLabels::ConfigureButtons(),
                             AppearanceSettings::kDefaultIconSizeConfigureButtons);
   return page;
 }

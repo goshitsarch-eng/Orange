@@ -1,5 +1,6 @@
 #include "covermanager/albumcoversearcher.h"
 
+#include "covermanager/albumcoversearcherlabels.h"
 #include "core/application.h"
 #include "core/network.h"
 #include "dialogs/dialoghelpers.h"
@@ -139,7 +140,7 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) { Show(parent
 void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &song, std::function<void(bool)> done) {
   const Song target = PreferredSong(song, SongForDialog(app));
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, Translations::CStr("Cover search"));
+  adw_dialog_set_title(dialog, Translations::CStr(AlbumCoverSearcherLabels::Title()));
   adw_dialog_set_content_width(dialog, 640);
   adw_dialog_set_content_height(dialog, 680);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -161,11 +162,11 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &s
     gtk_box_append(GTK_BOX(box), GTK_WIDGET(row));
     return GTK_WIDGET(row);
   };
-  state->artist = add_entry("Artist", target.EffectiveAlbumartist());
-  state->album = add_entry("Album", target.album());
+  state->artist = add_entry(AlbumCoverSearcherLabels::Artist(), target.EffectiveAlbumartist());
+  state->album = add_entry(AlbumCoverSearcherLabels::Album(), target.album());
   state->title = add_entry("Title", target.title());
 
-  GtkWidget *search = gtk_button_new_with_label(Translations::CStr("Search"));
+  GtkWidget *search = gtk_button_new_with_label(Translations::CStr(AlbumCoverSearcherLabels::Search()));
   gtk_widget_add_css_class(search, "suggested-action");
   gtk_box_append(GTK_BOX(box), search);
 

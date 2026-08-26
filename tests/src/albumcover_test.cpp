@@ -10,6 +10,7 @@
 #include "covermanager/albumcoverfetcher.h"
 #include "covermanager/albumcoverfetchersearch.h"
 #include "covermanager/albumcoversearcher.h"
+#include "covermanager/albumcoversearcherlabels.h"
 #include "covermanager/albumcoverloader.h"
 #include "covermanager/albumcoverloaderoptions.h"
 #include "covermanager/coverexportrunnable.h"
@@ -313,6 +314,13 @@ TEST(AlbumCoverFetcherSearch, RequestHitsAndStatus) {
   EXPECT_EQ("No covers found", AlbumCoverFetcherSearch::StatusFound(0));
   EXPECT_EQ("1 cover found", AlbumCoverFetcherSearch::StatusFound(1));
   EXPECT_EQ("2 covers found", AlbumCoverFetcherSearch::StatusFound(2));
+}
+
+TEST(AlbumCoverSearcherLabels, QtCopy) {
+  EXPECT_STREQ("Cover Manager", AlbumCoverSearcherLabels::Title());
+  EXPECT_STREQ("Artist", AlbumCoverSearcherLabels::Artist());
+  EXPECT_STREQ("Album", AlbumCoverSearcherLabels::Album());
+  EXPECT_STREQ("Search", AlbumCoverSearcherLabels::Search());
 }
 
 TEST(AlbumCoverSearcher, GridHelpers) {
