@@ -1,3 +1,5 @@
+#include "collection/collectionmodel.h"
+#include "collection/collectiontree.h"
 #include "device/devicecopy.h"
 #include "device/devicedrag.h"
 #include "device/devicekeyboard.h"
@@ -14,6 +16,7 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <set>
 #include <string>
 
 namespace {
@@ -246,6 +249,35 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_FALSE(request.move);
   EXPECT_TRUE(request.destination.empty());
   EXPECT_TRUE(DeviceCopy::CanCopyToCollection(request.songs));
+}
+
+TEST(DeviceCollectionTree, GroupsDeviceSongsUntilExpanded) {
+  Song a(Song::Source::Device);
+  a.set_valid(true);
+  a.set_title("Roads");
+  a.set_artist("Portishead");
+  a.set_albumartist("Portishead");
+  a.set_album("Dummy");
+  a.set_url("gphoto2://phone/Music/roads.mp3");
+  Song b(Song::Source::Device);
+  b.set_valid(true);
+  b.set_title("Mysterons");
+  b.set_artist("Portishead");
+  b.set_albumartist("Portishead");
+  b.set_album("Dummy");
+  b.set_url("gphoto2://phone/Music/mysterons.mp3");
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::Album;
+  grouping.third = CollectionGrouping::GroupBy::None;
+  CollectionModel model;
+  model.Reset({a, b}, grouping, false, false, false);
+  ASSERT_TRUE(model.root());
+  std::set<std::string> expanded;
+  EXPECT_EQ(0, CollectionTree::VisibleSongCount(model.root(), false, expanded));
+  EXPECT_EQ(2u, CollectionTree::SongsFromItem(model.root()).size());
+  CollectionTree::CollectExpandableKeys(model.root(), &expanded);
+  EXPECT_EQ(2, CollectionTree::VisibleSongCount(model.root(), false, expanded));
 }
 
 TEST(DeviceDrag, JoinsSongUrls) {

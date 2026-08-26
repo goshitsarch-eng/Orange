@@ -60,6 +60,48 @@ inline void CollectExpandableKeys(const CollectionItem *item, std::set<std::stri
   }
 }
 
+inline bool WalkChildren(const CollectionItem *item, bool filter_active, const std::set<std::string> &expanded) {
+  if (!item) {
+    return false;
+  }
+  if (item->type == CollectionItem::Type::Root) {
+    return true;
+  }
+  return ShowChildren(item, filter_active, expanded);
+}
+
+inline SongList SongsFromItem(const CollectionItem *item) {
+  if (!item) {
+    return {};
+  }
+  if (item->type == CollectionItem::Type::Song) {
+    return {item->metadata};
+  }
+  SongList songs;
+  for (const auto &child : item->children) {
+    const SongList more = SongsFromItem(child.get());
+    songs.insert(songs.end(), more.begin(), more.end());
+  }
+  return songs;
+}
+
+inline int VisibleSongCount(const CollectionItem *item, bool filter_active, const std::set<std::string> &expanded) {
+  if (!item) {
+    return 0;
+  }
+  if (item->type == CollectionItem::Type::Song) {
+    return 1;
+  }
+  if (!WalkChildren(item, filter_active, expanded)) {
+    return 0;
+  }
+  int count = 0;
+  for (const auto &child : item->children) {
+    count += VisibleSongCount(child.get(), filter_active, expanded);
+  }
+  return count;
+}
+
 inline std::string DragPayload(const SongList &songs) {
   std::string text;
   for (const Song &song : songs) {

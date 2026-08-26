@@ -207,6 +207,9 @@ TEST(CollectionTree, ExpandKeysAndDragPayload) {
   SongList songs = {song->metadata};
   EXPECT_EQ(song->metadata.url(), CollectionTree::DragPayload(songs));
   EXPECT_TRUE(CollectionTree::DragPayload({}).empty());
+  EXPECT_EQ(1u, CollectionTree::SongsFromItem(&root).size());
+  EXPECT_EQ(0, CollectionTree::VisibleSongCount(&root, false, {}));
+  EXPECT_EQ(1, CollectionTree::VisibleSongCount(&root, true, {}));
 }
 
 TEST(CollectionTask, StartsAndFinishesTaskManagerEntry) {

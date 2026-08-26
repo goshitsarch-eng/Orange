@@ -1,5 +1,8 @@
 #include "device/deviceview.h"
 
+#include "collection/collectiongrouping.h"
+#include "collection/collectionitemdelegate.h"
+#include "collection/collectiontree.h"
 #include "device/devicekeyboard.h"
 #include "device/devicedrag.h"
 #include "translations/translations.h"
@@ -24,6 +27,11 @@ DeviceView::DeviceView() {
                      }
                      if (kind && std::string(kind) == "add-all" && self->add_all_cb_) {
                        self->add_all_cb_();
+                       return;
+                     }
+                     auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+                     if (CollectionTree::IsExpandable(item)) {
+                       self->ToggleExpanded(item);
                        return;
                      }
                      if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
@@ -116,6 +124,11 @@ void DeviceView::AttachMenu(GtkWidget *row) {
                        if (self->device_menu_cb_) {
                          self->device_menu_cb_(*device);
                        }
+                     } else if (auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"))) {
+                       const SongList songs = CollectionTree::SongsFromItem(item);
+                       if (self->song_menu_cb_ && !songs.empty()) {
+                         self->song_menu_cb_(songs.front());
+                       }
                      } else if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
                        if (self->song_menu_cb_) {
                          self->song_menu_cb_(*song);
@@ -158,7 +171,76 @@ void DeviceView::ShowDevices(const std::vector<ConnectedDevice> &devices) {
   }
 }
 
+void DeviceView::ToggleExpanded(const CollectionItem *item) {
+  if (CollectionTree::Toggle(&expanded_, item) || CollectionTree::IsExpandable(item)) {
+    RebuildSongs();
+  }
+}
+
+void DeviceView::AppendItem(const CollectionItem *item, int depth) {
+  if (!item) {
+    return;
+  }
+  const bool expandable = CollectionTree::IsExpandable(item);
+  const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
+  GtkWidget *row = gtk_list_box_row_new();
+  GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_margin_start(row_box, 8 + depth * 12);
+  gtk_widget_set_margin_end(row_box, 8);
+  gtk_widget_set_margin_top(row_box, 4);
+  gtk_widget_set_margin_bottom(row_box, 4);
+  if (expandable) {
+    GtkWidget *toggle = gtk_button_new_from_icon_name(expanded ? "pan-down-symbolic" : "pan-end-symbolic");
+    gtk_widget_add_css_class(toggle, "flat");
+    gtk_widget_add_css_class(toggle, "circular");
+    gtk_widget_set_tooltip_text(toggle, expanded ? Translations::CStr("Collapse") : Translations::CStr("Expand"));
+    g_object_set_data(G_OBJECT(toggle), "item", const_cast<CollectionItem *>(item));
+    g_signal_connect(toggle, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                       auto *self = static_cast<DeviceView *>(data);
+                       self->ToggleExpanded(static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(button), "item")));
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(row_box), toggle);
+  }
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_set_hexpand(box, TRUE);
+  GtkWidget *primary = gtk_label_new(CollectionItemDelegate::PrimaryText(item).c_str());
+  gtk_widget_set_halign(primary, GTK_ALIGN_START);
+  if (expandable) {
+    gtk_widget_add_css_class(primary, "heading");
+  }
+  gtk_box_append(GTK_BOX(box), primary);
+  const std::string secondary = CollectionItemDelegate::SecondaryText(item);
+  if (!secondary.empty()) {
+    GtkWidget *sub = gtk_label_new(secondary.c_str());
+    gtk_widget_add_css_class(sub, "dim-label");
+    gtk_widget_set_halign(sub, GTK_ALIGN_START);
+    gtk_box_append(GTK_BOX(box), sub);
+  }
+  gtk_box_append(GTK_BOX(row_box), box);
+  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
+  g_object_set_data(G_OBJECT(row), "item", const_cast<CollectionItem *>(item));
+  const SongList songs = CollectionTree::SongsFromItem(item);
+  if (!songs.empty()) {
+    auto *copy = new Song(songs.front());
+    g_object_set_data_full(G_OBJECT(row), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+    SetupRowDrag(row, songs.front());
+  }
+  AttachMenu(row);
+  gtk_list_box_append(GTK_LIST_BOX(list_), row);
+  if (expanded) {
+    for (const auto &child : item->children) {
+      AppendItem(child.get(), depth + 1);
+    }
+  }
+}
+
 void DeviceView::ShowSongs(const SongList &songs) {
+  songs_ = songs;
+  RebuildSongs();
+}
+
+void DeviceView::RebuildSongs() {
   Clear();
   GtkWidget *back = gtk_list_box_row_new();
   gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(back), gtk_label_new(Translations::CStr("← Devices")));
@@ -168,23 +250,21 @@ void DeviceView::ShowSongs(const SongList &songs) {
   gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(add_all), gtk_label_new(Translations::CStr("Add all to playlist")));
   g_object_set_data(G_OBJECT(add_all), "row-kind", const_cast<char *>("add-all"));
   gtk_list_box_append(GTK_LIST_BOX(list_), add_all);
-  if (songs.empty()) {
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::Album;
+  grouping.third = CollectionGrouping::GroupBy::None;
+  model_.Reset(songs_, grouping, false, false, false);
+  if (songs_.empty()) {
     GtkWidget *empty = gtk_list_box_row_new();
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(empty), gtk_label_new(Translations::CStr("No songs found on this device")));
     gtk_list_box_append(GTK_LIST_BOX(list_), empty);
     return;
   }
-  for (const Song &song : songs) {
-    GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *label = gtk_label_new(song.PrettyTitleWithArtist().c_str());
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_margin_start(label, 12);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
-    auto *copy = new Song(song);
-    g_object_set_data_full(G_OBJECT(row), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
-    AttachMenu(row);
-    SetupRowDrag(row, song);
-    gtk_list_box_append(GTK_LIST_BOX(list_), row);
+  if (model_.root()) {
+    for (const auto &child : model_.root()->children) {
+      AppendItem(child.get(), 0);
+    }
   }
 }
 
@@ -236,6 +316,12 @@ SongList DeviceView::SelectedSongs() const {
   gtk_list_box_selected_foreach(
       GTK_LIST_BOX(list_),
       [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+        const SongList more = CollectionTree::SongsFromItem(item);
+        if (!more.empty()) {
+          static_cast<SongList *>(data)->insert(static_cast<SongList *>(data)->end(), more.begin(), more.end());
+          return;
+        }
         if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
           static_cast<SongList *>(data)->push_back(*song);
         }
