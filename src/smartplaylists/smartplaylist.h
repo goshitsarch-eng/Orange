@@ -4,6 +4,7 @@
 #include "core/song.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 class CollectionBackend;
