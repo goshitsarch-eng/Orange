@@ -26,11 +26,17 @@ FileViewList::FileViewList() {
   GtkGesture *gesture = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(gesture));
-  g_signal_connect(gesture, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
+  g_signal_connect(gesture, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble y, gpointer data) {
                      auto *self = static_cast<FileViewList *>(data);
+                     GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(self->list_), static_cast<int>(y));
+                     if (row && !gtk_list_box_row_is_selected(row)) {
+                       gtk_list_box_unselect_all(GTK_LIST_BOX(self->list_));
+                       gtk_list_box_select_row(GTK_LIST_BOX(self->list_), row);
+                     }
                      if (self->menu_) {
                        self->menu_(self->SelectedPaths());
                      }
+                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
   GtkEventController *keys = gtk_event_controller_key_new();

@@ -1,6 +1,7 @@
 #include "fileview/fileview.h"
 
 #include "core/settings.h"
+#include "fileview/fileviewmode.h"
 #include "fileview/fileviewsettings.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
@@ -23,22 +24,31 @@ FileView::FileView() {
   gtk_widget_set_tooltip_text(back_, Translations::CStr("Back"));
   forward_ = gtk_button_new_from_icon_name("go-next-symbolic");
   gtk_widget_set_tooltip_text(forward_, Translations::CStr("Forward"));
-  GtkWidget *up = gtk_button_new_from_icon_name("go-up-symbolic");
-  gtk_widget_set_tooltip_text(up, Translations::CStr("Up"));
-  GtkWidget *home = gtk_button_new_from_icon_name("go-home-symbolic");
-  gtk_widget_set_tooltip_text(home, Translations::CStr("Home"));
+  up_ = gtk_button_new_from_icon_name("go-up-symbolic");
+  gtk_widget_set_tooltip_text(up_, Translations::CStr("Up"));
+  home_btn_ = gtk_button_new_from_icon_name("go-home-symbolic");
+  gtk_widget_set_tooltip_text(home_btn_, Translations::CStr("Home"));
   path_entry_ = gtk_entry_new();
   gtk_editable_set_text(GTK_EDITABLE(path_entry_), path_.c_str());
   gtk_widget_set_hexpand(path_entry_, TRUE);
+  add_root_ = gtk_button_new_from_icon_name("folder-new-symbolic");
+  gtk_widget_set_tooltip_text(add_root_, Translations::CStr("Add root directory"));
+  remove_root_ = gtk_button_new_from_icon_name("list-remove-symbolic");
+  gtk_widget_set_tooltip_text(remove_root_, Translations::CStr("Remove selected root directory"));
+  toggle_ = gtk_button_new_from_icon_name("view-list-symbolic");
+  gtk_widget_set_tooltip_text(toggle_, Translations::CStr("Toggle between list and tree view"));
   hidden_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Hidden"));
   gtk_widget_set_tooltip_text(hidden_btn_, Translations::CStr("Show hidden files"));
   all_files_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("All files"));
   gtk_widget_set_tooltip_text(all_files_btn_, Translations::CStr("Show files that are not audio or playlists"));
   gtk_box_append(GTK_BOX(toolbar), back_);
   gtk_box_append(GTK_BOX(toolbar), forward_);
-  gtk_box_append(GTK_BOX(toolbar), up);
-  gtk_box_append(GTK_BOX(toolbar), home);
+  gtk_box_append(GTK_BOX(toolbar), up_);
+  gtk_box_append(GTK_BOX(toolbar), home_btn_);
   gtk_box_append(GTK_BOX(toolbar), path_entry_);
+  gtk_box_append(GTK_BOX(toolbar), add_root_);
+  gtk_box_append(GTK_BOX(toolbar), remove_root_);
+  gtk_box_append(GTK_BOX(toolbar), toggle_);
   gtk_box_append(GTK_BOX(toolbar), hidden_btn_);
   gtk_box_append(GTK_BOX(toolbar), all_files_btn_);
   gtk_box_append(GTK_BOX(widget_), toolbar);
@@ -54,13 +64,25 @@ FileView::FileView() {
 
   g_signal_connect(back_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileBack(); }), this);
   g_signal_connect(forward_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileForward(); }), this);
-  g_signal_connect(up, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileUp(); }), this);
-  g_signal_connect(home, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileHome(); }), this);
+  g_signal_connect(up_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileUp(); }), this);
+  g_signal_connect(home_btn_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileHome(); }), this);
+  g_signal_connect(add_root_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->AddRootButtonClicked(); }), this);
+  g_signal_connect(remove_root_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->RemoveRootButtonClicked(); }), this);
+  g_signal_connect(toggle_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->ToggleViewMode(); }), this);
   g_signal_connect(path_entry_, "activate", G_CALLBACK(+[](GtkEntry *entry, gpointer data) {
                      static_cast<FileView *>(data)->SetPath(gtk_editable_get_text(GTK_EDITABLE(entry)));
                    }),
                    this);
-  tree_->SetActivateCallback([this](const std::string &path) { SetPath(path); });
+  tree_->SetActivateCallback([this](const std::string &path) {
+    const bool is_directory = FileUtils::IsDirectory(path);
+    if (FileViewMode::ActivateNavigates(mode_, is_directory)) {
+      SetPath(path);
+      return;
+    }
+    if (FileViewMode::ActivateAddsToPlaylist(mode_, is_directory) && add_to_playlist_) {
+      add_to_playlist_({path});
+    }
+  });
   list_->SetActivateCallback([this](const std::string &path) { Activate(path); });
   list_->SetMenuCallback([this](const std::vector<std::string> &paths) { ShowMenu(paths); });
   tree_->SetMenuCallback([this](const std::string &path) {
@@ -91,6 +113,12 @@ FileView::FileView() {
   settings.BeginGroup(FileViewSettings::kSettingsGroup);
   const bool show_hidden = settings.BoolValue(FileViewSettings::kShowHidden, FileViewSettings::kDefaultShowHidden);
   const bool show_all = settings.BoolValue(FileViewSettings::kShowAllFiles, FileViewSettings::kDefaultShowAllFiles);
+  mode_ = FileViewMode::FromTreeActive(settings.BoolValue(FileViewSettings::kTreeViewActive, FileViewSettings::kDefaultTreeViewActive));
+  if (settings.Contains(FileViewSettings::kTreeRootPaths)) {
+    roots_ = FileViewMode::DecodeRoots(settings.Value(FileViewSettings::kTreeRootPaths));
+  } else {
+    roots_ = FileViewMode::DefaultRoots(home_);
+  }
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(hidden_btn_), show_hidden);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(all_files_btn_), show_all);
   model_.SetShowHidden(show_hidden);
@@ -103,8 +131,8 @@ FileView::FileView() {
                      static_cast<FileView *>(data)->SetShowAllFiles(gtk_toggle_button_get_active(button));
                    }),
                    this);
-  model_.SetRootPaths({home_});
   history_.Push(path_);
+  ApplyViewMode();
   Reload();
 }
 
@@ -149,13 +177,16 @@ void FileView::Reload() {
     gtk_editable_set_text(GTK_EDITABLE(path_entry_), path_.c_str());
   }
   UpdateNavButtons();
-  model_.SetRootPaths({FileUtils::DirName(path_).empty() ? path_ : FileUtils::DirName(path_)});
-  if (FileViewTreeItem *root = model_.root()) {
-    for (const auto &child : root->children) {
-      model_.LazyLoad(child.get());
+  if (FileViewMode::TreeActive(mode_)) {
+    model_.SetRootPaths(roots_);
+    if (FileViewTreeItem *root = model_.root()) {
+      for (const auto &child : root->children) {
+        model_.LazyLoad(child.get());
+      }
     }
+    tree_->Reload(&model_);
+    return;
   }
-  tree_->Reload(&model_);
   list_->Reload(model_.FilesIn(path_));
 }
 
@@ -176,7 +207,92 @@ void FileView::PersistSettings() {
   settings.BeginGroup(FileViewSettings::kSettingsGroup);
   settings.SetBoolValue(FileViewSettings::kShowHidden, model_.show_hidden());
   settings.SetBoolValue(FileViewSettings::kShowAllFiles, model_.show_all_files());
+  settings.SetBoolValue(FileViewSettings::kTreeViewActive, FileViewMode::TreeActive(mode_));
+  settings.SetValue(FileViewSettings::kTreeRootPaths, FileViewMode::EncodeRoots(roots_));
   settings.Sync();
+}
+
+void FileView::ToggleViewMode() {
+  mode_ = FileViewMode::Toggle(mode_);
+  PersistSettings();
+  ApplyViewMode();
+  Reload();
+}
+
+void FileView::ApplyViewMode() {
+  const bool nav = FileViewMode::NavVisible(mode_);
+  const bool roots = FileViewMode::RootButtonsVisible(mode_);
+  gtk_widget_set_visible(back_, nav);
+  gtk_widget_set_visible(forward_, nav);
+  gtk_widget_set_visible(up_, nav);
+  gtk_widget_set_visible(home_btn_, nav);
+  gtk_widget_set_visible(path_entry_, nav);
+  gtk_widget_set_visible(add_root_, roots);
+  gtk_widget_set_visible(remove_root_, roots);
+  gtk_widget_set_visible(tree_->widget(), FileViewMode::TreeActive(mode_));
+  gtk_widget_set_visible(list_->widget(), nav);
+  gtk_button_set_icon_name(GTK_BUTTON(toggle_), FileViewMode::TreeActive(mode_) ? "view-list-tree-symbolic" : "view-list-symbolic");
+}
+
+void FileView::AddTreeRootPath(const std::string &path) {
+  const std::vector<std::string> next = FileViewMode::AddRoot(roots_, path);
+  if (next == roots_) {
+    return;
+  }
+  roots_ = next;
+  PersistSettings();
+  if (FileViewMode::TreeActive(mode_)) {
+    Reload();
+  }
+}
+
+void FileView::RemoveTreeRootPath(const std::string &path) {
+  const std::vector<std::string> next = FileViewMode::RemoveMatchingRoot(roots_, path);
+  if (next == roots_) {
+    return;
+  }
+  roots_ = next;
+  PersistSettings();
+  if (FileViewMode::TreeActive(mode_)) {
+    Reload();
+  }
+}
+
+void FileView::AddRootButtonClicked() {
+  GtkFileDialog *dialog = gtk_file_dialog_new();
+  gtk_file_dialog_set_title(dialog, Translations::CStr("Select folder to add as tree root"));
+  GtkRoot *root = gtk_widget_get_root(widget_);
+  GtkWindow *window = GTK_IS_WINDOW(root) ? GTK_WINDOW(root) : nullptr;
+  const std::string start = roots_.empty() ? home_ : roots_.front();
+  if (!start.empty()) {
+    GFile *initial = g_file_new_for_path(start.c_str());
+    gtk_file_dialog_set_initial_folder(dialog, initial);
+    g_object_unref(initial);
+  }
+  gtk_file_dialog_select_folder(dialog, window, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+    auto *self = static_cast<FileView *>(data);
+    GError *error = nullptr;
+    GFile *file = gtk_file_dialog_select_folder_finish(GTK_FILE_DIALOG(source), result, &error);
+    if (!file) {
+      if (error) {
+        g_error_free(error);
+      }
+      return;
+    }
+    gchar *path = g_file_get_path(file);
+    if (path) {
+      self->AddTreeRootPath(path);
+      g_free(path);
+    }
+    g_object_unref(file);
+  }, this);
+}
+
+void FileView::RemoveRootButtonClicked() {
+  if (!tree_) {
+    return;
+  }
+  RemoveTreeRootPath(tree_->SelectedPath());
 }
 
 void FileView::SetAddToPlaylistCallback(PathsCallback callback) { add_to_playlist_ = std::move(callback); }
@@ -213,7 +329,8 @@ void FileView::ShowMenu(const std::vector<std::string> &paths) {
     g_menu_append(menu, Translations::CStr(item.label), (std::string("fileview.") + item.id).c_str());
   }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
-  gtk_widget_set_parent(popover, list_->widget());
+  GtkWidget *host = FileViewMode::TreeActive(mode_) ? tree_->widget() : list_->widget();
+  gtk_widget_set_parent(popover, host);
   auto *state = new std::pair<FileView *, std::vector<std::string>>(this, paths);
   g_object_set_data_full(G_OBJECT(popover), "fileview-menu", state, [](gpointer p) {
     delete static_cast<std::pair<FileView *, std::vector<std::string>> *>(p);
@@ -282,6 +399,6 @@ void FileView::ShowMenu(const std::vector<std::string> &paths) {
                      this);
     g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
   }
-  gtk_widget_insert_action_group(list_->widget(), "fileview", G_ACTION_GROUP(group));
+  gtk_widget_insert_action_group(host, "fileview", G_ACTION_GROUP(group));
   gtk_popover_popup(GTK_POPOVER(popover));
 }

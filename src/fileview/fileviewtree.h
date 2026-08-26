@@ -19,9 +19,10 @@ class FileViewTree {
   void Reload(FileViewTreeModel *model);
   void SetActivateCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  std::string SelectedPath() const;
 
  private:
-  void AppendItem(GtkWidget *parent, FileViewTreeItem *item);
+  void AppendItem(GtkWidget *parent, FileViewTreeItem *item, int depth);
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;

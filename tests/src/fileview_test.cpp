@@ -7,6 +7,7 @@
 #include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
 #include "fileview/fileviewmenu.h"
+#include "fileview/fileviewmode.h"
 #include "fileview/fileviewhidden.h"
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewkeyboard.h"
@@ -380,6 +381,103 @@ TEST(DeviceMenu, UnmountAndForgetFollowQtRules) {
   const auto offline_items = DeviceMenu::VisibleItems(offline);
   EXPECT_FALSE(DeviceMenu::Contains(offline_items, DeviceMenu::Action::Unmount));
   EXPECT_TRUE(DeviceMenu::Contains(offline_items, DeviceMenu::Action::Properties));
+}
+
+TEST(FileViewMode, ListAndTreeMatchQt) {
+  EXPECT_EQ(FileViewMode::Mode::List, FileViewMode::DefaultMode());
+  EXPECT_EQ(FileViewMode::Mode::List, FileViewMode::FromTreeActive(false));
+  EXPECT_EQ(FileViewMode::Mode::Tree, FileViewMode::FromTreeActive(true));
+  EXPECT_FALSE(FileViewMode::TreeActive(FileViewMode::Mode::List));
+  EXPECT_TRUE(FileViewMode::TreeActive(FileViewMode::Mode::Tree));
+  EXPECT_EQ(FileViewMode::Mode::Tree, FileViewMode::Toggle(FileViewMode::Mode::List));
+  EXPECT_EQ(FileViewMode::Mode::List, FileViewMode::Toggle(FileViewMode::Mode::Tree));
+  EXPECT_TRUE(FileViewMode::NavVisible(FileViewMode::Mode::List));
+  EXPECT_FALSE(FileViewMode::NavVisible(FileViewMode::Mode::Tree));
+  EXPECT_TRUE(FileViewMode::RootButtonsVisible(FileViewMode::Mode::Tree));
+  EXPECT_FALSE(FileViewMode::RootButtonsVisible(FileViewMode::Mode::List));
+  EXPECT_TRUE(FileViewMode::ActivateNavigates(FileViewMode::Mode::List, true));
+  EXPECT_FALSE(FileViewMode::ActivateNavigates(FileViewMode::Mode::Tree, true));
+  EXPECT_TRUE(FileViewMode::ActivateAddsToPlaylist(FileViewMode::Mode::List, false));
+  EXPECT_TRUE(FileViewMode::ActivateAddsToPlaylist(FileViewMode::Mode::Tree, false));
+  EXPECT_FALSE(FileViewMode::ActivateAddsToPlaylist(FileViewMode::Mode::Tree, true));
+}
+
+TEST(FileViewMode, RootsAddRemoveAndEncode) {
+  EXPECT_EQ("/music", FileViewMode::CleanPath("/music/"));
+  EXPECT_EQ("/", FileViewMode::CleanPath("/"));
+  EXPECT_TRUE(FileViewMode::SamePath("/music/", "/music"));
+  EXPECT_TRUE(FileViewMode::PathUnderRoot("/music/portishead", "/music"));
+  EXPECT_TRUE(FileViewMode::PathUnderRoot("/music", "/music"));
+  EXPECT_FALSE(FileViewMode::PathUnderRoot("/music2", "/music"));
+  const std::vector<std::string> added = FileViewMode::AddRoot({"/music"}, "/home/user");
+  ASSERT_EQ(2u, added.size());
+  EXPECT_EQ("/home/user", added.back());
+  EXPECT_EQ(1u, FileViewMode::AddRoot({"/music"}, "/music/").size());
+  EXPECT_EQ(1u, FileViewMode::AddRoot({"/music"}, {}).size());
+  EXPECT_EQ("/music", FileViewMode::MatchingRoot({"/music", "/home"}, "/music/portishead/dummy"));
+  EXPECT_TRUE(FileViewMode::MatchingRoot({"/music"}, "/other").empty());
+  const std::vector<std::string> removed = FileViewMode::RemoveMatchingRoot({"/music", "/home"}, "/music/portishead");
+  ASSERT_EQ(1u, removed.size());
+  EXPECT_EQ("/home", removed.front());
+  EXPECT_EQ("/music\n/home", FileViewMode::EncodeRoots({"/music", "/home"}));
+  const std::vector<std::string> decoded = FileViewMode::DecodeRoots("/music\n\n /home \n");
+  ASSERT_EQ(2u, decoded.size());
+  EXPECT_EQ("/music", decoded[0]);
+  EXPECT_EQ("/home", decoded[1]);
+  EXPECT_TRUE(FileViewMode::DecodeRoots("").empty());
+  ASSERT_EQ(1u, FileViewMode::DefaultRoots("/music").size());
+  EXPECT_EQ("/music", FileViewMode::DefaultRoots("/music").front());
+  EXPECT_TRUE(FileViewMode::DefaultRoots({}).empty());
+}
+
+TEST(FileViewMode, RightClickKeepsMultiSelection) {
+  EXPECT_TRUE(FileViewMode::ReplaceSelection(false));
+  EXPECT_FALSE(FileViewMode::ReplaceSelection(true));
+  const std::vector<std::string> selected = {"/a.flac", "/b.flac"};
+  EXPECT_EQ(selected, FileViewMode::MenuPaths(selected, "/a.flac"));
+  ASSERT_EQ(1u, FileViewMode::MenuPaths(selected, "/c.flac").size());
+  EXPECT_EQ("/c.flac", FileViewMode::MenuPaths(selected, "/c.flac").front());
+  EXPECT_EQ(selected, FileViewMode::MenuPaths(selected, {}));
+}
+
+TEST(FileViewTreeModel, LazyLoadIncludesAudioFiles) {
+  const std::string dir = TempDir();
+  const std::string audio = FileUtils::Join(dir, "roads.flac");
+  const std::string notes = FileUtils::Join(dir, "notes.txt");
+  const std::string nested = FileUtils::Join(dir, "dummy");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "a"));
+  ASSERT_TRUE(FileUtils::WriteFile(notes, "b"));
+  ASSERT_EQ(0, mkdir(nested.c_str(), 0755));
+
+  FileViewTreeModel model;
+  model.SetRootPaths({dir});
+  ASSERT_EQ(1, model.DirectoryCount());
+  FileViewTreeItem *root_dir = model.root()->children.front().get();
+  model.LazyLoad(root_dir);
+  bool saw_audio = false;
+  bool saw_notes = false;
+  bool saw_nested = false;
+  for (const auto &child : root_dir->children) {
+    if (child->path == audio) {
+      saw_audio = true;
+      EXPECT_EQ(FileViewTreeItem::Type::File, child->type);
+    }
+    if (child->path == notes) {
+      saw_notes = true;
+    }
+    if (child->path == nested) {
+      saw_nested = true;
+      EXPECT_EQ(FileViewTreeItem::Type::Directory, child->type);
+    }
+  }
+  EXPECT_TRUE(saw_audio);
+  EXPECT_FALSE(saw_notes);
+  EXPECT_TRUE(saw_nested);
+
+  FileUtils::Remove(audio);
+  FileUtils::Remove(notes);
+  rmdir(nested.c_str());
+  rmdir(dir.c_str());
 }
 
 TEST(DeviceDrag, JoinsSongUrls) {

@@ -61,14 +61,17 @@ void FileViewTreeModel::LazyLoad(FileViewTreeItem *item) {
     if (!FileViewHidden::ShouldIncludeEntry(name, show_hidden_)) {
       continue;
     }
-    if (!FileUtils::IsDirectory(path)) {
-      continue;
-    }
     auto child = std::make_unique<FileViewTreeItem>();
     child->path = path;
     child->name = name;
-    child->type = FileViewTreeItem::Type::Directory;
     child->parent = item;
+    if (FileUtils::IsDirectory(path)) {
+      child->type = FileViewTreeItem::Type::Directory;
+    } else if (AcceptsFile(path)) {
+      child->type = FileViewTreeItem::Type::File;
+    } else {
+      continue;
+    }
     item->children.push_back(std::move(child));
   }
 }

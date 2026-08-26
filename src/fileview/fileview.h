@@ -4,6 +4,7 @@
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewlist.h"
 #include "fileview/fileviewmenu.h"
+#include "fileview/fileviewmode.h"
 #include "fileview/fileviewtree.h"
 #include "fileview/fileviewtreemodel.h"
 
@@ -34,6 +35,11 @@ class FileView {
   void Reload();
   void SetShowHidden(bool show_hidden);
   void SetShowAllFiles(bool show_all);
+  void ToggleViewMode();
+  void AddTreeRootPath(const std::string &path);
+  void RemoveTreeRootPath(const std::string &path);
+  FileViewMode::Mode mode() const { return mode_; }
+  const std::vector<std::string> &tree_root_paths() const { return roots_; }
   FileViewHistory *history() { return &history_; }
   void SetAddToPlaylistCallback(PathsCallback callback);
   void SetReplacePlaylistCallback(PathsCallback callback);
@@ -49,6 +55,9 @@ class FileView {
   void ShowMenu(const std::vector<std::string> &paths);
   void Activate(const std::string &path);
   void UpdateNavButtons();
+  void ApplyViewMode();
+  void AddRootButtonClicked();
+  void RemoveRootButtonClicked();
 
   void PersistSettings();
 
@@ -56,6 +65,11 @@ class FileView {
   GtkWidget *path_entry_ = nullptr;
   GtkWidget *back_ = nullptr;
   GtkWidget *forward_ = nullptr;
+  GtkWidget *up_ = nullptr;
+  GtkWidget *home_btn_ = nullptr;
+  GtkWidget *add_root_ = nullptr;
+  GtkWidget *remove_root_ = nullptr;
+  GtkWidget *toggle_ = nullptr;
   GtkWidget *hidden_btn_ = nullptr;
   GtkWidget *all_files_btn_ = nullptr;
   FileViewTreeModel model_;
@@ -64,6 +78,8 @@ class FileView {
   FileViewHistory history_;
   std::string path_;
   std::string home_;
+  FileViewMode::Mode mode_ = FileViewMode::DefaultMode();
+  std::vector<std::string> roots_;
   PathsCallback add_to_playlist_;
   PathsCallback replace_playlist_;
   PathsCallback open_in_new_;
