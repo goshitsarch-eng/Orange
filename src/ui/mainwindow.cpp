@@ -4,6 +4,7 @@
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
 #include "context/contextview.h"
+#include "covermanager/coverproviders.h"
 #include "device/deviceviewcontainer.h"
 #include "moodbar/moodbarrenderer.h"
 #include "waveform/waveformrenderer.h"
@@ -676,6 +677,11 @@ void MainWindow::BuildContext() {
   if (!cover_controller_) {
     cover_controller_ = std::make_unique<AlbumCoverChoiceController>(app_);
   }
+  context_view_->SetCoverDropCallback([this](const std::vector<unsigned char> &data) {
+    const Song song = app_->player()->current_song();
+    CoverProviders::SaveAlbumCover(song, std::string(data.begin(), data.end()), app_->tagreader());
+    context_view_->AlbumCoverLoaded(data);
+  });
   context_view_->album_widget()->SetSearchCallback([this]() {
     if (cover_controller_) {
       Song song = app_->player()->current_song();
@@ -1066,6 +1072,7 @@ void MainWindow::RefreshSmartPlaylists() {
 
 void MainWindow::RefreshQueue() {
   if (queue_view_) {
+    queue_view_->SetNowPlayingUrl(app_->player()->current_song().url());
     queue_view_->Reload();
   }
 }

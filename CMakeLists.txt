@@ -337,6 +337,7 @@ set(STRAWBERRY_SOURCES
   src/widgets/resizabletextedit.cpp
   src/widgets/tracksliderslider.cpp
   src/context/contextalbum.cpp
+  src/context/contexttechnical.cpp
   src/context/contextview.cpp
   src/queue/queue.cpp
   src/queue/queueview.cpp
@@ -954,6 +955,7 @@ if(GTest_FOUND)
     src/playlist/playlistmanager.cpp
     src/playlist/playlistbackend.cpp
     src/queue/queue.cpp
+    src/context/contexttechnical.cpp
     src/systemtrayicon/systemtrayicon.cpp
     src/osd/osdbase.cpp
     src/osd/osddbus.cpp

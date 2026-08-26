@@ -38,6 +38,17 @@ void OSDPretty::ReloadSettings() {
   pos_y_ = s.IntValue("posy", 40);
   show_art_ = s.Contains(OSDSettings::kShowArt) ? s.BoolValue(OSDSettings::kShowArt, true) : s.BoolValue("showart", true);
   timeout_ms_ = s.Contains(OSDSettings::kTimeout) ? s.IntValue(OSDSettings::kTimeout, 5000) : s.IntValue("timeout", 4000);
+  s.BeginGroup(OSDPrettySettings::kSettingsGroup);
+  fading_ = s.BoolValue(OSDPrettySettings::kFading, true);
+}
+
+bool OSDPretty::Supported() {
+#ifdef HAVE_X11
+  GdkDisplay *display = gdk_display_get_default();
+  return display && GDK_IS_X11_DISPLAY(display);
+#else
+  return false;
+#endif
 }
 
 void OSDPretty::set_pos(int x, int y) {
@@ -176,11 +187,20 @@ void OSDPretty::ShowMessage(const std::string &summary, const std::string &messa
     timeout_id_ = 0;
   }
   SetMessage(summary, message, image);
+  if (fading_) {
+    gtk_widget_set_opacity(window_, 0.0);
+  }
   gtk_window_present(GTK_WINDOW(window_));
+  if (fading_) {
+    gtk_widget_set_opacity(window_, 1.0);
+  }
   if (mode_ == Mode::Popup && timeout_ms_ > 0) {
     timeout_id_ = g_timeout_add(timeout_ms_, [](gpointer data) -> gboolean {
       auto *self = static_cast<OSDPretty *>(data);
       if (self->window_) {
+        if (self->fading_) {
+          gtk_widget_set_opacity(self->window_, 0.0);
+        }
         gtk_widget_set_visible(self->window_, FALSE);
       }
       self->timeout_id_ = 0;

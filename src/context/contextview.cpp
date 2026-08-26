@@ -1,11 +1,12 @@
 #include "context/contextview.h"
 
 #include "constants/contextsettings.h"
+#include "context/contexttechnical.h"
 #include "core/settings.h"
 #include "core/song.h"
 #include "lyrics/lyricsfetcher.h"
 #include "lyrics/lyricsproviders.h"
-#include "utilities/timeutils.h"
+#include "translations/translations.h"
 
 ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyrics_fetcher)
     : lyrics_providers_(lyrics_providers), lyrics_fetcher_(lyrics_fetcher), album_(std::make_unique<ContextAlbum>()) {
@@ -25,9 +26,9 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   gtk_widget_set_margin_bottom(box, 12);
 
   GtkWidget *toggles = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-  show_album_btn_ = gtk_toggle_button_new_with_label("Album");
-  show_data_btn_ = gtk_toggle_button_new_with_label("Details");
-  show_lyrics_btn_ = gtk_toggle_button_new_with_label("Lyrics");
+  show_album_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Album"));
+  show_data_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Details"));
+  show_lyrics_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Lyrics"));
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), TRUE);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), TRUE);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), TRUE);
@@ -35,24 +36,41 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   gtk_box_append(GTK_BOX(toggles), show_data_btn_);
   gtk_box_append(GTK_BOX(toggles), show_lyrics_btn_);
 
-  title_ = gtk_label_new("Not playing");
+  title_ = gtk_label_new(Translations::CStr("Not playing"));
   gtk_widget_add_css_class(title_, "title-2");
   gtk_label_set_wrap(GTK_LABEL(title_), TRUE);
   artist_ = gtk_label_new("");
   gtk_widget_add_css_class(artist_, "heading");
   album_label_ = gtk_label_new("");
   gtk_widget_add_css_class(album_label_, "dim-label");
-  meta_ = gtk_label_new("");
-  gtk_widget_add_css_class(meta_, "dim-label");
-  gtk_label_set_wrap(GTK_LABEL(meta_), TRUE);
   data_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
-  gtk_box_append(GTK_BOX(data_box_), meta_);
+  data_grid_ = gtk_grid_new();
+  gtk_grid_set_row_spacing(GTK_GRID(data_grid_), 4);
+  gtk_grid_set_column_spacing(GTK_GRID(data_grid_), 12);
+  gtk_box_append(GTK_BOX(data_box_), data_grid_);
 
   lyrics_view_ = gtk_text_view_new();
   gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(lyrics_view_), GTK_WRAP_WORD);
   gtk_text_view_set_editable(GTK_TEXT_VIEW(lyrics_view_), FALSE);
   gtk_widget_set_vexpand(lyrics_view_, TRUE);
-  GtkWidget *save = gtk_button_new_with_label("Save lyrics to tag");
+  GtkWidget *lyrics_actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  search_lyrics_btn_ = gtk_button_new_with_label(Translations::CStr("Search lyrics"));
+  auto_lyrics_btn_ = gtk_check_button_new_with_label(Translations::CStr("Search automatically"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_lyrics_btn_), TRUE);
+  GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save lyrics to tag"));
+  gtk_box_append(GTK_BOX(lyrics_actions), search_lyrics_btn_);
+  gtk_box_append(GTK_BOX(lyrics_actions), auto_lyrics_btn_);
+  gtk_box_append(GTK_BOX(lyrics_actions), save);
+  g_signal_connect(search_lyrics_btn_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     static_cast<ContextView *>(data)->SearchLyrics(true);
+                   }),
+                   this);
+  g_signal_connect(auto_lyrics_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *self = static_cast<ContextView *>(data);
+                     self->search_lyrics_ = gtk_check_button_get_active(button);
+                     self->PersistVisibility();
+                   }),
+                   this);
   g_signal_connect(save, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<ContextView *>(data);
                      if (!self->save_lyrics_) {
@@ -68,6 +86,13 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
                    }),
                    this);
 
+  album_->SetDropCallback([this](const std::vector<unsigned char> &data) {
+    if (cover_drop_) {
+      cover_drop_(data);
+    }
+    AlbumCoverLoaded(data);
+  });
+
   gtk_box_append(GTK_BOX(box), toggles);
   gtk_box_append(GTK_BOX(box), album_->widget());
   gtk_box_append(GTK_BOX(box), title_);
@@ -75,7 +100,7 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   gtk_box_append(GTK_BOX(box), album_label_);
   gtk_box_append(GTK_BOX(box), data_box_);
   gtk_box_append(GTK_BOX(box), lyrics_view_);
-  gtk_box_append(GTK_BOX(box), save);
+  gtk_box_append(GTK_BOX(box), lyrics_actions);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), box);
   widget_ = scroll;
 
@@ -87,15 +112,21 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
 
 void ContextView::SetSaveLyricsCallback(SaveLyricsCallback callback) { save_lyrics_ = std::move(callback); }
 
+void ContextView::SetCoverDropCallback(CoverDropCallback callback) { cover_drop_ = std::move(callback); }
+
 void ContextView::ReloadSettings() {
   Settings settings;
   settings.BeginGroup(ContextSettings::kSettingsGroup);
   show_album_ = settings.BoolValue(ContextSettings::kAlbum, ContextSettings::kDefaultAlbum);
   show_data_ = settings.BoolValue(ContextSettings::kTechnicalData, ContextSettings::kDefaultTechnicalData);
   show_lyrics_ = settings.BoolValue(ContextSettings::kSongLyrics, ContextSettings::kDefaultSongLyrics);
+  search_lyrics_ = settings.BoolValue(ContextSettings::kSearchLyrics, ContextSettings::kDefaultSearchLyrics);
+  title_fmt_ = settings.Value(ContextSettings::kSettingsTitleFmt, ContextSettings::kDefaultTitleFmt);
+  summary_fmt_ = settings.Value(ContextSettings::kSettingsSummaryFmt, ContextSettings::kDefaultSummaryFmt);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), show_album_);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), show_data_);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), show_lyrics_);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_lyrics_btn_), search_lyrics_);
   ApplyVisibility();
 }
 
@@ -103,53 +134,80 @@ void ContextView::Playing() { SetSong(); }
 
 void ContextView::Stopped() { NoSong(); }
 
-void ContextView::Error() { gtk_label_set_text(GTK_LABEL(title_), "Error"); }
+void ContextView::Error() { gtk_label_set_text(GTK_LABEL(title_), Translations::CStr("Error")); }
 
 void ContextView::NoSong() {
   song_playing_ = Song();
-  gtk_label_set_text(GTK_LABEL(title_), "Not playing");
+  lyrics_tried_ = false;
+  gtk_label_set_text(GTK_LABEL(title_), Translations::CStr("Not playing"));
   gtk_label_set_text(GTK_LABEL(artist_), "");
   gtk_label_set_text(GTK_LABEL(album_label_), "");
-  gtk_label_set_text(GTK_LABEL(meta_), "");
   album_->Clear();
   SetLyrics({});
+  RebuildTechnicalData();
+  ApplyVisibility();
 }
 
 void ContextView::SongChanged(const Song &song) {
   song_playing_ = song;
+  lyrics_tried_ = false;
   SetSong();
-  SearchLyrics();
+  SearchLyrics(false);
 }
 
 void ContextView::SetSong() {
-  gtk_label_set_text(GTK_LABEL(title_), song_playing_.PrettyTitle().empty() ? "Not playing" : song_playing_.PrettyTitle().c_str());
+  const std::string headline = ContextTechnical::Headline(song_playing_, title_fmt_);
+  gtk_label_set_text(GTK_LABEL(title_), headline.empty() ? Translations::CStr("Not playing") : headline.c_str());
   gtk_label_set_text(GTK_LABEL(artist_), song_playing_.artist().c_str());
-  gtk_label_set_text(GTK_LABEL(album_label_), song_playing_.album().c_str());
-  const std::string meta = Song::SourceToString(song_playing_.source()) + " · " +
-                           (song_playing_.bitrate() > 0 ? std::to_string(song_playing_.bitrate()) + " kbps · " : "") +
-                           (song_playing_.samplerate() > 0 ? std::to_string(song_playing_.samplerate()) + " Hz · " : "") +
-                           (song_playing_.bitdepth() > 0 ? std::to_string(song_playing_.bitdepth()) + "-bit · " : "") +
-                           Utilities::PrettyTimeNanosec(song_playing_.length_nanosec());
-  gtk_label_set_text(GTK_LABEL(meta_), meta.c_str());
+  const std::string summary = ContextTechnical::Summary(song_playing_, summary_fmt_);
+  gtk_label_set_text(GTK_LABEL(album_label_), summary.c_str());
+  RebuildTechnicalData();
+  ApplyVisibility();
+}
+
+void ContextView::RebuildTechnicalData() {
+  GtkWidget *child = gtk_widget_get_first_child(data_grid_);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_widget_unparent(child);
+    child = next;
+  }
+  const auto rows = ContextTechnical::Rows(song_playing_);
+  int row = 0;
+  for (const auto &entry : rows) {
+    GtkWidget *key = gtk_label_new(entry.first.c_str());
+    gtk_widget_add_css_class(key, "dim-label");
+    gtk_label_set_xalign(GTK_LABEL(key), 0.0f);
+    GtkWidget *value = gtk_label_new(entry.second.c_str());
+    gtk_label_set_xalign(GTK_LABEL(value), 0.0f);
+    gtk_label_set_wrap(GTK_LABEL(value), TRUE);
+    gtk_grid_attach(GTK_GRID(data_grid_), key, 0, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(data_grid_), value, 1, row, 1, 1);
+    ++row;
+  }
 }
 
 void ContextView::AlbumCoverLoaded(const std::vector<unsigned char> &data) { album_->SetImage(data); }
 
 void ContextView::SetLyrics(const std::string &lyrics) {
   GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(lyrics_view_));
-  gtk_text_buffer_set_text(buffer, lyrics.empty() ? "No lyrics" : lyrics.c_str(), -1);
+  gtk_text_buffer_set_text(buffer, lyrics.empty() ? Translations::CStr("No lyrics") : lyrics.c_str(), -1);
 }
 
-void ContextView::SearchLyrics() {
-  Settings settings;
-  settings.BeginGroup(ContextSettings::kSettingsGroup);
-  if (!settings.BoolValue(ContextSettings::kSearchLyrics, ContextSettings::kDefaultSearchLyrics)) {
+void ContextView::SearchLyrics(bool force) {
+  if (!force && !search_lyrics_) {
     return;
   }
-  if (!song_playing_.is_valid()) {
-    SetLyrics({});
+  if (!force && lyrics_tried_) {
     return;
   }
+  if (song_playing_.artist().empty() || song_playing_.title().empty()) {
+    if (force) {
+      SetLyrics({});
+    }
+    return;
+  }
+  lyrics_tried_ = true;
   if (lyrics_fetcher_) {
     current_search_id_ = lyrics_fetcher_->Search(song_playing_.EffectiveAlbumartist(), song_playing_.artist(), song_playing_.album(),
                                                  song_playing_.title(), song_playing_.length_nanosec());
@@ -162,11 +220,25 @@ void ContextView::SearchLyrics() {
   lyrics_providers_->Fetch(song_playing_, [this](const std::string &lyrics, const std::string &) { SetLyrics(lyrics); });
 }
 
+void ContextView::PersistVisibility() {
+  Settings settings;
+  settings.BeginGroup(ContextSettings::kSettingsGroup);
+  settings.SetBoolValue(ContextSettings::kAlbum, show_album_);
+  settings.SetBoolValue(ContextSettings::kTechnicalData, show_data_);
+  settings.SetBoolValue(ContextSettings::kSongLyrics, show_lyrics_);
+  settings.SetBoolValue(ContextSettings::kSearchLyrics, search_lyrics_);
+  settings.Sync();
+}
+
 void ContextView::ApplyVisibility() {
   show_album_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_album_btn_));
   show_data_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_data_btn_));
   show_lyrics_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_));
+  const bool playing = song_playing_.is_valid() || !song_playing_.url().empty();
   gtk_widget_set_visible(album_->widget(), show_album_);
-  gtk_widget_set_visible(data_box_, show_data_);
+  gtk_widget_set_visible(data_box_, show_data_ && playing && gtk_widget_get_first_child(data_grid_) != nullptr);
   gtk_widget_set_visible(lyrics_view_, show_lyrics_);
+  gtk_widget_set_visible(search_lyrics_btn_, show_lyrics_);
+  gtk_widget_set_visible(auto_lyrics_btn_, show_lyrics_);
+  PersistVisibility();
 }

@@ -1,7 +1,10 @@
 #include "core/seekbarsettings.h"
 #include "core/song.h"
 #include "core/standardpaths.h"
+#include "covermanager/coverfromurldialog.h"
 #include "osd/osdbase.h"
+#include "osd/osdpretty.h"
+#include "queue/queueview.h"
 #include "systemtrayicon/systemtrayicon.h"
 #include "translations/translations.h"
 #include "utilities/strutils.h"
@@ -81,6 +84,28 @@ TEST(OSDBase, CustomTextAndPlaylistFinished) {
   osd.PlaylistFinished();
   EXPECT_EQ("Strawberry", tray.popup_summary());
   EXPECT_EQ("Playlist finished", tray.popup_message());
+}
+
+TEST(OSDPretty, SupportedRequiresX11Display) {
+  if (!gdk_display_get_default()) {
+    EXPECT_FALSE(OSDPretty::Supported());
+    EXPECT_FALSE(OSDBase::SupportsOSDPretty());
+  }
+}
+
+TEST(CoverFromUrlDialog, PrefillUrlAcceptsHttpOnly) {
+  EXPECT_EQ("https://example.com/a.jpg", CoverFromUrlDialog::PrefillUrl(" https://example.com/a.jpg\n"));
+  EXPECT_EQ("http://example.com/a.png", CoverFromUrlDialog::PrefillUrl("http://example.com/a.png"));
+  EXPECT_TRUE(CoverFromUrlDialog::PrefillUrl("not a url").empty());
+  EXPECT_TRUE(CoverFromUrlDialog::PrefillUrl("ftp://example.com/a.jpg").empty());
+}
+
+TEST(QueueView, NowPlayingMatchesUrl) {
+  Song song;
+  song.set_url("file:///tmp/roads.flac");
+  EXPECT_TRUE(QueueView::IsNowPlaying(song, "file:///tmp/roads.flac"));
+  EXPECT_FALSE(QueueView::IsNowPlaying(song, "file:///tmp/other.flac"));
+  EXPECT_FALSE(QueueView::IsNowPlaying(song, {}));
 }
 
 TEST(SeekbarSettings, ModeValuesMatchQt) {

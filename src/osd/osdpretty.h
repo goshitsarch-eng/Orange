@@ -26,6 +26,8 @@ class OSDPretty {
   void set_pos(int x, int y);
   void SavePosition() const;
   bool IsTransparencyAvailable() const { return true; }
+  static bool Supported();
+  bool fading() const { return fading_; }
   GtkWidget *window() const { return window_; }
 
  private:
@@ -45,6 +47,7 @@ class OSDPretty {
   int pos_y_ = 40;
   std::string font_ = "Sans 12";
   bool show_art_ = true;
+  bool fading_ = true;
   GtkWidget *window_ = nullptr;
   GtkWidget *title_ = nullptr;
   GtkWidget *body_ = nullptr;

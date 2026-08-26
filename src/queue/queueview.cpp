@@ -48,6 +48,11 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
 
 void QueueView::SetActivateCallback(std::function<void(const Song &)> callback) { activate_ = std::move(callback); }
 
+void QueueView::SetNowPlayingUrl(const std::string &url) {
+  now_playing_url_ = url;
+  Rebuild();
+}
+
 void QueueView::Reload() { Rebuild(); }
 
 void QueueView::Rebuild() {
@@ -71,12 +76,17 @@ void QueueView::Rebuild() {
   int index = 0;
   for (const Song &song : queue_->songs()) {
     GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *label = gtk_label_new(song.PrettyTitleWithArtist().c_str());
+    const bool current = IsNowPlaying(song, now_playing_url_);
+    const std::string text = (current ? "▶ " : "") + song.PrettyTitleWithArtist();
+    GtkWidget *label = gtk_label_new(text.c_str());
     gtk_widget_set_halign(label, GTK_ALIGN_START);
     gtk_widget_set_margin_start(label, 12);
     gtk_widget_set_margin_end(label, 12);
     gtk_widget_set_margin_top(label, 8);
     gtk_widget_set_margin_bottom(label, 8);
+    if (current) {
+      gtk_widget_add_css_class(row, "accent");
+    }
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
     g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index++));
     gtk_list_box_append(GTK_LIST_BOX(list_), row);

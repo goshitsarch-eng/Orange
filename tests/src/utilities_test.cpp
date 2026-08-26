@@ -9,7 +9,10 @@
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "equalizer/equalizer.h"
+#include "context/contextalbum.h"
+#include "context/contexttechnical.h"
 #include "organize/organize.h"
+#include "organize/organizeformatvalidator.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/fht.h"
 #include "core/deletefiles.h"
@@ -130,6 +133,51 @@ TEST(OrganizeFormat, OptionalBlocks) {
   without.set_title("Title");
   EXPECT_EQ("Artist/Album/Title", format.GetFilenameForSong(without));
   EXPECT_FALSE(OrganizeFormat::TokenHasValue("%disc", without));
+}
+
+TEST(ContextTechnical, RowsAndFormats) {
+  Song song;
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_album("Dummy");
+  song.set_bitrate(320);
+  song.set_samplerate(44100);
+  song.set_bitdepth(16);
+  song.set_length_nanosec(30000000000LL);
+  song.set_filetype(Song::FileType::FLAC);
+  song.set_valid(true);
+  const auto rows = ContextTechnical::Rows(song);
+  ASSERT_EQ(5u, rows.size());
+  EXPECT_EQ("Filetype", rows[0].first);
+  EXPECT_EQ("FLAC", rows[0].second);
+  EXPECT_EQ("Length", rows[1].first);
+  EXPECT_EQ("Samplerate", rows[2].first);
+  EXPECT_EQ("44100 Hz", rows[2].second);
+  EXPECT_EQ("Bit depth", rows[3].first);
+  EXPECT_EQ("16 Bit", rows[3].second);
+  EXPECT_EQ("Bitrate", rows[4].first);
+  EXPECT_EQ("320 kbps", rows[4].second);
+  EXPECT_EQ("Roads - Portishead", ContextTechnical::Headline(song, {}));
+  EXPECT_EQ("Dummy", ContextTechnical::Summary(song, {}));
+  EXPECT_EQ("Portishead", ContextTechnical::Headline(song, "%artist%"));
+  EXPECT_TRUE(ContextTechnical::Rows(Song()).empty());
+}
+
+TEST(ContextAlbum, ImagePathExtensions) {
+  EXPECT_TRUE(ContextAlbum::IsImagePath("/tmp/cover.jpg"));
+  EXPECT_TRUE(ContextAlbum::IsImagePath("https://ex.com/a.JPEG"));
+  EXPECT_TRUE(ContextAlbum::IsImagePath("art.webp"));
+  EXPECT_FALSE(ContextAlbum::IsImagePath("/tmp/song.flac"));
+  EXPECT_FALSE(ContextAlbum::IsImagePath("cover"));
+}
+
+TEST(OrganizeFormatValidator, EmptyAndUnbalanced) {
+  std::string error;
+  EXPECT_FALSE(OrganizeFormatValidator::IsValid("", &error));
+  EXPECT_EQ("Format is empty", error);
+  EXPECT_FALSE(OrganizeFormatValidator::IsValid("%artist/{%title", &error));
+  EXPECT_FALSE(error.empty());
+  EXPECT_TRUE(OrganizeFormatValidator::IsValid("%artist/%title"));
 }
 
 TEST(Organize, ReportsMissingSource) {

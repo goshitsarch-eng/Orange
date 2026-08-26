@@ -7,6 +7,7 @@
 class OrganizeSyntaxHighlighter {
  public:
   void Apply(GtkTextBuffer *buffer, const std::string &format);
+  void Highlight(GtkTextBuffer *buffer, const std::string &format);
 };
 
 #endif

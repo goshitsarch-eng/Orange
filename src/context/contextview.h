@@ -18,6 +18,7 @@ class LyricsProviders;
 class ContextView {
  public:
   using SaveLyricsCallback = std::function<void(const std::string &)>;
+  using CoverDropCallback = std::function<void(const std::vector<unsigned char> &)>;
 
   explicit ContextView(LyricsProviders *lyrics_providers = nullptr, LyricsFetcher *lyrics_fetcher = nullptr);
 
@@ -32,14 +33,17 @@ class ContextView {
   void SongChanged(const Song &song);
   void AlbumCoverLoaded(const std::vector<unsigned char> &data);
   void SetLyrics(const std::string &lyrics);
-  void SearchLyrics();
+  void SearchLyrics(bool force = false);
   void SetSaveLyricsCallback(SaveLyricsCallback callback);
+  void SetCoverDropCallback(CoverDropCallback callback);
   void ReloadSettings();
 
  private:
   void NoSong();
   void SetSong();
   void ApplyVisibility();
+  void PersistVisibility();
+  void RebuildTechnicalData();
 
   LyricsProviders *lyrics_providers_ = nullptr;
   LyricsFetcher *lyrics_fetcher_ = nullptr;
@@ -49,9 +53,11 @@ class ContextView {
   GtkWidget *title_ = nullptr;
   GtkWidget *artist_ = nullptr;
   GtkWidget *album_label_ = nullptr;
-  GtkWidget *meta_ = nullptr;
   GtkWidget *data_box_ = nullptr;
+  GtkWidget *data_grid_ = nullptr;
   GtkWidget *lyrics_view_ = nullptr;
+  GtkWidget *search_lyrics_btn_ = nullptr;
+  GtkWidget *auto_lyrics_btn_ = nullptr;
   GtkWidget *show_album_btn_ = nullptr;
   GtkWidget *show_data_btn_ = nullptr;
   GtkWidget *show_lyrics_btn_ = nullptr;
@@ -59,7 +65,12 @@ class ContextView {
   bool show_album_ = true;
   bool show_data_ = true;
   bool show_lyrics_ = true;
+  bool search_lyrics_ = true;
+  bool lyrics_tried_ = false;
+  std::string title_fmt_;
+  std::string summary_fmt_;
   SaveLyricsCallback save_lyrics_;
+  CoverDropCallback cover_drop_;
 };
 
 #endif

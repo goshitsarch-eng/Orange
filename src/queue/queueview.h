@@ -4,6 +4,7 @@
 #include "core/song.h"
 
 #include <functional>
+#include <string>
 #include <gtk/gtk.h>
 
 class Queue;
@@ -18,6 +19,10 @@ class QueueView {
   void Remove();
   void Clear();
   void SetActivateCallback(std::function<void(const Song &)> callback);
+  void SetNowPlayingUrl(const std::string &url);
+  const std::string &now_playing_url() const { return now_playing_url_; }
+
+  static bool IsNowPlaying(const Song &song, const std::string &url) { return !url.empty() && song.url() == url; }
 
  private:
   void Rebuild();
@@ -27,6 +32,7 @@ class QueueView {
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
   std::function<void(Song)> activate_;
+  std::string now_playing_url_;
 };
 
 #endif

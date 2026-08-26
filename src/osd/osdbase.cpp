@@ -76,7 +76,7 @@ bool OSDBase::SupportsNativeNotifications() const { return true; }
 
 bool OSDBase::SupportsTrayPopups() const { return tray_icon_ != nullptr; }
 
-bool OSDBase::SupportsOSDPretty() { return true; }
+bool OSDBase::SupportsOSDPretty() { return OSDPretty::Supported(); }
 
 void OSDBase::ShowNative(const std::string &summary, const std::string &body, const std::string &icon) {
   if (dbus_) {
