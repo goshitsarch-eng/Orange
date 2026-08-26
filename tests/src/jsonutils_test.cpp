@@ -125,4 +125,22 @@ TEST(JsonUtils, MusicBrainzRecordings) {
   EXPECT_EQ("Helplessness Blues", songs.front().album());
   EXPECT_EQ(2011, songs.front().year());
   EXPECT_EQ("rec-1", songs.front().musicbrainz_recording_id());
+  EXPECT_EQ("art-1", songs.front().musicbrainz_artist_id());
+  EXPECT_EQ("rel-1", songs.front().musicbrainz_album_id());
+}
+
+TEST(JsonUtils, MusicBrainzSingleRecordingLookup) {
+  const std::string json = R"json({
+    "id": "rec-solo",
+    "title": "Ragged Wood",
+    "length": 312000,
+    "artist-credit": [{"name": "Fleet Foxes", "artist": {"id": "art-2", "name": "Fleet Foxes"}}],
+    "releases": [{"id": "rel-2", "title": "Fleet Foxes", "date": "2008-06-03"}]
+  })json";
+  const SongList songs = JsonUtils::ParseMusicBrainzRecordings(json);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Ragged Wood", songs.front().title());
+  EXPECT_EQ("rec-solo", songs.front().musicbrainz_recording_id());
+  EXPECT_EQ("art-2", songs.front().musicbrainz_artist_id());
+  EXPECT_EQ(312000000000, songs.front().length_nanosec());
 }

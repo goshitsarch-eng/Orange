@@ -1,6 +1,7 @@
 #include "playlist/playlist.h"
 
 #include "playlist/playlistbehaviour.h"
+#include "playlist/playlistfilter.h"
 #include "playlist/playlistshuffle.h"
 #include "playlist/playlistdelegates.h"
 #include "tagreader/tagreader.h"
@@ -336,6 +337,26 @@ void Playlist::ReplaceRow(int row, const Song &song) {
   Changed.Emit();
 }
 
+void Playlist::SetFilterString(const std::string &filter) { filter_string_ = filter; }
+
+void Playlist::UpdateSongsByUrl(const Song &song) {
+  if (song.url().empty()) {
+    return;
+  }
+  bool changed = false;
+  for (int i = 0; i < row_count(); ++i) {
+    if (songs_[static_cast<size_t>(i)].url() == song.url()) {
+      const bool skipped = songs_[static_cast<size_t>(i)].skipped();
+      songs_[static_cast<size_t>(i)] = song;
+      songs_[static_cast<size_t>(i)].set_skipped(skipped);
+      changed = true;
+    }
+  }
+  if (changed) {
+    Changed.Emit();
+  }
+}
+
 bool Playlist::SetColumnValue(int row, PlaylistColumn column, const std::string &value) {
   return SetColumnValues({row}, column, value) > 0;
 }
@@ -498,8 +519,16 @@ int Playlist::NextIndex() const {
       return -1;
     }
     const int row = virtual_items_[static_cast<size_t>(virt)];
-    if (song(row).skipped()) {
+    const Song candidate = song(row);
+    if (candidate.skipped()) {
       return -1;
+    }
+    if (!filter_string_.empty()) {
+      PlaylistFilter filter;
+      filter.SetFilterString(filter_string_);
+      if (!filter.Accepts(candidate)) {
+        return -1;
+      }
     }
     if (album_only && current_row_ >= 0 && !SameAlbum(row, current_row_)) {
       return -1;
@@ -541,8 +570,16 @@ int Playlist::PreviousIndex() const {
       return -1;
     }
     const int row = virtual_items_[static_cast<size_t>(virt)];
-    if (song(row).skipped()) {
+    const Song candidate = song(row);
+    if (candidate.skipped()) {
       return -1;
+    }
+    if (!filter_string_.empty()) {
+      PlaylistFilter filter;
+      filter.SetFilterString(filter_string_);
+      if (!filter.Accepts(candidate)) {
+        return -1;
+      }
     }
     if (album_only && current_row_ >= 0 && !SameAlbum(row, current_row_)) {
       return -1;

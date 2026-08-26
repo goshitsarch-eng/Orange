@@ -1,3 +1,4 @@
+#include "core/playerrepeat.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistshuffle.h"
@@ -372,4 +373,62 @@ TEST(PlaylistShuffle, AlbumsKeepsTracksTogether) {
   EXPECT_EQ(first, PlaylistShuffle::AlbumKey(playlist.song(order[1])));
   EXPECT_NE(first, PlaylistShuffle::AlbumKey(playlist.song(order[2])));
   EXPECT_EQ(PlaylistShuffle::AlbumKey(playlist.song(order[2])), PlaylistShuffle::AlbumKey(playlist.song(order[3])));
+}
+
+TEST(Playlist, FilterIsHonoredByNextAndPrevious) {
+  Playlist playlist;
+  auto add = [&](const char *title, const char *artist) {
+    Song song;
+    song.set_title(title);
+    song.set_artist(artist);
+    song.set_url(std::string("file:///") + title);
+    song.set_valid(true);
+    playlist.AppendSongs({song});
+  };
+  add("Keep", "Portishead");
+  add("Skip", "Fleet Foxes");
+  add("Also", "Portishead");
+  playlist.set_current_row(0);
+  playlist.SetFilterString("artist:Portishead");
+  EXPECT_EQ(2, playlist.PeekNextRow());
+  playlist.Next();
+  EXPECT_EQ("Also", playlist.current_song().title());
+  EXPECT_EQ(-1, playlist.PeekNextRow());
+  playlist.SetRepeatMode(PlaylistSequence::RepeatMode::Playlist);
+  EXPECT_EQ(0, playlist.PeekNextRow());
+  playlist.SetRepeatMode(PlaylistSequence::RepeatMode::Off);
+  playlist.set_current_row(2);
+  EXPECT_EQ(-1, playlist.PeekNextRow());
+  playlist.Previous();
+  EXPECT_EQ("Keep", playlist.current_song().title());
+}
+
+TEST(Playlist, UpdateSongsByUrlReplacesMatchingRows) {
+  Playlist playlist;
+  Song a;
+  a.set_title("Old");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("Other");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  playlist.AppendSongs({a, b});
+  Song updated;
+  updated.set_title("New");
+  updated.set_artist("Portishead");
+  updated.set_url("file:///a");
+  updated.set_musicbrainz_recording_id("mbid-a");
+  updated.set_valid(true);
+  playlist.UpdateSongsByUrl(updated);
+  EXPECT_EQ("New", playlist.song(0).title());
+  EXPECT_EQ("mbid-a", playlist.song(0).musicbrainz_recording_id());
+  EXPECT_EQ("Other", playlist.song(1).title());
+}
+
+TEST(PlayerRepeat, OneByOneStopsAfterCurrent) {
+  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::OneByOne, false));
+  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, true));
+  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, false));
+  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Playlist, false));
 }

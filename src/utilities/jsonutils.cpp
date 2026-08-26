@@ -401,6 +401,80 @@ SongList ParseSongs(const std::string &json, Song::Source source) {
   return songs;
 }
 
+namespace {
+
+Song SongFromMusicBrainzRecording(JsonObject *recording) {
+  Song song(Song::Source::LocalFile);
+  if (!recording) {
+    return song;
+  }
+  song.set_title(NodeString(json_object_get_member(recording, "title")));
+  song.set_musicbrainz_recording_id(NodeString(json_object_get_member(recording, "id")));
+  if (json_object_has_member(recording, "length") && JSON_NODE_HOLDS_VALUE(json_object_get_member(recording, "length"))) {
+    const gint64 length_msec = json_node_get_int(json_object_get_member(recording, "length"));
+    if (length_msec > 0) {
+      song.set_length_nanosec(length_msec * 1000000);
+    }
+  }
+  if (json_object_has_member(recording, "artist-credit") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(recording, "artist-credit"))) {
+    JsonArray *credits = json_object_get_array_member(recording, "artist-credit");
+    if (json_array_get_length(credits) > 0) {
+      JsonObject *credit = json_array_get_object_element(credits, 0);
+      std::string artist = NodeString(json_object_get_member(credit, "name"));
+      if (json_object_has_member(credit, "artist") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(credit, "artist"))) {
+        JsonObject *artist_object = json_object_get_object_member(credit, "artist");
+        if (artist.empty()) {
+          artist = NodeString(json_object_get_member(artist_object, "name"));
+        }
+        song.set_musicbrainz_artist_id(NodeString(json_object_get_member(artist_object, "id")));
+      }
+      song.set_artist(artist);
+    }
+  }
+  if (json_object_has_member(recording, "releases") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(recording, "releases"))) {
+    JsonArray *releases = json_object_get_array_member(recording, "releases");
+    if (json_array_get_length(releases) > 0) {
+      JsonObject *release = json_array_get_object_element(releases, 0);
+      song.set_album(NodeString(json_object_get_member(release, "title")));
+      song.set_musicbrainz_album_id(NodeString(json_object_get_member(release, "id")));
+      if (json_object_has_member(release, "artist-credit") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(release, "artist-credit"))) {
+        JsonArray *album_credits = json_object_get_array_member(release, "artist-credit");
+        if (json_array_get_length(album_credits) > 0) {
+          JsonObject *album_credit = json_array_get_object_element(album_credits, 0);
+          std::string album_artist = NodeString(json_object_get_member(album_credit, "name"));
+          if (json_object_has_member(album_credit, "artist") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(album_credit, "artist"))) {
+            JsonObject *album_artist_object = json_object_get_object_member(album_credit, "artist");
+            if (album_artist.empty()) {
+              album_artist = NodeString(json_object_get_member(album_artist_object, "name"));
+            }
+            song.set_musicbrainz_album_artist_id(NodeString(json_object_get_member(album_artist_object, "id")));
+          }
+          song.set_albumartist(album_artist);
+        }
+      }
+      const std::string date = NodeString(json_object_get_member(release, "date"));
+      if (date.size() >= 4) {
+        song.set_year(std::atoi(date.c_str()));
+      }
+    }
+  }
+  return song;
+}
+
+void AppendMusicBrainzRecording(SongList *songs, JsonObject *recording) {
+  if (!songs || !recording) {
+    return;
+  }
+  Song song = SongFromMusicBrainzRecording(recording);
+  if (song.title().empty()) {
+    return;
+  }
+  song.set_valid(true);
+  songs->push_back(song);
+}
+
+}  // namespace
+
 SongList ParseMusicBrainzRecordings(const std::string &json) {
   JsonNode *root = Parse(json);
   if (!root || !JSON_NODE_HOLDS_OBJECT(root)) {
@@ -410,50 +484,19 @@ SongList ParseMusicBrainzRecordings(const std::string &json) {
     return {};
   }
   JsonObject *object = json_node_get_object(root);
-  if (!json_object_has_member(object, "recordings") || !JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "recordings"))) {
-    json_node_unref(root);
-    return {};
-  }
   SongList songs;
-  JsonArray *recordings = json_object_get_array_member(object, "recordings");
-  const guint n = json_array_get_length(recordings);
-  for (guint i = 0; i < n; ++i) {
-    JsonNode *item = json_array_get_element(recordings, i);
-    if (!item || !JSON_NODE_HOLDS_OBJECT(item)) {
-      continue;
-    }
-    JsonObject *recording = json_node_get_object(item);
-    Song song(Song::Source::LocalFile);
-    song.set_title(NodeString(json_object_get_member(recording, "title")));
-    song.set_musicbrainz_recording_id(NodeString(json_object_get_member(recording, "id")));
-    if (json_object_has_member(recording, "artist-credit") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(recording, "artist-credit"))) {
-      JsonArray *credits = json_object_get_array_member(recording, "artist-credit");
-      if (json_array_get_length(credits) > 0) {
-        JsonObject *credit = json_array_get_object_element(credits, 0);
-        std::string artist = NodeString(json_object_get_member(credit, "name"));
-        if (artist.empty() && json_object_has_member(credit, "artist") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(credit, "artist"))) {
-          artist = NodeString(json_object_get_member(json_object_get_object_member(credit, "artist"), "name"));
-          song.set_musicbrainz_artist_id(NodeString(json_object_get_member(json_object_get_object_member(credit, "artist"), "id")));
-        }
-        song.set_artist(artist);
+  if (json_object_has_member(object, "recordings") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "recordings"))) {
+    JsonArray *recordings = json_object_get_array_member(object, "recordings");
+    const guint n = json_array_get_length(recordings);
+    for (guint i = 0; i < n; ++i) {
+      JsonNode *item = json_array_get_element(recordings, i);
+      if (!item || !JSON_NODE_HOLDS_OBJECT(item)) {
+        continue;
       }
+      AppendMusicBrainzRecording(&songs, json_node_get_object(item));
     }
-    if (json_object_has_member(recording, "releases") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(recording, "releases"))) {
-      JsonArray *releases = json_object_get_array_member(recording, "releases");
-      if (json_array_get_length(releases) > 0) {
-        JsonObject *release = json_array_get_object_element(releases, 0);
-        song.set_album(NodeString(json_object_get_member(release, "title")));
-        song.set_musicbrainz_album_id(NodeString(json_object_get_member(release, "id")));
-        const std::string date = NodeString(json_object_get_member(release, "date"));
-        if (date.size() >= 4) {
-          song.set_year(std::atoi(date.c_str()));
-        }
-      }
-    }
-    if (!song.title().empty()) {
-      song.set_valid(true);
-      songs.push_back(song);
-    }
+  } else if (json_object_has_member(object, "title") && json_object_has_member(object, "id")) {
+    AppendMusicBrainzRecording(&songs, object);
   }
   json_node_unref(root);
   return songs;

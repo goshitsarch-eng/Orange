@@ -17,6 +17,10 @@ MusicBrainzClient::ResultList MusicBrainzClient::ParseResults(const std::string 
     result.track = song.track();
     result.year = song.year();
     result.duration_msec = song.length_nanosec() > 0 ? static_cast<int>(song.length_nanosec() / 1000000) : 0;
+    result.musicbrainz_recording_id = song.musicbrainz_recording_id();
+    result.musicbrainz_artist_id = song.musicbrainz_artist_id();
+    result.musicbrainz_album_id = song.musicbrainz_album_id();
+    result.musicbrainz_album_artist_id = song.musicbrainz_album_artist_id();
     results.push_back(result);
   }
   return results;
@@ -35,6 +39,10 @@ SongList MusicBrainzClient::ToSongs(const ResultList &results) {
     if (result.duration_msec > 0) {
       song.set_length_nanosec(static_cast<int64_t>(result.duration_msec) * 1000000);
     }
+    song.set_musicbrainz_recording_id(result.musicbrainz_recording_id);
+    song.set_musicbrainz_artist_id(result.musicbrainz_artist_id);
+    song.set_musicbrainz_album_id(result.musicbrainz_album_id);
+    song.set_musicbrainz_album_artist_id(result.musicbrainz_album_artist_id);
     song.set_valid(true);
     songs.push_back(song);
   }

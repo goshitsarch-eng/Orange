@@ -224,6 +224,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
     visible_count_ = 0;
     return;
   }
+  playlist->SetFilterString(filter_);
   PlaylistFilter filter;
   filter.SetFilterString(filter_);
   const int current = playlist->current_row();

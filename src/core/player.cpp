@@ -6,11 +6,13 @@
 #include "constants/behavioursettings.h"
 #include "constants/playlistsettings.h"
 #include "core/logging.h"
+#include "core/playerrepeat.h"
 #include "core/playerresume.h"
 #include "core/settings.h"
 #include "core/urlhandlers.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistmanager.h"
+#include "playlist/playlistsequence.h"
 #include "queue/queue.h"
 
 Player::Player(TaskManager *task_manager, UrlHandlers *url_handlers, PlaylistManager *playlist_manager)
@@ -399,7 +401,10 @@ void Player::HandleTrackEnded() {
     return;
   }
   FinishCurrentPlayback();
-  if (stop_after_current_) {
+  const PlaylistSequence::RepeatMode repeat = playlist_manager_ && playlist_manager_->active()
+                                                 ? playlist_manager_->active()->repeat_mode()
+                                                 : PlaylistSequence::RepeatMode::Off;
+  if (PlayerRepeat::ShouldStopAfterTrack(repeat, stop_after_current_)) {
     stop_after_current_ = false;
     Stop();
     return;

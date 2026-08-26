@@ -13,17 +13,42 @@
 
 class TagFetcher {
  public:
+  struct Job {
+    int id = 0;
+    Song song;
+  };
+
   explicit TagFetcher(NetworkAccessManager *network);
-  void Fetch(const Song &song);
+  int Fetch(const Song &song);
+  std::vector<int> QueueSongs(const SongList &songs);
+  std::vector<int> FetchSongs(const SongList &songs);
+  void Start();
+  void Cancel();
+  int pending() const { return static_cast<int>(queue_.size()) + (running_ ? 1 : 0); }
+  bool busy() const { return running_ || !queue_.empty(); }
+  int current_id() const { return current_.id; }
+
   Signal<SongList> Results;
+  Signal<int, SongList> SongResults;
+  Signal<int, std::string> Progress;
+  Signal<int, std::string> Error;
+  Signal<> Finished;
 
  private:
-  void FetchByMetadata(const Song &song);
-  void FetchByFingerprint(const Song &song);
+  int Enqueue(const Song &song);
+  void StartNext();
+  void Complete(int id, SongList results, const std::string &error);
+  void FetchByMetadata(const Job &job);
+  void FetchByFingerprint(const Job &job);
 
   NetworkAccessManager *network_;
   std::unique_ptr<AcoustidClient> acoustid_;
   std::unique_ptr<MusicBrainzClient> musicbrainz_;
+  std::vector<Job> queue_;
+  Job current_;
+  bool running_ = false;
+  bool cancelled_ = false;
+  int next_id_ = 1;
 };
 
 #endif

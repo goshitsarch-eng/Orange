@@ -18,6 +18,10 @@ class MusicBrainzClient {
     int track = 0;
     int year = -1;
     int duration_msec = 0;
+    std::string musicbrainz_recording_id;
+    std::string musicbrainz_artist_id;
+    std::string musicbrainz_album_id;
+    std::string musicbrainz_album_artist_id;
   };
   using ResultList = std::vector<Result>;
 

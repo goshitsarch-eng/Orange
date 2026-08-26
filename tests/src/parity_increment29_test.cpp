@@ -87,6 +87,12 @@ TEST(MusicBrainzClient, ParsesRecordings) {
   EXPECT_EQ("Ragged Wood", results[0].title);
   EXPECT_EQ("Fleet Foxes", results[0].artist);
   EXPECT_EQ(2008, results[0].year);
+  EXPECT_EQ("rec-1", results[0].musicbrainz_recording_id);
+  EXPECT_EQ("rel-1", results[0].musicbrainz_album_id);
+  const SongList songs = MusicBrainzClient::ToSongs(results);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("rec-1", songs.front().musicbrainz_recording_id());
+  EXPECT_EQ("rel-1", songs.front().musicbrainz_album_id());
 }
 
 TEST(OrganizeFormat, ValidatesBracesAndTokens) {

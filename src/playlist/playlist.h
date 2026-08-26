@@ -72,6 +72,9 @@ class Playlist {
   SequenceMode sequence_mode() const { return mode_; }
   void SetRepeatMode(PlaylistSequence::RepeatMode mode);
   void SetShuffleMode(PlaylistSequence::ShuffleMode mode);
+  void SetFilterString(const std::string &filter);
+  const std::string &filter_string() const { return filter_string_; }
+  void UpdateSongsByUrl(const Song &song);
   PlaylistSequence::RepeatMode repeat_mode() const { return repeat_mode_; }
   PlaylistSequence::ShuffleMode shuffle_mode() const { return shuffle_mode_; }
   void SetDynamic(bool dynamic, const SmartPlaylistSearch &search = {});
@@ -119,6 +122,7 @@ class Playlist {
   bool sort_descending_ = false;
   std::vector<int> virtual_items_;
   int current_virtual_index_ = -1;
+  std::string filter_string_;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H
