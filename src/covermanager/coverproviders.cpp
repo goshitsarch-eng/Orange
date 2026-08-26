@@ -17,6 +17,7 @@
 #include "covermanager/qobuzcoverprovider.h"
 #include "covermanager/spotifycoverprovider.h"
 #include "covermanager/tidalcoverprovider.h"
+#include "dialogs/edittagcover.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
@@ -152,34 +153,45 @@ std::vector<CoverProvider *> CoverProviders::All() const {
   return result;
 }
 
-bool CoverProviders::SaveAlbumCover(const Song &song, const std::string &image_data, TagReader *tagreader) {
-  if (image_data.empty()) {
+bool CoverProviders::SaveAlbumCover(const Song &song, const std::string &image_data, TagReader *tagreader, std::string *saved_path) {
+  return SaveAlbumCover(song, image_data, tagreader, CoverOptions::LoadFromSettings(), saved_path);
+}
+
+bool CoverProviders::SaveAlbumCover(const Song &song, const std::string &image_data, TagReader *tagreader, const CoverOptions &options,
+                                    std::string *saved_path) {
+  const std::string bytes = EditTagCover::ImageBytes(image_data);
+  if (bytes.empty()) {
     return false;
   }
-  const std::string path = FileUtils::PathFromUri(song.url());
-  const std::string dir = FileUtils::DirName(path);
-  Settings settings;
-  settings.BeginGroup("Covers");
-  const std::string dest_mode = settings.Value("save_dest", "album");
-  const std::string filename = settings.Value("filename", "cover.jpg");
-  if (dest_mode == "cache") {
-    const std::string cache = FileUtils::Join(g_get_user_cache_dir(), "strawberry/covers");
-    g_mkdir_with_parents(cache.c_str(), 0755);
-    const std::string dest = FileUtils::Join(cache, FileUtils::BaseName(path) + "-" + filename);
-    return FileUtils::WriteFile(dest, image_data);
-  }
-  bool wrote = dest_mode == "embedded";
-  if (dest_mode != "embedded") {
-    const std::string dest = FileUtils::Join(dir.empty() ? "." : dir, filename.empty() ? "cover.jpg" : filename);
-    wrote = FileUtils::WriteFile(dest, image_data);
-  }
-  if ((dest_mode == "embedded" || dest_mode == "album") && tagreader && !path.empty() && FileUtils::Exists(path)) {
+  const CoverOptions::CoverType type = options.EffectiveType(song);
+  if (type == CoverOptions::CoverType::Embedded) {
+    if (!tagreader) {
+      return false;
+    }
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (path.empty() || !FileUtils::Exists(path)) {
+      return false;
+    }
     TagReader::CoverData cover;
-    cover.data.assign(image_data.begin(), image_data.end());
+    cover.data.assign(bytes.begin(), bytes.end());
     cover.mime_type = "image/jpeg";
-    wrote = tagreader->SaveCover(path, cover) || wrote;
+    if (!tagreader->SaveCover(path, cover)) {
+      return false;
+    }
+    if (saved_path) {
+      *saved_path = path;
+    }
+    return true;
   }
-  return wrote;
+  const std::string dest = CoverOptions::UniquePath(options.FilePath(song), options.cover_overwrite);
+  g_mkdir_with_parents(FileUtils::DirName(dest).c_str(), 0755);
+  if (!FileUtils::WriteFile(dest, bytes)) {
+    return false;
+  }
+  if (saved_path) {
+    *saved_path = dest;
+  }
+  return true;
 }
 
 void CoverProviders::FetchFromEmbeddedOrFile(const Song &song, CoverProvider::Callback callback) {

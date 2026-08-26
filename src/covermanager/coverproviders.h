@@ -4,6 +4,7 @@
 #include "core/network.h"
 #include "core/signal.h"
 #include "core/song.h"
+#include "covermanager/coveroptions.h"
 #include "covermanager/coverprovider.h"
 
 #include <functional>
@@ -21,7 +22,10 @@ class CoverProviders {
   void FetchAll(const Song &song, const std::function<void(const std::string &provider, const std::string &image_data)> &callback);
   std::vector<CoverProvider *> All() const;
   void FetchFromEmbeddedOrFile(const Song &song, CoverProvider::Callback callback);
-  static bool SaveAlbumCover(const Song &song, const std::string &image_data, class TagReader *tagreader = nullptr);
+  static bool SaveAlbumCover(const Song &song, const std::string &image_data, class TagReader *tagreader = nullptr,
+                             std::string *saved_path = nullptr);
+  static bool SaveAlbumCover(const Song &song, const std::string &image_data, class TagReader *tagreader, const CoverOptions &options,
+                             std::string *saved_path = nullptr);
 
  private:
   void FetchFromIndex(const Song &song, size_t index, CoverProvider::Callback callback);

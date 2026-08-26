@@ -6,9 +6,13 @@
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "dialogs/dialoghelpers.h"
 #include "dialogs/dialoglistkeyboard.h"
+#include "dialogs/edittagcover.h"
 #include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfields.h"
+#include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagtabs.h"
+#include "tagreader/savetagsoptions.h"
+#include "tagreader/tagid3v2version.h"
 #include "dialogs/trackselectiondialog.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
@@ -44,6 +48,8 @@ struct State {
   GtkWidget *song_list = nullptr;
   GtkWidget *prev = nullptr;
   GtkWidget *next = nullptr;
+  GtkWidget *id3v2 = nullptr;
+  GtkWidget *embedded_cover = nullptr;
   std::unique_ptr<AlbumCoverChoiceController> covers;
   std::vector<std::pair<std::string, GtkWidget *>> fields;
   std::vector<std::string> initial;
@@ -130,6 +136,11 @@ void UpdateDisplay(State *state) {
     if (row) {
       gtk_list_box_select_row(GTK_LIST_BOX(state->song_list), row);
     }
+  }
+  if (state->embedded_cover && state->covers) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->embedded_cover),
+                                EditTagCover::DefaultEmbeddedChecked(state->song, state->covers->get_collection_save_album_cover_type()));
+    gtk_widget_set_sensitive(state->embedded_cover, state->song.save_embedded_cover_supported());
   }
 }
 
@@ -270,7 +281,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      }
                      const char *text = g_value_get_string(value);
                      const std::string path = EditTagCoverDrop::FirstImagePath(text ? text : "");
-                     if (path.empty() || !AlbumCoverChoiceController::SaveCover(self->app, &self->song, path)) {
+                     if (path.empty() || !self->covers || !self->covers->SaveCover(&self->song, path)) {
                        return FALSE;
                      }
                      if (self->index < self->songs.size()) {
@@ -307,6 +318,18 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_box_append(GTK_BOX(cover_buttons2), stats_cover);
   gtk_box_append(GTK_BOX(summary), cover_buttons);
   gtk_box_append(GTK_BOX(summary), cover_buttons2);
+  state->embedded_cover = gtk_check_button_new_with_label(Translations::CStr("Embedded cover"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(state->embedded_cover),
+                              EditTagCover::DefaultEmbeddedChecked(state->song, state->covers->get_collection_save_album_cover_type()));
+  gtk_widget_set_sensitive(state->embedded_cover, EditTagCover::AnySupported(targets));
+  gtk_box_append(GTK_BOX(summary), state->embedded_cover);
+  g_signal_connect(state->embedded_cover, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     if (self->covers) {
+                       self->covers->set_save_embedded_cover_override(gtk_check_button_get_active(button));
+                     }
+                   }),
+                   state);
   state->stats_label = gtk_label_new("");
   gtk_label_set_wrap(GTK_LABEL(state->stats_label), TRUE);
   gtk_label_set_xalign(GTK_LABEL(state->stats_label), 0);
@@ -350,6 +373,20 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      {"Artist sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.artistsort(); })},
                      {"Album sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumsort(); })},
                      {"Album artist sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumartistsort(); })}});
+  if (EditTagId3v2::AnySupported(targets)) {
+    GtkWidget *id3_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    GtkWidget *id3_label = gtk_label_new(Translations::CStr("ID3v2 version:"));
+    gtk_label_set_xalign(GTK_LABEL(id3_label), 0);
+    GtkStringList *versions = gtk_string_list_new(nullptr);
+    gtk_string_list_append(versions, "2.3");
+    gtk_string_list_append(versions, "2.4");
+    state->id3v2 = gtk_drop_down_new(G_LIST_MODEL(versions), nullptr);
+    gtk_drop_down_set_selected(GTK_DROP_DOWN(state->id3v2), EditTagId3v2::ComboIndex(EditTagId3v2::VersionForSongs(targets)));
+    gtk_widget_set_hexpand(state->id3v2, TRUE);
+    gtk_box_append(GTK_BOX(id3_row), id3_label);
+    gtk_box_append(GTK_BOX(id3_row), state->id3v2);
+    gtk_box_append(GTK_BOX(tags), id3_row);
+  }
   adw_view_stack_add_titled(stack, tags, "Tags", Translations::CStr("Tags"));
 
   GtkWidget *lyrics_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
@@ -429,6 +466,9 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      EditTagFields::ApplyChangedFields(&self->songs, changed);
                      const bool write_compilation = self->compilation != nullptr;
                      const bool write_rating = self->rating != nullptr;
+                     const TagID3v2Version id3v2_version =
+                         self->id3v2 ? EditTagId3v2::TagVersionFromIndex(static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(self->id3v2))))
+                                     : TagID3v2Version::Default;
                      for (Song &song : self->songs) {
                        if (write_compilation) {
                          song.set_compilation(gtk_check_button_get_active(GTK_CHECK_BUTTON(self->compilation)));
@@ -436,7 +476,8 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                        if (write_rating) {
                          song.set_rating(static_cast<float>(gtk_range_get_value(GTK_RANGE(self->rating)) / 5.0));
                        }
-                       self->app->tagreader()->WriteFile(song);
+                       self->app->tagreader()->WriteFile(FileUtils::PathFromUri(song.url()), song, static_cast<int>(SaveTagsOption::Tags), {},
+                                                         id3v2_version);
                        const std::string path = FileUtils::PathFromUri(song.url());
                        if (!path.empty() && song.rating() >= 0) {
                          self->app->tagreader()->SaveRating(path, song.rating());

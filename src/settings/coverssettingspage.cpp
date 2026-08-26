@@ -85,8 +85,8 @@ AdwPreferencesPage *CoversSettingsPage::Create(Settings *settings, Application *
   AdwPreferencesPage *page = SettingsPage::MakePage("Covers", "image-x-generic-symbolic");
   AdwPreferencesGroup *save = SettingsPage::AddGroup(page, "Saving");
   SettingsPage::AddCombo(save, settings, CoversSettings::kSaveType, "Save destination",
-                         {{"0", "Cache"}, {"1", "Album directory"}, {"2", "Embedded"}}, "1");
-  SettingsPage::AddCombo(save, settings, CoversSettings::kSaveFilename, "Filename", {{"0", "Hash"}, {"1", "Pattern"}}, "1");
+                         {{"1", "Cache"}, {"2", "Album directory"}, {"3", "Embedded"}}, "2");
+  SettingsPage::AddCombo(save, settings, CoversSettings::kSaveFilename, "Filename", {{"1", "Hash"}, {"2", "Pattern"}}, "2");
   SettingsPage::AddEntry(save, settings, CoversSettings::kSavePattern, "Cover filename pattern", CoversSettings::kDefaultSavePattern);
   SettingsPage::AddToggle(save, settings, CoversSettings::kSaveOverwrite, "Overwrite existing covers", nullptr, CoversSettings::kDefaultSaveOverwrite);
   SettingsPage::AddToggle(save, settings, CoversSettings::kSaveLowercase, "Lowercase filenames", nullptr, CoversSettings::kDefaultSaveLowercase);

@@ -15,6 +15,7 @@
 #include <taglib/audioproperties.h>
 #include <taglib/mpegfile.h>
 #include <taglib/id3v2tag.h>
+#include <taglib/id3v2header.h>
 #include <taglib/attachedpictureframe.h>
 #include <taglib/popularimeterframe.h>
 #include <taglib/textidentificationframe.h>
@@ -305,6 +306,9 @@ TagReader::CoverData CoverFromFile(TagLib::File *file) {
 void ReadId3v2Extras(TagLib::ID3v2::Tag *tag, Song *song) {
   if (!tag || !song) {
     return;
+  }
+  if (tag->header()) {
+    song->set_id3v2_version(static_cast<int>(tag->header()->majorVersion()));
   }
   if (auto *fmps_playcount = TagLib::ID3v2::UserTextIdentificationFrame::find(tag, kId3FmpsPlaycount)) {
     const TagLib::StringList fields = fmps_playcount->fieldList();

@@ -85,13 +85,20 @@ GtkWidget *DropDownFromNames(const std::vector<std::string> &names) {
 }
 
 bool ApplyCover(Application *app, Song *song, const std::string &image) {
-  if (!song || image.empty() || !CoverProviders::SaveAlbumCover(*song, image, app->tagreader())) {
+  return ApplyCover(app, song, image, CoverOptions::LoadFromSettings());
+}
+
+bool ApplyCover(Application *app, Song *song, const std::string &image, const CoverOptions &options) {
+  std::string dest;
+  if (!song || image.empty() || !CoverProviders::SaveAlbumCover(*song, image, app->tagreader(), options, &dest)) {
     return false;
   }
-  const std::string dest = FileUtils::Join(FileUtils::DirName(FileUtils::PathFromUri(song->url())), "cover.jpg");
-  song->set_art_manual(FileUtils::UriFromPath(dest));
   song->set_art_unset(false);
-  song->set_art_embedded(true);
+  if (options.EffectiveType(*song) == CoverOptions::CoverType::Embedded) {
+    song->set_art_embedded(true);
+  } else if (!dest.empty()) {
+    song->set_art_manual(FileUtils::UriFromPath(dest));
+  }
   if (song->id() > 0) {
     app->collection()->backend()->AddOrUpdateSong(*song);
   }

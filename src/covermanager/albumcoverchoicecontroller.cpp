@@ -19,7 +19,9 @@
 #include <algorithm>
 #include <memory>
 
-AlbumCoverChoiceController::AlbumCoverChoiceController(Application *app) : app_(app) {}
+AlbumCoverChoiceController::AlbumCoverChoiceController(Application *app) : app_(app) { ReloadSettings(); }
+
+void AlbumCoverChoiceController::ReloadSettings() { cover_options_ = CoverOptions::LoadFromSettings(); }
 
 bool AlbumCoverChoiceController::IsKnownImageExtension(const std::string &extension) {
   const std::string ext = StrUtils::ToLower(extension);
@@ -39,6 +41,10 @@ std::vector<std::string> AlbumCoverChoiceController::ImageExtensions() {
 
 bool AlbumCoverChoiceController::SaveCover(Application *app, Song *song, const std::string &image) {
   return DialogHelpers::ApplyCover(app, song, image);
+}
+
+bool AlbumCoverChoiceController::SaveCover(Song *song, const std::string &image) {
+  return DialogHelpers::ApplyCover(app_, song, image, EffectiveOptions());
 }
 
 void AlbumCoverChoiceController::ApplyImage(Song *song, GtkWidget *image, const std::string &data) {
@@ -69,7 +75,7 @@ void AlbumCoverChoiceController::FetchCover(Song *song, GtkWidget *image, GtkWid
       return;
     }
     statistics_.bytes_transferred += data.size();
-    if (SaveCover(app_, owned.get(), data)) {
+    if (SaveCover(owned.get(), data)) {
       ++statistics_.chosen_images;
       if (song) {
         *song = *owned;
@@ -319,7 +325,7 @@ void AlbumCoverChoiceController::LoadCoverFromURL(GtkWindow *parent, Song *song,
                      self->app_->network()->Get(url, [self, song, image](const NetworkAccessManager::Response &result) {
                        if (result.ok() && JsonUtils::LooksLikeImage(result.body)) {
                          self->statistics_.bytes_transferred += result.body.size();
-                         if (SaveCover(self->app_, song, result.body)) {
+                         if (self->SaveCover(song, result.body)) {
                            ++self->statistics_.chosen_images;
                            self->ApplyImage(song, image, result.body);
                          }
@@ -353,7 +359,7 @@ void AlbumCoverChoiceController::LoadCoverFromFile(GtkWindow *parent, Song *song
       gchar *path = g_file_get_path(file);
       if (path) {
         const std::string bytes = FileUtils::ReadFile(path);
-        if (!bytes.empty() && SaveCover(pair->controller->app_, pair->song, bytes)) {
+        if (!bytes.empty() && pair->controller->SaveCover(pair->song, bytes)) {
           ++pair->controller->statistics_.chosen_images;
           pair->controller->ApplyImage(pair->song, pair->image, bytes);
         }

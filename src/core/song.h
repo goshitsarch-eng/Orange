@@ -226,6 +226,19 @@ class Song {
   bool is_local_file() const { return source_ == Source::LocalFile || source_ == Source::Collection; }
   bool IsEditable() const;
 
+  int id3v2_version() const { return id3v2_version_; }
+  void set_id3v2_version(int v) { id3v2_version_ = v; }
+  bool id3v2_tags_supported() const {
+    return filetype_ == FileType::MPEG || filetype_ == FileType::WAV || filetype_ == FileType::AIFF;
+  }
+  static bool save_embedded_cover_supported(FileType filetype) {
+    return filetype == FileType::FLAC || filetype == FileType::OggVorbis || filetype == FileType::OggOpus ||
+           filetype == FileType::MPEG || filetype == FileType::MP4 || filetype == FileType::WAV || filetype == FileType::AIFF;
+  }
+  bool save_embedded_cover_supported() const {
+    return is_local_file() && save_embedded_cover_supported(filetype_) && cue_path_.empty();
+  }
+
   static FileType FiletypeByExtension(const std::string &extension);
   static FileType FiletypeByMimeType(const std::string &mimetype);
   static FileType FiletypeByFilename(const std::string &filename);
@@ -284,6 +297,7 @@ class Song {
   int64_t lastplayed_ = -1;
   int64_t lastseen_ = -1;
   bool art_embedded_ = false;
+  int id3v2_version_ = 0;
   std::string art_automatic_;
   std::string art_manual_;
   bool art_unset_ = false;

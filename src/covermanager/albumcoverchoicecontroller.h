@@ -2,6 +2,7 @@
 #define STRAWBERRY_ALBUMCOVERCHOICECONTROLLER_H
 
 #include "core/song.h"
+#include "covermanager/coveroptions.h"
 #include "covermanager/coversearchstatistics.h"
 
 #include <gtk/gtk.h>
@@ -31,15 +32,32 @@ class AlbumCoverChoiceController {
 
   const CoverSearchStatistics &statistics() const { return statistics_; }
 
+  void ReloadSettings();
+  void set_save_embedded_cover_override(bool value) { save_embedded_cover_override_ = value; }
+  CoverOptions::CoverType get_collection_save_album_cover_type() const { return cover_options_.cover_type; }
+  CoverOptions::CoverType get_save_album_cover_type() const {
+    return save_embedded_cover_override_ ? CoverOptions::CoverType::Embedded : cover_options_.cover_type;
+  }
+  CoverOptions EffectiveOptions() const {
+    CoverOptions options = cover_options_;
+    if (save_embedded_cover_override_) {
+      options.cover_type = CoverOptions::CoverType::Embedded;
+    }
+    return options;
+  }
+
   static bool IsKnownImageExtension(const std::string &extension);
   static std::vector<std::string> ImageExtensions();
   static bool SaveCover(Application *app, Song *song, const std::string &image);
+  bool SaveCover(Song *song, const std::string &image);
 
  private:
   void ApplyImage(Song *song, GtkWidget *image, const std::string &data);
 
   Application *app_ = nullptr;
   CoverSearchStatistics statistics_;
+  CoverOptions cover_options_;
+  bool save_embedded_cover_override_ = false;
 };
 
 #endif

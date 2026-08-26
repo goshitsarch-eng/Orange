@@ -1,7 +1,10 @@
 #include "constants/edittagdialogsettings.h"
+#include "covermanager/coveroptions.h"
 #include "dialogs/dialoglistkeyboard.h"
+#include "dialogs/edittagcover.h"
 #include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfields.h"
+#include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagtabs.h"
 #include "lyrics/lyricsproviderorder.h"
 #include "widgets/listboxkeyboard.h"
@@ -96,6 +99,82 @@ TEST(EditTagTabs, ClampNameAndSettingsKeys) {
   EXPECT_STREQ("Lyrics", EditTagTabs::Name(2));
   EXPECT_EQ(1, EditTagTabs::IndexFromName("Tags"));
   EXPECT_EQ(0, EditTagTabs::IndexFromName("Missing"));
+}
+
+TEST(EditTagId3v2, VersionForSongsAndCombo) {
+  EXPECT_EQ(TagID3v2Version::V3, EditTagId3v2::TagVersionFromIndex(EditTagId3v2::kComboIndex3));
+  EXPECT_EQ(TagID3v2Version::V4, EditTagId3v2::TagVersionFromIndex(EditTagId3v2::kComboIndex4));
+  EXPECT_EQ(EditTagId3v2::kComboIndex3, EditTagId3v2::ComboIndex(3));
+  EXPECT_EQ(EditTagId3v2::kComboIndex4, EditTagId3v2::ComboIndex(4));
+
+  Song mpeg;
+  mpeg.set_filetype(Song::FileType::MPEG);
+  mpeg.set_id3v2_version(3);
+  Song wav;
+  wav.set_filetype(Song::FileType::WAV);
+  wav.set_id3v2_version(3);
+  Song flac;
+  flac.set_filetype(Song::FileType::FLAC);
+  EXPECT_TRUE(mpeg.id3v2_tags_supported());
+  EXPECT_FALSE(flac.id3v2_tags_supported());
+  EXPECT_TRUE(EditTagId3v2::AnySupported({mpeg, flac}));
+  EXPECT_FALSE(EditTagId3v2::AnySupported({flac}));
+  EXPECT_EQ(3, EditTagId3v2::VersionForSongs({mpeg, wav}));
+  wav.set_id3v2_version(4);
+  EXPECT_EQ(4, EditTagId3v2::VersionForSongs({mpeg, wav}));
+  Song unknown;
+  unknown.set_filetype(Song::FileType::MPEG);
+  EXPECT_EQ(4, EditTagId3v2::VersionForSongs({unknown}));
+}
+
+TEST(EditTagCover, EmbeddedDefaultAndSaveType) {
+  EXPECT_TRUE(Song::save_embedded_cover_supported(Song::FileType::FLAC));
+  EXPECT_TRUE(Song::save_embedded_cover_supported(Song::FileType::MPEG));
+  EXPECT_TRUE(Song::save_embedded_cover_supported(Song::FileType::OggOpus));
+  EXPECT_FALSE(Song::save_embedded_cover_supported(Song::FileType::ASF));
+  Song flac;
+  flac.set_source(Song::Source::Collection);
+  flac.set_filetype(Song::FileType::FLAC);
+  flac.set_url("file:///tmp/dummy.flac");
+  EXPECT_TRUE(flac.save_embedded_cover_supported());
+  EXPECT_FALSE(EditTagCover::DefaultEmbeddedChecked(flac, CoverOptions::CoverType::Album));
+  flac.set_art_embedded(true);
+  EXPECT_TRUE(EditTagCover::DefaultEmbeddedChecked(flac, CoverOptions::CoverType::Album));
+  Song mp3;
+  mp3.set_source(Song::Source::Collection);
+  mp3.set_filetype(Song::FileType::MPEG);
+  mp3.set_url("file:///tmp/dummy.mp3");
+  EXPECT_TRUE(EditTagCover::DefaultEmbeddedChecked(mp3, CoverOptions::CoverType::Embedded));
+  EXPECT_EQ(CoverOptions::CoverType::Embedded, EditTagCover::EffectiveSaveType(CoverOptions::CoverType::Album, true));
+  EXPECT_EQ(CoverOptions::CoverType::Album, EditTagCover::EffectiveSaveType(CoverOptions::CoverType::Album, false));
+  EXPECT_TRUE(EditTagCover::AnySupported({flac}));
+}
+
+TEST(CoverOptions, TypeFilenameAndPattern) {
+  EXPECT_EQ(CoverOptions::CoverType::Cache, CoverOptions::TypeFromValue("1"));
+  EXPECT_EQ(CoverOptions::CoverType::Album, CoverOptions::TypeFromValue("2"));
+  EXPECT_EQ(CoverOptions::CoverType::Embedded, CoverOptions::TypeFromValue("3"));
+  EXPECT_EQ(CoverOptions::CoverType::Cache, CoverOptions::TypeFromValue("cache"));
+  EXPECT_EQ(CoverOptions::CoverType::Album, CoverOptions::TypeFromValue("album"));
+  EXPECT_EQ(CoverOptions::CoverFilename::Hash, CoverOptions::FilenameModeFromValue("1"));
+  EXPECT_EQ(CoverOptions::CoverFilename::Pattern, CoverOptions::FilenameModeFromValue("2"));
+  EXPECT_EQ(CoverOptions::CoverFilename::Pattern, CoverOptions::FilenameModeFromValue("pattern"));
+
+  Song song;
+  song.set_source(Song::Source::Collection);
+  song.set_artist("Portishead");
+  song.set_albumartist("Portishead");
+  song.set_album("Dummy (Disc 1)");
+  song.set_filetype(Song::FileType::ASF);
+  CoverOptions options;
+  options.cover_type = CoverOptions::CoverType::Embedded;
+  EXPECT_EQ(CoverOptions::CoverType::Cache, options.EffectiveType(song));
+  options.cover_type = CoverOptions::CoverType::Album;
+  options.cover_filename = CoverOptions::CoverFilename::Pattern;
+  options.cover_pattern = "%albumartist-%album";
+  options.cover_lowercase = true;
+  options.cover_replace_spaces = true;
+  EXPECT_EQ("portishead-dummy.jpg", options.FilenameForSong(song));
 }
 
 TEST(EditTagCoverDrop, AcceptsImageUrisAndSkipsOtherFiles) {
