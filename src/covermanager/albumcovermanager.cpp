@@ -730,8 +730,8 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   state->fetch_missing = fetch_missing;
   state->abort = gtk_button_new_with_label(Translations::CStr("Abort"));
   gtk_widget_set_visible(state->abort, FALSE);
-  GtkWidget *add_playlist = gtk_button_new_with_label(Translations::CStr("Add to playlist"));
-  GtkWidget *load_playlist = gtk_button_new_with_label(Translations::CStr("Load to playlist"));
+  GtkWidget *add_playlist = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::AddToPlaylist()));
+  GtkWidget *load_playlist = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::Load()));
   GtkWidget *from_url = gtk_button_new_with_label(Translations::CStr("Load cover from URL…"));
   GtkWidget *export_btn = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::Export()));
   GtkWidget *stats = gtk_button_new_with_label(Translations::CStr("Statistics"));

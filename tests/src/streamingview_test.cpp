@@ -2,6 +2,7 @@
 #include "collection/collectiontree.h"
 #include "streaming/streamingabort.h"
 #include "streaming/streamingalbum.h"
+#include "streaming/streamingcollectionlabels.h"
 #include "streaming/streamingcollectionstore.h"
 #include "streaming/streamingcollectiontree.h"
 #include "streaming/streamingcoverdownload.h"
@@ -59,6 +60,14 @@ TEST(StreamingSearchHelp, IdleUntilFirstSearch) {
   EXPECT_STREQ("No results", StreamingSearchHelp::EmptyResultsText());
   EXPECT_STREQ(StreamingSearchHelp::IdleText(), StreamingSearchHelp::LabelFor(false));
   EXPECT_STREQ(StreamingSearchHelp::EmptyResultsText(), StreamingSearchHelp::LabelFor(true));
+  EXPECT_STREQ("artists", StreamingSearchHelp::Artists());
+  EXPECT_STREQ("albums", StreamingSearchHelp::Albums());
+  EXPECT_STREQ("songs", StreamingSearchHelp::Songs());
+}
+
+TEST(StreamingCollectionLabels, MatchQtRefreshCatalogue) {
+  EXPECT_STREQ("Refresh catalogue", StreamingCollectionLabels::Refresh());
+  EXPECT_STREQ("Back", StreamingCollectionLabels::Back());
 }
 
 TEST(StreamingCover, UrlCacheAndPrettyCovers) {

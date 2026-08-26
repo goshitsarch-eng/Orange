@@ -511,6 +511,8 @@ TEST(CoverManagerStats, TotalAndWithoutCoverMatchQt) {
   EXPECT_STREQ("Without cover:", CoverManagerStats::WithoutLabel());
   EXPECT_STREQ("Fetch Missing Covers", CoverManagerStats::FetchMissing());
   EXPECT_STREQ("Export Covers", CoverManagerStats::Export());
+  EXPECT_STREQ("Load", CoverManagerStats::Load());
+  EXPECT_STREQ("Add to playlist", CoverManagerStats::AddToPlaylist());
   EXPECT_EQ(1, CoverManagerStats::WithoutCover(3, 2));
   EXPECT_EQ(0, CoverManagerStats::WithoutCover(2, 5));
   EXPECT_EQ(0, CoverManagerStats::WithoutCover(-1, 0));

@@ -8,6 +8,7 @@
 #include "collection/collectiontree.h"
 #include "collection/groupbydialog.h"
 #include "dialogs/dialoghelpers.h"
+#include "streaming/streamingcollectionlabels.h"
 #include "streaming/streamingcollectiontree.h"
 #include "streaming/streamingcover.h"
 #include "streaming/streamingdrag.h"
@@ -36,12 +37,12 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   gtk_widget_set_hexpand(label, TRUE);
   gtk_widget_set_halign(label, GTK_ALIGN_START);
   back_ = gtk_button_new_from_icon_name("go-previous-symbolic");
-  gtk_widget_set_tooltip_text(back_, "Back");
+  gtk_widget_set_tooltip_text(back_, Translations::CStr(StreamingCollectionLabels::Back()));
   gtk_widget_set_visible(back_, FALSE);
   g_signal_connect(back_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<StreamingCollectionView *>(data)->PopBrowse(); }),
                    this);
   GtkWidget *refresh = gtk_button_new_from_icon_name("view-refresh-symbolic");
-  gtk_widget_set_tooltip_text(refresh, "Refresh");
+  gtk_widget_set_tooltip_text(refresh, Translations::CStr(StreamingCollectionLabels::Refresh()));
   g_signal_connect(refresh, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<StreamingCollectionView *>(data);
                      if (self->refresh_) {

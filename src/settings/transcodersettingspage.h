@@ -112,6 +112,39 @@ inline FieldKind FieldsFor(Transcoder::Format format) {
 
 inline int QualityMax(Transcoder::Format format) { return format == Transcoder::Format::FLAC ? 8 : 10; }
 
+inline int DisplayKbps(int stored) { return stored >= 1000 ? stored / 1000 : stored; }
+
+inline int StoreBps(int kbps) { return kbps < 0 ? 0 : kbps * 1000; }
+
+inline int BitrateMinKbps(Transcoder::Format format) {
+  switch (format) {
+    case Transcoder::Format::Opus:
+      return 6;
+    case Transcoder::Format::AAC:
+      return 64;
+    default:
+      return 0;
+  }
+}
+
+inline int BitrateMaxKbps(Transcoder::Format format) { return format == Transcoder::Format::Opus ? 510 : 320; }
+
+inline int BitrateDefaultKbps(Transcoder::Format format) { return format == Transcoder::Format::AAC ? 128 : 320; }
+
+inline int ClampKbps(Transcoder::Format format, int kbps) {
+  const int min = BitrateMinKbps(format);
+  const int max = BitrateMaxKbps(format);
+  if (kbps < min) {
+    return min;
+  }
+  if (kbps > max) {
+    return max;
+  }
+  return kbps;
+}
+
+inline const char *BitrateTitle() { return "Bitrate"; }
+
 inline const char *QualityTitle(Transcoder::Format format) {
   switch (format) {
     case Transcoder::Format::FLAC:

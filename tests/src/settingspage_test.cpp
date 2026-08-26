@@ -319,6 +319,19 @@ TEST(TranscoderSettingsPage, TabsMatchQtOrderAndGroups) {
   }
   EXPECT_STREQ("audio/x-vorbis", TranscoderSettingsPage::FormatKeyFor(Transcoder::Format::OggVorbis));
   EXPECT_EQ(8u, TranscoderSettingsPage::DefaultFormatChoices().size());
+  EXPECT_STREQ("Bitrate", TranscoderSettingsPage::BitrateTitle());
+  EXPECT_EQ(6, TranscoderSettingsPage::BitrateMinKbps(Transcoder::Format::Opus));
+  EXPECT_EQ(510, TranscoderSettingsPage::BitrateMaxKbps(Transcoder::Format::Opus));
+  EXPECT_EQ(320, TranscoderSettingsPage::BitrateDefaultKbps(Transcoder::Format::Opus));
+  EXPECT_EQ(0, TranscoderSettingsPage::BitrateMinKbps(Transcoder::Format::ASF));
+  EXPECT_EQ(320, TranscoderSettingsPage::BitrateMaxKbps(Transcoder::Format::ASF));
+  EXPECT_EQ(64, TranscoderSettingsPage::BitrateMinKbps(Transcoder::Format::AAC));
+  EXPECT_EQ(128, TranscoderSettingsPage::BitrateDefaultKbps(Transcoder::Format::AAC));
+  EXPECT_EQ(320, TranscoderSettingsPage::DisplayKbps(320000));
+  EXPECT_EQ(128, TranscoderSettingsPage::DisplayKbps(128));
+  EXPECT_EQ(320000, TranscoderSettingsPage::StoreBps(320));
+  EXPECT_EQ(6, TranscoderSettingsPage::ClampKbps(Transcoder::Format::Opus, 1));
+  EXPECT_EQ(510, TranscoderSettingsPage::ClampKbps(Transcoder::Format::Opus, 999));
 }
 
 TEST(AnalyzerSettings, KeysDefaultsAndTypes) {

@@ -80,7 +80,7 @@ void SyncFromMode(ShortcutRowWidgets *row) {
 
 AdwPreferencesPage *GlobalShortcutsSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(GlobalShortcutsSettings::kSettingsGroup);
-  AdwPreferencesPage *page = SettingsPage::MakePage("Shortcuts", "input-keyboard-symbolic");
+  AdwPreferencesPage *page = SettingsPage::MakePage(GlobalShortcutBinding::PageTitle(), "input-keyboard-symbolic");
   AdwPreferencesGroup *backends = SettingsPage::AddGroup(page, "Backends");
   SettingsPage::AddToggle(backends, settings, "enabled", "Enable global shortcuts", nullptr, true);
   SettingsPage::AddToggle(backends, settings, GlobalShortcutsSettings::kUseKGlobalAccel, GlobalShortcutBinding::UseKGlobalAccel(), nullptr,
@@ -108,7 +108,8 @@ AdwPreferencesPage *GlobalShortcutsSettingsPage::Create(Settings *settings, Appl
     const std::string display = GlobalShortcutBinding::EffectiveKey(mode, stored, def.default_key);
 
     AdwComboRow *combo = ADW_COMBO_ROW(adw_combo_row_new());
-    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(combo), Translations::CStr(def.description));
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(combo),
+                                 Translations::CStr(GlobalShortcutBinding::ShortcutFor(def.description).c_str()));
     GtkStringList *model = gtk_string_list_new(nullptr);
     gtk_string_list_append(model, Translations::CStr(GlobalShortcutBinding::NoneLabel()));
     gtk_string_list_append(model, Translations::CStr(GlobalShortcutBinding::DefaultLabel()));

@@ -153,6 +153,10 @@ TEST(GlobalShortcutBinding, ModesMatchQtNoneDefaultCustom) {
   EXPECT_STREQ("Default", GlobalShortcutBinding::DefaultLabel());
   EXPECT_STREQ("Custom", GlobalShortcutBinding::CustomLabel());
   EXPECT_STREQ("Change shortcut...", GlobalShortcutBinding::ChangeShortcut());
+  EXPECT_STREQ("Global Shortcuts", GlobalShortcutBinding::PageTitle());
+  EXPECT_STREQ("Shortcut", GlobalShortcutBinding::ShortcutColumn());
+  EXPECT_EQ("Shortcut for Play/Pause", GlobalShortcutBinding::ShortcutFor("Play/Pause"));
+  EXPECT_EQ("Shortcut", GlobalShortcutBinding::ShortcutFor(""));
   EXPECT_STREQ("Use KGlobalAccel shortcuts when available", GlobalShortcutBinding::UseKGlobalAccel());
   EXPECT_STREQ("Use X11 shortcuts when available", GlobalShortcutBinding::UseX11());
   EXPECT_EQ(GlobalShortcutBinding::Mode::Default, GlobalShortcutBinding::FromStored("MediaPlay", "MediaPlay"));

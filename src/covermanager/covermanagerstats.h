@@ -9,6 +9,8 @@ inline const char *TotalLabel() { return "Total albums:"; }
 inline const char *WithoutLabel() { return "Without cover:"; }
 inline const char *FetchMissing() { return "Fetch Missing Covers"; }
 inline const char *Export() { return "Export Covers"; }
+inline const char *Load() { return "Load"; }
+inline const char *AddToPlaylist() { return "Add to playlist"; }
 
 inline int WithoutCover(int total, int with_cover) {
   if (total < 0) {

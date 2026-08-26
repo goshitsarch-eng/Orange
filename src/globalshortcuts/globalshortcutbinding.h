@@ -11,6 +11,15 @@ inline const char *NoneLabel() { return "None"; }
 inline const char *DefaultLabel() { return "Default"; }
 inline const char *CustomLabel() { return "Custom"; }
 inline const char *ChangeShortcut() { return "Change shortcut..."; }
+inline const char *PageTitle() { return "Global Shortcuts"; }
+inline const char *ShortcutColumn() { return "Shortcut"; }
+
+inline std::string ShortcutFor(const std::string &action) {
+  if (action.empty()) {
+    return "Shortcut";
+  }
+  return "Shortcut for " + action;
+}
 inline const char *UseKGlobalAccel() { return "Use KGlobalAccel shortcuts when available"; }
 inline const char *UseX11() { return "Use X11 shortcuts when available"; }
 inline const char *X11Warning() {

@@ -35,9 +35,9 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   gtk_widget_set_margin_start(types, 8);
   gtk_widget_set_margin_end(types, 8);
   gtk_widget_set_margin_bottom(types, 4);
-  type_artists_ = gtk_toggle_button_new_with_label("Artists");
-  type_albums_ = gtk_toggle_button_new_with_label("Albums");
-  type_songs_ = gtk_toggle_button_new_with_label("Songs");
+  type_artists_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingSearchHelp::Artists()));
+  type_albums_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingSearchHelp::Albums()));
+  type_songs_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingSearchHelp::Songs()));
   gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(type_albums_), GTK_TOGGLE_BUTTON(type_artists_));
   gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(type_songs_), GTK_TOGGLE_BUTTON(type_artists_));
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(type_songs_), TRUE);
