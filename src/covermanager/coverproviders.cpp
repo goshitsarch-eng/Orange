@@ -75,20 +75,25 @@ class JsonCoverProvider : public CoverProvider {
 }  // namespace
 
 CoverProviders::CoverProviders(NetworkAccessManager *network) : network_(network) {
-  providers_.push_back(std::make_unique<LastFmCoverProvider>());
-  providers_.push_back(std::make_unique<MusicbrainzCoverProvider>());
-  providers_.push_back(std::make_unique<DiscogsCoverProvider>());
-  providers_.push_back(std::make_unique<DeezerCoverProvider>());
-  providers_.push_back(std::make_unique<MusixmatchCoverProvider>());
-  providers_.push_back(std::make_unique<OpenTidalCoverProvider>());
+  auto add = [this](std::unique_ptr<CoverProvider> provider, float quality) {
+    provider->set_quality(quality);
+    provider->set_order(static_cast<int>(providers_.size()));
+    providers_.push_back(std::move(provider));
+  };
+  add(std::make_unique<LastFmCoverProvider>(), 1.0f);
+  add(std::make_unique<MusicbrainzCoverProvider>(), 1.5f);
+  add(std::make_unique<DiscogsCoverProvider>(), 0.0f);
+  add(std::make_unique<DeezerCoverProvider>(), 2.0f);
+  add(std::make_unique<MusixmatchCoverProvider>(), 1.0f);
+  add(std::make_unique<OpenTidalCoverProvider>(), 2.5f);
 #ifdef HAVE_TIDAL
-  providers_.push_back(std::make_unique<TidalCoverProvider>());
+  add(std::make_unique<TidalCoverProvider>(), 2.5f);
 #endif
 #ifdef HAVE_SPOTIFY
-  providers_.push_back(std::make_unique<SpotifyCoverProvider>());
+  add(std::make_unique<SpotifyCoverProvider>(), 2.5f);
 #endif
 #ifdef HAVE_QOBUZ
-  providers_.push_back(std::make_unique<QobuzCoverProvider>());
+  add(std::make_unique<QobuzCoverProvider>(), 2.0f);
 #endif
   ReloadSettings();
 }
@@ -199,39 +204,4 @@ void CoverProviders::FetchFromEmbeddedOrFile(const Song &song, CoverProvider::Ca
     return;
   }
   Fetch(song, callback);
-}
-
-AlbumCoverLoader::AlbumCoverLoader(TagReader *tagreader) : tagreader_(tagreader) {}
-
-std::string AlbumCoverLoader::LoadPath(const Song &song) const {
-  if (!song.art_manual().empty()) return song.art_manual();
-  if (!song.art_automatic().empty()) return song.art_automatic();
-  const std::string dir = FileUtils::DirName(FileUtils::PathFromUri(song.url()));
-  for (const char *name : {"cover.jpg", "cover.png", "folder.jpg", "front.jpg", "album.jpg"}) {
-    const std::string candidate = FileUtils::Join(dir, name);
-    if (FileUtils::Exists(candidate)) {
-      return FileUtils::UriFromPath(candidate);
-    }
-  }
-  return {};
-}
-
-std::vector<unsigned char> AlbumCoverLoader::LoadData(const Song &song) const {
-  if (tagreader_ && song.art_embedded()) {
-    auto cover = tagreader_->LoadCoverData(FileUtils::PathFromUri(song.url()));
-    if (!cover.data.empty()) return cover.data;
-  }
-  const std::string path = FileUtils::PathFromUri(LoadPath(song));
-  if (!path.empty() && FileUtils::Exists(path)) {
-    const std::string data = FileUtils::ReadFile(path);
-    return std::vector<unsigned char>(data.begin(), data.end());
-  }
-  return {};
-}
-
-CurrentAlbumCoverLoader::CurrentAlbumCoverLoader(AlbumCoverLoader *loader) : loader_(loader) {}
-
-void CurrentAlbumCoverLoader::Load(const Song &song) {
-  current_ = loader_ ? loader_->LoadData(song) : std::vector<unsigned char>{};
-  AlbumCoverReady.Emit(song, current_);
 }

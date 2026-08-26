@@ -17,9 +17,15 @@ class CoverProvider {
   virtual std::string name() const = 0;
   virtual bool enabled() const { return enabled_; }
   virtual void set_enabled(bool enabled) { enabled_ = enabled; }
+  virtual float quality() const { return quality_; }
+  virtual void set_quality(float quality) { quality_ = quality; }
+  virtual int order() const { return order_; }
+  virtual void set_order(int order) { order_ = order; }
   virtual void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) = 0;
  protected:
   bool enabled_ = true;
+  float quality_ = 1.0f;
+  int order_ = 0;
 };
 
 class CoverProviders {
@@ -37,26 +43,6 @@ class CoverProviders {
 
   NetworkAccessManager *network_;
   std::vector<std::unique_ptr<CoverProvider>> providers_;
-};
-
-class AlbumCoverLoader {
- public:
-  explicit AlbumCoverLoader(class TagReader *tagreader);
-  std::string LoadPath(const Song &song) const;
-  std::vector<unsigned char> LoadData(const Song &song) const;
- private:
-  class TagReader *tagreader_;
-};
-
-class CurrentAlbumCoverLoader {
- public:
-  explicit CurrentAlbumCoverLoader(AlbumCoverLoader *loader);
-  void Load(const Song &song);
-  const std::vector<unsigned char> &current() const { return current_; }
-  Signal<Song, std::vector<unsigned char>> AlbumCoverReady;
- private:
-  AlbumCoverLoader *loader_;
-  std::vector<unsigned char> current_;
 };
 
 #endif

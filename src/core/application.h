@@ -3,7 +3,9 @@
 
 #include "analyzer/analyzer.h"
 #include "collection/collectionlibrary.h"
+#include "covermanager/albumcoverloader.h"
 #include "covermanager/coverproviders.h"
+#include "covermanager/currentalbumcoverloader.h"
 #include "core/commandlineoptions.h"
 #include "core/database.h"
 #include "core/network.h"

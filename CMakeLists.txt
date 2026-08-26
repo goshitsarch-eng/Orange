@@ -182,6 +182,14 @@ set(STRAWBERRY_SOURCES
   src/smartplaylists/smartplaylist.cpp
   src/filterparser/filterparser.cpp
   src/covermanager/coverproviders.cpp
+  src/covermanager/coversearchstatistics.cpp
+  src/covermanager/albumcoverloaderoptions.cpp
+  src/covermanager/albumcoverloader.cpp
+  src/covermanager/currentalbumcoverloader.cpp
+  src/covermanager/albumcoverfetchersearch.cpp
+  src/covermanager/albumcoverfetcher.cpp
+  src/covermanager/coverexportrunnable.cpp
+  src/covermanager/albumcoverexporter.cpp
   src/covermanager/lastfmcoverprovider.cpp
   src/covermanager/musicbrainzcoverprovider.cpp
   src/covermanager/deezercoverprovider.cpp
@@ -330,6 +338,7 @@ if(GTest_FOUND)
     tests/src/streamtagreader_test.cpp
     tests/src/lastfmcover_test.cpp
     tests/src/coverprovider_test.cpp
+    tests/src/albumcover_test.cpp
     tests/src/scrobbler_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
@@ -371,6 +380,14 @@ if(GTest_FOUND)
     src/radios/somafmservice.cpp
     src/radios/radioparadiseservice.cpp
     src/radios/radiobrowserservice.cpp
+    src/covermanager/coversearchstatistics.cpp
+    src/covermanager/albumcoverloaderoptions.cpp
+    src/covermanager/albumcoverloader.cpp
+    src/covermanager/currentalbumcoverloader.cpp
+    src/covermanager/albumcoverfetchersearch.cpp
+    src/covermanager/albumcoverfetcher.cpp
+    src/covermanager/coverexportrunnable.cpp
+    src/covermanager/albumcoverexporter.cpp
     src/covermanager/lastfmcoverprovider.cpp
     src/covermanager/musicbrainzcoverprovider.cpp
     src/covermanager/deezercoverprovider.cpp
@@ -409,6 +426,7 @@ if(GTest_FOUND)
     PkgConfig::GLIB
     PkgConfig::GOBJECT
     PkgConfig::GIO
+    PkgConfig::GTK4
     PkgConfig::SQLITE
     PkgConfig::JSONGLIB
     PkgConfig::SOUP
