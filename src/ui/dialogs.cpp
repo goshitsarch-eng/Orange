@@ -38,19 +38,58 @@ void Dialogs::AddStream(GtkWindow *parent, const std::function<void(const std::s
 void Dialogs::CoverManager(GtkWindow *parent, Application *app) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, "Cover manager");
-  GtkWidget *status = adw_status_page_new();
-  adw_status_page_set_icon_name(ADW_STATUS_PAGE(status), "image-x-generic-symbolic");
-  adw_status_page_set_title(ADW_STATUS_PAGE(status), "Album covers");
-  adw_status_page_set_description(ADW_STATUS_PAGE(status),
-                                  "Search Last.fm, MusicBrainz, Discogs, Musixmatch, Deezer, Tidal, Qobuz and Spotify for missing artwork.");
-  GtkWidget *button = gtk_button_new_with_label("Fetch cover for current song");
-  g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+  adw_dialog_set_content_width(dialog, 520);
+  adw_dialog_set_content_height(dialog, 560);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_start(box, 12);
+  gtk_widget_set_margin_end(box, 12);
+  gtk_widget_set_margin_top(box, 12);
+  gtk_widget_set_margin_bottom(box, 12);
+  GtkWidget *status = gtk_label_new("Search Last.fm, MusicBrainz, Discogs, Musixmatch, Deezer, Tidal, Qobuz and Spotify for missing artwork.");
+  gtk_label_set_wrap(GTK_LABEL(status), TRUE);
+  gtk_box_append(GTK_BOX(box), status);
+  GtkWidget *scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(scroll, TRUE);
+  GtkWidget *list = gtk_list_box_new();
+  gtk_widget_add_css_class(list, "boxed-list");
+  std::string last;
+  for (const Song &song : app->collection()->Songs()) {
+    const std::string album = song.EffectiveAlbumartist() + " – " + song.album();
+    if (album == last || song.album().empty()) {
+      continue;
+    }
+    last = album;
+    auto *copy = new Song(song);
+    GtkWidget *row = adw_action_row_new();
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), song.album().c_str());
+    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), song.EffectiveAlbumartist().c_str());
+    GtkWidget *button = gtk_button_new_with_label("Fetch");
+    gtk_widget_add_css_class(button, "flat");
+    g_object_set_data_full(G_OBJECT(button), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                       auto *application = static_cast<Application *>(data);
+                       auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(btn), "song"));
+                       if (!song) {
+                         return;
+                       }
+                       application->cover_providers()->Fetch(*song, [btn](const std::string &image, const std::string &error) {
+                         gtk_button_set_label(GTK_BUTTON(btn), image.empty() ? (error.empty() ? "Missing" : "Failed") : "Saved");
+                       });
+                     }),
+                     app);
+    adw_action_row_add_suffix(ADW_ACTION_ROW(row), button);
+    gtk_list_box_append(GTK_LIST_BOX(list), row);
+  }
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list);
+  gtk_box_append(GTK_BOX(box), scroll);
+  GtkWidget *current = gtk_button_new_with_label("Fetch cover for current song");
+  g_signal_connect(current, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *application = static_cast<Application *>(data);
                      application->cover_providers()->Fetch(application->player()->current_song(), [](const std::string &, const std::string &) {});
                    }),
                    app);
-  adw_status_page_set_child(ADW_STATUS_PAGE(status), button);
-  adw_dialog_set_child(dialog, status);
+  gtk_box_append(GTK_BOX(box), current);
+  adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }
 

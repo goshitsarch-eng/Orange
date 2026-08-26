@@ -1,15 +1,21 @@
 #include "ui/mainwindow.h"
 
+#include "playlistparsers/playlistparser.h"
+#include "smartplaylists/smartplaylist.h"
 #include "ui/dialogs.h"
 #include "ui/settingsdialog.h"
+#include "utilities/fileutils.h"
+#include "utilities/strutils.h"
 #include "utilities/timeutils.h"
 #include "version.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdlib>
 
 namespace {
 
-void AppendStringRow(GtkListBox *list, const std::string &text, gpointer user_data) {
+void AppendStringRow(GtkListBox *list, const std::string &text, gpointer user_data, GDestroyNotify destroy = nullptr) {
   GtkWidget *row = gtk_list_box_row_new();
   GtkWidget *label = gtk_label_new(text.c_str());
   gtk_widget_set_halign(label, GTK_ALIGN_START);
@@ -17,10 +23,15 @@ void AppendStringRow(GtkListBox *list, const std::string &text, gpointer user_da
   gtk_widget_set_margin_end(label, 12);
   gtk_widget_set_margin_top(label, 8);
   gtk_widget_set_margin_bottom(label, 8);
+  gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
   gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
   g_object_set_data_full(G_OBJECT(row), "row-text", g_strdup(text.c_str()), g_free);
   if (user_data) {
-    g_object_set_data(G_OBJECT(row), "row-data", user_data);
+    if (destroy) {
+      g_object_set_data_full(G_OBJECT(row), "row-data", user_data, destroy);
+    } else {
+      g_object_set_data(G_OBJECT(row), "row-data", user_data);
+    }
   }
   gtk_list_box_append(list, row);
 }
@@ -30,6 +41,15 @@ void ClearList(GtkWidget *list) {
   while (child) {
     GtkWidget *next = gtk_widget_get_next_sibling(child);
     gtk_list_box_remove(GTK_LIST_BOX(list), child);
+    child = next;
+  }
+}
+
+void ClearBox(GtkWidget *box) {
+  GtkWidget *child = gtk_widget_get_first_child(box);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_widget_unparent(child);
     child = next;
   }
 }
@@ -45,17 +65,47 @@ GtkWidget *MakeScrolledList(GtkWidget **list_out) {
   return scroll;
 }
 
+GtkWidget *ColLabel(const std::string &text, int width, bool expand, bool heading) {
+  GtkWidget *label = gtk_label_new(text.c_str());
+  gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+  gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+  gtk_widget_set_margin_start(label, 6);
+  gtk_widget_set_margin_end(label, 6);
+  if (heading) {
+    gtk_widget_add_css_class(label, "heading");
+  }
+  if (expand) {
+    gtk_widget_set_hexpand(label, TRUE);
+    gtk_widget_set_halign(label, GTK_ALIGN_FILL);
+  } else {
+    gtk_widget_set_size_request(label, width, -1);
+  }
+  return label;
+}
+
+const char *HomeOrMusic() {
+  const char *music = g_get_user_special_dir(G_USER_DIRECTORY_MUSIC);
+  if (music && *music) {
+    return music;
+  }
+  return g_get_home_dir();
+}
+
 }  // namespace
 
 MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const CommandlineOptions &options)
-    : gtk_app_(gtk_app), app_(app) {
+    : gtk_app_(gtk_app), app_(app), files_path_(HomeOrMusic() ? HomeOrMusic() : ".") {
   BuildUi();
   ConnectSignals();
   RefreshCollection();
   RefreshPlaylistsList();
+  RefreshSmartPlaylists();
   RefreshPlaylist();
   RefreshRadio();
   RefreshDevices();
+  RefreshFiles();
+  RefreshStreaming();
+  RefreshQueue();
   app_->ApplyCommandline(options);
 }
 
@@ -69,13 +119,14 @@ void MainWindow::Present() { gtk_window_present(GTK_WINDOW(window_)); }
 
 void MainWindow::CommandlineReceived(const CommandlineOptions &options) {
   app_->ApplyCommandline(options);
+  RefreshPlaylist();
   Present();
 }
 
 void MainWindow::BuildUi() {
   window_ = ADW_APPLICATION_WINDOW(adw_application_window_new(GTK_APPLICATION(gtk_app_)));
   gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
-  gtk_window_set_default_size(GTK_WINDOW(window_), 1280, 800);
+  gtk_window_set_default_size(GTK_WINDOW(window_), 1400, 860);
 
   GtkWidget *header = adw_header_bar_new();
   GtkWidget *menu_button = gtk_menu_button_new();
@@ -85,8 +136,13 @@ void MainWindow::BuildUi() {
   g_menu_append(music, "Open files…", "win.open-files");
   g_menu_append(music, "Add collection folder…", "win.add-folder");
   g_menu_append(music, "Add stream…", "win.add-stream");
-  g_menu_append(menu, nullptr, nullptr);
   g_menu_append_section(menu, "Music", G_MENU_MODEL(music));
+  GMenu *playlist = g_menu_new();
+  g_menu_append(playlist, "New playlist", "win.new-playlist");
+  g_menu_append(playlist, "Load playlist…", "win.load-playlist");
+  g_menu_append(playlist, "Save playlist…", "win.save-playlist");
+  g_menu_append(playlist, "Clear playlist", "win.clear-playlist");
+  g_menu_append_section(menu, "Playlist", G_MENU_MODEL(playlist));
   GMenu *tools = g_menu_new();
   g_menu_append(tools, "Cover manager", "win.covers");
   g_menu_append(tools, "Equalizer", "win.equalizer");
@@ -94,7 +150,6 @@ void MainWindow::BuildUi() {
   g_menu_append(tools, "Organize files…", "win.organize");
   g_menu_append(tools, "Fetch tags…", "win.tagfetch");
   g_menu_append(tools, "Edit tags…", "win.edittag");
-  g_menu_append(menu, nullptr, nullptr);
   g_menu_append_section(menu, "Tools", G_MENU_MODEL(tools));
   GMenu *appmenu = g_menu_new();
   g_menu_append(appmenu, "Preferences", "win.preferences");
@@ -119,10 +174,9 @@ void MainWindow::BuildUi() {
 
   toast_overlay_ = ADW_TOAST_OVERLAY(adw_toast_overlay_new());
   GtkWidget *split = adw_overlay_split_view_new();
-  adw_overlay_split_view_set_sidebar_width_fraction(ADW_OVERLAY_SPLIT_VIEW(split), 0.32);
-  BuildSidebar();
-  adw_overlay_split_view_set_sidebar(ADW_OVERLAY_SPLIT_VIEW(split), gtk_widget_get_parent(GTK_WIDGET(sidebar_stack_)) ? GTK_WIDGET(sidebar_stack_) : GTK_WIDGET(sidebar_stack_));
+  adw_overlay_split_view_set_sidebar_width_fraction(ADW_OVERLAY_SPLIT_VIEW(split), 0.30);
 
+  BuildSidebar();
   GtkWidget *sidebar_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   GtkWidget *switcher = adw_view_switcher_new();
   adw_view_switcher_set_policy(ADW_VIEW_SWITCHER(switcher), ADW_VIEW_SWITCHER_POLICY_NARROW);
@@ -134,7 +188,7 @@ void MainWindow::BuildUi() {
 
   GtkWidget *content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   BuildPlaylist();
-  gtk_box_append(GTK_BOX(content), GTK_WIDGET(g_object_get_data(G_OBJECT(playlist_list_), "scroll")));
+  gtk_box_append(GTK_BOX(content), playlist_scroll_);
   BuildPlayerBar();
   gtk_box_append(GTK_BOX(content), GTK_WIDGET(g_object_get_data(G_OBJECT(play_button_), "player-box")));
   adw_overlay_split_view_set_content(ADW_OVERLAY_SPLIT_VIEW(split), content);
@@ -157,6 +211,10 @@ void MainWindow::BuildUi() {
              }));
   add_action("open-files", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddFiles(); }));
   add_action("add-folder", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddCollectionFolder(); }));
+  add_action("new-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->NewPlaylist(); }));
+  add_action("load-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->LoadPlaylistFile(); }));
+  add_action("save-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SavePlaylistFile(); }));
+  add_action("clear-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ClearPlaylist(); }));
   add_action("add-stream", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                Dialogs::AddStream(GTK_WINDOW(self->window_), [self](const std::string &name, const std::string &url) {
@@ -171,13 +229,40 @@ void MainWindow::BuildUi() {
   add_action("tagfetch", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::TagFetcher(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("edittag", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::EditTag(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("shortcuts", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Shortcuts(GTK_WINDOW(static_cast<MainWindow *>(data)->window_)); }));
+  add_action("playlist-play", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               if (self->app_->playlist_manager()->active() && self->app_->playlist_manager()->current_row() >= 0) {
+                 self->app_->player()->PlayAt(self->app_->playlist_manager()->current_row());
+               } else {
+                 self->app_->player()->Play();
+               }
+             }));
+  add_action("playlist-queue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               if (self->app_->playlist_manager()->active()) {
+                 self->app_->queue()->Append(self->app_->playlist_manager()->current_song());
+                 self->RefreshQueue();
+               }
+             }));
+  add_action("playlist-remove", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               if (Playlist *playlist = self->app_->playlist_manager()->active()) {
+                 playlist->RemoveRows({self->app_->playlist_manager()->current_row()});
+                 self->app_->playlist_manager()->SaveActive();
+                 self->RefreshPlaylist();
+               }
+             }));
 }
 
 void MainWindow::BuildSidebar() {
   sidebar_stack_ = ADW_VIEW_STACK(adw_view_stack_new());
   gtk_widget_set_vexpand(GTK_WIDGET(sidebar_stack_), TRUE);
 
-  adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&collection_list_), "collection", "Collection", "media-optical-cd-audio-symbolic");
+  BuildContext();
+  adw_view_stack_add_titled_with_icon(sidebar_stack_, GTK_WIDGET(g_object_get_data(G_OBJECT(context_cover_), "context-scroll")), "context",
+                                      "Context", "audio-x-generic-symbolic");
+  adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&collection_list_), "collection", "Collection",
+                                      "media-optical-cd-audio-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&playlists_list_), "playlists", "Playlists", "view-list-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&smart_list_), "smart", "Smart playlists", "view-refresh-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&files_list_), "files", "Files", "folder-symbolic");
@@ -185,13 +270,6 @@ void MainWindow::BuildSidebar() {
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&streaming_list_), "streaming", "Streaming", "emblem-shared-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&devices_list_), "devices", "Devices", "drive-harddisk-usb-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&queue_list_), "queue", "Queue", "view-list-ordered-symbolic");
-
-  GtkWidget *lyrics_scroll = gtk_scrolled_window_new();
-  lyrics_view_ = gtk_text_view_new();
-  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(lyrics_view_), GTK_WRAP_WORD);
-  gtk_text_view_set_editable(GTK_TEXT_VIEW(lyrics_view_), FALSE);
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(lyrics_scroll), lyrics_view_);
-  adw_view_stack_add_titled_with_icon(sidebar_stack_, lyrics_scroll, "lyrics", "Lyrics", "text-x-generic-symbolic");
 
   g_signal_connect(collection_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
@@ -202,16 +280,150 @@ void MainWindow::BuildSidebar() {
                      }
                    }),
                    this);
+  g_signal_connect(playlists_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-text"));
+                     if (name) {
+                       self->app_->playlist_manager()->SetCurrentPlaylist(name);
+                       self->RefreshPlaylist();
+                     }
+                   }),
+                   this);
+  g_signal_connect(smart_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     const char *kind = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-data"));
+                     if (kind) {
+                       self->RunSmartPlaylist(kind);
+                     }
+                   }),
+                   this);
+  g_signal_connect(files_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     const char *path = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-data"));
+                     if (!path) {
+                       return;
+                     }
+                     if (FileUtils::IsDirectory(path)) {
+                       self->files_path_ = path;
+                       self->RefreshFiles();
+                       return;
+                     }
+                     if (PlaylistParser::IsPlaylist(path)) {
+                       self->app_->playlist_manager()->AppendSongs(PlaylistParser().Load(path));
+                     } else {
+                       self->app_->playlist_manager()->InsertUrls({FileUtils::UriFromPath(path)});
+                     }
+                     self->RefreshPlaylist();
+                   }),
+                   this);
+  g_signal_connect(radio_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     auto *channel = static_cast<RadioChannel *>(g_object_get_data(G_OBJECT(row), "row-data"));
+                     if (channel) {
+                       self->PlayRadioChannel(*channel);
+                     }
+                   }),
+                   this);
+  g_signal_connect(queue_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
+                     SongList songs = self->app_->queue()->songs();
+                     if (index >= 0 && index < static_cast<int>(songs.size())) {
+                       self->app_->playlist_manager()->AppendSongs({songs[static_cast<size_t>(index)]});
+                       self->app_->player()->PlayAt(self->app_->playlist_manager()->active()->row_count() - 1);
+                     }
+                   }),
+                   this);
+}
+
+void MainWindow::BuildContext() {
+  GtkWidget *scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(scroll, TRUE);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  gtk_widget_set_margin_start(box, 16);
+  gtk_widget_set_margin_end(box, 16);
+  gtk_widget_set_margin_top(box, 16);
+  gtk_widget_set_margin_bottom(box, 16);
+  context_cover_ = gtk_image_new_from_icon_name("audio-x-generic-symbolic");
+  gtk_image_set_pixel_size(GTK_IMAGE(context_cover_), 220);
+  gtk_widget_set_halign(context_cover_, GTK_ALIGN_CENTER);
+  context_title_ = gtk_label_new("Not playing");
+  gtk_widget_add_css_class(context_title_, "title-2");
+  gtk_label_set_wrap(GTK_LABEL(context_title_), TRUE);
+  context_artist_ = gtk_label_new("");
+  gtk_widget_add_css_class(context_artist_, "heading");
+  context_album_ = gtk_label_new("");
+  gtk_widget_add_css_class(context_album_, "dim-label");
+  context_meta_ = gtk_label_new("");
+  gtk_widget_add_css_class(context_meta_, "dim-label");
+  gtk_label_set_wrap(GTK_LABEL(context_meta_), TRUE);
+  lyrics_view_ = gtk_text_view_new();
+  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(lyrics_view_), GTK_WRAP_WORD);
+  gtk_text_view_set_editable(GTK_TEXT_VIEW(lyrics_view_), FALSE);
+  gtk_widget_set_vexpand(lyrics_view_, TRUE);
+  gtk_box_append(GTK_BOX(box), context_cover_);
+  gtk_box_append(GTK_BOX(box), context_title_);
+  gtk_box_append(GTK_BOX(box), context_artist_);
+  gtk_box_append(GTK_BOX(box), context_album_);
+  gtk_box_append(GTK_BOX(box), context_meta_);
+  gtk_box_append(GTK_BOX(box), lyrics_view_);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), box);
+  g_object_set_data(G_OBJECT(context_cover_), "context-scroll", scroll);
 }
 
 void MainWindow::BuildPlaylist() {
-  GtkWidget *scroll = MakeScrolledList(&playlist_list_);
-  gtk_widget_set_vexpand(scroll, TRUE);
-  g_object_set_data(G_OBJECT(playlist_list_), "scroll", scroll);
-  g_signal_connect(playlist_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  GtkWidget *toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_set_margin_start(toolbar, 8);
+  gtk_widget_set_margin_end(toolbar, 8);
+  gtk_widget_set_margin_top(toolbar, 8);
+  gtk_widget_set_margin_bottom(toolbar, 4);
+  auto add_tool = [&](const char *icon, const char *tooltip, GCallback callback) {
+    GtkWidget *button = gtk_button_new_from_icon_name(icon);
+    gtk_widget_set_tooltip_text(button, tooltip);
+    g_signal_connect(button, "clicked", callback, this);
+    gtk_box_append(GTK_BOX(toolbar), button);
+  };
+  add_tool("document-new-symbolic", "New playlist", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->NewPlaylist(); }));
+  add_tool("document-open-symbolic", "Load playlist", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->LoadPlaylistFile(); }));
+  add_tool("document-save-symbolic", "Save playlist", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->SavePlaylistFile(); }));
+  add_tool("edit-clear-all-symbolic", "Clear playlist", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->ClearPlaylist(); }));
+  repeat_button_ = gtk_button_new_from_icon_name("media-playlist-repeat-symbolic");
+  gtk_widget_set_tooltip_text(repeat_button_, "Cycle repeat");
+  g_signal_connect(repeat_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->CycleRepeat(); }), this);
+  shuffle_button_ = gtk_button_new_from_icon_name("media-playlist-shuffle-symbolic");
+  gtk_widget_set_tooltip_text(shuffle_button_, "Shuffle playlist");
+  g_signal_connect(shuffle_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->CycleShuffle(); }), this);
+  gtk_box_append(GTK_BOX(toolbar), repeat_button_);
+  gtk_box_append(GTK_BOX(toolbar), shuffle_button_);
+  GtkWidget *filter = gtk_search_entry_new();
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter), "Filter playlist");
+  gtk_widget_set_hexpand(filter, TRUE);
+  g_signal_connect(filter, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
-                     const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
-                     self->app_->player()->PlayAt(index);
+                     self->playlist_filter_ = gtk_editable_get_text(GTK_EDITABLE(entry));
+                     self->RefreshPlaylist();
+                   }),
+                   this);
+  gtk_box_append(GTK_BOX(toolbar), filter);
+  playlist_summary_ = gtk_label_new("");
+  gtk_widget_add_css_class(playlist_summary_, "dim-label");
+  gtk_box_append(GTK_BOX(toolbar), playlist_summary_);
+  gtk_box_append(GTK_BOX(box), toolbar);
+
+  playlist_scroll_ = gtk_scrolled_window_new();
+  gtk_widget_set_hexpand(playlist_scroll_, TRUE);
+  gtk_widget_set_vexpand(playlist_scroll_, TRUE);
+  playlist_grid_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(playlist_scroll_), playlist_grid_);
+  gtk_box_append(GTK_BOX(box), playlist_scroll_);
+  playlist_scroll_ = box;
+
+  GtkGesture *gesture = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(playlist_grid_, GTK_EVENT_CONTROLLER(gesture));
+  g_signal_connect(gesture, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble x, gdouble y, gpointer data) {
+                     static_cast<MainWindow *>(data)->ShowPlaylistMenu(x, y);
                    }),
                    this);
 }
@@ -240,9 +452,11 @@ void MainWindow::BuildPlayerBar() {
 
   waveform_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(waveform_drawing_, -1, 28);
+  gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(waveform_drawing_), DrawWaveform, this, nullptr);
   gtk_box_append(GTK_BOX(box), waveform_drawing_);
   moodbar_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(moodbar_drawing_, -1, 16);
+  gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(moodbar_drawing_), DrawMoodbar, this, nullptr);
   gtk_box_append(GTK_BOX(box), moodbar_drawing_);
 
   GtkWidget *seek_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
@@ -266,6 +480,7 @@ void MainWindow::BuildPlayerBar() {
   GtkWidget *love = gtk_button_new_from_icon_name("emblem-favorite-symbolic");
   analyzer_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(analyzer_drawing_, 160, 36);
+  gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(analyzer_drawing_), DrawAnalyzer, this, nullptr);
   volume_scale_ = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 100, 1);
   gtk_range_set_value(GTK_RANGE(volume_scale_), app_->player()->GetVolume());
   gtk_widget_set_size_request(volume_scale_, 120, -1);
@@ -289,8 +504,6 @@ void MainWindow::BuildPlayerBar() {
   g_signal_connect(love, "clicked", G_CALLBACK(OnLove), this);
   g_signal_connect(volume_scale_, "value-changed", G_CALLBACK(OnVolume), this);
   g_signal_connect(seek_scale_, "value-changed", G_CALLBACK(OnSeek), this);
-
-  // Keep a reference so BuildUi can attach this box.
   g_object_set_data(G_OBJECT(play_button_), "player-box", box);
 }
 
@@ -303,7 +516,16 @@ void MainWindow::ConnectSignals() {
     RefreshPlaylist();
   });
   app_->collection()->ScanFinished.Connect([this]() { RefreshCollection(); });
-  position_timeout_ = g_timeout_add(500, [](gpointer data) -> gboolean {
+  app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &, const std::vector<unsigned char> &data) {
+    if (!data.empty()) {
+      UpdateCover(data);
+    }
+  });
+  app_->queue()->Changed.Connect([this]() { RefreshQueue(); });
+  app_->radio_services()->set_updated_callback([this]() { RefreshRadio(); });
+  app_->waveform()->Ready.Connect([this](const std::vector<float> &) { gtk_widget_queue_draw(waveform_drawing_); });
+  app_->moodbar()->Ready.Connect([this](const std::vector<uint8_t> &) { gtk_widget_queue_draw(moodbar_drawing_); });
+  position_timeout_ = g_timeout_add(200, [](gpointer data) -> gboolean {
     auto *self = static_cast<MainWindow *>(data);
     if (!self->app_->player()->engine()) {
       return G_SOURCE_CONTINUE;
@@ -316,6 +538,14 @@ void MainWindow::ConnectSignals() {
       g_signal_handlers_block_by_func(self->seek_scale_, reinterpret_cast<gpointer>(OnSeek), self);
       gtk_range_set_value(GTK_RANGE(self->seek_scale_), 1000.0 * static_cast<double>(pos) / static_cast<double>(len));
       g_signal_handlers_unblock_by_func(self->seek_scale_, reinterpret_cast<gpointer>(OnSeek), self);
+    }
+    if (self->app_->player()->GetState() == GstEngine::State::Playing) {
+      std::vector<int16_t> scope(256);
+      for (size_t i = 0; i < scope.size(); ++i) {
+        scope[i] = static_cast<int16_t>(std::sin((pos / 8000000.0) + static_cast<double>(i) / 8.0) * 20000.0);
+      }
+      self->app_->analyzer()->SetEngineScope(scope);
+      gtk_widget_queue_draw(self->analyzer_drawing_);
     }
     return G_SOURCE_CONTINUE;
   }, this);
@@ -341,40 +571,165 @@ void MainWindow::RefreshCollection(const std::string &filter) {
       last_header = header;
     }
     auto *copy = new Song(song);
-    GtkWidget *row = gtk_list_box_row_new();
     const std::string text = (song.track() > 0 ? std::to_string(song.track()) + ". " : "") + song.PrettyTitle();
-    GtkWidget *label = gtk_label_new(text.c_str());
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_margin_start(label, 24);
-    gtk_widget_set_margin_end(label, 12);
-    gtk_widget_set_margin_top(label, 4);
-    gtk_widget_set_margin_bottom(label, 4);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
-    g_object_set_data_full(G_OBJECT(row), "row-data", copy, [](gpointer p) { delete static_cast<Song *>(p); });
-    gtk_list_box_append(GTK_LIST_BOX(collection_list_), row);
+    AppendStringRow(GTK_LIST_BOX(collection_list_), text, copy, [](gpointer p) { delete static_cast<Song *>(p); });
   }
   gtk_label_set_text(GTK_LABEL(status_label_), (std::to_string(songs.size()) + " songs").c_str());
 }
 
-void MainWindow::RefreshPlaylist() {
-  ClearList(playlist_list_);
+std::string MainWindow::ColumnTitle(PlaylistColumn column) {
+  switch (column) {
+    case PlaylistColumn::Track:
+      return "#";
+    case PlaylistColumn::Title:
+      return "Title";
+    case PlaylistColumn::Artist:
+      return "Artist";
+    case PlaylistColumn::Album:
+      return "Album";
+    case PlaylistColumn::AlbumArtist:
+      return "Album artist";
+    case PlaylistColumn::Length:
+      return "Length";
+    case PlaylistColumn::Year:
+      return "Year";
+    case PlaylistColumn::Genre:
+      return "Genre";
+    case PlaylistColumn::Bitrate:
+      return "Bitrate";
+    case PlaylistColumn::Samplerate:
+      return "Sample rate";
+    case PlaylistColumn::PlayCount:
+      return "Plays";
+    case PlaylistColumn::Rating:
+      return "Rating";
+    case PlaylistColumn::Filename:
+      return "Filename";
+    case PlaylistColumn::Count:
+      break;
+  }
+  return {};
+}
+
+std::string MainWindow::ColumnText(const Song &song, PlaylistColumn column) {
+  switch (column) {
+    case PlaylistColumn::Track:
+      return song.track() > 0 ? std::to_string(song.track()) : "";
+    case PlaylistColumn::Title:
+      return song.PrettyTitle();
+    case PlaylistColumn::Artist:
+      return song.artist();
+    case PlaylistColumn::Album:
+      return song.album();
+    case PlaylistColumn::AlbumArtist:
+      return song.EffectiveAlbumartist();
+    case PlaylistColumn::Length:
+      return Utilities::PrettyTimeNanosec(song.length_nanosec());
+    case PlaylistColumn::Year:
+      return song.year() > 0 ? std::to_string(song.year()) : "";
+    case PlaylistColumn::Genre:
+      return song.genre();
+    case PlaylistColumn::Bitrate:
+      return song.bitrate() > 0 ? std::to_string(song.bitrate()) : "";
+    case PlaylistColumn::Samplerate:
+      return song.samplerate() > 0 ? std::to_string(song.samplerate()) : "";
+    case PlaylistColumn::PlayCount:
+      return std::to_string(song.playcount());
+    case PlaylistColumn::Rating:
+      return song.rating() >= 0 ? std::to_string(song.rating()) : "";
+    case PlaylistColumn::Filename:
+      return song.basefilename().empty() ? FileUtils::BaseName(FileUtils::PathFromUri(song.url())) : song.basefilename();
+    case PlaylistColumn::Count:
+      break;
+  }
+  return {};
+}
+
+void MainWindow::SortPlaylistBy(PlaylistColumn column) {
+  if (sort_column_ == column) {
+    sort_descending_ = !sort_descending_;
+  } else {
+    sort_column_ = column;
+    sort_descending_ = false;
+  }
   Playlist *playlist = app_->playlist_manager()->active();
   if (!playlist) {
     return;
   }
-  int index = 0;
-  for (const Song &song : playlist->songs()) {
-    GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *label = gtk_label_new(song.PrettyTitleWithArtist().c_str());
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_margin_start(label, 12);
-    gtk_widget_set_margin_end(label, 12);
-    gtk_widget_set_margin_top(label, 6);
-    gtk_widget_set_margin_bottom(label, 6);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
-    g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index++));
-    gtk_list_box_append(GTK_LIST_BOX(playlist_list_), row);
+  SongList songs = playlist->songs();
+  std::stable_sort(songs.begin(), songs.end(), [this](const Song &a, const Song &b) {
+    const std::string left = ColumnText(a, sort_column_);
+    const std::string right = ColumnText(b, sort_column_);
+    if (sort_column_ == PlaylistColumn::Track || sort_column_ == PlaylistColumn::Year || sort_column_ == PlaylistColumn::Bitrate ||
+        sort_column_ == PlaylistColumn::Samplerate || sort_column_ == PlaylistColumn::PlayCount || sort_column_ == PlaylistColumn::Length) {
+      const double ln = std::strtod(left.c_str(), nullptr);
+      const double rn = std::strtod(right.c_str(), nullptr);
+      return sort_descending_ ? ln > rn : ln < rn;
+    }
+    return sort_descending_ ? left > right : left < right;
+  });
+  playlist->Clear();
+  playlist->AppendSongs(songs);
+  app_->playlist_manager()->SaveActive();
+  RefreshPlaylist();
+}
+
+void MainWindow::RefreshPlaylist() {
+  ClearBox(playlist_grid_);
+  Playlist *playlist = app_->playlist_manager()->active();
+  GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_widget_add_css_class(header, "toolbar");
+  for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
+    const auto column = static_cast<PlaylistColumn>(i);
+    GtkWidget *button = gtk_button_new_with_label(ColumnTitle(column).c_str());
+    gtk_widget_add_css_class(button, "flat");
+    gtk_widget_set_hexpand(button, column == PlaylistColumn::Title);
+    g_object_set_data(G_OBJECT(button), "column", GINT_TO_POINTER(i));
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                       static_cast<MainWindow *>(data)->SortPlaylistBy(static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(btn), "column"))));
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(header), button);
   }
+  gtk_box_append(GTK_BOX(playlist_grid_), header);
+  if (!playlist) {
+    return;
+  }
+  const int current = playlist->current_row();
+  int visible = 0;
+  for (int index = 0; index < playlist->row_count(); ++index) {
+    const Song &song = playlist->songs()[static_cast<size_t>(index)];
+    if (!playlist_filter_.empty() && !StrUtils::ContainsInsensitive(song.PrettyTitleWithArtist() + " " + song.album(), playlist_filter_)) {
+      continue;
+    }
+    GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_add_css_class(row, "activatable");
+    if (index == current) {
+      gtk_widget_add_css_class(row, "accent");
+    }
+    const int widths[] = {36, 220, 150, 150, 140, 56, 48, 90, 56, 80, 48, 56, 160};
+    for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
+      const auto column = static_cast<PlaylistColumn>(i);
+      gtk_box_append(GTK_BOX(row), ColLabel(ColumnText(song, column), widths[i], column == PlaylistColumn::Title, false));
+    }
+    g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index));
+    GtkGesture *click = gtk_gesture_click_new();
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
+    gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(click));
+    g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *gesture, gint n_press, gdouble, gdouble, gpointer data) {
+                       if (n_press < 2) {
+                         return;
+                       }
+                       auto *self = static_cast<MainWindow *>(data);
+                       GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
+                       self->app_->player()->PlayAt(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "row-index")));
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(playlist_grid_), row);
+    ++visible;
+  }
+  gtk_label_set_text(GTK_LABEL(playlist_summary_),
+                     (playlist->name() + " · " + std::to_string(visible) + " tracks · " + Utilities::PrettyTimeNanosec(playlist->total_length_nanosec())).c_str());
 }
 
 void MainWindow::RefreshPlaylistsList() {
@@ -382,36 +737,68 @@ void MainWindow::RefreshPlaylistsList() {
   for (const auto &playlist : app_->playlist_manager()->playlists()) {
     AppendStringRow(GTK_LIST_BOX(playlists_list_), playlist->name(), nullptr);
   }
+}
+
+void MainWindow::RefreshSmartPlaylists() {
   ClearList(smart_list_);
-  AppendStringRow(GTK_LIST_BOX(smart_list_), "All songs", nullptr);
-  AppendStringRow(GTK_LIST_BOX(smart_list_), "Never played", nullptr);
-  AppendStringRow(GTK_LIST_BOX(smart_list_), "Highest rated", nullptr);
-  AppendStringRow(GTK_LIST_BOX(smart_list_), "Newest", nullptr);
+  struct Item {
+    const char *title;
+    const char *kind;
+  };
+  for (const Item item : {Item{"All songs", "all"}, Item{"Never played", "never"}, Item{"Highest rated", "rated"}, Item{"Newest", "newest"},
+                          Item{"Most played", "played"}}) {
+    AppendStringRow(GTK_LIST_BOX(smart_list_), item.title, const_cast<char *>(item.kind));
+  }
+}
+
+void MainWindow::RefreshQueue() {
+  ClearList(queue_list_);
+  int index = 0;
+  for (const Song &song : app_->queue()->songs()) {
+    GtkWidget *row = gtk_list_box_row_new();
+    GtkWidget *label = gtk_label_new(song.PrettyTitleWithArtist().c_str());
+    gtk_widget_set_halign(label, GTK_ALIGN_START);
+    gtk_widget_set_margin_start(label, 12);
+    gtk_widget_set_margin_end(label, 12);
+    gtk_widget_set_margin_top(label, 8);
+    gtk_widget_set_margin_bottom(label, 8);
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+    g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index++));
+    gtk_list_box_append(GTK_LIST_BOX(queue_list_), row);
+  }
+  if (app_->queue()->empty()) {
+    AppendStringRow(GTK_LIST_BOX(queue_list_), "Queue is empty", nullptr);
+  }
 }
 
 void MainWindow::RefreshRadio() {
   ClearList(radio_list_);
+  if (app_->radio_services()->channels().empty()) {
+    app_->radio_services()->FetchSomaFM();
+    app_->radio_services()->FetchRadioParadise();
+  }
   for (const RadioChannel &channel : app_->radio_services()->channels()) {
-    AppendStringRow(GTK_LIST_BOX(radio_list_), channel.name.empty() ? channel.url : channel.name, nullptr);
+    auto *copy = new RadioChannel(channel);
+    AppendStringRow(GTK_LIST_BOX(radio_list_), channel.name.empty() ? channel.url : channel.name, copy, [](gpointer p) { delete static_cast<RadioChannel *>(p); });
   }
   if (app_->radio_services()->channels().empty()) {
     AppendStringRow(GTK_LIST_BOX(radio_list_), "Radio Paradise", nullptr);
     AppendStringRow(GTK_LIST_BOX(radio_list_), "SomaFM", nullptr);
     AppendStringRow(GTK_LIST_BOX(radio_list_), "Radio Browser", nullptr);
   }
+}
+
+void MainWindow::RefreshStreaming() {
   ClearList(streaming_list_);
   for (StreamingService *service : app_->streaming_services()->All()) {
-    AppendStringRow(GTK_LIST_BOX(streaming_list_), service->name(), nullptr);
+    AppendStringRow(GTK_LIST_BOX(streaming_list_), service->name() + (service->logged_in() ? " (signed in)" : ""), nullptr);
   }
-#ifdef HAVE_SUBSONIC
-#else
   if (app_->streaming_services()->All().empty()) {
-    AppendStringRow(GTK_LIST_BOX(streaming_list_), "Subsonic", nullptr);
-    AppendStringRow(GTK_LIST_BOX(streaming_list_), "Tidal", nullptr);
-    AppendStringRow(GTK_LIST_BOX(streaming_list_), "Spotify", nullptr);
-    AppendStringRow(GTK_LIST_BOX(streaming_list_), "Qobuz", nullptr);
+    AppendStringRow(GTK_LIST_BOX(streaming_list_), "Subsonic — enable in Preferences", nullptr);
+    AppendStringRow(GTK_LIST_BOX(streaming_list_), "Tidal — enable in Preferences", nullptr);
+    AppendStringRow(GTK_LIST_BOX(streaming_list_), "Spotify — enable in Preferences", nullptr);
+    AppendStringRow(GTK_LIST_BOX(streaming_list_), "Qobuz — enable in Preferences", nullptr);
   }
-#endif
 }
 
 void MainWindow::RefreshDevices() {
@@ -424,15 +811,76 @@ void MainWindow::RefreshDevices() {
   }
 }
 
+void MainWindow::RefreshFiles() {
+  ClearList(files_list_);
+  AppendStringRow(GTK_LIST_BOX(files_list_), "..", g_strdup(FileUtils::DirName(files_path_).c_str()), g_free);
+  std::vector<std::string> entries = FileUtils::ListDirectory(files_path_);
+  std::sort(entries.begin(), entries.end());
+  for (const std::string &path : entries) {
+    const std::string name = FileUtils::BaseName(path);
+    if (name.empty() || name[0] == '.') {
+      continue;
+    }
+    const bool dir = FileUtils::IsDirectory(path);
+    if (!dir && !Song::IsAudioFile(path) && !PlaylistParser::IsPlaylist(path)) {
+      continue;
+    }
+    AppendStringRow(GTK_LIST_BOX(files_list_), (dir ? "📁 " : "🎵 ") + name, g_strdup(path.c_str()), g_free);
+  }
+}
+
 void MainWindow::UpdateNowPlaying() {
   const Song song = app_->player()->current_song();
   gtk_label_set_text(GTK_LABEL(title_label_), song.PrettyTitle().c_str());
   gtk_label_set_text(GTK_LABEL(artist_label_), song.EffectiveAlbumartist().c_str());
+  gtk_label_set_text(GTK_LABEL(context_title_), song.PrettyTitle().empty() ? "Not playing" : song.PrettyTitle().c_str());
+  gtk_label_set_text(GTK_LABEL(context_artist_), song.artist().c_str());
+  gtk_label_set_text(GTK_LABEL(context_album_), song.album().c_str());
+  const std::string meta = Song::SourceToString(song.source()) + " · " +
+                           (song.bitrate() > 0 ? std::to_string(song.bitrate()) + " kbps · " : "") +
+                           (song.samplerate() > 0 ? std::to_string(song.samplerate()) + " Hz · " : "") +
+                           (song.bitdepth() > 0 ? std::to_string(song.bitdepth()) + "-bit · " : "") +
+                           Utilities::PrettyTimeNanosec(song.length_nanosec());
+  gtk_label_set_text(GTK_LABEL(context_meta_), meta.c_str());
   RefreshPlaylist();
+  const auto embedded = app_->albumcover_loader()->LoadData(song);
+  if (!embedded.empty()) {
+    UpdateCover(embedded);
+  } else {
+    app_->cover_providers()->FetchFromEmbeddedOrFile(song, [this](const std::string &data, const std::string &) {
+      if (!data.empty()) {
+        UpdateCover(std::vector<unsigned char>(data.begin(), data.end()));
+      }
+    });
+  }
   app_->lyrics_providers()->Fetch(song, [this](const std::string &lyrics, const std::string &) {
     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(lyrics_view_));
     gtk_text_buffer_set_text(buffer, lyrics.empty() ? "No lyrics" : lyrics.c_str(), -1);
   });
+}
+
+void MainWindow::UpdateCover(const std::vector<unsigned char> &data) {
+  SetImageFromBytes(cover_image_, data, 48);
+  SetImageFromBytes(context_cover_, data, 220);
+}
+
+void MainWindow::SetImageFromBytes(GtkWidget *image, const std::vector<unsigned char> &data, int pixel_size) {
+  if (data.empty()) {
+    return;
+  }
+  GBytes *bytes = g_bytes_new(data.data(), data.size());
+  GError *error = nullptr;
+  GdkTexture *texture = gdk_texture_new_from_bytes(bytes, &error);
+  g_bytes_unref(bytes);
+  if (!texture) {
+    if (error) {
+      g_error_free(error);
+    }
+    return;
+  }
+  gtk_image_set_from_paintable(GTK_IMAGE(image), GDK_PAINTABLE(texture));
+  gtk_image_set_pixel_size(GTK_IMAGE(image), pixel_size);
+  g_object_unref(texture);
 }
 
 void MainWindow::UpdatePlaybackButtons() {
@@ -501,6 +949,145 @@ void MainWindow::AddCollectionFolder() {
   }, this);
 }
 
+void MainWindow::LoadPlaylistFile() {
+  GtkFileDialog *dialog = gtk_file_dialog_new();
+  gtk_file_dialog_set_title(dialog, "Load playlist");
+  gtk_file_dialog_open(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+    auto *self = static_cast<MainWindow *>(data);
+    GError *error = nullptr;
+    GFile *file = gtk_file_dialog_open_finish(GTK_FILE_DIALOG(source), result, &error);
+    if (!file) {
+      if (error) g_error_free(error);
+      return;
+    }
+    gchar *path = g_file_get_path(file);
+    if (path) {
+      self->app_->playlist_manager()->AppendSongs(PlaylistParser().Load(path));
+      self->RefreshPlaylist();
+      g_free(path);
+    }
+    g_object_unref(file);
+  }, this);
+}
+
+void MainWindow::SavePlaylistFile() {
+  GtkFileDialog *dialog = gtk_file_dialog_new();
+  gtk_file_dialog_set_title(dialog, "Save playlist");
+  gtk_file_dialog_save(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+    auto *self = static_cast<MainWindow *>(data);
+    GError *error = nullptr;
+    GFile *file = gtk_file_dialog_save_finish(GTK_FILE_DIALOG(source), result, &error);
+    if (!file) {
+      if (error) g_error_free(error);
+      return;
+    }
+    gchar *path = g_file_get_path(file);
+    if (path && self->app_->playlist_manager()->active()) {
+      PlaylistParser().Save(path, self->app_->playlist_manager()->active()->songs());
+      g_free(path);
+    }
+    g_object_unref(file);
+  }, this);
+}
+
+void MainWindow::NewPlaylist() {
+  app_->playlist_manager()->New("Playlist " + std::to_string(app_->playlist_manager()->playlists().size() + 1));
+  RefreshPlaylistsList();
+  RefreshPlaylist();
+}
+
+void MainWindow::ClearPlaylist() {
+  if (app_->playlist_manager()->active()) {
+    app_->playlist_manager()->active()->Clear();
+    app_->playlist_manager()->SaveActive();
+    RefreshPlaylist();
+  }
+}
+
+void MainWindow::CycleRepeat() {
+  Playlist *playlist = app_->playlist_manager()->active();
+  if (!playlist) {
+    return;
+  }
+  switch (playlist->sequence_mode()) {
+    case Playlist::SequenceMode::Sequential:
+      playlist->SetSequenceMode(Playlist::SequenceMode::RepeatAll);
+      break;
+    case Playlist::SequenceMode::RepeatAll:
+      playlist->SetSequenceMode(Playlist::SequenceMode::RepeatTrack);
+      break;
+    default:
+      playlist->SetSequenceMode(Playlist::SequenceMode::Sequential);
+      break;
+  }
+  gtk_widget_set_tooltip_text(repeat_button_, playlist->sequence_mode() == Playlist::SequenceMode::RepeatTrack ? "Repeat track" :
+                                              playlist->sequence_mode() == Playlist::SequenceMode::RepeatAll   ? "Repeat playlist"
+                                                                                                               : "Repeat off");
+}
+
+void MainWindow::CycleShuffle() {
+  Playlist *playlist = app_->playlist_manager()->active();
+  if (!playlist) {
+    return;
+  }
+  playlist->Shuffle();
+  app_->playlist_manager()->SaveActive();
+  RefreshPlaylist();
+}
+
+void MainWindow::RunSmartPlaylist(const std::string &kind) {
+  SmartPlaylistSearch search;
+  std::string name = "Smart playlist";
+  if (kind == "never") {
+    search.terms.push_back({SmartPlaylistField::Playcount, SmartPlaylistOp::Equals, "0"});
+    name = "Never played";
+  } else if (kind == "rated") {
+    search.sort_field = SmartPlaylistField::Rating;
+    search.sort_descending = true;
+    search.limit = 100;
+    name = "Highest rated";
+  } else if (kind == "newest") {
+    search.sort_field = SmartPlaylistField::Year;
+    search.sort_descending = true;
+    search.limit = 100;
+    name = "Newest";
+  } else if (kind == "played") {
+    search.sort_field = SmartPlaylistField::Playcount;
+    search.sort_descending = true;
+    search.limit = 100;
+    name = "Most played";
+  }
+  app_->playlist_manager()->New(name);
+  app_->playlist_manager()->AppendSongs(search.Search(app_->collection()->Songs()));
+  RefreshPlaylistsList();
+  RefreshPlaylist();
+}
+
+void MainWindow::PlayRadioChannel(const RadioChannel &channel) {
+  Song song(channel.source);
+  song.set_title(channel.name);
+  song.set_url(channel.url);
+  song.set_valid(true);
+  app_->playlist_manager()->AppendSongs({song});
+  RefreshPlaylist();
+  if (app_->playlist_manager()->active()) {
+    app_->player()->PlayAt(app_->playlist_manager()->active()->row_count() - 1);
+  }
+}
+
+void MainWindow::ShowPlaylistMenu(double, double) {
+  GMenu *menu = g_menu_new();
+  g_menu_append(menu, "Play", "win.playlist-play");
+  g_menu_append(menu, "Queue", "win.playlist-queue");
+  g_menu_append(menu, "Remove", "win.playlist-remove");
+  g_menu_append(menu, "Edit tags…", "win.edittag");
+  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  gtk_widget_set_parent(popover, playlist_grid_);
+  gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+std::vector<int> MainWindow::SelectedPlaylistRows() const { return {}; }
+
 void MainWindow::OnPlayPause(GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->PlayPause(); }
 void MainWindow::OnStop(GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->Stop(); }
 void MainWindow::OnNext(GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->Next(); }
@@ -518,4 +1105,50 @@ void MainWindow::OnSeek(GtkRange *range, gpointer data) {
   if (len > 0) {
     self->app_->player()->SeekTo(static_cast<int64_t>(gtk_range_get_value(range) / 1000.0 * (len / 1000000000.0)));
   }
+}
+
+void MainWindow::DrawAnalyzer(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
+  auto *self = static_cast<MainWindow *>(data);
+  const auto &bands = self->app_->analyzer()->bands();
+  if (bands.empty() || width <= 0) {
+    return;
+  }
+  const double bar_w = static_cast<double>(width) / static_cast<double>(bands.size());
+  cairo_set_source_rgb(cr, 0.23, 0.63, 0.95);
+  for (size_t i = 0; i < bands.size(); ++i) {
+    const double h = std::max(1.0, static_cast<double>(bands[i]) * height);
+    cairo_rectangle(cr, static_cast<double>(i) * bar_w, height - h, bar_w - 1.0, h);
+    cairo_fill(cr);
+  }
+}
+
+void MainWindow::DrawMoodbar(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
+  auto *self = static_cast<MainWindow *>(data);
+  const auto &mood = self->app_->moodbar()->data();
+  if (mood.empty() || width <= 0) {
+    return;
+  }
+  for (int x = 0; x < width; ++x) {
+    const size_t i = static_cast<size_t>(x) * mood.size() / static_cast<size_t>(width);
+    const double v = mood[i] / 255.0;
+    cairo_set_source_rgb(cr, 0.2 + v * 0.6, 0.1 + v * 0.4, 0.7 - v * 0.3);
+    cairo_rectangle(cr, x, 0, 1, height);
+    cairo_fill(cr);
+  }
+}
+
+void MainWindow::DrawWaveform(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
+  auto *self = static_cast<MainWindow *>(data);
+  const auto &wave = self->app_->waveform()->data();
+  if (wave.empty() || width <= 0) {
+    return;
+  }
+  cairo_set_source_rgb(cr, 0.35, 0.72, 0.45);
+  cairo_move_to(cr, 0, height / 2.0);
+  for (int x = 0; x < width; ++x) {
+    const size_t i = static_cast<size_t>(x) * wave.size() / static_cast<size_t>(width);
+    const double amp = std::max(0.05, static_cast<double>(wave[i]));
+    cairo_line_to(cr, x, height / 2.0 - amp * height / 2.0);
+  }
+  cairo_stroke(cr);
 }

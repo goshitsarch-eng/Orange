@@ -26,7 +26,10 @@ class LyricsProviders {
   void ReloadSettings();
   void Fetch(const Song &song, LyricsProvider::Callback callback);
   std::vector<LyricsProvider *> All() const;
+
  private:
+  void FetchFromIndex(const Song &song, size_t index, LyricsProvider::Callback callback);
+
   NetworkAccessManager *network_;
   std::vector<std::unique_ptr<LyricsProvider>> providers_;
 };

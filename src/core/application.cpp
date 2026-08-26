@@ -44,6 +44,7 @@ void Application::Init() {
   collection_->Init();
   playlist_manager_->Init();
   player_->Init();
+  player_->SetQueue(queue_.get());
   device_finders_->Init();
   device_manager_->Init();
   osd_->ReloadSettings();

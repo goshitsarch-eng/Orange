@@ -144,6 +144,7 @@ set(STRAWBERRY_SOURCES
   src/utilities/timeutils.cpp
   src/utilities/fileutils.cpp
   src/utilities/strutils.cpp
+  src/utilities/jsonutils.cpp
   src/engine/gstengine.cpp
   src/engine/devicefinders.cpp
   src/core/player.cpp
@@ -256,6 +257,7 @@ if(GTest_FOUND)
     tests/src/filterparser_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
+    tests/src/jsonutils_test.cpp
     src/core/logging.cpp
     src/core/standardpaths.cpp
     src/core/settings.cpp
@@ -264,6 +266,7 @@ if(GTest_FOUND)
     src/utilities/timeutils.cpp
     src/utilities/fileutils.cpp
     src/utilities/strutils.cpp
+    src/utilities/jsonutils.cpp
     src/playlistparsers/playlistparser.cpp
     src/smartplaylists/smartplaylist.cpp
     src/filterparser/filterparser.cpp
@@ -281,6 +284,7 @@ if(GTest_FOUND)
     PkgConfig::GOBJECT
     PkgConfig::GIO
     PkgConfig::SQLITE
+    PkgConfig::JSONGLIB
     ${TAGLIB_LIBRARIES}
   )
   add_test(NAME strawberry_tests COMMAND strawberry_tests)

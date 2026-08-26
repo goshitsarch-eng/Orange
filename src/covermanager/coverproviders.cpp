@@ -8,6 +8,8 @@
 #include "core/standardpaths.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
+#include "utilities/jsonutils.h"
+#include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
 
@@ -42,7 +44,16 @@ class JsonCoverProvider : public CoverProvider {
         callback({}, response.error.empty() ? "Cover request failed" : response.error);
         return;
       }
-      callback(response.body, {});
+      if (JsonUtils::LooksLikeImage(response.body)) {
+        callback(response.body, {});
+        return;
+      }
+      const std::string image_url = JsonUtils::FindCoverUrl(response.body);
+      if (image_url.empty()) {
+        callback({}, "No cover URL in provider response");
+        return;
+      }
+      callback(image_url, {});
     });
   }
  private:
@@ -117,13 +128,35 @@ void CoverProviders::ReloadSettings() {
 }
 
 void CoverProviders::Fetch(const Song &song, CoverProvider::Callback callback) {
-  for (auto &provider : providers_) {
-    if (provider->enabled()) {
-      provider->Fetch(song, network_, callback);
+  FetchFromIndex(song, 0, std::move(callback));
+}
+
+void CoverProviders::FetchFromIndex(const Song &song, size_t index, CoverProvider::Callback callback) {
+  while (index < providers_.size() && !providers_[index]->enabled()) {
+    ++index;
+  }
+  if (index >= providers_.size()) {
+    callback({}, "No cover providers returned artwork");
+    return;
+  }
+  providers_[index]->Fetch(song, network_, [this, song, index, callback](const std::string &data, const std::string &error) {
+    if (JsonUtils::LooksLikeImage(data)) {
+      callback(data, {});
       return;
     }
-  }
-  callback({}, "No cover providers enabled");
+    if (!data.empty() && (StrUtils::StartsWith(data, "http://") || StrUtils::StartsWith(data, "https://"))) {
+      network_->Get(data, [this, song, index, callback](const NetworkAccessManager::Response &response) {
+        if (response.ok() && JsonUtils::LooksLikeImage(response.body)) {
+          callback(response.body, {});
+          return;
+        }
+        FetchFromIndex(song, index + 1, callback);
+      });
+      return;
+    }
+    (void)error;
+    FetchFromIndex(song, index + 1, callback);
+  });
 }
 
 std::vector<CoverProvider *> CoverProviders::All() const {

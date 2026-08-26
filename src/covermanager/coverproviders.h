@@ -29,7 +29,10 @@ class CoverProviders {
   void Fetch(const Song &song, CoverProvider::Callback callback);
   std::vector<CoverProvider *> All() const;
   void FetchFromEmbeddedOrFile(const Song &song, CoverProvider::Callback callback);
+
  private:
+  void FetchFromIndex(const Song &song, size_t index, CoverProvider::Callback callback);
+
   NetworkAccessManager *network_;
   std::vector<std::unique_ptr<CoverProvider>> providers_;
 };

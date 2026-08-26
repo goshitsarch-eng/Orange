@@ -100,6 +100,7 @@ To build Strawberry from source, you’ll need:
 - [GTK 4](https://www.gtk.org/)
 - [libadwaita](https://gnome.pages.gitlab.gnome.org/libadwaita/)
 - [libsoup 3](https://libsoup.gnome.org/)
+- [json-glib](https://wiki.gnome.org/Projects/JsonGlib)
 - [SQLite 3.9 or higher](https://www.sqlite.org)
 - [ALSA (Linux only)](https://www.alsa-project.org/)
 - [GStreamer](https://gstreamer.freedesktop.org/)

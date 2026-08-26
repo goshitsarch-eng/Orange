@@ -10,6 +10,7 @@
 #include <vector>
 
 class PlaylistManager;
+class Queue;
 class TaskManager;
 class UrlHandlers;
 
@@ -18,6 +19,7 @@ class Player {
   Player(TaskManager *task_manager, UrlHandlers *url_handlers, PlaylistManager *playlist_manager);
 
   void Init();
+  void SetQueue(Queue *queue) { queue_ = queue; }
   GstEngine *engine() const { return engine_.get(); }
   GstEngine::State GetState() const;
   unsigned GetVolume() const { return volume_; }
@@ -58,10 +60,12 @@ class Player {
   void HandleEngineState(GstEngine::State state);
   void HandleTrackEnded();
   void PlayCurrent(bool pause);
+  void PlayLoadedSong(bool pause);
 
   TaskManager *task_manager_;
   UrlHandlers *url_handlers_;
   PlaylistManager *playlist_manager_;
+  Queue *queue_ = nullptr;
   std::unique_ptr<GstEngine> engine_;
   Song current_song_;
   unsigned volume_ = 100;

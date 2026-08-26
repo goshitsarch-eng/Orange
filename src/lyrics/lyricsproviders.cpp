@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include "core/settings.h"
+#include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 #include <memory>
 
@@ -28,7 +29,12 @@ class HttpLyricsProvider : public LyricsProvider {
     replace("{album}", song.album());
     network->Get(url, [callback](const NetworkAccessManager::Response &response) {
       if (!response.ok()) { callback({}, response.error.empty() ? "Lyrics request failed" : response.error); return; }
-      callback(response.body, {});
+      const std::string lyrics = JsonUtils::ExtractLyrics(response.body);
+      if (lyrics.empty()) {
+        callback({}, "No lyrics in provider response");
+        return;
+      }
+      callback(lyrics, {});
     });
   }
  private:
@@ -53,10 +59,25 @@ void LyricsProviders::ReloadSettings() {
 }
 void LyricsProviders::Fetch(const Song &song, LyricsProvider::Callback callback) {
   if (!song.lyrics().empty()) { callback(song.lyrics(), {}); return; }
-  for (auto &p : providers_) {
-    if (p->enabled()) { p->Fetch(song, network_, callback); return; }
+  FetchFromIndex(song, 0, std::move(callback));
+}
+
+void LyricsProviders::FetchFromIndex(const Song &song, size_t index, LyricsProvider::Callback callback) {
+  while (index < providers_.size() && !providers_[index]->enabled()) {
+    ++index;
   }
-  callback({}, "No lyrics providers enabled");
+  if (index >= providers_.size()) {
+    callback({}, "No lyrics providers returned lyrics");
+    return;
+  }
+  providers_[index]->Fetch(song, network_, [this, song, index, callback](const std::string &lyrics, const std::string &error) {
+    if (!lyrics.empty()) {
+      callback(lyrics, {});
+      return;
+    }
+    (void)error;
+    FetchFromIndex(song, index + 1, callback);
+  });
 }
 std::vector<LyricsProvider *> LyricsProviders::All() const {
   std::vector<LyricsProvider *> r; for (const auto &p : providers_) r.push_back(p.get()); return r;

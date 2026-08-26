@@ -2,6 +2,7 @@
 #include "config.h"
 #include "core/settings.h"
 #include "core/logging.h"
+#include "utilities/jsonutils.h"
 
 namespace {
 class GenericStreamingService : public StreamingService {
@@ -26,10 +27,16 @@ class GenericStreamingService : public StreamingService {
     network_->Get(url, [callback](const NetworkAccessManager::Response &response) {
       SongList songs;
       if (response.ok() && !response.body.empty()) {
-        Song song(Song::Source::Stream);
-        song.set_title(response.body.substr(0, 80));
-        song.set_valid(true);
-        songs.push_back(song);
+        songs = JsonUtils::ParseSongs(response.body, Song::Source::Stream);
+        if (songs.empty()) {
+          const std::string title = JsonUtils::FindStringByKeys(response.body, {"title", "name"});
+          if (!title.empty()) {
+            Song song(Song::Source::Stream);
+            song.set_title(title);
+            song.set_valid(true);
+            songs.push_back(song);
+          }
+        }
       }
       callback(songs);
     });

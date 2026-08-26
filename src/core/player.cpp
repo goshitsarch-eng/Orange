@@ -1,9 +1,12 @@
 #include "core/player.h"
 
+#include <algorithm>
+
 #include "core/logging.h"
 #include "core/settings.h"
 #include "core/urlhandlers.h"
 #include "playlist/playlistmanager.h"
+#include "queue/queue.h"
 
 Player::Player(TaskManager *task_manager, UrlHandlers *url_handlers, PlaylistManager *playlist_manager)
     : task_manager_(task_manager), url_handlers_(url_handlers), playlist_manager_(playlist_manager), engine_(std::make_unique<GstEngine>()) {}
@@ -75,6 +78,11 @@ void Player::Stop(bool stop_after) {
 void Player::StopAfterCurrent() { stop_after_current_ = !stop_after_current_; }
 
 void Player::Next() {
+  if (queue_ && !queue_->empty()) {
+    current_song_ = queue_->TakeNext();
+    PlayLoadedSong(false);
+    return;
+  }
   if (!playlist_manager_) {
     return;
   }
@@ -151,6 +159,10 @@ void Player::PlayCurrent(bool pause) {
     return;
   }
   current_song_ = playlist_manager_->current_song();
+  PlayLoadedSong(pause);
+}
+
+void Player::PlayLoadedSong(bool pause) {
   if (!current_song_.is_valid() && current_song_.url().empty()) {
     Stop();
     return;

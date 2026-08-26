@@ -1,6 +1,7 @@
 #include "radios/radioservices.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "utilities/jsonutils.h"
 
 RadioServices::RadioServices(Database *database, NetworkAccessManager *network) : database_(database), network_(network) { Reload(); }
 
@@ -41,15 +42,28 @@ void RadioServices::AddCustomStream(const std::string &name, const std::string &
 void RadioServices::FetchSomaFM() {
   if (!network_) return;
   network_->Get("https://somafm.com/channels.json", [this](const NetworkAccessManager::Response &response) {
-    if (response.ok()) {
+    if (!response.ok()) {
+      return;
+    }
+    const SongList songs = JsonUtils::ParseSongs(response.body, Song::Source::SomaFM);
+    if (songs.empty()) {
       RadioChannel channel;
-      channel.name = "SomaFM";
+      channel.name = "SomaFM Groove Salad";
       channel.url = "https://ice1.somafm.com/groovesalad-128-mp3";
       channel.source = Song::Source::SomaFM;
       channels_.push_back(channel);
       Persist(channel);
-      if (updated_) updated_();
+    } else {
+      for (const Song &song : songs) {
+        RadioChannel channel;
+        channel.name = song.PrettyTitle();
+        channel.url = song.url();
+        channel.source = Song::Source::SomaFM;
+        channels_.push_back(channel);
+        Persist(channel);
+      }
     }
+    if (updated_) updated_();
   });
 }
 void RadioServices::FetchRadioParadise() {
@@ -68,12 +82,24 @@ void RadioServices::FetchRadioBrowser(const std::string &query) {
   g_free(escaped);
   network_->Get(url, [this](const NetworkAccessManager::Response &response) {
     if (!response.ok()) return;
-    RadioChannel channel;
-    channel.name = "Radio Browser result";
-    channel.url = "https://de1.api.radio-browser.info";
-    channel.source = Song::Source::RadioBrowser;
-    channels_.push_back(channel);
-    Persist(channel);
+    const SongList songs = JsonUtils::ParseSongs(response.body, Song::Source::RadioBrowser);
+    if (songs.empty()) {
+      RadioChannel channel;
+      channel.name = "Radio Browser";
+      channel.url = "https://de1.api.radio-browser.info";
+      channel.source = Song::Source::RadioBrowser;
+      channels_.push_back(channel);
+      Persist(channel);
+    } else {
+      for (const Song &song : songs) {
+        RadioChannel channel;
+        channel.name = song.PrettyTitle();
+        channel.url = song.url();
+        channel.source = Song::Source::RadioBrowser;
+        channels_.push_back(channel);
+        Persist(channel);
+      }
+    }
     if (updated_) updated_();
   });
 }
