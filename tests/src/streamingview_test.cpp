@@ -1,5 +1,7 @@
 #include "streaming/streamingcover.h"
+#include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchgroup.h"
+#include "tidal/tidalservice.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "streaming/streamingsearchmodel.h"
 #include "streaming/streamingsearchsortmodel.h"
@@ -8,6 +10,8 @@
 #include "streaming/streamsongmimedata.h"
 
 #include <gtest/gtest.h>
+
+#include <string>
 
 TEST(StreamingSearchModel, FiltersAndSorts) {
   StreamingSearchModel model;
@@ -123,6 +127,58 @@ TEST(StreamingSearchItemDelegate, PrimaryAndSecondary) {
   mime.service_name = "Tidal";
   EXPECT_EQ(1u, mime.songs.size());
   EXPECT_EQ(Song::Source::Tidal, mime.source);
+}
+
+TEST(StreamingProgress, QueryProgressAndStatus) {
+  EXPECT_TRUE(StreamingProgress::HasQuery(" roads "));
+  EXPECT_FALSE(StreamingProgress::HasQuery({}));
+  EXPECT_FALSE(StreamingProgress::HasQuery(" \t"));
+  EXPECT_TRUE(StreamingProgress::ShouldShow(true, "roads"));
+  EXPECT_FALSE(StreamingProgress::ShouldShow(false, "roads"));
+  EXPECT_FALSE(StreamingProgress::ShouldShow(true, "  "));
+  EXPECT_EQ(0, StreamingProgress::GetProgress(0, 0));
+  EXPECT_EQ(0, StreamingProgress::GetProgress(1, 0));
+  EXPECT_EQ(50, StreamingProgress::GetProgress(1, 2));
+  EXPECT_EQ(100, StreamingProgress::GetProgress(2, 2));
+  EXPECT_DOUBLE_EQ(0.0, StreamingProgress::Fraction(0, 100));
+  EXPECT_DOUBLE_EQ(0.0, StreamingProgress::Fraction(10, 0));
+  EXPECT_DOUBLE_EQ(0.5, StreamingProgress::Fraction(50, 100));
+  EXPECT_DOUBLE_EQ(1.0, StreamingProgress::Fraction(100, 100));
+  EXPECT_STREQ("Searching...", StreamingProgress::Searching());
+  EXPECT_STREQ("Receiving artists...", StreamingProgress::ReceivingArtists());
+  EXPECT_STREQ("Receiving albums...", StreamingProgress::ReceivingAlbums());
+  EXPECT_STREQ("Receiving songs...", StreamingProgress::ReceivingSongs());
+  EXPECT_STREQ("Retrieving albums...", StreamingProgress::RetrievingAlbums());
+  EXPECT_EQ("Receiving albums for 1 artist...", StreamingProgress::ReceivingAlbumsForArtists(1));
+  EXPECT_EQ("Receiving albums for 3 artists...", StreamingProgress::ReceivingAlbumsForArtists(3));
+  EXPECT_EQ("Receiving songs for 1 album...", StreamingProgress::ReceivingSongsForAlbums(1));
+  EXPECT_EQ("Receiving songs for 4 albums...", StreamingProgress::ReceivingSongsForAlbums(4));
+  EXPECT_EQ("Receiving album cover for 1 album...", StreamingProgress::ReceivingCovers(1));
+  EXPECT_EQ("Receiving album covers for 2 albums...", StreamingProgress::ReceivingCovers(2));
+  EXPECT_EQ("Retrieving songs for 1 album...", StreamingProgress::RetrievingSongsForAlbums(1));
+  EXPECT_EQ("Retrieving album covers for 2 albums...", StreamingProgress::RetrievingCovers(2));
+}
+
+TEST(StreamingService, StartSearchProgressEmitsSearching) {
+  TidalService service(nullptr);
+  std::string status;
+  int max = 0;
+  int value = -1;
+  int id = 0;
+  service.SearchUpdateStatus.Connect([&](int search_id, const std::string &text) {
+    id = search_id;
+    status = text;
+  });
+  service.SearchProgressSetMaximum.Connect([&](int, int maximum) { max = maximum; });
+  service.SearchUpdateProgress.Connect([&](int, int progress) { value = progress; });
+  EXPECT_EQ(0, service.last_search_id());
+  EXPECT_EQ(1, service.StartSearchProgress());
+  EXPECT_EQ(1, service.last_search_id());
+  EXPECT_EQ(1, id);
+  EXPECT_EQ("Searching...", status);
+  EXPECT_EQ(StreamingProgress::kDefaultMaximum, max);
+  EXPECT_EQ(0, value);
+  EXPECT_EQ(2, service.StartSearchProgress());
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {

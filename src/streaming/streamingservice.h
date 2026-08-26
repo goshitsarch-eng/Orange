@@ -32,15 +32,21 @@ class StreamingService : public UrlHandler {
   virtual bool authenticated() const { return logged_in_; }
   void NotifyAuthenticationChanged();
   void NotifyAuthenticationFailed(const std::string &error);
-
-  Signal<> AuthenticationChanged;
-  Signal<std::string> AuthenticationFailed;
+  int last_search_id() const { return last_search_id_; }
+  int StartSearchProgress();
   virtual void GetFavorites(FavoriteType type, SearchCallback callback);
   virtual void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
   virtual void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
 
+  Signal<> AuthenticationChanged;
+  Signal<std::string> AuthenticationFailed;
+  Signal<int, std::string> SearchUpdateStatus;
+  Signal<int, int> SearchProgressSetMaximum;
+  Signal<int, int> SearchUpdateProgress;
+
  protected:
   bool logged_in_ = false;
+  int last_search_id_ = 0;
 };
 
 #endif

@@ -6,6 +6,7 @@
 #include "dialogs/dialoghelpers.h"
 #include "streaming/streamingcover.h"
 #include "streaming/streamingdrag.h"
+#include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchgroup.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "translations/translations.h"
@@ -102,9 +103,41 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
+  progress_ = gtk_progress_bar_new();
+  gtk_widget_set_margin_start(progress_, 8);
+  gtk_widget_set_margin_end(progress_, 8);
+  gtk_widget_set_visible(progress_, FALSE);
+  status_ = gtk_label_new("");
+  gtk_widget_set_halign(status_, GTK_ALIGN_START);
+  gtk_widget_set_margin_start(status_, 8);
+  gtk_widget_set_margin_end(status_, 8);
+  gtk_widget_set_visible(status_, FALSE);
   gtk_box_append(GTK_BOX(widget_), search_entry_);
   gtk_box_append(GTK_BOX(widget_), types);
+  gtk_box_append(GTK_BOX(widget_), progress_);
+  gtk_box_append(GTK_BOX(widget_), status_);
   gtk_box_append(GTK_BOX(widget_), scroll);
+  if (service_) {
+    const auto alive = alive_;
+    service_->SearchUpdateStatus.Connect([this, alive](int id, const std::string &text) {
+      if (!alive || !*alive || id != last_search_id_) {
+        return;
+      }
+      ApplyStatus(text);
+    });
+    service_->SearchProgressSetMaximum.Connect([this, alive](int id, int maximum) {
+      if (!alive || !*alive || id != last_search_id_ || maximum <= 0) {
+        return;
+      }
+      progress_max_ = maximum;
+    });
+    service_->SearchUpdateProgress.Connect([this, alive](int id, int value) {
+      if (!alive || !*alive || id != last_search_id_) {
+        return;
+      }
+      ApplyProgress(value, progress_max_);
+    });
+  }
   GtkEventController *keys = gtk_event_controller_key_new();
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
@@ -126,8 +159,41 @@ void StreamingSearchView::SetActivateCallback(ActivateCallback callback) { activ
 
 void StreamingSearchView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
+void StreamingSearchView::HideProgress() {
+  if (progress_) {
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), 0);
+    gtk_widget_set_visible(progress_, FALSE);
+  }
+  if (status_) {
+    gtk_label_set_text(GTK_LABEL(status_), "");
+    gtk_widget_set_visible(status_, FALSE);
+  }
+}
+
+void StreamingSearchView::ApplyStatus(const std::string &text) {
+  if (status_) {
+    gtk_label_set_text(GTK_LABEL(status_), text.c_str());
+    gtk_widget_set_visible(status_, TRUE);
+  }
+  if (progress_) {
+    gtk_widget_set_visible(progress_, TRUE);
+  }
+}
+
+void StreamingSearchView::ApplyProgress(int value, int maximum) {
+  if (maximum > 0) {
+    progress_max_ = maximum;
+  }
+  if (progress_) {
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), StreamingProgress::Fraction(value, progress_max_));
+    gtk_widget_set_visible(progress_, TRUE);
+  }
+}
+
 void StreamingSearchView::Search(const std::string &query) {
-  if (!service_ || query.empty()) {
+  if (!service_ || !StreamingProgress::HasQuery(query)) {
+    last_search_id_ = -1;
+    HideProgress();
     return;
   }
   StreamingService::SearchType type = StreamingService::SearchType::Songs;
@@ -138,12 +204,15 @@ void StreamingSearchView::Search(const std::string &query) {
   }
   model_.SetSearchType(type);
   ++cover_gen_;
+  last_search_id_ = service_->last_search_id() + 1;
+  service_->StartSearchProgress();
   const int gen = cover_gen_;
   const auto alive = alive_;
   service_->Search(query, type, [this, alive, gen](const SongList &songs) {
     if (!alive || !*alive || gen != cover_gen_) {
       return;
     }
+    HideProgress();
     model_.SetSongs(songs);
     Rebuild();
   });

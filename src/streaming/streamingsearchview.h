@@ -2,6 +2,7 @@
 #define STRAWBERRY_STREAMINGSEARCHVIEW_H
 
 #include "collection/collectiongrouping.h"
+#include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchgroup.h"
 #include "streaming/streamingsearchmodel.h"
 #include "streaming/streamingsearchsortmodel.h"
@@ -38,6 +39,9 @@ class StreamingSearchView {
   void PersistGrouping();
   void BuildGroupMenu();
   void ApplyGrouping(const CollectionGrouping::Grouping &grouping);
+  void HideProgress();
+  void ApplyStatus(const std::string &text);
+  void ApplyProgress(int value, int maximum);
   gboolean OnKeyPressed(guint keyval);
   void ResetTypeAhead();
 
@@ -54,6 +58,10 @@ class StreamingSearchView {
   GtkWidget *pretty_covers_btn_ = nullptr;
   GtkWidget *group_button_ = nullptr;
   GtkWidget *list_ = nullptr;
+  GtkWidget *progress_ = nullptr;
+  GtkWidget *status_ = nullptr;
+  int last_search_id_ = -1;
+  int progress_max_ = StreamingProgress::kDefaultMaximum;
   CollectionGrouping::Grouping grouping_ = StreamingSearchGroup::DefaultGrouping();
   std::string typeahead_;
   guint typeahead_timeout_ = 0;

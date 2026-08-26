@@ -1,5 +1,7 @@
 #include "streaming/streamingservice.h"
 
+#include "streaming/streamingprogress.h"
+
 void StreamingService::Search(const std::string &query, SearchType type, SearchCallback callback) {
   if (type == SearchType::Songs) {
     Search(query, std::move(callback));
@@ -46,6 +48,14 @@ void StreamingService::Logout() {
 }
 
 void StreamingService::NotifyAuthenticationChanged() { AuthenticationChanged.Emit(); }
+
+int StreamingService::StartSearchProgress() {
+  ++last_search_id_;
+  SearchUpdateStatus.Emit(last_search_id_, StreamingProgress::Searching());
+  SearchProgressSetMaximum.Emit(last_search_id_, StreamingProgress::kDefaultMaximum);
+  SearchUpdateProgress.Emit(last_search_id_, 0);
+  return last_search_id_;
+}
 
 void StreamingService::NotifyAuthenticationFailed(const std::string &error) { AuthenticationFailed.Emit(error); }
 
