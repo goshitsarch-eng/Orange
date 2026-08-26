@@ -240,3 +240,12 @@ TEST(OAuthenticator, BuildAuthorizeUrl) {
   EXPECT_NE(std::string::npos, url.find("client_id=client"));
   EXPECT_NE(std::string::npos, url.find("redirect_uri="));
 }
+
+TEST(OAuthenticator, ClientCredentialsBodyAndToken) {
+  const std::string body = OAuthenticator::ClientCredentialsBody("id", "secret");
+  EXPECT_NE(std::string::npos, body.find("grant_type=client_credentials"));
+  EXPECT_NE(std::string::npos, body.find("client_id=id"));
+  EXPECT_NE(std::string::npos, body.find("client_secret=secret"));
+  EXPECT_EQ("Basic aWQ6c2VjcmV0", OAuthenticator::BasicAuthorizationHeader("id", "secret"));
+  EXPECT_EQ("tok", OAuthenticator::ParseAccessToken(R"json({"access_token":"tok","token_type":"Bearer"})json"));
+}

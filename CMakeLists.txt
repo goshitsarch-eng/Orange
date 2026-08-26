@@ -178,6 +178,7 @@ set(STRAWBERRY_SOURCES
   src/covermanager/deezercoverprovider.cpp
   src/covermanager/discogscoverprovider.cpp
   src/covermanager/musixmatchcoverprovider.cpp
+  src/covermanager/opentidalcoverprovider.cpp
   src/covermanager/tidalcoverprovider.cpp
   src/covermanager/spotifycoverprovider.cpp
   src/covermanager/qobuzcoverprovider.cpp
@@ -342,6 +343,7 @@ if(GTest_FOUND)
     src/covermanager/deezercoverprovider.cpp
     src/covermanager/discogscoverprovider.cpp
     src/covermanager/musixmatchcoverprovider.cpp
+    src/covermanager/opentidalcoverprovider.cpp
     src/covermanager/tidalcoverprovider.cpp
     src/covermanager/spotifycoverprovider.cpp
     src/covermanager/qobuzcoverprovider.cpp

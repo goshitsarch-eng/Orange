@@ -11,6 +11,7 @@
 #include "covermanager/lastfmcoverprovider.h"
 #include "covermanager/musicbrainzcoverprovider.h"
 #include "covermanager/musixmatchcoverprovider.h"
+#include "covermanager/opentidalcoverprovider.h"
 #include "covermanager/qobuzcoverprovider.h"
 #include "covermanager/spotifycoverprovider.h"
 #include "covermanager/tidalcoverprovider.h"
@@ -69,11 +70,6 @@ class JsonCoverProvider : public CoverProvider {
  private:
   std::string name_;
   std::string url_template_;
-};
-
-class OpenTidalCoverProvider : public JsonCoverProvider {
- public:
-  OpenTidalCoverProvider() : JsonCoverProvider("OpenTidal", "https://openapi.tidal.com/v2/searchResults/%7Bquery%7D/relationships/albums") {}
 };
 
 }  // namespace

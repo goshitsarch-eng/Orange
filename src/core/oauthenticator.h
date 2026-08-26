@@ -17,10 +17,14 @@ class OAuthenticator {
 
   void AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback);
   void ExchangeCode(const std::string &token_url, const std::string &client_id, const std::string &client_secret, const std::string &code, Callback callback);
+  void ClientCredentials(const std::string &token_url, const std::string &client_id, const std::string &client_secret, Callback callback);
   std::string redirect_uri() const { return redirect_uri_; }
 
   static std::string BuildAuthorizeUrl(const std::string &authorize_url, const std::string &client_id, const std::string &redirect_uri,
                                        const std::string &scope, const std::string &state = {});
+  static std::string ClientCredentialsBody(const std::string &client_id, const std::string &client_secret);
+  static std::string BasicAuthorizationHeader(const std::string &client_id, const std::string &client_secret);
+  static std::string ParseAccessToken(const std::string &json);
 
  private:
   bool StartRedirectServer();

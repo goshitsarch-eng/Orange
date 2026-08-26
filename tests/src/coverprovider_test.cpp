@@ -2,6 +2,7 @@
 #include "covermanager/discogscoverprovider.h"
 #include "covermanager/musicbrainzcoverprovider.h"
 #include "covermanager/musixmatchcoverprovider.h"
+#include "covermanager/opentidalcoverprovider.h"
 #include "covermanager/qobuzcoverprovider.h"
 #include "covermanager/spotifycoverprovider.h"
 #include "covermanager/tidalcoverprovider.h"
@@ -163,6 +164,73 @@ TEST(SpotifyCoverProvider, ParsesAlbumImagesAtLeast300) {
   ASSERT_EQ(1u, results.size());
   EXPECT_EQ("https://i.scdn.co/large.jpg", results.front().image_url);
   EXPECT_EQ("Portishead", results.front().artist);
+}
+
+TEST(OpenTidalCoverProvider, BuildsSearchAndArtworkUrls) {
+  EXPECT_FALSE(OpenTidalCoverProvider::ClientId().empty());
+  EXPECT_FALSE(OpenTidalCoverProvider::ClientSecret().empty());
+  const std::string url = OpenTidalCoverProvider::SearchUrl("Portishead", "Dummy", {});
+  EXPECT_NE(std::string::npos, url.find("https://openapi.tidal.com/v2/searchResults/"));
+  EXPECT_NE(std::string::npos, url.find("Portishead"));
+  EXPECT_NE(std::string::npos, url.find("Dummy"));
+  EXPECT_NE(std::string::npos, url.find("countryCode=US"));
+  EXPECT_NE(std::string::npos, url.find("limit=6"));
+  EXPECT_NE(std::string::npos, url.find("include=albums"));
+  EXPECT_EQ("https://openapi.tidal.com/v2/albums/123/relationships/coverArt?countryCode=US", OpenTidalCoverProvider::CoverArtUrl("123"));
+  EXPECT_EQ("https://openapi.tidal.com/v2/artworks/art-1?countryCode=US", OpenTidalCoverProvider::ArtworkUrl("art-1"));
+  EXPECT_EQ("Bearer tok", OpenTidalCoverProvider::AuthorizationHeader("tok"));
+}
+
+TEST(OpenTidalCoverProvider, ParsesSearchAlbumsAndCoverArt) {
+  const std::string search = R"json({
+    "included": [
+      {"id": "alb-1", "type": "albums", "attributes": {"title": "Dummy"}},
+      {"id": "trk-1", "type": "tracks", "attributes": {"title": "Roads"}}
+    ]
+  })json";
+  const auto albums = OpenTidalCoverProvider::ParseSearchAlbums(search);
+  ASSERT_EQ(1u, albums.size());
+  EXPECT_EQ("alb-1", albums.front().id);
+  EXPECT_EQ("Dummy", albums.front().title);
+
+  const std::string cover_art = R"json({
+    "data": [
+      {"id": "art-1", "type": "artworks"},
+      {"id": "other", "type": "images"}
+    ]
+  })json";
+  const auto ids = OpenTidalCoverProvider::ParseCoverArtIds(cover_art);
+  ASSERT_EQ(1u, ids.size());
+  EXPECT_EQ("art-1", ids.front());
+}
+
+TEST(OpenTidalCoverProvider, ParsesArtworkFilesAtLeast640) {
+  const std::string json = R"json({
+    "data": {
+      "attributes": {
+        "files": [
+          {"href": "https://resources.tidal.com/small.jpg", "meta": {"width": 320, "height": 320}},
+          {"href": "https://resources.tidal.com/large.jpg", "meta": {"width": 1280, "height": 1280}}
+        ]
+      }
+    }
+  })json";
+  const auto files = OpenTidalCoverProvider::ParseArtworkFiles(json);
+  ASSERT_EQ(1u, files.size());
+  EXPECT_EQ("https://resources.tidal.com/large.jpg", files.front().href);
+  EXPECT_FALSE(OpenTidalCoverProvider::AcceptImage(639, 640));
+  EXPECT_TRUE(OpenTidalCoverProvider::AcceptImage(640, 640));
+}
+
+TEST(OpenTidalCoverProvider, ParsesTokenAndAuthenticationError) {
+  const auto token = OpenTidalCoverProvider::ParseToken(R"json({"access_token":"abc","token_type":"Bearer","expires_in":3600})json");
+  EXPECT_EQ("abc", token.access_token);
+  EXPECT_EQ("Bearer", token.token_type);
+  EXPECT_EQ(3600, token.expires_in);
+  const auto error = OpenTidalCoverProvider::ParseApiError(
+      R"json({"errors":[{"category":"AUTHENTICATION_ERROR","code":"401","detail":"expired"}]})json");
+  EXPECT_TRUE(error.authentication_error);
+  EXPECT_EQ("expired", error.detail);
 }
 
 TEST(QobuzCoverProvider, ParsesAlbumLargeImage) {

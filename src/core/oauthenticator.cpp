@@ -4,6 +4,7 @@
 #include "utilities/strutils.h"
 
 #include <gio/gio.h>
+#include <json-glib/json-glib.h>
 
 #include <cstring>
 
@@ -163,4 +164,56 @@ void OAuthenticator::ExchangeCode(const std::string &token_url, const std::strin
     }
     callback(response.body, {});
   }, "application/x-www-form-urlencoded");
+}
+
+std::string OAuthenticator::ClientCredentialsBody(const std::string &client_id, const std::string &client_secret) {
+  return std::string("grant_type=client_credentials&client_id=") + StrUtils::UriEscape(client_id) +
+         "&client_secret=" + StrUtils::UriEscape(client_secret);
+}
+
+std::string OAuthenticator::BasicAuthorizationHeader(const std::string &client_id, const std::string &client_secret) {
+  const std::string raw = client_id + ":" + client_secret;
+  gchar *encoded = g_base64_encode(reinterpret_cast<const guchar *>(raw.data()), raw.size());
+  std::string header = std::string("Basic ") + (encoded ? encoded : "");
+  g_free(encoded);
+  return header;
+}
+
+std::string OAuthenticator::ParseAccessToken(const std::string &json) {
+  if (json.empty()) {
+    return {};
+  }
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
+    g_object_unref(parser);
+    return {};
+  }
+  JsonNode *root = json_parser_get_root(parser);
+  std::string token;
+  if (root && JSON_NODE_HOLDS_OBJECT(root)) {
+    JsonObject *object = json_node_get_object(root);
+    if (json_object_has_member(object, "access_token") && JSON_NODE_HOLDS_VALUE(json_object_get_member(object, "access_token")) &&
+        json_node_get_value_type(json_object_get_member(object, "access_token")) == G_TYPE_STRING) {
+      const char *value = json_object_get_string_member(object, "access_token");
+      token = value ? value : "";
+    }
+  }
+  g_object_unref(parser);
+  return token;
+}
+
+void OAuthenticator::ClientCredentials(const std::string &token_url, const std::string &client_id, const std::string &client_secret, Callback callback) {
+  if (!network_) {
+    callback({}, "No network");
+    return;
+  }
+  network_->Post(token_url, ClientCredentialsBody(client_id, client_secret),
+                 [callback](const NetworkAccessManager::Response &response) {
+                   if (!response.ok()) {
+                     callback({}, response.error.empty() ? "Client credentials failed" : response.error);
+                     return;
+                   }
+                   callback(response.body, {});
+                 },
+                 "application/x-www-form-urlencoded", {{"Authorization", BasicAuthorizationHeader(client_id, client_secret)}});
 }
