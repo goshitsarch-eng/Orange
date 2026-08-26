@@ -379,6 +379,51 @@ TEST(CoverManagerMenu, UsesCoverChoiceAndPlaylist) {
   EXPECT_EQ(CoverChoiceMenu::Action::Search, CoverChoiceMenu::FromId("search"));
 }
 
+TEST(CoverManagerMenu, VisibleItemsFollowCoverState) {
+  EXPECT_FALSE(CoverManagerMenu::HasAnyProviders(0));
+  EXPECT_TRUE(CoverManagerMenu::HasAnyProviders(2));
+  EXPECT_TRUE(CoverManagerMenu::VisibleCoverItems(CoverManagerMenu::Analyze({})).empty());
+  EXPECT_FALSE(CoverManagerMenu::IncludePlaylistItems(CoverManagerMenu::Analyze({})));
+
+  Song covered;
+  covered.set_valid(true);
+  covered.set_art_embedded(true);
+  const auto with_cover = CoverManagerMenu::VisibleCoverItems(CoverManagerMenu::FromSong(covered));
+  EXPECT_TRUE(CoverManagerMenu::Contains(with_cover, CoverChoiceMenu::Action::Show));
+  EXPECT_TRUE(CoverManagerMenu::Contains(with_cover, CoverChoiceMenu::Action::Save));
+  EXPECT_TRUE(CoverManagerMenu::Contains(with_cover, CoverChoiceMenu::Action::Delete));
+  EXPECT_TRUE(CoverManagerMenu::Contains(with_cover, CoverChoiceMenu::Action::Unset));
+  EXPECT_TRUE(CoverManagerMenu::Contains(with_cover, CoverChoiceMenu::Action::Clear));
+  EXPECT_TRUE(CoverManagerMenu::Contains(with_cover, CoverChoiceMenu::Action::Search));
+  EXPECT_TRUE(CoverManagerMenu::IncludePlaylistItems(CoverManagerMenu::FromSong(covered)));
+
+  Song clear;
+  clear.set_valid(true);
+  EXPECT_TRUE(CoverManagerMenu::IsClear(clear));
+  const auto no_cover = CoverManagerMenu::VisibleCoverItems(CoverManagerMenu::FromSong(clear));
+  EXPECT_FALSE(CoverManagerMenu::Contains(no_cover, CoverChoiceMenu::Action::Show));
+  EXPECT_FALSE(CoverManagerMenu::Contains(no_cover, CoverChoiceMenu::Action::Save));
+  EXPECT_FALSE(CoverManagerMenu::Contains(no_cover, CoverChoiceMenu::Action::Delete));
+  EXPECT_TRUE(CoverManagerMenu::Contains(no_cover, CoverChoiceMenu::Action::Unset));
+  EXPECT_FALSE(CoverManagerMenu::Contains(no_cover, CoverChoiceMenu::Action::Clear));
+  EXPECT_TRUE(CoverManagerMenu::Contains(no_cover, CoverChoiceMenu::Action::File));
+  EXPECT_TRUE(CoverManagerMenu::Contains(no_cover, CoverChoiceMenu::Action::Fetch));
+
+  Song unset;
+  unset.set_valid(true);
+  unset.set_art_unset(true);
+  const auto unset_items = CoverManagerMenu::VisibleCoverItems(CoverManagerMenu::FromSong(unset, false));
+  EXPECT_FALSE(CoverManagerMenu::Contains(unset_items, CoverChoiceMenu::Action::Search));
+  EXPECT_TRUE(CoverManagerMenu::Contains(unset_items, CoverChoiceMenu::Action::Clear));
+  EXPECT_FALSE(CoverManagerMenu::Contains(unset_items, CoverChoiceMenu::Action::Unset));
+
+  Song flagged;
+  flagged.set_valid(true);
+  const auto override_cover = CoverManagerMenu::FromSong(flagged, true, true);
+  EXPECT_TRUE(override_cover.some_with_covers);
+  EXPECT_TRUE(CoverManagerMenu::Contains(CoverManagerMenu::VisibleCoverItems(override_cover), CoverChoiceMenu::Action::Show));
+}
+
 TEST(AlbumCoverSearcher, PrefersRequestedSong) {
   Song requested;
   requested.set_valid(true);

@@ -404,15 +404,20 @@ void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album,
   if (!state || !state->covers) {
     return;
   }
+  const bool has_providers =
+      state->app && state->app->cover_providers() && CoverManagerMenu::HasAnyProviders(state->app->cover_providers()->All().size());
+  const CoverManagerMenu::CoverState cover_state = CoverManagerMenu::FromSong(album.song, has_providers, album.has_cover);
   GMenu *menu = g_menu_new();
-  for (const CoverChoiceMenu::Item &item : CoverManagerMenu::CoverItems()) {
+  for (const CoverChoiceMenu::Item &item : CoverManagerMenu::VisibleCoverItems(cover_state)) {
     g_menu_append(menu, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
   }
-  GMenu *playlist = g_menu_new();
-  for (const CoverManagerMenu::Extra &item : CoverManagerMenu::PlaylistItems()) {
-    g_menu_append(playlist, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
+  if (CoverManagerMenu::IncludePlaylistItems(cover_state)) {
+    GMenu *playlist = g_menu_new();
+    for (const CoverManagerMenu::Extra &item : CoverManagerMenu::PlaylistItems()) {
+      g_menu_append(playlist, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
+    }
+    g_menu_append_section(menu, nullptr, G_MENU_MODEL(playlist));
   }
-  g_menu_append_section(menu, nullptr, G_MENU_MODEL(playlist));
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, image);
   GSimpleActionGroup *group = g_simple_action_group_new();
