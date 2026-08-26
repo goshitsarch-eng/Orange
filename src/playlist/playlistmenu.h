@@ -249,6 +249,10 @@ inline bool PlayEnabled(const SelectionState &state) {
 
 inline bool CopyToDeviceEnabled(const SelectionState &state) { return state.devices_connected; }
 
+inline bool SetColumnOpensDialog() { return false; }
+
+inline std::string ClickedColumnValue(const std::string &value) { return value; }
+
 inline std::string TruncatedValue(const std::string &value) {
   if (value.size() <= 25) {
     return value;

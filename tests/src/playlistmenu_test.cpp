@@ -149,6 +149,8 @@ TEST(PlaylistMenu, RenumberAndSetColumn) {
   EXPECT_TRUE(PlaylistMenu::Contains(title_items, PlaylistMenu::Action::SetColumnValue));
   EXPECT_EQ("Set title to \"A very long title that sh...\"...", PlaylistMenu::LabelFor(PlaylistMenu::Action::SetColumnValue, title));
   EXPECT_EQ("Edit tag \"Title\"...", PlaylistMenu::LabelFor(PlaylistMenu::Action::EditValue, title));
+  EXPECT_FALSE(PlaylistMenu::SetColumnOpensDialog());
+  EXPECT_EQ("Roads", PlaylistMenu::ClickedColumnValue("Roads"));
 }
 
 TEST(PlaylistMenu, CopyToDeviceAndDeletePolicy) {
