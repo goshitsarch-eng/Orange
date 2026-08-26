@@ -57,6 +57,24 @@ int StreamingService::StartSearchProgress() {
   return last_search_id_;
 }
 
+void StreamingService::StartArtistsProgress() {
+  ArtistsUpdateStatus.Emit(StreamingProgress::ReceivingArtists());
+  ArtistsProgressSetMaximum.Emit(StreamingProgress::kDefaultMaximum);
+  ArtistsUpdateProgress.Emit(0);
+}
+
+void StreamingService::StartAlbumsProgress() {
+  AlbumsUpdateStatus.Emit(StreamingProgress::ReceivingAlbums());
+  AlbumsProgressSetMaximum.Emit(StreamingProgress::kDefaultMaximum);
+  AlbumsUpdateProgress.Emit(0);
+}
+
+void StreamingService::StartSongsProgress() {
+  SongsUpdateStatus.Emit(StreamingProgress::ReceivingSongs());
+  SongsProgressSetMaximum.Emit(StreamingProgress::kDefaultMaximum);
+  SongsUpdateProgress.Emit(0);
+}
+
 void StreamingService::NotifyAuthenticationFailed(const std::string &error) { AuthenticationFailed.Emit(error); }
 
 void StreamingService::GetFavorites(FavoriteType, SearchCallback callback) {

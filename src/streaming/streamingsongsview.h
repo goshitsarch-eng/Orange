@@ -14,6 +14,7 @@ class StreamingSongsView {
   using ActivateCallback = std::function<void(const Song &)>;
 
   explicit StreamingSongsView(StreamingService *service);
+  ~StreamingSongsView();
   GtkWidget *widget() const { return container_->widget(); }
   void SetActivateCallback(ActivateCallback callback);
   void Reload();
@@ -21,6 +22,7 @@ class StreamingSongsView {
 
  private:
   StreamingService *service_ = nullptr;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
   std::unique_ptr<StreamingCollectionViewContainer> container_;
 };
 

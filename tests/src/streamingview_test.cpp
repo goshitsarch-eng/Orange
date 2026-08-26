@@ -157,6 +157,9 @@ TEST(StreamingProgress, QueryProgressAndStatus) {
   EXPECT_EQ("Receiving album covers for 2 albums...", StreamingProgress::ReceivingCovers(2));
   EXPECT_EQ("Retrieving songs for 1 album...", StreamingProgress::RetrievingSongsForAlbums(1));
   EXPECT_EQ("Retrieving album covers for 2 albums...", StreamingProgress::RetrievingCovers(2));
+  EXPECT_TRUE(StreamingProgress::ShouldShowBrowse(true, true));
+  EXPECT_FALSE(StreamingProgress::ShouldShowBrowse(false, true));
+  EXPECT_FALSE(StreamingProgress::ShouldShowBrowse(true, false));
 }
 
 TEST(StreamingService, StartSearchProgressEmitsSearching) {
@@ -179,6 +182,29 @@ TEST(StreamingService, StartSearchProgressEmitsSearching) {
   EXPECT_EQ(StreamingProgress::kDefaultMaximum, max);
   EXPECT_EQ(0, value);
   EXPECT_EQ(2, service.StartSearchProgress());
+}
+
+TEST(StreamingService, BrowseProgressEmitsReceiving) {
+  TidalService service(nullptr);
+  EXPECT_TRUE(service.show_progress());
+  std::string artists;
+  std::string albums;
+  std::string songs;
+  int artists_max = 0;
+  int albums_value = -1;
+  service.ArtistsUpdateStatus.Connect([&](const std::string &text) { artists = text; });
+  service.ArtistsProgressSetMaximum.Connect([&](int maximum) { artists_max = maximum; });
+  service.AlbumsUpdateStatus.Connect([&](const std::string &text) { albums = text; });
+  service.AlbumsUpdateProgress.Connect([&](int value) { albums_value = value; });
+  service.SongsUpdateStatus.Connect([&](const std::string &text) { songs = text; });
+  service.StartArtistsProgress();
+  service.StartAlbumsProgress();
+  service.StartSongsProgress();
+  EXPECT_EQ("Receiving artists...", artists);
+  EXPECT_EQ(StreamingProgress::kDefaultMaximum, artists_max);
+  EXPECT_EQ("Receiving albums...", albums);
+  EXPECT_EQ(0, albums_value);
+  EXPECT_EQ("Receiving songs...", songs);
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {

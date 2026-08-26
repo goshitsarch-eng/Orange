@@ -38,8 +38,11 @@ class StreamingTabsView {
   void BrowseArtist(StreamingCollectionView *view, const Song &artist);
   void BrowseAlbum(StreamingCollectionView *view, const Song &album);
 
+  void ConnectBrowseProgress();
+
   StreamingService *service_ = nullptr;
   ActivateCallback activate_;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
   GtkWidget *widget_ = nullptr;
   std::unique_ptr<StreamingCollectionViewContainer> artists_;
   std::unique_ptr<StreamingCollectionViewContainer> albums_;

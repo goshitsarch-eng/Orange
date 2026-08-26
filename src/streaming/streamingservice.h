@@ -30,10 +30,14 @@ class StreamingService : public UrlHandler {
   virtual void ReloadSettings() {}
   virtual bool logged_in() const { return logged_in_; }
   virtual bool authenticated() const { return logged_in_; }
+  virtual bool show_progress() const { return true; }
   void NotifyAuthenticationChanged();
   void NotifyAuthenticationFailed(const std::string &error);
   int last_search_id() const { return last_search_id_; }
   int StartSearchProgress();
+  void StartArtistsProgress();
+  void StartAlbumsProgress();
+  void StartSongsProgress();
   virtual void GetFavorites(FavoriteType type, SearchCallback callback);
   virtual void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
   virtual void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
@@ -43,6 +47,15 @@ class StreamingService : public UrlHandler {
   Signal<int, std::string> SearchUpdateStatus;
   Signal<int, int> SearchProgressSetMaximum;
   Signal<int, int> SearchUpdateProgress;
+  Signal<std::string> ArtistsUpdateStatus;
+  Signal<int> ArtistsProgressSetMaximum;
+  Signal<int> ArtistsUpdateProgress;
+  Signal<std::string> AlbumsUpdateStatus;
+  Signal<int> AlbumsProgressSetMaximum;
+  Signal<int> AlbumsUpdateProgress;
+  Signal<std::string> SongsUpdateStatus;
+  Signal<int> SongsProgressSetMaximum;
+  Signal<int> SongsUpdateProgress;
 
  protected:
   bool logged_in_ = false;

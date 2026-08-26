@@ -11,6 +11,8 @@ inline bool HasQuery(const std::string &query) { return query.find_first_not_of(
 
 inline bool ShouldShow(bool searching, const std::string &query) { return searching && HasQuery(query); }
 
+inline bool ShouldShowBrowse(bool show_progress, bool working) { return show_progress && working; }
+
 inline int GetProgress(int count, int total) {
   if (total <= 0) {
     return 0;
