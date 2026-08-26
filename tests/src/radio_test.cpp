@@ -7,7 +7,9 @@
 #include "radios/radiobrowserservice.h"
 #include "radios/radiochannel.h"
 #include "radios/radiodrag.h"
+#include "radios/radiomenu.h"
 #include "radios/radiomodel.h"
+#include "radios/radiotree.h"
 #include "radios/radioparadiseservice.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/somafmservice.h"
@@ -248,4 +250,87 @@ TEST(RadioBackend, PersistAndRemoveSource) {
   backend.RemoveSource(Song::Source::Stream);
   EXPECT_TRUE(backend.Load().empty());
   unlink(path.c_str());
+}
+
+TEST(RadioMenu, ItemsUrlsAndSelection) {
+  EXPECT_EQ(7, RadioMenu::ItemCount());
+  EXPECT_STREQ("win.radio-append", RadioMenu::WinAction(RadioMenu::Action::Append));
+  EXPECT_STREQ("win.radio-enqueue", RadioMenu::WinAction(RadioMenu::Action::Queue));
+  EXPECT_STREQ("win.radio-homepage", RadioMenu::WinAction(RadioMenu::Action::Homepage));
+  EXPECT_STREQ("win.radio-refresh", RadioMenu::WinAction(RadioMenu::Action::Refresh));
+  EXPECT_EQ(RadioMenu::Action::Homepage, RadioMenu::FromId("homepage"));
+  EXPECT_EQ(RadioMenu::Action::Refresh, RadioMenu::FromId("refresh"));
+  EXPECT_FALSE(RadioMenu::NeedsSelection(RadioMenu::Action::Refresh));
+  EXPECT_TRUE(RadioMenu::NeedsSelection(RadioMenu::Action::Donate));
+
+  const std::vector<RadioMenu::Item> empty = RadioMenu::VisibleItems(false);
+  EXPECT_EQ(1u, empty.size());
+  EXPECT_TRUE(RadioMenu::Contains(empty, RadioMenu::Action::Refresh));
+  EXPECT_FALSE(RadioMenu::Contains(empty, RadioMenu::Action::Append));
+  EXPECT_EQ(7u, RadioMenu::VisibleItems(true).size());
+
+  EXPECT_STREQ("SomaFM", RadioMenu::ServiceName(Song::Source::SomaFM));
+  EXPECT_STREQ("Radio Paradise", RadioMenu::ServiceName(Song::Source::RadioParadise));
+  EXPECT_STREQ("Radio Browser", RadioMenu::ServiceName(Song::Source::RadioBrowser));
+  EXPECT_EQ("https://somafm.com/", RadioMenu::HomepageUrl(Song::Source::SomaFM));
+  EXPECT_EQ("https://somafm.com/support/", RadioMenu::DonateUrl(Song::Source::SomaFM));
+  EXPECT_EQ("https://radioparadise.com/", RadioMenu::HomepageUrl(Song::Source::RadioParadise));
+  EXPECT_EQ("https://payments.radioparadise.com/rp2s-content.php?name=Support&file=support",
+            RadioMenu::DonateUrl(Song::Source::RadioParadise));
+  EXPECT_EQ("https://www.radio-browser.info/", RadioMenu::HomepageUrl(Song::Source::RadioBrowser));
+  EXPECT_TRUE(RadioMenu::HomepageUrl(Song::Source::Stream).empty());
+  EXPECT_TRUE(RadioMenu::DonateUrl(Song::Source::Stream).empty());
+
+  RadioChannel soma;
+  soma.source = Song::Source::SomaFM;
+  RadioChannel soma2;
+  soma2.source = Song::Source::SomaFM;
+  RadioChannel stream;
+  stream.source = Song::Source::Stream;
+  EXPECT_EQ(1u, RadioMenu::UniqueUrls({soma, soma2}, false).size());
+  EXPECT_EQ("https://somafm.com/", RadioMenu::UniqueUrls({soma, soma2}, false).front());
+  EXPECT_TRUE(RadioMenu::UniqueUrls({stream}, false).empty());
+}
+
+TEST(RadioTree, GroupsCollapsesAndServiceLabels) {
+  RadioChannel soma;
+  soma.source = Song::Source::SomaFM;
+  soma.name = "Groove Salad";
+  RadioChannel paradise;
+  paradise.source = Song::Source::RadioParadise;
+  paradise.name = "Main Mix";
+  RadioChannel browser;
+  browser.source = Song::Source::RadioBrowser;
+  browser.name = "Station";
+
+  const std::vector<RadioTree::Row> rows = RadioTree::VisibleRows({soma, paradise, browser}, {});
+  ASSERT_EQ(6u, rows.size());
+  EXPECT_EQ(RadioTree::Kind::Service, rows[0].kind);
+  EXPECT_EQ(Song::Source::SomaFM, rows[0].source);
+  EXPECT_EQ(1, rows[0].child_count);
+  EXPECT_EQ(RadioTree::Kind::Channel, rows[1].kind);
+  EXPECT_EQ("Groove Salad", rows[1].channel.name);
+  EXPECT_TRUE(RadioTree::ActivateExpands(RadioTree::Kind::Service));
+  EXPECT_FALSE(RadioTree::ActivatePlays(RadioTree::Kind::Service));
+  EXPECT_TRUE(RadioTree::ActivatePlays(RadioTree::Kind::Channel));
+  EXPECT_EQ("▼ SomaFM (1)", RadioTree::ServiceLabel(Song::Source::SomaFM, 1, true));
+  EXPECT_EQ("▶ SomaFM (1)", RadioTree::ServiceLabel(Song::Source::SomaFM, 1, false));
+
+  std::set<Song::Source> collapsed;
+  EXPECT_FALSE(RadioTree::Toggle(&collapsed, Song::Source::SomaFM));
+  EXPECT_FALSE(RadioTree::ShowChildren(Song::Source::SomaFM, collapsed));
+  const std::vector<RadioTree::Row> hidden = RadioTree::VisibleRows({soma, paradise}, collapsed);
+  ASSERT_EQ(3u, hidden.size());
+  EXPECT_EQ(RadioTree::Kind::Service, hidden[0].kind);
+  EXPECT_EQ(Song::Source::SomaFM, hidden[0].source);
+  EXPECT_EQ(RadioTree::Kind::Service, hidden[1].kind);
+  EXPECT_EQ(Song::Source::RadioParadise, hidden[1].source);
+
+  RadioModel model;
+  model.SetChannels({soma, paradise});
+  EXPECT_EQ(4u, model.Rows().size());
+  EXPECT_TRUE(model.Expanded(Song::Source::SomaFM));
+  model.Toggle(Song::Source::SomaFM);
+  EXPECT_FALSE(model.Expanded(Song::Source::SomaFM));
+  EXPECT_EQ(3u, model.Rows().size());
 }

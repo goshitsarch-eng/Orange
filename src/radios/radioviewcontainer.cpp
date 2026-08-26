@@ -22,14 +22,10 @@ RadioViewContainer::RadioViewContainer(RadioServices *services) : services_(serv
   gtk_box_append(GTK_BOX(channels), toolbar);
   gtk_box_append(GTK_BOX(channels), view_->widget());
   g_signal_connect(refresh, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *self = static_cast<RadioViewContainer *>(data);
-                     if (!self->services_) {
-                       return;
-                     }
-                     self->services_->FetchSomaFM();
-                     self->services_->FetchRadioParadise();
+                     static_cast<RadioViewContainer *>(data)->RefreshChannels();
                    }),
                    this);
+  view_->SetRefreshCallback([this]() { RefreshChannels(); });
 
   GtkWidget *stack = gtk_stack_new();
   gtk_widget_set_vexpand(stack, TRUE);
@@ -49,11 +45,18 @@ void RadioViewContainer::Reload() {
     return;
   }
   if (services_->channels().empty()) {
-    services_->FetchSomaFM();
-    services_->FetchRadioParadise();
+    RefreshChannels();
   }
   model_.SetChannels(services_->channels());
   view_->Reload(&model_);
+}
+
+void RadioViewContainer::RefreshChannels() {
+  if (!services_) {
+    return;
+  }
+  services_->FetchSomaFM();
+  services_->FetchRadioParadise();
 }
 
 void RadioViewContainer::Search(const std::string &) {}

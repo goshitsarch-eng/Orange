@@ -1,6 +1,7 @@
 #include "radios/radioview.h"
 
 #include "radios/radiodrag.h"
+#include "radios/radiotree.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 
@@ -13,8 +14,16 @@ RadioView::RadioView() {
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<RadioView *>(data);
+                     const RadioTree::Kind kind =
+                         static_cast<RadioTree::Kind>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-kind")) - 1);
+                     if (RadioTree::ActivateExpands(kind) && self->model_) {
+                       const auto source = static_cast<Song::Source>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-source")));
+                       self->model_->Toggle(source);
+                       self->Reload(self->model_);
+                       return;
+                     }
                      auto *channel = static_cast<RadioChannel *>(g_object_get_data(G_OBJECT(row), "channel"));
-                     if (channel && self->activate_) {
+                     if (channel && self->activate_ && RadioTree::ActivatePlays(kind)) {
                        self->activate_(*channel);
                      }
                    }),
@@ -49,6 +58,7 @@ RadioView::RadioView() {
 RadioView::~RadioView() { ResetTypeAhead(); }
 
 void RadioView::Reload(RadioModel *model) {
+  model_ = model;
   GtkWidget *child = gtk_widget_get_first_child(list_);
   while (child) {
     GtkWidget *next = gtk_widget_get_next_sibling(child);
@@ -58,18 +68,33 @@ void RadioView::Reload(RadioModel *model) {
   if (!model) {
     return;
   }
-  for (const RadioChannel &channel : model->visible()) {
+  for (const RadioTree::Row &entry : model->Rows()) {
     GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *label = gtk_label_new(model->Label(channel).c_str());
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_margin_start(label, 12);
-    gtk_widget_set_margin_end(label, 12);
-    gtk_widget_set_margin_top(label, 8);
-    gtk_widget_set_margin_bottom(label, 8);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
-    auto *copy = new RadioChannel(channel);
-    g_object_set_data_full(G_OBJECT(row), "channel", copy, [](gpointer p) { delete static_cast<RadioChannel *>(p); });
-    SetupRowDrag(row, channel);
+    g_object_set_data(G_OBJECT(row), "row-kind", GINT_TO_POINTER(static_cast<int>(entry.kind) + 1));
+    g_object_set_data(G_OBJECT(row), "row-source", GINT_TO_POINTER(static_cast<int>(entry.source)));
+    if (entry.kind == RadioTree::Kind::Service) {
+      GtkWidget *label = gtk_label_new(RadioTree::ServiceLabel(entry.source, entry.child_count, model->Expanded(entry.source)).c_str());
+      gtk_widget_add_css_class(label, "heading");
+      gtk_widget_set_halign(label, GTK_ALIGN_START);
+      gtk_widget_set_margin_start(label, 12);
+      gtk_widget_set_margin_end(label, 12);
+      gtk_widget_set_margin_top(label, 8);
+      gtk_widget_set_margin_bottom(label, 8);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+      auto *children = new std::vector<RadioChannel>(RadioTree::ChannelsForSource(model->visible(), entry.source));
+      g_object_set_data_full(G_OBJECT(row), "channels", children, [](gpointer p) { delete static_cast<std::vector<RadioChannel> *>(p); });
+    } else {
+      GtkWidget *label = gtk_label_new(model->Label(entry.channel).c_str());
+      gtk_widget_set_halign(label, GTK_ALIGN_START);
+      gtk_widget_set_margin_start(label, 28);
+      gtk_widget_set_margin_end(label, 12);
+      gtk_widget_set_margin_top(label, 8);
+      gtk_widget_set_margin_bottom(label, 8);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+      auto *copy = new RadioChannel(entry.channel);
+      g_object_set_data_full(G_OBJECT(row), "channel", copy, [](gpointer p) { delete static_cast<RadioChannel *>(p); });
+      SetupRowDrag(row, entry.channel);
+    }
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
 }
@@ -109,8 +134,13 @@ std::vector<RadioChannel> RadioView::SelectedChannels() const {
   gtk_list_box_selected_foreach(
       GTK_LIST_BOX(list_),
       [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto *out = static_cast<std::vector<RadioChannel> *>(data);
         if (auto *channel = static_cast<RadioChannel *>(g_object_get_data(G_OBJECT(row), "channel"))) {
-          static_cast<std::vector<RadioChannel> *>(data)->push_back(*channel);
+          out->push_back(*channel);
+          return;
+        }
+        if (auto *group = static_cast<std::vector<RadioChannel> *>(g_object_get_data(G_OBJECT(row), "channels"))) {
+          out->insert(out->end(), group->begin(), group->end());
         }
       },
       &channels);
@@ -128,6 +158,10 @@ void RadioView::ResetTypeAhead() {
 }
 
 gboolean RadioView::OnKeyPressed(guint keyval) {
+  if (keyval == GDK_KEY_F5 && refresh_) {
+    refresh_();
+    return TRUE;
+  }
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
   if (action == ListBoxKeyboard::Action::Activate) {
     ListBoxKeyboardGtk::ActivateSelected(list_);

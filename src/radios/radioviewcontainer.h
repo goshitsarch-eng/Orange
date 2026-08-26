@@ -21,6 +21,7 @@ class RadioViewContainer {
   RadioView *view() { return view_.get(); }
   RadioBrowserSearchView *search_view() { return search_view_.get(); }
   void Reload();
+  void RefreshChannels();
   void Search(const std::string &query);
   void SetActivateCallback(std::function<void(const RadioChannel &)> callback);
   void SetMenuCallback(RadioView::MenuCallback callback);

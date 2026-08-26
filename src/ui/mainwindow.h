@@ -198,6 +198,7 @@ class MainWindow {
   std::string streaming_service_name_;
   SongList streaming_menu_songs_;
   SongList radio_menu_songs_;
+  std::vector<RadioChannel> radio_menu_channels_;
   std::string playlist_list_menu_name_;
   std::string playlist_list_menu_folder_;
   std::string radio_query_;

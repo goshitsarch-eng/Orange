@@ -13,6 +13,7 @@
 class RadioView {
  public:
   using MenuCallback = std::function<void(const std::vector<RadioChannel> &)>;
+  using RefreshCallback = std::function<void()>;
 
   RadioView();
   ~RadioView();
@@ -22,6 +23,7 @@ class RadioView {
   void Reload(RadioModel *model);
   void SetActivateCallback(std::function<void(const RadioChannel &)> callback) { activate_ = std::move(callback); }
   void SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+  void SetRefreshCallback(RefreshCallback callback) { refresh_ = std::move(callback); }
   std::vector<RadioChannel> SelectedChannels() const;
   SongList SelectedSongs() const;
 
@@ -32,8 +34,10 @@ class RadioView {
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
+  RadioModel *model_ = nullptr;
   std::function<void(const RadioChannel &)> activate_;
   MenuCallback menu_;
+  RefreshCallback refresh_;
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
 };

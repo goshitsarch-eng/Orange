@@ -19,6 +19,7 @@
 #include "playlist/playlistfolders.h"
 #include "playlist/playlistlistdrop.h"
 #include "radios/radiodrag.h"
+#include "radios/radiomenu.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/radioviewcontainer.h"
 #include "smartplaylists/smartplaylistsview.h"
@@ -542,6 +543,24 @@ void MainWindow::BuildUi() {
   add_action("radio-enqueue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                self->ApplyCollectionPlan(CollectionBehaviour::Enqueue(), self->radio_menu_songs_);
+             }));
+  add_action("radio-homepage", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               for (const std::string &url : RadioMenu::UniqueUrls(self->radio_menu_channels_, false)) {
+                 g_app_info_launch_default_for_uri(url.c_str(), nullptr, nullptr);
+               }
+             }));
+  add_action("radio-donate", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               for (const std::string &url : RadioMenu::UniqueUrls(self->radio_menu_channels_, true)) {
+                 g_app_info_launch_default_for_uri(url.c_str(), nullptr, nullptr);
+               }
+             }));
+  add_action("radio-refresh", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               if (self->radio_container_) {
+                 self->radio_container_->RefreshChannels();
+               }
              }));
   add_action("playlist-list-open", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
@@ -2443,15 +2462,12 @@ void MainWindow::StreamingAddToList(StreamingCollectionStore::List list) {
 }
 
 void MainWindow::ShowRadioMenu(const std::vector<RadioChannel> &channels) {
+  radio_menu_channels_ = channels;
   radio_menu_songs_ = RadioDrag::Songs(channels);
-  if (radio_menu_songs_.empty()) {
-    return;
-  }
   GMenu *menu = g_menu_new();
-  g_menu_append(menu, Translations::Tr("Append to current playlist").c_str(), "win.radio-append");
-  g_menu_append(menu, Translations::Tr("Replace current playlist").c_str(), "win.radio-replace");
-  g_menu_append(menu, Translations::Tr("Open in new playlist").c_str(), "win.radio-new");
-  g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.radio-enqueue");
+  for (const RadioMenu::Item &item : RadioMenu::VisibleItems(!channels.empty())) {
+    g_menu_append(menu, Translations::Tr(item.label).c_str(), RadioMenu::WinAction(item.action));
+  }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   GtkWidget *parent = radio_container_ && radio_container_->view() ? radio_container_->view()->list() : GTK_WIDGET(window_);
   gtk_widget_set_parent(popover, parent);
