@@ -42,8 +42,13 @@ AdwPreferencesPage *PlaylistSettingsPage::Create(Settings *settings, Application
   SettingsPage::AddToggle(meta, settings, PlaylistSettings::kStretchColumns, "Stretch columns", nullptr,
                           PlaylistSettings::kDefaultStretchColumns);
   SettingsPage::AddToggle(meta, settings, PlaylistSettings::kRatingLocked, "Lock rating column", nullptr, PlaylistSettings::kDefaultRatingLocked);
-  SettingsPage::AddButtonRow(meta, Translations::CStr("Visible columns"), Translations::CStr("Configure…"), []() {
-    Dialogs::PlaylistColumns(nullptr, {});
+  SettingsPage::AddButtonRow(meta, Translations::CStr("Visible columns"), Translations::CStr("Configure…"), [](GtkWidget *button) {
+    GtkWindow *parent = nullptr;
+    GtkRoot *root = button ? gtk_widget_get_root(button) : nullptr;
+    if (GTK_IS_WINDOW(root)) {
+      parent = GTK_WINDOW(root);
+    }
+    Dialogs::PlaylistColumns(parent, {});
   });
   return page;
 }

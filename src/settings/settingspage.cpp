@@ -261,15 +261,24 @@ void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char 
 }
 
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked) {
+  AddButtonRow(group, title, button_label, [clicked](GtkWidget *) {
+    if (clicked) {
+      clicked();
+    }
+  });
+}
+
+void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
+                  const std::function<void(GtkWidget *button)> &clicked) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   GtkWidget *button = gtk_button_new_with_label(Translations::CStr(button_label));
-  auto *fn = new std::function<void()>(clicked);
-  g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     (*static_cast<std::function<void()> *>(data))();
+  auto *fn = new std::function<void(GtkWidget *)>(clicked);
+  g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                     (*static_cast<std::function<void(GtkWidget *)> *>(data))(GTK_WIDGET(btn));
                    }),
                    fn);
-  g_object_set_data_full(G_OBJECT(button), "clicked-fn", fn, +[](gpointer data) { delete static_cast<std::function<void()> *>(data); });
+  g_object_set_data_full(G_OBJECT(button), "clicked-fn", fn, +[](gpointer data) { delete static_cast<std::function<void(GtkWidget *)> *>(data); });
   adw_action_row_add_suffix(row, button);
   adw_preferences_group_add(group, GTK_WIDGET(row));
 }

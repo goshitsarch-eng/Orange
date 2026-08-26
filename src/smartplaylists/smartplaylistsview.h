@@ -13,6 +13,7 @@ enum class SmartPlaylistsAction { Activate, Append, Replace, OpenInNew, Queue, Q
 class SmartPlaylistsView {
  public:
   SmartPlaylistsView();
+  ~SmartPlaylistsView();
 
   using SongsCallback = std::function<SongList(const SmartPlaylistsItem &)>;
 
@@ -32,6 +33,8 @@ class SmartPlaylistsView {
   void Emit(const SmartPlaylistsItem &item, SmartPlaylistsAction action);
   void ShowMenu(GtkWidget *relative, const SmartPlaylistsItem *item);
   void SetupRowDrag(GtkWidget *row, const SmartPlaylistsItem &item);
+  gboolean OnKeyPressed(guint keyval);
+  void ResetTypeAhead();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
@@ -39,6 +42,8 @@ class SmartPlaylistsView {
   std::function<void(const SmartPlaylistsItem &)> delete_;
   std::function<void(const SmartPlaylistsItem &, SmartPlaylistsAction)> action_;
   SongsCallback songs_;
+  std::string typeahead_;
+  guint typeahead_timeout_ = 0;
 };
 
 #endif

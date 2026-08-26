@@ -2,6 +2,8 @@
 
 #include "smartplaylists/smartplaylistdrag.h"
 #include "translations/translations.h"
+#include "widgets/listboxkeyboard.h"
+#include "widgets/listboxkeyboardgtk.h"
 
 SmartPlaylistsView::SmartPlaylistsView() {
   widget_ = gtk_scrolled_window_new();
@@ -34,6 +36,68 @@ SmartPlaylistsView::SmartPlaylistsView() {
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(list_, keys);
+  gtk_widget_set_focusable(list_, TRUE);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<SmartPlaylistsView *>(data)->OnKeyPressed(keyval);
+                   })),
+                   this);
+}
+
+SmartPlaylistsView::~SmartPlaylistsView() { ResetTypeAhead(); }
+
+void SmartPlaylistsView::ResetTypeAhead() {
+  typeahead_.clear();
+  if (typeahead_timeout_) {
+    g_source_remove(typeahead_timeout_);
+    typeahead_timeout_ = 0;
+  }
+}
+
+gboolean SmartPlaylistsView::OnKeyPressed(guint keyval) {
+  const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
+  if (action == ListBoxKeyboard::Action::Activate) {
+    ListBoxKeyboardGtk::ActivateSelected(list_);
+    return TRUE;
+  }
+  if (action == ListBoxKeyboard::Action::Delete) {
+    if (const SmartPlaylistsItem *item = SelectedItem()) {
+      Emit(*item, SmartPlaylistsAction::Delete);
+    }
+    return TRUE;
+  }
+  if (action == ListBoxKeyboard::Action::MoveUp || action == ListBoxKeyboard::Action::MoveDown || action == ListBoxKeyboard::Action::Home ||
+      action == ListBoxKeyboard::Action::End) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), action));
+    return TRUE;
+  }
+  if (action == ListBoxKeyboard::Action::Escape) {
+    ResetTypeAhead();
+    return TRUE;
+  }
+  const gunichar ch = gdk_keyval_to_unicode(keyval);
+  if (ch && g_unichar_isprint(ch)) {
+    gchar utf8[8] = {};
+    typeahead_.append(utf8, static_cast<size_t>(g_unichar_to_utf8(ch, utf8)));
+    if (typeahead_timeout_) {
+      g_source_remove(typeahead_timeout_);
+    }
+    typeahead_timeout_ = g_timeout_add(1000, [](gpointer data) -> gboolean {
+      auto *self = static_cast<SmartPlaylistsView *>(data);
+      self->typeahead_timeout_ = 0;
+      self->typeahead_.clear();
+      return G_SOURCE_REMOVE;
+    }, this);
+    const int index = ListBoxKeyboard::FirstPrefixIndex(ListBoxKeyboardGtk::Labels(list_), typeahead_);
+    if (index >= 0) {
+      ListBoxKeyboardGtk::SelectIndex(list_, index);
+    }
+    return TRUE;
+  }
+  return FALSE;
 }
 
 void SmartPlaylistsView::Emit(const SmartPlaylistsItem &item, SmartPlaylistsAction action) {

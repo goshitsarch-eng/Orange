@@ -16,6 +16,7 @@ class QueueView {
   using PlaylistRowsDropCallback = std::function<void(const std::vector<int> &rows, int dest)>;
 
   explicit QueueView(Queue *queue);
+  ~QueueView();
   GtkWidget *widget() const { return widget_; }
   void Reload();
   void MoveUp();
@@ -36,6 +37,8 @@ class QueueView {
   void SetupRowDrag(GtkWidget *row, int index);
   int RowAtY(double y) const;
   gboolean OnDrop(const GValue *value, double y);
+  gboolean OnKeyPressed(guint keyval);
+  void ResetTypeAhead();
 
   Queue *queue_ = nullptr;
   GtkWidget *widget_ = nullptr;
@@ -44,6 +47,8 @@ class QueueView {
   UrlDropCallback url_drop_;
   PlaylistRowsDropCallback playlist_drop_;
   std::string now_playing_url_;
+  std::string typeahead_;
+  guint typeahead_timeout_ = 0;
 };
 
 #endif
