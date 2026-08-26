@@ -8,6 +8,8 @@
 #include "covermanager/coversearchstatisticsdialog.h"
 #include "dialogs/dialoghelpers.h"
 #include "translations/translations.h"
+#include "constants/filefilterconstants.h"
+#include "utilities/filefilters.h"
 #include "utilities/fileutils.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
@@ -26,7 +28,13 @@ bool AlbumCoverChoiceController::IsKnownImageExtension(const std::string &extens
 }
 
 std::vector<std::string> AlbumCoverChoiceController::ImageExtensions() {
-  return {"jpg", "jpeg", "png", "gif", "bmp", "webp"};
+  std::vector<std::string> extensions;
+  for (const std::string &glob : FileFilterConstants::SplitGlobs(FileFilterConstants::kLoadImages)) {
+    if (glob.size() > 2 && glob[0] == '*' && glob[1] == '.') {
+      extensions.push_back(glob.substr(2));
+    }
+  }
+  return extensions;
 }
 
 bool AlbumCoverChoiceController::SaveCover(Application *app, Song *song, const std::string &image) {
@@ -141,6 +149,7 @@ void AlbumCoverChoiceController::SaveCoverToFile(GtkWindow *parent, const Song &
   GtkFileDialog *dialog = gtk_file_dialog_new();
   gtk_file_dialog_set_title(dialog, "Save cover image");
   gtk_file_dialog_set_initial_name(dialog, "cover.jpg");
+  FileFilters::Apply(dialog, FileFilters::ImageFilters(true));
   auto *bytes = new std::string(data.begin(), data.end());
   gtk_file_dialog_save(dialog, parent, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *image = static_cast<std::string *>(data);
@@ -315,16 +324,7 @@ void AlbumCoverChoiceController::LoadCoverFromFile(GtkWindow *parent, Song *song
   }
   GtkFileDialog *dialog = gtk_file_dialog_new();
   gtk_file_dialog_set_title(dialog, "Choose cover image");
-  GtkFileFilter *filter = gtk_file_filter_new();
-  gtk_file_filter_set_name(filter, "Images");
-  for (const std::string &ext : ImageExtensions()) {
-    gtk_file_filter_add_suffix(filter, ext.c_str());
-  }
-  GListStore *filters = g_list_store_new(GTK_TYPE_FILE_FILTER);
-  g_list_store_append(filters, filter);
-  gtk_file_dialog_set_filters(dialog, G_LIST_MODEL(filters));
-  g_object_unref(filters);
-  g_object_unref(filter);
+  FileFilters::Apply(dialog, FileFilters::ImageFilters(false));
   struct FileState {
     AlbumCoverChoiceController *controller;
     Song *song;

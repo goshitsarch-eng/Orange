@@ -187,6 +187,7 @@ set(STRAWBERRY_SOURCES
   src/translations/translations.cpp
   src/utilities/timeutils.cpp
   src/utilities/fileutils.cpp
+  src/utilities/filefilters.cpp
   src/utilities/strutils.cpp
   src/utilities/jsonutils.cpp
   src/utilities/musixmatchprovider.cpp

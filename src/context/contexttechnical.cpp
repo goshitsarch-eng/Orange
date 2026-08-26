@@ -43,4 +43,11 @@ std::string Summary(const Song &song, const std::string &format) {
   return StrUtils::ReplaceMessage(format.empty() ? "%album%" : format, song);
 }
 
+std::string Totals(int songs, int artists, int albums) {
+  auto line = [](int count, const char *one, const char *many) {
+    return std::to_string(count) + " " + (count == 1 ? one : many);
+  };
+  return line(songs, "song", "songs") + "\n" + line(artists, "artist", "artists") + "\n" + line(albums, "album", "albums");
+}
+
 }  // namespace ContextTechnical

@@ -36,14 +36,17 @@ class ContextView {
   void SearchLyrics(bool force = false);
   void SetSaveLyricsCallback(SaveLyricsCallback callback);
   void SetCoverDropCallback(CoverDropCallback callback);
+  void SetCollectionTotals(int songs, int artists, int albums);
   void ReloadSettings();
 
  private:
   void NoSong();
   void SetSong();
+  void FadeStopFinished();
   void ApplyVisibility();
   void PersistVisibility();
   void RebuildTechnicalData();
+  void UpdateTotalsLabel();
 
   LyricsProviders *lyrics_providers_ = nullptr;
   LyricsFetcher *lyrics_fetcher_ = nullptr;
@@ -53,6 +56,7 @@ class ContextView {
   GtkWidget *title_ = nullptr;
   GtkWidget *artist_ = nullptr;
   GtkWidget *album_label_ = nullptr;
+  GtkWidget *totals_ = nullptr;
   GtkWidget *data_box_ = nullptr;
   GtkWidget *data_grid_ = nullptr;
   GtkWidget *lyrics_view_ = nullptr;
@@ -67,6 +71,9 @@ class ContextView {
   bool show_lyrics_ = true;
   bool search_lyrics_ = true;
   bool lyrics_tried_ = false;
+  int totals_songs_ = 0;
+  int totals_artists_ = 0;
+  int totals_albums_ = 0;
   std::string title_fmt_;
   std::string summary_fmt_;
   SaveLyricsCallback save_lyrics_;

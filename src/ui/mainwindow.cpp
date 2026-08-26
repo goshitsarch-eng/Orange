@@ -45,6 +45,7 @@
 #include "ui/dialogs.h"
 #include "ui/settingsdialog.h"
 #include "filterparser/filterparser.h"
+#include "utilities/filefilters.h"
 #include "utilities/filemanagerutils.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
@@ -689,8 +690,13 @@ void MainWindow::BuildContext() {
       cover_controller_->SearchForCover(GTK_WINDOW(window_));
     }
   });
-  cover_controller_->AttachMenu(context_view_->album_widget()->image(), GTK_WINDOW(window_),
+  cover_controller_->AttachMenu(context_view_->album_widget()->widget(), GTK_WINDOW(window_),
                                 [this]() { return app_->player()->current_song(); });
+  context_view_->album_widget()->SetActivateCallback([this]() {
+    if (cover_controller_) {
+      cover_controller_->ShowCover(GTK_WINDOW(window_), app_->player()->current_song());
+    }
+  });
 }
 
 void MainWindow::BuildPlaylist() {
@@ -768,6 +774,19 @@ void MainWindow::BuildPlayerBar() {
     cover_controller_ = std::make_unique<AlbumCoverChoiceController>(app_);
   }
   cover_controller_->AttachMenu(playing_widget_->cover(), GTK_WINDOW(window_), [this]() { return app_->player()->current_song(); });
+  GtkGesture *cover_activate = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(cover_activate), GDK_BUTTON_PRIMARY);
+  gtk_widget_add_controller(playing_widget_->cover(), GTK_EVENT_CONTROLLER(cover_activate));
+  g_signal_connect(cover_activate, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint n_press, gdouble, gdouble, gpointer data) {
+                     if (n_press != 2) {
+                       return;
+                     }
+                     auto *self = static_cast<MainWindow *>(data);
+                     if (self->cover_controller_) {
+                       self->cover_controller_->ShowCover(GTK_WINDOW(self->window_), self->app_->player()->current_song());
+                     }
+                   }),
+                   this);
   track_slider_ = std::make_unique<TrackSlider>();
   volume_slider_ = std::make_unique<VolumeSlider>();
   track_slider_->SetSeekCallback([this](int64_t pos) { app_->player()->Seek(pos); });
@@ -879,6 +898,16 @@ void MainWindow::ConnectSignals() {
     RefreshPlaylist();
   });
   app_->player()->SongChanged.Connect([this](const Song &) { UpdateNowPlaying(); });
+  app_->player()->Stopped.Connect([this]() {
+    if (playing_widget_) {
+      playing_widget_->SongChanged(Song());
+      playing_widget_->SetCover({});
+    }
+    if (context_view_) {
+      context_view_->Stopped();
+    }
+    UpdatePlaybackButtons();
+  });
   app_->player()->StateChanged.Connect([this](GstEngine::State) { UpdatePlaybackButtons(); });
   app_->player()->VolumeChanged.Connect([this](unsigned volume) {
     if (volume_slider_) {
@@ -955,6 +984,11 @@ void MainWindow::RefreshCollection(const std::string &filter, bool update_text) 
   collection_container_->view()->SetFilterString(collection_text_filter_);
   if (status_label_) {
     gtk_label_set_text(GTK_LABEL(status_label_), (std::to_string(collection_container_->view()->model()->TotalSongs()) + " songs").c_str());
+  }
+  if (context_view_) {
+    context_view_->SetCollectionTotals(collection_container_->view()->model()->TotalSongs(),
+                                      collection_container_->view()->model()->TotalArtists(),
+                                      collection_container_->view()->model()->TotalAlbums());
   }
 }
 
@@ -1198,6 +1232,7 @@ void MainWindow::OpenAbout() { AboutDialog::Show(GTK_WINDOW(window_)); }
 void MainWindow::AddFiles() {
   GtkFileDialog *dialog = gtk_file_dialog_new();
   gtk_file_dialog_set_title(dialog, Translations::CStr("Open audio files"));
+  FileFilters::Apply(dialog, FileFilters::MediaFilters());
   gtk_file_dialog_open_multiple(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *self = static_cast<MainWindow *>(data);
     GError *error = nullptr;
@@ -1245,6 +1280,7 @@ void MainWindow::AddCollectionFolder() {
 void MainWindow::LoadPlaylistFile() {
   GtkFileDialog *dialog = gtk_file_dialog_new();
   gtk_file_dialog_set_title(dialog, Translations::CStr("Load playlist"));
+  FileFilters::Apply(dialog, FileFilters::PlaylistFilters());
   gtk_file_dialog_open(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *self = static_cast<MainWindow *>(data);
     GError *error = nullptr;
@@ -1267,6 +1303,7 @@ void MainWindow::LoadPlaylistFile() {
 void MainWindow::SavePlaylistFile() {
   GtkFileDialog *dialog = gtk_file_dialog_new();
   gtk_file_dialog_set_title(dialog, Translations::CStr("Save playlist"));
+  FileFilters::Apply(dialog, FileFilters::PlaylistFilters());
   gtk_file_dialog_save(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *self = static_cast<MainWindow *>(data);
     GError *error = nullptr;

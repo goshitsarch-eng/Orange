@@ -9,6 +9,7 @@
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "equalizer/equalizer.h"
+#include "constants/filefilterconstants.h"
 #include "context/contextalbum.h"
 #include "context/contexttechnical.h"
 #include "organize/organize.h"
@@ -167,8 +168,41 @@ TEST(ContextAlbum, ImagePathExtensions) {
   EXPECT_TRUE(ContextAlbum::IsImagePath("/tmp/cover.jpg"));
   EXPECT_TRUE(ContextAlbum::IsImagePath("https://ex.com/a.JPEG"));
   EXPECT_TRUE(ContextAlbum::IsImagePath("art.webp"));
+  EXPECT_TRUE(ContextAlbum::IsImagePath("folder/cover.bmp"));
+  EXPECT_TRUE(ContextAlbum::IsImagePath("art.gif"));
   EXPECT_FALSE(ContextAlbum::IsImagePath("/tmp/song.flac"));
   EXPECT_FALSE(ContextAlbum::IsImagePath("cover"));
+}
+
+TEST(ContextAlbum, FadeOpacitiesMatchQtTimeline) {
+  EXPECT_DOUBLE_EQ(0.0, ContextAlbum::FadeInOpacity(0));
+  EXPECT_DOUBLE_EQ(1.0, ContextAlbum::FadeOutOpacity(0));
+  EXPECT_DOUBLE_EQ(0.5, ContextAlbum::FadeInOpacity(ContextAlbum::kFadeTimelineMs / 2));
+  EXPECT_DOUBLE_EQ(0.5, ContextAlbum::FadeOutOpacity(ContextAlbum::kFadeTimelineMs / 2));
+  EXPECT_DOUBLE_EQ(1.0, ContextAlbum::FadeInOpacity(ContextAlbum::kFadeTimelineMs));
+  EXPECT_DOUBLE_EQ(0.0, ContextAlbum::FadeOutOpacity(ContextAlbum::kFadeTimelineMs));
+  EXPECT_DOUBLE_EQ(1.0, ContextAlbum::FadeInOpacity(ContextAlbum::kFadeTimelineMs + 50));
+}
+
+TEST(ContextTechnical, CollectionTotalsMatchQtSingularPlural) {
+  EXPECT_EQ("0 songs\n0 artists\n0 albums", ContextTechnical::Totals(0, 0, 0));
+  EXPECT_EQ("1 song\n1 artist\n1 album", ContextTechnical::Totals(1, 1, 1));
+  EXPECT_EQ("12 songs\n3 artists\n4 albums", ContextTechnical::Totals(12, 3, 4));
+}
+
+TEST(FileFilterConstants, QtAudioPlaylistAndImageGlobs) {
+  EXPECT_TRUE(FileFilterConstants::ContainsExtension(FileFilterConstants::kFileFilter, "flac"));
+  EXPECT_TRUE(FileFilterConstants::ContainsExtension(FileFilterConstants::kFileFilter, "dsf"));
+  EXPECT_TRUE(FileFilterConstants::ContainsExtension(FileFilterConstants::kFileFilter, "m3u8"));
+  EXPECT_TRUE(FileFilterConstants::ContainsExtension(FileFilterConstants::kFileFilter, "cue"));
+  EXPECT_TRUE(FileFilterConstants::ContainsExtension(FileFilterConstants::kFileFilter, "mod"));
+  EXPECT_TRUE(FileFilterConstants::ContainsExtension(FileFilterConstants::kPlaylist, "xspf"));
+  EXPECT_TRUE(FileFilterConstants::ContainsExtension(FileFilterConstants::kLoadImages, "webp"));
+  EXPECT_TRUE(FileFilterConstants::ContainsExtension(FileFilterConstants::kLoadImages, "bmp"));
+  EXPECT_TRUE(FileFilterConstants::ContainsExtension(FileFilterConstants::kSaveImages, "png"));
+  EXPECT_FALSE(FileFilterConstants::ContainsExtension(FileFilterConstants::kSaveImages, "gif"));
+  EXPECT_TRUE(FileFilterConstants::PathMatchesGlobs("album.m3u8", FileFilterConstants::kPlaylist));
+  EXPECT_FALSE(FileFilterConstants::PathMatchesGlobs("song.flac", FileFilterConstants::kPlaylist));
 }
 
 TEST(OrganizeFormatValidator, EmptyAndUnbalanced) {

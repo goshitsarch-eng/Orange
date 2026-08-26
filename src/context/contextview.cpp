@@ -43,6 +43,11 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   gtk_widget_add_css_class(artist_, "heading");
   album_label_ = gtk_label_new("");
   gtk_widget_add_css_class(album_label_, "dim-label");
+  totals_ = gtk_label_new("");
+  gtk_widget_add_css_class(totals_, "dim-label");
+  gtk_label_set_wrap(GTK_LABEL(totals_), TRUE);
+  gtk_label_set_justify(GTK_LABEL(totals_), GTK_JUSTIFY_CENTER);
+  gtk_widget_set_visible(totals_, FALSE);
   data_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
   data_grid_ = gtk_grid_new();
   gtk_grid_set_row_spacing(GTK_GRID(data_grid_), 4);
@@ -92,12 +97,14 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
     }
     AlbumCoverLoaded(data);
   });
+  album_->SetFadeFinishedCallback([this]() { FadeStopFinished(); });
 
   gtk_box_append(GTK_BOX(box), toggles);
   gtk_box_append(GTK_BOX(box), album_->widget());
   gtk_box_append(GTK_BOX(box), title_);
   gtk_box_append(GTK_BOX(box), artist_);
   gtk_box_append(GTK_BOX(box), album_label_);
+  gtk_box_append(GTK_BOX(box), totals_);
   gtk_box_append(GTK_BOX(box), data_box_);
   gtk_box_append(GTK_BOX(box), lyrics_view_);
   gtk_box_append(GTK_BOX(box), lyrics_actions);
@@ -113,6 +120,17 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
 void ContextView::SetSaveLyricsCallback(SaveLyricsCallback callback) { save_lyrics_ = std::move(callback); }
 
 void ContextView::SetCoverDropCallback(CoverDropCallback callback) { cover_drop_ = std::move(callback); }
+
+void ContextView::SetCollectionTotals(int songs, int artists, int albums) {
+  totals_songs_ = songs;
+  totals_artists_ = artists;
+  totals_albums_ = albums;
+  UpdateTotalsLabel();
+}
+
+void ContextView::UpdateTotalsLabel() {
+  gtk_label_set_text(GTK_LABEL(totals_), ContextTechnical::Totals(totals_songs_, totals_artists_, totals_albums_).c_str());
+}
 
 void ContextView::ReloadSettings() {
   Settings settings;
@@ -132,7 +150,17 @@ void ContextView::ReloadSettings() {
 
 void ContextView::Playing() { SetSong(); }
 
-void ContextView::Stopped() { NoSong(); }
+void ContextView::Stopped() {
+  song_playing_ = Song();
+  lyrics_tried_ = false;
+  album_->SetImage({});
+}
+
+void ContextView::FadeStopFinished() {
+  if (!song_playing_.is_valid() && song_playing_.url().empty()) {
+    NoSong();
+  }
+}
 
 void ContextView::Error() { gtk_label_set_text(GTK_LABEL(title_), Translations::CStr("Error")); }
 
@@ -142,7 +170,7 @@ void ContextView::NoSong() {
   gtk_label_set_text(GTK_LABEL(title_), Translations::CStr("Not playing"));
   gtk_label_set_text(GTK_LABEL(artist_), "");
   gtk_label_set_text(GTK_LABEL(album_label_), "");
-  album_->Clear();
+  UpdateTotalsLabel();
   SetLyrics({});
   RebuildTechnicalData();
   ApplyVisibility();
@@ -236,6 +264,7 @@ void ContextView::ApplyVisibility() {
   show_lyrics_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_));
   const bool playing = song_playing_.is_valid() || !song_playing_.url().empty();
   gtk_widget_set_visible(album_->widget(), show_album_);
+  gtk_widget_set_visible(totals_, !playing);
   gtk_widget_set_visible(data_box_, show_data_ && playing && gtk_widget_get_first_child(data_grid_) != nullptr);
   gtk_widget_set_visible(lyrics_view_, show_lyrics_);
   gtk_widget_set_visible(search_lyrics_btn_, show_lyrics_);

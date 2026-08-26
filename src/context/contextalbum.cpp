@@ -9,9 +9,17 @@
 
 ContextAlbum::ContextAlbum() {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  previous_image_ = gtk_image_new_from_icon_name("audio-x-generic-symbolic");
+  gtk_image_set_pixel_size(GTK_IMAGE(previous_image_), 220);
+  gtk_widget_set_halign(previous_image_, GTK_ALIGN_CENTER);
+  gtk_widget_set_visible(previous_image_, FALSE);
   image_ = gtk_image_new_from_icon_name("audio-x-generic-symbolic");
   gtk_image_set_pixel_size(GTK_IMAGE(image_), 220);
   gtk_widget_set_halign(image_, GTK_ALIGN_CENTER);
+  GtkWidget *overlay = gtk_overlay_new();
+  gtk_overlay_set_child(GTK_OVERLAY(overlay), previous_image_);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay), image_);
+  gtk_widget_set_halign(overlay, GTK_ALIGN_CENTER);
   spinner_ = gtk_spinner_new();
   gtk_widget_set_halign(spinner_, GTK_ALIGN_CENTER);
   gtk_widget_set_visible(spinner_, FALSE);
@@ -25,7 +33,7 @@ ContextAlbum::ContextAlbum() {
                      }
                    }),
                    this);
-  gtk_box_append(GTK_BOX(widget_), image_);
+  gtk_box_append(GTK_BOX(widget_), overlay);
   gtk_box_append(GTK_BOX(widget_), spinner_);
   gtk_box_append(GTK_BOX(widget_), search);
 
@@ -39,7 +47,20 @@ ContextAlbum::ContextAlbum() {
                      return static_cast<ContextAlbum *>(data)->OnDrop(value);
                    }),
                    this);
+
+  GtkGesture *activate = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(activate), GDK_BUTTON_PRIMARY);
+  gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(activate));
+  g_signal_connect(activate, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint n_press, gdouble, gdouble, gpointer data) {
+                     auto *self = static_cast<ContextAlbum *>(data);
+                     if (n_press == 2 && self->has_cover_ && self->activate_) {
+                       self->activate_();
+                     }
+                   }),
+                   this);
 }
+
+ContextAlbum::~ContextAlbum() { StopFade(); }
 
 gboolean ContextAlbum::OnDrop(const GValue *value) {
   std::vector<std::string> paths;
@@ -87,8 +108,14 @@ gboolean ContextAlbum::OnDrop(const GValue *value) {
 
 void ContextAlbum::Clear() {
   downloading_ = false;
+  has_cover_ = false;
+  fading_to_placeholder_ = false;
+  StopFade();
   gtk_spinner_stop(GTK_SPINNER(spinner_));
   gtk_widget_set_visible(spinner_, FALSE);
+  gtk_widget_set_opacity(image_, 1.0);
+  gtk_widget_set_visible(previous_image_, FALSE);
+  gtk_image_set_from_icon_name(GTK_IMAGE(previous_image_), "audio-x-generic-symbolic");
   gtk_image_set_from_icon_name(GTK_IMAGE(image_), "audio-x-generic-symbolic");
 }
 
@@ -96,18 +123,32 @@ void ContextAlbum::SetSearchCallback(SearchCallback callback) { search_ = std::m
 
 void ContextAlbum::SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
 
+void ContextAlbum::SetFadeFinishedCallback(FadeFinishedCallback callback) { fade_finished_ = std::move(callback); }
+
+void ContextAlbum::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
+
 void ContextAlbum::SearchCoverInProgress() {
   downloading_ = true;
   gtk_widget_set_visible(spinner_, TRUE);
   gtk_spinner_start(GTK_SPINNER(spinner_));
 }
 
-void ContextAlbum::SetImage(const std::vector<unsigned char> &data, int pixel_size) {
-  downloading_ = false;
-  gtk_spinner_stop(GTK_SPINNER(spinner_));
-  gtk_widget_set_visible(spinner_, FALSE);
+void ContextAlbum::SnapshotCurrentToPrevious() {
+  GdkPaintable *paintable = gtk_image_get_paintable(GTK_IMAGE(image_));
+  if (paintable) {
+    gtk_image_set_from_paintable(GTK_IMAGE(previous_image_), paintable);
+  } else {
+    gtk_image_set_from_icon_name(GTK_IMAGE(previous_image_), "audio-x-generic-symbolic");
+  }
+  gtk_image_set_pixel_size(GTK_IMAGE(previous_image_), gtk_image_get_pixel_size(GTK_IMAGE(image_)));
+  gtk_widget_set_visible(previous_image_, TRUE);
+  gtk_widget_set_opacity(previous_image_, 1.0);
+}
+
+void ContextAlbum::ApplyImageData(const std::vector<unsigned char> &data, int pixel_size) {
   if (data.empty()) {
-    Clear();
+    gtk_image_set_from_icon_name(GTK_IMAGE(image_), "audio-x-generic-symbolic");
+    gtk_image_set_pixel_size(GTK_IMAGE(image_), pixel_size);
     return;
   }
   GBytes *bytes = g_bytes_new(data.data(), data.size());
@@ -118,9 +159,56 @@ void ContextAlbum::SetImage(const std::vector<unsigned char> &data, int pixel_si
     if (error) {
       g_error_free(error);
     }
+    gtk_image_set_from_icon_name(GTK_IMAGE(image_), "audio-x-generic-symbolic");
     return;
   }
   gtk_image_set_from_paintable(GTK_IMAGE(image_), GDK_PAINTABLE(texture));
   gtk_image_set_pixel_size(GTK_IMAGE(image_), pixel_size);
   g_object_unref(texture);
+}
+
+void ContextAlbum::StartFade(bool to_placeholder) {
+  StopFade();
+  fading_to_placeholder_ = to_placeholder;
+  fade_elapsed_ms_ = 0;
+  gtk_widget_set_opacity(image_, 0.0);
+  fade_timeout_id_ = g_timeout_add(kFadeTickMs, [](gpointer data) -> gboolean { return static_cast<ContextAlbum *>(data)->FadeTick(); }, this);
+}
+
+void ContextAlbum::StopFade() {
+  if (fade_timeout_id_) {
+    g_source_remove(fade_timeout_id_);
+    fade_timeout_id_ = 0;
+  }
+  fade_elapsed_ms_ = 0;
+}
+
+gboolean ContextAlbum::FadeTick() {
+  fade_elapsed_ms_ += kFadeTickMs;
+  const double fade_in = FadeInOpacity(fade_elapsed_ms_);
+  gtk_widget_set_opacity(previous_image_, FadeOutOpacity(fade_elapsed_ms_));
+  gtk_widget_set_opacity(image_, fade_in);
+  if (fade_elapsed_ms_ < kFadeTimelineMs) {
+    return G_SOURCE_CONTINUE;
+  }
+  fade_timeout_id_ = 0;
+  gtk_widget_set_opacity(image_, 1.0);
+  gtk_widget_set_visible(previous_image_, FALSE);
+  gtk_image_set_from_icon_name(GTK_IMAGE(previous_image_), "audio-x-generic-symbolic");
+  if (fading_to_placeholder_ && fade_finished_) {
+    fade_finished_();
+  }
+  fading_to_placeholder_ = false;
+  return G_SOURCE_REMOVE;
+}
+
+void ContextAlbum::SetImage(const std::vector<unsigned char> &data, int pixel_size) {
+  downloading_ = false;
+  gtk_spinner_stop(GTK_SPINNER(spinner_));
+  gtk_widget_set_visible(spinner_, FALSE);
+  SnapshotCurrentToPrevious();
+  has_cover_ = !data.empty();
+  ApplyImageData(data, pixel_size);
+  gtk_widget_set_opacity(image_, 0.0);
+  StartFade(!has_cover_);
 }
