@@ -9,6 +9,8 @@
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
+#include <ctime>
+
 const char SpotifyService::kApiUrl[] = "https://api.spotify.com/v1";
 
 SpotifyService::SpotifyService(NetworkAccessManager *network) : network_(network) { ReloadSettings(); }
@@ -20,19 +22,62 @@ void SpotifyService::ReloadSettings() {
   if (token_.empty()) {
     token_ = settings.Value(SpotifySettings::kAccessToken);
   }
+  refresh_token_ = settings.Value(SpotifySettings::kRefreshToken);
+  expires_in_ = settings.IntValue(SpotifySettings::kExpiresIn);
+  login_time_ = settings.Int64Value(SpotifySettings::kLoginTime);
+  client_id_ = settings.Value("clientid");
+  client_secret_ = settings.Value("clientsecret");
   logged_in_ = !token_.empty();
+}
+
+void SpotifyService::StoreTokens(const OAuthenticator::TokenResponse &tokens) {
+  Settings settings;
+  settings.BeginGroup(SpotifySettings::kSettingsGroup);
+  if (!tokens.access_token.empty()) {
+    settings.SetValue("token", tokens.access_token);
+    settings.SetValue(SpotifySettings::kAccessToken, tokens.access_token);
+  }
+  if (!tokens.refresh_token.empty()) {
+    settings.SetValue(SpotifySettings::kRefreshToken, tokens.refresh_token);
+  }
+  if (tokens.expires_in > 0) {
+    settings.SetIntValue(SpotifySettings::kExpiresIn, tokens.expires_in);
+    settings.SetInt64Value(SpotifySettings::kLoginTime, static_cast<gint64>(std::time(nullptr)));
+  }
+  settings.Sync();
+  ReloadSettings();
 }
 
 void SpotifyService::Login(const std::string &username, const std::string &password_or_token) {
   Settings settings;
-  settings.BeginGroup("Spotify");
+  settings.BeginGroup(SpotifySettings::kSettingsGroup);
   if (!username.empty()) {
     settings.SetValue("username", username);
   }
   settings.SetValue("token", password_or_token);
-  settings.SetValue("access_token", password_or_token);
+  settings.SetValue(SpotifySettings::kAccessToken, password_or_token);
   settings.Sync();
   ReloadSettings();
+}
+
+void SpotifyService::EnsureFreshToken(std::function<void()> next) {
+  if (refresh_token_.empty() || !OAuthenticator::AccessTokenExpired(login_time_, expires_in_)) {
+    if (next) {
+      next();
+    }
+    return;
+  }
+  auto *oauth = new OAuthenticator(network_);
+  oauth->RefreshAccessToken("https://accounts.spotify.com/api/token", client_id_, client_secret_, refresh_token_,
+                            [this, oauth, next](const std::string &body, const std::string &error) {
+                              if (error.empty()) {
+                                StoreTokens(OAuthenticator::ParseTokenResponse(body));
+                              }
+                              delete oauth;
+                              if (next) {
+                                next();
+                              }
+                            });
 }
 
 std::map<std::string, std::string> SpotifyService::AuthHeaders() const {
@@ -45,30 +90,38 @@ std::map<std::string, std::string> SpotifyService::AuthHeaders() const {
 void SpotifyService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
 
 void SpotifyService::Search(const std::string &query, SearchType type, SearchCallback callback) {
-  const auto request_type = SpotifyRequest::FromSearchType(type);
-  SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, request_type, query), AuthHeaders(), request_type, std::move(callback));
+  EnsureFreshToken([this, query, type, callback]() {
+    const auto request_type = SpotifyRequest::FromSearchType(type);
+    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, request_type, query), AuthHeaders(), request_type, callback);
+  });
 }
 
 void SpotifyService::GetArtists(SearchCallback callback) {
-  SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteArtists, {}), AuthHeaders(),
-                      SpotifyRequest::Type::FavouriteArtists, std::move(callback));
+  EnsureFreshToken([this, callback]() {
+    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteArtists, {}), AuthHeaders(),
+                        SpotifyRequest::Type::FavouriteArtists, callback);
+  });
 }
 
 void SpotifyService::GetAlbums(SearchCallback callback) {
-  SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteAlbums, {}), AuthHeaders(),
-                      SpotifyRequest::Type::FavouriteAlbums, std::move(callback));
+  EnsureFreshToken([this, callback]() {
+    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteAlbums, {}), AuthHeaders(),
+                        SpotifyRequest::Type::FavouriteAlbums, callback);
+  });
 }
 
 void SpotifyService::GetSongs(SearchCallback callback) {
-  SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteSongs, {}), AuthHeaders(),
-                      SpotifyRequest::Type::FavouriteSongs, std::move(callback));
+  EnsureFreshToken([this, callback]() {
+    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteSongs, {}), AuthHeaders(),
+                        SpotifyRequest::Type::FavouriteSongs, callback);
+  });
 }
 
 UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallback callback) {
   LoadResult result;
   result.media_url = url;
   const std::string id = StreamingMediaId(url);
-  if (!network_ || id.empty() || token_.empty()) {
+  if (!network_ || id.empty()) {
     result.error = "Spotify is not signed in";
     if (callback) {
       callback(result);
@@ -76,8 +129,19 @@ UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallbac
     return result;
   }
   result.type = LoadResult::Type::WillLoadAsynchronously;
-  const auto headers = AuthHeaders();
-  SpotifyMetadataRequest::Get(network_, SpotifyMetadataRequest::TrackUrl(kApiUrl, id), headers,
+  EnsureFreshToken([this, callback, url, id]() {
+    if (token_.empty()) {
+      LoadResult async;
+      async.media_url = url;
+      async.error = "Spotify is not signed in";
+      async.type = LoadResult::Type::Error;
+      if (callback) {
+        callback(async);
+      }
+      return;
+    }
+    const auto headers = AuthHeaders();
+    SpotifyMetadataRequest::Get(network_, SpotifyMetadataRequest::TrackUrl(kApiUrl, id), headers,
                               [this, callback, url, headers](const Song &song, const std::string &error) {
                                 LoadResult async;
                                 async.media_url = url;
@@ -114,17 +178,18 @@ UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallbac
                                     },
                                     headers);
                               });
+  });
   return result;
 }
 
 void SpotifyService::GetFavorites(FavoriteType type, SearchCallback callback) {
-  SpotifyFavoriteRequest::Get(network_, kApiUrl, AuthHeaders(), type, std::move(callback));
+  EnsureFreshToken([this, type, callback]() { SpotifyFavoriteRequest::Get(network_, kApiUrl, AuthHeaders(), type, callback); });
 }
 
 void SpotifyService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
-  SpotifyFavoriteRequest::Add(network_, kApiUrl, AuthHeaders(), type, songs, std::move(callback));
+  EnsureFreshToken([this, type, songs, callback]() { SpotifyFavoriteRequest::Add(network_, kApiUrl, AuthHeaders(), type, songs, callback); });
 }
 
 void SpotifyService::RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
-  SpotifyFavoriteRequest::Remove(network_, kApiUrl, AuthHeaders(), type, songs, std::move(callback));
+  EnsureFreshToken([this, type, songs, callback]() { SpotifyFavoriteRequest::Remove(network_, kApiUrl, AuthHeaders(), type, songs, callback); });
 }

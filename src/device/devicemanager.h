@@ -49,9 +49,15 @@ class DeviceManager {
   std::string DownloadMtpTrack(const std::string &url) const;
   static std::string MtpSerial(const std::string &unique_id);
 
+  void StartVolumeMonitor();
+  void StopVolumeMonitor();
+  void ScheduleRescan();
+
   std::vector<ConnectedDevice> devices_;
   std::unique_ptr<DeviceUrlHandler> url_handler_;
   std::unique_ptr<DeviceDatabaseBackend> device_db_;
+  void *volume_monitor_ = nullptr;
+  unsigned rescan_idle_ = 0;
 };
 
 #endif

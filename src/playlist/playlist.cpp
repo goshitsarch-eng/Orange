@@ -117,16 +117,41 @@ void Playlist::Clear() {
   Changed.Emit();
 }
 
-void Playlist::Move(int from, int to) {
-  if (from < 0 || to < 0 || from >= static_cast<int>(songs_.size()) || to >= static_cast<int>(songs_.size()) || from == to) {
+void Playlist::Move(int from, int to) { MoveRows({from}, to); }
+
+void Playlist::MoveRows(const std::vector<int> &rows, int to) {
+  if (rows.empty()) {
     return;
   }
+  std::vector<int> sorted = rows;
+  std::sort(sorted.begin(), sorted.end());
+  sorted.erase(std::unique(sorted.begin(), sorted.end()), sorted.end());
+  SongList moving;
+  for (int row : sorted) {
+    if (row < 0 || row >= row_count()) {
+      return;
+    }
+    moving.push_back(songs_[static_cast<size_t>(row)]);
+  }
+  const Song playing = current_song();
+  int dest = std::clamp(to, 0, row_count());
   PushUndo();
-  Song song = songs_[static_cast<size_t>(from)];
-  songs_.erase(songs_.begin() + from);
-  songs_.insert(songs_.begin() + to, song);
-  if (current_row_ == from) {
-    current_row_ = to;
+  for (auto it = sorted.rbegin(); it != sorted.rend(); ++it) {
+    songs_.erase(songs_.begin() + *it);
+    if (*it < dest) {
+      --dest;
+    }
+  }
+  dest = std::clamp(dest, 0, row_count());
+  songs_.insert(songs_.begin() + dest, moving.begin(), moving.end());
+  current_row_ = -1;
+  if (playing.is_valid() || !playing.url().empty()) {
+    for (int i = 0; i < row_count(); ++i) {
+      if (songs_[static_cast<size_t>(i)] == playing) {
+        current_row_ = i;
+        break;
+      }
+    }
   }
   Changed.Emit();
 }

@@ -7,6 +7,7 @@
 #include <json-glib/json-glib.h>
 
 #include <cstring>
+#include <ctime>
 
 namespace {
 
@@ -179,27 +180,70 @@ std::string OAuthenticator::BasicAuthorizationHeader(const std::string &client_i
   return header;
 }
 
-std::string OAuthenticator::ParseAccessToken(const std::string &json) {
+std::string OAuthenticator::RefreshTokenBody(const std::string &refresh_token, const std::string &client_id, const std::string &client_secret) {
+  return std::string("grant_type=refresh_token&refresh_token=") + StrUtils::UriEscape(refresh_token) +
+         "&client_id=" + StrUtils::UriEscape(client_id) + "&client_secret=" + StrUtils::UriEscape(client_secret);
+}
+
+void OAuthenticator::RefreshAccessToken(const std::string &token_url, const std::string &client_id, const std::string &client_secret,
+                                        const std::string &refresh_token, Callback callback) {
+  if (!network_) {
+    callback({}, "No network");
+    return;
+  }
+  network_->Post(token_url, RefreshTokenBody(refresh_token, client_id, client_secret),
+                 [callback](const NetworkAccessManager::Response &response) {
+                   if (!response.ok()) {
+                     callback({}, response.error.empty() ? "Token refresh failed" : response.error);
+                     return;
+                   }
+                   callback(response.body, {});
+                 },
+                 "application/x-www-form-urlencoded");
+}
+
+OAuthenticator::TokenResponse OAuthenticator::ParseTokenResponse(const std::string &json) {
+  TokenResponse token;
   if (json.empty()) {
-    return {};
+    return token;
   }
   JsonParser *parser = json_parser_new();
   if (!json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
     g_object_unref(parser);
-    return {};
+    return token;
   }
   JsonNode *root = json_parser_get_root(parser);
-  std::string token;
   if (root && JSON_NODE_HOLDS_OBJECT(root)) {
     JsonObject *object = json_node_get_object(root);
-    if (json_object_has_member(object, "access_token") && JSON_NODE_HOLDS_VALUE(json_object_get_member(object, "access_token")) &&
-        json_node_get_value_type(json_object_get_member(object, "access_token")) == G_TYPE_STRING) {
-      const char *value = json_object_get_string_member(object, "access_token");
-      token = value ? value : "";
+    auto take_string = [object](const char *key) -> std::string {
+      if (!json_object_has_member(object, key) || !JSON_NODE_HOLDS_VALUE(json_object_get_member(object, key)) ||
+          json_node_get_value_type(json_object_get_member(object, key)) != G_TYPE_STRING) {
+        return {};
+      }
+      const char *value = json_object_get_string_member(object, key);
+      return value ? value : "";
+    };
+    token.access_token = take_string("access_token");
+    token.refresh_token = take_string("refresh_token");
+    token.token_type = take_string("token_type");
+    if (json_object_has_member(object, "expires_in") && JSON_NODE_HOLDS_VALUE(json_object_get_member(object, "expires_in"))) {
+      token.expires_in = static_cast<int>(json_object_get_int_member(object, "expires_in"));
     }
   }
   g_object_unref(parser);
   return token;
+}
+
+std::string OAuthenticator::ParseAccessToken(const std::string &json) { return ParseTokenResponse(json).access_token; }
+
+bool OAuthenticator::AccessTokenExpired(gint64 login_time, int expires_in, gint64 now, int skew_seconds) {
+  if (login_time <= 0 || expires_in <= 0) {
+    return false;
+  }
+  if (now <= 0) {
+    now = static_cast<gint64>(std::time(nullptr));
+  }
+  return now + skew_seconds >= login_time + expires_in;
 }
 
 void OAuthenticator::ClientCredentials(const std::string &token_url, const std::string &client_id, const std::string &client_secret, Callback callback) {

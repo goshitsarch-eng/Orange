@@ -2,8 +2,11 @@
 
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistheader.h"
+#include "utilities/strutils.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 
 PlaylistView::PlaylistView() {
   widget_ = gtk_scrolled_window_new();
@@ -32,6 +35,123 @@ PlaylistView::PlaylistView() {
                      return FALSE;
                    }),
                    this);
+  GtkDropTarget *target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
+#ifdef GDK_TYPE_FILE_LIST
+  GType types[] = {G_TYPE_STRING, GDK_TYPE_FILE_LIST};
+  gtk_drop_target_set_gtypes(target, types, 2);
+#endif
+  gtk_drop_target_set_actions(target, static_cast<GdkDragAction>(GDK_ACTION_COPY | GDK_ACTION_MOVE));
+  gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(target));
+  g_signal_connect(target, "drop", G_CALLBACK(+[](GtkDropTarget *, const GValue *value, gdouble, gdouble y, gpointer data) -> gboolean {
+                     return static_cast<PlaylistView *>(data)->OnDrop(value, y);
+                   }),
+                   this);
+}
+
+void PlaylistView::SetDropUrlsCallback(DropUrlsCallback callback) { drop_urls_ = std::move(callback); }
+
+void PlaylistView::SetReorderCallback(ReorderCallback callback) { reorder_ = std::move(callback); }
+
+int PlaylistView::RowAtY(double y) const {
+  if (!grid_) {
+    return 0;
+  }
+  GtkWidget *child = gtk_widget_get_first_child(grid_);
+  if (child) {
+    child = gtk_widget_get_next_sibling(child);
+  }
+  int last_index = 0;
+  while (child) {
+    graphene_rect_t bounds{};
+    if (gtk_widget_compute_bounds(child, widget_, &bounds)) {
+      const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
+      if (y < bounds.origin.y + bounds.size.height) {
+        return index;
+      }
+      last_index = index + 1;
+    }
+    child = gtk_widget_get_next_sibling(child);
+  }
+  return last_index;
+}
+
+gboolean PlaylistView::OnDrop(const GValue *value, double y) {
+  const int row = RowAtY(y);
+  std::vector<std::string> urls;
+  if (G_VALUE_HOLDS_STRING(value)) {
+    const char *text = g_value_get_string(value);
+    if (text && std::string(text).rfind("strawberry-playlist-rows:", 0) == 0) {
+      std::vector<int> rows;
+      for (const std::string &part : StrUtils::Split(text + std::strlen("strawberry-playlist-rows:"), ',')) {
+        if (!part.empty()) {
+          rows.push_back(std::atoi(part.c_str()));
+        }
+      }
+      if (reorder_ && !rows.empty()) {
+        reorder_(rows, row);
+        return TRUE;
+      }
+    }
+    for (const std::string &part : StrUtils::Split(text ? text : "", '\n')) {
+      std::string url = part;
+      if (!url.empty() && url.back() == '\r') {
+        url.pop_back();
+      }
+      if (!url.empty()) {
+        urls.push_back(url);
+      }
+    }
+  }
+#ifdef GDK_TYPE_FILE_LIST
+  if (G_VALUE_HOLDS(value, GDK_TYPE_FILE_LIST)) {
+    auto *list = static_cast<GdkFileList *>(g_value_get_boxed(value));
+    GSList *files = gdk_file_list_get_files(list);
+    for (GSList *item = files; item; item = item->next) {
+      gchar *uri = g_file_get_uri(G_FILE(item->data));
+      if (uri) {
+        urls.emplace_back(uri);
+        g_free(uri);
+      }
+    }
+  }
+#endif
+  if (drop_urls_ && !urls.empty()) {
+    drop_urls_(urls, row);
+    return TRUE;
+  }
+  return FALSE;
+}
+
+void PlaylistView::SetupRowDrag(GtkWidget *row, int index) {
+  GtkDragSource *src = gtk_drag_source_new();
+  gtk_drag_source_set_actions(src, GDK_ACTION_MOVE);
+  g_object_set_data(G_OBJECT(src), "row", GINT_TO_POINTER(index + 1));
+  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
+                     auto *self = static_cast<PlaylistView *>(data);
+                     const int r = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(s), "row")) - 1;
+                     std::vector<int> rows = self->selected_rows_;
+                     if (std::find(rows.begin(), rows.end(), r) == rows.end()) {
+                       rows = {r};
+                     }
+                     if (rows.empty() || r < 0) {
+                       return nullptr;
+                     }
+                     std::string payload = "strawberry-playlist-rows:";
+                     for (size_t i = 0; i < rows.size(); ++i) {
+                       if (i) {
+                         payload += ",";
+                       }
+                       payload += std::to_string(rows[i]);
+                     }
+                     GValue v = G_VALUE_INIT;
+                     g_value_init(&v, G_TYPE_STRING);
+                     g_value_set_string(&v, payload.c_str());
+                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
+                     g_value_unset(&v);
+                     return provider;
+                   })),
+                   this);
+  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
 }
 
 void PlaylistView::SetFilterString(const std::string &filter) { filter_ = filter; }
@@ -145,6 +265,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
                        }
                      }),
                      this);
+    SetupRowDrag(row, index);
     gtk_box_append(GTK_BOX(grid_), row);
     ++visible_count_;
   }

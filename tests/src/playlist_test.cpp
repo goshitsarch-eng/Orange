@@ -187,6 +187,37 @@ TEST(Playlist, RenumberAndRateCurrent) {
   EXPECT_NEAR(0.8f, playlist.current_song().rating(), 0.001f);
 }
 
+TEST(Playlist, MoveRowsKeepsPlayingTrack) {
+  Playlist playlist;
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  Song c;
+  c.set_title("C");
+  c.set_url("file:///c");
+  c.set_valid(true);
+  playlist.AppendSongs({a, b, c});
+  playlist.set_current_row(0);
+  playlist.MoveRows({0}, 2);
+  ASSERT_EQ(3, playlist.row_count());
+  EXPECT_EQ("B", playlist.songs()[0].title());
+  EXPECT_EQ("A", playlist.songs()[1].title());
+  EXPECT_EQ("C", playlist.songs()[2].title());
+  EXPECT_EQ(1, playlist.current_row());
+  playlist.MoveRows({2, 1}, 0);
+  EXPECT_EQ("A", playlist.songs()[0].title());
+  EXPECT_EQ("C", playlist.songs()[1].title());
+  EXPECT_EQ("B", playlist.songs()[2].title());
+  EXPECT_EQ(0, playlist.current_row());
+  playlist.MoveRows({99}, 0);
+  EXPECT_EQ("A", playlist.songs()[0].title());
+}
+
 TEST(Playlist, SetColumnValuesUpdatesSongsAndUndo) {
   Playlist playlist;
   Song a;

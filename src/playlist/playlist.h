@@ -38,6 +38,7 @@ class Playlist {
   void RemoveRows(const std::vector<int> &rows);
   void Clear();
   void Move(int from, int to);
+  void MoveRows(const std::vector<int> &rows, int to);
   void Shuffle();
   void RemoveDuplicates();
   void RemoveUnavailable();

@@ -9,6 +9,7 @@
 #include "utilities/strutils.h"
 
 #include <cstdlib>
+#include <ctime>
 
 const char TidalService::kApiUrl[] = "https://api.tidalhifi.com/v1";
 const char TidalService::kResourcesUrl[] = "https://resources.tidal.com";
@@ -20,8 +21,13 @@ void TidalService::ReloadSettings() {
   settings.BeginGroup(TidalSettings::kSettingsGroup);
   token_ = settings.Value("token");
   if (token_.empty()) {
-    token_ = settings.Value("access_token");
+    token_ = settings.Value(TidalSettings::kAccessToken);
   }
+  refresh_token_ = settings.Value(TidalSettings::kRefreshToken);
+  expires_in_ = settings.IntValue(TidalSettings::kExpiresIn);
+  login_time_ = settings.Int64Value(TidalSettings::kLoginTime);
+  client_id_ = settings.Value(TidalSettings::kClientId);
+  client_secret_ = settings.Value("clientsecret");
   country_code_ = settings.Value("countrycode", "US");
   quality_ = settings.Value(TidalSettings::kQuality, TidalSettings::kDefaultQuality);
   stream_url_method_ = TidalStreamUrlRequest::MethodFromSettings(
@@ -31,16 +37,54 @@ void TidalService::ReloadSettings() {
   logged_in_ = !token_.empty();
 }
 
+void TidalService::StoreTokens(const OAuthenticator::TokenResponse &tokens) {
+  Settings settings;
+  settings.BeginGroup(TidalSettings::kSettingsGroup);
+  if (!tokens.access_token.empty()) {
+    settings.SetValue("token", tokens.access_token);
+    settings.SetValue(TidalSettings::kAccessToken, tokens.access_token);
+  }
+  if (!tokens.refresh_token.empty()) {
+    settings.SetValue(TidalSettings::kRefreshToken, tokens.refresh_token);
+  }
+  if (tokens.expires_in > 0) {
+    settings.SetIntValue(TidalSettings::kExpiresIn, tokens.expires_in);
+    settings.SetInt64Value(TidalSettings::kLoginTime, static_cast<gint64>(std::time(nullptr)));
+  }
+  settings.Sync();
+  ReloadSettings();
+}
+
 void TidalService::Login(const std::string &username, const std::string &password_or_token) {
   Settings settings;
-  settings.BeginGroup("Tidal");
+  settings.BeginGroup(TidalSettings::kSettingsGroup);
   if (!username.empty()) {
     settings.SetValue("username", username);
   }
   settings.SetValue("token", password_or_token);
-  settings.SetValue("access_token", password_or_token);
+  settings.SetValue(TidalSettings::kAccessToken, password_or_token);
   settings.Sync();
   ReloadSettings();
+}
+
+void TidalService::EnsureFreshToken(std::function<void()> next) {
+  if (refresh_token_.empty() || !OAuthenticator::AccessTokenExpired(login_time_, expires_in_)) {
+    if (next) {
+      next();
+    }
+    return;
+  }
+  auto *oauth = new OAuthenticator(network_);
+  oauth->RefreshAccessToken("https://auth.tidal.com/v1/oauth2/token", client_id_, client_secret_, refresh_token_,
+                            [this, oauth, next](const std::string &body, const std::string &error) {
+                              if (error.empty()) {
+                                StoreTokens(OAuthenticator::ParseTokenResponse(body));
+                              }
+                              delete oauth;
+                              if (next) {
+                                next();
+                              }
+                            });
 }
 
 std::map<std::string, std::string> TidalService::AuthHeaders() const {
@@ -53,31 +97,38 @@ std::map<std::string, std::string> TidalService::AuthHeaders() const {
 void TidalService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
 
 void TidalService::Search(const std::string &query, SearchType type, SearchCallback callback) {
-  const auto request_type = TidalRequest::FromSearchType(type);
-  TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_), AuthHeaders(), request_type,
-                    std::move(callback));
+  EnsureFreshToken([this, query, type, callback]() {
+    const auto request_type = TidalRequest::FromSearchType(type);
+    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_), AuthHeaders(), request_type, callback);
+  });
 }
 
 void TidalService::GetArtists(SearchCallback callback) {
-  TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteArtists, {}, country_code_, user_id_), AuthHeaders(),
-                    TidalRequest::Type::FavouriteArtists, std::move(callback));
+  EnsureFreshToken([this, callback]() {
+    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteArtists, {}, country_code_, user_id_), AuthHeaders(),
+                      TidalRequest::Type::FavouriteArtists, callback);
+  });
 }
 
 void TidalService::GetAlbums(SearchCallback callback) {
-  TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteAlbums, {}, country_code_, user_id_), AuthHeaders(),
-                    TidalRequest::Type::FavouriteAlbums, std::move(callback));
+  EnsureFreshToken([this, callback]() {
+    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteAlbums, {}, country_code_, user_id_), AuthHeaders(),
+                      TidalRequest::Type::FavouriteAlbums, callback);
+  });
 }
 
 void TidalService::GetSongs(SearchCallback callback) {
-  TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteSongs, {}, country_code_, user_id_), AuthHeaders(),
-                    TidalRequest::Type::FavouriteSongs, std::move(callback));
+  EnsureFreshToken([this, callback]() {
+    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteSongs, {}, country_code_, user_id_), AuthHeaders(),
+                      TidalRequest::Type::FavouriteSongs, callback);
+  });
 }
 
 UrlHandler::LoadResult TidalService::Load(const std::string &url, AsyncCallback callback) {
   LoadResult result;
   result.media_url = url;
   const std::string id = TidalStreamUrlRequest::TrackId(url);
-  if (!network_ || id.empty() || token_.empty()) {
+  if (!network_ || id.empty()) {
     result.error = "Tidal is not signed in";
     if (callback) {
       callback(result);
@@ -85,19 +136,37 @@ UrlHandler::LoadResult TidalService::Load(const std::string &url, AsyncCallback 
     return result;
   }
   result.type = LoadResult::Type::WillLoadAsynchronously;
-  TidalStreamUrlRequest::Get(network_, TidalStreamUrlRequest::Url(kApiUrl, stream_url_method_, id, country_code_, quality_),
-                             AuthHeaders(), url, id, std::move(callback));
+  EnsureFreshToken([this, url, id, callback]() {
+    if (token_.empty()) {
+      LoadResult async;
+      async.media_url = url;
+      async.error = "Tidal is not signed in";
+      async.type = LoadResult::Type::Error;
+      if (callback) {
+        callback(async);
+      }
+      return;
+    }
+    TidalStreamUrlRequest::Get(network_, TidalStreamUrlRequest::Url(kApiUrl, stream_url_method_, id, country_code_, quality_), AuthHeaders(),
+                               url, id, callback);
+  });
   return result;
 }
 
 void TidalService::GetFavorites(FavoriteType type, SearchCallback callback) {
-  TidalFavoriteRequest::Get(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, std::move(callback));
+  EnsureFreshToken([this, type, callback]() {
+    TidalFavoriteRequest::Get(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, callback);
+  });
 }
 
 void TidalService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
-  TidalFavoriteRequest::Add(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, songs, std::move(callback));
+  EnsureFreshToken([this, type, songs, callback]() {
+    TidalFavoriteRequest::Add(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, songs, callback);
+  });
 }
 
 void TidalService::RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
-  TidalFavoriteRequest::Remove(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, songs, std::move(callback));
+  EnsureFreshToken([this, type, songs, callback]() {
+    TidalFavoriteRequest::Remove(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, songs, callback);
+  });
 }

@@ -4,8 +4,8 @@
 #include "core/application.h"
 #include "core/oauthenticator.h"
 #include "settings/settingspage.h"
+#include "spotify/spotifyservice.h"
 #include "ui/dialogs.h"
-#include "utilities/jsonutils.h"
 
 AdwPreferencesPage *SpotifySettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(SpotifySettings::kSettingsGroup);
@@ -49,9 +49,13 @@ AdwPreferencesPage *SpotifySettingsPage::Create(Settings *settings, Application 
                                   ss.BeginGroup(SpotifySettings::kSettingsGroup);
                                   oauth->ExchangeCode("https://accounts.spotify.com/api/token", ss.Value("clientid"), ss.Value("clientsecret"), code,
                                                       [app, oauth](const std::string &body, const std::string &) {
-                                                        const std::string token = JsonUtils::GetString(body, {"access_token"});
-                                                        if (StreamingService *service = app->streaming_services()->ServiceByName("Spotify")) {
-                                                          service->Login({}, token.empty() ? body : token);
+                                                        const auto tokens = OAuthenticator::ParseTokenResponse(body);
+                                                        if (auto *service = dynamic_cast<SpotifyService *>(app->streaming_services()->ServiceByName("Spotify"))) {
+                                                          if (!tokens.access_token.empty()) {
+                                                            service->StoreTokens(tokens);
+                                                          } else {
+                                                            service->Login({}, body);
+                                                          }
                                                         }
                                                         delete oauth;
                                                       });

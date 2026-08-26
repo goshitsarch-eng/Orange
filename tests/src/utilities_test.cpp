@@ -465,3 +465,24 @@ TEST(OAuthenticator, ClientCredentialsBodyAndToken) {
   EXPECT_EQ("Basic aWQ6c2VjcmV0", OAuthenticator::BasicAuthorizationHeader("id", "secret"));
   EXPECT_EQ("tok", OAuthenticator::ParseAccessToken(R"json({"access_token":"tok","token_type":"Bearer"})json"));
 }
+
+TEST(OAuthenticator, ParseTokenResponseAndRefreshBody) {
+  const auto token = OAuthenticator::ParseTokenResponse(R"json({"access_token":"a","refresh_token":"r","token_type":"Bearer","expires_in":3600})json");
+  EXPECT_EQ("a", token.access_token);
+  EXPECT_EQ("r", token.refresh_token);
+  EXPECT_EQ("Bearer", token.token_type);
+  EXPECT_EQ(3600, token.expires_in);
+  const std::string body = OAuthenticator::RefreshTokenBody("refresh", "id", "secret");
+  EXPECT_NE(std::string::npos, body.find("grant_type=refresh_token"));
+  EXPECT_NE(std::string::npos, body.find("refresh_token=refresh"));
+  EXPECT_NE(std::string::npos, body.find("client_id=id"));
+}
+
+TEST(OAuthenticator, AccessTokenExpiredUsesSkew) {
+  EXPECT_FALSE(OAuthenticator::AccessTokenExpired(1000, 3600, 1000));
+  EXPECT_FALSE(OAuthenticator::AccessTokenExpired(1000, 3600, 4539));
+  EXPECT_TRUE(OAuthenticator::AccessTokenExpired(1000, 3600, 4540));
+  EXPECT_TRUE(OAuthenticator::AccessTokenExpired(1000, 3600, 5000));
+  EXPECT_FALSE(OAuthenticator::AccessTokenExpired(0, 3600, 5000));
+  EXPECT_FALSE(OAuthenticator::AccessTokenExpired(1000, 0, 5000));
+}

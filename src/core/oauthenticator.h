@@ -15,16 +15,28 @@ class OAuthenticator {
   explicit OAuthenticator(NetworkAccessManager *network);
   ~OAuthenticator();
 
+  struct TokenResponse {
+    std::string access_token;
+    std::string refresh_token;
+    std::string token_type;
+    int expires_in = 0;
+  };
+
   void AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback);
   void ExchangeCode(const std::string &token_url, const std::string &client_id, const std::string &client_secret, const std::string &code, Callback callback);
+  void RefreshAccessToken(const std::string &token_url, const std::string &client_id, const std::string &client_secret,
+                          const std::string &refresh_token, Callback callback);
   void ClientCredentials(const std::string &token_url, const std::string &client_id, const std::string &client_secret, Callback callback);
   std::string redirect_uri() const { return redirect_uri_; }
 
   static std::string BuildAuthorizeUrl(const std::string &authorize_url, const std::string &client_id, const std::string &redirect_uri,
                                        const std::string &scope, const std::string &state = {});
   static std::string ClientCredentialsBody(const std::string &client_id, const std::string &client_secret);
+  static std::string RefreshTokenBody(const std::string &refresh_token, const std::string &client_id, const std::string &client_secret);
   static std::string BasicAuthorizationHeader(const std::string &client_id, const std::string &client_secret);
   static std::string ParseAccessToken(const std::string &json);
+  static TokenResponse ParseTokenResponse(const std::string &json);
+  static bool AccessTokenExpired(gint64 login_time, int expires_in, gint64 now = 0, int skew_seconds = 60);
 
  private:
   bool StartRedirectServer();

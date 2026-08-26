@@ -17,6 +17,7 @@
 #include "device/mtpdevice.h"
 #include "device/mtploader.h"
 #include "utilities/fileutils.h"
+#include <glib.h>
 #ifdef HAVE_GIO
 #include <gio/gio.h>
 #include <glib/gstdio.h>
@@ -39,13 +40,59 @@ DeviceManager::DeviceManager(Database *database)
     : url_handler_(std::make_unique<DeviceUrlHandler>(this)),
       device_db_(database ? std::make_unique<DeviceDatabaseBackend>(database) : nullptr) {}
 
-DeviceManager::~DeviceManager() = default;
+DeviceManager::~DeviceManager() { StopVolumeMonitor(); }
 
 void DeviceManager::Init() {
   if (device_db_) {
     device_db_->Init();
   }
+  StartVolumeMonitor();
   Rescan();
+}
+
+void DeviceManager::StartVolumeMonitor() {
+#ifdef HAVE_GIO
+  if (volume_monitor_) {
+    return;
+  }
+  auto *monitor = g_volume_monitor_get();
+  volume_monitor_ = monitor;
+  auto added = +[](GVolumeMonitor *, GObject *, gpointer data) {
+    static_cast<DeviceManager *>(data)->ScheduleRescan();
+  };
+  g_signal_connect(monitor, "volume-added", G_CALLBACK(added), this);
+  g_signal_connect(monitor, "volume-removed", G_CALLBACK(added), this);
+  g_signal_connect(monitor, "mount-added", G_CALLBACK(added), this);
+  g_signal_connect(monitor, "mount-removed", G_CALLBACK(added), this);
+#endif
+}
+
+void DeviceManager::StopVolumeMonitor() {
+  if (rescan_idle_) {
+    g_source_remove(rescan_idle_);
+    rescan_idle_ = 0;
+  }
+#ifdef HAVE_GIO
+  if (volume_monitor_) {
+    g_signal_handlers_disconnect_by_data(volume_monitor_, this);
+    g_object_unref(static_cast<GVolumeMonitor *>(volume_monitor_));
+    volume_monitor_ = nullptr;
+  }
+#endif
+}
+
+void DeviceManager::ScheduleRescan() {
+  if (rescan_idle_) {
+    return;
+  }
+  rescan_idle_ = g_idle_add(
+      +[](gpointer data) -> gboolean {
+        auto *self = static_cast<DeviceManager *>(data);
+        self->rescan_idle_ = 0;
+        self->Rescan();
+        return G_SOURCE_REMOVE;
+      },
+      this);
 }
 
 std::string DeviceManager::MtpSerial(const std::string &unique_id) {

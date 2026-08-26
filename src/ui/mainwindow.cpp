@@ -651,6 +651,17 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->view()->SetEditCommitCallback([this](int row, PlaylistColumn column, const std::string &value) {
     ApplyColumnValue(column, value, {row});
   });
+  playlist_container_->view()->SetDropUrlsCallback([this](const std::vector<std::string> &urls, int row) {
+    app_->playlist_manager()->InsertUrls(urls, row);
+    RefreshPlaylist();
+  });
+  playlist_container_->view()->SetReorderCallback([this](const std::vector<int> &rows, int dest) {
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      playlist->MoveRows(rows, dest);
+      app_->playlist_manager()->SaveCurrent();
+      RefreshPlaylist();
+    }
+  });
   playlist_container_->tab_bar()->SetChangedCallback([this](const std::string &name) {
     app_->playlist_manager()->SetCurrentPlaylist(name);
     RefreshPlaylist();
@@ -787,6 +798,7 @@ void MainWindow::ConnectSignals() {
     }
   });
   app_->queue()->Changed.Connect([this]() { RefreshQueue(); });
+  app_->device_manager()->DevicesChanged.Connect([this]() { RefreshDevices(); });
   app_->radio_services()->set_updated_callback([this]() { RefreshRadio(); });
   app_->waveform()->Ready.Connect([this](const std::vector<float> &) { gtk_widget_queue_draw(waveform_drawing_); });
   app_->moodbar()->Ready.Connect([this](const std::vector<uint8_t> &) { gtk_widget_queue_draw(moodbar_drawing_); });
