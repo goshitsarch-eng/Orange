@@ -1,6 +1,15 @@
+#include "collection/collectionbackend.h"
+#include "core/database.h"
+#include "playlist/playlist.h"
+#include "smartplaylists/playlistgenerator.h"
+#include "smartplaylists/playlistgeneratorinserter.h"
+#include "smartplaylists/playlistquerygenerator.h"
 #include "smartplaylists/smartplaylist.h"
+#include "smartplaylists/smartplaylistwizardplugin.h"
+#include "smartplaylists/smartplaylistsmodel.h"
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 TEST(SmartPlaylist, ArtistContains) {
   Song match;
@@ -145,4 +154,83 @@ TEST(SmartPlaylist, FieldAndOpIndex) {
   EXPECT_EQ(SmartPlaylistOp::NotEmpty, SmartPlaylistSearch::OpFromIndex(static_cast<int>(SmartPlaylistSearch::OpNames().size()) - 1));
   EXPECT_EQ(SmartPlaylistSearch::FieldNames().size(), 29u);
   EXPECT_EQ(SmartPlaylistSearch::OpNames().size(), 10u);
+}
+
+TEST(PlaylistGenerator, CreateQueryRoundTripAndInsert) {
+  auto generator = PlaylistGenerator::Create(PlaylistGenerator::Type::Query);
+  ASSERT_TRUE(generator);
+  EXPECT_EQ(PlaylistGenerator::Type::Query, generator->type());
+  EXPECT_FALSE(generator->is_dynamic());
+
+  SmartPlaylistSearch search;
+  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "fleet"});
+  search.limit = 50;
+  generator->Load(search.Serialize());
+  EXPECT_EQ(search.Serialize(), generator->Save());
+
+  auto query = std::dynamic_pointer_cast<PlaylistQueryGenerator>(generator);
+  ASSERT_TRUE(query);
+  query->set_dynamic(true);
+  EXPECT_TRUE(query->is_dynamic());
+  EXPECT_EQ(50, query->GetDynamicFuture());
+  EXPECT_TRUE(query->Generate().empty());
+
+  const std::string path = "/tmp/strawberry-smartgen-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  ASSERT_GE(directory, 0);
+  Song match;
+  match.set_title("Ragged Wood");
+  match.set_artist("Fleet Foxes");
+  match.set_url("file:///tmp/music/ragged.flac");
+  match.set_directory_id(directory);
+  match.set_valid(true);
+  ASSERT_GT(backend.AddOrUpdateSong(match), 0);
+  Song other;
+  other.set_title("New Slang");
+  other.set_artist("The Shins");
+  other.set_url("file:///tmp/music/slang.flac");
+  other.set_directory_id(directory);
+  other.set_valid(true);
+  ASSERT_GT(backend.AddOrUpdateSong(other), 0);
+
+  query->set_collection_backend(&backend);
+  const SongList generated = query->Generate();
+  ASSERT_EQ(1u, generated.size());
+  EXPECT_EQ("Ragged Wood", generated.front().title());
+  EXPECT_TRUE(query->GenerateMore(1).empty());
+
+  Playlist playlist;
+  PlaylistGeneratorInserter inserter;
+  EXPECT_EQ(1, inserter.Insert(&playlist, query));
+  EXPECT_EQ(1, playlist.row_count());
+  unlink(path.c_str());
+}
+
+TEST(SmartPlaylistsModel, BuiltinSavedAndWizardKeys) {
+  SmartPlaylistSearch custom;
+  custom.terms.push_back({SmartPlaylistField::Title, SmartPlaylistOp::Contains, "live"});
+  SmartPlaylistSearch::AddSaved("Live tracks", custom);
+  SmartPlaylistsModel model;
+  model.Reload();
+  EXPECT_TRUE(model.ItemByKey("all"));
+  EXPECT_TRUE(model.ItemByKey("never"));
+  EXPECT_TRUE(model.ItemByKey("rated"));
+  EXPECT_TRUE(model.ItemByKey("newest"));
+  EXPECT_TRUE(model.ItemByKey("played"));
+  ASSERT_TRUE(model.ItemByKey("saved:Live tracks"));
+  EXPECT_EQ(SmartPlaylistsItem::Kind::Saved, model.ItemByKey("saved:Live tracks")->kind);
+  ASSERT_TRUE(model.ItemByKey("wizard"));
+  EXPECT_EQ(SmartPlaylistsItem::Kind::Wizard, model.ItemByKey("wizard")->kind);
+  EXPECT_FALSE(model.ItemByKey("missing"));
+  SmartPlaylistSearch::RemoveSaved("Live tracks");
+
+  SmartPlaylistQueryWizardPlugin plugin(custom);
+  auto generated = plugin.CreateGenerator("From wizard", true);
+  ASSERT_TRUE(generated);
+  EXPECT_EQ("From wizard", generated->name());
+  EXPECT_TRUE(generated->is_dynamic());
 }

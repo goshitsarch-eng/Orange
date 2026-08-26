@@ -4,10 +4,15 @@
 #include "utilities/audioanalysis.h"
 #include "collection/collectiongrouping.h"
 #include "core/oauthenticator.h"
+#include "device/cddasongloader.h"
 #include "device/devicemanager.h"
+#include "device/filesystemdevice.h"
+#include "device/giolister.h"
 #include "equalizer/equalizer.h"
 #include "organize/organize.h"
 #include "analyzer/analyzer.h"
+#include "analyzer/fht.h"
+#include "transcoder/transcoder.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -212,6 +217,64 @@ TEST(Analyzer, MagnitudesFillBands) {
   analyzer.SetMagnitudes(std::vector<float>(64, -20.0f));
   EXPECT_FALSE(analyzer.bands().empty());
   EXPECT_GT(analyzer.bands().front(), 0.0f);
+}
+
+TEST(FHT, AppliesHannWindow) {
+  FHT fht(4);
+  ASSERT_EQ(4, fht.size());
+  ASSERT_EQ(4u, fht.window().size());
+  EXPECT_NEAR(0.0f, fht.window().front(), 0.001f);
+  EXPECT_NEAR(1.0f, fht.window()[2], 0.001f);
+  std::vector<float> samples = {1.0f, 1.0f, 1.0f, 1.0f};
+  fht.Transform(&samples);
+  EXPECT_NEAR(0.0f, samples.front(), 0.001f);
+  EXPECT_NEAR(1.0f, samples[2], 0.001f);
+}
+
+TEST(Transcoder, PresetAndPipelineFor) {
+  EXPECT_EQ("mp3", Transcoder::Extension(Transcoder::Format::MP3));
+  EXPECT_EQ("FLAC", Transcoder::FormatName(Transcoder::Format::FLAC));
+  const Transcoder::Preset flac = Transcoder::PresetFor(Transcoder::Format::FLAC);
+  EXPECT_EQ("flac", flac.extension);
+  EXPECT_EQ("audio/x-flac", flac.codec_mimetype);
+  const std::string mp3 = Transcoder::PipelineFor(Transcoder::Format::MP3, 5);
+  EXPECT_NE(std::string::npos, mp3.find("lamemp3enc"));
+  EXPECT_NE(std::string::npos, mp3.find("xingmux"));
+  const std::string opus = Transcoder::PipelineFor(Transcoder::Format::Opus, 5);
+  EXPECT_NE(std::string::npos, opus.find("opusenc"));
+  Transcoder transcoder;
+  transcoder.set_quality(8);
+  EXPECT_EQ(8, transcoder.quality());
+  EXPECT_EQ(0, transcoder.job_count());
+}
+
+TEST(CddaSongLoader, SongsDelegateToDeviceManager) {
+  const SongList songs = CddaSongLoader::Songs(1, 2, {1000, 2000});
+  ASSERT_EQ(2u, songs.size());
+  EXPECT_EQ("cdda://1", songs[0].url());
+  EXPECT_EQ(Song::Source::CDDA, songs[0].source());
+  EXPECT_EQ(1000, songs[0].length_nanosec());
+  EXPECT_TRUE(CddaSongLoader::Songs(0, 0, {}).empty());
+}
+
+TEST(FilesystemDevice, SongsFromMountedDirectory) {
+  const std::string root = "/tmp/strawberry-fsdevice-" + std::to_string(getpid());
+  g_mkdir_with_parents(root.c_str(), 0755);
+  ASSERT_TRUE(FileUtils::WriteFile(FileUtils::Join(root, "song.mp3"), "x"));
+  ConnectedDevice info;
+  info.mount_path = root;
+  info.backend = "gio";
+  FilesystemDevice device(info);
+  const SongList songs = device.Songs();
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ(Song::Source::Device, songs[0].source());
+  FileUtils::Remove(FileUtils::Join(root, "song.mp3"));
+  rmdir(root.c_str());
+}
+
+TEST(GioLister, BackendName) {
+  GioLister lister;
+  EXPECT_EQ("gio", lister.backend());
 }
 
 TEST(FileUtils, ListDirectoryRecursive) {

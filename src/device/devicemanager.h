@@ -4,6 +4,7 @@
 #include "core/signal.h"
 #include "core/song.h"
 #include "core/urlhandlers.h"
+#include "device/connecteddevice.h"
 #include "device/devicedatabasebackend.h"
 
 #include <memory>
@@ -11,15 +12,6 @@
 #include <vector>
 
 class Database;
-
-struct ConnectedDevice {
-  std::string unique_id;
-  std::string friendly_name;
-  std::string icon;
-  int64_t size = 0;
-  std::string backend;
-  std::string mount_path;
-};
 
 class DeviceManager {
  public:

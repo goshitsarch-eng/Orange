@@ -4,20 +4,13 @@
 #include "core/database.h"
 #include "core/network.h"
 #include "core/song.h"
+#include "radios/radiochannel.h"
+#include "radios/radiobackend.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
-
-struct RadioChannel {
-  std::string name;
-  std::string url;
-  std::string thumbnail_url;
-  std::string country;
-  std::string tags;
-  std::string codec;
-  Song::Source source = Song::Source::Stream;
-};
 
 class RadioServices {
  public:
@@ -38,8 +31,8 @@ class RadioServices {
   void ResolveSomaFMPlaylists(std::vector<RadioChannel> channels);
   void NotifyUpdated();
 
-  Database *database_;
   NetworkAccessManager *network_;
+  std::unique_ptr<RadioBackend> backend_;
   std::vector<RadioChannel> channels_;
   std::vector<RadioChannel> search_results_;
   Callback updated_;

@@ -240,6 +240,17 @@ set(STRAWBERRY_SOURCES
   src/playlistparsers/cueparser.cpp
   src/playlistparsers/playlistparser.cpp
   src/smartplaylists/smartplaylist.cpp
+  src/smartplaylists/playlistgenerator.cpp
+  src/smartplaylists/playlistquerygenerator.cpp
+  src/smartplaylists/playlistgeneratorinserter.cpp
+  src/smartplaylists/smartplaylistsmodel.cpp
+  src/smartplaylists/smartplaylistsview.cpp
+  src/smartplaylists/smartplaylistsviewcontainer.cpp
+  src/smartplaylists/smartplaylistsearchtermwidget.cpp
+  src/smartplaylists/smartplaylistsearchpreview.cpp
+  src/smartplaylists/smartplaylistwizardplugin.cpp
+  src/smartplaylists/smartplaylistwizardtypepage.cpp
+  src/smartplaylists/smartplaylistwizardfinishpage.cpp
   src/smartplaylists/smartplaylistwizard.cpp
   src/filterparser/filterparser.cpp
   src/covermanager/coverproviders.cpp
@@ -310,10 +321,17 @@ set(STRAWBERRY_SOURCES
   src/qobuz/qobuzstreamurlrequest.cpp
   src/qobuz/qobuzurlhandler.cpp
   src/qobuz/qobuzmetadatarequest.cpp
+  src/radios/radiochannel.cpp
+  src/radios/radiobackend.cpp
   src/radios/radioservices.cpp
   src/radios/somafmservice.cpp
   src/radios/radioparadiseservice.cpp
   src/radios/radiobrowserservice.cpp
+  src/radios/radiomodel.cpp
+  src/radios/radioview.cpp
+  src/radios/radioviewcontainer.cpp
+  src/radios/radiobrowsersearchview.cpp
+  src/radios/radiostreamplaylistitem.cpp
   src/device/devicemanager.cpp
   src/device/devicedatabasebackend.cpp
   src/device/mtpconnection.cpp
@@ -321,12 +339,25 @@ set(STRAWBERRY_SOURCES
   src/device/mtpdevice.cpp
   src/device/gpodloader.cpp
   src/device/gpoddevice.cpp
+  src/device/filesystemdevice.cpp
+  src/device/cddasongloader.cpp
+  src/device/cddadevice.cpp
+  src/device/giolister.cpp
+  src/device/deviceview.cpp
+  src/device/deviceviewcontainer.cpp
   src/equalizer/equalizer.cpp
   src/equalizer/equalizerdialog.cpp
+  src/analyzer/fht.cpp
   src/analyzer/analyzer.cpp
+  src/analyzer/analyzer_render.cpp
   src/moodbar/moodbar.cpp
   src/waveform/waveform.cpp
   src/transcoder/transcoder.cpp
+  src/transcoder/transcoderoptionsinterface.cpp
+  src/transcoder/transcoderoptionsmp3.cpp
+  src/transcoder/transcoderoptionsflac.cpp
+  src/transcoder/transcoderoptionsvorbis.cpp
+  src/transcoder/transcoderoptionsdialog.cpp
   src/transcoder/transcodedialog.cpp
   src/organize/organize.cpp
   src/organize/organizedialog.cpp
@@ -500,6 +531,10 @@ if(GTest_FOUND)
     src/device/mtpdevice.cpp
     src/device/gpodloader.cpp
     src/device/gpoddevice.cpp
+    src/device/filesystemdevice.cpp
+    src/device/cddasongloader.cpp
+    src/device/cddadevice.cpp
+    src/device/giolister.cpp
     src/playlistparsers/parserbase.cpp
     src/playlistparsers/m3uparser.cpp
     src/playlistparsers/plsparser.cpp
@@ -510,6 +545,11 @@ if(GTest_FOUND)
     src/playlistparsers/cueparser.cpp
     src/playlistparsers/playlistparser.cpp
     src/smartplaylists/smartplaylist.cpp
+    src/smartplaylists/playlistgenerator.cpp
+    src/smartplaylists/playlistquerygenerator.cpp
+    src/smartplaylists/playlistgeneratorinserter.cpp
+    src/smartplaylists/smartplaylistsmodel.cpp
+    src/smartplaylists/smartplaylistwizardplugin.cpp
     src/filterparser/filterparser.cpp
     src/lyrics/htmllyricsprovider.cpp
     src/subsonic/subsonicservice.cpp
@@ -520,6 +560,10 @@ if(GTest_FOUND)
     src/streaming/streamingsearchsortmodel.cpp
     src/streaming/streamingsearchitemdelegate.cpp
     src/streaming/streamserviceplaylistitem.cpp
+    src/radios/radiochannel.cpp
+    src/radios/radiobackend.cpp
+    src/radios/radiomodel.cpp
+    src/radios/radiostreamplaylistitem.cpp
     src/radios/somafmservice.cpp
     src/radios/radioparadiseservice.cpp
     src/radios/radiobrowserservice.cpp
@@ -595,7 +639,15 @@ if(GTest_FOUND)
     ${GRESOURCE_C}
     src/equalizer/equalizer.cpp
     src/organize/organize.cpp
+    src/analyzer/fht.cpp
     src/analyzer/analyzer.cpp
+    src/analyzer/analyzer_render.cpp
+    src/transcoder/transcoder.cpp
+    src/transcoder/transcoderoptionsinterface.cpp
+    src/transcoder/transcoderoptionsmp3.cpp
+    src/transcoder/transcoderoptionsflac.cpp
+    src/transcoder/transcoderoptionsvorbis.cpp
+    src/transcoder/transcoderoptionsdialog.cpp
   )
   target_include_directories(strawberry_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

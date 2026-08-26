@@ -3,6 +3,7 @@
 #include "core/logging.h"
 #include "core/settings.h"
 #include "playlistparsers/playlistparser.h"
+#include "radios/radiobackend.h"
 #include "radios/radiobrowserservice.h"
 #include "radios/radioparadiseservice.h"
 #include "radios/somafmservice.h"
@@ -10,46 +11,30 @@
 #include <algorithm>
 #include <memory>
 
-RadioServices::RadioServices(Database *database, NetworkAccessManager *network) : database_(database), network_(network) {
+RadioServices::RadioServices(Database *database, NetworkAccessManager *network)
+    : network_(network), backend_(std::make_unique<RadioBackend>(database)) {
   Reload();
 }
 
 void RadioServices::Reload() {
   channels_.clear();
-  if (!database_) {
-    return;
-  }
-  SqlQuery query(database_, "SELECT source, name, url, thumbnail_url FROM radio_channels");
-  while (query.Step()) {
-    RadioChannel channel;
-    channel.source = static_cast<Song::Source>(query.ColumnInt(0));
-    channel.name = query.ColumnText(1);
-    channel.url = query.ColumnText(2);
-    channel.thumbnail_url = query.ColumnText(3);
-    channels_.push_back(channel);
+  if (backend_) {
+    channels_ = backend_->Load();
   }
 }
 
 void RadioServices::Persist(const RadioChannel &channel) {
-  if (!database_) {
-    return;
+  if (backend_) {
+    backend_->Save(channel);
   }
-  SqlQuery query(database_, "INSERT INTO radio_channels (source, name, url, thumbnail_url) VALUES (?, ?, ?, ?)");
-  query.Bind(1, static_cast<int>(channel.source));
-  query.Bind(2, channel.name);
-  query.Bind(3, channel.url);
-  query.Bind(4, channel.thumbnail_url);
-  query.Exec();
 }
 
 void RadioServices::RemoveSource(Song::Source source, bool persist) {
   channels_.erase(std::remove_if(channels_.begin(), channels_.end(),
                                  [source](const RadioChannel &channel) { return channel.source == source; }),
                   channels_.end());
-  if (persist && database_) {
-    SqlQuery query(database_, "DELETE FROM radio_channels WHERE source = ?");
-    query.Bind(1, static_cast<int>(source));
-    query.Exec();
+  if (persist && backend_) {
+    backend_->RemoveSource(source);
   }
 }
 

@@ -1,9 +1,17 @@
+#include "core/database.h"
+#include "playlist/streamplaylistitem.h"
 #include "playlistparsers/playlistparser.h"
+#include "radios/radiobackend.h"
+#include "radios/radiobrowsersearchmodel.h"
 #include "radios/radiobrowserservice.h"
+#include "radios/radiochannel.h"
+#include "radios/radiomodel.h"
 #include "radios/radioparadiseservice.h"
+#include "radios/radiostreamplaylistitem.h"
 #include "radios/somafmservice.h"
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 TEST(SomaFMService, ParsesPreferredQualityAndFormat) {
   const std::string json = R"({
@@ -107,4 +115,66 @@ TEST(RadioServices, PlaylistParserResolvesSomaFMPls) {
   const SongList songs = parser.LoadFromData(pls, "https://somafm.com/groovesalad.pls");
   ASSERT_FALSE(songs.empty());
   EXPECT_EQ("https://ice1.somafm.com/groovesalad-128-mp3", songs.front().url());
+}
+
+TEST(RadioChannel, ToSongAndPlaylistItem) {
+  RadioChannel channel;
+  channel.name = "Groove Salad";
+  channel.url = "https://ice1.somafm.com/groovesalad-128-mp3";
+  channel.thumbnail_url = "https://somafm.com/img/groovesalad120.png";
+  channel.tags = "ambient";
+  channel.source = Song::Source::SomaFM;
+  const Song song = channel.ToSong();
+  EXPECT_EQ("Groove Salad", song.title());
+  EXPECT_EQ(channel.url, song.url());
+  EXPECT_EQ(channel.thumbnail_url, song.art_automatic());
+  EXPECT_EQ("ambient", song.genre());
+  EXPECT_EQ(Song::Source::SomaFM, song.source());
+  EXPECT_TRUE(song.is_valid());
+
+  RadioStreamPlaylistItem item(channel);
+  EXPECT_EQ(channel.url, item.EffectiveMetadata().url());
+  EXPECT_EQ("Groove Salad", item.EffectiveMetadata().title());
+}
+
+TEST(RadioModel, LabelsAndSearchResults) {
+  RadioChannel channel;
+  channel.name = "Groove Salad";
+  channel.country = "US";
+  channel.codec = "mp3";
+  RadioModel model;
+  model.SetChannels({channel});
+  EXPECT_EQ(1, model.row_count());
+  EXPECT_EQ("Groove Salad · US (mp3)", model.Label(channel));
+  RadioChannel other;
+  other.name = "Search hit";
+  model.SetSearchResults({other});
+  EXPECT_EQ(1, model.row_count());
+  EXPECT_EQ("Search hit", model.visible().front().name);
+
+  RadioBrowserSearchModel search;
+  search.SetResults({channel, other});
+  EXPECT_EQ(2, search.row_count());
+}
+
+TEST(RadioBackend, PersistAndRemoveSource) {
+  const std::string path = "/tmp/strawberry-radio-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  RadioBackend backend(&db);
+  RadioChannel channel;
+  channel.name = "Custom";
+  channel.url = "https://example.com/stream.mp3";
+  channel.thumbnail_url = "https://example.com/art.png";
+  channel.source = Song::Source::Stream;
+  backend.Save(channel);
+  const std::vector<RadioChannel> loaded = backend.Load();
+  ASSERT_EQ(1u, loaded.size());
+  EXPECT_EQ("Custom", loaded.front().name);
+  EXPECT_EQ(channel.url, loaded.front().url);
+  EXPECT_EQ(Song::Source::Stream, loaded.front().source);
+  backend.RemoveSource(Song::Source::Stream);
+  EXPECT_TRUE(backend.Load().empty());
+  unlink(path.c_str());
 }

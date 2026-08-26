@@ -4,8 +4,14 @@
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
 #include "context/contextview.h"
+#include "device/deviceviewcontainer.h"
 #include "fileview/fileview.h"
 #include "playlist/playlistcontainer.h"
+#include "radios/radiostreamplaylistitem.h"
+#include "radios/radioviewcontainer.h"
+#include "smartplaylists/playlistgeneratorinserter.h"
+#include "smartplaylists/playlistquerygenerator.h"
+#include "smartplaylists/smartplaylistsviewcontainer.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistsequence.h"
@@ -312,7 +318,18 @@ void MainWindow::BuildSidebar() {
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, playlist_list_container_->widget(), "playlists", "Playlists",
                                       "view-list-symbolic");
-  adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&smart_list_), "smart", "Smart playlists", "view-refresh-symbolic");
+  smart_container_ = std::make_unique<SmartPlaylistsViewContainer>();
+  smart_container_->SetActivateCallback([this](const SmartPlaylistsItem &item) {
+    if (item.kind == SmartPlaylistsItem::Kind::Wizard) {
+      Dialogs::SmartPlaylistWizard(GTK_WINDOW(window_), app_);
+      smart_container_->Reload();
+      RefreshPlaylistsList();
+      RefreshPlaylist();
+      return;
+    }
+    RunSmartPlaylist(item.key);
+  });
+  adw_view_stack_add_titled_with_icon(sidebar_stack_, smart_container_->widget(), "smart", "Smart playlists", "view-refresh-symbolic");
   file_view_ = std::make_unique<FileView>();
   file_view_->SetAddToPlaylistCallback([this](const std::vector<std::string> &paths) {
     std::vector<std::string> urls;
@@ -357,23 +374,9 @@ void MainWindow::BuildSidebar() {
     }
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, file_view_->widget(), "files", "Files", "folder-symbolic");
-  GtkWidget *radio_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  GtkWidget *radio_search = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(radio_search), "Search Radio Browser");
-  gtk_widget_set_margin_start(radio_search, 8);
-  gtk_widget_set_margin_end(radio_search, 8);
-  gtk_widget_set_margin_top(radio_search, 6);
-  gtk_widget_set_margin_bottom(radio_search, 4);
-  gtk_box_append(GTK_BOX(radio_page), radio_search);
-  gtk_box_append(GTK_BOX(radio_page), MakeScrolledList(&radio_list_));
-  gtk_widget_set_vexpand(gtk_widget_get_last_child(radio_page), TRUE);
-  g_signal_connect(radio_search, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
-                     auto *self = static_cast<MainWindow *>(data);
-                     const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
-                     self->SearchRadio(text ? text : "");
-                   }),
-                   this);
-  adw_view_stack_add_titled_with_icon(sidebar_stack_, radio_page, "radio", "Internet radio", "network-wireless-symbolic");
+  radio_container_ = std::make_unique<RadioViewContainer>(app_->radio_services());
+  radio_container_->SetActivateCallback([this](const RadioChannel &channel) { PlayRadioChannel(channel); });
+  adw_view_stack_add_titled_with_icon(sidebar_stack_, radio_container_->widget(), "radio", "Internet radio", "network-wireless-symbolic");
   GtkWidget *streaming_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   streaming_service_drop_ = gtk_combo_box_text_new();
   gtk_widget_set_margin_start(streaming_service_drop_, 8);
@@ -408,21 +411,18 @@ void MainWindow::BuildSidebar() {
                    }),
                    this);
   adw_view_stack_add_titled_with_icon(sidebar_stack_, streaming_page, "streaming", "Streaming", "emblem-shared-symbolic");
-  adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&devices_list_), "devices", "Devices", "drive-harddisk-usb-symbolic");
+  device_container_ = std::make_unique<DeviceViewContainer>(app_->device_manager());
+  device_container_->SetSongCallback([this](const Song &song) {
+    app_->playlist_manager()->AppendSongs({song});
+    RefreshPlaylist();
+  });
+  device_container_->SetAddAllCallback([this](const SongList &songs) {
+    app_->playlist_manager()->AppendSongs(songs);
+    RefreshPlaylist();
+  });
+  adw_view_stack_add_titled_with_icon(sidebar_stack_, device_container_->widget(), "devices", "Devices", "drive-harddisk-usb-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&queue_list_), "queue", "Queue", "view-list-ordered-symbolic");
 
-  g_signal_connect(smart_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-                     auto *self = static_cast<MainWindow *>(data);
-                     const char *kind = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-data"));
-                     if (kind && std::string(kind) == "wizard") {
-                       Dialogs::SmartPlaylistWizard(GTK_WINDOW(self->window_), self->app_);
-                       self->RefreshPlaylistsList();
-                       self->RefreshPlaylist();
-                     } else if (kind) {
-                       self->RunSmartPlaylist(kind);
-                     }
-                   }),
-                   this);
   if (streaming_list_) {
   g_signal_connect(streaming_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
@@ -452,44 +452,6 @@ void MainWindow::BuildSidebar() {
                    }),
                    this);
   }
-  g_signal_connect(radio_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-                     auto *self = static_cast<MainWindow *>(data);
-                     auto *channel = static_cast<RadioChannel *>(g_object_get_data(G_OBJECT(row), "row-data"));
-                     if (channel) {
-                       self->PlayRadioChannel(*channel);
-                     }
-                   }),
-                   this);
-  g_signal_connect(devices_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-                     auto *self = static_cast<MainWindow *>(data);
-                     const char *kind = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-kind"));
-                     if (kind && std::string(kind) == "back") {
-                       self->device_browse_id_.clear();
-                       self->RefreshDevices();
-                       return;
-                     }
-                     if (kind && std::string(kind) == "add-all" && !self->device_browse_id_.empty()) {
-                       self->app_->playlist_manager()->AppendSongs(self->app_->device_manager()->Songs(self->device_browse_id_));
-                       self->RefreshPlaylist();
-                       return;
-                     }
-                     if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"))) {
-                       if (kind && std::string(kind) == "song") {
-                         self->app_->playlist_manager()->AppendSongs({*song});
-                         self->RefreshPlaylist();
-                         if (self->app_->playlist_manager()->active()) {
-                           self->app_->player()->PlayAt(self->app_->playlist_manager()->active()->row_count() - 1);
-                         }
-                         return;
-                       }
-                     }
-                     const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-data"));
-                     if (id && *id) {
-                       self->device_browse_id_ = id;
-                       self->RefreshDevices();
-                     }
-                   }),
-                   this);
   g_signal_connect(queue_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
                      const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
@@ -786,19 +748,9 @@ void MainWindow::RefreshPlaylistTabs() {
 }
 
 void MainWindow::RefreshSmartPlaylists() {
-  ClearList(smart_list_);
-  struct Item {
-    const char *title;
-    const char *kind;
-  };
-  for (const Item item : {Item{"All songs", "all"}, Item{"Never played", "never"}, Item{"Highest rated", "rated"}, Item{"Newest", "newest"},
-                          Item{"Most played", "played"}}) {
-      AppendStringRow(GTK_LIST_BOX(smart_list_), item.title, const_cast<char *>(item.kind));
+  if (smart_container_) {
+    smart_container_->Reload();
   }
-  for (const auto &preset : SmartPlaylistSearch::LoadSaved()) {
-    AppendStringRow(GTK_LIST_BOX(smart_list_), preset.first, g_strdup(("saved:" + preset.first).c_str()), g_free);
-  }
-  AppendStringRow(GTK_LIST_BOX(smart_list_), "Custom wizard…", const_cast<char *>("wizard"));
 }
 
 void MainWindow::RefreshQueue() {
@@ -822,47 +774,16 @@ void MainWindow::RefreshQueue() {
 }
 
 void MainWindow::RefreshRadio() {
-  ClearList(radio_list_);
-  if (!radio_query_.empty()) {
-    const std::vector<RadioChannel> &results = app_->radio_services()->search_results();
-    for (const RadioChannel &channel : results) {
-      std::string label = channel.name.empty() ? channel.url : channel.name;
-      if (!channel.country.empty()) {
-        label += " · " + channel.country;
-      }
-      if (!channel.codec.empty()) {
-        label += " (" + channel.codec + ")";
-      }
-      auto *copy = new RadioChannel(channel);
-      AppendStringRow(GTK_LIST_BOX(radio_list_), label, copy, [](gpointer p) { delete static_cast<RadioChannel *>(p); });
-    }
-    if (results.empty()) {
-      AppendStringRow(GTK_LIST_BOX(radio_list_), "Searching Radio Browser…", nullptr);
-    }
-    return;
-  }
-  if (app_->radio_services()->channels().empty()) {
-    app_->radio_services()->FetchSomaFM();
-    app_->radio_services()->FetchRadioParadise();
-  }
-  for (const RadioChannel &channel : app_->radio_services()->channels()) {
-    auto *copy = new RadioChannel(channel);
-    AppendStringRow(GTK_LIST_BOX(radio_list_), channel.name.empty() ? channel.url : channel.name, copy, [](gpointer p) { delete static_cast<RadioChannel *>(p); });
-  }
-  if (app_->radio_services()->channels().empty()) {
-    AppendStringRow(GTK_LIST_BOX(radio_list_), "SomaFM", nullptr);
-    AppendStringRow(GTK_LIST_BOX(radio_list_), "Radio Paradise", nullptr);
-    AppendStringRow(GTK_LIST_BOX(radio_list_), "Search Radio Browser above", nullptr);
+  if (radio_container_) {
+    radio_container_->Reload();
   }
 }
 
 void MainWindow::SearchRadio(const std::string &query) {
   radio_query_ = StrUtils::Trim(query);
-  if (radio_query_.empty()) {
-    RefreshRadio();
-    return;
+  if (radio_container_) {
+    radio_container_->Search(radio_query_);
   }
-  app_->radio_services()->FetchRadioBrowser(radio_query_);
 }
 
 void MainWindow::RefreshStreaming() {
@@ -906,32 +827,8 @@ void MainWindow::SearchStreaming(const std::string &query) {
 }
 
 void MainWindow::RefreshDevices() {
-  ClearList(devices_list_);
-  if (!device_browse_id_.empty()) {
-    GtkWidget *back = AppendStringRow(GTK_LIST_BOX(devices_list_), "← Devices", nullptr);
-    g_object_set_data(G_OBJECT(back), "row-kind", const_cast<char *>("back"));
-    GtkWidget *add_all = AppendStringRow(GTK_LIST_BOX(devices_list_), "Add all to playlist", nullptr);
-    g_object_set_data(G_OBJECT(add_all), "row-kind", const_cast<char *>("add-all"));
-    const SongList songs = app_->device_manager()->Songs(device_browse_id_);
-    for (const Song &song : songs) {
-      auto *copy = new Song(song);
-      GtkWidget *row = AppendStringRow(GTK_LIST_BOX(devices_list_), song.PrettyTitleWithArtist(), copy, [](gpointer p) {
-        delete static_cast<Song *>(p);
-      });
-      g_object_set_data(G_OBJECT(row), "row-kind", const_cast<char *>("song"));
-    }
-    if (songs.empty()) {
-      AppendStringRow(GTK_LIST_BOX(devices_list_), "No songs found on this device", nullptr);
-    }
-    return;
-  }
-  for (const ConnectedDevice &device : app_->device_manager()->devices()) {
-    GtkWidget *row = AppendStringRow(GTK_LIST_BOX(devices_list_), device.friendly_name + " · " + device.backend,
-                                     g_strdup(device.unique_id.c_str()), g_free);
-    g_object_set_data(G_OBJECT(row), "row-kind", const_cast<char *>("device"));
-  }
-  if (app_->device_manager()->devices().empty()) {
-    AppendStringRow(GTK_LIST_BOX(devices_list_), "No devices found", nullptr);
+  if (device_container_) {
+    device_container_->Reload();
   }
 }
 
@@ -1143,54 +1040,23 @@ void MainWindow::CycleShuffle() {
 }
 
 void MainWindow::RunSmartPlaylist(const std::string &kind) {
-  SmartPlaylistSearch search;
-  std::string name = "Smart playlist";
-  if (StrUtils::StartsWith(kind, "saved:")) {
-    const std::string saved_name = kind.substr(6);
-    for (const auto &preset : SmartPlaylistSearch::LoadSaved()) {
-      if (preset.first == saved_name) {
-        search = preset.second;
-        name = saved_name;
-        break;
-      }
-    }
-  } else if (kind == "never") {
-    search.terms.push_back({SmartPlaylistField::Playcount, SmartPlaylistOp::Equals, "0"});
-    name = "Never played";
-  } else if (kind == "rated") {
-    search.sort_field = SmartPlaylistField::Rating;
-    search.sort_descending = true;
-    search.limit = 100;
-    name = "Highest rated";
-  } else if (kind == "newest") {
-    search.sort_field = SmartPlaylistField::Year;
-    search.sort_descending = true;
-    search.limit = 100;
-    name = "Newest";
-  } else if (kind == "played") {
-    search.sort_field = SmartPlaylistField::Playcount;
-    search.sort_descending = true;
-    search.limit = 100;
-    name = "Most played";
-  }
+  SmartPlaylistsModel model;
+  model.Reload();
+  const SmartPlaylistsItem *item = model.ItemByKey(kind);
+  SmartPlaylistSearch search = item ? item->search : SmartPlaylistSearch();
+  std::string name = item ? item->title : "Smart playlist";
+  auto generator = std::make_shared<PlaylistQueryGenerator>(name, search, true);
+  generator->set_collection_backend(app_->collection()->backend());
   Playlist *playlist = app_->playlist_manager()->New(name);
   playlist->SetDynamic(true, search);
-  SmartPlaylistSearch initial = search;
-  if (initial.limit == 0 || initial.limit > 20) {
-    initial.limit = 20;
-  }
-  app_->playlist_manager()->AppendSongs(initial.Search(app_->collection()->Songs()));
+  PlaylistGeneratorInserter inserter;
+  inserter.Insert(playlist, generator);
   RefreshPlaylistsList();
   RefreshPlaylist();
 }
 
 void MainWindow::PlayRadioChannel(const RadioChannel &channel) {
-  Song song(channel.source);
-  song.set_title(channel.name);
-  song.set_url(channel.url);
-  song.set_art_automatic(channel.thumbnail_url);
-  song.set_genre(channel.tags);
-  song.set_valid(true);
+  const Song song = RadioStreamPlaylistItem(channel).EffectiveMetadata();
   app_->playlist_manager()->AppendSongs({song});
   RefreshPlaylist();
   if (app_->playlist_manager()->active()) {
@@ -1233,45 +1099,7 @@ void MainWindow::OnLove(GtkButton *, gpointer data) {
 
 void MainWindow::DrawAnalyzer(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
   auto *self = static_cast<MainWindow *>(data);
-  const auto &bands = self->app_->analyzer()->bands();
-  if (bands.empty() || width <= 0) {
-    return;
-  }
-  const std::string type = self->app_->analyzer()->type();
-  const double bar_w = static_cast<double>(width) / static_cast<double>(bands.size());
-  if (type == "Wave" || type == "Sonic") {
-    cairo_set_source_rgb(cr, type == "Sonic" ? 0.95 : 0.23, 0.63, type == "Sonic" ? 0.35 : 0.95);
-    cairo_move_to(cr, 0, height / 2.0);
-    for (size_t i = 0; i < bands.size(); ++i) {
-      const double x = static_cast<double>(i) * bar_w;
-      const double y = height / 2.0 - static_cast<double>(bands[i]) * height / 2.0;
-      cairo_line_to(cr, x, y);
-    }
-    cairo_stroke(cr);
-    return;
-  }
-  for (size_t i = 0; i < bands.size(); ++i) {
-    const double h = std::max(1.0, static_cast<double>(bands[i]) * height);
-    if (type == "Rainbow") {
-      cairo_set_source_rgb(cr, static_cast<double>(i) / bands.size(), 0.4, 1.0 - static_cast<double>(i) / bands.size());
-    } else if (type == "Turbine") {
-      cairo_set_source_rgb(cr, 0.9, 0.45 + bands[i] * 0.4, 0.1);
-    } else if (type == "Block") {
-      cairo_set_source_rgb(cr, 0.2, 0.8, 0.4);
-    } else {
-      cairo_set_source_rgb(cr, 0.23, 0.63, 0.95);
-    }
-    if (type == "Block") {
-      const int blocks = std::max(1, static_cast<int>(h / 4));
-      for (int b = 0; b < blocks; ++b) {
-        cairo_rectangle(cr, static_cast<double>(i) * bar_w, height - (b + 1) * 4, bar_w - 1.0, 3);
-        cairo_fill(cr);
-      }
-    } else {
-      cairo_rectangle(cr, static_cast<double>(i) * bar_w, height - h, bar_w - 1.0, h);
-      cairo_fill(cr);
-    }
-  }
+  self->app_->analyzer()->Draw(cr, width, height);
 }
 
 void MainWindow::DrawMoodbar(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
