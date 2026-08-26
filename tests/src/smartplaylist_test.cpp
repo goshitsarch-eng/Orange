@@ -6,6 +6,7 @@
 #include "smartplaylists/playlistquerygenerator.h"
 #include "smartplaylists/smartplaylist.h"
 #include "smartplaylists/smartplaylistsummary.h"
+#include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
 #include "smartplaylists/smartplaylistdrag.h"
 #include "smartplaylists/smartplaylistsmodel.h"
@@ -132,6 +133,7 @@ TEST(SmartPlaylist, SerializeRoundTrip) {
   EXPECT_EQ(25, parsed.limit);
   EXPECT_EQ(SmartPlaylistField::Year, parsed.sort_field);
   EXPECT_TRUE(parsed.sort_descending);
+  EXPECT_FALSE(parsed.sort_random);
   ASSERT_EQ(2u, parsed.terms.size());
   EXPECT_EQ(SmartPlaylistField::Artist, parsed.terms[0].field);
   EXPECT_EQ(SmartPlaylistOp::Contains, parsed.terms[0].op);
@@ -176,6 +178,14 @@ TEST(SmartPlaylistSummary, DescribesTermsLimitAndEmpty) {
   search.type = SmartPlaylistSearch::SearchType::Or;
   search.limit = 0;
   EXPECT_EQ("Artist Contains Portishead or Year Greater than 1990", SmartPlaylistSummary::Summary(search));
+
+  SmartPlaylistSearch all_songs;
+  all_songs.type = SmartPlaylistSearch::SearchType::All;
+  all_songs.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "ignored"});
+  all_songs.limit = 12;
+  EXPECT_EQ("Include all songs · limit 12", SmartPlaylistSummary::Summary(all_songs));
+  EXPECT_EQ("3 songs will be added as “Favorites”. Include all songs · limit 12",
+            SmartPlaylistSummary::FinishText(3, "Favorites", all_songs));
 
   SmartPlaylistTerm empty_comment;
   empty_comment.field = SmartPlaylistField::Comment;
@@ -326,6 +336,110 @@ TEST(SmartPlaylistsModel, BuiltinSavedAndWizardKeys) {
   ASSERT_TRUE(generated);
   EXPECT_EQ("From wizard", generated->name());
   EXPECT_TRUE(generated->is_dynamic());
+}
+
+TEST(SmartPlaylist, AllIgnoresTermsAndRandomRoundTrips) {
+  EXPECT_STREQ("And", SmartPlaylistSearch::TypeName(SmartPlaylistSearch::SearchType::And));
+  EXPECT_STREQ("Or", SmartPlaylistSearch::TypeName(SmartPlaylistSearch::SearchType::Or));
+  EXPECT_STREQ("All", SmartPlaylistSearch::TypeName(SmartPlaylistSearch::SearchType::All));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::And, SmartPlaylistSearch::TypeFromName("And"));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::Or, SmartPlaylistSearch::TypeFromName("Or"));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::All, SmartPlaylistSearch::TypeFromName("All"));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::And, SmartPlaylistSearch::TypeFromName("unknown"));
+  EXPECT_TRUE(SmartPlaylistSearch::TermsApply(SmartPlaylistSearch::SearchType::And));
+  EXPECT_TRUE(SmartPlaylistSearch::TermsApply(SmartPlaylistSearch::SearchType::Or));
+  EXPECT_FALSE(SmartPlaylistSearch::TermsApply(SmartPlaylistSearch::SearchType::All));
+  EXPECT_FALSE(SmartPlaylistSearch().IsValid());
+  SmartPlaylistSearch all_type;
+  all_type.type = SmartPlaylistSearch::SearchType::All;
+  EXPECT_TRUE(all_type.IsValid());
+
+  Song a;
+  a.set_title("Alpha");
+  a.set_artist("Fleet Foxes");
+  Song b;
+  b.set_title("Beta");
+  b.set_artist("The Shins");
+  SmartPlaylistSearch search;
+  search.type = SmartPlaylistSearch::SearchType::All;
+  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "fleet"});
+  const SongList all = search.Search({a, b});
+  ASSERT_EQ(2u, all.size());
+
+  search.sort_random = true;
+  search.limit = 1;
+  const SongList limited = search.Search({a, b});
+  ASSERT_EQ(1u, limited.size());
+  EXPECT_TRUE(limited.front().title() == "Alpha" || limited.front().title() == "Beta");
+
+  search.limit = 25;
+  search.sort_field = SmartPlaylistField::Year;
+  search.sort_descending = true;
+  const std::string blob = search.Serialize();
+  EXPECT_NE(std::string::npos, blob.find("All,"));
+  EXPECT_NE(std::string::npos, blob.find(",Random"));
+  SmartPlaylistSearch parsed;
+  ASSERT_TRUE(SmartPlaylistSearch::Parse(blob, &parsed));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::All, parsed.type);
+  EXPECT_TRUE(parsed.sort_random);
+  EXPECT_EQ(SmartPlaylistSearch::SortType::Random, parsed.sort_type());
+  EXPECT_EQ(25, parsed.limit);
+  EXPECT_TRUE(parsed.sort_descending);
+  EXPECT_EQ(1u, parsed.terms.size());
+
+  SmartPlaylistSearch legacy;
+  ASSERT_TRUE(SmartPlaylistSearch::Parse("And,0,0,0;0,0,fleet", &legacy));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::And, legacy.type);
+  EXPECT_FALSE(legacy.sort_random);
+  EXPECT_EQ(SmartPlaylistSearch::SortType::FieldAsc, legacy.sort_type());
+  ASSERT_EQ(1u, legacy.terms.size());
+  EXPECT_EQ("fleet", legacy.terms[0].value);
+
+  SmartPlaylistSearch field_desc;
+  field_desc.set_sort_type(SmartPlaylistSearch::SortType::FieldDesc);
+  EXPECT_FALSE(field_desc.sort_random);
+  EXPECT_TRUE(field_desc.sort_descending);
+  EXPECT_EQ(SmartPlaylistSearch::SortType::FieldDesc, field_desc.sort_type());
+}
+
+TEST(SmartPlaylistWizardLabels, SearchSortLimitAndDynamicCopy) {
+  EXPECT_STREQ("Search mode", SmartPlaylistWizardLabels::SearchMode());
+  EXPECT_STREQ("Match every search term (AND)", SmartPlaylistWizardLabels::And());
+  EXPECT_STREQ("Match one or more search terms (OR)", SmartPlaylistWizardLabels::Or());
+  EXPECT_STREQ("Include all songs", SmartPlaylistWizardLabels::All());
+  EXPECT_STREQ("Search terms", SmartPlaylistWizardLabels::SearchTerms());
+  EXPECT_STREQ("Sorting", SmartPlaylistWizardLabels::Sorting());
+  EXPECT_STREQ("Put songs in a random order", SmartPlaylistWizardLabels::Random());
+  EXPECT_STREQ("Sort songs by", SmartPlaylistWizardLabels::SortBy());
+  EXPECT_STREQ("Limits", SmartPlaylistWizardLabels::Limits());
+  EXPECT_STREQ("Show all the songs", SmartPlaylistWizardLabels::ShowAll());
+  EXPECT_STREQ("Only show the first", SmartPlaylistWizardLabels::OnlyFirst());
+  EXPECT_STREQ(" songs", SmartPlaylistWizardLabels::Songs());
+  EXPECT_STREQ("Name", SmartPlaylistWizardLabels::Name());
+  EXPECT_STREQ("Use dynamic mode", SmartPlaylistWizardLabels::UseDynamic());
+  EXPECT_STREQ("In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes.",
+              SmartPlaylistWizardLabels::DynamicHint());
+  EXPECT_EQ(0, SmartPlaylistWizardLabels::TypeIndex(SmartPlaylistSearch::SearchType::And));
+  EXPECT_EQ(1, SmartPlaylistWizardLabels::TypeIndex(SmartPlaylistSearch::SearchType::Or));
+  EXPECT_EQ(2, SmartPlaylistWizardLabels::TypeIndex(SmartPlaylistSearch::SearchType::All));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::And, SmartPlaylistWizardLabels::TypeFromIndex(0));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::Or, SmartPlaylistWizardLabels::TypeFromIndex(1));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::All, SmartPlaylistWizardLabels::TypeFromIndex(2));
+  EXPECT_TRUE(SmartPlaylistWizardLabels::TermsSensitive(SmartPlaylistSearch::SearchType::And));
+  EXPECT_FALSE(SmartPlaylistWizardLabels::TermsSensitive(SmartPlaylistSearch::SearchType::All));
+  EXPECT_TRUE(SmartPlaylistWizardLabels::ShowAllSongs(0));
+  EXPECT_TRUE(SmartPlaylistWizardLabels::ShowAllSongs(-1));
+  EXPECT_FALSE(SmartPlaylistWizardLabels::ShowAllSongs(15));
+  EXPECT_EQ(0, SmartPlaylistWizardLabels::LimitFromUi(true, 15));
+  EXPECT_EQ(15, SmartPlaylistWizardLabels::LimitFromUi(false, 15));
+  EXPECT_EQ(0, SmartPlaylistWizardLabels::LimitFromUi(false, 0));
+  EXPECT_EQ(15, SmartPlaylistWizardLabels::LimitSpinOrDefault(0));
+  EXPECT_EQ(40, SmartPlaylistWizardLabels::LimitSpinOrDefault(40));
+  EXPECT_FALSE(SmartPlaylistWizardLabels::FieldSortSensitive(true));
+  EXPECT_TRUE(SmartPlaylistWizardLabels::FieldSortSensitive(false));
+  EXPECT_FALSE(SmartPlaylistWizardLabels::LimitSpinSensitive(true));
+  EXPECT_TRUE(SmartPlaylistWizardLabels::LimitSpinSensitive(false));
+  EXPECT_EQ(3u, SmartPlaylistWizardLabels::SearchTypeChoices().size());
 }
 
 TEST(SmartPlaylistDrag, JoinsSongUrlsAndSkipsWizard) {

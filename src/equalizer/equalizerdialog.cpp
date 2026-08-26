@@ -3,6 +3,7 @@
 #include "core/application.h"
 #include "core/player.h"
 #include "equalizer/equalizer.h"
+#include "equalizer/equalizerlabels.h"
 #include "equalizer/equalizerpersist.h"
 #include "equalizer/equalizerpresets.h"
 #include "translations/translations.h"
@@ -23,13 +24,19 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   gtk_widget_set_margin_end(box, 18);
   gtk_widget_set_margin_top(box, 18);
   gtk_widget_set_margin_bottom(box, 18);
-  GtkWidget *enable = gtk_check_button_new_with_label(Translations::CStr("Enable equalizer"));
+  GtkWidget *enable = gtk_check_button_new_with_label(Translations::CStr(EqualizerLabels::Enable()));
+  gtk_widget_set_tooltip_text(enable, Translations::CStr(EqualizerLabels::RestartHint()));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(enable), equalizer->enabled());
   g_signal_connect(enable, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
                      static_cast<class Equalizer *>(data)->set_enabled(gtk_check_button_get_active(button));
                    }),
                    equalizer);
   gtk_box_append(GTK_BOX(box), enable);
+  GtkWidget *enable_hint = gtk_label_new(Translations::CStr(EqualizerLabels::RestartHint()));
+  gtk_label_set_wrap(GTK_LABEL(enable_hint), TRUE);
+  gtk_widget_set_halign(enable_hint, GTK_ALIGN_START);
+  gtk_widget_add_css_class(enable_hint, "dim-label");
+  gtk_box_append(GTK_BOX(box), enable_hint);
   GtkStringList *preset_names = gtk_string_list_new(nullptr);
   guint selected_preset = 0;
   guint preset_index = 0;
@@ -50,12 +57,13 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
                      }
                    }),
                    equalizer);
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(EqualizerLabels::Preset())));
   gtk_box_append(GTK_BOX(box), preset);
   GtkWidget *preset_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   GtkWidget *preset_name = gtk_entry_new();
   gtk_entry_set_placeholder_text(GTK_ENTRY(preset_name), "Custom preset name");
-  GtkWidget *save_preset = gtk_button_new_with_label(Translations::CStr("Save"));
-  GtkWidget *delete_preset = gtk_button_new_with_label(Translations::CStr("Delete"));
+  GtkWidget *save_preset = gtk_button_new_with_label(Translations::CStr(EqualizerLabels::SavePreset()));
+  GtkWidget *delete_preset = gtk_button_new_with_label(Translations::CStr(EqualizerLabels::DeletePreset()));
   g_object_set_data(G_OBJECT(save_preset), "name", preset_name);
   g_object_set_data(G_OBJECT(save_preset), "list", preset_names);
   g_signal_connect(save_preset, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
@@ -147,14 +155,26 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
     gtk_box_append(GTK_BOX(bands), col);
   }
   gtk_box_append(GTK_BOX(box), bands);
-  GtkWidget *enable_balance = gtk_check_button_new_with_label(Translations::CStr("Enable stereo balancer"));
+  GtkWidget *enable_balance = gtk_check_button_new_with_label(Translations::CStr(EqualizerLabels::EnableBalancer()));
+  gtk_widget_set_tooltip_text(enable_balance, Translations::CStr(EqualizerLabels::RestartHint()));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(enable_balance), equalizer->stereo_balancer_enabled());
-  GtkWidget *balance_label = gtk_label_new(Translations::CStr("Stereo balance"));
-  gtk_widget_set_halign(balance_label, GTK_ALIGN_START);
+  GtkWidget *balance_hint = gtk_label_new(Translations::CStr(EqualizerLabels::RestartHint()));
+  gtk_label_set_wrap(GTK_LABEL(balance_hint), TRUE);
+  gtk_widget_set_halign(balance_hint, GTK_ALIGN_START);
+  gtk_widget_add_css_class(balance_hint, "dim-label");
+  GtkWidget *balance_ends = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  GtkWidget *left_label = gtk_label_new(Translations::CStr(EqualizerLabels::Left()));
+  GtkWidget *balance_label = gtk_label_new(Translations::CStr(EqualizerLabels::Balance()));
+  GtkWidget *right_label = gtk_label_new(Translations::CStr(EqualizerLabels::Right()));
+  gtk_widget_set_hexpand(balance_label, TRUE);
+  gtk_widget_set_halign(balance_label, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(balance_ends), left_label);
+  gtk_box_append(GTK_BOX(balance_ends), balance_label);
+  gtk_box_append(GTK_BOX(balance_ends), right_label);
   GtkWidget *balance_scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, -100, 100, 1);
   gtk_range_set_value(GTK_RANGE(balance_scale), equalizer->stereo_balance());
-  gtk_scale_add_mark(GTK_SCALE(balance_scale), 0, GTK_POS_BOTTOM, Translations::CStr("Center"));
-  gtk_widget_set_tooltip_text(balance_scale, Translations::CStr("Left / Right"));
+  gtk_scale_add_mark(GTK_SCALE(balance_scale), 0, GTK_POS_BOTTOM, Translations::CStr(EqualizerLabels::Balance()));
+  gtk_widget_set_tooltip_text(balance_scale, Translations::CStr(EqualizerLabels::Balance()));
   gtk_widget_set_sensitive(balance_scale, equalizer->stereo_balancer_enabled());
   g_object_set_data(G_OBJECT(enable_balance), "scale", balance_scale);
   g_object_set_data(G_OBJECT(enable_balance), "equalizer-app", app);
@@ -177,7 +197,8 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
                    }),
                    equalizer);
   gtk_box_append(GTK_BOX(box), enable_balance);
-  gtk_box_append(GTK_BOX(box), balance_label);
+  gtk_box_append(GTK_BOX(box), balance_hint);
+  gtk_box_append(GTK_BOX(box), balance_ends);
   gtk_box_append(GTK_BOX(box), balance_scale);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));

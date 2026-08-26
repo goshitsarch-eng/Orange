@@ -27,7 +27,17 @@ inline std::string TermText(const SmartPlaylistTerm &term) {
   return text;
 }
 
+inline std::string LimitSuffix(const SmartPlaylistSearch &search) {
+  if (search.limit > 0) {
+    return " · limit " + std::to_string(search.limit);
+  }
+  return {};
+}
+
 inline std::string Summary(const SmartPlaylistSearch &search) {
+  if (search.type == SmartPlaylistSearch::SearchType::All) {
+    return std::string("Include all songs") + LimitSuffix(search);
+  }
   if (search.terms.empty()) {
     return EmptyTerms();
   }
@@ -39,10 +49,12 @@ inline std::string Summary(const SmartPlaylistSearch &search) {
     }
     out += TermText(search.terms[i]);
   }
-  if (search.limit > 0) {
-    out += " · limit " + std::to_string(search.limit);
-  }
+  out += LimitSuffix(search);
   return out;
+}
+
+inline std::string FinishText(int count, const std::string &name, const SmartPlaylistSearch &search) {
+  return std::to_string(count) + " songs will be added as “" + name + "”. " + Summary(search);
 }
 
 }  // namespace SmartPlaylistSummary

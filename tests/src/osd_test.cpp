@@ -3,6 +3,7 @@
 #include "core/song.h"
 #include "core/standardpaths.h"
 #include "covermanager/coverfromurldialog.h"
+#include "covermanager/coverfromurllabels.h"
 #include "osd/osdart.h"
 #include "osd/osdprettywayland.h"
 #include "osd/osdbase.h"
@@ -219,6 +220,8 @@ TEST(CoverFromUrlDialog, PrefillUrlAcceptsHttpOnly) {
   EXPECT_EQ("http://example.com/a.png", CoverFromUrlDialog::PrefillUrl("http://example.com/a.png"));
   EXPECT_TRUE(CoverFromUrlDialog::PrefillUrl("not a url").empty());
   EXPECT_TRUE(CoverFromUrlDialog::PrefillUrl("ftp://example.com/a.jpg").empty());
+  EXPECT_STREQ("Load cover from URL", CoverFromUrlLabels::Title());
+  EXPECT_STREQ("Enter a URL to download a cover from the Internet:", CoverFromUrlLabels::Prompt());
 }
 
 TEST(QueueView, NowPlayingMatchesUrl) {

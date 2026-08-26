@@ -12,6 +12,7 @@
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "equalizer/equalizer.h"
+#include "equalizer/equalizerlabels.h"
 #include "equalizer/equalizerpersist.h"
 #include "equalizer/equalizerpresets.h"
 #include "constants/filefilterconstants.h"
@@ -693,6 +694,18 @@ TEST(CollectionGrouping, SavedRoundTrip) {
   }
   EXPECT_TRUE(found);
   CollectionGrouping::RemoveSaved("GTK test grouping");
+}
+
+TEST(EqualizerLabels, RestartHintAndQtCopy) {
+  EXPECT_STREQ("Preset:", EqualizerLabels::Preset());
+  EXPECT_STREQ("Save preset", EqualizerLabels::SavePreset());
+  EXPECT_STREQ("Delete preset", EqualizerLabels::DeletePreset());
+  EXPECT_STREQ("You need to restart playback for this setting to take affect.", EqualizerLabels::RestartHint());
+  EXPECT_STREQ("Enable equalizer", EqualizerLabels::Enable());
+  EXPECT_STREQ("Enable stereo balancer", EqualizerLabels::EnableBalancer());
+  EXPECT_STREQ("Left", EqualizerLabels::Left());
+  EXPECT_STREQ("Balance", EqualizerLabels::Balance());
+  EXPECT_STREQ("Right", EqualizerLabels::Right());
 }
 
 TEST(Equalizer, BuiltinPresets) {

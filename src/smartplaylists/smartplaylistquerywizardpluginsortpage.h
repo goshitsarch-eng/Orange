@@ -13,9 +13,16 @@ class SmartPlaylistQueryWizardPluginSortPage {
   void SetSearch(const SmartPlaylistSearch &search);
 
  private:
+  void ApplySensitive();
+
   GtkWidget *widget_ = nullptr;
+  GtkWidget *random_ = nullptr;
+  GtkWidget *field_radio_ = nullptr;
   GtkWidget *field_drop_ = nullptr;
   GtkWidget *descending_ = nullptr;
+  GtkWidget *limit_none_ = nullptr;
+  GtkWidget *limit_limit_ = nullptr;
+  GtkWidget *limit_ = nullptr;
 };
 
 #endif

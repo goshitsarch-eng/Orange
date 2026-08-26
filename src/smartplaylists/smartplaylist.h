@@ -68,13 +68,30 @@ struct SmartPlaylistTerm {
 
 class SmartPlaylistSearch {
  public:
-  enum class SearchType { And, Or };
+  enum class SearchType { And = 0, Or, All };
+  enum class SortType { Random = 0, FieldAsc, FieldDesc };
 
   SearchType type = SearchType::And;
   std::vector<SmartPlaylistTerm> terms;
   int limit = 0;
   SmartPlaylistField sort_field = SmartPlaylistField::Title;
   bool sort_descending = false;
+  bool sort_random = false;
+
+  static const char *TypeName(SearchType type);
+  static SearchType TypeFromName(const std::string &name);
+  static bool TermsApply(SearchType type);
+  bool IsValid() const { return type == SearchType::All || !terms.empty(); }
+  SortType sort_type() const {
+    if (sort_random) {
+      return SortType::Random;
+    }
+    return sort_descending ? SortType::FieldDesc : SortType::FieldAsc;
+  }
+  void set_sort_type(SortType sort) {
+    sort_random = sort == SortType::Random;
+    sort_descending = sort == SortType::FieldDesc;
+  }
 
   SongList Search(const SongList &songs) const;
   SongList Search(CollectionBackend *backend) const;

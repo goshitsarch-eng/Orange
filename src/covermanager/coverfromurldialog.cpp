@@ -1,6 +1,7 @@
 #include "covermanager/coverfromurldialog.h"
 
 #include "core/application.h"
+#include "covermanager/coverfromurllabels.h"
 #include "covermanager/coverproviders.h"
 #include "translations/translations.h"
 #include "utilities/jsonutils.h"
@@ -9,13 +10,16 @@
 
 void CoverFromUrlDialog::Show(GtkWindow *parent, Application *app) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, Translations::CStr("Cover from URL"));
+  adw_dialog_set_title(dialog, Translations::CStr(CoverFromUrlLabels::Title()));
   adw_dialog_set_content_width(dialog, 420);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
   gtk_widget_set_margin_start(box, 18);
   gtk_widget_set_margin_end(box, 18);
   gtk_widget_set_margin_top(box, 18);
   gtk_widget_set_margin_bottom(box, 18);
+  GtkWidget *prompt = gtk_label_new(Translations::CStr(CoverFromUrlLabels::Prompt()));
+  gtk_label_set_wrap(GTK_LABEL(prompt), TRUE);
+  gtk_widget_set_halign(prompt, GTK_ALIGN_START);
   GtkWidget *entry = gtk_entry_new();
   gtk_entry_set_placeholder_text(GTK_ENTRY(entry), "https://");
   GtkWidget *spinner = gtk_spinner_new();
@@ -74,6 +78,7 @@ void CoverFromUrlDialog::Show(GtkWindow *parent, Application *app) {
       }
     }, entry);
   }
+  gtk_box_append(GTK_BOX(box), prompt);
   gtk_box_append(GTK_BOX(box), entry);
   gtk_box_append(GTK_BOX(box), spinner);
   gtk_box_append(GTK_BOX(box), status);

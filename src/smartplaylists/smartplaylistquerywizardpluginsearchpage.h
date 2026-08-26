@@ -13,9 +13,11 @@ class SmartPlaylistQueryWizardPluginSearchPage {
   void SetSearch(const SmartPlaylistSearch &search);
 
  private:
+  void ApplyTermsSensitive();
+
   GtkWidget *widget_ = nullptr;
   GtkWidget *type_drop_ = nullptr;
-  GtkWidget *limit_ = nullptr;
+  GtkWidget *terms_group_ = nullptr;
 };
 
 #endif

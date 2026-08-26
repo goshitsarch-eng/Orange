@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <random>
 #include <sstream>
 
 namespace {
@@ -132,6 +133,30 @@ SmartPlaylistFieldKind SmartPlaylistSearch::KindOf(SmartPlaylistField field) {
   }
 }
 
+const char *SmartPlaylistSearch::TypeName(SearchType type) {
+  switch (type) {
+    case SearchType::Or:
+      return "Or";
+    case SearchType::All:
+      return "All";
+    case SearchType::And:
+    default:
+      return "And";
+  }
+}
+
+SmartPlaylistSearch::SearchType SmartPlaylistSearch::TypeFromName(const std::string &name) {
+  if (name == "Or") {
+    return SearchType::Or;
+  }
+  if (name == "All") {
+    return SearchType::All;
+  }
+  return SearchType::And;
+}
+
+bool SmartPlaylistSearch::TermsApply(SearchType type) { return type != SearchType::All; }
+
 std::vector<SmartPlaylistOp> SmartPlaylistSearch::OperatorsFor(SmartPlaylistField field) {
   switch (KindOf(field)) {
     case SmartPlaylistFieldKind::Number:
@@ -228,10 +253,9 @@ bool SmartPlaylistTerm::Matches(const Song &song) const {
 SongList SmartPlaylistSearch::Search(const SongList &songs) const {
   SongList result;
   for (const Song &song : songs) {
-    bool matches = type == SearchType::And;
-    if (terms.empty()) {
-      matches = true;
-    } else {
+    bool matches = type == SearchType::All || terms.empty();
+    if (!matches) {
+      matches = type == SearchType::And;
       for (const SmartPlaylistTerm &term : terms) {
         const bool term_matches = term.Matches(song);
         if (type == SearchType::And) {
@@ -245,16 +269,21 @@ SongList SmartPlaylistSearch::Search(const SongList &songs) const {
       result.push_back(song);
     }
   }
-  std::sort(result.begin(), result.end(), [this](const Song &a, const Song &b) {
-    const std::string ta = FieldText(a, sort_field);
-    const std::string tb = FieldText(b, sort_field);
-    if (!ta.empty() || !tb.empty()) {
-      return sort_descending ? ta > tb : ta < tb;
-    }
-    const double na = FieldNumber(a, sort_field);
-    const double nb = FieldNumber(b, sort_field);
-    return sort_descending ? na > nb : na < nb;
-  });
+  if (sort_random) {
+    std::mt19937 rng{std::random_device{}()};
+    std::shuffle(result.begin(), result.end(), rng);
+  } else {
+    std::sort(result.begin(), result.end(), [this](const Song &a, const Song &b) {
+      const std::string ta = FieldText(a, sort_field);
+      const std::string tb = FieldText(b, sort_field);
+      if (!ta.empty() || !tb.empty()) {
+        return sort_descending ? ta > tb : ta < tb;
+      }
+      const double na = FieldNumber(a, sort_field);
+      const double nb = FieldNumber(b, sort_field);
+      return sort_descending ? na > nb : na < nb;
+    });
+  }
   if (limit > 0 && static_cast<int>(result.size()) > limit) {
     result.resize(static_cast<size_t>(limit));
   }
@@ -310,8 +339,10 @@ std::string SanitizeToken(std::string value) {
 
 std::string SmartPlaylistSearch::Serialize() const {
   std::ostringstream out;
-  out << (type == SearchType::Or ? "Or" : "And") << ',' << limit << ',' << static_cast<int>(sort_field) << ','
-      << (sort_descending ? 1 : 0);
+  out << TypeName(type) << ',' << limit << ',' << static_cast<int>(sort_field) << ',' << (sort_descending ? 1 : 0);
+  if (sort_random) {
+    out << ",Random";
+  }
   for (const SmartPlaylistTerm &term : terms) {
     out << ';' << static_cast<int>(term.field) << ',' << static_cast<int>(term.op) << ',' << SanitizeToken(term.value);
   }
@@ -331,10 +362,11 @@ bool SmartPlaylistSearch::Parse(const std::string &blob, SmartPlaylistSearch *se
   if (header.size() < 4) {
     return false;
   }
-  search->type = header[0] == "Or" ? SearchType::Or : SearchType::And;
+  search->type = TypeFromName(header[0]);
   search->limit = std::atoi(header[1].c_str());
   search->sort_field = FieldFromIndex(std::atoi(header[2].c_str()));
   search->sort_descending = header[3] == "1";
+  search->sort_random = header.size() >= 5 && header[4] == "Random";
   for (size_t i = 1; i < parts.size(); ++i) {
     const auto term = StrUtils::Split(parts[i], ',');
     if (term.size() < 3) {
