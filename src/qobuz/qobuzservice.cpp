@@ -2,6 +2,7 @@
 
 #include "core/settings.h"
 #include "qobuz/qobuzfavoriterequest.h"
+#include "qobuz/qobuzrequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -43,25 +44,27 @@ std::map<std::string, std::string> QobuzService::AuthHeaders() const {
   return headers;
 }
 
-void QobuzService::Search(const std::string &query, SearchCallback callback) {
-  if (!network_ || query.empty()) {
-    callback({});
-    return;
-  }
-  std::string url = std::string(kApiUrl) + "/track/search?query=" + StrUtils::UriEscape(query) + "&limit=50";
-  if (!app_id_.empty()) {
-    url += "&app_id=" + StrUtils::UriEscape(app_id_);
-  }
-  if (!user_auth_token_.empty()) {
-    url += "&user_auth_token=" + StrUtils::UriEscape(user_auth_token_);
-  }
-  network_->Get(url, [callback](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      callback({});
-      return;
-    }
-    callback(JsonUtils::ParseQobuzTracks(response.body));
-  }, AuthHeaders());
+void QobuzService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
+
+void QobuzService::Search(const std::string &query, SearchType type, SearchCallback callback) {
+  const auto request_type = QobuzRequest::FromSearchType(type);
+  QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, request_type, query, app_id_, user_auth_token_), AuthHeaders(), request_type,
+                    std::move(callback));
+}
+
+void QobuzService::GetArtists(SearchCallback callback) {
+  QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteArtists, {}, app_id_, user_auth_token_), AuthHeaders(),
+                    QobuzRequest::Type::FavouriteArtists, std::move(callback));
+}
+
+void QobuzService::GetAlbums(SearchCallback callback) {
+  QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteAlbums, {}, app_id_, user_auth_token_), AuthHeaders(),
+                    QobuzRequest::Type::FavouriteAlbums, std::move(callback));
+}
+
+void QobuzService::GetSongs(SearchCallback callback) {
+  QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteSongs, {}, app_id_, user_auth_token_), AuthHeaders(),
+                    QobuzRequest::Type::FavouriteSongs, std::move(callback));
 }
 
 UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback callback) {

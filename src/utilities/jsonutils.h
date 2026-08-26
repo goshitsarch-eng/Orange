@@ -18,9 +18,17 @@ std::string ExtractLyrics(const std::string &body);
 SongList ParseSongs(const std::string &json, Song::Source source = Song::Source::Stream);
 SongList ParseMusicBrainzRecordings(const std::string &json);
 SongList ParseSubsonicSongs(const std::string &json);
+SongList ParseSubsonicArtists(const std::string &json);
+SongList ParseSubsonicAlbums(const std::string &json);
 SongList ParseTidalTracks(const std::string &json);
+SongList ParseTidalArtists(const std::string &json);
+SongList ParseTidalAlbums(const std::string &json);
 SongList ParseSpotifyTracks(const std::string &json);
+SongList ParseSpotifyArtists(const std::string &json);
+SongList ParseSpotifyAlbums(const std::string &json);
 SongList ParseQobuzTracks(const std::string &json);
+SongList ParseQobuzArtists(const std::string &json);
+SongList ParseQobuzAlbums(const std::string &json);
 
 }  // namespace JsonUtils
 

@@ -2,6 +2,7 @@
 
 #include "core/settings.h"
 #include "tidal/tidalfavoriterequest.h"
+#include "tidal/tidalrequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -56,20 +57,27 @@ std::string TidalService::TrackId(const std::string &url) const {
   return id;
 }
 
-void TidalService::Search(const std::string &query, SearchCallback callback) {
-  if (!network_ || query.empty()) {
-    callback({});
-    return;
-  }
-  const std::string url = std::string(kApiUrl) + "/search/tracks?query=" + StrUtils::UriEscape(query) +
-                          "&limit=50&countryCode=" + StrUtils::UriEscape(country_code_);
-  network_->Get(url, [callback](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      callback({});
-      return;
-    }
-    callback(JsonUtils::ParseTidalTracks(response.body));
-  }, AuthHeaders());
+void TidalService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
+
+void TidalService::Search(const std::string &query, SearchType type, SearchCallback callback) {
+  const auto request_type = TidalRequest::FromSearchType(type);
+  TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_), AuthHeaders(), request_type,
+                    std::move(callback));
+}
+
+void TidalService::GetArtists(SearchCallback callback) {
+  TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteArtists, {}, country_code_, user_id_), AuthHeaders(),
+                    TidalRequest::Type::FavouriteArtists, std::move(callback));
+}
+
+void TidalService::GetAlbums(SearchCallback callback) {
+  TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteAlbums, {}, country_code_, user_id_), AuthHeaders(),
+                    TidalRequest::Type::FavouriteAlbums, std::move(callback));
+}
+
+void TidalService::GetSongs(SearchCallback callback) {
+  TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteSongs, {}, country_code_, user_id_), AuthHeaders(),
+                    TidalRequest::Type::FavouriteSongs, std::move(callback));
 }
 
 UrlHandler::LoadResult TidalService::Load(const std::string &url, AsyncCallback callback) {

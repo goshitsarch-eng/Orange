@@ -16,6 +16,10 @@ class SubsonicService : public StreamingService {
   std::string name() const override { return "Subsonic"; }
   std::string scheme() const override { return "subsonic"; }
   void Search(const std::string &query, SearchCallback callback) override;
+  void Search(const std::string &query, SearchType type, SearchCallback callback) override;
+  void GetArtists(SearchCallback callback) override;
+  void GetAlbums(SearchCallback callback) override;
+  void GetSongs(SearchCallback callback) override;
   void Login(const std::string &username, const std::string &password_or_token) override;
   void ReloadSettings() override;
   LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;

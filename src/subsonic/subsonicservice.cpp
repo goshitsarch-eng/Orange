@@ -2,6 +2,7 @@
 
 #include "core/settings.h"
 #include "subsonic/subsonicfavoriterequest.h"
+#include "subsonic/subsonicrequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -91,20 +92,49 @@ void SubsonicService::Login(const std::string &username, const std::string &pass
   ReloadSettings();
 }
 
-void SubsonicService::Search(const std::string &query, SearchCallback callback) {
-  if (!network_ || !logged_in_ || query.empty()) {
-    callback({});
+void SubsonicService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
+
+void SubsonicService::Search(const std::string &query, SearchType type, SearchCallback callback) {
+  if (!logged_in_) {
+    if (callback) {
+      callback({});
+    }
     return;
   }
-  const std::string url = CreateUrl(server_url_, username_, password_, "search3",
-                                    {{"query", query}, {"songCount", "50"}, {"albumCount", "0"}, {"artistCount", "0"}}, hex_auth_);
-  network_->Get(url, [callback](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
+  const auto request_type = SubsonicRequest::FromSearchType(type);
+  SubsonicRequest::Get(network_,
+                       CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(request_type),
+                                 SubsonicRequest::Params(request_type, query), hex_auth_),
+                       request_type, std::move(callback));
+}
+
+void SubsonicService::GetArtists(SearchCallback callback) {
+  if (!logged_in_) {
+    if (callback) {
       callback({});
-      return;
     }
-    callback(JsonUtils::ParseSubsonicSongs(response.body));
-  });
+    return;
+  }
+  SubsonicRequest::Get(network_, CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::ArtistsList),
+                                           {}, hex_auth_),
+                       SubsonicRequest::Type::ArtistsList, std::move(callback));
+}
+
+void SubsonicService::GetAlbums(SearchCallback callback) {
+  if (!logged_in_) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  SubsonicRequest::Get(network_,
+                       CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::AlbumList),
+                                 SubsonicRequest::Params(SubsonicRequest::Type::AlbumList, {}), hex_auth_),
+                       SubsonicRequest::Type::AlbumList, std::move(callback));
+}
+
+void SubsonicService::GetSongs(SearchCallback callback) {
+  GetAlbums(std::move(callback));
 }
 
 UrlHandler::LoadResult SubsonicService::Load(const std::string &url, AsyncCallback callback) {

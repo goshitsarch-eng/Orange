@@ -2,6 +2,7 @@
 
 #include "core/settings.h"
 #include "spotify/spotifyfavoriterequest.h"
+#include "spotify/spotifyrequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -38,19 +39,26 @@ std::map<std::string, std::string> SpotifyService::AuthHeaders() const {
   return {{"Authorization", "Bearer " + token_}};
 }
 
-void SpotifyService::Search(const std::string &query, SearchCallback callback) {
-  if (!network_ || query.empty()) {
-    callback({});
-    return;
-  }
-  const std::string url = std::string(kApiUrl) + "/search?type=track&limit=50&q=" + StrUtils::UriEscape(query);
-  network_->Get(url, [callback](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      callback({});
-      return;
-    }
-    callback(JsonUtils::ParseSpotifyTracks(response.body));
-  }, AuthHeaders());
+void SpotifyService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
+
+void SpotifyService::Search(const std::string &query, SearchType type, SearchCallback callback) {
+  const auto request_type = SpotifyRequest::FromSearchType(type);
+  SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, request_type, query), AuthHeaders(), request_type, std::move(callback));
+}
+
+void SpotifyService::GetArtists(SearchCallback callback) {
+  SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteArtists, {}), AuthHeaders(),
+                      SpotifyRequest::Type::FavouriteArtists, std::move(callback));
+}
+
+void SpotifyService::GetAlbums(SearchCallback callback) {
+  SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteAlbums, {}), AuthHeaders(),
+                      SpotifyRequest::Type::FavouriteAlbums, std::move(callback));
+}
+
+void SpotifyService::GetSongs(SearchCallback callback) {
+  SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteSongs, {}), AuthHeaders(),
+                      SpotifyRequest::Type::FavouriteSongs, std::move(callback));
 }
 
 UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallback callback) {

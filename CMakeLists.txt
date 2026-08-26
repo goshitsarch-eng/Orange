@@ -219,12 +219,16 @@ set(STRAWBERRY_SOURCES
   src/streaming/streamingservices.cpp
   src/subsonic/subsonicservice.cpp
   src/subsonic/subsonicfavoriterequest.cpp
+  src/subsonic/subsonicrequest.cpp
   src/tidal/tidalservice.cpp
   src/tidal/tidalfavoriterequest.cpp
+  src/tidal/tidalrequest.cpp
   src/spotify/spotifyservice.cpp
   src/spotify/spotifyfavoriterequest.cpp
+  src/spotify/spotifyrequest.cpp
   src/qobuz/qobuzservice.cpp
   src/qobuz/qobuzfavoriterequest.cpp
+  src/qobuz/qobuzrequest.cpp
   src/radios/radioservices.cpp
   src/radios/somafmservice.cpp
   src/radios/radioparadiseservice.cpp
@@ -335,6 +339,7 @@ if(GTest_FOUND)
     tests/src/mtp_test.cpp
     tests/src/streaming_test.cpp
     tests/src/streamingfavorite_test.cpp
+    tests/src/streamingrequest_test.cpp
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
     tests/src/streamtagreader_test.cpp
@@ -380,6 +385,7 @@ if(GTest_FOUND)
     src/lyrics/htmllyricsprovider.cpp
     src/subsonic/subsonicservice.cpp
     src/subsonic/subsonicfavoriterequest.cpp
+    src/subsonic/subsonicrequest.cpp
     src/radios/somafmservice.cpp
     src/radios/radioparadiseservice.cpp
     src/radios/radiobrowserservice.cpp
@@ -406,9 +412,12 @@ if(GTest_FOUND)
     src/scrobbler/subsonicscrobbler.cpp
     src/tidal/tidalservice.cpp
     src/tidal/tidalfavoriterequest.cpp
+    src/tidal/tidalrequest.cpp
     src/spotify/spotifyfavoriterequest.cpp
+    src/spotify/spotifyrequest.cpp
     src/qobuz/qobuzservice.cpp
     src/qobuz/qobuzfavoriterequest.cpp
+    src/qobuz/qobuzrequest.cpp
     src/tagreader/tagreadergme.cpp
     src/tagreader/tagreader.cpp
     src/tagreader/streamtagreader.cpp

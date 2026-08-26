@@ -676,4 +676,234 @@ SongList ParseQobuzTracks(const std::string &json) {
   return songs;
 }
 
+SongList ParseTidalArtists(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"items"});
+  if (!items) {
+    items = FindNamedArray(root, {"artists", "items"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Tidal, [](Song *song, JsonObject *object) {
+    const std::string name = ObjectString(object, "name");
+    song->set_title(name);
+    song->set_artist(name);
+    const std::string id = ObjectString(object, "id");
+    song->set_artist_id(id);
+    song->set_url(id.empty() ? std::string() : "tidal://artist/" + id);
+  });
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseTidalAlbums(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"items"});
+  if (!items) {
+    items = FindNamedArray(root, {"albums", "items"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Tidal, [](Song *song, JsonObject *object) {
+    std::string title = ObjectString(object, "title");
+    if (title.empty()) {
+      title = ObjectString(object, "name");
+    }
+    song->set_title(title);
+    song->set_album(title);
+    song->set_artist(NestedName(object, "artist", "name"));
+    const std::string id = ObjectString(object, "id");
+    song->set_album_id(id);
+    song->set_artist_id(NestedName(object, "artist", "id"));
+    song->set_url(id.empty() ? std::string() : "tidal://album/" + id);
+    const std::string cover = ObjectString(object, "cover");
+    if (!cover.empty()) {
+      song->set_art_automatic("https://resources.tidal.com/images/" + StrUtils::Replace(cover, "-", "/") + "/1280x1280.jpg");
+    }
+  });
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseSpotifyArtists(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"artists", "items"});
+  if (!items) {
+    items = FindNamedArray(root, {"items"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Spotify, [](Song *song, JsonObject *object) {
+    const std::string name = ObjectString(object, "name");
+    song->set_title(name);
+    song->set_artist(name);
+    const std::string id = ObjectString(object, "id");
+    song->set_artist_id(id);
+    song->set_url(id.empty() ? std::string() : "spotify://artist/" + id);
+    if (json_object_has_member(object, "images") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "images"))) {
+      JsonArray *images = json_object_get_array_member(object, "images");
+      if (json_array_get_length(images) > 0) {
+        song->set_art_automatic(ObjectString(json_array_get_object_element(images, 0), "url"));
+      }
+    }
+  });
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseSpotifyAlbums(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"albums", "items"});
+  if (!items) {
+    items = FindNamedArray(root, {"items"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Spotify, [](Song *song, JsonObject *object) {
+    const std::string name = ObjectString(object, "name");
+    song->set_title(name);
+    song->set_album(name);
+    const std::string id = ObjectString(object, "id");
+    song->set_album_id(id);
+    if (json_object_has_member(object, "artists") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "artists"))) {
+      JsonArray *artists = json_object_get_array_member(object, "artists");
+      if (json_array_get_length(artists) > 0) {
+        song->set_artist(ObjectString(json_array_get_object_element(artists, 0), "name"));
+        song->set_artist_id(ObjectString(json_array_get_object_element(artists, 0), "id"));
+      }
+    }
+    song->set_url(id.empty() ? std::string() : "spotify://album/" + id);
+    if (json_object_has_member(object, "images") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "images"))) {
+      JsonArray *images = json_object_get_array_member(object, "images");
+      if (json_array_get_length(images) > 0) {
+        song->set_art_automatic(ObjectString(json_array_get_object_element(images, 0), "url"));
+      }
+    }
+  });
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseQobuzArtists(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"artists", "items"});
+  if (!items) {
+    items = FindNamedArray(root, {"items"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Qobuz, [](Song *song, JsonObject *object) {
+    const std::string name = ObjectString(object, "name");
+    song->set_title(name);
+    song->set_artist(name);
+    const std::string id = ObjectString(object, "id");
+    song->set_artist_id(id);
+    song->set_url(id.empty() ? std::string() : "qobuz://artist/" + id);
+  });
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseQobuzAlbums(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"albums", "items"});
+  if (!items) {
+    items = FindNamedArray(root, {"items"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Qobuz, [](Song *song, JsonObject *object) {
+    const std::string title = ObjectString(object, "title");
+    song->set_title(title);
+    song->set_album(title);
+    song->set_artist(NestedName(object, "artist", "name"));
+    const std::string id = ObjectString(object, "id");
+    song->set_album_id(id);
+    song->set_artist_id(NestedName(object, "artist", "id"));
+    song->set_url(id.empty() ? std::string() : "qobuz://album/" + id);
+    if (json_object_has_member(object, "image") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, "image"))) {
+      song->set_art_automatic(ObjectString(json_object_get_object_member(object, "image"), "large"));
+    }
+  });
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseSubsonicArtists(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"subsonic-response", "searchResult3", "artist"});
+  if (!items) {
+    items = FindNamedArray(root, {"subsonic-response", "starred2", "artist"});
+  }
+  if (!items) {
+    items = FindNamedArray(root, {"subsonic-response", "starred", "artist"});
+  }
+  SongList songs;
+  auto fill = [](Song *song, JsonObject *object) {
+    const std::string name = ObjectString(object, "name");
+    song->set_title(name);
+    song->set_artist(name);
+    const std::string id = ObjectString(object, "id");
+    song->set_artist_id(id);
+    song->set_url(id.empty() ? std::string() : "subsonic://artist/" + id);
+  };
+  if (items) {
+    songs = SongsFromArray(items, Song::Source::Subsonic, fill);
+  } else if (JsonArray *indexes = FindNamedArray(root, {"subsonic-response", "artists", "index"})) {
+    const guint n = json_array_get_length(indexes);
+    for (guint i = 0; i < n; ++i) {
+      JsonObject *index = json_array_get_object_element(indexes, i);
+      if (!index || !json_object_has_member(index, "artist") || !JSON_NODE_HOLDS_ARRAY(json_object_get_member(index, "artist"))) {
+        continue;
+      }
+      const SongList page = SongsFromArray(json_object_get_array_member(index, "artist"), Song::Source::Subsonic, fill);
+      songs.insert(songs.end(), page.begin(), page.end());
+    }
+  }
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseSubsonicAlbums(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"subsonic-response", "searchResult3", "album"});
+  if (!items) {
+    items = FindNamedArray(root, {"subsonic-response", "starred2", "album"});
+  }
+  if (!items) {
+    items = FindNamedArray(root, {"subsonic-response", "starred", "album"});
+  }
+  if (!items) {
+    items = FindNamedArray(root, {"subsonic-response", "albumList2", "album"});
+  }
+  if (!items) {
+    items = FindNamedArray(root, {"subsonic-response", "albumList", "album"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Subsonic, [](Song *song, JsonObject *object) {
+    const std::string name = ObjectString(object, "name");
+    song->set_title(name);
+    song->set_album(name);
+    song->set_artist(ObjectString(object, "artist"));
+    const std::string id = ObjectString(object, "id");
+    song->set_album_id(id);
+    song->set_artist_id(ObjectString(object, "artistId"));
+    song->set_url(id.empty() ? std::string() : "subsonic://album/" + id);
+    song->set_year(std::atoi(ObjectString(object, "year").c_str()));
+  });
+  json_node_unref(root);
+  return songs;
+}
+
 }  // namespace JsonUtils

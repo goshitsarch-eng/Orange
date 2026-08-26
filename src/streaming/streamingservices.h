@@ -15,8 +15,37 @@ class StreamingService : public UrlHandler {
     Albums = 2,
     Songs = 3
   };
+  enum class SearchType {
+    Artists = 1,
+    Albums = 2,
+    Songs = 3
+  };
   virtual std::string name() const = 0;
   virtual void Search(const std::string &query, SearchCallback callback) = 0;
+  virtual void Search(const std::string &query, SearchType type, SearchCallback callback) {
+    if (type == SearchType::Songs) {
+      Search(query, std::move(callback));
+      return;
+    }
+    if (callback) {
+      callback({});
+    }
+  }
+  virtual void GetArtists(SearchCallback callback) {
+    if (callback) {
+      callback({});
+    }
+  }
+  virtual void GetAlbums(SearchCallback callback) {
+    if (callback) {
+      callback({});
+    }
+  }
+  virtual void GetSongs(SearchCallback callback) {
+    if (callback) {
+      callback({});
+    }
+  }
   virtual void Login(const std::string &username, const std::string &password_or_token) = 0;
   virtual void ReloadSettings() {}
   virtual bool logged_in() const { return logged_in_; }
