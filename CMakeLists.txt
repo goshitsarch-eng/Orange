@@ -161,6 +161,7 @@ set(STRAWBERRY_SOURCES
   src/core/player.cpp
   src/tagreader/tagreader.cpp
   src/tagreader/tagreadergme.cpp
+  src/tagreader/streamtagreader.cpp
   src/collection/collectionbackend.cpp
   src/collection/collectionwatcher.cpp
   src/collection/collectionlibrary.cpp
@@ -308,6 +309,7 @@ if(GTest_FOUND)
     tests/src/streaming_test.cpp
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
+    tests/src/streamtagreader_test.cpp
     tests/src/lastfmcover_test.cpp
     tests/src/coverprovider_test.cpp
     tests/src/scrobbler_test.cpp
@@ -354,6 +356,8 @@ if(GTest_FOUND)
     src/tidal/tidalservice.cpp
     src/qobuz/qobuzservice.cpp
     src/tagreader/tagreadergme.cpp
+    src/tagreader/tagreader.cpp
+    src/tagreader/streamtagreader.cpp
     src/playlist/playlist.cpp
     src/collection/collectionbackend.cpp
     src/collection/collectiongrouping.cpp

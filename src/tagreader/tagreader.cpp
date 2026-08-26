@@ -2,6 +2,7 @@
 
 #include "core/logging.h"
 #include "tagreader/tagreadergme.h"
+#include "tagreader/streamtagreader.h"
 #include "utilities/fileutils.h"
 
 #include <taglib/fileref.h>
@@ -27,6 +28,8 @@ namespace {
 std::string FromTagLib(const TagLib::String &value) { return value.to8Bit(true); }
 
 TagLib::String ToTagLib(const std::string &value) { return TagLib::String(value, TagLib::String::UTF8); }
+
+void ReadFromFileRef(TagLib::FileRef *file, Song *song);
 
 }  // namespace
 
@@ -67,18 +70,31 @@ Song TagReader::ReadFile(const std::string &filename) const {
     ApplyFileInfo(&song, filename);
     return song;
   }
+  ReadFromFileRef(&file, &song);
+  ApplyFileInfo(&song, filename);
+  if (song.title().empty()) {
+    song.set_title(FileUtils::BaseName(filename));
+  }
+  return song;
+}
 
-  const TagLib::Tag *tag = file.tag();
-  song.set_valid(true);
-  song.set_title(FromTagLib(tag->title()));
-  song.set_artist(FromTagLib(tag->artist()));
-  song.set_album(FromTagLib(tag->album()));
-  song.set_comment(FromTagLib(tag->comment()));
-  song.set_genre(FromTagLib(tag->genre()));
-  song.set_year(static_cast<int>(tag->year()));
-  song.set_track(static_cast<int>(tag->track()));
+namespace {
 
-  const TagLib::PropertyMap properties = file.file()->properties();
+void ReadFromFileRef(TagLib::FileRef *file, Song *song) {
+  if (!file || file->isNull() || !file->tag()) {
+    return;
+  }
+  const TagLib::Tag *tag = file->tag();
+  song->set_valid(true);
+  song->set_title(FromTagLib(tag->title()));
+  song->set_artist(FromTagLib(tag->artist()));
+  song->set_album(FromTagLib(tag->album()));
+  song->set_comment(FromTagLib(tag->comment()));
+  song->set_genre(FromTagLib(tag->genre()));
+  song->set_year(static_cast<int>(tag->year()));
+  song->set_track(static_cast<int>(tag->track()));
+
+  const TagLib::PropertyMap properties = file->file()->properties();
   auto take = [&properties](const char *key) -> std::string {
     const auto it = properties.find(key);
     if (it == properties.end() || it->second.isEmpty()) {
@@ -87,50 +103,80 @@ Song TagReader::ReadFile(const std::string &filename) const {
     return FromTagLib(it->second.front());
   };
 
-  song.set_albumartist(take("ALBUMARTIST"));
-  song.set_composer(take("COMPOSER"));
-  song.set_performer(take("PERFORMER"));
-  song.set_grouping(take("GROUPING"));
-  song.set_lyrics(take("LYRICS"));
-  song.set_titlesort(take("TITLESORT"));
-  song.set_albumsort(take("ALBUMSORT"));
-  song.set_artistsort(take("ARTISTSORT"));
-  song.set_albumartistsort(take("ALBUMARTISTSORT"));
-  song.set_composersort(take("COMPOSERSORT"));
-  song.set_performersort(take("PERFORMERSORT"));
+  song->set_albumartist(take("ALBUMARTIST"));
+  song->set_composer(take("COMPOSER"));
+  song->set_performer(take("PERFORMER"));
+  song->set_grouping(take("GROUPING"));
+  song->set_lyrics(take("LYRICS"));
+  song->set_titlesort(take("TITLESORT"));
+  song->set_albumsort(take("ALBUMSORT"));
+  song->set_artistsort(take("ARTISTSORT"));
+  song->set_albumartistsort(take("ALBUMARTISTSORT"));
+  song->set_composersort(take("COMPOSERSORT"));
+  song->set_performersort(take("PERFORMERSORT"));
   {
     const std::string compilation = take("COMPILATION");
-    song.set_compilation(compilation == "1" || compilation == "true" || compilation == "True");
+    song->set_compilation(compilation == "1" || compilation == "true" || compilation == "True");
   }
   if (properties.contains("DISCNUMBER") && !properties["DISCNUMBER"].isEmpty()) {
-    song.set_disc(properties["DISCNUMBER"].front().toInt());
+    song->set_disc(properties["DISCNUMBER"].front().toInt());
   }
   if (properties.contains("ORIGINALYEAR") && !properties["ORIGINALYEAR"].isEmpty()) {
-    song.set_originalyear(properties["ORIGINALYEAR"].front().toInt());
+    song->set_originalyear(properties["ORIGINALYEAR"].front().toInt());
   }
   if (properties.contains("BPM") && !properties["BPM"].isEmpty()) {
     try {
-      song.set_bpm(std::stof(FromTagLib(properties["BPM"].front())));
+      song->set_bpm(std::stof(FromTagLib(properties["BPM"].front())));
     } catch (...) {
     }
   }
-  song.set_mood(take("MOOD"));
-  song.set_initial_key(take("INITIALKEY"));
-  song.set_musicbrainz_album_id(take("MUSICBRAINZ_ALBUMID"));
-  song.set_musicbrainz_artist_id(take("MUSICBRAINZ_ARTISTID"));
-  song.set_musicbrainz_album_artist_id(take("MUSICBRAINZ_ALBUMARTISTID"));
-  song.set_musicbrainz_recording_id(take("MUSICBRAINZ_TRACKID"));
-  song.set_acoustid_id(take("ACOUSTID_ID"));
-  song.set_acoustid_fingerprint(take("ACOUSTID_FINGERPRINT"));
+  song->set_mood(take("MOOD"));
+  song->set_initial_key(take("INITIALKEY"));
+  song->set_musicbrainz_album_id(take("MUSICBRAINZ_ALBUMID"));
+  song->set_musicbrainz_artist_id(take("MUSICBRAINZ_ARTISTID"));
+  song->set_musicbrainz_album_artist_id(take("MUSICBRAINZ_ALBUMARTISTID"));
+  song->set_musicbrainz_recording_id(take("MUSICBRAINZ_TRACKID"));
+  song->set_acoustid_id(take("ACOUSTID_ID"));
+  song->set_acoustid_fingerprint(take("ACOUSTID_FINGERPRINT"));
 
-  if (file.audioProperties()) {
-    const TagLib::AudioProperties *properties_audio = file.audioProperties();
-    song.set_length_nanosec(static_cast<int64_t>(properties_audio->lengthInMilliseconds()) * 1000000LL);
-    song.set_bitrate(properties_audio->bitrate());
-    song.set_samplerate(properties_audio->sampleRate());
+  if (file->audioProperties()) {
+    const TagLib::AudioProperties *properties_audio = file->audioProperties();
+    song->set_length_nanosec(static_cast<int64_t>(properties_audio->lengthInMilliseconds()) * 1000000LL);
+    song->set_bitrate(properties_audio->bitrate());
+    song->set_samplerate(properties_audio->sampleRate());
   }
+}
 
-  ApplyFileInfo(&song, filename);
+}  // namespace
+
+Song TagReader::ReadStream(const std::string &url, const std::string &filename, uint64_t size, uint64_t mtime, const std::string &token_type,
+                           const std::string &access_token) const {
+  StreamTagReader stream(url, filename, static_cast<TagLibLengthType>(size), token_type, access_token);
+  return ReadStream(&stream, url, filename, size, mtime);
+}
+
+Song TagReader::ReadStream(StreamTagReader *stream, const std::string &url, const std::string &filename, uint64_t size, uint64_t mtime) const {
+  Song song(Song::Source::Stream);
+  song.set_url(url);
+  song.set_basefilename(FileUtils::BaseName(filename));
+  song.set_filesize(static_cast<int64_t>(size));
+  song.set_ctime(static_cast<int64_t>(mtime));
+  song.set_mtime(static_cast<int64_t>(mtime));
+  song.set_filetype(Song::FiletypeByFilename(filename));
+  if (!stream) {
+    return song;
+  }
+  stream->PreCache();
+  if (stream->num_requests() > 2) {
+    LogWarning("Total requests for stream %s: %d cached %zu", filename.c_str(), stream->num_requests(),
+               static_cast<size_t>(stream->cached_bytes()));
+  }
+  TagLib::FileRef file(stream, true, TagLib::AudioProperties::Accurate);
+  if (file.isNull() || !file.tag()) {
+    LogError("TagLib could not open stream %s", filename.c_str());
+    return song;
+  }
+  ReadFromFileRef(&file, &song);
   if (song.title().empty()) {
     song.set_title(FileUtils::BaseName(filename));
   }
