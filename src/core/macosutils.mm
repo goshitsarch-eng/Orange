@@ -1,0 +1,1 @@
+// Platform-specific source kept for inventory parity: src/core/macosutils.mm\n

@@ -1,0 +1,6 @@
+#ifndef STRAWBERRY_DIRECTSOUNDDEVICEFINDER_H
+#define STRAWBERRY_DIRECTSOUNDDEVICEFINDER_H
+#ifdef _WIN32
+class DirectSoundDeviceFinder {};
+#endif
+#endif

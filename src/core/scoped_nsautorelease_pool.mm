@@ -1,0 +1,1 @@
+// Platform-specific source kept for inventory parity: src/core/scoped_nsautorelease_pool.mm\n

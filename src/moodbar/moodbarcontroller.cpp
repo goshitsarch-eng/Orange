@@ -1,0 +1,1 @@
+#include "moodbar/moodbarcontroller.h"

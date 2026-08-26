@@ -1,0 +1,1 @@
+#include "scrobbler/scrobblerservice.h"

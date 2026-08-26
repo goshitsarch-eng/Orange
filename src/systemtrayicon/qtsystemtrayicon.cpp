@@ -1,0 +1,1 @@
+#include "systemtrayicon/qtsystemtrayicon.h"

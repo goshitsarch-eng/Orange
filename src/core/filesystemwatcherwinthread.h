@@ -1,0 +1,6 @@
+#ifndef STRAWBERRY_FILESYSTEMWATCHERWINTHREAD_H
+#define STRAWBERRY_FILESYSTEMWATCHERWINTHREAD_H
+#ifdef _WIN32
+class FileSystemWatcherWinThread {};
+#endif
+#endif

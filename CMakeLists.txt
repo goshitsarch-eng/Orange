@@ -165,6 +165,24 @@ set(STRAWBERRY_SOURCES
   src/core/networktimeouts.cpp
   src/core/httpbaserequest.cpp
   src/core/jsonbaserequest.cpp
+  src/core/appearance.cpp
+  src/core/musicstorage.cpp
+  src/core/urlhandler.cpp
+  src/core/playerinterface.cpp
+  src/core/networkaccessmanager.cpp
+  src/core/sqlquery.cpp
+  src/core/sqlrow.cpp
+  src/core/filewriteguard.cpp
+  src/core/platforminterface.cpp
+  src/core/thread.cpp
+  src/core/mimedata.cpp
+  src/core/metatypes.cpp
+  src/core/signalchecker.cpp
+  src/core/mergedproxymodel.cpp
+  src/core/multisortfilterproxy.cpp
+  src/core/standarditemiconloader.cpp
+  src/core/threadsafenetworkdiskcache.cpp
+  src/core/filesystemwatcherqt.cpp
   src/translations/translations.cpp
   src/utilities/timeutils.cpp
   src/utilities/fileutils.cpp
@@ -183,6 +201,13 @@ set(STRAWBERRY_SOURCES
   src/utilities/styleutils.cpp
   src/utilities/xmlutils.cpp
   src/utilities/filemanagerutils.cpp
+  src/utilities/threadutils.cpp
+  src/utilities/textencodingutils.cpp
+  src/utilities/transliterate.cpp
+  src/utilities/macaddrutils.cpp
+  src/utilities/xmlparser.cpp
+  src/utilities/stylehelper.cpp
+  src/utilities/stylesheetloader.cpp
   src/engine/gststartup.cpp
   src/engine/gstengine.cpp
   src/engine/gstenginepipeline.cpp
@@ -204,6 +229,25 @@ set(STRAWBERRY_SOURCES
   src/tagreader/streamtagreader.cpp
   src/tagreader/tagreaderresult.cpp
   src/tagreader/tagreaderclient.cpp
+  src/tagreader/tagreaderbase.cpp
+  src/tagreader/tagreadertaglib.cpp
+  src/tagreader/albumcovertagdata.cpp
+  src/tagreader/savetagcoverdata.cpp
+  src/tagreader/tagreaderrequest.cpp
+  src/tagreader/tagreaderreply.cpp
+  src/tagreader/tagreaderreadfilerequest.cpp
+  src/tagreader/tagreaderreadfilereply.cpp
+  src/tagreader/tagreaderreadstreamrequest.cpp
+  src/tagreader/tagreaderreadstreamreply.cpp
+  src/tagreader/tagreaderwritefilerequest.cpp
+  src/tagreader/tagreaderismediafilerequest.cpp
+  src/tagreader/tagreaderloadcoverdatarequest.cpp
+  src/tagreader/tagreaderloadcoverdatareply.cpp
+  src/tagreader/tagreaderloadcoverimagerequest.cpp
+  src/tagreader/tagreaderloadcoverimagereply.cpp
+  src/tagreader/tagreadersavecoverrequest.cpp
+  src/tagreader/tagreadersaveplaycountrequest.cpp
+  src/tagreader/tagreadersaveratingrequest.cpp
   src/collection/collectionbackend.cpp
   src/collection/collectionwatcher.cpp
   src/collection/collectionlibrary.cpp
@@ -217,6 +261,8 @@ set(STRAWBERRY_SOURCES
   src/collection/collectiondirectorymodel.cpp
   src/collection/collectiontask.cpp
   src/collection/collectionitemdelegate.cpp
+  src/collection/collectionmodelupdate.cpp
+  src/collection/collectionsettingsdirectorymodel.cpp
   src/collection/collectionfilterwidget.cpp
   src/collection/collectionview.cpp
   src/collection/collectionviewcontainer.cpp
@@ -232,6 +278,10 @@ set(STRAWBERRY_SOURCES
   src/playlist/playlistsequence.cpp
   src/playlist/playlistundocommandbase.cpp
   src/playlist/playlistundocommandinsertitems.cpp
+  src/playlist/songmimedata.cpp
+  src/playlist/playlistgeneratormimedata.cpp
+  src/playlist/playlistproxystyle.cpp
+  src/playlist/playlistmanagerinterface.cpp
   src/playlist/playlistundocommandremoveitems.cpp
   src/playlist/playlistundocommandmoveitems.cpp
   src/playlist/playlistundocommandreorderitems.cpp
@@ -276,6 +326,8 @@ set(STRAWBERRY_SOURCES
   src/widgets/stretchheaderview.cpp
   src/widgets/tracksliderpopup.cpp
   src/widgets/fancytabbar.cpp
+  src/widgets/fancytabdata.cpp
+  src/widgets/fancytabwidget.cpp
   src/widgets/autoexpandingtreeview.cpp
   src/widgets/forcescrollperpixel.cpp
   src/widgets/linetextedit.cpp
@@ -305,6 +357,10 @@ set(STRAWBERRY_SOURCES
   src/smartplaylists/smartplaylistsearchtermwidget.cpp
   src/smartplaylists/smartplaylistsearchpreview.cpp
   src/smartplaylists/smartplaylistwizardplugin.cpp
+  src/smartplaylists/smartplaylistsearch.cpp
+  src/smartplaylists/smartplaylistsearchterm.cpp
+  src/smartplaylists/smartplaylistquerywizardplugin.cpp
+  src/smartplaylists/smartplaylistsearchtermwidgetoverlay.cpp
   src/smartplaylists/smartplaylistwizardtypepage.cpp
   src/smartplaylists/smartplaylistwizardfinishpage.cpp
   src/smartplaylists/smartplaylistwizard.cpp
@@ -357,6 +413,10 @@ set(STRAWBERRY_SOURCES
   src/covermanager/albumcoverfetcher.cpp
   src/covermanager/coverexportrunnable.cpp
   src/covermanager/albumcoverexporter.cpp
+  src/covermanager/albumcoverexport.cpp
+  src/covermanager/coveroptions.cpp
+  src/covermanager/coverprovider.cpp
+  src/covermanager/albumcovermanagerlist.cpp
   src/covermanager/albumcovermanager.cpp
   src/covermanager/albumcoversearcher.cpp
   src/covermanager/albumcoverexportdialog.cpp
@@ -387,13 +447,17 @@ set(STRAWBERRY_SOURCES
   src/lyrics/geniuslyricsprovider.cpp
   src/lyrics/lyricsproviders.cpp
   src/scrobbler/scrobblemetadata.cpp
+  src/scrobbler/scrobblerservice.cpp
+  src/scrobbler/scrobblercacheitem.cpp
   src/scrobbler/scrobblersettingsservice.cpp
   src/scrobbler/audioscrobbler.cpp
   src/scrobbler/scrobblercache.cpp
   src/scrobbler/lastfmscrobbler.cpp
   src/scrobbler/listenbrainzscrobbler.cpp
   src/scrobbler/subsonicscrobbler.cpp
+  src/streaming/streamingservice.cpp
   src/streaming/streamingservices.cpp
+  src/streaming/streamsongmimedata.cpp
   src/streaming/streamingsearchmodel.cpp
   src/streaming/streamingsearchsortmodel.cpp
   src/streaming/streamingsearchitemdelegate.cpp
@@ -404,19 +468,25 @@ set(STRAWBERRY_SOURCES
   src/streaming/streamingtabsview.cpp
   src/streaming/streamingsongsview.cpp
   src/subsonic/subsonicservice.cpp
+  src/subsonic/subsonicbaserequest.cpp
+  src/subsonic/subsonicscrobblerequest.cpp
   src/subsonic/subsonicfavoriterequest.cpp
   src/subsonic/subsonicrequest.cpp
   src/subsonic/subsonicurlhandler.cpp
   src/tidal/tidalservice.cpp
+  src/tidal/tidalbaserequest.cpp
   src/tidal/tidalfavoriterequest.cpp
   src/tidal/tidalrequest.cpp
   src/tidal/tidalstreamurlrequest.cpp
   src/tidal/tidalurlhandler.cpp
   src/spotify/spotifyservice.cpp
+  src/spotify/spotifybaserequest.cpp
   src/spotify/spotifyfavoriterequest.cpp
   src/spotify/spotifyrequest.cpp
   src/spotify/spotifymetadatarequest.cpp
   src/qobuz/qobuzservice.cpp
+  src/qobuz/qobuzbaserequest.cpp
+  src/qobuz/qobuzcredentialfetcher.cpp
   src/qobuz/qobuzfavoriterequest.cpp
   src/qobuz/qobuzrequest.cpp
   src/qobuz/qobuzstreamurlrequest.cpp
@@ -425,6 +495,9 @@ set(STRAWBERRY_SOURCES
   src/radios/radiochannel.cpp
   src/radios/radiobackend.cpp
   src/radios/radioservices.cpp
+  src/radios/radioservice.cpp
+  src/radios/radiomimedata.cpp
+  src/radios/radiobrowsersearchmodel.cpp
   src/radios/somafmservice.cpp
   src/radios/radioparadiseservice.cpp
   src/radios/radiobrowserservice.cpp
@@ -433,6 +506,10 @@ set(STRAWBERRY_SOURCES
   src/radios/radioviewcontainer.cpp
   src/radios/radiobrowsersearchview.cpp
   src/radios/radiostreamplaylistitem.cpp
+  src/device/connecteddevice.cpp
+  src/device/deviceinfo.cpp
+  src/device/devicelister.cpp
+  src/device/devicestatefiltermodel.cpp
   src/device/devicemanager.cpp
   src/device/devicedatabasebackend.cpp
   src/device/mtpconnection.cpp
@@ -450,23 +527,43 @@ set(STRAWBERRY_SOURCES
   src/device/deviceview.cpp
   src/device/deviceviewcontainer.cpp
   src/equalizer/equalizer.cpp
+  src/equalizer/equalizerslider.cpp
   src/equalizer/equalizerdialog.cpp
   src/analyzer/fht.cpp
   src/analyzer/analyzer.cpp
-  src/analyzer/analyzer_render.cpp
+  src/analyzer/analyzerbase.cpp
+  src/analyzer/analyzercontainer.cpp
+  src/analyzer/blockanalyzer.cpp
+  src/analyzer/boomanalyzer.cpp
+  src/analyzer/rainbowanalyzer.cpp
+  src/analyzer/sonogramanalyzer.cpp
+  src/analyzer/turbineanalyzer.cpp
+  src/analyzer/waverubberanalyzer.cpp
   src/moodbar/moodbarbuilder.cpp
   src/moodbar/moodbarpipeline.cpp
   src/moodbar/moodbarrenderer.cpp
   src/moodbar/moodbar.cpp
+  src/moodbar/moodbarcontroller.cpp
+  src/moodbar/moodbarloader.cpp
+  src/moodbar/moodbaritemdelegate.cpp
+  src/moodbar/moodbarproxystyle.cpp
   src/waveform/waveformbuilder.cpp
   src/waveform/waveformpipeline.cpp
   src/waveform/waveformrenderer.cpp
   src/waveform/waveform.cpp
+  src/waveform/waveformcontroller.cpp
+  src/waveform/waveformloader.cpp
+  src/waveform/waveformproxystyle.cpp
   src/transcoder/transcoder.cpp
   src/transcoder/transcoderoptionsinterface.cpp
   src/transcoder/transcoderoptionsmp3.cpp
   src/transcoder/transcoderoptionsflac.cpp
   src/transcoder/transcoderoptionsvorbis.cpp
+  src/transcoder/transcoderoptionsaac.cpp
+  src/transcoder/transcoderoptionsopus.cpp
+  src/transcoder/transcoderoptionsasf.cpp
+  src/transcoder/transcoderoptionsspeex.cpp
+  src/transcoder/transcoderoptionswavpack.cpp
   src/transcoder/transcoderoptionsdialog.cpp
   src/transcoder/transcodedialog.cpp
   src/organize/organize.cpp
@@ -480,6 +577,7 @@ set(STRAWBERRY_SOURCES
   src/osd/osdpretty.cpp
   src/osd/osd.cpp
   src/systemtrayicon/systemtrayicon.cpp
+  src/systemtrayicon/qtsystemtrayicon.cpp
   src/mpris2/mpris2.cpp
   src/globalshortcuts/globalshortcut.cpp
   src/globalshortcuts/globalshortcutsbackend.cpp
@@ -487,8 +585,12 @@ set(STRAWBERRY_SOURCES
   src/globalshortcuts/globalshortcutsbackend-x11.cpp
   src/globalshortcuts/globalshortcutsbackend-kglobalaccel.cpp
   src/globalshortcuts/globalshortcuts.cpp
+  src/globalshortcuts/globalshortcutsmanager.cpp
   src/globalshortcuts/globalshortcutgrabber.cpp
   src/discord/discord.cpp
+  src/discord/discordpresence.cpp
+  src/discord/discordrichpresence.cpp
+  src/discord/discordrpc.cpp
   src/tagfetcher/acoustidclient.cpp
   src/tagfetcher/musicbrainzclient.cpp
   src/tagfetcher/tagfetcher.cpp
@@ -506,8 +608,11 @@ set(STRAWBERRY_SOURCES
   src/dialogs/edittagdialog.cpp
   src/dialogs/trackselectiondialog.cpp
   src/dialogs/shortcutsdialog.cpp
+  src/dialogs/aboutdialog.cpp
   src/device/copytodevicedialog.cpp
   src/settings/settingspage.cpp
+  src/settings/settingsprovider.cpp
+  src/settings/settingsitemdelegate.cpp
   src/settings/behavioursettingspage.cpp
   src/settings/collectionsettingspage.cpp
   src/settings/backendsettingspage.cpp
@@ -610,6 +715,7 @@ if(GTest_FOUND)
     tests/src/smartplaylist_test.cpp
     tests/src/filterparser_test.cpp
     tests/src/parity_increment29_test.cpp
+    tests/src/parity_increment30_test.cpp
     tests/src/lyrics_test.cpp
     tests/src/gpod_test.cpp
     tests/src/mtp_test.cpp
@@ -676,6 +782,13 @@ if(GTest_FOUND)
     src/utilities/mimeutils.cpp
     src/utilities/randutils.cpp
     src/utilities/xmlutils.cpp
+    src/utilities/textencodingutils.cpp
+    src/utilities/xmlparser.cpp
+    src/utilities/transliterate.cpp
+    src/covermanager/albumcovermanagerlist.cpp
+    src/device/devicestatefiltermodel.cpp
+    src/radios/radiomimedata.cpp
+    src/collection/collectionsettingsdirectorymodel.cpp
     src/core/filesystemwatcherinterface.cpp
     src/core/filesystemwatcherinotify.cpp
     src/core/networkproxyfactory.cpp
@@ -683,6 +796,15 @@ if(GTest_FOUND)
     src/core/networktimeouts.cpp
     src/core/httpbaserequest.cpp
     src/core/jsonbaserequest.cpp
+    src/core/sqlquery.cpp
+    src/core/sqlrow.cpp
+    src/core/mimedata.cpp
+    src/core/filewriteguard.cpp
+    src/core/threadsafenetworkdiskcache.cpp
+    src/core/filesystemwatcherqt.cpp
+    src/core/appearance.cpp
+    src/streaming/streamingservice.cpp
+    src/utilities/styleutils.cpp
     src/engine/enginebase.cpp
     src/engine/gstbusmessageevent.cpp
     src/engine/gstfastspectrum.cpp
@@ -827,7 +949,14 @@ if(GTest_FOUND)
     src/organize/organize.cpp
     src/analyzer/fht.cpp
     src/analyzer/analyzer.cpp
-    src/analyzer/analyzer_render.cpp
+    src/analyzer/analyzerbase.cpp
+    src/analyzer/analyzercontainer.cpp
+    src/analyzer/blockanalyzer.cpp
+    src/analyzer/boomanalyzer.cpp
+    src/analyzer/rainbowanalyzer.cpp
+    src/analyzer/sonogramanalyzer.cpp
+    src/analyzer/turbineanalyzer.cpp
+    src/analyzer/waverubberanalyzer.cpp
     src/transcoder/transcoder.cpp
     src/transcoder/transcoderoptionsinterface.cpp
     src/transcoder/transcoderoptionsmp3.cpp

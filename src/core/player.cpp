@@ -13,7 +13,7 @@ Player::Player(TaskManager *task_manager, UrlHandlers *url_handlers, PlaylistMan
 
 void Player::Init() {
   engine_->Init();
-  engine_->StateChanged.Connect([this](GstEngine::State state) { HandleEngineState(state); });
+  engine_->StateChanged.Connect([this](EngineBase::State state) { HandleEngineState(state); });
   engine_->TrackEnded.Connect([this]() { HandleTrackEnded(); });
   engine_->TrackAboutToEnd.Connect([this]() { PreloadNext(); });
   engine_->Error.Connect([](const std::string &error) { LogError("%s", error.c_str()); });
@@ -28,7 +28,7 @@ void Player::Init() {
   LoadVolume();
 }
 
-GstEngine::State Player::GetState() const { return engine_->state(); }
+EngineBase::State Player::GetState() const { return engine_->state(); }
 
 void Player::ReloadSettings() {
   Settings settings;
@@ -262,7 +262,7 @@ void Player::PreloadNext() {
   PlayLoadedSong(false, GstEngine::Auto);
 }
 
-void Player::HandleEngineState(GstEngine::State state) {
+void Player::HandleEngineState(EngineBase::State state) {
   StateChanged.Emit(state);
   switch (state) {
     case GstEngine::State::Playing:

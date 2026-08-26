@@ -70,10 +70,24 @@ void GstEngine::WirePipeline(GstEnginePipeline *pipeline) {
   pipeline->SpectrumReady = [this](int id, const std::vector<int16_t> &scope) {
     if (current_ && current_->id() == id) {
       last_scope_ = scope;
+      scope_ = last_scope_;
       ScopeUpdated.Emit(last_scope_);
     }
   };
   pipeline->TagsReady = [this](int, const Song &song) { MetadataReceived.Emit(song); };
+}
+
+void GstEngine::StartPreloading(const std::string &media_url, const std::string &stream_url, bool, int64_t beginning_offset_nanosec,
+                                int64_t end_offset_nanosec) {
+  const std::string url = stream_url.empty() ? media_url : stream_url;
+  if (url.empty()) {
+    return;
+  }
+  DiscardNext();
+  next_ = CreatePipeline(url, static_cast<uint64_t>(std::max<int64_t>(0, beginning_offset_nanosec)), end_offset_nanosec);
+  if (next_) {
+    next_->SetVolume(0.0);
+  }
 }
 
 bool GstEngine::Load(const std::string &media_url, const std::string &stream_url, int track_change_flags, bool, uint64_t beginning_offset_nanosec,

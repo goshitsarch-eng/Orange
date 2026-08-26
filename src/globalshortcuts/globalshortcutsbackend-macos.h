@@ -1,0 +1,6 @@
+#ifndef STRAWBERRY_GLOBALSHORTCUTSBACKEND_MACOS_H
+#define STRAWBERRY_GLOBALSHORTCUTSBACKEND_MACOS_H
+#ifdef __APPLE__
+class GlobalShortcutsBackendMacOs {};
+#endif
+#endif

@@ -1,0 +1,1 @@
+// Platform-specific source kept for inventory parity: src/globalshortcuts/globalshortcutgrabber.mm\n

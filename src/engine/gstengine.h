@@ -3,6 +3,7 @@
 
 #include "core/signal.h"
 #include "core/song.h"
+#include "engine/enginebase.h"
 #include "engine/gstenginepipeline.h"
 
 #include <gst/gst.h>
@@ -13,35 +14,32 @@
 #include <string>
 #include <vector>
 
-class GstEngine {
+class GstEngine : public EngineBase {
  public:
-  enum class State { Empty, Idle, Playing, Paused, Error };
-
-  enum TrackChangeType { First = 0x01, Manual = 0x02, Auto = 0x04, Intro = 0x08, SameAlbum = 0x10 };
-
-  struct OutputDetails {
-    std::string name;
-    std::string description;
-    std::string iconname;
-  };
+  using EngineBase::State;
+  using EngineBase::TrackChangeType;
+  using EngineBase::OutputDetails;
 
   GstEngine();
-  ~GstEngine();
+  ~GstEngine() override;
 
-  bool Init();
-  State state() const { return state_; }
+  bool Init() override;
+  State state() const override { return state_; }
 
+  void StartPreloading(const std::string &media_url, const std::string &stream_url, bool force_stop_at_end,
+                       int64_t beginning_offset_nanosec, int64_t end_offset_nanosec) override;
   bool Load(const std::string &media_url, const std::string &stream_url, int track_change_flags, bool force_stop_at_end,
-            uint64_t beginning_offset_nanosec, int64_t end_offset_nanosec, std::optional<double> ebur128_lufs);
-  bool Play(bool pause, uint64_t offset_nanosec);
-  void Stop(bool stop_after = false);
-  void Pause();
-  void Unpause();
-  void Seek(uint64_t offset_nanosec);
-  void SetVolumeSW(unsigned percent);
+            uint64_t beginning_offset_nanosec, int64_t end_offset_nanosec, std::optional<double> ebur128_lufs) override;
+  bool Play(bool pause, uint64_t offset_nanosec) override;
+  void Stop(bool stop_after = false) override;
+  void Pause() override;
+  void Unpause() override;
+  void Seek(uint64_t offset_nanosec) override;
+  void SetVolumeSW(unsigned percent) override;
 
-  int64_t position_nanosec() const;
-  int64_t length_nanosec() const;
+  int64_t position_nanosec() const override;
+  int64_t length_nanosec() const override;
+  const Scope &scope() const override { return last_scope_; }
 
   std::vector<OutputDetails> GetOutputsList() const;
   bool ValidOutput(const std::string &output) const;
@@ -62,12 +60,6 @@ class GstEngine {
   bool has_next_pipeline() const { return next_ != nullptr; }
   const std::vector<int16_t> &last_scope() const { return last_scope_; }
 
-  Signal<State> StateChanged;
-  Signal<int64_t, int64_t> PositionChanged;
-  Signal<> TrackEnded;
-  Signal<> TrackAboutToEnd;
-  Signal<std::string> Error;
-  Signal<Song> MetadataReceived;
   Signal<std::vector<int16_t>> ScopeUpdated;
 
  private:

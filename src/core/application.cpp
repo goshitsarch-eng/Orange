@@ -1,5 +1,6 @@
 #include "core/application.h"
 
+#include "core/appearance.h"
 #include "core/logging.h"
 #include "core/settings.h"
 
@@ -42,6 +43,8 @@ Application::Application()
 Application::~Application() { Exit(); }
 
 void Application::Init() {
+  Appearance appearance;
+  appearance.Apply();
   database_->Open();
   collection_->Init();
   {

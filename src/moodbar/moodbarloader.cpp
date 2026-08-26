@@ -1,0 +1,1 @@
+#include "moodbar/moodbarloader.h"

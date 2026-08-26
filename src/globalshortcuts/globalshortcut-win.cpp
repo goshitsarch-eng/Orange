@@ -1,0 +1,1 @@
+#include "globalshortcuts/globalshortcut.h"

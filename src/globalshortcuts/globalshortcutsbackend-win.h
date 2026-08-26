@@ -1,0 +1,6 @@
+#ifndef STRAWBERRY_GLOBALSHORTCUTSBACKEND_WIN_H
+#define STRAWBERRY_GLOBALSHORTCUTSBACKEND_WIN_H
+#ifdef _WIN32
+class GlobalShortcutsBackendWin {};
+#endif
+#endif

@@ -1,0 +1,1 @@
+#include "smartplaylists/smartplaylistsearch.h"

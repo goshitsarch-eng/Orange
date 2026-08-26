@@ -1,0 +1,6 @@
+#ifndef STRAWBERRY_WINSYSTEMMEDIATRANSPORTCONTROLS_H
+#define STRAWBERRY_WINSYSTEMMEDIATRANSPORTCONTROLS_H
+#ifdef _WIN32
+class WinSystemMediaTransportControls {};
+#endif
+#endif

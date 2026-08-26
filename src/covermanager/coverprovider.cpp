@@ -1,0 +1,1 @@
+#include "covermanager/coverprovider.h"

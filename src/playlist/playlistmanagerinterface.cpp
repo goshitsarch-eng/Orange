@@ -1,0 +1,1 @@
+#include "playlist/playlistmanagerinterface.h"

@@ -1,0 +1,6 @@
+#ifndef STRAWBERRY_PLAYLISTGENERATOR_FWD_H
+#define STRAWBERRY_PLAYLISTGENERATOR_FWD_H
+
+class PlaylistGenerator;
+
+#endif

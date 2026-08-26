@@ -1,0 +1,1 @@
+#include "transcoder/transcoderoptionswavpack.h"
