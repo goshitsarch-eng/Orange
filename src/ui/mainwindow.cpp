@@ -1,5 +1,6 @@
 #include "ui/mainwindow.h"
 
+#include "core/settings.h"
 #include "playlistparsers/playlistparser.h"
 #include "smartplaylists/smartplaylist.h"
 #include "ui/dialogs.h"
@@ -95,6 +96,9 @@ const char *HomeOrMusic() {
 
 MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const CommandlineOptions &options)
     : gtk_app_(gtk_app), app_(app), files_path_(HomeOrMusic() ? HomeOrMusic() : ".") {
+  Settings settings;
+  settings.BeginGroup("Collection");
+  collection_group_ = settings.Value("groupby", "artist-album");
   BuildUi();
   ConnectSignals();
   RefreshCollection();
@@ -142,6 +146,9 @@ void MainWindow::BuildUi() {
   g_menu_append(playlist, "Load playlist…", "win.load-playlist");
   g_menu_append(playlist, "Save playlist…", "win.save-playlist");
   g_menu_append(playlist, "Clear playlist", "win.clear-playlist");
+  g_menu_append(playlist, "Undo", "win.undo");
+  g_menu_append(playlist, "Redo", "win.redo");
+  g_menu_append(playlist, "Smart playlist wizard…", "win.smart-wizard");
   g_menu_append_section(menu, "Playlist", G_MENU_MODEL(playlist));
   GMenu *tools = g_menu_new();
   g_menu_append(tools, "Cover manager", "win.covers");
@@ -150,6 +157,9 @@ void MainWindow::BuildUi() {
   g_menu_append(tools, "Organize files…", "win.organize");
   g_menu_append(tools, "Fetch tags…", "win.tagfetch");
   g_menu_append(tools, "Edit tags…", "win.edittag");
+  g_menu_append(tools, "Collection grouping…", "win.group-by");
+  g_menu_append(tools, "Cycle analyzer", "win.cycle-analyzer");
+  g_menu_append(tools, "Debug console", "win.console");
   g_menu_append_section(menu, "Tools", G_MENU_MODEL(tools));
   GMenu *appmenu = g_menu_new();
   g_menu_append(appmenu, "Preferences", "win.preferences");
@@ -229,6 +239,27 @@ void MainWindow::BuildUi() {
   add_action("tagfetch", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::TagFetcher(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("edittag", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::EditTag(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("shortcuts", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Shortcuts(GTK_WINDOW(static_cast<MainWindow *>(data)->window_)); }));
+  add_action("undo", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->UndoPlaylist(); }));
+  add_action("redo", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RedoPlaylist(); }));
+  add_action("smart-wizard", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::SmartPlaylistWizard(GTK_WINDOW(self->window_), self->app_);
+               self->RefreshPlaylistsList();
+               self->RefreshPlaylist();
+             }));
+  add_action("group-by", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::GroupBy(GTK_WINDOW(self->window_), [self](const std::string &group) {
+                 self->collection_group_ = group;
+                 Settings settings;
+                 settings.BeginGroup("Collection");
+                 settings.SetValue("groupby", group);
+                 settings.Sync();
+                 self->RefreshCollection();
+               });
+             }));
+  add_action("console", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Console(GTK_WINDOW(static_cast<MainWindow *>(data)->window_)); }));
+  add_action("cycle-analyzer", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CycleAnalyzer(); }));
   add_action("playlist-play", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                if (self->app_->playlist_manager()->active() && self->app_->playlist_manager()->current_row() >= 0) {
@@ -292,7 +323,11 @@ void MainWindow::BuildSidebar() {
   g_signal_connect(smart_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
                      const char *kind = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-data"));
-                     if (kind) {
+                     if (kind && std::string(kind) == "wizard") {
+                       Dialogs::SmartPlaylistWizard(GTK_WINDOW(self->window_), self->app_);
+                       self->RefreshPlaylistsList();
+                       self->RefreshPlaylist();
+                     } else if (kind) {
                        self->RunSmartPlaylist(kind);
                      }
                    }),
@@ -388,6 +423,8 @@ void MainWindow::BuildPlaylist() {
   add_tool("document-open-symbolic", "Load playlist", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->LoadPlaylistFile(); }));
   add_tool("document-save-symbolic", "Save playlist", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->SavePlaylistFile(); }));
   add_tool("edit-clear-all-symbolic", "Clear playlist", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->ClearPlaylist(); }));
+  add_tool("edit-undo-symbolic", "Undo", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->UndoPlaylist(); }));
+  add_tool("edit-redo-symbolic", "Redo", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->RedoPlaylist(); }));
   repeat_button_ = gtk_button_new_from_icon_name("media-playlist-repeat-symbolic");
   gtk_widget_set_tooltip_text(repeat_button_, "Cycle repeat");
   g_signal_connect(repeat_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->CycleRepeat(); }), this);
@@ -410,6 +447,10 @@ void MainWindow::BuildPlaylist() {
   gtk_widget_add_css_class(playlist_summary_, "dim-label");
   gtk_box_append(GTK_BOX(toolbar), playlist_summary_);
   gtk_box_append(GTK_BOX(box), toolbar);
+  playlist_tabs_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+  gtk_widget_set_margin_start(playlist_tabs_, 8);
+  gtk_widget_set_margin_end(playlist_tabs_, 8);
+  gtk_box_append(GTK_BOX(box), playlist_tabs_);
 
   playlist_scroll_ = gtk_scrolled_window_new();
   gtk_widget_set_hexpand(playlist_scroll_, TRUE);
@@ -489,6 +530,13 @@ void MainWindow::BuildPlayerBar() {
   gtk_box_append(GTK_BOX(controls), stop);
   gtk_box_append(GTK_BOX(controls), next);
   gtk_box_append(GTK_BOX(controls), love);
+  gtk_widget_set_tooltip_text(analyzer_drawing_, "Click to cycle analyzer type");
+  GtkGesture *analyzer_click = gtk_gesture_click_new();
+  gtk_widget_add_controller(analyzer_drawing_, GTK_EVENT_CONTROLLER(analyzer_click));
+  g_signal_connect(analyzer_click, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
+                     static_cast<MainWindow *>(data)->CycleAnalyzer();
+                   }),
+                   this);
   gtk_box_append(GTK_BOX(controls), analyzer_drawing_);
   gtk_box_append(GTK_BOX(controls), volume_scale_);
   gtk_box_append(GTK_BOX(box), controls);
@@ -556,7 +604,7 @@ void MainWindow::RefreshCollection(const std::string &filter) {
   const SongList songs = app_->collection()->Songs(filter);
   std::string last_header;
   for (const Song &song : songs) {
-    const std::string header = song.EffectiveAlbumartist() + " – " + song.album();
+    const std::string header = CollectionHeader(song);
     if (header != last_header) {
       GtkWidget *header_row = gtk_list_box_row_new();
       gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(header_row), FALSE);
@@ -668,8 +716,7 @@ void MainWindow::SortPlaylistBy(PlaylistColumn column) {
     }
     return sort_descending_ ? left > right : left < right;
   });
-  playlist->Clear();
-  playlist->AppendSongs(songs);
+  playlist->ReplaceSongs(songs);
   app_->playlist_manager()->SaveActive();
   RefreshPlaylist();
 }
@@ -737,6 +784,51 @@ void MainWindow::RefreshPlaylistsList() {
   for (const auto &playlist : app_->playlist_manager()->playlists()) {
     AppendStringRow(GTK_LIST_BOX(playlists_list_), playlist->name(), nullptr);
   }
+  RefreshPlaylistTabs();
+}
+
+void MainWindow::RefreshPlaylistTabs() {
+  if (!playlist_tabs_) {
+    return;
+  }
+  GtkWidget *child = gtk_widget_get_first_child(playlist_tabs_);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_widget_unparent(child);
+    child = next;
+  }
+  for (const auto &playlist : app_->playlist_manager()->playlists()) {
+    GtkWidget *button = gtk_toggle_button_new_with_label(playlist->name().c_str());
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), playlist.get() == app_->playlist_manager()->active());
+    g_object_set_data_full(G_OBJECT(button), "playlist-name", g_strdup(playlist->name().c_str()), g_free);
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                       auto *self = static_cast<MainWindow *>(data);
+                       const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "playlist-name"));
+                       if (name) {
+                         self->app_->playlist_manager()->SetCurrentPlaylist(name);
+                         self->RefreshPlaylist();
+                         self->RefreshPlaylistTabs();
+                       }
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(playlist_tabs_), button);
+  }
+}
+
+std::string MainWindow::CollectionHeader(const Song &song) const {
+  if (collection_group_ == "album") {
+    return song.album().empty() ? "Unknown album" : song.album();
+  }
+  if (collection_group_ == "genre") {
+    return song.genre().empty() ? "Unknown genre" : song.genre();
+  }
+  if (collection_group_ == "year") {
+    return song.year() > 0 ? std::to_string(song.year()) : "Unknown year";
+  }
+  if (collection_group_ == "artist") {
+    return song.EffectiveAlbumartist().empty() ? "Unknown artist" : song.EffectiveAlbumartist();
+  }
+  return song.EffectiveAlbumartist() + " – " + song.album();
 }
 
 void MainWindow::RefreshSmartPlaylists() {
@@ -747,8 +839,9 @@ void MainWindow::RefreshSmartPlaylists() {
   };
   for (const Item item : {Item{"All songs", "all"}, Item{"Never played", "never"}, Item{"Highest rated", "rated"}, Item{"Newest", "newest"},
                           Item{"Most played", "played"}}) {
-    AppendStringRow(GTK_LIST_BOX(smart_list_), item.title, const_cast<char *>(item.kind));
+      AppendStringRow(GTK_LIST_BOX(smart_list_), item.title, const_cast<char *>(item.kind));
   }
+  AppendStringRow(GTK_LIST_BOX(smart_list_), "Custom wizard…", const_cast<char *>("wizard"));
 }
 
 void MainWindow::RefreshQueue() {
@@ -1004,6 +1097,31 @@ void MainWindow::ClearPlaylist() {
   }
 }
 
+void MainWindow::UndoPlaylist() {
+  if (Playlist *playlist = app_->playlist_manager()->active()) {
+    playlist->Undo();
+    app_->playlist_manager()->SaveActive();
+    RefreshPlaylist();
+  }
+}
+
+void MainWindow::RedoPlaylist() {
+  if (Playlist *playlist = app_->playlist_manager()->active()) {
+    playlist->Redo();
+    app_->playlist_manager()->SaveActive();
+    RefreshPlaylist();
+  }
+}
+
+void MainWindow::CycleAnalyzer() {
+  const auto types = Analyzer::Types();
+  auto it = std::find(types.begin(), types.end(), app_->analyzer()->type());
+  const size_t index = it == types.end() ? 0 : (static_cast<size_t>(std::distance(types.begin(), it)) + 1) % types.size();
+  app_->analyzer()->set_type(types[index]);
+  gtk_widget_set_tooltip_text(analyzer_drawing_, ("Analyzer: " + types[index]).c_str());
+  gtk_widget_queue_draw(analyzer_drawing_);
+}
+
 void MainWindow::CycleRepeat() {
   Playlist *playlist = app_->playlist_manager()->active();
   if (!playlist) {
@@ -1113,12 +1231,40 @@ void MainWindow::DrawAnalyzer(GtkDrawingArea *, cairo_t *cr, int width, int heig
   if (bands.empty() || width <= 0) {
     return;
   }
+  const std::string type = self->app_->analyzer()->type();
   const double bar_w = static_cast<double>(width) / static_cast<double>(bands.size());
-  cairo_set_source_rgb(cr, 0.23, 0.63, 0.95);
+  if (type == "Wave" || type == "Sonic") {
+    cairo_set_source_rgb(cr, type == "Sonic" ? 0.95 : 0.23, 0.63, type == "Sonic" ? 0.35 : 0.95);
+    cairo_move_to(cr, 0, height / 2.0);
+    for (size_t i = 0; i < bands.size(); ++i) {
+      const double x = static_cast<double>(i) * bar_w;
+      const double y = height / 2.0 - static_cast<double>(bands[i]) * height / 2.0;
+      cairo_line_to(cr, x, y);
+    }
+    cairo_stroke(cr);
+    return;
+  }
   for (size_t i = 0; i < bands.size(); ++i) {
     const double h = std::max(1.0, static_cast<double>(bands[i]) * height);
-    cairo_rectangle(cr, static_cast<double>(i) * bar_w, height - h, bar_w - 1.0, h);
-    cairo_fill(cr);
+    if (type == "Rainbow") {
+      cairo_set_source_rgb(cr, static_cast<double>(i) / bands.size(), 0.4, 1.0 - static_cast<double>(i) / bands.size());
+    } else if (type == "Turbine") {
+      cairo_set_source_rgb(cr, 0.9, 0.45 + bands[i] * 0.4, 0.1);
+    } else if (type == "Block") {
+      cairo_set_source_rgb(cr, 0.2, 0.8, 0.4);
+    } else {
+      cairo_set_source_rgb(cr, 0.23, 0.63, 0.95);
+    }
+    if (type == "Block") {
+      const int blocks = std::max(1, static_cast<int>(h / 4));
+      for (int b = 0; b < blocks; ++b) {
+        cairo_rectangle(cr, static_cast<double>(i) * bar_w, height - (b + 1) * 4, bar_w - 1.0, 3);
+        cairo_fill(cr);
+      }
+    } else {
+      cairo_rectangle(cr, static_cast<double>(i) * bar_w, height - h, bar_w - 1.0, h);
+      cairo_fill(cr);
+    }
   }
 }
 

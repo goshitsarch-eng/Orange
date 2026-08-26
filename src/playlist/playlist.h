@@ -34,6 +34,11 @@ class Playlist {
   void Clear();
   void Move(int from, int to);
   void Shuffle();
+  void ReplaceSongs(const SongList &songs);
+  void Undo();
+  void Redo();
+  bool CanUndo() const { return !undo_.empty(); }
+  bool CanRedo() const { return !redo_.empty(); }
   void Next();
   void Previous();
   void SetSequenceMode(SequenceMode mode) { mode_ = mode; }
@@ -45,8 +50,14 @@ class Playlist {
   Signal<int> CurrentChanged;
 
  private:
+  struct Snapshot {
+    SongList songs;
+    int current_row = -1;
+  };
+
   int NextIndex() const;
   int PreviousIndex() const;
+  void PushUndo();
 
   int id_ = -1;
   std::string name_ = "Playlist";
@@ -54,6 +65,8 @@ class Playlist {
   SongList songs_;
   int current_row_ = -1;
   SequenceMode mode_ = SequenceMode::Sequential;
+  std::vector<Snapshot> undo_;
+  std::vector<Snapshot> redo_;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H

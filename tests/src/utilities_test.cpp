@@ -1,7 +1,10 @@
 #include "utilities/strutils.h"
 #include "utilities/timeutils.h"
 #include "utilities/fileutils.h"
+#include "organize/organize.h"
+#include "analyzer/analyzer.h"
 
+#include <algorithm>
 #include <gtest/gtest.h>
 
 TEST(TimeUtils, PrettyTime) {
@@ -30,4 +33,24 @@ TEST(StrUtils, CaseAndTrim) {
 TEST(FileUtils, BaseAndExtension) {
   EXPECT_EQ("song.mp3", FileUtils::BaseName("/tmp/music/song.mp3"));
   EXPECT_EQ("mp3", FileUtils::Extension("/tmp/music/song.mp3"));
+}
+
+TEST(OrganizeFormat, ExpandsTokens) {
+  OrganizeFormat format("%albumartist/%album/%track - %title");
+  Song song;
+  song.set_albumartist("Artist");
+  song.set_album("Album");
+  song.set_title("Title");
+  song.set_track(3);
+  EXPECT_EQ("Artist/Album/03 - Title", format.GetFilenameForSong(song));
+}
+
+TEST(Analyzer, Types) {
+  const auto types = Analyzer::Types();
+  EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Bar"));
+  EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Rainbow"));
+  EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Turbine"));
+  EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Wave"));
+  EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Sonic"));
+  EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Block"));
 }

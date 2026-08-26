@@ -25,7 +25,52 @@ Song Playlist::song(int row) const {
   return songs_[static_cast<size_t>(row)];
 }
 
+void Playlist::PushUndo() {
+  undo_.push_back({songs_, current_row_});
+  redo_.clear();
+  if (undo_.size() > 50) {
+    undo_.erase(undo_.begin());
+  }
+}
+
+void Playlist::Undo() {
+  if (undo_.empty()) {
+    return;
+  }
+  redo_.push_back({songs_, current_row_});
+  songs_ = undo_.back().songs;
+  current_row_ = undo_.back().current_row;
+  undo_.pop_back();
+  Changed.Emit();
+}
+
+void Playlist::Redo() {
+  if (redo_.empty()) {
+    return;
+  }
+  undo_.push_back({songs_, current_row_});
+  songs_ = redo_.back().songs;
+  current_row_ = redo_.back().current_row;
+  redo_.pop_back();
+  Changed.Emit();
+}
+
+void Playlist::ReplaceSongs(const SongList &songs) {
+  PushUndo();
+  songs_ = songs;
+  if (songs_.empty()) {
+    current_row_ = -1;
+  } else if (current_row_ < 0 || current_row_ >= static_cast<int>(songs_.size())) {
+    current_row_ = 0;
+  }
+  Changed.Emit();
+}
+
 void Playlist::InsertSongs(int row, const SongList &songs) {
+  if (songs.empty()) {
+    return;
+  }
+  PushUndo();
   if (row < 0 || row > static_cast<int>(songs_.size())) {
     row = static_cast<int>(songs_.size());
   }
@@ -39,6 +84,10 @@ void Playlist::InsertSongs(int row, const SongList &songs) {
 void Playlist::AppendSongs(const SongList &songs) { InsertSongs(static_cast<int>(songs_.size()), songs); }
 
 void Playlist::RemoveRows(const std::vector<int> &rows) {
+  if (rows.empty()) {
+    return;
+  }
+  PushUndo();
   std::vector<int> sorted = rows;
   std::sort(sorted.begin(), sorted.end(), std::greater<int>());
   for (int row : sorted) {
@@ -53,15 +102,20 @@ void Playlist::RemoveRows(const std::vector<int> &rows) {
 }
 
 void Playlist::Clear() {
+  if (songs_.empty()) {
+    return;
+  }
+  PushUndo();
   songs_.clear();
   current_row_ = -1;
   Changed.Emit();
 }
 
 void Playlist::Move(int from, int to) {
-  if (from < 0 || to < 0 || from >= static_cast<int>(songs_.size()) || to >= static_cast<int>(songs_.size())) {
+  if (from < 0 || to < 0 || from >= static_cast<int>(songs_.size()) || to >= static_cast<int>(songs_.size()) || from == to) {
     return;
   }
+  PushUndo();
   Song song = songs_[static_cast<size_t>(from)];
   songs_.erase(songs_.begin() + from);
   songs_.insert(songs_.begin() + to, song);
@@ -72,6 +126,10 @@ void Playlist::Move(int from, int to) {
 }
 
 void Playlist::Shuffle() {
+  if (songs_.size() < 2) {
+    return;
+  }
+  PushUndo();
   std::random_device rd;
   std::mt19937 gen(rd());
   std::shuffle(songs_.begin(), songs_.end(), gen);

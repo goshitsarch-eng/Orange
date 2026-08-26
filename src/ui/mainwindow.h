@@ -63,9 +63,14 @@ class MainWindow {
   void SavePlaylistFile();
   void NewPlaylist();
   void ClearPlaylist();
+  void UndoPlaylist();
+  void RedoPlaylist();
   void CycleRepeat();
   void CycleShuffle();
+  void CycleAnalyzer();
   void RunSmartPlaylist(const std::string &kind);
+  void RefreshPlaylistTabs();
+  std::string CollectionHeader(const Song &song) const;
   void PlayRadioChannel(const RadioChannel &channel);
   void ShowPlaylistMenu(double x, double y);
   std::vector<int> SelectedPlaylistRows() const;
@@ -121,7 +126,9 @@ class MainWindow {
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;
   GtkWidget *playlist_summary_ = nullptr;
+  GtkWidget *playlist_tabs_ = nullptr;
   std::string files_path_;
+  std::string collection_group_ = "artist-album";
   std::string playlist_filter_;
   PlaylistColumn sort_column_ = PlaylistColumn::Title;
   bool sort_descending_ = false;

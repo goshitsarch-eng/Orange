@@ -272,6 +272,8 @@ if(GTest_FOUND)
     src/filterparser/filterparser.cpp
     src/playlist/playlist.cpp
     src/collection/collectionbackend.cpp
+    src/organize/organize.cpp
+    src/analyzer/analyzer.cpp
   )
   target_include_directories(strawberry_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

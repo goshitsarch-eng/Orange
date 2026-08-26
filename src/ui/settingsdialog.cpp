@@ -3,6 +3,7 @@
 #include "config.h"
 #include "core/application.h"
 #include "core/settings.h"
+#include "ui/dialogs.h"
 
 #include <adwaita.h>
 
@@ -106,6 +107,20 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AddToggle(group, settings, "Subsonic", "Subsonic scrobble", nullptr, false);
 #endif
     AddEntry(group, settings, "username", "Username");
+    AdwActionRow *login = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(login), "Account");
+    GtkWidget *button = gtk_button_new_with_label("Sign in");
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                       auto *application = static_cast<Application *>(data);
+                       Dialogs::Login(nullptr, "Last.fm", [application](const std::string &user, const std::string &pass) {
+                         for (ScrobblerService *service : application->scrobbler()->All()) {
+                           service->Authenticate(user, pass);
+                         }
+                       });
+                     }),
+                     app);
+    adw_action_row_add_suffix(login, button);
+    adw_preferences_group_add(group, GTK_WIDGET(login));
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -204,6 +219,20 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddEntry(group, settings, "url", "Server URL");
     AddEntry(group, settings, "username", "Username");
+    AdwActionRow *login = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(login), "Server login");
+    GtkWidget *button = gtk_button_new_with_label("Sign in");
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                       auto *application = static_cast<Application *>(data);
+                       Dialogs::Login(nullptr, "Subsonic", [application](const std::string &user, const std::string &token) {
+                         if (StreamingService *service = application->streaming_services()->ServiceByName("Subsonic")) {
+                           service->Login(user, token);
+                         }
+                       });
+                     }),
+                     app);
+    adw_action_row_add_suffix(login, button);
+    adw_preferences_group_add(group, GTK_WIDGET(login));
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -214,6 +243,20 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesPage *page = MakePage("Tidal", "emblem-shared-symbolic");
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddEntry(group, settings, "clientid", "Client ID");
+    AdwActionRow *login = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(login), "OAuth");
+    GtkWidget *button = gtk_button_new_with_label("Sign in");
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                       auto *application = static_cast<Application *>(data);
+                       Dialogs::Login(nullptr, "Tidal", [application](const std::string &user, const std::string &token) {
+                         if (StreamingService *service = application->streaming_services()->ServiceByName("Tidal")) {
+                           service->Login(user, token);
+                         }
+                       });
+                     }),
+                     app);
+    adw_action_row_add_suffix(login, button);
+    adw_preferences_group_add(group, GTK_WIDGET(login));
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -224,6 +267,20 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesPage *page = MakePage("Qobuz", "emblem-shared-symbolic");
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddEntry(group, settings, "appid", "App ID");
+    AdwActionRow *login = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(login), "Login");
+    GtkWidget *button = gtk_button_new_with_label("Sign in");
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                       auto *application = static_cast<Application *>(data);
+                       Dialogs::Login(nullptr, "Qobuz", [application](const std::string &user, const std::string &token) {
+                         if (StreamingService *service = application->streaming_services()->ServiceByName("Qobuz")) {
+                           service->Login(user, token);
+                         }
+                       });
+                     }),
+                     app);
+    adw_action_row_add_suffix(login, button);
+    adw_preferences_group_add(group, GTK_WIDGET(login));
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -234,6 +291,20 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesPage *page = MakePage("Spotify", "emblem-shared-symbolic");
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddEntry(group, settings, "clientid", "Client ID");
+    AdwActionRow *login = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(login), "OAuth");
+    GtkWidget *button = gtk_button_new_with_label("Sign in");
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                       auto *application = static_cast<Application *>(data);
+                       Dialogs::Login(nullptr, "Spotify", [application](const std::string &user, const std::string &token) {
+                         if (StreamingService *service = application->streaming_services()->ServiceByName("Spotify")) {
+                           service->Login(user, token);
+                         }
+                       });
+                     }),
+                     app);
+    adw_action_row_add_suffix(login, button);
+    adw_preferences_group_add(group, GTK_WIDGET(login));
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }

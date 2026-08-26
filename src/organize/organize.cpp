@@ -5,6 +5,9 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <cstdio>
+#include <utility>
+
+OrganizeFormat::OrganizeFormat(std::string format) : format_(std::move(format)) {}
 namespace {
 std::string Safe(const std::string &value) {
   std::string result = value;
