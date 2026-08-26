@@ -17,6 +17,7 @@ class PlaylistListView {
   using FolderCallback = std::function<void(const std::string &)>;
 
   PlaylistListView();
+  ~PlaylistListView();
 
   GtkWidget *widget() const { return widget_; }
   GtkWidget *list() const { return list_; }
@@ -25,6 +26,7 @@ class PlaylistListView {
   void SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
   void SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
   void SetFolderToggleCallback(FolderCallback callback) { toggle_ = std::move(callback); }
+  void SetDeleteCallback(ActivateCallback callback) { delete_ = std::move(callback); }
   std::string SelectedName() const;
   std::string SelectedFolderPath() const;
   bool SelectedIsFolder() const;
@@ -32,6 +34,8 @@ class PlaylistListView {
  private:
   void SetupRowDrop(GtkWidget *row, const PlaylistListDrop::Row &item);
   void SetupRowDrag(GtkWidget *row, const std::string &name);
+  gboolean OnKeyPressed(guint keyval);
+  void ResetTypeAhead();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
@@ -39,6 +43,9 @@ class PlaylistListView {
   MenuCallback menu_;
   DropCallback drop_;
   FolderCallback toggle_;
+  ActivateCallback delete_;
+  std::string typeahead_;
+  guint typeahead_timeout_ = 0;
 };
 
 #endif

@@ -1,5 +1,7 @@
+#include "dialogs/dialoglistkeyboard.h"
 #include "dialogs/edittagfields.h"
 #include "lyrics/lyricsproviderorder.h"
+#include "widgets/listboxkeyboard.h"
 
 #include <gtest/gtest.h>
 
@@ -81,6 +83,23 @@ TEST(EditTagFields, WrapIndexAndSongRowLabel) {
   EXPECT_EQ(2, EditTagFields::WrapIndex(0, -1, 3));
   Song song = MakeTagged("Roads", "Portishead", "Dummy");
   EXPECT_EQ("Portishead - Roads", EditTagFields::SongRowLabel(song));
+}
+
+TEST(DialogListKeyboard, ActivateMoveAndWrap) {
+  EXPECT_TRUE(DialogListKeyboard::IsActivate(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(DialogListKeyboard::IsActivate(ListBoxKeyboard::kKPEnter));
+  EXPECT_FALSE(DialogListKeyboard::IsActivate(ListBoxKeyboard::kDown));
+  EXPECT_TRUE(DialogListKeyboard::IsMove(ListBoxKeyboard::kUp));
+  EXPECT_TRUE(DialogListKeyboard::IsMove(ListBoxKeyboard::kDown));
+  EXPECT_TRUE(DialogListKeyboard::IsMove(ListBoxKeyboard::kHome));
+  EXPECT_TRUE(DialogListKeyboard::IsMove(ListBoxKeyboard::kEnd));
+  EXPECT_FALSE(DialogListKeyboard::IsMove(ListBoxKeyboard::kReturn));
+  EXPECT_FALSE(DialogListKeyboard::IsMove(ListBoxKeyboard::kDelete));
+  EXPECT_EQ(2, DialogListKeyboard::NextIndex(0, 3, ListBoxKeyboard::kUp));
+  EXPECT_EQ(0, DialogListKeyboard::NextIndex(2, 3, ListBoxKeyboard::kDown));
+  EXPECT_EQ(0, DialogListKeyboard::NextIndex(2, 3, ListBoxKeyboard::kHome));
+  EXPECT_EQ(2, DialogListKeyboard::NextIndex(0, 3, ListBoxKeyboard::kEnd));
+  EXPECT_EQ(-1, DialogListKeyboard::NextIndex(0, 0, ListBoxKeyboard::kDown));
 }
 
 TEST(LyricsProviderOrder, ParseJoinMoveAndRank) {

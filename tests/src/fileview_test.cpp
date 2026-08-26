@@ -1,4 +1,5 @@
 #include "device/devicedrag.h"
+#include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
 #include "fileview/fileviewhidden.h"
 #include "fileview/fileviewhistory.h"
@@ -214,6 +215,23 @@ TEST(FileViewKeyboard, AltAndHistoryBack) {
   EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::HistoryBack, false));
   EXPECT_EQ(FileViewKeyboard::Action::HistoryBack, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::HistoryBack, true));
   EXPECT_EQ(FileViewKeyboard::Action::Home, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::Home, false));
+}
+
+TEST(DeviceKeyboard, FromKeyBackAndSpecialRows) {
+  EXPECT_EQ(DeviceKeyboard::Action::Activate, DeviceKeyboard::FromKey(ListBoxKeyboard::kReturn));
+  EXPECT_EQ(DeviceKeyboard::Action::MoveUp, DeviceKeyboard::FromKey(ListBoxKeyboard::kUp));
+  EXPECT_EQ(DeviceKeyboard::Action::MoveDown, DeviceKeyboard::FromKey(ListBoxKeyboard::kDown));
+  EXPECT_EQ(DeviceKeyboard::Action::Home, DeviceKeyboard::FromKey(ListBoxKeyboard::kHome));
+  EXPECT_EQ(DeviceKeyboard::Action::End, DeviceKeyboard::FromKey(ListBoxKeyboard::kEnd));
+  EXPECT_EQ(DeviceKeyboard::Action::Back, DeviceKeyboard::FromKey(ListBoxKeyboard::kBackSpace));
+  EXPECT_EQ(DeviceKeyboard::Action::Escape, DeviceKeyboard::FromKey(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(DeviceKeyboard::Action::None, DeviceKeyboard::FromKey('a'));
+  EXPECT_EQ(ListBoxKeyboard::Action::Home, DeviceKeyboard::MoveAction(DeviceKeyboard::Action::Home));
+  EXPECT_EQ(ListBoxKeyboard::Action::None, DeviceKeyboard::MoveAction(DeviceKeyboard::Action::Back));
+  EXPECT_TRUE(DeviceKeyboard::IsSpecialRowKind("back"));
+  EXPECT_TRUE(DeviceKeyboard::IsSpecialRowKind("add-all"));
+  EXPECT_FALSE(DeviceKeyboard::IsSpecialRowKind("song"));
+  EXPECT_FALSE(DeviceKeyboard::IsSpecialRowKind(nullptr));
 }
 
 TEST(DeviceDrag, JoinsSongUrls) {

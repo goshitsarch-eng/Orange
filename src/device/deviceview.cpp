@@ -1,7 +1,10 @@
 #include "device/deviceview.h"
 
+#include "device/devicekeyboard.h"
 #include "device/devicedrag.h"
 #include "translations/translations.h"
+#include "widgets/listboxkeyboard.h"
+#include "widgets/listboxkeyboardgtk.h"
 
 #include <string>
 
@@ -36,6 +39,66 @@ DeviceView::DeviceView() {
                      }
                    }),
                    this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(list_, keys);
+  gtk_widget_set_focusable(list_, TRUE);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<DeviceView *>(data)->OnKeyPressed(keyval);
+                   })),
+                   this);
+}
+
+DeviceView::~DeviceView() { ResetTypeAhead(); }
+
+void DeviceView::ResetTypeAhead() {
+  typeahead_.clear();
+  if (typeahead_timeout_) {
+    g_source_remove(typeahead_timeout_);
+    typeahead_timeout_ = 0;
+  }
+}
+
+gboolean DeviceView::OnKeyPressed(guint keyval) {
+  const DeviceKeyboard::Action action = DeviceKeyboard::FromKey(keyval);
+  if (action == DeviceKeyboard::Action::Activate) {
+    ListBoxKeyboardGtk::ActivateSelected(list_);
+    return TRUE;
+  }
+  if (action == DeviceKeyboard::Action::Back && back_cb_) {
+    back_cb_();
+    return TRUE;
+  }
+  if (action == DeviceKeyboard::Action::MoveUp || action == DeviceKeyboard::Action::MoveDown || action == DeviceKeyboard::Action::Home ||
+      action == DeviceKeyboard::Action::End) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), DeviceKeyboard::MoveAction(action)));
+    return TRUE;
+  }
+  if (action == DeviceKeyboard::Action::Escape) {
+    ResetTypeAhead();
+    return TRUE;
+  }
+  const gunichar ch = gdk_keyval_to_unicode(keyval);
+  if (ch && g_unichar_isprint(ch)) {
+    gchar utf8[8] = {};
+    typeahead_.append(utf8, static_cast<size_t>(g_unichar_to_utf8(ch, utf8)));
+    if (typeahead_timeout_) {
+      g_source_remove(typeahead_timeout_);
+    }
+    typeahead_timeout_ = g_timeout_add(1000, [](gpointer data) -> gboolean {
+      auto *self = static_cast<DeviceView *>(data);
+      self->typeahead_timeout_ = 0;
+      self->typeahead_.clear();
+      return G_SOURCE_REMOVE;
+    }, this);
+    const int index = ListBoxKeyboard::FirstPrefixIndex(ListBoxKeyboardGtk::Labels(list_), typeahead_);
+    if (index >= 0) {
+      ListBoxKeyboardGtk::SelectIndex(list_, index);
+    }
+    return TRUE;
+  }
+  return FALSE;
 }
 
 void DeviceView::AttachMenu(GtkWidget *row) {

@@ -79,10 +79,21 @@ OSDPrettyPlacement::Rect WindowSize(GtkWidget *window) {
 }
 
 void MoveWindow(GtkWidget *window, int x, int y) {
+  bool is_x11 = false;
 #ifdef HAVE_X11
-  if (!window) {
+  if (window) {
+    if (GdkDisplay *display = gtk_widget_get_display(window)) {
+      is_x11 = GDK_IS_X11_DISPLAY(display);
+    }
+  }
+#endif
+  if (!OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::DetectBackend(is_x11, false))) {
+    (void)window;
+    (void)x;
+    (void)y;
     return;
   }
+#ifdef HAVE_X11
   GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
   if (surface && GDK_IS_X11_SURFACE(surface)) {
     XMoveWindow(GDK_SURFACE_XDISPLAY(surface), gdk_x11_surface_get_xid(surface), x, y);

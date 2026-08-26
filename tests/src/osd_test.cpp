@@ -106,6 +106,17 @@ TEST(OSDPrettyWayland, SupportedWhenADisplayExists) {
   EXPECT_FALSE(OSDPrettyWayland::SupportedOnDisplay(false));
 }
 
+TEST(OSDPrettyWayland, DetectsPositionBackend) {
+  EXPECT_EQ(OSDPrettyWayland::PositionBackend::X11, OSDPrettyWayland::DetectBackend(true, false));
+  EXPECT_EQ(OSDPrettyWayland::PositionBackend::X11, OSDPrettyWayland::DetectBackend(true, true));
+  EXPECT_EQ(OSDPrettyWayland::PositionBackend::LayerShell, OSDPrettyWayland::DetectBackend(false, true));
+  EXPECT_EQ(OSDPrettyWayland::PositionBackend::Unpositioned, OSDPrettyWayland::DetectBackend(false, false));
+  EXPECT_TRUE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::X11));
+  EXPECT_TRUE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::LayerShell));
+  EXPECT_FALSE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::Unpositioned));
+  EXPECT_FALSE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::None));
+}
+
 TEST(OSDPretty, SupportedRequiresX11Display) {
   if (!gdk_display_get_default()) {
     EXPECT_FALSE(OSDPretty::Supported());

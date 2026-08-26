@@ -1,5 +1,6 @@
 #include "discord/discord.h"
 #include "discord/discordart.h"
+#include "discord/discordcover.h"
 #include "core/song.h"
 
 #include <gtest/gtest.h>
@@ -43,6 +44,28 @@ TEST(DiscordArt, UsesHttpCoverOrEmbedded) {
   EXPECT_EQ("embedded_cover", DiscordArt::ArtKey("file:///covers/a.jpg"));
   EXPECT_EQ("https://example.com/a.jpg", DiscordArt::ArtKey("https://example.com/a.jpg"));
   EXPECT_EQ("https://cdn.example/a.jpg", DiscordArt::SongArtUrl("https://cdn.example/a.jpg", "file:///local.jpg"));
+}
+
+TEST(DiscordCover, LocalArtNeedsUploadAndEncodesDataUrl) {
+  EXPECT_TRUE(DiscordCover::NeedsUpload("file:///covers/a.jpg"));
+  EXPECT_TRUE(DiscordCover::NeedsUpload("/covers/a.png"));
+  EXPECT_FALSE(DiscordCover::NeedsUpload("https://cdn.example/a.jpg"));
+  EXPECT_FALSE(DiscordCover::NeedsUpload({}));
+  EXPECT_EQ("/covers/a.jpg", DiscordCover::PathFromArtUrl("file:///covers/a.jpg"));
+  EXPECT_EQ("/covers/a.jpg", DiscordCover::PathFromArtUrl("file://localhost/covers/a.jpg"));
+  EXPECT_EQ("/covers/a.jpg", DiscordCover::PathFromArtUrl("/covers/a.jpg"));
+  EXPECT_TRUE(DiscordCover::PathFromArtUrl("https://cdn.example/a.jpg").empty());
+  EXPECT_EQ("image/png", DiscordCover::MimeFromPath("/covers/a.PNG"));
+  EXPECT_EQ("image/webp", DiscordCover::MimeFromPath("cover.webp"));
+  EXPECT_EQ("image/gif", DiscordCover::MimeFromPath("/tmp/x.gif"));
+  EXPECT_EQ("image/bmp", DiscordCover::MimeFromPath("x.bmp"));
+  EXPECT_EQ("image/jpeg", DiscordCover::MimeFromPath("/covers/a"));
+  EXPECT_EQ("image/jpeg", DiscordCover::MimeFromPath("/covers/a.jpg"));
+  const std::vector<unsigned char> man{'M', 'a', 'n'};
+  EXPECT_EQ("TWFu", DiscordCover::Base64Encode(man));
+  EXPECT_EQ("TQ==", DiscordCover::Base64Encode({'M'}));
+  EXPECT_EQ("data:image/png;base64,TWFu", DiscordCover::DataUrl("image/png", man));
+  EXPECT_TRUE(DiscordCover::DataUrl("image/png", {}).empty());
 }
 
 TEST(DiscordRichPresence, DisabledDoesNotConnect) {

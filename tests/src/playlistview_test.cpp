@@ -3,11 +3,13 @@
 #include "playlist/playlist.h"
 #include "playlist/playlistfolders.h"
 #include "playlist/playlistlistdrop.h"
+#include "playlist/playlistlistkeyboard.h"
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
 #include "playlist/playlistsaveoptionsdialog.h"
 #include "playlist/songloaderinserter.h"
 #include "playlist/playlistratingclick.h"
+#include "widgets/listboxkeyboard.h"
 #include "widgets/ratingpainter.h"
 
 #include <gtest/gtest.h>
@@ -269,6 +271,28 @@ TEST(PlaylistFolders, FlattenBuildsTreeAndRespectsCollapse) {
   EXPECT_EQ("Rock", rows[1].name);
   EXPECT_TRUE(rows[1].folder);
   EXPECT_EQ("Rock Hits", rows[2].name);
+}
+
+TEST(PlaylistListKeyboard, FromKeyExpandCollapseAndLabels) {
+  EXPECT_EQ(PlaylistListKeyboard::Action::Activate, PlaylistListKeyboard::FromKey(ListBoxKeyboard::kReturn));
+  EXPECT_EQ(PlaylistListKeyboard::Action::MoveUp, PlaylistListKeyboard::FromKey(ListBoxKeyboard::kUp));
+  EXPECT_EQ(PlaylistListKeyboard::Action::MoveDown, PlaylistListKeyboard::FromKey(ListBoxKeyboard::kDown));
+  EXPECT_EQ(PlaylistListKeyboard::Action::Home, PlaylistListKeyboard::FromKey(ListBoxKeyboard::kHome));
+  EXPECT_EQ(PlaylistListKeyboard::Action::End, PlaylistListKeyboard::FromKey(ListBoxKeyboard::kEnd));
+  EXPECT_EQ(PlaylistListKeyboard::Action::Expand, PlaylistListKeyboard::FromKey(ListBoxKeyboard::kRight));
+  EXPECT_EQ(PlaylistListKeyboard::Action::Collapse, PlaylistListKeyboard::FromKey(ListBoxKeyboard::kLeft));
+  EXPECT_EQ(PlaylistListKeyboard::Action::Delete, PlaylistListKeyboard::FromKey(ListBoxKeyboard::kDelete));
+  EXPECT_EQ(PlaylistListKeyboard::Action::Escape, PlaylistListKeyboard::FromKey(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(PlaylistListKeyboard::Action::None, PlaylistListKeyboard::FromKey('a'));
+  EXPECT_EQ(ListBoxKeyboard::Action::MoveDown, PlaylistListKeyboard::MoveAction(PlaylistListKeyboard::Action::MoveDown));
+  EXPECT_EQ(ListBoxKeyboard::Action::None, PlaylistListKeyboard::MoveAction(PlaylistListKeyboard::Action::Expand));
+  const std::vector<std::string> labels = PlaylistListKeyboard::RowLabels({
+      {"Rock", false, true, "Rock", 0, true},
+      {"Favorites", true, false, "Favorites", 1, true},
+  });
+  ASSERT_EQ(2u, labels.size());
+  EXPECT_EQ("Rock", labels[0]);
+  EXPECT_EQ("★ Favorites", labels[1]);
 }
 
 TEST(PlaylistSaveOptionsDialog, PathTypeLabels) {

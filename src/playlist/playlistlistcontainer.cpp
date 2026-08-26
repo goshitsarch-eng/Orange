@@ -109,6 +109,17 @@ PlaylistListContainer::PlaylistListContainer()
     }
   });
   view_->SetFolderToggleCallback([this](const std::string &path) { ToggleFolder(path); });
+  view_->SetDeleteCallback([this](const std::string &name) {
+    if (SelectedIsFolder()) {
+      if (delete_folder_) {
+        delete_folder_(SelectedFolderPath());
+      }
+      return;
+    }
+    if (delete_) {
+      delete_(name);
+    }
+  });
 }
 
 void PlaylistListContainer::Reload(PlaylistManager *manager) {

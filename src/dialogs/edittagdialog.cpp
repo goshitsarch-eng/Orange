@@ -3,11 +3,13 @@
 #include "core/application.h"
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "dialogs/dialoghelpers.h"
+#include "dialogs/dialoglistkeyboard.h"
 #include "dialogs/edittagfields.h"
 #include "dialogs/trackselectiondialog.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
 #include "utilities/timeutils.h"
+#include "widgets/listboxkeyboardgtk.h"
 
 #include <adwaita.h>
 #include <memory>
@@ -207,6 +209,24 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
     g_signal_connect(state->song_list, "row-activated", G_CALLBACK((+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                        const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "song-index")) - 1;
                        SelectSong(static_cast<State *>(data), index);
+                     })),
+                     state);
+    gtk_widget_set_focusable(state->song_list, TRUE);
+    GtkEventController *keys = gtk_event_controller_key_new();
+    gtk_event_controller_set_propagation_phase(keys, GTK_PHASE_CAPTURE);
+    gtk_widget_add_controller(state->song_list, keys);
+    g_signal_connect(keys, "key-pressed",
+                     G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                       auto *self = static_cast<State *>(data);
+                       if (DialogListKeyboard::IsActivate(keyval)) {
+                         ListBoxKeyboardGtk::ActivateSelected(self->song_list);
+                         return TRUE;
+                       }
+                       if (DialogListKeyboard::IsMove(keyval)) {
+                         SelectSong(self, DialogListKeyboard::NextIndex(static_cast<int>(self->index), static_cast<int>(self->songs.size()), keyval));
+                         return TRUE;
+                       }
+                       return FALSE;
                      })),
                      state);
   }

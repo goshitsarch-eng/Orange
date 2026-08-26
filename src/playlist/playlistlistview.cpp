@@ -1,6 +1,9 @@
 #include "playlist/playlistlistview.h"
 
+#include "playlist/playlistlistkeyboard.h"
 #include "translations/translations.h"
+#include "widgets/listboxkeyboard.h"
+#include "widgets/listboxkeyboardgtk.h"
 
 PlaylistListView::PlaylistListView() {
   widget_ = gtk_scrolled_window_new();
@@ -41,6 +44,77 @@ PlaylistListView::PlaylistListView() {
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(list_, keys);
+  gtk_widget_set_focusable(list_, TRUE);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<PlaylistListView *>(data)->OnKeyPressed(keyval);
+                   })),
+                   this);
+}
+
+PlaylistListView::~PlaylistListView() { ResetTypeAhead(); }
+
+void PlaylistListView::ResetTypeAhead() {
+  typeahead_.clear();
+  if (typeahead_timeout_) {
+    g_source_remove(typeahead_timeout_);
+    typeahead_timeout_ = 0;
+  }
+}
+
+gboolean PlaylistListView::OnKeyPressed(guint keyval) {
+  const PlaylistListKeyboard::Action action = PlaylistListKeyboard::FromKey(keyval);
+  if (action == PlaylistListKeyboard::Action::Activate) {
+    ListBoxKeyboardGtk::ActivateSelected(list_);
+    return TRUE;
+  }
+  if (action == PlaylistListKeyboard::Action::Expand || action == PlaylistListKeyboard::Action::Collapse) {
+    if (SelectedIsFolder() && toggle_) {
+      toggle_(SelectedFolderPath());
+    }
+    return TRUE;
+  }
+  if (action == PlaylistListKeyboard::Action::Delete && delete_) {
+    if (SelectedIsFolder()) {
+      delete_(SelectedFolderPath());
+    } else if (!SelectedName().empty()) {
+      delete_(SelectedName());
+    }
+    return TRUE;
+  }
+  if (action == PlaylistListKeyboard::Action::MoveUp || action == PlaylistListKeyboard::Action::MoveDown ||
+      action == PlaylistListKeyboard::Action::Home || action == PlaylistListKeyboard::Action::End) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_),
+                                                                      PlaylistListKeyboard::MoveAction(action)));
+    return TRUE;
+  }
+  if (action == PlaylistListKeyboard::Action::Escape) {
+    ResetTypeAhead();
+    return TRUE;
+  }
+  const gunichar ch = gdk_keyval_to_unicode(keyval);
+  if (ch && g_unichar_isprint(ch)) {
+    gchar utf8[8] = {};
+    typeahead_.append(utf8, static_cast<size_t>(g_unichar_to_utf8(ch, utf8)));
+    if (typeahead_timeout_) {
+      g_source_remove(typeahead_timeout_);
+    }
+    typeahead_timeout_ = g_timeout_add(1000, [](gpointer data) -> gboolean {
+      auto *self = static_cast<PlaylistListView *>(data);
+      self->typeahead_timeout_ = 0;
+      self->typeahead_.clear();
+      return G_SOURCE_REMOVE;
+    }, this);
+    const int index = ListBoxKeyboard::FirstPrefixIndex(ListBoxKeyboardGtk::Labels(list_), typeahead_);
+    if (index >= 0) {
+      ListBoxKeyboardGtk::SelectIndex(list_, index);
+    }
+    return TRUE;
+  }
+  return FALSE;
 }
 
 void PlaylistListView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }

@@ -1,10 +1,12 @@
 #include "dialogs/trackselectiondialog.h"
 
 #include "core/application.h"
+#include "dialogs/dialoglistkeyboard.h"
 #include "playlist/playlistmanager.h"
 #include "tagfetcher/tagfetcher.h"
 #include "tagfetcher/tagfetchhelpers.h"
 #include "translations/translations.h"
+#include "widgets/listboxkeyboardgtk.h"
 
 #include <adwaita.h>
 
@@ -330,6 +332,47 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
                      const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "result-index")) - 1;
                      self->songs[static_cast<size_t>(self->current)].selected = index;
                      RefreshResults(self);
+                   })),
+                   state);
+  gtk_widget_set_focusable(state->song_list, TRUE);
+  gtk_widget_set_focusable(state->results, TRUE);
+  GtkEventController *song_keys = gtk_event_controller_key_new();
+  gtk_event_controller_set_propagation_phase(song_keys, GTK_PHASE_CAPTURE);
+  gtk_widget_add_controller(state->song_list, song_keys);
+  g_signal_connect(song_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<State *>(data);
+                     if (DialogListKeyboard::IsActivate(keyval)) {
+                       ListBoxKeyboardGtk::ActivateSelected(self->song_list);
+                       return TRUE;
+                     }
+                     if (DialogListKeyboard::IsMove(keyval)) {
+                       SelectSong(self, DialogListKeyboard::NextIndex(self->current, static_cast<int>(self->songs.size()), keyval));
+                       return TRUE;
+                     }
+                     return FALSE;
+                   })),
+                   state);
+  GtkEventController *result_keys = gtk_event_controller_key_new();
+  gtk_event_controller_set_propagation_phase(result_keys, GTK_PHASE_CAPTURE);
+  gtk_widget_add_controller(state->results, result_keys);
+  g_signal_connect(result_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<State *>(data);
+                     if (self->songs.empty()) {
+                       return FALSE;
+                     }
+                     PendingSong &pending = self->songs[static_cast<size_t>(self->current)];
+                     if (DialogListKeyboard::IsActivate(keyval)) {
+                       ListBoxKeyboardGtk::ActivateSelected(self->results);
+                       return TRUE;
+                     }
+                     if (DialogListKeyboard::IsMove(keyval) && !pending.results.empty()) {
+                       pending.selected = DialogListKeyboard::NextIndex(pending.selected, static_cast<int>(pending.results.size()), keyval);
+                       RefreshResults(self);
+                       return TRUE;
+                     }
+                     return FALSE;
                    })),
                    state);
   g_signal_connect(state->apply, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {

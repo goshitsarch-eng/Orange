@@ -13,6 +13,7 @@
 class DeviceView {
  public:
   DeviceView();
+  ~DeviceView();
 
   GtkWidget *widget() const { return widget_; }
   GtkWidget *list() const { return list_; }
@@ -32,6 +33,8 @@ class DeviceView {
   void Clear();
   void AttachMenu(GtkWidget *row);
   void SetupRowDrag(GtkWidget *row, const Song &song);
+  gboolean OnKeyPressed(guint keyval);
+  void ResetTypeAhead();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
@@ -41,6 +44,8 @@ class DeviceView {
   std::function<void()> add_all_cb_;
   std::function<void(const ConnectedDevice &)> device_menu_cb_;
   std::function<void(const Song &)> song_menu_cb_;
+  std::string typeahead_;
+  guint typeahead_timeout_ = 0;
 };
 
 #endif
