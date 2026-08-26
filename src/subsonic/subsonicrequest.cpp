@@ -69,6 +69,15 @@ std::map<std::string, std::string> Params(Type type, const std::string &query, i
     params["artistCount"] = type == Type::SearchArtists ? std::to_string(size) : "0";
     params["albumCount"] = type == Type::SearchAlbums ? std::to_string(size) : "0";
     params["songCount"] = type == Type::SearchSongs ? std::to_string(size) : "0";
+    if (offset > 0) {
+      if (type == Type::SearchArtists) {
+        params["artistOffset"] = std::to_string(offset);
+      } else if (type == Type::SearchAlbums) {
+        params["albumOffset"] = std::to_string(offset);
+      } else {
+        params["songOffset"] = std::to_string(offset);
+      }
+    }
   } else if (type == Type::AlbumList) {
     params["type"] = "alphabeticalByName";
     if (size > 0) {
@@ -95,6 +104,14 @@ SongList Parse(Type type, const std::string &json) {
   return JsonUtils::ParseSubsonicSongs(json);
 }
 
+StreamingPage::Page ParsePage(Type type, const std::string &json, int offset, int limit) {
+  StreamingPage::Page page = StreamingPage::ParseMeta(json, offset, limit);
+  page.songs = Parse(type, json);
+  page.offset = offset;
+  page.limit = limit;
+  return page;
+}
+
 void Get(NetworkAccessManager *network, const std::string &url, Type type, SearchCallback callback) {
   if (!network || url.empty()) {
     if (callback) {
@@ -108,6 +125,13 @@ void Get(NetworkAccessManager *network, const std::string &url, Type type, Searc
     }
     callback(response.ok() ? Parse(type, response.body) : SongList{});
   });
+}
+
+void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, Type type, SearchCallback callback,
+            StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current, int limit) {
+  StreamingPage::GetAll(
+      network, std::move(url_for), {}, [type](const std::string &json, int offset, int page_limit) { return ParsePage(type, json, offset, page_limit); },
+      std::move(callback), std::move(progress), std::move(still_current), limit);
 }
 
 }  // namespace SubsonicRequest

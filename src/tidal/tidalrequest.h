@@ -3,6 +3,7 @@
 
 #include "core/network.h"
 #include "core/song.h"
+#include "streaming/streamingpage.h"
 #include "streaming/streamingservices.h"
 
 #include <cstdint>
@@ -42,8 +43,13 @@ std::string CoverUrl(const std::string &cover_id, const std::string &size = "128
 
 SongList Parse(Type type, const std::string &json);
 
+StreamingPage::Page ParsePage(Type type, const std::string &json, int offset, int limit);
+
 void Get(NetworkAccessManager *network, const std::string &url, const std::map<std::string, std::string> &headers, Type type,
          SearchCallback callback);
+void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, const std::map<std::string, std::string> &headers,
+            Type type, SearchCallback callback, StreamingPage::ProgressCallback progress = {},
+            StreamingPage::StillCurrent still_current = {}, int limit = StreamingPage::kDefaultLimit);
 
 }  // namespace TidalRequest
 

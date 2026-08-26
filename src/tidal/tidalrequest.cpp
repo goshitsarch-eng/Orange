@@ -114,6 +114,12 @@ SongList Parse(Type type, const std::string &json) {
   return JsonUtils::ParseTidalTracks(json);
 }
 
+StreamingPage::Page ParsePage(Type type, const std::string &json, int offset, int limit) {
+  StreamingPage::Page page = StreamingPage::ParseMeta(json, offset, limit);
+  page.songs = Parse(type, json);
+  return page;
+}
+
 void Get(NetworkAccessManager *network, const std::string &url, const std::map<std::string, std::string> &headers, Type type,
          SearchCallback callback) {
   if (!network || url.empty()) {
@@ -131,6 +137,14 @@ void Get(NetworkAccessManager *network, const std::string &url, const std::map<s
         callback(response.ok() ? Parse(type, response.body) : SongList{});
       },
       headers);
+}
+
+void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, const std::map<std::string, std::string> &headers,
+            Type type, SearchCallback callback, StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current,
+            int limit) {
+  StreamingPage::GetAll(
+      network, std::move(url_for), headers, [type](const std::string &json, int offset, int page_limit) { return ParsePage(type, json, offset, page_limit); },
+      std::move(callback), std::move(progress), std::move(still_current), limit);
 }
 
 }  // namespace TidalRequest

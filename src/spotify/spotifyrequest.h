@@ -3,6 +3,7 @@
 
 #include "core/network.h"
 #include "core/song.h"
+#include "streaming/streamingpage.h"
 #include "streaming/streamingservices.h"
 
 #include <map>
@@ -37,8 +38,13 @@ std::string AlbumSongsUrl(const std::string &api_url, const std::string &album_i
 
 SongList Parse(Type type, const std::string &json);
 
+StreamingPage::Page ParsePage(Type type, const std::string &json, int offset, int limit);
+
 void Get(NetworkAccessManager *network, const std::string &url, const std::map<std::string, std::string> &headers, Type type,
          SearchCallback callback);
+void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, const std::map<std::string, std::string> &headers,
+            Type type, SearchCallback callback, StreamingPage::ProgressCallback progress = {},
+            StreamingPage::StillCurrent still_current = {}, int limit = StreamingPage::kDefaultLimit);
 
 }  // namespace SpotifyRequest
 

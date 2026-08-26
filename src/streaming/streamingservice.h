@@ -58,6 +58,10 @@ class StreamingService : public UrlHandler {
   SearchCallback GuardAlbums(SearchCallback callback);
   SearchCallback GuardSongs(SearchCallback callback);
   SearchCallback GuardSearch(SearchCallback callback);
+  void ReportSearchProgress(int received, int total);
+  void ReportArtistsProgress(int received, int total);
+  void ReportAlbumsProgress(int received, int total);
+  void ReportSongsProgress(int received, int total);
   virtual void GetFavorites(FavoriteType type, SearchCallback callback);
   virtual void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
   virtual void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});

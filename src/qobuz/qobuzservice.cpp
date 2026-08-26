@@ -64,24 +64,52 @@ std::map<std::string, std::string> QobuzService::AuthHeaders() const {
 void QobuzService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
 
 void QobuzService::Search(const std::string &query, SearchType type, SearchCallback callback) {
+  auto guarded = GuardSearch(std::move(callback));
+  const int gen = search_generation();
   const auto request_type = QobuzRequest::FromSearchType(type);
-  QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, request_type, query, app_id_, user_auth_token_), AuthHeaders(), request_type,
-                    GuardSearch(std::move(callback)));
+  QobuzRequest::GetAll(
+      network_,
+      [this, request_type, query](int offset, int limit) {
+        return QobuzRequest::Url(kApiUrl, request_type, query, app_id_, user_auth_token_, offset, limit);
+      },
+      AuthHeaders(), request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
+      [this, gen]() { return SearchRequestCurrent(gen); });
 }
 
 void QobuzService::GetArtists(SearchCallback callback) {
-  QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteArtists, {}, app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::FavouriteArtists, GuardArtists(std::move(callback)));
+  auto guarded = GuardArtists(std::move(callback));
+  const int gen = artists_generation();
+  QobuzRequest::GetAll(
+      network_,
+      [this](int offset, int limit) {
+        return QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteArtists, {}, app_id_, user_auth_token_, offset, limit);
+      },
+      AuthHeaders(), QobuzRequest::Type::FavouriteArtists, guarded,
+      [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); });
 }
 
 void QobuzService::GetAlbums(SearchCallback callback) {
-  QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteAlbums, {}, app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::FavouriteAlbums, GuardAlbums(std::move(callback)));
+  auto guarded = GuardAlbums(std::move(callback));
+  const int gen = albums_generation();
+  QobuzRequest::GetAll(
+      network_,
+      [this](int offset, int limit) {
+        return QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteAlbums, {}, app_id_, user_auth_token_, offset, limit);
+      },
+      AuthHeaders(), QobuzRequest::Type::FavouriteAlbums, guarded, [this](int received, int total) { ReportAlbumsProgress(received, total); },
+      [this, gen]() { return AlbumsRequestCurrent(gen); });
 }
 
 void QobuzService::GetSongs(SearchCallback callback) {
-  QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteSongs, {}, app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::FavouriteSongs, GuardSongs(std::move(callback)));
+  auto guarded = GuardSongs(std::move(callback));
+  const int gen = songs_generation();
+  QobuzRequest::GetAll(
+      network_,
+      [this](int offset, int limit) {
+        return QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteSongs, {}, app_id_, user_auth_token_, offset, limit);
+      },
+      AuthHeaders(), QobuzRequest::Type::FavouriteSongs, guarded, [this](int received, int total) { ReportSongsProgress(received, total); },
+      [this, gen]() { return SongsRequestCurrent(gen); });
 }
 
 void QobuzService::GetArtistAlbums(const Song &artist, SearchCallback callback) {

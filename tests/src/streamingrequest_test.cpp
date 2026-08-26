@@ -1,4 +1,5 @@
 #include "streaming/streamingauth.h"
+#include "streaming/streamingpage.h"
 #include "qobuz/qobuzrequest.h"
 #include "spotify/spotifyrequest.h"
 #include "subsonic/subsonicrequest.h"
@@ -16,6 +17,8 @@ TEST(TidalRequest, UrlsMatchOriginalResources) {
   EXPECT_NE(std::string::npos, search.find("query=foxes"));
   EXPECT_NE(std::string::npos, search.find("countryCode=US"));
   EXPECT_NE(std::string::npos, search.find("limit=50"));
+  const std::string page_two = TidalRequest::Url("https://api.tidalhifi.com/v1", TidalRequest::Type::SearchArtists, "foxes", "US", 0, 50, 50);
+  EXPECT_NE(std::string::npos, page_two.find("offset=50"));
   EXPECT_EQ("https://api.tidalhifi.com/v1/artists/7/albums?countryCode=US&limit=50",
             TidalRequest::ArtistAlbumsUrl("https://api.tidalhifi.com/v1", "7", "US"));
   EXPECT_EQ("https://api.tidalhifi.com/v1/albums/8/tracks?countryCode=US&limit=50",
@@ -58,6 +61,7 @@ TEST(SpotifyRequest, UrlsAndSearchType) {
   const std::string search = SpotifyRequest::Url("https://api.spotify.com/v1", SpotifyRequest::Type::SearchAlbums, "dummy");
   EXPECT_NE(std::string::npos, search.find("/search?type=album"));
   EXPECT_NE(std::string::npos, search.find("q=dummy"));
+  EXPECT_NE(std::string::npos, SpotifyRequest::Url("https://api.spotify.com/v1", SpotifyRequest::Type::SearchAlbums, "dummy", 50, 50).find("offset=50"));
   EXPECT_EQ("https://api.spotify.com/v1/artists/a1/albums?limit=50", SpotifyRequest::ArtistAlbumsUrl("https://api.spotify.com/v1", "a1"));
   EXPECT_EQ("https://api.spotify.com/v1/albums/b2/tracks?limit=50", SpotifyRequest::AlbumSongsUrl("https://api.spotify.com/v1", "b2"));
 }
@@ -122,9 +126,17 @@ TEST(SubsonicRequest, ResourcesParamsAndParse) {
   EXPECT_EQ("foxes", search.at("query"));
   EXPECT_EQ("50", search.at("artistCount"));
   EXPECT_EQ("0", search.at("songCount"));
+  EXPECT_EQ(0u, search.count("artistOffset"));
+  const auto paged_search = SubsonicRequest::Params(SubsonicRequest::Type::SearchSongs, "foxes", 50, 50);
+  EXPECT_EQ("50", paged_search.at("songOffset"));
+  EXPECT_EQ("50", paged_search.at("songCount"));
   const auto albums = SubsonicRequest::Params(SubsonicRequest::Type::AlbumList, {});
   EXPECT_EQ("alphabeticalByName", albums.at("type"));
   EXPECT_EQ("50", albums.at("size"));
+  EXPECT_EQ(0u, albums.count("offset"));
+  const auto paged_albums = SubsonicRequest::Params(SubsonicRequest::Type::AlbumList, {}, 50, 50);
+  EXPECT_EQ("50", paged_albums.at("offset"));
+  EXPECT_EQ("50", paged_albums.at("size"));
   EXPECT_EQ("12", SubsonicRequest::AlbumSongsParams("12").at("id"));
 
   const SongList artists = SubsonicRequest::Parse(
@@ -155,6 +167,78 @@ TEST(SubsonicRequest, ResourcesParamsAndParse) {
   ASSERT_EQ(1u, album_songs.size());
   EXPECT_EQ("Helplessness Blues", album_songs.front().title());
   EXPECT_EQ("42", album_songs.front().song_id());
+}
+
+TEST(StreamingPage, NeedAnotherPageFromTotalAndOffset) {
+  StreamingPage::Page page;
+  page.offset = 0;
+  page.limit = 50;
+  page.total = 120;
+  page.songs.resize(50);
+  EXPECT_TRUE(StreamingPage::NeedAnotherPage(page));
+  EXPECT_EQ(50, StreamingPage::NextOffset(page));
+
+  page.offset = 100;
+  page.songs.assign(20, Song());
+  EXPECT_FALSE(StreamingPage::NeedAnotherPage(page));
+  EXPECT_EQ(120, StreamingPage::NextOffset(page));
+}
+
+TEST(StreamingPage, NeedAnotherPageFromNextUrlAndFullPage) {
+  StreamingPage::Page next;
+  next.songs.assign(1, Song());
+  next.next_url = "https://api.spotify.com/v1/search?offset=50";
+  EXPECT_TRUE(StreamingPage::NeedAnotherPage(next));
+
+  StreamingPage::Page empty;
+  empty.limit = 50;
+  empty.total = 100;
+  empty.next_url = "https://api.spotify.com/v1/search?offset=50";
+  EXPECT_FALSE(StreamingPage::NeedAnotherPage(empty));
+
+  StreamingPage::Page full;
+  full.limit = 50;
+  full.songs.assign(50, Song());
+  EXPECT_TRUE(StreamingPage::NeedAnotherPage(full));
+  full.songs.assign(10, Song());
+  EXPECT_FALSE(StreamingPage::NeedAnotherPage(full));
+}
+
+TEST(StreamingPage, ParseMetaTidalSpotifyAndNullNext) {
+  const auto tidal = StreamingPage::ParseMeta(R"json({"offset":0,"limit":50,"totalNumberOfItems":120,"items":[]})json", 0, 50);
+  EXPECT_EQ(0, tidal.offset);
+  EXPECT_EQ(50, tidal.limit);
+  EXPECT_EQ(120, tidal.total);
+  EXPECT_TRUE(tidal.next_url.empty());
+
+  const auto spotify = StreamingPage::ParseMeta(
+      R"json({"artists":{"offset":50,"limit":50,"total":80,"next":"https://api.spotify.com/v1/search?offset=50"}})json", 0, 50);
+  EXPECT_EQ(50, spotify.offset);
+  EXPECT_EQ(50, spotify.limit);
+  EXPECT_EQ(80, spotify.total);
+  EXPECT_EQ("https://api.spotify.com/v1/search?offset=50", spotify.next_url);
+
+  const auto missing = StreamingPage::ParseMeta("{}", 3, 25);
+  EXPECT_EQ(3, missing.offset);
+  EXPECT_EQ(25, missing.limit);
+  EXPECT_EQ(-1, missing.total);
+
+  const auto null_next = StreamingPage::ParseMeta(R"json({"next":"null"})json", 0, 50);
+  EXPECT_TRUE(null_next.next_url.empty());
+  EXPECT_EQ(0, StreamingPage::FirstPresentInt("{}", {{"offset"}}, 0));
+  EXPECT_EQ(7, StreamingPage::FirstPresentInt(R"json({"offset":7})json", {{"offset"}}, 0));
+}
+
+TEST(StreamingPage, ParsePageKeepsRequestedLimitForSubsonic) {
+  const StreamingPage::Page page = SubsonicRequest::ParsePage(
+      SubsonicRequest::Type::AlbumList,
+      R"json({"subsonic-response":{"albumList2":{"album":[{"id":"8","name":"Helplessness Blues","artist":"Fleet Foxes","artistId":"1"}]}}})json",
+      0, 50);
+  EXPECT_EQ(0, page.offset);
+  EXPECT_EQ(50, page.limit);
+  EXPECT_EQ(-1, page.total);
+  ASSERT_EQ(1u, page.songs.size());
+  EXPECT_FALSE(StreamingPage::NeedAnotherPage(page));
 }
 
 TEST(StreamingAuth, EnsureActionMatchesExpiryAndRefresh) {

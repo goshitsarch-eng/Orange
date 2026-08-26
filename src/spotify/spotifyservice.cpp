@@ -108,33 +108,49 @@ void SpotifyService::Search(const std::string &query, SearchCallback callback) {
 
 void SpotifyService::Search(const std::string &query, SearchType type, SearchCallback callback) {
   auto guarded = GuardSearch(std::move(callback));
-  EnsureFreshToken([this, query, type, guarded]() {
+  const int gen = search_generation();
+  EnsureFreshToken([this, query, type, guarded, gen]() {
     const auto request_type = SpotifyRequest::FromSearchType(type);
-    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, request_type, query), AuthHeaders(), request_type, guarded);
+    SpotifyRequest::GetAll(
+        network_, [request_type, query](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, request_type, query, offset, limit); },
+        AuthHeaders(), request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
+        [this, gen]() { return SearchRequestCurrent(gen); });
   });
 }
 
 void SpotifyService::GetArtists(SearchCallback callback) {
   auto guarded = GuardArtists(std::move(callback));
-  EnsureFreshToken([this, guarded]() {
-    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteArtists, {}), AuthHeaders(),
-                        SpotifyRequest::Type::FavouriteArtists, guarded);
+  const int gen = artists_generation();
+  EnsureFreshToken([this, guarded, gen]() {
+    SpotifyRequest::GetAll(
+        network_,
+        [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteArtists, {}, offset, limit); },
+        AuthHeaders(), SpotifyRequest::Type::FavouriteArtists, guarded,
+        [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); });
   });
 }
 
 void SpotifyService::GetAlbums(SearchCallback callback) {
   auto guarded = GuardAlbums(std::move(callback));
-  EnsureFreshToken([this, guarded]() {
-    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteAlbums, {}), AuthHeaders(),
-                        SpotifyRequest::Type::FavouriteAlbums, guarded);
+  const int gen = albums_generation();
+  EnsureFreshToken([this, guarded, gen]() {
+    SpotifyRequest::GetAll(
+        network_,
+        [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteAlbums, {}, offset, limit); },
+        AuthHeaders(), SpotifyRequest::Type::FavouriteAlbums, guarded,
+        [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); });
   });
 }
 
 void SpotifyService::GetSongs(SearchCallback callback) {
   auto guarded = GuardSongs(std::move(callback));
-  EnsureFreshToken([this, guarded]() {
-    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteSongs, {}), AuthHeaders(),
-                        SpotifyRequest::Type::FavouriteSongs, guarded);
+  const int gen = songs_generation();
+  EnsureFreshToken([this, guarded, gen]() {
+    SpotifyRequest::GetAll(
+        network_,
+        [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteSongs, {}, offset, limit); },
+        AuthHeaders(), SpotifyRequest::Type::FavouriteSongs, guarded, [this](int received, int total) { ReportSongsProgress(received, total); },
+        [this, gen]() { return SongsRequestCurrent(gen); });
   });
 }
 
@@ -147,7 +163,8 @@ void SpotifyService::GetArtistAlbums(const Song &artist, SearchCallback callback
     return;
   }
   EnsureFreshToken([this, id, callback]() {
-    SpotifyRequest::Get(network_, SpotifyRequest::ArtistAlbumsUrl(kApiUrl, id), AuthHeaders(), SpotifyRequest::Type::SearchAlbums, callback);
+    SpotifyRequest::GetAll(network_, [id](int offset, int limit) { return SpotifyRequest::ArtistAlbumsUrl(SpotifyService::kApiUrl, id, offset, limit); },
+                           AuthHeaders(), SpotifyRequest::Type::SearchAlbums, callback);
   });
 }
 
@@ -160,7 +177,8 @@ void SpotifyService::GetAlbumSongs(const Song &album, SearchCallback callback) {
     return;
   }
   EnsureFreshToken([this, id, callback]() {
-    SpotifyRequest::Get(network_, SpotifyRequest::AlbumSongsUrl(kApiUrl, id), AuthHeaders(), SpotifyRequest::Type::SearchSongs, callback);
+    SpotifyRequest::GetAll(network_, [id](int offset, int limit) { return SpotifyRequest::AlbumSongsUrl(SpotifyService::kApiUrl, id, offset, limit); },
+                           AuthHeaders(), SpotifyRequest::Type::SearchSongs, callback);
   });
 }
 

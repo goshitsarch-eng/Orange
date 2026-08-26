@@ -462,6 +462,7 @@ set(STRAWBERRY_SOURCES
   src/scrobbler/listenbrainzscrobbler.cpp
   src/scrobbler/subsonicscrobbler.cpp
   src/streaming/streamingservice.cpp
+  src/streaming/streamingpage.cpp
   src/streaming/streamingservices.cpp
   src/streaming/streamsongmimedata.cpp
   src/streaming/streamingsearchmodel.cpp
@@ -835,6 +836,7 @@ if(GTest_FOUND)
     src/core/appearance.cpp
     src/core/windowgeometry.cpp
     src/streaming/streamingservice.cpp
+    src/streaming/streamingpage.cpp
     src/utilities/styleutils.cpp
     src/engine/enginebase.cpp
     src/engine/gstbusmessageevent.cpp

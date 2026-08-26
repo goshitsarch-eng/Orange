@@ -115,33 +115,58 @@ void TidalService::Search(const std::string &query, SearchCallback callback) { S
 
 void TidalService::Search(const std::string &query, SearchType type, SearchCallback callback) {
   auto guarded = GuardSearch(std::move(callback));
-  EnsureFreshToken([this, query, type, guarded]() {
+  const int gen = search_generation();
+  EnsureFreshToken([this, query, type, guarded, gen]() {
     const auto request_type = TidalRequest::FromSearchType(type);
-    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_), AuthHeaders(), request_type, guarded);
+    TidalRequest::GetAll(
+        network_,
+        [this, request_type, query](int offset, int limit) {
+          return TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_, offset, limit);
+        },
+        AuthHeaders(), request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
+        [this, gen]() { return SearchRequestCurrent(gen); });
   });
 }
 
 void TidalService::GetArtists(SearchCallback callback) {
   auto guarded = GuardArtists(std::move(callback));
-  EnsureFreshToken([this, guarded]() {
-    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteArtists, {}, country_code_, user_id_), AuthHeaders(),
-                      TidalRequest::Type::FavouriteArtists, guarded);
+  const int gen = artists_generation();
+  EnsureFreshToken([this, guarded, gen]() {
+    TidalRequest::GetAll(
+        network_,
+        [this](int offset, int limit) {
+          return TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteArtists, {}, country_code_, user_id_, offset, limit);
+        },
+        AuthHeaders(), TidalRequest::Type::FavouriteArtists, guarded,
+        [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); });
   });
 }
 
 void TidalService::GetAlbums(SearchCallback callback) {
   auto guarded = GuardAlbums(std::move(callback));
-  EnsureFreshToken([this, guarded]() {
-    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteAlbums, {}, country_code_, user_id_), AuthHeaders(),
-                      TidalRequest::Type::FavouriteAlbums, guarded);
+  const int gen = albums_generation();
+  EnsureFreshToken([this, guarded, gen]() {
+    TidalRequest::GetAll(
+        network_,
+        [this](int offset, int limit) {
+          return TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteAlbums, {}, country_code_, user_id_, offset, limit);
+        },
+        AuthHeaders(), TidalRequest::Type::FavouriteAlbums, guarded,
+        [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); });
   });
 }
 
 void TidalService::GetSongs(SearchCallback callback) {
   auto guarded = GuardSongs(std::move(callback));
-  EnsureFreshToken([this, guarded]() {
-    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteSongs, {}, country_code_, user_id_), AuthHeaders(),
-                      TidalRequest::Type::FavouriteSongs, guarded);
+  const int gen = songs_generation();
+  EnsureFreshToken([this, guarded, gen]() {
+    TidalRequest::GetAll(
+        network_,
+        [this](int offset, int limit) {
+          return TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteSongs, {}, country_code_, user_id_, offset, limit);
+        },
+        AuthHeaders(), TidalRequest::Type::FavouriteSongs, guarded, [this](int received, int total) { ReportSongsProgress(received, total); },
+        [this, gen]() { return SongsRequestCurrent(gen); });
   });
 }
 
@@ -154,8 +179,9 @@ void TidalService::GetArtistAlbums(const Song &artist, SearchCallback callback) 
     return;
   }
   EnsureFreshToken([this, id, callback]() {
-    TidalRequest::Get(network_, TidalRequest::ArtistAlbumsUrl(kApiUrl, id, country_code_), AuthHeaders(), TidalRequest::Type::SearchAlbums,
-                      callback);
+    TidalRequest::GetAll(network_,
+                         [this, id](int offset, int limit) { return TidalRequest::ArtistAlbumsUrl(kApiUrl, id, country_code_, offset, limit); },
+                         AuthHeaders(), TidalRequest::Type::SearchAlbums, callback);
   });
 }
 
@@ -168,8 +194,9 @@ void TidalService::GetAlbumSongs(const Song &album, SearchCallback callback) {
     return;
   }
   EnsureFreshToken([this, id, callback]() {
-    TidalRequest::Get(network_, TidalRequest::AlbumSongsUrl(kApiUrl, id, country_code_), AuthHeaders(), TidalRequest::Type::SearchSongs,
-                      callback);
+    TidalRequest::GetAll(network_,
+                         [this, id](int offset, int limit) { return TidalRequest::AlbumSongsUrl(kApiUrl, id, country_code_, offset, limit); },
+                         AuthHeaders(), TidalRequest::Type::SearchSongs, callback);
   });
 }
 

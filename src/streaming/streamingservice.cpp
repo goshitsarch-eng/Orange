@@ -142,6 +142,34 @@ StreamingService::SearchCallback StreamingService::GuardSongs(SearchCallback cal
   };
 }
 
+void StreamingService::ReportSearchProgress(int received, int total) {
+  if (total > 0) {
+    SearchProgressSetMaximum.Emit(last_search_id_, StreamingProgress::kDefaultMaximum);
+    SearchUpdateProgress.Emit(last_search_id_, StreamingProgress::GetProgress(received, total));
+  }
+}
+
+void StreamingService::ReportArtistsProgress(int received, int total) {
+  if (total > 0) {
+    ArtistsProgressSetMaximum.Emit(StreamingProgress::kDefaultMaximum);
+    ArtistsUpdateProgress.Emit(StreamingProgress::GetProgress(received, total));
+  }
+}
+
+void StreamingService::ReportAlbumsProgress(int received, int total) {
+  if (total > 0) {
+    AlbumsProgressSetMaximum.Emit(StreamingProgress::kDefaultMaximum);
+    AlbumsUpdateProgress.Emit(StreamingProgress::GetProgress(received, total));
+  }
+}
+
+void StreamingService::ReportSongsProgress(int received, int total) {
+  if (total > 0) {
+    SongsProgressSetMaximum.Emit(StreamingProgress::kDefaultMaximum);
+    SongsUpdateProgress.Emit(StreamingProgress::GetProgress(received, total));
+  }
+}
+
 StreamingService::SearchCallback StreamingService::GuardSearch(SearchCallback callback) {
   const int generation = BeginSearchRequest();
   return [this, generation, callback](const SongList &songs) {

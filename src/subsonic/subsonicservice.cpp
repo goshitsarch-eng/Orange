@@ -104,11 +104,16 @@ void SubsonicService::Search(const std::string &query, SearchType type, SearchCa
     guarded({});
     return;
   }
+  const int gen = search_generation();
   const auto request_type = SubsonicRequest::FromSearchType(type);
-  SubsonicRequest::Get(network_,
-                       CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(request_type),
-                                 SubsonicRequest::Params(request_type, query), hex_auth_),
-                       request_type, std::move(guarded));
+  SubsonicRequest::GetAll(
+      network_,
+      [this, request_type, query](int offset, int limit) {
+        return CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(request_type),
+                         SubsonicRequest::Params(request_type, query, offset, limit), hex_auth_);
+      },
+      request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
+      [this, gen]() { return SearchRequestCurrent(gen); });
 }
 
 void SubsonicService::GetArtists(SearchCallback callback) {
@@ -128,10 +133,15 @@ void SubsonicService::GetAlbums(SearchCallback callback) {
     guarded({});
     return;
   }
-  SubsonicRequest::Get(network_,
-                       CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::AlbumList),
-                                 SubsonicRequest::Params(SubsonicRequest::Type::AlbumList, {}), hex_auth_),
-                       SubsonicRequest::Type::AlbumList, std::move(guarded));
+  const int gen = albums_generation();
+  SubsonicRequest::GetAll(
+      network_,
+      [this](int offset, int limit) {
+        return CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::AlbumList),
+                         SubsonicRequest::Params(SubsonicRequest::Type::AlbumList, {}, offset, limit), hex_auth_);
+      },
+      SubsonicRequest::Type::AlbumList, guarded, [this](int received, int total) { ReportAlbumsProgress(received, total); },
+      [this, gen]() { return AlbumsRequestCurrent(gen); });
 }
 
 void SubsonicService::GetSongs(SearchCallback callback) {
@@ -140,10 +150,15 @@ void SubsonicService::GetSongs(SearchCallback callback) {
     guarded({});
     return;
   }
-  SubsonicRequest::Get(network_,
-                       CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::SearchSongs),
-                                 SubsonicRequest::Params(SubsonicRequest::Type::SearchSongs, ".", 0, 500), hex_auth_),
-                       SubsonicRequest::Type::SearchSongs, std::move(guarded));
+  const int gen = songs_generation();
+  SubsonicRequest::GetAll(
+      network_,
+      [this](int offset, int limit) {
+        return CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::SearchSongs),
+                         SubsonicRequest::Params(SubsonicRequest::Type::SearchSongs, ".", offset, limit), hex_auth_);
+      },
+      SubsonicRequest::Type::SearchSongs, guarded, [this](int received, int total) { ReportSongsProgress(received, total); },
+      [this, gen]() { return SongsRequestCurrent(gen); });
 }
 
 void SubsonicService::GetArtistAlbums(const Song &artist, SearchCallback callback) {

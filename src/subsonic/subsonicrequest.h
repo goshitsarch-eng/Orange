@@ -3,6 +3,7 @@
 
 #include "core/network.h"
 #include "core/song.h"
+#include "streaming/streamingpage.h"
 #include "streaming/streamingservices.h"
 
 #include <map>
@@ -40,7 +41,12 @@ std::map<std::string, std::string> ArtistAlbumsParams(const std::string &artist_
 
 SongList Parse(Type type, const std::string &json);
 
+StreamingPage::Page ParsePage(Type type, const std::string &json, int offset, int limit);
+
 void Get(NetworkAccessManager *network, const std::string &url, Type type, SearchCallback callback);
+void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, Type type, SearchCallback callback,
+            StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {},
+            int limit = StreamingPage::kDefaultLimit);
 
 }  // namespace SubsonicRequest
 
