@@ -203,6 +203,7 @@ set(STRAWBERRY_SOURCES
   src/playlist/songloaderinserter.cpp
   src/playlist/dynamicplaylistcontrols.cpp
   src/playlist/playlistsaveoptionsdialog.cpp
+  src/playlist/playlistcolumnsdialog.cpp
   src/playlist/playlistbackend.cpp
   src/playlist/playlistmanager.cpp
   src/widgets/ratingpainter.cpp
@@ -227,6 +228,7 @@ set(STRAWBERRY_SOURCES
   src/playlistparsers/cueparser.cpp
   src/playlistparsers/playlistparser.cpp
   src/smartplaylists/smartplaylist.cpp
+  src/smartplaylists/smartplaylistwizard.cpp
   src/filterparser/filterparser.cpp
   src/covermanager/coverproviders.cpp
   src/covermanager/coversearchstatistics.cpp
@@ -237,6 +239,10 @@ set(STRAWBERRY_SOURCES
   src/covermanager/albumcoverfetcher.cpp
   src/covermanager/coverexportrunnable.cpp
   src/covermanager/albumcoverexporter.cpp
+  src/covermanager/albumcovermanager.cpp
+  src/covermanager/albumcoversearcher.cpp
+  src/covermanager/albumcoverexportdialog.cpp
+  src/covermanager/coverfromurldialog.cpp
   src/covermanager/lastfmcoverprovider.cpp
   src/covermanager/musicbrainzcoverprovider.cpp
   src/covermanager/deezercoverprovider.cpp
@@ -302,20 +308,36 @@ set(STRAWBERRY_SOURCES
   src/device/gpodloader.cpp
   src/device/gpoddevice.cpp
   src/equalizer/equalizer.cpp
+  src/equalizer/equalizerdialog.cpp
   src/analyzer/analyzer.cpp
   src/moodbar/moodbar.cpp
   src/waveform/waveform.cpp
   src/transcoder/transcoder.cpp
+  src/transcoder/transcodedialog.cpp
   src/organize/organize.cpp
+  src/organize/organizedialog.cpp
   src/osd/osd.cpp
   src/systemtrayicon/systemtrayicon.cpp
   src/mpris2/mpris2.cpp
   src/globalshortcuts/globalshortcuts.cpp
+  src/globalshortcuts/globalshortcutgrabber.cpp
   src/discord/discord.cpp
   src/tagfetcher/tagfetcher.cpp
   src/ui/mainwindow.cpp
   src/ui/settingsdialog.cpp
   src/ui/dialogs.cpp
+  src/dialogs/dialoghelpers.cpp
+  src/dialogs/addstreamdialog.cpp
+  src/dialogs/userpassdialog.cpp
+  src/dialogs/errordialog.cpp
+  src/dialogs/messagedialog.cpp
+  src/dialogs/console.cpp
+  src/dialogs/saveplaylistsdialog.cpp
+  src/dialogs/deleteconfirmationdialog.cpp
+  src/dialogs/edittagdialog.cpp
+  src/dialogs/trackselectiondialog.cpp
+  src/dialogs/shortcutsdialog.cpp
+  src/device/copytodevicedialog.cpp
   src/settings/settingspage.cpp
   src/settings/behavioursettingspage.cpp
   src/settings/collectionsettingspage.cpp
