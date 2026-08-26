@@ -5,13 +5,14 @@
 #include "streaming/streamingbrowse.h"
 #include "streaming/streamingfavoriteaction.h"
 #include "streaming/streamingprogress.h"
+#include "streaming/streamingsearchopts.h"
 #include "translations/translations.h"
 
 StreamingTabsView::StreamingTabsView(StreamingService *service, Database *database) : service_(service), database_(database) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  GtkWidget *stack = gtk_stack_new();
+  stack_ = gtk_stack_new();
   GtkWidget *switcher = gtk_stack_switcher_new();
-  gtk_stack_switcher_set_stack(GTK_STACK_SWITCHER(switcher), GTK_STACK(stack));
+  gtk_stack_switcher_set_stack(GTK_STACK_SWITCHER(switcher), GTK_STACK(stack_));
   gtk_widget_set_halign(switcher, GTK_ALIGN_CENTER);
   gtk_widget_set_margin_top(switcher, 4);
   artists_ = std::make_unique<StreamingCollectionViewContainer>("Artists");
@@ -19,14 +20,14 @@ StreamingTabsView::StreamingTabsView(StreamingService *service, Database *databa
   songs_ = std::make_unique<StreamingCollectionViewContainer>("Songs");
   favorites_ = std::make_unique<StreamingCollectionViewContainer>("Favorites");
   search_ = std::make_unique<StreamingSearchView>(service);
-  gtk_stack_add_titled(GTK_STACK(stack), artists_->widget(), "artists", "Artists");
-  gtk_stack_add_titled(GTK_STACK(stack), albums_->widget(), "albums", "Albums");
-  gtk_stack_add_titled(GTK_STACK(stack), songs_->widget(), "songs", "Songs");
-  gtk_stack_add_titled(GTK_STACK(stack), favorites_->widget(), "favorites", "Favorites");
-  gtk_stack_add_titled(GTK_STACK(stack), search_->widget(), "search", "Search");
-  gtk_widget_set_vexpand(stack, TRUE);
+  gtk_stack_add_titled(GTK_STACK(stack_), artists_->widget(), "artists", "Artists");
+  gtk_stack_add_titled(GTK_STACK(stack_), albums_->widget(), "albums", "Albums");
+  gtk_stack_add_titled(GTK_STACK(stack_), songs_->widget(), "songs", "Songs");
+  gtk_stack_add_titled(GTK_STACK(stack_), favorites_->widget(), "favorites", "Favorites");
+  gtk_stack_add_titled(GTK_STACK(stack_), search_->widget(), "search", "Search");
+  gtk_widget_set_vexpand(stack_, TRUE);
   gtk_box_append(GTK_BOX(widget_), switcher);
-  gtk_box_append(GTK_BOX(widget_), stack);
+  gtk_box_append(GTK_BOX(widget_), stack_);
   artists_->view()->SetService(service_);
   albums_->view()->SetService(service_);
   songs_->view()->SetService(service_);
@@ -235,6 +236,43 @@ void StreamingTabsView::SetMenuCallback(MenuCallback callback) {
 }
 
 void StreamingTabsView::SetConfigureCallback(ConfigureCallback callback) { search_->SetConfigureCallback(std::move(callback)); }
+
+std::string StreamingTabsView::SelectedSearchQuery() const {
+  if (!stack_) {
+    return {};
+  }
+  const char *name = gtk_stack_get_visible_child_name(GTK_STACK(stack_));
+  if (!name) {
+    return {};
+  }
+  if (std::string(name) == "search") {
+    return search_->SelectedSearchQuery();
+  }
+  if (std::string(name) == "artists") {
+    return artists_->view()->SelectedSearchQuery();
+  }
+  if (std::string(name) == "albums") {
+    return albums_->view()->SelectedSearchQuery();
+  }
+  if (std::string(name) == "songs") {
+    return songs_->view()->SelectedSearchQuery();
+  }
+  if (std::string(name) == "favorites") {
+    return favorites_->view()->SelectedSearchQuery();
+  }
+  return {};
+}
+
+void StreamingTabsView::SearchForThis(const std::string &query) {
+  const std::string text = query.empty() ? SelectedSearchQuery() : query;
+  if (!StreamingSearchOpts::CanSearchForThis(text)) {
+    return;
+  }
+  if (stack_) {
+    gtk_stack_set_visible_child_name(GTK_STACK(stack_), "search");
+  }
+  search_->SearchForThis(text);
+}
 
 void StreamingTabsView::ReloadSettings() {
   if (service_) {

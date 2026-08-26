@@ -3,6 +3,7 @@
 
 #include "core/settings.h"
 #include "core/song.h"
+#include "streaming/streamingprogress.h"
 #include "streaming/streamingservice.h"
 #include "utilities/strutils.h"
 
@@ -31,12 +32,37 @@ constexpr bool kDefaultAlbumExplicit = false;
 
 inline const char *ConfigureLabel() { return "Configure…"; }
 
+inline const char *SearchForThisLabel() { return "Search for this"; }
+
 inline std::string ConfigureServiceLabel(const std::string &service) {
   if (service.empty()) {
     return ConfigureLabel();
   }
   return std::string("Configure ") + service + "…";
 }
+
+inline std::string QueryFromSong(const Song &song, StreamingService::SearchType type) {
+  switch (type) {
+    case StreamingService::SearchType::Artists: {
+      const std::string artist = song.EffectiveAlbumartist();
+      return artist.empty() ? song.artist() : artist;
+    }
+    case StreamingService::SearchType::Albums:
+      return song.album().empty() ? song.title() : song.album();
+    case StreamingService::SearchType::Songs:
+    default:
+      return song.title().empty() ? song.PrettyTitle() : song.title();
+  }
+}
+
+inline std::string QueryFromPrimary(const std::string &primary, const Song &song, StreamingService::SearchType type) {
+  if (!primary.empty() && primary != "Loading…") {
+    return primary;
+  }
+  return QueryFromSong(song, type);
+}
+
+inline bool CanSearchForThis(const std::string &query) { return StreamingProgress::HasQuery(query); }
 
 inline bool HasSearchLimits(const std::string &group) {
   return group == "Tidal" || group == "Qobuz" || group == "Spotify";

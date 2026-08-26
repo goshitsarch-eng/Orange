@@ -9,6 +9,7 @@
 #include "streaming/streamingcover.h"
 #include "streaming/streamingdrag.h"
 #include "streaming/streamingsearchgroup.h"
+#include "streaming/streamingsearchopts.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
@@ -450,6 +451,33 @@ SongList StreamingCollectionView::SelectedSongs() const {
       },
       &songs);
   return songs;
+}
+
+std::string StreamingCollectionView::SelectedSearchQuery() const {
+  std::string query;
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto *query = static_cast<std::string *>(data);
+        if (!query->empty()) {
+          return;
+        }
+        auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+        Song song;
+        auto *row_song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
+        if (row_song) {
+          song = *row_song;
+        }
+        *query = StreamingSearchOpts::QueryFromPrimary(CollectionItemDelegate::PrimaryText(item), song, StreamingService::SearchType::Songs);
+      },
+      &query);
+  if (query.empty()) {
+    const SongList songs = SelectedSongs();
+    if (!songs.empty()) {
+      query = StreamingSearchOpts::QueryFromSong(songs.front(), StreamingService::SearchType::Songs);
+    }
+  }
+  return query;
 }
 
 void StreamingCollectionView::ResetTypeAhead() {

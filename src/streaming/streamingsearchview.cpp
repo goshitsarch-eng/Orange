@@ -208,6 +208,56 @@ void StreamingSearchView::SetMenuCallback(MenuCallback callback) { menu_ = std::
 
 void StreamingSearchView::SetConfigureCallback(ConfigureCallback callback) { configure_ = std::move(callback); }
 
+StreamingService::SearchType StreamingSearchView::CurrentType() const {
+  if (type_artists_ && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(type_artists_))) {
+    return StreamingService::SearchType::Artists;
+  }
+  if (type_albums_ && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(type_albums_))) {
+    return StreamingService::SearchType::Albums;
+  }
+  return StreamingService::SearchType::Songs;
+}
+
+std::string StreamingSearchView::SelectedSearchQuery() const {
+  struct State {
+    std::string query;
+    StreamingService::SearchType type = StreamingService::SearchType::Songs;
+  } state;
+  state.type = CurrentType();
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto *state = static_cast<State *>(data);
+        if (!state->query.empty()) {
+          return;
+        }
+        auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+        Song song;
+        auto *row_song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
+        if (row_song) {
+          song = *row_song;
+        }
+        state->query = StreamingSearchOpts::QueryFromPrimary(CollectionItemDelegate::PrimaryText(item), song, state->type);
+      },
+      &state);
+  if (state.query.empty()) {
+    const SongList songs = SelectedSongs();
+    if (!songs.empty()) {
+      state.query = StreamingSearchOpts::QueryFromSong(songs.front(), state.type);
+    }
+  }
+  return state.query;
+}
+
+void StreamingSearchView::SearchForThis(const std::string &query) {
+  const std::string text = query.empty() ? SelectedSearchQuery() : query;
+  if (!search_entry_ || !StreamingSearchOpts::CanSearchForThis(text)) {
+    return;
+  }
+  gtk_editable_set_text(GTK_EDITABLE(search_entry_), text.c_str());
+  ScheduleSearch(text, true);
+}
+
 void StreamingSearchView::CancelPendingSearch() {
   ++search_timer_gen_;
   if (search_timer_ != 0) {
@@ -310,12 +360,7 @@ void StreamingSearchView::Search(const std::string &query) {
     HideProgress();
     return;
   }
-  StreamingService::SearchType type = StreamingService::SearchType::Songs;
-  if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(type_artists_))) {
-    type = StreamingService::SearchType::Artists;
-  } else if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(type_albums_))) {
-    type = StreamingService::SearchType::Albums;
-  }
+  const StreamingService::SearchType type = CurrentType();
   model_.SetSearchType(type);
   ++cover_gen_;
   has_error_ = false;

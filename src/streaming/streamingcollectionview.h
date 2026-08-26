@@ -45,6 +45,7 @@ class StreamingCollectionView {
   const SongList &songs() const { return songs_; }
   SongList Visible() const;
   SongList SelectedSongs() const;
+  std::string SelectedSearchQuery() const;
 
  private:
   struct Level {

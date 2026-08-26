@@ -28,6 +28,8 @@ class StreamingTabsView {
   void SetActivateCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback);
   void SetConfigureCallback(ConfigureCallback callback);
+  void SearchForThis(const std::string &query);
+  std::string SelectedSearchQuery() const;
   void ReloadSettings();
   void GetArtists();
   void GetAlbums();
@@ -61,6 +63,7 @@ class StreamingTabsView {
   ActivateCallback activate_;
   std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
   GtkWidget *widget_ = nullptr;
+  GtkWidget *stack_ = nullptr;
   std::unique_ptr<StreamingCollectionViewContainer> artists_;
   std::unique_ptr<StreamingCollectionViewContainer> albums_;
   std::unique_ptr<StreamingCollectionViewContainer> songs_;

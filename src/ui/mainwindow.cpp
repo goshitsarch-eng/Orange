@@ -38,6 +38,7 @@
 #include "constants/playlistsettings.h"
 #include "dialogs/deletefilespolicy.h"
 #include "streaming/streamingfavoriteaction.h"
+#include "streaming/streamingsearchopts.h"
 #include "constants/scrobblersettings.h"
 #include "analyzer/analyzerframerate.h"
 #include "constants/analyzersettings.h"
@@ -495,6 +496,9 @@ void MainWindow::BuildUi() {
              }));
   add_action("streaming-add-albums", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                static_cast<MainWindow *>(data)->StreamingAddToList(StreamingCollectionStore::List::Albums);
+             }));
+  add_action("streaming-search", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->StreamingSearchForThis();
              }));
   add_action("streaming-add-songs", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                static_cast<MainWindow *>(data)->StreamingAddToList(StreamingCollectionStore::List::Songs);
@@ -2288,6 +2292,7 @@ void MainWindow::ShowStreamingMenu(const SongList &songs) {
   g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.streaming-enqueue");
   g_menu_append(menu, Translations::Tr("Add to favorites").c_str(), "win.streaming-favorite");
   g_menu_append(menu, Translations::Tr("Remove from favorites").c_str(), "win.streaming-unfavorite");
+  g_menu_append(menu, Translations::Tr(StreamingSearchOpts::SearchForThisLabel()).c_str(), "win.streaming-search");
   for (StreamingCollectionStore::List list : StreamingCollectionStore::AddableLists(streaming_service_name_)) {
     const char *action = "win.streaming-add-songs";
     if (list == StreamingCollectionStore::List::Artists) {
@@ -2322,6 +2327,24 @@ void MainWindow::StreamingFavorite(bool add) {
   } else {
     service->RemoveFavorites(type, streaming_menu_songs_, done);
   }
+}
+
+void MainWindow::StreamingSearchForThis() {
+  StreamingTabsView *tabs = nullptr;
+  for (const auto &view : streaming_views_) {
+    if (view && view->service() && view->service()->name() == streaming_service_name_) {
+      tabs = view.get();
+      break;
+    }
+  }
+  if (!tabs) {
+    return;
+  }
+  std::string query = tabs->SelectedSearchQuery();
+  if (!StreamingSearchOpts::CanSearchForThis(query) && !streaming_menu_songs_.empty()) {
+    query = StreamingSearchOpts::QueryFromSong(streaming_menu_songs_.front(), StreamingService::SearchType::Songs);
+  }
+  tabs->SearchForThis(query);
 }
 
 void MainWindow::StreamingAddToList(StreamingCollectionStore::List list) {

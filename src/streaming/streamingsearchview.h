@@ -32,6 +32,8 @@ class StreamingSearchView {
   void SetActivateCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback);
   void SetConfigureCallback(ConfigureCallback callback);
+  void SearchForThis(const std::string &query = {});
+  std::string SelectedSearchQuery() const;
   StreamingSearchModel *model() { return &model_; }
   const SongList &results() const { return model_.songs(); }
   SongList SelectedSongs() const;
@@ -53,6 +55,7 @@ class StreamingSearchView {
   void ApplyProgress(int value, int maximum);
   void ScheduleSearch(const std::string &query, bool immediate);
   void CancelPendingSearch();
+  StreamingService::SearchType CurrentType() const;
   gboolean OnKeyPressed(guint keyval);
   void ResetTypeAhead();
 
