@@ -1,56 +1,39 @@
-/*
- * Strawberry Music Player
- * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_URLHANDLERS_H
+#define STRAWBERRY_URLHANDLERS_H
 
-#ifndef URLHANDLERS_H
-#define URLHANDLERS_H
+#include "core/song.h"
 
-#include "config.h"
+#include <functional>
+#include <map>
+#include <string>
+#include <vector>
 
-#include <QObject>
-#include <QMap>
-#include <QString>
-#include <QUrl>
-
-class UrlHandler;
-
-class UrlHandlers : public QObject {
-  Q_OBJECT
-
+class UrlHandler {
  public:
-  explicit UrlHandlers(QObject *parent = nullptr);
+  struct LoadResult {
+    enum class Type { Error, TrackAvailable, Async, NoMoreTracks, WillLoadAsynchronously };
+    Type type = Type::Error;
+    std::string media_url;
+    std::string stream_url;
+    std::string error;
+    Song song;
+  };
 
-  void Register(UrlHandler *url_handler);
-  void Unregister(UrlHandler *url_handler);
-  void Destroyed(QObject *object);
+  using AsyncCallback = std::function<void(const LoadResult &)>;
 
-  bool CanHandle(const QString &scheme) const;
-  bool CanHandle(const QUrl &url) const;
-
-  UrlHandler *GetUrlHandler(const QString &scheme) const;
-  UrlHandler *GetUrlHandler(const QUrl &url) const;
-
- Q_SIGNALS:
-  void Registered(UrlHandler *url_handler);
-  void UnRegistered(UrlHandler *url_handler);
-
- private:
-  QMap<QString, UrlHandler*> url_handlers_;
+  virtual ~UrlHandler() = default;
+  virtual std::string scheme() const = 0;
+  virtual LoadResult Load(const std::string &url, AsyncCallback callback = {}) = 0;
 };
 
-#endif  // URLHANDLERS_H
+class UrlHandlers {
+ public:
+  void AddHandler(UrlHandler *handler);
+  UrlHandler *HandlerForUrl(const std::string &url) const;
+  std::vector<std::string> Schemes() const;
+
+ private:
+  std::map<std::string, UrlHandler *> handlers_;
+};
+
+#endif

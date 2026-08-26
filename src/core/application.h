@@ -1,135 +1,115 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2012, David Sansome <me@davidsansome.com>
- * Copyright 2012, 2014, John Maguire <john.maguire@gmail.com>
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_APPLICATION_H
+#define STRAWBERRY_APPLICATION_H
 
-#ifndef APPLICATION_H
-#define APPLICATION_H
+#include "analyzer/analyzer.h"
+#include "collection/collectionlibrary.h"
+#include "covermanager/coverproviders.h"
+#include "core/commandlineoptions.h"
+#include "core/database.h"
+#include "core/network.h"
+#include "core/player.h"
+#include "core/signal.h"
+#include "core/taskmanager.h"
+#include "core/urlhandlers.h"
+#include "device/devicemanager.h"
+#include "discord/discord.h"
+#include "engine/devicefinders.h"
+#include "equalizer/equalizer.h"
+#include "globalshortcuts/globalshortcuts.h"
+#include "lyrics/lyricsproviders.h"
+#include "moodbar/moodbar.h"
+#include "mpris2/mpris2.h"
+#include "organize/organize.h"
+#include "osd/osd.h"
+#include "playlist/playlistbackend.h"
+#include "playlist/playlistmanager.h"
+#include "queue/queue.h"
+#include "radios/radioservices.h"
+#include "scrobbler/audioscrobbler.h"
+#include "streaming/streamingservices.h"
+#include "systemtrayicon/systemtrayicon.h"
+#include "tagfetcher/tagfetcher.h"
+#include "tagreader/tagreader.h"
+#include "transcoder/transcoder.h"
+#include "waveform/waveform.h"
 
-#include "config.h"
+#include <memory>
 
-#include <glib.h>
-
-#include <QObject>
-#include <QList>
-#include <QString>
-
-#include "includes/scoped_ptr.h"
-#include "includes/shared_ptr.h"
-
-class QThread;
-
-class TaskManager;
-class ApplicationImpl;
-class TagReaderClient;
-class Database;
-class DeviceFinders;
-class UrlHandlers;
-class Player;
-class NetworkAccessManager;
-class CollectionLibrary;
-class CollectionBackend;
-class CollectionModel;
-class PlaylistBackend;
-class PlaylistManager;
-class DeviceManager;
-class CoverProviders;
-class AlbumCoverLoader;
-class CurrentAlbumCoverLoader;
-class CoverProviders;
-class LyricsProviders;
-class StreamingServices;
-class RadioServices;
-#ifdef HAVE_MOODBAR
-class MoodbarController;
-class MoodbarLoader;
-#endif
-#ifdef HAVE_WAVEFORM
-class WaveformController;
-class WaveformLoader;
-#endif
-class AudioScrobbler;
-
-class Application : public QObject {
-  Q_OBJECT
-
+class Application {
  public:
-  explicit Application(QObject *parent = nullptr);
-  ~Application() override;
+  Application();
+  ~Application();
 
-  SharedPtr<TagReaderClient> tagreader_client() const;
-  SharedPtr<Database> database() const;
-  SharedPtr<TaskManager> task_manager() const;
-  SharedPtr<Player> player() const;
-  SharedPtr<NetworkAccessManager> network() const;
-  SharedPtr<DeviceFinders> device_finders() const;
-  SharedPtr<UrlHandlers> url_handlers() const;
-  SharedPtr<DeviceManager> device_manager() const;
-
-  SharedPtr<CollectionLibrary> collection() const;
-  SharedPtr<CollectionBackend> collection_backend() const;
-  CollectionModel *collection_model() const;
-
-  SharedPtr<PlaylistBackend> playlist_backend() const;
-  SharedPtr<PlaylistManager> playlist_manager() const;
-
-  SharedPtr<CoverProviders> cover_providers() const;
-  SharedPtr<AlbumCoverLoader> albumcover_loader() const;
-  SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader() const;
-
-  SharedPtr<LyricsProviders> lyrics_providers() const;
-
-  SharedPtr<StreamingServices> streaming_services() const;
-  SharedPtr<RadioServices> radio_services() const;
-
-#ifdef HAVE_MOODBAR
-  SharedPtr<MoodbarController> moodbar_controller() const;
-  SharedPtr<MoodbarLoader> moodbar_loader() const;
-#endif
-
-#ifdef HAVE_WAVEFORM
-  SharedPtr<WaveformController> waveform_controller() const;
-  SharedPtr<WaveformLoader> waveform_loader() const;
-#endif
-
-  SharedPtr<AudioScrobbler> scrobbler() const;
-
+  void Init();
   void Exit();
+  void ApplyCommandline(const CommandlineOptions &options);
 
-  QThread *MoveToNewThread(QObject *object);
-  static void MoveToThread(QObject *object, QThread *thread);
+  TaskManager *task_manager() const { return task_manager_.get(); }
+  Database *database() const { return database_.get(); }
+  NetworkAccessManager *network() const { return network_.get(); }
+  TagReader *tagreader() const { return tagreader_.get(); }
+  UrlHandlers *url_handlers() const { return url_handlers_.get(); }
+  CollectionLibrary *collection() const { return collection_.get(); }
+  PlaylistBackend *playlist_backend() const { return playlist_backend_.get(); }
+  PlaylistManager *playlist_manager() const { return playlist_manager_.get(); }
+  Player *player() const { return player_.get(); }
+  Queue *queue() const { return queue_.get(); }
+  CoverProviders *cover_providers() const { return cover_providers_.get(); }
+  AlbumCoverLoader *albumcover_loader() const { return albumcover_loader_.get(); }
+  CurrentAlbumCoverLoader *current_albumcover_loader() const { return current_albumcover_loader_.get(); }
+  LyricsProviders *lyrics_providers() const { return lyrics_providers_.get(); }
+  AudioScrobbler *scrobbler() const { return scrobbler_.get(); }
+  StreamingServices *streaming_services() const { return streaming_services_.get(); }
+  RadioServices *radio_services() const { return radio_services_.get(); }
+  DeviceManager *device_manager() const { return device_manager_.get(); }
+  DeviceFinders *device_finders() const { return device_finders_.get(); }
+  Equalizer *equalizer() const { return equalizer_.get(); }
+  Analyzer *analyzer() const { return analyzer_.get(); }
+  MoodbarController *moodbar() const { return moodbar_.get(); }
+  WaveformController *waveform() const { return waveform_.get(); }
+  Transcoder *transcoder() const { return transcoder_.get(); }
+  OSD *osd() const { return osd_.get(); }
+  SystemTrayIcon *tray() const { return tray_.get(); }
+  Mpris2 *mpris() const { return mpris_.get(); }
+  GlobalShortcutsManager *shortcuts() const { return shortcuts_.get(); }
+  DiscordRichPresence *discord() const { return discord_.get(); }
+  TagFetcher *tag_fetcher() const { return tag_fetcher_.get(); }
 
- private Q_SLOTS:
-  void ExitReceived();
-
- Q_SIGNALS:
-  void ExitFinished();
+  Signal<> ExitFinished;
 
  private:
-  static gpointer GLibMainLoopThreadFunc(gpointer data);
-
- private:
-  ScopedPtr<ApplicationImpl> p_;
-  GThread *g_thread_;
-  QList<QThread*> threads_;
-  QList<QObject*> wait_for_exit_;
+  std::unique_ptr<TaskManager> task_manager_;
+  std::unique_ptr<Database> database_;
+  std::unique_ptr<NetworkAccessManager> network_;
+  std::unique_ptr<TagReader> tagreader_;
+  std::unique_ptr<UrlHandlers> url_handlers_;
+  std::unique_ptr<CollectionLibrary> collection_;
+  std::unique_ptr<PlaylistBackend> playlist_backend_;
+  std::unique_ptr<PlaylistManager> playlist_manager_;
+  std::unique_ptr<Player> player_;
+  std::unique_ptr<Queue> queue_;
+  std::unique_ptr<CoverProviders> cover_providers_;
+  std::unique_ptr<AlbumCoverLoader> albumcover_loader_;
+  std::unique_ptr<CurrentAlbumCoverLoader> current_albumcover_loader_;
+  std::unique_ptr<LyricsProviders> lyrics_providers_;
+  std::unique_ptr<AudioScrobbler> scrobbler_;
+  std::unique_ptr<StreamingServices> streaming_services_;
+  std::unique_ptr<RadioServices> radio_services_;
+  std::unique_ptr<DeviceManager> device_manager_;
+  std::unique_ptr<DeviceFinders> device_finders_;
+  std::unique_ptr<Equalizer> equalizer_;
+  std::unique_ptr<Analyzer> analyzer_;
+  std::unique_ptr<MoodbarLoader> moodbar_loader_;
+  std::unique_ptr<MoodbarController> moodbar_;
+  std::unique_ptr<WaveformLoader> waveform_loader_;
+  std::unique_ptr<WaveformController> waveform_;
+  std::unique_ptr<Transcoder> transcoder_;
+  std::unique_ptr<OSD> osd_;
+  std::unique_ptr<SystemTrayIcon> tray_;
+  std::unique_ptr<Mpris2> mpris_;
+  std::unique_ptr<GlobalShortcutsManager> shortcuts_;
+  std::unique_ptr<DiscordRichPresence> discord_;
+  std::unique_ptr<TagFetcher> tag_fetcher_;
 };
 
-#endif  // APPLICATION_H
+#endif

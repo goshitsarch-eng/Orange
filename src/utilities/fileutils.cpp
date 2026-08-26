@@ -1,223 +1,114 @@
-/*
- * Strawberry Music Player
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "utilities/fileutils.h"
 
-#include <QtGlobal>
+#include <gio/gio.h>
+#include <glib.h>
+#include <glib/gstdio.h>
 
-#include <memory>
+#include <fstream>
+#include <sstream>
 
-#ifdef Q_OS_UNIX
-#  include <unistd.h>
-#  include <cstring>
-#endif
+namespace FileUtils {
 
-#ifdef Q_OS_WIN32
-#  include <io.h>
-#endif
-
-#include <QByteArray>
-#include <QString>
-#include <QIODevice>
-#include <QDir>
-#include <QFile>
-
-#include "core/logging.h"
-#include "includes/scoped_ptr.h"
-
-#include "fileutils.h"
-
-namespace Utilities {
-
-using std::unique_ptr;
-
-QByteArray ReadDataFromFile(const QString &filename) {
-
-  QFile file(filename);
-  QByteArray data;
-  if (file.open(QIODevice::ReadOnly)) {
-    data = file.readAll();
-    file.close();
-  }
-  else {
-    qLog(Error) << "Failed to open file" << filename << "for reading:" << file.errorString();
-  }
-  return data;
-
+std::string BaseName(const std::string &path) {
+  gchar *base = g_path_get_basename(path.c_str());
+  std::string result = base ? base : path;
+  g_free(base);
+  return result;
 }
 
-bool Copy(QIODevice *source, QIODevice *destination) {
-
-  if (!source->open(QIODevice::ReadOnly)) return false;
-
-  if (!destination->open(QIODevice::WriteOnly)) return false;
-
-  const qint64 bytes = source->size();
-  // size() returns -1 for sequential devices (sockets, processes); casting that to size_t would attempt a SIZE_MAX allocation.
-  if (bytes < 0) return false;
-  unique_ptr<char[]> data(new char[static_cast<size_t>(bytes)]);
-  qint64 pos = 0;
-
-  qint64 bytes_read = 0;
-  do {
-    bytes_read = source->read(data.get() + pos, bytes - pos);
-    if (bytes_read == -1) return false;
-
-    pos += bytes_read;
-  } while (bytes_read > 0 && pos != bytes);
-
-  // A short read (read() returning 0 before all bytes were read) leaves the buffer partially filled - don't go on to write a truncated/garbage copy and report success.
-  if (pos != bytes) return false;
-
-  pos = 0;
-  qint64 bytes_written = 0;
-  do {
-    bytes_written = destination->write(data.get() + pos, bytes - pos);
-    if (bytes_written == -1) return false;
-
-    pos += bytes_written;
-  } while (bytes_written > 0 && pos != bytes);
-
-  // Likewise a short write means the copy is incomplete despite no -1 error.
-  if (pos != bytes) return false;
-
-  return true;
-
+std::string DirName(const std::string &path) {
+  gchar *dir = g_path_get_dirname(path.c_str());
+  std::string result = dir ? dir : ".";
+  g_free(dir);
+  return result;
 }
 
-bool CopyRecursive(const QString &source, const QString &destination) {
-
-  // Make the destination directory
-  QString dir_name = source.section(u'/', -1, -1);
-  QString dest_path = destination + QLatin1Char('/') + dir_name;
-  QDir().mkpath(dest_path);
-
-  QDir dir(source);
-  const QStringList children_dirs = dir.entryList(QDir::NoDotAndDotDot | QDir::Dirs);
-  for (const QString &child : children_dirs) {
-    if (!CopyRecursive(source + QLatin1Char('/') + child, dest_path)) {
-      qLog(Warning) << "Failed to copy dir" << source + QLatin1Char('/') + child << "to" << dest_path;
-      return false;
-    }
+std::string Extension(const std::string &path) {
+  const std::string base = BaseName(path);
+  const auto pos = base.rfind('.');
+  if (pos == std::string::npos || pos == 0 || pos + 1 == base.size()) {
+    return {};
   }
-
-  const QStringList children_files = dir.entryList(QDir::NoDotAndDotDot | QDir::Files);
-  for (const QString &child : children_files) {
-    if (!QFile::copy(source + QLatin1Char('/') + child, dest_path + QLatin1Char('/') + child)) {
-      qLog(Warning) << "Failed to copy file" << source + QLatin1Char('/') + child << "to" << dest_path;
-      return false;
-    }
-  }
-
-  return true;
-
+  return base.substr(pos + 1);
 }
 
-bool RemoveRecursive(const QString &path) {
-
-  QDir dir(path);
-  const QStringList children_dirs = dir.entryList(QDir::NoDotAndDotDot | QDir::Dirs | QDir::Hidden);
-  for (const QString &child : children_dirs) {
-    if (!RemoveRecursive(path + QLatin1Char('/') + child)) {
-      return false;
-    }
-  }
-
-  const QStringList children_files = dir.entryList(QDir::NoDotAndDotDot | QDir::Files | QDir::Hidden);
-  for (const QString &child : children_files) {
-    if (!QFile::remove(path + QLatin1Char('/') + child)) {
-      return false;
-    }
-  }
-
-  return dir.rmdir(path);
-
+std::string Join(const std::string &a, const std::string &b) {
+  gchar *joined = g_build_filename(a.c_str(), b.c_str(), nullptr);
+  std::string result = joined ? joined : a + "/" + b;
+  g_free(joined);
+  return result;
 }
 
-// Whether the path is on a GVFS FUSE mount (GNOME's virtual filesystem, e.g. /run/user/<uid>/gvfs/... or the older ~/.gvfs/...).
-// Those mounts expose backends such as sftp, smb and mtp that do not support random, in-place writes; the whole file has to be rewritten instead.  Ordinary FUSE filesystems like sshfs do support in-place writes.
-bool FilenameOnGVFS(const QString &filename) {
-
-#ifdef Q_OS_UNIX
-  return filename.contains(QLatin1String("/gvfs/")) || filename.contains(QLatin1String("/.gvfs/"));
-#else
-  Q_UNUSED(filename)
-  return false;
-#endif  // Q_OS_UNIX
-
+std::string CanonicalPath(const std::string &path) {
+  gchar *canon = g_canonicalize_filename(path.c_str(), nullptr);
+  std::string result = canon ? canon : path;
+  g_free(canon);
+  return result;
 }
 
-// Copies the contents of source over destination (truncating it), streaming in chunks so large files are not held in memory.
-// Unlike QFile::copy() this overwrites an existing destination, and it only writes sequentially from the start.
-bool CopyFileContents(const QString &source, const QString &destination) {
+bool Exists(const std::string &path) { return g_file_test(path.c_str(), G_FILE_TEST_EXISTS); }
 
-  QFile source_file(source);
-  if (!source_file.open(QIODevice::ReadOnly)) {
-    qLog(Error) << "Failed to open" << source << "for reading:" << source_file.errorString();
-    return false;
-  }
+bool IsDirectory(const std::string &path) { return g_file_test(path.c_str(), G_FILE_TEST_IS_DIR); }
 
-  QFile destination_file(destination);
-  if (!destination_file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-    qLog(Error) << "Failed to open" << destination << "for writing:" << destination_file.errorString();
-    return false;
-  }
+bool IsFile(const std::string &path) { return g_file_test(path.c_str(), G_FILE_TEST_IS_REGULAR); }
 
-  constexpr qint64 kChunkSize = 64 * 1024;
-  for (;;) {
-    const QByteArray chunk = source_file.read(kChunkSize);
-    if (chunk.isEmpty()) break;
-    if (destination_file.write(chunk) != chunk.size()) {
-      qLog(Error) << "Failed to write to" << destination << ":" << destination_file.errorString();
-      return false;
+std::vector<std::string> ListDirectory(const std::string &path) {
+  std::vector<std::string> result;
+  GError *error = nullptr;
+  GDir *dir = g_dir_open(path.c_str(), 0, &error);
+  if (!dir) {
+    if (error) {
+      g_error_free(error);
     }
+    return result;
   }
-
-  if (source_file.error() != QFileDevice::NoError) {
-    qLog(Error) << "Failed to read from" << source << ":" << source_file.errorString();
-    return false;
+  const gchar *name = nullptr;
+  while ((name = g_dir_read_name(dir))) {
+    result.push_back(Join(path, name));
   }
-
-  // Flush and surface any error from closing (e.g. the remote write failing on commit).
-  if (!destination_file.flush()) {
-    qLog(Error) << "Failed to flush" << destination << ":" << destination_file.errorString();
-    return false;
-  }
-
-  // flush() only pushes the data into the OS; force it out to the underlying storage so that deferred write-back failures (common on network/FUSE-backed filesystems such as GVFS) are reported here rather than being silently lost when the file is closed.
-  const int handle = destination_file.handle();
-  if (handle != -1) {
-#ifdef Q_OS_UNIX
-    if (fsync(handle) != 0) {
-      qLog(Error) << "Failed to fsync" << destination << "to storage:" << strerror(errno);
-      return false;
-    }
-#endif
-#ifdef Q_OS_WIN32
-    if (_commit(handle) != 0) {
-      qLog(Error) << "Failed to commit" << destination << "to storage";
-      return false;
-    }
-#endif
-  }
-
-  return true;
-
+  g_dir_close(dir);
+  return result;
 }
 
-}  // namespace Utilities
+std::string PathFromUri(const std::string &uri) {
+  if (uri.rfind("file://", 0) != 0) {
+    return uri;
+  }
+  GFile *file = g_file_new_for_uri(uri.c_str());
+  gchar *path = g_file_get_path(file);
+  std::string result = path ? path : uri;
+  g_free(path);
+  g_object_unref(file);
+  return result;
+}
+
+std::string UriFromPath(const std::string &path) {
+  if (path.rfind("://", 0) != std::string::npos || path.find("://") != std::string::npos) {
+    if (path.find("://") != std::string::npos) {
+      return path;
+    }
+  }
+  GFile *file = g_file_new_for_path(path.c_str());
+  gchar *uri = g_file_get_uri(file);
+  std::string result = uri ? uri : path;
+  g_free(uri);
+  g_object_unref(file);
+  return result;
+}
+
+std::string ReadFile(const std::string &path) {
+  gchar *contents = nullptr;
+  gsize length = 0;
+  if (!g_file_get_contents(path.c_str(), &contents, &length, nullptr)) {
+    return {};
+  }
+  std::string result(contents, length);
+  g_free(contents);
+  return result;
+}
+
+bool WriteFile(const std::string &path, const std::string &contents) {
+  return g_file_set_contents(path.c_str(), contents.data(), static_cast<gssize>(contents.size()), nullptr);
+}
+
+}  // namespace FileUtils

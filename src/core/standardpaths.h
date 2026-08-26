@@ -1,36 +1,20 @@
-/*
- * Strawberry Music Player
- * Copyright 2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_STANDARDPATHS_H
+#define STRAWBERRY_STANDARDPATHS_H
 
-#ifndef STANDARDPATHS_H
-#define STANDARDPATHS_H
+#include <string>
 
-#include <QStandardPaths>
+namespace StandardPaths {
 
-class StandardPaths {
-  Q_GADGET
+std::string ConfigDir();
+std::string DataDir();
+std::string CacheDir();
+std::string DatabasePath();
+std::string SettingsPath();
+std::string CoverCacheDir();
+std::string LyricsCacheDir();
+std::string MoodbarCacheDir();
+std::string WaveformCacheDir();
 
- public:
-  using StandardLocation = QStandardPaths::StandardLocation;
-  static QString WritableLocation(const StandardLocation type);
+}  // namespace StandardPaths
 
- private:
-  static void AppendOrganizationAndApplication(QString &path);
-};
-
-#endif  // STANDARDPATHS_H
+#endif

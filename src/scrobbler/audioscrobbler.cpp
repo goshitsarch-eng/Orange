@@ -1,188 +1,46 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
+#include "scrobbler/audioscrobbler.h"
 #include "config.h"
-
-#include <utility>
-#include <memory>
-
-#include <QList>
-#include <QString>
-
-#include "includes/shared_ptr.h"
+#include "core/settings.h"
 #include "core/logging.h"
-#include "core/song.h"
 
-#include "audioscrobbler.h"
-#include "scrobblersettingsservice.h"
-#include "scrobblerservice.h"
+namespace {
+class HttpScrobbler : public ScrobblerService {
+ public:
+  HttpScrobbler(std::string name, std::string nowplaying, std::string scrobble, NetworkAccessManager *network)
+    : name_(std::move(name)), nowplaying_(std::move(nowplaying)), scrobble_(std::move(scrobble)), network_(network) {}
+  std::string name() const override { return name_; }
+  void NowPlaying(const Song &song) override { Post(nowplaying_, song); }
+  void Scrobble(const Song &song) override { Post(scrobble_, song); }
+  void Love(const Song &song) override { Post(scrobble_, song); }
+  void Authenticate(const std::string &username, const std::string &password) override {
+    Settings s; s.BeginGroup(name_); s.SetValue("username", username); s.SetValue("password", password); s.Sync();
+  }
+ private:
+  void Post(const std::string &url, const Song &song) {
+    if (!enabled_ || !network_ || url.empty()) return;
+    const std::string body = "artist=" + song.artist() + "&track=" + song.title() + "&album=" + song.album();
+    network_->Post(url, body, [](const NetworkAccessManager::Response &) {}, "application/x-www-form-urlencoded");
+  }
+  std::string name_, nowplaying_, scrobble_;
+  NetworkAccessManager *network_;
+};
+}
 
-using std::make_shared;
-
-AudioScrobbler::AudioScrobbler(QObject *parent)
-    : QObject(parent),
-      settings_(make_shared<ScrobblerSettingsService>()) {
-
+AudioScrobbler::AudioScrobbler(NetworkAccessManager *network) : network_(network) {
+  services_.push_back(std::make_unique<HttpScrobbler>("Last.fm", "https://ws.audioscrobbler.com/2.0/?method=track.updateNowPlaying", "https://ws.audioscrobbler.com/2.0/?method=track.scrobble", network));
+  services_.push_back(std::make_unique<HttpScrobbler>("ListenBrainz", "https://api.listenbrainz.org/1/submit-listens", "https://api.listenbrainz.org/1/submit-listens", network));
+#ifdef HAVE_SUBSONIC
+  services_.push_back(std::make_unique<HttpScrobbler>("Subsonic", "", "", network));
+#endif
   ReloadSettings();
-
 }
-
-AudioScrobbler::~AudioScrobbler() {
-
-  while (!services_.isEmpty()) {
-    ScrobblerServicePtr service = services_.value(services_.firstKey());
-    RemoveService(service);
-  }
-
-}
-
-void AudioScrobbler::AddService(ScrobblerServicePtr service) {
-
-  services_.insert(service->name(), service);
-
-  QObject::connect(&*service, &ScrobblerService::ErrorMessage, this, &AudioScrobbler::ErrorReceived);
-
-  qLog(Debug) << "Registered scrobbler service" << service->name();
-
-}
-
-void AudioScrobbler::RemoveService(ScrobblerServicePtr service) {
-
-  if (!service || !services_.contains(service->name())) return;
-
-  services_.remove(service->name());
-  QObject::disconnect(&*service, nullptr, this, nullptr);
-
-  QObject::disconnect(&*service, &ScrobblerService::ErrorMessage, this, &AudioScrobbler::ErrorReceived);
-
-  qLog(Debug) << "Unregistered scrobbler service" << service->name();
-
-}
-
-QList<ScrobblerServicePtr> AudioScrobbler::GetAll() {
-
-  return services_.values();
-
-}
-
-ScrobblerServicePtr AudioScrobbler::ServiceByName(const QString &name) {
-
-  if (services_.contains(name)) return services_.value(name);
-  return nullptr;
-
-}
-
 void AudioScrobbler::ReloadSettings() {
-
-  settings_->ReloadSettings();
-
-  const QList<ScrobblerServicePtr> services = services_.values();
-  for (ScrobblerServicePtr service : std::as_const(services)) {
-    service->ReloadSettings();
-  }
-
+  Settings s; s.BeginGroup("Scrobbler");
+  for (auto &svc : services_) svc->set_enabled(s.BoolValue(svc->name(), false));
 }
-
-void AudioScrobbler::ToggleScrobbling() {
-
-  settings_->ToggleScrobbling();
-
-  if (settings_->enabled() && !settings_->offline()) { Submit(); }
-
-}
-
-void AudioScrobbler::ToggleOffline() {
-
-  settings_->ToggleOffline();
-
-  if (settings_->enabled() && !settings_->offline()) { Submit(); }
-
-}
-
-void AudioScrobbler::UpdateNowPlaying(const Song &song) {
-
-  if (!settings_->sources().contains(song.source())) return;
-
-  qLog(Debug) << "Sending now playing for song" << song.artist() << song.album() << song.title();
-
-  const QList<ScrobblerServicePtr> services = GetAll();
-  for (ScrobblerServicePtr service : services) {
-    if (!service->enabled()) continue;
-    service->UpdateNowPlaying(song);
-  }
-
-}
-
-void AudioScrobbler::ClearPlaying() {
-
-  const QList<ScrobblerServicePtr> services = GetAll();
-  for (ScrobblerServicePtr service : services) {
-    if (!service->enabled()) continue;
-    service->ClearPlaying();
-  }
-
-}
-
-void AudioScrobbler::Scrobble(const Song &song, const qint64 scrobble_point) {
-
-  if (!settings_->sources().contains(song.source())) return;
-
-  qLog(Debug) << "Scrobbling song" << song.artist() << song.album() << song.title() << "at" << scrobble_point;
-
-  const QList<ScrobblerServicePtr> services = GetAll();
-  for (ScrobblerServicePtr service : services) {
-    if (!service->enabled()) continue;
-    service->Scrobble(song);
-  }
-
-}
-
-void AudioScrobbler::Love() {
-
-  const QList<ScrobblerServicePtr> services = GetAll();
-  for (ScrobblerServicePtr service : services) {
-    if (!service->enabled() || !service->authenticated()) continue;
-    service->Love();
-  }
-
-}
-
-void AudioScrobbler::Submit() {
-
-  const QList<ScrobblerServicePtr> services = GetAll();
-  for (ScrobblerServicePtr service : services) {
-    if (!service->enabled() || !service->authenticated() || service->submitted()) continue;
-    service->StartSubmit();
-  }
-
-}
-
-void AudioScrobbler::WriteCache() {
-
-  const QList<ScrobblerServicePtr> services = GetAll();
-  for (ScrobblerServicePtr service : services) {
-    if (!service->enabled()) continue;
-    service->WriteCache();
-  }
-
-}
-
-void AudioScrobbler::ErrorReceived(const QString &error) {
-  Q_EMIT ErrorMessage(error);
+void AudioScrobbler::NowPlaying(const Song &song) { for (auto &s : services_) if (s->enabled()) s->NowPlaying(song); }
+void AudioScrobbler::Scrobble(const Song &song) { for (auto &s : services_) if (s->enabled()) s->Scrobble(song); }
+void AudioScrobbler::Love(const Song &song) { for (auto &s : services_) if (s->enabled()) s->Love(song); }
+std::vector<ScrobblerService *> AudioScrobbler::All() const {
+  std::vector<ScrobblerService *> r; for (const auto &s : services_) r.push_back(s.get()); return r;
 }

@@ -1,73 +1,57 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_COVERPROVIDERS_H
+#define STRAWBERRY_COVERPROVIDERS_H
 
-#ifndef COVERPROVIDERS_H
-#define COVERPROVIDERS_H
+#include "core/network.h"
+#include "core/signal.h"
+#include "core/song.h"
 
-#include "config.h"
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include <QtGlobal>
-#include <QObject>
-#include <QMutex>
-#include <QList>
-#include <QMap>
-#include <QString>
-#include <QAtomicInt>
-
-class CoverProvider;
-
-// This is a repository for cover providers.
-// Providers are automatically unregistered from the repository when they are deleted.  The class is thread safe.
-class CoverProviders : public QObject {
-  Q_OBJECT
-
+class CoverProvider {
  public:
-  explicit CoverProviders(QObject *parent = nullptr);
-  ~CoverProviders() override;
-
-  void ReloadSettings();
-
-  bool HasAnyProviders() const;
-  QList<CoverProvider*> List() const;
-
-  CoverProvider *ProviderByName(const QString &name) const;
-
-  // Lets a cover provider register itself in the repository.
-  void AddProvider(CoverProvider *provider);
-  void RemoveProvider(CoverProvider *provider);
-
-  int NextId();
-
- private Q_SLOTS:
-  void ProviderDestroyed();
-
- private:
-  Q_DISABLE_COPY(CoverProviders)
-
-  static int NextOrderId;
-
-  QMap<CoverProvider*, QString> cover_providers_;
-  mutable QMutex mutex_;
-
-  QAtomicInt next_id_;
+  using Callback = std::function<void(const std::string &image_data, const std::string &error)>;
+  virtual ~CoverProvider() = default;
+  virtual std::string name() const = 0;
+  virtual bool enabled() const { return enabled_; }
+  virtual void set_enabled(bool enabled) { enabled_ = enabled; }
+  virtual void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) = 0;
+ protected:
+  bool enabled_ = true;
 };
 
-#endif  // COVERPROVIDERS_H
+class CoverProviders {
+ public:
+  explicit CoverProviders(NetworkAccessManager *network);
+  void ReloadSettings();
+  void Fetch(const Song &song, CoverProvider::Callback callback);
+  std::vector<CoverProvider *> All() const;
+  void FetchFromEmbeddedOrFile(const Song &song, CoverProvider::Callback callback);
+ private:
+  NetworkAccessManager *network_;
+  std::vector<std::unique_ptr<CoverProvider>> providers_;
+};
+
+class AlbumCoverLoader {
+ public:
+  explicit AlbumCoverLoader(class TagReader *tagreader);
+  std::string LoadPath(const Song &song) const;
+  std::vector<unsigned char> LoadData(const Song &song) const;
+ private:
+  class TagReader *tagreader_;
+};
+
+class CurrentAlbumCoverLoader {
+ public:
+  explicit CurrentAlbumCoverLoader(AlbumCoverLoader *loader);
+  void Load(const Song &song);
+  const std::vector<unsigned char> &current() const { return current_; }
+  Signal<Song, std::vector<unsigned char>> AlbumCoverReady;
+ private:
+  AlbumCoverLoader *loader_;
+  std::vector<unsigned char> current_;
+};
+
+#endif

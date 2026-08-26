@@ -1,97 +1,76 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
+#include "streaming/streamingservices.h"
 #include "config.h"
-
-#include <QObject>
-#include <QMap>
-#include <QString>
-
+#include "core/settings.h"
 #include "core/logging.h"
-#include "streamingservices.h"
-#include "streamingservice.h"
 
-StreamingServices::StreamingServices(QObject *parent) : QObject(parent) {}
-
-StreamingServices::~StreamingServices() {
-
-  while (!services_.isEmpty()) {
-    StreamingServicePtr service = services_.value(services_.firstKey());
-    RemoveService(service);
+namespace {
+class GenericStreamingService : public StreamingService {
+ public:
+  GenericStreamingService(std::string name, std::string scheme, std::string search_url, NetworkAccessManager *network)
+    : name_(std::move(name)), scheme_(std::move(scheme)), search_url_(std::move(search_url)), network_(network) {}
+  std::string name() const override { return name_; }
+  std::string scheme() const override { return scheme_; }
+  LoadResult Load(const std::string &url, AsyncCallback callback) override {
+    LoadResult result;
+    result.type = LoadResult::Type::TrackAvailable;
+    result.media_url = url;
+    result.stream_url = url;
+    if (callback) callback(result);
+    return result;
   }
-
+  void Search(const std::string &query, SearchCallback callback) override {
+    if (!network_) { callback({}); return; }
+    gchar *escaped = g_uri_escape_string(query.c_str(), nullptr, TRUE);
+    const std::string url = search_url_ + (escaped ? escaped : query);
+    g_free(escaped);
+    network_->Get(url, [callback](const NetworkAccessManager::Response &response) {
+      SongList songs;
+      if (response.ok() && !response.body.empty()) {
+        Song song(Song::Source::Stream);
+        song.set_title(response.body.substr(0, 80));
+        song.set_valid(true);
+        songs.push_back(song);
+      }
+      callback(songs);
+    });
+  }
+  void Login(const std::string &username, const std::string &token) override {
+    Settings s; s.BeginGroup(name_); s.SetValue("username", username); s.SetValue("token", token); s.Sync();
+    logged_in_ = !username.empty() || !token.empty();
+  }
+ private:
+  std::string name_, scheme_, search_url_;
+  NetworkAccessManager *network_;
+};
 }
 
-void StreamingServices::AddService(StreamingServicePtr service) {
-
-  services_.insert(service->source(), service);
-  if (service->has_initial_load_settings()) service->InitialLoadSettings();
-  else service->ReloadSettings();
-
-  qLog(Debug) << "Added streaming service" << service->name();
-
+StreamingServices::StreamingServices(NetworkAccessManager *network, UrlHandlers *url_handlers) {
+#ifdef HAVE_SUBSONIC
+  auto subsonic = std::make_unique<GenericStreamingService>("Subsonic", "subsonic", "", network);
+  if (url_handlers) url_handlers->AddHandler(subsonic.get());
+  services_.push_back(std::move(subsonic));
+#endif
+#ifdef HAVE_TIDAL
+  auto tidal = std::make_unique<GenericStreamingService>("Tidal", "tidal", "https://listen.tidal.com/v1/search?query=", network);
+  if (url_handlers) url_handlers->AddHandler(tidal.get());
+  services_.push_back(std::move(tidal));
+#endif
+#ifdef HAVE_SPOTIFY
+  auto spotify = std::make_unique<GenericStreamingService>("Spotify", "spotify", "https://api.spotify.com/v1/search?q=", network);
+  if (url_handlers) url_handlers->AddHandler(spotify.get());
+  services_.push_back(std::move(spotify));
+#endif
+#ifdef HAVE_QOBUZ
+  auto qobuz = std::make_unique<GenericStreamingService>("Qobuz", "qobuz", "https://www.qobuz.com/api.json/0.2/catalog/search?query=", network);
+  if (url_handlers) url_handlers->AddHandler(qobuz.get());
+  services_.push_back(std::move(qobuz));
+#endif
+  (void)network; (void)url_handlers;
 }
-
-void StreamingServices::RemoveService(StreamingServicePtr service) {
-
-  if (!services_.contains(service->source())) return;
-  services_.remove(service->source());
-  QObject::disconnect(&*service, nullptr, this, nullptr);
-
-  qLog(Debug) << "Removed streaming service" << service->name();
-
+std::vector<StreamingService *> StreamingServices::All() const {
+  std::vector<StreamingService *> r; for (const auto &s : services_) r.push_back(s.get()); return r;
 }
-
-StreamingServicePtr StreamingServices::ServiceBySource(const Song::Source source) const {
-
-  if (services_.contains(source)) return services_.value(source);
+StreamingService *StreamingServices::ServiceByName(const std::string &name) const {
+  for (const auto &s : services_) if (s->name() == name) return s.get();
   return nullptr;
-
-}
-
-void StreamingServices::ReloadSettings() {
-
-  const QList<StreamingServicePtr> services = services_.values();
-  for (StreamingServicePtr service : services) {
-    service->ReloadSettings();
-  }
-
-}
-
-void StreamingServices::Exit() {
-
-  const QList<StreamingServicePtr> services = services_.values();
-  for (StreamingServicePtr service : services) {
-    wait_for_exit_ << &*service;
-    QObject::connect(&*service, &StreamingService::ExitFinished, this, &StreamingServices::ExitReceived);
-    service->Exit();
-  }
-  if (wait_for_exit_.isEmpty()) Q_EMIT ExitFinished();
-
-}
-
-void StreamingServices::ExitReceived() {
-
-  StreamingService *service = qobject_cast<StreamingService*>(sender());
-  wait_for_exit_.removeAll(service);
-  if (wait_for_exit_.isEmpty()) Q_EMIT ExitFinished();
-
 }

@@ -1,66 +1,33 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_LYRICSPROVIDERS_H
+#define STRAWBERRY_LYRICSPROVIDERS_H
 
-#ifndef LYRICSPROVIDERS_H
-#define LYRICSPROVIDERS_H
+#include "core/network.h"
+#include "core/song.h"
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "config.h"
-
-#include <atomic>
-
-#include <QtGlobal>
-#include <QObject>
-#include <QMutex>
-#include <QList>
-#include <QHash>
-#include <QString>
-
-class LyricsProvider;
-
-class LyricsProviders : public QObject {
-  Q_OBJECT
-
+class LyricsProvider {
  public:
-  explicit LyricsProviders(QObject *parent = nullptr);
-  ~LyricsProviders() override;
-
-  void ReloadSettings();
-  LyricsProvider *ProviderByName(const QString &name) const;
-
-  void AddProvider(LyricsProvider *provider);
-  void RemoveProvider(LyricsProvider *provider);
-  QList<LyricsProvider*> List() const { return lyrics_providers_.keys(); }
-  bool HasAnyProviders() const { return !lyrics_providers_.isEmpty(); }
-  int NextId();
-
- private Q_SLOTS:
-  void ProviderDestroyed();
-
- private:
-  static int NextOrderId;
-
-  QHash<LyricsProvider*, QString> lyrics_providers_;
-  QMutex mutex_;
-
-  std::atomic<int> next_id_;
-
-  Q_DISABLE_COPY_MOVE(LyricsProviders)
+  using Callback = std::function<void(const std::string &lyrics, const std::string &error)>;
+  virtual ~LyricsProvider() = default;
+  virtual std::string name() const = 0;
+  virtual bool enabled() const { return enabled_; }
+  virtual void set_enabled(bool enabled) { enabled_ = enabled; }
+  virtual void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) = 0;
+ protected:
+  bool enabled_ = true;
 };
 
-#endif  // LYRICSPROVIDERS_H
+class LyricsProviders {
+ public:
+  explicit LyricsProviders(NetworkAccessManager *network);
+  void ReloadSettings();
+  void Fetch(const Song &song, LyricsProvider::Callback callback);
+  std::vector<LyricsProvider *> All() const;
+ private:
+  NetworkAccessManager *network_;
+  std::vector<std::unique_ptr<LyricsProvider>> providers_;
+};
+#endif

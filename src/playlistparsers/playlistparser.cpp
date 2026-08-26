@@ -1,261 +1,233 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "playlistparsers/playlistparser.h"
+
+#include "utilities/fileutils.h"
+#include "utilities/strutils.h"
 
 #include <algorithm>
+#include <sstream>
 
-#include <QObject>
-#include <QIODevice>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QByteArray>
-#include <QString>
-#include <QStringList>
-
-#include "includes/shared_ptr.h"
-#include "constants/playlistsettings.h"
-#include "core/logging.h"
-#include "playlistparser.h"
-#include "parserbase.h"
-#include "asxiniparser.h"
-#include "asxparser.h"
-#include "cueparser.h"
-#include "m3uparser.h"
-#include "plsparser.h"
-#include "wplparser.h"
-#include "xspfparser.h"
-
-using namespace Qt::Literals::StringLiterals;
-
-const int PlaylistParser::kMagicSize = 512;
-
-PlaylistParser::PlaylistParser(const SharedPtr<TagReaderClient> tagreader_client, const SharedPtr<CollectionBackendInterface> collection_backend, QObject *parent) : QObject(parent), default_parser_(nullptr) {
-
-  AddParser(new XSPFParser(tagreader_client, collection_backend, this));
-  AddParser(new M3UParser(tagreader_client, collection_backend, this));
-  AddParser(new PLSParser(tagreader_client, collection_backend, this));
-  AddParser(new ASXParser(tagreader_client, collection_backend, this));
-  AddParser(new AsxIniParser(tagreader_client, collection_backend, this));
-  AddParser(new CueParser(tagreader_client, collection_backend, this));
-  AddParser(new WplParser(tagreader_client, collection_backend, this));
-
+bool PlaylistParser::IsPlaylist(const std::string &path) {
+  const std::string ext = StrUtils::ToLower(FileUtils::Extension(path));
+  const auto supported = SupportedExtensions();
+  return std::find(supported.begin(), supported.end(), ext) != supported.end();
 }
 
-void PlaylistParser::AddParser(ParserBase *parser) {
+std::vector<std::string> PlaylistParser::SupportedExtensions() {
+  return {"m3u", "m3u8", "pls", "xspf", "asx", "asxini", "wpl", "cue"};
+}
 
-  if (!default_parser_) {
-    default_parser_ = parser;
+Song PlaylistParser::SongFromPath(const std::string &playlist_dir, const std::string &entry) const {
+  Song song;
+  std::string path = StrUtils::Trim(entry);
+  if (path.empty()) {
+    return song;
   }
-
-  parsers_ << parser;
-  QObject::connect(parser, &ParserBase::Error, this, &PlaylistParser::Error);
-
+  if (path.find("://") != std::string::npos) {
+    song.set_source(path.rfind("file://", 0) == 0 ? Song::Source::LocalFile : Song::Source::Stream);
+    song.set_url(path);
+    song.set_title(FileUtils::BaseName(FileUtils::PathFromUri(path)));
+    song.set_valid(true);
+    return song;
+  }
+  if (!path.empty() && path[0] != '/') {
+    path = FileUtils::Join(playlist_dir, path);
+  }
+  song.set_source(Song::Source::LocalFile);
+  song.set_url(FileUtils::UriFromPath(path));
+  song.set_title(FileUtils::BaseName(path));
+  song.set_valid(true);
+  return song;
 }
 
-QStringList PlaylistParser::file_extensions(const Type type) const {
-
-  QStringList ret;
-
-  for (ParserBase *parser : parsers_) {
-    if (ParserIsSupported(type, parser)) {
-      ret << parser->file_extensions();
+SongList PlaylistParser::LoadM3U(const std::string &path, const std::string &data) const {
+  SongList songs;
+  const std::string dir = FileUtils::DirName(path);
+  std::string pending_title;
+  std::istringstream stream(data);
+  std::string line;
+  while (std::getline(stream, line)) {
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+    }
+    const std::string trimmed = StrUtils::Trim(line);
+    if (trimmed.empty() || trimmed[0] == '#') {
+      if (StrUtils::StartsWith(trimmed, "#EXTINF:")) {
+        const auto comma = trimmed.find(',');
+        if (comma != std::string::npos) {
+          pending_title = trimmed.substr(comma + 1);
+        }
+      }
+      continue;
+    }
+    if (IsPlaylist(trimmed) && trimmed.find("://") == std::string::npos) {
+      const std::string nested = trimmed[0] == '/' ? trimmed : FileUtils::Join(dir, trimmed);
+      SongList nested_songs = Load(nested);
+      songs.insert(songs.end(), nested_songs.begin(), nested_songs.end());
+      pending_title.clear();
+      continue;
+    }
+    Song song = SongFromPath(dir, trimmed);
+    if (!pending_title.empty()) {
+      song.set_title(pending_title);
+      pending_title.clear();
+    }
+    if (song.is_valid()) {
+      songs.push_back(song);
     }
   }
-
-  std::stable_sort(ret.begin(), ret.end());
-  return ret;
-
-}
-
-QStringList PlaylistParser::mime_types(const Type type) const {
-
-  QStringList ret;
-
-  for (ParserBase *parser : parsers_) {
-    if (ParserIsSupported(type, parser) && !parser->mime_type().isEmpty()) {
-      ret << parser->mime_type();
-    }
-  }
-
-  std::stable_sort(ret.begin(), ret.end());
-
-  return ret;
-
-}
-
-QString PlaylistParser::filters(const Type type) const {
-
-  QStringList filters;
-  filters.reserve(parsers_.count() + 1);
-  QStringList all_extensions;
-  for (ParserBase *parser : parsers_) {
-    if (ParserIsSupported(type, parser)) {
-      filters << FilterForParser(parser, &all_extensions);
-    }
-  }
-
-  if (type == Type::Load) {
-    filters.prepend(tr("All playlists (%1)").arg(all_extensions.join(u' ')));
-  }
-
-  return filters.join(";;"_L1);
-
-}
-
-QString PlaylistParser::FilterForParser(const ParserBase *parser, QStringList *all_extensions) {
-
-  const QStringList file_extensions = parser->file_extensions();
-  QStringList extensions;
-  extensions.reserve(file_extensions.count());
-  for (const QString &extension : file_extensions) {
-    extensions << u"*."_s + extension;
-  }
-
-  if (all_extensions) *all_extensions << extensions;
-
-  return tr("%1 playlists (%2)").arg(parser->name(), extensions.join(u' '));
-
-}
-
-QString PlaylistParser::default_extension() const {
-  const QStringList extensions = default_parser_->file_extensions();
-  return extensions.isEmpty() ? QString() : extensions.constFirst();
-}
-
-QString PlaylistParser::default_filter() const {
-  return FilterForParser(default_parser_);
-}
-
-ParserBase *PlaylistParser::ParserForExtension(const Type type, const QString &suffix) const {
-
-  for (ParserBase *parser : parsers_) {
-    if (ParserIsSupported(type, parser) && parser->file_extensions().contains(suffix, Qt::CaseInsensitive)) {
-      return parser;
-    }
-  }
-  return nullptr;
-
-}
-
-ParserBase *PlaylistParser::ParserForMimeType(const Type type, const QString &mime_type) const {
-
-  for (ParserBase *parser : parsers_) {
-    if (ParserIsSupported(type, parser) && !parser->mime_type().isEmpty() && QString::compare(parser->mime_type(), mime_type, Qt::CaseInsensitive) == 0) {
-      return parser;
-    }
-  }
-  return nullptr;
-
-}
-
-ParserBase *PlaylistParser::ParserForMagic(const QByteArray &data, const QString &mime_type) const {
-
-  for (ParserBase *parser : parsers_) {
-    if ((!mime_type.isEmpty() && mime_type == parser->mime_type()) || parser->TryMagic(data)) {
-      return parser;
-    }
-  }
-  return nullptr;
-
-}
-
-SongList PlaylistParser::LoadFromFile(const QString &filename) const {
-
-  QFileInfo fileinfo(filename);
-
-  // Find a parser that supports this file extension
-  ParserBase *parser = ParserForExtension(Type::Load, fileinfo.suffix());
-  if (!parser) {
-    qLog(Error) << "Unknown filetype:" << filename;
-    Q_EMIT Error(tr("Unknown filetype: %1").arg(filename));
-    return SongList();
-  }
-
-  // Open the file
-  QFile file(filename);
-  if (!file.open(QIODevice::ReadOnly)) {
-    Q_EMIT Error(tr("Could not open file %1").arg(filename));
-    return SongList();
-  }
-
-  const SongList songs = parser->Load(&file, filename, fileinfo.absolutePath(), true).songs;
-  file.close();
-
   return songs;
-
 }
 
-SongList PlaylistParser::LoadFromDevice(QIODevice *device, const QString &path_hint, const QDir &dir_hint) const {
-
-  // Find a parser that supports this data
-  ParserBase *parser = ParserForMagic(device->peek(kMagicSize));
-  if (!parser) {
-    return SongList();
+SongList PlaylistParser::LoadPLS(const std::string &data) const {
+  SongList songs;
+  std::istringstream stream(data);
+  std::string line;
+  while (std::getline(stream, line)) {
+    const std::string trimmed = StrUtils::Trim(line);
+    const std::string lower = StrUtils::ToLower(trimmed);
+    if (StrUtils::StartsWith(lower, "file")) {
+      const auto eq = trimmed.find('=');
+      if (eq != std::string::npos) {
+        Song song = SongFromPath({}, trimmed.substr(eq + 1));
+        if (song.is_valid()) {
+          songs.push_back(song);
+        }
+      }
+    }
   }
-
-  return parser->Load(device, path_hint, dir_hint).songs;
-
+  return songs;
 }
 
-void PlaylistParser::Save(const QString &playlist_name, const SongList &songs, const QString &filename, const PlaylistSettings::PathType path_type) const {
-
-  QFileInfo fileinfo(filename);
-  QDir dir(fileinfo.path());
-
-  if (!dir.exists()) {
-    qLog(Error) << "Directory" << dir.path() << "does not exist";
-    Q_EMIT Error(tr("Directory %1 does not exist.").arg(dir.path()));
-    return;
+SongList PlaylistParser::LoadXSPF(const std::string &data) const {
+  SongList songs;
+  size_t pos = 0;
+  while ((pos = data.find("<location>", pos)) != std::string::npos) {
+    const size_t start = pos + 10;
+    const size_t end = data.find("</location>", start);
+    if (end == std::string::npos) {
+      break;
+    }
+    Song song = SongFromPath({}, data.substr(start, end - start));
+    if (song.is_valid()) {
+      songs.push_back(song);
+    }
+    pos = end;
   }
-
-  // Find a parser that supports this file extension
-  ParserBase *parser = ParserForExtension(Type::Save, fileinfo.suffix());
-  if (!parser) {
-    qLog(Error) << "Unknown filetype" << filename;
-    Q_EMIT Error(tr("Unknown filetype: %1").arg(filename));
-    return;
-  }
-
-  if (path_type == PlaylistSettings::PathType::Absolute && dir.path() != dir.absolutePath()) {
-    dir.setPath(dir.absolutePath());
-  }
-  else if (path_type != PlaylistSettings::PathType::Absolute && !dir.canonicalPath().isEmpty() && dir.path() != dir.canonicalPath()) {
-    dir.setPath(dir.canonicalPath());
-  }
-
-  // Open the file
-  QFile file(fileinfo.absoluteFilePath());
-  if (!file.open(QIODevice::WriteOnly)) {
-    qLog(Error) << "Failed to open" << filename << "for writing.";
-    Q_EMIT Error(tr("Failed to open %1 for writing.").arg(filename));
-    return;
-  }
-
-  parser->Save(playlist_name, songs, &file, dir, path_type);
-
-  file.close();
-
+  return songs;
 }
 
-bool PlaylistParser::ParserIsSupported(const Type type, ParserBase *parser) const {
+SongList PlaylistParser::LoadASX(const std::string &data) const {
+  SongList songs;
+  size_t pos = 0;
+  while ((pos = data.find("href=\"", pos)) != std::string::npos) {
+    const size_t start = pos + 6;
+    const size_t end = data.find('"', start);
+    if (end == std::string::npos) {
+      break;
+    }
+    Song song = SongFromPath({}, data.substr(start, end - start));
+    if (song.is_valid()) {
+      songs.push_back(song);
+    }
+    pos = end;
+  }
+  return songs;
+}
 
-  return ((type == Type::Load && parser->load_supported()) || (type == Type::Save && parser->save_supported()));
+SongList PlaylistParser::LoadWPL(const std::string &data) const {
+  SongList songs;
+  size_t pos = 0;
+  while ((pos = data.find("src=\"", pos)) != std::string::npos) {
+    const size_t start = pos + 5;
+    const size_t end = data.find('"', start);
+    if (end == std::string::npos) {
+      break;
+    }
+    Song song = SongFromPath({}, data.substr(start, end - start));
+    if (song.is_valid()) {
+      songs.push_back(song);
+    }
+    pos = end;
+  }
+  return songs;
+}
 
+SongList PlaylistParser::LoadCUE(const std::string &path, const std::string &data) const {
+  SongList songs;
+  const std::string dir = FileUtils::DirName(path);
+  std::string file;
+  Song current;
+  std::istringstream stream(data);
+  std::string line;
+  while (std::getline(stream, line)) {
+    const std::string trimmed = StrUtils::Trim(line);
+    if (StrUtils::StartsWith(trimmed, "FILE ")) {
+      const auto first = trimmed.find('"');
+      const auto last = trimmed.rfind('"');
+      if (first != std::string::npos && last > first) {
+        file = FileUtils::Join(dir, trimmed.substr(first + 1, last - first - 1));
+      }
+    } else if (StrUtils::StartsWith(trimmed, "TRACK ")) {
+      if (current.is_valid()) {
+        songs.push_back(current);
+      }
+      current = Song(Song::Source::LocalFile);
+      current.set_url(FileUtils::UriFromPath(file));
+      current.set_valid(true);
+    } else if (StrUtils::StartsWith(trimmed, "TITLE ")) {
+      const auto first = trimmed.find('"');
+      const auto last = trimmed.rfind('"');
+      if (first != std::string::npos && last > first) {
+        current.set_title(trimmed.substr(first + 1, last - first - 1));
+      }
+    } else if (StrUtils::StartsWith(trimmed, "PERFORMER ")) {
+      const auto first = trimmed.find('"');
+      const auto last = trimmed.rfind('"');
+      if (first != std::string::npos && last > first) {
+        current.set_artist(trimmed.substr(first + 1, last - first - 1));
+      }
+    }
+  }
+  if (current.is_valid()) {
+    songs.push_back(current);
+  }
+  return songs;
+}
+
+SongList PlaylistParser::Load(const std::string &path) const {
+  const std::string data = FileUtils::ReadFile(path);
+  const std::string ext = StrUtils::ToLower(FileUtils::Extension(path));
+  if (ext == "m3u" || ext == "m3u8") return LoadM3U(path, data);
+  if (ext == "pls") return LoadPLS(data);
+  if (ext == "xspf") return LoadXSPF(data);
+  if (ext == "asx" || ext == "asxini") return LoadASX(data);
+  if (ext == "wpl") return LoadWPL(data);
+  if (ext == "cue") return LoadCUE(path, data);
+  return {};
+}
+
+bool PlaylistParser::SaveM3U(const std::string &path, const SongList &songs) const {
+  std::string data = "#EXTM3U\n";
+  for (const Song &song : songs) {
+    data += "#EXTINF:" + std::to_string(song.length_nanosec() / 1000000000LL) + "," + song.PrettyTitleWithArtist() + "\n";
+    data += FileUtils::PathFromUri(song.url()) + "\n";
+  }
+  return FileUtils::WriteFile(path, data);
+}
+
+bool PlaylistParser::SaveXSPF(const std::string &path, const SongList &songs) const {
+  std::string data = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n  <trackList>\n";
+  for (const Song &song : songs) {
+    data += "    <track><location>" + song.url() + "</location><title>" + song.title() + "</title></track>\n";
+  }
+  data += "  </trackList>\n</playlist>\n";
+  return FileUtils::WriteFile(path, data);
+}
+
+bool PlaylistParser::Save(const std::string &path, const SongList &songs) const {
+  const std::string ext = StrUtils::ToLower(FileUtils::Extension(path));
+  if (ext == "xspf") {
+    return SaveXSPF(path, songs);
+  }
+  return SaveM3U(path, songs);
 }
