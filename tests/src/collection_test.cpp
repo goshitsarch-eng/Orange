@@ -1,5 +1,7 @@
 #include "collection/collectionbackend.h"
 #include "collection/collectionbehaviour.h"
+#include "collection/collectioncompilation.h"
+#include "engine/backendoptions.h"
 #include "collection/collectionwatcher.h"
 #include "collection/collectiondirectorymodel.h"
 #include "collection/collectionfilter.h"
@@ -363,6 +365,11 @@ TEST(CollectionBehaviour, DoubleClickAndMenuPlans) {
   EXPECT_TRUE(created.should_play);
 
   EXPECT_EQ(CollectionBehaviour::QueueMode::Next, CollectionBehaviour::EnqueueNext().queue);
+
+  const auto replace = CollectionBehaviour::Replace(PB::Always, false);
+  EXPECT_TRUE(replace.clear_current);
+  EXPECT_EQ(CollectionBehaviour::Destination::Current, replace.destination);
+  EXPECT_TRUE(replace.should_play);
 }
 
 TEST(CollectionBehaviour, SearchQueryUniqueAndPlaylistName) {
@@ -388,4 +395,54 @@ TEST(CollectionBehaviour, SearchQueryUniqueAndPlaylistName) {
   const SongList unique = CollectionBehaviour::UniqueByUrl({track->metadata, other, track->metadata});
   ASSERT_EQ(1u, unique.size());
   EXPECT_EQ("Dummy", CollectionBehaviour::NewPlaylistName(unique));
+}
+
+TEST(CollectionCompilation, EffectiveAndAlbumKeys) {
+  EXPECT_EQ(1, CollectionCompilation::Effective(true, false, false, false));
+  EXPECT_EQ(1, CollectionCompilation::Effective(false, true, false, false));
+  EXPECT_EQ(1, CollectionCompilation::Effective(false, false, true, false));
+  EXPECT_EQ(0, CollectionCompilation::Effective(true, true, true, true));
+  EXPECT_EQ(0, CollectionCompilation::Effective(false, false, false, false));
+  Song a = MakeSong("One", "A", "Album");
+  Song b = MakeSong("Two", "A", "Album");
+  b.set_url("file:///tmp/music/two.flac");
+  Song c = MakeSong("Three", "B", "Album");
+  c.set_url("file:///tmp/music/three.flac");
+  const auto keys = CollectionCompilation::AlbumArtistKeys({a, b, c});
+  ASSERT_EQ(2u, keys.size());
+  EXPECT_EQ("Album", keys.front().first);
+}
+
+TEST(CollectionBackend, ForceCompilationSetsEffectiveFlag) {
+  const std::string path = "/tmp/strawberry-collection-compilation-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song song = MakeSong("Roads", "Portishead", "Dummy");
+  song.set_directory_id(directory);
+  const int id = backend.AddOrUpdateSong(song);
+  ASSERT_GT(id, 0);
+  EXPECT_FALSE(backend.SongById(id).compilation());
+  EXPECT_EQ(1, backend.ForceCompilation({song}, true));
+  EXPECT_TRUE(backend.SongById(id).compilation());
+  EXPECT_EQ(1, backend.ForceCompilation({song}, false));
+  EXPECT_FALSE(backend.SongById(id).compilation());
+  unlink(path.c_str());
+}
+
+TEST(BackendOptions, PlaybinCrossfadeAndPauseFade) {
+  EXPECT_STREQ("playbin3", BackendOptions::PlaybinFactory(true));
+  EXPECT_STREQ("playbin", BackendOptions::PlaybinFactory(false));
+  EXPECT_TRUE(BackendOptions::SameAlbum("Dummy", "Dummy"));
+  EXPECT_FALSE(BackendOptions::SameAlbum("Dummy", "Third"));
+  EXPECT_FALSE(BackendOptions::SameAlbum("", ""));
+  EXPECT_TRUE(BackendOptions::AllowAutoCrossfade(true, true, "A", "B"));
+  EXPECT_FALSE(BackendOptions::AllowAutoCrossfade(true, true, "A", "A"));
+  EXPECT_TRUE(BackendOptions::AllowAutoCrossfade(true, false, "A", "A"));
+  EXPECT_FALSE(BackendOptions::AllowAutoCrossfade(false, false, "A", "B"));
+  EXPECT_EQ(0, BackendOptions::FadeDurationMs(false, 250, 250));
+  EXPECT_EQ(250, BackendOptions::FadeDurationMs(true, 250, 2000));
+  EXPECT_EQ(2000, BackendOptions::FadeDurationMs(true, 0, 2000));
 }

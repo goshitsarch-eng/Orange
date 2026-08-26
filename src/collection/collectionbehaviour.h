@@ -28,6 +28,7 @@ Plan Append(BehaviourSettings::PlayBehaviour menu_play, bool engine_stopped);
 Plan Enqueue();
 Plan EnqueueNext();
 Plan OpenInNew(BehaviourSettings::PlayBehaviour menu_play, bool engine_stopped);
+Plan Replace(BehaviourSettings::PlayBehaviour menu_play, bool engine_stopped);
 
 SongList UniqueByUrl(const SongList &songs);
 std::string NewPlaylistName(const SongList &songs);

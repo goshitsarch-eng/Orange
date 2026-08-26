@@ -1,7 +1,9 @@
 #include "engine/gstengine.h"
 
+#include "constants/backendsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "engine/backendoptions.h"
 
 #include <algorithm>
 
@@ -39,6 +41,11 @@ bool GstEngine::Init() {
                                                                     : settings.BoolValue("autocrossfade", fading_enabled_);
   fade_duration_ms_ = std::max(100, settings.Contains("FadeoutDuration") ? settings.IntValue("FadeoutDuration", 2000)
                                                                         : settings.IntValue("fadeduration", 2000));
+  playbin3_ = settings.BoolValue(BackendSettings::kPlaybin3, BackendSettings::kDefaultPlaybin3);
+  no_crossfade_same_album_ = settings.BoolValue(BackendSettings::kNoCrossfadeSameAlbum, BackendSettings::kDefaultNoCrossfadeSameAlbum);
+  fadeout_pause_enabled_ = settings.BoolValue(BackendSettings::kFadeoutPauseEnabled, BackendSettings::kDefaultFadeoutPauseEnabled);
+  fadeout_pause_duration_ms_ = std::max(
+      50, settings.IntValue(BackendSettings::kFadeoutPauseDuration, static_cast<int>(BackendSettings::kDefaultFadeoutPauseDuration)));
   return true;
 }
 
@@ -46,7 +53,7 @@ std::unique_ptr<GstEnginePipeline> GstEngine::CreatePipeline(const std::string &
                                                              int64_t end_offset_nanosec) {
   auto pipeline = std::make_unique<GstEnginePipeline>(next_pipeline_id_++);
   if (!pipeline->Create(url, output_, device_, beginning_offset_nanosec, end_offset_nanosec, replaygain_enabled_, replaygain_mode_,
-                        replaygain_preamp_, stereo_balance_)) {
+                        replaygain_preamp_, stereo_balance_, playbin3_)) {
     return nullptr;
   }
   pipeline->SetEqualizer(eq_preamp_, eq_gains_);
@@ -94,9 +101,10 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
                      int64_t end_offset_nanosec, std::optional<double>) {
   const std::string url = stream_url.empty() ? media_url : stream_url;
   const bool auto_change = (track_change_flags & Auto) != 0;
+  const bool auto_crossfade = BackendOptions::AllowAutoCrossfade(autocrossfade_enabled_, no_crossfade_same_album_, current_album_, next_album_);
   const bool crossfade = current_ && current_->valid() &&
-                         ((fading_enabled_ && (track_change_flags & Manual)) || (autocrossfade_enabled_ && auto_change) ||
-                          ((fading_enabled_ || autocrossfade_enabled_) && (track_change_flags & Intro)));
+                         ((fading_enabled_ && (track_change_flags & Manual)) || (auto_crossfade && auto_change) ||
+                          ((fading_enabled_ || auto_crossfade) && (track_change_flags & Intro)));
 
   if (auto_change && current_ && current_->valid() && !crossfade) {
     current_->SetNextUri(url);
@@ -159,6 +167,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
 }
 
 void GstEngine::Stop(bool) {
+  pending_pause_ = false;
   CancelFade();
   DiscardNext();
   if (current_) {
@@ -170,17 +179,32 @@ void GstEngine::Stop(bool) {
 }
 
 void GstEngine::Pause() {
-  if (current_) {
-    current_->Pause();
-    SetState(State::Paused);
+  if (!current_) {
+    return;
   }
+  if (fadeout_pause_enabled_) {
+    pending_pause_ = true;
+    StartFade(-1, fadeout_pause_duration_ms_);
+    return;
+  }
+  current_->Pause();
+  SetState(State::Paused);
 }
 
 void GstEngine::Unpause() {
-  if (current_) {
+  if (!current_) {
+    return;
+  }
+  pending_pause_ = false;
+  if (fadeout_pause_enabled_) {
+    ApplyCurrentVolume(0.0);
     current_->Unpause();
     SetState(State::Playing);
+    StartFade(1, fadeout_pause_duration_ms_);
+    return;
   }
+  current_->Unpause();
+  SetState(State::Playing);
 }
 
 void GstEngine::Seek(uint64_t offset_nanosec) {
@@ -211,6 +235,8 @@ void GstEngine::SetAutoCrossfadeEnabled(bool enabled) { autocrossfade_enabled_ =
 
 void GstEngine::SetFadeDurationMs(int milliseconds) { fade_duration_ms_ = std::max(100, milliseconds); }
 
+void GstEngine::SetFadeoutPauseDurationMs(int milliseconds) { fadeout_pause_duration_ms_ = std::max(50, milliseconds); }
+
 void GstEngine::CancelFade() {
   if (fade_timeout_id_) {
     g_source_remove(fade_timeout_id_);
@@ -219,14 +245,15 @@ void GstEngine::CancelFade() {
   fade_direction_ = 0;
 }
 
-void GstEngine::StartFade(int direction) {
+void GstEngine::StartFade(int direction, int duration_ms) {
   if (direction == 0) {
     return;
   }
   CancelFade();
   fade_direction_ = direction;
   fade_step_ = 0;
-  fade_steps_ = std::max(1, fade_duration_ms_ / 50);
+  const int duration = duration_ms > 0 ? duration_ms : fade_duration_ms_;
+  fade_steps_ = std::max(1, duration / 50);
   fade_timeout_id_ = g_timeout_add(50, FadeTick, this);
 }
 
@@ -248,7 +275,13 @@ gboolean GstEngine::FadeTick(gpointer data) {
   if (self->fade_step_ >= self->fade_steps_) {
     self->fade_timeout_id_ = 0;
     self->fade_direction_ = 0;
-    if (self->next_) {
+    if (self->pending_pause_) {
+      self->pending_pause_ = false;
+      if (self->current_) {
+        self->current_->Pause();
+      }
+      self->SetState(State::Paused);
+    } else if (self->next_) {
       self->FinishCrossfade();
     }
     return G_SOURCE_REMOVE;

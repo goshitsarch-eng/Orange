@@ -89,6 +89,7 @@ class MainWindow {
   void ShowPlaylistMenu(double x, double y);
   void ShowCollectionMenu();
   void ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, const SongList &songs);
+  void ForceCompilationSelected(bool on);
   SongList CollectionSongs() const;
   bool EngineStopped() const;
   void ApplyBehaviourSettings();

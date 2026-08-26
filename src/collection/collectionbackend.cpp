@@ -1,5 +1,6 @@
 #include "collection/collectionbackend.h"
 
+#include "collection/collectioncompilation.h"
 #include "collection/collectionquery.h"
 #include "filterparser/filterparser.h"
 #include "utilities/strutils.h"
@@ -55,6 +56,7 @@ Song CollectionBackend::SongFromQuery(const SqlQuery &query) const {
   song.set_year(query.ColumnInt(11));
   song.set_originalyear(query.ColumnInt(12));
   song.set_genre(query.ColumnText(13));
+  song.set_compilation(query.ColumnInt(46) != 0);
   song.set_composer(query.ColumnText(15));
   song.set_performer(query.ColumnText(17));
   song.set_grouping(query.ColumnText(19));
@@ -246,6 +248,29 @@ void CollectionBackend::SetRating(int song_id, float rating) {
   query.Bind(1, static_cast<int>(rating * 100.0f));
   query.Bind(2, song_id);
   query.Exec();
+}
+
+int CollectionBackend::ForceCompilation(const SongList &songs, bool on) {
+  if (!database_ || !database_->handle()) {
+    return 0;
+  }
+  int updated = 0;
+  for (const auto &key : CollectionCompilation::AlbumArtistKeys(songs)) {
+    SqlQuery query(database_,
+                   "UPDATE songs SET compilation_on = ?, compilation_off = ?, "
+                   "compilation_effective = ((compilation OR compilation_detected OR ?) AND NOT ?) + 0 "
+                   "WHERE album = ? AND artist = ? AND unavailable = 0");
+    query.Bind(1, on ? 1 : 0);
+    query.Bind(2, on ? 0 : 1);
+    query.Bind(3, on ? 1 : 0);
+    query.Bind(4, on ? 0 : 1);
+    query.Bind(5, key.first);
+    query.Bind(6, key.second);
+    if (query.Exec()) {
+      ++updated;
+    }
+  }
+  return updated;
 }
 
 void CollectionBackend::SetUnavailable(int song_id, bool unavailable) {

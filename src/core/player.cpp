@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "constants/backendsettings.h"
 #include "constants/playlistsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
@@ -50,6 +51,14 @@ void Player::ReloadSettings() {
                                                                             : settings.BoolValue("autocrossfade", fading));
   engine_->SetFadeDurationMs(settings.Contains("FadeoutDuration") ? settings.IntValue("FadeoutDuration", 2000)
                                                                  : settings.IntValue("fadeduration", 2000));
+  engine_->SetPlaybin3(settings.BoolValue(BackendSettings::kPlaybin3, BackendSettings::kDefaultPlaybin3));
+  engine_->SetNoCrossfadeSameAlbum(settings.BoolValue(BackendSettings::kNoCrossfadeSameAlbum, BackendSettings::kDefaultNoCrossfadeSameAlbum));
+  engine_->SetFadeoutPauseEnabled(settings.BoolValue(BackendSettings::kFadeoutPauseEnabled, BackendSettings::kDefaultFadeoutPauseEnabled));
+  engine_->SetFadeoutPauseDurationMs(
+      settings.IntValue(BackendSettings::kFadeoutPauseDuration, static_cast<int>(BackendSettings::kDefaultFadeoutPauseDuration)));
+  engine_->SetReplayGainEnabled(settings.BoolValue(BackendSettings::kRgEnabled, BackendSettings::kDefaultRgEnabled));
+  engine_->SetReplayGainMode(settings.IntValue(BackendSettings::kRgMode, BackendSettings::kDefaultRgMode));
+  engine_->SetReplayGainPreamp(settings.DoubleValue(BackendSettings::kRgPreamp, BackendSettings::kDefaultRgPreamp));
   engine_->SetOutput(settings.Contains("output") ? settings.Value("output", "autoaudiosink") : settings.Value("Output", "autoaudiosink"),
                      settings.Contains("device") ? settings.Value("device") : settings.Value("Device"));
 }
@@ -261,9 +270,11 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags) {
       const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause, track_change_flags](const UrlHandler::LoadResult &async) {
         ApplyLoadResult(&current_song_, async);
         if (!async.stream_url.empty()) {
+          engine_->SetNextAlbum(current_song_.album());
           engine_->Load(current_song_.url(), async.stream_url, track_change_flags, false, current_song_.beginning_nanosec(),
                         current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                         current_song_.ebur128_integrated_loudness_lufs());
+          engine_->SetCurrentAlbum(current_song_.album());
           engine_->Play(pause, 0);
         }
       });
@@ -272,9 +283,11 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags) {
       }
     }
   }
+  engine_->SetNextAlbum(current_song_.album());
   engine_->Load(current_song_.url(), current_song_.stream_url(), track_change_flags, false, current_song_.beginning_nanosec(),
                 current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                 current_song_.ebur128_integrated_loudness_lufs());
+  engine_->SetCurrentAlbum(current_song_.album());
   engine_->Play(pause, 0);
   error_count_ = 0;
   if (greyout_ && playlist_manager_) {

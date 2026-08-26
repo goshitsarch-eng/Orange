@@ -59,6 +59,13 @@ Plan OpenInNew(BehaviourSettings::PlayBehaviour menu_play, bool engine_stopped) 
   return plan;
 }
 
+Plan Replace(BehaviourSettings::PlayBehaviour menu_play, bool engine_stopped) {
+  Plan plan;
+  plan.clear_current = true;
+  plan.should_play = ShouldPlay(menu_play, engine_stopped);
+  return plan;
+}
+
 SongList UniqueByUrl(const SongList &songs) {
   SongList unique;
   for (const Song &song : songs) {

@@ -55,8 +55,17 @@ class GstEngine : public EngineBase {
   void SetFadingEnabled(bool enabled);
   void SetAutoCrossfadeEnabled(bool enabled);
   void SetFadeDurationMs(int milliseconds);
+  void SetPlaybin3(bool enabled) { playbin3_ = enabled; }
+  void SetNoCrossfadeSameAlbum(bool enabled) { no_crossfade_same_album_ = enabled; }
+  void SetFadeoutPauseEnabled(bool enabled) { fadeout_pause_enabled_ = enabled; }
+  void SetFadeoutPauseDurationMs(int milliseconds);
+  void SetCurrentAlbum(const std::string &album) { current_album_ = album; }
+  void SetNextAlbum(const std::string &album) { next_album_ = album; }
   bool fading_enabled() const { return fading_enabled_; }
   bool autocrossfade_enabled() const { return autocrossfade_enabled_; }
+  bool playbin3() const { return playbin3_; }
+  bool no_crossfade_same_album() const { return no_crossfade_same_album_; }
+  bool fadeout_pause_enabled() const { return fadeout_pause_enabled_; }
   bool has_next_pipeline() const { return next_ != nullptr; }
   const std::vector<int16_t> &last_scope() const { return last_scope_; }
 
@@ -70,7 +79,7 @@ class GstEngine : public EngineBase {
   void DiscardNext();
   void OnAboutToFinish(int pipeline_id);
   void OnEos(int pipeline_id);
-  void StartFade(int direction);
+  void StartFade(int direction, int duration_ms = 0);
   void CancelFade();
   static gboolean FadeTick(gpointer data);
   void SetState(State state);
@@ -92,7 +101,14 @@ class GstEngine : public EngineBase {
   bool replaygain_enabled_ = false;
   bool fading_enabled_ = false;
   bool autocrossfade_enabled_ = false;
+  bool playbin3_ = true;
+  bool no_crossfade_same_album_ = true;
+  bool fadeout_pause_enabled_ = false;
+  bool pending_pause_ = false;
   int fade_duration_ms_ = 2000;
+  int fadeout_pause_duration_ms_ = 250;
+  std::string current_album_;
+  std::string next_album_;
   int fade_direction_ = 0;
   int fade_step_ = 0;
   int fade_steps_ = 1;

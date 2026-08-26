@@ -37,10 +37,15 @@ GstElement *GstEnginePipeline::MakeAudioSink(const std::string &output, const st
 
 bool GstEnginePipeline::Create(const std::string &url, const std::string &output, const std::string &device,
                                uint64_t beginning_offset_nanosec, int64_t end_offset_nanosec, bool replaygain, int replaygain_mode,
-                               double replaygain_preamp, float stereo_balance) {
+                               double replaygain_preamp, float stereo_balance, bool playbin3) {
   beginning_offset_nanosec_ = beginning_offset_nanosec;
   end_offset_nanosec_ = end_offset_nanosec;
-  playbin_ = gst_element_factory_make("playbin", "playbin");
+  if (playbin3) {
+    playbin_ = gst_element_factory_make("playbin3", "playbin");
+  }
+  if (!playbin_) {
+    playbin_ = gst_element_factory_make("playbin", "playbin");
+  }
   if (!playbin_) {
     return false;
   }

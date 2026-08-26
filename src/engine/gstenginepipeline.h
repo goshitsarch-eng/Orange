@@ -22,7 +22,8 @@ class GstEnginePipeline {
   bool valid() const { return playbin_ != nullptr; }
 
   bool Create(const std::string &url, const std::string &output, const std::string &device, uint64_t beginning_offset_nanosec,
-              int64_t end_offset_nanosec, bool replaygain, int replaygain_mode, double replaygain_preamp, float stereo_balance);
+              int64_t end_offset_nanosec, bool replaygain, int replaygain_mode, double replaygain_preamp, float stereo_balance,
+              bool playbin3 = false);
   bool Play(bool pause, uint64_t offset_nanosec);
   void Stop();
   void Pause();

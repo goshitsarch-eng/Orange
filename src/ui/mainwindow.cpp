@@ -411,6 +411,29 @@ void MainWindow::BuildUi() {
                    settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
                self->ApplyCollectionPlan(CollectionBehaviour::OpenInNew(play, self->EngineStopped()), self->CollectionSongs());
              }));
+  add_action("collection-replace", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Settings settings;
+               settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+               const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+                   settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+               self->ApplyCollectionPlan(CollectionBehaviour::Replace(play, self->EngineStopped()), self->CollectionSongs());
+             }));
+  add_action("collection-various-on", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->ForceCompilationSelected(true);
+             }));
+  add_action("collection-various-off", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->ForceCompilationSelected(false);
+             }));
+  add_action("collection-rescan", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               const SongList songs = self->CollectionSongs();
+               if (songs.empty()) {
+                 return;
+               }
+               self->app_->collection()->Rescan(songs);
+               self->ShowToast("Rescanned " + std::to_string(songs.size()) + " song(s)");
+             }));
   add_action("collection-enqueue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                self->ApplyCollectionPlan(CollectionBehaviour::Enqueue(), self->CollectionSongs());
@@ -1869,16 +1892,31 @@ void MainWindow::ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, cons
   }
 }
 
+void MainWindow::ForceCompilationSelected(bool on) {
+  const SongList songs = CollectionSongs();
+  if (songs.empty() || !app_->collection() || !app_->collection()->backend()) {
+    return;
+  }
+  app_->collection()->backend()->ForceCompilation(songs, on);
+  RefreshCollection();
+  ShowToast(on ? "Shown in Various artists" : "Removed from Various artists");
+}
+
 void MainWindow::ShowCollectionMenu() {
   if (CollectionSongs().empty()) {
     return;
   }
   GMenu *menu = g_menu_new();
   g_menu_append(menu, Translations::Tr("Append to current playlist").c_str(), "win.collection-append");
+  g_menu_append(menu, Translations::Tr("Replace current playlist").c_str(), "win.collection-replace");
   g_menu_append(menu, Translations::Tr("Open in new playlist").c_str(), "win.collection-new");
   g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.collection-enqueue");
   g_menu_append(menu, Translations::Tr("Queue to play next").c_str(), "win.collection-enqueue-next");
   g_menu_append(menu, Translations::Tr("Search for this").c_str(), "win.collection-search");
+  g_menu_append(menu, Translations::Tr("Show in Various artists").c_str(), "win.collection-various-on");
+  g_menu_append(menu, Translations::Tr("Don't show in Various artists").c_str(), "win.collection-various-off");
+  g_menu_append(menu, Translations::Tr("Rescan selected songs").c_str(), "win.collection-rescan");
+  g_menu_append(menu, Translations::Tr("Copy to device…").c_str(), "win.copy-device");
   g_menu_append(menu, Translations::Tr("Organize files…").c_str(), "win.collection-organize");
   g_menu_append(menu, Translations::Tr("Edit track information…").c_str(), "win.collection-edittag");
   g_menu_append(menu, Translations::Tr("Show in file browser…").c_str(), "win.collection-browse");
