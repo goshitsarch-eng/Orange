@@ -3,6 +3,7 @@
 
 #include "core/song.h"
 
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
@@ -51,8 +52,12 @@ enum class SmartPlaylistOp {
   EndsWith,
   NotEquals,
   Empty,
-  NotEmpty
+  NotEmpty,
+  NumericDate,
+  RelativeDate
 };
+
+enum class SmartPlaylistFieldKind { Text, Number, Date, Rating, Time };
 
 struct SmartPlaylistTerm {
   SmartPlaylistField field = SmartPlaylistField::Title;
@@ -86,8 +91,12 @@ class SmartPlaylistSearch {
 
   static std::vector<std::string> FieldNames();
   static std::vector<std::string> OpNames();
+  static std::string OpName(SmartPlaylistOp op);
   static SmartPlaylistField FieldFromIndex(int index);
   static SmartPlaylistOp OpFromIndex(int index);
+  static SmartPlaylistFieldKind KindOf(SmartPlaylistField field);
+  static std::vector<SmartPlaylistOp> OperatorsFor(SmartPlaylistField field);
+  static int64_t ParseDateValue(const std::string &value);
 };
 
 #endif  // STRAWBERRY_SMARTPLAYLIST_H

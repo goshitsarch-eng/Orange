@@ -8,6 +8,8 @@
 #include "smartplaylists/smartplaylistwizardplugin.h"
 #include "smartplaylists/smartplaylistsmodel.h"
 
+#include <algorithm>
+#include <ctime>
 #include <gtest/gtest.h>
 #include <unistd.h>
 
@@ -161,9 +163,55 @@ TEST(SmartPlaylist, FieldAndOpIndex) {
   EXPECT_EQ(SmartPlaylistField::Title, SmartPlaylistSearch::FieldFromIndex(0));
   EXPECT_EQ(SmartPlaylistField::InitialKey, SmartPlaylistSearch::FieldFromIndex(static_cast<int>(SmartPlaylistSearch::FieldNames().size()) - 1));
   EXPECT_EQ(SmartPlaylistOp::Contains, SmartPlaylistSearch::OpFromIndex(0));
-  EXPECT_EQ(SmartPlaylistOp::NotEmpty, SmartPlaylistSearch::OpFromIndex(static_cast<int>(SmartPlaylistSearch::OpNames().size()) - 1));
+  EXPECT_EQ(SmartPlaylistOp::RelativeDate, SmartPlaylistSearch::OpFromIndex(static_cast<int>(SmartPlaylistSearch::OpNames().size()) - 1));
   EXPECT_EQ(SmartPlaylistSearch::FieldNames().size(), 29u);
-  EXPECT_EQ(SmartPlaylistSearch::OpNames().size(), 10u);
+  EXPECT_EQ(SmartPlaylistSearch::OpNames().size(), 12u);
+  EXPECT_EQ(SmartPlaylistFieldKind::Date, SmartPlaylistSearch::KindOf(SmartPlaylistField::LastPlayed));
+  EXPECT_EQ(SmartPlaylistFieldKind::Number, SmartPlaylistSearch::KindOf(SmartPlaylistField::Year));
+  EXPECT_EQ(SmartPlaylistFieldKind::Text, SmartPlaylistSearch::KindOf(SmartPlaylistField::Artist));
+  const auto date_ops = SmartPlaylistSearch::OperatorsFor(SmartPlaylistField::DateCreated);
+  EXPECT_NE(date_ops.end(), std::find(date_ops.begin(), date_ops.end(), SmartPlaylistOp::NumericDate));
+  EXPECT_NE(date_ops.end(), std::find(date_ops.begin(), date_ops.end(), SmartPlaylistOp::RelativeDate));
+}
+
+TEST(SmartPlaylist, DateAndLengthOperators) {
+  const int64_t day = SmartPlaylistSearch::ParseDateValue("2020-06-15");
+  EXPECT_GT(day, 0);
+  Song on_day;
+  on_day.set_valid(true);
+  on_day.set_title("Roads");
+  on_day.set_ctime(day + 3600);
+  SmartPlaylistTerm numeric;
+  numeric.field = SmartPlaylistField::DateCreated;
+  numeric.op = SmartPlaylistOp::NumericDate;
+  numeric.value = "2020-06-15";
+  EXPECT_TRUE(numeric.Matches(on_day));
+  numeric.value = "2020-06-16";
+  EXPECT_FALSE(numeric.Matches(on_day));
+
+  Song recent;
+  recent.set_valid(true);
+  recent.set_title("Helplessness Blues");
+  recent.set_lastplayed(static_cast<int64_t>(std::time(nullptr)) - 2 * 86400);
+  SmartPlaylistTerm relative;
+  relative.field = SmartPlaylistField::LastPlayed;
+  relative.op = SmartPlaylistOp::RelativeDate;
+  relative.value = "7";
+  EXPECT_TRUE(relative.Matches(recent));
+  relative.value = "1";
+  EXPECT_FALSE(relative.Matches(recent));
+
+  Song long_song;
+  long_song.set_valid(true);
+  long_song.set_title("The Trial");
+  long_song.set_length_nanosec(300LL * 1000000000LL);
+  SmartPlaylistTerm length;
+  length.field = SmartPlaylistField::Length;
+  length.op = SmartPlaylistOp::GreaterThan;
+  length.value = "120";
+  EXPECT_TRUE(length.Matches(long_song));
+  length.value = "400";
+  EXPECT_FALSE(length.Matches(long_song));
 }
 
 TEST(PlaylistGenerator, CreateQueryRoundTripAndInsert) {

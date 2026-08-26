@@ -308,6 +308,8 @@ TEST(Analyzer, Types) {
   const auto types = Analyzer::Types();
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Bar"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Rainbow"));
+  EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "RainbowDash"));
+  EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "NyanCat"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Turbine"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Wave"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Sonic"));

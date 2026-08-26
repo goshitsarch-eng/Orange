@@ -21,6 +21,8 @@ void AnalyzerContainer::Draw(cairo_t *cr, int width, int height, const std::vect
 
 std::unique_ptr<AnalyzerBase> AnalyzerContainer::Create(const std::string &type) {
   if (type == "Rainbow") return std::make_unique<RainbowAnalyzer>();
+  if (type == "RainbowDash") return std::make_unique<RainbowAnalyzer>(RainbowAnalyzer::Style::Dash);
+  if (type == "NyanCat") return std::make_unique<RainbowAnalyzer>(RainbowAnalyzer::Style::Nyan);
   if (type == "Turbine") return std::make_unique<TurbineAnalyzer>();
   if (type == "Wave") return std::make_unique<WaveRubberAnalyzer>();
   if (type == "Sonic") return std::make_unique<SonogramAnalyzer>();

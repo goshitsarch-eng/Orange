@@ -31,4 +31,6 @@ void Analyzer::SetEngineScope(const std::vector<int16_t> &scope) {
   }
 }
 
-std::vector<std::string> Analyzer::Types() { return {"Bar", "Rainbow", "Turbine", "Wave", "Sonic", "Block"}; }
+std::vector<std::string> Analyzer::Types() {
+  return {"Bar", "Rainbow", "RainbowDash", "NyanCat", "Turbine", "Wave", "Sonic", "Block"};
+}

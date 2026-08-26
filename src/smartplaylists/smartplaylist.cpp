@@ -5,8 +5,12 @@
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
 
+#include <glib.h>
+
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <sstream>
 
 namespace {
@@ -85,10 +89,107 @@ double FieldNumber(const Song &song, SmartPlaylistField field) {
 
 }  // namespace
 
+int64_t SmartPlaylistSearch::ParseDateValue(const std::string &value) {
+  int year = 0;
+  int month = 0;
+  int day = 0;
+  if (std::sscanf(value.c_str(), "%d-%d-%d", &year, &month, &day) == 3 && year > 1900 && month >= 1 && month <= 12 && day >= 1 &&
+      day <= 31) {
+    GDateTime *dt = g_date_time_new_utc(year, month, day, 0, 0, 0);
+    if (dt) {
+      const int64_t unix_time = g_date_time_to_unix(dt);
+      g_date_time_unref(dt);
+      return unix_time;
+    }
+  }
+  return std::strtoll(value.c_str(), nullptr, 10);
+}
+
+SmartPlaylistFieldKind SmartPlaylistSearch::KindOf(SmartPlaylistField field) {
+  switch (field) {
+    case SmartPlaylistField::Year:
+    case SmartPlaylistField::OriginalYear:
+    case SmartPlaylistField::Playcount:
+    case SmartPlaylistField::Skipcount:
+    case SmartPlaylistField::Bitrate:
+    case SmartPlaylistField::Track:
+    case SmartPlaylistField::Disc:
+    case SmartPlaylistField::Filesize:
+    case SmartPlaylistField::Samplerate:
+    case SmartPlaylistField::Bitdepth:
+    case SmartPlaylistField::BPM:
+      return SmartPlaylistFieldKind::Number;
+    case SmartPlaylistField::Rating:
+      return SmartPlaylistFieldKind::Rating;
+    case SmartPlaylistField::Length:
+      return SmartPlaylistFieldKind::Time;
+    case SmartPlaylistField::DateCreated:
+    case SmartPlaylistField::LastPlayed:
+    case SmartPlaylistField::DateModified:
+      return SmartPlaylistFieldKind::Date;
+    default:
+      return SmartPlaylistFieldKind::Text;
+  }
+}
+
+std::vector<SmartPlaylistOp> SmartPlaylistSearch::OperatorsFor(SmartPlaylistField field) {
+  switch (KindOf(field)) {
+    case SmartPlaylistFieldKind::Number:
+    case SmartPlaylistFieldKind::Rating:
+    case SmartPlaylistFieldKind::Time:
+      return {SmartPlaylistOp::Equals, SmartPlaylistOp::NotEquals, SmartPlaylistOp::GreaterThan, SmartPlaylistOp::LessThan,
+              SmartPlaylistOp::Empty, SmartPlaylistOp::NotEmpty};
+    case SmartPlaylistFieldKind::Date:
+      return {SmartPlaylistOp::NumericDate, SmartPlaylistOp::RelativeDate, SmartPlaylistOp::GreaterThan, SmartPlaylistOp::LessThan,
+              SmartPlaylistOp::Empty, SmartPlaylistOp::NotEmpty};
+    case SmartPlaylistFieldKind::Text:
+    default:
+      return {SmartPlaylistOp::Contains, SmartPlaylistOp::NotContains, SmartPlaylistOp::Equals, SmartPlaylistOp::NotEquals,
+              SmartPlaylistOp::StartsWith, SmartPlaylistOp::EndsWith, SmartPlaylistOp::Empty, SmartPlaylistOp::NotEmpty};
+  }
+}
+
+std::string SmartPlaylistSearch::OpName(SmartPlaylistOp op) {
+  switch (op) {
+    case SmartPlaylistOp::Contains:
+      return "Contains";
+    case SmartPlaylistOp::NotContains:
+      return "Not contains";
+    case SmartPlaylistOp::Equals:
+      return "Equals";
+    case SmartPlaylistOp::GreaterThan:
+      return "Greater than";
+    case SmartPlaylistOp::LessThan:
+      return "Less than";
+    case SmartPlaylistOp::StartsWith:
+      return "Starts with";
+    case SmartPlaylistOp::EndsWith:
+      return "Ends with";
+    case SmartPlaylistOp::NotEquals:
+      return "Not equals";
+    case SmartPlaylistOp::Empty:
+      return "Empty";
+    case SmartPlaylistOp::NotEmpty:
+      return "Not empty";
+    case SmartPlaylistOp::NumericDate:
+      return "On date";
+    case SmartPlaylistOp::RelativeDate:
+      return "In the last (days)";
+  }
+  return "Contains";
+}
+
 bool SmartPlaylistTerm::Matches(const Song &song) const {
   const std::string text = FieldText(song, field);
-  const double number = FieldNumber(song, field);
-  const double wanted = std::strtod(value.c_str(), nullptr);
+  double number = FieldNumber(song, field);
+  double wanted = std::strtod(value.c_str(), nullptr);
+  if (SmartPlaylistSearch::KindOf(field) == SmartPlaylistFieldKind::Time && wanted > 0 && wanted < 1000000.0) {
+    wanted *= 1000000000.0;
+  }
+  if (SmartPlaylistSearch::KindOf(field) == SmartPlaylistFieldKind::Date &&
+      (op == SmartPlaylistOp::GreaterThan || op == SmartPlaylistOp::LessThan)) {
+    wanted = static_cast<double>(SmartPlaylistSearch::ParseDateValue(value));
+  }
   switch (op) {
     case SmartPlaylistOp::Contains:
       return StrUtils::ContainsInsensitive(text, value);
@@ -110,6 +211,16 @@ bool SmartPlaylistTerm::Matches(const Song &song) const {
       return text.empty() && number <= 0;
     case SmartPlaylistOp::NotEmpty:
       return !text.empty() || number > 0;
+    case SmartPlaylistOp::NumericDate: {
+      const int64_t wanted_day = SmartPlaylistSearch::ParseDateValue(value);
+      const int64_t have = static_cast<int64_t>(number);
+      return have >= wanted_day && have < wanted_day + 86400;
+    }
+    case SmartPlaylistOp::RelativeDate: {
+      const int64_t days = std::max<int64_t>(0, static_cast<int64_t>(wanted));
+      const int64_t have = static_cast<int64_t>(number);
+      return have > 0 && have >= static_cast<int64_t>(std::time(nullptr)) - days * 86400;
+    }
   }
   return false;
 }
@@ -167,7 +278,7 @@ std::vector<std::string> SmartPlaylistSearch::FieldNames() {
 
 std::vector<std::string> SmartPlaylistSearch::OpNames() {
   return {"Contains", "Not contains", "Equals", "Greater than", "Less than", "Starts with", "Ends with", "Not equals", "Empty",
-          "Not empty"};
+          "Not empty", "On date", "In the last (days)"};
 }
 
 SmartPlaylistField SmartPlaylistSearch::FieldFromIndex(int index) {
