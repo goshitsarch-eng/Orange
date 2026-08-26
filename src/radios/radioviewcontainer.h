@@ -24,6 +24,7 @@ class RadioViewContainer {
   void RefreshChannels();
   void Search(const std::string &query);
   void SetActivateCallback(std::function<void(const RadioChannel &)> callback);
+  void SetEnqueueCallback(RadioView::EnqueueCallback callback);
   void SetMenuCallback(RadioView::MenuCallback callback);
 
  private:

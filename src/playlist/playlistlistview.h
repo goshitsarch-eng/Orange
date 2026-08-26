@@ -27,6 +27,7 @@ class PlaylistListView {
   void SelectName(const std::string &name);
   void SetActivateCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
   void SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
   void SetFolderToggleCallback(FolderCallback callback) { toggle_ = std::move(callback); }
   void SetDeleteCallback(ActivateCallback callback) { delete_ = std::move(callback); }

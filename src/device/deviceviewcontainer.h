@@ -20,6 +20,16 @@ class DeviceViewContainer {
   DeviceView *view() { return view_.get(); }
   void Reload();
   void SetSongCallback(std::function<void(const Song &)> callback) { song_cb_ = std::move(callback); }
+  void SetActivateSongsCallback(std::function<void(const SongList &)> callback) {
+    if (view_) {
+      view_->SetActivateSongsCallback(std::move(callback));
+    }
+  }
+  void SetEnqueueCallback(std::function<void(const SongList &)> callback) {
+    if (view_) {
+      view_->SetEnqueueCallback(std::move(callback));
+    }
+  }
   void SetAddAllCallback(std::function<void(const SongList &)> callback) { add_all_cb_ = std::move(callback); }
   void SetPlaylistCallback(std::function<void(DeviceSongMenu::Action, const SongList &)> callback) {
     playlist_cb_ = std::move(callback);

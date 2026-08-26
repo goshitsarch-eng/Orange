@@ -42,6 +42,7 @@ class FileView {
   const std::vector<std::string> &tree_root_paths() const { return roots_; }
   FileViewHistory *history() { return &history_; }
   void SetAddToPlaylistCallback(PathsCallback callback);
+  void SetEnqueueCallback(PathsCallback callback);
   void SetReplacePlaylistCallback(PathsCallback callback);
   void SetOpenInNewCallback(PathsCallback callback);
   void SetCopyToCollectionCallback(PathsCallback callback);
@@ -81,6 +82,7 @@ class FileView {
   FileViewMode::Mode mode_ = FileViewMode::DefaultMode();
   std::vector<std::string> roots_;
   PathsCallback add_to_playlist_;
+  PathsCallback enqueue_;
   PathsCallback replace_playlist_;
   PathsCallback open_in_new_;
   PathsCallback copy_to_collection_;

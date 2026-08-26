@@ -25,6 +25,12 @@ inline const char *MuteTooltip(bool muted) { return muted ? "Unmute" : "Mute"; }
 
 inline const char *MuteAccel() { return "<Control>m"; }
 
+inline const char *ClosePlaylistAccel() { return "<Control>w"; }
+
+inline const char *PlaylistQueueAccel() { return "<Control>d"; }
+
+inline const char *QueuePlayNextAccel() { return "<Control><Shift>d"; }
+
 }  // namespace MainWindowLook
 
 #endif

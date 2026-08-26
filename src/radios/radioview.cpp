@@ -4,6 +4,7 @@
 #include "radios/radiotree.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
+#include "widgets/listboxtreepressgtk.h"
 
 RadioView::RadioView() {
   widget_ = gtk_scrolled_window_new();
@@ -12,16 +13,11 @@ RadioView::RadioView() {
   gtk_widget_add_css_class(list_, "boxed-list");
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
+  ListBoxTreePressGtk::Attach(list_, this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<RadioView *>(data);
                      const RadioTree::Kind kind =
                          static_cast<RadioTree::Kind>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-kind")) - 1);
-                     if (RadioTree::ActivateExpands(kind) && self->model_) {
-                       const auto source = static_cast<Song::Source>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-source")));
-                       self->model_->Toggle(source);
-                       self->Reload(self->model_);
-                       return;
-                     }
                      auto *channel = static_cast<RadioChannel *>(g_object_get_data(G_OBJECT(row), "channel"));
                      if (channel && self->activate_ && RadioTree::ActivatePlays(kind)) {
                        self->activate_(*channel);
@@ -56,6 +52,29 @@ RadioView::RadioView() {
 }
 
 RadioView::~RadioView() { ResetTypeAhead(); }
+
+void RadioView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
+  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  if (action == CollectionTreeClick::Action::Enqueue) {
+    if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+      ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
+    }
+    if (enqueue_) {
+      enqueue_(SelectedSongs());
+    }
+    return;
+  }
+  if (action != CollectionTreeClick::Action::ToggleExpand || !row || ListBoxTreePressGtk::OnExpandControl(list_, x, y) || !model_) {
+    return;
+  }
+  const RadioTree::Kind kind = static_cast<RadioTree::Kind>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-kind")) - 1);
+  if (RadioTree::ActivateExpands(kind)) {
+    const auto source = static_cast<Song::Source>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-source")));
+    model_->Toggle(source);
+    Reload(model_);
+  }
+}
 
 void RadioView::Reload(RadioModel *model) {
   model_ = model;

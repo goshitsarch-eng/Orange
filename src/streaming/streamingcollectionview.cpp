@@ -20,6 +20,7 @@
 #include <vector>
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
+#include "widgets/listboxtreepressgtk.h"
 
 StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -82,15 +83,11 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   list_ = gtk_list_box_new();
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list_);
+  ListBoxTreePressGtk::Attach(list_, this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<StreamingCollectionView *>(data);
                      if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "empty-streaming")) && self->refresh_) {
                        self->refresh_();
-                       return;
-                     }
-                     auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
-                     if (CollectionTree::IsExpandable(item)) {
-                       self->ToggleExpanded(item);
                        return;
                      }
                      auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
@@ -132,6 +129,29 @@ StreamingCollectionView::~StreamingCollectionView() {
 }
 
 void StreamingCollectionView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
+
+void StreamingCollectionView::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
+
+void StreamingCollectionView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
+  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  if (action == CollectionTreeClick::Action::Enqueue) {
+    if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+      ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
+    }
+    if (enqueue_) {
+      enqueue_(SelectedSongs());
+    }
+    return;
+  }
+  if (action != CollectionTreeClick::Action::ToggleExpand || !row || ListBoxTreePressGtk::OnExpandControl(list_, x, y)) {
+    return;
+  }
+  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+  if (CollectionTreeClick::ShouldToggleFromRowClick(false, CollectionTree::IsExpandable(item))) {
+    ToggleExpanded(item);
+  }
+}
 
 void StreamingCollectionView::SetRefreshCallback(RefreshCallback callback) { refresh_ = std::move(callback); }
 

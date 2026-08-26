@@ -4,6 +4,7 @@
 #include "utilities/fileutils.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
+#include "widgets/listboxtreepressgtk.h"
 
 #include <algorithm>
 
@@ -15,6 +16,7 @@ FileViewList::FileViewList() {
   gtk_widget_add_css_class(list_, "boxed-list");
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
+  ListBoxTreePressGtk::Attach(list_, this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<FileViewList *>(data);
                      const char *path = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path"));
@@ -55,7 +57,21 @@ void FileViewList::SetNavigateCallback(NavigateCallback callback) { navigate_ = 
 
 void FileViewList::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
+void FileViewList::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
+
 void FileViewList::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+
+void FileViewList::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  (void)x;
+  if (CollectionTreeClick::FromPress(button, n_press, state) != CollectionTreeClick::Action::Enqueue || !enqueue_) {
+    return;
+  }
+  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+    ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
+  }
+  enqueue_(SelectedPaths());
+}
 
 void FileViewList::Reload(const std::vector<std::string> &paths) {
   GtkWidget *child = gtk_widget_get_first_child(list_);

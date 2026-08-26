@@ -24,6 +24,9 @@ class DeviceView {
   void ShowSongs(const SongList &songs);
   void SetDeviceCallback(std::function<void(const std::string &)> callback) { device_cb_ = std::move(callback); }
   void SetSongCallback(std::function<void(const Song &)> callback) { song_cb_ = std::move(callback); }
+  void SetActivateSongsCallback(std::function<void(const SongList &)> callback) { songs_cb_ = std::move(callback); }
+  void SetEnqueueCallback(std::function<void(const SongList &)> callback) { enqueue_ = std::move(callback); }
+  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
   void SetBackCallback(std::function<void()> callback) { back_cb_ = std::move(callback); }
   void SetAddAllCallback(std::function<void()> callback) { add_all_cb_ = std::move(callback); }
   void SetDeviceMenuCallback(std::function<void(const ConnectedDevice &)> callback) { device_menu_cb_ = std::move(callback); }
@@ -49,6 +52,8 @@ class DeviceView {
   SongList songs_;
   std::function<void(const std::string &)> device_cb_;
   std::function<void(const Song &)> song_cb_;
+  std::function<void(const SongList &)> songs_cb_;
+  std::function<void(const SongList &)> enqueue_;
   std::function<void()> back_cb_;
   std::function<void()> add_all_cb_;
   std::function<void(const ConnectedDevice &)> device_menu_cb_;

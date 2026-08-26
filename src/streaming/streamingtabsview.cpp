@@ -161,6 +161,14 @@ void StreamingTabsView::SetActivateCallback(ActivateCallback callback) {
   search_->SetActivateCallback(activate_);
 }
 
+void StreamingTabsView::SetEnqueueCallback(EnqueueCallback callback) {
+  artists_->view()->SetEnqueueCallback(callback);
+  albums_->view()->SetEnqueueCallback(callback);
+  songs_->view()->SetEnqueueCallback(callback);
+  favorites_->view()->SetEnqueueCallback(callback);
+  search_->SetEnqueueCallback(std::move(callback));
+}
+
 void StreamingTabsView::HandleActivate(StreamingCollectionView *view, const Song &song) {
   if (!view) {
     return;

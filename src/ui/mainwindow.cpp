@@ -843,6 +843,9 @@ void MainWindow::BuildUi() {
   set_accels("win.last-playlist", "<Control>9");
   set_accels("win.active-playlist", "<Control><Shift>p");
   set_accels("win.mute", MainWindowLook::MuteAccel());
+  set_accels("win.close-playlist", MainWindowLook::ClosePlaylistAccel());
+  set_accels("win.playlist-queue", MainWindowLook::PlaylistQueueAccel());
+  set_accels("win.queue-next", MainWindowLook::QueuePlayNextAccel());
 }
 
 void MainWindow::BuildSidebar() {
@@ -1027,6 +1030,9 @@ void MainWindow::BuildSidebar() {
   file_view_->SetAddToPlaylistCallback([file_playlist](const std::vector<std::string> &paths) {
     file_playlist(FileViewMenu::Action::Append, paths);
   });
+  file_view_->SetEnqueueCallback([this](const std::vector<std::string> &paths) {
+    ApplyCollectionPlan(CollectionBehaviour::Enqueue(), SongsFromFilePaths(paths));
+  });
   file_view_->SetReplacePlaylistCallback([file_playlist](const std::vector<std::string> &paths) {
     file_playlist(FileViewMenu::Action::Replace, paths);
   });
@@ -1065,6 +1071,7 @@ void MainWindow::BuildSidebar() {
   adw_view_stack_add_titled_with_icon(sidebar_stack_, file_view_->widget(), "files", "Files", "folder-symbolic");
   radio_container_ = std::make_unique<RadioViewContainer>(app_->radio_services());
   radio_container_->SetActivateCallback([this](const RadioChannel &channel) { PlayRadioChannel(channel); });
+  radio_container_->SetEnqueueCallback([this](const SongList &songs) { ApplyCollectionPlan(CollectionBehaviour::Enqueue(), songs); });
   radio_container_->SetMenuCallback([this](const std::vector<RadioChannel> &channels) { ShowRadioMenu(channels); });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, radio_container_->widget(), "radio", "Internet radio", "network-wireless-symbolic");
   GtkWidget *streaming_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -1082,6 +1089,7 @@ void MainWindow::BuildSidebar() {
   for (StreamingService *service : app_->streaming_services()->All()) {
     auto view = std::make_unique<StreamingTabsView>(service, app_->database());
     view->SetActivateCallback(activate_stream);
+    view->SetEnqueueCallback([this](const SongList &songs) { ApplyCollectionPlan(CollectionBehaviour::Enqueue(), songs); });
     view->SetMenuCallback([this](const SongList &songs) { ShowStreamingMenu(songs); });
     const char *page = SettingsPages::ForService(service->name());
     view->SetConfigureCallback([this, page]() { OpenSettings(page); });
@@ -1108,6 +1116,12 @@ void MainWindow::BuildSidebar() {
   device_container_->SetSongCallback([this](const Song &song) {
     app_->playlist_manager()->AppendSongs({song});
     RefreshPlaylist();
+  });
+  device_container_->SetActivateSongsCallback([this](const SongList &songs) {
+    ApplyCollectionPlan(CollectionBehaviour::Append(BehaviourSettings::kDefaultMenuPlayMode, EngineStopped()), songs);
+  });
+  device_container_->SetEnqueueCallback([this](const SongList &songs) {
+    ApplyCollectionPlan(CollectionBehaviour::Enqueue(), songs);
   });
   device_container_->SetAddAllCallback([this](const SongList &songs) {
     ApplyCollectionPlan(CollectionBehaviour::Append(BehaviourSettings::kDefaultMenuPlayMode, EngineStopped()), songs);

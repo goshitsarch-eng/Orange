@@ -12,6 +12,7 @@
 class FileViewList {
  public:
   using ActivateCallback = std::function<void(const std::string &)>;
+  using EnqueueCallback = std::function<void(const std::vector<std::string> &)>;
   using MenuCallback = std::function<void(const std::vector<std::string> &)>;
   using NavigateCallback = std::function<void(FileViewKeyboard::Action)>;
 
@@ -22,7 +23,9 @@ class FileViewList {
   GtkWidget *list() const { return list_; }
   void Reload(const std::vector<std::string> &paths);
   void SetActivateCallback(ActivateCallback callback);
+  void SetEnqueueCallback(EnqueueCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
   void SetNavigateCallback(NavigateCallback callback);
   std::vector<std::string> SelectedPaths() const;
 
@@ -35,6 +38,7 @@ class FileViewList {
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
   ActivateCallback activate_;
+  EnqueueCallback enqueue_;
   MenuCallback menu_;
   NavigateCallback navigate_;
   std::string typeahead_;

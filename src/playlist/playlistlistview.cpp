@@ -4,6 +4,7 @@
 #include "translations/translations.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
+#include "widgets/listboxtreepressgtk.h"
 
 PlaylistListView::PlaylistListView() {
   widget_ = gtk_scrolled_window_new();
@@ -11,15 +12,12 @@ PlaylistListView::PlaylistListView() {
   list_ = gtk_list_box_new();
   gtk_widget_add_css_class(list_, "boxed-list");
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
+  ListBoxTreePressGtk::Attach(list_, this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<PlaylistListView *>(data);
                      const gboolean folder = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "playlist-folder")) == 1;
                      const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "playlist-name"));
-                     const char *path = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "playlist-path"));
                      if (folder) {
-                       if (path && self->toggle_) {
-                         self->toggle_(path);
-                       }
                        return;
                      }
                      if (name && self->activate_) {
@@ -57,6 +55,32 @@ PlaylistListView::PlaylistListView() {
 PlaylistListView::~PlaylistListView() {
   CancelDragHover();
   ResetTypeAhead();
+}
+
+void PlaylistListView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
+  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  if (!row) {
+    return;
+  }
+  const bool folder = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "playlist-folder")) == 1;
+  const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "playlist-name"));
+  const char *path = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "playlist-path"));
+  if (action == CollectionTreeClick::Action::Enqueue) {
+    if (CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+      ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
+    }
+    if (!folder && name && activate_) {
+      activate_(name);
+    }
+    return;
+  }
+  if (action != CollectionTreeClick::Action::ToggleExpand || ListBoxTreePressGtk::OnExpandControl(list_, x, y)) {
+    return;
+  }
+  if (folder && path && toggle_) {
+    toggle_(path);
+  }
 }
 
 void PlaylistListView::ResetTypeAhead() {

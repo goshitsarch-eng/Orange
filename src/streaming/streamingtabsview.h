@@ -17,6 +17,7 @@ class Database;
 class StreamingTabsView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
+  using EnqueueCallback = std::function<void(const SongList &)>;
   using MenuCallback = std::function<void(const SongList &)>;
   using ConfigureCallback = std::function<void()>;
 
@@ -26,6 +27,7 @@ class StreamingTabsView {
   GtkWidget *widget() const { return widget_; }
   StreamingService *service() const { return service_; }
   void SetActivateCallback(ActivateCallback callback);
+  void SetEnqueueCallback(EnqueueCallback callback);
   void SetMenuCallback(MenuCallback callback);
   void SetConfigureCallback(ConfigureCallback callback);
   void SearchForThis(const std::string &query);

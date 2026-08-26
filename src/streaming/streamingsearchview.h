@@ -21,6 +21,7 @@
 class StreamingSearchView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
+  using EnqueueCallback = std::function<void(const SongList &)>;
   using MenuCallback = std::function<void(const SongList &)>;
   using ConfigureCallback = std::function<void()>;
 
@@ -30,7 +31,9 @@ class StreamingSearchView {
   GtkWidget *widget() const { return widget_; }
   void Search(const std::string &query);
   void SetActivateCallback(ActivateCallback callback);
+  void SetEnqueueCallback(EnqueueCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
   void SetConfigureCallback(ConfigureCallback callback);
   void SearchForThis(const std::string &query = {});
   std::string SelectedSearchQuery() const;
@@ -65,6 +68,7 @@ class StreamingSearchView {
   CollectionModel tree_model_;
   std::set<std::string> expanded_;
   ActivateCallback activate_;
+  EnqueueCallback enqueue_;
   MenuCallback menu_;
   ConfigureCallback configure_;
   GtkWidget *widget_ = nullptr;

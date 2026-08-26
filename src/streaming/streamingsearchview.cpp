@@ -19,6 +19,7 @@
 #include "utilities/jsonutils.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
+#include "widgets/listboxtreepressgtk.h"
 
 StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(service) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -108,13 +109,9 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   g_signal_connect(type_artists_, "toggled", G_CALLBACK(search_now), this);
   g_signal_connect(type_albums_, "toggled", G_CALLBACK(search_now), this);
   g_signal_connect(type_songs_, "toggled", G_CALLBACK(search_now), this);
+  ListBoxTreePressGtk::Attach(list_, this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<StreamingSearchView *>(data);
-                     auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
-                     if (CollectionTree::IsExpandable(item)) {
-                       self->ToggleExpanded(item);
-                       return;
-                     }
                      auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
                      if (song && self->activate_) {
                        self->activate_(*song);
@@ -203,6 +200,29 @@ StreamingSearchView::~StreamingSearchView() {
 }
 
 void StreamingSearchView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
+
+void StreamingSearchView::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
+
+void StreamingSearchView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
+  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  if (action == CollectionTreeClick::Action::Enqueue) {
+    if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+      ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
+    }
+    if (enqueue_) {
+      enqueue_(SelectedSongs());
+    }
+    return;
+  }
+  if (action != CollectionTreeClick::Action::ToggleExpand || !row || ListBoxTreePressGtk::OnExpandControl(list_, x, y)) {
+    return;
+  }
+  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+  if (CollectionTreeClick::ShouldToggleFromRowClick(false, CollectionTree::IsExpandable(item))) {
+    ToggleExpanded(item);
+  }
+}
 
 void StreamingSearchView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 

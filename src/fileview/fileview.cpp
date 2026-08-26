@@ -297,6 +297,13 @@ void FileView::RemoveRootButtonClicked() {
 
 void FileView::SetAddToPlaylistCallback(PathsCallback callback) { add_to_playlist_ = std::move(callback); }
 
+void FileView::SetEnqueueCallback(PathsCallback callback) {
+  enqueue_ = std::move(callback);
+  if (list_) {
+    list_->SetEnqueueCallback(enqueue_);
+  }
+}
+
 void FileView::SetReplacePlaylistCallback(PathsCallback callback) { replace_playlist_ = std::move(callback); }
 
 void FileView::SetOpenInNewCallback(PathsCallback callback) { open_in_new_ = std::move(callback); }

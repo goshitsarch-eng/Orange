@@ -19,6 +19,7 @@
 class StreamingCollectionView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
+  using EnqueueCallback = std::function<void(const SongList &)>;
   using RefreshCallback = std::function<void()>;
   using MenuCallback = std::function<void(const SongList &)>;
   using GroupingCallback = std::function<void(const CollectionGrouping::Grouping &)>;
@@ -34,8 +35,10 @@ class StreamingCollectionView {
   void SetStatus(const std::string &status);
   void SetFilter(const std::string &filter);
   void SetActivateCallback(ActivateCallback callback);
+  void SetEnqueueCallback(EnqueueCallback callback);
   void SetRefreshCallback(RefreshCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
   void SetGroupingChangedCallback(GroupingCallback callback) { grouping_changed_ = std::move(callback); }
   void SetService(StreamingService *service);
   void SetGrouping(const CollectionGrouping::Grouping &grouping);
@@ -80,6 +83,7 @@ class StreamingCollectionView {
   std::string filter_;
   CollectionGrouping::Grouping grouping_;
   ActivateCallback activate_;
+  EnqueueCallback enqueue_;
   RefreshCallback refresh_;
   MenuCallback menu_;
   GroupingCallback grouping_changed_;

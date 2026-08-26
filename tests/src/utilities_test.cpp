@@ -1122,6 +1122,9 @@ TEST(MainWindowLook, SidebarAndMuteMatchQt) {
   EXPECT_STREQ("Unmute", MainWindowLook::MuteTooltip(true));
   EXPECT_STREQ("Mute", MainWindowLook::MuteTooltip(false));
   EXPECT_STREQ("<Control>m", MainWindowLook::MuteAccel());
+  EXPECT_STREQ("<Control>w", MainWindowLook::ClosePlaylistAccel());
+  EXPECT_STREQ("<Control>d", MainWindowLook::PlaylistQueueAccel());
+  EXPECT_STREQ("<Control><Shift>d", MainWindowLook::QueuePlayNextAccel());
 }
 
 TEST(Appearance, BackgroundCssForTypesAndUrls) {

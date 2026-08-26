@@ -8,6 +8,7 @@
 #include "translations/translations.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
+#include "widgets/listboxtreepressgtk.h"
 
 #include <string>
 
@@ -18,6 +19,7 @@ DeviceView::DeviceView() {
   gtk_widget_add_css_class(list_, "boxed-list");
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
+  ListBoxTreePressGtk::Attach(list_, this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<DeviceView *>(data);
                      const char *kind = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-kind"));
@@ -30,8 +32,13 @@ DeviceView::DeviceView() {
                        return;
                      }
                      auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
-                     if (CollectionTree::IsExpandable(item)) {
-                       self->ToggleExpanded(item);
+                     if (item) {
+                       const SongList songs = CollectionTree::SongsFromItem(item);
+                       if (self->songs_cb_ && !songs.empty()) {
+                         self->songs_cb_(songs);
+                       } else if (self->song_cb_ && !songs.empty()) {
+                         self->song_cb_(songs.front());
+                       }
                        return;
                      }
                      if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
@@ -58,6 +65,27 @@ DeviceView::DeviceView() {
 }
 
 DeviceView::~DeviceView() { ResetTypeAhead(); }
+
+void DeviceView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
+  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  if (action == CollectionTreeClick::Action::Enqueue) {
+    if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+      ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
+    }
+    if (enqueue_) {
+      enqueue_(SelectedSongs());
+    }
+    return;
+  }
+  if (action != CollectionTreeClick::Action::ToggleExpand || !row || ListBoxTreePressGtk::OnExpandControl(list_, x, y)) {
+    return;
+  }
+  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+  if (CollectionTreeClick::ShouldToggleFromRowClick(false, CollectionTree::IsExpandable(item))) {
+    ToggleExpanded(item);
+  }
+}
 
 void DeviceView::ResetTypeAhead() {
   typeahead_.clear();
