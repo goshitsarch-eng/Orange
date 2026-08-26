@@ -2,6 +2,8 @@
 #define STRAWBERRY_STREAMINGCOLLECTIONVIEW_H
 
 #include "collection/collectiongrouping.h"
+#include "collection/collectionitem.h"
+#include "collection/collectionmodel.h"
 #include "core/song.h"
 #include "streaming/streamingservices.h"
 
@@ -10,6 +12,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -50,6 +53,8 @@ class StreamingCollectionView {
   };
 
   void Rebuild();
+  void AppendItem(const CollectionItem *item, int depth, bool filter_active);
+  void ToggleExpanded(const CollectionItem *item);
   void BuildGroupMenu();
   void SetupRowDrag(GtkWidget *row, const Song &song);
   void LoadCover(GtkWidget *image, const Song &song);
@@ -68,6 +73,8 @@ class StreamingCollectionView {
   GtkWidget *status_label_ = nullptr;
   GtkWidget *list_ = nullptr;
   SongList songs_;
+  CollectionModel model_;
+  std::set<std::string> expanded_;
   std::vector<Level> stack_;
   std::string filter_;
   CollectionGrouping::Grouping grouping_;

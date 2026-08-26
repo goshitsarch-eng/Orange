@@ -1,6 +1,9 @@
+#include "collection/collectionmodel.h"
+#include "collection/collectiontree.h"
 #include "streaming/streamingabort.h"
 #include "streaming/streamingalbum.h"
 #include "streaming/streamingcollectionstore.h"
+#include "streaming/streamingcollectiontree.h"
 #include "streaming/streamingcoverdownload.h"
 #include "streaming/streamingpage.h"
 #include "streaming/streamingsearchopts.h"
@@ -21,6 +24,7 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <set>
 #include <string>
 
 TEST(StreamingSearchModel, FiltersAndSorts) {
@@ -601,6 +605,44 @@ TEST(StreamingCollectionStore, MergeAppendsAndUpdatesByUrl) {
   EXPECT_EQ(2u, merged.size());
   EXPECT_EQ(1, StreamingCollectionStore::AddedCount({first}, merged));
   unlink(path.c_str());
+}
+
+TEST(StreamingCollectionTree, CollapsedHidesSongsUntilExpanded) {
+  Song a(Song::Source::Tidal);
+  a.set_valid(true);
+  a.set_title("Roads");
+  a.set_artist("Portishead");
+  a.set_albumartist("Portishead");
+  a.set_album("Dummy");
+  a.set_url("tidal://1");
+  Song b(Song::Source::Tidal);
+  b.set_valid(true);
+  b.set_title("Mysterons");
+  b.set_artist("Portishead");
+  b.set_albumartist("Portishead");
+  b.set_album("Dummy");
+  b.set_url("tidal://2");
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::Album;
+  grouping.third = CollectionGrouping::GroupBy::None;
+  CollectionModel model;
+  model.Reset({a, b}, grouping, false, false, false);
+  ASSERT_TRUE(model.root());
+  std::set<std::string> expanded;
+  EXPECT_FALSE(StreamingCollectionTree::FilterActive(""));
+  EXPECT_TRUE(StreamingCollectionTree::FilterActive("port"));
+  EXPECT_TRUE(StreamingCollectionTree::ShouldExpandAll(true));
+  EXPECT_FALSE(StreamingCollectionTree::ShouldExpandAll(false));
+  EXPECT_EQ(0, StreamingCollectionTree::VisibleSongCount(model.root(), false, expanded));
+  EXPECT_EQ(2, StreamingCollectionTree::VisibleSongCount(model.root(), true, expanded));
+  EXPECT_EQ(2, StreamingCollectionTree::SongsFromItem(model.root()).size());
+  CollectionTree::CollectExpandableKeys(model.root(), &expanded);
+  EXPECT_EQ(2, StreamingCollectionTree::VisibleSongCount(model.root(), false, expanded));
+  EXPECT_GT(StreamingCollectionTree::VisibleRowCount(model.root(), false, expanded), 2);
+  EXPECT_FALSE(StreamingCollectionTree::RepresentativeSong(model.root()).title().empty());
+  EXPECT_EQ("2 items", StreamingCollectionTree::StatusText(2));
+  EXPECT_EQ("1 item", StreamingCollectionTree::StatusText(1));
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {

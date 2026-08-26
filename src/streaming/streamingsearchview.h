@@ -2,6 +2,8 @@
 #define STRAWBERRY_STREAMINGSEARCHVIEW_H
 
 #include "collection/collectiongrouping.h"
+#include "collection/collectionitem.h"
+#include "collection/collectionmodel.h"
 #include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchgroup.h"
 #include "streaming/streamingsearchmodel.h"
@@ -13,6 +15,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 
 class StreamingSearchView {
@@ -35,6 +38,8 @@ class StreamingSearchView {
 
  private:
   void Rebuild();
+  void AppendItem(const CollectionItem *item, int depth, bool filter_active);
+  void ToggleExpanded(const CollectionItem *item);
   void SetupRowDrag(GtkWidget *row, const Song &song);
   void LoadCover(GtkWidget *image, const Song &song);
   void PersistPrettyCovers();
@@ -54,6 +59,8 @@ class StreamingSearchView {
   StreamingService *service_ = nullptr;
   StreamingSearchModel model_;
   StreamingSearchSortModel sort_model_{&model_};
+  CollectionModel tree_model_;
+  std::set<std::string> expanded_;
   ActivateCallback activate_;
   MenuCallback menu_;
   ConfigureCallback configure_;

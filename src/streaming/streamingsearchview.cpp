@@ -1,10 +1,13 @@
 #include "streaming/streamingsearchview.h"
 
 #include "collection/collectionfiltermenu.h"
+#include "collection/collectionitemdelegate.h"
+#include "collection/collectiontree.h"
 #include "collection/groupbydialog.h"
 #include "core/settings.h"
 #include "dialogs/dialoghelpers.h"
 #include "streaming/streamingabort.h"
+#include "streaming/streamingcollectiontree.h"
 #include "streaming/streamingcover.h"
 #include "streaming/streamingdrag.h"
 #include "streaming/streamingprogress.h"
@@ -106,6 +109,11 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   g_signal_connect(type_songs_, "toggled", G_CALLBACK(search_now), this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<StreamingSearchView *>(data);
+                     auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+                     if (CollectionTree::IsExpandable(item)) {
+                       self->ToggleExpanded(item);
+                       return;
+                     }
                      auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
                      if (song && self->activate_) {
                        self->activate_(*song);
@@ -327,6 +335,73 @@ void StreamingSearchView::Search(const std::string &query) {
   });
 }
 
+void StreamingSearchView::ToggleExpanded(const CollectionItem *item) {
+  if (CollectionTree::Toggle(&expanded_, item) || CollectionTree::IsExpandable(item)) {
+    Rebuild();
+  }
+}
+
+void StreamingSearchView::AppendItem(const CollectionItem *item, int depth, bool filter_active) {
+  if (!item) {
+    return;
+  }
+  const bool expandable = CollectionTree::IsExpandable(item);
+  const bool expanded = CollectionTree::ShowChildren(item, filter_active, expanded_);
+  GtkWidget *row = gtk_list_box_row_new();
+  GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_margin_start(row_box, 8 + depth * 12);
+  gtk_widget_set_margin_end(row_box, 8);
+  gtk_widget_set_margin_top(row_box, 4);
+  gtk_widget_set_margin_bottom(row_box, 4);
+  if (expandable) {
+    GtkWidget *toggle = gtk_button_new_from_icon_name(expanded ? "pan-down-symbolic" : "pan-end-symbolic");
+    gtk_widget_add_css_class(toggle, "flat");
+    gtk_widget_add_css_class(toggle, "circular");
+    gtk_widget_set_tooltip_text(toggle, expanded ? Translations::CStr("Collapse") : Translations::CStr("Expand"));
+    g_object_set_data(G_OBJECT(toggle), "item", const_cast<CollectionItem *>(item));
+    g_signal_connect(toggle, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                       auto *self = static_cast<StreamingSearchView *>(data);
+                       self->ToggleExpanded(static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(button), "item")));
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(row_box), toggle);
+  }
+  const Song cover_song = StreamingCollectionTree::RepresentativeSong(item);
+  if (StreamingCover::ShouldShowThumb(pretty_covers_) && (!cover_song.url().empty() || !StreamingCover::CoverUrl(cover_song).empty())) {
+    GtkWidget *image = gtk_image_new_from_icon_name(StreamingCover::kPlaceholderIcon);
+    gtk_image_set_pixel_size(GTK_IMAGE(image), StreamingCover::kArtHeight);
+    gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
+    gtk_box_append(GTK_BOX(row_box), image);
+    LoadCover(image, cover_song);
+  }
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_set_hexpand(box, TRUE);
+  GtkWidget *primary = gtk_label_new(CollectionItemDelegate::PrimaryText(item).c_str());
+  gtk_widget_set_halign(primary, GTK_ALIGN_START);
+  if (expandable) {
+    gtk_widget_add_css_class(primary, "heading");
+  }
+  gtk_box_append(GTK_BOX(box), primary);
+  const std::string secondary = CollectionItemDelegate::SecondaryText(item);
+  if (!secondary.empty()) {
+    GtkWidget *sub = gtk_label_new(secondary.c_str());
+    gtk_widget_add_css_class(sub, "dim-label");
+    gtk_widget_set_halign(sub, GTK_ALIGN_START);
+    gtk_box_append(GTK_BOX(box), sub);
+  }
+  gtk_box_append(GTK_BOX(row_box), box);
+  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
+  g_object_set_data(G_OBJECT(row), "item", const_cast<CollectionItem *>(item));
+  g_object_set_data_full(G_OBJECT(row), "row-data", new Song(cover_song), [](gpointer p) { delete static_cast<Song *>(p); });
+  SetupRowDrag(row, cover_song);
+  gtk_list_box_append(GTK_LIST_BOX(list_), row);
+  if (expanded) {
+    for (const auto &child : item->children) {
+      AppendItem(child.get(), depth + 1, filter_active);
+    }
+  }
+}
+
 void StreamingSearchView::Rebuild() {
   GtkWidget *child = gtk_widget_get_first_child(list_);
   while (child) {
@@ -335,55 +410,16 @@ void StreamingSearchView::Rebuild() {
     child = next;
   }
   const SongList visible = sort_model_.Visible();
+  tree_model_.Reset(visible, grouping_, CollectionGrouping::SeparateAlbumsByGrouping(), false, false);
   if (visible.empty()) {
     gtk_list_box_append(GTK_LIST_BOX(list_), gtk_label_new(Translations::CStr("No results")));
     return;
   }
   ++cover_gen_;
-  const std::vector<StreamingSearchGroup::Row> rows =
-      StreamingSearchGroup::RowsFor(visible, grouping_, CollectionGrouping::SeparateAlbumsByGrouping());
-  for (const StreamingSearchGroup::Row &entry : rows) {
-    GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_widget_set_margin_start(row_box, StreamingSearchGroup::IndentPixels(entry.indent));
-    gtk_widget_set_margin_end(row_box, 8);
-    gtk_widget_set_margin_top(row_box, 4);
-    gtk_widget_set_margin_bottom(row_box, 4);
-    if (entry.header) {
-      GtkWidget *label = gtk_label_new(entry.label.c_str());
-      gtk_widget_set_halign(label, GTK_ALIGN_START);
-      gtk_widget_add_css_class(label, "heading");
-      gtk_box_append(GTK_BOX(row_box), label);
-      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
-      gtk_list_box_row_set_activatable(GTK_LIST_BOX_ROW(row), FALSE);
-      gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(row), FALSE);
-      gtk_list_box_append(GTK_LIST_BOX(list_), row);
-      continue;
+  if (tree_model_.root()) {
+    for (const auto &node : tree_model_.root()->children) {
+      AppendItem(node.get(), 0, false);
     }
-    if (StreamingCover::ShouldShowThumb(pretty_covers_)) {
-      GtkWidget *image = gtk_image_new_from_icon_name(StreamingCover::kPlaceholderIcon);
-      gtk_image_set_pixel_size(GTK_IMAGE(image), StreamingCover::kArtHeight);
-      gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
-      gtk_box_append(GTK_BOX(row_box), image);
-      LoadCover(image, entry.song);
-    }
-    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_hexpand(box, TRUE);
-    GtkWidget *primary = gtk_label_new(StreamingSearchItemDelegate::PrimaryText(entry.song).c_str());
-    gtk_widget_set_halign(primary, GTK_ALIGN_START);
-    gtk_box_append(GTK_BOX(box), primary);
-    const std::string secondary = StreamingSearchItemDelegate::SecondaryText(entry.song);
-    if (!secondary.empty()) {
-      GtkWidget *sub = gtk_label_new(secondary.c_str());
-      gtk_widget_add_css_class(sub, "dim-label");
-      gtk_widget_set_halign(sub, GTK_ALIGN_START);
-      gtk_box_append(GTK_BOX(box), sub);
-    }
-    gtk_box_append(GTK_BOX(row_box), box);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
-    g_object_set_data_full(G_OBJECT(row), "row-data", new Song(entry.song), [](gpointer p) { delete static_cast<Song *>(p); });
-    SetupRowDrag(row, entry.song);
-    gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
 }
 
@@ -576,6 +612,12 @@ SongList StreamingSearchView::SelectedSongs() const {
   gtk_list_box_selected_foreach(
       GTK_LIST_BOX(list_),
       [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+        const SongList more = StreamingCollectionTree::SongsFromItem(item);
+        if (!more.empty()) {
+          static_cast<SongList *>(data)->insert(static_cast<SongList *>(data)->end(), more.begin(), more.end());
+          return;
+        }
         auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
         if (song) {
           static_cast<SongList *>(data)->push_back(*song);
