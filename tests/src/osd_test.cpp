@@ -3,6 +3,7 @@
 #include "core/song.h"
 #include "core/standardpaths.h"
 #include "covermanager/coverfromurldialog.h"
+#include "osd/osdart.h"
 #include "osd/osdbase.h"
 #include "osd/osdpretty.h"
 #include "osd/osdprettyplacement.h"
@@ -62,6 +63,14 @@ class TestOSD : public OSDBase {
 };
 
 }  // namespace
+
+TEST(OSDArt, AttachesOnlyWhenEnabledAndPresent) {
+  EXPECT_FALSE(OSDArt::ShouldAttachArt(false, {1, 2, 3}));
+  EXPECT_FALSE(OSDArt::ShouldAttachArt(true, {}));
+  EXPECT_TRUE(OSDArt::ShouldAttachArt(true, {1, 2, 3}));
+  EXPECT_TRUE(OSDArt::EffectiveArt(true, {9}).size() == 1);
+  EXPECT_TRUE(OSDArt::EffectiveArt(false, {9}).empty());
+}
 
 TEST(OSDBase, TrayPopupRoutesToTrayIcon) {
   SystemTrayIcon tray;

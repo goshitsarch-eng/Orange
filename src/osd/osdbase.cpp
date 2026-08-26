@@ -1,6 +1,7 @@
 #include "osd/osdbase.h"
 
 #include "core/settings.h"
+#include "osd/osdart.h"
 #include "osd/osddbus.h"
 #include "osd/osdpretty.h"
 #include "systemtrayicon/systemtrayicon.h"
@@ -78,9 +79,10 @@ bool OSDBase::SupportsTrayPopups() const { return tray_icon_ != nullptr; }
 
 bool OSDBase::SupportsOSDPretty() { return OSDPretty::Supported(); }
 
-void OSDBase::ShowNative(const std::string &summary, const std::string &body, const std::string &icon) {
+void OSDBase::ShowNative(const std::string &summary, const std::string &body, const std::string &icon,
+                         const std::vector<unsigned char> &art) {
   if (dbus_) {
-    dbus_->ShowMessage(summary, body, icon);
+    dbus_->ShowMessage(summary, body, icon, OSDArt::EffectiveArt(show_art_, art));
   }
 }
 
@@ -130,13 +132,13 @@ void OSDBase::ShowMessage(const std::string &summary, const std::string &body, c
       if (tray_icon_) {
         tray_icon_->ShowPopup(summary, body, timeout_ms_);
       } else {
-        ShowNative(summary, body, icon);
+        ShowNative(summary, body, icon, art);
       }
       break;
     case OSDSettings::Type::Native:
     case OSDSettings::Type::Disabled:
     default:
-      ShowNative(summary, body, icon);
+      ShowNative(summary, body, icon, art);
       break;
   }
 }

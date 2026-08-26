@@ -10,6 +10,10 @@ TEST(Mpris2Helpers, TrackIdAndArtUrl) {
   EXPECT_EQ("file:///covers/auto.jpg", Mpris2Helpers::ArtUrl(song));
   song.set_art_manual("file:///covers/manual.jpg");
   EXPECT_EQ("file:///covers/manual.jpg", Mpris2Helpers::ArtUrl(song));
+  Song local;
+  EXPECT_EQ("/org/strawberrymusicplayer/Strawberry/Track/row3", Mpris2Helpers::TrackIdForRow(local, 3));
+  EXPECT_EQ(3, Mpris2Helpers::RowFromTrackId("/org/strawberrymusicplayer/Strawberry/Track/row3"));
+  EXPECT_EQ(-1, Mpris2Helpers::RowFromTrackId(Mpris2Helpers::TrackId(song)));
 }
 
 TEST(Mpris2Helpers, LoopStatusRoundTrip) {

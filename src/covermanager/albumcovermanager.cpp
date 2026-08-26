@@ -3,6 +3,7 @@
 #include "core/application.h"
 #include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverchoicecontroller.h"
+#include "covermanager/albumcovermanagerselection.h"
 #include "covermanager/albumcoverexportdialog.h"
 #include "covermanager/albumcovermanagerlist.h"
 #include "covermanager/coverfromurldialog.h"
@@ -40,6 +41,7 @@ void RebuildAlbums(CoverManagerState *state);
 void UpdateBatchUi(CoverManagerState *state);
 void FinishBatch(CoverManagerState *state);
 void PumpBatch(CoverManagerState *state);
+AlbumCoverManagerList::HideCovers HideMode(GtkWidget *combo);
 
 void UpdateBatchUi(CoverManagerState *state) {
   if (!state) {
@@ -99,6 +101,54 @@ void PumpBatch(CoverManagerState *state) {
   });
 }
 
+std::vector<AlbumCoverManagerList::Album> SelectedAlbums(CoverManagerState *state) {
+  std::vector<AlbumCoverManagerList::Album> albums;
+  if (!state || !state->flow) {
+    return albums;
+  }
+  GList *children = gtk_flow_box_get_selected_children(GTK_FLOW_BOX(state->flow));
+  for (GList *item = children; item; item = item->next) {
+    GtkWidget *child = GTK_WIDGET(item->data);
+    GtkWidget *card = GTK_IS_FLOW_BOX_CHILD(child) ? gtk_flow_box_child_get_child(GTK_FLOW_BOX_CHILD(child)) : child;
+    if (auto *album = static_cast<AlbumCoverManagerList::Album *>(g_object_get_data(G_OBJECT(card), "album"))) {
+      albums.push_back(*album);
+    }
+  }
+  g_list_free(children);
+  return albums;
+}
+
+std::vector<AlbumCoverManagerList::Album> VisibleAlbums(CoverManagerState *state) {
+  if (!state) {
+    return {};
+  }
+  const char *filter_text = state->filter ? gtk_editable_get_text(GTK_EDITABLE(state->filter)) : "";
+  return state->catalog.Filtered(state->artist_filter, HideMode(state->hide), filter_text ? filter_text : "");
+}
+
+std::vector<AlbumCoverManagerList::Album> AlbumsForAction(CoverManagerState *state) {
+  const auto selected = SelectedAlbums(state);
+  if (AlbumCoverManagerSelection::PreferSelection(selected.size())) {
+    return selected;
+  }
+  return VisibleAlbums(state);
+}
+
+void UpdateAlbumStatus(CoverManagerState *state) {
+  if (!state || !state->status) {
+    return;
+  }
+  const auto albums = VisibleAlbums(state);
+  size_t with_cover = 0;
+  for (const auto &album : albums) {
+    if (album.has_cover) {
+      ++with_cover;
+    }
+  }
+  gtk_label_set_text(GTK_LABEL(state->status),
+                     AlbumCoverManagerSelection::StatusText(albums.size(), with_cover, SelectedAlbums(state).size()).c_str());
+}
+
 void AddAlbumToPlaylist(CoverManagerState *state, const AlbumCoverManagerList::Album &album, bool replace) {
   if (!state || !state->app) {
     return;
@@ -141,6 +191,7 @@ void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album,
   g_menu_append(menu, Translations::CStr("Delete cover"), "cover.delete");
   g_menu_append(menu, Translations::CStr("Add to playlist"), "cover.append");
   g_menu_append(menu, Translations::CStr("Load to playlist"), "cover.load");
+  g_menu_append(menu, Translations::CStr("Save cover to file…"), "cover.save");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, image);
   GSimpleActionGroup *group = g_simple_action_group_new();
@@ -188,6 +239,8 @@ void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album,
                          AddAlbumToPlaylist(self, *entry, false);
                        } else if (g_strcmp0(name, "load") == 0) {
                          AddAlbumToPlaylist(self, *entry, true);
+                       } else if (g_strcmp0(name, "save") == 0) {
+                         self->covers->SaveCoverToFile(self->parent, entry->song);
                        }
                        RebuildAlbums(self);
                      }),
@@ -203,6 +256,7 @@ void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album,
   add("delete");
   add("append");
   add("load");
+  add("save");
   gtk_widget_insert_action_group(popover, "cover", G_ACTION_GROUP(group));
   g_object_set_data_full(G_OBJECT(popover), "album", owned, [](gpointer p) { delete static_cast<AlbumCoverManagerList::Album *>(p); });
   gtk_popover_popup(GTK_POPOVER(popover));
@@ -220,11 +274,7 @@ void RebuildAlbums(CoverManagerState *state) {
   }
   const char *filter_text = state->filter ? gtk_editable_get_text(GTK_EDITABLE(state->filter)) : "";
   const auto albums = state->catalog.Filtered(state->artist_filter, HideMode(state->hide), filter_text ? filter_text : "");
-  int without = 0;
   for (const auto &album : albums) {
-    if (!album.has_cover) {
-      ++without;
-    }
     GtkWidget *card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
     gtk_widget_set_size_request(card, 140, -1);
     GtkWidget *image = gtk_image_new();
@@ -238,7 +288,8 @@ void RebuildAlbums(CoverManagerState *state) {
     GtkWidget *button = gtk_button_new_with_label(album.has_cover ? Translations::CStr("Replace") : Translations::CStr("Fetch"));
     gtk_widget_add_css_class(button, "flat");
     auto *owned = new AlbumCoverManagerList::Album(album);
-    g_object_set_data_full(G_OBJECT(button), "album", owned, [](gpointer p) { delete static_cast<AlbumCoverManagerList::Album *>(p); });
+    g_object_set_data_full(G_OBJECT(card), "album", owned, [](gpointer p) { delete static_cast<AlbumCoverManagerList::Album *>(p); });
+    g_object_set_data(G_OBJECT(button), "album", owned);
     g_object_set_data(G_OBJECT(button), "image", image);
     g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
                        auto *self = static_cast<CoverManagerState *>(data);
@@ -286,12 +337,7 @@ void RebuildAlbums(CoverManagerState *state) {
     gtk_box_append(GTK_BOX(card), button);
     gtk_flow_box_append(GTK_FLOW_BOX(state->flow), card);
   }
-  if (state->status) {
-    gtk_label_set_text(GTK_LABEL(state->status),
-                       (std::to_string(albums.size()) + " albums · " + std::to_string(albums.size() - without) + " with artwork · " +
-                        std::to_string(without) + " missing")
-                           .c_str());
-  }
+  UpdateAlbumStatus(state);
 }
 
 void RebuildArtists(CoverManagerState *state) {
@@ -431,8 +477,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                        return;
                      }
                      self->batch.Reset();
-                     const char *filter_text = self->filter ? gtk_editable_get_text(GTK_EDITABLE(self->filter)) : "";
-                     for (const auto &album : self->catalog.Filtered(self->artist_filter, HideMode(self->hide), filter_text ? filter_text : "")) {
+                     for (const auto &album : AlbumsForAction(self)) {
                        if (album.has_cover) {
                          continue;
                        }
@@ -454,8 +499,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                    state);
   g_signal_connect(add_playlist, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<CoverManagerState *>(data);
-                     const char *filter_text = self->filter ? gtk_editable_get_text(GTK_EDITABLE(self->filter)) : "";
-                     for (const auto &album : self->catalog.Filtered(self->artist_filter, HideMode(self->hide), filter_text ? filter_text : "")) {
+                     for (const auto &album : AlbumsForAction(self)) {
                        AddAlbumToPlaylist(self, album, false);
                      }
                    }),
@@ -463,11 +507,14 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   g_signal_connect(load_playlist, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<CoverManagerState *>(data);
                      bool first = true;
-                     const char *filter_text = self->filter ? gtk_editable_get_text(GTK_EDITABLE(self->filter)) : "";
-                     for (const auto &album : self->catalog.Filtered(self->artist_filter, HideMode(self->hide), filter_text ? filter_text : "")) {
+                     for (const auto &album : AlbumsForAction(self)) {
                        AddAlbumToPlaylist(self, album, first);
                        first = false;
                      }
+                   }),
+                   state);
+  g_signal_connect(state->flow, "selected-children-changed", G_CALLBACK(+[](GtkFlowBox *, gpointer data) {
+                     UpdateAlbumStatus(static_cast<CoverManagerState *>(data));
                    }),
                    state);
   g_signal_connect(from_url, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {

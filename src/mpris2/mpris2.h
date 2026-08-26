@@ -16,6 +16,7 @@ class Mpris2 {
   void EmitPlaybackStatus();
   void EmitMetadata();
   void EmitVolume();
+  void EmitTrackListReplaced();
   Application *app() const { return app_; }
 
  private:

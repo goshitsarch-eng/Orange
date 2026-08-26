@@ -2,6 +2,7 @@
 
 #include "constants/contextsettings.h"
 #include "context/contextfont.h"
+#include "context/contextlyrics.h"
 #include "context/contexttechnical.h"
 #include "core/settings.h"
 #include "core/song.h"
@@ -13,9 +14,9 @@
 ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyrics_fetcher)
     : lyrics_providers_(lyrics_providers), lyrics_fetcher_(lyrics_fetcher), album_(std::make_unique<ContextAlbum>()) {
   if (lyrics_fetcher_) {
-    lyrics_fetcher_->LyricsFetched.Connect([this](uint64_t id, const std::string &, const std::string &lyrics) {
+    lyrics_fetcher_->LyricsFetched.Connect([this](uint64_t id, const std::string &provider, const std::string &lyrics) {
       if (id == current_search_id_) {
-        SetLyrics(lyrics);
+        SetLyrics(lyrics, provider);
       }
     });
   }
@@ -108,7 +109,11 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   gtk_box_append(GTK_BOX(box), album_label_);
   gtk_box_append(GTK_BOX(box), totals_);
   gtk_box_append(GTK_BOX(box), data_box_);
+  lyrics_source_ = gtk_label_new("");
+  gtk_widget_add_css_class(lyrics_source_, "dim-label");
+  gtk_label_set_xalign(GTK_LABEL(lyrics_source_), 0.0f);
   gtk_box_append(GTK_BOX(box), lyrics_view_);
+  gtk_box_append(GTK_BOX(box), lyrics_source_);
   gtk_box_append(GTK_BOX(box), lyrics_actions);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), box);
   widget_ = scroll;
@@ -234,9 +239,12 @@ void ContextView::RebuildTechnicalData() {
 
 void ContextView::AlbumCoverLoaded(const std::vector<unsigned char> &data) { album_->SetImage(data); }
 
-void ContextView::SetLyrics(const std::string &lyrics) {
+void ContextView::SetLyrics(const std::string &lyrics, const std::string &provider) {
   GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(lyrics_view_));
   gtk_text_buffer_set_text(buffer, lyrics.empty() ? Translations::CStr("No lyrics") : lyrics.c_str(), -1);
+  const std::string source = ContextLyrics::Attribution(provider);
+  gtk_label_set_text(GTK_LABEL(lyrics_source_), source.c_str());
+  gtk_widget_set_visible(lyrics_source_, !source.empty());
 }
 
 void ContextView::SearchLyrics(bool force) {
@@ -286,5 +294,9 @@ void ContextView::ApplyVisibility() {
   gtk_widget_set_visible(lyrics_view_, show_lyrics_);
   gtk_widget_set_visible(search_lyrics_btn_, show_lyrics_);
   gtk_widget_set_visible(auto_lyrics_btn_, show_lyrics_);
+  if (lyrics_source_) {
+    const char *source = gtk_label_get_text(GTK_LABEL(lyrics_source_));
+    gtk_widget_set_visible(lyrics_source_, show_lyrics_ && source && source[0] != '\0');
+  }
   PersistVisibility();
 }

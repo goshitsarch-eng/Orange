@@ -8,6 +8,7 @@
 #include "core/threadsafenetworkdiskcache.h"
 #include "covermanager/albumcoverexport.h"
 #include "covermanager/albumcovermanagerlist.h"
+#include "covermanager/albumcovermanagerselection.h"
 #include "covermanager/coveroptions.h"
 #include "device/devicestatefiltermodel.h"
 #include "engine/enginebase.h"
@@ -100,6 +101,13 @@ TEST(AlbumCoverManagerList, FiltersArtistHideAndText) {
   const SongList songs = AlbumCoverManagerList::SongsInAlbum({covered, missing}, album);
   ASSERT_EQ(1u, songs.size());
   EXPECT_EQ("Dummy", songs.front().album());
+}
+
+TEST(AlbumCoverManagerSelection, StatusAndPreferSelection) {
+  EXPECT_FALSE(AlbumCoverManagerSelection::PreferSelection(0));
+  EXPECT_TRUE(AlbumCoverManagerSelection::PreferSelection(2));
+  EXPECT_EQ("3 albums · 2 with artwork · 1 missing", AlbumCoverManagerSelection::StatusText(3, 2, 0));
+  EXPECT_EQ("3 albums · 2 with artwork · 1 missing · 2 selected", AlbumCoverManagerSelection::StatusText(3, 2, 2));
 }
 
 TEST(DeviceStateFilterModel, FiltersConnected) {

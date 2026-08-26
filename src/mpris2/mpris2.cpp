@@ -47,12 +47,36 @@ static const gchar *kMprisXml =
     "    <property name='CanSeek' type='b' access='read'/>"
     "    <property name='CanControl' type='b' access='read'/>"
     "  </interface>"
+    "  <interface name='org.mpris.MediaPlayer2.TrackList'>"
+    "    <method name='GetTracksMetadata'>"
+    "      <arg type='ao' name='TrackIds' direction='in'/>"
+    "      <arg type='aa{sv}' name='Metadata' direction='out'/>"
+    "    </method>"
+    "    <method name='AddTrack'>"
+    "      <arg type='s' name='Uri' direction='in'/>"
+    "      <arg type='o' name='AfterTrack' direction='in'/>"
+    "      <arg type='b' name='SetAsCurrent' direction='in'/>"
+    "    </method>"
+    "    <method name='RemoveTrack'>"
+    "      <arg type='o' name='TrackId' direction='in'/>"
+    "    </method>"
+    "    <method name='GoTo'>"
+    "      <arg type='o' name='TrackId' direction='in'/>"
+    "    </method>"
+    "    <property name='Tracks' type='ao' access='read'/>"
+    "    <property name='CanEditTracks' type='b' access='read'/>"
+    "    <signal name='TrackListReplaced'>"
+    "      <arg type='ao' name='Tracks'/>"
+    "      <arg type='o' name='CurrentTrack'/>"
+    "    </signal>"
+    "  </interface>"
     "</node>";
 
-static GVariant *MetadataVariant(const Song &song) {
+static GVariant *MetadataVariant(const Song &song, int row = -1) {
   GVariantBuilder b;
   g_variant_builder_init(&b, G_VARIANT_TYPE("a{sv}"));
-  g_variant_builder_add(&b, "{sv}", "mpris:trackid", g_variant_new_object_path(Mpris2Helpers::TrackId(song).c_str()));
+  const std::string track_id = row >= 0 ? Mpris2Helpers::TrackIdForRow(song, row) : Mpris2Helpers::TrackId(song);
+  g_variant_builder_add(&b, "{sv}", "mpris:trackid", g_variant_new_object_path(track_id.c_str()));
   g_variant_builder_add(&b, "{sv}", "xesam:title", g_variant_new_string(song.title().c_str()));
   g_variant_builder_add(&b, "{sv}", "xesam:album", g_variant_new_string(song.album().c_str()));
   const gchar *artists[] = {song.artist().c_str(), nullptr};
@@ -71,6 +95,30 @@ static GVariant *MetadataVariant(const Song &song) {
   if (!song.albumartist().empty()) {
     const gchar *albumartists[] = {song.albumartist().c_str(), nullptr};
     g_variant_builder_add(&b, "{sv}", "xesam:albumArtist", g_variant_new_strv(albumartists, -1));
+  }
+  return g_variant_builder_end(&b);
+}
+
+static int TrackListRow(Playlist *playlist, const char *track_id) {
+  if (!playlist || !track_id) {
+    return -1;
+  }
+  for (int i = 0; i < playlist->row_count(); ++i) {
+    if (Mpris2Helpers::TrackIdForRow(playlist->song(i), i) == track_id || Mpris2Helpers::TrackId(playlist->song(i)) == track_id) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+static GVariant *TrackListIds(Playlist *playlist) {
+  GVariantBuilder b;
+  g_variant_builder_init(&b, G_VARIANT_TYPE("ao"));
+  if (playlist) {
+    for (int i = 0; i < playlist->row_count(); ++i) {
+      const std::string id = Mpris2Helpers::TrackIdForRow(playlist->song(i), i);
+      g_variant_builder_add(&b, "o", id.c_str());
+    }
   }
   return g_variant_builder_end(&b);
 }
@@ -119,6 +167,65 @@ static void HandleMethod(GDBusConnection *, const gchar *, const gchar *, const 
           app->playlist_manager()->InsertUrls({uri});
           app->player()->Play();
         }
+      } else if (g_strcmp0(method, "GetTracksMetadata") == 0) {
+        GVariantIter *iter = nullptr;
+        g_variant_get(parameters, "(ao)", &iter);
+        GVariantBuilder b;
+        g_variant_builder_init(&b, G_VARIANT_TYPE("aa{sv}"));
+        Playlist *playlist = app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
+        const gchar *id = nullptr;
+        while (iter && g_variant_iter_loop(iter, "o", &id)) {
+          const int row = TrackListRow(playlist, id);
+          if (row >= 0) {
+            g_variant_builder_add_value(&b, MetadataVariant(playlist->song(row), row));
+          }
+        }
+        if (iter) {
+          g_variant_iter_free(iter);
+        }
+        g_dbus_method_invocation_return_value(invocation, g_variant_new("(aa{sv})", &b));
+        return;
+      } else if (g_strcmp0(method, "AddTrack") == 0) {
+        const gchar *uri = nullptr;
+        const gchar *after = nullptr;
+        gboolean current = FALSE;
+        g_variant_get(parameters, "(&s&ob)", &uri, &after, &current);
+        if (uri && app->playlist_manager()) {
+          Playlist *playlist = app->playlist_manager()->current();
+          int insert_row = -1;
+          if (after && std::string(after) != "/org/mpris/MediaPlayer2/TrackList/NoTrack") {
+            const int after_row = TrackListRow(playlist, after);
+            if (after_row >= 0) {
+              insert_row = after_row + 1;
+            }
+          }
+          app->playlist_manager()->InsertUrls({uri}, insert_row);
+          if (current) {
+            app->player()->Play();
+          }
+          if (self) {
+            self->EmitTrackListReplaced();
+          }
+        }
+      } else if (g_strcmp0(method, "RemoveTrack") == 0) {
+        const gchar *id = nullptr;
+        g_variant_get(parameters, "(&o)", &id);
+        Playlist *playlist = app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
+        const int row = TrackListRow(playlist, id);
+        if (playlist && row >= 0) {
+          playlist->RemoveRows({row});
+          if (self) {
+            self->EmitTrackListReplaced();
+          }
+        }
+      } else if (g_strcmp0(method, "GoTo") == 0) {
+        const gchar *id = nullptr;
+        g_variant_get(parameters, "(&o)", &id);
+        Playlist *playlist = app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
+        const int row = TrackListRow(playlist, id);
+        if (row >= 0) {
+          app->player()->PlayAt(row);
+        }
       }
     }
   }
@@ -141,7 +248,14 @@ static GVariant *HandleGet(GDBusConnection *, const gchar *, const gchar *, cons
     return g_variant_new_boolean(TRUE);
   }
   if (g_strcmp0(property, "HasTrackList") == 0) {
-    return g_variant_new_boolean(FALSE);
+    return g_variant_new_boolean(TRUE);
+  }
+  if (g_strcmp0(property, "CanEditTracks") == 0) {
+    return g_variant_new_boolean(TRUE);
+  }
+  if (g_strcmp0(property, "Tracks") == 0) {
+    Playlist *playlist = app && app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
+    return TrackListIds(playlist);
   }
   if (g_strcmp0(property, "PlaybackStatus") == 0) {
     if (!app || !app->player()) {
@@ -198,10 +312,14 @@ static GVariant *HandleGet(GDBusConnection *, const gchar *, const gchar *, cons
   }
   if (g_strcmp0(property, "Metadata") == 0) {
     Song song;
+    int row = -1;
     if (app && app->player()) {
       song = app->player()->current_song();
     }
-    return MetadataVariant(song);
+    if (app && app->playlist_manager() && app->playlist_manager()->active()) {
+      row = app->playlist_manager()->active()->current_row();
+    }
+    return MetadataVariant(song, row);
   }
   (void)interface;
   return nullptr;
@@ -236,6 +354,9 @@ Mpris2::Mpris2(Application *app) : app_(app) {
     app_->player()->SongChanged.Connect([this](const Song &) { EmitMetadata(); });
     app_->player()->VolumeChanged.Connect([this](unsigned) { EmitVolume(); });
   }
+  if (app_ && app_->playlist_manager()) {
+    app_->playlist_manager()->CurrentChanged.Connect([this](Playlist *) { EmitTrackListReplaced(); });
+  }
   owner_id_ = g_bus_own_name(G_BUS_TYPE_SESSION, "org.mpris.MediaPlayer2.strawberry", G_BUS_NAME_OWNER_FLAGS_NONE, OnBusAcquired, nullptr,
                              nullptr, this, nullptr);
 #endif
@@ -263,6 +384,9 @@ void Mpris2::OnBusAcquired(GDBusConnection *connection, const gchar *, gpointer 
   }
   g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[0], &kVtable, self, nullptr, nullptr);
   g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[1], &kVtable, self, nullptr, nullptr);
+  if (info->interfaces[2]) {
+    g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[2], &kVtable, self, nullptr, nullptr);
+  }
   g_dbus_node_info_unref(info);
 #else
   (void)connection;
@@ -326,10 +450,14 @@ void Mpris2::EmitPlaybackStatus() {
 void Mpris2::EmitMetadata() {
 #ifdef HAVE_MPRIS2
   Song song;
+  int row = -1;
   if (app_ && app_->player()) {
     song = app_->player()->current_song();
   }
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Metadata", MetadataVariant(song));
+  if (app_ && app_->playlist_manager() && app_->playlist_manager()->active()) {
+    row = app_->playlist_manager()->active()->current_row();
+  }
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Metadata", MetadataVariant(song, row));
 #endif
 }
 
@@ -337,5 +465,21 @@ void Mpris2::EmitVolume() {
 #ifdef HAVE_MPRIS2
   const double volume = app_ && app_->player() ? app_->player()->GetVolume() / 100.0 : 1.0;
   EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Volume", g_variant_new_double(volume));
+#endif
+}
+
+void Mpris2::EmitTrackListReplaced() {
+#ifdef HAVE_MPRIS2
+  if (!connection_) {
+    return;
+  }
+  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  std::string current = "/org/mpris/MediaPlayer2/TrackList/NoTrack";
+  if (playlist && playlist->current_row() >= 0) {
+    current = Mpris2Helpers::TrackIdForRow(playlist->current_song(), playlist->current_row());
+  }
+  g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.TrackList", "TrackListReplaced",
+                                g_variant_new("(@aoo)", TrackListIds(playlist), current.c_str()), nullptr);
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.TrackList", "Tracks", TrackListIds(playlist));
 #endif
 }

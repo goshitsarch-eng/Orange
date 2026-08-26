@@ -42,7 +42,8 @@ class OSDBase {
   OSDSettings::Type type() const { return type_; }
 
  protected:
-  virtual void ShowNative(const std::string &summary, const std::string &body, const std::string &icon = "audio-x-generic");
+  virtual void ShowNative(const std::string &summary, const std::string &body, const std::string &icon = "audio-x-generic",
+                          const std::vector<unsigned char> &art = {});
   std::string PlayingSummary(const Song &song) const;
   std::string PlayingBody(const Song &song) const;
 

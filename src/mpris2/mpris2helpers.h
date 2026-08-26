@@ -4,6 +4,7 @@
 #include "core/song.h"
 #include "playlist/playlistsequence.h"
 
+#include <cstdlib>
 #include <string>
 
 namespace Mpris2Helpers {
@@ -13,6 +14,21 @@ inline std::string TrackId(const Song &song) {
     return "/org/strawberrymusicplayer/Strawberry/Track/" + std::to_string(song.id());
   }
   return "/org/strawberrymusicplayer/Strawberry/Track/0";
+}
+
+inline std::string TrackIdForRow(const Song &song, int row) {
+  if (song.id() > 0) {
+    return TrackId(song);
+  }
+  return "/org/strawberrymusicplayer/Strawberry/Track/row" + std::to_string(row);
+}
+
+inline int RowFromTrackId(const std::string &track_id) {
+  const std::string prefix = "/org/strawberrymusicplayer/Strawberry/Track/row";
+  if (track_id.rfind(prefix, 0) != 0) {
+    return -1;
+  }
+  return std::atoi(track_id.c_str() + prefix.size());
 }
 
 inline std::string ArtUrl(const Song &song) {

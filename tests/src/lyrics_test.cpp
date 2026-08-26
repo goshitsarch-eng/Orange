@@ -1,3 +1,4 @@
+#include "context/contextlyrics.h"
 #include "lyrics/geniuslyricsprovider.h"
 #include "lyrics/htmllyricsprovider.h"
 
@@ -54,6 +55,11 @@ TEST(GeniusLyricsProvider, AuthorizationAndSearchUrl) {
   EXPECT_NE(std::string::npos, auth.find("response_type=code"));
   const std::string json = R"json({"response":{"hits":[{"result":{"url":"https://genius.com/portishead-roads-lyrics"}}]}})json";
   EXPECT_EQ("https://genius.com/portishead-roads-lyrics", GeniusLyricsProvider::ParseSearchResultUrl(json));
+}
+
+TEST(ContextLyrics, Attribution) {
+  EXPECT_TRUE(ContextLyrics::Attribution({}).empty());
+  EXPECT_EQ("Source: Genius", ContextLyrics::Attribution("Genius"));
 }
 
 TEST(StrUtils, TransliterateAscii) {

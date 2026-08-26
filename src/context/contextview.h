@@ -32,7 +32,7 @@ class ContextView {
   void Error();
   void SongChanged(const Song &song);
   void AlbumCoverLoaded(const std::vector<unsigned char> &data);
-  void SetLyrics(const std::string &lyrics);
+  void SetLyrics(const std::string &lyrics, const std::string &provider = {});
   void SearchLyrics(bool force = false);
   void SetSaveLyricsCallback(SaveLyricsCallback callback);
   void SetCoverDropCallback(CoverDropCallback callback);
@@ -60,6 +60,7 @@ class ContextView {
   GtkWidget *data_box_ = nullptr;
   GtkWidget *data_grid_ = nullptr;
   GtkWidget *lyrics_view_ = nullptr;
+  GtkWidget *lyrics_source_ = nullptr;
   GtkWidget *search_lyrics_btn_ = nullptr;
   GtkWidget *auto_lyrics_btn_ = nullptr;
   GtkWidget *show_album_btn_ = nullptr;
