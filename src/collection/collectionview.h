@@ -3,6 +3,7 @@
 
 #include "collection/collectioncover.h"
 #include "collection/collectionfilter.h"
+#include "collection/collectionkeyboard.h"
 #include "collection/collectionmodel.h"
 
 #include <gtk/gtk.h>
@@ -20,6 +21,7 @@ class CollectionView {
   using ActivateCallback = std::function<void(const SongList &)>;
   using EnqueueCallback = std::function<void(const SongList &)>;
   using EmptyCallback = std::function<void()>;
+  using FocusFilterCallback = std::function<void()>;
   using MenuCallback = std::function<void(double x, double y)>;
 
   CollectionView();
@@ -36,7 +38,10 @@ class CollectionView {
   void SetActivateCallback(ActivateCallback callback);
   void SetEnqueueCallback(EnqueueCallback callback);
   void SetEmptyCallback(EmptyCallback callback);
+  void SetFocusFilterCallback(FocusFilterCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  void FilterReturnPressed();
+  void FocusAndMove(CollectionKeyboard::Action action);
   void SetCoverLoader(AlbumCoverLoader *loader) { cover_loader_ = loader; }
   void ApplyLook();
   void Rebuild();
@@ -67,6 +72,7 @@ class CollectionView {
   ActivateCallback activate_;
   EnqueueCallback enqueue_;
   EmptyCallback empty_;
+  FocusFilterCallback focus_filter_;
   MenuCallback menu_;
   AlbumCoverLoader *cover_loader_ = nullptr;
   GtkWidget *widget_ = nullptr;

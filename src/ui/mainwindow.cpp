@@ -1,6 +1,7 @@
 #include "ui/mainwindow.h"
 
 #include "collection/collectionbehaviour.h"
+#include "collection/collectionfilterkeyboard.h"
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectionmenu.h"
 #include "collection/collectionfilteroptions.h"
@@ -297,6 +298,33 @@ void MainWindow::BuildUi() {
                      }
                      self->RefreshCollection(text ? text : "", true);
                    }),
+                   this);
+  g_signal_connect(collection_search_, "activate", G_CALLBACK(+[](GtkSearchEntry *, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     if (self->collection_container_) {
+                       self->collection_container_->view()->FilterReturnPressed();
+                     }
+                   }),
+                   this);
+  GtkEventController *search_keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(collection_search_, search_keys);
+  g_signal_connect(search_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<MainWindow *>(data);
+                     if (!self->collection_container_) {
+                       return FALSE;
+                     }
+                     const CollectionFilterKeyboard::Action action = CollectionFilterKeyboard::FromSearchKey(keyval);
+                     if (action == CollectionFilterKeyboard::Action::MoveUp || action == CollectionFilterKeyboard::Action::MoveDown) {
+                       self->collection_container_->view()->FocusAndMove(CollectionFilterKeyboard::SearchMoveAction(action));
+                       return TRUE;
+                     }
+                     if (action == CollectionFilterKeyboard::Action::Clear) {
+                       gtk_editable_set_text(GTK_EDITABLE(self->collection_search_), "");
+                       return TRUE;
+                     }
+                     return FALSE;
+                   })),
                    this);
 
   GtkWidget *toolbar = adw_toolbar_view_new();
@@ -896,6 +924,7 @@ void MainWindow::BuildSidebar() {
     ApplyCollectionPlan(CollectionBehaviour::Enqueue(), songs);
   });
   collection_container_->view()->SetEmptyCallback([this]() { OpenSettings(SettingsPages::Collection()); });
+  collection_container_->view()->SetFocusFilterCallback([this]() { FocusCollectionSearch(); });
   collection_container_->view()->SetMenuCallback([this](double, double) { ShowCollectionMenu(); });
   gtk_box_append(GTK_BOX(collection_page), collection_container_->widget());
   adw_view_stack_add_titled_with_icon(sidebar_stack_, collection_page, "collection", "Collection",

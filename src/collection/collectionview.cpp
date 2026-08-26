@@ -3,6 +3,7 @@
 #include "collection/collectionautoopen.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionempty.h"
+#include "collection/collectionfilterkeyboard.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectiondivider.h"
 #include "collection/collectioniconcache.h"
@@ -83,7 +84,40 @@ void CollectionView::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = s
 
 void CollectionView::SetEmptyCallback(EmptyCallback callback) { empty_ = std::move(callback); }
 
+void CollectionView::SetFocusFilterCallback(FocusFilterCallback callback) { focus_filter_ = std::move(callback); }
+
 void CollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+
+void CollectionView::FilterReturnPressed() {
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  auto *item = row ? static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item")) : nullptr;
+  if (!CollectionFilterKeyboard::CanActivate(item)) {
+    for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+      if (!GTK_IS_LIST_BOX_ROW(child)) {
+        continue;
+      }
+      item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(child), "item"));
+      if (CollectionFilterKeyboard::CanActivate(item)) {
+        row = GTK_LIST_BOX_ROW(child);
+        gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+        gtk_list_box_select_row(GTK_LIST_BOX(list_), row);
+        break;
+      }
+    }
+  }
+  if (row && CollectionFilterKeyboard::CanActivate(item)) {
+    ActivateRow(row);
+  }
+}
+
+void CollectionView::FocusAndMove(CollectionKeyboard::Action action) {
+  gtk_widget_grab_focus(list_);
+  if (action == CollectionKeyboard::Action::MoveUp || action == CollectionKeyboard::Action::MoveDown ||
+      action == CollectionKeyboard::Action::Home || action == CollectionKeyboard::Action::End) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), CollectionKeyboard::MoveAction(action)));
+  }
+}
 
 GtkWidget *CollectionView::CreateEmptyPlaceholder(bool collection_empty) const {
   if (!collection_empty) {
@@ -419,6 +453,13 @@ void CollectionView::TypeAhead(gunichar ch) {
 }
 
 gboolean CollectionView::OnKeyPressed(guint keyval) {
+  if (CollectionFilterKeyboard::FromTreeKey(keyval) == CollectionFilterKeyboard::Action::FocusFilter) {
+    ResetTypeAhead();
+    if (focus_filter_) {
+      focus_filter_();
+    }
+    return TRUE;
+  }
   const CollectionKeyboard::Action action = CollectionKeyboard::FromKey(keyval);
   if (action == CollectionKeyboard::Action::Expand || action == CollectionKeyboard::Action::Collapse) {
     const CollectionItem *item = SelectedItem();

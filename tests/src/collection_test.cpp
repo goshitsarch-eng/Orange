@@ -1,5 +1,6 @@
 #include "collection/collectionautoopen.h"
 #include "collection/collectionempty.h"
+#include "collection/collectionfilterkeyboard.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectionbackend.h"
 #include "collection/collectionbehaviour.h"
@@ -743,6 +744,23 @@ TEST(CollectionAutoOpen, DrillsSingleChildAndMatchesQtBudget) {
     node->AddChild(CollectionItem::Type::Song)->metadata = MakeSong("T", node->key, "A");
   }
   EXPECT_TRUE(CollectionAutoOpen::RecursivelyExpandKeys(&crowded, true).empty());
+}
+
+TEST(CollectionFilterKeyboard, ReturnActivatesAndEscapeFocusesFilter) {
+  EXPECT_EQ(CollectionFilterKeyboard::Action::Activate, CollectionFilterKeyboard::FromSearchKey(ListBoxKeyboard::kReturn));
+  EXPECT_EQ(CollectionFilterKeyboard::Action::MoveDown, CollectionFilterKeyboard::FromSearchKey(ListBoxKeyboard::kDown));
+  EXPECT_EQ(CollectionFilterKeyboard::Action::MoveUp, CollectionFilterKeyboard::FromSearchKey(ListBoxKeyboard::kUp));
+  EXPECT_EQ(CollectionFilterKeyboard::Action::Clear, CollectionFilterKeyboard::FromSearchKey(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(CollectionFilterKeyboard::Action::FocusFilter, CollectionFilterKeyboard::FromTreeKey(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(CollectionFilterKeyboard::Action::FocusFilter, CollectionFilterKeyboard::FromTreeKey(ListBoxKeyboard::kBackSpace));
+  EXPECT_EQ(CollectionKeyboard::Action::MoveDown, CollectionFilterKeyboard::SearchMoveAction(CollectionFilterKeyboard::Action::MoveDown));
+  CollectionItem root(CollectionItem::Type::Root);
+  CollectionItem *divider = root.AddChild(CollectionItem::Type::Divider);
+  CollectionItem *artist = root.AddChild(CollectionItem::Type::Container);
+  artist->key = "Portishead";
+  EXPECT_FALSE(CollectionFilterKeyboard::CanActivate(divider));
+  EXPECT_TRUE(CollectionFilterKeyboard::CanActivate(artist));
+  EXPECT_EQ(artist, CollectionFilterKeyboard::FirstActivatable(&root));
 }
 
 TEST(CollectionEmpty, UsesQtCopyAndOpensOnPrimaryClick) {
