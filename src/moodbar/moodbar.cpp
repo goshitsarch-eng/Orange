@@ -1,22 +1,48 @@
 #include "moodbar/moodbar.h"
 
+#include "constants/moodbarsettings.h"
 #include "core/seekbarsettings.h"
 #include "core/settings.h"
 #include "core/standardpaths.h"
+#include "moodbar/moodbarpaths.h"
 #include "moodbar/moodbarpipeline.h"
 #include "utilities/fileutils.h"
 
+namespace {
+
+std::vector<uint8_t> ReadMood(const std::string &path) {
+  if (path.empty() || !FileUtils::Exists(path)) {
+    return {};
+  }
+  const std::string data = FileUtils::ReadFile(path);
+  return std::vector<uint8_t>(data.begin(), data.end());
+}
+
+}  // namespace
+
 std::vector<uint8_t> MoodbarLoader::Load(const Song &song) {
-  const std::string cache = FileUtils::Join(StandardPaths::MoodbarCacheDir(), FileUtils::BaseName(song.url()) + ".mood");
-  if (FileUtils::Exists(cache)) {
-    const std::string data = FileUtils::ReadFile(cache);
+  Settings settings;
+  settings.BeginGroup(MoodbarSettings::kSettingsGroup);
+  const bool save = settings.BoolValue(MoodbarSettings::kSave, MoodbarSettings::kDefaultSave);
+  const std::string path = FileUtils::PathFromUri(song.url());
+  for (const std::string &sidecar : MoodbarPaths::Sidecars(path)) {
+    const std::vector<uint8_t> data = ReadMood(sidecar);
     if (!data.empty()) {
-      return std::vector<uint8_t>(data.begin(), data.end());
+      return data;
     }
   }
+  const std::string cache = MoodbarPaths::CacheFile(StandardPaths::MoodbarCacheDir(), song.url());
+  const std::vector<uint8_t> cached = ReadMood(cache);
+  if (!cached.empty()) {
+    return cached;
+  }
   const std::vector<uint8_t> mood = MoodbarPipeline::Run(song.url());
-  if (!mood.empty()) {
-    FileUtils::WriteFile(cache, std::string(mood.begin(), mood.end()));
+  if (mood.empty()) {
+    return mood;
+  }
+  FileUtils::WriteFile(cache, std::string(mood.begin(), mood.end()));
+  if (save && !path.empty()) {
+    FileUtils::WriteFile(MoodbarPaths::HiddenSidecar(path), std::string(mood.begin(), mood.end()));
   }
   return mood;
 }

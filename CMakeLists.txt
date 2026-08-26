@@ -756,6 +756,7 @@ if(GTest_FOUND)
     tests/src/settings_test.cpp
     tests/src/settingspage_test.cpp
     tests/src/jsonutils_test.cpp
+    tests/src/moodbar_waveform_test.cpp
     src/core/logging.cpp
     src/core/standardpaths.cpp
     src/core/settings.cpp
