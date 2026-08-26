@@ -1,43 +1,50 @@
 #include "engine/devicefinders.h"
 
 #include "config.h"
-
-#ifdef HAVE_PULSE
-#  include <pulse/pulseaudio.h>
-#endif
-
 #ifdef HAVE_ALSA
-#  include <alsa/asoundlib.h>
+#include "engine/alsadevicefinder.h"
+#include "engine/alsapcmdevicefinder.h"
 #endif
+#ifdef HAVE_PULSE
+#include "engine/pulsedevicefinder.h"
+#endif
+
+DeviceFinders::DeviceFinders() = default;
+DeviceFinders::~DeviceFinders() = default;
 
 void DeviceFinders::Init() {
+  finders_.clear();
   devices_.clear();
   devices_.push_back({"", "Default", "audio-card-symbolic", "autoaudiosink"});
-
 #ifdef HAVE_PULSE
-  devices_.push_back({"", "PulseAudio", "audio-card-symbolic", "pulsesink"});
+  finders_.push_back(std::make_unique<PulseDeviceFinder>());
 #endif
 #ifdef HAVE_ALSA
-  void **hints = nullptr;
-  if (snd_device_name_hint(-1, "pcm", &hints) == 0) {
-    for (void **hint = hints; *hint; ++hint) {
-      char *name = snd_device_name_get_hint(*hint, "NAME");
-      char *desc = snd_device_name_get_hint(*hint, "DESC");
-      if (name) {
-        AudioDevice device;
-        device.id = name;
-        device.description = desc ? desc : name;
-        device.iconname = "audio-card-symbolic";
-        device.output = "alsasink";
-        devices_.push_back(device);
-      }
-      free(name);
-      free(desc);
-    }
-    snd_device_name_free_hint(hints);
-  }
+  finders_.push_back(std::make_unique<AlsaDeviceFinder>());
+  finders_.push_back(std::make_unique<AlsaPCMDeviceFinder>());
 #endif
+  for (auto &finder : finders_) {
+    if (!finder->Initialize()) {
+      continue;
+    }
+    for (const EngineDevice &device : finder->ListDevices()) {
+      AudioDevice audio;
+      audio.id = device.value;
+      audio.description = device.description.empty() ? device.value : device.description;
+      audio.iconname = device.iconname.empty() ? "audio-card-symbolic" : device.iconname;
+      audio.output = finder->outputs().empty() ? "autoaudiosink" : finder->outputs().back();
+      devices_.push_back(audio);
+    }
+  }
   devices_.push_back({"", "PipeWire", "audio-card-symbolic", "pipewiresink"});
+}
+
+std::vector<DeviceFinder *> DeviceFinders::ListFinders() const {
+  std::vector<DeviceFinder *> out;
+  for (const auto &finder : finders_) {
+    out.push_back(finder.get());
+  }
+  return out;
 }
 
 std::vector<AudioDevice> DeviceFinders::ListDevices() const { return devices_; }

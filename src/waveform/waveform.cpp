@@ -1,8 +1,8 @@
 #include "waveform/waveform.h"
 
 #include "core/standardpaths.h"
-#include "utilities/audioanalysis.h"
 #include "utilities/fileutils.h"
+#include "waveform/waveformpipeline.h"
 
 #include <cstdlib>
 
@@ -27,11 +27,7 @@ std::vector<float> WaveformLoader::Load(const Song &song) {
       return peaks;
     }
   }
-  const std::vector<int16_t> pcm = AudioAnalysis::DecodePcm(song.url());
-  if (pcm.empty()) {
-    return {};
-  }
-  const std::vector<float> peaks = AudioAnalysis::PeaksFromPcm(pcm.data(), pcm.size(), 1, 512);
+  const std::vector<float> peaks = WaveformPipeline::Run(song.url());
   std::string serialized;
   serialized.reserve(peaks.size() * 8);
   for (float peak : peaks) {

@@ -4,6 +4,7 @@
 #include "core/application.h"
 #include "core/commandlineoptions.h"
 #include "core/logging.h"
+#include "engine/gststartup.h"
 #include "ui/mainwindow.h"
 
 #include <adwaita.h>
@@ -59,7 +60,7 @@ int main(int argc, char **argv) {
     logging::SetDebugEnabled(true);
   }
 
-  gst_init(&argc, &argv);
+  GstStartup::Initialize();
   adw_init();
 
   Runtime runtime;

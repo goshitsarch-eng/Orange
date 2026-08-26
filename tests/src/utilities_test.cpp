@@ -12,11 +12,29 @@
 #include "organize/organize.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/fht.h"
+#include "core/deletefiles.h"
+#include "core/enginemetadata.h"
+#include "core/filesystemmusicstorage.h"
+#include "core/memorydatabase.h"
+#include "core/scopedtransaction.h"
+#include "core/temporaryfile.h"
+#include "device/cddalister.h"
+#include "device/udisks2lister.h"
+#include "engine/alsadevicefinder.h"
+#include "engine/chromaprinter.h"
+#include "engine/devicefinders.h"
+#include "engine/ebur128analysis.h"
+#include "engine/enginedevice.h"
+#include "engine/gststartup.h"
+#include "moodbar/moodbarbuilder.h"
 #include "transcoder/transcoder.h"
+#include "waveform/waveformbuilder.h"
+#include "widgets/stretchheaderview.h"
 
 #include <algorithm>
 #include <cstdint>
 #include <glib.h>
+#include <gst/gst.h>
 #include <unistd.h>
 #include <gtest/gtest.h>
 
@@ -275,6 +293,119 @@ TEST(FilesystemDevice, SongsFromMountedDirectory) {
 TEST(GioLister, BackendName) {
   GioLister lister;
   EXPECT_EQ("gio", lister.backend());
+}
+
+TEST(DeviceFinders, OutputsAndDefaultDevice) {
+  DeviceFinders finders;
+  finders.Init();
+  const auto outputs = finders.Outputs();
+  EXPECT_NE(outputs.end(), std::find(outputs.begin(), outputs.end(), "autoaudiosink"));
+  EXPECT_NE(outputs.end(), std::find(outputs.begin(), outputs.end(), "alsasink"));
+  ASSERT_FALSE(finders.ListDevices().empty());
+  EXPECT_EQ("Default", finders.ListDevices().front().description);
+  AlsaDeviceFinder alsa;
+  EXPECT_EQ("alsa", alsa.name());
+  EXPECT_TRUE(alsa.Initialize());
+}
+
+TEST(EngineDevice, GuessIconName) {
+  EngineDevice hdmi;
+  hdmi.description = "HDMI output";
+  EXPECT_EQ("video-display-symbolic", hdmi.GuessIconName());
+  EngineDevice usb;
+  usb.description = "USB Headset";
+  EXPECT_EQ("audio-headphones-symbolic", usb.GuessIconName());
+}
+
+TEST(GstStartup, InitializeIsIdempotent) {
+  GstStartup::Initialize();
+  GstStartup::Initialize();
+  EXPECT_TRUE(gst_is_initialized());
+}
+
+TEST(Chromaprinter, EmptyUrlReportsError) {
+  Chromaprinter printer("");
+  EXPECT_TRUE(printer.CreateFingerprint().empty());
+  EXPECT_FALSE(printer.LastError().empty());
+}
+
+TEST(EBUR128Analysis, EmptySongIsNullopt) {
+  EXPECT_FALSE(EBUR128Analysis::Compute(Song()).has_value());
+}
+
+TEST(MoodbarBuilder, FromPcm) {
+  const int16_t samples[] = {0, 32767, 0, -16384};
+  const auto mood = MoodbarBuilder::FromPcm(samples, 4, 1, 2);
+  ASSERT_EQ(6u, mood.size());
+}
+
+TEST(WaveformBuilder, FromPcm) {
+  const int16_t samples[] = {0, 32767, 0, -16384};
+  const auto peaks = WaveformBuilder::FromPcm(samples, 4, 1, 2);
+  ASSERT_EQ(2u, peaks.size());
+  EXPECT_GT(peaks[0], 0.9f);
+}
+
+TEST(FilesystemMusicStorage, CopyAndDelete) {
+  TemporaryFile tmp("strawberry-src-XXXXXX");
+  ASSERT_FALSE(tmp.filename().empty());
+  ASSERT_TRUE(FileUtils::WriteFile(tmp.filename(), "abc"));
+  const std::string dest_dir = "/tmp/strawberry-storage-" + std::to_string(getpid());
+  g_mkdir_with_parents(dest_dir.c_str(), 0755);
+  FilesystemMusicStorage storage(dest_dir);
+  MusicStorage::CopyJob job;
+  job.source = tmp.filename();
+  job.destination = FileUtils::Join(dest_dir, "copied.txt");
+  std::string error;
+  EXPECT_TRUE(storage.CopyToStorage(job, error));
+  EXPECT_EQ("abc", FileUtils::ReadFile(job.destination));
+  Song song;
+  song.set_url(FileUtils::UriFromPath(job.destination));
+  EXPECT_TRUE(storage.DeleteFromStorage({song, false}));
+  EXPECT_FALSE(FileUtils::Exists(job.destination));
+  rmdir(dest_dir.c_str());
+}
+
+TEST(DeleteFiles, ReportsMissingFiles) {
+  TaskManager tasks;
+  FilesystemMusicStorage storage("/tmp");
+  DeleteFiles deleter(&tasks, &storage, false);
+  Song missing;
+  missing.set_url("file:///tmp/does-not-exist-strawberry.flac");
+  deleter.Start(SongList{missing});
+  ASSERT_EQ(1u, deleter.errors().size());
+}
+
+TEST(MemoryDatabase, OpensAndScopedTransaction) {
+  MemoryDatabase db;
+  ASSERT_TRUE(db.Open());
+  ScopedTransaction tx(&db);
+  EXPECT_TRUE(db.Exec("CREATE TABLE IF NOT EXISTS t(id INTEGER)"));
+  tx.Commit();
+}
+
+TEST(EngineMetadata, ToSong) {
+  EngineMetadata meta;
+  meta.title = "Roads";
+  meta.artist = "Portishead";
+  meta.length_nanosec = 1000;
+  const Song song = meta.ToSong(Song::Source::LocalFile);
+  EXPECT_EQ("Roads", song.title());
+  EXPECT_EQ("Portishead", song.artist());
+  EXPECT_EQ(Song::Source::LocalFile, song.source());
+}
+
+TEST(StretchHeaderView, StretchColumnTakesRemainder) {
+  StretchHeaderView header;
+  header.SetColumns({"A", "B", "C"});
+  header.SetStretchColumn(1);
+  EXPECT_NEAR(96.0, header.ColumnWidth(0, 400), 0.01);
+  EXPECT_NEAR(208.0, header.ColumnWidth(1, 400), 0.01);
+}
+
+TEST(CddaAndUdisksListers, BackendNames) {
+  EXPECT_EQ("cdda", CddaLister().backend());
+  EXPECT_EQ("udisks2", Udisks2Lister().backend());
 }
 
 TEST(FileUtils, ListDirectoryRecursive) {

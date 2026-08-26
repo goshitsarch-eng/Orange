@@ -1,7 +1,7 @@
 #include "moodbar/moodbar.h"
 
 #include "core/standardpaths.h"
-#include "utilities/audioanalysis.h"
+#include "moodbar/moodbarpipeline.h"
 #include "utilities/fileutils.h"
 
 std::vector<uint8_t> MoodbarLoader::Load(const Song &song) {
@@ -12,12 +12,10 @@ std::vector<uint8_t> MoodbarLoader::Load(const Song &song) {
       return std::vector<uint8_t>(data.begin(), data.end());
     }
   }
-  const std::vector<int16_t> pcm = AudioAnalysis::DecodePcm(song.url());
-  if (pcm.empty()) {
-    return {};
+  const std::vector<uint8_t> mood = MoodbarPipeline::Run(song.url());
+  if (!mood.empty()) {
+    FileUtils::WriteFile(cache, std::string(mood.begin(), mood.end()));
   }
-  const std::vector<uint8_t> mood = AudioAnalysis::MoodFromPeaks(AudioAnalysis::PeaksFromPcm(pcm.data(), pcm.size(), 1, 300));
-  FileUtils::WriteFile(cache, std::string(mood.begin(), mood.end()));
   return mood;
 }
 

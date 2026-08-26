@@ -6,9 +6,11 @@
 #include "core/database.h"
 #include "device/devicedatabasebackend.h"
 #include "device/cddadevice.h"
+#include "device/cddalister.h"
 #include "device/cddasongloader.h"
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
+#include "device/udisks2lister.h"
 #include "device/gpoddevice.h"
 #include "device/gpodloader.h"
 #include "device/mtpconnection.h"
@@ -127,14 +129,15 @@ void DeviceManager::Rescan() {
   const std::vector<ConnectedDevice> volumes = GioLister().List();
   devices_.insert(devices_.end(), volumes.begin(), volumes.end());
 #endif
+#ifdef HAVE_UDISKS2
   {
-    CddaDevice cd;
-    const SongList tracks = cd.Songs();
-    if (!tracks.empty()) {
-      ConnectedDevice entry = cd.info();
-      entry.unique_id = "cdda:default";
-      devices_.push_back(entry);
-    }
+    const std::vector<ConnectedDevice> udisks = Udisks2Lister().List();
+    devices_.insert(devices_.end(), udisks.begin(), udisks.end());
+  }
+#endif
+  {
+    const std::vector<ConnectedDevice> cds = CddaLister().List();
+    devices_.insert(devices_.end(), cds.begin(), cds.end());
   }
 #ifdef HAVE_MTP
   {

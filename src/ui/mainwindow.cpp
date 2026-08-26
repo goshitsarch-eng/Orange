@@ -5,6 +5,8 @@
 #include "collection/collectionviewcontainer.h"
 #include "context/contextview.h"
 #include "device/deviceviewcontainer.h"
+#include "moodbar/moodbarrenderer.h"
+#include "waveform/waveformrenderer.h"
 #include "fileview/fileview.h"
 #include "playlist/playlistcontainer.h"
 #include "radios/radiostreamplaylistitem.h"
@@ -1104,31 +1106,10 @@ void MainWindow::DrawAnalyzer(GtkDrawingArea *, cairo_t *cr, int width, int heig
 
 void MainWindow::DrawMoodbar(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
   auto *self = static_cast<MainWindow *>(data);
-  const auto &mood = self->app_->moodbar()->data();
-  if (mood.empty() || width <= 0) {
-    return;
-  }
-  for (int x = 0; x < width; ++x) {
-    const size_t i = static_cast<size_t>(x) * mood.size() / static_cast<size_t>(width);
-    const double v = mood[i] / 255.0;
-    cairo_set_source_rgb(cr, 0.2 + v * 0.6, 0.1 + v * 0.4, 0.7 - v * 0.3);
-    cairo_rectangle(cr, x, 0, 1, height);
-    cairo_fill(cr);
-  }
+  MoodbarRenderer::Draw(cr, width, height, self->app_->moodbar()->data());
 }
 
 void MainWindow::DrawWaveform(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
   auto *self = static_cast<MainWindow *>(data);
-  const auto &wave = self->app_->waveform()->data();
-  if (wave.empty() || width <= 0) {
-    return;
-  }
-  cairo_set_source_rgb(cr, 0.35, 0.72, 0.45);
-  cairo_move_to(cr, 0, height / 2.0);
-  for (int x = 0; x < width; ++x) {
-    const size_t i = static_cast<size_t>(x) * wave.size() / static_cast<size_t>(width);
-    const double amp = std::max(0.05, static_cast<double>(wave[i]));
-    cairo_line_to(cr, x, height / 2.0 - amp * height / 2.0);
-  }
-  cairo_stroke(cr);
+  WaveformRenderer::Draw(cr, width, height, self->app_->waveform()->data());
 }

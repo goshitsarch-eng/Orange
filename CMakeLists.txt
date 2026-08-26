@@ -150,15 +150,32 @@ set(STRAWBERRY_SOURCES
   src/core/urlhandlers.cpp
   src/core/oauthenticator.cpp
   src/core/songloader.cpp
+  src/core/enginemetadata.cpp
+  src/core/filesystemmusicstorage.cpp
+  src/core/deletefiles.cpp
+  src/core/iconloader.cpp
+  src/core/scopedtransaction.cpp
+  src/core/temporaryfile.cpp
+  src/core/memorydatabase.cpp
+  src/core/localredirectserver.cpp
+  src/core/unixsignalwatcher.cpp
   src/utilities/timeutils.cpp
   src/utilities/fileutils.cpp
   src/utilities/strutils.cpp
   src/utilities/jsonutils.cpp
   src/utilities/musixmatchprovider.cpp
   src/utilities/audioanalysis.cpp
+  src/engine/gststartup.cpp
   src/engine/gstengine.cpp
   src/engine/gstenginepipeline.cpp
+  src/engine/enginedevice.cpp
+  src/engine/devicefinder.cpp
+  src/engine/alsadevicefinder.cpp
+  src/engine/alsapcmdevicefinder.cpp
+  src/engine/pulsedevicefinder.cpp
   src/engine/devicefinders.cpp
+  src/engine/chromaprinter.cpp
+  src/engine/ebur128analysis.cpp
   src/core/player.cpp
   src/tagreader/tagreader.cpp
   src/tagreader/tagreadergme.cpp
@@ -227,6 +244,10 @@ set(STRAWBERRY_SOURCES
   src/widgets/freespacebar.cpp
   src/widgets/groupediconview.cpp
   src/widgets/multiloadingindicator.cpp
+  src/widgets/lineedit.cpp
+  src/widgets/stretchheaderview.cpp
+  src/widgets/tracksliderpopup.cpp
+  src/widgets/fancytabbar.cpp
   src/context/contextalbum.cpp
   src/context/contextview.cpp
   src/queue/queue.cpp
@@ -343,6 +364,9 @@ set(STRAWBERRY_SOURCES
   src/device/cddasongloader.cpp
   src/device/cddadevice.cpp
   src/device/giolister.cpp
+  src/device/udisks2lister.cpp
+  src/device/cddalister.cpp
+  src/device/deviceproperties.cpp
   src/device/deviceview.cpp
   src/device/deviceviewcontainer.cpp
   src/equalizer/equalizer.cpp
@@ -350,7 +374,13 @@ set(STRAWBERRY_SOURCES
   src/analyzer/fht.cpp
   src/analyzer/analyzer.cpp
   src/analyzer/analyzer_render.cpp
+  src/moodbar/moodbarbuilder.cpp
+  src/moodbar/moodbarpipeline.cpp
+  src/moodbar/moodbarrenderer.cpp
   src/moodbar/moodbar.cpp
+  src/waveform/waveformbuilder.cpp
+  src/waveform/waveformpipeline.cpp
+  src/waveform/waveformrenderer.cpp
   src/waveform/waveform.cpp
   src/transcoder/transcoder.cpp
   src/transcoder/transcoderoptionsinterface.cpp
@@ -440,6 +470,7 @@ if(HAVE_PULSE)
   target_link_libraries(strawberry PRIVATE PkgConfig::LIBPULSE)
 endif()
 if(HAVE_ALSA)
+  target_include_directories(strawberry PRIVATE ${ALSA_INCLUDE_DIRS})
   target_link_libraries(strawberry PRIVATE ${ALSA_LIBRARIES})
 endif()
 if(HAVE_CHROMAPRINT)
@@ -517,6 +548,24 @@ if(GTest_FOUND)
     src/core/network.cpp
     src/core/oauthenticator.cpp
     src/core/songloader.cpp
+    src/core/enginemetadata.cpp
+    src/core/filesystemmusicstorage.cpp
+    src/core/deletefiles.cpp
+    src/core/scopedtransaction.cpp
+    src/core/temporaryfile.cpp
+    src/core/memorydatabase.cpp
+    src/engine/gststartup.cpp
+    src/engine/enginedevice.cpp
+    src/engine/devicefinder.cpp
+    src/engine/alsadevicefinder.cpp
+    src/engine/alsapcmdevicefinder.cpp
+    src/engine/pulsedevicefinder.cpp
+    src/engine/devicefinders.cpp
+    src/engine/chromaprinter.cpp
+    src/engine/ebur128analysis.cpp
+    src/moodbar/moodbarbuilder.cpp
+    src/waveform/waveformbuilder.cpp
+    src/widgets/stretchheaderview.cpp
     src/core/urlhandlers.cpp
     src/utilities/timeutils.cpp
     src/utilities/fileutils.cpp
@@ -535,6 +584,8 @@ if(GTest_FOUND)
     src/device/cddasongloader.cpp
     src/device/cddadevice.cpp
     src/device/giolister.cpp
+    src/device/udisks2lister.cpp
+    src/device/cddalister.cpp
     src/playlistparsers/parserbase.cpp
     src/playlistparsers/m3uparser.cpp
     src/playlistparsers/plsparser.cpp
@@ -678,6 +729,19 @@ if(GTest_FOUND)
   endif()
   if(HAVE_AUDIOCD)
     target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBCDIO)
+  endif()
+  if(HAVE_PULSE)
+    target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBPULSE)
+  endif()
+  if(HAVE_ALSA)
+    target_include_directories(strawberry_tests PRIVATE ${ALSA_INCLUDE_DIRS})
+    target_link_libraries(strawberry_tests PRIVATE ${ALSA_LIBRARIES})
+  endif()
+  if(HAVE_CHROMAPRINT)
+    target_link_libraries(strawberry_tests PRIVATE PkgConfig::CHROMAPRINT)
+  endif()
+  if(HAVE_EBUR128)
+    target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBEBUR128)
   endif()
   add_test(NAME strawberry_tests COMMAND strawberry_tests)
   add_custom_target(build_tests DEPENDS strawberry_tests)
