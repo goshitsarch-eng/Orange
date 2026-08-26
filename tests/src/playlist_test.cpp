@@ -47,6 +47,19 @@ TEST(Playlist, DynamicRefill) {
   playlist.RefillDynamic({have, extra, skip});
   EXPECT_EQ(2, playlist.row_count());
   EXPECT_EQ("Extra", playlist.songs().back().title());
+  playlist.set_current_row(0);
+  Song more;
+  more.set_title("More");
+  more.set_artist("A Group");
+  more.set_url("file:///more");
+  more.set_valid(true);
+  playlist.ExpandDynamic({have, extra, skip, more});
+  EXPECT_EQ(3, playlist.row_count());
+  playlist.RepopulateDynamic({have, extra, skip, more});
+  EXPECT_GE(playlist.row_count(), 1);
+  playlist.SetDynamic(false);
+  EXPECT_FALSE(playlist.is_dynamic());
+  EXPECT_EQ(Playlist::SequenceMode::Sequential, playlist.sequence_mode());
 }
 
 TEST(Playlist, PeekNextDoesNotAdvance) {

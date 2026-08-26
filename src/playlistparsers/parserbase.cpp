@@ -1,10 +1,20 @@
 #include "playlistparsers/parserbase.h"
 
+#include "constants/playlistsettings.h"
+#include "core/settings.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
 
 #include <algorithm>
 #include <cctype>
+
+namespace {
+
+int g_path_type_override = -1;
+
+}  // namespace
+
+void ParserBase::SetPathTypeOverride(int type) { g_path_type_override = type; }
 
 bool ParserBase::HasUrlScheme(const std::string &value) {
   const size_t colon = value.find(':');
@@ -44,10 +54,22 @@ Song ParserBase::LoadSong(const std::string &playlist_dir, const std::string &en
 }
 
 std::string ParserBase::URLOrFilename(const std::string &url, const std::string &playlist_dir) {
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  const int stored = g_path_type_override >= 0
+                         ? g_path_type_override
+                         : settings.IntValue(PlaylistSettings::kPathType, static_cast<int>(PlaylistSettings::kDefaultPathType));
+  const auto type = static_cast<PlaylistSettings::PathType>(stored);
   if (url.rfind("file://", 0) == 0) {
     std::string path = FileUtils::PathFromUri(url);
+    if (type == PlaylistSettings::PathType::Absolute) {
+      return path;
+    }
     if (!playlist_dir.empty() && StrUtils::StartsWith(path, playlist_dir + "/")) {
       return path.substr(playlist_dir.size() + 1);
+    }
+    if (type == PlaylistSettings::PathType::Relative) {
+      return FileUtils::BaseName(path);
     }
     return path;
   }

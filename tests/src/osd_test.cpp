@@ -1,3 +1,4 @@
+#include "core/seekbarsettings.h"
 #include "core/song.h"
 #include "core/standardpaths.h"
 #include "osd/osdbase.h"
@@ -80,6 +81,13 @@ TEST(OSDBase, CustomTextAndPlaylistFinished) {
   osd.PlaylistFinished();
   EXPECT_EQ("Strawberry", tray.popup_summary());
   EXPECT_EQ("Playlist finished", tray.popup_message());
+}
+
+TEST(SeekbarSettings, ModeValuesMatchQt) {
+  EXPECT_EQ(0, static_cast<int>(SeekbarSettings::Mode::Normal));
+  EXPECT_EQ(1, static_cast<int>(SeekbarSettings::Mode::Moodbar));
+  EXPECT_EQ(2, static_cast<int>(SeekbarSettings::Mode::Waveform));
+  EXPECT_STREQ("mode", SeekbarSettings::kMode);
 }
 
 TEST(Translations, AvailableLanguagesIncludeGerman) {

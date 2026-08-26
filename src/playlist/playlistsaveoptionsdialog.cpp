@@ -1,31 +1,35 @@
 #include "playlist/playlistsaveoptionsdialog.h"
 
+#include "translations/translations.h"
+
 #include <adwaita.h>
 
 const char *PlaylistSaveOptionsDialog::Label(PathType type) {
   switch (type) {
-    case PathType::Relative:
-      return "Relative paths";
     case PathType::Absolute:
-      return "Absolute paths";
+      return Translations::CStr("Absolute paths");
+    case PathType::Relative:
+      return Translations::CStr("Relative paths");
+    case PathType::Ask_User:
+      return Translations::CStr("Ask every time");
     case PathType::Automatic:
     default:
-      return "Automatic";
+      return Translations::CStr("Automatic");
   }
 }
 
 void PlaylistSaveOptionsDialog::Show(GtkWindow *parent, const std::function<void(PathType)> &callback) {
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, "Playlist save options");
+  adw_dialog_set_title(dialog, Translations::CStr("Playlist save options"));
   adw_dialog_set_content_width(dialog, 360);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
   gtk_widget_set_margin_start(box, 16);
   gtk_widget_set_margin_end(box, 16);
   gtk_widget_set_margin_top(box, 16);
   gtk_widget_set_margin_bottom(box, 16);
-  static const char *labels[] = {"Automatic", "Relative paths", "Absolute paths", nullptr};
+  const char *labels[] = {Label(PathType::Automatic), Label(PathType::Absolute), Label(PathType::Relative), nullptr};
   GtkWidget *drop = gtk_drop_down_new_from_strings(labels);
-  GtkWidget *save = gtk_button_new_with_label("Save");
+  GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save"));
   gtk_widget_add_css_class(save, "suggested-action");
   auto *cb = new std::function<void(PathType)>(callback);
   g_object_set_data_full(G_OBJECT(dialog), "callback", cb, [](gpointer p) { delete static_cast<std::function<void(PathType)> *>(p); });
@@ -41,7 +45,7 @@ void PlaylistSaveOptionsDialog::Show(GtkWindow *parent, const std::function<void
                      adw_dialog_close(ADW_DIALOG(dlg));
                    }),
                    cb);
-  gtk_box_append(GTK_BOX(box), gtk_label_new("File path style"));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("File path style")));
   gtk_box_append(GTK_BOX(box), drop);
   gtk_box_append(GTK_BOX(box), save);
   adw_dialog_set_child(dialog, box);

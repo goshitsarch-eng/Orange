@@ -35,6 +35,8 @@ void TrackSlider::SetTimes(int64_t position_nanosec, int64_t length_nanosec) {
 
 void TrackSlider::SetSeekCallback(SeekCallback callback) { seek_ = std::move(callback); }
 
+void TrackSlider::SetSliderVisible(bool visible) { gtk_widget_set_visible(slider_.widget(), visible); }
+
 void TrackSlider::UpdateLabels() {
   position_text_ = Utilities::PrettyTimeNanosec(position_nanosec_);
   duration_text_ = Utilities::PrettyTimeNanosec(length_nanosec_);

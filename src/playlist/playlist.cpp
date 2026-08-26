@@ -425,15 +425,21 @@ void Playlist::SetDynamic(bool dynamic, const SmartPlaylistSearch &search) {
   dynamic_search_ = search;
   if (dynamic) {
     mode_ = SequenceMode::Dynamic;
+  } else if (mode_ == SequenceMode::Dynamic) {
+    mode_ = SequenceMode::Sequential;
   }
 }
 
-void Playlist::RefillDynamic(const SongList &pool) {
+void Playlist::RefillDynamic(const SongList &pool, bool force) {
   if (!dynamic_) {
     return;
   }
   const int upcoming = current_row_ < 0 ? row_count() : row_count() - current_row_ - 1;
-  if (upcoming >= 15) {
+  if (!force && upcoming >= 15) {
+    return;
+  }
+  const int want = force ? 15 : std::max(0, 15 - upcoming);
+  if (want <= 0) {
     return;
   }
   SongList candidates = dynamic_search_.Search(pool);
@@ -449,11 +455,27 @@ void Playlist::RefillDynamic(const SongList &pool) {
     if (!seen) {
       extra.push_back(song);
     }
-    if (static_cast<int>(extra.size()) >= 15 - upcoming) {
+    if (static_cast<int>(extra.size()) >= want) {
       break;
     }
   }
   if (!extra.empty()) {
     AppendSongs(extra);
   }
+}
+
+void Playlist::ExpandDynamic(const SongList &pool) { RefillDynamic(pool, true); }
+
+void Playlist::RepopulateDynamic(const SongList &pool) {
+  if (!dynamic_) {
+    return;
+  }
+  std::vector<int> after;
+  for (int i = current_row_ + 1; i < row_count(); ++i) {
+    after.push_back(i);
+  }
+  if (!after.empty()) {
+    RemoveRows(after);
+  }
+  RefillDynamic(pool, true);
 }

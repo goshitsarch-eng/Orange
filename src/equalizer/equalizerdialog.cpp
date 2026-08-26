@@ -37,8 +37,8 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer) {
   GtkWidget *preset_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   GtkWidget *preset_name = gtk_entry_new();
   gtk_entry_set_placeholder_text(GTK_ENTRY(preset_name), "Custom preset name");
-  GtkWidget *save_preset = gtk_button_new_with_label("Save");
-  GtkWidget *delete_preset = gtk_button_new_with_label("Delete");
+  GtkWidget *save_preset = gtk_button_new_with_label(Translations::CStr("Save"));
+  GtkWidget *delete_preset = gtk_button_new_with_label(Translations::CStr("Delete"));
   g_object_set_data(G_OBJECT(save_preset), "name", preset_name);
   g_object_set_data(G_OBJECT(save_preset), "list", preset_names);
   g_signal_connect(save_preset, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {

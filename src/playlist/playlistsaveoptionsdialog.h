@@ -1,18 +1,15 @@
 #ifndef STRAWBERRY_PLAYLISTSAVEOPTIONSDIALOG_H
 #define STRAWBERRY_PLAYLISTSAVEOPTIONSDIALOG_H
 
+#include "constants/playlistsettings.h"
+
 #include <gtk/gtk.h>
 
 #include <functional>
-#include <string>
 
 class PlaylistSaveOptionsDialog {
  public:
-  enum class PathType {
-    Automatic = 0,
-    Relative = 1,
-    Absolute = 2
-  };
+  using PathType = PlaylistSettings::PathType;
 
   static void Show(GtkWindow *parent, const std::function<void(PathType)> &callback);
   static const char *Label(PathType type);

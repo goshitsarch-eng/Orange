@@ -20,6 +20,7 @@ class ParserBase {
   virtual bool Save(const std::string &path, const SongList &songs) const { (void)path; (void)songs; return false; }
 
   static Song LoadSong(const std::string &playlist_dir, const std::string &entry);
+  static void SetPathTypeOverride(int type);
   static std::string URLOrFilename(const std::string &url, const std::string &playlist_dir = {});
   static std::string XmlEscape(const std::string &value);
   static std::string XmlUnescape(const std::string &value);

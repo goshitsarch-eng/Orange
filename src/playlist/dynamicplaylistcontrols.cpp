@@ -1,13 +1,15 @@
 #include "playlist/dynamicplaylistcontrols.h"
 
+#include "translations/translations.h"
+
 DynamicPlaylistControls::DynamicPlaylistControls() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   gtk_widget_set_margin_start(widget_, 8);
   gtk_widget_set_margin_end(widget_, 8);
-  GtkWidget *expand = gtk_button_new_with_label("Expand");
-  GtkWidget *repopulate = gtk_button_new_with_label("Repopulate");
-  GtkWidget *off = gtk_button_new_with_label("Turn off");
-  gtk_box_append(GTK_BOX(widget_), gtk_label_new("Dynamic playlist"));
+  GtkWidget *expand = gtk_button_new_with_label(Translations::CStr("Expand"));
+  GtkWidget *repopulate = gtk_button_new_with_label(Translations::CStr("Repopulate"));
+  GtkWidget *off = gtk_button_new_with_label(Translations::CStr("Turn off"));
+  gtk_box_append(GTK_BOX(widget_), gtk_label_new(Translations::CStr("Dynamic playlist")));
   gtk_box_append(GTK_BOX(widget_), expand);
   gtk_box_append(GTK_BOX(widget_), repopulate);
   gtk_box_append(GTK_BOX(widget_), off);

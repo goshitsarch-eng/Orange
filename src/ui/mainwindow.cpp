@@ -25,7 +25,10 @@
 #include "constants/collectionsettings.h"
 #include "constants/playlistsettings.h"
 #include "constants/scrobblersettings.h"
+#include "core/seekbarsettings.h"
 #include "core/settings.h"
+#include "playlist/playlistsaveoptionsdialog.h"
+#include "playlistparsers/parserbase.h"
 #include "device/cddasongloader.h"
 #include "organize/organize.h"
 #include "organize/organizeformat.h"
@@ -483,6 +486,13 @@ void MainWindow::BuildSidebar() {
     }
     RunSmartPlaylist(item.key);
   });
+  smart_container_->SetDeleteCallback([this](const SmartPlaylistsItem &item) {
+    if (item.kind != SmartPlaylistsItem::Kind::Saved) {
+      return;
+    }
+    SmartPlaylistSearch::RemoveSaved(item.title);
+    smart_container_->Reload();
+  });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, smart_container_->widget(), "smart", "Smart playlists", "view-refresh-symbolic");
   file_view_ = std::make_unique<FileView>();
   file_view_->SetAddToPlaylistCallback([this](const std::vector<std::string> &paths) {
@@ -657,6 +667,18 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->view()->SetEditCommitCallback([this](int row, PlaylistColumn column, const std::string &value) {
     ApplyColumnValue(column, value, {row});
   });
+  playlist_container_->dynamic_controls()->SetExpandCallback([this]() {
+    app_->playlist_manager()->ExpandDynamic();
+    RefreshPlaylist();
+  });
+  playlist_container_->dynamic_controls()->SetRepopulateCallback([this]() {
+    app_->playlist_manager()->RepopulateDynamic();
+    RefreshPlaylist();
+  });
+  playlist_container_->dynamic_controls()->SetTurnOffCallback([this]() {
+    app_->playlist_manager()->TurnOffDynamic();
+    RefreshPlaylist();
+  });
   playlist_container_->view()->SetDropUrlsCallback([this](const std::vector<std::string> &urls, int row) {
     app_->playlist_manager()->InsertUrls(urls, row);
     RefreshPlaylist();
@@ -721,6 +743,28 @@ void MainWindow::BuildPlayerBar() {
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(moodbar_drawing_), DrawMoodbar, this, nullptr);
   gtk_box_append(GTK_BOX(box), moodbar_drawing_);
   gtk_box_append(GTK_BOX(box), track_slider_->widget());
+  auto attach_seek = [&](GtkWidget *widget) {
+    GtkGesture *click = gtk_gesture_click_new();
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
+    gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(click));
+    g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *gesture, gint, gdouble x, gdouble, gpointer data) {
+                       auto *self = static_cast<MainWindow *>(data);
+                       GtkWidget *area = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
+                       self->SeekFromBar(x, gtk_widget_get_width(area));
+                     }),
+                     this);
+    GtkGesture *cycle = gtk_gesture_click_new();
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(cycle), GDK_BUTTON_SECONDARY);
+    gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(cycle));
+    g_signal_connect(cycle, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
+                       static_cast<MainWindow *>(data)->CycleSeekbarMode();
+                     }),
+                     this);
+  };
+  attach_seek(moodbar_drawing_);
+  attach_seek(waveform_drawing_);
+  attach_seek(track_slider_->slider()->widget());
+  ApplySeekbarMode();
 
   GtkWidget *controls = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_widget_set_halign(controls, GTK_ALIGN_CENTER);
@@ -939,8 +983,11 @@ void MainWindow::RefreshPlaylist() {
     playlist_container_->SetSummary(playlist->name() + " · " +
                                     std::to_string(playlist_container_->view()->visible_count()) + " tracks · " +
                                     Utilities::PrettyTimeNanosec(playlist->total_length_nanosec()));
+    playlist_container_->dynamic_controls()->SetSearch(playlist->dynamic_search());
+    playlist_container_->dynamic_controls()->SetVisible(playlist->is_dynamic());
   } else {
     playlist_container_->SetSummary("");
+    playlist_container_->dynamic_controls()->SetVisible(false);
   }
 }
 
@@ -1079,6 +1126,9 @@ void MainWindow::OpenSettings() {
     app_->scrobbler()->ReloadSettings();
     app_->shortcuts()->ReloadSettings();
     UpdateScrobblerButtons();
+    ApplySeekbarMode();
+    app_->moodbar()->Load(app_->player()->current_song());
+    app_->waveform()->Load(app_->player()->current_song());
   });
 }
 
@@ -1165,11 +1215,31 @@ void MainWindow::SavePlaylistFile() {
       return;
     }
     gchar *path = g_file_get_path(file);
-    if (path && self->app_->playlist_manager()->current()) {
-      self->app_->playlist_manager()->Save(self->app_->playlist_manager()->current_id(), path);
-      g_free(path);
+    if (!path || !self->app_->playlist_manager()->current()) {
+      if (path) {
+        g_free(path);
+      }
+      g_object_unref(file);
+      return;
     }
+    const std::string filename = path;
+    g_free(path);
     g_object_unref(file);
+    auto save = [self, filename]() {
+      self->app_->playlist_manager()->Save(self->app_->playlist_manager()->current_id(), filename);
+    };
+    Settings settings;
+    settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+    if (settings.IntValue(PlaylistSettings::kPathType, static_cast<int>(PlaylistSettings::kDefaultPathType)) ==
+        static_cast<int>(PlaylistSettings::PathType::Ask_User)) {
+      PlaylistSaveOptionsDialog::Show(GTK_WINDOW(self->window_), [save](PlaylistSaveOptionsDialog::PathType type) {
+        ParserBase::SetPathTypeOverride(static_cast<int>(type));
+        save();
+        ParserBase::SetPathTypeOverride(-1);
+      });
+      return;
+    }
+    save();
   }, this);
 }
 
@@ -1815,6 +1885,45 @@ void MainWindow::OnLove(GtkButton *, gpointer data) {
 void MainWindow::DrawAnalyzer(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
   auto *self = static_cast<MainWindow *>(data);
   self->app_->analyzer()->Draw(cr, width, height);
+}
+
+void MainWindow::ApplySeekbarMode() {
+  Settings settings;
+  settings.BeginGroup(SeekbarSettings::kSettingsGroup);
+  const auto mode = static_cast<SeekbarSettings::Mode>(
+      settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode)));
+  if (moodbar_drawing_) {
+    gtk_widget_set_visible(moodbar_drawing_, mode == SeekbarSettings::Mode::Moodbar);
+  }
+  if (waveform_drawing_) {
+    gtk_widget_set_visible(waveform_drawing_, mode == SeekbarSettings::Mode::Waveform);
+  }
+  if (track_slider_) {
+    track_slider_->SetSliderVisible(mode == SeekbarSettings::Mode::Normal);
+  }
+}
+
+void MainWindow::CycleSeekbarMode() {
+  Settings settings;
+  settings.BeginGroup(SeekbarSettings::kSettingsGroup);
+  const int next = (settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode)) + 1) % 3;
+  settings.SetIntValue(SeekbarSettings::kMode, next);
+  settings.Sync();
+  ApplySeekbarMode();
+  app_->moodbar()->Load(app_->player()->current_song());
+  app_->waveform()->Load(app_->player()->current_song());
+}
+
+void MainWindow::SeekFromBar(double x, int width) {
+  if (width <= 0 || !app_->player()->engine()) {
+    return;
+  }
+  const int64_t length = app_->player()->engine()->length_nanosec();
+  if (length <= 0) {
+    return;
+  }
+  const double ratio = std::clamp(x / static_cast<double>(width), 0.0, 1.0);
+  app_->player()->Seek(static_cast<int64_t>(ratio * static_cast<double>(length)));
 }
 
 void MainWindow::DrawMoodbar(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {

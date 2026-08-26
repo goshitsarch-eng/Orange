@@ -20,6 +20,7 @@ class TrackSlider {
 
   void SetTimes(int64_t position_nanosec, int64_t length_nanosec);
   void SetSeekCallback(SeekCallback callback);
+  void SetSliderVisible(bool visible);
   const std::string &position_text() const { return position_text_; }
   const std::string &duration_text() const { return duration_text_; }
 

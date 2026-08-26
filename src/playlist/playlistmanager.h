@@ -66,6 +66,9 @@ class PlaylistManager : public PlaylistManagerInterface {
   void SaveCurrent();
   void LoadAll();
   void RefillDynamic();
+  void ExpandDynamic();
+  void RepopulateDynamic();
+  void TurnOffDynamic();
   void ClearCurrent() override;
   void ShuffleCurrent() override;
   void RemoveDuplicatesCurrent() override;

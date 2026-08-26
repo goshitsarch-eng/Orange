@@ -1,5 +1,7 @@
 #include "waveform/waveform.h"
 
+#include "core/seekbarsettings.h"
+#include "core/settings.h"
 #include "core/standardpaths.h"
 #include "utilities/fileutils.h"
 #include "waveform/waveformpipeline.h"
@@ -40,6 +42,14 @@ std::vector<float> WaveformLoader::Load(const Song &song) {
 WaveformController::WaveformController(WaveformLoader *loader) : loader_(loader) {}
 
 void WaveformController::Load(const Song &song) {
+  Settings settings;
+  settings.BeginGroup(SeekbarSettings::kSettingsGroup);
+  if (static_cast<SeekbarSettings::Mode>(settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode))) !=
+      SeekbarSettings::Mode::Waveform) {
+    data_.clear();
+    Ready.Emit(data_);
+    return;
+  }
   data_ = loader_ ? loader_->Load(song) : std::vector<float>{};
   Ready.Emit(data_);
 }

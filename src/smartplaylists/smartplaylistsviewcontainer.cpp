@@ -16,3 +16,7 @@ void SmartPlaylistsViewContainer::Reload() {
 void SmartPlaylistsViewContainer::SetActivateCallback(std::function<void(const SmartPlaylistsItem &)> callback) {
   view_->SetActivateCallback(std::move(callback));
 }
+
+void SmartPlaylistsViewContainer::SetDeleteCallback(std::function<void(const SmartPlaylistsItem &)> callback) {
+  view_->SetDeleteCallback(std::move(callback));
+}

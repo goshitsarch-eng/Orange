@@ -346,6 +346,31 @@ void PlaylistManager::RefillDynamic() {
   }
 }
 
+void PlaylistManager::ExpandDynamic() {
+  if (Playlist *playlist = Visible()) {
+    if (playlist->is_dynamic() && collection_backend_) {
+      playlist->ExpandDynamic(collection_backend_->Songs());
+      Persist(playlist);
+    }
+  }
+}
+
+void PlaylistManager::RepopulateDynamic() {
+  if (Playlist *playlist = Visible()) {
+    if (playlist->is_dynamic() && collection_backend_) {
+      playlist->RepopulateDynamic(collection_backend_->Songs());
+      Persist(playlist);
+    }
+  }
+}
+
+void PlaylistManager::TurnOffDynamic() {
+  if (Playlist *playlist = Visible()) {
+    playlist->SetDynamic(false);
+    Persist(playlist);
+  }
+}
+
 void PlaylistManager::SaveActive() { Persist(Playing()); }
 
 void PlaylistManager::SaveCurrent() { Persist(Visible()); }

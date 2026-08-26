@@ -111,6 +111,9 @@ class MainWindow {
   void PersistEditedSongs(const std::vector<int> &rows);
   void FocusCollectionSearch();
   void ShowToast(const std::string &text);
+  void ApplySeekbarMode();
+  void CycleSeekbarMode();
+  void SeekFromBar(double x, int width);
 
   static void OnPlayPause(GtkButton *button, gpointer data);
   static void OnStop(GtkButton *button, gpointer data);

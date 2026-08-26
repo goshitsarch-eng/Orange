@@ -1,7 +1,10 @@
+#include "constants/playlistsettings.h"
+#include "core/settings.h"
 #include "playlistparsers/asxiniparser.h"
 #include "playlistparsers/asxparser.h"
 #include "playlistparsers/cueparser.h"
 #include "playlistparsers/m3uparser.h"
+#include "playlistparsers/parserbase.h"
 #include "playlistparsers/playlistparser.h"
 #include "playlistparsers/plsparser.h"
 #include "playlistparsers/wplparser.h"
@@ -27,6 +30,17 @@ TEST(PlaylistParser, RoundTripM3U) {
   ASSERT_FALSE(loaded.empty());
   EXPECT_FALSE(loaded.front().url().empty());
   unlink(path.c_str());
+}
+
+TEST(ParserBase, URLOrFilenameHonorsPathType) {
+  ParserBase::SetPathTypeOverride(static_cast<int>(PlaylistSettings::PathType::Absolute));
+  EXPECT_EQ("/music/album/track.flac", ParserBase::URLOrFilename("file:///music/album/track.flac", "/music/album"));
+  ParserBase::SetPathTypeOverride(static_cast<int>(PlaylistSettings::PathType::Relative));
+  EXPECT_EQ("track.flac", ParserBase::URLOrFilename("file:///music/album/track.flac", "/music/album"));
+  ParserBase::SetPathTypeOverride(static_cast<int>(PlaylistSettings::PathType::Automatic));
+  EXPECT_EQ("track.flac", ParserBase::URLOrFilename("file:///music/album/track.flac", "/music/album"));
+  EXPECT_EQ("/other/track.flac", ParserBase::URLOrFilename("file:///other/track.flac", "/music/album"));
+  ParserBase::SetPathTypeOverride(-1);
 }
 
 TEST(PlaylistParser, DetectsExtensions) {

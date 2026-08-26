@@ -64,7 +64,10 @@ class Playlist {
   PlaylistSequence::ShuffleMode shuffle_mode() const { return shuffle_mode_; }
   void SetDynamic(bool dynamic, const SmartPlaylistSearch &search = {});
   bool is_dynamic() const { return dynamic_; }
-  void RefillDynamic(const SongList &pool);
+  const SmartPlaylistSearch &dynamic_search() const { return dynamic_search_; }
+  void RefillDynamic(const SongList &pool, bool force = false);
+  void ExpandDynamic(const SongList &pool);
+  void RepopulateDynamic(const SongList &pool);
 
   int64_t total_length_nanosec() const;
 

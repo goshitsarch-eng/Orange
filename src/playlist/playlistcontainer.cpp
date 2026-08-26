@@ -5,7 +5,8 @@
 PlaylistContainer::PlaylistContainer()
     : widget_(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0)),
       tab_bar_(std::make_unique<PlaylistTabBar>()),
-      view_(std::make_unique<PlaylistView>()) {
+      view_(std::make_unique<PlaylistView>()),
+      dynamic_controls_(std::make_unique<DynamicPlaylistControls>()) {
   GtkWidget *toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   gtk_widget_set_margin_start(toolbar, 8);
   gtk_widget_set_margin_end(toolbar, 8);
@@ -57,6 +58,7 @@ PlaylistContainer::PlaylistContainer()
   gtk_widget_set_margin_end(tab_bar_->widget(), 8);
   gtk_box_append(GTK_BOX(widget_), toolbar);
   gtk_box_append(GTK_BOX(widget_), tab_bar_->widget());
+  gtk_box_append(GTK_BOX(widget_), dynamic_controls_->widget());
   gtk_box_append(GTK_BOX(widget_), view_->widget());
 }
 
