@@ -53,6 +53,7 @@ class OpenTidalCoverProvider : public CoverProvider {
 
   std::string name() const override { return "OpenTidal"; }
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
+  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 
   static std::string ClientId();
   static std::string ClientSecret();
@@ -77,6 +78,12 @@ class OpenTidalCoverProvider : public CoverProvider {
                         Callback callback);
   void FetchArtworks(NetworkAccessManager *network, const std::string &token, const std::string &artist, const AlbumHit &album,
                      std::vector<std::string> artwork_ids, std::vector<AlbumHit> remaining, Callback callback);
+  void SearchAlbums(NetworkAccessManager *network, const std::string &token, const Song &song, SearchCallback callback);
+  void SearchAlbumCovers(NetworkAccessManager *network, const std::string &token, const std::string &artist, std::vector<AlbumHit> albums,
+                         SearchCallback callback, CoverProviderSearchResults collected = {});
+  void SearchArtworks(NetworkAccessManager *network, const std::string &token, const std::string &artist, const AlbumHit &album,
+                      std::vector<std::string> artwork_ids, std::vector<AlbumHit> remaining, SearchCallback callback,
+                      CoverProviderSearchResults collected);
 };
 
 #endif

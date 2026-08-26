@@ -1,6 +1,7 @@
 #include "covermanager/tidalcoverprovider.h"
 
 #include "core/settings.h"
+#include "covermanager/albumcoverfetchersearch.h"
 #include "tidal/tidalservice.h"
 #include "utilities/strutils.h"
 
@@ -101,8 +102,18 @@ std::vector<TidalCoverProvider::SearchResult> TidalCoverProvider::ParseItems(con
 }
 
 void TidalCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
+  Search(song, network, [callback](const CoverProviderSearchResults &results) {
+    if (results.empty()) {
+      callback({}, "No Tidal cover");
+      return;
+    }
+    callback(results.front().image_url, {});
+  });
+}
+
+void TidalCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
   if (!network || (song.EffectiveAlbumartist().empty() && song.album().empty() && song.title().empty())) {
-    callback({}, "No artist, album, or title");
+    callback({});
     return;
   }
   Settings settings;
@@ -110,21 +121,20 @@ void TidalCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, 
   const std::string token = settings.Value("token").empty() ? settings.Value("access_token") : settings.Value("token");
   const std::string country = settings.Value("countrycode", "US");
   if (token.empty()) {
-    callback({}, "Tidal is not signed in");
+    callback({});
     return;
   }
   network->Get(SearchUrl(song.EffectiveAlbumartist(), song.album(), song.title(), country),
-               [callback](const NetworkAccessManager::Response &response) {
+               [this, callback](const NetworkAccessManager::Response &response) {
+                 CoverProviderSearchResults results;
                  if (!response.ok()) {
-                   callback({}, response.error.empty() ? "Tidal cover request failed" : response.error);
+                   callback(results);
                    return;
                  }
-                 const std::vector<SearchResult> results = ParseItems(response.body);
-                 if (results.empty()) {
-                   callback({}, "No Tidal cover");
-                   return;
+                 for (const SearchResult &hit : ParseItems(response.body)) {
+                   results.push_back(AlbumCoverFetcherSearch::FromHit(name(), hit.artist, hit.album, hit.image_url));
                  }
-                 callback(results.front().image_url, {});
+                 callback(results);
                },
                {{"Authorization", "Bearer " + token}});
 }

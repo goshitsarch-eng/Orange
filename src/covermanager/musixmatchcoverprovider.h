@@ -16,6 +16,7 @@ class MusixmatchCoverProvider : public CoverProvider {
 
   std::string name() const override { return "Musixmatch"; }
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
+  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 
   static std::string AlbumUrl(const std::string &artist, const std::string &album);
   static std::string ExtractNextDataJson(const std::string &html);

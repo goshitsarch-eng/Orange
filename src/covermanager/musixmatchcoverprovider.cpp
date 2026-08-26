@@ -1,5 +1,6 @@
 #include "covermanager/musixmatchcoverprovider.h"
 
+#include "covermanager/albumcoverfetchersearch.h"
 #include "utilities/jsonutils.h"
 #include "utilities/musixmatchprovider.h"
 #include "utilities/strutils.h"
@@ -82,22 +83,31 @@ std::vector<MusixmatchCoverProvider::SearchResult> MusixmatchCoverProvider::Pars
 }
 
 void MusixmatchCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
-  if (!network || song.EffectiveAlbumartist().empty() || song.album().empty()) {
-    callback({}, "No artist or album");
-    return;
-  }
-  const std::string artist = song.EffectiveAlbumartist();
-  const std::string album = song.album();
-  network->Get(AlbumUrl(artist, album), [callback, artist, album](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      callback({}, response.error.empty() ? "Musixmatch cover request failed" : response.error);
-      return;
-    }
-    const std::vector<SearchResult> results = ParseAlbumPage(response.body, artist, album);
+  Search(song, network, [callback](const CoverProviderSearchResults &results) {
     if (results.empty()) {
       callback({}, "No Musixmatch cover");
       return;
     }
     callback(results.front().image_url, {});
+  });
+}
+
+void MusixmatchCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
+  if (!network || song.EffectiveAlbumartist().empty() || song.album().empty()) {
+    callback({});
+    return;
+  }
+  const std::string artist = song.EffectiveAlbumartist();
+  const std::string album = song.album();
+  network->Get(AlbumUrl(artist, album), [this, callback, artist, album](const NetworkAccessManager::Response &response) {
+    CoverProviderSearchResults results;
+    if (!response.ok()) {
+      callback(results);
+      return;
+    }
+    for (const SearchResult &hit : ParseAlbumPage(response.body, artist, album)) {
+      results.push_back(AlbumCoverFetcherSearch::FromHit(name(), hit.artist, hit.album, hit.image_url));
+    }
+    callback(results);
   });
 }

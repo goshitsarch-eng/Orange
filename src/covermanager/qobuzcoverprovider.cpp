@@ -1,6 +1,7 @@
 #include "covermanager/qobuzcoverprovider.h"
 
 #include "core/settings.h"
+#include "covermanager/albumcoverfetchersearch.h"
 #include "qobuz/qobuzservice.h"
 #include "utilities/strutils.h"
 
@@ -103,8 +104,18 @@ std::vector<QobuzCoverProvider::SearchResult> QobuzCoverProvider::ParseResults(c
 }
 
 void QobuzCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
+  Search(song, network, [callback](const CoverProviderSearchResults &results) {
+    if (results.empty()) {
+      callback({}, "No Qobuz cover");
+      return;
+    }
+    callback(results.front().image_url, {});
+  });
+}
+
+void QobuzCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
   if (!network || (song.EffectiveAlbumartist().empty() && song.album().empty() && song.title().empty())) {
-    callback({}, "No artist, album, or title");
+    callback({});
     return;
   }
   Settings settings;
@@ -112,21 +123,20 @@ void QobuzCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, 
   const std::string app_id = settings.Value("appid");
   const std::string token = settings.Value("token").empty() ? settings.Value("user_auth_token") : settings.Value("token");
   if (app_id.empty() || token.empty()) {
-    callback({}, "Qobuz is not signed in");
+    callback({});
     return;
   }
   network->Get(SearchUrl(song.EffectiveAlbumartist(), song.album(), song.title()),
-               [callback](const NetworkAccessManager::Response &response) {
+               [this, callback](const NetworkAccessManager::Response &response) {
+                 CoverProviderSearchResults results;
                  if (!response.ok()) {
-                   callback({}, response.error.empty() ? "Qobuz cover request failed" : response.error);
+                   callback(results);
                    return;
                  }
-                 const std::vector<SearchResult> results = ParseResults(response.body);
-                 if (results.empty()) {
-                   callback({}, "No Qobuz cover");
-                   return;
+                 for (const SearchResult &hit : ParseResults(response.body)) {
+                   results.push_back(AlbumCoverFetcherSearch::FromHit(name(), hit.artist, hit.album, hit.image_url));
                  }
-                 callback(results.front().image_url, {});
+                 callback(results);
                },
                {{"X-App-Id", app_id}, {"X-User-Auth-Token", token}});
 }

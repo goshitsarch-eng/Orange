@@ -1,5 +1,6 @@
 #include "covermanager/discogscoverprovider.h"
 
+#include "covermanager/albumcoverfetchersearch.h"
 #include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
@@ -202,56 +203,67 @@ std::vector<DiscogsCoverProvider::ImageResult> DiscogsCoverProvider::ParseReleas
   return images;
 }
 
+namespace {
+
+void LoadDiscogsHits(NetworkAccessManager *network, const std::string &provider, const std::string &artist, const std::string &album,
+                     std::vector<DiscogsCoverProvider::SearchHit> hits, size_t index, CoverProviderSearchResults collected,
+                     CoverProvider::SearchCallback callback) {
+  if (index >= hits.size()) {
+    callback(collected);
+    return;
+  }
+  network->Get(hits[index].resource_url, [network, provider, artist, album, hits, index, collected, callback](const NetworkAccessManager::Response &release) {
+    CoverProviderSearchResults next = collected;
+    if (release.ok()) {
+      for (const DiscogsCoverProvider::ImageResult &image : DiscogsCoverProvider::ParseReleaseImages(release.body, artist, album)) {
+        next.push_back(AlbumCoverFetcherSearch::FromHit(provider, image.artist, image.album, image.image_url));
+      }
+    }
+    LoadDiscogsHits(network, provider, artist, album, hits, index + 1, next, callback);
+  });
+}
+
+}  // namespace
+
 void DiscogsCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
+  Search(song, network, [callback](const CoverProviderSearchResults &results) {
+    if (results.empty()) {
+      callback({}, "No Discogs cover");
+      return;
+    }
+    callback(results.front().image_url, {});
+  });
+}
+
+void DiscogsCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
   if (!network || song.EffectiveAlbumartist().empty() || song.album().empty()) {
-    callback({}, "No artist or album");
+    callback({});
     return;
   }
   const std::string artist = song.EffectiveAlbumartist();
   const std::string album = song.album();
-  network->Get(SearchUrl(artist, album, "master"), [network, callback, artist, album](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      callback({}, response.error.empty() ? "Discogs search failed" : response.error);
-      return;
-    }
-    std::vector<SearchHit> hits = ParseSearchResults(response.body, artist, album);
-    if (hits.empty()) {
-      network->Get(SearchUrl(artist, album, "release"), [network, callback, artist, album](const NetworkAccessManager::Response &release_search) {
-        if (!release_search.ok()) {
-          callback({}, "Discogs search failed");
-          return;
-        }
-        const std::vector<SearchHit> release_hits = ParseSearchResults(release_search.body, artist, album);
-        if (release_hits.empty()) {
-          callback({}, "No Discogs release");
-          return;
-        }
-        network->Get(release_hits.front().resource_url, [callback, artist, album](const NetworkAccessManager::Response &release) {
-          if (!release.ok()) {
-            callback({}, "Discogs release failed");
-            return;
-          }
-          const std::vector<ImageResult> images = ParseReleaseImages(release.body, artist, album);
-          if (images.empty()) {
-            callback({}, "No Discogs cover");
-            return;
-          }
-          callback(images.front().image_url, {});
-        });
-      });
-      return;
-    }
-    network->Get(hits.front().resource_url, [callback, artist, album](const NetworkAccessManager::Response &release) {
-      if (!release.ok()) {
-        callback({}, "Discogs release failed");
+  const std::string provider = name();
+  network->Get(SearchUrl(artist, album, "master"), [network, callback, artist, album, provider](const NetworkAccessManager::Response &response) {
+    auto start_hits = [network, callback, artist, album, provider](const std::vector<SearchHit> &hits) {
+      if (hits.empty()) {
+        callback({});
         return;
       }
-      const std::vector<ImageResult> images = ParseReleaseImages(release.body, artist, album);
-      if (images.empty()) {
-        callback({}, "No Discogs cover");
+      LoadDiscogsHits(network, provider, artist, album, hits, 0, {}, callback);
+    };
+    if (response.ok()) {
+      const std::vector<SearchHit> hits = ParseSearchResults(response.body, artist, album);
+      if (!hits.empty()) {
+        start_hits(hits);
         return;
       }
-      callback(images.front().image_url, {});
+    }
+    network->Get(SearchUrl(artist, album, "release"), [start_hits, artist, album](const NetworkAccessManager::Response &release_search) {
+      if (!release_search.ok()) {
+        start_hits({});
+        return;
+      }
+      start_hits(ParseSearchResults(release_search.body, artist, album));
     });
   });
 }

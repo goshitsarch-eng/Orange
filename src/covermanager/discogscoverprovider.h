@@ -26,6 +26,7 @@ class DiscogsCoverProvider : public CoverProvider {
 
   std::string name() const override { return "Discogs"; }
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
+  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 
   static std::string AccessKey();
   static std::string SecretKey();

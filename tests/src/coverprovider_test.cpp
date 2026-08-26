@@ -1,3 +1,4 @@
+#include "covermanager/albumcoverfetchersearch.h"
 #include "covermanager/deezercoverprovider.h"
 #include "covermanager/discogscoverprovider.h"
 #include "covermanager/musicbrainzcoverprovider.h"
@@ -249,4 +250,89 @@ TEST(QobuzCoverProvider, ParsesAlbumLargeImage) {
   ASSERT_EQ(1u, results.size());
   EXPECT_EQ("Dummy", results.front().album);
   EXPECT_EQ("https://static.qobuz.com/large.jpg", results.front().image_url);
+}
+
+TEST(CoverProviderSearch, MapsAllProviderHits) {
+  const std::string tidal = R"({
+    "items": [
+      {"artist":{"name":"Portishead"},"title":"Dummy","cover":"aa-bb-cc"},
+      {"artist":{"name":"Portishead"},"title":"Third","cover":"dd-ee-ff"}
+    ]
+  })";
+  CoverProviderSearchResults tidal_hits;
+  for (const auto &hit : TidalCoverProvider::ParseItems(tidal)) {
+    tidal_hits.push_back(AlbumCoverFetcherSearch::FromHit("Tidal", hit.artist, hit.album, hit.image_url));
+  }
+  ASSERT_EQ(2u, tidal_hits.size());
+  EXPECT_EQ("Dummy", tidal_hits[0].album);
+  EXPECT_EQ("Third", tidal_hits[1].album);
+
+  const std::string spotify = R"({
+    "albums": {
+      "items": [
+        {
+          "name": "Dummy",
+          "artists": [{"name": "Portishead"}],
+          "images": [{"url": "https://i.scdn.co/a.jpg", "width": 640, "height": 640}]
+        },
+        {
+          "name": "Third",
+          "artists": [{"name": "Portishead"}],
+          "images": [{"url": "https://i.scdn.co/b.jpg", "width": 300, "height": 300}]
+        }
+      ]
+    }
+  })";
+  CoverProviderSearchResults spotify_hits;
+  for (const auto &hit : SpotifyCoverProvider::ParseResults(spotify, "albums")) {
+    spotify_hits.push_back(AlbumCoverFetcherSearch::FromHit("Spotify", hit.artist, hit.album, hit.image_url, hit.width, hit.height));
+  }
+  ASSERT_EQ(2u, spotify_hits.size());
+  EXPECT_EQ(640, spotify_hits[0].image_width);
+  EXPECT_EQ("https://i.scdn.co/b.jpg", spotify_hits[1].image_url);
+
+  const std::vector<OpenTidalCoverProvider::ArtworkFile> files = {{"https://tidal.example/a.jpg", 1280, 1280},
+                                                                 {"https://tidal.example/b.jpg", 640, 640}};
+  const auto open_hits = OpenTidalCoverProvider::ResultsFromFiles("Portishead", "Dummy", files);
+  ASSERT_EQ(2u, open_hits.size());
+  EXPECT_EQ("https://tidal.example/b.jpg", open_hits[1].image_url);
+
+  const std::string qobuz = R"json({
+    "albums": {
+      "items": [
+        {"title": "Dummy", "artist": {"name": "Portishead"}, "image": {"large": "https://static.qobuz.com/a.jpg"}},
+        {"title": "Third", "artist": {"name": "Portishead"}, "image": {"large": "https://static.qobuz.com/b.jpg"}}
+      ]
+    }
+  })json";
+  CoverProviderSearchResults qobuz_hits;
+  for (const auto &hit : QobuzCoverProvider::ParseResults(qobuz)) {
+    qobuz_hits.push_back(AlbumCoverFetcherSearch::FromHit("Qobuz", hit.artist, hit.album, hit.image_url));
+  }
+  ASSERT_EQ(2u, qobuz_hits.size());
+  EXPECT_EQ("https://static.qobuz.com/b.jpg", qobuz_hits[1].image_url);
+
+  const std::string discogs = R"({
+    "artists": [{"name": "Portishead"}],
+    "title": "Dummy",
+    "images": [
+      {"type": "primary", "resource_url": "https://img.example/a.jpg", "width": 600, "height": 600},
+      {"type": "primary", "resource_url": "https://img.example/b.jpg", "width": 800, "height": 800}
+    ]
+  })";
+  CoverProviderSearchResults discogs_hits;
+  for (const auto &image : DiscogsCoverProvider::ParseReleaseImages(discogs, "Portishead", "Dummy")) {
+    discogs_hits.push_back(AlbumCoverFetcherSearch::FromHit("Discogs", image.artist, image.album, image.image_url));
+  }
+  ASSERT_EQ(2u, discogs_hits.size());
+  EXPECT_EQ("https://img.example/b.jpg", discogs_hits[1].image_url);
+
+  const std::string musixmatch =
+      R"(<html><script id="__NEXT_DATA__" type="application/json">{"props":{"pageProps":{"data":{"albumGet":{"data":{"artistName":"Portishead","name":"Dummy","coverImage800x800":"https://s.mxmcdn.net/800.jpg"}}}}}}</script></html>)";
+  CoverProviderSearchResults musixmatch_hits;
+  for (const auto &hit : MusixmatchCoverProvider::ParseAlbumPage(musixmatch, "Portishead", "Dummy")) {
+    musixmatch_hits.push_back(AlbumCoverFetcherSearch::FromHit("Musixmatch", hit.artist, hit.album, hit.image_url));
+  }
+  ASSERT_EQ(1u, musixmatch_hits.size());
+  EXPECT_EQ("https://s.mxmcdn.net/800.jpg", musixmatch_hits.front().image_url);
 }

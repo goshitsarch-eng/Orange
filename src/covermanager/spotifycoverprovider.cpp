@@ -1,6 +1,7 @@
 #include "covermanager/spotifycoverprovider.h"
 
 #include "core/settings.h"
+#include "covermanager/albumcoverfetchersearch.h"
 #include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
@@ -130,30 +131,39 @@ std::vector<SpotifyCoverProvider::SearchResult> SpotifyCoverProvider::ParseResul
 }
 
 void SpotifyCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
+  Search(song, network, [callback](const CoverProviderSearchResults &results) {
+    if (results.empty()) {
+      callback({}, "No Spotify cover");
+      return;
+    }
+    callback(results.front().image_url, {});
+  });
+}
+
+void SpotifyCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
   if (!network || (song.EffectiveAlbumartist().empty() && song.album().empty() && song.title().empty())) {
-    callback({}, "No artist, album, or title");
+    callback({});
     return;
   }
   Settings settings;
   settings.BeginGroup("Spotify");
   const std::string token = settings.Value("token").empty() ? settings.Value("access_token") : settings.Value("token");
   if (token.empty()) {
-    callback({}, "Spotify is not signed in");
+    callback({});
     return;
   }
   const std::string extract = song.album().empty() && !song.title().empty() ? "tracks" : "albums";
   network->Get(SearchUrl(song.EffectiveAlbumartist(), song.album(), song.title()),
-               [callback, extract](const NetworkAccessManager::Response &response) {
+               [this, callback, extract](const NetworkAccessManager::Response &response) {
+                 CoverProviderSearchResults results;
                  if (!response.ok()) {
-                   callback({}, response.error.empty() ? "Spotify cover request failed" : response.error);
+                   callback(results);
                    return;
                  }
-                 const std::vector<SearchResult> results = ParseResults(response.body, extract);
-                 if (results.empty()) {
-                   callback({}, "No Spotify cover");
-                   return;
+                 for (const SearchResult &hit : ParseResults(response.body, extract)) {
+                   results.push_back(AlbumCoverFetcherSearch::FromHit(name(), hit.artist, hit.album, hit.image_url, hit.width, hit.height));
                  }
-                 callback(results.front().image_url, {});
+                 callback(results);
                },
                {{"Authorization", "Bearer " + token}});
 }

@@ -3,6 +3,7 @@
 #include "core/logging.h"
 #include "core/oauthenticator.h"
 #include "core/settings.h"
+#include "covermanager/albumcoverfetchersearch.h"
 #include "utilities/strutils.h"
 
 #include <glib.h>
@@ -450,4 +451,82 @@ void OpenTidalCoverProvider::Fetch(const Song &song, NetworkAccessManager *netwo
     }
     SearchAlbums(network, token, song, callback);
   });
+}
+
+void OpenTidalCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
+  if (!network || song.EffectiveAlbumartist().empty() || song.album().empty()) {
+    callback({});
+    return;
+  }
+  EnsureToken(network, [this, network, song, callback](const std::string &token, const std::string &) {
+    if (token.empty()) {
+      callback({});
+      return;
+    }
+    SearchAlbums(network, token, song, callback);
+  });
+}
+
+void OpenTidalCoverProvider::SearchAlbums(NetworkAccessManager *network, const std::string &token, const Song &song, SearchCallback callback) {
+  const std::string artist = song.EffectiveAlbumartist();
+  network->Get(SearchUrl(artist, song.album(), song.title()),
+               [this, network, token, artist, callback](const NetworkAccessManager::Response &response) {
+                 if (!response.ok()) {
+                   callback({});
+                   return;
+                 }
+                 std::vector<AlbumHit> albums = ParseSearchAlbums(response.body);
+                 if (albums.empty()) {
+                   callback({});
+                   return;
+                 }
+                 SearchAlbumCovers(network, token, artist, std::move(albums), callback);
+               },
+               ApiHeaders(token));
+}
+
+void OpenTidalCoverProvider::SearchAlbumCovers(NetworkAccessManager *network, const std::string &token, const std::string &artist,
+                                              std::vector<AlbumHit> albums, SearchCallback callback, CoverProviderSearchResults collected) {
+  if (albums.empty()) {
+    callback(collected);
+    return;
+  }
+  const AlbumHit album = albums.front();
+  albums.erase(albums.begin());
+  network->Get(CoverArtUrl(album.id),
+               [this, network, token, artist, album, albums, callback, collected](const NetworkAccessManager::Response &response) {
+                 if (!response.ok()) {
+                   SearchAlbumCovers(network, token, artist, albums, callback, collected);
+                   return;
+                 }
+                 std::vector<std::string> artwork_ids = ParseCoverArtIds(response.body);
+                 if (artwork_ids.empty()) {
+                   SearchAlbumCovers(network, token, artist, albums, callback, collected);
+                   return;
+                 }
+                 SearchArtworks(network, token, artist, album, std::move(artwork_ids), albums, callback, collected);
+               },
+               ApiHeaders(token));
+}
+
+void OpenTidalCoverProvider::SearchArtworks(NetworkAccessManager *network, const std::string &token, const std::string &artist, const AlbumHit &album,
+                                           std::vector<std::string> artwork_ids, std::vector<AlbumHit> remaining, SearchCallback callback,
+                                           CoverProviderSearchResults collected) {
+  if (artwork_ids.empty()) {
+    SearchAlbumCovers(network, token, artist, std::move(remaining), callback, collected);
+    return;
+  }
+  const std::string artwork_id = artwork_ids.front();
+  artwork_ids.erase(artwork_ids.begin());
+  network->Get(ArtworkUrl(artwork_id),
+               [this, network, token, artist, album, artwork_ids, remaining, callback, collected](const NetworkAccessManager::Response &response) {
+                 CoverProviderSearchResults next = collected;
+                 if (response.ok()) {
+                   for (const SearchResult &hit : ResultsFromFiles(artist, album.title, ParseArtworkFiles(response.body))) {
+                     next.push_back(AlbumCoverFetcherSearch::FromHit(name(), hit.artist, hit.album, hit.image_url, hit.width, hit.height));
+                   }
+                 }
+                 SearchArtworks(network, token, artist, album, artwork_ids, remaining, callback, next);
+               },
+               ApiHeaders(token));
 }
