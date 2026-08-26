@@ -250,7 +250,10 @@ UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallbac
 }
 
 void SpotifyService::GetFavorites(FavoriteType type, SearchCallback callback) {
-  EnsureFreshToken([this, type, callback]() { SpotifyFavoriteRequest::Get(network_, kApiUrl, AuthHeaders(), type, callback); });
+  EnsureFreshToken([this, type, callback]() {
+    SpotifyFavoriteRequest::Get(network_, kApiUrl, AuthHeaders(), type, callback,
+                                [this](int received, int total) { ReportSongsProgress(received, total); });
+  });
 }
 
 void SpotifyService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {

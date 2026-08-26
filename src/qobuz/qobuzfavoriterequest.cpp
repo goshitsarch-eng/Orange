@@ -1,5 +1,6 @@
 #include "qobuz/qobuzfavoriterequest.h"
 
+#include "qobuz/qobuzrequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -100,21 +101,15 @@ std::string DeleteUrl(const std::string &api_url, FavoriteType type, const std::
   return api_url + "/favorite/delete?" + FavoriteMethod(type) + "=" + StrUtils::UriEscape(JoinedIds(ids)) + AuthQuery(app_id, user_auth_token);
 }
 
+SongList Parse(FavoriteType type, const std::string &json) { return QobuzRequest::Parse(QobuzRequest::FromFavoriteType(type), json); }
+
 void Get(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
-         const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback) {
-  if (!network || !callback) {
-    if (callback) {
-      callback({});
-    }
-    return;
-  }
-  network->Get(ListUrl(api_url, type, app_id, user_auth_token), [callback](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      callback({});
-      return;
-    }
-    callback(JsonUtils::ParseQobuzTracks(response.body));
-  }, headers);
+         const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback,
+         StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current) {
+  QobuzRequest::GetAll(
+      network,
+      [api_url, app_id, user_auth_token, type](int offset, int limit) { return ListUrl(api_url, type, app_id, user_auth_token, offset, limit); },
+      headers, QobuzRequest::FromFavoriteType(type), std::move(callback), std::move(progress), std::move(still_current));
 }
 
 void Add(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,

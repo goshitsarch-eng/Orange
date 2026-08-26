@@ -52,6 +52,7 @@ TEST(TidalFavoriteRequest, TextMethodAndUrls) {
 
   EXPECT_EQ("https://api.tidalhifi.com/v1/users/42/favorites/tracks?countryCode=US&limit=50",
             TidalFavoriteRequest::ListUrl("https://api.tidalhifi.com/v1", 42, Type::Songs, "US"));
+  EXPECT_NE(std::string::npos, TidalFavoriteRequest::ListUrl("https://api.tidalhifi.com/v1", 42, Type::Songs, "US", 50, 50).find("offset=50"));
   EXPECT_EQ("https://api.tidalhifi.com/v1/users/42/favorites/tracks",
             TidalFavoriteRequest::AddUrl("https://api.tidalhifi.com/v1", 42, Type::Songs));
   EXPECT_EQ("countryCode=US&trackIds=99%2C100", TidalFavoriteRequest::AddFormBody(Type::Songs, "US", {"99", "100"}));
@@ -75,6 +76,12 @@ TEST(TidalFavoriteRequest, IdsFromSongsAndWrappedJson) {
   EXPECT_EQ("99", songs.front().song_id());
   EXPECT_EQ("7", songs.front().artist_id());
   EXPECT_EQ("8", songs.front().album_id());
+  const SongList parsed_songs = TidalFavoriteRequest::Parse(StreamingService::FavoriteType::Songs, json);
+  ASSERT_EQ(1u, parsed_songs.size());
+  EXPECT_EQ("99", parsed_songs.front().song_id());
+  const SongList artists = TidalFavoriteRequest::Parse(StreamingService::FavoriteType::Artists, R"json({"items":[{"id":7,"name":"Fleet Foxes"}]})json");
+  ASSERT_EQ(1u, artists.size());
+  EXPECT_EQ("7", artists.front().artist_id());
 }
 
 TEST(SpotifyFavoriteRequest, UrlsAndJsonArray) {
@@ -82,6 +89,7 @@ TEST(SpotifyFavoriteRequest, UrlsAndJsonArray) {
   EXPECT_EQ("https://api.spotify.com/v1/me/tracks?limit=50", SpotifyFavoriteRequest::ListUrl("https://api.spotify.com/v1", Type::Songs));
   EXPECT_EQ("https://api.spotify.com/v1/me/following?type=artist&limit=50",
             SpotifyFavoriteRequest::ListUrl("https://api.spotify.com/v1", Type::Artists));
+  EXPECT_NE(std::string::npos, SpotifyFavoriteRequest::ListUrl("https://api.spotify.com/v1", Type::Songs, 50, 50).find("offset=50"));
   EXPECT_EQ("https://api.spotify.com/v1/me/following?type=artist&ids=a%2Cb",
             SpotifyFavoriteRequest::MutateUrl("https://api.spotify.com/v1", Type::Artists, {"a", "b"}));
   EXPECT_EQ("[\"abc\",\"def\"]", SpotifyFavoriteRequest::JsonIdArray({"abc", "def"}));
@@ -93,6 +101,9 @@ TEST(SpotifyFavoriteRequest, UrlsAndJsonArray) {
   EXPECT_EQ("abc", songs.front().song_id());
   EXPECT_EQ("art", songs.front().artist_id());
   EXPECT_EQ("alb", songs.front().album_id());
+  const SongList parsed = SpotifyFavoriteRequest::Parse(Type::Songs, json);
+  ASSERT_EQ(1u, parsed.size());
+  EXPECT_EQ("abc", parsed.front().song_id());
 }
 
 TEST(QobuzFavoriteRequest, CreateDeleteAndListUrls) {
@@ -104,6 +115,7 @@ TEST(QobuzFavoriteRequest, CreateDeleteAndListUrls) {
   EXPECT_NE(std::string::npos, list.find("/favorite/getUserFavorites?type=tracks"));
   EXPECT_NE(std::string::npos, list.find("app_id=app"));
   EXPECT_NE(std::string::npos, list.find("user_auth_token=tok"));
+  EXPECT_NE(std::string::npos, QobuzFavoriteRequest::ListUrl("https://www.qobuz.com/api.json/0.2", Type::Songs, "app", "tok", 50, 50).find("offset=50"));
   const std::string create = QobuzFavoriteRequest::CreateUrl("https://www.qobuz.com/api.json/0.2", Type::Songs, {"7", "8"}, "app", "tok");
   EXPECT_NE(std::string::npos, create.find("/favorite/create?track_ids=7%2C8"));
   const std::string del = QobuzFavoriteRequest::DeleteUrl("https://www.qobuz.com/api.json/0.2", Type::Albums, {"9"}, "app", "tok");

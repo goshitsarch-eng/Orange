@@ -156,7 +156,8 @@ UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback 
 }
 
 void QobuzService::GetFavorites(FavoriteType type, SearchCallback callback) {
-  QobuzFavoriteRequest::Get(network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type, std::move(callback));
+  QobuzFavoriteRequest::Get(network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type, std::move(callback),
+                            [this](int received, int total) { ReportSongsProgress(received, total); });
 }
 
 void QobuzService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {

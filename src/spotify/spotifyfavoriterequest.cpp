@@ -1,5 +1,6 @@
 #include "spotify/spotifyfavoriterequest.h"
 
+#include "spotify/spotifyrequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -67,12 +68,23 @@ std::string JoinedIds(const std::vector<std::string> &ids) {
   return joined;
 }
 
-std::string ListUrl(const std::string &api_url, FavoriteType type, int limit) {
+std::string ListUrl(const std::string &api_url, FavoriteType type, int offset, int limit) {
+  std::string url;
   if (type == FavoriteType::Artists) {
-    return api_url + "/me/following?type=artist&limit=" + std::to_string(limit);
+    url = api_url + "/me/following?type=artist";
+  } else {
+    url = api_url + "/me/" + FavoriteText(type);
   }
-  return api_url + "/me/" + FavoriteText(type) + "?limit=" + std::to_string(limit);
+  if (limit > 0) {
+    url += (url.find('?') == std::string::npos ? "?" : "&") + std::string("limit=") + std::to_string(limit);
+  }
+  if (offset > 0) {
+    url += (url.find('?') == std::string::npos ? "?" : "&") + std::string("offset=") + std::to_string(offset);
+  }
+  return url;
 }
+
+SongList Parse(FavoriteType type, const std::string &json) { return SpotifyRequest::Parse(SpotifyRequest::FromFavoriteType(type), json); }
 
 std::string MutateUrl(const std::string &api_url, FavoriteType type, const std::vector<std::string> &ids) {
   if (type == FavoriteType::Artists) {
@@ -82,20 +94,10 @@ std::string MutateUrl(const std::string &api_url, FavoriteType type, const std::
 }
 
 void Get(NetworkAccessManager *network, const std::string &api_url, const std::map<std::string, std::string> &headers, FavoriteType type,
-         SearchCallback callback) {
-  if (!network || !callback) {
-    if (callback) {
-      callback({});
-    }
-    return;
-  }
-  network->Get(ListUrl(api_url, type), [callback](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      callback({});
-      return;
-    }
-    callback(JsonUtils::ParseSpotifyTracks(response.body));
-  }, headers);
+         SearchCallback callback, StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current) {
+  SpotifyRequest::GetAll(
+      network, [api_url, type](int offset, int limit) { return ListUrl(api_url, type, offset, limit); }, headers,
+      SpotifyRequest::FromFavoriteType(type), std::move(callback), std::move(progress), std::move(still_current));
 }
 
 void Add(NetworkAccessManager *network, const std::string &api_url, const std::map<std::string, std::string> &headers, FavoriteType type,

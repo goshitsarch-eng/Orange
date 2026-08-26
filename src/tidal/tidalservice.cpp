@@ -233,7 +233,8 @@ UrlHandler::LoadResult TidalService::Load(const std::string &url, AsyncCallback 
 
 void TidalService::GetFavorites(FavoriteType type, SearchCallback callback) {
   EnsureFreshToken([this, type, callback]() {
-    TidalFavoriteRequest::Get(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, callback);
+    TidalFavoriteRequest::Get(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, callback,
+                              [this](int received, int total) { ReportSongsProgress(received, total); });
   });
 }
 

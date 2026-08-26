@@ -3,6 +3,7 @@
 
 #include "core/network.h"
 #include "core/song.h"
+#include "streaming/streamingpage.h"
 #include "streaming/streamingservices.h"
 
 #include <map>
@@ -25,8 +26,11 @@ std::string CreateUrl(const std::string &api_url, FavoriteType type, const std::
 std::string DeleteUrl(const std::string &api_url, FavoriteType type, const std::vector<std::string> &ids, const std::string &app_id,
                       const std::string &user_auth_token);
 
+SongList Parse(FavoriteType type, const std::string &json);
+
 void Get(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
-         const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback);
+         const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback,
+         StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {});
 void Add(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
          const std::map<std::string, std::string> &headers, FavoriteType type, const SongList &songs, SearchCallback callback);
 void Remove(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
