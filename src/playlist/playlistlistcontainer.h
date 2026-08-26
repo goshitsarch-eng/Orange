@@ -19,6 +19,7 @@ class PlaylistListContainer {
  public:
   using NameCallback = std::function<void(const std::string &)>;
   using DropCallback = std::function<void(const std::string &, const std::string &, bool)>;
+  using FavoriteCallback = std::function<void(const std::string &, bool)>;
 
   PlaylistListContainer();
 
@@ -35,6 +36,7 @@ class PlaylistListContainer {
   void SetSaveCallback(NameCallback callback) { save_ = std::move(callback); }
   void SetCopyCallback(NameCallback callback) { copy_ = std::move(callback); }
   void SetMenuCallback(NameCallback callback) { menu_ = std::move(callback); }
+  void SetFavoriteCallback(FavoriteCallback callback);
   void SetDropCallback(DropCallback callback);
   std::string SelectedName() const;
   std::string SelectedFolderPath() const;
@@ -71,6 +73,7 @@ class PlaylistListContainer {
   NameCallback save_;
   NameCallback copy_;
   NameCallback menu_;
+  FavoriteCallback favorite_;
   std::vector<std::string> extra_folders_;
   std::set<std::string> collapsed_;
   std::string active_name_;

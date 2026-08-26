@@ -312,7 +312,7 @@ TEST(PlaylistListKeyboard, FromKeyExpandCollapseAndLabels) {
   });
   ASSERT_EQ(2u, labels.size());
   EXPECT_EQ("Rock", labels[0]);
-  EXPECT_EQ("★ Favorites", labels[1]);
+  EXPECT_EQ("Favorites", labels[1]);
 }
 
 TEST(PlaylistSaveOptionsDialog, PathTypeLabels) {

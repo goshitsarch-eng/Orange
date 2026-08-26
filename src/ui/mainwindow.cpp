@@ -988,6 +988,14 @@ void MainWindow::BuildSidebar() {
     Dialogs::CopyToDevice(GTK_WINDOW(window_), app_);
   });
   playlist_list_container_->SetMenuCallback([this](const std::string &name) { ShowPlaylistListMenu(name); });
+  playlist_list_container_->SetFavoriteCallback([this](const std::string &name, bool on) {
+    for (const auto &playlist : app_->playlist_manager()->playlists()) {
+      if (playlist->name() == name) {
+        app_->playlist_manager()->Favorite(playlist->id(), on);
+        break;
+      }
+    }
+  });
   playlist_list_container_->SetDropCallback(
       [this](const std::string &name, const std::string &payload, bool folder) { DropOnPlaylistList(name, payload, folder); });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, playlist_list_container_->widget(), "playlists", "Playlists",

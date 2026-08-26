@@ -61,7 +61,7 @@ inline std::vector<std::string> RowLabels(const std::vector<PlaylistListDrop::Ro
   std::vector<std::string> labels;
   labels.reserve(rows.size());
   for (const PlaylistListDrop::Row &row : rows) {
-    labels.push_back(row.folder ? row.name : PlaylistListDrop::DisplayName(row.name, row.favorite));
+    labels.push_back(row.name);
   }
   return labels;
 }

@@ -109,6 +109,11 @@ PlaylistListContainer::PlaylistListContainer()
     }
   });
   view_->SetFolderToggleCallback([this](const std::string &path) { ToggleFolder(path); });
+  view_->SetFavoriteCallback([this](const std::string &name, bool on) {
+    if (favorite_) {
+      favorite_(name, on);
+    }
+  });
   view_->SetDeleteCallback([this](const std::string &name) {
     if (SelectedIsFolder()) {
       if (delete_folder_) {
@@ -164,6 +169,8 @@ void PlaylistListContainer::SetActivateCallback(const std::function<void(const s
 }
 
 void PlaylistListContainer::SetDropCallback(DropCallback callback) { view_->SetDropCallback(std::move(callback)); }
+
+void PlaylistListContainer::SetFavoriteCallback(FavoriteCallback callback) { favorite_ = std::move(callback); }
 
 std::string PlaylistListContainer::SelectedName() const { return view_->SelectedName(); }
 

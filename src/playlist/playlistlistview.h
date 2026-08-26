@@ -3,10 +3,12 @@
 
 #include "playlist/playlistlistdrop.h"
 #include "playlist/playlistlistlook.h"
+#include "widgets/favoritewidget.h"
 
 #include <gtk/gtk.h>
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -16,6 +18,7 @@ class PlaylistListView {
   using MenuCallback = std::function<void(const std::string &)>;
   using DropCallback = std::function<void(const std::string &, const std::string &, bool)>;
   using FolderCallback = std::function<void(const std::string &)>;
+  using FavoriteCallback = std::function<void(const std::string &, bool)>;
 
   PlaylistListView();
   ~PlaylistListView();
@@ -31,6 +34,7 @@ class PlaylistListView {
   void SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
   void SetFolderToggleCallback(FolderCallback callback) { toggle_ = std::move(callback); }
   void SetDeleteCallback(ActivateCallback callback) { delete_ = std::move(callback); }
+  void SetFavoriteCallback(FavoriteCallback callback) { favorite_ = std::move(callback); }
   std::string SelectedName() const;
   std::string SelectedFolderPath() const;
   bool SelectedIsFolder() const;
@@ -50,6 +54,8 @@ class PlaylistListView {
   DropCallback drop_;
   FolderCallback toggle_;
   ActivateCallback delete_;
+  FavoriteCallback favorite_;
+  std::vector<std::unique_ptr<FavoriteWidget>> favorites_;
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
   std::string current_;

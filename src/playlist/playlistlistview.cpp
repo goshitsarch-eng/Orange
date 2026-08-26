@@ -198,6 +198,7 @@ void PlaylistListView::SelectName(const std::string &name) {
 void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, const std::string &current, const std::string &active,
                               PlaylistListLook::Playback playback) {
   CancelDragHover();
+  favorites_.clear();
   current_ = current;
   GtkWidget *child = gtk_widget_get_first_child(list_);
   while (child) {
@@ -250,10 +251,20 @@ void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, c
       GtkWidget *icon = gtk_image_new_from_icon_name(icon_name);
       gtk_box_append(GTK_BOX(outer), icon);
     }
-    GtkWidget *label = gtk_label_new(item.folder ? item.name.c_str() : PlaylistListDrop::DisplayName(item.name, item.favorite).c_str());
+    GtkWidget *label = gtk_label_new(item.name.c_str());
     gtk_widget_set_halign(label, GTK_ALIGN_START);
     gtk_widget_set_hexpand(label, TRUE);
     gtk_box_append(GTK_BOX(outer), label);
+    if (!item.folder) {
+      auto favorite = std::make_unique<FavoriteWidget>(item.id, item.favorite);
+      favorite->SetChangedCallback([this, name = item.name](int, bool on) {
+        if (favorite_) {
+          favorite_(name, on);
+        }
+      });
+      gtk_box_append(GTK_BOX(outer), favorite->widget());
+      favorites_.push_back(std::move(favorite));
+    }
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), outer);
     g_object_set_data_full(G_OBJECT(row), "playlist-name", g_strdup(item.folder ? "" : item.name.c_str()), g_free);
     g_object_set_data_full(G_OBJECT(row), "playlist-path", g_strdup(item.path.c_str()), g_free);
