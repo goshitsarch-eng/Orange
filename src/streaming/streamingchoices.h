@@ -21,7 +21,7 @@ inline const std::vector<std::pair<std::string, std::string>> &TidalStreamUrlMet
 
 inline const std::vector<std::pair<std::string, std::string>> &TidalCoverSizes() {
   static const std::vector<std::pair<std::string, std::string>> choices = {
-      {"160x160", "160"}, {"320x320", "320"}, {"640x640", "640"}, {"1280x1280", "1280"}};
+      {"160x160", "160x160"}, {"320x320", "320x320"}, {"640x640", "640x640"}, {"750x750", "750x750"}, {"1280x1280", "1280x1280"}};
   return choices;
 }
 
@@ -32,7 +32,7 @@ inline const std::vector<std::pair<std::string, std::string>> &QobuzFormats() {
 }
 
 inline const std::vector<std::pair<std::string, std::string>> &SubsonicAuthMethods() {
-  static const std::vector<std::pair<std::string, std::string>> choices = {{"0", "Hex"}, {"1", "MD5"}};
+  static const std::vector<std::pair<std::string, std::string>> choices = {{"0", "Hex"}, {"1", "MD5 token (Recommended)"}};
   return choices;
 }
 

@@ -3,41 +3,56 @@
 #include "config.h"
 #include "constants/subsonicsettings.h"
 #include "core/application.h"
+#include "dialogs/messagedialog.h"
 #include "settings/settingspage.h"
+#include "settings/streamingsettingslabels.h"
 #include "streaming/streamingchoices.h"
 #include "ui/dialogs.h"
 
 AdwPreferencesPage *SubsonicSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(SubsonicSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Subsonic", "network-server-symbolic");
-  AdwPreferencesGroup *group = SettingsPage::AddGroup(page, "Server");
-  SettingsPage::AddToggle(group, settings, SubsonicSettings::kEnabled, "Enable Subsonic", nullptr, SubsonicSettings::kDefaultEnabled);
-  SettingsPage::AddEntry(group, settings, SubsonicSettings::kUrl, "Server URL");
-  SettingsPage::AddEntry(group, settings, SubsonicSettings::kUsername, "Username");
-  SettingsPage::AddToggle(group, settings, SubsonicSettings::kHTTP2, "HTTP/2", nullptr, SubsonicSettings::kDefaultHTTP2);
-  SettingsPage::AddToggle(group, settings, SubsonicSettings::kVerifyCertificate, "Verify TLS certificate", nullptr,
-                          SubsonicSettings::kDefaultVerifyCertificate);
-  SettingsPage::AddToggle(group, settings, SubsonicSettings::kDownloadAlbumCovers, "Download album covers", nullptr,
-                          SubsonicSettings::kDefaultDownloadAlbumCovers);
-  SettingsPage::AddToggle(group, settings, SubsonicSettings::kUseAlbumIdForAlbumCovers, "Use album ID for covers", nullptr,
-                          SubsonicSettings::kDefaultUseAlbumIdForAlbumCovers);
-  SettingsPage::AddToggle(group, settings, SubsonicSettings::kServerSideScrobbling, "Server-side scrobbling", nullptr,
-                          SubsonicSettings::kDefaultServerSideScrobbling);
-  SettingsPage::AddCombo(group, settings, SubsonicSettings::kAuthMethod, "Auth method", StreamingChoices::SubsonicAuthMethods(),
-                         std::to_string(static_cast<int>(SubsonicSettings::kDefaultAuthMethod)), [settings](const std::string &id) {
+  AdwPreferencesGroup *enable = SettingsPage::AddGroup(page);
+  SettingsPage::AddToggle(enable, settings, SubsonicSettings::kEnabled, StreamingSettingsLabels::Enable(), nullptr,
+                          SubsonicSettings::kDefaultEnabled);
+
+  AdwPreferencesGroup *server = SettingsPage::AddGroup(page, SubsonicSettingsLabels::ServerUrl());
+  GtkWidget *url = SettingsPage::AddEntry(server, settings, SubsonicSettings::kUrl, SubsonicSettingsLabels::ServerUrl());
+
+  AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, StreamingSettingsLabels::Authentication());
+  GtkWidget *username = SettingsPage::AddEntry(auth, settings, SubsonicSettings::kUsername, StreamingSettingsLabels::Username());
+  GtkWidget *password = SettingsPage::AddPasswordEntry(auth, settings, SubsonicSettings::kPassword, StreamingSettingsLabels::Password());
+  SettingsPage::AddCombo(auth, settings, SubsonicSettings::kAuthMethod, SubsonicSettingsLabels::AuthMethod(),
+                         StreamingChoices::SubsonicAuthMethods(), std::to_string(static_cast<int>(SubsonicSettings::kDefaultAuthMethod)),
+                         [settings](const std::string &id) {
                            settings->BeginGroup(SubsonicSettings::kSettingsGroup);
                            settings->SetIntValue(SubsonicSettings::kAuthMethod, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
                            settings->Sync();
                          });
+  SettingsPage::AddButtonRow(auth, "", SubsonicSettingsLabels::Test(), [url, username, password]() {
+    const SubsonicConnectionCheck::Result result = SubsonicConnectionCheck::Validate(
+        gtk_editable_get_text(GTK_EDITABLE(url)), gtk_editable_get_text(GTK_EDITABLE(username)), gtk_editable_get_text(GTK_EDITABLE(password)));
+    MessageDialog::Show(nullptr, SubsonicConnectionCheck::Title(result), SubsonicConnectionCheck::Body(result));
+  });
   if (app) {
-    SettingsPage::AddButtonRow(group, "Server login", "Sign in", [app]() {
-      Dialogs::Login(nullptr, "Subsonic", [app](const std::string &user, const std::string &token) {
-        if (StreamingService *service = app->streaming_services()->ServiceByName("Subsonic")) {
-          service->Login(user, token);
-        }
-      });
-    });
-    SettingsPage::AddLoginState(group, app, "Subsonic");
+    SettingsPage::AddLoginState(auth, app, "Subsonic");
   }
+
+  AdwPreferencesGroup *prefs = SettingsPage::AddGroup(page, StreamingSettingsLabels::Preferences());
+  SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kHTTP2, SubsonicSettingsLabels::Http2(), nullptr, SubsonicSettings::kDefaultHTTP2);
+  SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kVerifyCertificate, SubsonicSettingsLabels::VerifyCertificate(), nullptr,
+                          SubsonicSettings::kDefaultVerifyCertificate);
+  GtkWidget *covers = SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kDownloadAlbumCovers, StreamingSettingsLabels::DownloadAlbumCovers(),
+                                              nullptr, SubsonicSettings::kDefaultDownloadAlbumCovers);
+  GtkWidget *album_id = SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kUseAlbumIdForAlbumCovers,
+                                               SubsonicSettingsLabels::UseAlbumIdForCovers(), nullptr,
+                                               SubsonicSettings::kDefaultUseAlbumIdForAlbumCovers);
+  gtk_widget_set_sensitive(album_id, adw_switch_row_get_active(ADW_SWITCH_ROW(covers)));
+  g_signal_connect(covers, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
+                     gtk_widget_set_sensitive(GTK_WIDGET(data), adw_switch_row_get_active(row));
+                   }),
+                   album_id);
+  SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kServerSideScrobbling, SubsonicSettingsLabels::ServerSideScrobbling(), nullptr,
+                          SubsonicSettings::kDefaultServerSideScrobbling);
   return page;
 }

@@ -22,6 +22,7 @@
 #include "core/appearancestyle.h"
 #include "settings/networkproxylabels.h"
 #include "settings/settingscontrols.h"
+#include "settings/streamingsettingslabels.h"
 #include "settings/transcodersettingspage.h"
 #include "covermanager/coverproviderauth.h"
 #include "settings/settingspages.h"
@@ -279,6 +280,50 @@ TEST(StreamingChoices, QualityAndAuthLabels) {
   EXPECT_EQ("2", StreamingChoices::TidalStreamUrlMethods().back().first);
   EXPECT_EQ("27", StreamingChoices::QobuzFormats().back().first);
   EXPECT_EQ("1", StreamingChoices::SubsonicAuthMethods().back().first);
+  EXPECT_STREQ("MD5 token (Recommended)", StreamingChoices::SubsonicAuthMethods().back().second.c_str());
   EXPECT_EQ("highest", StreamingChoices::SomaFmQualities().front().first);
   EXPECT_EQ("aac-320", StreamingChoices::RadioParadiseStreams().front().first);
+  ASSERT_EQ(5u, StreamingChoices::TidalCoverSizes().size());
+  EXPECT_EQ("750x750", StreamingChoices::TidalCoverSizes()[3].first);
+}
+
+TEST(StreamingSettingsLabels, MatchQtStreamingAndRadioCopy) {
+  EXPECT_STREQ("Enable", StreamingSettingsLabels::Enable());
+  EXPECT_STREQ("Authentication", StreamingSettingsLabels::Authentication());
+  EXPECT_STREQ("Preferences", StreamingSettingsLabels::Preferences());
+  EXPECT_STREQ("Login", StreamingSettingsLabels::Login());
+  EXPECT_STREQ("Search delay", StreamingSettingsLabels::SearchDelay());
+  EXPECT_STREQ("Remove (Remastered), etc from song titles", StreamingSettingsLabels::RemoveRemastered());
+  EXPECT_STREQ("Fetch entire albums when searching songs", StreamingSettingsLabels::FetchEntireAlbums());
+  EXPECT_STREQ("App Secret", QobuzSettingsLabels::AppSecret());
+  EXPECT_STREQ("Private key", QobuzSettingsLabels::PrivateKey());
+  EXPECT_STREQ("Fetch Credentials", QobuzSettingsLabels::FetchCredentials());
+  EXPECT_STREQ("Audio format", QobuzSettingsLabels::AudioFormat());
+  EXPECT_STREQ("Missing app id. Please fetch credentials first.", QobuzSettingsLabels::MissingCredentialMessage("", "s", "k"));
+  EXPECT_STREQ("Missing app secret. Please fetch credentials first.", QobuzSettingsLabels::MissingCredentialMessage("id", "", "k"));
+  EXPECT_STREQ("Missing private key. Please fetch credentials first.", QobuzSettingsLabels::MissingCredentialMessage("id", "s", ""));
+  EXPECT_EQ(nullptr, QobuzSettingsLabels::MissingCredentialMessage("id", "s", "k"));
+  EXPECT_STREQ("Server URL", SubsonicSettingsLabels::ServerUrl());
+  EXPECT_STREQ("Authentication method:", SubsonicSettingsLabels::AuthMethod());
+  EXPECT_STREQ("Use HTTP/2 when possible", SubsonicSettingsLabels::Http2());
+  EXPECT_STREQ("Verify server certificate", SubsonicSettingsLabels::VerifyCertificate());
+  EXPECT_STREQ("Use album ID for album covers", SubsonicSettingsLabels::UseAlbumIdForCovers());
+  EXPECT_EQ(SubsonicConnectionCheck::Result::MissingCredentials, SubsonicConnectionCheck::Validate("", "u", "p"));
+  EXPECT_EQ(SubsonicConnectionCheck::Result::InvalidUrl, SubsonicConnectionCheck::Validate("not-a-url", "u", "p"));
+  EXPECT_EQ(SubsonicConnectionCheck::Result::Ok, SubsonicConnectionCheck::Validate("https://music.example", "u", "p"));
+  EXPECT_STREQ("Configuration incomplete", SubsonicConnectionCheck::Title(SubsonicConnectionCheck::Result::MissingCredentials));
+  EXPECT_STREQ("Server URL is invalid.", SubsonicConnectionCheck::Body(SubsonicConnectionCheck::Result::InvalidUrl));
+  EXPECT_STREQ("Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these.",
+              TidalSettingsLabels::Disclaimer());
+  EXPECT_STREQ("Audio quality", TidalSettingsLabels::AudioQuality());
+  EXPECT_STREQ("Album cover size", TidalSettingsLabels::AlbumCoverSize());
+  EXPECT_STREQ("Basic authentication", SpotifySettingsLabels::BasicAuth());
+  EXPECT_STREQ("Authenticate", SpotifySettingsLabels::Authenticate());
+  EXPECT_STREQ("spotifyaudiosrc", SpotifySettingsLabels::PluginFeature());
+  EXPECT_NE(std::string::npos, SpotifySettingsLabels::PluginWarningMarkup().find(SpotifySettingsLabels::PluginWikiUrl()));
+  EXPECT_STREQ("Radios", RadioSettingsLabels::PageTitle());
+  EXPECT_STREQ("Stream quality:", RadioSettingsLabels::StreamQuality());
+  EXPECT_STREQ("Search results limit:", RadioSettingsLabels::SearchResultsLimit());
+  EXPECT_STREQ("Default sort order:", RadioSettingsLabels::DefaultSortOrder());
+  EXPECT_STREQ("Default country:", RadioSettingsLabels::DefaultCountry());
 }

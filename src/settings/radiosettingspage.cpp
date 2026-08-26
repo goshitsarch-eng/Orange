@@ -4,23 +4,26 @@
 #include "constants/radioparadisesettings.h"
 #include "constants/somafmsettings.h"
 #include "settings/settingspage.h"
+#include "settings/streamingsettingslabels.h"
 #include "streaming/streamingchoices.h"
 
 AdwPreferencesPage *RadioSettingsPage::Create(Settings *settings, Application *) {
-  settings->BeginGroup(RadioBrowserSettings::kSettingsGroup);
-  AdwPreferencesPage *page = SettingsPage::MakePage("Radio", "network-wireless-symbolic");
-  AdwPreferencesGroup *browser = SettingsPage::AddGroup(page, "Radio Browser");
-  SettingsPage::AddEntry(browser, settings, "server", "Radio Browser server", "https://de1.api.radio-browser.info");
-  SettingsPage::AddEntry(browser, settings, RadioBrowserSettings::kDefaultCountry, "Country filter");
-  SettingsPage::AddToggle(browser, settings, RadioBrowserSettings::kHideBroken, "Hide broken stations", nullptr,
-                          RadioBrowserSettings::kHideBrokenDefault);
-  SettingsPage::AddIntEntry(browser, settings, RadioBrowserSettings::kSearchLimit, "Search limit", RadioBrowserSettings::kSearchLimitDefault);
-  SettingsPage::AddEntry(browser, settings, RadioBrowserSettings::kDefaultSort, "Default sort", RadioBrowserSettings::kDefaultSortDefault);
+  AdwPreferencesPage *page = SettingsPage::MakePage(RadioSettingsLabels::PageTitle(), "network-wireless-symbolic");
 
   settings->BeginGroup(SomaFMSettings::kSettingsGroup);
   AdwPreferencesGroup *soma = SettingsPage::AddGroup(page, "SomaFM");
-  SettingsPage::AddCombo(soma, settings, SomaFMSettings::kQuality, "Quality", StreamingChoices::SomaFmQualities(),
+  SettingsPage::AddCombo(soma, settings, SomaFMSettings::kQuality, RadioSettingsLabels::StreamQuality(), StreamingChoices::SomaFmQualities(),
                          SomaFMSettings::kQualityDefault);
+
+  settings->BeginGroup(RadioBrowserSettings::kSettingsGroup);
+  AdwPreferencesGroup *browser = SettingsPage::AddGroup(page, "Radio Browser");
+  SettingsPage::AddIntEntry(browser, settings, RadioBrowserSettings::kSearchLimit, RadioSettingsLabels::SearchResultsLimit(),
+                            RadioBrowserSettings::kSearchLimitDefault);
+  SettingsPage::AddToggle(browser, settings, RadioBrowserSettings::kHideBroken, RadioSettingsLabels::HideBroken(), nullptr,
+                          RadioBrowserSettings::kHideBrokenDefault);
+  SettingsPage::AddEntry(browser, settings, RadioBrowserSettings::kDefaultSort, RadioSettingsLabels::DefaultSortOrder(),
+                         RadioBrowserSettings::kDefaultSortDefault);
+  SettingsPage::AddEntry(browser, settings, RadioBrowserSettings::kDefaultCountry, RadioSettingsLabels::DefaultCountry());
 
   settings->BeginGroup(RadioParadiseSettings::kSettingsGroup);
   AdwPreferencesGroup *rp = SettingsPage::AddGroup(page, "Radio Paradise");

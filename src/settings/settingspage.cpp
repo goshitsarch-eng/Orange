@@ -76,6 +76,36 @@ GtkWidget *AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *
   return GTK_WIDGET(row);
 }
 
+GtkWidget *AddPasswordEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback) {
+  AdwPasswordEntryRow *row = ADW_PASSWORD_ENTRY_ROW(adw_password_entry_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
+  gtk_editable_set_text(GTK_EDITABLE(row), settings->Value(key, fallback ? fallback : "").c_str());
+  g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
+  g_signal_connect(row, "changed", G_CALLBACK(+[](AdwPasswordEntryRow *entry, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(entry), "settings-key"));
+                     s->SetValue(settings_key, gtk_editable_get_text(GTK_EDITABLE(entry)));
+                     s->Sync();
+                   }),
+                   settings);
+  adw_preferences_group_add(group, GTK_WIDGET(row));
+  return GTK_WIDGET(row);
+}
+
+void AddDescription(AdwPreferencesGroup *group, const char *text, bool markup) {
+  GtkWidget *label = gtk_label_new(nullptr);
+  if (markup) {
+    gtk_label_set_markup(GTK_LABEL(label), Translations::CStr(text));
+    gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
+  } else {
+    gtk_label_set_text(GTK_LABEL(label), Translations::CStr(text));
+  }
+  gtk_label_set_wrap(GTK_LABEL(label), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+  gtk_widget_add_css_class(label, "dim-label");
+  adw_preferences_group_add(group, label);
+}
+
 GtkWidget *AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback) {
   AdwEntryRow *row = ADW_ENTRY_ROW(adw_entry_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
@@ -406,19 +436,26 @@ void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char 
   }
 }
 
-void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked) {
-  AddButtonRow(group, title, button_label, [clicked](GtkWidget *) {
-    if (clicked) {
-      clicked();
-    }
-  });
+void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked,
+                  const char *tooltip) {
+  AddButtonRow(
+      group, title, button_label,
+      [clicked](GtkWidget *) {
+        if (clicked) {
+          clicked();
+        }
+      },
+      tooltip);
 }
 
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
-                  const std::function<void(GtkWidget *button)> &clicked) {
+                  const std::function<void(GtkWidget *button)> &clicked, const char *tooltip) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   GtkWidget *button = gtk_button_new_with_label(Translations::CStr(button_label));
+  if (tooltip && tooltip[0]) {
+    gtk_widget_set_tooltip_text(button, Translations::CStr(tooltip));
+  }
   auto *fn = new std::function<void(GtkWidget *)>(clicked);
   g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
                      (*static_cast<std::function<void(GtkWidget *)> *>(data))(GTK_WIDGET(btn));

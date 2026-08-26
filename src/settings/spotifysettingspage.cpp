@@ -4,28 +4,22 @@
 #include "core/application.h"
 #include "core/oauthenticator.h"
 #include "settings/settingspage.h"
+#include "settings/streamingsettingslabels.h"
 #include "spotify/spotifyservice.h"
 #include "ui/dialogs.h"
+
+#include <gst/gst.h>
 
 AdwPreferencesPage *SpotifySettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(SpotifySettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Spotify", "emblem-shared-symbolic");
-  AdwPreferencesGroup *group = SettingsPage::AddGroup(page, "Spotify");
-  SettingsPage::AddToggle(group, settings, SpotifySettings::kEnabled, "Enable Spotify", nullptr, SpotifySettings::kDefaultEnabled);
-  SettingsPage::AddEntry(group, settings, "clientid", "Client ID");
-  SettingsPage::AddEntry(group, settings, "clientsecret", "Client secret");
-  SettingsPage::AddIntEntry(group, settings, SpotifySettings::kSearchDelay, "Search delay (ms)", SpotifySettings::kDefaultSearchDelay);
-  SettingsPage::AddIntEntry(group, settings, SpotifySettings::kArtistsSearchLimit, "Artists search limit", SpotifySettings::kDefaultArtistsSearchLimit);
-  SettingsPage::AddIntEntry(group, settings, SpotifySettings::kAlbumsSearchLimit, "Albums search limit", SpotifySettings::kDefaultAlbumsSearchLimit);
-  SettingsPage::AddIntEntry(group, settings, SpotifySettings::kSongsSearchLimit, "Songs search limit", SpotifySettings::kDefaultSongsSearchLimit);
-  SettingsPage::AddToggle(group, settings, SpotifySettings::kFetchAlbums, "Fetch albums when searching songs", nullptr,
-                          SpotifySettings::kDefaultFetchAlbums);
-  SettingsPage::AddToggle(group, settings, SpotifySettings::kDownloadAlbumCovers, "Download album covers", nullptr,
-                          SpotifySettings::kDefaultDownloadAlbumCovers);
-  SettingsPage::AddToggle(group, settings, SpotifySettings::kRemoveRemastered, "Remove remastered from titles", nullptr,
-                          SpotifySettings::kDefaultRemoveRemastered);
+  AdwPreferencesGroup *enable = SettingsPage::AddGroup(page);
+  SettingsPage::AddToggle(enable, settings, SpotifySettings::kEnabled, StreamingSettingsLabels::Enable(), nullptr,
+                          SpotifySettings::kDefaultEnabled);
+
+  AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, SpotifySettingsLabels::BasicAuth());
   if (app) {
-    SettingsPage::AddButtonRow(group, "OAuth", "Sign in", [app]() {
+    SettingsPage::AddButtonRow(auth, "", SpotifySettingsLabels::Authenticate(), [app]() {
       Settings s;
       s.BeginGroup(SpotifySettings::kSettingsGroup);
       const std::string client_id = s.Value("clientid");
@@ -61,7 +55,36 @@ AdwPreferencesPage *SpotifySettingsPage::Create(Settings *settings, Application 
                                                       });
                                 });
     });
-    SettingsPage::AddLoginState(group, app, "Spotify");
+    SettingsPage::AddLoginState(auth, app, "Spotify");
   }
+
+  bool has_plugin = false;
+  if (GstRegistry *reg = gst_registry_get()) {
+    if (GstPluginFeature *feature = gst_registry_lookup_feature(reg, SpotifySettingsLabels::PluginFeature())) {
+      gst_object_unref(feature);
+      has_plugin = true;
+    }
+  }
+  if (!has_plugin) {
+    AdwPreferencesGroup *warning = SettingsPage::AddGroup(page);
+    const std::string markup = SpotifySettingsLabels::PluginWarningMarkup();
+    SettingsPage::AddDescription(warning, markup.c_str(), true);
+  }
+
+  AdwPreferencesGroup *prefs = SettingsPage::AddGroup(page, StreamingSettingsLabels::Preferences());
+  SettingsPage::AddIntEntry(prefs, settings, SpotifySettings::kSearchDelay, StreamingSettingsLabels::SearchDelay(),
+                            SpotifySettings::kDefaultSearchDelay);
+  SettingsPage::AddIntEntry(prefs, settings, SpotifySettings::kArtistsSearchLimit, StreamingSettingsLabels::ArtistsSearchLimit(),
+                            SpotifySettings::kDefaultArtistsSearchLimit);
+  SettingsPage::AddIntEntry(prefs, settings, SpotifySettings::kAlbumsSearchLimit, StreamingSettingsLabels::AlbumsSearchLimit(),
+                            SpotifySettings::kDefaultAlbumsSearchLimit);
+  SettingsPage::AddIntEntry(prefs, settings, SpotifySettings::kSongsSearchLimit, StreamingSettingsLabels::SongsSearchLimit(),
+                            SpotifySettings::kDefaultSongsSearchLimit);
+  SettingsPage::AddToggle(prefs, settings, SpotifySettings::kDownloadAlbumCovers, StreamingSettingsLabels::DownloadAlbumCovers(), nullptr,
+                          SpotifySettings::kDefaultDownloadAlbumCovers);
+  SettingsPage::AddToggle(prefs, settings, SpotifySettings::kFetchAlbums, StreamingSettingsLabels::FetchEntireAlbums(), nullptr,
+                          SpotifySettings::kDefaultFetchAlbums);
+  SettingsPage::AddToggle(prefs, settings, SpotifySettings::kRemoveRemastered, StreamingSettingsLabels::RemoveRemastered(), nullptr,
+                          SpotifySettings::kDefaultRemoveRemastered);
   return page;
 }

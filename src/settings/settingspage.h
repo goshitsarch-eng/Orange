@@ -20,15 +20,18 @@ AdwPreferencesGroup *AddGroup(AdwPreferencesPage *page, const char *title = null
 GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *subtitle, bool fallback,
                      const char *group_name = nullptr);
 GtkWidget *AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback = "");
+GtkWidget *AddPasswordEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback = "");
 GtkWidget *AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback);
+void AddDescription(AdwPreferencesGroup *group, const char *text, bool markup = false);
 GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
                     const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
                     const std::function<void(const std::string &)> &changed = {}, const char *group_name = nullptr);
 GtkWidget *AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
                        const std::vector<std::pair<std::string, std::string>> &choices, int fallback);
-void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked);
+void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked,
+                  const char *tooltip = nullptr);
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
-                  const std::function<void(GtkWidget *button)> &clicked);
+                  const std::function<void(GtkWidget *button)> &clicked, const char *tooltip = nullptr);
 void AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
                     const char *fallback, const char *tooltip = nullptr);
 void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
