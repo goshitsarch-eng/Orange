@@ -26,6 +26,7 @@ class CollectionLibrary {
   void AbortScan();
   bool scanning() const;
   void Rescan(const SongList &songs);
+  void RescanDirectory(int id);
   void AddDirectory(const std::string &path, bool subdirs = true);
   void RemoveDirectory(int id);
   SongList Songs(const std::string &filter = {}) const;

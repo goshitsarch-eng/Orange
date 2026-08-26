@@ -235,6 +235,12 @@ void CollectionBackend::IncrementSkipCount(int song_id) {
   query.Exec();
 }
 
+void CollectionBackend::ResetPlayStatistics(int song_id) {
+  SqlQuery query(database_, "UPDATE songs SET playcount = 0, skipcount = 0, lastplayed = -1 WHERE ROWID = ?");
+  query.Bind(1, song_id);
+  query.Exec();
+}
+
 void CollectionBackend::SetRating(int song_id, float rating) {
   SqlQuery query(database_, "UPDATE songs SET rating = ? WHERE ROWID = ?");
   query.Bind(1, static_cast<int>(rating * 100.0f));

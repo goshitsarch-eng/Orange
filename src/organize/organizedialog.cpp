@@ -40,6 +40,37 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
   gtk_label_set_xalign(GTK_LABEL(format_error), 0.0f);
   GtkWidget *dest = gtk_entry_new();
   gtk_editable_set_text(GTK_EDITABLE(dest), saved_dest.c_str());
+  GtkWidget *dest_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  GtkWidget *browse = gtk_button_new_with_label(Translations::CStr("Choose folder…"));
+  gtk_widget_set_hexpand(dest, TRUE);
+  gtk_box_append(GTK_BOX(dest_row), dest);
+  gtk_box_append(GTK_BOX(dest_row), browse);
+  g_object_set_data(G_OBJECT(browse), "dest", dest);
+  g_object_set_data(G_OBJECT(browse), "parent", parent);
+  g_signal_connect(browse, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
+                     GtkFileDialog *chooser = gtk_file_dialog_new();
+                     gtk_file_dialog_set_title(chooser, Translations::CStr("Organize destination"));
+                     gtk_file_dialog_select_folder(chooser, GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), nullptr,
+                                                   +[](GObject *source, GAsyncResult *result, gpointer user) {
+                                                     auto *entry = GTK_EDITABLE(user);
+                                                     GError *error = nullptr;
+                                                     GFile *folder = gtk_file_dialog_select_folder_finish(GTK_FILE_DIALOG(source), result, &error);
+                                                     if (!folder) {
+                                                       if (error) {
+                                                         g_error_free(error);
+                                                       }
+                                                       return;
+                                                     }
+                                                     gchar *path = g_file_get_path(folder);
+                                                     if (path) {
+                                                       gtk_editable_set_text(entry, path);
+                                                     }
+                                                     g_free(path);
+                                                     g_object_unref(folder);
+                                                   },
+                                                   g_object_get_data(G_OBJECT(button), "dest"));
+                   })),
+                   nullptr);
   GtkWidget *move = gtk_check_button_new_with_label(Translations::CStr("Move files instead of copying"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(move), settings.BoolValue("move", false));
   auto *owned_songs = new SongList(songs);
@@ -149,7 +180,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
   gtk_box_append(GTK_BOX(box), format_view);
   gtk_box_append(GTK_BOX(box), format_error);
   gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Destination")));
-  gtk_box_append(GTK_BOX(box), dest);
+  gtk_box_append(GTK_BOX(box), dest_row);
   gtk_box_append(GTK_BOX(box), move);
   gtk_box_append(GTK_BOX(box), preview_btn);
   gtk_box_append(GTK_BOX(box), preview);

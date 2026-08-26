@@ -1,5 +1,6 @@
 #include "collection/collectionlibrary.h"
 
+#include "collection/collectiondirectory.h"
 #include "core/logging.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
@@ -43,6 +44,15 @@ void CollectionLibrary::Rescan(const SongList &songs) {
     backend_->AddOrUpdateSong(updated);
   }
   ScanFinished.Emit();
+}
+
+void CollectionLibrary::RescanDirectory(int id) {
+  for (const CollectionDirectory &directory : backend_->Directories()) {
+    if (directory.id == id) {
+      watcher_->ScanDirectory(id, directory.path, directory.subdirs);
+      return;
+    }
+  }
 }
 
 void CollectionLibrary::AddDirectory(const std::string &path, bool subdirs) {

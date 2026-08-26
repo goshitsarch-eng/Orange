@@ -4,6 +4,77 @@
 #include "collection/collectionbackend.h"
 #include "core/application.h"
 #include "settings/settingspage.h"
+#include "translations/translations.h"
+
+#include <gio/gio.h>
+
+namespace {
+
+struct FolderListState {
+  Application *app = nullptr;
+  GtkWidget *list = nullptr;
+  GtkWidget *status = nullptr;
+};
+
+GtkWindow *WindowForWidget(GtkWidget *widget) {
+  for (GtkWidget *current = widget; current; current = gtk_widget_get_parent(current)) {
+    if (GTK_IS_WINDOW(current)) {
+      return GTK_WINDOW(current);
+    }
+  }
+  GtkRoot *root = widget ? gtk_widget_get_root(widget) : nullptr;
+  return GTK_IS_WINDOW(root) ? GTK_WINDOW(root) : nullptr;
+}
+
+void RefreshFolderList(FolderListState *state) {
+  if (!state || !state->list || !state->app) {
+    return;
+  }
+  while (GtkWidget *child = gtk_widget_get_first_child(state->list)) {
+    gtk_list_box_remove(GTK_LIST_BOX(state->list), child);
+  }
+  const std::vector<CollectionDirectory> directories = state->app->collection()->backend()->Directories();
+  if (state->status) {
+    gtk_label_set_text(GTK_LABEL(state->status),
+                       directories.empty() ? Translations::CStr("No collection folders")
+                                           : (std::to_string(directories.size()) + " " + Translations::Tr("folder(s)")).c_str());
+  }
+  for (const CollectionDirectory &directory : directories) {
+    AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), directory.path.c_str());
+    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), directory.subdirs ? Translations::CStr("Including subfolders")
+                                                                      : Translations::CStr("This folder only"));
+    GtkWidget *rescan = gtk_button_new_with_label(Translations::CStr("Rescan"));
+    GtkWidget *remove = gtk_button_new_with_label(Translations::CStr("Remove"));
+    gtk_widget_add_css_class(remove, "destructive-action");
+    g_object_set_data(G_OBJECT(rescan), "folder-state", state);
+    g_object_set_data(G_OBJECT(remove), "folder-state", state);
+    g_object_set_data(G_OBJECT(rescan), "directory-id", GINT_TO_POINTER(directory.id));
+    g_object_set_data(G_OBJECT(remove), "directory-id", GINT_TO_POINTER(directory.id));
+    g_signal_connect(rescan, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
+                       auto *self = static_cast<FolderListState *>(g_object_get_data(G_OBJECT(button), "folder-state"));
+                       const int id = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "directory-id"));
+                       if (self && self->app) {
+                         self->app->collection()->RescanDirectory(id);
+                       }
+                     })),
+                     nullptr);
+    g_signal_connect(remove, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
+                       auto *self = static_cast<FolderListState *>(g_object_get_data(G_OBJECT(button), "folder-state"));
+                       const int id = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "directory-id"));
+                       if (self && self->app) {
+                         self->app->collection()->RemoveDirectory(id);
+                         RefreshFolderList(self);
+                       }
+                     })),
+                     nullptr);
+    adw_action_row_add_suffix(row, rescan);
+    adw_action_row_add_suffix(row, remove);
+    gtk_list_box_append(GTK_LIST_BOX(state->list), GTK_WIDGET(row));
+  }
+}
+
+}  // namespace
 
 AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(CollectionSettings::kSettingsGroup);
@@ -56,13 +127,69 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
                           CollectionSettings::kDefaultDeleteFiles);
 
   AdwPreferencesGroup *dirs = SettingsPage::AddGroup(page, "Folders");
+  GtkWidget *list = gtk_list_box_new();
+  gtk_widget_add_css_class(list, "boxed-list");
+  GtkWidget *status = gtk_label_new("");
+  gtk_widget_add_css_class(status, "dim-label");
+  gtk_label_set_xalign(GTK_LABEL(status), 0);
+  auto *folder_state = new FolderListState();
+  folder_state->app = app;
+  folder_state->list = list;
+  folder_state->status = status;
+  g_object_set_data_full(G_OBJECT(page), "folder-state", folder_state, [](gpointer p) { delete static_cast<FolderListState *>(p); });
   if (app) {
-    for (const CollectionDirectory &directory : app->collection()->backend()->Directories()) {
-      AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
-      adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), directory.path.c_str());
-      adw_action_row_set_subtitle(ADW_ACTION_ROW(row), directory.subdirs ? "Including subfolders" : "This folder only");
-      adw_preferences_group_add(dirs, GTK_WIDGET(row));
-    }
+    RefreshFolderList(folder_state);
+    GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    GtkWidget *add = gtk_button_new_with_label(Translations::CStr("Add folder…"));
+    GtkWidget *rescan_all = gtk_button_new_with_label(Translations::CStr("Rescan all"));
+    GtkWidget *full_scan = gtk_button_new_with_label(Translations::CStr("Full rescan"));
+    gtk_widget_add_css_class(add, "suggested-action");
+    gtk_box_append(GTK_BOX(buttons), add);
+    gtk_box_append(GTK_BOX(buttons), rescan_all);
+    gtk_box_append(GTK_BOX(buttons), full_scan);
+    g_signal_connect(add, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                       auto *self = static_cast<FolderListState *>(data);
+                       GtkFileDialog *chooser = gtk_file_dialog_new();
+                       gtk_file_dialog_set_title(chooser, Translations::CStr("Add collection folder"));
+                       gtk_file_dialog_select_folder(chooser, WindowForWidget(GTK_WIDGET(button)), nullptr,
+                                                     +[](GObject *source, GAsyncResult *result, gpointer user) {
+                                                       auto *state = static_cast<FolderListState *>(user);
+                                                       GError *error = nullptr;
+                                                       GFile *file = gtk_file_dialog_select_folder_finish(GTK_FILE_DIALOG(source), result, &error);
+                                                       if (!file) {
+                                                         if (error) {
+                                                           g_error_free(error);
+                                                         }
+                                                         return;
+                                                       }
+                                                       gchar *path = g_file_get_path(file);
+                                                       if (path && state && state->app) {
+                                                         state->app->collection()->AddDirectory(path, true);
+                                                         RefreshFolderList(state);
+                                                       }
+                                                       g_free(path);
+                                                       g_object_unref(file);
+                                                     },
+                                                     self);
+                     })),
+                     folder_state);
+    g_signal_connect(rescan_all, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                       auto *self = static_cast<FolderListState *>(data);
+                       if (self && self->app) {
+                         self->app->collection()->IncrementalScan();
+                       }
+                     })),
+                     folder_state);
+    g_signal_connect(full_scan, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                       auto *self = static_cast<FolderListState *>(data);
+                       if (self && self->app) {
+                         self->app->collection()->FullScan();
+                       }
+                     })),
+                     folder_state);
+    adw_preferences_group_add(dirs, buttons);
   }
+  adw_preferences_group_add(dirs, list);
+  adw_preferences_group_add(dirs, status);
   return page;
 }

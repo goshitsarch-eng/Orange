@@ -26,6 +26,7 @@ class CollectionBackend {
   void DeleteSongsInDirectory(int directory_id);
   void IncrementPlayCount(int song_id);
   void IncrementSkipCount(int song_id);
+  void ResetPlayStatistics(int song_id);
   void SetRating(int song_id, float rating);
   void SetUnavailable(int song_id, bool unavailable);
   int MarkMissingUnavailable(int directory_id, const std::vector<std::string> &seen_urls);

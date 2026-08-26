@@ -2,7 +2,9 @@
 
 #include "config.h"
 
+#include "constants/lyricssettings.h"
 #include "core/settings.h"
+#include "lyrics/lyricsproviderorder.h"
 #include "lyrics/azlyricscomlyricsprovider.h"
 #include "lyrics/elyricsnetlyricsprovider.h"
 #include "lyrics/geniuslyricsprovider.h"
@@ -11,6 +13,8 @@
 #include "lyrics/musixmatchlyricsprovider.h"
 #include "lyrics/ovhlyricsprovider.h"
 #include "lyrics/songlyricscomlyricsprovider.h"
+
+#include <algorithm>
 
 LyricsProviders::LyricsProviders(NetworkAccessManager *network) : network_(network) {
   providers_.push_back(std::make_unique<LrcLibLyricsProvider>());
@@ -26,8 +30,10 @@ LyricsProviders::LyricsProviders(NetworkAccessManager *network) : network_(netwo
 
 void LyricsProviders::ReloadSettings() {
   Settings settings;
-  settings.BeginGroup("Lyrics");
-  for (auto &provider : providers_) {
+  settings.BeginGroup(LyricsSettings::kSettingsGroup);
+  const std::vector<std::string> order = LyricsProviderOrder::Parse(settings.Value(LyricsSettings::kProviders, ""));
+  for (size_t i = 0; i < providers_.size(); ++i) {
+    auto &provider = providers_[i];
     const std::string legacy = [&]() {
       if (provider->name() == "azlyrics.com") return std::string("AZLyrics");
       if (provider->name() == "elyrics.net") return std::string("eLyrics");
@@ -42,7 +48,35 @@ void LyricsProviders::ReloadSettings() {
       enabled = settings.BoolValue(legacy, enabled);
     }
     provider->set_enabled(enabled);
+    provider->set_order(LyricsProviderOrder::Rank(order, provider->name(), static_cast<int>(1000 + i)));
   }
+  std::sort(providers_.begin(), providers_.end(), [](const std::unique_ptr<LyricsProvider> &a, const std::unique_ptr<LyricsProvider> &b) {
+    return a->order() < b->order();
+  });
+}
+
+void LyricsProviders::SaveOrder() {
+  std::vector<std::string> names;
+  names.reserve(providers_.size());
+  for (const auto &provider : providers_) {
+    names.push_back(provider->name());
+  }
+  Settings settings;
+  settings.BeginGroup(LyricsSettings::kSettingsGroup);
+  settings.SetValue(LyricsSettings::kProviders, LyricsProviderOrder::Join(names));
+  settings.Sync();
+}
+
+void LyricsProviders::Move(int index, int delta) {
+  const int dest = index + delta;
+  if (index < 0 || dest < 0 || dest >= static_cast<int>(providers_.size())) {
+    return;
+  }
+  std::swap(providers_[static_cast<size_t>(index)], providers_[static_cast<size_t>(dest)]);
+  for (size_t i = 0; i < providers_.size(); ++i) {
+    providers_[i]->set_order(static_cast<int>(i));
+  }
+  SaveOrder();
 }
 
 void LyricsProviders::Fetch(const Song &song, LyricsProvider::Callback callback) {

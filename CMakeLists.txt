@@ -610,6 +610,7 @@ set(STRAWBERRY_SOURCES
   src/dialogs/console.cpp
   src/dialogs/saveplaylistsdialog.cpp
   src/dialogs/deleteconfirmationdialog.cpp
+  src/dialogs/edittagfields.cpp
   src/dialogs/edittagdialog.cpp
   src/dialogs/trackselectiondialog.cpp
   src/dialogs/shortcutsdialog.cpp
@@ -721,6 +722,7 @@ if(GTest_FOUND)
     tests/src/filterparser_test.cpp
     tests/src/parity_increment29_test.cpp
     tests/src/parity_increment30_test.cpp
+    tests/src/edittag_test.cpp
     tests/src/lyrics_test.cpp
     tests/src/gpod_test.cpp
     tests/src/mtp_test.cpp
@@ -981,6 +983,7 @@ if(GTest_FOUND)
     src/fileview/fileviewtreemodel.cpp
     src/covermanager/coversearchstatisticsdialog.cpp
     src/widgets/ratingpainter.cpp
+    src/dialogs/edittagfields.cpp
     src/collection/collectionbackend.cpp
     src/collection/collectiongrouping.cpp
     src/collection/collectionfilteroptions.cpp

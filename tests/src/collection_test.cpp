@@ -322,6 +322,18 @@ TEST(CollectionBackend, PersistsRatingPlaycountAndEmbeddedArt) {
   EXPECT_NEAR(0.6f, kept.rating(), 0.001f);
   EXPECT_EQ(7u, kept.playcount());
   EXPECT_TRUE(kept.art_embedded());
+
+  backend.IncrementSkipCount(id);
+  backend.IncrementPlayCount(id);
+  const Song counted = backend.SongById(id);
+  EXPECT_EQ(8u, counted.playcount());
+  EXPECT_EQ(1u, counted.skipcount());
+  EXPECT_GT(counted.lastplayed(), 0);
+  backend.ResetPlayStatistics(id);
+  const Song reset = backend.SongById(id);
+  EXPECT_EQ(0u, reset.playcount());
+  EXPECT_EQ(0u, reset.skipcount());
+  EXPECT_LE(reset.lastplayed(), 0);
   unlink(path.c_str());
 }
 

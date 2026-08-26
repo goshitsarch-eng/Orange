@@ -13,6 +13,8 @@ class LyricsProviders {
  public:
   explicit LyricsProviders(NetworkAccessManager *network);
   void ReloadSettings();
+  void Move(int index, int delta);
+  void SaveOrder();
   void Fetch(const Song &song, LyricsProvider::Callback callback);
   std::vector<LyricsProvider *> All() const;
   NetworkAccessManager *network() const { return network_; }
