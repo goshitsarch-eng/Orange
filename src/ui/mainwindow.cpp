@@ -173,6 +173,9 @@ MainWindow::~MainWindow() {
   if (position_timeout_) {
     g_source_remove(position_timeout_);
   }
+  if (analyzer_timeout_) {
+    g_source_remove(analyzer_timeout_);
+  }
   if (collection_filter_timeout_) {
     g_source_remove(collection_filter_timeout_);
   }
@@ -1847,15 +1850,12 @@ void MainWindow::ConnectSignals() {
     if (!app_->analyzer()->enabled()) {
       return;
     }
-    app_->analyzer()->set_paused(app_->player()->GetState() == GstEngine::State::Paused);
+    const auto state = app_->player()->GetState();
+    app_->analyzer()->set_paused(state == GstEngine::State::Paused);
+    app_->analyzer()->set_playing(state == GstEngine::State::Playing);
     app_->analyzer()->SetEngineScope(scope);
-    const gint64 now = g_get_monotonic_time();
-    const gint64 interval = 1000000LL / std::max(1, app_->analyzer()->framerate());
-    if (now - analyzer_last_draw_us_ >= interval) {
-      analyzer_last_draw_us_ = now;
-      gtk_widget_queue_draw(analyzer_drawing_);
-    }
   });
+  EnsureAnalyzerTimer();
   position_timeout_ = g_timeout_add(200, [](gpointer data) -> gboolean {
     auto *self = static_cast<MainWindow *>(data);
     if (!self->app_->player()->engine()) {
@@ -2564,6 +2564,43 @@ void MainWindow::ApplyAnalyzer() {
   }
   gtk_widget_set_visible(analyzer_drawing_, app_->analyzer()->enabled());
   gtk_widget_set_tooltip_text(analyzer_drawing_, ("Analyzer: " + app_->analyzer()->type()).c_str());
+  EnsureAnalyzerTimer();
+  gtk_widget_queue_draw(analyzer_drawing_);
+}
+
+void MainWindow::EnsureAnalyzerTimer() {
+  if (!app_->analyzer()->enabled()) {
+    if (analyzer_timeout_) {
+      g_source_remove(analyzer_timeout_);
+      analyzer_timeout_ = 0;
+    }
+    analyzer_timer_ms_ = 0;
+    return;
+  }
+  const int ms = std::max(1, 1000 / std::max(1, app_->analyzer()->framerate()));
+  if (analyzer_timeout_ != 0 && analyzer_timer_ms_ == ms) {
+    return;
+  }
+  if (analyzer_timeout_) {
+    g_source_remove(analyzer_timeout_);
+    analyzer_timeout_ = 0;
+  }
+  analyzer_timer_ms_ = ms;
+  analyzer_timeout_ = g_timeout_add_full(G_PRIORITY_DEFAULT, static_cast<guint>(ms),
+                                         +[](gpointer data) -> gboolean {
+                                           static_cast<MainWindow *>(data)->TickAnalyzer();
+                                           return G_SOURCE_CONTINUE;
+                                         },
+                                         this, nullptr);
+}
+
+void MainWindow::TickAnalyzer() {
+  if (!analyzer_drawing_ || !app_->analyzer()->enabled()) {
+    return;
+  }
+  const auto state = app_->player()->GetState();
+  app_->analyzer()->set_paused(state == GstEngine::State::Paused);
+  app_->analyzer()->set_playing(state == GstEngine::State::Playing);
   gtk_widget_queue_draw(analyzer_drawing_);
 }
 
@@ -2627,6 +2664,7 @@ void MainWindow::ShowAnalyzerMenu() {
                        }
                        auto *self = static_cast<MainWindow *>(data);
                        self->app_->analyzer()->set_framerate(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "fps")));
+                       self->EnsureAnalyzerTimer();
                        if (auto *pop = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "popover"))) {
                          gtk_popover_popdown(GTK_POPOVER(pop));
                        }

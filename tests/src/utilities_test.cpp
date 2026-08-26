@@ -41,8 +41,13 @@
 #include "organize/organizetranscode.h"
 #include "constants/organizesettings.h"
 #include "analyzer/analyzer.h"
+#include "analyzer/analyzerdemo.h"
+#include "analyzer/baranalyzerstate.h"
+#include "analyzer/blockanalyzerstate.h"
 #include "analyzer/fht.h"
+#include "analyzer/rainbowcanvas.h"
 #include "analyzer/sonogramcanvas.h"
+#include "analyzer/waveamplitude.h"
 #include "constants/behavioursettings.h"
 #include "desktop/taskbarprogress.h"
 #include "context/contextformattokens.h"
@@ -78,6 +83,7 @@
 #include "widgets/stretchheaderview.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -801,6 +807,77 @@ TEST(Analyzer, Types) {
   EXPECT_EQ(60, Analyzer::ClampFramerate(120));
   EXPECT_EQ("Rainbow", Analyzer::NextType("Bar"));
   EXPECT_EQ("Bar", Analyzer::NextType("Block"));
+}
+
+TEST(BarAnalyzerState, PeakHoldDecaysSlowerThanBar) {
+  BarAnalyzerState state;
+  state.Advance({1.0f}, 100);
+  ASSERT_EQ(1u, state.bar_height.size());
+  EXPECT_GT(state.bar_height[0], 0.0);
+  EXPECT_DOUBLE_EQ(state.peak_height[0], state.bar_height[0]);
+  const double peak = state.peak_height[0];
+  const double bar = state.bar_height[0];
+  state.Advance({0.0f}, 100);
+  EXPECT_NEAR(state.bar_height[0], std::max(0.0, bar - BarAnalyzerState::kBarHeight), 1e-9);
+  EXPECT_GT(state.peak_height[0], state.bar_height[0]);
+  EXPECT_LT(state.peak_height[0], peak);
+  EXPECT_GT(state.peak_speed[0], BarAnalyzerState::kInitialPeakSpeed);
+}
+
+TEST(RainbowCanvas, ShiftsHistoryAndScalesBands) {
+  EXPECT_NEAR(-0.5f, RainbowCanvas::BandScale(0), 0.01f);
+  EXPECT_GT(std::abs(RainbowCanvas::BandScale(5)), 8.0f);
+  RainbowCanvas canvas;
+  canvas.Advance({1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f});
+  const float first = canvas.Last(0);
+  EXPECT_NE(0.0f, first);
+  canvas.Advance({0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f});
+  EXPECT_NEAR(first, canvas.At(0, RainbowCanvas::kHistorySize - 2), 1e-6);
+  EXPECT_NEAR(0.0f, canvas.Last(0), 1e-6);
+}
+
+TEST(BlockAnalyzerState, FallsThenStartsFade) {
+  BlockAnalyzerState state;
+  state.Advance({1.0f}, 30);
+  ASSERT_FALSE(state.store.empty());
+  EXPECT_EQ(0, static_cast<int>(state.store[0]));
+  EXPECT_EQ(BlockAnalyzerState::kFadeSize - 1, state.fade_intensity[0]);
+  const double store = state.store[0];
+  state.Advance({0.0f}, 30);
+  EXPECT_GT(state.store[0], store);
+  EXPECT_LT(state.fade_intensity[0], BlockAnalyzerState::kFadeSize - 1);
+}
+
+TEST(WaveAmplitude, HighlightsFromAmplitude) {
+  double r = 0, g = 0, b = 0;
+  WaveAmplitude::Color(-1.0f, &r, &g, &b);
+  EXPECT_NEAR(1.0, r, 1e-9);
+  EXPECT_DOUBLE_EQ(WaveAmplitude::kHighlightG, g);
+  WaveAmplitude::Color(1.0f, &r, &g, &b);
+  EXPECT_NEAR(0.0, r, 1e-9);
+  EXPECT_EQ(25, WaveAmplitude::MidY(100));
+  EXPECT_NEAR(50.0, WaveAmplitude::DrawY(0.0f, 25), 1e-9);
+}
+
+TEST(AnalyzerDemo, SineSweepThenSilence) {
+  AnalyzerDemo demo;
+  demo.t = 100;
+  const auto active = demo.Next(8);
+  ASSERT_EQ(8u, active.size());
+  EXPECT_GT(active[0], 0.0f);
+  demo.t = 500;
+  const auto idle = demo.Next(8);
+  EXPECT_EQ(0.0f, idle[0]);
+}
+
+TEST(Analyzer, PlayingAndPauseFlags) {
+  Analyzer analyzer;
+  EXPECT_FALSE(analyzer.playing());
+  EXPECT_FALSE(analyzer.paused());
+  analyzer.set_playing(true);
+  analyzer.set_paused(true);
+  EXPECT_TRUE(analyzer.playing());
+  EXPECT_TRUE(analyzer.paused());
 }
 
 TEST(SonogramCanvas, ScrollsLeftAndUsesQtColorThresholds) {

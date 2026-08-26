@@ -90,6 +90,8 @@ class MainWindow {
   void CycleAnalyzer();
   void ShowAnalyzerMenu();
   void ApplyAnalyzer();
+  void EnsureAnalyzerTimer();
+  void TickAnalyzer();
   void RunSmartPlaylist(const std::string &kind);
   void RefreshPlaylistTabs();
   void GoToPlaylistIndex(int index);
@@ -241,10 +243,11 @@ class MainWindow {
   std::vector<int> selected_playlist_rows_;
   std::string selection_playlist_name_;
   guint position_timeout_ = 0;
+  guint analyzer_timeout_ = 0;
+  int analyzer_timer_ms_ = 0;
   guint collection_filter_timeout_ = 0;
   bool refreshing_devices_ = false;
   bool sponsor_prompted_ = false;
-  gint64 analyzer_last_draw_us_ = 0;
   TaskbarProgress taskbar_;
 };
 
