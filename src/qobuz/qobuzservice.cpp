@@ -74,8 +74,9 @@ void QobuzService::Search(const std::string &query, SearchType type, SearchCallb
       [this, request_type, query](int offset, int page_limit) {
         return QobuzRequest::Url(kApiUrl, request_type, query, app_id_, user_auth_token_, offset, page_limit);
       },
-      AuthHeaders(), request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
-      [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit);
+      AuthHeaders(), request_type, [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+      [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit,
+      limit);
 }
 
 void QobuzService::GetArtists(SearchCallback callback) {
@@ -86,7 +87,8 @@ void QobuzService::GetArtists(SearchCallback callback) {
       [this](int offset, int limit) {
         return QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteArtists, {}, app_id_, user_auth_token_, offset, limit);
       },
-      AuthHeaders(), QobuzRequest::Type::FavouriteArtists, guarded,
+      AuthHeaders(), QobuzRequest::Type::FavouriteArtists,
+      [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
       [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); });
 }
 
@@ -98,8 +100,9 @@ void QobuzService::GetAlbums(SearchCallback callback) {
       [this](int offset, int limit) {
         return QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteAlbums, {}, app_id_, user_auth_token_, offset, limit);
       },
-      AuthHeaders(), QobuzRequest::Type::FavouriteAlbums, guarded, [this](int received, int total) { ReportAlbumsProgress(received, total); },
-      [this, gen]() { return AlbumsRequestCurrent(gen); });
+      AuthHeaders(), QobuzRequest::Type::FavouriteAlbums,
+      [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+      [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); });
 }
 
 void QobuzService::GetSongs(SearchCallback callback) {
@@ -110,7 +113,9 @@ void QobuzService::GetSongs(SearchCallback callback) {
       [this](int offset, int limit) {
         return QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteSongs, {}, app_id_, user_auth_token_, offset, limit);
       },
-      AuthHeaders(), QobuzRequest::Type::FavouriteSongs, guarded, [this](int received, int total) { ReportSongsProgress(received, total); },
+      AuthHeaders(), QobuzRequest::Type::FavouriteSongs,
+      [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+      [this](int received, int total) { ReportSongsProgress(received, total); },
       [this, gen]() { return SongsRequestCurrent(gen); });
 }
 
@@ -122,7 +127,11 @@ void QobuzService::GetArtistAlbums(const Song &artist, SearchCallback callback) 
     return;
   }
   QobuzRequest::Get(network_, QobuzRequest::ArtistAlbumsUrl(kApiUrl, artist.artist_id(), app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::SearchAlbums, std::move(callback));
+                    QobuzRequest::Type::SearchAlbums, [this, callback](const SongList &songs) {
+                      if (callback) {
+                        callback(StreamingSearchOpts::Finish(songs, name()));
+                      }
+                    });
 }
 
 void QobuzService::GetAlbumSongs(const Song &album, SearchCallback callback) {
@@ -133,7 +142,11 @@ void QobuzService::GetAlbumSongs(const Song &album, SearchCallback callback) {
     return;
   }
   QobuzRequest::Get(network_, QobuzRequest::AlbumSongsUrl(kApiUrl, album.album_id(), app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::SearchSongs, std::move(callback));
+                    QobuzRequest::Type::SearchSongs, [this, callback](const SongList &songs) {
+                      if (callback) {
+                        callback(StreamingSearchOpts::Finish(songs, name()));
+                      }
+                    });
 }
 
 UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback callback) {

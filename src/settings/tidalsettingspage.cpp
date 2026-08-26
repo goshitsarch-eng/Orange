@@ -32,7 +32,7 @@ AdwPreferencesPage *TidalSettingsPage::Create(Settings *settings, Application *a
                           TidalSettings::kDefaultDownloadAlbumCovers);
   SettingsPage::AddCombo(group, settings, TidalSettings::kCoverSize, "Cover size", StreamingChoices::TidalCoverSizes(),
                          TidalSettings::kDefaultCoverSize);
-  SettingsPage::AddToggle(group, settings, TidalSettings::kAlbumExplicit, "Include explicit albums", nullptr,
+  SettingsPage::AddToggle(group, settings, TidalSettings::kAlbumExplicit, "Append explicit to album title for explicit albums", nullptr,
                           TidalSettings::kDefaultAlbumExplicit);
   SettingsPage::AddToggle(group, settings, TidalSettings::kRemoveRemastered, "Remove remastered from titles", nullptr,
                           TidalSettings::kDefaultRemoveRemastered);

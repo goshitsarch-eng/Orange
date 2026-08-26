@@ -3,6 +3,7 @@
 #include "constants/spotifysettings.h"
 #include "core/settings.h"
 #include "streaming/streamingauth.h"
+#include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchopts.h"
 #include "spotify/spotifyfavoriterequest.h"
 #include "spotify/spotifymetadatarequest.h"
@@ -115,8 +116,35 @@ void SpotifyService::Search(const std::string &query, SearchType type, SearchCal
     const int limit = StreamingSearchOpts::LimitFor(name(), type);
     SpotifyRequest::GetAll(
         network_, [request_type, query](int offset, int page_limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, request_type, query, offset, page_limit); },
-        AuthHeaders(), request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
-        [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit);
+        AuthHeaders(), request_type,
+        [this, type, guarded, gen](const SongList &songs) {
+          const SongList cleaned = StreamingSearchOpts::Finish(songs, name());
+          if (!StreamingSearchOpts::ShouldFetchAlbums(name(), type)) {
+            guarded(cleaned);
+            return;
+          }
+          const std::vector<std::string> ids = StreamingSearchOpts::UniqueAlbumIds(cleaned);
+          if (ids.empty()) {
+            guarded(cleaned);
+            return;
+          }
+          SearchUpdateStatus.Emit(last_search_id_, StreamingProgress::RetrievingSongsForAlbums(static_cast<int>(ids.size())));
+          StreamingSearchOpts::FetchEachAlbum(
+              ids,
+              [this, gen](const std::string &id, SearchCallback done) {
+                if (!SearchRequestCurrent(gen)) {
+                  done({});
+                  return;
+                }
+                SpotifyRequest::GetAll(network_,
+                                       [id](int offset, int page_limit) { return SpotifyRequest::AlbumSongsUrl(SpotifyService::kApiUrl, id, offset, page_limit); },
+                                       AuthHeaders(), SpotifyRequest::Type::SearchSongs, std::move(done));
+              },
+              [this, guarded](const SongList &album_songs) { guarded(StreamingSearchOpts::Finish(album_songs, name())); },
+              [this, gen]() { return SearchRequestCurrent(gen); },
+              [this](int received, int total) { ReportSearchProgress(received, total); });
+        },
+        [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit);
   });
 }
 
@@ -127,7 +155,8 @@ void SpotifyService::GetArtists(SearchCallback callback) {
     SpotifyRequest::GetAll(
         network_,
         [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteArtists, {}, offset, limit); },
-        AuthHeaders(), SpotifyRequest::Type::FavouriteArtists, guarded,
+        AuthHeaders(), SpotifyRequest::Type::FavouriteArtists,
+        [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
         [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); });
   });
 }
@@ -139,7 +168,8 @@ void SpotifyService::GetAlbums(SearchCallback callback) {
     SpotifyRequest::GetAll(
         network_,
         [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteAlbums, {}, offset, limit); },
-        AuthHeaders(), SpotifyRequest::Type::FavouriteAlbums, guarded,
+        AuthHeaders(), SpotifyRequest::Type::FavouriteAlbums,
+        [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
         [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); });
   });
 }
@@ -151,8 +181,9 @@ void SpotifyService::GetSongs(SearchCallback callback) {
     SpotifyRequest::GetAll(
         network_,
         [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteSongs, {}, offset, limit); },
-        AuthHeaders(), SpotifyRequest::Type::FavouriteSongs, guarded, [this](int received, int total) { ReportSongsProgress(received, total); },
-        [this, gen]() { return SongsRequestCurrent(gen); });
+        AuthHeaders(), SpotifyRequest::Type::FavouriteSongs,
+        [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
+        [this](int received, int total) { ReportSongsProgress(received, total); }, [this, gen]() { return SongsRequestCurrent(gen); });
   });
 }
 
@@ -166,7 +197,11 @@ void SpotifyService::GetArtistAlbums(const Song &artist, SearchCallback callback
   }
   EnsureFreshToken([this, id, callback]() {
     SpotifyRequest::GetAll(network_, [id](int offset, int limit) { return SpotifyRequest::ArtistAlbumsUrl(SpotifyService::kApiUrl, id, offset, limit); },
-                           AuthHeaders(), SpotifyRequest::Type::SearchAlbums, callback);
+                           AuthHeaders(), SpotifyRequest::Type::SearchAlbums, [this, callback](const SongList &songs) {
+                             if (callback) {
+                               callback(StreamingSearchOpts::Finish(songs, name()));
+                             }
+                           });
   });
 }
 
@@ -180,7 +215,11 @@ void SpotifyService::GetAlbumSongs(const Song &album, SearchCallback callback) {
   }
   EnsureFreshToken([this, id, callback]() {
     SpotifyRequest::GetAll(network_, [id](int offset, int limit) { return SpotifyRequest::AlbumSongsUrl(SpotifyService::kApiUrl, id, offset, limit); },
-                           AuthHeaders(), SpotifyRequest::Type::SearchSongs, callback);
+                           AuthHeaders(), SpotifyRequest::Type::SearchSongs, [this, callback](const SongList &songs) {
+                             if (callback) {
+                               callback(StreamingSearchOpts::Finish(songs, name()));
+                             }
+                           });
   });
 }
 

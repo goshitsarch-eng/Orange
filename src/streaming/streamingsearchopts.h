@@ -2,9 +2,14 @@
 #define STRAWBERRY_STREAMINGSEARCHOPTS_H
 
 #include "core/settings.h"
+#include "core/song.h"
 #include "streaming/streamingservice.h"
+#include "utilities/strutils.h"
 
+#include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
 namespace StreamingSearchOpts {
 
@@ -12,11 +17,17 @@ constexpr char kSearchDelay[] = "searchdelay";
 constexpr char kArtistsSearchLimit[] = "artistssearchlimit";
 constexpr char kAlbumsSearchLimit[] = "albumssearchlimit";
 constexpr char kSongsSearchLimit[] = "songssearchlimit";
+constexpr char kFetchAlbums[] = "fetchalbums";
+constexpr char kRemoveRemastered[] = "remove_remastered";
+constexpr char kAlbumExplicit[] = "album_explicit";
 constexpr int kDefaultDelayMs = 1500;
 constexpr int kDefaultArtistsLimit = 4;
 constexpr int kDefaultAlbumsLimit = 10;
 constexpr int kDefaultSongsLimit = 10;
 constexpr int kMinQueryLength = 2;
+constexpr bool kDefaultFetchAlbums = false;
+constexpr bool kDefaultRemoveRemastered = true;
+constexpr bool kDefaultAlbumExplicit = false;
 
 inline const char *ConfigureLabel() { return "Configure…"; }
 
@@ -67,6 +78,159 @@ inline int LimitFor(const std::string &group, StreamingService::SearchType type)
   Settings settings;
   settings.BeginGroup(group);
   return ClampLimit(settings.IntValue(LimitKey(type), fallback), fallback);
+}
+
+inline bool FetchAlbumsEnabled(const std::string &group) {
+  if (group != "Tidal" && group != "Spotify") {
+    return false;
+  }
+  Settings settings;
+  settings.BeginGroup(group);
+  return settings.BoolValue(kFetchAlbums, kDefaultFetchAlbums);
+}
+
+inline bool ShouldFetchAlbums(bool enabled, StreamingService::SearchType type) {
+  return enabled && type == StreamingService::SearchType::Songs;
+}
+
+inline bool ShouldFetchAlbums(const std::string &group, StreamingService::SearchType type) {
+  return ShouldFetchAlbums(FetchAlbumsEnabled(group), type);
+}
+
+inline bool RemoveRemasteredEnabled(const std::string &group) {
+  if (!HasSearchLimits(group)) {
+    return false;
+  }
+  Settings settings;
+  settings.BeginGroup(group);
+  return settings.BoolValue(kRemoveRemastered, kDefaultRemoveRemastered);
+}
+
+inline bool AppendExplicitEnabled(const std::string &group) {
+  if (group != "Tidal") {
+    return false;
+  }
+  Settings settings;
+  settings.BeginGroup(group);
+  return settings.BoolValue(kAlbumExplicit, kDefaultAlbumExplicit);
+}
+
+inline bool LooksExplicit(const Song &song) {
+  return StrUtils::ContainsInsensitive(song.comment(), "explicit") || StrUtils::ContainsInsensitive(song.title(), "explicit") ||
+         StrUtils::ContainsInsensitive(song.album(), "explicit");
+}
+
+inline void MarkExplicit(Song *song) {
+  if (song && LooksExplicit(*song) && song->comment().empty()) {
+    song->set_comment("explicit");
+  }
+}
+
+inline void ApplyTitles(SongList &songs, bool remove_remastered) {
+  for (Song &song : songs) {
+    MarkExplicit(&song);
+    if (!remove_remastered) {
+      continue;
+    }
+    song.set_title(Song::AlbumRemoveDiscMisc(song.title()));
+    if (!song.album().empty()) {
+      song.set_album(Song::AlbumRemoveDiscMisc(song.album()));
+    }
+  }
+}
+
+inline void AppendExplicit(SongList &songs) {
+  for (Song &song : songs) {
+    if (!LooksExplicit(song)) {
+      continue;
+    }
+    if (!song.album().empty() && !StrUtils::ContainsInsensitive(song.album(), "explicit")) {
+      song.set_album(song.album() + " (Explicit)");
+    }
+    if (song.song_id().empty() && !song.title().empty() && !StrUtils::ContainsInsensitive(song.title(), "explicit")) {
+      song.set_title(song.title() + " (Explicit)");
+    }
+  }
+}
+
+inline SongList Finish(SongList songs, bool remove_remastered, bool append_explicit) {
+  ApplyTitles(songs, remove_remastered);
+  if (append_explicit) {
+    AppendExplicit(songs);
+  }
+  return songs;
+}
+
+inline SongList Finish(const SongList &songs, const std::string &group) {
+  return Finish(songs, RemoveRemasteredEnabled(group), AppendExplicitEnabled(group));
+}
+
+inline std::vector<std::string> UniqueAlbumIds(const SongList &songs) {
+  std::vector<std::string> ids;
+  for (const Song &song : songs) {
+    if (song.album_id().empty()) {
+      continue;
+    }
+    bool seen = false;
+    for (const std::string &id : ids) {
+      if (id == song.album_id()) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) {
+      ids.push_back(song.album_id());
+    }
+  }
+  return ids;
+}
+
+using FetchOneAlbum = std::function<void(const std::string &album_id, StreamingService::SearchCallback done)>;
+
+inline void FetchEachAlbum(const std::vector<std::string> &ids, FetchOneAlbum fetch_one, StreamingService::SearchCallback done,
+                           std::function<bool()> still_current = {}, std::function<void(int received, int total)> progress = {}) {
+  if (!fetch_one || ids.empty()) {
+    if (done) {
+      done({});
+    }
+    return;
+  }
+  struct State {
+    std::vector<std::string> ids;
+    FetchOneAlbum fetch_one;
+    StreamingService::SearchCallback done;
+    std::function<bool()> still_current;
+    std::function<void(int received, int total)> progress;
+    SongList songs;
+    size_t index = 0;
+  };
+  auto state = std::make_shared<State>();
+  state->ids = ids;
+  state->fetch_one = std::move(fetch_one);
+  state->done = std::move(done);
+  state->still_current = std::move(still_current);
+  state->progress = std::move(progress);
+  auto step = std::make_shared<std::function<void()>>();
+  *step = [state, step]() {
+    if (state->still_current && !state->still_current()) {
+      return;
+    }
+    if (state->index >= state->ids.size()) {
+      if (state->done) {
+        state->done(state->songs);
+      }
+      return;
+    }
+    if (state->progress) {
+      state->progress(static_cast<int>(state->index), static_cast<int>(state->ids.size()));
+    }
+    const std::string id = state->ids[state->index++];
+    state->fetch_one(id, [state, step](const SongList &page) {
+      state->songs.insert(state->songs.end(), page.begin(), page.end());
+      (*step)();
+    });
+  };
+  (*step)();
 }
 
 }  // namespace StreamingSearchOpts

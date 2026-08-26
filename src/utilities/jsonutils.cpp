@@ -569,6 +569,21 @@ std::string ObjectString(JsonObject *object, const char *name) {
   return NodeString(json_object_get_member(object, name));
 }
 
+bool ObjectBool(JsonObject *object, const char *name) {
+  if (!object || !json_object_has_member(object, name)) {
+    return false;
+  }
+  JsonNode *node = json_object_get_member(object, name);
+  if (!node || !JSON_NODE_HOLDS_VALUE(node)) {
+    return false;
+  }
+  if (json_node_get_value_type(node) == G_TYPE_BOOLEAN) {
+    return json_node_get_boolean(node) != FALSE;
+  }
+  const std::string text = NodeString(node);
+  return text == "true" || text == "1";
+}
+
 std::string NestedName(JsonObject *object, const char *member, const char *name_key) {
   if (!object || !json_object_has_member(object, member) || !JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, member))) {
     return {};
@@ -694,6 +709,9 @@ SongList ParseTidalTracks(const std::string &json) {
     const std::string cover = NestedName(object, "album", "cover");
     if (!cover.empty()) {
       song->set_art_automatic("https://resources.tidal.com/images/" + StrUtils::Replace(cover, "-", "/") + "/1280x1280.jpg");
+    }
+    if (ObjectBool(object, "explicit")) {
+      song->set_comment("explicit");
     }
   });
   json_node_unref(root);
@@ -838,6 +856,9 @@ SongList ParseTidalAlbums(const std::string &json) {
     const std::string cover = ObjectString(object, "cover");
     if (!cover.empty()) {
       song->set_art_automatic("https://resources.tidal.com/images/" + StrUtils::Replace(cover, "-", "/") + "/1280x1280.jpg");
+    }
+    if (ObjectBool(object, "explicit")) {
+      song->set_comment("explicit");
     }
   });
   json_node_unref(root);

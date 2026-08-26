@@ -256,6 +256,42 @@ TEST(StreamingService, ResetDropsInFlightCallbacks) {
   EXPECT_TRUE(service.ArtistsRequestCurrent(service.artists_generation()));
 }
 
+TEST(StreamingSearchOpts, FetchAlbumsRemasteredAndExplicit) {
+  using T = StreamingService::SearchType;
+  EXPECT_TRUE(StreamingSearchOpts::ShouldFetchAlbums(true, T::Songs));
+  EXPECT_FALSE(StreamingSearchOpts::ShouldFetchAlbums(true, T::Artists));
+  EXPECT_FALSE(StreamingSearchOpts::ShouldFetchAlbums(false, T::Songs));
+  EXPECT_FALSE(StreamingSearchOpts::FetchAlbumsEnabled("Subsonic"));
+  EXPECT_FALSE(StreamingSearchOpts::AppendExplicitEnabled("Qobuz"));
+
+  Song remastered;
+  remastered.set_title("Roads (Remastered)");
+  remastered.set_album("Dummy [Remastered]");
+  remastered.set_album_id("8");
+  remastered.set_song_id("99");
+  Song explicit_album;
+  explicit_album.set_title("Dummy");
+  explicit_album.set_album("Dummy");
+  explicit_album.set_album_id("8");
+  explicit_album.set_comment("explicit");
+  const SongList cleaned = StreamingSearchOpts::Finish({remastered, explicit_album}, true, true);
+  ASSERT_EQ(2u, cleaned.size());
+  EXPECT_EQ("Roads", cleaned[0].title());
+  EXPECT_EQ("Dummy", cleaned[0].album());
+  EXPECT_EQ("Dummy (Explicit)", cleaned[1].album());
+  EXPECT_EQ("Dummy (Explicit)", cleaned[1].title());
+  EXPECT_TRUE(StreamingSearchOpts::LooksExplicit(explicit_album));
+
+  Song a;
+  a.set_album_id("8");
+  Song b;
+  b.set_album_id("8");
+  Song c;
+  c.set_album_id("9");
+  Song none;
+  EXPECT_EQ(std::vector<std::string>({"8", "9"}), StreamingSearchOpts::UniqueAlbumIds({a, b, c, none}));
+}
+
 TEST(StreamingSearchOpts, DelayLimitsAndConfigure) {
   using T = StreamingService::SearchType;
   EXPECT_STREQ("Configure…", StreamingSearchOpts::ConfigureLabel());

@@ -41,6 +41,10 @@ TEST(TidalRequest, ParsesArtistsAlbumsAndTracks) {
   EXPECT_EQ("Helplessness Blues", albums.front().album());
   EXPECT_EQ("8", albums.front().album_id());
   EXPECT_NE(std::string::npos, albums.front().art_automatic().find("/images/aa/bb/1280x1280.jpg"));
+  const SongList explicit_albums = TidalRequest::Parse(
+      TidalRequest::Type::SearchAlbums, R"json({"items":[{"id":9,"title":"Dummy","artist":{"id":7,"name":"Portishead"},"explicit":true}]})json");
+  ASSERT_EQ(1u, explicit_albums.size());
+  EXPECT_EQ("explicit", explicit_albums.front().comment());
 
   const SongList songs = TidalRequest::Parse(
       TidalRequest::Type::SearchSongs,
