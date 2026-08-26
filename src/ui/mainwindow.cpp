@@ -4,6 +4,7 @@
 #include "core/settings.h"
 #include "playlistparsers/playlistparser.h"
 #include "smartplaylists/smartplaylist.h"
+#include "streaming/streamingtabsview.h"
 #include "ui/dialogs.h"
 #include "ui/settingsdialog.h"
 #include "filterparser/filterparser.h"
@@ -373,19 +374,36 @@ void MainWindow::BuildSidebar() {
                    this);
   adw_view_stack_add_titled_with_icon(sidebar_stack_, radio_page, "radio", "Internet radio", "network-wireless-symbolic");
   GtkWidget *streaming_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  GtkWidget *streaming_search = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(streaming_search), "Search streaming service");
-  gtk_widget_set_margin_start(streaming_search, 8);
-  gtk_widget_set_margin_end(streaming_search, 8);
-  gtk_widget_set_margin_top(streaming_search, 6);
-  gtk_widget_set_margin_bottom(streaming_search, 4);
-  gtk_box_append(GTK_BOX(streaming_page), streaming_search);
-  gtk_box_append(GTK_BOX(streaming_page), MakeScrolledList(&streaming_list_));
-  gtk_widget_set_vexpand(gtk_widget_get_last_child(streaming_page), TRUE);
-  g_signal_connect(streaming_search, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
+  streaming_service_drop_ = gtk_combo_box_text_new();
+  gtk_widget_set_margin_start(streaming_service_drop_, 8);
+  gtk_widget_set_margin_end(streaming_service_drop_, 8);
+  gtk_widget_set_margin_top(streaming_service_drop_, 6);
+  gtk_widget_set_margin_bottom(streaming_service_drop_, 4);
+  streaming_stack_ = gtk_stack_new();
+  gtk_widget_set_vexpand(streaming_stack_, TRUE);
+  auto activate_stream = [this](const Song &song) {
+    app_->playlist_manager()->AppendSongs({song});
+    RefreshPlaylist();
+  };
+  for (StreamingService *service : app_->streaming_services()->All()) {
+    auto view = std::make_unique<StreamingTabsView>(service);
+    view->SetActivateCallback(activate_stream);
+    gtk_stack_add_titled(GTK_STACK(streaming_stack_), view->widget(), service->name().c_str(), service->name().c_str());
+    streaming_views_.push_back(std::move(view));
+  }
+  gtk_box_append(GTK_BOX(streaming_page), streaming_service_drop_);
+  gtk_box_append(GTK_BOX(streaming_page), streaming_stack_);
+  if (streaming_views_.empty()) {
+    gtk_box_append(GTK_BOX(streaming_page), MakeScrolledList(&streaming_list_));
+  }
+  g_signal_connect(streaming_service_drop_, "changed", G_CALLBACK(+[](GtkComboBox *combo, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
-                     const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
-                     self->SearchStreaming(text ? text : "");
+                     const char *id = gtk_combo_box_get_active_id(combo);
+                     if (!id) {
+                       return;
+                     }
+                     self->streaming_service_name_ = id;
+                     gtk_stack_set_visible_child_name(GTK_STACK(self->streaming_stack_), id);
                    }),
                    this);
   adw_view_stack_add_titled_with_icon(sidebar_stack_, streaming_page, "streaming", "Streaming", "emblem-shared-symbolic");
@@ -441,6 +459,7 @@ void MainWindow::BuildSidebar() {
                      self->RefreshPlaylist();
                    }),
                    this);
+  if (streaming_list_) {
   g_signal_connect(streaming_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
                      const char *kind = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-kind"));
@@ -468,6 +487,7 @@ void MainWindow::BuildSidebar() {
                      }
                    }),
                    this);
+  }
   g_signal_connect(radio_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
                      auto *channel = static_cast<RadioChannel *>(g_object_get_data(G_OBJECT(row), "row-data"));
@@ -1276,17 +1296,26 @@ void MainWindow::SearchRadio(const std::string &query) {
 }
 
 void MainWindow::RefreshStreaming() {
-  ClearList(streaming_list_);
-  if (!streaming_service_name_.empty()) {
-    GtkWidget *back = AppendStringRow(GTK_LIST_BOX(streaming_list_), "← Services", nullptr);
-    g_object_set_data(G_OBJECT(back), "row-kind", const_cast<char *>("back"));
-    AppendStringRow(GTK_LIST_BOX(streaming_list_), "Search " + streaming_service_name_ + " above, then activate a result", nullptr);
+  if (streaming_service_drop_) {
+    gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(streaming_service_drop_));
+    for (StreamingService *service : app_->streaming_services()->All()) {
+      service->ReloadSettings();
+      const std::string label = service->name() + (service->logged_in() ? " (signed in)" : "");
+      gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(streaming_service_drop_), service->name().c_str(), label.c_str());
+    }
+    if (!streaming_service_name_.empty()) {
+      gtk_combo_box_set_active_id(GTK_COMBO_BOX(streaming_service_drop_), streaming_service_name_.c_str());
+    } else if (!app_->streaming_services()->All().empty()) {
+      gtk_combo_box_set_active(GTK_COMBO_BOX(streaming_service_drop_), 0);
+    }
+  }
+  for (const auto &view : streaming_views_) {
+    view->ReloadSettings();
+  }
+  if (!streaming_list_ || !streaming_views_.empty()) {
     return;
   }
-  for (StreamingService *service : app_->streaming_services()->All()) {
-    service->ReloadSettings();
-    AppendStringRow(GTK_LIST_BOX(streaming_list_), service->name() + (service->logged_in() ? " (signed in)" : ""), nullptr);
-  }
+  ClearList(streaming_list_);
   if (app_->streaming_services()->All().empty()) {
     AppendStringRow(GTK_LIST_BOX(streaming_list_), "Subsonic — enable in Preferences", nullptr);
     AppendStringRow(GTK_LIST_BOX(streaming_list_), "Tidal — enable in Preferences", nullptr);
@@ -1296,29 +1325,14 @@ void MainWindow::RefreshStreaming() {
 }
 
 void MainWindow::SearchStreaming(const std::string &query) {
-  if (streaming_service_name_.empty() || query.empty()) {
+  if (query.empty()) {
     return;
   }
-  StreamingService *service = app_->streaming_services()->ServiceByName(streaming_service_name_);
-  if (!service) {
-    return;
+  for (const auto &view : streaming_views_) {
+    if (view->search_view()) {
+      view->search_view()->Search(query);
+    }
   }
-  service->Search(query, [this](const SongList &songs) {
-    ClearList(streaming_list_);
-    GtkWidget *back = AppendStringRow(GTK_LIST_BOX(streaming_list_), "← Services", nullptr);
-    g_object_set_data(G_OBJECT(back), "row-kind", const_cast<char *>("back"));
-    if (songs.empty()) {
-      AppendStringRow(GTK_LIST_BOX(streaming_list_), "No results", nullptr);
-      return;
-    }
-    for (const Song &song : songs) {
-      auto *copy = new Song(song);
-      GtkWidget *row = AppendStringRow(GTK_LIST_BOX(streaming_list_), song.PrettyTitleWithArtist(), copy, [](gpointer p) {
-        delete static_cast<Song *>(p);
-      });
-      g_object_set_data(G_OBJECT(row), "row-kind", const_cast<char *>("song"));
-    }
-  });
 }
 
 void MainWindow::RefreshDevices() {

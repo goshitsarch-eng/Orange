@@ -217,6 +217,15 @@ set(STRAWBERRY_SOURCES
   src/scrobbler/listenbrainzscrobbler.cpp
   src/scrobbler/subsonicscrobbler.cpp
   src/streaming/streamingservices.cpp
+  src/streaming/streamingsearchmodel.cpp
+  src/streaming/streamingsearchsortmodel.cpp
+  src/streaming/streamingsearchitemdelegate.cpp
+  src/streaming/streamserviceplaylistitem.cpp
+  src/streaming/streamingcollectionview.cpp
+  src/streaming/streamingcollectionviewcontainer.cpp
+  src/streaming/streamingsearchview.cpp
+  src/streaming/streamingtabsview.cpp
+  src/streaming/streamingsongsview.cpp
   src/subsonic/subsonicservice.cpp
   src/subsonic/subsonicfavoriterequest.cpp
   src/subsonic/subsonicrequest.cpp
@@ -369,6 +378,7 @@ if(GTest_FOUND)
     tests/src/streamingfavorite_test.cpp
     tests/src/streamingrequest_test.cpp
     tests/src/streamurl_test.cpp
+    tests/src/streamingview_test.cpp
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
     tests/src/streamtagreader_test.cpp
@@ -418,6 +428,10 @@ if(GTest_FOUND)
     src/subsonic/subsonicfavoriterequest.cpp
     src/subsonic/subsonicrequest.cpp
     src/subsonic/subsonicurlhandler.cpp
+    src/streaming/streamingsearchmodel.cpp
+    src/streaming/streamingsearchsortmodel.cpp
+    src/streaming/streamingsearchitemdelegate.cpp
+    src/streaming/streamserviceplaylistitem.cpp
     src/radios/somafmservice.cpp
     src/radios/radioparadiseservice.cpp
     src/radios/radiobrowserservice.cpp

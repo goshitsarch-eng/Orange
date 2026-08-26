@@ -4,10 +4,12 @@
 #include "collection/collectiongrouping.h"
 #include "core/application.h"
 #include "core/commandlineoptions.h"
+#include "streaming/streamingtabsview.h"
 
 #include <adwaita.h>
 #include <gtk/gtk.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -133,6 +135,9 @@ class MainWindow {
   GtkWidget *devices_list_ = nullptr;
   GtkWidget *smart_list_ = nullptr;
   GtkWidget *streaming_list_ = nullptr;
+  GtkWidget *streaming_stack_ = nullptr;
+  GtkWidget *streaming_service_drop_ = nullptr;
+  std::vector<std::unique_ptr<StreamingTabsView>> streaming_views_;
   GtkWidget *lyrics_view_ = nullptr;
   GtkWidget *context_title_ = nullptr;
   GtkWidget *context_artist_ = nullptr;
