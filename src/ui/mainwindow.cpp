@@ -53,6 +53,7 @@
 #include "playlist/playlistsaveoptionsdialog.h"
 #include "playlistparsers/parserbase.h"
 #include "device/cddasongloader.h"
+#include "device/devicesongmenu.h"
 #include "organize/organize.h"
 #include "organize/organizeformat.h"
 #include "smartplaylists/smartplaylist.h"
@@ -985,8 +986,14 @@ void MainWindow::BuildSidebar() {
     RefreshPlaylist();
   });
   device_container_->SetAddAllCallback([this](const SongList &songs) {
-    app_->playlist_manager()->AppendSongs(songs);
-    RefreshPlaylist();
+    ApplyCollectionPlan(CollectionBehaviour::Append(BehaviourSettings::kDefaultMenuPlayMode, EngineStopped()), songs);
+  });
+  device_container_->SetPlaylistCallback([this](DeviceSongMenu::Action action, const SongList &songs) {
+    Settings settings;
+    settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+    const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+        settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+    ApplyCollectionPlan(DeviceSongMenu::PlanFor(action, play, EngineStopped()), songs);
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, device_container_->widget(), "devices", "Devices", "drive-harddisk-usb-symbolic");
   queue_view_ = std::make_unique<QueueView>(app_->queue());

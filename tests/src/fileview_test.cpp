@@ -1,6 +1,7 @@
 #include "collection/collectionmodel.h"
 #include "collection/collectiontree.h"
 #include "device/devicecopy.h"
+#include "device/devicesongmenu.h"
 #include "device/devicedrag.h"
 #include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
@@ -236,6 +237,31 @@ TEST(DeviceKeyboard, FromKeyBackAndSpecialRows) {
   EXPECT_TRUE(DeviceKeyboard::IsSpecialRowKind("add-all"));
   EXPECT_FALSE(DeviceKeyboard::IsSpecialRowKind("song"));
   EXPECT_FALSE(DeviceKeyboard::IsSpecialRowKind(nullptr));
+}
+
+TEST(DeviceSongMenu, PlaylistActionsMatchQt) {
+  EXPECT_EQ(5, DeviceSongMenu::ItemCount());
+  EXPECT_EQ(DeviceSongMenu::Action::Append, DeviceSongMenu::FromId("append"));
+  EXPECT_EQ(DeviceSongMenu::Action::Replace, DeviceSongMenu::FromId("replace"));
+  EXPECT_EQ(DeviceSongMenu::Action::New, DeviceSongMenu::FromId("new"));
+  EXPECT_EQ(DeviceSongMenu::Action::Copy, DeviceSongMenu::FromId("copy"));
+  EXPECT_EQ(DeviceSongMenu::Action::Delete, DeviceSongMenu::FromId("delete"));
+  EXPECT_TRUE(DeviceSongMenu::IsPlaylistAction(DeviceSongMenu::Action::Append));
+  EXPECT_TRUE(DeviceSongMenu::IsPlaylistAction(DeviceSongMenu::Action::Replace));
+  EXPECT_TRUE(DeviceSongMenu::IsPlaylistAction(DeviceSongMenu::Action::New));
+  EXPECT_FALSE(DeviceSongMenu::IsPlaylistAction(DeviceSongMenu::Action::Copy));
+  EXPECT_FALSE(DeviceSongMenu::IsPlaylistAction(DeviceSongMenu::Action::Delete));
+  EXPECT_EQ(4u, DeviceSongMenu::VisibleItems({}).size());
+  Song song(Song::Source::Device);
+  song.set_url("gphoto2://phone/Music/roads.mp3");
+  EXPECT_EQ(5u, DeviceSongMenu::VisibleItems({song}).size());
+  const CollectionBehaviour::Plan append = DeviceSongMenu::PlanFor(DeviceSongMenu::Action::Append, BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_FALSE(append.clear_current);
+  EXPECT_EQ(CollectionBehaviour::Destination::Current, append.destination);
+  const CollectionBehaviour::Plan replace = DeviceSongMenu::PlanFor(DeviceSongMenu::Action::Replace, BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_TRUE(replace.clear_current);
+  const CollectionBehaviour::Plan open_new = DeviceSongMenu::PlanFor(DeviceSongMenu::Action::New, BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_EQ(CollectionBehaviour::Destination::New, open_new.destination);
 }
 
 TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {

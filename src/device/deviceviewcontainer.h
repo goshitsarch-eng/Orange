@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_DEVICEVIEWCONTAINER_H
 #define STRAWBERRY_DEVICEVIEWCONTAINER_H
 
+#include "device/devicesongmenu.h"
 #include "device/deviceview.h"
 
 #include <functional>
@@ -20,6 +21,9 @@ class DeviceViewContainer {
   void Reload();
   void SetSongCallback(std::function<void(const Song &)> callback) { song_cb_ = std::move(callback); }
   void SetAddAllCallback(std::function<void(const SongList &)> callback) { add_all_cb_ = std::move(callback); }
+  void SetPlaylistCallback(std::function<void(DeviceSongMenu::Action, const SongList &)> callback) {
+    playlist_cb_ = std::move(callback);
+  }
 
  private:
   GtkWindow *ParentWindow() const;
@@ -33,6 +37,7 @@ class DeviceViewContainer {
   std::string browse_id_;
   std::function<void(const Song &)> song_cb_;
   std::function<void(const SongList &)> add_all_cb_;
+  std::function<void(DeviceSongMenu::Action, const SongList &)> playlist_cb_;
 };
 
 #endif

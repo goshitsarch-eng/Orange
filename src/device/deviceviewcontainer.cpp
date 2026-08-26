@@ -4,10 +4,13 @@
 #include "device/copytodevicedialog.h"
 #include "device/devicecopy.h"
 #include "device/deviceproperties.h"
+#include "device/devicesongmenu.h"
 #include "organize/organizedialog.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
+
+#include <string>
 
 DeviceViewContainer::DeviceViewContainer(Application *app) : app_(app) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -121,11 +124,9 @@ void DeviceViewContainer::ShowSongMenu(const Song &song) {
     songs.push_back(song);
   }
   GMenu *menu = g_menu_new();
-  g_menu_append(menu, Translations::CStr("Add to playlist"), "devicesong.add");
-  if (DeviceCopy::CanCopyToCollection(songs)) {
-    g_menu_append(menu, Translations::CStr("Copy to collection…"), "devicesong.copy-collection");
+  for (const DeviceSongMenu::Item &item : DeviceSongMenu::VisibleItems(songs)) {
+    g_menu_append(menu, Translations::CStr(item.label), (std::string("devicesong.") + item.id).c_str());
   }
-  g_menu_append(menu, Translations::CStr("Delete from device"), "devicesong.delete");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, view_->list());
   auto *owned = new SongList(songs);
@@ -139,18 +140,22 @@ void DeviceViewContainer::ShowSongMenu(const Song &song) {
                        if (!self || !songs) {
                          return;
                        }
-                       const char *name = g_action_get_name(G_ACTION(act));
-                       if (g_strcmp0(name, "add") == 0) {
-                         if (self->add_all_cb_) {
+                       const DeviceSongMenu::Action action = DeviceSongMenu::FromId(g_action_get_name(G_ACTION(act)));
+                       if (DeviceSongMenu::IsPlaylistAction(action)) {
+                         if (self->playlist_cb_) {
+                           self->playlist_cb_(action, *songs);
+                         } else if (self->add_all_cb_) {
                            self->add_all_cb_(*songs);
                          } else if (self->song_cb_) {
                            for (const Song &selected : *songs) {
                              self->song_cb_(selected);
                            }
                          }
-                       } else if (g_strcmp0(name, "copy-collection") == 0 && self->app_) {
+                         return;
+                       }
+                       if (action == DeviceSongMenu::Action::Copy && self->app_) {
                          OrganizeDialog::Show(self->ParentWindow(), self->app_, DeviceCopy::CollectionRequest(*songs));
-                       } else if (g_strcmp0(name, "delete") == 0 && self->app_ && !self->browse_id_.empty()) {
+                       } else if (action == DeviceSongMenu::Action::Delete && self->app_ && !self->browse_id_.empty()) {
                          for (const Song &selected : *songs) {
                            self->app_->device_manager()->DeleteSong(self->browse_id_, selected);
                          }
@@ -160,9 +165,9 @@ void DeviceViewContainer::ShowSongMenu(const Song &song) {
                      this);
     g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
   };
-  add("add");
-  add("copy-collection");
-  add("delete");
+  for (const DeviceSongMenu::Item &item : DeviceSongMenu::Items()) {
+    add(item.id);
+  }
   gtk_widget_insert_action_group(popover, "devicesong", G_ACTION_GROUP(group));
   g_object_set_data_full(G_OBJECT(popover), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });
   gtk_popover_popup(GTK_POPOVER(popover));
