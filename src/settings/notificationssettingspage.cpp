@@ -4,6 +4,7 @@
 #include "context/contextformattokens.h"
 #include "core/application.h"
 #include "core/song.h"
+#include "osd/osdbase.h"
 #include "osd/osdpretty.h"
 #include "settings/notificationscontrols.h"
 #include "settings/notificationssettingslabels.h"
@@ -11,19 +12,82 @@
 #include "translations/translations.h"
 #include "utilities/colorutils.h"
 
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace {
+
+struct NotificationSensitivity {
+  GtkWidget *duration = nullptr;
+  GtkWidget *disable_duration = nullptr;
+  GtkWidget *art = nullptr;
+  GtkWidget *general = nullptr;
+  GtkWidget *pretty = nullptr;
+  GtkWidget *custom = nullptr;
+  GtkWidget *tokens1 = nullptr;
+  GtkWidget *tokens2 = nullptr;
+};
+
+OSDSettings::Type ComboOsdType(AdwComboRow *combo) {
+  return NotificationsControls::TypeFromSelected(
+      static_cast<std::vector<std::string> *>(g_object_get_data(G_OBJECT(combo), "choice-ids")), adw_combo_row_get_selected(combo));
+}
+
+void ApplyNotificationSensitivity(AdwComboRow *combo) {
+  auto *state = static_cast<NotificationSensitivity *>(g_object_get_data(G_OBJECT(combo), "sensitivity"));
+  if (!state) {
+    return;
+  }
+  const OSDSettings::Type type = ComboOsdType(combo);
+  const bool disable_duration = state->disable_duration && adw_switch_row_get_active(ADW_SWITCH_ROW(state->disable_duration));
+  if (state->general) {
+    gtk_widget_set_sensitive(state->general, NotificationsControls::GeneralSensitive(type) ? TRUE : FALSE);
+  }
+  if (state->pretty) {
+    gtk_widget_set_sensitive(state->pretty, NotificationsControls::PrettyGroupSensitive(type) ? TRUE : FALSE);
+  }
+  if (state->custom) {
+    gtk_widget_set_sensitive(state->custom, NotificationsControls::CustomTextSensitive(type) ? TRUE : FALSE);
+  }
+  if (state->tokens1) {
+    gtk_widget_set_sensitive(state->tokens1, NotificationsControls::CustomTextSensitive(type) ? TRUE : FALSE);
+  }
+  if (state->tokens2) {
+    gtk_widget_set_sensitive(state->tokens2, NotificationsControls::CustomTextSensitive(type) ? TRUE : FALSE);
+  }
+  if (state->art) {
+    gtk_widget_set_sensitive(state->art, NotificationsControls::ArtSensitive(type) ? TRUE : FALSE);
+  }
+  if (state->disable_duration) {
+    gtk_widget_set_sensitive(state->disable_duration, NotificationsControls::DisableDurationSensitive(type) ? TRUE : FALSE);
+  }
+  if (state->duration) {
+    gtk_widget_set_sensitive(state->duration, NotificationsControls::DurationSpinSensitive(type, disable_duration) ? TRUE : FALSE);
+  }
+}
+
+}  // namespace
+
 AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(OSDSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Notifications", "preferences-system-notifications-symbolic");
   SettingsPage::AddDescription(SettingsPage::AddGroup(page), NotificationsSettingsLabels::Intro());
   AdwPreferencesGroup *osd = SettingsPage::AddGroup(page, NotificationsSettingsLabels::TypeGroup());
+  const bool native = app && app->osd() ? app->osd()->SupportsNativeNotifications() : true;
+  const bool tray = app && app->osd() ? app->osd()->SupportsTrayPopups() : false;
+  const bool pretty_ok = OSDBase::SupportsOSDPretty();
   const int type_value = settings->IntValue(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType));
-  const std::string type_id = std::to_string(type_value);
-  GtkWidget *type = SettingsPage::AddCombo(osd, settings, OSDSettings::kType, NotificationsSettingsLabels::TypeGroup(),
-                                           {{"0", NotificationsSettingsLabels::Disabled()},
-                                            {"1", NotificationsSettingsLabels::Native()},
-                                            {"2", NotificationsSettingsLabels::TrayPopup()},
-                                            {"3", NotificationsSettingsLabels::Pretty()}},
-                                           type_id, [settings](const std::string &id) {
+  const OSDSettings::Type effective = NotificationsControls::EffectiveType(type_value, native, tray, pretty_ok);
+  if (effective != static_cast<OSDSettings::Type>(type_value)) {
+    settings->SetIntValue(OSDSettings::kType, static_cast<int>(effective));
+  }
+  std::vector<std::pair<std::string, std::string>> type_choices;
+  for (const auto &choice : NotificationsControls::AvailableTypes(native, tray, pretty_ok)) {
+    type_choices.emplace_back(choice.first, choice.second);
+  }
+  GtkWidget *type = SettingsPage::AddCombo(osd, settings, OSDSettings::kType, NotificationsSettingsLabels::TypeGroup(), type_choices,
+                                           std::to_string(static_cast<int>(effective)), [settings](const std::string &id) {
                                              settings->BeginGroup(OSDSettings::kSettingsGroup);
                                              settings->SetIntValue(OSDSettings::kType, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
                                              settings->Sync();
@@ -48,36 +112,8 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
       SettingsPage::AddToggle(general, settings, OSDPrettySettings::kDisableDuration, NotificationsSettingsLabels::DisableDuration(), nullptr,
                               OSDPrettySettings::kDefaultDisableDuration, OSDPrettySettings::kSettingsGroup);
   settings->BeginGroup(OSDSettings::kSettingsGroup);
-  gtk_widget_set_sensitive(duration, NotificationsControls::DurationSpinSensitive(type_value, adw_switch_row_get_active(ADW_SWITCH_ROW(disable_duration)))
-                                         ? TRUE
-                                         : FALSE);
-  g_object_set_data(G_OBJECT(type), "duration-scale", duration);
-  g_object_set_data(G_OBJECT(type), "disable-duration", disable_duration);
-  g_object_set_data(G_OBJECT(disable_duration), "duration-scale", duration);
-  g_object_set_data(G_OBJECT(disable_duration), "type-row", type);
-  g_signal_connect(type, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer) {
-                     auto *scale = GTK_WIDGET(g_object_get_data(G_OBJECT(combo), "duration-scale"));
-                     auto *disable = GTK_WIDGET(g_object_get_data(G_OBJECT(combo), "disable-duration"));
-                     if (scale && disable) {
-                       gtk_widget_set_sensitive(scale, NotificationsControls::DurationSpinSensitive(static_cast<int>(adw_combo_row_get_selected(combo)),
-                                                                                                    adw_switch_row_get_active(ADW_SWITCH_ROW(disable)))
-                                                           ? TRUE
-                                                           : FALSE);
-                     }
-                   }),
-                   nullptr);
-  g_signal_connect(disable_duration, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
-                     auto *scale = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "duration-scale"));
-                     auto *combo = ADW_COMBO_ROW(g_object_get_data(G_OBJECT(row), "type-row"));
-                     if (scale && combo) {
-                       gtk_widget_set_sensitive(scale, NotificationsControls::DurationSpinSensitive(static_cast<int>(adw_combo_row_get_selected(combo)),
-                                                                                                    adw_switch_row_get_active(row))
-                                                           ? TRUE
-                                                           : FALSE);
-                     }
-                   }),
-                   nullptr);
-  SettingsPage::AddToggle(general, settings, OSDSettings::kShowArt, NotificationsSettingsLabels::ShowArt(), nullptr, OSDSettings::kDefaultShowArt);
+  GtkWidget *art = SettingsPage::AddToggle(general, settings, OSDSettings::kShowArt, NotificationsSettingsLabels::ShowArt(), nullptr,
+                                           OSDSettings::kDefaultShowArt);
   SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnVolumeChange, NotificationsSettingsLabels::ShowVolume(), nullptr,
                           OSDSettings::kDefaultShowOnVolumeChange);
   SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnPlayModeChange, NotificationsSettingsLabels::ShowPlayMode(), nullptr,
@@ -198,5 +234,25 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
                                                  static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
                            settings->Sync();
                          });
+  auto *sensitivity = new NotificationSensitivity();
+  sensitivity->duration = duration;
+  sensitivity->disable_duration = disable_duration;
+  sensitivity->art = art;
+  sensitivity->general = GTK_WIDGET(general);
+  sensitivity->pretty = GTK_WIDGET(pretty);
+  sensitivity->custom = GTK_WIDGET(custom);
+  sensitivity->tokens1 = GTK_WIDGET(tokens1);
+  sensitivity->tokens2 = GTK_WIDGET(tokens2);
+  g_object_set_data_full(G_OBJECT(type), "sensitivity", sensitivity, +[](gpointer data) { delete static_cast<NotificationSensitivity *>(data); });
+  g_object_set_data(G_OBJECT(disable_duration), "type-row", type);
+  ApplyNotificationSensitivity(ADW_COMBO_ROW(type));
+  g_signal_connect(type, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer) { ApplyNotificationSensitivity(combo); }),
+                   nullptr);
+  g_signal_connect(disable_duration, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
+                     if (auto *combo = ADW_COMBO_ROW(g_object_get_data(G_OBJECT(row), "type-row"))) {
+                       ApplyNotificationSensitivity(combo);
+                     }
+                   }),
+                   nullptr);
   return page;
 }

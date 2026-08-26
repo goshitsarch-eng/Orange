@@ -7,7 +7,9 @@
 #include "device/devicemenu.h"
 #include "device/devicesongmenu.h"
 #include "device/devicedrag.h"
+#include "device/deviceconnectdialog.h"
 #include "device/deviceviewlook.h"
+#include "device/deviceviewreload.h"
 #include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
 #include "fileview/fileviewicons.h"
@@ -531,6 +533,11 @@ TEST(DeviceViewLook, IconsAndStatusMatchQtDelegate) {
   EXPECT_EQ("Updating 40%...", DeviceViewLook::UpdatingText(40));
   EXPECT_EQ("Updating 0%...", DeviceViewLook::UpdatingText(-8));
   EXPECT_EQ("Updating 100%...", DeviceViewLook::UpdatingText(140));
+  volume.song_count = 12;
+  volume.updating_percent = 40;
+  EXPECT_EQ("Updating 40%...", DeviceViewLook::RowStatusText(volume));
+  volume.updating_percent = -1;
+  EXPECT_EQ("12 songs", DeviceViewLook::RowStatusText(volume));
   volume.mount_path.clear();
   EXPECT_TRUE(DeviceViewLook::ShouldMountOnActivate(volume));
   volume.mount_path = "/run/media/usb";
@@ -548,6 +555,23 @@ TEST(DeviceViewLook, IconsAndStatusMatchQtDelegate) {
   CollectionItem song(CollectionItem::Type::Song);
   song.metadata.set_url("file:///music/roads.flac");
   EXPECT_STREQ("audio-x-generic-symbolic", DeviceViewLook::ItemIconName(&song));
+}
+
+TEST(DeviceViewReload, DoesNotRescanOnRefresh) {
+  EXPECT_FALSE(DeviceViewReload::ShouldRescanOnReload());
+}
+
+TEST(DeviceConnectDialog, MatchesQtFirstConnectCopy) {
+  EXPECT_STREQ("Connect device", DeviceConnectDialog::Title());
+  EXPECT_STREQ("Connect device", DeviceConnectDialog::Accept());
+  EXPECT_STREQ("Cancel", DeviceConnectDialog::Cancel());
+  EXPECT_NE(std::string::npos, std::string(DeviceConnectDialog::Message()).find("first time you have connected this device"));
+  EXPECT_FALSE(DeviceConnectDialog::AskForScan("cdda"));
+  EXPECT_TRUE(DeviceConnectDialog::AskForScan("mtp"));
+  EXPECT_TRUE(DeviceConnectDialog::NeedsFirstConnectPrompt(false, false, "mtp"));
+  EXPECT_FALSE(DeviceConnectDialog::NeedsFirstConnectPrompt(true, false, "mtp"));
+  EXPECT_FALSE(DeviceConnectDialog::NeedsFirstConnectPrompt(false, true, "gio"));
+  EXPECT_FALSE(DeviceConnectDialog::NeedsFirstConnectPrompt(false, false, "cdda"));
 }
 
 TEST(DeviceDrag, JoinsSongUrls) {

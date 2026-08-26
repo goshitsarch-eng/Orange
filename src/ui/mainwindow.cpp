@@ -2154,9 +2154,14 @@ void MainWindow::SearchStreaming(const std::string &query) {
 }
 
 void MainWindow::RefreshDevices() {
+  if (refreshing_devices_) {
+    return;
+  }
+  refreshing_devices_ = true;
   if (device_container_) {
     device_container_->Reload();
   }
+  refreshing_devices_ = false;
 }
 
 void MainWindow::RefreshFiles() {

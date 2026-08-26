@@ -7,6 +7,7 @@
 #include "device/connecteddevice.h"
 #include "device/devicedatabasebackend.h"
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -26,6 +27,8 @@ class DeviceManager {
   bool Forget(const std::string &device_id);
   bool Mount(const std::string &device_id);
   bool Unmount(const std::string &device_id);
+  void Remember(const std::string &device_id);
+  void RememberSongCount(const std::string &device_id, int count);
   bool SetDeviceOptions(const std::string &device_id, const std::string &friendly_name, DeviceDatabaseBackend::TranscodeMode mode,
                         Song::FileType format, const std::string &icon_name = {});
   DeviceDatabaseBackend::Device StoredDevice(const std::string &device_id) const;
@@ -65,6 +68,7 @@ class DeviceManager {
 
   std::vector<ConnectedDevice> devices_;
   std::vector<std::string> forgotten_;
+  std::map<std::string, int> song_counts_;
   std::unique_ptr<DeviceUrlHandler> url_handler_;
   std::unique_ptr<DeviceDatabaseBackend> device_db_;
   void *volume_monitor_ = nullptr;

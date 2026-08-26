@@ -267,6 +267,12 @@ void DeviceManager::Rescan() {
   devices_.erase(std::remove_if(devices_.begin(), devices_.end(),
                                 [this](const ConnectedDevice &device) { return IsForgotten(device.unique_id); }),
                  devices_.end());
+  for (ConnectedDevice &device : devices_) {
+    const auto it = song_counts_.find(device.unique_id);
+    if (it != song_counts_.end()) {
+      device.song_count = it->second;
+    }
+  }
   DevicesChanged.Emit();
 }
 
@@ -446,10 +452,40 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
 #endif
 }
 
+void DeviceManager::Remember(const std::string &device_id) {
+  if (!device_db_) {
+    return;
+  }
+  const ConnectedDevice *found = FindDevice(device_id);
+  if (!found) {
+    return;
+  }
+  if (device_db_->FindByUniqueId(device_id).id >= 0) {
+    return;
+  }
+  DeviceDatabaseBackend::Device stored;
+  stored.unique_id = found->unique_id;
+  stored.friendly_name = found->friendly_name;
+  stored.icon_name = found->icon;
+  stored.size = found->size;
+  device_db_->AddDevice(stored);
+}
+
+void DeviceManager::RememberSongCount(const std::string &device_id, const int count) {
+  song_counts_[device_id] = count;
+  for (ConnectedDevice &device : devices_) {
+    if (device.unique_id == device_id) {
+      device.song_count = count;
+      return;
+    }
+  }
+}
+
 bool DeviceManager::Forget(const std::string &device_id) {
   if (device_id.empty()) {
     return false;
   }
+  song_counts_.erase(device_id);
   if (!IsForgotten(device_id)) {
     forgotten_.push_back(device_id);
   }

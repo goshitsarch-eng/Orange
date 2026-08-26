@@ -87,6 +87,13 @@ inline std::string StatusText(const ConnectedDevice &device, int song_count = -1
   return "Double click to open";
 }
 
+inline std::string RowStatusText(const ConnectedDevice &device, int song_count = -1, int updating_percent = -1, bool remembered_only = false) {
+  if (updating_percent >= 0) {
+    return UpdatingText(updating_percent);
+  }
+  return StatusText(device, song_count >= 0 ? song_count : device.song_count, remembered_only || device.remembered);
+}
+
 inline const char *ItemIconName(const CollectionItem *item) {
   if (!item) {
     return FileViewIcons::AudioIcon();

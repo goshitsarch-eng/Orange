@@ -199,7 +199,7 @@ void DeviceView::ShowDevices(const std::vector<ConnectedDevice> &devices) {
     GtkWidget *primary = gtk_label_new(device.friendly_name.c_str());
     gtk_widget_set_halign(primary, GTK_ALIGN_START);
     gtk_widget_add_css_class(primary, "heading");
-    GtkWidget *status = gtk_label_new(DeviceViewLook::StatusText(device, -1, device.remembered).c_str());
+    GtkWidget *status = gtk_label_new(DeviceViewLook::RowStatusText(device, device.song_count, device.updating_percent, device.remembered).c_str());
     gtk_widget_add_css_class(status, "dim-label");
     gtk_widget_set_halign(status, GTK_ALIGN_START);
     gtk_label_set_ellipsize(GTK_LABEL(status), PANGO_ELLIPSIZE_END);

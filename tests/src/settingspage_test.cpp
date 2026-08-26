@@ -602,6 +602,22 @@ TEST(NotificationsControls, ConvertsTimeoutAndGatesDuration) {
   EXPECT_FALSE(NotificationsControls::DurationSpinSensitive(OSDSettings::Type::Disabled, false));
   EXPECT_FALSE(NotificationsControls::DurationSpinSensitive(OSDSettings::Type::Pretty, true));
   EXPECT_TRUE(NotificationsControls::DurationSpinSensitive(OSDSettings::Type::Native, true));
+  EXPECT_TRUE(NotificationsControls::TypeEnabled(OSDSettings::Type::Disabled, false, false, false));
+  EXPECT_FALSE(NotificationsControls::TypeEnabled(OSDSettings::Type::Native, false, true, true));
+  EXPECT_EQ(OSDSettings::Type::Pretty, NotificationsControls::EffectiveType(OSDSettings::Type::Native, false, false, true));
+  EXPECT_EQ(OSDSettings::Type::Disabled, NotificationsControls::EffectiveType(OSDSettings::Type::TrayPopup, false, false, false));
+  EXPECT_FALSE(NotificationsControls::GeneralSensitive(OSDSettings::Type::Disabled));
+  EXPECT_TRUE(NotificationsControls::PrettyGroupSensitive(OSDSettings::Type::Pretty));
+  EXPECT_FALSE(NotificationsControls::ArtSensitive(OSDSettings::Type::TrayPopup));
+  EXPECT_TRUE(NotificationsControls::ArtSensitive(OSDSettings::Type::Native));
+  EXPECT_TRUE(NotificationsControls::DisableDurationSensitive(OSDSettings::Type::Pretty));
+  const auto types = NotificationsControls::AvailableTypes(true, false, true);
+  ASSERT_EQ(3u, types.size());
+  EXPECT_EQ("0", types[0].first);
+  EXPECT_EQ("1", types[1].first);
+  EXPECT_EQ("3", types[2].first);
+  std::vector<std::string> ids = {"0", "1", "3"};
+  EXPECT_EQ(OSDSettings::Type::Pretty, NotificationsControls::TypeFromSelected(&ids, 2));
 }
 
 TEST(PlaylistSettingsControls, GlowRequiresBars) {

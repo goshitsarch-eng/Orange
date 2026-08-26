@@ -8,6 +8,7 @@
 
 PlaylistTabBar::PlaylistTabBar() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+  gtk_widget_set_overflow(widget_, GTK_OVERFLOW_HIDDEN);
   popover_ = gtk_popover_new();
   gtk_widget_set_parent(popover_, widget_);
   gtk_popover_set_has_arrow(GTK_POPOVER(popover_), FALSE);
@@ -85,6 +86,7 @@ PlaylistTabBar::PlaylistTabBar() {
 }
 
 PlaylistTabBar::~PlaylistTabBar() {
+  StopVisibilityAnim();
   HideEditor();
   CancelDragHover();
   if (popover_) {
@@ -478,5 +480,56 @@ void PlaylistTabBar::Refresh(PlaylistManager *manager, const std::string &active
     favorites_.push_back(std::move(favorite));
     ++index;
   }
-  gtk_widget_set_visible(widget_, PlaylistTabBarVisibility::ShouldShow(index) ? TRUE : FALSE);
+  UpdateVisibility(PlaylistTabBarVisibility::ShouldShow(index));
+}
+
+void PlaylistTabBar::StopVisibilityAnim() {
+  if (anim_id_) {
+    g_source_remove(anim_id_);
+    anim_id_ = 0;
+  }
+}
+
+void PlaylistTabBar::UpdateVisibility(bool show) {
+  if (show == shown_ && anim_id_ == 0) {
+    gtk_widget_set_visible(widget_, show ? TRUE : FALSE);
+    gtk_widget_set_size_request(widget_, -1, -1);
+    return;
+  }
+  if (show == shown_ && anim_id_ != 0 && anim_showing_ == show) {
+    return;
+  }
+  StopVisibilityAnim();
+  gtk_widget_set_visible(widget_, TRUE);
+  gtk_widget_set_overflow(widget_, GTK_OVERFLOW_HIDDEN);
+  int natural = gtk_widget_get_height(widget_);
+  if (natural <= 0) {
+    int minimum = 0;
+    int nat = 0;
+    gtk_widget_measure(widget_, GTK_ORIENTATION_VERTICAL, -1, &minimum, &nat, nullptr, nullptr);
+    natural = nat > 0 ? nat : 36;
+  }
+  anim_natural_ = natural;
+  anim_showing_ = show;
+  anim_start_us_ = g_get_monotonic_time();
+  gtk_widget_set_size_request(widget_, -1, PlaylistTabBarVisibility::HeightAt(0, natural, show));
+  anim_id_ = g_timeout_add(
+      16,
+      +[](gpointer data) -> gboolean {
+        static_cast<PlaylistTabBar *>(data)->TickVisibility();
+        return G_SOURCE_CONTINUE;
+      },
+      this);
+}
+
+void PlaylistTabBar::TickVisibility() {
+  const int elapsed = static_cast<int>((g_get_monotonic_time() - anim_start_us_) / 1000);
+  gtk_widget_set_size_request(widget_, -1, PlaylistTabBarVisibility::HeightAt(elapsed, anim_natural_, anim_showing_));
+  if (elapsed < PlaylistTabBarVisibility::kAnimationMs) {
+    return;
+  }
+  StopVisibilityAnim();
+  shown_ = anim_showing_;
+  gtk_widget_set_visible(widget_, shown_ ? TRUE : FALSE);
+  gtk_widget_set_size_request(widget_, -1, -1);
 }

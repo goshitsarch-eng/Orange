@@ -242,6 +242,7 @@ class MainWindow {
   std::string selection_playlist_name_;
   guint position_timeout_ = 0;
   guint collection_filter_timeout_ = 0;
+  bool refreshing_devices_ = false;
   bool sponsor_prompted_ = false;
   gint64 analyzer_last_draw_us_ = 0;
   TaskbarProgress taskbar_;

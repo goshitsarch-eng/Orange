@@ -60,6 +60,9 @@ class PlaylistTabBar {
   void StartDragHover(int index);
   void CancelDragHover();
   void SetupTab(GtkWidget *tab, int index, int id, const std::string &name);
+  void UpdateVisibility(bool show);
+  void TickVisibility();
+  void StopVisibilityAnim();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *popover_ = nullptr;
@@ -80,6 +83,11 @@ class PlaylistTabBar {
   int rename_id_ = -1;
   int hover_index_ = -1;
   guint hover_timeout_ = 0;
+  bool shown_ = false;
+  bool anim_showing_ = false;
+  int anim_natural_ = 0;
+  gint64 anim_start_us_ = 0;
+  guint anim_id_ = 0;
 };
 
 #endif

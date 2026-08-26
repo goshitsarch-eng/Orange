@@ -12,6 +12,8 @@ struct ConnectedDevice {
   std::string backend;
   std::string mount_path;
   bool remembered = false;
+  int song_count = -1;
+  int updating_percent = -1;
 };
 
 #endif
