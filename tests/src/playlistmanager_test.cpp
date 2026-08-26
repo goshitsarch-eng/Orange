@@ -185,6 +185,10 @@ TEST(QueueRows, RemapsAndPositionsPlaylistSources) {
   const auto inserted = QueueRows::AfterInsert({{1, 2}}, 1, 1, 2);
   ASSERT_EQ(1u, inserted.size());
   EXPECT_EQ(4, inserted.front().row);
+  const auto moved = QueueRows::AfterMove({{1, 1}, {1, 3}}, 1, 4, {1}, 4);
+  ASSERT_EQ(2u, moved.size());
+  EXPECT_EQ(3, moved.front().row);
+  EXPECT_EQ(2, moved.back().row);
 }
 
 TEST(Queue, TracksPlaylistRowsAndToggle) {

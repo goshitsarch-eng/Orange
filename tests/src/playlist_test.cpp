@@ -1,5 +1,6 @@
 #include "core/playerrepeat.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistplayed.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistshuffle.h"
 #include "utilities/fileutils.h"
@@ -431,4 +432,46 @@ TEST(PlayerRepeat, OneByOneStopsAfterCurrent) {
   EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, true));
   EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, false));
   EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Playlist, false));
+}
+
+TEST(PlayerRepeat, IntroUsesTenSecondWindow) {
+  EXPECT_TRUE(PlayerRepeat::IsIntro(PlaylistSequence::RepeatMode::Intro));
+  EXPECT_FALSE(PlayerRepeat::IsIntro(PlaylistSequence::RepeatMode::Playlist));
+  EXPECT_FALSE(PlayerRepeat::IntroElapsed(9 * 1000000000LL));
+  EXPECT_TRUE(PlayerRepeat::IntroElapsed(10 * 1000000000LL));
+  EXPECT_EQ(10000u, PlayerRepeat::IntroTimeoutMs());
+}
+
+TEST(Playlist, PreviousUsesPlayedHistory) {
+  Playlist playlist;
+  auto add = [&](const char *title) {
+    Song song;
+    song.set_title(title);
+    song.set_url(std::string("file:///") + title);
+    song.set_valid(true);
+    playlist.AppendSongs({song});
+  };
+  add("A");
+  add("B");
+  add("C");
+  playlist.set_current_row(0);
+  playlist.Next();
+  playlist.Next();
+  EXPECT_EQ("C", playlist.current_song().title());
+  ASSERT_EQ(2u, playlist.played_indexes().size());
+  playlist.Previous();
+  EXPECT_EQ("B", playlist.current_song().title());
+  playlist.Previous();
+  EXPECT_EQ("A", playlist.current_song().title());
+}
+
+TEST(PlaylistPlayed, RemapsStackAfterRemoveAndMove) {
+  const std::vector<int> stack = {0, 3, 1};
+  const auto removed = PlaylistPlayed::AfterRemove(stack, {1});
+  ASSERT_EQ(2u, removed.size());
+  EXPECT_EQ(0, removed[0]);
+  EXPECT_EQ(2, removed[1]);
+  const auto moved = PlaylistPlayed::AfterMove({1}, 4, {1}, 4);
+  ASSERT_EQ(1u, moved.size());
+  EXPECT_EQ(3, moved.front());
 }

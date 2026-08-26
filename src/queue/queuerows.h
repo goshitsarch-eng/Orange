@@ -1,6 +1,8 @@
 #ifndef STRAWBERRY_QUEUEROWS_H
 #define STRAWBERRY_QUEUEROWS_H
 
+#include "playlist/playlistplayed.h"
+
 #include <algorithm>
 #include <vector>
 
@@ -58,6 +60,26 @@ inline std::vector<Source> AfterInsert(const std::vector<Source> &sources, int p
   for (Source &source : out) {
     if (source.valid() && source.playlist_id == playlist_id && source.row >= at) {
       source.row += count;
+    }
+  }
+  return out;
+}
+
+inline std::vector<Source> AfterMove(const std::vector<Source> &sources, int playlist_id, int count, const std::vector<int> &from, int to) {
+  const std::vector<int> map = PlaylistPlayed::MoveMap(count, from, to);
+  if (map.empty()) {
+    return sources;
+  }
+  std::vector<Source> out;
+  out.reserve(sources.size());
+  for (Source source : sources) {
+    if (!source.valid() || source.playlist_id != playlist_id) {
+      out.push_back(source);
+      continue;
+    }
+    if (source.row >= 0 && source.row < static_cast<int>(map.size()) && map[static_cast<size_t>(source.row)] >= 0) {
+      source.row = map[static_cast<size_t>(source.row)];
+      out.push_back(source);
     }
   }
   return out;

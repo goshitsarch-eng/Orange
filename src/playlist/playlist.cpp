@@ -2,6 +2,7 @@
 
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistfilter.h"
+#include "playlist/playlistplayed.h"
 #include "playlist/playlistshuffle.h"
 #include "playlist/playlistdelegates.h"
 #include "tagreader/tagreader.h"
@@ -89,6 +90,7 @@ void Playlist::InsertSongs(int row, const SongList &songs) {
     row = static_cast<int>(songs_.size());
   }
   songs_.insert(songs_.begin() + row, songs.begin(), songs.end());
+  played_indexes_ = PlaylistPlayed::AfterInsert(played_indexes_, row, static_cast<int>(songs.size()));
   if (current_row_ < 0 && !songs_.empty()) {
     current_row_ = 0;
   }
@@ -104,6 +106,7 @@ void Playlist::RemoveRows(const std::vector<int> &rows) {
     return;
   }
   PushUndo();
+  played_indexes_ = PlaylistPlayed::AfterRemove(played_indexes_, rows);
   std::vector<int> sorted = rows;
   std::sort(sorted.begin(), sorted.end(), std::greater<int>());
   for (int row : sorted) {
@@ -125,6 +128,7 @@ void Playlist::Clear() {
   PushUndo();
   songs_.clear();
   current_row_ = -1;
+  played_indexes_.clear();
   RebuildVirtualItems();
   Changed.Emit();
 }
@@ -146,6 +150,7 @@ void Playlist::MoveRows(const std::vector<int> &rows, int to) {
     moving.push_back(songs_[static_cast<size_t>(row)]);
   }
   const Song playing = current_song();
+  played_indexes_ = PlaylistPlayed::AfterMove(played_indexes_, row_count(), sorted, to);
   int dest = std::clamp(to, 0, row_count());
   PushUndo();
   for (auto it = sorted.rbegin(); it != sorted.rend(); ++it) {
@@ -607,15 +612,28 @@ int Playlist::PreviousIndex() const {
 void Playlist::Next() {
   const int next = NextIndex();
   if (next >= 0) {
+    PlaylistPlayed::Push(&played_indexes_, current_row_);
     set_current_row(next);
   }
 }
 
 void Playlist::Previous() {
+  const int played = PlaylistPlayed::Pop(&played_indexes_);
+  if (played >= 0 && played < row_count()) {
+    set_current_row(played);
+    return;
+  }
   const int previous = PreviousIndex();
   if (previous >= 0) {
     set_current_row(previous);
   }
+}
+
+void Playlist::RecordAndSetCurrentRow(int row) {
+  if (current_row_ >= 0 && current_row_ != row) {
+    PlaylistPlayed::Push(&played_indexes_, current_row_);
+  }
+  set_current_row(row);
 }
 
 int64_t Playlist::total_length_nanosec() const {

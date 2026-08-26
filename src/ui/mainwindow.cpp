@@ -1047,9 +1047,11 @@ void MainWindow::BuildPlaylist() {
   });
   playlist_container_->view()->SetReorderCallback([this](const std::vector<int> &rows, int dest) {
     if (Playlist *playlist = app_->playlist_manager()->current()) {
+      app_->queue()->RemapAfterPlaylistMove(playlist->id(), playlist->row_count(), rows, dest);
       playlist->MoveRows(rows, dest);
       app_->playlist_manager()->SaveCurrent();
       RefreshPlaylist();
+      RefreshQueue();
     }
   });
   playlist_container_->tab_bar()->SetChangedCallback([this](const std::string &name) {

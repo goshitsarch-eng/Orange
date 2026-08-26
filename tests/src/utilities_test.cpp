@@ -46,6 +46,7 @@
 #include "moodbar/moodbarbuilder.h"
 #include "transcoder/transcoder.h"
 #include "waveform/waveformbuilder.h"
+#include "transcoder/transcoderoptionsfields.h"
 #include "transcoder/transcoderoptionsinterface.h"
 #include "widgets/playingwidget.h"
 #include "widgets/stretchheaderview.h"
@@ -503,6 +504,14 @@ TEST(Transcoder, PresetAndPipelineFor) {
   const std::string asf = Transcoder::PipelineFor(Transcoder::Format::ASF, 5);
   EXPECT_NE(std::string::npos, asf.find("avenc_wmav2"));
   EXPECT_EQ(192, TranscoderOptionsInterface::BitrateKbps(5, 64, 320));
+  TranscoderOptionsFields::Mp3 lame;
+  lame.target = 0;
+  lame.quality = 4;
+  lame.cbr = true;
+  const std::string vbr = lame.Pipeline();
+  EXPECT_NE(std::string::npos, vbr.find("target=0"));
+  EXPECT_NE(std::string::npos, vbr.find("quality=4"));
+  EXPECT_NE(std::string::npos, vbr.find("cbr=true"));
   Transcoder transcoder;
   transcoder.set_quality(8);
   EXPECT_EQ(8, transcoder.quality());

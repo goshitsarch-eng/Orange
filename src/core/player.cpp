@@ -1,6 +1,9 @@
 #include "core/player.h"
 
 #include <algorithm>
+#include <memory>
+
+#include <glib.h>
 
 #include "constants/backendsettings.h"
 #include "constants/behavioursettings.h"
@@ -19,6 +22,8 @@
 
 Player::Player(TaskManager *task_manager, UrlHandlers *url_handlers, PlaylistManager *playlist_manager)
     : task_manager_(task_manager), url_handlers_(url_handlers), playlist_manager_(playlist_manager), engine_(std::make_unique<GstEngine>()) {}
+
+Player::~Player() { CancelIntroTimeout(); }
 
 void Player::Init() {
   engine_->Init();
@@ -154,6 +159,7 @@ void Player::Pause() {
 void Player::Stop(bool stop_after) {
   stop_after_current_ = stop_after;
   if (!stop_after) {
+    CancelIntroTimeout();
     FinishCurrentPlayback();
     engine_->Stop();
     if (playlist_manager_) {
@@ -356,6 +362,53 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_
     playlist_manager_->SongChangeRequestProcessed(current_song_.url(), true);
   }
   SongChanged.Emit(current_song_);
+  ArmIntroTimeout();
+}
+
+void Player::CancelIntroTimeout() {
+  if (intro_timeout_id_ != 0) {
+    g_source_remove(intro_timeout_id_);
+    intro_timeout_id_ = 0;
+  }
+  ++intro_generation_;
+}
+
+void Player::ArmIntroTimeout() {
+  CancelIntroTimeout();
+  const PlaylistSequence::RepeatMode repeat = playlist_manager_ && playlist_manager_->active()
+                                                 ? playlist_manager_->active()->repeat_mode()
+                                                 : PlaylistSequence::RepeatMode::Off;
+  if (!PlayerRepeat::IsIntro(repeat)) {
+    return;
+  }
+  struct IntroJob {
+    Player *player = nullptr;
+    int generation = 0;
+  };
+  auto *job = new IntroJob;
+  job->player = this;
+  job->generation = intro_generation_;
+  intro_timeout_id_ = g_timeout_add_full(
+      G_PRIORITY_DEFAULT, PlayerRepeat::IntroTimeoutMs(),
+      +[](gpointer data) -> gboolean {
+        auto *job = static_cast<IntroJob *>(data);
+        Player *self = job->player;
+        if (!self) {
+          return G_SOURCE_REMOVE;
+        }
+        self->intro_timeout_id_ = 0;
+        if (self->intro_generation_ != job->generation) {
+          return G_SOURCE_REMOVE;
+        }
+        const PlaylistSequence::RepeatMode mode = self->playlist_manager_ && self->playlist_manager_->active()
+                                                     ? self->playlist_manager_->active()->repeat_mode()
+                                                     : PlaylistSequence::RepeatMode::Off;
+        if (PlayerRepeat::IsIntro(mode)) {
+          self->Next();
+        }
+        return G_SOURCE_REMOVE;
+      },
+      job, +[](gpointer data) { delete static_cast<IntroJob *>(data); });
 }
 
 void Player::HandleEngineError(const std::string &error) {

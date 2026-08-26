@@ -29,6 +29,7 @@ class Queue {
   int PositionForPlaylistRow(int playlist_id, int playlist_row) const;
   void RemapAfterPlaylistRemove(int playlist_id, const std::vector<int> &removed);
   void RemapAfterPlaylistInsert(int playlist_id, int at, int count);
+  void RemapAfterPlaylistMove(int playlist_id, int count, const std::vector<int> &from, int to);
   void Clear();
   void Move(int from, int to);
   void MoveRows(const std::vector<int> &from, int to);

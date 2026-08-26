@@ -283,7 +283,7 @@ void PlaylistManager::SetActiveToCurrent() {
 
 void PlaylistManager::SetCurrentRow(int row) {
   if (Playlist *playlist = Visible()) {
-    playlist->set_current_row(row);
+    playlist->RecordAndSetCurrentRow(row);
     if (active_ != playlist) {
       active_ = playlist;
       ActiveChanged.Emit(active_);

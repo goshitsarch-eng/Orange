@@ -160,6 +160,12 @@ void Queue::RemapAfterPlaylistInsert(int playlist_id, int at, int count) {
   sources_ = QueueRows::AfterInsert(sources_, playlist_id, at, count);
 }
 
+void Queue::RemapAfterPlaylistMove(int playlist_id, int count, const std::vector<int> &from, int to) {
+  SyncSources();
+  sources_ = QueueRows::AfterMove(sources_, playlist_id, count, from, to);
+  Changed.Emit();
+}
+
 void Queue::Clear() {
   songs_.clear();
   sources_.clear();

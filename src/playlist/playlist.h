@@ -66,6 +66,8 @@ class Playlist {
   bool CanRedo() const { return !redo_.empty(); }
   void Next();
   void Previous();
+  void RecordAndSetCurrentRow(int row);
+  const std::vector<int> &played_indexes() const { return played_indexes_; }
   void Reshuffle(unsigned seed = 0);
   const std::vector<int> &virtual_items() const { return virtual_items_; }
   void SetSequenceMode(SequenceMode mode);
@@ -123,6 +125,7 @@ class Playlist {
   std::vector<int> virtual_items_;
   int current_virtual_index_ = -1;
   std::string filter_string_;
+  std::vector<int> played_indexes_;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H

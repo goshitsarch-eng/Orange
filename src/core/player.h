@@ -18,6 +18,7 @@ class UrlHandlers;
 class Player : public PlayerInterface {
  public:
   Player(TaskManager *task_manager, UrlHandlers *url_handlers, PlaylistManager *playlist_manager);
+  ~Player();
 
   void Init();
   void SetQueue(Queue *queue) { queue_ = queue; }
@@ -71,6 +72,8 @@ class Player : public PlayerInterface {
   void PlayCurrent(bool pause, uint64_t offset_nanosec = 0);
   void PlayLoadedSong(bool pause, int track_change_flags = GstEngine::Manual, uint64_t offset_nanosec = 0);
   void FinishCurrentPlayback();
+  void CancelIntroTimeout();
+  void ArmIntroTimeout();
 
   TaskManager *task_manager_;
   UrlHandlers *url_handlers_;
@@ -88,6 +91,8 @@ class Player : public PlayerInterface {
   bool continue_on_error_ = false;
   bool greyout_ = true;
   int error_count_ = 0;
+  unsigned intro_timeout_id_ = 0;
+  int intro_generation_ = 0;
 
   void HandleEngineError(const std::string &error);
 };
