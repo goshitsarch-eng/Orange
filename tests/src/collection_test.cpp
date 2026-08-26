@@ -9,6 +9,7 @@
 #include "collection/collectionitem.h"
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectionfiltermenu.h"
+#include "collection/collectionmenu.h"
 #include "collection/collectionkeyboard.h"
 #include "collection/collectionmodel.h"
 #include "collection/collectionplaylistitem.h"
@@ -541,4 +542,51 @@ TEST(CollectionKeyboard, FromKeyAndMoveAction) {
   EXPECT_EQ(CollectionKeyboard::Action::End, CollectionKeyboard::FromKey(ListBoxKeyboard::kEnd));
   EXPECT_EQ(ListBoxKeyboard::Action::MoveDown, CollectionKeyboard::MoveAction(CollectionKeyboard::Action::MoveDown));
   EXPECT_EQ(ListBoxKeyboard::Action::None, CollectionKeyboard::MoveAction(CollectionKeyboard::Action::Expand));
+}
+
+TEST(CollectionMenu, CatalogAndEmptySelection) {
+  EXPECT_EQ(16, CollectionMenu::ItemCount());
+  EXPECT_EQ(CollectionMenu::Action::Organize, CollectionMenu::FromId("organize"));
+  EXPECT_EQ(CollectionMenu::Action::EditTracks, CollectionMenu::FromId("edit-tracks"));
+  EXPECT_STREQ("win.collection-copy-device", CollectionMenu::WinAction(CollectionMenu::Action::CopyToDevice));
+  EXPECT_STREQ("", CollectionMenu::WinAction(CollectionMenu::Action::GroupBy));
+  const auto empty = CollectionMenu::VisibleItems(CollectionMenu::Analyze({}));
+  EXPECT_EQ(1u, empty.size());
+  EXPECT_TRUE(CollectionMenu::Contains(empty, CollectionMenu::Action::GroupBy));
+}
+
+TEST(CollectionMenu, EditTrackVsTracksAndOrganize) {
+  Song one(Song::Source::Collection);
+  one.set_valid(true);
+  one.set_url("file:///music/a.flac");
+  Song two = one;
+  two.set_url("file:///music/b.flac");
+  const auto single = CollectionMenu::VisibleItems(CollectionMenu::Analyze({one}, true, true));
+  EXPECT_TRUE(CollectionMenu::Contains(single, CollectionMenu::Action::EditTrack));
+  EXPECT_FALSE(CollectionMenu::Contains(single, CollectionMenu::Action::EditTracks));
+  EXPECT_TRUE(CollectionMenu::Contains(single, CollectionMenu::Action::Organize));
+  EXPECT_TRUE(CollectionMenu::Contains(single, CollectionMenu::Action::CopyToDevice));
+  EXPECT_TRUE(CollectionMenu::Contains(single, CollectionMenu::Action::Rescan));
+  EXPECT_TRUE(CollectionMenu::Contains(single, CollectionMenu::Action::DeleteFiles));
+  EXPECT_EQ("Edit track information...", CollectionMenu::LabelFor(CollectionMenu::Action::EditTrack));
+
+  const auto multi = CollectionMenu::VisibleItems(CollectionMenu::Analyze({one, two}, true, true));
+  EXPECT_FALSE(CollectionMenu::Contains(multi, CollectionMenu::Action::EditTrack));
+  EXPECT_TRUE(CollectionMenu::Contains(multi, CollectionMenu::Action::EditTracks));
+  EXPECT_EQ("Edit tracks information...", CollectionMenu::LabelFor(CollectionMenu::Action::EditTracks));
+}
+
+TEST(CollectionMenu, MixedEditableHidesOrganize) {
+  Song editable(Song::Source::Collection);
+  editable.set_valid(true);
+  editable.set_url("file:///music/a.flac");
+  Song stream(Song::Source::Tidal);
+  stream.set_valid(true);
+  stream.set_url("tidal://track/1");
+  const auto mixed = CollectionMenu::VisibleItems(CollectionMenu::Analyze({editable, stream}, true, false));
+  EXPECT_FALSE(CollectionMenu::Contains(mixed, CollectionMenu::Action::Organize));
+  EXPECT_FALSE(CollectionMenu::Contains(mixed, CollectionMenu::Action::CopyToDevice));
+  EXPECT_TRUE(CollectionMenu::Contains(mixed, CollectionMenu::Action::Rescan));
+  EXPECT_TRUE(CollectionMenu::Contains(mixed, CollectionMenu::Action::EditTrack));
+  EXPECT_FALSE(CollectionMenu::CopyToDeviceEnabled(CollectionMenu::Analyze({editable}, true, false)));
 }

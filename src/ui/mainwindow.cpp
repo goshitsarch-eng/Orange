@@ -2,6 +2,7 @@
 
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionfiltermenu.h"
+#include "collection/collectionmenu.h"
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
@@ -641,6 +642,29 @@ void MainWindow::BuildUi() {
                auto *self = static_cast<MainWindow *>(data);
                Dialogs::Organize(GTK_WINDOW(self->window_), self->app_, self->CollectionSongs());
              }));
+  add_action("collection-copy-device", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::CopyToDevice(GTK_WINDOW(self->window_), self->app_, self->CollectionSongs());
+             }));
+  {
+    GSimpleAction *preset = g_simple_action_new("collection-preset", G_VARIANT_TYPE_INT32);
+    g_signal_connect(preset, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
+                       auto *self = static_cast<MainWindow *>(data);
+                       const int index = g_variant_get_int32(param);
+                       const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
+                       if (index < 0 || static_cast<size_t>(index) >= presets.size() || presets[static_cast<size_t>(index)].advanced) {
+                         return;
+                       }
+                       self->grouping_ = presets[static_cast<size_t>(index)].grouping;
+                       CollectionGrouping::SaveCurrent(self->grouping_);
+                       if (self->collection_container_) {
+                         self->collection_container_->filter_widget()->SetGrouping(self->grouping_);
+                       }
+                       self->RefreshCollection();
+                     }),
+                     this);
+    g_action_map_add_action(G_ACTION_MAP(window_), G_ACTION(preset));
+  }
   add_action("collection-edittag", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                Dialogs::EditTag(GTK_WINDOW(self->window_), self->app_, self->CollectionSongs());
@@ -2299,31 +2323,35 @@ void MainWindow::ForceCompilationSelected(bool on) {
 }
 
 void MainWindow::ShowCollectionMenu() {
+  bool devices_connected = false;
+  for (const ConnectedDevice &device : app_->device_manager()->devices()) {
+    if (!device.mount_path.empty()) {
+      devices_connected = true;
+      break;
+    }
+  }
+  const CollectionMenu::SelectionState state =
+      CollectionMenu::Analyze(CollectionSongs(), DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Collection), devices_connected);
   GMenu *menu = g_menu_new();
   g_menu_append(menu, Translations::Tr("Expand all").c_str(), "win.collection-expand-all");
   g_menu_append(menu, Translations::Tr("Collapse all").c_str(), "win.collection-collapse-all");
   g_menu_append(menu, Translations::Tr(SettingsPages::ConfigureCollectionLabel()).c_str(), "win.collection-configure");
-  if (CollectionSongs().empty()) {
-    GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
-    gtk_widget_set_parent(popover, collection_container_ ? collection_container_->view()->list() : GTK_WIDGET(window_));
-    gtk_popover_popup(GTK_POPOVER(popover));
-    return;
-  }
-  g_menu_append(menu, Translations::Tr("Append to current playlist").c_str(), "win.collection-append");
-  g_menu_append(menu, Translations::Tr("Replace current playlist").c_str(), "win.collection-replace");
-  g_menu_append(menu, Translations::Tr("Open in new playlist").c_str(), "win.collection-new");
-  g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.collection-enqueue");
-  g_menu_append(menu, Translations::Tr("Queue to play next").c_str(), "win.collection-enqueue-next");
-  g_menu_append(menu, Translations::Tr("Search for this").c_str(), "win.collection-search");
-  g_menu_append(menu, Translations::Tr("Show in Various artists").c_str(), "win.collection-various-on");
-  g_menu_append(menu, Translations::Tr("Don't show in Various artists").c_str(), "win.collection-various-off");
-  g_menu_append(menu, Translations::Tr("Rescan selected songs").c_str(), "win.collection-rescan");
-  g_menu_append(menu, Translations::Tr("Copy to device…").c_str(), "win.copy-device");
-  g_menu_append(menu, Translations::Tr("Organize files…").c_str(), "win.collection-organize");
-  g_menu_append(menu, Translations::Tr("Edit track information…").c_str(), "win.collection-edittag");
-  g_menu_append(menu, Translations::Tr("Show in file browser…").c_str(), "win.collection-browse");
-  if (DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Collection)) {
-    g_menu_append(menu, Translations::Tr("Delete from disk…").c_str(), "win.collection-delete");
+  for (const CollectionMenu::Item &item : CollectionMenu::VisibleItems(state)) {
+    if (item.action == CollectionMenu::Action::GroupBy) {
+      GMenu *group_by = g_menu_new();
+      const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
+      for (size_t i = 0; i < presets.size(); ++i) {
+        if (presets[i].advanced) {
+          g_menu_append(group_by, Translations::Tr("Advanced grouping…").c_str(), "win.group-by");
+          continue;
+        }
+        const std::string target = "win.collection-preset(" + std::to_string(static_cast<int>(i)) + ")";
+        g_menu_append(group_by, Translations::Tr(presets[i].label).c_str(), target.c_str());
+      }
+      g_menu_append_submenu(menu, Translations::Tr(CollectionMenu::LabelFor(item.action)).c_str(), G_MENU_MODEL(group_by));
+      continue;
+    }
+    g_menu_append(menu, Translations::Tr(CollectionMenu::LabelFor(item.action)).c_str(), CollectionMenu::WinAction(item.action));
   }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, collection_container_ ? collection_container_->view()->list() : GTK_WIDGET(window_));
