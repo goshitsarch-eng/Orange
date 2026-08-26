@@ -3,9 +3,13 @@
 #include "core/application.h"
 #include "core/player.h"
 #include "equalizer/equalizer.h"
+#include "equalizer/equalizerpresets.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
+
+#include <string>
+#include <vector>
 
 void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application *app) {
   if (!equalizer) {
@@ -67,9 +71,24 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
                      auto *eq = static_cast<class Equalizer *>(data);
                      GtkDropDown *drop = GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "drop"));
                      GtkStringObject *item = GTK_STRING_OBJECT(gtk_drop_down_get_selected_item(drop));
-                     if (item) {
-                       eq->DeletePreset(gtk_string_object_get_string(item));
+                     if (!item) {
+                       return;
                      }
+                     const std::string name = gtk_string_object_get_string(item);
+                     const std::vector<std::string> remaining = EqualizerPresets::AfterDelete(eq->Presets(), name);
+                     if (!eq->DeletePreset(name)) {
+                       return;
+                     }
+                     const std::string next = EqualizerPresets::NextSelected(remaining, name, eq->selected_preset());
+                     GtkStringList *list = GTK_STRING_LIST(gtk_drop_down_get_model(drop));
+                     while (g_list_model_get_n_items(G_LIST_MODEL(list)) > 0) {
+                       gtk_string_list_remove(list, 0);
+                     }
+                     for (const std::string &preset : eq->Presets()) {
+                       gtk_string_list_append(list, preset.c_str());
+                     }
+                     eq->LoadPreset(next);
+                     gtk_drop_down_set_selected(drop, static_cast<guint>(EqualizerPresets::IndexOf(eq->Presets(), next)));
                    }),
                    equalizer);
   gtk_box_append(GTK_BOX(preset_row), preset_name);

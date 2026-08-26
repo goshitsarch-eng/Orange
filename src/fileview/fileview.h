@@ -31,6 +31,8 @@ class FileView {
   void FileBack();
   void FileForward();
   void Reload();
+  void SetShowHidden(bool show_hidden);
+  void SetShowAllFiles(bool show_all);
   FileViewHistory *history() { return &history_; }
   void SetAddToPlaylistCallback(PathsCallback callback);
   void SetCopyToCollectionCallback(PathsCallback callback);
@@ -44,10 +46,14 @@ class FileView {
   void Activate(const std::string &path);
   void UpdateNavButtons();
 
+  void PersistSettings();
+
   GtkWidget *widget_ = nullptr;
   GtkWidget *path_entry_ = nullptr;
   GtkWidget *back_ = nullptr;
   GtkWidget *forward_ = nullptr;
+  GtkWidget *hidden_btn_ = nullptr;
+  GtkWidget *all_files_btn_ = nullptr;
   FileViewTreeModel model_;
   std::unique_ptr<FileViewTree> tree_;
   std::unique_ptr<FileViewList> list_;

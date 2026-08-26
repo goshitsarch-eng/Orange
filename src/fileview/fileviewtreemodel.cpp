@@ -1,6 +1,7 @@
 #include "fileview/fileviewtreemodel.h"
 
 #include "core/song.h"
+#include "fileview/fileviewhidden.h"
 #include "playlistparsers/playlistparser.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
@@ -28,9 +29,16 @@ void FileViewTreeModel::SetRootPaths(const std::vector<std::string> &paths) {
 
 void FileViewTreeModel::SetNameFilters(const std::vector<std::string> &filters) { name_filters_ = filters; }
 
+void FileViewTreeModel::SetShowHidden(bool show_hidden) { show_hidden_ = show_hidden; }
+
+void FileViewTreeModel::SetShowAllFiles(bool show_all) { show_all_files_ = show_all; }
+
 void FileViewTreeModel::Reset() { root_.reset(); }
 
 bool FileViewTreeModel::AcceptsFile(const std::string &path) const {
+  if (show_all_files_) {
+    return true;
+  }
   if (Song::IsAudioFile(path) || PlaylistParser::IsPlaylist(path)) {
     return true;
   }
@@ -50,7 +58,7 @@ void FileViewTreeModel::LazyLoad(FileViewTreeItem *item) {
   std::sort(entries.begin(), entries.end());
   for (const std::string &path : entries) {
     const std::string name = FileUtils::BaseName(path);
-    if (name.empty() || name[0] == '.') {
+    if (!FileViewHidden::ShouldIncludeEntry(name, show_hidden_)) {
       continue;
     }
     if (!FileUtils::IsDirectory(path)) {
@@ -78,7 +86,7 @@ std::vector<std::string> FileViewTreeModel::FilesIn(const std::string &directory
   std::sort(entries.begin(), entries.end());
   for (const std::string &path : entries) {
     const std::string name = FileUtils::BaseName(path);
-    if (name.empty() || name[0] == '.') {
+    if (!FileViewHidden::ShouldIncludeEntry(name, show_hidden_)) {
       continue;
     }
     if (FileUtils::IsDirectory(path) || AcceptsFile(path)) {

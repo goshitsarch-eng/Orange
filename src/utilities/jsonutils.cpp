@@ -310,6 +310,10 @@ std::string ExtractLyrics(const std::string &body) {
     return {};
   }
   if (body.find('{') == 0 || body.find("\"lyrics\"") != std::string::npos || body.find("plainLyrics") != std::string::npos) {
+    const std::string synced = FindStringByKeys(body, {"syncedLyrics"});
+    if (!synced.empty()) {
+      return StrUtils::Trim(synced);
+    }
     const std::string lyrics = FindStringByKeys(body, {"plainLyrics", "lyrics", "lyric", "unsyncedLyrics", "text"});
     if (!lyrics.empty()) {
       return StrUtils::Trim(lyrics);

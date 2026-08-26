@@ -1356,6 +1356,9 @@ void MainWindow::ConnectSignals() {
     if (self->app_->mpris() && self->app_->player()->GetState() == EngineBase::State::Playing) {
       self->app_->mpris()->EmitPosition();
     }
+    if (self->context_view_) {
+      self->context_view_->SetPlaybackPosition(pos);
+    }
     return G_SOURCE_CONTINUE;
   }, this);
 }

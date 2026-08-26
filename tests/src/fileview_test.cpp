@@ -1,5 +1,6 @@
 #include "device/devicedrag.h"
 #include "fileview/fileviewdrag.h"
+#include "fileview/fileviewhidden.h"
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewkeyboard.h"
 #include "fileview/fileviewsongs.h"
@@ -63,6 +64,45 @@ TEST(FileViewTreeModel, NameFiltersIncludeExtraExtensions) {
 
   FileUtils::Remove(cue);
   FileUtils::Remove(txt);
+  rmdir(dir.c_str());
+}
+
+TEST(FileViewHidden, ShouldIncludeEntry) {
+  EXPECT_TRUE(FileViewHidden::IsHiddenEntry(".hidden.flac"));
+  EXPECT_FALSE(FileViewHidden::IsHiddenEntry("song.flac"));
+  EXPECT_FALSE(FileViewHidden::ShouldIncludeEntry(".hidden.flac", false));
+  EXPECT_TRUE(FileViewHidden::ShouldIncludeEntry(".hidden.flac", true));
+  EXPECT_TRUE(FileViewHidden::ShouldIncludeEntry("song.flac", false));
+  EXPECT_FALSE(FileViewHidden::ShouldIncludeEntry("", true));
+}
+
+TEST(FileViewTreeModel, ShowHiddenAndAllFiles) {
+  const std::string dir = TempDir();
+  const std::string audio = FileUtils::Join(dir, "song.flac");
+  const std::string hidden = FileUtils::Join(dir, ".hidden.flac");
+  const std::string notes = FileUtils::Join(dir, "notes.txt");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "a"));
+  ASSERT_TRUE(FileUtils::WriteFile(hidden, "b"));
+  ASSERT_TRUE(FileUtils::WriteFile(notes, "c"));
+
+  FileViewTreeModel model;
+  std::vector<std::string> files = model.FilesIn(dir);
+  EXPECT_NE(std::find(files.begin(), files.end(), audio), files.end());
+  EXPECT_EQ(std::find(files.begin(), files.end(), hidden), files.end());
+  EXPECT_EQ(std::find(files.begin(), files.end(), notes), files.end());
+
+  model.SetShowHidden(true);
+  files = model.FilesIn(dir);
+  EXPECT_NE(std::find(files.begin(), files.end(), hidden), files.end());
+  EXPECT_EQ(std::find(files.begin(), files.end(), notes), files.end());
+
+  model.SetShowAllFiles(true);
+  files = model.FilesIn(dir);
+  EXPECT_NE(std::find(files.begin(), files.end(), notes), files.end());
+
+  FileUtils::Remove(audio);
+  FileUtils::Remove(hidden);
+  FileUtils::Remove(notes);
   rmdir(dir.c_str());
 }
 

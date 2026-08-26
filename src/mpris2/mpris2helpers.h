@@ -6,7 +6,9 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <set>
 #include <string>
+#include <vector>
 
 namespace Mpris2Helpers {
 
@@ -52,6 +54,59 @@ inline std::string LoopStatus(PlaylistSequence::RepeatMode mode) {
 }
 
 inline int64_t PositionUsec(int64_t position_nanosec) { return position_nanosec / 1000; }
+
+inline const char *kNoTrack = "/org/mpris/MediaPlayer2/TrackList/NoTrack";
+
+struct TrackListDiff {
+  enum class Kind { None, Incremental, Replaced };
+  Kind kind = Kind::None;
+  std::vector<std::string> added;
+  std::vector<std::string> after_track;
+  std::vector<std::string> removed;
+};
+
+inline TrackListDiff DiffTrackIds(const std::vector<std::string> &before, const std::vector<std::string> &after) {
+  TrackListDiff diff;
+  if (before == after) {
+    return diff;
+  }
+  std::set<std::string> before_set(before.begin(), before.end());
+  std::set<std::string> after_set(after.begin(), after.end());
+  for (const auto &id : before) {
+    if (!after_set.count(id)) {
+      diff.removed.push_back(id);
+    }
+  }
+  for (size_t i = 0; i < after.size(); ++i) {
+    if (!before_set.count(after[i])) {
+      diff.added.push_back(after[i]);
+      diff.after_track.push_back(i == 0 ? kNoTrack : after[i - 1]);
+    }
+  }
+  std::vector<std::string> before_kept;
+  std::vector<std::string> after_kept;
+  for (const auto &id : before) {
+    if (after_set.count(id)) {
+      before_kept.push_back(id);
+    }
+  }
+  for (const auto &id : after) {
+    if (before_set.count(id)) {
+      after_kept.push_back(id);
+    }
+  }
+  if (before_kept != after_kept || diff.added.size() + diff.removed.size() > 16) {
+    diff.kind = TrackListDiff::Kind::Replaced;
+    return diff;
+  }
+  diff.kind = TrackListDiff::Kind::Incremental;
+  return diff;
+}
+
+inline bool MetadataNeedsUpdate(const Song &before, const Song &after) {
+  return before.title() != after.title() || before.artist() != after.artist() || before.album() != after.album() ||
+         before.url() != after.url() || before.length_nanosec() != after.length_nanosec() || ArtUrl(before) != ArtUrl(after);
+}
 
 inline PlaylistSequence::RepeatMode RepeatFromLoopStatus(const std::string &status) {
   if (status == "Track") {

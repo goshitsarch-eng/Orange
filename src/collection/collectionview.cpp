@@ -2,9 +2,12 @@
 
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionitemdelegate.h"
+#include "collection/collectionkeyboard.h"
 #include "collection/collectiontree.h"
 #include "translations/translations.h"
 #include "utilities/strutils.h"
+#include "widgets/listboxkeyboard.h"
+#include "widgets/listboxkeyboardgtk.h"
 
 #include <gdk/gdkkeysyms.h>
 
@@ -264,23 +267,30 @@ void CollectionView::TypeAhead(gunichar ch) {
 }
 
 gboolean CollectionView::OnKeyPressed(guint keyval) {
-  if (keyval == GDK_KEY_Right || keyval == GDK_KEY_Left) {
+  const CollectionKeyboard::Action action = CollectionKeyboard::FromKey(keyval);
+  if (action == CollectionKeyboard::Action::Expand || action == CollectionKeyboard::Action::Collapse) {
     const CollectionItem *item = SelectedItem();
     if (CollectionTree::IsExpandable(item) && filter_.filter_string().empty()) {
       const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
-      if ((keyval == GDK_KEY_Right && !expanded) || (keyval == GDK_KEY_Left && expanded)) {
+      if ((action == CollectionKeyboard::Action::Expand && !expanded) || (action == CollectionKeyboard::Action::Collapse && expanded)) {
         ToggleExpanded(item);
       }
       return TRUE;
     }
   }
-  if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
+  if (action == CollectionKeyboard::Action::Activate) {
     if (GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_))) {
       ActivateRow(row);
       return TRUE;
     }
   }
-  if (keyval == GDK_KEY_Escape) {
+  if (action == CollectionKeyboard::Action::MoveUp || action == CollectionKeyboard::Action::MoveDown ||
+      action == CollectionKeyboard::Action::Home || action == CollectionKeyboard::Action::End) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), CollectionKeyboard::MoveAction(action)));
+    return TRUE;
+  }
+  if (action == CollectionKeyboard::Action::Escape) {
     ResetTypeAhead();
     return TRUE;
   }

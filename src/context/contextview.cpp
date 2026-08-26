@@ -6,10 +6,13 @@
 #include "context/contexttechnical.h"
 #include "core/settings.h"
 #include "core/song.h"
+#include "lyrics/lrcparser.h"
 #include "lyrics/lyricsfetcher.h"
 #include "lyrics/lyricsproviders.h"
 #include "translations/translations.h"
 #include "utilities/styleutils.h"
+
+#include <pango/pango.h>
 
 ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyrics_fetcher)
     : lyrics_providers_(lyrics_providers), lyrics_fetcher_(lyrics_fetcher), album_(std::make_unique<ContextAlbum>()) {
@@ -240,11 +243,51 @@ void ContextView::RebuildTechnicalData() {
 void ContextView::AlbumCoverLoaded(const std::vector<unsigned char> &data) { album_->SetImage(data); }
 
 void ContextView::SetLyrics(const std::string &lyrics, const std::string &provider) {
+  lrc_lines_ = LrcParser::Parse(lyrics);
+  lrc_active_ = -1;
+  const std::string display = !lrc_lines_.empty() ? LrcParser::PlainText(lrc_lines_) : lyrics;
   GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(lyrics_view_));
-  gtk_text_buffer_set_text(buffer, lyrics.empty() ? Translations::CStr("No lyrics") : lyrics.c_str(), -1);
+  gtk_text_buffer_set_text(buffer, display.empty() ? Translations::CStr("No lyrics") : display.c_str(), -1);
+  if (!lrc_tag_) {
+    lrc_tag_ = gtk_text_buffer_create_tag(buffer, "lrc-current", "weight", PANGO_WEIGHT_BOLD, nullptr);
+  }
   const std::string source = ContextLyrics::Attribution(provider);
   gtk_label_set_text(GTK_LABEL(lyrics_source_), source.c_str());
   gtk_widget_set_visible(lyrics_source_, !source.empty());
+}
+
+void ContextView::SetPlaybackPosition(int64_t position_nanosec) {
+  if (lrc_lines_.empty()) {
+    return;
+  }
+  const int index = LrcParser::ActiveLineIndex(lrc_lines_, position_nanosec / 1000000);
+  if (index == lrc_active_) {
+    return;
+  }
+  lrc_active_ = index;
+  HighlightLrcLine(index);
+}
+
+void ContextView::HighlightLrcLine(int index) {
+  if (!lyrics_view_ || !lrc_tag_) {
+    return;
+  }
+  GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(lyrics_view_));
+  GtkTextIter start;
+  GtkTextIter end;
+  gtk_text_buffer_get_start_iter(buffer, &start);
+  gtk_text_buffer_get_end_iter(buffer, &end);
+  gtk_text_buffer_remove_tag(buffer, lrc_tag_, &start, &end);
+  if (index < 0) {
+    return;
+  }
+  GtkTextIter line_start;
+  GtkTextIter line_end;
+  gtk_text_buffer_get_iter_at_line(buffer, &line_start, index);
+  line_end = line_start;
+  gtk_text_iter_forward_to_line_end(&line_end);
+  gtk_text_buffer_apply_tag(buffer, lrc_tag_, &line_start, &line_end);
+  gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(lyrics_view_), &line_start, 0.2, FALSE, 0.0, 0.0);
 }
 
 void ContextView::SearchLyrics(bool force) {

@@ -5,6 +5,7 @@
 #include "core/logging.h"
 #include "core/player.h"
 #include "mpris2/mpris2helpers.h"
+#include "playlist/playlist.h"
 #include "playlist/playlistmanager.h"
 
 #include <algorithm>
@@ -68,6 +69,17 @@ static const gchar *kMprisXml =
     "    <signal name='TrackListReplaced'>"
     "      <arg type='ao' name='Tracks'/>"
     "      <arg type='o' name='CurrentTrack'/>"
+    "    </signal>"
+    "    <signal name='TrackAdded'>"
+    "      <arg type='a{sv}' name='Metadata'/>"
+    "      <arg type='o' name='AfterTrack'/>"
+    "    </signal>"
+    "    <signal name='TrackRemoved'>"
+    "      <arg type='o' name='TrackId'/>"
+    "    </signal>"
+    "    <signal name='TrackMetadataChanged'>"
+    "      <arg type='o' name='TrackId'/>"
+    "      <arg type='a{sv}' name='Metadata'/>"
     "    </signal>"
     "  </interface>"
     "</node>";
@@ -355,7 +367,12 @@ Mpris2::Mpris2(Application *app) : app_(app) {
     app_->player()->VolumeChanged.Connect([this](unsigned) { EmitVolume(); });
   }
   if (app_ && app_->playlist_manager()) {
-    app_->playlist_manager()->CurrentChanged.Connect([this](Playlist *) { EmitTrackListReplaced(); });
+    app_->playlist_manager()->CurrentChanged.Connect([this](Playlist *) {
+      WatchCurrentPlaylist();
+      EmitTrackListReplaced();
+    });
+    app_->playlist_manager()->PlaylistsLoaded.Connect([this]() { WatchCurrentPlaylist(); });
+    WatchCurrentPlaylist();
   }
   owner_id_ = g_bus_own_name(G_BUS_TYPE_SESSION, "org.mpris.MediaPlayer2.strawberry", G_BUS_NAME_OWNER_FLAGS_NONE, OnBusAcquired, nullptr,
                              nullptr, this, nullptr);
@@ -478,13 +495,103 @@ void Mpris2::EmitVolume() {
 #endif
 }
 
+void Mpris2::WatchCurrentPlaylist() {
+#ifdef HAVE_MPRIS2
+  ++playlist_watch_gen_;
+  const int gen = playlist_watch_gen_;
+  SnapshotTrackList();
+  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  if (!playlist) {
+    return;
+  }
+  playlist->Changed.Connect([this, gen]() {
+    if (gen != playlist_watch_gen_) {
+      return;
+    }
+    OnPlaylistContentsChanged();
+  });
+#endif
+}
+
+void Mpris2::SnapshotTrackList() {
+  last_track_ids_ = CurrentTrackIds();
+  last_songs_ = CurrentSongs();
+}
+
+std::vector<std::string> Mpris2::CurrentTrackIds() const {
+  std::vector<std::string> ids;
+  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  if (!playlist) {
+    return ids;
+  }
+  for (int i = 0; i < playlist->row_count(); ++i) {
+    ids.push_back(Mpris2Helpers::TrackIdForRow(playlist->song(i), i));
+  }
+  return ids;
+}
+
+SongList Mpris2::CurrentSongs() const {
+  SongList songs;
+  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  if (!playlist) {
+    return songs;
+  }
+  for (int i = 0; i < playlist->row_count(); ++i) {
+    songs.push_back(playlist->song(i));
+  }
+  return songs;
+}
+
+void Mpris2::OnPlaylistContentsChanged() {
+#ifdef HAVE_MPRIS2
+  const std::vector<std::string> now = CurrentTrackIds();
+  const SongList songs = CurrentSongs();
+  const Mpris2Helpers::TrackListDiff diff = Mpris2Helpers::DiffTrackIds(last_track_ids_, now);
+  if (diff.kind == Mpris2Helpers::TrackListDiff::Kind::Replaced || !connection_) {
+    last_track_ids_ = now;
+    last_songs_ = songs;
+    EmitTrackListReplaced();
+    return;
+  }
+  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  if (diff.kind == Mpris2Helpers::TrackListDiff::Kind::Incremental) {
+    for (const std::string &id : diff.removed) {
+      g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.TrackList", "TrackRemoved",
+                                    g_variant_new("(o)", id.c_str()), nullptr);
+    }
+    for (size_t i = 0; i < diff.added.size(); ++i) {
+      const int row = playlist ? TrackListRow(playlist, diff.added[i].c_str()) : -1;
+      Song song;
+      if (playlist && row >= 0) {
+        song = playlist->song(row);
+      }
+      g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.TrackList", "TrackAdded",
+                                    g_variant_new("(@a{sv}o)", MetadataVariant(song, row), diff.after_track[i].c_str()), nullptr);
+    }
+    EmitPropertiesChanged("org.mpris.MediaPlayer2.TrackList", "Tracks", TrackListIds(playlist));
+  }
+  if (now.size() == last_track_ids_.size() && now == last_track_ids_) {
+    for (size_t i = 0; i < now.size() && i < last_songs_.size() && i < songs.size(); ++i) {
+      if (Mpris2Helpers::MetadataNeedsUpdate(last_songs_[i], songs[i])) {
+        g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.TrackList",
+                                      "TrackMetadataChanged",
+                                      g_variant_new("(o@a{sv})", now[i].c_str(), MetadataVariant(songs[i], static_cast<int>(i))), nullptr);
+      }
+    }
+  }
+  last_track_ids_ = now;
+  last_songs_ = songs;
+#endif
+}
+
 void Mpris2::EmitTrackListReplaced() {
 #ifdef HAVE_MPRIS2
+  SnapshotTrackList();
   if (!connection_) {
     return;
   }
   Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
-  std::string current = "/org/mpris/MediaPlayer2/TrackList/NoTrack";
+  std::string current = Mpris2Helpers::kNoTrack;
   if (playlist && playlist->current_row() >= 0) {
     current = Mpris2Helpers::TrackIdForRow(playlist->current_song(), playlist->current_row());
   }

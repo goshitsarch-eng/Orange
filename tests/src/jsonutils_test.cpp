@@ -29,8 +29,13 @@ TEST(JsonUtils, LyricsOvh) {
   EXPECT_EQ("Hello\nWorld", JsonUtils::ExtractLyrics(json));
 }
 
-TEST(JsonUtils, LrcLibPlainLyrics) {
+TEST(JsonUtils, LrcLibPrefersSyncedLyrics) {
   const std::string json = R"({"plainLyrics":"Verse one","syncedLyrics":"[00:01.00] Verse one"})";
+  EXPECT_EQ("[00:01.00] Verse one", JsonUtils::ExtractLyrics(json));
+}
+
+TEST(JsonUtils, LrcLibPlainLyricsFallback) {
+  const std::string json = R"({"plainLyrics":"Verse one","syncedLyrics":""})";
   EXPECT_EQ("Verse one", JsonUtils::ExtractLyrics(json));
 }
 

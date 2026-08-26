@@ -1,6 +1,7 @@
 #include "context/contextlyrics.h"
 #include "lyrics/geniuslyricsprovider.h"
 #include "lyrics/htmllyricsprovider.h"
+#include "lyrics/lrcparser.h"
 
 #include "utilities/strutils.h"
 
@@ -55,6 +56,31 @@ TEST(GeniusLyricsProvider, AuthorizationAndSearchUrl) {
   EXPECT_NE(std::string::npos, auth.find("response_type=code"));
   const std::string json = R"json({"response":{"hits":[{"result":{"url":"https://genius.com/portishead-roads-lyrics"}}]}})json";
   EXPECT_EQ("https://genius.com/portishead-roads-lyrics", GeniusLyricsProvider::ParseSearchResultUrl(json));
+}
+
+TEST(LrcParser, TimestampsAndActiveLine) {
+  const std::string lrc = "[00:00.00] Intro\n[00:12.50] Verse\n[01:02.00] Chorus\n";
+  const auto lines = LrcParser::Parse(lrc);
+  ASSERT_EQ(3u, lines.size());
+  EXPECT_EQ(0, lines[0].timestamp_ms);
+  EXPECT_EQ("Intro", lines[0].text);
+  EXPECT_EQ(12500, lines[1].timestamp_ms);
+  EXPECT_EQ("Verse", lines[1].text);
+  EXPECT_EQ(62000, lines[2].timestamp_ms);
+  EXPECT_EQ(-1, LrcParser::ActiveLineIndex(lines, -1));
+  EXPECT_EQ(0, LrcParser::ActiveLineIndex(lines, 0));
+  EXPECT_EQ(1, LrcParser::ActiveLineIndex(lines, 12500));
+  EXPECT_EQ(1, LrcParser::ActiveLineIndex(lines, 30000));
+  EXPECT_EQ(2, LrcParser::ActiveLineIndex(lines, 62000));
+  EXPECT_EQ("Intro\nVerse\nChorus", LrcParser::PlainText(lines));
+  EXPECT_TRUE(LrcParser::LooksSynced(lrc));
+  EXPECT_FALSE(LrcParser::LooksSynced("just words"));
+  EXPECT_EQ(90500, LrcParser::ParseTimestamp("01:30.500"));
+  const auto multi = LrcParser::Parse("[00:12.00][00:45.00] Chorus");
+  ASSERT_EQ(2u, multi.size());
+  EXPECT_EQ(12000, multi[0].timestamp_ms);
+  EXPECT_EQ(45000, multi[1].timestamp_ms);
+  EXPECT_EQ("Chorus", multi[0].text);
 }
 
 TEST(ContextLyrics, Attribution) {

@@ -10,6 +10,7 @@
 #include "device/giolister.h"
 #include "equalizer/equalizer.h"
 #include "equalizer/equalizerpersist.h"
+#include "equalizer/equalizerpresets.h"
 #include "constants/filefilterconstants.h"
 #include "constants/collectionsettings.h"
 #include "analyzer/analyzerframerate.h"
@@ -455,6 +456,18 @@ TEST(Equalizer, BuiltinPresets) {
   EXPECT_EQ(-100, Equalizer::ClampBalance(-250));
   EXPECT_EQ(100, Equalizer::ClampBalance(250));
   EXPECT_EQ(0, Equalizer::ClampBalance(0));
+}
+
+TEST(EqualizerPresets, AfterDeleteAndNextSelected) {
+  const std::vector<std::string> presets = {"Custom", "Rock", "User"};
+  const auto remaining = EqualizerPresets::AfterDelete(presets, "User");
+  ASSERT_EQ(2u, remaining.size());
+  EXPECT_EQ("Custom", remaining[0]);
+  EXPECT_EQ("Rock", remaining[1]);
+  EXPECT_EQ("Rock", EqualizerPresets::NextSelected(remaining, "User", "Rock"));
+  EXPECT_EQ("Custom", EqualizerPresets::NextSelected(remaining, "User", "User"));
+  EXPECT_EQ(1, EqualizerPresets::IndexOf(remaining, "Rock"));
+  EXPECT_EQ("Custom", EqualizerPresets::NextSelected({}, "User", "User"));
 }
 
 TEST(EqualizerPersist, SelectedPresetAndStereoBalancer) {

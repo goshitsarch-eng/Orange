@@ -1,5 +1,7 @@
 #include "fileview/fileview.h"
 
+#include "core/settings.h"
+#include "fileview/fileviewsettings.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
 
@@ -26,11 +28,17 @@ FileView::FileView() {
   path_entry_ = gtk_entry_new();
   gtk_editable_set_text(GTK_EDITABLE(path_entry_), path_.c_str());
   gtk_widget_set_hexpand(path_entry_, TRUE);
+  hidden_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Hidden"));
+  gtk_widget_set_tooltip_text(hidden_btn_, Translations::CStr("Show hidden files"));
+  all_files_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("All files"));
+  gtk_widget_set_tooltip_text(all_files_btn_, Translations::CStr("Show files that are not audio or playlists"));
   gtk_box_append(GTK_BOX(toolbar), back_);
   gtk_box_append(GTK_BOX(toolbar), forward_);
   gtk_box_append(GTK_BOX(toolbar), up);
   gtk_box_append(GTK_BOX(toolbar), home);
   gtk_box_append(GTK_BOX(toolbar), path_entry_);
+  gtk_box_append(GTK_BOX(toolbar), hidden_btn_);
+  gtk_box_append(GTK_BOX(toolbar), all_files_btn_);
   gtk_box_append(GTK_BOX(widget_), toolbar);
 
   tree_ = std::make_unique<FileViewTree>();
@@ -72,6 +80,22 @@ FileView::FileView() {
         break;
     }
   });
+  Settings settings;
+  settings.BeginGroup(FileViewSettings::kSettingsGroup);
+  const bool show_hidden = settings.BoolValue(FileViewSettings::kShowHidden, FileViewSettings::kDefaultShowHidden);
+  const bool show_all = settings.BoolValue(FileViewSettings::kShowAllFiles, FileViewSettings::kDefaultShowAllFiles);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(hidden_btn_), show_hidden);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(all_files_btn_), show_all);
+  model_.SetShowHidden(show_hidden);
+  model_.SetShowAllFiles(show_all);
+  g_signal_connect(hidden_btn_, "toggled", G_CALLBACK(+[](GtkToggleButton *button, gpointer data) {
+                     static_cast<FileView *>(data)->SetShowHidden(gtk_toggle_button_get_active(button));
+                   }),
+                   this);
+  g_signal_connect(all_files_btn_, "toggled", G_CALLBACK(+[](GtkToggleButton *button, gpointer data) {
+                     static_cast<FileView *>(data)->SetShowAllFiles(gtk_toggle_button_get_active(button));
+                   }),
+                   this);
   model_.SetRootPaths({home_});
   history_.Push(path_);
   Reload();
@@ -126,6 +150,26 @@ void FileView::Reload() {
   }
   tree_->Reload(&model_);
   list_->Reload(model_.FilesIn(path_));
+}
+
+void FileView::SetShowHidden(bool show_hidden) {
+  model_.SetShowHidden(show_hidden);
+  PersistSettings();
+  Reload();
+}
+
+void FileView::SetShowAllFiles(bool show_all) {
+  model_.SetShowAllFiles(show_all);
+  PersistSettings();
+  Reload();
+}
+
+void FileView::PersistSettings() {
+  Settings settings;
+  settings.BeginGroup(FileViewSettings::kSettingsGroup);
+  settings.SetBoolValue(FileViewSettings::kShowHidden, model_.show_hidden());
+  settings.SetBoolValue(FileViewSettings::kShowAllFiles, model_.show_all_files());
+  settings.Sync();
 }
 
 void FileView::SetAddToPlaylistCallback(PathsCallback callback) { add_to_playlist_ = std::move(callback); }

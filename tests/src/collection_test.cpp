@@ -8,6 +8,7 @@
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectionitem.h"
 #include "collection/collectionitemdelegate.h"
+#include "collection/collectionkeyboard.h"
 #include "collection/collectionmodel.h"
 #include "collection/collectionplaylistitem.h"
 #include "collection/collectiontree.h"
@@ -501,4 +502,16 @@ TEST(BackendOptions, PlaybinCrossfadeAndPauseFade) {
   EXPECT_STREQ("1", BackendOptions::SoupForceHttp1(false));
   EXPECT_EQ(500, BackendOptions::WarmupMs(true, 500));
   EXPECT_EQ(0, BackendOptions::WarmupMs(false, 500));
+}
+
+TEST(CollectionKeyboard, FromKeyAndMoveAction) {
+  EXPECT_EQ(CollectionKeyboard::Action::Activate, CollectionKeyboard::FromKey(ListBoxKeyboard::kReturn));
+  EXPECT_EQ(CollectionKeyboard::Action::MoveUp, CollectionKeyboard::FromKey(ListBoxKeyboard::kUp));
+  EXPECT_EQ(CollectionKeyboard::Action::MoveDown, CollectionKeyboard::FromKey(ListBoxKeyboard::kDown));
+  EXPECT_EQ(CollectionKeyboard::Action::Expand, CollectionKeyboard::FromKey(ListBoxKeyboard::kRight));
+  EXPECT_EQ(CollectionKeyboard::Action::Collapse, CollectionKeyboard::FromKey(ListBoxKeyboard::kLeft));
+  EXPECT_EQ(CollectionKeyboard::Action::Home, CollectionKeyboard::FromKey(ListBoxKeyboard::kHome));
+  EXPECT_EQ(CollectionKeyboard::Action::End, CollectionKeyboard::FromKey(ListBoxKeyboard::kEnd));
+  EXPECT_EQ(ListBoxKeyboard::Action::MoveDown, CollectionKeyboard::MoveAction(CollectionKeyboard::Action::MoveDown));
+  EXPECT_EQ(ListBoxKeyboard::Action::None, CollectionKeyboard::MoveAction(CollectionKeyboard::Action::Expand));
 }

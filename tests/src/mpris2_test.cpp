@@ -21,6 +21,35 @@ TEST(Mpris2Helpers, PositionUsec) {
   EXPECT_EQ(1500000, Mpris2Helpers::PositionUsec(1500000000LL));
 }
 
+TEST(Mpris2Helpers, DiffTrackIdsIncrementalAndReorder) {
+  EXPECT_EQ(Mpris2Helpers::TrackListDiff::Kind::None, Mpris2Helpers::DiffTrackIds({"a"}, {"a"}).kind);
+  const auto added = Mpris2Helpers::DiffTrackIds({"a"}, {"a", "b"});
+  EXPECT_EQ(Mpris2Helpers::TrackListDiff::Kind::Incremental, added.kind);
+  ASSERT_EQ(1u, added.added.size());
+  EXPECT_EQ("b", added.added[0]);
+  EXPECT_EQ("a", added.after_track[0]);
+  const auto front = Mpris2Helpers::DiffTrackIds({"a"}, {"b", "a"});
+  EXPECT_EQ(Mpris2Helpers::TrackListDiff::Kind::Incremental, front.kind);
+  EXPECT_EQ("b", front.added[0]);
+  EXPECT_EQ(Mpris2Helpers::kNoTrack, front.after_track[0]);
+  const auto removed = Mpris2Helpers::DiffTrackIds({"a", "b"}, {"a"});
+  EXPECT_EQ(Mpris2Helpers::TrackListDiff::Kind::Incremental, removed.kind);
+  ASSERT_EQ(1u, removed.removed.size());
+  EXPECT_EQ("b", removed.removed[0]);
+  const auto reordered = Mpris2Helpers::DiffTrackIds({"a", "b"}, {"b", "a"});
+  EXPECT_EQ(Mpris2Helpers::TrackListDiff::Kind::Replaced, reordered.kind);
+}
+
+TEST(Mpris2Helpers, MetadataNeedsUpdate) {
+  Song a;
+  a.set_title("Roads");
+  a.set_artist("Portishead");
+  Song b = a;
+  EXPECT_FALSE(Mpris2Helpers::MetadataNeedsUpdate(a, b));
+  b.set_title("Glory Box");
+  EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(a, b));
+}
+
 TEST(Mpris2Helpers, LoopStatusRoundTrip) {
   EXPECT_EQ("None", Mpris2Helpers::LoopStatus(PlaylistSequence::RepeatMode::Off));
   EXPECT_EQ("Track", Mpris2Helpers::LoopStatus(PlaylistSequence::RepeatMode::Track));

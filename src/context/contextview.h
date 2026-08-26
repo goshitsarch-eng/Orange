@@ -3,6 +3,7 @@
 
 #include "context/contextalbum.h"
 #include "core/song.h"
+#include "lyrics/lrcparser.h"
 
 #include <gtk/gtk.h>
 
@@ -33,6 +34,7 @@ class ContextView {
   void SongChanged(const Song &song);
   void AlbumCoverLoaded(const std::vector<unsigned char> &data);
   void SetLyrics(const std::string &lyrics, const std::string &provider = {});
+  void SetPlaybackPosition(int64_t position_nanosec);
   void SearchLyrics(bool force = false);
   void SetSaveLyricsCallback(SaveLyricsCallback callback);
   void SetCoverDropCallback(CoverDropCallback callback);
@@ -47,6 +49,7 @@ class ContextView {
   void PersistVisibility();
   void RebuildTechnicalData();
   void UpdateTotalsLabel();
+  void HighlightLrcLine(int index);
 
   LyricsProviders *lyrics_providers_ = nullptr;
   LyricsFetcher *lyrics_fetcher_ = nullptr;
@@ -79,6 +82,9 @@ class ContextView {
   std::string summary_fmt_;
   SaveLyricsCallback save_lyrics_;
   CoverDropCallback cover_drop_;
+  std::vector<LrcParser::Line> lrc_lines_;
+  int lrc_active_ = -1;
+  GtkTextTag *lrc_tag_ = nullptr;
 };
 
 #endif
