@@ -15,6 +15,14 @@ inline SaveTagsOptions operator|(SaveTagsOption a, SaveTagsOption b) {
   return static_cast<int>(a) | static_cast<int>(b);
 }
 
+inline SaveTagsOptions operator|(SaveTagsOptions a, SaveTagsOption b) {
+  return a | static_cast<int>(b);
+}
+
+inline SaveTagsOptions operator|(SaveTagsOption a, SaveTagsOptions b) {
+  return static_cast<int>(a) | b;
+}
+
 inline bool HasSaveOption(SaveTagsOptions options, SaveTagsOption option) {
   return (options & static_cast<int>(option)) != 0;
 }
