@@ -16,7 +16,7 @@ class AlbumCoverChoiceController {
  public:
   explicit AlbumCoverChoiceController(Application *app);
 
-  void FetchCover(Song *song, GtkWidget *image = nullptr, GtkWidget *status = nullptr);
+  void FetchCover(Song *song, GtkWidget *image = nullptr, GtkWidget *status = nullptr, std::function<void(bool)> done = {});
   void SearchForCover(GtkWindow *parent);
   void UnsetCover(Song *song, GtkWidget *image = nullptr);
   void ClearCover(Song *song, GtkWidget *image = nullptr);

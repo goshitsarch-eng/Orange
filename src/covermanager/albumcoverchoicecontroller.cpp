@@ -50,16 +50,22 @@ void AlbumCoverChoiceController::ApplyImage(Song *song, GtkWidget *image, const 
   (void)song;
 }
 
-void AlbumCoverChoiceController::FetchCover(Song *song, GtkWidget *image, GtkWidget *status) {
+void AlbumCoverChoiceController::FetchCover(Song *song, GtkWidget *image, GtkWidget *status, std::function<void(bool)> done) {
   if (!app_ || !song) {
+    if (done) {
+      done(false);
+    }
     return;
   }
   ++statistics_.network_requests_made;
   auto owned = std::make_shared<Song>(*song);
-  app_->cover_providers()->Fetch(*owned, [this, owned, song, image, status](const std::string &data, const std::string &) {
+  app_->cover_providers()->Fetch(*owned, [this, owned, song, image, status, done](const std::string &data, const std::string &) {
     if (data.empty()) {
       ++statistics_.missing_images;
       if (status) gtk_button_set_label(GTK_BUTTON(status), "Failed");
+      if (done) {
+        done(false);
+      }
       return;
     }
     statistics_.bytes_transferred += data.size();
@@ -70,8 +76,16 @@ void AlbumCoverChoiceController::FetchCover(Song *song, GtkWidget *image, GtkWid
       }
       ApplyImage(owned.get(), image, data);
       if (status) gtk_button_set_label(GTK_BUTTON(status), "Saved");
-    } else if (status) {
-      gtk_button_set_label(GTK_BUTTON(status), "Failed");
+      if (done) {
+        done(true);
+      }
+    } else {
+      if (status) {
+        gtk_button_set_label(GTK_BUTTON(status), "Failed");
+      }
+      if (done) {
+        done(false);
+      }
     }
   });
 }

@@ -28,7 +28,14 @@ void StreamingService::GetSongs(SearchCallback callback) {
   }
 }
 
-void StreamingService::Logout() { logged_in_ = false; }
+void StreamingService::Logout() {
+  logged_in_ = false;
+  NotifyAuthenticationChanged();
+}
+
+void StreamingService::NotifyAuthenticationChanged() { AuthenticationChanged.Emit(); }
+
+void StreamingService::NotifyAuthenticationFailed(const std::string &error) { AuthenticationFailed.Emit(error); }
 
 void StreamingService::GetFavorites(FavoriteType, SearchCallback callback) {
   if (callback) {

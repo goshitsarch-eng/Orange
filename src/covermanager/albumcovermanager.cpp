@@ -1,6 +1,7 @@
 #include "covermanager/albumcovermanager.h"
 
 #include "core/application.h"
+#include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "covermanager/albumcoverexportdialog.h"
 #include "covermanager/albumcovermanagerlist.h"
@@ -22,15 +23,81 @@ struct CoverManagerState {
   GtkWindow *parent = nullptr;
   AlbumCoverChoiceController *covers = nullptr;
   AlbumCoverManagerList catalog;
+  AlbumCoverBatch batch;
   GtkWidget *artist_list = nullptr;
   GtkWidget *flow = nullptr;
   GtkWidget *filter = nullptr;
   GtkWidget *hide = nullptr;
   GtkWidget *status = nullptr;
+  GtkWidget *progress = nullptr;
+  GtkWidget *abort = nullptr;
+  GtkWidget *fetch_missing = nullptr;
+  std::shared_ptr<bool> alive = std::make_shared<bool>(true);
   std::string artist_filter;
 };
 
 void RebuildAlbums(CoverManagerState *state);
+void UpdateBatchUi(CoverManagerState *state);
+void FinishBatch(CoverManagerState *state);
+void PumpBatch(CoverManagerState *state);
+
+void UpdateBatchUi(CoverManagerState *state) {
+  if (!state) {
+    return;
+  }
+  if (state->status) {
+    gtk_label_set_text(GTK_LABEL(state->status), state->batch.StatusText().c_str());
+  }
+  if (state->progress) {
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(state->progress), state->batch.Progress());
+    gtk_widget_set_visible(state->progress, state->batch.started() && !state->batch.finished());
+  }
+  if (state->abort) {
+    gtk_widget_set_visible(state->abort, state->batch.running());
+  }
+  if (state->fetch_missing) {
+    gtk_widget_set_sensitive(state->fetch_missing, !state->batch.running());
+  }
+}
+
+void FinishBatch(CoverManagerState *state) {
+  if (!state) {
+    return;
+  }
+  UpdateBatchUi(state);
+  RebuildAlbums(state);
+}
+
+void PumpBatch(CoverManagerState *state) {
+  if (!state || !state->alive || !*state->alive) {
+    return;
+  }
+  if (state->batch.cancelled() || !state->batch.Current()) {
+    FinishBatch(state);
+    return;
+  }
+  const AlbumCoverBatch::Job *job = state->batch.Current();
+  const std::string artist = job->artist;
+  const std::string album = job->album;
+  Song song = job->song;
+  UpdateBatchUi(state);
+  state->covers->FetchCover(&song, nullptr, nullptr, [state, artist, album](bool ok) {
+    if (!state->alive || !*state->alive) {
+      return;
+    }
+    if (state->batch.cancelled()) {
+      FinishBatch(state);
+      return;
+    }
+    if (ok) {
+      state->catalog.SetCoverFlag(artist, album, true);
+      state->batch.MarkSuccess();
+    } else {
+      state->batch.MarkFailure();
+    }
+    PumpBatch(state);
+  });
+}
 
 void AddAlbumToPlaylist(CoverManagerState *state, const AlbumCoverManagerList::Album &album, bool replace) {
   if (!state || !state->app) {
@@ -91,8 +158,18 @@ void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album,
                        }
                        const char *name = g_action_get_name(G_ACTION(act));
                        if (g_strcmp0(name, "fetch") == 0) {
-                         self->covers->FetchCover(&entry->song, image_widget, nullptr);
-                         self->catalog.SetCoverFlag(entry->artist, entry->album, true);
+                         const std::string artist = entry->artist;
+                         const std::string album = entry->album;
+                         self->covers->FetchCover(&entry->song, image_widget, nullptr, [self, artist, album](bool ok) {
+                           if (!self->alive || !*self->alive) {
+                             return;
+                           }
+                           if (ok) {
+                             self->catalog.SetCoverFlag(artist, album, true);
+                           }
+                           RebuildAlbums(self);
+                         });
+                         return;
                        } else if (g_strcmp0(name, "file") == 0) {
                          self->covers->LoadCoverFromFile(self->parent, &entry->song, image_widget);
                        } else if (g_strcmp0(name, "url") == 0) {
@@ -263,6 +340,10 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   }
   g_object_set_data_full(G_OBJECT(dialog), "state", state, [](gpointer p) {
     auto *self = static_cast<CoverManagerState *>(p);
+    self->batch.Cancel();
+    if (self->alive) {
+      *self->alive = false;
+    }
     delete self->covers;
     delete self;
   });
@@ -306,16 +387,23 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   state->status = gtk_label_new("");
   gtk_label_set_xalign(GTK_LABEL(state->status), 0.0f);
   gtk_box_append(GTK_BOX(box), state->status);
+  state->progress = gtk_progress_bar_new();
+  gtk_widget_set_visible(state->progress, FALSE);
+  gtk_box_append(GTK_BOX(box), state->progress);
 
   GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   GtkWidget *fetch_missing = gtk_button_new_with_label(Translations::CStr("Fetch all missing"));
   gtk_widget_add_css_class(fetch_missing, "suggested-action");
+  state->fetch_missing = fetch_missing;
+  state->abort = gtk_button_new_with_label(Translations::CStr("Abort"));
+  gtk_widget_set_visible(state->abort, FALSE);
   GtkWidget *add_playlist = gtk_button_new_with_label(Translations::CStr("Add to playlist"));
   GtkWidget *load_playlist = gtk_button_new_with_label(Translations::CStr("Load to playlist"));
   GtkWidget *from_url = gtk_button_new_with_label(Translations::CStr("Load cover from URL…"));
   GtkWidget *export_btn = gtk_button_new_with_label(Translations::CStr("Export covers…"));
   GtkWidget *stats = gtk_button_new_with_label(Translations::CStr("Statistics"));
   gtk_box_append(GTK_BOX(actions), fetch_missing);
+  gtk_box_append(GTK_BOX(actions), state->abort);
   gtk_box_append(GTK_BOX(actions), add_playlist);
   gtk_box_append(GTK_BOX(actions), load_playlist);
   gtk_box_append(GTK_BOX(actions), from_url);
@@ -339,16 +427,29 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
 
   g_signal_connect(fetch_missing, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<CoverManagerState *>(data);
+                     if (self->batch.running()) {
+                       return;
+                     }
+                     self->batch.Reset();
                      const char *filter_text = self->filter ? gtk_editable_get_text(GTK_EDITABLE(self->filter)) : "";
                      for (const auto &album : self->catalog.Filtered(self->artist_filter, HideMode(self->hide), filter_text ? filter_text : "")) {
                        if (album.has_cover) {
                          continue;
                        }
-                       Song song = album.song;
-                       self->covers->FetchCover(&song, nullptr, nullptr);
-                       self->catalog.SetCoverFlag(album.artist, album.album, true);
+                       AlbumCoverBatch::Job job;
+                       job.artist = album.artist;
+                       job.album = album.album;
+                       job.song = album.song;
+                       self->batch.Enqueue(std::move(job));
                      }
-                     RebuildAlbums(self);
+                     self->batch.Start();
+                     PumpBatch(self);
+                   }),
+                   state);
+  g_signal_connect(state->abort, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<CoverManagerState *>(data);
+                     self->batch.Cancel();
+                     FinishBatch(self);
                    }),
                    state);
   g_signal_connect(add_playlist, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {

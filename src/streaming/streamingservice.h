@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_STREAMINGSERVICE_H
 #define STRAWBERRY_STREAMINGSERVICE_H
 
+#include "core/signal.h"
 #include "core/song.h"
 #include "core/urlhandler.h"
 
@@ -23,6 +24,12 @@ class StreamingService : public UrlHandler {
   virtual void Logout();
   virtual void ReloadSettings() {}
   virtual bool logged_in() const { return logged_in_; }
+  virtual bool authenticated() const { return logged_in_; }
+  void NotifyAuthenticationChanged();
+  void NotifyAuthenticationFailed(const std::string &error);
+
+  Signal<> AuthenticationChanged;
+  Signal<std::string> AuthenticationFailed;
   virtual void GetFavorites(FavoriteType type, SearchCallback callback);
   virtual void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
   virtual void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});

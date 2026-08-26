@@ -2,6 +2,7 @@
 
 #include "constants/qobuzsettings.h"
 #include "core/settings.h"
+#include "streaming/streamingauth.h"
 #include "qobuz/qobuzfavoriterequest.h"
 #include "qobuz/qobuzrequest.h"
 #include "qobuz/qobuzstreamurlrequest.h"
@@ -40,6 +41,13 @@ void QobuzService::Login(const std::string &username, const std::string &passwor
   settings.SetValue("user_auth_token", password_or_token);
   settings.Sync();
   ReloadSettings();
+  NotifyAuthenticationChanged();
+}
+
+void QobuzService::Logout() {
+  StreamingAuth::ClearKeys(QobuzSettings::kSettingsGroup, {"token", QobuzSettings::kUserAuthToken});
+  user_auth_token_.clear();
+  StreamingService::Logout();
 }
 
 std::map<std::string, std::string> QobuzService::AuthHeaders() const {

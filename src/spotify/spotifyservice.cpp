@@ -2,6 +2,7 @@
 
 #include "constants/spotifysettings.h"
 #include "core/settings.h"
+#include "streaming/streamingauth.h"
 #include "spotify/spotifyfavoriterequest.h"
 #include "spotify/spotifymetadatarequest.h"
 #include "spotify/spotifyrequest.h"
@@ -46,6 +47,18 @@ void SpotifyService::StoreTokens(const OAuthenticator::TokenResponse &tokens) {
   }
   settings.Sync();
   ReloadSettings();
+  NotifyAuthenticationChanged();
+}
+
+void SpotifyService::Logout() {
+  StreamingAuth::ClearKeys(SpotifySettings::kSettingsGroup,
+                           {"token", SpotifySettings::kAccessToken, SpotifySettings::kRefreshToken, SpotifySettings::kExpiresIn,
+                            SpotifySettings::kLoginTime});
+  token_.clear();
+  refresh_token_.clear();
+  expires_in_ = 0;
+  login_time_ = 0;
+  StreamingService::Logout();
 }
 
 void SpotifyService::Login(const std::string &username, const std::string &password_or_token) {
@@ -58,10 +71,11 @@ void SpotifyService::Login(const std::string &username, const std::string &passw
   settings.SetValue(SpotifySettings::kAccessToken, password_or_token);
   settings.Sync();
   ReloadSettings();
+  NotifyAuthenticationChanged();
 }
 
 void SpotifyService::EnsureFreshToken(std::function<void()> next) {
-  if (refresh_token_.empty() || !OAuthenticator::AccessTokenExpired(login_time_, expires_in_)) {
+  if (StreamingAuth::EnsureAction(login_time_, expires_in_, refresh_token_) == StreamingAuth::Action::Proceed) {
     if (next) {
       next();
     }
@@ -70,10 +84,13 @@ void SpotifyService::EnsureFreshToken(std::function<void()> next) {
   auto *oauth = new OAuthenticator(network_);
   oauth->RefreshAccessToken("https://accounts.spotify.com/api/token", client_id_, client_secret_, refresh_token_,
                             [this, oauth, next](const std::string &body, const std::string &error) {
-                              if (error.empty()) {
-                                StoreTokens(OAuthenticator::ParseTokenResponse(body));
-                              }
                               delete oauth;
+                              if (!error.empty()) {
+                                Logout();
+                                NotifyAuthenticationFailed(error);
+                                return;
+                              }
+                              StoreTokens(OAuthenticator::ParseTokenResponse(body));
                               if (next) {
                                 next();
                               }

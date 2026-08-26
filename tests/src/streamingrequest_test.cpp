@@ -1,3 +1,4 @@
+#include "streaming/streamingauth.h"
 #include "qobuz/qobuzrequest.h"
 #include "spotify/spotifyrequest.h"
 #include "subsonic/subsonicrequest.h"
@@ -132,4 +133,14 @@ TEST(SubsonicRequest, ResourcesParamsAndParse) {
   EXPECT_EQ("Helplessness Blues", album_list.front().album());
   EXPECT_EQ("8", album_list.front().album_id());
   EXPECT_EQ(2011, album_list.front().year());
+}
+
+TEST(StreamingAuth, EnsureActionMatchesExpiryAndRefresh) {
+  EXPECT_EQ(StreamingAuth::Action::Proceed, StreamingAuth::EnsureAction(false, true));
+  EXPECT_EQ(StreamingAuth::Action::Proceed, StreamingAuth::EnsureAction(false, false));
+  EXPECT_EQ(StreamingAuth::Action::Proceed, StreamingAuth::EnsureAction(true, false));
+  EXPECT_EQ(StreamingAuth::Action::Refresh, StreamingAuth::EnsureAction(true, true));
+  EXPECT_EQ(StreamingAuth::Action::Proceed, StreamingAuth::EnsureAction(1000, 3600, "refresh", 1000));
+  EXPECT_EQ(StreamingAuth::Action::Refresh, StreamingAuth::EnsureAction(1000, 3600, "refresh", 5000));
+  EXPECT_EQ(StreamingAuth::Action::Proceed, StreamingAuth::EnsureAction(1000, 3600, {}, 5000));
 }

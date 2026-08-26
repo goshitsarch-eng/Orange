@@ -1,3 +1,4 @@
+#include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverexport.h"
 #include "covermanager/albumcoverexporter.h"
 #include "covermanager/albumcoverfetcher.h"
@@ -189,4 +190,44 @@ TEST(AlbumCoverFetcher, IncrementsRequestIds) {
   EXPECT_EQ(1u, fetcher.SearchForCovers("A", "B"));
   EXPECT_EQ(2u, fetcher.FetchAlbumCover("A", "B", "C", true));
   EXPECT_EQ(3u, fetcher.next_id());
+}
+
+TEST(AlbumCoverBatch, ProgressAbortAndStatus) {
+  AlbumCoverBatch batch;
+  EXPECT_TRUE(batch.finished() || !batch.started());
+  EXPECT_EQ("No albums to fetch.", batch.StatusText());
+  EXPECT_DOUBLE_EQ(1.0, batch.Progress());
+
+  AlbumCoverBatch::Job first;
+  first.artist = "Portishead";
+  first.album = "Dummy";
+  first.song.set_title("Roads");
+  AlbumCoverBatch::Job second;
+  second.artist = "Fleet Foxes";
+  second.album = "Helplessness Blues";
+  batch.Enqueue(first);
+  batch.Enqueue(second);
+  EXPECT_EQ(2u, batch.total());
+  EXPECT_FALSE(batch.started());
+  batch.Start();
+  EXPECT_TRUE(batch.running());
+  ASSERT_TRUE(batch.Current());
+  EXPECT_EQ("Portishead", batch.Current()->artist);
+  batch.MarkSuccess();
+  EXPECT_EQ(1u, batch.succeeded());
+  EXPECT_EQ(1u, batch.remaining());
+  EXPECT_DOUBLE_EQ(0.5, batch.Progress());
+  EXPECT_NE(std::string::npos, batch.StatusText().find("1/2"));
+  batch.MarkFailure();
+  EXPECT_TRUE(batch.finished());
+  EXPECT_EQ(1u, batch.failed());
+  EXPECT_NE(std::string::npos, batch.StatusText().find("finished"));
+
+  batch.Reset();
+  batch.Enqueue(first);
+  batch.Start();
+  batch.Cancel();
+  EXPECT_TRUE(batch.cancelled());
+  EXPECT_TRUE(batch.finished());
+  EXPECT_NE(std::string::npos, batch.StatusText().find("cancelled"));
 }

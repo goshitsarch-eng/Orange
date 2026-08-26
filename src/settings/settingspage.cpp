@@ -5,6 +5,7 @@
 #include "ui/dialogs.h"
 #include "widgets/loginstatewidget.h"
 
+#include <memory>
 #include <string>
 
 namespace SettingsPage {
@@ -155,6 +156,7 @@ void AddLoginState(AdwPreferencesGroup *group, Application *app, const char *ser
   }
   StreamingService *service = app->streaming_services()->ServiceByName(service_name);
   auto *login = new LoginStateWidget();
+  auto alive = std::make_shared<bool>(true);
   login->SetLoggedIn(service && service->logged_in() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut,
                      service_name);
   login->SetLoginCallback([app, service_name]() {
@@ -169,10 +171,28 @@ void AddLoginState(AdwPreferencesGroup *group, Application *app, const char *ser
       service->Logout();
     }
   });
+  if (service) {
+    service->AuthenticationChanged.Connect([login, service, service_name, alive]() {
+      if (!*alive || !login || !service) {
+        return;
+      }
+      login->SetLoggedIn(service->logged_in() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut, service_name);
+    });
+    service->AuthenticationFailed.Connect([login, service_name, alive](const std::string &) {
+      if (!*alive || !login) {
+        return;
+      }
+      login->SetLoggedIn(LoginStateWidget::State::LoggedOut, service_name);
+    });
+  }
   adw_preferences_group_add(group, login->widget());
-  g_signal_connect(login->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) {
-                     auto *widget = static_cast<LoginStateWidget *>(data);
-                     delete widget;
+  g_object_set_data_full(G_OBJECT(login->widget()), "login-alive", new std::shared_ptr<bool>(alive),
+                         [](gpointer p) { delete static_cast<std::shared_ptr<bool> *>(p); });
+  g_signal_connect(login->widget(), "destroy", G_CALLBACK(+[](GtkWidget *widget, gpointer data) {
+                     if (auto *flag = static_cast<std::shared_ptr<bool> *>(g_object_get_data(G_OBJECT(widget), "login-alive"))) {
+                       **flag = false;
+                     }
+                     delete static_cast<LoginStateWidget *>(data);
                    }),
                    login);
 }

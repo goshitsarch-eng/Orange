@@ -2,6 +2,7 @@
 
 #include "constants/tidalsettings.h"
 #include "core/settings.h"
+#include "streaming/streamingauth.h"
 #include "tidal/tidalfavoriterequest.h"
 #include "tidal/tidalrequest.h"
 #include "tidal/tidalstreamurlrequest.h"
@@ -53,6 +54,18 @@ void TidalService::StoreTokens(const OAuthenticator::TokenResponse &tokens) {
   }
   settings.Sync();
   ReloadSettings();
+  NotifyAuthenticationChanged();
+}
+
+void TidalService::Logout() {
+  StreamingAuth::ClearKeys(TidalSettings::kSettingsGroup,
+                           {"token", TidalSettings::kAccessToken, TidalSettings::kRefreshToken, TidalSettings::kExpiresIn,
+                            TidalSettings::kLoginTime});
+  token_.clear();
+  refresh_token_.clear();
+  expires_in_ = 0;
+  login_time_ = 0;
+  StreamingService::Logout();
 }
 
 void TidalService::Login(const std::string &username, const std::string &password_or_token) {
@@ -65,10 +78,11 @@ void TidalService::Login(const std::string &username, const std::string &passwor
   settings.SetValue(TidalSettings::kAccessToken, password_or_token);
   settings.Sync();
   ReloadSettings();
+  NotifyAuthenticationChanged();
 }
 
 void TidalService::EnsureFreshToken(std::function<void()> next) {
-  if (refresh_token_.empty() || !OAuthenticator::AccessTokenExpired(login_time_, expires_in_)) {
+  if (StreamingAuth::EnsureAction(login_time_, expires_in_, refresh_token_) == StreamingAuth::Action::Proceed) {
     if (next) {
       next();
     }
@@ -77,10 +91,13 @@ void TidalService::EnsureFreshToken(std::function<void()> next) {
   auto *oauth = new OAuthenticator(network_);
   oauth->RefreshAccessToken("https://auth.tidal.com/v1/oauth2/token", client_id_, client_secret_, refresh_token_,
                             [this, oauth, next](const std::string &body, const std::string &error) {
-                              if (error.empty()) {
-                                StoreTokens(OAuthenticator::ParseTokenResponse(body));
-                              }
                               delete oauth;
+                              if (!error.empty()) {
+                                Logout();
+                                NotifyAuthenticationFailed(error);
+                                return;
+                              }
+                              StoreTokens(OAuthenticator::ParseTokenResponse(body));
                               if (next) {
                                 next();
                               }
