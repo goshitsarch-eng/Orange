@@ -512,16 +512,16 @@ int Playlist::NextIndex() const {
       return row;
     }
   }
-  if (!wrap) {
-    return -1;
-  }
-  for (int i = 0; i < n; ++i) {
-    const int row = accept(i);
-    if (row >= 0 && row != current_row_) {
-      return row;
+  if (wrap || album_only) {
+    for (int i = 0; i < n; ++i) {
+      const int row = accept(i);
+      if (row >= 0 && row != current_row_) {
+        return row;
+      }
     }
+    return current_row_;
   }
-  return current_row_;
+  return -1;
 }
 
 int Playlist::PreviousIndex() const {
