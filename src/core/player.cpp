@@ -15,6 +15,7 @@ void Player::Init() {
   engine_->Init();
   engine_->StateChanged.Connect([this](GstEngine::State state) { HandleEngineState(state); });
   engine_->TrackEnded.Connect([this]() { HandleTrackEnded(); });
+  engine_->TrackAboutToEnd.Connect([this]() { PreloadNext(); });
   engine_->Error.Connect([](const std::string &error) { LogError("%s", error.c_str()); });
   engine_->MetadataReceived.Connect([this](const Song &song) {
     if (current_song_.title().empty() && song.is_valid()) {
@@ -37,6 +38,7 @@ void Player::ReloadSettings() {
   settings.EndGroup();
   settings.BeginGroup("Backend");
   engine_->SetFadingEnabled(settings.BoolValue("fading", false));
+  engine_->SetAutoCrossfadeEnabled(settings.BoolValue("autocrossfade", settings.BoolValue("fading", false)));
   engine_->SetFadeDurationMs(settings.IntValue("fadeduration", 2000));
 }
 
@@ -166,17 +168,17 @@ void Player::PlayCurrent(bool pause) {
   PlayLoadedSong(pause);
 }
 
-void Player::PlayLoadedSong(bool pause) {
+void Player::PlayLoadedSong(bool pause, int track_change_flags) {
   if (!current_song_.is_valid() && current_song_.url().empty()) {
     Stop();
     return;
   }
   if (url_handlers_) {
     if (UrlHandler *handler = url_handlers_->HandlerForUrl(current_song_.url())) {
-      const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause](const UrlHandler::LoadResult &async) {
+      const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause, track_change_flags](const UrlHandler::LoadResult &async) {
         if (!async.stream_url.empty()) {
           current_song_.set_stream_url(async.stream_url);
-          engine_->Load(current_song_.url(), async.stream_url, GstEngine::Manual, false, current_song_.beginning_nanosec(),
+          engine_->Load(current_song_.url(), async.stream_url, track_change_flags, false, current_song_.beginning_nanosec(),
                         current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                         current_song_.ebur128_integrated_loudness_lufs());
           engine_->Play(pause, 0);
@@ -187,11 +189,35 @@ void Player::PlayLoadedSong(bool pause) {
       }
     }
   }
-  engine_->Load(current_song_.url(), current_song_.stream_url(), GstEngine::Manual, false, current_song_.beginning_nanosec(),
+  engine_->Load(current_song_.url(), current_song_.stream_url(), track_change_flags, false, current_song_.beginning_nanosec(),
                 current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                 current_song_.ebur128_integrated_loudness_lufs());
   engine_->Play(pause, 0);
   SongChanged.Emit(current_song_);
+}
+
+void Player::PreloadNext() {
+  if (stop_after_current_) {
+    return;
+  }
+  Song next_song;
+  if (queue_ && !queue_->empty()) {
+    next_song = queue_->songs().front();
+  } else if (playlist_manager_) {
+    playlist_manager_->RefillDynamic();
+    next_song = playlist_manager_->PeekNextSong();
+  }
+  if (!next_song.is_valid() && next_song.url().empty()) {
+    return;
+  }
+  if (queue_ && !queue_->empty()) {
+    current_song_ = queue_->TakeNext();
+  } else if (playlist_manager_) {
+    playlist_manager_->Next();
+    current_song_ = playlist_manager_->current_song();
+  }
+  preloaded_ = true;
+  PlayLoadedSong(false, GstEngine::Auto);
 }
 
 void Player::HandleEngineState(GstEngine::State state) {
@@ -212,6 +238,10 @@ void Player::HandleEngineState(GstEngine::State state) {
 }
 
 void Player::HandleTrackEnded() {
+  if (preloaded_) {
+    preloaded_ = false;
+    return;
+  }
   if (stop_after_current_) {
     stop_after_current_ = false;
     Stop();

@@ -155,6 +155,7 @@ set(STRAWBERRY_SOURCES
   src/utilities/jsonutils.cpp
   src/utilities/audioanalysis.cpp
   src/engine/gstengine.cpp
+  src/engine/gstenginepipeline.cpp
   src/engine/devicefinders.cpp
   src/core/player.cpp
   src/tagreader/tagreader.cpp

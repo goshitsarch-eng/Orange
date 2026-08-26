@@ -28,6 +28,8 @@ class Playlist {
   void set_current_row(int row);
   Song current_song() const;
   Song song(int row) const;
+  int PeekNextRow() const { return NextIndex(); }
+  Song PeekNextSong() const;
 
   void InsertSongs(int row, const SongList &songs);
   void AppendSongs(const SongList &songs);

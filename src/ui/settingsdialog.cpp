@@ -108,7 +108,8 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AddEntry(group, settings, "rgmode", "ReplayGain mode (album/track)", "album");
     AddEntry(group, settings, "rgpreamp", "ReplayGain preamp (dB)", "0");
     AddEntry(group, settings, "stereobalance", "Stereo balance (-100..100)", "0");
-    AddToggle(group, settings, "fading", "Cross-fade between tracks", nullptr, false);
+    AddToggle(group, settings, "fading", "Cross-fade on manual track change", nullptr, false);
+    AddToggle(group, settings, "autocrossfade", "Auto cross-fade / gapless between tracks", nullptr, false);
     AddEntry(group, settings, "fadeduration", "Cross-fade duration (ms)", "2000");
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);

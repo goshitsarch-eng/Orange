@@ -59,8 +59,9 @@ class Player {
  private:
   void HandleEngineState(GstEngine::State state);
   void HandleTrackEnded();
+  void PreloadNext();
   void PlayCurrent(bool pause);
-  void PlayLoadedSong(bool pause);
+  void PlayLoadedSong(bool pause, int track_change_flags = GstEngine::Manual);
 
   TaskManager *task_manager_;
   UrlHandlers *url_handlers_;
@@ -71,6 +72,7 @@ class Player {
   unsigned volume_ = 100;
   unsigned volume_before_mute_ = 100;
   bool stop_after_current_ = false;
+  bool preloaded_ = false;
   int seek_step_sec_ = 10;
   unsigned volume_increment_ = 5;
 };

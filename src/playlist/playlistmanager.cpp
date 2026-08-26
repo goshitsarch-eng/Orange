@@ -77,6 +77,8 @@ int PlaylistManager::current_row() const { return active_ ? active_->current_row
 
 Song PlaylistManager::current_song() const { return active_ ? active_->current_song() : Song(); }
 
+Song PlaylistManager::PeekNextSong() const { return active_ ? active_->PeekNextSong() : Song(); }
+
 void PlaylistManager::Next() {
   if (active_) {
     active_->Next();

@@ -31,6 +31,7 @@ class PlaylistManager {
   void SetCurrentRow(int row);
   int current_row() const;
   Song current_song() const;
+  Song PeekNextSong() const;
   void Next();
   void Previous();
   void AppendSongs(const SongList &songs);

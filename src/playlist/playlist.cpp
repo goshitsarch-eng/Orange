@@ -25,6 +25,8 @@ Song Playlist::song(int row) const {
   return songs_[static_cast<size_t>(row)];
 }
 
+Song Playlist::PeekNextSong() const { return song(NextIndex()); }
+
 void Playlist::PushUndo() {
   undo_.push_back({songs_, current_row_});
   redo_.clear();

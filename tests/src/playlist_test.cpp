@@ -48,6 +48,27 @@ TEST(Playlist, DynamicRefill) {
   EXPECT_EQ("Extra", playlist.songs().back().title());
 }
 
+TEST(Playlist, PeekNextDoesNotAdvance) {
+  Playlist playlist;
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  playlist.AppendSongs({a, b});
+  playlist.set_current_row(0);
+  EXPECT_EQ(1, playlist.PeekNextRow());
+  EXPECT_EQ("B", playlist.PeekNextSong().title());
+  EXPECT_EQ(0, playlist.current_row());
+  playlist.SetSequenceMode(Playlist::SequenceMode::RepeatAll);
+  playlist.set_current_row(1);
+  EXPECT_EQ(0, playlist.PeekNextRow());
+  EXPECT_EQ("A", playlist.PeekNextSong().title());
+}
+
 TEST(Playlist, UndoRedo) {
   Playlist playlist;
   Song a;

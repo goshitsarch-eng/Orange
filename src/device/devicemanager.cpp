@@ -17,6 +17,10 @@
 #endif
 
 #include <algorithm>
+#include <functional>
+#include <taglib/fileref.h>
+#include <taglib/tag.h>
+#include <taglib/audioproperties.h>
 
 DeviceManager::DeviceManager() : url_handler_(std::make_unique<DeviceUrlHandler>(this)) {}
 
@@ -44,12 +48,30 @@ SongList DeviceManager::SongsFromDirectory(const std::string &path) {
     }
     Song song(Song::Source::Device);
     song.set_url(FileUtils::UriFromPath(entry));
-    song.set_title(FileUtils::BaseName(entry));
     song.set_basefilename(FileUtils::BaseName(entry));
     song.set_valid(true);
+    TagLib::FileRef file(entry.c_str(), true, TagLib::AudioProperties::Fast);
+    if (!file.isNull() && file.tag()) {
+      const TagLib::Tag *tag = file.tag();
+      song.set_title(tag->title().to8Bit(true));
+      song.set_artist(tag->artist().to8Bit(true));
+      song.set_album(tag->album().to8Bit(true));
+      song.set_genre(tag->genre().to8Bit(true));
+      song.set_year(static_cast<int>(tag->year()));
+      song.set_track(static_cast<int>(tag->track()));
+      song.set_comment(tag->comment().to8Bit(true));
+    }
+    if (file.audioProperties()) {
+      song.set_length_nanosec(static_cast<int64_t>(file.audioProperties()->lengthInMilliseconds()) * 1000000LL);
+      song.set_bitrate(file.audioProperties()->bitrate());
+      song.set_samplerate(file.audioProperties()->sampleRate());
+    }
+    if (song.title().empty()) {
+      song.set_title(FileUtils::BaseName(entry));
+    }
     songs.push_back(song);
   }
-  std::sort(songs.begin(), songs.end(), [](const Song &a, const Song &b) { return a.title() < b.title(); });
+  std::sort(songs.begin(), songs.end(), [](const Song &a, const Song &b) { return a.PrettyTitleWithArtist() < b.PrettyTitleWithArtist(); });
   return songs;
 }
 
@@ -241,20 +263,43 @@ SongList DeviceManager::SongsFromMtp(const ConnectedDevice &device) const {
   if (!mtp) {
     return songs;
   }
-  LIBMTP_file_t *file = LIBMTP_Get_Filelisting_With_Callback(mtp, nullptr, nullptr);
-  while (file) {
-    LIBMTP_file_t *next = file->next;
-    if (LIBMTP_FILETYPE_IS_AUDIO(file->filetype) && file->filename) {
+  LIBMTP_track_t *track = LIBMTP_Get_Tracklisting_With_Callback(mtp, nullptr, nullptr);
+  if (track) {
+    while (track) {
+      LIBMTP_track_t *next = track->next;
       Song song(Song::Source::Device);
-      song.set_url("mtp://" + serial + "/" + std::to_string(file->item_id));
-      song.set_title(file->filename);
-      song.set_basefilename(file->filename);
-      song.set_filesize(static_cast<int64_t>(file->filesize));
+      song.set_url("mtp://" + serial + "/" + std::to_string(track->item_id));
+      song.set_title(track->title && *track->title ? track->title : (track->filename ? track->filename : "Track"));
+      song.set_artist(track->artist ? track->artist : "");
+      song.set_album(track->album ? track->album : "");
+      song.set_genre(track->genre ? track->genre : "");
+      song.set_track(static_cast<int>(track->tracknumber));
+      song.set_basefilename(track->filename ? track->filename : song.title());
+      song.set_filesize(static_cast<int64_t>(track->filesize));
+      if (track->duration > 0) {
+        song.set_length_nanosec(static_cast<int64_t>(track->duration) * 1000000LL);
+      }
       song.set_valid(true);
       songs.push_back(song);
+      LIBMTP_destroy_track_t(track);
+      track = next;
     }
-    LIBMTP_destroy_file_t(file);
-    file = next;
+  } else {
+    LIBMTP_file_t *file = LIBMTP_Get_Filelisting_With_Callback(mtp, nullptr, nullptr);
+    while (file) {
+      LIBMTP_file_t *next = file->next;
+      if (LIBMTP_FILETYPE_IS_AUDIO(file->filetype) && file->filename) {
+        Song song(Song::Source::Device);
+        song.set_url("mtp://" + serial + "/" + std::to_string(file->item_id));
+        song.set_title(file->filename);
+        song.set_basefilename(file->filename);
+        song.set_filesize(static_cast<int64_t>(file->filesize));
+        song.set_valid(true);
+        songs.push_back(song);
+      }
+      LIBMTP_destroy_file_t(file);
+      file = next;
+    }
   }
   LIBMTP_Release_Device(mtp);
 #else
@@ -392,7 +437,15 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
     if (src.empty() || !FileUtils::Exists(src)) {
       continue;
     }
-    const std::string dest = FileUtils::Join(music, FileUtils::BaseName(src));
+    std::string dest_dir = music;
+    if (target.backend == "gpod") {
+      const size_t bucket = std::hash<std::string>{}(FileUtils::BaseName(src)) % 20;
+      char folder[8];
+      g_snprintf(folder, sizeof(folder), "F%02zu", bucket);
+      dest_dir = FileUtils::Join(music, folder);
+      g_mkdir_with_parents(dest_dir.c_str(), 0755);
+    }
+    const std::string dest = FileUtils::Join(dest_dir, FileUtils::BaseName(src));
     if (FileUtils::CopyFile(src, dest)) {
       ++copied;
     }
