@@ -1,10 +1,14 @@
 #include "dialogs/edittagdialog.h"
 
+#include "constants/edittagdialogsettings.h"
 #include "core/application.h"
+#include "core/settings.h"
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "dialogs/dialoghelpers.h"
 #include "dialogs/dialoglistkeyboard.h"
+#include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfields.h"
+#include "dialogs/edittagtabs.h"
 #include "dialogs/trackselectiondialog.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
@@ -256,6 +260,26 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   state->cover = gtk_image_new();
   gtk_widget_set_halign(state->cover, GTK_ALIGN_CENTER);
   gtk_box_append(GTK_BOX(summary), state->cover);
+  GtkDropTarget *cover_drop = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
+  gtk_widget_add_controller(state->cover, GTK_EVENT_CONTROLLER(cover_drop));
+  g_signal_connect(cover_drop, "drop",
+                   G_CALLBACK((+[](GtkDropTarget *, const GValue *value, gdouble, gdouble, gpointer data) -> gboolean {
+                     auto *self = static_cast<State *>(data);
+                     if (!self || !self->app || !G_VALUE_HOLDS_STRING(value)) {
+                       return FALSE;
+                     }
+                     const char *text = g_value_get_string(value);
+                     const std::string path = EditTagCoverDrop::FirstImagePath(text ? text : "");
+                     if (path.empty() || !AlbumCoverChoiceController::SaveCover(self->app, &self->song, path)) {
+                       return FALSE;
+                     }
+                     if (self->index < self->songs.size()) {
+                       self->songs[self->index] = self->song;
+                     }
+                     UpdateDisplay(self);
+                     return TRUE;
+                   })),
+                   state);
   GtkWidget *cover_buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   gtk_widget_set_halign(cover_buttons, GTK_ALIGN_CENTER);
   gtk_widget_set_hexpand(cover_buttons, TRUE);
@@ -509,6 +533,19 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_box_append(GTK_BOX(box), switcher);
   gtk_widget_set_vexpand(GTK_WIDGET(stack), TRUE);
   gtk_box_append(GTK_BOX(box), GTK_WIDGET(stack));
+  {
+    Settings tab_settings;
+    tab_settings.BeginGroup(EditTagDialogSettings::kSettingsGroup);
+    adw_view_stack_set_visible_child_name(stack, EditTagTabs::Name(tab_settings.IntValue(EditTagDialogSettings::kCurrentTab)));
+  }
+  g_signal_connect(stack, "notify::visible-child-name", G_CALLBACK(+[](GObject *object, GParamSpec *, gpointer) {
+                     const char *name = adw_view_stack_get_visible_child_name(ADW_VIEW_STACK(object));
+                     Settings tab_settings;
+                     tab_settings.BeginGroup(EditTagDialogSettings::kSettingsGroup);
+                     tab_settings.SetIntValue(EditTagDialogSettings::kCurrentTab, EditTagTabs::IndexFromName(name ? name : ""));
+                     tab_settings.Sync();
+                   }),
+                   nullptr);
   gtk_box_append(GTK_BOX(box), actions);
   adw_dialog_set_child(dialog, box);
   UpdateDisplay(state);

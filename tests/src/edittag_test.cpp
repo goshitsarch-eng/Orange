@@ -1,5 +1,8 @@
+#include "constants/edittagdialogsettings.h"
 #include "dialogs/dialoglistkeyboard.h"
+#include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfields.h"
+#include "dialogs/edittagtabs.h"
 #include "lyrics/lyricsproviderorder.h"
 #include "widgets/listboxkeyboard.h"
 
@@ -83,6 +86,25 @@ TEST(EditTagFields, WrapIndexAndSongRowLabel) {
   EXPECT_EQ(2, EditTagFields::WrapIndex(0, -1, 3));
   Song song = MakeTagged("Roads", "Portishead", "Dummy");
   EXPECT_EQ("Portishead - Roads", EditTagFields::SongRowLabel(song));
+}
+
+TEST(EditTagTabs, ClampNameAndSettingsKeys) {
+  EXPECT_STREQ("EditTagDialog", EditTagDialogSettings::kSettingsGroup);
+  EXPECT_STREQ("current_tab", EditTagDialogSettings::kCurrentTab);
+  EXPECT_EQ(0, EditTagTabs::ClampIndex(-2));
+  EXPECT_EQ(3, EditTagTabs::ClampIndex(99));
+  EXPECT_STREQ("Lyrics", EditTagTabs::Name(2));
+  EXPECT_EQ(1, EditTagTabs::IndexFromName("Tags"));
+  EXPECT_EQ(0, EditTagTabs::IndexFromName("Missing"));
+}
+
+TEST(EditTagCoverDrop, AcceptsImageUrisAndSkipsOtherFiles) {
+  EXPECT_TRUE(EditTagCoverDrop::CanAcceptPath("/covers/dummy.jpg"));
+  EXPECT_TRUE(EditTagCoverDrop::CanAcceptPath("cover.WEBP"));
+  EXPECT_FALSE(EditTagCoverDrop::CanAcceptPath("/music/roads.flac"));
+  EXPECT_EQ("/covers/a.png", EditTagCoverDrop::FirstImagePath("file:///covers/a.png\nfile:///music/roads.flac"));
+  EXPECT_EQ("/covers/b.jpeg", EditTagCoverDrop::FirstImagePath("file://localhost/covers/b.jpeg"));
+  EXPECT_TRUE(EditTagCoverDrop::FirstImagePath("file:///music/roads.flac").empty());
 }
 
 TEST(DialogListKeyboard, ActivateMoveAndWrap) {
