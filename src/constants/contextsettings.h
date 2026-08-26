@@ -48,6 +48,7 @@ constexpr bool kDefaultSearchLyrics = true;
 
 constexpr char kDefaultFontFamily[] = "Noto Sans";
 constexpr double kDefaultFontSizeHeadline = 11;
+constexpr double kDefaultFontSizeNormal = 10;
 
 }  // namespace ContextSettings
 

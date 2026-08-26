@@ -86,6 +86,9 @@ class MainWindow {
   SongList CollectionSongs() const;
   bool EngineStopped() const;
   void ApplyBehaviourSettings();
+  void ApplyAppearance();
+  void RestoreGeometry();
+  void SaveGeometry();
   void SelectPlaylistRow(int index, bool add);
   std::vector<int> SelectedPlaylistRows() const;
   SongList SelectedSongs() const;

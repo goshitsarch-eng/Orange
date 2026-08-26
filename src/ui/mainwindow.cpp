@@ -29,9 +29,12 @@
 #include "constants/collectionsettings.h"
 #include "constants/playlistsettings.h"
 #include "constants/scrobblersettings.h"
+#include "constants/appearancesettings.h"
 #include "core/appearance.h"
 #include "core/seekbarsettings.h"
 #include "core/settings.h"
+#include "core/windowgeometry.h"
+#include "utilities/styleutils.h"
 #include "playlist/playlistsaveoptionsdialog.h"
 #include "playlistparsers/parserbase.h"
 #include "device/cddasongloader.h"
@@ -123,6 +126,7 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
 }
 
 MainWindow::~MainWindow() {
+  SaveGeometry();
   if (position_timeout_) {
     g_source_remove(position_timeout_);
   }
@@ -144,7 +148,9 @@ void MainWindow::CommandlineReceived(const CommandlineOptions &options) {
 void MainWindow::BuildUi() {
   window_ = ADW_APPLICATION_WINDOW(adw_application_window_new(GTK_APPLICATION(gtk_app_)));
   gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
-  gtk_window_set_default_size(GTK_WINDOW(window_), 1400, 860);
+  gtk_widget_add_css_class(GTK_WIDGET(window_), "strawberry-main");
+  RestoreGeometry();
+  ApplyAppearance();
 
   GtkWidget *header = adw_header_bar_new();
   GtkWidget *menu_button = gtk_menu_button_new();
@@ -267,6 +273,7 @@ void MainWindow::BuildUi() {
   adw_application_window_set_content(window_, toolbar);
   g_signal_connect(window_, "close-request", G_CALLBACK(+[](GtkWindow *, gpointer data) -> gboolean {
                      auto *self = static_cast<MainWindow *>(data);
+                     self->SaveGeometry();
                      Settings settings;
                      settings.BeginGroup(BehaviourSettings::kSettingsGroup);
                      if (settings.BoolValue(BehaviourSettings::kKeepRunning, BehaviourSettings::kDefaultKeepRunning) &&
@@ -1274,6 +1281,11 @@ void MainWindow::UpdateCover(const std::vector<unsigned char> &data) {
   if (context_view_) {
     context_view_->AlbumCoverLoaded(data);
   }
+  Appearance appearance;
+  appearance.ReloadSettings();
+  if (appearance.background_type() == static_cast<int>(AppearanceSettings::BackgroundImageType::Album)) {
+    ApplyAppearance();
+  }
 }
 
 void MainWindow::UpdatePlaybackButtons() {
@@ -1289,7 +1301,7 @@ void MainWindow::OpenSettings() {
     app_->osd()->ReloadSettings();
     app_->cover_providers()->ReloadSettings();
     app_->lyrics_providers()->ReloadSettings();
-    Appearance().Apply();
+    ApplyAppearance();
     if (context_view_) {
       context_view_->ReloadSettings();
     }
@@ -1542,6 +1554,58 @@ void MainWindow::ApplyBehaviourSettings() {
   if (playing_widget_) {
     playing_widget_->SetEnabled(settings.BoolValue(BehaviourSettings::kPlayingWidget, BehaviourSettings::kDefaultPlayingWidget));
   }
+}
+
+void MainWindow::ApplyAppearance() {
+  Appearance appearance;
+  appearance.Apply();
+  std::string cover_path;
+  if (appearance.background_type() == static_cast<int>(AppearanceSettings::BackgroundImageType::Album) && app_) {
+    const Song song = app_->player()->current_song();
+    cover_path = FileUtils::PathFromUri(song.art_manual().empty() ? song.art_automatic() : song.art_manual());
+  }
+  const std::string css = appearance.BackgroundCss(cover_path);
+  if (!css.empty()) {
+    StyleUtils::LoadCss(css);
+  }
+}
+
+void MainWindow::RestoreGeometry() {
+  Settings settings;
+  settings.BeginGroup(WindowGeometry::kSettingsGroup);
+  const WindowGeometry::State state = WindowGeometry::FromValues(settings.IntValue(WindowGeometry::kWidth, WindowGeometry::kDefaultWidth),
+                                                                 settings.IntValue(WindowGeometry::kHeight, WindowGeometry::kDefaultHeight),
+                                                                 settings.BoolValue(WindowGeometry::kMaximized, false));
+  gtk_window_set_default_size(GTK_WINDOW(window_), state.width, state.height);
+  Settings behaviour;
+  behaviour.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const int action = WindowGeometry::StartupAction(
+      behaviour.IntValue(BehaviourSettings::kStartupBehaviour, static_cast<int>(BehaviourSettings::kDefaultStartupBehaviour)), state.maximized);
+  if (action == 4) {
+    gtk_window_maximize(GTK_WINDOW(window_));
+  } else if (action == 5) {
+    gtk_window_minimize(GTK_WINDOW(window_));
+  } else if (action == 3) {
+    gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
+  }
+}
+
+void MainWindow::SaveGeometry() {
+  if (!window_) {
+    return;
+  }
+  int width = gtk_widget_get_width(GTK_WIDGET(window_));
+  int height = gtk_widget_get_height(GTK_WIDGET(window_));
+  if (width <= 0 || height <= 0) {
+    gtk_window_get_default_size(GTK_WINDOW(window_), &width, &height);
+  }
+  const WindowGeometry::State state = WindowGeometry::FromValues(width, height, gtk_window_is_maximized(GTK_WINDOW(window_)) == TRUE);
+  Settings settings;
+  settings.BeginGroup(WindowGeometry::kSettingsGroup);
+  settings.SetIntValue(WindowGeometry::kWidth, state.width);
+  settings.SetIntValue(WindowGeometry::kHeight, state.height);
+  settings.SetBoolValue(WindowGeometry::kMaximized, state.maximized);
+  settings.Sync();
 }
 
 bool MainWindow::EngineStopped() const {

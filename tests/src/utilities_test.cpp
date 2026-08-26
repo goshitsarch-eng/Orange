@@ -16,8 +16,12 @@
 #include "organize/organizeformatvalidator.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/fht.h"
+#include "constants/behavioursettings.h"
+#include "context/contextformattokens.h"
+#include "core/appearance.h"
 #include "core/deletefiles.h"
 #include "core/enginemetadata.h"
+#include "core/windowgeometry.h"
 #include "core/filesystemmusicstorage.h"
 #include "core/memorydatabase.h"
 #include "core/scopedtransaction.h"
@@ -606,4 +610,41 @@ TEST(DeviceFinders, ChoiceKeyAndOutputLabels) {
   const auto outputs = finders.Outputs();
   EXPECT_NE(outputs.end(), std::find(outputs.begin(), outputs.end(), "autoaudiosink"));
   EXPECT_FALSE(finders.ListDevices().empty());
+}
+
+TEST(WindowGeometry, ClampsAndMapsStartup) {
+  const WindowGeometry::State huge = WindowGeometry::FromValues(20000, 10, true);
+  EXPECT_EQ(WindowGeometry::kMaxWidth, huge.width);
+  EXPECT_EQ(WindowGeometry::kMinHeight, huge.height);
+  EXPECT_TRUE(huge.maximized);
+  const WindowGeometry::State fallback = WindowGeometry::FromValues(0, 0, false);
+  EXPECT_EQ(WindowGeometry::kDefaultWidth, fallback.width);
+  EXPECT_EQ(WindowGeometry::kDefaultHeight, fallback.height);
+  EXPECT_EQ(4, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Remember), true));
+  EXPECT_EQ(2, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Remember), false));
+  EXPECT_EQ(3, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Hide), false));
+  EXPECT_EQ(5, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::ShowMinimized), true));
+}
+
+TEST(Appearance, BackgroundCssForTypesAndUrls) {
+  EXPECT_EQ("file:///tmp/cover.jpg", Appearance::CssUrl("/tmp/cover.jpg"));
+  EXPECT_EQ("https://example/a.png", Appearance::CssUrl("https://example/a.png"));
+  EXPECT_EQ("top left", Appearance::BackgroundPositionCss(1));
+  EXPECT_EQ("bottom right", Appearance::BackgroundPositionCss(5));
+  EXPECT_TRUE(Appearance::BuildBackgroundCss(0, {}, 5, 0, 40).empty());
+  EXPECT_EQ(".strawberry-main { background-image: none; }", Appearance::BuildBackgroundCss(1, {}, 5, 0, 40));
+  EXPECT_NE(std::string::npos, Appearance::BuildBackgroundCss(4, {}, 5, 0, 40).find("#8B1E3F"));
+  const std::string custom = Appearance::BuildBackgroundCss(2, "/tmp/wall.jpg", 1, 8, 40);
+  EXPECT_NE(std::string::npos, custom.find("file:///tmp/wall.jpg"));
+  EXPECT_NE(std::string::npos, custom.find("top left"));
+  EXPECT_NE(std::string::npos, custom.find("blur(8px)"));
+}
+
+TEST(ContextFormatTokens, InsertsKnownTokens) {
+  EXPECT_TRUE(ContextFormatTokens::IsKnown("%title%"));
+  EXPECT_FALSE(ContextFormatTokens::IsKnown("%unknown%"));
+  EXPECT_EQ("%title%", ContextFormatTokens::Insert({}, "%title%"));
+  EXPECT_EQ("%title%%artist%", ContextFormatTokens::Insert("%title%", "%artist%"));
+  EXPECT_EQ("%title%", ContextFormatTokens::Insert("%title%", {}));
+  EXPECT_FALSE(ContextFormatTokens::All().empty());
 }

@@ -167,6 +167,7 @@ set(STRAWBERRY_SOURCES
   src/core/httpbaserequest.cpp
   src/core/jsonbaserequest.cpp
   src/core/appearance.cpp
+  src/core/windowgeometry.cpp
   src/core/musicstorage.cpp
   src/core/urlhandler.cpp
   src/core/playerinterface.cpp
@@ -823,6 +824,7 @@ if(GTest_FOUND)
     src/core/threadsafenetworkdiskcache.cpp
     src/core/filesystemwatcherqt.cpp
     src/core/appearance.cpp
+    src/core/windowgeometry.cpp
     src/streaming/streamingservice.cpp
     src/utilities/styleutils.cpp
     src/engine/enginebase.cpp

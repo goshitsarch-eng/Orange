@@ -9,8 +9,9 @@ AdwPreferencesPage *BehaviourSettingsPage::Create(Settings *settings, Applicatio
   AdwPreferencesGroup *startup = SettingsPage::AddGroup(page, "Startup");
   SettingsPage::AddToggle(startup, settings, BehaviourSettings::kResumePlayback, "Resume playback on startup", nullptr,
                           BehaviourSettings::kDefaultResumePlayback);
-  SettingsPage::AddIntEntry(startup, settings, BehaviourSettings::kStartupBehaviour, "Startup behaviour (1 remember / 2 show / 3 hide / 4 maximized / 5 minimized)",
-                            static_cast<int>(BehaviourSettings::kDefaultStartupBehaviour));
+  SettingsPage::AddCombo(startup, settings, BehaviourSettings::kStartupBehaviour, "Startup behaviour",
+                         {{"1", "Remember"}, {"2", "Show"}, {"3", "Hide"}, {"4", "Show maximized"}, {"5", "Show minimized"}},
+                         std::to_string(static_cast<int>(BehaviourSettings::kDefaultStartupBehaviour)));
   SettingsPage::AddEntry(startup, settings, BehaviourSettings::kLanguage, "Language");
 
   AdwPreferencesGroup *tray = SettingsPage::AddGroup(page, "System tray");

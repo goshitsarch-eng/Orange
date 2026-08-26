@@ -7,6 +7,7 @@
 #include "lyrics/lyricsfetcher.h"
 #include "lyrics/lyricsproviders.h"
 #include "translations/translations.h"
+#include "utilities/styleutils.h"
 
 ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyrics_fetcher)
     : lyrics_providers_(lyrics_providers), lyrics_fetcher_(lyrics_fetcher), album_(std::make_unique<ContextAlbum>()) {
@@ -141,6 +142,20 @@ void ContextView::ReloadSettings() {
   search_lyrics_ = settings.BoolValue(ContextSettings::kSearchLyrics, ContextSettings::kDefaultSearchLyrics);
   title_fmt_ = settings.Value(ContextSettings::kSettingsTitleFmt, ContextSettings::kDefaultTitleFmt);
   summary_fmt_ = settings.Value(ContextSettings::kSettingsSummaryFmt, ContextSettings::kDefaultSummaryFmt);
+  const std::string headline_font = settings.Value(ContextSettings::kFontHeadline, ContextSettings::kDefaultFontFamily);
+  const std::string normal_font = settings.Value(ContextSettings::kFontNormal, ContextSettings::kDefaultFontFamily);
+  const double headline_size = settings.DoubleValue(ContextSettings::kFontSizeHeadline, ContextSettings::kDefaultFontSizeHeadline);
+  const double normal_size = settings.DoubleValue(ContextSettings::kFontSizeNormal, ContextSettings::kDefaultFontSizeNormal);
+  if (title_) {
+    gtk_widget_set_name(title_, "context-headline");
+    StyleUtils::LoadCss("#context-headline { font-family: \"" + headline_font + "\"; font-size: " + std::to_string(headline_size) + "pt; }");
+  }
+  if (artist_ && album_label_) {
+    gtk_widget_set_name(artist_, "context-normal");
+    gtk_widget_set_name(album_label_, "context-summary");
+    StyleUtils::LoadCss("#context-normal, #context-summary { font-family: \"" + normal_font + "\"; font-size: " +
+                        std::to_string(normal_size) + "pt; }");
+  }
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), show_album_);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), show_data_);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), show_lyrics_);
