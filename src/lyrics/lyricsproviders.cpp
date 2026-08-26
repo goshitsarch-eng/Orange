@@ -105,6 +105,15 @@ void LyricsProviders::FetchFromIndex(const Song &song, size_t index, LyricsProvi
   });
 }
 
+LyricsProvider *LyricsProviders::ProviderByName(const std::string &name) const {
+  for (const auto &provider : providers_) {
+    if (provider->name() == name) {
+      return provider.get();
+    }
+  }
+  return nullptr;
+}
+
 std::vector<LyricsProvider *> LyricsProviders::All() const {
   std::vector<LyricsProvider *> result;
   for (const auto &provider : providers_) {

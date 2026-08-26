@@ -898,6 +898,7 @@ if(GTest_FOUND)
     src/filterparser/filtertreeterm.cpp
     src/filterparser/filtertreecolumnterm.cpp
     src/lyrics/htmllyricsprovider.cpp
+    src/lyrics/geniuslyricsprovider.cpp
     src/subsonic/subsonicservice.cpp
     src/subsonic/subsonicfavoriterequest.cpp
     src/subsonic/subsonicrequest.cpp

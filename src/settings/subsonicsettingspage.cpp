@@ -4,6 +4,7 @@
 #include "constants/subsonicsettings.h"
 #include "core/application.h"
 #include "settings/settingspage.h"
+#include "streaming/streamingchoices.h"
 #include "ui/dialogs.h"
 
 AdwPreferencesPage *SubsonicSettingsPage::Create(Settings *settings, Application *app) {
@@ -22,8 +23,12 @@ AdwPreferencesPage *SubsonicSettingsPage::Create(Settings *settings, Application
                           SubsonicSettings::kDefaultUseAlbumIdForAlbumCovers);
   SettingsPage::AddToggle(group, settings, SubsonicSettings::kServerSideScrobbling, "Server-side scrobbling", nullptr,
                           SubsonicSettings::kDefaultServerSideScrobbling);
-  SettingsPage::AddIntEntry(group, settings, SubsonicSettings::kAuthMethod, "Auth method (0 hex / 1 MD5)",
-                            static_cast<int>(SubsonicSettings::kDefaultAuthMethod));
+  SettingsPage::AddCombo(group, settings, SubsonicSettings::kAuthMethod, "Auth method", StreamingChoices::SubsonicAuthMethods(),
+                         std::to_string(static_cast<int>(SubsonicSettings::kDefaultAuthMethod)), [settings](const std::string &id) {
+                           settings->BeginGroup(SubsonicSettings::kSettingsGroup);
+                           settings->SetIntValue(SubsonicSettings::kAuthMethod, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
+                           settings->Sync();
+                         });
   if (app) {
     SettingsPage::AddButtonRow(group, "Server login", "Sign in", [app]() {
       Dialogs::Login(nullptr, "Subsonic", [app](const std::string &user, const std::string &token) {

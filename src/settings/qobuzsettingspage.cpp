@@ -3,6 +3,7 @@
 #include "constants/qobuzsettings.h"
 #include "core/application.h"
 #include "settings/settingspage.h"
+#include "streaming/streamingchoices.h"
 #include "ui/dialogs.h"
 
 AdwPreferencesPage *QobuzSettingsPage::Create(Settings *settings, Application *app) {
@@ -12,7 +13,12 @@ AdwPreferencesPage *QobuzSettingsPage::Create(Settings *settings, Application *a
   SettingsPage::AddToggle(group, settings, QobuzSettings::kEnabled, "Enable Qobuz", nullptr, QobuzSettings::kDefaultEnabled);
   SettingsPage::AddEntry(group, settings, QobuzSettings::kAppId, "App ID");
   SettingsPage::AddEntry(group, settings, QobuzSettings::kAppSecret, "App secret");
-  SettingsPage::AddIntEntry(group, settings, QobuzSettings::kFormat, "Format ID", QobuzSettings::kDefaultFormat);
+  SettingsPage::AddCombo(group, settings, QobuzSettings::kFormat, "Format", StreamingChoices::QobuzFormats(),
+                         std::to_string(QobuzSettings::kDefaultFormat), [settings](const std::string &id) {
+                           settings->BeginGroup(QobuzSettings::kSettingsGroup);
+                           settings->SetIntValue(QobuzSettings::kFormat, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
+                           settings->Sync();
+                         });
   SettingsPage::AddIntEntry(group, settings, QobuzSettings::kSearchDelay, "Search delay (ms)", QobuzSettings::kDefaultSearchDelay);
   SettingsPage::AddIntEntry(group, settings, QobuzSettings::kArtistsSearchLimit, "Artists search limit", QobuzSettings::kDefaultArtistsSearchLimit);
   SettingsPage::AddIntEntry(group, settings, QobuzSettings::kAlbumsSearchLimit, "Albums search limit", QobuzSettings::kDefaultAlbumsSearchLimit);

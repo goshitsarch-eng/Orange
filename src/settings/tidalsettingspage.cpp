@@ -4,6 +4,7 @@
 #include "core/application.h"
 #include "core/oauthenticator.h"
 #include "settings/settingspage.h"
+#include "streaming/streamingchoices.h"
 #include "tidal/tidalservice.h"
 #include "ui/dialogs.h"
 
@@ -14,9 +15,14 @@ AdwPreferencesPage *TidalSettingsPage::Create(Settings *settings, Application *a
   SettingsPage::AddToggle(group, settings, TidalSettings::kEnabled, "Enable Tidal", nullptr, TidalSettings::kDefaultEnabled);
   SettingsPage::AddEntry(group, settings, TidalSettings::kClientId, "Client ID");
   SettingsPage::AddEntry(group, settings, "clientsecret", "Client secret");
-  SettingsPage::AddEntry(group, settings, TidalSettings::kQuality, "Quality", TidalSettings::kDefaultQuality);
-  SettingsPage::AddIntEntry(group, settings, TidalSettings::kStreamUrl, "Stream URL method",
-                            static_cast<int>(TidalSettings::kDefaultStreamUrl));
+  SettingsPage::AddCombo(group, settings, TidalSettings::kQuality, "Quality", StreamingChoices::TidalQualities(),
+                         TidalSettings::kDefaultQuality);
+  SettingsPage::AddCombo(group, settings, TidalSettings::kStreamUrl, "Stream URL method", StreamingChoices::TidalStreamUrlMethods(),
+                         std::to_string(static_cast<int>(TidalSettings::kDefaultStreamUrl)), [settings](const std::string &id) {
+                           settings->BeginGroup(TidalSettings::kSettingsGroup);
+                           settings->SetIntValue(TidalSettings::kStreamUrl, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
+                           settings->Sync();
+                         });
   SettingsPage::AddIntEntry(group, settings, TidalSettings::kSearchDelay, "Search delay (ms)", TidalSettings::kDefaultSearchDelay);
   SettingsPage::AddIntEntry(group, settings, TidalSettings::kArtistsSearchLimit, "Artists search limit", TidalSettings::kDefaultArtistsSearchLimit);
   SettingsPage::AddIntEntry(group, settings, TidalSettings::kAlbumsSearchLimit, "Albums search limit", TidalSettings::kDefaultAlbumsSearchLimit);
@@ -24,7 +30,10 @@ AdwPreferencesPage *TidalSettingsPage::Create(Settings *settings, Application *a
   SettingsPage::AddToggle(group, settings, TidalSettings::kFetchAlbums, "Fetch albums when searching songs", nullptr, TidalSettings::kDefaultFetchAlbums);
   SettingsPage::AddToggle(group, settings, TidalSettings::kDownloadAlbumCovers, "Download album covers", nullptr,
                           TidalSettings::kDefaultDownloadAlbumCovers);
-  SettingsPage::AddEntry(group, settings, TidalSettings::kCoverSize, "Cover size", TidalSettings::kDefaultCoverSize);
+  SettingsPage::AddCombo(group, settings, TidalSettings::kCoverSize, "Cover size", StreamingChoices::TidalCoverSizes(),
+                         TidalSettings::kDefaultCoverSize);
+  SettingsPage::AddToggle(group, settings, TidalSettings::kAlbumExplicit, "Include explicit albums", nullptr,
+                          TidalSettings::kDefaultAlbumExplicit);
   SettingsPage::AddToggle(group, settings, TidalSettings::kRemoveRemastered, "Remove remastered from titles", nullptr,
                           TidalSettings::kDefaultRemoveRemastered);
   SettingsPage::AddEntry(group, settings, "countrycode", "Country code", "US");

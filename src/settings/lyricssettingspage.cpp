@@ -2,10 +2,16 @@
 
 #include "constants/lyricssettings.h"
 #include "core/application.h"
+#include "core/oauthenticator.h"
+#include "lyrics/geniuslyricsprovider.h"
 #include "lyrics/lyricsproviders.h"
 #include "lyrics/lyricsproviderorder.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
+#include "ui/dialogs.h"
+#include "widgets/loginstatewidget.h"
+
+#include <memory>
 
 namespace {
 
@@ -105,6 +111,79 @@ AdwPreferencesPage *LyricsSettingsPage::Create(Settings *settings, Application *
     g_object_set_data_full(G_OBJECT(page), "provider-state", state, [](gpointer p) { delete static_cast<ProviderListState *>(p); });
     adw_preferences_group_add(order, list);
     RefreshProviderList(state);
+  }
+  if (app) {
+    if (auto *genius = dynamic_cast<GeniusLyricsProvider *>(app->lyrics_providers()->ProviderByName("Genius"))) {
+      settings->BeginGroup("Genius");
+      AdwPreferencesGroup *genius_group = SettingsPage::AddGroup(page, "Genius account");
+      SettingsPage::AddEntry(genius_group, settings, "client_id", "Client ID");
+      SettingsPage::AddEntry(genius_group, settings, "client_secret", "Client secret");
+      auto *login = new LoginStateWidget();
+      login->SetAccountTypeVisible(false);
+      login->SetLoggedIn(genius->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut,
+                         genius->username());
+      auto page_alive = std::make_shared<bool>(true);
+      auto *alive_ptr = new std::shared_ptr<bool>(page_alive);
+      g_object_set_data_full(G_OBJECT(page), "genius-alive", alive_ptr, [](gpointer p) {
+        auto *alive = static_cast<std::shared_ptr<bool> *>(p);
+        **alive = false;
+        delete alive;
+      });
+      login->SetLoginCallback([app, genius, login, page_alive, settings]() {
+        settings->BeginGroup("Genius");
+        const std::string client_id = settings->Value("client_id");
+        if (client_id.empty()) {
+          Dialogs::Login(nullptr, "Genius", [genius, login, page_alive](const std::string &user, const std::string &token) {
+            genius->Authenticate(user, token);
+            if (*page_alive) {
+              login->SetLoggedIn(genius->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut,
+                                 genius->username());
+            }
+          });
+          return;
+        }
+        login->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
+        auto *oauth = new OAuthenticator(app->network());
+        oauth->AuthorizeInBrowser(GeniusLyricsProvider::kAuthUrl, client_id, "me",
+                                  [genius, login, page_alive, oauth, settings](const std::string &code, const std::string &error) {
+                                    if (code.empty()) {
+                                      (void)error;
+                                      delete oauth;
+                                      if (*page_alive) {
+                                        login->SetLoggedIn(LoginStateWidget::State::LoggedOut);
+                                      }
+                                      return;
+                                    }
+                                    settings->BeginGroup("Genius");
+                                    oauth->ExchangeCode(std::string(GeniusLyricsProvider::kApiUrl) + "/oauth/token",
+                                                        settings->Value("client_id"), settings->Value("client_secret"), code,
+                                                        [genius, login, page_alive, oauth](const std::string &body, const std::string &) {
+                                                          const auto tokens = OAuthenticator::ParseTokenResponse(body);
+                                                          if (!tokens.access_token.empty()) {
+                                                            genius->Authenticate({}, tokens.access_token);
+                                                          }
+                                                          delete oauth;
+                                                          if (*page_alive) {
+                                                            login->SetLoggedIn(genius->authenticated() ? LoginStateWidget::State::LoggedIn
+                                                                                                       : LoginStateWidget::State::LoggedOut,
+                                                                               genius->username());
+                                                          }
+                                                        });
+                                  });
+      });
+      login->SetLogoutCallback([genius, login, page_alive]() {
+        genius->Logout();
+        if (*page_alive) {
+          login->SetLoggedIn(LoginStateWidget::State::LoggedOut);
+        }
+      });
+      adw_preferences_group_add(genius_group, login->widget());
+      g_signal_connect(login->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                         delete static_cast<LoginStateWidget *>(data);
+                       }),
+                       login);
+      settings->BeginGroup(LyricsSettings::kSettingsGroup);
+    }
   }
   return page;
 }

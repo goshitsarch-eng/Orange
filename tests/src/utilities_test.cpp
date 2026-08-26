@@ -314,6 +314,10 @@ TEST(Analyzer, Types) {
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Wave"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Sonic"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Block"));
+  EXPECT_EQ(5, Analyzer::ClampFramerate(1));
+  EXPECT_EQ(60, Analyzer::ClampFramerate(120));
+  EXPECT_EQ("Rainbow", Analyzer::NextType("Bar"));
+  EXPECT_EQ("Bar", Analyzer::NextType("Block"));
 }
 
 TEST(AudioAnalysis, PeaksMoodAndScope) {

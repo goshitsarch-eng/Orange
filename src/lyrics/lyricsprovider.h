@@ -21,6 +21,10 @@ class LyricsProvider {
   virtual void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) = 0;
   virtual bool StartSearch(int id, const LyricsSearchRequest &request, NetworkAccessManager *network,
                            const std::function<void(int, const LyricsSearchResults &)> &finished);
+  virtual void Authenticate(const std::string &, const std::string &) {}
+  virtual void Logout() {}
+  virtual bool authenticated() const { return false; }
+  virtual std::string username() const { return {}; }
 
  protected:
   bool enabled_ = true;

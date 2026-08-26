@@ -29,6 +29,7 @@
 #include "constants/collectionsettings.h"
 #include "constants/playlistsettings.h"
 #include "constants/scrobblersettings.h"
+#include "constants/analyzersettings.h"
 #include "constants/appearancesettings.h"
 #include "core/appearance.h"
 #include "core/song.h"
@@ -936,14 +937,22 @@ void MainWindow::BuildPlayerBar() {
   gtk_box_append(GTK_BOX(controls), next);
   gtk_box_append(GTK_BOX(controls), scrobble_button_);
   gtk_box_append(GTK_BOX(controls), love_button_);
-  gtk_widget_set_tooltip_text(analyzer_drawing_, "Click to cycle analyzer type");
   GtkGesture *analyzer_click = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(analyzer_click), GDK_BUTTON_PRIMARY);
   gtk_widget_add_controller(analyzer_drawing_, GTK_EVENT_CONTROLLER(analyzer_click));
   g_signal_connect(analyzer_click, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
                      static_cast<MainWindow *>(data)->CycleAnalyzer();
                    }),
                    this);
+  GtkGesture *analyzer_menu = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(analyzer_menu), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(analyzer_drawing_, GTK_EVENT_CONTROLLER(analyzer_menu));
+  g_signal_connect(analyzer_menu, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
+                     static_cast<MainWindow *>(data)->ShowAnalyzerMenu();
+                   }),
+                   this);
   gtk_box_append(GTK_BOX(controls), analyzer_drawing_);
+  ApplyAnalyzer();
   gtk_box_append(GTK_BOX(controls), volume_slider_->widget());
   gtk_box_append(GTK_BOX(box), controls);
 
@@ -1054,8 +1063,16 @@ void MainWindow::ConnectSignals() {
   app_->waveform()->Ready.Connect([this](const std::vector<float> &) { gtk_widget_queue_draw(waveform_drawing_); });
   app_->moodbar()->Ready.Connect([this](const std::vector<uint8_t> &) { gtk_widget_queue_draw(moodbar_drawing_); });
   app_->player()->engine()->ScopeUpdated.Connect([this](const std::vector<int16_t> &scope) {
+    if (!app_->analyzer()->enabled()) {
+      return;
+    }
     app_->analyzer()->SetEngineScope(scope);
-    gtk_widget_queue_draw(analyzer_drawing_);
+    const gint64 now = g_get_monotonic_time();
+    const gint64 interval = 1000000LL / std::max(1, app_->analyzer()->framerate());
+    if (now - analyzer_last_draw_us_ >= interval) {
+      analyzer_last_draw_us_ = now;
+      gtk_widget_queue_draw(analyzer_drawing_);
+    }
   });
   position_timeout_ = g_timeout_add(200, [](gpointer data) -> gboolean {
     auto *self = static_cast<MainWindow *>(data);
@@ -1542,13 +1559,68 @@ void MainWindow::RedoPlaylist() {
   }
 }
 
-void MainWindow::CycleAnalyzer() {
-  const auto types = Analyzer::Types();
-  auto it = std::find(types.begin(), types.end(), app_->analyzer()->type());
-  const size_t index = it == types.end() ? 0 : (static_cast<size_t>(std::distance(types.begin(), it)) + 1) % types.size();
-  app_->analyzer()->set_type(types[index]);
-  gtk_widget_set_tooltip_text(analyzer_drawing_, ("Analyzer: " + types[index]).c_str());
+void MainWindow::ApplyAnalyzer() {
+  if (!analyzer_drawing_) {
+    return;
+  }
+  gtk_widget_set_visible(analyzer_drawing_, app_->analyzer()->enabled());
+  gtk_widget_set_tooltip_text(analyzer_drawing_, ("Analyzer: " + app_->analyzer()->type()).c_str());
   gtk_widget_queue_draw(analyzer_drawing_);
+}
+
+void MainWindow::CycleAnalyzer() {
+  app_->analyzer()->set_type(Analyzer::NextType(app_->analyzer()->type()));
+  ApplyAnalyzer();
+}
+
+void MainWindow::ShowAnalyzerMenu() {
+  GtkWidget *popover = gtk_popover_new();
+  gtk_widget_set_parent(popover, analyzer_drawing_);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+  gtk_widget_set_margin_start(box, 8);
+  gtk_widget_set_margin_end(box, 8);
+  gtk_widget_set_margin_top(box, 8);
+  gtk_widget_set_margin_bottom(box, 8);
+  GtkWidget *enable = gtk_check_button_new_with_label(Translations::CStr("Show analyzer"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(enable), app_->analyzer()->enabled());
+  g_signal_connect(enable, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     self->app_->analyzer()->set_enabled(gtk_check_button_get_active(button));
+                     self->ApplyAnalyzer();
+                   }),
+                   this);
+  gtk_box_append(GTK_BOX(box), enable);
+  for (const std::string &type : Analyzer::Types()) {
+    GtkWidget *button = gtk_button_new_with_label(type.c_str());
+    g_object_set_data_full(G_OBJECT(button), "analyzer-type", g_strdup(type.c_str()), g_free);
+    g_object_set_data(G_OBJECT(button), "popover", popover);
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                       auto *self = static_cast<MainWindow *>(data);
+                       const char *type_name = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "analyzer-type"));
+                       if (type_name) {
+                         self->app_->analyzer()->set_type(type_name);
+                         self->ApplyAnalyzer();
+                       }
+                       if (auto *pop = GTK_WIDGET(g_object_get_data(G_OBJECT(btn), "popover"))) {
+                         gtk_popover_popdown(GTK_POPOVER(pop));
+                       }
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(box), button);
+  }
+  GtkWidget *fps_label = gtk_label_new(Translations::CStr("Framerate"));
+  gtk_widget_set_halign(fps_label, GTK_ALIGN_START);
+  GtkWidget *fps = gtk_spin_button_new_with_range(AnalyzerSettings::kMinFramerate, AnalyzerSettings::kMaxFramerate, 1);
+  gtk_spin_button_set_value(GTK_SPIN_BUTTON(fps), app_->analyzer()->framerate());
+  g_signal_connect(fps, "value-changed", G_CALLBACK(+[](GtkSpinButton *spin, gpointer data) {
+                     static_cast<MainWindow *>(data)->app_->analyzer()->set_framerate(
+                         static_cast<int>(gtk_spin_button_get_value(spin)));
+                   }),
+                   this);
+  gtk_box_append(GTK_BOX(box), fps_label);
+  gtk_box_append(GTK_BOX(box), fps);
+  gtk_popover_set_child(GTK_POPOVER(popover), box);
+  gtk_popover_popup(GTK_POPOVER(popover));
 }
 
 void MainWindow::CycleRepeat() {

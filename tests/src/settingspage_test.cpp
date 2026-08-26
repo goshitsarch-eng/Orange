@@ -17,6 +17,7 @@
 #include "constants/tidalsettings.h"
 #include "constants/transcodersettings.h"
 #include "constants/waveformsettings.h"
+#include "streaming/streamingchoices.h"
 
 #include <gtest/gtest.h>
 
@@ -94,4 +95,13 @@ TEST(StreamingAndOsdSettings, OriginalGroups) {
   EXPECT_STREQ("color", WaveformSettings::kColor);
   EXPECT_EQ(8080u, NetworkProxySettings::kDefaultPort);
   EXPECT_STREQ("audio/x-vorbis", TranscoderSettings::kDefaultLastOutputFormat);
+}
+
+TEST(StreamingChoices, QualityAndAuthLabels) {
+  EXPECT_EQ("LOSSLESS", StreamingChoices::TidalQualities()[2].first);
+  EXPECT_EQ("2", StreamingChoices::TidalStreamUrlMethods().back().first);
+  EXPECT_EQ("27", StreamingChoices::QobuzFormats().back().first);
+  EXPECT_EQ("1", StreamingChoices::SubsonicAuthMethods().back().first);
+  EXPECT_EQ("highest", StreamingChoices::SomaFmQualities().front().first);
+  EXPECT_EQ("aac-320", StreamingChoices::RadioParadiseStreams().front().first);
 }

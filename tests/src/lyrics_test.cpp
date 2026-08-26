@@ -1,3 +1,4 @@
+#include "lyrics/geniuslyricsprovider.h"
 #include "lyrics/htmllyricsprovider.h"
 
 #include "utilities/strutils.h"
@@ -42,6 +43,17 @@ TEST(HtmlLyricsProvider, DashedAndLetrasSlugs) {
 
 TEST(HtmlLyricsProvider, ElyricsSlugAndFirstLetter) {
   EXPECT_EQ("fleet-foxes", HtmlLyricsProvider::SlugElyrics("Fleet Foxes"));
+}
+
+TEST(GeniusLyricsProvider, AuthorizationAndSearchUrl) {
+  EXPECT_EQ(std::string(GeniusLyricsProvider::kApiUrl) + "/search?q=Portishead%20Roads",
+            GeniusLyricsProvider::SearchApiUrl("Portishead Roads"));
+  const std::string auth = GeniusLyricsProvider::AuthorizationUrl("client", "http://127.0.0.1/callback");
+  EXPECT_NE(std::string::npos, auth.find(GeniusLyricsProvider::kAuthUrl));
+  EXPECT_NE(std::string::npos, auth.find("client_id=client"));
+  EXPECT_NE(std::string::npos, auth.find("response_type=code"));
+  const std::string json = R"json({"response":{"hits":[{"result":{"url":"https://genius.com/portishead-roads-lyrics"}}]}})json";
+  EXPECT_EQ("https://genius.com/portishead-roads-lyrics", GeniusLyricsProvider::ParseSearchResultUrl(json));
 }
 
 TEST(StrUtils, TransliterateAscii) {

@@ -4,6 +4,7 @@
 #include "constants/radioparadisesettings.h"
 #include "constants/somafmsettings.h"
 #include "settings/settingspage.h"
+#include "streaming/streamingchoices.h"
 
 AdwPreferencesPage *RadioSettingsPage::Create(Settings *settings, Application *) {
   settings->BeginGroup(RadioBrowserSettings::kSettingsGroup);
@@ -18,10 +19,11 @@ AdwPreferencesPage *RadioSettingsPage::Create(Settings *settings, Application *)
 
   settings->BeginGroup(SomaFMSettings::kSettingsGroup);
   AdwPreferencesGroup *soma = SettingsPage::AddGroup(page, "SomaFM");
-  SettingsPage::AddEntry(soma, settings, SomaFMSettings::kQuality, "Quality (highest/high/low)", SomaFMSettings::kQualityDefault);
+  SettingsPage::AddCombo(soma, settings, SomaFMSettings::kQuality, "Quality", StreamingChoices::SomaFmQualities(),
+                         SomaFMSettings::kQualityDefault);
 
   settings->BeginGroup(RadioParadiseSettings::kSettingsGroup);
   AdwPreferencesGroup *rp = SettingsPage::AddGroup(page, "Radio Paradise");
-  SettingsPage::AddEntry(rp, settings, "quality", "Stream (aac-320/aac-128/mp3-192)", "aac-320");
+  SettingsPage::AddCombo(rp, settings, "quality", "Stream", StreamingChoices::RadioParadiseStreams(), "aac-320");
   return page;
 }
