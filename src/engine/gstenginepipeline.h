@@ -10,6 +10,22 @@
 #include <string>
 #include <vector>
 
+struct GstPipelineExtras {
+  double replaygain_fallback = 0.0;
+  bool replaygain_compression = true;
+  bool exclusive = false;
+  bool volume_control = true;
+  bool volume_exponential = false;
+  bool channels_enabled = false;
+  int channels = 0;
+  bool bs2b = false;
+  bool strict_ssl = false;
+  int64_t buffer_duration_ms = 4000;
+  double buffer_low_watermark = 0.33;
+  double buffer_high_watermark = 0.99;
+  int device_warmup_ms = 0;
+};
+
 class GstEnginePipeline {
  public:
   explicit GstEnginePipeline(int id);
@@ -23,7 +39,7 @@ class GstEnginePipeline {
 
   bool Create(const std::string &url, const std::string &output, const std::string &device, uint64_t beginning_offset_nanosec,
               int64_t end_offset_nanosec, bool replaygain, int replaygain_mode, double replaygain_preamp, float stereo_balance,
-              bool playbin3 = false);
+              bool playbin3 = false, const GstPipelineExtras &extras = {});
   bool Play(bool pause, uint64_t offset_nanosec);
   void Stop();
   void Pause();
@@ -49,6 +65,7 @@ class GstEnginePipeline {
   static gboolean BusCallback(GstBus *bus, GstMessage *message, gpointer data);
   static void AboutToFinishCb(GstElement *playbin, gpointer data);
   GstElement *MakeAudioSink(const std::string &output, const std::string &device) const;
+  void CancelWarmup();
   void HandleSpectrum(GstMessage *message);
   void HandleError(GstMessage *message);
   void HandleTags(GstMessage *message);
@@ -59,8 +76,12 @@ class GstEnginePipeline {
   GstElement *equalizer_ = nullptr;
   GstElement *panorama_ = nullptr;
   guint bus_watch_id_ = 0;
+  guint warmup_timeout_id_ = 0;
   uint64_t beginning_offset_nanosec_ = 0;
   int64_t end_offset_nanosec_ = -1;
+  bool volume_control_ = true;
+  bool strict_ssl_ = false;
+  int device_warmup_ms_ = 0;
 };
 
 #endif  // STRAWBERRY_GSTENGINEPIPELINE_H

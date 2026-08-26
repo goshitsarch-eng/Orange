@@ -6,6 +6,8 @@
 #include "engine/backendoptions.h"
 #include "equalizer/equalizerpersist.h"
 
+#include <cstdlib>
+
 #include <algorithm>
 
 GstEngine::GstEngine() = default;
@@ -55,18 +57,61 @@ bool GstEngine::Init() {
   fadeout_pause_enabled_ = settings.BoolValue(BackendSettings::kFadeoutPauseEnabled, BackendSettings::kDefaultFadeoutPauseEnabled);
   fadeout_pause_duration_ms_ = std::max(
       50, settings.IntValue(BackendSettings::kFadeoutPauseDuration, static_cast<int>(BackendSettings::kDefaultFadeoutPauseDuration)));
+  ReloadBackendOptions();
   return true;
+}
+
+void GstEngine::ReloadBackendOptions() {
+  Settings settings;
+  settings.BeginGroup(BackendSettings::kSettingsGroup);
+  exclusive_mode_ = settings.BoolValue(BackendSettings::kExclusiveMode, BackendSettings::kDefaultExclusiveMode);
+  volume_control_ = settings.BoolValue(BackendSettings::kVolumeControl, BackendSettings::kDefaultVolumeControl);
+  volume_exponential_ = settings.BoolValue(BackendSettings::kVolumeExponential, BackendSettings::kDefaultVolumeExponential);
+  channels_enabled_ = settings.BoolValue(BackendSettings::kChannelsEnabled, BackendSettings::kDefaultChannelsEnabled);
+  channels_ = settings.IntValue(BackendSettings::kChannels, BackendSettings::kDefaultChannels);
+  bs2b_enabled_ = settings.BoolValue(BackendSettings::kBS2B, BackendSettings::kDefaultBS2B);
+  http2_enabled_ = settings.BoolValue(BackendSettings::kHTTP2, BackendSettings::kDefaultHTTP2);
+  strict_ssl_enabled_ = settings.BoolValue(BackendSettings::kStrictSSL, BackendSettings::kDefaultStrictSSL);
+  buffer_duration_ms_ = settings.Int64Value(BackendSettings::kBufferDuration, BackendSettings::kDefaultBufferDuration);
+  buffer_low_watermark_ = BackendOptions::ClampWatermark(
+      settings.DoubleValue(BackendSettings::kBufferLowWatermark, BackendSettings::kDefaultBufferLowWatermark));
+  buffer_high_watermark_ = BackendOptions::ClampWatermark(
+      settings.DoubleValue(BackendSettings::kBufferHighWatermark, BackendSettings::kDefaultBufferHighWatermark));
+  device_warmup_ms_ = settings.IntValue(BackendSettings::kDeviceWarmupDuration, BackendSettings::kDefaultDeviceWarmupDuration);
+  replaygain_fallback_ = settings.DoubleValue(BackendSettings::kRgFallbackGain, BackendSettings::kDefaultRgFallbackGain);
+  replaygain_compression_ = settings.BoolValue(BackendSettings::kRgCompression, BackendSettings::kDefaultRgCompression);
+  setenv("SOUP_FORCE_HTTP1", BackendOptions::SoupForceHttp1(http2_enabled_), 1);
+}
+
+double GstEngine::VolumeFraction() const { return BackendOptions::VolumeFraction(volume_percent_, volume_exponential_); }
+
+GstPipelineExtras GstEngine::PipelineExtras() const {
+  GstPipelineExtras extras;
+  extras.replaygain_fallback = replaygain_fallback_;
+  extras.replaygain_compression = replaygain_compression_;
+  extras.exclusive = exclusive_mode_;
+  extras.volume_control = volume_control_;
+  extras.volume_exponential = volume_exponential_;
+  extras.channels_enabled = channels_enabled_;
+  extras.channels = channels_;
+  extras.bs2b = bs2b_enabled_;
+  extras.strict_ssl = strict_ssl_enabled_;
+  extras.buffer_duration_ms = buffer_duration_ms_;
+  extras.buffer_low_watermark = buffer_low_watermark_;
+  extras.buffer_high_watermark = buffer_high_watermark_;
+  extras.device_warmup_ms = BackendOptions::WarmupMs(!current_, static_cast<int>(device_warmup_ms_));
+  return extras;
 }
 
 std::unique_ptr<GstEnginePipeline> GstEngine::CreatePipeline(const std::string &url, uint64_t beginning_offset_nanosec,
                                                              int64_t end_offset_nanosec) {
   auto pipeline = std::make_unique<GstEnginePipeline>(next_pipeline_id_++);
   if (!pipeline->Create(url, output_, device_, beginning_offset_nanosec, end_offset_nanosec, replaygain_enabled_, replaygain_mode_,
-                        replaygain_preamp_, stereo_balance_, playbin3_)) {
+                        replaygain_preamp_, stereo_balance_, playbin3_, PipelineExtras())) {
     return nullptr;
   }
   pipeline->SetEqualizer(eq_enabled_ ? eq_preamp_ : 0, eq_enabled_ ? eq_gains_ : std::vector<int>(10, 0));
-  pipeline->SetVolume(volume_percent_ / 100.0);
+  pipeline->SetVolume(VolumeFraction());
   WirePipeline(pipeline.get());
   return pipeline;
 }
@@ -231,9 +276,9 @@ void GstEngine::ApplyCurrentVolume(double fraction) {
 void GstEngine::SetVolumeSW(unsigned percent) {
   volume_percent_ = std::min(percent, 100u);
   if (fade_direction_ == 0) {
-    ApplyCurrentVolume(volume_percent_ / 100.0);
+    ApplyCurrentVolume(VolumeFraction());
     if (next_) {
-      next_->SetVolume(volume_percent_ / 100.0);
+      next_->SetVolume(VolumeFraction());
     }
   }
 }
@@ -270,7 +315,7 @@ gboolean GstEngine::FadeTick(gpointer data) {
   auto *self = static_cast<GstEngine *>(data);
   ++self->fade_step_;
   const double t = static_cast<double>(self->fade_step_) / static_cast<double>(self->fade_steps_);
-  const double target = self->volume_percent_ / 100.0;
+  const double target = self->VolumeFraction();
   if (self->next_ && self->next_->valid()) {
     if (self->current_) {
       self->current_->SetVolume(target * std::max(0.0, 1.0 - t));
@@ -304,7 +349,7 @@ void GstEngine::FinishCrossfade() {
   }
   current_ = std::move(next_);
   if (current_) {
-    current_->SetVolume(volume_percent_ / 100.0);
+    current_->SetVolume(VolumeFraction());
   }
   gapless_pending_ = false;
 }

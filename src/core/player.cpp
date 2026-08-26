@@ -61,6 +61,7 @@ void Player::ReloadSettings() {
   engine_->SetReplayGainPreamp(settings.DoubleValue(BackendSettings::kRgPreamp, BackendSettings::kDefaultRgPreamp));
   engine_->SetOutput(settings.Contains("output") ? settings.Value("output", "autoaudiosink") : settings.Value("Output", "autoaudiosink"),
                      settings.Contains("device") ? settings.Value("device") : settings.Value("Device"));
+  engine_->ReloadBackendOptions();
 }
 
 void Player::LoadVolume() {

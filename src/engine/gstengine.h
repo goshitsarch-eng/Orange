@@ -59,6 +59,7 @@ class GstEngine : public EngineBase {
   void SetNoCrossfadeSameAlbum(bool enabled) { no_crossfade_same_album_ = enabled; }
   void SetFadeoutPauseEnabled(bool enabled) { fadeout_pause_enabled_ = enabled; }
   void SetFadeoutPauseDurationMs(int milliseconds);
+  void ReloadBackendOptions();
   void SetCurrentAlbum(const std::string &album) { current_album_ = album; }
   void SetNextAlbum(const std::string &album) { next_album_ = album; }
   bool fading_enabled() const { return fading_enabled_; }
@@ -84,12 +85,16 @@ class GstEngine : public EngineBase {
   static gboolean FadeTick(gpointer data);
   void SetState(State state);
   void ApplyCurrentVolume(double fraction);
+  double VolumeFraction() const;
+  GstPipelineExtras PipelineExtras() const;
 
   std::unique_ptr<GstEnginePipeline> current_;
   std::unique_ptr<GstEnginePipeline> next_;
   int next_pipeline_id_ = 1;
   int replaygain_mode_ = 0;
   double replaygain_preamp_ = 0.0;
+  double replaygain_fallback_ = 0.0;
+  bool replaygain_compression_ = true;
   float stereo_balance_ = 0.0f;
   int eq_preamp_ = 0;
   std::vector<int> eq_gains_ = std::vector<int>(10, 0);
@@ -104,6 +109,18 @@ class GstEngine : public EngineBase {
   bool playbin3_ = true;
   bool no_crossfade_same_album_ = true;
   bool fadeout_pause_enabled_ = false;
+  bool exclusive_mode_ = false;
+  bool volume_control_ = true;
+  bool volume_exponential_ = false;
+  bool channels_enabled_ = false;
+  int channels_ = 0;
+  bool bs2b_enabled_ = false;
+  bool http2_enabled_ = false;
+  bool strict_ssl_enabled_ = false;
+  int64_t buffer_duration_ms_ = 4000;
+  double buffer_low_watermark_ = 0.33;
+  double buffer_high_watermark_ = 0.99;
+  int device_warmup_ms_ = 500;
   bool pending_pause_ = false;
   int fade_duration_ms_ = 2000;
   int fadeout_pause_duration_ms_ = 250;

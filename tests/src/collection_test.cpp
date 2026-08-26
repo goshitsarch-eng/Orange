@@ -445,4 +445,20 @@ TEST(BackendOptions, PlaybinCrossfadeAndPauseFade) {
   EXPECT_EQ(0, BackendOptions::FadeDurationMs(false, 250, 250));
   EXPECT_EQ(250, BackendOptions::FadeDurationMs(true, 250, 2000));
   EXPECT_EQ(2000, BackendOptions::FadeDurationMs(true, 0, 2000));
+  EXPECT_EQ(4000 * BackendOptions::kNsecPerMsec, BackendOptions::BufferDurationNanosec(4000));
+  EXPECT_EQ(0, BackendOptions::BufferDurationNanosec(-10));
+  EXPECT_DOUBLE_EQ(0.0, BackendOptions::ClampWatermark(-0.2));
+  EXPECT_DOUBLE_EQ(1.0, BackendOptions::ClampWatermark(1.5));
+  EXPECT_DOUBLE_EQ(0.33, BackendOptions::ClampWatermark(0.33));
+  EXPECT_DOUBLE_EQ(0.5, BackendOptions::VolumeFraction(50, false));
+  EXPECT_DOUBLE_EQ(0.0, BackendOptions::VolumeFraction(0, true));
+  EXPECT_DOUBLE_EQ(1.0, BackendOptions::VolumeFraction(100, true));
+  EXPECT_NEAR(0.56234132519, BackendOptions::VolumeFraction(80, true), 0.0001);
+  EXPECT_EQ(2, BackendOptions::EffectiveChannels(true, 2));
+  EXPECT_EQ(0, BackendOptions::EffectiveChannels(false, 2));
+  EXPECT_EQ(0, BackendOptions::EffectiveChannels(true, 0));
+  EXPECT_STREQ("", BackendOptions::SoupForceHttp1(true));
+  EXPECT_STREQ("1", BackendOptions::SoupForceHttp1(false));
+  EXPECT_EQ(500, BackendOptions::WarmupMs(true, 500));
+  EXPECT_EQ(0, BackendOptions::WarmupMs(false, 500));
 }
