@@ -1,6 +1,7 @@
 #include "core/appearance.h"
 
 #include "constants/appearancesettings.h"
+#include "core/appearancestyle.h"
 #include "core/settings.h"
 #include "utilities/styleutils.h"
 
@@ -48,9 +49,13 @@ void Appearance::Apply() {
   ReloadSettings();
   AdwStyleManager *manager = adw_style_manager_get_default();
   if (manager) {
-    adw_style_manager_set_color_scheme(manager, dark_mode_ ? ADW_COLOR_SCHEME_FORCE_DARK : ADW_COLOR_SCHEME_DEFAULT);
+    const bool dark = dark_mode_ || AppearanceStyle::ForcesDark(style_);
+    adw_style_manager_set_color_scheme(manager, dark ? ADW_COLOR_SCHEME_FORCE_DARK : ADW_COLOR_SCHEME_DEFAULT);
   }
-  if (!style_.empty()) {
+  const std::string style_css = AppearanceStyle::CssFor(style_);
+  if (!style_css.empty()) {
+    StyleUtils::LoadCss(style_css);
+  } else if (!style_.empty() && style_.find('{') != std::string::npos) {
     StyleUtils::LoadCss(style_);
   }
   const std::string theme = ThemeCss();

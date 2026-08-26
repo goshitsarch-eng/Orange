@@ -4,6 +4,10 @@
 #include "core/settings.h"
 #include "core/song.h"
 #include "systemtrayicon/trayiconcomposite.h"
+#include "systemtrayicon/trayiconmask.h"
+#include "systemtrayicon/trayiconpixmap.h"
+#include "systemtrayicon/traymenuposition.h"
+#include "systemtrayicon/traypopup.h"
 #include "systemtrayicon/trayprogressoverlay.h"
 
 #include <algorithm>
@@ -108,6 +112,61 @@ TEST(TrayIconComposite, QtCoverGeometryAndOverlayNames) {
   EXPECT_TRUE(TrayIconComposite::OverlayName(40, true, TrayIconComposite::Playback::Stopped).empty());
 }
 
+TEST(TrayIconMask, ProgressPolygonMatchesQtWedge) {
+  const auto early = TrayIconMask::ProgressMask(48, 48, 25);
+  ASSERT_EQ(4u, early.size());
+  EXPECT_EQ(0, early.front().x);
+  EXPECT_EQ(0, early.front().y);
+  EXPECT_EQ(0, early.back().x);
+  EXPECT_EQ(48, early[early.size() - 2].x);
+  const auto late = TrayIconMask::ProgressMask(48, 48, 80);
+  ASSERT_EQ(5u, late.size());
+  EXPECT_EQ(48, late[2].x);
+  EXPECT_EQ(48, late[2].y);
+}
+
+TEST(TrayIconPixmap, ByteCountAndNetworkArgb) {
+  EXPECT_EQ(48, TrayIconPixmap::kDefaultSize);
+  EXPECT_TRUE(TrayIconPixmap::ValidDimensions(48, 48));
+  EXPECT_FALSE(TrayIconPixmap::ValidDimensions(0, 48));
+  EXPECT_FALSE(TrayIconPixmap::ValidDimensions(300, 48));
+  EXPECT_EQ(9216u, TrayIconPixmap::ByteCount(48, 48));
+  uint8_t pixel[4] = {};
+  TrayIconPixmap::WriteNetworkArgb(pixel, 255, 12, 34, 56);
+  EXPECT_EQ(255, pixel[0]);
+  EXPECT_EQ(12, pixel[1]);
+  EXPECT_EQ(34, pixel[2]);
+  EXPECT_EQ(56, pixel[3]);
+  std::vector<uint8_t> packed;
+  const uint32_t row[] = {TrayIconPixmap::NativeArgb(255, 1, 2, 3)};
+  TrayIconPixmap::PackNativeArgbRow(row, 1, &packed);
+  ASSERT_EQ(4u, packed.size());
+  EXPECT_EQ(255, packed[0]);
+  EXPECT_EQ(1, packed[1]);
+}
+
+TEST(TrayMenuPosition, AnchorAndClamp) {
+  const auto anchor = TrayMenuPosition::AnchorPoint(100, 200);
+  EXPECT_EQ(100, anchor.x);
+  EXPECT_EQ(200, anchor.y);
+  EXPECT_EQ(1, anchor.width);
+  EXPECT_FALSE(TrayMenuPosition::HasScreenPoint(0, 0));
+  EXPECT_TRUE(TrayMenuPosition::HasScreenPoint(8, 0));
+  const TrayMenuPosition::Rect monitor{0, 0, 1920, 1080};
+  const auto clamped = TrayMenuPosition::ClampToMonitor({1900, 1070, 40, 40}, monitor);
+  EXPECT_EQ(1880, clamped.x);
+  EXPECT_EQ(1040, clamped.y);
+}
+
+TEST(TrayPopup, ArtAndFade) {
+  EXPECT_TRUE(TrayPopup::ShowArt(true, true));
+  EXPECT_FALSE(TrayPopup::ShowArt(false, true));
+  EXPECT_FALSE(TrayPopup::ShowArt(true, false));
+  EXPECT_DOUBLE_EQ(0.0, TrayPopup::FadeOpacity(0, 300, true));
+  EXPECT_DOUBLE_EQ(1.0, TrayPopup::FadeOpacity(300, 300, true));
+  EXPECT_EQ(300, TrayPopup::FadeDurationMs());
+}
+
 TEST(TrayProgressOverlay, DecadeAndIconName) {
   EXPECT_EQ(0, TrayProgressOverlay::Decade(-10));
   EXPECT_EQ(0, TrayProgressOverlay::Decade(9));
@@ -143,4 +202,12 @@ TEST(SystemTrayIcon, OverlayIconNameHonorsProgressSetting) {
   EXPECT_FALSE(tray.paused());
   EXPECT_FALSE(tray.playing());
   EXPECT_TRUE(tray.OverlayIconName().empty());
+  EXPECT_EQ(0, tray.icon_pixmap_width());
+  EXPECT_EQ(0u, tray.icon_pixmap_size());
+  tray.ShowMenu(120, 80);
+  EXPECT_EQ(120, tray.last_menu_x());
+  EXPECT_EQ(80, tray.last_menu_y());
+  tray.ShowPopup("title", "body", 1000, {1, 2, 3});
+  ASSERT_EQ(3u, tray.popup_art().size());
+  EXPECT_EQ(1, tray.popup_art()[0]);
 }

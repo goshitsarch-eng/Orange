@@ -3,6 +3,8 @@
 #include "constants/contextsettings.h"
 #include "context/contextcover.h"
 #include "context/contextfont.h"
+#include "context/contextidle.h"
+#include "context/contextplayingtext.h"
 #include "context/contextlyrics.h"
 #include "context/contextoptions.h"
 #include "context/contexttechnical.h"
@@ -44,9 +46,10 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   gtk_box_append(GTK_BOX(toggles), show_data_btn_);
   gtk_box_append(GTK_BOX(toggles), show_lyrics_btn_);
 
-  title_ = gtk_label_new(Translations::CStr("Not playing"));
+  title_ = gtk_label_new(Translations::CStr(ContextIdle::Headline()));
   gtk_widget_add_css_class(title_, "title-2");
   gtk_label_set_wrap(GTK_LABEL(title_), TRUE);
+  gtk_label_set_use_markup(GTK_LABEL(title_), TRUE);
   artist_ = gtk_label_new("");
   gtk_widget_add_css_class(artist_, "heading");
   album_label_ = gtk_label_new("");
@@ -163,7 +166,7 @@ void ContextView::SetCollectionTotals(int songs, int artists, int albums) {
 }
 
 void ContextView::UpdateTotalsLabel() {
-  gtk_label_set_text(GTK_LABEL(totals_), ContextTechnical::Totals(totals_songs_, totals_artists_, totals_albums_).c_str());
+  gtk_label_set_text(GTK_LABEL(totals_), ContextIdle::TotalsMarkup(totals_songs_, totals_artists_, totals_albums_).c_str());
 }
 
 void ContextView::ReloadSettings() {
@@ -184,8 +187,11 @@ void ContextView::ReloadSettings() {
                                                    static_cast<int>(settings.DoubleValue(ContextSettings::kFontSizeNormal,
                                                                                          ContextSettings::kDefaultFontSizeNormal)));
   if (title_) {
-    gtk_widget_set_name(title_, "context-headline");
+    gtk_widget_set_name(title_, Idle() ? "context-idle" : "context-headline");
     StyleUtils::LoadCss(ContextFont::CssRule("#context-headline", headline));
+    FontUtils::Font idle_font = headline;
+    idle_font.size_pt = ContextIdle::IdleFontSizePt(headline.size_pt);
+    StyleUtils::LoadCss(ContextFont::CssRule("#context-idle", idle_font));
   }
   if (artist_ && album_label_) {
     gtk_widget_set_name(artist_, "context-normal");
@@ -219,7 +225,8 @@ void ContextView::Error() { gtk_label_set_text(GTK_LABEL(title_), Translations::
 void ContextView::NoSong() {
   song_playing_ = Song();
   lyrics_tried_ = false;
-  gtk_label_set_text(GTK_LABEL(title_), Translations::CStr("Not playing"));
+  gtk_widget_set_name(title_, "context-idle");
+  gtk_label_set_text(GTK_LABEL(title_), Translations::CStr(ContextIdle::Headline()));
   gtk_label_set_text(GTK_LABEL(artist_), "");
   gtk_label_set_text(GTK_LABEL(album_label_), "");
   UpdateTotalsLabel();
@@ -237,10 +244,15 @@ void ContextView::SongChanged(const Song &song) {
 
 void ContextView::SetSong() {
   const std::string headline = ContextTechnical::Headline(song_playing_, title_fmt_);
-  gtk_label_set_text(GTK_LABEL(title_), headline.empty() ? Translations::CStr("Not playing") : headline.c_str());
-  gtk_label_set_text(GTK_LABEL(artist_), song_playing_.artist().c_str());
   const std::string summary = ContextTechnical::Summary(song_playing_, summary_fmt_);
-  gtk_label_set_text(GTK_LABEL(album_label_), summary.c_str());
+  gtk_widget_set_name(title_, "context-headline");
+  if (headline.empty() && summary.empty()) {
+    gtk_label_set_text(GTK_LABEL(title_), Translations::CStr(ContextIdle::Headline()));
+  } else {
+    gtk_label_set_markup(GTK_LABEL(title_), ContextPlayingText::TopMarkup(headline, summary).c_str());
+  }
+  gtk_label_set_text(GTK_LABEL(artist_), "");
+  gtk_label_set_text(GTK_LABEL(album_label_), "");
   RebuildTechnicalData();
   ApplyVisibility();
 }

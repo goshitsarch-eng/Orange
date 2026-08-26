@@ -2,6 +2,7 @@
 
 #include "constants/appearancesettings.h"
 #include "core/appearancecolors.h"
+#include "core/appearancestyle.h"
 #include "settings/settingscontrols.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
@@ -14,7 +15,7 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
   AdwPreferencesGroup *theme = SettingsPage::AddGroup(page, "Theme");
   SettingsPage::AddToggle(theme, settings, AppearanceSettings::kDarkMode, "Dark mode", nullptr, AppearanceSettings::kDefaultDarkMode);
   SettingsPage::AddToggle(theme, settings, AppearanceSettings::kSystemThemeIcons, "Use system icons", nullptr, AppearanceSettings::kDefaultSystemIcons);
-  SettingsPage::AddEntry(theme, settings, AppearanceSettings::kStyle, "Style");
+  SettingsPage::AddCombo(theme, settings, AppearanceSettings::kStyle, "Style", AppearanceStyle::Choices(), "");
   SettingsPage::AddBoolRadios(theme, settings, AppearanceSettings::kUseCustomColorSet, "System colors", "Custom color set",
                              AppearanceSettings::kDefaultUseCustomColorSet);
   SettingsPage::AddButtonRow(theme, Translations::CStr("Custom colors"), Translations::CStr("Set dark colors"), [settings]() {

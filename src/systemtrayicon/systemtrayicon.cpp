@@ -1,12 +1,27 @@
+#include "config.h"
+
 #include "systemtrayicon/systemtrayicon.h"
 
 #include "constants/behavioursettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "dialogs/dialoghelpers.h"
+#include "osd/osdprettyfade.h"
 #include "systemtrayicon/trayiconcomposite.h"
+#include "systemtrayicon/trayiconmask.h"
+#include "systemtrayicon/trayiconpixmap.h"
+#include "systemtrayicon/traymenuposition.h"
+#include "systemtrayicon/traypopup.h"
 #include "translations/translations.h"
 
+#include <cairo.h>
+
+#ifdef HAVE_X11
+#include <gdk/x11/gdkx.h>
+#endif
+
 #include <algorithm>
+#include <cstdint>
 #include <unistd.h>
 
 namespace {
@@ -23,6 +38,7 @@ const gchar kSniXml[] =
     "    <property name='Status' type='s' access='read'/>"
     "    <property name='WindowId' type='i' access='read'/>"
     "    <property name='IconName' type='s' access='read'/>"
+    "    <property name='IconPixmap' type='a(iiay)' access='read'/>"
     "    <property name='OverlayIconName' type='s' access='read'/>"
     "    <property name='AttentionIconName' type='s' access='read'/>"
     "    <property name='ToolTip' type='(sa(iiay)ss)' access='read'/>"
@@ -159,10 +175,12 @@ SystemTrayIcon::~SystemTrayIcon() {
   }
 }
 
-void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &message, int timeout_ms) {
+void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &message, int timeout_ms,
+                               const std::vector<unsigned char> &art) {
   popup_summary_ = summary;
   popup_message_ = message;
   popup_timeout_ms_ = timeout_ms;
+  popup_art_ = art;
   if (!gtk_is_initialized()) {
     return;
   }
@@ -177,19 +195,51 @@ void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &me
     gtk_widget_set_margin_end(box, 12);
     gtk_widget_set_margin_top(box, 8);
     gtk_widget_set_margin_bottom(box, 8);
+    popup_image_ = gtk_image_new();
+    gtk_widget_set_halign(popup_image_, GTK_ALIGN_START);
     popup_title_ = gtk_label_new("");
     gtk_widget_add_css_class(popup_title_, "title-4");
     gtk_label_set_xalign(GTK_LABEL(popup_title_), 0);
     popup_body_ = gtk_label_new("");
     gtk_widget_add_css_class(popup_body_, "dim-label");
     gtk_label_set_xalign(GTK_LABEL(popup_body_), 0);
+    gtk_box_append(GTK_BOX(box), popup_image_);
     gtk_box_append(GTK_BOX(box), popup_title_);
     gtk_box_append(GTK_BOX(box), popup_body_);
     gtk_window_set_child(GTK_WINDOW(popup_window_), box);
   }
   gtk_label_set_text(GTK_LABEL(popup_title_), summary.c_str());
   gtk_label_set_text(GTK_LABEL(popup_body_), message.c_str());
+  if (popup_image_) {
+    if (TrayPopup::ShowArt(true, !art.empty())) {
+      DialogHelpers::SetImageFromBytes(popup_image_, art, 64);
+      gtk_widget_set_visible(popup_image_, TRUE);
+    } else {
+      gtk_widget_set_visible(popup_image_, FALSE);
+    }
+  }
+  ++popup_fade_gen_;
+  gtk_widget_set_opacity(popup_window_, 0.0);
   gtk_window_present(GTK_WINDOW(popup_window_));
+  struct FadeJob {
+    SystemTrayIcon *self = nullptr;
+    int elapsed = 0;
+    int gen = 0;
+  };
+  auto *job = new FadeJob{this, 0, popup_fade_gen_};
+  g_timeout_add_full(
+      G_PRIORITY_DEFAULT, static_cast<guint>(TrayPopup::FadeTickMs()),
+      +[](gpointer data) -> gboolean {
+        auto *fade = static_cast<FadeJob *>(data);
+        if (!fade->self || fade->gen != fade->self->popup_fade_gen_ || !fade->self->popup_window_) {
+          return G_SOURCE_REMOVE;
+        }
+        fade->elapsed += TrayPopup::FadeTickMs();
+        gtk_widget_set_opacity(fade->self->popup_window_,
+                               TrayPopup::FadeOpacity(fade->elapsed, TrayPopup::FadeDurationMs(), true));
+        return OSDPrettyFade::Finished(fade->elapsed, TrayPopup::FadeDurationMs()) ? G_SOURCE_REMOVE : G_SOURCE_CONTINUE;
+      },
+      job, +[](gpointer data) { delete static_cast<FadeJob *>(data); });
   if (popup_timeout_id_) {
     g_source_remove(popup_timeout_id_);
     popup_timeout_id_ = 0;
@@ -206,6 +256,16 @@ void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &me
   }
 }
 
+void SystemTrayIcon::RefreshPresentation() {
+  UpdateTooltip();
+  RebuildIconPixmap();
+  EmitNewStatus();
+  EmitNewOverlayIcon();
+  EmitNewIcon();
+  ++menu_revision_;
+  EmitLayoutUpdated();
+}
+
 void SystemTrayIcon::SetPlaying(bool playing) {
   if (playing) {
     playing_ = true;
@@ -214,31 +274,19 @@ void SystemTrayIcon::SetPlaying(bool playing) {
     SetStopped();
     return;
   }
-  UpdateTooltip();
-  EmitNewStatus();
-  EmitNewOverlayIcon();
-  ++menu_revision_;
-  EmitLayoutUpdated();
+  RefreshPresentation();
 }
 
 void SystemTrayIcon::SetPaused() {
   playing_ = false;
   paused_ = true;
-  UpdateTooltip();
-  EmitNewStatus();
-  EmitNewOverlayIcon();
-  ++menu_revision_;
-  EmitLayoutUpdated();
+  RefreshPresentation();
 }
 
 void SystemTrayIcon::SetStopped() {
   playing_ = false;
   paused_ = false;
-  UpdateTooltip();
-  EmitNewStatus();
-  EmitNewOverlayIcon();
-  ++menu_revision_;
-  EmitLayoutUpdated();
+  RefreshPresentation();
 }
 
 void SystemTrayIcon::SetProgress(int percentage) {
@@ -247,8 +295,10 @@ void SystemTrayIcon::SetProgress(int percentage) {
   settings.BeginGroup(BehaviourSettings::kSettingsGroup);
   if (settings.BoolValue(BehaviourSettings::kTrayIconProgress, BehaviourSettings::kDefaultTrayIconProgress)) {
     UpdateTooltip();
+    RebuildIconPixmap();
     EmitNewToolTip();
     EmitNewOverlayIcon();
+    EmitNewIcon();
   }
 }
 
@@ -309,7 +359,116 @@ void SystemTrayIcon::EmitNewOverlayIcon() {
   g_dbus_connection_emit_signal(connection_, nullptr, kSniPath, kSniInterface, "NewOverlayIcon", nullptr, nullptr);
 }
 
-void SystemTrayIcon::ShowMenu(int, int) {
+void SystemTrayIcon::EmitNewIcon() {
+  if (!connection_ || registration_id_ == 0) {
+    return;
+  }
+  g_dbus_connection_emit_signal(connection_, nullptr, kSniPath, kSniInterface, "NewIcon", nullptr, nullptr);
+}
+
+void SystemTrayIcon::RebuildIconPixmap() {
+  icon_pixmap_.clear();
+  icon_w_ = 0;
+  icon_h_ = 0;
+  if (!gtk_is_initialized()) {
+    return;
+  }
+  const int size = TrayIconPixmap::kDefaultSize;
+  cairo_surface_t *surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, size, size);
+  cairo_t *cr = cairo_create(surface);
+  cairo_set_source_rgba(cr, 0, 0, 0, 0);
+  cairo_paint(cr);
+  cairo_set_source_rgb(cr, 0.77, 0.36, 0.15);
+  cairo_arc(cr, size / 2.0, size / 2.0, size * 0.38, 0, 6.283185307179586);
+  cairo_fill(cr);
+  cairo_set_source_rgb(cr, 0.45, 0.62, 0.22);
+  cairo_arc(cr, size * 0.62, size * 0.28, size * 0.10, 0, 6.283185307179586);
+  cairo_fill(cr);
+
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const bool progress_enabled = settings.BoolValue(BehaviourSettings::kTrayIconProgress, BehaviourSettings::kDefaultTrayIconProgress);
+  const TrayIconComposite::Playback state = TrayIconComposite::StateFrom(playing_, paused_);
+  if (TrayIconComposite::ShowsProgress(progress_, progress_enabled, state)) {
+    cairo_save(cr);
+    const auto mask = TrayIconMask::ProgressMask(size, size, progress_);
+    if (mask.size() >= 3) {
+      cairo_move_to(cr, mask[0].x, mask[0].y);
+      for (size_t i = 1; i < mask.size(); ++i) {
+        cairo_line_to(cr, mask[i].x, mask[i].y);
+      }
+      cairo_close_path(cr);
+      cairo_clip(cr);
+      cairo_set_source_rgba(cr, 0.55, 0.55, 0.55, 0.78);
+      cairo_paint(cr);
+    }
+    cairo_restore(cr);
+  }
+  if (state != TrayIconComposite::Playback::Stopped) {
+    const int badge_h = TrayIconComposite::BadgeHeight(size);
+    const TrayIconComposite::Point origin = TrayIconComposite::BadgeTopLeft(size, badge_h);
+    cairo_save(cr);
+    cairo_translate(cr, origin.x, origin.y);
+    cairo_set_source_rgba(cr, 0, 0, 0, 0.45);
+    cairo_rectangle(cr, 0, 0, badge_h, badge_h);
+    cairo_fill(cr);
+    cairo_set_source_rgb(cr, 1, 1, 1);
+    if (state == TrayIconComposite::Playback::Playing) {
+      cairo_move_to(cr, badge_h * 0.28, badge_h * 0.2);
+      cairo_line_to(cr, badge_h * 0.28, badge_h * 0.8);
+      cairo_line_to(cr, badge_h * 0.82, badge_h * 0.5);
+      cairo_close_path(cr);
+      cairo_fill(cr);
+    } else {
+      cairo_rectangle(cr, badge_h * 0.22, badge_h * 0.2, badge_h * 0.2, badge_h * 0.6);
+      cairo_rectangle(cr, badge_h * 0.58, badge_h * 0.2, badge_h * 0.2, badge_h * 0.6);
+      cairo_fill(cr);
+    }
+    cairo_restore(cr);
+  }
+  cairo_surface_flush(surface);
+  const unsigned char *data = cairo_image_surface_get_data(surface);
+  const int stride = cairo_image_surface_get_stride(surface);
+  if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS || !data) {
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+    return;
+  }
+  icon_w_ = size;
+  icon_h_ = size;
+  icon_pixmap_.reserve(TrayIconPixmap::ByteCount(size, size));
+  for (int y = 0; y < size; ++y) {
+    const auto *row = reinterpret_cast<const uint32_t *>(data + y * stride);
+    TrayIconPixmap::PackNativeArgbRow(row, size, &icon_pixmap_);
+  }
+  cairo_destroy(cr);
+  cairo_surface_destroy(surface);
+}
+
+void SystemTrayIcon::PositionMenuWindow(GtkWidget *window, int x, int y) {
+  if (!window || !TrayMenuPosition::HasScreenPoint(x, y)) {
+    return;
+  }
+  gtk_widget_realize(window);
+#ifdef HAVE_X11
+  GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+  if (surface && GDK_IS_X11_SURFACE(surface)) {
+    const TrayMenuPosition::Rect anchor = TrayMenuPosition::AnchorPoint(x, y);
+    Display *display = gdk_x11_display_get_xdisplay(gdk_surface_get_display(surface));
+    XMoveWindow(display, gdk_x11_surface_get_xid(GDK_X11_SURFACE(surface)), anchor.x, anchor.y);
+  }
+#else
+  (void)x;
+  (void)y;
+#endif
+}
+
+void SystemTrayIcon::ShowMenu(int x, int y) {
+  last_menu_x_ = x;
+  last_menu_y_ = y;
+  if (!gtk_is_initialized()) {
+    return;
+  }
   GtkWidget *window = gtk_window_new();
   gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
   gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
@@ -337,6 +496,7 @@ void SystemTrayIcon::ShowMenu(int, int) {
   connect(box, gtk_button_new_with_label(Translations::CStr("Quit")), &Quit);
   gtk_window_set_child(GTK_WINDOW(window), box);
   gtk_window_present(GTK_WINDOW(window));
+  PositionMenuWindow(window, x, y);
 }
 
 const char *SystemTrayIcon::MenuLabel(int id, bool playing) {
@@ -558,6 +718,15 @@ GVariant *SystemTrayIcon::HandleGetProperty(GDBusConnection *, const gchar *, co
   }
   if (g_strcmp0(property_name, "IconName") == 0) {
     return g_variant_new_string(TrayIconComposite::BaseIconName());
+  }
+  if (g_strcmp0(property_name, "IconPixmap") == 0) {
+    GVariantBuilder builder;
+    g_variant_builder_init(&builder, G_VARIANT_TYPE("a(iiay)"));
+    if (!self->icon_pixmap_.empty() && self->icon_w_ > 0 && self->icon_h_ > 0) {
+      GVariant *bytes = g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE, self->icon_pixmap_.data(), self->icon_pixmap_.size(), 1);
+      g_variant_builder_add(&builder, "(ii@ay)", self->icon_w_, self->icon_h_, bytes);
+    }
+    return g_variant_builder_end(&builder);
   }
   if (g_strcmp0(property_name, "OverlayIconName") == 0) {
     const std::string overlay = self->OverlayIconName();

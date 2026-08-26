@@ -130,7 +130,7 @@ void OSDBase::ShowMessage(const std::string &summary, const std::string &body, c
       break;
     case OSDSettings::Type::TrayPopup:
       if (tray_icon_) {
-        tray_icon_->ShowPopup(summary, body, timeout_ms_);
+        tray_icon_->ShowPopup(summary, body, timeout_ms_, show_art_ ? art : std::vector<unsigned char>());
       } else {
         ShowNative(summary, body, icon, art);
       }

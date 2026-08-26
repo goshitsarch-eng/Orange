@@ -22,6 +22,8 @@
 #include "context/contextcover.h"
 #include "context/contextfont.h"
 #include "context/contextoptions.h"
+#include "context/contextidle.h"
+#include "context/contextplayingtext.h"
 #include "context/contexttechnical.h"
 #include "dialogs/deletefilespolicy.h"
 #include "organize/organize.h"
@@ -308,6 +310,20 @@ TEST(DeleteFilesPolicy, SourceAndAllowFlags) {
   local.set_source(Song::Source::LocalFile);
   local.set_url("file:///tmp/b.flac");
   EXPECT_EQ(DeleteFilesPolicy::Source::Playlist, DeleteFilesPolicy::SourceForSongs({collection, local}));
+}
+
+TEST(ContextIdle, HeadlineScaleAndTotals) {
+  EXPECT_STREQ("No song playing", ContextIdle::Headline());
+  EXPECT_DOUBLE_EQ(1.6, ContextIdle::FontScale());
+  EXPECT_EQ(18, ContextIdle::IdleFontSizePt(11));
+  EXPECT_EQ(1, ContextIdle::IdleFontSizePt(0));
+  EXPECT_EQ("1 song\n1 artist\n1 album", ContextIdle::TotalsMarkup(1, 1, 1));
+}
+
+TEST(ContextPlayingText, EscapesAndCombinesHeader) {
+  EXPECT_EQ("&amp;&lt;&gt;", ContextPlayingText::EscapeMarkup("&<>"));
+  EXPECT_EQ("<b>Roads</b>\nDummy", ContextPlayingText::TopMarkup("Roads", "Dummy"));
+  EXPECT_EQ("<b>A &amp; B</b>", ContextPlayingText::TopMarkup("A & B", {}));
 }
 
 TEST(ContextTechnical, CollectionTotalsMatchQtSingularPlural) {

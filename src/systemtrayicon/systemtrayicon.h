@@ -7,6 +7,8 @@
 #include <gio/gio.h>
 #include <gtk/gtk.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -24,7 +26,8 @@ class SystemTrayIcon {
   void SetupStatusNotifier();
   void SetVisible(bool visible);
   void ShowMenu(int x, int y);
-  void ShowPopup(const std::string &summary, const std::string &message, int timeout_ms);
+  void ShowPopup(const std::string &summary, const std::string &message, int timeout_ms,
+                 const std::vector<unsigned char> &art = {});
 
   bool available() const { return available_; }
   bool visible() const { return visible_; }
@@ -32,6 +35,12 @@ class SystemTrayIcon {
   bool paused() const { return paused_; }
   int progress() const { return progress_; }
   std::string OverlayIconName() const;
+  int icon_pixmap_width() const { return icon_w_; }
+  int icon_pixmap_height() const { return icon_h_; }
+  size_t icon_pixmap_size() const { return icon_pixmap_.size(); }
+  int last_menu_x() const { return last_menu_x_; }
+  int last_menu_y() const { return last_menu_y_; }
+  const std::vector<unsigned char> &popup_art() const { return popup_art_; }
   const std::string &tooltip() const { return tooltip_; }
   const std::string &popup_summary() const { return popup_summary_; }
   const std::string &popup_message() const { return popup_message_; }
@@ -83,10 +92,14 @@ class SystemTrayIcon {
 
  private:
   void UpdateTooltip();
+  void RebuildIconPixmap();
+  void RefreshPresentation();
   void EmitNewToolTip();
   void EmitNewStatus();
   void EmitNewOverlayIcon();
+  void EmitNewIcon();
   void EmitLayoutUpdated();
+  void PositionMenuWindow(GtkWidget *window, int x, int y);
   GVariant *MenuLayout(int parent_id) const;
   void RegisterMenu(GDBusConnection *connection);
 
@@ -102,6 +115,13 @@ class SystemTrayIcon {
   bool playing_ = false;
   bool paused_ = false;
   int progress_ = 0;
+  int icon_w_ = 0;
+  int icon_h_ = 0;
+  int last_menu_x_ = 0;
+  int last_menu_y_ = 0;
+  int popup_fade_gen_ = 0;
+  std::vector<uint8_t> icon_pixmap_;
+  std::vector<unsigned char> popup_art_;
   Song song_;
   std::string tooltip_ = "Strawberry";
   std::string popup_summary_;
@@ -110,6 +130,7 @@ class SystemTrayIcon {
   GtkWidget *popup_window_ = nullptr;
   GtkWidget *popup_title_ = nullptr;
   GtkWidget *popup_body_ = nullptr;
+  GtkWidget *popup_image_ = nullptr;
   guint popup_timeout_id_ = 0;
 };
 

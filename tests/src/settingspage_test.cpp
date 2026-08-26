@@ -19,6 +19,7 @@
 #include "constants/tidalsettings.h"
 #include "constants/transcodersettings.h"
 #include "constants/waveformsettings.h"
+#include "core/appearancestyle.h"
 #include "settings/settingscontrols.h"
 #include "settings/transcodersettingspage.h"
 #include "covermanager/coverproviderauth.h"
@@ -72,6 +73,19 @@ TEST(SettingsControls, NormalizationAndScales) {
   EXPECT_TRUE(SettingsControls::PlaylistPlayingSongColor(true, "#6696e3").empty());
   EXPECT_EQ("#6696e3", SettingsControls::PlaylistPlayingSongColor(false, {}));
   EXPECT_EQ("#abcabc", SettingsControls::PlaylistPlayingSongColor(false, "#abcabc"));
+}
+
+TEST(AppearanceStyle, GtkThemeChoicesAndCss) {
+  const auto choices = AppearanceStyle::Choices();
+  ASSERT_EQ(4u, choices.size());
+  EXPECT_EQ("", choices.front().first);
+  EXPECT_EQ("Adwaita Dark", choices[2].second);
+  EXPECT_TRUE(AppearanceStyle::ForcesDark(AppearanceStyle::kAdwaitaDark));
+  EXPECT_FALSE(AppearanceStyle::ForcesDark(AppearanceStyle::kAdwaita));
+  EXPECT_TRUE(AppearanceStyle::HasCustomPalette(""));
+  EXPECT_FALSE(AppearanceStyle::HasCustomPalette(AppearanceStyle::kHighContrast));
+  EXPECT_TRUE(AppearanceStyle::CssFor(AppearanceStyle::kAdwaita).empty());
+  EXPECT_FALSE(AppearanceStyle::CssFor(AppearanceStyle::kHighContrast).empty());
 }
 
 TEST(SettingsControls, BufferDefaultsAndCacheUnitMax) {
