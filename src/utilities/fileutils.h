@@ -28,6 +28,7 @@ int64_t FreeSpaceBytes(const std::string &path);
 int64_t TotalSpaceBytes(const std::string &path);
 int64_t FileSize(const std::string &path);
 int64_t FileMtime(const std::string &path);
+bool FilenameOnGVFS(const std::string &path);
 
 }  // namespace FileUtils
 

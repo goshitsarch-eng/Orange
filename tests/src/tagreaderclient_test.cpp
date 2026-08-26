@@ -243,3 +243,57 @@ TEST(SaveTagsOptions, CombinesFlags) {
   EXPECT_TRUE(HasSaveOption(all, SaveTagsOption::Cover));
   EXPECT_FALSE(HasSaveOption(static_cast<int>(SaveTagsOption::NoType), SaveTagsOption::Tags));
 }
+
+TEST(TagReader, WriteFileWritesId3v2ExtrasAndLyrics) {
+  TagReader reader;
+  const std::string path = TempPath("id3-extras.mp3");
+  FileUtils::WriteFile(path, MakeId3Mpeg("Original", "Artist", "Album"));
+
+  Song song = reader.ReadFile(path);
+  song.set_title("Changed");
+  song.set_albumartist("Album Artist");
+  song.set_composer("Composer");
+  song.set_lyrics("Line one\nLine two");
+  song.set_disc(2);
+  song.set_compilation(true);
+  song.set_musicbrainz_recording_id("mbid-123");
+  song.set_grouping("Group");
+  ASSERT_TRUE(reader.WriteFile(path, song, static_cast<int>(SaveTagsOption::Tags)));
+
+  Song reread = reader.ReadFile(path);
+  EXPECT_EQ("Changed", reread.title());
+  EXPECT_EQ("Album Artist", reread.albumartist());
+  EXPECT_EQ("Composer", reread.composer());
+  EXPECT_EQ("Line one\nLine two", reread.lyrics());
+  EXPECT_EQ(2, reread.disc());
+  EXPECT_TRUE(reread.compilation());
+  EXPECT_EQ("mbid-123", reread.musicbrainz_recording_id());
+  EXPECT_EQ("Group", reread.grouping());
+
+  FileUtils::Remove(path);
+}
+
+TEST(TagReader, WriteFileCanSaveTagsRatingAndCoverTogether) {
+  TagReader reader;
+  const std::string path = TempPath("combined.mp3");
+  FileUtils::WriteFile(path, MakeId3Mpeg("Title", "Artist", "Album"));
+
+  Song song = reader.ReadFile(path);
+  song.set_title("Together");
+  song.set_rating(0.8f);
+  song.set_playcount(9);
+  TagReader::CoverData cover;
+  cover.data = {0xFF, 0xD8, 0xFF, 0xE0};
+  cover.mime_type = "image/jpeg";
+  const SaveTagsOptions options =
+      SaveTagsOption::Tags | SaveTagsOption::Rating | SaveTagsOption::Playcount | SaveTagsOption::Cover;
+  ASSERT_TRUE(reader.WriteFile(path, song, options, cover));
+
+  Song reread = reader.ReadFile(path);
+  EXPECT_EQ("Together", reread.title());
+  EXPECT_NEAR(0.8f, reread.rating(), 0.001f);
+  EXPECT_GE(reread.playcount(), 9u);
+  EXPECT_TRUE(reread.art_embedded());
+
+  FileUtils::Remove(path);
+}

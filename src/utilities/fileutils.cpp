@@ -213,4 +213,8 @@ int64_t FileMtime(const std::string &path) {
   return static_cast<int64_t>(st.st_mtime);
 }
 
+bool FilenameOnGVFS(const std::string &path) {
+  return path.find("/gvfs/") != std::string::npos || path.find("/.gvfs/") != std::string::npos;
+}
+
 }  // namespace FileUtils

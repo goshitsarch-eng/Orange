@@ -1,5 +1,6 @@
 #include "tagreader/tagreader.h"
 
+#include "core/filewriteguard.h"
 #include "core/logging.h"
 #include "tagreader/albumcovertagdata.h"
 #include "tagreader/tagreadergme.h"
@@ -15,6 +16,8 @@
 #include <taglib/attachedpictureframe.h>
 #include <taglib/popularimeterframe.h>
 #include <taglib/textidentificationframe.h>
+#include <taglib/unsynchronizedlyricsframe.h>
+#include <taglib/id3v2.h>
 #include <taglib/flacfile.h>
 #include <taglib/flacpicture.h>
 #include <taglib/mp4file.h>
@@ -51,6 +54,37 @@ constexpr char kMp4Cover[] = "covr";
 constexpr char kMp4FmpsRating[] = "----:com.apple.iTunes:FMPS_Rating";
 constexpr char kMp4FmpsPlaycount[] = "----:com.apple.iTunes:FMPS_Playcount";
 constexpr char kApeCover[] = "COVER ART (FRONT)";
+constexpr char kId3AlbumArtist[] = "TPE2";
+constexpr char kId3AlbumArtistSort[] = "TSO2";
+constexpr char kId3AlbumSort[] = "TSOA";
+constexpr char kId3ArtistSort[] = "TSOP";
+constexpr char kId3TitleSort[] = "TSOT";
+constexpr char kId3Disc[] = "TPOS";
+constexpr char kId3Composer[] = "TCOM";
+constexpr char kId3ComposerSort[] = "TSOC";
+constexpr char kId3Performer[] = "TOPE";
+constexpr char kId3Grouping[] = "TIT1";
+constexpr char kId3Compilation[] = "TCMP";
+constexpr char kId3Lyrics[] = "USLT";
+constexpr char kId3MusicBrainzRecording[] = "MUSICBRAINZ_TRACKID";
+constexpr char kVorbisAlbumArtist[] = "ALBUMARTIST";
+constexpr char kVorbisAlbumArtistAlt[] = "ALBUM ARTIST";
+constexpr char kMp4AlbumArtist[] = "aART";
+constexpr char kMp4Composer[] = "\251wrt";
+constexpr char kMp4Grouping[] = "\251grp";
+constexpr char kMp4Lyrics[] = "\251lyr";
+constexpr char kMp4Disc[] = "disk";
+constexpr char kMp4Compilation[] = "cpil";
+constexpr char kMp4MusicBrainzRecording[] = "----:com.apple.iTunes:MusicBrainz Track Id";
+constexpr char kApeAlbumArtist[] = "ALBUM ARTIST";
+constexpr char kAsfAlbumArtist[] = "WM/AlbumArtist";
+constexpr char kAsfComposer[] = "WM/Composer";
+constexpr char kAsfLyrics[] = "WM/Lyrics";
+constexpr char kAsfDisc[] = "WM/PartOfSet";
+constexpr char kAsfOriginalYear[] = "WM/OriginalReleaseYear";
+constexpr char kAsfMusicBrainzRecording[] = "MusicBrainz/Track Id";
+constexpr char kAsfFmpsRating[] = "FMPS/Rating";
+constexpr char kAsfFmpsPlaycount[] = "FMPS/Playcount";
 
 std::string FromTagLib(const TagLib::String &value) { return value.to8Bit(true); }
 
@@ -258,6 +292,22 @@ void ReadId3v2Extras(TagLib::ID3v2::Tag *tag, Song *song) {
       }
     }
   }
+  if (song->lyrics().empty()) {
+    const auto lyrics = tag->frameListMap()[kId3Lyrics];
+    if (!lyrics.isEmpty()) {
+      if (auto *uslt = dynamic_cast<TagLib::ID3v2::UnsynchronizedLyricsFrame *>(lyrics.front())) {
+        song->set_lyrics(FromTagLib(uslt->text()));
+      }
+    }
+  }
+  if (song->musicbrainz_recording_id().empty()) {
+    if (auto *mbid = TagLib::ID3v2::UserTextIdentificationFrame::find(tag, kId3MusicBrainzRecording)) {
+      const TagLib::StringList fields = mbid->fieldList();
+      if (fields.size() > 1) {
+        song->set_musicbrainz_recording_id(FromTagLib(fields[1]));
+      }
+    }
+  }
 }
 
 void SetId3v2Rating(TagLib::ID3v2::Tag *tag, float rating) {
@@ -309,6 +359,261 @@ void SetXiphCover(TagLib::Ogg::XiphComment *comment, const TagLib::ByteVector &b
   picture->setMimeType(ToTagLib(mime.empty() ? "image/jpeg" : mime));
   picture->setData(bytes);
   comment->addPicture(picture);
+}
+
+void SetId3v2TextFrame(TagLib::ID3v2::Tag *tag, const char *id, const std::string &value) {
+  if (!tag) {
+    return;
+  }
+  tag->removeFrames(id);
+  if (value.empty()) {
+    return;
+  }
+  auto *frame = new TagLib::ID3v2::TextIdentificationFrame(id, TagLib::String::UTF8);
+  frame->setText(ToTagLib(value));
+  tag->addFrame(frame);
+}
+
+void SetId3v2UserText(TagLib::ID3v2::Tag *tag, const char *description, const std::string &value) {
+  if (!tag) {
+    return;
+  }
+  if (auto *existing = TagLib::ID3v2::UserTextIdentificationFrame::find(tag, description)) {
+    tag->removeFrame(existing);
+  }
+  if (value.empty()) {
+    return;
+  }
+  auto *frame = new TagLib::ID3v2::UserTextIdentificationFrame(TagLib::String::UTF8);
+  frame->setDescription(description);
+  frame->setText(ToTagLib(value));
+  tag->addFrame(frame);
+}
+
+void SetId3v2Lyrics(TagLib::ID3v2::Tag *tag, const std::string &value) {
+  if (!tag) {
+    return;
+  }
+  tag->removeFrames(kId3Lyrics);
+  if (value.empty()) {
+    return;
+  }
+  auto *frame = new TagLib::ID3v2::UnsynchronizedLyricsFrame(TagLib::String::UTF8);
+  frame->setDescription("Strawberry editor");
+  frame->setText(ToTagLib(value));
+  tag->addFrame(frame);
+}
+
+void SetId3v2Tag(TagLib::ID3v2::Tag *tag, const Song &song) {
+  SetId3v2TextFrame(tag, kId3Disc, song.disc() > 0 ? std::to_string(song.disc()) : "");
+  SetId3v2TextFrame(tag, kId3Composer, song.composer());
+  SetId3v2TextFrame(tag, kId3ComposerSort, song.composersort());
+  SetId3v2TextFrame(tag, kId3Grouping, song.grouping());
+  SetId3v2TextFrame(tag, kId3Performer, song.performer());
+  SetId3v2TextFrame(tag, kId3AlbumArtist, song.albumartist());
+  SetId3v2TextFrame(tag, kId3AlbumArtistSort, song.albumartistsort());
+  SetId3v2TextFrame(tag, kId3AlbumSort, song.albumsort());
+  SetId3v2TextFrame(tag, kId3ArtistSort, song.artistsort());
+  SetId3v2TextFrame(tag, kId3TitleSort, song.titlesort());
+  SetId3v2TextFrame(tag, kId3Compilation, song.compilation() ? "1" : "");
+  SetId3v2Lyrics(tag, song.lyrics());
+  if (!song.musicbrainz_recording_id().empty()) {
+    SetId3v2UserText(tag, kId3MusicBrainzRecording, song.musicbrainz_recording_id());
+  }
+}
+
+void SetId3v2Playcount(TagLib::ID3v2::Tag *tag, unsigned playcount) {
+  SetId3v2UserText(tag, kId3FmpsPlaycount, std::to_string(playcount));
+  if (!tag) {
+    return;
+  }
+  TagLib::ID3v2::PopularimeterFrame *popm = nullptr;
+  const auto frames = tag->frameListMap()["POPM"];
+  for (auto *frame : frames) {
+    popm = dynamic_cast<TagLib::ID3v2::PopularimeterFrame *>(frame);
+    if (popm) {
+      break;
+    }
+  }
+  if (!popm) {
+    popm = new TagLib::ID3v2::PopularimeterFrame();
+    popm->setEmail("strawberry");
+    tag->addFrame(popm);
+  }
+  popm->setCounter(playcount);
+}
+
+void SetVorbisComments(TagLib::Ogg::XiphComment *comment, const Song &song) {
+  if (!comment) {
+    return;
+  }
+  comment->addField("COMPOSER", ToTagLib(song.composer()), true);
+  comment->addField("COMPOSERSORT", ToTagLib(song.composersort()), true);
+  comment->addField("PERFORMER", ToTagLib(song.performer()), true);
+  comment->addField("PERFORMERSORT", ToTagLib(song.performersort()), true);
+  comment->addField("GROUPING", ToTagLib(song.grouping()), true);
+  comment->addField("DISCNUMBER", song.disc() > 0 ? TagLib::String::number(song.disc()) : TagLib::String(), true);
+  comment->addField("COMPILATION", song.compilation() ? TagLib::String("1") : TagLib::String(), true);
+  comment->addField(kVorbisAlbumArtist, ToTagLib(song.albumartist()), true);
+  comment->removeFields(kVorbisAlbumArtistAlt);
+  comment->addField("ALBUMARTISTSORT", ToTagLib(song.albumartistsort()), true);
+  comment->addField("ALBUMSORT", ToTagLib(song.albumsort()), true);
+  comment->addField("ARTISTSORT", ToTagLib(song.artistsort()), true);
+  comment->addField("TITLESORT", ToTagLib(song.titlesort()), true);
+  comment->addField("LYRICS", ToTagLib(song.lyrics()), true);
+  comment->removeFields("UNSYNCEDLYRICS");
+  if (!song.musicbrainz_recording_id().empty()) {
+    comment->addField("MUSICBRAINZ_TRACKID", ToTagLib(song.musicbrainz_recording_id()), true);
+  }
+}
+
+void SetXiphPlaycount(TagLib::Ogg::XiphComment *comment, unsigned playcount) {
+  if (!comment) {
+    return;
+  }
+  if (playcount > 0) {
+    comment->addField(kFmpsPlaycount, TagLib::String::number(static_cast<int>(playcount)), true);
+  } else {
+    comment->removeFields(kFmpsPlaycount);
+  }
+}
+
+void SetXiphRating(TagLib::Ogg::XiphComment *comment, float rating) {
+  if (!comment) {
+    return;
+  }
+  if (rating > 0) {
+    comment->addField(kFmpsRating, TagLib::String::number(rating), true);
+  } else {
+    comment->removeFields(kFmpsRating);
+  }
+}
+
+void SetAPEItem(TagLib::APE::Tag *tag, const char *key, const std::string &value) {
+  if (!tag) {
+    return;
+  }
+  if (value.empty()) {
+    tag->removeItem(key);
+    return;
+  }
+  tag->setItem(key, TagLib::APE::Item(key, TagLib::StringList(ToTagLib(value))));
+}
+
+void SetAPETag(TagLib::APE::Tag *tag, const Song &song) {
+  SetAPEItem(tag, kApeAlbumArtist, song.albumartist());
+  SetAPEItem(tag, "DISC", song.disc() > 0 ? std::to_string(song.disc()) : "");
+  SetAPEItem(tag, "COMPOSER", song.composer());
+  SetAPEItem(tag, "GROUPING", song.grouping());
+  SetAPEItem(tag, "PERFORMER", song.performer());
+  SetAPEItem(tag, "LYRICS", song.lyrics());
+  SetAPEItem(tag, "COMPILATION", song.compilation() ? "1" : "");
+  if (!song.musicbrainz_recording_id().empty()) {
+    SetAPEItem(tag, "MUSICBRAINZ_TRACKID", song.musicbrainz_recording_id());
+  }
+}
+
+void SetAPEPlaycount(TagLib::APE::Tag *tag, unsigned playcount) {
+  SetAPEItem(tag, kFmpsPlaycount, playcount > 0 ? std::to_string(playcount) : "");
+}
+
+void SetAPERating(TagLib::APE::Tag *tag, float rating) {
+  SetAPEItem(tag, kFmpsRating, rating > 0 ? std::to_string(rating) : "");
+}
+
+void SetMP4String(TagLib::MP4::Tag *tag, const char *key, const std::string &value) {
+  if (!tag) {
+    return;
+  }
+  if (value.empty()) {
+    tag->removeItem(key);
+    return;
+  }
+  tag->setItem(key, TagLib::MP4::Item(TagLib::StringList(ToTagLib(value))));
+}
+
+void SetMP4Tag(TagLib::MP4::Tag *tag, const Song &song) {
+  if (!tag) {
+    return;
+  }
+  tag->setItem(kMp4Disc, TagLib::MP4::Item(song.disc() <= 0 ? 0 : song.disc(), 0));
+  SetMP4String(tag, kMp4Composer, song.composer());
+  SetMP4String(tag, kMp4Grouping, song.grouping());
+  SetMP4String(tag, kMp4Lyrics, song.lyrics());
+  SetMP4String(tag, kMp4AlbumArtist, song.albumartist());
+  tag->setItem(kMp4Compilation, TagLib::MP4::Item(song.compilation()));
+  if (!song.musicbrainz_recording_id().empty()) {
+    SetMP4String(tag, kMp4MusicBrainzRecording, song.musicbrainz_recording_id());
+  }
+}
+
+void SetMP4Playcount(TagLib::MP4::Tag *tag, unsigned playcount) {
+  SetMP4String(tag, kMp4FmpsPlaycount, playcount > 0 ? std::to_string(playcount) : "");
+}
+
+void SetMP4Rating(TagLib::MP4::Tag *tag, float rating) {
+  SetMP4String(tag, kMp4FmpsRating, rating > 0 ? std::to_string(rating) : "");
+}
+
+void SetASFAttribute(TagLib::ASF::Tag *tag, const char *key, const std::string &value) {
+  if (!tag) {
+    return;
+  }
+  if (value.empty()) {
+    tag->removeItem(key);
+    return;
+  }
+  tag->setAttribute(key, TagLib::ASF::Attribute(ToTagLib(value)));
+}
+
+void SetASFTag(TagLib::ASF::Tag *tag, const Song &song) {
+  SetASFAttribute(tag, kAsfAlbumArtist, song.albumartist());
+  SetASFAttribute(tag, kAsfComposer, song.composer());
+  SetASFAttribute(tag, kAsfLyrics, song.lyrics());
+  SetASFAttribute(tag, kAsfDisc, song.disc() > 0 ? std::to_string(song.disc()) : "");
+  SetASFAttribute(tag, kAsfOriginalYear, song.originalyear() > 0 ? std::to_string(song.originalyear()) : "");
+  SetASFAttribute(tag, kAsfMusicBrainzRecording, song.musicbrainz_recording_id());
+}
+
+void SetASFPlaycount(TagLib::ASF::Tag *tag, unsigned playcount) {
+  SetASFAttribute(tag, kAsfFmpsPlaycount, playcount > 0 ? std::to_string(playcount) : "");
+}
+
+void SetASFRating(TagLib::ASF::Tag *tag, float rating) {
+  SetASFAttribute(tag, kAsfFmpsRating, rating > 0 ? std::to_string(rating) : "");
+}
+
+void SetBasicTag(TagLib::Tag *tag, const Song &song) {
+  if (!tag) {
+    return;
+  }
+  tag->setTitle(ToTagLib(song.title()));
+  tag->setArtist(ToTagLib(song.artist()));
+  tag->setAlbum(ToTagLib(song.album()));
+  tag->setComment(ToTagLib(song.comment()));
+  tag->setGenre(ToTagLib(song.genre()));
+  tag->setYear(song.year() > 0 ? static_cast<unsigned>(song.year()) : 0);
+  tag->setTrack(song.track() > 0 ? static_cast<unsigned>(song.track()) : 0);
+}
+
+TagLib::ID3v2::Version Id3v2Version(TagID3v2Version version) {
+  return version == TagID3v2Version::V3 ? TagLib::ID3v2::v3 : TagLib::ID3v2::v4;
+}
+
+bool SaveFileRef(TagLib::FileRef *file, TagID3v2Version version) {
+  if (!file || !file->file()) {
+    return false;
+  }
+  if (auto *mpeg = dynamic_cast<TagLib::MPEG::File *>(file->file())) {
+    return mpeg->save(TagLib::MPEG::File::AllTags, TagLib::File::StripOthers, Id3v2Version(version));
+  }
+  if (auto *wav = dynamic_cast<TagLib::RIFF::WAV::File *>(file->file())) {
+    return wav->save(TagLib::RIFF::WAV::File::AllTags, TagLib::File::StripOthers, Id3v2Version(version));
+  }
+  if (auto *aiff = dynamic_cast<TagLib::RIFF::AIFF::File *>(file->file())) {
+    return aiff->save(Id3v2Version(version));
+  }
+  return file->save();
 }
 
 }  // namespace
@@ -498,46 +803,199 @@ Song TagReader::ReadStream(StreamTagReader *stream, const std::string &url, cons
 }
 
 bool TagReader::WriteFile(const Song &song) const {
-  const std::string filename = FileUtils::PathFromUri(song.url());
-  TagLib::FileRef file(filename.c_str());
-  if (file.isNull() || !file.tag()) {
+  return WriteFile(FileUtils::PathFromUri(song.url()), song, static_cast<int>(SaveTagsOption::Tags));
+}
+
+bool TagReader::WriteFile(const std::string &filename, const Song &song, SaveTagsOptions save_tags_options, const CoverData &cover,
+                          TagID3v2Version tag_id3v2_version) const {
+  if (filename.empty() || !FileUtils::Exists(filename)) {
     return false;
   }
-  file.tag()->setTitle(ToTagLib(song.title()));
-  file.tag()->setArtist(ToTagLib(song.artist()));
-  file.tag()->setAlbum(ToTagLib(song.album()));
-  file.tag()->setComment(ToTagLib(song.comment()));
-  file.tag()->setGenre(ToTagLib(song.genre()));
-  file.tag()->setYear(song.year() > 0 ? static_cast<unsigned>(song.year()) : 0);
-  file.tag()->setTrack(song.track() > 0 ? static_cast<unsigned>(song.track()) : 0);
+  const bool save_tags = HasSaveOption(save_tags_options, SaveTagsOption::Tags);
+  const bool save_playcount = HasSaveOption(save_tags_options, SaveTagsOption::Playcount);
+  const bool save_rating = HasSaveOption(save_tags_options, SaveTagsOption::Rating);
+  const bool save_cover = HasSaveOption(save_tags_options, SaveTagsOption::Cover);
 
-  TagLib::PropertyMap properties = file.file()->properties();
-  auto set_or_remove = [&properties](const char *key, const std::string &value) {
-    if (value.empty()) {
-      properties.erase(key);
-    } else {
-      properties.replace(key, TagLib::StringList(ToTagLib(value)));
+  FileWriteGuard write_guard(filename);
+  if (!write_guard.Init()) {
+    return false;
+  }
+
+  TagLib::FileRef file(write_guard.working_filename().c_str());
+  if (file.isNull() || !file.file()) {
+    return false;
+  }
+
+  if (save_tags) {
+    SetBasicTag(file.tag(), song);
+  }
+
+  TagLib::ByteVector cover_bytes;
+  std::string cover_mime;
+  if (save_cover && !cover.data.empty()) {
+    cover_bytes = TagLib::ByteVector(reinterpret_cast<const char *>(cover.data.data()), static_cast<unsigned>(cover.data.size()));
+    cover_mime = cover.mime_type.empty() ? AlbumCoverTagData::GuessMimeType(cover.data) : cover.mime_type;
+  }
+
+  bool is_flac = false;
+  if (auto *flac = dynamic_cast<TagLib::FLAC::File *>(file.file())) {
+    is_flac = true;
+    TagLib::Ogg::XiphComment *comment = flac->xiphComment(true);
+    if (save_tags) {
+      SetVorbisComments(comment, song);
     }
-  };
-  set_or_remove("ALBUMARTIST", song.albumartist());
-  set_or_remove("COMPOSER", song.composer());
-  set_or_remove("PERFORMER", song.performer());
-  set_or_remove("GROUPING", song.grouping());
-  set_or_remove("LYRICS", song.lyrics());
-  set_or_remove("TITLESORT", song.titlesort());
-  set_or_remove("ALBUMSORT", song.albumsort());
-  set_or_remove("ARTISTSORT", song.artistsort());
-  set_or_remove("ALBUMARTISTSORT", song.albumartistsort());
-  set_or_remove("COMPOSERSORT", song.composersort());
-  set_or_remove("PERFORMERSORT", song.performersort());
-  set_or_remove("MOOD", song.mood());
-  set_or_remove("INITIALKEY", song.initial_key());
-  set_or_remove("COMPILATION", song.compilation() ? "1" : "");
-  set_or_remove("DISCNUMBER", song.disc() > 0 ? std::to_string(song.disc()) : "");
-  set_or_remove("ORIGINALYEAR", song.originalyear() > 0 ? std::to_string(song.originalyear()) : "");
-  set_or_remove("BPM", song.bpm() > 0 ? std::to_string(song.bpm()) : "");
-  file.file()->setProperties(properties);
-  return file.save();
+    if (save_playcount) {
+      SetXiphPlaycount(comment, song.playcount());
+    }
+    if (save_rating) {
+      SetXiphRating(comment, song.rating());
+    }
+    if (save_cover) {
+      flac->removePictures();
+      if (!cover.data.empty()) {
+        auto *picture = new TagLib::FLAC::Picture();
+        picture->setMimeType(ToTagLib(cover_mime.empty() ? "image/jpeg" : cover_mime));
+        picture->setType(TagLib::FLAC::Picture::FrontCover);
+        picture->setData(cover_bytes);
+        flac->addPicture(picture);
+      }
+    }
+  } else if (auto *wavpack = dynamic_cast<TagLib::WavPack::File *>(file.file())) {
+    TagLib::APE::Tag *tag = wavpack->APETag(true);
+    if (save_tags) {
+      SetAPETag(tag, song);
+    }
+    if (save_playcount) {
+      SetAPEPlaycount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetAPERating(tag, song.rating());
+    }
+  } else if (auto *ape = dynamic_cast<TagLib::APE::File *>(file.file())) {
+    TagLib::APE::Tag *tag = ape->APETag(true);
+    if (save_tags) {
+      SetAPETag(tag, song);
+    }
+    if (save_playcount) {
+      SetAPEPlaycount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetAPERating(tag, song.rating());
+    }
+  } else if (auto *mpc = dynamic_cast<TagLib::MPC::File *>(file.file())) {
+    TagLib::APE::Tag *tag = mpc->APETag(true);
+    if (save_tags) {
+      SetAPETag(tag, song);
+    }
+    if (save_playcount) {
+      SetAPEPlaycount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetAPERating(tag, song.rating());
+    }
+  } else if (auto *mpeg = dynamic_cast<TagLib::MPEG::File *>(file.file())) {
+    TagLib::ID3v2::Tag *tag = mpeg->ID3v2Tag(true);
+    if (save_tags) {
+      SetId3v2Tag(tag, song);
+    }
+    if (save_playcount) {
+      SetId3v2Playcount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetId3v2Rating(tag, song.rating());
+    }
+    if (save_cover) {
+      SetId3v2Cover(tag, cover_bytes, cover_mime);
+    }
+  } else if (auto *mp4 = dynamic_cast<TagLib::MP4::File *>(file.file())) {
+    TagLib::MP4::Tag *tag = mp4->tag();
+    if (save_tags) {
+      SetMP4Tag(tag, song);
+    }
+    if (save_playcount) {
+      SetMP4Playcount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetMP4Rating(tag, song.rating());
+    }
+    if (save_cover && tag) {
+      if (cover.data.empty()) {
+        tag->removeItem(kMp4Cover);
+      } else {
+        TagLib::MP4::CoverArt::Format format = TagLib::MP4::CoverArt::JPEG;
+        if (cover_mime == "image/png") {
+          format = TagLib::MP4::CoverArt::PNG;
+        } else if (cover_mime == "image/gif") {
+          format = TagLib::MP4::CoverArt::GIF;
+        }
+        TagLib::MP4::CoverArtList list;
+        list.append(TagLib::MP4::CoverArt(format, cover_bytes));
+        tag->setItem(kMp4Cover, TagLib::MP4::Item(list));
+      }
+    }
+  } else if (auto *wav = dynamic_cast<TagLib::RIFF::WAV::File *>(file.file())) {
+    TagLib::ID3v2::Tag *tag = wav->ID3v2Tag();
+    if (save_tags) {
+      SetId3v2Tag(tag, song);
+    }
+    if (save_playcount) {
+      SetId3v2Playcount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetId3v2Rating(tag, song.rating());
+    }
+    if (save_cover) {
+      SetId3v2Cover(tag, cover_bytes, cover_mime);
+    }
+  } else if (auto *aiff = dynamic_cast<TagLib::RIFF::AIFF::File *>(file.file())) {
+    TagLib::ID3v2::Tag *tag = aiff->tag();
+    if (save_tags) {
+      SetId3v2Tag(tag, song);
+    }
+    if (save_playcount) {
+      SetId3v2Playcount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetId3v2Rating(tag, song.rating());
+    }
+    if (save_cover) {
+      SetId3v2Cover(tag, cover_bytes, cover_mime);
+    }
+  } else if (auto *asf = dynamic_cast<TagLib::ASF::File *>(file.file())) {
+    TagLib::ASF::Tag *tag = asf->tag();
+    if (save_tags) {
+      SetASFTag(tag, song);
+    }
+    if (save_playcount) {
+      SetASFPlaycount(tag, song.playcount());
+    }
+    if (save_rating) {
+      SetASFRating(tag, song.rating());
+    }
+  }
+
+  if (!is_flac) {
+    if (auto *comment = dynamic_cast<TagLib::Ogg::XiphComment *>(file.file()->tag())) {
+      if (save_tags) {
+        SetVorbisComments(comment, song);
+      }
+      if (save_playcount) {
+        SetXiphPlaycount(comment, song.playcount());
+      }
+      if (save_rating) {
+        SetXiphRating(comment, song.rating());
+      }
+      if (save_cover) {
+        SetXiphCover(comment, cover_bytes, cover_mime);
+      }
+    }
+  }
+
+  const bool success = SaveFileRef(&file, tag_id3v2_version);
+  if (success && !write_guard.Commit()) {
+    return false;
+  }
+  return success;
 }
 
 TagReader::CoverData TagReader::LoadCoverData(const std::string &filename) const {
@@ -625,62 +1083,15 @@ bool TagReader::SaveCover(const std::string &filename, const CoverData &cover) c
 }
 
 bool TagReader::SavePlaycount(const std::string &filename, unsigned playcount) const {
-  TagLib::FileRef file(filename.c_str());
-  if (file.isNull() || !file.file()) {
-    return false;
-  }
-  TagLib::PropertyMap properties = file.file()->properties();
-  properties.replace("PLAYCOUNT", TagLib::StringList(TagLib::String::number(static_cast<int>(playcount))));
-  properties.replace(kFmpsPlaycount, TagLib::StringList(TagLib::String::number(static_cast<int>(playcount))));
-  file.file()->setProperties(properties);
-  if (auto *mpeg = dynamic_cast<TagLib::MPEG::File *>(file.file())) {
-    if (TagLib::ID3v2::Tag *tag = mpeg->ID3v2Tag(true)) {
-      if (auto *existing = TagLib::ID3v2::UserTextIdentificationFrame::find(tag, kId3FmpsPlaycount)) {
-        tag->removeFrame(existing);
-      }
-      auto *fmps = new TagLib::ID3v2::UserTextIdentificationFrame(TagLib::String::UTF8);
-      fmps->setDescription(kId3FmpsPlaycount);
-      fmps->setText(TagLib::String::number(static_cast<int>(playcount)));
-      tag->addFrame(fmps);
-    }
-  }
-  return file.save();
+  Song song;
+  song.set_url(FileUtils::UriFromPath(filename));
+  song.set_playcount(playcount);
+  return WriteFile(filename, song, static_cast<int>(SaveTagsOption::Playcount));
 }
 
 bool TagReader::SaveRating(const std::string &filename, float rating) const {
-  TagLib::FileRef file(filename.c_str());
-  if (file.isNull() || !file.file()) {
-    return false;
-  }
-  if (auto *mpeg = dynamic_cast<TagLib::MPEG::File *>(file.file())) {
-    SetId3v2Rating(mpeg->ID3v2Tag(true), rating);
-  } else if (auto *wav = dynamic_cast<TagLib::RIFF::WAV::File *>(file.file())) {
-    SetId3v2Rating(wav->ID3v2Tag(), rating);
-  } else if (auto *aiff = dynamic_cast<TagLib::RIFF::AIFF::File *>(file.file())) {
-    SetId3v2Rating(aiff->tag(), rating);
-  } else if (auto *mp4 = dynamic_cast<TagLib::MP4::File *>(file.file())) {
-    if (TagLib::MP4::Tag *tag = mp4->tag()) {
-      if (rating > 0) {
-        tag->setItem(kMp4FmpsRating, TagLib::MP4::Item(TagLib::StringList(TagLib::String::number(rating))));
-      } else {
-        tag->removeItem(kMp4FmpsRating);
-      }
-    }
-  } else if (auto *xiph = dynamic_cast<TagLib::Ogg::XiphComment *>(file.file()->tag())) {
-    if (rating > 0) {
-      xiph->addField(kFmpsRating, TagLib::String::number(rating), true);
-    } else {
-      xiph->removeFields(kFmpsRating);
-    }
-  }
-  TagLib::PropertyMap properties = file.file()->properties();
-  if (rating > 0) {
-    properties.replace("RATING", TagLib::StringList(TagLib::String::number(rating)));
-    properties.replace(kFmpsRating, TagLib::StringList(TagLib::String::number(rating)));
-  } else {
-    properties.erase("RATING");
-    properties.erase(kFmpsRating);
-  }
-  file.file()->setProperties(properties);
-  return file.save();
+  Song song;
+  song.set_url(FileUtils::UriFromPath(filename));
+  song.set_rating(rating);
+  return WriteFile(filename, song, static_cast<int>(SaveTagsOption::Rating));
 }

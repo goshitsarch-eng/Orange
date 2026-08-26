@@ -117,28 +117,16 @@ TagReaderReadStreamReplyPtr TagReaderClient::ReadStreamAsync(const std::string &
 }
 
 TagReaderResult TagReaderClient::WriteFileBlocking(const std::string &filename, const Song &song, SaveTagsOptions save_tags_options,
-                                                   const SaveTagCoverData &save_tag_cover_data, TagID3v2Version) {
+                                                   const SaveTagCoverData &save_tag_cover_data, TagID3v2Version tag_id3v2_version) {
   const TagReaderResult path = PathResult(filename);
   if (!path.success()) {
     return path;
   }
-  bool ok = true;
-  if (HasSaveOption(save_tags_options, SaveTagsOption::Tags)) {
-    Song written = song;
-    if (written.url().empty()) {
-      written.set_url(FileUtils::UriFromPath(filename));
-    }
-    ok = tagreader_->WriteFile(written) && ok;
+  Song written = song;
+  if (written.url().empty()) {
+    written.set_url(FileUtils::UriFromPath(filename));
   }
-  if (HasSaveOption(save_tags_options, SaveTagsOption::Playcount)) {
-    ok = tagreader_->SavePlaycount(filename, song.playcount()) && ok;
-  }
-  if (HasSaveOption(save_tags_options, SaveTagsOption::Rating)) {
-    ok = tagreader_->SaveRating(filename, song.rating()) && ok;
-  }
-  if (HasSaveOption(save_tags_options, SaveTagsOption::Cover)) {
-    ok = tagreader_->SaveCover(filename, ToCoverData(save_tag_cover_data)) && ok;
-  }
+  const bool ok = tagreader_->WriteFile(filename, written, save_tags_options, ToCoverData(save_tag_cover_data), tag_id3v2_version);
   return ok ? TagReaderResult{TagReaderResult::ErrorCode::Success} : TagReaderResult{TagReaderResult::ErrorCode::FileSaveError};
 }
 

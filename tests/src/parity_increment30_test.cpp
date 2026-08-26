@@ -12,6 +12,7 @@
 #include "device/devicestatefiltermodel.h"
 #include "engine/enginebase.h"
 #include "radios/radiomimedata.h"
+#include "utilities/fileutils.h"
 #include "utilities/textencodingutils.h"
 #include "utilities/transliterate.h"
 #include "utilities/xmlparser.h"
@@ -106,6 +107,10 @@ TEST(CollectionSettingsDirectoryModel, AddAndRemove) {
 TEST(FileWriteGuard, ChecksPath) {
   FileWriteGuard missing("/tmp/strawberry-does-not-exist-filewriteguard");
   EXPECT_FALSE(missing.ok());
+  EXPECT_FALSE(missing.active());
+  EXPECT_FALSE(FileUtils::FilenameOnGVFS("/home/user/music/track.mp3"));
+  EXPECT_TRUE(FileUtils::FilenameOnGVFS("/run/user/1000/gvfs/smb-share:server=host/track.mp3"));
+  EXPECT_TRUE(FileUtils::FilenameOnGVFS("/home/user/.gvfs/sftp/track.mp3"));
 }
 
 TEST(FileSystemWatcherQt, AddAndClear) {
