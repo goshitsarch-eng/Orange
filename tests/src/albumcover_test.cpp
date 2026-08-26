@@ -1,5 +1,6 @@
 #include "covermanager/coverchoicemenu.h"
 #include "covermanager/covermanagermenu.h"
+#include "covermanager/covermanagerstats.h"
 #include "covermanager/covermanagerview.h"
 #include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverexport.h"
@@ -458,4 +459,14 @@ TEST(CoverManagerView, LabelsAndHideIndexMatchQt) {
   EXPECT_EQ(2, CoverManagerView::IndexFromHide(AlbumCoverManagerList::HideCovers::WithCovers));
   EXPECT_EQ(0, CoverManagerView::ClampIndex(-3));
   EXPECT_EQ(2, CoverManagerView::ClampIndex(9));
+}
+
+TEST(CoverManagerStats, TotalAndWithoutCoverMatchQt) {
+  EXPECT_STREQ("Total albums:", CoverManagerStats::TotalLabel());
+  EXPECT_STREQ("Without cover:", CoverManagerStats::WithoutLabel());
+  EXPECT_EQ(1, CoverManagerStats::WithoutCover(3, 2));
+  EXPECT_EQ(0, CoverManagerStats::WithoutCover(2, 5));
+  EXPECT_EQ(0, CoverManagerStats::WithoutCover(-1, 0));
+  EXPECT_EQ("12", CoverManagerStats::CountText(12));
+  EXPECT_EQ("0", CoverManagerStats::CountText(-4));
 }

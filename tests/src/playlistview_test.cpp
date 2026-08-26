@@ -17,6 +17,7 @@
 #include "playlist/playlistlistlook.h"
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
+#include "playlist/playlistsaveoptions.h"
 #include "playlist/playlistsaveoptionsdialog.h"
 #include "playlist/playlisttabnav.h"
 #include "playlist/playlisttabmenu.h"
@@ -332,6 +333,25 @@ TEST(PlaylistSaveOptionsDialog, PathTypeLabels) {
   EXPECT_STREQ("Relative paths", PlaylistSaveOptionsDialog::Label(PlaylistSaveOptionsDialog::PathType::Relative));
   EXPECT_STREQ("Absolute paths", PlaylistSaveOptionsDialog::Label(PlaylistSaveOptionsDialog::PathType::Absolute));
   EXPECT_STREQ("Ask every time", PlaylistSaveOptionsDialog::Label(PlaylistSaveOptionsDialog::PathType::Ask_User));
+}
+
+TEST(PlaylistSaveOptions, RememberAndDialogChoicesMatchQt) {
+  EXPECT_STREQ("Playlist options", PlaylistSaveOptions::Title());
+  EXPECT_STREQ("File paths", PlaylistSaveOptions::PathsLabel());
+  EXPECT_STREQ("Remember my choice", PlaylistSaveOptions::RememberLabel());
+  EXPECT_STREQ("This can be changed later through the preferences", PlaylistSaveOptions::Hint());
+  EXPECT_STREQ("When saving a playlist, file paths should be", PlaylistSaveOptions::SettingsPrompt());
+  EXPECT_STREQ("Ask when saving", PlaylistSaveOptions::AskWhenSaving());
+  EXPECT_STREQ("Relative", PlaylistSaveOptions::DialogLabel(PlaylistSettings::PathType::Relative));
+  EXPECT_STREQ("Absolute", PlaylistSaveOptions::DialogLabel(PlaylistSettings::PathType::Absolute));
+  EXPECT_EQ(PlaylistSettings::PathType::Automatic, PlaylistSaveOptions::PathFromIndex(0));
+  EXPECT_EQ(PlaylistSettings::PathType::Relative, PlaylistSaveOptions::PathFromIndex(1));
+  EXPECT_EQ(PlaylistSettings::PathType::Absolute, PlaylistSaveOptions::PathFromIndex(2));
+  EXPECT_EQ(PlaylistSettings::PathType::Automatic, PlaylistSaveOptions::PathFromIndex(99));
+  EXPECT_EQ(1, PlaylistSaveOptions::IndexFromPath(PlaylistSettings::PathType::Relative));
+  EXPECT_EQ(2, PlaylistSaveOptions::IndexFromPath(PlaylistSettings::PathType::Absolute));
+  EXPECT_TRUE(PlaylistSaveOptions::ShouldPersist(true));
+  EXPECT_FALSE(PlaylistSaveOptions::ShouldPersist(false));
 }
 
 TEST(SongLoaderInserter, NullTagReaderReturnsEmpty) {

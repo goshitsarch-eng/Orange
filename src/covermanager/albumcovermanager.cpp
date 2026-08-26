@@ -7,6 +7,7 @@
 #include "covermanager/albumcoverexportdialog.h"
 #include "covermanager/albumcovermanagerlist.h"
 #include "covermanager/coverfromurldialog.h"
+#include "covermanager/covermanagerstats.h"
 #include "covermanager/covermanagerview.h"
 #include "covermanager/covermanagermenu.h"
 #include "covermanager/coverproviders.h"
@@ -34,6 +35,8 @@ struct CoverManagerState {
   GtkWidget *filter = nullptr;
   GtkWidget *view = nullptr;
   int hide_index = 0;
+  GtkWidget *total_albums = nullptr;
+  GtkWidget *without_cover = nullptr;
   GtkWidget *status = nullptr;
   GtkWidget *progress = nullptr;
   GtkWidget *abort = nullptr;
@@ -155,18 +158,27 @@ std::vector<AlbumCoverManagerList::Album> AlbumsForAction(CoverManagerState *sta
 }
 
 void UpdateAlbumStatus(CoverManagerState *state) {
-  if (!state || !state->status) {
+  if (!state) {
     return;
   }
   const auto albums = VisibleAlbums(state);
-  size_t with_cover = 0;
+  int with_cover = 0;
   for (const auto &album : albums) {
     if (album.has_cover) {
       ++with_cover;
     }
   }
-  gtk_label_set_text(GTK_LABEL(state->status),
-                     AlbumCoverManagerSelection::StatusText(albums.size(), with_cover, SelectedAlbums(state).size()).c_str());
+  const int total = static_cast<int>(albums.size());
+  if (state->total_albums) {
+    gtk_label_set_text(GTK_LABEL(state->total_albums), CoverManagerStats::CountText(total).c_str());
+  }
+  if (state->without_cover) {
+    gtk_label_set_text(GTK_LABEL(state->without_cover), CoverManagerStats::CountText(CoverManagerStats::WithoutCover(total, with_cover)).c_str());
+  }
+  if (state->status) {
+    gtk_label_set_text(GTK_LABEL(state->status),
+                       AlbumCoverManagerSelection::StatusText(albums.size(), static_cast<size_t>(with_cover), SelectedAlbums(state).size()).c_str());
+  }
 }
 
 void AddAlbumToPlaylist(CoverManagerState *state, const AlbumCoverManagerList::Album &album, bool replace) {
@@ -687,6 +699,23 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(album_scroll), state->flow);
   gtk_box_append(GTK_BOX(split), album_scroll);
   gtk_box_append(GTK_BOX(box), split);
+
+  GtkWidget *stats_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 16);
+  GtkWidget *total_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  GtkWidget *total_caption = gtk_label_new(Translations::CStr(CoverManagerStats::TotalLabel()));
+  state->total_albums = gtk_label_new("0");
+  gtk_widget_set_halign(state->total_albums, GTK_ALIGN_END);
+  gtk_box_append(GTK_BOX(total_box), total_caption);
+  gtk_box_append(GTK_BOX(total_box), state->total_albums);
+  GtkWidget *without_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  GtkWidget *without_caption = gtk_label_new(Translations::CStr(CoverManagerStats::WithoutLabel()));
+  state->without_cover = gtk_label_new("0");
+  gtk_widget_set_halign(state->without_cover, GTK_ALIGN_END);
+  gtk_box_append(GTK_BOX(without_box), without_caption);
+  gtk_box_append(GTK_BOX(without_box), state->without_cover);
+  gtk_box_append(GTK_BOX(stats_row), total_box);
+  gtk_box_append(GTK_BOX(stats_row), without_box);
+  gtk_box_append(GTK_BOX(box), stats_row);
 
   state->status = gtk_label_new("");
   gtk_label_set_xalign(GTK_LABEL(state->status), 0.0f);

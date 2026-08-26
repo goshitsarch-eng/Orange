@@ -1,6 +1,7 @@
 #include "settings/playlistsettingspage.h"
 
 #include "constants/playlistsettings.h"
+#include "playlist/playlistsaveoptions.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
 #include "ui/dialogs.h"
@@ -28,8 +29,12 @@ AdwPreferencesPage *PlaylistSettingsPage::Create(Settings *settings, Application
   SettingsPage::AddToggle(behaviour, settings, PlaylistSettings::kPlaylistClear, "Allow clearing the playlist", nullptr,
                           PlaylistSettings::kDefaultPlaylistClear);
   SettingsPage::AddToggle(behaviour, settings, PlaylistSettings::kAutoSort, "Auto-sort the playlist", nullptr, PlaylistSettings::kDefaultAutoSort);
-  SettingsPage::AddIntCombo(behaviour, settings, PlaylistSettings::kSettingsGroup, PlaylistSettings::kPathType, "Path type",
-                            {{"0", "Automatic"}, {"1", "Absolute"}, {"2", "Relative"}, {"3", "Ask"}},
+  SettingsPage::AddIntCombo(behaviour, settings, PlaylistSettings::kSettingsGroup, PlaylistSettings::kPathType,
+                            PlaylistSaveOptions::SettingsPrompt(),
+                            {{"0", PlaylistSaveOptions::DialogLabel(PlaylistSettings::PathType::Automatic)},
+                             {"1", PlaylistSaveOptions::DialogLabel(PlaylistSettings::PathType::Absolute)},
+                             {"2", PlaylistSaveOptions::DialogLabel(PlaylistSettings::PathType::Relative)},
+                             {"3", PlaylistSaveOptions::AskWhenSaving()}},
                             static_cast<int>(PlaylistSettings::kDefaultPathType));
 
   AdwPreferencesGroup *meta = SettingsPage::AddGroup(page, "Metadata");
