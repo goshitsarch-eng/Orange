@@ -27,6 +27,26 @@ std::string TagName(std::string pattern) {
   return StrUtils::ToLower(pattern);
 }
 
+size_t FindInsensitive(const std::string &haystack, const std::string &needle, size_t from) {
+  if (needle.empty() || from >= haystack.size()) {
+    return std::string::npos;
+  }
+  const std::string lower_needle = StrUtils::ToLower(needle);
+  for (size_t i = from; i + lower_needle.size() <= haystack.size(); ++i) {
+    bool match = true;
+    for (size_t j = 0; j < lower_needle.size(); ++j) {
+      if (std::tolower(static_cast<unsigned char>(haystack[i + j])) != static_cast<unsigned char>(lower_needle[j])) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      return i;
+    }
+  }
+  return std::string::npos;
+}
+
 size_t FindOpenTag(const std::string &content, const std::string &tag, size_t from, size_t *after) {
   const std::string needle = "<" + tag;
   size_t pos = from;
@@ -64,26 +84,6 @@ size_t FindCloseTag(const std::string &content, const std::string &tag, size_t f
     *after = pos + needle.size();
   }
   return pos;
-}
-
-size_t FindInsensitive(const std::string &haystack, const std::string &needle, size_t from) {
-  if (needle.empty() || from >= haystack.size()) {
-    return std::string::npos;
-  }
-  const std::string lower_needle = StrUtils::ToLower(needle);
-  for (size_t i = from; i + lower_needle.size() <= haystack.size(); ++i) {
-    bool match = true;
-    for (size_t j = 0; j < lower_needle.size(); ++j) {
-      if (std::tolower(static_cast<unsigned char>(haystack[i + j])) != static_cast<unsigned char>(lower_needle[j])) {
-        match = false;
-        break;
-      }
-    }
-    if (match) {
-      return i;
-    }
-  }
-  return std::string::npos;
 }
 
 std::string Collapse(const std::string &text, char ch) {
