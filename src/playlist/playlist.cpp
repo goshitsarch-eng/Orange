@@ -1,5 +1,6 @@
 #include "playlist/playlist.h"
 
+#include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
 #include <algorithm>
@@ -197,6 +198,53 @@ void Playlist::RateCurrentSong(float rating) {
   Changed.Emit();
 }
 
+void Playlist::SkipTracks(const std::vector<int> &rows) {
+  bool all_skipped = true;
+  for (int row : rows) {
+    if (row >= 0 && row < row_count() && !songs_[static_cast<size_t>(row)].skipped()) {
+      all_skipped = false;
+      break;
+    }
+  }
+  PushUndo();
+  for (int row : rows) {
+    if (row >= 0 && row < row_count()) {
+      songs_[static_cast<size_t>(row)].set_skipped(!all_skipped);
+    }
+  }
+  Changed.Emit();
+}
+
+void Playlist::ReplaceRow(int row, const Song &song) {
+  if (row < 0 || row >= row_count()) {
+    return;
+  }
+  PushUndo();
+  const bool skipped = songs_[static_cast<size_t>(row)].skipped();
+  songs_[static_cast<size_t>(row)] = song;
+  songs_[static_cast<size_t>(row)].set_skipped(skipped);
+  Changed.Emit();
+}
+
+void Playlist::ReloadRow(int row, TagReader *tagreader) {
+  if (!tagreader || row < 0 || row >= row_count()) {
+    return;
+  }
+  const std::string path = FileUtils::PathFromUri(songs_[static_cast<size_t>(row)].url());
+  if (path.empty() || !FileUtils::Exists(path)) {
+    return;
+  }
+  Song updated = tagreader->ReadFile(path);
+  if (!updated.is_valid()) {
+    return;
+  }
+  updated.set_id(songs_[static_cast<size_t>(row)].id());
+  updated.set_skipped(songs_[static_cast<size_t>(row)].skipped());
+  PushUndo();
+  songs_[static_cast<size_t>(row)] = updated;
+  Changed.Emit();
+}
+
 void Playlist::SetSequenceMode(SequenceMode mode) {
   mode_ = mode;
   switch (mode) {
@@ -247,37 +295,53 @@ int Playlist::NextIndex() const {
   if (mode_ == SequenceMode::RepeatTrack || repeat_mode_ == PlaylistSequence::RepeatMode::Track) {
     return current_row_;
   }
+  const bool wrap = mode_ == SequenceMode::RepeatAll || repeat_mode_ == PlaylistSequence::RepeatMode::Playlist;
   if (repeat_mode_ == PlaylistSequence::RepeatMode::Album && current_row_ >= 0) {
     const std::string album = song(current_row_).album();
     for (int i = 1; i <= row_count(); ++i) {
       const int row = (current_row_ + i) % row_count();
-      if (song(row).album() == album) {
+      if (!song(row).skipped() && song(row).album() == album) {
         return row;
       }
     }
   }
-  switch (mode_) {
-    case SequenceMode::Shuffle:
-    case SequenceMode::AlbumShuffle:
-    case SequenceMode::Dynamic:
-    case SequenceMode::RepeatAll:
-    case SequenceMode::Sequential:
-    default:
-      if (current_row_ + 1 < static_cast<int>(songs_.size())) {
-        return current_row_ + 1;
+  const int start = current_row_ < 0 ? -1 : current_row_;
+  const int n = row_count();
+  for (int i = 1; i <= n; ++i) {
+    int row = start + i;
+    if (row >= n) {
+      if (!wrap) {
+        return -1;
       }
-      return (mode_ == SequenceMode::RepeatAll || repeat_mode_ == PlaylistSequence::RepeatMode::Playlist) ? 0 : -1;
+      row %= n;
+    }
+    if (!song(row).skipped()) {
+      return row;
+    }
   }
+  return wrap ? current_row_ : -1;
 }
 
 int Playlist::PreviousIndex() const {
   if (songs_.empty()) {
     return -1;
   }
-  if (current_row_ > 0) {
-    return current_row_ - 1;
+  const bool wrap = mode_ == SequenceMode::RepeatAll;
+  const int start = current_row_ < 0 ? 0 : current_row_;
+  const int n = row_count();
+  for (int i = 1; i <= n; ++i) {
+    int row = start - i;
+    if (row < 0) {
+      if (!wrap) {
+        return current_row_;
+      }
+      row += n;
+    }
+    if (!song(row).skipped()) {
+      return row;
+    }
   }
-  return mode_ == SequenceMode::RepeatAll ? static_cast<int>(songs_.size()) - 1 : current_row_;
+  return current_row_;
 }
 
 void Playlist::Next() {

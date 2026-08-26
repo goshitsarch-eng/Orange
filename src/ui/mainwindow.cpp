@@ -27,7 +27,9 @@
 #include "organize/organizeformat.h"
 #include "smartplaylists/smartplaylist.h"
 #include "streaming/streamingtabsview.h"
+#include "core/urlhandler.h"
 #include "dialogs/aboutdialog.h"
+#include "dialogs/trackselectiondialog.h"
 #include "transcoder/transcodedialog.h"
 #include "ui/dialogs.h"
 #include "ui/settingsdialog.h"
@@ -150,6 +152,11 @@ void MainWindow::BuildUi() {
   g_menu_append(playlist, "Remove duplicates", "win.remove-duplicates");
   g_menu_append(playlist, "Remove unavailable", "win.remove-unavailable");
   g_menu_append(playlist, "Renumber tracks", "win.renumber-tracks");
+  g_menu_append(playlist, "Skip selected tracks", "win.playlist-skip");
+  g_menu_append(playlist, "Jump to playing track", "win.jump-playing");
+  g_menu_append(playlist, "Rescan selected songs", "win.rescan-selected");
+  g_menu_append(playlist, "Fetch streaming metadata", "win.fetch-metadata");
+  g_menu_append(playlist, "Auto-complete tags…", "win.autocomplete-tags");
   g_menu_append(playlist, "Undo", "win.undo");
   g_menu_append(playlist, "Redo", "win.redo");
   g_menu_append(playlist, "Smart playlist wizard…", "win.smart-wizard");
@@ -265,6 +272,19 @@ void MainWindow::BuildUi() {
   add_action("open-file-manager", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->OpenSelectedInFileManager(); }));
   add_action("copy-url", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CopySelectedUrl(); }));
   add_action("rate-5", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RateSelected(5); }));
+  add_action("playlist-skip", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SkipSelected(); }));
+  add_action("jump-playing", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->JumpToPlaying(); }));
+  add_action("rescan-selected", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RescanSelected(); }));
+  add_action("fetch-metadata", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->FetchStreamingMetadata(); }));
+  add_action("autocomplete-tags", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AutoCompleteTags(); }));
+  {
+    GSimpleAction *add_to = g_simple_action_new("add-to-playlist", G_VARIANT_TYPE_INT32);
+    g_signal_connect(add_to, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
+                       static_cast<MainWindow *>(data)->AddSelectedToPlaylist(g_variant_get_int32(param));
+                     }),
+                     this);
+    g_action_map_add_action(G_ACTION_MAP(window_), G_ACTION(add_to));
+  }
   add_action("add-stream", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                Dialogs::AddStream(GTK_WINDOW(self->window_), [self](const std::string &name, const std::string &url) {
@@ -317,16 +337,23 @@ void MainWindow::BuildUi() {
              }));
   add_action("playlist-queue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               Playlist *playlist = self->app_->playlist_manager()->current();
-               if (!playlist) {
-                 return;
+               const SongList songs = self->SelectedSongs();
+               bool all_queued = !songs.empty();
+               for (const Song &song : songs) {
+                 if (!self->app_->queue()->Contains(song)) {
+                   all_queued = false;
+                   break;
+                 }
                }
-               for (int row : self->SelectedPlaylistRows()) {
-                 if (row >= 0 && row < playlist->row_count()) {
-                   self->app_->queue()->Append(playlist->songs()[static_cast<size_t>(row)]);
+               for (const Song &song : songs) {
+                 if (all_queued) {
+                   self->app_->queue()->RemoveSong(song);
+                 } else {
+                   self->app_->queue()->Append(song);
                  }
                }
                self->RefreshQueue();
+               self->ShowToast(all_queued ? "Removed from queue" : "Added to queue");
              }));
   add_action("playlist-remove", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
@@ -1116,10 +1143,34 @@ void MainWindow::PlayRadioChannel(const RadioChannel &channel) {
 void MainWindow::ShowPlaylistMenu(double, double) {
   GMenu *menu = g_menu_new();
   g_menu_append(menu, "Play", "win.playlist-play");
-  g_menu_append(menu, "Queue", "win.playlist-queue");
+  const SongList selected = SelectedSongs();
+  bool queued = !selected.empty();
+  for (const Song &song : selected) {
+    if (!app_->queue()->Contains(song)) {
+      queued = false;
+      break;
+    }
+  }
+  g_menu_append(menu, queued ? "Dequeue" : "Queue", "win.playlist-queue");
   g_menu_append(menu, "Play next", "win.queue-next");
+  g_menu_append(menu, "Skip / unskip", "win.playlist-skip");
+  g_menu_append(menu, "Jump to playing track", "win.jump-playing");
   g_menu_append(menu, "Stop after this track", "win.stop-after");
   g_menu_append(menu, "Remove", "win.playlist-remove");
+  g_menu_append(menu, "Rescan selected songs", "win.rescan-selected");
+  g_menu_append(menu, "Fetch streaming metadata", "win.fetch-metadata");
+  g_menu_append(menu, "Auto-complete tags…", "win.autocomplete-tags");
+  GMenu *add_to = g_menu_new();
+  for (Playlist *playlist : app_->playlist_manager()->GetAllPlaylists()) {
+    if (!playlist || playlist == app_->playlist_manager()->current()) {
+      continue;
+    }
+    const std::string target = "win.add-to-playlist(" + std::to_string(playlist->id()) + ")";
+    g_menu_append(add_to, playlist->name().c_str(), target.c_str());
+  }
+  if (g_menu_model_get_n_items(G_MENU_MODEL(add_to)) > 0) {
+    g_menu_append_submenu(menu, "Add to playlist", G_MENU_MODEL(add_to));
+  }
   g_menu_append(menu, "Show in collection", "win.show-in-collection");
   g_menu_append(menu, "Open in file manager", "win.open-file-manager");
   g_menu_append(menu, "Copy to collection", "win.copy-collection");
@@ -1296,6 +1347,110 @@ void MainWindow::RateSelected(int stars) {
     app_->collection()->backend()->SetRating(song.id(), static_cast<float>(std::clamp(stars, 0, 5)) / 5.0f);
   }
   RefreshPlaylist();
+}
+
+void MainWindow::SkipSelected() {
+  if (Playlist *playlist = app_->playlist_manager()->current()) {
+    playlist->SkipTracks(SelectedPlaylistRows());
+    app_->playlist_manager()->SaveCurrent();
+    RefreshPlaylist();
+  }
+}
+
+void MainWindow::JumpToPlaying() {
+  Playlist *playlist = app_->playlist_manager()->active();
+  if (!playlist || !playlist_container_) {
+    return;
+  }
+  app_->playlist_manager()->SetCurrentPlaylist(playlist->id());
+  const int row = playlist->current_row();
+  if (row >= 0) {
+    SelectPlaylistRow(row, false);
+    playlist_container_->view()->ScrollToRow(row);
+  }
+  RefreshPlaylist();
+}
+
+void MainWindow::RescanSelected() {
+  const SongList songs = SelectedSongs();
+  if (songs.empty()) {
+    ShowToast("No songs selected");
+    return;
+  }
+  app_->collection()->Rescan(songs);
+  if (Playlist *playlist = app_->playlist_manager()->current()) {
+    for (int row : SelectedPlaylistRows()) {
+      playlist->ReloadRow(row, app_->tagreader());
+    }
+    app_->playlist_manager()->SaveCurrent();
+  }
+  RefreshCollection();
+  RefreshPlaylist();
+  ShowToast("Rescanned " + std::to_string(songs.size()) + " song(s)");
+}
+
+void MainWindow::FetchStreamingMetadata() {
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (!playlist) {
+    return;
+  }
+  int started = 0;
+  for (int row : SelectedPlaylistRows()) {
+    if (row < 0 || row >= playlist->row_count()) {
+      continue;
+    }
+    const Song song = playlist->song(row);
+    UrlHandler *handler = app_->url_handlers()->HandlerForUrl(song.url());
+    if (!handler) {
+      continue;
+    }
+    ++started;
+    handler->Load(song.url(), [this, row](const UrlHandler::LoadResult &result) {
+      Playlist *current = app_->playlist_manager()->current();
+      if (!current || row < 0 || row >= current->row_count()) {
+        return;
+      }
+      Song updated = current->song(row);
+      if (result.song.is_valid()) {
+        if (!result.song.title().empty()) {
+          updated.set_title(result.song.title());
+        }
+        if (!result.song.artist().empty()) {
+          updated.set_artist(result.song.artist());
+        }
+        if (!result.song.album().empty()) {
+          updated.set_album(result.song.album());
+        }
+        if (!result.song.genre().empty()) {
+          updated.set_genre(result.song.genre());
+        }
+        if (result.song.length_nanosec() > 0) {
+          updated.set_length_nanosec(result.song.length_nanosec());
+        }
+      }
+      if (!result.stream_url.empty()) {
+        updated.set_stream_url(result.stream_url);
+      }
+      current->ReplaceRow(row, updated);
+      app_->playlist_manager()->SaveCurrent();
+      RefreshPlaylist();
+    });
+  }
+  ShowToast(started > 0 ? ("Fetching metadata for " + std::to_string(started) + " stream(s)") : "No streaming tracks selected");
+}
+
+void MainWindow::AddSelectedToPlaylist(int id) {
+  const SongList songs = SelectedSongs();
+  if (songs.empty()) {
+    return;
+  }
+  app_->playlist_manager()->InsertSongs(id, songs);
+  RefreshPlaylistsList();
+  ShowToast("Added " + std::to_string(songs.size()) + " song(s) to " + app_->playlist_manager()->playlist_name(id));
+}
+
+void MainWindow::AutoCompleteTags() {
+  TrackSelectionDialog::Show(GTK_WINDOW(window_), app_, SelectedSongs());
 }
 
 void MainWindow::CopySelectedUrl() {

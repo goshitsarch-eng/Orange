@@ -24,6 +24,7 @@ class PlaylistView {
   void SetFilterString(const std::string &filter);
   void SetSelectedRows(const std::vector<int> &rows);
   void Refresh(Playlist *playlist);
+  void ScrollToRow(int row);
   void SetActivateCallback(ActivateCallback callback);
   void SetSelectCallback(SelectCallback callback);
   void SetSortCallback(SortCallback callback);

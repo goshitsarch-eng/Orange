@@ -96,6 +96,12 @@ class MainWindow {
   void ShuffleCurrent();
   void RateSelected(int stars);
   void CopySelectedUrl();
+  void SkipSelected();
+  void JumpToPlaying();
+  void RescanSelected();
+  void FetchStreamingMetadata();
+  void AddSelectedToPlaylist(int id);
+  void AutoCompleteTags();
   void ShowToast(const std::string &text);
 
   static void OnPlayPause(GtkButton *button, gpointer data);

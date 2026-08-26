@@ -1,5 +1,7 @@
 #include "queue/queue.h"
 
+#include <algorithm>
+
 void Queue::Append(const Song &song) {
   songs_.push_back(song);
   Changed.Emit();
@@ -25,6 +27,15 @@ void Queue::Remove(int index) {
     songs_.erase(songs_.begin() + index);
     Changed.Emit();
   }
+}
+
+void Queue::RemoveSong(const Song &song) {
+  songs_.erase(std::remove_if(songs_.begin(), songs_.end(), [&](const Song &other) { return other.url() == song.url(); }), songs_.end());
+  Changed.Emit();
+}
+
+bool Queue::Contains(const Song &song) const {
+  return std::any_of(songs_.begin(), songs_.end(), [&](const Song &other) { return other.url() == song.url(); });
 }
 
 void Queue::Clear() {

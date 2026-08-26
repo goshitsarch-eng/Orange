@@ -42,6 +42,9 @@ class Playlist {
   void RemoveUnavailable();
   void RenumberTracks();
   void RateCurrentSong(float rating);
+  void SkipTracks(const std::vector<int> &rows);
+  void ReplaceRow(int row, const Song &song);
+  void ReloadRow(int row, class TagReader *tagreader);
   void ReplaceSongs(const SongList &songs);
   void Undo();
   void Redo();

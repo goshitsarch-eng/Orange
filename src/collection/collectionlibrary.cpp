@@ -1,6 +1,8 @@
 #include "collection/collectionlibrary.h"
 
 #include "core/logging.h"
+#include "tagreader/tagreader.h"
+#include "utilities/fileutils.h"
 
 CollectionLibrary::CollectionLibrary(Database *database, TaskManager *task_manager, TagReader *tagreader)
     : database_(database),
@@ -18,6 +20,24 @@ void CollectionLibrary::IncrementalScan() {
 
 void CollectionLibrary::FullScan() {
   watcher_->Scan();
+  ScanFinished.Emit();
+}
+
+void CollectionLibrary::Rescan(const SongList &songs) {
+  for (const Song &song : songs) {
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (path.empty() || !FileUtils::Exists(path) || !tagreader_) {
+      continue;
+    }
+    Song updated = tagreader_->ReadFile(path);
+    if (!updated.is_valid()) {
+      continue;
+    }
+    if (song.id() > 0) {
+      updated.set_id(song.id());
+    }
+    backend_->AddOrUpdateSong(updated);
+  }
   ScanFinished.Emit();
 }
 

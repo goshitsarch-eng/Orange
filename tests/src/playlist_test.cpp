@@ -141,6 +141,31 @@ TEST(Playlist, RemoveUnavailableDropsMissingLocalFiles) {
   FileUtils::Remove(existing);
 }
 
+TEST(Playlist, SkipTracksAreBypassedOnNext) {
+  Playlist playlist;
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  Song c;
+  c.set_title("C");
+  c.set_url("file:///c");
+  c.set_valid(true);
+  playlist.AppendSongs({a, b, c});
+  playlist.set_current_row(0);
+  playlist.SkipTracks({1});
+  EXPECT_TRUE(playlist.songs()[1].skipped());
+  EXPECT_EQ(2, playlist.PeekNextRow());
+  playlist.Next();
+  EXPECT_EQ("C", playlist.current_song().title());
+  playlist.SkipTracks({1});
+  EXPECT_FALSE(playlist.songs()[1].skipped());
+}
+
 TEST(Playlist, RenumberAndRateCurrent) {
   Playlist playlist;
   Song a;

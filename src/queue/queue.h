@@ -12,6 +12,8 @@ class Queue {
   void InsertNext(const Song &song);
   Song TakeNext();
   void Remove(int index);
+  void RemoveSong(const Song &song);
+  bool Contains(const Song &song) const;
   void Clear();
   void Move(int from, int to);
   const SongList &songs() const { return songs_; }

@@ -4,7 +4,7 @@
 
 #include <adwaita.h>
 
-void TrackSelectionDialog::Show(GtkWindow *parent, Application *app) {
+void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, "Fetch tags");
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -46,5 +46,13 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app) {
       gtk_list_box_append(GTK_LIST_BOX(list), row);
     }
   });
-  app->tag_fetcher()->Fetch(app->player()->current_song());
+  Song query = !songs.empty() ? songs.front() : app->player()->current_song();
+  if (!query.is_valid() && query.url().empty()) {
+    gtk_label_set_text(GTK_LABEL(status), "No song selected");
+    return;
+  }
+  if (songs.size() > 1) {
+    gtk_label_set_text(GTK_LABEL(status), ("Searching tags for " + std::to_string(songs.size()) + " selected tracks…").c_str());
+  }
+  app->tag_fetcher()->Fetch(query);
 }

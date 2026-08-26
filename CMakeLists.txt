@@ -937,6 +937,7 @@ if(GTest_FOUND)
     src/playlist/playlistmanagerinterface.cpp
     src/playlist/playlistmanager.cpp
     src/playlist/playlistbackend.cpp
+    src/queue/queue.cpp
     src/playlist/playlistitem.cpp
     src/playlist/songplaylistitem.cpp
     src/playlist/streamplaylistitem.cpp

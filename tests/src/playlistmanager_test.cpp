@@ -1,4 +1,5 @@
 #include "playlist/playlistmanager.h"
+#include "queue/queue.h"
 
 #include "utilities/fileutils.h"
 
@@ -76,6 +77,23 @@ TEST(PlaylistManager, PlaylistMutationsAndSmartPlaylist) {
   manager.PlaySmartPlaylist("all", true, true);
   EXPECT_EQ("All songs", manager.current()->name());
   EXPECT_TRUE(manager.current()->is_dynamic());
+}
+
+TEST(Queue, ContainsAndRemoveSong) {
+  Queue queue;
+  Song a;
+  a.set_url("file:///a");
+  a.set_title("A");
+  Song b;
+  b.set_url("file:///b");
+  b.set_title("B");
+  queue.Append(a);
+  queue.InsertNext(b);
+  EXPECT_TRUE(queue.Contains(a));
+  EXPECT_EQ(2, queue.size());
+  queue.RemoveSong(a);
+  EXPECT_FALSE(queue.Contains(a));
+  EXPECT_TRUE(queue.Contains(b));
 }
 
 TEST(PlaylistManager, ChangeOrderAndFavorite) {

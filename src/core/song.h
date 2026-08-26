@@ -113,6 +113,8 @@ class Song {
   int64_t mtime() const { return mtime_; }
   int64_t ctime() const { return ctime_; }
   bool unavailable() const { return unavailable_; }
+  bool skipped() const { return skipped_; }
+  void set_skipped(bool v) { skipped_ = v; }
 
   const std::string &fingerprint() const { return fingerprint_; }
   unsigned playcount() const { return playcount_; }
@@ -274,6 +276,7 @@ class Song {
   int64_t mtime_ = -1;
   int64_t ctime_ = -1;
   bool unavailable_ = false;
+  bool skipped_ = false;
   std::string fingerprint_;
   unsigned playcount_ = 0;
   unsigned skipcount_ = 0;

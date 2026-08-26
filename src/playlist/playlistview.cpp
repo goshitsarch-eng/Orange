@@ -71,6 +71,9 @@ void PlaylistView::Refresh(Playlist *playlist) {
     if (index == current) {
       gtk_widget_add_css_class(row, "accent");
     }
+    if (song.skipped()) {
+      gtk_widget_add_css_class(row, "dim-label");
+    }
     if (std::find(selected_rows_.begin(), selected_rows_.end(), index) != selected_rows_.end()) {
       gtk_widget_add_css_class(row, "card");
     }
@@ -110,5 +113,20 @@ void PlaylistView::Refresh(Playlist *playlist) {
                      this);
     gtk_box_append(GTK_BOX(grid_), row);
     ++visible_count_;
+  }
+}
+
+void PlaylistView::ScrollToRow(int row) {
+  GtkWidget *child = gtk_widget_get_first_child(grid_);
+  while (child) {
+    if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index")) == row) {
+      graphene_rect_t bounds;
+      if (gtk_widget_compute_bounds(child, widget_, &bounds)) {
+        GtkAdjustment *adjust = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(widget_));
+        gtk_adjustment_set_value(adjust, bounds.origin.y);
+      }
+      return;
+    }
+    child = gtk_widget_get_next_sibling(child);
   }
 }
