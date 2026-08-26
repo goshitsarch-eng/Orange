@@ -292,6 +292,16 @@ void ReadId3v2Extras(TagLib::ID3v2::Tag *tag, Song *song) {
       }
     }
   }
+  if (song->grouping().empty()) {
+    const auto grouping = tag->frameListMap()[kId3Grouping];
+    if (!grouping.isEmpty()) {
+      if (auto *text = dynamic_cast<TagLib::ID3v2::TextIdentificationFrame *>(grouping.front())) {
+        if (!text->fieldList().isEmpty()) {
+          song->set_grouping(FromTagLib(text->fieldList().front()));
+        }
+      }
+    }
+  }
   if (song->lyrics().empty()) {
     const auto lyrics = tag->frameListMap()[kId3Lyrics];
     if (!lyrics.isEmpty()) {
