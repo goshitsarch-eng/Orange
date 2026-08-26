@@ -889,6 +889,9 @@ void MainWindow::BuildSidebar() {
         settings.IntValue(BehaviourSettings::kDoubleClickPlayMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlayMode)));
     ApplyCollectionPlan(CollectionBehaviour::FromDoubleClick(add, play, EngineStopped()), songs);
   });
+  collection_container_->view()->SetEnqueueCallback([this](const SongList &songs) {
+    ApplyCollectionPlan(CollectionBehaviour::Enqueue(), songs);
+  });
   collection_container_->view()->SetMenuCallback([this](double, double) { ShowCollectionMenu(); });
   gtk_box_append(GTK_BOX(collection_page), collection_container_->widget());
   adw_view_stack_add_titled_with_icon(sidebar_stack_, collection_page, "collection", "Collection",

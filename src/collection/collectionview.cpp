@@ -2,6 +2,7 @@
 
 #include "collection/collectionautoopen.h"
 #include "collection/collectionbehaviour.h"
+#include "collection/collectiontreeclick.h"
 #include "collection/collectiondivider.h"
 #include "collection/collectioniconcache.h"
 #include "collection/collectionitemdelegate.h"
@@ -26,6 +27,25 @@ CollectionView::CollectionView() {
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      static_cast<CollectionView *>(data)->ActivateRow(row);
+                   }),
+                   this);
+
+  GtkGesture *primary = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(primary), GDK_BUTTON_PRIMARY);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(primary));
+  g_signal_connect(primary, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint n_press, gdouble x, gdouble y, gpointer data) {
+                     auto *self = static_cast<CollectionView *>(data);
+                     self->HandlePress(GDK_BUTTON_PRIMARY, n_press, x, y, gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(click)));
+                   }),
+                   this);
+
+  GtkGesture *middle = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(middle), GDK_BUTTON_MIDDLE);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(middle));
+  g_signal_connect(middle, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint n_press, gdouble x, gdouble y, gpointer data) {
+                     auto *self = static_cast<CollectionView *>(data);
+                     self->HandlePress(GDK_BUTTON_MIDDLE, n_press, x, y, gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(click)));
+                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
 
@@ -58,7 +78,33 @@ CollectionView::~CollectionView() { ResetTypeAhead(); }
 
 void CollectionView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
+void CollectionView::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
+
 void CollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+
+void CollectionView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
+  GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(list_), static_cast<int>(y));
+  if (action == CollectionTreeClick::Action::Enqueue) {
+    if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+      gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+      gtk_list_box_select_row(GTK_LIST_BOX(list_), row);
+    }
+    if (enqueue_) {
+      enqueue_(SelectedSongs());
+    }
+    return;
+  }
+  if (action != CollectionTreeClick::Action::ToggleExpand || !row) {
+    return;
+  }
+  GtkWidget *picked = gtk_widget_pick(list_, x, y, GTK_PICK_DEFAULT);
+  const bool on_expand_control = picked && gtk_widget_get_ancestor(picked, GTK_TYPE_BUTTON);
+  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+  if (CollectionTreeClick::ShouldToggleFromRowClick(on_expand_control, CollectionTree::IsExpandable(item))) {
+    ToggleExpanded(item);
+  }
+}
 
 void CollectionView::ApplyLook() {
   pretty_covers_ = CollectionCover::LoadPrettyCovers();

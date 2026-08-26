@@ -1,4 +1,5 @@
 #include "collection/collectionautoopen.h"
+#include "collection/collectiontreeclick.h"
 #include "collection/collectionbackend.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectioncover.h"
@@ -741,6 +742,21 @@ TEST(CollectionAutoOpen, DrillsSingleChildAndMatchesQtBudget) {
     node->AddChild(CollectionItem::Type::Song)->metadata = MakeSong("T", node->key, "A");
   }
   EXPECT_TRUE(CollectionAutoOpen::RecursivelyExpandKeys(&crowded, true).empty());
+}
+
+TEST(CollectionTreeClick, MatchesQtAutoExpandingTreeView) {
+  EXPECT_EQ(CollectionTreeClick::Action::ToggleExpand, CollectionTreeClick::FromPress(CollectionTreeClick::kPrimaryButton, 1, static_cast<GdkModifierType>(0)));
+  EXPECT_EQ(CollectionTreeClick::Action::None, CollectionTreeClick::FromPress(CollectionTreeClick::kPrimaryButton, 2, static_cast<GdkModifierType>(0)));
+  EXPECT_EQ(CollectionTreeClick::Action::None, CollectionTreeClick::FromPress(CollectionTreeClick::kPrimaryButton, 1, GDK_CONTROL_MASK));
+  EXPECT_EQ(CollectionTreeClick::Action::None, CollectionTreeClick::FromPress(CollectionTreeClick::kPrimaryButton, 1, GDK_SHIFT_MASK));
+  EXPECT_EQ(CollectionTreeClick::Action::Enqueue, CollectionTreeClick::FromPress(CollectionTreeClick::kMiddleButton, 1, static_cast<GdkModifierType>(0)));
+  EXPECT_EQ(CollectionTreeClick::Action::Enqueue, CollectionTreeClick::FromPress(CollectionTreeClick::kMiddleButton, 1, GDK_CONTROL_MASK));
+  EXPECT_EQ(CollectionTreeClick::Action::None, CollectionTreeClick::FromPress(CollectionTreeClick::kSecondaryButton, 1, static_cast<GdkModifierType>(0)));
+  EXPECT_TRUE(CollectionTreeClick::ShouldToggleFromRowClick(false, true));
+  EXPECT_FALSE(CollectionTreeClick::ShouldToggleFromRowClick(true, true));
+  EXPECT_FALSE(CollectionTreeClick::ShouldToggleFromRowClick(false, false));
+  EXPECT_TRUE(CollectionTreeClick::SelectRowBeforeEnqueue(false));
+  EXPECT_FALSE(CollectionTreeClick::SelectRowBeforeEnqueue(true));
 }
 
 TEST(CollectionStats, WritesLocalSongsAndKeepsQtCopy) {
