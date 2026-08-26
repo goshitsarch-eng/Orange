@@ -12,6 +12,7 @@
 #include "fileview/fileview.h"
 #include "fileview/fileviewsongs.h"
 #include "playlist/playlistcontainer.h"
+#include "playlist/playlistlistdrop.h"
 #include "radios/radiodrag.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/radioviewcontainer.h"
@@ -476,6 +477,37 @@ void MainWindow::BuildUi() {
                auto *self = static_cast<MainWindow *>(data);
                self->ApplyCollectionPlan(CollectionBehaviour::Enqueue(), self->radio_menu_songs_);
              }));
+  add_action("playlist-list-open", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->SelectPlaylistByName(self->playlist_list_menu_name_);
+             }));
+  add_action("playlist-list-favorite", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               if (Playlist *playlist = self->PlaylistByName(self->playlist_list_menu_name_)) {
+                 self->app_->playlist_manager()->Favorite(playlist->id(), !playlist->favorite());
+                 self->RefreshPlaylistsList();
+               }
+             }));
+  add_action("playlist-list-rename", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->SelectPlaylistByName(self->playlist_list_menu_name_);
+               self->RenameCurrentPlaylist();
+             }));
+  add_action("playlist-list-delete", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->SelectPlaylistByName(self->playlist_list_menu_name_);
+               self->DeleteCurrentPlaylist();
+             }));
+  add_action("playlist-list-save", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->SelectPlaylistByName(self->playlist_list_menu_name_);
+               self->SavePlaylistFile();
+             }));
+  add_action("playlist-list-copy", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->SelectPlaylistByName(self->playlist_list_menu_name_);
+               Dialogs::CopyToDevice(GTK_WINDOW(self->window_), self->app_);
+             }));
   add_action("collection-expand-all", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                if (self->collection_container_) {
@@ -646,11 +678,22 @@ void MainWindow::BuildSidebar() {
   adw_view_stack_add_titled_with_icon(sidebar_stack_, collection_page, "collection", "Collection",
                                       "media-optical-cd-audio-symbolic");
   playlist_list_container_ = std::make_unique<PlaylistListContainer>();
-  playlist_list_container_->SetActivateCallback([this](const std::string &name) {
-    app_->playlist_manager()->SetCurrentPlaylist(name);
-    RefreshPlaylist();
-    RefreshPlaylistTabs();
+  playlist_list_container_->SetActivateCallback([this](const std::string &name) { SelectPlaylistByName(name); });
+  playlist_list_container_->SetNewCallback([this] { NewPlaylist(); });
+  playlist_list_container_->SetDeleteCallback([this](const std::string &name) {
+    SelectPlaylistByName(name);
+    DeleteCurrentPlaylist();
   });
+  playlist_list_container_->SetSaveCallback([this](const std::string &name) {
+    SelectPlaylistByName(name);
+    SavePlaylistFile();
+  });
+  playlist_list_container_->SetCopyCallback([this](const std::string &name) {
+    SelectPlaylistByName(name);
+    Dialogs::CopyToDevice(GTK_WINDOW(window_), app_);
+  });
+  playlist_list_container_->SetMenuCallback([this](const std::string &name) { ShowPlaylistListMenu(name); });
+  playlist_list_container_->SetDropCallback([this](const std::string &name, const std::string &payload) { DropOnPlaylistList(name, payload); });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, playlist_list_container_->widget(), "playlists", "Playlists",
                                       "view-list-symbolic");
   smart_container_ = std::make_unique<SmartPlaylistsViewContainer>();
@@ -2051,6 +2094,74 @@ void MainWindow::ShowRadioMenu(const std::vector<RadioChannel> &channels) {
   GtkWidget *parent = radio_container_ && radio_container_->view() ? radio_container_->view()->list() : GTK_WIDGET(window_);
   gtk_widget_set_parent(popover, parent);
   gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+void MainWindow::ShowPlaylistListMenu(const std::string &name) {
+  playlist_list_menu_name_ = name;
+  if (playlist_list_menu_name_.empty()) {
+    return;
+  }
+  Playlist *playlist = PlaylistByName(playlist_list_menu_name_);
+  GMenu *menu = g_menu_new();
+  g_menu_append(menu, Translations::Tr("Open").c_str(), "win.playlist-list-open");
+  g_menu_append(menu, playlist && playlist->favorite() ? Translations::Tr("Remove from favorites").c_str() : Translations::Tr("Add to favorites").c_str(),
+                "win.playlist-list-favorite");
+  g_menu_append(menu, Translations::Tr("Rename…").c_str(), "win.playlist-list-rename");
+  g_menu_append(menu, Translations::Tr("Delete").c_str(), "win.playlist-list-delete");
+  g_menu_append(menu, Translations::Tr("Save playlist").c_str(), "win.playlist-list-save");
+  g_menu_append(menu, Translations::Tr("Copy to device…").c_str(), "win.playlist-list-copy");
+  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  GtkWidget *parent = playlist_list_container_ && playlist_list_container_->view() ? playlist_list_container_->view()->list() : GTK_WIDGET(window_);
+  gtk_widget_set_parent(popover, parent);
+  gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+void MainWindow::SelectPlaylistByName(const std::string &name) {
+  if (name.empty()) {
+    return;
+  }
+  app_->playlist_manager()->SetCurrentPlaylist(name);
+  RefreshPlaylist();
+  RefreshPlaylistTabs();
+  RefreshPlaylistsList();
+}
+
+Playlist *MainWindow::PlaylistByName(const std::string &name) const {
+  if (name.empty()) {
+    return nullptr;
+  }
+  for (Playlist *playlist : app_->playlist_manager()->GetAllPlaylists()) {
+    if (playlist && playlist->name() == name) {
+      return playlist;
+    }
+  }
+  return nullptr;
+}
+
+void MainWindow::DropOnPlaylistList(const std::string &name, const std::string &payload) {
+  Playlist *target = PlaylistByName(name);
+  if (!target) {
+    return;
+  }
+  if (PlaylistListDrop::IsPlaylistRows(payload)) {
+    SongList songs;
+    Playlist *source = app_->playlist_manager()->current();
+    for (int row : PlaylistListDrop::ParsePlaylistRows(payload)) {
+      if (source && row >= 0 && row < source->row_count()) {
+        songs.push_back(source->song(row));
+      }
+    }
+    app_->playlist_manager()->InsertSongs(target->id(), songs);
+  } else {
+    const std::vector<std::string> urls = PlaylistListDrop::ParseUrls(payload);
+    if (urls.empty()) {
+      return;
+    }
+    app_->playlist_manager()->SetCurrentPlaylist(name);
+    app_->playlist_manager()->InsertUrls(urls);
+  }
+  RefreshPlaylistsList();
+  RefreshPlaylist();
 }
 
 SongList MainWindow::SongsFromUrls(const std::vector<std::string> &urls) const {

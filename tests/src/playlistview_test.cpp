@@ -1,6 +1,7 @@
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistlistdrop.h"
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
 #include "playlist/playlistsaveoptionsdialog.h"
@@ -187,6 +188,27 @@ TEST(PlaylistListSortFilterModel, FiltersAndSorts) {
   std::vector<std::string> starred = filter.Visible();
   ASSERT_EQ(1u, starred.size());
   EXPECT_EQ("Favorites", starred[0]);
+
+  filter.SetFavoritesOnly(false);
+  const std::vector<PlaylistListDrop::Row> rows = filter.VisibleRows();
+  ASSERT_EQ(3u, rows.size());
+  EXPECT_EQ("Apple", rows[0].name);
+  EXPECT_FALSE(rows[0].favorite);
+  EXPECT_EQ("Favorites", rows[1].name);
+  EXPECT_TRUE(rows[1].favorite);
+}
+
+TEST(PlaylistListDrop, DisplayNameAndPayloads) {
+  EXPECT_EQ("Inbox", PlaylistListDrop::DisplayName("Inbox", false));
+  EXPECT_EQ("★ Favorites", PlaylistListDrop::DisplayName("Favorites", true));
+  EXPECT_TRUE(PlaylistListDrop::IsPlaylistRows("strawberry-playlist-rows:0,2"));
+  const std::vector<int> rows = PlaylistListDrop::ParsePlaylistRows("strawberry-playlist-rows:0,2");
+  ASSERT_EQ(2u, rows.size());
+  EXPECT_EQ(0, rows[0]);
+  EXPECT_EQ(2, rows[1]);
+  const std::vector<std::string> urls = PlaylistListDrop::ParseUrls("file:///a\nfile:///b");
+  ASSERT_EQ(2u, urls.size());
+  EXPECT_EQ("file:///a", urls[0]);
 }
 
 TEST(PlaylistSaveOptionsDialog, PathTypeLabels) {
