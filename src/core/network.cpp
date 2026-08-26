@@ -9,12 +9,7 @@
 NetworkAccessManager::NetworkAccessManager() {
   session_ = soup_session_new();
   g_object_set(session_, "user-agent", "Strawberry/1.2.0 (+https://www.strawberrymusicplayer.org)", nullptr);
-  NetworkProxyFactory proxy;
-  proxy.ReloadSettings();
-  const std::string uri = proxy.ProxyUri();
-  if (!uri.empty()) {
-    SetProxy(uri);
-  }
+  ReloadSettings();
 }
 
 NetworkAccessManager::~NetworkAccessManager() {
@@ -24,12 +19,26 @@ NetworkAccessManager::~NetworkAccessManager() {
 }
 
 void NetworkAccessManager::SetProxy(const std::string &proxy_uri) {
-  if (!session_ || proxy_uri.empty()) {
+  if (!session_) {
+    return;
+  }
+  if (proxy_uri.empty()) {
+    g_object_set(session_, "proxy-resolver", static_cast<GProxyResolver *>(nullptr), nullptr);
     return;
   }
   GProxyResolver *resolver = g_simple_proxy_resolver_new(proxy_uri.c_str(), nullptr);
   g_object_set(session_, "proxy-resolver", resolver, nullptr);
   g_object_unref(resolver);
+}
+
+void NetworkAccessManager::ReloadSettings() {
+  NetworkProxyFactory proxy;
+  proxy.ReloadSettings();
+  if (proxy.mode() == NetworkProxyFactory::Mode::Direct) {
+    SetProxy("direct://");
+    return;
+  }
+  SetProxy(proxy.ProxyUri());
 }
 
 void NetworkAccessManager::Send(SoupMessage *message, Callback callback) {

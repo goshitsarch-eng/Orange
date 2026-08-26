@@ -20,6 +20,10 @@ struct GstPipelineExtras {
   int channels = 0;
   bool bs2b = false;
   bool strict_ssl = false;
+  std::string proxy_address;
+  bool proxy_authentication = false;
+  std::string proxy_user;
+  std::string proxy_pass;
   int64_t buffer_duration_ms = 4000;
   double buffer_low_watermark = 0.33;
   double buffer_high_watermark = 0.99;
@@ -81,6 +85,10 @@ class GstEnginePipeline {
   int64_t end_offset_nanosec_ = -1;
   bool volume_control_ = true;
   bool strict_ssl_ = false;
+  std::string proxy_address_;
+  bool proxy_authentication_ = false;
+  std::string proxy_user_;
+  std::string proxy_pass_;
   int device_warmup_ms_ = 0;
 };
 

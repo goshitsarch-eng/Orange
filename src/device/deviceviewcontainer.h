@@ -40,6 +40,10 @@ class DeviceViewContainer {
   void OpenDevice(const std::string &id);
   void ShowDeviceMenu(const ConnectedDevice &device);
   void ShowSongMenu(const Song &song);
+  void ConfirmForget(const std::string &id, const std::string &backend);
+  void FinishForget(const std::string &id);
+  void ConfirmDelete(const SongList &songs);
+  void FinishDelete(const SongList &songs);
 
   Application *app_ = nullptr;
   GtkWidget *widget_ = nullptr;

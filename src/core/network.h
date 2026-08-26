@@ -36,6 +36,7 @@ class NetworkAccessManager {
   Response GetSync(const std::string &url, const std::map<std::string, std::string> &headers = {});
 
   void SetProxy(const std::string &proxy_uri);
+  void ReloadSettings();
   SoupSession *session() const { return session_; }
 
  private:

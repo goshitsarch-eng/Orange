@@ -7,7 +7,9 @@
 #include "device/devicemenu.h"
 #include "device/devicesongmenu.h"
 #include "device/devicedrag.h"
+#include "device/devicedeletedialog.h"
 #include "device/deviceconnectdialog.h"
+#include "device/deviceforgetdialog.h"
 #include "device/deviceviewlook.h"
 #include "device/deviceviewreload.h"
 #include "device/devicekeyboard.h"
@@ -559,6 +561,22 @@ TEST(DeviceViewLook, IconsAndStatusMatchQtDelegate) {
 
 TEST(DeviceViewReload, DoesNotRescanOnRefresh) {
   EXPECT_FALSE(DeviceViewReload::ShouldRescanOnReload());
+}
+
+TEST(DeviceForgetDialog, MatchesQtForgetCopy) {
+  EXPECT_STREQ("Forget device", DeviceForgetDialog::Title());
+  EXPECT_STREQ("Forget device", DeviceForgetDialog::Accept());
+  EXPECT_STREQ("Cancel", DeviceForgetDialog::Cancel());
+  EXPECT_NE(std::string::npos, std::string(DeviceForgetDialog::Message()).find("rescan all the songs again"));
+  EXPECT_FALSE(DeviceForgetDialog::NeedsPrompt("cdda"));
+  EXPECT_TRUE(DeviceForgetDialog::NeedsPrompt("mtp"));
+}
+
+TEST(DeviceDeleteDialog, MatchesQtDeleteCopy) {
+  EXPECT_STREQ("Delete files", DeviceDeleteDialog::Title());
+  EXPECT_STREQ("These files will be deleted from the device, are you sure you want to continue?", DeviceDeleteDialog::Message());
+  EXPECT_STREQ("Yes", DeviceDeleteDialog::Accept());
+  EXPECT_STREQ("Cancel", DeviceDeleteDialog::Cancel());
 }
 
 TEST(DeviceConnectDialog, MatchesQtFirstConnectCopy) {

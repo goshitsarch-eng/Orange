@@ -2231,6 +2231,7 @@ void MainWindow::OpenSettings(const char *page_name) {
     app_->scrobbler()->ReloadSettings();
     app_->shortcuts()->ReloadSettings();
     app_->player()->ReloadSettings();
+    app_->network()->ReloadSettings();
     app_->osd()->ReloadSettings();
     app_->cover_providers()->ReloadSettings();
     app_->lyrics_providers()->ReloadSettings();

@@ -5,6 +5,8 @@
 #include "device/devicecopy.h"
 #include "device/devicemenu.h"
 #include "device/deviceproperties.h"
+#include "device/devicedeletedialog.h"
+#include "device/deviceforgetdialog.h"
 #include "device/deviceconnectdialog.h"
 #include "device/deviceviewlook.h"
 #include "device/deviceviewreload.h"
@@ -144,9 +146,7 @@ void DeviceViewContainer::ShowDeviceMenu(const ConnectedDevice &device) {
                          self->app_->device_manager()->Unmount(device->unique_id);
                          self->Reload();
                        } else if (g_strcmp0(name, "forget") == 0) {
-                         self->app_->device_manager()->Forget(device->unique_id);
-                         self->browse_id_.clear();
-                         self->Reload();
+                         self->ConfirmForget(device->unique_id, device->backend);
                        }
                      }),
                      this);
@@ -209,10 +209,7 @@ void DeviceViewContainer::ShowSongMenu(const Song &song) {
                        if (action == DeviceSongMenu::Action::Copy && self->app_) {
                          OrganizeDialog::Show(self->ParentWindow(), self->app_, DeviceCopy::CollectionRequest(*songs));
                        } else if (action == DeviceSongMenu::Action::Delete && self->app_ && !self->browse_id_.empty()) {
-                         for (const Song &selected : *songs) {
-                           self->app_->device_manager()->DeleteSong(self->browse_id_, selected);
-                         }
-                         self->Reload();
+                         self->ConfirmDelete(*songs);
                        }
                      }),
                      this);
@@ -224,4 +221,64 @@ void DeviceViewContainer::ShowSongMenu(const Song &song) {
   gtk_widget_insert_action_group(popover, "devicesong", G_ACTION_GROUP(group));
   g_object_set_data_full(G_OBJECT(popover), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });
   gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+void DeviceViewContainer::FinishForget(const std::string &id) {
+  if (app_ && app_->device_manager()) {
+    app_->device_manager()->Forget(id);
+  }
+  browse_id_.clear();
+  Reload();
+}
+
+void DeviceViewContainer::ConfirmForget(const std::string &id, const std::string &backend) {
+  if (!DeviceForgetDialog::NeedsPrompt(backend)) {
+    FinishForget(id);
+    return;
+  }
+  AdwDialog *dialog = adw_alert_dialog_new(Translations::CStr(DeviceForgetDialog::Title()), Translations::CStr(DeviceForgetDialog::Message()));
+  adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "cancel", Translations::CStr(DeviceForgetDialog::Cancel()));
+  adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "forget", Translations::CStr(DeviceForgetDialog::Accept()));
+  adw_alert_dialog_set_response_appearance(ADW_ALERT_DIALOG(dialog), "forget", ADW_RESPONSE_DESTRUCTIVE);
+  auto *owned = new std::string(id);
+  g_object_set_data(G_OBJECT(dialog), "container", this);
+  g_object_set_data_full(G_OBJECT(dialog), "device-id", owned, [](gpointer p) { delete static_cast<std::string *>(p); });
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
+                     auto *self = static_cast<DeviceViewContainer *>(g_object_get_data(G_OBJECT(data), "container"));
+                     auto *device_id = static_cast<std::string *>(g_object_get_data(G_OBJECT(data), "device-id"));
+                     if (self && device_id && g_strcmp0(response, "forget") == 0) {
+                       self->FinishForget(*device_id);
+                     }
+                   }),
+                   dialog);
+  adw_dialog_present(dialog, GTK_WIDGET(ParentWindow()));
+}
+
+void DeviceViewContainer::FinishDelete(const SongList &songs) {
+  if (!app_ || !app_->device_manager() || browse_id_.empty()) {
+    return;
+  }
+  for (const Song &selected : songs) {
+    app_->device_manager()->DeleteSong(browse_id_, selected);
+  }
+  Reload();
+}
+
+void DeviceViewContainer::ConfirmDelete(const SongList &songs) {
+  AdwDialog *dialog = adw_alert_dialog_new(Translations::CStr(DeviceDeleteDialog::Title()), Translations::CStr(DeviceDeleteDialog::Message()));
+  adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "cancel", Translations::CStr(DeviceDeleteDialog::Cancel()));
+  adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "delete", Translations::CStr(DeviceDeleteDialog::Accept()));
+  adw_alert_dialog_set_response_appearance(ADW_ALERT_DIALOG(dialog), "delete", ADW_RESPONSE_DESTRUCTIVE);
+  auto *owned = new SongList(songs);
+  g_object_set_data(G_OBJECT(dialog), "container", this);
+  g_object_set_data_full(G_OBJECT(dialog), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
+                     auto *self = static_cast<DeviceViewContainer *>(g_object_get_data(G_OBJECT(data), "container"));
+                     auto *selected = static_cast<SongList *>(g_object_get_data(G_OBJECT(data), "songs"));
+                     if (self && selected && g_strcmp0(response, "delete") == 0) {
+                       self->FinishDelete(*selected);
+                     }
+                   }),
+                   dialog);
+  adw_dialog_present(dialog, GTK_WIDGET(ParentWindow()));
 }

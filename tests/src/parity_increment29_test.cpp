@@ -6,6 +6,7 @@
 #include "core/settings.h"
 #include "covermanager/coverutils.h"
 #include "engine/enginebase.h"
+#include "engine/gstengineproxy.h"
 #include "engine/gstbusmessageevent.h"
 #include "engine/gstfastspectrum.h"
 #include "filterparser/filterparserintgecomparator.h"
@@ -114,6 +115,21 @@ TEST(NetworkHelpers, ProxyAndParams) {
   factory.ReloadSettings();
   EXPECT_EQ(NetworkProxyFactory::Mode::Manual, factory.mode());
   EXPECT_EQ("http://127.0.0.1:8080", factory.ProxyUri());
+  EXPECT_EQ("http", factory.Scheme());
+  s.SetIntValue("mode", static_cast<int>(NetworkProxySettings::Mode::Direct));
+  s.Sync();
+  factory.ReloadSettings();
+  EXPECT_EQ(NetworkProxyFactory::Mode::Direct, factory.mode());
+  EXPECT_TRUE(factory.ProxyUri().empty());
+  s.SetIntValue("mode", static_cast<int>(NetworkProxySettings::Mode::Manual));
+  s.SetIntValue("type", static_cast<int>(NetworkProxySettings::ProxyType::Socks5Proxy));
+  s.SetBoolValue("use_authentication", true);
+  s.SetValue("username", "user");
+  s.SetValue("password", "secret");
+  s.Sync();
+  factory.ReloadSettings();
+  EXPECT_EQ("socks5://user:secret@127.0.0.1:8080", factory.ProxyUri());
+  EXPECT_TRUE(factory.EngineOptions().address.empty());
   const std::string encoded = HttpBaseRequest::EncodeParams({{"q", "fleet foxes"}, {"fmt", "json"}});
   EXPECT_NE(std::string::npos, encoded.find("q="));
   EXPECT_NE(std::string::npos, encoded.find("fmt=json"));

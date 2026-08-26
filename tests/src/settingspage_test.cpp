@@ -36,6 +36,7 @@
 #include "settings/contextsettingslabels.h"
 #include "dialogs/errordialoglabels.h"
 #include "transcoder/transcoderoptionslabels.h"
+#include "engine/gstengineproxy.h"
 #include "settings/notificationscontrols.h"
 #include "settings/notificationssettingslabels.h"
 #include "settings/playlistsettingscontrols.h"
@@ -698,4 +699,21 @@ TEST(SmartPlaylistsLabel, MatchQtToolbarCopy) {
   EXPECT_STREQ("Edit smart playlist", SmartPlaylistsLabel::EditPlaylist());
   EXPECT_STREQ("Delete smart playlist", SmartPlaylistsLabel::DeletePlaylist());
   EXPECT_STREQ("Restore defaults", SmartPlaylistsLabel::RestoreDefaults());
+}
+
+TEST(GstEngineProxy, AppliesOnlyManualHttpWhenEngineEnabled) {
+  EXPECT_TRUE(GstEngineProxy::ShouldApply(NetworkProxySettings::Mode::Manual, NetworkProxySettings::ProxyType::HttpProxy, true));
+  EXPECT_FALSE(GstEngineProxy::ShouldApply(NetworkProxySettings::Mode::Manual, NetworkProxySettings::ProxyType::Socks5Proxy, true));
+  EXPECT_FALSE(GstEngineProxy::ShouldApply(NetworkProxySettings::Mode::System, NetworkProxySettings::ProxyType::HttpProxy, true));
+  EXPECT_FALSE(GstEngineProxy::ShouldApply(NetworkProxySettings::Mode::Manual, NetworkProxySettings::ProxyType::HttpProxy, false));
+  EXPECT_EQ("proxy.local:8080", GstEngineProxy::Address("proxy.local", 8080));
+  EXPECT_TRUE(GstEngineProxy::Address("", 8080).empty());
+  const auto applied = GstEngineProxy::FromSettings(NetworkProxySettings::Mode::Manual, NetworkProxySettings::ProxyType::HttpProxy, true,
+                                                    "proxy.local", 8080, true, "user", "pw");
+  EXPECT_EQ("proxy.local:8080", applied.address);
+  EXPECT_TRUE(applied.authentication);
+  EXPECT_EQ("user", applied.user);
+  const auto skipped = GstEngineProxy::FromSettings(NetworkProxySettings::Mode::Manual, NetworkProxySettings::ProxyType::Socks5Proxy, true,
+                                                    "proxy.local", 8080, true, "user", "pw");
+  EXPECT_TRUE(skipped.address.empty());
 }

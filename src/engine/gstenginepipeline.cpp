@@ -51,6 +51,10 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
   end_offset_nanosec_ = end_offset_nanosec;
   volume_control_ = extras.volume_control;
   strict_ssl_ = extras.strict_ssl;
+  proxy_address_ = extras.proxy_address;
+  proxy_authentication_ = extras.proxy_authentication;
+  proxy_user_ = extras.proxy_user;
+  proxy_pass_ = extras.proxy_pass;
   device_warmup_ms_ = extras.device_warmup_ms;
   if (playbin3) {
     playbin_ = gst_element_factory_make("playbin3", "playbin");
@@ -148,6 +152,13 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
                      auto *self = static_cast<GstEnginePipeline *>(data);
                      if (g_object_class_find_property(G_OBJECT_GET_CLASS(source), "ssl-strict")) {
                        g_object_set(source, "ssl-strict", self->strict_ssl_ ? TRUE : FALSE, nullptr);
+                     }
+                     if (!self->proxy_address_.empty() && g_object_class_find_property(G_OBJECT_GET_CLASS(source), "proxy")) {
+                       g_object_set(source, "proxy", self->proxy_address_.c_str(), nullptr);
+                       if (self->proxy_authentication_ && g_object_class_find_property(G_OBJECT_GET_CLASS(source), "proxy-id") &&
+                           g_object_class_find_property(G_OBJECT_GET_CLASS(source), "proxy-pw")) {
+                         g_object_set(source, "proxy-id", self->proxy_user_.c_str(), "proxy-pw", self->proxy_pass_.c_str(), nullptr);
+                       }
                      }
                    })),
                    this);

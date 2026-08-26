@@ -117,6 +117,10 @@ class GstEngine : public EngineBase {
   bool bs2b_enabled_ = false;
   bool http2_enabled_ = false;
   bool strict_ssl_enabled_ = false;
+  std::string proxy_address_;
+  bool proxy_authentication_ = false;
+  std::string proxy_user_;
+  std::string proxy_pass_;
   int64_t buffer_duration_ms_ = 4000;
   double buffer_low_watermark_ = 0.33;
   double buffer_high_watermark_ = 0.99;

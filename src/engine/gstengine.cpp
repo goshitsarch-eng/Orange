@@ -3,6 +3,7 @@
 #include "constants/backendsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "core/networkproxyfactory.h"
 #include "engine/backendoptions.h"
 #include "equalizer/equalizerpersist.h"
 
@@ -81,6 +82,13 @@ void GstEngine::ReloadBackendOptions() {
   replaygain_fallback_ = settings.DoubleValue(BackendSettings::kRgFallbackGain, BackendSettings::kDefaultRgFallbackGain);
   replaygain_compression_ = settings.BoolValue(BackendSettings::kRgCompression, BackendSettings::kDefaultRgCompression);
   setenv("SOUP_FORCE_HTTP1", BackendOptions::SoupForceHttp1(http2_enabled_), 1);
+  NetworkProxyFactory proxy;
+  proxy.ReloadSettings();
+  const GstEngineProxy::Options engine_proxy = proxy.EngineOptions();
+  proxy_address_ = engine_proxy.address;
+  proxy_authentication_ = engine_proxy.authentication;
+  proxy_user_ = engine_proxy.user;
+  proxy_pass_ = engine_proxy.pass;
 }
 
 double GstEngine::VolumeFraction() const { return BackendOptions::VolumeFraction(volume_percent_, volume_exponential_); }
@@ -96,6 +104,10 @@ GstPipelineExtras GstEngine::PipelineExtras() const {
   extras.channels = channels_;
   extras.bs2b = bs2b_enabled_;
   extras.strict_ssl = strict_ssl_enabled_;
+  extras.proxy_address = proxy_address_;
+  extras.proxy_authentication = proxy_authentication_;
+  extras.proxy_user = proxy_user_;
+  extras.proxy_pass = proxy_pass_;
   extras.buffer_duration_ms = buffer_duration_ms_;
   extras.buffer_low_watermark = buffer_low_watermark_;
   extras.buffer_high_watermark = buffer_high_watermark_;
