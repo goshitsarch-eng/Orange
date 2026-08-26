@@ -93,11 +93,12 @@ SongList Parse(FavoriteType type, const std::string &json) { return TidalRequest
 
 void Get(NetworkAccessManager *network, const std::string &api_url, uint64_t user_id, const std::string &country_code,
          const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback,
-         StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current) {
+         StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current, StreamingPage::ErrorCallback error) {
   TidalRequest::GetAll(
       network,
       [api_url, user_id, country_code, type](int offset, int limit) { return ListUrl(api_url, user_id, type, country_code, offset, limit); },
-      headers, TidalRequest::FromFavoriteType(type), std::move(callback), std::move(progress), std::move(still_current));
+      headers, TidalRequest::FromFavoriteType(type), std::move(callback), std::move(progress), std::move(still_current),
+      StreamingPage::kDefaultLimit, 0, std::move(error));
 }
 
 void Add(NetworkAccessManager *network, const std::string &api_url, uint64_t user_id, const std::string &country_code,

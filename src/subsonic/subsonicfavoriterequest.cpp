@@ -1,5 +1,6 @@
 #include "subsonic/subsonicfavoriterequest.h"
 
+#include "streaming/streamingabort.h"
 #include "utilities/jsonutils.h"
 
 #include <algorithm>
@@ -47,19 +48,29 @@ std::string StarResource(bool remove) { return remove ? "unstar" : "star"; }
 
 std::map<std::string, std::string> StarParams(FavoriteType type, const std::string &id) { return {{IdParam(type), id}}; }
 
-void Get(NetworkAccessManager *network, const std::string &list_url, SearchCallback callback) {
-  if (!network || !callback) {
+void Get(NetworkAccessManager *network, const std::string &list_url, SearchCallback callback, StreamingPage::ErrorCallback error) {
+  if (!network || list_url.empty()) {
+    if (error) {
+      error(StreamingAbort::HttpError(0, {}));
+    }
     if (callback) {
       callback({});
     }
     return;
   }
-  network->Get(list_url, [callback](const NetworkAccessManager::Response &response) {
+  network->Get(list_url, [callback, error](const NetworkAccessManager::Response &response) {
     if (!response.ok()) {
-      callback({});
+      if (error) {
+        error(StreamingAbort::HttpError(response.status, response.error));
+      }
+      if (callback) {
+        callback({});
+      }
       return;
     }
-    callback(JsonUtils::ParseSubsonicSongs(response.body));
+    if (callback) {
+      callback(JsonUtils::ParseSubsonicSongs(response.body));
+    }
   });
 }
 

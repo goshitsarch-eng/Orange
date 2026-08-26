@@ -1,12 +1,17 @@
 #include "streaming/streamingpage.h"
 
+#include "streaming/streamingabort.h"
+
 #include <memory>
 
 namespace StreamingPage {
 
 void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<std::string, std::string> &headers, ParsePage parse,
-            DoneCallback callback, ProgressCallback progress, StillCurrent still_current, int limit, int max_items) {
+            DoneCallback callback, ProgressCallback progress, StillCurrent still_current, int limit, int max_items, ErrorCallback error) {
   if (!network || !url_for || !parse) {
+    if (error) {
+      error(StreamingAbort::HttpError(0, {}));
+    }
     if (callback) {
       callback({});
     }
@@ -20,6 +25,7 @@ void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<
     DoneCallback callback;
     ProgressCallback progress;
     StillCurrent still_current;
+    ErrorCallback error;
     int limit = kDefaultLimit;
     int max_items = 0;
     int offset = 0;
@@ -35,6 +41,7 @@ void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<
   state->callback = std::move(callback);
   state->progress = std::move(progress);
   state->still_current = std::move(still_current);
+  state->error = std::move(error);
   state->limit = limit > 0 ? limit : kDefaultLimit;
   state->max_items = max_items;
 
@@ -75,6 +82,12 @@ void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<
           Page page;
           if (response.ok()) {
             page = state->parse(response.body, requested_offset, state->limit);
+          } else if (state->songs.empty() && state->error) {
+            state->error(StreamingAbort::HttpError(response.status, response.error));
+            if (state->callback) {
+              state->callback({});
+            }
+            return;
           }
           state->songs.insert(state->songs.end(), page.songs.begin(), page.songs.end());
           if (ReachedMax(static_cast<int>(state->songs.size()), state->max_items)) {

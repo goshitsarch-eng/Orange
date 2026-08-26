@@ -22,10 +22,7 @@ StreamingCollectionViewContainer::StreamingCollectionViewContainer(const std::st
   gtk_widget_set_margin_bottom(abort_, 8);
   gtk_widget_set_visible(abort_, FALSE);
   g_signal_connect(abort_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *self = static_cast<StreamingCollectionViewContainer *>(data);
-                     if (self->abort_callback_) {
-                       self->abort_callback_();
-                     }
+                     static_cast<StreamingCollectionViewContainer *>(data)->OnActionClicked();
                    }),
                    this);
   gtk_box_append(GTK_BOX(widget_), view_->widget());
@@ -34,7 +31,27 @@ StreamingCollectionViewContainer::StreamingCollectionViewContainer(const std::st
   gtk_box_append(GTK_BOX(widget_), abort_);
 }
 
+void StreamingCollectionViewContainer::UpdateActionButton() {
+  if (!abort_) {
+    return;
+  }
+  gtk_button_set_label(GTK_BUTTON(abort_), Translations::CStr(StreamingAbort::ButtonLabel(working_, has_error_)));
+  gtk_widget_set_visible(abort_, StreamingAbort::ShouldShowAction(working_, has_error_) ? TRUE : FALSE);
+}
+
+void StreamingCollectionViewContainer::OnActionClicked() {
+  if (working_) {
+    if (abort_callback_) {
+      abort_callback_();
+    }
+    return;
+  }
+  HideProgress();
+}
+
 void StreamingCollectionViewContainer::ShowProgress(const std::string &status) {
+  working_ = true;
+  has_error_ = false;
   if (!status.empty()) {
     SetProgressStatus(status);
   }
@@ -44,12 +61,23 @@ void StreamingCollectionViewContainer::ShowProgress(const std::string &status) {
     }
     gtk_widget_set_visible(progress_, TRUE);
   }
-  if (abort_) {
-    gtk_widget_set_visible(abort_, StreamingAbort::ShouldShowAbort(true) ? TRUE : FALSE);
+  UpdateActionButton();
+}
+
+void StreamingCollectionViewContainer::ShowError(const std::string &status) {
+  working_ = false;
+  has_error_ = true;
+  if (progress_) {
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), 0);
+    gtk_widget_set_visible(progress_, FALSE);
   }
+  SetProgressStatus(status);
+  UpdateActionButton();
 }
 
 void StreamingCollectionViewContainer::HideProgress() {
+  working_ = false;
+  has_error_ = false;
   if (progress_) {
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), 0);
     gtk_widget_set_visible(progress_, FALSE);
@@ -58,12 +86,18 @@ void StreamingCollectionViewContainer::HideProgress() {
     gtk_label_set_text(GTK_LABEL(status_), "");
     gtk_widget_set_visible(status_, FALSE);
   }
-  if (abort_) {
-    gtk_widget_set_visible(abort_, StreamingAbort::ShouldShowAbort(false) ? TRUE : FALSE);
+  UpdateActionButton();
+}
+
+void StreamingCollectionViewContainer::HideProgressUnlessError() {
+  if (!has_error_) {
+    HideProgress();
   }
 }
 
 void StreamingCollectionViewContainer::SetProgress(int value, int maximum) {
+  working_ = true;
+  has_error_ = false;
   if (maximum > 0) {
     progress_max_ = maximum;
   }
@@ -71,9 +105,7 @@ void StreamingCollectionViewContainer::SetProgress(int value, int maximum) {
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), StreamingProgress::Fraction(value, progress_max_));
     gtk_widget_set_visible(progress_, TRUE);
   }
-  if (abort_) {
-    gtk_widget_set_visible(abort_, StreamingAbort::ShouldShowAbort(true) ? TRUE : FALSE);
-  }
+  UpdateActionButton();
 }
 
 void StreamingCollectionViewContainer::SetAbortCallback(AbortCallback callback) { abort_callback_ = std::move(callback); }

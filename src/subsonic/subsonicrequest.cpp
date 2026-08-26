@@ -1,5 +1,6 @@
 #include "subsonic/subsonicrequest.h"
 
+#include "streaming/streamingabort.h"
 #include "utilities/jsonutils.h"
 
 namespace SubsonicRequest {
@@ -112,26 +113,38 @@ StreamingPage::Page ParsePage(Type type, const std::string &json, int offset, in
   return page;
 }
 
-void Get(NetworkAccessManager *network, const std::string &url, Type type, SearchCallback callback) {
+void Get(NetworkAccessManager *network, const std::string &url, Type type, SearchCallback callback, StreamingPage::ErrorCallback error) {
   if (!network || url.empty()) {
+    if (error) {
+      error(StreamingAbort::HttpError(0, {}));
+    }
     if (callback) {
       callback({});
     }
     return;
   }
-  network->Get(url, [type, callback](const NetworkAccessManager::Response &response) {
-    if (!callback) {
+  network->Get(url, [type, callback, error](const NetworkAccessManager::Response &response) {
+    if (!response.ok()) {
+      if (error) {
+        error(StreamingAbort::HttpError(response.status, response.error));
+      }
+      if (callback) {
+        callback({});
+      }
       return;
     }
-    callback(response.ok() ? Parse(type, response.body) : SongList{});
+    if (callback) {
+      callback(Parse(type, response.body));
+    }
   });
 }
 
 void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, Type type, SearchCallback callback,
-            StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current, int limit, int max_items) {
+            StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current, int limit, int max_items,
+            StreamingPage::ErrorCallback error) {
   StreamingPage::GetAll(
       network, std::move(url_for), {}, [type](const std::string &json, int offset, int page_limit) { return ParsePage(type, json, offset, page_limit); },
-      std::move(callback), std::move(progress), std::move(still_current), limit, max_items);
+      std::move(callback), std::move(progress), std::move(still_current), limit, max_items, std::move(error));
 }
 
 }  // namespace SubsonicRequest

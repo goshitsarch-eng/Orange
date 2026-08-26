@@ -76,7 +76,7 @@ void QobuzService::Search(const std::string &query, SearchType type, SearchCallb
       },
       AuthHeaders(), request_type, [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
       [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit,
-      limit);
+      limit, [this](const std::string &error) { NotifySearchFailed(error); });
 }
 
 void QobuzService::GetArtists(SearchCallback callback) {
@@ -89,7 +89,8 @@ void QobuzService::GetArtists(SearchCallback callback) {
       },
       AuthHeaders(), QobuzRequest::Type::FavouriteArtists,
       [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
-      [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); });
+      [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); },
+      StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyArtistsFailed(error); });
 }
 
 void QobuzService::GetAlbums(SearchCallback callback) {
@@ -102,7 +103,8 @@ void QobuzService::GetAlbums(SearchCallback callback) {
       },
       AuthHeaders(), QobuzRequest::Type::FavouriteAlbums,
       [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
-      [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); });
+      [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); },
+      StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyAlbumsFailed(error); });
 }
 
 void QobuzService::GetSongs(SearchCallback callback) {
@@ -115,8 +117,8 @@ void QobuzService::GetSongs(SearchCallback callback) {
       },
       AuthHeaders(), QobuzRequest::Type::FavouriteSongs,
       [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
-      [this](int received, int total) { ReportSongsProgress(received, total); },
-      [this, gen]() { return SongsRequestCurrent(gen); });
+      [this](int received, int total) { ReportSongsProgress(received, total); }, [this, gen]() { return SongsRequestCurrent(gen); },
+      StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifySongsFailed(error); });
 }
 
 void QobuzService::GetArtistAlbums(const Song &artist, SearchCallback callback) {
@@ -170,7 +172,8 @@ UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback 
 
 void QobuzService::GetFavorites(FavoriteType type, SearchCallback callback) {
   QobuzFavoriteRequest::Get(network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type, std::move(callback),
-                            [this](int received, int total) { ReportSongsProgress(received, total); });
+                            [this](int received, int total) { ReportSongsProgress(received, total); }, {},
+                            [this](const std::string &error) { NotifyFavoritesFailed(error); });
 }
 
 void QobuzService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {

@@ -24,6 +24,11 @@ StreamingSongsView::StreamingSongsView(StreamingService *service)
         container_->SetProgress(value);
       }
     });
+    service_->SongsFailed.Connect([this, alive](const std::string &error) {
+      if (alive && *alive) {
+        container_->ShowError(error);
+      }
+    });
   }
 }
 
@@ -45,7 +50,7 @@ void StreamingSongsView::Reload() {
   }
   container_->view()->SetStatus("Loading songs…");
   service_->GetSongs([this](const SongList &songs) {
-    container_->HideProgress();
+    container_->HideProgressUnlessError();
     container_->view()->SetSongs(songs);
   });
 }

@@ -3,6 +3,7 @@
 
 #include "core/network.h"
 #include "core/song.h"
+#include "streaming/streamingpage.h"
 #include "streaming/streamingservices.h"
 
 #include <map>
@@ -20,7 +21,8 @@ std::vector<std::string> IdsFromSongs(FavoriteType type, const SongList &songs);
 std::string StarResource(bool remove);
 std::map<std::string, std::string> StarParams(FavoriteType type, const std::string &id);
 
-void Get(NetworkAccessManager *network, const std::string &list_url, SearchCallback callback);
+void Get(NetworkAccessManager *network, const std::string &list_url, SearchCallback callback,
+         StreamingPage::ErrorCallback error = {});
 void Mutate(NetworkAccessManager *network, const std::string &url, const SongList &songs, SearchCallback callback);
 
 }  // namespace SubsonicFavoriteRequest

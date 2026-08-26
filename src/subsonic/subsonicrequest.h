@@ -43,10 +43,11 @@ SongList Parse(Type type, const std::string &json);
 
 StreamingPage::Page ParsePage(Type type, const std::string &json, int offset, int limit);
 
-void Get(NetworkAccessManager *network, const std::string &url, Type type, SearchCallback callback);
+void Get(NetworkAccessManager *network, const std::string &url, Type type, SearchCallback callback,
+         StreamingPage::ErrorCallback error = {});
 void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, Type type, SearchCallback callback,
             StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {},
-            int limit = StreamingPage::kDefaultLimit, int max_items = 0);
+            int limit = StreamingPage::kDefaultLimit, int max_items = 0, StreamingPage::ErrorCallback error = {});
 
 }  // namespace SubsonicRequest
 

@@ -30,6 +30,7 @@ StreamingTabsView::StreamingTabsView(StreamingService *service) : service_(servi
   artists_->SetAbortCallback([this]() { AbortGetArtists(); });
   albums_->SetAbortCallback([this]() { AbortGetAlbums(); });
   songs_->SetAbortCallback([this]() { AbortGetSongs(); });
+  favorites_->SetAbortCallback([this]() { favorites_->HideProgress(); });
   ConnectBrowseProgress();
 }
 
@@ -92,6 +93,26 @@ void StreamingTabsView::ConnectBrowseProgress() {
       songs_->SetProgress(value);
     }
   });
+  service_->ArtistsFailed.Connect([this, alive](const std::string &error) {
+    if (alive && *alive) {
+      artists_->ShowError(error);
+    }
+  });
+  service_->AlbumsFailed.Connect([this, alive](const std::string &error) {
+    if (alive && *alive) {
+      albums_->ShowError(error);
+    }
+  });
+  service_->SongsFailed.Connect([this, alive](const std::string &error) {
+    if (alive && *alive) {
+      songs_->ShowError(error);
+    }
+  });
+  service_->FavoritesFailed.Connect([this, alive](const std::string &error) {
+    if (alive && *alive) {
+      favorites_->ShowError(error);
+    }
+  });
 }
 
 void StreamingTabsView::SetActivateCallback(ActivateCallback callback) {
@@ -137,7 +158,7 @@ void StreamingTabsView::BrowseArtist(StreamingCollectionView *view, const Song &
     container->ShowProgress(StreamingProgress::ReceivingAlbums());
   }
   service_->GetArtistAlbums(artist, [this, view, container](const SongList &albums) {
-    container->HideProgress();
+    container->HideProgressUnlessError();
     view->PushSongs(albums);
     if (albums.empty()) {
       view->SetStatus(service_->logged_in() ? "No albums" : "Sign in in Preferences");
@@ -161,7 +182,7 @@ void StreamingTabsView::BrowseAlbum(StreamingCollectionView *view, const Song &a
     container->ShowProgress(StreamingProgress::ReceivingSongs());
   }
   service_->GetAlbumSongs(album, [this, view, container](const SongList &songs) {
-    container->HideProgress();
+    container->HideProgressUnlessError();
     view->PushSongs(songs);
     if (songs.empty()) {
       view->SetStatus(service_->logged_in() ? "No songs" : "Sign in in Preferences");
@@ -195,7 +216,7 @@ void StreamingTabsView::GetArtists() {
   }
   artists_->view()->SetStatus("Loading artists…");
   service_->GetArtists([this](const SongList &songs) {
-    artists_->HideProgress();
+    artists_->HideProgressUnlessError();
     artists_->view()->SetSongs(songs);
     if (songs.empty()) {
       artists_->view()->SetStatus(service_->logged_in() ? "No artists" : "Sign in in Preferences");
@@ -213,7 +234,7 @@ void StreamingTabsView::GetAlbums() {
   }
   albums_->view()->SetStatus("Loading albums…");
   service_->GetAlbums([this](const SongList &songs) {
-    albums_->HideProgress();
+    albums_->HideProgressUnlessError();
     albums_->view()->SetSongs(songs);
     if (songs.empty()) {
       albums_->view()->SetStatus(service_->logged_in() ? "No albums" : "Sign in in Preferences");
@@ -231,7 +252,7 @@ void StreamingTabsView::GetSongs() {
   }
   songs_->view()->SetStatus("Loading songs…");
   service_->GetSongs([this](const SongList &songs) {
-    songs_->HideProgress();
+    songs_->HideProgressUnlessError();
     songs_->view()->SetSongs(songs);
     if (songs.empty()) {
       songs_->view()->SetStatus(service_->logged_in() ? "No songs" : "Sign in in Preferences");
@@ -269,7 +290,7 @@ void StreamingTabsView::GetFavorites() {
   }
   favorites_->view()->SetStatus("Loading favorites…");
   service_->GetFavorites(StreamingService::FavoriteType::Songs, [this](const SongList &songs) {
-    favorites_->HideProgress();
+    favorites_->HideProgressUnlessError();
     favorites_->view()->SetSongs(songs);
     if (songs.empty()) {
       favorites_->view()->SetStatus(service_->logged_in() ? "No favorites" : "Sign in in Preferences");

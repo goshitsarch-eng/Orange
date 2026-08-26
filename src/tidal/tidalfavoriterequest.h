@@ -30,7 +30,8 @@ SongList Parse(FavoriteType type, const std::string &json);
 
 void Get(NetworkAccessManager *network, const std::string &api_url, uint64_t user_id, const std::string &country_code,
          const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback,
-         StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {});
+         StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {},
+         StreamingPage::ErrorCallback error = {});
 void Add(NetworkAccessManager *network, const std::string &api_url, uint64_t user_id, const std::string &country_code,
          const std::map<std::string, std::string> &headers, FavoriteType type, const SongList &songs, SearchCallback callback);
 void Remove(NetworkAccessManager *network, const std::string &api_url, uint64_t user_id, const std::string &country_code,

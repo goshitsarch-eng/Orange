@@ -144,7 +144,8 @@ void SpotifyService::Search(const std::string &query, SearchType type, SearchCal
               [this, gen]() { return SearchRequestCurrent(gen); },
               [this](int received, int total) { ReportSearchProgress(received, total); });
         },
-        [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit);
+        [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit,
+        [this](const std::string &error) { NotifySearchFailed(error); });
   });
 }
 
@@ -157,7 +158,8 @@ void SpotifyService::GetArtists(SearchCallback callback) {
         [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteArtists, {}, offset, limit); },
         AuthHeaders(), SpotifyRequest::Type::FavouriteArtists,
         [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
-        [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); });
+        [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); },
+        StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyArtistsFailed(error); });
   });
 }
 
@@ -170,7 +172,8 @@ void SpotifyService::GetAlbums(SearchCallback callback) {
         [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteAlbums, {}, offset, limit); },
         AuthHeaders(), SpotifyRequest::Type::FavouriteAlbums,
         [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
-        [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); });
+        [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); },
+        StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyAlbumsFailed(error); });
   });
 }
 
@@ -183,7 +186,8 @@ void SpotifyService::GetSongs(SearchCallback callback) {
         [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteSongs, {}, offset, limit); },
         AuthHeaders(), SpotifyRequest::Type::FavouriteSongs,
         [this, guarded](const SongList &songs) { guarded(StreamingSearchOpts::Finish(songs, name())); },
-        [this](int received, int total) { ReportSongsProgress(received, total); }, [this, gen]() { return SongsRequestCurrent(gen); });
+        [this](int received, int total) { ReportSongsProgress(received, total); }, [this, gen]() { return SongsRequestCurrent(gen); },
+        StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifySongsFailed(error); });
   });
 }
 
@@ -291,7 +295,8 @@ UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallbac
 void SpotifyService::GetFavorites(FavoriteType type, SearchCallback callback) {
   EnsureFreshToken([this, type, callback]() {
     SpotifyFavoriteRequest::Get(network_, kApiUrl, AuthHeaders(), type, callback,
-                                [this](int received, int total) { ReportSongsProgress(received, total); });
+                                [this](int received, int total) { ReportSongsProgress(received, total); }, {},
+                                [this](const std::string &error) { NotifyFavoritesFailed(error); });
   });
 }
 

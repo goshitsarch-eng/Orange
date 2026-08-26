@@ -29,6 +29,7 @@ using ParsePage = std::function<Page(const std::string &json, int offset, int li
 using ProgressCallback = std::function<void(int received, int total)>;
 using StillCurrent = std::function<bool()>;
 using DoneCallback = std::function<void(const SongList &)>;
+using ErrorCallback = std::function<void(const std::string &)>;
 
 inline std::string FirstPresentString(const std::string &json, const std::vector<std::vector<std::string>> &paths) {
   for (const auto &path : paths) {
@@ -94,7 +95,7 @@ inline bool ReachedMax(int received, int max_items) { return max_items > 0 && re
 
 void GetAll(NetworkAccessManager *network, UrlForOffset url_for, const std::map<std::string, std::string> &headers, ParsePage parse,
             DoneCallback callback, ProgressCallback progress = {}, StillCurrent still_current = {}, int limit = kDefaultLimit,
-            int max_items = 0);
+            int max_items = 0, ErrorCallback error = {});
 
 }  // namespace StreamingPage
 

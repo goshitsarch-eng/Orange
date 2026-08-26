@@ -42,6 +42,8 @@ class StreamingSearchView {
   void BuildGroupMenu();
   void ApplyGrouping(const CollectionGrouping::Grouping &grouping);
   void HideProgress();
+  void HideProgressUnlessError();
+  void ShowError(const std::string &status);
   void ApplyStatus(const std::string &text);
   void ApplyProgress(int value, int maximum);
   void ScheduleSearch(const std::string &query, bool immediate);
@@ -66,6 +68,7 @@ class StreamingSearchView {
   GtkWidget *list_ = nullptr;
   GtkWidget *progress_ = nullptr;
   GtkWidget *status_ = nullptr;
+  GtkWidget *close_ = nullptr;
   int last_search_id_ = -1;
   int progress_max_ = StreamingProgress::kDefaultMaximum;
   CollectionGrouping::Grouping grouping_ = StreamingSearchGroup::DefaultGrouping();
@@ -78,6 +81,7 @@ class StreamingSearchView {
   int search_timer_gen_ = 0;
   std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
   std::map<std::string, std::string> cover_cache_;
+  bool has_error_ = false;
 };
 
 #endif

@@ -49,7 +49,8 @@ void Get(NetworkAccessManager *network, const std::string &url, const std::map<s
          SearchCallback callback);
 void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, const std::map<std::string, std::string> &headers,
             Type type, SearchCallback callback, StreamingPage::ProgressCallback progress = {},
-            StreamingPage::StillCurrent still_current = {}, int limit = StreamingPage::kDefaultLimit, int max_items = 0);
+            StreamingPage::StillCurrent still_current = {}, int limit = StreamingPage::kDefaultLimit, int max_items = 0,
+            StreamingPage::ErrorCallback error = {});
 
 }  // namespace TidalRequest
 

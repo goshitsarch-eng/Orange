@@ -212,14 +212,38 @@ TEST(StreamingService, BrowseProgressEmitsReceiving) {
 
 TEST(StreamingAbort, VisibilityAndGeneration) {
   EXPECT_STREQ("Abort", StreamingAbort::AbortLabel());
+  EXPECT_STREQ("Close", StreamingAbort::CloseLabel());
   EXPECT_TRUE(StreamingAbort::ShouldShowAbort(true));
   EXPECT_FALSE(StreamingAbort::ShouldShowAbort(false));
   EXPECT_TRUE(StreamingAbort::ShouldShowClose(false, true));
   EXPECT_FALSE(StreamingAbort::ShouldShowClose(true, true));
   EXPECT_FALSE(StreamingAbort::ShouldShowClose(false, false));
+  EXPECT_TRUE(StreamingAbort::ShouldShowAction(true, false));
+  EXPECT_TRUE(StreamingAbort::ShouldShowAction(false, true));
+  EXPECT_FALSE(StreamingAbort::ShouldShowAction(false, false));
+  EXPECT_STREQ("Abort", StreamingAbort::ButtonLabel(true, false));
+  EXPECT_STREQ("Close", StreamingAbort::ButtonLabel(false, true));
+  EXPECT_EQ("HTTP 401", StreamingAbort::HttpError(401, {}));
+  EXPECT_EQ("timeout", StreamingAbort::HttpError(0, "timeout"));
+  EXPECT_EQ("Network error", StreamingAbort::HttpError(0, {}));
   EXPECT_EQ(1, StreamingAbort::NextGeneration(0));
   EXPECT_TRUE(StreamingAbort::IsCurrent(2, 2));
   EXPECT_FALSE(StreamingAbort::IsCurrent(1, 2));
+}
+
+TEST(StreamingService, NotifyFailedEmitsStatusAndFailed) {
+  TidalService service(nullptr);
+  std::string artists_status;
+  std::string artists_failed;
+  std::string favorites_failed;
+  service.ArtistsUpdateStatus.Connect([&](const std::string &text) { artists_status = text; });
+  service.ArtistsFailed.Connect([&](const std::string &text) { artists_failed = text; });
+  service.FavoritesFailed.Connect([&](const std::string &text) { favorites_failed = text; });
+  service.NotifyArtistsFailed("HTTP 401");
+  service.NotifyFavoritesFailed("timeout");
+  EXPECT_EQ("HTTP 401", artists_status);
+  EXPECT_EQ("HTTP 401", artists_failed);
+  EXPECT_EQ("timeout", favorites_failed);
 }
 
 TEST(StreamingService, ResetDropsInFlightCallbacks) {

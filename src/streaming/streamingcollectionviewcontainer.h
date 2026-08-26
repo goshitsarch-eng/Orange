@@ -21,13 +21,20 @@ class StreamingCollectionViewContainer {
   GtkWidget *abort_button() const { return abort_; }
   StreamingCollectionView *view() const { return view_.get(); }
   void ShowProgress(const std::string &status = {});
+  void ShowError(const std::string &status);
   void HideProgress();
+  void HideProgressUnlessError();
   void SetProgress(int value, int maximum = StreamingProgress::kDefaultMaximum);
   void SetProgressMaximum(int maximum);
   void SetProgressStatus(const std::string &status);
   void SetAbortCallback(AbortCallback callback);
+  bool has_error() const { return has_error_; }
+  bool working() const { return working_; }
 
  private:
+  void UpdateActionButton();
+  void OnActionClicked();
+
   std::unique_ptr<StreamingCollectionView> view_;
   GtkWidget *widget_ = nullptr;
   GtkWidget *progress_ = nullptr;
@@ -35,6 +42,8 @@ class StreamingCollectionViewContainer {
   GtkWidget *abort_ = nullptr;
   AbortCallback abort_callback_;
   int progress_max_ = StreamingProgress::kDefaultMaximum;
+  bool working_ = false;
+  bool has_error_ = false;
 };
 
 #endif

@@ -4,6 +4,7 @@
 #include "collection/groupbydialog.h"
 #include "core/settings.h"
 #include "dialogs/dialoghelpers.h"
+#include "streaming/streamingabort.h"
 #include "streaming/streamingcover.h"
 #include "streaming/streamingdrag.h"
 #include "streaming/streamingprogress.h"
@@ -130,10 +131,21 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   gtk_widget_set_margin_start(status_, 8);
   gtk_widget_set_margin_end(status_, 8);
   gtk_widget_set_visible(status_, FALSE);
+  close_ = gtk_button_new_with_label(Translations::CStr(StreamingAbort::CloseLabel()));
+  gtk_widget_set_halign(close_, GTK_ALIGN_END);
+  gtk_widget_set_margin_start(close_, 8);
+  gtk_widget_set_margin_end(close_, 8);
+  gtk_widget_set_margin_bottom(close_, 8);
+  gtk_widget_set_visible(close_, FALSE);
+  g_signal_connect(close_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     static_cast<StreamingSearchView *>(data)->HideProgress();
+                   }),
+                   this);
   gtk_box_append(GTK_BOX(widget_), search_entry_);
   gtk_box_append(GTK_BOX(widget_), types);
   gtk_box_append(GTK_BOX(widget_), progress_);
   gtk_box_append(GTK_BOX(widget_), status_);
+  gtk_box_append(GTK_BOX(widget_), close_);
   gtk_box_append(GTK_BOX(widget_), scroll);
   if (service_) {
     const auto alive = alive_;
@@ -154,6 +166,12 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
         return;
       }
       ApplyProgress(value, progress_max_);
+    });
+    service_->SearchFailed.Connect([this, alive](int id, const std::string &error) {
+      if (!alive || !*alive || id != last_search_id_) {
+        return;
+      }
+      ShowError(error);
     });
   }
   GtkEventController *keys = gtk_event_controller_key_new();
@@ -215,6 +233,7 @@ void StreamingSearchView::ScheduleSearch(const std::string &query, bool immediat
 }
 
 void StreamingSearchView::HideProgress() {
+  has_error_ = false;
   if (progress_) {
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), 0);
     gtk_widget_set_visible(progress_, FALSE);
@@ -222,6 +241,30 @@ void StreamingSearchView::HideProgress() {
   if (status_) {
     gtk_label_set_text(GTK_LABEL(status_), "");
     gtk_widget_set_visible(status_, FALSE);
+  }
+  if (close_) {
+    gtk_widget_set_visible(close_, FALSE);
+  }
+}
+
+void StreamingSearchView::HideProgressUnlessError() {
+  if (!has_error_) {
+    HideProgress();
+  }
+}
+
+void StreamingSearchView::ShowError(const std::string &status) {
+  has_error_ = true;
+  if (progress_) {
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), 0);
+    gtk_widget_set_visible(progress_, FALSE);
+  }
+  ApplyStatus(status);
+  if (progress_) {
+    gtk_widget_set_visible(progress_, FALSE);
+  }
+  if (close_) {
+    gtk_widget_set_visible(close_, StreamingAbort::ShouldShowClose(false, has_error_) ? TRUE : FALSE);
   }
 }
 
@@ -236,6 +279,9 @@ void StreamingSearchView::ApplyStatus(const std::string &text) {
 }
 
 void StreamingSearchView::ApplyProgress(int value, int maximum) {
+  if (has_error_) {
+    return;
+  }
   if (maximum > 0) {
     progress_max_ = maximum;
   }
@@ -262,6 +308,10 @@ void StreamingSearchView::Search(const std::string &query) {
   }
   model_.SetSearchType(type);
   ++cover_gen_;
+  has_error_ = false;
+  if (close_) {
+    gtk_widget_set_visible(close_, FALSE);
+  }
   last_search_id_ = service_->last_search_id() + 1;
   service_->StartSearchProgress();
   const int gen = cover_gen_;
@@ -270,7 +320,7 @@ void StreamingSearchView::Search(const std::string &query) {
     if (!alive || !*alive || gen != cover_gen_) {
       return;
     }
-    HideProgress();
+    HideProgressUnlessError();
     model_.SetSongs(songs);
     Rebuild();
   });

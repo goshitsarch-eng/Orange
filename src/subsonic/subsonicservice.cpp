@@ -115,7 +115,7 @@ void SubsonicService::Search(const std::string &query, SearchType type, SearchCa
                          SubsonicRequest::Params(request_type, query, offset, page_limit), hex_auth_);
       },
       request_type, guarded, [this](int received, int total) { ReportSearchProgress(received, total); },
-      [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit);
+      [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit, [this](const std::string &error) { NotifySearchFailed(error); });
 }
 
 void SubsonicService::GetArtists(SearchCallback callback) {
@@ -126,7 +126,8 @@ void SubsonicService::GetArtists(SearchCallback callback) {
   }
   SubsonicRequest::Get(network_, CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::ArtistsList),
                                            {}, hex_auth_),
-                       SubsonicRequest::Type::ArtistsList, std::move(guarded));
+                       SubsonicRequest::Type::ArtistsList, std::move(guarded),
+                       [this](const std::string &error) { NotifyArtistsFailed(error); });
 }
 
 void SubsonicService::GetAlbums(SearchCallback callback) {
@@ -143,7 +144,8 @@ void SubsonicService::GetAlbums(SearchCallback callback) {
                          SubsonicRequest::Params(SubsonicRequest::Type::AlbumList, {}, offset, limit), hex_auth_);
       },
       SubsonicRequest::Type::AlbumList, guarded, [this](int received, int total) { ReportAlbumsProgress(received, total); },
-      [this, gen]() { return AlbumsRequestCurrent(gen); });
+      [this, gen]() { return AlbumsRequestCurrent(gen); }, StreamingPage::kDefaultLimit, 0,
+      [this](const std::string &error) { NotifyAlbumsFailed(error); });
 }
 
 void SubsonicService::GetSongs(SearchCallback callback) {
@@ -160,7 +162,8 @@ void SubsonicService::GetSongs(SearchCallback callback) {
                          SubsonicRequest::Params(SubsonicRequest::Type::SearchSongs, ".", offset, limit), hex_auth_);
       },
       SubsonicRequest::Type::SearchSongs, guarded, [this](int received, int total) { ReportSongsProgress(received, total); },
-      [this, gen]() { return SongsRequestCurrent(gen); });
+      [this, gen]() { return SongsRequestCurrent(gen); }, StreamingPage::kDefaultLimit, 0,
+      [this](const std::string &error) { NotifySongsFailed(error); });
 }
 
 void SubsonicService::GetArtistAlbums(const Song &artist, SearchCallback callback) {
@@ -215,7 +218,8 @@ void SubsonicService::GetFavorites(FavoriteType, SearchCallback callback) {
     }
     return;
   }
-  SubsonicFavoriteRequest::Get(network_, CreateUrl(server_url_, username_, password_, "getStarred2", {}, hex_auth_), std::move(callback));
+  SubsonicFavoriteRequest::Get(network_, CreateUrl(server_url_, username_, password_, "getStarred2", {}, hex_auth_), std::move(callback),
+                               [this](const std::string &error) { NotifyFavoritesFailed(error); });
 }
 
 void SubsonicService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {

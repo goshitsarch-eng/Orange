@@ -170,6 +170,28 @@ void StreamingService::ReportSongsProgress(int received, int total) {
   }
 }
 
+void StreamingService::NotifySearchFailed(const std::string &error) {
+  SearchUpdateStatus.Emit(last_search_id_, error);
+  SearchFailed.Emit(last_search_id_, error);
+}
+
+void StreamingService::NotifyArtistsFailed(const std::string &error) {
+  ArtistsUpdateStatus.Emit(error);
+  ArtistsFailed.Emit(error);
+}
+
+void StreamingService::NotifyAlbumsFailed(const std::string &error) {
+  AlbumsUpdateStatus.Emit(error);
+  AlbumsFailed.Emit(error);
+}
+
+void StreamingService::NotifySongsFailed(const std::string &error) {
+  SongsUpdateStatus.Emit(error);
+  SongsFailed.Emit(error);
+}
+
+void StreamingService::NotifyFavoritesFailed(const std::string &error) { FavoritesFailed.Emit(error); }
+
 StreamingService::SearchCallback StreamingService::GuardSearch(SearchCallback callback) {
   const int generation = BeginSearchRequest();
   return [this, generation, callback](const SongList &songs) {

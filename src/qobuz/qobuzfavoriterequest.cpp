@@ -105,11 +105,12 @@ SongList Parse(FavoriteType type, const std::string &json) { return QobuzRequest
 
 void Get(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
          const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback,
-         StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current) {
+         StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current, StreamingPage::ErrorCallback error) {
   QobuzRequest::GetAll(
       network,
       [api_url, app_id, user_auth_token, type](int offset, int limit) { return ListUrl(api_url, type, app_id, user_auth_token, offset, limit); },
-      headers, QobuzRequest::FromFavoriteType(type), std::move(callback), std::move(progress), std::move(still_current));
+      headers, QobuzRequest::FromFavoriteType(type), std::move(callback), std::move(progress), std::move(still_current),
+      StreamingPage::kDefaultLimit, 0, std::move(error));
 }
 
 void Add(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
