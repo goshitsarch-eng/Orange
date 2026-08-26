@@ -4,6 +4,7 @@
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
 #include "core/application.h"
+#include "playlist/playlistsequence.h"
 #include "core/commandlineoptions.h"
 #include "streaming/streamingtabsview.h"
 
@@ -165,6 +166,7 @@ class MainWindow {
   std::string streaming_service_name_;
   std::string radio_query_;
   CollectionGrouping::Grouping grouping_;
+  PlaylistSequence playlist_sequence_;
   std::string playlist_filter_;
   std::string collection_text_filter_;
   PlaylistColumn sort_column_ = PlaylistColumn::Title;

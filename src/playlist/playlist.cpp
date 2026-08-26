@@ -138,13 +138,66 @@ void Playlist::Shuffle() {
   Changed.Emit();
 }
 
+void Playlist::SetSequenceMode(SequenceMode mode) {
+  mode_ = mode;
+  switch (mode) {
+    case SequenceMode::RepeatTrack:
+      repeat_mode_ = PlaylistSequence::RepeatMode::Track;
+      break;
+    case SequenceMode::RepeatAll:
+      repeat_mode_ = PlaylistSequence::RepeatMode::Playlist;
+      break;
+    case SequenceMode::Shuffle:
+      shuffle_mode_ = PlaylistSequence::ShuffleMode::All;
+      break;
+    case SequenceMode::AlbumShuffle:
+      shuffle_mode_ = PlaylistSequence::ShuffleMode::InsideAlbum;
+      break;
+    case SequenceMode::Sequential:
+      repeat_mode_ = PlaylistSequence::RepeatMode::Off;
+      break;
+    case SequenceMode::Dynamic:
+      break;
+  }
+}
+
+void Playlist::SetRepeatMode(PlaylistSequence::RepeatMode mode) {
+  repeat_mode_ = mode;
+  if (mode == PlaylistSequence::RepeatMode::Track) {
+    mode_ = SequenceMode::RepeatTrack;
+  } else if (mode == PlaylistSequence::RepeatMode::Playlist) {
+    mode_ = SequenceMode::RepeatAll;
+  } else if (mode == PlaylistSequence::RepeatMode::Off) {
+    mode_ = SequenceMode::Sequential;
+  }
+}
+
+void Playlist::SetShuffleMode(PlaylistSequence::ShuffleMode mode) {
+  shuffle_mode_ = mode;
+  if (mode == PlaylistSequence::ShuffleMode::All) {
+    mode_ = SequenceMode::Shuffle;
+  } else if (mode == PlaylistSequence::ShuffleMode::InsideAlbum) {
+    mode_ = SequenceMode::AlbumShuffle;
+  }
+}
+
 int Playlist::NextIndex() const {
   if (songs_.empty()) {
     return -1;
   }
+  if (mode_ == SequenceMode::RepeatTrack || repeat_mode_ == PlaylistSequence::RepeatMode::Track) {
+    return current_row_;
+  }
+  if (repeat_mode_ == PlaylistSequence::RepeatMode::Album && current_row_ >= 0) {
+    const std::string album = song(current_row_).album();
+    for (int i = 1; i <= row_count(); ++i) {
+      const int row = (current_row_ + i) % row_count();
+      if (song(row).album() == album) {
+        return row;
+      }
+    }
+  }
   switch (mode_) {
-    case SequenceMode::RepeatTrack:
-      return current_row_;
     case SequenceMode::Shuffle:
     case SequenceMode::AlbumShuffle:
     case SequenceMode::Dynamic:
@@ -154,7 +207,7 @@ int Playlist::NextIndex() const {
       if (current_row_ + 1 < static_cast<int>(songs_.size())) {
         return current_row_ + 1;
       }
-      return mode_ == SequenceMode::RepeatAll ? 0 : -1;
+      return (mode_ == SequenceMode::RepeatAll || repeat_mode_ == PlaylistSequence::RepeatMode::Playlist) ? 0 : -1;
   }
 }
 

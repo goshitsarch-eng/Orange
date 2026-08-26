@@ -3,6 +3,7 @@
 
 #include "core/signal.h"
 #include "core/song.h"
+#include "playlist/playlistsequence.h"
 #include "smartplaylists/smartplaylist.h"
 
 #include <string>
@@ -44,8 +45,12 @@ class Playlist {
   bool CanRedo() const { return !redo_.empty(); }
   void Next();
   void Previous();
-  void SetSequenceMode(SequenceMode mode) { mode_ = mode; }
+  void SetSequenceMode(SequenceMode mode);
   SequenceMode sequence_mode() const { return mode_; }
+  void SetRepeatMode(PlaylistSequence::RepeatMode mode);
+  void SetShuffleMode(PlaylistSequence::ShuffleMode mode);
+  PlaylistSequence::RepeatMode repeat_mode() const { return repeat_mode_; }
+  PlaylistSequence::ShuffleMode shuffle_mode() const { return shuffle_mode_; }
   void SetDynamic(bool dynamic, const SmartPlaylistSearch &search = {});
   bool is_dynamic() const { return dynamic_; }
   void RefillDynamic(const SongList &pool);
@@ -71,6 +76,8 @@ class Playlist {
   SongList songs_;
   int current_row_ = -1;
   SequenceMode mode_ = SequenceMode::Sequential;
+  PlaylistSequence::RepeatMode repeat_mode_ = PlaylistSequence::RepeatMode::Off;
+  PlaylistSequence::ShuffleMode shuffle_mode_ = PlaylistSequence::ShuffleMode::Off;
   std::vector<Snapshot> undo_;
   std::vector<Snapshot> redo_;
   bool dynamic_ = false;

@@ -183,6 +183,14 @@ set(STRAWBERRY_SOURCES
   src/collection/groupbydialog.cpp
   src/collection/savedgroupingmanager.cpp
   src/playlist/playlist.cpp
+  src/playlist/playlistitem.cpp
+  src/playlist/songplaylistitem.cpp
+  src/playlist/streamplaylistitem.cpp
+  src/playlist/playlistitemmimedata.cpp
+  src/playlist/playlistitemsavedata.cpp
+  src/playlist/playlistfilter.cpp
+  src/playlist/playlistsequence.cpp
+  src/playlist/playlistundocommandbase.cpp
   src/playlist/playlistbackend.cpp
   src/playlist/playlistmanager.cpp
   src/queue/queue.cpp
@@ -394,6 +402,7 @@ if(GTest_FOUND)
     tests/src/streamurl_test.cpp
     tests/src/streamingview_test.cpp
     tests/src/collection_test.cpp
+    tests/src/playlistitem_test.cpp
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
     tests/src/streamtagreader_test.cpp
@@ -492,6 +501,14 @@ if(GTest_FOUND)
     src/tagreader/tagreaderresult.cpp
     src/tagreader/tagreaderclient.cpp
     src/playlist/playlist.cpp
+    src/playlist/playlistitem.cpp
+    src/playlist/songplaylistitem.cpp
+    src/playlist/streamplaylistitem.cpp
+    src/playlist/playlistitemmimedata.cpp
+    src/playlist/playlistitemsavedata.cpp
+    src/playlist/playlistfilter.cpp
+    src/playlist/playlistsequence.cpp
+    src/playlist/playlistundocommandbase.cpp
     src/collection/collectionbackend.cpp
     src/collection/collectiongrouping.cpp
     src/collection/collectionfilteroptions.cpp

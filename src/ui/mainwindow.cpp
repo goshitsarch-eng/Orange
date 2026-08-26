@@ -3,6 +3,8 @@
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
 #include "collection/collectionviewcontainer.h"
+#include "playlist/playlistfilter.h"
+#include "playlist/playlistsequence.h"
 #include "core/settings.h"
 #include "playlistparsers/playlistparser.h"
 #include "smartplaylists/smartplaylist.h"
@@ -1055,9 +1057,11 @@ void MainWindow::RefreshPlaylist() {
   }
   const int current = playlist->current_row();
   int visible = 0;
+  PlaylistFilter filter;
+  filter.SetFilterString(playlist_filter_);
   for (int index = 0; index < playlist->row_count(); ++index) {
     const Song &song = playlist->songs()[static_cast<size_t>(index)];
-    if (!playlist_filter_.empty() && !FilterParser(playlist_filter_).Matches(song)) {
+    if (!filter.Accepts(song)) {
       continue;
     }
     GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -1507,20 +1511,9 @@ void MainWindow::CycleRepeat() {
   if (!playlist) {
     return;
   }
-  switch (playlist->sequence_mode()) {
-    case Playlist::SequenceMode::Sequential:
-      playlist->SetSequenceMode(Playlist::SequenceMode::RepeatAll);
-      break;
-    case Playlist::SequenceMode::RepeatAll:
-      playlist->SetSequenceMode(Playlist::SequenceMode::RepeatTrack);
-      break;
-    default:
-      playlist->SetSequenceMode(Playlist::SequenceMode::Sequential);
-      break;
-  }
-  gtk_widget_set_tooltip_text(repeat_button_, playlist->sequence_mode() == Playlist::SequenceMode::RepeatTrack ? "Repeat track" :
-                                              playlist->sequence_mode() == Playlist::SequenceMode::RepeatAll   ? "Repeat playlist"
-                                                                                                               : "Repeat off");
+  playlist_sequence_.CycleRepeatMode();
+  playlist->SetRepeatMode(playlist_sequence_.repeat_mode());
+  gtk_widget_set_tooltip_text(repeat_button_, PlaylistSequence::RepeatLabel(playlist_sequence_.repeat_mode()));
 }
 
 void MainWindow::CycleShuffle() {
@@ -1528,9 +1521,14 @@ void MainWindow::CycleShuffle() {
   if (!playlist) {
     return;
   }
-  playlist->Shuffle();
-  app_->playlist_manager()->SaveActive();
-  RefreshPlaylist();
+  playlist_sequence_.CycleShuffleMode();
+  playlist->SetShuffleMode(playlist_sequence_.shuffle_mode());
+  gtk_widget_set_tooltip_text(shuffle_button_, PlaylistSequence::ShuffleLabel(playlist_sequence_.shuffle_mode()));
+  if (playlist_sequence_.shuffle_mode() == PlaylistSequence::ShuffleMode::All) {
+    playlist->Shuffle();
+    app_->playlist_manager()->SaveActive();
+    RefreshPlaylist();
+  }
 }
 
 void MainWindow::RunSmartPlaylist(const std::string &kind) {
