@@ -14,12 +14,14 @@
 class StreamingTabsView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
+  using MenuCallback = std::function<void(const SongList &)>;
 
   explicit StreamingTabsView(StreamingService *service);
   ~StreamingTabsView();
 
   GtkWidget *widget() const { return widget_; }
   void SetActivateCallback(ActivateCallback callback);
+  void SetMenuCallback(MenuCallback callback);
   void ReloadSettings();
   void GetArtists();
   void GetAlbums();

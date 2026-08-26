@@ -13,6 +13,7 @@
 class StreamingSearchView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
+  using MenuCallback = std::function<void(const SongList &)>;
 
   explicit StreamingSearchView(StreamingService *service);
   ~StreamingSearchView();
@@ -20,16 +21,20 @@ class StreamingSearchView {
   GtkWidget *widget() const { return widget_; }
   void Search(const std::string &query);
   void SetActivateCallback(ActivateCallback callback);
+  void SetMenuCallback(MenuCallback callback);
   StreamingSearchModel *model() { return &model_; }
   const SongList &results() const { return model_.songs(); }
+  SongList SelectedSongs() const;
 
  private:
   void Rebuild();
+  void SetupRowDrag(GtkWidget *row, const Song &song);
 
   StreamingService *service_ = nullptr;
   StreamingSearchModel model_;
   StreamingSearchSortModel sort_model_{&model_};
   ActivateCallback activate_;
+  MenuCallback menu_;
   GtkWidget *widget_ = nullptr;
   GtkWidget *search_entry_ = nullptr;
   GtkWidget *type_artists_ = nullptr;

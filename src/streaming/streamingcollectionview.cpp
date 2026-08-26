@@ -1,5 +1,6 @@
 #include "streaming/streamingcollectionview.h"
 
+#include "streaming/streamingdrag.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "utilities/strutils.h"
 
@@ -40,7 +41,7 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   GtkWidget *scroll = gtk_scrolled_window_new();
   gtk_widget_set_vexpand(scroll, TRUE);
   list_ = gtk_list_box_new();
-  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_SINGLE);
+  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list_);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<StreamingCollectionView *>(data);
@@ -48,6 +49,17 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
                      if (song && self->activate_) {
                        self->activate_(*song);
                      }
+                   }),
+                   this);
+  GtkGesture *menu = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(menu));
+  g_signal_connect(menu, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble, gpointer data) {
+                     auto *self = static_cast<StreamingCollectionView *>(data);
+                     if (self->menu_) {
+                       self->menu_(self->SelectedSongs());
+                     }
+                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
   gtk_box_append(GTK_BOX(widget_), header);
@@ -61,6 +73,8 @@ StreamingCollectionView::~StreamingCollectionView() = default;
 void StreamingCollectionView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
 void StreamingCollectionView::SetRefreshCallback(RefreshCallback callback) { refresh_ = std::move(callback); }
+
+void StreamingCollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
 void StreamingCollectionView::SetFilter(const std::string &filter) {
   filter_ = filter;
@@ -122,7 +136,52 @@ void StreamingCollectionView::Rebuild() {
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
     auto *copy = new Song(song);
     g_object_set_data_full(G_OBJECT(row), "row-data", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+    SetupRowDrag(row, song);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
   SetStatus(std::to_string(visible.size()) + " items");
+}
+
+void StreamingCollectionView::SetupRowDrag(GtkWidget *row, const Song &song) {
+  GtkDragSource *src = gtk_drag_source_new();
+  gtk_drag_source_set_actions(src, GDK_ACTION_COPY);
+  auto *copy = new Song(song);
+  g_object_set_data_full(G_OBJECT(src), "row-data", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
+                     auto *self = static_cast<StreamingCollectionView *>(data);
+                     auto *dragged = static_cast<Song *>(g_object_get_data(G_OBJECT(s), "row-data"));
+                     SongList songs = dragged ? SongList{*dragged} : SongList{};
+                     for (const Song &selected : self->SelectedSongs()) {
+                       if (dragged && selected.url() == dragged->url()) {
+                         songs = self->SelectedSongs();
+                         break;
+                       }
+                     }
+                     const std::string payload = StreamingDrag::DragPayload(songs);
+                     if (payload.empty()) {
+                       return nullptr;
+                     }
+                     GValue v = G_VALUE_INIT;
+                     g_value_init(&v, G_TYPE_STRING);
+                     g_value_set_string(&v, payload.c_str());
+                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
+                     g_value_unset(&v);
+                     return provider;
+                   })),
+                   this);
+  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
+}
+
+SongList StreamingCollectionView::SelectedSongs() const {
+  SongList songs;
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
+        if (song) {
+          static_cast<SongList *>(data)->push_back(*song);
+        }
+      },
+      &songs);
+  return songs;
 }

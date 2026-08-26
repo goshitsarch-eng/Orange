@@ -37,6 +37,14 @@ void StreamingTabsView::SetActivateCallback(ActivateCallback callback) {
   search_->SetActivateCallback(activate_);
 }
 
+void StreamingTabsView::SetMenuCallback(MenuCallback callback) {
+  artists_->view()->SetMenuCallback(callback);
+  albums_->view()->SetMenuCallback(callback);
+  songs_->view()->SetMenuCallback(callback);
+  favorites_->view()->SetMenuCallback(callback);
+  search_->SetMenuCallback(std::move(callback));
+}
+
 void StreamingTabsView::ReloadSettings() {
   if (service_) {
     service_->ReloadSettings();

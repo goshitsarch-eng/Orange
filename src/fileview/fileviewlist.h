@@ -22,6 +22,8 @@ class FileViewList {
   std::vector<std::string> SelectedPaths() const;
 
  private:
+  void SetupRowDrag(GtkWidget *row, const std::string &path);
+
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
   ActivateCallback activate_;

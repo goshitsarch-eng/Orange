@@ -1,3 +1,4 @@
+#include "fileview/fileviewdrag.h"
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewsongs.h"
 #include "fileview/fileviewtreemodel.h"
@@ -121,4 +122,16 @@ TEST(FileViewHistory, BackForwardAndTruncate) {
   EXPECT_EQ(2, history.index());
   ASSERT_EQ(3u, history.items().size());
   EXPECT_EQ("/music/radiohead", history.items().back());
+}
+
+TEST(FileViewDrag, SkipsDirectoriesAndEmitsFileUris) {
+  const std::string dir = TempDir();
+  const std::string audio = FileUtils::Join(dir, "roads.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "a"));
+  const std::string payload = FileViewDrag::DragPayload({dir, audio, ""});
+  EXPECT_EQ(FileUtils::UriFromPath(audio), payload);
+  EXPECT_TRUE(payload.find('\n') == std::string::npos);
+  EXPECT_TRUE(FileViewDrag::DragPayload({dir}).empty());
+  FileUtils::Remove(audio);
+  rmdir(dir.c_str());
 }

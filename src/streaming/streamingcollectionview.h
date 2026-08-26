@@ -13,6 +13,7 @@ class StreamingCollectionView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
   using RefreshCallback = std::function<void()>;
+  using MenuCallback = std::function<void(const SongList &)>;
 
   explicit StreamingCollectionView(const std::string &title);
   ~StreamingCollectionView();
@@ -23,11 +24,14 @@ class StreamingCollectionView {
   void SetFilter(const std::string &filter);
   void SetActivateCallback(ActivateCallback callback);
   void SetRefreshCallback(RefreshCallback callback);
+  void SetMenuCallback(MenuCallback callback);
   const SongList &songs() const { return songs_; }
   SongList Visible() const;
+  SongList SelectedSongs() const;
 
  private:
   void Rebuild();
+  void SetupRowDrag(GtkWidget *row, const Song &song);
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *filter_entry_ = nullptr;
@@ -37,6 +41,7 @@ class StreamingCollectionView {
   std::string filter_;
   ActivateCallback activate_;
   RefreshCallback refresh_;
+  MenuCallback menu_;
 };
 
 #endif

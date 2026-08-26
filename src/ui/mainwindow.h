@@ -88,6 +88,7 @@ class MainWindow {
   void PlayRadioChannel(const RadioChannel &channel);
   void ShowPlaylistMenu(double x, double y);
   void ShowCollectionMenu();
+  void ShowStreamingMenu(const SongList &songs);
   void ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, const SongList &songs);
   void ForceCompilationSelected(bool on);
   SongList CollectionSongs() const;
@@ -181,6 +182,7 @@ class MainWindow {
   GtkWidget *collection_search_ = nullptr;
   std::string device_browse_id_;
   std::string streaming_service_name_;
+  SongList streaming_menu_songs_;
   std::string radio_query_;
   CollectionGrouping::Grouping grouping_;
   PlaylistSequence playlist_sequence_;

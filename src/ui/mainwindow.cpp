@@ -419,6 +419,34 @@ void MainWindow::BuildUi() {
                    settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
                self->ApplyCollectionPlan(CollectionBehaviour::Replace(play, self->EngineStopped()), self->CollectionSongs());
              }));
+  add_action("streaming-append", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Settings settings;
+               settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+               const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+                   settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+               self->ApplyCollectionPlan(CollectionBehaviour::Append(play, self->EngineStopped()), self->streaming_menu_songs_);
+             }));
+  add_action("streaming-replace", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Settings settings;
+               settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+               const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+                   settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+               self->ApplyCollectionPlan(CollectionBehaviour::Replace(play, self->EngineStopped()), self->streaming_menu_songs_);
+             }));
+  add_action("streaming-new", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Settings settings;
+               settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+               const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+                   settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+               self->ApplyCollectionPlan(CollectionBehaviour::OpenInNew(play, self->EngineStopped()), self->streaming_menu_songs_);
+             }));
+  add_action("streaming-enqueue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->ApplyCollectionPlan(CollectionBehaviour::Enqueue(), self->streaming_menu_songs_);
+             }));
   add_action("collection-expand-all", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                if (self->collection_container_) {
@@ -705,6 +733,7 @@ void MainWindow::BuildSidebar() {
   for (StreamingService *service : app_->streaming_services()->All()) {
     auto view = std::make_unique<StreamingTabsView>(service);
     view->SetActivateCallback(activate_stream);
+    view->SetMenuCallback([this](const SongList &songs) { ShowStreamingMenu(songs); });
     gtk_stack_add_titled(GTK_STACK(streaming_stack_), view->widget(), service->name().c_str(), service->name().c_str());
     streaming_views_.push_back(std::move(view));
   }
@@ -1941,6 +1970,22 @@ void MainWindow::ShowCollectionMenu() {
   g_menu_append(menu, Translations::Tr("Delete from disk…").c_str(), "win.collection-delete");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, collection_container_ ? collection_container_->view()->list() : GTK_WIDGET(window_));
+  gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+void MainWindow::ShowStreamingMenu(const SongList &songs) {
+  streaming_menu_songs_ = songs;
+  if (streaming_menu_songs_.empty()) {
+    return;
+  }
+  GMenu *menu = g_menu_new();
+  g_menu_append(menu, Translations::Tr("Append to current playlist").c_str(), "win.streaming-append");
+  g_menu_append(menu, Translations::Tr("Replace current playlist").c_str(), "win.streaming-replace");
+  g_menu_append(menu, Translations::Tr("Open in new playlist").c_str(), "win.streaming-new");
+  g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.streaming-enqueue");
+  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  GtkWidget *parent = streaming_stack_ ? streaming_stack_ : GTK_WIDGET(window_);
+  gtk_widget_set_parent(popover, parent);
   gtk_popover_popup(GTK_POPOVER(popover));
 }
 
