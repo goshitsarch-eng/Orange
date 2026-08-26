@@ -1,6 +1,7 @@
 #include "device/cddasongloader.h"
 
 #include "config.h"
+#include "device/cddahelpers.h"
 #include "device/devicemanager.h"
 
 #ifdef HAVE_AUDIOCD
@@ -13,12 +14,20 @@ SongList CddaSongLoader::Songs(int first_track, int last_track, const std::vecto
 
 SongList CddaSongLoader::LoadDevice(const std::string &device_path) {
 #ifdef HAVE_AUDIOCD
-  CdIo_t *cdio = cdio_open(device_path.empty() ? nullptr : device_path.c_str(), DRIVER_UNKNOWN);
+  if (CddaHelpers::ShouldSkipDevice(device_path)) {
+    return {};
+  }
+  CddaHelpers::EnsureInit();
+  CdIo_t *cdio = cdio_open(device_path.empty() ? nullptr : device_path.c_str(), DRIVER_DEVICE);
   if (!cdio) {
     return {};
   }
   const track_t first = cdio_get_first_track_num(cdio);
   const track_t last = cdio_get_last_track_num(cdio);
+  if (!CddaHelpers::IsValidTrackRange(first, last)) {
+    cdio_destroy(cdio);
+    return {};
+  }
   std::vector<int64_t> lengths;
   for (track_t track = first; track <= last; ++track) {
     const lsn_t start = cdio_get_track_lsn(cdio, track);

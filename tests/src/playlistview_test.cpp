@@ -21,6 +21,7 @@
 #include "playlist/playlistsaveoptionsdialog.h"
 #include "playlist/playlisttabnav.h"
 #include "playlist/playlisttabmenu.h"
+#include "playlist/playlisttabbarvisibility.h"
 #include "playlist/playlisttagcompletion.h"
 #include "widgets/favoritewidget.h"
 #include "playlist/songloaderinserter.h"
@@ -475,6 +476,19 @@ TEST(PlaylistListModel, StoresIdsThroughFilter) {
   EXPECT_EQ(4, rows[0].id);
   EXPECT_EQ("Queue", rows[1].name);
   EXPECT_EQ(7, rows[1].id);
+}
+
+TEST(PlaylistTabBarVisibility, HidesSinglePlaylistAndAnimates500Ms) {
+  EXPECT_EQ(500, PlaylistTabBarVisibility::kAnimationMs);
+  EXPECT_FALSE(PlaylistTabBarVisibility::ShouldShow(0));
+  EXPECT_FALSE(PlaylistTabBarVisibility::ShouldShow(1));
+  EXPECT_TRUE(PlaylistTabBarVisibility::ShouldShow(2));
+  EXPECT_EQ(0, PlaylistTabBarVisibility::HeightAt(0, 40, true));
+  EXPECT_EQ(20, PlaylistTabBarVisibility::HeightAt(250, 40, true));
+  EXPECT_EQ(40, PlaylistTabBarVisibility::HeightAt(500, 40, true));
+  EXPECT_EQ(40, PlaylistTabBarVisibility::HeightAt(0, 40, false));
+  EXPECT_EQ(20, PlaylistTabBarVisibility::HeightAt(250, 40, false));
+  EXPECT_EQ(0, PlaylistTabBarVisibility::HeightAt(500, 40, false));
 }
 
 TEST(PlaylistTabMenu, ContextActionsMatchQt) {

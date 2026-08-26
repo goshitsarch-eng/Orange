@@ -123,11 +123,18 @@ void Application::Init() {
       osd_->Resumed();
     }
     playback_was_paused_ = false;
+    discord_->UpdatePresence(player_->current_song(), true);
   });
   player_->Paused.Connect([this]() {
     playback_was_paused_ = true;
     tray_->SetPaused();
     osd_->Paused();
+    discord_->Clear();
+  });
+  player_->PositionChanged.Connect([this](int64_t position_nanosec, int64_t) {
+    if (player_->GetState() == GstEngine::State::Playing) {
+      discord_->RefreshAfterSeek(player_->current_song(), position_nanosec / 1000000000LL);
+    }
   });
   player_->Stopped.Connect([this]() {
     playback_was_paused_ = false;

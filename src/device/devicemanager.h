@@ -24,6 +24,7 @@ class DeviceManager {
   bool CopySongs(const std::string &device_id, const SongList &songs);
   bool DeleteSong(const std::string &device_id, const Song &song);
   bool Forget(const std::string &device_id);
+  bool Mount(const std::string &device_id);
   bool Unmount(const std::string &device_id);
   bool SetDeviceOptions(const std::string &device_id, const std::string &friendly_name, DeviceDatabaseBackend::TranscodeMode mode,
                         Song::FileType format, const std::string &icon_name = {});

@@ -56,6 +56,20 @@ inline std::string SongCountText(int song_count) {
   return std::to_string(song_count) + (song_count == 1 ? " song" : " songs");
 }
 
+inline std::string UpdatingText(int percent) {
+  if (percent < 0) {
+    percent = 0;
+  }
+  if (percent > 100) {
+    percent = 100;
+  }
+  return "Updating " + std::to_string(percent) + "%...";
+}
+
+inline bool ShouldMountOnActivate(const ConnectedDevice &device) {
+  return InferStatus(device, device.remembered) == Status::NotMounted;
+}
+
 inline std::string StatusText(const ConnectedDevice &device, int song_count = -1, bool remembered_only = false) {
   switch (InferStatus(device, remembered_only)) {
     case Status::Remembered:

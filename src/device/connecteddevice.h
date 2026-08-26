@@ -11,6 +11,7 @@ struct ConnectedDevice {
   int64_t size = 0;
   std::string backend;
   std::string mount_path;
+  bool remembered = false;
 };
 
 #endif

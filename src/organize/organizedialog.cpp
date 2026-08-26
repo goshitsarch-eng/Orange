@@ -10,6 +10,7 @@
 #include "organize/organizeformatvalidator.h"
 #include "organize/organizepreview.h"
 #include "organize/organizesyntaxhighlighter.h"
+#include "organize/organizetokenhelp.h"
 #include "organize/organizetranscode.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
@@ -260,6 +261,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   GtkWidget *format_view = gtk_text_view_new();
   gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(format_view), GTK_WRAP_WORD_CHAR);
   gtk_widget_set_size_request(format_view, -1, 56);
+  gtk_widget_set_tooltip_text(format_view, Translations::CStr(OrganizeTokenHelp::Tooltip()));
   GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(format_view));
   OrganizeSyntaxHighlighter highlighter;
   highlighter.Apply(buffer, saved_format);

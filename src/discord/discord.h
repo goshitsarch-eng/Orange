@@ -16,6 +16,7 @@ class DiscordRichPresence {
 
   void ReloadSettings();
   void UpdatePresence(const Song &song, bool playing);
+  void RefreshAfterSeek(const Song &song, gint64 position_secs);
   void Clear();
   bool enabled() const { return enabled_; }
   bool connected() const { return connection_ != nullptr; }

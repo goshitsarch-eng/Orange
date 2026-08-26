@@ -3,6 +3,7 @@
 #include "constants/notificationssettings.h"
 #include "discord/discordart.h"
 #include "discord/discordcover.h"
+#include "discord/discordlifecycle.h"
 #include "core/logging.h"
 #include "core/settings.h"
 
@@ -182,17 +183,23 @@ void DiscordRichPresence::UpdatePresence(const Song &song, bool playing) {
   if (!enabled_) {
     return;
   }
+  if (DiscordLifecycle::ShouldClear(playing)) {
+    Clear();
+    return;
+  }
   if (!EnsureConnected()) {
     return;
   }
-  if (playing && start_timestamp_ <= 0) {
+  if (start_timestamp_ <= 0) {
     start_timestamp_ = static_cast<gint64>(std::time(nullptr));
   }
-  if (!playing) {
-    start_timestamp_ = 0;
-  }
   const std::string art_key = DiscordCover::ResolveArtKey(DiscordArt::SongArtUrl(song.art_manual(), song.art_automatic()));
-  SendFrame(Opcode::Frame, SetActivityJson(song, playing, status_display_type_, start_timestamp_, getpid(), nonce_++, art_key));
+  SendFrame(Opcode::Frame, SetActivityJson(song, true, status_display_type_, start_timestamp_, getpid(), nonce_++, art_key));
+}
+
+void DiscordRichPresence::RefreshAfterSeek(const Song &song, gint64 position_secs) {
+  start_timestamp_ = DiscordLifecycle::StartTimestampAfterSeek(static_cast<gint64>(std::time(nullptr)), position_secs);
+  UpdatePresence(song, true);
 }
 
 void DiscordRichPresence::Clear() {

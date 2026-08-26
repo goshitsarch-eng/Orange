@@ -8,8 +8,10 @@
 #include "collection/collectiongrouping.h"
 #include "collection/groupbydialoglabels.h"
 #include "core/oauthenticator.h"
+#include "device/cddahelpers.h"
 #include "device/cddasongloader.h"
 #include "device/devicemanager.h"
+#include "device/giodevicefilter.h"
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "equalizer/equalizer.h"
@@ -34,6 +36,7 @@
 #include "organize/organize.h"
 #include "organize/organizefilename.h"
 #include "organize/organizeformatvalidator.h"
+#include "organize/organizetokenhelp.h"
 #include "organize/organizepreview.h"
 #include "organize/organizetranscode.h"
 #include "constants/organizesettings.h"
@@ -177,6 +180,11 @@ TEST(FileUtils, CopyAndRemove) {
   EXPECT_TRUE(FileUtils::Remove(dest));
   EXPECT_TRUE(FileUtils::Remove(src));
   EXPECT_FALSE(FileUtils::Exists(dest));
+}
+
+TEST(OrganizeTokenHelp, MentionsQtTokensAndBraces) {
+  EXPECT_TRUE(OrganizeTokenHelp::MentionsTokenExample(OrganizeTokenHelp::Tooltip()));
+  EXPECT_TRUE(OrganizeTokenHelp::MentionsOptionalBraces(OrganizeTokenHelp::Tooltip()));
 }
 
 TEST(OrganizeFormat, ExpandsTokens) {
@@ -1037,6 +1045,33 @@ TEST(StretchHeaderView, StretchColumnTakesRemainder) {
 TEST(CddaAndUdisksListers, BackendNames) {
   EXPECT_EQ("cdda", CddaLister().backend());
   EXPECT_EQ("udisks2", Udisks2Lister().backend());
+}
+
+TEST(CddaHelpers, SkipsImageFilesAndInvalidTrackRanges) {
+  EXPECT_FALSE(CddaHelpers::ShouldSkipDevice("/dev/sr0"));
+  EXPECT_FALSE(CddaHelpers::ShouldSkipDevice({}));
+  EXPECT_TRUE(CddaHelpers::ShouldSkipDevice("/path/image.nrg"));
+  EXPECT_TRUE(CddaHelpers::ShouldSkipDevice("/tmp/disc.ISO"));
+  EXPECT_TRUE(CddaHelpers::ShouldSkipDevice("album.cue"));
+  EXPECT_FALSE(CddaHelpers::IsValidTrackRange(0, 0));
+  EXPECT_FALSE(CddaHelpers::IsValidTrackRange(3, 1));
+  EXPECT_TRUE(CddaHelpers::IsValidTrackRange(1, 8));
+  EXPECT_TRUE(CddaHelpers::ShouldAddGenericCdda(0));
+  EXPECT_FALSE(CddaHelpers::ShouldAddGenericCdda(1));
+}
+
+TEST(GioDeviceFilter, MatchesQtSuitableRules) {
+  EXPECT_TRUE(GioDeviceFilter::IsSuitableFilesystem(nullptr));
+  EXPECT_TRUE(GioDeviceFilter::IsSuitableFilesystem("ext4"));
+  EXPECT_FALSE(GioDeviceFilter::IsSuitableFilesystem("udf"));
+  EXPECT_FALSE(GioDeviceFilter::IsSuitableFilesystem("smb"));
+  EXPECT_FALSE(GioDeviceFilter::IsSuitableFilesystem("cifs"));
+  EXPECT_FALSE(GioDeviceFilter::IsSuitableFilesystem("ssh"));
+  EXPECT_FALSE(GioDeviceFilter::IsSuitableFilesystem("isofs"));
+  EXPECT_FALSE(GioDeviceFilter::IsSuitable(false, false, false, false, nullptr));
+  EXPECT_FALSE(GioDeviceFilter::IsSuitable(true, true, false, false, nullptr));
+  EXPECT_FALSE(GioDeviceFilter::IsSuitable(true, false, true, false, "ext4"));
+  EXPECT_TRUE(GioDeviceFilter::IsSuitable(true, false, true, true, "ext4"));
 }
 
 TEST(FileUtils, ListDirectoryRecursive) {

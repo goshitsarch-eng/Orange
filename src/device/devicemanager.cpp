@@ -33,6 +33,7 @@
 #ifdef HAVE_AUDIOCD
 #include <cdio/cdio.h>
 #endif
+#include "device/cddahelpers.h"
 
 #include <algorithm>
 #include <functional>
@@ -186,10 +187,8 @@ void DeviceManager::Rescan() {
     devices_.insert(devices_.end(), udisks.begin(), udisks.end());
   }
 #endif
-  {
-    const std::vector<ConnectedDevice> cds = CddaLister().List();
-    devices_.insert(devices_.end(), cds.begin(), cds.end());
-  }
+  const std::vector<ConnectedDevice> cds = CddaLister().List();
+  devices_.insert(devices_.end(), cds.begin(), cds.end());
 #ifdef HAVE_MTP
   {
     MtpConnection::InitLibMtp();
@@ -242,13 +241,29 @@ void DeviceManager::Rescan() {
   }
 #endif
 #ifdef HAVE_AUDIOCD
-  ConnectedDevice cd;
-  cd.friendly_name = "Audio CD";
-  cd.unique_id = "cdda";
-  cd.icon = "media-optical-symbolic";
-  cd.backend = "cdda";
-  devices_.push_back(cd);
+  if (CddaHelpers::ShouldAddGenericCdda(static_cast<int>(cds.size()))) {
+    ConnectedDevice cd;
+    cd.friendly_name = "Audio CD";
+    cd.unique_id = "cdda";
+    cd.icon = "media-optical-symbolic";
+    cd.backend = "cdda";
+    devices_.push_back(cd);
+  }
 #endif
+  if (device_db_) {
+    for (const DeviceDatabaseBackend::Device &stored : device_db_->GetAllDevices()) {
+      if (FindDevice(stored.unique_id) || IsForgotten(stored.unique_id)) {
+        continue;
+      }
+      ConnectedDevice remembered;
+      remembered.unique_id = stored.unique_id;
+      remembered.friendly_name = stored.friendly_name.empty() ? stored.unique_id : stored.friendly_name;
+      remembered.icon = stored.icon_name;
+      remembered.backend = "filesystem";
+      remembered.remembered = true;
+      devices_.push_back(remembered);
+    }
+  }
   devices_.erase(std::remove_if(devices_.begin(), devices_.end(),
                                 [this](const ConnectedDevice &device) { return IsForgotten(device.unique_id); }),
                  devices_.end());
@@ -287,15 +302,17 @@ SongList DeviceManager::Songs(const std::string &device_id) const {
 
 SongList DeviceManager::SongsFromCdda() const {
 #ifdef HAVE_AUDIOCD
+  CddaHelpers::EnsureInit();
   CdIo_t *cdio = cdio_open(nullptr, DRIVER_DEVICE);
-  if (!cdio) {
-    cdio = cdio_open(nullptr, DRIVER_UNKNOWN);
-  }
   if (!cdio) {
     return {};
   }
   const track_t first = cdio_get_first_track_num(cdio);
   const track_t last = cdio_get_last_track_num(cdio);
+  if (!CddaHelpers::IsValidTrackRange(first, last)) {
+    cdio_destroy(cdio);
+    return {};
+  }
   std::vector<int64_t> lengths;
   for (track_t track = first; track <= last; ++track) {
     if (cdio_get_track_format(cdio, track) != TRACK_FORMAT_AUDIO) {
@@ -444,6 +461,52 @@ bool DeviceManager::Forget(const std::string &device_id) {
   }
   Rescan();
   return true;
+}
+
+bool DeviceManager::Mount(const std::string &device_id) {
+#ifdef HAVE_GIO
+  if (device_id.empty()) {
+    return false;
+  }
+  GVolumeMonitor *monitor = g_volume_monitor_get();
+  if (!monitor) {
+    return false;
+  }
+  GList *volumes = g_volume_monitor_get_volumes(monitor);
+  GVolume *match = nullptr;
+  for (GList *l = volumes; l; l = l->next) {
+    GVolume *volume = G_VOLUME(l->data);
+    gchar *id = g_volume_get_identifier(volume, G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
+    gchar *name = g_volume_get_name(volume);
+    const bool same = (id && device_id == id) || (name && device_id == name);
+    g_free(id);
+    g_free(name);
+    if (same) {
+      match = volume;
+      g_object_ref(match);
+      break;
+    }
+  }
+  for (GList *l = volumes; l; l = l->next) {
+    g_object_unref(l->data);
+  }
+  g_list_free(volumes);
+  g_object_unref(monitor);
+  if (!match) {
+    return false;
+  }
+  g_volume_mount(match, G_MOUNT_MOUNT_NONE, nullptr, nullptr,
+                 +[](GObject *source, GAsyncResult *result, gpointer data) {
+                   g_volume_mount_finish(G_VOLUME(source), result, nullptr);
+                   static_cast<DeviceManager *>(data)->Rescan();
+                   g_object_unref(source);
+                 },
+                 this);
+  return true;
+#else
+  (void)device_id;
+  return false;
+#endif
 }
 
 bool DeviceManager::Unmount(const std::string &device_id) {

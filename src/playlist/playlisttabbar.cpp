@@ -1,5 +1,7 @@
 #include "playlist/playlisttabbar.h"
 
+#include "playlist/playlisttabbarvisibility.h"
+
 #include "translations/translations.h"
 
 #include <cstring>
@@ -476,4 +478,5 @@ void PlaylistTabBar::Refresh(PlaylistManager *manager, const std::string &active
     favorites_.push_back(std::move(favorite));
     ++index;
   }
+  gtk_widget_set_visible(widget_, PlaylistTabBarVisibility::ShouldShow(index) ? TRUE : FALSE);
 }

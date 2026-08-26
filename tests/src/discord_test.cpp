@@ -1,12 +1,20 @@
 #include "discord/discord.h"
 #include "discord/discordart.h"
 #include "discord/discordcover.h"
+#include "discord/discordlifecycle.h"
 #include "core/song.h"
 
 #include <cstdio>
 #include <unistd.h>
 
 #include <gtest/gtest.h>
+
+TEST(DiscordLifecycle, ClearsWhenNotPlayingAndAdjustsSeekTimestamp) {
+  EXPECT_TRUE(DiscordLifecycle::ShouldClear(false));
+  EXPECT_FALSE(DiscordLifecycle::ShouldClear(true));
+  EXPECT_EQ(900, DiscordLifecycle::StartTimestampAfterSeek(1000, 100));
+  EXPECT_EQ(1000, DiscordLifecycle::StartTimestampAfterSeek(1000, -5));
+}
 
 TEST(DiscordRichPresence, HandshakeAndClearJson) {
   EXPECT_EQ(R"({"v":1,"client_id":"1352351827206733974"})", DiscordRichPresence::HandshakeJson(DiscordRichPresence::kApplicationId));

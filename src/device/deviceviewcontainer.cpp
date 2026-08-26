@@ -5,6 +5,7 @@
 #include "device/devicecopy.h"
 #include "device/devicemenu.h"
 #include "device/deviceproperties.h"
+#include "device/deviceviewlook.h"
 #include "device/devicesongmenu.h"
 #include "organize/organizedialog.h"
 #include "translations/translations.h"
@@ -59,6 +60,14 @@ GtkWindow *DeviceViewContainer::ParentWindow() const {
 }
 
 void DeviceViewContainer::OpenDevice(const std::string &id) {
+  if (app_ && app_->device_manager()) {
+    for (const ConnectedDevice &device : app_->device_manager()->devices()) {
+      if (device.unique_id == id && DeviceViewLook::ShouldMountOnActivate(device)) {
+        app_->device_manager()->Mount(id);
+        return;
+      }
+    }
+  }
   browse_id_ = id;
   Reload();
 }

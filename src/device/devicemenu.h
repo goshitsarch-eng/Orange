@@ -51,7 +51,7 @@ inline Action FromId(const char *id) {
 inline DeviceState FromDevice(const ConnectedDevice &device, bool remembered) {
   DeviceState state;
   state.connected = !device.unique_id.empty();
-  state.remembered = remembered;
+  state.remembered = remembered || device.remembered;
   state.mountable = !device.mount_path.empty();
   state.filesystem = DeviceCopy::IsFilesystemDevice(device);
   return state;
@@ -61,8 +61,9 @@ inline bool ItemEnabled(Action action, const DeviceState &state) {
   switch (action) {
     case Action::Browse:
     case Action::CopyPlaylist:
-    case Action::Unmount:
       return state.connected;
+    case Action::Unmount:
+      return state.connected && state.mountable;
     case Action::Properties:
       return true;
     case Action::Forget:

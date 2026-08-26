@@ -388,8 +388,9 @@ TEST(DeviceMenu, UnmountAndForgetFollowQtRules) {
   remembered.unique_id = "usb:1";
   const DeviceMenu::DeviceState stored = DeviceMenu::FromDevice(remembered, true);
   EXPECT_TRUE(DeviceMenu::ForgetEnabled(stored));
-  EXPECT_TRUE(DeviceMenu::UnmountEnabled(stored));
+  EXPECT_FALSE(DeviceMenu::UnmountEnabled(stored));
   EXPECT_TRUE(DeviceMenu::Contains(DeviceMenu::VisibleItems(stored), DeviceMenu::Action::Forget));
+  EXPECT_FALSE(DeviceMenu::Contains(DeviceMenu::VisibleItems(stored), DeviceMenu::Action::Unmount));
 
   const DeviceMenu::DeviceState offline = DeviceMenu::FromDevice(ConnectedDevice{}, true);
   EXPECT_FALSE(DeviceMenu::UnmountEnabled(offline));
@@ -527,6 +528,16 @@ TEST(DeviceViewLook, IconsAndStatusMatchQtDelegate) {
   EXPECT_EQ("1 song", DeviceViewLook::StatusText(volume, 1));
   EXPECT_EQ("12 songs", DeviceViewLook::StatusText(volume, 12));
   EXPECT_EQ("Not connected", DeviceViewLook::StatusText(volume, -1, true));
+  EXPECT_EQ("Updating 40%...", DeviceViewLook::UpdatingText(40));
+  EXPECT_EQ("Updating 0%...", DeviceViewLook::UpdatingText(-8));
+  EXPECT_EQ("Updating 100%...", DeviceViewLook::UpdatingText(140));
+  volume.mount_path.clear();
+  EXPECT_TRUE(DeviceViewLook::ShouldMountOnActivate(volume));
+  volume.mount_path = "/run/media/usb";
+  EXPECT_FALSE(DeviceViewLook::ShouldMountOnActivate(volume));
+  volume.mount_path.clear();
+  volume.remembered = true;
+  EXPECT_FALSE(DeviceViewLook::ShouldMountOnActivate(volume));
 
   ConnectedDevice cd;
   cd.backend = "cdda";
