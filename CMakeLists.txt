@@ -757,6 +757,7 @@ if(GTest_FOUND)
     tests/src/commandlineoptions_test.cpp
     tests/src/playlist_test.cpp
     tests/src/playlistmanager_test.cpp
+    tests/src/queue_test.cpp
     tests/src/systemtrayicon_test.cpp
     tests/src/osd_test.cpp
     tests/src/discord_test.cpp

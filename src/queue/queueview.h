@@ -39,10 +39,16 @@ class QueueView {
   gboolean OnDrop(const GValue *value, double y);
   gboolean OnKeyPressed(guint keyval);
   void ResetTypeAhead();
+  void UpdateChrome();
 
   Queue *queue_ = nullptr;
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
+  GtkWidget *summary_ = nullptr;
+  GtkWidget *move_up_ = nullptr;
+  GtkWidget *move_down_ = nullptr;
+  GtkWidget *remove_ = nullptr;
+  GtkWidget *clear_ = nullptr;
   std::function<void(Song)> activate_;
   UrlDropCallback url_drop_;
   PlaylistRowsDropCallback playlist_drop_;

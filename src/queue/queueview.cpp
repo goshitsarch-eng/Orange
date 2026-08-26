@@ -2,6 +2,7 @@
 
 #include "queue/queue.h"
 #include "queue/queuedrop.h"
+#include "queue/queueui.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 
@@ -21,19 +22,28 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
   gtk_widget_set_vexpand(scrolled, TRUE);
   gtk_box_append(GTK_BOX(widget_), scrolled);
   GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-  GtkWidget *up = gtk_button_new_with_label("Up");
-  GtkWidget *down = gtk_button_new_with_label("Down");
-  GtkWidget *remove = gtk_button_new_with_label("Remove");
-  GtkWidget *clear = gtk_button_new_with_label("Clear");
-  g_signal_connect(up, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<QueueView *>(data)->MoveUp(); }), this);
-  g_signal_connect(down, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<QueueView *>(data)->MoveDown(); }), this);
-  g_signal_connect(remove, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<QueueView *>(data)->Remove(); }), this);
-  g_signal_connect(clear, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<QueueView *>(data)->Clear(); }), this);
-  gtk_box_append(GTK_BOX(buttons), up);
-  gtk_box_append(GTK_BOX(buttons), down);
-  gtk_box_append(GTK_BOX(buttons), remove);
-  gtk_box_append(GTK_BOX(buttons), clear);
-  gtk_box_append(GTK_BOX(widget_), buttons);
+  move_down_ = gtk_button_new_with_label("Down");
+  move_up_ = gtk_button_new_with_label("Up");
+  remove_ = gtk_button_new_with_label("Remove");
+  clear_ = gtk_button_new_with_label("Clear");
+  summary_ = gtk_label_new("");
+  gtk_widget_add_css_class(summary_, "dim-label");
+  gtk_widget_set_hexpand(summary_, TRUE);
+  gtk_widget_set_halign(summary_, GTK_ALIGN_END);
+  g_signal_connect(move_up_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<QueueView *>(data)->MoveUp(); }), this);
+  g_signal_connect(move_down_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<QueueView *>(data)->MoveDown(); }), this);
+  g_signal_connect(remove_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<QueueView *>(data)->Remove(); }), this);
+  g_signal_connect(clear_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<QueueView *>(data)->Clear(); }), this);
+  gtk_box_append(GTK_BOX(buttons), move_down_);
+  gtk_box_append(GTK_BOX(buttons), move_up_);
+  gtk_box_append(GTK_BOX(buttons), remove_);
+  gtk_box_append(GTK_BOX(buttons), clear_);
+  gtk_box_append(GTK_BOX(buttons), summary_);
+  gtk_box_prepend(GTK_BOX(widget_), buttons);
+  g_signal_connect(list_, "selected-rows-changed", G_CALLBACK(+[](GtkListBox *, gpointer data) {
+                     static_cast<QueueView *>(data)->UpdateChrome();
+                   }),
+                   this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<QueueView *>(data);
                      const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index")) - 1;
@@ -148,6 +158,7 @@ void QueueView::Rebuild() {
     gtk_widget_set_margin_bottom(label, 8);
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
+    UpdateChrome();
     return;
   }
   int index = 0;
@@ -169,6 +180,27 @@ void QueueView::Rebuild() {
     SetupRowDrag(row, index);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
     ++index;
+  }
+  UpdateChrome();
+}
+
+void QueueView::UpdateChrome() {
+  const int count = queue_ ? queue_->size() : 0;
+  if (summary_) {
+    gtk_label_set_text(GTK_LABEL(summary_), QueueUi::SummaryText(queue_ ? queue_->songs() : SongList{}).c_str());
+  }
+  const QueueUi::ButtonState state = QueueUi::Buttons(SelectedIndexes(), count);
+  if (move_up_) {
+    gtk_widget_set_sensitive(move_up_, state.move_up);
+  }
+  if (move_down_) {
+    gtk_widget_set_sensitive(move_down_, state.move_down);
+  }
+  if (remove_) {
+    gtk_widget_set_sensitive(remove_, state.remove);
+  }
+  if (clear_) {
+    gtk_widget_set_sensitive(clear_, state.clear);
   }
 }
 
