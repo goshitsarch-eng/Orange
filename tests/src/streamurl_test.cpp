@@ -64,21 +64,21 @@ TEST(TidalStreamUrlRequest, ParsesJsonManifestAndDash) {
   const std::string manifest = TidalStreamUrlRequest::EncodeBase64(
       R"json({"encryptionType":"NONE","urls":["https://cdn.example/a.flac"],"mimeType":"audio/flac"})json");
   const UrlHandler::LoadResult result =
-      TidalStreamUrlRequest::Parse(R"json({"trackId":8,"manifest":")" + manifest + R"json("})json", "tidal://8", "8");
+      TidalStreamUrlRequest::Parse("{\"trackId\":8,\"manifest\":\"" + manifest + "\"}", "tidal://8", "8");
   EXPECT_EQ(UrlHandler::LoadResult::Type::TrackAvailable, result.type);
   EXPECT_EQ("https://cdn.example/a.flac", result.stream_url);
   EXPECT_EQ(Song::FileType::FLAC, result.filetype);
 
   const std::string dash = TidalStreamUrlRequest::EncodeBase64("<MPD></MPD>");
   const UrlHandler::LoadResult dash_result =
-      TidalStreamUrlRequest::Parse(R"json({"trackId":8,"manifest":")" + dash + R"json("})json", "tidal://8", "8");
+      TidalStreamUrlRequest::Parse("{\"trackId\":8,\"manifest\":\"" + dash + "\"}", "tidal://8", "8");
   EXPECT_EQ("data:application/dash+xml;base64," + dash, dash_result.stream_url);
 }
 
 TEST(TidalStreamUrlRequest, RejectsEncryptedStreams) {
   const std::string manifest = TidalStreamUrlRequest::EncodeBase64(R"json({"encryptionType":"OLD_AES","urls":["https://x"]})json");
   const UrlHandler::LoadResult encrypted =
-      TidalStreamUrlRequest::Parse(R"json({"trackId":1,"manifest":")" + manifest + R"json("})json", "tidal://1", "1");
+      TidalStreamUrlRequest::Parse("{\"trackId\":1,\"manifest\":\"" + manifest + "\"}", "tidal://1", "1");
   EXPECT_EQ(UrlHandler::LoadResult::Type::Error, encrypted.type);
   EXPECT_NE(std::string::npos, encrypted.error.find("encrypted"));
 
