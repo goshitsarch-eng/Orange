@@ -23,6 +23,8 @@ class Playlist {
   void set_name(const std::string &name) { name_ = name; }
   bool favorite() const { return favorite_; }
   void set_favorite(bool favorite) { favorite_ = favorite; }
+  const std::string &ui_path() const { return ui_path_; }
+  void set_ui_path(const std::string &path) { ui_path_ = path; }
 
   const SongList &songs() const { return songs_; }
   int row_count() const { return static_cast<int>(songs_.size()); }
@@ -96,6 +98,7 @@ class Playlist {
 
   int id_ = -1;
   std::string name_ = "Playlist";
+  std::string ui_path_;
   bool favorite_ = false;
   SongList songs_;
   int current_row_ = -1;

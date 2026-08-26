@@ -63,6 +63,7 @@ constexpr char kLastSaveExtension[] = "last_save_extension";
 
 constexpr char kLastSaveAllPath[] = "last_save_all_path";
 constexpr char kLastSaveAllExtension[] = "last_save_all_extension";
+constexpr char kUiFolders[] = "ui_folders";
 
 constexpr bool kDefaultAlternatingRowColors = true;
 constexpr bool kDefaultShowBars = true;

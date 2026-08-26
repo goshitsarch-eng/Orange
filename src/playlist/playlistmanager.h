@@ -44,6 +44,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   void Save(int id, const std::string &filename) override;
   void Rename(int id, const std::string &new_name) override;
   void Favorite(int id, bool favorite) override;
+  void SetPlaylistUiPath(int id, const std::string &path);
   void Delete(int id) override;
   bool Close(int id) override;
   void Open(int id) override;

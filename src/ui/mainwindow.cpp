@@ -12,6 +12,7 @@
 #include "fileview/fileview.h"
 #include "fileview/fileviewsongs.h"
 #include "playlist/playlistcontainer.h"
+#include "playlist/playlistfolders.h"
 #include "playlist/playlistlistdrop.h"
 #include "radios/radiodrag.h"
 #include "radios/radiostreamplaylistitem.h"
@@ -175,6 +176,7 @@ void MainWindow::BuildUi() {
   g_menu_append_section(menu, Translations::Tr("Music").c_str(), G_MENU_MODEL(music));
   GMenu *playlist = g_menu_new();
   g_menu_append(playlist, Translations::Tr("New playlist").c_str(), "win.new-playlist");
+  g_menu_append(playlist, Translations::Tr("New playlist folder").c_str(), "win.new-playlist-folder");
   g_menu_append(playlist, Translations::Tr("Load playlist…").c_str(), "win.load-playlist");
   g_menu_append(playlist, Translations::Tr("Save playlist…").c_str(), "win.save-playlist");
   g_menu_append(playlist, Translations::Tr("Save all playlists…").c_str(), "win.save-all-playlists");
@@ -330,6 +332,7 @@ void MainWindow::BuildUi() {
                self->ShowToast("Collection scan stopping");
              }));
   add_action("new-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->NewPlaylist(); }));
+  add_action("new-playlist-folder", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->NewPlaylistFolder(); }));
   add_action("load-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->LoadPlaylistFile(); }));
   add_action("save-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SavePlaylistFile(); }));
   add_action("rename-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RenameCurrentPlaylist(); }));
@@ -509,6 +512,19 @@ void MainWindow::BuildUi() {
                self->SelectPlaylistByName(self->playlist_list_menu_name_);
                Dialogs::CopyToDevice(GTK_WINDOW(self->window_), self->app_);
              }));
+  add_action("playlist-list-new-folder", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->NewPlaylistFolder(); }));
+  add_action("playlist-list-rename-folder", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->RenamePlaylistFolder(self->playlist_list_menu_folder_);
+             }));
+  add_action("playlist-list-delete-folder", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->DeletePlaylistFolder(self->playlist_list_menu_folder_);
+             }));
+  add_action("playlist-list-remove-from-folder", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->MovePlaylistToFolder(self->playlist_list_menu_name_, {});
+             }));
   add_action("collection-expand-all", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                if (self->collection_container_) {
@@ -681,10 +697,12 @@ void MainWindow::BuildSidebar() {
   playlist_list_container_ = std::make_unique<PlaylistListContainer>();
   playlist_list_container_->SetActivateCallback([this](const std::string &name) { SelectPlaylistByName(name); });
   playlist_list_container_->SetNewCallback([this] { NewPlaylist(); });
+  playlist_list_container_->SetNewFolderCallback([this] { NewPlaylistFolder(); });
   playlist_list_container_->SetDeleteCallback([this](const std::string &name) {
     SelectPlaylistByName(name);
     DeleteCurrentPlaylist();
   });
+  playlist_list_container_->SetDeleteFolderCallback([this](const std::string &path) { DeletePlaylistFolder(path); });
   playlist_list_container_->SetSaveCallback([this](const std::string &name) {
     SelectPlaylistByName(name);
     SavePlaylistFile();
@@ -694,7 +712,8 @@ void MainWindow::BuildSidebar() {
     Dialogs::CopyToDevice(GTK_WINDOW(window_), app_);
   });
   playlist_list_container_->SetMenuCallback([this](const std::string &name) { ShowPlaylistListMenu(name); });
-  playlist_list_container_->SetDropCallback([this](const std::string &name, const std::string &payload) { DropOnPlaylistList(name, payload); });
+  playlist_list_container_->SetDropCallback(
+      [this](const std::string &name, const std::string &payload, bool folder) { DropOnPlaylistList(name, payload, folder); });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, playlist_list_container_->widget(), "playlists", "Playlists",
                                       "view-list-symbolic");
   smart_container_ = std::make_unique<SmartPlaylistsViewContainer>();
@@ -1671,7 +1690,13 @@ void MainWindow::SavePlaylistFile() {
 }
 
 void MainWindow::NewPlaylist() {
-  app_->playlist_manager()->New("Playlist " + std::to_string(app_->playlist_manager()->playlists().size() + 1));
+  Playlist *created = app_->playlist_manager()->New("Playlist " + std::to_string(app_->playlist_manager()->playlists().size() + 1));
+  if (created && playlist_list_container_) {
+    const std::string folder = playlist_list_container_->SelectedFolderPath();
+    if (!folder.empty()) {
+      app_->playlist_manager()->SetPlaylistUiPath(created->id(), folder);
+    }
+  }
   RefreshPlaylistsList();
   RefreshPlaylist();
 }
@@ -2139,18 +2164,28 @@ void MainWindow::ShowRadioMenu(const std::vector<RadioChannel> &channels) {
 
 void MainWindow::ShowPlaylistListMenu(const std::string &name) {
   playlist_list_menu_name_ = name;
-  if (playlist_list_menu_name_.empty()) {
-    return;
+  playlist_list_menu_folder_.clear();
+  if (playlist_list_container_ && playlist_list_container_->SelectedIsFolder()) {
+    playlist_list_menu_folder_ = playlist_list_container_->SelectedFolderPath();
   }
-  Playlist *playlist = PlaylistByName(playlist_list_menu_name_);
   GMenu *menu = g_menu_new();
-  g_menu_append(menu, Translations::Tr("Open").c_str(), "win.playlist-list-open");
-  g_menu_append(menu, playlist && playlist->favorite() ? Translations::Tr("Remove from favorites").c_str() : Translations::Tr("Add to favorites").c_str(),
-                "win.playlist-list-favorite");
-  g_menu_append(menu, Translations::Tr("Rename…").c_str(), "win.playlist-list-rename");
-  g_menu_append(menu, Translations::Tr("Delete").c_str(), "win.playlist-list-delete");
-  g_menu_append(menu, Translations::Tr("Save playlist").c_str(), "win.playlist-list-save");
-  g_menu_append(menu, Translations::Tr("Copy to device…").c_str(), "win.playlist-list-copy");
+  g_menu_append(menu, Translations::Tr("New folder").c_str(), "win.playlist-list-new-folder");
+  if (!playlist_list_menu_folder_.empty()) {
+    g_menu_append(menu, Translations::Tr("Rename folder…").c_str(), "win.playlist-list-rename-folder");
+    g_menu_append(menu, Translations::Tr("Delete folder").c_str(), "win.playlist-list-delete-folder");
+  } else if (!playlist_list_menu_name_.empty()) {
+    Playlist *playlist = PlaylistByName(playlist_list_menu_name_);
+    g_menu_append(menu, Translations::Tr("Open").c_str(), "win.playlist-list-open");
+    g_menu_append(menu, playlist && playlist->favorite() ? Translations::Tr("Remove from favorites").c_str() : Translations::Tr("Add to favorites").c_str(),
+                  "win.playlist-list-favorite");
+    g_menu_append(menu, Translations::Tr("Rename…").c_str(), "win.playlist-list-rename");
+    g_menu_append(menu, Translations::Tr("Delete").c_str(), "win.playlist-list-delete");
+    g_menu_append(menu, Translations::Tr("Save playlist").c_str(), "win.playlist-list-save");
+    g_menu_append(menu, Translations::Tr("Copy to device…").c_str(), "win.playlist-list-copy");
+    if (playlist && !playlist->ui_path().empty()) {
+      g_menu_append(menu, Translations::Tr("Remove from folder").c_str(), "win.playlist-list-remove-from-folder");
+    }
+  }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   GtkWidget *parent = playlist_list_container_ && playlist_list_container_->view() ? playlist_list_container_->view()->list() : GTK_WIDGET(window_);
   gtk_widget_set_parent(popover, parent);
@@ -2179,7 +2214,24 @@ Playlist *MainWindow::PlaylistByName(const std::string &name) const {
   return nullptr;
 }
 
-void MainWindow::DropOnPlaylistList(const std::string &name, const std::string &payload) {
+void MainWindow::DropOnPlaylistList(const std::string &name, const std::string &payload, bool folder) {
+  if (PlaylistListDrop::IsPlaylistMove(payload)) {
+    const std::string source = PlaylistListDrop::ParseMoveName(payload);
+    if (source.empty() || source == name) {
+      return;
+    }
+    std::string dest;
+    if (folder) {
+      dest = name;
+    } else if (Playlist *target = PlaylistByName(name)) {
+      dest = target->ui_path();
+    }
+    MovePlaylistToFolder(source, dest);
+    return;
+  }
+  if (folder) {
+    return;
+  }
   Playlist *target = PlaylistByName(name);
   if (!target) {
     return;
@@ -2203,6 +2255,101 @@ void MainWindow::DropOnPlaylistList(const std::string &name, const std::string &
   }
   RefreshPlaylistsList();
   RefreshPlaylist();
+}
+
+void MainWindow::NewPlaylistFolder() {
+  if (!playlist_list_container_) {
+    return;
+  }
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("New folder"), Translations::CStr("Enter the name of the folder")));
+  GtkWidget *entry = gtk_entry_new();
+  adw_alert_dialog_set_extra_child(dialog, entry);
+  adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "create", Translations::CStr("Create"), nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "create", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response(dialog, "create");
+  g_object_set_data(G_OBJECT(dialog), "entry", entry);
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+                     if (g_strcmp0(response, "create") != 0) {
+                       return;
+                     }
+                     auto *self = static_cast<MainWindow *>(data);
+                     auto *name_entry = GTK_EDITABLE(g_object_get_data(G_OBJECT(alert), "entry"));
+                     const std::string name = PlaylistFolders::SanitizeName(gtk_editable_get_text(name_entry));
+                     if (name.empty() || !self->playlist_list_container_) {
+                       return;
+                     }
+                     const std::string parent = self->playlist_list_container_->SelectedFolderPath();
+                     self->playlist_list_container_->AddExtraFolder(PlaylistFolders::Child(parent, name));
+                   }),
+                   this);
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
+}
+
+void MainWindow::RenamePlaylistFolder(const std::string &path) {
+  if (path.empty() || !playlist_list_container_) {
+    return;
+  }
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Rename folder"), Translations::CStr("Enter a new name for this folder.")));
+  GtkWidget *entry = gtk_entry_new();
+  gtk_editable_set_text(GTK_EDITABLE(entry), PlaylistFolders::Leaf(path).c_str());
+  adw_alert_dialog_set_extra_child(dialog, entry);
+  adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "rename", Translations::CStr("Rename"), nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "rename", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response(dialog, "rename");
+  g_object_set_data(G_OBJECT(dialog), "entry", entry);
+  g_object_set_data_full(G_OBJECT(dialog), "folder-path", g_strdup(path.c_str()), g_free);
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+                     if (g_strcmp0(response, "rename") != 0) {
+                       return;
+                     }
+                     auto *self = static_cast<MainWindow *>(data);
+                     auto *name_entry = GTK_EDITABLE(g_object_get_data(G_OBJECT(alert), "entry"));
+                     const char *old_path = static_cast<const char *>(g_object_get_data(G_OBJECT(alert), "folder-path"));
+                     const std::string name = PlaylistFolders::SanitizeName(gtk_editable_get_text(name_entry));
+                     if (name.empty() || !old_path || !self->playlist_list_container_) {
+                       return;
+                     }
+                     const std::string new_path = PlaylistFolders::Child(PlaylistFolders::Parent(old_path), name);
+                     if (new_path == old_path) {
+                       return;
+                     }
+                     for (Playlist *playlist : self->app_->playlist_manager()->GetAllPlaylists()) {
+                       if (!playlist) {
+                         continue;
+                       }
+                       const std::string updated = PlaylistFolders::RenamePrefix(playlist->ui_path(), old_path, new_path);
+                       if (updated != playlist->ui_path()) {
+                         self->app_->playlist_manager()->SetPlaylistUiPath(playlist->id(), updated);
+                       }
+                     }
+                     self->playlist_list_container_->RenameExtraFolder(old_path, new_path);
+                     self->RefreshPlaylistsList();
+                   }),
+                   this);
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
+}
+
+void MainWindow::DeletePlaylistFolder(const std::string &path) {
+  if (path.empty() || !playlist_list_container_) {
+    return;
+  }
+  const std::string parent = PlaylistFolders::Parent(path);
+  for (Playlist *playlist : app_->playlist_manager()->GetAllPlaylists()) {
+    if (playlist && PlaylistFolders::IsUnder(playlist->ui_path(), path)) {
+      app_->playlist_manager()->SetPlaylistUiPath(playlist->id(), parent);
+    }
+  }
+  playlist_list_container_->RemoveExtraFolder(path);
+  RefreshPlaylistsList();
+}
+
+void MainWindow::MovePlaylistToFolder(const std::string &name, const std::string &folder) {
+  Playlist *playlist = PlaylistByName(name);
+  if (!playlist) {
+    return;
+  }
+  app_->playlist_manager()->SetPlaylistUiPath(playlist->id(), folder);
+  RefreshPlaylistsList();
 }
 
 SongList MainWindow::SongsFromUrls(const std::vector<std::string> &urls) const {

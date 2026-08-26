@@ -18,6 +18,7 @@ struct PlaylistMetadata {
   int last_played = -1;
   int ui_order = 0;
   std::string special_type;
+  std::string ui_path;
   bool favorite = false;
 };
 
@@ -31,6 +32,7 @@ class PlaylistBackend {
   void DeletePlaylist(int id);
   void RenamePlaylist(int id, const std::string &name);
   void SetFavorite(int id, bool favorite);
+  void SetPlaylistUiPath(int id, const std::string &path);
 
  private:
   Database *database_;

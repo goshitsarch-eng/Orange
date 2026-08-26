@@ -163,6 +163,15 @@ void PlaylistManager::Favorite(int id, bool favorite) {
   }
 }
 
+void PlaylistManager::SetPlaylistUiPath(int id, const std::string &path) {
+  if (Playlist *found = FindById(id)) {
+    found->set_ui_path(path);
+  }
+  if (backend_) {
+    backend_->SetPlaylistUiPath(id, path);
+  }
+}
+
 void PlaylistManager::Delete(int id) {
   if (Playlist *found = FindById(id)) {
     found->set_favorite(false);

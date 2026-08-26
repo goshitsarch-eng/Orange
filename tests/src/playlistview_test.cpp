@@ -1,6 +1,7 @@
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistfolders.h"
 #include "playlist/playlistlistdrop.h"
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
@@ -209,6 +210,63 @@ TEST(PlaylistListDrop, DisplayNameAndPayloads) {
   const std::vector<std::string> urls = PlaylistListDrop::ParseUrls("file:///a\nfile:///b");
   ASSERT_EQ(2u, urls.size());
   EXPECT_EQ("file:///a", urls[0]);
+  EXPECT_TRUE(PlaylistListDrop::IsPlaylistMove("strawberry-playlist-move:Inbox"));
+  EXPECT_EQ("Inbox", PlaylistListDrop::ParseMoveName(PlaylistListDrop::MovePayload("Inbox")));
+}
+
+TEST(PlaylistFolders, PathHelpersAndRename) {
+  EXPECT_EQ("Rock Live", PlaylistFolders::SanitizeName("Rock/Live"));
+  EXPECT_EQ(std::vector<std::string>({"Jazz", "Live"}), PlaylistFolders::Split("Jazz/Live"));
+  EXPECT_EQ("Jazz/Live", PlaylistFolders::Join({"Jazz", "Live"}));
+  EXPECT_EQ("Jazz", PlaylistFolders::Parent("Jazz/Live"));
+  EXPECT_EQ("Live", PlaylistFolders::Leaf("Jazz/Live"));
+  EXPECT_EQ("Jazz/Live", PlaylistFolders::Child("Jazz", "Live"));
+  EXPECT_TRUE(PlaylistFolders::IsUnder("Jazz/Live", "Jazz"));
+  EXPECT_FALSE(PlaylistFolders::IsUnder("Rock", "Jazz"));
+  EXPECT_EQ("Metal/Deep", PlaylistFolders::RenamePrefix("Rock/Deep", "Rock", "Metal"));
+  EXPECT_EQ("Metal", PlaylistFolders::RenamePrefix("Rock", "Rock", "Metal"));
+}
+
+TEST(PlaylistFolders, FlattenBuildsTreeAndRespectsCollapse) {
+  const std::vector<PlaylistFolders::PlaylistRef> playlists{
+      {"Inbox", false, ""},
+      {"Rock Hits", true, "Rock"},
+      {"Apollo", false, "Jazz/Live"},
+  };
+  const auto expanded = PlaylistFolders::Flatten(playlists, {"Empty"}, {}, {}, false);
+  ASSERT_EQ(7u, expanded.size());
+  EXPECT_TRUE(expanded[0].folder);
+  EXPECT_EQ("Empty", expanded[0].name);
+  EXPECT_EQ("Inbox", expanded[1].name);
+  EXPECT_FALSE(expanded[1].folder);
+  EXPECT_EQ("Jazz", expanded[2].name);
+  EXPECT_TRUE(expanded[2].folder);
+  EXPECT_EQ(0, expanded[2].depth);
+  EXPECT_EQ("Live", expanded[3].name);
+  EXPECT_EQ(1, expanded[3].depth);
+  EXPECT_EQ("Apollo", expanded[4].name);
+  EXPECT_EQ(2, expanded[4].depth);
+  EXPECT_EQ("Rock", expanded[5].name);
+  EXPECT_EQ("Rock Hits", expanded[6].name);
+  EXPECT_TRUE(expanded[6].favorite);
+
+  const auto collapsed = PlaylistFolders::Flatten(playlists, {}, {"Jazz"}, {}, false);
+  ASSERT_EQ(4u, collapsed.size());
+  EXPECT_EQ("Inbox", collapsed[0].name);
+  EXPECT_EQ("Jazz", collapsed[1].name);
+  EXPECT_FALSE(collapsed[1].expanded);
+  EXPECT_EQ("Rock", collapsed[2].name);
+  EXPECT_EQ("Rock Hits", collapsed[3].name);
+
+  PlaylistListModel model;
+  model.SetRows({"Inbox", "Rock Hits"}, {false, true}, {"", "Rock"});
+  PlaylistListSortFilterModel filter(&model);
+  const auto rows = filter.VisibleRows();
+  ASSERT_EQ(3u, rows.size());
+  EXPECT_EQ("Inbox", rows[0].name);
+  EXPECT_EQ("Rock", rows[1].name);
+  EXPECT_TRUE(rows[1].folder);
+  EXPECT_EQ("Rock Hits", rows[2].name);
 }
 
 TEST(PlaylistSaveOptionsDialog, PathTypeLabels) {

@@ -91,7 +91,11 @@ class MainWindow {
   void ShowStreamingMenu(const SongList &songs);
   void ShowRadioMenu(const std::vector<RadioChannel> &channels);
   void ShowPlaylistListMenu(const std::string &name);
-  void DropOnPlaylistList(const std::string &name, const std::string &payload);
+  void DropOnPlaylistList(const std::string &name, const std::string &payload, bool folder);
+  void NewPlaylistFolder();
+  void RenamePlaylistFolder(const std::string &path);
+  void DeletePlaylistFolder(const std::string &path);
+  void MovePlaylistToFolder(const std::string &name, const std::string &folder);
   void SelectPlaylistByName(const std::string &name);
   Playlist *PlaylistByName(const std::string &name) const;
   SongList SongsFromUrls(const std::vector<std::string> &urls) const;
@@ -191,6 +195,7 @@ class MainWindow {
   SongList streaming_menu_songs_;
   SongList radio_menu_songs_;
   std::string playlist_list_menu_name_;
+  std::string playlist_list_menu_folder_;
   std::string radio_query_;
   CollectionGrouping::Grouping grouping_;
   PlaylistSequence playlist_sequence_;

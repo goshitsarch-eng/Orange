@@ -1,6 +1,6 @@
 #include "playlist/playlistlistsortfiltermodel.h"
 
-#include "utilities/strutils.h"
+#include "playlist/playlistfolders.h"
 
 PlaylistListSortFilterModel::PlaylistListSortFilterModel(PlaylistListModel *source) : source_(source) {}
 
@@ -9,28 +9,28 @@ void PlaylistListSortFilterModel::SetFilter(const std::string &filter) { filter_
 void PlaylistListSortFilterModel::SetFavoritesOnly(bool favorites_only) { favorites_only_ = favorites_only; }
 
 std::vector<PlaylistListDrop::Row> PlaylistListSortFilterModel::VisibleRows() const {
-  std::vector<PlaylistListDrop::Row> rows;
+  std::vector<PlaylistFolders::PlaylistRef> playlists;
   if (!source_) {
-    return rows;
+    return {};
   }
   for (int i = 0; i < source_->Count(); ++i) {
-    const bool favorite = i < static_cast<int>(source_->favorites().size()) && source_->favorites()[static_cast<size_t>(i)];
-    if (favorites_only_ && !favorite) {
-      continue;
+    PlaylistFolders::PlaylistRef playlist;
+    playlist.name = source_->At(i);
+    playlist.favorite = i < static_cast<int>(source_->favorites().size()) && source_->favorites()[static_cast<size_t>(i)];
+    if (i < static_cast<int>(source_->paths().size())) {
+      playlist.ui_path = source_->paths()[static_cast<size_t>(i)];
     }
-    if (!filter_.empty() && !StrUtils::ContainsInsensitive(source_->At(i), filter_)) {
-      continue;
-    }
-    rows.push_back({source_->At(i), favorite});
+    playlists.push_back(playlist);
   }
-  std::sort(rows.begin(), rows.end(), [](const PlaylistListDrop::Row &a, const PlaylistListDrop::Row &b) { return a.name < b.name; });
-  return rows;
+  return PlaylistFolders::Flatten(playlists, extra_folders_, collapsed_, filter_, favorites_only_);
 }
 
 std::vector<std::string> PlaylistListSortFilterModel::Visible() const {
   std::vector<std::string> names;
   for (const PlaylistListDrop::Row &row : VisibleRows()) {
-    names.push_back(row.name);
+    if (!row.folder) {
+      names.push_back(row.name);
+    }
   }
   return names;
 }

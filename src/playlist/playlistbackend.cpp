@@ -9,7 +9,8 @@ PlaylistBackend::PlaylistBackend(Database *database, TagReader *tagreader, Colle
 
 std::vector<PlaylistMetadata> PlaylistBackend::GetAllPlaylists() {
   std::vector<PlaylistMetadata> result;
-  SqlQuery query(database_, "SELECT ROWID, name, last_played, ui_order, special_type, is_favorite FROM playlists ORDER BY ui_order, name");
+  SqlQuery query(database_,
+                 "SELECT ROWID, name, last_played, ui_order, special_type, ui_path, is_favorite FROM playlists ORDER BY ui_order, name");
   while (query.Step()) {
     PlaylistMetadata metadata;
     metadata.id = query.ColumnInt(0);
@@ -17,7 +18,8 @@ std::vector<PlaylistMetadata> PlaylistBackend::GetAllPlaylists() {
     metadata.last_played = query.ColumnInt(2);
     metadata.ui_order = query.ColumnInt(3);
     metadata.special_type = query.ColumnText(4);
-    metadata.favorite = query.ColumnInt(5) != 0;
+    metadata.ui_path = query.ColumnText(5);
+    metadata.favorite = query.ColumnInt(6) != 0;
     result.push_back(metadata);
   }
   return result;
@@ -26,13 +28,14 @@ std::vector<PlaylistMetadata> PlaylistBackend::GetAllPlaylists() {
 std::unique_ptr<Playlist> PlaylistBackend::LoadPlaylist(int id) {
   auto playlist = std::make_unique<Playlist>();
   playlist->set_id(id);
-  SqlQuery meta(database_, "SELECT name, is_favorite, last_played FROM playlists WHERE ROWID = ?");
+  SqlQuery meta(database_, "SELECT name, is_favorite, last_played, ui_path FROM playlists WHERE ROWID = ?");
   meta.Bind(1, id);
   int last_played = -1;
   if (meta.Step()) {
     playlist->set_name(meta.ColumnText(0));
     playlist->set_favorite(meta.ColumnInt(1) != 0);
     last_played = meta.ColumnInt(2);
+    playlist->set_ui_path(meta.ColumnText(3));
   }
   SqlQuery items(database_, "SELECT collection_id, url, title, album, artist, albumartist, track, length FROM playlist_items WHERE playlist = ?");
   items.Bind(1, id);
@@ -67,18 +70,20 @@ int PlaylistBackend::SavePlaylist(Playlist *playlist) {
     return -1;
   }
   if (playlist->id() < 0) {
-    SqlQuery query(database_, "INSERT INTO playlists (name, last_played, ui_order, is_favorite) VALUES (?, ?, 0, ?)");
+    SqlQuery query(database_, "INSERT INTO playlists (name, last_played, ui_order, is_favorite, ui_path) VALUES (?, ?, 0, ?, ?)");
     query.Bind(1, playlist->name());
     query.Bind(2, playlist->current_row());
     query.Bind(3, playlist->favorite() ? 1 : 0);
+    query.Bind(4, playlist->ui_path());
     query.Exec();
     playlist->set_id(static_cast<int>(database_->LastInsertRowId()));
   } else {
-    SqlQuery query(database_, "UPDATE playlists SET name = ?, is_favorite = ?, last_played = ? WHERE ROWID = ?");
+    SqlQuery query(database_, "UPDATE playlists SET name = ?, is_favorite = ?, last_played = ?, ui_path = ? WHERE ROWID = ?");
     query.Bind(1, playlist->name());
     query.Bind(2, playlist->favorite() ? 1 : 0);
     query.Bind(3, playlist->current_row());
-    query.Bind(4, playlist->id());
+    query.Bind(4, playlist->ui_path());
+    query.Bind(5, playlist->id());
     query.Exec();
     SqlQuery clear(database_, "DELETE FROM playlist_items WHERE playlist = ?");
     clear.Bind(1, playlist->id());
@@ -122,6 +127,13 @@ void PlaylistBackend::RenamePlaylist(int id, const std::string &name) {
 void PlaylistBackend::SetFavorite(int id, bool favorite) {
   SqlQuery query(database_, "UPDATE playlists SET is_favorite = ? WHERE ROWID = ?");
   query.Bind(1, favorite ? 1 : 0);
+  query.Bind(2, id);
+  query.Exec();
+}
+
+void PlaylistBackend::SetPlaylistUiPath(int id, const std::string &path) {
+  SqlQuery query(database_, "UPDATE playlists SET ui_path = ? WHERE ROWID = ?");
+  query.Bind(1, path);
   query.Bind(2, id);
   query.Exec();
 }

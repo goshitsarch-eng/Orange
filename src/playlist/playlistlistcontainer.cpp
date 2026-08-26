@@ -1,9 +1,16 @@
 #include "playlist/playlistlistcontainer.h"
 
+#include "constants/playlistsettings.h"
+#include "core/settings.h"
+#include "playlist/playlistfolders.h"
 #include "translations/translations.h"
+
+#include <algorithm>
 
 PlaylistListContainer::PlaylistListContainer()
     : widget_(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0)), filter_(&model_), view_(std::make_unique<PlaylistListView>()) {
+  LoadExtraFolders();
+  filter_.SetExtraFolders(extra_folders_);
   search_ = gtk_search_entry_new();
   gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search_), Translations::CStr("Filter playlists"));
   gtk_widget_set_margin_start(search_, 8);
@@ -23,6 +30,9 @@ PlaylistListContainer::PlaylistListContainer()
   GtkWidget *add = gtk_button_new_from_icon_name("list-add-symbolic");
   gtk_widget_add_css_class(add, "flat");
   gtk_widget_set_tooltip_text(add, Translations::CStr("New playlist"));
+  GtkWidget *folder = gtk_button_new_from_icon_name("folder-new-symbolic");
+  gtk_widget_add_css_class(folder, "flat");
+  gtk_widget_set_tooltip_text(folder, Translations::CStr("New folder"));
   GtkWidget *remove = gtk_button_new_from_icon_name("list-remove-symbolic");
   gtk_widget_add_css_class(remove, "flat");
   gtk_widget_set_tooltip_text(remove, Translations::CStr("Delete playlist"));
@@ -43,8 +53,21 @@ PlaylistListContainer::PlaylistListContainer()
                      }
                    }),
                    this);
+  g_signal_connect(folder, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<PlaylistListContainer *>(data);
+                     if (self->new_folder_) {
+                       self->new_folder_();
+                     }
+                   }),
+                   this);
   g_signal_connect(remove, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<PlaylistListContainer *>(data);
+                     if (self->SelectedIsFolder()) {
+                       if (self->delete_folder_) {
+                         self->delete_folder_(self->SelectedFolderPath());
+                       }
+                       return;
+                     }
                      if (self->delete_) {
                        self->delete_(self->SelectedName());
                      }
@@ -71,6 +94,7 @@ PlaylistListContainer::PlaylistListContainer()
                    }),
                    this);
   gtk_box_append(GTK_BOX(bar), add);
+  gtk_box_append(GTK_BOX(bar), folder);
   gtk_box_append(GTK_BOX(bar), remove);
   gtk_box_append(GTK_BOX(bar), save);
   gtk_box_append(GTK_BOX(bar), copy);
@@ -84,6 +108,7 @@ PlaylistListContainer::PlaylistListContainer()
       menu_(name);
     }
   });
+  view_->SetFolderToggleCallback([this](const std::string &path) { ToggleFolder(path); });
 }
 
 void PlaylistListContainer::Reload(PlaylistManager *manager) {
@@ -97,6 +122,8 @@ void PlaylistListContainer::Rebuild() {
   if (manager_ && manager_->current()) {
     current = manager_->current()->name();
   }
+  filter_.SetExtraFolders(extra_folders_);
+  filter_.SetCollapsed(collapsed_);
   view_->Refresh(filter_.VisibleRows(), current);
 }
 
@@ -108,4 +135,64 @@ void PlaylistListContainer::SetDropCallback(DropCallback callback) { view_->SetD
 
 std::string PlaylistListContainer::SelectedName() const { return view_->SelectedName(); }
 
+std::string PlaylistListContainer::SelectedFolderPath() const { return view_->SelectedFolderPath(); }
+
+bool PlaylistListContainer::SelectedIsFolder() const { return view_->SelectedIsFolder(); }
+
 void PlaylistListContainer::ApplyFilter() { Rebuild(); }
+
+void PlaylistListContainer::ToggleFolder(const std::string &path) {
+  if (path.empty()) {
+    return;
+  }
+  if (collapsed_.erase(path) == 0) {
+    collapsed_.insert(path);
+  }
+  Rebuild();
+}
+
+void PlaylistListContainer::AddExtraFolder(const std::string &path) {
+  if (path.empty()) {
+    return;
+  }
+  if (std::find(extra_folders_.begin(), extra_folders_.end(), path) == extra_folders_.end()) {
+    extra_folders_.push_back(path);
+    SaveExtraFolders();
+  }
+  Rebuild();
+}
+
+void PlaylistListContainer::RemoveExtraFolder(const std::string &path) {
+  extra_folders_.erase(std::remove_if(extra_folders_.begin(), extra_folders_.end(),
+                                      [&](const std::string &folder) { return PlaylistFolders::IsUnder(folder, path); }),
+                       extra_folders_.end());
+  collapsed_.erase(path);
+  SaveExtraFolders();
+  Rebuild();
+}
+
+void PlaylistListContainer::RenameExtraFolder(const std::string &old_path, const std::string &new_path) {
+  for (std::string &folder : extra_folders_) {
+    folder = PlaylistFolders::RenamePrefix(folder, old_path, new_path);
+  }
+  std::set<std::string> collapsed;
+  for (const std::string &folder : collapsed_) {
+    collapsed.insert(PlaylistFolders::RenamePrefix(folder, old_path, new_path));
+  }
+  collapsed_ = std::move(collapsed);
+  SaveExtraFolders();
+  Rebuild();
+}
+
+void PlaylistListContainer::LoadExtraFolders() {
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  extra_folders_ = PlaylistFolders::ParseFolderList(settings.Value(PlaylistSettings::kUiFolders));
+}
+
+void PlaylistListContainer::SaveExtraFolders() {
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  settings.SetValue(PlaylistSettings::kUiFolders, PlaylistFolders::JoinFolderList(extra_folders_));
+  settings.Sync();
+}
