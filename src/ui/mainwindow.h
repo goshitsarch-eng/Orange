@@ -83,7 +83,7 @@ class MainWindow {
   void SelectPlaylistRow(int index, bool add);
   std::vector<int> SelectedPlaylistRows() const;
   SongList SelectedSongs() const;
-  void SortPlaylistBy(PlaylistColumn column);
+  void SortPlaylistBy(PlaylistColumn column, PlaylistSortOrder order = PlaylistSortOrder::Toggle);
   void RescanCollection(bool full);
   void StopAfterCurrent();
   void QueuePlayNext();

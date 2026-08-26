@@ -1,6 +1,6 @@
 #include "playlist/playlistdelegates.h"
 
-#include "core/settings.h"
+#include "playlist/playlistcolumnlayout.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
 #include "utilities/timeutils.h"
@@ -122,19 +122,7 @@ int PlaylistDelegates::ColumnWidth(PlaylistColumn column) {
   }
 }
 
-bool PlaylistDelegates::ColumnVisible(PlaylistColumn column) {
-  Settings settings;
-  settings.BeginGroup("Playlist");
-  const std::string enabled =
-      settings.Value("columns", "Track,Title,Artist,Album,Album artist,Length,Year,Genre,Bitrate,Sample rate,Plays,Rating,Filename");
-  const std::string title = ColumnTitle(column);
-  for (const std::string &part : StrUtils::Split(enabled, ',')) {
-    if (part == title) {
-      return true;
-    }
-  }
-  return false;
-}
+bool PlaylistDelegates::ColumnVisible(PlaylistColumn column) { return PlaylistColumnLayout::IsVisible(column); }
 
 std::string PlaylistDelegates::RatingStars(float rating) { return RatingPainter::Stars(rating); }
 

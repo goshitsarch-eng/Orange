@@ -1,7 +1,7 @@
 #include "playlist/playlistview.h"
 
+#include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistfilter.h"
-#include "playlist/playlistheader.h"
 #include "utilities/strutils.h"
 
 #include <algorithm>
@@ -9,6 +9,13 @@
 #include <cstring>
 
 PlaylistView::PlaylistView() {
+  header_ = std::make_unique<PlaylistHeader>();
+  header_->SetSortCallback([this](PlaylistColumn column, PlaylistSortOrder order) {
+    if (sort_) {
+      sort_(column, order);
+    }
+  });
+  header_->SetLayoutChangedCallback([this]() { Refresh(playlist_); });
   widget_ = gtk_scrolled_window_new();
   gtk_widget_set_hexpand(widget_, TRUE);
   gtk_widget_set_vexpand(widget_, TRUE);
@@ -197,14 +204,10 @@ void PlaylistView::Clear() {
 }
 
 void PlaylistView::Refresh(Playlist *playlist) {
+  playlist_ = playlist;
   Clear();
-  PlaylistHeader header;
-  header.Rebuild([this](PlaylistColumn column) {
-    if (sort_) {
-      sort_(column);
-    }
-  });
-  gtk_box_append(GTK_BOX(grid_), header.widget());
+  header_->Rebuild();
+  gtk_box_append(GTK_BOX(grid_), header_->widget());
   if (!playlist) {
     visible_count_ = 0;
     return;
@@ -229,22 +232,18 @@ void PlaylistView::Refresh(Playlist *playlist) {
     if (std::find(selected_rows_.begin(), selected_rows_.end(), index) != selected_rows_.end()) {
       gtk_widget_add_css_class(row, "card");
     }
-    for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
-      const auto column = static_cast<PlaylistColumn>(i);
-      if (!PlaylistDelegates::ColumnVisible(column)) {
-        continue;
-      }
+    for (PlaylistColumn column : PlaylistColumnLayout::Visible()) {
       GtkWidget *label = gtk_label_new(PlaylistDelegates::ColumnText(song, column).c_str());
-      gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+      gtk_label_set_xalign(GTK_LABEL(label), PlaylistColumnLayout::XAlign(column));
       gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
       gtk_widget_set_margin_start(label, 6);
       gtk_widget_set_margin_end(label, 6);
-      if (column == PlaylistColumn::Title) {
+      if (PlaylistColumnLayout::StretchColumn(column)) {
         gtk_widget_set_hexpand(label, TRUE);
       } else {
         gtk_widget_set_size_request(label, PlaylistDelegates::ColumnWidth(column), -1);
       }
-      g_object_set_data(G_OBJECT(label), "column", GINT_TO_POINTER(i + 1));
+      g_object_set_data(G_OBJECT(label), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
       gtk_box_append(GTK_BOX(row), label);
     }
     g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index));
@@ -286,7 +285,7 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
         const char *current = GTK_IS_LABEL(cell) ? gtk_label_get_text(GTK_LABEL(cell)) : "";
         GtkWidget *entry = gtk_entry_new();
         gtk_editable_set_text(GTK_EDITABLE(entry), current);
-        gtk_widget_set_hexpand(entry, column == PlaylistColumn::Title);
+        gtk_widget_set_hexpand(entry, PlaylistColumnLayout::StretchColumn(column));
         gtk_widget_set_size_request(entry, PlaylistDelegates::ColumnWidth(column), -1);
         g_object_set_data(G_OBJECT(entry), "column", GINT_TO_POINTER(stored));
         g_object_set_data(G_OBJECT(entry), "row-index", GINT_TO_POINTER(row));

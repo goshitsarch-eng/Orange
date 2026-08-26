@@ -51,7 +51,10 @@ constexpr char kDeleteFiles[] = "delete_files";
 
 constexpr char kStateVersion[] = "state_version";
 constexpr char kState[] = "state";
+constexpr char kColumns[] = "columns";
+constexpr char kDefaultColumns[] = "Track,Title,Artist,Album,Album artist,Length,Year,Genre,Bitrate,Sample rate,Plays,Rating,Filename";
 constexpr char kColumnAlignments[] = "column_alignments";
+constexpr char kStretchColumns[] = "stretch_columns";
 constexpr char kRatingLocked[] = "rating_locked";
 
 constexpr char kLastSaveFilter[] = "last_save_filter";
@@ -81,6 +84,7 @@ constexpr bool kDefaultEditMetadataInline = false;
 constexpr bool kDefaultWriteMetadata = true;
 constexpr bool kDefaultDeleteFiles = false;
 constexpr int kDefaultStateVersion = 0;
+constexpr bool kDefaultStretchColumns = true;
 constexpr bool kDefaultRatingLocked = false;
 
 }  // namespace PlaylistSettings

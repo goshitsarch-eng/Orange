@@ -11,11 +11,66 @@ SmartPlaylistsView::SmartPlaylistsView() {
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<SmartPlaylistsView *>(data);
                      auto *item = static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(row), "item"));
-                     if (item && self->activate_) {
-                       self->activate_(*item);
+                     if (item) {
+                       self->Emit(*item, SmartPlaylistsAction::Activate);
                      }
                    }),
                    this);
+}
+
+void SmartPlaylistsView::Emit(const SmartPlaylistsItem &item, SmartPlaylistsAction action) {
+  if (action == SmartPlaylistsAction::Activate && activate_) {
+    activate_(item);
+    return;
+  }
+  if (action == SmartPlaylistsAction::Delete && delete_) {
+    delete_(item);
+    return;
+  }
+  if (action_) {
+    action_(item, action);
+  }
+}
+
+void SmartPlaylistsView::ShowMenu(GtkWidget *relative, const SmartPlaylistsItem &item) {
+  GtkWidget *popover = gtk_popover_new();
+  gtk_widget_set_parent(popover, relative);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+  gtk_widget_set_margin_start(box, 8);
+  gtk_widget_set_margin_end(box, 8);
+  gtk_widget_set_margin_top(box, 8);
+  gtk_widget_set_margin_bottom(box, 8);
+  auto add_button = [&](const char *label, SmartPlaylistsAction action) {
+    GtkWidget *button = gtk_button_new_with_label(label);
+    gtk_widget_add_css_class(button, "flat");
+    auto *copy = new SmartPlaylistsItem(item);
+    g_object_set_data_full(G_OBJECT(button), "item", copy, [](gpointer p) { delete static_cast<SmartPlaylistsItem *>(p); });
+    g_object_set_data(G_OBJECT(button), "action", GINT_TO_POINTER(static_cast<int>(action) + 1));
+    g_object_set_data(G_OBJECT(button), "popover", popover);
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                       auto *self = static_cast<SmartPlaylistsView *>(data);
+                       auto *saved = static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(btn), "item"));
+                       if (auto *menu = GTK_POPOVER(g_object_get_data(G_OBJECT(btn), "popover"))) {
+                         gtk_popover_popdown(menu);
+                       }
+                       if (saved) {
+                         self->Emit(*saved, static_cast<SmartPlaylistsAction>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(btn), "action")) - 1));
+                       }
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(box), button);
+  };
+  if (item.kind != SmartPlaylistsItem::Kind::Wizard) {
+    add_button(Translations::CStr("Append to current"), SmartPlaylistsAction::Append);
+    add_button(Translations::CStr("Replace current"), SmartPlaylistsAction::Replace);
+    add_button(Translations::CStr("Add to queue"), SmartPlaylistsAction::Queue);
+  }
+  if (item.kind == SmartPlaylistsItem::Kind::Saved) {
+    add_button(Translations::CStr("Edit"), SmartPlaylistsAction::Edit);
+    add_button(Translations::CStr("Delete"), SmartPlaylistsAction::Delete);
+  }
+  gtk_popover_set_child(GTK_POPOVER(popover), box);
+  gtk_popover_popup(GTK_POPOVER(popover));
 }
 
 void SmartPlaylistsView::Reload(SmartPlaylistsModel *model) {
@@ -40,6 +95,21 @@ void SmartPlaylistsView::Reload(SmartPlaylistsModel *model) {
     gtk_widget_set_margin_bottom(label, 8);
     gtk_box_append(GTK_BOX(box), label);
     auto *copy = new SmartPlaylistsItem(item);
+    if (item.kind != SmartPlaylistsItem::Kind::Wizard) {
+      GtkWidget *menu = gtk_button_new_from_icon_name("view-more-symbolic");
+      gtk_widget_set_tooltip_text(menu, Translations::CStr("Actions"));
+      gtk_widget_set_valign(menu, GTK_ALIGN_CENTER);
+      g_object_set_data(G_OBJECT(menu), "item", copy);
+      g_signal_connect(menu, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                         auto *self = static_cast<SmartPlaylistsView *>(data);
+                         auto *saved = static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(button), "item"));
+                         if (saved) {
+                           self->ShowMenu(GTK_WIDGET(button), *saved);
+                         }
+                       }),
+                       this);
+      gtk_box_append(GTK_BOX(box), menu);
+    }
     if (item.kind == SmartPlaylistsItem::Kind::Saved) {
       GtkWidget *remove = gtk_button_new_from_icon_name("edit-delete-symbolic");
       gtk_widget_set_tooltip_text(remove, Translations::CStr("Delete"));
@@ -48,8 +118,8 @@ void SmartPlaylistsView::Reload(SmartPlaylistsModel *model) {
       g_signal_connect(remove, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
                          auto *self = static_cast<SmartPlaylistsView *>(data);
                          auto *saved = static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(button), "item"));
-                         if (saved && self->delete_) {
-                           self->delete_(*saved);
+                         if (saved) {
+                           self->Emit(*saved, SmartPlaylistsAction::Delete);
                          }
                        }),
                        this);

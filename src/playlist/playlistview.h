@@ -3,10 +3,12 @@
 
 #include "playlist/playlist.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistheader.h"
 
 #include <gtk/gtk.h>
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -14,7 +16,7 @@ class PlaylistView {
  public:
   using ActivateCallback = std::function<void(int)>;
   using SelectCallback = std::function<void(int, bool)>;
-  using SortCallback = std::function<void(PlaylistColumn)>;
+  using SortCallback = std::function<void(PlaylistColumn, PlaylistSortOrder)>;
   using MenuCallback = std::function<void(double, double)>;
   using EditRequestCallback = std::function<void()>;
   using EditCommitCallback = std::function<void(int, PlaylistColumn, const std::string &)>;
@@ -51,6 +53,8 @@ class PlaylistView {
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *grid_ = nullptr;
+  std::unique_ptr<PlaylistHeader> header_;
+  Playlist *playlist_ = nullptr;
   std::string filter_;
   std::vector<int> selected_rows_;
   ActivateCallback activate_;

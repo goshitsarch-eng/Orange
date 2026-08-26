@@ -144,7 +144,17 @@ TEST(SmartPlaylist, SerializeRoundTrip) {
     }
   }
   EXPECT_TRUE(found);
-  SmartPlaylistSearch::RemoveSaved("Fleet years");
+  SmartPlaylistSearch parsed_saved;
+  ASSERT_TRUE(SmartPlaylistSearch::FindSaved("Fleet years", &parsed_saved));
+  EXPECT_EQ(25, parsed_saved.limit);
+  SmartPlaylistSearch updated = search;
+  updated.limit = 10;
+  SmartPlaylistSearch::RenameSaved("Fleet years", "Fleet years renamed", updated);
+  EXPECT_FALSE(SmartPlaylistSearch::FindSaved("Fleet years", &parsed_saved));
+  ASSERT_TRUE(SmartPlaylistSearch::FindSaved("Fleet years renamed", &parsed_saved));
+  EXPECT_EQ(10, parsed_saved.limit);
+  SmartPlaylistSearch::RemoveSaved("Fleet years renamed");
+  EXPECT_FALSE(SmartPlaylistSearch::FindSaved("Fleet years renamed", &parsed_saved));
 }
 
 TEST(SmartPlaylist, FieldAndOpIndex) {

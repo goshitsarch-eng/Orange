@@ -5,6 +5,10 @@
 
 #include <string>
 
+enum class PlaylistSortOrder { Toggle, Ascending, Descending, Clear };
+
+enum class PlaylistColumnAlign { Left, Center, Right };
+
 enum class PlaylistColumn {
   Track,
   Title,

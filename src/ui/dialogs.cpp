@@ -57,6 +57,10 @@ void Dialogs::Login(GtkWindow *parent, const std::string &service, const std::fu
 
 void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app) { SmartPlaylistWizard::Show(parent, app); }
 
+void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app, const std::string &name, const SmartPlaylistSearch &search) {
+  SmartPlaylistWizard::Show(parent, app, name, search);
+}
+
 void Dialogs::GroupBy(GtkWindow *parent, const CollectionGrouping::Grouping &current,
                       const std::function<void(const CollectionGrouping::Grouping &)> &callback) {
   GroupByDialog::Show(parent, current, callback);

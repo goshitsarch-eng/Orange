@@ -1,3 +1,4 @@
+#include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistlistmodel.h"
@@ -7,6 +8,52 @@
 #include "widgets/ratingpainter.h"
 
 #include <gtest/gtest.h>
+
+TEST(PlaylistColumnLayout, DefaultOrderAlignmentAndReset) {
+  PlaylistColumnLayout::Reset();
+  const std::vector<PlaylistColumn> defaults = PlaylistColumnLayout::DefaultVisible();
+  ASSERT_GE(defaults.size(), 5u);
+  EXPECT_EQ(PlaylistColumn::Track, defaults.front());
+  EXPECT_EQ(defaults, PlaylistColumnLayout::Visible());
+  EXPECT_TRUE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Comment));
+  EXPECT_EQ(PlaylistColumnAlign::Right, PlaylistColumnLayout::DefaultAlignment(PlaylistColumn::Track));
+  EXPECT_EQ(PlaylistColumnAlign::Right, PlaylistColumnLayout::Alignment(PlaylistColumn::Year));
+  EXPECT_EQ(PlaylistColumnAlign::Left, PlaylistColumnLayout::Alignment(PlaylistColumn::Title));
+  EXPECT_FLOAT_EQ(1.0f, PlaylistColumnLayout::XAlign(PlaylistColumn::Bitrate));
+  EXPECT_FLOAT_EQ(0.0f, PlaylistColumnLayout::XAlign(PlaylistColumn::Artist));
+  EXPECT_TRUE(PlaylistColumnLayout::StretchEnabled());
+  EXPECT_TRUE(PlaylistColumnLayout::StretchColumn(PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistColumnLayout::StretchColumn(PlaylistColumn::Track));
+  EXPECT_FALSE(PlaylistColumnLayout::RatingLocked());
+
+  PlaylistColumnLayout::SetAlignment(PlaylistColumn::Title, PlaylistColumnAlign::Center);
+  EXPECT_EQ(PlaylistColumnAlign::Center, PlaylistColumnLayout::Alignment(PlaylistColumn::Title));
+  EXPECT_FLOAT_EQ(0.5f, PlaylistColumnLayout::XAlign(PlaylistColumn::Title));
+  PlaylistColumnLayout::SetStretchEnabled(false);
+  EXPECT_FALSE(PlaylistColumnLayout::StretchEnabled());
+  EXPECT_FALSE(PlaylistColumnLayout::StretchColumn(PlaylistColumn::Title));
+  PlaylistColumnLayout::SetRatingLocked(true);
+  EXPECT_TRUE(PlaylistColumnLayout::RatingLocked());
+
+  PlaylistColumnLayout::Hide(PlaylistColumn::Track);
+  EXPECT_FALSE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Track));
+  EXPECT_EQ(PlaylistColumn::Title, PlaylistColumnLayout::Visible().front());
+  PlaylistColumnLayout::ToggleVisible(PlaylistColumn::Comment);
+  EXPECT_TRUE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Comment));
+  ASSERT_TRUE(PlaylistColumnLayout::Move(PlaylistColumn::Title, 1));
+  EXPECT_NE(PlaylistColumn::Title, PlaylistColumnLayout::Visible().front());
+
+  PlaylistColumnLayout::SetVisibleColumns({PlaylistColumn::Title});
+  PlaylistColumnLayout::Hide(PlaylistColumn::Title);
+  EXPECT_TRUE(PlaylistColumnLayout::IsVisible(PlaylistColumn::Title));
+
+  PlaylistColumnLayout::Reset();
+  EXPECT_EQ(defaults, PlaylistColumnLayout::Visible());
+  EXPECT_EQ(PlaylistColumnAlign::Left, PlaylistColumnLayout::Alignment(PlaylistColumn::Title));
+  EXPECT_TRUE(PlaylistColumnLayout::StretchEnabled());
+  EXPECT_FALSE(PlaylistColumnLayout::RatingLocked());
+}
 
 TEST(PlaylistDelegates, ColumnTitleAndText) {
   EXPECT_EQ("Title", PlaylistDelegates::ColumnTitle(PlaylistColumn::Title));

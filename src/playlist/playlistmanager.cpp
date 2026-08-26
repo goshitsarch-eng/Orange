@@ -440,7 +440,9 @@ void PlaylistManager::PlaySmartPlaylist(const std::string &name, bool as_new, bo
       playlist->Clear();
     }
   }
-  playlist->SetDynamic(true, search);
+  if (as_new || clear) {
+    playlist->SetDynamic(true, search);
+  }
   PlaylistGeneratorInserter inserter;
   inserter.Insert(playlist, generator);
   Persist(playlist);

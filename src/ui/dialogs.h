@@ -3,6 +3,7 @@
 
 #include "collection/collectiongrouping.h"
 #include "core/song.h"
+#include "smartplaylists/smartplaylist.h"
 
 #include <functional>
 #include <string>
@@ -28,6 +29,7 @@ class Dialogs {
   static void GrabShortcut(GtkWindow *parent, const std::function<void(const std::string &)> &callback);
   static void Login(GtkWindow *parent, const std::string &service, const std::function<void(const std::string &, const std::string &)> &callback);
   static void SmartPlaylistWizard(GtkWindow *parent, Application *app);
+  static void SmartPlaylistWizard(GtkWindow *parent, Application *app, const std::string &name, const SmartPlaylistSearch &search);
   static void GroupBy(GtkWindow *parent, const CollectionGrouping::Grouping &current,
                       const std::function<void(const CollectionGrouping::Grouping &)> &callback);
   static void ManageSavedGroupings(GtkWindow *parent, const std::function<void(const CollectionGrouping::Grouping &)> &callback);

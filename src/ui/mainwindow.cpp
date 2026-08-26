@@ -11,7 +11,9 @@
 #include "playlist/playlistcontainer.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/radioviewcontainer.h"
+#include "smartplaylists/smartplaylistsview.h"
 #include "smartplaylists/smartplaylistsviewcontainer.h"
+#include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistsequence.h"
@@ -493,6 +495,44 @@ void MainWindow::BuildSidebar() {
     SmartPlaylistSearch::RemoveSaved(item.title);
     smart_container_->Reload();
   });
+  smart_container_->SetActionCallback([this](const SmartPlaylistsItem &item, SmartPlaylistsAction action) {
+    switch (action) {
+      case SmartPlaylistsAction::Activate:
+        RunSmartPlaylist(item.key);
+        break;
+      case SmartPlaylistsAction::Append:
+        app_->playlist_manager()->PlaySmartPlaylist(item.key, false, false);
+        RefreshPlaylistsList();
+        RefreshPlaylist();
+        break;
+      case SmartPlaylistsAction::Replace:
+        app_->playlist_manager()->PlaySmartPlaylist(item.key, false, true);
+        RefreshPlaylistsList();
+        RefreshPlaylist();
+        break;
+      case SmartPlaylistsAction::Queue: {
+        const SongList songs = item.search.Search(app_->collection()->Songs());
+        for (const Song &song : songs) {
+          app_->queue()->Append(song);
+        }
+        RefreshQueue();
+        break;
+      }
+      case SmartPlaylistsAction::Edit:
+        if (item.kind == SmartPlaylistsItem::Kind::Saved) {
+          Dialogs::SmartPlaylistWizard(GTK_WINDOW(window_), app_, item.title, item.search);
+          smart_container_->Reload();
+          RefreshPlaylistsList();
+        }
+        break;
+      case SmartPlaylistsAction::Delete:
+        if (item.kind == SmartPlaylistsItem::Kind::Saved) {
+          SmartPlaylistSearch::RemoveSaved(item.title);
+          smart_container_->Reload();
+        }
+        break;
+    }
+  });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, smart_container_->widget(), "smart", "Smart playlists", "view-refresh-symbolic");
   file_view_ = std::make_unique<FileView>();
   file_view_->SetAddToPlaylistCallback([this](const std::vector<std::string> &paths) {
@@ -661,7 +701,7 @@ void MainWindow::BuildPlaylist() {
   });
   playlist_container_->view()->SetActivateCallback([this](int index) { app_->player()->PlayAt(index); });
   playlist_container_->view()->SetSelectCallback([this](int index, bool add) { SelectPlaylistRow(index, add); });
-  playlist_container_->view()->SetSortCallback([this](PlaylistColumn column) { SortPlaylistBy(column); });
+  playlist_container_->view()->SetSortCallback([this](PlaylistColumn column, PlaylistSortOrder order) { SortPlaylistBy(column, order); });
   playlist_container_->view()->SetMenuCallback([this](double x, double y) { ShowPlaylistMenu(x, y); });
   playlist_container_->view()->SetEditRequestCallback([this]() { EditColumnValue(); });
   playlist_container_->view()->SetEditCommitCallback([this](int row, PlaylistColumn column, const std::string &value) {
@@ -912,12 +952,26 @@ void MainWindow::RefreshCollection(const std::string &filter, bool update_text) 
   }
 }
 
-void MainWindow::SortPlaylistBy(PlaylistColumn column) {
-  if (sort_column_ == column) {
+void MainWindow::SortPlaylistBy(PlaylistColumn column, PlaylistSortOrder order) {
+  if (order == PlaylistSortOrder::Clear) {
+    sort_column_ = PlaylistColumn::Count;
+    sort_descending_ = false;
+    return;
+  }
+  if (order == PlaylistSortOrder::Ascending) {
+    sort_column_ = column;
+    sort_descending_ = false;
+  } else if (order == PlaylistSortOrder::Descending) {
+    sort_column_ = column;
+    sort_descending_ = true;
+  } else if (sort_column_ == column) {
     sort_descending_ = !sort_descending_;
   } else {
     sort_column_ = column;
     sort_descending_ = false;
+  }
+  if (sort_column_ == PlaylistColumn::Count) {
+    return;
   }
   Playlist *playlist = app_->playlist_manager()->current();
   if (!playlist) {
@@ -1577,6 +1631,10 @@ void MainWindow::ShuffleCurrent() {
 }
 
 void MainWindow::RateSelected(int stars) {
+  if (PlaylistColumnLayout::RatingLocked()) {
+    ShowToast(Translations::Tr("Rating is locked"));
+    return;
+  }
   const float rating = static_cast<float>(std::clamp(stars, 0, 5)) / 5.0f;
   Playlist *playlist = app_->playlist_manager()->current();
   if (!playlist) {

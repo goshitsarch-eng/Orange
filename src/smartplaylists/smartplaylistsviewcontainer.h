@@ -19,6 +19,7 @@ class SmartPlaylistsViewContainer {
   void Reload();
   void SetActivateCallback(std::function<void(const SmartPlaylistsItem &)> callback);
   void SetDeleteCallback(std::function<void(const SmartPlaylistsItem &)> callback);
+  void SetActionCallback(std::function<void(const SmartPlaylistsItem &, SmartPlaylistsAction)> callback);
 
  private:
   GtkWidget *widget_ = nullptr;

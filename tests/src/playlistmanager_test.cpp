@@ -77,6 +77,18 @@ TEST(PlaylistManager, PlaylistMutationsAndSmartPlaylist) {
   manager.PlaySmartPlaylist("all", true, true);
   EXPECT_EQ("All songs", manager.current()->name());
   EXPECT_TRUE(manager.current()->is_dynamic());
+  const int smart_id = manager.current_id();
+  manager.New("Scratch");
+  manager.AppendSongs({MakeSong("Keep", "file:///keep")});
+  EXPECT_EQ(1, manager.current()->row_count());
+  manager.PlaySmartPlaylist("all", false, false);
+  EXPECT_EQ("Scratch", manager.current()->name());
+  EXPECT_GE(manager.current()->row_count(), 1);
+  EXPECT_FALSE(manager.current()->is_dynamic());
+  manager.PlaySmartPlaylist("never", false, true);
+  EXPECT_EQ("Scratch", manager.current()->name());
+  EXPECT_TRUE(manager.current()->is_dynamic());
+  EXPECT_NE(smart_id, manager.current_id());
 }
 
 TEST(Queue, ContainsAndRemoveSong) {

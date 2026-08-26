@@ -81,6 +81,8 @@ class SmartPlaylistSearch {
   static void SaveAll(const std::vector<std::pair<std::string, SmartPlaylistSearch>> &presets);
   static void AddSaved(const std::string &name, const SmartPlaylistSearch &search);
   static void RemoveSaved(const std::string &name);
+  static bool FindSaved(const std::string &name, SmartPlaylistSearch *search);
+  static void RenameSaved(const std::string &old_name, const std::string &new_name, const SmartPlaylistSearch &search);
 
   static std::vector<std::string> FieldNames();
   static std::vector<std::string> OpNames();

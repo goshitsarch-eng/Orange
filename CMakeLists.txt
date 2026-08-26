@@ -289,6 +289,7 @@ set(STRAWBERRY_SOURCES
   src/playlist/playlistundocommandshuffleitems.cpp
   src/playlist/playlistundocommandsortitems.cpp
   src/playlist/playlistdelegates.cpp
+  src/playlist/playlistcolumnlayout.cpp
   src/playlist/playlistheader.cpp
   src/playlist/playlistview.cpp
   src/playlist/playlisttabbar.cpp
@@ -968,6 +969,7 @@ if(GTest_FOUND)
     src/playlist/playlistundocommandbase.cpp
     src/playlist/playlistundocommandinsertitems.cpp
     src/playlist/playlistdelegates.cpp
+    src/playlist/playlistcolumnlayout.cpp
     src/playlist/playlistlistmodel.cpp
     src/playlist/playlistlistsortfiltermodel.cpp
     src/playlist/playlistsaveoptionsdialog.cpp

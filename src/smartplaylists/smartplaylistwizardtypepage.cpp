@@ -16,3 +16,9 @@ std::string SmartPlaylistWizardTypePage::name() const {
 }
 
 bool SmartPlaylistWizardTypePage::dynamic() const { return gtk_check_button_get_active(GTK_CHECK_BUTTON(dynamic_)); }
+
+void SmartPlaylistWizardTypePage::SetName(const std::string &name) {
+  gtk_editable_set_text(GTK_EDITABLE(name_), name.c_str());
+}
+
+void SmartPlaylistWizardTypePage::SetDynamic(bool dynamic) { gtk_check_button_set_active(GTK_CHECK_BUTTON(dynamic_), dynamic); }

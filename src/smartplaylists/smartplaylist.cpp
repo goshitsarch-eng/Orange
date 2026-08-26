@@ -296,3 +296,40 @@ void SmartPlaylistSearch::RemoveSaved(const std::string &name) {
   presets.erase(std::remove_if(presets.begin(), presets.end(), [&](const auto &preset) { return preset.first == name; }), presets.end());
   SaveAll(presets);
 }
+
+bool SmartPlaylistSearch::FindSaved(const std::string &name, SmartPlaylistSearch *search) {
+  if (!search) {
+    return false;
+  }
+  for (const auto &preset : LoadSaved()) {
+    if (preset.first == name) {
+      *search = preset.second;
+      return true;
+    }
+  }
+  return false;
+}
+
+void SmartPlaylistSearch::RenameSaved(const std::string &old_name, const std::string &new_name, const SmartPlaylistSearch &search) {
+  if (new_name.empty()) {
+    return;
+  }
+  auto presets = LoadSaved();
+  bool replaced = false;
+  for (auto &preset : presets) {
+    if (preset.first == old_name || preset.first == new_name) {
+      if (!replaced) {
+        preset.first = new_name;
+        preset.second = search;
+        replaced = true;
+      } else {
+        preset.first.clear();
+      }
+    }
+  }
+  presets.erase(std::remove_if(presets.begin(), presets.end(), [](const auto &preset) { return preset.first.empty(); }), presets.end());
+  if (!replaced) {
+    presets.emplace_back(new_name, search);
+  }
+  SaveAll(presets);
+}
