@@ -1,6 +1,7 @@
 #include "core/network.h"
 
 #include "core/logging.h"
+#include "core/networkproxyfactory.h"
 #include "core/settings.h"
 
 #include <glib.h>
@@ -8,18 +9,11 @@
 NetworkAccessManager::NetworkAccessManager() {
   session_ = soup_session_new();
   g_object_set(session_, "user-agent", "Strawberry/1.2.0 (+https://www.strawberrymusicplayer.org)", nullptr);
-  Settings settings;
-  settings.BeginGroup("NetworkProxy");
-  const std::string type = settings.Value("type");
-  const int mode = settings.IntValue("mode", -1);
-  if (mode == 2 || type == "manual" || type == "http" || type == "socks" || type == "3" || type == "1") {
-    const std::string host = settings.Value("hostname");
-    const int port = settings.IntValue("port", 0);
-    if (!host.empty() && port > 0) {
-      gchar *uri = g_strdup_printf("http://%s:%d", host.c_str(), port);
-      SetProxy(uri);
-      g_free(uri);
-    }
+  NetworkProxyFactory proxy;
+  proxy.ReloadSettings();
+  const std::string uri = proxy.ProxyUri();
+  if (!uri.empty()) {
+    SetProxy(uri);
   }
 }
 

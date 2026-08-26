@@ -18,9 +18,17 @@ void CollectionWatcher::StopWatching() {
     g_object_unref(monitor);
   }
   monitors_.clear();
+  if (inotify_watcher_) {
+    inotify_watcher_->Clear();
+  }
 }
 
 void CollectionWatcher::WatchPath(const std::string &path) {
+  if (!inotify_watcher_) {
+    inotify_watcher_ = std::make_unique<FileSystemWatcherInotify>();
+    inotify_watcher_->PathChanged.Connect([this](const std::string &) { Scan(); });
+  }
+  inotify_watcher_->AddPath(path);
   GFile *file = g_file_new_for_path(path.c_str());
   GFileMonitor *monitor = g_file_monitor_directory(file, G_FILE_MONITOR_NONE, nullptr, nullptr);
   g_object_unref(file);

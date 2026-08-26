@@ -1,0 +1,62 @@
+#include "tagfetcher/musicbrainzclient.h"
+
+#include "utilities/jsonutils.h"
+
+#include <glib.h>
+
+MusicBrainzClient::MusicBrainzClient(NetworkAccessManager *network) : network_(network) {}
+
+MusicBrainzClient::ResultList MusicBrainzClient::ParseResults(const std::string &json) {
+  ResultList results;
+  for (const Song &song : JsonUtils::ParseMusicBrainzRecordings(json)) {
+    Result result;
+    result.title = song.title();
+    result.artist = song.artist();
+    result.album = song.album();
+    result.album_artist = song.albumartist();
+    result.track = song.track();
+    result.year = song.year();
+    result.duration_msec = song.length_nanosec() > 0 ? static_cast<int>(song.length_nanosec() / 1000000) : 0;
+    results.push_back(result);
+  }
+  return results;
+}
+
+SongList MusicBrainzClient::ToSongs(const ResultList &results) {
+  SongList songs;
+  for (const Result &result : results) {
+    Song song;
+    song.set_title(result.title);
+    song.set_artist(result.artist);
+    song.set_album(result.album);
+    song.set_albumartist(result.album_artist);
+    song.set_track(result.track);
+    song.set_year(result.year);
+    if (result.duration_msec > 0) {
+      song.set_length_nanosec(static_cast<int64_t>(result.duration_msec) * 1000000);
+    }
+    song.set_valid(true);
+    songs.push_back(song);
+  }
+  return songs;
+}
+
+void MusicBrainzClient::Start(int id, const std::vector<std::string> &mbid_list) {
+  if (!network_ || mbid_list.empty()) {
+    Finished.Emit(id, {}, "No MusicBrainz IDs");
+    return;
+  }
+  const std::string url = std::string("https://musicbrainz.org/ws/2/recording/") + mbid_list.front() +
+                          "?inc=artists+releases+release-groups&fmt=json";
+  network_->Get(url, [this, id](const NetworkAccessManager::Response &response) {
+    if (!response.ok()) {
+      Finished.Emit(id, {}, response.error.empty() ? "MusicBrainz request failed" : response.error);
+      return;
+    }
+    Finished.Emit(id, ParseResults(response.body), {});
+  }, {{"User-Agent", "Strawberry/1.0 (https://www.strawberrymusicplayer.org/)"}});
+}
+
+void MusicBrainzClient::Cancel(int) {}
+
+void MusicBrainzClient::CancelAll() {}

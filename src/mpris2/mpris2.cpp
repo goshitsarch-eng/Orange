@@ -96,7 +96,8 @@ static GVariant *HandleGet(GDBusConnection*, const gchar*, const gchar*, const g
       const Song song = app->player()->current_song();
       g_variant_builder_add(&b, "{sv}", "xesam:title", g_variant_new_string(song.title().c_str()));
       g_variant_builder_add(&b, "{sv}", "xesam:album", g_variant_new_string(song.album().c_str()));
-      g_variant_builder_add(&b, "{sv}", "xesam:artist", g_variant_new_strv((const gchar *[]){song.artist().c_str(), nullptr}, -1));
+      const gchar *artists[] = {song.artist().c_str(), nullptr};
+      g_variant_builder_add(&b, "{sv}", "xesam:artist", g_variant_new_strv(artists, -1));
       g_variant_builder_add(&b, "{sv}", "xesam:url", g_variant_new_string(song.url().c_str()));
     }
     return g_variant_builder_end(&b);

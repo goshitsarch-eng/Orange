@@ -17,6 +17,7 @@
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistsequence.h"
+#include "queue/queueview.h"
 #include "widgets/multiloadingindicator.h"
 #include "widgets/playingwidget.h"
 #include "widgets/trackslider.h"
@@ -423,7 +424,12 @@ void MainWindow::BuildSidebar() {
     RefreshPlaylist();
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, device_container_->widget(), "devices", "Devices", "drive-harddisk-usb-symbolic");
-  adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&queue_list_), "queue", "Queue", "view-list-ordered-symbolic");
+  queue_view_ = std::make_unique<QueueView>(app_->queue());
+  queue_view_->SetActivateCallback([this](const Song &song) {
+    app_->playlist_manager()->AppendSongs({song});
+    app_->player()->PlayAt(app_->playlist_manager()->active()->row_count() - 1);
+  });
+  adw_view_stack_add_titled_with_icon(sidebar_stack_, queue_view_->widget(), "queue", "Queue", "view-list-ordered-symbolic");
 
   if (streaming_list_) {
   g_signal_connect(streaming_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
@@ -454,16 +460,6 @@ void MainWindow::BuildSidebar() {
                    }),
                    this);
   }
-  g_signal_connect(queue_list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-                     auto *self = static_cast<MainWindow *>(data);
-                     const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
-                     SongList songs = self->app_->queue()->songs();
-                     if (index >= 0 && index < static_cast<int>(songs.size())) {
-                       self->app_->playlist_manager()->AppendSongs({songs[static_cast<size_t>(index)]});
-                       self->app_->player()->PlayAt(self->app_->playlist_manager()->active()->row_count() - 1);
-                     }
-                   }),
-                   this);
 }
 
 void MainWindow::BuildContext() {
@@ -756,22 +752,8 @@ void MainWindow::RefreshSmartPlaylists() {
 }
 
 void MainWindow::RefreshQueue() {
-  ClearList(queue_list_);
-  int index = 0;
-  for (const Song &song : app_->queue()->songs()) {
-    GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *label = gtk_label_new(song.PrettyTitleWithArtist().c_str());
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_margin_start(label, 12);
-    gtk_widget_set_margin_end(label, 12);
-    gtk_widget_set_margin_top(label, 8);
-    gtk_widget_set_margin_bottom(label, 8);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
-    g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index++));
-    gtk_list_box_append(GTK_LIST_BOX(queue_list_), row);
-  }
-  if (app_->queue()->empty()) {
-    AppendStringRow(GTK_LIST_BOX(queue_list_), "Queue is empty", nullptr);
+  if (queue_view_) {
+    queue_view_->Reload();
   }
 }
 

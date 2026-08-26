@@ -20,6 +20,7 @@ Application::Application()
       albumcover_loader_(std::make_unique<AlbumCoverLoader>(tagreader_.get())),
       current_albumcover_loader_(std::make_unique<CurrentAlbumCoverLoader>(albumcover_loader_.get())),
       lyrics_providers_(std::make_unique<LyricsProviders>(network_.get())),
+      lyrics_fetcher_(std::make_unique<LyricsFetcher>(lyrics_providers_.get())),
       scrobbler_(std::make_unique<AudioScrobbler>(network_.get())),
       streaming_services_(std::make_unique<StreamingServices>(network_.get(), url_handlers_.get(), task_manager_.get())),
       radio_services_(std::make_unique<RadioServices>(database_.get(), network_.get())),

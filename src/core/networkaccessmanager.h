@@ -1,0 +1,6 @@
+#ifndef STRAWBERRY_NETWORKACCESSMANAGER_H
+#define STRAWBERRY_NETWORKACCESSMANAGER_H
+
+#include "core/network.h"
+
+#endif

@@ -53,7 +53,7 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
       {"toggle-pretty-osd", 0, 0, G_OPTION_ARG_NONE, &toggle_pretty_osd, "Toggle the pretty OSD", nullptr},
       {"language", 0, 0, G_OPTION_ARG_STRING, &language, "Override the language", "LANG"},
       {"debug", 0, 0, G_OPTION_ARG_NONE, &debug, "Enable debug output", nullptr},
-      {nullptr},
+      {nullptr, 0, 0, G_OPTION_ARG_NONE, nullptr, nullptr, nullptr},
   };
 
   GError *error = nullptr;

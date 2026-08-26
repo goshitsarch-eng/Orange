@@ -12,6 +12,7 @@
 #include "device/deviceviewcontainer.h"
 #include "fileview/fileview.h"
 #include "playlist/playlistsequence.h"
+#include "queue/queueview.h"
 #include "radios/radioviewcontainer.h"
 #include "smartplaylists/smartplaylistsviewcontainer.h"
 #include "streaming/streamingtabsview.h"
@@ -104,6 +105,7 @@ class MainWindow {
   std::unique_ptr<RadioViewContainer> radio_container_;
   std::unique_ptr<DeviceViewContainer> device_container_;
   std::unique_ptr<MultiLoadingIndicator> loading_indicator_;
+  std::unique_ptr<QueueView> queue_view_;
   GtkWidget *queue_list_ = nullptr;
   GtkWidget *streaming_list_ = nullptr;
   GtkWidget *streaming_stack_ = nullptr;

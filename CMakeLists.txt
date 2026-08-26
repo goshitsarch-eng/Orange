@@ -26,7 +26,7 @@ if(BUILD_WERROR)
   set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 endif()
 
-add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter)
+add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter -Wno-unused-private-field -Wno-deprecated-declarations -Wno-overlength-strings)
 
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
@@ -159,12 +159,30 @@ set(STRAWBERRY_SOURCES
   src/core/memorydatabase.cpp
   src/core/localredirectserver.cpp
   src/core/unixsignalwatcher.cpp
+  src/core/filesystemwatcherinterface.cpp
+  src/core/filesystemwatcherinotify.cpp
+  src/core/networkproxyfactory.cpp
+  src/core/networktimeouts.cpp
+  src/core/httpbaserequest.cpp
+  src/core/jsonbaserequest.cpp
+  src/translations/translations.cpp
   src/utilities/timeutils.cpp
   src/utilities/fileutils.cpp
   src/utilities/strutils.cpp
   src/utilities/jsonutils.cpp
   src/utilities/musixmatchprovider.cpp
   src/utilities/audioanalysis.cpp
+  src/utilities/colorutils.cpp
+  src/utilities/cryptutils.cpp
+  src/utilities/diskutils.cpp
+  src/utilities/envutils.cpp
+  src/utilities/imageutils.cpp
+  src/utilities/mimeutils.cpp
+  src/utilities/randutils.cpp
+  src/utilities/screenutils.cpp
+  src/utilities/styleutils.cpp
+  src/utilities/xmlutils.cpp
+  src/utilities/filemanagerutils.cpp
   src/engine/gststartup.cpp
   src/engine/gstengine.cpp
   src/engine/gstenginepipeline.cpp
@@ -176,6 +194,10 @@ set(STRAWBERRY_SOURCES
   src/engine/devicefinders.cpp
   src/engine/chromaprinter.cpp
   src/engine/ebur128analysis.cpp
+  src/engine/enginebase.cpp
+  src/engine/gstbusmessageevent.cpp
+  src/engine/gstfastspectrum.cpp
+  src/engine/gstfastspectrumplugin.cpp
   src/core/player.cpp
   src/tagreader/tagreader.cpp
   src/tagreader/tagreadergme.cpp
@@ -209,6 +231,12 @@ set(STRAWBERRY_SOURCES
   src/playlist/playlistfilter.cpp
   src/playlist/playlistsequence.cpp
   src/playlist/playlistundocommandbase.cpp
+  src/playlist/playlistundocommandinsertitems.cpp
+  src/playlist/playlistundocommandremoveitems.cpp
+  src/playlist/playlistundocommandmoveitems.cpp
+  src/playlist/playlistundocommandreorderitems.cpp
+  src/playlist/playlistundocommandshuffleitems.cpp
+  src/playlist/playlistundocommandsortitems.cpp
   src/playlist/playlistdelegates.cpp
   src/playlist/playlistheader.cpp
   src/playlist/playlistview.cpp
@@ -248,9 +276,16 @@ set(STRAWBERRY_SOURCES
   src/widgets/stretchheaderview.cpp
   src/widgets/tracksliderpopup.cpp
   src/widgets/fancytabbar.cpp
+  src/widgets/autoexpandingtreeview.cpp
+  src/widgets/forcescrollperpixel.cpp
+  src/widgets/linetextedit.cpp
+  src/widgets/renametablineedit.cpp
+  src/widgets/resizabletextedit.cpp
+  src/widgets/tracksliderslider.cpp
   src/context/contextalbum.cpp
   src/context/contextview.cpp
   src/queue/queue.cpp
+  src/queue/queueview.cpp
   src/playlistparsers/parserbase.cpp
   src/playlistparsers/m3uparser.cpp
   src/playlistparsers/plsparser.cpp
@@ -273,8 +308,47 @@ set(STRAWBERRY_SOURCES
   src/smartplaylists/smartplaylistwizardtypepage.cpp
   src/smartplaylists/smartplaylistwizardfinishpage.cpp
   src/smartplaylists/smartplaylistwizard.cpp
+  src/smartplaylists/smartplaylistquerywizardpluginsearchpage.cpp
+  src/smartplaylists/smartplaylistquerywizardpluginsortpage.cpp
   src/filterparser/filterparser.cpp
+  src/filterparser/filterparsersearchtermcomparator.cpp
+  src/filterparser/filterparsertexteqcomparator.cpp
+  src/filterparser/filterparsertextnecomparator.cpp
+  src/filterparser/filterparsertextcontainscomparator.cpp
+  src/filterparser/filterparserinteqcomparator.cpp
+  src/filterparser/filterparserintnecomparator.cpp
+  src/filterparser/filterparserintgtcomparator.cpp
+  src/filterparser/filterparserintgecomparator.cpp
+  src/filterparser/filterparserintltcomparator.cpp
+  src/filterparser/filterparserintlecomparator.cpp
+  src/filterparser/filterparseruinteqcomparator.cpp
+  src/filterparser/filterparseruintnecomparator.cpp
+  src/filterparser/filterparseruintgtcomparator.cpp
+  src/filterparser/filterparseruintgecomparator.cpp
+  src/filterparser/filterparseruintltcomparator.cpp
+  src/filterparser/filterparseruintlecomparator.cpp
+  src/filterparser/filterparserint64eqcomparator.cpp
+  src/filterparser/filterparserint64necomparator.cpp
+  src/filterparser/filterparserint64gtcomparator.cpp
+  src/filterparser/filterparserint64gecomparator.cpp
+  src/filterparser/filterparserint64ltcomparator.cpp
+  src/filterparser/filterparserint64lecomparator.cpp
+  src/filterparser/filterparserfloateqcomparator.cpp
+  src/filterparser/filterparserfloatnecomparator.cpp
+  src/filterparser/filterparserfloatgtcomparator.cpp
+  src/filterparser/filterparserfloatgecomparator.cpp
+  src/filterparser/filterparserfloatltcomparator.cpp
+  src/filterparser/filterparserfloatlecomparator.cpp
+  src/filterparser/filtertree.cpp
+  src/filterparser/filtertreeand.cpp
+  src/filterparser/filtertreeor.cpp
+  src/filterparser/filtertreenot.cpp
+  src/filterparser/filtertreenop.cpp
+  src/filterparser/filtertreeterm.cpp
+  src/filterparser/filtertreecolumnterm.cpp
   src/covermanager/coverproviders.cpp
+  src/covermanager/jsoncoverprovider.cpp
+  src/covermanager/coverutils.cpp
   src/covermanager/coversearchstatistics.cpp
   src/covermanager/albumcoverloaderoptions.cpp
   src/covermanager/albumcoverloader.cpp
@@ -298,6 +372,10 @@ set(STRAWBERRY_SOURCES
   src/covermanager/tidalcoverprovider.cpp
   src/covermanager/spotifycoverprovider.cpp
   src/covermanager/qobuzcoverprovider.cpp
+  src/lyrics/lyricsprovider.cpp
+  src/lyrics/jsonlyricsprovider.cpp
+  src/lyrics/lyricsfetcher.cpp
+  src/lyrics/lyricsfetchersearch.cpp
   src/lyrics/htmllyricsprovider.cpp
   src/lyrics/azlyricscomlyricsprovider.cpp
   src/lyrics/elyricsnetlyricsprovider.cpp
@@ -308,6 +386,8 @@ set(STRAWBERRY_SOURCES
   src/lyrics/musixmatchlyricsprovider.cpp
   src/lyrics/geniuslyricsprovider.cpp
   src/lyrics/lyricsproviders.cpp
+  src/scrobbler/scrobblemetadata.cpp
+  src/scrobbler/scrobblersettingsservice.cpp
   src/scrobbler/audioscrobbler.cpp
   src/scrobbler/scrobblercache.cpp
   src/scrobbler/lastfmscrobbler.cpp
@@ -390,13 +470,27 @@ set(STRAWBERRY_SOURCES
   src/transcoder/transcoderoptionsdialog.cpp
   src/transcoder/transcodedialog.cpp
   src/organize/organize.cpp
+  src/organize/organizeformat.cpp
+  src/organize/organizeformatvalidator.cpp
+  src/organize/organizesyntaxhighlighter.cpp
+  src/organize/organizeerrordialog.cpp
   src/organize/organizedialog.cpp
+  src/osd/osdbase.cpp
+  src/osd/osddbus.cpp
+  src/osd/osdpretty.cpp
   src/osd/osd.cpp
   src/systemtrayicon/systemtrayicon.cpp
   src/mpris2/mpris2.cpp
+  src/globalshortcuts/globalshortcut.cpp
+  src/globalshortcuts/globalshortcutsbackend.cpp
+  src/globalshortcuts/keymapper_x11.cpp
+  src/globalshortcuts/globalshortcutsbackend-x11.cpp
+  src/globalshortcuts/globalshortcutsbackend-kglobalaccel.cpp
   src/globalshortcuts/globalshortcuts.cpp
   src/globalshortcuts/globalshortcutgrabber.cpp
   src/discord/discord.cpp
+  src/tagfetcher/acoustidclient.cpp
+  src/tagfetcher/musicbrainzclient.cpp
   src/tagfetcher/tagfetcher.cpp
   src/ui/mainwindow.cpp
   src/ui/settingsdialog.cpp
@@ -438,6 +532,7 @@ set(STRAWBERRY_SOURCES
 )
 
 add_executable(strawberry ${STRAWBERRY_SOURCES})
+target_compile_options(strawberry PRIVATE -Wno-overlength-strings)
 
 target_include_directories(strawberry PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -514,6 +609,7 @@ if(GTest_FOUND)
     tests/src/m3uparser_test.cpp
     tests/src/smartplaylist_test.cpp
     tests/src/filterparser_test.cpp
+    tests/src/parity_increment29_test.cpp
     tests/src/lyrics_test.cpp
     tests/src/gpod_test.cpp
     tests/src/mtp_test.cpp
@@ -573,6 +669,32 @@ if(GTest_FOUND)
     src/utilities/musixmatchprovider.cpp
     src/utilities/jsonutils.cpp
     src/utilities/audioanalysis.cpp
+    src/utilities/colorutils.cpp
+    src/utilities/cryptutils.cpp
+    src/utilities/diskutils.cpp
+    src/utilities/envutils.cpp
+    src/utilities/mimeutils.cpp
+    src/utilities/randutils.cpp
+    src/utilities/xmlutils.cpp
+    src/core/filesystemwatcherinterface.cpp
+    src/core/filesystemwatcherinotify.cpp
+    src/core/networkproxyfactory.cpp
+    src/globalshortcuts/globalshortcut.cpp
+    src/core/networktimeouts.cpp
+    src/core/httpbaserequest.cpp
+    src/core/jsonbaserequest.cpp
+    src/engine/enginebase.cpp
+    src/engine/gstbusmessageevent.cpp
+    src/engine/gstfastspectrum.cpp
+    src/tagfetcher/acoustidclient.cpp
+    src/tagfetcher/musicbrainzclient.cpp
+    src/lyrics/lyricsprovider.cpp
+    src/lyrics/jsonlyricsprovider.cpp
+    src/covermanager/coverutils.cpp
+    src/scrobbler/scrobblemetadata.cpp
+    src/organize/organizeformat.cpp
+    src/organize/organizeformatvalidator.cpp
+    src/translations/translations.cpp
     src/device/devicemanager.cpp
     src/device/devicedatabasebackend.cpp
     src/device/mtpconnection.cpp
@@ -602,6 +724,18 @@ if(GTest_FOUND)
     src/smartplaylists/smartplaylistsmodel.cpp
     src/smartplaylists/smartplaylistwizardplugin.cpp
     src/filterparser/filterparser.cpp
+    src/filterparser/filterparsersearchtermcomparator.cpp
+    src/filterparser/filterparsertexteqcomparator.cpp
+    src/filterparser/filterparsertextcontainscomparator.cpp
+    src/filterparser/filterparserinteqcomparator.cpp
+    src/filterparser/filterparserintgecomparator.cpp
+    src/filterparser/filtertree.cpp
+    src/filterparser/filtertreeand.cpp
+    src/filterparser/filtertreeor.cpp
+    src/filterparser/filtertreenot.cpp
+    src/filterparser/filtertreenop.cpp
+    src/filterparser/filtertreeterm.cpp
+    src/filterparser/filtertreecolumnterm.cpp
     src/lyrics/htmllyricsprovider.cpp
     src/subsonic/subsonicservice.cpp
     src/subsonic/subsonicfavoriterequest.cpp
@@ -668,6 +802,7 @@ if(GTest_FOUND)
     src/playlist/playlistfilter.cpp
     src/playlist/playlistsequence.cpp
     src/playlist/playlistundocommandbase.cpp
+    src/playlist/playlistundocommandinsertitems.cpp
     src/playlist/playlistdelegates.cpp
     src/playlist/playlistlistmodel.cpp
     src/playlist/playlistlistsortfiltermodel.cpp
@@ -700,6 +835,7 @@ if(GTest_FOUND)
     src/transcoder/transcoderoptionsvorbis.cpp
     src/transcoder/transcoderoptionsdialog.cpp
   )
+  target_compile_options(strawberry_tests PRIVATE -Wno-overlength-strings)
   target_include_directories(strawberry_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_BINARY_DIR}/src
@@ -742,6 +878,12 @@ if(GTest_FOUND)
   endif()
   if(HAVE_EBUR128)
     target_link_libraries(strawberry_tests PRIVATE PkgConfig::LIBEBUR128)
+  endif()
+  if(HAVE_GSTFASTSPECTRUM)
+    target_link_libraries(strawberry_tests PRIVATE PkgConfig::FFTW3)
+  endif()
+  if(HAVE_X11)
+    target_link_libraries(strawberry_tests PRIVATE ${X11_LIBRARIES})
   endif()
   add_test(NAME strawberry_tests COMMAND strawberry_tests)
   add_custom_target(build_tests DEPENDS strawberry_tests)

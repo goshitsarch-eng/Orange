@@ -1,0 +1,6 @@
+#ifndef STRAWBERRY_PLAYLISTUNDOCOMMANDREMOVEITEMS_H
+#define STRAWBERRY_PLAYLISTUNDOCOMMANDREMOVEITEMS_H
+
+#include "playlist/playlistundocommandbase.h"
+
+#endif

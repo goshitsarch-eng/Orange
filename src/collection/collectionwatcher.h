@@ -1,10 +1,12 @@
 #ifndef STRAWBERRY_COLLECTIONWATCHER_H
 #define STRAWBERRY_COLLECTIONWATCHER_H
 
+#include "core/filesystemwatcherinotify.h"
 #include "core/song.h"
 
 #include <gio/gio.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,6 +34,7 @@ class CollectionWatcher {
   TaskManager *task_manager_;
   int last_added_ = 0;
   std::vector<GFileMonitor *> monitors_;
+  std::unique_ptr<FileSystemWatcherInotify> inotify_watcher_;
 };
 
 #endif  // STRAWBERRY_COLLECTIONWATCHER_H

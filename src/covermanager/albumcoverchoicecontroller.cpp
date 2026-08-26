@@ -124,37 +124,46 @@ void AlbumCoverChoiceController::LoadCoverFromFile(GtkWindow *parent, Song *song
   if (!app_ || !song) {
     return;
   }
-  GtkFileChooserNative *chooser = gtk_file_chooser_native_new("Choose cover image", parent, GTK_FILE_CHOOSER_ACTION_OPEN, "Open", "Cancel");
+  GtkFileDialog *dialog = gtk_file_dialog_new();
+  gtk_file_dialog_set_title(dialog, "Choose cover image");
   GtkFileFilter *filter = gtk_file_filter_new();
   gtk_file_filter_set_name(filter, "Images");
   for (const std::string &ext : ImageExtensions()) {
     gtk_file_filter_add_suffix(filter, ext.c_str());
   }
-  gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(chooser), filter);
-  using FileState = std::pair<AlbumCoverChoiceController *, std::pair<Song *, GtkWidget *>>;
-  auto *state = new FileState(this, {song, image});
-  g_signal_connect(chooser, "response", G_CALLBACK((+[](GtkNativeDialog *dlg, int response, gpointer data) {
-                     auto *pair = static_cast<FileState *>(data);
-                     if (response == GTK_RESPONSE_ACCEPT) {
-                       GFile *file = gtk_file_chooser_get_file(GTK_FILE_CHOOSER(dlg));
-                       if (file) {
-                         gchar *path = g_file_get_path(file);
-                         if (path) {
-                           const std::string bytes = FileUtils::ReadFile(path);
-                           if (!bytes.empty() && SaveCover(pair->first->app_, pair->second.first, bytes)) {
-                             ++pair->first->statistics_.chosen_images;
-                             pair->first->ApplyImage(pair->second.first, pair->second.second, bytes);
-                           }
-                           g_free(path);
-                         }
-                         g_object_unref(file);
-                       }
-                     }
-                     delete pair;
-                     g_object_unref(dlg);
-                   })),
-                   state);
-  gtk_native_dialog_show(GTK_NATIVE_DIALOG(chooser));
+  GListStore *filters = g_list_store_new(GTK_TYPE_FILE_FILTER);
+  g_list_store_append(filters, filter);
+  gtk_file_dialog_set_filters(dialog, G_LIST_MODEL(filters));
+  g_object_unref(filters);
+  g_object_unref(filter);
+  struct FileState {
+    AlbumCoverChoiceController *controller;
+    Song *song;
+    GtkWidget *image;
+  };
+  auto *state = new FileState{this, song, image};
+  gtk_file_dialog_open(dialog, parent, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+    auto *pair = static_cast<FileState *>(data);
+    GError *error = nullptr;
+    GFile *file = gtk_file_dialog_open_finish(GTK_FILE_DIALOG(source), result, &error);
+    if (file) {
+      gchar *path = g_file_get_path(file);
+      if (path) {
+        const std::string bytes = FileUtils::ReadFile(path);
+        if (!bytes.empty() && SaveCover(pair->controller->app_, pair->song, bytes)) {
+          ++pair->controller->statistics_.chosen_images;
+          pair->controller->ApplyImage(pair->song, pair->image, bytes);
+        }
+        g_free(path);
+      }
+      g_object_unref(file);
+    }
+    if (error) {
+      g_error_free(error);
+    }
+    delete pair;
+    g_object_unref(source);
+  }, state);
 }
 
 void AlbumCoverChoiceController::ShowStatistics(GtkWindow *parent) {

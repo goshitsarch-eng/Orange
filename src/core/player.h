@@ -21,6 +21,7 @@ class Player {
   void Init();
   void SetQueue(Queue *queue) { queue_ = queue; }
   GstEngine *engine() const { return engine_.get(); }
+  TaskManager *task_manager() const { return task_manager_; }
   GstEngine::State GetState() const;
   unsigned GetVolume() const { return volume_; }
   const Song &current_song() const { return current_song_; }

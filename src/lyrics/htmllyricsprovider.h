@@ -1,7 +1,8 @@
 #ifndef STRAWBERRY_HTMLLYRICSPROVIDER_H
 #define STRAWBERRY_HTMLLYRICSPROVIDER_H
 
-#include "lyrics/lyricsproviders.h"
+#include "lyrics/jsonlyricsprovider.h"
+#include "lyrics/lyricsprovider.h"
 
 #include <map>
 #include <string>
@@ -29,20 +30,6 @@ class HtmlLyricsProvider : public LyricsProvider {
   std::string end_tag_;
   std::string lyrics_start_;
   bool multiple_ = false;
-};
-
-class JsonLyricsProvider : public LyricsProvider {
- public:
-  JsonLyricsProvider(std::string name, std::string url_template);
-  std::string name() const override { return name_; }
-  void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
-
- protected:
-  virtual std::string UrlFor(const Song &song) const;
-  virtual std::string Extract(const std::string &body) const;
-
-  std::string name_;
-  std::string url_template_;
 };
 
 #endif

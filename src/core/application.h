@@ -18,6 +18,7 @@
 #include "engine/devicefinders.h"
 #include "equalizer/equalizer.h"
 #include "globalshortcuts/globalshortcuts.h"
+#include "lyrics/lyricsfetcher.h"
 #include "lyrics/lyricsproviders.h"
 #include "moodbar/moodbar.h"
 #include "mpris2/mpris2.h"
@@ -62,6 +63,7 @@ class Application {
   AlbumCoverLoader *albumcover_loader() const { return albumcover_loader_.get(); }
   CurrentAlbumCoverLoader *current_albumcover_loader() const { return current_albumcover_loader_.get(); }
   LyricsProviders *lyrics_providers() const { return lyrics_providers_.get(); }
+  LyricsFetcher *lyrics_fetcher() const { return lyrics_fetcher_.get(); }
   AudioScrobbler *scrobbler() const { return scrobbler_.get(); }
   StreamingServices *streaming_services() const { return streaming_services_.get(); }
   RadioServices *radio_services() const { return radio_services_.get(); }
@@ -97,6 +99,7 @@ class Application {
   std::unique_ptr<AlbumCoverLoader> albumcover_loader_;
   std::unique_ptr<CurrentAlbumCoverLoader> current_albumcover_loader_;
   std::unique_ptr<LyricsProviders> lyrics_providers_;
+  std::unique_ptr<LyricsFetcher> lyrics_fetcher_;
   std::unique_ptr<AudioScrobbler> scrobbler_;
   std::unique_ptr<StreamingServices> streaming_services_;
   std::unique_ptr<RadioServices> radio_services_;
