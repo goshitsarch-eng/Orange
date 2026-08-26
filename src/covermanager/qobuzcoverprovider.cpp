@@ -2,12 +2,15 @@
 
 #include "core/settings.h"
 #include "covermanager/albumcoverfetchersearch.h"
+#include "covermanager/coverproviderauth.h"
 #include "qobuz/qobuzservice.h"
 #include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
 
 const int QobuzCoverProvider::kLimit = 10;
+
+bool QobuzCoverProvider::authenticated() const { return CoverProviderAuth::HasServiceToken(name()); }
 
 namespace {
 

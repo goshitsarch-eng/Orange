@@ -1,6 +1,8 @@
 #include "covermanager/albumcoverfetchersearch.h"
+#include "covermanager/coverproviderauth.h"
 #include "covermanager/deezercoverprovider.h"
 #include "covermanager/discogscoverprovider.h"
+#include "covermanager/lastfmcoverprovider.h"
 #include "covermanager/musicbrainzcoverprovider.h"
 #include "covermanager/musixmatchcoverprovider.h"
 #include "covermanager/opentidalcoverprovider.h"
@@ -335,4 +337,44 @@ TEST(CoverProviderSearch, MapsAllProviderHits) {
   }
   ASSERT_EQ(1u, musixmatch_hits.size());
   EXPECT_EQ("https://s.mxmcdn.net/800.jpg", musixmatch_hits.front().image_url);
+}
+
+TEST(AlbumCoverFetcherSearch, ProviderEligibilityMatchesQt) {
+  const CoverSearchRequest album = AlbumCoverFetcherSearch::MakeRequest(1, "Portishead", "Dummy", {}, false, false);
+  const CoverSearchRequest batch = AlbumCoverFetcherSearch::MakeRequest(2, "Portishead", "Dummy", {}, false, true);
+  const CoverSearchRequest title_only = AlbumCoverFetcherSearch::MakeRequest(3, "Portishead", {}, "Roads", false, false);
+  const CoverSearchRequest commercial = AlbumCoverFetcherSearch::MakeRequest(4, "commercial-free", {}, "listener-supported", true, false);
+
+  EXPECT_TRUE(AlbumCoverFetcherSearch::ShouldUseProvider(true, false, true, true, true, album));
+  EXPECT_FALSE(AlbumCoverFetcherSearch::ShouldUseProvider(false, false, true, true, true, album));
+  EXPECT_FALSE(AlbumCoverFetcherSearch::ShouldUseProvider(true, true, false, true, true, album));
+  EXPECT_TRUE(AlbumCoverFetcherSearch::ShouldUseProvider(true, true, true, true, true, album));
+  EXPECT_FALSE(AlbumCoverFetcherSearch::ShouldUseProvider(true, false, true, false, true, batch));
+  EXPECT_TRUE(AlbumCoverFetcherSearch::ShouldUseProvider(true, false, true, false, true, album));
+  EXPECT_FALSE(AlbumCoverFetcherSearch::ShouldUseProvider(true, false, true, true, false, title_only));
+  EXPECT_TRUE(AlbumCoverFetcherSearch::ShouldUseProvider(true, false, true, true, true, title_only));
+  EXPECT_TRUE(AlbumCoverFetcherSearch::ShouldTerminateSearch(commercial));
+  EXPECT_FALSE(AlbumCoverFetcherSearch::ShouldTerminateSearch(album));
+
+  LastFmCoverProvider lastfm;
+  EXPECT_FALSE(lastfm.allow_missing_album());
+  EXPECT_TRUE(lastfm.batch());
+  EXPECT_FALSE(lastfm.authentication_required());
+  EXPECT_TRUE(lastfm.authenticated());
+  EXPECT_FALSE(AlbumCoverFetcherSearch::ShouldUseProvider(&lastfm, title_only));
+  EXPECT_TRUE(AlbumCoverFetcherSearch::ShouldUseProvider(&lastfm, album));
+
+  DiscogsCoverProvider discogs;
+  EXPECT_FALSE(discogs.enabled());
+  EXPECT_FALSE(discogs.batch());
+  EXPECT_FALSE(discogs.allow_missing_album());
+  EXPECT_FALSE(AlbumCoverFetcherSearch::ShouldUseProvider(&discogs, album));
+  discogs.set_enabled(true);
+  EXPECT_FALSE(AlbumCoverFetcherSearch::ShouldUseProvider(&discogs, batch));
+  EXPECT_TRUE(AlbumCoverFetcherSearch::ShouldUseProvider(&discogs, album));
+
+  TidalCoverProvider tidal;
+  EXPECT_TRUE(tidal.authentication_required());
+  EXPECT_EQ(tidal.authenticated(), CoverProviderAuth::HasServiceToken("Tidal"));
+  EXPECT_FALSE(CoverProviderAuth::HasServiceToken("Last.fm"));
 }

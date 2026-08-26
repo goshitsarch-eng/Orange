@@ -24,7 +24,10 @@ class DiscogsCoverProvider : public CoverProvider {
   static const char *kAccessKeyB64;
   static const char *kSecretKeyB64;
 
+  DiscogsCoverProvider() { enabled_ = false; }
   std::string name() const override { return "Discogs"; }
+  bool batch() const override { return false; }
+  bool allow_missing_album() const override { return false; }
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
   void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 

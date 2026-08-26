@@ -2,12 +2,15 @@
 
 #include "core/settings.h"
 #include "covermanager/albumcoverfetchersearch.h"
+#include "covermanager/coverproviderauth.h"
 #include "tidal/tidalservice.h"
 #include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
 
 const int TidalCoverProvider::kLimit = 10;
+
+bool TidalCoverProvider::authenticated() const { return CoverProviderAuth::HasServiceToken(name()); }
 
 namespace {
 

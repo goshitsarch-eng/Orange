@@ -17,6 +17,8 @@ class QobuzCoverProvider : public CoverProvider {
   static const int kLimit;
 
   std::string name() const override { return "Qobuz"; }
+  bool authentication_required() const override { return true; }
+  bool authenticated() const override;
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
   void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 

@@ -3,6 +3,7 @@
 
 #include "core/song.h"
 #include "covermanager/albumcoverfetcher.h"
+#include "covermanager/coverprovider.h"
 #include "utilities/strutils.h"
 
 #include <glib.h>
@@ -21,6 +22,39 @@ class AlbumCoverFetcherSearch {
   static void SortByScore(CoverProviderSearchResults *results);
 
   static bool IsCompilationOrLiveAlbum(const std::string &album);
+
+  static bool ShouldUseProvider(bool enabled, bool authentication_required, bool authenticated, bool batch_supported,
+                                bool allow_missing_album, const CoverSearchRequest &request) {
+    if (!enabled) {
+      return false;
+    }
+    if (authentication_required && !authenticated) {
+      return false;
+    }
+    if (request.batch && !batch_supported) {
+      return false;
+    }
+    if (!allow_missing_album && request.album.empty() && !request.title.empty()) {
+      return false;
+    }
+    return true;
+  }
+
+  static bool ShouldUseProvider(const CoverProvider *provider, const CoverSearchRequest &request) {
+    if (!provider) {
+      return false;
+    }
+    return ShouldUseProvider(provider->enabled(), provider->authentication_required(), provider->authenticated(), provider->batch(),
+                             provider->allow_missing_album(), request);
+  }
+
+  static bool ShouldTerminateSearch(const CoverSearchRequest &request) {
+    return StrUtils::ToLower(request.artist) == "commercial-free" && StrUtils::ToLower(request.title) == "listener-supported";
+  }
+
+  static CoverSearchRequest RequestFromSong(const Song &song, bool search = false, bool batch = false) {
+    return MakeRequest(0, song.EffectiveAlbumartist(), song.album(), song.title(), search, batch);
+  }
 
   static CoverSearchRequest MakeRequest(uint64_t id, const std::string &artist, const std::string &album, const std::string &title, bool search,
                                         bool batch) {

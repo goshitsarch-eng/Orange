@@ -1,6 +1,10 @@
 #ifndef STRAWBERRY_COVERPROVIDERAUTH_H
 #define STRAWBERRY_COVERPROVIDERAUTH_H
 
+#include "constants/qobuzsettings.h"
+#include "constants/spotifysettings.h"
+#include "constants/tidalsettings.h"
+#include "core/settings.h"
 #include "settings/settingspages.h"
 
 #include <cstring>
@@ -25,6 +29,23 @@ inline bool UsesServiceSettings(const std::string &name) {
 inline Mode ModeFor(const std::string &name) { return UsesServiceSettings(name) ? Mode::ServiceSettings : Mode::None; }
 
 inline bool RequiresAuthentication(const std::string &name) { return ModeFor(name) != Mode::None; }
+
+inline bool HasServiceToken(const std::string &name) {
+  Settings settings;
+  if (name == "Tidal") {
+    settings.BeginGroup(TidalSettings::kSettingsGroup);
+    return !settings.Value("token").empty() || !settings.Value("access_token").empty();
+  }
+  if (name == "Spotify") {
+    settings.BeginGroup(SpotifySettings::kSettingsGroup);
+    return !settings.Value("token").empty() || !settings.Value("access_token").empty();
+  }
+  if (name == "Qobuz") {
+    settings.BeginGroup(QobuzSettings::kSettingsGroup);
+    return !settings.Value("token").empty() || !settings.Value("user_auth_token").empty();
+  }
+  return false;
+}
 
 inline std::string StatusText(const std::string &name, bool authenticated) {
   if (name.empty()) {

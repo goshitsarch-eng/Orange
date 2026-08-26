@@ -52,6 +52,7 @@ class OpenTidalCoverProvider : public CoverProvider {
   static const int kMinImageSize;
 
   std::string name() const override { return "OpenTidal"; }
+  bool allow_missing_album() const override { return false; }
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
   void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 

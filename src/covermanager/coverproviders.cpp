@@ -8,6 +8,7 @@
 #include "core/settings.h"
 #include "core/standardpaths.h"
 #include "lyrics/lyricsproviderorder.h"
+#include "covermanager/albumcoverfetchersearch.h"
 #include "covermanager/deezercoverprovider.h"
 #include "covermanager/discogscoverprovider.h"
 #include "covermanager/lastfmcoverprovider.h"
@@ -59,7 +60,7 @@ void CoverProviders::ReloadSettings() {
   const std::vector<std::string> order = LyricsProviderOrder::Parse(settings.Value(CoversSettings::kProviders, ""));
   for (size_t i = 0; i < providers_.size(); ++i) {
     auto &provider = providers_[i];
-    provider->set_enabled(settings.BoolValue(provider->name(), true));
+    provider->set_enabled(settings.BoolValue(provider->name(), provider->enabled()));
     provider->set_order(LyricsProviderOrder::Rank(order, provider->name(), static_cast<int>(1000 + i)));
   }
   std::sort(providers_.begin(), providers_.end(), [](const std::unique_ptr<CoverProvider> &a, const std::unique_ptr<CoverProvider> &b) {
@@ -96,8 +97,9 @@ void CoverProviders::Fetch(const Song &song, CoverProvider::Callback callback) {
 }
 
 void CoverProviders::FetchAll(const Song &song, const std::function<void(const std::string &provider, const std::string &image_data)> &callback) {
+  const CoverSearchRequest request = AlbumCoverFetcherSearch::RequestFromSong(song);
   for (auto &provider : providers_) {
-    if (!provider->enabled()) {
+    if (!AlbumCoverFetcherSearch::ShouldUseProvider(provider.get(), request)) {
       continue;
     }
     const std::string name = provider->name();
@@ -118,7 +120,8 @@ void CoverProviders::FetchAll(const Song &song, const std::function<void(const s
 }
 
 void CoverProviders::FetchFromIndex(const Song &song, size_t index, CoverProvider::Callback callback) {
-  while (index < providers_.size() && !providers_[index]->enabled()) {
+  const CoverSearchRequest request = AlbumCoverFetcherSearch::RequestFromSong(song);
+  while (index < providers_.size() && !AlbumCoverFetcherSearch::ShouldUseProvider(providers_[index].get(), request)) {
     ++index;
   }
   if (index >= providers_.size()) {

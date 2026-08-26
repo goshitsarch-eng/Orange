@@ -2,12 +2,15 @@
 
 #include "core/settings.h"
 #include "covermanager/albumcoverfetchersearch.h"
+#include "covermanager/coverproviderauth.h"
 #include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
 
 const char *SpotifyCoverProvider::kApiUrl = "https://api.spotify.com/v1";
 const int SpotifyCoverProvider::kLimit = 10;
+
+bool SpotifyCoverProvider::authenticated() const { return CoverProviderAuth::HasServiceToken(name()); }
 
 namespace {
 

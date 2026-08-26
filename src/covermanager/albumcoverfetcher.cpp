@@ -52,9 +52,13 @@ void AlbumCoverFetcher::StartRequests() {
 void AlbumCoverFetcher::StartJob(const CoverSearchRequest &request) {
   auto job = std::make_shared<Job>();
   job->request = request;
+  if (AlbumCoverFetcherSearch::ShouldTerminateSearch(request)) {
+    FinishJob(job);
+    return;
+  }
   const std::vector<CoverProvider *> providers = cover_providers_->All();
   for (CoverProvider *provider : providers) {
-    if (provider && provider->enabled()) {
+    if (AlbumCoverFetcherSearch::ShouldUseProvider(provider, request)) {
       ++job->pending;
     }
   }
@@ -65,7 +69,7 @@ void AlbumCoverFetcher::StartJob(const CoverSearchRequest &request) {
   active_[request.id] = job;
   const Song song = AlbumCoverFetcherSearch::SongFromRequest(request);
   for (CoverProvider *provider : providers) {
-    if (!provider || !provider->enabled()) {
+    if (!AlbumCoverFetcherSearch::ShouldUseProvider(provider, request)) {
       continue;
     }
     ++job->statistics.network_requests_made;
