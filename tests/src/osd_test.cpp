@@ -10,6 +10,7 @@
 #include "utilities/fontutils.h"
 #include "queue/queueview.h"
 #include "systemtrayicon/systemtrayicon.h"
+#include "translations/languagechoices.h"
 #include "translations/translations.h"
 #include "utilities/strutils.h"
 
@@ -184,6 +185,15 @@ TEST(SeekbarSettings, ModeValuesMatchQt) {
   EXPECT_EQ(1, static_cast<int>(SeekbarSettings::Mode::Moodbar));
   EXPECT_EQ(2, static_cast<int>(SeekbarSettings::Mode::Waveform));
   EXPECT_STREQ("mode", SeekbarSettings::kMode);
+}
+
+TEST(LanguageChoices, ListsSystemDefaultAndGerman) {
+  const auto choices = LanguageChoices::All();
+  ASSERT_FALSE(choices.empty());
+  EXPECT_TRUE(choices.front().first.empty());
+  EXPECT_EQ("System default", choices.front().second);
+  EXPECT_EQ("Deutsch (de_DE)", LanguageChoices::DisplayName("de_DE"));
+  EXPECT_EQ(32u, choices.size());
 }
 
 TEST(Translations, AvailableLanguagesIncludeGerman) {

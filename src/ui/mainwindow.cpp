@@ -1074,6 +1074,9 @@ void MainWindow::ConnectSignals() {
     if (len > 0) {
       self->app_->tray()->SetProgress(static_cast<int>(pos * 100 / len));
     }
+    if (self->playlist_container_ && self->playlist_container_->view()) {
+      self->playlist_container_->view()->SetPlaybackProgress(len > 0 ? static_cast<double>(pos) / static_cast<double>(len) : 0.0);
+    }
     return G_SOURCE_CONTINUE;
   }, this);
 }
@@ -1185,6 +1188,7 @@ void MainWindow::RefreshPlaylist() {
     selected_playlist_rows_.clear();
     selection_playlist_name_ = playlist ? playlist->name() : std::string();
   }
+  playlist_container_->ApplyLook();
   playlist_container_->view()->SetFilterString(playlist_filter_);
   playlist_container_->view()->SetSelectedRows(selected_playlist_rows_);
   playlist_container_->view()->Refresh(playlist);

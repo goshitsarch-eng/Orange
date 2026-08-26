@@ -2,6 +2,7 @@
 
 #include "constants/behavioursettings.h"
 #include "settings/settingspage.h"
+#include "translations/languagechoices.h"
 
 AdwPreferencesPage *BehaviourSettingsPage::Create(Settings *settings, Application *) {
   settings->BeginGroup(BehaviourSettings::kSettingsGroup);
@@ -12,7 +13,12 @@ AdwPreferencesPage *BehaviourSettingsPage::Create(Settings *settings, Applicatio
   SettingsPage::AddCombo(startup, settings, BehaviourSettings::kStartupBehaviour, "Startup behaviour",
                          {{"1", "Remember"}, {"2", "Show"}, {"3", "Hide"}, {"4", "Show maximized"}, {"5", "Show minimized"}},
                          std::to_string(static_cast<int>(BehaviourSettings::kDefaultStartupBehaviour)));
-  SettingsPage::AddEntry(startup, settings, BehaviourSettings::kLanguage, "Language");
+  SettingsPage::AddCombo(startup, settings, nullptr, "Language", LanguageChoices::All(), settings->Value(BehaviourSettings::kLanguage),
+                         [settings](const std::string &id) {
+                           settings->BeginGroup(BehaviourSettings::kSettingsGroup);
+                           settings->SetValue(BehaviourSettings::kLanguage, id);
+                           settings->Sync();
+                         });
 
   AdwPreferencesGroup *tray = SettingsPage::AddGroup(page, "System tray");
   SettingsPage::AddToggle(tray, settings, BehaviourSettings::kShowTrayIcon, "Show system tray icon", nullptr, BehaviourSettings::kDefaultShowTrayIcon);

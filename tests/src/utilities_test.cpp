@@ -11,6 +11,7 @@
 #include "equalizer/equalizer.h"
 #include "constants/filefilterconstants.h"
 #include "constants/collectionsettings.h"
+#include "playlist/playlistlook.h"
 #include "context/contextalbum.h"
 #include "context/contextfont.h"
 #include "context/contexttechnical.h"
@@ -868,6 +869,17 @@ TEST(ContextFont, UsesFallbackSizeForFamilyOnly) {
   EXPECT_EQ(14, pango.size_pt);
   EXPECT_TRUE(pango.bold);
   EXPECT_EQ("#context-headline { font: 11pt \"Noto Sans\"; }", ContextFont::CssRule("#context-headline", family_only));
+}
+
+TEST(PlaylistLook, CombinedCssCoversAlternatingGlowAndBars) {
+  EXPECT_TRUE(PlaylistLook::AlternatingCss(false).empty());
+  EXPECT_NE(std::string::npos, PlaylistLook::AlternatingCss(true).find("playlist-alt"));
+  EXPECT_NE(std::string::npos, PlaylistLook::GlowCss(true).find("playlist-glow"));
+  EXPECT_NE(std::string::npos, PlaylistLook::BarsCss(true, 0.4).find("40%"));
+  const std::string css = PlaylistLook::CombinedCss(true, true, true, 0.25);
+  EXPECT_NE(std::string::npos, css.find("playlist-alt"));
+  EXPECT_NE(std::string::npos, css.find("playlist-glow"));
+  EXPECT_NE(std::string::npos, css.find("25%"));
 }
 
 TEST(CollectionSettings, CacheSizeUnitsMatchQt) {

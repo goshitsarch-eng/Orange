@@ -1,8 +1,12 @@
 #include "playlist/playlistview.h"
 
+#include "constants/playlistsettings.h"
+#include "core/settings.h"
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistfilter.h"
+#include "playlist/playlistlook.h"
 #include "utilities/strutils.h"
+#include "utilities/styleutils.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -215,6 +219,12 @@ void PlaylistView::Refresh(Playlist *playlist) {
   PlaylistFilter filter;
   filter.SetFilterString(filter_);
   const int current = playlist->current_row();
+  Settings look;
+  look.BeginGroup(PlaylistSettings::kSettingsGroup);
+  const bool alternating = look.BoolValue(PlaylistSettings::kAlternatingRowColors, PlaylistSettings::kDefaultAlternatingRowColors);
+  const bool glow = look.BoolValue(PlaylistSettings::kGlowEffect, PlaylistSettings::kDefaultGlowEffect);
+  const bool bars = look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars);
+  StyleUtils::LoadCss(PlaylistLook::CombinedCss(alternating, glow, bars, playback_progress_));
   visible_count_ = 0;
   for (int index = 0; index < playlist->row_count(); ++index) {
     const Song &song = playlist->songs()[static_cast<size_t>(index)];
@@ -223,9 +233,19 @@ void PlaylistView::Refresh(Playlist *playlist) {
     }
     GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_add_css_class(row, "activatable");
+    gtk_widget_add_css_class(row, "playlist-row");
+    if (alternating && (visible_count_ % 2) == 1) {
+      gtk_widget_add_css_class(row, "playlist-alt");
+    }
     if (index == current) {
       gtk_widget_add_css_class(row, "accent");
       gtk_widget_add_css_class(row, "playlist-playing");
+      if (glow) {
+        gtk_widget_add_css_class(row, "playlist-glow");
+      }
+      if (bars) {
+        gtk_widget_add_css_class(row, "playlist-bars");
+      }
     }
     if (song.skipped()) {
       gtk_widget_add_css_class(row, "dim-label");
@@ -313,6 +333,15 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
     }
     child = gtk_widget_get_next_sibling(child);
   }
+}
+
+void PlaylistView::SetPlaybackProgress(double progress) {
+  playback_progress_ = std::clamp(progress, 0.0, 1.0);
+  Settings look;
+  look.BeginGroup(PlaylistSettings::kSettingsGroup);
+  StyleUtils::LoadCss(PlaylistLook::CombinedCss(look.BoolValue(PlaylistSettings::kAlternatingRowColors, PlaylistSettings::kDefaultAlternatingRowColors),
+                                                look.BoolValue(PlaylistSettings::kGlowEffect, PlaylistSettings::kDefaultGlowEffect),
+                                                look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars), playback_progress_));
 }
 
 void PlaylistView::ScrollToRow(int row) {

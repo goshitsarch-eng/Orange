@@ -62,6 +62,7 @@ int main(int argc, char **argv) {
   }
 
   GstStartup::Initialize();
+  Translations::ApplySavedLanguage();
   Translations::Init();
   adw_init();
 

@@ -57,7 +57,8 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
 
   AdwPreferencesGroup *rg = SettingsPage::AddGroup(page, "ReplayGain / EBU R128");
   SettingsPage::AddToggle(rg, settings, BackendSettings::kRgEnabled, "Enable ReplayGain", nullptr, BackendSettings::kDefaultRgEnabled);
-  SettingsPage::AddIntEntry(rg, settings, BackendSettings::kRgMode, "ReplayGain mode (0 album / 1 track)", BackendSettings::kDefaultRgMode);
+  SettingsPage::AddIntCombo(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgMode, "ReplayGain mode",
+                            {{"0", "Album"}, {"1", "Track"}}, BackendSettings::kDefaultRgMode);
   SettingsPage::AddEntry(rg, settings, BackendSettings::kRgPreamp, "ReplayGain preamp (dB)", "0");
   SettingsPage::AddToggle(rg, settings, BackendSettings::kRgCompression, "Prevent clipping", nullptr, BackendSettings::kDefaultRgCompression);
   SettingsPage::AddEntry(rg, settings, BackendSettings::kRgFallbackGain, "Fallback gain (dB)", "0");

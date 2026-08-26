@@ -1,9 +1,12 @@
 #include "translations/translations.h"
 
+#include "constants/behavioursettings.h"
+#include "core/settings.h"
 #include "core/standardpaths.h"
 
 #include <glib/gi18n.h>
 #include <glib.h>
+#include <locale.h>
 
 namespace {
 
@@ -13,6 +16,17 @@ const char *kLanguages[] = {"ca_ES", "cs_CZ", "de_DE", "el_CY", "el_GR", "en_US"
                             "zh_TW"};
 
 }  // namespace
+
+void Translations::ApplySavedLanguage() {
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const std::string language = settings.Value(BehaviourSettings::kLanguage);
+  if (language.empty()) {
+    return;
+  }
+  g_setenv("LANGUAGE", language.c_str(), TRUE);
+  setlocale(LC_MESSAGES, language.c_str());
+}
 
 void Translations::Init(const std::string &locale_dir) {
   const std::string dir = locale_dir.empty() ? StandardPaths::LocaleDir() : locale_dir;

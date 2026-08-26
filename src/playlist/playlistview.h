@@ -44,6 +44,7 @@ class PlaylistView {
   void SetLastClickedColumn(PlaylistColumn column) { last_clicked_column_ = column; }
   void StartInlineEdit(int row, PlaylistColumn column);
   int visible_count() const { return visible_count_; }
+  void SetPlaybackProgress(double progress);
 
  private:
   void Clear();
@@ -67,6 +68,7 @@ class PlaylistView {
   ReorderCallback reorder_;
   PlaylistColumn last_clicked_column_ = PlaylistColumn::Title;
   int visible_count_ = 0;
+  double playback_progress_ = 0;
 };
 
 #endif

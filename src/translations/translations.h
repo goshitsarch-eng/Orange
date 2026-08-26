@@ -10,6 +10,7 @@ class Translations {
   static std::string Tr(const std::string &text);
   static const char *CStr(const char *text);
   static std::vector<std::string> AvailableLanguages();
+  static void ApplySavedLanguage();
 };
 
 #endif

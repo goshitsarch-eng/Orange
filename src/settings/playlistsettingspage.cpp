@@ -2,6 +2,8 @@
 
 #include "constants/playlistsettings.h"
 #include "settings/settingspage.h"
+#include "translations/translations.h"
+#include "ui/dialogs.h"
 
 AdwPreferencesPage *PlaylistSettingsPage::Create(Settings *settings, Application *) {
   settings->BeginGroup(PlaylistSettings::kSettingsGroup);
@@ -37,7 +39,11 @@ AdwPreferencesPage *PlaylistSettingsPage::Create(Settings *settings, Application
                           PlaylistSettings::kDefaultWriteMetadata);
   SettingsPage::AddToggle(meta, settings, PlaylistSettings::kDeleteFiles, "Allow deleting files from the playlist", nullptr,
                           PlaylistSettings::kDefaultDeleteFiles);
-  SettingsPage::AddEntry(meta, settings, "columns", "Visible columns",
-                         "Track,Title,Artist,Album,Album artist,Length,Year,Genre,Bitrate,Sample rate,Plays,Rating,Filename");
+  SettingsPage::AddToggle(meta, settings, PlaylistSettings::kStretchColumns, "Stretch columns", nullptr,
+                          PlaylistSettings::kDefaultStretchColumns);
+  SettingsPage::AddToggle(meta, settings, PlaylistSettings::kRatingLocked, "Lock rating column", nullptr, PlaylistSettings::kDefaultRatingLocked);
+  SettingsPage::AddButtonRow(meta, Translations::CStr("Visible columns"), Translations::CStr("Configure…"), []() {
+    Dialogs::PlaylistColumns(nullptr, {});
+  });
   return page;
 }

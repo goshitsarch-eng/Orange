@@ -31,9 +31,11 @@ class PlaylistContainer {
   void SetFilterChangedCallback(const std::function<void(const std::string &)> &callback);
   void SetActionCallback(const char *name, ActionCallback callback);
   void SetSummary(const std::string &text);
+  void ApplyLook();
 
  private:
   GtkWidget *widget_ = nullptr;
+  GtkWidget *toolbar_ = nullptr;
   GtkWidget *summary_ = nullptr;
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;
