@@ -3,6 +3,7 @@
 
 #include "core/signal.h"
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -24,6 +25,7 @@ class Equalizer {
   bool IsBuiltin(const std::string &name) const;
   std::vector<std::string> Presets() const;
   static std::vector<std::string> BuiltinPresetNames();
+  static int ClampBalance(int value) { return std::clamp(value, -100, 100); }
   Signal<bool, int, std::vector<int>> ParametersChanged;
 
  private:

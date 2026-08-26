@@ -20,7 +20,7 @@ class Dialogs {
   static void CoverFromUrl(GtkWindow *parent, Application *app);
   static void CoverSearch(GtkWindow *parent, Application *app);
   static void CoverExport(GtkWindow *parent, Application *app);
-  static void Equalizer(GtkWindow *parent, class Equalizer *equalizer);
+  static void Equalizer(GtkWindow *parent, Application *app);
   static void Transcode(GtkWindow *parent, Application *app);
   static void Organize(GtkWindow *parent, Application *app, const SongList &songs = {});
   static void TagFetcher(GtkWindow *parent, Application *app);

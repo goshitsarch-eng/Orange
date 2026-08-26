@@ -11,6 +11,12 @@ std::string ColorToRgba(int r, int g, int b, double a) {
   return buf;
 }
 
+std::string HexToCss(unsigned hex) {
+  char buf[8];
+  std::snprintf(buf, sizeof(buf), "#%06x", hex & 0xFFFFFFu);
+  return buf;
+}
+
 bool IsColorDark(int r, int g, int b) { return (0.299 * r + 0.587 * g + 0.114 * b) < 128.0; }
 
 unsigned ParseHex(const std::string &color) {

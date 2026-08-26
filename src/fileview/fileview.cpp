@@ -14,17 +14,22 @@ FileView::FileView() {
   gtk_widget_set_margin_end(toolbar, 8);
   gtk_widget_set_margin_top(toolbar, 6);
   gtk_widget_set_margin_bottom(toolbar, 4);
+  back_ = gtk_button_new_from_icon_name("go-previous-symbolic");
+  gtk_widget_set_tooltip_text(back_, "Back");
+  forward_ = gtk_button_new_from_icon_name("go-next-symbolic");
+  gtk_widget_set_tooltip_text(forward_, "Forward");
   GtkWidget *up = gtk_button_new_from_icon_name("go-up-symbolic");
   gtk_widget_set_tooltip_text(up, "Up");
   GtkWidget *home = gtk_button_new_from_icon_name("go-home-symbolic");
   gtk_widget_set_tooltip_text(home, "Home");
-  path_label_ = gtk_label_new(path_.c_str());
-  gtk_widget_set_hexpand(path_label_, TRUE);
-  gtk_widget_set_halign(path_label_, GTK_ALIGN_START);
-  gtk_label_set_ellipsize(GTK_LABEL(path_label_), PANGO_ELLIPSIZE_START);
+  path_entry_ = gtk_entry_new();
+  gtk_editable_set_text(GTK_EDITABLE(path_entry_), path_.c_str());
+  gtk_widget_set_hexpand(path_entry_, TRUE);
+  gtk_box_append(GTK_BOX(toolbar), back_);
+  gtk_box_append(GTK_BOX(toolbar), forward_);
   gtk_box_append(GTK_BOX(toolbar), up);
   gtk_box_append(GTK_BOX(toolbar), home);
-  gtk_box_append(GTK_BOX(toolbar), path_label_);
+  gtk_box_append(GTK_BOX(toolbar), path_entry_);
   gtk_box_append(GTK_BOX(widget_), toolbar);
 
   tree_ = std::make_unique<FileViewTree>();
@@ -36,20 +41,30 @@ FileView::FileView() {
   gtk_paned_set_resize_start_child(GTK_PANED(paned), FALSE);
   gtk_box_append(GTK_BOX(widget_), paned);
 
+  g_signal_connect(back_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileBack(); }), this);
+  g_signal_connect(forward_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileForward(); }), this);
   g_signal_connect(up, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileUp(); }), this);
   g_signal_connect(home, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<FileView *>(data)->FileHome(); }), this);
+  g_signal_connect(path_entry_, "activate", G_CALLBACK(+[](GtkEntry *entry, gpointer data) {
+                     static_cast<FileView *>(data)->SetPath(gtk_editable_get_text(GTK_EDITABLE(entry)));
+                   }),
+                   this);
   tree_->SetActivateCallback([this](const std::string &path) { SetPath(path); });
   list_->SetActivateCallback([this](const std::string &path) { Activate(path); });
   list_->SetMenuCallback([this](const std::vector<std::string> &paths) { ShowMenu(paths); });
   model_.SetRootPaths({home_});
+  history_.Push(path_);
   Reload();
 }
 
-void FileView::SetPath(const std::string &path) {
+void FileView::SetPath(const std::string &path, bool record) {
   if (!FileUtils::IsDirectory(path)) {
     return;
   }
   path_ = path;
+  if (record) {
+    history_.Push(path_);
+  }
   Reload();
 }
 
@@ -57,8 +72,32 @@ void FileView::FileUp() { SetPath(FileUtils::DirName(path_)); }
 
 void FileView::FileHome() { SetPath(home_); }
 
+void FileView::FileBack() {
+  if (history_.CanBack()) {
+    SetPath(history_.Back(), false);
+  }
+}
+
+void FileView::FileForward() {
+  if (history_.CanForward()) {
+    SetPath(history_.Forward(), false);
+  }
+}
+
+void FileView::UpdateNavButtons() {
+  if (back_) {
+    gtk_widget_set_sensitive(back_, history_.CanBack());
+  }
+  if (forward_) {
+    gtk_widget_set_sensitive(forward_, history_.CanForward());
+  }
+}
+
 void FileView::Reload() {
-  gtk_label_set_text(GTK_LABEL(path_label_), path_.c_str());
+  if (path_entry_) {
+    gtk_editable_set_text(GTK_EDITABLE(path_entry_), path_.c_str());
+  }
+  UpdateNavButtons();
   model_.SetRootPaths({FileUtils::DirName(path_).empty() ? path_ : FileUtils::DirName(path_)});
   if (FileViewTreeItem *root = model_.root()) {
     for (const auto &child : root->children) {

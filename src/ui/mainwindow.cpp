@@ -31,6 +31,7 @@
 #include "constants/scrobblersettings.h"
 #include "constants/appearancesettings.h"
 #include "core/appearance.h"
+#include "core/song.h"
 #include "core/seekbarsettings.h"
 #include "core/settings.h"
 #include "core/windowgeometry.h"
@@ -385,7 +386,7 @@ void MainWindow::BuildUi() {
                auto *self = static_cast<MainWindow *>(data);
                Dialogs::PlaylistColumns(GTK_WINDOW(self->window_), [self]() { self->RefreshPlaylist(); });
              }));
-  add_action("equalizer", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Equalizer(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_->equalizer()); }));
+  add_action("equalizer", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Equalizer(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("transcode", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Transcode(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("organize", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Organize(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("collection-append", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
@@ -644,11 +645,21 @@ void MainWindow::BuildSidebar() {
     Dialogs::EditTag(GTK_WINDOW(window_), app_);
   });
   file_view_->SetDeleteCallback([this](const std::vector<std::string> &paths) {
+    SongList songs;
+    songs.reserve(paths.size());
     for (const std::string &path : paths) {
-      FileUtils::Remove(path);
+      Song song(Song::Source::LocalFile);
+      song.set_valid(true);
+      song.set_url(FileUtils::UriFromPath(path));
+      song.set_title(FileUtils::BaseName(path));
+      songs.push_back(song);
     }
+    Dialogs::DeleteFiles(GTK_WINDOW(window_), app_, songs);
     if (file_view_) {
-      file_view_->Reload();
+      g_timeout_add(800, [](gpointer data) -> gboolean {
+        static_cast<FileView *>(data)->Reload();
+        return G_SOURCE_REMOVE;
+      }, file_view_.get());
     }
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, file_view_->widget(), "files", "Files", "folder-symbolic");

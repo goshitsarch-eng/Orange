@@ -6,6 +6,7 @@
 namespace ColorUtils {
 
 std::string ColorToRgba(int r, int g, int b, double a = 1.0);
+std::string HexToCss(unsigned hex);
 bool IsColorDark(int r, int g, int b);
 unsigned ParseHex(const std::string &color);
 

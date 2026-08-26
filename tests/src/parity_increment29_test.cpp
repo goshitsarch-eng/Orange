@@ -25,6 +25,7 @@
 #include "tagfetcher/acoustidclient.h"
 #include "tagfetcher/musicbrainzclient.h"
 #include "translations/translations.h"
+#include "constants/notificationssettings.h"
 #include "utilities/colorutils.h"
 #include "utilities/cryptutils.h"
 #include "utilities/envutils.h"
@@ -119,6 +120,9 @@ TEST(NetworkHelpers, ProxyAndParams) {
 
 TEST(UtilitiesParity, ColorCryptXmlRandEnvMime) {
   EXPECT_NE(std::string::npos, ColorUtils::ColorToRgba(10, 20, 30, 0.5).find("rgba"));
+  EXPECT_EQ("#6696e3", ColorUtils::HexToCss(OSDPrettySettings::kPresetBlue));
+  EXPECT_EQ("#ca1610", ColorUtils::HexToCss(OSDPrettySettings::kPresetRed));
+  EXPECT_EQ(OSDPrettySettings::kPresetBlue, ColorUtils::ParseHex(ColorUtils::HexToCss(OSDPrettySettings::kPresetBlue)));
   EXPECT_TRUE(ColorUtils::IsColorDark(0, 0, 0));
   EXPECT_FALSE(ColorUtils::IsColorDark(255, 255, 255));
   const std::string digest = CryptUtils::HexEncode(CryptUtils::HmacSha1("key", "data"));

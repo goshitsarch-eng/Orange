@@ -18,6 +18,9 @@ GstEnginePipeline::~GstEnginePipeline() {
   if (playbin_) {
     gst_object_unref(playbin_);
     playbin_ = nullptr;
+    volume_ = nullptr;
+    equalizer_ = nullptr;
+    panorama_ = nullptr;
   }
 }
 
@@ -51,7 +54,8 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
     equalizer_ = gst_element_factory_make("equalizer-10bands", "equalizer");
     GstElement *rgvolume = replaygain ? gst_element_factory_make("rgvolume", "rgvolume") : nullptr;
     GstElement *rglimiter = replaygain ? gst_element_factory_make("rglimiter", "rglimiter") : nullptr;
-    GstElement *panorama = gst_element_factory_make("audiopanorama", "panorama");
+    panorama_ = gst_element_factory_make("audiopanorama", "panorama");
+    GstElement *panorama = panorama_;
     GstElement *spectrum = gst_element_factory_make("spectrum", "spectrum");
     if (spectrum) {
       g_object_set(spectrum, "bands", 64, "threshold", -80, "interval", GST_SECOND / 10, "post-messages", TRUE, "message-phase", FALSE,
@@ -153,6 +157,12 @@ void GstEnginePipeline::SetEqualizer(int preamp, const std::vector<int> &band_ga
     gchar name[16];
     g_snprintf(name, sizeof(name), "band%zu", i);
     g_object_set(equalizer_, name, static_cast<gdouble>(band_gains[i]), nullptr);
+  }
+}
+
+void GstEnginePipeline::SetStereoBalance(float value) {
+  if (panorama_) {
+    g_object_set(panorama_, "panorama", value, nullptr);
   }
 }
 

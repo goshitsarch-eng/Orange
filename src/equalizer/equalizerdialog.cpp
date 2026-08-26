@@ -1,11 +1,17 @@
 #include "equalizer/equalizerdialog.h"
 
+#include "core/application.h"
+#include "core/player.h"
+#include "core/settings.h"
 #include "equalizer/equalizer.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
 
-void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer) {
+void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application *app) {
+  if (!equalizer) {
+    return;
+  }
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr("Equalizer"));
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
@@ -91,6 +97,29 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer) {
     gtk_box_append(GTK_BOX(bands), col);
   }
   gtk_box_append(GTK_BOX(box), bands);
+  Settings settings;
+  settings.BeginGroup("Backend");
+  const int balance = Equalizer::ClampBalance(settings.IntValue("stereobalance", 0));
+  GtkWidget *balance_label = gtk_label_new(Translations::CStr("Stereo balance"));
+  gtk_widget_set_halign(balance_label, GTK_ALIGN_START);
+  GtkWidget *balance_scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, -100, 100, 1);
+  gtk_range_set_value(GTK_RANGE(balance_scale), balance);
+  gtk_scale_add_mark(GTK_SCALE(balance_scale), 0, GTK_POS_BOTTOM, Translations::CStr("Center"));
+  gtk_widget_set_tooltip_text(balance_scale, Translations::CStr("Left / Right"));
+  g_object_set_data(G_OBJECT(balance_scale), "equalizer-app", app);
+  g_signal_connect(balance_scale, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer) {
+                     const int value = Equalizer::ClampBalance(static_cast<int>(gtk_range_get_value(range)));
+                     Settings saved;
+                     saved.BeginGroup("Backend");
+                     saved.SetIntValue("stereobalance", value);
+                     saved.Sync();
+                     if (auto *application = static_cast<Application *>(g_object_get_data(G_OBJECT(range), "equalizer-app"))) {
+                       application->player()->engine()->SetStereoBalance(static_cast<float>(value) / 100.0f);
+                     }
+                   }),
+                   nullptr);
+  gtk_box_append(GTK_BOX(box), balance_label);
+  gtk_box_append(GTK_BOX(box), balance_scale);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

@@ -338,7 +338,15 @@ void GstEngine::SetEqualizerParameters(int preamp, const std::vector<int> &band_
 void GstEngine::SetReplayGainEnabled(bool enabled) { replaygain_enabled_ = enabled; }
 void GstEngine::SetReplayGainMode(int mode) { replaygain_mode_ = mode; }
 void GstEngine::SetReplayGainPreamp(double preamp) { replaygain_preamp_ = preamp; }
-void GstEngine::SetStereoBalance(float value) { stereo_balance_ = value; }
+void GstEngine::SetStereoBalance(float value) {
+  stereo_balance_ = value;
+  if (current_) {
+    current_->SetStereoBalance(value);
+  }
+  if (next_) {
+    next_->SetStereoBalance(value);
+  }
+}
 
 void GstEngine::SetState(State state) {
   if (state_ == state) {

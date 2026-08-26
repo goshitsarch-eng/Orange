@@ -30,6 +30,7 @@ class GstEnginePipeline {
   void Seek(uint64_t offset_nanosec);
   void SetVolume(double fraction);
   void SetEqualizer(int preamp, const std::vector<int> &band_gains);
+  void SetStereoBalance(float value);
   void SetNextUri(const std::string &url);
 
   int64_t position_nanosec() const;
@@ -55,6 +56,7 @@ class GstEnginePipeline {
   GstElement *playbin_ = nullptr;
   GstElement *volume_ = nullptr;
   GstElement *equalizer_ = nullptr;
+  GstElement *panorama_ = nullptr;
   guint bus_watch_id_ = 0;
   uint64_t beginning_offset_nanosec_ = 0;
   int64_t end_offset_nanosec_ = -1;

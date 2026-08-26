@@ -1,3 +1,4 @@
+#include "fileview/fileviewhistory.h"
 #include "fileview/fileviewtreemodel.h"
 #include "utilities/fileutils.h"
 
@@ -64,4 +65,25 @@ TEST(FileViewTreeModel, MissingRootIsIgnored) {
   FileViewTreeModel model;
   model.SetRootPaths({"/tmp/does-not-exist-strawberry-fileview"});
   EXPECT_EQ(0, model.DirectoryCount());
+}
+
+TEST(FileViewHistory, BackForwardAndTruncate) {
+  FileViewHistory history;
+  EXPECT_FALSE(history.CanBack());
+  EXPECT_FALSE(history.CanForward());
+  history.Push("/music");
+  history.Push("/music/portishead");
+  history.Push("/music/portishead/dummy");
+  EXPECT_TRUE(history.CanBack());
+  EXPECT_FALSE(history.CanForward());
+  EXPECT_EQ("/music/portishead", history.Back());
+  EXPECT_TRUE(history.CanForward());
+  EXPECT_EQ("/music/portishead/dummy", history.Forward());
+  history.Back();
+  history.Push("/music/radiohead");
+  EXPECT_EQ("/music/radiohead", history.Current());
+  EXPECT_FALSE(history.CanForward());
+  EXPECT_EQ(2, history.index());
+  ASSERT_EQ(3u, history.items().size());
+  EXPECT_EQ("/music/radiohead", history.items().back());
 }

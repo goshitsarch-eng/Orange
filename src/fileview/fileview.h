@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_FILEVIEW_H
 #define STRAWBERRY_FILEVIEW_H
 
+#include "fileview/fileviewhistory.h"
 #include "fileview/fileviewlist.h"
 #include "fileview/fileviewtree.h"
 #include "fileview/fileviewtreemodel.h"
@@ -24,10 +25,13 @@ class FileView {
   FileViewTree *tree() { return tree_.get(); }
   const std::string &path() const { return path_; }
 
-  void SetPath(const std::string &path);
+  void SetPath(const std::string &path, bool record = true);
   void FileUp();
   void FileHome();
+  void FileBack();
+  void FileForward();
   void Reload();
+  FileViewHistory *history() { return &history_; }
   void SetAddToPlaylistCallback(PathsCallback callback);
   void SetCopyToCollectionCallback(PathsCallback callback);
   void SetCopyToDeviceCallback(PathsCallback callback);
@@ -37,12 +41,16 @@ class FileView {
  private:
   void ShowMenu(const std::vector<std::string> &paths);
   void Activate(const std::string &path);
+  void UpdateNavButtons();
 
   GtkWidget *widget_ = nullptr;
-  GtkWidget *path_label_ = nullptr;
+  GtkWidget *path_entry_ = nullptr;
+  GtkWidget *back_ = nullptr;
+  GtkWidget *forward_ = nullptr;
   FileViewTreeModel model_;
   std::unique_ptr<FileViewTree> tree_;
   std::unique_ptr<FileViewList> list_;
+  FileViewHistory history_;
   std::string path_;
   std::string home_;
   PathsCallback add_to_playlist_;

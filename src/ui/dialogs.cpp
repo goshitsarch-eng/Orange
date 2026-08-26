@@ -1,5 +1,6 @@
 #include "ui/dialogs.h"
 
+#include "core/application.h"
 #include "collection/groupbydialog.h"
 #include "collection/savedgroupingmanager.h"
 #include "covermanager/albumcoverexportdialog.h"
@@ -35,7 +36,9 @@ void Dialogs::CoverSearch(GtkWindow *parent, Application *app) { AlbumCoverSearc
 
 void Dialogs::CoverExport(GtkWindow *parent, Application *app) { AlbumCoverExportDialog::Show(parent, app); }
 
-void Dialogs::Equalizer(GtkWindow *parent, class Equalizer *equalizer) { EqualizerDialog::Show(parent, equalizer); }
+void Dialogs::Equalizer(GtkWindow *parent, Application *app) {
+  EqualizerDialog::Show(parent, app ? app->equalizer() : nullptr, app);
+}
 
 void Dialogs::Transcode(GtkWindow *parent, Application *app) { TranscodeDialog::Show(parent, app); }
 

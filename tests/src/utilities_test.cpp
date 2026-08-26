@@ -299,6 +299,9 @@ TEST(Equalizer, BuiltinPresets) {
   Equalizer eq;
   eq.LoadPreset("Rock");
   EXPECT_NE(0, eq.gains()[0]);
+  EXPECT_EQ(-100, Equalizer::ClampBalance(-250));
+  EXPECT_EQ(100, Equalizer::ClampBalance(250));
+  EXPECT_EQ(0, Equalizer::ClampBalance(0));
 }
 
 TEST(Analyzer, Types) {
