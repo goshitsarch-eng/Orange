@@ -1,10 +1,10 @@
 #include "covermanager/albumcoversearcher.h"
 
 #include "core/application.h"
-#include "covermanager/albumcoverfetcher.h"
-#include "covermanager/albumcoverfetchersearch.h"
+#include "core/network.h"
 #include "dialogs/dialoghelpers.h"
 #include "translations/translations.h"
+#include "utilities/jsonutils.h"
 
 #include <adwaita.h>
 
@@ -23,52 +23,86 @@ struct SearcherState {
   GtkWidget *album = nullptr;
   GtkWidget *title = nullptr;
   GtkWidget *status = nullptr;
-  GtkWidget *list = nullptr;
+  GtkWidget *grid = nullptr;
   std::unique_ptr<AlbumCoverFetcher> fetcher;
   std::shared_ptr<bool> alive = std::make_shared<bool>(true);
+  int search_gen = 0;
 };
 
-void ClearList(GtkWidget *list) {
-  if (!list) {
+void ClearGrid(GtkWidget *grid) {
+  if (!grid) {
     return;
   }
-  while (GtkWidget *child = gtk_widget_get_first_child(list)) {
-    gtk_list_box_remove(GTK_LIST_BOX(list), child);
+  while (GtkWidget *child = gtk_widget_get_first_child(grid)) {
+    gtk_flow_box_remove(GTK_FLOW_BOX(grid), child);
   }
 }
 
-void AddResult(SearcherState *state, const CoverProviderSearchResult &result) {
-  if (!state || !state->list) {
+void SaveResult(SearcherState *state, CoverProviderSearchResult *result, GtkWidget *status_label) {
+  if (!state || !state->app || !result) {
     return;
   }
-  GtkWidget *row = adw_action_row_new();
-  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), AlbumCoverFetcherSearch::ResultLabel(result).c_str());
-  adw_action_row_set_subtitle(ADW_ACTION_ROW(row), AlbumCoverFetcherSearch::ResultSubtitle(result).c_str());
-  if (!result.image_data.empty()) {
-    GtkWidget *thumb = gtk_image_new();
-    SetImageFromBytes(thumb, std::vector<unsigned char>(result.image_data.begin(), result.image_data.end()), 48);
-    adw_action_row_add_prefix(ADW_ACTION_ROW(row), thumb);
+  const std::string image = !result->image_data.empty() ? result->image_data : result->image_url;
+  if (ApplyCover(state->app, &state->song, image)) {
+    if (status_label) {
+      gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Saved"));
+    }
+  } else if (status_label) {
+    gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Failed"));
   }
-  GtkWidget *apply = gtk_button_new_with_label(Translations::CStr("Save"));
-  gtk_widget_add_css_class(apply, "suggested-action");
+}
+
+void LoadThumb(SearcherState *state, GtkWidget *image, GtkWidget *size_label, CoverProviderSearchResult *result, int gen) {
+  if (!state || !image || !result) {
+    return;
+  }
+  if (!result->image_data.empty()) {
+    SetImageFromBytes(image, std::vector<unsigned char>(result->image_data.begin(), result->image_data.end()), AlbumCoverSearcher::kIconSize);
+    return;
+  }
+  if (!state->app || !state->app->network() || !AlbumCoverFetcherSearch::IsHttpUrl(result->image_url)) {
+    return;
+  }
+  const auto alive = state->alive;
+  state->app->network()->Get(result->image_url, [state, alive, gen, image, size_label, result](const NetworkAccessManager::Response &response) {
+    if (!alive || !*alive || !state || gen != state->search_gen || !result) {
+      return;
+    }
+    if (!response.ok() || !JsonUtils::LooksLikeImage(response.body)) {
+      return;
+    }
+    result->image_data = response.body;
+    SetImageFromBytes(image, std::vector<unsigned char>(response.body.begin(), response.body.end()), AlbumCoverSearcher::kIconSize);
+    GdkPaintable *paintable = gtk_image_get_paintable(GTK_IMAGE(image));
+    if (GDK_IS_TEXTURE(paintable)) {
+      result->image_width = gdk_texture_get_width(GDK_TEXTURE(paintable));
+      result->image_height = gdk_texture_get_height(GDK_TEXTURE(paintable));
+      if (size_label) {
+        gtk_label_set_text(GTK_LABEL(size_label), AlbumCoverSearcher::CellSubtitle(*result).c_str());
+      }
+    }
+  });
+}
+
+void AddResult(SearcherState *state, const CoverProviderSearchResult &result) {
+  if (!state || !state->grid) {
+    return;
+  }
+  GtkWidget *cell = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+  gtk_widget_set_size_request(cell, AlbumCoverSearcher::kIconSize + 8, AlbumCoverSearcher::kIconSize + 36);
+  GtkWidget *thumb = gtk_image_new_from_icon_name("image-x-generic-symbolic");
+  gtk_image_set_pixel_size(GTK_IMAGE(thumb), AlbumCoverSearcher::kIconSize);
+  gtk_widget_set_halign(thumb, GTK_ALIGN_CENTER);
+  GtkWidget *caption = gtk_label_new(AlbumCoverSearcher::CellSubtitle(result).c_str());
+  gtk_label_set_ellipsize(GTK_LABEL(caption), PANGO_ELLIPSIZE_END);
+  gtk_label_set_xalign(GTK_LABEL(caption), 0.5);
+  gtk_widget_add_css_class(caption, "dim-label");
+  gtk_box_append(GTK_BOX(cell), thumb);
+  gtk_box_append(GTK_BOX(cell), caption);
   auto *hit = new CoverProviderSearchResult(result);
-  g_object_set_data_full(G_OBJECT(apply), "result", hit, [](gpointer p) { delete static_cast<CoverProviderSearchResult *>(p); });
-  g_signal_connect(apply, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
-                     auto *self = static_cast<SearcherState *>(data);
-                     auto *result = static_cast<CoverProviderSearchResult *>(g_object_get_data(G_OBJECT(button), "result"));
-                     if (!self || !self->app || !result) {
-                       return;
-                     }
-                     const std::string image = !result->image_data.empty() ? result->image_data : result->image_url;
-                     if (ApplyCover(self->app, &self->song, image)) {
-                       gtk_button_set_label(button, Translations::CStr("Saved"));
-                     } else {
-                       gtk_button_set_label(button, Translations::CStr("Failed"));
-                     }
-                   })),
-                   state);
-  adw_action_row_add_suffix(ADW_ACTION_ROW(row), apply);
-  gtk_list_box_append(GTK_LIST_BOX(state->list), row);
+  g_object_set_data_full(G_OBJECT(cell), "result", hit, [](gpointer p) { delete static_cast<CoverProviderSearchResult *>(p); });
+  gtk_flow_box_append(GTK_FLOW_BOX(state->grid), cell);
+  LoadThumb(state, thumb, caption, hit, state->search_gen);
 }
 
 void StartSearch(SearcherState *state) {
@@ -82,7 +116,8 @@ void StartSearch(SearcherState *state) {
   state->song.set_albumartist(artist);
   state->song.set_album(album);
   state->song.set_title(title);
-  ClearList(state->list);
+  ++state->search_gen;
+  ClearGrid(state->grid);
   gtk_label_set_text(GTK_LABEL(state->status), AlbumCoverFetcherSearch::StatusSearching(album).c_str());
   state->fetcher->SearchForCovers(artist, album, title);
 }
@@ -93,8 +128,8 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) {
   Song song = SongForDialog(app);
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr("Cover search"));
-  adw_dialog_set_content_width(dialog, 520);
-  adw_dialog_set_content_height(dialog, 620);
+  adw_dialog_set_content_width(dialog, 640);
+  adw_dialog_set_content_height(dialog, 680);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   gtk_widget_set_margin_start(box, 12);
   gtk_widget_set_margin_end(box, 12);
@@ -128,10 +163,17 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) {
 
   GtkWidget *scroll = gtk_scrolled_window_new();
   gtk_widget_set_vexpand(scroll, TRUE);
-  state->list = gtk_list_box_new();
-  gtk_widget_add_css_class(state->list, "boxed-list");
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), state->list);
+  state->grid = gtk_flow_box_new();
+  gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(state->grid), kMinColumns);
+  gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(state->grid), kMaxColumns);
+  gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(state->grid), GTK_SELECTION_SINGLE);
+  gtk_flow_box_set_activate_on_single_click(GTK_FLOW_BOX(state->grid), FALSE);
+  gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(state->grid), TRUE);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), state->grid);
   gtk_box_append(GTK_BOX(box), scroll);
+
+  GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save selected"));
+  gtk_box_append(GTK_BOX(box), save);
 
   g_object_set_data_full(G_OBJECT(dialog), "searcher-state", state, [](gpointer p) {
     auto *self = static_cast<SearcherState *>(p);
@@ -149,7 +191,7 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) {
     if (!alive || !*alive || !state) {
       return;
     }
-    ClearList(state->list);
+    ClearGrid(state->grid);
     for (const CoverProviderSearchResult &result : results) {
       AddResult(state, result);
     }
@@ -160,6 +202,29 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app) {
   g_signal_connect(state->album, "apply", G_CALLBACK(+[](AdwEntryRow *, gpointer data) { StartSearch(static_cast<SearcherState *>(data)); }), state);
   g_signal_connect(state->artist, "apply", G_CALLBACK(+[](AdwEntryRow *, gpointer data) { StartSearch(static_cast<SearcherState *>(data)); }), state);
   g_signal_connect(state->title, "apply", G_CALLBACK(+[](AdwEntryRow *, gpointer data) { StartSearch(static_cast<SearcherState *>(data)); }), state);
+  g_signal_connect(state->grid, "child-activated", G_CALLBACK((+[](GtkFlowBox *, GtkFlowBoxChild *child, gpointer data) {
+                     auto *self = static_cast<SearcherState *>(data);
+                     GtkWidget *cell = gtk_flow_box_child_get_child(child);
+                     auto *result = cell ? static_cast<CoverProviderSearchResult *>(g_object_get_data(G_OBJECT(cell), "result")) : nullptr;
+                     SaveResult(self, result, self ? self->status : nullptr);
+                   })),
+                   state);
+  g_signal_connect(save, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<SearcherState *>(data);
+                     if (!self || !self->grid) {
+                       return;
+                     }
+                     GList *selected = gtk_flow_box_get_selected_children(GTK_FLOW_BOX(self->grid));
+                     if (!selected) {
+                       return;
+                     }
+                     auto *child = GTK_FLOW_BOX_CHILD(selected->data);
+                     GtkWidget *cell = gtk_flow_box_child_get_child(child);
+                     auto *result = cell ? static_cast<CoverProviderSearchResult *>(g_object_get_data(G_OBJECT(cell), "result")) : nullptr;
+                     SaveResult(self, result, self->status);
+                     g_list_free(selected);
+                   })),
+                   state);
 
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));

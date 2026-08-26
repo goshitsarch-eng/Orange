@@ -1,5 +1,6 @@
 #include "covermanager/jsoncoverprovider.h"
 
+#include "covermanager/albumcoverfetchersearch.h"
 #include "utilities/jsonutils.h"
 
 #include <cstring>
@@ -9,8 +10,22 @@ JsonCoverProvider::JsonCoverProvider(std::string name, std::string url_template)
     : name_(std::move(name)), url_template_(std::move(url_template)) {}
 
 void JsonCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
+  Search(song, network, [callback](const CoverProviderSearchResults &results) {
+    if (results.empty()) {
+      callback({}, "No cover URL in provider response");
+      return;
+    }
+    if (!results.front().image_data.empty()) {
+      callback(results.front().image_data, {});
+      return;
+    }
+    callback(results.front().image_url, {});
+  });
+}
+
+void JsonCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
   if (!network || song.album().empty()) {
-    callback({}, "No album");
+    callback({});
     return;
   }
   std::string url = url_template_;
@@ -26,20 +41,22 @@ void JsonCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, C
   replace("{artist}", song.EffectiveAlbumartist());
   replace("{album}", song.album());
   replace("{title}", song.title());
-  network->Get(url, [callback](const NetworkAccessManager::Response &response) {
+  const std::string artist = song.EffectiveAlbumartist();
+  const std::string album = song.album();
+  network->Get(url, [this, callback, artist, album](const NetworkAccessManager::Response &response) {
+    CoverProviderSearchResults results;
     if (!response.ok()) {
-      callback({}, response.error.empty() ? "Cover request failed" : response.error);
+      callback(results);
       return;
     }
     if (JsonUtils::LooksLikeImage(response.body)) {
-      callback(response.body, {});
+      results.push_back(AlbumCoverFetcherSearch::FromHit(name(), artist, album, {}, 0, 0, response.body));
+      callback(results);
       return;
     }
-    const std::string image_url = JsonUtils::FindCoverUrl(response.body);
-    if (image_url.empty()) {
-      callback({}, "No cover URL in provider response");
-      return;
+    for (const std::string &image_url : JsonUtils::FindAllCoverUrls(response.body)) {
+      results.push_back(AlbumCoverFetcherSearch::FromHit(name(), artist, album, image_url));
     }
-    callback(image_url, {});
+    callback(results);
   });
 }

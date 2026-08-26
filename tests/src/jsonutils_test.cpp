@@ -19,6 +19,26 @@ TEST(JsonUtils, DeezerCoverUrl) {
   EXPECT_EQ("https://cdn.example/cover-xl.jpg", JsonUtils::FindCoverUrl(json));
 }
 
+TEST(JsonUtils, FindAllCoverUrls) {
+  const std::string lastfm = R"({
+    "album": {
+      "image": [
+        {"#text": "https://lastfm.example/small.jpg", "size": "small"},
+        {"#text": "https://lastfm.example/extralarge.jpg", "size": "extralarge"}
+      ]
+    }
+  })";
+  const auto lastfm_urls = JsonUtils::FindAllCoverUrls(lastfm);
+  ASSERT_EQ(2u, lastfm_urls.size());
+  EXPECT_EQ("https://lastfm.example/extralarge.jpg", lastfm_urls.front());
+  EXPECT_EQ("https://lastfm.example/small.jpg", lastfm_urls.back());
+
+  const std::string deezer = R"({"data":[{"cover_xl":"https://cdn.example/cover-xl.jpg","cover_medium":"https://cdn.example/cover-md.jpg"}]})";
+  const auto deezer_urls = JsonUtils::FindAllCoverUrls(deezer);
+  ASSERT_EQ(2u, deezer_urls.size());
+  EXPECT_EQ("https://cdn.example/cover-xl.jpg", deezer_urls.front());
+}
+
 TEST(JsonUtils, MusicBrainzCoverArtArchive) {
   const std::string json = R"({"releases":[{"id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","title":"Album"}]})";
   EXPECT_EQ("https://coverartarchive.org/release/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/front", JsonUtils::FindCoverUrl(json));

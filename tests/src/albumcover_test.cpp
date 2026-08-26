@@ -3,6 +3,7 @@
 #include "covermanager/albumcoverexporter.h"
 #include "covermanager/albumcoverfetcher.h"
 #include "covermanager/albumcoverfetchersearch.h"
+#include "covermanager/albumcoversearcher.h"
 #include "covermanager/albumcoverloader.h"
 #include "covermanager/albumcoverloaderoptions.h"
 #include "covermanager/coverexportrunnable.h"
@@ -228,6 +229,20 @@ TEST(AlbumCoverFetcherSearch, RequestHitsAndStatus) {
   EXPECT_EQ("No covers found", AlbumCoverFetcherSearch::StatusFound(0));
   EXPECT_EQ("1 cover found", AlbumCoverFetcherSearch::StatusFound(1));
   EXPECT_EQ("2 covers found", AlbumCoverFetcherSearch::StatusFound(2));
+}
+
+TEST(AlbumCoverSearcher, GridHelpers) {
+  EXPECT_EQ(3, AlbumCoverSearcher::ColumnsForWidth(0));
+  EXPECT_EQ(2, AlbumCoverSearcher::ColumnsForWidth(100));
+  EXPECT_EQ(4, AlbumCoverSearcher::ColumnsForWidth(4 * (AlbumCoverSearcher::kIconSize + AlbumCoverSearcher::kCellPadding)));
+  EXPECT_EQ(6, AlbumCoverSearcher::ColumnsForWidth(2000));
+  EXPECT_TRUE(AlbumCoverSearcher::DimensionLabel(0, 500).empty());
+  EXPECT_EQ("640×640", AlbumCoverSearcher::DimensionLabel(640, 640));
+  CoverProviderSearchResult result = AlbumCoverFetcherSearch::FromHit("Last.fm", "Portishead", "Dummy", "https://example/a.jpg", 500, 500);
+  EXPECT_EQ("Last.fm · 500×500", AlbumCoverSearcher::CellSubtitle(result));
+  EXPECT_TRUE(AlbumCoverSearcher::CanLoadThumb(result));
+  CoverProviderSearchResult empty;
+  EXPECT_FALSE(AlbumCoverSearcher::CanLoadThumb(empty));
 }
 
 TEST(AlbumCoverBatch, ProgressAbortAndStatus) {

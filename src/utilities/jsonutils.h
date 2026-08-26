@@ -16,6 +16,7 @@ double GetDouble(const std::string &json, const std::vector<std::string> &path, 
 std::string FindStringByKeys(const std::string &json, const std::vector<std::string> &keys);
 std::string FindFirstImageUrl(const std::string &json);
 std::string FindCoverUrl(const std::string &json);
+std::vector<std::string> FindAllCoverUrls(const std::string &json);
 std::string ExtractLyrics(const std::string &body);
 SongList ParseSongs(const std::string &json, Song::Source source = Song::Source::Stream);
 SongList ParseMusicBrainzRecordings(const std::string &json);

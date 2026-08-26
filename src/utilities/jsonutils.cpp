@@ -305,6 +305,60 @@ std::string FindCoverUrl(const std::string &json) {
   return best;
 }
 
+std::vector<std::string> FindAllCoverUrls(const std::string &json) {
+  std::vector<std::string> urls;
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return urls;
+  }
+  struct Hit {
+    std::string url;
+    int score = 0;
+  };
+  std::vector<Hit> hits;
+  std::string release_id;
+  WalkNode(root, {}, [&](const std::string &key, JsonNode *node) {
+    if (node && JSON_NODE_HOLDS_OBJECT(node)) {
+      JsonObject *object = json_node_get_object(node);
+      if (json_object_has_member(object, "#text") && json_object_has_member(object, "size")) {
+        const std::string url = NodeString(json_object_get_member(object, "#text"));
+        const std::string size = NodeString(json_object_get_member(object, "size"));
+        if (IsHttpUrl(url)) {
+          hits.push_back({url, ImageUrlScore(size, url) + 5});
+        }
+      }
+    }
+    const std::string value = NodeString(node);
+    if (value.empty()) {
+      return;
+    }
+    const std::string lower_key = StrUtils::ToLower(key);
+    if (release_id.empty() && (lower_key == "id" || lower_key == "mbid") && value.size() == 36 && value.find('-') != std::string::npos) {
+      release_id = value;
+    }
+    if (!IsHttpUrl(value)) {
+      return;
+    }
+    if (LooksLikeImageUrl(value) || lower_key == "#text" || lower_key.find("cover") != std::string::npos ||
+        lower_key.find("image") != std::string::npos || lower_key.find("thumb") != std::string::npos ||
+        lower_key.find("picture") != std::string::npos) {
+      hits.push_back({value, ImageUrlScore(key, value)});
+    }
+  });
+  json_node_unref(root);
+  std::sort(hits.begin(), hits.end(), [](const Hit &a, const Hit &b) { return a.score > b.score; });
+  for (const Hit &hit : hits) {
+    if (std::find(urls.begin(), urls.end(), hit.url) != urls.end()) {
+      continue;
+    }
+    urls.push_back(hit.url);
+  }
+  if (urls.empty() && !release_id.empty()) {
+    urls.push_back("https://coverartarchive.org/release/" + release_id + "/front");
+  }
+  return urls;
+}
+
 std::string ExtractLyrics(const std::string &body) {
   if (body.empty()) {
     return {};

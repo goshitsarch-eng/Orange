@@ -10,6 +10,7 @@ class JsonCoverProvider : public CoverProvider {
   JsonCoverProvider(std::string name, std::string url_template);
   std::string name() const override { return name_; }
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
+  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 
  protected:
   std::string name_;
