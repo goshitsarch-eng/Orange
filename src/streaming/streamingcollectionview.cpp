@@ -18,6 +18,7 @@
 #include "utilities/strutils.h"
 
 #include <vector>
+#include "widgets/filtersearchkeyboard.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 #include "widgets/listboxtreepressgtk.h"
@@ -74,6 +75,23 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
                      const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
                      self->SetFilter(text ? text : "");
                    }),
+                   this);
+  GtkEventController *filter_keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(filter_entry_, filter_keys);
+  g_signal_connect(filter_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<StreamingCollectionView *>(data);
+                     const FilterSearchKeyboard::Action action = FilterSearchKeyboard::FromSearchKey(keyval);
+                     if (action == FilterSearchKeyboard::Action::MoveUp || action == FilterSearchKeyboard::Action::MoveDown) {
+                       self->FocusListAndMove(keyval);
+                       return TRUE;
+                     }
+                     if (action == FilterSearchKeyboard::Action::Clear) {
+                       gtk_editable_set_text(GTK_EDITABLE(self->filter_entry_), "");
+                       return TRUE;
+                     }
+                     return FALSE;
+                   })),
                    this);
   status_label_ = gtk_label_new("");
   gtk_widget_set_margin_start(status_label_, 8);
@@ -546,10 +564,30 @@ void StreamingCollectionView::ResetTypeAhead() {
   }
 }
 
+void StreamingCollectionView::FocusFilter() {
+  if (filter_entry_) {
+    gtk_widget_grab_focus(filter_entry_);
+  }
+}
+
+void StreamingCollectionView::FocusListAndMove(unsigned keyval) {
+  gtk_widget_grab_focus(list_);
+  const ListBoxKeyboard::Action move = FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::FromSearchKey(keyval));
+  if (move == ListBoxKeyboard::Action::MoveUp || move == ListBoxKeyboard::Action::MoveDown) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), move));
+  }
+}
+
 gboolean StreamingCollectionView::OnKeyPressed(guint keyval) {
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
   if ((action == ListBoxKeyboard::Action::Backspace || action == ListBoxKeyboard::Action::Escape) && CanGoBack()) {
     PopBrowse();
+    return TRUE;
+  }
+  if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
+    ResetTypeAhead();
+    FocusFilter();
     return TRUE;
   }
   if (action == ListBoxKeyboard::Action::Activate) {

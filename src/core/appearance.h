@@ -27,6 +27,8 @@ class Appearance {
                                         bool keep_aspect, bool do_not_cut, int max_size);
   static std::string BackgroundPositionCss(int position);
   static std::string CssUrl(const std::string &path);
+  static constexpr const char *kMainSelector = ".strawberry-main";
+  static constexpr const char *kPlaylistViewportSelector = ".strawberry-playlist-viewport";
 
  private:
   bool dark_mode_ = false;

@@ -38,6 +38,8 @@ class PlaylistContainer {
   void SetShuffleMode(PlaylistSequence::ShuffleMode mode);
   void SetSummary(const std::string &text);
   void ApplyLook();
+  void FocusFilter();
+  GtkWidget *filter_entry() const { return filter_entry_; }
 
  private:
   GtkWidget *widget_ = nullptr;
@@ -46,6 +48,7 @@ class PlaylistContainer {
   GtkWidget *summary_ = nullptr;
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;
+  GtkWidget *filter_entry_ = nullptr;
   std::vector<GtkWidget *> repeat_items_;
   std::vector<GtkWidget *> shuffle_items_;
   bool updating_sequence_ = false;

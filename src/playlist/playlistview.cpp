@@ -12,6 +12,7 @@
 #include "playlist/playlisttagcompletion.h"
 #include "utilities/strutils.h"
 #include "utilities/styleutils.h"
+#include "widgets/filtersearchkeyboard.h"
 #include "widgets/listboxkeyboard.h"
 
 #include <algorithm>
@@ -29,6 +30,7 @@ PlaylistView::PlaylistView() {
   });
   header_->SetLayoutChangedCallback([this]() { Refresh(playlist_); });
   widget_ = gtk_scrolled_window_new();
+  gtk_widget_add_css_class(widget_, "strawberry-playlist-viewport");
   gtk_widget_set_hexpand(widget_, TRUE);
   gtk_widget_set_vexpand(widget_, TRUE);
   grid_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -84,7 +86,29 @@ void PlaylistView::ResetTypeAhead() {
   }
 }
 
+void PlaylistView::SetFocusFilterCallback(FocusFilterCallback callback) { focus_filter_ = std::move(callback); }
+
+void PlaylistView::FilterReturnPressed() {
+  if (!activate_ || visible_rows_.empty()) {
+    return;
+  }
+  const int row = selected_rows_.empty() ? visible_rows_.front() : selected_rows_.front();
+  activate_(row);
+}
+
+void PlaylistView::FocusAndMove(unsigned keyval) {
+  gtk_widget_grab_focus(widget_);
+  OnKeyPressed(keyval);
+}
+
 gboolean PlaylistView::OnKeyPressed(guint keyval) {
+  if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
+    ResetTypeAhead();
+    if (focus_filter_) {
+      focus_filter_();
+    }
+    return TRUE;
+  }
   if (keyval == GDK_KEY_F2 && edit_request_) {
     edit_request_();
     return TRUE;

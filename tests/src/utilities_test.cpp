@@ -41,6 +41,7 @@
 #include "core/windowgeometry.h"
 #include "core/mainwindowsettings.h"
 #include "ui/mainwindowlook.h"
+#include "widgets/filtersearchkeyboard.h"
 #include "core/filesystemmusicstorage.h"
 #include "core/memorydatabase.h"
 #include "core/scopedtransaction.h"
@@ -189,6 +190,13 @@ TEST(ContextTechnical, RowsAndFormats) {
   EXPECT_EQ("Dummy", ContextTechnical::Summary(song, {}));
   EXPECT_EQ("Portishead", ContextTechnical::Headline(song, "%artist%"));
   EXPECT_TRUE(ContextTechnical::Rows(Song()).empty());
+}
+
+TEST(ContextAlbum, CoverPixelSizeFollowsPanelWidth) {
+  EXPECT_EQ(ContextAlbum::kDefaultCoverSize, ContextAlbum::CoverPixelSize(0));
+  EXPECT_EQ(ContextAlbum::kMinCoverSize, ContextAlbum::CoverPixelSize(20));
+  EXPECT_EQ(184, ContextAlbum::CoverPixelSize(200));
+  EXPECT_EQ(190, ContextAlbum::CoverPixelSize(200, 10));
 }
 
 TEST(ContextAlbum, ImagePathExtensions) {
@@ -1127,19 +1135,33 @@ TEST(MainWindowLook, SidebarAndMuteMatchQt) {
   EXPECT_STREQ("<Control><Shift>d", MainWindowLook::QueuePlayNextAccel());
 }
 
+TEST(FilterSearchKeyboard, MatchesCollectionFilterKeys) {
+  EXPECT_EQ(FilterSearchKeyboard::Action::Activate, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kReturn));
+  EXPECT_EQ(FilterSearchKeyboard::Action::MoveDown, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kDown));
+  EXPECT_EQ(FilterSearchKeyboard::Action::Clear, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(FilterSearchKeyboard::Action::FocusFilter, FilterSearchKeyboard::FromTreeKey(ListBoxKeyboard::kBackSpace));
+  EXPECT_EQ(ListBoxKeyboard::Action::MoveUp, FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::Action::MoveUp));
+}
+
 TEST(Appearance, BackgroundCssForTypesAndUrls) {
   EXPECT_EQ("file:///tmp/cover.jpg", Appearance::CssUrl("/tmp/cover.jpg"));
   EXPECT_EQ("https://example/a.png", Appearance::CssUrl("https://example/a.png"));
   EXPECT_EQ("top left", Appearance::BackgroundPositionCss(1));
   EXPECT_EQ("bottom right", Appearance::BackgroundPositionCss(5));
   EXPECT_TRUE(Appearance::BuildBackgroundCss(0, {}, 5, 0, 40).empty());
-  EXPECT_EQ(".strawberry-main { background-image: none; }", Appearance::BuildBackgroundCss(1, {}, 5, 0, 40));
+  const std::string none = Appearance::BuildBackgroundCss(1, {}, 5, 0, 40);
+  EXPECT_NE(std::string::npos, none.find(Appearance::kMainSelector));
+  EXPECT_NE(std::string::npos, none.find(Appearance::kPlaylistViewportSelector));
+  EXPECT_NE(std::string::npos, none.find("background-image: none"));
+  EXPECT_EQ(std::string::npos, none.find(std::string(Appearance::kMainSelector) + " { background-image: linear-gradient"));
   EXPECT_NE(std::string::npos, Appearance::BuildBackgroundCss(4, {}, 5, 0, 40).find("#8B1E3F"));
   const std::string custom = Appearance::BuildBackgroundCss(2, "/tmp/wall.jpg", 1, 8, 40);
+  EXPECT_NE(std::string::npos, custom.find(Appearance::kPlaylistViewportSelector));
   EXPECT_NE(std::string::npos, custom.find("file:///tmp/wall.jpg"));
   EXPECT_NE(std::string::npos, custom.find("top left"));
   EXPECT_NE(std::string::npos, custom.find("blur(8px)"));
   EXPECT_NE(std::string::npos, custom.find("background-size: auto"));
+  EXPECT_EQ(std::string::npos, custom.find(std::string(Appearance::kMainSelector) + " { background-image: linear-gradient"));
   const std::string stretched = Appearance::BuildBackgroundCss(2, "/tmp/wall.jpg", 1, 0, 40, true, true, false, 0);
   EXPECT_NE(std::string::npos, stretched.find("background-size: cover"));
   const std::string contained = Appearance::BuildBackgroundCss(2, "/tmp/wall.jpg", 1, 0, 40, true, true, true, 0);

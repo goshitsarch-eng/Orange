@@ -34,6 +34,8 @@ class StreamingSearchView {
   void SetEnqueueCallback(EnqueueCallback callback);
   void SetMenuCallback(MenuCallback callback);
   void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
+  void FocusSearch();
+  void FocusResultsAndMove(unsigned keyval);
   void SetConfigureCallback(ConfigureCallback callback);
   void SearchForThis(const std::string &query = {});
   std::string SelectedSearchQuery() const;

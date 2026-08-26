@@ -128,21 +128,22 @@ std::string Appearance::BuildBackgroundCss(int type, const std::string &path, in
   if (kind == Type::Default) {
     return {};
   }
+  const std::string reset_main = std::string(kMainSelector) + " { background-image: none; filter: none; }";
   if (kind == Type::None) {
-    return ".strawberry-main { background-image: none; }";
+    return reset_main + kPlaylistViewportSelector + " { background-image: none; }";
   }
   if (kind == Type::Strawbs) {
-    return ".strawberry-main { background-color: #8B1E3F; background-image: none; }";
+    return reset_main + kPlaylistViewportSelector + " { background-color: #8B1E3F; background-image: none; }";
   }
   const std::string url = CssUrl(path);
   if (url.empty()) {
-    return ".strawberry-main { background-image: none; }";
+    return reset_main + kPlaylistViewportSelector + " { background-image: none; }";
   }
   const int level = std::clamp(opacity, 0, 100);
   const double veil = 1.0 - (static_cast<double>(level) / 100.0);
   const int radius = std::max(0, blur);
-  std::string css = ".strawberry-main { background-image: linear-gradient(rgba(0,0,0," + std::to_string(veil) + "), rgba(0,0,0," +
-                    std::to_string(veil) + ")), url(\"" + url +
+  std::string css = reset_main + kPlaylistViewportSelector + " { background-image: linear-gradient(rgba(0,0,0," + std::to_string(veil) +
+                    "), rgba(0,0,0," + std::to_string(veil) + ")), url(\"" + url +
                     "\"); background-repeat: no-repeat; background-size: " + AppearanceColors::BackgroundSizeCss(stretch, keep_aspect, do_not_cut, max_size) +
                     "; background-position: " + BackgroundPositionCss(position) + ";";
   if (radius > 0) {

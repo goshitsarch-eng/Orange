@@ -3,6 +3,7 @@
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "translations/translations.h"
+#include "widgets/filtersearchkeyboard.h"
 
 PlaylistContainer::PlaylistContainer()
     : widget_(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0)),
@@ -114,10 +115,10 @@ PlaylistContainer::PlaylistContainer()
 
   gtk_box_append(GTK_BOX(toolbar_), repeat_button_);
   gtk_box_append(GTK_BOX(toolbar_), shuffle_button_);
-  GtkWidget *filter = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter), Translations::Tr("Filter playlist").c_str());
-  gtk_widget_set_hexpand(filter, TRUE);
-  g_signal_connect(filter, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
+  filter_entry_ = gtk_search_entry_new();
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter_entry_), Translations::Tr("Filter playlist").c_str());
+  gtk_widget_set_hexpand(filter_entry_, TRUE);
+  g_signal_connect(filter_entry_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<PlaylistContainer *>(data);
                      self->filter_ = gtk_editable_get_text(GTK_EDITABLE(entry));
                      if (self->filter_changed_) {
@@ -125,7 +126,29 @@ PlaylistContainer::PlaylistContainer()
                      }
                    }),
                    this);
-  gtk_box_append(GTK_BOX(toolbar_), filter);
+  g_signal_connect(filter_entry_, "activate", G_CALLBACK(+[](GtkSearchEntry *, gpointer data) {
+                     static_cast<PlaylistContainer *>(data)->view()->FilterReturnPressed();
+                   }),
+                   this);
+  GtkEventController *filter_keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(filter_entry_, filter_keys);
+  g_signal_connect(filter_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<PlaylistContainer *>(data);
+                     const FilterSearchKeyboard::Action action = FilterSearchKeyboard::FromSearchKey(keyval);
+                     if (action == FilterSearchKeyboard::Action::MoveUp || action == FilterSearchKeyboard::Action::MoveDown) {
+                       self->view()->FocusAndMove(keyval);
+                       return TRUE;
+                     }
+                     if (action == FilterSearchKeyboard::Action::Clear) {
+                       gtk_editable_set_text(GTK_EDITABLE(self->filter_entry_), "");
+                       return TRUE;
+                     }
+                     return FALSE;
+                   })),
+                   this);
+  gtk_box_append(GTK_BOX(toolbar_), filter_entry_);
+  view_->SetFocusFilterCallback([this]() { FocusFilter(); });
   summary_ = gtk_label_new("");
   gtk_widget_add_css_class(summary_, "dim-label");
   gtk_box_append(GTK_BOX(toolbar_), summary_);
@@ -140,6 +163,12 @@ PlaylistContainer::PlaylistContainer()
 
 void PlaylistContainer::SetFilterChangedCallback(const std::function<void(const std::string &)> &callback) {
   filter_changed_ = callback;
+}
+
+void PlaylistContainer::FocusFilter() {
+  if (filter_entry_) {
+    gtk_widget_grab_focus(filter_entry_);
+  }
 }
 
 void PlaylistContainer::SetActionCallback(const char *name, ActionCallback callback) {

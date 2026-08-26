@@ -33,6 +33,15 @@ ContextAlbum::ContextAlbum() {
                      }
                    }),
                    this);
+  GtkWidget *sensor = gtk_drawing_area_new();
+  gtk_widget_set_hexpand(sensor, TRUE);
+  gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(sensor), 1);
+  gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(sensor), +[](GtkDrawingArea *, cairo_t *, int, int, gpointer) {}, nullptr, nullptr);
+  g_signal_connect(sensor, "resize", G_CALLBACK(+[](GtkDrawingArea *, gint width, gint, gpointer data) {
+                     static_cast<ContextAlbum *>(data)->UpdateWidth(width);
+                   }),
+                   this);
+  gtk_box_append(GTK_BOX(widget_), sensor);
   gtk_box_append(GTK_BOX(widget_), overlay);
   gtk_box_append(GTK_BOX(widget_), spinner_);
   gtk_box_append(GTK_BOX(widget_), search);
@@ -126,6 +135,16 @@ void ContextAlbum::SetDropCallback(DropCallback callback) { drop_ = std::move(ca
 void ContextAlbum::SetFadeFinishedCallback(FadeFinishedCallback callback) { fade_finished_ = std::move(callback); }
 
 void ContextAlbum::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
+
+void ContextAlbum::UpdateWidth(int allocated_width) {
+  const int size = CoverPixelSize(allocated_width);
+  if (image_) {
+    gtk_image_set_pixel_size(GTK_IMAGE(image_), size);
+  }
+  if (previous_image_) {
+    gtk_image_set_pixel_size(GTK_IMAGE(previous_image_), size);
+  }
+}
 
 void ContextAlbum::SearchCoverInProgress() {
   downloading_ = true;

@@ -39,6 +39,8 @@ class StreamingCollectionView {
   void SetRefreshCallback(RefreshCallback callback);
   void SetMenuCallback(MenuCallback callback);
   void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
+  void FocusFilter();
+  void FocusListAndMove(unsigned keyval);
   void SetGroupingChangedCallback(GroupingCallback callback) { grouping_changed_ = std::move(callback); }
   void SetService(StreamingService *service);
   void SetGrouping(const CollectionGrouping::Grouping &grouping);

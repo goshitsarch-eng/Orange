@@ -17,6 +17,7 @@
 #include "streaming/streamingsearchitemdelegate.h"
 #include "translations/translations.h"
 #include "utilities/jsonutils.h"
+#include "widgets/filtersearchkeyboard.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 #include "widgets/listboxtreepressgtk.h"
@@ -90,6 +91,23 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
     self->ScheduleSearch(text ? text : "", true);
   };
   g_signal_connect(search_entry_, "activate", G_CALLBACK(search_now), this);
+  GtkEventController *search_keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(search_entry_, search_keys);
+  g_signal_connect(search_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     const FilterSearchKeyboard::Action action = FilterSearchKeyboard::FromSearchKey(keyval);
+                     if (action == FilterSearchKeyboard::Action::MoveUp || action == FilterSearchKeyboard::Action::MoveDown) {
+                       self->FocusResultsAndMove(keyval);
+                       return TRUE;
+                     }
+                     if (action == FilterSearchKeyboard::Action::Clear) {
+                       gtk_editable_set_text(GTK_EDITABLE(self->search_entry_), "");
+                       return TRUE;
+                     }
+                     return FALSE;
+                   })),
+                   this);
   g_signal_connect(search_entry_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<StreamingSearchView *>(data);
                      const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
@@ -635,7 +653,27 @@ void StreamingSearchView::ResetTypeAhead() {
   }
 }
 
+void StreamingSearchView::FocusSearch() {
+  if (search_entry_) {
+    gtk_widget_grab_focus(search_entry_);
+  }
+}
+
+void StreamingSearchView::FocusResultsAndMove(unsigned keyval) {
+  gtk_widget_grab_focus(list_);
+  const ListBoxKeyboard::Action move = FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::FromSearchKey(keyval));
+  if (move == ListBoxKeyboard::Action::MoveUp || move == ListBoxKeyboard::Action::MoveDown) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), move));
+  }
+}
+
 gboolean StreamingSearchView::OnKeyPressed(guint keyval) {
+  if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
+    ResetTypeAhead();
+    FocusSearch();
+    return TRUE;
+  }
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
   if (action == ListBoxKeyboard::Action::Activate) {
     ListBoxKeyboardGtk::ActivateSelected(list_);

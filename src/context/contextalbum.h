@@ -18,6 +18,20 @@ class ContextAlbum {
 
   static constexpr int kFadeTimelineMs = 1000;
   static constexpr int kFadeTickMs = 50;
+  static constexpr int kDefaultCoverSize = 220;
+  static constexpr int kMinCoverSize = 80;
+  static constexpr int kCoverMargin = 16;
+
+  static int CoverPixelSize(int allocated_width, int horizontal_margin = kCoverMargin) {
+    if (allocated_width <= 0) {
+      return kDefaultCoverSize;
+    }
+    const int inner = allocated_width - horizontal_margin;
+    if (inner < kMinCoverSize) {
+      return kMinCoverSize;
+    }
+    return inner;
+  }
 
   ContextAlbum();
   ~ContextAlbum();
@@ -30,6 +44,7 @@ class ContextAlbum {
   void SetDropCallback(DropCallback callback);
   void SetFadeFinishedCallback(FadeFinishedCallback callback);
   void SetActivateCallback(ActivateCallback callback);
+  void UpdateWidth(int allocated_width);
   void SearchCoverInProgress();
   bool downloading() const { return downloading_; }
   bool has_cover() const { return has_cover_; }

@@ -26,6 +26,7 @@ class PlaylistView {
   using RateCallback = std::function<void(int, float)>;
   using QueuePositionCallback = std::function<int(int)>;
   using DeleteCallback = std::function<void()>;
+  using FocusFilterCallback = std::function<void()>;
 
   PlaylistView();
   ~PlaylistView();
@@ -47,6 +48,9 @@ class PlaylistView {
   void SetRateCallback(RateCallback callback);
   void SetQueuePositionCallback(QueuePositionCallback callback);
   void SetDeleteCallback(DeleteCallback callback);
+  void SetFocusFilterCallback(FocusFilterCallback callback);
+  void FilterReturnPressed();
+  void FocusAndMove(unsigned keyval);
   int RowAtY(double y) const;
   PlaylistColumn last_clicked_column() const { return last_clicked_column_; }
   void SetLastClickedColumn(PlaylistColumn column) { last_clicked_column_ = column; }
@@ -81,6 +85,7 @@ class PlaylistView {
   RateCallback rate_;
   QueuePositionCallback queue_position_;
   DeleteCallback delete_;
+  FocusFilterCallback focus_filter_;
   PlaylistColumn last_clicked_column_ = PlaylistColumn::Title;
   double last_click_cell_x_ = 0;
   double last_click_cell_width_ = 0;
