@@ -1,6 +1,7 @@
 #include "queue/queue.h"
 
 #include <algorithm>
+#include <functional>
 
 void Queue::Append(const Song &song) {
   songs_.push_back(song);
@@ -9,6 +10,22 @@ void Queue::Append(const Song &song) {
 
 void Queue::InsertNext(const Song &song) {
   songs_.insert(songs_.begin(), song);
+  Changed.Emit();
+}
+
+void Queue::Insert(int index, const Song &song) { Insert(index, SongList{song}); }
+
+void Queue::Insert(int index, const SongList &songs) {
+  if (songs.empty()) {
+    return;
+  }
+  if (index < 0) {
+    index = 0;
+  }
+  if (index > size()) {
+    index = size();
+  }
+  songs_.insert(songs_.begin() + index, songs.begin(), songs.end());
   Changed.Emit();
 }
 
@@ -25,6 +42,22 @@ Song Queue::TakeNext() {
 void Queue::Remove(int index) {
   if (index >= 0 && index < static_cast<int>(songs_.size())) {
     songs_.erase(songs_.begin() + index);
+    Changed.Emit();
+  }
+}
+
+void Queue::RemoveRows(const std::vector<int> &indexes) {
+  std::vector<int> sorted = indexes;
+  std::sort(sorted.begin(), sorted.end(), std::greater<int>());
+  sorted.erase(std::unique(sorted.begin(), sorted.end()), sorted.end());
+  bool changed = false;
+  for (int index : sorted) {
+    if (index >= 0 && index < size()) {
+      songs_.erase(songs_.begin() + index);
+      changed = true;
+    }
+  }
+  if (changed) {
     Changed.Emit();
   }
 }
@@ -50,5 +83,42 @@ void Queue::Move(int from, int to) {
   Song song = songs_[static_cast<size_t>(from)];
   songs_.erase(songs_.begin() + from);
   songs_.insert(songs_.begin() + to, song);
+  Changed.Emit();
+}
+
+void Queue::MoveRows(const std::vector<int> &from, int to) {
+  if (from.empty()) {
+    return;
+  }
+  std::vector<int> sorted = from;
+  std::sort(sorted.begin(), sorted.end());
+  sorted.erase(std::unique(sorted.begin(), sorted.end()), sorted.end());
+  SongList moving;
+  for (int row : sorted) {
+    if (row < 0 || row >= size()) {
+      return;
+    }
+    moving.push_back(songs_[static_cast<size_t>(row)]);
+  }
+  int dest = to;
+  if (dest < 0) {
+    dest = 0;
+  }
+  if (dest > size()) {
+    dest = size();
+  }
+  for (auto it = sorted.rbegin(); it != sorted.rend(); ++it) {
+    songs_.erase(songs_.begin() + *it);
+    if (*it < dest) {
+      --dest;
+    }
+  }
+  if (dest < 0) {
+    dest = 0;
+  }
+  if (dest > size()) {
+    dest = size();
+  }
+  songs_.insert(songs_.begin() + dest, moving.begin(), moving.end());
   Changed.Emit();
 }

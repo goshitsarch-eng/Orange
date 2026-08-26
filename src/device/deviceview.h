@@ -31,6 +31,7 @@ class DeviceView {
  private:
   void Clear();
   void AttachMenu(GtkWidget *row);
+  void SetupRowDrag(GtkWidget *row, const Song &song);
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;

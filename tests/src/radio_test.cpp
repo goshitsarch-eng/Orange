@@ -5,6 +5,7 @@
 #include "radios/radiobrowsersearchmodel.h"
 #include "radios/radiobrowserservice.h"
 #include "radios/radiochannel.h"
+#include "radios/radiodrag.h"
 #include "radios/radiomodel.h"
 #include "radios/radioparadiseservice.h"
 #include "radios/radiostreamplaylistitem.h"
@@ -135,6 +136,22 @@ TEST(RadioChannel, ToSongAndPlaylistItem) {
   RadioStreamPlaylistItem item(channel);
   EXPECT_EQ(channel.url, item.EffectiveMetadata().url());
   EXPECT_EQ("Groove Salad", item.EffectiveMetadata().title());
+}
+
+TEST(RadioDrag, JoinsChannelUrlsAndSongs) {
+  RadioChannel a;
+  a.name = "Groove Salad";
+  a.url = "https://ice1.somafm.com/groovesalad-128-mp3";
+  RadioChannel b;
+  b.name = "Drone Zone";
+  b.url = "https://ice1.somafm.com/dronezone-128-mp3";
+  RadioChannel empty;
+  const SongList songs = RadioDrag::Songs({a, b});
+  ASSERT_EQ(2u, songs.size());
+  EXPECT_EQ(a.url, songs.front().url());
+  EXPECT_EQ("Drone Zone", songs.back().title());
+  EXPECT_EQ(a.url + "\n" + b.url, RadioDrag::DragPayload({a, b, empty}));
+  EXPECT_TRUE(RadioDrag::DragPayload({empty}).empty());
 }
 
 TEST(RadioModel, LabelsAndSearchResults) {

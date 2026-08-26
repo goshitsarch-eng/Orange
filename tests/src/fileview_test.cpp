@@ -1,3 +1,4 @@
+#include "device/devicedrag.h"
 #include "fileview/fileviewdrag.h"
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewsongs.h"
@@ -134,4 +135,14 @@ TEST(FileViewDrag, SkipsDirectoriesAndEmitsFileUris) {
   EXPECT_TRUE(FileViewDrag::DragPayload({dir}).empty());
   FileUtils::Remove(audio);
   rmdir(dir.c_str());
+}
+
+TEST(DeviceDrag, JoinsSongUrls) {
+  Song a(Song::Source::Device);
+  a.set_url("gphoto2://phone/Music/a.mp3");
+  Song b(Song::Source::Device);
+  b.set_url("gphoto2://phone/Music/b.mp3");
+  Song empty;
+  EXPECT_EQ("gphoto2://phone/Music/a.mp3\ngphoto2://phone/Music/b.mp3", DeviceDrag::DragPayload({a, b, empty}));
+  EXPECT_TRUE(DeviceDrag::DragPayload({}).empty());
 }

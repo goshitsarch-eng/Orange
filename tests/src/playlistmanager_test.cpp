@@ -1,5 +1,6 @@
 #include "playlist/playlistmanager.h"
 #include "queue/queue.h"
+#include "queue/queuedrop.h"
 
 #include "utilities/fileutils.h"
 
@@ -106,6 +107,41 @@ TEST(Queue, ContainsAndRemoveSong) {
   queue.RemoveSong(a);
   EXPECT_FALSE(queue.Contains(a));
   EXPECT_TRUE(queue.Contains(b));
+}
+
+TEST(Queue, InsertAndMoveRows) {
+  Queue queue;
+  queue.Append(MakeSong("A", "file:///a"));
+  queue.Append(MakeSong("B", "file:///b"));
+  queue.Insert(1, {MakeSong("C", "file:///c")});
+  ASSERT_EQ(3, queue.size());
+  EXPECT_EQ("file:///c", queue.songs()[1].url());
+  queue.MoveRows({0, 1}, 3);
+  ASSERT_EQ(3, queue.size());
+  EXPECT_EQ("file:///b", queue.songs()[0].url());
+  EXPECT_EQ("file:///a", queue.songs()[1].url());
+  EXPECT_EQ("file:///c", queue.songs()[2].url());
+  queue.RemoveRows({0, 2});
+  ASSERT_EQ(1, queue.size());
+  EXPECT_EQ("file:///a", queue.songs()[0].url());
+}
+
+TEST(QueueDrop, ParsesRowsAndUrls) {
+  EXPECT_TRUE(QueueDrop::IsQueueRows("strawberry-queue-rows:1,2"));
+  EXPECT_TRUE(QueueDrop::IsPlaylistRows("strawberry-playlist-rows:0,3"));
+  EXPECT_FALSE(QueueDrop::IsQueueRows("https://example.com/a\nhttps://example.com/b"));
+  const std::vector<int> rows = QueueDrop::ParseRows("strawberry-queue-rows:1,4,2", QueueDrop::kQueueRowsPrefix);
+  ASSERT_EQ(3u, rows.size());
+  EXPECT_EQ(1, rows[0]);
+  EXPECT_EQ(4, rows[1]);
+  EXPECT_EQ(2, rows[2]);
+  EXPECT_EQ("strawberry-queue-rows:1,4", QueueDrop::RowsPayload({1, 4}, QueueDrop::kQueueRowsPrefix));
+  EXPECT_TRUE(QueueDrop::ParseUrls("strawberry-playlist-rows:0").empty());
+  const std::vector<std::string> urls = QueueDrop::ParseUrls("file:///a\r\nfile:///b\n");
+  ASSERT_EQ(2u, urls.size());
+  EXPECT_EQ("file:///a", urls[0]);
+  EXPECT_EQ("file:///b", urls[1]);
+  EXPECT_EQ(1, QueueDrop::DestinationAfterRemove(3, {0, 2}));
 }
 
 TEST(PlaylistManager, ChangeOrderAndFavorite) {

@@ -12,6 +12,7 @@
 #include "fileview/fileview.h"
 #include "fileview/fileviewsongs.h"
 #include "playlist/playlistcontainer.h"
+#include "radios/radiodrag.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/radioviewcontainer.h"
 #include "smartplaylists/smartplaylistsview.h"
@@ -447,6 +448,34 @@ void MainWindow::BuildUi() {
                auto *self = static_cast<MainWindow *>(data);
                self->ApplyCollectionPlan(CollectionBehaviour::Enqueue(), self->streaming_menu_songs_);
              }));
+  add_action("radio-append", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Settings settings;
+               settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+               const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+                   settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+               self->ApplyCollectionPlan(CollectionBehaviour::Append(play, self->EngineStopped()), self->radio_menu_songs_);
+             }));
+  add_action("radio-replace", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Settings settings;
+               settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+               const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+                   settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+               self->ApplyCollectionPlan(CollectionBehaviour::Replace(play, self->EngineStopped()), self->radio_menu_songs_);
+             }));
+  add_action("radio-new", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Settings settings;
+               settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+               const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+                   settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+               self->ApplyCollectionPlan(CollectionBehaviour::OpenInNew(play, self->EngineStopped()), self->radio_menu_songs_);
+             }));
+  add_action("radio-enqueue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->ApplyCollectionPlan(CollectionBehaviour::Enqueue(), self->radio_menu_songs_);
+             }));
   add_action("collection-expand-all", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                if (self->collection_container_) {
@@ -717,6 +746,7 @@ void MainWindow::BuildSidebar() {
   adw_view_stack_add_titled_with_icon(sidebar_stack_, file_view_->widget(), "files", "Files", "folder-symbolic");
   radio_container_ = std::make_unique<RadioViewContainer>(app_->radio_services());
   radio_container_->SetActivateCallback([this](const RadioChannel &channel) { PlayRadioChannel(channel); });
+  radio_container_->SetMenuCallback([this](const std::vector<RadioChannel> &channels) { ShowRadioMenu(channels); });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, radio_container_->widget(), "radio", "Internet radio", "network-wireless-symbolic");
   GtkWidget *streaming_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   streaming_service_drop_ = gtk_combo_box_text_new();
@@ -767,6 +797,24 @@ void MainWindow::BuildSidebar() {
   queue_view_->SetActivateCallback([this](const Song &song) {
     app_->playlist_manager()->AppendSongs({song});
     app_->player()->PlayAt(app_->playlist_manager()->active()->row_count() - 1);
+  });
+  queue_view_->SetUrlDropCallback([this](const std::vector<std::string> &urls, int dest) {
+    app_->queue()->Insert(dest, SongsFromUrls(urls));
+    RefreshQueue();
+  });
+  queue_view_->SetPlaylistRowsDropCallback([this](const std::vector<int> &rows, int dest) {
+    SongList songs;
+    Playlist *playlist = app_->playlist_manager()->current();
+    if (!playlist) {
+      return;
+    }
+    for (int row : rows) {
+      if (row >= 0 && row < playlist->row_count()) {
+        songs.push_back(playlist->song(row));
+      }
+    }
+    app_->queue()->Insert(dest, songs);
+    RefreshQueue();
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, queue_view_->widget(), "queue", "Queue", "view-list-ordered-symbolic");
 
@@ -1987,6 +2035,45 @@ void MainWindow::ShowStreamingMenu(const SongList &songs) {
   GtkWidget *parent = streaming_stack_ ? streaming_stack_ : GTK_WIDGET(window_);
   gtk_widget_set_parent(popover, parent);
   gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+void MainWindow::ShowRadioMenu(const std::vector<RadioChannel> &channels) {
+  radio_menu_songs_ = RadioDrag::Songs(channels);
+  if (radio_menu_songs_.empty()) {
+    return;
+  }
+  GMenu *menu = g_menu_new();
+  g_menu_append(menu, Translations::Tr("Append to current playlist").c_str(), "win.radio-append");
+  g_menu_append(menu, Translations::Tr("Replace current playlist").c_str(), "win.radio-replace");
+  g_menu_append(menu, Translations::Tr("Open in new playlist").c_str(), "win.radio-new");
+  g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.radio-enqueue");
+  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  GtkWidget *parent = radio_container_ && radio_container_->view() ? radio_container_->view()->list() : GTK_WIDGET(window_);
+  gtk_widget_set_parent(popover, parent);
+  gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+SongList MainWindow::SongsFromUrls(const std::vector<std::string> &urls) const {
+  SongList songs;
+  Playlist *playlist = app_->playlist_manager()->current();
+  for (const std::string &url : urls) {
+    Song song;
+    if (playlist) {
+      for (int i = 0; i < playlist->row_count(); ++i) {
+        if (playlist->song(i).url() == url) {
+          song = playlist->song(i);
+          break;
+        }
+      }
+    }
+    if (song.url().empty()) {
+      song.set_url(url);
+      song.set_title(url);
+      song.set_valid(true);
+    }
+    songs.push_back(song);
+  }
+  return songs;
 }
 
 void MainWindow::ShowPlaylistMenu(double, double) {

@@ -46,3 +46,7 @@ void RadioViewContainer::Search(const std::string &query) {
 void RadioViewContainer::SetActivateCallback(std::function<void(const RadioChannel &)> callback) {
   view_->SetActivateCallback(std::move(callback));
 }
+
+void RadioViewContainer::SetMenuCallback(RadioView::MenuCallback callback) {
+  view_->SetMenuCallback(std::move(callback));
+}

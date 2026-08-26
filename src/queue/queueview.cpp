@@ -1,6 +1,9 @@
 #include "queue/queueview.h"
 
 #include "queue/queue.h"
+#include "queue/queuedrop.h"
+
+#include <algorithm>
 
 QueueView::QueueView(Queue *queue) : queue_(queue) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -9,6 +12,7 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
   gtk_widget_set_margin_top(widget_, 8);
   gtk_widget_set_margin_bottom(widget_, 8);
   list_ = gtk_list_box_new();
+  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_widget_set_vexpand(list_, TRUE);
   GtkWidget *scrolled = gtk_scrolled_window_new();
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scrolled), list_);
@@ -30,15 +34,26 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
   gtk_box_append(GTK_BOX(widget_), buttons);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<QueueView *>(data);
-                     const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
-                     if (!self->queue_ || !self->activate_) {
+                     const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index")) - 1;
+                     if (!self->queue_ || !self->activate_ || index < 0) {
                        return;
                      }
                      const SongList songs = self->queue_->songs();
-                     if (index >= 0 && index < static_cast<int>(songs.size())) {
+                     if (index < static_cast<int>(songs.size())) {
                        self->activate_(songs[static_cast<size_t>(index)]);
                      }
                    }),
+                   this);
+  GtkDropTarget *target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
+#ifdef GDK_TYPE_FILE_LIST
+  GType types[] = {G_TYPE_STRING, GDK_TYPE_FILE_LIST};
+  gtk_drop_target_set_gtypes(target, types, 2);
+#endif
+  gtk_drop_target_set_actions(target, static_cast<GdkDragAction>(GDK_ACTION_COPY | GDK_ACTION_MOVE));
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(target));
+  g_signal_connect(target, "drop", G_CALLBACK((+[](GtkDropTarget *, const GValue *value, gdouble, gdouble y, gpointer data) -> gboolean {
+                     return static_cast<QueueView *>(data)->OnDrop(value, y);
+                   })),
                    this);
   if (queue_) {
     queue_->Changed.Connect([this]() { Reload(); });
@@ -88,37 +103,138 @@ void QueueView::Rebuild() {
       gtk_widget_add_css_class(row, "accent");
     }
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
-    g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index++));
+    g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index + 1));
+    SetupRowDrag(row, index);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
+    ++index;
   }
 }
 
-int QueueView::SelectedIndex() const {
-  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
-  if (!row) {
-    return -1;
+void QueueView::SetupRowDrag(GtkWidget *row, int index) {
+  GtkDragSource *src = gtk_drag_source_new();
+  gtk_drag_source_set_actions(src, GDK_ACTION_MOVE);
+  g_object_set_data(G_OBJECT(src), "row", GINT_TO_POINTER(index + 1));
+  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
+                     auto *self = static_cast<QueueView *>(data);
+                     const int r = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(s), "row")) - 1;
+                     std::vector<int> rows = self->SelectedIndexes();
+                     if (std::find(rows.begin(), rows.end(), r) == rows.end()) {
+                       rows = {r};
+                     }
+                     if (rows.empty() || r < 0) {
+                       return nullptr;
+                     }
+                     const std::string payload = QueueDrop::RowsPayload(rows, QueueDrop::kQueueRowsPrefix);
+                     GValue v = G_VALUE_INIT;
+                     g_value_init(&v, G_TYPE_STRING);
+                     g_value_set_string(&v, payload.c_str());
+                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
+                     g_value_unset(&v);
+                     return provider;
+                   })),
+                   this);
+  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
+}
+
+int QueueView::RowAtY(double y) const {
+  GtkWidget *child = gtk_widget_get_first_child(list_);
+  int last_index = 0;
+  while (child) {
+    graphene_rect_t bounds{};
+    const int stored = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
+    if (stored > 0 && gtk_widget_compute_bounds(child, list_, &bounds)) {
+      const int index = stored - 1;
+      if (y < bounds.origin.y + bounds.size.height) {
+        return index;
+      }
+      last_index = index + 1;
+    }
+    child = gtk_widget_get_next_sibling(child);
   }
-  return GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
+  return last_index;
+}
+
+gboolean QueueView::OnDrop(const GValue *value, double y) {
+  const int dest = RowAtY(y);
+  if (G_VALUE_HOLDS_STRING(value)) {
+    const char *text = g_value_get_string(value);
+    const std::string payload = text ? text : "";
+    if (QueueDrop::IsQueueRows(payload)) {
+      const std::vector<int> rows = QueueDrop::ParseRows(payload, QueueDrop::kQueueRowsPrefix);
+      if (queue_ && !rows.empty()) {
+        queue_->MoveRows(rows, dest);
+        return TRUE;
+      }
+    }
+    if (QueueDrop::IsPlaylistRows(payload)) {
+      const std::vector<int> rows = QueueDrop::ParseRows(payload, QueueDrop::kPlaylistRowsPrefix);
+      if (playlist_drop_ && !rows.empty()) {
+        playlist_drop_(rows, dest);
+        return TRUE;
+      }
+    }
+    const std::vector<std::string> urls = QueueDrop::ParseUrls(payload);
+    if (url_drop_ && !urls.empty()) {
+      url_drop_(urls, dest);
+      return TRUE;
+    }
+  }
+#ifdef GDK_TYPE_FILE_LIST
+  if (G_VALUE_HOLDS(value, GDK_TYPE_FILE_LIST) && url_drop_) {
+    std::vector<std::string> urls;
+    auto *list = static_cast<GdkFileList *>(g_value_get_boxed(value));
+    GSList *files = gdk_file_list_get_files(list);
+    for (GSList *item = files; item; item = item->next) {
+      gchar *uri = g_file_get_uri(G_FILE(item->data));
+      if (uri) {
+        urls.emplace_back(uri);
+        g_free(uri);
+      }
+    }
+    if (!urls.empty()) {
+      url_drop_(urls, dest);
+      return TRUE;
+    }
+  }
+#endif
+  return FALSE;
+}
+
+std::vector<int> QueueView::SelectedIndexes() const {
+  std::vector<int> indexes;
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index")) - 1;
+        if (index >= 0) {
+          static_cast<std::vector<int> *>(data)->push_back(index);
+        }
+      },
+      &indexes);
+  std::sort(indexes.begin(), indexes.end());
+  return indexes;
 }
 
 void QueueView::MoveUp() {
-  const int index = SelectedIndex();
-  if (queue_ && index > 0) {
-    queue_->Move(index, index - 1);
+  const std::vector<int> indexes = SelectedIndexes();
+  if (!queue_ || indexes.empty() || indexes.front() <= 0) {
+    return;
   }
+  queue_->MoveRows(indexes, indexes.front() - 1);
 }
 
 void QueueView::MoveDown() {
-  const int index = SelectedIndex();
-  if (queue_ && index >= 0 && index + 1 < queue_->size()) {
-    queue_->Move(index, index + 1);
+  const std::vector<int> indexes = SelectedIndexes();
+  if (!queue_ || indexes.empty() || indexes.back() + 1 >= queue_->size()) {
+    return;
   }
+  queue_->MoveRows(indexes, indexes.back() + 2);
 }
 
 void QueueView::Remove() {
-  const int index = SelectedIndex();
-  if (queue_ && index >= 0) {
-    queue_->Remove(index);
+  const std::vector<int> indexes = SelectedIndexes();
+  if (queue_ && !indexes.empty()) {
+    queue_->RemoveRows(indexes);
   }
 }
 

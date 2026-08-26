@@ -89,6 +89,8 @@ class MainWindow {
   void ShowPlaylistMenu(double x, double y);
   void ShowCollectionMenu();
   void ShowStreamingMenu(const SongList &songs);
+  void ShowRadioMenu(const std::vector<RadioChannel> &channels);
+  SongList SongsFromUrls(const std::vector<std::string> &urls) const;
   void ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, const SongList &songs);
   void ForceCompilationSelected(bool on);
   SongList CollectionSongs() const;
@@ -183,6 +185,7 @@ class MainWindow {
   std::string device_browse_id_;
   std::string streaming_service_name_;
   SongList streaming_menu_songs_;
+  SongList radio_menu_songs_;
   std::string radio_query_;
   CollectionGrouping::Grouping grouping_;
   PlaylistSequence playlist_sequence_;
