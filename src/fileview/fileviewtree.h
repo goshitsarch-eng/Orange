@@ -18,6 +18,7 @@ class FileViewTree {
   GtkWidget *widget() const { return widget_; }
   void Reload(FileViewTreeModel *model);
   void SetActivateCallback(ActivateCallback callback);
+  void SetDoubleClickCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback);
   std::string SelectedPath() const;
 
@@ -28,6 +29,7 @@ class FileViewTree {
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
   ActivateCallback activate_;
+  ActivateCallback double_click_;
   MenuCallback menu_;
 };
 

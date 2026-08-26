@@ -55,6 +55,7 @@ class FileView {
  private:
   void ShowMenu(const std::vector<std::string> &paths);
   void Activate(const std::string &path);
+  void DoubleClick(const std::string &path);
   void UpdateNavButtons();
   void ApplyViewMode();
   void AddRootButtonClicked();

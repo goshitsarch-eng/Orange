@@ -53,6 +53,13 @@ inline const char *MoveUpTooltip() { return "Move up"; }
 inline const char *RemoveTooltip() { return "Remove"; }
 inline const char *ClearTooltip() { return "Clear"; }
 
+inline constexpr const char *kRowClass = "queue-row";
+inline constexpr const char *kAltClass = "queue-alt";
+
+inline bool IsAltRow(int index) { return index % 2 == 1; }
+
+inline std::string AlternatingCss() { return ".queue-row.queue-alt { background-color: alpha(currentColor, 0.06); }"; }
+
 inline ButtonState Buttons(const std::vector<int> &selected, int count) {
   ButtonState state;
   state.clear = count > 0;

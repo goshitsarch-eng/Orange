@@ -6,6 +6,7 @@
 #include "device/devicedrag.h"
 #include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
+#include "fileview/fileviewicons.h"
 #include "fileview/fileviewmenu.h"
 #include "fileview/fileviewmode.h"
 #include "fileview/fileviewhidden.h"
@@ -408,9 +409,18 @@ TEST(FileViewMode, ListAndTreeMatchQt) {
   EXPECT_FALSE(FileViewMode::RootButtonsVisible(FileViewMode::Mode::List));
   EXPECT_TRUE(FileViewMode::ActivateNavigates(FileViewMode::Mode::List, true));
   EXPECT_FALSE(FileViewMode::ActivateNavigates(FileViewMode::Mode::Tree, true));
-  EXPECT_TRUE(FileViewMode::ActivateAddsToPlaylist(FileViewMode::Mode::List, false));
-  EXPECT_TRUE(FileViewMode::ActivateAddsToPlaylist(FileViewMode::Mode::Tree, false));
+  EXPECT_FALSE(FileViewMode::ActivateAddsToPlaylist(FileViewMode::Mode::List, false));
+  EXPECT_FALSE(FileViewMode::ActivateAddsToPlaylist(FileViewMode::Mode::Tree, false));
   EXPECT_FALSE(FileViewMode::ActivateAddsToPlaylist(FileViewMode::Mode::Tree, true));
+  EXPECT_TRUE(FileViewMode::DoubleClickAddsToPlaylist(false));
+  EXPECT_FALSE(FileViewMode::DoubleClickAddsToPlaylist(true));
+}
+
+TEST(FileViewIcons, UsesSymbolicIconsLikeQFileIconProvider) {
+  EXPECT_STREQ("folder-symbolic", FileViewIcons::IconName(true, "/music"));
+  EXPECT_STREQ("audio-x-generic-symbolic", FileViewIcons::IconName(false, "/music/roads.flac"));
+  EXPECT_STREQ("view-list-symbolic", FileViewIcons::IconName(false, "/music/album.m3u"));
+  EXPECT_STREQ("text-x-generic-symbolic", FileViewIcons::IconName(false, "/music/notes.txt"));
 }
 
 TEST(FileViewMode, RootsAddRemoveAndEncode) {

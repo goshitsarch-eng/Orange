@@ -23,6 +23,7 @@ class FileViewList {
   GtkWidget *list() const { return list_; }
   void Reload(const std::vector<std::string> &paths);
   void SetActivateCallback(ActivateCallback callback);
+  void SetDoubleClickCallback(ActivateCallback callback);
   void SetEnqueueCallback(EnqueueCallback callback);
   void SetMenuCallback(MenuCallback callback);
   void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
@@ -38,6 +39,7 @@ class FileViewList {
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
   ActivateCallback activate_;
+  ActivateCallback double_click_;
   EnqueueCallback enqueue_;
   MenuCallback menu_;
   NavigateCallback navigate_;

@@ -68,6 +68,15 @@ TEST(QueueUi, ToolbuttonIconsMatchQt) {
   EXPECT_STREQ("Clear", QueueUi::ClearTooltip());
 }
 
+TEST(QueueUi, AlternatingRowsMatchQt) {
+  EXPECT_FALSE(QueueUi::IsAltRow(0));
+  EXPECT_TRUE(QueueUi::IsAltRow(1));
+  EXPECT_FALSE(QueueUi::IsAltRow(2));
+  EXPECT_STREQ("queue-row", QueueUi::kRowClass);
+  EXPECT_STREQ("queue-alt", QueueUi::kAltClass);
+  EXPECT_NE(std::string::npos, QueueUi::AlternatingCss().find(".queue-row.queue-alt"));
+}
+
 TEST(QueueKeyboard, MatchesQtShortcuts) {
   EXPECT_EQ(QueueKeyboard::Action::Remove, QueueKeyboard::FromKey(QueueKeyboard::kDelete, 0));
   EXPECT_EQ(QueueKeyboard::Action::Clear, QueueKeyboard::FromKey('k', QueueKeyboard::kControlMask));

@@ -1,6 +1,7 @@
 #include "fileview/fileviewtree.h"
 
 #include "fileview/fileviewdrag.h"
+#include "fileview/fileviewicons.h"
 
 #include <string>
 #include <vector>
@@ -40,9 +41,26 @@ FileViewTree::FileViewTree() {
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
+  GtkGesture *primary = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(primary), GDK_BUTTON_PRIMARY);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(primary));
+  g_signal_connect(primary, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint n_press, gdouble, gdouble y, gpointer data) {
+                     auto *self = static_cast<FileViewTree *>(data);
+                     if (n_press != 2 || !self->double_click_) {
+                       return;
+                     }
+                     GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(self->list_), static_cast<int>(y));
+                     const char *path = row ? static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path")) : nullptr;
+                     if (path) {
+                       self->double_click_(path);
+                     }
+                   }),
+                   this);
 }
 
 void FileViewTree::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
+
+void FileViewTree::SetDoubleClickCallback(ActivateCallback callback) { double_click_ = std::move(callback); }
 
 void FileViewTree::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
@@ -52,14 +70,18 @@ void FileViewTree::AppendItem(GtkWidget *parent, FileViewTreeItem *item, int dep
   }
   if (!item->path.empty()) {
     GtkWidget *row = gtk_list_box_row_new();
-    const char *prefix = item->type == FileViewTreeItem::Type::File ? "🎵 " : "📁 ";
-    GtkWidget *label = gtk_label_new((std::string(prefix) + item->name).c_str());
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_widget_set_margin_start(box, 12 + depth * 16);
+    gtk_widget_set_margin_end(box, 12);
+    gtk_widget_set_margin_top(box, 6);
+    gtk_widget_set_margin_bottom(box, 6);
+    const bool is_file = item->type == FileViewTreeItem::Type::File;
+    gtk_box_append(GTK_BOX(box), gtk_image_new_from_icon_name(FileViewIcons::IconName(!is_file, item->path)));
+    GtkWidget *label = gtk_label_new(item->name.c_str());
     gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_margin_start(label, 12 + depth * 16);
-    gtk_widget_set_margin_end(label, 12);
-    gtk_widget_set_margin_top(label, 6);
-    gtk_widget_set_margin_bottom(label, 6);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+    gtk_widget_set_hexpand(label, TRUE);
+    gtk_box_append(GTK_BOX(box), label);
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
     g_object_set_data_full(G_OBJECT(row), "file-path", g_strdup(item->path.c_str()), g_free);
     SetupRowDrag(row, item->path);
     gtk_list_box_append(GTK_LIST_BOX(parent), row);

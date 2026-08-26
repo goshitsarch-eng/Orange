@@ -5,6 +5,7 @@
 #include "queue/queuedrop.h"
 #include "queue/queuekeyboard.h"
 #include "queue/queueui.h"
+#include "utilities/styleutils.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 
@@ -19,6 +20,7 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
   list_ = gtk_list_box_new();
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_widget_set_vexpand(list_, TRUE);
+  StyleUtils::LoadCss(QueueUi::AlternatingCss());
   GtkWidget *overlay = gtk_overlay_new();
   gtk_overlay_set_child(GTK_OVERLAY(overlay), list_);
   drop_overlay_ = gtk_drawing_area_new();
@@ -239,6 +241,10 @@ void QueueView::Rebuild() {
     gtk_widget_set_margin_bottom(label, 8);
     if (current) {
       gtk_widget_add_css_class(row, "accent");
+    }
+    gtk_widget_add_css_class(row, QueueUi::kRowClass);
+    if (QueueUi::IsAltRow(index)) {
+      gtk_widget_add_css_class(row, QueueUi::kAltClass);
     }
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
     g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index + 1));

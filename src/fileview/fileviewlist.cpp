@@ -1,6 +1,7 @@
 #include "fileview/fileviewlist.h"
 
 #include "fileview/fileviewdrag.h"
+#include "fileview/fileviewicons.h"
 #include "utilities/fileutils.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
@@ -57,12 +58,22 @@ void FileViewList::SetNavigateCallback(NavigateCallback callback) { navigate_ = 
 
 void FileViewList::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
+void FileViewList::SetDoubleClickCallback(ActivateCallback callback) { double_click_ = std::move(callback); }
+
 void FileViewList::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
 
 void FileViewList::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
 void FileViewList::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
   (void)x;
+  if (button == CollectionTreeClick::kPrimaryButton && n_press == 2 && double_click_) {
+    GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+    const char *path = row ? static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path")) : nullptr;
+    if (path) {
+      double_click_(path);
+    }
+    return;
+  }
   if (CollectionTreeClick::FromPress(button, n_press, state) != CollectionTreeClick::Action::Enqueue || !enqueue_) {
     return;
   }
@@ -83,13 +94,17 @@ void FileViewList::Reload(const std::vector<std::string> &paths) {
   for (const std::string &path : paths) {
     GtkWidget *row = gtk_list_box_row_new();
     const bool dir = FileUtils::IsDirectory(path);
-    GtkWidget *label = gtk_label_new(((dir ? "📁 " : "🎵 ") + FileUtils::BaseName(path)).c_str());
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_widget_set_margin_start(box, 12);
+    gtk_widget_set_margin_end(box, 12);
+    gtk_widget_set_margin_top(box, 8);
+    gtk_widget_set_margin_bottom(box, 8);
+    gtk_box_append(GTK_BOX(box), gtk_image_new_from_icon_name(FileViewIcons::IconName(dir, path)));
+    GtkWidget *label = gtk_label_new(FileUtils::BaseName(path).c_str());
     gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_margin_start(label, 12);
-    gtk_widget_set_margin_end(label, 12);
-    gtk_widget_set_margin_top(label, 8);
-    gtk_widget_set_margin_bottom(label, 8);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+    gtk_widget_set_hexpand(label, TRUE);
+    gtk_box_append(GTK_BOX(box), label);
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
     g_object_set_data_full(G_OBJECT(row), "file-path", g_strdup(path.c_str()), g_free);
     g_object_set_data_full(G_OBJECT(row), "file-label", g_strdup(FileUtils::BaseName(path).c_str()), g_free);
     SetupRowDrag(row, path);

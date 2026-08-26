@@ -74,16 +74,13 @@ FileView::FileView() {
                    }),
                    this);
   tree_->SetActivateCallback([this](const std::string &path) {
-    const bool is_directory = FileUtils::IsDirectory(path);
-    if (FileViewMode::ActivateNavigates(mode_, is_directory)) {
+    if (FileViewMode::ActivateNavigates(mode_, FileUtils::IsDirectory(path))) {
       SetPath(path);
-      return;
-    }
-    if (FileViewMode::ActivateAddsToPlaylist(mode_, is_directory) && add_to_playlist_) {
-      add_to_playlist_({path});
     }
   });
+  tree_->SetDoubleClickCallback([this](const std::string &path) { DoubleClick(path); });
   list_->SetActivateCallback([this](const std::string &path) { Activate(path); });
+  list_->SetDoubleClickCallback([this](const std::string &path) { DoubleClick(path); });
   list_->SetMenuCallback([this](const std::vector<std::string> &paths) { ShowMenu(paths); });
   tree_->SetMenuCallback([this](const std::string &path) {
     if (!path.empty()) {
@@ -321,11 +318,13 @@ void FileView::SetDeleteCallback(PathsCallback callback) { delete_ = std::move(c
 void FileView::SetShowInBrowserCallback(PathsCallback callback) { show_in_browser_ = std::move(callback); }
 
 void FileView::Activate(const std::string &path) {
-  if (FileUtils::IsDirectory(path)) {
+  if (FileViewMode::ActivateNavigates(mode_, FileUtils::IsDirectory(path))) {
     SetPath(path);
-    return;
   }
-  if (add_to_playlist_) {
+}
+
+void FileView::DoubleClick(const std::string &path) {
+  if (FileViewMode::DoubleClickAddsToPlaylist(FileUtils::IsDirectory(path)) && add_to_playlist_) {
     add_to_playlist_({path});
   }
 }

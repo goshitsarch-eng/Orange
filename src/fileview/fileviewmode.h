@@ -24,7 +24,10 @@ inline bool RootButtonsVisible(Mode mode) { return mode == Mode::Tree; }
 
 inline bool ActivateNavigates(Mode mode, bool is_directory) { return mode == Mode::List && is_directory; }
 
-inline bool ActivateAddsToPlaylist(Mode mode, bool is_directory) { return !is_directory && (mode == Mode::List || mode == Mode::Tree); }
+// Qt FileView::ItemActivated only opens directories in the list. Files are added on double-click.
+inline bool ActivateAddsToPlaylist(Mode, bool) { return false; }
+
+inline bool DoubleClickAddsToPlaylist(bool is_directory) { return !is_directory; }
 
 inline std::string CleanPath(std::string path) {
   while (path.size() > 1 && (path.back() == '/' || path.back() == '\\')) {
