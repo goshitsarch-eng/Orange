@@ -2,8 +2,10 @@
 
 #include "config.h"
 #include "core/application.h"
+#include "core/oauthenticator.h"
 #include "core/settings.h"
 #include "ui/dialogs.h"
+#include "utilities/jsonutils.h"
 
 #include <adwaita.h>
 
@@ -63,6 +65,10 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AddToggle(group, settings, "resumeplayback", "Resume playback on startup", nullptr, true);
     AddToggle(group, settings, "stopplayifclosed", "Stop playing if the window is closed", nullptr, false);
     AddToggle(group, settings, "continueonerror", "Continue on error", nullptr, true);
+    AddToggle(group, settings, "showtrayicon", "Show system tray icon", nullptr, true);
+    AddToggle(group, settings, "keeprunning", "Keep running in the tray when the window is closed", nullptr, false);
+    AddToggle(group, settings, "starthidden", "Start hidden", nullptr, false);
+    AddToggle(group, settings, "songtracking", "Track songs with Chromaprint / AcoustID", nullptr, false);
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -74,6 +80,8 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AddToggle(group, settings, "startupscan", "Scan collection on startup", nullptr, true);
     AddToggle(group, settings, "monitor", "Watch folders for changes", nullptr, true);
     AddToggle(group, settings, "prettycovers", "Use pretty covers", nullptr, true);
+    AddToggle(group, settings, "variousartists", "Group various artists albums", nullptr, true);
+    AddToggle(group, settings, "show_dividers", "Show artist / album dividers", nullptr, true);
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -85,6 +93,8 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AddEntry(group, settings, "output", "GStreamer output", "autoaudiosink");
     AddEntry(group, settings, "device", "Device");
     AddToggle(group, settings, "rgenabled", "ReplayGain / EBU R128", "Normalize volume using ReplayGain or EBU R128", false);
+    AddEntry(group, settings, "rgmode", "ReplayGain mode (album/track)", "album");
+    AddToggle(group, settings, "fading", "Cross-fade between tracks", nullptr, false);
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -94,6 +104,10 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddToggle(group, settings, "alternating_row_colors", "Alternating row colors", nullptr, true);
     AddToggle(group, settings, "barcodes", "Show barcodes", nullptr, false);
+    AddToggle(group, settings, "greyout_unavailable", "Grey out unavailable songs", nullptr, true);
+    AddToggle(group, settings, "warnclose", "Warn when closing a playlist", nullptr, true);
+    AddEntry(group, settings, "columns", "Visible columns",
+             "Track,Title,Artist,Album,Album artist,Length,Year,Genre,Bitrate,Sample rate,Plays,Rating,Filename");
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -193,6 +207,23 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesPage *page = MakePage("Shortcuts", "input-keyboard-symbolic");
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddToggle(group, settings, "enabled", "Enable global shortcuts", nullptr, true);
+    AddEntry(group, settings, "playpause", "Play / Pause", "MediaPlay");
+    AddEntry(group, settings, "next", "Next", "MediaNext");
+    AddEntry(group, settings, "previous", "Previous", "MediaPrevious");
+    AdwActionRow *grab = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(grab), "Grab play/pause shortcut");
+    GtkWidget *grab_button = gtk_button_new_with_label("Grab");
+    g_signal_connect(grab_button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                       auto *s = static_cast<Settings *>(data);
+                       Dialogs::GrabShortcut(nullptr, [s](const std::string &accel) {
+                         s->BeginGroup("GlobalShortcuts");
+                         s->SetValue("playpause", accel);
+                         s->Sync();
+                       });
+                     }),
+                     settings);
+    adw_action_row_add_suffix(grab, grab_button);
+    adw_preferences_group_add(group, GTK_WIDGET(grab));
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -243,17 +274,44 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesPage *page = MakePage("Tidal", "emblem-shared-symbolic");
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddEntry(group, settings, "clientid", "Client ID");
+    AddEntry(group, settings, "clientsecret", "Client secret");
     AdwActionRow *login = ADW_ACTION_ROW(adw_action_row_new());
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(login), "OAuth");
     GtkWidget *button = gtk_button_new_with_label("Sign in");
-    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+    g_signal_connect(button, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
                        auto *application = static_cast<Application *>(data);
-                       Dialogs::Login(nullptr, "Tidal", [application](const std::string &user, const std::string &token) {
-                         if (StreamingService *service = application->streaming_services()->ServiceByName("Tidal")) {
-                           service->Login(user, token);
-                         }
-                       });
-                     }),
+                       Settings s;
+                       s.BeginGroup("Tidal");
+                       const std::string client_id = s.Value("clientid");
+                       if (client_id.empty()) {
+                         Dialogs::Login(nullptr, "Tidal", [application](const std::string &user, const std::string &token) {
+                           if (StreamingService *service = application->streaming_services()->ServiceByName("Tidal")) {
+                             service->Login(user, token);
+                           }
+                         });
+                         return;
+                       }
+                       auto *oauth = new OAuthenticator(application->network());
+                       oauth->AuthorizeInBrowser("https://login.tidal.com/authorize", client_id, "r_usr r_res w_usr",
+                                                 [application, oauth](const std::string &code, const std::string &error) {
+                                                   if (!code.empty()) {
+                                                     Settings ts;
+                                                     ts.BeginGroup("Tidal");
+                                                     oauth->ExchangeCode("https://auth.tidal.com/v1/oauth2/token", ts.Value("clientid"),
+                                                                         ts.Value("clientsecret"), code,
+                                                                         [application, oauth](const std::string &body, const std::string &) {
+                                                                           const std::string token = JsonUtils::GetString(body, {"access_token"});
+                                                                           if (StreamingService *service = application->streaming_services()->ServiceByName("Tidal")) {
+                                                                             service->Login({}, token.empty() ? body : token);
+                                                                           }
+                                                                           delete oauth;
+                                                                         });
+                                                   } else {
+                                                     (void)error;
+                                                     delete oauth;
+                                                   }
+                                                 });
+                     })),
                      app);
     adw_action_row_add_suffix(login, button);
     adw_preferences_group_add(group, GTK_WIDGET(login));
@@ -291,17 +349,43 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesPage *page = MakePage("Spotify", "emblem-shared-symbolic");
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddEntry(group, settings, "clientid", "Client ID");
+    AddEntry(group, settings, "clientsecret", "Client secret");
     AdwActionRow *login = ADW_ACTION_ROW(adw_action_row_new());
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(login), "OAuth");
     GtkWidget *button = gtk_button_new_with_label("Sign in");
-    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+    g_signal_connect(button, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
                        auto *application = static_cast<Application *>(data);
-                       Dialogs::Login(nullptr, "Spotify", [application](const std::string &user, const std::string &token) {
-                         if (StreamingService *service = application->streaming_services()->ServiceByName("Spotify")) {
-                           service->Login(user, token);
-                         }
-                       });
-                     }),
+                       Settings s;
+                       s.BeginGroup("Spotify");
+                       const std::string client_id = s.Value("clientid");
+                       if (client_id.empty()) {
+                         Dialogs::Login(nullptr, "Spotify", [application](const std::string &user, const std::string &token) {
+                           if (StreamingService *service = application->streaming_services()->ServiceByName("Spotify")) {
+                             service->Login(user, token);
+                           }
+                         });
+                         return;
+                       }
+                       auto *oauth = new OAuthenticator(application->network());
+                       oauth->AuthorizeInBrowser("https://accounts.spotify.com/authorize", client_id, "user-read-private user-read-email",
+                                                 [application, oauth](const std::string &code, const std::string &error) {
+                                                   if (code.empty()) {
+                                                     (void)error;
+                                                     delete oauth;
+                                                     return;
+                                                   }
+                                                   Settings ss;
+                                                   ss.BeginGroup("Spotify");
+                                                   oauth->ExchangeCode("https://accounts.spotify.com/api/token", ss.Value("clientid"), ss.Value("clientsecret"),
+                                                                       code, [application, oauth](const std::string &body, const std::string &) {
+                                                                         const std::string token = JsonUtils::GetString(body, {"access_token"});
+                                                                         if (StreamingService *service = application->streaming_services()->ServiceByName("Spotify")) {
+                                                                           service->Login({}, token.empty() ? body : token);
+                                                                         }
+                                                                         delete oauth;
+                                                                       });
+                                                 });
+                     })),
                      app);
     adw_action_row_add_suffix(login, button);
     adw_preferences_group_add(group, GTK_WIDGET(login));

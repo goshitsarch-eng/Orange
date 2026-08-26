@@ -29,6 +29,7 @@ class CoverProviders {
   void Fetch(const Song &song, CoverProvider::Callback callback);
   std::vector<CoverProvider *> All() const;
   void FetchFromEmbeddedOrFile(const Song &song, CoverProvider::Callback callback);
+  static bool SaveAlbumCover(const Song &song, const std::string &image_data, class TagReader *tagreader = nullptr);
 
  private:
   void FetchFromIndex(const Song &song, size_t index, CoverProvider::Callback callback);

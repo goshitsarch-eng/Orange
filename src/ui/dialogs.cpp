@@ -2,11 +2,13 @@
 
 #include "core/application.h"
 #include "core/settings.h"
+#include "playlistparsers/playlistparser.h"
 #include "equalizer/equalizer.h"
 #include "organize/organize.h"
 #include "smartplaylists/smartplaylist.h"
 #include "transcoder/transcoder.h"
 #include "utilities/fileutils.h"
+#include "utilities/jsonutils.h"
 #include "utilities/timeutils.h"
 
 #include <adwaita.h>
@@ -73,16 +75,24 @@ void Dialogs::CoverManager(GtkWindow *parent, Application *app) {
     GtkWidget *button = gtk_button_new_with_label("Fetch");
     gtk_widget_add_css_class(button, "flat");
     g_object_set_data_full(G_OBJECT(button), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
-    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+    g_signal_connect(button, "clicked", G_CALLBACK((+[](GtkButton *btn, gpointer data) {
                        auto *application = static_cast<Application *>(data);
                        auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(btn), "song"));
                        if (!song) {
                          return;
                        }
-                       application->cover_providers()->Fetch(*song, [btn](const std::string &image, const std::string &error) {
-                         gtk_button_set_label(GTK_BUTTON(btn), image.empty() ? (error.empty() ? "Missing" : "Failed") : "Saved");
+                       application->cover_providers()->Fetch(*song, [btn, application, song](const std::string &image, const std::string &error) {
+                         if (!image.empty() && CoverProviders::SaveAlbumCover(*song, image, application->tagreader())) {
+                           song->set_art_manual(FileUtils::UriFromPath(FileUtils::Join(FileUtils::DirName(FileUtils::PathFromUri(song->url())), "cover.jpg")));
+                           if (song->id() > 0) {
+                             application->collection()->backend()->AddOrUpdateSong(*song);
+                           }
+                           gtk_button_set_label(GTK_BUTTON(btn), "Saved");
+                           return;
+                         }
+                         gtk_button_set_label(GTK_BUTTON(btn), image.empty() ? (error.empty() ? "Missing" : "Failed") : "Failed");
                        });
-                     }),
+                     })),
                      app);
     adw_action_row_add_suffix(ADW_ACTION_ROW(row), button);
     gtk_list_box_append(GTK_LIST_BOX(list), row);
@@ -90,12 +100,24 @@ void Dialogs::CoverManager(GtkWindow *parent, Application *app) {
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list);
   gtk_box_append(GTK_BOX(box), scroll);
   GtkWidget *current = gtk_button_new_with_label("Fetch cover for current song");
-  g_signal_connect(current, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+  g_signal_connect(current, "clicked", G_CALLBACK((+[](GtkButton *btn, gpointer data) {
                      auto *application = static_cast<Application *>(data);
-                     application->cover_providers()->Fetch(application->player()->current_song(), [](const std::string &, const std::string &) {});
+                     Song song = application->player()->current_song();
+                     application->cover_providers()->Fetch(song, [application, song, btn](const std::string &image, const std::string &) {
+                       if (!image.empty() && CoverProviders::SaveAlbumCover(song, image, application->tagreader())) {
+                         gtk_button_set_label(btn, "Saved");
+                       }
+                     });
+                   })),
+                   app);
+  GtkWidget *from_url = gtk_button_new_with_label("Load cover from URL…");
+  g_signal_connect(from_url, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     Dialogs::CoverFromUrl(nullptr, application);
                    }),
                    app);
   gtk_box_append(GTK_BOX(box), current);
+  gtk_box_append(GTK_BOX(box), from_url);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }
@@ -275,12 +297,30 @@ void Dialogs::TagFetcher(GtkWindow *parent, Application *app) {
   gtk_box_append(GTK_BOX(box), list);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
-  app->tag_fetcher()->Results.Connect([status, list](const SongList &songs) {
-    gtk_label_set_text(GTK_LABEL(status), songs.empty() ? "No matches" : (std::to_string(songs.size()) + " matches").c_str());
+  app->tag_fetcher()->Results.Connect([status, list, app](const SongList &songs) {
+    gtk_label_set_text(GTK_LABEL(status), songs.empty() ? "No matches" : (std::to_string(songs.size()) + " matches — click Apply to write tags").c_str());
     for (const Song &song : songs) {
+      auto *copy = new Song(song);
       GtkWidget *row = adw_action_row_new();
       adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), song.PrettyTitle().c_str());
-      adw_action_row_set_subtitle(ADW_ACTION_ROW(row), (song.artist() + " – " + song.album()).c_str());
+      adw_action_row_set_subtitle(ADW_ACTION_ROW(row), (song.artist() + " – " + song.album() + (song.year() > 0 ? " (" + std::to_string(song.year()) + ")" : "")).c_str());
+      GtkWidget *apply = gtk_button_new_with_label("Apply");
+      gtk_widget_add_css_class(apply, "suggested-action");
+      g_object_set_data_full(G_OBJECT(apply), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+      g_signal_connect(apply, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                         auto *application = static_cast<Application *>(data);
+                         auto *result = static_cast<Song *>(g_object_get_data(G_OBJECT(btn), "song"));
+                         if (!result) {
+                           return;
+                         }
+                         application->tagreader()->WriteFile(*result);
+                         if (result->id() > 0) {
+                           application->collection()->backend()->AddOrUpdateSong(*result);
+                         }
+                         gtk_button_set_label(btn, "Applied");
+                       }),
+                       app);
+      adw_action_row_add_suffix(ADW_ACTION_ROW(row), apply);
       gtk_list_box_append(GTK_LIST_BOX(list), row);
     }
   });
@@ -544,6 +584,177 @@ void Dialogs::Console(GtkWindow *parent) {
   gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(view)), "Logging is written to the GLib log domain \"strawberry\".", -1);
   adw_dialog_set_child(dialog, view);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
+}
+
+void Dialogs::CoverFromUrl(GtkWindow *parent, Application *app) {
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new("Cover from URL", "Download artwork and save it next to the current song."));
+  GtkWidget *entry = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(entry), "https://");
+  adw_alert_dialog_set_extra_child(dialog, entry);
+  adw_alert_dialog_add_responses(dialog, "cancel", "Cancel", "fetch", "Download", nullptr);
+  g_object_set_data(G_OBJECT(dialog), "entry", entry);
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+                     if (g_strcmp0(response, "fetch") != 0) {
+                       return;
+                     }
+                     auto *application = static_cast<Application *>(data);
+                     const char *url = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(alert), "entry")));
+                     if (!url || !*url) {
+                       return;
+                     }
+                     application->network()->Get(url, [application](const NetworkAccessManager::Response &result) {
+                       if (result.ok() && JsonUtils::LooksLikeImage(result.body)) {
+                         CoverProviders::SaveAlbumCover(application->player()->current_song(), result.body, application->tagreader());
+                       }
+                     });
+                   }),
+                   app);
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
+}
+
+void Dialogs::PlaylistColumns(GtkWindow *parent, const std::function<void()> &callback) {
+  AdwDialog *dialog = adw_dialog_new();
+  adw_dialog_set_title(dialog, "Playlist columns");
+  adw_dialog_set_content_width(dialog, 360);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_start(box, 16);
+  gtk_widget_set_margin_end(box, 16);
+  gtk_widget_set_margin_top(box, 16);
+  gtk_widget_set_margin_bottom(box, 16);
+  static const char *columns[] = {"Track", "Title", "Artist", "Album", "Album artist", "Performer", "Composer", "Year", "Original year",
+                                  "Disc", "Length", "Genre", "Sample rate", "Bit depth", "Bitrate", "URL", "Filename", "Filesize",
+                                  "Filetype", "Date created", "Date modified", "Plays", "Skips", "Last played", "Comment", "Grouping",
+                                  "Source", "Moodbar", "Rating", "CUE", "EBU R128 I", "EBU R128 LRA", "BPM", "Mood", "Initial key", nullptr};
+  Settings settings;
+  settings.BeginGroup("Playlist");
+  const std::string enabled = settings.Value("columns", "Track,Title,Artist,Album,Album artist,Length,Year,Genre,Bitrate,Sample rate,Plays,Rating,Filename");
+  GtkWidget *list = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+  for (int i = 0; columns[i]; ++i) {
+    GtkWidget *check = gtk_check_button_new_with_label(columns[i]);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(check), enabled.find(columns[i]) != std::string::npos);
+    gtk_box_append(GTK_BOX(list), check);
+  }
+  GtkWidget *scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(scroll, TRUE);
+  gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(scroll), 360);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list);
+  GtkWidget *apply = gtk_button_new_with_label("Apply");
+  gtk_widget_add_css_class(apply, "suggested-action");
+  auto *cb = new std::function<void()>(callback);
+  g_object_set_data(G_OBJECT(apply), "list", list);
+  g_object_set_data_full(G_OBJECT(apply), "callback", cb, [](gpointer p) { delete static_cast<std::function<void()> *>(p); });
+  g_signal_connect(apply, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
+                     GtkWidget *list_box = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "list"));
+                     std::string value;
+                     for (GtkWidget *child = gtk_widget_get_first_child(list_box); child; child = gtk_widget_get_next_sibling(child)) {
+                       if (GTK_IS_CHECK_BUTTON(child) && gtk_check_button_get_active(GTK_CHECK_BUTTON(child))) {
+                         if (!value.empty()) {
+                           value += ",";
+                         }
+                         value += gtk_check_button_get_label(GTK_CHECK_BUTTON(child));
+                       }
+                     }
+                     Settings settings;
+                     settings.BeginGroup("Playlist");
+                     settings.SetValue("columns", value);
+                     settings.Sync();
+                     if (auto *fn = static_cast<std::function<void()> *>(g_object_get_data(G_OBJECT(button), "callback"))) {
+                       (*fn)();
+                     }
+                   }),
+                   nullptr);
+  gtk_box_append(GTK_BOX(box), scroll);
+  gtk_box_append(GTK_BOX(box), apply);
+  adw_dialog_set_child(dialog, box);
+  adw_dialog_present(dialog, GTK_WIDGET(parent));
+}
+
+void Dialogs::DeleteFiles(GtkWindow *parent, Application *app) {
+  Playlist *playlist = app->playlist_manager()->active();
+  if (!playlist || playlist->current_row() < 0) {
+    Error(parent, "Select a song in the playlist first.");
+    return;
+  }
+  const Song song = playlist->current_song();
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new("Delete files", ("Permanently delete “" + song.PrettyTitle() + "” from disk?").c_str()));
+  adw_alert_dialog_add_responses(dialog, "cancel", "Cancel", "delete", "Delete", nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "delete", ADW_RESPONSE_DESTRUCTIVE);
+  auto *copy = new Song(song);
+  g_object_set_data_full(G_OBJECT(dialog), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+                     if (g_strcmp0(response, "delete") != 0) {
+                       return;
+                     }
+                     auto *application = static_cast<Application *>(data);
+                     auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(alert), "song"));
+                     const std::string path = FileUtils::PathFromUri(song->url());
+                     FileUtils::Remove(path);
+                     if (application->playlist_manager()->active()) {
+                       application->playlist_manager()->active()->RemoveRows({application->playlist_manager()->current_row()});
+                       application->playlist_manager()->SaveActive();
+                     }
+                   }),
+                   app);
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
+}
+
+void Dialogs::CopyToDevice(GtkWindow *parent, Application *app) {
+  AdwDialog *dialog = adw_dialog_new();
+  adw_dialog_set_title(dialog, "Copy to device");
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_start(box, 16);
+  gtk_widget_set_margin_end(box, 16);
+  gtk_widget_set_margin_top(box, 16);
+  gtk_widget_set_margin_bottom(box, 16);
+  app->device_manager()->Rescan();
+  GtkWidget *list = gtk_list_box_new();
+  gtk_widget_add_css_class(list, "boxed-list");
+  for (const ConnectedDevice &device : app->device_manager()->devices()) {
+    GtkWidget *row = adw_action_row_new();
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), device.friendly_name.c_str());
+    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), device.mount_path.empty() ? device.backend.c_str() : device.mount_path.c_str());
+    GtkWidget *copy = gtk_button_new_with_label("Copy playlist");
+    g_object_set_data_full(G_OBJECT(copy), "device-id", g_strdup(device.unique_id.c_str()), g_free);
+    g_signal_connect(copy, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                       auto *application = static_cast<Application *>(data);
+                       const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "device-id"));
+                       if (id && application->playlist_manager()->active()) {
+                         const bool ok = application->device_manager()->CopySongs(id, application->playlist_manager()->active()->songs());
+                         gtk_button_set_label(btn, ok ? "Copied" : "Failed");
+                       }
+                     }),
+                     app);
+    adw_action_row_add_suffix(ADW_ACTION_ROW(row), copy);
+    gtk_list_box_append(GTK_LIST_BOX(list), row);
+  }
+  gtk_box_append(GTK_BOX(box), list);
+  adw_dialog_set_child(dialog, box);
+  adw_dialog_present(dialog, GTK_WIDGET(parent));
+}
+
+void Dialogs::SaveAllPlaylists(GtkWindow *parent, Application *app) {
+  GtkFileDialog *chooser = gtk_file_dialog_new();
+  gtk_file_dialog_set_title(chooser, "Save all playlists");
+  gtk_file_dialog_select_folder(chooser, parent, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+    auto *application = static_cast<Application *>(data);
+    GError *error = nullptr;
+    GFile *folder = gtk_file_dialog_select_folder_finish(GTK_FILE_DIALOG(source), result, &error);
+    if (!folder) {
+      if (error) {
+        g_error_free(error);
+      }
+      return;
+    }
+    gchar *path = g_file_get_path(folder);
+    if (path) {
+      for (const auto &playlist : application->playlist_manager()->playlists()) {
+        const std::string dest = FileUtils::Join(path, playlist->name() + ".m3u");
+        PlaylistParser().Save(dest, playlist->songs());
+      }
+      g_free(path);
+    }
+    g_object_unref(folder);
+  }, app);
 }
 
 void Dialogs::Error(GtkWindow *parent, const std::string &message) {

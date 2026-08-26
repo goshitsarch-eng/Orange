@@ -111,4 +111,19 @@ bool WriteFile(const std::string &path, const std::string &contents) {
   return g_file_set_contents(path.c_str(), contents.data(), static_cast<gssize>(contents.size()), nullptr);
 }
 
+bool CopyFile(const std::string &source, const std::string &destination) {
+  GFile *src = g_file_new_for_path(source.c_str());
+  GFile *dest = g_file_new_for_path(destination.c_str());
+  GError *error = nullptr;
+  const gboolean ok = g_file_copy(src, dest, G_FILE_COPY_OVERWRITE, nullptr, nullptr, nullptr, &error);
+  if (error) {
+    g_error_free(error);
+  }
+  g_object_unref(src);
+  g_object_unref(dest);
+  return ok == TRUE;
+}
+
+bool Remove(const std::string &path) { return g_unlink(path.c_str()) == 0; }
+
 }  // namespace FileUtils

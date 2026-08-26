@@ -1,6 +1,7 @@
 #include "utilities/strutils.h"
 #include "utilities/timeutils.h"
 #include "utilities/fileutils.h"
+#include "core/oauthenticator.h"
 #include "organize/organize.h"
 #include "analyzer/analyzer.h"
 
@@ -35,6 +36,17 @@ TEST(FileUtils, BaseAndExtension) {
   EXPECT_EQ("mp3", FileUtils::Extension("/tmp/music/song.mp3"));
 }
 
+TEST(FileUtils, CopyAndRemove) {
+  const std::string src = "/tmp/strawberry-copy-src.txt";
+  const std::string dest = "/tmp/strawberry-copy-dest.txt";
+  ASSERT_TRUE(FileUtils::WriteFile(src, "hello"));
+  EXPECT_TRUE(FileUtils::CopyFile(src, dest));
+  EXPECT_EQ("hello", FileUtils::ReadFile(dest));
+  EXPECT_TRUE(FileUtils::Remove(dest));
+  EXPECT_TRUE(FileUtils::Remove(src));
+  EXPECT_FALSE(FileUtils::Exists(dest));
+}
+
 TEST(OrganizeFormat, ExpandsTokens) {
   OrganizeFormat format("%albumartist/%album/%track - %title");
   Song song;
@@ -53,4 +65,11 @@ TEST(Analyzer, Types) {
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Wave"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Sonic"));
   EXPECT_NE(types.end(), std::find(types.begin(), types.end(), "Block"));
+}
+
+TEST(OAuthenticator, BuildAuthorizeUrl) {
+  const std::string url = OAuthenticator::BuildAuthorizeUrl("https://example.com/oauth", "client", "http://127.0.0.1:9/callback", "scope");
+  EXPECT_NE(std::string::npos, url.find("response_type=code"));
+  EXPECT_NE(std::string::npos, url.find("client_id=client"));
+  EXPECT_NE(std::string::npos, url.find("redirect_uri="));
 }

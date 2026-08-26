@@ -167,6 +167,25 @@ std::vector<CoverProvider *> CoverProviders::All() const {
   return result;
 }
 
+bool CoverProviders::SaveAlbumCover(const Song &song, const std::string &image_data, TagReader *tagreader) {
+  if (image_data.empty()) {
+    return false;
+  }
+  const std::string path = FileUtils::PathFromUri(song.url());
+  const std::string dir = FileUtils::DirName(path);
+  const std::string dest = FileUtils::Join(dir.empty() ? "." : dir, "cover.jpg");
+  if (!FileUtils::WriteFile(dest, image_data)) {
+    return false;
+  }
+  if (tagreader && !path.empty() && FileUtils::Exists(path)) {
+    TagReader::CoverData cover;
+    cover.data.assign(image_data.begin(), image_data.end());
+    cover.mime_type = "image/jpeg";
+    tagreader->SaveCover(path, cover);
+  }
+  return true;
+}
+
 void CoverProviders::FetchFromEmbeddedOrFile(const Song &song, CoverProvider::Callback callback) {
   if (!song.art_manual().empty() && FileUtils::Exists(FileUtils::PathFromUri(song.art_manual()))) {
     callback(FileUtils::ReadFile(FileUtils::PathFromUri(song.art_manual())), {});

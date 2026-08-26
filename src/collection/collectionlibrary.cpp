@@ -9,7 +9,7 @@ CollectionLibrary::CollectionLibrary(Database *database, TaskManager *task_manag
       backend_(std::make_unique<CollectionBackend>(database)),
       watcher_(std::make_unique<CollectionWatcher>(backend_.get(), tagreader, task_manager)) {}
 
-void CollectionLibrary::Init() {}
+void CollectionLibrary::Init() { watcher_->StartWatching(); }
 
 void CollectionLibrary::IncrementalScan() {
   watcher_->Scan();
@@ -25,6 +25,7 @@ void CollectionLibrary::AddDirectory(const std::string &path, bool subdirs) {
   const int id = backend_->AddDirectory(path, subdirs);
   if (id >= 0) {
     watcher_->ScanDirectory(id, path, subdirs);
+    watcher_->StartWatching();
   }
   ScanFinished.Emit();
 }

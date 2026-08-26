@@ -22,6 +22,9 @@ TEST(Song, FiletypeAndAudio) {
   EXPECT_EQ(Song::FileType::MPEG, Song::FiletypeByFilename("track.mp3"));
   EXPECT_TRUE(Song::IsAudioFile("album/01.flac"));
   EXPECT_FALSE(Song::IsAudioFile("notes.txt"));
+  EXPECT_EQ("FLAC", Song::FiletypeToString(Song::FileType::FLAC));
+  EXPECT_EQ("MP3", Song::FiletypeToString(Song::FileType::MPEG));
+  EXPECT_EQ("Collection", Song::SourceToString(Song::Source::Collection));
 }
 
 TEST(Song, EqualityByUrl) {

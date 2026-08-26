@@ -13,6 +13,7 @@ class Dialogs {
  public:
   static void AddStream(GtkWindow *parent, const std::function<void(const std::string &, const std::string &)> &callback);
   static void CoverManager(GtkWindow *parent, Application *app);
+  static void CoverFromUrl(GtkWindow *parent, Application *app);
   static void Equalizer(GtkWindow *parent, class Equalizer *equalizer);
   static void Transcode(GtkWindow *parent, Application *app);
   static void Organize(GtkWindow *parent, Application *app);
@@ -23,6 +24,10 @@ class Dialogs {
   static void Login(GtkWindow *parent, const std::string &service, const std::function<void(const std::string &, const std::string &)> &callback);
   static void SmartPlaylistWizard(GtkWindow *parent, Application *app);
   static void GroupBy(GtkWindow *parent, const std::function<void(const std::string &)> &callback);
+  static void PlaylistColumns(GtkWindow *parent, const std::function<void()> &callback);
+  static void DeleteFiles(GtkWindow *parent, Application *app);
+  static void CopyToDevice(GtkWindow *parent, Application *app);
+  static void SaveAllPlaylists(GtkWindow *parent, Application *app);
   static void Console(GtkWindow *parent);
   static void Error(GtkWindow *parent, const std::string &message);
 };

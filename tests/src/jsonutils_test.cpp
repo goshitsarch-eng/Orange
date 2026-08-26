@@ -63,3 +63,23 @@ TEST(JsonUtils, GetStringPath) {
   const std::string json = R"({"album":{"name":"Dummy"}})";
   EXPECT_EQ("Dummy", JsonUtils::GetString(json, {"album", "name"}));
 }
+
+TEST(JsonUtils, MusicBrainzRecordings) {
+  const std::string json = R"({
+    "recordings": [
+      {
+        "id": "rec-1",
+        "title": "Helplessness Blues",
+        "artist-credit": [{"name": "Fleet Foxes", "artist": {"id": "art-1", "name": "Fleet Foxes"}}],
+        "releases": [{"id": "rel-1", "title": "Helplessness Blues", "date": "2011-05-03"}]
+      }
+    ]
+  })";
+  const SongList songs = JsonUtils::ParseMusicBrainzRecordings(json);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Helplessness Blues", songs.front().title());
+  EXPECT_EQ("Fleet Foxes", songs.front().artist());
+  EXPECT_EQ("Helplessness Blues", songs.front().album());
+  EXPECT_EQ(2011, songs.front().year());
+  EXPECT_EQ("rec-1", songs.front().musicbrainz_recording_id());
+}

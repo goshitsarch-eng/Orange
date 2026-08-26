@@ -2,12 +2,52 @@
 
 #include "collection/collectionbackend.h"
 #include "core/logging.h"
+#include "core/settings.h"
 #include "core/taskmanager.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
 CollectionWatcher::CollectionWatcher(CollectionBackend *backend, TagReader *tagreader, TaskManager *task_manager)
     : backend_(backend), tagreader_(tagreader), task_manager_(task_manager) {}
+
+CollectionWatcher::~CollectionWatcher() { StopWatching(); }
+
+void CollectionWatcher::StopWatching() {
+  for (GFileMonitor *monitor : monitors_) {
+    g_file_monitor_cancel(monitor);
+    g_object_unref(monitor);
+  }
+  monitors_.clear();
+}
+
+void CollectionWatcher::WatchPath(const std::string &path) {
+  GFile *file = g_file_new_for_path(path.c_str());
+  GFileMonitor *monitor = g_file_monitor_directory(file, G_FILE_MONITOR_NONE, nullptr, nullptr);
+  g_object_unref(file);
+  if (!monitor) {
+    return;
+  }
+  g_signal_connect(monitor, "changed", G_CALLBACK(+[](GFileMonitor *, GFile *, GFile *, GFileMonitorEvent event, gpointer data) {
+                     if (event == G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT || event == G_FILE_MONITOR_EVENT_CREATED ||
+                         event == G_FILE_MONITOR_EVENT_DELETED) {
+                       static_cast<CollectionWatcher *>(data)->Scan();
+                     }
+                   }),
+                   this);
+  monitors_.push_back(monitor);
+}
+
+void CollectionWatcher::StartWatching() {
+  StopWatching();
+  Settings settings;
+  settings.BeginGroup("Collection");
+  if (!settings.BoolValue("monitor", true) || !backend_) {
+    return;
+  }
+  for (const CollectionDirectory &directory : backend_->Directories()) {
+    WatchPath(directory.path);
+  }
+}
 
 void CollectionWatcher::Scan() {
   last_added_ = 0;

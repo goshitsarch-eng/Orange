@@ -141,6 +141,7 @@ set(STRAWBERRY_SOURCES
   src/core/commandlineoptions.cpp
   src/core/application.cpp
   src/core/urlhandlers.cpp
+  src/core/oauthenticator.cpp
   src/utilities/timeutils.cpp
   src/utilities/fileutils.cpp
   src/utilities/strutils.cpp
@@ -263,6 +264,8 @@ if(GTest_FOUND)
     src/core/settings.cpp
     src/core/song.cpp
     src/core/database.cpp
+    src/core/network.cpp
+    src/core/oauthenticator.cpp
     src/utilities/timeutils.cpp
     src/utilities/fileutils.cpp
     src/utilities/strutils.cpp
@@ -287,6 +290,7 @@ if(GTest_FOUND)
     PkgConfig::GIO
     PkgConfig::SQLITE
     PkgConfig::JSONGLIB
+    PkgConfig::SOUP
     ${TAGLIB_LIBRARIES}
   )
   add_test(NAME strawberry_tests COMMAND strawberry_tests)

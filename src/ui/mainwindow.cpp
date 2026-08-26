@@ -145,6 +145,8 @@ void MainWindow::BuildUi() {
   g_menu_append(playlist, "New playlist", "win.new-playlist");
   g_menu_append(playlist, "Load playlist…", "win.load-playlist");
   g_menu_append(playlist, "Save playlist…", "win.save-playlist");
+  g_menu_append(playlist, "Save all playlists…", "win.save-all-playlists");
+  g_menu_append(playlist, "Playlist columns…", "win.playlist-columns");
   g_menu_append(playlist, "Clear playlist", "win.clear-playlist");
   g_menu_append(playlist, "Undo", "win.undo");
   g_menu_append(playlist, "Redo", "win.redo");
@@ -152,9 +154,12 @@ void MainWindow::BuildUi() {
   g_menu_append_section(menu, "Playlist", G_MENU_MODEL(playlist));
   GMenu *tools = g_menu_new();
   g_menu_append(tools, "Cover manager", "win.covers");
+  g_menu_append(tools, "Cover from URL…", "win.cover-from-url");
   g_menu_append(tools, "Equalizer", "win.equalizer");
   g_menu_append(tools, "Transcode…", "win.transcode");
   g_menu_append(tools, "Organize files…", "win.organize");
+  g_menu_append(tools, "Copy to device…", "win.copy-device");
+  g_menu_append(tools, "Delete files…", "win.delete-files");
   g_menu_append(tools, "Fetch tags…", "win.tagfetch");
   g_menu_append(tools, "Edit tags…", "win.edittag");
   g_menu_append(tools, "Collection grouping…", "win.group-by");
@@ -233,6 +238,14 @@ void MainWindow::BuildUi() {
                });
              }));
   add_action("covers", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverManager(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("cover-from-url", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverFromUrl(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("copy-device", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CopyToDevice(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("delete-files", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::DeleteFiles(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("save-all-playlists", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::SaveAllPlaylists(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("playlist-columns", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::PlaylistColumns(GTK_WINDOW(self->window_), [self]() { self->RefreshPlaylist(); });
+             }));
   add_action("equalizer", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Equalizer(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_->equalizer()); }));
   add_action("transcode", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Transcode(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("organize", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Organize(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
@@ -628,7 +641,7 @@ void MainWindow::RefreshCollection(const std::string &filter) {
 std::string MainWindow::ColumnTitle(PlaylistColumn column) {
   switch (column) {
     case PlaylistColumn::Track:
-      return "#";
+      return "Track";
     case PlaylistColumn::Title:
       return "Title";
     case PlaylistColumn::Artist:
@@ -637,26 +650,102 @@ std::string MainWindow::ColumnTitle(PlaylistColumn column) {
       return "Album";
     case PlaylistColumn::AlbumArtist:
       return "Album artist";
-    case PlaylistColumn::Length:
-      return "Length";
+    case PlaylistColumn::Performer:
+      return "Performer";
+    case PlaylistColumn::Composer:
+      return "Composer";
     case PlaylistColumn::Year:
       return "Year";
+    case PlaylistColumn::OriginalYear:
+      return "Original year";
+    case PlaylistColumn::Disc:
+      return "Disc";
+    case PlaylistColumn::Length:
+      return "Length";
     case PlaylistColumn::Genre:
       return "Genre";
-    case PlaylistColumn::Bitrate:
-      return "Bitrate";
     case PlaylistColumn::Samplerate:
       return "Sample rate";
-    case PlaylistColumn::PlayCount:
-      return "Plays";
-    case PlaylistColumn::Rating:
-      return "Rating";
+    case PlaylistColumn::Bitdepth:
+      return "Bit depth";
+    case PlaylistColumn::Bitrate:
+      return "Bitrate";
+    case PlaylistColumn::URL:
+      return "URL";
     case PlaylistColumn::Filename:
       return "Filename";
+    case PlaylistColumn::Filesize:
+      return "Filesize";
+    case PlaylistColumn::Filetype:
+      return "Filetype";
+    case PlaylistColumn::DateCreated:
+      return "Date created";
+    case PlaylistColumn::DateModified:
+      return "Date modified";
+    case PlaylistColumn::PlayCount:
+      return "Plays";
+    case PlaylistColumn::SkipCount:
+      return "Skips";
+    case PlaylistColumn::LastPlayed:
+      return "Last played";
+    case PlaylistColumn::Comment:
+      return "Comment";
+    case PlaylistColumn::Grouping:
+      return "Grouping";
+    case PlaylistColumn::Source:
+      return "Source";
+    case PlaylistColumn::Moodbar:
+      return "Moodbar";
+    case PlaylistColumn::Rating:
+      return "Rating";
+    case PlaylistColumn::HasCUE:
+      return "CUE";
+    case PlaylistColumn::EBUR128I:
+      return "EBU R128 I";
+    case PlaylistColumn::EBUR128LRA:
+      return "EBU R128 LRA";
+    case PlaylistColumn::BPM:
+      return "BPM";
+    case PlaylistColumn::Mood:
+      return "Mood";
+    case PlaylistColumn::InitialKey:
+      return "Initial key";
     case PlaylistColumn::Count:
       break;
   }
   return {};
+}
+
+int MainWindow::ColumnWidth(PlaylistColumn column) {
+  switch (column) {
+    case PlaylistColumn::Title:
+    case PlaylistColumn::URL:
+    case PlaylistColumn::Filename:
+    case PlaylistColumn::Comment:
+      return 200;
+    case PlaylistColumn::Artist:
+    case PlaylistColumn::Album:
+    case PlaylistColumn::AlbumArtist:
+    case PlaylistColumn::Performer:
+    case PlaylistColumn::Composer:
+      return 150;
+    default:
+      return 80;
+  }
+}
+
+bool MainWindow::ColumnVisible(PlaylistColumn column) const {
+  Settings settings;
+  settings.BeginGroup("Playlist");
+  const std::string enabled =
+      settings.Value("columns", "Track,Title,Artist,Album,Album artist,Length,Year,Genre,Bitrate,Sample rate,Plays,Rating,Filename");
+  const std::string title = ColumnTitle(column);
+  for (const std::string &part : StrUtils::Split(enabled, ',')) {
+    if (part == title) {
+      return true;
+    }
+  }
+  return false;
 }
 
 std::string MainWindow::ColumnText(const Song &song, PlaylistColumn column) {
@@ -671,22 +760,66 @@ std::string MainWindow::ColumnText(const Song &song, PlaylistColumn column) {
       return song.album();
     case PlaylistColumn::AlbumArtist:
       return song.EffectiveAlbumartist();
-    case PlaylistColumn::Length:
-      return Utilities::PrettyTimeNanosec(song.length_nanosec());
+    case PlaylistColumn::Performer:
+      return song.performer();
+    case PlaylistColumn::Composer:
+      return song.composer();
     case PlaylistColumn::Year:
       return song.year() > 0 ? std::to_string(song.year()) : "";
+    case PlaylistColumn::OriginalYear:
+      return song.originalyear() > 0 ? std::to_string(song.originalyear()) : "";
+    case PlaylistColumn::Disc:
+      return song.disc() > 0 ? std::to_string(song.disc()) : "";
+    case PlaylistColumn::Length:
+      return Utilities::PrettyTimeNanosec(song.length_nanosec());
     case PlaylistColumn::Genre:
       return song.genre();
     case PlaylistColumn::Bitrate:
       return song.bitrate() > 0 ? std::to_string(song.bitrate()) : "";
     case PlaylistColumn::Samplerate:
       return song.samplerate() > 0 ? std::to_string(song.samplerate()) : "";
-    case PlaylistColumn::PlayCount:
-      return std::to_string(song.playcount());
-    case PlaylistColumn::Rating:
-      return song.rating() >= 0 ? std::to_string(song.rating()) : "";
+    case PlaylistColumn::Bitdepth:
+      return song.bitdepth() > 0 ? std::to_string(song.bitdepth()) : "";
+    case PlaylistColumn::URL:
+      return song.url();
     case PlaylistColumn::Filename:
       return song.basefilename().empty() ? FileUtils::BaseName(FileUtils::PathFromUri(song.url())) : song.basefilename();
+    case PlaylistColumn::Filesize:
+      return song.filesize() > 0 ? std::to_string(song.filesize()) : "";
+    case PlaylistColumn::Filetype:
+      return Song::FiletypeToString(song.filetype());
+    case PlaylistColumn::DateCreated:
+      return song.ctime() > 0 ? std::to_string(song.ctime()) : "";
+    case PlaylistColumn::DateModified:
+      return song.mtime() > 0 ? std::to_string(song.mtime()) : "";
+    case PlaylistColumn::PlayCount:
+      return std::to_string(song.playcount());
+    case PlaylistColumn::SkipCount:
+      return std::to_string(song.skipcount());
+    case PlaylistColumn::LastPlayed:
+      return song.lastplayed() > 0 ? std::to_string(song.lastplayed()) : "";
+    case PlaylistColumn::Comment:
+      return song.comment();
+    case PlaylistColumn::Grouping:
+      return song.grouping();
+    case PlaylistColumn::Source:
+      return Song::SourceToString(song.source());
+    case PlaylistColumn::Moodbar:
+      return song.mood().empty() ? "" : "●";
+    case PlaylistColumn::Rating:
+      return song.rating() >= 0 ? std::to_string(song.rating()) : "";
+    case PlaylistColumn::HasCUE:
+      return song.cue_path().empty() ? "" : "CUE";
+    case PlaylistColumn::EBUR128I:
+      return song.ebur128_integrated_loudness_lufs() ? std::to_string(*song.ebur128_integrated_loudness_lufs()) : "";
+    case PlaylistColumn::EBUR128LRA:
+      return song.ebur128_loudness_range_lu() ? std::to_string(*song.ebur128_loudness_range_lu()) : "";
+    case PlaylistColumn::BPM:
+      return song.bpm() > 0 ? std::to_string(song.bpm()) : "";
+    case PlaylistColumn::Mood:
+      return song.mood();
+    case PlaylistColumn::InitialKey:
+      return song.initial_key();
     case PlaylistColumn::Count:
       break;
   }
@@ -708,8 +841,10 @@ void MainWindow::SortPlaylistBy(PlaylistColumn column) {
   std::stable_sort(songs.begin(), songs.end(), [this](const Song &a, const Song &b) {
     const std::string left = ColumnText(a, sort_column_);
     const std::string right = ColumnText(b, sort_column_);
-    if (sort_column_ == PlaylistColumn::Track || sort_column_ == PlaylistColumn::Year || sort_column_ == PlaylistColumn::Bitrate ||
-        sort_column_ == PlaylistColumn::Samplerate || sort_column_ == PlaylistColumn::PlayCount || sort_column_ == PlaylistColumn::Length) {
+    if (sort_column_ == PlaylistColumn::Track || sort_column_ == PlaylistColumn::Year || sort_column_ == PlaylistColumn::OriginalYear ||
+        sort_column_ == PlaylistColumn::Disc || sort_column_ == PlaylistColumn::Bitrate || sort_column_ == PlaylistColumn::Samplerate ||
+        sort_column_ == PlaylistColumn::Bitdepth || sort_column_ == PlaylistColumn::PlayCount || sort_column_ == PlaylistColumn::SkipCount ||
+        sort_column_ == PlaylistColumn::Length || sort_column_ == PlaylistColumn::Filesize || sort_column_ == PlaylistColumn::BPM) {
       const double ln = std::strtod(left.c_str(), nullptr);
       const double rn = std::strtod(right.c_str(), nullptr);
       return sort_descending_ ? ln > rn : ln < rn;
@@ -728,9 +863,13 @@ void MainWindow::RefreshPlaylist() {
   gtk_widget_add_css_class(header, "toolbar");
   for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
     const auto column = static_cast<PlaylistColumn>(i);
+    if (!ColumnVisible(column)) {
+      continue;
+    }
     GtkWidget *button = gtk_button_new_with_label(ColumnTitle(column).c_str());
     gtk_widget_add_css_class(button, "flat");
     gtk_widget_set_hexpand(button, column == PlaylistColumn::Title);
+    gtk_widget_set_size_request(button, ColumnWidth(column), -1);
     g_object_set_data(G_OBJECT(button), "column", GINT_TO_POINTER(i));
     g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
                        static_cast<MainWindow *>(data)->SortPlaylistBy(static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(btn), "column"))));
@@ -754,10 +893,12 @@ void MainWindow::RefreshPlaylist() {
     if (index == current) {
       gtk_widget_add_css_class(row, "accent");
     }
-    const int widths[] = {36, 220, 150, 150, 140, 56, 48, 90, 56, 80, 48, 56, 160};
     for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
       const auto column = static_cast<PlaylistColumn>(i);
-      gtk_box_append(GTK_BOX(row), ColLabel(ColumnText(song, column), widths[i], column == PlaylistColumn::Title, false));
+      if (!ColumnVisible(column)) {
+        continue;
+      }
+      gtk_box_append(GTK_BOX(row), ColLabel(ColumnText(song, column), ColumnWidth(column), column == PlaylistColumn::Title, false));
     }
     g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index));
     GtkGesture *click = gtk_gesture_click_new();
@@ -1199,6 +1340,7 @@ void MainWindow::ShowPlaylistMenu(double, double) {
   g_menu_append(menu, "Queue", "win.playlist-queue");
   g_menu_append(menu, "Remove", "win.playlist-remove");
   g_menu_append(menu, "Edit tags…", "win.edittag");
+  g_menu_append(menu, "Delete file…", "win.delete-files");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, playlist_grid_);
   gtk_popover_popup(GTK_POPOVER(popover));

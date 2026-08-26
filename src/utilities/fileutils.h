@@ -19,6 +19,8 @@ std::string PathFromUri(const std::string &uri);
 std::string UriFromPath(const std::string &path);
 std::string ReadFile(const std::string &path);
 bool WriteFile(const std::string &path, const std::string &contents);
+bool CopyFile(const std::string &source, const std::string &destination);
+bool Remove(const std::string &path);
 
 }  // namespace FileUtils
 

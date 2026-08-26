@@ -42,6 +42,13 @@ Application::~Application() { Exit(); }
 void Application::Init() {
   database_->Open();
   collection_->Init();
+  {
+    Settings settings;
+    settings.BeginGroup("Collection");
+    if (settings.BoolValue("startupscan", true)) {
+      collection_->IncrementalScan();
+    }
+  }
   playlist_manager_->Init();
   player_->Init();
   player_->SetQueue(queue_.get());

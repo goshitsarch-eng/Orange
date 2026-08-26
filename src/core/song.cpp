@@ -157,6 +157,61 @@ std::string Song::SourceToString(Source source) {
   }
 }
 
+std::string Song::FiletypeToString(FileType type) {
+  switch (type) {
+    case FileType::WAV:
+      return "WAV";
+    case FileType::FLAC:
+      return "FLAC";
+    case FileType::WavPack:
+      return "WavPack";
+    case FileType::OggFlac:
+      return "Ogg FLAC";
+    case FileType::OggVorbis:
+      return "Ogg Vorbis";
+    case FileType::OggOpus:
+      return "Opus";
+    case FileType::OggSpeex:
+      return "Speex";
+    case FileType::MPEG:
+      return "MP3";
+    case FileType::MP4:
+      return "MP4";
+    case FileType::ASF:
+      return "ASF";
+    case FileType::AIFF:
+      return "AIFF";
+    case FileType::MPC:
+      return "MPC";
+    case FileType::TrueAudio:
+      return "True Audio";
+    case FileType::DSF:
+      return "DSF";
+    case FileType::DSDIFF:
+      return "DSDIFF";
+    case FileType::PCM:
+      return "PCM";
+    case FileType::APE:
+      return "APE";
+    case FileType::ALAC:
+      return "ALAC";
+    case FileType::CDDA:
+      return "CDDA";
+    case FileType::Stream:
+      return "Stream";
+    case FileType::MOD:
+    case FileType::S3M:
+    case FileType::XM:
+    case FileType::IT:
+    case FileType::SPC:
+    case FileType::VGM:
+      return "Module";
+    case FileType::Unknown:
+    default:
+      return "Unknown";
+  }
+}
+
 const char *Song::TextSearchColumnsSql() {
   return "title LIKE ? OR album LIKE ? OR artist LIKE ? OR albumartist LIKE ? OR composer LIKE ? OR performer LIKE ? OR grouping LIKE ? OR genre LIKE ? OR comment LIKE ?";
 }

@@ -26,14 +26,36 @@ class MainWindow {
     Artist,
     Album,
     AlbumArtist,
-    Length,
+    Performer,
+    Composer,
     Year,
+    OriginalYear,
+    Disc,
+    Length,
     Genre,
-    Bitrate,
     Samplerate,
-    PlayCount,
-    Rating,
+    Bitdepth,
+    Bitrate,
+    URL,
     Filename,
+    Filesize,
+    Filetype,
+    DateCreated,
+    DateModified,
+    PlayCount,
+    SkipCount,
+    LastPlayed,
+    Comment,
+    Grouping,
+    Source,
+    Moodbar,
+    Rating,
+    HasCUE,
+    EBUR128I,
+    EBUR128LRA,
+    BPM,
+    Mood,
+    InitialKey,
     Count
   };
 
@@ -76,6 +98,8 @@ class MainWindow {
   std::vector<int> SelectedPlaylistRows() const;
   static std::string ColumnTitle(PlaylistColumn column);
   static std::string ColumnText(const Song &song, PlaylistColumn column);
+  static int ColumnWidth(PlaylistColumn column);
+  bool ColumnVisible(PlaylistColumn column) const;
   void SortPlaylistBy(PlaylistColumn column);
   void SetImageFromBytes(GtkWidget *image, const std::vector<unsigned char> &data, int pixel_size);
 

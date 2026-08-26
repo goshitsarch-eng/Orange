@@ -10,6 +10,7 @@ struct ConnectedDevice {
   std::string icon;
   int64_t size = 0;
   std::string backend;
+  std::string mount_path;
 };
 class DeviceManager {
  public:

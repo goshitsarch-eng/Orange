@@ -7,6 +7,11 @@
 #include <taglib/tag.h>
 #include <taglib/tpropertymap.h>
 #include <taglib/audioproperties.h>
+#include <taglib/mpegfile.h>
+#include <taglib/id3v2tag.h>
+#include <taglib/attachedpictureframe.h>
+#include <taglib/flacfile.h>
+#include <taglib/flacpicture.h>
 #ifdef HAVE_TAGLIB_DSFFILE
 #  include <taglib/dsffile.h>
 #endif
@@ -143,11 +148,67 @@ bool TagReader::WriteFile(const Song &song) const {
 
 TagReader::CoverData TagReader::LoadCoverData(const std::string &filename) const {
   CoverData cover;
-  (void)filename;
+  {
+    TagLib::MPEG::File mpeg(filename.c_str());
+    if (mpeg.isValid() && mpeg.ID3v2Tag()) {
+      const auto frames = mpeg.ID3v2Tag()->frameListMap()["APIC"];
+      if (!frames.isEmpty()) {
+        auto *picture = dynamic_cast<TagLib::ID3v2::AttachedPictureFrame *>(frames.front());
+        if (picture) {
+          const TagLib::ByteVector data = picture->picture();
+          cover.data.assign(data.begin(), data.end());
+          cover.mime_type = FromTagLib(picture->mimeType());
+          return cover;
+        }
+      }
+    }
+  }
+  {
+    TagLib::FLAC::File flac(filename.c_str());
+    if (flac.isValid()) {
+      const auto pictures = flac.pictureList();
+      if (!pictures.isEmpty() && pictures.front()) {
+        const TagLib::ByteVector data = pictures.front()->data();
+        cover.data.assign(data.begin(), data.end());
+        cover.mime_type = FromTagLib(pictures.front()->mimeType());
+      }
+    }
+  }
   return cover;
 }
 
-bool TagReader::SaveCover(const std::string &, const CoverData &) const { return false; }
+bool TagReader::SaveCover(const std::string &filename, const CoverData &cover) const {
+  if (cover.data.empty()) {
+    return false;
+  }
+  TagLib::ByteVector bytes(reinterpret_cast<const char *>(cover.data.data()), static_cast<unsigned>(cover.data.size()));
+  {
+    TagLib::MPEG::File mpeg(filename.c_str());
+    if (mpeg.isValid()) {
+      TagLib::ID3v2::Tag *tag = mpeg.ID3v2Tag(true);
+      tag->removeFrames("APIC");
+      auto *frame = new TagLib::ID3v2::AttachedPictureFrame();
+      frame->setMimeType(ToTagLib(cover.mime_type.empty() ? "image/jpeg" : cover.mime_type));
+      frame->setType(TagLib::ID3v2::AttachedPictureFrame::FrontCover);
+      frame->setPicture(bytes);
+      tag->addFrame(frame);
+      return mpeg.save();
+    }
+  }
+  {
+    TagLib::FLAC::File flac(filename.c_str());
+    if (flac.isValid()) {
+      flac.removePictures();
+      auto *picture = new TagLib::FLAC::Picture();
+      picture->setMimeType(ToTagLib(cover.mime_type.empty() ? "image/jpeg" : cover.mime_type));
+      picture->setType(TagLib::FLAC::Picture::FrontCover);
+      picture->setData(bytes);
+      flac.addPicture(picture);
+      return flac.save();
+    }
+  }
+  return false;
+}
 
 bool TagReader::SavePlaycount(const std::string &filename, unsigned playcount) const {
   TagLib::FileRef file(filename.c_str());
