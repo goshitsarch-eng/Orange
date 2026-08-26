@@ -13,6 +13,16 @@ inline bool IsHttpUrl(const std::string &url) {
 
 inline std::string ArtKey(const std::string &art_url) { return IsHttpUrl(art_url) ? art_url : kEmbeddedCover; }
 
+inline std::string PresenceArtKey(const std::string &art_url, const std::string &uploaded_data_url) {
+  if (IsHttpUrl(art_url)) {
+    return art_url;
+  }
+  if (!uploaded_data_url.empty()) {
+    return uploaded_data_url;
+  }
+  return kEmbeddedCover;
+}
+
 inline std::string SongArtUrl(const std::string &manual, const std::string &automatic) { return !manual.empty() ? manual : automatic; }
 
 }  // namespace DiscordArt

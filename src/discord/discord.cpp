@@ -2,6 +2,7 @@
 
 #include "constants/notificationssettings.h"
 #include "discord/discordart.h"
+#include "discord/discordcover.h"
 #include "core/logging.h"
 #include "core/settings.h"
 
@@ -77,17 +78,18 @@ std::string DiscordRichPresence::HandshakeJson(const std::string &client_id) {
 }
 
 std::string DiscordRichPresence::SetActivityJson(const Song &song, bool playing, int status_display_type, gint64 start_timestamp,
-                                                 int pid, unsigned nonce) {
+                                                 int pid, unsigned nonce, const std::string &art_key) {
   const std::string title = JsonEscape(song.PrettyTitle());
   const std::string artist = JsonEscape(PadArtist(song.artist()));
   const std::string album = JsonEscape(song.album());
   const gint64 length_secs = song.length_nanosec() > 0 ? song.length_nanosec() / 1000000000LL : 0;
   const gint64 end_timestamp = start_timestamp > 0 && length_secs > 0 ? start_timestamp + length_secs : 0;
+  const std::string large_image =
+      art_key.empty() ? DiscordArt::ArtKey(DiscordArt::SongArtUrl(song.art_manual(), song.art_automatic())) : art_key;
   std::string json = "{\"cmd\":\"SET_ACTIVITY\",\"nonce\":\"" + std::to_string(nonce) + "\",\"args\":{\"pid\":" +
                      std::to_string(pid) + ",\"activity\":{\"type\":2,\"status_display_type\":" + std::to_string(status_display_type) +
                      ",\"name\":\"Strawberry\",\"details\":\"" + title + "\",\"state\":\"" + artist +
-                     "\",\"assets\":{\"large_image\":\"" +
-                     JsonEscape(DiscordArt::ArtKey(DiscordArt::SongArtUrl(song.art_manual(), song.art_automatic()))) +
+                     "\",\"assets\":{\"large_image\":\"" + JsonEscape(large_image) +
                      "\",\"small_image\":\"embedded_cover\",\"small_text\":\"Strawberry Music Player\"";
   if (!album.empty()) {
     json += ",\"large_text\":\"on " + album + "\"";
@@ -189,7 +191,8 @@ void DiscordRichPresence::UpdatePresence(const Song &song, bool playing) {
   if (!playing) {
     start_timestamp_ = 0;
   }
-  SendFrame(Opcode::Frame, SetActivityJson(song, playing, status_display_type_, start_timestamp_, getpid(), nonce_++));
+  const std::string art_key = DiscordCover::ResolveArtKey(DiscordArt::SongArtUrl(song.art_manual(), song.art_automatic()));
+  SendFrame(Opcode::Frame, SetActivityJson(song, playing, status_display_type_, start_timestamp_, getpid(), nonce_++, art_key));
 }
 
 void DiscordRichPresence::Clear() {

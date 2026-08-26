@@ -3,6 +3,9 @@
 #include "discord/discordcover.h"
 #include "core/song.h"
 
+#include <cstdio>
+#include <unistd.h>
+
 #include <gtest/gtest.h>
 
 TEST(DiscordRichPresence, HandshakeAndClearJson) {
@@ -44,6 +47,10 @@ TEST(DiscordArt, UsesHttpCoverOrEmbedded) {
   EXPECT_EQ("embedded_cover", DiscordArt::ArtKey("file:///covers/a.jpg"));
   EXPECT_EQ("https://example.com/a.jpg", DiscordArt::ArtKey("https://example.com/a.jpg"));
   EXPECT_EQ("https://cdn.example/a.jpg", DiscordArt::SongArtUrl("https://cdn.example/a.jpg", "file:///local.jpg"));
+  EXPECT_EQ("https://cdn.example/a.jpg", DiscordArt::PresenceArtKey("https://cdn.example/a.jpg", "data:image/png;base64,xx"));
+  EXPECT_EQ("data:image/png;base64,TWFu", DiscordArt::PresenceArtKey("file:///covers/a.jpg", "data:image/png;base64,TWFu"));
+  EXPECT_EQ("embedded_cover", DiscordArt::PresenceArtKey("file:///covers/a.jpg", {}));
+  EXPECT_EQ("embedded_cover", DiscordArt::PresenceArtKey({}, {}));
 }
 
 TEST(DiscordCover, LocalArtNeedsUploadAndEncodesDataUrl) {
@@ -66,6 +73,25 @@ TEST(DiscordCover, LocalArtNeedsUploadAndEncodesDataUrl) {
   EXPECT_EQ("TQ==", DiscordCover::Base64Encode({'M'}));
   EXPECT_EQ("data:image/png;base64,TWFu", DiscordCover::DataUrl("image/png", man));
   EXPECT_TRUE(DiscordCover::DataUrl("image/png", {}).empty());
+  EXPECT_EQ("https://cdn.example/a.jpg", DiscordCover::ResolveArtKey("https://cdn.example/a.jpg"));
+  EXPECT_EQ("embedded_cover", DiscordCover::ResolveArtKey({}));
+  EXPECT_EQ("embedded_cover", DiscordCover::ResolveArtKey("file:///no/such/strawberry-cover.jpg"));
+
+  char path[] = "/tmp/strawberry-discord-cover-XXXXXX.png";
+  const int fd = mkstemps(path, 4);
+  ASSERT_GE(fd, 0);
+  ASSERT_EQ(3, write(fd, "Man", 3));
+  close(fd);
+  EXPECT_EQ("data:image/png;base64,TWFu", DiscordCover::ResolveArtKey(std::string("file://") + path));
+  EXPECT_EQ("data:image/png;base64,TWFu", DiscordCover::ResolveArtKey(path));
+  unlink(path);
+}
+
+TEST(DiscordRichPresence, SetActivityJsonUsesResolvedArtKey) {
+  Song song;
+  song.set_title("Roads");
+  const std::string json = DiscordRichPresence::SetActivityJson(song, false, 0, 0, 1, 1, "data:image/png;base64,TWFu");
+  EXPECT_NE(std::string::npos, json.find("\"large_image\":\"data:image/png;base64,TWFu\""));
 }
 
 TEST(DiscordRichPresence, DisabledDoesNotConnect) {

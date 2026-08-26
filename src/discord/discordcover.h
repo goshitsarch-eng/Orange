@@ -4,6 +4,7 @@
 #include "discord/discordart.h"
 #include "utilities/strutils.h"
 
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -72,6 +73,42 @@ inline std::string DataUrl(const std::string &mime, const std::vector<unsigned c
     return {};
   }
   return "data:" + mime + ";base64," + Base64Encode(data);
+}
+
+inline std::vector<unsigned char> ReadFileBytes(const std::string &path, size_t max_bytes = 1048576) {
+  if (path.empty()) {
+    return {};
+  }
+  FILE *fp = std::fopen(path.c_str(), "rb");
+  if (!fp) {
+    return {};
+  }
+  if (std::fseek(fp, 0, SEEK_END) != 0) {
+    std::fclose(fp);
+    return {};
+  }
+  const long size = std::ftell(fp);
+  if (size <= 0 || static_cast<size_t>(size) > max_bytes) {
+    std::fclose(fp);
+    return {};
+  }
+  if (std::fseek(fp, 0, SEEK_SET) != 0) {
+    std::fclose(fp);
+    return {};
+  }
+  std::vector<unsigned char> bytes(static_cast<size_t>(size));
+  const size_t n = std::fread(bytes.data(), 1, bytes.size(), fp);
+  std::fclose(fp);
+  bytes.resize(n);
+  return bytes;
+}
+
+inline std::string ResolveArtKey(const std::string &art_url) {
+  if (DiscordArt::IsHttpUrl(art_url) || !NeedsUpload(art_url)) {
+    return DiscordArt::ArtKey(art_url);
+  }
+  const std::string path = PathFromArtUrl(art_url);
+  return DiscordArt::PresenceArtKey(art_url, DataUrl(MimeFromPath(path), ReadFileBytes(path)));
 }
 
 }  // namespace DiscordCover

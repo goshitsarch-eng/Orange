@@ -23,7 +23,7 @@ class DiscordRichPresence {
   static std::string JsonEscape(const std::string &value);
   static std::string HandshakeJson(const std::string &client_id);
   static std::string SetActivityJson(const Song &song, bool playing, int status_display_type, gint64 start_timestamp, int pid,
-                                    unsigned nonce);
+                                    unsigned nonce, const std::string &art_key = {});
   static std::string ClearActivityJson(int pid, unsigned nonce);
   static std::string SocketPath(int index);
 
