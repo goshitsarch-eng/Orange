@@ -5,7 +5,6 @@
 #include "constants/behavioursettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
-#include "dialogs/dialoghelpers.h"
 #include "osd/osdprettyfade.h"
 #include "systemtrayicon/trayiconcomposite.h"
 #include "systemtrayicon/trayiconmask.h"
@@ -142,6 +141,24 @@ const GDBusInterfaceVTable kMenuVtable = {
     {nullptr},
 };
 
+void SetPopupArt(GtkWidget *image, const std::vector<unsigned char> &data, int pixel_size) {
+  if (!image || data.empty()) {
+    return;
+  }
+  GdkPixbufLoader *loader = gdk_pixbuf_loader_new();
+  if (gdk_pixbuf_loader_write(loader, data.data(), data.size(), nullptr) && gdk_pixbuf_loader_close(loader, nullptr)) {
+    GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf(loader);
+    if (pixbuf) {
+      GdkPixbuf *scaled = gdk_pixbuf_scale_simple(pixbuf, pixel_size, pixel_size, GDK_INTERP_BILINEAR);
+      GdkTexture *texture = gdk_texture_new_for_pixbuf(scaled);
+      gtk_image_set_from_paintable(GTK_IMAGE(image), GDK_PAINTABLE(texture));
+      g_object_unref(texture);
+      g_object_unref(scaled);
+    }
+  }
+  g_object_unref(loader);
+}
+
 GVariant *ItemProps(const char *label, const char *type = "standard") {
   GVariantBuilder props;
   g_variant_builder_init(&props, G_VARIANT_TYPE("a{sv}"));
@@ -212,7 +229,7 @@ void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &me
   gtk_label_set_text(GTK_LABEL(popup_body_), message.c_str());
   if (popup_image_) {
     if (TrayPopup::ShowArt(true, !art.empty())) {
-      DialogHelpers::SetImageFromBytes(popup_image_, art, 64);
+      SetPopupArt(popup_image_, art, 64);
       gtk_widget_set_visible(popup_image_, TRUE);
     } else {
       gtk_widget_set_visible(popup_image_, FALSE);
