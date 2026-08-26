@@ -848,9 +848,26 @@ if(GTest_FOUND)
     src/filterparser/filterparser.cpp
     src/filterparser/filterparsersearchtermcomparator.cpp
     src/filterparser/filterparsertexteqcomparator.cpp
+    src/filterparser/filterparsertextnecomparator.cpp
     src/filterparser/filterparsertextcontainscomparator.cpp
     src/filterparser/filterparserinteqcomparator.cpp
+    src/filterparser/filterparserintnecomparator.cpp
+    src/filterparser/filterparserintgtcomparator.cpp
     src/filterparser/filterparserintgecomparator.cpp
+    src/filterparser/filterparserintltcomparator.cpp
+    src/filterparser/filterparserintlecomparator.cpp
+    src/filterparser/filterparserint64eqcomparator.cpp
+    src/filterparser/filterparserint64necomparator.cpp
+    src/filterparser/filterparserint64gtcomparator.cpp
+    src/filterparser/filterparserint64gecomparator.cpp
+    src/filterparser/filterparserint64ltcomparator.cpp
+    src/filterparser/filterparserint64lecomparator.cpp
+    src/filterparser/filterparserfloateqcomparator.cpp
+    src/filterparser/filterparserfloatnecomparator.cpp
+    src/filterparser/filterparserfloatgtcomparator.cpp
+    src/filterparser/filterparserfloatgecomparator.cpp
+    src/filterparser/filterparserfloatltcomparator.cpp
+    src/filterparser/filterparserfloatlecomparator.cpp
     src/filterparser/filtertree.cpp
     src/filterparser/filtertreeand.cpp
     src/filterparser/filtertreeor.cpp

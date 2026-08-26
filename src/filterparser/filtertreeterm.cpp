@@ -1,6 +1,7 @@
 #include "filterparser/filtertreeterm.h"
 
-FilterTreeTerm::FilterTreeTerm(std::unique_ptr<FilterParserSearchTermComparator> comparator) : cmp_(std::move(comparator)) {}
+FilterTreeTerm::FilterTreeTerm(std::unique_ptr<FilterParserSearchTermComparator> comparator, std::string sql)
+    : cmp_(std::move(comparator)), sql_(std::move(sql)) {}
 
 bool FilterTreeTerm::accept(const Song &song) const {
   if (!cmp_) {

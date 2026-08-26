@@ -7,6 +7,7 @@ class FilterTreeNop : public FilterTree {
  public:
   FilterType type() const override { return FilterType::Nop; }
   bool accept(const Song &) const override { return true; }
+  std::string ToSql() const override { return "1=1"; }
 };
 
 #endif

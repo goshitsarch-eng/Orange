@@ -1,11 +1,19 @@
 #include "context/contextview.h"
 
 #include "core/song.h"
+#include "lyrics/lyricsfetcher.h"
 #include "lyrics/lyricsproviders.h"
 #include "utilities/timeutils.h"
 
-ContextView::ContextView(LyricsProviders *lyrics_providers)
-    : lyrics_providers_(lyrics_providers), album_(std::make_unique<ContextAlbum>()) {
+ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyrics_fetcher)
+    : lyrics_providers_(lyrics_providers), lyrics_fetcher_(lyrics_fetcher), album_(std::make_unique<ContextAlbum>()) {
+  if (lyrics_fetcher_) {
+    lyrics_fetcher_->LyricsFetched.Connect([this](uint64_t id, const std::string &, const std::string &lyrics) {
+      if (id == current_search_id_) {
+        SetLyrics(lyrics);
+      }
+    });
+  }
   GtkWidget *scroll = gtk_scrolled_window_new();
   gtk_widget_set_vexpand(scroll, TRUE);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -121,7 +129,16 @@ void ContextView::SetLyrics(const std::string &lyrics) {
 }
 
 void ContextView::SearchLyrics() {
-  if (!lyrics_providers_ || !song_playing_.is_valid()) {
+  if (!song_playing_.is_valid()) {
+    SetLyrics({});
+    return;
+  }
+  if (lyrics_fetcher_) {
+    current_search_id_ = lyrics_fetcher_->Search(song_playing_.EffectiveAlbumartist(), song_playing_.artist(), song_playing_.album(),
+                                                 song_playing_.title(), song_playing_.length_nanosec());
+    return;
+  }
+  if (!lyrics_providers_) {
     SetLyrics({});
     return;
   }

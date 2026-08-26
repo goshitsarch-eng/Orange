@@ -10,6 +10,7 @@ class FilterTreeNot : public FilterTree {
   explicit FilterTreeNot(std::unique_ptr<FilterTree> child);
   FilterType type() const override { return FilterType::Not; }
   bool accept(const Song &song) const override;
+  std::string ToSql() const override;
 
  private:
   std::unique_ptr<FilterTree> child_;

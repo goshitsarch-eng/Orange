@@ -1,34 +1,20 @@
 #include "filterparser/filterparser.h"
 
-#include "utilities/fileutils.h"
+#include "filterparser/filterparsersearchcomparators.h"
+#include "filterparser/filtertreeand.h"
+#include "filterparser/filtertreecolumnterm.h"
+#include "filterparser/filtertreenop.h"
+#include "filterparser/filtertreenot.h"
+#include "filterparser/filtertreeor.h"
+#include "filterparser/filtertreeterm.h"
 #include "utilities/strutils.h"
 
 #include <cctype>
+#include <cstdint>
 #include <cstdlib>
 #include <ctime>
-
-namespace {
-
-bool CompareNumber(double left, FilterOperator op, double right) {
-  switch (op) {
-    case FilterOperator::Ne:
-      return left != right;
-    case FilterOperator::Gt:
-      return left > right;
-    case FilterOperator::Ge:
-      return left >= right;
-    case FilterOperator::Lt:
-      return left < right;
-    case FilterOperator::Le:
-      return left <= right;
-    case FilterOperator::Eq:
-    case FilterOperator::None:
-    default:
-      return left == right;
-  }
-}
-
-}  // namespace
+#include <memory>
+#include <vector>
 
 FilterParser::FilterParser(const std::string &filter) : filter_(StrUtils::Trim(filter)) {
   Parse();
@@ -179,106 +165,197 @@ std::string FilterParser::ColumnSql(FilterColumn column) {
   }
 }
 
-std::string FilterParser::TextValue(const Song &song, FilterColumn column) {
-  switch (column) {
-    case FilterColumn::Title:
-      return song.title();
-    case FilterColumn::TitleSort:
-      return song.titlesort();
-    case FilterColumn::Album:
-      return song.album();
-    case FilterColumn::AlbumSort:
-      return song.albumsort();
-    case FilterColumn::Artist:
-      return song.artist();
-    case FilterColumn::ArtistSort:
-      return song.artistsort();
-    case FilterColumn::AlbumArtist:
-      return song.albumartist();
-    case FilterColumn::AlbumArtistSort:
-      return song.albumartistsort();
-    case FilterColumn::Composer:
-      return song.composer();
-    case FilterColumn::ComposerSort:
-      return song.composersort();
-    case FilterColumn::Performer:
-      return song.performer();
-    case FilterColumn::PerformerSort:
-      return song.performersort();
-    case FilterColumn::Grouping:
-      return song.grouping();
-    case FilterColumn::Genre:
-      return song.genre();
-    case FilterColumn::Comment:
-      return song.comment();
-    case FilterColumn::Filename:
-      return song.basefilename().empty() ? FileUtils::BaseName(FileUtils::PathFromUri(song.url())) : song.basefilename();
-    case FilterColumn::URL:
-      return song.url();
+FilterOperator FilterParser::OperatorFromPrefix(const std::string &prefix) {
+  if (prefix == "=" || prefix == "==") return FilterOperator::Eq;
+  if (prefix == "!=" || prefix == "<>") return FilterOperator::Ne;
+  if (prefix == ">") return FilterOperator::Gt;
+  if (prefix == ">=") return FilterOperator::Ge;
+  if (prefix == "<") return FilterOperator::Lt;
+  if (prefix == "<=") return FilterOperator::Le;
+  return FilterOperator::None;
+}
+
+std::string FilterParser::FreeTextSql(const std::string &value) {
+  if (value.empty()) {
+    return "1=1";
+  }
+  const std::string like = "'%" + StrUtils::SqlLikeEscape(value) + "%' ESCAPE '\\'";
+  return "(title LIKE " + like + " OR album LIKE " + like + " OR artist LIKE " + like + " OR albumartist LIKE " + like +
+         " OR composer LIKE " + like + " OR performer LIKE " + like + " OR genre LIKE " + like + " OR comment LIKE " + like + ")";
+}
+
+std::string FilterParser::TermSql(FilterColumn column, FilterOperator op, const std::string &value) {
+  const std::string sql_column = ColumnSql(column);
+  if (sql_column.empty()) {
+    return "1=1";
+  }
+  if (IsTimeDays(column)) {
+    const int days = std::atoi(value.c_str());
+    const std::string cutoff = "strftime('%s','now') - " + std::to_string(static_cast<int64_t>(days) * 86400);
+    std::string sql_op = ">=";
+    if (op == FilterOperator::Lt) sql_op = "<";
+    else if (op == FilterOperator::Le) sql_op = "<=";
+    else if (op == FilterOperator::Gt) sql_op = ">";
+    else if (op == FilterOperator::Ge) sql_op = ">=";
+    else if (op == FilterOperator::Eq) sql_op = "=";
+    else if (op == FilterOperator::Ne) sql_op = "!=";
+    return "(" + sql_column + " > 0 AND " + sql_column + " " + sql_op + " " + cutoff + ")";
+  }
+  if (IsNumeric(column)) {
+    std::string expr = sql_column;
+    if (column == FilterColumn::Rating) {
+      expr = "(rating / 100.0)";
+    }
+    std::string sql_op = "=";
+    if (op == FilterOperator::None && (column == FilterColumn::Rating || column == FilterColumn::Playcount || column == FilterColumn::Skipcount)) {
+      sql_op = ">=";
+    } else if (op == FilterOperator::Ne) {
+      sql_op = "!=";
+    } else if (op == FilterOperator::Gt) {
+      sql_op = ">";
+    } else if (op == FilterOperator::Ge) {
+      sql_op = ">=";
+    } else if (op == FilterOperator::Lt) {
+      sql_op = "<";
+    } else if (op == FilterOperator::Le) {
+      sql_op = "<=";
+    }
+    return expr + " " + sql_op + " " + value;
+  }
+  if (op == FilterOperator::Eq) {
+    return "LOWER(" + sql_column + ") = " + StrUtils::SqlQuote(StrUtils::ToLower(value));
+  }
+  if (op == FilterOperator::Ne) {
+    return "LOWER(" + sql_column + ") != " + StrUtils::SqlQuote(StrUtils::ToLower(value));
+  }
+  return sql_column + " LIKE '%" + StrUtils::SqlLikeEscape(value) + "%' ESCAPE '\\'";
+}
+
+namespace {
+
+std::unique_ptr<FilterParserSearchTermComparator> MakeIntComparator(FilterOperator op, int value) {
+  switch (op) {
+    case FilterOperator::Ne:
+      return std::make_unique<FilterParserIntNeComparator>(value);
+    case FilterOperator::Gt:
+      return std::make_unique<FilterParserIntGtComparator>(value);
+    case FilterOperator::Ge:
+      return std::make_unique<FilterParserIntGeComparator>(value);
+    case FilterOperator::Lt:
+      return std::make_unique<FilterParserIntLtComparator>(value);
+    case FilterOperator::Le:
+      return std::make_unique<FilterParserIntLeComparator>(value);
+    case FilterOperator::Eq:
+    case FilterOperator::None:
     default:
-      return {};
+      return std::make_unique<FilterParserIntEqComparator>(value);
   }
 }
 
-double FilterParser::NumericValue(const Song &song, FilterColumn column) {
-  switch (column) {
-    case FilterColumn::Track:
-      return song.track();
-    case FilterColumn::Year:
-      return song.year();
-    case FilterColumn::Samplerate:
-      return song.samplerate();
-    case FilterColumn::Bitdepth:
-      return song.bitdepth();
-    case FilterColumn::Bitrate:
-      return song.bitrate();
-    case FilterColumn::Playcount:
-      return song.playcount();
-    case FilterColumn::Skipcount:
-      return song.skipcount();
-    case FilterColumn::Length:
-      return static_cast<double>(song.length_nanosec());
-    case FilterColumn::Rating:
-      return song.rating();
-    case FilterColumn::Age:
-    case FilterColumn::Added:
-      return static_cast<double>(song.ctime());
-    case FilterColumn::LastPlayed:
-      return static_cast<double>(song.lastplayed());
+std::unique_ptr<FilterParserSearchTermComparator> MakeInt64Comparator(FilterOperator op, int64_t value) {
+  switch (op) {
+    case FilterOperator::Ne:
+      return std::make_unique<FilterParserInt64NeComparator>(value);
+    case FilterOperator::Gt:
+      return std::make_unique<FilterParserInt64GtComparator>(value);
+    case FilterOperator::Ge:
+      return std::make_unique<FilterParserInt64GeComparator>(value);
+    case FilterOperator::Lt:
+      return std::make_unique<FilterParserInt64LtComparator>(value);
+    case FilterOperator::Le:
+      return std::make_unique<FilterParserInt64LeComparator>(value);
+    case FilterOperator::Eq:
+    case FilterOperator::None:
     default:
-      return 0;
+      return std::make_unique<FilterParserInt64EqComparator>(value);
   }
+}
+
+std::unique_ptr<FilterParserSearchTermComparator> MakeFloatComparator(FilterOperator op, double value) {
+  switch (op) {
+    case FilterOperator::Ne:
+      return std::make_unique<FilterParserFloatNeComparator>(value);
+    case FilterOperator::Gt:
+      return std::make_unique<FilterParserFloatGtComparator>(value);
+    case FilterOperator::Ge:
+      return std::make_unique<FilterParserFloatGeComparator>(value);
+    case FilterOperator::Lt:
+      return std::make_unique<FilterParserFloatLtComparator>(value);
+    case FilterOperator::Le:
+      return std::make_unique<FilterParserFloatLeComparator>(value);
+    case FilterOperator::Eq:
+    case FilterOperator::None:
+    default:
+      return std::make_unique<FilterParserFloatEqComparator>(value);
+  }
+}
+
+}  // namespace
+
+std::unique_ptr<FilterTree> FilterParser::CreateSearchTerm(const std::string &column_name, const std::string &prefix,
+                                                           const std::string &value) const {
+  const FilterOperator op = OperatorFromPrefix(prefix);
+  const FilterColumn column = ColumnFromName(column_name);
+  if (column == FilterColumn::Unknown && value.empty()) {
+    return std::make_unique<FilterTreeNop>();
+  }
+  if (column == FilterColumn::Unknown) {
+    return std::make_unique<FilterTreeTerm>(std::make_unique<FilterParserTextContainsComparator>(value), FreeTextSql(value));
+  }
+
+  std::unique_ptr<FilterParserSearchTermComparator> cmp;
+  if (IsTimeDays(column)) {
+    const int days = std::atoi(value.c_str());
+    const int64_t cutoff = static_cast<int64_t>(std::time(nullptr)) - static_cast<int64_t>(days) * 86400;
+    cmp = MakeInt64Comparator(op == FilterOperator::None ? FilterOperator::Ge : op, cutoff);
+  } else if (column == FilterColumn::Rating) {
+    cmp = MakeFloatComparator(op == FilterOperator::None ? FilterOperator::Ge : op, std::strtod(value.c_str(), nullptr));
+  } else if (column == FilterColumn::Length) {
+    cmp = MakeInt64Comparator(op == FilterOperator::None ? FilterOperator::Eq : op, std::strtoll(value.c_str(), nullptr, 10));
+  } else if (IsNumeric(column)) {
+    FilterOperator effective = op;
+    if (op == FilterOperator::None && (column == FilterColumn::Playcount || column == FilterColumn::Skipcount)) {
+      effective = FilterOperator::Ge;
+    }
+    cmp = MakeIntComparator(effective, static_cast<int>(std::strtol(value.c_str(), nullptr, 10)));
+  } else if (op == FilterOperator::Eq) {
+    cmp = std::make_unique<FilterParserTextEqComparator>(value);
+  } else if (op == FilterOperator::Ne) {
+    cmp = std::make_unique<FilterParserTextNeComparator>(value);
+  } else {
+    cmp = std::make_unique<FilterParserTextContainsComparator>(value);
+  }
+  const bool also_albumartist = column == FilterColumn::Artist && op == FilterOperator::None;
+  return std::make_unique<FilterTreeColumnTerm>(column, std::move(cmp), TermSql(column, op, value), also_albumartist);
 }
 
 void FilterParser::Parse() {
   pos_ = 0;
   if (filter_.empty()) {
-    root_ = Node{};
+    tree_ = std::make_unique<FilterTreeNop>();
     return;
   }
-  root_ = ParseOr();
+  tree_ = ParseOr();
 }
 
-FilterParser::Node FilterParser::ParseOr() {
-  Node node = ParseAnd();
+std::unique_ptr<FilterTree> FilterParser::ParseOr() {
+  auto node = ParseAnd();
   SkipSpace();
   if (!Consume("OR")) {
     return node;
   }
-  Node group;
-  group.kind = NodeKind::Or;
-  group.children.push_back(std::move(node));
+  auto group = std::make_unique<FilterTreeOr>();
+  group->Add(std::move(node));
   do {
-    group.children.push_back(ParseAnd());
+    group->Add(ParseAnd());
   } while (Consume("OR"));
   return group;
 }
 
-FilterParser::Node FilterParser::ParseAnd() {
-  Node node = ParseUnary();
+std::unique_ptr<FilterTree> FilterParser::ParseAnd() {
+  std::vector<std::unique_ptr<FilterTree>> children;
+  children.push_back(ParseUnary());
   SkipSpace();
-  std::vector<Node> children;
-  children.push_back(std::move(node));
   while (pos_ < filter_.size() && filter_[pos_] != ')') {
     if (Consume("OR")) {
       pos_ -= 2;
@@ -293,19 +370,20 @@ FilterParser::Node FilterParser::ParseAnd() {
     SkipSpace();
   }
   if (children.size() == 1) {
-    return children.front();
+    return std::move(children.front());
   }
-  Node group;
-  group.kind = NodeKind::And;
-  group.children = std::move(children);
+  auto group = std::make_unique<FilterTreeAnd>();
+  for (auto &child : children) {
+    group->Add(std::move(child));
+  }
   return group;
 }
 
-FilterParser::Node FilterParser::ParseUnary() {
+std::unique_ptr<FilterTree> FilterParser::ParseUnary() {
   SkipSpace();
   if (pos_ < filter_.size() && filter_[pos_] == '(') {
     ++pos_;
-    Node inner = ParseOr();
+    auto inner = ParseOr();
     SkipSpace();
     if (pos_ < filter_.size() && filter_[pos_] == ')') {
       ++pos_;
@@ -314,18 +392,13 @@ FilterParser::Node FilterParser::ParseUnary() {
   }
   if (pos_ < filter_.size() && filter_[pos_] == '-') {
     ++pos_;
-    Node node;
-    node.kind = NodeKind::Not;
-    node.children.push_back(ParseUnary());
-    return node;
+    return std::make_unique<FilterTreeNot>(ParseUnary());
   }
   return ParseTerm();
 }
 
-FilterParser::Node FilterParser::ParseTerm() {
+std::unique_ptr<FilterTree> FilterParser::ParseTerm() {
   SkipSpace();
-  Node node;
-  node.kind = NodeKind::Term;
   std::string column;
   std::string prefix;
   std::string value;
@@ -359,7 +432,7 @@ FilterParser::Node FilterParser::ParseTerm() {
     if (std::isspace(static_cast<unsigned char>(ch)) || ch == '(' || ch == ')' || ch == '-') {
       break;
     }
-    if (value.empty() && column.empty() == false && prefix.empty() && (ch == '>' || ch == '<' || ch == '=' || ch == '!')) {
+    if (value.empty() && !column.empty() && prefix.empty() && (ch == '>' || ch == '<' || ch == '=' || ch == '!')) {
       prefix.push_back(ch);
       ++pos_;
       if (pos_ < filter_.size() && filter_[pos_] == '=' && prefix != "=") {
@@ -391,205 +464,28 @@ FilterParser::Node FilterParser::ParseTerm() {
     value.push_back(ch);
     ++pos_;
   }
-
-  if (prefix == "=" || prefix == "==") {
-    node.op = FilterOperator::Eq;
-  } else if (prefix == "!=" || prefix == "<>") {
-    node.op = FilterOperator::Ne;
-  } else if (prefix == ">") {
-    node.op = FilterOperator::Gt;
-  } else if (prefix == ">=") {
-    node.op = FilterOperator::Ge;
-  } else if (prefix == "<") {
-    node.op = FilterOperator::Lt;
-  } else if (prefix == "<=") {
-    node.op = FilterOperator::Le;
-  }
-  node.column = ColumnFromName(column);
-  node.value = value;
-  return node;
-}
-
-bool FilterParser::TermMatches(const Node &node, const Song &song) const {
-  if (node.column == FilterColumn::Unknown && node.value.empty()) {
-    return true;
-  }
-  if (node.column == FilterColumn::Unknown) {
-    return StrUtils::ContainsInsensitive(song.title(), node.value) || StrUtils::ContainsInsensitive(song.album(), node.value) ||
-           StrUtils::ContainsInsensitive(song.artist(), node.value) || StrUtils::ContainsInsensitive(song.albumartist(), node.value) ||
-           StrUtils::ContainsInsensitive(song.composer(), node.value) || StrUtils::ContainsInsensitive(song.performer(), node.value) ||
-           StrUtils::ContainsInsensitive(song.genre(), node.value) || StrUtils::ContainsInsensitive(song.comment(), node.value);
-  }
-  if (IsTimeDays(node.column)) {
-    const int64_t stamp = node.column == FilterColumn::LastPlayed ? song.lastplayed() : song.ctime();
-    if (stamp <= 0) {
-      return false;
-    }
-    const int days = std::atoi(node.value.c_str());
-    const int64_t cutoff = static_cast<int64_t>(std::time(nullptr)) - static_cast<int64_t>(days) * 86400;
-    const double left = static_cast<double>(stamp);
-    const double right = static_cast<double>(cutoff);
-    if (node.op == FilterOperator::None) {
-      return stamp >= cutoff || days <= 0;
-    }
-    return CompareNumber(left, node.op, right);
-  }
-  if (IsNumeric(node.column)) {
-    const double left = NumericValue(song, node.column);
-    const double right = std::strtod(node.value.c_str(), nullptr);
-    if (node.op == FilterOperator::None && (node.column == FilterColumn::Rating || node.column == FilterColumn::Playcount ||
-                                            node.column == FilterColumn::Skipcount)) {
-      return left >= right;
-    }
-    if (node.op == FilterOperator::None) {
-      return left == right;
-    }
-    return CompareNumber(left, node.op, right);
-  }
-  const std::string text = TextValue(song, node.column);
-  if (node.column == FilterColumn::Artist && node.op == FilterOperator::None) {
-    return StrUtils::ContainsInsensitive(song.artist(), node.value) || StrUtils::ContainsInsensitive(song.albumartist(), node.value);
-  }
-  if (node.op == FilterOperator::Eq) {
-    return StrUtils::ToLower(text) == StrUtils::ToLower(node.value);
-  }
-  if (node.op == FilterOperator::Ne) {
-    return StrUtils::ToLower(text) != StrUtils::ToLower(node.value);
-  }
-  return StrUtils::ContainsInsensitive(text, node.value);
-}
-
-bool FilterParser::MatchesNode(const Node &node, const Song &song) const {
-  switch (node.kind) {
-    case NodeKind::Not:
-      return node.children.empty() ? true : !MatchesNode(node.children.front(), song);
-    case NodeKind::Or: {
-      for (const Node &child : node.children) {
-        if (MatchesNode(child, song)) {
-          return true;
-        }
-      }
-      return node.children.empty();
-    }
-    case NodeKind::And: {
-      for (const Node &child : node.children) {
-        if (!MatchesNode(child, song)) {
-          return false;
-        }
-      }
-      return true;
-    }
-    case NodeKind::Term:
-    default:
-      return TermMatches(node, song);
-  }
+  return CreateSearchTerm(column, prefix, value);
 }
 
 bool FilterParser::Matches(const Song &song) const {
   if (filter_.empty()) {
     return true;
   }
-  return MatchesNode(root_, song);
-}
-
-std::string FilterParser::TermSql(const Node &node) const {
-  if (node.column == FilterColumn::Unknown) {
-    if (node.value.empty()) {
-      return "1=1";
-    }
-    const std::string like = "'%" + StrUtils::SqlLikeEscape(node.value) + "%' ESCAPE '\\'";
-    return "(title LIKE " + like + " OR album LIKE " + like + " OR artist LIKE " + like + " OR albumartist LIKE " + like +
-           " OR composer LIKE " + like + " OR performer LIKE " + like + " OR genre LIKE " + like + " OR comment LIKE " + like + ")";
-  }
-  const std::string column = ColumnSql(node.column);
-  if (column.empty()) {
-    return "1=1";
-  }
-  if (IsTimeDays(node.column)) {
-    const int days = std::atoi(node.value.c_str());
-    const std::string cutoff = "strftime('%s','now') - " + std::to_string(static_cast<int64_t>(days) * 86400);
-    std::string op = ">=";
-    if (node.op == FilterOperator::Lt) op = "<";
-    else if (node.op == FilterOperator::Le) op = "<=";
-    else if (node.op == FilterOperator::Gt) op = ">";
-    else if (node.op == FilterOperator::Ge) op = ">=";
-    else if (node.op == FilterOperator::Eq) op = "=";
-    else if (node.op == FilterOperator::Ne) op = "!=";
-    return "(" + column + " > 0 AND " + column + " " + op + " " + cutoff + ")";
-  }
-  if (IsNumeric(node.column)) {
-    std::string sql_column = column;
-    std::string value = node.value;
-    if (node.column == FilterColumn::Rating) {
-      sql_column = "(rating / 100.0)";
-    }
-    std::string op = "=";
-    if (node.op == FilterOperator::None && (node.column == FilterColumn::Rating || node.column == FilterColumn::Playcount ||
-                                            node.column == FilterColumn::Skipcount)) {
-      op = ">=";
-    } else if (node.op == FilterOperator::Ne) {
-      op = "!=";
-    } else if (node.op == FilterOperator::Gt) {
-      op = ">";
-    } else if (node.op == FilterOperator::Ge) {
-      op = ">=";
-    } else if (node.op == FilterOperator::Lt) {
-      op = "<";
-    } else if (node.op == FilterOperator::Le) {
-      op = "<=";
-    }
-    return sql_column + " " + op + " " + value;
-  }
-  if (node.op == FilterOperator::Eq) {
-    return "LOWER(" + column + ") = " + StrUtils::SqlQuote(StrUtils::ToLower(node.value));
-  }
-  if (node.op == FilterOperator::Ne) {
-    return "LOWER(" + column + ") != " + StrUtils::SqlQuote(StrUtils::ToLower(node.value));
-  }
-  return column + " LIKE '%" + StrUtils::SqlLikeEscape(node.value) + "%' ESCAPE '\\'";
-}
-
-std::string FilterParser::NodeSql(const Node &node) const {
-  switch (node.kind) {
-    case NodeKind::Not:
-      return node.children.empty() ? "1=1" : "(NOT " + NodeSql(node.children.front()) + ")";
-    case NodeKind::Or: {
-      if (node.children.empty()) {
-        return "1=1";
-      }
-      std::string sql = "(";
-      for (size_t i = 0; i < node.children.size(); ++i) {
-        if (i) {
-          sql += " OR ";
-        }
-        sql += NodeSql(node.children[i]);
-      }
-      sql += ")";
-      return sql;
-    }
-    case NodeKind::And: {
-      if (node.children.empty()) {
-        return "1=1";
-      }
-      std::string sql = "(";
-      for (size_t i = 0; i < node.children.size(); ++i) {
-        if (i) {
-          sql += " AND ";
-        }
-        sql += NodeSql(node.children[i]);
-      }
-      sql += ")";
-      return sql;
-    }
-    case NodeKind::Term:
-    default:
-      return TermSql(node);
-  }
+  return tree_ ? tree_->accept(song) : true;
 }
 
 std::string FilterParser::ToSql() const {
   if (filter_.empty()) {
     return {};
   }
-  return NodeSql(root_);
+  return tree_ ? tree_->ToSql() : std::string();
+}
+
+std::string FilterParser::ToolTip() {
+  return "Prefix a search term with a field name to limit the search, e.g. artist:Strawbs. "
+         "Exclude a word with a preceding -. Numerical fields accept =, !=, <, >, <= and >=. "
+         "Combine terms with AND (default) or OR, and group with parentheses. "
+         "Available fields: title, album, artist, albumartist, composer, performer, grouping, genre, "
+         "comment, filename, url, track, year, samplerate, bitdepth, bitrate, playcount, skipcount, "
+         "length, rating, age, added, lastplayed.";
 }

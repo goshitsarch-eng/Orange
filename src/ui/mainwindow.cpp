@@ -463,7 +463,7 @@ void MainWindow::BuildSidebar() {
 }
 
 void MainWindow::BuildContext() {
-  context_view_ = std::make_unique<ContextView>(app_->lyrics_providers());
+  context_view_ = std::make_unique<ContextView>(app_->lyrics_providers(), app_->lyrics_fetcher());
   context_view_->SetSaveLyricsCallback([this](const std::string &lyrics) {
     Song song = app_->player()->current_song();
     song.set_lyrics(lyrics);

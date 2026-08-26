@@ -6,18 +6,20 @@
 
 #include <gtk/gtk.h>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
+class LyricsFetcher;
 class LyricsProviders;
 
 class ContextView {
  public:
   using SaveLyricsCallback = std::function<void(const std::string &)>;
 
-  explicit ContextView(LyricsProviders *lyrics_providers = nullptr);
+  explicit ContextView(LyricsProviders *lyrics_providers = nullptr, LyricsFetcher *lyrics_fetcher = nullptr);
 
   GtkWidget *widget() const { return widget_; }
   ContextAlbum *album_widget() { return album_.get(); }
@@ -40,6 +42,8 @@ class ContextView {
   void ApplyVisibility();
 
   LyricsProviders *lyrics_providers_ = nullptr;
+  LyricsFetcher *lyrics_fetcher_ = nullptr;
+  uint64_t current_search_id_ = 0;
   std::unique_ptr<ContextAlbum> album_;
   GtkWidget *widget_ = nullptr;
   GtkWidget *title_ = nullptr;

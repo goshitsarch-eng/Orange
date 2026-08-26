@@ -9,12 +9,14 @@
 
 class FilterTreeTerm : public FilterTree {
  public:
-  explicit FilterTreeTerm(std::unique_ptr<FilterParserSearchTermComparator> comparator);
+  explicit FilterTreeTerm(std::unique_ptr<FilterParserSearchTermComparator> comparator, std::string sql = "1=1");
   FilterType type() const override { return FilterType::Term; }
   bool accept(const Song &song) const override;
+  std::string ToSql() const override { return sql_; }
 
  private:
   std::unique_ptr<FilterParserSearchTermComparator> cmp_;
+  std::string sql_;
 };
 
 #endif

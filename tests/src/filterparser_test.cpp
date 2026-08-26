@@ -72,3 +72,15 @@ TEST(FilterParser, ToSqlContainsColumnsAndOperators) {
   EXPECT_NE(std::string::npos, sql.find(">="));
   EXPECT_NE(std::string::npos, sql.find("NOT"));
 }
+
+TEST(FilterParser, BuildsFilterTree) {
+  FilterParser parser("genre:Folk OR artist:Fleet");
+  FilterTree *tree = parser.parse();
+  ASSERT_NE(nullptr, tree);
+  EXPECT_EQ(FilterTree::FilterType::Or, tree->type());
+  Song folk;
+  folk.set_genre("Folk");
+  folk.set_artist("Other");
+  EXPECT_TRUE(tree->accept(folk));
+  EXPECT_FALSE(FilterParser::ToolTip().empty());
+}

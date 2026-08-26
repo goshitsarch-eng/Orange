@@ -15,6 +15,7 @@ class FilterTree {
   virtual ~FilterTree() = default;
   virtual FilterType type() const = 0;
   virtual bool accept(const Song &song) const = 0;
+  virtual std::string ToSql() const { return "1=1"; }
 
   static std::string DataFromColumn(FilterColumn column, const Song &song);
   static double NumericFromColumn(FilterColumn column, const Song &song);

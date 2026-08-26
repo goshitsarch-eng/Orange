@@ -3,50 +3,41 @@
 
 #include "core/song.h"
 #include "filterparser/filtercolumn.h"
+#include "filterparser/filtertree.h"
 
+#include <memory>
 #include <string>
-#include <vector>
 
 class FilterParser {
  public:
   explicit FilterParser(const std::string &filter);
 
+  FilterTree *parse() const { return tree_.get(); }
   bool Matches(const Song &song) const;
   const std::string &filter() const { return filter_; }
   std::string ToSql() const;
+  static std::string ToolTip();
 
  private:
-  enum class NodeKind { And, Or, Not, Term };
-
-  struct Node {
-    NodeKind kind = NodeKind::And;
-    FilterColumn column = FilterColumn::Unknown;
-    FilterOperator op = FilterOperator::None;
-    std::string value;
-    std::vector<Node> children;
-  };
-
   void Parse();
-  Node ParseOr();
-  Node ParseAnd();
-  Node ParseUnary();
-  Node ParseTerm();
+  std::unique_ptr<FilterTree> ParseOr();
+  std::unique_ptr<FilterTree> ParseAnd();
+  std::unique_ptr<FilterTree> ParseUnary();
+  std::unique_ptr<FilterTree> ParseTerm();
+  std::unique_ptr<FilterTree> CreateSearchTerm(const std::string &column, const std::string &prefix, const std::string &value) const;
   void SkipSpace();
   bool Consume(const std::string &word);
-  bool MatchesNode(const Node &node, const Song &song) const;
-  bool TermMatches(const Node &node, const Song &song) const;
-  std::string NodeSql(const Node &node) const;
-  std::string TermSql(const Node &node) const;
-  static std::string ColumnSql(FilterColumn column);
+  static FilterOperator OperatorFromPrefix(const std::string &prefix);
   static FilterColumn ColumnFromName(const std::string &name);
   static bool IsNumeric(FilterColumn column);
   static bool IsTimeDays(FilterColumn column);
-  static std::string TextValue(const Song &song, FilterColumn column);
-  static double NumericValue(const Song &song, FilterColumn column);
+  static std::string ColumnSql(FilterColumn column);
+  static std::string TermSql(FilterColumn column, FilterOperator op, const std::string &value);
+  static std::string FreeTextSql(const std::string &value);
 
   std::string filter_;
   size_t pos_ = 0;
-  Node root_;
+  std::unique_ptr<FilterTree> tree_;
 };
 
 #endif

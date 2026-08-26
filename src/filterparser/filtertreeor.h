@@ -11,6 +11,7 @@ class FilterTreeOr : public FilterTree {
   void Add(std::unique_ptr<FilterTree> child);
   FilterType type() const override { return FilterType::Or; }
   bool accept(const Song &song) const override;
+  std::string ToSql() const override;
 
  private:
   std::vector<std::unique_ptr<FilterTree>> children_;

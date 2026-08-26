@@ -5,6 +5,7 @@
 #include "core/commandlineoptions.h"
 #include "core/logging.h"
 #include "engine/gststartup.h"
+#include "translations/translations.h"
 #include "ui/mainwindow.h"
 
 #include <adwaita.h>
@@ -61,6 +62,7 @@ int main(int argc, char **argv) {
   }
 
   GstStartup::Initialize();
+  Translations::Init();
   adw_init();
 
   Runtime runtime;
