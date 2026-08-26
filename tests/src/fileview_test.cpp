@@ -5,6 +5,7 @@
 #include "device/devicedrag.h"
 #include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
+#include "fileview/fileviewmenu.h"
 #include "fileview/fileviewhidden.h"
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewkeyboard.h"
@@ -15,6 +16,7 @@
 
 #include <algorithm>
 #include <gtest/gtest.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <set>
@@ -150,6 +152,37 @@ TEST(FileViewSongs, FromPathsSkipsDirectoriesAndReadsTags) {
 
   FileUtils::Remove(audio);
   rmdir(dir.c_str());
+}
+
+TEST(FileViewMenu, PlaylistActionsMatchQt) {
+  EXPECT_EQ(9, FileViewMenu::ItemCount());
+  EXPECT_EQ(FileViewMenu::Action::Append, FileViewMenu::FromId("append"));
+  EXPECT_EQ(FileViewMenu::Action::Replace, FileViewMenu::FromId("replace"));
+  EXPECT_EQ(FileViewMenu::Action::New, FileViewMenu::FromId("new"));
+  EXPECT_EQ(FileViewMenu::Action::Browse, FileViewMenu::FromId("browse"));
+  EXPECT_EQ(FileViewMenu::Action::Delete, FileViewMenu::FromId("delete"));
+  EXPECT_TRUE(FileViewMenu::IsPlaylistAction(FileViewMenu::Action::Append));
+  EXPECT_TRUE(FileViewMenu::IsPlaylistAction(FileViewMenu::Action::Replace));
+  EXPECT_TRUE(FileViewMenu::IsPlaylistAction(FileViewMenu::Action::New));
+  EXPECT_FALSE(FileViewMenu::IsPlaylistAction(FileViewMenu::Action::Browse));
+  EXPECT_EQ("/tmp/song.flac", FileViewMenu::BrowserPath({"/tmp/song.flac", "/tmp/other.flac"}));
+  EXPECT_TRUE(FileViewMenu::BrowserPath({}).empty());
+  const CollectionBehaviour::Plan replace =
+      FileViewMenu::PlanFor(FileViewMenu::Action::Replace, BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_TRUE(replace.clear_current);
+  const CollectionBehaviour::Plan open_new =
+      FileViewMenu::PlanFor(FileViewMenu::Action::New, BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_EQ(CollectionBehaviour::Destination::New, open_new.destination);
+
+  const std::string dir = TempDir();
+  const std::string audio = FileUtils::Join(dir, "roads.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "x"));
+  const std::string nested = FileUtils::Join(dir, "nested");
+  ASSERT_EQ(0, mkdir(nested.c_str(), 0755));
+  const std::vector<std::string> expanded = FileViewMenu::ExpandPaths({dir, audio});
+  ASSERT_EQ(2u, expanded.size());
+  EXPECT_EQ(audio, expanded[0]);
+  EXPECT_EQ(audio, expanded[1]);
 }
 
 TEST(FileViewHistory, BackForwardAndTruncate) {

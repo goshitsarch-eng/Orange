@@ -11,12 +11,14 @@
 class FileViewTree {
  public:
   using ActivateCallback = std::function<void(const std::string &)>;
+  using MenuCallback = std::function<void(const std::string &)>;
 
   FileViewTree();
 
   GtkWidget *widget() const { return widget_; }
   void Reload(FileViewTreeModel *model);
   void SetActivateCallback(ActivateCallback callback);
+  void SetMenuCallback(MenuCallback callback);
 
  private:
   void AppendItem(GtkWidget *parent, FileViewTreeItem *item);
@@ -24,6 +26,7 @@ class FileViewTree {
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
   ActivateCallback activate_;
+  MenuCallback menu_;
 };
 
 #endif

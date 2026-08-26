@@ -7,6 +7,8 @@
 
 #include <adwaita.h>
 
+#include <string>
+
 FileView::FileView() {
   const char *music = g_get_user_special_dir(G_USER_DIRECTORY_MUSIC);
   home_ = music && *music ? music : (g_get_home_dir() ? g_get_home_dir() : ".");
@@ -61,6 +63,11 @@ FileView::FileView() {
   tree_->SetActivateCallback([this](const std::string &path) { SetPath(path); });
   list_->SetActivateCallback([this](const std::string &path) { Activate(path); });
   list_->SetMenuCallback([this](const std::vector<std::string> &paths) { ShowMenu(paths); });
+  tree_->SetMenuCallback([this](const std::string &path) {
+    if (!path.empty()) {
+      ShowMenu({path});
+    }
+  });
   list_->SetNavigateCallback([this](FileViewKeyboard::Action action) {
     action = FileViewKeyboard::ResolveHistoryBack(action, history_.CanBack());
     switch (action) {
@@ -174,6 +181,10 @@ void FileView::PersistSettings() {
 
 void FileView::SetAddToPlaylistCallback(PathsCallback callback) { add_to_playlist_ = std::move(callback); }
 
+void FileView::SetReplacePlaylistCallback(PathsCallback callback) { replace_playlist_ = std::move(callback); }
+
+void FileView::SetOpenInNewCallback(PathsCallback callback) { open_in_new_ = std::move(callback); }
+
 void FileView::SetCopyToCollectionCallback(PathsCallback callback) { copy_to_collection_ = std::move(callback); }
 
 void FileView::SetMoveToCollectionCallback(PathsCallback callback) { move_to_collection_ = std::move(callback); }
@@ -183,6 +194,8 @@ void FileView::SetCopyToDeviceCallback(PathsCallback callback) { copy_to_device_
 void FileView::SetEditTagsCallback(PathsCallback callback) { edit_tags_ = std::move(callback); }
 
 void FileView::SetDeleteCallback(PathsCallback callback) { delete_ = std::move(callback); }
+
+void FileView::SetShowInBrowserCallback(PathsCallback callback) { show_in_browser_ = std::move(callback); }
 
 void FileView::Activate(const std::string &path) {
   if (FileUtils::IsDirectory(path)) {
@@ -196,12 +209,9 @@ void FileView::Activate(const std::string &path) {
 
 void FileView::ShowMenu(const std::vector<std::string> &paths) {
   GMenu *menu = g_menu_new();
-  g_menu_append(menu, Translations::CStr("Add to playlist"), "fileview.add");
-  g_menu_append(menu, Translations::CStr("Copy to collection"), "fileview.copy-collection");
-  g_menu_append(menu, Translations::CStr("Move to collection"), "fileview.move-collection");
-  g_menu_append(menu, Translations::CStr("Copy to device"), "fileview.copy-device");
-  g_menu_append(menu, Translations::CStr("Edit track information…"), "fileview.edit-tags");
-  g_menu_append(menu, Translations::CStr("Delete"), "fileview.delete");
+  for (const FileViewMenu::Item &item : FileViewMenu::Items()) {
+    g_menu_append(menu, Translations::CStr(item.label), (std::string("fileview.") + item.id).c_str());
+  }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, list_->widget());
   auto *state = new std::pair<FileView *, std::vector<std::string>>(this, paths);
@@ -209,9 +219,8 @@ void FileView::ShowMenu(const std::vector<std::string> &paths) {
     delete static_cast<std::pair<FileView *, std::vector<std::string>> *>(p);
   });
   GSimpleActionGroup *group = g_simple_action_group_new();
-  const char *names[] = {"add", "copy-collection", "move-collection", "copy-device", "edit-tags", "delete", nullptr};
-  for (int i = 0; names[i]; ++i) {
-    GSimpleAction *action = g_simple_action_new(names[i], nullptr);
+  for (const FileViewMenu::Item &item : FileViewMenu::Items()) {
+    GSimpleAction *action = g_simple_action_new(item.id, nullptr);
     g_object_set_data(G_OBJECT(action), "popover", popover);
     g_signal_connect(action, "activate", G_CALLBACK((+[](GSimpleAction *act, GVariant *, gpointer data) {
                        GtkWidget *pop = GTK_WIDGET(g_object_get_data(G_OBJECT(act), "popover"));
@@ -221,19 +230,53 @@ void FileView::ShowMenu(const std::vector<std::string> &paths) {
                        if (!pair) {
                          return;
                        }
-                       const char *n = g_action_get_name(G_ACTION(act));
-                       if (g_strcmp0(n, "add") == 0 && self->add_to_playlist_) {
-                         self->add_to_playlist_(pair->second);
-                       } else if (g_strcmp0(n, "copy-collection") == 0 && self->copy_to_collection_) {
-                         self->copy_to_collection_(pair->second);
-                       } else if (g_strcmp0(n, "move-collection") == 0 && self->move_to_collection_) {
-                         self->move_to_collection_(pair->second);
-                       } else if (g_strcmp0(n, "copy-device") == 0 && self->copy_to_device_) {
-                         self->copy_to_device_(pair->second);
-                       } else if (g_strcmp0(n, "edit-tags") == 0 && self->edit_tags_) {
-                         self->edit_tags_(pair->second);
-                       } else if (g_strcmp0(n, "delete") == 0 && self->delete_) {
-                         self->delete_(pair->second);
+                       const FileViewMenu::Action action = FileViewMenu::FromId(g_action_get_name(G_ACTION(act)));
+                       switch (action) {
+                         case FileViewMenu::Action::Append:
+                           if (self->add_to_playlist_) {
+                             self->add_to_playlist_(FileViewMenu::ExpandPaths(pair->second));
+                           }
+                           break;
+                         case FileViewMenu::Action::Replace:
+                           if (self->replace_playlist_) {
+                             self->replace_playlist_(FileViewMenu::ExpandPaths(pair->second));
+                           }
+                           break;
+                         case FileViewMenu::Action::New:
+                           if (self->open_in_new_) {
+                             self->open_in_new_(FileViewMenu::ExpandPaths(pair->second));
+                           }
+                           break;
+                         case FileViewMenu::Action::Copy:
+                           if (self->copy_to_collection_) {
+                             self->copy_to_collection_(pair->second);
+                           }
+                           break;
+                         case FileViewMenu::Action::Move:
+                           if (self->move_to_collection_) {
+                             self->move_to_collection_(pair->second);
+                           }
+                           break;
+                         case FileViewMenu::Action::Device:
+                           if (self->copy_to_device_) {
+                             self->copy_to_device_(FileViewMenu::ExpandPaths(pair->second));
+                           }
+                           break;
+                         case FileViewMenu::Action::EditTags:
+                           if (self->edit_tags_) {
+                             self->edit_tags_(FileViewMenu::ExpandPaths(pair->second));
+                           }
+                           break;
+                         case FileViewMenu::Action::Delete:
+                           if (self->delete_) {
+                             self->delete_(FileViewMenu::ExpandPaths(pair->second));
+                           }
+                           break;
+                         case FileViewMenu::Action::Browse:
+                           if (self->show_in_browser_) {
+                             self->show_in_browser_(pair->second);
+                           }
+                           break;
                        }
                      })),
                      this);

@@ -3,6 +3,7 @@
 
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewlist.h"
+#include "fileview/fileviewmenu.h"
 #include "fileview/fileviewtree.h"
 #include "fileview/fileviewtreemodel.h"
 
@@ -35,11 +36,14 @@ class FileView {
   void SetShowAllFiles(bool show_all);
   FileViewHistory *history() { return &history_; }
   void SetAddToPlaylistCallback(PathsCallback callback);
+  void SetReplacePlaylistCallback(PathsCallback callback);
+  void SetOpenInNewCallback(PathsCallback callback);
   void SetCopyToCollectionCallback(PathsCallback callback);
   void SetMoveToCollectionCallback(PathsCallback callback);
   void SetCopyToDeviceCallback(PathsCallback callback);
   void SetEditTagsCallback(PathsCallback callback);
   void SetDeleteCallback(PathsCallback callback);
+  void SetShowInBrowserCallback(PathsCallback callback);
 
  private:
   void ShowMenu(const std::vector<std::string> &paths);
@@ -61,11 +65,14 @@ class FileView {
   std::string path_;
   std::string home_;
   PathsCallback add_to_playlist_;
+  PathsCallback replace_playlist_;
+  PathsCallback open_in_new_;
   PathsCallback copy_to_collection_;
   PathsCallback move_to_collection_;
   PathsCallback copy_to_device_;
   PathsCallback edit_tags_;
   PathsCallback delete_;
+  PathsCallback show_in_browser_;
 };
 
 #endif

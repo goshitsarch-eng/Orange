@@ -15,9 +15,26 @@ FileViewTree::FileViewTree() {
                      }
                    }),
                    this);
+  GtkGesture *gesture = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(gesture));
+  g_signal_connect(gesture, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
+                     auto *self = static_cast<FileViewTree *>(data);
+                     if (!self->menu_) {
+                       return;
+                     }
+                     GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(self->list_));
+                     const char *path = row ? static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path")) : nullptr;
+                     if (path) {
+                       self->menu_(path);
+                     }
+                   }),
+                   this);
 }
 
 void FileViewTree::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
+
+void FileViewTree::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
 void FileViewTree::AppendItem(GtkWidget *parent, FileViewTreeItem *item) {
   if (!item) {

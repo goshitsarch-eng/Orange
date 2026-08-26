@@ -906,14 +906,21 @@ void MainWindow::BuildSidebar() {
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, smart_container_->widget(), "smart", "Smart playlists", "view-refresh-symbolic");
   file_view_ = std::make_unique<FileView>();
-  file_view_->SetAddToPlaylistCallback([this](const std::vector<std::string> &paths) {
-    std::vector<std::string> urls;
-    urls.reserve(paths.size());
-    for (const std::string &path : paths) {
-      urls.push_back(FileUtils::UriFromPath(path));
-    }
-    app_->playlist_manager()->InsertUrls(urls);
-    RefreshPlaylist();
+  auto file_playlist = [this](FileViewMenu::Action action, const std::vector<std::string> &paths) {
+    Settings settings;
+    settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+    const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+        settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+    ApplyCollectionPlan(FileViewMenu::PlanFor(action, play, EngineStopped()), SongsFromFilePaths(paths));
+  };
+  file_view_->SetAddToPlaylistCallback([file_playlist](const std::vector<std::string> &paths) {
+    file_playlist(FileViewMenu::Action::Append, paths);
+  });
+  file_view_->SetReplacePlaylistCallback([file_playlist](const std::vector<std::string> &paths) {
+    file_playlist(FileViewMenu::Action::Replace, paths);
+  });
+  file_view_->SetOpenInNewCallback([file_playlist](const std::vector<std::string> &paths) {
+    file_playlist(FileViewMenu::Action::New, paths);
   });
   file_view_->SetCopyToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, false); });
   file_view_->SetMoveToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, true); });
@@ -936,6 +943,12 @@ void MainWindow::BuildSidebar() {
         static_cast<FileView *>(data)->Reload();
         return G_SOURCE_REMOVE;
       }, file_view_.get());
+    }
+  });
+  file_view_->SetShowInBrowserCallback([this](const std::vector<std::string> &paths) {
+    const std::string path = FileViewMenu::BrowserPath(paths);
+    if (path.empty() || !FileManagerUtils::OpenInFileManager(path)) {
+      ShowToast("Could not open the file manager");
     }
   });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, file_view_->widget(), "files", "Files", "folder-symbolic");
