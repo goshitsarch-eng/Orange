@@ -196,10 +196,17 @@ UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback 
 }
 
 void QobuzService::GetFavorites(FavoriteType type, SearchCallback callback) {
-  QobuzFavoriteRequest::Get(network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type,
-                            [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); },
-                            [this](int received, int total) { ReportSongsProgress(received, total); }, {},
-                            [this](const std::string &error) { NotifyFavoritesFailed(error); });
+  auto guarded = GuardFavorites(std::move(callback));
+  const int gen = favorites_generation();
+  QobuzFavoriteRequest::Get(
+      network_, kApiUrl, app_id_, user_auth_token_, AuthHeaders(), type,
+      [this, guarded, gen](const SongList &songs) {
+        DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { FavoritesUpdateStatus.Emit(text); },
+                          [this](int received, int total) { ReportFavoritesProgress(received, total); },
+                          [this, gen]() { return FavoritesRequestCurrent(gen); });
+      },
+      [this](int received, int total) { ReportFavoritesProgress(received, total); }, [this, gen]() { return FavoritesRequestCurrent(gen); },
+      [this](const std::string &error) { NotifyFavoritesFailed(error); });
 }
 
 void QobuzService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {

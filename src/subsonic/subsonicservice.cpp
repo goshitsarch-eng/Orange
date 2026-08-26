@@ -246,15 +246,19 @@ UrlHandler::LoadResult SubsonicService::Load(const std::string &url, AsyncCallba
 }
 
 void SubsonicService::GetFavorites(FavoriteType, SearchCallback callback) {
+  auto guarded = GuardFavorites(std::move(callback));
+  const int gen = favorites_generation();
   if (!logged_in_) {
-    if (callback) {
-      callback({});
-    }
+    guarded({});
     return;
   }
   SubsonicFavoriteRequest::Get(
       network_, CreateUrl(server_url_, username_, password_, "getStarred2", {}, hex_auth_),
-      [this, callback](const SongList &songs) { DeliverWithCovers(network_, {}, WithCoverUrls(songs), callback); },
+      [this, guarded, gen](const SongList &songs) {
+        DeliverWithCovers(network_, {}, WithCoverUrls(songs), guarded, [this](const std::string &text) { FavoritesUpdateStatus.Emit(text); },
+                          [this](int received, int total) { ReportFavoritesProgress(received, total); },
+                          [this, gen]() { return FavoritesRequestCurrent(gen); });
+      },
       [this](const std::string &error) { NotifyFavoritesFailed(error); });
 }
 

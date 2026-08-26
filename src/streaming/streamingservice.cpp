@@ -77,6 +77,18 @@ void StreamingService::StartSongsProgress() {
   SongsUpdateProgress.Emit(0);
 }
 
+void StreamingService::StartFavoritesProgress(FavoriteType type) {
+  const char *text = StreamingProgress::ReceivingSongs();
+  if (type == FavoriteType::Artists) {
+    text = StreamingProgress::ReceivingArtists();
+  } else if (type == FavoriteType::Albums) {
+    text = StreamingProgress::ReceivingAlbums();
+  }
+  FavoritesUpdateStatus.Emit(text);
+  FavoritesProgressSetMaximum.Emit(StreamingProgress::kDefaultMaximum);
+  FavoritesUpdateProgress.Emit(0);
+}
+
 void StreamingService::CancelSearch() { ++search_gen_; }
 
 void StreamingService::ResetArtistsRequest() { ++artists_gen_; }
@@ -84,6 +96,8 @@ void StreamingService::ResetArtistsRequest() { ++artists_gen_; }
 void StreamingService::ResetAlbumsRequest() { ++albums_gen_; }
 
 void StreamingService::ResetSongsRequest() { ++songs_gen_; }
+
+void StreamingService::ResetFavoritesRequest() { ++favorites_gen_; }
 
 int StreamingService::BeginArtistsRequest() {
   artists_gen_ = StreamingAbort::NextGeneration(artists_gen_);
@@ -105,6 +119,11 @@ int StreamingService::BeginSearchRequest() {
   return search_gen_;
 }
 
+int StreamingService::BeginFavoritesRequest() {
+  favorites_gen_ = StreamingAbort::NextGeneration(favorites_gen_);
+  return favorites_gen_;
+}
+
 bool StreamingService::ArtistsRequestCurrent(int generation) const { return StreamingAbort::IsCurrent(generation, artists_gen_); }
 
 bool StreamingService::AlbumsRequestCurrent(int generation) const { return StreamingAbort::IsCurrent(generation, albums_gen_); }
@@ -112,6 +131,8 @@ bool StreamingService::AlbumsRequestCurrent(int generation) const { return Strea
 bool StreamingService::SongsRequestCurrent(int generation) const { return StreamingAbort::IsCurrent(generation, songs_gen_); }
 
 bool StreamingService::SearchRequestCurrent(int generation) const { return StreamingAbort::IsCurrent(generation, search_gen_); }
+
+bool StreamingService::FavoritesRequestCurrent(int generation) const { return StreamingAbort::IsCurrent(generation, favorites_gen_); }
 
 StreamingService::SearchCallback StreamingService::GuardArtists(SearchCallback callback) {
   const int generation = BeginArtistsRequest();
@@ -171,6 +192,13 @@ void StreamingService::ReportSongsProgress(int received, int total) {
   }
 }
 
+void StreamingService::ReportFavoritesProgress(int received, int total) {
+  if (total > 0) {
+    FavoritesProgressSetMaximum.Emit(StreamingProgress::kDefaultMaximum);
+    FavoritesUpdateProgress.Emit(StreamingProgress::GetProgress(received, total));
+  }
+}
+
 void StreamingService::NotifySearchFailed(const std::string &error) {
   SearchUpdateStatus.Emit(last_search_id_, error);
   SearchFailed.Emit(last_search_id_, error);
@@ -191,7 +219,10 @@ void StreamingService::NotifySongsFailed(const std::string &error) {
   SongsFailed.Emit(error);
 }
 
-void StreamingService::NotifyFavoritesFailed(const std::string &error) { FavoritesFailed.Emit(error); }
+void StreamingService::NotifyFavoritesFailed(const std::string &error) {
+  FavoritesUpdateStatus.Emit(error);
+  FavoritesFailed.Emit(error);
+}
 
 void StreamingService::DeliverWithCovers(NetworkAccessManager *network, const std::map<std::string, std::string> &headers,
                                          const SongList &songs, SearchCallback callback, std::function<void(const std::string &)> status,
@@ -204,6 +235,16 @@ StreamingService::SearchCallback StreamingService::GuardSearch(SearchCallback ca
   const int generation = BeginSearchRequest();
   return [this, generation, callback](const SongList &songs) {
     if (!SearchRequestCurrent(generation) || !callback) {
+      return;
+    }
+    callback(songs);
+  };
+}
+
+StreamingService::SearchCallback StreamingService::GuardFavorites(SearchCallback callback) {
+  const int generation = BeginFavoritesRequest();
+  return [this, generation, callback](const SongList &songs) {
+    if (!FavoritesRequestCurrent(generation) || !callback) {
       return;
     }
     callback(songs);

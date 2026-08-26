@@ -40,30 +40,37 @@ class StreamingService : public UrlHandler {
   void StartArtistsProgress();
   void StartAlbumsProgress();
   void StartSongsProgress();
+  void StartFavoritesProgress(FavoriteType type = FavoriteType::Songs);
   virtual void CancelSearch();
   virtual void ResetArtistsRequest();
   virtual void ResetAlbumsRequest();
   virtual void ResetSongsRequest();
+  virtual void ResetFavoritesRequest();
   int BeginArtistsRequest();
   int BeginAlbumsRequest();
   int BeginSongsRequest();
   int BeginSearchRequest();
+  int BeginFavoritesRequest();
   bool ArtistsRequestCurrent(int generation) const;
   bool AlbumsRequestCurrent(int generation) const;
   bool SongsRequestCurrent(int generation) const;
   bool SearchRequestCurrent(int generation) const;
+  bool FavoritesRequestCurrent(int generation) const;
   int artists_generation() const { return artists_gen_; }
   int albums_generation() const { return albums_gen_; }
   int songs_generation() const { return songs_gen_; }
   int search_generation() const { return search_gen_; }
+  int favorites_generation() const { return favorites_gen_; }
   SearchCallback GuardArtists(SearchCallback callback);
   SearchCallback GuardAlbums(SearchCallback callback);
   SearchCallback GuardSongs(SearchCallback callback);
   SearchCallback GuardSearch(SearchCallback callback);
+  SearchCallback GuardFavorites(SearchCallback callback);
   void ReportSearchProgress(int received, int total);
   void ReportArtistsProgress(int received, int total);
   void ReportAlbumsProgress(int received, int total);
   void ReportSongsProgress(int received, int total);
+  void ReportFavoritesProgress(int received, int total);
   void NotifySearchFailed(const std::string &error);
   void NotifyArtistsFailed(const std::string &error);
   void NotifyAlbumsFailed(const std::string &error);
@@ -90,6 +97,9 @@ class StreamingService : public UrlHandler {
   Signal<std::string> SongsUpdateStatus;
   Signal<int> SongsProgressSetMaximum;
   Signal<int> SongsUpdateProgress;
+  Signal<std::string> FavoritesUpdateStatus;
+  Signal<int> FavoritesProgressSetMaximum;
+  Signal<int> FavoritesUpdateProgress;
   Signal<int, std::string> SearchFailed;
   Signal<std::string> ArtistsFailed;
   Signal<std::string> AlbumsFailed;
@@ -103,6 +113,7 @@ class StreamingService : public UrlHandler {
   int albums_gen_ = 0;
   int songs_gen_ = 0;
   int search_gen_ = 0;
+  int favorites_gen_ = 0;
 };
 
 #endif

@@ -255,14 +255,17 @@ TEST(StreamingService, NotifyFailedEmitsStatusAndFailed) {
   TidalService service(nullptr);
   std::string artists_status;
   std::string artists_failed;
+  std::string favorites_status;
   std::string favorites_failed;
   service.ArtistsUpdateStatus.Connect([&](const std::string &text) { artists_status = text; });
   service.ArtistsFailed.Connect([&](const std::string &text) { artists_failed = text; });
+  service.FavoritesUpdateStatus.Connect([&](const std::string &text) { favorites_status = text; });
   service.FavoritesFailed.Connect([&](const std::string &text) { favorites_failed = text; });
   service.NotifyArtistsFailed("HTTP 401");
   service.NotifyFavoritesFailed("timeout");
   EXPECT_EQ("HTTP 401", artists_status);
   EXPECT_EQ("HTTP 401", artists_failed);
+  EXPECT_EQ("timeout", favorites_status);
   EXPECT_EQ("timeout", favorites_failed);
 }
 
@@ -272,32 +275,62 @@ TEST(StreamingService, ResetDropsInFlightCallbacks) {
   int albums = 0;
   int songs = 0;
   int searches = 0;
+  int favorites = 0;
   auto artist_cb = service.GuardArtists([&](const SongList &) { ++artists; });
   auto album_cb = service.GuardAlbums([&](const SongList &) { ++albums; });
   auto song_cb = service.GuardSongs([&](const SongList &) { ++songs; });
   auto search_cb = service.GuardSearch([&](const SongList &) { ++searches; });
+  auto favorite_cb = service.GuardFavorites([&](const SongList &) { ++favorites; });
   artist_cb({});
   album_cb({});
   song_cb({});
   search_cb({});
+  favorite_cb({});
   EXPECT_EQ(1, artists);
   EXPECT_EQ(1, albums);
   EXPECT_EQ(1, songs);
   EXPECT_EQ(1, searches);
+  EXPECT_EQ(1, favorites);
   service.ResetArtistsRequest();
   service.ResetAlbumsRequest();
   service.ResetSongsRequest();
   service.CancelSearch();
+  service.ResetFavoritesRequest();
   artist_cb({});
   album_cb({});
   song_cb({});
   search_cb({});
+  favorite_cb({});
   EXPECT_EQ(1, artists);
   EXPECT_EQ(1, albums);
   EXPECT_EQ(1, songs);
   EXPECT_EQ(1, searches);
+  EXPECT_EQ(1, favorites);
   EXPECT_FALSE(service.ArtistsRequestCurrent(service.artists_generation() - 1));
   EXPECT_TRUE(service.ArtistsRequestCurrent(service.artists_generation()));
+  EXPECT_FALSE(service.FavoritesRequestCurrent(service.favorites_generation() - 1));
+  EXPECT_TRUE(service.FavoritesRequestCurrent(service.favorites_generation()));
+}
+
+TEST(StreamingService, FavoritesProgressUsesOwnChannel) {
+  TidalService service(nullptr);
+  std::string favorites_status;
+  std::string songs_status;
+  int favorites_max = 0;
+  int favorites_value = -1;
+  service.FavoritesUpdateStatus.Connect([&](const std::string &text) { favorites_status = text; });
+  service.SongsUpdateStatus.Connect([&](const std::string &text) { songs_status = text; });
+  service.FavoritesProgressSetMaximum.Connect([&](int maximum) { favorites_max = maximum; });
+  service.FavoritesUpdateProgress.Connect([&](int value) { favorites_value = value; });
+  service.StartFavoritesProgress(StreamingService::FavoriteType::Artists);
+  EXPECT_EQ("Receiving artists...", favorites_status);
+  EXPECT_TRUE(songs_status.empty());
+  EXPECT_EQ(100, favorites_max);
+  EXPECT_EQ(0, favorites_value);
+  service.ReportFavoritesProgress(25, 50);
+  EXPECT_EQ(50, favorites_value);
+  service.StartFavoritesProgress(StreamingService::FavoriteType::Albums);
+  EXPECT_EQ("Receiving albums...", favorites_status);
 }
 
 TEST(StreamingSearchOpts, FetchAlbumsRemasteredAndExplicit) {

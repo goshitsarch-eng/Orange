@@ -48,7 +48,7 @@ StreamingTabsView::StreamingTabsView(StreamingService *service, Database *databa
   artists_->SetAbortCallback([this]() { AbortGetArtists(); });
   albums_->SetAbortCallback([this]() { AbortGetAlbums(); });
   songs_->SetAbortCallback([this]() { AbortGetSongs(); });
-  favorites_->SetAbortCallback([this]() { favorites_->HideProgress(); });
+  favorites_->SetAbortCallback([this]() { AbortGetFavorites(); });
   LoadFavoriteType();
   BuildFavoriteTypes();
   ConnectBrowseProgress();
@@ -126,6 +126,22 @@ void StreamingTabsView::ConnectBrowseProgress() {
   service_->SongsFailed.Connect([this, alive](const std::string &error) {
     if (alive && *alive) {
       songs_->ShowError(error);
+    }
+  });
+  service_->FavoritesUpdateStatus.Connect([this, alive](const std::string &text) {
+    if (alive && *alive) {
+      favorites_->SetProgressStatus(text);
+      favorites_->ShowProgress();
+    }
+  });
+  service_->FavoritesProgressSetMaximum.Connect([this, alive](int maximum) {
+    if (alive && *alive) {
+      favorites_->SetProgressMaximum(maximum);
+    }
+  });
+  service_->FavoritesUpdateProgress.Connect([this, alive](int value) {
+    if (alive && *alive) {
+      favorites_->SetProgress(value);
     }
   });
   service_->FavoritesFailed.Connect([this, alive](const std::string &error) {
@@ -414,6 +430,13 @@ void StreamingTabsView::AbortGetSongs() {
   songs_->HideProgress();
 }
 
+void StreamingTabsView::AbortGetFavorites() {
+  if (service_) {
+    service_->ResetFavoritesRequest();
+  }
+  favorites_->HideProgress();
+}
+
 void StreamingTabsView::GetFavorites() {
   if (!service_) {
     return;
@@ -421,6 +444,7 @@ void StreamingTabsView::GetFavorites() {
   ShowCached(favorites_->view(), StreamingFavoriteAction::StoreList(favorite_type_));
   if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
     favorites_->ShowProgress(StreamingFavoriteAction::Receiving(favorite_type_));
+    service_->StartFavoritesProgress(favorite_type_);
   }
   favorites_->view()->SetStatus("Loading favorites…");
   service_->GetFavorites(favorite_type_, [this](const SongList &songs) {

@@ -297,11 +297,18 @@ UrlHandler::LoadResult TidalService::Load(const std::string &url, AsyncCallback 
 }
 
 void TidalService::GetFavorites(FavoriteType type, SearchCallback callback) {
-  EnsureFreshToken([this, type, callback]() {
+  auto guarded = GuardFavorites(std::move(callback));
+  const int gen = favorites_generation();
+  EnsureFreshToken([this, type, guarded, gen]() {
     TidalFavoriteRequest::Get(
         network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type,
-        [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(songs), callback); },
-        [this](int received, int total) { ReportSongsProgress(received, total); }, {},
+        [this, guarded, gen](const SongList &songs) {
+          DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(songs), guarded,
+                            [this](const std::string &text) { FavoritesUpdateStatus.Emit(text); },
+                            [this](int received, int total) { ReportFavoritesProgress(received, total); },
+                            [this, gen]() { return FavoritesRequestCurrent(gen); });
+        },
+        [this](int received, int total) { ReportFavoritesProgress(received, total); }, [this, gen]() { return FavoritesRequestCurrent(gen); },
         [this](const std::string &error) { NotifyFavoritesFailed(error); });
   });
 }
