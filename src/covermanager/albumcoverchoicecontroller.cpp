@@ -289,6 +289,8 @@ void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent
                      for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
                        g_menu_append(menu, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
                      }
+                     g_menu_append(menu, Translations::CStr(CoverChoiceMenu::SearchAutomaticallyLabel()),
+                                   CoverChoiceMenu::SearchAutomaticallyPath("cover").c_str());
                      GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
                      gtk_widget_set_parent(popover, widget);
                      GSimpleActionGroup *group = g_simple_action_group_new();
@@ -312,6 +314,20 @@ void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent
                      for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
                        add(item.id);
                      }
+                     Settings auto_settings;
+                     GSimpleAction *auto_action = g_simple_action_new_stateful(
+                         CoverChoiceMenu::SearchAutomaticallyId(), nullptr, g_variant_new_boolean(ContextCover::LoadEnabled(auto_settings)));
+                     g_signal_connect(auto_action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer controller) {
+                                        auto *self = static_cast<AlbumCoverChoiceController *>(controller);
+                                        Settings settings;
+                                        const bool enabled = ContextCover::ToggleEnabled(settings);
+                                        g_simple_action_set_state(act, g_variant_new_boolean(enabled));
+                                        if (self->search_auto_changed_) {
+                                          self->search_auto_changed_(enabled);
+                                        }
+                                      }),
+                                      self);
+                     g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(auto_action));
                      gtk_widget_insert_action_group(popover, "cover", G_ACTION_GROUP(group));
                      g_object_set_data_full(G_OBJECT(popover), "song", owned, [](gpointer p) { delete static_cast<Song *>(p); });
                      gtk_popover_popup(GTK_POPOVER(popover));

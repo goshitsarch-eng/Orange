@@ -51,6 +51,12 @@ inline void PersistEnabled(Settings &settings, bool enabled) {
   settings.BeginGroup(ContextSettings::kSettingsGroup);
 }
 
+inline bool ToggleEnabled(Settings &settings) {
+  const bool next = !LoadEnabled(settings);
+  PersistEnabled(settings, next);
+  return next;
+}
+
 }  // namespace ContextCover
 
 #endif

@@ -31,6 +31,7 @@ class AlbumCoverChoiceController {
   void SearchCoverAutomatically(Song *song, GtkWidget *image = nullptr);
   void ShowStatistics(GtkWindow *parent);
   void AttachMenu(GtkWidget *widget, GtkWindow *parent, const std::function<Song()> &song_for_menu);
+  void SetSearchAutoChangedCallback(std::function<void(bool)> callback) { search_auto_changed_ = std::move(callback); }
   void Perform(CoverChoiceMenu::Action action, GtkWindow *parent, Song *song, GtkWidget *image = nullptr);
 
   const CoverSearchStatistics &statistics() const { return statistics_; }
@@ -58,6 +59,7 @@ class AlbumCoverChoiceController {
   void ApplyImage(Song *song, GtkWidget *image, const std::string &data);
 
   Application *app_ = nullptr;
+  std::function<void(bool)> search_auto_changed_;
   CoverSearchStatistics statistics_;
   CoverOptions cover_options_;
   bool save_embedded_cover_override_ = false;

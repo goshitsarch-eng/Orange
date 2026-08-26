@@ -49,6 +49,16 @@ inline bool HasCoverActions(bool has_callback, bool song_valid) { return has_cal
 
 inline int ItemCount() { return static_cast<int>(Items().size()); }
 
+inline const char *SearchAutomaticallyLabel() { return "Search automatically"; }
+
+inline const char *SearchAutomaticallyId() { return "auto"; }
+
+inline std::string SearchAutomaticallyPath(const char *prefix) { return ActionPath(prefix, SearchAutomaticallyId()); }
+
+inline bool IsSearchAutomatically(const char *id) { return id && std::strcmp(id, SearchAutomaticallyId()) == 0; }
+
+inline int ItemCountWithAutoSearch() { return ItemCount() + 1; }
+
 }  // namespace CoverChoiceMenu
 
 #endif

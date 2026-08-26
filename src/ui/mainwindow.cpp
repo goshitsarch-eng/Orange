@@ -1186,6 +1186,16 @@ void MainWindow::BuildPlayerBar() {
     cover_controller_ = std::make_unique<AlbumCoverChoiceController>(app_);
   }
   cover_controller_->AttachMenu(playing_widget_->cover(), GTK_WINDOW(window_), [this]() { return app_->player()->current_song(); });
+  cover_controller_->SetSearchAutoChangedCallback([this](bool) {
+    if (context_view_) {
+      context_view_->ReloadSettings();
+    }
+  });
+  playing_widget_->SetSearchAutoChangedCallback([this](bool) {
+    if (context_view_) {
+      context_view_->ReloadSettings();
+    }
+  });
   playing_widget_->SetCoverActionCallback([this](CoverChoiceMenu::Action action) {
     Song song = app_->player()->current_song();
     cover_controller_->Perform(action, GTK_WINDOW(window_), &song, playing_widget_->cover());

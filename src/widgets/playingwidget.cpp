@@ -1,6 +1,7 @@
 #include "widgets/playingwidget.h"
 
 #include "constants/playingwidgetsettings.h"
+#include "context/contextcover.h"
 #include "core/settings.h"
 #include "covermanager/coverchoicemenu.h"
 #include "translations/translations.h"
@@ -369,6 +370,8 @@ void PlayingWidget::ShowMenu(double x, double y) {
     for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
       g_menu_append(cover, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
     }
+    g_menu_append(cover, Translations::CStr(CoverChoiceMenu::SearchAutomaticallyLabel()),
+                  CoverChoiceMenu::SearchAutomaticallyPath("cover").c_str());
     g_menu_append_section(menu, Translations::CStr("Cover"), G_MENU_MODEL(cover));
     g_object_unref(cover);
   }
@@ -414,6 +417,21 @@ void PlayingWidget::ShowMenu(double x, double y) {
       g_action_map_add_action(G_ACTION_MAP(cover_group), G_ACTION(action));
       g_object_unref(action);
     }
+    Settings auto_settings;
+    GSimpleAction *auto_action = g_simple_action_new_stateful(
+        CoverChoiceMenu::SearchAutomaticallyId(), nullptr, g_variant_new_boolean(ContextCover::LoadEnabled(auto_settings)));
+    g_signal_connect(auto_action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer data) {
+                       auto *self = static_cast<PlayingWidget *>(data);
+                       Settings settings;
+                       const bool enabled = ContextCover::ToggleEnabled(settings);
+                       g_simple_action_set_state(act, g_variant_new_boolean(enabled));
+                       if (self->search_auto_changed_) {
+                         self->search_auto_changed_(enabled);
+                       }
+                     }),
+                     this);
+    g_action_map_add_action(G_ACTION_MAP(cover_group), G_ACTION(auto_action));
+    g_object_unref(auto_action);
     gtk_widget_insert_action_group(popover, "cover", G_ACTION_GROUP(cover_group));
     g_object_unref(cover_group);
   }

@@ -349,6 +349,13 @@ TEST(CoverChoiceMenu, ItemsAndWhenToShow) {
   EXPECT_TRUE(CoverChoiceMenu::HasCoverActions(true, true));
   EXPECT_FALSE(CoverChoiceMenu::HasCoverActions(true, false));
   EXPECT_FALSE(CoverChoiceMenu::HasCoverActions(false, true));
+  EXPECT_STREQ("Search automatically", CoverChoiceMenu::SearchAutomaticallyLabel());
+  EXPECT_STREQ("auto", CoverChoiceMenu::SearchAutomaticallyId());
+  EXPECT_EQ("cover.auto", CoverChoiceMenu::SearchAutomaticallyPath("cover"));
+  EXPECT_TRUE(CoverChoiceMenu::IsSearchAutomatically("auto"));
+  EXPECT_FALSE(CoverChoiceMenu::IsSearchAutomatically("search"));
+  EXPECT_EQ(10, CoverChoiceMenu::ItemCountWithAutoSearch());
+  EXPECT_EQ(9, CoverChoiceMenu::ItemCount());
 }
 
 TEST(CoverManagerMenu, UsesCoverChoiceAndPlaylist) {

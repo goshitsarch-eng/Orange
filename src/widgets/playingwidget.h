@@ -18,6 +18,7 @@ class PlayingWidget {
   enum class Mode { SmallSongDetails = 0, LargeSongDetails = 1 };
   using DropCallback = std::function<void(const std::vector<unsigned char> &)>;
   using CoverActionCallback = std::function<void(CoverChoiceMenu::Action)>;
+  using SearchAutoChangedCallback = std::function<void(bool)>;
 
   static constexpr int kSmallCover = 48;
   static constexpr int kLargeCover = 160;
@@ -46,6 +47,7 @@ class PlayingWidget {
   void SetFitCoverWidth(bool fit);
   void SetDropCallback(DropCallback callback);
   void SetCoverActionCallback(CoverActionCallback callback);
+  void SetSearchAutoChangedCallback(SearchAutoChangedCallback callback) { search_auto_changed_ = std::move(callback); }
   void Playing();
   void Stopped();
   void Error();
@@ -155,6 +157,7 @@ class PlayingWidget {
   GtkWidget *spinner_ = nullptr;
   DropCallback drop_;
   CoverActionCallback cover_action_;
+  SearchAutoChangedCallback search_auto_changed_;
   bool enabled_ = true;
   bool playing_ = false;
   bool active_ = false;
