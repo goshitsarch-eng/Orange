@@ -42,7 +42,9 @@
 #include "queue/queueview.h"
 #include "widgets/multiloadingindicator.h"
 #include "widgets/playingwidget.h"
+#include "widgets/seekbarmode.h"
 #include "widgets/trackslider.h"
+#include "widgets/tracksliderwheel.h"
 #include "widgets/volumeslider.h"
 #include "collection/collectiondirectory.h"
 #include "constants/behavioursettings.h"
@@ -162,6 +164,10 @@ MainWindow::~MainWindow() {
   }
   if (collection_filter_timeout_) {
     g_source_remove(collection_filter_timeout_);
+  }
+  if (seekbar_menu_) {
+    gtk_widget_unparent(seekbar_menu_);
+    seekbar_menu_ = nullptr;
   }
 }
 
@@ -1490,6 +1496,7 @@ void MainWindow::BuildPlayerBar() {
   track_slider_ = std::make_unique<TrackSlider>();
   volume_slider_ = std::make_unique<VolumeSlider>();
   track_slider_->SetSeekCallback([this](int64_t pos) { app_->player()->Seek(pos); });
+  track_slider_->SetSeekStepCallbacks([this]() { app_->player()->SeekBackward(); }, [this]() { app_->player()->SeekForward(); });
   volume_slider_->SetVolumeCallback([this](unsigned volume) { app_->player()->SetVolume(volume); });
   volume_slider_->SetVolume(app_->player()->GetVolume());
 
@@ -1509,7 +1516,7 @@ void MainWindow::BuildPlayerBar() {
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(moodbar_drawing_), DrawMoodbar, this, nullptr);
   gtk_box_append(GTK_BOX(box), moodbar_drawing_);
   gtk_box_append(GTK_BOX(box), track_slider_->widget());
-  auto attach_seek = [&](GtkWidget *widget) {
+  auto attach_seek = [&](GtkWidget *widget, bool hover_and_wheel) {
     GtkGesture *click = gtk_gesture_click_new();
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
     gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(click));
@@ -1519,17 +1526,45 @@ void MainWindow::BuildPlayerBar() {
                        self->SeekFromBar(x, gtk_widget_get_width(area));
                      }),
                      this);
-    GtkGesture *cycle = gtk_gesture_click_new();
-    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(cycle), GDK_BUTTON_SECONDARY);
-    gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(cycle));
-    g_signal_connect(cycle, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
-                       static_cast<MainWindow *>(data)->CycleSeekbarMode();
+    GtkGesture *menu = gtk_gesture_click_new();
+    gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
+    gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(menu));
+    g_signal_connect(menu, "pressed", G_CALLBACK(+[](GtkGestureClick *gesture, gint, gdouble, gdouble, gpointer data) {
+                       auto *self = static_cast<MainWindow *>(data);
+                       self->ShowSeekbarMenu(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture)));
+                     }),
+                     this);
+    if (!hover_and_wheel) {
+      return;
+    }
+    GtkEventController *scroll = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_VERTICAL);
+    gtk_widget_add_controller(widget, scroll);
+    g_signal_connect(scroll, "scroll", G_CALLBACK((+[](GtkEventControllerScroll *, gdouble, gdouble dy, gpointer data) -> gboolean {
+                       static_cast<MainWindow *>(data)->OnSeekbarScroll(dy);
+                       return TRUE;
+                     })),
+                     this);
+    GtkEventController *motion = gtk_event_controller_motion_new();
+    gtk_widget_add_controller(widget, motion);
+    g_signal_connect(motion, "motion", G_CALLBACK(+[](GtkEventControllerMotion *controller, gdouble x, gdouble, gpointer data) {
+                       auto *self = static_cast<MainWindow *>(data);
+                       GtkWidget *area = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+                       if (self->track_slider_) {
+                         self->track_slider_->ShowHoverAt(area, x, gtk_widget_get_width(area));
+                       }
+                     }),
+                     this);
+    g_signal_connect(motion, "leave", G_CALLBACK(+[](GtkEventControllerMotion *, gpointer data) {
+                       auto *self = static_cast<MainWindow *>(data);
+                       if (self->track_slider_) {
+                         self->track_slider_->HideHover();
+                       }
                      }),
                      this);
   };
-  attach_seek(moodbar_drawing_);
-  attach_seek(waveform_drawing_);
-  attach_seek(track_slider_->slider()->widget());
+  attach_seek(moodbar_drawing_, true);
+  attach_seek(waveform_drawing_, true);
+  attach_seek(track_slider_->slider()->widget(), false);
   ApplySeekbarMode();
 
   GtkWidget *controls = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
@@ -3653,15 +3688,62 @@ void MainWindow::ApplySeekbarMode() {
   }
 }
 
-void MainWindow::CycleSeekbarMode() {
+void MainWindow::SetSeekbarMode(SeekbarSettings::Mode mode) {
   Settings settings;
   settings.BeginGroup(SeekbarSettings::kSettingsGroup);
-  const int next = (settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode)) + 1) % 3;
-  settings.SetIntValue(SeekbarSettings::kMode, next);
+  settings.SetIntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarModeMenu::Clamp(static_cast<int>(mode))));
   settings.Sync();
   ApplySeekbarMode();
   app_->moodbar()->Load(app_->player()->current_song());
   app_->waveform()->Load(app_->player()->current_song());
+}
+
+void MainWindow::CycleSeekbarMode() {
+  Settings settings;
+  settings.BeginGroup(SeekbarSettings::kSettingsGroup);
+  const auto current = static_cast<SeekbarSettings::Mode>(
+      settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode)));
+  SetSeekbarMode(SeekbarModeMenu::Next(current));
+}
+
+void MainWindow::ShowSeekbarMenu(GtkWidget *relative) {
+  if (!relative) {
+    return;
+  }
+  if (seekbar_menu_) {
+    gtk_widget_unparent(seekbar_menu_);
+    seekbar_menu_ = nullptr;
+  }
+  GMenu *menu = g_menu_new();
+  for (int i = 0; i < SeekbarModeMenu::kCount; ++i) {
+    char action[32];
+    g_snprintf(action, sizeof(action), "seekbar.mode(%d)", i);
+    g_menu_append(menu, SeekbarModeMenu::Label(static_cast<SeekbarSettings::Mode>(i)), action);
+  }
+  GSimpleActionGroup *group = g_simple_action_group_new();
+  GSimpleAction *mode_action = g_simple_action_new("mode", G_VARIANT_TYPE_INT32);
+  g_signal_connect(mode_action, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
+                     static_cast<MainWindow *>(data)->SetSeekbarMode(SeekbarModeMenu::Clamp(g_variant_get_int32(param)));
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(mode_action));
+  seekbar_menu_ = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  gtk_widget_insert_action_group(seekbar_menu_, "seekbar", G_ACTION_GROUP(group));
+  gtk_widget_set_parent(seekbar_menu_, relative);
+  gtk_popover_popup(GTK_POPOVER(seekbar_menu_));
+  g_object_unref(group);
+  g_object_unref(menu);
+}
+
+void MainWindow::OnSeekbarScroll(double dy) {
+  const TrackSliderWheel::Result result = TrackSliderWheel::FromGtkScroll(seekbar_wheel_accum_, dy);
+  seekbar_wheel_accum_ = result.accumulator;
+  const TrackSliderWheel::Direction direction = TrackSliderWheel::DirectionFromSteps(result.steps);
+  if (direction == TrackSliderWheel::Direction::Forward) {
+    app_->player()->SeekForward();
+  } else if (direction == TrackSliderWheel::Direction::Backward) {
+    app_->player()->SeekBackward();
+  }
 }
 
 void MainWindow::SeekFromBar(double x, int width) {

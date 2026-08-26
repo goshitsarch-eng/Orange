@@ -2,6 +2,7 @@
 
 #include "core/settings.h"
 #include "widgets/trackslidertime.h"
+#include "widgets/tracksliderwheel.h"
 
 TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
   Settings settings;
@@ -33,6 +34,23 @@ TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
     }
     seek_(static_cast<int64_t>(value / 1000.0 * static_cast<double>(length_nanosec_)));
   });
+  GtkEventController *scroll = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_VERTICAL);
+  gtk_widget_add_controller(slider_.widget(), scroll);
+  g_signal_connect(scroll, "scroll", G_CALLBACK((+[](GtkEventControllerScroll *, gdouble, gdouble dy, gpointer data) -> gboolean {
+                     static_cast<TrackSlider *>(data)->OnWheel(dy);
+                     return TRUE;
+                   })),
+                   this);
+  GtkEventController *motion = gtk_event_controller_motion_new();
+  gtk_widget_add_controller(slider_.widget(), motion);
+  g_signal_connect(motion, "motion", G_CALLBACK(+[](GtkEventControllerMotion *, gdouble x, gdouble, gpointer data) {
+                     static_cast<TrackSlider *>(data)->OnHover(x);
+                   }),
+                   this);
+  g_signal_connect(motion, "leave", G_CALLBACK(+[](GtkEventControllerMotion *, gpointer data) {
+                     static_cast<TrackSlider *>(data)->HideHover();
+                   }),
+                   this);
 }
 
 void TrackSlider::SetTimes(int64_t position_nanosec, int64_t length_nanosec) {
@@ -49,6 +67,33 @@ void TrackSlider::SetTimes(int64_t position_nanosec, int64_t length_nanosec) {
 }
 
 void TrackSlider::SetSeekCallback(SeekCallback callback) { seek_ = std::move(callback); }
+
+void TrackSlider::SetSeekStepCallbacks(StepCallback backward, StepCallback forward) {
+  seek_backward_ = std::move(backward);
+  seek_forward_ = std::move(forward);
+}
+
+void TrackSlider::OnWheel(double dy) {
+  const TrackSliderWheel::Result result = TrackSliderWheel::FromGtkScroll(wheel_accumulator_, dy);
+  wheel_accumulator_ = result.accumulator;
+  const TrackSliderWheel::Direction direction = TrackSliderWheel::DirectionFromSteps(result.steps);
+  if (direction == TrackSliderWheel::Direction::Forward && seek_forward_) {
+    seek_forward_();
+  } else if (direction == TrackSliderWheel::Direction::Backward && seek_backward_) {
+    seek_backward_();
+  }
+}
+
+void TrackSlider::OnHover(double x) { ShowHoverAt(slider_.widget(), x, gtk_widget_get_width(slider_.widget())); }
+
+void TrackSlider::ShowHoverAt(GtkWidget *relative, double x, int width) {
+  const int length_sec = static_cast<int>(length_nanosec_ / 1000000000LL);
+  const int position_sec = static_cast<int>(position_nanosec_ / 1000000000LL);
+  const int hover_sec = TrackSliderHover::SecondsAtX(x, static_cast<double>(width), length_sec);
+  popup_.ShowAt(relative, static_cast<int>(x), TrackSliderHover::HoverText(hover_sec), TrackSliderHover::DeltaText(hover_sec, position_sec));
+}
+
+void TrackSlider::HideHover() { popup_.Hide(); }
 
 void TrackSlider::SetSliderVisible(bool visible) { gtk_widget_set_visible(slider_.widget(), visible); }
 

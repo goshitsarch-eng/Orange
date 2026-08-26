@@ -9,6 +9,7 @@
 #include "context/contextview.h"
 #include "core/application.h"
 #include "core/commandlineoptions.h"
+#include "core/seekbarsettings.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistcontainer.h"
 #include "playlist/playlistlistcontainer.h"
@@ -157,6 +158,9 @@ class MainWindow {
   void ShowToast(const std::string &text);
   void ApplySeekbarMode();
   void CycleSeekbarMode();
+  void SetSeekbarMode(SeekbarSettings::Mode mode);
+  void ShowSeekbarMenu(GtkWidget *relative);
+  void OnSeekbarScroll(double dy);
   void SeekFromBar(double x, int width);
   void SetShowSidebar(bool show);
   void ApplySidebar();
@@ -210,6 +214,8 @@ class MainWindow {
   GtkWidget *analyzer_drawing_ = nullptr;
   GtkWidget *moodbar_drawing_ = nullptr;
   GtkWidget *waveform_drawing_ = nullptr;
+  GtkWidget *seekbar_menu_ = nullptr;
+  int seekbar_wheel_accum_ = 0;
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;
   GtkWidget *collection_search_ = nullptr;

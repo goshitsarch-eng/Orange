@@ -1,5 +1,7 @@
 #include "constants/moodbarsettings.h"
 #include "constants/waveformsettings.h"
+#include "widgets/seekbarmode.h"
+#include "widgets/tracksliderwheel.h"
 #include "core/song.h"
 #include "moodbar/moodbarcell.h"
 #include "moodbar/moodbarpaths.h"
@@ -125,4 +127,46 @@ TEST(AnalysisAsync, GenerateOnlyWhenEnabledAndCacheMisses) {
   EXPECT_TRUE(AnalysisAsync::AcceptGeneration(3, 3, true));
   EXPECT_FALSE(AnalysisAsync::AcceptGeneration(2, 3, true));
   EXPECT_FALSE(AnalysisAsync::AcceptGeneration(3, 3, false));
+}
+
+TEST(TrackSliderWheel, AccumulatesQtNotches) {
+  EXPECT_EQ(120, TrackSliderWheel::kRotationToSeek);
+  const TrackSliderWheel::Result none = TrackSliderWheel::FromAngleDelta(0, 0);
+  EXPECT_EQ(0, none.steps);
+  const TrackSliderWheel::Result forward = TrackSliderWheel::FromAngleDelta(0, 120);
+  EXPECT_EQ(1, forward.steps);
+  EXPECT_EQ(TrackSliderWheel::Direction::Forward, TrackSliderWheel::DirectionFromSteps(forward.steps));
+  const TrackSliderWheel::Result backward = TrackSliderWheel::FromAngleDelta(0, -120);
+  EXPECT_EQ(-1, backward.steps);
+  EXPECT_EQ(TrackSliderWheel::Direction::Backward, TrackSliderWheel::DirectionFromSteps(backward.steps));
+  const TrackSliderWheel::Result partial = TrackSliderWheel::FromAngleDelta(0, 60);
+  EXPECT_EQ(0, partial.steps);
+  EXPECT_EQ(60, partial.accumulator);
+  const TrackSliderWheel::Result completed = TrackSliderWheel::FromAngleDelta(partial.accumulator, 60);
+  EXPECT_EQ(1, completed.steps);
+  const TrackSliderWheel::Result gtk_up = TrackSliderWheel::FromGtkScroll(0, -1.0);
+  EXPECT_EQ(1, gtk_up.steps);
+  const TrackSliderWheel::Result gtk_down = TrackSliderWheel::FromGtkScroll(0, 1.0);
+  EXPECT_EQ(-1, gtk_down.steps);
+}
+
+TEST(TrackSliderHover, MapsXToTimeAndDelta) {
+  EXPECT_EQ(0, TrackSliderHover::SecondsAtX(0, 100, 180));
+  EXPECT_EQ(90, TrackSliderHover::SecondsAtX(50, 100, 180));
+  EXPECT_EQ(180, TrackSliderHover::SecondsAtX(100, 100, 180));
+  EXPECT_EQ(0, TrackSliderHover::SecondsAtX(10, 0, 180));
+  EXPECT_EQ("1:30", TrackSliderHover::HoverText(90));
+  EXPECT_EQ("+0:30", TrackSliderHover::DeltaText(90, 60));
+  EXPECT_EQ("-0:30", TrackSliderHover::DeltaText(30, 60));
+}
+
+TEST(SeekbarModeMenu, LabelsAndCycleMatchQt) {
+  EXPECT_STREQ("Normal", SeekbarModeMenu::Label(SeekbarSettings::Mode::Normal));
+  EXPECT_STREQ("Moodbar", SeekbarModeMenu::Label(SeekbarSettings::Mode::Moodbar));
+  EXPECT_STREQ("Waveform", SeekbarModeMenu::Label(SeekbarSettings::Mode::Waveform));
+  EXPECT_EQ(SeekbarSettings::Mode::Moodbar, SeekbarModeMenu::Next(SeekbarSettings::Mode::Normal));
+  EXPECT_EQ(SeekbarSettings::Mode::Waveform, SeekbarModeMenu::Next(SeekbarSettings::Mode::Moodbar));
+  EXPECT_EQ(SeekbarSettings::Mode::Normal, SeekbarModeMenu::Next(SeekbarSettings::Mode::Waveform));
+  EXPECT_EQ(SeekbarSettings::Mode::Normal, SeekbarModeMenu::Clamp(-1));
+  EXPECT_EQ(SeekbarSettings::Mode::Waveform, SeekbarModeMenu::Clamp(2));
 }
