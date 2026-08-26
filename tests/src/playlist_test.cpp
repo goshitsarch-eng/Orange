@@ -21,6 +21,33 @@ TEST(Playlist, AppendAndNavigate) {
   EXPECT_EQ(0, playlist.row_count());
 }
 
+TEST(Playlist, DynamicRefill) {
+  Playlist playlist;
+  SmartPlaylistSearch search;
+  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "A"});
+  playlist.SetDynamic(true, search);
+  EXPECT_TRUE(playlist.is_dynamic());
+  Song have;
+  have.set_title("Have");
+  have.set_artist("A");
+  have.set_url("file:///have");
+  have.set_valid(true);
+  playlist.AppendSongs({have});
+  Song extra;
+  extra.set_title("Extra");
+  extra.set_artist("A Band");
+  extra.set_url("file:///extra");
+  extra.set_valid(true);
+  Song skip;
+  skip.set_title("Skip");
+  skip.set_artist("Other");
+  skip.set_url("file:///skip");
+  skip.set_valid(true);
+  playlist.RefillDynamic({have, extra, skip});
+  EXPECT_EQ(2, playlist.row_count());
+  EXPECT_EQ("Extra", playlist.songs().back().title());
+}
+
 TEST(Playlist, UndoRedo) {
   Playlist playlist;
   Song a;

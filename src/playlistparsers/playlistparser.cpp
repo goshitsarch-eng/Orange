@@ -4,6 +4,7 @@
 #include "utilities/strutils.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <sstream>
 
 bool PlaylistParser::IsPlaylist(const std::string &path) {
@@ -152,44 +153,116 @@ SongList PlaylistParser::LoadWPL(const std::string &data) const {
   return songs;
 }
 
+int64_t PlaylistParser::CueIndexToNanosec(const std::string &index) {
+  int minutes = 0;
+  int seconds = 0;
+  int frames = 0;
+  if (std::sscanf(index.c_str(), "%d:%d:%d", &minutes, &seconds, &frames) < 2) {
+    return 0;
+  }
+  const int64_t total_frames = (static_cast<int64_t>(minutes) * 60 + seconds) * 75 + frames;
+  return total_frames * 1000000000LL / 75;
+}
+
+std::string PlaylistParser::FindCueForAudio(const std::string &audio_path) {
+  const std::string dir = FileUtils::DirName(audio_path);
+  const std::string base = FileUtils::BaseName(audio_path);
+  const auto dot = base.rfind('.');
+  const std::string stem = dot == std::string::npos ? base : base.substr(0, dot);
+  const std::vector<std::string> candidates = {FileUtils::Join(dir, stem + ".cue"), FileUtils::Join(dir, stem + ".CUE"),
+                                               FileUtils::Join(dir, "album.cue")};
+  for (const std::string &candidate : candidates) {
+    if (FileUtils::Exists(candidate)) {
+      return candidate;
+    }
+  }
+  return {};
+}
+
+namespace {
+
+std::string CueQuoted(const std::string &line) {
+  const auto first = line.find('"');
+  const auto last = line.rfind('"');
+  if (first != std::string::npos && last > first) {
+    return line.substr(first + 1, last - first - 1);
+  }
+  return {};
+}
+
+}  // namespace
+
 SongList PlaylistParser::LoadCUE(const std::string &path, const std::string &data) const {
   SongList songs;
   const std::string dir = FileUtils::DirName(path);
   std::string file;
+  std::string album;
+  std::string album_artist;
   Song current;
+  bool in_track = false;
   std::istringstream stream(data);
   std::string line;
+  auto finish_track = [&]() {
+    if (current.is_valid()) {
+      if (current.album().empty()) {
+        current.set_album(album);
+      }
+      if (current.albumartist().empty()) {
+        current.set_albumartist(album_artist);
+      }
+      current.set_cue_path(path);
+      songs.push_back(current);
+    }
+    current = Song();
+    in_track = false;
+  };
   while (std::getline(stream, line)) {
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+    }
     const std::string trimmed = StrUtils::Trim(line);
     if (StrUtils::StartsWith(trimmed, "FILE ")) {
-      const auto first = trimmed.find('"');
-      const auto last = trimmed.rfind('"');
-      if (first != std::string::npos && last > first) {
-        file = FileUtils::Join(dir, trimmed.substr(first + 1, last - first - 1));
+      const std::string name = CueQuoted(trimmed);
+      if (!name.empty()) {
+        file = name[0] == '/' ? name : FileUtils::Join(dir, name);
       }
     } else if (StrUtils::StartsWith(trimmed, "TRACK ")) {
-      if (current.is_valid()) {
-        songs.push_back(current);
-      }
+      finish_track();
       current = Song(Song::Source::LocalFile);
       current.set_url(FileUtils::UriFromPath(file));
-      current.set_valid(true);
+      current.set_valid(!file.empty());
+      int track = 0;
+      std::sscanf(trimmed.c_str(), "TRACK %d", &track);
+      current.set_track(track);
+      in_track = true;
     } else if (StrUtils::StartsWith(trimmed, "TITLE ")) {
-      const auto first = trimmed.find('"');
-      const auto last = trimmed.rfind('"');
-      if (first != std::string::npos && last > first) {
-        current.set_title(trimmed.substr(first + 1, last - first - 1));
+      const std::string title = CueQuoted(trimmed);
+      if (in_track) {
+        current.set_title(title);
+      } else {
+        album = title;
       }
     } else if (StrUtils::StartsWith(trimmed, "PERFORMER ")) {
-      const auto first = trimmed.find('"');
-      const auto last = trimmed.rfind('"');
-      if (first != std::string::npos && last > first) {
-        current.set_artist(trimmed.substr(first + 1, last - first - 1));
+      const std::string performer = CueQuoted(trimmed);
+      if (in_track) {
+        current.set_artist(performer);
+      } else {
+        album_artist = performer;
+      }
+    } else if (StrUtils::StartsWith(trimmed, "INDEX 01 ") || StrUtils::StartsWith(trimmed, "INDEX 1 ")) {
+      const auto space = trimmed.rfind(' ');
+      if (space != std::string::npos) {
+        current.set_beginning_nanosec(CueIndexToNanosec(trimmed.substr(space + 1)));
       }
     }
   }
-  if (current.is_valid()) {
-    songs.push_back(current);
+  finish_track();
+  for (size_t i = 0; i + 1 < songs.size(); ++i) {
+    const int64_t next = songs[i + 1].beginning_nanosec();
+    const int64_t start = songs[i].beginning_nanosec();
+    if (next > start) {
+      songs[i].set_length_nanosec(next - start);
+    }
   }
   return songs;
 }

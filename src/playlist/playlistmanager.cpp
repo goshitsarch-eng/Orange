@@ -1,5 +1,7 @@
 #include "playlist/playlistmanager.h"
 
+#include "collection/collectionbackend.h"
+#include "playlistparsers/playlistparser.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
@@ -98,17 +100,29 @@ void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row) 
     return;
   }
   SongList songs;
+  PlaylistParser parser;
   for (const std::string &url : urls) {
     const std::string path = FileUtils::PathFromUri(url);
-    if (FileUtils::IsFile(path) && Song::IsAudioFile(path)) {
-      songs.push_back(tagreader_->ReadFile(path));
-    } else {
-      Song song(Song::Source::Stream);
-      song.set_url(url);
-      song.set_title(url);
-      song.set_valid(true);
-      songs.push_back(song);
+    if (FileUtils::IsFile(path) && PlaylistParser::IsPlaylist(path)) {
+      SongList loaded = parser.Load(path);
+      songs.insert(songs.end(), loaded.begin(), loaded.end());
+      continue;
     }
+    if (FileUtils::IsFile(path) && Song::IsAudioFile(path)) {
+      const std::string cue = PlaylistParser::FindCueForAudio(path);
+      if (!cue.empty()) {
+        SongList loaded = parser.Load(cue);
+        songs.insert(songs.end(), loaded.begin(), loaded.end());
+        continue;
+      }
+      songs.push_back(tagreader_->ReadFile(path));
+      continue;
+    }
+    Song song(Song::Source::Stream);
+    song.set_url(url);
+    song.set_title(url);
+    song.set_valid(true);
+    songs.push_back(song);
   }
   if (row < 0) {
     active_->AppendSongs(songs);
@@ -116,6 +130,12 @@ void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row) 
     active_->InsertSongs(row, songs);
   }
   SaveActive();
+}
+
+void PlaylistManager::RefillDynamic() {
+  if (active_ && active_->is_dynamic() && collection_backend_) {
+    active_->RefillDynamic(collection_backend_->Songs());
+  }
 }
 
 void PlaylistManager::SaveActive() {

@@ -176,7 +176,8 @@ void MainWindow::BuildUi() {
   adw_header_bar_pack_end(ADW_HEADER_BAR(header), menu_button);
 
   GtkWidget *search = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search), "Filter collection");
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search), "Filter collection (artist:name, -term)");
+  gtk_widget_set_tooltip_text(search, "Field filters: artist: title: album: genre: year: rating:  Use -term to exclude.");
   adw_header_bar_pack_start(ADW_HEADER_BAR(header), search);
   g_signal_connect(search, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
@@ -415,6 +416,26 @@ void MainWindow::BuildContext() {
   gtk_box_append(GTK_BOX(box), context_album_);
   gtk_box_append(GTK_BOX(box), context_meta_);
   gtk_box_append(GTK_BOX(box), lyrics_view_);
+  GtkWidget *save_lyrics = gtk_button_new_with_label("Save lyrics to tag");
+  g_signal_connect(save_lyrics, "clicked", G_CALLBACK((+[](GtkButton *btn, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     Song song = self->app_->player()->current_song();
+                     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(self->lyrics_view_));
+                     GtkTextIter start;
+                     GtkTextIter end;
+                     gtk_text_buffer_get_bounds(buffer, &start, &end);
+                     gchar *text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+                     song.set_lyrics(text ? text : "");
+                     g_free(text);
+                     if (self->app_->tagreader()->WriteFile(song)) {
+                       gtk_button_set_label(btn, "Saved");
+                       if (song.id() > 0) {
+                         self->app_->collection()->backend()->AddOrUpdateSong(song);
+                       }
+                     }
+                   })),
+                   this);
+  gtk_box_append(GTK_BOX(box), save_lyrics);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), box);
   g_object_set_data(G_OBJECT(context_cover_), "context-scroll", scroll);
 }
@@ -616,24 +637,39 @@ void MainWindow::RefreshCollection(const std::string &filter) {
   ClearList(collection_list_);
   const SongList songs = app_->collection()->Songs(filter);
   std::string last_header;
+  GtkWidget *current_box = nullptr;
   for (const Song &song : songs) {
     const std::string header = CollectionHeader(song);
     if (header != last_header) {
+      GtkWidget *expander = gtk_expander_new(header.c_str());
+      gtk_expander_set_expanded(GTK_EXPANDER(expander), TRUE);
+      current_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+      gtk_expander_set_child(GTK_EXPANDER(expander), current_box);
       GtkWidget *header_row = gtk_list_box_row_new();
       gtk_list_box_row_set_selectable(GTK_LIST_BOX_ROW(header_row), FALSE);
-      GtkWidget *header_label = gtk_label_new(header.c_str());
-      gtk_widget_add_css_class(header_label, "heading");
-      gtk_widget_set_halign(header_label, GTK_ALIGN_START);
-      gtk_widget_set_margin_start(header_label, 12);
-      gtk_widget_set_margin_top(header_label, 10);
-      gtk_widget_set_margin_bottom(header_label, 4);
-      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(header_row), header_label);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(header_row), expander);
       gtk_list_box_append(GTK_LIST_BOX(collection_list_), header_row);
       last_header = header;
     }
     auto *copy = new Song(song);
     const std::string text = (song.track() > 0 ? std::to_string(song.track()) + ". " : "") + song.PrettyTitle();
-    AppendStringRow(GTK_LIST_BOX(collection_list_), text, copy, [](gpointer p) { delete static_cast<Song *>(p); });
+    if (current_box) {
+      GtkWidget *button = gtk_button_new_with_label(text.c_str());
+      gtk_widget_add_css_class(button, "flat");
+      gtk_widget_set_halign(button, GTK_ALIGN_START);
+      g_object_set_data_full(G_OBJECT(button), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+      g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                         auto *self = static_cast<MainWindow *>(data);
+                         if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(btn), "song"))) {
+                           self->app_->playlist_manager()->AppendSongs({*song});
+                           self->RefreshPlaylist();
+                         }
+                       }),
+                       this);
+      gtk_box_append(GTK_BOX(current_box), button);
+    } else {
+      AppendStringRow(GTK_LIST_BOX(collection_list_), text, copy, [](gpointer p) { delete static_cast<Song *>(p); });
+    }
   }
   gtk_label_set_text(GTK_LABEL(status_label_), (std::to_string(songs.size()) + " songs").c_str());
 }
@@ -1316,8 +1352,13 @@ void MainWindow::RunSmartPlaylist(const std::string &kind) {
     search.limit = 100;
     name = "Most played";
   }
-  app_->playlist_manager()->New(name);
-  app_->playlist_manager()->AppendSongs(search.Search(app_->collection()->Songs()));
+  Playlist *playlist = app_->playlist_manager()->New(name);
+  playlist->SetDynamic(true, search);
+  SmartPlaylistSearch initial = search;
+  if (initial.limit == 0 || initial.limit > 20) {
+    initial.limit = 20;
+  }
+  app_->playlist_manager()->AppendSongs(initial.Search(app_->collection()->Songs()));
   RefreshPlaylistsList();
   RefreshPlaylist();
 }

@@ -37,6 +37,7 @@ class PlaylistManager {
   void InsertUrls(const std::vector<std::string> &urls, int row = -1);
   void SaveActive();
   void LoadAll();
+  void RefillDynamic();
 
   Signal<Playlist *> PlaylistAdded;
   Signal<int> PlaylistClosed;

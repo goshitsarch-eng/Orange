@@ -213,5 +213,8 @@ void Player::HandleTrackEnded() {
     Stop();
     return;
   }
+  if (playlist_manager_) {
+    playlist_manager_->RefillDynamic();
+  }
   Next();
 }

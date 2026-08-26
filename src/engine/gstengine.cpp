@@ -36,6 +36,9 @@ bool GstEngine::Init() {
   output_ = settings.Value("output", DefaultOutput());
   device_ = settings.Value("device");
   replaygain_enabled_ = settings.BoolValue("rgenabled", false);
+  replaygain_mode_ = settings.Value("rgmode", "album") == "track" ? 1 : 0;
+  replaygain_preamp_ = settings.IntValue("rgpreamp", 0);
+  stereo_balance_ = static_cast<float>(settings.IntValue("stereobalance", 0)) / 100.0f;
   return true;
 }
 
@@ -78,19 +81,31 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
     GstElement *bin = gst_bin_new("audio-bin");
     volume_ = gst_element_factory_make("volume", "volume");
     equalizer_ = gst_element_factory_make("equalizer-10bands", "equalizer");
-    rgvolume_ = gst_element_factory_make("rgvolume", "rgvolume");
-    if (volume_) gst_bin_add(GST_BIN(bin), volume_);
-    if (equalizer_) gst_bin_add(GST_BIN(bin), equalizer_);
-    if (rgvolume_ && replaygain_enabled_) gst_bin_add(GST_BIN(bin), rgvolume_);
-    gst_bin_add(GST_BIN(bin), sink);
-
-    GstElement *head = sink;
-    if (volume_) {
-      gst_element_link(volume_, equalizer_ ? equalizer_ : sink);
-      head = volume_;
+    rgvolume_ = replaygain_enabled_ ? gst_element_factory_make("rgvolume", "rgvolume") : nullptr;
+    rglimiter_ = replaygain_enabled_ ? gst_element_factory_make("rglimiter", "rglimiter") : nullptr;
+    panorama_ = gst_element_factory_make("audiopanorama", "panorama");
+    std::vector<GstElement *> chain;
+    auto add = [&](GstElement *element) {
+      if (element) {
+        gst_bin_add(GST_BIN(bin), element);
+        chain.push_back(element);
+      }
+    };
+    add(volume_);
+    add(equalizer_);
+    add(rgvolume_);
+    add(rglimiter_);
+    add(panorama_);
+    add(sink);
+    for (size_t i = 0; i + 1 < chain.size(); ++i) {
+      gst_element_link(chain[i], chain[i + 1]);
     }
-    if (equalizer_ && volume_) {
-      gst_element_link(equalizer_, sink);
+    GstElement *head = chain.empty() ? sink : chain.front();
+    if (rgvolume_) {
+      g_object_set(rgvolume_, "album-mode", replaygain_mode_ == 0, "pre-amp", replaygain_preamp_, nullptr);
+    }
+    if (panorama_) {
+      g_object_set(panorama_, "panorama", stereo_balance_, nullptr);
     }
     GstPad *pad = gst_element_get_static_pad(head, "sink");
     GstPad *ghost = gst_ghost_pad_new("sink", pad);
@@ -232,13 +247,24 @@ void GstEngine::SetEqualizerParameters(int preamp, const std::vector<int> &band_
 }
 
 void GstEngine::SetReplayGainEnabled(bool enabled) { replaygain_enabled_ = enabled; }
-void GstEngine::SetReplayGainMode(int) {}
-void GstEngine::SetReplayGainPreamp(double preamp) {
+void GstEngine::SetReplayGainMode(int mode) {
+  replaygain_mode_ = mode;
   if (rgvolume_) {
-    g_object_set(rgvolume_, "preamp", preamp, nullptr);
+    g_object_set(rgvolume_, "album-mode", mode == 0, nullptr);
   }
 }
-void GstEngine::SetStereoBalance(float) {}
+void GstEngine::SetReplayGainPreamp(double preamp) {
+  replaygain_preamp_ = preamp;
+  if (rgvolume_) {
+    g_object_set(rgvolume_, "pre-amp", preamp, nullptr);
+  }
+}
+void GstEngine::SetStereoBalance(float value) {
+  stereo_balance_ = value;
+  if (panorama_) {
+    g_object_set(panorama_, "panorama", value, nullptr);
+  }
+}
 
 gboolean GstEngine::BusCallback(GstBus *, GstMessage *message, gpointer data) {
   auto *self = static_cast<GstEngine *>(data);

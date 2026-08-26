@@ -6,6 +6,10 @@
 #include <gio/gio.h>
 #include <glib/gstdio.h>
 #endif
+#ifdef HAVE_MTP
+#include <libmtp.h>
+#include <cstdlib>
+#endif
 
 void DeviceManager::Init() { Rescan(); }
 
@@ -43,20 +47,48 @@ void DeviceManager::Rescan() {
   g_object_unref(monitor);
 #endif
 #ifdef HAVE_MTP
-  ConnectedDevice mtp;
-  mtp.friendly_name = "MTP devices";
-  mtp.unique_id = "mtp";
-  mtp.icon = "multimedia-player-symbolic";
-  mtp.backend = "mtp";
-  devices_.push_back(mtp);
+  {
+    LIBMTP_raw_device_t *raw = nullptr;
+    int count = 0;
+    LIBMTP_Init();
+    if (LIBMTP_Detect_Raw_Devices(&raw, &count) == LIBMTP_ERROR_NONE && raw) {
+      for (int i = 0; i < count; ++i) {
+        LIBMTP_mtpdevice_t *device = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
+        ConnectedDevice entry;
+        entry.backend = "mtp";
+        entry.icon = "multimedia-player-symbolic";
+        if (device) {
+          char *name = LIBMTP_Get_Friendlyname(device);
+          char *serial = LIBMTP_Get_Serialnumber(device);
+          entry.friendly_name = name && *name ? name : "MTP device";
+          entry.unique_id = std::string("mtp:") + (serial ? serial : std::to_string(i));
+          free(name);
+          free(serial);
+          LIBMTP_Release_Device(device);
+        } else {
+          entry.friendly_name = "MTP device";
+          entry.unique_id = "mtp:" + std::to_string(i);
+        }
+        devices_.push_back(entry);
+      }
+      free(raw);
+    }
+  }
 #endif
 #ifdef HAVE_GPOD
-  ConnectedDevice ipod;
-  ipod.friendly_name = "iPod";
-  ipod.unique_id = "gpod";
-  ipod.icon = "multimedia-player-symbolic";
-  ipod.backend = "gpod";
-  devices_.push_back(ipod);
+  for (ConnectedDevice &device : devices_) {
+    if (device.mount_path.empty()) {
+      continue;
+    }
+    if (FileUtils::Exists(FileUtils::Join(device.mount_path, "iPod_Control")) ||
+        FileUtils::Exists(FileUtils::Join(device.mount_path, "iTunes_Control"))) {
+      device.backend = "gpod";
+      device.icon = "multimedia-player-symbolic";
+      if (device.friendly_name.find("iPod") == std::string::npos) {
+        device.friendly_name += " (iPod)";
+      }
+    }
+  }
 #endif
 #ifdef HAVE_AUDIOCD
   ConnectedDevice cd;
@@ -70,19 +102,66 @@ void DeviceManager::Rescan() {
 }
 
 bool DeviceManager::CopySongs(const std::string &device_id, const SongList &songs) {
-  std::string dest_root;
+  ConnectedDevice target;
   for (const ConnectedDevice &device : devices_) {
     if (device.unique_id == device_id || device.friendly_name == device_id) {
-      dest_root = device.mount_path;
+      target = device;
       break;
     }
   }
-  if (dest_root.empty()) {
+#ifdef HAVE_MTP
+  if (target.backend == "mtp") {
+    LIBMTP_raw_device_t *raw = nullptr;
+    int count = 0;
+    if (LIBMTP_Detect_Raw_Devices(&raw, &count) != LIBMTP_ERROR_NONE || !raw) {
+      return false;
+    }
+    LIBMTP_mtpdevice_t *mtp = nullptr;
+    for (int i = 0; i < count; ++i) {
+      LIBMTP_mtpdevice_t *device = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
+      if (!device) {
+        continue;
+      }
+      char *serial = LIBMTP_Get_Serialnumber(device);
+      const std::string id = std::string("mtp:") + (serial ? serial : "");
+      free(serial);
+      if (id == target.unique_id || count == 1) {
+        mtp = device;
+        break;
+      }
+      LIBMTP_Release_Device(device);
+    }
+    free(raw);
+    if (!mtp) {
+      return false;
+    }
+    int copied = 0;
+    for (const Song &song : songs) {
+      const std::string src = FileUtils::PathFromUri(song.url());
+      if (src.empty() || !FileUtils::Exists(src)) {
+        continue;
+      }
+      LIBMTP_file_t *file = LIBMTP_new_file_t();
+      file->filename = strdup(FileUtils::BaseName(src).c_str());
+      file->filesize = static_cast<uint64_t>(song.filesize() > 0 ? song.filesize() : 0);
+      file->parent_id = 0;
+      file->storage_id = 0;
+      if (LIBMTP_Send_File_From_File(mtp, src.c_str(), file, nullptr, nullptr) == 0) {
+        ++copied;
+      }
+      LIBMTP_destroy_file_t(file);
+    }
+    LIBMTP_Release_Device(mtp);
+    LogInfo("Copied %d songs to MTP device", copied);
+    return copied > 0;
+  }
+#endif
+  if (target.mount_path.empty()) {
     LogInfo("Device %s has no mount path", device_id.c_str());
     return false;
   }
 #ifdef HAVE_GIO
-  const std::string music = FileUtils::Join(dest_root, "Music");
+  const std::string music = FileUtils::Join(target.mount_path, target.backend == "gpod" ? "iPod_Control/Music" : "Music");
   g_mkdir_with_parents(music.c_str(), 0755);
   int copied = 0;
   for (const Song &song : songs) {

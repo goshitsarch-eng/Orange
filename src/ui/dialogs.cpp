@@ -427,6 +427,23 @@ void Dialogs::EditTag(GtkWindow *parent, Application *app) {
   gtk_widget_set_vexpand(GTK_WIDGET(stack), TRUE);
   gtk_box_append(GTK_BOX(box), GTK_WIDGET(stack));
   gtk_box_append(GTK_BOX(box), save);
+  GtkWidget *fetch_lyrics = gtk_button_new_with_label("Fetch lyrics");
+  g_object_set_data(G_OBJECT(fetch_lyrics), "song", copy);
+  g_signal_connect(fetch_lyrics, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(button), "song"));
+                     if (!song) {
+                       return;
+                     }
+                     application->lyrics_providers()->Fetch(*song, [button, song](const std::string &lyrics, const std::string &) {
+                       if (!lyrics.empty()) {
+                         song->set_lyrics(lyrics);
+                         gtk_button_set_label(button, "Fetched");
+                       }
+                     });
+                   })),
+                   app);
+  gtk_box_append(GTK_BOX(box), fetch_lyrics);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }
@@ -521,6 +538,7 @@ void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app) {
   gtk_entry_set_placeholder_text(GTK_ENTRY(value), "Value");
   GtkWidget *limit = gtk_spin_button_new_with_range(0, 10000, 1);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(limit), 100);
+  GtkWidget *dynamic = gtk_check_button_new_with_label("Dynamic (keep refilling as tracks play)");
   GtkWidget *create = gtk_button_new_with_label("Create");
   gtk_widget_add_css_class(create, "suggested-action");
   g_object_set_data(G_OBJECT(create), "name", name);
@@ -528,6 +546,7 @@ void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app) {
   g_object_set_data(G_OBJECT(create), "op", op);
   g_object_set_data(G_OBJECT(create), "value", value);
   g_object_set_data(G_OBJECT(create), "limit", limit);
+  g_object_set_data(G_OBJECT(create), "dynamic", dynamic);
   g_signal_connect(create, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
                      SmartPlaylistSearch search;
@@ -541,7 +560,11 @@ void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app) {
                      search.terms.push_back({fields[field_i], ops[op_i], gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "value")))});
                      search.limit = static_cast<int>(gtk_spin_button_get_value(GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "limit"))));
                      const char *playlist_name = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "name")));
-                     application->playlist_manager()->New(playlist_name && *playlist_name ? playlist_name : "Smart playlist");
+                     Playlist *playlist = application->playlist_manager()->New(playlist_name && *playlist_name ? playlist_name : "Smart playlist");
+                     if (gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "dynamic")))) {
+                       playlist->SetDynamic(true, search);
+                       search.limit = 20;
+                     }
                      application->playlist_manager()->AppendSongs(search.Search(application->collection()->Songs()));
                    })),
                    app);
@@ -550,6 +573,7 @@ void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app) {
   gtk_box_append(GTK_BOX(box), op);
   gtk_box_append(GTK_BOX(box), value);
   gtk_box_append(GTK_BOX(box), limit);
+  gtk_box_append(GTK_BOX(box), dynamic);
   gtk_box_append(GTK_BOX(box), create);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
@@ -688,7 +712,11 @@ void Dialogs::DeleteFiles(GtkWindow *parent, Application *app) {
                      auto *application = static_cast<Application *>(data);
                      auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(alert), "song"));
                      const std::string path = FileUtils::PathFromUri(song->url());
-                     FileUtils::Remove(path);
+                     GFile *file = g_file_new_for_path(path.c_str());
+                     if (!g_file_trash(file, nullptr, nullptr)) {
+                       FileUtils::Remove(path);
+                     }
+                     g_object_unref(file);
                      if (application->playlist_manager()->active()) {
                        application->playlist_manager()->active()->RemoveRows({application->playlist_manager()->current_row()});
                        application->playlist_manager()->SaveActive();

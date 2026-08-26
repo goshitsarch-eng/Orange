@@ -3,6 +3,7 @@
 
 #include "core/signal.h"
 #include "core/song.h"
+#include "smartplaylists/smartplaylist.h"
 
 #include <string>
 #include <vector>
@@ -43,6 +44,9 @@ class Playlist {
   void Previous();
   void SetSequenceMode(SequenceMode mode) { mode_ = mode; }
   SequenceMode sequence_mode() const { return mode_; }
+  void SetDynamic(bool dynamic, const SmartPlaylistSearch &search = {});
+  bool is_dynamic() const { return dynamic_; }
+  void RefillDynamic(const SongList &pool);
 
   int64_t total_length_nanosec() const;
 
@@ -67,6 +71,8 @@ class Playlist {
   SequenceMode mode_ = SequenceMode::Sequential;
   std::vector<Snapshot> undo_;
   std::vector<Snapshot> redo_;
+  bool dynamic_ = false;
+  SmartPlaylistSearch dynamic_search_;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H

@@ -82,7 +82,16 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AddToggle(group, settings, "prettycovers", "Use pretty covers", nullptr, true);
     AddToggle(group, settings, "variousartists", "Group various artists albums", nullptr, true);
     AddToggle(group, settings, "show_dividers", "Show artist / album dividers", nullptr, true);
+    AdwPreferencesGroup *dirs = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
+    adw_preferences_group_set_title(dirs, "Folders");
+    for (const CollectionDirectory &directory : app->collection()->backend()->Directories()) {
+      AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+      adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), directory.path.c_str());
+      adw_action_row_set_subtitle(ADW_ACTION_ROW(row), directory.subdirs ? "Including subfolders" : "This folder only");
+      adw_preferences_group_add(dirs, GTK_WIDGET(row));
+    }
     adw_preferences_page_add(page, group);
+    adw_preferences_page_add(page, dirs);
     adw_preferences_dialog_add(dialog, page);
   }
   {
@@ -94,6 +103,8 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AddEntry(group, settings, "device", "Device");
     AddToggle(group, settings, "rgenabled", "ReplayGain / EBU R128", "Normalize volume using ReplayGain or EBU R128", false);
     AddEntry(group, settings, "rgmode", "ReplayGain mode (album/track)", "album");
+    AddEntry(group, settings, "rgpreamp", "ReplayGain preamp (dB)", "0");
+    AddEntry(group, settings, "stereobalance", "Stereo balance (-100..100)", "0");
     AddToggle(group, settings, "fading", "Cross-fade between tracks", nullptr, false);
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
@@ -142,6 +153,8 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     settings->BeginGroup("Covers");
     AdwPreferencesPage *page = MakePage("Covers", "image-x-generic-symbolic");
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
+    AddEntry(group, settings, "save_dest", "Save destination (album/embedded/cache)", "album");
+    AddEntry(group, settings, "filename", "Cover filename", "cover.jpg");
     for (CoverProvider *provider : app->cover_providers()->All()) {
       AddToggle(group, settings, provider->name().c_str(), provider->name().c_str(), nullptr, true);
     }
@@ -199,6 +212,8 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddToggle(group, settings, "enabled", "Show notifications", nullptr, true);
     AddToggle(group, settings, "showart", "Show album art", nullptr, true);
+    AddEntry(group, settings, "type", "Type (native/pretty/both)", "native");
+    AddEntry(group, settings, "timeout", "Pretty OSD timeout (ms)", "4000");
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -232,6 +247,7 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesPage *page = MakePage("Moodbar", "weather-clear-symbolic");
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddToggle(group, settings, "enabled", "Show moodbar", nullptr, true);
+    AddEntry(group, settings, "style", "Style (normal/angry/frozen/happy)", "normal");
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }
@@ -398,7 +414,19 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AdwPreferencesPage *page = MakePage("Radio", "network-wireless-symbolic");
     AdwPreferencesGroup *group = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
     AddEntry(group, settings, "server", "Radio Browser server", "https://de1.api.radio-browser.info");
+    AddEntry(group, settings, "country", "Country filter");
+    AddToggle(group, settings, "hidebroken", "Hide broken stations", nullptr, true);
     adw_preferences_page_add(page, group);
+    settings->BeginGroup("SomaFM");
+    AdwPreferencesGroup *soma = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
+    adw_preferences_group_set_title(soma, "SomaFM");
+    AddEntry(soma, settings, "quality", "Quality (64/128/256)", "128");
+    adw_preferences_page_add(page, soma);
+    settings->BeginGroup("RadioParadise");
+    AdwPreferencesGroup *rp = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
+    adw_preferences_group_set_title(rp, "Radio Paradise");
+    AddEntry(rp, settings, "quality", "Stream (aac-320/aac-128/mp3-192)", "aac-320");
+    adw_preferences_page_add(page, rp);
     adw_preferences_dialog_add(dialog, page);
   }
 

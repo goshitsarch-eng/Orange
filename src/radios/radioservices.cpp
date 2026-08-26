@@ -49,7 +49,9 @@ void RadioServices::FetchSomaFM() {
     if (songs.empty()) {
       RadioChannel channel;
       channel.name = "SomaFM Groove Salad";
-      channel.url = "https://ice1.somafm.com/groovesalad-128-mp3";
+      Settings settings;
+      settings.BeginGroup("SomaFM");
+      channel.url = "https://ice1.somafm.com/groovesalad-" + settings.Value("quality", "128") + "-mp3";
       channel.source = Song::Source::SomaFM;
       channels_.push_back(channel);
       Persist(channel);
@@ -69,7 +71,9 @@ void RadioServices::FetchSomaFM() {
 void RadioServices::FetchRadioParadise() {
   RadioChannel channel;
   channel.name = "Radio Paradise";
-  channel.url = "https://stream.radioparadise.com/aac-320";
+  Settings settings;
+  settings.BeginGroup("RadioParadise");
+  channel.url = "https://stream.radioparadise.com/" + settings.Value("quality", "aac-320");
   channel.source = Song::Source::RadioParadise;
   channels_.push_back(channel);
   Persist(channel);

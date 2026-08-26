@@ -8,6 +8,8 @@
 #include "core/standardpaths.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
+
+#include <glib/gstdio.h>
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -173,17 +175,28 @@ bool CoverProviders::SaveAlbumCover(const Song &song, const std::string &image_d
   }
   const std::string path = FileUtils::PathFromUri(song.url());
   const std::string dir = FileUtils::DirName(path);
-  const std::string dest = FileUtils::Join(dir.empty() ? "." : dir, "cover.jpg");
-  if (!FileUtils::WriteFile(dest, image_data)) {
-    return false;
+  Settings settings;
+  settings.BeginGroup("Covers");
+  const std::string dest_mode = settings.Value("save_dest", "album");
+  const std::string filename = settings.Value("filename", "cover.jpg");
+  if (dest_mode == "cache") {
+    const std::string cache = FileUtils::Join(g_get_user_cache_dir(), "strawberry/covers");
+    g_mkdir_with_parents(cache.c_str(), 0755);
+    const std::string dest = FileUtils::Join(cache, FileUtils::BaseName(path) + "-" + filename);
+    return FileUtils::WriteFile(dest, image_data);
   }
-  if (tagreader && !path.empty() && FileUtils::Exists(path)) {
+  bool wrote = dest_mode == "embedded";
+  if (dest_mode != "embedded") {
+    const std::string dest = FileUtils::Join(dir.empty() ? "." : dir, filename.empty() ? "cover.jpg" : filename);
+    wrote = FileUtils::WriteFile(dest, image_data);
+  }
+  if ((dest_mode == "embedded" || dest_mode == "album") && tagreader && !path.empty() && FileUtils::Exists(path)) {
     TagReader::CoverData cover;
     cover.data.assign(image_data.begin(), image_data.end());
     cover.mime_type = "image/jpeg";
-    tagreader->SaveCover(path, cover);
+    wrote = tagreader->SaveCover(path, cover) || wrote;
   }
-  return true;
+  return wrote;
 }
 
 void CoverProviders::FetchFromEmbeddedOrFile(const Song &song, CoverProvider::Callback callback) {

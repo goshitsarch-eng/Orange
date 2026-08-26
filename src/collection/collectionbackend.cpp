@@ -1,5 +1,6 @@
 #include "collection/collectionbackend.h"
 
+#include "filterparser/filterparser.h"
 #include "utilities/strutils.h"
 
 CollectionBackend::CollectionBackend(Database *database) : database_(database) {}
@@ -73,13 +74,14 @@ Song CollectionBackend::SongFromQuery(const SqlQuery &query) const {
 
 SongList CollectionBackend::Songs(const std::string &filter) const {
   SongList songs;
+  const bool advanced = !filter.empty() && (filter.find(':') != std::string::npos || filter[0] == '-');
   std::string sql = "SELECT ROWID, " + std::string(Song::kColumnSpec) + " FROM songs";
-  if (!filter.empty()) {
+  if (!filter.empty() && !advanced) {
     sql += " WHERE title LIKE ? OR album LIKE ? OR artist LIKE ? OR albumartist LIKE ? OR composer LIKE ? OR genre LIKE ?";
   }
   sql += " ORDER BY effective_albumartist, album, disc, track, title";
   SqlQuery query(database_, sql);
-  if (!filter.empty()) {
+  if (!filter.empty() && !advanced) {
     const std::string like = "%" + StrUtils::SqlLikeEscape(filter) + "%";
     for (int i = 1; i <= 6; ++i) {
       query.Bind(i, like);
@@ -87,6 +89,16 @@ SongList CollectionBackend::Songs(const std::string &filter) const {
   }
   while (query.Step()) {
     songs.push_back(SongFromQuery(query));
+  }
+  if (advanced) {
+    FilterParser parser(filter);
+    SongList filtered;
+    for (const Song &song : songs) {
+      if (parser.Matches(song)) {
+        filtered.push_back(song);
+      }
+    }
+    return filtered;
   }
   return songs;
 }

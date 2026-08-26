@@ -184,3 +184,41 @@ int64_t Playlist::total_length_nanosec() const {
   return std::accumulate(songs_.begin(), songs_.end(), int64_t{0},
                          [](int64_t total, const Song &song) { return total + std::max<int64_t>(0, song.length_nanosec()); });
 }
+
+void Playlist::SetDynamic(bool dynamic, const SmartPlaylistSearch &search) {
+  dynamic_ = dynamic;
+  dynamic_search_ = search;
+  if (dynamic) {
+    mode_ = SequenceMode::Dynamic;
+  }
+}
+
+void Playlist::RefillDynamic(const SongList &pool) {
+  if (!dynamic_) {
+    return;
+  }
+  const int upcoming = current_row_ < 0 ? row_count() : row_count() - current_row_ - 1;
+  if (upcoming >= 15) {
+    return;
+  }
+  SongList candidates = dynamic_search_.Search(pool);
+  SongList extra;
+  for (const Song &song : candidates) {
+    bool seen = false;
+    for (const Song &existing : songs_) {
+      if (existing.url() == song.url()) {
+        seen = true;
+        break;
+      }
+    }
+    if (!seen) {
+      extra.push_back(song);
+    }
+    if (static_cast<int>(extra.size()) >= 15 - upcoming) {
+      break;
+    }
+  }
+  if (!extra.empty()) {
+    AppendSongs(extra);
+  }
+}

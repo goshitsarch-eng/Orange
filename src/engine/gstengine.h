@@ -72,6 +72,11 @@ class GstEngine {
   GstElement *volume_ = nullptr;
   GstElement *equalizer_ = nullptr;
   GstElement *rgvolume_ = nullptr;
+  GstElement *rglimiter_ = nullptr;
+  GstElement *panorama_ = nullptr;
+  int replaygain_mode_ = 0;
+  double replaygain_preamp_ = 0.0;
+  float stereo_balance_ = 0.0f;
   guint bus_watch_id_ = 0;
   State state_ = State::Empty;
   std::string output_ = "autoaudiosink";

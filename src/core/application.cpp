@@ -61,9 +61,9 @@ void Application::Init() {
   mpris_ = std::make_unique<Mpris2>(this);
 
   player_->SongChanged.Connect([this](const Song &song) {
-    osd_->SongChanged(song);
     scrobbler_->NowPlaying(song);
     current_albumcover_loader_->Load(song);
+    osd_->SongChanged(song, current_albumcover_loader_->current());
     moodbar_->Load(song);
     waveform_->Load(song);
     discord_->UpdatePresence(song, player_->GetState() == GstEngine::State::Playing);
@@ -71,6 +71,7 @@ void Application::Init() {
       collection_->backend()->IncrementPlayCount(song.id());
     }
   });
+  player_->ForceShowOSD.Connect([this](const Song &song) { osd_->SongChanged(song, current_albumcover_loader_->current()); });
   player_->Stopped.Connect([this]() { discord_->Clear(); });
   equalizer_->ParametersChanged.Connect([this](bool enabled, int preamp, const std::vector<int> &gains) {
     player_->engine()->SetEqualizerEnabled(enabled);
@@ -82,6 +83,8 @@ void Application::Init() {
   shortcuts_->Previous.Connect([this]() { player_->Previous(); });
   shortcuts_->VolumeUp.Connect([this]() { player_->VolumeUp(); });
   shortcuts_->VolumeDown.Connect([this]() { player_->VolumeDown(); });
+  shortcuts_->Mute.Connect([this]() { player_->Mute(); });
+  shortcuts_->ShowOSD.Connect([this]() { player_->ShowOSD(); });
 }
 
 void Application::Exit() {
