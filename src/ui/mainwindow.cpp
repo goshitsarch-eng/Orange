@@ -538,9 +538,8 @@ void MainWindow::BuildUi() {
   }
   add_action("add-stream", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               Dialogs::AddStream(GTK_WINDOW(self->window_), [self](const std::string &name, const std::string &url) {
-                 self->app_->radio_services()->AddCustomStream(name, url);
-                 self->RefreshRadio();
+               Dialogs::AddStream(GTK_WINDOW(self->window_), [self](const std::string &, const std::string &url) {
+                 self->app_->playlist_manager()->InsertUrls({url});
                });
              }));
   add_action("covers", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverManager(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));

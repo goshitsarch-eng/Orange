@@ -384,7 +384,7 @@ TEST(CoverChoiceMenu, ItemsAndWhenToShow) {
   EXPECT_TRUE(CoverChoiceMenu::HasCoverActions(true, true));
   EXPECT_FALSE(CoverChoiceMenu::HasCoverActions(true, false));
   EXPECT_FALSE(CoverChoiceMenu::HasCoverActions(false, true));
-  EXPECT_STREQ("Search automatically", CoverChoiceMenu::SearchAutomaticallyLabel());
+  EXPECT_STREQ("Fetch automatically", CoverChoiceMenu::SearchAutomaticallyLabel());
   EXPECT_STREQ("auto", CoverChoiceMenu::SearchAutomaticallyId());
   EXPECT_EQ("cover.auto", CoverChoiceMenu::SearchAutomaticallyPath("cover"));
   EXPECT_TRUE(CoverChoiceMenu::IsSearchAutomatically("auto"));

@@ -49,7 +49,7 @@ inline bool HasCoverActions(bool has_callback, bool song_valid) { return has_cal
 
 inline int ItemCount() { return static_cast<int>(Items().size()); }
 
-inline const char *SearchAutomaticallyLabel() { return "Search automatically"; }
+inline const char *SearchAutomaticallyLabel() { return "Fetch automatically"; }
 
 inline const char *SearchAutomaticallyId() { return "auto"; }
 

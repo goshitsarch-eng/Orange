@@ -26,7 +26,9 @@
 #include "context/contextidle.h"
 #include "context/contextplayingtext.h"
 #include "context/contexttechnical.h"
+#include "dialogs/addstreamurl.h"
 #include "dialogs/deletefilespolicy.h"
+#include "dialogs/userpasslabels.h"
 #include "organize/organize.h"
 #include "organize/organizefilename.h"
 #include "organize/organizeformatvalidator.h"
@@ -1532,4 +1534,24 @@ TEST(CollectionSettings, CacheSizeUnitsMatchQt) {
   EXPECT_EQ(3, static_cast<int>(CollectionSettings::CacheSizeUnit::TB));
   EXPECT_STREQ("cache_size_unit", CollectionSettings::kSettingsCacheSizeUnit);
   EXPECT_STREQ("disk_cache_size_unit", CollectionSettings::kSettingsDiskCacheSizeUnit);
+}
+
+TEST(AddStreamUrl, ValidatesSchemeAndHostLikeQt) {
+  EXPECT_STREQ("Add Stream", AddStreamUrl::Title());
+  EXPECT_STREQ("Enter the URL of a stream:", AddStreamUrl::Prompt());
+  EXPECT_TRUE(AddStreamUrl::IsValid("https://example.com/stream.mp3"));
+  EXPECT_TRUE(AddStreamUrl::IsValid("http://host:8000/"));
+  EXPECT_TRUE(AddStreamUrl::IsValid("https://[2001:db8::1]/live"));
+  EXPECT_FALSE(AddStreamUrl::IsValid(""));
+  EXPECT_FALSE(AddStreamUrl::IsValid("example.com"));
+  EXPECT_FALSE(AddStreamUrl::IsValid("https://"));
+  EXPECT_FALSE(AddStreamUrl::IsValid("://missing-scheme.example"));
+  EXPECT_EQ("https", AddStreamUrl::Scheme("https://radio.example/live"));
+  EXPECT_EQ("radio.example", AddStreamUrl::Host("https://radio.example/live"));
+}
+
+TEST(UserPassLabels, MatchQtDialogCopy) {
+  EXPECT_STREQ("Enter username and password", UserPassLabels::Prompt());
+  EXPECT_STREQ("Username", UserPassLabels::Username());
+  EXPECT_STREQ("Password", UserPassLabels::Password());
 }
