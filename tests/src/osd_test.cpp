@@ -1,3 +1,4 @@
+#include "constants/notificationssettings.h"
 #include "core/seekbarsettings.h"
 #include "core/song.h"
 #include "core/standardpaths.h"
@@ -5,6 +6,8 @@
 #include "osd/osdbase.h"
 #include "osd/osdpretty.h"
 #include "osd/osdprettyplacement.h"
+#include "utilities/colorutils.h"
+#include "utilities/fontutils.h"
 #include "queue/queueview.h"
 #include "systemtrayicon/systemtrayicon.h"
 #include "translations/translations.h"
@@ -133,6 +136,29 @@ TEST(OSDPrettyPlacement, RelativePosMarksDockedEdgesAndParsesSavedPoint) {
   EXPECT_EQ(50, parsed.y);
   const OSDPrettyPlacement::Point snapped = OSDPrettyPlacement::DragPosition(monitor, {790, 40}, 320, 80);
   EXPECT_EQ(800, snapped.x);
+}
+
+TEST(FontUtils, ParsesQtAndPangoAndWritesCss) {
+  const FontUtils::Font qt = FontUtils::Parse(OSDPrettySettings::kDefaultFont);
+  EXPECT_EQ("Verdana", qt.family);
+  EXPECT_EQ(9, qt.size_pt);
+  EXPECT_FALSE(qt.bold);
+  const FontUtils::Font pango = FontUtils::Parse("Cantarell Bold Italic 11");
+  EXPECT_EQ("Cantarell", pango.family);
+  EXPECT_EQ(11, pango.size_pt);
+  EXPECT_TRUE(pango.bold);
+  EXPECT_TRUE(pango.italic);
+  EXPECT_EQ("Cantarell Bold Italic 11", FontUtils::ToPango(pango));
+  EXPECT_EQ("italic bold 11pt \"Cantarell\"", FontUtils::ToCss(pango));
+  EXPECT_EQ("12pt \"Sans\"", FontUtils::ToCss(FontUtils::Parse("Sans 12")));
+}
+
+TEST(ColorUtils, RgbRoundTripFromHex) {
+  const ColorUtils::Rgb rgb = ColorUtils::RgbFromHex("#6696e3");
+  EXPECT_EQ(0x66, rgb.r);
+  EXPECT_EQ(0x96, rgb.g);
+  EXPECT_EQ(0xe3, rgb.b);
+  EXPECT_EQ("#6696e3", ColorUtils::HexFromRgb(rgb));
 }
 
 TEST(CoverFromUrlDialog, PrefillUrlAcceptsHttpOnly) {

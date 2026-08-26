@@ -88,10 +88,14 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
                            settings->SetValue(OSDPrettySettings::kBackgroundColor, id == "red" ? red : blue);
                            settings->Sync();
                          });
-  SettingsPage::AddEntry(pretty, settings, OSDPrettySettings::kForegroundColor, Translations::CStr("Foreground color"), "#ffffff");
-  SettingsPage::AddEntry(pretty, settings, OSDPrettySettings::kBackgroundColor, Translations::CStr("Background color"), "#202020");
-  SettingsPage::AddEntry(pretty, settings, OSDPrettySettings::kBackgroundOpacity, Translations::CStr("Background opacity"), "0.85");
-  SettingsPage::AddEntry(pretty, settings, OSDPrettySettings::kFont, Translations::CStr("Font"), OSDPrettySettings::kDefaultFont);
+  SettingsPage::AddColorButton(pretty, settings, OSDPrettySettings::kSettingsGroup, OSDPrettySettings::kForegroundColor,
+                              Translations::CStr("Foreground color"), "#ffffff");
+  SettingsPage::AddColorButton(pretty, settings, OSDPrettySettings::kSettingsGroup, OSDPrettySettings::kBackgroundColor,
+                              Translations::CStr("Background color"), "#202020");
+  SettingsPage::AddOpacityScale(pretty, settings, OSDPrettySettings::kSettingsGroup, OSDPrettySettings::kBackgroundOpacity,
+                               Translations::CStr("Background opacity"), OSDPrettySettings::kDefaultBackgroundOpacity);
+  SettingsPage::AddFontButton(pretty, settings, OSDPrettySettings::kSettingsGroup, OSDPrettySettings::kFont, Translations::CStr("Font"),
+                             OSDPrettySettings::kDefaultFont);
   auto monitors = OSDPretty::MonitorChoices();
   if (monitors.size() == 1 && monitors.front().first.empty()) {
     monitors.front().second = Translations::Tr("Primary");
@@ -106,6 +110,17 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
   SettingsPage::AddToggle(pretty, settings, OSDPrettySettings::kDisableDuration, Translations::CStr("Disable timeout"), nullptr,
                           OSDPrettySettings::kDefaultDisableDuration);
   SettingsPage::AddToggle(pretty, settings, OSDPrettySettings::kFading, Translations::CStr("Fade the popup"), nullptr, true);
+  SettingsPage::AddButtonRow(pretty, Translations::CStr("Position preview"), Translations::CStr("Show"), [settings, page]() {
+    settings->BeginGroup(OSDPrettySettings::kSettingsGroup);
+    settings->Sync();
+    auto *preview = static_cast<OSDPretty *>(g_object_get_data(G_OBJECT(page), "pretty-preview"));
+    if (!preview) {
+      preview = new OSDPretty(OSDPretty::Mode::Draggable);
+      g_object_set_data_full(G_OBJECT(page), "pretty-preview", preview, +[](gpointer data) { delete static_cast<OSDPretty *>(data); });
+    }
+    preview->ReloadSettings();
+    preview->ShowMessage(Translations::Tr("OSD Preview"), Translations::Tr("Drag to reposition"));
+  });
 
   settings->BeginGroup(DiscordRPCSettings::kSettingsGroup);
   AdwPreferencesGroup *discord = SettingsPage::AddGroup(page, Translations::CStr("Discord"));

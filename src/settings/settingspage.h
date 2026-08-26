@@ -26,6 +26,12 @@ void AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, c
 void AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
                  const std::vector<std::pair<std::string, std::string>> &choices, int fallback);
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked);
+void AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                    const char *fallback);
+void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                   const char *fallback);
+void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                     double fallback);
 void AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name);
 
 }  // namespace SettingsPage

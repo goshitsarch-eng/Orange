@@ -3,7 +3,11 @@
 #include "core/application.h"
 #include "translations/translations.h"
 #include "ui/dialogs.h"
+#include "utilities/colorutils.h"
+#include "utilities/fontutils.h"
 #include "widgets/loginstatewidget.h"
+
+#include <cmath>
 
 #include <memory>
 #include <string>
@@ -134,6 +138,126 @@ void AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *gro
     settings->SetIntValue(key, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
     settings->Sync();
   });
+}
+
+void AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                    const char *fallback) {
+  AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
+  GtkColorDialog *dialog = gtk_color_dialog_new();
+  GtkWidget *button = gtk_color_dialog_button_new(dialog);
+  g_object_unref(dialog);
+  const ColorUtils::Rgb rgb = ColorUtils::RgbFromHex(settings ? settings->Value(key, fallback ? fallback : "#ffffff") : (fallback ? fallback : "#ffffff"));
+  GdkRGBA rgba;
+  rgba.red = rgb.r / 255.0;
+  rgba.green = rgb.g / 255.0;
+  rgba.blue = rgb.b / 255.0;
+  rgba.alpha = 1.0;
+  gtk_color_dialog_button_set_rgba(GTK_COLOR_DIALOG_BUTTON(button), &rgba);
+  if (group_name) {
+    g_object_set_data_full(G_OBJECT(button), "settings-group", g_strdup(group_name), g_free);
+  }
+  if (key) {
+    g_object_set_data_full(G_OBJECT(button), "settings-key", g_strdup(key), g_free);
+  }
+  g_signal_connect(button, "notify::rgba",
+                   G_CALLBACK((+[](GtkColorDialogButton *color, GParamSpec *, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     const char *settings_group = static_cast<const char *>(g_object_get_data(G_OBJECT(color), "settings-group"));
+                     const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(color), "settings-key"));
+                     if (!s || !settings_key) {
+                       return;
+                     }
+                     const GdkRGBA *value = gtk_color_dialog_button_get_rgba(color);
+                     if (!value) {
+                       return;
+                     }
+                     if (settings_group) {
+                       s->BeginGroup(settings_group);
+                     }
+                     const unsigned hex = (static_cast<unsigned>(std::lround(value->red * 255.0)) << 16) |
+                                          (static_cast<unsigned>(std::lround(value->green * 255.0)) << 8) |
+                                          static_cast<unsigned>(std::lround(value->blue * 255.0));
+                     s->SetValue(settings_key, ColorUtils::HexToCss(hex));
+                     s->Sync();
+                   })),
+                   settings);
+  adw_action_row_add_suffix(row, button);
+  adw_preferences_group_add(group, GTK_WIDGET(row));
+}
+
+void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                   const char *fallback) {
+  AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
+  GtkFontDialog *dialog = gtk_font_dialog_new();
+  GtkWidget *button = gtk_font_dialog_button_new(dialog);
+  g_object_unref(dialog);
+  const std::string stored = settings ? settings->Value(key, fallback ? fallback : "") : (fallback ? fallback : "");
+  const std::string pango = FontUtils::ToPango(FontUtils::Parse(stored));
+  PangoFontDescription *desc = pango_font_description_from_string(pango.c_str());
+  gtk_font_dialog_button_set_font_desc(GTK_FONT_DIALOG_BUTTON(button), desc);
+  pango_font_description_free(desc);
+  if (group_name) {
+    g_object_set_data_full(G_OBJECT(button), "settings-group", g_strdup(group_name), g_free);
+  }
+  if (key) {
+    g_object_set_data_full(G_OBJECT(button), "settings-key", g_strdup(key), g_free);
+  }
+  g_signal_connect(button, "notify::font-desc", G_CALLBACK(+[](GtkFontDialogButton *font, GParamSpec *, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     const char *settings_group = static_cast<const char *>(g_object_get_data(G_OBJECT(font), "settings-group"));
+                     const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(font), "settings-key"));
+                     if (!s || !settings_key) {
+                       return;
+                     }
+                     PangoFontDescription *chosen = gtk_font_dialog_button_get_font_desc(font);
+                     if (!chosen) {
+                       return;
+                     }
+                     char *text = pango_font_description_to_string(chosen);
+                     if (settings_group) {
+                       s->BeginGroup(settings_group);
+                     }
+                     s->SetValue(settings_key, text ? text : "");
+                     s->Sync();
+                     g_free(text);
+                   }),
+                   settings);
+  adw_action_row_add_suffix(row, button);
+  adw_preferences_group_add(group, GTK_WIDGET(row));
+}
+
+void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                     double fallback) {
+  AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
+  GtkWidget *scale = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0.2, 1.0, 0.05);
+  gtk_widget_set_size_request(scale, 180, -1);
+  gtk_scale_set_draw_value(GTK_SCALE(scale), TRUE);
+  gtk_range_set_value(GTK_RANGE(scale), settings ? settings->DoubleValue(key, fallback) : fallback);
+  if (group_name) {
+    g_object_set_data_full(G_OBJECT(scale), "settings-group", g_strdup(group_name), g_free);
+  }
+  if (key) {
+    g_object_set_data_full(G_OBJECT(scale), "settings-key", g_strdup(key), g_free);
+  }
+  g_signal_connect(scale, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     const char *settings_group = static_cast<const char *>(g_object_get_data(G_OBJECT(range), "settings-group"));
+                     const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(range), "settings-key"));
+                     if (!s || !settings_key) {
+                       return;
+                     }
+                     if (settings_group) {
+                       s->BeginGroup(settings_group);
+                     }
+                     s->SetDoubleValue(settings_key, gtk_range_get_value(range));
+                     s->Sync();
+                   }),
+                   settings);
+  adw_action_row_add_suffix(row, scale);
+  adw_preferences_group_add(group, GTK_WIDGET(row));
 }
 
 void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked) {

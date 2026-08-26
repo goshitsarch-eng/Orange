@@ -4,6 +4,7 @@
 #include "constants/notificationssettings.h"
 #include "core/settings.h"
 #include "osd/osdprettyplacement.h"
+#include "utilities/fontutils.h"
 
 #include <algorithm>
 #include <utility>
@@ -194,7 +195,7 @@ void OSDPretty::ApplyStyle() {
   }
   GtkCssProvider *css = gtk_css_provider_new();
   const std::string sheet = ".osd-pretty { background-color: alpha(" + bg_ + ", " + std::to_string(std::clamp(opacity_, 0.2, 1.0)) +
-                            "); color: " + fg_ + "; font: " + font_ + "; border-radius: 10px; }";
+                            "); color: " + fg_ + "; font: " + FontUtils::ToCss(FontUtils::Parse(font_)) + "; border-radius: 10px; }";
 #if GTK_CHECK_VERSION(4, 12, 0)
   gtk_css_provider_load_from_string(css, sheet.c_str());
 #else
