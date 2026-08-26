@@ -3,8 +3,13 @@
 #include "config.h"
 #include "core/logging.h"
 #include "core/standardpaths.h"
+#include "core/database.h"
+#include "device/devicedatabasebackend.h"
 #include "device/gpoddevice.h"
 #include "device/gpodloader.h"
+#include "device/mtpconnection.h"
+#include "device/mtpdevice.h"
+#include "device/mtploader.h"
 #include "utilities/fileutils.h"
 #ifdef HAVE_GIO
 #include <gio/gio.h>
@@ -24,11 +29,25 @@
 #include <taglib/tag.h>
 #include <taglib/audioproperties.h>
 
-DeviceManager::DeviceManager() : url_handler_(std::make_unique<DeviceUrlHandler>(this)) {}
+DeviceManager::DeviceManager(Database *database)
+    : url_handler_(std::make_unique<DeviceUrlHandler>(this)),
+      device_db_(database ? std::make_unique<DeviceDatabaseBackend>(database) : nullptr) {}
 
 DeviceManager::~DeviceManager() = default;
 
-void DeviceManager::Init() { Rescan(); }
+void DeviceManager::Init() {
+  if (device_db_) {
+    device_db_->Init();
+  }
+  Rescan();
+}
+
+std::string DeviceManager::MtpSerial(const std::string &unique_id) {
+  if (unique_id.rfind("mtp:", 0) == 0) {
+    return unique_id.substr(4);
+  }
+  return unique_id;
+}
 
 const ConnectedDevice *DeviceManager::FindDevice(const std::string &device_id) const {
   for (const ConnectedDevice &device : devices_) {
@@ -133,15 +152,15 @@ void DeviceManager::Rescan() {
 #endif
 #ifdef HAVE_MTP
   {
+    MtpConnection::InitLibMtp();
     LIBMTP_raw_device_t *raw = nullptr;
     int count = 0;
-    LIBMTP_Init();
     if (LIBMTP_Detect_Raw_Devices(&raw, &count) == LIBMTP_ERROR_NONE && raw) {
       for (int i = 0; i < count; ++i) {
-        LIBMTP_mtpdevice_t *device = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
         ConnectedDevice entry;
         entry.backend = "mtp";
         entry.icon = "multimedia-player-symbolic";
+        LIBMTP_mtpdevice_t *device = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
         if (device) {
           char *name = LIBMTP_Get_Friendlyname(device);
           char *serial = LIBMTP_Get_Serialnumber(device);
@@ -155,6 +174,13 @@ void DeviceManager::Rescan() {
           entry.unique_id = "mtp:" + std::to_string(i);
         }
         devices_.push_back(entry);
+        if (device_db_) {
+          DeviceDatabaseBackend::Device stored;
+          stored.unique_id = entry.unique_id;
+          stored.friendly_name = entry.friendly_name;
+          stored.icon_name = entry.icon;
+          device_db_->AddDevice(stored);
+        }
       }
       free(raw);
     }
@@ -242,127 +268,24 @@ SongList DeviceManager::SongsFromCdda() const {
 }
 
 SongList DeviceManager::SongsFromMtp(const ConnectedDevice &device) const {
-  SongList songs;
 #ifdef HAVE_MTP
-  LIBMTP_raw_device_t *raw = nullptr;
-  int count = 0;
-  if (LIBMTP_Detect_Raw_Devices(&raw, &count) != LIBMTP_ERROR_NONE || !raw) {
-    return songs;
-  }
-  LIBMTP_mtpdevice_t *mtp = nullptr;
-  std::string serial;
-  for (int i = 0; i < count; ++i) {
-    LIBMTP_mtpdevice_t *opened = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
-    if (!opened) {
-      continue;
-    }
-    char *value = LIBMTP_Get_Serialnumber(opened);
-    serial = value ? value : "";
-    free(value);
-    const std::string id = std::string("mtp:") + serial;
-    if (id == device.unique_id || count == 1) {
-      mtp = opened;
-      break;
-    }
-    LIBMTP_Release_Device(opened);
-  }
-  free(raw);
-  if (!mtp) {
-    return songs;
-  }
-  LIBMTP_track_t *track = LIBMTP_Get_Tracklisting_With_Callback(mtp, nullptr, nullptr);
-  if (track) {
-    while (track) {
-      LIBMTP_track_t *next = track->next;
-      Song song(Song::Source::Device);
-      song.set_url("mtp://" + serial + "/" + std::to_string(track->item_id));
-      song.set_title(track->title && *track->title ? track->title : (track->filename ? track->filename : "Track"));
-      song.set_artist(track->artist ? track->artist : "");
-      song.set_album(track->album ? track->album : "");
-      song.set_genre(track->genre ? track->genre : "");
-      song.set_track(static_cast<int>(track->tracknumber));
-      song.set_basefilename(track->filename ? track->filename : song.title());
-      song.set_filesize(static_cast<int64_t>(track->filesize));
-      if (track->duration > 0) {
-        song.set_length_nanosec(static_cast<int64_t>(track->duration) * 1000000LL);
-      }
-      song.set_valid(true);
-      songs.push_back(song);
-      LIBMTP_destroy_track_t(track);
-      track = next;
-    }
-  } else {
-    LIBMTP_file_t *file = LIBMTP_Get_Filelisting_With_Callback(mtp, nullptr, nullptr);
-    while (file) {
-      LIBMTP_file_t *next = file->next;
-      if (LIBMTP_FILETYPE_IS_AUDIO(file->filetype) && file->filename) {
-        Song song(Song::Source::Device);
-        song.set_url("mtp://" + serial + "/" + std::to_string(file->item_id));
-        song.set_title(file->filename);
-        song.set_basefilename(file->filename);
-        song.set_filesize(static_cast<int64_t>(file->filesize));
-        song.set_valid(true);
-        songs.push_back(song);
-      }
-      LIBMTP_destroy_file_t(file);
-      file = next;
+  SongList songs = MtpLoader::LoadSongs(MtpSerial(device.unique_id));
+  if (device_db_) {
+    const DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device.unique_id);
+    if (!songs.empty() && stored.id >= 0) {
+      device_db_->ReplaceSongs(stored.id, songs);
+    } else if (songs.empty() && stored.id >= 0) {
+      songs = device_db_->Songs(stored.id);
     }
   }
-  LIBMTP_Release_Device(mtp);
+  return songs;
 #else
   (void)device;
-#endif
-  return songs;
-}
-
-std::string DeviceManager::DownloadMtpTrack(const std::string &url) const {
-#ifdef HAVE_MTP
-  if (url.rfind("mtp://", 0) != 0) {
-    return {};
-  }
-  const std::string rest = url.substr(6);
-  const auto slash = rest.find('/');
-  if (slash == std::string::npos) {
-    return {};
-  }
-  const std::string serial = rest.substr(0, slash);
-  const uint32_t item_id = static_cast<uint32_t>(std::strtoul(rest.substr(slash + 1).c_str(), nullptr, 10));
-  const std::string dest = FileUtils::Join(StandardPaths::CacheDir(), "mtp-" + rest.substr(slash + 1));
-  if (FileUtils::Exists(dest)) {
-    return dest;
-  }
-  LIBMTP_raw_device_t *raw = nullptr;
-  int count = 0;
-  if (LIBMTP_Detect_Raw_Devices(&raw, &count) != LIBMTP_ERROR_NONE || !raw) {
-    return {};
-  }
-  LIBMTP_mtpdevice_t *mtp = nullptr;
-  for (int i = 0; i < count; ++i) {
-    LIBMTP_mtpdevice_t *opened = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
-    if (!opened) {
-      continue;
-    }
-    char *value = LIBMTP_Get_Serialnumber(opened);
-    const std::string id = value ? value : "";
-    free(value);
-    if (id == serial || count == 1) {
-      mtp = opened;
-      break;
-    }
-    LIBMTP_Release_Device(opened);
-  }
-  free(raw);
-  if (!mtp) {
-    return {};
-  }
-  const int ok = LIBMTP_Get_File_To_File(mtp, item_id, dest.c_str(), nullptr, nullptr);
-  LIBMTP_Release_Device(mtp);
-  return ok == 0 ? dest : std::string();
-#else
-  (void)url;
   return {};
 #endif
 }
+
+std::string DeviceManager::DownloadMtpTrack(const std::string &url) const { return MtpDevice::DownloadTrack(url); }
 
 UrlHandler::LoadResult DeviceManager::DeviceUrlHandler::Load(const std::string &url, AsyncCallback) {
   UrlHandler::LoadResult result;
@@ -386,49 +309,7 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
   const ConnectedDevice target = *found;
 #ifdef HAVE_MTP
   if (target.backend == "mtp") {
-    LIBMTP_raw_device_t *raw = nullptr;
-    int count = 0;
-    if (LIBMTP_Detect_Raw_Devices(&raw, &count) != LIBMTP_ERROR_NONE || !raw) {
-      return false;
-    }
-    LIBMTP_mtpdevice_t *mtp = nullptr;
-    for (int i = 0; i < count; ++i) {
-      LIBMTP_mtpdevice_t *device = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
-      if (!device) {
-        continue;
-      }
-      char *serial = LIBMTP_Get_Serialnumber(device);
-      const std::string id = std::string("mtp:") + (serial ? serial : "");
-      free(serial);
-      if (id == target.unique_id || count == 1) {
-        mtp = device;
-        break;
-      }
-      LIBMTP_Release_Device(device);
-    }
-    free(raw);
-    if (!mtp) {
-      return false;
-    }
-    int copied = 0;
-    for (const Song &song : songs) {
-      const std::string src = FileUtils::PathFromUri(song.url());
-      if (src.empty() || !FileUtils::Exists(src)) {
-        continue;
-      }
-      LIBMTP_file_t *file = LIBMTP_new_file_t();
-      file->filename = strdup(FileUtils::BaseName(src).c_str());
-      file->filesize = static_cast<uint64_t>(song.filesize() > 0 ? song.filesize() : 0);
-      file->parent_id = 0;
-      file->storage_id = 0;
-      if (LIBMTP_Send_File_From_File(mtp, src.c_str(), file, nullptr, nullptr) == 0) {
-        ++copied;
-      }
-      LIBMTP_destroy_file_t(file);
-    }
-    LIBMTP_Release_Device(mtp);
-    LogInfo("Copied %d songs to MTP device", copied);
-    return copied > 0;
+    return MtpDevice::CopySongs(MtpSerial(target.unique_id), songs);
   }
 #endif
   if (target.mount_path.empty()) {
@@ -460,4 +341,18 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
   (void)songs;
   return false;
 #endif
+}
+
+bool DeviceManager::DeleteSong(const std::string &device_id, const Song &song) {
+  const ConnectedDevice *found = FindDevice(device_id);
+  if (!found) {
+    return false;
+  }
+#ifdef HAVE_MTP
+  if (found->backend == "mtp") {
+    return MtpDevice::DeleteSong(MtpSerial(found->unique_id), song);
+  }
+#endif
+  (void)song;
+  return false;
 }

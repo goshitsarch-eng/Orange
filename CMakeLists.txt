@@ -216,6 +216,10 @@ set(STRAWBERRY_SOURCES
   src/radios/radioparadiseservice.cpp
   src/radios/radiobrowserservice.cpp
   src/device/devicemanager.cpp
+  src/device/devicedatabasebackend.cpp
+  src/device/mtpconnection.cpp
+  src/device/mtploader.cpp
+  src/device/mtpdevice.cpp
   src/device/gpodloader.cpp
   src/device/gpoddevice.cpp
   src/equalizer/equalizer.cpp
@@ -314,6 +318,7 @@ if(GTest_FOUND)
     tests/src/filterparser_test.cpp
     tests/src/lyrics_test.cpp
     tests/src/gpod_test.cpp
+    tests/src/mtp_test.cpp
     tests/src/streaming_test.cpp
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
@@ -338,6 +343,10 @@ if(GTest_FOUND)
     src/utilities/jsonutils.cpp
     src/utilities/audioanalysis.cpp
     src/device/devicemanager.cpp
+    src/device/devicedatabasebackend.cpp
+    src/device/mtpconnection.cpp
+    src/device/mtploader.cpp
+    src/device/mtpdevice.cpp
     src/device/gpodloader.cpp
     src/device/gpoddevice.cpp
     src/playlistparsers/parserbase.cpp
