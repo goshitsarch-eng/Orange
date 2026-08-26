@@ -1,6 +1,8 @@
 #ifndef STRAWBERRY_STRUTILS_H
 #define STRAWBERRY_STRUTILS_H
 
+#include "core/song.h"
+
 #include <string>
 #include <vector>
 
@@ -20,6 +22,7 @@ std::string SqlQuote(const std::string &value);
 std::string UriEscape(const std::string &value);
 std::string JsonEscape(const std::string &value);
 std::string Transliterate(const std::string &value);
+std::string ReplaceMessage(const std::string &message, const Song &song, const std::string &newline = "\n");
 
 }  // namespace StrUtils
 

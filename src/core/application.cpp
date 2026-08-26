@@ -4,6 +4,7 @@
 #include "constants/notificationssettings.h"
 #include "constants/scrobblersettings.h"
 #include "core/appearance.h"
+#include "playlist/playlistsequence.h"
 #include "core/logging.h"
 #include "core/settings.h"
 #include "scrobbler/scrobblereligibility.h"
@@ -65,6 +66,7 @@ void Application::Init() {
   device_finders_->Init();
   device_manager_->Init();
   url_handlers_->AddHandler(device_manager_->url_handler());
+  osd_->set_tray_icon(tray_.get());
   osd_->ReloadSettings();
   shortcuts_->Init();
   discord_->ReloadSettings();
@@ -112,12 +114,34 @@ void Application::Init() {
     }
   });
   player_->ForceShowOSD.Connect([this](const Song &song) { osd_->SongChanged(song, current_albumcover_loader_->current()); });
-  player_->Playing.Connect([this]() { tray_->SetPlaying(true); });
-  player_->Paused.Connect([this]() { tray_->SetPlaying(false); });
+  player_->Playing.Connect([this]() {
+    tray_->SetPlaying(true);
+    if (playback_was_paused_) {
+      osd_->Resumed();
+    }
+    playback_was_paused_ = false;
+  });
+  player_->Paused.Connect([this]() {
+    playback_was_paused_ = true;
+    tray_->SetPlaying(false);
+    osd_->Paused();
+  });
   player_->Stopped.Connect([this]() {
+    playback_was_paused_ = false;
     discord_->Clear();
     tray_->SetPlaying(false);
     tray_->ClearNowPlaying();
+    osd_->Stopped();
+  });
+  player_->VolumeChanged.Connect([this](unsigned volume) { osd_->VolumeChanged(volume); });
+  player_->PlaylistFinished.Connect([this]() { osd_->PlaylistFinished(); });
+  playlist_manager_->SequenceChanged.Connect([this]() {
+    Playlist *playlist = playlist_manager_->current();
+    if (!playlist) {
+      return;
+    }
+    osd_->PlayModeChanged(std::string(PlaylistSequence::RepeatLabel(playlist->repeat_mode())) + " / " +
+                          PlaylistSequence::ShuffleLabel(playlist->shuffle_mode()));
   });
   equalizer_->ParametersChanged.Connect([this](bool enabled, int preamp, const std::vector<int> &gains) {
     player_->engine()->SetEqualizerEnabled(enabled);
@@ -127,7 +151,10 @@ void Application::Init() {
   shortcuts_->Pause.Connect([this]() { player_->Pause(); });
   shortcuts_->PlayPause.Connect([this]() { player_->PlayPause(); });
   shortcuts_->Stop.Connect([this]() { player_->Stop(); });
-  shortcuts_->StopAfter.Connect([this]() { player_->StopAfterCurrent(); });
+  shortcuts_->StopAfter.Connect([this]() {
+    player_->StopAfterCurrent();
+    osd_->StopAfterToggle(true);
+  });
   shortcuts_->Next.Connect([this]() { player_->Next(); });
   shortcuts_->Previous.Connect([this]() { player_->Previous(); });
   shortcuts_->RestartOrPrevious.Connect([this]() { player_->RestartOrPrevious(); });

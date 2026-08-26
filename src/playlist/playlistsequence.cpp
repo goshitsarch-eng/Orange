@@ -1,6 +1,7 @@
 #include "playlist/playlistsequence.h"
 
 #include "core/settings.h"
+#include "translations/translations.h"
 
 PlaylistSequence::PlaylistSequence() { Load(); }
 
@@ -76,33 +77,33 @@ void PlaylistSequence::CycleShuffleMode() {
 const char *PlaylistSequence::RepeatLabel(RepeatMode mode) {
   switch (mode) {
     case RepeatMode::Track:
-      return "Repeat track";
+      return Translations::CStr("Repeat track");
     case RepeatMode::Album:
-      return "Repeat album";
+      return Translations::CStr("Repeat album");
     case RepeatMode::Playlist:
-      return "Repeat playlist";
+      return Translations::CStr("Repeat playlist");
     case RepeatMode::OneByOne:
-      return "One by one";
+      return Translations::CStr("Stop after every track");
     case RepeatMode::Intro:
-      return "Intro";
+      return Translations::CStr("Intro tracks");
     case RepeatMode::Off:
     default:
-      return "Repeat off";
+      return Translations::CStr("Don't repeat");
   }
 }
 
 const char *PlaylistSequence::ShuffleLabel(ShuffleMode mode) {
   switch (mode) {
     case ShuffleMode::All:
-      return "Shuffle all";
+      return Translations::CStr("Shuffle all");
     case ShuffleMode::InsideAlbum:
-      return "Shuffle inside album";
+      return Translations::CStr("Shuffle tracks in this album");
     case ShuffleMode::Albums:
-      return "Shuffle albums";
+      return Translations::CStr("Shuffle albums");
     case ShuffleMode::Grouping:
-      return "Shuffle grouping";
+      return Translations::CStr("Shuffle grouping");
     case ShuffleMode::Off:
     default:
-      return "Shuffle off";
+      return Translations::CStr("Don't shuffle");
   }
 }

@@ -327,5 +327,16 @@ void Player::HandleTrackEnded() {
   if (playlist_manager_) {
     playlist_manager_->RefillDynamic();
   }
+  Song next_song;
+  if (queue_ && !queue_->empty()) {
+    next_song = queue_->songs().front();
+  } else if (playlist_manager_) {
+    next_song = playlist_manager_->PeekNextSong();
+  }
+  if (!next_song.is_valid() && next_song.url().empty()) {
+    PlaylistFinished.Emit();
+    Stop();
+    return;
+  }
   Next();
 }

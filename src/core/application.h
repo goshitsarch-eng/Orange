@@ -119,6 +119,7 @@ class Application {
   std::unique_ptr<GlobalShortcutsManager> shortcuts_;
   std::unique_ptr<DiscordRichPresence> discord_;
   std::unique_ptr<TagFetcher> tag_fetcher_;
+  bool playback_was_paused_ = false;
 };
 
 #endif

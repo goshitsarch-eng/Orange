@@ -1,8 +1,9 @@
 #include "systemtrayicon/systemtrayicon.h"
 
+#include "constants/behavioursettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
-#include "constants/behavioursettings.h"
+#include "translations/translations.h"
 
 #include <algorithm>
 #include <unistd.h>
@@ -140,11 +141,66 @@ GVariant *ItemProps(const char *label, const char *type = "standard") {
 SystemTrayIcon::SystemTrayIcon() = default;
 
 SystemTrayIcon::~SystemTrayIcon() {
+  if (popup_timeout_id_) {
+    g_source_remove(popup_timeout_id_);
+    popup_timeout_id_ = 0;
+  }
+  if (popup_window_) {
+    gtk_window_destroy(GTK_WINDOW(popup_window_));
+    popup_window_ = nullptr;
+  }
   if (connection_ && menu_registration_id_ != 0) {
     g_dbus_connection_unregister_object(connection_, menu_registration_id_);
   }
   if (owner_id_ != 0) {
     g_bus_unown_name(owner_id_);
+  }
+}
+
+void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &message, int timeout_ms) {
+  popup_summary_ = summary;
+  popup_message_ = message;
+  popup_timeout_ms_ = timeout_ms;
+  if (!gtk_is_initialized()) {
+    return;
+  }
+  if (!popup_window_) {
+    popup_window_ = gtk_window_new();
+    gtk_window_set_decorated(GTK_WINDOW(popup_window_), FALSE);
+    gtk_window_set_resizable(GTK_WINDOW(popup_window_), FALSE);
+    gtk_window_set_title(GTK_WINDOW(popup_window_), "Strawberry");
+    gtk_widget_add_css_class(popup_window_, "osd");
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+    gtk_widget_set_margin_start(box, 12);
+    gtk_widget_set_margin_end(box, 12);
+    gtk_widget_set_margin_top(box, 8);
+    gtk_widget_set_margin_bottom(box, 8);
+    popup_title_ = gtk_label_new("");
+    gtk_widget_add_css_class(popup_title_, "title-4");
+    gtk_label_set_xalign(GTK_LABEL(popup_title_), 0);
+    popup_body_ = gtk_label_new("");
+    gtk_widget_add_css_class(popup_body_, "dim-label");
+    gtk_label_set_xalign(GTK_LABEL(popup_body_), 0);
+    gtk_box_append(GTK_BOX(box), popup_title_);
+    gtk_box_append(GTK_BOX(box), popup_body_);
+    gtk_window_set_child(GTK_WINDOW(popup_window_), box);
+  }
+  gtk_label_set_text(GTK_LABEL(popup_title_), summary.c_str());
+  gtk_label_set_text(GTK_LABEL(popup_body_), message.c_str());
+  gtk_window_present(GTK_WINDOW(popup_window_));
+  if (popup_timeout_id_) {
+    g_source_remove(popup_timeout_id_);
+    popup_timeout_id_ = 0;
+  }
+  if (timeout_ms > 0) {
+    popup_timeout_id_ = g_timeout_add(timeout_ms, [](gpointer data) -> gboolean {
+      auto *self = static_cast<SystemTrayIcon *>(data);
+      if (self->popup_window_) {
+        gtk_widget_set_visible(self->popup_window_, FALSE);
+      }
+      self->popup_timeout_id_ = 0;
+      return G_SOURCE_REMOVE;
+    }, this);
   }
 }
 
@@ -226,12 +282,12 @@ void SystemTrayIcon::ShowMenu(int, int) {
                      signal);
     gtk_box_append(GTK_BOX(box), button);
   };
-  connect(box, gtk_button_new_with_label(playing_ ? "Pause" : "Play"), &PlayPause);
-  connect(box, gtk_button_new_with_label("Stop"), &Stop);
-  connect(box, gtk_button_new_with_label("Next"), &Next);
-  connect(box, gtk_button_new_with_label("Previous"), &Previous);
-  connect(box, gtk_button_new_with_label("Show / Hide"), &ShowHide);
-  connect(box, gtk_button_new_with_label("Quit"), &Quit);
+  connect(box, gtk_button_new_with_label(playing_ ? Translations::CStr("Pause") : Translations::CStr("Play")), &PlayPause);
+  connect(box, gtk_button_new_with_label(Translations::CStr("Stop")), &Stop);
+  connect(box, gtk_button_new_with_label(Translations::CStr("Next")), &Next);
+  connect(box, gtk_button_new_with_label(Translations::CStr("Previous")), &Previous);
+  connect(box, gtk_button_new_with_label(Translations::CStr("Show / Hide")), &ShowHide);
+  connect(box, gtk_button_new_with_label(Translations::CStr("Quit")), &Quit);
   gtk_window_set_child(GTK_WINDOW(window), box);
   gtk_window_present(GTK_WINDOW(window));
 }
@@ -239,17 +295,17 @@ void SystemTrayIcon::ShowMenu(int, int) {
 const char *SystemTrayIcon::MenuLabel(int id, bool playing) {
   switch (id) {
     case 1:
-      return playing ? "Pause" : "Play";
+      return playing ? Translations::CStr("Pause") : Translations::CStr("Play");
     case 2:
-      return "Stop";
+      return Translations::CStr("Stop");
     case 3:
-      return "Next";
+      return Translations::CStr("Next");
     case 4:
-      return "Previous";
+      return Translations::CStr("Previous");
     case 6:
-      return "Show / Hide";
+      return Translations::CStr("Show / Hide");
     case 7:
-      return "Quit";
+      return Translations::CStr("Quit");
     default:
       return "";
   }

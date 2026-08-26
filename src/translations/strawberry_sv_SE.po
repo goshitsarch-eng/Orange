@@ -1,0 +1,4478 @@
+# Translation catalog for Strawberry Music Player.
+# Generated from the Qt .ts files on origin/master.
+msgid ""
+msgstr ""
+"Project-Id-Version: strawberry\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-26 00:00+0000\n"
+"PO-Revision-Date: 2026-08-26 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: sv_SE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "ASX playlist is too large"
+msgstr "ASX-spellistan är för stor"
+
+msgid "Failed to write ASX playlist"
+msgstr "Det gick inte att skriva ASX-spellistan"
+
+msgid "About"
+msgstr "Om"
+
+msgid "About Strawberry"
+msgstr "Om Strawberry"
+
+msgid "Version %1"
+msgstr "Version %1"
+
+msgid "Strawberry is a music player and music collection organizer."
+msgstr "Strawberry är en musikspelare och ett verktyg för att organisera musiksamlingar."
+
+msgid "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."
+msgstr "Det är en förgrening av Clementine, lanserad 2018, som riktar sig till musiksamlare och audiofiler."
+
+msgid "Strawberry is free software released under GPL. The source code is available on %1"
+msgstr "Strawberry är fri programvara som släpps under GPL. Källkoden är tillgänglig på %1"
+
+msgid "You should have received a copy of the GNU General Public License along with this program.  If not, see %1"
+msgstr "Du borde ha fått en kopia av GNU General Public License tillsammans med det här programmet. Om inte, se %1"
+
+msgid "If you like Strawberry and can make use of it, consider sponsoring or donating."
+msgstr "Om du gillar Strawberry och har nytta av det, överväg att sponsra eller donera."
+
+msgid "You can sponsor the author on %1 or %2. You can also make a one-time payment through %3."
+msgstr "Du kan sponsra upphovsmannen på %1 eller %2. Du kan också göra en engångsbetalning genom %3."
+
+msgid "Author and maintainer"
+msgstr "Upphovsman och underhållare"
+
+msgid "Contributors"
+msgstr "Bidragsgivare"
+
+msgid "Clementine authors"
+msgstr "Clementine-upphovsmän"
+
+msgid "Clementine contributors"
+msgstr "Clementine-bidragsgivare"
+
+msgid "Thanks to"
+msgstr "Tack till"
+
+msgid "Thanks to all the other Amarok and Clementine contributors."
+msgstr "Tack till alla andra Amarok- och Clementine-bidragsgivare."
+
+msgid "Add Stream"
+msgstr "Lägg till flöde"
+
+msgid "Enter the URL of a stream:"
+msgstr "Ange URL:n till ett flöde:"
+
+msgid "Load cover from disk..."
+msgstr "Läs in omslag från disk…"
+
+msgid "Save cover to disk..."
+msgstr "Spara omslag till disk…"
+
+msgid "Load cover from URL..."
+msgstr "Läs in omslag från URL…"
+
+msgid "Search for album covers..."
+msgstr "Sök efter albumomslag…"
+
+msgid "Unset cover"
+msgstr "Ta bort omslag"
+
+msgid "Delete cover"
+msgstr "Ta bort omslag"
+
+msgid "Clear cover"
+msgstr "Rensa omslag"
+
+msgid "Show fullsize..."
+msgstr "Visa i full storlek…"
+
+msgid "Search automatically"
+msgstr "Sök automatiskt"
+
+msgid "Load cover from disk"
+msgstr "Läs in omslag från disk"
+
+msgid "Failed to open cover file %1 for reading: %2"
+msgstr "Det gick inte att öppna omslagsfilen %1 för läsning: %2"
+
+msgid "Cover file %1 is empty."
+msgstr "Omslagsfilen %1 är tom."
+
+msgid "unknown"
+msgstr "okänt"
+
+msgid "Save album cover"
+msgstr "Spara albumomslag"
+
+msgid "Failed to open cover file %1 for writing: %2"
+msgstr "Det gick inte att öppna omslagsfilen %1 för att skriva: %2"
+
+msgid "Failed writing cover to file %1: %2"
+msgstr "Det gick inte att skriva omslaget till filen %1: %2"
+
+msgid "Failed writing cover to file %1."
+msgstr "Det gick inte att skriva omslaget till filen %1."
+
+msgid "Failed to delete cover file %1: %2"
+msgstr "Det gick inte att ta bort omslagsfilen %1: %2"
+
+msgid "Failed to write cover to file %1: %2"
+msgstr "Det gick inte att skriva omslaget till filen %1: %2"
+
+msgid "Could not save cover to file %1."
+msgstr "Det gick inte att spara omslag till filen %1."
+
+msgid "Export covers"
+msgstr "Exportera omslag"
+
+msgid "Output"
+msgstr "Utmatning"
+
+msgid "Enter a filename for exported covers (no extension):"
+msgstr "Ange ett filnamn för exporterade omslag (utan ändelse):"
+
+msgid "Export downloaded covers"
+msgstr "Exportera hämtade omslag"
+
+msgid "Export embedded covers"
+msgstr "Exportera inbäddade omslag"
+
+msgid "Existing covers"
+msgstr "Befintliga omslag"
+
+msgid "Do not overwrite"
+msgstr "Skriv inte över"
+
+msgid "O&verwrite all"
+msgstr "S&kriv över alla"
+
+msgid "Overwrite s&maller ones only"
+msgstr "Skriv endast över m&indre"
+
+msgid "Size"
+msgstr "Storlek"
+
+msgid "Scale size"
+msgstr "Skalningsstorlek"
+
+msgid "Size:"
+msgstr "Storlek:"
+
+msgid "Pixel"
+msgstr "Pixel"
+
+msgid "Abort"
+msgstr "Avbryt"
+
+msgid "All albums"
+msgstr "Alla album"
+
+msgid "Albums with covers"
+msgstr "Album med omslag"
+
+msgid "Albums without covers"
+msgstr "Album utan omslag"
+
+msgid "Really cancel?"
+msgstr "Vill du verkligen avbryta?"
+
+msgid "Closing this window will stop searching for album covers."
+msgstr "Om du stänger det här fönstret stoppas sökningen efter albumomslag."
+
+msgid "Don't stop!"
+msgstr "Stoppa inte!"
+
+msgid "All artists"
+msgstr "Alla artister"
+
+msgid "Various artists"
+msgstr "Diverse artister"
+
+msgid "Got %1 covers out of %2 (%3 failed)"
+msgstr "Hämtade %1 omslag av %2 (%3 misslyckades)"
+
+msgid "%1 transferred"
+msgstr "%1 överfört"
+
+msgid "Export finished"
+msgstr "Exporten är klar"
+
+msgid "No covers to export."
+msgstr "Inga omslag att exportera."
+
+msgid "Exported %1 covers out of %2 (%3 skipped)"
+msgstr "Exporterade %1 omslag av %2 (%3 hoppades över)"
+
+msgid "Cover Manager"
+msgstr "Omslagshanterare"
+
+msgid "Artist"
+msgstr "Artist"
+
+msgid "Album"
+msgstr "Album"
+
+msgid "Search"
+msgstr "Sök"
+
+msgid "Covers from %1"
+msgstr "Omslag från %1"
+
+msgid "Framerate"
+msgstr "Bildfrekvens"
+
+msgid "Low (%1 fps)"
+msgstr "Låg (%1 fps)"
+
+msgid "Medium (%1 fps)"
+msgstr "Mellan (%1 fps)"
+
+msgid "High (%1 fps)"
+msgstr "Hög (%1 fps)"
+
+msgid "Super high (%1 fps)"
+msgstr "Väldigt hög (%1 fps)"
+
+msgid "No analyzer"
+msgstr "Ingen analysator"
+
+msgid "Block analyzer"
+msgstr "Blockanalysator"
+
+msgid "Boom analyzer"
+msgstr "Boom-analysator"
+
+msgid "Turbine"
+msgstr "Turbin"
+
+msgid "Sonogram"
+msgstr "Sonogram"
+
+msgid "WaveRubber"
+msgstr "WaveRubber"
+
+msgid "Appearance"
+msgstr "Utseende"
+
+msgid "Style"
+msgstr "Stil"
+
+msgid "Tabbar colors"
+msgstr "Färger för flikfält"
+
+msgid "&Use the system default color"
+msgstr "&Använd systemets standardfärg"
+
+msgid "Use custom color"
+msgstr "Använd anpassad färg"
+
+msgid "Use gradient background"
+msgstr "Använd tonad bakgrund"
+
+msgid "Select tabbar color:"
+msgstr "Välj färg för flikfält:"
+
+msgid "Background image"
+msgstr "Bakgrundsbild"
+
+msgid "Default bac&kground image"
+msgstr "Standardba&kgrundsbild"
+
+msgid "&No background image"
+msgstr "&Ingen bakgrundsbild"
+
+msgid "The album cover of the currently playing song"
+msgstr "Albumomslaget för den låt som spelas"
+
+msgid "Albu&m cover"
+msgstr "Albu&momslag"
+
+msgid "Custom image:"
+msgstr "Anpassad bild:"
+
+msgid "Browse..."
+msgstr "Bläddra…"
+
+msgid "Position"
+msgstr "Position"
+
+msgid "Upper Left"
+msgstr "Övre vänster"
+
+msgid "Upper Right"
+msgstr "Övre höger"
+
+msgid "Middle"
+msgstr "Mellan"
+
+msgid "Bottom Left"
+msgstr "Nedre vänster"
+
+msgid "Bottom Right"
+msgstr "Nedre höger"
+
+msgid "Max cover size"
+msgstr "Största omslagsstorleken"
+
+msgid "Stretch image to fill playlist"
+msgstr "Sträck ut bilden så att den fyller spellistan"
+
+msgid "Keep aspect ratio"
+msgstr "Bevara bildförhållandet"
+
+msgid "Do not cut image"
+msgstr "Klipp inte av bilden"
+
+msgid "Blur amount"
+msgstr "Suddighet"
+
+msgid "0px"
+msgstr "0px"
+
+msgid "Opacity"
+msgstr "Opacitet"
+
+msgid "40%"
+msgstr "40%"
+
+msgid "Icon sizes"
+msgstr "Ikonstorlekar"
+
+msgid "Playlist buttons"
+msgstr "Spellisteknappar"
+
+msgid "Tabbar large mode"
+msgstr "Stort läge för flikfält"
+
+msgid "Play control buttons"
+msgstr "Uppspelningsknappar"
+
+msgid "Configure buttons"
+msgstr "Anpassa knappar"
+
+msgid "Files, playlists and queue buttons"
+msgstr "Knappar för filer, spellistor och kö"
+
+msgid "Tabbar small mode"
+msgstr "Litet läge för flikfält"
+
+msgid "Playlist playing song color"
+msgstr "Färg på spelad låt i spellistan"
+
+msgid "System highlight color"
+msgstr "Systemets markeringsfärg"
+
+msgid "Custom color"
+msgstr "Anpassad färg"
+
+msgid "Select playlist playing song color:"
+msgstr "Välj färg för spelad låt i spellistan:"
+
+msgid "Window"
+msgstr "Fönster"
+
+msgid "Window text"
+msgstr "Fönstertext"
+
+msgid "Base"
+msgstr "Bas"
+
+msgid "Alternate base"
+msgstr "Alternativ bas"
+
+msgid "Tooltip base"
+msgstr "Bakgrund för verktygstips"
+
+msgid "Tooltip text"
+msgstr "Text i verktygstips"
+
+msgid "Placeholder text"
+msgstr "Platshållartext"
+
+msgid "Text"
+msgstr "Text"
+
+msgid "Button"
+msgstr "Knapp"
+
+msgid "Button text"
+msgstr "Knapptext"
+
+msgid "Bright text"
+msgstr "Ljus text"
+
+msgid "Select color"
+msgstr "Välj färg"
+
+msgid "Select background image"
+msgstr "Välj en bakgrundsbild"
+
+msgid "Colors"
+msgstr "Färger"
+
+msgid "&Use the system default color set"
+msgstr "&Använd systemets standardfärger"
+
+msgid "Use a custom color set"
+msgstr "Använd en anpassad färguppsättning"
+
+msgid "Set a custom color set suitable for a dark theme"
+msgstr "Ange en anpassad färguppsättning som passar ett mörkt tema"
+
+msgid "Dark mode"
+msgstr "Mörkt läge"
+
+msgid "Reset the custom color set to the system default colors"
+msgstr "Återställ den anpassade färguppsättningen till systemets standardfärger"
+
+msgid "Reset to default"
+msgstr "Återställ till standard"
+
+msgid "You might need to restart Strawberry for this setting to fully apply"
+msgstr "Du kan behöva starta om Strawberry för att inställningen ska tillämpas fullt ut"
+
+msgid "You need to restart Strawberry for this setting to take affect"
+msgstr "Du måste starta om Strawberry för att den här inställningen ska börja gälla"
+
+msgid "System icons"
+msgstr "Systemikoner"
+
+msgid "Changing colors is only supported with some styles"
+msgstr "Färgändringar stöds endast av vissa stilar"
+
+msgid "Dark colors"
+msgstr "Mörka färger"
+
+msgid "Backend"
+msgstr "Bakände"
+
+msgid "Audio output"
+msgstr "Ljudutmatning"
+
+msgid "Device"
+msgstr "Enhet"
+
+msgid "ALSA plugin:"
+msgstr "ALSA-insticksmodul:"
+
+msgid "hw"
+msgstr "hw"
+
+msgid "p&lughw"
+msgstr "p&lughw"
+
+msgid "pcm"
+msgstr "pcm"
+
+msgid "Exclusive mode (Experimental)"
+msgstr "Exklusivt läge (experimentellt)"
+
+msgid "Options"
+msgstr "Alternativ"
+
+msgid "Enable volume control"
+msgstr "Aktivera volymkontroll"
+
+msgid "Upmix / downmix to"
+msgstr "Uppmixa/nedmixa till"
+
+msgid "channels"
+msgstr "kanaler"
+
+msgid "Improve headphone listening of stereo audio records (bs2b)"
+msgstr "Förbättra lyssning på stereoinspelningar med hörlurar (bs2b)"
+
+msgid "Use playbin3 when available"
+msgstr "Använd playbin3 när tillgängligt"
+
+msgid "Enable HTTP/2 for streaming"
+msgstr "Aktivera HTTP/2 för strömning"
+
+msgid "Use strict SSL mode"
+msgstr "Använd strikt SSL-läge"
+
+msgid "Buffer"
+msgstr "Buffert"
+
+msgid " ms"
+msgstr " ms"
+
+msgid "Buffer duration"
+msgstr "Buffertlängd"
+
+msgid "High watermark"
+msgstr "Övre buffertgräns"
+
+msgid "Low watermark"
+msgstr "Nedre buffertgräns"
+
+msgid "Defaults"
+msgstr "Standardvärden"
+
+msgid "Audio normalization"
+msgstr "Ljudnormalisering"
+
+msgid "No audio normalization"
+msgstr "Ingen ljudnormalisering"
+
+msgid "Replay Gain"
+msgstr "ReplayGain"
+
+msgid "Use Replay Gain metadata if it is available"
+msgstr "Använd ReplayGain-metadata om sådana finns"
+
+msgid "Replay Gain mode"
+msgstr "ReplayGain-läge"
+
+msgid "Radio (equal loudness for all tracks)"
+msgstr "Radio (samma ljudstyrka för alla spår)"
+
+msgid "Album (ideal loudness for all tracks)"
+msgstr "Album (idealisk ljudstyrka för alla spår)"
+
+msgid "Pre-amp"
+msgstr "Förförstärkare"
+
+msgid "Apply compression to prevent clipping"
+msgstr "Tillämpa komprimering för att förhindra klippning"
+
+msgid "Fallback-gain"
+msgstr "Reservförstärkning"
+
+msgid "EBU R 128 Loudness Normalization"
+msgstr "EBU R 128 ljudstyrkenormalisering"
+
+msgid "Perform track loudness normalization"
+msgstr "Utför normalisering av spårets ljudstyrka"
+
+msgid "Target Level"
+msgstr "Målnivå"
+
+msgid "Fading"
+msgstr "Toning"
+
+msgid "Fade out when stopping a track"
+msgstr "Tona ut när ett spår stoppas"
+
+msgid "Cross-fade when changing tracks manually"
+msgstr "Övertona vid manuellt byte av spår"
+
+msgid "Cross-fade when changing tracks automatically"
+msgstr "Övertona vid automatiskt byte av spår"
+
+msgid "Except between tracks on the same album or in the same CUE sheet"
+msgstr "Förutom mellan spår på samma album eller i samma CUE-fil"
+
+msgid "Fading duration"
+msgstr "Toningstid"
+
+msgid "Fade out on pause / fade in on resume"
+msgstr "Tona ut vid pausning / tona in vid återupptagning"
+
+msgid "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+msgstr "Använd en decibelskala för volymreglaget så att den upplevda ljudstyrkan ändras jämnt. Varje steg på 1 % motsvarar 0,5 dB, 100 % är 0 dB och 0 % är tystnad."
+
+msgid "Exponential volume scaling"
+msgstr "Exponentiell volymskalning"
+
+msgid "Device warm-up"
+msgstr "Startfördröjning för ljudenhet"
+
+msgid "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+msgstr "Fördröjning mellan att ljudenheten öppnas och uppspelningen startar, så att början av spåret inte klipps bort medan enheten (DAC) fortfarande blir klar. Ange 0 för att inaktivera."
+
+msgid "Behavior"
+msgstr "Beteende"
+
+msgid "Show system tray icon"
+msgstr "Visa ikon i systemfältet"
+
+msgid "Keep running in the background when the window is closed"
+msgstr "Fortsätt köra i bakgrunden när fönstret är stängt"
+
+msgid "Show song progress on system tray icon"
+msgstr "Visa låtens förlopp på ikonen i systemfältet"
+
+msgid "Show song progress on taskbar"
+msgstr "Visa låtens förlopp i aktivitetsfältet"
+
+msgid "Resume playback on start"
+msgstr "Fortsätt uppspelning vid start"
+
+msgid "Show playing widget"
+msgstr "Visa uppspelningspanelen"
+
+msgid "On startup"
+msgstr "Vid start"
+
+msgid "Remember from &last time"
+msgstr "Kom ihåg från &förra gången"
+
+msgid "Show the main window"
+msgstr "Visa huvudfönstret"
+
+msgid "Hide the main window"
+msgstr "Dölj huvudfönstret"
+
+msgid "Show the main window maximized"
+msgstr "Visa huvudfönstret som maximerat"
+
+msgid "Show the main window minimized"
+msgstr "Visa huvudfönstret som minimerat"
+
+msgid "Language"
+msgstr "Språk"
+
+msgid "Use the system default"
+msgstr "Använd systemets standardspråk"
+
+msgid "You will need to restart Strawberry if you change the language."
+msgstr "Du måste starta om Strawberry om du ändrar språket."
+
+msgid "Using the menu to add a song will..."
+msgstr "När du lägger till en låt via menyn…"
+
+msgid "Never start playing"
+msgstr "Aldrig starta uppspelning"
+
+msgid "Play if there is nothing already playing"
+msgstr "Starta uppspelningen om inget redan spelas"
+
+msgid "Always start playing"
+msgstr "Alltid starta uppspelning"
+
+msgid "Pressing \"Previous\" in player will..."
+msgstr "När du klickar på \"Föregående\" i spelaren…"
+
+msgid "Jump to previous song right away"
+msgstr "Hoppa till föregående låt direkt"
+
+msgid "Restart song, then jump to previous if pressed again"
+msgstr "Starta om låten, hoppa sedan till föregående om du trycker igen"
+
+msgid "Double clicking a song will..."
+msgstr "När du dubbelklickar på en låt…"
+
+msgid "Append to the playlist"
+msgstr "Lägg till i spellistan"
+
+msgid "Replace the playlist"
+msgstr "Ersätt spellistan"
+
+msgid "Open in new playlist"
+msgstr "Öppna i ny spellista"
+
+msgid "Add to the queue"
+msgstr "Lägg till i kön"
+
+msgid "Double clicking a song in the playlist will..."
+msgstr "När du dubbelklickar på en låt i spellistan…"
+
+msgid "Change the currently playing song"
+msgstr "Byt till den valda låten"
+
+msgid "Seeking using a keyboard shortcut or mouse wheel"
+msgstr "Förflyttning i uppspelningen med kortkommando eller mushjul"
+
+msgid "Time step"
+msgstr "Tidssteg"
+
+msgid " s"
+msgstr " s"
+
+msgid "Volume Increment"
+msgstr "Volymökning"
+
+msgid "Could not create cdiocddasrc"
+msgstr "Det gick inte att skapa cdiocddasrc"
+
+msgid "Error while setting CDDA device to ready state."
+msgstr "Fel när CDDA-enheten försattes i redoläge."
+
+msgid "Error while setting CDDA device to pause state."
+msgstr "Fel när CDDA-enheten försattes i pausläge."
+
+msgid "The 'track' format is not supported by GStreamer."
+msgstr "'track'-formatet stöds inte av GStreamer."
+
+msgid "Error while querying CDDA tracks."
+msgstr "Fel vid hämtning av CDDA-spår."
+
+msgid "Unable to execute collection SQL query: %1"
+msgstr "Det gick inte att köra SQL-frågan för samlingen: %1"
+
+msgid "Failed SQL query: %1"
+msgstr "SQL-frågan misslyckades: %1"
+
+msgid "Updating %1 database."
+msgstr "Uppdaterar %1-databasen."
+
+msgid "Collection Filter"
+msgstr "Samlingsfilter"
+
+msgid "Enter search terms here"
+msgstr "Ange söktermer här"
+
+msgid "MenuPopupToolButton"
+msgstr "MenuPopupToolButton"
+
+msgid "Entire collection"
+msgstr "Hela samlingen"
+
+msgid "Added today"
+msgstr "Tillagda idag"
+
+msgid "Added this week"
+msgstr "Tillagda den här veckan"
+
+msgid "Added within three months"
+msgstr "Tillagda inom tre månader"
+
+msgid "Added this year"
+msgstr "Tillagda i år"
+
+msgid "Added this month"
+msgstr "Tillagda den här månaden"
+
+msgid "Save current grouping"
+msgstr "Spara aktuell gruppering"
+
+msgid "Manage saved groupings"
+msgstr "Hantera sparade grupperingar"
+
+msgid "Any rating"
+msgstr "Vilket betyg som helst"
+
+msgid "Rating non null"
+msgstr "Har betyg"
+
+msgid "Rating greater than 1 star"
+msgstr "Betyg över 1 stjärna"
+
+msgid "Rating greater than 2 stars"
+msgstr "Betyg över 2 stjärnor"
+
+msgid "Rating greater than 3 stars"
+msgstr "Betyg över 3 stjärnor"
+
+msgid "Rating greater than 4 stars"
+msgstr "Betyg över 4 stjärnor"
+
+msgid "Group by"
+msgstr "Gruppera efter"
+
+msgid "Filter by age"
+msgstr "Filtrera efter ålder"
+
+msgid "Filter by rating"
+msgstr "Filtrera efter betyg"
+
+msgid "Display options"
+msgstr "Visningsalternativ"
+
+msgid "Group by Album artist/Album"
+msgstr "Gruppera efter albumartist/album"
+
+msgid "Group by Album artist/Album - Disc"
+msgstr "Gruppera efter albumartist/album - Skiva"
+
+msgid "Group by Album artist/Year - Album"
+msgstr "Gruppera efter albumartist/år - album"
+
+msgid "Group by Album artist/Year - Album - Disc"
+msgstr "Gruppera efter albumartist/år - album - skiva"
+
+msgid "Group by Artist/Album"
+msgstr "Gruppera efter artist/album"
+
+msgid "Group by Artist/Album - Disc"
+msgstr "Gruppera efter artist/album - skiva"
+
+msgid "Group by Artist/Year - Album"
+msgstr "Gruppera efter artist/år - album"
+
+msgid "Group by Artist/Year - Album - Disc"
+msgstr "Gruppera efter artist/år - album - skiva"
+
+msgid "Group by Genre/Album artist/Album"
+msgstr "Gruppera efter genre/albumartist/album"
+
+msgid "Group by Genre/Artist/Album"
+msgstr "Gruppera efter genre/artist/album"
+
+msgid "Group by Album Artist"
+msgstr "Gruppera efter albumartist"
+
+msgid "Group by Artist"
+msgstr "Gruppera efter artist"
+
+msgid "Group by Album"
+msgstr "Gruppera efter album"
+
+msgid "Group by Genre/Album"
+msgstr "Gruppera efter genre/album"
+
+msgid "Advanced grouping..."
+msgstr "Avancerad gruppering…"
+
+msgid "Grouping Name"
+msgstr "Grupperingsnamn"
+
+msgid "Grouping name:"
+msgstr "Grupperingsnamn:"
+
+msgid "Support for sort tags artist, album, album artist, title, composer and performer"
+msgstr "Stöd för sorteringstaggar för artist, album, albumartist, titel, kompositör och medverkande"
+
+msgid "Saving playcounts and ratings"
+msgstr "Sparar antal spelningar och betyg"
+
+msgid "Loading..."
+msgstr "Läser in…"
+
+msgid "Unknown"
+msgstr "Okänt"
+
+msgid "Collection"
+msgstr "Samling"
+
+msgid "These folders will be scanned for music to make up your collection"
+msgstr "Dessa mappar kommer att skannas efter musik för att skapa din samling"
+
+msgid "Add new folder..."
+msgstr "Lägg till ny mapp…"
+
+msgid "Remove folder"
+msgstr "Ta bort mapp"
+
+msgid "Automatic updating"
+msgstr "Automatisk uppdatering"
+
+msgid "Update the collection when Strawberry starts"
+msgstr "Uppdatera samlingen när Strawberry startar"
+
+msgid "Monitor the collection for changes"
+msgstr "Bevaka ändringar i samlingen"
+
+msgid "Song fingerprinting and tracking"
+msgstr "Fingeravtryck och spårning av låtar"
+
+msgid "Mark disappeared songs unavailable"
+msgstr "Markera försvunna låtar som otillgängliga"
+
+msgid "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+msgstr "Utför EBU R 128-analys av låtar (krävs för EBU R 128-ljudstyrkenormalisering)"
+
+msgid "Expire unavailable songs after"
+msgstr "Ta bort otillgängliga låtar efter"
+
+msgid "days"
+msgstr "dagar"
+
+msgid "Preferred album art filenames (comma separated)"
+msgstr "Föredragna filnamn för albumomslag (kommaseparerade)"
+
+msgid "When looking for album art Strawberry will first look for picture files that contain one of these words.\nIf there are no matches then it will use the largest image in the directory."
+msgstr "Vid sökning efter albumomslag letar Strawberry först efter bildfiler som innehåller ett av dessa ord.\nOm det inte finns några träffar används den största bilden i mappen."
+
+msgid "Automatically open single categories in the collection tree"
+msgstr "Öppna enskilda kategorier automatiskt i samlingsträdet"
+
+msgid "Show dividers"
+msgstr "Visa avdelare"
+
+msgid "Show album cover art in collection"
+msgstr "Visa omslagsbilder i samlingen"
+
+msgid "Use various artists for compilation albums"
+msgstr "Använd ”Diverse artister” för samlingsalbum"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+msgstr "Hoppa över inledande artiklar (\"the\", \"a\" och \"an\") när artister, kompositörer och medverkande sorteras"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+msgstr "Hoppa över inledande artiklar (\"the\", \"a\" och \"an\") när album sorteras"
+
+msgid "Use sort tags for sorting when available"
+msgstr "Använd sorteringstaggar för sortering när det är möjligt"
+
+msgid "Album cover pixmap cache"
+msgstr "Bildcache för albumomslag"
+
+msgid "Enable Disk Cache"
+msgstr "Aktivera diskcache"
+
+msgid "Disk Cache Size"
+msgstr "Storlek på diskcache"
+
+msgid "Current disk cache in use:"
+msgstr "Aktuell användning av diskcachen:"
+
+msgid "Clear Disk Cache"
+msgstr "Rensa diskcache"
+
+msgid "Song playcounts and ratings"
+msgstr "Antal spelningar och betyg för låtar"
+
+msgid "Save playcounts to song tags when possible"
+msgstr "Spara antal spelningar i låttaggar när det är möjligt"
+
+msgid "Save ratings to song tags when possible"
+msgstr "Spara betyg i låttaggar när det är möjligt"
+
+msgid "Overwrite database playcount when songs are re-read from disk"
+msgstr "Skriv över antalet spelningar i databasen när låtar läses om från disken"
+
+msgid "Overwrite database rating when songs are re-read from disk"
+msgstr "Skriv över betygen i databasen när låtar läses om från disken"
+
+msgid "Save playcounts and ratings to files now"
+msgstr "Spara antal spelningar och betyg till filer nu"
+
+msgid "Enable delete files in the right click context menu"
+msgstr "Aktivera borttagning av filer i snabbmenyn"
+
+msgid "Add directory..."
+msgstr "Lägg till mapp…"
+
+msgid "Write all playcounts and ratings to files"
+msgstr "Skriv alla låtars antal spelningar och betyg till filer"
+
+msgid "Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"
+msgstr "Vill du skriva alla låtars antal spelningar och betyg till filer?"
+
+msgid "Your collection is empty!"
+msgstr "Din samling är tom!"
+
+msgid "Click here to add some music"
+msgstr "Klicka här för att lägga till musik"
+
+msgid "Append to current playlist"
+msgstr "Lägg till i aktuell spellista"
+
+msgid "Replace current playlist"
+msgstr "Ersätt aktuell spellista"
+
+msgid "Queue track"
+msgstr "Lägg till spår i kön"
+
+msgid "Queue to play next"
+msgstr "Lägg till i kön för att spela som nästa"
+
+msgid "Search for this"
+msgstr "Sök efter det här"
+
+msgid "Organize files..."
+msgstr "Organisera filer…"
+
+msgid "Copy to device..."
+msgstr "Kopiera till enhet…"
+
+msgid "Delete from disk..."
+msgstr "Ta bort från disk…"
+
+msgid "Edit track information..."
+msgstr "Redigera spårinformation…"
+
+msgid "Edit tracks information..."
+msgstr "Redigera spårinformation…"
+
+msgid "Show in file browser..."
+msgstr "Visa i filhanteraren…"
+
+msgid "Rescan song(s)"
+msgstr "Skanna om låtar"
+
+msgid "Show in various artists"
+msgstr "Visa under Diverse artister"
+
+msgid "Don't show in various artists"
+msgstr "Visa inte under Diverse artister"
+
+msgid "There are other songs in this album"
+msgstr "Det finns andra låtar i det här albumet"
+
+msgid "Would you like to move the other songs on this album to Various Artists as well?"
+msgstr "Vill du även flytta de andra låtarna på albumet till Diverse artister?"
+
+msgid "Error"
+msgstr "Fel"
+
+msgid "None of the selected songs were suitable for copying to a device"
+msgstr "Ingen av de valda låtarna lämpar sig för kopiering till en enhet"
+
+msgid "Form"
+msgstr "Formulär"
+
+msgid "Updating collection"
+msgstr "Uppdaterar samlingen"
+
+msgid "Updating %1"
+msgstr "Uppdaterar %1"
+
+msgid "Console"
+msgstr "Konsol"
+
+msgid "Run"
+msgstr "Kör"
+
+msgid "Context"
+msgstr "Kontext"
+
+msgid "Custom text settings"
+msgstr "Anpassade textinställningar"
+
+msgid "Title"
+msgstr "Titel"
+
+msgid "Summary"
+msgstr "Sammanfattning"
+
+msgid "Enable Items"
+msgstr "Aktivera objekt"
+
+msgid "Technical Data"
+msgstr "Tekniska data"
+
+msgid "Song Lyrics"
+msgstr "Låttexter"
+
+msgid "Automatically search for album cover"
+msgstr "Sök automatiskt efter albumomslag"
+
+msgid "Automatically search for song lyrics"
+msgstr "Sök automatiskt efter låttexter"
+
+msgid "Font for headline"
+msgstr "Typsnitt för rubrik"
+
+msgid "Font"
+msgstr "Typsnitt"
+
+msgid "Font size"
+msgstr "Typsnittsstorlek"
+
+msgid " pt"
+msgstr " pt"
+
+msgid "Preview"
+msgstr "Förhandsvisning"
+
+msgid "Font for data and lyrics"
+msgstr "Typsnitt för data och låttexter"
+
+msgid "Add song artist tag"
+msgstr "Lägg till tagg för låtens artist"
+
+msgid "Add song album tag"
+msgstr "Lägg till tagg för låtens album"
+
+msgid "Add song title tag"
+msgstr "Lägg till tagg för låtens titel"
+
+msgid "Add song albumartist tag"
+msgstr "Lägg till tagg för låtens albumartist"
+
+msgid "Add song year tag"
+msgstr "Lägg till tagg för år"
+
+msgid "Add song composer tag"
+msgstr "Lägg till tagg för låtens kompositör"
+
+msgid "Add song performer tag"
+msgstr "Lägg till tagg för medverkande"
+
+msgid "Add song grouping tag"
+msgstr "Lägg till tagg för låtgruppering"
+
+msgid "Add song disc tag"
+msgstr "Lägg till tagg för skivnummer"
+
+msgid "Add song track tag"
+msgstr "Lägg till tagg för spårnummer"
+
+msgid "Add song genre tag"
+msgstr "Lägg till tagg för låtgenre"
+
+msgid "Add song length tag"
+msgstr "Lägg till tagg för låtens längd"
+
+msgid "Add song play count"
+msgstr "Lägg till antal spelningar för låten"
+
+msgid "Add song skip count"
+msgstr "Lägg till antal överhoppningar för låten"
+
+msgid "Add a new line if supported by the notification type"
+msgstr "Lägg till en ny rad om det stöds av aviseringstypen"
+
+msgid "%filename%"
+msgstr "%filename%"
+
+msgid "Add song filename"
+msgstr "Lägg till låtens filnamn"
+
+msgid "%url%"
+msgstr "%url%"
+
+msgid "Add song URL"
+msgstr "Lägg till låtens URL"
+
+msgid "%rating%"
+msgstr "%rating%"
+
+msgid "Add song rating"
+msgstr "Lägg till låtbetyg"
+
+msgid "Add song original year tag"
+msgstr "Lägg till tagg för låtens originalår"
+
+msgid "Add song artistsort tag"
+msgstr "Lägg till tagg för sortering efter artist"
+
+msgid "Add song albumartistsort tag"
+msgstr "Lägg till tagg för sortering efter albumartist"
+
+msgid "Add song titlesort tag"
+msgstr "Lägg till tagg för sortering efter titel"
+
+msgid "Add song composersort tag"
+msgstr "Lägg till tagg för sortering efter kompositör"
+
+msgid "Add song performersort tag"
+msgstr "Lägg till tagg för sortering efter medverkande"
+
+msgid "Add song albumsort tag"
+msgstr "Lägg till tagg för sortering efter album"
+
+msgid "Filetype"
+msgstr "Filtyp"
+
+msgid "Length"
+msgstr "Längd"
+
+msgid "Samplerate"
+msgstr "Samplingsfrekvens"
+
+msgid "Bit depth"
+msgstr "Bitdjup"
+
+msgid "Bitrate"
+msgstr "Bithastighet"
+
+msgid "Show album cover"
+msgstr "Visa albumomslag"
+
+msgid "Show song technical data"
+msgstr "Visa tekniska data för låten"
+
+msgid "Show song lyrics"
+msgstr "Visa låttexter"
+
+msgid "No song playing"
+msgstr "Ingen låt spelas"
+
+msgid "%1 song"
+msgstr "%1 låt"
+
+msgid "%1 songs"
+msgstr "%1 låtar"
+
+msgid "%1 artist"
+msgstr "%1 artist"
+
+msgid "%1 artists"
+msgstr "%1 artister"
+
+msgid "%1 album"
+msgstr "%1 album"
+
+msgid "%1 albums"
+msgstr "%1 album"
+
+msgid "kbps"
+msgstr "kbps"
+
+msgid "Load cover from URL"
+msgstr "Läs in omslag från URL"
+
+msgid "Enter a URL to download a cover from the Internet:"
+msgstr "Ange en URL för att hämta ett omslag från internet:"
+
+msgid "Fetching cover error"
+msgstr "Fel vid hämtning av omslag"
+
+msgid "The site you requested does not exist!"
+msgstr "Webbplatsen du angav finns inte!"
+
+msgid "The site you requested is not an image!"
+msgstr "URL:en du angav leder inte till en bild!"
+
+msgid "View"
+msgstr "Visa"
+
+msgid "Total albums:"
+msgstr "Album totalt:"
+
+msgid "Without cover:"
+msgstr "Utan omslag:"
+
+msgid "0"
+msgstr "0"
+
+msgid "Fetch Missing Covers"
+msgstr "Hämta omslag som saknas"
+
+msgid "Export Covers"
+msgstr "Exportera omslag"
+
+msgid "Fetch automatically"
+msgstr "Hämta automatiskt"
+
+msgid "Load"
+msgstr "Läs in"
+
+msgid "Add to playlist"
+msgstr "Lägg till i spellista"
+
+msgid "Fetch completed"
+msgstr "Hämtning klar"
+
+msgid "Total network requests made"
+msgstr "Totalt antal nätverksförfrågningar"
+
+msgid "Average image size"
+msgstr "Genomsnittlig bildstorlek"
+
+msgid "Total bytes transferred"
+msgstr "Totalt överförda byte"
+
+msgid "Covers"
+msgstr "Omslag"
+
+msgid "Cover providers"
+msgstr "Omslagsleverantörer"
+
+msgid "Choose the providers you want to use when searching for covers."
+msgstr "Välj vilka leverantörer du vill använda när du söker efter omslag."
+
+msgid "Move up"
+msgstr "Flytta uppåt"
+
+msgid "Move down"
+msgstr "Flytta nedåt"
+
+msgid "Authentication"
+msgstr "Autentisering"
+
+msgid "Login"
+msgstr "Logga in"
+
+msgid "Album cover types"
+msgstr "Typer av albumomslag"
+
+msgid "Saving album covers"
+msgstr "Spara albumomslag"
+
+msgid "Save album covers in album directory"
+msgstr "Spara albumomslag i albummappen"
+
+msgid "Save album covers in cache directory"
+msgstr "Spara albumomslag i cachemappen"
+
+msgid "Save album covers as embedded cover"
+msgstr "Spara albumomslag som inbäddade bilder"
+
+msgid "Filename:"
+msgstr "Filnamn:"
+
+msgid "Pattern"
+msgstr "Mönster"
+
+msgid "Random"
+msgstr "Slumpat"
+
+msgid "Overwrite existing file"
+msgstr "Skriv över befintlig fil"
+
+msgid "Lowercase filename"
+msgstr "Filnamn med gemener"
+
+msgid "Replace spaces with dashes"
+msgstr "Ersätt mellanslag med bindestreck"
+
+msgid "Use Tidal settings to authenticate."
+msgstr "Använd Tidal-inställningarna för autentisering."
+
+msgid "Use Spotify settings to authenticate."
+msgstr "Använd Spotify-inställningarna för autentisering."
+
+msgid "Use Qobuz settings to authenticate."
+msgstr "Använd Qobuz-inställningarna för autentisering."
+
+msgid "%1 needs authentication."
+msgstr "%1 behöver autentisering."
+
+msgid "%1 does not need authentication."
+msgstr "%1 behöver inte autentisering."
+
+msgid "No provider selected."
+msgstr "Ingen leverantör vald."
+
+msgid "Authentication failed"
+msgstr "Autentisering misslyckades"
+
+msgid "Manually unset (%1)"
+msgstr "Borttaget manuellt (%1)"
+
+msgid "Set through album cover search (%1)"
+msgstr "Inställt genom sökning efter albumomslag (%1)"
+
+msgid "Automatically picked up from album directory (%1)"
+msgstr "Hämtat automatiskt från albummappen (%1)"
+
+msgid "Embedded album cover art (%1)"
+msgstr "Inbäddat albumomslag (%1)"
+
+msgid "Saving CUE files is not supported."
+msgstr "Det går inte att spara CUE-filer."
+
+msgid "Unable to execute SQL query: %1"
+msgstr "Det gick inte att köra SQL-fråga: %1"
+
+msgid "Integrity check"
+msgstr "Integritetskontroll"
+
+msgid "Database corruption detected."
+msgstr "Databasskada upptäcktes."
+
+msgid "Backing up database"
+msgstr "Säkerhetskopierar databas"
+
+msgid "Delete files"
+msgstr "Ta bort filer"
+
+msgid "The following files will be deleted from disk:"
+msgstr "Följande filer tas bort från hårddisken:"
+
+msgid "Are you sure you want to continue?"
+msgstr "Är du säker på att du vill fortsätta?"
+
+msgid "Deleting files"
+msgstr "Tar bort filer"
+
+msgid "Updating %1%..."
+msgstr "Uppdaterar %1%…"
+
+msgid "Not connected"
+msgstr "Inte ansluten"
+
+msgid "Not mounted - double click to mount"
+msgstr "Inte monterad - dubbelklicka för att montera"
+
+msgid "Double click to open"
+msgstr "Dubbelklicka för att öppna"
+
+msgid "%1 song%2"
+msgstr "%1 låt%2"
+
+msgid "Connect device"
+msgstr "Anslut enhet"
+
+msgid "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+msgstr "Det här är första gången du ansluter enheten. Strawberry söker nu efter musikfiler på den – det kan ta en stund."
+
+msgid "This device will not work properly"
+msgstr "Den här enheten kommer inte att fungera ordentligt"
+
+msgid "This is an MTP device, but you compiled Strawberry without libmtp support."
+msgstr "Det här är en MTP-enhet, men Strawberry har kompilerats utan stöd för libmtp."
+
+msgid "If you continue, this device will work slowly and songs copied to it may not work."
+msgstr "Om du fortsätter fungerar enheten långsamt och låtar som kopieras till den kanske inte kan spelas."
+
+msgid "This is an iPod, but you compiled Strawberry without libgpod support."
+msgstr "Det här är en iPod, men du har kompilerat Strawberry utan stöd för libgpod."
+
+msgid "This type of device is not supported: %1"
+msgstr "Den här typen av enhet stöds inte: %1"
+
+msgid "Device Properties"
+msgstr "Enhetsegenskaper"
+
+msgid "Information"
+msgstr "Information"
+
+msgid "Name"
+msgstr "Namn"
+
+msgid "Icon"
+msgstr "Ikon"
+
+msgid "Hardware information"
+msgstr "Hårdvaruinformation"
+
+msgid "Hardware information is only available while the device is connected."
+msgstr "Hårdvaruinformation är endast tillgänglig när enheten är ansluten."
+
+msgid "File formats"
+msgstr "Filformat"
+
+msgid "Supported formats"
+msgstr "Format som stöds"
+
+msgid "This device supports the following file formats:"
+msgstr "Den här enheten stöder följande filformat:"
+
+msgid "Strawberry can automatically convert the music you copy to this device into a format that it can play."
+msgstr "Strawberry kan automatiskt konvertera musiken du kopierar till den här enheten till ett format som den kan spela."
+
+msgid "Do not convert any music"
+msgstr "Konvertera inte någon musik"
+
+msgid "Convert any music that the device can't play"
+msgstr "Konvertera all musik som inte kan spelas av enheten"
+
+msgid "Convert all music"
+msgstr "Konvertera all musik"
+
+msgid "Preferred format"
+msgstr "Önskat format"
+
+msgid "This device must be connected and opened before Strawberry can see what file formats it supports."
+msgstr "Den här enheten måste vara ansluten och öppnad innan Strawberry kan se vilka filformat den stöder."
+
+msgid "Open device"
+msgstr "Öppna enhet"
+
+msgid "Querying device..."
+msgstr "Hämtar information från enheten…"
+
+msgid "Model"
+msgstr "Modell"
+
+msgid "Manufacturer"
+msgstr "Tillverkare"
+
+msgid "Safely remove device"
+msgstr "Mata ut enheten säkert"
+
+msgid "Forget device"
+msgstr "Glöm enheten"
+
+msgid "Device properties..."
+msgstr "Enhetsegenskaper…"
+
+msgid "Copy to collection..."
+msgstr "Kopiera till samling…"
+
+msgid "Delete from device..."
+msgstr "Ta bort från enhet…"
+
+msgid "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+msgstr "När du glömmer en enhet tas den bort från listan, och Strawberry måste skanna om alla låtar nästa gång du ansluter den."
+
+msgid "These files will be deleted from the device, are you sure you want to continue?"
+msgstr "Filerna kommer att tas bort från enheten. Är du säker på att du vill fortsätta?"
+
+msgid "on "
+msgstr "på "
+
+msgid "Dynamic mode is on"
+msgstr "Dynamiskt läge är på"
+
+msgid "New tracks will be added automatically."
+msgstr "Nya spår läggs till automatiskt."
+
+msgid "Expand"
+msgstr "Expandera"
+
+msgid "Repopulate"
+msgstr "Fyll på igen"
+
+msgid "Turn off"
+msgstr "Stäng av"
+
+msgid "Edit track information"
+msgstr "Redigera spårinformation"
+
+msgid "Date created"
+msgstr "Skapad"
+
+msgid "Art Automatic"
+msgstr "Automatiskt omslag"
+
+msgid "Date modified"
+msgstr "Ändrad"
+
+msgid "Art Embedded"
+msgstr "Inbäddat omslag"
+
+#. A playlist's tag.
+msgid "Last played"
+msgstr "Senast spelad"
+
+msgid "File type"
+msgstr "Filtyp"
+
+msgid "Play count"
+msgstr "Antal spelningar"
+
+msgid "EBU R 128 integrated loudness"
+msgstr "EBU R 128 integrerad ljudstyrka"
+
+msgid "Bit rate"
+msgstr "Bithastighet"
+
+msgid "Skip count"
+msgstr "Överhoppningsantal"
+
+msgid "Sample rate"
+msgstr "Samplingsfrekvens"
+
+msgid "Path"
+msgstr "Sökväg"
+
+msgid "Filename"
+msgstr "Filnamn"
+
+msgid "Art Unset"
+msgstr "Omslaget inte inställt"
+
+msgid "File size"
+msgstr "Filstorlek"
+
+msgid "Art Manual"
+msgstr "Manuellt omslag"
+
+msgid "EBU R 128 loudness range"
+msgstr "EBU R 128 ljudstyrkeintervall"
+
+msgid "Reset play counts"
+msgstr "Återställ antal spelningar"
+
+msgid "Tags"
+msgstr "Taggar"
+
+msgid "Change art"
+msgstr "Byt omslag"
+
+msgid "Embedded cover"
+msgstr "Inbäddat omslag"
+
+msgid "Disc"
+msgstr "Skiva"
+
+msgid "Grouping"
+msgstr "Gruppering"
+
+msgid "Album artist"
+msgstr "Albumartist"
+
+msgid "Year"
+msgstr "År"
+
+msgid "Composer"
+msgstr "Kompositör"
+
+msgid "Complete tags automatically"
+msgstr "Fyll i taggar automatiskt"
+
+msgid "Genre"
+msgstr "Genre"
+
+msgid "Comment"
+msgstr "Kommentar"
+
+msgid "Performer"
+msgstr "Medverkande"
+
+msgid "Compilation"
+msgstr "Samlingsalbum"
+
+msgid "Track"
+msgstr "Spår"
+
+msgid "Rating"
+msgstr "Betyg"
+
+msgid "Lyrics"
+msgstr "Låttexter"
+
+msgid "Complete lyrics automatically"
+msgstr "Komplettera låttexter automatiskt"
+
+msgid "(different across multiple songs)"
+msgstr "(skiljer sig mellan flera låtar)"
+
+msgid "Different art across multiple songs."
+msgstr "Omslagen skiljer sig mellan de valda låtarna."
+
+msgid "Previous"
+msgstr "Föregående"
+
+msgid "Next"
+msgstr "Nästa"
+
+msgid "Saving tracks"
+msgstr "Sparar spår"
+
+msgid "Loading tracks"
+msgstr "Läser in spår"
+
+msgid "%1 songs selected."
+msgstr "%1 låtar valda."
+
+msgid "Yes"
+msgstr "Ja"
+
+msgid "No"
+msgstr "Nej"
+
+msgid "None"
+msgstr "Ingen"
+
+msgid "Cover is unset."
+msgstr "Omslaget är inte inställt."
+
+msgid "Cover from embedded image."
+msgstr "Omslag från inbäddad bild."
+
+msgid "Cover from %1"
+msgstr "Omslag från %1"
+
+msgid "Cover art not set"
+msgstr "Albumomslaget är inte inställt"
+
+msgid "Album cover editing is only available for collection songs."
+msgstr "Redigering av albumomslag är endast tillgänglig för låtar i samlingen."
+
+msgid "Cover changed: Will be cleared when saved."
+msgstr "Omslaget har ändrats: det rensas när du sparar."
+
+msgid "Cover changed: Will be unset when saved."
+msgstr "Omslaget har ändrats: kopplingen tas bort när du sparar."
+
+msgid "Cover changed: Will be deleted when saved."
+msgstr "Omslaget har ändrats: omslagsfilen tas bort när du sparar."
+
+msgid "Cover changed: Will set new when saved."
+msgstr "Omslaget har ändrats: ett nytt omslag ställs in när du sparar."
+
+msgid "Never"
+msgstr "Aldrig"
+
+msgid "Reset song play statistics"
+msgstr "Återställ låtens spelstatistik"
+
+msgid "Are you sure you want to reset this song's play statistics?"
+msgstr "Är du säker på att du vill återställa den här låtens spelstatistik?"
+
+msgid "loading..."
+msgstr "läser in…"
+
+msgid "Not found."
+msgstr "Hittades inte."
+
+msgid "Could not write metadata to %1"
+msgstr "Det gick inte att skriva metadata till %1"
+
+msgid "Could not write metadata to %1: %2"
+msgstr "Det gick inte att skriva metadata till %1: %2"
+
+msgid "ID3v2 version:"
+msgstr "ID3v2-version:"
+
+msgid "2.3"
+msgstr "2.3"
+
+msgid "2.4"
+msgstr "2.4"
+
+msgid "Performer sort"
+msgstr "Sortering efter medverkande"
+
+msgid "Title sort"
+msgstr "Sortering efter titel"
+
+msgid "Album artist sort"
+msgstr "Sortering efter albumartist"
+
+msgid "Artist sort"
+msgstr "Sortering efter artist"
+
+msgid "Album sort"
+msgstr "Sortering efter album"
+
+msgid "Composer sort"
+msgstr "Sortering efter kompositör"
+
+msgid "Equalizer"
+msgstr "Frekvenskorrigering"
+
+msgid "Preset:"
+msgstr "Förinställning:"
+
+msgid "Save preset"
+msgstr "Spara förinställning"
+
+msgid "Delete preset"
+msgstr "Ta bort förinställning"
+
+msgid "Enable equalizer"
+msgstr "Aktivera frekvenskorrigering"
+
+msgid "Enable stereo balancer"
+msgstr "Aktivera stereobalans"
+
+msgid "Left"
+msgstr "Vänster"
+
+msgid "Balance"
+msgstr "Balans"
+
+msgid "Right"
+msgstr "Höger"
+
+msgid "Custom"
+msgstr "Anpassad"
+
+msgid "Classical"
+msgstr "Klassisk"
+
+msgid "Club"
+msgstr "Klubb"
+
+msgid "Dance"
+msgstr "Dans"
+
+msgid "Full Bass"
+msgstr "Full bas"
+
+msgid "Full Treble"
+msgstr "Full diskant"
+
+msgid "Full Bass + Treble"
+msgstr "Full bas + diskant"
+
+msgid "Laptop/Headphones"
+msgstr "Bärbar dator/hörlurar"
+
+msgid "Large Hall"
+msgstr "Stor sal"
+
+msgid "Live"
+msgstr "Live"
+
+msgid "Party"
+msgstr "Fest"
+
+msgid "Pop"
+msgstr "Pop"
+
+msgid "Reggae"
+msgstr "Reggae"
+
+msgid "Rock"
+msgstr "Rock"
+
+msgid "Soft"
+msgstr "Mjuk"
+
+msgid "Ska"
+msgstr "Ska"
+
+msgid "Soft Rock"
+msgstr "Mjukrock"
+
+msgid "Techno"
+msgstr "Techno"
+
+msgid "Zero"
+msgstr "Noll"
+
+msgid "Are you sure you want to delete the \"%1\" preset?"
+msgstr "Är du säker på att du vill ta bort förinställningen \"%1\"?"
+
+msgid "You need to restart playback for this setting to take affect."
+msgstr "Du måste starta om uppspelningen för att den här inställningen ska börja gälla."
+
+msgid "%1 dB"
+msgstr "%1 dB"
+
+msgid "Strawberry Error"
+msgstr "Strawberry-fel"
+
+msgid "Large sidebar"
+msgstr "Stort sidofält"
+
+msgid "Icons sidebar"
+msgstr "Sidofält med ikoner"
+
+msgid "Small sidebar"
+msgstr "Litet sidofält"
+
+msgid "Plain sidebar"
+msgstr "Vanligt sidofält"
+
+msgid "Tabs on top"
+msgstr "Flikar längst upp"
+
+msgid "Icons on top"
+msgstr "Ikoner längst upp"
+
+msgid "Add root directory"
+msgstr "Lägg till rotmapp"
+
+msgid "Remove selected root directory"
+msgstr "Ta bort markerad rotmapp"
+
+msgid "Toggle between list and tree view"
+msgstr "Växla mellan list- och trädvy"
+
+msgid "Select folder to add as tree root"
+msgstr "Välj den mapp som ska läggas till som trädets rot"
+
+msgid "Move to collection..."
+msgstr "Flytta till samling…"
+
+msgid "Files"
+msgstr "Filer"
+
+msgid "Available"
+msgstr "Tillgängligt"
+
+msgid "New songs"
+msgstr "Nya låtar"
+
+msgid "Exceeded by"
+msgstr "Överskrids med"
+
+msgid "Used"
+msgstr "Använt"
+
+msgid "Could not copy %1 to %2: %3"
+msgstr "Det gick inte att kopiera %1 till %2: %3"
+
+msgid "Writing database failed: %1"
+msgstr "Det gick inte att skriva till databasen: %1"
+
+msgid "Writing database failed."
+msgstr "Det gick inte att skriva till databasen."
+
+msgid "Loading iPod database"
+msgstr "Läser in iPod-databas"
+
+msgid "An error occurred loading the iTunes database"
+msgstr "Ett fel uppstod vid inläsning av iTunes-databasen"
+
+msgid "Mount point"
+msgstr "Monteringspunkt"
+
+msgid "URI"
+msgstr "URI"
+
+msgid "Press a key"
+msgstr "Tryck på en tangent"
+
+msgid "Press a key combination to use for %1..."
+msgstr "Tryck på en tangentkombination som ska användas för %1…"
+
+msgid "Play"
+msgstr "Spela"
+
+msgid "Pause"
+msgstr "Pausa"
+
+msgid "Play/Pause"
+msgstr "Spela/pausa"
+
+msgid "Stop"
+msgstr "Stoppa"
+
+msgid "Stop playing after current track"
+msgstr "Stoppa spelning efter aktuellt spår"
+
+msgid "Next track"
+msgstr "Nästa spår"
+
+msgid "Previous track"
+msgstr "Föregående spår"
+
+msgid "Restart or previous track"
+msgstr "Starta om eller föregående spår"
+
+msgid "Increase volume"
+msgstr "Höj volymen"
+
+msgid "Decrease volume"
+msgstr "Sänk volymen"
+
+msgid "Mute"
+msgstr "Ljud av"
+
+msgid "Seek forward"
+msgstr "Sök framåt"
+
+msgid "Seek backward"
+msgstr "Sök bakåt"
+
+msgid "Show/Hide"
+msgstr "Visa/dölj"
+
+msgid "Show OSD"
+msgstr "Visa avisering"
+
+msgid "Toggle Pretty OSD"
+msgstr "Växla snygg avisering"
+
+msgid "Change shuffle mode"
+msgstr "Ändra blandningsläge"
+
+msgid "Change repeat mode"
+msgstr "Ändra upprepningsläge"
+
+msgid "Enable/disable scrobbling"
+msgstr "Aktivera/inaktivera skrobbling"
+
+msgid "Love"
+msgstr "Gilla"
+
+msgid "Global Shortcuts"
+msgstr "Globala kortkommandon"
+
+msgid "Open..."
+msgstr "Öppna…"
+
+msgid "Use X11 shortcuts when available"
+msgstr "Använd X11-kortkommandon när de är tillgängliga"
+
+msgid "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+msgstr "Du måste öppna Systeminställningar och tillåta Strawberry att \"<span style=\"font-style:italic\">styra datorn</span>\" för att kunna använda globala genvägar."
+
+#. Category label
+msgid "Action"
+msgstr "Åtgärd"
+
+msgid "Shortcut"
+msgstr "Kortkommando"
+
+msgid "Shortcut for %1"
+msgstr "Kortkommando för %1"
+
+msgid "&None"
+msgstr "I&ngen"
+
+msgid "&Default"
+msgstr "&Standard"
+
+msgid "&Custom"
+msgstr "A&npassad"
+
+msgid "Change shortcut..."
+msgstr "Ändra genväg…"
+
+msgid "Use KGlobalAccel shortcuts when available"
+msgstr "Använd KGlobalAccel-kortkommandon när de är tillgängliga"
+
+msgid "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+msgstr "X11-genvägar rekommenderas inte och kan göra att tangentbordet slutar svara. Genvägar bör vanligtvis användas via MPRIS2/KGlobalAccel."
+
+msgid "Collection advanced grouping"
+msgstr "Avancerad gruppering av samling"
+
+msgid "You can change the way the songs in the collection are organized."
+msgstr "Du kan ändra hur låtarna i samlingen organiseras."
+
+msgid "Group Collection by..."
+msgstr "Gruppera samling efter…"
+
+msgid "First level"
+msgstr "Första nivå"
+
+msgid "Album - Disc"
+msgstr "Album – skiva"
+
+msgid "Format"
+msgstr "Format"
+
+msgid "Year - Album"
+msgstr "År – album"
+
+msgid "Year - Album - Disc"
+msgstr "År – album – skiva"
+
+msgid "Original year"
+msgstr "Originalår"
+
+msgid "Original year - Album"
+msgstr "Originalår - Album"
+
+msgid "Second level"
+msgstr "Andra nivå"
+
+msgid "Third level"
+msgstr "Tredje nivå"
+
+msgid "Separate albums by grouping tag"
+msgstr "Separera album efter grupperingstagg"
+
+msgid "Original year - Album - Disc"
+msgstr "Originalår – album – skiva"
+
+msgid "Buffering"
+msgstr "Buffrar"
+
+msgid "%1 Scrobbler Authentication"
+msgstr "Autentisering för %1-skrobblare"
+
+msgid "Open URL in web browser?"
+msgstr "Öppna URL:en i webbläsaren?"
+
+msgid "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+msgstr "Klicka på \"Spara\" för att kopiera URL:en till urklipp och öppna den manuellt i en webbläsare."
+
+msgid "Could not open URL. Please open this URL in your browser"
+msgstr "Det gick inte att öppna URL:en. Öppna den här URL:en i webbläsaren"
+
+msgid "Invalid reply from web browser. Missing token."
+msgstr "Webbläsaren gav ett ogiltigt svar. Token saknas."
+
+msgid "Received invalid reply from web browser. Try another browser."
+msgstr "Webbläsaren gav ett ogiltigt svar. Försök med en annan webbläsare."
+
+msgid "Scrobbler %1 is not authenticated!"
+msgstr "%1-skrobblaren har inte autentiserats!"
+
+msgid "Scrobbler %1 error: %2"
+msgstr "Fel i skrobblaren %1: %2"
+
+msgid "Least favourite tracks"
+msgstr "Minst omtyckta spår"
+
+msgid "Unable to scrobble %1 - %2 because of error: %3"
+msgstr "Det gick inte att skrobbla %1 - %2 på grund av fel: %3"
+
+msgid "Missing MusicBrainz recording ID for %1 %2 %3"
+msgstr "MusicBrainz-inspelnings-ID saknas för %1 %2 %3"
+
+msgid "ListenBrainz error: %1"
+msgstr "ListenBrainz-fel: %1"
+
+msgid "You are not signed in."
+msgstr "Du är inte inloggad."
+
+msgid "Sign out"
+msgstr "Logga ut"
+
+msgid "Signing in..."
+msgstr "Loggar in…"
+
+msgid "You are signed in."
+msgstr "Du är inloggad."
+
+msgid "You are signed in as %1."
+msgstr "Du är inloggad som %1."
+
+msgid "Expires on %1"
+msgstr "Går ut den %1"
+
+msgid "Lyrics providers"
+msgstr "Låttextleverantörer"
+
+msgid "Choose the providers you want to use when searching for lyrics."
+msgstr "Välj vilka leverantörer du vill använda när du söker efter låttexter."
+
+msgid "Strawberry Music Player"
+msgstr "Strawberry Music Player"
+
+msgid "&Music"
+msgstr "&Musik"
+
+msgid "P&laylist"
+msgstr "&Spellista"
+
+msgid "Help"
+msgstr "Hjälp"
+
+msgid "&Tools"
+msgstr "&Verktyg"
+
+msgid "F5"
+msgstr "F5"
+
+msgid "&Play"
+msgstr "&Spela"
+
+msgid "F6"
+msgstr "F6"
+
+msgid "&Stop"
+msgstr "&Stoppa"
+
+msgid "F7"
+msgstr "F7"
+
+msgid "&Next track"
+msgstr "&Nästa spår"
+
+msgid "F8"
+msgstr "F8"
+
+msgid "&Quit"
+msgstr "A&vsluta"
+
+msgid "Ctrl+Q"
+msgstr "Ctrl+Q"
+
+msgid "Stop after this track"
+msgstr "Stoppa efter det här spåret"
+
+msgid "Ctrl+Alt+V"
+msgstr "Ctrl+Alt+V"
+
+msgid "&Clear playlist"
+msgstr "&Rensa spellista"
+
+msgid "Clear playlist"
+msgstr "Rensa spellista"
+
+msgid "Ctrl+K"
+msgstr "Ctrl+K"
+
+msgid "Ctrl+E"
+msgstr "Ctrl+E"
+
+msgid "Renumber tracks in this order..."
+msgstr "Omnumrera spår i den här ordningen…"
+
+msgid "Set value for all selected tracks..."
+msgstr "Ställ in värde för alla valda spår…"
+
+msgid "Edit tag..."
+msgstr "Redigera tagg…"
+
+msgid "&Settings..."
+msgstr "&Inställningar…"
+
+msgid "Ctrl+P"
+msgstr "Ctrl+P"
+
+msgid "&About Strawberry"
+msgstr "&Om Strawberry"
+
+msgid "F1"
+msgstr "F1"
+
+msgid "S&huffle playlist"
+msgstr "B&landa spellista"
+
+msgid "&Add file..."
+msgstr "&Lägg till fil…"
+
+msgid "Ctrl+Shift+A"
+msgstr "Ctrl+Skift+A"
+
+msgid "&Open file..."
+msgstr "&Öppna fil…"
+
+msgid "Open audio &CD..."
+msgstr "Öppna &ljud-CD…"
+
+msgid "&Cover Manager"
+msgstr "&Omslagshanterare"
+
+msgid "C&onsole"
+msgstr "K&onsol"
+
+msgid "&Shuffle mode"
+msgstr "&Blandningsläge"
+
+msgid "&Repeat mode"
+msgstr "&Upprepningsläge"
+
+msgid "Remove from playlist"
+msgstr "Ta bort från spellista"
+
+msgid "&Equalizer"
+msgstr "&Frekvenskorrigering"
+
+msgid "&Transcode Music"
+msgstr "&Koda om musik"
+
+msgid "Add &folder..."
+msgstr "Lägg till &mapp…"
+
+msgid "&Jump to the currently playing track"
+msgstr "&Hoppa till det spår som spelas"
+
+msgid "Ctrl+J"
+msgstr "Ctrl+J"
+
+msgid "&New playlist"
+msgstr "&Ny spellista"
+
+msgid "Ctrl+N"
+msgstr "Ctrl+N"
+
+msgid "Save &playlist..."
+msgstr "Spara &spellista…"
+
+msgid "Ctrl+S"
+msgstr "Ctrl+S"
+
+msgid "&Load playlist..."
+msgstr "&Läs in spellista…"
+
+msgid "Ctrl+Shift+O"
+msgstr "Ctrl+Skift+O"
+
+msgid "&Save all playlists..."
+msgstr "&Spara alla spellistor…"
+
+msgid "Go to next playlist tab"
+msgstr "Gå till nästa spellisteflik"
+
+msgid "Go to previous playlist tab"
+msgstr "Gå till föregående spellisteflik"
+
+msgid "&Update changed collection folders"
+msgstr "&Uppdatera ändrade samlingsmappar"
+
+msgid "About &Qt"
+msgstr "Om &Qt"
+
+msgid "&Mute"
+msgstr "&Ljud av"
+
+msgid "Ctrl+M"
+msgstr "Ctrl+M"
+
+msgid "&Do a full collection rescan"
+msgstr "&Gör en fullständig omskanning av samlingen"
+
+msgid "Stop collection scan"
+msgstr "Stoppa skanningen av samlingen"
+
+msgid "Complete tags automatically..."
+msgstr "Fyll i taggar automatiskt…"
+
+msgid "Ctrl+T"
+msgstr "Ctrl+T"
+
+msgid "Toggle scrobbling"
+msgstr "Växla skrobbling"
+
+msgid "Remove &duplicates from playlist"
+msgstr "Ta bort &dubbletter från spellista"
+
+msgid "Remove &unavailable tracks from playlist"
+msgstr "Ta bort &otillgängliga spår från spellista"
+
+msgid "Add file(s) to transcoder"
+msgstr "Lägg till filer i omkodaren"
+
+msgid "Add file to transcoder"
+msgstr "Lägg till fil i omkodaren"
+
+msgid "Add stream..."
+msgstr "Lägg till flöde…"
+
+msgid "Show sidebar"
+msgstr "Visa sidofält"
+
+msgid "Queue"
+msgstr "Kö"
+
+msgid "Playlists"
+msgstr "Spellistor"
+
+msgid "Smart playlists"
+msgstr "Smarta spellistor"
+
+msgid "Radios"
+msgstr "Radiokanaler"
+
+msgid "Devices"
+msgstr "Enheter"
+
+msgid "Subsonic"
+msgstr "Subsonic"
+
+msgid "Tidal"
+msgstr "Tidal"
+
+msgid "Spotify"
+msgstr "Spotify"
+
+msgid "Qobuz"
+msgstr "Qobuz"
+
+msgid "Show all songs"
+msgstr "Visa alla låtar"
+
+msgid "Show only duplicates"
+msgstr "Visa endast dubbletter"
+
+msgid "Show only untagged"
+msgstr "Visa endast utan taggar"
+
+msgid "Configure collection..."
+msgstr "Anpassa samling…"
+
+msgid "Toggle queue status"
+msgstr "Växla köstatus"
+
+msgid "Queue selected tracks to play next"
+msgstr "Lägg till valda spår i kön för att spela som nästa"
+
+msgid "Toggle skip status"
+msgstr "Växla överhoppningsstatus"
+
+msgid "Rescan song(s)..."
+msgstr "Skanna om låtar…"
+
+msgid "Fetch metadata from service"
+msgstr "Hämta metadata från tjänst"
+
+msgid "Copy URL(s)..."
+msgstr "Kopiera URL:er…"
+
+msgid "Show in collection..."
+msgstr "Visa i samlingen…"
+
+msgid "Check for updates..."
+msgstr "Sök efter uppdateringar…"
+
+msgid "Strawberry running under Rosetta"
+msgstr "Strawberry körs under Rosetta"
+
+msgid "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+msgstr "Du kör Strawberry under Rosetta. Att köra Strawberry under Rosetta stöds inte och är känt för att ha problem. Du bör hämta Strawberry för korrekt CPU-arkitektur från %1"
+
+msgid "Sponsoring Strawberry"
+msgstr "Sponsring av Strawberry"
+
+msgid "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+msgstr "Strawberry är fri programvara med öppen källkod. Om du gillar Strawberry kan du överväga att sponsra projektet. För mer information om sponsring, se vår webbplats %1"
+
+msgid "Dequeue track"
+msgstr "Ta bort spår från kön"
+
+msgid "Dequeue selected tracks"
+msgstr "Ta bort valda spår från kön"
+
+msgid "Queue selected tracks"
+msgstr "Lägg till valda spår i kön"
+
+msgid "Unskip track"
+msgstr "Hoppa inte över valt spår"
+
+msgid "Unskip selected tracks"
+msgstr "Hoppa inte över valda spår"
+
+msgid "Skip track"
+msgstr "Hoppa över spår"
+
+msgid "Skip selected tracks"
+msgstr "Hoppa över valda spår"
+
+msgid "Set %1 to \"%2\"..."
+msgstr "Ställ in %1 på \"%2\"…"
+
+msgid "Edit tag \"%1\"..."
+msgstr "Redigera taggen \"%1\"…"
+
+msgid "Add to another playlist"
+msgstr "Lägg till i en annan spellista"
+
+msgid "New playlist"
+msgstr "Ny spellista"
+
+msgid "Add file"
+msgstr "Lägg till fil"
+
+msgid "Music"
+msgstr "Musik"
+
+msgid "Add folder"
+msgstr "Lägg till mapp"
+
+msgid "Playlist has %1 songs, too large to undo, are you sure you want to clear the playlist?"
+msgstr "Spellistan har %1 låtar, vilket är för många för att åtgärden ska kunna ångras. Är du säker på att du vill rensa spellistan?"
+
+msgid "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:"
+msgstr "Den version av Strawberry som du just har uppdaterat till kräver en fullständig omskanning av samlingen på grund av de nya funktionerna nedan:"
+
+msgid "Would you like to run a full rescan right now?"
+msgstr "Vill du köra en fullständig omskanning nu?"
+
+msgid "Collection rescan notice"
+msgstr "Meddelande om omskanning av samlingen"
+
+msgid "Ctrl+Shift+H"
+msgstr "Ctrl+Skift+H"
+
+msgid "Go to last playlist tab"
+msgstr "Gå till den sista spellistefliken"
+
+msgid "Go to active playlist tab"
+msgstr "Gå till den aktiva spellistefliken"
+
+msgid "Close current playlist tab"
+msgstr "Stäng den aktuella spellistefliken"
+
+msgid "Message Dialog"
+msgstr "Meddelandedialogruta"
+
+msgid "Do not show this message again."
+msgstr "Visa inte det här meddelandet igen."
+
+msgid "Playlist"
+msgstr "Spellista"
+
+msgid "Moodbar"
+msgstr "Stämningsdiagram"
+
+msgid "Moodbar style"
+msgstr "Stil på stämningsdiagrammet"
+
+msgid "Save the .mood files directly in the songs folders"
+msgstr "Spara .mood-filerna direkt i låtmapparna"
+
+msgid "Invalid MTP device: %1"
+msgstr "Ogiltig MTP-enhet: %1"
+
+msgid "Could not open MTP device."
+msgstr "Det gick inte att öppna MTP-enheten."
+
+msgid "MTP error: %1"
+msgstr "MTP-fel: %1"
+
+msgid "MTP device not found."
+msgstr "MTP-enheten hittades inte."
+
+msgid "Loading MTP device"
+msgstr "Läser in MTP-enhet"
+
+msgid "Error connecting MTP device %1"
+msgstr "Fel vid anslutning av MTP-enhet %1"
+
+msgid "Error connecting MTP device %1: %2"
+msgstr "Fel vid anslutning till MTP-enheten %1: %2"
+
+msgid "Network Proxy"
+msgstr "Nätverksproxy"
+
+msgid "&Use the system proxy settings"
+msgstr "&Använd systemets proxyinställningar"
+
+msgid "Direct internet connection"
+msgstr "Direkt internetanslutning"
+
+msgid "&Manual proxy configuration"
+msgstr "&Manuell proxykonfiguration"
+
+msgid "HTTP proxy"
+msgstr "HTTP-proxy"
+
+msgid "SOCKS proxy"
+msgstr "SOCKS-proxy"
+
+msgid "Port"
+msgstr "Port"
+
+msgid "Use authentication"
+msgstr "Använd autentisering"
+
+msgid "Username"
+msgstr "Användarnamn"
+
+msgid "Password"
+msgstr "Lösenord"
+
+msgid "Use proxy settings for streaming"
+msgstr "Använd proxyinställningar för strömning"
+
+msgid "Only HTTP proxy is supported for streaming."
+msgstr "Endast HTTP-proxy stöds för strömning."
+
+msgid "Notifications"
+msgstr "Aviseringar"
+
+msgid "Strawberry can show a message when the track changes."
+msgstr "Strawberry kan visa ett meddelande vid byte av spår."
+
+msgid "Notification type"
+msgstr "Aviseringstyp"
+
+#. Refers to a disabled notification type in Notification settings.
+msgid "Disabled"
+msgstr "Inaktiverad"
+
+msgid "Show a &native desktop notification"
+msgstr "Visa en &systemavisering"
+
+msgid "Show a pretty OSD"
+msgstr "Visa en snygg avisering"
+
+msgid "Show a popup fro&m the system tray"
+msgstr "Visa ett popupfönster fr&ån systemfältet"
+
+msgid "General settings"
+msgstr "Allmänna inställningar"
+
+msgid "Popup duration"
+msgstr "Popup-varaktighet"
+
+msgid " seconds"
+msgstr " sekunder"
+
+msgid "Disable duration"
+msgstr "Inaktivera varaktighet"
+
+msgid "Show a notification when I change the volume"
+msgstr "Visa en avisering när jag ändrar volymen"
+
+msgid "Show a notification when I change the repeat/shuffle mode"
+msgstr "Visa en avisering när jag ändrar upprepnings-/blandningsläge"
+
+msgid "Show a notification when I pause playback"
+msgstr "Visa en avisering när jag pausar uppspelningen"
+
+msgid "Show a notification when I resume playback"
+msgstr "Visa en avisering när jag återupptar uppspelningen"
+
+msgid "Include album art in the notification"
+msgstr "Inkludera albumomslag i aviseringen"
+
+msgid "Custom message settings"
+msgstr "Anpassade meddelandeinställningar"
+
+msgid "Use a custom message for notifications"
+msgstr "Använd ett eget meddelande för aviseringar"
+
+msgid "Body"
+msgstr "Brödtext"
+
+msgid "Pretty OSD options"
+msgstr "Alternativ för snygg avisering"
+
+msgid "Background color"
+msgstr "Bakgrundsfärg"
+
+msgid "Text options"
+msgstr "Textalternativ"
+
+msgid "Choose font..."
+msgstr "Välj typsnitt…"
+
+msgid "Choose color..."
+msgstr "Välj färg…"
+
+msgid "Background opacity"
+msgstr "Bakgrundsopacitet"
+
+msgid "Basic Blue"
+msgstr "Basblå"
+
+msgid "Strawberry Red"
+msgstr "Jordgubbsröd"
+
+msgid "Custom..."
+msgstr "Anpassad…"
+
+msgid "Enable fading"
+msgstr "Aktivera toning"
+
+msgid "%originalyear%"
+msgstr "%originalyear%"
+
+msgid "OSD Preview"
+msgstr "Förhandsvisning av avisering"
+
+msgid "Drag to reposition"
+msgstr "Dra för att ändra position"
+
+msgid "Discord"
+msgstr "Discord"
+
+msgid "Enable Rich Presence"
+msgstr "Aktivera Rich Presence"
+
+msgid "\"Listening to...\""
+msgstr "\"Lyssnar på…\""
+
+msgid "Strawberry"
+msgstr "Strawberry"
+
+msgid "Artist name"
+msgstr "Artistnamn"
+
+msgid "Song title"
+msgstr "Låttitel"
+
+msgid "Please open this URL in your browser"
+msgstr "Öppna den här URL:en i webbläsaren"
+
+msgid "Received invalid reply from web browser."
+msgstr "Webbläsaren gav ett ogiltigt svar."
+
+msgid "Redirect URL is missing query."
+msgstr "Omdirigerings-URL:en saknar en frågesträng."
+
+msgid "Request URL is missing code!"
+msgstr "Kod saknas i begärans-URL:en!"
+
+msgid "Request URL is missing state!"
+msgstr "Parametern state saknas i begärans-URL:en!"
+
+msgid "Request URL has wrong state %1 != %2"
+msgstr "Begärans-URL:en har fel state-värde: %1 != %2"
+
+msgid "disc %1"
+msgstr "skiva %1"
+
+msgid "track %1"
+msgstr "spår %1"
+
+msgid "Paused"
+msgstr "Pausad"
+
+msgid "Stopped"
+msgstr "Stoppad"
+
+msgid "Stop playing after track: %1"
+msgstr "Stoppa uppspelningen efter spår: %1"
+
+msgid "On"
+msgstr "På"
+
+msgid "Off"
+msgstr "Av"
+
+msgid "Playlist finished"
+msgstr "Spellistan är slut"
+
+msgid "Volume %1%"
+msgstr "Volym %1%"
+
+msgid "Don't shuffle"
+msgstr "Blanda inte"
+
+msgid "Shuffle all"
+msgstr "Blanda alla"
+
+msgid "Shuffle tracks in this album"
+msgstr "Blanda låtar i det här albumet"
+
+msgid "Shuffle albums"
+msgstr "Blanda album"
+
+msgid "Shuffle grouping"
+msgstr "Blanda gruppering"
+
+msgid "Don't repeat"
+msgstr "Upprepa inte"
+
+msgid "Repeat track"
+msgstr "Upprepa spår"
+
+msgid "Repeat album"
+msgstr "Upprepa album"
+
+msgid "Repeat playlist"
+msgstr "Upprepa spellista"
+
+msgid "Stop after every track"
+msgstr "Stoppa efter varje spår"
+
+msgid "Intro tracks"
+msgstr "Introduktionsspår"
+
+msgid "Organizing files"
+msgstr "Organiserar filer"
+
+msgid "Organize Files"
+msgstr "Organisera filer"
+
+msgid "Destination"
+msgstr "Mål"
+
+msgid "After copying..."
+msgstr "Efter kopiering…"
+
+msgid "Keep the original files"
+msgstr "Behåll originalfiler"
+
+msgid "Delete the original files"
+msgstr "Ta bort originalfiler"
+
+msgid "Naming options"
+msgstr "Namngivningsalternativ"
+
+msgid "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+msgstr "<p>Variabler börjar med %, till exempel %artist, %album och %title </p>\n\n<p>Om du omger textavsnitt som innehåller en variabel med klammerparenteser döljs avsnittet om variabeln är tom.</p>"
+
+msgid "Insert..."
+msgstr "Infoga…"
+
+msgid "Remove problematic characters from filenames"
+msgstr "Ta bort problematiska tecken från filnamn"
+
+msgid "Restrict to characters allowed on FAT filesystems"
+msgstr "Begränsa till tecken som är tillåtna i FAT-filsystem"
+
+msgid "Restrict characters to ASCII"
+msgstr "Begränsa tecken till ASCII"
+
+msgid "Allow extended ASCII characters"
+msgstr "Tillåt utökade ASCII-tecken"
+
+msgid "Replace spaces with underscores"
+msgstr "Ersätt mellanslag med understreck"
+
+msgid "Overwrite existing files"
+msgstr "Skriv över befintliga filer"
+
+msgid "Copy album cover artwork"
+msgstr "Kopiera albumomslag"
+
+msgid "Safely remove the device after copying"
+msgstr "Mata ut enheten säkert efter kopieringen"
+
+msgid "Artist's initial"
+msgstr "Artistens initial"
+
+msgid "File extension"
+msgstr "Filändelse"
+
+msgid "Error copying songs"
+msgstr "Fel vid kopiering av låtar"
+
+msgid "There were problems copying some songs.  The following files could not be copied:"
+msgstr "Det uppstod problem när några låtar skulle kopieras. Det gick inte att kopiera följande filer:"
+
+msgid "Error deleting songs"
+msgstr "Fel vid borttagning av låtar"
+
+msgid "There were problems deleting some songs.  The following files could not be deleted:"
+msgstr "Det uppstod problem när några låtar skulle tas bort. Det gick inte att ta bort följande filer:"
+
+msgid "Don't know how to handle %1"
+msgstr "Vet inte hur man hanterar %1"
+
+msgid "File %1 does not exist"
+msgstr "Filen %1 finns inte"
+
+msgid "Could not read file %1: %2"
+msgstr "Det gick inte att läsa filen %1: %2"
+
+msgid "Small album cover"
+msgstr "Litet albumomslag"
+
+msgid "Large album cover"
+msgstr "Stort albumomslag"
+
+msgid "Fit cover to width"
+msgstr "Passa omslag till bredd"
+
+msgid "Show above status bar"
+msgstr "Visa ovanför statusraden"
+
+msgid "Title Sort"
+msgstr "Sortering efter titel"
+
+msgid "Artist Sort"
+msgstr "Sortering efter artist"
+
+msgid "Album Sort"
+msgstr "Sortering efter album"
+
+msgid "Original Year"
+msgstr "Originalår"
+
+msgid "Album Artist"
+msgstr "Albumartist"
+
+msgid "Album Artist Sort"
+msgstr "Sortering efter albumartist"
+
+msgid "Composer Sort"
+msgstr "Sortering efter kompositör"
+
+msgid "Performer Sort"
+msgstr "Sortering av medverkande"
+
+msgid "Play Count"
+msgstr "Antal spelningar"
+
+msgid "Skip Count"
+msgstr "Antal överhoppningar"
+
+msgid "Last Played"
+msgstr "Senast spelad"
+
+msgid "Sample Rate"
+msgstr "Samplingsfrekvens"
+
+msgid "Bit Depth"
+msgstr "Bitdjup"
+
+msgid "Initial key"
+msgstr "Tonart"
+
+msgid "File Name (without path)"
+msgstr "Filnamn (utan sökväg)"
+
+msgid "File Size"
+msgstr "Filstorlek"
+
+msgid "File Type"
+msgstr "Filtyp"
+
+msgid "Date Modified"
+msgstr "Ändrad"
+
+msgid "Date Created"
+msgstr "Skapad"
+
+msgid "Source"
+msgstr "Källa"
+
+msgid "BPM"
+msgstr "BPM"
+
+msgid "Mood"
+msgstr "Stämning"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "CUE"
+msgstr "CUE"
+
+msgid "Integrated Loudness"
+msgstr "Integrerad ljudstyrka"
+
+msgid "Loudness Range"
+msgstr "Ljudstyrkeintervall"
+
+msgid "Undo"
+msgstr "Ångra"
+
+msgid "Redo"
+msgstr "Gör om"
+
+msgid "Load playlist"
+msgstr "Läs in spellista"
+
+msgid "No matches found.  Clear the search box to show the whole playlist again."
+msgstr "Inga träffar hittades. Töm sökrutan för att visa hela spellistan igen."
+
+msgid "stop"
+msgstr "stoppa"
+
+msgid "Loading smart playlist"
+msgstr "Läser in smart spellista"
+
+msgid "&Hide..."
+msgstr "&Dölj…"
+
+msgid "&Stretch columns to fit window"
+msgstr "&Sträck ut kolumner så de passar i fönstret"
+
+msgid "&Reset columns to default"
+msgstr "&Återställ kolumner till standard"
+
+msgid "&Lock rating"
+msgstr "&Lås betyg"
+
+msgid "&Align text"
+msgstr "&Justera text"
+
+msgid "&Left"
+msgstr "&Vänster"
+
+msgid "&Center"
+msgstr "&Centrera"
+
+msgid "&Right"
+msgstr "&Höger"
+
+msgid "&Hide %1"
+msgstr "&Dölj %1"
+
+msgid "New folder"
+msgstr "Ny mapp"
+
+msgid "Delete"
+msgstr "Ta bort"
+
+#. Save playlist menu action.
+msgid "Save playlist"
+msgstr "Spara spellista"
+
+msgid "Enter the name of the folder"
+msgstr "Ange mappens namn"
+
+msgid "Copy songs to playlist"
+msgstr "Kopiera låtar till spellista"
+
+msgid "Copy to device"
+msgstr "Kopiera till enhet"
+
+msgid "Playlist must be open first."
+msgstr "Spellistan måste vara öppen först."
+
+msgid "Remove playlists"
+msgstr "Ta bort spellistor"
+
+msgid "You are about to remove %1 playlists from your favorites, are you sure?"
+msgstr "Du håller på att ta bort %1 spellistor från favoriterna. Är du säker?"
+
+msgid "You can favorite playlists by clicking the star icon next to a playlist name"
+msgstr "Du kan favoritmarkera spellistor genom att klicka på stjärnikonen bredvid spellistans namn"
+
+msgid "Favorited playlists will be saved here"
+msgstr "Favoritmarkerade spellistor sparas här"
+
+msgid "Couldn't create playlist"
+msgstr "Det gick inte att skapa spellistan"
+
+msgid "Unknown playlist extension"
+msgstr "Okänd ändelse för spellista"
+
+msgid "Unknown file extension for playlist."
+msgstr "Okänd filändelse för spellista."
+
+msgid "%1 selected of"
+msgstr "%1 valda av"
+
+msgid "%n track(s)"
+msgid_plural "%n track(s)"
+msgstr[0] "%n spår"
+msgstr[1] "%n spår"
+
+msgid "All playlists (%1)"
+msgstr "Alla spellistor (%1)"
+
+msgid "%1 playlists (%2)"
+msgstr "%1 spellistor (%2)"
+
+msgid "Unknown filetype: %1"
+msgstr "Okänd filtyp: %1"
+
+msgid "Could not open file %1"
+msgstr "Det gick inte att öppna filen %1"
+
+msgid "Directory %1 does not exist."
+msgstr "Mappen %1 finns inte."
+
+msgid "Failed to open %1 for writing."
+msgstr "Det gick inte att öppna %1 för skrivning."
+
+msgid "Playlist options"
+msgstr "Alternativ för spellista"
+
+msgid "File paths"
+msgstr "Filsökvägar"
+
+msgid "This can be changed later through the preferences"
+msgstr "Det här kan ändras senare via inställningarna"
+
+msgid "Remember my choice"
+msgstr "Kom ihåg mitt val"
+
+msgid "Automatic"
+msgstr "Automatisk"
+
+msgid "Relative"
+msgstr "Relativ"
+
+msgid "Absolute"
+msgstr "Absolut"
+
+msgid "Repeat"
+msgstr "Upprepa"
+
+msgid "Shuffle"
+msgstr "Blanda"
+
+msgid "Stop after each track"
+msgstr "Stoppa efter varje låt"
+
+msgid "Use alternating row colors"
+msgstr "Använd alternerande radfärger"
+
+msgid "Show bars on the currently playing track"
+msgstr "Visa staplar på det spår som spelas för närvarande"
+
+msgid "Show a glowing animation on the currently playing track"
+msgstr "Visa en glödande animering på det spår som spelas"
+
+msgid "Warn me when closing a playlist tab"
+msgstr "Varna mig när jag stänger en spellisteflik"
+
+msgid "Continue to the next item in the playlist if a song is unavailable"
+msgstr "Fortsätt till nästa post i spellistan om en låt inte är tillgänglig"
+
+msgid "Grey out unavailable songs in playlists on playback"
+msgstr "Gråmarkera otillgängliga låtar i spellistor vid uppspelning"
+
+msgid "Grey out unavailable songs in playlists on startup"
+msgstr "Gråmarkera otillgängliga låtar i spellistor vid start"
+
+msgid "Automatically select current playing track"
+msgstr "Välj automatiskt det spår som spelas"
+
+msgid "Enable playlist toolbar"
+msgstr "Aktivera verktygsfältet för spellistan"
+
+msgid "Enable playlist clear button"
+msgstr "Aktivera spellistans rensningsknapp"
+
+msgid "Automatically sort playlist when inserting songs"
+msgstr "Sortera spellistan automatiskt när du lägger in låtar"
+
+msgid "When saving a playlist, file paths should be"
+msgstr "När en spellista sparas ska sökvägarna vara"
+
+msgid "A&utomatic"
+msgstr "A&utomatiska"
+
+msgid "Absolu&te"
+msgstr "Absolu&ta"
+
+msgid "Re&lative"
+msgstr "Re&lativa"
+
+msgid "As&k when saving"
+msgstr "Frå&ga när du sparar"
+
+msgid "Metadata"
+msgstr "Metadata"
+
+msgid "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+msgstr "Om alternativet är aktiverat kan du klicka på en markerad låt i spellistan för att redigera taggvärdet direkt"
+
+msgid "Enable song metadata inline edition with click"
+msgstr "Aktivera direktredigering av låtmetadata genom att klicka"
+
+msgid "Write metadata when saving playlists"
+msgstr "Skriv metadata när spellistor sparas"
+
+msgid "Star playlist"
+msgstr "Stjärnmarkera spellista"
+
+msgid "Close playlist"
+msgstr "Stäng spellista"
+
+msgid "Rename playlist..."
+msgstr "Byt namn på spellista…"
+
+msgid "Save playlist..."
+msgstr "Spara spellista…"
+
+msgid "Rename playlist"
+msgstr "Byt namn på spellista"
+
+msgid "Enter a new name for this playlist"
+msgstr "Ange ett nytt namn för den här spellistan"
+
+msgid "Remove playlist"
+msgstr "Ta bort spellista"
+
+msgid "You are about to remove a playlist which is not part of your favorite playlists: the playlist will be deleted (this action cannot be undone). \nAre you sure you want to continue?"
+msgstr "Du är på väg att ta bort en spellista som inte ingår i dina favoritspellistor: spellistan kommer att tas bort (den här åtgärden kan inte ångras).\nÄr du säker på att du vill fortsätta?"
+
+msgid "This option can be changed in the \"Behavior\" preferences"
+msgstr "Det här alternativet kan ändras i inställningarna för \"Beteende\""
+
+msgid "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+msgstr "Dubbelklicka här för att favoritmarkera spellistan så att den sparas och förblir tillgänglig från panelen \"Spellistor\" i det vänstra sidofältet"
+
+msgid "Hz"
+msgstr "Hz"
+
+msgid "Bit"
+msgstr "Bit"
+
+msgid "Usage"
+msgstr "Användning"
+
+msgid "options"
+msgstr "alternativ"
+
+msgid "URL(s)"
+msgstr "URL:er"
+
+msgid "Player options"
+msgstr "Alternativ för spelaren"
+
+msgid "Start the playlist currently playing"
+msgstr "Starta uppspelningen av den aktuella spellistan"
+
+msgid "Play if stopped, pause if playing"
+msgstr "Spela om uppspelningen är stoppad, pausa om den pågår"
+
+msgid "Pause playback"
+msgstr "Pausa uppspelning"
+
+msgid "Stop playback"
+msgstr "Stoppa uppspelning"
+
+msgid "Stop playback after current track"
+msgstr "Stoppa uppspelning efter aktuellt spår"
+
+msgid "Skip backwards in playlist"
+msgstr "Hoppa bakåt i spellistan"
+
+msgid "Skip forwards in playlist"
+msgstr "Hoppa framåt i spellistan"
+
+msgid "Set the volume to <value> percent"
+msgstr "Ställ in volymen till <value> procent"
+
+msgid "Increase the volume by 4 percent"
+msgstr "Höj volymen med 4 procent"
+
+msgid "Decrease the volume by 4 percent"
+msgstr "Sänk volymen med 4 procent"
+
+msgid "Increase the volume by <value> percent"
+msgstr "Höj volymen med <value> procent"
+
+msgid "Decrease the volume by <value> percent"
+msgstr "Sänk volymen med <value> procent"
+
+msgid "Seek the currently playing track to an absolute position"
+msgstr "Flytta uppspelningspositionen i det aktuella spåret till en absolut position"
+
+msgid "Seek the currently playing track by a relative amount"
+msgstr "Flytta uppspelningspositionen i det aktuella spåret med ett relativt värde"
+
+msgid "Restart the track, or play the previous track if within 8 seconds of start."
+msgstr "Starta om spåret, eller spela föregående spår om mindre än 8 sekunder har gått sedan starten."
+
+msgid "Create a new playlist with files"
+msgstr "Skapa en ny spellista med filer"
+
+msgid "Append files/URLs to the playlist"
+msgstr "Lägg till filer/URL:er i spellistan"
+
+msgid "Loads files/URLs, replacing current playlist"
+msgstr "Läs in filer/URL:er och ersätt den aktuella spellistan"
+
+msgid "Play the <n>th track in the playlist"
+msgstr "Spela spår nummer <n> i spellistan"
+
+msgid "Play given playlist"
+msgstr "Spela angiven spellista"
+
+msgid "Other options"
+msgstr "Övriga alternativ"
+
+msgid "Display the on-screen-display"
+msgstr "Visa avisering"
+
+msgid "Toggle visibility for the pretty on-screen-display"
+msgstr "Växla synlighet för snygg avisering"
+
+msgid "Change the language"
+msgstr "Ändra språket"
+
+msgid "Resize the window"
+msgstr "Ändra storlek på fönstret"
+
+msgid "Equivalent to --log-levels *:1"
+msgstr "Motsvarar --log-levels *:1"
+
+msgid "Equivalent to --log-levels *:3"
+msgstr "Motsvarar --log-levels *:3"
+
+msgid "Comma separated list of class:level, level is 0-3"
+msgstr "Kommaseparerad lista över class:level; level är 0-3"
+
+msgid "Print out version information"
+msgstr "Visa versionsinformation"
+
+msgid "Create fingerprint"
+msgstr "Skapa fingeravtryck"
+
+msgid "Failed to create directory %1."
+msgstr "Det gick inte att skapa katalogen %1."
+
+msgid "Destination file %1 exists, but not allowed to overwrite."
+msgstr "Målfilen %1 finns, men får inte skrivas över."
+
+msgid "Destination file %1 exists, but not allowed to overwrite"
+msgstr "Målfilen %1 finns, men får inte skrivas över"
+
+msgid "Could not copy file %1 to %2."
+msgstr "Det gick inte att kopiera filen %1 till %2."
+
+msgid "LUFS"
+msgstr "LUFS"
+
+msgid "LU"
+msgstr "LU"
+
+msgid "1 day"
+msgstr "1 dag"
+
+msgid "%1 days"
+msgstr "%1 dagar"
+
+msgid "Today"
+msgstr "Idag"
+
+msgid "Yesterday"
+msgstr "Igår"
+
+msgid "%1 days ago"
+msgstr "%1 dagar sedan"
+
+msgid "Tomorrow"
+msgstr "Imorgon"
+
+msgid "In %1 days"
+msgstr "Om %1 dagar"
+
+msgid "Next week"
+msgstr "Nästa vecka"
+
+msgid "In %1 weeks"
+msgstr "Om %1 veckor"
+
+msgid "Show in file browser"
+msgstr "Visa i filhanteraren"
+
+msgid "Too many songs selected."
+msgstr "För många låtar valda."
+
+msgid "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+msgstr "%1 låtar i %2 olika mappar har valts. Är du säker på att du vill öppna dem alla?"
+
+msgid "Failed to load image from data for %1"
+msgstr "Det gick inte att läsa in bilden från data för %1"
+
+msgid "Success"
+msgstr "Lyckades"
+
+msgid "File is unsupported"
+msgstr "Filen stöds inte"
+
+msgid "Filename is missing"
+msgstr "Filnamn saknas"
+
+msgid "File does not exist"
+msgstr "Filen finns inte"
+
+msgid "File could not be opened"
+msgstr "Det gick inte att öppna filen"
+
+msgid "Could not parse file"
+msgstr "Det gick inte att tolka filen"
+
+msgid "Could not save file"
+msgstr "Det gick inte att spara filen"
+
+msgid "Unknown error"
+msgstr "Okänt fel"
+
+msgid "Prefix a search term with a field name to limit the search to that field, e.g.:"
+msgstr "Inled en sökterm med ett fältnamn för att begränsa sökningen till det fältet, t.ex.:"
+
+msgid "artist"
+msgstr "artist"
+
+msgid "searches for all artists containing the word %1."
+msgstr "söker efter alla artister som innehåller ordet %1."
+
+msgid "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+msgstr "Söktermer för numeriska fält kan föregås av %1 eller %2 för att förfina sökningen, t.ex.: "
+
+msgid "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+msgstr "Ett ord kan uteslutas genom att föregås av \"%1\". Om du behöver söka efter ett ord som innehåller \"%1\" omger du ordet med citattecken."
+
+msgid "rating"
+msgstr "betyg"
+
+msgid "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+msgstr "Flera söktermer kan också kombineras med \"%1\" (standard) och \"%2\", samt grupperas med parenteser."
+
+msgid "Available fields"
+msgstr "Tillgängliga fält"
+
+msgid "after"
+msgstr "efter"
+
+msgid "before"
+msgstr "före"
+
+msgid "on"
+msgstr "på"
+
+msgid "not on"
+msgstr "inte på"
+
+msgid "in the last"
+msgstr "de senaste"
+
+msgid "not in the last"
+msgstr "inte de senaste"
+
+msgid "between"
+msgstr "mellan"
+
+msgid "contains"
+msgstr "som innehåller"
+
+msgid "does not contain"
+msgstr "som inte innehåller"
+
+msgid "starts with"
+msgstr "som börjar med"
+
+msgid "ends with"
+msgstr "som slutar med"
+
+msgid "greater than"
+msgstr "som är större än"
+
+msgid "less than"
+msgstr "som är mindre än"
+
+msgid "equals"
+msgstr "som är lika med"
+
+msgid "not equals"
+msgstr "inte lika med"
+
+msgid "empty"
+msgstr "tom"
+
+msgid "not empty"
+msgstr "inte tom"
+
+msgid "A-Z"
+msgstr "A-Ö"
+
+msgid "Z-A"
+msgstr "Ö-A"
+
+msgid "oldest first"
+msgstr "äldsta först"
+
+msgid "newest first"
+msgstr "nyaste först"
+
+msgid "shortest first"
+msgstr "kortaste först"
+
+msgid "longest first"
+msgstr "längsta först"
+
+msgid "smallest first"
+msgstr "minsta först"
+
+msgid "biggest first"
+msgstr "största först"
+
+msgid "Hours"
+msgstr "Timmar"
+
+msgid "Days"
+msgstr "Dagar"
+
+msgid "Weeks"
+msgstr "Veckor"
+
+msgid "Months"
+msgstr "Månader"
+
+msgid "Years"
+msgstr "År"
+
+msgid "Normal"
+msgstr "Normal"
+
+msgid "Angry"
+msgstr "Arg"
+
+msgid "Frozen"
+msgstr "Frusen"
+
+msgid "Happy"
+msgstr "Glad"
+
+msgid "System colors"
+msgstr "Systemfärger"
+
+msgid "add %n songs"
+msgid_plural "add %n songs"
+msgstr[0] "lägg till %n låt"
+msgstr[1] "lägg till %n låtar"
+
+msgid "remove %n songs"
+msgid_plural "remove %n songs"
+msgstr[0] "ta bort %n låt"
+msgstr[1] "ta bort %n låtar"
+
+msgid "move %n songs"
+msgid_plural "move %n songs"
+msgstr[0] "flytta %n låt"
+msgstr[1] "flytta %n låtar"
+
+msgid "sort songs"
+msgstr "sortera låtar"
+
+msgid "shuffle songs"
+msgstr "blanda låtar"
+
+msgid "Invalid collection directory"
+msgstr "Ogiltig samlingsmapp"
+
+msgid "Can't add directory %1 with special filesystem %2 to collection"
+msgstr "Det går inte att lägga till mappen %1 med specialfilsystemet %2 i samlingen"
+
+msgid "Clear"
+msgstr "Rensa"
+
+msgid "Reset"
+msgstr "Återställ"
+
+msgid "Not authenticated"
+msgstr "Inte autentiserad"
+
+msgid "No track ID"
+msgstr "Spår-ID saknas"
+
+msgid "Receiving artists..."
+msgstr "Hämtar artister…"
+
+msgid "Receiving albums..."
+msgstr "Hämtar album…"
+
+msgid "Receiving songs..."
+msgstr "Hämtar låtar…"
+
+msgid "Searching..."
+msgstr "Söker…"
+
+msgid "Receiving albums for %1 artist..."
+msgstr "Hämtar album för %1 artist…"
+
+msgid "Receiving albums for %1 artists..."
+msgstr "Hämtar album för %1 artister…"
+
+msgid "Receiving songs for %1 album..."
+msgstr "Hämtar låtar för %1 album…"
+
+msgid "Receiving songs for %1 albums..."
+msgstr "Hämtar låtar för %1 album…"
+
+msgid "Receiving album cover for %1 album..."
+msgstr "Hämtar albumomslag för %1 album…"
+
+msgid "Receiving album covers for %1 albums..."
+msgstr "Hämtar albumomslag för %1 album…"
+
+msgid "No match."
+msgstr "Ingen träff."
+
+msgid "Missing Qobuz app ID."
+msgstr "Qobuz-app-ID saknas."
+
+msgid "Missing app ID. Please fetch credentials first."
+msgstr "App-ID saknas. Hämta autentiseringsuppgifterna först."
+
+msgid "Missing app secret. Please fetch credentials first."
+msgstr "Apphemligheten saknas. Hämta autentiseringsuppgifterna först."
+
+msgid "Missing private key. Please fetch credentials first."
+msgstr "Den privata nyckeln saknas. Hämta autentiseringsuppgifterna först."
+
+msgid "Failed to start local server for OAuth redirect: %1"
+msgstr "Det gick inte att starta den lokala servern för OAuth-omdirigering: %1"
+
+msgid "Failed to open the web browser. Please open this URL manually: %1"
+msgstr "Det gick inte att öppna webbläsaren. Öppna URL:en manuellt: %1"
+
+msgid "Waiting for browser authentication..."
+msgstr "Väntar på autentisering i webbläsaren…"
+
+msgid "OAuth redirect failed: %1"
+msgstr "OAuth-omdirigeringen misslyckades: %1"
+
+msgid "OAuth redirect is missing authorization code."
+msgstr "OAuth-omdirigeringen saknar en auktoriseringskod."
+
+msgid "Exchanging authorization code..."
+msgstr "Växlar in auktoriseringskod…"
+
+msgid "Not authenticated with Qobuz."
+msgstr "Inte autentiserad med Qobuz."
+
+msgid "Missing Qobuz app ID or secret."
+msgstr "Qobuz-app-ID eller hemlighet saknas."
+
+msgid "Not authenticated. Please login to Qobuz in the settings."
+msgstr "Inte autentiserad. Logga in på Qobuz i inställningarna."
+
+msgid "Enable"
+msgstr "Aktivera"
+
+msgid "App ID"
+msgstr "App-ID"
+
+msgid "App Secret"
+msgstr "Apphemlighet"
+
+msgid "Preferences"
+msgstr "Inställningar"
+
+msgid "Audio format"
+msgstr "Ljudformat"
+
+msgid "Search delay"
+msgstr "Sökfördröjning"
+
+msgid "ms"
+msgstr "ms"
+
+msgid "Artists search limit"
+msgstr "Sökgräns för artister"
+
+msgid "Albums search limit"
+msgstr "Sökgräns för album"
+
+msgid "Songs search limit"
+msgstr "Sökgräns för låtar"
+
+msgid "Download album covers"
+msgstr "Hämta albumomslag"
+
+msgid "Configuration incomplete"
+msgstr "Konfigurationen ofullständig"
+
+msgid "Missing app id. Please fetch credentials first."
+msgstr "App-ID saknas. Hämta autentiseringsuppgifterna först."
+
+msgid "Fetching..."
+msgstr "Hämtar…"
+
+msgid "Credentials fetched"
+msgstr "Autentiseringsuppgifterna har hämtats"
+
+msgid "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+msgstr "Autentiseringsuppgifterna har hämtats. Klicka på Logga in för att autentisera via webbläsaren."
+
+msgid "Credential fetch failed"
+msgstr "Det gick inte att hämta autentiseringsuppgifterna"
+
+msgid "Fetch Credentials"
+msgstr "Hämta autentiseringsuppgifter"
+
+msgid "Remove (Remastered), etc from song titles"
+msgstr "Ta bort ”(Remastered)” och liknande från låttitlar"
+
+msgid "Private key"
+msgstr "Privat nyckel"
+
+msgid "Automatically fetch app ID, app secret and private key from Qobuz web player"
+msgstr "Hämta automatiskt app-ID, apphemlighet och privat nyckel från Qobuz-webbspelaren"
+
+msgid "Not authenticated. Please log in on the Qobuz settings page."
+msgstr "Inte autentiserad. Logga in på inställningssidan för Qobuz."
+
+msgid "Cancelled."
+msgstr "Avbruten."
+
+msgid "QueueView"
+msgstr "QueueView"
+
+msgid "Ctrl+Up"
+msgstr "Ctrl+Upp"
+
+msgid "Ctrl+Down"
+msgstr "Ctrl+Ner"
+
+msgid "Remove"
+msgstr "Ta bort"
+
+msgid "Country"
+msgstr "Land"
+
+msgid "Codec"
+msgstr "Kodek"
+
+msgid "Load more..."
+msgstr "Hämta fler…"
+
+msgid "Search for radio stations using radio-browser.info"
+msgstr "Sök efter radiostationer med radio-browser.info"
+
+msgid "Search radio stations..."
+msgstr "Sök efter radiostationer…"
+
+msgid "All countries"
+msgstr "Alla länder"
+
+msgid "By votes"
+msgstr "Efter röster"
+
+msgid "By clicks"
+msgstr "Efter klick"
+
+msgid "By name"
+msgstr "Efter namn"
+
+msgid "By bitrate"
+msgstr "Efter bithastighet"
+
+msgid "No stations found."
+msgstr "Inga stationer hittades."
+
+msgid "%1 stations found"
+msgstr "%1 stationer hittades"
+
+msgid "No Radio Browser server available."
+msgstr "Ingen server för radiokatalogen är tillgänglig."
+
+msgid "Searching Radio Browser"
+msgstr "Söker i radiokatalogen"
+
+msgid "Radio Browser search failed: %1"
+msgstr "Sökningen i radiokatalogen misslyckades: %1"
+
+msgid "Getting %1 channels"
+msgstr "Hämtar %1 kanaler"
+
+msgid "SomaFM"
+msgstr "SomaFM"
+
+msgid "Stream quality:"
+msgstr "Strömningskvalitet:"
+
+msgid "Radio Browser"
+msgstr "Radiokatalog"
+
+msgid "Search results limit:"
+msgstr "Gräns för sökresultat:"
+
+msgid "Hide broken stations"
+msgstr "Dölj stationer som inte fungerar"
+
+msgid "Default sort order:"
+msgstr "Standardsortering:"
+
+msgid "Default country:"
+msgstr "Standardland:"
+
+msgid "Highest"
+msgstr "Högsta"
+
+msgid "High"
+msgstr "Hög"
+
+msgid "Low"
+msgstr "Låg"
+
+msgid "Open homepage"
+msgstr "Öppna webbplats"
+
+msgid "Donate"
+msgstr "Donera"
+
+msgid "Refresh channels"
+msgstr "Uppdatera kanaler"
+
+msgid "Channels"
+msgstr "Kanaler"
+
+msgid "Select directory for saving playlists"
+msgstr "Välj mapp där spellistorna ska sparas"
+
+msgid "Type"
+msgstr "Typ"
+
+msgid "Select directory for the playlists"
+msgstr "Välj mapp för spellistorna"
+
+msgid "Directory does not exist."
+msgstr "Mappen finns inte."
+
+msgid "Saved Grouping Manager"
+msgstr "Hanterare för sparade grupperingar"
+
+msgid "Second Level"
+msgstr "Andra nivå"
+
+msgid "Third Level"
+msgstr "Tredje nivå"
+
+msgid "Scrobbler"
+msgstr "Skrobblare"
+
+msgid "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+msgstr "Låtar skrobblas om de har giltiga metadata, är längre än 30 sekunder och har spelats i minst halva sin längd eller i fyra minuter, beroende på vilket som inträffar först."
+
+msgid "Show scrobble button"
+msgstr "Visa skrobblingsknapp"
+
+msgid "Show love button"
+msgstr "Visa gilla-knapp"
+
+msgid "Submit scrobbles every"
+msgstr "Skicka skrobblingar varje"
+
+msgid "Prefer album artist when sending scrobbles"
+msgstr "Föredra albumartist vid sändning av skrobblingar"
+
+msgid "Show dialog for errors"
+msgstr "Visa en dialogruta vid fel"
+
+msgid "Strip \"remastered\" and similar from album and title"
+msgstr "Ta bort \"remastered\" och liknande från album- och låttitlar"
+
+msgid "Enable scrobbling for the following sources:"
+msgstr "Aktivera skrobbling för följande källor:"
+
+msgid "Local file"
+msgstr "Lokal fil"
+
+msgid "CDDA"
+msgstr "CD-ljud"
+
+msgid "Stream"
+msgstr "Flöde"
+
+msgid "Radio Paradise"
+msgstr "Radio Paradise"
+
+msgid "Last.fm"
+msgstr "Last.fm"
+
+msgid "Listenbrainz"
+msgstr "ListenBrainz"
+
+msgid "User token:"
+msgstr "Användartoken:"
+
+msgid "Enter your user token from"
+msgstr "Ange din användartoken från"
+
+msgid "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+msgstr "När det här alternativet är aktiverat sparas skrobblingar lokalt på disken men skickas inte till servern. Alternativet kan användas när servern eller internetanslutningen är instabil. Skrobblingarna skickas när alternativet inaktiveras."
+
+msgid "Offline mode (Only cache scrobbles)"
+msgstr "Frånkopplat läge (spara endast skrobblingar i cacheminnet)"
+
+msgid "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+msgstr "Detta är fördröjningen mellan att en låt skrobblas och att skrobblingarna skickas till servern. Om tiden ställs in på 0 sekunder skickas skrobblingarna omedelbart."
+
+msgid "Settings"
+msgstr "Inställningar"
+
+msgid "General"
+msgstr "Allmänt"
+
+msgid "User interface"
+msgstr "Användargränssnitt"
+
+msgid "Streaming"
+msgstr "Strömning"
+
+msgid "Search mode"
+msgstr "Sökläge"
+
+msgid "Match every search term (AND)"
+msgstr "Matcha varje sökterm (OCH)"
+
+msgid "Match one or more search terms (OR)"
+msgstr "Matcha en eller flera söktermer (ELLER)"
+
+msgid "Include all songs"
+msgstr "Inkludera alla spår"
+
+msgid "Search terms"
+msgstr "Söktermer"
+
+msgid "Sorting"
+msgstr "Sortering"
+
+msgid "Put songs in a random order"
+msgstr "Lägg låtarna i slumpmässig ordning"
+
+msgid "Sort songs by"
+msgstr "Sortera låtar efter"
+
+msgid "Limits"
+msgstr "Begränsningar"
+
+msgid "Show all the songs"
+msgstr "Visa alla låtarna"
+
+msgid "Only show the first"
+msgstr "Visa endast de första"
+
+msgid " songs"
+msgstr " låtar"
+
+msgid "Collection search"
+msgstr "Samlingssökning"
+
+msgid "Find songs in your collection that match the criteria you specify."
+msgstr "Hitta låtar i din samling som matchar de kriterier du anger."
+
+msgid "A song will be included in the playlist if it matches these conditions."
+msgstr "En låt kommer att inkluderas i spellistan om den uppfyller dessa villkor."
+
+msgid "Search options"
+msgstr "Sökalternativ"
+
+msgid "Choose how the playlist is sorted and how many songs it will contain."
+msgstr "Välj hur spellistan ska sorteras och hur många låtar den ska innehålla."
+
+msgid "%1 songs found (showing %2)"
+msgstr "%1 låtar hittades (visar %2)"
+
+msgid "%1 songs found"
+msgstr "%1 låtar hittades"
+
+msgid "and"
+msgstr "och"
+
+msgid "ago"
+msgstr "sedan"
+
+msgid "The second value must be greater than the first one!"
+msgstr "Det andra värdet måste vara större än det första!"
+
+msgid "Add search term"
+msgstr "Lägg till sökterm"
+
+msgid "Smart playlist"
+msgstr "Smart spellista"
+
+msgid "Playlist type"
+msgstr "Spellistetyp"
+
+msgid "A smart playlist is a dynamic list of songs that come from your collection.  There are different types of smart playlist that offer different ways of selecting songs."
+msgstr "En smart spellista är en dynamisk lista över låtar från din samling. Det finns olika typer av smarta spellistor som väljer låtar på olika sätt."
+
+msgid "Finish"
+msgstr "Avsluta"
+
+msgid "Choose a name for your smart playlist"
+msgstr "Välj ett namn för din smarta spellista"
+
+msgid "Use dynamic mode"
+msgstr "Aktivera dynamiskt läge"
+
+msgid "In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes."
+msgstr "I dynamiskt läge väljs nya spår och läggs till i spellistan varje gång en låt tar slut."
+
+msgid "Newest tracks"
+msgstr "Nyaste spåren"
+
+msgid "50 random tracks"
+msgstr "50 slumpmässiga spår"
+
+msgid "Ever played"
+msgstr "Har spelats"
+
+msgid "Never played"
+msgstr "Har aldrig spelats"
+
+msgid "Most played"
+msgstr "Mest spelade"
+
+msgid "Favourite tracks"
+msgstr "Favoritspår"
+
+msgid "All tracks"
+msgstr "Alla spår"
+
+msgid "Dynamic random mix"
+msgstr "Dynamisk slumpmix"
+
+msgid "New smart playlist"
+msgstr "Ny smart spellista"
+
+msgid "Edit smart playlist"
+msgstr "Redigera smart spellista"
+
+msgid "Delete smart playlist"
+msgstr "Ta bort smart spellista"
+
+msgid "New smart playlist..."
+msgstr "Ny smart spellista…"
+
+msgid "Play next"
+msgstr "Spela nästa"
+
+msgid "Edit smart playlist..."
+msgstr "Redigera smart spellista…"
+
+msgid "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+msgstr "Vill du verkligen återställa de smarta standardspellistorna? Alla anpassade smarta spellistor tas bort"
+
+msgid "Restore defaults"
+msgstr "Återställ standardvärden"
+
+msgid "Preload function was not set for blocking operation."
+msgstr "Förinläsningsfunktionen var inte inställd för en blockerande åtgärd."
+
+msgid "File %1 does not exist."
+msgstr "Filen %1 finns inte."
+
+msgid "Could not open file %1 for reading: %2"
+msgstr "Det gick inte att öppna filen %1 för läsning: %2"
+
+msgid "Could not open CUE file %1 for reading: %2"
+msgstr "Det gick inte att öppna CUE-filen %1 för läsning: %2"
+
+msgid "Could not open playlist file %1 for reading: %2"
+msgstr "Det gick inte att öppna spellistefilen %1 för läsning: %2"
+
+msgid "Couldn't create GStreamer source element for %1"
+msgstr "Det gick inte att skapa GStreamer-källelementet för %1"
+
+msgid "Couldn't create GStreamer typefind element for %1"
+msgstr "Det gick inte att skapa GStreamer-typefind-elementet för %1"
+
+msgid "Couldn't create GStreamer fakesink element for %1"
+msgstr "Det gick inte att skapa GStreamer-fakesink-elementet för %1"
+
+msgid "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+msgstr "Det gick inte att länka GStreamer-elementen source, typefind och fakesink för %1"
+
+msgid "Missing CDDA playback."
+msgstr "CDDA-uppspelning saknas."
+
+msgid "Error while loading audio CD."
+msgstr "Fel vid inläsning av ljud-CD."
+
+msgid "Loading tracks info"
+msgstr "Läser in låtinformation"
+
+msgid "No pending song for track ID"
+msgstr "Ingen väntande låt för detta spår-ID"
+
+msgid "Authenticating..."
+msgstr "Autentiserar…"
+
+msgid "Data missing error"
+msgstr "Fel på grund av saknade data"
+
+msgid "Not authenticated with Spotify."
+msgstr "Inte autentiserad med Spotify."
+
+msgid "Basic authentication"
+msgstr "Grundläggande autentisering"
+
+msgid "Authenticate"
+msgstr "Autentisera"
+
+msgid "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+msgstr "<html><head/><body><p>GStreamer-tillägget för Spotify hittades inte. Du kan inte strömma låtar från Spotify utan det. Se <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">wikin</span></a> för anvisningar om hur du installerar tillägget.</p></body></html>"
+
+msgid "Fetch entire albums when searching songs"
+msgstr "Hämta hela album vid sökning efter låtar"
+
+msgid "The streaming collection is empty!"
+msgstr "Strömningssamlingen är tom!"
+
+msgid "Click here to retrieve music"
+msgstr "Klicka här för att hämta musik"
+
+msgid "Remove from favorites"
+msgstr "Ta bort från favoriter"
+
+msgid "Close"
+msgstr "Stäng"
+
+msgid "Refresh catalogue"
+msgstr "Uppdatera katalogen"
+
+msgid "Streaming Search View"
+msgstr "Sökvy för strömning"
+
+msgid "artists"
+msgstr "artister"
+
+msgid "albums"
+msgstr "album"
+
+msgid "songs"
+msgstr "låtar"
+
+msgid "Enter search terms above to find music"
+msgstr "Ange söktermer ovan för att hitta musik"
+
+msgid "Configure %1..."
+msgstr "Anpassa %1…"
+
+msgid "Add to artists"
+msgstr "Lägg till i artister"
+
+msgid "Add to albums"
+msgstr "Lägg till i album"
+
+msgid "Add to songs"
+msgstr "Lägg till låtar"
+
+msgid "Streaming Tabs View"
+msgstr "Vy med strömningsflikar"
+
+msgid "Artists"
+msgstr "Artister"
+
+msgid "Albums"
+msgstr "Album"
+
+msgid "Songs"
+msgstr "Låtar"
+
+msgid "Retrieving albums..."
+msgstr "Hämtar album…"
+
+msgid "Retrieving songs for %1 album..."
+msgstr "Hämtar låtar för %1 album…"
+
+msgid "Retrieving songs for %1 albums..."
+msgstr "Hämtar låtar för %1 album…"
+
+msgid "Retrieving album cover for %1 album..."
+msgstr "Hämtar albumomslag för %1 album…"
+
+msgid "Retrieving album covers for %1 albums..."
+msgstr "Hämtar albumomslag för %1 album…"
+
+msgid "Server URL is invalid."
+msgstr "Serverns URL är ogiltig."
+
+msgid "Missing username or password."
+msgstr "Användarnamn eller lösenord saknas."
+
+msgid "Server URL"
+msgstr "Server-URL"
+
+msgid "Authentication method:"
+msgstr "Autentiseringsmetod:"
+
+msgid "Hex"
+msgstr "Hex"
+
+msgid "MD5 token (Recommended)"
+msgstr "MD5-token (rekommenderas)"
+
+msgid "Use HTTP/2 when possible"
+msgstr "Använd HTTP/2 när det är möjligt"
+
+msgid "Verify server certificate"
+msgstr "Verifiera servercertifikat"
+
+msgid "Use album ID for album covers"
+msgstr "Använd album-ID för albumomslag"
+
+msgid "Server-side scrobbling"
+msgstr "Skrobbling på serversidan"
+
+msgid "Test"
+msgstr "Testa"
+
+msgid "Delete songs"
+msgstr "Ta bort låtar"
+
+msgid "Missing server url, username or password."
+msgstr "Serverns URL, användarnamn eller lösenord saknas."
+
+msgid "Configuration incorrect"
+msgstr "Felaktig konfiguration"
+
+msgid "Test successful!"
+msgstr "Testet lyckades!"
+
+msgid "Test failed!"
+msgstr "Testet misslyckades!"
+
+msgid "Subsonic server URL is invalid."
+msgstr "Subsonic-serverns URL är ogiltig."
+
+msgid "Missing Subsonic username or password."
+msgstr "Användarnamn eller lösenord saknas för Subsonic."
+
+msgid "Stage: %1"
+msgstr "Steg: %1"
+
+msgid "Reason: %1"
+msgstr "Orsak: %1"
+
+msgid "Identifying song"
+msgstr "Identifierar låt"
+
+msgid "Fingerprinting song"
+msgstr "Skapar fingeravtryck för låt"
+
+msgid "Generated fingerprint is empty or invalid"
+msgstr "Det genererade fingeravtrycket är tomt eller ogiltigt"
+
+msgid "Fingerprinting"
+msgstr "Skapar fingeravtryck"
+
+msgid "Fingerprint length: %1"
+msgstr "Fingeravtryckets längd: %1"
+
+msgid "Minimum required length: %1"
+msgstr "Minsta längd som krävs: %1"
+
+msgid "Downloading metadata"
+msgstr "Hämtar metadata"
+
+msgid "No MusicBrainz metadata was found for this track"
+msgstr "Inga metadata från MusicBrainz hittades för det här spåret"
+
+msgid "MusicBrainz metadata"
+msgstr "MusicBrainz-metadata"
+
+msgid "Candidate metadata rows: 0"
+msgstr "Metadata-kandidater: 0"
+
+msgid "Not authenticated with Tidal."
+msgstr "Inte autentiserad med Tidal."
+
+msgid "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+msgstr "Tidal stöds inte officiellt och kräver en API-token från ett registrerat program för att fungera. Vi kan inte hjälpa dig att skaffa en sådan."
+
+msgid "Client ID"
+msgstr "Klient-ID"
+
+msgid "Audio quality"
+msgstr "Ljudkvalitet"
+
+msgid "Album cover size"
+msgstr "Albumomslagets storlek"
+
+msgid "Stream URL method"
+msgstr "Metod för strömnings-URL"
+
+msgid "Append explicit to album title for explicit albums"
+msgstr "Lägg till ”Explicit” i albumtiteln för album med explicit innehåll"
+
+msgid "Missing Tidal client ID."
+msgstr "Tidal-klient-ID saknas."
+
+msgid "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "En URL med en %1-krypterad ström togs emot från Tidal. Strawberry stöder för närvarande inte krypterade strömmar."
+
+msgid "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "En URL med en krypterad ström togs emot från Tidal. Strawberry stöder för närvarande inte krypterade strömmar."
+
+msgid "Tag fetcher"
+msgstr "Tagghämtare"
+
+msgid "Strawberry was unable to find results for this file"
+msgstr "Strawberry hittade inga resultat för den här filen"
+
+msgid "Select best possible match"
+msgstr "Välj bästa möjliga matchning"
+
+msgid "Original tags"
+msgstr "Ursprungliga taggar"
+
+msgid "Suggested tags"
+msgstr "Föreslagna taggar"
+
+msgid "No results"
+msgstr "Inga resultat"
+
+msgid "0:00:00"
+msgstr "0:00:00"
+
+msgid "Click to toggle between remaining time and total time"
+msgstr "Klicka för att växla mellan återstående tid och total tid"
+
+msgid "Waveform"
+msgstr "Vågform"
+
+msgid "Transcode Music"
+msgstr "Koda om musik"
+
+msgid "Files to transcode"
+msgstr "Filer att omkoda"
+
+msgid "Directory"
+msgstr "Mapp"
+
+msgid "Add..."
+msgstr "Lägg till…"
+
+msgid "Add all tracks from a directory and all its subdirectories"
+msgstr "Lägg till alla låtar från en mapp och alla dess undermappar"
+
+msgid "Import..."
+msgstr "Importera…"
+
+msgid "Output options"
+msgstr "Alternativ för utmatning"
+
+msgid "Options..."
+msgstr "Alternativ…"
+
+msgid "Alongside the originals"
+msgstr "Tillsammans med originalfilerna"
+
+msgid "Select..."
+msgstr "Välj…"
+
+msgid "Progress"
+msgstr "Förlopp"
+
+msgid "Details..."
+msgstr "Detaljer…"
+
+msgid "Start transcoding"
+msgstr "Starta omkodning"
+
+msgid "%n remaining"
+msgid_plural "%n remaining"
+msgstr[0] "%n återstår"
+msgstr[1] "%n återstår"
+
+msgid "%n finished"
+msgid_plural "%n finished"
+msgstr[0] "%n är klar"
+msgstr[1] "%n är klara"
+
+msgid "%n failed"
+msgid_plural "%n failed"
+msgstr[0] "%n misslyckades"
+msgstr[1] "%n misslyckades"
+
+msgid "Add files to transcode"
+msgstr "Lägg till filer för omkodning"
+
+msgid "Open a directory to import music from"
+msgstr "Öppna en mapp att importera musik från"
+
+msgid "Import Directory"
+msgstr "Importera mapp"
+
+msgid "Preserve directory structure in output directory (import only)"
+msgstr "Bevara mappstrukturen i utmatningsmappen (endast import)"
+
+msgid "Transcoder Log"
+msgstr "Omkodningslogg"
+
+msgid "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+msgstr "Det gick inte att skapa GStreamer-elementet \"%1\". Kontrollera att alla nödvändiga GStreamer-insticksmoduler är installerade"
+
+msgid "Successfully written %1"
+msgstr "Skrev %1 utan fel"
+
+msgid "Transcoding %1 files using %2 threads"
+msgstr "Omkodar %1 filer med %2 trådar"
+
+msgid "Error processing %1: %2"
+msgstr "Fel vid bearbetning av %1: %2"
+
+msgid "Starting %1"
+msgstr "Startar %1"
+
+msgid "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+msgstr "Det gick inte att hitta någon kodare för %1. Kontrollera att rätt GStreamer-insticksmoduler är installerade"
+
+msgid "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+msgstr "Det gick inte att hitta någon muxer för %1. Kontrollera att rätt GStreamer-insticksmoduler är installerade"
+
+msgid " kbps"
+msgstr " kbps"
+
+msgid "Profile"
+msgstr "Profil"
+
+msgid "Main profile (MAIN)"
+msgstr "Huvudprofil (MAIN)"
+
+msgid "Low complexity profile (LC)"
+msgstr "Profil med låg komplexitet (LC)"
+
+msgid "Scalable sampling rate profile (SSR)"
+msgstr "Profil med skalbar samplingsfrekvens (SSR)"
+
+msgid "Long term prediction profile (LTP)"
+msgstr "Profil med långtidsprediktion (LTP)"
+
+msgid "Use temporal noise shaping"
+msgstr "Använd tidsbaserad brusformning"
+
+msgid "Allow mid/side encoding"
+msgstr "Tillåt mid/side-kodning"
+
+msgid "Block type"
+msgstr "Blocktyp"
+
+msgid "Normal block type"
+msgstr "Normal blocktyp"
+
+msgid "No short blocks"
+msgstr "Inga korta block"
+
+msgid "No long blocks"
+msgstr "Inga långa block"
+
+msgid "Transcoding options"
+msgstr "Alternativ för omkodning"
+
+#. Sound quality
+msgid "Quality"
+msgstr "Kvalitet"
+
+msgid "Fast"
+msgstr "Snabb"
+
+msgid "Best"
+msgstr "Bästa"
+
+msgid "Optimize for &quality"
+msgstr "Optimera för &kvalitet"
+
+msgid "Opti&mize for bitrate"
+msgstr "Opti&mera för bithastighet"
+
+msgid "Constant bitrate"
+msgstr "Konstant bithastighet"
+
+msgid "Encoding engine quality"
+msgstr "Kodningsmotorns kvalitet"
+
+msgid "Standard"
+msgstr "Standard"
+
+msgid "Force mono encoding"
+msgstr "Tvinga monokodning"
+
+msgid "automatic"
+msgstr "automatisk"
+
+msgid "Average bitrate"
+msgstr "Genomsnittlig bithastighet"
+
+msgid "disabled"
+msgstr "inaktiverad"
+
+msgid "Encoding mode"
+msgstr "Kodningsläge"
+
+msgid "Auto"
+msgstr "Automatisk"
+
+msgid "Ultra wide band (UWB)"
+msgstr "Ultrabredband (UWB)"
+
+msgid "Wide band (WB)"
+msgstr "Bredband (WB)"
+
+msgid "Narrow band (NB)"
+msgstr "Smalband (NB)"
+
+msgid "Variable bit rate"
+msgstr "Variabel bithastighet"
+
+msgid "Voice activity detection"
+msgstr "Detektering av röstaktivitet"
+
+msgid "Discontinuous transmission"
+msgstr "Diskontinuerlig överföring"
+
+msgid "Encoding complexity"
+msgstr "Kodningskomplexitet"
+
+msgid "Frames per buffer"
+msgstr "Ramar per buffert"
+
+msgid "Use bitrate management engine"
+msgstr "Använd motorn för bithastighetshantering"
+
+msgid "Target bitrate"
+msgstr "Målbithastighet"
+
+msgid "Minimum bitrate"
+msgstr "Lägsta bithastighet"
+
+msgid "Maximum bitrate"
+msgstr "Högsta bithastighet"
+
+msgid "Transcoding"
+msgstr "Omkodning"
+
+msgid "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+msgstr "Dessa inställningar används i dialogrutan \"Koda om musik\" och vid konvertering av musik innan den kopieras till en enhet."
+
+msgid "FLAC"
+msgstr "FLAC"
+
+msgid "WavPack"
+msgstr "WavPack"
+
+msgid "Vorbis"
+msgstr "Vorbis"
+
+msgid "Opus"
+msgstr "Opus"
+
+msgid "Speex"
+msgstr "Speex"
+
+msgid "AAC"
+msgstr "AAC"
+
+msgid "ASF (WMA)"
+msgstr "ASF (WMA)"
+
+msgid "MP3"
+msgstr "MP3"
+
+msgid "D-Bus path"
+msgstr "D-Bus-sökväg"
+
+msgid "Serial number"
+msgstr "Serienummer"
+
+msgid "Mount points"
+msgstr "Monteringspunkter"
+
+msgid "Partition label"
+msgstr "Partitionsetikett"
+
+msgid "UUID"
+msgstr "UUID"
+
+msgid "Enter username and password"
+msgstr "Ange användarnamn och lösenord"
+
+msgid "Color"
+msgstr "Färg"
+
+msgid "Select waveform color"
+msgstr "Välj färg på vågformen"
+
+msgid "Save the .waveform files directly in the songs folders"
+msgstr "Spara .waveform-filerna direkt i låtmapparna"
+
+msgid "Failed to write XSPF playlist"
+msgstr "Det gick inte att skriva XSPF-spellistan"
+

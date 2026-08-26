@@ -59,6 +59,7 @@ class Player : public PlayerInterface {
   Signal<> Paused;
   Signal<> Playing;
   Signal<> Stopped;
+  Signal<> PlaylistFinished;
 
  private:
   void HandleEngineState(EngineBase::State state);

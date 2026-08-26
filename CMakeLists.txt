@@ -106,7 +106,8 @@ optional_component(SPOTIFY ON "Streaming: Spotify")
 optional_component(QOBUZ ON "Streaming: Qobuz")
 optional_component(DISCORD_RPC ON "Discord Rich Presence")
 optional_component(GLOBALSHORTCUTS ON "Global keyboard shortcuts")
-optional_component(TRANSLATIONS OFF "Translations")
+find_program(MSGFMT msgfmt)
+optional_component(TRANSLATIONS ON "Translations" DEPENDS "msgfmt" MSGFMT)
 
 if(LINUX)
   find_package(X11)
@@ -741,6 +742,7 @@ if(GTest_FOUND)
     tests/src/playlist_test.cpp
     tests/src/playlistmanager_test.cpp
     tests/src/systemtrayicon_test.cpp
+    tests/src/osd_test.cpp
     tests/src/discord_test.cpp
     tests/src/globalshortcuts_test.cpp
     tests/src/mpris2_test.cpp
@@ -952,6 +954,9 @@ if(GTest_FOUND)
     src/playlist/playlistbackend.cpp
     src/queue/queue.cpp
     src/systemtrayicon/systemtrayicon.cpp
+    src/osd/osdbase.cpp
+    src/osd/osddbus.cpp
+    src/osd/osdpretty.cpp
     src/discord/discord.cpp
     src/playlist/playlistitem.cpp
     src/playlist/songplaylistitem.cpp
@@ -1049,6 +1054,7 @@ if(GTest_FOUND)
     target_link_libraries(strawberry_tests PRIVATE PkgConfig::FFTW3)
   endif()
   if(HAVE_X11)
+    target_include_directories(strawberry_tests PRIVATE ${X11_INCLUDE_DIR})
     target_link_libraries(strawberry_tests PRIVATE ${X11_LIBRARIES})
   endif()
   add_test(NAME strawberry_tests COMMAND strawberry_tests)
@@ -1057,6 +1063,39 @@ if(GTest_FOUND)
     COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
     DEPENDS strawberry_tests
   )
+endif()
+
+if(HAVE_TRANSLATIONS)
+  file(GLOB STRAWBERRY_PO_FILES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/translations/*.po)
+  set(STRAWBERRY_LOCALE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/locale")
+  set(STRAWBERRY_MO_FILES)
+  foreach(po ${STRAWBERRY_PO_FILES})
+    get_filename_component(po_name ${po} NAME_WE)
+    string(REGEX REPLACE "^strawberry_" "" locale "${po_name}")
+    set(mo_dir "${STRAWBERRY_LOCALE_OUTPUT_DIR}/${locale}/LC_MESSAGES")
+    set(mo "${mo_dir}/strawberry.mo")
+    add_custom_command(
+      OUTPUT ${mo}
+      COMMAND ${CMAKE_COMMAND} -E make_directory ${mo_dir}
+      COMMAND ${MSGFMT} -o ${mo} ${po}
+      DEPENDS ${po}
+      VERBATIM
+    )
+    list(APPEND STRAWBERRY_MO_FILES ${mo})
+    if(INSTALL_TRANSLATIONS)
+      install(FILES ${mo} DESTINATION ${CMAKE_INSTALL_LOCALEDIR}/${locale}/LC_MESSAGES)
+    endif()
+  endforeach()
+  add_custom_target(strawberry_translations ALL DEPENDS ${STRAWBERRY_MO_FILES})
+  add_dependencies(strawberry strawberry_translations)
+  target_compile_definitions(strawberry PRIVATE "STRAWBERRY_LOCALE_DIR=\"${STRAWBERRY_LOCALE_OUTPUT_DIR}\"")
+  if(TARGET strawberry_tests)
+    add_dependencies(strawberry_tests strawberry_translations)
+    target_compile_definitions(strawberry_tests PRIVATE
+      "STRAWBERRY_LOCALE_DIR=\"${STRAWBERRY_LOCALE_OUTPUT_DIR}\""
+      "STRAWBERRY_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\""
+    )
+  endif()
 endif()
 
 optional_component_summary_show()

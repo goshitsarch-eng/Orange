@@ -1,0 +1,4463 @@
+# Translation catalog for Strawberry Music Player.
+# Generated from the Qt .ts files on origin/master.
+msgid ""
+msgstr ""
+"Project-Id-Version: strawberry\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-26 00:00+0000\n"
+"PO-Revision-Date: 2026-08-26 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: el_GR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "ASX playlist is too large"
+msgstr "Η λίστα αναπαραγωγής ASX είναι πολύ μεγάλη"
+
+msgid "Failed to write ASX playlist"
+msgstr "Αποτυχία εγγραφής λίστας αναπαραγωγής ASX"
+
+msgid "About"
+msgstr "Σχετικά με την εφαρμογή"
+
+msgid "About Strawberry"
+msgstr "Σχετικά Με Strawberry"
+
+msgid "Version %1"
+msgstr "Έκδοση %1"
+
+msgid "Strawberry is a music player and music collection organizer."
+msgstr "Το Strawberry είναι ένα πρόγραμμα αναπαραγωγής μουσικής και οργάνωσης μουσικής συλλογής."
+
+msgid "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."
+msgstr "Είναι απόγονος του Clementine που κυκλοφόρησε το 2018 και απευθύνεται σε συλλέκτες μουσικής και ηχόφιλους."
+
+msgid "Strawberry is free software released under GPL. The source code is available on %1"
+msgstr "Το Strawberry είναι ελεύθερο λογισμικό που διατίθεται στο πλαίσιο της GPL. Ο πηγαίος κώδικας είναι διαθέσιμος στο %1"
+
+msgid "You should have received a copy of the GNU General Public License along with this program.  If not, see %1"
+msgstr "Θα πρέπει να έχετε λάβει ένα αντίγραφο της Γενικής Άδειας Δημόσιας Χρήσης GNU (GNU General Public License) μαζί με το πρόγραμμα. Αν όχι, ανατρέξτε στην ενότητα %1"
+
+msgid "If you like Strawberry and can make use of it, consider sponsoring or donating."
+msgstr "'Αν σας είναι χρήσιμο το Strawberry εξετάστε το ενδεχόμενο επιχορήγησης ή δωρεά."
+
+msgid "You can sponsor the author on %1 or %2. You can also make a one-time payment through %3."
+msgstr "Μπορείτε να επιχορηγήσετε τον συγγραφέα στο %1 ή %2. Μπορείτε επίσης να κάνετε μια εφάπαξ πληρωμή μέσω του %3."
+
+msgid "Author and maintainer"
+msgstr "Συγγραφέας και συντηρητής"
+
+msgid "Contributors"
+msgstr "Συντελεστές"
+
+msgid "Clementine authors"
+msgstr "Συγγραφείς του Clementine"
+
+msgid "Clementine contributors"
+msgstr "Συντελεστές Clementine"
+
+msgid "Thanks to"
+msgstr "Ευχαριστούμε"
+
+msgid "Thanks to all the other Amarok and Clementine contributors."
+msgstr "Ευχαριστούμε όλους τους άλλους συνεισφέροντες Amarok και Clementine."
+
+msgid "Add Stream"
+msgstr "Προσθήκη Ροής"
+
+msgid "Enter the URL of a stream:"
+msgstr "Εισάγετε το URL μιας ροής:"
+
+msgid "Load cover from disk..."
+msgstr "Φόρτωση εξώφυλλου από δίσκο..."
+
+msgid "Save cover to disk..."
+msgstr "Αποθήκευση εξωφύλλου στο δίσκο..."
+
+msgid "Load cover from URL..."
+msgstr "Φόρτωση εξώφυλλου από URL..."
+
+msgid "Search for album covers..."
+msgstr "Αναζήτηση για καλύμματα άλμπουμ..."
+
+msgid "Unset cover"
+msgstr "Αφαίρεση εξώφυλλου"
+
+msgid "Delete cover"
+msgstr "Διαγραφή εξωφύλλου"
+
+msgid "Clear cover"
+msgstr "Εκκαθάριση εξωφύλλου"
+
+msgid "Show fullsize..."
+msgstr "Show fullsize..."
+
+msgid "Search automatically"
+msgstr "Αυτόματη αναζήτηση"
+
+msgid "Load cover from disk"
+msgstr "Φόρτωση εξώφυλλου από το δίσκο"
+
+msgid "Failed to open cover file %1 for reading: %2"
+msgstr "Αποτυχία ανοίγματος αρχείου εξώφυλλου %1 για ανάγνωση: %2"
+
+msgid "Cover file %1 is empty."
+msgstr "Το αρχείο εξωφύλλου %1 είναι κενό."
+
+msgid "unknown"
+msgstr "άγνωστο"
+
+msgid "Save album cover"
+msgstr "Αποθήκευση εξώφυλλου"
+
+msgid "Failed to open cover file %1 for writing: %2"
+msgstr "Αποτυχία ανοίγματος αρχείου εξώφυλλου %1 για ανάγνωση: %2"
+
+msgid "Failed writing cover to file %1: %2"
+msgstr "Αποτυχία εγγραφής εξωφύλλου στο αρχείο %1: %2"
+
+msgid "Failed writing cover to file %1."
+msgstr "Αποτυχία εγγραφής εξωφύλλου στο αρχείο %1."
+
+msgid "Failed to delete cover file %1: %2"
+msgstr "Αποτυχία διαγραφής αρχείου εξωφύλλου %1: %2"
+
+msgid "Failed to write cover to file %1: %2"
+msgstr "Αποτυχία εγγραφής εξωφύλλου στο αρχείο %1: %2"
+
+msgid "Could not save cover to file %1."
+msgstr "Δεν ήταν δυνατή η αποθήκευση του εξωφύλλου στο αρχείο %1."
+
+msgid "Export covers"
+msgstr "Εξαγωγή εξωφύλλων"
+
+msgid "Output"
+msgstr "Έξοδος"
+
+msgid "Enter a filename for exported covers (no extension):"
+msgstr "Εισάγετε ένα όνομα αρχείου για εξαγώγιμα εξώφυλλα (χωρίς επέκταση):"
+
+msgid "Export downloaded covers"
+msgstr "Εξαγωγή κατεβασμένων εξωφύλλων"
+
+msgid "Export embedded covers"
+msgstr "Εξαγωγή ενσωματωμένων εξώφυλλων"
+
+msgid "Existing covers"
+msgstr "Υπάρχοντα εξώφυλλα"
+
+msgid "Do not overwrite"
+msgstr "Να μην αντικατασταθεί"
+
+msgid "O&verwrite all"
+msgstr "Αντικατάσταση όλων"
+
+msgid "Overwrite s&maller ones only"
+msgstr "Αντικατάσταση μόνο μικρών"
+
+msgid "Size"
+msgstr "Μέγεθος"
+
+msgid "Scale size"
+msgstr "Μέγεθος κλίμακας"
+
+msgid "Size:"
+msgstr "Μέγεθος:"
+
+msgid "Pixel"
+msgstr "Εικονοστοιχείο"
+
+msgid "Abort"
+msgstr "Ματαίωση"
+
+msgid "All albums"
+msgstr "Όλα τα άλμπουμ"
+
+msgid "Albums with covers"
+msgstr "Άλμπουμ με εξώφυλλα"
+
+msgid "Albums without covers"
+msgstr "Άλμπουμ χωρίς εξώφυλλα"
+
+msgid "Really cancel?"
+msgstr "Πραγματικά ακύρωση;"
+
+msgid "Closing this window will stop searching for album covers."
+msgstr "Κλείσιμο αυτού του παραθύρου θα σταματήσει την αναζήτηση για εξώφυλλα άλμπουμ."
+
+msgid "Don't stop!"
+msgstr "Μη παύση!"
+
+msgid "All artists"
+msgstr "Όλοι οι καλλιτέχνες"
+
+msgid "Various artists"
+msgstr "Διάφοροι καλλιτέχνες"
+
+msgid "Got %1 covers out of %2 (%3 failed)"
+msgstr "Ανάκτηση %1 εξωφύλλων από %2 (%3 απέτυχαν)"
+
+msgid "%1 transferred"
+msgstr "%1 μεταφέρθηκε"
+
+msgid "Export finished"
+msgstr "Η εξαγωγή ολοκληρώθηκε"
+
+msgid "No covers to export."
+msgstr "Δεν υπάρχουν εξώφυλλα για εξαγωγή."
+
+msgid "Exported %1 covers out of %2 (%3 skipped)"
+msgstr "Ανάκτηση %1 εξωφύλλων από %2 (%3 απέτυχαν)"
+
+msgid "Cover Manager"
+msgstr "Διαχειριστής Εξωφύλλων"
+
+msgid "Artist"
+msgstr "Καλλιτέχνης"
+
+msgid "Album"
+msgstr "Άλμπουμ"
+
+msgid "Search"
+msgstr "Αναζήτηση"
+
+msgid "Covers from %1"
+msgstr "Εξώφυλλα από %1"
+
+msgid "Framerate"
+msgstr "Ρυθμός ανανέωσης"
+
+msgid "Low (%1 fps)"
+msgstr "Χαμηλή (%1 fps)"
+
+msgid "Medium (%1 fps)"
+msgstr "Μεσαία (%1 fps)"
+
+msgid "High (%1 fps)"
+msgstr "Υψηλή (%1 fps)"
+
+msgid "Super high (%1 fps)"
+msgstr "Πολύ υψηλή (%1 fps)"
+
+msgid "No analyzer"
+msgstr "Χωρίς αναλυτή"
+
+msgid "Block analyzer"
+msgstr "Αναλύτης Block"
+
+msgid "Boom analyzer"
+msgstr "Αναλυτής Boom"
+
+msgid "Turbine"
+msgstr "Turbine"
+
+msgid "Sonogram"
+msgstr "Σονόγραμμα"
+
+msgid "WaveRubber"
+msgstr "Κυματοειδές"
+
+msgid "Appearance"
+msgstr "Εμφάνιση"
+
+msgid "Style"
+msgstr "Στυλ"
+
+msgid "Tabbar colors"
+msgstr "Χρώματα πλαισίου"
+
+msgid "&Use the system default color"
+msgstr "&Χρησιμοποιήστε την προεπιλογή χρωμάτων του συστήματος"
+
+msgid "Use custom color"
+msgstr "Χρήση προσαρμοσμένου χρώματος"
+
+msgid "Use gradient background"
+msgstr "Χρήση βαθμιδωτού φόντου"
+
+msgid "Select tabbar color:"
+msgstr "Επιλογή χρώματος πλαισίου:"
+
+msgid "Background image"
+msgstr "Εικόνα φόντου"
+
+msgid "Default bac&kground image"
+msgstr "Προεπιλεγμένη εικόνα φόντου"
+
+msgid "&No background image"
+msgstr "&Χωρίς εικόνα φόντου"
+
+msgid "The album cover of the currently playing song"
+msgstr "Το εξώφυλλο του τρέχοντος τραγουδιού"
+
+msgid "Albu&m cover"
+msgstr "Εξώφυλλο Albu&m"
+
+msgid "Custom image:"
+msgstr "Προσαρμοσμένη εικόνα:"
+
+msgid "Browse..."
+msgstr "Αναζήτηση..."
+
+msgid "Position"
+msgstr "Θέση"
+
+msgid "Upper Left"
+msgstr "Άνω Αριστερά"
+
+msgid "Upper Right"
+msgstr "Πάνω Δεξιά"
+
+msgid "Middle"
+msgstr "Μεσαία"
+
+msgid "Bottom Left"
+msgstr "Κάτω Αριστερά"
+
+msgid "Bottom Right"
+msgstr "Κάτω Δεξιά"
+
+msgid "Max cover size"
+msgstr "Μέγιστο μέγεθος εξωφύλλου"
+
+msgid "Stretch image to fill playlist"
+msgstr "Τέντωμα εικόνας για συμπλήρωση λίστας αναπαραγωγής"
+
+msgid "Keep aspect ratio"
+msgstr "Διατήρηση αναλογίας διαστάσεων"
+
+msgid "Do not cut image"
+msgstr "Να μην κοπεί η εικόνα"
+
+msgid "Blur amount"
+msgstr "Ποσότητα θολώματος"
+
+msgid "0px"
+msgstr "0px"
+
+msgid "Opacity"
+msgstr "Αδιαφάνεια"
+
+msgid "40%"
+msgstr "40%"
+
+msgid "Icon sizes"
+msgstr "Μεγέθη εικονιδίων"
+
+msgid "Playlist buttons"
+msgstr "Κουμπιά λίστας αναπαραγωγής"
+
+msgid "Tabbar large mode"
+msgstr "Λειτουργία μεγάλης γραμμής καρτέλας"
+
+msgid "Play control buttons"
+msgstr "Κουμπιά ελέγχου αναπαραγωγής"
+
+msgid "Configure buttons"
+msgstr "Ρύθμιση κουμπιών"
+
+msgid "Files, playlists and queue buttons"
+msgstr "Κουμπιά αρχείων, λίστων αναπαραγωγής και ουράς"
+
+msgid "Tabbar small mode"
+msgstr "Μικρή λειτουργία καρτέλας"
+
+msgid "Playlist playing song color"
+msgstr "Χρώμα για το τραγουδι αναπαραγωγής"
+
+msgid "System highlight color"
+msgstr "Χρώμα επισήμανσης συστήματος"
+
+msgid "Custom color"
+msgstr "Προσαρμοσμένο χρώμα"
+
+msgid "Select playlist playing song color:"
+msgstr "Επιλογή χρώματος τραγουδιού αναπαραγωγής:"
+
+msgid "Window"
+msgstr "Παράθυρο"
+
+msgid "Window text"
+msgstr "Window text"
+
+msgid "Base"
+msgstr "Βασικό"
+
+msgid "Tooltip base"
+msgstr "Tooltip base"
+
+msgid "Tooltip text"
+msgstr "Tooltip text"
+
+msgid "Placeholder text"
+msgstr "Placeholder text"
+
+msgid "Text"
+msgstr "Κείμενο"
+
+msgid "Button"
+msgstr "Button"
+
+msgid "Button text"
+msgstr "Button text"
+
+msgid "Bright text"
+msgstr "Bright text"
+
+msgid "Select color"
+msgstr "Επιλέξτε χρώμα"
+
+msgid "Select background image"
+msgstr "Προεπιλεγμένη εικόνα φόντου"
+
+msgid "Colors"
+msgstr "Χρώματα"
+
+msgid "&Use the system default color set"
+msgstr "&Χρησιμοποιήστε την προεπιλογή χρωμάτων του συστήματος"
+
+msgid "Use a custom color set"
+msgstr "Χρήση προσαρμοσμένου χρώματος"
+
+msgid "Set a custom color set suitable for a dark theme"
+msgstr "Ορίστε ένα προσαρμοσμένο σύνολο χρωμάτων κατάλληλο για ένα σκούρο θέμα"
+
+msgid "Dark mode"
+msgstr "Dark mode"
+
+msgid "Reset the custom color set to the system default colors"
+msgstr "Επαναφορά προσαρμοσμένου χρώματος στα προκαθορισμένα χρώματα του συστήματος"
+
+msgid "Reset to default"
+msgstr "Επαναφορά στις προεπιλογές"
+
+msgid "You might need to restart Strawberry for this setting to fully apply"
+msgstr "Ίσως να πρέπει να επανεκκινήσετε το Srawberry για να ενεργοποιηθεί αυτή η ρύθμιση"
+
+msgid "You need to restart Strawberry for this setting to take affect"
+msgstr "Θα πρέπει να επανεκκινήσετε το Srawberry για να ενεργοποιηθεί αυτή η ρύθμιση"
+
+msgid "System icons"
+msgstr "Εικονίδια συστήματος"
+
+msgid "Changing colors is only supported with some styles"
+msgstr "Η αλλαγή χρωμάτων υποστηρίζεται μόνο με κάποια στυλ"
+
+msgid "Dark colors"
+msgstr "Σκοτεινά χρώματα"
+
+msgid "Backend"
+msgstr "Backend"
+
+msgid "Audio output"
+msgstr "Έξοδος ήχου"
+
+msgid "Device"
+msgstr "Συσκευή"
+
+msgid "ALSA plugin:"
+msgstr "Πρόσθετο ALSA:"
+
+msgid "hw"
+msgstr "hw"
+
+msgid "p&lughw"
+msgstr "p&lughw"
+
+msgid "pcm"
+msgstr "pcm"
+
+msgid "Exclusive mode (Experimental)"
+msgstr "Αποκλειστική λειτουργία (Πειραματικό)"
+
+msgid "Options"
+msgstr "Επιλογές"
+
+msgid "Enable volume control"
+msgstr "Ενεργοποίηση ελέγχου έντασης"
+
+msgid "Upmix / downmix to"
+msgstr "Upmix / downmix σε"
+
+msgid "channels"
+msgstr "κανάλια"
+
+msgid "Improve headphone listening of stereo audio records (bs2b)"
+msgstr "Βελτίωση ακρόασης με ακουστικά για στερεοφωνικεγγραφές (bs2b)"
+
+msgid "Use playbin3 when available"
+msgstr "Χρήση playbin3 όταν είναι διαθέσιμο"
+
+msgid "Enable HTTP/2 for streaming"
+msgstr "Ενεργοποίηση ροής HTTP/2"
+
+msgid "Use strict SSL mode"
+msgstr "Χρήση αυστηρής λειτουργίας SSL"
+
+msgid "Buffer"
+msgstr "Buffer"
+
+msgid " ms"
+msgstr " ms"
+
+msgid "Buffer duration"
+msgstr "Διάρκεια buffer"
+
+msgid "High watermark"
+msgstr "High watermark"
+
+msgid "Low watermark"
+msgstr "Low watermark"
+
+msgid "Defaults"
+msgstr "Προεπιλογές"
+
+msgid "Audio normalization"
+msgstr "Ομαλοποίηση ήχου"
+
+msgid "No audio normalization"
+msgstr "Χωρίς ομαλοποίηση ήχου"
+
+msgid "Replay Gain"
+msgstr "Ένταση αναπαραγωγής"
+
+msgid "Use Replay Gain metadata if it is available"
+msgstr "Χρήση μεταδεδομένων έντασης αναπαραγωγής εάν είναι διαθέσιμα"
+
+msgid "Replay Gain mode"
+msgstr "Τρόπος έντασης αναπαραγωγής"
+
+msgid "Radio (equal loudness for all tracks)"
+msgstr "Ραδιόφωνο (ίση ένταση για όλα τα κομμάτια)"
+
+msgid "Album (ideal loudness for all tracks)"
+msgstr "Άλμπουμ (ιδανική ένταση για όλα τα κομμάτια)"
+
+msgid "Pre-amp"
+msgstr "Pre-amp"
+
+msgid "Apply compression to prevent clipping"
+msgstr "Εφαρμόστε συμπίεση για να αποφύγετε την αποκοπή"
+
+msgid "Fallback-gain"
+msgstr "Fallback-gain"
+
+msgid "EBU R 128 Loudness Normalization"
+msgstr "EBU R 128 Κανονικοποίηση Έντασης"
+
+msgid "Perform track loudness normalization"
+msgstr "Εκτέλεση εξομάλυνσης έντασης κομματιού"
+
+msgid "Target Level"
+msgstr "Target Level"
+
+msgid "Fading"
+msgstr "Εξασθένιση"
+
+msgid "Fade out when stopping a track"
+msgstr "Σταδιακό σβήσιμο κατά τη διακοπή ενός κομματιού"
+
+msgid "Cross-fade when changing tracks manually"
+msgstr "Σταδιακή εξασθένιση κατά τη χειροκίνητη αλλαγή κομματιών"
+
+msgid "Cross-fade when changing tracks automatically"
+msgstr "Σταδιακή εξασθένιση κατά την αυτόματη αλλαγή κομματιών"
+
+msgid "Except between tracks on the same album or in the same CUE sheet"
+msgstr "Εκτός από κομμάτια στο ίδιο άλμπουμ ή στο ίδιο φύλλο CUE"
+
+msgid "Fading duration"
+msgstr "Διάρκεια σβησίματος"
+
+msgid "Fade out on pause / fade in on resume"
+msgstr "Ξεθώριασμα σε παύση / ξεθώριασμα σε συνέχιση"
+
+msgid "Exponential volume scaling"
+msgstr "Exponential volume scaling"
+
+msgid "Device warm-up"
+msgstr "Προθέρμανση συσκευής"
+
+msgid "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+msgstr "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+
+msgid "Behavior"
+msgstr "Συμπεριφορά"
+
+msgid "Show system tray icon"
+msgstr "Εμφάνιση εικονιδίου πλαισίου συστήματος"
+
+msgid "Keep running in the background when the window is closed"
+msgstr "Να εκτελείται στο παρασκήνιο όταν το παράθυρο είναι κλειστό"
+
+msgid "Show song progress on system tray icon"
+msgstr "Εμφάνιση προόδου τραγουδιού στο εικονίδιο συστήματος"
+
+msgid "Show song progress on taskbar"
+msgstr "Εμφάνιση προόδου τραγουδιού στη γραμμή εργασιών"
+
+msgid "Resume playback on start"
+msgstr "Συνέχιση αναπαραγωγής κατά την εκκίνηση"
+
+msgid "Show playing widget"
+msgstr "Εμφάνιση widget αναπαραγωγής"
+
+msgid "On startup"
+msgstr "Κατά την εκκίνηση"
+
+msgid "Remember from &last time"
+msgstr "Απομνημόνευση από &τελευταία φορά"
+
+msgid "Show the main window"
+msgstr "Εμφάνιση του κύριου παραθύρου"
+
+msgid "Hide the main window"
+msgstr "Απόκρυψη του κύριου παραθύρου"
+
+msgid "Show the main window maximized"
+msgstr "Εμφάνιση μεγιστοποιημένου κύριου παραθύρου"
+
+msgid "Show the main window minimized"
+msgstr "Εμφάνιση ελαχιστοποιημένου κύριου παραθύρου"
+
+msgid "Language"
+msgstr "Γλώσσα"
+
+msgid "Use the system default"
+msgstr "Χρησιμοποιήστε την προεπιλογή του συστήματος"
+
+msgid "You will need to restart Strawberry if you change the language."
+msgstr "Θα χρειαστεί να επανεκκινήσετε το Strawberry αν αλλάξετε τη γλώσσα."
+
+msgid "Using the menu to add a song will..."
+msgstr "Χρήση του μενού για να προσθέσετε ένα τραγούδι θα..."
+
+msgid "Never start playing"
+msgstr "Ποτέ μην αρχίζετε να παίζετε"
+
+msgid "Play if there is nothing already playing"
+msgstr "Παίξτε αν δεν υπάρχει τίποτα που να παίζει ήδη"
+
+msgid "Always start playing"
+msgstr "Να γίνεται πάντα αναπαραγωγή"
+
+msgid "Pressing \"Previous\" in player will..."
+msgstr "Πατώντας το \"Previous\" στον παίκτη..."
+
+msgid "Jump to previous song right away"
+msgstr "Μετάβαση στο προηγούμενο τραγούδι αμέσως"
+
+msgid "Restart song, then jump to previous if pressed again"
+msgstr "Επανεκκίνηση τραγουδιού και μετά μεταπήδηση στο προηγούμενο αν πατηθεί ξανά"
+
+msgid "Double clicking a song will..."
+msgstr "Διπλό κλικ σε ένα τραγούδι θα..."
+
+msgid "Append to the playlist"
+msgstr "Προσάρτηση στη λίστα αναπαραγωγής"
+
+msgid "Replace the playlist"
+msgstr "Αντικατάσταση της λίστας αναπαραγωγής"
+
+msgid "Open in new playlist"
+msgstr "Άνοιγμα σε νέα λίστα αναπαραγωγής"
+
+msgid "Add to the queue"
+msgstr "Προσθήκη στην ουρά"
+
+msgid "Double clicking a song in the playlist will..."
+msgstr "Διπλό κλικ σε ένα τραγούδι στη λίστα αναπαραγωγής θα..."
+
+msgid "Change the currently playing song"
+msgstr "Αλλαγή του τρέχοντος τραγουδιού"
+
+msgid "Seeking using a keyboard shortcut or mouse wheel"
+msgstr "Αναζήτηση με τη χρήση συντόμευσης πληκτρολογίου ή τροχού ποντικιού"
+
+msgid "Time step"
+msgstr "Βήμα χρόνου"
+
+msgid " s"
+msgstr " s"
+
+msgid "Volume Increment"
+msgstr "Αύξηση Έντασης"
+
+msgid "Could not create cdiocddasrc"
+msgstr "Αδυναμία δημιουργίας cdiocdasrc"
+
+msgid "Error while setting CDDA device to ready state."
+msgstr "Σφάλμα κατά τη ρύθμιση της συσκευής CDDA σε κατάσταση ετοιμότητας."
+
+msgid "Error while setting CDDA device to pause state."
+msgstr "Σφάλμα κατά τη ρύθμιση της συσκευής CDDA σε κατάσταση παύσης."
+
+msgid "The 'track' format is not supported by GStreamer."
+msgstr "The 'track' format is not supported by GStreamer."
+
+msgid "Error while querying CDDA tracks."
+msgstr "Σφάλμα κατά την αναζήτηση κομματιών CDDA."
+
+msgid "Unable to execute collection SQL query: %1"
+msgstr "Δεν είναι δυνατή η εκτέλεση ερωτήματος SQL: %1"
+
+msgid "Failed SQL query: %1"
+msgstr "Απέτυχε το ερώτημα SQL: %1"
+
+msgid "Updating %1 database."
+msgstr "Ενημέρωση βάσης δεδομένων %1."
+
+msgid "Collection Filter"
+msgstr "Φίλτρο Συλλογής"
+
+msgid "Enter search terms here"
+msgstr "Εισάγετε εδώ όρους αναζήτησης"
+
+msgid "MenuPopupToolButton"
+msgstr "MenuPopupToolButton"
+
+msgid "Entire collection"
+msgstr "Ολόκληρη η συλλογή"
+
+msgid "Added today"
+msgstr "Προστέθηκε σήμερα"
+
+msgid "Added this week"
+msgstr "Προστέθηκε αυτή την εβδομάδα"
+
+msgid "Added within three months"
+msgstr "Προστέθηκε εντός τριών μηνών"
+
+msgid "Added this year"
+msgstr "Προστέθηκε φέτος"
+
+msgid "Added this month"
+msgstr "Προστέθηκε αυτό το μήνα"
+
+msgid "Save current grouping"
+msgstr "Αποθήκευση τρέχουσας ομαδοποίησης"
+
+msgid "Manage saved groupings"
+msgstr "Διαχείριση αποθηκευμένων ομαδοποιήσεων"
+
+msgid "Any rating"
+msgstr "Οποιαδήποτε αξιολόγηση"
+
+msgid "Rating non null"
+msgstr "Μη μηδενική αξιολόγηση"
+
+msgid "Rating greater than 1 star"
+msgstr "Αξιολόγηση μεγαλύτερη από 1 αστέρι"
+
+msgid "Rating greater than 2 stars"
+msgstr "Αξιολόγηση μεγαλύτερη από 2 αστέρια"
+
+msgid "Rating greater than 3 stars"
+msgstr "Αξιολόγηση μεγαλύτερη από 3 αστέρια"
+
+msgid "Rating greater than 4 stars"
+msgstr "Αξιολόγηση μεγαλύτερη από 4 αστέρια"
+
+msgid "Group by"
+msgstr "Ομαδοποίηση κατά"
+
+msgid "Filter by age"
+msgstr "Φίλτρο κατά ηλικία"
+
+msgid "Filter by rating"
+msgstr "Φίλτρο κατά αξιολόγηση"
+
+msgid "Display options"
+msgstr "Επιλογές προβολής"
+
+msgid "Group by Album artist/Album"
+msgstr "Ομαδοποίηση κατά καλλιτέχνη 'Αλπουμ/Άλμπουμ"
+
+msgid "Group by Album artist/Album - Disc"
+msgstr "Ομαδοποίηση ανά καλλιτέχνη 'Αλπουμ/Άλμπουμ - Δίσκος"
+
+msgid "Group by Album artist/Year - Album"
+msgstr "Ομαδοποίηση κατά καλλιτέχνη άλμπουμ/Έτος - Άλμπουμ"
+
+msgid "Group by Album artist/Year - Album - Disc"
+msgstr "Ομαδοποίηση κατά καλλιτέχνη άλμπουμ/Έτος - Άλμπουμ"
+
+msgid "Group by Artist/Album"
+msgstr "Ομαδοποίηση κατά Καλλιτέχνη/Άλμπουμ"
+
+msgid "Group by Artist/Album - Disc"
+msgstr "Ομάδα κατά Καλλιτέχνη/Άλμπουμ - Δίσκος"
+
+msgid "Group by Artist/Year - Album"
+msgstr "Ομαδοποίηση κατά Καλλιτέχνη/Έτος - Άλμπουμ"
+
+msgid "Group by Artist/Year - Album - Disc"
+msgstr "Ομαδοποίηση κατά καλλιτέχνη/Έτος - Άλμπουμ - Δίσκος"
+
+msgid "Group by Genre/Album artist/Album"
+msgstr "Ομαδοποίηση κατά είδος/άλμπουμ καλλιτέχνη/άλμπουμ"
+
+msgid "Group by Genre/Artist/Album"
+msgstr "Ομαδοποίηση κατά είδος/καλλιτέχνη/άλμπουμ"
+
+msgid "Group by Album Artist"
+msgstr "Ομαδοποίηση κατά καλλιτέχνη άλμπουμ"
+
+msgid "Group by Artist"
+msgstr "Ομαδοποίηση κατά καλλιτέχνη"
+
+msgid "Group by Album"
+msgstr "Ομαδοποίηση κατά άλμπουμ"
+
+msgid "Group by Genre/Album"
+msgstr "Ομαδοποίηση κατά είδος/άλμπουμ"
+
+msgid "Advanced grouping..."
+msgstr "Προηγμένη ομαδοποίηση\"...\""
+
+msgid "Grouping Name"
+msgstr "Όνομα Ομαδοποίησης"
+
+msgid "Grouping name:"
+msgstr "Όνομα Ομαδοποίησης:"
+
+msgid "Support for sort tags artist, album, album artist, title, composer and performer"
+msgstr "Support for sort tags artist, album, album artist, title, composer and performer"
+
+msgid "Saving playcounts and ratings"
+msgstr "Αποθήκευση αριθμών αναπαραγωγής και βαθμολογιών"
+
+msgid "Loading..."
+msgstr "Φόρτωση..."
+
+msgid "Unknown"
+msgstr "Άγνωστο"
+
+msgid "Collection"
+msgstr "Συλλογή"
+
+msgid "These folders will be scanned for music to make up your collection"
+msgstr "Αυτοί οι φάκελοι θα σαρωθούν για μουσική για να φτιαχτεί η συλλογή σας"
+
+msgid "Add new folder..."
+msgstr "Προσθήκη νέου φακέλου..."
+
+msgid "Remove folder"
+msgstr "Αφαίρεση φακέλου"
+
+msgid "Automatic updating"
+msgstr "Αυτόματη ενημέρωση"
+
+msgid "Update the collection when Strawberry starts"
+msgstr "Ενημερώστε τη συλλογή όταν ξεκινά το Strawberry"
+
+msgid "Monitor the collection for changes"
+msgstr "Παρακολούθηση της συλλογής για αλλαγές"
+
+msgid "Song fingerprinting and tracking"
+msgstr "Αποτύπωση και παρακολούθηση τραγουδιού"
+
+msgid "Mark disappeared songs unavailable"
+msgstr "Μη διαθέσιμη επισήμανση τραγουδιών"
+
+msgid "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+msgstr "Εκτελέστε ανάλυση EBU R 128 στο τραγούδι (απαιτείται για EBU R 128 ομαλοποίηση έντασης)"
+
+msgid "Expire unavailable songs after"
+msgstr "Λήξη μη διαθέσιμων τραγουδιών μετά"
+
+msgid "days"
+msgstr "ημέρες"
+
+msgid "Preferred album art filenames (comma separated)"
+msgstr "Προτιμώμενα ονόματα αρχείων εξωφύλλου (χωρισμένα με κόμμα)"
+
+msgid "When looking for album art Strawberry will first look for picture files that contain one of these words.\nIf there are no matches then it will use the largest image in the directory."
+msgstr "Όταν ψάχνει για εξώφυλλο άλμπουμ ο Strawberry θα ψάξει πρώτα για αρχεία εικόνων που περιέχουν μία από αυτές τις λέξεις.\nΕάν δεν υπάρχουν αντιστοιχίες, τότε θα χρησιμοποιήσει τη μεγαλύτερη εικόνα στον κατάλογο."
+
+msgid "Automatically open single categories in the collection tree"
+msgstr "Αυτόματο άνοιγμα μεμονωμένων κατηγοριών στο δέντρο συλλογής"
+
+msgid "Show dividers"
+msgstr "Εμφάνιση διαχωριστικών"
+
+msgid "Show album cover art in collection"
+msgstr "Εμφάνιση εξώφυλλου άλμπουμ στη συλλογή"
+
+msgid "Use various artists for compilation albums"
+msgstr "Χρήση διαφόρων καλλιτεχνών σε μεταγλώττιση άλμπουμ"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+
+msgid "Use sort tags for sorting when available"
+msgstr "Χρήση ετικετών ταξινόμησης όταν είναι διαθέσιμες"
+
+msgid "Album cover pixmap cache"
+msgstr "Προσωρινή μνήμη εικονογραφήσεων εξώφυλλου άλμπουμ"
+
+msgid "Enable Disk Cache"
+msgstr "Ενεργοποίηση Cache Δίσκου"
+
+msgid "Disk Cache Size"
+msgstr "Μέγεθος Προσωρινής Αποθήκευσης"
+
+msgid "Current disk cache in use:"
+msgstr "Τρέχουσα προσωρινή μνήμη δίσκου που χρησιμοποιείται:"
+
+msgid "Clear Disk Cache"
+msgstr "Εκκαθάριση Cache Δίσκου"
+
+msgid "Song playcounts and ratings"
+msgstr "Καταμέτρηση και βαθμολογίες τραγουδιού"
+
+msgid "Save playcounts to song tags when possible"
+msgstr "Αποθήκευση πλήθους αναπαραγωγής σε ετικέτες τραγουδιών όταν είναι εφικτό"
+
+msgid "Save ratings to song tags when possible"
+msgstr "Αποθήκευση πλήθους αναπαραγωγής σε ετικέτες τραγουδιών όταν είναι εφικτό"
+
+msgid "Overwrite database playcount when songs are re-read from disk"
+msgstr "Αντικατάσταση αριθμού αναπαραγωγής βάσης δεδομένων όταν τα τραγούδια ξανααναγνωστούν από το δίσκο"
+
+msgid "Overwrite database rating when songs are re-read from disk"
+msgstr "Αντικατάσταση βάσης δεδομένων όταν τα τραγούδια ξαναδιαβάζονται από το δίσκο"
+
+msgid "Save playcounts and ratings to files now"
+msgstr "Αποθηκεύστε τους αριθμούς αναπαραγωγής και τις βαθμολογίες σε αρχεία τώρα"
+
+msgid "Enable delete files in the right click context menu"
+msgstr "Ενεργοποίηση διαγραφής αρχείων στο μενού δεξιού κλικ"
+
+msgid "Write all playcounts and ratings to files"
+msgstr "Γράψτε όλους τους αριθμούς αναπαραγωγής και τις αξιολογήσεις σε αρχεία"
+
+msgid "Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"
+msgstr "Είστε βέβαιοι ότι θέλετε να γράψετε τις μετρήσεις τραγουδιών και βαθμολογίες σε αρχείο για όλα τα τραγούδια στη συλλογή σας;"
+
+msgid "Your collection is empty!"
+msgstr "Η συλλογή σας είναι άδεια!"
+
+msgid "Click here to add some music"
+msgstr "Κάντε κλικ εδώ για να προσθέσετε μουσική"
+
+msgid "Append to current playlist"
+msgstr "Προσάρτηση στην τρέχουσα λίστα"
+
+msgid "Replace current playlist"
+msgstr "Αντικατάσταση της τρέχουσας λίστας"
+
+msgid "Queue track"
+msgstr "Εισαγωγή στην ουρά"
+
+msgid "Queue to play next"
+msgstr "Στην ουρά σαν επόμενο"
+
+msgid "Search for this"
+msgstr "Αναζήτηση για αυτό"
+
+msgid "Organize files..."
+msgstr "Οργάνωση αρχείων..."
+
+msgid "Copy to device..."
+msgstr "Αντιγραφή στη συσκευή..."
+
+msgid "Delete from disk..."
+msgstr "Διαγραφή από το δίσκο..."
+
+msgid "Edit track information..."
+msgstr "Επεξεργασία πληροφοριών τραγουδιού..."
+
+msgid "Edit tracks information..."
+msgstr "Επεξεργασία πληροφοριών τραγουδιών..."
+
+msgid "Show in file browser..."
+msgstr "Εμφάνιση στον περιηγητή αρχείων..."
+
+msgid "Rescan song(s)"
+msgstr "Επανασάρωση τραγουδιού(ών)"
+
+msgid "Show in various artists"
+msgstr "Εμφάνιση σε διάφορους καλλιτέχνες"
+
+msgid "Don't show in various artists"
+msgstr "Όχι εμφάνιση σε διάφορους καλλιτέχνες"
+
+msgid "There are other songs in this album"
+msgstr "Υπάρχουν και άλλα τραγούδια σε αυτό το άλμπουμ"
+
+msgid "Would you like to move the other songs on this album to Various Artists as well?"
+msgstr "Θα θέλατε να μετακινήσετε και τα άλλα τραγούδια σε αυτό το άλμπουμ σε Διάφορους Καλλιτέχνες?"
+
+msgid "Error"
+msgstr "Σφάλμα"
+
+msgid "None of the selected songs were suitable for copying to a device"
+msgstr "Κανένα από τα επιλεγμένα τραγούδια δεν ήταν κατάλληλο για αντιγραφή σε μια συσκευή"
+
+msgid "Form"
+msgstr "Φόρμα"
+
+msgid "Updating collection"
+msgstr "Ενημέρωση συλλογής"
+
+msgid "Updating %1"
+msgstr "Ενημέρωση Του %1"
+
+msgid "Console"
+msgstr "Κονσόλα"
+
+msgid "Run"
+msgstr "Εκτέλεση"
+
+msgid "Context"
+msgstr "Πλαίσιο"
+
+msgid "Custom text settings"
+msgstr "Προσαρμοσμένες ρυθμίσεις κειμένου"
+
+msgid "Title"
+msgstr "Τίτλος"
+
+msgid "Summary"
+msgstr "Σύνοψη"
+
+msgid "Enable Items"
+msgstr "Ενεργοποίηση Αντικειμένων"
+
+msgid "Technical Data"
+msgstr "Τεχνικά Δεδομένα"
+
+msgid "Song Lyrics"
+msgstr "Στίχοι Τραγουδιού"
+
+msgid "Automatically search for album cover"
+msgstr "Αυτόματη αναζήτηση εξώφυλλου άλμπουμ"
+
+msgid "Automatically search for song lyrics"
+msgstr "Αυτόματη αναζήτηση για στίχους τραγουδιών"
+
+msgid "Font for headline"
+msgstr "Γραμματοσειρά για την επικεφαλίδα"
+
+msgid "Font"
+msgstr "Γραμματοσειρά"
+
+msgid "Font size"
+msgstr "Μέγεθος γραμματοσειράς"
+
+msgid " pt"
+msgstr " pt"
+
+msgid "Preview"
+msgstr "Προεπισκόπιση"
+
+msgid "Font for data and lyrics"
+msgstr "Γραμματοσειρά για δεδομένα και στίχους"
+
+msgid "Add song artist tag"
+msgstr "Προσθήκη ετικέτας καλλιτέχνη τραγουδιού"
+
+msgid "Add song album tag"
+msgstr "Προσθήκη ετικέτας άλμπουμ"
+
+msgid "Add song title tag"
+msgstr "Προσθήκη ετικέτας τίτλου τραγουδιού"
+
+msgid "Add song albumartist tag"
+msgstr "Θα θέλατε να μετακινήσετε και τα άλλα τραγούδια σε αυτό το άλμπουμ σε Διάφορους Καλλιτέχνες?"
+
+msgid "Add song year tag"
+msgstr "Προσθήκη ετικέτας τίτλου τραγουδιού"
+
+msgid "Add song composer tag"
+msgstr "Προσθήκη ετικέτας συνθέτη τραγουδιού"
+
+msgid "Add song performer tag"
+msgstr "Προσθήκη ετικέτας ερμηνευτή τραγουδιού"
+
+msgid "Add song grouping tag"
+msgstr "Προσθήκη ετικέτας ομαδοποίησης τραγουδιού"
+
+msgid "Add song disc tag"
+msgstr "Προσθήκη ετικέτας δίσκου τραγουδιού"
+
+msgid "Add song track tag"
+msgstr "Προσθήκη ετικέτας τραγουδιού track"
+
+msgid "Add song genre tag"
+msgstr "Προσθήκη ετικέτας είδους"
+
+msgid "Add song length tag"
+msgstr "Προσθήκη ετικέτας διάρκειας τραγουδιού"
+
+msgid "Add song play count"
+msgstr "Προσθήκη μετρητή αναπαραγωγής"
+
+msgid "Add song skip count"
+msgstr "Προσθήκη μετρητή αναπαραγωγής"
+
+msgid "Add a new line if supported by the notification type"
+msgstr "Προσθήκη νέας γραμμής εάν υποστηρίζεται από τον τύπο ειδοποίησης"
+
+msgid "%filename%"
+msgstr "%filename%"
+
+msgid "Add song filename"
+msgstr "Προσθήκη ονόματος αρχείου τραγουδιού"
+
+msgid "%url%"
+msgstr "%url%"
+
+msgid "Add song URL"
+msgstr "Προσθήκη URL τραγουδιού"
+
+msgid "%rating%"
+msgstr "%rating%"
+
+msgid "Add song rating"
+msgstr "Προσθήκη αξιολόγησης τραγουδιού"
+
+msgid "Add song original year tag"
+msgstr "Προσθήκη ετικέτας αρχικού έτους τραγουδιού"
+
+msgid "Add song artistsort tag"
+msgstr "Προσθήκη ετικέτας artistsort "
+
+msgid "Add song albumartistsort tag"
+msgstr "Add song albumartistsort tag"
+
+msgid "Add song titlesort tag"
+msgstr "Add song titlesort tag"
+
+msgid "Add song composersort tag"
+msgstr "Add song composersort tag"
+
+msgid "Add song performersort tag"
+msgstr "Add song performersort tag"
+
+msgid "Add song albumsort tag"
+msgstr "Add song albumsort tag"
+
+msgid "Filetype"
+msgstr "Τύπος Αρχείου"
+
+msgid "Length"
+msgstr "Διάρκεια"
+
+msgid "Samplerate"
+msgstr "Ρυθμός Δείγματος (samplerate)"
+
+msgid "Bit depth"
+msgstr "Βάθος bit"
+
+msgid "Bitrate"
+msgstr "Bitrate"
+
+msgid "Show album cover"
+msgstr "Εμφάνιση εξωφύλλου άλμπουμ"
+
+msgid "Show song technical data"
+msgstr "Εμφάνιση τεχνικών δεδομένων τραγουδιού"
+
+msgid "Show song lyrics"
+msgstr "Εμφάνιση στίχων τραγουδιού"
+
+msgid "No song playing"
+msgstr "Δεν αναπαράγεται τραγούδι"
+
+msgid "%1 song"
+msgstr "Τραγούδι %1"
+
+msgid "%1 songs"
+msgstr "Τραγούδια %1"
+
+msgid "%1 artist"
+msgstr "%1 καλλιτέχνης"
+
+msgid "%1 artists"
+msgstr "%1 καλλιτέχνες"
+
+msgid "%1 album"
+msgstr "%1 άλμπουμ"
+
+msgid "%1 albums"
+msgstr "%1 άλμπουμ"
+
+msgid "kbps"
+msgstr "kbps"
+
+msgid "Load cover from URL"
+msgstr "Φόρτωση εξώφυλλου από URL"
+
+msgid "Enter a URL to download a cover from the Internet:"
+msgstr "Εισάγετε ένα URL για να κατεβάσετε ένα εξώφυλλο από το Διαδίκτυο:"
+
+msgid "Fetching cover error"
+msgstr "Σφάλμα ανάκτησης εξώφυλλου"
+
+msgid "The site you requested does not exist!"
+msgstr "Η ιστοσελίδα που ζητήσατε δεν υπάρχει!"
+
+msgid "The site you requested is not an image!"
+msgstr "Η σελίδα που ζητήσατε δεν είναι εικόνα!"
+
+msgid "View"
+msgstr "Εμφάνιση"
+
+msgid "Total albums:"
+msgstr "Σύνολο άλμπουμ:"
+
+msgid "Without cover:"
+msgstr "Χωρίς εξώφυλλο:"
+
+msgid "0"
+msgstr "0"
+
+msgid "Fetch Missing Covers"
+msgstr "Ανάκτηση Εξωφύλλων Που Λείπουν"
+
+msgid "Export Covers"
+msgstr "Εξαγωγή εξωφύλλων"
+
+msgid "Fetch automatically"
+msgstr "Αυτόματη λήψη"
+
+msgid "Load"
+msgstr "Φόρτωση"
+
+msgid "Add to playlist"
+msgstr "Προσθήκη στην λίστα αναπαραγωγής"
+
+msgid "Fetch completed"
+msgstr "Η λήψη ολοκληρώθηκε"
+
+msgid "Total network requests made"
+msgstr "Συνολικές αιτήσεις δικτύου που υποβλήθηκαν"
+
+msgid "Average image size"
+msgstr "Μέσο μέγεθος εικόνας"
+
+msgid "Total bytes transferred"
+msgstr "Σύνολο μεταφερθέντων bytes"
+
+msgid "Covers"
+msgstr "Εξώφυλλα"
+
+msgid "Cover providers"
+msgstr "Πάροχοι εξωφύλλων"
+
+msgid "Choose the providers you want to use when searching for covers."
+msgstr "Επιλέξτε τους παρόχους που θέλετε να χρησιμοποιήσετε κατά την αναζήτηση καλύμματα."
+
+msgid "Move up"
+msgstr "Μετακίνηση προς τα επάνω"
+
+msgid "Move down"
+msgstr "Μετακίνηση κάτω"
+
+msgid "Authentication"
+msgstr "Έλεγχος ταυτότητας"
+
+msgid "Login"
+msgstr "Σύνδεση"
+
+msgid "Album cover types"
+msgstr "Τύποι εξωφύλλων άλμπουμ"
+
+msgid "Saving album covers"
+msgstr "Αποθήκευση εξωφύλλων άλμπουμ"
+
+msgid "Save album covers in album directory"
+msgstr "Αποθήκευση εξώφυλλων άλμπουμ στον κατάλογο άλμπουμ"
+
+msgid "Save album covers in cache directory"
+msgstr "Αποθήκευση εξώφυλλα άλμπουμ στον κατάλογο cache"
+
+msgid "Save album covers as embedded cover"
+msgstr "Αποθήκευση εξώφυλλα άλμπουμ ως ενσωματωμένο εξώφυλλο"
+
+msgid "Filename:"
+msgstr "Όνομα Αρχείου:"
+
+msgid "Pattern"
+msgstr "Μοτίβο"
+
+msgid "Random"
+msgstr "Τυχαίο"
+
+msgid "Overwrite existing file"
+msgstr "Αντικατάσταση υπάρχοντος αρχείου"
+
+msgid "Lowercase filename"
+msgstr "Πεζό όνομα αρχείου"
+
+msgid "Replace spaces with dashes"
+msgstr "Αντικατάσταση κενών με παύλες"
+
+msgid "Use Tidal settings to authenticate."
+msgstr "Χρήση του Tidal για έλεγχο ταυτότητας."
+
+msgid "Use Spotify settings to authenticate."
+msgstr "Χρήση του Spotify για έλεγχο ταυτότητας."
+
+msgid "Use Qobuz settings to authenticate."
+msgstr "Χρήση του Qobuz για έλεγχο ταυτότητας."
+
+msgid "%1 needs authentication."
+msgstr "%1 χρειάζεται έλεγχο ταυτότητας."
+
+msgid "%1 does not need authentication."
+msgstr "Το %1 δεν χρειάζεται ταυτοποίηση."
+
+msgid "No provider selected."
+msgstr "Δεν επιλέχθηκε πάροχος."
+
+msgid "Authentication failed"
+msgstr "Αποτυχία ταυτοποίησης"
+
+msgid "Manually unset (%1)"
+msgstr "Χειροκίνητη απενεργοποίηση (%1)"
+
+msgid "Set through album cover search (%1)"
+msgstr "Ορισμός μέσω αναζήτησης εξωφύλλου άλμπουμ (%1)"
+
+msgid "Automatically picked up from album directory (%1)"
+msgstr "Αυτόματη παραλαβή από τον κατάλογο άλμπουμ (%1)"
+
+msgid "Embedded album cover art (%1)"
+msgstr "Ενσωματωμένο εξώφυλλο άλμπουμ (%1)"
+
+msgid "Saving CUE files is not supported."
+msgstr "Η αποθήκευση αρχείων CUE δεν υποστηρίζεται."
+
+msgid "Unable to execute SQL query: %1"
+msgstr "Δεν είναι δυνατή η εκτέλεση ερωτήματος SQL: %1"
+
+msgid "Integrity check"
+msgstr "Έλεγχος ακεραιότητας"
+
+msgid "Database corruption detected."
+msgstr "Εντοπίστηκε διαφθορά βάσης δεδομένων."
+
+msgid "Backing up database"
+msgstr "Δημιουργία αντιγράφου ασφαλείας βάσης δεδομένων"
+
+msgid "Delete files"
+msgstr "Διαγραφή αρχείων"
+
+msgid "The following files will be deleted from disk:"
+msgstr "Τα ακόλουθα αρχεία θα διαγραφούν από το δίσκο:"
+
+msgid "Are you sure you want to continue?"
+msgstr "Είστε σίγουροι ότι θέλετε να συνεχίσετε;"
+
+msgid "Deleting files"
+msgstr "Διαγραφή αρχείων"
+
+msgid "Updating %1%..."
+msgstr "Ενημέρωση %1%..."
+
+msgid "Not connected"
+msgstr "Μη συνδεδεμένο"
+
+msgid "Not mounted - double click to mount"
+msgstr "Δεν υπάρχει προσάρτηση (mount) - διπλό κλικ για προσάρτηση"
+
+msgid "Double click to open"
+msgstr "Διπλό κλικ για άνοιγμα"
+
+msgid "%1 song%2"
+msgstr "%1 τραγούδι%2"
+
+msgid "Connect device"
+msgstr "Σύνδεση συσκευής"
+
+msgid "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+msgstr "Αυτή είναι η πρώτη φορά που συνδέετε αυτήν τη συσκευή. Το Strawberry θα σαρώσει τώρα τη συσκευή για να βρει αρχεία μουσικής - αυτό μπορεί να πάρει κάποιο χρόνο."
+
+msgid "This device will not work properly"
+msgstr "Αυτή η συσκευή δεν θα λειτουργήσει σωστά"
+
+msgid "This is an MTP device, but you compiled Strawberry without libmtp support."
+msgstr "Αυτή είναι μια συσκευή MTP, αλλά συντάξατε το Strawberry χωρίς υποστήριξη libmtp."
+
+msgid "If you continue, this device will work slowly and songs copied to it may not work."
+msgstr "Αν συνεχίσετε, αυτή η συσκευή θα λειτουργεί αργά και τα τραγούδια που αντιγράφονται σε αυτήν ενδέχεται να μην λειτουργούν."
+
+msgid "This is an iPod, but you compiled Strawberry without libgpod support."
+msgstr "Αυτό είναι ένα iPod, αλλά έχετε συντάξει (compile) το Strawberry χωρίς υποστήριξη libgpod."
+
+msgid "Device Properties"
+msgstr "Ιδιότητες Συσκευής"
+
+msgid "Information"
+msgstr "Πληροφορίες"
+
+msgid "Name"
+msgstr "Όνομα"
+
+msgid "Icon"
+msgstr "Εικονίδιο"
+
+msgid "Hardware information"
+msgstr "Πληροφορίες υλικού"
+
+msgid "Hardware information is only available while the device is connected."
+msgstr "Οι πληροφορίες υλικού είναι διαθέσιμες μόνο όταν η συσκευή είναι συνδεδεμένη."
+
+msgid "File formats"
+msgstr "Μορφές αρχείων"
+
+msgid "Supported formats"
+msgstr "Υποστηριζόμενες μορφές"
+
+msgid "This device supports the following file formats:"
+msgstr "Αυτή η συσκευή υποστηρίζει τις ακόλουθες μορφές αρχείων:"
+
+msgid "Strawberry can automatically convert the music you copy to this device into a format that it can play."
+msgstr "Ο Strawberry μπορεί να μετατρέψει αυτόματα τη μουσική που αντιγράφετε σε αυτή τη συσκευή σε μια μορφή που μπορεί να παίξει."
+
+msgid "Do not convert any music"
+msgstr "Μην μετατρέπετε μουσική"
+
+msgid "Convert any music that the device can't play"
+msgstr "Μετατροπή οποιασδήποτε μουσικής που η συσκευή μπορεί να αναπαράξει"
+
+msgid "Convert all music"
+msgstr "Μετατροπή όλης της μουσικής"
+
+msgid "Preferred format"
+msgstr "Προτιμώμενη μορφή"
+
+msgid "This device must be connected and opened before Strawberry can see what file formats it supports."
+msgstr "Αυτή η συσκευή πρέπει να συνδεθεί και να ανοίξει πριν το Strawberry μπορεί να δει ποιες μορφές αρχείων υποστηρίζει."
+
+msgid "Open device"
+msgstr "Άνοιγμα συσκευής"
+
+msgid "Querying device..."
+msgstr "Αναζήτηση συσκευής..."
+
+msgid "Model"
+msgstr "Μοντέλο"
+
+msgid "Manufacturer"
+msgstr "Κατασκευαστής"
+
+msgid "Safely remove device"
+msgstr "Ασφαλής αφαίρεση συσκευής"
+
+msgid "Forget device"
+msgstr "Διαγραφή συσκευής"
+
+msgid "Device properties..."
+msgstr "Ιδιότητες συσκευής..."
+
+msgid "Copy to collection..."
+msgstr "Αντιγραφή στη συλλογή..."
+
+msgid "Delete from device..."
+msgstr "Διαγραφή από τη συσκευή..."
+
+msgid "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+msgstr "Ξεχνώντας μια συσκευή θα την αφαιρέσετε από αυτή τη λίστα και το Strawberry θα πρέπει να επανακτήσει όλα τα τραγούδια την επόμενη φορά που θα τη συνδέσετε."
+
+msgid "These files will be deleted from the device, are you sure you want to continue?"
+msgstr "Αυτά τα αρχεία θα διαγραφούν από τη συσκευή, είστε σίγουροι ότι θέλετε να συνεχίσετε;"
+
+msgid "on "
+msgstr "on "
+
+msgid "Dynamic mode is on"
+msgstr "Δυναμική λειτουργία είναι ενεργή"
+
+msgid "New tracks will be added automatically."
+msgstr "Τα νέα κομμάτια θα προστεθούν αυτόματα."
+
+msgid "Expand"
+msgstr "Επέκταση"
+
+msgid "Repopulate"
+msgstr "Επαναδημιουργία"
+
+msgid "Turn off"
+msgstr "Απενεργοποίηση"
+
+msgid "Edit track information"
+msgstr "Επεξεργασία πληροφοριών τραγουδιού"
+
+msgid "Date created"
+msgstr "Ημερομηνία δημιουργίας"
+
+msgid "Art Automatic"
+msgstr "Αυτόματο Art"
+
+msgid "Date modified"
+msgstr "Ημερομηνία τροποποίησης"
+
+msgid "Art Embedded"
+msgstr "Ενσωματωμένη Τέχνη"
+
+#. A playlist's tag.
+msgid "Last played"
+msgstr "Τελευταία αναπαραγωγή"
+
+msgid "File type"
+msgstr "Τύπος αρχείου"
+
+msgid "Play count"
+msgstr "Φορές αναπαραγωγής"
+
+msgid "EBU R 128 integrated loudness"
+msgstr "EBU R 128 ενσωματωμένη ένταση"
+
+msgid "Bit rate"
+msgstr "Ρυθμός bit"
+
+msgid "Skip count"
+msgstr "Παράλειψη καταμέτρησης"
+
+msgid "Sample rate"
+msgstr "Ρυθμός δειγματοληψίας"
+
+msgid "Path"
+msgstr "Διαδρομή"
+
+msgid "Filename"
+msgstr "Όνομα Αρχείου"
+
+msgid "Art Unset"
+msgstr "Αποεπιλογή Εξωφύλλων"
+
+msgid "File size"
+msgstr "Μέγεθος αρχείου"
+
+msgid "Art Manual"
+msgstr "Χειροκίνητο Art"
+
+msgid "EBU R 128 loudness range"
+msgstr "EBU R 128 εύρος έντασης"
+
+msgid "Reset play counts"
+msgstr "Επαναφορά μετρήσεων αναπαραγωγής"
+
+msgid "Tags"
+msgstr "Ετικέτες"
+
+msgid "Change art"
+msgstr "Αλλαγή εξωφύλλων"
+
+msgid "Embedded cover"
+msgstr "Ενσωματωμένο εξώφυλλο"
+
+msgid "Disc"
+msgstr "Δίσκος"
+
+msgid "Grouping"
+msgstr "Ομαδοποίηση"
+
+msgid "Album artist"
+msgstr "Καλλιτέχνης άλμπουμ"
+
+msgid "Year"
+msgstr "Έτος"
+
+msgid "Composer"
+msgstr "Συνθέτης"
+
+msgid "Complete tags automatically"
+msgstr "Αυτόματη συμπλήρωση ετικετών"
+
+msgid "Genre"
+msgstr "Είδος"
+
+msgid "Comment"
+msgstr "Σχόλιο"
+
+msgid "Performer"
+msgstr "Εκτέλεση"
+
+msgid "Compilation"
+msgstr "Συλλογή"
+
+msgid "Track"
+msgstr "Τραγούδι"
+
+msgid "Rating"
+msgstr "Βαθμολογία"
+
+msgid "Lyrics"
+msgstr "Στίχοι"
+
+msgid "Complete lyrics automatically"
+msgstr "Αυτόματη ολοκλήρωση στίχων"
+
+msgid "(different across multiple songs)"
+msgstr "(διαφορετικά μεταξύ πολλών τραγουδιών)"
+
+msgid "Different art across multiple songs."
+msgstr "Διαφορετική τέχνη σε πολλαπλά τραγούδια."
+
+msgid "Previous"
+msgstr "Προηγούμενο"
+
+msgid "Next"
+msgstr "Επόμενο"
+
+msgid "Saving tracks"
+msgstr "Αποθήκευση τραγουδιών"
+
+msgid "Loading tracks"
+msgstr "Φόρτωση τραγουδιών"
+
+msgid "%1 songs selected."
+msgstr "Επιλέχθηκαν %1 τραγούδια."
+
+msgid "Yes"
+msgstr "Ναι"
+
+msgid "No"
+msgstr "Όχι"
+
+msgid "None"
+msgstr "Κανένα"
+
+msgid "Cover is unset."
+msgstr "Το εξώφυλλο απενεργοποιήθηκε."
+
+msgid "Cover from embedded image."
+msgstr "Εξώφυλλο από ενσωματωμένη εικόνα"
+
+msgid "Cover from %1"
+msgstr "Εξώφυλλο από %1"
+
+msgid "Cover art not set"
+msgstr "Δεν έχει οριστεί εξώφυλλο"
+
+msgid "Album cover editing is only available for collection songs."
+msgstr "Η επεξεργασία εξώφυλλου άλμπουμ είναι διαθέσιμη μόνο για τραγούδια συλλογής."
+
+msgid "Cover changed: Will be cleared when saved."
+msgstr "Το εξώφυλλο άλλαξε: Θα καθαριστεί όταν αποθηκευτεί."
+
+msgid "Cover changed: Will be unset when saved."
+msgstr "Το εξώφυλλο άλλαξε: Θα απενεργοποιηθεί όταν αποθηκευτεί."
+
+msgid "Cover changed: Will be deleted when saved."
+msgstr "Το εξώφυλλο άλλαξε: Θα διαγραφεί όταν αποθηκευτεί."
+
+msgid "Cover changed: Will set new when saved."
+msgstr "Το εξώφυλλο άλλαξε: Θα οριστεί νέο όταν αποθηκευτεί."
+
+msgid "Never"
+msgstr "Ποτέ"
+
+msgid "Reset song play statistics"
+msgstr "Επαναφορά στατιστικών τραγουδιού"
+
+msgid "Are you sure you want to reset this song's play statistics?"
+msgstr "Είστε βέβαιοι ότι θέλετε να επαναφέρετε τα στατιστικά σε αυτό το τραγούδι';"
+
+msgid "loading..."
+msgstr "φόρτωση..."
+
+msgid "Not found."
+msgstr "Δε βρέθηκε."
+
+msgid "Could not write metadata to %1"
+msgstr "Αδυναμία εγγραφής μεταδεδομένων στο %1"
+
+msgid "Could not write metadata to %1: %2"
+msgstr "Αδυναμία εγγραφής μεταδεδομένων στο %1: %2"
+
+msgid "ID3v2 version:"
+msgstr "Έκδοση ID3v2:"
+
+msgid "2.3"
+msgstr "2.3"
+
+msgid "2.4"
+msgstr "2.4"
+
+msgid "Performer sort"
+msgstr "Ταξινόμηση εκτελεστή"
+
+msgid "Title sort"
+msgstr "Ταξινόμηση τίτλων"
+
+msgid "Album artist sort"
+msgstr "Ταξινόμηση άλμπουμ καλλιτέχνη"
+
+msgid "Artist sort"
+msgstr "Ταξινόμηση καλλιτέχνη"
+
+msgid "Album sort"
+msgstr "Ταξινόμηση άλμπουμ"
+
+msgid "Composer sort"
+msgstr "Ταξινόμηση συνθέτη"
+
+msgid "Equalizer"
+msgstr "Ισοσταθμιστής"
+
+msgid "Preset:"
+msgstr "Προρύθμιση:"
+
+msgid "Save preset"
+msgstr "Αποθήκευση προεπιλογής"
+
+msgid "Delete preset"
+msgstr "Διαγραφή προεπιλογής"
+
+msgid "Enable equalizer"
+msgstr "Ενεργοποίηση ισοσταθμιστή"
+
+msgid "Enable stereo balancer"
+msgstr "Ενεργοποίηση στερεοφωνικού ισολογισμού"
+
+msgid "Left"
+msgstr "Αριστερά"
+
+msgid "Balance"
+msgstr "Εξισορρόπηση"
+
+msgid "Right"
+msgstr "Δεξιά"
+
+msgid "Custom"
+msgstr "Προσαρμογή"
+
+msgid "Classical"
+msgstr "Κλασικό"
+
+msgid "Club"
+msgstr "Club"
+
+msgid "Dance"
+msgstr "Dance"
+
+msgid "Full Bass"
+msgstr "Πλήρες Μπάσο"
+
+msgid "Full Treble"
+msgstr "Πλήρες Πρίμα"
+
+msgid "Full Bass + Treble"
+msgstr "Πλήρης Μπάσα + Πρίμα"
+
+msgid "Laptop/Headphones"
+msgstr "Laptop/Ακουστικά"
+
+msgid "Large Hall"
+msgstr "Μεγάλη αίθουσα"
+
+msgid "Live"
+msgstr "Ζωντανά"
+
+msgid "Party"
+msgstr "Πάρτυ"
+
+msgid "Pop"
+msgstr "Ποπ"
+
+msgid "Reggae"
+msgstr "Ρέγκε"
+
+msgid "Rock"
+msgstr "Ροκ"
+
+msgid "Soft"
+msgstr "Απαλό"
+
+msgid "Ska"
+msgstr "Σκα"
+
+msgid "Soft Rock"
+msgstr "Απαλό Ροκ"
+
+msgid "Techno"
+msgstr "Techno"
+
+msgid "Zero"
+msgstr "Μηδέν"
+
+msgid "Are you sure you want to delete the \"%1\" preset?"
+msgstr "Είστε βέβαιοι ότι θέλετε να διαγράψετε το \"%1\" προεπιλογή?;"
+
+msgid "You need to restart playback for this setting to take affect."
+msgstr "Θα πρέπει να επανεκκινήσετε το Srawberry για να ενεργοποιηθεί αυτή η ρύθμιση."
+
+msgid "%1 dB"
+msgstr "%1 dB"
+
+msgid "Strawberry Error"
+msgstr "Εξώφυλλο από ενσωματωμένη εικόνα"
+
+msgid "Large sidebar"
+msgstr "Μεγάλη πλαϊνή μπάρα"
+
+msgid "Icons sidebar"
+msgstr "Πλαϊνή μπάρα εικονιδίων"
+
+msgid "Small sidebar"
+msgstr "Μικρή πλαϊνή μπάρα"
+
+msgid "Plain sidebar"
+msgstr "Απλή πλαϊνή μπάρα"
+
+msgid "Tabs on top"
+msgstr "Καρτέλες στην κορυφή"
+
+msgid "Icons on top"
+msgstr "Εικονίδια στην κορυφή"
+
+msgid "Add root directory"
+msgstr "Προσθήκη καταλόγου root"
+
+msgid "Remove selected root directory"
+msgstr "Αφαίρεση επιλεγμένου καταλόγου ρίζας"
+
+msgid "Toggle between list and tree view"
+msgstr "Εναλλαγή μεταξύ λίστας και προβολής δέντρου"
+
+msgid "Select folder to add as tree root"
+msgstr "Select folder to add as tree root"
+
+msgid "Move to collection..."
+msgstr "Μετακίνηση στη συλλογή..."
+
+msgid "Files"
+msgstr "Αρχεία"
+
+msgid "Available"
+msgstr "Διαθέσιμος"
+
+msgid "New songs"
+msgstr "Νέα τραγούδια"
+
+msgid "Exceeded by"
+msgstr "Υπέρβαση από"
+
+msgid "Used"
+msgstr "Χρησιμοποιημένο"
+
+msgid "Could not copy %1 to %2: %3"
+msgstr "Αδυναμία αντιγραφής %1 στο %2: %3"
+
+msgid "Writing database failed: %1"
+msgstr "Αποτυχία εγγραφής βάσης δεδομένων: %1"
+
+msgid "Writing database failed."
+msgstr "Αποτυχία εγγραφής βάσης δεδομένων."
+
+msgid "Loading iPod database"
+msgstr "Φόρτωση βάσης δεδομένων iPod"
+
+msgid "An error occurred loading the iTunes database"
+msgstr "Παρουσιάστηκε σφάλμα κατά τη φόρτωση της βάσης δεδομένων iTunes"
+
+msgid "Mount point"
+msgstr "Σημείο προσάρτησης"
+
+msgid "URI"
+msgstr "URI"
+
+msgid "Press a key"
+msgstr "Πατήστε ένα πλήκτρο"
+
+msgid "Press a key combination to use for %1..."
+msgstr "Πατήστε ένα συνδυασμό πλήκτρων για να χρησιμοποιήσετε το %1..."
+
+msgid "Play"
+msgstr "Έναρξη"
+
+msgid "Pause"
+msgstr "Παύση"
+
+msgid "Play/Pause"
+msgstr "Αναπαραγωγή/Παύση"
+
+msgid "Stop"
+msgstr "Παύση"
+
+msgid "Stop playing after current track"
+msgstr "Παύση αναπαραγωγής μετά το τρέχον κομμάτι"
+
+msgid "Next track"
+msgstr "Επόμενο κομμάτι"
+
+msgid "Previous track"
+msgstr "Προηγούμενο κομμάτι"
+
+msgid "Restart or previous track"
+msgstr "Επανεκκίνηση ή προηγούμενο τραγούδι"
+
+msgid "Increase volume"
+msgstr "Αύξηση έντασης"
+
+msgid "Decrease volume"
+msgstr "Μείωση έντασης"
+
+msgid "Mute"
+msgstr "Σίγαση"
+
+msgid "Seek forward"
+msgstr "Αναζήτηση προς τα εμπρός"
+
+msgid "Seek backward"
+msgstr "Αναζήτηση προς τα πίσω"
+
+msgid "Show/Hide"
+msgstr "Εμφάνιση/Απόκρυψη"
+
+msgid "Show OSD"
+msgstr "Εμφάνιση OSD"
+
+msgid "Toggle Pretty OSD"
+msgstr "Εναλλαγή Όμορφου OSD"
+
+msgid "Change shuffle mode"
+msgstr "Αλλαγή λειτουργίας τυχαίας αναπαραγωγής"
+
+msgid "Change repeat mode"
+msgstr "Αλλαγή λειτουργίας επανάληψης"
+
+msgid "Enable/disable scrobbling"
+msgstr "Ενεργοποίηση/απενεργοποίηση scrobbling"
+
+msgid "Love"
+msgstr "Αγάπη"
+
+msgid "Global Shortcuts"
+msgstr "Γενικές Συντομεύσεις"
+
+msgid "Open..."
+msgstr "Άνοιξε..."
+
+msgid "Use X11 shortcuts when available"
+msgstr "Χρήση συντομεύσεων X11 όταν είναι διαθέσιμες"
+
+msgid "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+msgstr "Θα πρέπει να εκκινήσετε τις Προτιμήσεις συστήματος και να επιτρέψετε στο Straberry να \"<span style=\"font-style:italic\">να ελέγχει τον υπολογιστή σας</span>\" να χρησιμοποιεί καθολικές συντομεύσεις στo Strawberry."
+
+#. Category label
+msgid "Action"
+msgstr "Ενέργεια"
+
+msgid "Shortcut"
+msgstr "Συντόμευση"
+
+msgid "Shortcut for %1"
+msgstr "Συντόμευση για %1"
+
+msgid "&None"
+msgstr "&Κανένα"
+
+msgid "&Default"
+msgstr "&Προεπιλογή"
+
+msgid "&Custom"
+msgstr "&Προσαρμογή"
+
+msgid "Change shortcut..."
+msgstr "Αλλαγή συντόμευσης..."
+
+msgid "Use KGlobalAccel shortcuts when available"
+msgstr "Χρήση συντομεύσεων KGlobalAccel όταν είναι διαθέσιμες"
+
+msgid "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+msgstr "Η χρήση συντομεύσεων X11 δεν συνιστάται και μπορεί να προκαλέσει ανανταπόκριση στο πληκτρολόγιο! Συνήθως οι συντομεύσεις θα πρέπει να χρησιμοποιηθούν μέσω του MPRIS2 / KGlobalAccel."
+
+msgid "Collection advanced grouping"
+msgstr "Προηγμένη ομαδοποίηση συλλογής"
+
+msgid "You can change the way the songs in the collection are organized."
+msgstr "Μπορείτε να αλλάξετε τον τρόπο οργάνωσης των τραγουδιών της συλλογής."
+
+msgid "Group Collection by..."
+msgstr "Ομαδοποίηση Συλλογής κατά..."
+
+msgid "First level"
+msgstr "Πρώτο επίπεδο"
+
+msgid "Album - Disc"
+msgstr "Άλμπουμ - Δίσκος"
+
+msgid "Format"
+msgstr "Μορφή"
+
+msgid "Year - Album"
+msgstr "Έτος - Άλμπουμ"
+
+msgid "Year - Album - Disc"
+msgstr "Έτος - Άλμπουμ - Δίσκος"
+
+msgid "Original year"
+msgstr "Αρχικό έτος"
+
+msgid "Original year - Album"
+msgstr "Αρχικό έτος - Άλμπουμ"
+
+msgid "Second level"
+msgstr "Δεύτερο επίπεδο"
+
+msgid "Third level"
+msgstr "Τρίτο επίπεδο"
+
+msgid "Separate albums by grouping tag"
+msgstr "Διαχωρισμός άλμπουμ με ετικέτα ομαδοποίησης"
+
+msgid "Original year - Album - Disc"
+msgstr "Original year - Album - Disc"
+
+msgid "Buffering"
+msgstr "Buffering"
+
+msgid "%1 Scrobbler Authentication"
+msgstr "Ταυτοποίηση %1 Scrobbler"
+
+msgid "Open URL in web browser?"
+msgstr "Άνοιγμα διεύθυνσης URL στο πρόγραμμα περιήγησης;"
+
+msgid "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+msgstr "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+
+msgid "Could not open URL. Please open this URL in your browser"
+msgstr "Αδυναμία ανοίγματος του URL. Παρακαλώ ανοίξτε αυτό το URL στο πρόγραμμα περιήγησης"
+
+msgid "Invalid reply from web browser. Missing token."
+msgstr "Μη έγκυρη απάντηση από το πρόγραμμα περιήγησης. Λείπει token."
+
+msgid "Received invalid reply from web browser. Try another browser."
+msgstr "Λήφθηκε μη έγκυρη απάντηση από το πρόγραμμα περιήγησης. Δοκιμάστε ένα άλλο πρόγραμμα περιήγησης."
+
+msgid "Scrobbler %1 is not authenticated!"
+msgstr "Το Scrobbler %1 δεν έχει ταυτοποιηθεί!"
+
+msgid "Scrobbler %1 error: %2"
+msgstr "Scrobbler %1 σφάλμα: %2"
+
+msgid "Least favourite tracks"
+msgstr "Λιγότερα αγαπημένα κομμάτια"
+
+msgid "Unable to scrobble %1 - %2 because of error: %3"
+msgstr "Αδυναμία scrobble %1 - %2 λόγω σφάλματος: %3"
+
+msgid "Missing MusicBrainz recording ID for %1 %2 %3"
+msgstr "Απουσία αναγνωριστικού εγγραφής MusicBrainz για %1 %2 %3"
+
+msgid "ListenBrainz error: %1"
+msgstr "Λάθος από ListenBrainz: %1"
+
+msgid "You are not signed in."
+msgstr "Δεν είστε συνδεδεμένοι."
+
+msgid "Sign out"
+msgstr "Αποσύνδεση"
+
+msgid "Signing in..."
+msgstr "Συνδέεται…"
+
+msgid "You are signed in."
+msgstr "Είστε συνδεδεμένοι."
+
+msgid "You are signed in as %1."
+msgstr "Έχετε συνδεθεί ως %1."
+
+msgid "Expires on %1"
+msgstr "Λήγει στις %1"
+
+msgid "Lyrics providers"
+msgstr "Πάροχοι στίχων"
+
+msgid "Choose the providers you want to use when searching for lyrics."
+msgstr "Επιλέξτε τους παρόχους που θέλετε να χρησιμοποιήσετε κατά την αναζήτηση στίχων."
+
+msgid "Strawberry Music Player"
+msgstr "Αναπαραγωγέας Μουσικής Strawberry"
+
+msgid "&Music"
+msgstr "&Μουσική"
+
+msgid "P&laylist"
+msgstr "&Λίστα αναπαραγωγής"
+
+msgid "Help"
+msgstr "Βοήθεια"
+
+msgid "&Tools"
+msgstr "&Εργαλεία"
+
+msgid "F5"
+msgstr "F5"
+
+msgid "&Play"
+msgstr "&Έναρξη"
+
+msgid "F6"
+msgstr "F6"
+
+msgid "&Stop"
+msgstr "&Παύση"
+
+msgid "F7"
+msgstr "F7"
+
+msgid "&Next track"
+msgstr "&Επόμενο τραγούδι"
+
+msgid "F8"
+msgstr "F8"
+
+msgid "&Quit"
+msgstr "&Έξοδος"
+
+msgid "Ctrl+Q"
+msgstr "Ctrl+Q"
+
+msgid "Stop after this track"
+msgstr "Σταμάτημα μετά από αυτό το κομμάτι"
+
+msgid "Ctrl+Alt+V"
+msgstr "Ctrl+Alt+V"
+
+msgid "&Clear playlist"
+msgstr "&Καθαρισμός λίστας"
+
+msgid "Clear playlist"
+msgstr "Καθαρισμός λίστας"
+
+msgid "Ctrl+K"
+msgstr "Ctrl+K"
+
+msgid "Ctrl+E"
+msgstr "Ctrl+E"
+
+msgid "Renumber tracks in this order..."
+msgstr "Επαναρίθμηση κομματιών με αυτή τη σειρά..."
+
+msgid "Set value for all selected tracks..."
+msgstr "Ορισμός τιμής για όλα τα επιλεγμένα κομμάτια..."
+
+msgid "Edit tag..."
+msgstr "Επεξεργασία ετικέτας..."
+
+msgid "&Settings..."
+msgstr "&Ρυθμίσεις..."
+
+msgid "Ctrl+P"
+msgstr "Ctrl+P"
+
+msgid "&About Strawberry"
+msgstr "&Σχετικά Με Strawberry"
+
+msgid "F1"
+msgstr "F1"
+
+msgid "S&huffle playlist"
+msgstr "&Ανακάτεμα λίστας αναπαραγωγής"
+
+msgid "&Add file..."
+msgstr "&Προσθήκη Αρχείου..."
+
+msgid "Ctrl+Shift+A"
+msgstr "Ctrl+Shift+A"
+
+msgid "&Open file..."
+msgstr "&Άνοιγμα αρχείου..."
+
+msgid "Open audio &CD..."
+msgstr "Άνοιγμα &CD..."
+
+msgid "&Cover Manager"
+msgstr "&Διαχειριστής Εξωφύλλων"
+
+msgid "C&onsole"
+msgstr "Κ&ονσόλα"
+
+msgid "&Shuffle mode"
+msgstr "&Τυχαία σειρά"
+
+msgid "&Repeat mode"
+msgstr "&Λειτουργία επανάληψης"
+
+msgid "Remove from playlist"
+msgstr "Αφαίρεση από τη λίστα"
+
+msgid "&Equalizer"
+msgstr "&Ισοσταθμιστής"
+
+msgid "&Transcode Music"
+msgstr "&Μετακωδικοποίηση Μουσικής"
+
+msgid "Add &folder..."
+msgstr "Προσθήκη &φακέλου..."
+
+msgid "&Jump to the currently playing track"
+msgstr "&Μετάβαση στο τρέχον κομμάτι"
+
+msgid "Ctrl+J"
+msgstr "Ctrl+J"
+
+msgid "&New playlist"
+msgstr "&Νέα λίστα"
+
+msgid "Ctrl+N"
+msgstr "Ctrl+Ν"
+
+msgid "Save &playlist..."
+msgstr "Αποθήκευση &λίστας..."
+
+msgid "Ctrl+S"
+msgstr "Ctrl+S"
+
+msgid "&Load playlist..."
+msgstr "&Φόρτωση λίστας..."
+
+msgid "Ctrl+Shift+O"
+msgstr "Ctrl+Shift+O"
+
+msgid "&Save all playlists..."
+msgstr "&Αποθήκευση όλων των λιστών αναπαραγωγής..."
+
+msgid "Go to next playlist tab"
+msgstr "Μετάβαση στην επόμενη καρτέλα λίστας αναπαραγωγής"
+
+msgid "Go to previous playlist tab"
+msgstr "Μετάβαση στην προηγούμενη καρτέλα λίστας αναπαραγωγής"
+
+msgid "&Update changed collection folders"
+msgstr "&Ενημέρωση αλλαγμένων φακέλων συλλογής"
+
+msgid "About &Qt"
+msgstr "Σχετικά Με &Qt"
+
+msgid "&Mute"
+msgstr "&Σίγαση"
+
+msgid "Ctrl+M"
+msgstr "Ctrl+M"
+
+msgid "&Do a full collection rescan"
+msgstr "&Κάντε μια πλήρη επανασάρωση συλλογής"
+
+msgid "Stop collection scan"
+msgstr "Διακοπή σάρωσης συλλογής"
+
+msgid "Complete tags automatically..."
+msgstr "Αυτόματη συμπλήρωση ετικετών..."
+
+msgid "Ctrl+T"
+msgstr "Ctrl+T"
+
+msgid "Toggle scrobbling"
+msgstr "Εναλλαγή scrobbling"
+
+msgid "Remove &duplicates from playlist"
+msgstr "Αφαίρεση &διπλότυπων από τη λίστα αναπαραγωγής"
+
+msgid "Remove &unavailable tracks from playlist"
+msgstr "Αφαίρεση μη διαθέσιμων κομματιών από τη λίστα"
+
+msgid "Add file(s) to transcoder"
+msgstr "Προσθήκη αρχείου(ων) στο transcoder"
+
+msgid "Add file to transcoder"
+msgstr "Προσθήκη αρχείου στο transcoder"
+
+msgid "Add stream..."
+msgstr "Προσθήκη ροής..."
+
+msgid "Show sidebar"
+msgstr "Εμφ´νιση sidebar"
+
+msgid "Queue"
+msgstr "Σειρά"
+
+msgid "Playlists"
+msgstr "Λίστες αναπαραγωγής"
+
+msgid "Smart playlists"
+msgstr "Έξυπνες λίστες"
+
+msgid "Radios"
+msgstr "Ραδιοφωνία"
+
+msgid "Devices"
+msgstr "Συσκευές"
+
+msgid "Subsonic"
+msgstr "Subsonic"
+
+msgid "Tidal"
+msgstr "Tidal"
+
+msgid "Spotify"
+msgstr "Spotify"
+
+msgid "Qobuz"
+msgstr "Qobuz"
+
+msgid "Show all songs"
+msgstr "Εμφάνιση όλων των τραγουδιών"
+
+msgid "Show only duplicates"
+msgstr "Εμφάνιση μόνο διπλότυπων"
+
+msgid "Show only untagged"
+msgstr "Εμφάνιση μόνο χωρίς ετικέτα"
+
+msgid "Configure collection..."
+msgstr "Ρύθμιση συλλογής..."
+
+msgid "Toggle queue status"
+msgstr "Εναλλαγή κατάστασης ουράς"
+
+msgid "Queue selected tracks to play next"
+msgstr "Ουρά επιλεγμένων κομματιών για επόμενη αναπαραγωγή"
+
+msgid "Toggle skip status"
+msgstr "Εναλλαγή κατάστασης παράκαμψης"
+
+msgid "Rescan song(s)..."
+msgstr "Επανασάρωση τραγουδιού(ών)..."
+
+msgid "Fetch metadata from service"
+msgstr "Λήψη μεταδεδομένων από την υπηρεσία"
+
+msgid "Copy URL(s)..."
+msgstr "Αντιγραφή URL(s)..."
+
+msgid "Show in collection..."
+msgstr "Εμφάνιση στη συλλογή..."
+
+msgid "Check for updates..."
+msgstr "Έλεγχος για ενημερώσεις..."
+
+msgid "Strawberry running under Rosetta"
+msgstr "Φράουλα που τρέχουν κάτω από Rosetta"
+
+msgid "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+msgstr "Τρέχετε το Strawberry κάτω από Rosetta. Η χρήση του Strawberry κάτω από Rosetta δεν υποστηρίζεται και είναι γνωστό ότι παρουσιάζει προβλήματα. Θα πρέπει να λάβετε το Strawberry για τη σωστή αρχιτεκτονική CPU από %1"
+
+msgid "Sponsoring Strawberry"
+msgstr "Χορηγία Strawberry"
+
+msgid "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+msgstr "Το Strawberry είναι ελεύθερο και ανοικτού κώδικα λογισμικό. Αν σας αρέσει το Strawberry, παρακαλώ σκεφτείτε τη χορηγία του έργου. Για περισσότερες πληροφορίες σχετικά με τη χορηγία δείτε την ιστοσελίδα μας %1"
+
+msgid "Dequeue track"
+msgstr "Αφαίρεση από την ουρά"
+
+msgid "Dequeue selected tracks"
+msgstr "Αφαίρεση από την ουρά των επιλεγμένων κομματιών"
+
+msgid "Queue selected tracks"
+msgstr "Εισαγωγή στην ουρά επιλεγμένων τραγουδιών"
+
+msgid "Unskip track"
+msgstr "Μη παράκαμψη του κομματιού"
+
+msgid "Unskip selected tracks"
+msgstr "Μη παράκαμψη των επιλεγμένων κομματιών"
+
+msgid "Skip track"
+msgstr "Παράλειψη κομματιού"
+
+msgid "Skip selected tracks"
+msgstr "Παράκαμψη επιλεγμένων κομματιών"
+
+msgid "Set %1 to \"%2\"..."
+msgstr "Όρισε το %1 σε \"%2\"..."
+
+msgid "Edit tag \"%1\"..."
+msgstr "Επεξεργασία ετικέτας \"%1\"..."
+
+msgid "Add to another playlist"
+msgstr "Προσθήκη σε άλλη λίστα αναπαραγωγής"
+
+msgid "New playlist"
+msgstr "Νέα λίστα"
+
+msgid "Add file"
+msgstr "Προσθήκη Αρχείου"
+
+msgid "Music"
+msgstr "Μουσική"
+
+msgid "Add folder"
+msgstr "Προσθήκη φακέλου"
+
+msgid "Playlist has %1 songs, too large to undo, are you sure you want to clear the playlist?"
+msgstr "Η λίστα αναπαραγωγής έχει %1 τραγούδια, είναι πολύ μεγάλη για αναίρεση, είστε σίγουροι ότι θέλετε να καθαρίσετε τη λίστα αναπαραγωγής;"
+
+msgid "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:"
+msgstr "Η έκδοση του Strawberry που μόλις ενημερώθηκε απαιτεί πλήρη επανασάρωση συλλογής λόγω των νέων χαρακτηριστικών που αναφέρονται παρακάτω:"
+
+msgid "Would you like to run a full rescan right now?"
+msgstr "Θα θέλατε να εκτελέσετε μια πλήρη επανασάρωση τώρα;"
+
+msgid "Collection rescan notice"
+msgstr "Επανασάρωση συλλογής"
+
+msgid "Ctrl+Shift+H"
+msgstr "Ctrl+Shift+H"
+
+msgid "Go to last playlist tab"
+msgstr "Go to last playlist tab"
+
+msgid "Go to active playlist tab"
+msgstr "Go to active playlist tab"
+
+msgid "Close current playlist tab"
+msgstr "Close current playlist tab"
+
+msgid "Message Dialog"
+msgstr "Διάλογος Μηνυμάτων"
+
+msgid "Do not show this message again."
+msgstr "Να μην εμφανιστεί ξανά αυτό το μήνυμα."
+
+msgid "Playlist"
+msgstr "Λίστα αναπαραγωγής"
+
+msgid "Moodbar"
+msgstr "Moodbar"
+
+msgid "Moodbar style"
+msgstr "Στυλ μπάρας διάθεσης"
+
+msgid "Save the .mood files directly in the songs folders"
+msgstr "Αποθηκεύστε τα αρχεία .mood απευθείας στους φακέλους τραγουδιών"
+
+msgid "Invalid MTP device: %1"
+msgstr "Μη έγκυρη συσκευή MTP: %1"
+
+msgid "Could not open MTP device."
+msgstr "Αδυναμία ανοίγματος συσκευής MTP."
+
+msgid "MTP error: %1"
+msgstr "Σφάλμα MTP: %1"
+
+msgid "MTP device not found."
+msgstr "Η συσκευή MTP δεν βρέθηκε."
+
+msgid "Loading MTP device"
+msgstr "Φόρτωση συσκευής MTP"
+
+msgid "Error connecting MTP device %1"
+msgstr "Σφάλμα κατά τη σύνδεση της συσκευής MTP %1"
+
+msgid "Error connecting MTP device %1: %2"
+msgstr "Σφάλμα κατά τη σύνδεση της συσκευής MTP %1: %2"
+
+msgid "Network Proxy"
+msgstr "Διαμεσολαβητής Δικτύου"
+
+msgid "&Use the system proxy settings"
+msgstr "&Χρήση των ρυθμίσεων διαμεσολαβητή συστήματος"
+
+msgid "Direct internet connection"
+msgstr "Απευθείας σύνδεση στο διαδίκτυο"
+
+msgid "&Manual proxy configuration"
+msgstr "&Χειροκίνητη διαμόρφωση διαμεσολαβητή"
+
+msgid "HTTP proxy"
+msgstr "Διαμεσολαβητής HTTP"
+
+msgid "SOCKS proxy"
+msgstr "Διαμεσολαβητής SOCKS"
+
+msgid "Port"
+msgstr "Θύρα"
+
+msgid "Use authentication"
+msgstr "Χρήση ταυτοποίησης"
+
+msgid "Username"
+msgstr "Όνομα χρήστη"
+
+msgid "Password"
+msgstr "Κωδικός πρόσβασης"
+
+msgid "Use proxy settings for streaming"
+msgstr "Χρήση ρυθμίσεων διακομιστή μεσολάβησης για τη ροή"
+
+msgid "Only HTTP proxy is supported for streaming."
+msgstr "Only HTTP proxy is supported for streaming."
+
+msgid "Notifications"
+msgstr "Ειδοποιήσεις"
+
+msgid "Strawberry can show a message when the track changes."
+msgstr "Το Strawberry μπορεί να εμφανίσει ένα μήνυμα όταν αλλάζει το τραγούδι."
+
+msgid "Notification type"
+msgstr "Τύπος ειδοποίησης"
+
+#. Refers to a disabled notification type in Notification settings.
+msgid "Disabled"
+msgstr "Ανενεργό"
+
+msgid "Show a &native desktop notification"
+msgstr "Εμφάνιση μιας ειδοποίησης &εγγενούς επιφάνειας εργασίας"
+
+msgid "Show a pretty OSD"
+msgstr "Εμφάνιση όμορφου OSD"
+
+msgid "Show a popup fro&m the system tray"
+msgstr "Εμφάνιση αναδυόμενου παράθυρου από το πλαίσιο συστήματος"
+
+msgid "General settings"
+msgstr "Γενικές Ρυθμίσεις"
+
+msgid "Popup duration"
+msgstr "Διάρκεια αναδυόμενου μενού"
+
+msgid " seconds"
+msgstr " δευτερόλεπτα"
+
+msgid "Disable duration"
+msgstr "Απενεργοποίηση διάρκειας"
+
+msgid "Show a notification when I change the volume"
+msgstr "Εμφάνιση ειδοποίησης όταν αλλάζω την ένταση"
+
+msgid "Show a notification when I change the repeat/shuffle mode"
+msgstr "Show a notification when I change the repeat/shuffle mode"
+
+msgid "Show a notification when I pause playback"
+msgstr "Εμφάνιση ειδοποίησης κατά την παύση αναπαραγωγής"
+
+msgid "Show a notification when I resume playback"
+msgstr "Εμφάνιση ειδοποίησης όταν συνεχίσω την αναπαραγωγή"
+
+msgid "Include album art in the notification"
+msgstr "Συμπερίληψη εξώφυλλου άλμπουμ στην ειδοποίηση"
+
+msgid "Custom message settings"
+msgstr "Προσαρμοσμένες ρυθμίσεις μηνύματος"
+
+msgid "Use a custom message for notifications"
+msgstr "Χρήση προσαρμοσμένου μηνύματος για ειδοποιήσεις"
+
+msgid "Body"
+msgstr "Κείμενο"
+
+msgid "Pretty OSD options"
+msgstr "Όμορφες επιλογές OSD"
+
+msgid "Background color"
+msgstr "Χρώμα φόντου"
+
+msgid "Text options"
+msgstr "Επιλογές κειμένου"
+
+msgid "Choose font..."
+msgstr "Επιλέξτε γραμματοσειρά..."
+
+msgid "Choose color..."
+msgstr "Επιλέξτε χρώμα..."
+
+msgid "Background opacity"
+msgstr "Αδιαφάνεια υποβάθρου"
+
+msgid "Basic Blue"
+msgstr "Βασικό Μπλε"
+
+msgid "Strawberry Red"
+msgstr "Srawberry Κόκκινο"
+
+msgid "Custom..."
+msgstr "Προσαρμογή..."
+
+msgid "Enable fading"
+msgstr "Ενεργοποίηση fading"
+
+msgid "%originalyear%"
+msgstr "%originalyear%"
+
+msgid "OSD Preview"
+msgstr "Προεπισκόπηση OSD"
+
+msgid "Drag to reposition"
+msgstr "Σύρετε για επανατοποθέτηση"
+
+msgid "Discord"
+msgstr "Discord"
+
+msgid "Enable Rich Presence"
+msgstr "Ενεργοποίηση Rich Presence"
+
+msgid "\"Listening to...\""
+msgstr "\"Listening to...\""
+
+msgid "Strawberry"
+msgstr "Srawberry"
+
+msgid "Artist name"
+msgstr "Όνομα καλλιτέχνη"
+
+msgid "Song title"
+msgstr "Τίτλος Τραγουδιού"
+
+msgid "Please open this URL in your browser"
+msgstr "Παρακαλώ ανοίξτε αυτό το URL στο πρόγραμμα περιήγησης"
+
+msgid "Received invalid reply from web browser."
+msgstr "Λήφθηκε μη έγκυρη απάντηση από το πρόγραμμα περιήγησης."
+
+msgid "Redirect URL is missing query."
+msgstr "Redirect URL is missing query."
+
+msgid "Request URL is missing code!"
+msgstr "Request URL is missing code!"
+
+msgid "Request URL is missing state!"
+msgstr "Request URL is missing state!"
+
+msgid "Request URL has wrong state %1 != %2"
+msgstr "Request URL has wrong state %1 != %2"
+
+msgid "disc %1"
+msgstr "δίσκος %1"
+
+msgid "track %1"
+msgstr "τραγούδι %1"
+
+msgid "Paused"
+msgstr "Σε παύση"
+
+msgid "Stopped"
+msgstr "Διακόπηκε"
+
+msgid "Stop playing after track: %1"
+msgstr "Διακοπή αναπαραγωγής μετά το τραγούδι: %1"
+
+msgid "On"
+msgstr "Ενεργό"
+
+msgid "Off"
+msgstr "Ανενεργό"
+
+msgid "Playlist finished"
+msgstr "Ολοκλήρωση λίστας"
+
+msgid "Volume %1%"
+msgstr "Ένταση %1%"
+
+msgid "Don't shuffle"
+msgstr "Don't shuffle"
+
+msgid "Shuffle all"
+msgstr "Τυχαία αναπαραγωγή όλων"
+
+msgid "Shuffle tracks in this album"
+msgstr "Τυχαία αναπαραγωγή τραγουδιών σε αυτό το άλμπουμ"
+
+msgid "Shuffle albums"
+msgstr "Τυχαίο άλμπουμ"
+
+msgid "Shuffle grouping"
+msgstr "Τυχαίο ομαδοποίηση"
+
+msgid "Don't repeat"
+msgstr "Μη επανάληψη"
+
+msgid "Repeat track"
+msgstr "Επανάληψη τραγουδιού"
+
+msgid "Repeat album"
+msgstr "Επανάληψη άλμπουμ"
+
+msgid "Repeat playlist"
+msgstr "Επανάληψη λίστας"
+
+msgid "Stop after every track"
+msgstr "Παύση μετά από κάθε τραγούδι"
+
+msgid "Intro tracks"
+msgstr "Εισαγωγικά κομμάτια"
+
+msgid "Organizing files"
+msgstr "Οργάνωση αρχείων"
+
+msgid "Organize Files"
+msgstr "Οργάνωση αρχείων"
+
+msgid "Destination"
+msgstr "Προορισμός"
+
+msgid "After copying..."
+msgstr "Μετά την αντιγραφή..."
+
+msgid "Keep the original files"
+msgstr "Κρατήστε τα αρχικά αρχεία"
+
+msgid "Delete the original files"
+msgstr "Διαγραφή των αρχικών αρχείων"
+
+msgid "Naming options"
+msgstr "Επιλογές ονομασίας"
+
+msgid "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+msgstr "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+
+msgid "Insert..."
+msgstr "Εισαγωγή..."
+
+msgid "Remove problematic characters from filenames"
+msgstr "Αφαίρεση προβληματικών χαρακτήρων από ονόματα αρχείων"
+
+msgid "Restrict to characters allowed on FAT filesystems"
+msgstr "Περιορισμός στους χαρακτήρες που επιτρέπονται στα FAT συστήματα αρχείων"
+
+msgid "Restrict characters to ASCII"
+msgstr "Περιορισμός χαρακτήρων στο ASCII"
+
+msgid "Allow extended ASCII characters"
+msgstr "Να επιτρέπονται εκτεταμένοι χαρακτήρες ASCII"
+
+msgid "Replace spaces with underscores"
+msgstr "Αντικατάσταση των κενών με κάτω παύλες"
+
+msgid "Overwrite existing files"
+msgstr "Αντικατάσταση υφιστάμενων αρχείων"
+
+msgid "Copy album cover artwork"
+msgstr "Αντιγραφή εξώφυλλου άλμπουμ"
+
+msgid "Safely remove the device after copying"
+msgstr "Ασφαλής αφαίρεση της συσκευής μετά την αντιγραφή"
+
+msgid "Artist's initial"
+msgstr "Αρχικά καλλιτέχνη"
+
+msgid "File extension"
+msgstr "Επέκταση αρχείου"
+
+msgid "Error copying songs"
+msgstr "Σφάλμα αντιγραφής τραγουδιών"
+
+msgid "There were problems copying some songs.  The following files could not be copied:"
+msgstr "Υπήρξαν προβλήματα στην αντιγραφή κάποιων τραγουδιών. Τα ακόλουθα αρχεία δεν μπόρεσαν να αντιγραφούν:"
+
+msgid "Error deleting songs"
+msgstr "Σφάλμα διαγραφής τραγουδιών"
+
+msgid "There were problems deleting some songs.  The following files could not be deleted:"
+msgstr "Υπήρξαν προβλήματα κατά τη διαγραφή μερικών τραγουδιών. Τα ακόλουθα αρχεία δεν μπόρεσαν να διαγραφούν:"
+
+msgid "Don't know how to handle %1"
+msgstr "Don't know how to handle %1"
+
+msgid "File %1 does not exist"
+msgstr "Το αρχείο %1 δεν υπάρχει"
+
+msgid "Could not read file %1: %2"
+msgstr "Αδυναμία αντιγραφής αρχείου %1 στο %2"
+
+msgid "Small album cover"
+msgstr "Μικρό εξώφυλλο άλμπουμ"
+
+msgid "Large album cover"
+msgstr "Μεγάλο εξώφυλλο άλμπουμ"
+
+msgid "Fit cover to width"
+msgstr "Προσαρμόστε το κάλυμμα στο πλάτος"
+
+msgid "Show above status bar"
+msgstr "Εμφάνιση πάνω από τη γραμμή κατάστασης"
+
+msgid "Title Sort"
+msgstr "Ταξινόμηση τίτλων"
+
+msgid "Artist Sort"
+msgstr "Ταξινόμηση καλλιτέχνη"
+
+msgid "Album Sort"
+msgstr "Ταξινόμηση άλμπουμ"
+
+msgid "Original Year"
+msgstr "Αρχικό Έτος"
+
+msgid "Album Artist"
+msgstr "Καλλιτέχνης Άλμπουμ"
+
+msgid "Album Artist Sort"
+msgstr "Ταξινόμηση άλμπουμ καλλιτέχνη"
+
+msgid "Composer Sort"
+msgstr "Ταξινόμηση συνθέτη"
+
+msgid "Performer Sort"
+msgstr "Ταξινόμηση εκτελεστή"
+
+msgid "Play Count"
+msgstr "Φορές αναπαραγωγής"
+
+msgid "Skip Count"
+msgstr "Παράλειψη καταμέτρησης"
+
+msgid "Last Played"
+msgstr "Τελευταία αναπαραγωγή"
+
+msgid "Sample Rate"
+msgstr "Ρυθμός Δειγμάτων"
+
+msgid "Bit Depth"
+msgstr "Βάθος bit"
+
+msgid "Initial key"
+msgstr "Initial key"
+
+msgid "File Name (without path)"
+msgstr "Όνομα Αρχείου (χωρίς διαδρομή)"
+
+msgid "File Size"
+msgstr "Μέγεθος αρχείου"
+
+msgid "File Type"
+msgstr "Τύπος αρχείου"
+
+msgid "Date Modified"
+msgstr "Ημερομηνία τροποποίησης"
+
+msgid "Date Created"
+msgstr "Ημερομηνία Δημιουργίας"
+
+msgid "Source"
+msgstr "Πηγή"
+
+msgid "BPM"
+msgstr "BPM"
+
+msgid "Mood"
+msgstr "Διάθεση"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "CUE"
+msgstr "CUE"
+
+msgid "Integrated Loudness"
+msgstr "Ενσωματωμένη Ζωηρότητα"
+
+msgid "Loudness Range"
+msgstr "Loudness Range"
+
+msgid "Undo"
+msgstr "Αναίρεση"
+
+msgid "Redo"
+msgstr "Επανάληψη"
+
+msgid "Load playlist"
+msgstr "Φόρτωση λίστας"
+
+msgid "No matches found.  Clear the search box to show the whole playlist again."
+msgstr "Δεν βρέθηκαν αποτελέσματα. Καθαρίστε το πλαίσιο αναζήτησης για να εμφανιστεί ολόκληρη η λίστα αναπαραγωγής."
+
+msgid "stop"
+msgstr "παύση"
+
+msgid "Loading smart playlist"
+msgstr "Φόρτωση έξυπνης λίστας αναπαραγωγής"
+
+msgid "&Hide..."
+msgstr "&Απόκρυψη..."
+
+msgid "&Stretch columns to fit window"
+msgstr "&Επέκταση στηλών για προσαρμογή στο παράθυρο"
+
+msgid "&Reset columns to default"
+msgstr "&Επαναφορά στηλών στις προεπιλογές"
+
+msgid "&Lock rating"
+msgstr "&Κλείδωμα βαθμολογίας"
+
+msgid "&Align text"
+msgstr "&Align text"
+
+msgid "&Left"
+msgstr "&Αριστερά"
+
+msgid "&Center"
+msgstr "&Κέντρο"
+
+msgid "&Right"
+msgstr "&Δεξιά"
+
+msgid "&Hide %1"
+msgstr "&Απόκρυψη %1"
+
+msgid "New folder"
+msgstr "Νέος φάκελος"
+
+msgid "Delete"
+msgstr "Διαγραφή"
+
+#. Save playlist menu action.
+msgid "Save playlist"
+msgstr "Αποθήκευση λίστας αναπαραγωγής"
+
+msgid "Enter the name of the folder"
+msgstr "Εισάγετε το όνομα του φακέλου"
+
+msgid "Copy songs to playlist"
+msgstr "Αντιγραφή τραγουδιών στη λίστα αναπαραγωγής"
+
+msgid "Copy to device"
+msgstr "Αντιγραφή στη συσκευή"
+
+msgid "Playlist must be open first."
+msgstr "Η λίστα αναπαραγωγής πρέπει να είναι ανοιχτή πρώτα."
+
+msgid "Remove playlists"
+msgstr "Αφαίρεση λιστών αναπαραγωγής"
+
+msgid "You are about to remove %1 playlists from your favorites, are you sure?"
+msgstr "Πρόκειται να αφαιρέσετε %1 λίστες αναπαραγωγής από τα αγαπημένα σας, είστε σίγουρος/η?"
+
+msgid "You can favorite playlists by clicking the star icon next to a playlist name"
+msgstr "Μπορείτε να κάνετε αγαπημένες λίστες αναπαραγωγής κάνοντας κλικ στο εικονίδιο με το αστέρι δίπλα στο όνομα της λίστας αναπαραγωγής"
+
+msgid "Favorited playlists will be saved here"
+msgstr "Οι αγαπημένες λίστες αναπαραγωγής θα αποθηκευτούν εδώ"
+
+msgid "Couldn't create playlist"
+msgstr "Αδυναμία δημιουργίας λίστας αναπαραγωγής"
+
+msgid "Unknown playlist extension"
+msgstr "Άγνωστη επέκταση λίστας αναπαραγωγής"
+
+msgid "Unknown file extension for playlist."
+msgstr "Άγνωστη επέκταση αρχείου για τη λίστα αναπαραγωγής."
+
+msgid "%1 selected of"
+msgstr "%1 επιλέχθηκε από"
+
+msgid "%n track(s)"
+msgid_plural "%n track(s)"
+msgstr[0] "%n κομμάτι(α)"
+msgstr[1] "%n κομμάτι(α)"
+
+msgid "All playlists (%1)"
+msgstr "Όλες οι λίστες αναπαραγωγής (%1)"
+
+msgid "%1 playlists (%2)"
+msgstr "%1 λίστες αναπαραγωγής (%2)"
+
+msgid "Unknown filetype: %1"
+msgstr "Άγνωστος τύπος αρχείου: %1"
+
+msgid "Could not open file %1"
+msgstr "Αδυναμία ανοίγματος αρχείου %1"
+
+msgid "Directory %1 does not exist."
+msgstr "Ο κατάλογος %1 δεν υπάρχει."
+
+msgid "Failed to open %1 for writing."
+msgstr "Αποτυχία ανοίγματος %1 για εγγραφή."
+
+msgid "Playlist options"
+msgstr "Ρυθμίσεις λίστας αναπαραγωγής"
+
+msgid "File paths"
+msgstr "Διαδρομή αρχείου"
+
+msgid "This can be changed later through the preferences"
+msgstr "Αυτό μπορεί να αλλάξει αργότερα μέσω των προτιμήσεων"
+
+msgid "Remember my choice"
+msgstr "Απομνημόνευση της επιλογής μου"
+
+msgid "Automatic"
+msgstr "Αυτόματα"
+
+msgid "Relative"
+msgstr "Σχετικό"
+
+msgid "Absolute"
+msgstr "Απόλυτο"
+
+msgid "Repeat"
+msgstr "Επανάληψη"
+
+msgid "Shuffle"
+msgstr "Τυχαία Αναπαραγωγή"
+
+msgid "Stop after each track"
+msgstr "Παύση μετά από κάθε τραγούδι"
+
+msgid "Use alternating row colors"
+msgstr "Χρήση εναλλασσόμενων χρωμάτων γραμμής"
+
+msgid "Show bars on the currently playing track"
+msgstr "Show bars on the currently playing track"
+
+msgid "Show a glowing animation on the currently playing track"
+msgstr "Εμφάνιση φωτεινού εφέ στο τρέχον κομμάτι αναπαραγωγής"
+
+msgid "Warn me when closing a playlist tab"
+msgstr "Προειδοποίηση κατά το κλείσιμο μιας καρτέλας λίστας"
+
+msgid "Continue to the next item in the playlist if a song is unavailable"
+msgstr "Συνέχεια στο επόμενο αντικείμενο της λίστας αναπαραγωγής αν ένα τραγούδι δεν είναι διαθέσιμο"
+
+msgid "Grey out unavailable songs in playlists on playback"
+msgstr "Grey out unavailable songs in playlists on playback"
+
+msgid "Grey out unavailable songs in playlists on startup"
+msgstr "Grey out unavailable songs in playlists on startup"
+
+msgid "Automatically select current playing track"
+msgstr "Αυτόματη επιλογή τρέχοντος κομματιού"
+
+msgid "Enable playlist toolbar"
+msgstr "Ενεργοποίηση γραμμής εργαλείων λίστας αναπαραγωγής"
+
+msgid "Enable playlist clear button"
+msgstr "Ενεργοποίηση κουμπιού εκκαθάρισης λίστας αναπαραγωγής"
+
+msgid "Automatically sort playlist when inserting songs"
+msgstr "Αυτόματη ταξινόμηση λίστας αναπαραγωγής κατά την εισαγωγή τραγουδιών"
+
+msgid "When saving a playlist, file paths should be"
+msgstr "Κατά την αποθήκευση μιας λίστας αναπαραγωγής, οι διαδρομές αρχείων θα πρέπει να είναι"
+
+msgid "A&utomatic"
+msgstr "Α&υτόματο"
+
+msgid "Absolu&te"
+msgstr "Απόλυ&το"
+
+msgid "Re&lative"
+msgstr "&Σχετικό"
+
+msgid "As&k when saving"
+msgstr "&Ερώτηση κατά την αποθήκευση"
+
+msgid "Metadata"
+msgstr "Μεταδεδομένα"
+
+msgid "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+msgstr "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+
+msgid "Enable song metadata inline edition with click"
+msgstr "Enable song metadata inline edition with click"
+
+msgid "Write metadata when saving playlists"
+msgstr "Εγγραφή μεταδεδομένων κατά την αποθήκευση λιστών αναπαραγωγής"
+
+msgid "Star playlist"
+msgstr "Star playlist"
+
+msgid "Close playlist"
+msgstr "Κλείσιμο λίστας αναπαραγωγής"
+
+msgid "Rename playlist..."
+msgstr "Μετονομασία λίστας αναπαραγωγής..."
+
+msgid "Save playlist..."
+msgstr "Αποθήκευση λίστας αναπαραγωγής..."
+
+msgid "Rename playlist"
+msgstr "Μετονομασία λίστας αναπαραγωγής"
+
+msgid "Enter a new name for this playlist"
+msgstr "Εισάγετε ένα νέο όνομα για αυτή τη λίστα αναπαραγωγής"
+
+msgid "Remove playlist"
+msgstr "Αφαίρεση λίστας αναπαραγωγής"
+
+msgid "You are about to remove a playlist which is not part of your favorite playlists: the playlist will be deleted (this action cannot be undone). \nAre you sure you want to continue?"
+msgstr "Πρόκειται να καταργήσετε μια λίστα αναπαραγωγής που δεν αποτελεί μέρος των αγαπημένων σας λιστών αναπαραγωγής: η λίστα αναπαραγωγής θα διαγραφεί (η ενέργεια αυτή δεν μπορεί να αναιρεθεί). \nΕίστε σίγουροι ότι θέλετε να συνεχίσετε;"
+
+msgid "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+msgstr "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+
+msgid "Hz"
+msgstr "Hz"
+
+msgid "Bit"
+msgstr "Bit"
+
+msgid "Usage"
+msgstr "Χρήση"
+
+msgid "options"
+msgstr "επιλογές"
+
+msgid "URL(s)"
+msgstr "URL(s)"
+
+msgid "Player options"
+msgstr "Επιλογές αναπαραγωγής"
+
+msgid "Start the playlist currently playing"
+msgstr "Start the playlist currently playing"
+
+msgid "Play if stopped, pause if playing"
+msgstr "Play if stopped, pause if playing"
+
+msgid "Pause playback"
+msgstr "Παύση αναπαραγωγής"
+
+msgid "Stop playback"
+msgstr "Διακοπή αναπαραγωγής"
+
+msgid "Stop playback after current track"
+msgstr "Παύση αναπαραγωγής μετά το τρέχον κομμάτι"
+
+msgid "Skip backwards in playlist"
+msgstr "Μετάβαση προς τα πίσω στη λίστα"
+
+msgid "Skip forwards in playlist"
+msgstr "Μετάβαση μπροστά στη λίστα αναπαραγωγής"
+
+msgid "Set the volume to <value> percent"
+msgstr "Ορίστε την ένταση σε <value> τοις εκατό"
+
+msgid "Increase the volume by 4 percent"
+msgstr "Αύξηση της έντασης κατά 4 τοις εκατό"
+
+msgid "Decrease the volume by 4 percent"
+msgstr "Μείωση έντασης κατά 4 τοις εκατό"
+
+msgid "Increase the volume by <value> percent"
+msgstr "Αύξηση της έντασης κατά <value> τοις εκατό"
+
+msgid "Decrease the volume by <value> percent"
+msgstr "Μείωση της έντασης κατά <value> τοις εκατό"
+
+msgid "Seek the currently playing track to an absolute position"
+msgstr "Seek the currently playing track to an absolute position"
+
+msgid "Seek the currently playing track by a relative amount"
+msgstr "Seek the currently playing track by a relative amount"
+
+msgid "Restart the track, or play the previous track if within 8 seconds of start."
+msgstr "Restart the track, or play the previous track if within 8 seconds of start."
+
+msgid "Create a new playlist with files"
+msgstr "Δημιουργία νέας λίστας αναπαραγωγής με αρχεία"
+
+msgid "Append files/URLs to the playlist"
+msgstr "Προσάρτηση αρχείων/URL στη λίστα αναπαραγωγής"
+
+msgid "Loads files/URLs, replacing current playlist"
+msgstr "Φόρτωση αρχείων/URL, αντικατάσταση της τρέχουσας λίστας αναπαραγωγής"
+
+msgid "Play the <n>th track in the playlist"
+msgstr "Play the <n>th track in the playlist"
+
+msgid "Play given playlist"
+msgstr "Αναπαραγωγή δοσμένης λίστας αναπαραγωγής"
+
+msgid "Other options"
+msgstr "Άλλες επιλογές"
+
+msgid "Display the on-screen-display"
+msgstr "Εμφάνιση της on-screen-display"
+
+msgid "Toggle visibility for the pretty on-screen-display"
+msgstr "Toggle visibility for the pretty on-screen-display"
+
+msgid "Change the language"
+msgstr "Αλλαγή γλώσσας"
+
+msgid "Resize the window"
+msgstr "Αλλαγή μεγέθους παραθύρου"
+
+msgid "Equivalent to --log-levels *:1"
+msgstr "Ισοδύναμος με το --log-levels *:1"
+
+msgid "Equivalent to --log-levels *:3"
+msgstr "Ισοδύναμος με το --log-levels *:3"
+
+msgid "Comma separated list of class:level, level is 0-3"
+msgstr "Comma separated list of class:level, level is 0-3"
+
+msgid "Print out version information"
+msgstr "Πληροφορίες έκδοσης"
+
+msgid "Create fingerprint"
+msgstr "Δημιουργία μοναδικού αποτυπώματος"
+
+msgid "Failed to create directory %1."
+msgstr "Αποτυχία δημιουργίας καταλόγου %1."
+
+msgid "Destination file %1 exists, but not allowed to overwrite."
+msgstr "Το αρχείο προορισμού %1 υπάρχει, αλλά δεν επιτρέπεται να αντικατασταθεί."
+
+msgid "Destination file %1 exists, but not allowed to overwrite"
+msgstr "Το αρχείο προορισμού %1 υπάρχει, αλλά δεν επιτρέπεται να αντικατασταθεί"
+
+msgid "Could not copy file %1 to %2."
+msgstr "Αδυναμία αντιγραφής αρχείου %1 στο %2."
+
+msgid "LUFS"
+msgstr "LUFS"
+
+msgid "LU"
+msgstr "LU"
+
+msgid "1 day"
+msgstr "1 ημέρα"
+
+msgid "%1 days"
+msgstr "%1 ημέρες"
+
+msgid "Today"
+msgstr "Σήμερα"
+
+msgid "Yesterday"
+msgstr "Χθες"
+
+msgid "%1 days ago"
+msgstr "%1 ημέρες πριν"
+
+msgid "Tomorrow"
+msgstr "Αύριο"
+
+msgid "In %1 days"
+msgstr "Σε %1 ημέρες"
+
+msgid "Next week"
+msgstr "Την επόμενη εβδομάδα"
+
+msgid "In %1 weeks"
+msgstr "Σε %1 εβδομάδες"
+
+msgid "Show in file browser"
+msgstr "Εμφάνιση στον περιηγητή αρχείων"
+
+msgid "Too many songs selected."
+msgstr "Επιλέχθηκαν πάρα πολλά τραγούδια."
+
+msgid "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+msgstr "%1 τραγούδια σε διαφορετικούς καταλόγους %2 επιλέχθηκαν, είστε σίγουροι ότι θέλετε να τα ανοίξετε όλα;"
+
+msgid "Failed to load image from data for %1"
+msgstr "Αποτυχία φόρτωσης εικόνας από δεδομένα για %1"
+
+msgid "Success"
+msgstr "Επιτυχία"
+
+msgid "File is unsupported"
+msgstr "Το αρχείο δεν υποστηρίζεται"
+
+msgid "Filename is missing"
+msgstr "Απουσία ονόματος αρχείου"
+
+msgid "File does not exist"
+msgstr "Το αρχείο δεν υπάρχει"
+
+msgid "File could not be opened"
+msgstr "Δεν ήταν δυνατό το άνοιγμα του αρχείου"
+
+msgid "Could not parse file"
+msgstr "Αδυναμία ανοίγματος αρχείου"
+
+msgid "Could not save file"
+msgstr "Αδυναμία αποθήκευσης αρχείου"
+
+msgid "Unknown error"
+msgstr "Άγνωστο σφάλμα"
+
+msgid "Prefix a search term with a field name to limit the search to that field, e.g.:"
+msgstr "Prefix a search term with a field name to limit the search to that field, e.g.:"
+
+msgid "artist"
+msgstr "καλλιτέχνης"
+
+msgid "searches for all artists containing the word %1."
+msgstr "αναζητήσεις για όλους τους καλλιτέχνες που περιέχουν τη λέξη %1."
+
+msgid "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+msgstr "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+
+msgid "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+msgstr "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+
+msgid "rating"
+msgstr "αξιολόγηση"
+
+msgid "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+msgstr "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+
+msgid "Available fields"
+msgstr "Διαθέσιμα πεδία"
+
+msgid "after"
+msgstr "μετά"
+
+msgid "before"
+msgstr "πριν"
+
+msgid "on"
+msgstr "στο"
+
+msgid "not on"
+msgstr "όχι σε"
+
+msgid "in the last"
+msgstr "στο τελευταίο"
+
+msgid "not in the last"
+msgstr "όχι στο τελευταίο"
+
+msgid "between"
+msgstr "μεταξύ"
+
+msgid "contains"
+msgstr "περιέχει"
+
+msgid "does not contain"
+msgstr "δεν περιέχει"
+
+msgid "starts with"
+msgstr "ξεκινά με"
+
+msgid "ends with"
+msgstr "τελειώνει με"
+
+msgid "greater than"
+msgstr "μεγαλύτερο από"
+
+msgid "less than"
+msgstr "λιγότερο από"
+
+msgid "equals"
+msgstr "ίσον"
+
+msgid "not equals"
+msgstr "δεν ισούται με"
+
+msgid "empty"
+msgstr "κενό"
+
+msgid "not empty"
+msgstr "δεν είναι κενό"
+
+msgid "A-Z"
+msgstr "Α-Ω"
+
+msgid "Z-A"
+msgstr "Ω-Α"
+
+msgid "oldest first"
+msgstr "παλαιότερο πρώτα"
+
+msgid "newest first"
+msgstr "νεότερο πρώτα"
+
+msgid "shortest first"
+msgstr "μικρότερο πρώτα"
+
+msgid "longest first"
+msgstr "μεγαλύτερο πρώτα"
+
+msgid "smallest first"
+msgstr "μικρότερο πρώτα"
+
+msgid "biggest first"
+msgstr "μεγαλύτερο πρώτα"
+
+msgid "Hours"
+msgstr "Ώρες"
+
+msgid "Days"
+msgstr "Ημέρες"
+
+msgid "Weeks"
+msgstr "Εβδομάδες"
+
+msgid "Months"
+msgstr "Μήνες"
+
+msgid "Years"
+msgstr "Έτη"
+
+msgid "Normal"
+msgstr "Κανονικός"
+
+msgid "Angry"
+msgstr "Θυμωμένος"
+
+msgid "Frozen"
+msgstr "Παγωμένο"
+
+msgid "Happy"
+msgstr "Χαρούμενος"
+
+msgid "System colors"
+msgstr "Χρώματα συστήματος"
+
+msgid "add %n songs"
+msgid_plural "add %n songs"
+msgstr[0] "προσθήκη %n τραγουδιών"
+msgstr[1] "προσθήκη %n τραγουδιών"
+
+msgid "remove %n songs"
+msgid_plural "remove %n songs"
+msgstr[0] "αφαίρεση %n τραγουδιών"
+msgstr[1] "αφαίρεση %n τραγουδιών"
+
+msgid "move %n songs"
+msgid_plural "move %n songs"
+msgstr[0] "μετακίνηση %n τραγουδιών"
+msgstr[1] "μετακίνηση %n τραγουδιών"
+
+msgid "sort songs"
+msgstr "ταξινόμηση τραγουδιών"
+
+msgid "shuffle songs"
+msgstr "ανακάτεμα τραγουδιών"
+
+msgid "Invalid collection directory"
+msgstr "Μη έγκυρος φάκελος συλλογής"
+
+msgid "Can't add directory %1 with special filesystem %2 to collection"
+msgstr "Can't add directory %1 with special filesystem %2 to collection"
+
+msgid "Clear"
+msgstr "Εκκαθάριση"
+
+msgid "Reset"
+msgstr "Επαναφορά"
+
+msgid "Not authenticated"
+msgstr "Μη ταυτοποιημένο"
+
+msgid "No track ID"
+msgstr "Δεν υπάρχει ID κομματιού"
+
+msgid "Receiving artists..."
+msgstr "Λήψη καλλιτεχνών..."
+
+msgid "Receiving albums..."
+msgstr "Λήψη άλμπουμ..."
+
+msgid "Receiving songs..."
+msgstr "Λήψη τραγουδιών..."
+
+msgid "Searching..."
+msgstr "Αναζήτηση..."
+
+msgid "Receiving albums for %1 artist..."
+msgstr "Λήψη άλμπουμ για καλλιτέχνη %1..."
+
+msgid "Receiving songs for %1 album..."
+msgstr "Λήψη τραγουδιών για το άλμπουμ %1..."
+
+msgid "Receiving songs for %1 albums..."
+msgstr "Λήψη τραγουδιών για %1 άλμπουμς..."
+
+msgid "Receiving album cover for %1 album..."
+msgstr "Λήψη εξωφύλλου για το άλμπουμ %1..."
+
+msgid "Receiving album covers for %1 albums..."
+msgstr "Λήψη εξώφυλλων για άλμπουμ %1..."
+
+msgid "No match."
+msgstr "Δεν ταιριάζει."
+
+msgid "Missing Qobuz app ID."
+msgstr "Λείπει το αναγνωριστικό εφαρμογής Qobuz."
+
+msgid "Missing app ID. Please fetch credentials first."
+msgstr "Missing app ID. Please fetch credentials first."
+
+msgid "Missing app secret. Please fetch credentials first."
+msgstr "Missing app secret. Please fetch credentials first."
+
+msgid "Missing private key. Please fetch credentials first."
+msgstr "Missing private key. Please fetch credentials first."
+
+msgid "Failed to start local server for OAuth redirect: %1"
+msgstr "Failed to start local server for OAuth redirect: %1"
+
+msgid "Failed to open the web browser. Please open this URL manually: %1"
+msgstr "Failed to open the web browser. Please open this URL manually: %1"
+
+msgid "Waiting for browser authentication..."
+msgstr "Αναμονή για έλεγχο ταυτότητας περιηγητή..."
+
+msgid "OAuth redirect failed: %1"
+msgstr "Η ανακατεύθυνση OAuth απέτυχε: %1"
+
+msgid "OAuth redirect is missing authorization code."
+msgstr "OAuth redirect is missing authorization code."
+
+msgid "Exchanging authorization code..."
+msgstr "Exchanging authorization code..."
+
+msgid "Not authenticated with Qobuz."
+msgstr "Δεν έχει πιστοποιηθεί με Qobuz."
+
+msgid "Missing Qobuz app ID or secret."
+msgstr "Λείπει Qobuz app ID ή μυστικό."
+
+msgid "Not authenticated. Please login to Qobuz in the settings."
+msgstr "Not authenticated. Please login to Qobuz in the settings."
+
+msgid "Enable"
+msgstr "Ενεργοποίηση"
+
+msgid "App ID"
+msgstr "ID Εφαρμογής"
+
+msgid "App Secret"
+msgstr "Μυστικό App"
+
+msgid "Preferences"
+msgstr "Προτιμήσεις"
+
+msgid "Audio format"
+msgstr "Μορφότυπο ήχου"
+
+msgid "Search delay"
+msgstr "Καθυστέρηση αναζήτησης"
+
+msgid "ms"
+msgstr "ms"
+
+msgid "Artists search limit"
+msgstr "Όριο αναζήτησης καλλιτεχνών"
+
+msgid "Albums search limit"
+msgstr "Όριο αναζήτησης άλμπουμ"
+
+msgid "Songs search limit"
+msgstr "Όριο αναζήτησης τραγουδιών"
+
+msgid "Download album covers"
+msgstr "Λήψη εξώφυλλων άλμπουμ"
+
+msgid "Configuration incomplete"
+msgstr "Μη ολοκληρωμένη διαμόρφωση"
+
+msgid "Missing app id. Please fetch credentials first."
+msgstr "Missing app id. Please fetch credentials first."
+
+msgid "Fetching..."
+msgstr "Fetching..."
+
+msgid "Credentials fetched"
+msgstr "Credentials fetched"
+
+msgid "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+msgstr "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+
+msgid "Credential fetch failed"
+msgstr "Credential fetch failed"
+
+msgid "Fetch Credentials"
+msgstr "Fetch Credentials"
+
+msgid "Remove (Remastered), etc from song titles"
+msgstr "Remove (Remastered), etc from song titles"
+
+msgid "Private key"
+msgstr "Ιδιωτικό Κλειδί"
+
+msgid "Automatically fetch app ID, app secret and private key from Qobuz web player"
+msgstr "Automatically fetch app ID, app secret and private key from Qobuz web player"
+
+msgid "Not authenticated. Please log in on the Qobuz settings page."
+msgstr "Not authenticated. Please log in on the Qobuz settings page."
+
+msgid "Cancelled."
+msgstr "Ακυρώθηκε."
+
+msgid "QueueView"
+msgstr "Προβολή Ουράς"
+
+msgid "Ctrl+Up"
+msgstr "Ctrl+Up"
+
+msgid "Ctrl+Down"
+msgstr "Ctrl+Down"
+
+msgid "Remove"
+msgstr "Αφαίρεση"
+
+msgid "Country"
+msgstr "Χώρα"
+
+msgid "Codec"
+msgstr "Κωδικοποιητής"
+
+msgid "Load more..."
+msgstr "Φόρτωση περισσότερων..."
+
+msgid "Search for radio stations using radio-browser.info"
+msgstr "Αναζήτηση ραδιοφωνικών σταθμών με χρήση radio-browser.info"
+
+msgid "Search radio stations..."
+msgstr "Αναζήτηση ραδιοφωνικών σταθμών..."
+
+msgid "All countries"
+msgstr "Όλες οι χώρες"
+
+msgid "By votes"
+msgstr "Κατά ψήφους"
+
+msgid "By clicks"
+msgstr "Κατά κλικ"
+
+msgid "By name"
+msgstr "Κατά όνομα"
+
+msgid "By bitrate"
+msgstr "Κατά bitrate"
+
+msgid "No stations found."
+msgstr "No stations found."
+
+msgid "%1 stations found"
+msgstr "%1 stations found"
+
+msgid "No Radio Browser server available."
+msgstr "No Radio Browser server available."
+
+msgid "Searching Radio Browser"
+msgstr "Searching Radio Browser"
+
+msgid "Radio Browser search failed: %1"
+msgstr "Radio Browser search failed: %1"
+
+msgid "Getting %1 channels"
+msgstr "Λήψη %1 καναλιών"
+
+msgid "SomaFM"
+msgstr "SomaFM"
+
+msgid "Stream quality:"
+msgstr "Stream quality:"
+
+msgid "Radio Browser"
+msgstr "Radio Browser"
+
+msgid "Search results limit:"
+msgstr "Search results limit:"
+
+msgid "Hide broken stations"
+msgstr "Hide broken stations"
+
+msgid "Default sort order:"
+msgstr "Default sort order:"
+
+msgid "Default country:"
+msgstr "Default country:"
+
+msgid "Highest"
+msgstr "Highest"
+
+msgid "High"
+msgstr "High"
+
+msgid "Low"
+msgstr "Low"
+
+msgid "Open homepage"
+msgstr "Άνοιγμα αρχικής σελίδας"
+
+msgid "Donate"
+msgstr "Κάντε μια δωρεά"
+
+msgid "Refresh channels"
+msgstr "Ανανέωση καναλιών"
+
+msgid "Channels"
+msgstr "Channels"
+
+msgid "Select directory for saving playlists"
+msgstr "Επιλέξτε φάκελο για τις λίστες αναπαραγωγής"
+
+msgid "Type"
+msgstr "Τύπος"
+
+msgid "Select directory for the playlists"
+msgstr "Επιλέξτε φάκελο για τις λίστες αναπαραγωγής"
+
+msgid "Directory does not exist."
+msgstr "Ο κατάλογος δεν υπάρχει."
+
+msgid "Saved Grouping Manager"
+msgstr "Saved Grouping Manager"
+
+msgid "Second Level"
+msgstr "Δεύτερο επίπεδο"
+
+msgid "Third Level"
+msgstr "Τρίτο επίπεδο"
+
+msgid "Scrobbler"
+msgstr "Scrobbler"
+
+msgid "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+msgstr "Τα τραγούδια γίνονται scrobble αν έχουν έγκυρα μεταδεδομένα και είναι μεγαλύτερα από 30 δευτερόλεπτα, παίζουν για τουλάχιστον το ήμισυ της διάρκειας τους ή για 4 λεπτά (όποιο συμβεί νωρίτερα)."
+
+msgid "Show scrobble button"
+msgstr "Εμφάνιση πλήκτρου scrobble"
+
+msgid "Show love button"
+msgstr "Εμφάνιση πλήκτρου αγάπης"
+
+msgid "Submit scrobbles every"
+msgstr "Υποβολή scrobbles κάθε"
+
+msgid "Prefer album artist when sending scrobbles"
+msgstr "Προτίμηση καλλιτέχνη άλμπουμ κατά την αποστολή scrobbles"
+
+msgid "Show dialog for errors"
+msgstr "Εμφάνιση διαλόγου για σφάλματα"
+
+msgid "Strip \"remastered\" and similar from album and title"
+msgstr "Strip \"remastered\" and similar from album and title"
+
+msgid "Enable scrobbling for the following sources:"
+msgstr "Ενεργοποίηση scrobbling για τις ακόλουθες πηγές:"
+
+msgid "Local file"
+msgstr "Τοπικό αρχείο"
+
+msgid "CDDA"
+msgstr "CDDA"
+
+msgid "Stream"
+msgstr "Ροή"
+
+msgid "Radio Paradise"
+msgstr "Radio Paradise"
+
+msgid "Last.fm"
+msgstr "Last.fm"
+
+msgid "Listenbrainz"
+msgstr "Listenbrainz"
+
+msgid "User token:"
+msgstr "Κλειδί χρήστη:"
+
+msgid "Enter your user token from"
+msgstr "Εισάγετε το διακριτικό χρήστη από"
+
+msgid "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+msgstr "Με αυτήν την επιλογή ενεργοποιημένη, τα scrobbles θα αποθηκεύονται προσωρινά στο δίσκο αλλά δεν θα αποστέλλονται στο διακομιστή. Αυτή η επιλογή μπορεί να ενεργοποιηθεί σε περιπτώσεις όπου ο διακομιστής ή η σύνδεση στο διαδίκτυο είναι ασταθής, τα scrobbles θα αποσταλούν όταν η επιλογή είναι απενεργοποιημένη."
+
+msgid "Offline mode (Only cache scrobbles)"
+msgstr "Λειτουργία εκτός σύνδεσης (Μόνο cache scrobbles)"
+
+msgid "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+msgstr "Αυτή είναι η καθυστέρηση μεταξύ του όταν ένα τραγούδι γίνεται scrobbled και όταν scrobbles υποβάλλονται στο διακομιστή. Ρύθμιση του χρόνου σε 0 δευτερόλεπτα θα υποβάλει τα scrobbles αμέσως."
+
+msgid "Settings"
+msgstr "Ρυθμίσεις"
+
+msgid "General"
+msgstr "Γενικά"
+
+msgid "User interface"
+msgstr "Διεπαφή Χρήστη"
+
+msgid "Streaming"
+msgstr "Streaming"
+
+msgid "Search mode"
+msgstr "Μέθοδος αναζήτησης"
+
+msgid "Match every search term (AND)"
+msgstr "Ταίριαξε κάθε όρο αναζήτησης (ΚΑΙ)"
+
+msgid "Match one or more search terms (OR)"
+msgstr "Ταίριαξε έναν ή περισσότερους όρους αναζήτησης (OR)"
+
+msgid "Include all songs"
+msgstr "Συμπερίληψη όλων των τραγουδιών"
+
+msgid "Search terms"
+msgstr "Όροι Αναζήτησης"
+
+msgid "Sorting"
+msgstr "Ταξινόμηση"
+
+msgid "Put songs in a random order"
+msgstr "Τοποθετήστε τα τραγούδια σε τυχαία σειρά"
+
+msgid "Sort songs by"
+msgstr "Ταξινόμηση τραγουδιών κατά"
+
+msgid "Limits"
+msgstr "Όρια"
+
+msgid "Show all the songs"
+msgstr "Εμφάνιση όλων των τραγουδιών"
+
+msgid "Only show the first"
+msgstr "Εμφάνιση μόνο του πρώτου"
+
+msgid " songs"
+msgstr " τραγούδια"
+
+msgid "Collection search"
+msgstr "Αναζήτηση Συλλογής"
+
+msgid "Find songs in your collection that match the criteria you specify."
+msgstr "Βρείτε τραγούδια στη συλλογή σας που ταιριάζουν με τα κριτήρια που έχετε ορίσει."
+
+msgid "A song will be included in the playlist if it matches these conditions."
+msgstr "Ένα τραγούδι θα συμπεριληφθεί στη λίστα αναπαραγωγής αν ταιριάζει με αυτές τις συνθήκες."
+
+msgid "Search options"
+msgstr "Επιλογές αναζήτησης"
+
+msgid "Choose how the playlist is sorted and how many songs it will contain."
+msgstr "Επιλέξτε πώς θα ταξινομηθεί η λίστα αναπαραγωγής και πόσα τραγούδια θα περιέχει."
+
+msgid "%1 songs found (showing %2)"
+msgstr "βρέθηκαν %1 τραγούδια (παρουσίαση %2)"
+
+msgid "%1 songs found"
+msgstr "Βρέθηκαν %1 τραγούδια"
+
+msgid "and"
+msgstr "και"
+
+msgid "ago"
+msgstr "πριν"
+
+msgid "The second value must be greater than the first one!"
+msgstr "Η δεύτερη τιμή πρέπει να είναι μεγαλύτερη από την πρώτη!"
+
+msgid "Add search term"
+msgstr "Προσθήκη όρου αναζήτησης"
+
+msgid "Smart playlist"
+msgstr "Έξυπνη λίστα αναπαραγωγής"
+
+msgid "Playlist type"
+msgstr "Τύπος Λίστας Αναπαραγωγής"
+
+msgid "A smart playlist is a dynamic list of songs that come from your collection.  There are different types of smart playlist that offer different ways of selecting songs."
+msgstr "Μια έξυπνη λίστα αναπαραγωγής είναι μια δυναμική λίστα με τραγούδια που προέρχονται από τη συλλογή σας. Υπάρχουν διαφορετικοί τύποι έξυπνων λιστών αναπαραγωγής που προσφέρουν διαφορετικούς τρόπους επιλογής τραγουδιών."
+
+msgid "Finish"
+msgstr "Τερματισμός"
+
+msgid "Choose a name for your smart playlist"
+msgstr "Επιλέξτε ένα όνομα για την έξυπνη λίστα αναπαραγωγής σας"
+
+msgid "Use dynamic mode"
+msgstr "Χρήση δυναμικής λειτουργίας"
+
+msgid "In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes."
+msgstr "Σε δυναμική λειτουργία νέα κομμάτια θα επιλέγονται και θα προστίθενται στη λίστα αναπαραγωγής κάθε φορά που ένα τραγούδι τελειώνει."
+
+msgid "Newest tracks"
+msgstr "Νεότερα τραγούδια"
+
+msgid "50 random tracks"
+msgstr "50 τυχαία κομμάτια"
+
+msgid "Ever played"
+msgstr "Έπαιξε ποτέ"
+
+msgid "Never played"
+msgstr "Δεν παίχτηκε ποτέ"
+
+msgid "Most played"
+msgstr "Τα πιο παιγμένα"
+
+msgid "Favourite tracks"
+msgstr "Αγαπημένα κομμάτια"
+
+msgid "All tracks"
+msgstr "Όλα τα κομμάτια"
+
+msgid "Dynamic random mix"
+msgstr "Δυναμικό τυχαίο μείγμα"
+
+msgid "New smart playlist"
+msgstr "Νέα έξυπνη λίστα αναπαραγωγής"
+
+msgid "Edit smart playlist"
+msgstr "Επεξεργασία έξυπνης λίστας αναπαραγωγής"
+
+msgid "Delete smart playlist"
+msgstr "Διαγραφή έξυπνης λίστας αναπαραγωγής"
+
+msgid "New smart playlist..."
+msgstr "Νέα έξυπνη λίστα αναπαραγωγής..."
+
+msgid "Play next"
+msgstr "Επόμενο"
+
+msgid "Edit smart playlist..."
+msgstr "Επεξεργασία έξυπνης λίστας αναπαραγωγής..."
+
+msgid "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+msgstr "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+
+msgid "Restore defaults"
+msgstr "Επαναφορά προεπιλογών"
+
+msgid "Preload function was not set for blocking operation."
+msgstr "Preload function was not set for blocking operation."
+
+msgid "File %1 does not exist."
+msgstr "Το αρχείο %1 δεν υπάρχει."
+
+msgid "Could not open file %1 for reading: %2"
+msgstr "Αδυναμία ανοίγματος αρχείου %1 για ανάγνωση: %2"
+
+msgid "Could not open CUE file %1 for reading: %2"
+msgstr "Αδυναμία ανοίγματος αρχείου CUE %1 για ανάγνωση: %2"
+
+msgid "Could not open playlist file %1 for reading: %2"
+msgstr "Αδυναμία ανοίγματος αρχείου λίστας αναπαραγωγής %1 για ανάγνωση: %2"
+
+msgid "Couldn't create GStreamer source element for %1"
+msgstr "Couldn't create GStreamer source element for %1"
+
+msgid "Couldn't create GStreamer typefind element for %1"
+msgstr "Couldn't create GStreamer typefind element for %1"
+
+msgid "Couldn't create GStreamer fakesink element for %1"
+msgstr "Couldn't create GStreamer fakesink element for %1"
+
+msgid "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+msgstr "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+
+msgid "Missing CDDA playback."
+msgstr "Λείπει η αναπαραγωγή CDDA."
+
+msgid "Error while loading audio CD."
+msgstr "Σφάλμα κατά τη φόρτωση CD ήχου."
+
+msgid "Loading tracks info"
+msgstr "Φόρτωση πληροφοριών τραγουδιών"
+
+msgid "No pending song for track ID"
+msgstr "No pending song for track ID"
+
+msgid "Authenticating..."
+msgstr "Επαλήθευση ταυτότητας..."
+
+msgid "Receiving albums for %1 artists..."
+msgstr "Λήψη άλμπουμ για καλλιτέχνες %1..."
+
+msgid "Data missing error"
+msgstr "Σφάλμα δεδομένων που λείπουν"
+
+msgid "Not authenticated with Spotify."
+msgstr "Μη πιστοποίηση με το Spotify."
+
+msgid "Basic authentication"
+msgstr "Βασική ταυτοποίηση"
+
+msgid "Authenticate"
+msgstr "Ταυτοποίηση"
+
+msgid "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+msgstr "<html><head/><body><p>Το πρόσθετο GStreamer Spotify δεν ανιχνεύθηκε, δεν θα μπορείτε να μεταδίδετε τραγούδια από το Spotify χωρίς αυτό. Δείτε <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> για οδηγίες σχετικά με τον τρόπο εγκατάστασης του plugin.</p></body></html>"
+
+msgid "Fetch entire albums when searching songs"
+msgstr "Λήψη ολόκληρων άλμπουμ κατά την αναζήτηση τραγουδιών"
+
+msgid "The streaming collection is empty!"
+msgstr "Η συλλογή streaming είναι κενή!"
+
+msgid "Click here to retrieve music"
+msgstr "Κάντε κλικ εδώ για να ανακτήσετε μουσική"
+
+msgid "Remove from favorites"
+msgstr "Αφαίρεση από τα αγαπημένα"
+
+msgid "Close"
+msgstr "Κλείσιμο"
+
+msgid "Refresh catalogue"
+msgstr "Ανανέωση καταλόγου"
+
+msgid "Streaming Search View"
+msgstr "Streaming Search View"
+
+msgid "artists"
+msgstr "καλλιτέχνες"
+
+msgid "albums"
+msgstr "άλμπουμ"
+
+msgid "songs"
+msgstr "τραγούδια"
+
+msgid "Enter search terms above to find music"
+msgstr "Εισάγετε τους όρους αναζήτησης παραπάνω για να βρείτε μουσική"
+
+msgid "Configure %1..."
+msgstr "Ρύθμιση %1..."
+
+msgid "Add to artists"
+msgstr "Προσθήκη στους καλλιτέχνες"
+
+msgid "Add to albums"
+msgstr "Προσθήκη στα άλμπουμ"
+
+msgid "Add to songs"
+msgstr "Προσθήκη στα τραγούδια"
+
+msgid "Streaming Tabs View"
+msgstr "Προβολή Καρτέλων Ροής"
+
+msgid "Artists"
+msgstr "Καλλιτέχνες"
+
+msgid "Albums"
+msgstr "Άλμπουμ"
+
+msgid "Songs"
+msgstr "Τραγούδια"
+
+msgid "Retrieving albums..."
+msgstr "Ανάκτηση άλμπουμ..."
+
+msgid "Retrieving songs for %1 album..."
+msgstr "Λήψη τραγουδιών για το άλμπουμ %1..."
+
+msgid "Retrieving songs for %1 albums..."
+msgstr "Λήψη τραγουδιών για άλμπουμ %1..."
+
+msgid "Retrieving album cover for %1 album..."
+msgstr "Λήψη εξώφυλλων για %1 άλμπουμ..."
+
+msgid "Retrieving album covers for %1 albums..."
+msgstr "Λήψη εξώφυλλων για %1 άλμπουμ..."
+
+msgid "Server URL is invalid."
+msgstr "Διεύθυνση URL διακομιστή δεν είναι έγκυρη."
+
+msgid "Missing username or password."
+msgstr "Λείπει το όνομα χρήστη ή ο κωδικός πρόσβασης."
+
+msgid "Server URL"
+msgstr "URL Διακομιστή"
+
+msgid "Authentication method:"
+msgstr "Μέθοδος ταυτοποίησης:"
+
+msgid "Hex"
+msgstr "Hex"
+
+msgid "MD5 token (Recommended)"
+msgstr "MD5 διακριτικό (συνιστάται)"
+
+msgid "Use HTTP/2 when possible"
+msgstr "Χρήση HTTP/2 όταν είναι εφικτό"
+
+msgid "Verify server certificate"
+msgstr "Επαλήθευση πιστοποιητικού διακομιστή"
+
+msgid "Use album ID for album covers"
+msgstr "Χρήση του ID άλμπουμ για εξώφυλλα άλμπουμ"
+
+msgid "Server-side scrobbling"
+msgstr "Server-side scrobbling"
+
+msgid "Test"
+msgstr "Δοκιμή"
+
+msgid "Delete songs"
+msgstr "Διαγραφή τραγουδιών"
+
+msgid "Missing server url, username or password."
+msgstr "Λείπει το URL του διακομιστή, το όνομα χρήστη ή ο κωδικός πρόσβασης."
+
+msgid "Configuration incorrect"
+msgstr "Λανθασμένες ρυθμίσεις"
+
+msgid "Test successful!"
+msgstr "Δοκιμή επιτυχής!"
+
+msgid "Test failed!"
+msgstr "Η δοκιμή απέτυχε!"
+
+msgid "Subsonic server URL is invalid."
+msgstr "Το URL του Subsonic server δεν είναι έγκυρο."
+
+msgid "Missing Subsonic username or password."
+msgstr "Λείπει το Subsonic όνομα χρήστη ή κωδικός."
+
+msgid "Stage: %1"
+msgstr "Stage: %1"
+
+msgid "Reason: %1"
+msgstr "Reason: %1"
+
+msgid "Identifying song"
+msgstr "Αναγνώριση τραγουδιού"
+
+msgid "Fingerprinting song"
+msgstr "Fingerprinting song"
+
+msgid "Generated fingerprint is empty or invalid"
+msgstr "Generated fingerprint is empty or invalid"
+
+msgid "Fingerprinting"
+msgstr "Fingerprinting"
+
+msgid "Fingerprint length: %1"
+msgstr "Fingerprint length: %1"
+
+msgid "Minimum required length: %1"
+msgstr "Minimum required length: %1"
+
+msgid "Downloading metadata"
+msgstr "Λήψη μεταδεδομένων"
+
+msgid "No MusicBrainz metadata was found for this track"
+msgstr "No MusicBrainz metadata was found for this track"
+
+msgid "MusicBrainz metadata"
+msgstr "MusicBrainz metadata"
+
+msgid "Candidate metadata rows: 0"
+msgstr "Candidate metadata rows: 0"
+
+msgid "Not authenticated with Tidal."
+msgstr "Μη πιστοποίηση με το Tidal."
+
+msgid "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+msgstr "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+
+msgid "Client ID"
+msgstr "Κωδικός Πελάτη"
+
+msgid "Audio quality"
+msgstr "Ποιότητα Ήχου"
+
+msgid "Album cover size"
+msgstr "Μέγεθος εξωφύλλου άλμπουμ"
+
+msgid "Stream URL method"
+msgstr "Μέθοδος ροής URL"
+
+msgid "Append explicit to album title for explicit albums"
+msgstr "Append explicit to album title for explicit albums"
+
+msgid "Missing Tidal client ID."
+msgstr "Λείπει το Tidal ID πελάτη."
+
+msgid "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Λήφθηκε URL με κρυπτογράφηση %1 από το Tidal. Το Strawberry δεν υποστηρίζει προς το παρόν κρυπτογραφημένες ροές."
+
+msgid "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Λήφθηκε URL με κρυπτογράφηση από το Tidal. Το Strawberry δεν υποστηρίζει προς το παρόν κρυπτογραφημένες ροές."
+
+msgid "Tag fetcher"
+msgstr "Λήψη ετικετών"
+
+msgid "Strawberry was unable to find results for this file"
+msgstr "Το Strawberry δεν μπόρεσε να βρει αποτελέσματα για αυτό το αρχείο"
+
+msgid "Select best possible match"
+msgstr "Επιλέξτε το καλύτερο δυνατό ταίριασμα"
+
+msgid "Original tags"
+msgstr "Αρχικές ετικέτες"
+
+msgid "Suggested tags"
+msgstr "Προτεινόμενες ετικέτες"
+
+msgid "No results"
+msgstr "Δε βρέθηκαν αποτελέσματα"
+
+msgid "0:00:00"
+msgstr "0:00:00"
+
+msgid "Click to toggle between remaining time and total time"
+msgstr "Κλικ για εναλλαγή μεταξύ χρόνου που απομένει και συνολικού χρόνου"
+
+msgid "Waveform"
+msgstr "Κυματομορφή"
+
+msgid "Transcode Music"
+msgstr "Transcode Μουσική"
+
+msgid "Files to transcode"
+msgstr "Αρχεία για μετακωδικοποίηση"
+
+msgid "Directory"
+msgstr "Φάκελος"
+
+msgid "Add..."
+msgstr "Προσθήκη..."
+
+msgid "Add all tracks from a directory and all its subdirectories"
+msgstr "Προσθήκη όλων των κομματιών από έναν κατάλογο και όλους τους υποκαταλόγους του"
+
+msgid "Import..."
+msgstr "Εισαγωγή..."
+
+msgid "Output options"
+msgstr "Επιλογές εξόδου"
+
+msgid "Options..."
+msgstr "Επιλογές..."
+
+msgid "Alongside the originals"
+msgstr "Παράλληλα με τα πρωτότυπα"
+
+msgid "Select..."
+msgstr "Επιλέξτε..."
+
+msgid "Progress"
+msgstr "Πρόοδος"
+
+msgid "Details..."
+msgstr "Λεπτομέρειες..."
+
+msgid "Start transcoding"
+msgstr "Έναρξη transcoding"
+
+msgid "%n remaining"
+msgid_plural "%n remaining"
+msgstr[0] "%n απομένουν"
+msgstr[1] "%n απομένουν"
+
+msgid "%n finished"
+msgid_plural "%n finished"
+msgstr[0] "%n ολοκληρώθηκε"
+msgstr[1] "%n finished"
+
+msgid "%n failed"
+msgid_plural "%n failed"
+msgstr[0] "%n απέτυχε"
+msgstr[1] "%n απέτυχε"
+
+msgid "Add files to transcode"
+msgstr "Προσθήκη αρχείων για μετακωδικοποίηση"
+
+msgid "Open a directory to import music from"
+msgstr "Άνοιγμα φακέλου για εισαγωγή μουσικής από"
+
+msgid "Import Directory"
+msgstr "Εισαγωγή Καταλόγου"
+
+msgid "Preserve directory structure in output directory (import only)"
+msgstr "Διατήρηση δομής καταλόγου στον κατάλογο εξόδου (μόνο εισαγωγή)"
+
+msgid "Transcoder Log"
+msgstr "Καταγραφή Μετακωδικοποιητή"
+
+msgid "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+msgstr "Δεν ήταν δυνατή η δημιουργία του στοιχείου GStreamer \"%1\" - βεβαιωθείτε ότι έχετε εγκατεστημένα όλα τα απαιτούμενα πρόσθετα του GStreamer"
+
+msgid "Successfully written %1"
+msgstr "Γράφτηκε επιτυχώς %1"
+
+msgid "Transcoding %1 files using %2 threads"
+msgstr "Μετατροπή αρχείων %1 με χρήση %2 νημάτων"
+
+msgid "Error processing %1: %2"
+msgstr "Επεξεργασίας σφάλματος %1: %2"
+
+msgid "Starting %1"
+msgstr "Έναρξη %1"
+
+msgid "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+msgstr "Δεν βρέθηκε κωδικοποιητής για %1, ελέγξτε ότι έχετε εγκατεστημένα τα σωστά plugins του GStreamer"
+
+msgid "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+msgstr "Δεν βρέθηκε muxer για %1, ελέγξτε ότι έχετε εγκατεστημένα τα σωστά plugins του GStreamer"
+
+msgid " kbps"
+msgstr " kbps"
+
+msgid "Profile"
+msgstr "Προφίλ"
+
+msgid "Main profile (MAIN)"
+msgstr "Κύριο προφίλ (MAIN)"
+
+msgid "Low complexity profile (LC)"
+msgstr "Προφίλ χαμηλής πολυπλοκότητας (LC)"
+
+msgid "Scalable sampling rate profile (SSR)"
+msgstr "Προφίλ κλιμακωτού ρυθμού δειγματοληψίας (SSR)"
+
+msgid "Long term prediction profile (LTP)"
+msgstr "Μακροπρόθεσμο προφίλ πρόβλεψης (LTP)"
+
+msgid "Use temporal noise shaping"
+msgstr "Χρησιμοποιήστε χρονική διαμόρφωση θορύβου"
+
+msgid "Allow mid/side encoding"
+msgstr "Επίτρεψε μεσαία κωδικοποίηση"
+
+msgid "Block type"
+msgstr "Τύπος μπλοκ"
+
+msgid "Normal block type"
+msgstr "Κανονικός τύπος block"
+
+msgid "No short blocks"
+msgstr "Χωρίς μικρά μπλοκ"
+
+msgid "No long blocks"
+msgstr "Χωρίς μακρύ μπλοκ"
+
+msgid "Transcoding options"
+msgstr "Επιλογές μετακωδικοποίησης"
+
+#. Sound quality
+msgid "Quality"
+msgstr "Ποιότητα"
+
+msgid "Fast"
+msgstr "Γρήγορο"
+
+msgid "Best"
+msgstr "Καλύτερο"
+
+msgid "Optimize for &quality"
+msgstr "Βελτιστοποίηση για &ποιότητα"
+
+msgid "Opti&mize for bitrate"
+msgstr "Βελτιστοποίηση ρυθμού bit"
+
+msgid "Constant bitrate"
+msgstr "Σταθερό bitrate"
+
+msgid "Encoding engine quality"
+msgstr "Ποιότητα κινητήρα κωδικοποίησης"
+
+msgid "Standard"
+msgstr "Κανονικό"
+
+msgid "Force mono encoding"
+msgstr "Εξαναγκασμός κωδικοποίησης μονο"
+
+msgid "automatic"
+msgstr "αυτόματα"
+
+msgid "Average bitrate"
+msgstr "Μέσος ρυθμός bit"
+
+msgid "disabled"
+msgstr "απενεργοποιημένο"
+
+msgid "Encoding mode"
+msgstr "Λειτουργία κωδικοποίησης"
+
+msgid "Auto"
+msgstr "Αυτόματα"
+
+msgid "Ultra wide band (UWB)"
+msgstr "Εξαιρετικά ευρεία ζώνη (UWB)"
+
+msgid "Wide band (WB)"
+msgstr "Ευρεία ζώνη (WB)"
+
+msgid "Narrow band (NB)"
+msgstr "Στενή ζώνη (NB)"
+
+msgid "Variable bit rate"
+msgstr "Μεταβλητός ρυθμός bit"
+
+msgid "Voice activity detection"
+msgstr "Ανίχνευση φωνητικής δραστηριότητας"
+
+msgid "Discontinuous transmission"
+msgstr "Μη συνεχής μετάδοση"
+
+msgid "Encoding complexity"
+msgstr "Πολυπλοκότητα κωδικοποίησης"
+
+msgid "Frames per buffer"
+msgstr "Καρέ ανά buffer"
+
+msgid "Use bitrate management engine"
+msgstr "Χρήση μηχανής διαχείρισης bitrate"
+
+msgid "Target bitrate"
+msgstr "Target bitrate"
+
+msgid "Minimum bitrate"
+msgstr "Ελάχιστο bitrate"
+
+msgid "Maximum bitrate"
+msgstr "Μέγιστο bitrate"
+
+msgid "Transcoding"
+msgstr "Μετατροπή"
+
+msgid "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+msgstr "Αυτές οι ρυθμίσεις χρησιμοποιούνται στο διάλογο \"Transcode Music\" και κατά τη μετατροπή μουσικής πριν την αντιγραφή σε μια συσκευή."
+
+msgid "FLAC"
+msgstr "FLAC"
+
+msgid "WavPack"
+msgstr "WavPack"
+
+msgid "Vorbis"
+msgstr "Vorbis"
+
+msgid "Opus"
+msgstr "Opus"
+
+msgid "Speex"
+msgstr "Speex"
+
+msgid "AAC"
+msgstr "AAC"
+
+msgid "ASF (WMA)"
+msgstr "ASF (WMA)"
+
+msgid "MP3"
+msgstr "ΜΡ3"
+
+msgid "D-Bus path"
+msgstr "Δίαυλος D-Bus"
+
+msgid "Serial number"
+msgstr "Σειριακός αριθμός"
+
+msgid "Mount points"
+msgstr "Σημεία προσάρτησης"
+
+msgid "Partition label"
+msgstr "Ετικέτα διαμερίσματος"
+
+msgid "UUID"
+msgstr "UUID"
+
+msgid "Enter username and password"
+msgstr "Εισάγετε όνομα χρήστη και κωδικό"
+
+msgid "Color"
+msgstr "Χρώμα"
+
+msgid "Select waveform color"
+msgstr "Select waveform color"
+
+msgid "Save the .waveform files directly in the songs folders"
+msgstr "Save the .waveform files directly in the songs folders"
+
+msgid "Failed to write XSPF playlist"
+msgstr "Failed to write XSPF playlist"
+

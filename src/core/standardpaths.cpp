@@ -72,4 +72,15 @@ std::string WaveformCacheDir() {
   return path;
 }
 
+std::string LocaleDir() {
+  if (const char *env = g_getenv("STRAWBERRY_LOCALE_DIR")) {
+    return env;
+  }
+#ifdef STRAWBERRY_LOCALE_DIR
+  return STRAWBERRY_LOCALE_DIR;
+#else
+  return "/usr/share/locale";
+#endif
+}
+
 }  // namespace StandardPaths

@@ -1,0 +1,4485 @@
+# Translation catalog for Strawberry Music Player.
+# Generated from the Qt .ts files on origin/master.
+msgid ""
+msgstr ""
+"Project-Id-Version: strawberry\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-26 00:00+0000\n"
+"PO-Revision-Date: 2026-08-26 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: uk_UA\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+
+msgid "ASX playlist is too large"
+msgstr "ASX playlist is too large"
+
+msgid "Failed to write ASX playlist"
+msgstr "Failed to write ASX playlist"
+
+msgid "About"
+msgstr "Про програму"
+
+msgid "About Strawberry"
+msgstr "Про Strawberry"
+
+msgid "Version %1"
+msgstr "Версія %1"
+
+msgid "Strawberry is a music player and music collection organizer."
+msgstr "Strawberry — це програвач музики та організатор музичних колекцій."
+
+msgid "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."
+msgstr "Це відгалуження Clementine випущене в 2018 році і призначене для колекціонерів музики та аудіофілів."
+
+msgid "Strawberry is free software released under GPL. The source code is available on %1"
+msgstr "Strawberry — це безкоштовне програмне забезпечення, випущене під GPL. Вихідний код доступний на %1"
+
+msgid "You should have received a copy of the GNU General Public License along with this program.  If not, see %1"
+msgstr "Ви повинні були отримати копію Загальної публічної ліцензії GNU разом із цією програмою. В іншому випадку див. %1"
+
+msgid "If you like Strawberry and can make use of it, consider sponsoring or donating."
+msgstr "Якщо вам подобається Strawberry і ви часто ним користуєтесь, подумайте про спонсорство або пожертвування."
+
+msgid "You can sponsor the author on %1 or %2. You can also make a one-time payment through %3."
+msgstr "Ви можете підтримати автора на %1 або %2. Ви також можете зробити одноразовий платіж через %3."
+
+msgid "Author and maintainer"
+msgstr "Координатор"
+
+msgid "Contributors"
+msgstr "Учасники проекту"
+
+msgid "Clementine authors"
+msgstr "Автори Clementine"
+
+msgid "Clementine contributors"
+msgstr "Учасники проекту Clementine"
+
+msgid "Thanks to"
+msgstr "Окрема подяка"
+
+msgid "Thanks to all the other Amarok and Clementine contributors."
+msgstr "Дякуємо всім іншим учасникам проектів Amarok і Clementine."
+
+msgid "Add Stream"
+msgstr "Додати потік"
+
+msgid "Enter the URL of a stream:"
+msgstr "Вкажіть адресу потоку:"
+
+msgid "Load cover from disk..."
+msgstr "Завантажити обкладинку з диска..."
+
+msgid "Save cover to disk..."
+msgstr "Зберегти обкладинку на диск..."
+
+msgid "Load cover from URL..."
+msgstr "Завантажити обкладинку з адресою..."
+
+msgid "Search for album covers..."
+msgstr "Шукати обкладинки альбомів..."
+
+msgid "Unset cover"
+msgstr "Вилучити обкладинку"
+
+msgid "Delete cover"
+msgstr "Видалити обкладинку"
+
+msgid "Clear cover"
+msgstr "Стерти обкладинку"
+
+msgid "Show fullsize..."
+msgstr "Показати на повний розмір..."
+
+msgid "Search automatically"
+msgstr "Шукати автоматично"
+
+msgid "Load cover from disk"
+msgstr "Завантаження обкладинки з диска"
+
+msgid "Failed to open cover file %1 for reading: %2"
+msgstr "Не вдалось відкрити файл обкладинки %1 для читання: %2"
+
+msgid "Cover file %1 is empty."
+msgstr "Файл обкладинки %1 пустий."
+
+msgid "unknown"
+msgstr "невідомо"
+
+msgid "Save album cover"
+msgstr "Зберегти обкладинку альбому"
+
+msgid "Failed to open cover file %1 for writing: %2"
+msgstr "Не вдалось відкрити файл обкладинки %1 для запису: %2"
+
+msgid "Failed writing cover to file %1: %2"
+msgstr "Не вдалось записати обкладинку в файл %1: %2"
+
+msgid "Failed writing cover to file %1."
+msgstr "Не вдалось записати обкладинку в файл %1."
+
+msgid "Failed to delete cover file %1: %2"
+msgstr "Не вдалось видалити файл обкладинки %1: %2"
+
+msgid "Failed to write cover to file %1: %2"
+msgstr "Не вдалось записати обкладинку в файл %1: %2"
+
+msgid "Could not save cover to file %1."
+msgstr "Не вдалося зберегти обкладинку в файл %1."
+
+msgid "Export covers"
+msgstr "Експортувати обкладинки"
+
+msgid "Output"
+msgstr "Результат"
+
+msgid "Enter a filename for exported covers (no extension):"
+msgstr "Вкажіть назву файлу для експортованих обкладинок (без суфікса назви):"
+
+msgid "Export downloaded covers"
+msgstr "Експортувати отримані обкладинки"
+
+msgid "Export embedded covers"
+msgstr "Експортувати вбудовані обкладинки"
+
+msgid "Existing covers"
+msgstr "Наявні обкладинки"
+
+msgid "Do not overwrite"
+msgstr "Не перезаписувати"
+
+msgid "O&verwrite all"
+msgstr "&Перезаписати все"
+
+msgid "Overwrite s&maller ones only"
+msgstr "Перезаписати лише &менші"
+
+msgid "Size"
+msgstr "Розмір"
+
+msgid "Scale size"
+msgstr "Масштабований розмір"
+
+msgid "Size:"
+msgstr "Розмір:"
+
+msgid "Pixel"
+msgstr "Піксель"
+
+msgid "Abort"
+msgstr "Перервати"
+
+msgid "All albums"
+msgstr "Всі альбоми"
+
+msgid "Albums with covers"
+msgstr "Альбоми з обкладинками"
+
+msgid "Albums without covers"
+msgstr "Альбоми без обкладинок"
+
+msgid "Really cancel?"
+msgstr "Дійсно скасувати?"
+
+msgid "Closing this window will stop searching for album covers."
+msgstr "Закриття цього вікна зупинить пошук обкладинок альбомів."
+
+msgid "Don't stop!"
+msgstr "Не зупиняти!"
+
+msgid "All artists"
+msgstr "Всі виконавці"
+
+msgid "Various artists"
+msgstr "Різні виконавці"
+
+msgid "Got %1 covers out of %2 (%3 failed)"
+msgstr "Отримано %1 обкладинок з %2 (%3 не вдалось)"
+
+msgid "%1 transferred"
+msgstr "%1 передано"
+
+msgid "Export finished"
+msgstr "Експортування завершено"
+
+msgid "No covers to export."
+msgstr "Немає зображень обкладинок для експортування."
+
+msgid "Exported %1 covers out of %2 (%3 skipped)"
+msgstr "Експортовано %1 обкладинок з %2 (%3 пропущено)"
+
+msgid "Cover Manager"
+msgstr "Менеджер обкладинок"
+
+msgid "Artist"
+msgstr "Виконавець"
+
+msgid "Album"
+msgstr "Альбом"
+
+msgid "Search"
+msgstr "Пошук"
+
+msgid "Covers from %1"
+msgstr "Обкладинки з %1"
+
+msgid "Framerate"
+msgstr "Частота кадрів"
+
+msgid "Low (%1 fps)"
+msgstr "Низька (%1 к/с)"
+
+msgid "Medium (%1 fps)"
+msgstr "Середня (%1 к/с)"
+
+msgid "High (%1 fps)"
+msgstr "Висока (%1 к/с)"
+
+msgid "Super high (%1 fps)"
+msgstr "Найвища (%1 к/с)"
+
+msgid "No analyzer"
+msgstr "Без аналізатора"
+
+msgid "Block analyzer"
+msgstr "Блок аналізатора"
+
+msgid "Boom analyzer"
+msgstr "Плаваючий аналізатор"
+
+msgid "Turbine"
+msgstr "Турбіна"
+
+msgid "Sonogram"
+msgstr "Сонограма"
+
+msgid "WaveRubber"
+msgstr "Гумова хвиля"
+
+msgid "Appearance"
+msgstr "Вигляд"
+
+msgid "Style"
+msgstr "Стиль"
+
+msgid "Tabbar colors"
+msgstr "Колір панелі вкладок"
+
+msgid "&Use the system default color"
+msgstr "&Використати стандартний системний колір"
+
+msgid "Use custom color"
+msgstr "Використовувати власний колір"
+
+msgid "Use gradient background"
+msgstr "Використовувати градієнтний фон"
+
+msgid "Select tabbar color:"
+msgstr "Виберіть колір панелі вкладок:"
+
+msgid "Background image"
+msgstr "Зображення тла"
+
+msgid "Default bac&kground image"
+msgstr "Стандартне &фонове зображення"
+
+msgid "&No background image"
+msgstr "&Без фонового зображення"
+
+msgid "The album cover of the currently playing song"
+msgstr "Обкладинка альбому, до якого увійшла композиція, яка зараз відтворюється"
+
+msgid "Albu&m cover"
+msgstr "Обкладинка &альбому"
+
+msgid "Custom image:"
+msgstr "Власне зображення:"
+
+msgid "Browse..."
+msgstr "Огляд..."
+
+msgid "Position"
+msgstr "Розташування"
+
+msgid "Upper Left"
+msgstr "Вгорі ліворуч"
+
+msgid "Upper Right"
+msgstr "Вгорі праворуч"
+
+msgid "Middle"
+msgstr "Середній"
+
+msgid "Bottom Left"
+msgstr "Внизу ліворуч"
+
+msgid "Bottom Right"
+msgstr "Внизу праворуч"
+
+msgid "Max cover size"
+msgstr "Найбільший розмір обкладинки"
+
+msgid "Stretch image to fill playlist"
+msgstr "Розтягнути зображення, щоб заповнити список відтворення"
+
+msgid "Keep aspect ratio"
+msgstr "Зберегти співвідношення сторін"
+
+msgid "Do not cut image"
+msgstr "Не обрізати зображення"
+
+msgid "Blur amount"
+msgstr "Рівень розмивання"
+
+msgid "0px"
+msgstr "0 пкс"
+
+msgid "Opacity"
+msgstr "Непрозорість"
+
+msgid "40%"
+msgstr "40%"
+
+msgid "Icon sizes"
+msgstr "Розміри піктограм"
+
+msgid "Playlist buttons"
+msgstr "Кнопки керування списком відтворення"
+
+msgid "Tabbar large mode"
+msgstr "Велика панель вкладок"
+
+msgid "Play control buttons"
+msgstr "Кнопки керування відтворенням"
+
+msgid "Configure buttons"
+msgstr "Налаштувати кнопки"
+
+msgid "Files, playlists and queue buttons"
+msgstr "Кнопки файлів, списків відтворення і черг"
+
+msgid "Tabbar small mode"
+msgstr "Мала панель вкладок"
+
+msgid "Playlist playing song color"
+msgstr "Колір відтворюваної композиції у списку"
+
+msgid "System highlight color"
+msgstr "Системний колір виділення"
+
+msgid "Custom color"
+msgstr "Власний колір"
+
+msgid "Select playlist playing song color:"
+msgstr "Виберіть колір відтворюваної композиції у списку:"
+
+msgid "Window"
+msgstr "Window"
+
+msgid "Window text"
+msgstr "Window text"
+
+msgid "Base"
+msgstr "Base"
+
+msgid "Alternate base"
+msgstr "Alternate base"
+
+msgid "Tooltip base"
+msgstr "Tooltip base"
+
+msgid "Tooltip text"
+msgstr "Tooltip text"
+
+msgid "Placeholder text"
+msgstr "Placeholder text"
+
+msgid "Text"
+msgstr "Text"
+
+msgid "Button"
+msgstr "Button"
+
+msgid "Button text"
+msgstr "Button text"
+
+msgid "Bright text"
+msgstr "Bright text"
+
+msgid "Select color"
+msgstr "Select color"
+
+msgid "Select background image"
+msgstr "Вибір фонового зображення"
+
+msgid "Colors"
+msgstr "Colors"
+
+msgid "&Use the system default color set"
+msgstr "&Use the system default color set"
+
+msgid "Use a custom color set"
+msgstr "Use a custom color set"
+
+msgid "Set a custom color set suitable for a dark theme"
+msgstr "Set a custom color set suitable for a dark theme"
+
+msgid "Dark mode"
+msgstr "Dark mode"
+
+msgid "Reset the custom color set to the system default colors"
+msgstr "Reset the custom color set to the system default colors"
+
+msgid "Reset to default"
+msgstr "Reset to default"
+
+msgid "You might need to restart Strawberry for this setting to fully apply"
+msgstr "You might need to restart Strawberry for this setting to fully apply"
+
+msgid "You need to restart Strawberry for this setting to take affect"
+msgstr "You need to restart Strawberry for this setting to take affect"
+
+msgid "System icons"
+msgstr "System icons"
+
+msgid "Changing colors is only supported with some styles"
+msgstr "Changing colors is only supported with some styles"
+
+msgid "Dark colors"
+msgstr "Dark colors"
+
+msgid "Backend"
+msgstr "Бекенд"
+
+msgid "Audio output"
+msgstr "Виведення звуку"
+
+msgid "Device"
+msgstr "Пристрій"
+
+msgid "ALSA plugin:"
+msgstr "Плагін ALSA:"
+
+msgid "hw"
+msgstr "hw"
+
+msgid "p&lughw"
+msgstr "p&lughw"
+
+msgid "pcm"
+msgstr "pcm"
+
+msgid "Exclusive mode (Experimental)"
+msgstr "Ексклюзивний режим (експериментально)"
+
+msgid "Options"
+msgstr "Налаштування"
+
+msgid "Enable volume control"
+msgstr "Дозволити керування гучністю"
+
+msgid "Upmix / downmix to"
+msgstr "Знижувальне/збільшувальне мікшування"
+
+msgid "channels"
+msgstr "канали"
+
+msgid "Improve headphone listening of stereo audio records (bs2b)"
+msgstr "Поліпшити прослуховування стереозвукових записів (bs2b)"
+
+msgid "Use playbin3 when available"
+msgstr "Use playbin3 when available"
+
+msgid "Enable HTTP/2 for streaming"
+msgstr "Увімкнути HTTP/2 для трансляції"
+
+msgid "Use strict SSL mode"
+msgstr "Використовувати суворий режим SSL"
+
+msgid "Buffer"
+msgstr "Буфер"
+
+msgid " ms"
+msgstr " мс"
+
+msgid "Buffer duration"
+msgstr "Місткість буфера"
+
+msgid "High watermark"
+msgstr "Водяний знак зверху"
+
+msgid "Low watermark"
+msgstr "Водяний знак знизу"
+
+msgid "Defaults"
+msgstr "Стандартні значення"
+
+msgid "Audio normalization"
+msgstr "Нормалізація звуку"
+
+msgid "No audio normalization"
+msgstr "Без нормалізації звуку"
+
+msgid "Replay Gain"
+msgstr "Вирівнювання гучності"
+
+msgid "Use Replay Gain metadata if it is available"
+msgstr "Використовувати метадані Replay Gain, якщо можливо"
+
+msgid "Replay Gain mode"
+msgstr "Режим вирівнювання гучності"
+
+msgid "Radio (equal loudness for all tracks)"
+msgstr "Радіо (однакова гучність всіх композицій)"
+
+msgid "Album (ideal loudness for all tracks)"
+msgstr "Альбом (ідеальна гучність для всіх композицій)"
+
+msgid "Pre-amp"
+msgstr "Підсилення"
+
+msgid "Apply compression to prevent clipping"
+msgstr "Застосувати стиснення для запобігання зрізанню"
+
+msgid "Fallback-gain"
+msgstr "Вирівнювання гучності"
+
+msgid "EBU R 128 Loudness Normalization"
+msgstr "Нормалізація гучності EBU R 128"
+
+msgid "Perform track loudness normalization"
+msgstr "Нормалізувати гучність композиції"
+
+msgid "Target Level"
+msgstr "Цільовий рівень"
+
+msgid "Fading"
+msgstr "Згасання"
+
+msgid "Fade out when stopping a track"
+msgstr "Поступово заглушати під час зупинки відтворення"
+
+msgid "Cross-fade when changing tracks manually"
+msgstr "Перехресне згасання під час ручної зміни композицій"
+
+msgid "Cross-fade when changing tracks automatically"
+msgstr "Перехресне згасання під час автоматичної зміни композицій"
+
+msgid "Except between tracks on the same album or in the same CUE sheet"
+msgstr "Крім як між композиціями в одному альбомі, або в тому ж CUE-листі"
+
+msgid "Fading duration"
+msgstr "Тривалість згасання"
+
+msgid "Fade out on pause / fade in on resume"
+msgstr "Поступово заглушати під час призупинення і поступово робити голоснішим під час відновлення"
+
+msgid "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+msgstr "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+
+msgid "Exponential volume scaling"
+msgstr "Exponential volume scaling"
+
+msgid "Device warm-up"
+msgstr "Device warm-up"
+
+msgid "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+msgstr "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+
+msgid "Behavior"
+msgstr "Поведінка"
+
+msgid "Show system tray icon"
+msgstr "Показувати піктограму в системному лотку"
+
+msgid "Keep running in the background when the window is closed"
+msgstr "Продовжувати виконання у фоні коли вікно зачинено"
+
+msgid "Show song progress on system tray icon"
+msgstr "Показувати перебіг композиції на піктограмі в системному лотку"
+
+msgid "Show song progress on taskbar"
+msgstr "Показувати прогрес пісні на панелі завдань"
+
+msgid "Resume playback on start"
+msgstr "Відновлювати відтворення після запуску"
+
+msgid "Show playing widget"
+msgstr "Показати віджет відтворення"
+
+msgid "On startup"
+msgstr "Під час запуску"
+
+msgid "Remember from &last time"
+msgstr "Запам'ятати &останній варіант"
+
+msgid "Show the main window"
+msgstr "Показати головне вікно"
+
+msgid "Hide the main window"
+msgstr "Сховати головне вікно"
+
+msgid "Show the main window maximized"
+msgstr "Показати головне вікно розгорнутим"
+
+msgid "Show the main window minimized"
+msgstr "Показати головне вікно згорнутим"
+
+msgid "Language"
+msgstr "Мова"
+
+msgid "Use the system default"
+msgstr "Використовувати системну"
+
+msgid "You will need to restart Strawberry if you change the language."
+msgstr "Після зміни мови потрібно перезапустити Strawberry."
+
+msgid "Using the menu to add a song will..."
+msgstr "Використання меню для додавання композиції призведе до..."
+
+msgid "Never start playing"
+msgstr "Ніколи не починати відтворення"
+
+msgid "Play if there is nothing already playing"
+msgstr "Відтворювати, якщо зараз нічого не відтворюється"
+
+msgid "Always start playing"
+msgstr "Завжди починати відтворення"
+
+msgid "Pressing \"Previous\" in player will..."
+msgstr "Натискання «Попередня» у програвачі призведе до..."
+
+msgid "Jump to previous song right away"
+msgstr "Перейти до попередньої композиції негайно"
+
+msgid "Restart song, then jump to previous if pressed again"
+msgstr "Перезапустити композицію, потім перейти до попередньої, якщо натиснуто ще раз"
+
+msgid "Double clicking a song will..."
+msgstr "Подвійне клацання на композиції призведе до..."
+
+msgid "Append to the playlist"
+msgstr "Додати  до списку відтворення"
+
+msgid "Replace the playlist"
+msgstr "Замінити список відтворення"
+
+msgid "Open in new playlist"
+msgstr "Відкрити у новому списку відтворення"
+
+msgid "Add to the queue"
+msgstr "Додати до черги"
+
+msgid "Double clicking a song in the playlist will..."
+msgstr "Подвійне клацання на композицій у списку призведе до..."
+
+msgid "Change the currently playing song"
+msgstr "Змінити поточну відтворювану композицію"
+
+msgid "Seeking using a keyboard shortcut or mouse wheel"
+msgstr "Позиціювання за допомогою сполучення клавіш або коліщатка миші"
+
+msgid "Time step"
+msgstr "Крок за часом"
+
+msgid " s"
+msgstr " с"
+
+msgid "Volume Increment"
+msgstr "Приріст гучності"
+
+msgid "Could not create cdiocddasrc"
+msgstr "Could not create cdiocddasrc"
+
+msgid "Error while setting CDDA device to ready state."
+msgstr "Error while setting CDDA device to ready state."
+
+msgid "Error while setting CDDA device to pause state."
+msgstr "Error while setting CDDA device to pause state."
+
+msgid "The 'track' format is not supported by GStreamer."
+msgstr "The 'track' format is not supported by GStreamer."
+
+msgid "Error while querying CDDA tracks."
+msgstr "Error while querying CDDA tracks."
+
+msgid "Unable to execute collection SQL query: %1"
+msgstr "Не вдалось виконати SQL-запит для збору даних: %1"
+
+msgid "Failed SQL query: %1"
+msgstr "Помилка SQL-запиту: %1"
+
+msgid "Updating %1 database."
+msgstr "Оновлення бази даних %1."
+
+msgid "Collection Filter"
+msgstr "Фільтр фонотеки"
+
+msgid "Enter search terms here"
+msgstr "Введіть сюди критерії пошуку"
+
+msgid "MenuPopupToolButton"
+msgstr "MenuPopupToolButton"
+
+msgid "Entire collection"
+msgstr "Вся фонотека"
+
+msgid "Added today"
+msgstr "Додано сьогодні"
+
+msgid "Added this week"
+msgstr "Додано цього тижня"
+
+msgid "Added within three months"
+msgstr "Додано за три місяці"
+
+msgid "Added this year"
+msgstr "Додано цього року"
+
+msgid "Added this month"
+msgstr "Додано цього місяця"
+
+msgid "Save current grouping"
+msgstr "Зберегти поточне групування"
+
+msgid "Manage saved groupings"
+msgstr "Керування збереженими групуваннями"
+
+msgid "Any rating"
+msgstr "Any rating"
+
+msgid "Rating non null"
+msgstr "Rating non null"
+
+msgid "Rating greater than 1 star"
+msgstr "Rating greater than 1 star"
+
+msgid "Rating greater than 2 stars"
+msgstr "Rating greater than 2 stars"
+
+msgid "Rating greater than 3 stars"
+msgstr "Rating greater than 3 stars"
+
+msgid "Rating greater than 4 stars"
+msgstr "Rating greater than 4 stars"
+
+msgid "Group by"
+msgstr "Групувати за"
+
+msgid "Filter by age"
+msgstr "Filter by age"
+
+msgid "Filter by rating"
+msgstr "Filter by rating"
+
+msgid "Display options"
+msgstr "Налаштування відображення"
+
+msgid "Group by Album artist/Album"
+msgstr "Групувати за виконавцем альбому/альбомом"
+
+msgid "Group by Album artist/Album - Disc"
+msgstr "Групувати за виконавцем альбому/альбомом - диском"
+
+msgid "Group by Album artist/Year - Album"
+msgstr "Групувати за виконавцем альбому/роком - альбомом"
+
+msgid "Group by Album artist/Year - Album - Disc"
+msgstr "Групувати за виконавцем альбому/роком - альбомом - диском"
+
+msgid "Group by Artist/Album"
+msgstr "Групувати за виконавецем/альбомом"
+
+msgid "Group by Artist/Album - Disc"
+msgstr "Групувати за виконавцем/альбомом - диском"
+
+msgid "Group by Artist/Year - Album"
+msgstr "Групувати за виконавцем/роком - альбомом"
+
+msgid "Group by Artist/Year - Album - Disc"
+msgstr "Групувати за виконавцем/роком - альбомом - диском"
+
+msgid "Group by Genre/Album artist/Album"
+msgstr "Групувати за жанром/виконавцем альбому/альбомом"
+
+msgid "Group by Genre/Artist/Album"
+msgstr "Групувати за жанром/виконавцем/альбомом"
+
+msgid "Group by Album Artist"
+msgstr "Групувати за виконавцем альбому"
+
+msgid "Group by Artist"
+msgstr "Групувати за виконавцем"
+
+msgid "Group by Album"
+msgstr "Групувати за альбомом"
+
+msgid "Group by Genre/Album"
+msgstr "Групувати за жанром/альбомом"
+
+msgid "Advanced grouping..."
+msgstr "Розширене групування..."
+
+msgid "Grouping Name"
+msgstr "Назва групування"
+
+msgid "Grouping name:"
+msgstr "Назва групування:"
+
+msgid "Support for sort tags artist, album, album artist, title, composer and performer"
+msgstr "Support for sort tags artist, album, album artist, title, composer and performer"
+
+msgid "Saving playcounts and ratings"
+msgstr "Збереження кількостей відтворювань і рейтингів композицій"
+
+msgid "Loading..."
+msgstr "Завантаження..."
+
+msgid "Unknown"
+msgstr "Невідомо"
+
+msgid "Collection"
+msgstr "Фонотека"
+
+msgid "These folders will be scanned for music to make up your collection"
+msgstr "В цих теках виконуватиметься пошук музики для створення фонотеки"
+
+msgid "Add new folder..."
+msgstr "Додати нову папку..."
+
+msgid "Remove folder"
+msgstr "Видалити теку"
+
+msgid "Automatic updating"
+msgstr "Автоматичне оновлення"
+
+msgid "Update the collection when Strawberry starts"
+msgstr "Оновлювати фонотеку під час запуску Strawberry"
+
+msgid "Monitor the collection for changes"
+msgstr "Стежити за змінами у фонотеці"
+
+msgid "Song fingerprinting and tracking"
+msgstr "Відбитки композицій і стеження"
+
+msgid "Mark disappeared songs unavailable"
+msgstr "Позначити зниклі композиції як недоступні"
+
+msgid "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+msgstr "Аналізувати композицій згідно EBU R 128 (потрібно для нормалізації гучності EBU R 128)"
+
+msgid "Expire unavailable songs after"
+msgstr "Термін дії недоступних композицій закінчується після"
+
+msgid "days"
+msgstr "днів"
+
+msgid "Preferred album art filenames (comma separated)"
+msgstr "Бажані імена файлів для обкладинок, розділені комами"
+
+msgid "When looking for album art Strawberry will first look for picture files that contain one of these words.\nIf there are no matches then it will use the largest image in the directory."
+msgstr "Під час пошуку обкладинок Strawberry спочатку шукатиме файли зображень, що містять одне з цих слів.\nЯкщо збігів не буде, використовуватиметься найбільше зображення в каталозі."
+
+msgid "Automatically open single categories in the collection tree"
+msgstr "Автоматично відкривати одиночні категорії в дереві фонотеки"
+
+msgid "Show dividers"
+msgstr "Показати розділювач"
+
+msgid "Show album cover art in collection"
+msgstr "Показати обкладинку альбому в фонотеці"
+
+msgid "Use various artists for compilation albums"
+msgstr "Використовувати різних виконавців для альбомів-збірок"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+
+msgid "Use sort tags for sorting when available"
+msgstr "Use sort tags for sorting when available"
+
+msgid "Album cover pixmap cache"
+msgstr "Pixmap кеш обкладинки альбому"
+
+msgid "Enable Disk Cache"
+msgstr "Увімкнути кеш диска"
+
+msgid "Disk Cache Size"
+msgstr "Розмір кешу диска"
+
+msgid "Current disk cache in use:"
+msgstr "Поточний кеш диска:"
+
+msgid "Clear Disk Cache"
+msgstr "Очистити кеш диска"
+
+msgid "Song playcounts and ratings"
+msgstr "Кількість відтворювань і рейтинги композицій"
+
+msgid "Save playcounts to song tags when possible"
+msgstr "Зберегти кількість відтворювань в тегах композиції, якщо можливо"
+
+msgid "Save ratings to song tags when possible"
+msgstr "Зберігати рейтинги в теги композиції, якщо можливо"
+
+msgid "Overwrite database playcount when songs are re-read from disk"
+msgstr "Перезаписувати кількість відтворень в базі даних, коли композиції повторно зчитуються з диска"
+
+msgid "Overwrite database rating when songs are re-read from disk"
+msgstr "Перезаписати рейтинги з бази даних, коли композиції повторно зчитуються з диска"
+
+msgid "Save playcounts and ratings to files now"
+msgstr "Зберегти кількість відтворювань і рейтинги в файли"
+
+msgid "Enable delete files in the right click context menu"
+msgstr "Додати у контекстне меню команду для видалення файлів"
+
+msgid "Add directory..."
+msgstr "Додати папку..."
+
+msgid "Write all playcounts and ratings to files"
+msgstr "Записати кількість відтворювань і рейтинги в файли"
+
+msgid "Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"
+msgstr "Дійсно записати кількості відтворень та рейтинги композицій в файл для всіх композицій у вашій колекції?"
+
+msgid "Your collection is empty!"
+msgstr "Ваша фонотека порожня!"
+
+msgid "Click here to add some music"
+msgstr "Клацніть тут, щоб додати музику"
+
+msgid "Append to current playlist"
+msgstr "Додати до списку відтворення"
+
+msgid "Replace current playlist"
+msgstr "Замінити список відтворення"
+
+msgid "Queue track"
+msgstr "Додати до черги"
+
+msgid "Queue to play next"
+msgstr "Відтворити наступним"
+
+msgid "Search for this"
+msgstr "Шукати наступне"
+
+msgid "Organize files..."
+msgstr "Впорядкувати файли..."
+
+msgid "Copy to device..."
+msgstr "Копіюваня до пристрою..."
+
+msgid "Delete from disk..."
+msgstr "Видалити з диска..."
+
+msgid "Edit track information..."
+msgstr "Редагувати дані композиції..."
+
+msgid "Edit tracks information..."
+msgstr "Редагувати дані композицій..."
+
+msgid "Show in file browser..."
+msgstr "Показати в оглядачі файлів..."
+
+msgid "Rescan song(s)"
+msgstr "Сканування композицій"
+
+msgid "Show in various artists"
+msgstr "Показувати в різних виконавцях"
+
+msgid "Don't show in various artists"
+msgstr "Не показувати в «різних виконавцях»"
+
+msgid "There are other songs in this album"
+msgstr "У цьому альбомі є інші композиції"
+
+msgid "Would you like to move the other songs on this album to Various Artists as well?"
+msgstr "Перемістити також й інші композиції з цього альбому до різних виконавців?"
+
+msgid "Error"
+msgstr "Помилка"
+
+msgid "None of the selected songs were suitable for copying to a device"
+msgstr "Жодна з вибраних композицій не придатна для копіювання на пристрій"
+
+msgid "Form"
+msgstr "Форма"
+
+msgid "Updating collection"
+msgstr "Оновлення фонотеки"
+
+msgid "Updating %1"
+msgstr "Оновлення %1"
+
+msgid "Console"
+msgstr "Консоль"
+
+msgid "Run"
+msgstr "Виконати"
+
+msgid "Context"
+msgstr "Контекст"
+
+msgid "Custom text settings"
+msgstr "Власні налаштування тексту"
+
+msgid "Title"
+msgstr "Назва"
+
+msgid "Summary"
+msgstr "Зведення"
+
+msgid "Enable Items"
+msgstr "Увімкнути елементи"
+
+msgid "Technical Data"
+msgstr "Технічні дані"
+
+msgid "Song Lyrics"
+msgstr "Текст пісні"
+
+msgid "Automatically search for album cover"
+msgstr "Автоматичний пошук обкладинки альбому"
+
+msgid "Automatically search for song lyrics"
+msgstr "Автоматичний пошук текстів композицій"
+
+msgid "Font for headline"
+msgstr "Шрифт для заголовка"
+
+msgid "Font"
+msgstr "Шрифт"
+
+msgid "Font size"
+msgstr "Розмір шрифту"
+
+msgid " pt"
+msgstr " пт"
+
+msgid "Preview"
+msgstr "Попередній перегляд"
+
+msgid "Font for data and lyrics"
+msgstr "Шрифт для даних та текстів пісень"
+
+msgid "Add song artist tag"
+msgstr "Додати тег виконавця композиції"
+
+msgid "Add song album tag"
+msgstr "Додати тег альбому композиції"
+
+msgid "Add song title tag"
+msgstr "Додати тег назви композиції"
+
+msgid "Add song albumartist tag"
+msgstr "Додати тег виконавця альбому"
+
+msgid "Add song year tag"
+msgstr "Додати тег року композиції"
+
+msgid "Add song composer tag"
+msgstr "Додати тег композитора"
+
+msgid "Add song performer tag"
+msgstr "Додати тег виконавця композиції"
+
+msgid "Add song grouping tag"
+msgstr "Додати тег групування композицій"
+
+msgid "Add song disc tag"
+msgstr "Додати тег диску"
+
+msgid "Add song track tag"
+msgstr "Додати тег номера композиції"
+
+msgid "Add song genre tag"
+msgstr "Додати тег жанру композиції"
+
+msgid "Add song length tag"
+msgstr "Додати тег тривалості композиції"
+
+msgid "Add song play count"
+msgstr "Додати кількість відтворень композиції"
+
+msgid "Add song skip count"
+msgstr "Додати кількість пропусків композиції"
+
+msgid "Add a new line if supported by the notification type"
+msgstr "Додати новий рядок, якщо підтримується типом сповіщення"
+
+msgid "%filename%"
+msgstr "%filename%"
+
+msgid "Add song filename"
+msgstr "Додати ім'я файлу композиції"
+
+msgid "%url%"
+msgstr "%url%"
+
+msgid "Add song URL"
+msgstr "Додати URL-адресу композиції"
+
+msgid "%rating%"
+msgstr "%rating%"
+
+msgid "Add song rating"
+msgstr "Додати рейтинг композиції"
+
+msgid "Add song original year tag"
+msgstr "Додати тег оригінального року композиції"
+
+msgid "Add song artistsort tag"
+msgstr "Add song artistsort tag"
+
+msgid "Add song albumartistsort tag"
+msgstr "Add song albumartistsort tag"
+
+msgid "Add song titlesort tag"
+msgstr "Add song titlesort tag"
+
+msgid "Add song composersort tag"
+msgstr "Add song composersort tag"
+
+msgid "Add song performersort tag"
+msgstr "Add song performersort tag"
+
+msgid "Add song albumsort tag"
+msgstr "Add song albumsort tag"
+
+msgid "Filetype"
+msgstr "Тип файлу"
+
+msgid "Length"
+msgstr "Тривалість"
+
+msgid "Samplerate"
+msgstr "Частота вибірки"
+
+msgid "Bit depth"
+msgstr "Розрядна глибина"
+
+msgid "Bitrate"
+msgstr "Бітова швидкість"
+
+msgid "Show album cover"
+msgstr "Показати обкладинку альбому"
+
+msgid "Show song technical data"
+msgstr "Показати технічні дані композиціїї"
+
+msgid "Show song lyrics"
+msgstr "Показати текст пісні"
+
+msgid "No song playing"
+msgstr "Нічого не відтворюється"
+
+msgid "%1 song"
+msgstr "%1 композиція"
+
+msgid "%1 songs"
+msgstr "%1 композицій"
+
+msgid "%1 artist"
+msgstr "%1 виконавець"
+
+msgid "%1 artists"
+msgstr "%1 виконавців"
+
+msgid "%1 album"
+msgstr "%1 альбом"
+
+msgid "%1 albums"
+msgstr "%1 альбомів"
+
+msgid "kbps"
+msgstr "кбіт/с"
+
+msgid "Load cover from URL"
+msgstr "Завантаження обкладинки за адресою"
+
+msgid "Enter a URL to download a cover from the Internet:"
+msgstr "Вкажіть адресу для завантаження обкладинки з Інтернету:"
+
+msgid "Fetching cover error"
+msgstr "Не вдалося завантажити обкладинку"
+
+msgid "The site you requested does not exist!"
+msgstr "Вказана адреса не існує!"
+
+msgid "The site you requested is not an image!"
+msgstr "Вказана адреса не є малюнком!"
+
+msgid "View"
+msgstr "Перегляд"
+
+msgid "Total albums:"
+msgstr "Загалом альбомів:"
+
+msgid "Without cover:"
+msgstr "Без обкладинки:"
+
+msgid "0"
+msgstr "0"
+
+msgid "Fetch Missing Covers"
+msgstr "Завантажити обкладинки, котрих бракує"
+
+msgid "Export Covers"
+msgstr "Експортування обкладинок"
+
+msgid "Fetch automatically"
+msgstr "Завантажувати автоматично"
+
+msgid "Load"
+msgstr "Завантажити"
+
+msgid "Add to playlist"
+msgstr "Додати до списку відтворення"
+
+msgid "Fetch completed"
+msgstr "Завантаження завершено"
+
+msgid "Total network requests made"
+msgstr "Всього зроблено запитів до мережі"
+
+msgid "Average image size"
+msgstr "Середній розмір малюнку"
+
+msgid "Total bytes transferred"
+msgstr "Всього передано байт"
+
+msgid "Covers"
+msgstr "Обкладинки"
+
+msgid "Cover providers"
+msgstr "Постачальники обкладинок"
+
+msgid "Choose the providers you want to use when searching for covers."
+msgstr "Виберіть постачальників, яких потрібно використовувати під час пошуку обкладинок."
+
+msgid "Move up"
+msgstr "Перемістити вгору"
+
+msgid "Move down"
+msgstr "Перемістити вниз"
+
+msgid "Authentication"
+msgstr "Автентифікація"
+
+msgid "Login"
+msgstr "Увійти"
+
+msgid "Album cover types"
+msgstr "Типи обкладинок альбомів"
+
+msgid "Saving album covers"
+msgstr "Збереження обкладинок альбомів"
+
+msgid "Save album covers in album directory"
+msgstr "Зберегти обкладинки альбому в каталозі альбому"
+
+msgid "Save album covers in cache directory"
+msgstr "Зберегти обкладинки альбому в каталозі кешу"
+
+msgid "Save album covers as embedded cover"
+msgstr "Зберегти обкладинки альбому як вбудовані"
+
+msgid "Filename:"
+msgstr "Назва файлу:"
+
+msgid "Pattern"
+msgstr "Шаблон"
+
+msgid "Random"
+msgstr "Випадково"
+
+msgid "Overwrite existing file"
+msgstr "Перезаписати наявний файл"
+
+msgid "Lowercase filename"
+msgstr "Назва файлу в нижньому регистрі"
+
+msgid "Replace spaces with dashes"
+msgstr "Замінити пробіли дефісами"
+
+msgid "Use Tidal settings to authenticate."
+msgstr "Використовувати налаштування Tidal для автентифікації."
+
+msgid "Use Spotify settings to authenticate."
+msgstr "Використовувати налаштування Spotify для автентифікації."
+
+msgid "Use Qobuz settings to authenticate."
+msgstr "Використовувати налаштування Qobuz для автентифікації."
+
+msgid "%1 needs authentication."
+msgstr "%1 потребує автентифікації."
+
+msgid "%1 does not need authentication."
+msgstr "%1 не потребує автентифікації."
+
+msgid "No provider selected."
+msgstr "Постачальника не вибрано."
+
+msgid "Authentication failed"
+msgstr "Помилка автентификації"
+
+msgid "Manually unset (%1)"
+msgstr "Знято вручну (%1)"
+
+msgid "Set through album cover search (%1)"
+msgstr "Встановлено через пошук обкладинок альбомів (%1)"
+
+msgid "Automatically picked up from album directory (%1)"
+msgstr "Автоматично підібрано з теки альбому (%1)"
+
+msgid "Embedded album cover art (%1)"
+msgstr "Вбудована обкладинка альбому (%1)"
+
+msgid "Saving CUE files is not supported."
+msgstr "Збереження CUE-файлів не підтримується."
+
+msgid "Unable to execute SQL query: %1"
+msgstr "Не вдалось виконати SQL-запит: %1"
+
+msgid "Integrity check"
+msgstr "Перевірка цілісності даних"
+
+msgid "Database corruption detected."
+msgstr "Виявлено пошкодження бази даних."
+
+msgid "Backing up database"
+msgstr "Створення резервної копії бази даних"
+
+msgid "Delete files"
+msgstr "Видалити файли"
+
+msgid "The following files will be deleted from disk:"
+msgstr "Наступні файли будуть видалені з диска:"
+
+msgid "Are you sure you want to continue?"
+msgstr "Дійсно продовжити?"
+
+msgid "Deleting files"
+msgstr "Видалення файлів"
+
+msgid "Updating %1%..."
+msgstr "Оновлення %1%..."
+
+msgid "Not connected"
+msgstr "Не з'єднано"
+
+msgid "Not mounted - double click to mount"
+msgstr "Не змонтовано — двічі клацніть, щоб змонтувати"
+
+msgid "Double click to open"
+msgstr "Подвійне клацання, щоб відкрити"
+
+msgid "%1 song%2"
+msgstr "%1 композиція %2"
+
+msgid "Connect device"
+msgstr "Підключити пристрій"
+
+msgid "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+msgstr "Це перше під'єднання цього пристрою. Strawberry спробує знайти на ньому музичні файли. Це може зайняти деякий час."
+
+msgid "This device will not work properly"
+msgstr "Цей пристрій не працюватиме як слід"
+
+msgid "This is an MTP device, but you compiled Strawberry without libmtp support."
+msgstr "Це пристрій MTP, але Strawberry був зібраний без підтримки libmtp."
+
+msgid "If you continue, this device will work slowly and songs copied to it may not work."
+msgstr "Якщо продовжити, цей пристрій буде працювати повільно і скопійовані на нього композиції можуть не відтворюватись."
+
+msgid "This is an iPod, but you compiled Strawberry without libgpod support."
+msgstr "Це пристрій iPod, але Strawberry був зібраний без підтримки libgpod."
+
+msgid "This type of device is not supported: %1"
+msgstr "Цей тип пристрою не підтримується: %1"
+
+msgid "Device Properties"
+msgstr "Налаштування пристрою"
+
+msgid "Information"
+msgstr "Інформація"
+
+msgid "Name"
+msgstr "Назва"
+
+msgid "Icon"
+msgstr "Піктограма"
+
+msgid "Hardware information"
+msgstr "Відомості про обладнання"
+
+msgid "Hardware information is only available while the device is connected."
+msgstr "Відомості про обладнання доступні лише після під'єднання пристрою."
+
+msgid "File formats"
+msgstr "Формати файлів"
+
+msgid "Supported formats"
+msgstr "Підтримувані формати"
+
+msgid "This device supports the following file formats:"
+msgstr "Цей пристрій підтримує наступні формати файлів:"
+
+msgid "Strawberry can automatically convert the music you copy to this device into a format that it can play."
+msgstr "Strawberry може автоматично конвертувати скопійовану до цього пристрою музику в потрібний формат."
+
+msgid "Do not convert any music"
+msgstr "Не конвертувати ніяку музику"
+
+msgid "Convert any music that the device can't play"
+msgstr "Конвертувати всю музику, яку не може відтворити пристрій"
+
+msgid "Convert all music"
+msgstr "Конвертувати всю музику"
+
+msgid "Preferred format"
+msgstr "Бажаний формат"
+
+msgid "This device must be connected and opened before Strawberry can see what file formats it supports."
+msgstr "Потрібно під'єднати та відкрити пристрій, щоб Strawberry , які формати файлів він підтримує."
+
+msgid "Open device"
+msgstr "Відкрити пристрій"
+
+msgid "Querying device..."
+msgstr "Опитування пристрою..."
+
+msgid "Model"
+msgstr "Модель"
+
+msgid "Manufacturer"
+msgstr "Виробник"
+
+msgid "Safely remove device"
+msgstr "Безпечно відключити пристрій"
+
+msgid "Forget device"
+msgstr "Забути пристрій"
+
+msgid "Device properties..."
+msgstr "Налаштування пристрою..."
+
+msgid "Copy to collection..."
+msgstr "Скопіювати до фонотеки..."
+
+msgid "Delete from device..."
+msgstr "Видалити з пристрою..."
+
+msgid "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+msgstr "Після забування пристрій буде вилучено з цього списку. Strawberry знову доведеться шукати композиції на ньому під час наступного з'єднання."
+
+msgid "These files will be deleted from the device, are you sure you want to continue?"
+msgstr "Ці файли будуть видалені з пристрою. Дійсно видалити їх?"
+
+msgid "on "
+msgstr "on "
+
+msgid "Dynamic mode is on"
+msgstr "Динамічний режим увімкнений"
+
+msgid "New tracks will be added automatically."
+msgstr "Нові композиції будуть додані автоматично."
+
+msgid "Expand"
+msgstr "Розширити"
+
+msgid "Repopulate"
+msgstr "Повторно заповнити"
+
+msgid "Turn off"
+msgstr "Вимкнути"
+
+msgid "Edit track information"
+msgstr "Редагувати дані композиції"
+
+msgid "Date created"
+msgstr "Дата створення"
+
+msgid "Art Automatic"
+msgstr "Автоматично"
+
+msgid "Date modified"
+msgstr "Дата зміни"
+
+msgid "Art Embedded"
+msgstr "Вбудована обкладинка"
+
+#. A playlist's tag.
+msgid "Last played"
+msgstr "Останнє відтворення"
+
+msgid "File type"
+msgstr "Тип файлу"
+
+msgid "Play count"
+msgstr "Кількість відтворень"
+
+msgid "EBU R 128 integrated loudness"
+msgstr "Вбудована гучність EBU R 128"
+
+msgid "Bit rate"
+msgstr "Бітова швидкість"
+
+msgid "Skip count"
+msgstr "Кількість пропусків"
+
+msgid "Sample rate"
+msgstr "Частота вибірки"
+
+msgid "Path"
+msgstr "Шлях"
+
+msgid "Filename"
+msgstr "Назва файлу"
+
+msgid "Art Unset"
+msgstr "Обкладинку знято"
+
+msgid "File size"
+msgstr "Розмір файлу"
+
+msgid "Art Manual"
+msgstr "Вручну"
+
+msgid "EBU R 128 loudness range"
+msgstr "Діапазон гучності EBU R 128"
+
+msgid "Reset play counts"
+msgstr "Скинути лічильник відтворень"
+
+msgid "Tags"
+msgstr "Теги"
+
+msgid "Change art"
+msgstr "Змінити зображення"
+
+msgid "Embedded cover"
+msgstr "Вбудована обкладинка"
+
+msgid "Disc"
+msgstr "Диск"
+
+msgid "Grouping"
+msgstr "Групування"
+
+msgid "Album artist"
+msgstr "Виконавець альбому"
+
+msgid "Year"
+msgstr "Рік"
+
+msgid "Composer"
+msgstr "Композитор"
+
+msgid "Complete tags automatically"
+msgstr "Заповнити мітки автоматично"
+
+msgid "Genre"
+msgstr "Жанр"
+
+msgid "Comment"
+msgstr "Коментар"
+
+msgid "Performer"
+msgstr "Виконавець"
+
+msgid "Compilation"
+msgstr "Компіляція"
+
+msgid "Track"
+msgstr "Композиція"
+
+msgid "Rating"
+msgstr "Рейтинг"
+
+msgid "Lyrics"
+msgstr "Тексти пісень"
+
+msgid "Complete lyrics automatically"
+msgstr "Завантажити текст пісні"
+
+msgid "(different across multiple songs)"
+msgstr "(відрізняється поміж кількох композицій)"
+
+msgid "Different art across multiple songs."
+msgstr "Різні обкладинки поміж кількох композицій."
+
+msgid "Previous"
+msgstr "Попередня"
+
+msgid "Next"
+msgstr "Наступна"
+
+msgid "Saving tracks"
+msgstr "Збереження композицій"
+
+msgid "Loading tracks"
+msgstr "Завантаження композицій"
+
+msgid "%1 songs selected."
+msgstr "Вибрано %1 композицій."
+
+msgid "Yes"
+msgstr "Так"
+
+msgid "No"
+msgstr "Ні"
+
+msgid "None"
+msgstr "Немає"
+
+msgid "Cover is unset."
+msgstr "Обкладинку знято."
+
+msgid "Cover from embedded image."
+msgstr "Обкладинка з вбудованого зображення."
+
+msgid "Cover from %1"
+msgstr "Обкладинка з %1"
+
+msgid "Cover art not set"
+msgstr "Обкладинку не встановлено"
+
+msgid "Album cover editing is only available for collection songs."
+msgstr "Редагування обкладинки альбому доступне лише для пісень з колекції."
+
+msgid "Cover changed: Will be cleared when saved."
+msgstr "Обкладинку змінено: вона буде скасована під час збереження."
+
+msgid "Cover changed: Will be unset when saved."
+msgstr "Обкладинку змінено: вона буде прибрана під час збереження."
+
+msgid "Cover changed: Will be deleted when saved."
+msgstr "Обкладинку змінено: вона буде видалена під час збереження."
+
+msgid "Cover changed: Will set new when saved."
+msgstr "Обкладинку змінено: під час збереження буде встановлена нова."
+
+msgid "Never"
+msgstr "Ніколи"
+
+msgid "Reset song play statistics"
+msgstr "Скинути статистику відтворення композиції"
+
+msgid "Are you sure you want to reset this song's play statistics?"
+msgstr "Дійсно скинути статистику відтворення композиції?"
+
+msgid "loading..."
+msgstr "завантаження..."
+
+msgid "Not found."
+msgstr "Не знайдено."
+
+msgid "Could not write metadata to %1"
+msgstr "Не вдалось записати метадані в %1"
+
+msgid "Could not write metadata to %1: %2"
+msgstr "Не вдалось записати метадані в %1: %2"
+
+msgid "ID3v2 version:"
+msgstr "ID3v2 version:"
+
+msgid "2.3"
+msgstr "2.3"
+
+msgid "2.4"
+msgstr "2.4"
+
+msgid "Performer sort"
+msgstr "Performer sort"
+
+msgid "Title sort"
+msgstr "Title sort"
+
+msgid "Album artist sort"
+msgstr "Album artist sort"
+
+msgid "Artist sort"
+msgstr "Artist sort"
+
+msgid "Album sort"
+msgstr "Album sort"
+
+msgid "Composer sort"
+msgstr "Composer sort"
+
+msgid "Equalizer"
+msgstr "Еквалайзер"
+
+msgid "Preset:"
+msgstr "Визначені налаштування:"
+
+msgid "Save preset"
+msgstr "Зберегти визначені налаштування"
+
+msgid "Delete preset"
+msgstr "Видалити визначені налаштування"
+
+msgid "Enable equalizer"
+msgstr "Увімкнути еквалайзер"
+
+msgid "Enable stereo balancer"
+msgstr "Увімкнути балансування стерео"
+
+msgid "Left"
+msgstr "Ліворуч"
+
+msgid "Balance"
+msgstr "Баланс"
+
+msgid "Right"
+msgstr "Праворуч"
+
+msgid "Custom"
+msgstr "Інша"
+
+msgid "Classical"
+msgstr "Класична"
+
+msgid "Club"
+msgstr "Клубна"
+
+msgid "Dance"
+msgstr "Танцювальна"
+
+msgid "Full Bass"
+msgstr "Повні баси"
+
+msgid "Full Treble"
+msgstr "Повні верхи"
+
+msgid "Full Bass + Treble"
+msgstr "Повні баси + верхи"
+
+msgid "Laptop/Headphones"
+msgstr "Ноутбук або навушники"
+
+msgid "Large Hall"
+msgstr "Велика зала"
+
+msgid "Live"
+msgstr "Наживо"
+
+msgid "Party"
+msgstr "Вечірка"
+
+msgid "Pop"
+msgstr "Поп"
+
+msgid "Reggae"
+msgstr "Реґґі"
+
+msgid "Rock"
+msgstr "Рок"
+
+msgid "Soft"
+msgstr "Легка"
+
+msgid "Ska"
+msgstr "Ска"
+
+msgid "Soft Rock"
+msgstr "Легкий рок"
+
+msgid "Techno"
+msgstr "Техно"
+
+msgid "Zero"
+msgstr "Нуль"
+
+msgid "Are you sure you want to delete the \"%1\" preset?"
+msgstr "Дійсно видалити визначені налаштування «%1»?"
+
+msgid "You need to restart playback for this setting to take affect."
+msgstr "You need to restart playback for this setting to take affect."
+
+msgid "%1 dB"
+msgstr "%1 дБ"
+
+msgid "Strawberry Error"
+msgstr "Помилка Strawberry"
+
+msgid "Large sidebar"
+msgstr "Велика бічна панель"
+
+msgid "Icons sidebar"
+msgstr "Значки на бічній панелі"
+
+msgid "Small sidebar"
+msgstr "Маленька бічна панель"
+
+msgid "Plain sidebar"
+msgstr "Звичайна бічна панель"
+
+msgid "Tabs on top"
+msgstr "Вкладки зверху"
+
+msgid "Icons on top"
+msgstr "Піктограми зверху"
+
+msgid "Add root directory"
+msgstr "Add root directory"
+
+msgid "Remove selected root directory"
+msgstr "Remove selected root directory"
+
+msgid "Toggle between list and tree view"
+msgstr "Toggle between list and tree view"
+
+msgid "Select folder to add as tree root"
+msgstr "Select folder to add as tree root"
+
+msgid "Move to collection..."
+msgstr "Перемістити до фонотеки..."
+
+msgid "Files"
+msgstr "Files"
+
+msgid "Available"
+msgstr "Доступне"
+
+msgid "New songs"
+msgstr "Нові композиції"
+
+msgid "Exceeded by"
+msgstr "Перевищено за"
+
+msgid "Used"
+msgstr "Використано"
+
+msgid "Could not copy %1 to %2: %3"
+msgstr "Не вдалося скопіювати %1 в %2: %3"
+
+msgid "Writing database failed: %1"
+msgstr "Помилка запису в базу даних: %1"
+
+msgid "Writing database failed."
+msgstr "Помилка запису в базу даних."
+
+msgid "Loading iPod database"
+msgstr "Завантаження бази даних iPod"
+
+msgid "An error occurred loading the iTunes database"
+msgstr "Виникла помилка завантаження бази даних iTunes"
+
+msgid "Mount point"
+msgstr "Точка монтування"
+
+msgid "URI"
+msgstr "Адреса"
+
+msgid "Press a key"
+msgstr "Натисніть клавішу"
+
+msgid "Press a key combination to use for %1..."
+msgstr "Натисніть комбінацію клавіш для %1..."
+
+msgid "Play"
+msgstr "Відтворити"
+
+msgid "Pause"
+msgstr "Призупинити"
+
+msgid "Play/Pause"
+msgstr "Відтворення/Пауза"
+
+msgid "Stop"
+msgstr "Зупинити"
+
+msgid "Stop playing after current track"
+msgstr "Зупинити відтворення після поточної композиції"
+
+msgid "Next track"
+msgstr "Наступна композиція"
+
+msgid "Previous track"
+msgstr "Попередня композиція"
+
+msgid "Restart or previous track"
+msgstr "Перезапустити або повернутись до попередньої композиції"
+
+msgid "Increase volume"
+msgstr "Збільшити гучність"
+
+msgid "Decrease volume"
+msgstr "Зменшити гучність"
+
+msgid "Mute"
+msgstr "Вимкнути звук"
+
+msgid "Seek forward"
+msgstr "Перемотати вперед"
+
+msgid "Seek backward"
+msgstr "Перемотати назад"
+
+msgid "Show/Hide"
+msgstr "Показати/сховати"
+
+msgid "Show OSD"
+msgstr "Показати OSD"
+
+msgid "Toggle Pretty OSD"
+msgstr "Показати або сховати OSD"
+
+msgid "Change shuffle mode"
+msgstr "Змінити режим перемішування"
+
+msgid "Change repeat mode"
+msgstr "Змінити режим повторення"
+
+msgid "Enable/disable scrobbling"
+msgstr "Увімкнути/вимкнути скроблінг"
+
+msgid "Love"
+msgstr "Люблю"
+
+msgid "Global Shortcuts"
+msgstr "Глобальні сполучення клавіш"
+
+msgid "Open..."
+msgstr "Відкрити..."
+
+msgid "Use X11 shortcuts when available"
+msgstr "Використовувати сполучення клавіш X11, якщо можливо"
+
+msgid "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+msgstr "Щоб у Strawberry можна було користуватися глобальними сполученнями клавішу, запустіть програму «Системні налаштування» і дозвольте Strawberry «<span style=\"font-style:italic\">керувати вашим комп'тером</span>»."
+
+#. Category label
+msgid "Action"
+msgstr "Дія"
+
+msgid "Shortcut"
+msgstr "Сполучення клавіш"
+
+msgid "Shortcut for %1"
+msgstr "Сполучення клавіш для %1"
+
+msgid "&None"
+msgstr "&Нічого"
+
+msgid "&Default"
+msgstr "&Стандартний"
+
+msgid "&Custom"
+msgstr "&Власний"
+
+msgid "Change shortcut..."
+msgstr "Змінити комбінацію клавіш..."
+
+msgid "Use KGlobalAccel shortcuts when available"
+msgstr "Використовувати сполучення клавіш KGlobalAccel, якщо можливо"
+
+msgid "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+msgstr "Не рекомендується використовувати сполучення клавіш X11, оскільки клавіатура може перестати реагувати на натискання! Скорочення краще використовувати через MPRIS2 або KGlobalAccel."
+
+msgid "Collection advanced grouping"
+msgstr "Розширене групування фонотеки"
+
+msgid "You can change the way the songs in the collection are organized."
+msgstr "Ви можете змінити спосіб впорядкування композицій у фонотеці."
+
+msgid "Group Collection by..."
+msgstr "Групувати фонотеку за..."
+
+msgid "First level"
+msgstr "Перший рівень"
+
+msgid "Album - Disc"
+msgstr "Альбом - Диск"
+
+msgid "Format"
+msgstr "Формат"
+
+msgid "Year - Album"
+msgstr "Рік – Альбом"
+
+msgid "Year - Album - Disc"
+msgstr "Рік – Альбом – Диск"
+
+msgid "Original year"
+msgstr "Рік оригіналу"
+
+msgid "Original year - Album"
+msgstr "Рік оригіналу – Альбом"
+
+msgid "Second level"
+msgstr "Другий рівень"
+
+msgid "Third level"
+msgstr "Третій рівень"
+
+msgid "Separate albums by grouping tag"
+msgstr "Розділяти альбоми за тегом групування"
+
+msgid "Original year - Album - Disc"
+msgstr "Original year - Album - Disc"
+
+msgid "Buffering"
+msgstr "Буферизація"
+
+msgid "%1 Scrobbler Authentication"
+msgstr "%1 Scrobbler Authentication"
+
+msgid "Open URL in web browser?"
+msgstr "Open URL in web browser?"
+
+msgid "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+msgstr "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+
+msgid "Could not open URL. Please open this URL in your browser"
+msgstr "Could not open URL. Please open this URL in your browser"
+
+msgid "Invalid reply from web browser. Missing token."
+msgstr "Invalid reply from web browser. Missing token."
+
+msgid "Received invalid reply from web browser. Try another browser."
+msgstr "Received invalid reply from web browser. Try another browser."
+
+msgid "Scrobbler %1 is not authenticated!"
+msgstr "Scrobbler %1 is not authenticated!"
+
+msgid "Scrobbler %1 error: %2"
+msgstr "Scrobbler %1 error: %2"
+
+msgid "Least favourite tracks"
+msgstr "Найменш улюблені композиції"
+
+msgid "Unable to scrobble %1 - %2 because of error: %3"
+msgstr "Не вдалось надіслати дані скроблінгу %1 - %2 через помилку: %3"
+
+msgid "Missing MusicBrainz recording ID for %1 %2 %3"
+msgstr "Відсутній ідентифікатор запису MusicBrainz для %1 %2 %3"
+
+msgid "ListenBrainz error: %1"
+msgstr "Помилка ListenBrainz: %1"
+
+msgid "You are not signed in."
+msgstr "Ви не ввійшли до системи."
+
+msgid "Sign out"
+msgstr "Вийти"
+
+msgid "Signing in..."
+msgstr "Реєстрація..."
+
+msgid "You are signed in."
+msgstr "Ви ввійшли до системи."
+
+msgid "You are signed in as %1."
+msgstr "Ви ввійшли до системи як %1."
+
+msgid "Expires on %1"
+msgstr "Діє до %1"
+
+msgid "Lyrics providers"
+msgstr "Постачальники текстів пісень"
+
+msgid "Choose the providers you want to use when searching for lyrics."
+msgstr "Виберіть постачальників, яких ви хочете використовувати під час пошуку текстів композицій."
+
+msgid "Strawberry Music Player"
+msgstr "Музичний програвач Strawberry"
+
+msgid "&Music"
+msgstr "&Музика"
+
+msgid "P&laylist"
+msgstr "&Список відтворення"
+
+msgid "Help"
+msgstr "Довідка"
+
+msgid "&Tools"
+msgstr "&Інструменти"
+
+msgid "F5"
+msgstr "F5"
+
+msgid "&Play"
+msgstr "&Відтворити"
+
+msgid "F6"
+msgstr "F6"
+
+msgid "&Stop"
+msgstr "&Зупинити"
+
+msgid "F7"
+msgstr "F7"
+
+msgid "&Next track"
+msgstr "&Наступна композиція"
+
+msgid "F8"
+msgstr "F8"
+
+msgid "&Quit"
+msgstr "&Вийти"
+
+msgid "Ctrl+Q"
+msgstr "Ctrl+Q"
+
+msgid "Stop after this track"
+msgstr "Зупинити після цієї композиції"
+
+msgid "Ctrl+Alt+V"
+msgstr "Ctrl+Alt+V"
+
+msgid "&Clear playlist"
+msgstr "&Очистити список відтворення"
+
+msgid "Clear playlist"
+msgstr "Очистити список відтворення"
+
+msgid "Ctrl+K"
+msgstr "Ctrl+K"
+
+msgid "Ctrl+E"
+msgstr "Ctrl+E"
+
+msgid "Renumber tracks in this order..."
+msgstr "Пронумерувати композиції у такому порядку..."
+
+msgid "Set value for all selected tracks..."
+msgstr "Встановити значення для всіх вибраних композицій..."
+
+msgid "Edit tag..."
+msgstr "Редагувати тег..."
+
+msgid "&Settings..."
+msgstr "&Налаштування..."
+
+msgid "Ctrl+P"
+msgstr "Ctrl+P"
+
+msgid "&About Strawberry"
+msgstr "&Про Strawberry"
+
+msgid "F1"
+msgstr "F1"
+
+msgid "S&huffle playlist"
+msgstr "&Перемішати список відтворення"
+
+msgid "&Add file..."
+msgstr "&Додати файл..."
+
+msgid "Ctrl+Shift+A"
+msgstr "Ctrl+Shift+A"
+
+msgid "&Open file..."
+msgstr "&Відкрити файл..."
+
+msgid "Open audio &CD..."
+msgstr "Відкрити &аудіо-CD..."
+
+msgid "&Cover Manager"
+msgstr "&Менеджер обкладинок"
+
+msgid "C&onsole"
+msgstr "&Консоль"
+
+msgid "&Shuffle mode"
+msgstr "Режим &перемішування"
+
+msgid "&Repeat mode"
+msgstr "Режим &повтору"
+
+msgid "Remove from playlist"
+msgstr "Вилучити зі списку відтворення"
+
+msgid "&Equalizer"
+msgstr "Еквалайзер"
+
+msgid "&Transcode Music"
+msgstr "&Перекодування музики"
+
+msgid "Add &folder..."
+msgstr "Додати &папку..."
+
+msgid "&Jump to the currently playing track"
+msgstr "&Перейти до композиції, що відтворюється зараз"
+
+msgid "Ctrl+J"
+msgstr "Ctrl+J"
+
+msgid "&New playlist"
+msgstr "&Створити список відтворення"
+
+msgid "Ctrl+N"
+msgstr "Ctrl+N"
+
+msgid "Save &playlist..."
+msgstr "Зберегти &список відтворення..."
+
+msgid "Ctrl+S"
+msgstr "Ctrl+S"
+
+msgid "&Load playlist..."
+msgstr "&Завантажити список відтворення..."
+
+msgid "Ctrl+Shift+O"
+msgstr "Ctrl+Shift+O"
+
+msgid "&Save all playlists..."
+msgstr "&Зберегти всі списки відтворення..."
+
+msgid "Go to next playlist tab"
+msgstr "До наступної вкладки списку відтворення"
+
+msgid "Go to previous playlist tab"
+msgstr "До попередньої вкладки списку відтворення"
+
+msgid "&Update changed collection folders"
+msgstr "&Оновити змінені теки колекції"
+
+msgid "About &Qt"
+msgstr "Про &Qt"
+
+msgid "&Mute"
+msgstr "&Вимкнути звук"
+
+msgid "Ctrl+M"
+msgstr "Ctrl+M"
+
+msgid "&Do a full collection rescan"
+msgstr "&Повністю пересканувати колекцію"
+
+msgid "Stop collection scan"
+msgstr "Зупинити сканування фонотеки"
+
+msgid "Complete tags automatically..."
+msgstr "Заповнити мітки автоматично..."
+
+msgid "Ctrl+T"
+msgstr "Ctrl+T"
+
+msgid "Toggle scrobbling"
+msgstr "Змінити режим скроблінгу"
+
+msgid "Remove &duplicates from playlist"
+msgstr "Видалити &дублікати зі списку відтворення"
+
+msgid "Remove &unavailable tracks from playlist"
+msgstr "Видалити &недоступні композиції зі списку відтворення"
+
+msgid "Add file(s) to transcoder"
+msgstr "Додати файли для перекодування"
+
+msgid "Add file to transcoder"
+msgstr "Додати файл для перекодування"
+
+msgid "Add stream..."
+msgstr "Додати потік..."
+
+msgid "Show sidebar"
+msgstr "Показати бічну панель"
+
+msgid "Queue"
+msgstr "Черга"
+
+msgid "Playlists"
+msgstr "Списки відтворення"
+
+msgid "Smart playlists"
+msgstr "Розумні списки відтворення"
+
+msgid "Radios"
+msgstr "Радіостанції"
+
+msgid "Devices"
+msgstr "Пристрої"
+
+msgid "Subsonic"
+msgstr "Subsonic"
+
+msgid "Tidal"
+msgstr "Tidal"
+
+msgid "Spotify"
+msgstr "Spotify"
+
+msgid "Qobuz"
+msgstr "Qobuz"
+
+msgid "Show all songs"
+msgstr "Показати всі композиції"
+
+msgid "Show only duplicates"
+msgstr "Показати тільки дублікати"
+
+msgid "Show only untagged"
+msgstr "Показати тільки без тегів"
+
+msgid "Configure collection..."
+msgstr "Налаштувати фонотеку..."
+
+msgid "Toggle queue status"
+msgstr "Перемикнути статус черги"
+
+msgid "Queue selected tracks to play next"
+msgstr "Відтворити наступними обрані композиції"
+
+msgid "Toggle skip status"
+msgstr "Змінити стан пропуску"
+
+msgid "Rescan song(s)..."
+msgstr "Сканувати композиції..."
+
+msgid "Fetch metadata from service"
+msgstr "Fetch metadata from service"
+
+msgid "Copy URL(s)..."
+msgstr "Копіювати адреси..."
+
+msgid "Show in collection..."
+msgstr "Показати у фонотеці..."
+
+msgid "Check for updates..."
+msgstr "Перевірити оновлення..."
+
+msgid "Strawberry running under Rosetta"
+msgstr "Strawberry запущений в трансляторі Rosetta"
+
+msgid "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+msgstr "Strawberry запущений в трансляторі Rosetta. Такий режим не є підтримуваним, можуть бути помилки. Вам слід завантажити версію Strawberry для відповідної архітектури CPU з сайту %1"
+
+msgid "Sponsoring Strawberry"
+msgstr "Підтримати Strawberry"
+
+msgid "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+msgstr "Strawberry є безкоштовним та відкритим програмним забезпеченням. Якщо вам подобається Strawberry, ми будемо раді вашій підтримці. Додаткові відомості дивіться на нашому веб-сайті %1"
+
+msgid "Dequeue track"
+msgstr "Вилучити композицію з черги"
+
+msgid "Dequeue selected tracks"
+msgstr "Вилучити з черги вибрані композиції"
+
+msgid "Queue selected tracks"
+msgstr "Додати до черги обрані композиції"
+
+msgid "Unskip track"
+msgstr "Не пропускати композицію"
+
+msgid "Unskip selected tracks"
+msgstr "Не пропускати вибрані композиції"
+
+msgid "Skip track"
+msgstr "Пропустити композицію"
+
+msgid "Skip selected tracks"
+msgstr "Пропустити позначені композиції"
+
+msgid "Set %1 to \"%2\"..."
+msgstr "Встановити %1 у «%2»..."
+
+msgid "Edit tag \"%1\"..."
+msgstr "Змінити тег «%1»..."
+
+msgid "Add to another playlist"
+msgstr "Додати до іншого списку відтворення"
+
+msgid "New playlist"
+msgstr "Новий список відтворення"
+
+msgid "Add file"
+msgstr "Додати файл"
+
+msgid "Music"
+msgstr "Музика"
+
+msgid "Add folder"
+msgstr "Додати папку"
+
+msgid "Playlist has %1 songs, too large to undo, are you sure you want to clear the playlist?"
+msgstr "Список відтворення містить %1 композицій, що забагато для скасування. Дійсно очистити список відтворення?"
+
+msgid "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:"
+msgstr "Для версії Strawberry, яку ви щойно встановили, потрібно повне сканування фонотеки через наступні нові можливості:"
+
+msgid "Would you like to run a full rescan right now?"
+msgstr "Запустити повне сканування фонотеки зараз?"
+
+msgid "Collection rescan notice"
+msgstr "Повідомлення про повторне сканування фонотеки"
+
+msgid "Ctrl+Shift+H"
+msgstr "Ctrl+Shift+H"
+
+msgid "Go to last playlist tab"
+msgstr "Go to last playlist tab"
+
+msgid "Go to active playlist tab"
+msgstr "Go to active playlist tab"
+
+msgid "Close current playlist tab"
+msgstr "Close current playlist tab"
+
+msgid "Message Dialog"
+msgstr "Діалог повідомлення"
+
+msgid "Do not show this message again."
+msgstr "Більше не показувати це повідомлення."
+
+msgid "Playlist"
+msgstr "Список відтворення"
+
+msgid "Moodbar"
+msgstr "Панель настрою"
+
+msgid "Moodbar style"
+msgstr "Стиль панелі настрою"
+
+msgid "Save the .mood files directly in the songs folders"
+msgstr "Зберігати MOOD-файли в каталогах композицій"
+
+msgid "Invalid MTP device: %1"
+msgstr "Неприпустимий пристрій MTP: %1"
+
+msgid "Could not open MTP device."
+msgstr "Не вдалося відкрити пристрій MTP."
+
+msgid "MTP error: %1"
+msgstr "Помилка MTP: %1"
+
+msgid "MTP device not found."
+msgstr "Пристрій MTP не знайдено."
+
+msgid "Loading MTP device"
+msgstr "Завантаження пристрою MTP"
+
+msgid "Error connecting MTP device %1"
+msgstr "Не вдалось підключитись до MTP-пристрою %1"
+
+msgid "Error connecting MTP device %1: %2"
+msgstr "Не вдалося підключитись до MTP-пристрою %1: %2"
+
+msgid "Network Proxy"
+msgstr "Проксі-сервер"
+
+msgid "&Use the system proxy settings"
+msgstr "&Використати системні налаштування проксі"
+
+msgid "Direct internet connection"
+msgstr "Пряме з'єднання з Інтернетом"
+
+msgid "&Manual proxy configuration"
+msgstr "&Вручну налаштувати проксі"
+
+msgid "HTTP proxy"
+msgstr "HTTP-проксі"
+
+msgid "SOCKS proxy"
+msgstr "SOCKS-проксі"
+
+msgid "Port"
+msgstr "Порт"
+
+msgid "Use authentication"
+msgstr "Використовувати автентифікацію"
+
+msgid "Username"
+msgstr "Користувач"
+
+msgid "Password"
+msgstr "Пароль"
+
+msgid "Use proxy settings for streaming"
+msgstr "Використовувати налаштування проксі для потокового передавання"
+
+msgid "Only HTTP proxy is supported for streaming."
+msgstr "Only HTTP proxy is supported for streaming."
+
+msgid "Notifications"
+msgstr "Сповіщення"
+
+msgid "Strawberry can show a message when the track changes."
+msgstr "Strawberry може показувати повідомлення під час зміни композиції."
+
+msgid "Notification type"
+msgstr "Тип сповіщення"
+
+#. Refers to a disabled notification type in Notification settings.
+msgid "Disabled"
+msgstr "Вимкнено"
+
+msgid "Show a &native desktop notification"
+msgstr "Показувати &системне сповіщення на робочому столі"
+
+msgid "Show a pretty OSD"
+msgstr "Показувати спливаючі сповіщення"
+
+msgid "Show a popup fro&m the system tray"
+msgstr "Показувати спливаюче сповіщення в &лотку"
+
+msgid "General settings"
+msgstr "Загальні налаштування"
+
+msgid "Popup duration"
+msgstr "Тривалість спливаючого сповіщення"
+
+msgid " seconds"
+msgstr " секунд"
+
+msgid "Disable duration"
+msgstr "Вимкнути тривалість"
+
+msgid "Show a notification when I change the volume"
+msgstr "Показувати сповіщення після зміни гучністі"
+
+msgid "Show a notification when I change the repeat/shuffle mode"
+msgstr "Показувати сповіщення після зміни режиму повторення чи перемішування"
+
+msgid "Show a notification when I pause playback"
+msgstr "Показувати сповіщення після призупинення відтворення"
+
+msgid "Show a notification when I resume playback"
+msgstr "Показувати сповіщення після відновлення відтворення"
+
+msgid "Include album art in the notification"
+msgstr "Показувати обкладинку в сповіщенні"
+
+msgid "Custom message settings"
+msgstr "Власні налаштування повідомлень"
+
+msgid "Use a custom message for notifications"
+msgstr "Використовувати власне повідомлення для сповіщень"
+
+msgid "Body"
+msgstr "Текст"
+
+msgid "Pretty OSD options"
+msgstr "Налаштування спливаючого сповіщення"
+
+msgid "Background color"
+msgstr "Колір фону"
+
+msgid "Text options"
+msgstr "Налаштування тексту"
+
+msgid "Choose font..."
+msgstr "Вибрати шрифт..."
+
+msgid "Choose color..."
+msgstr "Вибрати колір..."
+
+msgid "Background opacity"
+msgstr "Прозорість фону"
+
+msgid "Basic Blue"
+msgstr "Стандартний синій"
+
+msgid "Strawberry Red"
+msgstr "Червоний Strawberry"
+
+msgid "Custom..."
+msgstr "Власний..."
+
+msgid "Enable fading"
+msgstr "Увімкнути згасання"
+
+msgid "%originalyear%"
+msgstr "%originalyear%"
+
+msgid "OSD Preview"
+msgstr "Попередній перегляд сповіщення"
+
+msgid "Drag to reposition"
+msgstr "Перетягніть, щоб змінити розташування"
+
+msgid "Discord"
+msgstr "Discord"
+
+msgid "Enable Rich Presence"
+msgstr "Enable Rich Presence"
+
+msgid "\"Listening to...\""
+msgstr "\"Listening to...\""
+
+msgid "Strawberry"
+msgstr "Strawberry"
+
+msgid "Artist name"
+msgstr "Artist name"
+
+msgid "Song title"
+msgstr "Song title"
+
+msgid "Please open this URL in your browser"
+msgstr "Please open this URL in your browser"
+
+msgid "Received invalid reply from web browser."
+msgstr "Received invalid reply from web browser."
+
+msgid "Redirect URL is missing query."
+msgstr "Redirect URL is missing query."
+
+msgid "Request URL is missing code!"
+msgstr "Request URL is missing code!"
+
+msgid "Request URL is missing state!"
+msgstr "Request URL is missing state!"
+
+msgid "Request URL has wrong state %1 != %2"
+msgstr "Request URL has wrong state %1 != %2"
+
+msgid "disc %1"
+msgstr "диск %1"
+
+msgid "track %1"
+msgstr "композиція %1"
+
+msgid "Paused"
+msgstr "Призупинено"
+
+msgid "Stopped"
+msgstr "Зупинено"
+
+msgid "Stop playing after track: %1"
+msgstr "Зупинити відтворення після композиції %1"
+
+msgid "On"
+msgstr "Увімкн"
+
+msgid "Off"
+msgstr "Вимкн"
+
+msgid "Playlist finished"
+msgstr "Список відтворення завершився"
+
+msgid "Volume %1%"
+msgstr "Гучність %1%"
+
+msgid "Don't shuffle"
+msgstr "Не перемішувати"
+
+msgid "Shuffle all"
+msgstr "Перемішати все"
+
+msgid "Shuffle tracks in this album"
+msgstr "Перемішати поточний альбом"
+
+msgid "Shuffle albums"
+msgstr "Перемішати альбоми"
+
+msgid "Shuffle grouping"
+msgstr "Перемішати групування"
+
+msgid "Don't repeat"
+msgstr "Не повторювати"
+
+msgid "Repeat track"
+msgstr "Повторювати композицію"
+
+msgid "Repeat album"
+msgstr "Повторювати альбом"
+
+msgid "Repeat playlist"
+msgstr "Повторювати список відтворення"
+
+msgid "Stop after every track"
+msgstr "Зупинятися після будь-якої композиції"
+
+msgid "Intro tracks"
+msgstr "Вступні композиції"
+
+msgid "Organizing files"
+msgstr "Впорядкування файлів"
+
+msgid "Organize Files"
+msgstr "Впорядкування файлів"
+
+msgid "Destination"
+msgstr "Призначення"
+
+msgid "After copying..."
+msgstr "Після копіювання..."
+
+msgid "Keep the original files"
+msgstr "Зберегти оригінальні файли"
+
+msgid "Delete the original files"
+msgstr "Видалити оригінальні файли"
+
+msgid "Naming options"
+msgstr "Налаштування найменування"
+
+msgid "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+msgstr "<p>Мітки починаються з %, наприклад: %artist %album %title </p>\n\n<p>Якщо взяти частину тексту з міткою у фігурні дужки, цю частину буде приховано, якщо мітка порожня.</p>"
+
+msgid "Insert..."
+msgstr "Вставити..."
+
+msgid "Remove problematic characters from filenames"
+msgstr "Видалити проблемні символи з імен файлів"
+
+msgid "Restrict to characters allowed on FAT filesystems"
+msgstr "Обмежитись символами, дозволеними у файлових системах FAT"
+
+msgid "Restrict characters to ASCII"
+msgstr "Обмежитись символами ASCII"
+
+msgid "Allow extended ASCII characters"
+msgstr "Дозволити розширені символи ASCII"
+
+msgid "Replace spaces with underscores"
+msgstr "Замінити пробіли символами підкреслення"
+
+msgid "Overwrite existing files"
+msgstr "Перезаписати наявні файли"
+
+msgid "Copy album cover artwork"
+msgstr "Копіювати обкладинку альбому"
+
+msgid "Safely remove the device after copying"
+msgstr "Безпечно відключити пристрій після копіювання"
+
+msgid "Artist's initial"
+msgstr "Ініціали виконавця"
+
+msgid "File extension"
+msgstr "Розширення файлу"
+
+msgid "Error copying songs"
+msgstr "Не вдалось скопіювати композиції"
+
+msgid "There were problems copying some songs.  The following files could not be copied:"
+msgstr "Виникли проблеми з копіюванням деяких композицій. Не вдалось скопіювати наступні:"
+
+msgid "Error deleting songs"
+msgstr "Не вдалось видалити композиції"
+
+msgid "There were problems deleting some songs.  The following files could not be deleted:"
+msgstr "Виникли проблеми з видаленням деяких композицій. Не вдалось вилучити наступні:"
+
+msgid "Don't know how to handle %1"
+msgstr "Не знаю, як працювати з %1"
+
+msgid "File %1 does not exist"
+msgstr "File %1 does not exist"
+
+msgid "Could not read file %1: %2"
+msgstr "Could not read file %1: %2"
+
+msgid "Small album cover"
+msgstr "Маленька обкладинка альбому"
+
+msgid "Large album cover"
+msgstr "Велика обкладинка альбому"
+
+msgid "Fit cover to width"
+msgstr "Підібрати розміри обкладинки за шириною"
+
+msgid "Show above status bar"
+msgstr "Показати над рядком стану"
+
+msgid "Title Sort"
+msgstr "Title Sort"
+
+msgid "Artist Sort"
+msgstr "Artist Sort"
+
+msgid "Album Sort"
+msgstr "Album Sort"
+
+msgid "Original Year"
+msgstr "Оригінальний рік"
+
+msgid "Album Artist"
+msgstr "Виконавець альбому"
+
+msgid "Album Artist Sort"
+msgstr "Album Artist Sort"
+
+msgid "Composer Sort"
+msgstr "Composer Sort"
+
+msgid "Performer Sort"
+msgstr "Performer Sort"
+
+msgid "Play Count"
+msgstr "Кількість відтворень"
+
+msgid "Skip Count"
+msgstr "Кількість пропусків"
+
+msgid "Last Played"
+msgstr "Востаннє відтворено"
+
+msgid "Sample Rate"
+msgstr "Частота дискретизації"
+
+msgid "Bit Depth"
+msgstr "Розрядна глибина"
+
+msgid "Initial key"
+msgstr "Initial key"
+
+msgid "File Name (without path)"
+msgstr "Ім'я файлу (без шляху)"
+
+msgid "File Size"
+msgstr "Розмір файлу"
+
+msgid "File Type"
+msgstr "Тип файлу"
+
+msgid "Date Modified"
+msgstr "Дата зміни"
+
+msgid "Date Created"
+msgstr "Дата створення"
+
+msgid "Source"
+msgstr "Джерело"
+
+msgid "BPM"
+msgstr "BPM"
+
+msgid "Mood"
+msgstr "Настрій"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "CUE"
+msgstr "CUE"
+
+msgid "Integrated Loudness"
+msgstr "Вбудована гучність"
+
+msgid "Loudness Range"
+msgstr "Діапазон гучності"
+
+msgid "Undo"
+msgstr "Скасувати"
+
+msgid "Redo"
+msgstr "Повторити"
+
+msgid "Load playlist"
+msgstr "Завантажити список відтворення"
+
+msgid "No matches found.  Clear the search box to show the whole playlist again."
+msgstr "Нічого не знайдено. Очистіть вікно пошуку, щоб знову показати весь список відтворення."
+
+msgid "stop"
+msgstr "зупинити"
+
+msgid "Loading smart playlist"
+msgstr "Завантаження розумного списку відтворення"
+
+msgid "&Hide..."
+msgstr "&Приховати..."
+
+msgid "&Stretch columns to fit window"
+msgstr "&Розтягнути стовпчики для заповнення вікна"
+
+msgid "&Reset columns to default"
+msgstr "&Відновити початковий стан стовпчиків"
+
+msgid "&Lock rating"
+msgstr "&Закріпити рейтинг"
+
+msgid "&Align text"
+msgstr "&Вирівняти текст"
+
+msgid "&Left"
+msgstr "Ліворуч"
+
+msgid "&Center"
+msgstr "По &центру"
+
+msgid "&Right"
+msgstr "&Праворуч"
+
+msgid "&Hide %1"
+msgstr "Приховати %1"
+
+msgid "New folder"
+msgstr "Нова папка"
+
+msgid "Delete"
+msgstr "Видалити"
+
+#. Save playlist menu action.
+msgid "Save playlist"
+msgstr "Зберегти список відтворення"
+
+msgid "Enter the name of the folder"
+msgstr "Вкажіть назву теки"
+
+msgid "Copy songs to playlist"
+msgstr "Copy songs to playlist"
+
+msgid "Copy to device"
+msgstr "Скопіювати до пристрою"
+
+msgid "Playlist must be open first."
+msgstr "Спочатку необхідно відкрити список відтворення."
+
+msgid "Remove playlists"
+msgstr "Видалити списки відтворення"
+
+msgid "You are about to remove %1 playlists from your favorites, are you sure?"
+msgstr "Ви збираєтесь видалити %1 списків відтворення з улюблених. Дійсно видалити їх?"
+
+msgid "You can favorite playlists by clicking the star icon next to a playlist name"
+msgstr "Список відтворення можна зробити улюбленим, натиснувши піктограму"
+
+msgid "Favorited playlists will be saved here"
+msgstr "зірки поряд з назвою списку Улюблені списки відтворення буде збережено тут"
+
+msgid "Couldn't create playlist"
+msgstr "Не вдалося створити список відтворення"
+
+msgid "Unknown playlist extension"
+msgstr "Невідоме розширення списку відтворення"
+
+msgid "Unknown file extension for playlist."
+msgstr "Невідоме розширення файлу для списку відтворення."
+
+msgid "%1 selected of"
+msgstr "вибрано %1 з"
+
+msgid "%n track(s)"
+msgid_plural "%n track(s)"
+msgstr[0] "%n композиція"
+msgstr[1] "%n композиції"
+msgstr[2] "%n композицій"
+
+msgid "All playlists (%1)"
+msgstr "Всі списки відтворення (%1)"
+
+msgid "%1 playlists (%2)"
+msgstr "%1 списків відтворення (%2)"
+
+msgid "Unknown filetype: %1"
+msgstr "Невідомий тип файлу: %1"
+
+msgid "Could not open file %1"
+msgstr "Не вдалося відкрити файл %1"
+
+msgid "Directory %1 does not exist."
+msgstr "Каталог %1 не існує."
+
+msgid "Failed to open %1 for writing."
+msgstr "Не вдалося відкрити %1 для запису."
+
+msgid "Playlist options"
+msgstr "Налаштування списку відтворення"
+
+msgid "File paths"
+msgstr "Шляхи до файлів"
+
+msgid "This can be changed later through the preferences"
+msgstr "Згодом цей параметр можна буде змінити у налаштуваннях програми"
+
+msgid "Remember my choice"
+msgstr "Запам'ятати вибір"
+
+msgid "Automatic"
+msgstr "Автоматично"
+
+msgid "Relative"
+msgstr "Відносними"
+
+msgid "Absolute"
+msgstr "Абсолютний"
+
+msgid "Repeat"
+msgstr "Повторювати"
+
+msgid "Shuffle"
+msgstr "Режим перемішування"
+
+msgid "Stop after each track"
+msgstr "Зупинятися після кожної композиції"
+
+msgid "Use alternating row colors"
+msgstr "Чергувати кольори рядків"
+
+msgid "Show bars on the currently playing track"
+msgstr "Показувати смужки на композиції, що зараз відтворюється"
+
+msgid "Show a glowing animation on the currently playing track"
+msgstr "Показувати анімацію підсвічування на композиції, що зараз відтворюється"
+
+msgid "Warn me when closing a playlist tab"
+msgstr "Попереджати про закриття вкладки зі списком відтворення"
+
+msgid "Continue to the next item in the playlist if a song is unavailable"
+msgstr "Перейти до наступного пункту в списку відтворення, якщо композиція недоступна"
+
+msgid "Grey out unavailable songs in playlists on playback"
+msgstr "Виділяти сірим недоступні пісні у списках відтворення під час відтворення"
+
+msgid "Grey out unavailable songs in playlists on startup"
+msgstr "Виділяти сірим недоступні пісні у списках відтворення під час запуску"
+
+msgid "Automatically select current playing track"
+msgstr "Автоматично вибирати поточну композицію"
+
+msgid "Enable playlist toolbar"
+msgstr "Увімкнути панель інструментів для списку відтворення"
+
+msgid "Enable playlist clear button"
+msgstr "Увімкнути кнопку очищення списку відтворення"
+
+msgid "Automatically sort playlist when inserting songs"
+msgstr "Автоматично сортувати список відтворення під час додавання композицій"
+
+msgid "When saving a playlist, file paths should be"
+msgstr "Шляхи під час збереження списків відтворення мають бути"
+
+msgid "A&utomatic"
+msgstr "&Автоматично"
+
+msgid "Absolu&te"
+msgstr "&Абсолютний"
+
+msgid "Re&lative"
+msgstr "&Відносно"
+
+msgid "As&k when saving"
+msgstr "&Питати при збереженні"
+
+msgid "Metadata"
+msgstr "Метадані"
+
+msgid "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+msgstr "Якщо вибрано, теги композиції можна буде редагувати прямо списку відтворення простим клацанням на відповідному записі"
+
+msgid "Enable song metadata inline edition with click"
+msgstr "Дозволити вбудоване редагування метаданих композиції клацанням"
+
+msgid "Write metadata when saving playlists"
+msgstr "Записати метадані під час збереження списків відтворення"
+
+msgid "Star playlist"
+msgstr "Список відтворення із зіркою"
+
+msgid "Close playlist"
+msgstr "Закрити список відтворення"
+
+msgid "Rename playlist..."
+msgstr "Перейменувати список відтворення..."
+
+msgid "Save playlist..."
+msgstr "Зберегти список відтворення..."
+
+msgid "Rename playlist"
+msgstr "Перейменування списку відтворення"
+
+msgid "Enter a new name for this playlist"
+msgstr "Введіть назву для цього списку відтворення"
+
+msgid "Remove playlist"
+msgstr "Видалити список відтворення"
+
+msgid "You are about to remove a playlist which is not part of your favorite playlists: the playlist will be deleted (this action cannot be undone). \nAre you sure you want to continue?"
+msgstr "Ви збираєтесь видалити список відтворення, який не входить до улюблених. Він буде видалений без можливості відновлення. \nДійсно продовжити й видалити цей список відтворення?"
+
+msgid "This option can be changed in the \"Behavior\" preferences"
+msgstr "Цей параметр можна змінити в розділі налаштувань «Поведінка»"
+
+msgid "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+msgstr "Двічі клацніть тут, щоб зробити цей список відтворення улюбленим. Тоді він буде збережений і стане доступний на панелі «Списки відтворення» ліворуч"
+
+msgid "Hz"
+msgstr "Гц"
+
+msgid "Bit"
+msgstr "Біт"
+
+msgid "Usage"
+msgstr "Використання"
+
+msgid "options"
+msgstr "налаштування"
+
+msgid "URL(s)"
+msgstr "Адреси"
+
+msgid "Player options"
+msgstr "Налаштування програвача"
+
+msgid "Start the playlist currently playing"
+msgstr "Запустити список відтворення, що відтворюється на цей час"
+
+msgid "Play if stopped, pause if playing"
+msgstr "Відтворити, якщо зупинено. Призупинити, якщо відтворюється"
+
+msgid "Pause playback"
+msgstr "Призупинити відтворення"
+
+msgid "Stop playback"
+msgstr "Зупинити відтворення"
+
+msgid "Stop playback after current track"
+msgstr "Зупинити відтворення після поточної композиції"
+
+msgid "Skip backwards in playlist"
+msgstr "Перескочити назад в списку композицій"
+
+msgid "Skip forwards in playlist"
+msgstr "Перескочити вперед у списку композицій"
+
+msgid "Set the volume to <value> percent"
+msgstr "Встановити гучність у <value> відсотків"
+
+msgid "Increase the volume by 4 percent"
+msgstr "Збільшити гучність на 4 відсотки"
+
+msgid "Decrease the volume by 4 percent"
+msgstr "Зменшити гучність на 4 відсотки"
+
+msgid "Increase the volume by <value> percent"
+msgstr "Збільшити гучність на <value> відсотків"
+
+msgid "Decrease the volume by <value> percent"
+msgstr "Зменшити гучність на <value> відсотків"
+
+msgid "Seek the currently playing track to an absolute position"
+msgstr "Перемотати поточну композицію на абсолютну позицію"
+
+msgid "Seek the currently playing track by a relative amount"
+msgstr "Трохи перемотати поточну композицію"
+
+msgid "Restart the track, or play the previous track if within 8 seconds of start."
+msgstr "Повторно відтворити композицію або відтворити попередню композицію, якщо було відтворено не більше 8 секунд поточної композиції."
+
+msgid "Create a new playlist with files"
+msgstr "Створити новий список відтворення з файлів"
+
+msgid "Append files/URLs to the playlist"
+msgstr "Додати файли/адреси до списку відтворення"
+
+msgid "Loads files/URLs, replacing current playlist"
+msgstr "Завантажити файли/адреси і замінити поточний список відтворення"
+
+msgid "Play the <n>th track in the playlist"
+msgstr "Відтворити композицію <n> у списку відтворення"
+
+msgid "Play given playlist"
+msgstr "Відтворити наданий список відтворення"
+
+msgid "Other options"
+msgstr "Інші налаштування"
+
+msgid "Display the on-screen-display"
+msgstr "Показувати екранні повідомлення"
+
+msgid "Toggle visibility for the pretty on-screen-display"
+msgstr "Змінити режим видимості сповіщень"
+
+msgid "Change the language"
+msgstr "Змінити мову"
+
+msgid "Resize the window"
+msgstr "Змінити розмір вікна"
+
+msgid "Equivalent to --log-levels *:1"
+msgstr "Відповідає --log-levels *:1"
+
+msgid "Equivalent to --log-levels *:3"
+msgstr "Відповідає --log-levels *:3"
+
+msgid "Comma separated list of class:level, level is 0-3"
+msgstr "Список, розділений комами, виду клас:рівень, рівень може бути від 0 до 3"
+
+msgid "Print out version information"
+msgstr "Показати відомості про версію"
+
+msgid "Create fingerprint"
+msgstr "Create fingerprint"
+
+msgid "Failed to create directory %1."
+msgstr "Не вдалося створити каталог: %1."
+
+msgid "Destination file %1 exists, but not allowed to overwrite."
+msgstr "Файл призначення %1 існує, але його не можна перезаписати."
+
+msgid "Destination file %1 exists, but not allowed to overwrite"
+msgstr "Файл призначення %1 існує, але його не можна перезаписати"
+
+msgid "Could not copy file %1 to %2."
+msgstr "Не вдалося скопіювати файл %1 в %2."
+
+msgid "LUFS"
+msgstr "LUFS"
+
+msgid "LU"
+msgstr "LU"
+
+msgid "1 day"
+msgstr "1 день"
+
+msgid "%1 days"
+msgstr "%1 днів"
+
+msgid "Today"
+msgstr "Сьогодні"
+
+msgid "Yesterday"
+msgstr "Вчора"
+
+msgid "%1 days ago"
+msgstr "%1 день тому"
+
+msgid "Tomorrow"
+msgstr "Завтра"
+
+msgid "In %1 days"
+msgstr "За %1 днів"
+
+msgid "Next week"
+msgstr "Наступного тижня"
+
+msgid "In %1 weeks"
+msgstr "За %1 тижнів"
+
+msgid "Show in file browser"
+msgstr "Показати в оглядачі файлів"
+
+msgid "Too many songs selected."
+msgstr "Вибрано забагато композицій."
+
+msgid "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+msgstr "Вибрано %1 композицій з %2 різних каталогів? Дійсно відкрити їх усі?"
+
+msgid "Failed to load image from data for %1"
+msgstr "Не вдалося завантажити зображення для %1"
+
+msgid "Success"
+msgstr "Успішно"
+
+msgid "File is unsupported"
+msgstr "Файл не підтримується"
+
+msgid "Filename is missing"
+msgstr "Відсутнє ім'я файлу"
+
+msgid "File does not exist"
+msgstr "Файлу не існує"
+
+msgid "File could not be opened"
+msgstr "Не вдалося відкрити файл"
+
+msgid "Could not parse file"
+msgstr "Не вдалося проаналізувати файл"
+
+msgid "Could not save file"
+msgstr "Could not save file"
+
+msgid "Unknown error"
+msgstr "Невідома помилка"
+
+msgid "Prefix a search term with a field name to limit the search to that field, e.g.:"
+msgstr "Додайте перед словом назву поля, щоб обмежити пошук до цього поля, наприклад:"
+
+msgid "artist"
+msgstr "виконавець"
+
+msgid "searches for all artists containing the word %1."
+msgstr "шукати всіх виконавців, що містять слово %1."
+
+msgid "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+msgstr "Для уточнення пошуку перед пошуковими термінами для числових полів можна додати %1 або %2, наприклад: "
+
+msgid "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+msgstr "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+
+msgid "rating"
+msgstr "рейтинг"
+
+msgid "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+msgstr "Кілька пошукових термінів також можна об'єднати за допомогою \"%1\" (за замовчуванням) та \"%2\", а також згрупувати за допомогою дужок."
+
+msgid "Available fields"
+msgstr "Доступні поля"
+
+msgid "after"
+msgstr "після"
+
+msgid "before"
+msgstr "до"
+
+msgid "on"
+msgstr "на"
+
+msgid "not on"
+msgstr "не на"
+
+msgid "in the last"
+msgstr "в минулому"
+
+msgid "not in the last"
+msgstr "не в минулому"
+
+msgid "between"
+msgstr "поміж"
+
+msgid "contains"
+msgstr "містить"
+
+msgid "does not contain"
+msgstr "не містить"
+
+msgid "starts with"
+msgstr "починається з"
+
+msgid "ends with"
+msgstr "закінчується на"
+
+msgid "greater than"
+msgstr "більше ніж"
+
+msgid "less than"
+msgstr "менше ніж"
+
+msgid "equals"
+msgstr "дорівнює"
+
+msgid "not equals"
+msgstr "не дорівнює"
+
+msgid "empty"
+msgstr "порожній"
+
+msgid "not empty"
+msgstr "не порожній"
+
+msgid "A-Z"
+msgstr "А-Я"
+
+msgid "Z-A"
+msgstr "Я-А"
+
+msgid "oldest first"
+msgstr "спочатку настаріші"
+
+msgid "newest first"
+msgstr "спочатку найновіші"
+
+msgid "shortest first"
+msgstr "спочатку найкоротші"
+
+msgid "longest first"
+msgstr "спочатку найдовші"
+
+msgid "smallest first"
+msgstr "спочатку найменші"
+
+msgid "biggest first"
+msgstr "спочатку найбільші"
+
+msgid "Hours"
+msgstr "Години"
+
+msgid "Days"
+msgstr "Дні"
+
+msgid "Weeks"
+msgstr "Тижні"
+
+msgid "Months"
+msgstr "Місяці"
+
+msgid "Years"
+msgstr "Роки"
+
+msgid "Normal"
+msgstr "Звичайний"
+
+msgid "Angry"
+msgstr "Лютий"
+
+msgid "Frozen"
+msgstr "Заморожений"
+
+msgid "Happy"
+msgstr "Щасливий"
+
+msgid "System colors"
+msgstr "Системні кольори"
+
+msgid "add %n songs"
+msgid_plural "add %n songs"
+msgstr[0] "додати %n композицію"
+msgstr[1] "додати %n композиції"
+msgstr[2] "додати %n композицій"
+
+msgid "remove %n songs"
+msgid_plural "remove %n songs"
+msgstr[0] "вилучити %n композицію"
+msgstr[1] "вилучити %n композиції"
+msgstr[2] "вилучити %n композицій"
+
+msgid "move %n songs"
+msgid_plural "move %n songs"
+msgstr[0] "перемістити %n композицію"
+msgstr[1] "перемістити %n композиції"
+msgstr[2] "перемістити %n композицій"
+
+msgid "sort songs"
+msgstr "сортувати композиції"
+
+msgid "shuffle songs"
+msgstr "перемішати композиції"
+
+msgid "Invalid collection directory"
+msgstr "Invalid collection directory"
+
+msgid "Can't add directory %1 with special filesystem %2 to collection"
+msgstr "Can't add directory %1 with special filesystem %2 to collection"
+
+msgid "Clear"
+msgstr "Очистити"
+
+msgid "Reset"
+msgstr "Скинути"
+
+msgid "Not authenticated"
+msgstr "Not authenticated"
+
+msgid "No track ID"
+msgstr "No track ID"
+
+msgid "Receiving artists..."
+msgstr "Завантаження виконавців..."
+
+msgid "Receiving albums..."
+msgstr "Завантаження альбомів..."
+
+msgid "Receiving songs..."
+msgstr "Завантаження композицій..."
+
+msgid "Searching..."
+msgstr "Пошук..."
+
+msgid "Receiving albums for %1 artist..."
+msgstr "Завантаження альбомів для %1 виконавця..."
+
+msgid "Receiving albums for %1 artists..."
+msgstr "Завантаження альбомів для %1 виконавців..."
+
+msgid "Receiving songs for %1 album..."
+msgstr "Завантаження композицій для %1 альбому..."
+
+msgid "Receiving songs for %1 albums..."
+msgstr "Завантаження композицій для %1 альбомів..."
+
+msgid "Receiving album cover for %1 album..."
+msgstr "Завантаження обкладинки для %1 альбому..."
+
+msgid "Receiving album covers for %1 albums..."
+msgstr "Завантаження обкладинок для %1 альбомів..."
+
+msgid "No match."
+msgstr "Немає збігів."
+
+msgid "Missing Qobuz app ID."
+msgstr "Відсутній ідентифікатор додатку Qobuz."
+
+msgid "Missing app ID. Please fetch credentials first."
+msgstr "Missing app ID. Please fetch credentials first."
+
+msgid "Missing app secret. Please fetch credentials first."
+msgstr "Missing app secret. Please fetch credentials first."
+
+msgid "Missing private key. Please fetch credentials first."
+msgstr "Missing private key. Please fetch credentials first."
+
+msgid "Failed to start local server for OAuth redirect: %1"
+msgstr "Failed to start local server for OAuth redirect: %1"
+
+msgid "Failed to open the web browser. Please open this URL manually: %1"
+msgstr "Failed to open the web browser. Please open this URL manually: %1"
+
+msgid "Waiting for browser authentication..."
+msgstr "Waiting for browser authentication..."
+
+msgid "OAuth redirect failed: %1"
+msgstr "OAuth redirect failed: %1"
+
+msgid "OAuth redirect is missing authorization code."
+msgstr "OAuth redirect is missing authorization code."
+
+msgid "Exchanging authorization code..."
+msgstr "Exchanging authorization code..."
+
+msgid "Not authenticated with Qobuz."
+msgstr "Помилка автентифікації на Qobuz."
+
+msgid "Missing Qobuz app ID or secret."
+msgstr "Відсутній ідентифікатор додатку Qobuz або секрет."
+
+msgid "Not authenticated. Please login to Qobuz in the settings."
+msgstr "Not authenticated. Please login to Qobuz in the settings."
+
+msgid "Enable"
+msgstr "Увімкнути"
+
+msgid "App ID"
+msgstr "ІД додатку"
+
+msgid "App Secret"
+msgstr "Ключ додатку"
+
+msgid "Preferences"
+msgstr "Параметри"
+
+msgid "Audio format"
+msgstr "Аудіо-формат"
+
+msgid "Search delay"
+msgstr "Затримка пошуку"
+
+msgid "ms"
+msgstr "мс"
+
+msgid "Artists search limit"
+msgstr "Обмеження на пошук виконавців"
+
+msgid "Albums search limit"
+msgstr "Обмеження пошуку альбомів"
+
+msgid "Songs search limit"
+msgstr "Обмеження пошуку композицій"
+
+msgid "Download album covers"
+msgstr "Завантажити обкладинки альбомів"
+
+msgid "Configuration incomplete"
+msgstr "Конфігурація неповна"
+
+msgid "Missing app id. Please fetch credentials first."
+msgstr "Missing app id. Please fetch credentials first."
+
+msgid "Fetching..."
+msgstr "Fetching..."
+
+msgid "Credentials fetched"
+msgstr "Credentials fetched"
+
+msgid "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+msgstr "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+
+msgid "Credential fetch failed"
+msgstr "Credential fetch failed"
+
+msgid "Fetch Credentials"
+msgstr "Fetch Credentials"
+
+msgid "Remove (Remastered), etc from song titles"
+msgstr "Remove (Remastered), etc from song titles"
+
+msgid "Private key"
+msgstr "Private key"
+
+msgid "Automatically fetch app ID, app secret and private key from Qobuz web player"
+msgstr "Automatically fetch app ID, app secret and private key from Qobuz web player"
+
+msgid "Not authenticated. Please log in on the Qobuz settings page."
+msgstr "Not authenticated. Please log in on the Qobuz settings page."
+
+msgid "Cancelled."
+msgstr "Скасовано."
+
+msgid "QueueView"
+msgstr "Подання черги"
+
+msgid "Ctrl+Up"
+msgstr "Ctrl+Вгору"
+
+msgid "Ctrl+Down"
+msgstr "Ctrl+Вниз"
+
+msgid "Remove"
+msgstr "Видалити"
+
+msgid "Country"
+msgstr "Country"
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "Load more..."
+msgstr "Load more..."
+
+msgid "Search for radio stations using radio-browser.info"
+msgstr "Search for radio stations using radio-browser.info"
+
+msgid "Search radio stations..."
+msgstr "Search radio stations..."
+
+msgid "All countries"
+msgstr "All countries"
+
+msgid "By votes"
+msgstr "By votes"
+
+msgid "By clicks"
+msgstr "By clicks"
+
+msgid "By name"
+msgstr "By name"
+
+msgid "By bitrate"
+msgstr "By bitrate"
+
+msgid "No stations found."
+msgstr "No stations found."
+
+msgid "%1 stations found"
+msgstr "%1 stations found"
+
+msgid "No Radio Browser server available."
+msgstr "No Radio Browser server available."
+
+msgid "Searching Radio Browser"
+msgstr "Searching Radio Browser"
+
+msgid "Radio Browser search failed: %1"
+msgstr "Radio Browser search failed: %1"
+
+msgid "Getting %1 channels"
+msgstr "Отримання %1 каналів"
+
+msgid "SomaFM"
+msgstr "SomaFM"
+
+msgid "Stream quality:"
+msgstr "Stream quality:"
+
+msgid "Radio Browser"
+msgstr "Radio Browser"
+
+msgid "Search results limit:"
+msgstr "Search results limit:"
+
+msgid "Hide broken stations"
+msgstr "Hide broken stations"
+
+msgid "Default sort order:"
+msgstr "Default sort order:"
+
+msgid "Default country:"
+msgstr "Default country:"
+
+msgid "Highest"
+msgstr "Highest"
+
+msgid "High"
+msgstr "High"
+
+msgid "Low"
+msgstr "Low"
+
+msgid "Open homepage"
+msgstr "Відкрити домашню сторінку"
+
+msgid "Donate"
+msgstr "Пожертвувати"
+
+msgid "Refresh channels"
+msgstr "Оновити канали"
+
+msgid "Channels"
+msgstr "Channels"
+
+msgid "Select directory for saving playlists"
+msgstr "Виберіть теку для збереження списків відтворення"
+
+msgid "Type"
+msgstr "Тип"
+
+msgid "Select directory for the playlists"
+msgstr "Виберіть теку для списків відтворення"
+
+msgid "Directory does not exist."
+msgstr "Тека не існує."
+
+msgid "Saved Grouping Manager"
+msgstr "Керування збереженими групуваннями"
+
+msgid "Second Level"
+msgstr "Другий рівень"
+
+msgid "Third Level"
+msgstr "Третій рівень"
+
+msgid "Scrobbler"
+msgstr "Скроблер"
+
+msgid "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+msgstr "Композиції скроблюються, якщо вони мають дійсні метадані, мають тривалість більше 30 секунд та відтворюються щонайменше половину тривалості або 4 хвилини (залежно від того, що станеться раніше)."
+
+msgid "Show scrobble button"
+msgstr "Показати кнопку скороблінгу"
+
+msgid "Show love button"
+msgstr "Показати кнопку «Люблю»"
+
+msgid "Submit scrobbles every"
+msgstr "Надсилати дані скроблінгу кожні"
+
+msgid "Prefer album artist when sending scrobbles"
+msgstr "Надавати перевагу виконавцю альбому під час надсилання даних скроблінгу"
+
+msgid "Show dialog for errors"
+msgstr "Показати діалогове вікно для помилок"
+
+msgid "Strip \"remastered\" and similar from album and title"
+msgstr "Вирізати \"remastered\" і подібні речі з назв альбомів і заголовків"
+
+msgid "Enable scrobbling for the following sources:"
+msgstr "Увімкнути скроблінг для наступних джерел:"
+
+msgid "Local file"
+msgstr "Локальний файл"
+
+msgid "CDDA"
+msgstr "CDDA"
+
+msgid "Stream"
+msgstr "Потік"
+
+msgid "Radio Paradise"
+msgstr "Радіо Paradise"
+
+msgid "Last.fm"
+msgstr "Last.fm"
+
+msgid "Listenbrainz"
+msgstr "Listenbrainz"
+
+msgid "User token:"
+msgstr "Маркер користувача:"
+
+msgid "Enter your user token from"
+msgstr "Введіть свій маркер користувача з"
+
+msgid "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+msgstr "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+
+msgid "Offline mode (Only cache scrobbles)"
+msgstr "Offline mode (Only cache scrobbles)"
+
+msgid "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+msgstr "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+
+msgid "Settings"
+msgstr "Налаштування"
+
+msgid "General"
+msgstr "Загальне"
+
+msgid "User interface"
+msgstr "Інтерфейс користувача"
+
+msgid "Streaming"
+msgstr "Потік"
+
+msgid "Search mode"
+msgstr "Режим пошуку"
+
+msgid "Match every search term (AND)"
+msgstr "Відповідати кожному критерію пошуку (логічне І)"
+
+msgid "Match one or more search terms (OR)"
+msgstr "Відповідати одному чи кільком критеріям пошуку (логічне АБО)"
+
+msgid "Include all songs"
+msgstr "Показати всі композиції"
+
+msgid "Search terms"
+msgstr "Критерії пошуку"
+
+msgid "Sorting"
+msgstr "Сортування"
+
+msgid "Put songs in a random order"
+msgstr "Перемішати композиції у довільному порядку"
+
+msgid "Sort songs by"
+msgstr "Сортувати композиції за"
+
+msgid "Limits"
+msgstr "Обмеження"
+
+msgid "Show all the songs"
+msgstr "Показати всі композиції"
+
+msgid "Only show the first"
+msgstr "Показати тільки перший"
+
+msgid " songs"
+msgstr " композиції"
+
+msgid "Collection search"
+msgstr "Пошук по фонотеці"
+
+msgid "Find songs in your collection that match the criteria you specify."
+msgstr "Пошук у фонотеці композицій, які відповідають заданим критеріям."
+
+msgid "A song will be included in the playlist if it matches these conditions."
+msgstr "Композицію буде включено до списку відтворення, якщо вона відповідає цим умовам."
+
+msgid "Search options"
+msgstr "Параметри пошуку"
+
+msgid "Choose how the playlist is sorted and how many songs it will contain."
+msgstr "Виберіть спосіб сортування списку відтворення та кількість пісень, які він міститиме."
+
+msgid "%1 songs found (showing %2)"
+msgstr "Знайдено %1 композицій (показано %2)"
+
+msgid "%1 songs found"
+msgstr "Знайдено %1 композицій"
+
+msgid "and"
+msgstr "і"
+
+msgid "ago"
+msgstr "потому"
+
+msgid "The second value must be greater than the first one!"
+msgstr "Друге значення має бути більше першого!"
+
+msgid "Add search term"
+msgstr "Додати пошуковий термін"
+
+msgid "Smart playlist"
+msgstr "Розумний список відтворення"
+
+msgid "Playlist type"
+msgstr "Тип списку відтворення"
+
+msgid "A smart playlist is a dynamic list of songs that come from your collection.  There are different types of smart playlist that offer different ways of selecting songs."
+msgstr "Розумний список відтворення — це динамічний список композицій з вашої фонотеки. Існують різні типи розумних списків з різними способами відбору композицій."
+
+msgid "Finish"
+msgstr "Завершити"
+
+msgid "Choose a name for your smart playlist"
+msgstr "Введіть назву для свого розумного списку відтворення"
+
+msgid "Use dynamic mode"
+msgstr "Використовувати динамічний режим"
+
+msgid "In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes."
+msgstr "У динамічному режимі нові композиції вибиратимуться та додаватимуться до списку відтворення одразу після закінчення попередньої композиції."
+
+msgid "Newest tracks"
+msgstr "Найновіші композиції"
+
+msgid "50 random tracks"
+msgstr "50 випадкових композицій"
+
+msgid "Ever played"
+msgstr "Коли-небудь відтворювалась"
+
+msgid "Never played"
+msgstr "Ніколи не відтворювались"
+
+msgid "Most played"
+msgstr "Найчастіше відтворювались"
+
+msgid "Favourite tracks"
+msgstr "Улюблені композиції"
+
+msgid "All tracks"
+msgstr "Всі композиції"
+
+msgid "Dynamic random mix"
+msgstr "Динамічний випадковий мікс"
+
+msgid "New smart playlist"
+msgstr "Новий розумний список відтворення"
+
+msgid "Edit smart playlist"
+msgstr "Змінити розумний список відтворення"
+
+msgid "Delete smart playlist"
+msgstr "Видалити розумний список відтворення"
+
+msgid "New smart playlist..."
+msgstr "Створити розумний список відтворення..."
+
+msgid "Play next"
+msgstr "Відтворити наступну"
+
+msgid "Edit smart playlist..."
+msgstr "Змінити розумний список відтворення..."
+
+msgid "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+msgstr "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+
+msgid "Restore defaults"
+msgstr "Restore defaults"
+
+msgid "Preload function was not set for blocking operation."
+msgstr "Для блокування не була встановлена функція попереднього завантаження."
+
+msgid "File %1 does not exist."
+msgstr "Файл %1 не існує."
+
+msgid "Could not open file %1 for reading: %2"
+msgstr "Не вдалось відкрити файл %1 для читання: %2"
+
+msgid "Could not open CUE file %1 for reading: %2"
+msgstr "Не вдалось відкрити CUE-файл %1 для читання: %2"
+
+msgid "Could not open playlist file %1 for reading: %2"
+msgstr "Не вдалось відкрити список відтворення %1 для читання: %2"
+
+msgid "Couldn't create GStreamer source element for %1"
+msgstr "Не вдалось створити елемент GStreamer для %1"
+
+msgid "Couldn't create GStreamer typefind element for %1"
+msgstr "Не вдалося створити елемент typefind GStreamer для %1"
+
+msgid "Couldn't create GStreamer fakesink element for %1"
+msgstr "Не вдалося створити елемент fakesink GStreamer для %1"
+
+msgid "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+msgstr "Не вдалося зв'язати елементи source, typefind та fakesink GStreamer для %1"
+
+msgid "Missing CDDA playback."
+msgstr "Відтворення CDDA відсутнє."
+
+msgid "Error while loading audio CD."
+msgstr "Не вдалось завантажити аудіо-CD."
+
+msgid "Loading tracks info"
+msgstr "Завантаження даних композицій"
+
+msgid "No pending song for track ID"
+msgstr "No pending song for track ID"
+
+msgid "Authenticating..."
+msgstr "Автентифікація..."
+
+msgid "Data missing error"
+msgstr "Помилка: дані відсутні"
+
+msgid "Not authenticated with Spotify."
+msgstr "Помилка автентифікації на Spotify."
+
+msgid "Basic authentication"
+msgstr "Базова автентифікація"
+
+msgid "Authenticate"
+msgstr "Автентифікація"
+
+msgid "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+msgstr "<html><head/><body><p>Плагін GStreamer Spotify не знайдено. Без нього неможливо транслювати композиції зі Spotify. Інструкції по встановленню плагіна дивіться на <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">цій вікі-сторінці</span></a>.</p></body></html>"
+
+msgid "Fetch entire albums when searching songs"
+msgstr "Завантажувати повні альбоми під час пошуку композицій"
+
+msgid "The streaming collection is empty!"
+msgstr "Колекція трансляцій порожня!"
+
+msgid "Click here to retrieve music"
+msgstr "Клацніть тут, щоб отримати музику"
+
+msgid "Remove from favorites"
+msgstr "Вилучити з улюблених"
+
+msgid "Close"
+msgstr "Закрити"
+
+msgid "Refresh catalogue"
+msgstr "Оновити каталог"
+
+msgid "Streaming Search View"
+msgstr "Подання пошуку трансляцій"
+
+msgid "artists"
+msgstr "виконавці"
+
+msgid "albums"
+msgstr "альбоми"
+
+msgid "songs"
+msgstr "композиції"
+
+msgid "Enter search terms above to find music"
+msgstr "Введіть вище критерії для пошуку музики"
+
+msgid "Configure %1..."
+msgstr "Налаштувати %1..."
+
+msgid "Add to artists"
+msgstr "Додати до виконавців"
+
+msgid "Add to albums"
+msgstr "Додати до альбомів"
+
+msgid "Add to songs"
+msgstr "Додати до композицій"
+
+msgid "Streaming Tabs View"
+msgstr "Подання з вкладками трансляцій"
+
+msgid "Artists"
+msgstr "Виконавці"
+
+msgid "Albums"
+msgstr "Альбоми"
+
+msgid "Songs"
+msgstr "Композиції"
+
+msgid "Retrieving albums..."
+msgstr "Завантаження альбомів..."
+
+msgid "Retrieving songs for %1 album..."
+msgstr "Завантаження композицій для %1 альбому..."
+
+msgid "Retrieving songs for %1 albums..."
+msgstr "Завантаження композицій для %1 альбомів..."
+
+msgid "Retrieving album cover for %1 album..."
+msgstr "Завантаження обкладинки для %1 альбому..."
+
+msgid "Retrieving album covers for %1 albums..."
+msgstr "Завантаження обкладинок для %1 альбомів..."
+
+msgid "Server URL is invalid."
+msgstr "Недійсна адреса сервера."
+
+msgid "Missing username or password."
+msgstr "Відсутнє ім'я користувача або пароль."
+
+msgid "Server URL"
+msgstr "Адреса сервера"
+
+msgid "Authentication method:"
+msgstr "Метод автентифікації:"
+
+msgid "Hex"
+msgstr "Шістнадцяткове"
+
+msgid "MD5 token (Recommended)"
+msgstr "Токен MD5 (рекомендовано)"
+
+msgid "Use HTTP/2 when possible"
+msgstr "Використовувати HTTP/2, якщо можливо"
+
+msgid "Verify server certificate"
+msgstr "Перевірити сертифікат сервера"
+
+msgid "Use album ID for album covers"
+msgstr "Використовуйте ID альбому для обкладинок альбомів"
+
+msgid "Server-side scrobbling"
+msgstr "Скроблінг на боці сервера"
+
+msgid "Test"
+msgstr "Тест"
+
+msgid "Delete songs"
+msgstr "Видалити пісні"
+
+msgid "Missing server url, username or password."
+msgstr "Відсутня адреса сервера, ім’я користувача або пароль."
+
+msgid "Configuration incorrect"
+msgstr "Конфігурація з помилками"
+
+msgid "Test successful!"
+msgstr "Тест успішний!"
+
+msgid "Test failed!"
+msgstr "Тест не пройшов!"
+
+msgid "Subsonic server URL is invalid."
+msgstr "Недійсна адреса сервера Subsonic."
+
+msgid "Missing Subsonic username or password."
+msgstr "Відсутнє ім'я користувача або пароль Subsonic."
+
+msgid "Stage: %1"
+msgstr "Stage: %1"
+
+msgid "Reason: %1"
+msgstr "Reason: %1"
+
+msgid "Identifying song"
+msgstr "Визначаю композицію"
+
+msgid "Fingerprinting song"
+msgstr "Роблю відбиток композиції"
+
+msgid "Generated fingerprint is empty or invalid"
+msgstr "Generated fingerprint is empty or invalid"
+
+msgid "Fingerprinting"
+msgstr "Fingerprinting"
+
+msgid "Fingerprint length: %1"
+msgstr "Fingerprint length: %1"
+
+msgid "Minimum required length: %1"
+msgstr "Minimum required length: %1"
+
+msgid "Downloading metadata"
+msgstr "Завантаження метаданих"
+
+msgid "No MusicBrainz metadata was found for this track"
+msgstr "No MusicBrainz metadata was found for this track"
+
+msgid "MusicBrainz metadata"
+msgstr "MusicBrainz metadata"
+
+msgid "Candidate metadata rows: 0"
+msgstr "Candidate metadata rows: 0"
+
+msgid "Not authenticated with Tidal."
+msgstr "Помилка автентифікації на Tidal."
+
+msgid "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+msgstr "Підтримка Tidal не є офіційною, і для роботи потрібен маркер API із зареєстрованої програми. Ми не можемо допомогти вам отримати ці дані."
+
+msgid "Client ID"
+msgstr "ID клієнта"
+
+msgid "Audio quality"
+msgstr "Якість аудіо"
+
+msgid "Album cover size"
+msgstr "Розмір обкладинки альбому"
+
+msgid "Stream URL method"
+msgstr "Протокол адреси потоку"
+
+msgid "Append explicit to album title for explicit albums"
+msgstr "Додати явний текст до назви альбому для явних альбомів"
+
+msgid "Missing Tidal client ID."
+msgstr "Відсутній ID клієнта Tidal."
+
+msgid "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Отримано URL-адресу з %1 зашифрованим потоком з Tidal. Strawberry наразі не підтримує зашифровані потоки."
+
+msgid "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Отримано URL-адресу з зашифрованим потоком з Tidal. Strawberry наразі не підтримує зашифровані потоки."
+
+msgid "Tag fetcher"
+msgstr "Завантажувач тегів"
+
+msgid "Strawberry was unable to find results for this file"
+msgstr "Strawberry не знайшов нічого для цього файлу"
+
+msgid "Select best possible match"
+msgstr "Оберіть найкращий збіг"
+
+msgid "Original tags"
+msgstr "Початкові теги"
+
+msgid "Suggested tags"
+msgstr "Пропоновані теги"
+
+msgid "No results"
+msgstr "No results"
+
+msgid "0:00:00"
+msgstr "0:00:00"
+
+msgid "Click to toggle between remaining time and total time"
+msgstr "Клацніть аби перемкнутися між часом, що залишився, та загальним"
+
+msgid "Waveform"
+msgstr "Waveform"
+
+msgid "Transcode Music"
+msgstr "Перекодування музики"
+
+msgid "Files to transcode"
+msgstr "Файли для перекодування"
+
+msgid "Directory"
+msgstr "Тека"
+
+msgid "Add..."
+msgstr "Додати..."
+
+msgid "Add all tracks from a directory and all its subdirectories"
+msgstr "Додати усі композиції з каталогу та усіх його підкаталогів"
+
+msgid "Import..."
+msgstr "Імпортувати..."
+
+msgid "Output options"
+msgstr "Налаштування виведення"
+
+msgid "Options..."
+msgstr "Налаштування..."
+
+msgid "Alongside the originals"
+msgstr "Разом з оригіналами"
+
+msgid "Select..."
+msgstr "Вибрати..."
+
+msgid "Progress"
+msgstr "Поступ"
+
+msgid "Details..."
+msgstr "Детальніше..."
+
+msgid "Start transcoding"
+msgstr "Почати перекодування"
+
+msgid "%n remaining"
+msgid_plural "%n remaining"
+msgstr[0] "%n залишилась"
+msgstr[1] "%n залишилось"
+msgstr[2] "%n залишилось"
+
+msgid "%n finished"
+msgid_plural "%n finished"
+msgstr[0] "%n завершена"
+msgstr[1] "%n завершено"
+msgstr[2] "%n завершено"
+
+msgid "%n failed"
+msgid_plural "%n failed"
+msgstr[0] "%n не вдалось"
+msgstr[1] "%n не вдалось"
+msgstr[2] "%n не вдалось"
+
+msgid "Add files to transcode"
+msgstr "Додати файли для перекодування"
+
+msgid "Open a directory to import music from"
+msgstr "Відкрити каталог для імпортування музичних творів"
+
+msgid "Import Directory"
+msgstr "Import Directory"
+
+msgid "Preserve directory structure in output directory (import only)"
+msgstr "Preserve directory structure in output directory (import only)"
+
+msgid "Transcoder Log"
+msgstr "Журнал перекодування"
+
+msgid "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+msgstr "Не вдалось створити елемент GStreamer «%1». Переконайтесь, що встановлені всі потрібні плагіни GStreamer"
+
+msgid "Successfully written %1"
+msgstr "Успішно записано %1"
+
+msgid "Transcoding %1 files using %2 threads"
+msgstr "Перекодовано %1 файлів, використовуючи %2 гілки"
+
+msgid "Error processing %1: %2"
+msgstr "Помилка обробляння %1: %2"
+
+msgid "Starting %1"
+msgstr "Запуск %1"
+
+msgid "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+msgstr "Не вдалось знайти кодер для %1. Перевірте чи встановлено відповідні плагіни GStreamer"
+
+msgid "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+msgstr "Не вдалось знайти ущільнювач для %1. Перевірте чи встановлено відповідні плагіни GStreamer"
+
+msgid " kbps"
+msgstr " кб/с"
+
+msgid "Profile"
+msgstr "Профіль"
+
+msgid "Main profile (MAIN)"
+msgstr "Основний профіль (MAIN)"
+
+msgid "Low complexity profile (LC)"
+msgstr "Профіль низької складності (LC)"
+
+msgid "Scalable sampling rate profile (SSR)"
+msgstr "Профіль масштабованої частоти вибірки (SSR)"
+
+msgid "Long term prediction profile (LTP)"
+msgstr "Профіль довготривалого передбачення (LTP)"
+
+msgid "Use temporal noise shaping"
+msgstr "Використовувати тимчасове формування шуму"
+
+msgid "Allow mid/side encoding"
+msgstr "Дозволити mid/side кодування"
+
+msgid "Block type"
+msgstr "Тип блоку"
+
+msgid "Normal block type"
+msgstr "Звичаний тип блоку"
+
+msgid "No short blocks"
+msgstr "Без коротких блоків"
+
+msgid "No long blocks"
+msgstr "Без довгих блоків"
+
+msgid "Transcoding options"
+msgstr "Налаштування перекодування"
+
+#. Sound quality
+msgid "Quality"
+msgstr "Якість"
+
+msgid "Fast"
+msgstr "Швидко"
+
+msgid "Best"
+msgstr "Найкраще"
+
+msgid "Optimize for &quality"
+msgstr "Оптимізувати під &якість"
+
+msgid "Opti&mize for bitrate"
+msgstr "Оптимізувати під &бітову швидкість"
+
+msgid "Constant bitrate"
+msgstr "Стала бітова швидкість"
+
+msgid "Encoding engine quality"
+msgstr "Якість кодування"
+
+msgid "Standard"
+msgstr "Стандартний"
+
+msgid "Force mono encoding"
+msgstr "Примусове моно-кодування"
+
+msgid "automatic"
+msgstr "автоматично"
+
+msgid "Average bitrate"
+msgstr "Середня бітова швидкість"
+
+msgid "disabled"
+msgstr "вимкнено"
+
+msgid "Encoding mode"
+msgstr "Режим кодування"
+
+msgid "Auto"
+msgstr "Автоматично"
+
+msgid "Ultra wide band (UWB)"
+msgstr "Надзвичайно широка смуга (UWB)"
+
+msgid "Wide band (WB)"
+msgstr "Широка смуга (WB)"
+
+msgid "Narrow band (NB)"
+msgstr "Вузька смуга (NB)"
+
+msgid "Variable bit rate"
+msgstr "Змінна бітова швидкість"
+
+msgid "Voice activity detection"
+msgstr "Визначення голосової активності"
+
+msgid "Discontinuous transmission"
+msgstr "Переривчаста передача"
+
+msgid "Encoding complexity"
+msgstr "Складність кодування"
+
+msgid "Frames per buffer"
+msgstr "Кадрів на буфер"
+
+msgid "Use bitrate management engine"
+msgstr "Використовувати засіб керування бітовою швидкістю"
+
+msgid "Target bitrate"
+msgstr "Цільова бітова швидкість"
+
+msgid "Minimum bitrate"
+msgstr "Найменша бітова швидкість"
+
+msgid "Maximum bitrate"
+msgstr "Найбільша бітова швидкість"
+
+msgid "Transcoding"
+msgstr "Перекодування"
+
+msgid "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+msgstr "Ці налаштування використовуються у діалозі «Перекодування музики» та під час конвертування музики перед її копіюванням на пристрій."
+
+msgid "FLAC"
+msgstr "FLAC"
+
+msgid "WavPack"
+msgstr "WavPack"
+
+msgid "Vorbis"
+msgstr "Vorbis"
+
+msgid "Opus"
+msgstr "Opus"
+
+msgid "Speex"
+msgstr "Speex"
+
+msgid "AAC"
+msgstr "AAC"
+
+msgid "ASF (WMA)"
+msgstr "ASF (WMA)"
+
+msgid "MP3"
+msgstr "MP3"
+
+msgid "D-Bus path"
+msgstr "Шлях D-Bus"
+
+msgid "Serial number"
+msgstr "Серійний номер"
+
+msgid "Mount points"
+msgstr "Точки монтування"
+
+msgid "Partition label"
+msgstr "Мітка розділу"
+
+msgid "UUID"
+msgstr "UUID"
+
+msgid "Enter username and password"
+msgstr "Вкажіть ім'я користувача і пароль"
+
+msgid "Color"
+msgstr "Color"
+
+msgid "Select waveform color"
+msgstr "Select waveform color"
+
+msgid "Save the .waveform files directly in the songs folders"
+msgstr "Save the .waveform files directly in the songs folders"
+
+msgid "Failed to write XSPF playlist"
+msgstr "Failed to write XSPF playlist"
+

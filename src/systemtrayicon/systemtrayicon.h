@@ -21,12 +21,16 @@ class SystemTrayIcon {
   void SetupStatusNotifier();
   void SetVisible(bool visible);
   void ShowMenu(int x, int y);
+  void ShowPopup(const std::string &summary, const std::string &message, int timeout_ms);
 
   bool available() const { return available_; }
   bool visible() const { return visible_; }
   bool playing() const { return playing_; }
   int progress() const { return progress_; }
   const std::string &tooltip() const { return tooltip_; }
+  const std::string &popup_summary() const { return popup_summary_; }
+  const std::string &popup_message() const { return popup_message_; }
+  int popup_timeout_ms() const { return popup_timeout_ms_; }
   const std::string &menu_path() const { return menu_path_; }
   unsigned menu_revision() const { return menu_revision_; }
 
@@ -75,6 +79,13 @@ class SystemTrayIcon {
   int progress_ = 0;
   Song song_;
   std::string tooltip_ = "Strawberry";
+  std::string popup_summary_;
+  std::string popup_message_;
+  int popup_timeout_ms_ = 0;
+  GtkWidget *popup_window_ = nullptr;
+  GtkWidget *popup_title_ = nullptr;
+  GtkWidget *popup_body_ = nullptr;
+  guint popup_timeout_id_ = 0;
 };
 
 #endif

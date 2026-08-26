@@ -1,5 +1,7 @@
 #include "playlist/playlistcontainer.h"
 
+#include "translations/translations.h"
+
 PlaylistContainer::PlaylistContainer()
     : widget_(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0)),
       tab_bar_(std::make_unique<PlaylistTabBar>()),
@@ -24,20 +26,20 @@ PlaylistContainer::PlaylistContainer()
                      }),
                      this);
   };
-  add_tool("document-new-symbolic", "New playlist", "new");
-  add_tool("document-open-symbolic", "Load playlist", "load");
-  add_tool("document-save-symbolic", "Save playlist", "save");
-  add_tool("edit-clear-all-symbolic", "Clear playlist", "clear");
-  add_tool("edit-undo-symbolic", "Undo", "undo");
-  add_tool("edit-redo-symbolic", "Redo", "redo");
+  add_tool("document-new-symbolic", Translations::Tr("New playlist").c_str(), "new");
+  add_tool("document-open-symbolic", Translations::Tr("Load playlist").c_str(), "load");
+  add_tool("document-save-symbolic", Translations::Tr("Save playlist").c_str(), "save");
+  add_tool("edit-clear-all-symbolic", Translations::Tr("Clear playlist").c_str(), "clear");
+  add_tool("edit-undo-symbolic", Translations::Tr("Undo").c_str(), "undo");
+  add_tool("edit-redo-symbolic", Translations::Tr("Redo").c_str(), "redo");
   repeat_button_ = gtk_button_new_from_icon_name("media-playlist-repeat-symbolic");
-  gtk_widget_set_tooltip_text(repeat_button_, "Cycle repeat");
+  gtk_widget_set_tooltip_text(repeat_button_, Translations::Tr("Cycle repeat").c_str());
   shuffle_button_ = gtk_button_new_from_icon_name("media-playlist-shuffle-symbolic");
-  gtk_widget_set_tooltip_text(shuffle_button_, "Shuffle playlist");
+  gtk_widget_set_tooltip_text(shuffle_button_, Translations::Tr("Shuffle playlist").c_str());
   gtk_box_append(GTK_BOX(toolbar), repeat_button_);
   gtk_box_append(GTK_BOX(toolbar), shuffle_button_);
   GtkWidget *filter = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter), "Filter playlist");
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter), Translations::Tr("Filter playlist").c_str());
   gtk_widget_set_hexpand(filter, TRUE);
   g_signal_connect(filter, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<PlaylistContainer *>(data);

@@ -14,6 +14,7 @@ std::string CoverCacheDir();
 std::string LyricsCacheDir();
 std::string MoodbarCacheDir();
 std::string WaveformCacheDir();
+std::string LocaleDir();
 
 }  // namespace StandardPaths
 

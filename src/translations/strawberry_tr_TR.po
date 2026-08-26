@@ -1,0 +1,4475 @@
+# Translation catalog for Strawberry Music Player.
+# Generated from the Qt .ts files on origin/master.
+msgid ""
+msgstr ""
+"Project-Id-Version: strawberry\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-26 00:00+0000\n"
+"PO-Revision-Date: 2026-08-26 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: tr_TR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "ASX playlist is too large"
+msgstr "ASX playlist is too large"
+
+msgid "Failed to write ASX playlist"
+msgstr "Failed to write ASX playlist"
+
+msgid "About"
+msgstr "Hakkında"
+
+msgid "About Strawberry"
+msgstr "Strawberry Hakkında"
+
+msgid "Version %1"
+msgstr "Sürüm %1"
+
+msgid "Strawberry is a music player and music collection organizer."
+msgstr "Strawberry bir müzik çalar ve müzik koleksiyonu düzenleyicisidir."
+
+msgid "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."
+msgstr "2018 yılında piyasaya sürülen Clementine'in müzik koleksiyoncuları ve müzik tutkunlarına yönelik bir versiyonudur."
+
+msgid "Strawberry is free software released under GPL. The source code is available on %1"
+msgstr "Strawberry, GPL altında yayınlanan özgür bir yazılımdır. Kaynak kodu %1'da mevcuttur"
+
+msgid "You should have received a copy of the GNU General Public License along with this program.  If not, see %1"
+msgstr "Bu programla birlikte GNU Genel Kamu Lisansı'nın bir kopyasını almış olmalısınız. Eğer almadıysanız, %1'e bakın"
+
+msgid "If you like Strawberry and can make use of it, consider sponsoring or donating."
+msgstr "Eğer Strawberry'yi beğendiyseniz ve işinize yarıyorsa sponsor olmayı düşünebilir veya bağışta bulunabilirsiniz."
+
+msgid "You can sponsor the author on %1 or %2. You can also make a one-time payment through %3."
+msgstr "Geliştiriciye %1 veya %2 üzerinden sponsor olabilirsiniz. Ayrıca %3 üzerinden tek seferlik ödeme yapabilirsiniz."
+
+msgid "Author and maintainer"
+msgstr "Geliştirici ve bakımcı"
+
+msgid "Contributors"
+msgstr "Katkıda bulunanlar"
+
+msgid "Clementine authors"
+msgstr "Clementine geliştiricileri"
+
+msgid "Clementine contributors"
+msgstr "Clementine'e katkıda bulunanlar"
+
+msgid "Thanks to"
+msgstr "Teşekkürler"
+
+msgid "Thanks to all the other Amarok and Clementine contributors."
+msgstr "Amarok ve Clementine için katkıda bulunanlara teşekkürler"
+
+msgid "Add Stream"
+msgstr "Akış ekle"
+
+msgid "Enter the URL of a stream:"
+msgstr "Bir akış URLsi girin:"
+
+msgid "Load cover from disk..."
+msgstr "Diskten kapak yükle..."
+
+msgid "Save cover to disk..."
+msgstr "Kapağı diske kaydet..."
+
+msgid "Load cover from URL..."
+msgstr "URL'den kapak yükle..."
+
+msgid "Search for album covers..."
+msgstr "Albüm kapağı ara"
+
+msgid "Unset cover"
+msgstr "Kapağı kaldır"
+
+msgid "Delete cover"
+msgstr "Kapağı sil"
+
+msgid "Clear cover"
+msgstr "Kapağı temizle"
+
+msgid "Show fullsize..."
+msgstr "Tam boyut göster"
+
+msgid "Search automatically"
+msgstr "Otomatik ara"
+
+msgid "Load cover from disk"
+msgstr "Diskten kapak yükle"
+
+msgid "Failed to open cover file %1 for reading: %2"
+msgstr "Failed to open cover file %1 for reading: %2"
+
+msgid "Cover file %1 is empty."
+msgstr "Kapak dosyası %1 boş."
+
+msgid "unknown"
+msgstr "bilinmeyen"
+
+msgid "Save album cover"
+msgstr "Albüm kapağını kaydet"
+
+msgid "Failed to open cover file %1 for writing: %2"
+msgstr "Failed to open cover file %1 for writing: %2"
+
+msgid "Failed writing cover to file %1: %2"
+msgstr "Failed writing cover to file %1: %2"
+
+msgid "Failed writing cover to file %1."
+msgstr "Failed writing cover to file %1."
+
+msgid "Failed to delete cover file %1: %2"
+msgstr "Failed to delete cover file %1: %2"
+
+msgid "Failed to write cover to file %1: %2"
+msgstr "Failed to write cover to file %1: %2"
+
+msgid "Could not save cover to file %1."
+msgstr "Kapak dosya %1'e kaydedilemedi"
+
+msgid "Export covers"
+msgstr "Kapakları dışa aktar"
+
+msgid "Output"
+msgstr "Çıktı"
+
+msgid "Enter a filename for exported covers (no extension):"
+msgstr "Dışa aktarılan kapaklar için dosya adı girin (uzantı olmadan):"
+
+msgid "Export downloaded covers"
+msgstr "İndirilmiş kapakları dışa aktar"
+
+msgid "Export embedded covers"
+msgstr "Gömülü kapakları dışa aktar"
+
+msgid "Existing covers"
+msgstr "Var olan kapaklar"
+
+msgid "Do not overwrite"
+msgstr "Üstüne yazmayın"
+
+msgid "O&verwrite all"
+msgstr "H&epsinin üstüne yaz"
+
+msgid "Overwrite s&maller ones only"
+msgstr "Sadece daha k&üçük olanların üstüne yaz"
+
+msgid "Size"
+msgstr "Boyut"
+
+msgid "Scale size"
+msgstr "Ölçek boyutu"
+
+msgid "Size:"
+msgstr "Boyut:"
+
+msgid "Pixel"
+msgstr "Piksel"
+
+msgid "Abort"
+msgstr "İptal et"
+
+msgid "All albums"
+msgstr "Tüm albümler"
+
+msgid "Albums with covers"
+msgstr "Kapaklı albümler"
+
+msgid "Albums without covers"
+msgstr "Kapaksız albümler"
+
+msgid "Really cancel?"
+msgstr "Gerçekten iptal mi?"
+
+msgid "Closing this window will stop searching for album covers."
+msgstr "Bu pencereyi kapatmak albüm kapağı aramasını durduracaktır."
+
+msgid "Don't stop!"
+msgstr "Durma!"
+
+msgid "All artists"
+msgstr "Tüm sanatçılar"
+
+msgid "Various artists"
+msgstr "Çeşitli sanatçılar"
+
+msgid "Got %1 covers out of %2 (%3 failed)"
+msgstr "Got %1 covers out of %2 (%3 failed)"
+
+msgid "%1 transferred"
+msgstr "%1 transfer edildi"
+
+msgid "Export finished"
+msgstr "Dışarı aktarma bitti"
+
+msgid "No covers to export."
+msgstr "Dışarı aktaracak kapak yok."
+
+msgid "Exported %1 covers out of %2 (%3 skipped)"
+msgstr "Exported %1 covers out of %2 (%3 skipped)"
+
+msgid "Cover Manager"
+msgstr "Kapak Yöneticisi"
+
+msgid "Artist"
+msgstr "Sanatçı"
+
+msgid "Album"
+msgstr "Albüm"
+
+msgid "Search"
+msgstr "Ara"
+
+msgid "Covers from %1"
+msgstr "%1'den kapaklar"
+
+msgid "Framerate"
+msgstr "Kare hızı"
+
+msgid "Low (%1 fps)"
+msgstr "Düşük (%1 fps)"
+
+msgid "Medium (%1 fps)"
+msgstr "Orta (%1 fps)"
+
+msgid "High (%1 fps)"
+msgstr "Yüksek (%1 fps)"
+
+msgid "Super high (%1 fps)"
+msgstr "Çok yüksek (%1 fps)"
+
+msgid "No analyzer"
+msgstr "Analizör yok"
+
+msgid "Block analyzer"
+msgstr "Analizörü engelle"
+
+msgid "Boom analyzer"
+msgstr "Boom analyzer"
+
+msgid "Turbine"
+msgstr "Türbin"
+
+msgid "Sonogram"
+msgstr "Sonogram"
+
+msgid "WaveRubber"
+msgstr "WaveRubber"
+
+msgid "Appearance"
+msgstr "Görünüm"
+
+msgid "Style"
+msgstr "Tarz"
+
+msgid "Tabbar colors"
+msgstr "Sekme çubuğu renkleri"
+
+msgid "&Use the system default color"
+msgstr "Sistem varsayılanını kullan"
+
+msgid "Use custom color"
+msgstr "Özel renk kullan"
+
+msgid "Use gradient background"
+msgstr "Gradyan arkaplan kullan"
+
+msgid "Select tabbar color:"
+msgstr "Sekme çubuğu rengini seçin:"
+
+msgid "Background image"
+msgstr "Arkaplan resmi"
+
+msgid "Default bac&kground image"
+msgstr "Varsayılan resim"
+
+msgid "&No background image"
+msgstr "&Arkaplan resmi yok"
+
+msgid "The album cover of the currently playing song"
+msgstr "Şu anda çalan şarkının albüm kapağı"
+
+msgid "Albu&m cover"
+msgstr "Albüm kapağı"
+
+msgid "Custom image:"
+msgstr "Özel görsel"
+
+msgid "Browse..."
+msgstr "Göz at..."
+
+msgid "Position"
+msgstr "Konum"
+
+msgid "Upper Left"
+msgstr "Sol Üst"
+
+msgid "Upper Right"
+msgstr "Sağ Üst"
+
+msgid "Middle"
+msgstr "Orta"
+
+msgid "Bottom Left"
+msgstr "Sol Alt"
+
+msgid "Bottom Right"
+msgstr "Sağ Alt"
+
+msgid "Max cover size"
+msgstr "En büyük kapak boyutu"
+
+msgid "Stretch image to fill playlist"
+msgstr "Görseli çalma listesini dolduracak şekilde uzat"
+
+msgid "Keep aspect ratio"
+msgstr "En boy oranını koru"
+
+msgid "Do not cut image"
+msgstr "Görseli kırpma"
+
+msgid "Blur amount"
+msgstr "Bulanıklaştırma miktarı"
+
+msgid "0px"
+msgstr "0px"
+
+msgid "Opacity"
+msgstr "Saydamlık"
+
+msgid "40%"
+msgstr "%40"
+
+msgid "Icon sizes"
+msgstr "Simge boyutları"
+
+msgid "Playlist buttons"
+msgstr "Çalma listesi seçenekleri"
+
+msgid "Tabbar large mode"
+msgstr "Sekme çubuğu büyük"
+
+msgid "Play control buttons"
+msgstr "Çalma kontrolü seçenekleri"
+
+msgid "Configure buttons"
+msgstr "Yapılandırma seçenekleri"
+
+msgid "Files, playlists and queue buttons"
+msgstr "Dosyalar, çalma listeleri ve kuyruk seçenekleri"
+
+msgid "Tabbar small mode"
+msgstr "Sekme çubuğu küçük"
+
+msgid "Playlist playing song color"
+msgstr "Çalma listesi oynatılan şarkı rengi"
+
+msgid "System highlight color"
+msgstr "Sistem vurgu rengi"
+
+msgid "Custom color"
+msgstr "Özel renk"
+
+msgid "Select playlist playing song color:"
+msgstr "Çalma listesi oynatılan şarkı rengi seçin:"
+
+msgid "Window"
+msgstr "Window"
+
+msgid "Window text"
+msgstr "Window text"
+
+msgid "Base"
+msgstr "Base"
+
+msgid "Alternate base"
+msgstr "Alternate base"
+
+msgid "Tooltip base"
+msgstr "Tooltip base"
+
+msgid "Tooltip text"
+msgstr "Tooltip text"
+
+msgid "Placeholder text"
+msgstr "Placeholder text"
+
+msgid "Text"
+msgstr "Text"
+
+msgid "Button"
+msgstr "Button"
+
+msgid "Button text"
+msgstr "Button text"
+
+msgid "Bright text"
+msgstr "Bright text"
+
+msgid "Select color"
+msgstr "Select color"
+
+msgid "Select background image"
+msgstr "Arkaplan resmi seçin"
+
+msgid "Colors"
+msgstr "Colors"
+
+msgid "&Use the system default color set"
+msgstr "&Use the system default color set"
+
+msgid "Use a custom color set"
+msgstr "Use a custom color set"
+
+msgid "Set a custom color set suitable for a dark theme"
+msgstr "Set a custom color set suitable for a dark theme"
+
+msgid "Dark mode"
+msgstr "Dark mode"
+
+msgid "Reset the custom color set to the system default colors"
+msgstr "Reset the custom color set to the system default colors"
+
+msgid "Reset to default"
+msgstr "Reset to default"
+
+msgid "You might need to restart Strawberry for this setting to fully apply"
+msgstr "You might need to restart Strawberry for this setting to fully apply"
+
+msgid "You need to restart Strawberry for this setting to take affect"
+msgstr "You need to restart Strawberry for this setting to take affect"
+
+msgid "System icons"
+msgstr "System icons"
+
+msgid "Changing colors is only supported with some styles"
+msgstr "Changing colors is only supported with some styles"
+
+msgid "Dark colors"
+msgstr "Dark colors"
+
+msgid "Backend"
+msgstr "Panel"
+
+msgid "Audio output"
+msgstr "Ses çıkışı"
+
+msgid "Device"
+msgstr "Cihazlar"
+
+msgid "ALSA plugin:"
+msgstr "ALSA eklentisi:"
+
+msgid "hw"
+msgstr "hw"
+
+msgid "p&lughw"
+msgstr "p&lughw"
+
+msgid "pcm"
+msgstr "pcm"
+
+msgid "Exclusive mode (Experimental)"
+msgstr "Özel mod (Deneysel)"
+
+msgid "Options"
+msgstr "Seçenekler"
+
+msgid "Enable volume control"
+msgstr "Ses kontrolünü etkinleştir"
+
+msgid "Upmix / downmix to"
+msgstr "Upmix / downmix to"
+
+msgid "channels"
+msgstr "channels"
+
+msgid "Improve headphone listening of stereo audio records (bs2b)"
+msgstr "Improve headphone listening of stereo audio records (bs2b)"
+
+msgid "Use playbin3 when available"
+msgstr "Use playbin3 when available"
+
+msgid "Enable HTTP/2 for streaming"
+msgstr "Enable HTTP/2 for streaming"
+
+msgid "Use strict SSL mode"
+msgstr "Use strict SSL mode"
+
+msgid "Buffer"
+msgstr "Buffer"
+
+msgid " ms"
+msgstr " ms"
+
+msgid "Buffer duration"
+msgstr "Buffer duration"
+
+msgid "High watermark"
+msgstr "High watermark"
+
+msgid "Low watermark"
+msgstr "Low watermark"
+
+msgid "Defaults"
+msgstr "Varsayılanlar"
+
+msgid "Audio normalization"
+msgstr "Ses normalleştirme"
+
+msgid "No audio normalization"
+msgstr "Ses normalleştirmesi yok"
+
+msgid "Replay Gain"
+msgstr "Replay Gain"
+
+msgid "Use Replay Gain metadata if it is available"
+msgstr "Use Replay Gain metadata if it is available"
+
+msgid "Replay Gain mode"
+msgstr "Replay Gain mode"
+
+msgid "Radio (equal loudness for all tracks)"
+msgstr "Radio (equal loudness for all tracks)"
+
+msgid "Album (ideal loudness for all tracks)"
+msgstr "Album (ideal loudness for all tracks)"
+
+msgid "Pre-amp"
+msgstr "Ön-amfi"
+
+msgid "Apply compression to prevent clipping"
+msgstr "Apply compression to prevent clipping"
+
+msgid "Fallback-gain"
+msgstr "Fallback-gain"
+
+msgid "EBU R 128 Loudness Normalization"
+msgstr "EBU R 128 Loudness Normalization"
+
+msgid "Perform track loudness normalization"
+msgstr "Perform track loudness normalization"
+
+msgid "Target Level"
+msgstr "Target Level"
+
+msgid "Fading"
+msgstr "Çapraz geçiş"
+
+msgid "Fade out when stopping a track"
+msgstr "Parçayı durdururken çapraz geç"
+
+msgid "Cross-fade when changing tracks manually"
+msgstr "Parçaları elle değiştirirken çapraz geç"
+
+msgid "Cross-fade when changing tracks automatically"
+msgstr "Parçaları otomatik değiştirirken çapraz geç"
+
+msgid "Except between tracks on the same album or in the same CUE sheet"
+msgstr "Except between tracks on the same album or in the same CUE sheet"
+
+msgid "Fading duration"
+msgstr "Çapraz geçiş süresi"
+
+msgid "Fade out on pause / fade in on resume"
+msgstr "Durdururken / devam ederken çapraz geç"
+
+msgid "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+msgstr "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+
+msgid "Exponential volume scaling"
+msgstr "Exponential volume scaling"
+
+msgid "Device warm-up"
+msgstr "Device warm-up"
+
+msgid "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+msgstr "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+
+msgid "Behavior"
+msgstr "Davranış"
+
+msgid "Show system tray icon"
+msgstr "Sistem tepsisinde göster"
+
+msgid "Keep running in the background when the window is closed"
+msgstr "Pencere kapalıyken de arkaplanda çalışmaya devam et"
+
+msgid "Show song progress on system tray icon"
+msgstr "Şarkı ilerlemesini sistem tepsisinde göster"
+
+msgid "Show song progress on taskbar"
+msgstr "Şarkı ilerlemesini görev çubuğunda göster"
+
+msgid "Resume playback on start"
+msgstr "Başlangıçta devam ettir"
+
+msgid "Show playing widget"
+msgstr "Oynatılan widgetı göster"
+
+msgid "On startup"
+msgstr "Başlangıçta"
+
+msgid "Remember from &last time"
+msgstr "Son seferden hatırla"
+
+msgid "Show the main window"
+msgstr "Ana pencereyi göster"
+
+msgid "Hide the main window"
+msgstr "Ana pencereyi gizle"
+
+msgid "Show the main window maximized"
+msgstr "Ana pencereyi büyütülmüş göster"
+
+msgid "Show the main window minimized"
+msgstr "Ana pencereyi küçültülmüş göster"
+
+msgid "Language"
+msgstr "Dil"
+
+msgid "Use the system default"
+msgstr "Sistem varsayılanını kullan"
+
+msgid "You will need to restart Strawberry if you change the language."
+msgstr "Dilinizi değiştirirseniz Strawberry'yi yeniden başlatmanız gerekir."
+
+msgid "Using the menu to add a song will..."
+msgstr "Şarkı eklemek için menüyü kullanmak..."
+
+msgid "Never start playing"
+msgstr "Asla oynatarak başlama"
+
+msgid "Play if there is nothing already playing"
+msgstr "Oynatılan bir şey yoksa oynat"
+
+msgid "Always start playing"
+msgstr "Her zaman oynatarak başla"
+
+msgid "Pressing \"Previous\" in player will..."
+msgstr "\"Önceki\" şarkıya tıklamak..."
+
+msgid "Jump to previous song right away"
+msgstr "Önceki şarkıya atla"
+
+msgid "Restart song, then jump to previous if pressed again"
+msgstr "Şarkıyı yeniden başlat, tekrar basılırsa önceki şarkıya geç"
+
+msgid "Double clicking a song will..."
+msgstr "Bir şarkıya çift tıklamak..."
+
+msgid "Append to the playlist"
+msgstr "Geçerli çalma listesine ekle"
+
+msgid "Replace the playlist"
+msgstr "Çalma listesinin yerine koy"
+
+msgid "Open in new playlist"
+msgstr "Yeni çalma listesinde aç"
+
+msgid "Add to the queue"
+msgstr "Kuyruğa ekle"
+
+msgid "Double clicking a song in the playlist will..."
+msgstr "Çalma listesindeki bir şarkıya çift tıklamak..."
+
+msgid "Change the currently playing song"
+msgstr "Oynatılan şarkıyı değiştir"
+
+msgid "Seeking using a keyboard shortcut or mouse wheel"
+msgstr "Seeking using a keyboard shortcut or mouse wheel"
+
+msgid " s"
+msgstr " s"
+
+msgid "Volume Increment"
+msgstr "Ses Yükseltme"
+
+msgid "Could not create cdiocddasrc"
+msgstr "Could not create cdiocddasrc"
+
+msgid "Error while setting CDDA device to ready state."
+msgstr "Error while setting CDDA device to ready state."
+
+msgid "Error while setting CDDA device to pause state."
+msgstr "Error while setting CDDA device to pause state."
+
+msgid "The 'track' format is not supported by GStreamer."
+msgstr "The 'track' format is not supported by GStreamer."
+
+msgid "Error while querying CDDA tracks."
+msgstr "Error while querying CDDA tracks."
+
+msgid "Unable to execute collection SQL query: %1"
+msgstr "Koleksiyon SQL sorgusu çalıştırılamıyor: %1"
+
+msgid "Failed SQL query: %1"
+msgstr "SQL sorgusu başarısız: %1"
+
+msgid "Updating %1 database."
+msgstr "%1 veritabanı güncelleniyor."
+
+msgid "Collection Filter"
+msgstr "Koleksiyon Filtresi"
+
+msgid "Enter search terms here"
+msgstr "Arama terimlerini girin"
+
+msgid "MenuPopupToolButton"
+msgstr "MenuPopupToolButton"
+
+msgid "Entire collection"
+msgstr "Tüm koleksiyon"
+
+msgid "Added today"
+msgstr "Bugün eklendi"
+
+msgid "Added this week"
+msgstr "Bu hafta eklendi"
+
+msgid "Added within three months"
+msgstr "Üç ay içinde eklendi"
+
+msgid "Added this year"
+msgstr "Bu yıl eklendi"
+
+msgid "Added this month"
+msgstr "Bu ay eklendi"
+
+msgid "Save current grouping"
+msgstr "Geçerli gruplamayı kaydet"
+
+msgid "Manage saved groupings"
+msgstr "Kayıtlı gruplamaları yönet"
+
+msgid "Any rating"
+msgstr "Any rating"
+
+msgid "Rating non null"
+msgstr "Rating non null"
+
+msgid "Rating greater than 1 star"
+msgstr "Rating greater than 1 star"
+
+msgid "Rating greater than 2 stars"
+msgstr "Rating greater than 2 stars"
+
+msgid "Rating greater than 3 stars"
+msgstr "Rating greater than 3 stars"
+
+msgid "Rating greater than 4 stars"
+msgstr "Rating greater than 4 stars"
+
+msgid "Group by"
+msgstr "Grupla"
+
+msgid "Filter by age"
+msgstr "Filter by age"
+
+msgid "Filter by rating"
+msgstr "Derecelendirmeye göre süz"
+
+msgid "Display options"
+msgstr "Görüntüleme seçenekleri"
+
+msgid "Group by Album artist/Album"
+msgstr "Albüm sanatçısı/Albüm olarak grupla"
+
+msgid "Group by Album artist/Album - Disc"
+msgstr "Albüm sanatçısı/Album - Disk olarak grupla"
+
+msgid "Group by Album artist/Year - Album"
+msgstr "Albüm sanatçısı/Yıl - Albüm olarak grupla"
+
+msgid "Group by Album artist/Year - Album - Disc"
+msgstr "Albüm sanatçısı/Yıl - Albüm - Disk olarak grupla"
+
+msgid "Group by Artist/Album"
+msgstr "Sanatçı/Albüm olarak grupla"
+
+msgid "Group by Artist/Album - Disc"
+msgstr "Sanatçi/Albüm - Disk olarak grupla"
+
+msgid "Group by Artist/Year - Album"
+msgstr "Sanatçi/Yıl - Albüm olarak grupla"
+
+msgid "Group by Artist/Year - Album - Disc"
+msgstr "Sanatçı/Yıl - Albüm - Disk olarak grupla"
+
+msgid "Group by Genre/Album artist/Album"
+msgstr "Tür/Albüm sanatçısı/Albüm olarak grupla"
+
+msgid "Group by Genre/Artist/Album"
+msgstr "Tür/Sanatçı/Albüm olarak grupla"
+
+msgid "Group by Album Artist"
+msgstr "Albüm sanatçısı ile grupla"
+
+msgid "Group by Artist"
+msgstr "Sanatçı ile grupla"
+
+msgid "Group by Album"
+msgstr "Albüm ile grupla"
+
+msgid "Group by Genre/Album"
+msgstr "Tür/Albüm olarak grupla"
+
+msgid "Advanced grouping..."
+msgstr "Gelişmiş gruplama..."
+
+msgid "Grouping Name"
+msgstr "Gruplandırma Adı"
+
+msgid "Grouping name:"
+msgstr "Gruplandırma Adı:"
+
+msgid "Support for sort tags artist, album, album artist, title, composer and performer"
+msgstr "Support for sort tags artist, album, album artist, title, composer and performer"
+
+msgid "Saving playcounts and ratings"
+msgstr "Çalma sayısı ve derecelendirmeler kaydediliyor"
+
+msgid "Loading..."
+msgstr "Yükleniyor..."
+
+msgid "Unknown"
+msgstr "Bilinmeyen"
+
+msgid "Collection"
+msgstr "Koleksiyon"
+
+msgid "These folders will be scanned for music to make up your collection"
+msgstr "These folders will be scanned for music to make up your collection"
+
+msgid "Add new folder..."
+msgstr "Yeni klasör ekle..."
+
+msgid "Remove folder"
+msgstr "Klasörü kaldır"
+
+msgid "Automatic updating"
+msgstr "Otomatik güncelleme"
+
+msgid "Update the collection when Strawberry starts"
+msgstr "Strawberry başlatıldığında kütüphaneyi güncelle"
+
+msgid "Monitor the collection for changes"
+msgstr "Değişiklikleri izle"
+
+msgid "Song fingerprinting and tracking"
+msgstr "Song fingerprinting and tracking"
+
+msgid "Mark disappeared songs unavailable"
+msgstr "Kayıp şarkıları mevcut değil olarak işaretle"
+
+msgid "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+msgstr "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+
+msgid "Expire unavailable songs after"
+msgstr "Expire unavailable songs after"
+
+msgid "days"
+msgstr "gün"
+
+msgid "Preferred album art filenames (comma separated)"
+msgstr "Preferred album art filenames (comma separated)"
+
+msgid "When looking for album art Strawberry will first look for picture files that contain one of these words.\nIf there are no matches then it will use the largest image in the directory."
+msgstr "Albüm kapağı ararken Strawberry ilk olarak o kelimelerden birini içeren görselleri arar. Eğer eşleşme bulunamazsa klasördeki en büyük görseli kullanır."
+
+msgid "Automatically open single categories in the collection tree"
+msgstr "Automatically open single categories in the collection tree"
+
+msgid "Show dividers"
+msgstr "Bölücüleri göster"
+
+msgid "Show album cover art in collection"
+msgstr "Kütüphanede albüm kapağını göster"
+
+msgid "Use various artists for compilation albums"
+msgstr "Derleme albümleri için Çeşitli Sanatçılar kullan"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+
+msgid "Use sort tags for sorting when available"
+msgstr "Use sort tags for sorting when available"
+
+msgid "Album cover pixmap cache"
+msgstr "Album cover pixmap cache"
+
+msgid "Enable Disk Cache"
+msgstr "Disk önbelleğini aktif et"
+
+msgid "Disk Cache Size"
+msgstr "Disk önbelleği boyutu"
+
+msgid "Current disk cache in use:"
+msgstr "Kullanılan disk önbelleği:"
+
+msgid "Clear Disk Cache"
+msgstr "Disk önbelleğini temizle"
+
+msgid "Song playcounts and ratings"
+msgstr "Çalma sayısı ve derecelendirmeler"
+
+msgid "Save playcounts to song tags when possible"
+msgstr "Kaç kez dinlediğimi mümkün oldukça etiketlere kaydet"
+
+msgid "Save ratings to song tags when possible"
+msgstr "Derecelendirmeleri mümkün oldukça etiketlere kaydet"
+
+msgid "Overwrite database playcount when songs are re-read from disk"
+msgstr "Overwrite database playcount when songs are re-read from disk"
+
+msgid "Overwrite database rating when songs are re-read from disk"
+msgstr "Overwrite database rating when songs are re-read from disk"
+
+msgid "Save playcounts and ratings to files now"
+msgstr "Çalma sayısı ve derecelendirmeleri dosyalara kaydet"
+
+msgid "Enable delete files in the right click context menu"
+msgstr "Enable delete files in the right click context menu"
+
+msgid "Add directory..."
+msgstr "Dizin ekle..."
+
+msgid "Write all playcounts and ratings to files"
+msgstr "Tüm çalma sayısını ve derecelendirmeleri dosyalara yazdır"
+
+msgid "Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"
+msgstr "Koleksiyonunuzdaki tüm şarkılar için çalma sayısı ve derecelendirmeleri dosyaya yazdırmak istediğinizden emin misiniz?"
+
+msgid "Your collection is empty!"
+msgstr "Koleksiyonunuz boş!"
+
+msgid "Click here to add some music"
+msgstr "Biraz müzik eklemek için buraya tıklayın"
+
+msgid "Append to current playlist"
+msgstr "Geçerli çalma listesine ekle"
+
+msgid "Replace current playlist"
+msgstr "Geçerli çalma listesinin yerine koy"
+
+msgid "Queue track"
+msgstr "Çalma sırasına ekle"
+
+msgid "Queue to play next"
+msgstr "Sıradaki yap"
+
+msgid "Search for this"
+msgstr "Bunun için ara"
+
+msgid "Organize files..."
+msgstr "Dosyaları düzenle..."
+
+msgid "Copy to device..."
+msgstr "Cihaza kopyala..."
+
+msgid "Delete from disk..."
+msgstr "Diskten sil"
+
+msgid "Edit track information..."
+msgstr "Parça bilgisini düzenle..."
+
+msgid "Edit tracks information..."
+msgstr "Parçaların bilgilerini düzenle..."
+
+msgid "Show in file browser..."
+msgstr "Dosya tarayıcısında göster..."
+
+msgid "Rescan song(s)"
+msgstr "Şarkıları yeniden tara..."
+
+msgid "Show in various artists"
+msgstr "Çeşitli sanatçılar içinde göster"
+
+msgid "Don't show in various artists"
+msgstr "Çeşitli sanatçılar içinde gösterme"
+
+msgid "There are other songs in this album"
+msgstr "Bu albümde diğer şarkılar var"
+
+msgid "Would you like to move the other songs on this album to Various Artists as well?"
+msgstr "Bu albümdeki diğer şarkıları da Çeşitli Sanatçılar'a taşımak ister misiniz?"
+
+msgid "Error"
+msgstr "Hata"
+
+msgid "None of the selected songs were suitable for copying to a device"
+msgstr "Seçilen parçaların hiçbiri cihaza kopyalamak için uygun değil"
+
+msgid "Form"
+msgstr "Biçim"
+
+msgid "Updating collection"
+msgstr "Koleksiyon güncelleniyor"
+
+msgid "Updating %1"
+msgstr "%1 güncelleniyor"
+
+msgid "Console"
+msgstr "Konsol"
+
+msgid "Run"
+msgstr "Çalıştır"
+
+msgid "Context"
+msgstr "İçerik"
+
+msgid "Custom text settings"
+msgstr "Custom text settings"
+
+msgid "Title"
+msgstr "Başlık"
+
+msgid "Summary"
+msgstr "Özet"
+
+msgid "Enable Items"
+msgstr "Enable Items"
+
+msgid "Technical Data"
+msgstr "Teknik Veri"
+
+msgid "Song Lyrics"
+msgstr "Şarkı Sözleri"
+
+msgid "Automatically search for album cover"
+msgstr "Automatically search for album cover"
+
+msgid "Automatically search for song lyrics"
+msgstr "Şarkı sözlerini otomatik ara"
+
+msgid "Font for headline"
+msgstr "Font for headline"
+
+msgid "Font"
+msgstr "Yazı tipi"
+
+msgid "Font size"
+msgstr "Yazı tipi boyutu"
+
+msgid " pt"
+msgstr " pt"
+
+msgid "Preview"
+msgstr "Ön izleme"
+
+msgid "Font for data and lyrics"
+msgstr "Veri ve sözler için yazı tipi"
+
+msgid "Add song artist tag"
+msgstr "Sanatçı etiketi ekle"
+
+msgid "Add song album tag"
+msgstr "Albüm etiketi ekle"
+
+msgid "Add song title tag"
+msgstr "Başlık etiketi ekle"
+
+msgid "Add song albumartist tag"
+msgstr "Albüm sanatçısı etiketi ekle"
+
+msgid "Add song year tag"
+msgstr "Yıl etiketi ekle"
+
+msgid "Add song composer tag"
+msgstr "Besteci etiketi ekle"
+
+msgid "Add song performer tag"
+msgstr "Yapımcı etiketi ekle"
+
+msgid "Add song grouping tag"
+msgstr "Gruplama etiketi ekle"
+
+msgid "Add song disc tag"
+msgstr "Disk etiketi ekle"
+
+msgid "Add song track tag"
+msgstr "Parça sayısı etiketi ekle"
+
+msgid "Add song genre tag"
+msgstr "Tür etiketi ekle"
+
+msgid "Add song length tag"
+msgstr "Uzunluk etiketi ekle"
+
+msgid "Add song play count"
+msgstr "Çalma sayısı ekle"
+
+msgid "Add song skip count"
+msgstr "Geçme sayısı ekle"
+
+msgid "Add a new line if supported by the notification type"
+msgstr "Add a new line if supported by the notification type"
+
+msgid "%filename%"
+msgstr "%filename%"
+
+msgid "Add song filename"
+msgstr "Şarkı dosya ismi ekle"
+
+msgid "%url%"
+msgstr "%url%"
+
+msgid "Add song URL"
+msgstr "Şarkı bağlantısı ekle"
+
+msgid "%rating%"
+msgstr "%rating%"
+
+msgid "Add song rating"
+msgstr "Derecelendirme ekle"
+
+msgid "Add song original year tag"
+msgstr "Orijinal yıl etiketi ekle"
+
+msgid "Add song artistsort tag"
+msgstr "Add song artistsort tag"
+
+msgid "Add song albumartistsort tag"
+msgstr "Add song albumartistsort tag"
+
+msgid "Add song titlesort tag"
+msgstr "Add song titlesort tag"
+
+msgid "Add song composersort tag"
+msgstr "Add song composersort tag"
+
+msgid "Add song performersort tag"
+msgstr "Yapımcı sıralama etiketi ekle"
+
+msgid "Add song albumsort tag"
+msgstr "Add song albumsort tag"
+
+msgid "Filetype"
+msgstr "Dosya türü"
+
+msgid "Length"
+msgstr "Uzunluk"
+
+msgid "Samplerate"
+msgstr "Örnek hız"
+
+msgid "Bit depth"
+msgstr "Bit derinliği"
+
+msgid "Bitrate"
+msgstr "Bit oranı"
+
+msgid "Show album cover"
+msgstr "Albüm kapağını göster"
+
+msgid "Show song technical data"
+msgstr "Şarkı teknik verilerini göster"
+
+msgid "Show song lyrics"
+msgstr "Şarkı sözlerini göster"
+
+msgid "No song playing"
+msgstr "Şarkı çalmıyor"
+
+msgid "%1 song"
+msgstr "%1 şarkı"
+
+msgid "%1 songs"
+msgstr "%1 şarkı"
+
+msgid "%1 artist"
+msgstr "%1 sanatçı"
+
+msgid "%1 artists"
+msgstr "%1 sanatçı"
+
+msgid "%1 album"
+msgstr "%1 albüm"
+
+msgid "%1 albums"
+msgstr "%1 albüm"
+
+msgid "kbps"
+msgstr "kbps"
+
+msgid "Load cover from URL"
+msgstr "URL'den kapak yükle"
+
+msgid "Enter a URL to download a cover from the Internet:"
+msgstr "İnternetten kapak indirmek için bir URL girin:"
+
+msgid "Fetching cover error"
+msgstr "Kapak getirme hatası"
+
+msgid "The site you requested does not exist!"
+msgstr "Girdiğiniz site geçersiz!"
+
+msgid "The site you requested is not an image!"
+msgstr "Girdiğiniz site bir görsel değil!"
+
+msgid "View"
+msgstr "Görünüm"
+
+msgid "Total albums:"
+msgstr "Toplam albüm:"
+
+msgid "Without cover:"
+msgstr "Kapaksız:"
+
+msgid "0"
+msgstr "0"
+
+msgid "Fetch Missing Covers"
+msgstr "Eksik kapakları ara"
+
+msgid "Export Covers"
+msgstr "Kapakları dışa aktar"
+
+msgid "Fetch automatically"
+msgstr "Otomatik ara"
+
+msgid "Load"
+msgstr "Yükle"
+
+msgid "Add to playlist"
+msgstr "Çalma listesine ekle"
+
+msgid "Fetch completed"
+msgstr "Getirme tamamlandı"
+
+msgid "Total network requests made"
+msgstr "Total network requests made"
+
+msgid "Average image size"
+msgstr "Ortalama resim boyutu"
+
+msgid "Total bytes transferred"
+msgstr "Aktarılan bit"
+
+msgid "Covers"
+msgstr "Kapaklar"
+
+msgid "Cover providers"
+msgstr "Kapak sağlayıcıları"
+
+msgid "Choose the providers you want to use when searching for covers."
+msgstr "Albüm kapağı aramak için istediğiniz sağlayıcıları seçin."
+
+msgid "Move up"
+msgstr "Yukarıya taşı"
+
+msgid "Move down"
+msgstr "Aşağıya taşı"
+
+msgid "Authentication"
+msgstr "Doğrulama"
+
+msgid "Login"
+msgstr "Giriş yap"
+
+msgid "Album cover types"
+msgstr "Album cover types"
+
+msgid "Saving album covers"
+msgstr "Albüm kapakları kaydediliyor"
+
+msgid "Save album covers in album directory"
+msgstr "Albüm kapaklarını albüm dizinine kaydet"
+
+msgid "Save album covers in cache directory"
+msgstr "Albüm kapaklarını önbellek dizinine kaydet"
+
+msgid "Save album covers as embedded cover"
+msgstr "Albüm kapaklarını gömülü olarak kaydet"
+
+msgid "Filename:"
+msgstr "Dosya adı:"
+
+msgid "Pattern"
+msgstr "Desen"
+
+msgid "Random"
+msgstr "Rastgele"
+
+msgid "Overwrite existing file"
+msgstr "Var olan dosyanın üzerine yaz"
+
+msgid "Lowercase filename"
+msgstr "Lowercase filename"
+
+msgid "Replace spaces with dashes"
+msgstr "Boşluk yerine alt çizgi koy"
+
+msgid "Use Tidal settings to authenticate."
+msgstr "Kimlik doğrulama için Tidal ayarlarını kullan."
+
+msgid "Use Spotify settings to authenticate."
+msgstr "Kimlik doğrulama için Spotify ayarlarını kullan."
+
+msgid "Use Qobuz settings to authenticate."
+msgstr "Kimlik doğrulama için Qobuz ayarlarını kullan."
+
+msgid "%1 needs authentication."
+msgstr "%1 kimlik doğrulaması gerektiriyor."
+
+msgid "%1 does not need authentication."
+msgstr "%1 kimlik doğrulaması gerektirmiyor."
+
+msgid "No provider selected."
+msgstr "Sağlayıcı seçilmedi."
+
+msgid "Authentication failed"
+msgstr "Doğrulama başarısız"
+
+msgid "Manually unset (%1)"
+msgstr "Manually unset (%1)"
+
+msgid "Set through album cover search (%1)"
+msgstr "Set through album cover search (%1)"
+
+msgid "Automatically picked up from album directory (%1)"
+msgstr "Automatically picked up from album directory (%1)"
+
+msgid "Embedded album cover art (%1)"
+msgstr "Gömülü albüm kapagı (%1)"
+
+msgid "Saving CUE files is not supported."
+msgstr "CUE dosyalarının kaydedilmesi desteklenmiyor."
+
+msgid "Unable to execute SQL query: %1"
+msgstr "SQL sorgusu çalıştırılamıyor: %1"
+
+msgid "Integrity check"
+msgstr "Bütünlük kontrolü"
+
+msgid "Database corruption detected."
+msgstr "Veritabanı bozulması tespit edildi."
+
+msgid "Backing up database"
+msgstr "Veritabanı yedekleniyor"
+
+msgid "Delete files"
+msgstr "Dosyaları sil"
+
+msgid "The following files will be deleted from disk:"
+msgstr "Şu dosyalar diskten silinecek:"
+
+msgid "Are you sure you want to continue?"
+msgstr "Devam etmek istediğinize emin misiniz?"
+
+msgid "Deleting files"
+msgstr "Dosyalar siliniyor"
+
+msgid "Updating %1%..."
+msgstr "Güncelleniyor %1%"
+
+msgid "Not connected"
+msgstr "Bağlı değil"
+
+msgid "Not mounted - double click to mount"
+msgstr "Bağlanmamış - bağlamak için çift tıklayın"
+
+msgid "Double click to open"
+msgstr "Açmak için çift tıklayın"
+
+msgid "%1 song%2"
+msgstr "%1 song%2"
+
+msgid "Connect device"
+msgstr "Cihazı bağla"
+
+msgid "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+msgstr "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+
+msgid "This device will not work properly"
+msgstr "Bu cihaz düzgün çalışmaz"
+
+msgid "This is an MTP device, but you compiled Strawberry without libmtp support."
+msgstr "This is an MTP device, but you compiled Strawberry without libmtp support."
+
+msgid "If you continue, this device will work slowly and songs copied to it may not work."
+msgstr "If you continue, this device will work slowly and songs copied to it may not work."
+
+msgid "This is an iPod, but you compiled Strawberry without libgpod support."
+msgstr "Bu bir iPod, fakat Strawberry libgpod desteği olmadan derlenmiş."
+
+msgid "This type of device is not supported: %1"
+msgstr "Cihaz türü desteklenmiyor: %1"
+
+msgid "Device Properties"
+msgstr "Cihaz Seçenekleri"
+
+msgid "Information"
+msgstr "Bilgi"
+
+msgid "Name"
+msgstr "Ad"
+
+msgid "Icon"
+msgstr "Simge"
+
+msgid "Hardware information"
+msgstr "Aygıt bilgisi"
+
+msgid "Hardware information is only available while the device is connected."
+msgstr "Hardware information is only available while the device is connected."
+
+msgid "File formats"
+msgstr "Dosya biçimleri"
+
+msgid "Supported formats"
+msgstr "Desteklenen dosya biçimleri"
+
+msgid "This device supports the following file formats:"
+msgstr "This device supports the following file formats:"
+
+msgid "Strawberry can automatically convert the music you copy to this device into a format that it can play."
+msgstr "Strawberry bu cihaza kopyaladığınız müziği otomatik olarak oynatabileceği bir biçime dönüştürebilir."
+
+msgid "Do not convert any music"
+msgstr "Müzik çevirme"
+
+msgid "Convert any music that the device can't play"
+msgstr "Convert any music that the device can't play"
+
+msgid "Convert all music"
+msgstr "Tüm müzikleri çevir"
+
+msgid "Preferred format"
+msgstr "Tercih edilen dosya biçimi"
+
+msgid "This device must be connected and opened before Strawberry can see what file formats it supports."
+msgstr "This device must be connected and opened before Strawberry can see what file formats it supports."
+
+msgid "Open device"
+msgstr "Cihazı aç"
+
+msgid "Querying device..."
+msgstr "Cihaz sorgulanıyor..."
+
+msgid "Model"
+msgstr "Model"
+
+msgid "Manufacturer"
+msgstr "Üretici"
+
+msgid "Safely remove device"
+msgstr "Cihazı güvenle kaldır"
+
+msgid "Forget device"
+msgstr "Cihazı unut"
+
+msgid "Device properties..."
+msgstr "Cihaz seçenekleri..."
+
+msgid "Copy to collection..."
+msgstr "Koleksiyona kopyala..."
+
+msgid "Delete from device..."
+msgstr "Diskten sil..."
+
+msgid "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+msgstr "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+
+msgid "These files will be deleted from the device, are you sure you want to continue?"
+msgstr "These files will be deleted from the device, are you sure you want to continue?"
+
+msgid "on "
+msgstr "on "
+
+msgid "Dynamic mode is on"
+msgstr "Dinamik mod açık"
+
+msgid "New tracks will be added automatically."
+msgstr "Yeni parçalar otomatik olarak eklenecek."
+
+msgid "Expand"
+msgstr "Genişlet"
+
+msgid "Repopulate"
+msgstr "Repopulate"
+
+msgid "Turn off"
+msgstr "Kapat"
+
+msgid "Edit track information"
+msgstr "Parça bilgisini düzenle"
+
+msgid "Date created"
+msgstr "Oluşturma tarihi"
+
+msgid "Art Automatic"
+msgstr "Kapak Otomatik"
+
+msgid "Date modified"
+msgstr "Değiştirilme tarihi"
+
+msgid "Art Embedded"
+msgstr "Kapak Gömülü"
+
+#. A playlist's tag.
+msgid "Last played"
+msgstr "Son çalınma"
+
+msgid "File type"
+msgstr "Dosya türü"
+
+msgid "Play count"
+msgstr "Çalma sayısı"
+
+msgid "EBU R 128 integrated loudness"
+msgstr "EBU R 128 integrated loudness"
+
+msgid "Bit rate"
+msgstr "Bit hızı"
+
+msgid "Skip count"
+msgstr "Atlama sayısı"
+
+msgid "Sample rate"
+msgstr "Örnek hızı"
+
+msgid "Path"
+msgstr "Yol"
+
+msgid "Filename"
+msgstr "Dosya adı"
+
+msgid "Art Unset"
+msgstr "Kapak ayarlanmadı"
+
+msgid "File size"
+msgstr "Dosya boyutu"
+
+msgid "Art Manual"
+msgstr "Kapak Elle"
+
+msgid "EBU R 128 loudness range"
+msgstr "EBU R 128 loudness range"
+
+msgid "Reset play counts"
+msgstr "Çalma sayısını sıfırla"
+
+msgid "Tags"
+msgstr "Etiketler"
+
+msgid "Change art"
+msgstr "Kapağı değiştir"
+
+msgid "Embedded cover"
+msgstr "Gömülü kapak"
+
+msgid "Disc"
+msgstr "Disk"
+
+msgid "Grouping"
+msgstr "Gruplandırma"
+
+msgid "Album artist"
+msgstr "Albüm sanatçısı"
+
+msgid "Year"
+msgstr "Yıl"
+
+msgid "Composer"
+msgstr "Besteci"
+
+msgid "Complete tags automatically"
+msgstr "Etiketleri otomatik olarak tamamla"
+
+msgid "Genre"
+msgstr "Tarz"
+
+msgid "Comment"
+msgstr "Yorum"
+
+msgid "Performer"
+msgstr "Yapımcı"
+
+msgid "Compilation"
+msgstr "Derleme"
+
+msgid "Track"
+msgstr "Parça"
+
+msgid "Rating"
+msgstr "Derecelendirme"
+
+msgid "Lyrics"
+msgstr "Şarkı sözleri"
+
+msgid "Complete lyrics automatically"
+msgstr "Şarkı sözlerini otomatik olarak tamamla"
+
+msgid "(different across multiple songs)"
+msgstr "(different across multiple songs)"
+
+msgid "Different art across multiple songs."
+msgstr "Different art across multiple songs."
+
+msgid "Previous"
+msgstr "Önceki"
+
+msgid "Next"
+msgstr "Sonraki"
+
+msgid "Saving tracks"
+msgstr "Parçalar kaydediliyor"
+
+msgid "Loading tracks"
+msgstr "Parçalar yükleniyor"
+
+msgid "%1 songs selected."
+msgstr "%1 şarkı seçildi."
+
+msgid "Yes"
+msgstr "Evet"
+
+msgid "No"
+msgstr "Hayır"
+
+msgid "None"
+msgstr "Hiçbiri"
+
+msgid "Cover is unset."
+msgstr "Kapak ayarlanmadı."
+
+msgid "Cover from embedded image."
+msgstr "Gömülü resimden albüm kapağı."
+
+msgid "Cover from %1"
+msgstr "%1'dan kapak"
+
+msgid "Cover art not set"
+msgstr "Kapak resmi seçilmedi"
+
+msgid "Album cover editing is only available for collection songs."
+msgstr "Albüm kapağı düzenleme sadece koleksiyondaki şarkılar için geçerlidir."
+
+msgid "Cover changed: Will be cleared when saved."
+msgstr "Cover changed: Will be cleared when saved."
+
+msgid "Cover changed: Will be unset when saved."
+msgstr "Cover changed: Will be unset when saved."
+
+msgid "Cover changed: Will be deleted when saved."
+msgstr "Cover changed: Will be deleted when saved."
+
+msgid "Cover changed: Will set new when saved."
+msgstr "Cover changed: Will set new when saved."
+
+msgid "Never"
+msgstr "Asla"
+
+msgid "Reset song play statistics"
+msgstr "Şarkı çalma istatistiklerini sıfırla"
+
+msgid "Are you sure you want to reset this song's play statistics?"
+msgstr "Bu şarkının çalma istatistiklerini silmek istediğinize emin misiniz?"
+
+msgid "loading..."
+msgstr "yükleniyor..."
+
+msgid "Not found."
+msgstr "Bulunamadı."
+
+msgid "Could not write metadata to %1"
+msgstr "%1'e üstveri yazılamadı"
+
+msgid "Could not write metadata to %1: %2"
+msgstr "%1'e üstveri yazılamadı: %2"
+
+msgid "ID3v2 version:"
+msgstr "ID3v2 version:"
+
+msgid "2.3"
+msgstr "2.3"
+
+msgid "2.4"
+msgstr "2.4"
+
+msgid "Performer sort"
+msgstr "Yapımcı sıralama"
+
+msgid "Title sort"
+msgstr "Başlık sıra"
+
+msgid "Album artist sort"
+msgstr "Albüm sanatçısı sıra"
+
+msgid "Artist sort"
+msgstr "Sanatçı sıra"
+
+msgid "Album sort"
+msgstr "Albüm sıra"
+
+msgid "Composer sort"
+msgstr "Besteci sıra"
+
+msgid "Equalizer"
+msgstr "Ekolayzır"
+
+msgid "Preset:"
+msgstr "Ön ayar:"
+
+msgid "Save preset"
+msgstr "Önayarı kaydet"
+
+msgid "Delete preset"
+msgstr "Önayarı sil"
+
+msgid "Enable equalizer"
+msgstr "Ekolayzırı etkinleştir"
+
+msgid "Enable stereo balancer"
+msgstr "Stereo dengeleyiciyi etkinleştir"
+
+msgid "Left"
+msgstr "Sol"
+
+msgid "Balance"
+msgstr "Denge"
+
+msgid "Right"
+msgstr "Sağ"
+
+msgid "Custom"
+msgstr "Özel"
+
+msgid "Classical"
+msgstr "Klasik"
+
+msgid "Club"
+msgstr "Kulüp"
+
+msgid "Dance"
+msgstr "Dans"
+
+msgid "Full Bass"
+msgstr "Full Bass"
+
+msgid "Full Treble"
+msgstr "Full Treble"
+
+msgid "Full Bass + Treble"
+msgstr "Full Bass + Treble"
+
+msgid "Laptop/Headphones"
+msgstr "Dizüstü/Kulaklık"
+
+msgid "Large Hall"
+msgstr "Büyük Salon"
+
+msgid "Live"
+msgstr "Canlı"
+
+msgid "Party"
+msgstr "Parti"
+
+msgid "Pop"
+msgstr "Pop"
+
+msgid "Reggae"
+msgstr "Reggae"
+
+msgid "Rock"
+msgstr "Rock"
+
+msgid "Soft"
+msgstr "Yumuşak"
+
+msgid "Ska"
+msgstr "Ska"
+
+msgid "Soft Rock"
+msgstr "Soft Rock"
+
+msgid "Techno"
+msgstr "Tekno"
+
+msgid "Zero"
+msgstr "Sıfır"
+
+msgid "Are you sure you want to delete the \"%1\" preset?"
+msgstr "%1 önayarını silmek istediğinize emin misiniz?"
+
+msgid "You need to restart playback for this setting to take affect."
+msgstr "Bu ayarın etki etmesi için şarkının oynatılmasını yeniden başlatmanız gerekir."
+
+msgid "%1 dB"
+msgstr "%1 dB"
+
+msgid "Strawberry Error"
+msgstr "Strawberry Hatası"
+
+msgid "Large sidebar"
+msgstr "Büyük kenar çubuğu"
+
+msgid "Icons sidebar"
+msgstr "Simge kenar çubuğu"
+
+msgid "Small sidebar"
+msgstr "Küçük kenar çubuğu"
+
+msgid "Plain sidebar"
+msgstr "Düz kenar çubuğu"
+
+msgid "Tabs on top"
+msgstr "Sekmeler üstte"
+
+msgid "Icons on top"
+msgstr "Simgeler üstte"
+
+msgid "Add root directory"
+msgstr "Kök klasör ekle"
+
+msgid "Remove selected root directory"
+msgstr "Seçili kök klasörü kaldır"
+
+msgid "Toggle between list and tree view"
+msgstr "Liste/ağaç görünümüne geç"
+
+msgid "Select folder to add as tree root"
+msgstr "Ağaç kökü olarak eklemek için klasör seç"
+
+msgid "Move to collection..."
+msgstr "Koleksiyona taşı..."
+
+msgid "Files"
+msgstr "Dosyalar"
+
+msgid "Available"
+msgstr "Mevcut"
+
+msgid "New songs"
+msgstr "Yeni şarkılar"
+
+msgid "Exceeded by"
+msgstr "Exceeded by"
+
+msgid "Used"
+msgstr "Kullanılan"
+
+msgid "Could not copy %1 to %2: %3"
+msgstr "Could not copy %1 to %2: %3"
+
+msgid "Writing database failed: %1"
+msgstr "Veri tabanı yazma başarısız: %1"
+
+msgid "Writing database failed."
+msgstr "Veri tabanı yazma başarısız."
+
+msgid "Loading iPod database"
+msgstr "iPod veri tabanı yükleniyor"
+
+msgid "An error occurred loading the iTunes database"
+msgstr "iTunes veri tabanı yüklenirken bir hatayla karşılaşıldı"
+
+msgid "Mount point"
+msgstr "Bağlama noktası"
+
+msgid "URI"
+msgstr "URI"
+
+msgid "Press a key"
+msgstr "Bir tuşa basın"
+
+msgid "Press a key combination to use for %1..."
+msgstr "%1 için kullanmak adına bir tuş kombinasyonuna basın..."
+
+msgid "Play"
+msgstr "Çal"
+
+msgid "Pause"
+msgstr "Duraklat"
+
+msgid "Play/Pause"
+msgstr "Oynat/Duraklat"
+
+msgid "Stop"
+msgstr "Durdur"
+
+msgid "Stop playing after current track"
+msgstr "Geçerli parçadan sonra çalmayı durdur"
+
+msgid "Next track"
+msgstr "Sonraki parça"
+
+msgid "Previous track"
+msgstr "Önceki parça"
+
+msgid "Restart or previous track"
+msgstr "Parçayı yeniden başlat veya önceki parçaya geç"
+
+msgid "Increase volume"
+msgstr "Sesi yükselt"
+
+msgid "Decrease volume"
+msgstr "Sesi kıs"
+
+msgid "Mute"
+msgstr "Sessiz"
+
+msgid "Seek forward"
+msgstr "İleri sar"
+
+msgid "Seek backward"
+msgstr "Geriye sar"
+
+msgid "Show/Hide"
+msgstr "Göster/Gizle"
+
+msgid "Show OSD"
+msgstr "OSD göster"
+
+msgid "Toggle Pretty OSD"
+msgstr "Şirin OSD'yi aç/kapa"
+
+msgid "Change shuffle mode"
+msgstr "Karıştırma modunu değiştir"
+
+msgid "Change repeat mode"
+msgstr "Tekrarlama modunu değiştir"
+
+msgid "Enable/disable scrobbling"
+msgstr "Skroplamayı aç/kapa"
+
+msgid "Love"
+msgstr "Beğen"
+
+msgid "Global Shortcuts"
+msgstr "Genel Kısayollar"
+
+msgid "Open..."
+msgstr "Aç..."
+
+msgid "Use X11 shortcuts when available"
+msgstr "Mümkün oldukça X11 kısayolları kullan"
+
+msgid "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+msgstr "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+
+#. Category label
+msgid "Action"
+msgstr "Action"
+
+msgid "Shortcut"
+msgstr "Kısayol"
+
+msgid "Shortcut for %1"
+msgstr "%1 için kısayol"
+
+msgid "&None"
+msgstr "Yok"
+
+msgid "&Default"
+msgstr "Varsayılan"
+
+msgid "&Custom"
+msgstr "Özel"
+
+msgid "Change shortcut..."
+msgstr "Kısayolu değiştir..."
+
+msgid "Use KGlobalAccel shortcuts when available"
+msgstr "Use KGlobalAccel shortcuts when available"
+
+msgid "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+msgstr "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+
+msgid "Collection advanced grouping"
+msgstr "Collection advanced grouping"
+
+msgid "You can change the way the songs in the collection are organized."
+msgstr "You can change the way the songs in the collection are organized."
+
+msgid "Group Collection by..."
+msgstr "Koleksiyonu sınıflandır..."
+
+msgid "First level"
+msgstr "Birinci seviye"
+
+msgid "Album - Disc"
+msgstr "Albüm - Disk"
+
+msgid "Format"
+msgstr "Biçim"
+
+msgid "Year - Album"
+msgstr "Yıl - Albüm"
+
+msgid "Year - Album - Disc"
+msgstr "Yıl - Albüm - Disk"
+
+msgid "Original year"
+msgstr "Orijinal yıl"
+
+msgid "Original year - Album"
+msgstr "Orijinal yıl - Albüm"
+
+msgid "Second level"
+msgstr "İkinci seviye"
+
+msgid "Third level"
+msgstr "Üçüncü seviye"
+
+msgid "Separate albums by grouping tag"
+msgstr "Albümleri sınıflandırma etiketine göre ayır"
+
+msgid "Original year - Album - Disc"
+msgstr "Original year - Album - Disc"
+
+msgid "Buffering"
+msgstr "Yükleniyor"
+
+msgid "%1 Scrobbler Authentication"
+msgstr "%1 Scrobbler Authentication"
+
+msgid "Open URL in web browser?"
+msgstr "Open URL in web browser?"
+
+msgid "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+msgstr "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+
+msgid "Could not open URL. Please open this URL in your browser"
+msgstr "Could not open URL. Please open this URL in your browser"
+
+msgid "Invalid reply from web browser. Missing token."
+msgstr "Invalid reply from web browser. Missing token."
+
+msgid "Received invalid reply from web browser. Try another browser."
+msgstr "Received invalid reply from web browser. Try another browser."
+
+msgid "Scrobbler %1 is not authenticated!"
+msgstr "Scrobbler %1 is not authenticated!"
+
+msgid "Scrobbler %1 error: %2"
+msgstr "Scrobbler %1 error: %2"
+
+msgid "Least favourite tracks"
+msgstr "En az beğenilen parça"
+
+msgid "Unable to scrobble %1 - %2 because of error: %3"
+msgstr "Unable to scrobble %1 - %2 because of error: %3"
+
+msgid "Missing MusicBrainz recording ID for %1 %2 %3"
+msgstr "Missing MusicBrainz recording ID for %1 %2 %3"
+
+msgid "ListenBrainz error: %1"
+msgstr "ListenBrainz hatası: %1"
+
+msgid "You are not signed in."
+msgstr "Giriş yapmadınız."
+
+msgid "Sign out"
+msgstr "Çıkış yap"
+
+msgid "Signing in..."
+msgstr "Giriş yapılıyor..."
+
+msgid "You are signed in."
+msgstr "Giriş yaptınız."
+
+msgid "You are signed in as %1."
+msgstr "%1 olarak giriş yaptınız."
+
+msgid "Expires on %1"
+msgstr "%1 tarihinde sona eriyor"
+
+msgid "Lyrics providers"
+msgstr "Şarkı sözü sağlayıcıları"
+
+msgid "Choose the providers you want to use when searching for lyrics."
+msgstr "Şarkı sözü aramak için istediğiniz sağlayıcıları seçin."
+
+msgid "Strawberry Music Player"
+msgstr "Strawberry Müzik Çalar"
+
+msgid "&Music"
+msgstr "Müzik"
+
+msgid "P&laylist"
+msgstr "Çalma Listesi"
+
+msgid "Help"
+msgstr "Yardım"
+
+msgid "&Tools"
+msgstr "Araçlar"
+
+msgid "F5"
+msgstr "F5"
+
+msgid "&Play"
+msgstr "Çal"
+
+msgid "F6"
+msgstr "F6"
+
+msgid "&Stop"
+msgstr "&Durdur"
+
+msgid "F7"
+msgstr "F7"
+
+msgid "&Next track"
+msgstr "Sıradaki parça"
+
+msgid "F8"
+msgstr "F8"
+
+msgid "&Quit"
+msgstr "Çık"
+
+msgid "Ctrl+Q"
+msgstr "Kontrol+Q"
+
+msgid "Stop after this track"
+msgstr "Bu parçadan sonra dur"
+
+msgid "Ctrl+Alt+V"
+msgstr "Kontrol+Alt+V"
+
+msgid "&Clear playlist"
+msgstr "Çalma listesini temizle"
+
+msgid "Clear playlist"
+msgstr "Çalma listesini temizle"
+
+msgid "Ctrl+K"
+msgstr "Kontrol+K"
+
+msgid "Ctrl+E"
+msgstr "Kontrol+E"
+
+msgid "Renumber tracks in this order..."
+msgstr "Parçaları bu sırada hatırla..."
+
+msgid "Set value for all selected tracks..."
+msgstr "Seçilen parçalar için değer ata..."
+
+msgid "Edit tag..."
+msgstr "Etiketi düzenle..."
+
+msgid "&Settings..."
+msgstr "Ayarlar..."
+
+msgid "Ctrl+P"
+msgstr "Ctrl+P"
+
+msgid "&About Strawberry"
+msgstr "Strawberry Hakkında"
+
+msgid "F1"
+msgstr "F1"
+
+msgid "S&huffle playlist"
+msgstr "Çalma listesini karıştır"
+
+msgid "&Add file..."
+msgstr "Dosya ekle..."
+
+msgid "Ctrl+Shift+A"
+msgstr "Kontrol+Shift+A"
+
+msgid "&Open file..."
+msgstr "Dosya aç..."
+
+msgid "Open audio &CD..."
+msgstr "Ses CD'si aç..."
+
+msgid "&Cover Manager"
+msgstr "Kapak Yöneticisi"
+
+msgid "C&onsole"
+msgstr "Konsol"
+
+msgid "&Shuffle mode"
+msgstr "Karıştırma modu"
+
+msgid "&Repeat mode"
+msgstr "Tekrarlama modu"
+
+msgid "Remove from playlist"
+msgstr "Çalma listesinden kaldır"
+
+msgid "&Equalizer"
+msgstr "Ekolayzır"
+
+msgid "&Transcode Music"
+msgstr "Müzik Dönüştür"
+
+msgid "Add &folder..."
+msgstr "Dizin ekle..."
+
+msgid "&Jump to the currently playing track"
+msgstr "Şu anda çalan parçaya atla"
+
+msgid "Ctrl+J"
+msgstr "Kontrol+J"
+
+msgid "&New playlist"
+msgstr "Yeni çalma listesi"
+
+msgid "Ctrl+N"
+msgstr "Kontrol+N"
+
+msgid "Save &playlist..."
+msgstr "Çalma listesi kaydet"
+
+msgid "Ctrl+S"
+msgstr "Kontrol+S"
+
+msgid "&Load playlist..."
+msgstr "Çalma listesi yükle..."
+
+msgid "Ctrl+Shift+O"
+msgstr "Kontrol+Shift+O"
+
+msgid "&Save all playlists..."
+msgstr "Tüm çalma listelerini kaydet"
+
+msgid "Go to next playlist tab"
+msgstr "Sonraki çalma listesi sekmesine git"
+
+msgid "Go to previous playlist tab"
+msgstr "Önceki çalma listesi sekmesine git"
+
+msgid "&Update changed collection folders"
+msgstr "Değiştirilmiş koleksiyon dizinlerini güncelle"
+
+msgid "About &Qt"
+msgstr "Qt Hakkında"
+
+msgid "&Mute"
+msgstr "Sessiz"
+
+msgid "Ctrl+M"
+msgstr "Kontrol+M"
+
+msgid "&Do a full collection rescan"
+msgstr "Tüm koleksiyonu yeniden tara"
+
+msgid "Stop collection scan"
+msgstr "Koleksiyon taramasını durdur"
+
+msgid "Complete tags automatically..."
+msgstr "Etiketleri otomatik olarak tamamla..."
+
+msgid "Ctrl+T"
+msgstr "Kontrol+T"
+
+msgid "Toggle scrobbling"
+msgstr "Skroplamayı aç/kapa"
+
+msgid "Remove &duplicates from playlist"
+msgstr "Çalma listesindeki kopyaları kaldır"
+
+msgid "Remove &unavailable tracks from playlist"
+msgstr "Mevcut olmayan parçaları kaldır"
+
+msgid "Add file(s) to transcoder"
+msgstr "Dönüştürücüye dosya(lar) ekleyin"
+
+msgid "Add file to transcoder"
+msgstr "Dönüştürücü dosya ekle"
+
+msgid "Add stream..."
+msgstr "Akış ekle..."
+
+msgid "Show sidebar"
+msgstr "Kenar çubuğunu göster"
+
+msgid "Queue"
+msgstr "Sıra"
+
+msgid "Playlists"
+msgstr "Çalma listeleri"
+
+msgid "Smart playlists"
+msgstr "Akıllı çalma listeleri"
+
+msgid "Radios"
+msgstr "Radyolar"
+
+msgid "Devices"
+msgstr "Cihazlar"
+
+msgid "Subsonic"
+msgstr "Subsonic"
+
+msgid "Tidal"
+msgstr "Tidal"
+
+msgid "Spotify"
+msgstr "Spotify"
+
+msgid "Qobuz"
+msgstr "Qobuz"
+
+msgid "Show all songs"
+msgstr "Tüm şarkıları göster"
+
+msgid "Show only duplicates"
+msgstr "Sadece kopyaları göster"
+
+msgid "Show only untagged"
+msgstr "Sadece etiketlenmemişleri göster"
+
+msgid "Configure collection..."
+msgstr "Koleksiyon ayarları..."
+
+msgid "Toggle queue status"
+msgstr "Toggle queue status"
+
+msgid "Queue selected tracks to play next"
+msgstr "Seçilen parçaları sıradaki yap"
+
+msgid "Toggle skip status"
+msgstr "Toggle skip status"
+
+msgid "Rescan song(s)..."
+msgstr "Şarkıları yeniden tara..."
+
+msgid "Fetch metadata from service"
+msgstr "Fetch metadata from service"
+
+msgid "Copy URL(s)..."
+msgstr "URLleri kopyala..."
+
+msgid "Show in collection..."
+msgstr "Koleksiyonda göster..."
+
+msgid "Check for updates..."
+msgstr "Güncellemeleri kontrol et..."
+
+msgid "Strawberry running under Rosetta"
+msgstr "Strawberry Rosetta'da çalışıyor"
+
+msgid "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+msgstr "Strawberry'yi Rosetta'da çalıştırıyorsun. Strawberry'yi Rosetta'da çalıştırmak desteklenmiyor ve sorunlara yol açtığı biliniyor. Doğru CPU mimarisi için Strawberry'yi şu adresten indirmelisiniz: %1"
+
+msgid "Sponsoring Strawberry"
+msgstr "Sponsoring Strawberry"
+
+msgid "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+msgstr "Strawberry ücretsiz ve açık kaynaklı bir yazılımdır. Strawberry'yi beğendiyseniz projeye sponsor olabilirsiniz. Sponsorluk hakkında daha fazla bilgi için web sitemizi ziyaret edin %1"
+
+msgid "Dequeue track"
+msgstr "Parçayı sıradan çıkar"
+
+msgid "Dequeue selected tracks"
+msgstr "Seçili parçaları sıradan çıkar"
+
+msgid "Queue selected tracks"
+msgstr "Seçili parçaları sıraya al"
+
+msgid "Unskip track"
+msgstr "Parçayı atlama"
+
+msgid "Unskip selected tracks"
+msgstr "Seçili parçaları atlama"
+
+msgid "Skip track"
+msgstr "Parçayı atla"
+
+msgid "Skip selected tracks"
+msgstr "Seçili parçaları atla"
+
+msgid "Set %1 to \"%2\"..."
+msgstr "%1'i %2'ye ayarla"
+
+msgid "Edit tag \"%1\"..."
+msgstr "\"%1\" etiketini düzenle..."
+
+msgid "Add to another playlist"
+msgstr "Başka çalma listesine ekle"
+
+msgid "New playlist"
+msgstr "Yeni çalma listesi"
+
+msgid "Add file"
+msgstr "Dosya ekle"
+
+msgid "Music"
+msgstr "Müzik"
+
+msgid "Add folder"
+msgstr "Klasör ekle"
+
+msgid "Playlist has %1 songs, too large to undo, are you sure you want to clear the playlist?"
+msgstr "Çalma listesinde, geri alınamayacak kadar fazla %1 şarkı var. Çalma listesini temizlemek istediğinizden emin misiniz?"
+
+msgid "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:"
+msgstr "Güncellediğiniz Strawberry sürümü, aşağıda listelenen yeni özellikler nedeniyle koleksiyonun yeniden taranmasını gerektiriyor:"
+
+msgid "Would you like to run a full rescan right now?"
+msgstr "Tam yeniden taramayı şimdi yapmak ister misiniz?"
+
+msgid "Collection rescan notice"
+msgstr "Koleksiyon yeniden tarama bildirimi"
+
+msgid "Ctrl+Shift+H"
+msgstr "Ctrl+Shift+H"
+
+msgid "Go to last playlist tab"
+msgstr "Go to last playlist tab"
+
+msgid "Go to active playlist tab"
+msgstr "Go to active playlist tab"
+
+msgid "Close current playlist tab"
+msgstr "Close current playlist tab"
+
+msgid "Message Dialog"
+msgstr "Message Dialog"
+
+msgid "Do not show this message again."
+msgstr "Bu mesajı bir daha gösterme."
+
+msgid "Playlist"
+msgstr "Çalma listesi"
+
+msgid "Moodbar"
+msgstr "Moodbar"
+
+msgid "Moodbar style"
+msgstr "Moodbar tarzı"
+
+msgid "Save the .mood files directly in the songs folders"
+msgstr "Şarkı klasörüne .mood dosyaları kaydet"
+
+msgid "Invalid MTP device: %1"
+msgstr "Invalid MTP device: %1"
+
+msgid "Could not open MTP device."
+msgstr "Could not open MTP device."
+
+msgid "MTP error: %1"
+msgstr "MTP error: %1"
+
+msgid "MTP device not found."
+msgstr "MTP device not found."
+
+msgid "Loading MTP device"
+msgstr "Loading MTP device"
+
+msgid "Error connecting MTP device %1"
+msgstr "Error connecting MTP device %1"
+
+msgid "Error connecting MTP device %1: %2"
+msgstr "Error connecting MTP device %1: %2"
+
+msgid "Network Proxy"
+msgstr "Ağ Vekili"
+
+msgid "&Use the system proxy settings"
+msgstr "Sistem vekil ayarlarını kullan"
+
+msgid "Direct internet connection"
+msgstr "Doğrudan internet bağlantısı"
+
+msgid "&Manual proxy configuration"
+msgstr "&Manual proxy configuration"
+
+msgid "HTTP proxy"
+msgstr "HTTP vekili"
+
+msgid "SOCKS proxy"
+msgstr "SOCKS proxy"
+
+msgid "Port"
+msgstr "Port"
+
+msgid "Use authentication"
+msgstr "Kimlik doğrulaması kullan"
+
+msgid "Username"
+msgstr "Kullanıcı adı"
+
+msgid "Password"
+msgstr "Parola"
+
+msgid "Use proxy settings for streaming"
+msgstr "Use proxy settings for streaming"
+
+msgid "Only HTTP proxy is supported for streaming."
+msgstr "Only HTTP proxy is supported for streaming."
+
+msgid "Notifications"
+msgstr "Bildirimler"
+
+msgid "Strawberry can show a message when the track changes."
+msgstr "Parça değiştiğinde Strawberry bir ileti gösterebilir."
+
+msgid "Notification type"
+msgstr "Bildirim türü"
+
+#. Refers to a disabled notification type in Notification settings.
+msgid "Disabled"
+msgstr "Devre dışı"
+
+msgid "Show a &native desktop notification"
+msgstr "Yerel bir masaüstü bildirimi göster"
+
+msgid "Show a pretty OSD"
+msgstr "Şirin bir OSD göster"
+
+msgid "Show a popup fro&m the system tray"
+msgstr "Sistem tepsisinde bir açılır pencere göster"
+
+msgid "General settings"
+msgstr "Genel ayarlar"
+
+msgid "Popup duration"
+msgstr "Açılır pencere süresi"
+
+msgid " seconds"
+msgstr " saniye"
+
+msgid "Disable duration"
+msgstr "Süreyi devre dışı bırak"
+
+msgid "Show a notification when I change the volume"
+msgstr "Ses seviyesini değiştirdiğimde bir bildirim göster"
+
+msgid "Show a notification when I change the repeat/shuffle mode"
+msgstr "Yinele/karıştır modunu değiştirdiğimde bir bildirim göster"
+
+msgid "Show a notification when I pause playback"
+msgstr "Çalmayı durdurduğumda bir bildirim göster"
+
+msgid "Show a notification when I resume playback"
+msgstr "Çalmayı devam ettirdiğimde bir bildirim göster"
+
+msgid "Include album art in the notification"
+msgstr "Bildirime albüm kapağını dahil et"
+
+msgid "Custom message settings"
+msgstr "Özel mesaj ayarları"
+
+msgid "Use a custom message for notifications"
+msgstr "Bildirimler için özel bir mesaj kullan"
+
+msgid "Body"
+msgstr "Body"
+
+msgid "Pretty OSD options"
+msgstr "Şirin OSD seçenekleri"
+
+msgid "Background color"
+msgstr "Arka plan rengi"
+
+msgid "Text options"
+msgstr "Yazı seçenekleri"
+
+msgid "Choose font..."
+msgstr "Yazı tipi seçin..."
+
+msgid "Choose color..."
+msgstr "Renk seçin..."
+
+msgid "Background opacity"
+msgstr "Arka plan saydamlığı"
+
+msgid "Basic Blue"
+msgstr "Basic Blue"
+
+msgid "Strawberry Red"
+msgstr "Çilek kırmızısı"
+
+msgid "Custom..."
+msgstr "Özel..."
+
+msgid "Enable fading"
+msgstr "Çapraz geçişi etkinleştir"
+
+msgid "%originalyear%"
+msgstr "%originalyear%"
+
+msgid "OSD Preview"
+msgstr "OSD ön izleme"
+
+msgid "Drag to reposition"
+msgstr "Drag to reposition"
+
+msgid "Discord"
+msgstr "Discord"
+
+msgid "Enable Rich Presence"
+msgstr "Enable Rich Presence"
+
+msgid "\"Listening to...\""
+msgstr "\"Listening to...\""
+
+msgid "Strawberry"
+msgstr "Strawberry"
+
+msgid "Artist name"
+msgstr "Artist name"
+
+msgid "Song title"
+msgstr "Song title"
+
+msgid "Please open this URL in your browser"
+msgstr "Please open this URL in your browser"
+
+msgid "Received invalid reply from web browser."
+msgstr "Received invalid reply from web browser."
+
+msgid "Redirect URL is missing query."
+msgstr "Redirect URL is missing query."
+
+msgid "Request URL is missing code!"
+msgstr "Request URL is missing code!"
+
+msgid "Request URL is missing state!"
+msgstr "Request URL is missing state!"
+
+msgid "Request URL has wrong state %1 != %2"
+msgstr "Request URL has wrong state %1 != %2"
+
+msgid "disc %1"
+msgstr "disk %1"
+
+msgid "track %1"
+msgstr "parça %1"
+
+msgid "Paused"
+msgstr "Duraklatıldı"
+
+msgid "Stopped"
+msgstr "Durduruldu"
+
+msgid "Stop playing after track: %1"
+msgstr "Parçadan sonra çalmayı durdur: %1"
+
+msgid "On"
+msgstr "Açık"
+
+msgid "Off"
+msgstr "Kapalı"
+
+msgid "Playlist finished"
+msgstr "Çalma listesinin sonu"
+
+msgid "Volume %1%"
+msgstr "Ses %1%"
+
+msgid "Don't shuffle"
+msgstr "Karıştırma"
+
+msgid "Shuffle all"
+msgstr "Hepsini karıştır"
+
+msgid "Shuffle tracks in this album"
+msgstr "Bu albümdeki tüm parçaları karıştır"
+
+msgid "Shuffle albums"
+msgstr "Albümleri karıştır"
+
+msgid "Shuffle grouping"
+msgstr "Gruplama karıştır"
+
+msgid "Don't repeat"
+msgstr "Tekrarlama"
+
+msgid "Repeat track"
+msgstr "Parçayı tekrarla"
+
+msgid "Repeat album"
+msgstr "Albümü tekrarla"
+
+msgid "Repeat playlist"
+msgstr "Çalma listesini yinele"
+
+msgid "Stop after every track"
+msgstr "Her parçadan sonra dur"
+
+msgid "Intro tracks"
+msgstr "Intro tracks"
+
+msgid "Organizing files"
+msgstr "Dosyalar düzenleniyor"
+
+msgid "Organize Files"
+msgstr "Dosyaları Düzenle"
+
+msgid "Destination"
+msgstr "Destination"
+
+msgid "After copying..."
+msgstr "Kopyaladıktan sonra..."
+
+msgid "Keep the original files"
+msgstr "Orijinal dosyaları tut"
+
+msgid "Delete the original files"
+msgstr "Orijinal dosyaları sil"
+
+msgid "Naming options"
+msgstr "Naming options"
+
+msgid "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+msgstr "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+
+msgid "Insert..."
+msgstr "Tak..."
+
+msgid "Remove problematic characters from filenames"
+msgstr "Remove problematic characters from filenames"
+
+msgid "Restrict to characters allowed on FAT filesystems"
+msgstr "Restrict to characters allowed on FAT filesystems"
+
+msgid "Restrict characters to ASCII"
+msgstr "Restrict characters to ASCII"
+
+msgid "Allow extended ASCII characters"
+msgstr "Allow extended ASCII characters"
+
+msgid "Replace spaces with underscores"
+msgstr "Boşlukların yerine alt çizgi koy"
+
+msgid "Overwrite existing files"
+msgstr "Var olan dosyaların üstüne yaz"
+
+msgid "Copy album cover artwork"
+msgstr "Copy album cover artwork"
+
+msgid "Safely remove the device after copying"
+msgstr "Safely remove the device after copying"
+
+msgid "Artist's initial"
+msgstr "Artist's initial"
+
+msgid "File extension"
+msgstr "Dosya uzantısı"
+
+msgid "Error copying songs"
+msgstr "Error copying songs"
+
+msgid "There were problems copying some songs.  The following files could not be copied:"
+msgstr "There were problems copying some songs.  The following files could not be copied:"
+
+msgid "Error deleting songs"
+msgstr "Şarkı silme hatası"
+
+msgid "There were problems deleting some songs.  The following files could not be deleted:"
+msgstr "There were problems deleting some songs.  The following files could not be deleted:"
+
+msgid "Don't know how to handle %1"
+msgstr "Don't know how to handle %1"
+
+msgid "File %1 does not exist"
+msgstr "File %1 does not exist"
+
+msgid "Could not read file %1: %2"
+msgstr "Could not read file %1: %2"
+
+msgid "Small album cover"
+msgstr "Küçük albüm kapağı"
+
+msgid "Large album cover"
+msgstr "Büyük albüm kapağı"
+
+msgid "Fit cover to width"
+msgstr "Fit cover to width"
+
+msgid "Show above status bar"
+msgstr "Show above status bar"
+
+msgid "Title Sort"
+msgstr "Başlık Sıralama"
+
+msgid "Artist Sort"
+msgstr "Sanatçı Sıralama"
+
+msgid "Album Sort"
+msgstr "Albüm Sıralama"
+
+msgid "Original Year"
+msgstr "Orijinal Yıl"
+
+msgid "Album Artist"
+msgstr "Albüm Sanatçısı"
+
+msgid "Album Artist Sort"
+msgstr "Albüm Sanatçısı Sıralama"
+
+msgid "Composer Sort"
+msgstr "Besteci Sıralama"
+
+msgid "Performer Sort"
+msgstr "Yapımcı Sıralama"
+
+msgid "Play Count"
+msgstr "Çalma Sayısı"
+
+msgid "Skip Count"
+msgstr "Atlama Sayısı"
+
+msgid "Last Played"
+msgstr "Son Çalma"
+
+msgid "Sample Rate"
+msgstr "Örnekleme Sıklığı"
+
+msgid "Bit Depth"
+msgstr "Bit Derinliği"
+
+msgid "Initial key"
+msgstr "Initial key"
+
+msgid "File Name (without path)"
+msgstr "Dosya Adı (dosya yolu olmadan)"
+
+msgid "File Size"
+msgstr "Dosya Boyutu"
+
+msgid "File Type"
+msgstr "Dosya Türü"
+
+msgid "Date Modified"
+msgstr "Düzenlendiği Tarih"
+
+msgid "Date Created"
+msgstr "Oluşturulduğu Tarih"
+
+msgid "Source"
+msgstr "Kaynak"
+
+msgid "BPM"
+msgstr "BPM"
+
+msgid "Mood"
+msgstr "Ruh Hali"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "CUE"
+msgstr "CUE"
+
+msgid "Integrated Loudness"
+msgstr "Entegre Edilmiş Ses Yüksekliği"
+
+msgid "Loudness Range"
+msgstr "Ses Yüksekliği Aralığı"
+
+msgid "Undo"
+msgstr "Geri Al"
+
+msgid "Redo"
+msgstr "Yinele"
+
+msgid "Load playlist"
+msgstr "Çalma listesini yükle"
+
+msgid "No matches found.  Clear the search box to show the whole playlist again."
+msgstr "Eşleşme bulunamadı. Çalma listesinin tamamını görüntülemek için arama kutusunu temizleyin."
+
+msgid "stop"
+msgstr "durdur"
+
+msgid "Loading smart playlist"
+msgstr "Akıllı çalma listeleri yükleniyor"
+
+msgid "&Hide..."
+msgstr "&Sakla..."
+
+msgid "&Stretch columns to fit window"
+msgstr "&Pencereyi sığdırmak için sütunları uzat"
+
+msgid "&Reset columns to default"
+msgstr "&Sütunları varsayılana sıfırla"
+
+msgid "&Lock rating"
+msgstr "&Derecelendirmeyi kilitle"
+
+msgid "&Align text"
+msgstr "&Metni hizala"
+
+msgid "&Left"
+msgstr "&Sol"
+
+msgid "&Center"
+msgstr "&Orta"
+
+msgid "&Right"
+msgstr "&Sağ"
+
+msgid "&Hide %1"
+msgstr "&%1 ögesini sakla"
+
+msgid "New folder"
+msgstr "Yeni klasör"
+
+msgid "Delete"
+msgstr "Sil"
+
+#. Save playlist menu action.
+msgid "Save playlist"
+msgstr "Çalma listesini kaydet"
+
+msgid "Enter the name of the folder"
+msgstr "Klasör adını giriniz"
+
+msgid "Copy songs to playlist"
+msgstr "Şarkıları çalma listesine kopyala"
+
+msgid "Copy to device"
+msgstr "Cihaza kopyala"
+
+msgid "Playlist must be open first."
+msgstr "Önce çalma listesinin açık olması gerekir."
+
+msgid "Remove playlists"
+msgstr "Çalma listelerini kaldır"
+
+msgid "You are about to remove %1 playlists from your favorites, are you sure?"
+msgstr "%1 çalma listesini favorilerinizden kaldırmak üzeresiniz, emin misiniz?"
+
+msgid "You can favorite playlists by clicking the star icon next to a playlist name"
+msgstr "Çalma listesinin adının yanındaki yıldız simgesine basarak çalma listelerini favorilerinize ekleyebilirsiniz"
+
+msgid "Favorited playlists will be saved here"
+msgstr "Favorilere eklenen çalma listeleri buraya kaydedilecek"
+
+msgid "Couldn't create playlist"
+msgstr "Çalma listesi oluşturulamadı"
+
+msgid "Unknown playlist extension"
+msgstr "Bilinmeyen çalma listesi uzantısı"
+
+msgid "Unknown file extension for playlist."
+msgstr "Çalma listesi için bilinmeyen dosya uzantısı"
+
+msgid "%1 selected of"
+msgstr "%1 seçildi"
+
+msgid "%n track(s)"
+msgid_plural "%n track(s)"
+msgstr[0] "%n parça"
+msgstr[1] "%n parça"
+
+msgid "All playlists (%1)"
+msgstr "Tüm çalma listeleri (%1)"
+
+msgid "%1 playlists (%2)"
+msgstr "%1 çalma listesi (%2)"
+
+msgid "Unknown filetype: %1"
+msgstr "Bilinmeyen dosya türü: %1"
+
+msgid "Could not open file %1"
+msgstr "%1 dosyası açılamadı"
+
+msgid "Directory %1 does not exist."
+msgstr "%1 dizini mevcut değil."
+
+msgid "Failed to open %1 for writing."
+msgstr "%1 yazmak için açılamadı."
+
+msgid "Playlist options"
+msgstr "Çalma listesi seçenekleri"
+
+msgid "File paths"
+msgstr "Dosya yolu"
+
+msgid "This can be changed later through the preferences"
+msgstr "Bu sonradan tercihler sekmesinden değiştirilebilir"
+
+msgid "Remember my choice"
+msgstr "Seçimimi hatırla"
+
+msgid "Automatic"
+msgstr "Otomatik"
+
+msgid "Relative"
+msgstr "Göreceli"
+
+msgid "Absolute"
+msgstr "Mutlak"
+
+msgid "Repeat"
+msgstr "Yinele"
+
+msgid "Shuffle"
+msgstr "Karıştır"
+
+msgid "Stop after each track"
+msgstr "Bu parçadan sonra durdur"
+
+msgid "Use alternating row colors"
+msgstr "Use alternating row colors"
+
+msgid "Show bars on the currently playing track"
+msgstr "Show bars on the currently playing track"
+
+msgid "Show a glowing animation on the currently playing track"
+msgstr "Show a glowing animation on the currently playing track"
+
+msgid "Warn me when closing a playlist tab"
+msgstr "Çalma listesi sekmesini kapatırken beni uyar"
+
+msgid "Continue to the next item in the playlist if a song is unavailable"
+msgstr "Continue to the next item in the playlist if a song is unavailable"
+
+msgid "Grey out unavailable songs in playlists on playback"
+msgstr "Grey out unavailable songs in playlists on playback"
+
+msgid "Grey out unavailable songs in playlists on startup"
+msgstr "Grey out unavailable songs in playlists on startup"
+
+msgid "Automatically select current playing track"
+msgstr "Automatically select current playing track"
+
+msgid "Enable playlist toolbar"
+msgstr "Enable playlist toolbar"
+
+msgid "Enable playlist clear button"
+msgstr "Çalma listesini temizleme seçeneğini etkinleştir"
+
+msgid "Automatically sort playlist when inserting songs"
+msgstr "Automatically sort playlist when inserting songs"
+
+msgid "When saving a playlist, file paths should be"
+msgstr "Bir çalma listesini kaydedirken, dosya yolu şöyle olmalı"
+
+msgid "A&utomatic"
+msgstr "Otomatik"
+
+msgid "Absolu&te"
+msgstr "Absolu&te"
+
+msgid "Re&lative"
+msgstr "Re&lative"
+
+msgid "As&k when saving"
+msgstr "Kaydederken sor"
+
+msgid "Metadata"
+msgstr "Üstveri"
+
+msgid "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+msgstr "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+
+msgid "Enable song metadata inline edition with click"
+msgstr "Enable song metadata inline edition with click"
+
+msgid "Write metadata when saving playlists"
+msgstr "Write metadata when saving playlists"
+
+msgid "Star playlist"
+msgstr "Çalma listesini yıldızla"
+
+msgid "Close playlist"
+msgstr "Çalma listesini kapat"
+
+msgid "Rename playlist..."
+msgstr "Çalma listesini yeniden adlandır..."
+
+msgid "Save playlist..."
+msgstr "Çalma listesini kaydet..."
+
+msgid "Rename playlist"
+msgstr "Çalma listesini yeniden adlandır"
+
+msgid "Enter a new name for this playlist"
+msgstr "Çalma listesi için yeni bir ad gir"
+
+msgid "Remove playlist"
+msgstr "Çalma listesini kaldır"
+
+msgid "You are about to remove a playlist which is not part of your favorite playlists: the playlist will be deleted (this action cannot be undone). \nAre you sure you want to continue?"
+msgstr "Favori çalma listelerinizin bir parçası olmayan bir çalma listesini kaldırmak üzeresiniz: çalma listesi silinecektir (bu işlem geri alınamaz).\nDevam etmek istediğinizden emin misiniz?"
+
+msgid "This option can be changed in the \"Behavior\" preferences"
+msgstr "This option can be changed in the \"Behavior\" preferences"
+
+msgid "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+msgstr "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+
+msgid "Hz"
+msgstr "Hz"
+
+msgid "Bit"
+msgstr "Bit"
+
+msgid "Usage"
+msgstr "Kullanım"
+
+msgid "options"
+msgstr "seçenekler"
+
+msgid "URL(s)"
+msgstr "URL'ler"
+
+msgid "Player options"
+msgstr "Oynatıcı seçenekleri"
+
+msgid "Start the playlist currently playing"
+msgstr "Devam eden çalma listesini başlat"
+
+msgid "Play if stopped, pause if playing"
+msgstr "Durmuşsa çal, çalıyorsa durdur"
+
+msgid "Pause playback"
+msgstr "Yeniden çalmayı duraklat"
+
+msgid "Stop playback"
+msgstr "Yeniden çalmayı durdur"
+
+msgid "Stop playback after current track"
+msgstr "Yeniden çalmayı devam eden parçadan sonra durdur"
+
+msgid "Skip backwards in playlist"
+msgstr "Çalma listesinde geriye doğru atla"
+
+msgid "Skip forwards in playlist"
+msgstr "Çalma listesinde ileriye doğru atla"
+
+msgid "Set the volume to <value> percent"
+msgstr "Ses seviyesini <value>'ye ayarla"
+
+msgid "Increase the volume by 4 percent"
+msgstr "Ses seviyesini yüzde 4 arttır"
+
+msgid "Decrease the volume by 4 percent"
+msgstr "Ses seviyesini yüzde 4 azalt"
+
+msgid "Increase the volume by <value> percent"
+msgstr "Ses seviyesini yüzde <value> arttır"
+
+msgid "Decrease the volume by <value> percent"
+msgstr "Ses seviyesini yüzde <value> azalt"
+
+msgid "Seek the currently playing track to an absolute position"
+msgstr "Seek the currently playing track to an absolute position"
+
+msgid "Seek the currently playing track by a relative amount"
+msgstr "Seek the currently playing track by a relative amount"
+
+msgid "Restart the track, or play the previous track if within 8 seconds of start."
+msgstr "Restart the track, or play the previous track if within 8 seconds of start."
+
+msgid "Create a new playlist with files"
+msgstr "Dosyalarla yeni bir çalma listesi oluştur"
+
+msgid "Append files/URLs to the playlist"
+msgstr "Çalma listesine dosya/URL'ler ekle"
+
+msgid "Loads files/URLs, replacing current playlist"
+msgstr "Loads files/URLs, replacing current playlist"
+
+msgid "Play the <n>th track in the playlist"
+msgstr "Çalma listesindeki <n>. parçayı çal"
+
+msgid "Play given playlist"
+msgstr "Verilen çalma listesini çal"
+
+msgid "Other options"
+msgstr "Diğer seçenekler"
+
+msgid "Display the on-screen-display"
+msgstr "Ekran üstü görüntüyü görüntüle"
+
+msgid "Toggle visibility for the pretty on-screen-display"
+msgstr "Ekran üstü güzel görünüm için görünürlüğü değiştir"
+
+msgid "Change the language"
+msgstr "Dili değiştir"
+
+msgid "Resize the window"
+msgstr "Ekranı yeniden boyutlandır"
+
+msgid "Equivalent to --log-levels *:1"
+msgstr "-log-levels *:1'e eşit"
+
+msgid "Equivalent to --log-levels *:3"
+msgstr "-log-levels *:3'e eşit"
+
+msgid "Comma separated list of class:level, level is 0-3"
+msgstr "Comma separated list of class:level, level is 0-3"
+
+msgid "Print out version information"
+msgstr "Sürüm bilgisini yazdır"
+
+msgid "Create fingerprint"
+msgstr "Create fingerprint"
+
+msgid "Failed to create directory %1."
+msgstr "Klasör oluşturulamadı: %1."
+
+msgid "Destination file %1 exists, but not allowed to overwrite."
+msgstr "%1 hedef dosyası mevcut, ancak üzerine yazılmasına izin verilmiyor"
+
+msgid "Destination file %1 exists, but not allowed to overwrite"
+msgstr "%1 hedef dosyası mevcut, ancak üzerine yazılmasına izin verilmiyor"
+
+msgid "Could not copy file %1 to %2."
+msgstr "Could not copy file %1 to %2."
+
+msgid "LUFS"
+msgstr "LUFS"
+
+msgid "LU"
+msgstr "LU"
+
+msgid "1 day"
+msgstr "1 gün"
+
+msgid "%1 days"
+msgstr "%1 gün"
+
+msgid "Today"
+msgstr "Bugün"
+
+msgid "Yesterday"
+msgstr "Dün"
+
+msgid "%1 days ago"
+msgstr "%1 gün önce"
+
+msgid "Tomorrow"
+msgstr "Yarın"
+
+msgid "In %1 days"
+msgstr "%1 gün içinde"
+
+msgid "Next week"
+msgstr "Gelecek hafta"
+
+msgid "In %1 weeks"
+msgstr "%1 hafta içinde"
+
+msgid "Show in file browser"
+msgstr "Dosya tarayıcısında göster"
+
+msgid "Too many songs selected."
+msgstr "Çok fazla şarkı seçildi."
+
+msgid "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+msgstr "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+
+msgid "Failed to load image from data for %1"
+msgstr "%1 için veriden görüntü yüklenemedi"
+
+msgid "Success"
+msgstr "Başarılı"
+
+msgid "File is unsupported"
+msgstr "Dosya desteklenmiyor"
+
+msgid "Filename is missing"
+msgstr "Dosya adı eksik"
+
+msgid "File does not exist"
+msgstr "Dosya mevcut değil"
+
+msgid "File could not be opened"
+msgstr "Dosya açılamadı"
+
+msgid "Could not parse file"
+msgstr "Could not parse file"
+
+msgid "Could not save file"
+msgstr "Could not save file"
+
+msgid "Unknown error"
+msgstr "Bilinmeyen hata"
+
+msgid "Prefix a search term with a field name to limit the search to that field, e.g.:"
+msgstr "Prefix a search term with a field name to limit the search to that field, e.g.:"
+
+msgid "artist"
+msgstr "sanatçı"
+
+msgid "searches for all artists containing the word %1."
+msgstr "searches for all artists containing the word %1."
+
+msgid "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+msgstr "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+
+msgid "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+msgstr "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+
+msgid "rating"
+msgstr "derecelendirme"
+
+msgid "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+msgstr "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+
+msgid "Available fields"
+msgstr "Kullanılabilir alanlar"
+
+msgid "after"
+msgstr "sonra"
+
+msgid "before"
+msgstr "önce"
+
+msgid "on"
+msgstr "on"
+
+msgid "not on"
+msgstr "not on"
+
+msgid "in the last"
+msgstr "sondaki"
+
+msgid "not in the last"
+msgstr "sondaki değil"
+
+msgid "between"
+msgstr "arasında"
+
+msgid "contains"
+msgstr "içeren"
+
+msgid "does not contain"
+msgstr "içermiyor"
+
+msgid "starts with"
+msgstr "ile başlar"
+
+msgid "ends with"
+msgstr "ile biter"
+
+msgid "greater than"
+msgstr "büyüktür"
+
+msgid "less than"
+msgstr "küçüktür"
+
+msgid "equals"
+msgstr "eşittir"
+
+msgid "not equals"
+msgstr "eşit değildir"
+
+msgid "empty"
+msgstr "boş"
+
+msgid "not empty"
+msgstr "boş değil"
+
+msgid "A-Z"
+msgstr "A-Z"
+
+msgid "Z-A"
+msgstr "Z-A"
+
+msgid "oldest first"
+msgstr "ilk önce en eski"
+
+msgid "newest first"
+msgstr "ilk önce en yeni"
+
+msgid "shortest first"
+msgstr "ilk önce en kısa"
+
+msgid "longest first"
+msgstr "ilk önce en uzun"
+
+msgid "smallest first"
+msgstr "ilk önce en küçük"
+
+msgid "biggest first"
+msgstr "ilk önce en büyük"
+
+msgid "Hours"
+msgstr "Saat"
+
+msgid "Days"
+msgstr "Gün"
+
+msgid "Weeks"
+msgstr "Hafta"
+
+msgid "Months"
+msgstr "Ay"
+
+msgid "Years"
+msgstr "Yıl"
+
+msgid "Normal"
+msgstr "Normal"
+
+msgid "Angry"
+msgstr "Sinirli"
+
+msgid "Frozen"
+msgstr "Donuk"
+
+msgid "Happy"
+msgstr "Mutlu"
+
+msgid "System colors"
+msgstr "Sistem renkleri"
+
+msgid "add %n songs"
+msgid_plural "add %n songs"
+msgstr[0] "%n şarkı ekle"
+msgstr[1] "%n şarkı ekle"
+
+msgid "remove %n songs"
+msgid_plural "remove %n songs"
+msgstr[0] "%n şarkı kaldır"
+msgstr[1] "%n şarkı kaldır"
+
+msgid "move %n songs"
+msgid_plural "move %n songs"
+msgstr[0] "%n şarkı taşı"
+msgstr[1] "%n şarkı taşı"
+
+msgid "sort songs"
+msgstr "şarkıları sırala"
+
+msgid "shuffle songs"
+msgstr "şarkıları karıştır"
+
+msgid "Invalid collection directory"
+msgstr "Geçersiz koleksiyon dizini"
+
+msgid "Can't add directory %1 with special filesystem %2 to collection"
+msgstr "Can't add directory %1 with special filesystem %2 to collection"
+
+msgid "Clear"
+msgstr "Temizle"
+
+msgid "Reset"
+msgstr "Sıfırla"
+
+msgid "Not authenticated"
+msgstr "Not authenticated"
+
+msgid "No track ID"
+msgstr "No track ID"
+
+msgid "Receiving artists..."
+msgstr "Sanatçılar alınıyor..."
+
+msgid "Receiving albums..."
+msgstr "Albümler alınıyor..."
+
+msgid "Receiving songs..."
+msgstr "Şarkılar alınıyor..."
+
+msgid "Searching..."
+msgstr "Aranıyor..."
+
+msgid "Receiving albums for %1 artist..."
+msgstr "%1 için albümler alınıyor..."
+
+msgid "Receiving albums for %1 artists..."
+msgstr "%1 için albümler alınıyor..."
+
+msgid "Receiving songs for %1 album..."
+msgstr "%1 için şarkılar alınıyor..."
+
+msgid "Receiving songs for %1 albums..."
+msgstr "%1 için şarkılar alınıyor..."
+
+msgid "Receiving album cover for %1 album..."
+msgstr "%1 için albüm kapağı alınıyor..."
+
+msgid "Receiving album covers for %1 albums..."
+msgstr "%1 için albüm kapağı alınıyor..."
+
+msgid "No match."
+msgstr "Eşleşme yok."
+
+msgid "Missing Qobuz app ID."
+msgstr "Qobuz uygulama kimliği eksik."
+
+msgid "Missing app ID. Please fetch credentials first."
+msgstr "Missing app ID. Please fetch credentials first."
+
+msgid "Missing app secret. Please fetch credentials first."
+msgstr "Missing app secret. Please fetch credentials first."
+
+msgid "Missing private key. Please fetch credentials first."
+msgstr "Missing private key. Please fetch credentials first."
+
+msgid "Failed to start local server for OAuth redirect: %1"
+msgstr "Failed to start local server for OAuth redirect: %1"
+
+msgid "Failed to open the web browser. Please open this URL manually: %1"
+msgstr "Failed to open the web browser. Please open this URL manually: %1"
+
+msgid "Waiting for browser authentication..."
+msgstr "Waiting for browser authentication..."
+
+msgid "OAuth redirect failed: %1"
+msgstr "OAuth redirect failed: %1"
+
+msgid "OAuth redirect is missing authorization code."
+msgstr "OAuth redirect is missing authorization code."
+
+msgid "Exchanging authorization code..."
+msgstr "Exchanging authorization code..."
+
+msgid "Not authenticated with Qobuz."
+msgstr "Qobuz ile doğrulanmadı."
+
+msgid "Missing Qobuz app ID or secret."
+msgstr "Missing Qobuz app ID or secret."
+
+msgid "Not authenticated. Please login to Qobuz in the settings."
+msgstr "Not authenticated. Please login to Qobuz in the settings."
+
+msgid "Enable"
+msgstr "Etkinleştir"
+
+msgid "App ID"
+msgstr "Uygulama kimliği"
+
+msgid "App Secret"
+msgstr "App Secret"
+
+msgid "Preferences"
+msgstr "Tercihler"
+
+msgid "Audio format"
+msgstr "Audio format"
+
+msgid "Search delay"
+msgstr "Search delay"
+
+msgid "ms"
+msgstr "ms"
+
+msgid "Artists search limit"
+msgstr "Sanatçı arama sınırı"
+
+msgid "Albums search limit"
+msgstr "Albüm arama sınırı"
+
+msgid "Songs search limit"
+msgstr "Şarkı arama sınırı"
+
+msgid "Download album covers"
+msgstr "Albüm kapaklarını indir"
+
+msgid "Configuration incomplete"
+msgstr "Configuration incomplete"
+
+msgid "Missing app id. Please fetch credentials first."
+msgstr "Missing app id. Please fetch credentials first."
+
+msgid "Fetching..."
+msgstr "Fetching..."
+
+msgid "Credentials fetched"
+msgstr "Credentials fetched"
+
+msgid "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+msgstr "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+
+msgid "Credential fetch failed"
+msgstr "Credential fetch failed"
+
+msgid "Fetch Credentials"
+msgstr "Fetch Credentials"
+
+msgid "Remove (Remastered), etc from song titles"
+msgstr "Remove (Remastered), etc from song titles"
+
+msgid "Private key"
+msgstr "Private key"
+
+msgid "Automatically fetch app ID, app secret and private key from Qobuz web player"
+msgstr "Automatically fetch app ID, app secret and private key from Qobuz web player"
+
+msgid "Not authenticated. Please log in on the Qobuz settings page."
+msgstr "Not authenticated. Please log in on the Qobuz settings page."
+
+msgid "Cancelled."
+msgstr "İptal edildi."
+
+msgid "QueueView"
+msgstr "QueueView"
+
+msgid "Ctrl+Up"
+msgstr "Kontrol+Yukarı"
+
+msgid "Ctrl+Down"
+msgstr "Kontrol+Aşağı"
+
+msgid "Remove"
+msgstr "Kaldır"
+
+msgid "Country"
+msgstr "Country"
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "Load more..."
+msgstr "Load more..."
+
+msgid "Search for radio stations using radio-browser.info"
+msgstr "Search for radio stations using radio-browser.info"
+
+msgid "Search radio stations..."
+msgstr "Search radio stations..."
+
+msgid "All countries"
+msgstr "All countries"
+
+msgid "By votes"
+msgstr "By votes"
+
+msgid "By clicks"
+msgstr "By clicks"
+
+msgid "By name"
+msgstr "By name"
+
+msgid "By bitrate"
+msgstr "By bitrate"
+
+msgid "No stations found."
+msgstr "No stations found."
+
+msgid "%1 stations found"
+msgstr "%1 stations found"
+
+msgid "No Radio Browser server available."
+msgstr "No Radio Browser server available."
+
+msgid "Searching Radio Browser"
+msgstr "Searching Radio Browser"
+
+msgid "Radio Browser search failed: %1"
+msgstr "Radio Browser search failed: %1"
+
+msgid "Getting %1 channels"
+msgstr "%1 kanalları alınıyor"
+
+msgid "SomaFM"
+msgstr "SomaFM"
+
+msgid "Stream quality:"
+msgstr "Stream quality:"
+
+msgid "Radio Browser"
+msgstr "Radio Browser"
+
+msgid "Search results limit:"
+msgstr "Search results limit:"
+
+msgid "Hide broken stations"
+msgstr "Hide broken stations"
+
+msgid "Default sort order:"
+msgstr "Default sort order:"
+
+msgid "Default country:"
+msgstr "Default country:"
+
+msgid "Highest"
+msgstr "Highest"
+
+msgid "High"
+msgstr "High"
+
+msgid "Low"
+msgstr "Low"
+
+msgid "Open homepage"
+msgstr "Ana sayfayı aç"
+
+msgid "Donate"
+msgstr "Bağış yap"
+
+msgid "Refresh channels"
+msgstr "Kanalları yenile"
+
+msgid "Channels"
+msgstr "Channels"
+
+msgid "Select directory for saving playlists"
+msgstr "Çalma listelerini kaydetmek için bir dizin seçin"
+
+msgid "Type"
+msgstr "Type"
+
+msgid "Select directory for the playlists"
+msgstr "Çalma listeleri için bir dizin seçin"
+
+msgid "Directory does not exist."
+msgstr "Dizin mevcut değil"
+
+msgid "Saved Grouping Manager"
+msgstr "Saved Grouping Manager"
+
+msgid "Second Level"
+msgstr "İkinci seviye"
+
+msgid "Third Level"
+msgstr "Üçüncü seviye"
+
+msgid "Scrobbler"
+msgstr "Skroplayıcı"
+
+msgid "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+msgstr "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+
+msgid "Show scrobble button"
+msgstr "Skroplama tuşunu göster"
+
+msgid "Show love button"
+msgstr "Beğen tuşunu göster"
+
+msgid "Submit scrobbles every"
+msgstr "Skropları şu kadarda bir gönder"
+
+msgid "Prefer album artist when sending scrobbles"
+msgstr "Skropları gönderirken albüm sanatçısını tercih et"
+
+msgid "Show dialog for errors"
+msgstr "Hatalar için mesaj göster"
+
+msgid "Strip \"remastered\" and similar from album and title"
+msgstr "Albüm ve başlıktan \"remastered\" ve benzeri yazıları çıkar"
+
+msgid "Enable scrobbling for the following sources:"
+msgstr "Seçili kaynaklardan skropla:"
+
+msgid "Local file"
+msgstr "Yerel dosya"
+
+msgid "CDDA"
+msgstr "CDDA"
+
+msgid "Stream"
+msgstr "Akış"
+
+msgid "Radio Paradise"
+msgstr "Radio Paradise"
+
+msgid "Last.fm"
+msgstr "Last.fm"
+
+msgid "Listenbrainz"
+msgstr "Listenbrainz"
+
+msgid "User token:"
+msgstr "Kullanıcı jetonu:"
+
+msgid "Enter your user token from"
+msgstr "Kullanıcı jetonunuzu şuradan girin"
+
+msgid "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+msgstr "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+
+msgid "Offline mode (Only cache scrobbles)"
+msgstr "Çevrimdışı mod (yalnızca önbellek skropları)"
+
+msgid "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+msgstr "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+
+msgid "Settings"
+msgstr "Ayarlar"
+
+msgid "General"
+msgstr "Genel"
+
+msgid "User interface"
+msgstr "Kullanıcı arayüzü"
+
+msgid "Streaming"
+msgstr "Streaming"
+
+msgid "Search mode"
+msgstr "Arama modu"
+
+msgid "Match every search term (AND)"
+msgstr "Match every search term (AND)"
+
+msgid "Match one or more search terms (OR)"
+msgstr "Match one or more search terms (OR)"
+
+msgid "Include all songs"
+msgstr "Tüm şarkıları dahil et"
+
+msgid "Search terms"
+msgstr "Arama terimleri"
+
+msgid "Sorting"
+msgstr "Sınıflandırma"
+
+msgid "Put songs in a random order"
+msgstr "Şarkıları rastgele sırala"
+
+msgid "Sort songs by"
+msgstr "Şarkıları sırala"
+
+msgid "Limits"
+msgstr "Sınırlar"
+
+msgid "Show all the songs"
+msgstr "Tüm şarkıları göster"
+
+msgid "Only show the first"
+msgstr "Sadece ilkini göster"
+
+msgid " songs"
+msgstr " şarkı"
+
+msgid "Collection search"
+msgstr "Koleksiyon araması"
+
+msgid "Find songs in your collection that match the criteria you specify."
+msgstr "Koleksiyonunuzda belirttiğiniz kriterlere uyan şarkıları bulun."
+
+msgid "A song will be included in the playlist if it matches these conditions."
+msgstr "Bu şartları sağlayan şarkılar listeye eklenecektir."
+
+msgid "Search options"
+msgstr "Arama seçenekleri"
+
+msgid "Choose how the playlist is sorted and how many songs it will contain."
+msgstr "Çalma listesinin nasıl sıralanacağını ve kaç şarkı içereceğini seçin."
+
+msgid "%1 songs found (showing %2)"
+msgstr "%1 şarkı bulundu (%2 tanesi gösteriliyor)"
+
+msgid "%1 songs found"
+msgstr "%1 şarkı bulundu"
+
+msgid "and"
+msgstr "ve"
+
+msgid "ago"
+msgstr "önce"
+
+msgid "The second value must be greater than the first one!"
+msgstr "İkinci değer birinci değerden daha büyük olmalıdır!"
+
+msgid "Add search term"
+msgstr "Arama terimi sekle"
+
+msgid "Smart playlist"
+msgstr "Akıllı çalma listesi"
+
+msgid "Playlist type"
+msgstr "Çalma listesi türü"
+
+msgid "A smart playlist is a dynamic list of songs that come from your collection.  There are different types of smart playlist that offer different ways of selecting songs."
+msgstr "Akıllı çalma listesi, koleksiyonunuzdan gelen şarkıların dinamik bir listesidir. Şarkıları seçmenin farklı yollarını sunan farklı akıllı çalma listesi türleri vardır."
+
+msgid "Finish"
+msgstr "Bitir"
+
+msgid "Choose a name for your smart playlist"
+msgstr "Akıllı çalma listen için bir ad seç"
+
+msgid "Use dynamic mode"
+msgstr "Dinamik modu kullan"
+
+msgid "In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes."
+msgstr "Dinamik modda şarkı bitince yeni parçalar seçilip çalma listesine eklenecektir."
+
+msgid "Newest tracks"
+msgstr "En yeni parçalar"
+
+msgid "50 random tracks"
+msgstr "50 rastgele parça"
+
+msgid "Ever played"
+msgstr "Hiç çalınmamış"
+
+msgid "Never played"
+msgstr "Hiç çalınmamış"
+
+msgid "Most played"
+msgstr "En çok çalınan"
+
+msgid "Favourite tracks"
+msgstr "Favori parçalar"
+
+msgid "All tracks"
+msgstr "Tüm parçalar"
+
+msgid "Dynamic random mix"
+msgstr "Dinamik rastgele miks"
+
+msgid "New smart playlist"
+msgstr "Yeni akıllı çalma listesi"
+
+msgid "Edit smart playlist"
+msgstr "Akıllı çalma listesini düzenle"
+
+msgid "Delete smart playlist"
+msgstr "Akıllı çalma listesini sil"
+
+msgid "New smart playlist..."
+msgstr "Yeni akıllı çalma listesi..."
+
+msgid "Play next"
+msgstr "Sonrakini çal"
+
+msgid "Edit smart playlist..."
+msgstr "Akıllı çalma listesini düzenle..."
+
+msgid "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+msgstr "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+
+msgid "Restore defaults"
+msgstr "Restore defaults"
+
+msgid "Preload function was not set for blocking operation."
+msgstr "Preload function was not set for blocking operation."
+
+msgid "File %1 does not exist."
+msgstr "%1 dosyası mevcut değil."
+
+msgid "Could not open file %1 for reading: %2"
+msgstr "Could not open file %1 for reading: %2"
+
+msgid "Could not open CUE file %1 for reading: %2"
+msgstr "Could not open CUE file %1 for reading: %2"
+
+msgid "Could not open playlist file %1 for reading: %2"
+msgstr "Could not open playlist file %1 for reading: %2"
+
+msgid "Couldn't create GStreamer source element for %1"
+msgstr "Couldn't create GStreamer source element for %1"
+
+msgid "Couldn't create GStreamer typefind element for %1"
+msgstr "Couldn't create GStreamer typefind element for %1"
+
+msgid "Couldn't create GStreamer fakesink element for %1"
+msgstr "Couldn't create GStreamer fakesink element for %1"
+
+msgid "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+msgstr "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+
+msgid "Missing CDDA playback."
+msgstr "Missing CDDA playback."
+
+msgid "Error while loading audio CD."
+msgstr "Ses CD'si yüklenirken hata."
+
+msgid "Loading tracks info"
+msgstr "Parça bilgileri yükleniyor"
+
+msgid "No pending song for track ID"
+msgstr "No pending song for track ID"
+
+msgid "Authenticating..."
+msgstr "Doğrulanıyor..."
+
+msgid "Data missing error"
+msgstr "Eksik veri hatası"
+
+msgid "Not authenticated with Spotify."
+msgstr "Spotify ile doğrulanmadı."
+
+msgid "Basic authentication"
+msgstr "Temel doğrulama"
+
+msgid "Authenticate"
+msgstr "Doğrula"
+
+msgid "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+msgstr "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+
+msgid "Fetch entire albums when searching songs"
+msgstr "Şarkıları ararken tüm albümleri al"
+
+msgid "The streaming collection is empty!"
+msgstr "Akış koleksiyonu boş!"
+
+msgid "Click here to retrieve music"
+msgstr "Müziğinizi geri getirmek için tıklayın"
+
+msgid "Remove from favorites"
+msgstr "Beğenilenlerden kaldır"
+
+msgid "Close"
+msgstr "Kapat"
+
+msgid "Refresh catalogue"
+msgstr "Refresh catalogue"
+
+msgid "Streaming Search View"
+msgstr "Streaming Search View"
+
+msgid "artists"
+msgstr "sanatçı"
+
+msgid "albums"
+msgstr "albüm"
+
+msgid "songs"
+msgstr "şarkı"
+
+msgid "Enter search terms above to find music"
+msgstr "Şarkı bulmak için arama terimlerini girin"
+
+msgid "Configure %1..."
+msgstr "%1 yapılandır..."
+
+msgid "Add to artists"
+msgstr "Sanatçılara ekle"
+
+msgid "Add to albums"
+msgstr "Albümlere ekle"
+
+msgid "Add to songs"
+msgstr "Şarkılara ekle"
+
+msgid "Streaming Tabs View"
+msgstr "Streaming Tabs View"
+
+msgid "Artists"
+msgstr "Sanatçılar"
+
+msgid "Albums"
+msgstr "Albümler"
+
+msgid "Songs"
+msgstr "Şarkılar"
+
+msgid "Retrieving albums..."
+msgstr "Retrieving albums..."
+
+msgid "Retrieving songs for %1 album..."
+msgstr "%1 için şarkılar getiriliyor..."
+
+msgid "Retrieving songs for %1 albums..."
+msgstr "%1 için şarkılar getiriliyor..."
+
+msgid "Retrieving album cover for %1 album..."
+msgstr "%1 için albüm kapağı getiriliyor..."
+
+msgid "Retrieving album covers for %1 albums..."
+msgstr "%1 için albüm kapağı getiriliyor..."
+
+msgid "Server URL is invalid."
+msgstr "Server URL is invalid."
+
+msgid "Missing username or password."
+msgstr "Kullanıcı adı ve şifresi eksik."
+
+msgid "Server URL"
+msgstr "Sunucu Bağlantısı"
+
+msgid "Authentication method:"
+msgstr "Doğrulama yöntemi:"
+
+msgid "Hex"
+msgstr "Hex"
+
+msgid "MD5 token (Recommended)"
+msgstr "MD5 token (Recommended)"
+
+msgid "Use HTTP/2 when possible"
+msgstr "Use HTTP/2 when possible"
+
+msgid "Verify server certificate"
+msgstr "Verify server certificate"
+
+msgid "Use album ID for album covers"
+msgstr "Albüm kapakları için albüm ID'sini kullanın"
+
+msgid "Server-side scrobbling"
+msgstr "Server-side scrobbling"
+
+msgid "Test"
+msgstr "Test"
+
+msgid "Delete songs"
+msgstr "Şarkıları sil"
+
+msgid "Missing server url, username or password."
+msgstr "Sunucu bağlantısı, kullanıcı adı ve parola eksik."
+
+msgid "Configuration incorrect"
+msgstr "Yapılandırma geçersiz"
+
+msgid "Test successful!"
+msgstr "Test başarılı!"
+
+msgid "Test failed!"
+msgstr "Test başarısız!"
+
+msgid "Subsonic server URL is invalid."
+msgstr "Subsonic sunucu bağlantısı geçersiz."
+
+msgid "Missing Subsonic username or password."
+msgstr "Subsonic kullanıcı adı ve şifresi eksik."
+
+msgid "Stage: %1"
+msgstr "Stage: %1"
+
+msgid "Reason: %1"
+msgstr "Reason: %1"
+
+msgid "Identifying song"
+msgstr "Şarkı tanınıyor"
+
+msgid "Fingerprinting song"
+msgstr "Fingerprinting song"
+
+msgid "Generated fingerprint is empty or invalid"
+msgstr "Generated fingerprint is empty or invalid"
+
+msgid "Fingerprinting"
+msgstr "Fingerprinting"
+
+msgid "Fingerprint length: %1"
+msgstr "Fingerprint length: %1"
+
+msgid "Minimum required length: %1"
+msgstr "Minimum required length: %1"
+
+msgid "Downloading metadata"
+msgstr "Üstveri indiriliyor"
+
+msgid "No MusicBrainz metadata was found for this track"
+msgstr "No MusicBrainz metadata was found for this track"
+
+msgid "MusicBrainz metadata"
+msgstr "MusicBrainz metadata"
+
+msgid "Candidate metadata rows: 0"
+msgstr "Candidate metadata rows: 0"
+
+msgid "Not authenticated with Tidal."
+msgstr "Tidal ile doğrulanmadı."
+
+msgid "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+msgstr "Tidal desteği resmi değil ve çalışmak için kayıtlı bir uygulamadan API jetonuna ihtiyaç duyar. Bunları elde etmenize yardım edemeyiz."
+
+msgid "Client ID"
+msgstr "İstemci Kimliği"
+
+msgid "Audio quality"
+msgstr "Ses kalitesi"
+
+msgid "Album cover size"
+msgstr "Albüm kapağı boyutu"
+
+msgid "Stream URL method"
+msgstr "Akış URL yöntemi"
+
+msgid "Append explicit to album title for explicit albums"
+msgstr "Append explicit to album title for explicit albums"
+
+msgid "Missing Tidal client ID."
+msgstr "Tidal istemci kimliği eksik."
+
+msgid "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+
+msgid "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+
+msgid "Tag fetcher"
+msgstr "Etiket getirici"
+
+msgid "Strawberry was unable to find results for this file"
+msgstr "Strawberry bu dosya için sonuç bulamadı"
+
+msgid "Select best possible match"
+msgstr "En iyi eşleşmeyi seç"
+
+msgid "Original tags"
+msgstr "Özgün etiketler"
+
+msgid "Suggested tags"
+msgstr "Önerilen etiketler"
+
+msgid "No results"
+msgstr "No results"
+
+msgid "0:00:00"
+msgstr "0:00:00"
+
+msgid "Click to toggle between remaining time and total time"
+msgstr "Kalan süre ile toplam süre arasında geçiş yapmak için tıklayın"
+
+msgid "Waveform"
+msgstr "Waveform"
+
+msgid "Transcode Music"
+msgstr "Müzik Dönüştür"
+
+msgid "Files to transcode"
+msgstr "Dönüştürülecek dosyalar"
+
+msgid "Directory"
+msgstr "Dizin"
+
+msgid "Add..."
+msgstr "Ekle..."
+
+msgid "Add all tracks from a directory and all its subdirectories"
+msgstr "Bir dizin ve alt dizinlerinden tüm şarkıları ekle"
+
+msgid "Import..."
+msgstr "İçe aktar..."
+
+msgid "Output options"
+msgstr "Çıktı seçenekleri"
+
+msgid "Options..."
+msgstr "Seçenekler..."
+
+msgid "Alongside the originals"
+msgstr "Alongside the originals"
+
+msgid "Select..."
+msgstr "Seç..."
+
+msgid "Progress"
+msgstr "İlerleme"
+
+msgid "Details..."
+msgstr "Detaylar..."
+
+msgid "Start transcoding"
+msgstr "Dönüştürmeyi başlat"
+
+msgid "%n remaining"
+msgid_plural "%n remaining"
+msgstr[0] "%n kaldı"
+msgstr[1] "%n kaldı"
+
+msgid "%n finished"
+msgid_plural "%n finished"
+msgstr[0] "%n bitti"
+msgstr[1] "%n bitti"
+
+msgid "%n failed"
+msgid_plural "%n failed"
+msgstr[0] "%n başarısız"
+msgstr[1] "%n başarısız"
+
+msgid "Add files to transcode"
+msgstr "Dönüştürülecek dosyaları ekleyin"
+
+msgid "Open a directory to import music from"
+msgstr "Müzik içe aktarmak için bir klasör açın"
+
+msgid "Import Directory"
+msgstr "Dizini içe aktar"
+
+msgid "Preserve directory structure in output directory (import only)"
+msgstr "Preserve directory structure in output directory (import only)"
+
+msgid "Transcoder Log"
+msgstr "Dönüştürücü Günlüğü"
+
+msgid "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+msgstr "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+
+msgid "Successfully written %1"
+msgstr "Başarıyla yazıldı %1"
+
+msgid "Transcoding %1 files using %2 threads"
+msgstr "Transcoding %1 files using %2 threads"
+
+msgid "Error processing %1: %2"
+msgstr "Error processing %1: %2"
+
+msgid "Starting %1"
+msgstr "%1 başlatılıyor"
+
+msgid "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+msgstr "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+
+msgid "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+msgstr "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+
+msgid " kbps"
+msgstr " kbps"
+
+msgid "Profile"
+msgstr "Profil"
+
+msgid "Main profile (MAIN)"
+msgstr "Main profile (MAIN)"
+
+msgid "Low complexity profile (LC)"
+msgstr "Low complexity profile (LC)"
+
+msgid "Scalable sampling rate profile (SSR)"
+msgstr "Scalable sampling rate profile (SSR)"
+
+msgid "Long term prediction profile (LTP)"
+msgstr "Long term prediction profile (LTP)"
+
+msgid "Use temporal noise shaping"
+msgstr "Use temporal noise shaping"
+
+msgid "Allow mid/side encoding"
+msgstr "Allow mid/side encoding"
+
+msgid "Block type"
+msgstr "Block type"
+
+msgid "Normal block type"
+msgstr "Normal block type"
+
+msgid "No short blocks"
+msgstr "No short blocks"
+
+msgid "No long blocks"
+msgstr "No long blocks"
+
+msgid "Transcoding options"
+msgstr "Dönüştürme seçenekleri"
+
+#. Sound quality
+msgid "Quality"
+msgstr "Kalite"
+
+msgid "Fast"
+msgstr "Hızlı"
+
+msgid "Best"
+msgstr "En İyi"
+
+msgid "Optimize for &quality"
+msgstr "Kalite için optimize et"
+
+msgid "Opti&mize for bitrate"
+msgstr "Bit oranı için optimize et"
+
+msgid "Constant bitrate"
+msgstr "Sabit bit oranı"
+
+msgid "Encoding engine quality"
+msgstr "Kodlama motoru kalitesi"
+
+msgid "Standard"
+msgstr "Standart"
+
+msgid "Force mono encoding"
+msgstr "Force mono encoding"
+
+msgid "automatic"
+msgstr "otomatik"
+
+msgid "Average bitrate"
+msgstr "Average bitrate"
+
+msgid "disabled"
+msgstr "devre dışı"
+
+msgid "Encoding mode"
+msgstr "Kodlama modu"
+
+msgid "Auto"
+msgstr "Otomatik"
+
+msgid "Ultra wide band (UWB)"
+msgstr "Ultra wide band (UWB)"
+
+msgid "Wide band (WB)"
+msgstr "Wide band (WB)"
+
+msgid "Narrow band (NB)"
+msgstr "Narrow band (NB)"
+
+msgid "Variable bit rate"
+msgstr "Variable bit rate"
+
+msgid "Voice activity detection"
+msgstr "Voice activity detection"
+
+msgid "Discontinuous transmission"
+msgstr "Discontinuous transmission"
+
+msgid "Encoding complexity"
+msgstr "Encoding complexity"
+
+msgid "Frames per buffer"
+msgstr "Frames per buffer"
+
+msgid "Use bitrate management engine"
+msgstr "Bit oranı yönetme motoru kullan"
+
+msgid "Target bitrate"
+msgstr "Hedef bit oranı"
+
+msgid "Minimum bitrate"
+msgstr "En düşük bit oranı"
+
+msgid "Maximum bitrate"
+msgstr "En yüksek bit oranı"
+
+msgid "Transcoding"
+msgstr "Dönüştürme"
+
+msgid "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+msgstr "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+
+msgid "FLAC"
+msgstr "FLAC"
+
+msgid "WavPack"
+msgstr "WavPack"
+
+msgid "Vorbis"
+msgstr "Vorbis"
+
+msgid "Opus"
+msgstr "Opus"
+
+msgid "Speex"
+msgstr "Speex"
+
+msgid "AAC"
+msgstr "AAC"
+
+msgid "ASF (WMA)"
+msgstr "ASF (WMA)"
+
+msgid "MP3"
+msgstr "MP3"
+
+msgid "D-Bus path"
+msgstr "D-Bus path"
+
+msgid "Serial number"
+msgstr "Seri numarası"
+
+msgid "Mount points"
+msgstr "Bağlama noktaları"
+
+msgid "Partition label"
+msgstr "Partition label"
+
+msgid "UUID"
+msgstr "UUID"
+
+msgid "Enter username and password"
+msgstr "Kullanıcı adı ve parola girin"
+
+msgid "Color"
+msgstr "Color"
+
+msgid "Select waveform color"
+msgstr "Select waveform color"
+
+msgid "Save the .waveform files directly in the songs folders"
+msgstr "Save the .waveform files directly in the songs folders"
+
+msgid "Failed to write XSPF playlist"
+msgstr "Failed to write XSPF playlist"
+
