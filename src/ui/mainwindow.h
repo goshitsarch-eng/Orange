@@ -66,7 +66,7 @@ class MainWindow {
   void BuildPlayerBar();
   void BuildContext();
   void ConnectSignals();
-  void RefreshCollection(const std::string &filter = {});
+  void RefreshCollection(const std::string &filter = {}, bool update_text = false);
   void RefreshPlaylist();
   void RefreshPlaylistsList();
   void RefreshQueue();
@@ -157,6 +157,9 @@ class MainWindow {
   std::string device_browse_id_;
   CollectionGrouping::Grouping grouping_;
   std::string playlist_filter_;
+  std::string collection_text_filter_;
+  int collection_age_days_ = -1;
+  float collection_min_rating_ = -1.0f;
   PlaylistColumn sort_column_ = PlaylistColumn::Title;
   bool sort_descending_ = false;
   std::vector<int> selected_playlist_rows_;

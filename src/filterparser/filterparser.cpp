@@ -2,6 +2,8 @@
 
 #include "utilities/strutils.h"
 
+#include <cstdlib>
+#include <ctime>
 #include <sstream>
 
 FilterParser::FilterParser(const std::string &filter) : filter_(StrUtils::Trim(filter)) {}
@@ -30,6 +32,28 @@ bool FilterParser::TermMatches(const std::string &term, const Song &song) const 
   if (field == "grouping") return contains(song.grouping());
   if (field == "year") return std::to_string(song.year()) == value;
   if (field == "rating") return song.rating() >= std::strtof(value.c_str(), nullptr);
+  if (field == "playcount") return static_cast<int>(song.playcount()) >= std::atoi(value.c_str());
+  if (field == "skipcount") return static_cast<int>(song.skipcount()) >= std::atoi(value.c_str());
+  if (field == "age" || field == "added") {
+    const int days = std::atoi(value.c_str());
+    if (song.ctime() <= 0) {
+      return false;
+    }
+    if (days <= 0) {
+      return true;
+    }
+    return song.ctime() >= static_cast<int64_t>(std::time(nullptr)) - static_cast<int64_t>(days) * 86400;
+  }
+  if (field == "lastplayed") {
+    const int days = std::atoi(value.c_str());
+    if (song.lastplayed() <= 0) {
+      return false;
+    }
+    if (days <= 0) {
+      return true;
+    }
+    return song.lastplayed() >= static_cast<int64_t>(std::time(nullptr)) - static_cast<int64_t>(days) * 86400;
+  }
   return contains(song.title());
 }
 

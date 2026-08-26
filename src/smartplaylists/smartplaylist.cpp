@@ -1,11 +1,13 @@
 #include "smartplaylists/smartplaylist.h"
 
 #include "collection/collectionbackend.h"
+#include "core/settings.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
 
 #include <algorithm>
 #include <cstdlib>
+#include <sstream>
 
 namespace {
 
@@ -180,4 +182,117 @@ SmartPlaylistOp SmartPlaylistSearch::OpFromIndex(int index) {
     return SmartPlaylistOp::Contains;
   }
   return static_cast<SmartPlaylistOp>(index);
+}
+
+namespace {
+
+std::string SanitizeToken(std::string value) {
+  for (char &ch : value) {
+    if (ch == ';' || ch == '|' || ch == '\t') {
+      ch = ' ';
+    }
+  }
+  return value;
+}
+
+}  // namespace
+
+std::string SmartPlaylistSearch::Serialize() const {
+  std::ostringstream out;
+  out << (type == SearchType::Or ? "Or" : "And") << ',' << limit << ',' << static_cast<int>(sort_field) << ','
+      << (sort_descending ? 1 : 0);
+  for (const SmartPlaylistTerm &term : terms) {
+    out << ';' << static_cast<int>(term.field) << ',' << static_cast<int>(term.op) << ',' << SanitizeToken(term.value);
+  }
+  return out.str();
+}
+
+bool SmartPlaylistSearch::Parse(const std::string &blob, SmartPlaylistSearch *search) {
+  if (!search || blob.empty()) {
+    return false;
+  }
+  *search = SmartPlaylistSearch();
+  const auto parts = StrUtils::Split(blob, ';');
+  if (parts.empty()) {
+    return false;
+  }
+  const auto header = StrUtils::Split(parts[0], ',');
+  if (header.size() < 4) {
+    return false;
+  }
+  search->type = header[0] == "Or" ? SearchType::Or : SearchType::And;
+  search->limit = std::atoi(header[1].c_str());
+  search->sort_field = FieldFromIndex(std::atoi(header[2].c_str()));
+  search->sort_descending = header[3] == "1";
+  for (size_t i = 1; i < parts.size(); ++i) {
+    const auto term = StrUtils::Split(parts[i], ',');
+    if (term.size() < 3) {
+      continue;
+    }
+    SmartPlaylistTerm parsed;
+    parsed.field = FieldFromIndex(std::atoi(term[0].c_str()));
+    parsed.op = OpFromIndex(std::atoi(term[1].c_str()));
+    parsed.value = term[2];
+    for (size_t extra = 3; extra < term.size(); ++extra) {
+      parsed.value += "," + term[extra];
+    }
+    search->terms.push_back(parsed);
+  }
+  return true;
+}
+
+std::vector<std::pair<std::string, SmartPlaylistSearch>> SmartPlaylistSearch::LoadSaved() {
+  Settings settings;
+  settings.BeginGroup("SmartPlaylists");
+  std::vector<std::pair<std::string, SmartPlaylistSearch>> result;
+  for (const std::string &preset : StrUtils::Split(settings.Value("presets"), '|')) {
+    const auto tab = preset.find('\t');
+    if (tab == std::string::npos) {
+      continue;
+    }
+    SmartPlaylistSearch search;
+    if (Parse(preset.substr(tab + 1), &search)) {
+      result.emplace_back(preset.substr(0, tab), search);
+    }
+  }
+  return result;
+}
+
+void SmartPlaylistSearch::SaveAll(const std::vector<std::pair<std::string, SmartPlaylistSearch>> &presets) {
+  std::string blob;
+  for (const auto &preset : presets) {
+    if (!blob.empty()) {
+      blob += "|";
+    }
+    blob += SanitizeToken(preset.first) + "\t" + preset.second.Serialize();
+  }
+  Settings settings;
+  settings.BeginGroup("SmartPlaylists");
+  settings.SetValue("presets", blob);
+  settings.Sync();
+}
+
+void SmartPlaylistSearch::AddSaved(const std::string &name, const SmartPlaylistSearch &search) {
+  if (name.empty()) {
+    return;
+  }
+  auto presets = LoadSaved();
+  bool replaced = false;
+  for (auto &preset : presets) {
+    if (preset.first == name) {
+      preset.second = search;
+      replaced = true;
+      break;
+    }
+  }
+  if (!replaced) {
+    presets.emplace_back(name, search);
+  }
+  SaveAll(presets);
+}
+
+void SmartPlaylistSearch::RemoveSaved(const std::string &name) {
+  auto presets = LoadSaved();
+  presets.erase(std::remove_if(presets.begin(), presets.end(), [&](const auto &preset) { return preset.first == name; }), presets.end());
+  SaveAll(presets);
 }

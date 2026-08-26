@@ -902,7 +902,9 @@ void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app) {
                      auto *wizard = static_cast<SmartWizard *>(g_object_get_data(G_OBJECT(button), "wizard"));
                      SmartPlaylistSearch search = SearchFromWizard(wizard);
                      const char *playlist_name = gtk_editable_get_text(GTK_EDITABLE(wizard->name));
-                     Playlist *playlist = application->playlist_manager()->New(playlist_name && *playlist_name ? playlist_name : "Smart playlist");
+                     const std::string saved_name = playlist_name && *playlist_name ? playlist_name : "Smart playlist";
+                     Playlist *playlist = application->playlist_manager()->New(saved_name);
+                     SmartPlaylistSearch::AddSaved(saved_name, search);
                      if (gtk_check_button_get_active(GTK_CHECK_BUTTON(wizard->dynamic))) {
                        playlist->SetDynamic(true, search);
                        search.limit = search.limit > 0 ? std::min(search.limit, 20) : 20;

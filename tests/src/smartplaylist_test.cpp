@@ -104,6 +104,40 @@ TEST(SmartPlaylist, ExtraFieldsAndLimit) {
   EXPECT_EQ("Other", limited.front().title());
 }
 
+TEST(SmartPlaylist, SerializeRoundTrip) {
+  SmartPlaylistSearch search;
+  search.type = SmartPlaylistSearch::SearchType::Or;
+  search.limit = 25;
+  search.sort_field = SmartPlaylistField::Year;
+  search.sort_descending = true;
+  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "fleet"});
+  search.terms.push_back({SmartPlaylistField::Comment, SmartPlaylistOp::Empty, {}});
+  const std::string blob = search.Serialize();
+  SmartPlaylistSearch parsed;
+  ASSERT_TRUE(SmartPlaylistSearch::Parse(blob, &parsed));
+  EXPECT_EQ(SmartPlaylistSearch::SearchType::Or, parsed.type);
+  EXPECT_EQ(25, parsed.limit);
+  EXPECT_EQ(SmartPlaylistField::Year, parsed.sort_field);
+  EXPECT_TRUE(parsed.sort_descending);
+  ASSERT_EQ(2u, parsed.terms.size());
+  EXPECT_EQ(SmartPlaylistField::Artist, parsed.terms[0].field);
+  EXPECT_EQ(SmartPlaylistOp::Contains, parsed.terms[0].op);
+  EXPECT_EQ("fleet", parsed.terms[0].value);
+  EXPECT_EQ(SmartPlaylistOp::Empty, parsed.terms[1].op);
+
+  SmartPlaylistSearch::AddSaved("Fleet years", search);
+  const auto saved = SmartPlaylistSearch::LoadSaved();
+  bool found = false;
+  for (const auto &preset : saved) {
+    if (preset.first == "Fleet years") {
+      found = true;
+      EXPECT_EQ(25, preset.second.limit);
+    }
+  }
+  EXPECT_TRUE(found);
+  SmartPlaylistSearch::RemoveSaved("Fleet years");
+}
+
 TEST(SmartPlaylist, FieldAndOpIndex) {
   EXPECT_EQ(SmartPlaylistField::Title, SmartPlaylistSearch::FieldFromIndex(0));
   EXPECT_EQ(SmartPlaylistField::InitialKey, SmartPlaylistSearch::FieldFromIndex(static_cast<int>(SmartPlaylistSearch::FieldNames().size()) - 1));

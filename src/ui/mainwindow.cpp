@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <ctime>
 
 namespace {
 
@@ -183,7 +184,7 @@ void MainWindow::BuildUi() {
   adw_header_bar_pack_start(ADW_HEADER_BAR(header), search);
   g_signal_connect(search, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
-                     self->RefreshCollection(gtk_editable_get_text(GTK_EDITABLE(entry)));
+                     self->RefreshCollection(gtk_editable_get_text(GTK_EDITABLE(entry)), true);
                    }),
                    this);
 
@@ -314,7 +315,41 @@ void MainWindow::BuildSidebar() {
   BuildContext();
   adw_view_stack_add_titled_with_icon(sidebar_stack_, GTK_WIDGET(g_object_get_data(G_OBJECT(context_cover_), "context-scroll")), "context",
                                       "Context", "audio-x-generic-symbolic");
-  adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&collection_list_), "collection", "Collection",
+  GtkWidget *collection_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  GtkWidget *collection_filters = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_set_margin_start(collection_filters, 8);
+  gtk_widget_set_margin_end(collection_filters, 8);
+  gtk_widget_set_margin_top(collection_filters, 6);
+  gtk_widget_set_margin_bottom(collection_filters, 4);
+  static const char *age_labels[] = {"Any age", "Added today", "Added last week", "Added last month", "Added last 3 months",
+                                     "Added last year", nullptr};
+  static const char *rating_labels[] = {"Any rating", "Unrated", "1★+", "2★+", "3★+", "4★+", "5★", nullptr};
+  GtkWidget *age_drop = gtk_drop_down_new_from_strings(age_labels);
+  GtkWidget *rating_drop = gtk_drop_down_new_from_strings(rating_labels);
+  gtk_widget_set_hexpand(age_drop, TRUE);
+  gtk_widget_set_hexpand(rating_drop, TRUE);
+  gtk_box_append(GTK_BOX(collection_filters), age_drop);
+  gtk_box_append(GTK_BOX(collection_filters), rating_drop);
+  gtk_box_append(GTK_BOX(collection_page), collection_filters);
+  gtk_box_append(GTK_BOX(collection_page), MakeScrolledList(&collection_list_));
+  gtk_widget_set_vexpand(gtk_widget_get_last_child(collection_page), TRUE);
+  g_signal_connect(age_drop, "notify::selected", G_CALLBACK(+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     static const int days[] = {-1, 1, 7, 30, 90, 365};
+                     const guint selected = gtk_drop_down_get_selected(drop);
+                     self->collection_age_days_ = selected < G_N_ELEMENTS(days) ? days[selected] : -1;
+                     self->RefreshCollection();
+                   }),
+                   this);
+  g_signal_connect(rating_drop, "notify::selected", G_CALLBACK(+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     static const float ratings[] = {-1.0f, -2.0f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f};
+                     const guint selected = gtk_drop_down_get_selected(drop);
+                     self->collection_min_rating_ = selected < G_N_ELEMENTS(ratings) ? ratings[selected] : -1.0f;
+                     self->RefreshCollection();
+                   }),
+                   this);
+  adw_view_stack_add_titled_with_icon(sidebar_stack_, collection_page, "collection", "Collection",
                                       "media-optical-cd-audio-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&playlists_list_), "playlists", "Playlists", "view-list-symbolic");
   adw_view_stack_add_titled_with_icon(sidebar_stack_, MakeScrolledList(&smart_list_), "smart", "Smart playlists", "view-refresh-symbolic");
@@ -709,9 +744,25 @@ void MainWindow::AppendCollectionNode(GtkWidget *parent, const CollectionGroupin
   }
 }
 
-void MainWindow::RefreshCollection(const std::string &filter) {
+void MainWindow::RefreshCollection(const std::string &filter, bool update_text) {
+  if (update_text) {
+    collection_text_filter_ = filter;
+  }
+  if (!collection_list_) {
+    return;
+  }
   ClearList(collection_list_);
-  const SongList songs = app_->collection()->Songs(filter);
+  SongList songs = app_->collection()->Songs(collection_text_filter_);
+  if (collection_age_days_ > 0) {
+    const int64_t cutoff = static_cast<int64_t>(std::time(nullptr)) - static_cast<int64_t>(collection_age_days_) * 86400;
+    songs.erase(std::remove_if(songs.begin(), songs.end(), [cutoff](const Song &song) { return song.ctime() < cutoff; }), songs.end());
+  }
+  if (collection_min_rating_ <= -2.0f) {
+    songs.erase(std::remove_if(songs.begin(), songs.end(), [](const Song &song) { return song.rating() >= 0; }), songs.end());
+  } else if (collection_min_rating_ >= 0) {
+    songs.erase(std::remove_if(songs.begin(), songs.end(), [this](const Song &song) { return song.rating() < collection_min_rating_; }),
+                songs.end());
+  }
   Settings settings;
   settings.BeginGroup("Collection");
   const CollectionGrouping::Node tree =
@@ -719,7 +770,9 @@ void MainWindow::RefreshCollection(const std::string &filter) {
                                     settings.BoolValue("sort_skip_articles_for_artists", false),
                                     settings.BoolValue("sort_skip_articles_for_albums", false));
   AppendCollectionNode(collection_list_, tree, 0);
-  gtk_label_set_text(GTK_LABEL(status_label_), (std::to_string(songs.size()) + " songs").c_str());
+  if (status_label_) {
+    gtk_label_set_text(GTK_LABEL(status_label_), (std::to_string(songs.size()) + " songs").c_str());
+  }
 }
 
 std::string MainWindow::ColumnTitle(PlaylistColumn column) {
@@ -1092,6 +1145,9 @@ void MainWindow::RefreshSmartPlaylists() {
                           Item{"Most played", "played"}}) {
       AppendStringRow(GTK_LIST_BOX(smart_list_), item.title, const_cast<char *>(item.kind));
   }
+  for (const auto &preset : SmartPlaylistSearch::LoadSaved()) {
+    AppendStringRow(GTK_LIST_BOX(smart_list_), preset.first, g_strdup(("saved:" + preset.first).c_str()), g_free);
+  }
   AppendStringRow(GTK_LIST_BOX(smart_list_), "Custom wizard…", const_cast<char *>("wizard"));
 }
 
@@ -1427,7 +1483,16 @@ void MainWindow::CycleShuffle() {
 void MainWindow::RunSmartPlaylist(const std::string &kind) {
   SmartPlaylistSearch search;
   std::string name = "Smart playlist";
-  if (kind == "never") {
+  if (StrUtils::StartsWith(kind, "saved:")) {
+    const std::string saved_name = kind.substr(6);
+    for (const auto &preset : SmartPlaylistSearch::LoadSaved()) {
+      if (preset.first == saved_name) {
+        search = preset.second;
+        name = saved_name;
+        break;
+      }
+    }
+  } else if (kind == "never") {
     search.terms.push_back({SmartPlaylistField::Playcount, SmartPlaylistOp::Equals, "0"});
     name = "Never played";
   } else if (kind == "rated") {

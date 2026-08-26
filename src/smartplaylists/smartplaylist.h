@@ -73,6 +73,14 @@ class SmartPlaylistSearch {
   SongList Search(const SongList &songs) const;
   SongList Search(CollectionBackend *backend) const;
 
+  std::string Serialize() const;
+  static bool Parse(const std::string &blob, SmartPlaylistSearch *search);
+
+  static std::vector<std::pair<std::string, SmartPlaylistSearch>> LoadSaved();
+  static void SaveAll(const std::vector<std::pair<std::string, SmartPlaylistSearch>> &presets);
+  static void AddSaved(const std::string &name, const SmartPlaylistSearch &search);
+  static void RemoveSaved(const std::string &name);
+
   static std::vector<std::string> FieldNames();
   static std::vector<std::string> OpNames();
   static SmartPlaylistField FieldFromIndex(int index);
