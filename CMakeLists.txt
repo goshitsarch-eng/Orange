@@ -572,6 +572,7 @@ set(STRAWBERRY_SOURCES
   src/transcoder/transcoderoptionswavpack.cpp
   src/transcoder/transcoderoptionsdialog.cpp
   src/transcoder/transcodedialog.cpp
+  src/transcoder/transcodelogdialog.cpp
   src/organize/organize.cpp
   src/organize/organizeformat.cpp
   src/organize/organizeformatvalidator.cpp

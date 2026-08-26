@@ -4,6 +4,8 @@
 #include "core/application.h"
 #include "core/settings.h"
 #include "transcoder/transcodeui.h"
+#include "transcoder/transcodelog.h"
+#include "transcoder/transcodelogdialog.h"
 #include "transcoder/transcoder.h"
 #include "transcoder/transcoderoptionsdialog.h"
 #include "translations/translations.h"
@@ -34,6 +36,9 @@ struct State {
   GtkWidget *progress = nullptr;
   GtkWidget *status = nullptr;
   GtkWidget *log = nullptr;
+  GtkWidget *details = nullptr;
+  GtkWidget *log_view = nullptr;
+  std::vector<std::string> log_lines;
   GtkWidget *start = nullptr;
   GtkWidget *cancel = nullptr;
   GtkWidget *add = nullptr;
@@ -95,6 +100,24 @@ void SetWorking(State *state, bool working) {
   if (state->dialog) {
     adw_dialog_set_can_close(state->dialog, working ? FALSE : TRUE);
   }
+}
+
+void RefreshLogView(State *state) {
+  if (!state || !state->log_view) {
+    return;
+  }
+  gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(state->log_view)), TranscodeLog::Join(state->log_lines).c_str(), -1);
+}
+
+void RecordLog(State *state, const std::string &message) {
+  if (!state) {
+    return;
+  }
+  TranscodeLog::Append(&state->log_lines, TranscodeLog::FormatLine(TranscodeLog::NowStamp(), message));
+  if (state->log) {
+    gtk_label_set_text(GTK_LABEL(state->log), TranscodeLog::LastLine(state->log_lines).c_str());
+  }
+  RefreshLogView(state);
 }
 
 void UpdateProgress(State *state) {
@@ -190,10 +213,10 @@ void StartJobs(State *state) {
     UpdateProgress(state);
   });
   transcoder->LogLine.Connect([alive, state](const std::string &line) {
-    if (!*alive || !state->log) {
+    if (!*alive) {
       return;
     }
-    gtk_label_set_text(GTK_LABEL(state->log), line.c_str());
+    RecordLog(state, line);
   });
   Persist(state);
   SetWorking(state, true);
@@ -205,9 +228,10 @@ void StartJobs(State *state) {
     state->remaining = 0;
     UpdateProgress(state);
     SetWorking(state, false);
-    if (state->log && !transcoder->log().empty()) {
-      gtk_label_set_text(GTK_LABEL(state->log), transcoder->log().back().c_str());
+    if (state->log) {
+      gtk_label_set_text(GTK_LABEL(state->log), TranscodeLog::LastLine(state->log_lines).c_str());
     }
+    RefreshLogView(state);
   }
   transcoder->Progress.Clear();
   transcoder->Finished.Clear();
@@ -445,11 +469,16 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   state->progress = gtk_progress_bar_new();
   state->status = gtk_label_new("");
   gtk_widget_set_halign(state->status, GTK_ALIGN_START);
+  gtk_widget_set_hexpand(state->status, TRUE);
+  state->details = gtk_button_new_with_label(Translations::CStr("Details…"));
+  GtkWidget *status_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_box_append(GTK_BOX(status_row), state->status);
+  gtk_box_append(GTK_BOX(status_row), state->details);
   state->log = gtk_label_new("");
   gtk_label_set_wrap(GTK_LABEL(state->log), TRUE);
   gtk_widget_set_halign(state->log, GTK_ALIGN_START);
   gtk_box_append(GTK_BOX(box), state->progress);
-  gtk_box_append(GTK_BOX(box), state->status);
+  gtk_box_append(GTK_BOX(box), status_row);
   gtk_box_append(GTK_BOX(box), state->log);
 
   GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
@@ -479,6 +508,11 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
                          gtk_spin_button_set_value(GTK_SPIN_BUTTON(self->quality), value);
                        }
                      });
+                   }),
+                   state);
+  g_signal_connect(state->details, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     TranscodeLogDialog::Show(self->parent, &self->log_lines, &self->log_view, self->log);
                    }),
                    state);
   g_signal_connect(state->start, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { StartJobs(static_cast<State *>(data)); }), state);

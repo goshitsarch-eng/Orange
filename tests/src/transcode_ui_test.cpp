@@ -1,6 +1,7 @@
 #include "constants/transcodersettings.h"
 #include "core/song.h"
 #include "transcoder/transcodeui.h"
+#include "transcoder/transcodelog.h"
 #include "transcoder/transcoder.h"
 
 #include <gtest/gtest.h>
@@ -50,6 +51,30 @@ TEST(TranscodeUi, QueueAudioAndFormatKeys) {
   EXPECT_EQ(0, TranscodeUi::FormatIndexFromKey("audio/mpeg"));
   EXPECT_STREQ("audio/x-vorbis", TranscodeUi::FormatKey(3));
   EXPECT_STREQ("audio/x-vorbis", TranscodeUi::FormatKey(99));
+}
+
+TEST(TranscodeLog, FormatJoinLastAndClear) {
+  EXPECT_EQ("Wed Aug 26 15:10:00 2026: Wrote /out/roads.mp3", TranscodeLog::FormatLine("Wed Aug 26 15:10:00 2026", "Wrote /out/roads.mp3"));
+  EXPECT_EQ("Wrote /out/roads.mp3", TranscodeLog::FormatLine({}, "Wrote /out/roads.mp3"));
+  EXPECT_EQ("Wed Aug 26 15:10:00 2026", TranscodeLog::FormatLine("Wed Aug 26 15:10:00 2026", {}));
+  EXPECT_TRUE(TranscodeLog::FormatLine({}, {}).empty());
+  const std::string stamp = TranscodeLog::NowStamp();
+  EXPECT_FALSE(stamp.empty());
+  EXPECT_EQ(stamp + ": Cancelled", TranscodeLog::FormatLine(stamp, "Cancelled"));
+
+  std::vector<std::string> lines;
+  TranscodeLog::Append(&lines, TranscodeLog::FormatLine("t1", "Missing source: /tmp/a.flac"));
+  TranscodeLog::Append(&lines, TranscodeLog::FormatLine("t2", "Wrote /out/a.mp3"));
+  TranscodeLog::Append(&lines, {});
+  TranscodeLog::Append(nullptr, "ignored");
+  EXPECT_EQ(2u, lines.size());
+  EXPECT_EQ("t1: Missing source: /tmp/a.flac\nt2: Wrote /out/a.mp3", TranscodeLog::Join(lines));
+  EXPECT_EQ("t2: Wrote /out/a.mp3", TranscodeLog::LastLine(lines));
+  TranscodeLog::Clear(&lines);
+  TranscodeLog::Clear(nullptr);
+  EXPECT_TRUE(lines.empty());
+  EXPECT_TRUE(TranscodeLog::Join(lines).empty());
+  EXPECT_TRUE(TranscodeLog::LastLine(lines).empty());
 }
 
 TEST(Transcoder, CancelClearsQueuedJobs) {
