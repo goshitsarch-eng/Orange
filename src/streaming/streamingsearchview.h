@@ -1,6 +1,8 @@
 #ifndef STRAWBERRY_STREAMINGSEARCHVIEW_H
 #define STRAWBERRY_STREAMINGSEARCHVIEW_H
 
+#include "collection/collectiongrouping.h"
+#include "streaming/streamingsearchgroup.h"
 #include "streaming/streamingsearchmodel.h"
 #include "streaming/streamingsearchsortmodel.h"
 #include "streaming/streamingservices.h"
@@ -33,6 +35,9 @@ class StreamingSearchView {
   void SetupRowDrag(GtkWidget *row, const Song &song);
   void LoadCover(GtkWidget *image, const Song &song);
   void PersistPrettyCovers();
+  void PersistGrouping();
+  void BuildGroupMenu();
+  void ApplyGrouping(const CollectionGrouping::Grouping &grouping);
   gboolean OnKeyPressed(guint keyval);
   void ResetTypeAhead();
 
@@ -47,7 +52,9 @@ class StreamingSearchView {
   GtkWidget *type_albums_ = nullptr;
   GtkWidget *type_songs_ = nullptr;
   GtkWidget *pretty_covers_btn_ = nullptr;
+  GtkWidget *group_button_ = nullptr;
   GtkWidget *list_ = nullptr;
+  CollectionGrouping::Grouping grouping_ = StreamingSearchGroup::DefaultGrouping();
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
   bool pretty_covers_ = true;

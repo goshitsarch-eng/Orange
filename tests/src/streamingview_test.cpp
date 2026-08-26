@@ -1,4 +1,5 @@
 #include "streaming/streamingcover.h"
+#include "streaming/streamingsearchgroup.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "streaming/streamingsearchmodel.h"
 #include "streaming/streamingsearchsortmodel.h"
@@ -58,6 +59,53 @@ TEST(StreamingCover, UrlCacheAndPrettyCovers) {
   EXPECT_TRUE(StreamingCover::CoverUrl(no_art).empty());
   EXPECT_FALSE(StreamingCover::CanLoad(no_art));
   EXPECT_EQ("qobuz://track/9", StreamingCover::CacheKey(no_art));
+}
+
+TEST(StreamingSearchGroup, DefaultFlattenAndHeaders) {
+  using G = CollectionGrouping::GroupBy;
+  EXPECT_EQ(G::AlbumArtist, StreamingSearchGroup::DefaultGrouping().first);
+  EXPECT_EQ(G::AlbumDisc, StreamingSearchGroup::DefaultGrouping().second);
+  EXPECT_EQ(G::None, StreamingSearchGroup::DefaultGrouping().third);
+  EXPECT_TRUE(StreamingSearchGroup::HasLevels(StreamingSearchGroup::DefaultGrouping()));
+  EXPECT_FALSE(StreamingSearchGroup::HasLevels({G::None, G::None, G::None}));
+  EXPECT_EQ(G::AlbumArtist, StreamingSearchGroup::FromSaved(0, 0, 0, false).first);
+  EXPECT_EQ(G::Artist, StreamingSearchGroup::FromSaved(2, 3, 0, true).first);
+  EXPECT_EQ(G::Album, StreamingSearchGroup::FromSaved(2, 3, 0, true).second);
+  EXPECT_EQ(8, StreamingSearchGroup::IndentPixels(0));
+  EXPECT_EQ(24, StreamingSearchGroup::IndentPixels(1));
+
+  Song a(Song::Source::Tidal);
+  a.set_albumartist("Portishead");
+  a.set_artist("Portishead");
+  a.set_album("Dummy");
+  a.set_title("Roads");
+  a.set_track(3);
+  Song b(Song::Source::Tidal);
+  b.set_albumartist("Portishead");
+  b.set_artist("Portishead");
+  b.set_album("Dummy");
+  b.set_title("Mysterons");
+  b.set_track(1);
+  Song c(Song::Source::Tidal);
+  c.set_albumartist("Fleet Foxes");
+  c.set_artist("Fleet Foxes");
+  c.set_album("Helplessness Blues");
+  c.set_title("Montezuma");
+  const CollectionGrouping::Node tree =
+      CollectionGrouping::BuildTree({a, b, c}, StreamingSearchGroup::DefaultGrouping(), false, true, false);
+  const auto rows = StreamingSearchGroup::Flatten(tree);
+  EXPECT_EQ(4, StreamingSearchGroup::HeaderCount(rows));
+  ASSERT_GE(rows.size(), 7u);
+  EXPECT_TRUE(rows[0].header);
+  EXPECT_EQ("Fleet Foxes", rows[0].label);
+  EXPECT_TRUE(rows[1].header);
+  EXPECT_EQ("Helplessness Blues", rows[1].label);
+  EXPECT_FALSE(rows[2].header);
+  EXPECT_EQ("Montezuma", rows[2].song.title());
+  EXPECT_EQ("Portishead", rows[3].label);
+  EXPECT_EQ("Dummy", rows[4].label);
+  EXPECT_EQ("Mysterons", rows[5].song.title());
+  EXPECT_EQ("Roads", rows[6].song.title());
 }
 
 TEST(StreamingSearchItemDelegate, PrimaryAndSecondary) {

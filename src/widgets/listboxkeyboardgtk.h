@@ -44,6 +44,23 @@ inline void SelectIndex(GtkWidget *list, int index) {
   gtk_widget_grab_focus(GTK_WIDGET(row));
 }
 
+inline std::string FirstLabel(GtkWidget *widget) {
+  if (!widget) {
+    return {};
+  }
+  if (GTK_IS_LABEL(widget)) {
+    const char *text = gtk_label_get_text(GTK_LABEL(widget));
+    return text ? text : "";
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child)) {
+    const std::string text = FirstLabel(child);
+    if (!text.empty()) {
+      return text;
+    }
+  }
+  return {};
+}
+
 inline std::vector<std::string> Labels(GtkWidget *list) {
   std::vector<std::string> labels;
   if (!list) {
@@ -53,19 +70,7 @@ inline std::vector<std::string> Labels(GtkWidget *list) {
     if (!GTK_IS_LIST_BOX_ROW(child)) {
       continue;
     }
-    GtkWidget *inner = gtk_list_box_row_get_child(GTK_LIST_BOX_ROW(child));
-    if (GTK_IS_LABEL(inner)) {
-      labels.emplace_back(gtk_label_get_text(GTK_LABEL(inner)));
-      continue;
-    }
-    std::string text;
-    for (GtkWidget *label = inner ? gtk_widget_get_first_child(inner) : nullptr; label; label = gtk_widget_get_next_sibling(label)) {
-      if (GTK_IS_LABEL(label)) {
-        text = gtk_label_get_text(GTK_LABEL(label));
-        break;
-      }
-    }
-    labels.push_back(text);
+    labels.push_back(FirstLabel(gtk_list_box_row_get_child(GTK_LIST_BOX_ROW(child))));
   }
   return labels;
 }
