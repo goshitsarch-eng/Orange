@@ -981,9 +981,19 @@ TEST(PlayingWidget, DetailsAndHeight) {
   EXPECT_TRUE(PlayingWidget::ShouldShow(true, true));
   EXPECT_FALSE(PlayingWidget::ShouldShow(true, false));
   EXPECT_EQ(4 + 260 + 40, PlayingWidget::LargeTotalHeight(260, 40));
+  EXPECT_EQ(60, PlayingWidget::DetailsEstimate(true));
+  EXPECT_EQ(40, PlayingWidget::DetailsEstimate(false));
+  EXPECT_EQ(PlayingWidget::kSmallCover, PlayingWidget::TotalHeight(PlayingWidget::Mode::SmallSongDetails, 48, 20));
+  EXPECT_EQ(4 + 260 + 60, PlayingWidget::TotalHeight(PlayingWidget::Mode::LargeSongDetails, 260, 60));
   EXPECT_EQ(0.0, PlayingWidget::ShowHideProgress(0));
   EXPECT_EQ(1.0, PlayingWidget::ShowHideProgress(PlayingWidget::kShowHideMs));
   EXPECT_EQ(130, PlayingWidget::AnimatedHeight(260, 250));
+  EXPECT_EQ(50, PlayingWidget::ShowHideElapsed(true, 0, 50));
+  EXPECT_EQ(450, PlayingWidget::ShowHideElapsed(false, 500, 50));
+  EXPECT_EQ(PlayingWidget::kShowHideMs, PlayingWidget::ShowHideElapsed(true, 490, 50));
+  EXPECT_TRUE(PlayingWidget::ShowHideFinished(true, PlayingWidget::kShowHideMs));
+  EXPECT_TRUE(PlayingWidget::ShowHideFinished(false, 0));
+  EXPECT_FALSE(PlayingWidget::ShowHideFinished(true, 250));
   EXPECT_TRUE(PlayingWidget::IsImagePath("cover.jpg"));
   EXPECT_FALSE(PlayingWidget::IsImagePath("track.mp3"));
 }

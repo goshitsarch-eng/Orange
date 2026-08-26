@@ -20,7 +20,7 @@ PlayingWidget::PlayingWidget() {
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay), cover_);
   spinner_ = gtk_spinner_new();
   gtk_widget_set_visible(spinner_, FALSE);
-  GtkWidget *labels = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+  labels_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
   title_ = gtk_label_new(Translations::CStr("Not playing"));
   gtk_widget_add_css_class(title_, "heading");
   gtk_label_set_wrap(GTK_LABEL(title_), TRUE);
@@ -33,12 +33,12 @@ PlayingWidget::PlayingWidget() {
   gtk_widget_add_css_class(album_, "dim-label");
   gtk_label_set_wrap(GTK_LABEL(album_), TRUE);
   gtk_widget_set_halign(album_, GTK_ALIGN_START);
-  gtk_box_append(GTK_BOX(labels), title_);
-  gtk_box_append(GTK_BOX(labels), artist_);
-  gtk_box_append(GTK_BOX(labels), album_);
+  gtk_box_append(GTK_BOX(labels_), title_);
+  gtk_box_append(GTK_BOX(labels_), artist_);
+  gtk_box_append(GTK_BOX(labels_), album_);
   gtk_box_append(GTK_BOX(widget_), overlay);
   gtk_box_append(GTK_BOX(widget_), spinner_);
-  gtk_box_append(GTK_BOX(widget_), labels);
+  gtk_box_append(GTK_BOX(widget_), labels_);
 
   GtkGesture *menu = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
@@ -61,12 +61,16 @@ PlayingWidget::PlayingWidget() {
                    })),
                    this);
 
+  gtk_widget_set_overflow(widget_, GTK_OVERFLOW_HIDDEN);
   LoadSettings();
   ApplyLayout();
-  ApplyVisibility();
+  ApplyVisibility(false);
 }
 
-PlayingWidget::~PlayingWidget() { StopFade(); }
+PlayingWidget::~PlayingWidget() {
+  StopFade();
+  StopShowHide();
+}
 
 void PlayingWidget::LoadSettings() {
   Settings settings;
@@ -126,7 +130,73 @@ void PlayingWidget::ApplyLayout() {
   gtk_widget_set_halign(previous_cover_, large ? GTK_ALIGN_CENTER : GTK_ALIGN_START);
 }
 
-void PlayingWidget::ApplyVisibility() { gtk_widget_set_visible(widget_, ShouldShow(enabled_, active_)); }
+int PlayingWidget::CurrentTotalHeight() const {
+  const int cover = CoverSize(mode_, fit_cover_width_, gtk_widget_get_width(widget_));
+  int details = labels_ ? gtk_widget_get_height(labels_) : 0;
+  if (details <= 0) {
+    details = DetailsEstimate(!DetailsAlbum(song_).empty());
+  }
+  return TotalHeight(mode_, cover, details);
+}
+
+void PlayingWidget::ApplyShowHideHeight() {
+  const int height = AnimatedHeight(CurrentTotalHeight(), showhide_elapsed_ms_);
+  gtk_widget_set_size_request(widget_, -1, height);
+  gtk_widget_set_visible(widget_, height > 0 || showhide_target_);
+}
+
+void PlayingWidget::StopShowHide() {
+  if (showhide_timeout_id_) {
+    g_source_remove(showhide_timeout_id_);
+    showhide_timeout_id_ = 0;
+  }
+}
+
+void PlayingWidget::StartShowHide(bool show) {
+  showhide_target_ = show;
+  if (showhide_timeout_id_) {
+    return;
+  }
+  if (show) {
+    gtk_widget_set_visible(widget_, TRUE);
+  }
+  showhide_timeout_id_ =
+      g_timeout_add(kFadeTickMs, [](gpointer data) -> gboolean { return static_cast<PlayingWidget *>(data)->ShowHideTick(); }, this);
+}
+
+gboolean PlayingWidget::ShowHideTick() {
+  showhide_elapsed_ms_ = ShowHideElapsed(showhide_target_, showhide_elapsed_ms_, kFadeTickMs);
+  ApplyShowHideHeight();
+  if (!ShowHideFinished(showhide_target_, showhide_elapsed_ms_)) {
+    return G_SOURCE_CONTINUE;
+  }
+  showhide_timeout_id_ = 0;
+  shown_ = showhide_target_;
+  if (shown_) {
+    gtk_widget_set_size_request(widget_, -1, -1);
+    gtk_widget_set_visible(widget_, TRUE);
+  } else {
+    gtk_widget_set_visible(widget_, FALSE);
+  }
+  return G_SOURCE_REMOVE;
+}
+
+void PlayingWidget::ApplyVisibility(bool animate) {
+  const bool want = ShouldShow(enabled_, active_);
+  if (!animate) {
+    StopShowHide();
+    shown_ = want;
+    showhide_target_ = want;
+    showhide_elapsed_ms_ = want ? kShowHideMs : 0;
+    gtk_widget_set_visible(widget_, want);
+    gtk_widget_set_size_request(widget_, -1, want ? -1 : 0);
+    return;
+  }
+  if (want == shown_ && !showhide_timeout_id_) {
+    return;
+  }
+  StartShowHide(want);
+}
 
 void PlayingWidget::Playing() { playing_ = true; }
 

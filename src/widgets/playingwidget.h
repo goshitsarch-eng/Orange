@@ -59,8 +59,28 @@ class PlayingWidget {
 
   static bool ShouldShow(bool enabled, bool active) { return enabled && active; }
 
+  static int DetailsEstimate(bool has_album) { return has_album ? 60 : 40; }
+
   static int LargeTotalHeight(int cover_size, int details_height) {
     return kTopBorder + std::max(0, cover_size) + std::max(0, details_height);
+  }
+
+  static int TotalHeight(Mode mode, int cover_size, int details_height) {
+    if (mode == Mode::SmallSongDetails) {
+      return std::max(kSmallCover, std::max(0, details_height));
+    }
+    return LargeTotalHeight(cover_size, details_height);
+  }
+
+  static int ShowHideElapsed(bool showing, int elapsed_ms, int tick_ms) {
+    if (showing) {
+      return std::min(kShowHideMs, elapsed_ms + std::max(0, tick_ms));
+    }
+    return std::max(0, elapsed_ms - std::max(0, tick_ms));
+  }
+
+  static bool ShowHideFinished(bool showing, int elapsed_ms) {
+    return showing ? elapsed_ms >= kShowHideMs : elapsed_ms <= 0;
   }
 
   static double ShowHideProgress(int elapsed_ms) {
@@ -108,7 +128,12 @@ class PlayingWidget {
   void SetImageFromBytes(GtkWidget *image, const std::vector<unsigned char> &data);
   void SnapshotCurrentToPrevious();
   void ApplyLayout();
-  void ApplyVisibility();
+  void ApplyVisibility(bool animate = true);
+  int CurrentTotalHeight() const;
+  void StartShowHide(bool show);
+  void StopShowHide();
+  void ApplyShowHideHeight();
+  gboolean ShowHideTick();
   void LoadSettings();
   void SaveSettings() const;
   void ShowMenu(double x, double y);
@@ -123,6 +148,7 @@ class PlayingWidget {
   GtkWidget *title_ = nullptr;
   GtkWidget *artist_ = nullptr;
   GtkWidget *album_ = nullptr;
+  GtkWidget *labels_ = nullptr;
   GtkWidget *spinner_ = nullptr;
   DropCallback drop_;
   bool enabled_ = true;
@@ -133,6 +159,10 @@ class PlayingWidget {
   Mode mode_ = Mode::LargeSongDetails;
   int fade_elapsed_ms_ = 0;
   guint fade_timeout_id_ = 0;
+  bool shown_ = false;
+  bool showhide_target_ = false;
+  int showhide_elapsed_ms_ = 0;
+  guint showhide_timeout_id_ = 0;
   Song song_;
 };
 
