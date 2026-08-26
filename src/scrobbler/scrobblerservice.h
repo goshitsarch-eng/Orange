@@ -15,6 +15,10 @@ class ScrobblerService {
   virtual void Scrobble(const Song &song) = 0;
   virtual void Love(const Song &song) = 0;
   virtual void Authenticate(const std::string &username, const std::string &password) = 0;
+  virtual void StartAuthentication() {}
+  virtual void Logout() {}
+  virtual bool authenticated() const { return false; }
+  virtual std::string username() const { return {}; }
 
  protected:
   bool enabled_ = false;

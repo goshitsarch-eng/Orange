@@ -4,6 +4,7 @@
 #include "scrobbler/audioscrobbler.h"
 #include "scrobbler/scrobblercache.h"
 
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -11,6 +12,7 @@
 class LastFmScrobbler : public ScrobblerService {
  public:
   static const char *kApiUrl;
+  static const char *kAuthUrl;
   static const char *kApiKey;
   static const char *kSecret;
   static const char *kCacheFile;
@@ -22,7 +24,17 @@ class LastFmScrobbler : public ScrobblerService {
   void Scrobble(const Song &song) override;
   void Love(const Song &song) override;
   void Authenticate(const std::string &username, const std::string &password) override;
+  void StartAuthentication() override;
+  void Logout() override;
+  bool authenticated() const override { return !session_key_.empty(); }
+  std::string username() const override { return username_; }
 
+  void Authenticate(const std::string &username, const std::string &password, const std::function<void(bool)> &done);
+  void GetToken(const std::function<void(bool)> &done);
+  void OpenAuthorizationUrl() const;
+  void CompleteAuthorization(const std::function<void(bool)> &done);
+
+  static std::string AuthorizationUrl(const std::string &token);
   static std::string Sign(const std::map<std::string, std::string> &params);
   static std::string FormBody(const std::map<std::string, std::string> &params);
   static std::map<std::string, std::string> ScrobbleParams(const std::vector<ScrobblerCacheItem> &items, const std::string &session_key);
@@ -30,9 +42,12 @@ class LastFmScrobbler : public ScrobblerService {
  private:
   void Post(const std::map<std::string, std::string> &params);
   void SubmitCache();
+  void SaveSession();
 
   NetworkAccessManager *network_ = nullptr;
   std::string session_key_;
+  std::string username_;
+  std::string pending_token_;
   ScrobblerCache cache_;
 };
 

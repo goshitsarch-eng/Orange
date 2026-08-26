@@ -5,6 +5,7 @@
 #include "core/settings.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
+#include "scrobbler/scrobblersources.h"
 #ifdef HAVE_SUBSONIC
 #  include "scrobbler/subsonicscrobbler.h"
 #endif
@@ -41,6 +42,11 @@ bool AudioScrobbler::enabled() const {
 }
 
 void AudioScrobbler::NowPlaying(const Song &song) {
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  if (!ScrobblerSources::Allows(settings.Value(ScrobblerSettings::kSources), song.source())) {
+    return;
+  }
   for (auto &service : services_) {
     if (service->enabled()) {
       service->NowPlaying(song);
@@ -49,6 +55,11 @@ void AudioScrobbler::NowPlaying(const Song &song) {
 }
 
 void AudioScrobbler::Scrobble(const Song &song) {
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  if (!ScrobblerSources::Allows(settings.Value(ScrobblerSettings::kSources), song.source())) {
+    return;
+  }
   for (auto &service : services_) {
     if (service->enabled()) {
       service->Scrobble(song);
@@ -70,6 +81,15 @@ void AudioScrobbler::ToggleScrobbling() {
   const bool enabled = settings.BoolValue(ScrobblerSettings::kEnabled, ScrobblerSettings::kDefaultEnabled);
   settings.SetBoolValue(ScrobblerSettings::kEnabled, !enabled);
   settings.Sync();
+}
+
+ScrobblerService *AudioScrobbler::ServiceByName(const std::string &name) const {
+  for (const auto &service : services_) {
+    if (service->name() == name) {
+      return service.get();
+    }
+  }
+  return nullptr;
 }
 
 std::vector<ScrobblerService *> AudioScrobbler::All() const {

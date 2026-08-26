@@ -1,7 +1,9 @@
 #include "scrobbler/scrobblereligibility.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
+#include "scrobbler/scrobblemetadata.h"
 #include "scrobbler/scrobblercache.h"
+#include "scrobbler/scrobblersources.h"
 #include "scrobbler/subsonicscrobbler.h"
 
 #include <gtest/gtest.h>
@@ -73,6 +75,53 @@ TEST(SubsonicScrobbler, ScrobbleUrlUsesRestEndpoint) {
   EXPECT_NE(std::string::npos, url.find("id=12"));
   EXPECT_NE(std::string::npos, url.find("submission=true"));
   EXPECT_NE(std::string::npos, url.find("p=enc:"));
+}
+
+TEST(ScrobblerSources, EmptyAllowsEverySource) {
+  EXPECT_TRUE(ScrobblerSources::Parse("").empty());
+  EXPECT_TRUE(ScrobblerSources::Allows("", Song::Source::Tidal));
+  EXPECT_TRUE(ScrobblerSources::Allows("  ", Song::Source::Collection));
+}
+
+TEST(ScrobblerSources, ParseJoinAndAllows) {
+  const std::vector<int> parsed = ScrobblerSources::Parse("2, 6,11");
+  ASSERT_EQ(3u, parsed.size());
+  EXPECT_EQ(2, parsed[0]);
+  EXPECT_EQ(6, parsed[1]);
+  EXPECT_EQ(11, parsed[2]);
+  EXPECT_EQ("2,6,11", ScrobblerSources::Join(parsed));
+  EXPECT_TRUE(ScrobblerSources::Allows("2,6", Song::Source::Collection));
+  EXPECT_TRUE(ScrobblerSources::Allows("2,6", Song::Source::Tidal));
+  EXPECT_FALSE(ScrobblerSources::Allows("2,6", Song::Source::Spotify));
+  EXPECT_FALSE(ScrobblerSources::Allows("1", Song::Source::Unknown));
+}
+
+TEST(LastFmScrobbler, AuthorizationUrlIncludesKeyAndToken) {
+  const std::string url = LastFmScrobbler::AuthorizationUrl("abc123");
+  EXPECT_EQ(std::string(LastFmScrobbler::kAuthUrl) + "?api_key=" + LastFmScrobbler::kApiKey + "&token=abc123", url);
+  EXPECT_EQ(std::string(LastFmScrobbler::kAuthUrl) + "?api_key=" + LastFmScrobbler::kApiKey, LastFmScrobbler::AuthorizationUrl(""));
+}
+
+TEST(ListenBrainzScrobbler, LoveBodyEscapesMbid) {
+  EXPECT_EQ("{\"recording_mbid\":\"mb\\\"id\",\"score\":1}", ListenBrainzScrobbler::LoveBody("mb\"id"));
+}
+
+TEST(ScrobbleMetadata, StripRemasteredAndAlbumArtist) {
+  EXPECT_EQ("Roads", ScrobbleMetadata::StripRemasteredTitle("Roads (Remastered)"));
+  EXPECT_EQ("Roads", ScrobbleMetadata::StripRemasteredTitle("Roads [2012 Remaster]"));
+  EXPECT_EQ("Roads (Live)", ScrobbleMetadata::StripRemasteredTitle("Roads (Live)"));
+  Song song;
+  song.set_artist("Beth Gibbons");
+  song.set_albumartist("Portishead");
+  song.set_title("Roads (Deluxe Edition)");
+  song.set_album("Dummy");
+  const auto original = ScrobbleMetadata::FromSong(song, 7);
+  EXPECT_EQ("Beth Gibbons", original.artist);
+  EXPECT_EQ("Roads (Deluxe Edition)", original.title);
+  const auto preferred = ScrobbleMetadata::FromSong(song, 7, true, true);
+  EXPECT_EQ("Portishead", preferred.artist);
+  EXPECT_EQ("Roads", preferred.title);
+  EXPECT_EQ("Portishead", preferred.albumartist);
 }
 
 TEST(ScrobblerEligibility, LastFmHalfOrFourMinutes) {

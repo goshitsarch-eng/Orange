@@ -1,22 +1,54 @@
 #include "scrobbler/lastfmscrobbler.h"
 
+#include "constants/scrobblersettings.h"
 #include "core/settings.h"
+#include "scrobbler/scrobblemetadata.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
+#include <gio/gio.h>
 #include <glib.h>
 
 #include <ctime>
 
 const char *LastFmScrobbler::kApiUrl = "https://ws.audioscrobbler.com/2.0/";
+const char *LastFmScrobbler::kAuthUrl = "https://www.last.fm/api/auth/";
 const char *LastFmScrobbler::kApiKey = "211990b4c96782c05d1536e7219eb56e";
 const char *LastFmScrobbler::kSecret = "80fd738f49596e9709b1bf9319c444a8";
 const char *LastFmScrobbler::kCacheFile = "lastfmscrobbler.cache";
+
+namespace {
+
+bool OfflineMode() {
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  return settings.BoolValue(ScrobblerSettings::kOffline, ScrobblerSettings::kDefaultOffline);
+}
+
+Song SongFromMetadata(const Song &song, const ScrobbleMetadata &metadata) {
+  Song processed = song;
+  processed.set_artist(metadata.artist);
+  processed.set_album(metadata.album);
+  processed.set_title(metadata.title);
+  processed.set_albumartist(metadata.albumartist);
+  return processed;
+}
+
+}  // namespace
 
 LastFmScrobbler::LastFmScrobbler(NetworkAccessManager *network) : network_(network), cache_(kCacheFile) {
   Settings settings;
   settings.BeginGroup("Last.fm");
   session_key_ = settings.Value("session_key");
+  username_ = settings.Value("username");
+}
+
+std::string LastFmScrobbler::AuthorizationUrl(const std::string &token) {
+  std::string url = std::string(kAuthUrl) + "?api_key=" + kApiKey;
+  if (!token.empty()) {
+    url += "&token=" + token;
+  }
+  return url;
 }
 
 std::string LastFmScrobbler::Sign(const std::map<std::string, std::string> &params) {
@@ -59,8 +91,16 @@ std::map<std::string, std::string> LastFmScrobbler::ScrobbleParams(const std::ve
   return params;
 }
 
+void LastFmScrobbler::SaveSession() {
+  Settings settings;
+  settings.BeginGroup("Last.fm");
+  settings.SetValue("session_key", session_key_);
+  settings.SetValue("username", username_);
+  settings.Sync();
+}
+
 void LastFmScrobbler::Post(const std::map<std::string, std::string> &params) {
-  if (!enabled_ || !network_ || session_key_.empty()) {
+  if (!enabled_ || !network_ || session_key_.empty() || OfflineMode()) {
     return;
   }
   std::map<std::string, std::string> signed_params = params;
@@ -73,22 +113,23 @@ void LastFmScrobbler::NowPlaying(const Song &song) {
   if (session_key_.empty()) {
     return;
   }
+  const ScrobbleMetadata metadata = ScrobbleMetadata::FromSongSettings(song);
   Post({{"method", "track.updateNowPlaying"},
         {"api_key", kApiKey},
         {"sk", session_key_},
-        {"artist", song.artist()},
-        {"track", song.title()},
-        {"album", song.album()}});
+        {"artist", metadata.artist},
+        {"track", metadata.title},
+        {"album", metadata.album}});
 }
 
 void LastFmScrobbler::Scrobble(const Song &song) {
-  cache_.Add(song, static_cast<uint64_t>(std::time(nullptr)));
+  cache_.Add(SongFromMetadata(song, ScrobbleMetadata::FromSongSettings(song)), static_cast<uint64_t>(std::time(nullptr)));
   SubmitCache();
 }
 
 void LastFmScrobbler::SubmitCache() {
   const std::vector<ScrobblerCacheItem> unsent = cache_.Unsent();
-  if (unsent.empty() || session_key_.empty() || !network_) {
+  if (unsent.empty() || session_key_.empty() || !network_ || OfflineMode()) {
     return;
   }
   cache_.MarkSent();
@@ -103,20 +144,29 @@ void LastFmScrobbler::SubmitCache() {
 }
 
 void LastFmScrobbler::Love(const Song &song) {
+  const ScrobbleMetadata metadata = ScrobbleMetadata::FromSongSettings(song);
   Post({{"method", "track.love"},
         {"api_key", kApiKey},
         {"sk", session_key_},
-        {"artist", song.artist()},
-        {"track", song.title()}});
+        {"artist", metadata.artist},
+        {"track", metadata.title}});
 }
 
 void LastFmScrobbler::Authenticate(const std::string &username, const std::string &password) {
+  Authenticate(username, password, {});
+}
+
+void LastFmScrobbler::Authenticate(const std::string &username, const std::string &password, const std::function<void(bool)> &done) {
+  username_ = username;
   Settings settings;
   settings.BeginGroup("Last.fm");
   settings.SetValue("username", username);
   settings.SetValue("password", password);
   settings.Sync();
   if (!network_) {
+    if (done) {
+      done(false);
+    }
     return;
   }
   std::map<std::string, std::string> params = {{"method", "auth.getMobileSession"},
@@ -125,17 +175,111 @@ void LastFmScrobbler::Authenticate(const std::string &username, const std::strin
                                                {"api_key", kApiKey}};
   params["api_sig"] = Sign(params);
   params["format"] = "json";
-  network_->Post(kApiUrl, FormBody(params), [this](const NetworkAccessManager::Response &response) {
+  network_->Post(kApiUrl, FormBody(params), [this, done](const NetworkAccessManager::Response &response) {
     if (!response.ok()) {
+      if (done) {
+        done(false);
+      }
       return;
     }
     const std::string key = JsonUtils::GetString(response.body, {"session", "key"});
-    if (!key.empty()) {
-      session_key_ = key;
-      Settings saved;
-      saved.BeginGroup("Last.fm");
-      saved.SetValue("session_key", key);
-      saved.Sync();
+    const std::string name = JsonUtils::GetString(response.body, {"session", "name"});
+    if (key.empty()) {
+      if (done) {
+        done(false);
+      }
+      return;
+    }
+    session_key_ = key;
+    if (!name.empty()) {
+      username_ = name;
+    }
+    SaveSession();
+    if (done) {
+      done(true);
     }
   }, "application/x-www-form-urlencoded");
+}
+
+void LastFmScrobbler::GetToken(const std::function<void(bool)> &done) {
+  if (!network_) {
+    if (done) {
+      done(false);
+    }
+    return;
+  }
+  std::map<std::string, std::string> params = {{"method", "auth.getToken"}, {"api_key", kApiKey}};
+  params["api_sig"] = Sign(params);
+  params["format"] = "json";
+  network_->Post(kApiUrl, FormBody(params), [this, done](const NetworkAccessManager::Response &response) {
+    const std::string token = response.ok() ? JsonUtils::GetString(response.body, {"token"}) : std::string();
+    pending_token_ = token;
+    if (done) {
+      done(!token.empty());
+    }
+  }, "application/x-www-form-urlencoded");
+}
+
+void LastFmScrobbler::OpenAuthorizationUrl() const {
+  if (pending_token_.empty()) {
+    return;
+  }
+  g_app_info_launch_default_for_uri(AuthorizationUrl(pending_token_).c_str(), nullptr, nullptr);
+}
+
+void LastFmScrobbler::StartAuthentication() {
+  GetToken([this](bool ok) {
+    if (ok) {
+      OpenAuthorizationUrl();
+    }
+  });
+}
+
+void LastFmScrobbler::CompleteAuthorization(const std::function<void(bool)> &done) {
+  if (!network_ || pending_token_.empty()) {
+    if (done) {
+      done(false);
+    }
+    return;
+  }
+  std::map<std::string, std::string> params = {{"method", "auth.getSession"}, {"api_key", kApiKey}, {"token", pending_token_}};
+  params["api_sig"] = Sign(params);
+  params["format"] = "json";
+  network_->Post(kApiUrl, FormBody(params), [this, done](const NetworkAccessManager::Response &response) {
+    if (!response.ok()) {
+      if (done) {
+        done(false);
+      }
+      return;
+    }
+    const std::string key = JsonUtils::GetString(response.body, {"session", "key"});
+    const std::string name = JsonUtils::GetString(response.body, {"session", "name"});
+    if (key.empty()) {
+      if (done) {
+        done(false);
+      }
+      return;
+    }
+    session_key_ = key;
+    if (!name.empty()) {
+      username_ = name;
+    }
+    pending_token_.clear();
+    SaveSession();
+    if (done) {
+      done(true);
+    }
+  }, "application/x-www-form-urlencoded");
+}
+
+void LastFmScrobbler::Logout() {
+  session_key_.clear();
+  username_.clear();
+  pending_token_.clear();
+  Settings settings;
+  settings.BeginGroup("Last.fm");
+  settings.SetValue("session_key", "");
+  settings.SetValue("username", "");
+  settings.SetValue("password", "");
+  settings.Sync();
 }

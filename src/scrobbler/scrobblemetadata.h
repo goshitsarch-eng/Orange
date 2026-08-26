@@ -15,7 +15,10 @@ struct ScrobbleMetadata {
   int64_t length_nanosec = 0;
   uint64_t timestamp = 0;
 
-  static ScrobbleMetadata FromSong(const Song &song, uint64_t timestamp = 0);
+  static std::string StripRemasteredTitle(const std::string &title);
+  static ScrobbleMetadata FromSong(const Song &song, uint64_t timestamp = 0, bool prefer_album_artist = false,
+                                  bool strip_remastered = false);
+  static ScrobbleMetadata FromSongSettings(const Song &song, uint64_t timestamp = 0);
 };
 
 #endif

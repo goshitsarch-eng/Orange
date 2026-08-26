@@ -10,6 +10,7 @@
 class ListenBrainzScrobbler : public ScrobblerService {
  public:
   static const char *kSubmitUrl;
+  static const char *kFeedbackUrl;
   static const char *kCacheFile;
 
   explicit ListenBrainzScrobbler(NetworkAccessManager *network);
@@ -19,14 +20,19 @@ class ListenBrainzScrobbler : public ScrobblerService {
   void Scrobble(const Song &song) override;
   void Love(const Song &song) override;
   void Authenticate(const std::string &username, const std::string &token) override;
+  void Logout() override;
+  bool authenticated() const override { return !token_.empty(); }
+  std::string username() const override { return username_; }
 
   static std::string SubmitBody(const std::string &listen_type, const std::vector<ScrobblerCacheItem> &items);
+  static std::string LoveBody(const std::string &recording_mbid);
 
  private:
   void Submit(const std::string &listen_type, const std::vector<ScrobblerCacheItem> &items, bool from_cache);
 
   NetworkAccessManager *network_ = nullptr;
   std::string token_;
+  std::string username_;
   ScrobblerCache cache_;
 };
 
