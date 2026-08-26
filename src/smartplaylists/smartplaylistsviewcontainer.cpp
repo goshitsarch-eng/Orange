@@ -1,5 +1,6 @@
 #include "smartplaylists/smartplaylistsviewcontainer.h"
 
+#include "smartplaylists/smartplaylistslabel.h"
 #include "translations/translations.h"
 
 SmartPlaylistsViewContainer::SmartPlaylistsViewContainer() {
@@ -11,16 +12,16 @@ SmartPlaylistsViewContainer::SmartPlaylistsViewContainer() {
   gtk_widget_set_margin_bottom(bar, 4);
   GtkWidget *add = gtk_button_new_from_icon_name("document-new-symbolic");
   gtk_widget_add_css_class(add, "flat");
-  gtk_widget_set_tooltip_text(add, Translations::CStr("New smart playlist…"));
+  gtk_widget_set_tooltip_text(add, Translations::CStr(SmartPlaylistsLabel::NewPlaylist()));
   edit_button_ = gtk_button_new_from_icon_name("document-edit-symbolic");
   gtk_widget_add_css_class(edit_button_, "flat");
-  gtk_widget_set_tooltip_text(edit_button_, Translations::CStr("Edit smart playlist…"));
+  gtk_widget_set_tooltip_text(edit_button_, Translations::CStr(SmartPlaylistsLabel::EditPlaylist()));
   delete_button_ = gtk_button_new_from_icon_name("edit-delete-symbolic");
   gtk_widget_add_css_class(delete_button_, "flat");
-  gtk_widget_set_tooltip_text(delete_button_, Translations::CStr("Delete smart playlist"));
+  gtk_widget_set_tooltip_text(delete_button_, Translations::CStr(SmartPlaylistsLabel::DeletePlaylist()));
   GtkWidget *restore = gtk_button_new_from_icon_name("view-refresh-symbolic");
   gtk_widget_add_css_class(restore, "flat");
-  gtk_widget_set_tooltip_text(restore, Translations::CStr("Restore defaults"));
+  gtk_widget_set_tooltip_text(restore, Translations::CStr(SmartPlaylistsLabel::RestoreDefaults()));
   g_signal_connect(add, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      static_cast<SmartPlaylistsViewContainer *>(data)->EmitSelected(SmartPlaylistsAction::New);
                    }),

@@ -16,7 +16,7 @@ inline std::string GroupFor(Transcoder::Format format) {
     case Transcoder::Format::MP3:
       return "Transcoder/lamemp3enc";
     case Transcoder::Format::AAC:
-      return "Transcoder/avenc_aac";
+      return "Transcoder/faac";
     case Transcoder::Format::FLAC:
       return "Transcoder/flacenc";
     case Transcoder::Format::OggVorbis:
@@ -28,9 +28,45 @@ inline std::string GroupFor(Transcoder::Format format) {
     case Transcoder::Format::WavPack:
       return "Transcoder/wavpackenc";
     case Transcoder::Format::ASF:
-      return "Transcoder/avenc_wmav2";
+      return "Transcoder/ffenc_wmav2";
   }
   return TranscoderSettings::kSettingsGroup;
+}
+
+inline const char *LegacyGroupFor(Transcoder::Format format) {
+  switch (format) {
+    case Transcoder::Format::AAC:
+      return "Transcoder/avenc_aac";
+    case Transcoder::Format::ASF:
+      return "Transcoder/avenc_wmav2";
+    default:
+      return nullptr;
+  }
+}
+
+inline void BeginStoredGroup(Settings *settings, Transcoder::Format format) {
+  if (!settings) {
+    return;
+  }
+  settings->BeginGroup(GroupFor(format));
+  const char *legacy = LegacyGroupFor(format);
+  if (!legacy) {
+    return;
+  }
+  if (settings->Contains("bitrate") || settings->Contains("quality") || settings->Contains("profile") || settings->Contains("managed")) {
+    return;
+  }
+  settings->BeginGroup(legacy);
+}
+
+inline int NormalizeBitrateBps(int stored, int fallback) {
+  if (stored <= 0) {
+    return fallback;
+  }
+  if (stored < 1000) {
+    return stored * 1000;
+  }
+  return stored;
 }
 
 struct Mp3 {
@@ -245,12 +281,9 @@ struct Aac {
 
   void Load() {
     Settings settings;
-    settings.BeginGroup(GroupFor(Transcoder::Format::AAC));
+    BeginStoredGroup(&settings, Transcoder::Format::AAC);
     quality = settings.IntValue("quality", quality);
-    bitrate_bps = settings.IntValue("bitrate", bitrate_bps);
-    if (bitrate_bps > 0 && bitrate_bps < 1000) {
-      bitrate_bps *= 1000;
-    }
+    bitrate_bps = NormalizeBitrateBps(settings.IntValue("bitrate", bitrate_bps), bitrate_bps);
     profile = settings.IntValue("profile", profile);
     tns = settings.BoolValue("tns", tns);
     midside = settings.BoolValue("midside", midside);
@@ -285,12 +318,13 @@ struct BitrateEncoder {
 
   void Load(Transcoder::Format format) {
     Settings settings;
-    settings.BeginGroup(GroupFor(format));
+    BeginStoredGroup(&settings, format);
     quality = settings.IntValue("quality", quality);
     if (settings.Contains("bitrate")) {
       const int bitrate = settings.IntValue("bitrate", Bitrate());
+      const int kbps = bitrate >= 1000 ? bitrate / 1000 : bitrate;
       if (max_kbps > min_kbps) {
-        quality = std::clamp((bitrate - min_kbps) * 10 / (max_kbps - min_kbps), 0, 10);
+        quality = std::clamp((kbps - min_kbps) * 10 / (max_kbps - min_kbps), 0, 10);
       }
     }
   }
@@ -299,9 +333,63 @@ struct BitrateEncoder {
     Settings settings;
     settings.BeginGroup(GroupFor(format));
     settings.SetIntValue("quality", quality);
-    settings.SetIntValue("bitrate", Bitrate());
+    settings.SetIntValue("bitrate", Bitrate() * 1000);
     settings.Sync();
   }
+};
+
+struct Opus {
+  int quality = 5;
+  int bitrate_bps = 320000;
+
+  void ApplyQuality(int value) {
+    quality = std::clamp(value, 0, 10);
+    bitrate_bps = TranscoderOptionsInterface::BitrateKbps(quality, 48, 256) * 1000;
+  }
+
+  void Load() {
+    Settings settings;
+    BeginStoredGroup(&settings, Transcoder::Format::Opus);
+    quality = settings.IntValue("quality", quality);
+    bitrate_bps = NormalizeBitrateBps(settings.IntValue("bitrate", bitrate_bps), bitrate_bps);
+  }
+
+  void Save() const {
+    Settings settings;
+    settings.BeginGroup(GroupFor(Transcoder::Format::Opus));
+    settings.SetIntValue("quality", quality);
+    settings.SetIntValue("bitrate", bitrate_bps);
+    settings.Sync();
+  }
+
+  std::string Pipeline() const { return "opusenc bitrate=" + std::to_string(std::max(6000, bitrate_bps)) + " ! oggmux"; }
+};
+
+struct Asf {
+  int quality = 5;
+  int bitrate_bps = 320000;
+
+  void ApplyQuality(int value) {
+    quality = std::clamp(value, 0, 10);
+    bitrate_bps = TranscoderOptionsInterface::BitrateKbps(quality, 64, 192) * 1000;
+  }
+
+  void Load() {
+    Settings settings;
+    BeginStoredGroup(&settings, Transcoder::Format::ASF);
+    quality = settings.IntValue("quality", quality);
+    bitrate_bps = NormalizeBitrateBps(settings.IntValue("bitrate", bitrate_bps), bitrate_bps);
+  }
+
+  void Save() const {
+    Settings settings;
+    settings.BeginGroup(GroupFor(Transcoder::Format::ASF));
+    settings.SetIntValue("quality", quality);
+    settings.SetIntValue("bitrate", bitrate_bps);
+    settings.Sync();
+  }
+
+  std::string Pipeline() const { return "avenc_wmav2 bitrate=" + std::to_string(std::max(8000, bitrate_bps)) + " ! asfmux"; }
 };
 
 }  // namespace TranscoderOptionsFields

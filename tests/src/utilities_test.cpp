@@ -100,7 +100,7 @@ TEST(TrackSliderTime, DurationTogglesRemainingLikeQt) {
   EXPECT_EQ("-1:30", TrackSliderTime::DurationLabel(true, 90000000000LL, 180000000000LL));
   EXPECT_EQ("-0:00", TrackSliderTime::DurationLabel(true, 180000000000LL, 180000000000LL));
   EXPECT_EQ("1:30 / -1:30", TrackSliderTime::PopupText(true, 90000000000LL, 180000000000LL));
-  EXPECT_STREQ("Click to toggle remaining time", TrackSliderTime::DurationTooltip());
+  EXPECT_STREQ("Click to toggle between remaining time and total time", TrackSliderTime::DurationTooltip());
 }
 
 TEST(VolumeSliderWheel, AccumulatesNotchesAndPresets) {
@@ -868,6 +868,20 @@ TEST(Transcoder, PresetAndPipelineFor) {
   EXPECT_NE(std::string::npos, wavpack.find("wavpackenc mode=2"));
   const std::string asf = Transcoder::PipelineFor(Transcoder::Format::ASF, 5);
   EXPECT_NE(std::string::npos, asf.find("avenc_wmav2"));
+  EXPECT_EQ("Transcoder/faac", TranscoderOptionsFields::GroupFor(Transcoder::Format::AAC));
+  EXPECT_EQ("Transcoder/ffenc_wmav2", TranscoderOptionsFields::GroupFor(Transcoder::Format::ASF));
+  EXPECT_STREQ("Transcoder/avenc_aac", TranscoderOptionsFields::LegacyGroupFor(Transcoder::Format::AAC));
+  EXPECT_STREQ("Transcoder/avenc_wmav2", TranscoderOptionsFields::LegacyGroupFor(Transcoder::Format::ASF));
+  TranscoderOptionsFields::Opus opus;
+  EXPECT_EQ(320000, opus.bitrate_bps);
+  opus.ApplyQuality(5);
+  EXPECT_NE(std::string::npos, opus.Pipeline().find("opusenc bitrate="));
+  TranscoderOptionsFields::Asf asf_opts;
+  EXPECT_EQ(320000, asf_opts.bitrate_bps);
+  asf_opts.ApplyQuality(5);
+  EXPECT_NE(std::string::npos, asf_opts.Pipeline().find("avenc_wmav2"));
+  EXPECT_EQ(128000, TranscoderOptionsFields::NormalizeBitrateBps(128, 320000));
+  EXPECT_EQ(320000, TranscoderOptionsFields::NormalizeBitrateBps(320000, 128000));
   EXPECT_EQ(192, TranscoderOptionsInterface::BitrateKbps(5, 64, 320));
   TranscoderOptionsFields::Mp3 lame;
   lame.target = 0;
@@ -1207,14 +1221,31 @@ TEST(WindowGeometry, ClampsAndMapsStartup) {
 }
 
 TEST(MainWindowMenu, MatchesQtDailyActionLabels) {
+  EXPECT_STREQ("Open file...", MainWindowMenu::OpenFile());
+  EXPECT_STREQ("Add folder...", MainWindowMenu::AddFolder());
+  EXPECT_STREQ("Open audio CD...", MainWindowMenu::OpenCD());
+  EXPECT_STREQ("Add stream...", MainWindowMenu::AddStream());
   EXPECT_STREQ("Update changed collection folders", MainWindowMenu::UpdateCollection());
+  EXPECT_STREQ("Do a full collection rescan", MainWindowMenu::FullScan());
+  EXPECT_STREQ("Load playlist...", MainWindowMenu::LoadPlaylist());
+  EXPECT_STREQ("Save playlist...", MainWindowMenu::SavePlaylist());
+  EXPECT_STREQ("Save all playlists...", MainWindowMenu::SaveAllPlaylists());
+  EXPECT_STREQ("Close current playlist tab", MainWindowMenu::ClosePlaylist());
+  EXPECT_STREQ("Remove duplicates from playlist", MainWindowMenu::RemoveDuplicates());
+  EXPECT_STREQ("Remove unavailable tracks from playlist", MainWindowMenu::RemoveUnavailable());
+  EXPECT_STREQ("Jump to the currently playing track", MainWindowMenu::JumpToPlaying());
   EXPECT_STREQ("Edit track information...", MainWindowMenu::EditTrack());
+  EXPECT_STREQ("Complete tags automatically...", MainWindowMenu::CompleteTags());
   EXPECT_STREQ("Renumber tracks in this order...", MainWindowMenu::RenumberTracks());
   EXPECT_STREQ("Set value for all selected tracks...", MainWindowMenu::SetValue());
   EXPECT_STREQ("Love", MainWindowMenu::Love());
   EXPECT_STREQ("Toggle scrobbling", MainWindowMenu::ToggleScrobbling());
   EXPECT_STREQ("Shuffle mode", MainWindowMenu::ShuffleMode());
   EXPECT_STREQ("Repeat mode", MainWindowMenu::RepeatMode());
+  EXPECT_STREQ("Cover Manager", MainWindowMenu::CoverManager());
+  EXPECT_STREQ("Transcode Music", MainWindowMenu::Transcode());
+  EXPECT_STREQ("Console", MainWindowMenu::Console());
+  EXPECT_STREQ("Settings...", MainWindowMenu::Settings());
   EXPECT_STREQ("win.toggle-scrobbling", MainWindowMenu::ToggleScrobblingAction());
 }
 

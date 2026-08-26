@@ -165,14 +165,20 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
     encoder.Load(format);
     default_quality = encoder.quality;
     gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("Mode (0 fast … 10 extra)"), 0, 10, encoder.quality, &quality_spin));
+  } else if (format == Transcoder::Format::Opus) {
+    TranscoderOptionsFields::Opus opus;
+    opus.Load();
+    default_quality = opus.quality;
+    gtk_box_append(GTK_BOX(box), LabeledSpin((std::string(TranscoderOptionsLabels::Bitrate()) + TranscoderOptionsLabels::Kbps()).c_str(), 6, 510,
+                                            std::max(6, opus.bitrate_bps / 1000), &bitrate_spin));
+  } else if (format == Transcoder::Format::ASF) {
+    TranscoderOptionsFields::Asf asf;
+    asf.Load();
+    default_quality = asf.quality;
+    gtk_box_append(GTK_BOX(box), LabeledSpin((std::string(TranscoderOptionsLabels::Bitrate()) + TranscoderOptionsLabels::Kbps()).c_str(), 0, 320,
+                                            std::max(0, asf.bitrate_bps / 1000), &bitrate_spin));
   } else {
     TranscoderOptionsFields::BitrateEncoder encoder;
-    if (format == Transcoder::Format::Opus) {
-      encoder.min_kbps = 48;
-      encoder.max_kbps = 256;
-    } else if (format == Transcoder::Format::ASF) {
-      encoder.max_kbps = 192;
-    }
     encoder.Load(format);
     default_quality = encoder.quality;
     gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("Quality (0–10)"), 0, 10, encoder.quality, &quality_spin));
@@ -332,10 +338,28 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
                          aac.shortctl = static_cast<int>(gtk_drop_down_get_selected(short_w));
                        }
                        aac.Save();
-                     } else if (format == Transcoder::Format::Opus || format == Transcoder::Format::ASF) {
-                       TranscoderOptionsFields::BitrateEncoder encoder;
-                       encoder.ApplyQuality(quality);
-                       encoder.Save(format);
+                     } else if (format == Transcoder::Format::Opus) {
+                       TranscoderOptionsFields::Opus opus;
+                       opus.Load();
+                       if (auto *bitrate_w = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "bitrate"))) {
+                         opus.bitrate_bps = static_cast<int>(gtk_spin_button_get_value(bitrate_w)) * 1000;
+                         quality = std::clamp((opus.bitrate_bps / 1000 - 48) * 10 / 208, 0, 10);
+                         opus.quality = quality;
+                       } else {
+                         opus.ApplyQuality(quality);
+                       }
+                       opus.Save();
+                     } else if (format == Transcoder::Format::ASF) {
+                       TranscoderOptionsFields::Asf asf;
+                       asf.Load();
+                       if (auto *bitrate_w = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "bitrate"))) {
+                         asf.bitrate_bps = static_cast<int>(gtk_spin_button_get_value(bitrate_w)) * 1000;
+                         quality = std::clamp((asf.bitrate_bps / 1000 - 64) * 10 / 128, 0, 10);
+                         asf.quality = quality;
+                       } else {
+                         asf.ApplyQuality(quality);
+                       }
+                       asf.Save();
                      } else {
                        TranscoderOptionsFields::QualityEncoder encoder;
                        encoder.ApplyQuality(quality);

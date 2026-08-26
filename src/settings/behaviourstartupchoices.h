@@ -2,6 +2,7 @@
 #define STRAWBERRY_BEHAVIOURSTARTUPCHOICES_H
 
 #include "constants/behavioursettings.h"
+#include "settings/behavioursettingslabels.h"
 
 #include <string>
 #include <utility>
@@ -14,12 +15,13 @@ inline bool IncludesHide(bool tray_available, bool tray_enabled) { return tray_a
 inline bool TrayDependentSensitive(bool tray_available, bool show_tray) { return tray_available && show_tray; }
 
 inline std::vector<std::pair<std::string, std::string>> StartupChoices(bool tray_available, bool tray_enabled) {
-  std::vector<std::pair<std::string, std::string>> choices = {{"1", "Remember"}, {"2", "Show"}};
+  std::vector<std::pair<std::string, std::string>> choices = {{"1", BehaviourSettingsLabels::Remember()},
+                                                             {"2", BehaviourSettingsLabels::ShowWindow()}};
   if (IncludesHide(tray_available, tray_enabled)) {
-    choices.emplace_back("3", "Hide");
+    choices.emplace_back("3", BehaviourSettingsLabels::HideWindow());
   }
-  choices.emplace_back("4", "Show maximized");
-  choices.emplace_back("5", "Show minimized");
+  choices.emplace_back("4", BehaviourSettingsLabels::ShowMaximized());
+  choices.emplace_back("5", BehaviourSettingsLabels::ShowMinimized());
   return choices;
 }
 

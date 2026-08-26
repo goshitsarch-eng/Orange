@@ -28,7 +28,7 @@ inline std::string PopupText(bool show_remaining, int64_t position_nanosec, int6
   return PositionLabel(position_nanosec) + " / " + DurationLabel(show_remaining, position_nanosec, length_nanosec);
 }
 
-inline const char *DurationTooltip() { return "Click to toggle remaining time"; }
+inline const char *DurationTooltip() { return "Click to toggle between remaining time and total time"; }
 
 }  // namespace TrackSliderTime
 

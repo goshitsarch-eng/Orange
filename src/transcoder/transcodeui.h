@@ -9,6 +9,10 @@ namespace TranscodeUi {
 
 inline const char *Title() { return "Transcode Music"; }
 inline const char *FilesGroup() { return "Files to transcode"; }
+inline const char *FilenameColumn() { return "Filename"; }
+inline const char *DirectoryColumn() { return "Directory"; }
+inline const char *ImportDirectory() { return "Import Directory"; }
+inline const char *Progress() { return "Progress"; }
 inline const char *AddFiles() { return "Add..."; }
 inline const char *Import() { return "Import..."; }
 inline const char *ImportTooltip() { return "Add all tracks from a directory and all its subdirectories"; }
@@ -79,6 +83,25 @@ inline std::string JoinPath(const std::string &dir, const std::string &name) {
     return dir + name;
   }
   return dir + "/" + name;
+}
+
+inline std::string FilenameOf(const std::string &path) {
+  const std::string::size_type slash = path.find_last_of('/');
+  return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+inline std::string DirectoryOf(const std::string &path) {
+  const std::string::size_type slash = path.find_last_of('/');
+  return slash == std::string::npos ? std::string() : path.substr(0, slash);
+}
+
+inline std::string QueueRowText(const QueueItem &item) {
+  const std::string name = FilenameOf(item.path);
+  const std::string dir = DirectoryOf(item.path);
+  if (dir.empty()) {
+    return name;
+  }
+  return name + "  —  " + dir;
 }
 
 inline std::string TrimBasename(const std::string &path) {

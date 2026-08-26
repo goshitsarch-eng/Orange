@@ -243,7 +243,7 @@ TEST(LanguageChoices, ListsSystemDefaultAndGerman) {
   const auto choices = LanguageChoices::All();
   ASSERT_FALSE(choices.empty());
   EXPECT_TRUE(choices.front().first.empty());
-  EXPECT_EQ("System default", choices.front().second);
+  EXPECT_EQ("Use the system default", choices.front().second);
   EXPECT_EQ("Deutsch (de_DE)", LanguageChoices::DisplayName("de_DE"));
   EXPECT_EQ(32u, choices.size());
 }

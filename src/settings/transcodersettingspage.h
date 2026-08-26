@@ -44,7 +44,7 @@ inline const char *TabLabel(Transcoder::Format format) {
     case Transcoder::Format::AAC:
       return "AAC";
     case Transcoder::Format::ASF:
-      return "ASF";
+      return "ASF (WMA)";
     case Transcoder::Format::MP3:
       return "MP3";
   }
@@ -78,7 +78,7 @@ inline const char *GroupName(Transcoder::Format format) {
     case Transcoder::Format::MP3:
       return "Transcoder/lamemp3enc";
     case Transcoder::Format::AAC:
-      return "Transcoder/avenc_aac";
+      return "Transcoder/faac";
     case Transcoder::Format::FLAC:
       return "Transcoder/flacenc";
     case Transcoder::Format::OggVorbis:
@@ -90,7 +90,7 @@ inline const char *GroupName(Transcoder::Format format) {
     case Transcoder::Format::WavPack:
       return "Transcoder/wavpackenc";
     case Transcoder::Format::ASF:
-      return "Transcoder/avenc_wmav2";
+      return "Transcoder/ffenc_wmav2";
   }
   return "Transcoder";
 }

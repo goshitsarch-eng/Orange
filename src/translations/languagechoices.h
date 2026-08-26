@@ -41,7 +41,7 @@ inline std::string DisplayName(const std::string &code) {
   if (code == "vi_VN") return "Tiếng Việt (vi_VN)";
   if (code == "zh_CN") return "简体中文 (zh_CN)";
   if (code == "zh_TW") return "繁體中文 (zh_TW)";
-  return code.empty() ? "System default" : code;
+  return code.empty() ? "Use the system default" : code;
 }
 
 inline std::vector<std::pair<std::string, std::string>> All() {

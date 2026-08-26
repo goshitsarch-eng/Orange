@@ -73,10 +73,17 @@ void RefreshList(State *state) {
   }
   for (const TranscodeUi::QueueItem &item : state->files) {
     GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *label = gtk_label_new(item.path.c_str());
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_MIDDLE);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
+    GtkWidget *cols = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 16);
+    GtkWidget *name = gtk_label_new(TranscodeUi::FilenameOf(item.path).c_str());
+    GtkWidget *dir = gtk_label_new(TranscodeUi::DirectoryOf(item.path).c_str());
+    gtk_widget_set_hexpand(name, TRUE);
+    gtk_widget_set_halign(name, GTK_ALIGN_START);
+    gtk_widget_set_halign(dir, GTK_ALIGN_START);
+    gtk_label_set_ellipsize(GTK_LABEL(name), PANGO_ELLIPSIZE_MIDDLE);
+    gtk_label_set_ellipsize(GTK_LABEL(dir), PANGO_ELLIPSIZE_MIDDLE);
+    gtk_box_append(GTK_BOX(cols), name);
+    gtk_box_append(GTK_BOX(cols), dir);
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), cols);
     gtk_list_box_append(GTK_LIST_BOX(state->list), row);
   }
 }
@@ -463,6 +470,17 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   gtk_widget_set_halign(queue_header, GTK_ALIGN_START);
   gtk_widget_add_css_class(queue_header, "heading");
   gtk_box_append(GTK_BOX(box), queue_header);
+  GtkWidget *columns = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 16);
+  GtkWidget *filename_col = gtk_label_new(Translations::CStr(TranscodeUi::FilenameColumn()));
+  GtkWidget *directory_col = gtk_label_new(Translations::CStr(TranscodeUi::DirectoryColumn()));
+  gtk_widget_add_css_class(filename_col, "dim-label");
+  gtk_widget_add_css_class(directory_col, "dim-label");
+  gtk_widget_set_hexpand(filename_col, TRUE);
+  gtk_widget_set_halign(filename_col, GTK_ALIGN_START);
+  gtk_widget_set_halign(directory_col, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(columns), filename_col);
+  gtk_box_append(GTK_BOX(columns), directory_col);
+  gtk_box_append(GTK_BOX(box), columns);
 
   state->list = gtk_list_box_new();
   gtk_widget_add_css_class(state->list, "boxed-list");
@@ -520,6 +538,7 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   gtk_box_append(GTK_BOX(box), dest_row);
   gtk_box_append(GTK_BOX(box), state->preserve);
 
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(TranscodeUi::Progress())));
   state->progress = gtk_progress_bar_new();
   state->status = gtk_label_new("");
   gtk_widget_set_halign(state->status, GTK_ALIGN_START);

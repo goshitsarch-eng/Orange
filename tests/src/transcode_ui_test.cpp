@@ -83,6 +83,13 @@ TEST(TranscodeUi, DestinationAlongsideMatchesQt) {
   EXPECT_STREQ("Add...", TranscodeUi::AddFiles());
   EXPECT_STREQ("Import...", TranscodeUi::Import());
   EXPECT_STREQ("Alongside the originals", TranscodeUi::Alongside());
+  EXPECT_STREQ("Filename", TranscodeUi::FilenameColumn());
+  EXPECT_STREQ("Directory", TranscodeUi::DirectoryColumn());
+  EXPECT_STREQ("Import Directory", TranscodeUi::ImportDirectory());
+  EXPECT_STREQ("Progress", TranscodeUi::Progress());
+  EXPECT_EQ("roads.flac", TranscodeUi::FilenameOf("/music/Dummy/roads.flac"));
+  EXPECT_EQ("/music/Dummy", TranscodeUi::DirectoryOf("/music/Dummy/roads.flac"));
+  EXPECT_EQ("roads.flac  —  /music/Dummy", TranscodeUi::QueueRowText({"/music/Dummy/roads.flac", "/music"}));
   EXPECT_STREQ("Select...", TranscodeUi::Select());
   EXPECT_STREQ("Preserve directory structure in output directory (import only)", TranscodeUi::Preserve());
   EXPECT_TRUE(TranscodeUi::IsAlongside(0));

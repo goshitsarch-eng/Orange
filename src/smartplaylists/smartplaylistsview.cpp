@@ -1,6 +1,7 @@
 #include "smartplaylists/smartplaylistsview.h"
 
 #include "smartplaylists/smartplaylistdrag.h"
+#include "smartplaylists/smartplaylistslabel.h"
 #include "translations/translations.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
@@ -149,12 +150,12 @@ void SmartPlaylistsView::ShowMenu(GtkWidget *relative, const SmartPlaylistsItem 
     add_button(Translations::CStr("Queue track"), SmartPlaylistsAction::Queue);
     add_button(Translations::CStr("Play next"), SmartPlaylistsAction::QueueNext);
   }
-  add_button(Translations::CStr("New smart playlist…"), SmartPlaylistsAction::New);
+  add_button(Translations::CStr(SmartPlaylistsLabel::NewPlaylist()), SmartPlaylistsAction::New);
   if (item && item->kind == SmartPlaylistsItem::Kind::Saved) {
-    add_button(Translations::CStr("Edit smart playlist…"), SmartPlaylistsAction::Edit);
-    add_button(Translations::CStr("Delete smart playlist"), SmartPlaylistsAction::Delete);
+    add_button(Translations::CStr(SmartPlaylistsLabel::EditPlaylist()), SmartPlaylistsAction::Edit);
+    add_button(Translations::CStr(SmartPlaylistsLabel::DeletePlaylist()), SmartPlaylistsAction::Delete);
   }
-  add_button(Translations::CStr("Restore defaults"), SmartPlaylistsAction::RestoreDefaults);
+  add_button(Translations::CStr(SmartPlaylistsLabel::RestoreDefaults()), SmartPlaylistsAction::RestoreDefaults);
   gtk_popover_set_child(GTK_POPOVER(popover), box);
   gtk_popover_popup(GTK_POPOVER(popover));
 }

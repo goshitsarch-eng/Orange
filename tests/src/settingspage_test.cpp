@@ -29,6 +29,9 @@
 #include "core/mainwindowsponsor.h"
 #include "settings/appearancesettingslabels.h"
 #include "settings/backendsettingslabels.h"
+#include "settings/behavioursettingslabels.h"
+#include "collection/savedgroupinglabels.h"
+#include "smartplaylists/smartplaylistslabel.h"
 #include "settings/collectionsettingslabels.h"
 #include "settings/contextsettingslabels.h"
 #include "dialogs/errordialoglabels.h"
@@ -299,7 +302,7 @@ TEST(TranscoderSettingsPage, TabsMatchQtOrderAndGroups) {
   EXPECT_EQ(Transcoder::Format::MP3, tabs[7]);
   EXPECT_STREQ("FLAC", TranscoderSettingsPage::TabLabel(Transcoder::Format::FLAC));
   EXPECT_STREQ("Vorbis", TranscoderSettingsPage::TabLabel(Transcoder::Format::OggVorbis));
-  EXPECT_STREQ("ASF", TranscoderSettingsPage::TabLabel(Transcoder::Format::ASF));
+  EXPECT_STREQ("ASF (WMA)", TranscoderSettingsPage::TabLabel(Transcoder::Format::ASF));
   EXPECT_STREQ("flac", TranscoderSettingsPage::TabId(Transcoder::Format::FLAC));
   EXPECT_STREQ("mp3", TranscoderSettingsPage::TabId(Transcoder::Format::MP3));
   EXPECT_EQ(TranscoderSettingsPage::FieldKind::Quality, TranscoderSettingsPage::FieldsFor(Transcoder::Format::FLAC));
@@ -470,7 +473,7 @@ TEST(BehaviourStartupChoices, HideAndTrayInterlocksMatchQt) {
   const auto with_hide = BehaviourStartupChoices::StartupChoices(true, true);
   ASSERT_EQ(5u, with_hide.size());
   EXPECT_EQ("3", with_hide[2].first);
-  EXPECT_EQ("Hide", with_hide[2].second);
+  EXPECT_EQ("Hide the main window", with_hide[2].second);
   EXPECT_TRUE(BehaviourStartupChoices::IncludesHide(true, true));
 
   const auto no_hide = BehaviourStartupChoices::StartupChoices(true, false);
@@ -620,4 +623,50 @@ TEST(ScrobblerSettingsLabels, MatchQtSubmitDelayCopy) {
   EXPECT_STREQ("User token:", ScrobblerSettingsLabels::UserToken());
   EXPECT_STREQ("https://listenbrainz.org/profile/", ScrobblerSettingsLabels::ListenBrainzProfileUrl());
   EXPECT_NE(std::string::npos, std::string(ScrobblerSettingsLabels::ListenBrainzTokenHint()).find("listenbrainz.org/profile"));
+}
+
+TEST(BehaviourSettingsLabels, MatchQtPlaybackAndStartupCopy) {
+  EXPECT_STREQ("Behavior", BehaviourSettingsLabels::PageTitle());
+  EXPECT_STREQ("Keep running in the background when the window is closed", BehaviourSettingsLabels::KeepRunning());
+  EXPECT_STREQ("Show song progress on system tray icon", BehaviourSettingsLabels::TrayProgress());
+  EXPECT_STREQ("Show song progress on taskbar", BehaviourSettingsLabels::TaskbarProgress());
+  EXPECT_STREQ("Resume playback on start", BehaviourSettingsLabels::ResumePlayback());
+  EXPECT_STREQ("On startup", BehaviourSettingsLabels::OnStartup());
+  EXPECT_STREQ("Remember from last time", BehaviourSettingsLabels::Remember());
+  EXPECT_STREQ("Hide the main window", BehaviourSettingsLabels::HideWindow());
+  EXPECT_STREQ("Use the system default", BehaviourSettingsLabels::SystemLanguage());
+  EXPECT_STREQ("Using the menu to add a song will...", BehaviourSettingsLabels::MenuPlay());
+  EXPECT_STREQ("Never start playing", BehaviourSettingsLabels::NeverPlay());
+  EXPECT_STREQ("Play if there is nothing already playing", BehaviourSettingsLabels::PlayIfStopped());
+  EXPECT_STREQ("Jump to previous song right away", BehaviourSettingsLabels::PreviousJump());
+  EXPECT_STREQ("Restart song, then jump to previous if pressed again", BehaviourSettingsLabels::PreviousRestart());
+  EXPECT_STREQ("Append to the playlist", BehaviourSettingsLabels::Append());
+  EXPECT_STREQ("Replace the playlist", BehaviourSettingsLabels::Replace());
+  EXPECT_STREQ("Add to the queue", BehaviourSettingsLabels::Enqueue());
+  EXPECT_STREQ("Change the currently playing song", BehaviourSettingsLabels::ChangePlaying());
+  EXPECT_STREQ("Seeking using a keyboard shortcut or mouse wheel", BehaviourSettingsLabels::Seeking());
+  EXPECT_STREQ("Time step", BehaviourSettingsLabels::TimeStep());
+  EXPECT_STREQ("Volume Increment", BehaviourSettingsLabels::VolumeIncrement());
+  const auto add = BehaviourSettingsLabels::DoubleClickAddChoices();
+  ASSERT_EQ(4u, add.size());
+  EXPECT_EQ("1", add[0].first);
+  EXPECT_EQ("3", add[1].first);
+  EXPECT_EQ("4", add[2].first);
+  EXPECT_EQ("2", add[3].first);
+}
+
+TEST(SavedGroupingLabels, MatchQtManagerCopy) {
+  EXPECT_STREQ("Saved Grouping Manager", SavedGroupingLabels::Title());
+  EXPECT_STREQ("Name", SavedGroupingLabels::Name());
+  EXPECT_STREQ("First level", SavedGroupingLabels::FirstLevel());
+  EXPECT_STREQ("Second Level", SavedGroupingLabels::SecondLevel());
+  EXPECT_STREQ("Third Level", SavedGroupingLabels::ThirdLevel());
+  EXPECT_STREQ("Remove", SavedGroupingLabels::Remove());
+}
+
+TEST(SmartPlaylistsLabel, MatchQtToolbarCopy) {
+  EXPECT_STREQ("New smart playlist", SmartPlaylistsLabel::NewPlaylist());
+  EXPECT_STREQ("Edit smart playlist", SmartPlaylistsLabel::EditPlaylist());
+  EXPECT_STREQ("Delete smart playlist", SmartPlaylistsLabel::DeletePlaylist());
+  EXPECT_STREQ("Restore defaults", SmartPlaylistsLabel::RestoreDefaults());
 }
