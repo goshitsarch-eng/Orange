@@ -64,10 +64,15 @@ SongLoader::Result SongLoader::LoadMany(const std::vector<std::string> &urls) {
 }
 
 SongLoader::Result SongLoader::LoadFilenamesBlocking() {
-  for (const std::string &path : pending_paths_) {
-    LoadLocal(path);
-  }
+  const std::vector<std::string> queued = pending_paths_;
   pending_paths_.clear();
+  for (const std::string &path : queued) {
+    if (FileUtils::IsDirectory(path)) {
+      LoadLocalDirectory(path);
+    } else {
+      LoadLocal(path);
+    }
+  }
   return songs_.empty() ? Result::Error : Result::Success;
 }
 
