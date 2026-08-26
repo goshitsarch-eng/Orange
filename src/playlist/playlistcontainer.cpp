@@ -2,6 +2,9 @@
 
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
+#include "filterparser/filterparser.h"
+#include "playlist/playlistfiltersync.h"
+#include "playlist/playlistundostate.h"
 #include "translations/translations.h"
 #include "widgets/filtersearchkeyboard.h"
 
@@ -35,8 +38,9 @@ PlaylistContainer::PlaylistContainer()
   add_tool("document-open-symbolic", Translations::Tr("Load playlist").c_str(), "load");
   add_tool("document-save-symbolic", Translations::Tr("Save playlist").c_str(), "save");
   clear_button_ = add_tool("edit-clear-all-symbolic", Translations::Tr("Clear playlist").c_str(), "clear");
-  add_tool("edit-undo-symbolic", Translations::Tr("Undo").c_str(), "undo");
-  add_tool("edit-redo-symbolic", Translations::Tr("Redo").c_str(), "redo");
+  undo_button_ = add_tool("edit-undo-symbolic", Translations::CStr(PlaylistUndoState::UndoTooltip(false)), "undo");
+  redo_button_ = add_tool("edit-redo-symbolic", Translations::CStr(PlaylistUndoState::RedoTooltip(false)), "redo");
+  UpdateUndoRedoChrome(false, false);
 
   auto make_menu_button = [](const char *icon, const char *tooltip) {
     GtkWidget *button = gtk_menu_button_new();
@@ -117,9 +121,13 @@ PlaylistContainer::PlaylistContainer()
   gtk_box_append(GTK_BOX(toolbar_), shuffle_button_);
   filter_entry_ = gtk_search_entry_new();
   gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter_entry_), Translations::Tr("Filter playlist").c_str());
+  gtk_widget_set_tooltip_text(filter_entry_, Translations::CStr(FilterParser::ToolTip().c_str()));
   gtk_widget_set_hexpand(filter_entry_, TRUE);
   g_signal_connect(filter_entry_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<PlaylistContainer *>(data);
+                     if (self->updating_filter_) {
+                       return;
+                     }
                      self->filter_ = gtk_editable_get_text(GTK_EDITABLE(entry));
                      if (self->filter_changed_) {
                        self->filter_changed_(self->filter_);
@@ -169,6 +177,33 @@ void PlaylistContainer::SetFilterChangedCallback(const std::function<void(const 
 void PlaylistContainer::FocusFilter() {
   if (filter_entry_) {
     gtk_widget_grab_focus(filter_entry_);
+  }
+}
+
+void PlaylistContainer::SetFilterText(const std::string &text) {
+  if (!filter_entry_ || !PlaylistFilterSync::ShouldSyncEntry(filter_, text)) {
+    return;
+  }
+  updating_filter_ = true;
+  filter_ = text;
+  gtk_editable_set_text(GTK_EDITABLE(filter_entry_), text.c_str());
+  updating_filter_ = false;
+}
+
+void PlaylistContainer::UpdateNoMatchesOverlay() {
+  if (view_) {
+    view_->UpdateNoMatchesOverlay();
+  }
+}
+
+void PlaylistContainer::UpdateUndoRedoChrome(bool can_undo, bool can_redo) {
+  if (undo_button_) {
+    gtk_widget_set_sensitive(undo_button_, PlaylistUndoState::UndoEnabled(can_undo) ? TRUE : FALSE);
+    gtk_widget_set_tooltip_text(undo_button_, Translations::CStr(PlaylistUndoState::UndoTooltip(can_undo)));
+  }
+  if (redo_button_) {
+    gtk_widget_set_sensitive(redo_button_, PlaylistUndoState::RedoEnabled(can_redo) ? TRUE : FALSE);
+    gtk_widget_set_tooltip_text(redo_button_, Translations::CStr(PlaylistUndoState::RedoTooltip(can_redo)));
   }
 }
 

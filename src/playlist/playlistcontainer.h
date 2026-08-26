@@ -39,16 +39,22 @@ class PlaylistContainer {
   void SetSummary(const std::string &text);
   void ApplyLook();
   void FocusFilter();
+  void SetFilterText(const std::string &text);
+  void UpdateNoMatchesOverlay();
+  void UpdateUndoRedoChrome(bool can_undo, bool can_redo);
   GtkWidget *filter_entry() const { return filter_entry_; }
 
  private:
   GtkWidget *widget_ = nullptr;
   GtkWidget *toolbar_ = nullptr;
   GtkWidget *clear_button_ = nullptr;
+  GtkWidget *undo_button_ = nullptr;
+  GtkWidget *redo_button_ = nullptr;
   GtkWidget *summary_ = nullptr;
   GtkWidget *repeat_button_ = nullptr;
   GtkWidget *shuffle_button_ = nullptr;
   GtkWidget *filter_entry_ = nullptr;
+  bool updating_filter_ = false;
   std::vector<GtkWidget *> repeat_items_;
   std::vector<GtkWidget *> shuffle_items_;
   bool updating_sequence_ = false;

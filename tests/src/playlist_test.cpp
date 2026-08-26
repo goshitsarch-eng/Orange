@@ -1,9 +1,14 @@
 #include "core/playerrepeat.h"
+#include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistfilterempty.h"
+#include "playlist/playlistfiltersync.h"
 #include "playlist/playlistplayed.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistshuffle.h"
 #include "playlist/playlistsummary.h"
+#include "playlist/playlistundolimits.h"
+#include "playlist/playlistundostate.h"
 #include "utilities/fileutils.h"
 
 #include <gtest/gtest.h>
@@ -487,6 +492,66 @@ TEST(PlaylistSummary, UsesSelectionWhenMoreThanOneRow) {
   EXPECT_EQ(2, input.selected_tracks);
   EXPECT_EQ(240000000000LL, input.selected_length_ns);
   EXPECT_EQ("2 selected of 3 tracks - [ 4 minutes ]", PlaylistSummary::Format(input));
+}
+
+TEST(PlaylistFilterEmpty, ShowsOnlyWhenPlaylistHasRowsButNoneVisible) {
+  EXPECT_FALSE(PlaylistFilterEmpty::ShouldShow(0, 0));
+  EXPECT_FALSE(PlaylistFilterEmpty::ShouldShow(5, 5));
+  EXPECT_FALSE(PlaylistFilterEmpty::ShouldShow(5, 1));
+  EXPECT_TRUE(PlaylistFilterEmpty::ShouldShow(5, 0));
+  EXPECT_STREQ("No matches found. Clear the search box to show the whole playlist again.", PlaylistFilterEmpty::Message());
+}
+
+TEST(PlaylistFilterSync, RestoresStoredFilterWhenEntryDiffers) {
+  Playlist playlist;
+  playlist.SetFilterString("artist:Queen");
+  EXPECT_EQ("artist:Queen", PlaylistFilterSync::FilterForPlaylist(&playlist));
+  EXPECT_EQ("", PlaylistFilterSync::FilterForPlaylist(nullptr));
+  EXPECT_TRUE(PlaylistFilterSync::ShouldSyncEntry("foo", "artist:Queen"));
+  EXPECT_FALSE(PlaylistFilterSync::ShouldSyncEntry("artist:Queen", "artist:Queen"));
+  EXPECT_EQ("artist:Queen", PlaylistFilterSync::EntryFromPlaylist(playlist.filter_string()));
+}
+
+TEST(PlaylistUndoLimits, ConfirmsClearWhenOverUndoLimit) {
+  EXPECT_EQ(500, PlaylistUndoLimits::kUndoItemLimit);
+  EXPECT_FALSE(PlaylistUndoLimits::NeedsClearConfirmation(0));
+  EXPECT_FALSE(PlaylistUndoLimits::NeedsClearConfirmation(500));
+  EXPECT_TRUE(PlaylistUndoLimits::NeedsClearConfirmation(501));
+  EXPECT_STREQ("Clear playlist", PlaylistUndoLimits::ClearConfirmTitle());
+  EXPECT_EQ("Playlist has 501 songs, too large to undo, are you sure you want to clear the playlist?",
+            PlaylistUndoLimits::ClearConfirmBody(501));
+}
+
+TEST(PlaylistUndoState, EnablesButtonsFromStack) {
+  EXPECT_TRUE(PlaylistUndoState::UndoEnabled(true));
+  EXPECT_FALSE(PlaylistUndoState::UndoEnabled(false));
+  EXPECT_TRUE(PlaylistUndoState::RedoEnabled(true));
+  EXPECT_FALSE(PlaylistUndoState::RedoEnabled(false));
+  EXPECT_STREQ("Undo", PlaylistUndoState::UndoTooltip(true));
+  EXPECT_STREQ("Redo", PlaylistUndoState::RedoTooltip(false));
+}
+
+TEST(SavePlaylistsOptions, BuildsDestinationAndValidates) {
+  EXPECT_STREQ("Select directory for saving playlists", SavePlaylistsOptions::Title());
+  EXPECT_STREQ("Select directory for the playlists", SavePlaylistsOptions::BrowseTitle());
+  EXPECT_STREQ("Type", SavePlaylistsOptions::TypeLabel());
+  EXPECT_STREQ("Directory does not exist.", SavePlaylistsOptions::DirectoryMissingTitle());
+  EXPECT_STREQ("Directory does not exist.", SavePlaylistsOptions::DirectoryMissingBody());
+  EXPECT_EQ("Mix.m3u8", SavePlaylistsOptions::DestFilename("Mix", "m3u8"));
+  EXPECT_EQ("Mix.pls", SavePlaylistsOptions::DestFilename("Mix", ".pls"));
+  const auto choices = SavePlaylistsOptions::ExtensionChoices();
+  ASSERT_EQ(5u, choices.size());
+  EXPECT_EQ("m3u", choices.front());
+  EXPECT_EQ("asx", choices.back());
+  EXPECT_EQ(0, SavePlaylistsOptions::ExtensionIndex(choices, "m3u"));
+  EXPECT_EQ(2, SavePlaylistsOptions::ExtensionIndex(choices, "pls"));
+  EXPECT_EQ(0, SavePlaylistsOptions::ExtensionIndex(choices, "unknown"));
+  EXPECT_EQ("/home/user", SavePlaylistsOptions::FallbackPath("", "/home/user"));
+  EXPECT_EQ("/tmp/playlists", SavePlaylistsOptions::FallbackPath("/tmp/playlists", "/home/user"));
+  EXPECT_EQ("m3u", SavePlaylistsOptions::DefaultExtension(""));
+  EXPECT_EQ("xspf", SavePlaylistsOptions::DefaultExtension("xspf"));
+  EXPECT_FALSE(SavePlaylistsOptions::ValidateDirectory(""));
+  EXPECT_TRUE(SavePlaylistsOptions::ValidateDirectory("/tmp"));
 }
 
 TEST(PlaylistPlayed, RemapsStackAfterRemoveAndMove) {

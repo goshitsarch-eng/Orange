@@ -67,6 +67,7 @@ class PlaylistView {
   double last_click_cell_width() const { return last_click_cell_width_; }
   void StartInlineEdit(int row, PlaylistColumn column);
   int visible_count() const { return visible_count_; }
+  void UpdateNoMatchesOverlay();
   void SetPlaybackProgress(double progress);
   void SetGlowing(bool glowing);
 
@@ -88,6 +89,7 @@ class PlaylistView {
   GtkWidget *grid_ = nullptr;
   GtkWidget *overlay_ = nullptr;
   GtkWidget *drop_overlay_ = nullptr;
+  GtkWidget *no_matches_ = nullptr;
   PlaylistDropIndicator::State drop_state_;
   std::unique_ptr<PlaylistHeader> header_;
   std::unique_ptr<MoodbarItemDelegate> moodbar_;

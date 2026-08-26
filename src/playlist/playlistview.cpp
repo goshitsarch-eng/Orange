@@ -12,9 +12,11 @@
 #include "playlist/playlistratingclick.h"
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistfilter.h"
+#include "playlist/playlistfilterempty.h"
 #include "playlist/playlistkeyboard.h"
 #include "playlist/playlistlook.h"
 #include "playlist/playlisttagcompletion.h"
+#include "translations/translations.h"
 #include "utilities/strutils.h"
 #include "utilities/styleutils.h"
 #include "widgets/filtersearchkeyboard.h"
@@ -69,6 +71,18 @@ PlaylistView::PlaylistView() {
                                  },
                                  this, nullptr);
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay_), drop_overlay_);
+  no_matches_ = gtk_label_new(Translations::CStr(PlaylistFilterEmpty::Message()));
+  gtk_label_set_wrap(GTK_LABEL(no_matches_), TRUE);
+  gtk_label_set_justify(GTK_LABEL(no_matches_), GTK_JUSTIFY_CENTER);
+  gtk_label_set_xalign(GTK_LABEL(no_matches_), 0.5f);
+  gtk_widget_add_css_class(no_matches_, "dim-label");
+  gtk_widget_set_halign(no_matches_, GTK_ALIGN_CENTER);
+  gtk_widget_set_valign(no_matches_, GTK_ALIGN_CENTER);
+  gtk_widget_set_margin_start(no_matches_, 24);
+  gtk_widget_set_margin_end(no_matches_, 24);
+  gtk_widget_set_can_target(no_matches_, FALSE);
+  gtk_widget_set_visible(no_matches_, FALSE);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay_), no_matches_);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), overlay_);
   GtkGesture *gesture = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
@@ -482,6 +496,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
   gtk_box_append(GTK_BOX(grid_), header_->widget());
   if (!playlist) {
     visible_count_ = 0;
+    UpdateNoMatchesOverlay();
     return;
   }
   playlist->SetFilterString(filter_);
@@ -610,6 +625,15 @@ void PlaylistView::Refresh(Playlist *playlist) {
     ++visible_count_;
   }
   ApplyColumnWidths();
+  UpdateNoMatchesOverlay();
+}
+
+void PlaylistView::UpdateNoMatchesOverlay() {
+  if (!no_matches_) {
+    return;
+  }
+  const int total = playlist_ ? playlist_->row_count() : 0;
+  gtk_widget_set_visible(no_matches_, PlaylistFilterEmpty::ShouldShow(total, visible_count_) ? TRUE : FALSE);
 }
 
 void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {

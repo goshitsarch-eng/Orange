@@ -22,6 +22,8 @@
 #include "fileview/fileview.h"
 #include "fileview/fileviewsongs.h"
 #include "playlist/playlistcontainer.h"
+#include "playlist/playlistfiltersync.h"
+#include "playlist/playlistundolimits.h"
 #include "playlist/playlistfolders.h"
 #include "playlist/playlisttabnav.h"
 #include "playlist/playlisttabmenu.h"
@@ -1338,6 +1340,9 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->SetActionCallback("redo", [this] { RedoPlaylist(); });
   playlist_container_->SetFilterChangedCallback([this](const std::string &filter) {
     playlist_filter_ = filter;
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      playlist->SetFilterString(filter);
+    }
     RefreshPlaylist();
   });
   playlist_container_->view()->SetActivateCallback([this](int index) { app_->player()->PlayAt(index); });
@@ -1912,9 +1917,22 @@ void MainWindow::RefreshPlaylist() {
     selection_playlist_name_ = playlist ? playlist->name() : std::string();
   }
   playlist_container_->ApplyLook();
+  if (playlist) {
+    const std::string stored = PlaylistFilterSync::FilterForPlaylist(playlist);
+    if (PlaylistFilterSync::ShouldSyncEntry(playlist_container_->filter_string(), stored)) {
+      playlist_container_->SetFilterText(PlaylistFilterSync::EntryFromPlaylist(stored));
+    }
+    playlist_filter_ = PlaylistFilterSync::FilterForPlaylist(playlist);
+    playlist_container_->UpdateUndoRedoChrome(playlist->CanUndo(), playlist->CanRedo());
+  } else {
+    playlist_filter_.clear();
+    playlist_container_->SetFilterText({});
+    playlist_container_->UpdateUndoRedoChrome(false, false);
+  }
   playlist_container_->view()->SetFilterString(playlist_filter_);
   playlist_container_->view()->SetSelectedRows(selected_playlist_rows_);
   playlist_container_->view()->Refresh(playlist);
+  playlist_container_->UpdateNoMatchesOverlay();
   if (playlist) {
     playlist_container_->dynamic_controls()->SetSearch(playlist->dynamic_search());
     playlist_container_->dynamic_controls()->SetVisible(playlist->is_dynamic());
@@ -2318,6 +2336,24 @@ void MainWindow::ClearPlaylist() {
   Settings settings;
   settings.BeginGroup(PlaylistSettings::kSettingsGroup);
   if (!settings.BoolValue(PlaylistSettings::kPlaylistClear, PlaylistSettings::kDefaultPlaylistClear)) {
+    return;
+  }
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (playlist && PlaylistUndoLimits::NeedsClearConfirmation(playlist->row_count())) {
+    const std::string body = PlaylistUndoLimits::ClearConfirmBody(playlist->row_count());
+    AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(PlaylistUndoLimits::ClearConfirmTitle()), body.c_str()));
+    adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "clear", Translations::CStr("Clear"), nullptr);
+    adw_alert_dialog_set_response_appearance(dialog, "clear", ADW_RESPONSE_DESTRUCTIVE);
+    g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
+                       if (g_strcmp0(response, "clear") != 0) {
+                         return;
+                       }
+                       auto *self = static_cast<MainWindow *>(data);
+                       self->app_->playlist_manager()->ClearCurrent();
+                       self->RefreshPlaylist();
+                     }),
+                     this);
+    adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
     return;
   }
   app_->playlist_manager()->ClearCurrent();
