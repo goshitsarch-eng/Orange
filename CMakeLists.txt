@@ -255,6 +255,27 @@ set(STRAWBERRY_SOURCES
   src/ui/mainwindow.cpp
   src/ui/settingsdialog.cpp
   src/ui/dialogs.cpp
+  src/settings/settingspage.cpp
+  src/settings/behavioursettingspage.cpp
+  src/settings/collectionsettingspage.cpp
+  src/settings/backendsettingspage.cpp
+  src/settings/playlistsettingspage.cpp
+  src/settings/scrobblersettingspage.cpp
+  src/settings/coverssettingspage.cpp
+  src/settings/lyricssettingspage.cpp
+  src/settings/transcodersettingspage.cpp
+  src/settings/networkproxysettingspage.cpp
+  src/settings/appearancesettingspage.cpp
+  src/settings/contextsettingspage.cpp
+  src/settings/notificationssettingspage.cpp
+  src/settings/globalshortcutssettingspage.cpp
+  src/settings/moodbarsettingspage.cpp
+  src/settings/waveformsettingspage.cpp
+  src/settings/subsonicsettingspage.cpp
+  src/settings/tidalsettingspage.cpp
+  src/settings/qobuzsettingspage.cpp
+  src/settings/spotifysettingspage.cpp
+  src/settings/radiosettingspage.cpp
   ${GRESOURCE_C}
 )
 
@@ -350,6 +371,7 @@ if(GTest_FOUND)
     tests/src/scrobbler_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
+    tests/src/settingspage_test.cpp
     tests/src/jsonutils_test.cpp
     src/core/logging.cpp
     src/core/standardpaths.cpp

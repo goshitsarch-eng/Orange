@@ -46,7 +46,7 @@ void Application::Init() {
   {
     Settings settings;
     settings.BeginGroup("Collection");
-    if (settings.BoolValue("startupscan", true)) {
+    if (settings.BoolValue("startup_scan", settings.BoolValue("startupscan", true))) {
       collection_->IncrementalScan();
     }
   }

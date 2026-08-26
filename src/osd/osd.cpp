@@ -14,16 +14,24 @@
 void OSD::ReloadSettings() {
   Settings s;
   s.BeginGroup("OSD");
-  enabled_ = s.BoolValue("enabled", true);
-  show_art_ = s.BoolValue("showart", true);
-  type_ = s.Value("type", "native");
-  timeout_ms_ = s.IntValue("timeout", 4000);
-  fg_ = s.Value("foreground", "#ffffff");
-  bg_ = s.Value("background", "#202020");
-  opacity_ = s.DoubleValue("opacity", 0.92);
+  if (s.Contains("Behaviour")) {
+    const int type = s.IntValue("Behaviour", 1);
+    enabled_ = type != 0;
+    type_ = type == 3 ? "pretty" : (type == 2 ? "tray" : "native");
+  } else {
+    enabled_ = s.BoolValue("enabled", true);
+    type_ = s.Value("type", "native");
+  }
+  show_art_ = s.Contains("ShowArt") ? s.BoolValue("ShowArt", true) : s.BoolValue("showart", true);
+  timeout_ms_ = s.Contains("Timeout") ? s.IntValue("Timeout", 5000) : s.IntValue("timeout", 4000);
+  s.BeginGroup("OSDPretty");
+  fg_ = s.Contains("foreground_color") ? s.Value("foreground_color") : s.Value("foreground", "#ffffff");
+  bg_ = s.Contains("background_color") ? s.Value("background_color") : s.Value("background", "#202020");
+  opacity_ = s.Contains("background_opacity") ? s.DoubleValue("background_opacity", 0.85) : s.DoubleValue("opacity", 0.92);
+  font_ = s.Contains("font") ? s.Value("font", "Verdana,9,-1,5,50,0,0,0,0,0") : s.Value("font", "Sans 12");
+  s.BeginGroup("OSD");
   pos_x_ = s.IntValue("posx", 40);
   pos_y_ = s.IntValue("posy", 40);
-  font_ = s.Value("font", "Sans 12");
 }
 
 void OSD::ShowMessage(const std::string &summary, const std::string &body, const std::string &icon) {

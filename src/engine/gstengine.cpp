@@ -28,12 +28,17 @@ bool GstEngine::Init() {
   output_ = settings.Value("output", DefaultOutput());
   device_ = settings.Value("device");
   replaygain_enabled_ = settings.BoolValue("rgenabled", false);
-  replaygain_mode_ = settings.Value("rgmode", "album") == "track" ? 1 : 0;
+  if (settings.Contains("rgmode")) {
+    const std::string mode = settings.Value("rgmode");
+    replaygain_mode_ = (mode == "track" || mode == "1") ? 1 : settings.IntValue("rgmode", 0);
+  }
   replaygain_preamp_ = settings.IntValue("rgpreamp", 0);
   stereo_balance_ = static_cast<float>(settings.IntValue("stereobalance", 0)) / 100.0f;
-  fading_enabled_ = settings.BoolValue("fading", false);
-  autocrossfade_enabled_ = settings.BoolValue("autocrossfade", fading_enabled_);
-  fade_duration_ms_ = std::max(100, settings.IntValue("fadeduration", 2000));
+  fading_enabled_ = settings.Contains("FadeoutEnabled") ? settings.BoolValue("FadeoutEnabled") : settings.BoolValue("fading", false);
+  autocrossfade_enabled_ = settings.Contains("AutoCrossfadeEnabled") ? settings.BoolValue("AutoCrossfadeEnabled")
+                                                                    : settings.BoolValue("autocrossfade", fading_enabled_);
+  fade_duration_ms_ = std::max(100, settings.Contains("FadeoutDuration") ? settings.IntValue("FadeoutDuration", 2000)
+                                                                        : settings.IntValue("fadeduration", 2000));
   return true;
 }
 

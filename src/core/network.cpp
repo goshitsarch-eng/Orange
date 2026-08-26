@@ -11,7 +11,8 @@ NetworkAccessManager::NetworkAccessManager() {
   Settings settings;
   settings.BeginGroup("NetworkProxy");
   const std::string type = settings.Value("type");
-  if (type == "manual" || type == "http" || type == "socks") {
+  const int mode = settings.IntValue("mode", -1);
+  if (mode == 2 || type == "manual" || type == "http" || type == "socks" || type == "3" || type == "1") {
     const std::string host = settings.Value("hostname");
     const int port = settings.IntValue("port", 0);
     if (!host.empty() && port > 0) {

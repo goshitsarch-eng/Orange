@@ -827,8 +827,8 @@ void MainWindow::RefreshCollection(const std::string &filter, bool update_text) 
   settings.BeginGroup("Collection");
   const CollectionGrouping::Node tree =
       CollectionGrouping::BuildTree(songs, grouping_, CollectionGrouping::SeparateAlbumsByGrouping(),
-                                    settings.BoolValue("sort_skip_articles_for_artists", false),
-                                    settings.BoolValue("sort_skip_articles_for_albums", false));
+                                    settings.BoolValue("skip_articles_for_artists", settings.BoolValue("sort_skip_articles_for_artists", true)),
+                                    settings.BoolValue("skip_articles_for_albums", settings.BoolValue("sort_skip_articles_for_albums", false)));
   AppendCollectionNode(collection_list_, tree, 0);
   if (status_label_) {
     gtk_label_set_text(GTK_LABEL(status_label_), (std::to_string(songs.size()) + " songs").c_str());

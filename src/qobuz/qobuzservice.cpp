@@ -13,7 +13,10 @@ QobuzService::QobuzService(NetworkAccessManager *network) : network_(network) { 
 void QobuzService::ReloadSettings() {
   Settings settings;
   settings.BeginGroup("Qobuz");
-  app_id_ = settings.Value("appid");
+  app_id_ = settings.Value("app_id");
+  if (app_id_.empty()) {
+    app_id_ = settings.Value("appid");
+  }
   user_auth_token_ = settings.Value("token");
   if (user_auth_token_.empty()) {
     user_auth_token_ = settings.Value("user_auth_token");

@@ -33,13 +33,17 @@ GstEngine::State Player::GetState() const { return engine_->state(); }
 void Player::ReloadSettings() {
   Settings settings;
   settings.BeginGroup("Behaviour");
-  seek_step_sec_ = settings.IntValue("seekstep", 10);
-  volume_increment_ = static_cast<unsigned>(settings.IntValue("volumeincrement", 5));
+  seek_step_sec_ = settings.Contains("seek_step_sec") ? settings.IntValue("seek_step_sec", 10) : settings.IntValue("seekstep", 10);
+  volume_increment_ = static_cast<unsigned>(settings.Contains("volume_increment") ? settings.IntValue("volume_increment", 5)
+                                                                                : settings.IntValue("volumeincrement", 5));
   settings.EndGroup();
   settings.BeginGroup("Backend");
-  engine_->SetFadingEnabled(settings.BoolValue("fading", false));
-  engine_->SetAutoCrossfadeEnabled(settings.BoolValue("autocrossfade", settings.BoolValue("fading", false)));
-  engine_->SetFadeDurationMs(settings.IntValue("fadeduration", 2000));
+  const bool fading = settings.Contains("FadeoutEnabled") ? settings.BoolValue("FadeoutEnabled") : settings.BoolValue("fading", false);
+  engine_->SetFadingEnabled(fading);
+  engine_->SetAutoCrossfadeEnabled(settings.Contains("AutoCrossfadeEnabled") ? settings.BoolValue("AutoCrossfadeEnabled")
+                                                                            : settings.BoolValue("autocrossfade", fading));
+  engine_->SetFadeDurationMs(settings.Contains("FadeoutDuration") ? settings.IntValue("FadeoutDuration", 2000)
+                                                                 : settings.IntValue("fadeduration", 2000));
 }
 
 void Player::LoadVolume() {
