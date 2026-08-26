@@ -109,6 +109,171 @@ struct QualityEncoder {
   }
 };
 
+struct Vorbis {
+  int quality = 5;
+  bool managed = false;
+  int bitrate_bps = -1;
+  int min_bitrate_bps = -1;
+  int max_bitrate_bps = -1;
+
+  void ApplyQuality(int value) { quality = std::clamp(value, 0, 10); }
+
+  void Load() {
+    Settings settings;
+    settings.BeginGroup(GroupFor(Transcoder::Format::OggVorbis));
+    const double stored = settings.DoubleValue("quality", static_cast<double>(quality) / 10.0);
+    if (stored > 0 && stored <= 1.0) {
+      quality = std::clamp(static_cast<int>(stored * 10.0 + 0.5), 0, 10);
+    } else {
+      quality = settings.IntValue("quality", quality);
+    }
+    managed = settings.BoolValue("managed", managed);
+    bitrate_bps = settings.IntValue("bitrate", bitrate_bps);
+    min_bitrate_bps = settings.IntValue("min-bitrate", min_bitrate_bps);
+    max_bitrate_bps = settings.IntValue("max-bitrate", max_bitrate_bps);
+  }
+
+  void Save() const {
+    Settings settings;
+    settings.BeginGroup(GroupFor(Transcoder::Format::OggVorbis));
+    settings.SetDoubleValue("quality", static_cast<double>(quality) / 10.0);
+    settings.SetBoolValue("managed", managed);
+    settings.SetIntValue("bitrate", bitrate_bps);
+    settings.SetIntValue("min-bitrate", min_bitrate_bps);
+    settings.SetIntValue("max-bitrate", max_bitrate_bps);
+    settings.Sync();
+  }
+
+  std::string Pipeline() const {
+    if (managed) {
+      std::string fragment = "vorbisenc managed=true";
+      if (bitrate_bps > 0) {
+        fragment += " bitrate=" + std::to_string(bitrate_bps);
+      }
+      if (min_bitrate_bps > 0) {
+        fragment += " min-bitrate=" + std::to_string(min_bitrate_bps);
+      }
+      if (max_bitrate_bps > 0) {
+        fragment += " max-bitrate=" + std::to_string(max_bitrate_bps);
+      }
+      return fragment + " ! oggmux";
+    }
+    return "vorbisenc quality=" + std::to_string(static_cast<double>(quality) / 10.0) + " ! oggmux";
+  }
+};
+
+struct Speex {
+  int quality = 5;
+  int bitrate_bps = 0;
+  int mode = 0;
+  bool vbr = false;
+  int abr_bps = 0;
+  bool vad = false;
+  bool dtx = false;
+  int complexity = 3;
+  int nframes = 1;
+
+  void ApplyQuality(int value) { quality = std::clamp(value, 0, 10); }
+
+  void Load() {
+    Settings settings;
+    settings.BeginGroup(GroupFor(Transcoder::Format::Speex));
+    quality = settings.IntValue("quality", quality);
+    bitrate_bps = settings.IntValue("bitrate", bitrate_bps);
+    mode = settings.IntValue("mode", mode);
+    vbr = settings.BoolValue("vbr", vbr);
+    abr_bps = settings.IntValue("abr", abr_bps);
+    vad = settings.BoolValue("vad", vad);
+    dtx = settings.BoolValue("dtx", dtx);
+    complexity = settings.IntValue("complexity", complexity);
+    nframes = settings.IntValue("nframes", nframes);
+  }
+
+  void Save() const {
+    Settings settings;
+    settings.BeginGroup(GroupFor(Transcoder::Format::Speex));
+    settings.SetIntValue("quality", quality);
+    settings.SetIntValue("bitrate", bitrate_bps);
+    settings.SetIntValue("mode", mode);
+    settings.SetBoolValue("vbr", vbr);
+    settings.SetIntValue("abr", abr_bps);
+    settings.SetBoolValue("vad", vad);
+    settings.SetBoolValue("dtx", dtx);
+    settings.SetIntValue("complexity", complexity);
+    settings.SetIntValue("nframes", nframes);
+    settings.Sync();
+  }
+
+  std::string Pipeline() const {
+    std::string fragment = "speexenc quality=" + std::to_string(std::clamp(quality, 0, 10));
+    if (bitrate_bps > 0) {
+      fragment += " bitrate=" + std::to_string(bitrate_bps);
+    }
+    if (mode > 0) {
+      fragment += " mode=" + std::to_string(mode);
+    }
+    if (vbr) {
+      fragment += " vbr=true";
+    }
+    if (abr_bps > 0) {
+      fragment += " abr=" + std::to_string(abr_bps);
+    }
+    if (vad) {
+      fragment += " vad=true";
+    }
+    if (dtx) {
+      fragment += " dtx=true";
+    }
+    fragment += " complexity=" + std::to_string(std::clamp(complexity, 0, 10));
+    fragment += " nframes=" + std::to_string(std::max(1, nframes));
+    return fragment + " ! oggmux";
+  }
+};
+
+struct Aac {
+  int quality = 5;
+  int bitrate_bps = 128000;
+  int profile = 2;
+  bool tns = false;
+  bool midside = true;
+  int shortctl = 0;
+
+  void ApplyQuality(int value) {
+    quality = std::clamp(value, 0, 10);
+    bitrate_bps = TranscoderOptionsInterface::BitrateKbps(quality, 64, 320) * 1000;
+  }
+
+  void Load() {
+    Settings settings;
+    settings.BeginGroup(GroupFor(Transcoder::Format::AAC));
+    quality = settings.IntValue("quality", quality);
+    bitrate_bps = settings.IntValue("bitrate", bitrate_bps);
+    if (bitrate_bps > 0 && bitrate_bps < 1000) {
+      bitrate_bps *= 1000;
+    }
+    profile = settings.IntValue("profile", profile);
+    tns = settings.BoolValue("tns", tns);
+    midside = settings.BoolValue("midside", midside);
+    shortctl = settings.IntValue("shortctl", shortctl);
+  }
+
+  void Save() const {
+    Settings settings;
+    settings.BeginGroup(GroupFor(Transcoder::Format::AAC));
+    settings.SetIntValue("quality", quality);
+    settings.SetIntValue("bitrate", bitrate_bps);
+    settings.SetIntValue("profile", profile);
+    settings.SetBoolValue("tns", tns);
+    settings.SetBoolValue("midside", midside);
+    settings.SetIntValue("shortctl", shortctl);
+    settings.Sync();
+  }
+
+  std::string Pipeline() const {
+    return "avenc_aac bitrate=" + std::to_string(std::max(8000, bitrate_bps)) + " ! mp4mux";
+  }
+};
+
 struct BitrateEncoder {
   int quality = 5;
   int min_kbps = 64;

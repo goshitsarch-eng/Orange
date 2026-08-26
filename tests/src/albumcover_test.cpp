@@ -16,6 +16,7 @@
 #include "covermanager/coverexportrunnable.h"
 #include "covermanager/coversearchstatistics.h"
 #include "covermanager/coversearchstatisticsdialog.h"
+#include "covermanager/coversearchstatisticslabels.h"
 #include "covermanager/coverprovidersettings.h"
 #include "covermanager/currentalbumcoverloader.h"
 #include "settings/coverssettingslabels.h"
@@ -35,9 +36,12 @@ TEST(CoverSearchStatisticsDialog, SummaryIncludesCounts) {
   stats.total_images_by_provider["Last.fm"] = 4;
   stats.chosen_images_by_provider["Last.fm"] = 2;
   const std::string text = CoverSearchStatisticsDialog::SummaryText(stats);
-  EXPECT_NE(std::string::npos, text.find("Network requests: 3"));
-  EXPECT_NE(std::string::npos, text.find("Chosen images: 2"));
-  EXPECT_NE(std::string::npos, text.find("Last.fm"));
+  EXPECT_EQ("Got 2 covers out of 3 (1 failed)", CoverSearchStatisticsLabels::Got(2, 1));
+  EXPECT_STREQ("Fetch completed", CoverSearchStatisticsLabels::Title());
+  EXPECT_NE(std::string::npos, text.find("Got 2 covers out of 3 (1 failed)"));
+  EXPECT_NE(std::string::npos, text.find("Covers from Last.fm: 2"));
+  EXPECT_NE(std::string::npos, text.find("Total network requests made: 3"));
+  EXPECT_NE(std::string::npos, text.find("0 bytes"));
 }
 
 TEST(CoverSearchStatistics, AverageDimensionsAndAccumulate) {

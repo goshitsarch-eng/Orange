@@ -1,6 +1,7 @@
 #include "settings/contextsettingspage.h"
 
 #include "constants/contextsettings.h"
+#include "settings/contextsettingslabels.h"
 #include "context/contextcover.h"
 #include "context/contextfont.h"
 #include "context/contextfontcontrols.h"
@@ -31,9 +32,9 @@ void ApplyPreview(GtkWidget *label, const FontUtils::Font &font) {
 AdwPreferencesPage *ContextSettingsPage::Create(Settings *settings, Application *) {
   settings->BeginGroup(ContextSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Context", "view-paged-symbolic");
-  AdwPreferencesGroup *group = SettingsPage::AddGroup(page, "Context view");
-  SettingsPage::AddEntry(group, settings, ContextSettings::kSettingsTitleFmt, "Title format", ContextSettings::kDefaultTitleFmt);
-  SettingsPage::AddEntry(group, settings, ContextSettings::kSettingsSummaryFmt, "Summary format", ContextSettings::kDefaultSummaryFmt);
+  AdwPreferencesGroup *group = SettingsPage::AddGroup(page, ContextSettingsLabels::EnableItems());
+  SettingsPage::AddEntry(group, settings, ContextSettings::kSettingsTitleFmt, ContextSettingsLabels::Title(), ContextSettings::kDefaultTitleFmt);
+  SettingsPage::AddEntry(group, settings, ContextSettings::kSettingsSummaryFmt, ContextSettingsLabels::Summary(), ContextSettings::kDefaultSummaryFmt);
   AdwPreferencesGroup *title_tokens = SettingsPage::AddGroup(page, "Insert into title");
   for (const auto &token : ContextFormatTokens::All()) {
     SettingsPage::AddButtonRow(title_tokens, token.second.c_str(), token.first.c_str(), [settings, token]() {
@@ -52,11 +53,13 @@ AdwPreferencesPage *ContextSettingsPage::Create(Settings *settings, Application 
       settings->Sync();
     });
   }
-  SettingsPage::AddToggle(group, settings, ContextSettings::kAlbum, "Show album", nullptr, ContextSettings::kDefaultAlbum);
-  SettingsPage::AddToggle(group, settings, ContextSettings::kTechnicalData, "Show technical data", nullptr, ContextSettings::kDefaultTechnicalData);
-  SettingsPage::AddToggle(group, settings, ContextSettings::kSongLyrics, "Show lyrics", nullptr, ContextSettings::kDefaultSongLyrics);
+  SettingsPage::AddToggle(group, settings, ContextSettings::kAlbum, ContextSettingsLabels::Album(), nullptr, ContextSettings::kDefaultAlbum);
+  SettingsPage::AddToggle(group, settings, ContextSettings::kTechnicalData, ContextSettingsLabels::TechnicalData(), nullptr,
+                          ContextSettings::kDefaultTechnicalData);
+  SettingsPage::AddToggle(group, settings, ContextSettings::kSongLyrics, ContextSettingsLabels::SongLyrics(), nullptr,
+                          ContextSettings::kDefaultSongLyrics);
   AdwSwitchRow *search_cover = ADW_SWITCH_ROW(adw_switch_row_new());
-  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(search_cover), Translations::CStr("Automatically search for album cover"));
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(search_cover), Translations::CStr(ContextSettingsLabels::SearchCover()));
   adw_switch_row_set_active(search_cover, ContextCover::LoadEnabled(*settings));
   g_signal_connect(search_cover, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
                      auto *s = static_cast<Settings *>(data);
@@ -65,7 +68,8 @@ AdwPreferencesPage *ContextSettingsPage::Create(Settings *settings, Application 
                    settings);
   adw_preferences_group_add(group, GTK_WIDGET(search_cover));
   settings->BeginGroup(ContextSettings::kSettingsGroup);
-  SettingsPage::AddToggle(group, settings, ContextSettings::kSearchLyrics, "Search for lyrics", nullptr, ContextSettings::kDefaultSearchLyrics);
+  SettingsPage::AddToggle(group, settings, ContextSettings::kSearchLyrics, ContextSettingsLabels::SearchLyrics(), nullptr,
+                          ContextSettings::kDefaultSearchLyrics);
 
   const FontUtils::Font headline = ContextFontControls::Headline(
       settings->Value(ContextSettings::kFontHeadline, ContextSettings::kDefaultFontFamily),

@@ -30,6 +30,9 @@
 #include "settings/appearancesettingslabels.h"
 #include "settings/backendsettingslabels.h"
 #include "settings/collectionsettingslabels.h"
+#include "settings/contextsettingslabels.h"
+#include "dialogs/errordialoglabels.h"
+#include "transcoder/transcoderoptionslabels.h"
 #include "settings/notificationscontrols.h"
 #include "settings/notificationssettingslabels.h"
 #include "settings/playlistsettingscontrols.h"
@@ -175,6 +178,33 @@ TEST(BackendSettingsLabels, QtCopy) {
   EXPECT_STREQ("Cross-fade when changing tracks manually", BackendSettingsLabels::FadeManual());
   EXPECT_STREQ("Except between tracks on the same album or in the same CUE sheet", BackendSettingsLabels::FadeSameAlbum());
   EXPECT_STREQ("Fade out on pause / fade in on resume", BackendSettingsLabels::FadePause());
+}
+
+TEST(ContextSettingsLabels, EnableItemsCopy) {
+  EXPECT_STREQ("Enable Items", ContextSettingsLabels::EnableItems());
+  EXPECT_STREQ("Album", ContextSettingsLabels::Album());
+  EXPECT_STREQ("Technical Data", ContextSettingsLabels::TechnicalData());
+  EXPECT_STREQ("Song Lyrics", ContextSettingsLabels::SongLyrics());
+  EXPECT_STREQ("Automatically search for album cover", ContextSettingsLabels::SearchCover());
+  EXPECT_STREQ("Automatically search for song lyrics", ContextSettingsLabels::SearchLyrics());
+  EXPECT_STREQ("Font for headline", ContextSettingsLabels::HeadlineFont());
+  EXPECT_STREQ("Font for data and lyrics", ContextSettingsLabels::NormalFont());
+}
+
+TEST(ErrorDialogLabels, QtTitle) { EXPECT_STREQ("Strawberry Error", ErrorDialogLabels::Title()); }
+
+TEST(TranscoderOptionsLabels, QtCopy) {
+  EXPECT_STREQ("Transcoding options", TranscoderOptionsLabels::Title());
+  EXPECT_STREQ("Optimize for quality", TranscoderOptionsLabels::Quality());
+  EXPECT_STREQ("Optimize for bitrate", TranscoderOptionsLabels::OptimizeBitrate());
+  EXPECT_STREQ("Force mono encoding", TranscoderOptionsLabels::ForceMono());
+  EXPECT_STREQ("Encoding engine quality", TranscoderOptionsLabels::EngineQuality());
+  EXPECT_STREQ("Fast", TranscoderOptionsLabels::EngineName(0));
+  EXPECT_STREQ("Standard", TranscoderOptionsLabels::EngineName(1));
+  EXPECT_STREQ("High", TranscoderOptionsLabels::EngineName(2));
+  EXPECT_STREQ("Use bitrate management engine", TranscoderOptionsLabels::Managed());
+  EXPECT_STREQ("Voice activity detection", TranscoderOptionsLabels::Vad());
+  EXPECT_STREQ("Low complexity profile (LC)", TranscoderOptionsLabels::Lc());
 }
 
 TEST(BackendSettings, OriginalFadeAndReplayGainKeys) {

@@ -4,6 +4,7 @@
 #include "transcoder/transcoderoptionsasf.h"
 #include "transcoder/transcoderoptionsfields.h"
 #include "transcoder/transcoderoptionsflac.h"
+#include "transcoder/transcoderoptionslabels.h"
 #include "transcoder/transcoderoptionsmp3.h"
 #include "transcoder/transcoderoptionsopus.h"
 #include "transcoder/transcoderoptionsspeex.h"
@@ -14,6 +15,7 @@
 #include <adwaita.h>
 
 #include <algorithm>
+#include <string>
 
 std::unique_ptr<TranscoderOptionsInterface> TranscoderOptionsDialog::OptionsFor(Transcoder::Format format) {
   switch (format) {
@@ -70,7 +72,7 @@ GtkWidget *LabeledSwitch(const char *label, bool on, GtkWidget **switch_out) {
 void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format, const std::function<void(int quality)> &applied) {
   auto options = OptionsFor(format);
   AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, (Transcoder::FormatName(format) + " " + Translations::Tr("options")).c_str());
+  adw_dialog_set_title(dialog, Translations::CStr(TranscoderOptionsLabels::Title()));
   adw_dialog_set_content_width(dialog, 420);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
   gtk_widget_set_margin_start(box, 18);
@@ -84,33 +86,80 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
   GtkWidget *cbr = nullptr;
   GtkWidget *mono = nullptr;
   GtkWidget *engine = nullptr;
+  GtkWidget *managed = nullptr;
+  GtkWidget *min_bitrate = nullptr;
+  GtkWidget *max_bitrate = nullptr;
+  GtkWidget *profile = nullptr;
+  GtkWidget *tns = nullptr;
+  GtkWidget *midside = nullptr;
+  GtkWidget *shortctl = nullptr;
+  GtkWidget *mode = nullptr;
+  GtkWidget *vbr = nullptr;
+  GtkWidget *abr = nullptr;
+  GtkWidget *vad = nullptr;
+  GtkWidget *dtx = nullptr;
+  GtkWidget *complexity = nullptr;
+  GtkWidget *nframes = nullptr;
   int default_quality = 5;
 
   if (format == Transcoder::Format::MP3) {
     TranscoderOptionsFields::Mp3 mp3;
     mp3.Load();
     default_quality = mp3.quality;
-    static const char *targets[] = {"Quality (VBR)", "Bitrate", nullptr};
+    static const char *targets[] = {TranscoderOptionsLabels::Quality(), TranscoderOptionsLabels::OptimizeBitrate(), nullptr};
     target_drop = gtk_drop_down_new_from_strings(targets);
     gtk_drop_down_set_selected(GTK_DROP_DOWN(target_drop), static_cast<guint>(std::clamp(mp3.target, 0, 1)));
-    gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Encoding target")));
     gtk_box_append(GTK_BOX(box), target_drop);
-    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("VBR quality (0–9)"), 0, 9, mp3.quality, &quality_spin));
-    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("Bitrate (kbps)"), 32, 320, mp3.bitrate, &bitrate_spin));
-    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("Engine quality (0–2)"), 0, 2, mp3.engine_quality, &engine));
-    gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr("Constant bitrate"), mp3.cbr, &cbr));
-    gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr("Mono"), mp3.mono, &mono));
+    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr(TranscoderOptionsLabels::Quality()), 0, 9, mp3.quality, &quality_spin));
+    gtk_box_append(GTK_BOX(box),
+                   LabeledSpin((std::string(TranscoderOptionsLabels::Bitrate()) + TranscoderOptionsLabels::Kbps()).c_str(), 32, 320,
+                               mp3.bitrate, &bitrate_spin));
+    static const char *engines[] = {TranscoderOptionsLabels::Fast(), TranscoderOptionsLabels::Standard(), TranscoderOptionsLabels::High(),
+                                    nullptr};
+    engine = gtk_drop_down_new_from_strings(engines);
+    gtk_drop_down_set_selected(GTK_DROP_DOWN(engine), static_cast<guint>(std::clamp(mp3.engine_quality, 0, 2)));
+    gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(TranscoderOptionsLabels::EngineQuality())));
+    gtk_box_append(GTK_BOX(box), engine);
+    gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::ConstantBitrate()), mp3.cbr, &cbr));
+    gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::ForceMono()), mp3.mono, &mono));
   } else if (format == Transcoder::Format::FLAC) {
     TranscoderOptionsFields::QualityEncoder flac;
     flac.max_quality = 8;
     flac.Load(format);
     default_quality = flac.quality;
+    gtk_box_append(GTK_BOX(box), gtk_label_new((std::string(TranscoderOptionsLabels::Fast()) + " – " + TranscoderOptionsLabels::Best()).c_str()));
     gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("Compression (0–8)"), 0, 8, flac.quality, &quality_spin));
-  } else if (format == Transcoder::Format::OggVorbis || format == Transcoder::Format::Speex) {
-    TranscoderOptionsFields::QualityEncoder encoder;
-    encoder.Load(format);
-    default_quality = encoder.quality;
-    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("Quality (0–10)"), 0, 10, encoder.quality, &quality_spin));
+  } else if (format == Transcoder::Format::OggVorbis) {
+    TranscoderOptionsFields::Vorbis vorbis;
+    vorbis.Load();
+    default_quality = vorbis.quality;
+    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("Quality (0–10)"), 0, 10, vorbis.quality, &quality_spin));
+    gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::Managed()), vorbis.managed, &managed));
+    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr(TranscoderOptionsLabels::TargetBitrate()), 0, 500,
+                                            vorbis.bitrate_bps > 0 ? vorbis.bitrate_bps / 1000 : 0, &bitrate_spin));
+    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr(TranscoderOptionsLabels::MinBitrate()), 0, 500,
+                                            vorbis.min_bitrate_bps > 0 ? vorbis.min_bitrate_bps / 1000 : 0, &min_bitrate));
+    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr(TranscoderOptionsLabels::MaxBitrate()), 0, 500,
+                                            vorbis.max_bitrate_bps > 0 ? vorbis.max_bitrate_bps / 1000 : 0, &max_bitrate));
+  } else if (format == Transcoder::Format::Speex) {
+    TranscoderOptionsFields::Speex speex;
+    speex.Load();
+    default_quality = speex.quality;
+    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("Quality (0–10)"), 0, 10, speex.quality, &quality_spin));
+    gtk_box_append(GTK_BOX(box), LabeledSpin((std::string(TranscoderOptionsLabels::Bitrate()) + TranscoderOptionsLabels::Kbps()).c_str(), 0,
+                                            256, speex.bitrate_bps / 1000, &bitrate_spin));
+    static const char *modes[] = {TranscoderOptionsLabels::Auto(), TranscoderOptionsLabels::Uwb(), TranscoderOptionsLabels::Wb(),
+                                  TranscoderOptionsLabels::Nb(), nullptr};
+    mode = gtk_drop_down_new_from_strings(modes);
+    gtk_drop_down_set_selected(GTK_DROP_DOWN(mode), static_cast<guint>(std::clamp(speex.mode, 0, 3)));
+    gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(TranscoderOptionsLabels::EncodingMode())));
+    gtk_box_append(GTK_BOX(box), mode);
+    gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::Vbr()), speex.vbr, &vbr));
+    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr(TranscoderOptionsLabels::AverageBitrate()), 0, 256, speex.abr_bps / 1000, &abr));
+    gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::Vad()), speex.vad, &vad));
+    gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::Dtx()), speex.dtx, &dtx));
+    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr(TranscoderOptionsLabels::Complexity()), 0, 10, speex.complexity, &complexity));
+    gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr(TranscoderOptionsLabels::Nframes()), 1, 10, speex.nframes, &nframes));
   } else if (format == Transcoder::Format::WavPack) {
     TranscoderOptionsFields::QualityEncoder encoder;
     encoder.Load(format);
@@ -127,7 +176,29 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
     encoder.Load(format);
     default_quality = encoder.quality;
     gtk_box_append(GTK_BOX(box), LabeledSpin(Translations::CStr("Quality (0–10)"), 0, 10, encoder.quality, &quality_spin));
-    gtk_box_append(GTK_BOX(box), gtk_label_new((Translations::Tr("Bitrate ≈ ") + std::to_string(encoder.Bitrate()) + " kbps").c_str()));
+    if (format == Transcoder::Format::AAC) {
+      TranscoderOptionsFields::Aac aac;
+      aac.Load();
+      aac.ApplyQuality(default_quality);
+      gtk_box_append(GTK_BOX(box), LabeledSpin((std::string(TranscoderOptionsLabels::Bitrate()) + TranscoderOptionsLabels::Kbps()).c_str(),
+                                              64, 320, aac.bitrate_bps / 1000, &bitrate_spin));
+      static const char *profiles[] = {TranscoderOptionsLabels::Main(), TranscoderOptionsLabels::Lc(), TranscoderOptionsLabels::Ssr(),
+                                       TranscoderOptionsLabels::Ltp(), nullptr};
+      profile = gtk_drop_down_new_from_strings(profiles);
+      gtk_drop_down_set_selected(GTK_DROP_DOWN(profile), static_cast<guint>(std::clamp(aac.profile - 1, 0, 3)));
+      gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(TranscoderOptionsLabels::Profile())));
+      gtk_box_append(GTK_BOX(box), profile);
+      gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::Tns()), aac.tns, &tns));
+      gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::Midside()), aac.midside, &midside));
+      static const char *blocks[] = {TranscoderOptionsLabels::NormalBlock(), TranscoderOptionsLabels::NoShort(),
+                                     TranscoderOptionsLabels::NoLong(), nullptr};
+      shortctl = gtk_drop_down_new_from_strings(blocks);
+      gtk_drop_down_set_selected(GTK_DROP_DOWN(shortctl), static_cast<guint>(std::clamp(aac.shortctl, 0, 2)));
+      gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(TranscoderOptionsLabels::BlockType())));
+      gtk_box_append(GTK_BOX(box), shortctl);
+    } else {
+      gtk_box_append(GTK_BOX(box), gtk_label_new((Translations::Tr("Bitrate ≈ ") + std::to_string(encoder.Bitrate()) + " kbps").c_str()));
+    }
   }
 
   GtkWidget *pipeline = gtk_label_new(options->PipelineFragment().c_str());
@@ -147,6 +218,20 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
   g_object_set_data(G_OBJECT(apply), "cbr", cbr);
   g_object_set_data(G_OBJECT(apply), "mono", mono);
   g_object_set_data(G_OBJECT(apply), "engine", engine);
+  g_object_set_data(G_OBJECT(apply), "managed", managed);
+  g_object_set_data(G_OBJECT(apply), "min-bitrate", min_bitrate);
+  g_object_set_data(G_OBJECT(apply), "max-bitrate", max_bitrate);
+  g_object_set_data(G_OBJECT(apply), "profile", profile);
+  g_object_set_data(G_OBJECT(apply), "tns", tns);
+  g_object_set_data(G_OBJECT(apply), "midside", midside);
+  g_object_set_data(G_OBJECT(apply), "shortctl", shortctl);
+  g_object_set_data(G_OBJECT(apply), "mode", mode);
+  g_object_set_data(G_OBJECT(apply), "vbr", vbr);
+  g_object_set_data(G_OBJECT(apply), "abr", abr);
+  g_object_set_data(G_OBJECT(apply), "vad", vad);
+  g_object_set_data(G_OBJECT(apply), "dtx", dtx);
+  g_object_set_data(G_OBJECT(apply), "complexity", complexity);
+  g_object_set_data(G_OBJECT(apply), "nframes", nframes);
   auto *fn = new std::function<void(int)>(applied);
   g_object_set_data_full(G_OBJECT(apply), "applied", fn, [](gpointer p) { delete static_cast<std::function<void(int)> *>(p); });
   g_object_set_data(G_OBJECT(apply), "default-quality", GINT_TO_POINTER(default_quality + 1));
@@ -161,7 +246,7 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
                        mp3.Load();
                        auto *target_w = GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "target"));
                        auto *bitrate_w = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "bitrate"));
-                       auto *engine_w = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "engine"));
+                       auto *engine_w = GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "engine"));
                        auto *cbr_w = GTK_SWITCH(g_object_get_data(G_OBJECT(button), "cbr"));
                        auto *mono_w = GTK_SWITCH(g_object_get_data(G_OBJECT(button), "mono"));
                        if (target_w) {
@@ -172,7 +257,7 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
                          mp3.bitrate = static_cast<int>(gtk_spin_button_get_value(bitrate_w));
                        }
                        if (engine_w) {
-                         mp3.engine_quality = static_cast<int>(gtk_spin_button_get_value(engine_w));
+                         mp3.engine_quality = static_cast<int>(gtk_drop_down_get_selected(engine_w));
                        }
                        if (cbr_w) {
                          mp3.cbr = gtk_switch_get_active(cbr_w) == TRUE;
@@ -181,7 +266,73 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
                          mp3.mono = gtk_switch_get_active(mono_w) == TRUE;
                        }
                        mp3.Save();
-                     } else if (format == Transcoder::Format::AAC || format == Transcoder::Format::Opus || format == Transcoder::Format::ASF) {
+                     } else if (format == Transcoder::Format::OggVorbis) {
+                       TranscoderOptionsFields::Vorbis vorbis;
+                       vorbis.Load();
+                       vorbis.ApplyQuality(quality);
+                       if (auto *managed_w = GTK_SWITCH(g_object_get_data(G_OBJECT(button), "managed"))) {
+                         vorbis.managed = gtk_switch_get_active(managed_w) == TRUE;
+                       }
+                       auto kbps = [](gpointer widget) {
+                         return widget ? static_cast<int>(gtk_spin_button_get_value(GTK_SPIN_BUTTON(widget))) * 1000 : 0;
+                       };
+                       const int bitrate = kbps(g_object_get_data(G_OBJECT(button), "bitrate"));
+                       vorbis.bitrate_bps = bitrate > 0 ? bitrate : -1;
+                       const int min_rate = kbps(g_object_get_data(G_OBJECT(button), "min-bitrate"));
+                       vorbis.min_bitrate_bps = min_rate > 0 ? min_rate : -1;
+                       const int max_rate = kbps(g_object_get_data(G_OBJECT(button), "max-bitrate"));
+                       vorbis.max_bitrate_bps = max_rate > 0 ? max_rate : -1;
+                       vorbis.Save();
+                     } else if (format == Transcoder::Format::Speex) {
+                       TranscoderOptionsFields::Speex speex;
+                       speex.Load();
+                       speex.ApplyQuality(quality);
+                       if (auto *bitrate_w = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "bitrate"))) {
+                         speex.bitrate_bps = static_cast<int>(gtk_spin_button_get_value(bitrate_w)) * 1000;
+                       }
+                       if (auto *mode_w = GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "mode"))) {
+                         speex.mode = static_cast<int>(gtk_drop_down_get_selected(mode_w));
+                       }
+                       if (auto *vbr_w = GTK_SWITCH(g_object_get_data(G_OBJECT(button), "vbr"))) {
+                         speex.vbr = gtk_switch_get_active(vbr_w) == TRUE;
+                       }
+                       if (auto *abr_w = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "abr"))) {
+                         speex.abr_bps = static_cast<int>(gtk_spin_button_get_value(abr_w)) * 1000;
+                       }
+                       if (auto *vad_w = GTK_SWITCH(g_object_get_data(G_OBJECT(button), "vad"))) {
+                         speex.vad = gtk_switch_get_active(vad_w) == TRUE;
+                       }
+                       if (auto *dtx_w = GTK_SWITCH(g_object_get_data(G_OBJECT(button), "dtx"))) {
+                         speex.dtx = gtk_switch_get_active(dtx_w) == TRUE;
+                       }
+                       if (auto *complexity_w = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "complexity"))) {
+                         speex.complexity = static_cast<int>(gtk_spin_button_get_value(complexity_w));
+                       }
+                       if (auto *nframes_w = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "nframes"))) {
+                         speex.nframes = static_cast<int>(gtk_spin_button_get_value(nframes_w));
+                       }
+                       speex.Save();
+                     } else if (format == Transcoder::Format::AAC) {
+                       TranscoderOptionsFields::Aac aac;
+                       aac.Load();
+                       aac.ApplyQuality(quality);
+                       if (auto *bitrate_w = GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "bitrate"))) {
+                         aac.bitrate_bps = static_cast<int>(gtk_spin_button_get_value(bitrate_w)) * 1000;
+                       }
+                       if (auto *profile_w = GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "profile"))) {
+                         aac.profile = static_cast<int>(gtk_drop_down_get_selected(profile_w)) + 1;
+                       }
+                       if (auto *tns_w = GTK_SWITCH(g_object_get_data(G_OBJECT(button), "tns"))) {
+                         aac.tns = gtk_switch_get_active(tns_w) == TRUE;
+                       }
+                       if (auto *midside_w = GTK_SWITCH(g_object_get_data(G_OBJECT(button), "midside"))) {
+                         aac.midside = gtk_switch_get_active(midside_w) == TRUE;
+                       }
+                       if (auto *short_w = GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "shortctl"))) {
+                         aac.shortctl = static_cast<int>(gtk_drop_down_get_selected(short_w));
+                       }
+                       aac.Save();
+                     } else if (format == Transcoder::Format::Opus || format == Transcoder::Format::ASF) {
                        TranscoderOptionsFields::BitrateEncoder encoder;
                        encoder.ApplyQuality(quality);
                        encoder.Save(format);
