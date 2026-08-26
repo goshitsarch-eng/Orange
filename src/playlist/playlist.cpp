@@ -162,7 +162,15 @@ void Playlist::RemoveUnavailable() {
   PushUndo();
   songs_.erase(std::remove_if(songs_.begin(), songs_.end(),
                               [](const Song &song) {
-                                const std::string path = FileUtils::PathFromUri(song.url());
+                                const std::string &url = song.url();
+                                if (url.empty()) {
+                                  return false;
+                                }
+                                const auto scheme = url.find("://");
+                                if (scheme != std::string::npos && url.rfind("file://", 0) != 0) {
+                                  return false;
+                                }
+                                const std::string path = FileUtils::PathFromUri(url);
                                 return !path.empty() && !FileUtils::Exists(path);
                               }),
                songs_.end());
