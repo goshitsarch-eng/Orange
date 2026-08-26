@@ -20,6 +20,7 @@
 #include "constants/transcodersettings.h"
 #include "constants/waveformsettings.h"
 #include "settings/settingscontrols.h"
+#include "covermanager/coverproviderauth.h"
 #include "settings/settingspages.h"
 #include "streaming/streamingchoices.h"
 
@@ -153,6 +154,28 @@ TEST(SettingsPages, ServicePageNames) {
   EXPECT_STREQ("Configure collection…", SettingsPages::ConfigureCollectionLabel());
   EXPECT_FALSE(SettingsPages::CanOpenAt(nullptr));
   EXPECT_FALSE(SettingsPages::CanOpenAt(""));
+}
+
+TEST(CoverProviderAuth, StatusTextAndServiceSettings) {
+  EXPECT_EQ(3u, CoverProviderAuth::ServiceSettingsProviders().size());
+  EXPECT_EQ(CoverProviderAuth::Mode::ServiceSettings, CoverProviderAuth::ModeFor("Tidal"));
+  EXPECT_EQ(CoverProviderAuth::Mode::ServiceSettings, CoverProviderAuth::ModeFor("Spotify"));
+  EXPECT_EQ(CoverProviderAuth::Mode::ServiceSettings, CoverProviderAuth::ModeFor("Qobuz"));
+  EXPECT_EQ(CoverProviderAuth::Mode::None, CoverProviderAuth::ModeFor("Last.fm"));
+  EXPECT_FALSE(CoverProviderAuth::RequiresAuthentication("MusicBrainz"));
+  EXPECT_EQ("Last.fm does not need authentication.", CoverProviderAuth::StatusText("Last.fm", false));
+  EXPECT_EQ("Use Tidal settings to authenticate.", CoverProviderAuth::StatusText("Tidal", false));
+  EXPECT_EQ("Tidal needs authentication.", CoverProviderAuth::StatusText("Tidal", true));
+  EXPECT_EQ("Use Spotify settings to authenticate.", CoverProviderAuth::StatusText("Spotify", false));
+  EXPECT_EQ("Use Qobuz settings to authenticate.", CoverProviderAuth::StatusText("Qobuz", false));
+  EXPECT_EQ("No cover provider selected.", CoverProviderAuth::StatusText({}, false));
+  EXPECT_STREQ("Tidal", CoverProviderAuth::SettingsPageName("Tidal"));
+  EXPECT_STREQ("Spotify", CoverProviderAuth::SettingsPageName("Spotify"));
+  EXPECT_STREQ("Qobuz", CoverProviderAuth::SettingsPageName("Qobuz"));
+  EXPECT_EQ(nullptr, CoverProviderAuth::SettingsPageName("Last.fm"));
+  EXPECT_TRUE(CoverProviderAuth::ShowOpenSettings("Tidal"));
+  EXPECT_FALSE(CoverProviderAuth::ShowOpenSettings("Last.fm"));
+  EXPECT_EQ("Open Tidal settings", CoverProviderAuth::OpenSettingsLabel("Tidal"));
 }
 
 TEST(StreamingChoices, QualityAndAuthLabels) {

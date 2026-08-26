@@ -3,9 +3,11 @@
 #include "constants/coverssettings.h"
 #include "core/application.h"
 #include "covermanager/coverarttypes.h"
+#include "covermanager/coverproviderauth.h"
 #include "covermanager/coverproviders.h"
 #include "lyrics/lyricsproviderorder.h"
 #include "settings/settingspage.h"
+#include "streaming/streamingservices.h"
 #include "translations/translations.h"
 
 namespace {
@@ -259,6 +261,42 @@ AdwPreferencesPage *CoversSettingsPage::Create(Settings *settings, Application *
     g_object_set_data_full(G_OBJECT(page), "cover-provider-state", state, [](gpointer p) { delete static_cast<ProviderListState *>(p); });
     adw_preferences_group_add(order, list);
     RefreshProviderList(state);
+  }
+
+  AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, "Authentication");
+  GtkWidget *auth_hint = gtk_label_new(Translations::CStr("Streaming cover providers authenticate from their service settings pages."));
+  gtk_label_set_wrap(GTK_LABEL(auth_hint), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(auth_hint), 0);
+  gtk_widget_add_css_class(auth_hint, "dim-label");
+  adw_preferences_group_add(auth, auth_hint);
+  for (const char *name : CoverProviderAuth::ServiceSettingsProviders()) {
+    bool authenticated = false;
+    if (app && app->streaming_services()) {
+      if (StreamingService *service = app->streaming_services()->ServiceByName(name)) {
+        authenticated = service->logged_in();
+      }
+    }
+    AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), name);
+    const std::string status = Translations::Tr(CoverProviderAuth::StatusText(name, authenticated));
+    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), status.c_str());
+    if (CoverProviderAuth::ShowOpenSettings(name)) {
+      const std::string open_label = Translations::Tr(CoverProviderAuth::OpenSettingsLabel(name));
+      GtkWidget *button = gtk_button_new_with_label(open_label.c_str());
+      gtk_widget_add_css_class(button, "flat");
+      g_object_set_data_full(G_OBJECT(button), "settings-page", g_strdup(CoverProviderAuth::SettingsPageName(name)), g_free);
+      g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer) {
+                         const char *page_name = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "settings-page"));
+                         GtkWidget *dialog = gtk_widget_get_ancestor(GTK_WIDGET(btn), ADW_TYPE_PREFERENCES_DIALOG);
+                         if (dialog && page_name) {
+                           adw_preferences_dialog_set_visible_page_name(ADW_PREFERENCES_DIALOG(dialog), page_name);
+                         }
+                       }),
+                       nullptr);
+      adw_action_row_add_suffix(row, button);
+      adw_action_row_set_activatable_widget(row, button);
+    }
+    adw_preferences_group_add(auth, GTK_WIDGET(row));
   }
   return page;
 }
