@@ -5,6 +5,7 @@
 #include "organize/organizefilename.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 class OrganizeFormat {
@@ -44,6 +45,27 @@ class OrganizeFormat {
   static bool IsUniqueTag(const std::string &token);
   static std::string ArtistInitial(const std::string &albumartist);
   static const char *kKnownTags[];
+  static std::vector<std::pair<const char *, const char *>> InsertTags() {
+    return {{"Album", "album"},
+            {"Album artist", "albumartist"},
+            {"Artist", "artist"},
+            {"Artist's initial", "artistinitial"},
+            {"Bit depth", "bitdepth"},
+            {"Bitrate", "bitrate"},
+            {"Comment", "comment"},
+            {"Composer", "composer"},
+            {"Disc", "disc"},
+            {"File extension", "extension"},
+            {"Genre", "genre"},
+            {"Grouping", "grouping"},
+            {"Length", "length"},
+            {"Original year", "originalyear"},
+            {"Performer", "performer"},
+            {"Sample rate", "samplerate"},
+            {"Title", "title"},
+            {"Track", "track"},
+            {"Year", "year"}};
+  }
 
  private:
   std::string ExpandTokens(const std::string &pattern, const Song &song) const;

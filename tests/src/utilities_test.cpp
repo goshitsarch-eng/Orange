@@ -457,6 +457,25 @@ TEST(OrganizePreview, AfterCopyChoicesAndUniqueTags) {
                OrganizeSettings::kDefaultFormat);
 }
 
+TEST(OrganizeFormat, InsertTagsMatchQtOrder) {
+  const auto tags = OrganizeFormat::InsertTags();
+  ASSERT_EQ(19u, tags.size());
+  EXPECT_STREQ("Album", tags.front().first);
+  EXPECT_STREQ("album", tags.front().second);
+  EXPECT_STREQ("Album artist", tags[1].first);
+  EXPECT_STREQ("albumartist", tags[1].second);
+  EXPECT_STREQ("Artist's initial", tags[3].first);
+  EXPECT_STREQ("artistinitial", tags[3].second);
+  EXPECT_STREQ("File extension", tags[9].first);
+  EXPECT_STREQ("extension", tags[9].second);
+  EXPECT_STREQ("Sample rate", tags[15].first);
+  EXPECT_STREQ("Title", tags[16].first);
+  EXPECT_STREQ("title", tags[16].second);
+  EXPECT_STREQ("Year", tags.back().first);
+  EXPECT_STREQ("year", tags.back().second);
+  EXPECT_TRUE(std::none_of(tags.begin(), tags.end(), [](const auto &tag) { return std::string(tag.second) == "lyrics"; }));
+}
+
 TEST(OrganizeFormat, UniqueFilenameFromTitleAndTrack) {
   Song song;
   song.set_title("Roads");
