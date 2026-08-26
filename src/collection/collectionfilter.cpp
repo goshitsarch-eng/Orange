@@ -18,7 +18,7 @@ bool CollectionFilter::AcceptsItem(const CollectionItem *item) const {
   if (filter_string_.empty()) {
     return true;
   }
-  if (item->type == CollectionItem::Type::LoadingIndicator) {
+  if (item->type == CollectionItem::Type::LoadingIndicator || item->type == CollectionItem::Type::Divider) {
     return true;
   }
   if (item->type == CollectionItem::Type::Song) {

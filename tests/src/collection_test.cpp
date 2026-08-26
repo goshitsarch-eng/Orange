@@ -1,6 +1,7 @@
 #include "collection/collectionbackend.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectioncover.h"
+#include "collection/collectiondivider.h"
 #include "collection/collectioniconcache.h"
 #include "collection/collectionstats.h"
 #include "collection/collectioncompilation.h"
@@ -162,6 +163,53 @@ TEST(CollectionModel, BuildsGroupedTreeAndPlaylistItem) {
   CollectionPlaylistItem item(a);
   EXPECT_EQ(a.PrettyTitleWithArtist(), item.DisplayText());
   EXPECT_EQ(a.url(), item.url());
+}
+
+TEST(CollectionDivider, KeysAndDisplayMatchQt) {
+  EXPECT_TRUE(CollectionDivider::ShouldInsert(true, 0, "P"));
+  EXPECT_FALSE(CollectionDivider::ShouldInsert(true, 1, "P"));
+  EXPECT_FALSE(CollectionDivider::ShouldInsert(false, 0, "P"));
+  EXPECT_FALSE(CollectionDivider::ShouldInsert(true, 0, ""));
+  Song song = MakeSong("Roads", "Portishead", "Dummy");
+  song.set_year(1994);
+  song.set_bitrate(320);
+  EXPECT_EQ("P", CollectionDivider::Key(CollectionGrouping::GroupBy::AlbumArtist, song, "Portishead"));
+  EXPECT_EQ("0", CollectionDivider::Key(CollectionGrouping::GroupBy::Artist, song, "123 Party"));
+  EXPECT_EQ("0-9", CollectionDivider::DisplayText(CollectionGrouping::GroupBy::Artist, "0"));
+  EXPECT_EQ("P", CollectionDivider::DisplayText(CollectionGrouping::GroupBy::Artist, "P"));
+  EXPECT_EQ("1990", CollectionDivider::Key(CollectionGrouping::GroupBy::Year, song, "1994"));
+  EXPECT_EQ("1990", CollectionDivider::DisplayText(CollectionGrouping::GroupBy::Year, "1990"));
+  EXPECT_EQ("Unknown", CollectionDivider::DisplayText(CollectionGrouping::GroupBy::Year, "0000"));
+  EXPECT_EQ("1994", CollectionDivider::Key(CollectionGrouping::GroupBy::YearAlbum, song, "1994 - Dummy"));
+  EXPECT_EQ("0320", CollectionDivider::SortTextForNumber(320));
+  EXPECT_EQ("320", CollectionDivider::SortTextForBitrate(320));
+  CollectionItem divider(CollectionItem::Type::Divider);
+  EXPECT_TRUE(CollectionDivider::IsDivider(&divider));
+  EXPECT_TRUE(CollectionItemDelegate::IsDivider(&divider));
+}
+
+TEST(CollectionModel, InsertsTopLevelDividersWhenEnabled) {
+  Song a = MakeSong("Roads", "Portishead", "Dummy");
+  Song b = MakeSong("White Winter Hymnal", "Fleet Foxes", "Fleet Foxes");
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::Album;
+  grouping.third = CollectionGrouping::GroupBy::None;
+  CollectionModel model;
+  model.Reset({a, b}, grouping, false, true, false, true);
+  ASSERT_TRUE(model.root());
+  int dividers = 0;
+  int containers = 0;
+  for (const auto &child : model.root()->children) {
+    if (child->type == CollectionItem::Type::Divider) {
+      ++dividers;
+    }
+    if (child->type == CollectionItem::Type::Container) {
+      ++containers;
+    }
+  }
+  EXPECT_EQ(2, containers);
+  EXPECT_EQ(2, dividers);
 }
 
 TEST(CollectionCover, PrettyCoversMatchQtAlbumRows) {

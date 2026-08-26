@@ -1,6 +1,7 @@
 #include "collection/collectionview.h"
 
 #include "collection/collectionbehaviour.h"
+#include "collection/collectiondivider.h"
 #include "collection/collectioniconcache.h"
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectionkeyboard.h"
@@ -74,13 +75,14 @@ void CollectionView::SetModelSongs(const SongList &songs, const CollectionGroupi
                                    bool skip_artist_articles, bool skip_album_articles) {
   grouping_ = grouping;
   ApplyLook();
-  model_.Reset(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles);
+  model_.Reset(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles,
+               CollectionDivider::LoadShowDividers());
   Rebuild();
 }
 
 void CollectionView::ActivateRow(GtkListBoxRow *row) {
   auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
-  if (item && activate_) {
+  if (item && !CollectionItemDelegate::IsDivider(item) && activate_) {
     activate_(model_.SongsFromItem(item));
   }
 }
@@ -123,6 +125,10 @@ void CollectionView::AppendItem(GtkWidget *parent, const CollectionItem *item, i
   gtk_widget_set_hexpand(box, TRUE);
   GtkWidget *primary = gtk_label_new(CollectionItemDelegate::PrimaryText(item).c_str());
   gtk_widget_set_halign(primary, GTK_ALIGN_START);
+  if (CollectionItemDelegate::IsDivider(item)) {
+    gtk_widget_add_css_class(primary, "heading");
+    gtk_widget_add_css_class(row, "collection-divider");
+  }
   gtk_box_append(GTK_BOX(box), primary);
   const std::string secondary = CollectionItemDelegate::SecondaryText(item);
   if (!secondary.empty()) {

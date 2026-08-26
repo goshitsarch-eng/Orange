@@ -19,7 +19,7 @@ class CollectionModel {
   CollectionItem *root() const { return root_.get(); }
 
   void Reset(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
-             bool skip_artist_articles, bool skip_album_articles);
+             bool skip_artist_articles, bool skip_album_articles, bool show_dividers = false);
   void ApplyUpdate(const CollectionModelUpdate &update);
 
   int TotalSongs() const { return total_songs_; }
@@ -30,11 +30,12 @@ class CollectionModel {
   SongList SongsFromItem(const CollectionItem *item) const;
 
  private:
-  void AppendNode(CollectionItem *parent, const CollectionGrouping::Node &node, int level);
+  void AppendNode(CollectionItem *parent, const CollectionGrouping::Node &node, int level, std::string *last_divider);
   static void Count(const CollectionItem *item, int *songs, int *artists, int *albums);
 
   CollectionBackend *backend_ = nullptr;
   CollectionGrouping::Grouping grouping_;
+  bool show_dividers_ = false;
   std::unique_ptr<CollectionItem> root_;
   int total_songs_ = 0;
   int total_artists_ = 0;
