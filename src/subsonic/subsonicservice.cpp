@@ -99,55 +99,51 @@ void SubsonicService::Login(const std::string &username, const std::string &pass
 void SubsonicService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
 
 void SubsonicService::Search(const std::string &query, SearchType type, SearchCallback callback) {
+  auto guarded = GuardSearch(std::move(callback));
   if (!logged_in_) {
-    if (callback) {
-      callback({});
-    }
+    guarded({});
     return;
   }
   const auto request_type = SubsonicRequest::FromSearchType(type);
   SubsonicRequest::Get(network_,
                        CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(request_type),
                                  SubsonicRequest::Params(request_type, query), hex_auth_),
-                       request_type, std::move(callback));
+                       request_type, std::move(guarded));
 }
 
 void SubsonicService::GetArtists(SearchCallback callback) {
+  auto guarded = GuardArtists(std::move(callback));
   if (!logged_in_) {
-    if (callback) {
-      callback({});
-    }
+    guarded({});
     return;
   }
   SubsonicRequest::Get(network_, CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::ArtistsList),
                                            {}, hex_auth_),
-                       SubsonicRequest::Type::ArtistsList, std::move(callback));
+                       SubsonicRequest::Type::ArtistsList, std::move(guarded));
 }
 
 void SubsonicService::GetAlbums(SearchCallback callback) {
+  auto guarded = GuardAlbums(std::move(callback));
   if (!logged_in_) {
-    if (callback) {
-      callback({});
-    }
+    guarded({});
     return;
   }
   SubsonicRequest::Get(network_,
                        CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::AlbumList),
                                  SubsonicRequest::Params(SubsonicRequest::Type::AlbumList, {}), hex_auth_),
-                       SubsonicRequest::Type::AlbumList, std::move(callback));
+                       SubsonicRequest::Type::AlbumList, std::move(guarded));
 }
 
 void SubsonicService::GetSongs(SearchCallback callback) {
+  auto guarded = GuardSongs(std::move(callback));
   if (!logged_in_) {
-    if (callback) {
-      callback({});
-    }
+    guarded({});
     return;
   }
   SubsonicRequest::Get(network_,
                        CreateUrl(server_url_, username_, password_, SubsonicRequest::Resource(SubsonicRequest::Type::SearchSongs),
                                  SubsonicRequest::Params(SubsonicRequest::Type::SearchSongs, ".", 0, 500), hex_auth_),
-                       SubsonicRequest::Type::SearchSongs, std::move(callback));
+                       SubsonicRequest::Type::SearchSongs, std::move(guarded));
 }
 
 void SubsonicService::GetArtistAlbums(const Song &artist, SearchCallback callback) {

@@ -1,5 +1,8 @@
 #include "streaming/streamingcollectionviewcontainer.h"
 
+#include "streaming/streamingabort.h"
+#include "translations/translations.h"
+
 StreamingCollectionViewContainer::StreamingCollectionViewContainer(const std::string &title)
     : view_(std::make_unique<StreamingCollectionView>(title)) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -12,9 +15,23 @@ StreamingCollectionViewContainer::StreamingCollectionViewContainer(const std::st
   gtk_widget_set_margin_start(status_, 8);
   gtk_widget_set_margin_end(status_, 8);
   gtk_widget_set_visible(status_, FALSE);
+  abort_ = gtk_button_new_with_label(Translations::CStr(StreamingAbort::AbortLabel()));
+  gtk_widget_set_halign(abort_, GTK_ALIGN_END);
+  gtk_widget_set_margin_start(abort_, 8);
+  gtk_widget_set_margin_end(abort_, 8);
+  gtk_widget_set_margin_bottom(abort_, 8);
+  gtk_widget_set_visible(abort_, FALSE);
+  g_signal_connect(abort_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<StreamingCollectionViewContainer *>(data);
+                     if (self->abort_callback_) {
+                       self->abort_callback_();
+                     }
+                   }),
+                   this);
   gtk_box_append(GTK_BOX(widget_), view_->widget());
   gtk_box_append(GTK_BOX(widget_), progress_);
   gtk_box_append(GTK_BOX(widget_), status_);
+  gtk_box_append(GTK_BOX(widget_), abort_);
 }
 
 void StreamingCollectionViewContainer::ShowProgress(const std::string &status) {
@@ -27,6 +44,9 @@ void StreamingCollectionViewContainer::ShowProgress(const std::string &status) {
     }
     gtk_widget_set_visible(progress_, TRUE);
   }
+  if (abort_) {
+    gtk_widget_set_visible(abort_, StreamingAbort::ShouldShowAbort(true) ? TRUE : FALSE);
+  }
 }
 
 void StreamingCollectionViewContainer::HideProgress() {
@@ -38,6 +58,9 @@ void StreamingCollectionViewContainer::HideProgress() {
     gtk_label_set_text(GTK_LABEL(status_), "");
     gtk_widget_set_visible(status_, FALSE);
   }
+  if (abort_) {
+    gtk_widget_set_visible(abort_, StreamingAbort::ShouldShowAbort(false) ? TRUE : FALSE);
+  }
 }
 
 void StreamingCollectionViewContainer::SetProgress(int value, int maximum) {
@@ -48,7 +71,12 @@ void StreamingCollectionViewContainer::SetProgress(int value, int maximum) {
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), StreamingProgress::Fraction(value, progress_max_));
     gtk_widget_set_visible(progress_, TRUE);
   }
+  if (abort_) {
+    gtk_widget_set_visible(abort_, StreamingAbort::ShouldShowAbort(true) ? TRUE : FALSE);
+  }
 }
+
+void StreamingCollectionViewContainer::SetAbortCallback(AbortCallback callback) { abort_callback_ = std::move(callback); }
 
 void StreamingCollectionViewContainer::SetProgressMaximum(int maximum) {
   if (maximum > 0) {

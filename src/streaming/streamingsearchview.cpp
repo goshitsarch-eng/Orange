@@ -193,6 +193,9 @@ void StreamingSearchView::ApplyProgress(int value, int maximum) {
 void StreamingSearchView::Search(const std::string &query) {
   if (!service_ || !StreamingProgress::HasQuery(query)) {
     last_search_id_ = -1;
+    if (service_) {
+      service_->CancelSearch();
+    }
     HideProgress();
     return;
   }

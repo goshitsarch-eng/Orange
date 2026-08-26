@@ -38,6 +38,26 @@ class StreamingService : public UrlHandler {
   void StartArtistsProgress();
   void StartAlbumsProgress();
   void StartSongsProgress();
+  virtual void CancelSearch();
+  virtual void ResetArtistsRequest();
+  virtual void ResetAlbumsRequest();
+  virtual void ResetSongsRequest();
+  int BeginArtistsRequest();
+  int BeginAlbumsRequest();
+  int BeginSongsRequest();
+  int BeginSearchRequest();
+  bool ArtistsRequestCurrent(int generation) const;
+  bool AlbumsRequestCurrent(int generation) const;
+  bool SongsRequestCurrent(int generation) const;
+  bool SearchRequestCurrent(int generation) const;
+  int artists_generation() const { return artists_gen_; }
+  int albums_generation() const { return albums_gen_; }
+  int songs_generation() const { return songs_gen_; }
+  int search_generation() const { return search_gen_; }
+  SearchCallback GuardArtists(SearchCallback callback);
+  SearchCallback GuardAlbums(SearchCallback callback);
+  SearchCallback GuardSongs(SearchCallback callback);
+  SearchCallback GuardSearch(SearchCallback callback);
   virtual void GetFavorites(FavoriteType type, SearchCallback callback);
   virtual void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
   virtual void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
@@ -60,6 +80,10 @@ class StreamingService : public UrlHandler {
  protected:
   bool logged_in_ = false;
   int last_search_id_ = 0;
+  int artists_gen_ = 0;
+  int albums_gen_ = 0;
+  int songs_gen_ = 0;
+  int search_gen_ = 0;
 };
 
 #endif

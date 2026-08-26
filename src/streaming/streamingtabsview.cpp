@@ -27,6 +27,9 @@ StreamingTabsView::StreamingTabsView(StreamingService *service) : service_(servi
   albums_->view()->SetRefreshCallback([this]() { GetAlbums(); });
   songs_->view()->SetRefreshCallback([this]() { GetSongs(); });
   favorites_->view()->SetRefreshCallback([this]() { GetFavorites(); });
+  artists_->SetAbortCallback([this]() { AbortGetArtists(); });
+  albums_->SetAbortCallback([this]() { AbortGetAlbums(); });
+  songs_->SetAbortCallback([this]() { AbortGetSongs(); });
   ConnectBrowseProgress();
 }
 
@@ -232,6 +235,27 @@ void StreamingTabsView::GetSongs() {
       songs_->view()->SetStatus(service_->logged_in() ? "No songs" : "Sign in in Preferences");
     }
   });
+}
+
+void StreamingTabsView::AbortGetArtists() {
+  if (service_) {
+    service_->ResetArtistsRequest();
+  }
+  artists_->HideProgress();
+}
+
+void StreamingTabsView::AbortGetAlbums() {
+  if (service_) {
+    service_->ResetAlbumsRequest();
+  }
+  albums_->HideProgress();
+}
+
+void StreamingTabsView::AbortGetSongs() {
+  if (service_) {
+    service_->ResetSongsRequest();
+  }
+  songs_->HideProgress();
 }
 
 void StreamingTabsView::GetFavorites() {

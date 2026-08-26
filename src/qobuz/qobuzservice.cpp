@@ -66,22 +66,22 @@ void QobuzService::Search(const std::string &query, SearchCallback callback) { S
 void QobuzService::Search(const std::string &query, SearchType type, SearchCallback callback) {
   const auto request_type = QobuzRequest::FromSearchType(type);
   QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, request_type, query, app_id_, user_auth_token_), AuthHeaders(), request_type,
-                    std::move(callback));
+                    GuardSearch(std::move(callback)));
 }
 
 void QobuzService::GetArtists(SearchCallback callback) {
   QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteArtists, {}, app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::FavouriteArtists, std::move(callback));
+                    QobuzRequest::Type::FavouriteArtists, GuardArtists(std::move(callback)));
 }
 
 void QobuzService::GetAlbums(SearchCallback callback) {
   QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteAlbums, {}, app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::FavouriteAlbums, std::move(callback));
+                    QobuzRequest::Type::FavouriteAlbums, GuardAlbums(std::move(callback)));
 }
 
 void QobuzService::GetSongs(SearchCallback callback) {
   QobuzRequest::Get(network_, QobuzRequest::Url(kApiUrl, QobuzRequest::Type::FavouriteSongs, {}, app_id_, user_auth_token_), AuthHeaders(),
-                    QobuzRequest::Type::FavouriteSongs, std::move(callback));
+                    QobuzRequest::Type::FavouriteSongs, GuardSongs(std::move(callback)));
 }
 
 void QobuzService::GetArtistAlbums(const Song &artist, SearchCallback callback) {

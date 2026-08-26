@@ -18,6 +18,7 @@ class StreamingSongsView {
   GtkWidget *widget() const { return container_->widget(); }
   void SetActivateCallback(ActivateCallback callback);
   void Reload();
+  void AbortGetSongs();
   StreamingCollectionView *view() const { return container_->view(); }
 
  private:

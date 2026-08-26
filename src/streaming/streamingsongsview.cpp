@@ -5,6 +5,7 @@
 StreamingSongsView::StreamingSongsView(StreamingService *service)
     : service_(service), container_(std::make_unique<StreamingCollectionViewContainer>("Songs")) {
   container_->view()->SetRefreshCallback([this]() { Reload(); });
+  container_->SetAbortCallback([this]() { AbortGetSongs(); });
   if (service_) {
     const auto alive = alive_;
     service_->SongsUpdateStatus.Connect([this, alive](const std::string &text) {
@@ -47,4 +48,11 @@ void StreamingSongsView::Reload() {
     container_->HideProgress();
     container_->view()->SetSongs(songs);
   });
+}
+
+void StreamingSongsView::AbortGetSongs() {
+  if (service_) {
+    service_->ResetSongsRequest();
+  }
+  container_->HideProgress();
 }

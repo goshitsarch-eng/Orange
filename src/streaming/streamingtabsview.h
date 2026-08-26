@@ -28,6 +28,9 @@ class StreamingTabsView {
   void GetAlbums();
   void GetSongs();
   void GetFavorites();
+  void AbortGetArtists();
+  void AbortGetAlbums();
+  void AbortGetSongs();
   StreamingCollectionView *artists_collection_view() const { return artists_->view(); }
   StreamingCollectionView *albums_collection_view() const { return albums_->view(); }
   StreamingCollectionView *songs_collection_view() const { return songs_->view(); }

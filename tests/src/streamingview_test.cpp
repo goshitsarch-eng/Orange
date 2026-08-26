@@ -1,3 +1,4 @@
+#include "streaming/streamingabort.h"
 #include "streaming/streamingcover.h"
 #include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchgroup.h"
@@ -205,6 +206,52 @@ TEST(StreamingService, BrowseProgressEmitsReceiving) {
   EXPECT_EQ("Receiving albums...", albums);
   EXPECT_EQ(0, albums_value);
   EXPECT_EQ("Receiving songs...", songs);
+}
+
+TEST(StreamingAbort, VisibilityAndGeneration) {
+  EXPECT_STREQ("Abort", StreamingAbort::AbortLabel());
+  EXPECT_TRUE(StreamingAbort::ShouldShowAbort(true));
+  EXPECT_FALSE(StreamingAbort::ShouldShowAbort(false));
+  EXPECT_TRUE(StreamingAbort::ShouldShowClose(false, true));
+  EXPECT_FALSE(StreamingAbort::ShouldShowClose(true, true));
+  EXPECT_FALSE(StreamingAbort::ShouldShowClose(false, false));
+  EXPECT_EQ(1, StreamingAbort::NextGeneration(0));
+  EXPECT_TRUE(StreamingAbort::IsCurrent(2, 2));
+  EXPECT_FALSE(StreamingAbort::IsCurrent(1, 2));
+}
+
+TEST(StreamingService, ResetDropsInFlightCallbacks) {
+  TidalService service(nullptr);
+  int artists = 0;
+  int albums = 0;
+  int songs = 0;
+  int searches = 0;
+  auto artist_cb = service.GuardArtists([&](const SongList &) { ++artists; });
+  auto album_cb = service.GuardAlbums([&](const SongList &) { ++albums; });
+  auto song_cb = service.GuardSongs([&](const SongList &) { ++songs; });
+  auto search_cb = service.GuardSearch([&](const SongList &) { ++searches; });
+  artist_cb({});
+  album_cb({});
+  song_cb({});
+  search_cb({});
+  EXPECT_EQ(1, artists);
+  EXPECT_EQ(1, albums);
+  EXPECT_EQ(1, songs);
+  EXPECT_EQ(1, searches);
+  service.ResetArtistsRequest();
+  service.ResetAlbumsRequest();
+  service.ResetSongsRequest();
+  service.CancelSearch();
+  artist_cb({});
+  album_cb({});
+  song_cb({});
+  search_cb({});
+  EXPECT_EQ(1, artists);
+  EXPECT_EQ(1, albums);
+  EXPECT_EQ(1, songs);
+  EXPECT_EQ(1, searches);
+  EXPECT_FALSE(service.ArtistsRequestCurrent(service.artists_generation() - 1));
+  EXPECT_TRUE(service.ArtistsRequestCurrent(service.artists_generation()));
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {

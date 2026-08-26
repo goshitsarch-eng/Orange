@@ -107,30 +107,34 @@ std::map<std::string, std::string> SpotifyService::AuthHeaders() const {
 void SpotifyService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
 
 void SpotifyService::Search(const std::string &query, SearchType type, SearchCallback callback) {
-  EnsureFreshToken([this, query, type, callback]() {
+  auto guarded = GuardSearch(std::move(callback));
+  EnsureFreshToken([this, query, type, guarded]() {
     const auto request_type = SpotifyRequest::FromSearchType(type);
-    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, request_type, query), AuthHeaders(), request_type, callback);
+    SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, request_type, query), AuthHeaders(), request_type, guarded);
   });
 }
 
 void SpotifyService::GetArtists(SearchCallback callback) {
-  EnsureFreshToken([this, callback]() {
+  auto guarded = GuardArtists(std::move(callback));
+  EnsureFreshToken([this, guarded]() {
     SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteArtists, {}), AuthHeaders(),
-                        SpotifyRequest::Type::FavouriteArtists, callback);
+                        SpotifyRequest::Type::FavouriteArtists, guarded);
   });
 }
 
 void SpotifyService::GetAlbums(SearchCallback callback) {
-  EnsureFreshToken([this, callback]() {
+  auto guarded = GuardAlbums(std::move(callback));
+  EnsureFreshToken([this, guarded]() {
     SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteAlbums, {}), AuthHeaders(),
-                        SpotifyRequest::Type::FavouriteAlbums, callback);
+                        SpotifyRequest::Type::FavouriteAlbums, guarded);
   });
 }
 
 void SpotifyService::GetSongs(SearchCallback callback) {
-  EnsureFreshToken([this, callback]() {
+  auto guarded = GuardSongs(std::move(callback));
+  EnsureFreshToken([this, guarded]() {
     SpotifyRequest::Get(network_, SpotifyRequest::Url(kApiUrl, SpotifyRequest::Type::FavouriteSongs, {}), AuthHeaders(),
-                        SpotifyRequest::Type::FavouriteSongs, callback);
+                        SpotifyRequest::Type::FavouriteSongs, guarded);
   });
 }
 

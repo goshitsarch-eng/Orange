@@ -114,30 +114,34 @@ std::map<std::string, std::string> TidalService::AuthHeaders() const {
 void TidalService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
 
 void TidalService::Search(const std::string &query, SearchType type, SearchCallback callback) {
-  EnsureFreshToken([this, query, type, callback]() {
+  auto guarded = GuardSearch(std::move(callback));
+  EnsureFreshToken([this, query, type, guarded]() {
     const auto request_type = TidalRequest::FromSearchType(type);
-    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_), AuthHeaders(), request_type, callback);
+    TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_), AuthHeaders(), request_type, guarded);
   });
 }
 
 void TidalService::GetArtists(SearchCallback callback) {
-  EnsureFreshToken([this, callback]() {
+  auto guarded = GuardArtists(std::move(callback));
+  EnsureFreshToken([this, guarded]() {
     TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteArtists, {}, country_code_, user_id_), AuthHeaders(),
-                      TidalRequest::Type::FavouriteArtists, callback);
+                      TidalRequest::Type::FavouriteArtists, guarded);
   });
 }
 
 void TidalService::GetAlbums(SearchCallback callback) {
-  EnsureFreshToken([this, callback]() {
+  auto guarded = GuardAlbums(std::move(callback));
+  EnsureFreshToken([this, guarded]() {
     TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteAlbums, {}, country_code_, user_id_), AuthHeaders(),
-                      TidalRequest::Type::FavouriteAlbums, callback);
+                      TidalRequest::Type::FavouriteAlbums, guarded);
   });
 }
 
 void TidalService::GetSongs(SearchCallback callback) {
-  EnsureFreshToken([this, callback]() {
+  auto guarded = GuardSongs(std::move(callback));
+  EnsureFreshToken([this, guarded]() {
     TidalRequest::Get(network_, TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteSongs, {}, country_code_, user_id_), AuthHeaders(),
-                      TidalRequest::Type::FavouriteSongs, callback);
+                      TidalRequest::Type::FavouriteSongs, guarded);
   });
 }
 
