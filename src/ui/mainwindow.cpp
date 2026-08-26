@@ -24,6 +24,7 @@
 #include "smartplaylists/smartplaylistsviewcontainer.h"
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistmenu.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistsequence.h"
 #include "queue/queuerows.h"
@@ -422,9 +423,13 @@ void MainWindow::BuildUi() {
   add_action("cover-from-url", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverFromUrl(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("cover-export", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverExport(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("copy-device", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CopyToDevice(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("playlist-copy-device", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::CopyToDevice(GTK_WINDOW(self->window_), self->app_, self->SelectedSongs());
+             }));
   add_action("delete-files", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               Dialogs::DeleteFiles(GTK_WINDOW(self->window_), self->app_, {}, DeleteFilesPolicy::Source::Playlist);
+               Dialogs::DeleteFiles(GTK_WINDOW(self->window_), self->app_, self->SelectedSongs(), DeleteFilesPolicy::Source::Playlist);
              }));
   add_action("save-all-playlists", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::SaveAllPlaylists(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("playlist-columns", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
@@ -434,6 +439,11 @@ void MainWindow::BuildUi() {
   add_action("equalizer", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Equalizer(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("transcode", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Transcode(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("organize", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Organize(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("organize-selected", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::Organize(GTK_WINDOW(self->window_), self->app_, self->SelectedSongs(), true);
+             }));
+  add_action("stop", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->Stop(); }));
   add_action("collection-append", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                Settings settings;
@@ -678,8 +688,14 @@ void MainWindow::BuildUi() {
   add_action("cycle-analyzer", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CycleAnalyzer(); }));
   add_action("playlist-play", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               if (self->app_->playlist_manager()->current() && !self->SelectedPlaylistRows().empty()) {
-                 self->app_->player()->PlayAt(self->SelectedPlaylistRows().front());
+               Playlist *playlist = self->app_->playlist_manager()->current();
+               if (playlist && !self->SelectedPlaylistRows().empty()) {
+                 const int row = self->SelectedPlaylistRows().front();
+                 if (playlist->current_row() == row && self->app_->player()->GetState() == GstEngine::State::Playing) {
+                   self->app_->player()->Pause();
+                 } else {
+                   self->app_->player()->PlayAt(row);
+                 }
                } else {
                  self->app_->player()->Play();
                }
@@ -2628,66 +2644,58 @@ SongList MainWindow::SongsFromUrls(const std::vector<std::string> &urls) const {
 }
 
 void MainWindow::ShowPlaylistMenu(double, double) {
-  GMenu *menu = g_menu_new();
-  g_menu_append(menu, Translations::Tr("Play").c_str(), "win.playlist-play");
-  const SongList selected = SelectedSongs();
-  bool queued = !SelectedPlaylistRows().empty();
   Playlist *playlist = app_->playlist_manager()->current();
-  if (playlist) {
-    for (int row : SelectedPlaylistRows()) {
-      if (!app_->queue()->ContainsPlaylistRow(playlist->id(), row)) {
-        queued = false;
-        break;
-      }
-    }
-  } else {
-    queued = !selected.empty();
-    for (const Song &song : selected) {
-      if (!app_->queue()->Contains(song)) {
-        queued = false;
-        break;
-      }
+  const std::vector<int> rows = SelectedPlaylistRows();
+  const PlaylistColumn column = playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Title;
+  PlaylistMenu::SelectionState opts;
+  opts.index_valid = playlist && !rows.empty();
+  opts.track_column = column == PlaylistColumn::Track;
+  opts.column_editable = PlaylistDelegates::ColumnIsEditable(column);
+  opts.column = column;
+  opts.column_name = PlaylistDelegates::ColumnTitle(column);
+  opts.delete_allowed = DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Playlist);
+  for (const ConnectedDevice &device : app_->device_manager()->devices()) {
+    if (!device.mount_path.empty()) {
+      opts.devices_connected = true;
+      break;
     }
   }
-  g_menu_append(menu, queued ? Translations::Tr("Dequeue").c_str() : Translations::Tr("Queue").c_str(), "win.playlist-queue");
-  g_menu_append(menu, Translations::Tr("Play next").c_str(), "win.queue-next");
-  g_menu_append(menu, Translations::Tr("Skip / unskip").c_str(), "win.playlist-skip");
-  g_menu_append(menu, Translations::Tr("Jump to playing track").c_str(), "win.jump-playing");
-  g_menu_append(menu, Translations::Tr("Stop after this track").c_str(), "win.stop-after");
-  g_menu_append(menu, Translations::Tr("Remove").c_str(), "win.playlist-remove");
-  g_menu_append(menu, Translations::Tr("Rescan selected songs").c_str(), "win.rescan-selected");
-  g_menu_append(menu, Translations::Tr("Fetch streaming metadata").c_str(), "win.fetch-metadata");
-  g_menu_append(menu, Translations::Tr("Auto-complete tags…").c_str(), "win.autocomplete-tags");
-  g_menu_append(menu, Translations::Tr("Edit value").c_str(), "win.edit-value");
-  g_menu_append(menu, Translations::Tr("Set column to…").c_str(), "win.set-column");
-  GMenu *add_to = g_menu_new();
-  for (Playlist *playlist : app_->playlist_manager()->GetAllPlaylists()) {
-    if (!playlist || playlist == app_->playlist_manager()->current()) {
+  if (playlist && !rows.empty()) {
+    const int row = rows.front();
+    if (row >= 0 && row < playlist->row_count()) {
+      const Song &song = playlist->song(row);
+      opts.column_value = PlaylistDelegates::ColumnText(song, column);
+      opts.collection_item = song.source() == Song::Source::Collection && song.id() > 0;
+      opts.playing_selected = playlist->current_row() == row && app_->player()->GetState() == GstEngine::State::Playing;
+    }
+  }
+  std::vector<PlaylistMenu::RowInfo> infos;
+  if (playlist) {
+    for (int row : rows) {
+      if (row < 0 || row >= playlist->row_count()) {
+        continue;
+      }
+      infos.push_back(PlaylistMenu::FromSong(playlist->song(row), app_->queue()->ContainsPlaylistRow(playlist->id(), row)));
+    }
+  }
+  const PlaylistMenu::SelectionState state = PlaylistMenu::Analyze(infos, opts);
+
+  GMenu *menu = g_menu_new();
+  for (const PlaylistMenu::Item &item : PlaylistMenu::VisibleItems(state)) {
+    if (item.action == PlaylistMenu::Action::AddToPlaylist) {
+      GMenu *add_to = g_menu_new();
+      for (Playlist *other : app_->playlist_manager()->GetAllPlaylists()) {
+        if (!other || other == playlist) {
+          continue;
+        }
+        const std::string target = "win.add-to-playlist(" + std::to_string(other->id()) + ")";
+        g_menu_append(add_to, other->name().c_str(), target.c_str());
+      }
+      g_menu_append(add_to, Translations::Tr("New playlist").c_str(), "win.add-to-playlist(-1)");
+      g_menu_append_submenu(menu, Translations::Tr(PlaylistMenu::LabelFor(item.action, state)).c_str(), G_MENU_MODEL(add_to));
       continue;
     }
-    const std::string target = "win.add-to-playlist(" + std::to_string(playlist->id()) + ")";
-    g_menu_append(add_to, playlist->name().c_str(), target.c_str());
-  }
-  if (g_menu_model_get_n_items(G_MENU_MODEL(add_to)) > 0) {
-    g_menu_append_submenu(menu, Translations::Tr("Add to playlist").c_str(), G_MENU_MODEL(add_to));
-  }
-  g_menu_append(menu, Translations::Tr("Show in collection").c_str(), "win.show-in-collection");
-  g_menu_append(menu, Translations::Tr("Open in file manager").c_str(), "win.open-file-manager");
-  g_menu_append(menu, Translations::Tr("Copy to collection").c_str(), "win.copy-collection");
-  g_menu_append(menu, Translations::Tr("Move to collection").c_str(), "win.move-collection");
-  g_menu_append(menu, Translations::Tr("Add to transcoder…").c_str(), "win.transcode-selected");
-  g_menu_append(menu, Translations::Tr("Copy song URL").c_str(), "win.copy-url");
-  GMenu *rate_menu = g_menu_new();
-  g_menu_append(rate_menu, Translations::Tr("1 star").c_str(), "win.rate(1)");
-  g_menu_append(rate_menu, Translations::Tr("2 stars").c_str(), "win.rate(2)");
-  g_menu_append(rate_menu, Translations::Tr("3 stars").c_str(), "win.rate(3)");
-  g_menu_append(rate_menu, Translations::Tr("4 stars").c_str(), "win.rate(4)");
-  g_menu_append(rate_menu, Translations::Tr("5 stars").c_str(), "win.rate(5)");
-  g_menu_append_submenu(menu, Translations::Tr("Rate").c_str(), G_MENU_MODEL(rate_menu));
-  g_menu_append(menu, Translations::Tr("Edit tags…").c_str(), "win.edittag");
-  g_menu_append(menu, Translations::Tr("Cover search…").c_str(), "win.cover-search");
-  if (DeleteFilesPolicy::Allowed(DeleteFilesPolicy::Source::Playlist)) {
-    g_menu_append(menu, Translations::Tr("Delete file…").c_str(), "win.delete-files");
+    g_menu_append(menu, Translations::Tr(PlaylistMenu::LabelFor(item.action, state)).c_str(), PlaylistMenu::WinAction(item.action));
   }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, playlist_container_ ? playlist_container_->view()->grid() : GTK_WIDGET(window_));
@@ -3030,6 +3038,13 @@ void MainWindow::FetchStreamingMetadata() {
 void MainWindow::AddSelectedToPlaylist(int id) {
   const SongList songs = SelectedSongs();
   if (songs.empty()) {
+    return;
+  }
+  if (id < 0) {
+    Playlist *created = app_->playlist_manager()->New("Playlist", songs);
+    RefreshPlaylistsList();
+    RefreshPlaylistTabs();
+    ShowToast("Added " + std::to_string(songs.size()) + " song(s) to " + (created ? created->name() : std::string("Playlist")));
     return;
   }
   app_->playlist_manager()->InsertSongs(id, songs);

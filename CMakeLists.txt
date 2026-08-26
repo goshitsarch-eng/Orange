@@ -743,6 +743,7 @@ if(GTest_FOUND)
     tests/src/collection_test.cpp
     tests/src/playlistitem_test.cpp
     tests/src/playlistview_test.cpp
+    tests/src/playlistmenu_test.cpp
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
     tests/src/streamtagreader_test.cpp
