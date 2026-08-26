@@ -1,4 +1,5 @@
 #include "collection/collectionbackend.h"
+#include "collection/collectionwatcher.h"
 #include "collection/collectiondirectorymodel.h"
 #include "collection/collectionfilter.h"
 #include "collection/collectionfilteroptions.h"
@@ -250,5 +251,40 @@ TEST(CollectionBackend, SongsFromQueryMapsColumnsAndAppliesOptions) {
   ASSERT_TRUE(directories.At(0));
   EXPECT_EQ("/tmp/music", directories.At(0)->path);
 
+  unlink(path.c_str());
+}
+
+TEST(CollectionWatcher, NeedsRescanUsesMtimeAndUnavailable) {
+  Song existing;
+  existing.set_valid(true);
+  existing.set_mtime(100);
+  existing.set_filesize(50);
+  EXPECT_FALSE(CollectionWatcher::NeedsRescan(existing, 100, 50));
+  EXPECT_TRUE(CollectionWatcher::NeedsRescan(existing, 101, 50));
+  EXPECT_TRUE(CollectionWatcher::NeedsRescan(existing, 100, 51));
+  existing.set_unavailable(true);
+  EXPECT_TRUE(CollectionWatcher::NeedsRescan(existing, 100, 50));
+  Song missing;
+  EXPECT_TRUE(CollectionWatcher::NeedsRescan(missing, 100, 50));
+}
+
+TEST(CollectionBackend, MarkMissingUnavailableLeavesSeenSongs) {
+  const std::string path = "/tmp/strawberry-collection-unavailable.db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song keep = MakeSong("Keep", "A", "Album");
+  keep.set_directory_id(directory);
+  keep.set_url("file:///tmp/music/keep.flac");
+  const int keep_id = backend.AddOrUpdateSong(keep);
+  Song gone = MakeSong("Gone", "A", "Album");
+  gone.set_directory_id(directory);
+  gone.set_url("file:///tmp/music/gone.flac");
+  const int gone_id = backend.AddOrUpdateSong(gone);
+  EXPECT_EQ(1, backend.MarkMissingUnavailable(directory, {"file:///tmp/music/keep.flac"}));
+  EXPECT_FALSE(backend.SongById(keep_id).unavailable());
+  EXPECT_TRUE(backend.SongById(gone_id).unavailable());
   unlink(path.c_str());
 }

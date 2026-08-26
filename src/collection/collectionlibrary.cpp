@@ -9,19 +9,23 @@ CollectionLibrary::CollectionLibrary(Database *database, TaskManager *task_manag
       task_manager_(task_manager),
       tagreader_(tagreader),
       backend_(std::make_unique<CollectionBackend>(database)),
-      watcher_(std::make_unique<CollectionWatcher>(backend_.get(), tagreader, task_manager)) {}
+      watcher_(std::make_unique<CollectionWatcher>(backend_.get(), tagreader, task_manager)) {
+  watcher_->ScanFinished.Connect([this]() { ScanFinished.Emit(); });
+}
 
 void CollectionLibrary::Init() { watcher_->StartWatching(); }
 
-void CollectionLibrary::IncrementalScan() {
-  watcher_->Scan();
-  ScanFinished.Emit();
+void CollectionLibrary::IncrementalScan() { watcher_->Scan(CollectionWatcher::ScanType::Incremental); }
+
+void CollectionLibrary::FullScan() { watcher_->Scan(CollectionWatcher::ScanType::Full); }
+
+void CollectionLibrary::AbortScan() {
+  if (watcher_) {
+    watcher_->Abort();
+  }
 }
 
-void CollectionLibrary::FullScan() {
-  watcher_->Scan();
-  ScanFinished.Emit();
-}
+bool CollectionLibrary::scanning() const { return watcher_ && watcher_->scanning(); }
 
 void CollectionLibrary::Rescan(const SongList &songs) {
   for (const Song &song : songs) {

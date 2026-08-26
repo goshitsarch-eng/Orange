@@ -23,6 +23,8 @@ class CollectionLibrary {
   void Init();
   void IncrementalScan();
   void FullScan();
+  void AbortScan();
+  bool scanning() const;
   void Rescan(const SongList &songs);
   void AddDirectory(const std::string &path, bool subdirs = true);
   void RemoveDirectory(int id);

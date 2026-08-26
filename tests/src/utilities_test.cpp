@@ -72,6 +72,15 @@ TEST(FileUtils, BaseAndExtension) {
   EXPECT_EQ("mp3", FileUtils::Extension("/tmp/music/song.mp3"));
 }
 
+TEST(FileUtils, FileSizeAndMtime) {
+  const std::string path = "/tmp/strawberry-filesize.txt";
+  FileUtils::WriteFile(path, "hello");
+  EXPECT_EQ(5, FileUtils::FileSize(path));
+  EXPECT_GT(FileUtils::FileMtime(path), 0);
+  EXPECT_EQ(-1, FileUtils::FileSize("/tmp/strawberry-missing-filesize.txt"));
+  FileUtils::Remove(path);
+}
+
 TEST(FileUtils, PrettySize) {
   EXPECT_EQ("0 B", FileUtils::PrettySize(0));
   EXPECT_EQ("512 B", FileUtils::PrettySize(512));

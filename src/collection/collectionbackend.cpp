@@ -4,6 +4,8 @@
 #include "filterparser/filterparser.h"
 #include "utilities/strutils.h"
 
+#include <algorithm>
+
 CollectionBackend::CollectionBackend(Database *database) : database_(database) {}
 
 std::vector<CollectionDirectory> CollectionBackend::Directories() const {
@@ -227,6 +229,33 @@ void CollectionBackend::SetRating(int song_id, float rating) {
   query.Bind(1, static_cast<int>(rating * 100.0f));
   query.Bind(2, song_id);
   query.Exec();
+}
+
+void CollectionBackend::SetUnavailable(int song_id, bool unavailable) {
+  SqlQuery query(database_, "UPDATE songs SET unavailable = ? WHERE ROWID = ?");
+  query.Bind(1, unavailable ? 1 : 0);
+  query.Bind(2, song_id);
+  query.Exec();
+}
+
+int CollectionBackend::MarkMissingUnavailable(int directory_id, const std::vector<std::string> &seen_urls) {
+  SongList songs;
+  SqlQuery query(database_, "SELECT ROWID, " + std::string(Song::kColumnSpec) + " FROM songs WHERE directory_id = ?");
+  query.Bind(1, directory_id);
+  while (query.Step()) {
+    songs.push_back(SongFromQuery(query));
+  }
+  int marked = 0;
+  for (const Song &song : songs) {
+    if (song.unavailable()) {
+      continue;
+    }
+    if (std::find(seen_urls.begin(), seen_urls.end(), song.url()) == seen_urls.end()) {
+      SetUnavailable(song.id(), true);
+      ++marked;
+    }
+  }
+  return marked;
 }
 
 int CollectionBackend::SongCount() const {

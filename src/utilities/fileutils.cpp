@@ -4,6 +4,8 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 
+#include <sys/stat.h>
+
 #include <fstream>
 #include <sstream>
 
@@ -193,6 +195,22 @@ int64_t FreeSpaceBytes(const std::string &path) {
 
 int64_t TotalSpaceBytes(const std::string &path) {
   return QueryFilesystemAttribute(path, G_FILE_ATTRIBUTE_FILESYSTEM_SIZE);
+}
+
+int64_t FileSize(const std::string &path) {
+  struct stat st {};
+  if (stat(path.c_str(), &st) != 0) {
+    return -1;
+  }
+  return static_cast<int64_t>(st.st_size);
+}
+
+int64_t FileMtime(const std::string &path) {
+  struct stat st {};
+  if (stat(path.c_str(), &st) != 0) {
+    return -1;
+  }
+  return static_cast<int64_t>(st.st_mtime);
 }
 
 }  // namespace FileUtils

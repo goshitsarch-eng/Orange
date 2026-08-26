@@ -26,6 +26,8 @@ bool Remove(const std::string &path);
 std::string PrettySize(int64_t bytes);
 int64_t FreeSpaceBytes(const std::string &path);
 int64_t TotalSpaceBytes(const std::string &path);
+int64_t FileSize(const std::string &path);
+int64_t FileMtime(const std::string &path);
 
 }  // namespace FileUtils
 

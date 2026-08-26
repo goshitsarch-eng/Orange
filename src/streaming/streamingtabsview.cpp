@@ -10,10 +10,12 @@ StreamingTabsView::StreamingTabsView(StreamingService *service) : service_(servi
   artists_ = std::make_unique<StreamingCollectionViewContainer>("Artists");
   albums_ = std::make_unique<StreamingCollectionViewContainer>("Albums");
   songs_ = std::make_unique<StreamingCollectionViewContainer>("Songs");
+  favorites_ = std::make_unique<StreamingCollectionViewContainer>("Favorites");
   search_ = std::make_unique<StreamingSearchView>(service);
   gtk_stack_add_titled(GTK_STACK(stack), artists_->widget(), "artists", "Artists");
   gtk_stack_add_titled(GTK_STACK(stack), albums_->widget(), "albums", "Albums");
   gtk_stack_add_titled(GTK_STACK(stack), songs_->widget(), "songs", "Songs");
+  gtk_stack_add_titled(GTK_STACK(stack), favorites_->widget(), "favorites", "Favorites");
   gtk_stack_add_titled(GTK_STACK(stack), search_->widget(), "search", "Search");
   gtk_widget_set_vexpand(stack, TRUE);
   gtk_box_append(GTK_BOX(widget_), switcher);
@@ -21,6 +23,7 @@ StreamingTabsView::StreamingTabsView(StreamingService *service) : service_(servi
   artists_->view()->SetRefreshCallback([this]() { GetArtists(); });
   albums_->view()->SetRefreshCallback([this]() { GetAlbums(); });
   songs_->view()->SetRefreshCallback([this]() { GetSongs(); });
+  favorites_->view()->SetRefreshCallback([this]() { GetFavorites(); });
 }
 
 StreamingTabsView::~StreamingTabsView() = default;
@@ -30,6 +33,7 @@ void StreamingTabsView::SetActivateCallback(ActivateCallback callback) {
   artists_->view()->SetActivateCallback(activate_);
   albums_->view()->SetActivateCallback(activate_);
   songs_->view()->SetActivateCallback(activate_);
+  favorites_->view()->SetActivateCallback(activate_);
   search_->SetActivateCallback(activate_);
 }
 
@@ -74,6 +78,19 @@ void StreamingTabsView::GetSongs() {
     songs_->view()->SetSongs(songs);
     if (songs.empty()) {
       songs_->view()->SetStatus(service_->logged_in() ? "No songs" : "Sign in in Preferences");
+    }
+  });
+}
+
+void StreamingTabsView::GetFavorites() {
+  if (!service_) {
+    return;
+  }
+  favorites_->view()->SetStatus("Loading favorites…");
+  service_->GetFavorites(StreamingService::FavoriteType::Songs, [this](const SongList &songs) {
+    favorites_->view()->SetSongs(songs);
+    if (songs.empty()) {
+      favorites_->view()->SetStatus(service_->logged_in() ? "No favorites" : "Sign in in Preferences");
     }
   });
 }

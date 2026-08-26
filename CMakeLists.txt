@@ -741,6 +741,7 @@ if(GTest_FOUND)
     tests/src/playlist_test.cpp
     tests/src/playlistmanager_test.cpp
     tests/src/systemtrayicon_test.cpp
+    tests/src/mpris2_test.cpp
     tests/src/settings_test.cpp
     tests/src/settingspage_test.cpp
     tests/src/jsonutils_test.cpp

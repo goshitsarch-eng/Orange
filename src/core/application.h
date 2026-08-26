@@ -82,6 +82,7 @@ class Application {
   TagFetcher *tag_fetcher() const { return tag_fetcher_.get(); }
 
   Signal<> ExitFinished;
+  Signal<> RaiseRequested;
 
  private:
   std::unique_ptr<TaskManager> task_manager_;

@@ -24,6 +24,7 @@ class StreamingTabsView {
   void GetArtists();
   void GetAlbums();
   void GetSongs();
+  void GetFavorites();
   StreamingCollectionView *artists_collection_view() const { return artists_->view(); }
   StreamingCollectionView *albums_collection_view() const { return albums_->view(); }
   StreamingCollectionView *songs_collection_view() const { return songs_->view(); }
@@ -36,6 +37,7 @@ class StreamingTabsView {
   std::unique_ptr<StreamingCollectionViewContainer> artists_;
   std::unique_ptr<StreamingCollectionViewContainer> albums_;
   std::unique_ptr<StreamingCollectionViewContainer> songs_;
+  std::unique_ptr<StreamingCollectionViewContainer> favorites_;
   std::unique_ptr<StreamingSearchView> search_;
 };
 

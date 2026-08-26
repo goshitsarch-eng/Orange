@@ -141,6 +141,7 @@ void MainWindow::BuildUi() {
   g_menu_append(music, "Add stream…", "win.add-stream");
   g_menu_append(music, "Rescan collection", "win.rescan");
   g_menu_append(music, "Full collection scan", "win.full-scan");
+  g_menu_append(music, "Stop collection scan", "win.stop-scan");
   g_menu_append_section(menu, "Music", G_MENU_MODEL(music));
   GMenu *playlist = g_menu_new();
   g_menu_append(playlist, "New playlist", "win.new-playlist");
@@ -290,6 +291,11 @@ void MainWindow::BuildUi() {
   add_action("add-cd", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddCdTracks(); }));
   add_action("rescan", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RescanCollection(false); }));
   add_action("full-scan", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RescanCollection(true); }));
+  add_action("stop-scan", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->app_->collection()->AbortScan();
+               self->ShowToast("Collection scan stopping");
+             }));
   add_action("new-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->NewPlaylist(); }));
   add_action("load-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->LoadPlaylistFile(); }));
   add_action("save-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SavePlaylistFile(); }));
@@ -749,6 +755,7 @@ void MainWindow::BuildPlayerBar() {
 }
 
 void MainWindow::ConnectSignals() {
+  app_->RaiseRequested.Connect([this]() { Present(); });
   app_->player()->SongChanged.Connect([this](const Song &) { UpdateNowPlaying(); });
   app_->player()->StateChanged.Connect([this](GstEngine::State) { UpdatePlaybackButtons(); });
   app_->player()->VolumeChanged.Connect([this](unsigned volume) {
@@ -760,7 +767,10 @@ void MainWindow::ConnectSignals() {
     RefreshPlaylistsList();
     RefreshPlaylist();
   });
-  app_->collection()->ScanFinished.Connect([this]() { RefreshCollection(); });
+  app_->collection()->ScanFinished.Connect([this]() {
+    RefreshCollection();
+    ShowToast("Collection scan finished");
+  });
   app_->task_manager()->TasksChanged.Connect([this](int) {
     if (!loading_indicator_) {
       return;
@@ -1357,13 +1367,16 @@ void MainWindow::AddCdTracks() {
 }
 
 void MainWindow::RescanCollection(bool full) {
+  if (app_->collection()->scanning()) {
+    ShowToast("A collection scan is already running");
+    return;
+  }
   if (full) {
     app_->collection()->FullScan();
   } else {
     app_->collection()->IncrementalScan();
   }
-  RefreshCollection();
-  ShowToast(full ? "Full collection scan finished" : "Collection rescan finished");
+  ShowToast(full ? "Full collection scan started" : "Collection rescan started");
 }
 
 void MainWindow::StopAfterCurrent() {
