@@ -32,6 +32,7 @@
 #include "systemtrayicon/systemtrayicon.h"
 #include "tagfetcher/tagfetcher.h"
 #include "tagreader/tagreader.h"
+#include "tagreader/tagreaderclient.h"
 #include "transcoder/transcoder.h"
 #include "waveform/waveform.h"
 
@@ -50,6 +51,7 @@ class Application {
   Database *database() const { return database_.get(); }
   NetworkAccessManager *network() const { return network_.get(); }
   TagReader *tagreader() const { return tagreader_.get(); }
+  TagReaderClient *tagreader_client() const { return tagreader_client_.get(); }
   UrlHandlers *url_handlers() const { return url_handlers_.get(); }
   CollectionLibrary *collection() const { return collection_.get(); }
   PlaylistBackend *playlist_backend() const { return playlist_backend_.get(); }
@@ -84,6 +86,7 @@ class Application {
   std::unique_ptr<Database> database_;
   std::unique_ptr<NetworkAccessManager> network_;
   std::unique_ptr<TagReader> tagreader_;
+  std::unique_ptr<TagReaderClient> tagreader_client_;
   std::unique_ptr<UrlHandlers> url_handlers_;
   std::unique_ptr<CollectionLibrary> collection_;
   std::unique_ptr<PlaylistBackend> playlist_backend_;

@@ -8,6 +8,7 @@ Application::Application()
       database_(std::make_unique<Database>()),
       network_(std::make_unique<NetworkAccessManager>()),
       tagreader_(std::make_unique<TagReader>()),
+      tagreader_client_(std::make_unique<TagReaderClient>(tagreader_.get())),
       url_handlers_(std::make_unique<UrlHandlers>()),
       collection_(std::make_unique<CollectionLibrary>(database_.get(), task_manager_.get(), tagreader_.get())),
       playlist_backend_(std::make_unique<PlaylistBackend>(database_.get(), tagreader_.get(), collection_->backend())),

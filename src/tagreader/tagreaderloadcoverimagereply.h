@@ -1,0 +1,9 @@
+#ifndef STRAWBERRY_TAGREADERLOADCOVERIMAGEREPLY_H
+#define STRAWBERRY_TAGREADERLOADCOVERIMAGEREPLY_H
+
+#include "tagreader/tagreaderloadcoverdatareply.h"
+
+using TagReaderLoadCoverImageReply = TagReaderLoadCoverDataReply;
+using TagReaderLoadCoverImageReplyPtr = TagReaderLoadCoverDataReplyPtr;
+
+#endif
