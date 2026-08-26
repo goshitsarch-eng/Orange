@@ -224,6 +224,7 @@ class Song {
   bool is_local_file() const { return source_ == Source::LocalFile || source_ == Source::Collection; }
 
   static FileType FiletypeByExtension(const std::string &extension);
+  static FileType FiletypeByMimeType(const std::string &mimetype);
   static FileType FiletypeByFilename(const std::string &filename);
   static bool IsAudioFile(const std::string &filename);
   static std::string SourceToString(Source source);

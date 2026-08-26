@@ -1,10 +1,14 @@
 #include "qobuz/qobuzservice.h"
 
+#include "constants/qobuzsettings.h"
 #include "core/settings.h"
 #include "qobuz/qobuzfavoriterequest.h"
 #include "qobuz/qobuzrequest.h"
+#include "qobuz/qobuzstreamurlrequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
+
+#include <ctime>
 
 const char QobuzService::kApiUrl[] = "https://www.qobuz.com/api.json/0.2";
 
@@ -12,15 +16,17 @@ QobuzService::QobuzService(NetworkAccessManager *network) : network_(network) { 
 
 void QobuzService::ReloadSettings() {
   Settings settings;
-  settings.BeginGroup("Qobuz");
-  app_id_ = settings.Value("app_id");
+  settings.BeginGroup(QobuzSettings::kSettingsGroup);
+  app_id_ = settings.Value(QobuzSettings::kAppId);
   if (app_id_.empty()) {
     app_id_ = settings.Value("appid");
   }
+  app_secret_ = settings.Value(QobuzSettings::kAppSecret);
   user_auth_token_ = settings.Value("token");
   if (user_auth_token_.empty()) {
-    user_auth_token_ = settings.Value("user_auth_token");
+    user_auth_token_ = settings.Value(QobuzSettings::kUserAuthToken);
   }
+  format_ = settings.IntValue(QobuzSettings::kFormat, QobuzSettings::kDefaultFormat);
   logged_in_ = !app_id_.empty() && !user_auth_token_.empty();
 }
 
@@ -73,11 +79,7 @@ void QobuzService::GetSongs(SearchCallback callback) {
 UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback callback) {
   LoadResult result;
   result.media_url = url;
-  std::string id = url;
-  const auto scheme = id.find("://");
-  if (scheme != std::string::npos) {
-    id = id.substr(scheme + 3);
-  }
+  const std::string id = QobuzStreamUrlRequest::TrackId(url);
   if (!network_ || id.empty() || !logged_in_) {
     result.error = "Qobuz is not signed in";
     if (callback) {
@@ -85,27 +87,11 @@ UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback 
     }
     return result;
   }
-  result.type = LoadResult::Type::Async;
-  const std::string request = std::string(kApiUrl) + "/track/getFileUrl?track_id=" + StrUtils::UriEscape(id) +
-                              "&format_id=5&app_id=" + StrUtils::UriEscape(app_id_) +
-                              "&user_auth_token=" + StrUtils::UriEscape(user_auth_token_);
-  network_->Get(request, [callback, url](const NetworkAccessManager::Response &response) {
-    LoadResult async;
-    async.media_url = url;
-    if (response.ok()) {
-      async.stream_url = JsonUtils::GetString(response.body, {"url"});
-      if (async.stream_url.empty()) {
-        async.stream_url = JsonUtils::FindStringByKeys(response.body, {"url", "sample_url"});
-      }
-    }
-    async.type = async.stream_url.empty() ? LoadResult::Type::Error : LoadResult::Type::TrackAvailable;
-    if (async.stream_url.empty()) {
-      async.error = response.error.empty() ? "Qobuz stream URL missing" : response.error;
-    }
-    if (callback) {
-      callback(async);
-    }
-  }, AuthHeaders());
+  result.type = LoadResult::Type::WillLoadAsynchronously;
+  const uint64_t timestamp = static_cast<uint64_t>(std::time(nullptr));
+  QobuzStreamUrlRequest::Get(network_,
+                             QobuzStreamUrlRequest::Url(kApiUrl, id, format_, timestamp, app_id_, app_secret_, user_auth_token_),
+                             AuthHeaders(), url, id, std::move(callback));
   return result;
 }
 

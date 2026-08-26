@@ -26,12 +26,19 @@ class QobuzService : public StreamingService {
   void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;
   void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;
 
+  const std::string &app_id() const { return app_id_; }
+  const std::string &app_secret() const { return app_secret_; }
+  const std::string &user_auth_token() const { return user_auth_token_; }
+  int format() const { return format_; }
+
  private:
   std::map<std::string, std::string> AuthHeaders() const;
 
   NetworkAccessManager *network_ = nullptr;
   std::string app_id_;
+  std::string app_secret_;
   std::string user_auth_token_;
+  int format_ = 27;
 };
 
 #endif

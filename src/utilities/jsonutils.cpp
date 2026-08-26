@@ -210,6 +210,22 @@ std::string GetString(const std::string &json, const std::vector<std::string> &p
   return value;
 }
 
+int GetInt(const std::string &json, const std::vector<std::string> &path, int fallback) {
+  const std::string value = GetString(json, path);
+  if (value.empty()) {
+    return fallback;
+  }
+  return static_cast<int>(std::strtol(value.c_str(), nullptr, 10));
+}
+
+double GetDouble(const std::string &json, const std::vector<std::string> &path, double fallback) {
+  const std::string value = GetString(json, path);
+  if (value.empty()) {
+    return fallback;
+  }
+  return std::strtod(value.c_str(), nullptr);
+}
+
 std::string FindStringByKeys(const std::string &json, const std::vector<std::string> &keys) {
   JsonNode *root = Parse(json);
   if (!root) {

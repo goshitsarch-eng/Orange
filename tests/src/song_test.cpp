@@ -19,6 +19,7 @@ TEST(Song, PrettyTitle) {
 
 TEST(Song, FiletypeAndAudio) {
   EXPECT_EQ(Song::FileType::FLAC, Song::FiletypeByExtension("flac"));
+  EXPECT_EQ(Song::FileType::FLAC, Song::FiletypeByMimeType("audio/flac"));
   EXPECT_EQ(Song::FileType::MPEG, Song::FiletypeByFilename("track.mp3"));
   EXPECT_TRUE(Song::IsAudioFile("album/01.flac"));
   EXPECT_FALSE(Song::IsAudioFile("notes.txt"));

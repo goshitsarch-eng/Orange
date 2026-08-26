@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_TIDALSERVICE_H
 #define STRAWBERRY_TIDALSERVICE_H
 
+#include "constants/tidalsettings.h"
 #include "streaming/streamingservices.h"
 
 #include <cstdint>
@@ -16,6 +17,8 @@ class TidalService : public StreamingService {
 
   std::string name() const override { return "Tidal"; }
   std::string scheme() const override { return "tidal"; }
+  const std::string &quality() const { return quality_; }
+  TidalSettings::StreamUrlMethod stream_url_method() const { return stream_url_method_; }
   void Search(const std::string &query, SearchCallback callback) override;
   void Search(const std::string &query, SearchType type, SearchCallback callback) override;
   void GetArtists(SearchCallback callback) override;
@@ -33,11 +36,12 @@ class TidalService : public StreamingService {
 
  private:
   std::map<std::string, std::string> AuthHeaders() const;
-  std::string TrackId(const std::string &url) const;
 
   NetworkAccessManager *network_ = nullptr;
   std::string token_;
   std::string country_code_ = "US";
+  std::string quality_ = TidalSettings::kDefaultQuality;
+  TidalSettings::StreamUrlMethod stream_url_method_ = TidalSettings::kDefaultStreamUrl;
   uint64_t user_id_ = 0;
 };
 

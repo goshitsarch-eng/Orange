@@ -15,6 +15,8 @@ AdwPreferencesPage *TidalSettingsPage::Create(Settings *settings, Application *a
   SettingsPage::AddEntry(group, settings, TidalSettings::kClientId, "Client ID");
   SettingsPage::AddEntry(group, settings, "clientsecret", "Client secret");
   SettingsPage::AddEntry(group, settings, TidalSettings::kQuality, "Quality", TidalSettings::kDefaultQuality);
+  SettingsPage::AddIntEntry(group, settings, TidalSettings::kStreamUrl, "Stream URL method",
+                            static_cast<int>(TidalSettings::kDefaultStreamUrl));
   SettingsPage::AddIntEntry(group, settings, TidalSettings::kSearchDelay, "Search delay (ms)", TidalSettings::kDefaultSearchDelay);
   SettingsPage::AddIntEntry(group, settings, TidalSettings::kArtistsSearchLimit, "Artists search limit", TidalSettings::kDefaultArtistsSearchLimit);
   SettingsPage::AddIntEntry(group, settings, TidalSettings::kAlbumsSearchLimit, "Albums search limit", TidalSettings::kDefaultAlbumsSearchLimit);

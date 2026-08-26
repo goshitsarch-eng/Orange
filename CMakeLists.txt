@@ -220,15 +220,22 @@ set(STRAWBERRY_SOURCES
   src/subsonic/subsonicservice.cpp
   src/subsonic/subsonicfavoriterequest.cpp
   src/subsonic/subsonicrequest.cpp
+  src/subsonic/subsonicurlhandler.cpp
   src/tidal/tidalservice.cpp
   src/tidal/tidalfavoriterequest.cpp
   src/tidal/tidalrequest.cpp
+  src/tidal/tidalstreamurlrequest.cpp
+  src/tidal/tidalurlhandler.cpp
   src/spotify/spotifyservice.cpp
   src/spotify/spotifyfavoriterequest.cpp
   src/spotify/spotifyrequest.cpp
+  src/spotify/spotifymetadatarequest.cpp
   src/qobuz/qobuzservice.cpp
   src/qobuz/qobuzfavoriterequest.cpp
   src/qobuz/qobuzrequest.cpp
+  src/qobuz/qobuzstreamurlrequest.cpp
+  src/qobuz/qobuzurlhandler.cpp
+  src/qobuz/qobuzmetadatarequest.cpp
   src/radios/radioservices.cpp
   src/radios/somafmservice.cpp
   src/radios/radioparadiseservice.cpp
@@ -361,6 +368,7 @@ if(GTest_FOUND)
     tests/src/streaming_test.cpp
     tests/src/streamingfavorite_test.cpp
     tests/src/streamingrequest_test.cpp
+    tests/src/streamurl_test.cpp
     tests/src/radio_test.cpp
     tests/src/tagreader_gme_test.cpp
     tests/src/streamtagreader_test.cpp
@@ -378,6 +386,7 @@ if(GTest_FOUND)
     src/core/settings.cpp
     src/core/song.cpp
     src/core/database.cpp
+    src/core/taskmanager.cpp
     src/core/network.cpp
     src/core/oauthenticator.cpp
     src/utilities/timeutils.cpp
@@ -408,6 +417,7 @@ if(GTest_FOUND)
     src/subsonic/subsonicservice.cpp
     src/subsonic/subsonicfavoriterequest.cpp
     src/subsonic/subsonicrequest.cpp
+    src/subsonic/subsonicurlhandler.cpp
     src/radios/somafmservice.cpp
     src/radios/radioparadiseservice.cpp
     src/radios/radiobrowserservice.cpp
@@ -435,11 +445,18 @@ if(GTest_FOUND)
     src/tidal/tidalservice.cpp
     src/tidal/tidalfavoriterequest.cpp
     src/tidal/tidalrequest.cpp
+    src/tidal/tidalstreamurlrequest.cpp
+    src/tidal/tidalurlhandler.cpp
+    src/spotify/spotifyservice.cpp
     src/spotify/spotifyfavoriterequest.cpp
     src/spotify/spotifyrequest.cpp
+    src/spotify/spotifymetadatarequest.cpp
     src/qobuz/qobuzservice.cpp
     src/qobuz/qobuzfavoriterequest.cpp
     src/qobuz/qobuzrequest.cpp
+    src/qobuz/qobuzstreamurlrequest.cpp
+    src/qobuz/qobuzurlhandler.cpp
+    src/qobuz/qobuzmetadatarequest.cpp
     src/tagreader/tagreadergme.cpp
     src/tagreader/tagreader.cpp
     src/tagreader/streamtagreader.cpp

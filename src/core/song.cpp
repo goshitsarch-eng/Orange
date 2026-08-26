@@ -113,6 +113,32 @@ Song::FileType Song::FiletypeByExtension(const std::string &extension) {
   return FileType::Unknown;
 }
 
+Song::FileType Song::FiletypeByMimeType(const std::string &mimetype) {
+  std::string mime = mimetype;
+  const auto semicolon = mime.find(';');
+  if (semicolon != std::string::npos) {
+    mime = mime.substr(0, semicolon);
+  }
+  std::transform(mime.begin(), mime.end(), mime.begin(), [](unsigned char c) { return std::tolower(c); });
+  if (mime == "audio/flac" || mime == "audio/x-flac") return FileType::FLAC;
+  if (mime == "audio/mpeg" || mime == "audio/mp3" || mime == "audio/x-mpeg") return FileType::MPEG;
+  if (mime == "audio/mp4" || mime == "audio/m4a" || mime == "audio/x-m4a" || mime == "audio/aac") return FileType::MP4;
+  if (mime == "audio/ogg" || mime == "application/ogg" || mime == "audio/vorbis" || mime == "audio/x-vorbis") return FileType::OggVorbis;
+  if (mime == "audio/opus" || mime == "audio/ogg; codecs=opus") return FileType::OggOpus;
+  if (mime == "audio/wav" || mime == "audio/x-wav" || mime == "audio/wave") return FileType::WAV;
+  if (mime == "audio/x-wavpack") return FileType::WavPack;
+  if (mime == "audio/x-ms-wma" || mime == "audio/wma") return FileType::ASF;
+  if (mime == "audio/aiff" || mime == "audio/x-aiff") return FileType::AIFF;
+  const auto slash = mime.rfind('/');
+  if (slash != std::string::npos) {
+    const FileType by_suffix = FiletypeByExtension(mime.substr(slash + 1));
+    if (by_suffix != FileType::Unknown) {
+      return by_suffix;
+    }
+  }
+  return FileType::Unknown;
+}
+
 Song::FileType Song::FiletypeByFilename(const std::string &filename) {
   return FiletypeByExtension(FileUtils::Extension(filename));
 }

@@ -11,6 +11,8 @@ namespace JsonUtils {
 bool LooksLikeImage(const std::string &data);
 std::string StripHtml(const std::string &html);
 std::string GetString(const std::string &json, const std::vector<std::string> &path);
+int GetInt(const std::string &json, const std::vector<std::string> &path, int fallback = 0);
+double GetDouble(const std::string &json, const std::vector<std::string> &path, double fallback = 0.0);
 std::string FindStringByKeys(const std::string &json, const std::vector<std::string> &keys);
 std::string FindFirstImageUrl(const std::string &json);
 std::string FindCoverUrl(const std::string &json);

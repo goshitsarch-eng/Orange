@@ -172,6 +172,42 @@ void Player::PlayCurrent(bool pause) {
   PlayLoadedSong(pause);
 }
 
+namespace {
+
+void ApplyLoadResult(Song *song, const UrlHandler::LoadResult &result) {
+  if (!result.stream_url.empty()) {
+    song->set_stream_url(result.stream_url);
+  }
+  if (result.filetype != Song::FileType::Unknown) {
+    song->set_filetype(result.filetype);
+  }
+  if (result.samplerate > 0) {
+    song->set_samplerate(result.samplerate);
+  }
+  if (result.bit_depth > 0) {
+    song->set_bitdepth(result.bit_depth);
+  }
+  if (result.duration > 0) {
+    song->set_length_nanosec(result.duration);
+  }
+  if (result.song.is_valid()) {
+    if (!result.song.title().empty()) {
+      song->set_title(result.song.title());
+    }
+    if (!result.song.artist().empty()) {
+      song->set_artist(result.song.artist());
+    }
+    if (!result.song.album().empty()) {
+      song->set_album(result.song.album());
+    }
+    if (!result.song.genre().empty()) {
+      song->set_genre(result.song.genre());
+    }
+  }
+}
+
+}  // namespace
+
 void Player::PlayLoadedSong(bool pause, int track_change_flags) {
   if (!current_song_.is_valid() && current_song_.url().empty()) {
     Stop();
@@ -180,8 +216,8 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags) {
   if (url_handlers_) {
     if (UrlHandler *handler = url_handlers_->HandlerForUrl(current_song_.url())) {
       const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause, track_change_flags](const UrlHandler::LoadResult &async) {
+        ApplyLoadResult(&current_song_, async);
         if (!async.stream_url.empty()) {
-          current_song_.set_stream_url(async.stream_url);
           engine_->Load(current_song_.url(), async.stream_url, track_change_flags, false, current_song_.beginning_nanosec(),
                         current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                         current_song_.ebur128_integrated_loudness_lufs());
@@ -189,7 +225,7 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags) {
         }
       });
       if (result.type == UrlHandler::LoadResult::Type::TrackAvailable) {
-        current_song_.set_stream_url(result.stream_url);
+        ApplyLoadResult(&current_song_, result);
       }
     }
   }

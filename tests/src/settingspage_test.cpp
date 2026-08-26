@@ -75,7 +75,13 @@ TEST(StreamingAndOsdSettings, OriginalGroups) {
   EXPECT_STREQ("OSDPretty", OSDPrettySettings::kSettingsGroup);
   EXPECT_STREQ("DiscordRPC", DiscordRPCSettings::kSettingsGroup);
   EXPECT_STREQ("client_id", TidalSettings::kClientId);
+  EXPECT_STREQ("quality", TidalSettings::kQuality);
+  EXPECT_STREQ("streamurl", TidalSettings::kStreamUrl);
+  EXPECT_STREQ("LOSSLESS", TidalSettings::kDefaultQuality);
   EXPECT_STREQ("app_id", QobuzSettings::kAppId);
+  EXPECT_STREQ("app_secret", QobuzSettings::kAppSecret);
+  EXPECT_STREQ("format", QobuzSettings::kFormat);
+  EXPECT_EQ(27, QobuzSettings::kDefaultFormat);
   EXPECT_STREQ("user_auth_token", QobuzSettings::kUserAuthToken);
   EXPECT_STREQ("access_token", SpotifySettings::kAccessToken);
   EXPECT_STREQ("authmethod", SubsonicSettings::kAuthMethod);

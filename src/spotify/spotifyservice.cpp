@@ -1,8 +1,11 @@
 #include "spotify/spotifyservice.h"
 
+#include "constants/spotifysettings.h"
 #include "core/settings.h"
 #include "spotify/spotifyfavoriterequest.h"
+#include "spotify/spotifymetadatarequest.h"
 #include "spotify/spotifyrequest.h"
+#include "streaming/streamingmediaid.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -12,10 +15,10 @@ SpotifyService::SpotifyService(NetworkAccessManager *network) : network_(network
 
 void SpotifyService::ReloadSettings() {
   Settings settings;
-  settings.BeginGroup("Spotify");
+  settings.BeginGroup(SpotifySettings::kSettingsGroup);
   token_ = settings.Value("token");
   if (token_.empty()) {
-    token_ = settings.Value("access_token");
+    token_ = settings.Value(SpotifySettings::kAccessToken);
   }
   logged_in_ = !token_.empty();
 }
@@ -64,11 +67,7 @@ void SpotifyService::GetSongs(SearchCallback callback) {
 UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallback callback) {
   LoadResult result;
   result.media_url = url;
-  std::string id = url;
-  const auto scheme = id.find("://");
-  if (scheme != std::string::npos) {
-    id = id.substr(scheme + 3);
-  }
+  const std::string id = StreamingMediaId(url);
   if (!network_ || id.empty() || token_.empty()) {
     result.error = "Spotify is not signed in";
     if (callback) {
@@ -76,28 +75,45 @@ UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallbac
     }
     return result;
   }
-  result.type = LoadResult::Type::Async;
-  const std::string request = std::string(kApiUrl) + "/tracks/" + StrUtils::UriEscape(id);
-  network_->Get(request, [callback, url](const NetworkAccessManager::Response &response) {
-    LoadResult async;
-    async.media_url = url;
-    if (response.ok()) {
-      async.stream_url = JsonUtils::GetString(response.body, {"preview_url"});
-      if (async.stream_url.empty()) {
-        const SongList songs = JsonUtils::ParseSpotifyTracks(response.body);
-        if (!songs.empty()) {
-          async.stream_url = songs.front().stream_url();
-        }
-      }
-    }
-    async.type = async.stream_url.empty() ? LoadResult::Type::Error : LoadResult::Type::TrackAvailable;
-    if (async.stream_url.empty()) {
-      async.error = response.error.empty() ? "Spotify preview URL missing" : response.error;
-    }
-    if (callback) {
-      callback(async);
-    }
-  }, AuthHeaders());
+  result.type = LoadResult::Type::WillLoadAsynchronously;
+  const auto headers = AuthHeaders();
+  SpotifyMetadataRequest::Get(network_, SpotifyMetadataRequest::TrackUrl(kApiUrl, id), headers,
+                              [this, callback, url, headers](const Song &song, const std::string &error) {
+                                LoadResult async;
+                                async.media_url = url;
+                                async.song = song;
+                                async.stream_url = song.stream_url() == song.url() ? std::string() : song.stream_url();
+                                if (async.stream_url.empty()) {
+                                  async.error = error.empty() ? "Spotify preview URL missing" : error;
+                                  async.type = LoadResult::Type::Error;
+                                  if (callback) {
+                                    callback(async);
+                                  }
+                                  return;
+                                }
+                                async.duration = song.length_nanosec() > 0 ? song.length_nanosec() : -1;
+                                async.type = LoadResult::Type::TrackAvailable;
+                                if (song.artist_id().empty() || !network_) {
+                                  if (callback) {
+                                    callback(async);
+                                  }
+                                  return;
+                                }
+                                network_->Get(
+                                    SpotifyMetadataRequest::ArtistUrl(kApiUrl, song.artist_id()),
+                                    [callback, async](const NetworkAccessManager::Response &response) mutable {
+                                      if (response.ok()) {
+                                        const std::string genre = SpotifyMetadataRequest::ParseArtistGenre(response.body);
+                                        if (!genre.empty()) {
+                                          async.song.set_genre(genre);
+                                        }
+                                      }
+                                      if (callback) {
+                                        callback(async);
+                                      }
+                                    },
+                                    headers);
+                              });
   return result;
 }
 

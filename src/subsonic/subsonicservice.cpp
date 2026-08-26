@@ -1,8 +1,10 @@
 #include "subsonic/subsonicservice.h"
 
+#include "constants/subsonicsettings.h"
 #include "core/settings.h"
 #include "subsonic/subsonicfavoriterequest.h"
 #include "subsonic/subsonicrequest.h"
+#include "subsonic/subsonicurlhandler.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -71,14 +73,16 @@ std::string SubsonicService::CreateUrl(const std::string &server_url, const std:
 
 void SubsonicService::ReloadSettings() {
   Settings settings;
-  settings.BeginGroup("Subsonic");
-  server_url_ = settings.Value("url");
-  username_ = settings.Value("username");
-  password_ = settings.Value("password");
+  settings.BeginGroup(SubsonicSettings::kSettingsGroup);
+  server_url_ = settings.Value(SubsonicSettings::kUrl);
+  username_ = settings.Value(SubsonicSettings::kUsername);
+  password_ = settings.Value(SubsonicSettings::kPassword);
   if (password_.empty()) {
     password_ = settings.Value("token");
   }
-  hex_auth_ = settings.Value("auth") == "hex";
+  hex_auth_ = settings.IntValue(SubsonicSettings::kAuthMethod, static_cast<int>(SubsonicSettings::kDefaultAuthMethod)) ==
+                  static_cast<int>(SubsonicSettings::AuthMethod::Hex) ||
+              settings.Value("auth") == "hex";
   logged_in_ = !server_url_.empty() && !username_.empty() && !password_.empty();
 }
 
@@ -139,14 +143,8 @@ void SubsonicService::GetSongs(SearchCallback callback) {
 
 UrlHandler::LoadResult SubsonicService::Load(const std::string &url, AsyncCallback callback) {
   LoadResult result;
-  std::string id = url;
-  const auto scheme = id.find("://");
-  if (scheme != std::string::npos) {
-    id = id.substr(scheme + 3);
-  }
-  if (!id.empty() && id.front() == '/') {
-    id.erase(id.begin());
-  }
+  result.media_url = url;
+  const std::string id = SubsonicUrlHandler::SongId(url);
   if (!logged_in_ || id.empty()) {
     result.error = "Subsonic is not signed in";
     if (callback) {
@@ -155,8 +153,7 @@ UrlHandler::LoadResult SubsonicService::Load(const std::string &url, AsyncCallba
     return result;
   }
   result.type = LoadResult::Type::TrackAvailable;
-  result.media_url = url;
-  result.stream_url = CreateUrl(server_url_, username_, password_, "stream", {{"id", id}}, hex_auth_);
+  result.stream_url = SubsonicUrlHandler::StreamUrl(server_url_, username_, password_, id, hex_auth_);
   if (callback) {
     callback(result);
   }

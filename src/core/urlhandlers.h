@@ -3,6 +3,7 @@
 
 #include "core/song.h"
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <string>
@@ -17,6 +18,10 @@ class UrlHandler {
     std::string stream_url;
     std::string error;
     Song song;
+    Song::FileType filetype = Song::FileType::Unknown;
+    int samplerate = -1;
+    int bit_depth = -1;
+    int64_t duration = -1;
   };
 
   using AsyncCallback = std::function<void(const LoadResult &)>;
