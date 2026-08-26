@@ -91,7 +91,7 @@ TEST(StreamTagReader, SeekTellAndEndOffset) {
 }
 
 TEST(StreamTagReader, CachesPrefixAndSuffixWithTwoRequests) {
-  const std::string body(2000, 'a');
+  const std::string body(StreamTagReader::kPrefixCacheBytes + StreamTagReader::kSuffixCacheBytes + 1024, 'a');
   StreamTagReader stream("https://example/stream.mp3", "stream.mp3", body.size(), {}, {}, BufferFetcher(body, nullptr));
   stream.PreCache();
   EXPECT_EQ(2, stream.num_requests());
