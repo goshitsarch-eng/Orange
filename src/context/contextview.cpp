@@ -4,6 +4,7 @@
 #include "context/contextcover.h"
 #include "context/contextfont.h"
 #include "context/contextlyrics.h"
+#include "context/contextoptions.h"
 #include "context/contexttechnical.h"
 #include "core/settings.h"
 #include "core/song.h"
@@ -37,7 +38,7 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   show_data_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Details"));
   show_lyrics_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Lyrics"));
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), TRUE);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), TRUE);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), FALSE);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), TRUE);
   gtk_box_append(GTK_BOX(toggles), show_album_btn_);
   gtk_box_append(GTK_BOX(toggles), show_data_btn_);
@@ -135,6 +136,19 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   g_signal_connect(show_album_btn_, "toggled", G_CALLBACK(notify), this);
   g_signal_connect(show_data_btn_, "toggled", G_CALLBACK(notify), this);
   g_signal_connect(show_lyrics_btn_, "toggled", G_CALLBACK(notify), this);
+
+  GtkGesture *idle_menu = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(idle_menu), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(idle_menu));
+  g_signal_connect(idle_menu, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble, gpointer data) {
+                     auto *self = static_cast<ContextView *>(data);
+                     if (!ContextOptions::ShowIdleMenu(self->Idle())) {
+                       return;
+                     }
+                     self->ShowIdleMenu();
+                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
+                   }),
+                   this);
 }
 
 void ContextView::SetSaveLyricsCallback(SaveLyricsCallback callback) { save_lyrics_ = std::move(callback); }
@@ -329,6 +343,60 @@ void ContextView::SearchLyrics(bool force) {
   lyrics_providers_->Fetch(song_playing_, [this](const std::string &lyrics, const std::string &) { SetLyrics(lyrics); });
 }
 
+bool ContextView::Idle() const { return ContextOptions::IsIdle(song_playing_.is_valid(), !song_playing_.url().empty()); }
+
+void ContextView::ApplyOption(ContextOptions::Action action, bool enabled) {
+  switch (action) {
+    case ContextOptions::Action::ShowAlbum:
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), enabled);
+      break;
+    case ContextOptions::Action::ShowData:
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), enabled);
+      break;
+    case ContextOptions::Action::ShowLyrics:
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), enabled);
+      break;
+    case ContextOptions::Action::SearchLyrics:
+      search_lyrics_ = enabled;
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_lyrics_btn_), enabled);
+      break;
+  }
+  ApplyVisibility();
+  if (ContextOptions::TriggersLyricsSearch(action)) {
+    SearchLyrics();
+  }
+}
+
+void ContextView::ShowIdleMenu() {
+  GMenu *menu = g_menu_new();
+  for (const ContextOptions::Item &item : ContextOptions::Items()) {
+    g_menu_append(menu, Translations::CStr(item.label), (std::string("context.") + item.id).c_str());
+  }
+  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  gtk_widget_set_parent(popover, widget_);
+  GSimpleActionGroup *group = g_simple_action_group_new();
+  for (const ContextOptions::Item &item : ContextOptions::Items()) {
+    const bool checked = ContextOptions::Checked(item.action, show_album_, show_data_, show_lyrics_, search_lyrics_);
+    GSimpleAction *action = g_simple_action_new_stateful(item.id, nullptr, g_variant_new_boolean(checked));
+    g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer data) {
+                       auto *self = static_cast<ContextView *>(data);
+                       const ContextOptions::Action option = ContextOptions::FromId(g_action_get_name(G_ACTION(act)));
+                       GVariant *state = g_action_get_state(G_ACTION(act));
+                       const bool current = state && g_variant_get_boolean(state);
+                       if (state) {
+                         g_variant_unref(state);
+                       }
+                       const bool next = !current;
+                       g_simple_action_set_state(act, g_variant_new_boolean(next));
+                       self->ApplyOption(option, next);
+                     }),
+                     this);
+    g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
+  }
+  gtk_widget_insert_action_group(widget_, "context", G_ACTION_GROUP(group));
+  gtk_popover_popup(GTK_POPOVER(popover));
+}
+
 void ContextView::PersistVisibility() {
   Settings settings;
   settings.BeginGroup(ContextSettings::kSettingsGroup);
@@ -343,7 +411,7 @@ void ContextView::ApplyVisibility() {
   show_album_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_album_btn_));
   show_data_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_data_btn_));
   show_lyrics_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_));
-  const bool playing = song_playing_.is_valid() || !song_playing_.url().empty();
+  const bool playing = !Idle();
   gtk_widget_set_visible(album_->widget(), show_album_);
   gtk_widget_set_visible(auto_cover_btn_, show_album_);
   gtk_widget_set_visible(totals_, !playing);

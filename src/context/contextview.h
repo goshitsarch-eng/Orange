@@ -2,6 +2,7 @@
 #define STRAWBERRY_CONTEXTVIEW_H
 
 #include "context/contextalbum.h"
+#include "context/contextoptions.h"
 #include "core/song.h"
 #include "lyrics/lrcparser.h"
 
@@ -48,6 +49,9 @@ class ContextView {
   void FadeStopFinished();
   void ApplyVisibility();
   void PersistVisibility();
+  void ShowIdleMenu();
+  void ApplyOption(ContextOptions::Action action, bool enabled);
+  bool Idle() const;
   void RebuildTechnicalData();
   void UpdateTotalsLabel();
   void HighlightLrcLine(int index);
@@ -73,7 +77,7 @@ class ContextView {
   GtkWidget *show_lyrics_btn_ = nullptr;
   Song song_playing_;
   bool show_album_ = true;
-  bool show_data_ = true;
+  bool show_data_ = false;
   bool show_lyrics_ = true;
   bool search_lyrics_ = true;
   bool search_cover_ = true;

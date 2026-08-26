@@ -284,6 +284,9 @@ void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent
                        return;
                      }
                      Song song = (*fn)();
+                     if (!song.is_valid() && song.url().empty()) {
+                       return;
+                     }
                      auto *owned = new Song(song);
                      GMenu *menu = g_menu_new();
                      for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {

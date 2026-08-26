@@ -19,6 +19,7 @@
 #include "context/contextalbum.h"
 #include "context/contextcover.h"
 #include "context/contextfont.h"
+#include "context/contextoptions.h"
 #include "context/contexttechnical.h"
 #include "dialogs/deletefilespolicy.h"
 #include "organize/organize.h"
@@ -1081,6 +1082,34 @@ TEST(ContextCover, ShouldSearch) {
   EXPECT_FALSE(ContextCover::ShouldSearchForSong(true, true, false, false, "/cover.jpg", {}, "Portishead", "Dummy"));
   EXPECT_FALSE(ContextCover::ShouldSearchForSong(true, true, false, false, {}, {}, {}, "Dummy"));
   EXPECT_FALSE(ContextCover::ShouldSearchForSong(false, true, false, false, {}, {}, "Portishead", "Dummy"));
+}
+
+TEST(ContextOptions, IdleMenuMatchesQt) {
+  EXPECT_EQ(4, ContextOptions::ItemCount());
+  EXPECT_EQ(ContextOptions::Action::ShowAlbum, ContextOptions::FromId("album"));
+  EXPECT_EQ(ContextOptions::Action::ShowData, ContextOptions::FromId("data"));
+  EXPECT_EQ(ContextOptions::Action::ShowLyrics, ContextOptions::FromId("lyrics"));
+  EXPECT_EQ(ContextOptions::Action::SearchLyrics, ContextOptions::FromId("search-lyrics"));
+  EXPECT_EQ(ContextOptions::Action::ShowAlbum, ContextOptions::FromId(nullptr));
+  EXPECT_EQ("Show album cover", ContextOptions::Items()[0].label);
+  EXPECT_EQ("Show song technical data", ContextOptions::Items()[1].label);
+  EXPECT_EQ("Show song lyrics", ContextOptions::Items()[2].label);
+  EXPECT_EQ("Automatically search for song lyrics", ContextOptions::Items()[3].label);
+  EXPECT_TRUE(ContextOptions::IsIdle(false, false));
+  EXPECT_FALSE(ContextOptions::IsIdle(true, false));
+  EXPECT_FALSE(ContextOptions::IsIdle(false, true));
+  EXPECT_TRUE(ContextOptions::ShowIdleMenu(true));
+  EXPECT_FALSE(ContextOptions::ShowIdleMenu(false));
+  EXPECT_TRUE(ContextOptions::ShowCoverMenu(false, true));
+  EXPECT_FALSE(ContextOptions::ShowCoverMenu(true, true));
+  EXPECT_FALSE(ContextOptions::ShowCoverMenu(false, false));
+  EXPECT_TRUE(ContextOptions::TriggersLyricsSearch(ContextOptions::Action::ShowLyrics));
+  EXPECT_TRUE(ContextOptions::TriggersLyricsSearch(ContextOptions::Action::SearchLyrics));
+  EXPECT_FALSE(ContextOptions::TriggersLyricsSearch(ContextOptions::Action::ShowAlbum));
+  EXPECT_TRUE(ContextOptions::Checked(ContextOptions::Action::ShowAlbum, true, false, true, true));
+  EXPECT_FALSE(ContextOptions::Checked(ContextOptions::Action::ShowData, true, false, true, true));
+  EXPECT_TRUE(ContextOptions::Toggle(ContextOptions::Action::ShowData, true, false, true, true));
+  EXPECT_FALSE(ContextOptions::Toggle(ContextOptions::Action::SearchLyrics, true, false, true, true));
 }
 
 TEST(ContextFont, UsesFallbackSizeForFamilyOnly) {
