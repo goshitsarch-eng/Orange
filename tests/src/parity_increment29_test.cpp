@@ -110,6 +110,9 @@ TEST(NetworkHelpers, ProxyAndParams) {
   s.SetValue("type", "manual");
   s.SetValue("hostname", "127.0.0.1");
   s.SetIntValue("port", 8080);
+  s.SetBoolValue("use_authentication", false);
+  s.SetValue("username", "");
+  s.SetValue("password", "");
   s.Sync();
   NetworkProxyFactory factory;
   factory.ReloadSettings();
