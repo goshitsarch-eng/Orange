@@ -469,7 +469,10 @@ void MainWindow::BuildUi() {
                  self->RefreshCollection();
                });
              }));
-  add_action("console", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Console(GTK_WINDOW(static_cast<MainWindow *>(data)->window_)); }));
+  add_action("console", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               Dialogs::Console(GTK_WINDOW(self->window_), self->app_);
+             }));
   add_action("cycle-analyzer", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CycleAnalyzer(); }));
   add_action("playlist-play", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);

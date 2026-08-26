@@ -37,7 +37,7 @@ class Dialogs {
   static void DeleteFiles(GtkWindow *parent, Application *app, const SongList &songs = {});
   static void CopyToDevice(GtkWindow *parent, Application *app, const SongList &songs = {});
   static void SaveAllPlaylists(GtkWindow *parent, Application *app);
-  static void Console(GtkWindow *parent);
+  static void Console(GtkWindow *parent, Application *app = nullptr);
   static void Error(GtkWindow *parent, const std::string &message);
 };
 

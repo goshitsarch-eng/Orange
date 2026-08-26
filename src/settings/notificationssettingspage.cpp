@@ -4,6 +4,7 @@
 #include "context/contextformattokens.h"
 #include "core/application.h"
 #include "core/song.h"
+#include "osd/osdpretty.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
 #include "utilities/colorutils.h"
@@ -91,7 +92,17 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
   SettingsPage::AddEntry(pretty, settings, OSDPrettySettings::kBackgroundColor, Translations::CStr("Background color"), "#202020");
   SettingsPage::AddEntry(pretty, settings, OSDPrettySettings::kBackgroundOpacity, Translations::CStr("Background opacity"), "0.85");
   SettingsPage::AddEntry(pretty, settings, OSDPrettySettings::kFont, Translations::CStr("Font"), OSDPrettySettings::kDefaultFont);
-  SettingsPage::AddIntEntry(pretty, settings, OSDPrettySettings::kPopupScreen, Translations::CStr("Popup screen"), 0);
+  auto monitors = OSDPretty::MonitorChoices();
+  if (monitors.size() == 1 && monitors.front().first.empty()) {
+    monitors.front().second = Translations::Tr("Primary");
+  }
+  const std::string current_screen = settings->Value(OSDPrettySettings::kPopupScreen);
+  SettingsPage::AddCombo(pretty, settings, nullptr, Translations::CStr("Popup screen"), monitors,
+                         current_screen.empty() ? monitors.front().first : current_screen, [settings](const std::string &id) {
+                           settings->BeginGroup(OSDPrettySettings::kSettingsGroup);
+                           settings->SetValue(OSDPrettySettings::kPopupScreen, id);
+                           settings->Sync();
+                         });
   SettingsPage::AddToggle(pretty, settings, OSDPrettySettings::kDisableDuration, Translations::CStr("Disable timeout"), nullptr,
                           OSDPrettySettings::kDefaultDisableDuration);
   SettingsPage::AddToggle(pretty, settings, OSDPrettySettings::kFading, Translations::CStr("Fade the popup"), nullptr, true);

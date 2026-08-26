@@ -4,6 +4,7 @@
 #include "covermanager/coverfromurldialog.h"
 #include "osd/osdbase.h"
 #include "osd/osdpretty.h"
+#include "osd/osdprettyplacement.h"
 #include "queue/queueview.h"
 #include "systemtrayicon/systemtrayicon.h"
 #include "translations/translations.h"
@@ -91,6 +92,47 @@ TEST(OSDPretty, SupportedRequiresX11Display) {
     EXPECT_FALSE(OSDPretty::Supported());
     EXPECT_FALSE(OSDBase::SupportsOSDPretty());
   }
+}
+
+TEST(OSDPrettyPlacement, AbsolutePositionUsesMonitorOriginAndNegativeEdges) {
+  const OSDPrettyPlacement::Rect monitor{1920, 0, 1920, 1080};
+  const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::AbsolutePosition(monitor, {40, 40}, 320, 80, false);
+  EXPECT_EQ(1960, abs.x);
+  EXPECT_EQ(40, abs.y);
+  const OSDPrettyPlacement::Point docked = OSDPrettyPlacement::AbsolutePosition(monitor, {-1, -1}, 320, 80, false);
+  EXPECT_EQ(monitor.Right() - 320, docked.x);
+  EXPECT_EQ(monitor.Bottom() - 80, docked.y);
+  const OSDPrettyPlacement::Point on_second = OSDPrettyPlacement::AbsolutePosition(monitor, {40, 40}, 320, 80, true);
+  EXPECT_EQ(1960, on_second.x);
+  EXPECT_EQ(40, on_second.y);
+  const OSDPrettyPlacement::Point clamped = OSDPrettyPlacement::AbsolutePosition({0, 0, 800, 600}, {900, 700}, 320, 80, true);
+  EXPECT_EQ(479, clamped.x);
+  EXPECT_EQ(519, clamped.y);
+}
+
+TEST(OSDPrettyPlacement, ResolveIndexAcceptsNameAndLegacyInt) {
+  const std::vector<std::string> names{"eDP-1", "HDMI-1"};
+  EXPECT_EQ(0, OSDPrettyPlacement::ResolveIndex({}, names));
+  EXPECT_EQ(1, OSDPrettyPlacement::ResolveIndex("HDMI-1", names));
+  EXPECT_EQ(1, OSDPrettyPlacement::ResolveIndex("1", names));
+  EXPECT_EQ(0, OSDPrettyPlacement::ResolveIndex("missing", names));
+  EXPECT_EQ(0, OSDPrettyPlacement::ResolveIndex("9", names));
+}
+
+TEST(OSDPrettyPlacement, RelativePosMarksDockedEdgesAndParsesSavedPoint) {
+  const OSDPrettyPlacement::Rect monitor{0, 0, 1920, 1080};
+  const OSDPrettyPlacement::Point docked = OSDPrettyPlacement::RelativePosition(monitor, {1600, 1000}, 320, 80);
+  EXPECT_EQ(-1, docked.x);
+  EXPECT_EQ(-1, docked.y);
+  const OSDPrettyPlacement::Point rel = OSDPrettyPlacement::RelativePosition(monitor, {40, 50}, 320, 80);
+  EXPECT_EQ(40, rel.x);
+  EXPECT_EQ(50, rel.y);
+  EXPECT_EQ("40,50", OSDPrettyPlacement::FormatPos({40, 50}));
+  const OSDPrettyPlacement::Point parsed = OSDPrettyPlacement::ParsePos("40,50");
+  EXPECT_EQ(40, parsed.x);
+  EXPECT_EQ(50, parsed.y);
+  const OSDPrettyPlacement::Point snapped = OSDPrettyPlacement::DragPosition(monitor, {790, 40}, 320, 80);
+  EXPECT_EQ(800, snapped.x);
 }
 
 TEST(CoverFromUrlDialog, PrefillUrlAcceptsHttpOnly) {

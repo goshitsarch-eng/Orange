@@ -3,9 +3,11 @@
 
 #include <gtk/gtk.h>
 
+class Database;
+
 class Console {
  public:
-  static void Show(GtkWindow *parent);
+  static void Show(GtkWindow *parent, Database *database = nullptr);
 };
 
 #endif

@@ -4,6 +4,7 @@
 #include <gtk/gtk.h>
 
 #include <string>
+#include <utility>
 #include <vector>
 
 class OSDPretty {
@@ -27,12 +28,16 @@ class OSDPretty {
   void SavePosition() const;
   bool IsTransparencyAvailable() const { return true; }
   static bool Supported();
+  static std::vector<std::pair<std::string, std::string>> MonitorChoices();
   bool fading() const { return fading_; }
+  bool disable_duration() const { return disable_duration_; }
+  const std::string &popup_screen() const { return popup_screen_; }
   GtkWidget *window() const { return window_; }
 
  private:
   void EnsureWindow();
   void ApplyStyle();
+  void ApplyPosition();
   void ConnectDrag();
   static void OnDragBegin(GtkGestureDrag *gesture, double x, double y, gpointer data);
   static void OnDragUpdate(GtkGestureDrag *gesture, double x, double y, gpointer data);
@@ -46,8 +51,10 @@ class OSDPretty {
   int pos_x_ = 40;
   int pos_y_ = 40;
   std::string font_ = "Sans 12";
+  std::string popup_screen_;
   bool show_art_ = true;
   bool fading_ = true;
+  bool disable_duration_ = false;
   GtkWidget *window_ = nullptr;
   GtkWidget *title_ = nullptr;
   GtkWidget *body_ = nullptr;

@@ -3,13 +3,96 @@
 #include "config.h"
 #include "constants/notificationssettings.h"
 #include "core/settings.h"
+#include "osd/osdprettyplacement.h"
 
 #include <algorithm>
+#include <utility>
 
 #ifdef HAVE_X11
 #include <gdk/x11/gdkx.h>
 #include <X11/Xlib.h>
 #endif
+
+namespace {
+
+struct ListedMonitor {
+  std::string name;
+  OSDPrettyPlacement::Rect workarea;
+};
+
+std::string MonitorName(GdkMonitor *monitor, int index) {
+  if (!monitor) {
+    return std::to_string(index);
+  }
+  if (const char *connector = gdk_monitor_get_connector(monitor); connector && *connector) {
+    return connector;
+  }
+#if GTK_CHECK_VERSION(4, 10, 0)
+  if (const char *description = gdk_monitor_get_description(monitor); description && *description) {
+    return description;
+  }
+#endif
+  if (const char *model = gdk_monitor_get_model(monitor); model && *model) {
+    return model;
+  }
+  return std::to_string(index);
+}
+
+std::vector<ListedMonitor> ListMonitors() {
+  std::vector<ListedMonitor> out;
+  GdkDisplay *display = gdk_display_get_default();
+  if (!display) {
+    return out;
+  }
+  GListModel *model = gdk_display_get_monitors(display);
+  const guint n = g_list_model_get_n_items(model);
+  for (guint i = 0; i < n; ++i) {
+    auto *monitor = GDK_MONITOR(g_list_model_get_item(model, i));
+    ListedMonitor item;
+    item.name = MonitorName(monitor, static_cast<int>(i));
+    GdkRectangle geo{};
+    gdk_monitor_get_geometry(monitor, &geo);
+#ifdef HAVE_X11
+    if (GDK_IS_X11_MONITOR(monitor)) {
+      gdk_x11_monitor_get_workarea(monitor, &geo);
+    }
+#endif
+    item.workarea = {geo.x, geo.y, geo.width, geo.height};
+    out.push_back(item);
+    g_object_unref(monitor);
+  }
+  return out;
+}
+
+OSDPrettyPlacement::Rect WindowSize(GtkWidget *window) {
+  int width = 320;
+  int height = 80;
+  if (window) {
+    GtkRequisition nat{};
+    gtk_widget_get_preferred_size(window, nullptr, &nat);
+    width = std::max({nat.width, gtk_widget_get_width(window), 160});
+    height = std::max({nat.height, gtk_widget_get_height(window), 48});
+  }
+  return {0, 0, width, height};
+}
+
+void MoveWindow(GtkWidget *window, int x, int y) {
+#ifdef HAVE_X11
+  if (!window) {
+    return;
+  }
+  GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+  if (surface && GDK_IS_X11_SURFACE(surface)) {
+    XMoveWindow(GDK_SURFACE_XDISPLAY(surface), gdk_x11_surface_get_xid(surface), x, y);
+  }
+#else
+  (void)window;
+  (void)x;
+  (void)y;
+#endif
+}
+
+}  // namespace
 
 OSDPretty::OSDPretty(Mode mode) : mode_(mode) { ReloadSettings(); }
 
@@ -40,6 +123,13 @@ void OSDPretty::ReloadSettings() {
   timeout_ms_ = s.Contains(OSDSettings::kTimeout) ? s.IntValue(OSDSettings::kTimeout, 5000) : s.IntValue("timeout", 4000);
   s.BeginGroup(OSDPrettySettings::kSettingsGroup);
   fading_ = s.BoolValue(OSDPrettySettings::kFading, true);
+  disable_duration_ = s.BoolValue(OSDPrettySettings::kDisableDuration, OSDPrettySettings::kDefaultDisableDuration);
+  popup_screen_ = s.Value(OSDPrettySettings::kPopupScreen);
+  if (s.Contains(OSDPrettySettings::kPopupPos)) {
+    const OSDPrettyPlacement::Point pos = OSDPrettyPlacement::ParsePos(s.Value(OSDPrettySettings::kPopupPos), {pos_x_, pos_y_});
+    pos_x_ = pos.x;
+    pos_y_ = pos.y;
+  }
 }
 
 bool OSDPretty::Supported() {
@@ -61,7 +151,41 @@ void OSDPretty::SavePosition() const {
   s.BeginGroup(OSDSettings::kSettingsGroup);
   s.SetIntValue("posx", pos_x_);
   s.SetIntValue("posy", pos_y_);
+  s.BeginGroup(OSDPrettySettings::kSettingsGroup);
+  s.SetValue(OSDPrettySettings::kPopupScreen, popup_screen_);
+  s.SetValue(OSDPrettySettings::kPopupPos, OSDPrettyPlacement::FormatPos({pos_x_, pos_y_}));
   s.Sync();
+}
+
+std::vector<std::pair<std::string, std::string>> OSDPretty::MonitorChoices() {
+  std::vector<std::pair<std::string, std::string>> choices;
+  for (const auto &monitor : ListMonitors()) {
+    const std::string label = monitor.name.empty() ? "Primary" : monitor.name;
+    choices.emplace_back(monitor.name, label);
+  }
+  if (choices.empty()) {
+    choices.emplace_back("", "Primary");
+  }
+  return choices;
+}
+
+void OSDPretty::ApplyPosition() {
+  const auto monitors = ListMonitors();
+  std::vector<std::string> names;
+  names.reserve(monitors.size());
+  for (const auto &monitor : monitors) {
+    names.push_back(monitor.name);
+  }
+  const int index = OSDPrettyPlacement::ResolveIndex(popup_screen_, names);
+  const OSDPrettyPlacement::Rect workarea = (index >= 0 && static_cast<size_t>(index) < monitors.size())
+                                                ? monitors[static_cast<size_t>(index)].workarea
+                                                : OSDPrettyPlacement::Rect{0, 0, 1920, 1080};
+  if (index >= 0 && static_cast<size_t>(index) < monitors.size()) {
+    popup_screen_ = monitors[static_cast<size_t>(index)].name;
+  }
+  const OSDPrettyPlacement::Rect size = WindowSize(window_);
+  const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::AbsolutePosition(workarea, {pos_x_, pos_y_}, size.width, size.height);
+  MoveWindow(window_, abs.x, abs.y);
 }
 
 void OSDPretty::ApplyStyle() {
@@ -93,22 +217,47 @@ void OSDPretty::ConnectDrag() {
 
 void OSDPretty::OnDragBegin(GtkGestureDrag *, double, double, gpointer data) {
   auto *self = static_cast<OSDPretty *>(data);
-  self->drag_start_x_ = self->pos_x_;
-  self->drag_start_y_ = self->pos_y_;
+  const auto monitors = ListMonitors();
+  std::vector<std::string> names;
+  names.reserve(monitors.size());
+  for (const auto &monitor : monitors) {
+    names.push_back(monitor.name);
+  }
+  const int index = OSDPrettyPlacement::ResolveIndex(self->popup_screen_, names);
+  const OSDPrettyPlacement::Rect workarea = (index >= 0 && static_cast<size_t>(index) < monitors.size())
+                                                ? monitors[static_cast<size_t>(index)].workarea
+                                                : OSDPrettyPlacement::Rect{0, 0, 1920, 1080};
+  const OSDPrettyPlacement::Rect size = WindowSize(self->window_);
+  const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::AbsolutePosition(workarea, {self->pos_x_, self->pos_y_}, size.width, size.height, false);
+  self->drag_start_x_ = abs.x;
+  self->drag_start_y_ = abs.y;
 }
 
 void OSDPretty::OnDragUpdate(GtkGestureDrag *, double offset_x, double offset_y, gpointer data) {
   auto *self = static_cast<OSDPretty *>(data);
-  self->pos_x_ = static_cast<int>(self->drag_start_x_ + offset_x);
-  self->pos_y_ = static_cast<int>(self->drag_start_y_ + offset_y);
-#ifdef HAVE_X11
-  if (self->window_) {
-    GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(self->window_));
-    if (surface && GDK_IS_X11_SURFACE(surface)) {
-      XMoveWindow(GDK_SURFACE_XDISPLAY(surface), gdk_x11_surface_get_xid(surface), self->pos_x_, self->pos_y_);
-    }
+  const OSDPrettyPlacement::Point raw{static_cast<int>(self->drag_start_x_ + offset_x), static_cast<int>(self->drag_start_y_ + offset_y)};
+  const auto monitors = ListMonitors();
+  std::vector<OSDPrettyPlacement::Rect> rects;
+  rects.reserve(monitors.size());
+  for (const auto &monitor : monitors) {
+    rects.push_back(monitor.workarea);
   }
-#endif
+  int index = OSDPrettyPlacement::IndexContaining(rects, raw);
+  if (index < 0 && !monitors.empty()) {
+    index = 0;
+  }
+  const OSDPrettyPlacement::Rect workarea = (index >= 0 && static_cast<size_t>(index) < monitors.size())
+                                                ? monitors[static_cast<size_t>(index)].workarea
+                                                : OSDPrettyPlacement::Rect{0, 0, 1920, 1080};
+  const OSDPrettyPlacement::Rect size = WindowSize(self->window_);
+  const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::DragPosition(workarea, raw, size.width, size.height);
+  const OSDPrettyPlacement::Point rel = OSDPrettyPlacement::RelativePosition(workarea, abs, size.width, size.height);
+  self->pos_x_ = rel.x;
+  self->pos_y_ = rel.y;
+  if (index >= 0 && static_cast<size_t>(index) < monitors.size()) {
+    self->popup_screen_ = monitors[static_cast<size_t>(index)].name;
+  }
+  MoveWindow(self->window_, abs.x, abs.y);
 }
 
 void OSDPretty::OnDragEnd(GtkGestureDrag *, double, double, gpointer data) {
@@ -128,12 +277,8 @@ void OSDPretty::EnsureWindow() {
   gtk_widget_add_css_class(window_, "osd-pretty");
   ApplyStyle();
 #ifdef HAVE_X11
-  g_signal_connect(window_, "realize", G_CALLBACK(+[](GtkWidget *widget, gpointer data) {
-                     auto *self = static_cast<OSDPretty *>(data);
-                     GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(widget));
-                     if (surface && GDK_IS_X11_SURFACE(surface)) {
-                       XMoveWindow(GDK_SURFACE_XDISPLAY(surface), gdk_x11_surface_get_xid(surface), self->pos_x_, self->pos_y_);
-                     }
+  g_signal_connect(window_, "realize", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     static_cast<OSDPretty *>(data)->ApplyPosition();
                    }),
                    this);
 #endif
@@ -191,10 +336,11 @@ void OSDPretty::ShowMessage(const std::string &summary, const std::string &messa
     gtk_widget_set_opacity(window_, 0.0);
   }
   gtk_window_present(GTK_WINDOW(window_));
+  ApplyPosition();
   if (fading_) {
     gtk_widget_set_opacity(window_, 1.0);
   }
-  if (mode_ == Mode::Popup && timeout_ms_ > 0) {
+  if (mode_ == Mode::Popup && timeout_ms_ > 0 && !disable_duration_) {
     timeout_id_ = g_timeout_add(timeout_ms_, [](gpointer data) -> gboolean {
       auto *self = static_cast<OSDPretty *>(data);
       if (self->window_) {

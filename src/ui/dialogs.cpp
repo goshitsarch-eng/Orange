@@ -83,6 +83,6 @@ void Dialogs::CopyToDevice(GtkWindow *parent, Application *app, const SongList &
 
 void Dialogs::SaveAllPlaylists(GtkWindow *parent, Application *app) { SavePlaylistsDialog::Show(parent, app); }
 
-void Dialogs::Console(GtkWindow *parent) { Console::Show(parent); }
+void Dialogs::Console(GtkWindow *parent, Application *app) { Console::Show(parent, app ? app->database() : nullptr); }
 
 void Dialogs::Error(GtkWindow *parent, const std::string &message) { ErrorDialog::Show(parent, message); }
