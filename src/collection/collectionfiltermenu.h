@@ -10,7 +10,7 @@ namespace CollectionFilterMenu {
 
 enum class DelayBehaviour { AlwaysInstant, DelayedOnLargeLibraries, AlwaysDelayed };
 
-enum class ActionKind { Preset, Saved, Advanced, Save, Manage };
+enum class ActionKind { Preset, Saved, Advanced, Save, Manage, Configure };
 
 inline constexpr int kFilterDelayMs = 500;
 inline constexpr int kLargeLibrarySongs = 100000;

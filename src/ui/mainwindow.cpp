@@ -6,6 +6,7 @@
 #include "collection/collectionmenu.h"
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
+#include "playlist/playlistsummary.h"
 #include "collection/collectionviewcontainer.h"
 #include "constants/backendsettings.h"
 #include "constants/coverssettings.h"
@@ -961,13 +962,15 @@ void MainWindow::BuildSidebar() {
       }
       RefreshCollection();
     };
-    if (kind == CollectionFilterMenu::ActionKind::Advanced || kind == CollectionFilterMenu::ActionKind::Save) {
+    if (kind == CollectionFilterMenu::ActionKind::Advanced) {
       Dialogs::GroupBy(GTK_WINDOW(window_), grouping_, apply);
     } else if (kind == CollectionFilterMenu::ActionKind::Manage) {
       Dialogs::ManageSavedGroupings(GTK_WINDOW(window_), apply);
       if (collection_container_) {
         collection_container_->filter_widget()->ReloadMenu();
       }
+    } else if (kind == CollectionFilterMenu::ActionKind::Configure) {
+      OpenSettings(SettingsPages::Collection());
     }
   });
   collection_container_->view()->SetActivateCallback([this](const SongList &songs) {
@@ -1823,9 +1826,6 @@ void MainWindow::RefreshCollection(const std::string &filter, bool update_text) 
   }
   CollectionFilterOptions options = collection_container_->filter_widget()->options();
   SongList songs = app_->collection()->Songs(options);
-  if (collection_container_->filter_widget()->unrated_only()) {
-    songs.erase(std::remove_if(songs.begin(), songs.end(), [](const Song &song) { return song.rating() >= 0; }), songs.end());
-  }
   Settings settings;
   settings.BeginGroup("Collection");
   collection_container_->view()->SetModelSongs(
@@ -1885,6 +1885,7 @@ void MainWindow::SelectPlaylistRow(int index, bool add) {
     playlist_container_->view()->SetSelectedRows(selected_playlist_rows_);
     playlist_container_->view()->Refresh(playlist);
   }
+  RefreshPlaylistSummary();
 }
 
 void MainWindow::RefreshPlaylist() {
@@ -1901,15 +1902,25 @@ void MainWindow::RefreshPlaylist() {
   playlist_container_->view()->SetSelectedRows(selected_playlist_rows_);
   playlist_container_->view()->Refresh(playlist);
   if (playlist) {
-    playlist_container_->SetSummary(playlist->name() + " · " +
-                                    std::to_string(playlist_container_->view()->visible_count()) + " tracks · " +
-                                    Utilities::PrettyTimeNanosec(playlist->total_length_nanosec()));
     playlist_container_->dynamic_controls()->SetSearch(playlist->dynamic_search());
     playlist_container_->dynamic_controls()->SetVisible(playlist->is_dynamic());
   } else {
-    playlist_container_->SetSummary("");
     playlist_container_->dynamic_controls()->SetVisible(false);
   }
+  RefreshPlaylistSummary();
+}
+
+void MainWindow::RefreshPlaylistSummary() {
+  if (!playlist_container_) {
+    return;
+  }
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (!playlist) {
+    playlist_container_->SetSummary("");
+    return;
+  }
+  playlist_container_->SetSummary(PlaylistSummary::Format(
+      PlaylistSummary::FromPlaylist(playlist->row_count(), playlist->total_length_nanosec(), playlist->songs(), selected_playlist_rows_)));
 }
 
 void MainWindow::GoToPlaylistIndex(int index) {

@@ -3,6 +3,7 @@
 #include "playlist/playlistplayed.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistshuffle.h"
+#include "playlist/playlistsummary.h"
 #include "utilities/fileutils.h"
 
 #include <gtest/gtest.h>
@@ -463,6 +464,29 @@ TEST(Playlist, PreviousUsesPlayedHistory) {
   EXPECT_EQ("B", playlist.current_song().title());
   playlist.Previous();
   EXPECT_EQ("A", playlist.current_song().title());
+}
+
+TEST(PlaylistSummary, UsesSelectionWhenMoreThanOneRow) {
+  EXPECT_EQ("0 tracks", PlaylistSummary::Format({}));
+  EXPECT_EQ("1 track", PlaylistSummary::Format({1, 0, 0, 0}));
+  EXPECT_EQ("10 tracks - [ 10 minutes ]", PlaylistSummary::Format({10, 0, 600000000000LL, 0}));
+  EXPECT_EQ("10 tracks - [ 10 minutes ]", PlaylistSummary::Format({10, 1, 600000000000LL, 180000000000LL}));
+  EXPECT_EQ("3 selected of 10 tracks - [ 3 minutes ]", PlaylistSummary::Format({10, 3, 600000000000LL, 180000000000LL}));
+  EXPECT_EQ(600000000000LL, PlaylistSummary::DurationNs({10, 1, 600000000000LL, 180000000000LL}));
+  EXPECT_EQ(180000000000LL, PlaylistSummary::DurationNs({10, 3, 600000000000LL, 180000000000LL}));
+
+  Song short_song;
+  short_song.set_length_nanosec(60000000000LL);
+  Song long_song;
+  long_song.set_length_nanosec(180000000000LL);
+  Song skipped;
+  skipped.set_length_nanosec(-1);
+  const SongList songs = {short_song, long_song, skipped};
+  EXPECT_EQ(240000000000LL, PlaylistSummary::SelectedLengthNs(songs, {0, 1, 2, 99}));
+  const PlaylistSummary::Input input = PlaylistSummary::FromPlaylist(3, 240000000000LL, songs, {0, 1});
+  EXPECT_EQ(2, input.selected_tracks);
+  EXPECT_EQ(240000000000LL, input.selected_length_ns);
+  EXPECT_EQ("2 selected of 3 tracks - [ 4 minutes ]", PlaylistSummary::Format(input));
 }
 
 TEST(PlaylistPlayed, RemapsStackAfterRemoveAndMove) {

@@ -1,6 +1,11 @@
 #include "collection/collectionfilterwidget.h"
 
+#include "collection/collectionfilterchoices.h"
+#include "collection/collectiongroupingsave.h"
+#include "settings/settingspages.h"
 #include "translations/translations.h"
+
+#include <adwaita.h>
 
 CollectionFilterWidget::CollectionFilterWidget() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
@@ -8,30 +13,15 @@ CollectionFilterWidget::CollectionFilterWidget() {
   gtk_widget_set_margin_end(widget_, 8);
   gtk_widget_set_margin_top(widget_, 6);
   gtk_widget_set_margin_bottom(widget_, 4);
-  static const char *age_labels[] = {"Any age", "Added today", "Added last week", "Added last month", "Added last 3 months",
-                                     "Added last year", nullptr};
-  static const char *rating_labels[] = {"Any rating", "Unrated", "1★+", "2★+", "3★+", "4★+", "5★", nullptr};
-  static const char *mode_labels[] = {"All songs", "Duplicates", "Untagged", nullptr};
-  age_drop_ = gtk_drop_down_new_from_strings(age_labels);
-  rating_drop_ = gtk_drop_down_new_from_strings(rating_labels);
-  mode_drop_ = gtk_drop_down_new_from_strings(mode_labels);
-  gtk_widget_set_hexpand(age_drop_, TRUE);
-  gtk_widget_set_hexpand(rating_drop_, TRUE);
-  gtk_widget_set_hexpand(mode_drop_, TRUE);
+  GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  gtk_widget_set_hexpand(spacer, TRUE);
   options_button_ = gtk_menu_button_new();
-  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(options_button_), "view-more-symbolic");
+  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(options_button_), "preferences-system-symbolic");
   gtk_widget_set_tooltip_text(options_button_, Translations::CStr("Display options"));
-  gtk_box_append(GTK_BOX(widget_), age_drop_);
-  gtk_box_append(GTK_BOX(widget_), rating_drop_);
-  gtk_box_append(GTK_BOX(widget_), mode_drop_);
+  gtk_box_append(GTK_BOX(widget_), spacer);
   gtk_box_append(GTK_BOX(widget_), options_button_);
-  auto notify = +[](GtkDropDown *, GParamSpec *, gpointer data) {
-    static_cast<CollectionFilterWidget *>(data)->EmitChanged();
-  };
-  g_signal_connect(age_drop_, "notify::selected", G_CALLBACK(notify), this);
-  g_signal_connect(rating_drop_, "notify::selected", G_CALLBACK(notify), this);
-  g_signal_connect(mode_drop_, "notify::selected", G_CALLBACK(notify), this);
   grouping_ = CollectionGrouping::LoadCurrent();
+  options_ = CollectionFilterChoices::FromIndices(age_index_, rating_index_, mode_index_);
   BuildMenu();
 }
 
@@ -43,6 +33,16 @@ void CollectionFilterWidget::SetGrouping(const CollectionGrouping::Grouping &gro
 }
 
 void CollectionFilterWidget::ReloadMenu() { BuildMenu(); }
+
+void CollectionFilterWidget::ApplyFilterIndices(int age, int rating, int mode) {
+  age_index_ = CollectionFilterChoices::ClampIndex(age, CollectionFilterChoices::kAgeCount);
+  rating_index_ = CollectionFilterChoices::ClampIndex(rating, CollectionFilterChoices::kRatingCount);
+  mode_index_ = CollectionFilterChoices::ClampIndex(mode, CollectionFilterChoices::kModeCount);
+  options_ = CollectionFilterChoices::FromIndices(age_index_, rating_index_, mode_index_);
+  if (changed_) {
+    changed_();
+  }
+}
 
 void CollectionFilterWidget::ApplyPreset(int index) {
   const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
@@ -73,48 +73,133 @@ void CollectionFilterWidget::ApplySaved(int index) {
   }
 }
 
+void CollectionFilterWidget::PromptSave() {
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(CollectionGroupingSave::DialogTitle()),
+                                                                Translations::CStr(CollectionGroupingSave::DialogPrompt())));
+  GtkWidget *entry = gtk_entry_new();
+  adw_alert_dialog_set_extra_child(dialog, entry);
+  adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "save", Translations::CStr("Save"), nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "save", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response(dialog, "save");
+  g_object_set_data(G_OBJECT(dialog), "entry", entry);
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+                     if (g_strcmp0(response, "save") != 0) {
+                       return;
+                     }
+                     auto *self = static_cast<CollectionFilterWidget *>(data);
+                     auto *name_entry = GTK_EDITABLE(g_object_get_data(G_OBJECT(alert), "entry"));
+                     if (CollectionGroupingSave::Save(gtk_editable_get_text(name_entry), self->grouping_)) {
+                       self->ReloadMenu();
+                     }
+                   }),
+                   this);
+  GtkWidget *parent = GTK_WIDGET(gtk_widget_get_root(widget_));
+  adw_dialog_present(ADW_DIALOG(dialog), parent ? parent : widget_);
+}
+
 void CollectionFilterWidget::BuildMenu() {
+  const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
+  const auto saved = CollectionGrouping::LoadSaved();
+  const int check = CollectionGroupingSave::MenuCheckIndex(grouping_, presets, saved);
+  const std::string group_state = CollectionGroupingSave::MenuStateKey(check, static_cast<int>(presets.size()));
+
   GMenu *root = g_menu_new();
   GMenu *group_by = g_menu_new();
-  const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
   for (size_t i = 0; i < presets.size(); ++i) {
     const CollectionFilterMenu::Preset &preset = presets[i];
     if (preset.advanced) {
       continue;
     }
-    char action[64];
-    g_snprintf(action, sizeof(action), "collfilter.preset(%d)", static_cast<int>(i));
-    g_menu_append(group_by, Translations::CStr(preset.label), action);
+    const std::string action = "collfilter.groupby::p" + std::to_string(static_cast<int>(i));
+    g_menu_append(group_by, Translations::CStr(preset.label), action.c_str());
   }
-  const auto saved = CollectionGrouping::LoadSaved();
   if (!saved.empty()) {
     GMenu *saved_section = g_menu_new();
     for (size_t i = 0; i < saved.size(); ++i) {
-      char action[64];
-      g_snprintf(action, sizeof(action), "collfilter.saved(%d)", static_cast<int>(i));
-      g_menu_append(saved_section, saved[i].first.c_str(), action);
+      const std::string action = "collfilter.groupby::s" + std::to_string(static_cast<int>(i));
+      g_menu_append(saved_section, saved[i].first.c_str(), action.c_str());
     }
     g_menu_append_section(group_by, nullptr, G_MENU_MODEL(saved_section));
     g_object_unref(saved_section);
   }
-  g_menu_append(group_by, Translations::CStr("Advanced grouping…"), "collfilter.advanced");
+  g_menu_append(group_by, Translations::CStr("Advanced grouping…"), "collfilter.groupby::advanced");
   g_menu_append_submenu(root, Translations::CStr("Group by"), G_MENU_MODEL(group_by));
-  g_menu_append(root, Translations::CStr("Save grouping…"), "collfilter.save");
-  g_menu_append(root, Translations::CStr("Manage groupings…"), "collfilter.manage");
+  g_menu_append(root, Translations::CStr(CollectionGroupingSave::SaveLabel()), "collfilter.save");
+  g_menu_append(root, Translations::CStr(CollectionGroupingSave::ManageLabel()), "collfilter.manage");
+
+  GMenu *age_menu = g_menu_new();
+  for (int i = 0; i < CollectionFilterChoices::kAgeCount; ++i) {
+    char action[64];
+    g_snprintf(action, sizeof(action), "collfilter.age(%d)", i);
+    g_menu_append(age_menu, Translations::CStr(CollectionFilterChoices::kAgeLabels[i]), action);
+  }
+  g_menu_append_submenu(root, Translations::CStr(CollectionFilterChoices::AgeMenuTitle()), G_MENU_MODEL(age_menu));
+
+  GMenu *rating_menu = g_menu_new();
+  for (int i = 0; i < CollectionFilterChoices::kRatingCount; ++i) {
+    char action[64];
+    g_snprintf(action, sizeof(action), "collfilter.rating(%d)", i);
+    g_menu_append(rating_menu, Translations::CStr(CollectionFilterChoices::kRatingLabels[i]), action);
+  }
+  g_menu_append_submenu(root, Translations::CStr(CollectionFilterChoices::RatingMenuTitle()), G_MENU_MODEL(rating_menu));
+
+  GMenu *mode_section = g_menu_new();
+  for (int i = 0; i < CollectionFilterChoices::kModeCount; ++i) {
+    char action[64];
+    g_snprintf(action, sizeof(action), "collfilter.mode(%d)", i);
+    g_menu_append(mode_section, Translations::CStr(CollectionFilterChoices::kModeLabels[i]), action);
+  }
+  g_menu_append_section(root, nullptr, G_MENU_MODEL(mode_section));
+  g_menu_append(root, Translations::CStr(SettingsPages::ConfigureCollectionLabel()), "collfilter.configure");
 
   GSimpleActionGroup *group = g_simple_action_group_new();
-  GSimpleAction *preset = g_simple_action_new("preset", G_VARIANT_TYPE_INT32);
-  g_signal_connect(preset, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
-                     static_cast<CollectionFilterWidget *>(data)->ApplyPreset(g_variant_get_int32(param));
+  GSimpleAction *groupby = g_simple_action_new_stateful("groupby", G_VARIANT_TYPE_STRING, g_variant_new_string(group_state.c_str()));
+  g_signal_connect(groupby, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
+                     auto *self = static_cast<CollectionFilterWidget *>(data);
+                     const char *key = g_variant_get_string(param, nullptr);
+                     g_simple_action_set_state(action, param);
+                     if (g_strcmp0(key, "advanced") == 0) {
+                       if (self->menu_action_) {
+                         self->menu_action_(CollectionFilterMenu::ActionKind::Advanced);
+                       }
+                       return;
+                     }
+                     if (key && key[0] == 'p') {
+                       self->ApplyPreset(g_ascii_strtoll(key + 1, nullptr, 10));
+                     } else if (key && key[0] == 's') {
+                       self->ApplySaved(g_ascii_strtoll(key + 1, nullptr, 10));
+                     }
                    }),
                    this);
-  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(preset));
-  GSimpleAction *saved_action = g_simple_action_new("saved", G_VARIANT_TYPE_INT32);
-  g_signal_connect(saved_action, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
-                     static_cast<CollectionFilterWidget *>(data)->ApplySaved(g_variant_get_int32(param));
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(groupby));
+
+  GSimpleAction *age = g_simple_action_new_stateful("age", G_VARIANT_TYPE_INT32, g_variant_new_int32(age_index_));
+  g_signal_connect(age, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
+                     auto *self = static_cast<CollectionFilterWidget *>(data);
+                     g_simple_action_set_state(action, param);
+                     self->ApplyFilterIndices(g_variant_get_int32(param), self->rating_index_, self->mode_index_);
                    }),
                    this);
-  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(saved_action));
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(age));
+
+  GSimpleAction *rating = g_simple_action_new_stateful("rating", G_VARIANT_TYPE_INT32, g_variant_new_int32(rating_index_));
+  g_signal_connect(rating, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
+                     auto *self = static_cast<CollectionFilterWidget *>(data);
+                     g_simple_action_set_state(action, param);
+                     self->ApplyFilterIndices(self->age_index_, g_variant_get_int32(param), self->mode_index_);
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(rating));
+
+  GSimpleAction *mode = g_simple_action_new_stateful("mode", G_VARIANT_TYPE_INT32, g_variant_new_int32(mode_index_));
+  g_signal_connect(mode, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
+                     auto *self = static_cast<CollectionFilterWidget *>(data);
+                     g_simple_action_set_state(action, param);
+                     self->ApplyFilterIndices(self->age_index_, self->rating_index_, g_variant_get_int32(param));
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(mode));
+
   auto add_kind = [&](const char *name, CollectionFilterMenu::ActionKind kind) {
     GSimpleAction *action = g_simple_action_new(name, nullptr);
     g_object_set_data(G_OBJECT(action), "kind", GINT_TO_POINTER(static_cast<int>(kind) + 1));
@@ -128,33 +213,20 @@ void CollectionFilterWidget::BuildMenu() {
                      this);
     g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
   };
-  add_kind("advanced", CollectionFilterMenu::ActionKind::Advanced);
-  add_kind("save", CollectionFilterMenu::ActionKind::Save);
+  GSimpleAction *save = g_simple_action_new("save", nullptr);
+  g_signal_connect(save, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+                     static_cast<CollectionFilterWidget *>(data)->PromptSave();
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(save));
   add_kind("manage", CollectionFilterMenu::ActionKind::Manage);
+  add_kind("configure", CollectionFilterMenu::ActionKind::Configure);
   gtk_widget_insert_action_group(options_button_, "collfilter", G_ACTION_GROUP(group));
   gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(options_button_), G_MENU_MODEL(root));
   g_object_unref(group);
   g_object_unref(root);
   g_object_unref(group_by);
-}
-
-void CollectionFilterWidget::EmitChanged() {
-  static const int days[] = {-1, 1, 7, 30, 90, 365};
-  static const float ratings[] = {-1.0f, -2.0f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f};
-  const guint age = gtk_drop_down_get_selected(GTK_DROP_DOWN(age_drop_));
-  const guint rating = gtk_drop_down_get_selected(GTK_DROP_DOWN(rating_drop_));
-  const guint mode = gtk_drop_down_get_selected(GTK_DROP_DOWN(mode_drop_));
-  options_.set_max_age(age < G_N_ELEMENTS(days) && days[age] > 0 ? days[age] * 86400 : -1);
-  unrated_only_ = rating < G_N_ELEMENTS(ratings) && ratings[rating] <= -2.0f;
-  options_.set_min_rating(unrated_only_ ? -1.0f : (rating < G_N_ELEMENTS(ratings) ? ratings[rating] : -1.0f));
-  if (mode == 1) {
-    options_.set_filter_mode(CollectionFilterOptions::FilterMode::Duplicates);
-  } else if (mode == 2) {
-    options_.set_filter_mode(CollectionFilterOptions::FilterMode::Untagged);
-  } else {
-    options_.set_filter_mode(CollectionFilterOptions::FilterMode::All);
-  }
-  if (changed_) {
-    changed_();
-  }
+  g_object_unref(age_menu);
+  g_object_unref(rating_menu);
+  g_object_unref(mode_section);
 }

@@ -16,7 +16,9 @@
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectionitem.h"
 #include "collection/collectionitemdelegate.h"
+#include "collection/collectionfilterchoices.h"
 #include "collection/collectionfiltermenu.h"
+#include "collection/collectiongroupingsave.h"
 #include "collection/collectionmenu.h"
 #include "collection/collectionkeyboard.h"
 #include "collection/collectionmodel.h"
@@ -623,6 +625,82 @@ TEST(CollectionFilterMenu, DelayAndBuiltinPresets) {
   custom.second = CollectionGrouping::GroupBy::Composer;
   custom.third = CollectionGrouping::GroupBy::None;
   EXPECT_EQ(-1, CollectionFilterMenu::MatchingPresetIndex(custom, presets));
+}
+
+TEST(CollectionGroupingSave, AcceptsNamesAndMarksMenuChecks) {
+  EXPECT_FALSE(CollectionGroupingSave::AcceptName(""));
+  EXPECT_FALSE(CollectionGroupingSave::AcceptName("   "));
+  EXPECT_TRUE(CollectionGroupingSave::AcceptName("Favorites"));
+  EXPECT_EQ("Favorites", CollectionGroupingSave::TrimmedName("  Favorites  "));
+  EXPECT_STREQ("Grouping Name", CollectionGroupingSave::DialogTitle());
+  EXPECT_STREQ("Grouping name:", CollectionGroupingSave::DialogPrompt());
+  EXPECT_STREQ("Save current grouping", CollectionGroupingSave::SaveLabel());
+  EXPECT_STREQ("Manage saved groupings", CollectionGroupingSave::ManageLabel());
+  EXPECT_EQ("✓ Group by Album", CollectionGroupingSave::MenuLabel("Group by Album", true));
+  EXPECT_EQ("Group by Album", CollectionGroupingSave::MenuLabel("Group by Album", false));
+
+  const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
+  CollectionGrouping::Grouping album_disc;
+  album_disc.first = CollectionGrouping::GroupBy::AlbumArtist;
+  album_disc.second = CollectionGrouping::GroupBy::AlbumDisc;
+  album_disc.third = CollectionGrouping::GroupBy::None;
+  EXPECT_EQ(1, CollectionGroupingSave::MenuCheckIndex(album_disc, presets, {}));
+  EXPECT_EQ("p1", CollectionGroupingSave::MenuStateKey(1, static_cast<int>(presets.size())));
+
+  CollectionGrouping::Grouping custom;
+  custom.first = CollectionGrouping::GroupBy::Year;
+  custom.second = CollectionGrouping::GroupBy::Composer;
+  custom.third = CollectionGrouping::GroupBy::None;
+  EXPECT_EQ(-1, CollectionGroupingSave::MenuCheckIndex(custom, presets, {}));
+  EXPECT_EQ("advanced", CollectionGroupingSave::MenuStateKey(-1, static_cast<int>(presets.size())));
+
+  std::vector<std::pair<std::string, CollectionGrouping::Grouping>> saved = {{"Year / Composer", custom}};
+  EXPECT_EQ(static_cast<int>(presets.size()), CollectionGroupingSave::MenuCheckIndex(custom, presets, saved));
+  EXPECT_EQ("s0", CollectionGroupingSave::MenuStateKey(static_cast<int>(presets.size()), static_cast<int>(presets.size())));
+}
+
+TEST(CollectionFilterChoices, AgeRatingAndShowModeMatchQt) {
+  EXPECT_EQ(6, CollectionFilterChoices::kAgeCount);
+  EXPECT_EQ(6, CollectionFilterChoices::kRatingCount);
+  EXPECT_EQ(3, CollectionFilterChoices::kModeCount);
+  EXPECT_STREQ("Entire collection", CollectionFilterChoices::kAgeLabels[0]);
+  EXPECT_STREQ("Added this week", CollectionFilterChoices::kAgeLabels[2]);
+  EXPECT_STREQ("Added within three months", CollectionFilterChoices::kAgeLabels[4]);
+  EXPECT_STREQ("Rating non null", CollectionFilterChoices::kRatingLabels[1]);
+  EXPECT_STREQ("Rating greater than 4 stars", CollectionFilterChoices::kRatingLabels[5]);
+  EXPECT_STREQ("Show all songs", CollectionFilterChoices::kModeLabels[0]);
+  EXPECT_STREQ("Show only duplicates", CollectionFilterChoices::kModeLabels[1]);
+  EXPECT_STREQ("Show only untagged", CollectionFilterChoices::kModeLabels[2]);
+  EXPECT_STREQ("Filter by age", CollectionFilterChoices::AgeMenuTitle());
+  EXPECT_STREQ("Filter by rating", CollectionFilterChoices::RatingMenuTitle());
+  EXPECT_EQ(60 * 60 * 24, CollectionFilterChoices::kAgeSeconds[1]);
+  EXPECT_EQ(60 * 60 * 24 * 30 * 3, CollectionFilterChoices::kAgeSeconds[4]);
+  EXPECT_FLOAT_EQ(0.0f, CollectionFilterChoices::kRatingValues[1]);
+
+  CollectionFilterOptions any = CollectionFilterChoices::FromIndices(0, 0, 0);
+  EXPECT_EQ(-1, any.max_age());
+  EXPECT_FLOAT_EQ(-1.0f, any.min_rating());
+  EXPECT_EQ(CollectionFilterOptions::FilterMode::All, any.filter_mode());
+
+  CollectionFilterOptions today = CollectionFilterChoices::FromIndices(1, 0, 0);
+  EXPECT_EQ(86400, today.max_age());
+  CollectionFilterOptions rated = CollectionFilterChoices::FromIndices(0, 1, 1);
+  EXPECT_EQ(-1, rated.max_age());
+  EXPECT_FLOAT_EQ(0.0f, rated.min_rating());
+  EXPECT_EQ(CollectionFilterOptions::FilterMode::Duplicates, rated.filter_mode());
+  Song rated_song = MakeSong("Glory Box", "Portishead", "Dummy");
+  rated_song.set_rating(0.2f);
+  Song unrated_song = MakeSong("Mysterons", "Portishead", "Dummy");
+  unrated_song.set_url("file:///tmp/music/mysterons.flac");
+  EXPECT_TRUE(rated.Matches(rated_song));
+  EXPECT_FALSE(rated.Matches(unrated_song));
+
+  CollectionFilterOptions year = CollectionFilterChoices::FromIndices(5, 5, 2);
+  EXPECT_EQ(60 * 60 * 24 * 365, year.max_age());
+  EXPECT_FLOAT_EQ(0.8f, year.min_rating());
+  EXPECT_EQ(CollectionFilterOptions::FilterMode::Untagged, year.filter_mode());
+  EXPECT_EQ(0, CollectionFilterChoices::ClampIndex(-4, CollectionFilterChoices::kAgeCount));
+  EXPECT_EQ(5, CollectionFilterChoices::ClampIndex(99, CollectionFilterChoices::kAgeCount));
 }
 
 TEST(CollectionKeyboard, FromKeyAndMoveAction) {

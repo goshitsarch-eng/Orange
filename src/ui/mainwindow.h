@@ -122,6 +122,7 @@ class MainWindow {
   void SaveGeometry();
   void PlacePlayingWidget();
   void SelectPlaylistRow(int index, bool add);
+  void RefreshPlaylistSummary();
   std::vector<int> SelectedPlaylistRows() const;
   SongList SelectedSongs() const;
   void SortPlaylistBy(PlaylistColumn column, PlaylistSortOrder order = PlaylistSortOrder::Toggle);

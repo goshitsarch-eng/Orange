@@ -20,7 +20,6 @@ class CollectionFilterWidget {
 
   GtkWidget *widget() const { return widget_; }
   CollectionFilterOptions options() const { return options_; }
-  bool unrated_only() const { return unrated_only_; }
   CollectionGrouping::Grouping grouping() const { return grouping_; }
   void SetChangedCallback(ChangedCallback callback);
   void SetGroupingChangedCallback(GroupingCallback callback) { grouping_changed_ = std::move(callback); }
@@ -29,19 +28,19 @@ class CollectionFilterWidget {
   void ReloadMenu();
 
  private:
-  void EmitChanged();
+  void ApplyFilterIndices(int age, int rating, int mode);
   void BuildMenu();
   void ApplyPreset(int index);
   void ApplySaved(int index);
+  void PromptSave();
 
   GtkWidget *widget_ = nullptr;
-  GtkWidget *age_drop_ = nullptr;
-  GtkWidget *rating_drop_ = nullptr;
-  GtkWidget *mode_drop_ = nullptr;
   GtkWidget *options_button_ = nullptr;
   CollectionFilterOptions options_;
   CollectionGrouping::Grouping grouping_;
-  bool unrated_only_ = false;
+  int age_index_ = 0;
+  int rating_index_ = 0;
+  int mode_index_ = 0;
   ChangedCallback changed_;
   GroupingCallback grouping_changed_;
   MenuActionCallback menu_action_;
