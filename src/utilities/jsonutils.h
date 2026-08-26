@@ -17,6 +17,10 @@ std::string FindCoverUrl(const std::string &json);
 std::string ExtractLyrics(const std::string &body);
 SongList ParseSongs(const std::string &json, Song::Source source = Song::Source::Stream);
 SongList ParseMusicBrainzRecordings(const std::string &json);
+SongList ParseSubsonicSongs(const std::string &json);
+SongList ParseTidalTracks(const std::string &json);
+SongList ParseSpotifyTracks(const std::string &json);
+SongList ParseQobuzTracks(const std::string &json);
 
 }  // namespace JsonUtils
 

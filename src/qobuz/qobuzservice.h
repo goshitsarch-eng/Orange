@@ -1,0 +1,30 @@
+#ifndef STRAWBERRY_QOBUZSERVICE_H
+#define STRAWBERRY_QOBUZSERVICE_H
+
+#include "streaming/streamingservices.h"
+
+#include <map>
+#include <string>
+
+class QobuzService : public StreamingService {
+ public:
+  static const char kApiUrl[];
+
+  explicit QobuzService(NetworkAccessManager *network);
+
+  std::string name() const override { return "Qobuz"; }
+  std::string scheme() const override { return "qobuz"; }
+  void Search(const std::string &query, SearchCallback callback) override;
+  void Login(const std::string &username, const std::string &password_or_token) override;
+  void ReloadSettings() override;
+  LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;
+
+ private:
+  std::map<std::string, std::string> AuthHeaders() const;
+
+  NetworkAccessManager *network_ = nullptr;
+  std::string app_id_;
+  std::string user_auth_token_;
+};
+
+#endif

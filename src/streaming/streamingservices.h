@@ -13,6 +13,7 @@ class StreamingService : public UrlHandler {
   virtual std::string name() const = 0;
   virtual void Search(const std::string &query, SearchCallback callback) = 0;
   virtual void Login(const std::string &username, const std::string &password_or_token) = 0;
+  virtual void ReloadSettings() {}
   virtual bool logged_in() const { return logged_in_; }
  protected:
   bool logged_in_ = false;

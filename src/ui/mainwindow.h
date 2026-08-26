@@ -74,6 +74,7 @@ class MainWindow {
   void RefreshDevices();
   void RefreshFiles();
   void RefreshStreaming();
+  void SearchStreaming(const std::string &query);
   void RefreshSmartPlaylists();
   void UpdateNowPlaying();
   void UpdatePlaybackButtons();
@@ -155,6 +156,7 @@ class MainWindow {
   GtkWidget *playlist_tabs_ = nullptr;
   std::string files_path_;
   std::string device_browse_id_;
+  std::string streaming_service_name_;
   CollectionGrouping::Grouping grouping_;
   std::string playlist_filter_;
   std::string collection_text_filter_;

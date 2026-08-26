@@ -443,4 +443,199 @@ SongList ParseMusicBrainzRecordings(const std::string &json) {
   return songs;
 }
 
+namespace {
+
+std::string ObjectString(JsonObject *object, const char *name) {
+  if (!object || !json_object_has_member(object, name)) {
+    return {};
+  }
+  return NodeString(json_object_get_member(object, name));
+}
+
+std::string NestedName(JsonObject *object, const char *member, const char *name_key) {
+  if (!object || !json_object_has_member(object, member) || !JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, member))) {
+    return {};
+  }
+  return ObjectString(json_object_get_object_member(object, member), name_key);
+}
+
+void ApplyDurationSeconds(Song *song, const std::string &seconds) {
+  if (seconds.empty()) {
+    return;
+  }
+  song->set_length_nanosec(static_cast<int64_t>(std::strtod(seconds.c_str(), nullptr) * 1000000000.0));
+}
+
+SongList SongsFromArray(JsonArray *array, Song::Source source, const std::function<void(Song *, JsonObject *)> &fill) {
+  SongList songs;
+  if (!array) {
+    return songs;
+  }
+  const guint n = json_array_get_length(array);
+  for (guint i = 0; i < n; ++i) {
+    JsonNode *item = json_array_get_element(array, i);
+    if (!item || !JSON_NODE_HOLDS_OBJECT(item)) {
+      continue;
+    }
+    Song song(source);
+    fill(&song, json_node_get_object(item));
+    if (!song.title().empty()) {
+      song.set_valid(true);
+      songs.push_back(song);
+    }
+  }
+  return songs;
+}
+
+JsonArray *FindNamedArray(JsonNode *root, const std::vector<std::string> &path) {
+  JsonNode *node = root;
+  for (const std::string &part : path) {
+    if (!node || !JSON_NODE_HOLDS_OBJECT(node)) {
+      return nullptr;
+    }
+    node = json_object_get_member(json_node_get_object(node), part.c_str());
+  }
+  if (node && JSON_NODE_HOLDS_ARRAY(node)) {
+    return json_node_get_array(node);
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+SongList ParseSubsonicSongs(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *songs_array = FindNamedArray(root, {"subsonic-response", "searchResult3", "song"});
+  if (!songs_array) {
+    songs_array = FindNamedArray(root, {"subsonic-response", "album", "song"});
+  }
+  SongList songs = SongsFromArray(songs_array, Song::Source::Subsonic, [](Song *song, JsonObject *object) {
+    song->set_title(ObjectString(object, "title"));
+    song->set_artist(ObjectString(object, "artist"));
+    song->set_album(ObjectString(object, "album"));
+    song->set_albumartist(ObjectString(object, "albumArtist"));
+    song->set_genre(ObjectString(object, "genre"));
+    const std::string id = ObjectString(object, "id");
+    song->set_song_id(id);
+    song->set_url(id.empty() ? std::string() : "subsonic://" + id);
+    song->set_year(std::atoi(ObjectString(object, "year").c_str()));
+    song->set_track(std::atoi(ObjectString(object, "track").c_str()));
+    song->set_disc(std::atoi(ObjectString(object, "discNumber").c_str()));
+    song->set_bitrate(std::atoi(ObjectString(object, "bitRate").c_str()));
+    song->set_filesize(std::strtoll(ObjectString(object, "size").c_str(), nullptr, 10));
+    ApplyDurationSeconds(song, ObjectString(object, "duration"));
+  });
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseTidalTracks(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"items"});
+  if (!items) {
+    items = FindNamedArray(root, {"tracks", "items"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Tidal, [](Song *song, JsonObject *object) {
+    song->set_title(ObjectString(object, "title"));
+    song->set_artist(NestedName(object, "artist", "name"));
+    song->set_album(NestedName(object, "album", "title"));
+    if (song->album().empty()) {
+      song->set_album(NestedName(object, "album", "name"));
+    }
+    const std::string id = ObjectString(object, "id");
+    song->set_song_id(id);
+    song->set_url(id.empty() ? std::string() : "tidal://" + id);
+    ApplyDurationSeconds(song, ObjectString(object, "duration"));
+    const std::string cover = NestedName(object, "album", "cover");
+    if (!cover.empty()) {
+      song->set_art_automatic("https://resources.tidal.com/images/" + StrUtils::Replace(cover, "-", "/") + "/1280x1280.jpg");
+    }
+  });
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseSpotifyTracks(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"tracks", "items"});
+  if (!items) {
+    items = FindNamedArray(root, {"items"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Spotify, [](Song *song, JsonObject *object) {
+    song->set_title(ObjectString(object, "name"));
+    if (json_object_has_member(object, "artists") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "artists"))) {
+      JsonArray *artists = json_object_get_array_member(object, "artists");
+      if (json_array_get_length(artists) > 0) {
+        song->set_artist(ObjectString(json_array_get_object_element(artists, 0), "name"));
+      }
+    }
+    song->set_album(NestedName(object, "album", "name"));
+    const std::string id = ObjectString(object, "id");
+    song->set_song_id(id);
+    song->set_url(id.empty() ? std::string() : "spotify://" + id);
+    const std::string preview = ObjectString(object, "preview_url");
+    if (!preview.empty()) {
+      song->set_stream_url(preview);
+    }
+    const std::string ms = ObjectString(object, "duration_ms");
+    if (!ms.empty()) {
+      song->set_length_nanosec(std::strtoll(ms.c_str(), nullptr, 10) * 1000000LL);
+    }
+    if (json_object_has_member(object, "album") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, "album"))) {
+      JsonObject *album = json_object_get_object_member(object, "album");
+      if (json_object_has_member(album, "images") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(album, "images"))) {
+        JsonArray *images = json_object_get_array_member(album, "images");
+        if (json_array_get_length(images) > 0) {
+          song->set_art_automatic(ObjectString(json_array_get_object_element(images, 0), "url"));
+        }
+      }
+    }
+  });
+  json_node_unref(root);
+  return songs;
+}
+
+SongList ParseQobuzTracks(const std::string &json) {
+  JsonNode *root = Parse(json);
+  if (!root) {
+    return {};
+  }
+  JsonArray *items = FindNamedArray(root, {"tracks", "items"});
+  if (!items) {
+    items = FindNamedArray(root, {"items"});
+  }
+  SongList songs = SongsFromArray(items, Song::Source::Qobuz, [](Song *song, JsonObject *object) {
+    song->set_title(ObjectString(object, "title"));
+    song->set_artist(NestedName(object, "performer", "name"));
+    if (song->artist().empty()) {
+      song->set_artist(NestedName(object, "artist", "name"));
+    }
+    song->set_album(NestedName(object, "album", "title"));
+    const std::string id = ObjectString(object, "id");
+    song->set_song_id(id);
+    song->set_url(id.empty() ? std::string() : "qobuz://" + id);
+    ApplyDurationSeconds(song, ObjectString(object, "duration"));
+    const std::string image = NestedName(object, "album", "image");
+    if (!image.empty()) {
+      song->set_art_automatic(image);
+    } else if (json_object_has_member(object, "album") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, "album"))) {
+      JsonObject *album = json_object_get_object_member(object, "album");
+      if (json_object_has_member(album, "image") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(album, "image"))) {
+        song->set_art_automatic(ObjectString(json_object_get_object_member(album, "image"), "large"));
+      }
+    }
+  });
+  json_node_unref(root);
+  return songs;
+}
+
 }  // namespace JsonUtils

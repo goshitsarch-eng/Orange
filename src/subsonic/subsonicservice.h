@@ -1,0 +1,37 @@
+#ifndef STRAWBERRY_SUBSONICSERVICE_H
+#define STRAWBERRY_SUBSONICSERVICE_H
+
+#include "streaming/streamingservices.h"
+
+#include <map>
+#include <string>
+
+class SubsonicService : public StreamingService {
+ public:
+  static const char *kClientName;
+  static const char *kApiVersion;
+
+  explicit SubsonicService(NetworkAccessManager *network);
+
+  std::string name() const override { return "Subsonic"; }
+  std::string scheme() const override { return "subsonic"; }
+  void Search(const std::string &query, SearchCallback callback) override;
+  void Login(const std::string &username, const std::string &password_or_token) override;
+  void ReloadSettings() override;
+  LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;
+
+  static std::string CreateUrl(const std::string &server_url, const std::string &username, const std::string &password,
+                               const std::string &resource, const std::map<std::string, std::string> &params = {}, bool hex_auth = false);
+  static std::string Md5Hex(const std::string &value);
+  static std::string HexEncode(const std::string &value);
+  static std::string RandomSalt(int length = 20);
+
+ private:
+  NetworkAccessManager *network_ = nullptr;
+  std::string server_url_;
+  std::string username_;
+  std::string password_;
+  bool hex_auth_ = false;
+};
+
+#endif

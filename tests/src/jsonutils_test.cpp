@@ -64,6 +64,49 @@ TEST(JsonUtils, GetStringPath) {
   EXPECT_EQ("Dummy", JsonUtils::GetString(json, {"album", "name"}));
 }
 
+TEST(JsonUtils, SubsonicSearchSongs) {
+  const std::string json = R"({
+    "subsonic-response": {
+      "searchResult3": {
+        "song": [
+          {"id": "42", "title": "Ragged Wood", "artist": "Fleet Foxes", "album": "Fleet Foxes", "duration": 301, "bitRate": 320, "track": 2, "year": 2008}
+        ]
+      }
+    }
+  })";
+  const SongList songs = JsonUtils::ParseSubsonicSongs(json);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Ragged Wood", songs.front().title());
+  EXPECT_EQ("Fleet Foxes", songs.front().artist());
+  EXPECT_EQ("subsonic://42", songs.front().url());
+  EXPECT_EQ(Song::Source::Subsonic, songs.front().source());
+}
+
+TEST(JsonUtils, TidalTracks) {
+  const std::string json = R"({"items":[{"id":99,"title":"Song","artist":{"name":"Artist"},"album":{"title":"Album","cover":"aa-bb"},"duration":180}]})";
+  const SongList songs = JsonUtils::ParseTidalTracks(json);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Song", songs.front().title());
+  EXPECT_EQ("tidal://99", songs.front().url());
+}
+
+TEST(JsonUtils, SpotifyTracks) {
+  const std::string json = R"({"tracks":{"items":[{"id":"abc","name":"Song","artists":[{"name":"Artist"}],"album":{"name":"Album"},"preview_url":"https://p.example/a.mp3","duration_ms":123000}]}})";
+  const SongList songs = JsonUtils::ParseSpotifyTracks(json);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Song", songs.front().title());
+  EXPECT_EQ("spotify://abc", songs.front().url());
+  EXPECT_EQ("https://p.example/a.mp3", songs.front().stream_url());
+}
+
+TEST(JsonUtils, QobuzTracks) {
+  const std::string json = R"({"tracks":{"items":[{"id":7,"title":"Song","performer":{"name":"Artist"},"album":{"title":"Album"},"duration":200}]}})";
+  const SongList songs = JsonUtils::ParseQobuzTracks(json);
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Song", songs.front().title());
+  EXPECT_EQ("qobuz://7", songs.front().url());
+}
+
 TEST(JsonUtils, MusicBrainzRecordings) {
   const std::string json = R"({
     "recordings": [

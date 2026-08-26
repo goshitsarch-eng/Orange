@@ -183,6 +183,10 @@ set(STRAWBERRY_SOURCES
   src/lyrics/lyricsproviders.cpp
   src/scrobbler/audioscrobbler.cpp
   src/streaming/streamingservices.cpp
+  src/subsonic/subsonicservice.cpp
+  src/tidal/tidalservice.cpp
+  src/spotify/spotifyservice.cpp
+  src/qobuz/qobuzservice.cpp
   src/radios/radioservices.cpp
   src/device/devicemanager.cpp
   src/device/gpodloader.cpp
@@ -283,6 +287,7 @@ if(GTest_FOUND)
     tests/src/filterparser_test.cpp
     tests/src/lyrics_test.cpp
     tests/src/gpod_test.cpp
+    tests/src/streaming_test.cpp
     tests/src/playlist_test.cpp
     tests/src/settings_test.cpp
     tests/src/jsonutils_test.cpp
@@ -305,6 +310,7 @@ if(GTest_FOUND)
     src/smartplaylists/smartplaylist.cpp
     src/filterparser/filterparser.cpp
     src/lyrics/htmllyricsprovider.cpp
+    src/subsonic/subsonicservice.cpp
     src/playlist/playlist.cpp
     src/collection/collectionbackend.cpp
     src/collection/collectiongrouping.cpp
