@@ -30,7 +30,7 @@ AdwPreferencesGroup *AddGroup(AdwPreferencesPage *page, const char *title) {
   return group;
 }
 
-void AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *subtitle, bool fallback) {
+GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *subtitle, bool fallback) {
   AdwSwitchRow *row = ADW_SWITCH_ROW(adw_switch_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   if (subtitle) {
@@ -46,9 +46,10 @@ void AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, 
                    }),
                    settings);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  return GTK_WIDGET(row);
 }
 
-void AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback) {
+GtkWidget *AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback) {
   AdwEntryRow *row = ADW_ENTRY_ROW(adw_entry_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   gtk_editable_set_text(GTK_EDITABLE(row), settings->Value(key, fallback ? fallback : "").c_str());
@@ -61,6 +62,7 @@ void AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, c
                    }),
                    settings);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  return GTK_WIDGET(row);
 }
 
 void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback) {
@@ -78,9 +80,9 @@ void AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key
   adw_preferences_group_add(group, GTK_WIDGET(row));
 }
 
-void AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
-              const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
-              const std::function<void(const std::string &)> &changed) {
+GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
+                    const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
+                    const std::function<void(const std::string &)> &changed) {
   AdwComboRow *row = ADW_COMBO_ROW(adw_combo_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   GtkStringList *model = gtk_string_list_new(nullptr);
@@ -123,6 +125,7 @@ void AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, c
                    }),
                    settings);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  return GTK_WIDGET(row);
 }
 
 void AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,

@@ -1,5 +1,6 @@
 #include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverexport.h"
+#include "covermanager/coverarttypes.h"
 #include "covermanager/albumcoverexporter.h"
 #include "covermanager/albumcoverfetcher.h"
 #include "covermanager/albumcoverfetchersearch.h"
@@ -101,6 +102,52 @@ TEST(AlbumCoverFetcherSearch, ScoresExactMatchAndCompilationPenalty) {
   EXPECT_TRUE(AlbumCoverFetcherSearch::IsCompilationOrLiveAlbum("Greatest Hits"));
   EXPECT_TRUE(AlbumCoverFetcherSearch::IsCompilationOrLiveAlbum("The Essential Collection"));
   EXPECT_FALSE(AlbumCoverFetcherSearch::IsCompilationOrLiveAlbum("Helplessness Blues"));
+}
+
+TEST(CoverArtTypes, ParseSaveAndFilenameSensitivity) {
+  EXPECT_EQ("art_unset", CoverArtTypes::AllIds().front());
+  EXPECT_EQ("art_embedded,art_automatic,art_manual", CoverArtTypes::DefaultSaved());
+  EXPECT_EQ("Embedded album cover art (art_embedded)", CoverArtTypes::Description("art_embedded"));
+  EXPECT_EQ("Manually unset (art_unset)", CoverArtTypes::Description("art_unset"));
+  EXPECT_EQ("Set through album cover search (art_manual)", CoverArtTypes::Description("art_manual"));
+  EXPECT_EQ("Automatically picked up from album directory (art_automatic)", CoverArtTypes::Description("art_automatic"));
+
+  const auto missing_unset = CoverArtTypes::Parse(CoverArtTypes::DefaultSaved());
+  ASSERT_EQ(4u, missing_unset.size());
+  EXPECT_EQ("art_embedded", missing_unset[0].id);
+  EXPECT_TRUE(missing_unset[0].enabled);
+  EXPECT_EQ("art_automatic", missing_unset[1].id);
+  EXPECT_TRUE(missing_unset[1].enabled);
+  EXPECT_EQ("art_manual", missing_unset[2].id);
+  EXPECT_TRUE(missing_unset[2].enabled);
+  EXPECT_EQ("art_unset", missing_unset[3].id);
+  EXPECT_FALSE(missing_unset[3].enabled);
+  EXPECT_EQ(CoverArtTypes::DefaultSaved(), CoverArtTypes::Save(missing_unset));
+
+  const auto qt_default = CoverArtTypes::Parse("art_unset,art_manual,art_automatic,art_embedded");
+  ASSERT_EQ(4u, qt_default.size());
+  EXPECT_EQ("art_unset", qt_default[0].id);
+  EXPECT_TRUE(qt_default[0].enabled);
+  EXPECT_EQ("art_embedded,art_automatic,art_manual", CoverArtTypes::Save(CoverArtTypes::Move(missing_unset, 0, 0)));
+  const auto moved = CoverArtTypes::Move(missing_unset, 0, 1);
+  EXPECT_EQ("art_automatic", moved[0].id);
+  EXPECT_EQ("art_embedded", moved[1].id);
+
+  const auto all_disabled = CoverArtTypes::Parse("");
+  EXPECT_TRUE(CoverArtTypes::EnabledIds(all_disabled).empty());
+  EXPECT_TRUE(CoverArtTypes::Save(all_disabled).empty());
+  EXPECT_EQ(4u, all_disabled.size());
+  EXPECT_FALSE(CoverArtTypes::Parse("art_unknown,art_embedded")[0].id.empty());
+  EXPECT_EQ("art_embedded", CoverArtTypes::Parse("art_unknown,art_embedded").front().id);
+
+  EXPECT_TRUE(CoverArtTypes::FilenameGroupEnabled("2"));
+  EXPECT_TRUE(CoverArtTypes::FilenameGroupEnabled(CoverOptions::CoverType::Album));
+  EXPECT_FALSE(CoverArtTypes::FilenameGroupEnabled("1"));
+  EXPECT_FALSE(CoverArtTypes::FilenameGroupEnabled("3"));
+  EXPECT_TRUE(CoverArtTypes::FilenamePatternOptionsEnabled("2", "2"));
+  EXPECT_FALSE(CoverArtTypes::FilenamePatternOptionsEnabled("2", "1"));
+  EXPECT_FALSE(CoverArtTypes::FilenamePatternOptionsEnabled("1", "2"));
+  EXPECT_FALSE(CoverArtTypes::FilenamePatternOptionsEnabled(CoverOptions::CoverType::Cache, CoverOptions::CoverFilename::Pattern));
 }
 
 TEST(AlbumCoverLoaderOptions, TypeNamesAndLoadTypesDefault) {
