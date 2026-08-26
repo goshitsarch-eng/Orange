@@ -9,6 +9,22 @@
 
 #include <gtest/gtest.h>
 
+TEST(StreamingFavoriteAction, TypeAndStoreHelpers) {
+  using Type = StreamingService::FavoriteType;
+  EXPECT_EQ(Type::Artists, StreamingFavoriteAction::FromInt(1));
+  EXPECT_EQ(Type::Albums, StreamingFavoriteAction::FromInt(2));
+  EXPECT_EQ(Type::Songs, StreamingFavoriteAction::FromInt(3));
+  EXPECT_EQ(Type::Songs, StreamingFavoriteAction::FromInt(0));
+  EXPECT_EQ(1, StreamingFavoriteAction::ToInt(Type::Artists));
+  EXPECT_EQ(StreamingCollectionStore::List::Artists, StreamingFavoriteAction::StoreList(Type::Artists));
+  EXPECT_EQ(StreamingCollectionStore::List::Albums, StreamingFavoriteAction::StoreList(Type::Albums));
+  EXPECT_EQ(StreamingCollectionStore::List::Songs, StreamingFavoriteAction::StoreList(Type::Songs));
+  EXPECT_STREQ("Artists", StreamingFavoriteAction::Label(Type::Artists));
+  EXPECT_STREQ("Receiving albums...", StreamingFavoriteAction::Receiving(Type::Albums));
+  EXPECT_STREQ("No favorite artists", StreamingFavoriteAction::EmptyStatus(Type::Artists, true));
+  EXPECT_STREQ("Sign in in Preferences", StreamingFavoriteAction::EmptyStatus(Type::Songs, false));
+}
+
 TEST(StreamingFavoriteAction, TypeForSongs) {
   Song track(Song::Source::Tidal);
   track.set_song_id("99");

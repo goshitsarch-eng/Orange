@@ -1,8 +1,11 @@
 #include "streaming/streamingtabsview.h"
 
 #include "collection/collectiongrouping.h"
+#include "core/settings.h"
 #include "streaming/streamingbrowse.h"
+#include "streaming/streamingfavoriteaction.h"
 #include "streaming/streamingprogress.h"
+#include "translations/translations.h"
 
 StreamingTabsView::StreamingTabsView(StreamingService *service, Database *database) : service_(service), database_(database) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -46,6 +49,8 @@ StreamingTabsView::StreamingTabsView(StreamingService *service, Database *databa
   albums_->SetAbortCallback([this]() { AbortGetAlbums(); });
   songs_->SetAbortCallback([this]() { AbortGetSongs(); });
   favorites_->SetAbortCallback([this]() { favorites_->HideProgress(); });
+  LoadFavoriteType();
+  BuildFavoriteTypes();
   ConnectBrowseProgress();
 }
 
@@ -219,6 +224,81 @@ void StreamingTabsView::ReloadSettings() {
   if (service_) {
     service_->ReloadSettings();
   }
+  LoadFavoriteType();
+}
+
+void StreamingTabsView::LoadFavoriteType() {
+  if (!service_) {
+    favorite_type_ = StreamingService::FavoriteType::Songs;
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(service_->name());
+  favorite_type_ = StreamingFavoriteAction::FromInt(
+      settings.IntValue(StreamingFavoriteAction::kFavoritesType, StreamingFavoriteAction::ToInt(StreamingService::FavoriteType::Songs)));
+}
+
+void StreamingTabsView::PersistFavoriteType() {
+  if (!service_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(service_->name());
+  settings.SetIntValue(StreamingFavoriteAction::kFavoritesType, StreamingFavoriteAction::ToInt(favorite_type_));
+  settings.Sync();
+}
+
+void StreamingTabsView::SetFavoriteType(StreamingService::FavoriteType type, bool reload) {
+  favorite_type_ = type;
+  PersistFavoriteType();
+  if (fav_artists_) {
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_artists_), type == StreamingService::FavoriteType::Artists);
+  }
+  if (fav_albums_) {
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_albums_), type == StreamingService::FavoriteType::Albums);
+  }
+  if (fav_songs_) {
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_songs_), type == StreamingService::FavoriteType::Songs);
+  }
+  if (reload) {
+    GetFavorites();
+  }
+}
+
+void StreamingTabsView::BuildFavoriteTypes() {
+  GtkWidget *types = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+  gtk_widget_set_margin_start(types, 8);
+  gtk_widget_set_margin_end(types, 8);
+  gtk_widget_set_margin_top(types, 4);
+  gtk_widget_set_margin_bottom(types, 4);
+  fav_artists_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingFavoriteAction::Label(StreamingService::FavoriteType::Artists)));
+  fav_albums_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingFavoriteAction::Label(StreamingService::FavoriteType::Albums)));
+  fav_songs_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingFavoriteAction::Label(StreamingService::FavoriteType::Songs)));
+  gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(fav_albums_), GTK_TOGGLE_BUTTON(fav_artists_));
+  gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(fav_songs_), GTK_TOGGLE_BUTTON(fav_artists_));
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_artists_), favorite_type_ == StreamingService::FavoriteType::Artists);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_albums_), favorite_type_ == StreamingService::FavoriteType::Albums);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_songs_), favorite_type_ == StreamingService::FavoriteType::Songs);
+  gtk_box_append(GTK_BOX(types), fav_artists_);
+  gtk_box_append(GTK_BOX(types), fav_albums_);
+  gtk_box_append(GTK_BOX(types), fav_songs_);
+  auto on_toggle = +[](GtkToggleButton *button, gpointer data) {
+    if (!gtk_toggle_button_get_active(button)) {
+      return;
+    }
+    auto *self = static_cast<StreamingTabsView *>(data);
+    if (GTK_WIDGET(button) == self->fav_artists_) {
+      self->SetFavoriteType(StreamingService::FavoriteType::Artists, true);
+    } else if (GTK_WIDGET(button) == self->fav_albums_) {
+      self->SetFavoriteType(StreamingService::FavoriteType::Albums, true);
+    } else {
+      self->SetFavoriteType(StreamingService::FavoriteType::Songs, true);
+    }
+  };
+  g_signal_connect(fav_artists_, "toggled", G_CALLBACK(on_toggle), this);
+  g_signal_connect(fav_albums_, "toggled", G_CALLBACK(on_toggle), this);
+  g_signal_connect(fav_songs_, "toggled", G_CALLBACK(on_toggle), this);
+  gtk_box_prepend(GTK_BOX(favorites_->widget()), types);
 }
 
 void StreamingTabsView::ShowCached(StreamingCollectionView *view, StreamingCollectionStore::List list) {
@@ -338,15 +418,22 @@ void StreamingTabsView::GetFavorites() {
   if (!service_) {
     return;
   }
+  ShowCached(favorites_->view(), StreamingFavoriteAction::StoreList(favorite_type_));
   if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
-    favorites_->ShowProgress(StreamingProgress::ReceivingSongs());
+    favorites_->ShowProgress(StreamingFavoriteAction::Receiving(favorite_type_));
   }
   favorites_->view()->SetStatus("Loading favorites…");
-  service_->GetFavorites(StreamingService::FavoriteType::Songs, [this](const SongList &songs) {
+  service_->GetFavorites(favorite_type_, [this](const SongList &songs) {
     favorites_->HideProgressUnlessError();
+    if (StreamingCollectionStore::ShouldKeepCache(favorites_->has_error(), songs)) {
+      return;
+    }
+    if (StreamingCollectionStore::ShouldPersist(favorites_->has_error(), service_->logged_in(), songs)) {
+      PersistList(StreamingFavoriteAction::StoreList(favorite_type_), songs);
+    }
     favorites_->view()->SetSongs(songs);
     if (songs.empty()) {
-      favorites_->view()->SetStatus(service_->logged_in() ? "No favorites" : "Sign in in Preferences");
+      favorites_->view()->SetStatus(StreamingFavoriteAction::EmptyStatus(favorite_type_, service_->logged_in()));
     }
   });
 }

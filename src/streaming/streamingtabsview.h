@@ -47,6 +47,10 @@ class StreamingTabsView {
   void BrowseAlbum(StreamingCollectionView *view, const Song &album);
   void ShowCached(StreamingCollectionView *view, StreamingCollectionStore::List list);
   void PersistList(StreamingCollectionStore::List list, const SongList &songs);
+  void BuildFavoriteTypes();
+  void SetFavoriteType(StreamingService::FavoriteType type, bool reload);
+  void PersistFavoriteType();
+  void LoadFavoriteType();
 
   void ConnectBrowseProgress();
 
@@ -60,6 +64,10 @@ class StreamingTabsView {
   std::unique_ptr<StreamingCollectionViewContainer> songs_;
   std::unique_ptr<StreamingCollectionViewContainer> favorites_;
   std::unique_ptr<StreamingSearchView> search_;
+  StreamingService::FavoriteType favorite_type_ = StreamingService::FavoriteType::Songs;
+  GtkWidget *fav_artists_ = nullptr;
+  GtkWidget *fav_albums_ = nullptr;
+  GtkWidget *fav_songs_ = nullptr;
 };
 
 #endif
