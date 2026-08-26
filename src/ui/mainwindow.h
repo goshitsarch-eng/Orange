@@ -222,7 +222,7 @@ class MainWindow {
   PlaylistSequence playlist_sequence_;
   std::string playlist_filter_;
   std::string collection_text_filter_;
-  PlaylistColumn sort_column_ = PlaylistColumn::Title;
+  PlaylistColumn sort_column_ = PlaylistColumn::Count;
   bool sort_descending_ = false;
   std::vector<int> selected_playlist_rows_;
   std::string selection_playlist_name_;

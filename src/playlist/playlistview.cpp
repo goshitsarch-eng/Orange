@@ -335,6 +335,7 @@ void PlaylistView::Clear() {
 void PlaylistView::Refresh(Playlist *playlist) {
   playlist_ = playlist;
   Clear();
+  header_->SetSortState(playlist ? playlist->sort_column() : PlaylistColumn::Count, playlist && playlist->sort_descending());
   header_->Rebuild();
   gtk_box_append(GTK_BOX(grid_), header_->widget());
   if (!playlist) {

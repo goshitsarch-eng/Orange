@@ -1,5 +1,6 @@
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistheadersort.h"
 #include "playlist/playlist.h"
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlistfolders.h"
@@ -503,4 +504,50 @@ TEST(PlaylistTabNavigation, WrapsLikeQtShortcuts) {
   EXPECT_EQ(1, PlaylistTabNavigation::ActiveIndex(1, 3));
   EXPECT_EQ(-1, PlaylistTabNavigation::ActiveIndex(5, 3));
   EXPECT_EQ(-1, PlaylistTabNavigation::ActiveIndex(-1, 3));
+}
+
+TEST(PlaylistHeaderSort, MarksAndMenuChecksMatchQtHeader) {
+  EXPECT_FALSE(PlaylistHeaderSort::IsSorted(PlaylistColumn::Title, PlaylistColumn::Count));
+  EXPECT_TRUE(PlaylistHeaderSort::IsSorted(PlaylistColumn::Title, PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistHeaderSort::IsSorted(PlaylistColumn::Artist, PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistHeaderSort::HasSort(PlaylistColumn::Count));
+  EXPECT_TRUE(PlaylistHeaderSort::HasSort(PlaylistColumn::Title));
+  EXPECT_EQ("Title", PlaylistHeaderSort::Label("Title", false, false));
+  EXPECT_EQ(std::string("Title") + PlaylistHeaderSort::kAscendingMark, PlaylistHeaderSort::Label("Title", true, false));
+  EXPECT_EQ(std::string("Artist") + PlaylistHeaderSort::kDescendingMark, PlaylistHeaderSort::Label("Artist", true, true));
+  EXPECT_EQ(std::string("Title") + PlaylistHeaderSort::kAscendingMark,
+            PlaylistHeaderSort::LabelForColumn("Title", PlaylistColumn::Title, PlaylistColumn::Title, false));
+  EXPECT_EQ("Album", PlaylistHeaderSort::LabelForColumn("Album", PlaylistColumn::Album, PlaylistColumn::Title, false));
+  EXPECT_TRUE(PlaylistHeaderSort::AscendingChecked(PlaylistColumn::Title, PlaylistColumn::Title, false));
+  EXPECT_FALSE(PlaylistHeaderSort::DescendingChecked(PlaylistColumn::Title, PlaylistColumn::Title, false));
+  EXPECT_TRUE(PlaylistHeaderSort::DescendingChecked(PlaylistColumn::Year, PlaylistColumn::Year, true));
+  EXPECT_FALSE(PlaylistHeaderSort::AscendingChecked(PlaylistColumn::Year, PlaylistColumn::Title, false));
+  EXPECT_TRUE(PlaylistHeaderSort::ClearEnabled(PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistHeaderSort::ClearEnabled(PlaylistColumn::Count));
+}
+
+TEST(PlaylistHeaderSort, ApplyOrderAndSkipRedundantExplicitSort) {
+  const PlaylistHeaderSort::State unsorted;
+  const PlaylistHeaderSort::State title_asc = PlaylistHeaderSort::ApplyOrder(unsorted, PlaylistColumn::Title, PlaylistSortOrder::Toggle);
+  EXPECT_EQ(PlaylistColumn::Title, title_asc.column);
+  EXPECT_FALSE(title_asc.descending);
+  const PlaylistHeaderSort::State title_desc = PlaylistHeaderSort::ApplyOrder(title_asc, PlaylistColumn::Title, PlaylistSortOrder::Toggle);
+  EXPECT_TRUE(title_desc.descending);
+  const PlaylistHeaderSort::State artist = PlaylistHeaderSort::ApplyOrder(title_desc, PlaylistColumn::Artist, PlaylistSortOrder::Toggle);
+  EXPECT_EQ(PlaylistColumn::Artist, artist.column);
+  EXPECT_FALSE(artist.descending);
+  const PlaylistHeaderSort::State explicit_desc =
+      PlaylistHeaderSort::ApplyOrder(title_asc, PlaylistColumn::Album, PlaylistSortOrder::Descending);
+  EXPECT_EQ(PlaylistColumn::Album, explicit_desc.column);
+  EXPECT_TRUE(explicit_desc.descending);
+  const PlaylistHeaderSort::State cleared = PlaylistHeaderSort::ApplyOrder(explicit_desc, PlaylistColumn::Album, PlaylistSortOrder::Clear);
+  EXPECT_EQ(PlaylistColumn::Count, cleared.column);
+  EXPECT_FALSE(cleared.descending);
+  EXPECT_FALSE(PlaylistHeaderSort::ShouldApplyExplicit(PlaylistColumn::Title, PlaylistColumn::Title, false, PlaylistSortOrder::Ascending));
+  EXPECT_TRUE(PlaylistHeaderSort::ShouldApplyExplicit(PlaylistColumn::Title, PlaylistColumn::Title, false, PlaylistSortOrder::Descending));
+  EXPECT_TRUE(PlaylistHeaderSort::ShouldApplyExplicit(PlaylistColumn::Title, PlaylistColumn::Title, false, PlaylistSortOrder::Clear));
+  EXPECT_FALSE(PlaylistHeaderSort::ShouldApplyExplicit(PlaylistColumn::Title, PlaylistColumn::Count, false, PlaylistSortOrder::Clear));
+  EXPECT_TRUE(PlaylistHeaderSort::ShouldApplyExplicit(PlaylistColumn::Title, PlaylistColumn::Artist, true, PlaylistSortOrder::Toggle));
+  EXPECT_TRUE(PlaylistHeaderSort::ShouldSortNow(PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistHeaderSort::ShouldSortNow(PlaylistColumn::Count));
 }

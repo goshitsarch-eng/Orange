@@ -1,6 +1,7 @@
 #include "playlist/playlistheader.h"
 
 #include "playlist/playlistcolumnlayout.h"
+#include "playlist/playlistheadersort.h"
 #include "translations/translations.h"
 
 #include <string>
@@ -19,6 +20,11 @@ PlaylistHeader::PlaylistHeader() {
                    this);
 }
 
+void PlaylistHeader::SetSortState(PlaylistColumn column, bool descending) {
+  sort_column_ = column;
+  sort_descending_ = descending;
+}
+
 void PlaylistHeader::Rebuild() {
   GtkWidget *child = gtk_widget_get_first_child(widget_);
   while (child) {
@@ -27,7 +33,9 @@ void PlaylistHeader::Rebuild() {
     child = next;
   }
   for (PlaylistColumn column : PlaylistColumnLayout::Visible()) {
-    GtkWidget *button = gtk_button_new_with_label(PlaylistDelegates::ColumnTitle(column).c_str());
+    const std::string title =
+        PlaylistHeaderSort::LabelForColumn(PlaylistDelegates::ColumnTitle(column), column, sort_column_, sort_descending_);
+    GtkWidget *button = gtk_button_new_with_label(title.c_str());
     gtk_widget_add_css_class(button, "flat");
     if (PlaylistColumnLayout::StretchColumn(column)) {
       gtk_widget_set_hexpand(button, TRUE);
@@ -142,30 +150,68 @@ void PlaylistHeader::ShowMenu(PlaylistColumn column) {
     gtk_box_append(GTK_BOX(box), lock);
   }
 
-  add_button(Translations::CStr("Sort ascending"), [this, column]() {
-    if (sort_) {
-      sort_(column, PlaylistSortOrder::Ascending);
-    }
-  });
-  add_button(Translations::CStr("Sort descending"), [this, column]() {
-    if (sort_) {
-      sort_(column, PlaylistSortOrder::Descending);
-    }
-  });
-  add_button(Translations::CStr("Clear sorting"), [this, column]() {
-    if (sort_) {
+  auto add_check = [&](const char *label, bool active, bool sensitive, const std::function<void()> &action) {
+    GtkWidget *check = gtk_check_button_new_with_label(label);
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(check), active);
+    gtk_widget_set_sensitive(check, sensitive);
+    auto *cb = new std::function<void()>(action);
+    g_object_set_data_full(G_OBJECT(check), "action", cb, [](gpointer p) { delete static_cast<std::function<void()> *>(p); });
+    g_signal_connect(check, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                       if (!gtk_check_button_get_active(button)) {
+                         return;
+                       }
+                       auto *fn = static_cast<std::function<void()> *>(g_object_get_data(G_OBJECT(button), "action"));
+                       gtk_popover_popdown(GTK_POPOVER(data));
+                       if (fn && *fn) {
+                         (*fn)();
+                       }
+                     }),
+                     popover);
+    gtk_box_append(GTK_BOX(box), check);
+  };
+
+  add_check(Translations::CStr("Sort ascending"),
+            PlaylistHeaderSort::AscendingChecked(column, sort_column_, sort_descending_), true, [this, column]() {
+              if (sort_ && PlaylistHeaderSort::ShouldApplyExplicit(column, sort_column_, sort_descending_, PlaylistSortOrder::Ascending)) {
+                sort_(column, PlaylistSortOrder::Ascending);
+              }
+            });
+  add_check(Translations::CStr("Sort descending"),
+            PlaylistHeaderSort::DescendingChecked(column, sort_column_, sort_descending_), true, [this, column]() {
+              if (sort_ && PlaylistHeaderSort::ShouldApplyExplicit(column, sort_column_, sort_descending_, PlaylistSortOrder::Descending)) {
+                sort_(column, PlaylistSortOrder::Descending);
+              }
+            });
+  GtkWidget *clear = gtk_button_new_with_label(Translations::CStr("Clear sorting"));
+  gtk_widget_add_css_class(clear, "flat");
+  gtk_widget_set_halign(clear, GTK_ALIGN_FILL);
+  gtk_widget_set_sensitive(clear, PlaylistHeaderSort::ClearEnabled(sort_column_));
+  auto *clear_cb = new std::function<void()>([this, column]() {
+    if (sort_ && PlaylistHeaderSort::ShouldApplyExplicit(column, sort_column_, sort_descending_, PlaylistSortOrder::Clear)) {
       sort_(column, PlaylistSortOrder::Clear);
     }
   });
-  add_button(Translations::CStr("Align left"), [this, column]() {
+  g_object_set_data_full(G_OBJECT(clear), "action", clear_cb, [](gpointer p) { delete static_cast<std::function<void()> *>(p); });
+  g_signal_connect(clear, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                     auto *fn = static_cast<std::function<void()> *>(g_object_get_data(G_OBJECT(btn), "action"));
+                     gtk_popover_popdown(GTK_POPOVER(data));
+                     if (fn && *fn) {
+                       (*fn)();
+                     }
+                   }),
+                   popover);
+  gtk_box_append(GTK_BOX(box), clear);
+
+  const PlaylistColumnAlign align = PlaylistColumnLayout::Alignment(column);
+  add_check(Translations::CStr("Align left"), align == PlaylistColumnAlign::Left, true, [this, column]() {
     PlaylistColumnLayout::SetAlignment(column, PlaylistColumnAlign::Left);
     NotifyLayoutChanged();
   });
-  add_button(Translations::CStr("Align center"), [this, column]() {
+  add_check(Translations::CStr("Align center"), align == PlaylistColumnAlign::Center, true, [this, column]() {
     PlaylistColumnLayout::SetAlignment(column, PlaylistColumnAlign::Center);
     NotifyLayoutChanged();
   });
-  add_button(Translations::CStr("Align right"), [this, column]() {
+  add_check(Translations::CStr("Align right"), align == PlaylistColumnAlign::Right, true, [this, column]() {
     PlaylistColumnLayout::SetAlignment(column, PlaylistColumnAlign::Right);
     NotifyLayoutChanged();
   });

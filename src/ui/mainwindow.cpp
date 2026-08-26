@@ -32,6 +32,7 @@
 #include "smartplaylists/smartplaylistsviewcontainer.h"
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistheadersort.h"
 #include "playlist/playlistmenu.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistlistlook.h"
@@ -1730,34 +1731,21 @@ void MainWindow::RefreshCollection(const std::string &filter, bool update_text) 
 }
 
 void MainWindow::SortPlaylistBy(PlaylistColumn column, PlaylistSortOrder order) {
-  if (order == PlaylistSortOrder::Clear) {
-    sort_column_ = PlaylistColumn::Count;
-    sort_descending_ = false;
+  if (!PlaylistHeaderSort::ShouldApplyExplicit(column, sort_column_, sort_descending_, order) && order != PlaylistSortOrder::Toggle) {
     return;
   }
-  if (order == PlaylistSortOrder::Ascending) {
-    sort_column_ = column;
-    sort_descending_ = false;
-  } else if (order == PlaylistSortOrder::Descending) {
-    sort_column_ = column;
-    sort_descending_ = true;
-  } else if (sort_column_ == column) {
-    sort_descending_ = !sort_descending_;
-  } else {
-    sort_column_ = column;
-    sort_descending_ = false;
-  }
-  if (sort_column_ == PlaylistColumn::Count) {
-    return;
-  }
+  const PlaylistHeaderSort::State next = PlaylistHeaderSort::ApplyOrder({sort_column_, sort_descending_}, column, order);
+  sort_column_ = next.column;
+  sort_descending_ = next.descending;
   Playlist *playlist = app_->playlist_manager()->current();
-  if (!playlist) {
-    return;
+  if (playlist) {
+    ApplyPlaylistBehaviour();
+    playlist->SetSort(sort_column_, sort_descending_);
+    if (PlaylistHeaderSort::ShouldSortNow(sort_column_)) {
+      playlist->SortNow();
+      app_->playlist_manager()->SaveCurrent();
+    }
   }
-  ApplyPlaylistBehaviour();
-  playlist->SetSort(sort_column_, sort_descending_);
-  playlist->SortNow();
-  app_->playlist_manager()->SaveCurrent();
   RefreshPlaylist();
 }
 

@@ -17,6 +17,7 @@ class PlaylistHeader {
   GtkWidget *widget() const { return widget_; }
   void SetSortCallback(SortCallback callback) { sort_ = std::move(callback); }
   void SetLayoutChangedCallback(LayoutChangedCallback callback) { layout_changed_ = std::move(callback); }
+  void SetSortState(PlaylistColumn column, bool descending);
   void Rebuild();
 
  private:
@@ -27,6 +28,8 @@ class PlaylistHeader {
   GtkWidget *widget_ = nullptr;
   SortCallback sort_;
   LayoutChangedCallback layout_changed_;
+  PlaylistColumn sort_column_ = PlaylistColumn::Count;
+  bool sort_descending_ = false;
 };
 
 #endif
