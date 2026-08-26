@@ -96,6 +96,7 @@ class MainWindow {
   void AppendCollectionNode(GtkWidget *parent, const CollectionGrouping::Node &node, int depth);
   void PlayRadioChannel(const RadioChannel &channel);
   void ShowPlaylistMenu(double x, double y);
+  void SelectPlaylistRow(int index, bool add);
   std::vector<int> SelectedPlaylistRows() const;
   static std::string ColumnTitle(PlaylistColumn column);
   static std::string ColumnText(const Song &song, PlaylistColumn column);
@@ -158,6 +159,8 @@ class MainWindow {
   std::string playlist_filter_;
   PlaylistColumn sort_column_ = PlaylistColumn::Title;
   bool sort_descending_ = false;
+  std::vector<int> selected_playlist_rows_;
+  std::string selection_playlist_name_;
   guint position_timeout_ = 0;
 };
 

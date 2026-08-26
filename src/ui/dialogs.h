@@ -16,6 +16,8 @@ class Dialogs {
   static void AddStream(GtkWindow *parent, const std::function<void(const std::string &, const std::string &)> &callback);
   static void CoverManager(GtkWindow *parent, Application *app);
   static void CoverFromUrl(GtkWindow *parent, Application *app);
+  static void CoverSearch(GtkWindow *parent, Application *app);
+  static void CoverExport(GtkWindow *parent, Application *app);
   static void Equalizer(GtkWindow *parent, class Equalizer *equalizer);
   static void Transcode(GtkWindow *parent, Application *app);
   static void Organize(GtkWindow *parent, Application *app);

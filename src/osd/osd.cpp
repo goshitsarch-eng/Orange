@@ -1,8 +1,15 @@
 #include "osd/osd.h"
 
+#include "config.h"
 #include "core/settings.h"
 
+#include <algorithm>
+
 #include <gdk-pixbuf/gdk-pixbuf.h>
+#ifdef HAVE_X11
+#include <gdk/x11/gdkx.h>
+#include <X11/Xlib.h>
+#endif
 
 void OSD::ReloadSettings() {
   Settings s;
@@ -11,6 +18,12 @@ void OSD::ReloadSettings() {
   show_art_ = s.BoolValue("showart", true);
   type_ = s.Value("type", "native");
   timeout_ms_ = s.IntValue("timeout", 4000);
+  fg_ = s.Value("foreground", "#ffffff");
+  bg_ = s.Value("background", "#202020");
+  opacity_ = s.DoubleValue("opacity", 0.92);
+  pos_x_ = s.IntValue("posx", 40);
+  pos_y_ = s.IntValue("posy", 40);
+  font_ = s.Value("font", "Sans 12");
 }
 
 void OSD::ShowMessage(const std::string &summary, const std::string &body, const std::string &icon) {
@@ -42,6 +55,30 @@ void OSD::ShowPretty(const std::string &summary, const std::string &body, const 
   gtk_window_set_resizable(GTK_WINDOW(pretty_window_), FALSE);
   gtk_window_set_title(GTK_WINDOW(pretty_window_), "Strawberry");
   gtk_widget_add_css_class(pretty_window_, "osd");
+  gtk_widget_add_css_class(pretty_window_, "osd-pretty");
+  GtkCssProvider *css = gtk_css_provider_new();
+  const std::string sheet = ".osd-pretty { background-color: alpha(" + bg_ + ", " + std::to_string(std::clamp(opacity_, 0.2, 1.0)) +
+                            "); color: " + fg_ + "; font: " + font_ + "; border-radius: 10px; }";
+#if GTK_CHECK_VERSION(4, 12, 0)
+  gtk_css_provider_load_from_string(css, sheet.c_str());
+#else
+  gtk_css_provider_load_from_data(css, sheet.c_str(), static_cast<gssize>(sheet.size()));
+#endif
+  gtk_style_context_add_provider_for_display(gdk_display_get_default(), GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+  g_object_unref(css);
+  g_object_set_data(G_OBJECT(pretty_window_), "pos-x", GINT_TO_POINTER(pos_x_));
+  g_object_set_data(G_OBJECT(pretty_window_), "pos-y", GINT_TO_POINTER(pos_y_));
+  g_signal_connect(pretty_window_, "realize", G_CALLBACK(+[](GtkWidget *window, gpointer) {
+#ifdef HAVE_X11
+                     GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
+                     if (surface && GDK_IS_X11_SURFACE(surface)) {
+                       const int x = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(window), "pos-x"));
+                       const int y = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(window), "pos-y"));
+                       XMoveWindow(GDK_SURFACE_XDISPLAY(surface), gdk_x11_surface_get_xid(surface), x, y);
+                     }
+#endif
+                   }),
+                   nullptr);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
   gtk_widget_set_margin_start(box, 16);
   gtk_widget_set_margin_end(box, 16);

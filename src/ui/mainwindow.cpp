@@ -154,7 +154,9 @@ void MainWindow::BuildUi() {
   g_menu_append_section(menu, "Playlist", G_MENU_MODEL(playlist));
   GMenu *tools = g_menu_new();
   g_menu_append(tools, "Cover manager", "win.covers");
+  g_menu_append(tools, "Cover search…", "win.cover-search");
   g_menu_append(tools, "Cover from URL…", "win.cover-from-url");
+  g_menu_append(tools, "Export covers…", "win.cover-export");
   g_menu_append(tools, "Equalizer", "win.equalizer");
   g_menu_append(tools, "Transcode…", "win.transcode");
   g_menu_append(tools, "Organize files…", "win.organize");
@@ -239,7 +241,9 @@ void MainWindow::BuildUi() {
                });
              }));
   add_action("covers", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverManager(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("cover-search", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverSearch(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("cover-from-url", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverFromUrl(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
+  add_action("cover-export", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverExport(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("copy-device", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CopyToDevice(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("delete-files", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::DeleteFiles(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("save-all-playlists", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::SaveAllPlaylists(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
@@ -281,15 +285,22 @@ void MainWindow::BuildUi() {
              }));
   add_action("playlist-queue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               if (self->app_->playlist_manager()->active()) {
-                 self->app_->queue()->Append(self->app_->playlist_manager()->current_song());
-                 self->RefreshQueue();
+               Playlist *playlist = self->app_->playlist_manager()->active();
+               if (!playlist) {
+                 return;
                }
+               for (int row : self->SelectedPlaylistRows()) {
+                 if (row >= 0 && row < playlist->row_count()) {
+                   self->app_->queue()->Append(playlist->songs()[static_cast<size_t>(row)]);
+                 }
+               }
+               self->RefreshQueue();
              }));
   add_action("playlist-remove", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                if (Playlist *playlist = self->app_->playlist_manager()->active()) {
-                 playlist->RemoveRows({self->app_->playlist_manager()->current_row()});
+                 playlist->RemoveRows(self->SelectedPlaylistRows());
+                 self->selected_playlist_rows_.clear();
                  self->app_->playlist_manager()->SaveActive();
                  self->RefreshPlaylist();
                }
@@ -929,9 +940,45 @@ void MainWindow::SortPlaylistBy(PlaylistColumn column) {
   RefreshPlaylist();
 }
 
+void MainWindow::SelectPlaylistRow(int index, bool add) {
+  Playlist *playlist = app_->playlist_manager()->active();
+  if (!playlist || index < 0 || index >= playlist->row_count()) {
+    return;
+  }
+  if (!add) {
+    selected_playlist_rows_.clear();
+    selected_playlist_rows_.push_back(index);
+  } else {
+    auto it = std::find(selected_playlist_rows_.begin(), selected_playlist_rows_.end(), index);
+    if (it == selected_playlist_rows_.end()) {
+      selected_playlist_rows_.push_back(index);
+      std::sort(selected_playlist_rows_.begin(), selected_playlist_rows_.end());
+    } else {
+      selected_playlist_rows_.erase(it);
+    }
+  }
+  selection_playlist_name_ = playlist->name();
+  app_->playlist_manager()->SetCurrentRow(index);
+  for (GtkWidget *child = gtk_widget_get_first_child(playlist_grid_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!g_object_get_data(G_OBJECT(child), "is-track")) {
+      continue;
+    }
+    const int row = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
+    if (std::find(selected_playlist_rows_.begin(), selected_playlist_rows_.end(), row) != selected_playlist_rows_.end()) {
+      gtk_widget_add_css_class(child, "card");
+    } else {
+      gtk_widget_remove_css_class(child, "card");
+    }
+  }
+}
+
 void MainWindow::RefreshPlaylist() {
   ClearBox(playlist_grid_);
   Playlist *playlist = app_->playlist_manager()->active();
+  if (!playlist || playlist->name() != selection_playlist_name_) {
+    selected_playlist_rows_.clear();
+    selection_playlist_name_ = playlist ? playlist->name() : std::string();
+  }
   GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_css_class(header, "toolbar");
   for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
@@ -966,6 +1013,9 @@ void MainWindow::RefreshPlaylist() {
     if (index == current) {
       gtk_widget_add_css_class(row, "accent");
     }
+    if (std::find(selected_playlist_rows_.begin(), selected_playlist_rows_.end(), index) != selected_playlist_rows_.end()) {
+      gtk_widget_add_css_class(row, "card");
+    }
     for (int i = 0; i < static_cast<int>(PlaylistColumn::Count); ++i) {
       const auto column = static_cast<PlaylistColumn>(i);
       if (!ColumnVisible(column)) {
@@ -974,16 +1024,19 @@ void MainWindow::RefreshPlaylist() {
       gtk_box_append(GTK_BOX(row), ColLabel(ColumnText(song, column), ColumnWidth(column), column == PlaylistColumn::Title, false));
     }
     g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index));
+    g_object_set_data(G_OBJECT(row), "is-track", GINT_TO_POINTER(1));
     GtkGesture *click = gtk_gesture_click_new();
     gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
     gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(click));
     g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *gesture, gint n_press, gdouble, gdouble, gpointer data) {
-                       if (n_press < 2) {
-                         return;
-                       }
                        auto *self = static_cast<MainWindow *>(data);
                        GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
-                       self->app_->player()->PlayAt(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "row-index")));
+                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "row-index"));
+                       const GdkModifierType mods = gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
+                       self->SelectPlaylistRow(index, (mods & GDK_CONTROL_MASK) != 0);
+                       if (n_press >= 2) {
+                         self->app_->player()->PlayAt(index);
+                       }
                      }),
                      this);
     gtk_box_append(GTK_BOX(playlist_grid_), row);
@@ -1422,13 +1475,23 @@ void MainWindow::ShowPlaylistMenu(double, double) {
   g_menu_append(menu, "Queue", "win.playlist-queue");
   g_menu_append(menu, "Remove", "win.playlist-remove");
   g_menu_append(menu, "Edit tags…", "win.edittag");
+  g_menu_append(menu, "Cover search…", "win.cover-search");
   g_menu_append(menu, "Delete file…", "win.delete-files");
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, playlist_grid_);
   gtk_popover_popup(GTK_POPOVER(popover));
 }
 
-std::vector<int> MainWindow::SelectedPlaylistRows() const { return {}; }
+std::vector<int> MainWindow::SelectedPlaylistRows() const {
+  if (!selected_playlist_rows_.empty()) {
+    return selected_playlist_rows_;
+  }
+  const int current = app_->playlist_manager()->current_row();
+  if (current >= 0) {
+    return {current};
+  }
+  return {};
+}
 
 void MainWindow::OnPlayPause(GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->PlayPause(); }
 void MainWindow::OnStop(GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->Stop(); }

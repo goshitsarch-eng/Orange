@@ -13,9 +13,149 @@
 #include "utilities/timeutils.h"
 
 #include <adwaita.h>
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#include <glib/gstdio.h>
 
+#include <algorithm>
 #include <cstdlib>
+#include <ctime>
 #include <vector>
+
+namespace {
+
+Song SongForDialog(Application *app) {
+  Song song = app->player()->current_song();
+  if (app->playlist_manager()->active() && app->playlist_manager()->current_row() >= 0) {
+    song = app->playlist_manager()->current_song();
+  }
+  return song;
+}
+
+void SetImageFromBytes(GtkWidget *image, const std::vector<unsigned char> &data, int pixel_size) {
+  if (!image) {
+    return;
+  }
+  if (data.empty()) {
+    gtk_image_set_from_icon_name(GTK_IMAGE(image), "audio-x-generic-symbolic");
+    gtk_image_set_pixel_size(GTK_IMAGE(image), pixel_size);
+    return;
+  }
+  GdkPixbufLoader *loader = gdk_pixbuf_loader_new();
+  if (gdk_pixbuf_loader_write(loader, data.data(), data.size(), nullptr) && gdk_pixbuf_loader_close(loader, nullptr)) {
+    GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf(loader);
+    if (pixbuf) {
+      GdkPixbuf *scaled = gdk_pixbuf_scale_simple(pixbuf, pixel_size, pixel_size, GDK_INTERP_BILINEAR);
+      GdkTexture *texture = gdk_texture_new_for_pixbuf(scaled);
+      gtk_image_set_from_paintable(GTK_IMAGE(image), GDK_PAINTABLE(texture));
+      g_object_unref(texture);
+      g_object_unref(scaled);
+    }
+  }
+  g_object_unref(loader);
+}
+
+std::string PrettyBytes(int64_t bytes) {
+  if (bytes < 0) {
+    return {};
+  }
+  if (bytes < 1024) {
+    return std::to_string(bytes) + " B";
+  }
+  if (bytes < 1024 * 1024) {
+    return std::to_string(bytes / 1024) + " KB";
+  }
+  char buf[32];
+  g_snprintf(buf, sizeof(buf), "%.1f MB", static_cast<double>(bytes) / 1048576.0);
+  return buf;
+}
+
+std::string PrettyUnixTime(int64_t ts) {
+  if (ts <= 0) {
+    return "Never";
+  }
+  const time_t value = static_cast<time_t>(ts);
+  struct tm local {};
+  localtime_r(&value, &local);
+  char buf[64];
+  strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &local);
+  return buf;
+}
+
+std::string SafeFolderName(std::string name) {
+  for (char &ch : name) {
+    if (ch == '/' || ch == '\\' || ch == ':' || ch == '\0') {
+      ch = '-';
+    }
+  }
+  return name.empty() ? "Unknown" : name;
+}
+
+GtkWidget *DropDownFromNames(const std::vector<std::string> &names) {
+  GtkStringList *list = gtk_string_list_new(nullptr);
+  for (const std::string &name : names) {
+    gtk_string_list_append(list, name.c_str());
+  }
+  return gtk_drop_down_new(G_LIST_MODEL(list), nullptr);
+}
+
+bool ApplyCover(Application *app, Song *song, const std::string &image) {
+  if (!song || image.empty() || !CoverProviders::SaveAlbumCover(*song, image, app->tagreader())) {
+    return false;
+  }
+  const std::string dest = FileUtils::Join(FileUtils::DirName(FileUtils::PathFromUri(song->url())), "cover.jpg");
+  song->set_art_manual(FileUtils::UriFromPath(dest));
+  song->set_art_unset(false);
+  song->set_art_embedded(true);
+  if (song->id() > 0) {
+    app->collection()->backend()->AddOrUpdateSong(*song);
+  }
+  return true;
+}
+
+struct SmartTermRow {
+  GtkWidget *field = nullptr;
+  GtkWidget *op = nullptr;
+  GtkWidget *value = nullptr;
+};
+
+struct SmartWizard {
+  GtkWidget *name = nullptr;
+  GtkWidget *match = nullptr;
+  SmartTermRow terms[3];
+  GtkWidget *limit = nullptr;
+  GtkWidget *sort = nullptr;
+  GtkWidget *descending = nullptr;
+  GtkWidget *dynamic = nullptr;
+  GtkWidget *preview = nullptr;
+};
+
+struct CoverExportJob {
+  Application *app = nullptr;
+  std::string filename;
+  bool overwrite = true;
+};
+
+SmartPlaylistSearch SearchFromWizard(SmartWizard *wizard) {
+  SmartPlaylistSearch search;
+  search.type = gtk_drop_down_get_selected(GTK_DROP_DOWN(wizard->match)) == 1 ? SmartPlaylistSearch::SearchType::Or
+                                                                             : SmartPlaylistSearch::SearchType::And;
+  for (const SmartTermRow &term : wizard->terms) {
+    const int field_i = static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(term.field)));
+    const int op_i = static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(term.op)));
+    const SmartPlaylistOp op = SmartPlaylistSearch::OpFromIndex(op_i);
+    const std::string value = gtk_editable_get_text(GTK_EDITABLE(term.value));
+    if (value.empty() && op != SmartPlaylistOp::Empty && op != SmartPlaylistOp::NotEmpty) {
+      continue;
+    }
+    search.terms.push_back({SmartPlaylistSearch::FieldFromIndex(field_i), op, value});
+  }
+  search.limit = static_cast<int>(gtk_spin_button_get_value(GTK_SPIN_BUTTON(wizard->limit)));
+  search.sort_field = SmartPlaylistSearch::FieldFromIndex(static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(wizard->sort))));
+  search.sort_descending = gtk_check_button_get_active(GTK_CHECK_BUTTON(wizard->descending));
+  return search;
+}
+
+}  // namespace
 
 void Dialogs::AddStream(GtkWindow *parent, const std::function<void(const std::string &, const std::string &)> &callback) {
   AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new("Add stream", "Enter a name and stream URL."));
@@ -394,67 +534,129 @@ void Dialogs::TagFetcher(GtkWindow *parent, Application *app) {
 }
 
 void Dialogs::EditTag(GtkWindow *parent, Application *app) {
-  Song song = app->player()->current_song();
-  if (app->playlist_manager()->active() && app->playlist_manager()->current_row() >= 0) {
-    song = app->playlist_manager()->current_song();
-  }
+  const Song song = SongForDialog(app);
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, "Edit tags");
-  adw_dialog_set_content_width(dialog, 480);
-  adw_dialog_set_content_height(dialog, 640);
+  adw_dialog_set_content_width(dialog, 520);
+  adw_dialog_set_content_height(dialog, 720);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   AdwViewStack *stack = ADW_VIEW_STACK(adw_view_stack_new());
   GtkWidget *switcher = adw_view_switcher_new();
   adw_view_switcher_set_stack(ADW_VIEW_SWITCHER(switcher), stack);
 
-  auto *fields = new std::vector<std::pair<std::string, GtkWidget *>>();
-  auto add_page = [&](const char *name, const std::vector<std::pair<const char *, std::string>> &rows, bool lyrics = false) {
-    GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
-    gtk_widget_set_margin_start(page, 12);
-    gtk_widget_set_margin_end(page, 12);
-    gtk_widget_set_margin_top(page, 12);
+  struct State {
+    Song song;
+    GtkWidget *cover = nullptr;
+    GtkWidget *lyrics = nullptr;
+    GtkWidget *rating = nullptr;
+    GtkWidget *compilation = nullptr;
+    std::vector<std::pair<std::string, GtkWidget *>> fields;
+  };
+  auto *state = new State{song};
+
+  auto add_entries = [&](GtkWidget *page, const std::vector<std::pair<const char *, std::string>> &rows) {
     for (const auto &row : rows) {
-      if (lyrics) {
-        GtkWidget *view = gtk_text_view_new();
-        gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(view), GTK_WRAP_WORD);
-        gtk_widget_set_vexpand(view, TRUE);
-        GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
-        gtk_text_buffer_set_text(buffer, row.second.c_str(), -1);
-        fields->emplace_back(row.first, view);
-        gtk_box_append(GTK_BOX(page), gtk_label_new(row.first));
-        gtk_box_append(GTK_BOX(page), view);
-      } else {
-        AdwEntryRow *entry = ADW_ENTRY_ROW(adw_entry_row_new());
-        adw_preferences_row_set_title(ADW_PREFERENCES_ROW(entry), row.first);
-        gtk_editable_set_text(GTK_EDITABLE(entry), row.second.c_str());
-        fields->emplace_back(row.first, GTK_WIDGET(entry));
-        gtk_box_append(GTK_BOX(page), GTK_WIDGET(entry));
-      }
+      AdwEntryRow *entry = ADW_ENTRY_ROW(adw_entry_row_new());
+      adw_preferences_row_set_title(ADW_PREFERENCES_ROW(entry), row.first);
+      gtk_editable_set_text(GTK_EDITABLE(entry), row.second.c_str());
+      state->fields.emplace_back(row.first, GTK_WIDGET(entry));
+      gtk_box_append(GTK_BOX(page), GTK_WIDGET(entry));
     }
-    adw_view_stack_add_titled(stack, page, name, name);
   };
 
-  add_page("Summary", {{"Title", song.title()}, {"Artist", song.artist()}, {"Album", song.album()}, {"Album artist", song.albumartist()},
-                       {"Year", song.year() > 0 ? std::to_string(song.year()) : ""}, {"Track", song.track() > 0 ? std::to_string(song.track()) : ""},
-                       {"Genre", song.genre()}});
-  add_page("Tags", {{"Composer", song.composer()}, {"Performer", song.performer()}, {"Grouping", song.grouping()},
-                    {"Comment", song.comment()}, {"Disc", song.disc() > 0 ? std::to_string(song.disc()) : ""},
-                    {"BPM", song.bpm() > 0 ? std::to_string(song.bpm()) : ""}, {"Mood", song.mood()}, {"Initial key", song.initial_key()}});
-  add_page("Lyrics", {{"Lyrics", song.lyrics()}}, true);
+  GtkWidget *summary = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_start(summary, 12);
+  gtk_widget_set_margin_end(summary, 12);
+  gtk_widget_set_margin_top(summary, 12);
+  state->cover = gtk_image_new();
+  gtk_widget_set_halign(state->cover, GTK_ALIGN_CENTER);
+  SetImageFromBytes(state->cover, app->albumcover_loader()->LoadData(song), 160);
+  gtk_box_append(GTK_BOX(summary), state->cover);
+  GtkWidget *cover_buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_halign(cover_buttons, GTK_ALIGN_CENTER);
+  GtkWidget *fetch_cover = gtk_button_new_with_label("Fetch cover");
+  GtkWidget *search_cover = gtk_button_new_with_label("Search…");
+  GtkWidget *unset_cover = gtk_button_new_with_label("Unset");
+  gtk_box_append(GTK_BOX(cover_buttons), fetch_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), search_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), unset_cover);
+  gtk_box_append(GTK_BOX(summary), cover_buttons);
+  const std::string stats = "Plays: " + std::to_string(song.playcount()) + "   Skips: " + std::to_string(song.skipcount()) +
+                            "   Last played: " + PrettyUnixTime(song.lastplayed()) + "\n" +
+                            FileUtils::PathFromUri(song.url()) + "\n" + PrettyBytes(song.filesize()) + " · " +
+                            Utilities::PrettyTimeNanosec(song.length_nanosec()) + " · " +
+                            (song.bitrate() > 0 ? std::to_string(song.bitrate()) + " kbps" : "") +
+                            (song.samplerate() > 0 ? " · " + std::to_string(song.samplerate()) + " Hz" : "") +
+                            (song.bitdepth() > 0 ? " · " + std::to_string(song.bitdepth()) + "-bit" : "") + " · " +
+                            Song::FiletypeToString(song.filetype());
+  GtkWidget *stats_label = gtk_label_new(stats.c_str());
+  gtk_label_set_wrap(GTK_LABEL(stats_label), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(stats_label), 0);
+  gtk_widget_add_css_class(stats_label, "dim-label");
+  gtk_box_append(GTK_BOX(summary), stats_label);
+  GtkWidget *rating_label = gtk_label_new("Rating");
+  gtk_label_set_xalign(GTK_LABEL(rating_label), 0);
+  gtk_box_append(GTK_BOX(summary), rating_label);
+  state->rating = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 5, 0.5);
+  gtk_scale_set_digits(GTK_SCALE(state->rating), 1);
+  gtk_scale_set_draw_value(GTK_SCALE(state->rating), TRUE);
+  gtk_range_set_value(GTK_RANGE(state->rating), song.rating() >= 0 ? song.rating() * 5.0 : 0);
+  gtk_box_append(GTK_BOX(summary), state->rating);
+  add_entries(summary, {{"Title", song.title()},
+                        {"Artist", song.artist()},
+                        {"Album", song.album()},
+                        {"Album artist", song.albumartist()},
+                        {"Year", song.year() > 0 ? std::to_string(song.year()) : ""},
+                        {"Original year", song.originalyear() > 0 ? std::to_string(song.originalyear()) : ""},
+                        {"Track", song.track() > 0 ? std::to_string(song.track()) : ""},
+                        {"Genre", song.genre()}});
+  adw_view_stack_add_titled(stack, summary, "Summary", "Summary");
+
+  GtkWidget *tags = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+  gtk_widget_set_margin_start(tags, 12);
+  gtk_widget_set_margin_end(tags, 12);
+  gtk_widget_set_margin_top(tags, 12);
+  state->compilation = gtk_check_button_new_with_label("Compilation");
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(state->compilation), song.compilation());
+  gtk_box_append(GTK_BOX(tags), state->compilation);
+  add_entries(tags, {{"Composer", song.composer()},
+                     {"Performer", song.performer()},
+                     {"Grouping", song.grouping()},
+                     {"Comment", song.comment()},
+                     {"Disc", song.disc() > 0 ? std::to_string(song.disc()) : ""},
+                     {"BPM", song.bpm() > 0 ? std::to_string(song.bpm()) : ""},
+                     {"Mood", song.mood()},
+                     {"Initial key", song.initial_key()},
+                     {"Title sort", song.titlesort()},
+                     {"Artist sort", song.artistsort()},
+                     {"Album sort", song.albumsort()},
+                     {"Album artist sort", song.albumartistsort()}});
+  adw_view_stack_add_titled(stack, tags, "Tags", "Tags");
+
+  GtkWidget *lyrics_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+  gtk_widget_set_margin_start(lyrics_page, 12);
+  gtk_widget_set_margin_end(lyrics_page, 12);
+  gtk_widget_set_margin_top(lyrics_page, 12);
+  state->lyrics = gtk_text_view_new();
+  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(state->lyrics), GTK_WRAP_WORD);
+  gtk_widget_set_vexpand(state->lyrics, TRUE);
+  gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(state->lyrics)), song.lyrics().c_str(), -1);
+  state->fields.emplace_back("Lyrics", state->lyrics);
+  gtk_box_append(GTK_BOX(lyrics_page), gtk_label_new("Lyrics"));
+  gtk_box_append(GTK_BOX(lyrics_page), state->lyrics);
+  adw_view_stack_add_titled(stack, lyrics_page, "Lyrics", "Lyrics");
 
   GtkWidget *save = gtk_button_new_with_label("Save");
   gtk_widget_add_css_class(save, "suggested-action");
-  auto *copy = new Song(song);
-  g_object_set_data_full(G_OBJECT(save), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
-  g_object_set_data_full(G_OBJECT(save), "fields", fields, [](gpointer p) { delete static_cast<std::vector<std::pair<std::string, GtkWidget *>> *>(p); });
+  g_object_set_data_full(G_OBJECT(save), "state", state, [](gpointer p) { delete static_cast<State *>(p); });
   g_signal_connect(save, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
-                     auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(button), "song"));
-                     auto *fields = static_cast<std::vector<std::pair<std::string, GtkWidget *>> *>(g_object_get_data(G_OBJECT(button), "fields"));
+                     auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
                      auto text_of = [](GtkWidget *widget) -> std::string {
                        if (GTK_IS_TEXT_VIEW(widget)) {
                          GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
-                         GtkTextIter start, end;
+                         GtkTextIter start;
+                         GtkTextIter end;
                          gtk_text_buffer_get_bounds(buffer, &start, &end);
                          gchar *text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
                          std::string result = text ? text : "";
@@ -463,52 +665,107 @@ void Dialogs::EditTag(GtkWindow *parent, Application *app) {
                        }
                        return gtk_editable_get_text(GTK_EDITABLE(widget));
                      };
-                     for (const auto &field : *fields) {
+                     for (const auto &field : state->fields) {
                        const std::string value = text_of(field.second);
-                       if (field.first == "Title") song->set_title(value);
-                       else if (field.first == "Artist") song->set_artist(value);
-                       else if (field.first == "Album") song->set_album(value);
-                       else if (field.first == "Album artist") song->set_albumartist(value);
-                       else if (field.first == "Composer") song->set_composer(value);
-                       else if (field.first == "Performer") song->set_performer(value);
-                       else if (field.first == "Grouping") song->set_grouping(value);
-                       else if (field.first == "Comment") song->set_comment(value);
-                       else if (field.first == "Genre") song->set_genre(value);
-                       else if (field.first == "Lyrics") song->set_lyrics(value);
-                       else if (field.first == "Mood") song->set_mood(value);
-                       else if (field.first == "Initial key") song->set_initial_key(value);
-                       else if (field.first == "Year") song->set_year(std::atoi(value.c_str()));
-                       else if (field.first == "Track") song->set_track(std::atoi(value.c_str()));
-                       else if (field.first == "Disc") song->set_disc(std::atoi(value.c_str()));
-                       else if (field.first == "BPM") song->set_bpm(std::strtof(value.c_str(), nullptr));
+                       if (field.first == "Title") state->song.set_title(value);
+                       else if (field.first == "Artist") state->song.set_artist(value);
+                       else if (field.first == "Album") state->song.set_album(value);
+                       else if (field.first == "Album artist") state->song.set_albumartist(value);
+                       else if (field.first == "Composer") state->song.set_composer(value);
+                       else if (field.first == "Performer") state->song.set_performer(value);
+                       else if (field.first == "Grouping") state->song.set_grouping(value);
+                       else if (field.first == "Comment") state->song.set_comment(value);
+                       else if (field.first == "Genre") state->song.set_genre(value);
+                       else if (field.first == "Lyrics") state->song.set_lyrics(value);
+                       else if (field.first == "Mood") state->song.set_mood(value);
+                       else if (field.first == "Initial key") state->song.set_initial_key(value);
+                       else if (field.first == "Title sort") state->song.set_titlesort(value);
+                       else if (field.first == "Artist sort") state->song.set_artistsort(value);
+                       else if (field.first == "Album sort") state->song.set_albumsort(value);
+                       else if (field.first == "Album artist sort") state->song.set_albumartistsort(value);
+                       else if (field.first == "Year") state->song.set_year(std::atoi(value.c_str()));
+                       else if (field.first == "Original year") state->song.set_originalyear(std::atoi(value.c_str()));
+                       else if (field.first == "Track") state->song.set_track(std::atoi(value.c_str()));
+                       else if (field.first == "Disc") state->song.set_disc(std::atoi(value.c_str()));
+                       else if (field.first == "BPM") state->song.set_bpm(std::strtof(value.c_str(), nullptr));
                      }
-                     application->tagreader()->WriteFile(*song);
-                     if (song->id() > 0) {
-                       application->collection()->backend()->AddOrUpdateSong(*song);
+                     if (state->compilation) {
+                       state->song.set_compilation(gtk_check_button_get_active(GTK_CHECK_BUTTON(state->compilation)));
+                     }
+                     if (state->rating) {
+                       state->song.set_rating(static_cast<float>(gtk_range_get_value(GTK_RANGE(state->rating)) / 5.0));
+                     }
+                     application->tagreader()->WriteFile(state->song);
+                     const std::string path = FileUtils::PathFromUri(state->song.url());
+                     if (!path.empty() && state->song.rating() >= 0) {
+                       application->tagreader()->SaveRating(path, state->song.rating());
+                     }
+                     if (state->song.id() > 0) {
+                       application->collection()->backend()->AddOrUpdateSong(state->song);
+                       application->collection()->backend()->SetRating(state->song.id(), state->song.rating());
                      }
                      gtk_button_set_label(button, "Saved");
                    })),
                    app);
-  gtk_box_append(GTK_BOX(box), switcher);
-  gtk_widget_set_vexpand(GTK_WIDGET(stack), TRUE);
-  gtk_box_append(GTK_BOX(box), GTK_WIDGET(stack));
-  gtk_box_append(GTK_BOX(box), save);
-  GtkWidget *fetch_lyrics = gtk_button_new_with_label("Fetch lyrics");
-  g_object_set_data(G_OBJECT(fetch_lyrics), "song", copy);
-  g_signal_connect(fetch_lyrics, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+
+  g_object_set_data(G_OBJECT(fetch_cover), "state", state);
+  g_signal_connect(fetch_cover, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
-                     auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(button), "song"));
-                     if (!song) {
-                       return;
-                     }
-                     application->lyrics_providers()->Fetch(*song, [button, song](const std::string &lyrics, const std::string &) {
-                       if (!lyrics.empty()) {
-                         song->set_lyrics(lyrics);
-                         gtk_button_set_label(button, "Fetched");
+                     auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
+                     application->cover_providers()->Fetch(state->song, [button, application, state](const std::string &image, const std::string &) {
+                       if (ApplyCover(application, &state->song, image)) {
+                         SetImageFromBytes(state->cover, std::vector<unsigned char>(image.begin(), image.end()), 160);
+                         gtk_button_set_label(button, "Saved");
+                       } else {
+                         gtk_button_set_label(button, "Failed");
                        }
                      });
                    })),
                    app);
+  g_signal_connect(search_cover, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     Dialogs::CoverSearch(nullptr, application);
+                   }),
+                   app);
+  g_object_set_data(G_OBJECT(unset_cover), "state", state);
+  g_signal_connect(unset_cover, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
+                     state->song.set_art_unset(true);
+                     state->song.set_art_manual({});
+                     state->song.set_art_automatic({});
+                     state->song.set_art_embedded(false);
+                     if (state->song.id() > 0) {
+                       application->collection()->backend()->AddOrUpdateSong(state->song);
+                     }
+                     SetImageFromBytes(state->cover, {}, 160);
+                     gtk_button_set_label(button, "Unset");
+                   })),
+                   app);
+
+  GtkWidget *fetch_lyrics = gtk_button_new_with_label("Fetch lyrics");
+  g_object_set_data(G_OBJECT(fetch_lyrics), "state", state);
+  g_signal_connect(fetch_lyrics, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     auto *state = static_cast<State *>(g_object_get_data(G_OBJECT(button), "state"));
+                     application->lyrics_providers()->Fetch(state->song, [button, state](const std::string &lyrics, const std::string &) {
+                       if (lyrics.empty()) {
+                         gtk_button_set_label(button, "Missing");
+                         return;
+                       }
+                       state->song.set_lyrics(lyrics);
+                       if (state->lyrics) {
+                         gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(state->lyrics)), lyrics.c_str(), -1);
+                       }
+                       gtk_button_set_label(button, "Fetched");
+                     });
+                   })),
+                   app);
+
+  gtk_box_append(GTK_BOX(box), switcher);
+  gtk_widget_set_vexpand(GTK_WIDGET(stack), TRUE);
+  gtk_box_append(GTK_BOX(box), GTK_WIDGET(stack));
+  gtk_box_append(GTK_BOX(box), save);
   gtk_box_append(GTK_BOX(box), fetch_lyrics);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
@@ -589,6 +846,8 @@ void Dialogs::Login(GtkWindow *parent, const std::string &service, const std::fu
 void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, "Smart playlist");
+  adw_dialog_set_content_width(dialog, 520);
+  adw_dialog_set_content_height(dialog, 640);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
   gtk_widget_set_margin_start(box, 18);
   gtk_widget_set_margin_end(box, 18);
@@ -596,50 +855,71 @@ void Dialogs::SmartPlaylistWizard(GtkWindow *parent, Application *app) {
   gtk_widget_set_margin_bottom(box, 18);
   GtkWidget *name = gtk_entry_new();
   gtk_entry_set_placeholder_text(GTK_ENTRY(name), "Playlist name");
-  static const char *field_names[] = {"Title", "Album", "Artist", "Genre", "Year", "Rating", "Playcount", nullptr};
-  static const char *op_names[] = {"Contains", "Equals", "Greater than", "Less than", "Not contains", nullptr};
-  GtkWidget *field = gtk_drop_down_new_from_strings(field_names);
-  GtkWidget *op = gtk_drop_down_new_from_strings(op_names);
-  GtkWidget *value = gtk_entry_new();
-  gtk_entry_set_placeholder_text(GTK_ENTRY(value), "Value");
-  GtkWidget *limit = gtk_spin_button_new_with_range(0, 10000, 1);
-  gtk_spin_button_set_value(GTK_SPIN_BUTTON(limit), 100);
-  GtkWidget *dynamic = gtk_check_button_new_with_label("Dynamic (keep refilling as tracks play)");
+  GtkWidget *match = DropDownFromNames({"Match all terms (AND)", "Match any term (OR)"});
+  auto *wizard = new SmartWizard();
+  wizard->name = name;
+  wizard->match = match;
+  GtkWidget *terms_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  for (int i = 0; i < 3; ++i) {
+    GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    wizard->terms[i].field = DropDownFromNames(SmartPlaylistSearch::FieldNames());
+    wizard->terms[i].op = DropDownFromNames(SmartPlaylistSearch::OpNames());
+    wizard->terms[i].value = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(wizard->terms[i].value), i == 0 ? "Value" : "Optional term");
+    gtk_widget_set_hexpand(wizard->terms[i].value, TRUE);
+    gtk_box_append(GTK_BOX(row), wizard->terms[i].field);
+    gtk_box_append(GTK_BOX(row), wizard->terms[i].op);
+    gtk_box_append(GTK_BOX(row), wizard->terms[i].value);
+    gtk_box_append(GTK_BOX(terms_box), row);
+  }
+  wizard->limit = gtk_spin_button_new_with_range(0, 10000, 1);
+  gtk_spin_button_set_value(GTK_SPIN_BUTTON(wizard->limit), 100);
+  wizard->sort = DropDownFromNames(SmartPlaylistSearch::FieldNames());
+  wizard->descending = gtk_check_button_new_with_label("Sort descending");
+  wizard->dynamic = gtk_check_button_new_with_label("Dynamic (keep refilling as tracks play)");
+  wizard->preview = gtk_label_new("Preview shows matching tracks from the collection.");
+  gtk_label_set_wrap(GTK_LABEL(wizard->preview), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(wizard->preview), 0);
+  GtkWidget *preview = gtk_button_new_with_label("Preview");
   GtkWidget *create = gtk_button_new_with_label("Create");
   gtk_widget_add_css_class(create, "suggested-action");
-  g_object_set_data(G_OBJECT(create), "name", name);
-  g_object_set_data(G_OBJECT(create), "field", field);
-  g_object_set_data(G_OBJECT(create), "op", op);
-  g_object_set_data(G_OBJECT(create), "value", value);
-  g_object_set_data(G_OBJECT(create), "limit", limit);
-  g_object_set_data(G_OBJECT(create), "dynamic", dynamic);
+  g_object_set_data_full(G_OBJECT(create), "wizard", wizard, [](gpointer p) { delete static_cast<SmartWizard *>(p); });
+  g_object_set_data(G_OBJECT(preview), "wizard", wizard);
+  g_signal_connect(preview, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     auto *wizard = static_cast<SmartWizard *>(g_object_get_data(G_OBJECT(button), "wizard"));
+                     const SongList songs = SearchFromWizard(wizard).Search(application->collection()->Songs());
+                     std::string text = std::to_string(songs.size()) + " matches";
+                     for (size_t i = 0; i < songs.size() && i < 8; ++i) {
+                       text += "\n" + songs[i].PrettyTitleWithArtist();
+                     }
+                     gtk_label_set_text(GTK_LABEL(wizard->preview), text.c_str());
+                   })),
+                   app);
   g_signal_connect(create, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
-                     SmartPlaylistSearch search;
-                     const guint field_i = gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "field")));
-                     const guint op_i = gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "op")));
-                     static const SmartPlaylistField fields[] = {SmartPlaylistField::Title, SmartPlaylistField::Album, SmartPlaylistField::Artist,
-                                                                SmartPlaylistField::Genre, SmartPlaylistField::Year, SmartPlaylistField::Rating,
-                                                                SmartPlaylistField::Playcount};
-                     static const SmartPlaylistOp ops[] = {SmartPlaylistOp::Contains, SmartPlaylistOp::Equals, SmartPlaylistOp::GreaterThan,
-                                                          SmartPlaylistOp::LessThan, SmartPlaylistOp::NotContains};
-                     search.terms.push_back({fields[field_i], ops[op_i], gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "value")))});
-                     search.limit = static_cast<int>(gtk_spin_button_get_value(GTK_SPIN_BUTTON(g_object_get_data(G_OBJECT(button), "limit"))));
-                     const char *playlist_name = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "name")));
+                     auto *wizard = static_cast<SmartWizard *>(g_object_get_data(G_OBJECT(button), "wizard"));
+                     SmartPlaylistSearch search = SearchFromWizard(wizard);
+                     const char *playlist_name = gtk_editable_get_text(GTK_EDITABLE(wizard->name));
                      Playlist *playlist = application->playlist_manager()->New(playlist_name && *playlist_name ? playlist_name : "Smart playlist");
-                     if (gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "dynamic")))) {
+                     if (gtk_check_button_get_active(GTK_CHECK_BUTTON(wizard->dynamic))) {
                        playlist->SetDynamic(true, search);
-                       search.limit = 20;
+                       search.limit = search.limit > 0 ? std::min(search.limit, 20) : 20;
                      }
                      application->playlist_manager()->AppendSongs(search.Search(application->collection()->Songs()));
                    })),
                    app);
   gtk_box_append(GTK_BOX(box), name);
-  gtk_box_append(GTK_BOX(box), field);
-  gtk_box_append(GTK_BOX(box), op);
-  gtk_box_append(GTK_BOX(box), value);
-  gtk_box_append(GTK_BOX(box), limit);
-  gtk_box_append(GTK_BOX(box), dynamic);
+  gtk_box_append(GTK_BOX(box), match);
+  gtk_box_append(GTK_BOX(box), terms_box);
+  gtk_box_append(GTK_BOX(box), gtk_label_new("Limit (0 = no limit)"));
+  gtk_box_append(GTK_BOX(box), wizard->limit);
+  gtk_box_append(GTK_BOX(box), gtk_label_new("Sort by"));
+  gtk_box_append(GTK_BOX(box), wizard->sort);
+  gtk_box_append(GTK_BOX(box), wizard->descending);
+  gtk_box_append(GTK_BOX(box), wizard->dynamic);
+  gtk_box_append(GTK_BOX(box), preview);
+  gtk_box_append(GTK_BOX(box), wizard->preview);
   gtk_box_append(GTK_BOX(box), create);
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
@@ -826,6 +1106,163 @@ void Dialogs::CoverFromUrl(GtkWindow *parent, Application *app) {
                    }),
                    app);
   adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
+}
+
+void Dialogs::CoverSearch(GtkWindow *parent, Application *app) {
+  Song song = SongForDialog(app);
+  AdwDialog *dialog = adw_dialog_new();
+  adw_dialog_set_title(dialog, "Cover search");
+  adw_dialog_set_content_width(dialog, 480);
+  adw_dialog_set_content_height(dialog, 560);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_start(box, 12);
+  gtk_widget_set_margin_end(box, 12);
+  gtk_widget_set_margin_top(box, 12);
+  gtk_widget_set_margin_bottom(box, 12);
+  GtkWidget *status = gtk_label_new(("Searching providers for “" + song.album() + "”…").c_str());
+  gtk_label_set_wrap(GTK_LABEL(status), TRUE);
+  GtkWidget *scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(scroll, TRUE);
+  GtkWidget *list = gtk_list_box_new();
+  gtk_widget_add_css_class(list, "boxed-list");
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list);
+  gtk_box_append(GTK_BOX(box), status);
+  gtk_box_append(GTK_BOX(box), scroll);
+  adw_dialog_set_child(dialog, box);
+  adw_dialog_present(dialog, GTK_WIDGET(parent));
+  auto *copy = new Song(song);
+  g_object_set_data_full(G_OBJECT(dialog), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
+  g_object_set_data(G_OBJECT(dialog), "list", list);
+  g_object_set_data(G_OBJECT(dialog), "status", status);
+  g_object_set_data(G_OBJECT(dialog), "count", GINT_TO_POINTER(0));
+  app->cover_providers()->FetchAll(song, [dialog, app](const std::string &provider, const std::string &image) {
+    if (image.empty() || !GTK_IS_WIDGET(dialog)) {
+      return;
+    }
+    GtkWidget *list = GTK_WIDGET(g_object_get_data(G_OBJECT(dialog), "list"));
+    GtkWidget *status = GTK_WIDGET(g_object_get_data(G_OBJECT(dialog), "status"));
+    auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(dialog), "song"));
+    const int count = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(dialog), "count")) + 1;
+    g_object_set_data(G_OBJECT(dialog), "count", GINT_TO_POINTER(count));
+    GtkWidget *row = adw_action_row_new();
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), provider.c_str());
+    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), (PrettyBytes(static_cast<int64_t>(image.size())) + " image").c_str());
+    GtkWidget *thumb = gtk_image_new();
+    SetImageFromBytes(thumb, std::vector<unsigned char>(image.begin(), image.end()), 48);
+    adw_action_row_add_prefix(ADW_ACTION_ROW(row), thumb);
+    GtkWidget *apply = gtk_button_new_with_label("Save");
+    gtk_widget_add_css_class(apply, "suggested-action");
+    auto *image_copy = new std::string(image);
+    g_object_set_data_full(G_OBJECT(apply), "image", image_copy, [](gpointer p) { delete static_cast<std::string *>(p); });
+    g_object_set_data(G_OBJECT(apply), "song", song);
+    g_signal_connect(apply, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                       auto *application = static_cast<Application *>(data);
+                       auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(button), "song"));
+                       auto *image = static_cast<std::string *>(g_object_get_data(G_OBJECT(button), "image"));
+                       if (song && image && ApplyCover(application, song, *image)) {
+                         gtk_button_set_label(button, "Saved");
+                       } else {
+                         gtk_button_set_label(button, "Failed");
+                       }
+                     })),
+                     app);
+    adw_action_row_add_suffix(ADW_ACTION_ROW(row), apply);
+    gtk_list_box_append(GTK_LIST_BOX(list), row);
+    gtk_label_set_text(GTK_LABEL(status), (std::to_string(count) + " covers found").c_str());
+  });
+}
+
+void Dialogs::CoverExport(GtkWindow *parent, Application *app) {
+  AdwDialog *dialog = adw_dialog_new();
+  adw_dialog_set_title(dialog, "Export album covers");
+  adw_dialog_set_content_width(dialog, 420);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  gtk_widget_set_margin_start(box, 16);
+  gtk_widget_set_margin_end(box, 16);
+  gtk_widget_set_margin_top(box, 16);
+  gtk_widget_set_margin_bottom(box, 16);
+  GtkWidget *filename = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(filename), "Filename");
+  gtk_editable_set_text(GTK_EDITABLE(filename), "cover.jpg");
+  GtkWidget *overwrite = gtk_check_button_new_with_label("Overwrite existing files");
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(overwrite), TRUE);
+  GtkWidget *status = gtk_label_new("Exports each album’s artwork into Artist - Album folders.");
+  gtk_label_set_wrap(GTK_LABEL(status), TRUE);
+  GtkWidget *export_btn = gtk_button_new_with_label("Choose folder…");
+  gtk_widget_add_css_class(export_btn, "suggested-action");
+  g_object_set_data(G_OBJECT(export_btn), "filename", filename);
+  g_object_set_data(G_OBJECT(export_btn), "overwrite", overwrite);
+  g_object_set_data(G_OBJECT(export_btn), "status", status);
+  g_object_set_data(G_OBJECT(export_btn), "parent", parent);
+  g_signal_connect(export_btn, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     auto *job = new CoverExportJob();
+                     job->app = application;
+                     job->filename = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "filename")));
+                     if (job->filename.empty()) {
+                       job->filename = "cover.jpg";
+                     }
+                     job->overwrite = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "overwrite")));
+                     GtkWindow *parent = GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent"));
+                     GtkFileDialog *chooser = gtk_file_dialog_new();
+                     gtk_file_dialog_set_title(chooser, "Export album covers");
+                     gtk_file_dialog_select_folder(chooser, parent, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+                       auto *job = static_cast<CoverExportJob *>(data);
+                       GError *error = nullptr;
+                       GFile *folder = gtk_file_dialog_select_folder_finish(GTK_FILE_DIALOG(source), result, &error);
+                       if (!folder) {
+                         if (error) {
+                           g_error_free(error);
+                         }
+                         delete job;
+                         return;
+                       }
+                       gchar *path = g_file_get_path(folder);
+                       int saved = 0;
+                       int skipped = 0;
+                       if (path) {
+                         std::string last;
+                         for (const Song &song : job->app->collection()->Songs()) {
+                           const std::string album_key = song.EffectiveAlbumartist() + " – " + song.album();
+                           if (album_key == last || song.album().empty()) {
+                             continue;
+                           }
+                           last = album_key;
+                           const std::vector<unsigned char> cover = job->app->albumcover_loader()->LoadData(song);
+                           if (cover.empty()) {
+                             ++skipped;
+                             continue;
+                           }
+                           const std::string dest_dir = FileUtils::Join(path, SafeFolderName(song.EffectiveAlbumartist() + " - " + song.album()));
+                           g_mkdir_with_parents(dest_dir.c_str(), 0755);
+                           const std::string dest = FileUtils::Join(dest_dir, job->filename);
+                           if (!job->overwrite && FileUtils::Exists(dest)) {
+                             ++skipped;
+                             continue;
+                           }
+                           if (FileUtils::WriteFile(dest, std::string(cover.begin(), cover.end()))) {
+                             ++saved;
+                           } else {
+                             ++skipped;
+                           }
+                         }
+                         g_free(path);
+                       }
+                       g_object_unref(folder);
+                       AdwAlertDialog *done = ADW_ALERT_DIALOG(adw_alert_dialog_new(
+                           "Export album covers", ("Exported " + std::to_string(saved) + " covers (" + std::to_string(skipped) + " skipped).").c_str()));
+                       adw_alert_dialog_add_response(done, "ok", "OK");
+                       adw_dialog_present(ADW_DIALOG(done), nullptr);
+                       delete job;
+                     }, job);
+                   })),
+                   app);
+  gtk_box_append(GTK_BOX(box), filename);
+  gtk_box_append(GTK_BOX(box), overwrite);
+  gtk_box_append(GTK_BOX(box), status);
+  gtk_box_append(GTK_BOX(box), export_btn);
+  adw_dialog_set_child(dialog, box);
+  adw_dialog_present(dialog, GTK_WIDGET(parent));
 }
 
 void Dialogs::PlaylistColumns(GtkWindow *parent, const std::function<void()> &callback) {

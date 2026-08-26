@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <string>
 
 namespace {
 
@@ -80,6 +81,16 @@ Song TagReader::ReadFile(const std::string &filename) const {
   song.set_performer(take("PERFORMER"));
   song.set_grouping(take("GROUPING"));
   song.set_lyrics(take("LYRICS"));
+  song.set_titlesort(take("TITLESORT"));
+  song.set_albumsort(take("ALBUMSORT"));
+  song.set_artistsort(take("ARTISTSORT"));
+  song.set_albumartistsort(take("ALBUMARTISTSORT"));
+  song.set_composersort(take("COMPOSERSORT"));
+  song.set_performersort(take("PERFORMERSORT"));
+  {
+    const std::string compilation = take("COMPILATION");
+    song.set_compilation(compilation == "1" || compilation == "true" || compilation == "True");
+  }
   if (properties.contains("DISCNUMBER") && !properties["DISCNUMBER"].isEmpty()) {
     song.set_disc(properties["DISCNUMBER"].front().toInt());
   }
@@ -142,6 +153,18 @@ bool TagReader::WriteFile(const Song &song) const {
   set_or_remove("PERFORMER", song.performer());
   set_or_remove("GROUPING", song.grouping());
   set_or_remove("LYRICS", song.lyrics());
+  set_or_remove("TITLESORT", song.titlesort());
+  set_or_remove("ALBUMSORT", song.albumsort());
+  set_or_remove("ARTISTSORT", song.artistsort());
+  set_or_remove("ALBUMARTISTSORT", song.albumartistsort());
+  set_or_remove("COMPOSERSORT", song.composersort());
+  set_or_remove("PERFORMERSORT", song.performersort());
+  set_or_remove("MOOD", song.mood());
+  set_or_remove("INITIALKEY", song.initial_key());
+  set_or_remove("COMPILATION", song.compilation() ? "1" : "");
+  set_or_remove("DISCNUMBER", song.disc() > 0 ? std::to_string(song.disc()) : "");
+  set_or_remove("ORIGINALYEAR", song.originalyear() > 0 ? std::to_string(song.originalyear()) : "");
+  set_or_remove("BPM", song.bpm() > 0 ? std::to_string(song.bpm()) : "");
   file.file()->setProperties(properties);
   return file.save();
 }

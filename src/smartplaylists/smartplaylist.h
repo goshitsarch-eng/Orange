@@ -22,10 +22,36 @@ enum class SmartPlaylistField {
   Length,
   Bitrate,
   DateCreated,
-  LastPlayed
+  LastPlayed,
+  Track,
+  Disc,
+  OriginalYear,
+  Performer,
+  Grouping,
+  Comment,
+  Filepath,
+  Filetype,
+  Filesize,
+  DateModified,
+  Samplerate,
+  Bitdepth,
+  BPM,
+  Mood,
+  InitialKey
 };
 
-enum class SmartPlaylistOp { Contains, NotContains, Equals, GreaterThan, LessThan, StartsWith, EndsWith };
+enum class SmartPlaylistOp {
+  Contains,
+  NotContains,
+  Equals,
+  GreaterThan,
+  LessThan,
+  StartsWith,
+  EndsWith,
+  NotEquals,
+  Empty,
+  NotEmpty
+};
 
 struct SmartPlaylistTerm {
   SmartPlaylistField field = SmartPlaylistField::Title;
@@ -46,6 +72,11 @@ class SmartPlaylistSearch {
 
   SongList Search(const SongList &songs) const;
   SongList Search(CollectionBackend *backend) const;
+
+  static std::vector<std::string> FieldNames();
+  static std::vector<std::string> OpNames();
+  static SmartPlaylistField FieldFromIndex(int index);
+  static SmartPlaylistOp OpFromIndex(int index);
 };
 
 #endif  // STRAWBERRY_SMARTPLAYLIST_H

@@ -21,6 +21,12 @@ class OSD {
   bool show_art_ = true;
   std::string type_ = "native";
   int timeout_ms_ = 4000;
+  std::string fg_ = "#ffffff";
+  std::string bg_ = "#202020";
+  double opacity_ = 0.92;
+  int pos_x_ = 40;
+  int pos_y_ = 40;
+  std::string font_ = "Sans 12";
   GtkWidget *pretty_window_ = nullptr;
   guint pretty_timeout_ = 0;
 };

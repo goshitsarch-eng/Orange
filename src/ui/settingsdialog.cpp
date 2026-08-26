@@ -218,6 +218,12 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app) {
     AddToggle(group, settings, "showart", "Show album art", nullptr, true);
     AddEntry(group, settings, "type", "Type (native/pretty/both)", "native");
     AddEntry(group, settings, "timeout", "Pretty OSD timeout (ms)", "4000");
+    AddEntry(group, settings, "foreground", "Pretty OSD foreground", "#ffffff");
+    AddEntry(group, settings, "background", "Pretty OSD background", "#202020");
+    AddEntry(group, settings, "opacity", "Pretty OSD opacity", "0.92");
+    AddEntry(group, settings, "posx", "Pretty OSD X position", "40");
+    AddEntry(group, settings, "posy", "Pretty OSD Y position", "40");
+    AddEntry(group, settings, "font", "Pretty OSD font", "Sans 12");
     adw_preferences_page_add(page, group);
     adw_preferences_dialog_add(dialog, page);
   }

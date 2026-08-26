@@ -133,6 +133,28 @@ void CoverProviders::Fetch(const Song &song, CoverProvider::Callback callback) {
   FetchFromIndex(song, 0, std::move(callback));
 }
 
+void CoverProviders::FetchAll(const Song &song, const std::function<void(const std::string &provider, const std::string &image_data)> &callback) {
+  for (auto &provider : providers_) {
+    if (!provider->enabled()) {
+      continue;
+    }
+    const std::string name = provider->name();
+    provider->Fetch(song, network_, [this, callback, name](const std::string &data, const std::string &) {
+      if (JsonUtils::LooksLikeImage(data)) {
+        callback(name, data);
+        return;
+      }
+      if (!data.empty() && (StrUtils::StartsWith(data, "http://") || StrUtils::StartsWith(data, "https://"))) {
+        network_->Get(data, [callback, name](const NetworkAccessManager::Response &response) {
+          if (response.ok() && JsonUtils::LooksLikeImage(response.body)) {
+            callback(name, response.body);
+          }
+        });
+      }
+    });
+  }
+}
+
 void CoverProviders::FetchFromIndex(const Song &song, size_t index, CoverProvider::Callback callback) {
   while (index < providers_.size() && !providers_[index]->enabled()) {
     ++index;

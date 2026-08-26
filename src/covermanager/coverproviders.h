@@ -27,6 +27,7 @@ class CoverProviders {
   explicit CoverProviders(NetworkAccessManager *network);
   void ReloadSettings();
   void Fetch(const Song &song, CoverProvider::Callback callback);
+  void FetchAll(const Song &song, const std::function<void(const std::string &provider, const std::string &image_data)> &callback);
   std::vector<CoverProvider *> All() const;
   void FetchFromEmbeddedOrFile(const Song &song, CoverProvider::Callback callback);
   static bool SaveAlbumCover(const Song &song, const std::string &image_data, class TagReader *tagreader = nullptr);
