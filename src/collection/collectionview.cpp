@@ -4,6 +4,8 @@
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectionkeyboard.h"
 #include "collection/collectiontree.h"
+#include "covermanager/albumcoverloader.h"
+#include "dialogs/dialoghelpers.h"
 #include "translations/translations.h"
 #include "utilities/strutils.h"
 #include "widgets/listboxkeyboard.h"
@@ -55,6 +57,8 @@ void CollectionView::SetActivateCallback(ActivateCallback callback) { activate_ 
 
 void CollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
+void CollectionView::ApplyLook() { pretty_covers_ = CollectionCover::LoadPrettyCovers(); }
+
 void CollectionView::SetFilterString(const std::string &filter) {
   filter_.SetFilterString(filter);
   Rebuild();
@@ -62,6 +66,8 @@ void CollectionView::SetFilterString(const std::string &filter) {
 
 void CollectionView::SetModelSongs(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
                                    bool skip_artist_articles, bool skip_album_articles) {
+  grouping_ = grouping;
+  ApplyLook();
   model_.Reset(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles);
   Rebuild();
 }
@@ -99,6 +105,14 @@ void CollectionView::AppendItem(GtkWidget *parent, const CollectionItem *item, i
                      this);
     gtk_box_append(GTK_BOX(outer), toggle);
   }
+  const Song cover_song = CollectionCover::RepresentativeSong(item);
+  if (CollectionCover::ShouldShowThumb(pretty_covers_, item->type, item->container_level, grouping_)) {
+    GtkWidget *image = gtk_image_new_from_icon_name(CollectionCover::kPlaceholderIcon);
+    gtk_image_set_pixel_size(GTK_IMAGE(image), CollectionCover::kArtHeight);
+    gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
+    gtk_box_append(GTK_BOX(outer), image);
+    LoadCover(image, cover_song);
+  }
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_widget_set_hexpand(box, TRUE);
   GtkWidget *primary = gtk_label_new(CollectionItemDelegate::PrimaryText(item).c_str());
@@ -123,6 +137,28 @@ void CollectionView::AppendItem(GtkWidget *parent, const CollectionItem *item, i
       AppendItem(parent, child.get(), depth + 1);
     }
   }
+}
+
+void CollectionView::LoadCover(GtkWidget *image, const Song &song) {
+  if (!image) {
+    return;
+  }
+  const std::string key = CollectionCover::CacheKey(song);
+  const auto cached = cover_cache_.find(key);
+  if (cached != cover_cache_.end()) {
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(cached->second.begin(), cached->second.end()),
+                                     CollectionCover::kArtHeight);
+    return;
+  }
+  if (!cover_loader_) {
+    return;
+  }
+  const std::vector<unsigned char> data = cover_loader_->LoadData(song);
+  if (data.empty()) {
+    return;
+  }
+  cover_cache_[key] = std::string(data.begin(), data.end());
+  DialogHelpers::SetImageFromBytes(image, data, CollectionCover::kArtHeight);
 }
 
 void CollectionView::SetupRowDrag(GtkWidget *row, const CollectionItem *item) {

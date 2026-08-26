@@ -1,15 +1,19 @@
 #ifndef STRAWBERRY_COLLECTIONVIEW_H
 #define STRAWBERRY_COLLECTIONVIEW_H
 
+#include "collection/collectioncover.h"
 #include "collection/collectionfilter.h"
 #include "collection/collectionmodel.h"
 
 #include <gtk/gtk.h>
 
 #include <functional>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
+
+class AlbumCoverLoader;
 
 class CollectionView {
  public:
@@ -29,6 +33,8 @@ class CollectionView {
   void SetFilterString(const std::string &filter);
   void SetActivateCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  void SetCoverLoader(AlbumCoverLoader *loader) { cover_loader_ = loader; }
+  void ApplyLook();
   void Rebuild();
   void ExpandAll();
   void CollapseAll();
@@ -41,6 +47,7 @@ class CollectionView {
 
  private:
   void AppendItem(GtkWidget *parent, const CollectionItem *item, int depth);
+  void LoadCover(GtkWidget *image, const Song &song);
   void SetupRowDrag(GtkWidget *row, const CollectionItem *item);
   void TypeAhead(gunichar ch);
   void ResetTypeAhead();
@@ -49,11 +56,15 @@ class CollectionView {
 
   CollectionModel model_;
   CollectionFilter filter_;
+  CollectionGrouping::Grouping grouping_;
   ActivateCallback activate_;
   MenuCallback menu_;
+  AlbumCoverLoader *cover_loader_ = nullptr;
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
   std::set<std::string> expanded_;
+  std::map<std::string, std::string> cover_cache_;
+  bool pretty_covers_ = CollectionSettings::kDefaultPrettyCovers;
   std::string typeahead_;
   guint typeahead_timeout_id_ = 0;
 };

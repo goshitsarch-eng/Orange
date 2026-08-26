@@ -853,6 +853,7 @@ void MainWindow::BuildSidebar() {
   adw_view_stack_add_titled_with_icon(sidebar_stack_, context_view_->widget(), "context", "Context", "audio-x-generic-symbolic");
   GtkWidget *collection_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   collection_container_ = std::make_unique<CollectionViewContainer>();
+  collection_container_->view()->SetCoverLoader(app_->albumcover_loader());
   gtk_widget_set_vexpand(collection_container_->widget(), TRUE);
   collection_container_->filter_widget()->SetChangedCallback([this]() { RefreshCollection(); });
   collection_container_->filter_widget()->SetGrouping(grouping_);
@@ -1994,6 +1995,7 @@ void MainWindow::OpenSettings(const char *page_name) {
     ApplySeekbarMode();
     ApplyBehaviourSettings();
     ApplyPlaylistBehaviour();
+    RefreshCollection();
     app_->analyzer()->ReloadSettings();
     ApplyAnalyzer();
     app_->moodbar()->Load(app_->player()->current_song());

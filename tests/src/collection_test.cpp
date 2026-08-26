@@ -1,5 +1,6 @@
 #include "collection/collectionbackend.h"
 #include "collection/collectionbehaviour.h"
+#include "collection/collectioncover.h"
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
 #include "collection/collectionwatcher.h"
@@ -159,6 +160,29 @@ TEST(CollectionModel, BuildsGroupedTreeAndPlaylistItem) {
   CollectionPlaylistItem item(a);
   EXPECT_EQ(a.PrettyTitleWithArtist(), item.DisplayText());
   EXPECT_EQ(a.url(), item.url());
+}
+
+TEST(CollectionCover, PrettyCoversMatchQtAlbumRows) {
+  EXPECT_EQ(32, CollectionCover::kArtHeight);
+  EXPECT_STREQ("media-optical-symbolic", CollectionCover::kPlaceholderIcon);
+  EXPECT_STREQ("pretty_covers", CollectionSettings::kPrettyCovers);
+  EXPECT_TRUE(CollectionSettings::kDefaultPrettyCovers);
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::AlbumDisc;
+  grouping.third = CollectionGrouping::GroupBy::None;
+  EXPECT_TRUE(CollectionCover::ShouldShowThumb(true, CollectionItem::Type::Container, 1, grouping));
+  EXPECT_FALSE(CollectionCover::ShouldShowThumb(false, CollectionItem::Type::Container, 1, grouping));
+  EXPECT_FALSE(CollectionCover::ShouldShowThumb(true, CollectionItem::Type::Container, 0, grouping));
+  EXPECT_FALSE(CollectionCover::ShouldShowThumb(true, CollectionItem::Type::Song, 1, grouping));
+  EXPECT_FALSE(CollectionCover::ShouldShowThumb(true, CollectionItem::Type::Divider, 1, grouping));
+  CollectionItem album(CollectionItem::Type::Container);
+  album.container_level = 1;
+  CollectionItem *song = album.AddChild(CollectionItem::Type::Song);
+  song->metadata = MakeSong("Roads", "Portishead", "Dummy");
+  song->metadata.set_albumartist("Portishead");
+  EXPECT_EQ("Roads", CollectionCover::RepresentativeSong(&album).title());
+  EXPECT_EQ("Portishead|Dummy", CollectionCover::CacheKey(&album));
 }
 
 TEST(CollectionItemDelegate, PrimarySecondaryAndIndent) {
