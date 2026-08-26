@@ -1270,6 +1270,9 @@ void MainWindow::BuildPlaylist() {
     RefreshPlaylist();
   });
   playlist_container_->view()->SetActivateCallback([this](int index) { app_->player()->PlayAt(index); });
+  playlist_container_->view()->SetPlayPauseCallback([this]() { app_->player()->PlayPause(); });
+  playlist_container_->view()->SetSeekBackwardCallback([this]() { app_->player()->SeekBackward(); });
+  playlist_container_->view()->SetSeekForwardCallback([this]() { app_->player()->SeekForward(); });
   playlist_container_->view()->SetSelectCallback([this](int index, bool add) { SelectPlaylistRow(index, add); });
   playlist_container_->view()->SetRateCallback([this](int row, float rating) { RateRow(row, rating); });
   playlist_container_->view()->SetQueuePositionCallback([this](int row) {

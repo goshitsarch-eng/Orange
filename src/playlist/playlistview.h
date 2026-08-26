@@ -4,6 +4,7 @@
 #include "moodbar/moodbaritemdelegate.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistdropindicator.h"
 #include "playlist/playlistheader.h"
 
 #include <gtk/gtk.h>
@@ -27,6 +28,8 @@ class PlaylistView {
   using QueuePositionCallback = std::function<int(int)>;
   using DeleteCallback = std::function<void()>;
   using FocusFilterCallback = std::function<void()>;
+  using PlayPauseCallback = std::function<void()>;
+  using SeekCallback = std::function<void()>;
 
   PlaylistView();
   ~PlaylistView();
@@ -52,6 +55,9 @@ class PlaylistView {
   void SetQueuePositionCallback(QueuePositionCallback callback);
   void SetDeleteCallback(DeleteCallback callback);
   void SetFocusFilterCallback(FocusFilterCallback callback);
+  void SetPlayPauseCallback(PlayPauseCallback callback);
+  void SetSeekBackwardCallback(SeekCallback callback);
+  void SetSeekForwardCallback(SeekCallback callback);
   void FilterReturnPressed();
   void FocusAndMove(unsigned keyval);
   int RowAtY(double y) const;
@@ -70,6 +76,8 @@ class PlaylistView {
   void RecordClickedColumn(GtkWidget *row, double x);
   void SetupRowDrag(GtkWidget *row, int index);
   gboolean OnDrop(const GValue *value, double y);
+  void UpdateDropIndicator(double y);
+  void ClearDropIndicator();
   void ApplyColumnWidths();
   void ReloadLookCss();
   void StartGlowTimer();
@@ -78,6 +86,9 @@ class PlaylistView {
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *grid_ = nullptr;
+  GtkWidget *overlay_ = nullptr;
+  GtkWidget *drop_overlay_ = nullptr;
+  PlaylistDropIndicator::State drop_state_;
   std::unique_ptr<PlaylistHeader> header_;
   std::unique_ptr<MoodbarItemDelegate> moodbar_;
   Playlist *playlist_ = nullptr;
@@ -95,6 +106,9 @@ class PlaylistView {
   QueuePositionCallback queue_position_;
   DeleteCallback delete_;
   FocusFilterCallback focus_filter_;
+  PlayPauseCallback play_pause_;
+  SeekCallback seek_backward_;
+  SeekCallback seek_forward_;
   PlaylistColumn last_clicked_column_ = PlaylistColumn::Title;
   double last_click_cell_x_ = 0;
   double last_click_cell_width_ = 0;

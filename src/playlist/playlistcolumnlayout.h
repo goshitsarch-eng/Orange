@@ -16,6 +16,7 @@ class PlaylistColumnLayout {
   static bool CanHide();
   static void Hide(PlaylistColumn column);
   static bool Move(PlaylistColumn column, int delta);
+  static bool MoveTo(PlaylistColumn column, int dest_visual);
 
   static PlaylistColumnAlign DefaultAlignment(PlaylistColumn column);
   static PlaylistColumnAlign Alignment(PlaylistColumn column);

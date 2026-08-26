@@ -3,6 +3,9 @@
 #include "playlist/playlistheadersort.h"
 #include "playlist/playlistautoscroll.h"
 #include "playlist/playlistclipboard.h"
+#include "playlist/playlistdropindicator.h"
+#include "playlist/playlistheaderreorder.h"
+#include "playlist/playlistkeyboard.h"
 #include "playlist/playlistcolumnwidths.h"
 #include "playlist/playlistplayingicon.h"
 #include "playlist/playlist.h"
@@ -652,6 +655,57 @@ TEST(PlaylistClipboard, JoinsVisibleColumnsAndCopyShortcut) {
   EXPECT_TRUE(PlaylistClipboard::IsCopyShortcut('C', 4, 4));
   EXPECT_FALSE(PlaylistClipboard::IsCopyShortcut('c', 0, 4));
   EXPECT_FALSE(PlaylistClipboard::IsCopyShortcut('x', 4, 4));
+}
+
+TEST(PlaylistHeaderReorder, ModeAndOrderAfterMove) {
+  EXPECT_EQ(PlaylistHeaderReorder::DragMode::Resize, PlaylistHeaderReorder::ModeAt(true, PlaylistColumn::Title));
+  EXPECT_EQ(PlaylistHeaderReorder::DragMode::Reorder, PlaylistHeaderReorder::ModeAt(false, PlaylistColumn::Title));
+  EXPECT_EQ(PlaylistHeaderReorder::DragMode::None, PlaylistHeaderReorder::ModeAt(false, PlaylistColumn::Count));
+  const std::vector<PlaylistColumn> visible = {PlaylistColumn::Title, PlaylistColumn::Artist, PlaylistColumn::Album};
+  EXPECT_EQ(1, PlaylistHeaderReorder::VisualIndex(visible, PlaylistColumn::Artist));
+  EXPECT_EQ(-1, PlaylistHeaderReorder::VisualIndex(visible, PlaylistColumn::Year));
+  const auto moved = PlaylistHeaderReorder::OrderAfterMove(visible, PlaylistColumn::Title, 2);
+  ASSERT_EQ(3u, moved.size());
+  EXPECT_EQ(PlaylistColumn::Artist, moved[0]);
+  EXPECT_EQ(PlaylistColumn::Title, moved[1]);
+  EXPECT_EQ(PlaylistColumn::Album, moved[2]);
+  const auto left = PlaylistHeaderReorder::OrderAfterMove(visible, PlaylistColumn::Album, 0);
+  ASSERT_EQ(3u, left.size());
+  EXPECT_EQ(PlaylistColumn::Album, left[0]);
+  EXPECT_EQ(PlaylistColumn::Title, left[1]);
+  EXPECT_EQ(PlaylistColumn::Artist, left[2]);
+  EXPECT_TRUE(PlaylistHeaderReorder::ShouldApplyReorder(PlaylistColumn::Title, PlaylistColumn::Artist));
+  EXPECT_FALSE(PlaylistHeaderReorder::ShouldApplyReorder(PlaylistColumn::Title, PlaylistColumn::Title));
+  EXPECT_TRUE(PlaylistHeaderReorder::ShouldStartReorder(40, 0, 100));
+  EXPECT_FALSE(PlaylistHeaderReorder::ShouldStartReorder(96, 0, 100));
+}
+
+TEST(PlaylistDropIndicator, MidpointInsertAndEmpty) {
+  EXPECT_EQ(2, PlaylistDropIndicator::kLineWidth);
+  EXPECT_EQ(5, PlaylistDropIndicator::kGradientWidth);
+  const auto empty = PlaylistDropIndicator::FromPointer(10, -1, 0, 0, false, 0);
+  EXPECT_EQ(0, empty.insert_row);
+  EXPECT_EQ(PlaylistDropIndicator::Position::Empty, empty.pos);
+  EXPECT_EQ(1, empty.line_y);
+  const auto above = PlaylistDropIndicator::FromPointer(10, 3, 0, 40, true, 40);
+  EXPECT_EQ(3, above.insert_row);
+  EXPECT_EQ(PlaylistDropIndicator::Position::Above, above.pos);
+  EXPECT_EQ(0, above.line_y);
+  const auto below = PlaylistDropIndicator::FromPointer(30, 3, 0, 40, true, 40);
+  EXPECT_EQ(4, below.insert_row);
+  EXPECT_EQ(PlaylistDropIndicator::Position::Below, below.pos);
+  EXPECT_EQ(40, below.line_y);
+  EXPECT_TRUE(PlaylistDropIndicator::Active(above));
+  EXPECT_EQ(4, PlaylistDropIndicator::InsertRow(below, 0));
+  EXPECT_EQ(7, PlaylistDropIndicator::InsertRow({}, 7));
+}
+
+TEST(PlaylistKeyboard, SpacePlayPauseAndArrowsSeek) {
+  EXPECT_EQ(PlaylistKeyboard::Action::PlayPause, PlaylistKeyboard::FromKey(PlaylistKeyboard::kSpace, 0));
+  EXPECT_EQ(PlaylistKeyboard::Action::None, PlaylistKeyboard::FromKey(PlaylistKeyboard::kSpace, PlaylistKeyboard::kControlMask));
+  EXPECT_EQ(PlaylistKeyboard::Action::SeekBack, PlaylistKeyboard::FromKey(PlaylistKeyboard::kLeft, 0));
+  EXPECT_EQ(PlaylistKeyboard::Action::SeekForward, PlaylistKeyboard::FromKey(PlaylistKeyboard::kRight, 0));
+  EXPECT_EQ(PlaylistKeyboard::Action::None, PlaylistKeyboard::FromKey('c', 0));
 }
 
 TEST(PlaylistPlayingIcon, PauseAndPlayNames) {

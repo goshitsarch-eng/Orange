@@ -33,7 +33,10 @@ class PlaylistHeader {
   void UpdateResizeCursor(double x);
   void OnDragBegin(double x);
   void OnDragUpdate(double offset_x);
+  void OnDragEnd();
+  void ReorderButtons();
   void NotifyWidthsChanged();
+  bool DragActive() const;
 
   GtkWidget *widget_ = nullptr;
   SortCallback sort_;
@@ -46,6 +49,9 @@ class PlaylistHeader {
   PlaylistColumn resize_next_ = PlaylistColumn::Count;
   int resize_left_start_ = 0;
   int resize_right_start_ = 0;
+  PlaylistColumn reorder_column_ = PlaylistColumn::Count;
+  PlaylistColumn reorder_last_hover_ = PlaylistColumn::Count;
+  double drag_start_x_ = 0;
 };
 
 #endif

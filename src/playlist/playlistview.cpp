@@ -10,7 +10,9 @@
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlistplayingicon.h"
 #include "playlist/playlistratingclick.h"
+#include "playlist/playlistdropindicator.h"
 #include "playlist/playlistfilter.h"
+#include "playlist/playlistkeyboard.h"
 #include "playlist/playlistlook.h"
 #include "playlist/playlisttagcompletion.h"
 #include "utilities/strutils.h"
@@ -38,7 +40,36 @@ PlaylistView::PlaylistView() {
   gtk_widget_set_hexpand(widget_, TRUE);
   gtk_widget_set_vexpand(widget_, TRUE);
   grid_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), grid_);
+  overlay_ = gtk_overlay_new();
+  gtk_overlay_set_child(GTK_OVERLAY(overlay_), grid_);
+  drop_overlay_ = gtk_drawing_area_new();
+  gtk_widget_set_can_target(drop_overlay_, FALSE);
+  gtk_widget_set_hexpand(drop_overlay_, TRUE);
+  gtk_widget_set_vexpand(drop_overlay_, TRUE);
+  gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drop_overlay_),
+                                 +[](GtkDrawingArea *, cairo_t *cr, int width, int, gpointer data) {
+                                   auto *self = static_cast<PlaylistView *>(data);
+                                   if (!PlaylistDropIndicator::Active(self->drop_state_)) {
+                                     return;
+                                   }
+                                   const double y = self->drop_state_.line_y;
+                                   cairo_pattern_t *grad = cairo_pattern_create_linear(0, y - PlaylistDropIndicator::kGradientWidth, 0,
+                                                                                       y + PlaylistDropIndicator::kGradientWidth);
+                                   cairo_pattern_add_color_stop_rgba(grad, 0.0, 0.2, 0.5, 1.0, 0.0);
+                                   cairo_pattern_add_color_stop_rgba(grad, 0.5, 0.2, 0.5, 1.0, 0.35);
+                                   cairo_pattern_add_color_stop_rgba(grad, 1.0, 0.2, 0.5, 1.0, 0.0);
+                                   cairo_set_source(cr, grad);
+                                   cairo_rectangle(cr, 0, y - PlaylistDropIndicator::kGradientWidth, width,
+                                                   PlaylistDropIndicator::kGradientWidth * 2);
+                                   cairo_fill(cr);
+                                   cairo_pattern_destroy(grad);
+                                   cairo_set_source_rgb(cr, 0.2, 0.5, 1.0);
+                                   cairo_rectangle(cr, 0, y, width, PlaylistDropIndicator::kLineWidth);
+                                   cairo_fill(cr);
+                                 },
+                                 this, nullptr);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay_), drop_overlay_);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), overlay_);
   GtkGesture *gesture = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(grid_, GTK_EVENT_CONTROLLER(gesture));
@@ -63,7 +94,18 @@ PlaylistView::PlaylistView() {
   gtk_drop_target_set_gtypes(target, types, 2);
 #endif
   gtk_drop_target_set_actions(target, static_cast<GdkDragAction>(GDK_ACTION_COPY | GDK_ACTION_MOVE));
+  gtk_drop_target_set_preload(target, TRUE);
   gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(target));
+  g_signal_connect(target, "motion", G_CALLBACK(+[](GtkDropTarget *, gdouble, gdouble y, gpointer data) -> GdkDragAction {
+                     auto *self = static_cast<PlaylistView *>(data);
+                     self->UpdateDropIndicator(y);
+                     return GDK_ACTION_COPY;
+                   }),
+                   this);
+  g_signal_connect(target, "leave", G_CALLBACK(+[](GtkDropTarget *, gpointer data) {
+                     static_cast<PlaylistView *>(data)->ClearDropIndicator();
+                   }),
+                   this);
   g_signal_connect(target, "drop", G_CALLBACK(+[](GtkDropTarget *, const GValue *value, gdouble, gdouble y, gpointer data) -> gboolean {
                      return static_cast<PlaylistView *>(data)->OnDrop(value, y);
                    }),
@@ -102,6 +144,12 @@ void PlaylistView::ResetTypeAhead() {
 
 void PlaylistView::SetFocusFilterCallback(FocusFilterCallback callback) { focus_filter_ = std::move(callback); }
 
+void PlaylistView::SetPlayPauseCallback(PlayPauseCallback callback) { play_pause_ = std::move(callback); }
+
+void PlaylistView::SetSeekBackwardCallback(SeekCallback callback) { seek_backward_ = std::move(callback); }
+
+void PlaylistView::SetSeekForwardCallback(SeekCallback callback) { seek_forward_ = std::move(callback); }
+
 void PlaylistView::FilterReturnPressed() {
   if (!activate_ || visible_rows_.empty()) {
     return;
@@ -116,6 +164,19 @@ void PlaylistView::FocusAndMove(unsigned keyval) {
 }
 
 gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  const PlaylistKeyboard::Action key_action = PlaylistKeyboard::FromKey(keyval, state, GDK_CONTROL_MASK);
+  if (key_action == PlaylistKeyboard::Action::PlayPause && play_pause_) {
+    play_pause_();
+    return TRUE;
+  }
+  if (key_action == PlaylistKeyboard::Action::SeekBack && seek_backward_) {
+    seek_backward_();
+    return TRUE;
+  }
+  if (key_action == PlaylistKeyboard::Action::SeekForward && seek_forward_) {
+    seek_forward_();
+    return TRUE;
+  }
   if (PlaylistClipboard::IsCopyShortcut(keyval, state, GDK_CONTROL_MASK)) {
     CopyCurrentToClipboard();
     return TRUE;
@@ -209,8 +270,47 @@ int PlaylistView::RowAtY(double y) const {
   return last_index;
 }
 
+void PlaylistView::ClearDropIndicator() {
+  drop_state_ = {};
+  if (drop_overlay_) {
+    gtk_widget_queue_draw(drop_overlay_);
+  }
+}
+
+void PlaylistView::UpdateDropIndicator(double y) {
+  GtkWidget *child = gtk_widget_get_first_child(grid_);
+  if (child) {
+    child = gtk_widget_get_next_sibling(child);
+  }
+  double last_bottom = 0;
+  int found = -1;
+  double row_y = 0;
+  double row_h = 0;
+  bool has_rows = false;
+  while (child) {
+    graphene_rect_t bounds{};
+    if (gtk_widget_compute_bounds(child, widget_, &bounds)) {
+      has_rows = true;
+      last_bottom = bounds.origin.y + bounds.size.height;
+      const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
+      if (y < last_bottom && found < 0) {
+        found = index;
+        row_y = bounds.origin.y;
+        row_h = bounds.size.height;
+      }
+    }
+    child = gtk_widget_get_next_sibling(child);
+  }
+  drop_state_ = PlaylistDropIndicator::FromPointer(y, found, row_y, row_h, has_rows, last_bottom);
+  if (drop_overlay_) {
+    gtk_widget_queue_draw(drop_overlay_);
+  }
+}
+
 gboolean PlaylistView::OnDrop(const GValue *value, double y) {
-  const int row = RowAtY(y);
+  UpdateDropIndicator(y);
+  const int row = PlaylistDropIndicator::InsertRow(drop_state_, RowAtY(y));
+  ClearDropIndicator();
   std::vector<std::string> urls;
   if (G_VALUE_HOLDS_STRING(value)) {
     const char *text = g_value_get_string(value);

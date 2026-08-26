@@ -2,11 +2,13 @@
 
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistcolumnwidths.h"
+#include "playlist/playlistheaderreorder.h"
 #include "playlist/playlistheadersort.h"
 #include "translations/translations.h"
 
 #include <algorithm>
 #include <string>
+#include <vector>
 
 PlaylistHeader::PlaylistHeader() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -32,12 +34,15 @@ PlaylistHeader::PlaylistHeader() {
   g_signal_connect(drag, "drag-begin", G_CALLBACK(+[](GtkGestureDrag *g, gdouble x, gdouble, gpointer data) {
                      auto *self = static_cast<PlaylistHeader *>(data);
                      self->OnDragBegin(x);
-                     gtk_gesture_set_state(GTK_GESTURE(g), self->resize_column_ == PlaylistColumn::Count ? GTK_EVENT_SEQUENCE_DENIED
-                                                                                                        : GTK_EVENT_SEQUENCE_CLAIMED);
+                     gtk_gesture_set_state(GTK_GESTURE(g), self->DragActive() ? GTK_EVENT_SEQUENCE_CLAIMED : GTK_EVENT_SEQUENCE_DENIED);
                    }),
                    this);
   g_signal_connect(drag, "drag-update", G_CALLBACK(+[](GtkGestureDrag *, gdouble offset_x, gdouble, gpointer data) {
                      static_cast<PlaylistHeader *>(data)->OnDragUpdate(offset_x);
+                   }),
+                   this);
+  g_signal_connect(drag, "drag-end", G_CALLBACK(+[](GtkGestureDrag *, gdouble, gdouble, gpointer data) {
+                     static_cast<PlaylistHeader *>(data)->OnDragEnd();
                    }),
                    this);
 }
@@ -106,21 +111,79 @@ PlaylistColumn PlaylistHeader::ResizeColumnAtX(double x) const {
 }
 
 void PlaylistHeader::UpdateResizeCursor(double x) {
-  gtk_widget_set_cursor_from_name(widget_, ResizeColumnAtX(x) == PlaylistColumn::Count ? nullptr : "col-resize");
+  if (ResizeColumnAtX(x) != PlaylistColumn::Count) {
+    gtk_widget_set_cursor_from_name(widget_, "col-resize");
+    return;
+  }
+  gtk_widget_set_cursor_from_name(widget_, ColumnAtX(x) == PlaylistColumn::Count ? nullptr : "grab");
+}
+
+bool PlaylistHeader::DragActive() const {
+  return resize_column_ != PlaylistColumn::Count || reorder_column_ != PlaylistColumn::Count;
+}
+
+void PlaylistHeader::ReorderButtons() {
+  std::vector<GtkWidget *> buttons;
+  for (GtkWidget *child = gtk_widget_get_first_child(widget_); child;) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "column")) > 0) {
+      g_object_ref(child);
+      gtk_widget_unparent(child);
+      buttons.push_back(child);
+    }
+    child = next;
+  }
+  for (PlaylistColumn column : PlaylistColumnLayout::Visible()) {
+    for (GtkWidget *button : buttons) {
+      if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "column")) - 1 == static_cast<int>(column)) {
+        gtk_box_append(GTK_BOX(widget_), button);
+        g_object_unref(button);
+        break;
+      }
+    }
+  }
 }
 
 void PlaylistHeader::OnDragBegin(double x) {
+  drag_start_x_ = x;
   resize_column_ = ResizeColumnAtX(x);
   resize_next_ = NextVisible(resize_column_);
-  if (resize_column_ == PlaylistColumn::Count || resize_next_ == PlaylistColumn::Count) {
+  reorder_column_ = PlaylistColumn::Count;
+  reorder_last_hover_ = PlaylistColumn::Count;
+  if (resize_column_ != PlaylistColumn::Count && resize_next_ != PlaylistColumn::Count) {
+    const int total = viewport_width_ > 0 ? viewport_width_ : gtk_widget_get_width(widget_);
+    resize_left_start_ = PlaylistColumnLayout::PixelWidth(resize_column_, total);
+    resize_right_start_ = PlaylistColumnLayout::PixelWidth(resize_next_, total);
     return;
   }
-  const int total = viewport_width_ > 0 ? viewport_width_ : gtk_widget_get_width(widget_);
-  resize_left_start_ = PlaylistColumnLayout::PixelWidth(resize_column_, total);
-  resize_right_start_ = PlaylistColumnLayout::PixelWidth(resize_next_, total);
+  resize_column_ = PlaylistColumn::Count;
+  resize_next_ = PlaylistColumn::Count;
+  reorder_column_ = ColumnAtX(x);
+  reorder_last_hover_ = reorder_column_;
+}
+
+void PlaylistHeader::OnDragEnd() {
+  if (reorder_column_ != PlaylistColumn::Count) {
+    NotifyLayoutChanged();
+  }
+  resize_column_ = PlaylistColumn::Count;
+  resize_next_ = PlaylistColumn::Count;
+  reorder_column_ = PlaylistColumn::Count;
+  reorder_last_hover_ = PlaylistColumn::Count;
 }
 
 void PlaylistHeader::OnDragUpdate(double offset_x) {
+  if (reorder_column_ != PlaylistColumn::Count) {
+    const PlaylistColumn hover = ColumnAtX(drag_start_x_ + offset_x);
+    if (!PlaylistHeaderReorder::ShouldApplyReorder(reorder_column_, hover) || hover == reorder_last_hover_) {
+      return;
+    }
+    reorder_last_hover_ = hover;
+    PlaylistColumnLayout::MoveTo(reorder_column_, PlaylistHeaderReorder::VisualIndex(PlaylistColumnLayout::Visible(), hover));
+    ReorderButtons();
+    ApplyWidths();
+    return;
+  }
   if (resize_column_ == PlaylistColumn::Count || resize_next_ == PlaylistColumn::Count) {
     return;
   }

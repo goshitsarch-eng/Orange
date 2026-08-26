@@ -3,6 +3,7 @@
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "playlist/playlistcolumnwidths.h"
+#include "playlist/playlistheaderreorder.h"
 #include "utilities/strutils.h"
 
 #include <algorithm>
@@ -150,6 +151,16 @@ bool PlaylistColumnLayout::Move(PlaylistColumn column, int delta) {
   }
   std::swap(columns[static_cast<size_t>(index)], columns[static_cast<size_t>(next)]);
   SetVisibleColumns(columns);
+  return true;
+}
+
+bool PlaylistColumnLayout::MoveTo(PlaylistColumn column, int dest_visual) {
+  const auto columns = Visible();
+  const auto next = PlaylistHeaderReorder::OrderAfterMove(columns, column, dest_visual);
+  if (next == columns) {
+    return false;
+  }
+  SetVisibleColumns(next);
   return true;
 }
 
