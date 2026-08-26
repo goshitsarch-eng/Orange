@@ -8,6 +8,7 @@
 #include "collection/collectiondivider.h"
 #include "collection/collectioniconcache.h"
 #include "collection/collectionstats.h"
+#include "subsonic/subsonicsettingsactions.h"
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
 #include "collection/collectionwatcher.h"
@@ -883,6 +884,37 @@ TEST(CollectionTreeClick, MatchesQtAutoExpandingTreeView) {
   EXPECT_FALSE(CollectionTreeClick::ShouldToggleFromRowClick(false, false));
   EXPECT_TRUE(CollectionTreeClick::SelectRowBeforeEnqueue(false));
   EXPECT_FALSE(CollectionTreeClick::SelectRowBeforeEnqueue(true));
+}
+
+TEST(CollectionBackend, DeleteSongsBySourceRemovesOnlyThatSource) {
+  const std::string path = "/tmp/strawberry-collection-source-test-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  ASSERT_GE(directory, 0);
+
+  Song local = MakeSong("Roads", "Portishead", "Dummy");
+  local.set_directory_id(directory);
+  ASSERT_GT(backend.AddOrUpdateSong(local), 0);
+
+  Song remote = MakeSong("Helplessness Blues", "Fleet Foxes", "Helplessness Blues");
+  remote.set_source(Song::Source::Subsonic);
+  remote.set_url("subsonic://42");
+  remote.set_directory_id(directory);
+  ASSERT_GT(backend.AddOrUpdateSong(remote), 0);
+
+  int deleted = 0;
+  backend.SongsDeleted.Connect([&](const SongList &songs) { deleted = static_cast<int>(songs.size()); });
+  EXPECT_EQ(1, SubsonicSettingsActions::DeleteCachedSongs(&backend));
+  EXPECT_EQ(1, deleted);
+  const SongList remaining = backend.Songs();
+  ASSERT_EQ(1u, remaining.size());
+  EXPECT_EQ(Song::Source::Collection, remaining.front().source());
+  EXPECT_EQ("Roads", remaining.front().title());
+  EXPECT_EQ(0, backend.DeleteSongsBySource(Song::Source::Subsonic));
+  unlink(path.c_str());
 }
 
 TEST(CollectionStats, WritesLocalSongsAndKeepsQtCopy) {

@@ -225,6 +225,26 @@ void CollectionBackend::DeleteSongsInDirectory(int directory_id) {
   query.Exec();
 }
 
+int CollectionBackend::DeleteSongsBySource(Song::Source source) {
+  if (!database_ || !database_->handle()) {
+    return 0;
+  }
+  SongList deleted;
+  for (const Song &song : Songs()) {
+    if (song.source() == source) {
+      deleted.push_back(song);
+    }
+  }
+  if (deleted.empty()) {
+    return 0;
+  }
+  SqlQuery query(database_, "DELETE FROM songs WHERE source = ?");
+  query.Bind(1, static_cast<int>(source));
+  query.Exec();
+  SongsDeleted.Emit(deleted);
+  return static_cast<int>(deleted.size());
+}
+
 void CollectionBackend::IncrementPlayCount(int song_id) {
   SqlQuery query(database_, "UPDATE songs SET playcount = playcount + 1, lastplayed = strftime('%s','now') WHERE ROWID = ?");
   query.Bind(1, song_id);

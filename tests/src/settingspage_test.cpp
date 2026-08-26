@@ -25,6 +25,10 @@
 #include "settings/networkproxylabels.h"
 #include "settings/settingscontrols.h"
 #include "settings/streamingsettingslabels.h"
+#include "subsonic/subsonicping.h"
+#include "subsonic/subsonicsettingsactions.h"
+#include "context/contextfontcontrols.h"
+#include "context/contextfontpreview.h"
 #include "widgets/loginstatevisibility.h"
 #include "settings/transcodersettingspage.h"
 #include "covermanager/coverproviderauth.h"
@@ -324,6 +328,26 @@ TEST(StreamingSettingsLabels, MatchQtStreamingAndRadioCopy) {
   EXPECT_EQ(SubsonicConnectionCheck::Result::Ok, SubsonicConnectionCheck::Validate("https://music.example", "u", "p"));
   EXPECT_STREQ("Configuration incomplete", SubsonicConnectionCheck::Title(SubsonicConnectionCheck::Result::MissingCredentials));
   EXPECT_STREQ("Server URL is invalid.", SubsonicConnectionCheck::Body(SubsonicConnectionCheck::Result::InvalidUrl));
+  EXPECT_STREQ("Delete songs", SubsonicSettingsActions::DeleteSongs());
+  EXPECT_EQ(0, SubsonicSettingsActions::DeleteCachedSongs(nullptr));
+  const std::string ping = SubsonicPing::Url("https://music.example/subsonic", "user", "secret", true);
+  EXPECT_NE(std::string::npos, ping.find("/rest/ping.view"));
+  EXPECT_NE(std::string::npos, ping.find("p=enc:"));
+  const SubsonicPing::Result ok = SubsonicPing::Parse(R"json({"subsonic-response":{"status":"ok","version":"1.16.1"}})json");
+  EXPECT_EQ(SubsonicPing::Status::Ok, ok.status);
+  EXPECT_STREQ("Test successful!", SubsonicPing::Title(ok));
+  EXPECT_EQ("Test successful!", SubsonicPing::Body(ok));
+  const SubsonicPing::Result failed =
+      SubsonicPing::Parse(R"json({"subsonic-response":{"status":"failed","error":{"code":40,"message":"Wrong username or password"}}})json");
+  EXPECT_EQ(SubsonicPing::Status::Failed, failed.status);
+  EXPECT_STREQ("Test failed!", SubsonicPing::Title(failed));
+  EXPECT_EQ("Wrong username or password (40)", failed.message);
+  const SubsonicPing::Result missing = SubsonicPing::Parse(R"json({"subsonic-response":{"version":"1.16.1"}})json");
+  EXPECT_EQ(SubsonicPing::Status::Invalid, missing.status);
+  EXPECT_EQ("Ping reply from server is missing status", missing.message);
+  const SubsonicPing::Result http = SubsonicPing::Parse("", 503, "Service Unavailable");
+  EXPECT_EQ(SubsonicPing::Status::Failed, http.status);
+  EXPECT_EQ("Service Unavailable", http.message);
   EXPECT_STREQ("Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these.",
               TidalSettingsLabels::Disclaimer());
   EXPECT_STREQ("Audio quality", TidalSettingsLabels::AudioQuality());
@@ -377,6 +401,23 @@ TEST(BehaviourStartupChoices, HideAndTrayInterlocksMatchQt) {
   EXPECT_TRUE(BehaviourStartupChoices::TrayDependentSensitive(true, true));
   EXPECT_FALSE(BehaviourStartupChoices::TrayDependentSensitive(true, false));
   EXPECT_FALSE(BehaviourStartupChoices::TrayDependentSensitive(false, true));
+}
+
+TEST(ContextFontControls, MatchesQtGroupsAndClampsPointSize) {
+  EXPECT_STREQ("Font for headline", ContextFontControls::HeadlineGroup());
+  EXPECT_STREQ("Font for data and lyrics", ContextFontControls::NormalGroup());
+  EXPECT_STREQ("Font", ContextFontControls::FontTitle());
+  EXPECT_STREQ("Font size", ContextFontControls::SizeTitle());
+  EXPECT_STREQ(" pt", ContextFontControls::SizeSuffix());
+  EXPECT_EQ(6.0, ContextFontControls::MinPt());
+  EXPECT_EQ(32.0, ContextFontControls::MaxPt());
+  EXPECT_EQ(0.5, ContextFontControls::Step());
+  EXPECT_EQ(6.0, ContextFontControls::ClampPt(1.0));
+  EXPECT_EQ(32.0, ContextFontControls::ClampPt(99.0));
+  EXPECT_EQ(11.0, ContextFontControls::ClampPt(11.0));
+  EXPECT_STREQ("Preview", ContextFontPreview::Title());
+  EXPECT_STREQ("The quick brown fox jumps over the lazy dog", ContextFontPreview::HeadlineSample());
+  EXPECT_STREQ("Lyrics and technical data use this font.", ContextFontPreview::NormalSample());
 }
 
 TEST(LoginStateVisibility, HidesCredentialsWhileSignedIn) {

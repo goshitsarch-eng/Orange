@@ -24,6 +24,7 @@ class CollectionBackend {
   Song SongByUrl(const std::string &url) const;
   int AddOrUpdateSong(const Song &song);
   void DeleteSongsInDirectory(int directory_id);
+  int DeleteSongsBySource(Song::Source source);
   void IncrementPlayCount(int song_id);
   void IncrementSkipCount(int song_id);
   void ResetPlayStatistics(int song_id);

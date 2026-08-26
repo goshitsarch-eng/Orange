@@ -2,6 +2,7 @@
 
 #include "constants/globalshortcutssettings.h"
 #include "core/settings.h"
+#include "globalshortcuts/globalshortcutbinding.h"
 #include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
 #include "globalshortcuts/globalshortcutsbackend-portal.h"
 #include "globalshortcuts/globalshortcutsbackend-x11.h"
@@ -234,16 +235,10 @@ void GlobalShortcutsManager::LoadShortcutKeys() {
   Settings s;
   s.BeginGroup(GlobalShortcutsSettings::kSettingsGroup);
   for (auto &shortcut : shortcuts_) {
-    std::string key = s.Value(shortcut->id(), {});
-    if (key.empty()) {
-      const std::string alias = LegacySettingsKey(shortcut->id());
-      if (!alias.empty()) {
-        key = s.Value(alias, {});
-      }
-    }
-    if (key.empty()) {
-      key = shortcut->default_key();
-    }
+    const std::string alias = LegacySettingsKey(shortcut->id());
+    const std::string key = GlobalShortcutBinding::ResolveStoredKey(s.Contains(shortcut->id()), s.Value(shortcut->id()),
+                                                                    !alias.empty() && s.Contains(alias), alias.empty() ? std::string() : s.Value(alias),
+                                                                    shortcut->default_key());
     shortcut->set_key(key);
   }
 }
