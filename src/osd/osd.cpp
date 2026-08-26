@@ -68,17 +68,17 @@ void OSD::ShowPretty(const std::string &summary, const std::string &body, const 
   g_object_unref(css);
   g_object_set_data(G_OBJECT(pretty_window_), "pos-x", GINT_TO_POINTER(pos_x_));
   g_object_set_data(G_OBJECT(pretty_window_), "pos-y", GINT_TO_POINTER(pos_y_));
-  g_signal_connect(pretty_window_, "realize", G_CALLBACK(+[](GtkWidget *window, gpointer) {
 #ifdef HAVE_X11
+  g_signal_connect(pretty_window_, "realize", G_CALLBACK(+[](GtkWidget *window, gpointer) {
                      GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
                      if (surface && GDK_IS_X11_SURFACE(surface)) {
                        const int x = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(window), "pos-x"));
                        const int y = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(window), "pos-y"));
                        XMoveWindow(GDK_SURFACE_XDISPLAY(surface), gdk_x11_surface_get_xid(surface), x, y);
                      }
-#endif
                    }),
                    nullptr);
+#endif
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
   gtk_widget_set_margin_start(box, 16);
   gtk_widget_set_margin_end(box, 16);

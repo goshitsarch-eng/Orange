@@ -552,7 +552,8 @@ void Dialogs::EditTag(GtkWindow *parent, Application *app) {
     GtkWidget *compilation = nullptr;
     std::vector<std::pair<std::string, GtkWidget *>> fields;
   };
-  auto *state = new State{song};
+  auto *state = new State();
+  state->song = song;
 
   auto add_entries = [&](GtkWidget *page, const std::vector<std::pair<const char *, std::string>> &rows) {
     for (const auto &row : rows) {
