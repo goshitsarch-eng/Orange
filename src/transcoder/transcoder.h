@@ -24,6 +24,9 @@ class Transcoder {
   int quality() const { return quality_; }
   void Start();
   void Cancel();
+  bool cancelled() const { return cancelled_; }
+  int finished_success() const { return finished_success_; }
+  int finished_failed() const { return finished_failed_; }
   bool TranscodeFile(const Song &song, const std::string &destination, Format format);
   const std::vector<std::string> &log() const { return log_; }
   int job_count() const { return static_cast<int>(jobs_.size()); }
@@ -46,6 +49,9 @@ class Transcoder {
   std::vector<Job> jobs_;
   std::vector<std::string> log_;
   int quality_ = 5;
+  bool cancelled_ = false;
+  int finished_success_ = 0;
+  int finished_failed_ = 0;
 };
 
 #endif

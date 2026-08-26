@@ -25,6 +25,11 @@ namespace TranscoderSettings {
 
 constexpr char kSettingsGroup[] = "Transcoder";
 constexpr char kDefaultLastOutputFormat[] = "audio/x-vorbis";
+constexpr char kLastAddDir[] = "last_add_dir";
+constexpr char kLastImportDir[] = "last_import_dir";
+constexpr char kLastOutputFormat[] = "last_output_format";
+constexpr char kLastDestDir[] = "last_dest_dir";
+constexpr char kPreserveDirStructure[] = "preserve_dir_structure";
 
 namespace LameMP3Settings {
 constexpr char kTarget[] = "target";

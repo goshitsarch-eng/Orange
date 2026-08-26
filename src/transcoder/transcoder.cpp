@@ -75,13 +75,25 @@ bool Transcoder::TranscodeFile(const Song &song, const std::string &destination,
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
   GstBus *bus = gst_element_get_bus(pipeline);
   bool ok = false;
+  int idle = 0;
   while (true) {
-    GstMessage *message = gst_bus_timed_pop_filtered(bus, 30 * GST_SECOND,
-                                                     static_cast<GstMessageType>(GST_MESSAGE_EOS | GST_MESSAGE_ERROR));
-    if (!message) {
-      log_.push_back("Timed out transcoding " + src);
+    if (cancelled_) {
+      log_.push_back("Cancelled");
       break;
     }
+    GstMessage *message = gst_bus_timed_pop_filtered(bus, 100 * GST_MSECOND,
+                                                     static_cast<GstMessageType>(GST_MESSAGE_EOS | GST_MESSAGE_ERROR));
+    while (g_main_context_pending(nullptr)) {
+      g_main_context_iteration(nullptr, FALSE);
+    }
+    if (!message) {
+      if (++idle >= 300) {
+        log_.push_back("Timed out transcoding " + src);
+        break;
+      }
+      continue;
+    }
+    idle = 0;
     if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_EOS) {
       ok = true;
       gst_message_unref(message);
@@ -109,15 +121,35 @@ bool Transcoder::TranscodeFile(const Song &song, const std::string &destination,
 }
 
 void Transcoder::Start() {
+  cancelled_ = false;
+  finished_success_ = 0;
+  finished_failed_ = 0;
+  const int total = static_cast<int>(jobs_.size());
   int i = 0;
-  for (const Job &job : jobs_) {
-    TranscodeFile(job.song, job.destination, job.format);
-    Progress.Emit(++i, static_cast<int>(jobs_.size()));
+  while (i < static_cast<int>(jobs_.size())) {
+    if (cancelled_) {
+      break;
+    }
+    const Job job = jobs_[static_cast<size_t>(i)];
+    if (TranscodeFile(job.song, job.destination, job.format)) {
+      ++finished_success_;
+    } else {
+      ++finished_failed_;
+    }
+    ++i;
+    Progress.Emit(finished_success_ + finished_failed_, total);
+    while (g_main_context_pending(nullptr)) {
+      g_main_context_iteration(nullptr, FALSE);
+    }
   }
+  jobs_.clear();
   Finished.Emit();
 }
 
-void Transcoder::Cancel() { jobs_.clear(); }
+void Transcoder::Cancel() {
+  cancelled_ = true;
+  jobs_.clear();
+}
 
 std::string Transcoder::FormatName(Format format) { return PresetFor(format).name; }
 
