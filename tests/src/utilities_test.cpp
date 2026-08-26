@@ -960,13 +960,32 @@ TEST(AppearanceColors, PaletteTabPlayingAndIconCss) {
 
 TEST(PlayingWidget, CoverSizeAndFade) {
   EXPECT_EQ(PlayingWidget::kSmallCover, PlayingWidget::CoverSize(PlayingWidget::Mode::SmallSongDetails, true, 400));
-  EXPECT_EQ(PlayingWidget::kLargeCover, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, false, 400));
-  EXPECT_EQ(320, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, true, 800));
+  EXPECT_EQ(PlayingWidget::kMaxCoverSize, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, false, 400));
+  EXPECT_EQ(PlayingWidget::kLargeCover, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, false, 0));
+  EXPECT_EQ(PlayingWidget::kMaxCoverSize, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, true, 800));
   EXPECT_EQ(80, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, true, 20));
   EXPECT_EQ(0.0, PlayingWidget::FadeInOpacity(0));
   EXPECT_EQ(1.0, PlayingWidget::FadeInOpacity(PlayingWidget::kFadeTimelineMs));
   EXPECT_NEAR(0.5, PlayingWidget::FadeInOpacity(500), 0.001);
   EXPECT_NEAR(0.5, PlayingWidget::FadeOutOpacity(500), 0.001);
+}
+
+TEST(PlayingWidget, DetailsAndHeight) {
+  Song song;
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_album("Dummy");
+  EXPECT_EQ("Roads", PlayingWidget::DetailsTitle(song));
+  EXPECT_EQ("Portishead", PlayingWidget::DetailsArtist(song));
+  EXPECT_EQ("Dummy", PlayingWidget::DetailsAlbum(song));
+  EXPECT_TRUE(PlayingWidget::ShouldShow(true, true));
+  EXPECT_FALSE(PlayingWidget::ShouldShow(true, false));
+  EXPECT_EQ(4 + 260 + 40, PlayingWidget::LargeTotalHeight(260, 40));
+  EXPECT_EQ(0.0, PlayingWidget::ShowHideProgress(0));
+  EXPECT_EQ(1.0, PlayingWidget::ShowHideProgress(PlayingWidget::kShowHideMs));
+  EXPECT_EQ(130, PlayingWidget::AnimatedHeight(260, 250));
+  EXPECT_TRUE(PlayingWidget::IsImagePath("cover.jpg"));
+  EXPECT_FALSE(PlayingWidget::IsImagePath("track.mp3"));
 }
 
 TEST(ContextFormatTokens, InsertsKnownTokens) {

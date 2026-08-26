@@ -3,12 +3,21 @@
 #include "constants/playingwidgetsettings.h"
 #include "core/settings.h"
 #include "translations/translations.h"
+#include "utilities/fileutils.h"
+#include "utilities/jsonutils.h"
+#include "utilities/strutils.h"
 
 PlayingWidget::PlayingWidget() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
   gtk_widget_add_css_class(widget_, "playing-widget");
+  previous_cover_ = gtk_image_new_from_icon_name("audio-x-generic-symbolic");
+  gtk_image_set_pixel_size(GTK_IMAGE(previous_cover_), kSmallCover);
+  gtk_widget_set_visible(previous_cover_, FALSE);
   cover_ = gtk_image_new_from_icon_name("audio-x-generic-symbolic");
   gtk_image_set_pixel_size(GTK_IMAGE(cover_), kSmallCover);
+  GtkWidget *overlay = gtk_overlay_new();
+  gtk_overlay_set_child(GTK_OVERLAY(overlay), previous_cover_);
+  gtk_overlay_add_overlay(GTK_OVERLAY(overlay), cover_);
   spinner_ = gtk_spinner_new();
   gtk_widget_set_visible(spinner_, FALSE);
   GtkWidget *labels = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
@@ -20,9 +29,14 @@ PlayingWidget::PlayingWidget() {
   gtk_widget_add_css_class(artist_, "dim-label");
   gtk_label_set_wrap(GTK_LABEL(artist_), TRUE);
   gtk_widget_set_halign(artist_, GTK_ALIGN_START);
+  album_ = gtk_label_new("");
+  gtk_widget_add_css_class(album_, "dim-label");
+  gtk_label_set_wrap(GTK_LABEL(album_), TRUE);
+  gtk_widget_set_halign(album_, GTK_ALIGN_START);
   gtk_box_append(GTK_BOX(labels), title_);
   gtk_box_append(GTK_BOX(labels), artist_);
-  gtk_box_append(GTK_BOX(widget_), cover_);
+  gtk_box_append(GTK_BOX(labels), album_);
+  gtk_box_append(GTK_BOX(widget_), overlay);
   gtk_box_append(GTK_BOX(widget_), spinner_);
   gtk_box_append(GTK_BOX(widget_), labels);
 
@@ -36,8 +50,20 @@ PlayingWidget::PlayingWidget() {
                    })),
                    this);
 
+  GtkDropTarget *target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
+#ifdef GDK_TYPE_FILE_LIST
+  GType types[] = {G_TYPE_STRING, GDK_TYPE_FILE_LIST};
+  gtk_drop_target_set_gtypes(target, types, 2);
+#endif
+  gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(target));
+  g_signal_connect(target, "drop", G_CALLBACK((+[](GtkDropTarget *, const GValue *value, gdouble, gdouble, gpointer data) -> gboolean {
+                     return static_cast<PlayingWidget *>(data)->OnDrop(value);
+                   })),
+                   this);
+
   LoadSettings();
   ApplyLayout();
+  ApplyVisibility();
 }
 
 PlayingWidget::~PlayingWidget() { StopFade(); }
@@ -61,8 +87,10 @@ void PlayingWidget::SaveSettings() const {
 
 void PlayingWidget::SetEnabled(bool enabled) {
   enabled_ = enabled;
-  gtk_widget_set_visible(widget_, enabled);
+  ApplyVisibility();
 }
+
+void PlayingWidget::SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
 
 void PlayingWidget::SetMode(Mode mode) {
   mode_ = mode;
@@ -90,17 +118,27 @@ void PlayingWidget::ApplyLayout() {
   gtk_orientable_set_orientation(GTK_ORIENTABLE(widget_), large ? GTK_ORIENTATION_VERTICAL : GTK_ORIENTATION_HORIZONTAL);
   const int size = CoverSize(mode_, fit_cover_width_, gtk_widget_get_width(widget_));
   gtk_image_set_pixel_size(GTK_IMAGE(cover_), size);
+  gtk_image_set_pixel_size(GTK_IMAGE(previous_cover_), size);
   gtk_widget_set_size_request(cover_, size, size);
+  gtk_widget_set_size_request(previous_cover_, size, size);
   gtk_widget_set_hexpand(cover_, large && fit_cover_width_);
   gtk_widget_set_halign(cover_, large ? GTK_ALIGN_CENTER : GTK_ALIGN_START);
+  gtk_widget_set_halign(previous_cover_, large ? GTK_ALIGN_CENTER : GTK_ALIGN_START);
 }
+
+void PlayingWidget::ApplyVisibility() { gtk_widget_set_visible(widget_, ShouldShow(enabled_, active_)); }
 
 void PlayingWidget::Playing() { playing_ = true; }
 
 void PlayingWidget::Stopped() {
   playing_ = false;
+  active_ = false;
+  StopFade();
+  gtk_widget_set_opacity(cover_, 1.0);
+  gtk_widget_set_visible(previous_cover_, FALSE);
   SongChanged(Song());
-  SetCover({});
+  SetImageFromBytes(cover_, {});
+  ApplyVisibility();
 }
 
 void PlayingWidget::Error() {
@@ -110,14 +148,26 @@ void PlayingWidget::Error() {
 
 void PlayingWidget::SongChanged(const Song &song) {
   song_ = song;
-  gtk_label_set_text(GTK_LABEL(title_), song.PrettyTitle().empty() ? Translations::CStr("Not playing") : song.PrettyTitle().c_str());
-  gtk_label_set_text(GTK_LABEL(artist_), song.EffectiveAlbumartist().c_str());
+  const std::string title = DetailsTitle(song);
+  gtk_label_set_text(GTK_LABEL(title_), title.empty() ? Translations::CStr("Not playing") : title.c_str());
+  gtk_label_set_text(GTK_LABEL(artist_), DetailsArtist(song).c_str());
+  gtk_label_set_text(GTK_LABEL(album_), DetailsAlbum(song).c_str());
+  gtk_widget_set_visible(album_, !DetailsAlbum(song).empty());
+  if (playing_) {
+    active_ = true;
+    ApplyVisibility();
+  }
 }
 
 void PlayingWidget::SetCover(const std::vector<unsigned char> &data) {
   gtk_widget_set_visible(spinner_, FALSE);
   gtk_spinner_stop(GTK_SPINNER(spinner_));
-  SetImageFromBytes(data);
+  SnapshotCurrentToPrevious();
+  SetImageFromBytes(cover_, data);
+  if (playing_) {
+    active_ = true;
+    ApplyVisibility();
+  }
   StartFade();
 }
 
@@ -126,11 +176,23 @@ void PlayingWidget::SearchCoverInProgress() {
   gtk_spinner_start(GTK_SPINNER(spinner_));
 }
 
-void PlayingWidget::SetImageFromBytes(const std::vector<unsigned char> &data) {
+void PlayingWidget::SnapshotCurrentToPrevious() {
+  GdkPaintable *paintable = gtk_image_get_paintable(GTK_IMAGE(cover_));
+  if (paintable) {
+    gtk_image_set_from_paintable(GTK_IMAGE(previous_cover_), paintable);
+  } else {
+    gtk_image_set_from_icon_name(GTK_IMAGE(previous_cover_), "audio-x-generic-symbolic");
+  }
+  gtk_image_set_pixel_size(GTK_IMAGE(previous_cover_), gtk_image_get_pixel_size(GTK_IMAGE(cover_)));
+  gtk_widget_set_visible(previous_cover_, TRUE);
+  gtk_widget_set_opacity(previous_cover_, 1.0);
+}
+
+void PlayingWidget::SetImageFromBytes(GtkWidget *image, const std::vector<unsigned char> &data) {
   const int size = CoverSize(mode_, fit_cover_width_, gtk_widget_get_width(widget_));
   if (data.empty()) {
-    gtk_image_set_from_icon_name(GTK_IMAGE(cover_), "audio-x-generic-symbolic");
-    gtk_image_set_pixel_size(GTK_IMAGE(cover_), size);
+    gtk_image_set_from_icon_name(GTK_IMAGE(image), "audio-x-generic-symbolic");
+    gtk_image_set_pixel_size(GTK_IMAGE(image), size);
     return;
   }
   GBytes *bytes = g_bytes_new(data.data(), data.size());
@@ -143,8 +205,8 @@ void PlayingWidget::SetImageFromBytes(const std::vector<unsigned char> &data) {
     }
     return;
   }
-  gtk_image_set_from_paintable(GTK_IMAGE(cover_), GDK_PAINTABLE(texture));
-  gtk_image_set_pixel_size(GTK_IMAGE(cover_), size);
+  gtk_image_set_from_paintable(GTK_IMAGE(image), GDK_PAINTABLE(texture));
+  gtk_image_set_pixel_size(GTK_IMAGE(image), size);
   g_object_unref(texture);
 }
 
@@ -152,16 +214,7 @@ void PlayingWidget::StartFade() {
   StopFade();
   fade_elapsed_ms_ = 0;
   gtk_widget_set_opacity(cover_, 0.0);
-  fade_timeout_id_ = g_timeout_add(50, [](gpointer data) -> gboolean {
-    auto *self = static_cast<PlayingWidget *>(data);
-    self->fade_elapsed_ms_ += 50;
-    gtk_widget_set_opacity(self->cover_, FadeInOpacity(self->fade_elapsed_ms_));
-    if (self->fade_elapsed_ms_ >= kFadeTimelineMs) {
-      self->fade_timeout_id_ = 0;
-      return G_SOURCE_REMOVE;
-    }
-    return G_SOURCE_CONTINUE;
-  }, this);
+  fade_timeout_id_ = g_timeout_add(kFadeTickMs, [](gpointer data) -> gboolean { return static_cast<PlayingWidget *>(data)->FadeTick(); }, this);
 }
 
 void PlayingWidget::StopFade() {
@@ -169,7 +222,66 @@ void PlayingWidget::StopFade() {
     g_source_remove(fade_timeout_id_);
     fade_timeout_id_ = 0;
   }
+  fade_elapsed_ms_ = 0;
   gtk_widget_set_opacity(cover_, 1.0);
+}
+
+gboolean PlayingWidget::FadeTick() {
+  fade_elapsed_ms_ += kFadeTickMs;
+  gtk_widget_set_opacity(previous_cover_, FadeOutOpacity(fade_elapsed_ms_));
+  gtk_widget_set_opacity(cover_, FadeInOpacity(fade_elapsed_ms_));
+  if (fade_elapsed_ms_ < kFadeTimelineMs) {
+    return G_SOURCE_CONTINUE;
+  }
+  fade_timeout_id_ = 0;
+  gtk_widget_set_opacity(cover_, 1.0);
+  gtk_widget_set_visible(previous_cover_, FALSE);
+  gtk_image_set_from_icon_name(GTK_IMAGE(previous_cover_), "audio-x-generic-symbolic");
+  return G_SOURCE_REMOVE;
+}
+
+gboolean PlayingWidget::OnDrop(const GValue *value) {
+  std::vector<std::string> paths;
+  if (G_VALUE_HOLDS_STRING(value)) {
+    const char *text = g_value_get_string(value);
+    for (const std::string &part : StrUtils::Split(text ? text : "", '\n')) {
+      std::string url = part;
+      if (!url.empty() && url.back() == '\r') {
+        url.pop_back();
+      }
+      if (!url.empty()) {
+        paths.push_back(url);
+      }
+    }
+  }
+#ifdef GDK_TYPE_FILE_LIST
+  if (G_VALUE_HOLDS(value, GDK_TYPE_FILE_LIST)) {
+    auto *list = static_cast<GdkFileList *>(g_value_get_boxed(value));
+    GSList *files = gdk_file_list_get_files(list);
+    for (GSList *item = files; item; item = item->next) {
+      gchar *uri = g_file_get_uri(G_FILE(item->data));
+      if (uri) {
+        paths.emplace_back(uri);
+        g_free(uri);
+      }
+    }
+  }
+#endif
+  for (const std::string &url : paths) {
+    const std::string path = FileUtils::PathFromUri(url);
+    if (!IsImagePath(path) && !IsImagePath(url)) {
+      continue;
+    }
+    const std::string data = FileUtils::ReadFile(path);
+    if (data.empty() || !JsonUtils::LooksLikeImage(data)) {
+      continue;
+    }
+    if (drop_) {
+      drop_(std::vector<unsigned char>(data.begin(), data.end()));
+    }
+    return TRUE;
+  }
+  return FALSE;
 }
 
 void PlayingWidget::ShowMenu(double x, double y) {

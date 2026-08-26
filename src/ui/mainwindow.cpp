@@ -1158,6 +1158,14 @@ void MainWindow::BuildPlayerBar() {
     cover_controller_ = std::make_unique<AlbumCoverChoiceController>(app_);
   }
   cover_controller_->AttachMenu(playing_widget_->cover(), GTK_WINDOW(window_), [this]() { return app_->player()->current_song(); });
+  playing_widget_->SetDropCallback([this](const std::vector<unsigned char> &data) {
+    const Song song = app_->player()->current_song();
+    CoverProviders::SaveAlbumCover(song, std::string(data.begin(), data.end()), app_->tagreader());
+    playing_widget_->SetCover(data);
+    if (context_view_) {
+      context_view_->AlbumCoverLoaded(data);
+    }
+  });
   GtkGesture *cover_activate = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(cover_activate), GDK_BUTTON_PRIMARY);
   gtk_widget_add_controller(playing_widget_->cover(), GTK_EVENT_CONTROLLER(cover_activate));
