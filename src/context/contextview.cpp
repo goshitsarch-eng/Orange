@@ -1,6 +1,7 @@
 #include "context/contextview.h"
 
 #include "constants/contextsettings.h"
+#include "context/contextfont.h"
 #include "context/contexttechnical.h"
 #include "core/settings.h"
 #include "core/song.h"
@@ -142,19 +143,20 @@ void ContextView::ReloadSettings() {
   search_lyrics_ = settings.BoolValue(ContextSettings::kSearchLyrics, ContextSettings::kDefaultSearchLyrics);
   title_fmt_ = settings.Value(ContextSettings::kSettingsTitleFmt, ContextSettings::kDefaultTitleFmt);
   summary_fmt_ = settings.Value(ContextSettings::kSettingsSummaryFmt, ContextSettings::kDefaultSummaryFmt);
-  const std::string headline_font = settings.Value(ContextSettings::kFontHeadline, ContextSettings::kDefaultFontFamily);
-  const std::string normal_font = settings.Value(ContextSettings::kFontNormal, ContextSettings::kDefaultFontFamily);
-  const double headline_size = settings.DoubleValue(ContextSettings::kFontSizeHeadline, ContextSettings::kDefaultFontSizeHeadline);
-  const double normal_size = settings.DoubleValue(ContextSettings::kFontSizeNormal, ContextSettings::kDefaultFontSizeNormal);
+  const FontUtils::Font headline = ContextFont::Load(settings.Value(ContextSettings::kFontHeadline, ContextSettings::kDefaultFontFamily),
+                                                     static_cast<int>(settings.DoubleValue(ContextSettings::kFontSizeHeadline,
+                                                                                           ContextSettings::kDefaultFontSizeHeadline)));
+  const FontUtils::Font normal = ContextFont::Load(settings.Value(ContextSettings::kFontNormal, ContextSettings::kDefaultFontFamily),
+                                                   static_cast<int>(settings.DoubleValue(ContextSettings::kFontSizeNormal,
+                                                                                         ContextSettings::kDefaultFontSizeNormal)));
   if (title_) {
     gtk_widget_set_name(title_, "context-headline");
-    StyleUtils::LoadCss("#context-headline { font-family: \"" + headline_font + "\"; font-size: " + std::to_string(headline_size) + "pt; }");
+    StyleUtils::LoadCss(ContextFont::CssRule("#context-headline", headline));
   }
   if (artist_ && album_label_) {
     gtk_widget_set_name(artist_, "context-normal");
     gtk_widget_set_name(album_label_, "context-summary");
-    StyleUtils::LoadCss("#context-normal, #context-summary { font-family: \"" + normal_font + "\"; font-size: " +
-                        std::to_string(normal_size) + "pt; }");
+    StyleUtils::LoadCss(ContextFont::CssRule("#context-normal, #context-summary", normal));
   }
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), show_album_);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), show_data_);

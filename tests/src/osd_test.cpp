@@ -151,6 +151,9 @@ TEST(FontUtils, ParsesQtAndPangoAndWritesCss) {
   EXPECT_EQ("Cantarell Bold Italic 11", FontUtils::ToPango(pango));
   EXPECT_EQ("italic bold 11pt \"Cantarell\"", FontUtils::ToCss(pango));
   EXPECT_EQ("12pt \"Sans\"", FontUtils::ToCss(FontUtils::Parse("Sans 12")));
+  EXPECT_FALSE(FontUtils::HasExplicitSize("Noto Sans"));
+  EXPECT_TRUE(FontUtils::HasExplicitSize("Noto Sans 11"));
+  EXPECT_TRUE(FontUtils::HasExplicitSize(OSDPrettySettings::kDefaultFont));
 }
 
 TEST(ColorUtils, RgbRoundTripFromHex) {

@@ -108,12 +108,15 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
 
   AdwPreferencesGroup *cache = SettingsPage::AddGroup(page, "Cache");
   SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsCacheSize, "Icon cache size", CollectionSettings::kSettingsCacheSizeDefault);
-  SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsCacheSizeUnit, "Icon cache unit (0 KB / 1 MB / 2 GB / 3 TB)",
-                            static_cast<int>(CollectionSettings::kDefaultSettingsCacheSizeUnit));
+  const std::vector<std::pair<std::string, std::string>> units = {{"0", "KB"}, {"1", "MB"}, {"2", "GB"}, {"3", "TB"}};
+  SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsCacheSizeUnit, "Icon cache unit",
+                            units, static_cast<int>(CollectionSettings::kDefaultSettingsCacheSizeUnit));
   SettingsPage::AddToggle(cache, settings, CollectionSettings::kSettingsDiskCacheEnable, "Enable disk cache", nullptr,
                           CollectionSettings::kDefaultSettingsDiskCacheEnable);
   SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsDiskCacheSize, "Disk cache size",
                             CollectionSettings::kSettingsDiskCacheSizeDefault);
+  SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsDiskCacheSizeUnit,
+                            "Disk cache unit", units, static_cast<int>(CollectionSettings::kDefaultSettingsDiskCacheSizeUnit));
 
   AdwPreferencesGroup *tags = SettingsPage::AddGroup(page, "Tags");
   SettingsPage::AddToggle(tags, settings, CollectionSettings::kSavePlayCounts, "Save playcounts to files", nullptr,

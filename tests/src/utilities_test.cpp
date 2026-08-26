@@ -10,7 +10,9 @@
 #include "device/giolister.h"
 #include "equalizer/equalizer.h"
 #include "constants/filefilterconstants.h"
+#include "constants/collectionsettings.h"
 #include "context/contextalbum.h"
+#include "context/contextfont.h"
 #include "context/contexttechnical.h"
 #include "organize/organize.h"
 #include "organize/organizeformatvalidator.h"
@@ -855,4 +857,24 @@ TEST(ContextFormatTokens, InsertsKnownTokens) {
   EXPECT_EQ("%title%%artist%", ContextFormatTokens::Insert("%title%", "%artist%"));
   EXPECT_EQ("%title%", ContextFormatTokens::Insert("%title%", {}));
   EXPECT_FALSE(ContextFormatTokens::All().empty());
+}
+
+TEST(ContextFont, UsesFallbackSizeForFamilyOnly) {
+  const FontUtils::Font family_only = ContextFont::Load("Noto Sans", 11);
+  EXPECT_EQ("Noto Sans", family_only.family);
+  EXPECT_EQ(11, family_only.size_pt);
+  const FontUtils::Font pango = ContextFont::Load("Cantarell Bold 14", 10);
+  EXPECT_EQ("Cantarell", pango.family);
+  EXPECT_EQ(14, pango.size_pt);
+  EXPECT_TRUE(pango.bold);
+  EXPECT_EQ("#context-headline { font: 11pt \"Noto Sans\"; }", ContextFont::CssRule("#context-headline", family_only));
+}
+
+TEST(CollectionSettings, CacheSizeUnitsMatchQt) {
+  EXPECT_EQ(0, static_cast<int>(CollectionSettings::CacheSizeUnit::KB));
+  EXPECT_EQ(1, static_cast<int>(CollectionSettings::CacheSizeUnit::MB));
+  EXPECT_EQ(2, static_cast<int>(CollectionSettings::CacheSizeUnit::GB));
+  EXPECT_EQ(3, static_cast<int>(CollectionSettings::CacheSizeUnit::TB));
+  EXPECT_STREQ("cache_size_unit", CollectionSettings::kSettingsCacheSizeUnit);
+  EXPECT_STREQ("disk_cache_size_unit", CollectionSettings::kSettingsDiskCacheSizeUnit);
 }

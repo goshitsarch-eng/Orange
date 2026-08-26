@@ -108,6 +108,23 @@ inline Font Parse(const std::string &value) {
   return ParsePango(value);
 }
 
+inline bool HasExplicitSize(const std::string &value) {
+  if (value.empty()) {
+    return false;
+  }
+  const auto first = value.find(',');
+  if (first != std::string::npos && value.find(',', first + 1) != std::string::npos) {
+    return true;
+  }
+  std::istringstream in(value);
+  std::string token;
+  std::string last;
+  while (in >> token) {
+    last = token;
+  }
+  return ParseSizeToken(last) > 0;
+}
+
 inline std::string ToPango(const Font &font) {
   std::string out = font.family.empty() ? "Sans" : font.family;
   if (font.bold) {
