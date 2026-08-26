@@ -21,6 +21,7 @@ class MusicbrainzCoverProvider : public CoverProvider {
 
   std::string name() const override { return "MusicBrainz"; }
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
+  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 
   static std::string EscapeQuery(const std::string &value);
   static std::string SearchUrl(const std::string &artist, const std::string &album);

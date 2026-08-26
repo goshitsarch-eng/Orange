@@ -1,5 +1,6 @@
 #include "covermanager/lastfmcoverprovider.h"
 
+#include "covermanager/albumcoverfetchersearch.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -8,6 +9,7 @@
 
 #include <cctype>
 #include <cstring>
+#include <functional>
 
 const char *LastFmCoverProvider::kUrl = "https://ws.audioscrobbler.com/2.0/";
 const char *LastFmCoverProvider::kApiKey = "211990b4c96782c05d1536e7219eb56e";
@@ -146,9 +148,12 @@ std::vector<LastFmCoverProvider::SearchResult> LastFmCoverProvider::ParseResults
   return results;
 }
 
-void LastFmCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
+namespace {
+
+void LastFmQuery(const Song &song, NetworkAccessManager *network,
+                 const std::function<void(const std::vector<LastFmCoverProvider::SearchResult> &, const std::string &)> &done) {
   if (!network || (song.EffectiveAlbumartist().empty() && song.album().empty() && song.title().empty())) {
-    callback({}, "No artist, album, or title");
+    done({}, "No artist, album, or title");
     return;
   }
   std::string method;
@@ -179,24 +184,45 @@ void LastFmCoverProvider::Fetch(const Song &song, NetworkAccessManager *network,
       ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
     }
   }
-  std::map<std::string, std::string> params = {{"api_key", kApiKey}, {"lang", lang}, {"method", method}, {type, query}};
-  params["api_sig"] = Sign(params);
+  std::map<std::string, std::string> params = {{"api_key", LastFmCoverProvider::kApiKey}, {"lang", lang}, {"method", method}, {type, query}};
+  params["api_sig"] = LastFmCoverProvider::Sign(params);
   params["format"] = "json";
-  network->Post(kUrl, FormBody(params), [callback, type](const NetworkAccessManager::Response &response) {
+  network->Post(LastFmCoverProvider::kUrl, LastFmCoverProvider::FormBody(params), [done, type](const NetworkAccessManager::Response &response) {
     if (!response.ok()) {
-      callback({}, response.error.empty() ? "Last.fm cover request failed" : response.error);
+      done({}, response.error.empty() ? "Last.fm cover request failed" : response.error);
       return;
     }
-    const std::vector<SearchResult> results = ParseResults(response.body, type);
+    std::vector<LastFmCoverProvider::SearchResult> results = LastFmCoverProvider::ParseResults(response.body, type);
     if (results.empty()) {
       const std::string fallback = JsonUtils::FindCoverUrl(response.body);
       if (!fallback.empty()) {
-        callback(UpgradeImageUrl(fallback), {});
-        return;
+        LastFmCoverProvider::SearchResult result;
+        result.image_url = LastFmCoverProvider::UpgradeImageUrl(fallback);
+        results.push_back(result);
       }
-      callback({}, "No Last.fm cover");
+    }
+    done(results, results.empty() ? "No Last.fm cover" : std::string());
+  }, "application/x-www-form-urlencoded");
+}
+
+}  // namespace
+
+void LastFmCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
+  LastFmQuery(song, network, [callback](const std::vector<SearchResult> &results, const std::string &error) {
+    if (results.empty()) {
+      callback({}, error);
       return;
     }
     callback(results.front().image_url, {});
-  }, "application/x-www-form-urlencoded");
+  });
+}
+
+void LastFmCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
+  LastFmQuery(song, network, [this, callback](const std::vector<SearchResult> &hits, const std::string &) {
+    CoverProviderSearchResults results;
+    for (const SearchResult &hit : hits) {
+      results.push_back(AlbumCoverFetcherSearch::FromHit(name(), hit.artist, hit.album, hit.image_url));
+    }
+    callback(results);
+  });
 }

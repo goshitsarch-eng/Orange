@@ -1,5 +1,6 @@
 #include "covermanager/musicbrainzcoverprovider.h"
 
+#include "covermanager/albumcoverfetchersearch.h"
 #include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
@@ -99,21 +100,30 @@ std::vector<MusicbrainzCoverProvider::SearchResult> MusicbrainzCoverProvider::Pa
 }
 
 void MusicbrainzCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
-  if (!network || song.EffectiveAlbumartist().empty() || song.album().empty()) {
-    callback({}, "No artist or album");
-    return;
-  }
-  const std::string artist = song.EffectiveAlbumartist();
-  network->Get(SearchUrl(artist, song.album()), [callback, artist](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      callback({}, response.error.empty() ? "MusicBrainz search failed" : response.error);
-      return;
-    }
-    const std::vector<SearchResult> results = ParseReleases(response.body, artist);
+  Search(song, network, [callback](const CoverProviderSearchResults &results) {
     if (results.empty()) {
       callback({}, "No MusicBrainz release");
       return;
     }
     callback(results.front().image_url, {});
+  });
+}
+
+void MusicbrainzCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
+  if (!network || song.EffectiveAlbumartist().empty() || song.album().empty()) {
+    callback({});
+    return;
+  }
+  const std::string artist = song.EffectiveAlbumartist();
+  network->Get(SearchUrl(artist, song.album()), [this, callback, artist](const NetworkAccessManager::Response &response) {
+    CoverProviderSearchResults results;
+    if (!response.ok()) {
+      callback(results);
+      return;
+    }
+    for (const SearchResult &hit : ParseReleases(response.body, artist)) {
+      results.push_back(AlbumCoverFetcherSearch::FromHit(name(), hit.artist, hit.album, hit.image_url));
+    }
+    callback(results);
   });
 }

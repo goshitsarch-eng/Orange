@@ -928,6 +928,8 @@ if(GTest_FOUND)
     src/covermanager/currentalbumcoverloader.cpp
     src/covermanager/albumcoverfetchersearch.cpp
     src/covermanager/albumcoverfetcher.cpp
+    src/covermanager/coverprovider.cpp
+    src/covermanager/coverproviders.cpp
     src/covermanager/coverexportrunnable.cpp
     src/covermanager/albumcoverexporter.cpp
     src/covermanager/lastfmcoverprovider.cpp

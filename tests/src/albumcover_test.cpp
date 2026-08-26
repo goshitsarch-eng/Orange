@@ -190,6 +190,44 @@ TEST(AlbumCoverFetcher, IncrementsRequestIds) {
   EXPECT_EQ(1u, fetcher.SearchForCovers("A", "B"));
   EXPECT_EQ(2u, fetcher.FetchAlbumCover("A", "B", "C", true));
   EXPECT_EQ(3u, fetcher.next_id());
+  EXPECT_EQ(0u, fetcher.queued());
+  EXPECT_EQ(0u, fetcher.active());
+  fetcher.Clear();
+  EXPECT_EQ(0u, fetcher.queued());
+}
+
+TEST(AlbumCoverFetcherSearch, RequestHitsAndStatus) {
+  const CoverSearchRequest request = AlbumCoverFetcherSearch::MakeRequest(7, "Portishead", "Dummy (Disc 1)", "Roads", true, false);
+  EXPECT_EQ(7u, request.id);
+  EXPECT_EQ("Portishead", request.artist);
+  EXPECT_EQ("Dummy", request.album);
+  EXPECT_EQ("Roads", request.title);
+  EXPECT_TRUE(request.search);
+  EXPECT_FALSE(request.batch);
+
+  const Song song = AlbumCoverFetcherSearch::SongFromRequest(request);
+  EXPECT_EQ("Portishead", song.EffectiveAlbumartist());
+  EXPECT_EQ("Dummy", song.album());
+  EXPECT_EQ("Roads", song.title());
+
+  CoverProviderSearchResults results = {
+      AlbumCoverFetcherSearch::FromHit("Last.fm", "Portishead", "Dummy", "https://example/a.jpg", 500, 500),
+      AlbumCoverFetcherSearch::FromHit("Deezer", "Other", "Other", "https://example/b.jpg", 100, 100),
+  };
+  AlbumCoverFetcherSearch::ScoreResults(request, 1.5f, "Last.fm", &results);
+  AlbumCoverFetcherSearch::SortByScore(&results);
+  AlbumCoverFetcherSearch::AssignNumbers(&results);
+  ASSERT_EQ(2u, results.size());
+  EXPECT_EQ(1, results.front().number);
+  EXPECT_EQ("Portishead - Dummy", AlbumCoverFetcherSearch::ResultLabel(results.front()));
+  EXPECT_NE(std::string::npos, AlbumCoverFetcherSearch::ResultSubtitle(results.front()).find("Last.fm"));
+  EXPECT_EQ(&results.front(), AlbumCoverFetcherSearch::Best(results));
+  EXPECT_TRUE(AlbumCoverFetcherSearch::IsHttpUrl("https://example/a.jpg"));
+  EXPECT_FALSE(AlbumCoverFetcherSearch::IsHttpUrl("not-a-url"));
+  EXPECT_EQ("Searching providers for “Dummy”…", AlbumCoverFetcherSearch::StatusSearching("Dummy"));
+  EXPECT_EQ("No covers found", AlbumCoverFetcherSearch::StatusFound(0));
+  EXPECT_EQ("1 cover found", AlbumCoverFetcherSearch::StatusFound(1));
+  EXPECT_EQ("2 covers found", AlbumCoverFetcherSearch::StatusFound(2));
 }
 
 TEST(AlbumCoverBatch, ProgressAbortAndStatus) {

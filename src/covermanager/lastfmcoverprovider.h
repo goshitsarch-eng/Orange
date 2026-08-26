@@ -29,6 +29,7 @@ class LastFmCoverProvider : public CoverProvider {
 
   std::string name() const override { return "Last.fm"; }
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
+  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 
   static std::string Sign(const std::map<std::string, std::string> &params);
   static std::string FormBody(const std::map<std::string, std::string> &params);

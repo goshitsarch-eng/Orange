@@ -19,6 +19,7 @@ class DeezerCoverProvider : public CoverProvider {
 
   std::string name() const override { return "Deezer"; }
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
+  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 
   static std::string SearchUrl(const std::string &artist, const std::string &album, const std::string &title);
   static std::vector<SearchResult> ParseResults(const std::string &json);

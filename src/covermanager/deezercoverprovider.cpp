@@ -1,5 +1,6 @@
 #include "covermanager/deezercoverprovider.h"
 
+#include "covermanager/albumcoverfetchersearch.h"
 #include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
@@ -103,20 +104,29 @@ std::vector<DeezerCoverProvider::SearchResult> DeezerCoverProvider::ParseResults
 }
 
 void DeezerCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
-  if (!network || (song.EffectiveAlbumartist().empty() && song.album().empty() && song.title().empty())) {
-    callback({}, "No artist, album, or title");
-    return;
-  }
-  network->Get(SearchUrl(song.EffectiveAlbumartist(), song.album(), song.title()), [callback](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      callback({}, response.error.empty() ? "Deezer cover request failed" : response.error);
-      return;
-    }
-    const std::vector<SearchResult> results = ParseResults(response.body);
+  Search(song, network, [callback](const CoverProviderSearchResults &results) {
     if (results.empty()) {
       callback({}, "No Deezer cover");
       return;
     }
     callback(results.front().image_url, {});
+  });
+}
+
+void DeezerCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
+  if (!network || (song.EffectiveAlbumartist().empty() && song.album().empty() && song.title().empty())) {
+    callback({});
+    return;
+  }
+  network->Get(SearchUrl(song.EffectiveAlbumartist(), song.album(), song.title()), [this, callback](const NetworkAccessManager::Response &response) {
+    CoverProviderSearchResults results;
+    if (!response.ok()) {
+      callback(results);
+      return;
+    }
+    for (const SearchResult &hit : ParseResults(response.body)) {
+      results.push_back(AlbumCoverFetcherSearch::FromHit(name(), hit.artist, hit.album, hit.image_url));
+    }
+    callback(results);
   });
 }
