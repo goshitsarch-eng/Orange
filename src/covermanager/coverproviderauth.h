@@ -66,6 +66,48 @@ inline bool ShowOpenSettings(const std::string &name) { return UsesServiceSettin
 
 inline std::string OpenSettingsLabel(const std::string &name) { return "Open " + name + " settings"; }
 
+enum class Panel { Hidden, ServiceHint, Direct };
+
+inline const char *NoProviderSelected() { return "No provider selected."; }
+
+inline const char *Authenticate() { return "Authenticate"; }
+
+// Qt CoversSettingsPage::ProvidersCurrentItemChanged
+inline Panel PanelFor(const std::string &name, bool authentication_required, bool authenticated) {
+  if (name.empty() || !authentication_required) {
+    return Panel::Hidden;
+  }
+  if (UsesServiceSettings(name) && !authenticated) {
+    return Panel::ServiceHint;
+  }
+  return Panel::Direct;
+}
+
+inline bool AuthenticateVisible(Panel panel) { return panel == Panel::Direct; }
+
+inline bool AuthenticateEnabled(Panel panel, bool login_in_progress) { return panel == Panel::Direct && !login_in_progress; }
+
+inline bool LoginStateVisible(Panel panel) { return panel == Panel::Direct; }
+
+inline bool OpenSettingsVisible(Panel panel) { return panel == Panel::ServiceHint; }
+
+inline std::string SelectionStatusText(const std::string &name, bool authentication_required, bool authenticated) {
+  if (name.empty()) {
+    return NoProviderSelected();
+  }
+  if (!authentication_required) {
+    return name + " does not need authentication.";
+  }
+  if (UsesServiceSettings(name) && !authenticated) {
+    return "Use " + name + " settings to authenticate.";
+  }
+  return name + " needs authentication.";
+}
+
+inline bool MoveUpEnabled(int row, int count) { return row > 0 && count > 0; }
+
+inline bool MoveDownEnabled(int row, int count) { return row >= 0 && row + 1 < count; }
+
 }  // namespace CoverProviderAuth
 
 #endif

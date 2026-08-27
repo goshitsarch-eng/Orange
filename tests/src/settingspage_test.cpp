@@ -446,6 +446,32 @@ TEST(CoverProviderAuth, StatusTextAndServiceSettings) {
   EXPECT_TRUE(CoverProviderAuth::ShowOpenSettings("Tidal"));
   EXPECT_FALSE(CoverProviderAuth::ShowOpenSettings("Last.fm"));
   EXPECT_EQ("Open Tidal settings", CoverProviderAuth::OpenSettingsLabel("Tidal"));
+  EXPECT_STREQ("No provider selected.", CoverProviderAuth::NoProviderSelected());
+  EXPECT_STREQ("Authenticate", CoverProviderAuth::Authenticate());
+  EXPECT_EQ(CoverProviderAuth::Panel::Hidden, CoverProviderAuth::PanelFor("", true, false));
+  EXPECT_EQ(CoverProviderAuth::Panel::Hidden, CoverProviderAuth::PanelFor("MusicBrainz", false, false));
+  EXPECT_EQ(CoverProviderAuth::Panel::ServiceHint, CoverProviderAuth::PanelFor("Tidal", true, false));
+  EXPECT_EQ(CoverProviderAuth::Panel::Direct, CoverProviderAuth::PanelFor("Tidal", true, true));
+  EXPECT_EQ(CoverProviderAuth::Panel::Direct, CoverProviderAuth::PanelFor("Discogs", true, false));
+  EXPECT_FALSE(CoverProviderAuth::AuthenticateVisible(CoverProviderAuth::Panel::Hidden));
+  EXPECT_FALSE(CoverProviderAuth::AuthenticateVisible(CoverProviderAuth::Panel::ServiceHint));
+  EXPECT_TRUE(CoverProviderAuth::AuthenticateVisible(CoverProviderAuth::Panel::Direct));
+  EXPECT_TRUE(CoverProviderAuth::AuthenticateEnabled(CoverProviderAuth::Panel::Direct, false));
+  EXPECT_FALSE(CoverProviderAuth::AuthenticateEnabled(CoverProviderAuth::Panel::Direct, true));
+  EXPECT_FALSE(CoverProviderAuth::AuthenticateEnabled(CoverProviderAuth::Panel::ServiceHint, false));
+  EXPECT_TRUE(CoverProviderAuth::LoginStateVisible(CoverProviderAuth::Panel::Direct));
+  EXPECT_FALSE(CoverProviderAuth::LoginStateVisible(CoverProviderAuth::Panel::ServiceHint));
+  EXPECT_TRUE(CoverProviderAuth::OpenSettingsVisible(CoverProviderAuth::Panel::ServiceHint));
+  EXPECT_FALSE(CoverProviderAuth::OpenSettingsVisible(CoverProviderAuth::Panel::Direct));
+  EXPECT_EQ("No provider selected.", CoverProviderAuth::SelectionStatusText({}, false, false));
+  EXPECT_EQ("MusicBrainz does not need authentication.", CoverProviderAuth::SelectionStatusText("MusicBrainz", false, false));
+  EXPECT_EQ("Use Tidal settings to authenticate.", CoverProviderAuth::SelectionStatusText("Tidal", true, false));
+  EXPECT_EQ("Tidal needs authentication.", CoverProviderAuth::SelectionStatusText("Tidal", true, true));
+  EXPECT_FALSE(CoverProviderAuth::MoveUpEnabled(0, 3));
+  EXPECT_TRUE(CoverProviderAuth::MoveUpEnabled(1, 3));
+  EXPECT_TRUE(CoverProviderAuth::MoveDownEnabled(0, 3));
+  EXPECT_FALSE(CoverProviderAuth::MoveDownEnabled(2, 3));
+  EXPECT_FALSE(CoverProviderAuth::MoveDownEnabled(0, 0));
 }
 
 TEST(StreamingChoices, QualityAndAuthLabels) {
