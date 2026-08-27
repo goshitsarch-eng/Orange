@@ -1,5 +1,6 @@
 #include "core/commandlinefingerprint.h"
 #include "core/commandlineoptions.h"
+#include "core/commandlineshortopts.h"
 #include "core/commandlineurl.h"
 #include "core/commandlinevolume.h"
 #include "core/commandlineurlplan.h"
@@ -77,6 +78,46 @@ TEST(CommandlineOptions, ParsesResizeVersionAndLogLevels) {
   const CommandlineOptions created = parse({"--create", "Mix", "file:///tmp/c.flac"});
   EXPECT_EQ(CommandlineOptions::UrlListAction::CreateNew, created.url_list_action());
   EXPECT_EQ("Mix", created.playlist_name());
+}
+
+TEST(CommandlineOptions, ShortPlayPauseStopAndOsdMatchQt) {
+  auto parse = [](std::vector<const char *> args) {
+    args.insert(args.begin(), "strawberry");
+    std::vector<char *> argv;
+    for (const char *arg : args) {
+      argv.push_back(const_cast<char *>(arg));
+    }
+    CommandlineOptions options;
+    EXPECT_TRUE(options.Parse(static_cast<int>(argv.size()), argv.data()));
+    return options;
+  };
+  EXPECT_EQ(CommandlineOptions::PlayerAction::Play, parse({"-p"}).player_action());
+  EXPECT_EQ(CommandlineOptions::PlayerAction::PlayPause, parse({"-t"}).player_action());
+  EXPECT_EQ(CommandlineOptions::PlayerAction::Pause, parse({"-u"}).player_action());
+  EXPECT_EQ(CommandlineOptions::PlayerAction::Stop, parse({"-s"}).player_action());
+  EXPECT_EQ(CommandlineOptions::PlayerAction::Previous, parse({"-r"}).player_action());
+  EXPECT_EQ(CommandlineOptions::PlayerAction::Next, parse({"-f"}).player_action());
+  const CommandlineOptions track = parse({"-k", "2"});
+  EXPECT_EQ(2, track.play_track_at());
+  const CommandlineOptions playlist = parse({"-i", "Favorites"});
+  EXPECT_EQ(CommandlineOptions::PlayerAction::PlayPlaylist, playlist.player_action());
+  EXPECT_EQ("Favorites", playlist.playlist_name());
+  EXPECT_TRUE(parse({"-o"}).show_osd());
+  EXPECT_TRUE(parse({"-y"}).toggle_pretty_osd());
+  EXPECT_EQ("nb", parse({"-g", "nb"}).language());
+  const CommandlineOptions resize = parse({"-w", "800x600"});
+  EXPECT_EQ(CommandlineOptions::PlayerAction::ResizeWindow, resize.player_action());
+  EXPECT_EQ(800, resize.resize_width());
+  EXPECT_EQ(600, resize.resize_height());
+  EXPECT_TRUE(parse({"-v"}).version());
+  EXPECT_EQ("*:1", parse({"-q"}).log_levels());
+  EXPECT_EQ(CommandlineShortOpts::kPlay, CommandlineShortOpts::ForLongOption("play"));
+  EXPECT_EQ(0, CommandlineShortOpts::ForLongOption("volume"));
+  EXPECT_EQ(0, CommandlineShortOpts::ForLongOption("stop-after-current"));
+  EXPECT_TRUE(CommandlineShortOpts::IsReserved('v'));
+  EXPECT_TRUE(CommandlineShortOpts::IsReserved('q'));
+  EXPECT_TRUE(CommandlineShortOpts::IsQtCompatible('p'));
+  EXPECT_FALSE(CommandlineShortOpts::IsQtCompatible('v'));
 }
 
 TEST(CommandlineOptions, VolumeUpDownAndIncreaseByMatchQt) {

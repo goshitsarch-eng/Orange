@@ -1,5 +1,6 @@
 #include "core/commandlineoptions.h"
 
+#include "core/commandlineshortopts.h"
 #include "core/commandlineurl.h"
 #include "core/commandlinevolume.h"
 #include "core/commandlinewindow.h"
@@ -42,18 +43,18 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   gint play_track = -1;
 
   const GOptionEntry entries[] = {
-      {"play", 0, 0, G_OPTION_ARG_NONE, &play, "Start playing", nullptr},
-      {"play-pause", 0, 0, G_OPTION_ARG_NONE, &play_pause, "Play if stopped, pause if playing", nullptr},
-      {"pause", 0, 0, G_OPTION_ARG_NONE, &pause, "Pause playback", nullptr},
-      {"stop", 0, 0, G_OPTION_ARG_NONE, &stop, "Stop playback", nullptr},
+      {"play", CommandlineShortOpts::kPlay, 0, G_OPTION_ARG_NONE, &play, "Start playing", nullptr},
+      {"play-pause", CommandlineShortOpts::kPlayPause, 0, G_OPTION_ARG_NONE, &play_pause, "Play if stopped, pause if playing", nullptr},
+      {"pause", CommandlineShortOpts::kPause, 0, G_OPTION_ARG_NONE, &pause, "Pause playback", nullptr},
+      {"stop", CommandlineShortOpts::kStop, 0, G_OPTION_ARG_NONE, &stop, "Stop playback", nullptr},
       {"stop-after-current", 0, 0, G_OPTION_ARG_NONE, &stop_after_current, "Stop after the current track", nullptr},
-      {"previous", 0, 0, G_OPTION_ARG_NONE, &previous, "Skip backward", nullptr},
+      {"previous", CommandlineShortOpts::kPrevious, 0, G_OPTION_ARG_NONE, &previous, "Skip backward", nullptr},
       {"restart-or-previous", 0, 0, G_OPTION_ARG_NONE, &restart_or_previous, "Restart the current track or go to the previous track", nullptr},
-      {"next", 0, 0, G_OPTION_ARG_NONE, &next, "Skip forward", nullptr},
-      {"play-playlist", 0, 0, G_OPTION_ARG_STRING, &play_playlist, "Play the named playlist", "NAME"},
-      {"append", 'a', 0, G_OPTION_ARG_NONE, &append, "Append files/URLs to the playlist", nullptr},
-      {"load", 'l', 0, G_OPTION_ARG_NONE, &load, "Replace the current playlist with files/URLs", nullptr},
-      {"create", 'c', 0, G_OPTION_ARG_STRING, &create_new, "Create a new playlist from files/URLs", "NAME"},
+      {"next", CommandlineShortOpts::kNext, 0, G_OPTION_ARG_NONE, &next, "Skip forward", nullptr},
+      {"play-playlist", CommandlineShortOpts::kPlayPlaylist, 0, G_OPTION_ARG_STRING, &play_playlist, "Play the named playlist", "NAME"},
+      {"append", CommandlineShortOpts::kAppend, 0, G_OPTION_ARG_NONE, &append, "Append files/URLs to the playlist", nullptr},
+      {"load", CommandlineShortOpts::kLoad, 0, G_OPTION_ARG_NONE, &load, "Replace the current playlist with files/URLs", nullptr},
+      {"create", CommandlineShortOpts::kCreate, 0, G_OPTION_ARG_STRING, &create_new, "Create a new playlist from files/URLs", "NAME"},
       {"volume", 0, 0, G_OPTION_ARG_INT, &volume, "Set the volume to LEVEL (0-100)", "LEVEL"},
       {"volume-up", 0, 0, G_OPTION_ARG_NONE, &volume_up, "Increase the volume by 4 percent", nullptr},
       {"volume-down", 0, 0, G_OPTION_ARG_NONE, &volume_down, "Decrease the volume by 4 percent", nullptr},
@@ -63,16 +64,16 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
       {"volume-decrease", 0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_INT, &volume_decrease, "Decrease volume by LEVEL", "LEVEL"},
       {"seek-to", 0, 0, G_OPTION_ARG_INT, &seek_to, "Seek to POSITION seconds", "POSITION"},
       {"seek-by", 0, 0, G_OPTION_ARG_INT, &seek_by, "Seek by OFFSET seconds", "OFFSET"},
-      {"play-track", 0, 0, G_OPTION_ARG_INT, &play_track, "Play the track at INDEX", "INDEX"},
-      {"show-osd", 0, 0, G_OPTION_ARG_NONE, &show_osd, "Display the on-screen-display", nullptr},
-      {"toggle-pretty-osd", 0, 0, G_OPTION_ARG_NONE, &toggle_pretty_osd, "Toggle the pretty OSD", nullptr},
-      {"language", 0, 0, G_OPTION_ARG_STRING, &language, "Override the language", "LANG"},
+      {"play-track", CommandlineShortOpts::kPlayTrack, 0, G_OPTION_ARG_INT, &play_track, "Play the track at INDEX", "INDEX"},
+      {"show-osd", CommandlineShortOpts::kShowOsd, 0, G_OPTION_ARG_NONE, &show_osd, "Display the on-screen-display", nullptr},
+      {"toggle-pretty-osd", CommandlineShortOpts::kTogglePrettyOsd, 0, G_OPTION_ARG_NONE, &toggle_pretty_osd, "Toggle the pretty OSD", nullptr},
+      {"language", CommandlineShortOpts::kLanguage, 0, G_OPTION_ARG_STRING, &language, "Override the language", "LANG"},
       {"debug", 0, 0, G_OPTION_ARG_NONE, &debug, "Enable debug output", nullptr},
-      {"version", 'v', 0, G_OPTION_ARG_NONE, &version, "Print version and exit", nullptr},
-      {"quiet", 'q', 0, G_OPTION_ARG_NONE, &quiet, "Equivalent to --log-levels *:1", nullptr},
+      {"version", CommandlineShortOpts::kVersion, 0, G_OPTION_ARG_NONE, &version, "Print version and exit", nullptr},
+      {"quiet", CommandlineShortOpts::kQuiet, 0, G_OPTION_ARG_NONE, &quiet, "Equivalent to --log-levels *:1", nullptr},
       {"verbose", 0, 0, G_OPTION_ARG_NONE, &verbose, "Equivalent to --log-levels *:4", nullptr},
       {"log-levels", 0, 0, G_OPTION_ARG_STRING, &log_levels, "Comma-separated log levels (e.g. *:4)", "LEVELS"},
-      {"resize-window", 0, 0, G_OPTION_ARG_STRING, &resize_window, "Resize the main window", "WxH"},
+      {"resize-window", CommandlineShortOpts::kResizeWindow, 0, G_OPTION_ARG_STRING, &resize_window, "Resize the main window", "WxH"},
       {"create-fingerprint", 0, 0, G_OPTION_ARG_STRING, &create_fingerprint, "Create fingerprint", "FILENAME"},
       {nullptr, 0, 0, G_OPTION_ARG_NONE, nullptr, nullptr, nullptr},
   };
