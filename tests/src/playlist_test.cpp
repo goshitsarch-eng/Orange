@@ -404,6 +404,7 @@ TEST(PlaylistSaveItem, GenerationGuardAndWriteError) {
   Song editable(Song::Source::LocalFile);
   editable.set_valid(true);
   editable.set_url("file:///tmp/a.flac");
+  editable.set_filetype(Song::FileType::FLAC);
   EXPECT_TRUE(PlaylistSaveItem::ShouldWriteFile(editable));
   Song stream(Song::Source::Tidal);
   stream.set_valid(true);

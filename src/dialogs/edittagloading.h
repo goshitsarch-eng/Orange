@@ -35,6 +35,9 @@ inline bool OpensDialog(const SongList &songs) { return !songs.empty(); }
 
 inline bool KeepRead(const TagReaderResult &result, const Song &song) { return result.success() && song.is_valid(); }
 
+// Qt LoadData rereads local files; stream-service/radio metadata stays in memory.
+inline bool ShouldRereadFromDisk(const Song &song) { return song.IsEditable() && !song.is_stream(); }
+
 using ReadBlocking = std::function<TagReaderResult(const std::string &, Song *)>;
 
 // Qt EditTagDialog::LoadData: reread editable local files and keep only successful reads.
@@ -45,6 +48,10 @@ inline SongList LoadData(const SongList &songs, const ReadBlocking &read) {
   }
   for (const Song &song : songs) {
     if (!song.IsEditable()) {
+      continue;
+    }
+    if (!ShouldRereadFromDisk(song)) {
+      loaded.push_back(song);
       continue;
     }
     Song copy = song;

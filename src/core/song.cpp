@@ -98,7 +98,7 @@ bool Song::is_stream() const { return is_radio() || is_stream_service() || filet
 bool Song::is_metadata_good() const { return !url_.empty() && !artist_.empty() && !title_.empty(); }
 
 bool Song::IsEditable() const {
-  return valid_ && is_local_file() && !is_stream() && !is_cdda() && !unavailable_ && cue_path_.empty();
+  return valid_ && !url_.empty() && ((url_is_local_file() && write_tags_supported() && !has_cue()) || is_stream());
 }
 
 void Song::MergeUserSetData(const Song &other, bool merge_playcount, bool merge_rating) {

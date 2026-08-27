@@ -251,6 +251,14 @@ class Song {
   bool is_cdda() const { return source_ == Source::CDDA || filetype_ == FileType::CDDA; }
   bool is_collection_song() const { return source_ == Source::Collection; }
   bool is_local_file() const { return source_ == Source::LocalFile || source_ == Source::Collection; }
+  bool url_is_local_file() const { return url_.rfind("file:", 0) == 0 || url_.rfind('/', 0) == 0; }
+  bool write_tags_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::WavPack || filetype_ == FileType::OggFlac ||
+           filetype_ == FileType::OggVorbis || filetype_ == FileType::OggOpus || filetype_ == FileType::OggSpeex ||
+           filetype_ == FileType::MPEG || filetype_ == FileType::MP4 || filetype_ == FileType::ASF || filetype_ == FileType::AIFF ||
+           filetype_ == FileType::MPC || filetype_ == FileType::TrueAudio || filetype_ == FileType::APE || filetype_ == FileType::DSF ||
+           filetype_ == FileType::DSDIFF || filetype_ == FileType::WAV;
+  }
   bool IsEditable() const;
   void MergeUserSetData(const Song &other, bool merge_playcount, bool merge_rating);
 

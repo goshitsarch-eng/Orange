@@ -133,19 +133,44 @@ TEST(Song, IsEditableRequiresLocalWritableFile) {
   local.set_valid(true);
   local.set_source(Song::Source::LocalFile);
   local.set_url("file:///tmp/song.flac");
+  local.set_filetype(Song::FileType::FLAC);
+  EXPECT_TRUE(local.write_tags_supported());
   EXPECT_TRUE(local.IsEditable());
 
   Song collection;
   collection.set_valid(true);
   collection.set_source(Song::Source::Collection);
   collection.set_url("file:///music/album/track.flac");
+  collection.set_filetype(Song::FileType::FLAC);
   EXPECT_TRUE(collection.IsEditable());
 
   Song stream;
   stream.set_valid(true);
   stream.set_source(Song::Source::Stream);
   stream.set_url("http://example.invalid/live");
-  EXPECT_FALSE(stream.IsEditable());
+  EXPECT_TRUE(stream.IsEditable());
+
+  Song tidal(Song::Source::Tidal);
+  tidal.set_valid(true);
+  tidal.set_url("https://tidal.example/roads");
+  EXPECT_FALSE(tidal.write_tags_supported());
+  EXPECT_TRUE(tidal.IsEditable());
+
+  Song module;
+  module.set_valid(true);
+  module.set_source(Song::Source::LocalFile);
+  module.set_url("file:///tmp/tune.mod");
+  module.set_filetype(Song::FileType::MOD);
+  EXPECT_FALSE(module.write_tags_supported());
+  EXPECT_FALSE(module.IsEditable());
+
+  Song dsf;
+  dsf.set_valid(true);
+  dsf.set_source(Song::Source::LocalFile);
+  dsf.set_url("file:///tmp/song.dsf");
+  dsf.set_filetype(Song::FileType::DSF);
+  EXPECT_TRUE(dsf.write_tags_supported());
+  EXPECT_TRUE(dsf.IsEditable());
 
   Song cdda;
   cdda.set_valid(true);
@@ -156,6 +181,7 @@ TEST(Song, IsEditableRequiresLocalWritableFile) {
   cue.set_valid(true);
   cue.set_source(Song::Source::LocalFile);
   cue.set_url("file:///tmp/album.flac");
+  cue.set_filetype(Song::FileType::FLAC);
   cue.set_cue_path("/tmp/album.cue");
   EXPECT_FALSE(cue.IsEditable());
 

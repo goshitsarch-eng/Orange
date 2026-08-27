@@ -10,6 +10,7 @@ Song LocalSong() {
   Song song(Song::Source::LocalFile);
   song.set_valid(true);
   song.set_url("file:///tmp/roads.flac");
+  song.set_filetype(Song::FileType::FLAC);
   song.set_title("Roads");
   return song;
 }
@@ -19,6 +20,7 @@ Song CollectionSong() {
   song.set_valid(true);
   song.set_id(7);
   song.set_url("file:///music/roads.flac");
+  song.set_filetype(Song::FileType::FLAC);
   song.set_title("Roads");
   return song;
 }
@@ -35,6 +37,7 @@ Song CueSong() {
   Song song(Song::Source::LocalFile);
   song.set_valid(true);
   song.set_url("file:///tmp/album.flac");
+  song.set_filetype(Song::FileType::FLAC);
   song.set_cue_path("/tmp/album.cue");
   return song;
 }

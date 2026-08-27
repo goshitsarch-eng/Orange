@@ -38,6 +38,7 @@ Song MakeTagged(const std::string &title, const std::string &artist, const std::
   song.set_skipcount(2);
   song.set_lastplayed(1700000000);
   song.set_url("file:///tmp/music/" + title + ".flac");
+  song.set_filetype(Song::FileType::FLAC);
   song.set_valid(true);
   return song;
 }
@@ -456,9 +457,9 @@ TEST(EditTagFields, FetchTagsAndFieldEnableMatchQt) {
   stream.set_valid(true);
   stream.set_url("https://tidal.example/roads");
   const SongList valid = EditTagFields::ValidSongs({collection, stream});
-  ASSERT_EQ(1u, valid.size());
+  ASSERT_EQ(2u, valid.size());
   EXPECT_EQ("Roads", valid.front().title());
-  EXPECT_TRUE(EditTagFields::ValidSongs({stream}).empty());
+  EXPECT_EQ(1u, EditTagFields::ValidSongs({stream}).size());
 }
 
 TEST(EditTagLoading, FileViewPlaceholdersAndLoadDataMatchQt) {
@@ -503,9 +504,16 @@ TEST(EditTagLoading, FileViewPlaceholdersAndLoadDataMatchQt) {
   Song stream(Song::Source::Tidal);
   stream.set_valid(true);
   stream.set_url("https://tidal.example/roads");
-  EXPECT_TRUE(EditTagLoading::LoadData({stream}, [&](const std::string &, Song *) {
+  stream.set_title("Roads");
+  EXPECT_FALSE(EditTagLoading::ShouldRereadFromDisk(stream));
+  EXPECT_TRUE(EditTagLoading::ShouldRereadFromDisk(placeholder));
+  const SongList stream_loaded = EditTagLoading::LoadData({stream}, [&](const std::string &, Song *) {
+    ADD_FAILURE() << "stream metadata should not be reread from disk";
     return TagReaderResult{TagReaderResult::ErrorCode::Success};
-  }).empty());
+  });
+  ASSERT_EQ(1u, stream_loaded.size());
+  EXPECT_EQ("Roads", stream_loaded.front().title());
+  EXPECT_EQ(stream.url(), stream_loaded.front().url());
 
   Song invalid;
   const SongList dropped = EditTagLoading::LoadData(placeholders, [&](const std::string &, Song *song) {
@@ -544,10 +552,13 @@ TEST(EditTagSave, PlaylistReloadAndStreamApplyMatchQt) {
   EXPECT_TRUE(EditTagSave::ShouldPersist({2, 5}));
 
   const std::vector<int> kept = EditTagSave::RowsForValidSongs({local, tidal, other}, {4, 7, 9});
-  ASSERT_EQ(2u, kept.size());
+  ASSERT_EQ(3u, kept.size());
   EXPECT_EQ(4, kept[0]);
-  EXPECT_EQ(9, kept[1]);
-  EXPECT_TRUE(EditTagSave::RowsForValidSongs({tidal}, {3}).empty());
+  EXPECT_EQ(7, kept[1]);
+  EXPECT_EQ(9, kept[2]);
+  const std::vector<int> stream_only = EditTagSave::RowsForValidSongs({tidal}, {3});
+  ASSERT_EQ(1u, stream_only.size());
+  EXPECT_EQ(3, stream_only.front());
 
   const std::vector<int> after_load = EditTagSave::RowsForLoaded({local, other}, {4, 9}, {other});
   ASSERT_EQ(1u, after_load.size());

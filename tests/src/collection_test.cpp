@@ -1071,6 +1071,7 @@ TEST(CollectionMenu, EditTrackVsTracksAndOrganize) {
   Song one(Song::Source::Collection);
   one.set_valid(true);
   one.set_url("file:///music/a.flac");
+  one.set_filetype(Song::FileType::FLAC);
   Song two = one;
   two.set_url("file:///music/b.flac");
   const auto single = CollectionMenu::VisibleItems(CollectionMenu::Analyze({one}, true, true));
@@ -1092,14 +1093,16 @@ TEST(CollectionMenu, MixedEditableHidesOrganize) {
   Song editable(Song::Source::Collection);
   editable.set_valid(true);
   editable.set_url("file:///music/a.flac");
+  editable.set_filetype(Song::FileType::FLAC);
   Song stream(Song::Source::Tidal);
   stream.set_valid(true);
   stream.set_url("tidal://track/1");
   const auto mixed = CollectionMenu::VisibleItems(CollectionMenu::Analyze({editable, stream}, true, false));
-  EXPECT_FALSE(CollectionMenu::Contains(mixed, CollectionMenu::Action::Organize));
-  EXPECT_FALSE(CollectionMenu::Contains(mixed, CollectionMenu::Action::CopyToDevice));
+  EXPECT_TRUE(CollectionMenu::Contains(mixed, CollectionMenu::Action::Organize));
+  EXPECT_TRUE(CollectionMenu::Contains(mixed, CollectionMenu::Action::CopyToDevice));
   EXPECT_TRUE(CollectionMenu::Contains(mixed, CollectionMenu::Action::Rescan));
-  EXPECT_TRUE(CollectionMenu::Contains(mixed, CollectionMenu::Action::EditTrack));
+  EXPECT_FALSE(CollectionMenu::Contains(mixed, CollectionMenu::Action::EditTrack));
+  EXPECT_TRUE(CollectionMenu::Contains(mixed, CollectionMenu::Action::EditTracks));
   EXPECT_FALSE(CollectionMenu::CopyToDeviceEnabled(CollectionMenu::Analyze({editable}, true, false)));
 }
 

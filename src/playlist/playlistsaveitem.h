@@ -9,7 +9,7 @@ inline unsigned long long Begin(unsigned long long previous) { return previous +
 
 inline bool ShouldApply(unsigned long long started, unsigned long long current) { return started == current; }
 
-inline bool ShouldWriteFile(const Song &song) { return song.IsEditable(); }
+inline bool ShouldWriteFile(const Song &song) { return song.IsEditable() && !song.is_stream(); }
 
 inline Song ChooseMetadata(bool read_ok, const Song &from_file, const Song &fallback) { return read_ok && from_file.is_valid() ? from_file : fallback; }
 
