@@ -477,8 +477,10 @@ TEST(EditTagCover, ChangeArtAndActionEnableMatchQt) {
   collection.set_art_embedded(true);
   EXPECT_TRUE(EditTagCover::HasValidArt(collection));
   EXPECT_TRUE(EditTagCover::ShowCoverEnabled(collection, false));
+  EXPECT_TRUE(EditTagCover::ShowOnDoubleClick(collection, false));
   EXPECT_TRUE(EditTagCover::SaveCoverEnabled(collection, false));
   EXPECT_FALSE(EditTagCover::ShowCoverEnabled(collection, true));
+  EXPECT_FALSE(EditTagCover::ShowOnDoubleClick(collection, true));
   collection.set_art_unset(true);
   EXPECT_FALSE(EditTagCover::ShowCoverEnabled(collection, false));
 
@@ -537,6 +539,21 @@ TEST(EditTagCover, ArtDifferentAndTabEnableMatchQt) {
   EXPECT_TRUE(EditTagCover::ArtDifferent(a, b));
   EXPECT_TRUE(EditTagCover::ShowCoverEnabled(a, false));
   EXPECT_FALSE(EditTagCover::ShowCoverEnabled(a, EditTagCover::ArtDifferentAcrossSongs({a, b})));
+}
+
+TEST(EditTagCover, TagsArtGesturesMatchQt) {
+  EXPECT_STREQ("Change art", EditTagCover::ChangeArt());
+  EXPECT_EQ(160, EditTagCover::kSummaryArtSize);
+  EXPECT_EQ(128, EditTagCover::kTagsArtSize);
+  EXPECT_EQ(1, EditTagCover::kPrimaryButton);
+  EXPECT_TRUE(EditTagCover::IsDoubleClick(2, 1));
+  EXPECT_TRUE(EditTagCover::IsDoubleClick(3, 1));
+  EXPECT_FALSE(EditTagCover::IsDoubleClick(1, 1));
+  EXPECT_FALSE(EditTagCover::IsDoubleClick(2, 3));
+  EXPECT_TRUE(EditTagCover::IsMenuClick(1, 1));
+  EXPECT_FALSE(EditTagCover::IsMenuClick(2, 1));
+  EXPECT_FALSE(EditTagCover::IsMenuClick(1, 3));
+  EXPECT_STREQ("Complete tags automatically", EditTagSummaryLabels::FetchTags());
 }
 
 TEST(EditTagFields, FieldEnabledMatchesQtFiletypeSupport) {

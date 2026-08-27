@@ -46,6 +46,19 @@ inline bool ShowCoverEnabled(const Song &song, bool art_different) {
   return !art_different && HasValidArt(song) && !song.art_unset();
 }
 
+// Qt EditTagDialog::eventFilter: double-click summary_art / tags_art calls ShowCover.
+inline constexpr int kPrimaryButton = 1;
+inline constexpr int kSummaryArtSize = 160;
+inline constexpr int kTagsArtSize = 128;
+
+inline const char *ChangeArt() { return "Change art"; }
+
+inline bool ShowOnDoubleClick(const Song &song, bool art_different) { return ShowCoverEnabled(song, art_different); }
+
+inline bool IsDoubleClick(int n_press, unsigned button) { return n_press >= 2 && static_cast<int>(button) == kPrimaryButton; }
+
+inline bool IsMenuClick(int n_press, unsigned button) { return n_press == 1 && static_cast<int>(button) == kPrimaryButton; }
+
 inline bool SaveCoverEnabled(const Song &song, bool art_different) { return ShowCoverEnabled(song, art_different); }
 
 inline bool FromFileEnabled(bool change_art) { return change_art; }
