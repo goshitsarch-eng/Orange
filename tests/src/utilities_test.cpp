@@ -47,6 +47,7 @@
 #include "organize/organizefilename.h"
 #include "organize/organizeformatvalidator.h"
 #include "organize/organizetokenhelp.h"
+#include "widgets/linetexteditkeys.h"
 #include "organize/organizeloading.h"
 #include "organize/organizepreview.h"
 #include "organize/organizetranscode.h"
@@ -242,6 +243,15 @@ TEST(FileUtils, CopyAndRemove) {
 TEST(OrganizeTokenHelp, MentionsQtTokensAndBraces) {
   EXPECT_TRUE(OrganizeTokenHelp::MentionsTokenExample(OrganizeTokenHelp::Tooltip()));
   EXPECT_TRUE(OrganizeTokenHelp::MentionsOptionalBraces(OrganizeTokenHelp::Tooltip()));
+}
+
+TEST(LineTextEditKeys, IgnoresEnterLikeQt) {
+  EXPECT_TRUE(LineTextEditKeys::IsEnter(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(LineTextEditKeys::IsEnter(ListBoxKeyboard::kKPEnter));
+  EXPECT_TRUE(LineTextEditKeys::ShouldIgnore(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(LineTextEditKeys::ShouldIgnore(ListBoxKeyboard::kKPEnter));
+  EXPECT_FALSE(LineTextEditKeys::ShouldIgnore(ListBoxKeyboard::kEscape));
+  EXPECT_FALSE(LineTextEditKeys::ShouldIgnore('a'));
 }
 
 TEST(OrganizeFormat, ExpandsTokens) {
