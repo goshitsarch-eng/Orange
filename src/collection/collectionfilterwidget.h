@@ -34,6 +34,7 @@ class CollectionFilterWidget {
   void SetConfigureLabel(const std::string &label);
   void SetGrouping(const CollectionGrouping::Grouping &grouping);
   void ReloadMenu();
+  void ApplyLook();
 
  private:
   void ApplyFilterIndices(int age, int rating, int mode);

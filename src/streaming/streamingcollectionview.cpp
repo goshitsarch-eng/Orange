@@ -1,5 +1,6 @@
 #include "streaming/streamingcollectionview.h"
 
+#include "core/appearanceconfigurebuttons.h"
 #include "collection/collectionempty.h"
 #include "collection/collectionsearchlabels.h"
 #include "filterparser/filterparser.h"
@@ -142,6 +143,7 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   gtk_box_append(GTK_BOX(widget_), filter_entry_);
   gtk_box_append(GTK_BOX(widget_), status_label_);
   gtk_box_append(GTK_BOX(widget_), scroll);
+  ApplyLook();
   GtkEventController *keys = gtk_event_controller_key_new();
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
@@ -187,6 +189,12 @@ void StreamingCollectionView::HandlePress(guint button, gint n_press, double x, 
 void StreamingCollectionView::SetRefreshCallback(RefreshCallback callback) { refresh_ = std::move(callback); }
 
 void StreamingCollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+
+void StreamingCollectionView::ApplyLook() {
+  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingCollectionFilter)) {
+    AppearanceConfigureButtons::ApplyWidget(filter_entry_, AppearanceConfigureButtons::StoredSize());
+  }
+}
 
 void StreamingCollectionView::SetService(StreamingService *service) {
   service_ = service;

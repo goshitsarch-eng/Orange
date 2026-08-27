@@ -2322,6 +2322,7 @@ TEST(AppearanceColors, PaletteTabPlayingAndIconCss) {
   EXPECT_EQ(AppearanceSettings::kDefaultIconSizePlayControlButtons, clamped.play_controls);
   EXPECT_EQ(128, clamped.tabbar_small);
   EXPECT_NE(std::string::npos, AppearanceColors::BuildIconSizeCss(sizes).find("32px"));
+  EXPECT_NE(std::string::npos, AppearanceColors::BuildIconSizeCss(sizes).find(".strawberry-configure-buttons"));
 }
 
 TEST(FancyTabMode, ModesMatchQtAndPersist) {

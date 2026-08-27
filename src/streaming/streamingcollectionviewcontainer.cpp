@@ -48,6 +48,15 @@ StreamingCollectionViewContainer::StreamingCollectionViewContainer(const std::st
   gtk_box_append(GTK_BOX(widget_), abort_);
 }
 
+void StreamingCollectionViewContainer::ApplyLook() {
+  if (filter_widget_) {
+    filter_widget_->ApplyLook();
+  }
+  if (view_) {
+    view_->ApplyLook();
+  }
+}
+
 void StreamingCollectionViewContainer::UpdateActionButton() {
   if (!abort_) {
     return;

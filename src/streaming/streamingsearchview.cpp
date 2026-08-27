@@ -4,6 +4,7 @@
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectiontree.h"
 #include "collection/groupbydialog.h"
+#include "core/appearanceconfigurebuttons.h"
 #include "core/settings.h"
 #include "dialogs/dialoghelpers.h"
 #include "streaming/streamingabort.h"
@@ -172,6 +173,7 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
                    }),
                    this);
   gtk_box_append(GTK_BOX(widget_), search_entry_);
+  ApplyLook();
   g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
                      if (StreamingSearchOpts::ShouldFocusOnShow()) {
                        static_cast<StreamingSearchView *>(data)->FocusSearch();
@@ -270,6 +272,16 @@ void StreamingSearchView::HandlePress(guint button, gint n_press, double x, doub
 void StreamingSearchView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
 void StreamingSearchView::SetConfigureCallback(ConfigureCallback callback) { configure_ = std::move(callback); }
+
+void StreamingSearchView::ApplyLook() {
+  const int size = AppearanceConfigureButtons::StoredSize();
+  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingSearch)) {
+    AppearanceConfigureButtons::ApplyWidget(search_entry_, size);
+  }
+  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingConfigure)) {
+    AppearanceConfigureButtons::ApplyWidget(configure_button_, size);
+  }
+}
 
 StreamingService::SearchType StreamingSearchView::CurrentType() const {
   if (type_artists_ && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(type_artists_))) {

@@ -146,7 +146,9 @@
 #ifdef HAVE_SPOTIFY
 #include "spotify/spotifyservice.h"
 #endif
+#include "streaming/streamingserviceenable.h"
 #include "streaming/streamingtabsview.h"
+#include "core/appearanceconfigurebuttons.h"
 #include "core/urlhandler.h"
 #include "dialogs/aboutdialog.h"
 #include "dialogs/trackselectiondialog.h"
@@ -566,6 +568,9 @@ void MainWindow::BuildUi() {
   gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(collection_search_),
                                         Translations::CStr(CollectionSearchLabels::Placeholder()));
   gtk_widget_set_tooltip_text(collection_search_, Translations::CStr(FilterParser::ToolTip().c_str()));
+  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionSearch)) {
+    AppearanceConfigureButtons::ApplyWidget(collection_search_, AppearanceConfigureButtons::StoredSize());
+  }
   adw_header_bar_pack_start(ADW_HEADER_BAR(header), collection_search_);
   g_signal_connect(collection_search_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
@@ -2620,27 +2625,42 @@ void MainWindow::SearchRadio(const std::string &query) {
 }
 
 void MainWindow::RefreshStreaming() {
+  std::vector<std::string> enabled_names;
   if (streaming_service_drop_) {
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(streaming_service_drop_));
     for (StreamingService *service : app_->streaming_services()->All()) {
       service->ReloadSettings();
+      const bool enabled = StreamingServiceEnable::IsEnabled(service->name());
+      if (streaming_stack_) {
+        if (GtkWidget *page = gtk_stack_get_child_by_name(GTK_STACK(streaming_stack_), service->name().c_str())) {
+          gtk_widget_set_visible(page, StreamingServiceEnable::ShouldShowStackPage(enabled) ? TRUE : FALSE);
+        }
+      }
+      if (!StreamingServiceEnable::ShouldList(enabled)) {
+        continue;
+      }
+      enabled_names.push_back(service->name());
       const std::string label = service->name() + (service->logged_in() ? " (signed in)" : "");
       gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(streaming_service_drop_), service->name().c_str(), label.c_str());
     }
+    streaming_service_name_ = StreamingServiceEnable::SelectVisible(streaming_service_name_, enabled_names);
     if (!streaming_service_name_.empty()) {
       gtk_combo_box_set_active_id(GTK_COMBO_BOX(streaming_service_drop_), streaming_service_name_.c_str());
-    } else if (!app_->streaming_services()->All().empty()) {
-      gtk_combo_box_set_active(GTK_COMBO_BOX(streaming_service_drop_), 0);
+      if (streaming_stack_) {
+        gtk_stack_set_visible_child_name(GTK_STACK(streaming_stack_), streaming_service_name_.c_str());
+      }
+    } else {
+      gtk_combo_box_set_active(GTK_COMBO_BOX(streaming_service_drop_), -1);
     }
   }
   for (const auto &view : streaming_views_) {
     view->ReloadSettings();
   }
-  if (!streaming_list_ || !streaming_views_.empty()) {
+  if (!streaming_list_) {
     return;
   }
   ClearList(streaming_list_);
-  if (app_->streaming_services()->All().empty()) {
+  if (enabled_names.empty() && StreamingServiceEnable::EnabledAmong({"Subsonic", "Tidal", "Spotify", "Qobuz"}).empty()) {
     AppendStringRow(GTK_LIST_BOX(streaming_list_), "Subsonic — enable in Preferences", nullptr);
     AppendStringRow(GTK_LIST_BOX(streaming_list_), "Tidal — enable in Preferences", nullptr);
     AppendStringRow(GTK_LIST_BOX(streaming_list_), "Spotify — enable in Preferences", nullptr);
@@ -2778,6 +2798,9 @@ void MainWindow::OpenSettings(const char *page_name) {
     ApplyBehaviourSettings();
     ApplyPlaylistBehaviour();
     RefreshCollection();
+    if (StreamingServiceEnable::ShouldRefreshOnSettingsClose()) {
+      RefreshStreaming();
+    }
     app_->analyzer()->ReloadSettings();
     ApplyAnalyzer();
     app_->moodbar()->ReloadSettings();
@@ -3473,6 +3496,17 @@ void MainWindow::ApplyAppearance() {
   }
   if (playlist_container_) {
     playlist_container_->ApplyLook();
+  }
+  if (collection_search_ && AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionSearch)) {
+    AppearanceConfigureButtons::ApplyWidget(collection_search_, AppearanceConfigureButtons::IconSize(appearance.icon_sizes().configure));
+  }
+  if (collection_container_) {
+    collection_container_->ApplyLook();
+  }
+  for (const auto &view : streaming_views_) {
+    if (view) {
+      view->ApplyLook();
+    }
   }
   if (play_button_) {
     const int size = appearance.icon_sizes().play_controls;

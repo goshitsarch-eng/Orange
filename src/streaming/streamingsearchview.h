@@ -38,6 +38,7 @@ class StreamingSearchView {
   bool SearchFieldHasFocus() const;
   void FocusResultsAndMove(unsigned keyval);
   void SetConfigureCallback(ConfigureCallback callback);
+  void ApplyLook();
   GMenuModel *GroupMenuModel() const { return group_menu_model_; }
   void AttachGroupActions(GtkWidget *widget);
   void SearchForThis(const std::string &query = {});

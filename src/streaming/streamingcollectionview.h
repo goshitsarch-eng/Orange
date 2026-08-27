@@ -48,6 +48,7 @@ class StreamingCollectionView {
   void FocusListAndMove(unsigned keyval);
   void SetGroupingChangedCallback(GroupingCallback callback) { grouping_changed_ = std::move(callback); }
   void SetService(StreamingService *service);
+  void ApplyLook();
   void SetGrouping(const CollectionGrouping::Grouping &grouping);
   void ApplyGrouping(const CollectionGrouping::Grouping &grouping);
   const CollectionGrouping::Grouping &grouping() const { return grouping_; }

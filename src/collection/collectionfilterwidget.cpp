@@ -2,6 +2,7 @@
 
 #include "collection/collectionfilterchoices.h"
 #include "collection/collectiongroupingsave.h"
+#include "core/appearanceconfigurebuttons.h"
 #include "settings/settingspages.h"
 #include "translations/translations.h"
 
@@ -23,6 +24,13 @@ CollectionFilterWidget::CollectionFilterWidget() {
   grouping_ = CollectionGrouping::LoadCurrent();
   options_ = CollectionFilterChoices::FromIndices(age_index_, rating_index_, mode_index_);
   BuildMenu();
+  ApplyLook();
+}
+
+void CollectionFilterWidget::ApplyLook() {
+  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionOptions)) {
+    AppearanceConfigureButtons::ApplyWidget(options_button_, AppearanceConfigureButtons::StoredSize());
+  }
 }
 
 CollectionFilterWidget::~CollectionFilterWidget() {

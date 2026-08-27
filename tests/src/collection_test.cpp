@@ -1,3 +1,4 @@
+#include "core/appearanceconfigurebuttons.h"
 #include "collection/collectionfullrescan.h"
 #include "collection/collectioncompilationdetect.h"
 #include "collection/collectionsongpatch.h"
@@ -2040,6 +2041,19 @@ TEST(CollectionFullRescan, MatchesQtRevisions) {
   EXPECT_NE(std::string::npos, message.find("full collection rescan"));
   EXPECT_NE(std::string::npos, message.find(reasons.front()));
   EXPECT_STREQ("Collection rescan notice", CollectionFullRescan::DialogTitle());
+}
+
+TEST(AppearanceConfigureButtons, SizesCollectionAndStreamingLikeQt) {
+  EXPECT_STREQ("strawberry-configure-buttons", AppearanceConfigureButtons::CssClass());
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionOptions));
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionSearch));
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingSearch));
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingConfigure));
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingCollectionFilter));
+  EXPECT_EQ(AppearanceSettings::kDefaultIconSizeConfigureButtons, AppearanceConfigureButtons::IconSize(0));
+  EXPECT_EQ(20, AppearanceConfigureButtons::IconSize(20));
+  EXPECT_EQ(32, AppearanceConfigureButtons::IconSize(32));
+  EXPECT_EQ(128, AppearanceConfigureButtons::IconSize(256));
 }
 
 TEST(Database, RecordsStartupSchemaVersion) {
