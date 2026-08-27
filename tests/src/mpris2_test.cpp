@@ -65,7 +65,7 @@ TEST(Mpris2Helpers, MetadataNeedsUpdate) {
 TEST(Mpris2Helpers, RatingMatchesQt) {
   EXPECT_DOUBLE_EQ(0.0, Mpris2Helpers::RatingProperty(-1.0f));
   EXPECT_DOUBLE_EQ(0.0, Mpris2Helpers::RatingProperty(0.0f));
-  EXPECT_DOUBLE_EQ(0.8, Mpris2Helpers::RatingProperty(0.8f));
+  EXPECT_FLOAT_EQ(0.8f, static_cast<float>(Mpris2Helpers::RatingProperty(0.8f)));
   EXPECT_FLOAT_EQ(1.0f, Mpris2Helpers::RatingFromProperty(1.5));
   EXPECT_FLOAT_EQ(-1.0f, Mpris2Helpers::RatingFromProperty(0.0));
   EXPECT_FLOAT_EQ(-1.0f, Mpris2Helpers::RatingFromProperty(-0.2));
