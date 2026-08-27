@@ -19,12 +19,18 @@ inline const std::vector<std::string> &AllIds() {
   return kAll;
 }
 
-inline const std::vector<std::string> &DefaultEnabledIds() {
-  static const std::vector<std::string> kDefault = {"art_embedded", "art_automatic", "art_manual"};
+// Qt CoversSettingsPage::Load default list: all types enabled in this order.
+inline const std::vector<std::string> &DefaultEnabledIds() { return AllIds(); }
+
+inline std::string DefaultSaved() { return StrUtils::Join(DefaultEnabledIds(), ","); }
+
+// Qt AlbumCoverLoaderOptions::LoadTypes default when the key is missing.
+inline const std::vector<std::string> &LoaderDefaultIds() {
+  static const std::vector<std::string> kDefault = {"art_unset", "art_embedded", "art_manual", "art_automatic"};
   return kDefault;
 }
 
-inline std::string DefaultSaved() { return StrUtils::Join(DefaultEnabledIds(), ","); }
+inline std::string DefaultLoaderSaved() { return StrUtils::Join(LoaderDefaultIds(), ","); }
 
 inline bool IsKnown(const std::string &id) {
   return id == "art_unset" || id == "art_manual" || id == "art_automatic" || id == "art_embedded";
