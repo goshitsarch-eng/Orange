@@ -3,6 +3,7 @@
 #include "constants/scrobblersettings.h"
 #include "core/settings.h"
 #include "scrobbler/scrobblemetadata.h"
+#include "scrobbler/scrobblererror.h"
 #include "scrobbler/scrobblerplayingstate.h"
 #include "scrobbler/scrobblersubmittiming.h"
 #include "utilities/jsonutils.h"
@@ -115,7 +116,14 @@ void LastFmScrobbler::Post(const std::map<std::string, std::string> &params) {
   std::map<std::string, std::string> signed_params = params;
   signed_params["api_sig"] = Sign(signed_params);
   signed_params["format"] = "json";
-  network_->Post(kApiUrl, FormBody(signed_params), [](const NetworkAccessManager::Response &) {}, "application/x-www-form-urlencoded");
+  network_->Post(
+      kApiUrl, FormBody(signed_params),
+      [this](const NetworkAccessManager::Response &response) {
+        if (!response.ok()) {
+          Error.Emit(ScrobblerError::RequestFailed("Last.fm"));
+        }
+      },
+      "application/x-www-form-urlencoded");
 }
 
 void LastFmScrobbler::CheckScrobblePrevSong() {
@@ -198,6 +206,7 @@ void LastFmScrobbler::SubmitCache() {
     if (response.ok()) {
       cache_.RemoveSent();
     } else {
+      Error.Emit(ScrobblerError::RequestFailed("Last.fm"));
       ScheduleSubmit(true);
     }
   }, "application/x-www-form-urlencoded");
@@ -224,6 +233,7 @@ void LastFmScrobbler::Authenticate(const std::string &username, const std::strin
   settings.SetValue("password", password);
   settings.Sync();
   if (!network_) {
+    Error.Emit(ScrobblerError::NotAuthenticated("Last.fm"));
     if (done) {
       done(false);
     }
@@ -237,6 +247,7 @@ void LastFmScrobbler::Authenticate(const std::string &username, const std::strin
   params["format"] = "json";
   network_->Post(kApiUrl, FormBody(params), [this, done](const NetworkAccessManager::Response &response) {
     if (!response.ok()) {
+      Error.Emit(ScrobblerError::NotAuthenticated("Last.fm"));
       if (done) {
         done(false);
       }
@@ -245,6 +256,7 @@ void LastFmScrobbler::Authenticate(const std::string &username, const std::strin
     const std::string key = JsonUtils::GetString(response.body, {"session", "key"});
     const std::string name = JsonUtils::GetString(response.body, {"session", "name"});
     if (key.empty()) {
+      Error.Emit(ScrobblerError::NotAuthenticated("Last.fm"));
       if (done) {
         done(false);
       }

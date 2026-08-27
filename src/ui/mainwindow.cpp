@@ -65,6 +65,10 @@
 #include "streaming/streamingfavoriteaction.h"
 #include "streaming/streamingsearchopts.h"
 #include "constants/scrobblersettings.h"
+#include "playlist/playlistrestorescroll.h"
+#include "scrobbler/scrobbletoggleicon.h"
+#include "scrobbler/scrobblererror.h"
+#include "scrobbler/scrobblerlovestate.h"
 #include "analyzer/analyzerframerate.h"
 #include "constants/analyzersettings.h"
 #include "constants/appearancesettings.h"
@@ -474,6 +478,7 @@ void MainWindow::BuildUi() {
                if (self->app_ && self->app_->scrobbler()) {
                  self->app_->scrobbler()->ToggleScrobbling();
                }
+               self->UpdateScrobblerButtons();
              }));
   add_action("shuffle-mode", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CycleShuffle(); }));
   add_action("repeat-mode", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CycleRepeat(); }));
@@ -1815,6 +1820,23 @@ void MainWindow::ConnectSignals() {
     ApplyPlaylistBehaviour();
     RefreshPlaylistsList();
     RefreshPlaylist();
+    if (playlist_container_ && playlist_container_->view()) {
+      Playlist *playlist = app_->playlist_manager()->current();
+      const int row = PlaylistRestoreScroll::TargetRow(playlist ? playlist->current_row() : -1, playlist ? playlist->current_row() : -1);
+      if (PlaylistRestoreScroll::ShouldJump(row)) {
+        playlist_container_->view()->JumpToCurrentlyPlayingTrack();
+      }
+    }
+  });
+  app_->scrobbler()->Error.Connect([this](const std::string &message) {
+    if (ScrobblerError::ShouldShowDialog(message)) {
+      ShowToast(message);
+    }
+  });
+  app_->scrobbler()->EnabledChanged.Connect([this](bool) { UpdateScrobblerButtons(); });
+  app_->scrobbler()->TrackLoved.Connect([this](const Song &) {
+    loved_current_track_ = ScrobblerLoveState::DisableAfterLove();
+    UpdateScrobblerButtons();
   });
   app_->collection()->ScanFinished.Connect([this]() {
     RefreshCollection();
@@ -2172,6 +2194,11 @@ void MainWindow::RefreshFiles() {
 }
 
 void MainWindow::UpdateNowPlaying() {
+  const Song now = app_->player()->current_song();
+  if (ScrobblerLoveState::ResetLovedOnSongChange(loved_song_url_, now.url())) {
+    loved_current_track_ = false;
+    loved_song_url_ = now.url();
+  }
   UpdateScrobblerButtons();
   const Song song = app_->player()->current_song();
   if (playing_widget_) {
@@ -3554,11 +3581,20 @@ void MainWindow::UpdateScrobblerButtons() {
   settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
   const bool show_scrobble = settings.BoolValue(ScrobblerSettings::kScrobbleButton, ScrobblerSettings::kDefaultScrobbleButton);
   const bool show_love = settings.BoolValue(ScrobblerSettings::kLoveButton, ScrobblerSettings::kDefaultLoveButton);
+  const bool scrobbler_on = app_ && app_->scrobbler() && app_->scrobbler()->enabled();
+  const Song song = app_ && app_->player() ? app_->player()->current_song() : Song();
+  const bool love_enabled = ScrobblerLoveState::CanLove(scrobbler_on, song) && !loved_current_track_;
   if (scrobble_button_) {
     gtk_widget_set_visible(scrobble_button_, show_scrobble);
+    gtk_button_set_icon_name(GTK_BUTTON(scrobble_button_), ScrobbleToggleIcon::Name(scrobbler_on));
   }
   if (love_button_) {
     gtk_widget_set_visible(love_button_, show_love);
+    gtk_widget_set_sensitive(love_button_, love_enabled);
+  }
+  if (app_ && app_->tray()) {
+    app_->tray()->SetLoveVisible(show_love);
+    app_->tray()->SetLoveEnabled(love_enabled);
   }
 }
 

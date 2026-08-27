@@ -3,6 +3,7 @@
 #include "constants/scrobblersettings.h"
 #include "core/settings.h"
 #include "scrobbler/scrobblemetadata.h"
+#include "scrobbler/scrobblererror.h"
 #include "scrobbler/scrobblerplayingstate.h"
 #include "utilities/strutils.h"
 
@@ -67,11 +68,14 @@ void ListenBrainzScrobbler::Submit(const std::string &listen_type, const std::ve
   settings.BeginGroup("ListenBrainz");
   const std::string token = token_.empty() ? settings.Value("token") : token_;
   if (token.empty()) {
+    Error.Emit(ScrobblerError::NotAuthenticated("ListenBrainz"));
     return;
   }
   network_->Post(kSubmitUrl, SubmitBody(listen_type, items), [this, from_cache](const NetworkAccessManager::Response &response) {
     if (from_cache && response.ok()) {
       cache_.RemoveSent();
+    } else if (!response.ok()) {
+      Error.Emit(ScrobblerError::RequestFailed("ListenBrainz"));
     }
   }, "application/json", {{"Authorization", "Token " + token}});
 }

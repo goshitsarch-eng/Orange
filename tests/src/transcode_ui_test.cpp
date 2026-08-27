@@ -1,7 +1,10 @@
 #include "constants/transcodersettings.h"
+#include "core/settings.h"
 #include "core/song.h"
+#include "transcoder/transcoderoptionsfields.h"
 #include "transcoder/transcodeui.h"
 #include "transcoder/transcodelog.h"
+#include "transcoder/transcodequality.h"
 #include "transcoder/transcoder.h"
 
 #include <gtest/gtest.h>
@@ -108,6 +111,18 @@ TEST(TranscodeUi, DestinationAlongsideMatchesQt) {
   }
   EXPECT_EQ(TranscodeUi::MaxDestinationFolders(), static_cast<int>(folders.size()));
   EXPECT_EQ("/music/out-3", folders.front());
+}
+
+TEST(TranscodeQuality, JobOverrideUsesStoredWhenUnchanged) {
+  EXPECT_EQ(-1, TranscodeQuality::JobOverride(5, 5));
+  EXPECT_EQ(8, TranscodeQuality::JobOverride(8, 5));
+  EXPECT_EQ(2, TranscodeQuality::JobOverride(2, 5));
+  Settings settings;
+  settings.BeginGroup(TranscoderOptionsFields::GroupFor(Transcoder::Format::FLAC));
+  settings.SetIntValue("quality", 2);
+  settings.Sync();
+  EXPECT_EQ(2, TranscodeQuality::Stored(Transcoder::Format::FLAC));
+  EXPECT_EQ(-1, TranscodeQuality::JobOverride(2, TranscodeQuality::Stored(Transcoder::Format::FLAC)));
 }
 
 TEST(Transcoder, CancelClearsQueuedJobs) {

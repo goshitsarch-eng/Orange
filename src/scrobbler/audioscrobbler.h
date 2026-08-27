@@ -23,6 +23,8 @@ class AudioScrobbler {
   ScrobblerService *ServiceByName(const std::string &name) const;
   std::vector<ScrobblerService *> All() const;
   Signal<std::string> Error;
+  Signal<bool> EnabledChanged;
+  Signal<Song> TrackLoved;
 
  private:
   NetworkAccessManager *network_;

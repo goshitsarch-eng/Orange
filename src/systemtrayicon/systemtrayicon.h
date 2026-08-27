@@ -28,6 +28,10 @@ class SystemTrayIcon {
   void ShowMenu(int x, int y);
   void ShowPopup(const std::string &summary, const std::string &message, int timeout_ms,
                  const std::vector<unsigned char> &art = {});
+  void SetLoveVisible(bool visible);
+  void SetLoveEnabled(bool enabled);
+  bool love_visible() const { return love_visible_; }
+  bool love_enabled() const { return love_enabled_; }
 
   bool available() const { return available_; }
   bool visible() const { return visible_; }
@@ -61,10 +65,11 @@ class SystemTrayIcon {
   static constexpr int kMenuLove = 10;
   static const char *MenuLabel(int id, bool playing);
   static bool IsSeparatorId(int id) { return id == kMenuSeparator; }
-  static std::vector<int> RootMenuIds() {
+  static std::vector<int> AllMenuIds() {
     return {kMenuPlayPause, kMenuStop, kMenuNext, kMenuPrevious, kMenuMute, kMenuStopAfter, kMenuLove, kMenuSeparator, kMenuShowHide,
             kMenuQuit};
   }
+  static std::vector<int> RootMenuIds(bool show_love = true);
   static bool ActivateMenuId(int id, Signal<> *play_pause, Signal<> *stop, Signal<> *next, Signal<> *previous, Signal<> *show_hide,
                              Signal<> *quit, Signal<> *mute = nullptr, Signal<> *stop_after = nullptr, Signal<> *love = nullptr);
 
@@ -127,6 +132,8 @@ class SystemTrayIcon {
   std::string popup_summary_;
   std::string popup_message_;
   int popup_timeout_ms_ = 0;
+  bool love_visible_ = true;
+  bool love_enabled_ = true;
   GtkWidget *popup_window_ = nullptr;
   GtkWidget *popup_title_ = nullptr;
   GtkWidget *popup_body_ = nullptr;

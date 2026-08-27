@@ -288,17 +288,20 @@ void ContextView::RebuildTechnicalData() {
 void ContextView::AlbumCoverLoaded(const std::vector<unsigned char> &data) { album_->SetImage(data); }
 
 void ContextView::SetLyrics(const std::string &lyrics, const std::string &provider) {
-  lyrics_ = ContextLyrics::FormatFetched(lyrics, provider);
+  const bool show_source = ContextLyrics::ShouldShowSource(provider, show_lyrics_);
+  lyrics_ = ContextLyrics::FormatFetched(lyrics, provider, !show_source);
   lrc_lines_ = LrcParser::Parse(lyrics);
   lrc_active_ = -1;
-  const std::string display = !lrc_lines_.empty() ? LrcParser::PlainText(lrc_lines_) + ContextLyrics::Footer(provider) : lyrics_;
+  const std::string display = !lrc_lines_.empty()
+                                  ? LrcParser::PlainText(lrc_lines_) + (show_source ? std::string() : ContextLyrics::Footer(provider))
+                                  : lyrics_;
   GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(lyrics_view_));
   gtk_text_buffer_set_text(buffer, display.c_str(), -1);
   if (!lrc_tag_) {
     lrc_tag_ = gtk_text_buffer_create_tag(buffer, "lrc-current", "weight", PANGO_WEIGHT_BOLD, nullptr);
   }
-  gtk_label_set_text(GTK_LABEL(lyrics_source_), "");
-  gtk_widget_set_visible(lyrics_source_, FALSE);
+  gtk_label_set_text(GTK_LABEL(lyrics_source_), ContextLyrics::Attribution(provider).c_str());
+  gtk_widget_set_visible(lyrics_source_, show_source);
 }
 
 void ContextView::SetPlaybackPosition(int64_t position_nanosec) {

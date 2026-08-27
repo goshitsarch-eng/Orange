@@ -9,6 +9,7 @@
 #include "systemtrayicon/trayiconcomposite.h"
 #include "systemtrayicon/trayiconmask.h"
 #include "systemtrayicon/trayiconpixmap.h"
+#include "systemtrayicon/traymenulove.h"
 #include "systemtrayicon/traymenuposition.h"
 #include "systemtrayicon/traypopup.h"
 #include "translations/translations.h"
@@ -159,19 +160,39 @@ void SetPopupArt(GtkWidget *image, const std::vector<unsigned char> &data, int p
   g_object_unref(loader);
 }
 
-GVariant *ItemProps(const char *label, const char *type = "standard") {
+GVariant *ItemProps(const char *label, const char *type = "standard", bool enabled = true, bool visible = true) {
   GVariantBuilder props;
   g_variant_builder_init(&props, G_VARIANT_TYPE("a{sv}"));
   g_variant_builder_add(&props, "{sv}", "type", g_variant_new_string(type));
   if (label && *label) {
     g_variant_builder_add(&props, "{sv}", "label", g_variant_new_string(label));
-    g_variant_builder_add(&props, "{sv}", "enabled", g_variant_new_boolean(TRUE));
-    g_variant_builder_add(&props, "{sv}", "visible", g_variant_new_boolean(TRUE));
+    g_variant_builder_add(&props, "{sv}", "enabled", g_variant_new_boolean(enabled));
+    g_variant_builder_add(&props, "{sv}", "visible", g_variant_new_boolean(visible));
   }
   return g_variant_builder_end(&props);
 }
 
 }  // namespace
+
+std::vector<int> SystemTrayIcon::RootMenuIds(bool show_love) {
+  return TrayMenuLove::FilterMenuIds(AllMenuIds(), kMenuLove, show_love);
+}
+
+void SystemTrayIcon::SetLoveVisible(bool visible) {
+  if (love_visible_ == visible) {
+    return;
+  }
+  love_visible_ = visible;
+  EmitLayoutUpdated();
+}
+
+void SystemTrayIcon::SetLoveEnabled(bool enabled) {
+  if (love_enabled_ == enabled) {
+    return;
+  }
+  love_enabled_ = enabled;
+  EmitLayoutUpdated();
+}
 
 SystemTrayIcon::SystemTrayIcon() = default;
 
@@ -508,7 +529,11 @@ void SystemTrayIcon::ShowMenu(int x, int y) {
   connect(box, gtk_button_new_with_label(Translations::CStr("Previous")), &Previous);
   connect(box, gtk_button_new_with_label(Translations::CStr("Mute")), &Mute);
   connect(box, gtk_button_new_with_label(Translations::CStr("Stop after this track")), &StopAfter);
-  connect(box, gtk_button_new_with_label(Translations::CStr("Love")), &Love);
+  if (love_visible_) {
+    GtkWidget *love = gtk_button_new_with_label(Translations::CStr("Love"));
+    gtk_widget_set_sensitive(love, love_enabled_ ? TRUE : FALSE);
+    connect(box, love, &Love);
+  }
   connect(box, gtk_button_new_with_label(Translations::CStr("Show / Hide")), &ShowHide);
   connect(box, gtk_button_new_with_label(Translations::CStr("Quit")), &Quit);
   gtk_window_set_child(GTK_WINDOW(window), box);
@@ -607,12 +632,14 @@ GVariant *SystemTrayIcon::MenuLayout(int parent_id) const {
   g_variant_builder_add(&root_props, "{sv}", "children-display", g_variant_new_string("submenu"));
   GVariantBuilder children;
   g_variant_builder_init(&children, G_VARIANT_TYPE("av"));
-  const std::vector<int> ids = RootMenuIds();
+  const std::vector<int> ids = RootMenuIds(love_visible_);
   for (int id : ids) {
     GVariantBuilder empty;
     g_variant_builder_init(&empty, G_VARIANT_TYPE("av"));
     const char *type = IsSeparatorId(id) ? "separator" : "standard";
-    GVariant *item = g_variant_new("(i@a{sv}av)", id, ItemProps(MenuLabel(id, playing_), type), &empty);
+    const bool enabled = TrayMenuLove::ItemEnabled(id, kMenuLove, love_enabled_);
+    const bool visible = TrayMenuLove::ItemVisible(id, kMenuLove, love_visible_);
+    GVariant *item = g_variant_new("(i@a{sv}av)", id, ItemProps(MenuLabel(id, playing_), type, enabled, visible), &empty);
     g_variant_builder_add(&children, "v", item);
   }
   return g_variant_new("(ia{sv}av)", 0, &root_props, &children);
@@ -788,8 +815,10 @@ void SystemTrayIcon::HandleMenuMethod(GDBusConnection *, const gchar *, const gc
     GVariant *value = g_variant_new_string(MenuLabel(id, self->playing_));
     if (g_strcmp0(name, "type") == 0) {
       value = g_variant_new_string(IsSeparatorId(id) ? "separator" : "standard");
-    } else if (g_strcmp0(name, "enabled") == 0 || g_strcmp0(name, "visible") == 0) {
-      value = g_variant_new_boolean(TRUE);
+    } else if (g_strcmp0(name, "enabled") == 0) {
+      value = g_variant_new_boolean(TrayMenuLove::ItemEnabled(id, kMenuLove, self->love_enabled_));
+    } else if (g_strcmp0(name, "visible") == 0) {
+      value = g_variant_new_boolean(TrayMenuLove::ItemVisible(id, kMenuLove, self->love_visible_));
     }
     g_dbus_method_invocation_return_value(invocation, g_variant_new("(v)", value));
     return;

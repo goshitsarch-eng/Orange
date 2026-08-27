@@ -22,6 +22,7 @@
 #include "playlist/playlisttabnav.h"
 #include "playlist/playlisttabmenu.h"
 #include "playlist/playlisttabbarvisibility.h"
+#include "playlist/playlistrestorescroll.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlisttagcompletion.h"
 #include "widgets/favoritewidget.h"
@@ -780,4 +781,12 @@ TEST(PlaylistPlayingIcon, PauseAndPlayNames) {
   EXPECT_TRUE(PlaylistPlayingIcon::ShowOnCurrentRow(true));
   EXPECT_FALSE(PlaylistPlayingIcon::ShowOnCurrentRow(false));
   EXPECT_EQ(12, PlaylistPlayingIcon::kPixelSize);
+}
+
+TEST(PlaylistRestoreScroll, PrefersLastPlayedThenCurrent) {
+  EXPECT_EQ(3, PlaylistRestoreScroll::TargetRow(3, 0));
+  EXPECT_EQ(2, PlaylistRestoreScroll::TargetRow(-1, 2));
+  EXPECT_EQ(-1, PlaylistRestoreScroll::TargetRow(-1, -1));
+  EXPECT_TRUE(PlaylistRestoreScroll::ShouldJump(0));
+  EXPECT_FALSE(PlaylistRestoreScroll::ShouldJump(-1));
 }

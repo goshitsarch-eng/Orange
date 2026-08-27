@@ -3,6 +3,7 @@
 #include "constants/transcodersettings.h"
 #include "core/application.h"
 #include "core/settings.h"
+#include "transcoder/transcodequality.h"
 #include "transcoder/transcodeui.h"
 #include "transcoder/transcodelog.h"
 #include "transcoder/transcodelogdialog.h"
@@ -60,6 +61,14 @@ struct ChooserJob {
   std::shared_ptr<bool> alive;
   State *state = nullptr;
 };
+
+void SyncQualitySpin(State *state) {
+  if (!state || !state->formats || !state->quality) {
+    return;
+  }
+  const auto format = static_cast<Transcoder::Format>(gtk_drop_down_get_selected(GTK_DROP_DOWN(state->formats)));
+  gtk_spin_button_set_value(GTK_SPIN_BUTTON(state->quality), TranscodeQuality::Stored(format));
+}
 
 void RefreshList(State *state) {
   if (!state || !state->list) {
@@ -219,7 +228,8 @@ void StartJobs(State *state) {
   const auto format = static_cast<Transcoder::Format>(gtk_drop_down_get_selected(GTK_DROP_DOWN(state->formats)));
   const std::string dest_dir = SelectedDest(state);
   const bool preserve = TranscodeUi::PreserveSensitive(state->dest_index) && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->preserve));
-  transcoder->set_quality(static_cast<int>(gtk_spin_button_get_value(GTK_SPIN_BUTTON(state->quality))));
+  const int spin = static_cast<int>(gtk_spin_button_get_value(GTK_SPIN_BUTTON(state->quality)));
+  transcoder->set_quality(TranscodeQuality::JobOverride(spin, TranscodeQuality::Stored(format)));
   std::vector<TranscodeUi::QueueItem> source = state->files;
   if (source.empty() && state->app->playlist_manager() && state->app->playlist_manager()->current()) {
     for (const Song &song : state->app->playlist_manager()->current()->songs()) {
@@ -504,7 +514,11 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   state->formats = gtk_drop_down_new_from_strings(format_names);
   gtk_drop_down_set_selected(GTK_DROP_DOWN(state->formats), static_cast<guint>(format_index));
   state->quality = gtk_spin_button_new_with_range(0, 10, 1);
-  gtk_spin_button_set_value(GTK_SPIN_BUTTON(state->quality), 5);
+  SyncQualitySpin(state);
+  g_signal_connect(state->formats, "notify::selected", G_CALLBACK(+[](GtkDropDown *, GParamSpec *, gpointer data) {
+                     SyncQualitySpin(static_cast<State *>(data));
+                   }),
+                   state);
   state->options = gtk_button_new_with_label(Translations::CStr(TranscodeUi::Options()));
   state->dest = gtk_drop_down_new(nullptr, nullptr);
   gtk_widget_set_hexpand(state->dest, TRUE);

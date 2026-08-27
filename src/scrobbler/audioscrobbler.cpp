@@ -16,6 +16,9 @@ AudioScrobbler::AudioScrobbler(NetworkAccessManager *network) : network_(network
 #ifdef HAVE_SUBSONIC
   services_.push_back(std::make_unique<SubsonicScrobbler>(network));
 #endif
+  for (auto &service : services_) {
+    service->Error.Connect([this](const std::string &message) { Error.Emit(message); });
+  }
   ReloadSettings();
 }
 
@@ -81,6 +84,7 @@ void AudioScrobbler::Love(const Song &song) {
       service->Love(song);
     }
   }
+  TrackLoved.Emit(song);
 }
 
 void AudioScrobbler::ToggleScrobbling() {
@@ -89,6 +93,7 @@ void AudioScrobbler::ToggleScrobbling() {
   const bool enabled = settings.BoolValue(ScrobblerSettings::kEnabled, ScrobblerSettings::kDefaultEnabled);
   settings.SetBoolValue(ScrobblerSettings::kEnabled, !enabled);
   settings.Sync();
+  EnabledChanged.Emit(this->enabled());
 }
 
 ScrobblerService *AudioScrobbler::ServiceByName(const std::string &name) const {

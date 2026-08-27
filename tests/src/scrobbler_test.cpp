@@ -1,4 +1,8 @@
+#include "core/song.h"
+#include "scrobbler/scrobbletoggleicon.h"
 #include "scrobbler/scrobblereligibility.h"
+#include "scrobbler/scrobblererror.h"
+#include "scrobbler/scrobblerlovestate.h"
 #include "scrobbler/scrobblerplayingstate.h"
 #include "scrobbler/scrobblersubmittiming.h"
 #include "scrobbler/lastfmscrobbler.h"
@@ -187,4 +191,29 @@ TEST(ScrobblerSubmitTiming, UsesConfiguredDelayWithErrorFloor) {
   EXPECT_EQ(30, ScrobblerSubmitTiming::DelaySeconds(10, true));
   EXPECT_EQ(5, ScrobblerSubmitTiming::DelaySeconds(3, false));
   EXPECT_EQ(45, ScrobblerSubmitTiming::DelaySeconds(45, true));
+}
+
+TEST(ScrobblerLoveState, GatesOnEnabledMetadataAndLoved) {
+  Song song;
+  song.set_url("file:///tmp/roads.flac");
+  song.set_artist("Portishead");
+  song.set_title("Roads");
+  EXPECT_TRUE(ScrobblerLoveState::CanLove(true, song));
+  EXPECT_FALSE(ScrobblerLoveState::CanLove(false, song));
+  Song incomplete;
+  incomplete.set_url("file:///tmp/x.flac");
+  EXPECT_FALSE(ScrobblerLoveState::CanLove(true, incomplete));
+  EXPECT_TRUE(ScrobblerLoveState::DisableAfterLove());
+  EXPECT_TRUE(ScrobblerLoveState::ResetLovedOnSongChange("file:///a", "file:///b"));
+  EXPECT_FALSE(ScrobblerLoveState::ResetLovedOnSongChange("file:///a", "file:///a"));
+}
+
+TEST(ScrobblerError, DialogAndMessages) {
+  EXPECT_TRUE(ScrobblerError::ShouldShowDialog(true, "Last.fm: request failed"));
+  EXPECT_FALSE(ScrobblerError::ShouldShowDialog(true, {}));
+  EXPECT_FALSE(ScrobblerError::ShouldShowDialog(false, "Last.fm: request failed"));
+  EXPECT_EQ("Last.fm: request failed", ScrobblerError::RequestFailed("Last.fm"));
+  EXPECT_EQ("ListenBrainz: not authenticated", ScrobblerError::NotAuthenticated("ListenBrainz"));
+  EXPECT_STREQ("document-send-symbolic", ScrobbleToggleIcon::Name(true));
+  EXPECT_STREQ("mail-send-symbolic", ScrobbleToggleIcon::Name(false));
 }

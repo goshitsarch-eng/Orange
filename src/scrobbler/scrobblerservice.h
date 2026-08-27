@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_SCROBBLERSERVICE_H
 #define STRAWBERRY_SCROBBLERSERVICE_H
 
+#include "core/signal.h"
 #include "core/song.h"
 
 #include <string>
@@ -20,6 +21,8 @@ class ScrobblerService {
   virtual void Logout() {}
   virtual bool authenticated() const { return false; }
   virtual std::string username() const { return {}; }
+
+  Signal<std::string> Error;
 
  protected:
   bool enabled_ = false;

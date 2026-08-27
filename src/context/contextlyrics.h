@@ -23,12 +23,14 @@ inline std::string Footer(const std::string &provider) {
   return "\n\n(Lyrics from " + provider + ")\n";
 }
 
-inline std::string FormatFetched(const std::string &lyrics, const std::string &provider) {
+inline std::string FormatFetched(const std::string &lyrics, const std::string &provider, bool include_footer = true) {
   if (lyrics.empty()) {
     return NoResultsText();
   }
-  return lyrics + Footer(provider);
+  return include_footer ? lyrics + Footer(provider) : lyrics;
 }
+
+inline bool ShouldShowSource(const std::string &provider, bool show_lyrics) { return show_lyrics && !provider.empty(); }
 
 inline bool IsNoResults(const std::string &text) { return text == NoResultsText(); }
 

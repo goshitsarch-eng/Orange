@@ -216,6 +216,8 @@ class MainWindow {
   GtkWidget *play_button_ = nullptr;
   GtkWidget *love_button_ = nullptr;
   GtkWidget *scrobble_button_ = nullptr;
+  bool loved_current_track_ = false;
+  std::string loved_song_url_;
   GtkWidget *status_bar_stack_ = nullptr;
   GtkWidget *status_label_ = nullptr;
   GtkWidget *analyzer_drawing_ = nullptr;

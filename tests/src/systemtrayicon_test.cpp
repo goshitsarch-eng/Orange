@@ -1,4 +1,5 @@
 #include "systemtrayicon/systemtrayicon.h"
+#include "systemtrayicon/traymenulove.h"
 
 #include "constants/behavioursettings.h"
 #include "core/settings.h"
@@ -51,6 +52,15 @@ TEST(SystemTrayIcon, DBusMenuLabelsAndActions) {
   EXPECT_NE(ids.end(), std::find(ids.begin(), ids.end(), SystemTrayIcon::kMenuMute));
   EXPECT_NE(ids.end(), std::find(ids.begin(), ids.end(), SystemTrayIcon::kMenuStopAfter));
   EXPECT_NE(ids.end(), std::find(ids.begin(), ids.end(), SystemTrayIcon::kMenuLove));
+  const auto hidden = SystemTrayIcon::RootMenuIds(false);
+  EXPECT_EQ(9u, hidden.size());
+  EXPECT_EQ(hidden.end(), std::find(hidden.begin(), hidden.end(), SystemTrayIcon::kMenuLove));
+  EXPECT_EQ(ids, TrayMenuLove::FilterMenuIds(SystemTrayIcon::AllMenuIds(), SystemTrayIcon::kMenuLove, true));
+  EXPECT_FALSE(TrayMenuLove::LoveEnabled(false, true, false));
+  EXPECT_FALSE(TrayMenuLove::LoveEnabled(true, true, true));
+  EXPECT_TRUE(TrayMenuLove::LoveEnabled(true, true, false));
+  EXPECT_FALSE(TrayMenuLove::ItemVisible(SystemTrayIcon::kMenuLove, SystemTrayIcon::kMenuLove, false));
+  EXPECT_TRUE(TrayMenuLove::ItemEnabled(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuLove, false));
 
   SystemTrayIcon tray;
   int play = 0;
