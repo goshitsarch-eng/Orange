@@ -5,6 +5,7 @@
 #include "filterparser/filterparser.h"
 #include "playlist/playlistfilterdelay.h"
 #include "playlist/playlistfiltersync.h"
+#include "playlist/playlisttoolbar.h"
 #include "playlist/playlistundostate.h"
 #include "translations/translations.h"
 #include "widgets/filtersearchkeyboard.h"
@@ -135,7 +136,7 @@ PlaylistContainer::PlaylistContainer()
   gtk_widget_set_hexpand(filter_entry_, TRUE);
   g_signal_connect(filter_entry_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<PlaylistContainer *>(data);
-                     if (self->updating_filter_) {
+                     if (self->updating_filter_ || !PlaylistToolbar::FilterApplies(self->toolbar_ && gtk_widget_get_visible(self->toolbar_))) {
                        return;
                      }
                      self->filter_ = gtk_editable_get_text(GTK_EDITABLE(entry));
@@ -229,9 +230,10 @@ void PlaylistContainer::ApplyPendingFilter() {
 }
 
 void PlaylistContainer::FocusFilter() {
-  if (filter_entry_) {
-    gtk_widget_grab_focus(filter_entry_);
+  if (!filter_entry_ || !PlaylistToolbar::FocusEnabled(toolbar_ && gtk_widget_get_visible(toolbar_))) {
+    return;
   }
+  gtk_widget_grab_focus(filter_entry_);
 }
 
 void PlaylistContainer::SetFilterText(const std::string &text) {
@@ -313,8 +315,17 @@ void PlaylistContainer::SetSummary(const std::string &text) { gtk_label_set_text
 void PlaylistContainer::ApplyLook() {
   Settings settings;
   settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  const bool show_toolbar = settings.BoolValue(PlaylistSettings::kShowToolbar, PlaylistSettings::kDefaultShowToolbar);
   if (toolbar_) {
-    gtk_widget_set_visible(toolbar_, settings.BoolValue(PlaylistSettings::kShowToolbar, PlaylistSettings::kDefaultShowToolbar));
+    gtk_widget_set_visible(toolbar_, PlaylistToolbar::Visible(show_toolbar));
+  }
+  if (PlaylistToolbar::ShouldClearFilter(show_toolbar) && filter_entry_) {
+    updating_filter_ = true;
+    gtk_editable_set_text(GTK_EDITABLE(filter_entry_), "");
+    filter_.clear();
+    updating_filter_ = false;
+    CancelFilterTimer();
+    ApplyPendingFilter();
   }
   if (clear_button_) {
     gtk_widget_set_visible(clear_button_, settings.BoolValue(PlaylistSettings::kPlaylistClear, PlaylistSettings::kDefaultPlaylistClear));

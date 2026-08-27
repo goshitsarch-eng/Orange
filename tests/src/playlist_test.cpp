@@ -32,6 +32,7 @@
 #include "playlist/playlistfilterdelay.h"
 #include "playlist/playlistfilterempty.h"
 #include "playlist/playlistfiltersync.h"
+#include "playlist/playlisttoolbar.h"
 #include "playlist/playlistplayed.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistshuffle.h"
@@ -708,6 +709,17 @@ TEST(PlaylistFilterSync, RestoresStoredFilterWhenEntryDiffers) {
   EXPECT_TRUE(PlaylistFilterSync::ShouldSyncEntry("foo", "artist:Queen"));
   EXPECT_FALSE(PlaylistFilterSync::ShouldSyncEntry("artist:Queen", "artist:Queen"));
   EXPECT_EQ("artist:Queen", PlaylistFilterSync::EntryFromPlaylist(playlist.filter_string()));
+}
+
+TEST(PlaylistToolbar, HideClearsFilterLikeQt) {
+  EXPECT_TRUE(PlaylistToolbar::Visible(true));
+  EXPECT_FALSE(PlaylistToolbar::Visible(false));
+  EXPECT_FALSE(PlaylistToolbar::ShouldClearFilter(true));
+  EXPECT_TRUE(PlaylistToolbar::ShouldClearFilter(false));
+  EXPECT_TRUE(PlaylistToolbar::FilterApplies(true));
+  EXPECT_FALSE(PlaylistToolbar::FilterApplies(false));
+  EXPECT_TRUE(PlaylistToolbar::FocusEnabled(true));
+  EXPECT_FALSE(PlaylistToolbar::FocusEnabled(false));
 }
 
 TEST(PlaylistUndoLimits, ConfirmsClearWhenOverUndoLimit) {
