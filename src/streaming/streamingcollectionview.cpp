@@ -23,6 +23,7 @@
 #include "utilities/strutils.h"
 
 #include <vector>
+#include "widgets/filterentryapply.h"
 #include "widgets/filtersearchkeyboard.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
@@ -659,7 +660,7 @@ gboolean StreamingCollectionView::OnKeyPressed(guint keyval) {
   }
   if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
     ResetTypeAhead();
-    FocusFilter();
+    FilterEntryApply::FromKey(filter_entry_, keyval);
     return TRUE;
   }
   if (action == ListBoxKeyboard::Action::Activate) {

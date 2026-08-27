@@ -19,6 +19,7 @@
 #include "streaming/streamingsearchitemdelegate.h"
 #include "translations/translations.h"
 #include "utilities/jsonutils.h"
+#include "widgets/filterentryapply.h"
 #include "widgets/filtersearchkeyboard.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
@@ -705,7 +706,7 @@ void StreamingSearchView::FocusResultsAndMove(unsigned keyval) {
 gboolean StreamingSearchView::OnKeyPressed(guint keyval) {
   if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
     ResetTypeAhead();
-    FocusSearch();
+    FilterEntryApply::FromKey(search_entry_, keyval);
     return TRUE;
   }
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);

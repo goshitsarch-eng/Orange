@@ -3,7 +3,10 @@
 #include "streaming/streamingabort.h"
 #include "streaming/streamingalbum.h"
 #include "streaming/streamingcollectionactions.h"
+#include "collection/collectionfilterfocus.h"
 #include "streaming/streamingcollectionfilter.h"
+#include "widgets/filtersearchkeyboard.h"
+#include "widgets/listboxkeyboard.h"
 #include "streaming/streamingcollectionlabels.h"
 #include "streaming/streamingcollectionstore.h"
 #include "streaming/streamingcollectiontree.h"
@@ -821,6 +824,15 @@ TEST(StreamingCollectionFilter, AgeRatingUntaggedDuplicatesAndText) {
   const SongList text = StreamingCollectionFilter::Apply({tagged, old, untagged, dup}, all, "wandering");
   ASSERT_EQ(1u, text.size());
   EXPECT_EQ("Wandering Star", text.front().title());
+}
+
+TEST(StreamingFilterFocus, TreeKeysApplyLikeQtFocusOnFilter) {
+  EXPECT_EQ(FilterSearchKeyboard::Action::FocusFilter, FilterSearchKeyboard::FromTreeKey(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(FilterSearchKeyboard::Action::FocusFilter, FilterSearchKeyboard::FromTreeKey(ListBoxKeyboard::kBackSpace));
+  EXPECT_EQ(CollectionFilterFocus::Effect::Clear, CollectionFilterFocus::KeyEffect(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(CollectionFilterFocus::Effect::DeleteLast, CollectionFilterFocus::KeyEffect(ListBoxKeyboard::kBackSpace));
+  EXPECT_TRUE(CollectionFilterFocus::Apply("portishead", CollectionFilterFocus::Effect::Clear).empty());
+  EXPECT_EQ("qobu", CollectionFilterFocus::Apply("qobuz", CollectionFilterFocus::Effect::DeleteLast));
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {
