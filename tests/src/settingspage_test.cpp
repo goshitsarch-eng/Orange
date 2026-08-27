@@ -582,6 +582,10 @@ TEST(StreamingLoginControls, DisablesDuringOAuth) {
   EXPECT_TRUE(StreamingLoginControls::LoginButtonEnabledOnPageShown());
   EXPECT_TRUE(StreamingLoginControls::TidalCredentialsValid("abc"));
   EXPECT_FALSE(StreamingLoginControls::TidalCredentialsValid(""));
+  EXPECT_TRUE(StreamingLoginControls::ShouldRefreshLoginStateOnShow());
+  EXPECT_EQ(StreamingLoginControls::LoginState::LoggedIn, StreamingLoginControls::StateFromAuth(true, false));
+  EXPECT_EQ(StreamingLoginControls::LoginState::LoginInProgress, StreamingLoginControls::StateFromAuth(false, true));
+  EXPECT_EQ(StreamingLoginControls::LoginState::LoggedOut, StreamingLoginControls::StateFromAuth(false, false));
 }
 
 TEST(StreamingSettingsLabels, SubsonicCopyAndConnectionCheck) {

@@ -12,6 +12,8 @@ inline bool SaveEnabled(bool items_selected) { return items_selected; }
 
 inline bool CopyEnabled(bool items_selected) { return items_selected; }
 
+inline bool ShouldRefreshOnShow() { return true; }
+
 }  // namespace PlaylistListActions
 
 #endif

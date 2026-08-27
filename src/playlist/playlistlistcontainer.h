@@ -49,6 +49,7 @@ class PlaylistListContainer {
   void SetActive(const std::string &name, int id);
   void SelectName(const std::string &name);
   bool HasSelection() const;
+  void RefreshOnShow();
   PlaylistListLook::Playback playback() const { return playback_; }
   const std::string &active_name() const { return active_name_; }
   int active_id() const { return active_id_; }

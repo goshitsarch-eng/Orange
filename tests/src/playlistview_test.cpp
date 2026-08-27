@@ -596,6 +596,7 @@ TEST(PlaylistListActions, EnableRemoveSaveAndCopyOnlyWithASelection) {
   EXPECT_TRUE(PlaylistListActions::SaveEnabled(true));
   EXPECT_FALSE(PlaylistListActions::CopyEnabled(false));
   EXPECT_TRUE(PlaylistListActions::CopyEnabled(true));
+  EXPECT_TRUE(PlaylistListActions::ShouldRefreshOnShow());
 }
 
 TEST(PlaylistListModel, StoresIdsThroughFilter) {

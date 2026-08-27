@@ -482,6 +482,12 @@ GtkWidget *AddButtonRow(AdwPreferencesGroup *group, const char *title, const cha
   return GTK_WIDGET(row);
 }
 
+struct LoginStateMap {
+  LoginStateWidget *login = nullptr;
+  StreamingService *service = nullptr;
+  const char *service_name = nullptr;
+};
+
 LoginStateWidget *AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name) {
   if (!app || !service_name) {
     return nullptr;
@@ -518,6 +524,23 @@ LoginStateWidget *AddLoginState(AdwPreferencesGroup *group, Application *app, co
     });
   }
   adw_preferences_group_add(group, login->widget());
+  auto *map_state = new LoginStateMap{login, service, service_name};
+  g_object_set_data_full(G_OBJECT(login->widget()), "login-map-state", map_state, [](gpointer p) { delete static_cast<LoginStateMap *>(p); });
+  g_signal_connect(login->widget(), "map", G_CALLBACK((+[](GtkWidget *widget, gpointer) {
+                     if (!StreamingLoginControls::ShouldRefreshLoginStateOnShow()) {
+                       return;
+                     }
+                     auto *ctx = static_cast<LoginStateMap *>(g_object_get_data(G_OBJECT(widget), "login-map-state"));
+                     if (!ctx || !ctx->login) {
+                       return;
+                     }
+                     const bool logged_in = ctx->service && ctx->service->logged_in();
+                     const StreamingLoginControls::LoginState state = StreamingLoginControls::StateFromAuth(logged_in, false);
+                     ctx->login->SetLoggedIn(state == StreamingLoginControls::LoginState::LoggedIn ? LoginStateWidget::State::LoggedIn
+                                                                                                  : LoginStateWidget::State::LoggedOut,
+                                             ctx->service_name ? ctx->service_name : "");
+                   })),
+                   nullptr);
   g_object_set_data_full(G_OBJECT(login->widget()), "login-alive", new std::shared_ptr<bool>(alive),
                          [](gpointer p) { delete static_cast<std::shared_ptr<bool> *>(p); });
   g_signal_connect(login->widget(), "destroy", G_CALLBACK(+[](GtkWidget *widget, gpointer data) {

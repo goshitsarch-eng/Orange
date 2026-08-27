@@ -406,6 +406,27 @@ void MainWindow::BuildUi() {
 #ifdef _WIN32
   thumbbar_ = std::make_unique<Windows7ThumbBar>(GTK_WIDGET(window_));
   thumbbar_->SetActions(Windows7ThumbBarActions::DefaultActions());
+  thumbbar_->set_activated([this](Windows7ThumbBarActions::Id id) {
+    switch (id) {
+      case Windows7ThumbBarActions::Id::Previous:
+        app_->player()->Previous();
+        break;
+      case Windows7ThumbBarActions::Id::PlayPause:
+        app_->player()->PlayPause();
+        break;
+      case Windows7ThumbBarActions::Id::Stop:
+        app_->player()->Stop();
+        break;
+      case Windows7ThumbBarActions::Id::Next:
+        app_->player()->Next();
+        break;
+      case Windows7ThumbBarActions::Id::Love:
+        app_->scrobbler()->Love(app_->player()->current_song());
+        break;
+      case Windows7ThumbBarActions::Id::Spacer:
+        break;
+    }
+  });
   smtc_ = std::make_unique<WinSystemMediaTransportControls>(app_->player());
   smtc_->set_button_callback([this](const std::string &id) { app_->shortcuts()->Emit(id); });
   g_signal_connect(window_, "realize", G_CALLBACK(+[](GtkWidget *widget, gpointer data) {

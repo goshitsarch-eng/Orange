@@ -104,6 +104,10 @@ PlaylistListContainer::PlaylistListContainer()
   gtk_box_append(GTK_BOX(widget_), search_);
   gtk_box_append(GTK_BOX(widget_), bar);
   gtk_box_append(GTK_BOX(widget_), view_->widget());
+  g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     static_cast<PlaylistListContainer *>(data)->RefreshOnShow();
+                   }),
+                   this);
   view_->SetMenuCallback([this](const std::string &name) {
     if (menu_) {
       menu_(name);
@@ -170,6 +174,12 @@ void PlaylistListContainer::SelectName(const std::string &name) {
 }
 
 bool PlaylistListContainer::HasSelection() const { return view_ && view_->HasSelection(); }
+
+void PlaylistListContainer::RefreshOnShow() {
+  if (PlaylistListActions::ShouldRefreshOnShow()) {
+    UpdateSelectionChrome();
+  }
+}
 
 void PlaylistListContainer::UpdateSelectionChrome() {
   const bool selected = HasSelection();

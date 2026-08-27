@@ -20,15 +20,23 @@ class Windows7ThumbBar {
   void SetActions(const std::vector<Windows7ThumbBarActions::Id> &actions);
   void SetPlaying(bool playing);
   void HandleWinEvent(void *msg);
+  void HandleCommand(int button_id);
   void set_activated(Activated cb) { activated_ = std::move(cb); }
 
  private:
-  void Rebuild();
+  void ScheduleUpdate();
+  void Rebuild(bool add_buttons);
+  void InstallHook();
+  void SetupButton(int index, void *button);
+
   GtkWidget *window_ = nullptr;
   std::vector<Windows7ThumbBarActions::Id> actions_;
   bool playing_ = false;
+  bool buttons_added_ = false;
   unsigned button_created_message_id_ = 0;
+  unsigned update_source_ = 0;
   void *taskbar_list_ = nullptr;
+  void *old_wndproc_ = nullptr;
   Activated activated_;
 #else
   Windows7ThumbBar() = default;

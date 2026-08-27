@@ -2638,6 +2638,27 @@ TEST(Windows7ThumbBarActions, DefaultOrderAndFlags) {
   EXPECT_EQ(Windows7ThumbBarActions::Flag::Hidden, Windows7ThumbBarActions::FlagFor(false, false, true));
   EXPECT_EQ(Windows7ThumbBarActions::Flag::Enabled, Windows7ThumbBarActions::FlagFor(false, true, true));
   EXPECT_STREQ("media-playback-pause-symbolic", Windows7ThumbBarActions::IconName(Windows7ThumbBarActions::Id::PlayPause, true));
+  EXPECT_STREQ("Play/Pause", Windows7ThumbBarActions::Tooltip(Windows7ThumbBarActions::Id::PlayPause));
+  EXPECT_STREQ("love", Windows7ThumbBarActions::PlayerAction(Windows7ThumbBarActions::Id::Love));
+  EXPECT_TRUE(Windows7ThumbBarActions::ShouldDispatch(Windows7ThumbBarActions::Id::Next));
+  EXPECT_FALSE(Windows7ThumbBarActions::ShouldDispatch(Windows7ThumbBarActions::Id::Spacer));
+  EXPECT_TRUE(Windows7ThumbBarActions::ShouldRebuildOnPlayingChange(false, true));
+  EXPECT_FALSE(Windows7ThumbBarActions::ShouldRebuildOnPlayingChange(true, true));
+  EXPECT_TRUE(Windows7ThumbBarActions::ShouldAddButtons(true, false));
+  EXPECT_FALSE(Windows7ThumbBarActions::ShouldAddButtons(true, true));
+  EXPECT_TRUE(Windows7ThumbBarActions::ShouldUpdateButtons(true));
+  EXPECT_EQ(259, Windows7ThumbBarActions::ClampTipChars(400));
+  EXPECT_EQ(0, Windows7ThumbBarActions::ClampTipChars(-1));
+  EXPECT_EQ(Windows7ThumbBarActions::kThbfNoBackground, Windows7ThumbBarActions::WinFlags(Windows7ThumbBarActions::Flag::NoBackground));
+  EXPECT_EQ(Windows7ThumbBarActions::kThbFlags, Windows7ThumbBarActions::ButtonMask(true));
+  EXPECT_EQ(Windows7ThumbBarActions::kThbIcon | Windows7ThumbBarActions::kThbTooltip | Windows7ThumbBarActions::kThbFlags,
+            Windows7ThumbBarActions::ButtonMask(false));
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Stop, Windows7ThumbBarActions::ActionAtCommand(2, actions));
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Spacer, Windows7ThumbBarActions::ActionAtCommand(99, actions));
+  EXPECT_EQ(3, Windows7ThumbBarActions::CommandId(0x00030001u));
+  EXPECT_EQ(Windows7ThumbBarActions::WinMessage::Command, Windows7ThumbBarActions::ClassifyMessage(0x0111, 0));
+  EXPECT_EQ(Windows7ThumbBarActions::WinMessage::TaskbarCreated, Windows7ThumbBarActions::ClassifyMessage(42, 42));
+  EXPECT_EQ(300, Windows7ThumbBarActions::kUpdateDelayMs);
 }
 
 TEST(WinSmtcStatus, MapsEngineState) {
