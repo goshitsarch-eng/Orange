@@ -4,6 +4,7 @@
 #include "core/player.h"
 #include "equalizer/equalizer.h"
 #include "equalizer/equalizercontrols.h"
+#include "equalizer/equalizergain.h"
 #include "equalizer/equalizerlabels.h"
 #include "equalizer/equalizerpersist.h"
 #include "equalizer/equalizerpresets.h"
@@ -185,20 +186,20 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   static const char *kHz[] = {"60", "170", "310", "600", "1k", "3k", "6k", "12k", "14k", "16k"};
   for (int i = 0; i < 10; ++i) {
     GtkWidget *col = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
-    GtkWidget *scale = gtk_scale_new_with_range(GTK_ORIENTATION_VERTICAL, -12, 12, 1);
+    GtkWidget *scale = gtk_scale_new_with_range(GTK_ORIENTATION_VERTICAL, EqualizerGain::kSliderMin, EqualizerGain::kSliderMax, 1);
     gtk_range_set_inverted(GTK_RANGE(scale), TRUE);
     gtk_range_set_value(GTK_RANGE(scale), equalizer->gains()[static_cast<size_t>(i)]);
     gtk_widget_set_size_request(scale, -1, 160);
     g_object_set_data(G_OBJECT(scale), "band", GINT_TO_POINTER(i));
-    GtkWidget *db = gtk_label_new(EqualizerPersist::DbLabel(equalizer->gains()[static_cast<size_t>(i)]).c_str());
+    GtkWidget *db = gtk_label_new(EqualizerGain::BandDbLabel(equalizer->gains()[static_cast<size_t>(i)]).c_str());
     gtk_widget_add_css_class(db, "dim-label");
     g_object_set_data(G_OBJECT(scale), "db-label", db);
     g_signal_connect(scale, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer data) {
                        const int band = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(range), "band"));
-                       const int value = static_cast<int>(gtk_range_get_value(range));
+                       const int value = EqualizerGain::ClampSlider(static_cast<int>(gtk_range_get_value(range)));
                        static_cast<class Equalizer *>(data)->set_gain(band, value);
                        if (auto *label = GTK_LABEL(g_object_get_data(G_OBJECT(range), "db-label"))) {
-                         gtk_label_set_text(label, EqualizerPersist::DbLabel(value).c_str());
+                         gtk_label_set_text(label, EqualizerGain::BandDbLabel(value).c_str());
                        }
                      }),
                      equalizer);

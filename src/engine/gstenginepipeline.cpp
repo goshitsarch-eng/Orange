@@ -6,8 +6,11 @@
 #include "engine/gsturl.h"
 #include "core/logging.h"
 #include "engine/backendoptions.h"
+#include "equalizer/equalizergain.h"
 #include "equalizer/equalizerpersist.h"
 #include "utilities/audioanalysis.h"
+
+#include <gst/gstchildproxy.h>
 
 #include <algorithm>
 #include <cstring>
@@ -112,7 +115,19 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
                        this);
     }
     equalizer_preamp_ = gst_element_factory_make("volume", "equalizer_preamp");
-    equalizer_ = gst_element_factory_make("equalizer-10bands", "equalizer");
+    equalizer_ = gst_element_factory_make("equalizer-nbands", "equalizer");
+    if (equalizer_) {
+      g_object_set(equalizer_, "num-bands", EqualizerGain::kPipelineBandCount, nullptr);
+      for (const EqualizerGain::BandSetup &setup : EqualizerGain::AllBandSetups()) {
+        GstObject *band = GST_OBJECT(gst_child_proxy_get_child_by_index(GST_CHILD_PROXY(equalizer_), static_cast<guint>(setup.child_index)));
+        if (!band) {
+          continue;
+        }
+        g_object_set(G_OBJECT(band), "freq", static_cast<gdouble>(setup.freq), "bandwidth", static_cast<gdouble>(setup.bandwidth), "gain",
+                     0.0, nullptr);
+        g_object_unref(band);
+      }
+    }
     GstElement *rgvolume = replaygain ? gst_element_factory_make("rgvolume", "rgvolume") : nullptr;
     GstElement *rglimiter = replaygain ? gst_element_factory_make("rglimiter", "rglimiter") : nullptr;
     volume_ebur128_ = extras.ebur128_loudness_normalization ? gst_element_factory_make("volume", "ebur128_volume") : nullptr;
@@ -311,10 +326,14 @@ void GstEnginePipeline::SetEqualizer(int preamp, const std::vector<int> &band_ga
   if (!equalizer_) {
     return;
   }
-  for (size_t i = 0; i < band_gains.size() && i < 10; ++i) {
-    gchar name[16];
-    g_snprintf(name, sizeof(name), "band%zu", i);
-    g_object_set(equalizer_, name, static_cast<gdouble>(band_gains[i]), nullptr);
+  for (int i = 0; i < EqualizerGain::kBandCount && i < static_cast<int>(band_gains.size()); ++i) {
+    GstObject *band = GST_OBJECT(gst_child_proxy_get_child_by_index(GST_CHILD_PROXY(equalizer_),
+                                                                   static_cast<guint>(EqualizerGain::PipelineBandIndex(i))));
+    if (!band) {
+      continue;
+    }
+    g_object_set(G_OBJECT(band), "gain", static_cast<gdouble>(EqualizerGain::BandGainDb(band_gains[i])), nullptr);
+    g_object_unref(band);
   }
 }
 

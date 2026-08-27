@@ -1,6 +1,7 @@
 #include "equalizer/equalizer.h"
 
 #include "core/settings.h"
+#include "equalizer/equalizergain.h"
 #include "equalizer/equalizerpersist.h"
 #include "utilities/strutils.h"
 
@@ -11,12 +12,12 @@
 namespace {
 
 std::vector<int> ParseGains(const std::string &text) {
-  std::vector<int> gains(10, 0);
+  std::vector<int> gains(EqualizerGain::kBandCount, 0);
   std::istringstream stream(text);
   std::string part;
   size_t i = 0;
   while (i < gains.size() && std::getline(stream, part, ',')) {
-    gains[i++] = std::atoi(part.c_str());
+    gains[i++] = EqualizerGain::ClampSlider(std::atoi(part.c_str()));
   }
   return gains;
 }
@@ -34,36 +35,28 @@ std::string JoinGains(const std::vector<int> &gains) {
 
 }  // namespace
 
-Equalizer::Equalizer() : gains_(10, 0) { ReloadSettings(); }
-
-std::vector<int> Equalizer::ScaleTenths(const std::vector<int> &tenths) const {
-  std::vector<int> gains(10, 0);
-  for (size_t i = 0; i < tenths.size() && i < gains.size(); ++i) {
-    gains[i] = std::clamp(tenths[i] / 10, -24, 12);
-  }
-  return gains;
-}
+Equalizer::Equalizer() : gains_(EqualizerGain::kBandCount, 0) { ReloadSettings(); }
 
 void Equalizer::LoadBuiltinPresets() {
-  presets_["Custom"] = std::vector<int>(10, 0);
-  presets_["Classical"] = ScaleTenths({0, 0, 0, 0, 0, 0, -40, -40, -40, -50});
-  presets_["Club"] = ScaleTenths({0, 0, 20, 30, 30, 30, 20, 0, 0, 0});
-  presets_["Dance"] = ScaleTenths({50, 35, 10, 0, 0, -30, -40, -40, 0, 0});
-  presets_["Full Bass"] = ScaleTenths({70, 70, 70, 40, 20, -45, -50, -55, -55, -55});
-  presets_["Full Treble"] = ScaleTenths({-50, -50, -50, -25, 15, 55, 80, 80, 80, 85});
-  presets_["Full Bass + Treble"] = ScaleTenths({35, 30, 0, -40, -25, 10, 45, 55, 60, 60});
-  presets_["Laptop/Headphones"] = ScaleTenths({25, 50, 25, -20, 0, -30, -40, -40, 0, 0});
-  presets_["Large Hall"] = ScaleTenths({50, 50, 30, 30, 0, -25, -25, -25, 0, 0});
-  presets_["Live"] = ScaleTenths({-25, 0, 20, 25, 30, 30, 20, 15, 15, 10});
-  presets_["Party"] = ScaleTenths({35, 35, 0, 0, 0, 0, 0, 0, 35, 35});
-  presets_["Pop"] = ScaleTenths({-10, 25, 35, 40, 25, -5, -15, -15, -10, -10});
-  presets_["Reggae"] = ScaleTenths({0, 0, -5, -30, 0, -35, -35, 0, 0, 0});
-  presets_["Rock"] = ScaleTenths({40, 25, -30, -40, -20, 20, 45, 55, 55, 55});
-  presets_["Soft"] = ScaleTenths({25, 10, -5, -15, -5, 20, 45, 50, 55, 60});
-  presets_["Ska"] = ScaleTenths({-15, -25, -25, -5, 20, 30, 45, 50, 55, 50});
-  presets_["Soft Rock"] = ScaleTenths({20, 20, 10, -5, -25, -30, -20, -5, 15, 45});
-  presets_["Techno"] = ScaleTenths({40, 30, 0, -30, -25, 0, 40, 50, 50, 45});
-  presets_["Zero"] = std::vector<int>(10, 0);
+  presets_["Custom"] = std::vector<int>(EqualizerGain::kBandCount, 0);
+  presets_["Classical"] = {0, 0, 0, 0, 0, 0, -40, -40, -40, -50};
+  presets_["Club"] = {0, 0, 20, 30, 30, 30, 20, 0, 0, 0};
+  presets_["Dance"] = {50, 35, 10, 0, 0, -30, -40, -40, 0, 0};
+  presets_["Full Bass"] = {70, 70, 70, 40, 20, -45, -50, -55, -55, -55};
+  presets_["Full Treble"] = {-50, -50, -50, -25, 15, 55, 80, 80, 80, 85};
+  presets_["Full Bass + Treble"] = {35, 30, 0, -40, -25, 10, 45, 55, 60, 60};
+  presets_["Laptop/Headphones"] = {25, 50, 25, -20, 0, -30, -40, -40, 0, 0};
+  presets_["Large Hall"] = {50, 50, 30, 30, 0, -25, -25, -25, 0, 0};
+  presets_["Live"] = {-25, 0, 20, 25, 30, 30, 20, 15, 15, 10};
+  presets_["Party"] = {35, 35, 0, 0, 0, 0, 0, 0, 35, 35};
+  presets_["Pop"] = {-10, 25, 35, 40, 25, -5, -15, -15, -10, -10};
+  presets_["Reggae"] = {0, 0, -5, -30, 0, -35, -35, 0, 0, 0};
+  presets_["Rock"] = {40, 25, -30, -40, -20, 20, 45, 55, 55, 55};
+  presets_["Soft"] = {25, 10, -5, -15, -5, 20, 45, 50, 55, 60};
+  presets_["Ska"] = {-15, -25, -25, -5, 20, 30, 45, 50, 55, 50};
+  presets_["Soft Rock"] = {20, 20, 10, -5, -25, -30, -20, -5, 15, 45};
+  presets_["Techno"] = {40, 30, 0, -30, -25, 0, 40, 50, 50, 45};
+  presets_["Zero"] = std::vector<int>(EqualizerGain::kBandCount, 0);
 }
 
 std::vector<std::string> Equalizer::BuiltinPresetNames() {
@@ -94,11 +87,11 @@ void Equalizer::ReloadSettings() {
   enabled_ = s.BoolValue("enabled", false);
   preamp_ = s.IntValue("preamp", 0);
   selected_preset_ = EqualizerPersist::PresetOrDefault(s.Value(EqualizerPersist::kSelectedPreset, EqualizerPersist::kDefaultPreset));
-  for (int i = 0; i < 10; ++i) {
-    if (static_cast<int>(gains_.size()) < 10) {
-      gains_.resize(10, 0);
+  for (int i = 0; i < EqualizerGain::kBandCount; ++i) {
+    if (static_cast<int>(gains_.size()) < EqualizerGain::kBandCount) {
+      gains_.resize(EqualizerGain::kBandCount, 0);
     }
-    gains_[i] = s.IntValue("band" + std::to_string(i), 0);
+    gains_[i] = EqualizerGain::ClampSlider(s.IntValue("band" + std::to_string(i), 0));
   }
   LoadBuiltinPresets();
   user_names_.clear();
@@ -129,7 +122,7 @@ void Equalizer::Save() {
   s.SetValue(EqualizerPersist::kSelectedPreset, selected_preset_);
   s.SetBoolValue(EqualizerPersist::kEnableStereoBalancer, stereo_balancer_enabled_);
   s.SetIntValue(EqualizerPersist::kStereoBalance, stereo_balance_);
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < EqualizerGain::kBandCount; ++i) {
     s.SetIntValue("band" + std::to_string(i), gains_[i]);
   }
   std::string blob;
@@ -159,8 +152,8 @@ void Equalizer::set_preamp(int preamp) {
 }
 
 void Equalizer::set_gain(int band, int gain) {
-  if (band >= 0 && band < 10) {
-    gains_[band] = gain;
+  if (band >= 0 && band < EqualizerGain::kBandCount) {
+    gains_[band] = EqualizerGain::ClampSlider(gain);
     selected_preset_ = EqualizerPersist::kDefaultPreset;
     Save();
     ParametersChanged.Emit(enabled_, preamp_, gains_);

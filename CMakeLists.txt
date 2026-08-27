@@ -565,6 +565,7 @@ set(STRAWBERRY_SOURCES
   src/device/deviceview.cpp
   src/device/deviceviewcontainer.cpp
   src/equalizer/equalizer.cpp
+  src/equalizer/equalizergain.h
   src/equalizer/equalizerslider.cpp
   src/equalizer/equalizerdialog.cpp
   src/analyzer/fht.cpp

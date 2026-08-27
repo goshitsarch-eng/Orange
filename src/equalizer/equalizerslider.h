@@ -21,6 +21,7 @@ class EqualizerSlider {
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *scale_ = nullptr;
+  GtkWidget *db_label_ = nullptr;
   int band_ = 0;
   int value_ = 0;
   ChangedCallback callback_ = nullptr;

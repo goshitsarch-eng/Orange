@@ -22,6 +22,7 @@
 #include "device/giolister.h"
 #include "equalizer/equalizer.h"
 #include "equalizer/equalizercontrols.h"
+#include "equalizer/equalizergain.h"
 #include "equalizer/equalizerlabels.h"
 #include "equalizer/equalizerpersist.h"
 #include "equalizer/equalizerpresets.h"
@@ -932,7 +933,9 @@ TEST(Equalizer, BuiltinPresets) {
   EXPECT_GE(names.size(), 14u);
   Equalizer eq;
   eq.LoadPreset("Rock");
-  EXPECT_NE(0, eq.gains()[0]);
+  EXPECT_EQ(40, eq.gains()[0]);
+  EXPECT_EQ(25, eq.gains()[1]);
+  EXPECT_EQ(-30, eq.gains()[2]);
   EXPECT_EQ("Rock", eq.selected_preset());
   EXPECT_EQ(-100, Equalizer::ClampBalance(-250));
   EXPECT_EQ(100, Equalizer::ClampBalance(250));
@@ -953,6 +956,55 @@ TEST(EqualizerPresets, AfterDeleteAndNextSelected) {
   EXPECT_FALSE(EqualizerPresets::CanSave("", false));
   EXPECT_FALSE(EqualizerPresets::CanSave("Rock", true));
   EXPECT_TRUE(EqualizerPresets::CanSave("My Mix", false));
+}
+
+TEST(EqualizerGain, QtSliderMappingAndNBands) {
+  EXPECT_EQ(10, EqualizerGain::kBandCount);
+  EXPECT_EQ(12, EqualizerGain::kPipelineBandCount);
+  EXPECT_EQ(1, EqualizerGain::PipelineBandIndex(0));
+  EXPECT_EQ(10, EqualizerGain::PipelineBandIndex(9));
+  EXPECT_EQ(0, EqualizerGain::DummyFirstBand().child_index);
+  EXPECT_EQ(11, EqualizerGain::DummyLastBand().child_index);
+  EXPECT_FLOAT_EQ(20.0f, EqualizerGain::DummyFirstBand().freq);
+  EXPECT_FLOAT_EQ(0.0f, EqualizerGain::DummyFirstBand().bandwidth);
+  EXPECT_FLOAT_EQ(20000.0f, EqualizerGain::DummyLastBand().freq);
+  EXPECT_EQ(60, EqualizerGain::kBandFrequencies[0]);
+  EXPECT_EQ(16000, EqualizerGain::kBandFrequencies[9]);
+  EXPECT_FLOAT_EQ(60.0f, EqualizerGain::UiBandSetup(0).freq);
+  EXPECT_FLOAT_EQ(60.0f, EqualizerGain::UiBandSetup(0).bandwidth);
+  EXPECT_FLOAT_EQ(170.0f, EqualizerGain::UiBandSetup(1).freq);
+  EXPECT_FLOAT_EQ(110.0f, EqualizerGain::UiBandSetup(1).bandwidth);
+  EXPECT_FLOAT_EQ(0.0f, EqualizerGain::BandGainDb(0));
+  EXPECT_FLOAT_EQ(4.8f, EqualizerGain::BandGainDb(40));
+  EXPECT_FLOAT_EQ(3.0f, EqualizerGain::BandGainDb(25));
+  EXPECT_FLOAT_EQ(-7.2f, EqualizerGain::BandGainDb(-30));
+  EXPECT_FLOAT_EQ(-9.6f, EqualizerGain::BandGainDb(-40));
+  EXPECT_FLOAT_EQ(12.0f, EqualizerGain::BandGainDb(100));
+  EXPECT_FLOAT_EQ(-24.0f, EqualizerGain::BandGainDb(-100));
+  EXPECT_EQ(-100, EqualizerGain::ClampSlider(-250));
+  EXPECT_EQ(100, EqualizerGain::ClampSlider(250));
+  EXPECT_EQ("4.8 dB", EqualizerGain::BandDbLabel(40));
+  EXPECT_EQ("-7.2 dB", EqualizerGain::BandDbLabel(-30));
+  EXPECT_EQ("0 dB", EqualizerGain::BandDbLabel(0));
+  const std::vector<int> rock = {40, 25, -30, -40, -20, 20, 45, 55, 55, 55};
+  const auto gains = EqualizerGain::PipelineGains(rock);
+  ASSERT_EQ(10u, gains.size());
+  EXPECT_FLOAT_EQ(4.8f, gains[0]);
+  EXPECT_FLOAT_EQ(3.0f, gains[1]);
+  EXPECT_FLOAT_EQ(-7.2f, gains[2]);
+  EXPECT_FLOAT_EQ(-9.6f, gains[3]);
+  EXPECT_FLOAT_EQ(-4.8f, gains[4]);
+  EXPECT_FLOAT_EQ(2.4f, gains[5]);
+  EXPECT_FLOAT_EQ(5.4f, gains[6]);
+  EXPECT_FLOAT_EQ(6.6f, gains[7]);
+  EXPECT_FLOAT_EQ(6.6f, gains[8]);
+  EXPECT_FLOAT_EQ(6.6f, gains[9]);
+  const auto setups = EqualizerGain::AllBandSetups();
+  EXPECT_EQ(0, setups[0].child_index);
+  EXPECT_EQ(1, setups[1].child_index);
+  EXPECT_EQ(11, setups[11].child_index);
+  EXPECT_FLOAT_EQ(60.0f, setups[1].freq);
+  EXPECT_FLOAT_EQ(16000.0f, setups[10].freq);
 }
 
 TEST(EqualizerPersist, SelectedPresetAndStereoBalancer) {

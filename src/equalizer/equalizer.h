@@ -2,6 +2,7 @@
 #define STRAWBERRY_EQUALIZER_H
 
 #include "core/signal.h"
+#include "equalizer/equalizergain.h"
 #include "equalizer/equalizerpersist.h"
 
 #include <algorithm>
@@ -42,7 +43,6 @@ class Equalizer {
 
  private:
   void LoadBuiltinPresets();
-  std::vector<int> ScaleTenths(const std::vector<int> &tenths) const;
 
   bool enabled_ = false;
   int preamp_ = 0;
