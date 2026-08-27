@@ -29,6 +29,7 @@ class SpotifyService : public StreamingService {
   void StoreTokens(const OAuthenticator::TokenResponse &tokens);
   void ReloadSettings() override;
   LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;
+  void FetchTrackMetadata(const std::string &track_id, std::function<void(const Song &, const std::string &error)> callback);
   void GetFavorites(FavoriteType type, SearchCallback callback) override;
   void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;
   void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;

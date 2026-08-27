@@ -196,6 +196,17 @@ TEST(PlaylistMenu, CueHidesEditsAndPlayPauseLabel) {
   EXPECT_EQ("Pause", PlaylistMenu::LabelFor(PlaylistMenu::Action::Play, playing));
   playing.pause_disabled = true;
   EXPECT_FALSE(PlaylistMenu::PlayEnabled(playing));
+
+  Song radio(Song::Source::Stream);
+  radio.set_valid(true);
+  radio.set_url("http://example.com/live");
+  EXPECT_TRUE(PlaylistMenu::FromSong(radio).pause_disabled);
+  PlaylistMenu::SelectionState radio_playing;
+  radio_playing.index_valid = true;
+  PlaylistMenu::ApplyContextSong(&radio_playing, radio, true);
+  EXPECT_TRUE(radio_playing.playing_selected);
+  EXPECT_TRUE(radio_playing.pause_disabled);
+  EXPECT_FALSE(PlaylistMenu::PlayEnabled(radio_playing));
 }
 
 TEST(PlaylistEditPolicy, MenuEditIgnoresInlineSetting) {

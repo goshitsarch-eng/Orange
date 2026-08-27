@@ -3,6 +3,7 @@
 
 #include "streaming/streamingservices.h"
 
+#include <functional>
 #include <map>
 #include <string>
 
@@ -26,6 +27,7 @@ class QobuzService : public StreamingService {
   void Logout() override;
   void ReloadSettings() override;
   LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;
+  void FetchTrackMetadata(const std::string &track_id, std::function<void(const Song &, const std::string &error)> callback);
   void GetFavorites(FavoriteType type, SearchCallback callback) override;
   void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;
   void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {}) override;

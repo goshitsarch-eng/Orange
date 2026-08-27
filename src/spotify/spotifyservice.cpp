@@ -307,6 +307,54 @@ UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallbac
   return result;
 }
 
+void SpotifyService::FetchTrackMetadata(const std::string &track_id, std::function<void(const Song &, const std::string &error)> callback) {
+  if (track_id.empty()) {
+    if (callback) {
+      callback(Song(), "No track ID");
+    }
+    return;
+  }
+  EnsureFreshToken([this, track_id, callback]() {
+    if (token_.empty()) {
+      if (callback) {
+        callback(Song(), "Not authenticated");
+      }
+      return;
+    }
+    const auto headers = AuthHeaders();
+    SpotifyMetadataRequest::Get(network_, SpotifyMetadataRequest::TrackUrl(kApiUrl, track_id), headers,
+                                [this, callback, headers](const Song &song, const std::string &error) {
+                                  if (!song.is_valid()) {
+                                    if (callback) {
+                                      callback(song, error.empty() ? "Spotify metadata missing" : error);
+                                    }
+                                    return;
+                                  }
+                                  if (song.artist_id().empty() || !network_) {
+                                    if (callback) {
+                                      callback(song, {});
+                                    }
+                                    return;
+                                  }
+                                  network_->Get(
+                                      SpotifyMetadataRequest::ArtistUrl(kApiUrl, song.artist_id()),
+                                      [callback, song](const NetworkAccessManager::Response &response) {
+                                        Song out = song;
+                                        if (response.ok()) {
+                                          const std::string genre = SpotifyMetadataRequest::ParseArtistGenre(response.body);
+                                          if (!genre.empty()) {
+                                            out.set_genre(genre);
+                                          }
+                                        }
+                                        if (callback) {
+                                          callback(out, {});
+                                        }
+                                      },
+                                      headers);
+                                });
+  });
+}
+
 void SpotifyService::GetFavorites(FavoriteType type, SearchCallback callback) {
   auto guarded = GuardFavorites(std::move(callback));
   const int gen = favorites_generation();

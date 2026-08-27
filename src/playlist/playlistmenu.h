@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_PLAYLISTMENU_H
 #define STRAWBERRY_PLAYLISTMENU_H
 
+#include "core/playeritemoptions.h"
 #include "core/song.h"
 #include "playlist/playlistdelegates.h"
 
@@ -53,6 +54,7 @@ struct RowInfo {
   bool editable = false;
   bool in_queue = false;
   bool skipped = false;
+  bool pause_disabled = false;
 };
 
 struct SelectionState {
@@ -133,7 +135,17 @@ inline RowInfo FromSong(const Song &song, bool in_queue = false) {
   row.editable = song.IsEditable();
   row.in_queue = in_queue;
   row.skipped = song.skipped();
+  row.pause_disabled = PlayerItemOptions::PauseDisabled(song);
   return row;
+}
+
+// Qt playlist context Play uses the item under the cursor (PauseDisabled on radio).
+inline void ApplyContextSong(SelectionState *opts, const Song &song, bool playing) {
+  if (!opts) {
+    return;
+  }
+  opts->pause_disabled = PlayerItemOptions::PauseDisabled(song);
+  opts->playing_selected = playing;
 }
 
 inline SelectionState Analyze(const std::vector<RowInfo> &rows, SelectionState opts = {}) {

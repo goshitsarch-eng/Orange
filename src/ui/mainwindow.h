@@ -22,6 +22,7 @@
 #include "queue/queueview.h"
 #include "radios/radioviewcontainer.h"
 #include "smartplaylists/smartplaylistsviewcontainer.h"
+#include "streaming/streamingmetadataqueue.h"
 #include "streaming/streamingtabsview.h"
 #include "widgets/multiloadingindicator.h"
 #include "widgets/playingwidget.h"
@@ -159,6 +160,9 @@ class MainWindow {
   void JumpToPlaying();
   void RescanSelected();
   void FetchStreamingMetadata();
+  void ProcessMetadataQueue();
+  void ApplyFetchedMetadata(const StreamingMetadataQueue::Entry &entry, const Song &fetched, const std::string &error);
+  void ScheduleMetadataQueue();
   void AddSelectedToPlaylist(int id);
   void AutoCompleteTags();
   void EditColumnValue();
@@ -263,6 +267,9 @@ class MainWindow {
   guint analyzer_timeout_ = 0;
   int analyzer_timer_ms_ = 0;
   guint collection_filter_timeout_ = 0;
+  std::vector<StreamingMetadataQueue::Entry> metadata_queue_;
+  guint metadata_queue_timeout_ = 0;
+  std::shared_ptr<bool> metadata_alive_ = std::make_shared<bool>(true);
   bool refreshing_devices_ = false;
   bool sponsor_prompted_ = false;
   TaskbarProgress taskbar_;

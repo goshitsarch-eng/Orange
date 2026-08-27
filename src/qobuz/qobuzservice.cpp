@@ -6,6 +6,7 @@
 #include "streaming/streamingauth.h"
 #include "streaming/streamingsearchopts.h"
 #include "qobuz/qobuzfavoriterequest.h"
+#include "qobuz/qobuzmetadatarequest.h"
 #include "qobuz/qobuzrequest.h"
 #include "qobuz/qobuzstreamurlrequest.h"
 #include "utilities/jsonutils.h"
@@ -193,6 +194,22 @@ UrlHandler::LoadResult QobuzService::Load(const std::string &url, AsyncCallback 
                              QobuzStreamUrlRequest::Url(kApiUrl, id, format_, timestamp, app_id_, app_secret_, user_auth_token_),
                              AuthHeaders(), url, id, std::move(callback));
   return result;
+}
+
+void QobuzService::FetchTrackMetadata(const std::string &track_id, std::function<void(const Song &, const std::string &error)> callback) {
+  if (!logged_in_) {
+    if (callback) {
+      callback(Song(), "Not authenticated");
+    }
+    return;
+  }
+  if (track_id.empty()) {
+    if (callback) {
+      callback(Song(), "No track ID");
+    }
+    return;
+  }
+  QobuzMetadataRequest::Get(network_, QobuzMetadataRequest::Url(kApiUrl, track_id, app_id_, user_auth_token_), AuthHeaders(), std::move(callback));
 }
 
 void QobuzService::GetFavorites(FavoriteType type, SearchCallback callback) {

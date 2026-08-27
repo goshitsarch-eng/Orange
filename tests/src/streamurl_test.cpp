@@ -1,7 +1,10 @@
 #include "core/song.h"
 #include "core/taskmanager.h"
 #include "core/urlhandlers.h"
+#include "dialogs/edittagsave.h"
 #include "qobuz/qobuzmetadatarequest.h"
+#include "streaming/streamingmetadatamerge.h"
+#include "streaming/streamingmetadataqueue.h"
 #include "qobuz/qobuzservice.h"
 #include "qobuz/qobuzstreamurlrequest.h"
 #include "qobuz/qobuzurlhandler.h"
@@ -187,6 +190,84 @@ TEST(SpotifyMetadataRequest, ParsesTrackAndArtistGenre) {
   EXPECT_EQ(1994, song.year());
   EXPECT_EQ(300000000000LL, song.length_nanosec());
   EXPECT_EQ("trip hop", SpotifyMetadataRequest::ParseArtistGenre(R"json({"genres":["trip hop","electronic"]})json"));
+}
+
+TEST(StreamingMetadataQueue, TrackIdsAndMergeMatchQt) {
+  EXPECT_EQ(200, StreamingMetadataQueue::kDelayMs);
+  EXPECT_TRUE(StreamingMetadataQueue::ShouldStart(false, false));
+  EXPECT_FALSE(StreamingMetadataQueue::ShouldStart(true, false));
+  EXPECT_FALSE(StreamingMetadataQueue::ShouldStart(false, true));
+  EXPECT_TRUE(StreamingMetadataQueue::ShouldContinue(false));
+  EXPECT_FALSE(StreamingMetadataQueue::ShouldContinue(true));
+
+  Song qobuz(Song::Source::Qobuz);
+  qobuz.set_song_id("7");
+  qobuz.set_url("qobuz://ignored");
+  EXPECT_EQ("7", StreamingMetadataQueue::TrackId(qobuz));
+  EXPECT_EQ("99", StreamingMetadataQueue::QobuzTrackId({}, "qobuz://99"));
+  EXPECT_EQ("99", StreamingMetadataQueue::QobuzTrackId({}, "qobuz:///99"));
+  EXPECT_TRUE(StreamingMetadataQueue::ShouldEnqueue(qobuz));
+
+  Song spotify(Song::Source::Spotify);
+  spotify.set_url("spotify:track:abc");
+  EXPECT_EQ("abc", StreamingMetadataQueue::TrackId(spotify));
+  EXPECT_EQ("xyz", StreamingMetadataQueue::SpotifyTrackId("xyz", "spotify:track:abc"));
+  EXPECT_EQ("abc", StreamingMetadataQueue::SpotifyTrackId({}, "spotify://abc"));
+  EXPECT_TRUE(StreamingMetadataQueue::ShouldEnqueue(spotify));
+
+  Song tidal(Song::Source::Tidal);
+  tidal.set_song_id("1");
+  tidal.set_url("tidal://1");
+  EXPECT_TRUE(StreamingMetadataQueue::TrackId(tidal).empty());
+  EXPECT_FALSE(StreamingMetadataQueue::ShouldEnqueue(tidal));
+  EXPECT_FALSE(StreamingMetadataQueue::ShouldEnqueue(Song::Source::Qobuz, {}));
+
+  SongList songs = {qobuz, tidal, spotify};
+  const auto queued = StreamingMetadataQueue::EntriesFromSelection(songs, {2, 4, 6});
+  ASSERT_EQ(2u, queued.size());
+  EXPECT_EQ(Song::Source::Qobuz, queued[0].source);
+  EXPECT_EQ("7", queued[0].track_id);
+  EXPECT_EQ(2, queued[0].row);
+  EXPECT_EQ(Song::Source::Spotify, queued[1].source);
+  EXPECT_EQ("abc", queued[1].track_id);
+  EXPECT_EQ(6, queued[1].row);
+
+  Song original(Song::Source::Qobuz);
+  original.set_valid(true);
+  original.set_url("qobuz://7");
+  original.set_title("Old");
+  original.set_artist("Keep");
+  original.set_track(3);
+  original.set_year(-1);
+  Song fetched(Song::Source::Qobuz);
+  fetched.set_valid(true);
+  fetched.set_title("Roads");
+  fetched.set_album("Dummy");
+  fetched.set_albumartist("Portishead");
+  fetched.set_composer("Barrow");
+  fetched.set_performer("Portishead");
+  fetched.set_comment("(C)");
+  fetched.set_genre("Trip Hop");
+  fetched.set_disc(1);
+  fetched.set_year(1994);
+  fetched.set_length_nanosec(300000000000LL);
+  fetched.set_art_automatic("https://i/l.jpg");
+  StreamingMetadataMerge::Apply(&original, fetched);
+  EXPECT_EQ("Roads", original.title());
+  EXPECT_EQ("Keep", original.artist());
+  EXPECT_EQ("Dummy", original.album());
+  EXPECT_EQ("Portishead", original.albumartist());
+  EXPECT_EQ("Barrow", original.composer());
+  EXPECT_EQ("Portishead", original.performer());
+  EXPECT_EQ("(C)", original.comment());
+  EXPECT_EQ("Trip Hop", original.genre());
+  EXPECT_EQ(3, original.track());
+  EXPECT_EQ(1, original.disc());
+  EXPECT_EQ(1994, original.year());
+  EXPECT_EQ(300000000000LL, original.length_nanosec());
+  EXPECT_EQ("https://i/l.jpg", original.art_automatic());
+  EXPECT_FALSE(StreamingMetadataMerge::ShouldApply(Song()));
+  EXPECT_EQ(0, EditTagSave::ResolveRow({original}, 2, "qobuz://7"));
 }
 
 TEST(SubsonicUrlHandler, BuildsStreamUrlFromPath) {

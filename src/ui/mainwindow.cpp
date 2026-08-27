@@ -1,3 +1,5 @@
+#include "config.h"
+#include "core/logging.h"
 #include "ui/mainwindow.h"
 
 #include "collection/collectionbehaviour.h"
@@ -103,6 +105,14 @@
 #include "organize/organizeformat.h"
 #include "organize/organizeloading.h"
 #include "smartplaylists/smartplaylist.h"
+#include "streaming/streamingmetadatamerge.h"
+#include "streaming/streamingmetadataqueue.h"
+#ifdef HAVE_QOBUZ
+#include "qobuz/qobuzservice.h"
+#endif
+#ifdef HAVE_SPOTIFY
+#include "spotify/spotifyservice.h"
+#endif
 #include "streaming/streamingtabsview.h"
 #include "core/urlhandler.h"
 #include "dialogs/aboutdialog.h"
@@ -190,6 +200,13 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
 }
 
 MainWindow::~MainWindow() {
+  if (metadata_alive_) {
+    *metadata_alive_ = false;
+  }
+  if (metadata_queue_timeout_) {
+    g_source_remove(metadata_queue_timeout_);
+    metadata_queue_timeout_ = 0;
+  }
   SaveGeometry();
   if (position_timeout_) {
     g_source_remove(position_timeout_);
@@ -3512,6 +3529,7 @@ void MainWindow::ShowPlaylistMenu(double, double y) {
     opts.column_value = PlaylistDelegates::ColumnText(song, column);
     opts.collection_item = song.source() == Song::Source::Collection && song.id() > 0;
     opts.playing_selected = playlist->current_row() == info_row && app_->player()->GetState() == GstEngine::State::Playing;
+    PlaylistMenu::ApplyContextSong(&opts, song, opts.playing_selected);
   }
   std::vector<PlaylistMenu::RowInfo> infos;
   if (playlist) {
@@ -3862,49 +3880,85 @@ void MainWindow::FetchStreamingMetadata() {
   if (!playlist) {
     return;
   }
-  int started = 0;
-  for (int row : SelectedPlaylistRows()) {
+  const std::vector<int> rows = SelectedPlaylistRows();
+  SongList songs;
+  std::vector<int> aligned;
+  for (int row : rows) {
     if (row < 0 || row >= playlist->row_count()) {
       continue;
     }
-    const Song song = playlist->song(row);
-    UrlHandler *handler = app_->url_handlers()->HandlerForUrl(song.url());
-    if (!handler) {
-      continue;
-    }
-    ++started;
-    handler->Load(song.url(), [this, row](const UrlHandler::LoadResult &result) {
-      Playlist *current = app_->playlist_manager()->current();
-      if (!current || row < 0 || row >= current->row_count()) {
-        return;
-      }
-      Song updated = current->song(row);
-      if (result.song.is_valid()) {
-        if (!result.song.title().empty()) {
-          updated.set_title(result.song.title());
-        }
-        if (!result.song.artist().empty()) {
-          updated.set_artist(result.song.artist());
-        }
-        if (!result.song.album().empty()) {
-          updated.set_album(result.song.album());
-        }
-        if (!result.song.genre().empty()) {
-          updated.set_genre(result.song.genre());
-        }
-        if (result.song.length_nanosec() > 0) {
-          updated.set_length_nanosec(result.song.length_nanosec());
-        }
-      }
-      if (!result.stream_url.empty()) {
-        updated.set_stream_url(result.stream_url);
-      }
-      current->ReplaceRow(row, updated);
+    songs.push_back(playlist->song(row));
+    aligned.push_back(row);
+  }
+  const std::vector<StreamingMetadataQueue::Entry> queued = StreamingMetadataQueue::EntriesFromSelection(songs, aligned);
+  metadata_queue_.insert(metadata_queue_.end(), queued.begin(), queued.end());
+  if (StreamingMetadataQueue::ShouldStart(metadata_queue_.empty(), metadata_queue_timeout_ != 0)) {
+    ProcessMetadataQueue();
+  }
+  ShowToast(!queued.empty() ? ("Fetching metadata for " + std::to_string(queued.size()) + " stream(s)") : "No streaming tracks selected");
+}
+
+void MainWindow::ScheduleMetadataQueue() {
+  if (metadata_queue_timeout_ != 0 || !StreamingMetadataQueue::ShouldContinue(metadata_queue_.empty())) {
+    return;
+  }
+  metadata_queue_timeout_ = g_timeout_add(StreamingMetadataQueue::kDelayMs, [](gpointer data) -> gboolean {
+    auto *self = static_cast<MainWindow *>(data);
+    self->metadata_queue_timeout_ = 0;
+    self->ProcessMetadataQueue();
+    return G_SOURCE_REMOVE;
+  }, this);
+}
+
+void MainWindow::ApplyFetchedMetadata(const StreamingMetadataQueue::Entry &entry, const Song &fetched, const std::string &error) {
+  if (!error.empty()) {
+    LogError("Failed to fetch streaming metadata: %s", error.c_str());
+  }
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (playlist && StreamingMetadataMerge::ShouldApply(fetched)) {
+    const int row = EditTagSave::ResolveRow(playlist->songs(), entry.row, entry.url);
+    if (row >= 0) {
+      Song updated = playlist->song(row);
+      StreamingMetadataMerge::Apply(&updated, fetched);
+      playlist->ReplaceRow(row, updated);
       app_->playlist_manager()->SaveCurrent();
       RefreshPlaylist();
-    });
+    }
   }
-  ShowToast(started > 0 ? ("Fetching metadata for " + std::to_string(started) + " stream(s)") : "No streaming tracks selected");
+  ScheduleMetadataQueue();
+}
+
+void MainWindow::ProcessMetadataQueue() {
+  if (metadata_queue_.empty()) {
+    return;
+  }
+  const StreamingMetadataQueue::Entry entry = metadata_queue_.front();
+  metadata_queue_.erase(metadata_queue_.begin());
+  auto alive = metadata_alive_;
+  auto finish = [this, entry, alive](const Song &fetched, const std::string &error) {
+    if (!alive || !*alive) {
+      return;
+    }
+    ApplyFetchedMetadata(entry, fetched, error);
+  };
+
+#ifdef HAVE_QOBUZ
+  if (entry.source == Song::Source::Qobuz) {
+    if (auto *qobuz = dynamic_cast<QobuzService *>(app_->streaming_services()->ServiceByName("Qobuz"))) {
+      qobuz->FetchTrackMetadata(entry.track_id, finish);
+      return;
+    }
+  }
+#endif
+#ifdef HAVE_SPOTIFY
+  if (entry.source == Song::Source::Spotify) {
+    if (auto *spotify = dynamic_cast<SpotifyService *>(app_->streaming_services()->ServiceByName("Spotify"))) {
+      spotify->FetchTrackMetadata(entry.track_id, finish);
+      return;
+    }
+  }
+#endif
+  ScheduleMetadataQueue();
 }
 
 void MainWindow::AddSelectedToPlaylist(int id) {
