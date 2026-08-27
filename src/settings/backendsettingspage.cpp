@@ -24,10 +24,43 @@ void ApplyFadeSensitivity(FadeWidgets *state) {
   const bool fade_on = SettingsControls::FadeDurationEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(state->stop)),
                                                             adw_switch_row_get_active(ADW_SWITCH_ROW(state->cross)),
                                                             adw_switch_row_get_active(ADW_SWITCH_ROW(state->auto_cross)));
-  gtk_widget_set_sensitive(state->same, fade_on ? TRUE : FALSE);
+  gtk_widget_set_sensitive(state->same, SettingsControls::SameAlbumFadeEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(state->auto_cross)))
+                                            ? TRUE
+                                            : FALSE);
   gtk_widget_set_sensitive(state->duration, fade_on ? TRUE : FALSE);
   gtk_widget_set_sensitive(state->pause_duration,
                            SettingsControls::PauseFadeEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(state->pause))) ? TRUE : FALSE);
+}
+
+struct BackendEnableState {
+  Settings *settings = nullptr;
+  GtkWidget *alsa_group = nullptr;
+  GtkWidget *fade_group = nullptr;
+  FadeWidgets *fade = nullptr;
+};
+
+void ApplyBackendEnable(BackendEnableState *state) {
+  if (!state || !state->settings) {
+    return;
+  }
+  state->settings->BeginGroup(BackendSettings::kSettingsGroup);
+  const std::string output = state->settings->Value(BackendSettings::kOutput, "autoaudiosink");
+  const std::string device = state->settings->Value(BackendSettings::kDevice);
+  if (state->alsa_group) {
+    gtk_widget_set_sensitive(state->alsa_group, SettingsControls::AlsaPluginEnabled(output) ? TRUE : FALSE);
+  }
+  const bool fading = SettingsControls::FadingGroupEnabled(output, device);
+  if (state->fade_group) {
+    gtk_widget_set_sensitive(state->fade_group, fading ? TRUE : FALSE);
+  }
+  if (!fading && state->fade) {
+    adw_switch_row_set_active(ADW_SWITCH_ROW(state->fade->stop), FALSE);
+    adw_switch_row_set_active(ADW_SWITCH_ROW(state->fade->cross), FALSE);
+    adw_switch_row_set_active(ADW_SWITCH_ROW(state->fade->auto_cross), FALSE);
+  }
+  if (state->fade) {
+    ApplyFadeSensitivity(state->fade);
+  }
 }
 
 }  // namespace
@@ -35,6 +68,9 @@ void ApplyFadeSensitivity(FadeWidgets *state) {
 AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application *app) {
   settings->BeginGroup(BackendSettings::kSettingsGroup);
   AdwPreferencesPage *page = SettingsPage::MakePage("Backend", "audio-card-symbolic");
+  auto *enable = new BackendEnableState();
+  enable->settings = settings;
+  g_object_set_data_full(G_OBJECT(page), "backend-enable", enable, [](gpointer p) { delete static_cast<BackendEnableState *>(p); });
   AdwPreferencesGroup *output = SettingsPage::AddGroup(page, "Output");
   std::vector<std::pair<std::string, std::string>> outputs;
   DeviceFinders *finders = app ? app->device_finders() : nullptr;
@@ -42,7 +78,8 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
   for (const std::string &sink : sink_names) {
     outputs.emplace_back(sink, DeviceFinders::OutputLabel(sink));
   }
-  SettingsPage::AddCombo(output, settings, BackendSettings::kOutput, "GStreamer output", outputs, "autoaudiosink");
+  SettingsPage::AddCombo(output, settings, BackendSettings::kOutput, "GStreamer output", outputs, "autoaudiosink",
+                         [enable](const std::string &) { ApplyBackendEnable(enable); });
 
   const std::vector<AudioDevice> listed = finders ? finders->ListDevices() : std::vector<AudioDevice>{};
   std::vector<std::pair<std::string, std::string>> devices = {{DeviceFinders::ChoiceKey("autoaudiosink", ""), "Default"}};
@@ -59,11 +96,12 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
   const std::string current_choice = BackendOutputChoices::ComboKey(current_output, current_device, listed);
   auto *custom_entry = new GtkWidget *(nullptr);
   g_object_set_data_full(G_OBJECT(page), "custom-device-entry", custom_entry, [](gpointer p) { delete static_cast<GtkWidget **>(p); });
-  SettingsPage::AddCombo(output, settings, nullptr, "Device", devices, current_choice, [settings, custom_entry](const std::string &key) {
+  SettingsPage::AddCombo(output, settings, nullptr, "Device", devices, current_choice, [settings, custom_entry, enable](const std::string &key) {
     if (BackendOutputChoices::IsCustomKey(key)) {
       if (*custom_entry) {
         gtk_widget_set_sensitive(*custom_entry, TRUE);
       }
+      ApplyBackendEnable(enable);
       return;
     }
     std::string sink;
@@ -75,10 +113,17 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
     if (*custom_entry) {
       gtk_widget_set_sensitive(*custom_entry, FALSE);
     }
+    ApplyBackendEnable(enable);
   });
   *custom_entry = SettingsPage::AddEntry(output, settings, BackendSettings::kDevice, BackendOutputChoices::CustomDeviceTitle());
   gtk_widget_set_sensitive(*custom_entry, custom_device ? TRUE : FALSE);
-  SettingsPage::AddChoiceRadios(output, settings, BackendSettings::kALSAPlugin, "ALSA plugin",
+  g_signal_connect(*custom_entry, "changed", G_CALLBACK(+[](AdwEntryRow *, gpointer data) {
+                     ApplyBackendEnable(static_cast<BackendEnableState *>(data));
+                   }),
+                   enable);
+  AdwPreferencesGroup *alsa = SettingsPage::AddGroup(page, "ALSA plugin");
+  enable->alsa_group = GTK_WIDGET(alsa);
+  SettingsPage::AddChoiceRadios(alsa, settings, BackendSettings::kALSAPlugin, "ALSA plugin",
                                {{"hw", "hw"}, {"plughw", "plughw"}, {"pcm", "pcm"}}, "hw");
   SettingsPage::AddToggle(output, settings, BackendSettings::kExclusiveMode, BackendSettingsLabels::Exclusive(), nullptr,
                           BackendSettings::kDefaultExclusiveMode);
@@ -157,6 +202,7 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
                               BackendSettingsLabels::TargetLevel(), BackendSettings::kDefaultEBUR128TargetLevelLUFS, ebu.min, ebu.max, ebu.step);
 
   AdwPreferencesGroup *fade = SettingsPage::AddGroup(page, "Fading");
+  enable->fade_group = GTK_WIDGET(fade);
   GtkWidget *fade_stop =
       SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutEnabled, BackendSettingsLabels::FadeStop(), nullptr,
                               BackendSettings::kDefaultFadeoutEnabled);
@@ -191,5 +237,7 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
   connect_fade(fade_cross);
   connect_fade(fade_auto);
   connect_fade(fade_pause);
+  enable->fade = fade_widgets;
+  ApplyBackendEnable(enable);
   return page;
 }

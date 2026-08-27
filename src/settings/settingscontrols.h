@@ -47,6 +47,23 @@ inline bool NormalizationUsesEbu(const std::string &choice) { return choice == "
 
 inline bool FadeDurationEnabled(bool stop, bool cross, bool auto_cross) { return stop || cross || auto_cross; }
 
+inline bool SameAlbumFadeEnabled(bool auto_cross) { return auto_cross; }
+
+inline bool AlsaOutput(const std::string &output) { return output == "alsasink" || output == "alsa"; }
+
+inline bool AlsaPluginEnabled(const std::string &output) { return AlsaOutput(output); }
+
+inline bool AlsaHwDevice(const std::string &device) { return device.rfind("hw:", 0) == 0; }
+
+inline bool AlsaPlugHwDevice(const std::string &device) { return device.rfind("plughw:", 0) == 0; }
+
+inline bool FadingGroupEnabled(const std::string &output, const std::string &device) {
+  if (!AlsaOutput(output) || device.empty()) {
+    return true;
+  }
+  return !AlsaHwDevice(device) && !AlsaPlugHwDevice(device);
+}
+
 inline bool PauseFadeEnabled(bool pause) { return pause; }
 
 inline bool ChannelsSpinEnabled(bool force_channels) { return force_channels; }
