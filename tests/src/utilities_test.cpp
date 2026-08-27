@@ -1981,6 +1981,9 @@ TEST(AddStreamUrl, ValidatesSchemeAndHostLikeQt) {
   EXPECT_FALSE(AddStreamUrl::IsValid("example.com"));
   EXPECT_FALSE(AddStreamUrl::IsValid("https://"));
   EXPECT_FALSE(AddStreamUrl::IsValid("://missing-scheme.example"));
+  EXPECT_FALSE(AddStreamUrl::IsComplete(""));
+  EXPECT_FALSE(AddStreamUrl::IsComplete("https://"));
+  EXPECT_TRUE(AddStreamUrl::IsComplete("https://example.com/stream.mp3"));
   EXPECT_EQ("https", AddStreamUrl::Scheme("https://radio.example/live"));
   EXPECT_EQ("radio.example", AddStreamUrl::Host("https://radio.example/live"));
 }

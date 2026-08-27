@@ -36,6 +36,9 @@ inline std::string Host(const std::string &url) {
 
 inline bool IsValid(const std::string &url) { return !Scheme(url).empty() && !Host(url).empty(); }
 
+// Qt AddStreamDialog::TextChanged: OK/Add stays off until the URL has a scheme and host.
+inline bool IsComplete(const std::string &url) { return IsValid(url); }
+
 }  // namespace AddStreamUrl
 
 #endif

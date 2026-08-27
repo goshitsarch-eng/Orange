@@ -12,6 +12,13 @@ void AddStreamDialog::Show(GtkWindow *parent, const std::function<void(const std
   adw_alert_dialog_set_extra_child(dialog, url);
   adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "add", Translations::CStr(AddStreamUrl::Add()), nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "add", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_response_enabled(dialog, "add", FALSE);
+  g_signal_connect(url, "changed", G_CALLBACK((+[](GtkEditable *editable, gpointer data) {
+                     const char *text = gtk_editable_get_text(editable);
+                     adw_alert_dialog_set_response_enabled(ADW_ALERT_DIALOG(data), "add",
+                                                           AddStreamUrl::IsComplete(text ? text : "") ? TRUE : FALSE);
+                   })),
+                   dialog);
   auto *cb = new std::function<void(const std::string &, const std::string &)>(callback);
   g_object_set_data(G_OBJECT(dialog), "url-entry", url);
   g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
