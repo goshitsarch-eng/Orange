@@ -11,6 +11,7 @@
 class FileViewTree {
  public:
   using ActivateCallback = std::function<void(const std::string &)>;
+  using EnqueueCallback = std::function<void(const std::vector<std::string> &)>;
   using MenuCallback = std::function<void(const std::string &)>;
 
   FileViewTree();
@@ -19,7 +20,9 @@ class FileViewTree {
   void Reload(FileViewTreeModel *model);
   void SetActivateCallback(ActivateCallback callback);
   void SetDoubleClickCallback(ActivateCallback callback);
+  void SetEnqueueCallback(EnqueueCallback callback);
   void SetMenuCallback(MenuCallback callback);
+  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
   std::string SelectedPath() const;
 
  private:
@@ -30,6 +33,7 @@ class FileViewTree {
   GtkWidget *list_ = nullptr;
   ActivateCallback activate_;
   ActivateCallback double_click_;
+  EnqueueCallback enqueue_;
   MenuCallback menu_;
 };
 

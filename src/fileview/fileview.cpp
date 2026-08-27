@@ -310,6 +310,9 @@ void FileView::SetEnqueueCallback(PathsCallback callback) {
   if (list_) {
     list_->SetEnqueueCallback(enqueue_);
   }
+  if (tree_) {
+    tree_->SetEnqueueCallback(enqueue_);
+  }
 }
 
 void FileView::SetReplacePlaylistCallback(PathsCallback callback) { replace_playlist_ = std::move(callback); }

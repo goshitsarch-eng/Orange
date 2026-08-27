@@ -1,5 +1,6 @@
 #include "collection/collectionmodel.h"
 #include "collection/collectiontree.h"
+#include "collection/collectiontreeclick.h"
 #include "device/devicepropertiesicons.h"
 #include "device/devicepropertiesinfo.h"
 #include "device/devicepropertieslabels.h"
@@ -270,6 +271,17 @@ TEST(FileViewMenu, ExpandPathsRecursesNestedAlbums) {
   rmdir(cd1.c_str());
   rmdir(cd2.c_str());
   rmdir(album.c_str());
+}
+
+TEST(FileViewTreeClick, MiddleButtonEnqueues) {
+  EXPECT_EQ(CollectionTreeClick::Action::Enqueue,
+            CollectionTreeClick::FromPress(CollectionTreeClick::kMiddleButton, 1, static_cast<GdkModifierType>(0)));
+  EXPECT_TRUE(CollectionTreeClick::SelectRowBeforeEnqueue(false));
+  EXPECT_FALSE(CollectionTreeClick::SelectRowBeforeEnqueue(true));
+  const auto paths = FileViewMenu::TreeEnqueuePaths("/music/portishead/dummy.flac");
+  ASSERT_EQ(1u, paths.size());
+  EXPECT_EQ("/music/portishead/dummy.flac", paths.front());
+  EXPECT_TRUE(FileViewMenu::TreeEnqueuePaths("").empty());
 }
 
 TEST(FileViewMenu, DoubleClickPlaylistNameMatchesQt) {

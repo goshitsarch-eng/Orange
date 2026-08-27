@@ -1,7 +1,9 @@
 #include "fileview/fileviewtree.h"
 
+#include "collection/collectiontreeclick.h"
 #include "fileview/fileviewdrag.h"
 #include "fileview/fileviewicons.h"
+#include "widgets/listboxtreepressgtk.h"
 
 #include <string>
 #include <vector>
@@ -41,26 +43,37 @@ FileViewTree::FileViewTree() {
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
-  GtkGesture *primary = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(primary), GDK_BUTTON_PRIMARY);
-  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(primary));
-  g_signal_connect(primary, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint n_press, gdouble, gdouble y, gpointer data) {
-                     auto *self = static_cast<FileViewTree *>(data);
-                     if (n_press != 2 || !self->double_click_) {
-                       return;
-                     }
-                     GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(self->list_), static_cast<int>(y));
-                     const char *path = row ? static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path")) : nullptr;
-                     if (path) {
-                       self->double_click_(path);
-                     }
-                   }),
-                   this);
+  ListBoxTreePressGtk::Attach(list_, this);
 }
 
 void FileViewTree::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
 void FileViewTree::SetDoubleClickCallback(ActivateCallback callback) { double_click_ = std::move(callback); }
+
+void FileViewTree::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
+
+void FileViewTree::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  (void)x;
+  if (button == CollectionTreeClick::kPrimaryButton && n_press == 2 && double_click_) {
+    GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+    const char *path = row ? static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path")) : nullptr;
+    if (path) {
+      double_click_(path);
+    }
+    return;
+  }
+  if (CollectionTreeClick::FromPress(button, n_press, state) != CollectionTreeClick::Action::Enqueue || !enqueue_) {
+    return;
+  }
+  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+    ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
+  }
+  const char *path = row ? static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path")) : nullptr;
+  if (path) {
+    enqueue_({path});
+  }
+}
 
 void FileViewTree::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 

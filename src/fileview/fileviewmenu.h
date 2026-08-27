@@ -141,6 +141,11 @@ inline std::string PathPlaylistName(const std::string &path) {
   return base.substr(0, base.size() - ext.size() - 1);
 }
 
+// Qt FileViewTree::mousePressEvent middle-click enqueues the clicked path after selecting it.
+inline std::vector<std::string> TreeEnqueuePaths(const std::string &path) {
+  return path.empty() ? std::vector<std::string>{} : std::vector<std::string>{path};
+}
+
 // Qt FileView::ItemDoubleClick sets MimeData::name_for_new_playlist_ to the file path.
 inline std::string DoubleClickPlaylistName(const std::vector<std::string> &paths) {
   return paths.empty() ? std::string() : paths.front();
