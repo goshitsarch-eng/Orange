@@ -2,10 +2,13 @@
 
 #include "constants/scrobblersettings.h"
 #include "core/settings.h"
+#include "scrobbler/listenbrainzscrobblestate.h"
 #include "scrobbler/scrobblemetadata.h"
 #include "scrobbler/scrobblererror.h"
 #include "scrobbler/scrobblerplayingstate.h"
 #include "utilities/strutils.h"
+
+#include <glib.h>
 
 #include <ctime>
 
@@ -32,11 +35,20 @@ Song SongFromMetadata(const Song &song, const ScrobbleMetadata &metadata) {
 
 }  // namespace
 
-ListenBrainzScrobbler::ListenBrainzScrobbler(NetworkAccessManager *network) : network_(network), cache_(kCacheFile) {
+ListenBrainzScrobbler::ListenBrainzScrobbler(NetworkAccessManager *network) : network_(network), cache_(kCacheFile), song_playing_(Song()) {
   Settings settings;
   settings.BeginGroup("ListenBrainz");
   token_ = settings.Value("token");
   username_ = settings.Value("username");
+}
+
+ListenBrainzScrobbler::~ListenBrainzScrobbler() { CancelSubmitTimer(); }
+
+void ListenBrainzScrobbler::CancelSubmitTimer() {
+  if (submit_timeout_id_ != 0) {
+    g_source_remove(submit_timeout_id_);
+    submit_timeout_id_ = 0;
+  }
 }
 
 std::string ListenBrainzScrobbler::SubmitBody(const std::string &listen_type, const std::vector<ScrobblerCacheItem> &items) {
@@ -62,20 +74,34 @@ std::string ListenBrainzScrobbler::LoveBody(const std::string &recording_mbid) {
 
 void ListenBrainzScrobbler::Submit(const std::string &listen_type, const std::vector<ScrobblerCacheItem> &items, bool from_cache) {
   if (!enabled_ || !network_ || items.empty() || OfflineMode()) {
+    submitted_ = false;
+    if (from_cache) {
+      cache_.ClearSent();
+    }
     return;
   }
   Settings settings;
   settings.BeginGroup("ListenBrainz");
   const std::string token = token_.empty() ? settings.Value("token") : token_;
   if (token.empty()) {
+    submitted_ = false;
+    if (from_cache) {
+      cache_.ClearSent();
+    }
     Error.Emit(ScrobblerError::NotAuthenticated("ListenBrainz"));
     return;
   }
   network_->Post(kSubmitUrl, SubmitBody(listen_type, items), [this, from_cache](const NetworkAccessManager::Response &response) {
+    submitted_ = false;
     if (from_cache && response.ok()) {
       cache_.RemoveSent();
+      submit_error_ = false;
     } else if (!response.ok()) {
       Error.Emit(ScrobblerError::RequestFailed("ListenBrainz"));
+      if (from_cache) {
+        cache_.ClearSent();
+        ScheduleSubmit(true);
+      }
     }
   }, "application/json", {{"Authorization", "Token " + token}});
 }
@@ -121,20 +147,49 @@ void ListenBrainzScrobbler::Scrobble(const Song &song) {
   scrobbled_ = true;
   cache_.Add(SongFromMetadata(song, ScrobbleMetadata::FromSongSettings(song)),
              ScrobblerPlayingState::TimestampOrNow(timestamp_, static_cast<uint64_t>(std::time(nullptr))));
-  const std::vector<ScrobblerCacheItem> items = cache_.Unsent();
-  cache_.MarkSent();
-  Submit("single", items, true);
+  if (OfflineMode() || token_.empty()) {
+    return;
+  }
+  ScheduleSubmit(false);
 }
 
 void ListenBrainzScrobbler::WriteCache() { cache_.Save(); }
 
-void ListenBrainzScrobbler::Submit() {
+void ListenBrainzScrobbler::ScheduleSubmit(bool had_error) {
+  submit_error_ = had_error;
+  if (!ListenBrainzScrobbleState::ShouldStartSubmitTimer(submitted_, !cache_.Unsent().empty(), submit_timeout_id_ != 0)) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  const int delay = ListenBrainzScrobbleState::DelaySeconds(settings.IntValue(ScrobblerSettings::kSubmit, ScrobblerSettings::kDefaultSubmit),
+                                                            had_error);
+  CancelSubmitTimer();
+  submit_timeout_id_ = g_timeout_add_seconds(static_cast<guint>(delay), +[](gpointer data) -> gboolean {
+                                               auto *self = static_cast<ListenBrainzScrobbler *>(data);
+                                               self->submit_timeout_id_ = 0;
+                                               self->FlushCache();
+                                               return G_SOURCE_REMOVE;
+                                             },
+                                             this);
+}
+
+void ListenBrainzScrobbler::FlushCache() {
+  if (submitted_) {
+    return;
+  }
   const std::vector<ScrobblerCacheItem> items = cache_.Unsent();
   if (items.empty()) {
     return;
   }
   cache_.MarkSent();
-  Submit("single", items, true);
+  submitted_ = true;
+  Submit(ListenBrainzScrobbleState::CachedListenType(), items, true);
+}
+
+void ListenBrainzScrobbler::Submit() {
+  CancelSubmitTimer();
+  FlushCache();
 }
 
 void ListenBrainzScrobbler::Love(const Song &song) {

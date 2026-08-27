@@ -73,6 +73,12 @@ void ScrobblerCache::MarkSent() {
   }
 }
 
+void ScrobblerCache::ClearSent() {
+  for (ScrobblerCacheItem &item : items_) {
+    item.sent = false;
+  }
+}
+
 void ScrobblerCache::RemoveSent() {
   items_.erase(std::remove_if(items_.begin(), items_.end(), [](const ScrobblerCacheItem &item) { return item.sent; }), items_.end());
   Save();

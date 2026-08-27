@@ -15,6 +15,7 @@ class ListenBrainzScrobbler : public ScrobblerService {
   static const char *kCacheFile;
 
   explicit ListenBrainzScrobbler(NetworkAccessManager *network);
+  ~ListenBrainzScrobbler() override;
 
   std::string name() const override { return "ListenBrainz"; }
   void NowPlaying(const Song &song) override;
@@ -34,6 +35,9 @@ class ListenBrainzScrobbler : public ScrobblerService {
  private:
   void Submit(const std::string &listen_type, const std::vector<ScrobblerCacheItem> &items, bool from_cache);
   void CheckScrobblePrevSong();
+  void CancelSubmitTimer();
+  void ScheduleSubmit(bool had_error);
+  void FlushCache();
 
   NetworkAccessManager *network_ = nullptr;
   std::string token_;
@@ -42,6 +46,9 @@ class ListenBrainzScrobbler : public ScrobblerService {
   Song song_playing_;
   uint64_t timestamp_ = 0;
   bool scrobbled_ = false;
+  bool submitted_ = false;
+  bool submit_error_ = false;
+  unsigned submit_timeout_id_ = 0;
 };
 
 #endif

@@ -9,6 +9,7 @@
 #include "scrobbler/scrobblersubmittiming.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
+#include "scrobbler/listenbrainzscrobblestate.h"
 #include "scrobbler/scrobblemetadata.h"
 #include "scrobbler/scrobblercache.h"
 #include "scrobbler/scrobblersources.h"
@@ -87,6 +88,17 @@ TEST(ListenBrainzScrobbler, SubmitBodyEscapesQuotes) {
   EXPECT_NE(std::string::npos, body.find("\"listened_at\":99"));
   EXPECT_NE(std::string::npos, body.find("AC\\\"DC"));
   EXPECT_EQ(std::string::npos, body.find("\"artist_name\":\"AC\"DC\""));
+  EXPECT_STREQ("import", ListenBrainzScrobbleState::CachedListenType());
+  EXPECT_EQ(5, ListenBrainzScrobbleState::DelaySeconds(0, false));
+  EXPECT_EQ(30, ListenBrainzScrobbleState::DelaySeconds(0, true));
+  EXPECT_EQ(10, ListenBrainzScrobbleState::DelaySeconds(10, false));
+  EXPECT_EQ(45, ListenBrainzScrobbleState::DelaySeconds(45, true));
+  EXPECT_TRUE(ListenBrainzScrobbleState::ShouldStartSubmitTimer(false, true, false));
+  EXPECT_FALSE(ListenBrainzScrobbleState::ShouldStartSubmitTimer(true, true, false));
+  EXPECT_FALSE(ListenBrainzScrobbleState::ShouldStartSubmitTimer(false, false, false));
+  EXPECT_FALSE(ListenBrainzScrobbleState::ShouldStartSubmitTimer(false, true, true));
+  const std::string imported = ListenBrainzScrobbler::SubmitBody(ListenBrainzScrobbleState::CachedListenType(), {item});
+  EXPECT_NE(std::string::npos, imported.find("\"listen_type\":\"import\""));
 }
 
 TEST(SubsonicScrobbler, ScrobbleUrlUsesRestEndpoint) {

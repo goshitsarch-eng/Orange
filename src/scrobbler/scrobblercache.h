@@ -26,6 +26,7 @@ class ScrobblerCache {
   std::vector<ScrobblerCacheItem> List() const { return items_; }
   std::vector<ScrobblerCacheItem> Unsent() const;
   void MarkSent();
+  void ClearSent();
   void RemoveSent();
   size_t Count() const { return items_.size(); }
   void Load();
