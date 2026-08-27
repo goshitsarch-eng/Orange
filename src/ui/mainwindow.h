@@ -28,6 +28,10 @@
 #include "widgets/playingwidget.h"
 #include "widgets/trackslider.h"
 #include "widgets/volumeslider.h"
+#ifdef _WIN32
+#include "core/windows7thumbbar.h"
+#include "core/winsystemmediatransportcontrols.h"
+#endif
 
 #include <adwaita.h>
 #include <gtk/gtk.h>
@@ -305,6 +309,10 @@ class MainWindow {
   bool has_pending_options_ = false;
   CommandlineOptions pending_options_;
   TaskbarProgress taskbar_;
+#ifdef _WIN32
+  std::unique_ptr<Windows7ThumbBar> thumbbar_;
+  std::unique_ptr<WinSystemMediaTransportControls> smtc_;
+#endif
 };
 
 #endif

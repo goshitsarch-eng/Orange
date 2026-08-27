@@ -1,5 +1,9 @@
 #include "config.h"
 #include "core/logging.h"
+#ifdef _WIN32
+#include "core/windows7thumbbaractions.h"
+#include "utilities/winutils.h"
+#endif
 #include "ui/mainwindow.h"
 
 #include "collection/collectionfullrescan.h"
@@ -399,6 +403,22 @@ void MainWindow::BuildUi() {
                                       data);
                    }),
                    this);
+#ifdef _WIN32
+  thumbbar_ = std::make_unique<Windows7ThumbBar>(GTK_WIDGET(window_));
+  thumbbar_->SetActions(Windows7ThumbBarActions::DefaultActions());
+  smtc_ = std::make_unique<WinSystemMediaTransportControls>(app_->player());
+  smtc_->set_button_callback([this](const std::string &id) { app_->shortcuts()->Emit(id); });
+  g_signal_connect(window_, "realize", G_CALLBACK(+[](GtkWidget *widget, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     if (self->smtc_) {
+                       self->smtc_->Initialize(WinUtils::NativeHandle(widget));
+                     }
+                     if (self->thumbbar_) {
+                       self->thumbbar_->SetActions(Windows7ThumbBarActions::DefaultActions());
+                     }
+                   }),
+                   this);
+#endif
   gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
   gtk_widget_add_css_class(GTK_WIDGET(window_), "strawberry-main");
   RestoreGeometry();
@@ -2052,10 +2072,17 @@ void MainWindow::ConnectSignals() {
     }
     RefreshPlaylist();
   });
-  app_->player()->SongChanged.Connect([this](const Song &) {
+  app_->player()->SongChanged.Connect([this](const Song &song) {
     UpdateNowPlaying();
     SelectPlayingTrack();
     ApplySeekbarPlaybackState();
+#ifdef _WIN32
+    if (smtc_) {
+      smtc_->CurrentSongChanged(song);
+    }
+#else
+    (void)song;
+#endif
   });
   app_->player()->Playing.Connect([this]() {
     ApplySeekbarPlaybackState();
@@ -2661,6 +2688,14 @@ void MainWindow::UpdateCover(const std::vector<unsigned char> &data) {
 void MainWindow::UpdatePlaybackButtons() {
   const bool playing = app_->player()->GetState() == GstEngine::State::Playing;
   gtk_button_set_icon_name(GTK_BUTTON(play_button_), playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic");
+#ifdef _WIN32
+  if (thumbbar_) {
+    thumbbar_->SetPlaying(playing);
+  }
+  if (smtc_) {
+    smtc_->EngineStateChanged(app_->player()->GetState());
+  }
+#endif
 }
 
 void MainWindow::OpenSettings(const char *page_name) {

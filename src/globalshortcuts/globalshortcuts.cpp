@@ -6,6 +6,12 @@
 #include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
 #include "globalshortcuts/globalshortcutsbackend-portal.h"
 #include "globalshortcuts/globalshortcutsbackend-x11.h"
+#ifdef _WIN32
+#include "globalshortcuts/globalshortcutsbackend-win.h"
+#endif
+#ifdef __APPLE__
+#include "globalshortcuts/globalshortcutsbackend-macos.h"
+#endif
 
 namespace {
 
@@ -229,6 +235,18 @@ void GlobalShortcutsManager::RegisterBackends() {
       backends_.push_back(std::move(x11));
     }
   }
+#ifdef _WIN32
+  auto win = std::make_unique<GlobalShortcutsBackendWin>(this);
+  if (win->IsAvailable() && win->Register()) {
+    backends_.push_back(std::move(win));
+  }
+#endif
+#ifdef __APPLE__
+  auto mac = std::make_unique<GlobalShortcutsBackendMacOs>(this);
+  if (mac->IsAvailable() && mac->Register()) {
+    backends_.push_back(std::move(mac));
+  }
+#endif
 }
 
 void GlobalShortcutsManager::LoadShortcutKeys() {

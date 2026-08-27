@@ -1,4 +1,11 @@
+#include "core/filesystemwatcherwinpolicy.h"
+#include "core/windows7thumbbaractions.h"
+#include "core/winsmtcstatus.h"
+#include "engine/enginebase.h"
+#include "engine/platformdeviceoutputs.h"
+#include "globalshortcuts/keymapper_win.h"
 #include "utilities/strutils.h"
+#include "utilities/winblurbehind.h"
 #include "utilities/timeutils.h"
 #include "widgets/multiloadingtext.h"
 #include "widgets/tracksliderstate.h"
@@ -1946,6 +1953,8 @@ TEST(DeviceFinders, ChoiceKeyAndOutputLabels) {
   EXPECT_EQ("PulseAudio", DeviceFinders::OutputLabel("pulsesink"));
   EXPECT_EQ("PipeWire", DeviceFinders::OutputLabel("pipewiresink"));
   EXPECT_EQ("ALSA", DeviceFinders::OutputLabel("alsasink"));
+  EXPECT_EQ("WASAPI", DeviceFinders::OutputLabel("wasapisink"));
+  EXPECT_EQ("Core Audio", DeviceFinders::OutputLabel("osxaudiosink"));
 
   DeviceFinders finders;
   finders.Init();
@@ -2586,4 +2595,81 @@ TEST(MainWindowAddMedia, FolderGoesToPlaylistWithLastPath) {
   EXPECT_TRUE(always.should_play);
   FileUtils::Remove(audio);
   rmdir(dir.c_str());
+}
+
+TEST(PlatformDeviceOutputs, NamesMatchQt) {
+  EXPECT_STREQ("Default device", PlatformDeviceOutputs::DefaultDeviceDescription());
+  EXPECT_EQ(2u, PlatformDeviceOutputs::MMDeviceOutputs().size());
+  EXPECT_STREQ("wasapisink", PlatformDeviceOutputs::MMDeviceOutputs()[0]);
+  EXPECT_STREQ("wasapi2sink", PlatformDeviceOutputs::MMDeviceOutputs()[1]);
+  EXPECT_STREQ("directsoundsink", PlatformDeviceOutputs::DirectSoundOutputs()[2]);
+  EXPECT_STREQ("asiosink", PlatformDeviceOutputs::AsioOutputs()[0]);
+  EXPECT_STREQ("osxaudiosink", PlatformDeviceOutputs::MacOsOutputs()[2]);
+  EXPECT_STREQ("WASAPI", PlatformDeviceOutputs::OutputLabel("wasapisink"));
+  EXPECT_STREQ("DirectSound", PlatformDeviceOutputs::OutputLabel("directsoundsink"));
+  EXPECT_STREQ("ASIO", PlatformDeviceOutputs::OutputLabel("asiosink"));
+  EXPECT_STREQ("Core Audio", PlatformDeviceOutputs::OutputLabel("osxaudiosink"));
+#ifndef _WIN32
+#ifndef __APPLE__
+  EXPECT_TRUE(PlatformDeviceOutputs::ExtraSinks().empty());
+#endif
+#endif
+}
+
+TEST(Windows7ThumbBarActions, DefaultOrderAndFlags) {
+  const auto actions = Windows7ThumbBarActions::DefaultActions();
+  ASSERT_EQ(6u, actions.size());
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Previous, actions[0]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::PlayPause, actions[1]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Stop, actions[2]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Next, actions[3]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Spacer, actions[4]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Love, actions[5]);
+  EXPECT_TRUE(Windows7ThumbBarActions::IsSpacer(Windows7ThumbBarActions::Id::Spacer));
+  EXPECT_FALSE(Windows7ThumbBarActions::IsSpacer(Windows7ThumbBarActions::Id::Love));
+  EXPECT_EQ(7, Windows7ThumbBarActions::kMaxButtonCount);
+  EXPECT_EQ(16, Windows7ThumbBarActions::kIconSize);
+  EXPECT_TRUE(Windows7ThumbBarActions::WithinLimit(7));
+  EXPECT_FALSE(Windows7ThumbBarActions::WithinLimit(8));
+  EXPECT_EQ(Windows7ThumbBarActions::Flag::NoBackground, Windows7ThumbBarActions::FlagFor(true, true, true));
+  EXPECT_EQ(Windows7ThumbBarActions::Flag::Hidden, Windows7ThumbBarActions::FlagFor(false, false, true));
+  EXPECT_EQ(Windows7ThumbBarActions::Flag::Enabled, Windows7ThumbBarActions::FlagFor(false, true, true));
+  EXPECT_STREQ("media-playback-pause-symbolic", Windows7ThumbBarActions::IconName(Windows7ThumbBarActions::Id::PlayPause, true));
+}
+
+TEST(WinSmtcStatus, MapsEngineState) {
+  EXPECT_EQ(WinSmtcStatus::Playback::Playing, WinSmtcStatus::FromEngine(EngineBase::State::Playing));
+  EXPECT_EQ(WinSmtcStatus::Playback::Paused, WinSmtcStatus::FromEngine(EngineBase::State::Paused));
+  EXPECT_EQ(WinSmtcStatus::Playback::Stopped, WinSmtcStatus::FromEngine(EngineBase::State::Idle));
+  EXPECT_EQ(WinSmtcStatus::Playback::Closed, WinSmtcStatus::FromEngine(EngineBase::State::Error));
+  EXPECT_TRUE(WinSmtcStatus::ButtonsEnabled(WinSmtcStatus::Playback::Playing));
+  EXPECT_FALSE(WinSmtcStatus::ButtonsEnabled(WinSmtcStatus::Playback::Stopped));
+  EXPECT_TRUE(WinSmtcStatus::TimelineEnabled(WinSmtcStatus::Playback::Paused));
+  EXPECT_FALSE(WinSmtcStatus::TimelineEnabled(WinSmtcStatus::Playback::Closed));
+}
+
+TEST(WinBlurBehind, AppliesOnWindowsMask) {
+  EXPECT_TRUE(WinBlurBehind::ShouldApply(true, true));
+  EXPECT_FALSE(WinBlurBehind::ShouldApply(true, false));
+  EXPECT_FALSE(WinBlurBehind::ShouldApply(false, true));
+}
+
+TEST(FileSystemWatcherWinPolicy, BatchesAndNormalizes) {
+  EXPECT_EQ(64, FileSystemWatcherWinPolicy::kMaxWaitObjects);
+  EXPECT_EQ(63, FileSystemWatcherWinPolicy::MaxWatchesPerThread());
+  EXPECT_TRUE(FileSystemWatcherWinPolicy::ThreadHasRoom(62));
+  EXPECT_FALSE(FileSystemWatcherWinPolicy::ThreadHasRoom(63));
+  EXPECT_EQ("c:\\music", FileSystemWatcherWinPolicy::PathKey("C:/Music"));
+}
+
+TEST(KeyMapperWin, ParsesMediaKeys) {
+  unsigned modifiers = 0;
+  unsigned vk = 0;
+  EXPECT_STREQ("win", KeyMapperWin::Name());
+  EXPECT_TRUE(KeyMapperWin::Parse("MediaPlay", &modifiers, &vk));
+  EXPECT_EQ(0xB3u, vk);
+  EXPECT_TRUE(KeyMapperWin::Parse("<Ctrl>MediaNext", &modifiers, &vk));
+  EXPECT_EQ(0xB0u, vk);
+  EXPECT_EQ(0x0002u, modifiers);
+  EXPECT_FALSE(KeyMapperWin::Parse("", &modifiers, &vk));
 }

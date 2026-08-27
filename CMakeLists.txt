@@ -758,6 +758,31 @@ endif()
 if(HAVE_GTK4_LAYER_SHELL)
   target_link_libraries(strawberry PRIVATE PkgConfig::GTK4_LAYER_SHELL)
 endif()
+if(WIN32)
+  target_sources(strawberry PRIVATE
+    src/core/windows7thumbbar.cpp
+    src/core/winsystemmediatransportcontrols.cpp
+    src/core/filesystemwatcherwin.cpp
+    src/core/filesystemwatcherwinthread.cpp
+    src/utilities/winutils.cpp
+    src/engine/mmdevicefinder.cpp
+    src/engine/directsounddevicefinder.cpp
+    src/engine/asiodevicefinder.cpp
+    src/engine/uwpdevicefinder.cpp
+    src/globalshortcuts/globalshortcutsbackend-win.cpp
+    src/globalshortcuts/globalshortcut-win.cpp
+  )
+  target_link_libraries(strawberry PRIVATE dwmapi ole32 oleaut32 uuid dsound)
+endif()
+if(APPLE)
+  target_sources(strawberry PRIVATE
+    src/core/macosutils.mm
+    src/engine/macosdevicefinder.cpp
+    src/device/macosdevicelister.mm
+    src/globalshortcuts/globalshortcutsbackend-macos.mm
+  )
+  target_link_libraries(strawberry PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon")
+endif()
 
 install(TARGETS strawberry RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES dist/unix/org.strawberrymusicplayer.strawberry.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
@@ -1146,6 +1171,31 @@ if(GTest_FOUND)
   endif()
   if(HAVE_GTK4_LAYER_SHELL)
     target_link_libraries(strawberry_tests PRIVATE PkgConfig::GTK4_LAYER_SHELL)
+  endif()
+  if(WIN32)
+    target_sources(strawberry_tests PRIVATE
+      src/core/windows7thumbbar.cpp
+      src/core/winsystemmediatransportcontrols.cpp
+      src/core/filesystemwatcherwin.cpp
+      src/core/filesystemwatcherwinthread.cpp
+      src/utilities/winutils.cpp
+      src/engine/mmdevicefinder.cpp
+      src/engine/directsounddevicefinder.cpp
+      src/engine/asiodevicefinder.cpp
+      src/engine/uwpdevicefinder.cpp
+      src/globalshortcuts/globalshortcutsbackend-win.cpp
+      src/globalshortcuts/globalshortcut-win.cpp
+    )
+    target_link_libraries(strawberry_tests PRIVATE dwmapi ole32 oleaut32 uuid dsound)
+  endif()
+  if(APPLE)
+    target_sources(strawberry_tests PRIVATE
+      src/core/macosutils.mm
+      src/engine/macosdevicefinder.cpp
+      src/device/macosdevicelister.mm
+      src/globalshortcuts/globalshortcutsbackend-macos.mm
+    )
+    target_link_libraries(strawberry_tests PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon")
   endif()
   add_test(NAME strawberry_tests COMMAND strawberry_tests)
   add_custom_target(build_tests DEPENDS strawberry_tests)

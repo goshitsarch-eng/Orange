@@ -10,6 +10,10 @@
 #include "osd/osdprettytransparency.h"
 #include "osd/osdprettywayland.h"
 #include "utilities/fontutils.h"
+#include "utilities/winblurbehind.h"
+#ifdef _WIN32
+#include "utilities/winutils.h"
+#endif
 
 #include <algorithm>
 #include <utility>
@@ -427,6 +431,11 @@ void OSDPretty::ApplyShape() {
   XFreePixmap(xdisplay, pixmap);
 #else
   (void)0;
+#endif
+#ifdef _WIN32
+  if (window_ && WinBlurBehind::ShouldApply(true, true)) {
+    WinUtils::EnableBlurBehindWindow(window_);
+  }
 #endif
 }
 

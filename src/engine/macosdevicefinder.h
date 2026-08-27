@@ -1,6 +1,13 @@
 #ifndef STRAWBERRY_MACOSDEVICEFINDER_H
 #define STRAWBERRY_MACOSDEVICEFINDER_H
-#ifdef __APPLE__
-class MacOsDeviceFinder {};
-#endif
+
+#include "engine/devicefinder.h"
+
+class MacOsDeviceFinder : public DeviceFinder {
+ public:
+  MacOsDeviceFinder();
+  bool Initialize() override { return true; }
+  EngineDeviceList ListDevices() override;
+};
+
 #endif

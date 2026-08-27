@@ -14,6 +14,11 @@
 #include "collection/collectionscangates.h"
 #include "collection/collectionsubdirectory.h"
 #include "constants/collectionsettings.h"
+#ifdef _WIN32
+#include "core/filesystemwatcherwin.h"
+#else
+#include "core/filesystemwatcherinotify.h"
+#endif
 #include "core/logging.h"
 #include "core/settings.h"
 #include "core/songuserdatamerge.h"
@@ -511,17 +516,21 @@ void CollectionWatcher::StopWatching() {
     g_object_unref(monitor);
   }
   monitors_.clear();
-  if (inotify_watcher_) {
-    inotify_watcher_->Clear();
+  if (native_watcher_) {
+    native_watcher_->Clear();
   }
 }
 
 void CollectionWatcher::WatchPath(const std::string &path) {
-  if (!inotify_watcher_) {
-    inotify_watcher_ = std::make_unique<FileSystemWatcherInotify>();
-    inotify_watcher_->PathChanged.Connect([this](const std::string &) { ScheduleIncremental(); });
+  if (!native_watcher_) {
+#ifdef _WIN32
+    native_watcher_ = std::make_unique<FileSystemWatcherWin>();
+#else
+    native_watcher_ = std::make_unique<FileSystemWatcherInotify>();
+#endif
+    native_watcher_->PathChanged.Connect([this](const std::string &) { ScheduleIncremental(); });
   }
-  inotify_watcher_->AddPath(path);
+  native_watcher_->AddPath(path);
   GFile *file = g_file_new_for_path(path.c_str());
   GFileMonitor *monitor = g_file_monitor_directory(file, G_FILE_MONITOR_NONE, nullptr, nullptr);
   g_object_unref(file);

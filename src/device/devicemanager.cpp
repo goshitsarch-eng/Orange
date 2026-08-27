@@ -33,6 +33,9 @@
 #include <gio/gio.h>
 #include <glib/gstdio.h>
 #endif
+#ifdef __APPLE__
+#include "device/macosdevicelister.h"
+#endif
 #ifdef HAVE_MTP
 #include <libmtp.h>
 #include <cstdlib>
@@ -235,6 +238,12 @@ void DeviceManager::Rescan() {
 #endif
   const std::vector<ConnectedDevice> cds = CddaLister().List();
   devices_.insert(devices_.end(), cds.begin(), cds.end());
+#ifdef __APPLE__
+  {
+    const std::vector<ConnectedDevice> macos = MacOsDeviceLister().List();
+    devices_.insert(devices_.end(), macos.begin(), macos.end());
+  }
+#endif
 #ifdef HAVE_MTP
   {
     MtpConnection::InitLibMtp();

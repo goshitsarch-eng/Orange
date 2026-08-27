@@ -7,7 +7,7 @@
 #include "collection/collectionrescanreason.h"
 #include "collection/collectionscandelay.h"
 #include "collection/collectionsubdirectory.h"
-#include "core/filesystemwatcherinotify.h"
+#include "core/filesystemwatcherinterface.h"
 #include "core/signal.h"
 #include "core/song.h"
 
@@ -132,7 +132,7 @@ class CollectionWatcher {
   std::atomic<bool> scanning_{false};
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
   std::vector<GFileMonitor *> monitors_;
-  std::unique_ptr<FileSystemWatcherInotify> inotify_watcher_;
+  std::unique_ptr<FileSystemWatcherInterface> native_watcher_;
   guint rescan_timeout_id_ = 0;
   guint periodic_timeout_id_ = 0;
   bool queued_incremental_ = false;
