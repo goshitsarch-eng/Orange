@@ -56,6 +56,7 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
     GtkWidget *descending = nullptr;
     std::unique_ptr<SmartPlaylistSearchPreview> preview;
     std::unique_ptr<SmartPlaylistWizardFinishPage> finish;
+    SongList library;
     std::string original_name;
     bool editing = false;
 
@@ -112,7 +113,7 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
     }
 
     void AddTerm(const SmartPlaylistTerm *term = nullptr) {
-      auto widget = std::make_unique<SmartPlaylistSearchTermWidget>();
+      auto widget = std::make_unique<SmartPlaylistSearchTermWidget>(library);
       widget->SetChangedCallback([this]() { RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Terms); });
       SmartPlaylistSearchTermWidget *raw = widget.get();
       widget->SetRemoveCallback([this, raw]() { RemoveTerm(raw); });
@@ -158,6 +159,9 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   };
   auto *state = new WizardState();
   state->app = app;
+  if (app && app->collection()) {
+    state->library = app->collection()->Songs();
+  }
   state->type = std::make_unique<SmartPlaylistWizardTypePage>();
   state->match = DropDownFromNames({Labels::And(), Labels::Or(), Labels::All()});
   state->preview = std::make_unique<SmartPlaylistSearchPreview>();
@@ -184,7 +188,7 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(Labels::SearchTerms())));
   gtk_box_append(GTK_BOX(box), state->terms_box);
   if (SmartPlaylistTermRow::KeepsPlaceholder()) {
-    state->placeholder = std::make_unique<SmartPlaylistSearchTermWidget>();
+    state->placeholder = std::make_unique<SmartPlaylistSearchTermWidget>(state->library);
     state->placeholder->SetActive(false);
     state->placeholder->SetClickedCallback([state]() { state->AddTerm(); });
     gtk_box_append(GTK_BOX(state->terms_box), state->placeholder->widget());

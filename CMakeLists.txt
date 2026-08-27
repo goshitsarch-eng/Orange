@@ -373,6 +373,7 @@ set(STRAWBERRY_SOURCES
   src/smartplaylists/smartplaylistpreviewpolicy.h
   src/smartplaylists/smartplaylisttermrow.h
   src/smartplaylists/smartplaylisttermvalue.h
+  src/smartplaylists/smartplaylisttagcompleter.h
   src/smartplaylists/smartplaylistquerywizardpluginsearchpage.cpp
   src/smartplaylists/smartplaylistquerywizardpluginsortpage.cpp
   src/filterparser/filterparser.cpp

@@ -18,7 +18,7 @@ class SmartPlaylistSearchTermWidget {
   using ClickedCallback = std::function<void()>;
   using RemoveCallback = std::function<void()>;
 
-  SmartPlaylistSearchTermWidget();
+  explicit SmartPlaylistSearchTermWidget(SongList library = {});
   ~SmartPlaylistSearchTermWidget();
 
   GtkWidget *widget() const { return widget_; }
@@ -34,6 +34,7 @@ class SmartPlaylistSearchTermWidget {
  private:
   void RebuildOps();
   void RebuildValue();
+  void AttachCompletion();
   void ConnectValueSignals();
   void EmitChanged();
   std::string CurrentValue() const;
@@ -54,6 +55,7 @@ class SmartPlaylistSearchTermWidget {
   std::unique_ptr<RatingWidget> rating_;
   SmartPlaylistTermValue::Editor editor_ = SmartPlaylistTermValue::Editor::Text;
   std::vector<SmartPlaylistOp> current_ops_;
+  SongList library_;
   bool updating_ = false;
   bool active_ = true;
   ChangedCallback changed_;

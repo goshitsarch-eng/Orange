@@ -2,6 +2,7 @@
 
 #include "dialogs/dialoghelpers.h"
 #include "smartplaylists/smartplaylistsearchtermwidgetoverlay.h"
+#include "smartplaylists/smartplaylisttagcompleter.h"
 #include "smartplaylists/smartplaylisttermrow.h"
 #include "widgets/ratingwidget.h"
 
@@ -10,7 +11,7 @@
 
 using DialogHelpers::DropDownFromNames;
 
-SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget() {
+SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget(SongList library) : library_(std::move(library)) {
   widget_ = gtk_overlay_new();
   row_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   field_ = DropDownFromNames(SmartPlaylistSearch::FieldNames());
@@ -190,7 +191,31 @@ void SmartPlaylistSearchTermWidget::RebuildValue() {
   if (!previous.empty()) {
     SetCurrentValue(previous);
   }
+  AttachCompletion();
   ConnectValueSignals();
+}
+
+void SmartPlaylistSearchTermWidget::AttachCompletion() {
+  if (!GTK_IS_ENTRY(value_)) {
+    return;
+  }
+  const SmartPlaylistField field = SmartPlaylistSearch::FieldFromIndex(static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(field_))));
+  if (!SmartPlaylistTagCompleter::ShouldAttach(editor_, field)) {
+    gtk_entry_set_completion(GTK_ENTRY(value_), nullptr);
+    return;
+  }
+  GtkEntryCompletion *completion = gtk_entry_completion_new();
+  GtkListStore *store = gtk_list_store_new(1, G_TYPE_STRING);
+  for (const std::string &value : SmartPlaylistTagCompleter::ValuesFor(library_, field)) {
+    GtkTreeIter iter;
+    gtk_list_store_append(store, &iter);
+    gtk_list_store_set(store, &iter, 0, value.c_str(), -1);
+  }
+  gtk_entry_completion_set_model(completion, GTK_TREE_MODEL(store));
+  gtk_entry_completion_set_text_column(completion, 0);
+  gtk_entry_set_completion(GTK_ENTRY(value_), completion);
+  g_object_unref(store);
+  g_object_unref(completion);
 }
 
 void SmartPlaylistSearchTermWidget::ConnectValueSignals() {

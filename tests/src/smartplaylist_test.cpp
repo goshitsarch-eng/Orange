@@ -10,6 +10,7 @@
 #include "smartplaylists/smartplaylistsearchtermwidgetoverlay.h"
 #include "smartplaylists/smartplaylisttermrow.h"
 #include "smartplaylists/smartplaylisttermvalue.h"
+#include "smartplaylists/smartplaylisttagcompleter.h"
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
@@ -610,6 +611,38 @@ TEST(SmartPlaylistTermValue, EditorsAndDateTimeMatchQt) {
   rating.op = SmartPlaylistOp::Equals;
   rating.value = SmartPlaylistTermValue::FormatRating(0.5f);
   EXPECT_TRUE(rating.Matches(rated));
+}
+
+TEST(SmartPlaylistTagCompleter, CompletesQtArtistAlbumFields) {
+  EXPECT_TRUE(SmartPlaylistTagCompleter::CompletesField(SmartPlaylistField::Artist));
+  EXPECT_TRUE(SmartPlaylistTagCompleter::CompletesField(SmartPlaylistField::Album));
+  EXPECT_TRUE(SmartPlaylistTagCompleter::CompletesField(SmartPlaylistField::AlbumArtist));
+  EXPECT_FALSE(SmartPlaylistTagCompleter::CompletesField(SmartPlaylistField::Title));
+  EXPECT_FALSE(SmartPlaylistTagCompleter::CompletesField(SmartPlaylistField::Genre));
+  EXPECT_FALSE(SmartPlaylistTagCompleter::CompletesField(SmartPlaylistField::Composer));
+  EXPECT_FALSE(SmartPlaylistTagCompleter::CompletesField(SmartPlaylistField::Year));
+  EXPECT_EQ(PlaylistColumn::Artist, SmartPlaylistTagCompleter::ColumnFor(SmartPlaylistField::Artist));
+  EXPECT_EQ(PlaylistColumn::Album, SmartPlaylistTagCompleter::ColumnFor(SmartPlaylistField::Album));
+  EXPECT_EQ(PlaylistColumn::AlbumArtist, SmartPlaylistTagCompleter::ColumnFor(SmartPlaylistField::AlbumArtist));
+  EXPECT_TRUE(SmartPlaylistTagCompleter::ShouldAttach(SmartPlaylistTermValue::Editor::Text, SmartPlaylistField::Artist));
+  EXPECT_FALSE(SmartPlaylistTagCompleter::ShouldAttach(SmartPlaylistTermValue::Editor::Number, SmartPlaylistField::Artist));
+  EXPECT_FALSE(SmartPlaylistTagCompleter::ShouldAttach(SmartPlaylistTermValue::Editor::Text, SmartPlaylistField::Title));
+
+  Song radiohead;
+  radiohead.set_artist("Radiohead");
+  radiohead.set_album("OK Computer");
+  radiohead.set_albumartist("Radiohead");
+  radiohead.set_valid(true);
+  Song portishead;
+  portishead.set_artist("Portishead");
+  portishead.set_album("Dummy");
+  portishead.set_albumartist("Portishead");
+  portishead.set_valid(true);
+  const auto artists = SmartPlaylistTagCompleter::ValuesFor({radiohead, portishead}, SmartPlaylistField::Artist);
+  ASSERT_EQ(2u, artists.size());
+  EXPECT_EQ("Portishead", artists[0]);
+  EXPECT_EQ("Radiohead", artists[1]);
+  EXPECT_TRUE(SmartPlaylistTagCompleter::ValuesFor({radiohead}, SmartPlaylistField::Title).empty());
 }
 
 TEST(SmartPlaylistWizardFinishPage, IsCompleteRequiresNonEmptyName) {
