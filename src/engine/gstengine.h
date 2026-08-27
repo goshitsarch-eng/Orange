@@ -58,6 +58,7 @@ class GstEngine : public EngineBase {
   void SetReplayGainPreamp(double preamp);
   void SetStereoBalance(float value);
   void SetFadingEnabled(bool enabled);
+  void SetCrossfadeEnabled(bool enabled);
   void SetAutoCrossfadeEnabled(bool enabled);
   void SetFadeDurationMs(int milliseconds);
   void SetPlaybin3(bool enabled) { playbin3_ = enabled; }
@@ -70,6 +71,7 @@ class GstEngine : public EngineBase {
   void SetCurrentAlbum(const std::string &album) { current_album_ = album; }
   void SetNextAlbum(const std::string &album) { next_album_ = album; }
   bool fading_enabled() const { return fading_enabled_; }
+  bool crossfade_enabled() const { return crossfade_enabled_; }
   bool autocrossfade_enabled() const { return autocrossfade_enabled_; }
   bool playbin3() const { return playbin3_; }
   bool no_crossfade_same_album() const { return no_crossfade_same_album_; }
@@ -90,6 +92,10 @@ class GstEngine : public EngineBase {
   void StartFade(int direction, int duration_ms = 0);
   void CancelFade();
   static gboolean FadeTick(gpointer data);
+  void StartStopFade();
+  void CancelStopFade();
+  static gboolean StopFadeTick(gpointer data);
+  void FinishStopImmediate();
   void SetState(State state);
   void ApplyCurrentVolume(double fraction);
   double VolumeFraction() const;
@@ -107,6 +113,7 @@ class GstEngine : public EngineBase {
 
   std::unique_ptr<GstEnginePipeline> current_;
   std::unique_ptr<GstEnginePipeline> next_;
+  std::unique_ptr<GstEnginePipeline> fadeout_;
   GstDiscoverer *discoverer_ = nullptr;
   gulong discovered_handler_ = 0;
   gulong finished_handler_ = 0;
@@ -133,6 +140,7 @@ class GstEngine : public EngineBase {
   unsigned volume_percent_ = 100;
   bool replaygain_enabled_ = false;
   bool fading_enabled_ = false;
+  bool crossfade_enabled_ = false;
   bool autocrossfade_enabled_ = false;
   bool playbin3_ = true;
   bool no_crossfade_same_album_ = true;
@@ -162,6 +170,9 @@ class GstEngine : public EngineBase {
   int fade_step_ = 0;
   int fade_steps_ = 1;
   guint fade_timeout_id_ = 0;
+  int fadeout_step_ = 0;
+  int fadeout_steps_ = 1;
+  guint fadeout_timeout_id_ = 0;
   bool gapless_pending_ = false;
   std::vector<int16_t> last_scope_;
   TaskManager *task_manager_ = nullptr;

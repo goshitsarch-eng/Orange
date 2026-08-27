@@ -3,6 +3,7 @@
 #include "core/enginemetadata.h"
 #include "core/taskmanager.h"
 #include "engine/enginebuffering.h"
+#include "engine/enginefade.h"
 #include "engine/ebur128normalization.h"
 #include "engine/enginediscoverer.h"
 #include "engine/gstengineerror.h"
@@ -24,8 +25,13 @@ GstEngine::GstEngine() = default;
 
 GstEngine::~GstEngine() {
   CancelFade();
+  CancelStopFade();
   DiscardNext();
   BufferingFinished();
+  if (fadeout_) {
+    fadeout_->Stop();
+    fadeout_.reset();
+  }
   current_.reset();
   DestroyDiscoverer();
 }
@@ -60,6 +66,8 @@ bool GstEngine::Init() {
   }
   eq_enabled_ = eq.BoolValue("enabled", false);
   fading_enabled_ = settings.Contains("FadeoutEnabled") ? settings.BoolValue("FadeoutEnabled") : settings.BoolValue("fading", false);
+  crossfade_enabled_ = settings.Contains("CrossfadeEnabled") ? settings.BoolValue("CrossfadeEnabled")
+                                                            : settings.BoolValue("crossfade", fading_enabled_);
   autocrossfade_enabled_ = settings.Contains("AutoCrossfadeEnabled") ? settings.BoolValue("AutoCrossfadeEnabled")
                                                                     : settings.BoolValue("autocrossfade", fading_enabled_);
   fade_duration_ms_ = std::max(100, settings.Contains("FadeoutDuration") ? settings.IntValue("FadeoutDuration", 2000)
@@ -223,8 +231,8 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
                                                                 next_album_, same_album) &&
                               !BackendOptions::SuppressSameAlbumCrossfade(auto_change, same_album, no_crossfade_same_album_);
   const bool crossfade = current_ && current_->valid() &&
-                         ((fading_enabled_ && (track_change_flags & Manual)) || (auto_crossfade && auto_change) ||
-                          ((fading_enabled_ || auto_crossfade) && (track_change_flags & Intro)));
+                         ((crossfade_enabled_ && (track_change_flags & Manual)) || (auto_crossfade && auto_change) ||
+                          ((crossfade_enabled_ || auto_crossfade) && (track_change_flags & Intro)));
 
   if (auto_change && current_ && current_->valid() && !crossfade) {
     DiscardNext();
@@ -295,7 +303,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
     // A GST_MESSAGE_ERROR is still on its way to HandlePipelineError.
     return false;
   }
-  if (fading_enabled_ && !pause && !gapless_pending_) {
+  if (crossfade_enabled_ && !pause && !gapless_pending_) {
     ApplyCurrentVolume(0.0);
     StartFade(1);
   }
@@ -304,26 +312,34 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
   return true;
 }
 
-void GstEngine::Stop(bool) {
+void GstEngine::Stop(bool stop_after) {
   pending_pause_ = false;
   CancelFade();
   DiscardNext();
   BufferingFinished();
-  if (current_) {
-    current_->Stop();
-  }
-  current_.reset();
-  media_url_.clear();
-  stream_url_.clear();
   gapless_pending_ = false;
-  SetState(State::Empty);
+  const bool already_idle = state_ == State::Idle || state_ == State::Empty;
+  if (EngineFade::ShouldFadeOnStop(fading_enabled_, stop_after, exclusive_mode_, already_idle) && current_ && current_->valid()) {
+    CancelStopFade();
+    if (fadeout_) {
+      fadeout_->Stop();
+      fadeout_.reset();
+    }
+    fadeout_ = std::move(current_);
+    media_url_.clear();
+    stream_url_.clear();
+    SetState(State::Empty);
+    StartStopFade();
+    return;
+  }
+  FinishStopImmediate();
 }
 
 void GstEngine::Pause() {
   if (!current_) {
     return;
   }
-  if (fadeout_pause_enabled_) {
+  if (EngineFade::ShouldFadeOnPause(fadeout_pause_enabled_, exclusive_mode_)) {
     pending_pause_ = true;
     StartFade(-1, fadeout_pause_duration_ms_);
     return;
@@ -337,7 +353,7 @@ void GstEngine::Unpause() {
     return;
   }
   pending_pause_ = false;
-  if (fadeout_pause_enabled_) {
+  if (EngineFade::ShouldFadeOnPause(fadeout_pause_enabled_, exclusive_mode_)) {
     ApplyCurrentVolume(0.0);
     current_->Unpause();
     SetState(State::Playing);
@@ -372,6 +388,8 @@ void GstEngine::SetVolumeSW(unsigned percent) {
 
 void GstEngine::SetFadingEnabled(bool enabled) { fading_enabled_ = enabled; }
 
+void GstEngine::SetCrossfadeEnabled(bool enabled) { crossfade_enabled_ = enabled; }
+
 void GstEngine::SetAutoCrossfadeEnabled(bool enabled) { autocrossfade_enabled_ = enabled; }
 
 void GstEngine::SetFadeDurationMs(int milliseconds) { fade_duration_ms_ = std::max(100, milliseconds); }
@@ -405,13 +423,11 @@ gboolean GstEngine::FadeTick(gpointer data) {
   const double target = self->VolumeFraction();
   if (self->next_ && self->next_->valid()) {
     if (self->current_) {
-      self->current_->SetVolume(target * std::max(0.0, 1.0 - t));
+      self->current_->SetVolume(EngineFade::VolumeAtStep(target, -1, t));
     }
-    self->next_->SetVolume(target * std::min(1.0, t));
-  } else if (self->fade_direction_ < 0) {
-    self->ApplyCurrentVolume(target * std::max(0.0, 1.0 - t));
+    self->next_->SetVolume(EngineFade::VolumeAtStep(target, 1, t));
   } else {
-    self->ApplyCurrentVolume(target * std::min(1.0, t));
+    self->ApplyCurrentVolume(EngineFade::VolumeAtStep(target, self->fade_direction_, t));
   }
   if (self->fade_step_ >= self->fade_steps_) {
     self->fade_timeout_id_ = 0;
@@ -428,6 +444,54 @@ gboolean GstEngine::FadeTick(gpointer data) {
     return G_SOURCE_REMOVE;
   }
   return G_SOURCE_CONTINUE;
+}
+
+void GstEngine::StartStopFade() {
+  CancelStopFade();
+  fadeout_step_ = 0;
+  fadeout_steps_ = std::max(1, fade_duration_ms_ / 50);
+  fadeout_timeout_id_ = g_timeout_add(50, StopFadeTick, this);
+}
+
+void GstEngine::CancelStopFade() {
+  if (fadeout_timeout_id_) {
+    g_source_remove(fadeout_timeout_id_);
+    fadeout_timeout_id_ = 0;
+  }
+}
+
+gboolean GstEngine::StopFadeTick(gpointer data) {
+  auto *self = static_cast<GstEngine *>(data);
+  ++self->fadeout_step_;
+  const double t = static_cast<double>(self->fadeout_step_) / static_cast<double>(self->fadeout_steps_);
+  if (self->fadeout_) {
+    self->fadeout_->SetVolume(EngineFade::VolumeAtStep(self->VolumeFraction(), -1, t));
+  }
+  if (self->fadeout_step_ >= self->fadeout_steps_ || !self->fadeout_) {
+    self->fadeout_timeout_id_ = 0;
+    if (self->fadeout_) {
+      self->fadeout_->Stop();
+      self->fadeout_.reset();
+    }
+    return G_SOURCE_REMOVE;
+  }
+  return G_SOURCE_CONTINUE;
+}
+
+void GstEngine::FinishStopImmediate() {
+  CancelStopFade();
+  if (fadeout_) {
+    fadeout_->Stop();
+    fadeout_.reset();
+  }
+  if (current_) {
+    current_->Stop();
+  }
+  current_.reset();
+  media_url_.clear();
+  stream_url_.clear();
+  gapless_pending_ = false;
+  SetState(State::Empty);
 }
 
 void GstEngine::FinishCrossfade() {
@@ -458,7 +522,7 @@ void GstEngine::OnAboutToFinish(int pipeline_id) {
   if (!current_ || current_->id() != pipeline_id) {
     return;
   }
-  if ((fading_enabled_ || autocrossfade_enabled_) && !next_) {
+  if ((crossfade_enabled_ || autocrossfade_enabled_) && !next_) {
     StartFade(-1);
   }
   TrackAboutToEnd.Emit();

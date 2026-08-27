@@ -77,6 +77,8 @@ void Player::ReloadSettings() {
   settings.BeginGroup("Backend");
   const bool fading = settings.Contains("FadeoutEnabled") ? settings.BoolValue("FadeoutEnabled") : settings.BoolValue("fading", false);
   engine_->SetFadingEnabled(fading);
+  engine_->SetCrossfadeEnabled(settings.Contains("CrossfadeEnabled") ? settings.BoolValue("CrossfadeEnabled")
+                                                                    : settings.BoolValue("crossfade", fading));
   engine_->SetAutoCrossfadeEnabled(settings.Contains("AutoCrossfadeEnabled") ? settings.BoolValue("AutoCrossfadeEnabled")
                                                                             : settings.BoolValue("autocrossfade", fading));
   engine_->SetFadeDurationMs(settings.Contains("FadeoutDuration") ? settings.IntValue("FadeoutDuration", 2000)

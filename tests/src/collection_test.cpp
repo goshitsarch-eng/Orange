@@ -22,6 +22,7 @@
 #include "subsonic/subsonicsettingsactions.h"
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
+#include "engine/enginefade.h"
 #include "collection/collectionalbumart.h"
 #include "collection/collectionartpersist.h"
 #include "collection/collectioncuescan.h"
@@ -993,6 +994,22 @@ TEST(BackendOptions, PlaybinCrossfadeAndPauseFade) {
   EXPECT_STREQ("1", BackendOptions::SoupForceHttp1(false));
   EXPECT_EQ(500, BackendOptions::WarmupMs(true, 500));
   EXPECT_EQ(0, BackendOptions::WarmupMs(false, 500));
+}
+
+TEST(EngineFade, StopFadeGatingMatchesQt) {
+  EXPECT_TRUE(EngineFade::ShouldFadeOnStop(true, false, false, false));
+  EXPECT_FALSE(EngineFade::ShouldFadeOnStop(true, true, false, false));
+  EXPECT_FALSE(EngineFade::ShouldFadeOnStop(true, false, true, false));
+  EXPECT_FALSE(EngineFade::ShouldFadeOnStop(true, false, false, true));
+  EXPECT_FALSE(EngineFade::ShouldFadeOnStop(false, false, false, false));
+  EXPECT_TRUE(EngineFade::ShouldFadeOnPause(true, false));
+  EXPECT_FALSE(EngineFade::ShouldFadeOnPause(true, true));
+  EXPECT_FALSE(EngineFade::ShouldFadeOnPause(false, false));
+  EXPECT_DOUBLE_EQ(0.5, EngineFade::VolumeAtStep(1.0, -1, 0.5));
+  EXPECT_DOUBLE_EQ(0.0, EngineFade::VolumeAtStep(1.0, -1, 1.0));
+  EXPECT_DOUBLE_EQ(1.0, EngineFade::VolumeAtStep(1.0, -1, 0.0));
+  EXPECT_DOUBLE_EQ(0.5, EngineFade::VolumeAtStep(1.0, 1, 0.5));
+  EXPECT_DOUBLE_EQ(0.0, EngineFade::VolumeAtStep(1.0, 1, 0.0));
 }
 
 TEST(CollectionFilterMenu, DelayAndBuiltinPresets) {
