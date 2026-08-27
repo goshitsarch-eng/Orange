@@ -41,7 +41,7 @@ TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
   });
   gtk_widget_set_focusable(slider_.widget(), TRUE);
   GtkEventController *keys = gtk_event_controller_key_new();
-  gtk_event_controller_set_propagation_phase(keys, GTK_PROPAGATION_PHASE_CAPTURE);
+  gtk_event_controller_set_propagation_phase(keys, GTK_PHASE_CAPTURE);
   gtk_widget_add_controller(slider_.widget(), keys);
   g_signal_connect(keys, "key-pressed",
                    G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
