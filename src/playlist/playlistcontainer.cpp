@@ -159,7 +159,7 @@ PlaylistContainer::PlaylistContainer()
                    G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
                      auto *self = static_cast<PlaylistContainer *>(data);
                      const FilterSearchKeyboard::Action action = FilterSearchKeyboard::FromSearchKey(keyval);
-                     if (action == FilterSearchKeyboard::Action::MoveUp || action == FilterSearchKeyboard::Action::MoveDown) {
+                     if (FilterSearchKeyboard::ForwardsToView(action)) {
                        self->view()->FocusAndMove(keyval);
                        return TRUE;
                      }

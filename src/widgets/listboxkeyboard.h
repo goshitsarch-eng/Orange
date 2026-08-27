@@ -16,11 +16,16 @@ constexpr unsigned kLeft = 0xff51;
 constexpr unsigned kRight = 0xff53;
 constexpr unsigned kHome = 0xff50;
 constexpr unsigned kEnd = 0xff57;
+constexpr unsigned kPageUp = 0xff55;
+constexpr unsigned kPageDown = 0xff56;
+constexpr unsigned kKPPageUp = 0xff9a;
+constexpr unsigned kKPPageDown = 0xff9b;
 constexpr unsigned kEscape = 0xff1b;
 constexpr unsigned kBackSpace = 0xff08;
 constexpr unsigned kDelete = 0xffff;
+constexpr int kDefaultPage = 10;
 
-enum class Action { None, Activate, MoveUp, MoveDown, Home, End, Escape, TypeAhead, Delete, Backspace };
+enum class Action { None, Activate, MoveUp, MoveDown, Home, End, PageUp, PageDown, Escape, TypeAhead, Delete, Backspace };
 
 inline Action FromKey(unsigned keyval) {
   if (keyval == kReturn || keyval == kKPEnter) {
@@ -38,6 +43,12 @@ inline Action FromKey(unsigned keyval) {
   if (keyval == kEnd) {
     return Action::End;
   }
+  if (keyval == kPageUp || keyval == kKPPageUp) {
+    return Action::PageUp;
+  }
+  if (keyval == kPageDown || keyval == kKPPageDown) {
+    return Action::PageDown;
+  }
   if (keyval == kEscape) {
     return Action::Escape;
   }
@@ -50,7 +61,15 @@ inline Action FromKey(unsigned keyval) {
   return Action::None;
 }
 
-inline int NextIndex(int current, int count, Action action) {
+inline int PageSize(int widget_height, int row_height = 28) {
+  if (widget_height <= 0 || row_height <= 0) {
+    return kDefaultPage;
+  }
+  const int page = widget_height / row_height;
+  return page < 1 ? 1 : page;
+}
+
+inline int NextIndex(int current, int count, Action action, int page = kDefaultPage) {
   if (count <= 0) {
     return -1;
   }
@@ -66,6 +85,14 @@ inline int NextIndex(int current, int count, Action action) {
   }
   if (action == Action::MoveDown) {
     return start >= count - 1 ? 0 : start + 1;
+  }
+  const int step = page > 0 ? page : kDefaultPage;
+  if (action == Action::PageUp) {
+    return start <= step ? 0 : start - step;
+  }
+  if (action == Action::PageDown) {
+    const int next = start + step;
+    return next >= count ? count - 1 : next;
   }
   return start;
 }

@@ -2056,6 +2056,24 @@ TEST(FilterSearchKeyboard, MatchesCollectionFilterKeys) {
   EXPECT_EQ(ListBoxKeyboard::Action::MoveUp, FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::Action::MoveUp));
 }
 
+TEST(FilterSearchKeyboard, ForwardsPageKeysToPlaylist) {
+  EXPECT_EQ(FilterSearchKeyboard::Action::PageUp, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kPageUp));
+  EXPECT_EQ(FilterSearchKeyboard::Action::PageDown, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kPageDown));
+  EXPECT_EQ(FilterSearchKeyboard::Action::PageUp, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kKPPageUp));
+  EXPECT_EQ(FilterSearchKeyboard::Action::PageDown, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kKPPageDown));
+  EXPECT_TRUE(FilterSearchKeyboard::ForwardsToView(FilterSearchKeyboard::Action::MoveDown));
+  EXPECT_TRUE(FilterSearchKeyboard::ForwardsToView(FilterSearchKeyboard::Action::PageUp));
+  EXPECT_TRUE(FilterSearchKeyboard::ForwardsToView(FilterSearchKeyboard::Action::PageDown));
+  EXPECT_FALSE(FilterSearchKeyboard::ForwardsToView(FilterSearchKeyboard::Action::Clear));
+  EXPECT_EQ(ListBoxKeyboard::Action::PageUp, FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::Action::PageUp));
+  EXPECT_EQ(ListBoxKeyboard::Action::PageDown, ListBoxKeyboard::FromKey(ListBoxKeyboard::kPageDown));
+  EXPECT_EQ(0, ListBoxKeyboard::NextIndex(3, 20, ListBoxKeyboard::Action::PageUp, 10));
+  EXPECT_EQ(13, ListBoxKeyboard::NextIndex(3, 20, ListBoxKeyboard::Action::PageDown, 10));
+  EXPECT_EQ(19, ListBoxKeyboard::NextIndex(15, 20, ListBoxKeyboard::Action::PageDown, 10));
+  EXPECT_EQ(10, ListBoxKeyboard::PageSize(280, 28));
+  EXPECT_EQ(ListBoxKeyboard::kDefaultPage, ListBoxKeyboard::PageSize(0, 28));
+}
+
 TEST(Appearance, BackgroundCssForTypesAndUrls) {
   EXPECT_EQ("file:///tmp/cover.jpg", Appearance::CssUrl("/tmp/cover.jpg"));
   EXPECT_EQ("https://example/a.png", Appearance::CssUrl("https://example/a.png"));

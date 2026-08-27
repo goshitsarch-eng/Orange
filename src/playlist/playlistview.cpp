@@ -258,7 +258,7 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
     return TRUE;
   }
   if (action == ListBoxKeyboard::Action::MoveUp || action == ListBoxKeyboard::Action::MoveDown || action == ListBoxKeyboard::Action::Home ||
-      action == ListBoxKeyboard::Action::End) {
+      action == ListBoxKeyboard::Action::End || action == ListBoxKeyboard::Action::PageUp || action == ListBoxKeyboard::Action::PageDown) {
     int current = -1;
     if (!selected_rows_.empty() && !visible_rows_.empty()) {
       for (size_t i = 0; i < visible_rows_.size(); ++i) {
@@ -268,7 +268,8 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
         }
       }
     }
-    const int next = ListBoxKeyboard::NextIndex(current, static_cast<int>(visible_rows_.size()), action);
+    const int next = ListBoxKeyboard::NextIndex(current, static_cast<int>(visible_rows_.size()), action,
+                                                ListBoxKeyboard::PageSize(gtk_widget_get_height(widget_)));
     if (next >= 0 && select_) {
       const int next_row = visible_rows_[static_cast<size_t>(next)];
       if (PlaylistEditColumn::ShouldClearLastClicked(last_clicked_row_, next_row)) {
