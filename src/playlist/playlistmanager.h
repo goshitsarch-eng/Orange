@@ -18,6 +18,7 @@
 class CollectionBackend;
 class TaskManager;
 class TagReader;
+class TagReaderClient;
 class UrlHandlers;
 
 class PlaylistManager : public PlaylistManagerInterface {
@@ -78,6 +79,9 @@ class PlaylistManager : public PlaylistManagerInterface {
   void ExpandDynamic();
   void RepopulateDynamic();
   void UpdateCollectionSongs(const SongList &songs);
+  void set_tagreader_client(TagReaderClient *client);
+  void ArmTagReaderPump();
+  bool PumpTagReader();
   void TurnOffDynamic();
   void ClearCurrent() override;
   void ShuffleCurrent() override;
@@ -102,6 +106,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   Signal<Playlist *> ActiveChanged;
   Signal<> PlaylistsLoaded;
   Signal<> SequenceChanged;
+  Signal<std::string> Error;
 
  private:
   Playlist *FindByName(const std::string &name) const;
@@ -113,12 +118,14 @@ class PlaylistManager : public PlaylistManagerInterface {
   void PersistLastPlayed(Playlist *playlist);
   void SchedulePersist(Playlist *playlist, PlaylistSaveSchedule::Intent intent);
   void ArmSaveTimer();
+  void WatchSaves(Playlist *playlist);
 
   TaskManager *task_manager_;
   TagReader *tagreader_;
   UrlHandlers *url_handlers_;
   PlaylistBackend *backend_;
   CollectionBackend *collection_backend_;
+  TagReaderClient *tagreader_client_ = nullptr;
   std::vector<std::unique_ptr<Playlist>> playlists_;
   Playlist *current_ = nullptr;
   Playlist *active_ = nullptr;
@@ -126,6 +133,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   std::set<int> pending_ids_;
   PlaylistSaveSchedule::Intent pending_intent_ = PlaylistSaveSchedule::Intent::None;
   guint save_timeout_id_ = 0;
+  guint tag_pump_id_ = 0;
 };
 
 #endif  // STRAWBERRY_PLAYLISTMANAGER_H

@@ -46,6 +46,14 @@ void TagReaderClient::ProcessRequests() {
   }
 }
 
+bool TagReaderClient::ProcessNext() {
+  if (!HaveRequests()) {
+    return false;
+  }
+  ProcessRequest(DequeueRequest());
+  return HaveRequests();
+}
+
 TagReaderResult TagReaderClient::PathResult(const std::string &filename) const {
   if (filename.empty()) {
     return {TagReaderResult::ErrorCode::FilenameMissing};

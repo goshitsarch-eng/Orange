@@ -1,6 +1,10 @@
 #include "tagreader/albumcovertagdata.h"
 #include "tagreader/tagreaderbase.h"
 #include "tagreader/tagreaderclient.h"
+#include "tagreader/tagreaderclientpump.h"
+#include "playlist/playlist.h"
+#include "playlist/playlistdelegates.h"
+#include "playlist/playlistsaveitem.h"
 #include "utilities/fileutils.h"
 
 #include <gtest/gtest.h>
@@ -295,5 +299,47 @@ TEST(TagReader, WriteFileCanSaveTagsRatingAndCoverTogether) {
   EXPECT_GE(reread.playcount(), 9u);
   EXPECT_TRUE(reread.art_embedded());
 
+  FileUtils::Remove(path);
+}
+
+TEST(TagReaderClient, ProcessNextDrainsOneRequest) {
+  TagReaderClient client;
+  EXPECT_FALSE(client.ProcessNext());
+  const std::string path = TempPath("next.mp3");
+  FileUtils::WriteFile(path, MakeId3Mpeg("Roads", "Portishead", "Dummy"));
+  auto first = client.IsMediaFileAsync(path);
+  auto second = client.IsMediaFileAsync(path);
+  EXPECT_TRUE(client.HaveRequests());
+  EXPECT_TRUE(TagReaderClientPump::ShouldArm(client.HaveRequests(), false));
+  EXPECT_TRUE(client.ProcessNext());
+  EXPECT_TRUE(first->finished());
+  EXPECT_FALSE(second->finished());
+  EXPECT_FALSE(client.ProcessNext());
+  EXPECT_TRUE(second->finished());
+  FileUtils::Remove(path);
+}
+
+TEST(Playlist, SaveRowsReloadsAfterAsyncWrite) {
+  const std::string path = TempPath("save-row.mp3");
+  FileUtils::WriteFile(path, MakeId3Mpeg("Roads", "Portishead", "Dummy"));
+  TagReaderClient client;
+  Playlist playlist;
+  playlist.set_tagreader_client(&client);
+  Song song(Song::Source::LocalFile);
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_url(FileUtils::UriFromPath(path));
+  song.set_valid(true);
+  playlist.AppendSongs({song});
+  ASSERT_EQ(1, playlist.SetColumnValues({0}, PlaylistColumn::Title, "Glory Box"));
+  playlist.SaveRows({0});
+  EXPECT_TRUE(client.HaveRequests());
+  client.ProcessRequests();
+  EXPECT_EQ("Glory Box", playlist.song(0).title());
+  const std::string uuid = playlist.UuidAt(0);
+  const unsigned long long first = playlist.BumpSaveGeneration(uuid);
+  const unsigned long long second = playlist.BumpSaveGeneration(uuid);
+  EXPECT_FALSE(PlaylistSaveItem::ShouldApply(first, playlist.SaveGeneration(uuid)));
+  EXPECT_TRUE(PlaylistSaveItem::ShouldApply(second, playlist.SaveGeneration(uuid)));
   FileUtils::Remove(path);
 }

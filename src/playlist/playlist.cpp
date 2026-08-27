@@ -8,6 +8,9 @@
 #include "playlist/playlistcollectionsync.h"
 #include "playlist/playlistremoveitemsnotinqueue.h"
 #include "playlist/playlistplayrow.h"
+#include "playlist/playlistsaveitem.h"
+#include "tagreader/tagreaderclient.h"
+#include "tagreader/tagreaderreadfilereply.h"
 #include "playlist/playlistlocalartdiscover.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlistbehaviour.h"
@@ -33,6 +36,14 @@
 #include <random>
 
 Playlist::Playlist() = default;
+
+Playlist::~Playlist() {
+  for (const std::shared_ptr<bool> &alive : pending_save_flags_) {
+    if (alive) {
+      *alive = false;
+    }
+  }
+}
 
 void Playlist::set_current_row(int row) {
   if (songs_.empty()) {
@@ -606,6 +617,129 @@ int Playlist::SetColumnValues(const std::vector<int> &rows, PlaylistColumn colum
   }
   Changed.Emit();
   return updated;
+}
+
+unsigned long long Playlist::SaveGeneration(const std::string &uuid) const {
+  const auto it = save_generations_.find(uuid);
+  return it == save_generations_.end() ? 0 : it->second;
+}
+
+unsigned long long Playlist::BumpSaveGeneration(const std::string &uuid) {
+  if (uuid.empty()) {
+    return 0;
+  }
+  return save_generations_[uuid] = PlaylistSaveItem::Begin(SaveGeneration(uuid));
+}
+
+int Playlist::RowForUuid(const std::string &uuid) const {
+  if (uuid.empty()) {
+    return -1;
+  }
+  for (int i = 0; i < row_count(); ++i) {
+    if (UuidAt(i) == uuid) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+void Playlist::SaveRows(const std::vector<int> &rows) {
+  if (!tagreader_client_ || rows.empty()) {
+    return;
+  }
+  EnsureUuids();
+  bool queued = false;
+  for (int row : rows) {
+    if (row < 0 || row >= row_count()) {
+      continue;
+    }
+    const Song song = songs_[static_cast<size_t>(row)];
+    if (!PlaylistSaveItem::ShouldWriteFile(song)) {
+      continue;
+    }
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (path.empty()) {
+      continue;
+    }
+    const std::string uuid = UuidAt(row);
+    const unsigned long long generation = BumpSaveGeneration(uuid);
+    TagReaderReplyPtr reply = tagreader_client_->WriteFileAsync(path, song);
+    auto alive = std::make_shared<bool>(true);
+    pending_save_flags_.push_back(alive);
+    reply->Finished.Connect([this, alive, uuid, generation, song, reply](const std::string &, const TagReaderResult &) {
+      if (!alive || !*alive) {
+        return;
+      }
+      SaveRowComplete(uuid, generation, song, reply);
+    });
+    queued = true;
+  }
+  if (queued) {
+    SaveQueued.Emit();
+  }
+}
+
+void Playlist::SaveRowComplete(const std::string &uuid, unsigned long long generation, const Song &pre_edit, TagReaderReplyPtr reply) {
+  if (!PlaylistSaveItem::ShouldApply(generation, SaveGeneration(uuid))) {
+    return;
+  }
+  if (!reply || !reply->success()) {
+    Error.Emit(PlaylistSaveItem::WriteError(reply ? reply->filename() : std::string{}, reply ? reply->error() : std::string{}));
+    ReloadSavedRow(uuid, generation, pre_edit);
+    return;
+  }
+  ReloadSavedRow(uuid, generation, Song());
+}
+
+void Playlist::ReloadSavedRow(const std::string &uuid, unsigned long long generation, const Song &fallback) {
+  if (!tagreader_client_ || !PlaylistSaveItem::ShouldApply(generation, SaveGeneration(uuid))) {
+    return;
+  }
+  const int row = RowForUuid(uuid);
+  if (row < 0) {
+    return;
+  }
+  const std::string path = FileUtils::PathFromUri(songs_[static_cast<size_t>(row)].url());
+  if (path.empty()) {
+    ApplyReloadedRow(uuid, generation, Song(), fallback, false);
+    return;
+  }
+  TagReaderReadFileReplyPtr reply = tagreader_client_->ReadFileAsync(path);
+  auto alive = std::make_shared<bool>(true);
+  pending_save_flags_.push_back(alive);
+  reply->SongFinished.Connect([this, alive, uuid, generation, fallback, reply](const std::string &, const Song &, const TagReaderResult &) {
+    if (!alive || !*alive) {
+      return;
+    }
+    ApplyReloadedRow(uuid, generation, reply->song(), fallback, reply->success());
+  });
+  SaveQueued.Emit();
+}
+
+void Playlist::ApplyReloadedRow(const std::string &uuid, unsigned long long generation, const Song &from_file, const Song &fallback,
+                               bool read_ok) {
+  if (!PlaylistSaveItem::ShouldApply(generation, SaveGeneration(uuid))) {
+    return;
+  }
+  const int row = RowForUuid(uuid);
+  if (row < 0) {
+    return;
+  }
+  Song applied = PlaylistSaveItem::ChooseMetadata(read_ok, from_file, fallback);
+  if (!applied.is_valid()) {
+    return;
+  }
+  const Song current = songs_[static_cast<size_t>(row)];
+  if (current.id() > 0) {
+    applied.set_id(current.id());
+  }
+  applied.set_skipped(current.skipped());
+  if (!applied.url().empty() && current.url() != applied.url() && !current.url().empty()) {
+    applied.set_url(current.url());
+  }
+  songs_[static_cast<size_t>(row)] = applied;
+  Changed.Emit();
+  ItemSaved.Emit(applied);
 }
 
 void Playlist::ReloadRow(int row, TagReader *tagreader) {

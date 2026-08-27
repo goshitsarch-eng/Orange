@@ -12,6 +12,8 @@
 #include "smartplaylists/playlistquerygenerator.h"
 #include "smartplaylists/smartplaylistsmodel.h"
 #include "tagreader/tagreader.h"
+#include "tagreader/tagreaderclient.h"
+#include "tagreader/tagreaderclientpump.h"
 #include "utilities/fileutils.h"
 
 #include <algorithm>
@@ -24,7 +26,22 @@ PlaylistManager::PlaylistManager(TaskManager *task_manager, TagReader *tagreader
       backend_(backend),
       collection_backend_(collection_backend) {}
 
-PlaylistManager::~PlaylistManager() { FlushPendingSaves(); }
+namespace {
+
+gboolean PlaylistManagerTagPumpCb(gpointer data) {
+  auto *self = static_cast<PlaylistManager *>(data);
+  return self->PumpTagReader() ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
+}
+
+}  // namespace
+
+PlaylistManager::~PlaylistManager() {
+  if (tag_pump_id_) {
+    g_source_remove(tag_pump_id_);
+    tag_pump_id_ = 0;
+  }
+  FlushPendingSaves();
+}
 
 void PlaylistManager::Init() {
   LoadAll();
@@ -36,6 +53,42 @@ void PlaylistManager::Init() {
 }
 
 void PlaylistManager::UpdateCollectionSongs(const SongList &songs) { PlaylistCollectionSync::PatchAll(GetAllPlaylists(), songs); }
+
+void PlaylistManager::set_tagreader_client(TagReaderClient *client) {
+  tagreader_client_ = client;
+  for (const auto &playlist : playlists_) {
+    playlist->set_tagreader_client(client);
+  }
+}
+
+void PlaylistManager::WatchSaves(Playlist *playlist) {
+  if (!playlist) {
+    return;
+  }
+  playlist->set_tagreader_client(tagreader_client_);
+  playlist->SaveQueued.Connect([this]() { ArmTagReaderPump(); });
+  playlist->ItemSaved.Connect([this](const Song &song) {
+    if (collection_backend_ && (song.id() > 0 || song.is_collection_song())) {
+      collection_backend_->AddOrUpdateSong(song);
+    }
+  });
+  playlist->Error.Connect([this](const std::string &message) { Error.Emit(message); });
+}
+
+void PlaylistManager::ArmTagReaderPump() {
+  if (!TagReaderClientPump::ShouldArm(tagreader_client_ && tagreader_client_->HaveRequests(), tag_pump_id_ != 0)) {
+    return;
+  }
+  tag_pump_id_ = g_idle_add(PlaylistManagerTagPumpCb, this);
+}
+
+bool PlaylistManager::PumpTagReader() {
+  if (!tagreader_client_ || !tagreader_client_->ProcessNext()) {
+    tag_pump_id_ = 0;
+    return false;
+  }
+  return TagReaderClientPump::ShouldContinue(tagreader_client_->HaveRequests());
+}
 
 void PlaylistManager::LoadAll() {
   playlists_.clear();
@@ -52,6 +105,7 @@ void PlaylistManager::LoadAll() {
     current_ = playlists_.front().get();
     active_ = current_;
     for (const auto &playlist : playlists_) {
+      WatchSaves(playlist.get());
       if (playlist->id() >= next_id_) {
         next_id_ = playlist->id() + 1;
       }
@@ -131,6 +185,7 @@ Playlist *PlaylistManager::New(const std::string &name, const SongList &songs) {
     active_ = current_;
   }
   playlists_.push_back(std::move(playlist));
+  WatchSaves(current_);
   PlaylistAdded.Emit(current_);
   CurrentChanged.Emit(current_);
   return current_;
@@ -245,6 +300,7 @@ void PlaylistManager::Open(int id) {
     next_id_ = current_->id() + 1;
   }
   playlists_.push_back(std::move(playlist));
+  WatchSaves(current_);
   PlaylistAdded.Emit(current_);
   CurrentChanged.Emit(current_);
 }

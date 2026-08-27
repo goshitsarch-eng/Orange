@@ -7,12 +7,16 @@
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistsequence.h"
 #include "queue/queue.h"
+#include "tagreader/tagreaderreply.h"
 #include "smartplaylists/playlistgenerator.h"
 #include "smartplaylists/smartplaylist.h"
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
+
+class TagReaderClient;
 
 class Playlist {
  public:
@@ -20,6 +24,7 @@ class Playlist {
   enum class AutoScroll { Never, Maybe, Always };
 
   Playlist();
+  ~Playlist();
 
   int id() const { return id_; }
   void set_id(int id) { id_ = id; }
@@ -69,6 +74,11 @@ class Playlist {
   void ReplaceRow(int row, const Song &song);
   bool SetColumnValue(int row, PlaylistColumn column, const std::string &value);
   int SetColumnValues(const std::vector<int> &rows, PlaylistColumn column, const std::string &value);
+  void set_tagreader_client(TagReaderClient *client) { tagreader_client_ = client; }
+  TagReaderClient *tagreader_client() const { return tagreader_client_; }
+  void SaveRows(const std::vector<int> &rows);
+  unsigned long long SaveGeneration(const std::string &uuid) const;
+  unsigned long long BumpSaveGeneration(const std::string &uuid);
   void ReloadRow(int row, class TagReader *tagreader);
   void ReplaceSongs(const SongList &songs);
   void Undo();
@@ -121,6 +131,9 @@ class Playlist {
   Signal<int> CurrentChanged;
   Signal<> RepeatModeChanged;
   Signal<> ShuffleModeChanged;
+  Signal<> SaveQueued;
+  Signal<Song> ItemSaved;
+  Signal<std::string> Error;
 
  private:
   struct Snapshot {
@@ -171,6 +184,15 @@ class Playlist {
   bool loading_ = false;
   Queue queue_;
   std::vector<std::string> uuids_;
+  TagReaderClient *tagreader_client_ = nullptr;
+  std::map<std::string, unsigned long long> save_generations_;
+  std::vector<std::shared_ptr<bool>> pending_save_flags_;
+
+  void SaveRowComplete(const std::string &uuid, unsigned long long generation, const Song &pre_edit, TagReaderReplyPtr reply);
+  void ReloadSavedRow(const std::string &uuid, unsigned long long generation, const Song &fallback);
+  void ApplyReloadedRow(const std::string &uuid, unsigned long long generation, const Song &from_file, const Song &fallback,
+                        bool read_ok);
+  int RowForUuid(const std::string &uuid) const;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H

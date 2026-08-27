@@ -1870,6 +1870,7 @@ void MainWindow::ConnectSignals() {
       ShowToast(message);
     }
   });
+  app_->playlist_manager()->Error.Connect([this](const std::string &message) { ShowToast(message); });
   app_->scrobbler()->EnabledChanged.Connect([this](bool) { UpdateScrobblerButtons(); });
   app_->scrobbler()->TrackLoved.Connect([this](const Song &) {
     loved_current_track_ = ScrobblerLoveState::DisableAfterLove();
@@ -3799,19 +3800,12 @@ void MainWindow::FocusCollectionSearch() {
 
 void MainWindow::PersistEditedSongs(const std::vector<int> &rows) {
   Playlist *playlist = app_->playlist_manager()->current();
-  if (!playlist || !app_->tagreader()) {
+  if (!playlist) {
     return;
   }
-  for (int row : rows) {
-    Song song = playlist->song(row);
-    if (!song.IsEditable()) {
-      continue;
-    }
-    app_->tagreader()->WriteFile(song);
-    if (song.id() > 0 || song.is_collection_song()) {
-      app_->collection()->backend()->AddOrUpdateSong(song);
-    }
-  }
+  playlist->set_tagreader_client(app_->tagreader_client());
+  playlist->SaveRows(rows);
+  app_->playlist_manager()->ArmTagReaderPump();
 }
 
 void MainWindow::ApplyColumnValue(PlaylistColumn column, const std::string &value, const std::vector<int> &rows) {

@@ -64,6 +64,7 @@ void Application::Init() {
     }
   }
   playlist_manager_->Init();
+  playlist_manager_->set_tagreader_client(tagreader_client_.get());
   player_->Init();
   BindPlayerQueue();
   playlist_manager_->CurrentChanged.Connect([this](Playlist *) { BindPlayerQueue(); });

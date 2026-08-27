@@ -38,6 +38,7 @@ class TagReaderClient {
   bool HaveRequests() const;
   void EnqueueRequest(TagReaderRequestPtr request);
   void ProcessRequests();
+  bool ProcessNext();
   void ProcessRequest(const TagReaderRequestPtr &request);
   void Clear();
 

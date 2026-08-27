@@ -45,6 +45,8 @@
 #include "smartplaylists/playlistgeneratorinserter.h"
 #include "smartplaylists/playlistquerygenerator.h"
 #include "playlist/playlistundostate.h"
+#include "playlist/playlistsaveitem.h"
+#include "tagreader/tagreaderclientpump.h"
 #include "utilities/fileutils.h"
 
 #include <memory>
@@ -391,6 +393,34 @@ TEST(Playlist, OwnsDedicatedQueue) {
   EXPECT_EQ("B", second.queue()->songs().front().title());
   EXPECT_EQ(first.queue(), PlaylistQueueScope::For(&first));
   EXPECT_EQ(nullptr, PlaylistQueueScope::For(static_cast<Playlist *>(nullptr)));
+}
+
+TEST(PlaylistSaveItem, GenerationGuardAndWriteError) {
+  EXPECT_EQ(1u, PlaylistSaveItem::Begin(0));
+  EXPECT_EQ(4u, PlaylistSaveItem::Begin(3));
+  EXPECT_TRUE(PlaylistSaveItem::ShouldApply(2, 2));
+  EXPECT_FALSE(PlaylistSaveItem::ShouldApply(2, 3));
+  Song editable(Song::Source::LocalFile);
+  editable.set_valid(true);
+  editable.set_url("file:///tmp/a.flac");
+  EXPECT_TRUE(PlaylistSaveItem::ShouldWriteFile(editable));
+  Song stream(Song::Source::Tidal);
+  stream.set_valid(true);
+  stream.set_url("tidal://1");
+  EXPECT_FALSE(PlaylistSaveItem::ShouldWriteFile(stream));
+  Song from_file;
+  from_file.set_valid(true);
+  from_file.set_title("On disk");
+  Song fallback;
+  fallback.set_valid(true);
+  fallback.set_title("Previous");
+  EXPECT_EQ("On disk", PlaylistSaveItem::ChooseMetadata(true, from_file, fallback).title());
+  EXPECT_EQ("Previous", PlaylistSaveItem::ChooseMetadata(false, from_file, fallback).title());
+  EXPECT_EQ("Could not write metadata to /tmp/a.flac", PlaylistSaveItem::WriteError("/tmp/a.flac", {}));
+  EXPECT_EQ("Could not write metadata to /tmp/a.flac: denied", PlaylistSaveItem::WriteError("/tmp/a.flac", "denied"));
+  EXPECT_TRUE(TagReaderClientPump::ShouldArm(true, false));
+  EXPECT_FALSE(TagReaderClientPump::ShouldArm(true, true));
+  EXPECT_TRUE(TagReaderClientPump::ShouldContinue(true));
 }
 
 TEST(Playlist, SetColumnValuesUpdatesSongsAndUndo) {
