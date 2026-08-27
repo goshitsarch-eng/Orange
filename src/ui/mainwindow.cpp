@@ -49,6 +49,7 @@
 #include "ui/mainwindowmenu.h"
 #include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
+#include "systemtrayicon/traysettingsreload.h"
 #include "ui/mainwindowsearchfocus.h"
 #include "context/contextcover.h"
 #include "context/contextview.h"
@@ -3469,6 +3470,14 @@ void MainWindow::ApplyBehaviourSettings() {
   settings.BeginGroup(BehaviourSettings::kSettingsGroup);
   if (playing_widget_) {
     playing_widget_->SetEnabled(settings.BoolValue(BehaviourSettings::kPlayingWidget, BehaviourSettings::kDefaultPlayingWidget));
+  }
+  if (app_->tray() && TraySettingsReload::ShouldReloadOnSettingsClose()) {
+    const bool show_tray =
+        TraySettingsReload::ShowTray(settings.BoolValue(BehaviourSettings::kShowTrayIcon, BehaviourSettings::kDefaultShowTrayIcon));
+    app_->tray()->ReloadSettings();
+    if (window_ && TraySettingsReload::ShouldPresentWindowAfterDisable(show_tray, gtk_widget_get_visible(GTK_WIDGET(window_)) == TRUE)) {
+      Present();
+    }
   }
   ApplyPlaylistBehaviour();
 }

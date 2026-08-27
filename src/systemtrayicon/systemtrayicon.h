@@ -24,6 +24,7 @@ class SystemTrayIcon {
   void SetNowPlaying(const Song &song);
   void ClearNowPlaying();
   void SetupStatusNotifier();
+  void ReloadSettings();
   void SetVisible(bool visible);
   void ShowMenu(int x, int y);
   void ShowPopup(const std::string &summary, const std::string &message, int timeout_ms,
@@ -107,6 +108,7 @@ class SystemTrayIcon {
   void PositionMenuWindow(GtkWidget *window, int x, int y);
   GVariant *MenuLayout(int parent_id) const;
   void RegisterMenu(GDBusConnection *connection);
+  void TeardownStatusNotifier();
 
   guint owner_id_ = 0;
   guint registration_id_ = 0;

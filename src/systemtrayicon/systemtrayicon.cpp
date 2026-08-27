@@ -12,6 +12,7 @@
 #include "systemtrayicon/traymenulove.h"
 #include "systemtrayicon/traymenuposition.h"
 #include "systemtrayicon/traypopup.h"
+#include "systemtrayicon/traysettingsreload.h"
 #include "translations/translations.h"
 
 #include <cairo.h>
@@ -205,12 +206,7 @@ SystemTrayIcon::~SystemTrayIcon() {
     gtk_window_destroy(GTK_WINDOW(popup_window_));
     popup_window_ = nullptr;
   }
-  if (connection_ && menu_registration_id_ != 0) {
-    g_dbus_connection_unregister_object(connection_, menu_registration_id_);
-  }
-  if (owner_id_ != 0) {
-    g_bus_unown_name(owner_id_);
-  }
+  TeardownStatusNotifier();
 }
 
 void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &message, int timeout_ms,
@@ -674,12 +670,53 @@ void SystemTrayIcon::RegisterMenu(GDBusConnection *connection) {
   menu_path_ = kMenuObjectPath;
 }
 
+void SystemTrayIcon::TeardownStatusNotifier() {
+  if (connection_ && menu_registration_id_ != 0) {
+    g_dbus_connection_unregister_object(connection_, menu_registration_id_);
+    menu_registration_id_ = 0;
+  }
+  if (connection_ && registration_id_ != 0) {
+    g_dbus_connection_unregister_object(connection_, registration_id_);
+    registration_id_ = 0;
+  }
+  if (owner_id_ != 0) {
+    g_bus_unown_name(owner_id_);
+    owner_id_ = 0;
+  }
+  connection_ = nullptr;
+  available_ = false;
+  visible_ = false;
+  menu_path_ = "/NO_DBUSMENU";
+}
+
+void SystemTrayIcon::ReloadSettings() {
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const bool show = TraySettingsReload::ShowTray(settings.BoolValue(BehaviourSettings::kShowTrayIcon, BehaviourSettings::kDefaultShowTrayIcon));
+  const bool registered = TraySettingsReload::IsRegistered(owner_id_);
+  if (TraySettingsReload::ShouldUnregister(show, registered)) {
+    TeardownStatusNotifier();
+    return;
+  }
+  if (TraySettingsReload::ShouldRegister(show, registered)) {
+    SetupStatusNotifier();
+    return;
+  }
+  if (show && TraySettingsReload::ShouldRefreshProgress()) {
+    SetVisible(true);
+    RefreshPresentation();
+  }
+}
+
 void SystemTrayIcon::SetupStatusNotifier() {
   Settings settings;
   settings.BeginGroup(BehaviourSettings::kSettingsGroup);
-  if (!settings.BoolValue(BehaviourSettings::kShowTrayIcon, BehaviourSettings::kDefaultShowTrayIcon)) {
+  if (!TraySettingsReload::ShowTray(settings.BoolValue(BehaviourSettings::kShowTrayIcon, BehaviourSettings::kDefaultShowTrayIcon))) {
     available_ = false;
     visible_ = false;
+    return;
+  }
+  if (TraySettingsReload::IsRegistered(owner_id_)) {
     return;
   }
   service_name_ = "org.kde.StatusNotifierItem-" + std::to_string(getpid()) + "-1";

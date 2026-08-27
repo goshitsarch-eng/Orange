@@ -12,6 +12,7 @@
 #include "systemtrayicon/traymenuposition.h"
 #include "systemtrayicon/traypopup.h"
 #include "systemtrayicon/trayprogressoverlay.h"
+#include "systemtrayicon/traysettingsreload.h"
 
 #include <algorithm>
 
@@ -241,6 +242,24 @@ TEST(MacStartupActions, ReopenDockAndMediaKeysMatchQt) {
   const auto ids = MacStartupActions::DockMenuIds(true);
   EXPECT_EQ(SystemTrayIcon::RootMenuIds(true), ids);
   EXPECT_TRUE(MacStartupActions::DockItemIsSeparator(SystemTrayIcon::kMenuSeparator));
+}
+
+TEST(TraySettingsReload, RegistersAndPresentsLikeQt) {
+  EXPECT_TRUE(TraySettingsReload::ShouldReloadOnSettingsClose());
+  EXPECT_TRUE(TraySettingsReload::ShowTray(true));
+  EXPECT_FALSE(TraySettingsReload::ShowTray(false));
+  EXPECT_TRUE(TraySettingsReload::IsRegistered(1));
+  EXPECT_FALSE(TraySettingsReload::IsRegistered(0));
+  EXPECT_TRUE(TraySettingsReload::ShouldRegister(true, false));
+  EXPECT_FALSE(TraySettingsReload::ShouldRegister(true, true));
+  EXPECT_FALSE(TraySettingsReload::ShouldRegister(false, false));
+  EXPECT_TRUE(TraySettingsReload::ShouldUnregister(false, true));
+  EXPECT_FALSE(TraySettingsReload::ShouldUnregister(false, false));
+  EXPECT_FALSE(TraySettingsReload::ShouldUnregister(true, true));
+  EXPECT_TRUE(TraySettingsReload::ShouldRefreshProgress());
+  EXPECT_TRUE(TraySettingsReload::ShouldPresentWindowAfterDisable(false, false));
+  EXPECT_FALSE(TraySettingsReload::ShouldPresentWindowAfterDisable(false, true));
+  EXPECT_FALSE(TraySettingsReload::ShouldPresentWindowAfterDisable(true, false));
 }
 
 TEST(BusyIndicatorAnim, StartsOnShowStopsOnHide) {
