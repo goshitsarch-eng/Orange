@@ -3,6 +3,7 @@
 #include "collection/collectionfullrescan.h"
 #include "collection/collectiondirectory.h"
 #include "collection/collectionstats.h"
+#include "collection/collectionwatcherreload.h"
 #include "constants/collectionsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
@@ -51,6 +52,12 @@ void CollectionLibrary::Init() {
       ResumeWatcher();
     }
   });
+}
+
+void CollectionLibrary::ReloadSettings() {
+  if (watcher_ && CollectionWatcherReload::ShouldReloadOnSettingsClose()) {
+    watcher_->ReloadSettings();
+  }
 }
 
 void CollectionLibrary::PauseWatcher() {

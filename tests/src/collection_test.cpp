@@ -1,4 +1,5 @@
 #include "core/appearanceconfigurebuttons.h"
+#include "collection/collectionwatcherreload.h"
 #include "collection/collectionfullrescan.h"
 #include "collection/collectioncompilationdetect.h"
 #include "collection/collectionsongpatch.h"
@@ -2024,6 +2025,21 @@ TEST(CollectionBackend, UpdatesLastSeenAndExpiresOldUnavailable) {
   EXPECT_TRUE(backend.SongById(keep_id).is_valid());
   EXPECT_FALSE(backend.SongById(gone_id).is_valid());
   unlink(path.c_str());
+}
+
+TEST(CollectionWatcherReload, RestartsWatchingAndPeriodicScanLikeQt) {
+  EXPECT_TRUE(CollectionWatcherReload::ShouldReloadOnSettingsClose());
+  EXPECT_TRUE(CollectionWatcherReload::MarkUnavailable(true, false));
+  EXPECT_FALSE(CollectionWatcherReload::MarkUnavailable(false, false));
+  EXPECT_TRUE(CollectionWatcherReload::MarkUnavailable(false, true));
+  EXPECT_TRUE(CollectionWatcherReload::ShouldRunPeriodicScan(true, true, true));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldRunPeriodicScan(false, true, true));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldRunPeriodicScan(true, false, true));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldRunPeriodicScan(true, true, false));
+  EXPECT_TRUE(CollectionWatcherReload::ShouldStopWatching(true, false));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldStopWatching(true, true));
+  EXPECT_TRUE(CollectionWatcherReload::ShouldStartWatching(false, true));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldStartWatching(true, true));
 }
 
 TEST(CollectionFullRescan, MatchesQtRevisions) {

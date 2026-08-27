@@ -52,7 +52,9 @@
 #include "ui/mainwindowsearchfocus.h"
 #include "context/contextcover.h"
 #include "context/contextview.h"
+#include "collection/collectionwatcherreload.h"
 #include "covermanager/coveroptionsreload.h"
+#include "discord/discordsettingsreload.h"
 #include "covermanager/coverproviders.h"
 #include "device/deviceviewcontainer.h"
 #include "constants/moodbarsettings.h"
@@ -2803,6 +2805,12 @@ void MainWindow::OpenSettings(const char *page_name) {
     }
     if (cover_controller_ && CoverOptionsReload::ShouldReloadOnSettingsClose()) {
       cover_controller_->ReloadSettings();
+    }
+    if (DiscordSettingsReload::ShouldReloadOnSettingsClose()) {
+      app_->discord()->ReloadSettings();
+    }
+    if (CollectionWatcherReload::ShouldReloadOnSettingsClose()) {
+      app_->collection()->ReloadSettings();
     }
     RefreshCollection();
     if (StreamingServiceEnable::ShouldRefreshOnSettingsClose()) {

@@ -14,6 +14,7 @@
 #include "collection/collectionscandelay.h"
 #include "collection/collectionscangates.h"
 #include "collection/collectionsubdirectory.h"
+#include "collection/collectionwatcherreload.h"
 #include "constants/collectionsettings.h"
 #ifdef _WIN32
 #include "core/filesystemwatcherwin.h"
@@ -115,6 +116,28 @@ void CollectionWatcher::StartPeriodicScan() {
     return;
   }
   periodic_timeout_id_ = g_timeout_add(CollectionScanDelay::kPeriodicMs, OnPeriodicTimeout, this);
+}
+
+void CollectionWatcher::ReloadSettings() {
+  Settings settings;
+  settings.BeginGroup(CollectionSettings::kSettingsGroup);
+  const bool was_monitoring = monitor_;
+  monitor_ = settings.BoolValue(CollectionSettings::kMonitor, CollectionSettings::kDefaultMonitor);
+  const bool startup_scan = settings.BoolValue(CollectionSettings::kStartupScan, CollectionSettings::kDefaultStartupScan);
+  const bool tracking = settings.BoolValue(CollectionSettings::kSongTracking, CollectionSettings::kDefaultSongTracking);
+  const bool mark_unavailable = CollectionWatcherReload::MarkUnavailable(
+      tracking, settings.BoolValue(CollectionSettings::kMarkSongsUnavailable, CollectionSettings::kDefaultMarkSongsUnavailable));
+  if (CollectionWatcherReload::ShouldStopWatching(was_monitoring, monitor_)) {
+    StopWatching();
+  } else if (CollectionWatcherReload::ShouldStartWatching(was_monitoring, monitor_)) {
+    StartWatching();
+  }
+  if (CollectionWatcherReload::ShouldRunPeriodicScan(monitor_, startup_scan, mark_unavailable)) {
+    StartPeriodicScan();
+  } else if (periodic_timeout_id_) {
+    g_source_remove(periodic_timeout_id_);
+    periodic_timeout_id_ = 0;
+  }
 }
 
 gboolean CollectionWatcher::OnPeriodicTimeout(gpointer data) {
@@ -615,13 +638,20 @@ void CollectionWatcher::StartWatching() {
   StopWatching();
   Settings settings;
   settings.BeginGroup(CollectionSettings::kSettingsGroup);
-  if (!settings.BoolValue(CollectionSettings::kMonitor, CollectionSettings::kDefaultMonitor) || !backend_) {
+  monitor_ = settings.BoolValue(CollectionSettings::kMonitor, CollectionSettings::kDefaultMonitor);
+  if (!monitor_ || !backend_) {
     return;
   }
   for (const CollectionDirectory &directory : backend_->Directories()) {
     WatchPath(directory.path);
   }
-  StartPeriodicScan();
+  const bool startup_scan = settings.BoolValue(CollectionSettings::kStartupScan, CollectionSettings::kDefaultStartupScan);
+  const bool tracking = settings.BoolValue(CollectionSettings::kSongTracking, CollectionSettings::kDefaultSongTracking);
+  const bool mark_unavailable = CollectionWatcherReload::MarkUnavailable(
+      tracking, settings.BoolValue(CollectionSettings::kMarkSongsUnavailable, CollectionSettings::kDefaultMarkSongsUnavailable));
+  if (CollectionWatcherReload::ShouldRunPeriodicScan(monitor_, startup_scan, mark_unavailable)) {
+    StartPeriodicScan();
+  }
 }
 
 void CollectionWatcher::ScanDirectory(int directory_id, const std::string &path, bool recursive) {

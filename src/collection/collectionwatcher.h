@@ -40,6 +40,7 @@ class CollectionWatcher {
   bool scanning() const { return scanning_; }
   void StartWatching();
   void StopWatching();
+  void ReloadSettings();
   void SetRescanPaused(bool pause);
   bool rescan_paused() const { return rescan_paused_; }
   bool incremental_queued() const { return queued_incremental_; }
@@ -142,6 +143,7 @@ class CollectionWatcher {
   guint periodic_timeout_id_ = 0;
   bool queued_incremental_ = false;
   bool rescan_paused_ = false;
+  bool monitor_ = CollectionSettings::kDefaultMonitor;
 };
 
 #endif  // STRAWBERRY_COLLECTIONWATCHER_H

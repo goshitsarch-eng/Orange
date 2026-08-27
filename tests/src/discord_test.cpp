@@ -3,6 +3,9 @@
 #include "discord/discordcover.h"
 #include "discord/discordlifecycle.h"
 #include "discord/discordreconnect.h"
+#include "discord/discordsettingsreload.h"
+#include "constants/notificationssettings.h"
+#include "core/settings.h"
 #include "core/song.h"
 
 #include <cstdio>
@@ -137,6 +140,33 @@ TEST(DiscordReconnect, SocketPathsIncludeAllTempDirs) {
   EXPECT_TRUE(found_zero);
   EXPECT_TRUE(found_tmp9);
   EXPECT_EQ(DiscordReconnect::SocketPath(DiscordReconnect::TempDirs().front(), 0), DiscordRichPresence::SocketPath(0));
+}
+
+TEST(DiscordSettingsReload, ReloadsEnabledAfterPreferencesLikeQt) {
+  EXPECT_TRUE(DiscordSettingsReload::ShouldReloadOnSettingsClose());
+  EXPECT_TRUE(DiscordSettingsReload::ShouldDisconnectWhenDisabled(false));
+  EXPECT_FALSE(DiscordSettingsReload::ShouldDisconnectWhenDisabled(true));
+  Settings settings;
+  settings.BeginGroup(DiscordRPCSettings::kSettingsGroup);
+  const bool had = settings.Contains(DiscordRPCSettings::kEnabled);
+  const bool old = settings.BoolValue(DiscordRPCSettings::kEnabled, DiscordRPCSettings::kDefaultEnabled);
+  settings.SetBoolValue(DiscordRPCSettings::kEnabled, true);
+  settings.Sync();
+  DiscordRichPresence discord;
+  discord.ReloadSettings();
+  EXPECT_TRUE(discord.enabled());
+  EXPECT_FALSE(discord.connected());
+  settings.SetBoolValue(DiscordRPCSettings::kEnabled, false);
+  settings.Sync();
+  discord.ReloadSettings();
+  EXPECT_FALSE(discord.enabled());
+  EXPECT_FALSE(discord.connected());
+  if (had) {
+    settings.SetBoolValue(DiscordRPCSettings::kEnabled, old);
+  } else {
+    settings.Remove(DiscordRPCSettings::kEnabled);
+  }
+  settings.Sync();
 }
 
 TEST(DiscordRichPresence, DisabledDoesNotConnect) {
