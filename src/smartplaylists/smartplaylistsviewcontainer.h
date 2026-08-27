@@ -17,6 +17,7 @@ class SmartPlaylistsViewContainer {
   SmartPlaylistsModel *model() { return &model_; }
   SmartPlaylistsView *view() { return view_.get(); }
   void Reload();
+  void ApplyLook();
   void RefreshOnShow();
   void SetActivateCallback(std::function<void(const SmartPlaylistsItem &)> callback);
   void SetDeleteCallback(std::function<void(const SmartPlaylistsItem &)> callback);
@@ -28,8 +29,10 @@ class SmartPlaylistsViewContainer {
   void UpdateButtons();
 
   GtkWidget *widget_ = nullptr;
+  GtkWidget *add_button_ = nullptr;
   GtkWidget *edit_button_ = nullptr;
   GtkWidget *delete_button_ = nullptr;
+  GtkWidget *restore_button_ = nullptr;
   SmartPlaylistsModel model_;
   std::unique_ptr<SmartPlaylistsView> view_;
 };

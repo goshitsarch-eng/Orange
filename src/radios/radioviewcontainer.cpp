@@ -1,5 +1,6 @@
 #include "radios/radioviewcontainer.h"
 
+#include "core/appearanceleftpanel.h"
 #include "radios/radiobrowsersearchopts.h"
 #include "radios/radioservices.h"
 #include "radios/radioviewsearch.h"
@@ -18,12 +19,12 @@ RadioViewContainer::RadioViewContainer(RadioServices *services) : services_(serv
   gtk_widget_set_margin_end(toolbar, 8);
   gtk_widget_set_margin_top(toolbar, 4);
   gtk_widget_set_margin_bottom(toolbar, 4);
-  GtkWidget *refresh = gtk_button_new_from_icon_name("view-refresh-symbolic");
-  gtk_widget_set_tooltip_text(refresh, Translations::CStr("Refresh channels"));
-  gtk_box_append(GTK_BOX(toolbar), refresh);
+  refresh_button_ = gtk_button_new_from_icon_name("view-refresh-symbolic");
+  gtk_widget_set_tooltip_text(refresh_button_, Translations::CStr("Refresh channels"));
+  gtk_box_append(GTK_BOX(toolbar), refresh_button_);
   gtk_box_append(GTK_BOX(channels), toolbar);
   gtk_box_append(GTK_BOX(channels), view_->widget());
-  g_signal_connect(refresh, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+  g_signal_connect(refresh_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      static_cast<RadioViewContainer *>(data)->RefreshChannels();
                    }),
                    this);
@@ -41,6 +42,7 @@ RadioViewContainer::RadioViewContainer(RadioServices *services) : services_(serv
   gtk_box_append(GTK_BOX(widget_), switcher);
   gtk_box_append(GTK_BOX(widget_), stack_);
   Reload();
+  ApplyLook();
   g_signal_connect(view_->widget(), "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
                      static_cast<RadioViewContainer *>(data)->OnShown();
                    }),
@@ -62,6 +64,13 @@ void RadioViewContainer::Reload() {
   }
   model_.SetChannels(services_->channels());
   view_->Reload(&model_);
+}
+
+void RadioViewContainer::ApplyLook() {
+  if (!AppearanceLeftPanel::ShouldApply()) {
+    return;
+  }
+  AppearanceLeftPanel::ApplyWidget(refresh_button_, AppearanceLeftPanel::StoredSize());
 }
 
 void RadioViewContainer::RefreshChannels() {

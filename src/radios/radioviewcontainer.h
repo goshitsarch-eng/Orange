@@ -21,6 +21,7 @@ class RadioViewContainer {
   RadioView *view() { return view_.get(); }
   RadioBrowserSearchView *search_view() { return search_view_.get(); }
   void Reload();
+  void ApplyLook();
   void RefreshChannels();
   void Search(const std::string &query);
   void SetActivateCallback(std::function<void(const RadioChannel &)> callback);
@@ -32,6 +33,7 @@ class RadioViewContainer {
 
   RadioServices *services_ = nullptr;
   GtkWidget *widget_ = nullptr;
+  GtkWidget *refresh_button_ = nullptr;
   GtkWidget *stack_ = nullptr;
   RadioModel model_;
   std::unique_ptr<RadioView> view_;
