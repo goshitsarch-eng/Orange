@@ -885,6 +885,16 @@ TEST(SmartPlaylistPreviewDisplay, CapsAtGeneratorLimitAndUsesQtCountStrings) {
   EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(false, false));
 }
 
+TEST(SmartPlaylistPreviewDisplay, DefersBusyOrHiddenAndShowsLoading) {
+  EXPECT_STREQ("Loading...", SmartPlaylistPreviewDisplay::BusyText());
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Ignore, SmartPlaylistPreviewDisplay::DecideUpdate(true, false, false));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Ignore, SmartPlaylistPreviewDisplay::DecideUpdate(true, true, true));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Defer, SmartPlaylistPreviewDisplay::DecideUpdate(false, true, false));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Defer, SmartPlaylistPreviewDisplay::DecideUpdate(false, false, true));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Defer, SmartPlaylistPreviewDisplay::DecideUpdate(false, true, true));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Run, SmartPlaylistPreviewDisplay::DecideUpdate(false, false, false));
+}
+
 TEST(SmartPlaylistContextMenu, KeyboardUsesSelectionNotPointer) {
   EXPECT_TRUE(SmartPlaylistContextMenu::IsTrigger(SmartPlaylistContextMenu::kMenu, 0));
   EXPECT_TRUE(SmartPlaylistContextMenu::IsTrigger(SmartPlaylistContextMenu::kF10, SmartPlaylistContextMenu::kShiftMask));

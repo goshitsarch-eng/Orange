@@ -94,6 +94,13 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
       UpdateCreate();
     }
 
+    void OnPreviewFinished(int match_count) {
+      if (!finish) {
+        return;
+      }
+      finish->SetSummary(SmartPlaylistSummary::FinishText(match_count, type ? type->name() : std::string(), Build()));
+    }
+
     bool SearchComplete() const {
       std::vector<bool> valid;
       valid.reserve(terms.size());
@@ -185,6 +192,7 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   state->type = std::make_unique<SmartPlaylistWizardTypePage>();
   state->match = DropDownFromNames({Labels::And(), Labels::Or(), Labels::All()});
   state->preview = std::make_unique<SmartPlaylistSearchPreview>();
+  state->preview->SetFinishedCallback([state](int match_count) { state->OnPreviewFinished(match_count); });
   state->finish = std::make_unique<SmartPlaylistWizardFinishPage>();
   state->limit = gtk_spin_button_new_with_range(1, 1000, 1);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(state->limit), 15);
