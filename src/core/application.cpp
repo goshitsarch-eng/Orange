@@ -11,6 +11,7 @@
 #include "collection/skipcounteligibility.h"
 #include "scrobbler/scrobblereligibility.h"
 #include "scrobbler/scrobblerlifecycle.h"
+#include "core/exitfade.h"
 #include "constants/behavioursettings.h"
 #include "core/commandlineurlplan.h"
 #include "tidal/tidalloginurl.h"
@@ -58,7 +59,11 @@ Application::Application()
       discord_(std::make_unique<DiscordRichPresence>()),
       tag_fetcher_(std::make_unique<TagFetcher>(network_.get())) {}
 
-Application::~Application() { Exit(); }
+Application::~Application() {
+  if (!exit_started_) {
+    CompleteExit();
+  }
+}
 
 void Application::Init() {
   Appearance appearance;
@@ -226,6 +231,35 @@ void Application::Init() {
 }
 
 void Application::Exit() {
+  ++exit_count_;
+  const bool playing = player_ && player_->GetState() == EngineBase::State::Playing;
+  const bool fadeout_enabled = player_ && player_->engine() && player_->engine()->fading_enabled();
+  const ExitFade::Action action = ExitFade::Decide(exit_count_, fadeout_enabled, playing, exit_started_);
+  if (action == ExitFade::Action::WaitForFade) {
+    waiting_for_fade_ = true;
+    HideForExit.Emit();
+    if (player_ && player_->engine()) {
+      player_->engine()->Finished.Connect([this]() { CompleteExit(); });
+    }
+    if (player_) {
+      player_->SaveVolume();
+      player_->SavePlaybackStatus();
+      player_->Stop();
+    }
+    return;
+  }
+  if (action == ExitFade::Action::AbortProcess && exit_started_) {
+    return;
+  }
+  CompleteExit();
+}
+
+void Application::CompleteExit() {
+  if (exit_started_) {
+    return;
+  }
+  exit_started_ = true;
+  waiting_for_fade_ = false;
   if (player_) {
     player_->SaveVolume();
     player_->SavePlaybackStatus();

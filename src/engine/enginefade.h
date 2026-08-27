@@ -24,6 +24,9 @@ inline bool ShouldFadeInOnResume(bool faded_out_to_pause, bool fadeout_pause_ena
 // Qt FadeoutPauseFinished + StopFadeoutPause: latch after pause-fade completes or is aborted.
 inline bool ShouldMarkFadedOutToPause(bool pause_fade_active) { return pause_fade_active; }
 
+// Qt GstEngine::FinishPipeline: emit Finished when no current or fadeout pipeline remains.
+inline bool ShouldEmitFinished(bool has_current, bool has_fadeout) { return !has_current && !has_fadeout; }
+
 // Linear volume at fade progress t ∈ [0, 1]. direction < 0 fades out.
 inline double VolumeAtStep(double target_fraction, int direction, double t) {
   t = std::clamp(t, 0.0, 1.0);

@@ -23,6 +23,7 @@
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
 #include "engine/engineexclusive.h"
+#include "core/exitfade.h"
 #include "engine/enginefade.h"
 #include "engine/engineplay.h"
 #include "engine/engineseek.h"
@@ -997,6 +998,20 @@ TEST(BackendOptions, PlaybinCrossfadeAndPauseFade) {
   EXPECT_STREQ("1", BackendOptions::SoupForceHttp1(false));
   EXPECT_EQ(500, BackendOptions::WarmupMs(true, 500));
   EXPECT_EQ(0, BackendOptions::WarmupMs(false, 500));
+}
+
+TEST(ExitFade, DecideMatchesQtMainWindow) {
+  EXPECT_EQ(ExitFade::Action::ShutdownNow, ExitFade::Decide(1, false, true, false));
+  EXPECT_EQ(ExitFade::Action::ShutdownNow, ExitFade::Decide(1, true, false, false));
+  EXPECT_EQ(ExitFade::Action::WaitForFade, ExitFade::Decide(1, true, true, false));
+  EXPECT_TRUE(ExitFade::ShouldHideUi(ExitFade::Action::WaitForFade));
+  EXPECT_TRUE(ExitFade::ShouldKeepWindow(ExitFade::Action::WaitForFade));
+  EXPECT_FALSE(ExitFade::ShouldKeepWindow(ExitFade::Action::ShutdownNow));
+  EXPECT_EQ(ExitFade::Action::SkipFade, ExitFade::Decide(2, true, true, false));
+  EXPECT_EQ(ExitFade::Action::AbortProcess, ExitFade::Decide(2, true, true, true));
+  EXPECT_TRUE(EngineFade::ShouldEmitFinished(false, false));
+  EXPECT_FALSE(EngineFade::ShouldEmitFinished(true, false));
+  EXPECT_FALSE(EngineFade::ShouldEmitFinished(false, true));
 }
 
 TEST(EngineFade, StopFadeGatingMatchesQt) {

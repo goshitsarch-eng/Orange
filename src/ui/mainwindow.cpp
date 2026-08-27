@@ -567,9 +567,20 @@ void MainWindow::BuildUi() {
                        return TRUE;
                      }
                      self->app_->Exit();
-                     return FALSE;
+                     return self->app_->WaitingForExitFade() ? TRUE : FALSE;
                    }),
                    this);
+  app_->HideForExit.Connect([this]() {
+    gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
+    if (app_->tray()->available()) {
+      app_->tray()->SetVisible(false);
+    }
+  });
+  app_->ExitFinished.Connect([this]() {
+    if (window_ && !gtk_widget_get_visible(GTK_WIDGET(window_))) {
+      gtk_window_destroy(GTK_WINDOW(window_));
+    }
+  });
   app_->tray()->ShowHide.Connect([this]() {
     if (gtk_widget_get_visible(GTK_WIDGET(window_))) {
       gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
@@ -579,7 +590,9 @@ void MainWindow::BuildUi() {
   });
   app_->tray()->Quit.Connect([this]() {
     app_->Exit();
-    gtk_window_close(GTK_WINDOW(window_));
+    if (!app_->WaitingForExitFade()) {
+      gtk_window_close(GTK_WINDOW(window_));
+    }
   });
 
   auto add_action = [this](const char *name, GCallback callback) {

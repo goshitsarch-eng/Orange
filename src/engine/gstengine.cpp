@@ -555,6 +555,8 @@ gboolean GstEngine::StopFadeTick(gpointer data) {
       const uint64_t offset = self->delayed_play_offset_nanosec_;
       self->delayed_play_pending_ = false;
       self->Play(pause, offset);
+    } else if (EngineFade::ShouldEmitFinished(self->current_ != nullptr, self->fadeout_ != nullptr)) {
+      self->Finished.Emit();
     }
     return G_SOURCE_REMOVE;
   }
@@ -578,6 +580,9 @@ void GstEngine::FinishStopImmediate() {
   faded_out_to_pause_ = false;
   delayed_play_pending_ = false;
   SetState(State::Empty);
+  if (EngineFade::ShouldEmitFinished(current_ != nullptr, fadeout_ != nullptr)) {
+    Finished.Emit();
+  }
 }
 
 void GstEngine::FinishCrossfade() {

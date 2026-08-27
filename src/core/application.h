@@ -46,6 +46,7 @@ class Application {
 
   void Init();
   void Exit();
+  bool WaitingForExitFade() const { return waiting_for_fade_ && !exit_started_; }
   void ApplyCommandline(const CommandlineOptions &options);
 
   TaskManager *task_manager() const { return task_manager_.get(); }
@@ -83,6 +84,7 @@ class Application {
 
   Signal<> ExitFinished;
   Signal<> RaiseRequested;
+  Signal<> HideForExit;
 
  private:
   void WatchPlaylistOsd(class Playlist *playlist);
@@ -123,6 +125,11 @@ class Application {
   std::unique_ptr<TagFetcher> tag_fetcher_;
   bool playback_was_paused_ = false;
   int playlist_osd_gen_ = 0;
+  int exit_count_ = 0;
+  bool exit_started_ = false;
+  bool waiting_for_fade_ = false;
+
+  void CompleteExit();
 };
 
 #endif
