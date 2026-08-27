@@ -1,6 +1,7 @@
 #include "playlist/playlist.h"
 
 #include "core/playermetadatasync.h"
+#include "playlist/playlistmetadataupdate.h"
 #include "playlist/playlistautosort.h"
 #include "playlist/playlistitemuuid.h"
 #include "playlist/dynamicplaylistmaintenance.h"
@@ -581,6 +582,26 @@ void Playlist::UpdateSongsByUrl(const Song &song) {
       songs_[static_cast<size_t>(i)] = song;
       songs_[static_cast<size_t>(i)].set_skipped(skipped);
       changed = true;
+    }
+  }
+  if (changed) {
+    Changed.Emit();
+  }
+}
+
+void Playlist::UpdateItems(const SongList &songs) {
+  bool changed = false;
+  for (int i = 0; i < row_count(); ++i) {
+    Song &existing = songs_[static_cast<size_t>(i)];
+    for (const Song &incoming : songs) {
+      if (!PlaylistMetadataUpdate::ShouldReplace(existing, incoming)) {
+        continue;
+      }
+      const bool skipped = existing.skipped();
+      existing = incoming;
+      existing.set_skipped(skipped);
+      changed = true;
+      break;
     }
   }
   if (changed) {

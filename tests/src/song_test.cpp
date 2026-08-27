@@ -7,6 +7,7 @@ TEST(Song, Defaults) {
   EXPECT_FALSE(song.is_valid());
   EXPECT_EQ(-1, song.id());
   EXPECT_EQ(Song::Source::Unknown, song.source());
+  EXPECT_FALSE(song.init_from_file());
 }
 
 TEST(Song, PrettyTitle) {
@@ -264,4 +265,16 @@ TEST(Song, StoresCueEndMarker) {
   song.set_beginning_nanosec(1000);
   song.set_end_nanosec(5000);
   EXPECT_EQ(5000, song.end_nanosec());
+}
+
+TEST(Song, InitFromFilePartialUsesBasenameAndExtension) {
+  Song song;
+  song.InitFromFilePartial("/tmp/white-winter-hymnal.flac");
+  EXPECT_TRUE(song.is_valid());
+  EXPECT_FALSE(song.init_from_file());
+  EXPECT_EQ(Song::Source::LocalFile, song.source());
+  EXPECT_EQ(Song::FileType::FLAC, song.filetype());
+  EXPECT_EQ("white-winter-hymnal.flac", song.title());
+  EXPECT_EQ("white-winter-hymnal.flac", song.basefilename());
+  EXPECT_NE(std::string::npos, song.url().find("white-winter-hymnal.flac"));
 }

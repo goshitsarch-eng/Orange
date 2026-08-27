@@ -98,6 +98,7 @@ class Playlist {
   void SetFilterString(const std::string &filter);
   const std::string &filter_string() const { return filter_string_; }
   void UpdateSongsByUrl(const Song &song);
+  void UpdateItems(const SongList &songs);
   bool MergeFromEngine(const Song &engine);
   bool UpdateRowMetadata(int row, const Song &engine);
   PlaylistSequence::RepeatMode repeat_mode() const { return repeat_mode_; }

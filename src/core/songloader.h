@@ -34,6 +34,7 @@ class SongLoader {
 
  private:
   Result LoadLocal(const std::string &path);
+  Result LoadLocalPartial(const std::string &path);
   Result LoadRemote(const std::string &url);
   Result TypefindRemote(const std::string &url);
   void LoadLocalDirectory(const std::string &path);

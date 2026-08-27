@@ -59,6 +59,16 @@ void Song::set_url(const std::string &v) {
   }
 }
 
+void Song::InitFromFilePartial(const std::string &filename) {
+  set_url(FileUtils::UriFromPath(filename));
+  set_valid(true);
+  set_source(Source::LocalFile);
+  set_filetype(FiletypeByFilename(filename));
+  const std::string base = FileUtils::BaseName(filename);
+  set_basefilename(base);
+  set_title(base);
+}
+
 std::string Song::PrettyTitle() const {
   if (!title_.empty()) {
     return title_;

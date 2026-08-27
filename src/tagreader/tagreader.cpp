@@ -737,6 +737,7 @@ Song TagReader::ReadFile(const std::string &filename) const {
     if (song.title().empty()) {
       song.set_title(FileUtils::BaseName(filename));
     }
+    song.set_init_from_file(true);
     return song;
   }
   TagLib::FileRef file(filename.c_str(), true, TagLib::AudioProperties::Accurate);
@@ -748,6 +749,9 @@ Song TagReader::ReadFile(const std::string &filename) const {
   ApplyFileInfo(&song, filename);
   if (song.title().empty()) {
     song.set_title(FileUtils::BaseName(filename));
+  }
+  if (song.is_valid()) {
+    song.set_init_from_file(true);
   }
   return song;
 }

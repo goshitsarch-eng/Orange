@@ -119,6 +119,9 @@ class Song {
   bool unavailable() const { return unavailable_; }
   bool skipped() const { return skipped_; }
   void set_skipped(bool v) { skipped_ = v; }
+  bool init_from_file() const { return init_from_file_; }
+  void set_init_from_file(bool v) { init_from_file_ = v; }
+  void InitFromFilePartial(const std::string &filename);
 
   const std::string &fingerprint() const { return fingerprint_; }
   unsigned playcount() const { return playcount_; }
@@ -383,6 +386,7 @@ class Song {
   int64_t ctime_ = -1;
   bool unavailable_ = false;
   bool skipped_ = false;
+  bool init_from_file_ = false;
   std::string fingerprint_;
   unsigned playcount_ = 0;
   unsigned skipcount_ = 0;

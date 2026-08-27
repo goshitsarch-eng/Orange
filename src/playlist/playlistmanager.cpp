@@ -8,6 +8,7 @@
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "core/songloader.h"
+#include "playlist/songloaderinserter.h"
 #include "playlistparsers/playlistparser.h"
 #include "smartplaylists/playlistgeneratorinserter.h"
 #include "smartplaylists/playlistquerygenerator.h"
@@ -457,22 +458,8 @@ void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row) 
   if (!playlist) {
     return;
   }
-  SongLoader loader(url_handlers_, collection_backend_, tagreader_);
-  const SongLoader::Result result = loader.LoadMany(urls);
-  if (result == SongLoader::Result::BlockingLoadRequired) {
-    loader.LoadFilenamesBlocking();
-  }
-  loader.LoadMetadataBlocking();
-  const SongList &songs = loader.songs();
-  if (songs.empty()) {
-    return;
-  }
-  if (row < 0) {
-    playlist->AppendSongs(songs);
-  } else {
-    playlist->InsertSongs(row, songs);
-  }
-  Persist(playlist);
+  auto *inserter = new SongLoaderInserter(tagreader_, task_manager_, url_handlers_, collection_backend_);
+  inserter->Start(playlist, urls, row, [this, playlist]() { Persist(playlist); });
 }
 
 void PlaylistManager::RemoveCurrentSong() {

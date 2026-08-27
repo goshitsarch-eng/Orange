@@ -1,7 +1,9 @@
 #include "core/songloader.h"
+#include "core/songloadeffective.h"
 #include "core/songloadremote.h"
 #include "core/songloadsort.h"
 #include "core/songloadtypefind.h"
+#include "playlist/songloaderinserterplan.h"
 #include "core/urlhandlers.h"
 #include "playlistparsers/playlistparser.h"
 #include "utilities/fileutils.h"
@@ -218,9 +220,52 @@ TEST(SongLoader, DirectoryImportSortsByUrlWhenTagsEmpty) {
   ASSERT_EQ(2u, loader.songs().size());
   EXPECT_EQ(FileUtils::UriFromPath(earlier), loader.songs().front().url());
   EXPECT_EQ(FileUtils::UriFromPath(later), loader.songs().back().url());
+  EXPECT_EQ("a-track.flac", loader.songs().front().title());
+  EXPECT_FALSE(loader.songs().front().init_from_file());
+  EXPECT_EQ(Song::FileType::FLAC, loader.songs().front().filetype());
   FileUtils::Remove(later);
   FileUtils::Remove(earlier);
   rmdir(dir.c_str());
+}
+
+TEST(SongLoader, AudioFileRequiresBlockingPartialLoad) {
+  const std::string dir = TempDir();
+  const std::string file = FileUtils::Join(dir, "helplessness-blues.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(file, "not-really-flac"));
+  SongLoader loader(nullptr, nullptr, nullptr);
+  EXPECT_EQ(SongLoader::Result::BlockingLoadRequired, loader.Load(file));
+  EXPECT_EQ(SongLoader::Result::Success, loader.LoadFilenamesBlocking());
+  ASSERT_EQ(1u, loader.songs().size());
+  EXPECT_EQ("helplessness-blues.flac", loader.songs().front().title());
+  EXPECT_FALSE(loader.songs().front().init_from_file());
+  EXPECT_EQ(Song::FileType::FLAC, loader.songs().front().filetype());
+  loader.LoadMetadataBlocking();
+  EXPECT_EQ("helplessness-blues.flac", loader.songs().front().title());
+  EXPECT_FALSE(loader.songs().front().init_from_file());
+  FileUtils::Remove(file);
+  rmdir(dir.c_str());
+}
+
+TEST(SongLoadEffective, AlreadyLoadedSkipsUnknownAndPartial) {
+  Song partial;
+  partial.InitFromFilePartial("/tmp/track.flac");
+  EXPECT_FALSE(SongLoadEffective::AlreadyLoaded(partial));
+  Song tagged;
+  tagged.set_init_from_file(true);
+  tagged.set_filetype(Song::FileType::FLAC);
+  EXPECT_TRUE(SongLoadEffective::AlreadyLoaded(tagged));
+  Song unknown;
+  unknown.set_init_from_file(true);
+  unknown.set_filetype(Song::FileType::Unknown);
+  EXPECT_FALSE(SongLoadEffective::AlreadyLoaded(unknown));
+}
+
+TEST(SongLoaderInserterPlan, TaskNamesAndFirstMetadata) {
+  EXPECT_STREQ("Loading tracks", SongLoaderInserterPlan::PreloadTaskName());
+  EXPECT_STREQ("Loading tracks info", SongLoaderInserterPlan::MetadataTaskName());
+  EXPECT_TRUE(SongLoaderInserterPlan::ShouldLoadFirstMetadata(false, true));
+  EXPECT_FALSE(SongLoaderInserterPlan::ShouldLoadFirstMetadata(true, true));
+  EXPECT_FALSE(SongLoaderInserterPlan::ShouldLoadFirstMetadata(false, false));
 }
 
 TEST(SongLoader, LoadFilenamesBlockingEmptyIsError) {

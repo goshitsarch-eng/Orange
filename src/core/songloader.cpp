@@ -4,6 +4,7 @@
 #include "core/commandlineurl.h"
 #include "core/loadurl.h"
 #include "core/network.h"
+#include "core/songloadeffective.h"
 #include "core/songloadremote.h"
 #include "core/songloadsort.h"
 #include "core/songloadtypefind.h"
@@ -100,7 +101,7 @@ SongLoader::Result SongLoader::LoadFilenamesBlocking() {
     if (FileUtils::IsDirectory(path)) {
       LoadLocalDirectory(path);
     } else {
-      LoadLocal(path);
+      LoadLocalPartial(path);
     }
   }
   const std::vector<std::string> remotes = pending_remote_urls_;
@@ -357,7 +358,42 @@ SongLoader::Result SongLoader::LoadLocal(const std::string &path) {
     return songs_.empty() ? Result::Error : Result::Success;
   }
   if (Song::IsAudioFile(path)) {
-    LoadAudioFile(path);
+    if (collection_backend_) {
+      Song collection = collection_backend_->SongByUrl(FileUtils::UriFromPath(path));
+      if (collection.is_valid()) {
+        songs_.push_back(collection);
+        return Result::Success;
+      }
+    }
+    pending_paths_.push_back(path);
+    return Result::BlockingLoadRequired;
+  }
+  errors_.push_back("Unsupported file: " + path);
+  return Result::Error;
+}
+
+SongLoader::Result SongLoader::LoadLocalPartial(const std::string &path) {
+  if (path.empty() || !FileUtils::Exists(path)) {
+    errors_.push_back(LoadUrl::MissingFileMessage(path.empty() ? "URL" : path));
+    return Result::Error;
+  }
+  if (FileUtils::IsDirectory(path)) {
+    LoadLocalDirectory(path);
+    return Result::Success;
+  }
+  if (PlaylistParser::IsPlaylist(path)) {
+    LoadPlaylistFile(path);
+    return songs_.empty() ? Result::Error : Result::Success;
+  }
+  const std::string cue = PlaylistParser::FindCueForAudio(path);
+  if (!cue.empty()) {
+    LoadPlaylistFile(cue);
+    return songs_.empty() ? Result::Error : Result::Success;
+  }
+  if (Song::IsAudioFile(path) || (tagreader_ && tagreader_->IsMediaFile(path))) {
+    Song song;
+    song.InitFromFilePartial(path);
+    songs_.push_back(song);
     return Result::Success;
   }
   errors_.push_back("Unsupported file: " + path);
@@ -367,7 +403,7 @@ SongLoader::Result SongLoader::LoadLocal(const std::string &path) {
 void SongLoader::LoadLocalDirectory(const std::string &path) {
   for (const std::string &entry : FileUtils::ListDirectoryRecursive(path)) {
     if (PlaylistParser::IsPlaylist(entry) || Song::IsAudioFile(entry)) {
-      LoadLocal(entry);
+      LoadLocalPartial(entry);
     }
   }
   SongLoadSort::StableSort(songs_);
@@ -423,7 +459,17 @@ void SongLoader::AddRawStream(const std::string &url) {
 }
 
 void SongLoader::EffectiveSongLoad(Song *song) {
-  if (!song || !tagreader_) {
+  if (!song || SongLoadEffective::AlreadyLoaded(*song)) {
+    return;
+  }
+  if (collection_backend_) {
+    Song collection = collection_backend_->SongByUrl(song->url());
+    if (collection.is_valid()) {
+      *song = collection;
+      return;
+    }
+  }
+  if (!tagreader_) {
     return;
   }
   const std::string path = FileUtils::PathFromUri(song->url());

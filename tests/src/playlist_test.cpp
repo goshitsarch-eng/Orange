@@ -19,6 +19,7 @@
 #include "playlist/playlistsaveschedule.h"
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistmetadataupdate.h"
 #include "playlist/playlistplayrow.h"
 #include "playlist/playlistcollectionsync.h"
 #include "playlist/playlistqueuerefresh.h"
@@ -1065,6 +1066,68 @@ TEST(PlayerSeekNotify, ClampsAndRefreshesNowPlaying) {
   EXPECT_TRUE(PlayerSeekNotify::ShouldRefreshNowPlaying(0, 100));
   EXPECT_FALSE(PlayerSeekNotify::ShouldRefreshNowPlaying(1, 100));
   EXPECT_FALSE(PlayerSeekNotify::ShouldRefreshNowPlaying(0, 0));
+}
+
+TEST(PlaylistMetadataUpdate, ReplacesPartialAndUnknown) {
+  Song partial;
+  partial.set_url("file:///tmp/track.flac");
+  partial.set_filetype(Song::FileType::FLAC);
+  partial.set_init_from_file(false);
+  Song tagged = partial;
+  tagged.set_init_from_file(true);
+  tagged.set_title("White Winter Hymnal");
+  EXPECT_TRUE(PlaylistMetadataUpdate::ShouldReplace(partial, tagged));
+  Song unknown;
+  unknown.set_url("file:///tmp/track.flac");
+  unknown.set_filetype(Song::FileType::Unknown);
+  unknown.set_init_from_file(true);
+  EXPECT_TRUE(PlaylistMetadataUpdate::ShouldReplace(unknown, tagged));
+  Song stream;
+  stream.set_url("file:///tmp/track.flac");
+  stream.set_filetype(Song::FileType::Stream);
+  stream.set_init_from_file(true);
+  EXPECT_TRUE(PlaylistMetadataUpdate::ShouldReplace(stream, tagged));
+  Song cdda;
+  cdda.set_url("file:///tmp/track.flac");
+  cdda.set_filetype(Song::FileType::CDDA);
+  cdda.set_init_from_file(true);
+  EXPECT_TRUE(PlaylistMetadataUpdate::ShouldReplace(cdda, tagged));
+  EXPECT_FALSE(PlaylistMetadataUpdate::ShouldReplace(tagged, partial));
+  Song other;
+  other.set_url("file:///tmp/other.flac");
+  EXPECT_FALSE(PlaylistMetadataUpdate::ShouldReplace(partial, other));
+}
+
+TEST(Playlist, UpdateItemsReplacesPartialKeepsTagged) {
+  Playlist playlist;
+  Song partial;
+  partial.set_url("file:///tmp/a.flac");
+  partial.set_title("a.flac");
+  partial.set_filetype(Song::FileType::FLAC);
+  partial.set_valid(true);
+  partial.set_skipped(true);
+  Song tagged;
+  tagged.set_url("file:///tmp/b.flac");
+  tagged.set_title("Already Tagged");
+  tagged.set_filetype(Song::FileType::FLAC);
+  tagged.set_init_from_file(true);
+  tagged.set_valid(true);
+  playlist.AppendSongs({partial, tagged});
+  Song loaded_a;
+  loaded_a.set_url("file:///tmp/a.flac");
+  loaded_a.set_title("White Winter Hymnal");
+  loaded_a.set_artist("Fleet Foxes");
+  loaded_a.set_filetype(Song::FileType::FLAC);
+  loaded_a.set_init_from_file(true);
+  loaded_a.set_valid(true);
+  Song loaded_b = tagged;
+  loaded_b.set_title("Should Not Replace");
+  playlist.UpdateItems({loaded_a, loaded_b});
+  EXPECT_EQ("White Winter Hymnal", playlist.song(0).title());
+  EXPECT_EQ("Fleet Foxes", playlist.song(0).artist());
+  EXPECT_TRUE(playlist.song(0).init_from_file());
+  EXPECT_TRUE(playlist.song(0).skipped());
+  EXPECT_EQ("Already Tagged", playlist.song(1).title());
 }
 
 TEST(Playlist, UpdateRowMetadataLeavesOtherRows) {
