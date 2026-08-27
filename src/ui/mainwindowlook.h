@@ -17,6 +17,13 @@ inline bool MuteVisibleFromSettings(bool volume_control_stored, bool default_vol
   return MuteVisible(volume_control_stored);
 }
 
+// Qt MainWindow::ReloadSettings applies BackendSettings::kVolumeControl to the slider, mute action, and tray mute.
+inline bool SliderEnabled(bool volume_control) { return volume_control; }
+
+inline bool MuteActionEnabled(bool volume_control) { return volume_control; }
+
+inline bool ShouldApplyVolumeControl() { return true; }
+
 inline bool IsMuted(unsigned volume) { return volume == 0; }
 
 inline const char *MuteIconName(bool muted) { return muted ? "audio-volume-muted-symbolic" : "audio-volume-high-symbolic"; }

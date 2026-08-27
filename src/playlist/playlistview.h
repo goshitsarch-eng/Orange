@@ -79,6 +79,7 @@ class PlaylistView {
   void UpdateNoMatchesOverlay();
   void SetPlaybackProgress(double progress);
   void SetGlowing(bool glowing);
+  void ReloadSettings();
   void SetBackground(const std::string &css, const std::string &key);
 
  private:

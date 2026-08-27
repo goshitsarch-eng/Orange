@@ -103,6 +103,7 @@ class MainWindow : public PlatformInterface {
   void ToggleHide();
   void SelectPlayingTrack();
   void ApplyPlaylistBehaviour();
+  void ApplyBackendSettings();
   void DeleteCurrentPlaylist();
   void RenameCurrentPlaylist();
   void RenamePlaylist(int id);

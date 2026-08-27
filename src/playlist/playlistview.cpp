@@ -915,6 +915,14 @@ gboolean PlaylistView::OnGlowTick() {
   return G_SOURCE_CONTINUE;
 }
 
+void PlaylistView::ReloadSettings() {
+  ReloadLookCss();
+  SetGlowing(glowing_);
+  if (playlist_ && PlaylistLook::ShouldRefreshRowsOnReload()) {
+    Refresh(playlist_);
+  }
+}
+
 void PlaylistView::SetGlowing(bool glowing) {
   glowing_ = glowing;
   Settings look;

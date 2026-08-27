@@ -52,6 +52,7 @@
 #include "ui/mainwindowsearchfocus.h"
 #include "context/contextcover.h"
 #include "context/contextview.h"
+#include "covermanager/coveroptionsreload.h"
 #include "covermanager/coverproviders.h"
 #include "device/deviceviewcontainer.h"
 #include "constants/moodbarsettings.h"
@@ -2053,7 +2054,7 @@ void MainWindow::BuildPlayerBar() {
   g_signal_connect(mute_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->ToggleMute(); }), this);
   gtk_box_append(GTK_BOX(controls), mute_button_);
   gtk_box_append(GTK_BOX(controls), volume_slider_->widget());
-  ApplyMuteUi(app_->player()->GetVolume());
+  ApplyBackendSettings();
   gtk_box_append(GTK_BOX(box), controls);
 
   loading_indicator_ = std::make_unique<MultiLoadingIndicator>();
@@ -2797,6 +2798,12 @@ void MainWindow::OpenSettings(const char *page_name) {
     ApplySeekbarMode();
     ApplyBehaviourSettings();
     ApplyPlaylistBehaviour();
+    if (MainWindowLook::ShouldApplyVolumeControl()) {
+      ApplyBackendSettings();
+    }
+    if (cover_controller_ && CoverOptionsReload::ShouldReloadOnSettingsClose()) {
+      cover_controller_->ReloadSettings();
+    }
     RefreshCollection();
     if (StreamingServiceEnable::ShouldRefreshOnSettingsClose()) {
       RefreshStreaming();
@@ -3473,6 +3480,9 @@ void MainWindow::ApplyPlaylistBehaviour() {
   }
   if (playlist_container_) {
     playlist_container_->ApplyLook();
+    if (playlist_container_->view()) {
+      playlist_container_->view()->ReloadSettings();
+    }
   }
 }
 
@@ -3608,6 +3618,16 @@ void MainWindow::PersistTabSettings() const {
 }
 
 void MainWindow::ToggleMute() { app_->player()->Mute(); }
+
+void MainWindow::ApplyBackendSettings() {
+  Settings settings;
+  settings.BeginGroup(BackendSettings::kSettingsGroup);
+  const bool volume_control = settings.BoolValue(BackendSettings::kVolumeControl, BackendSettings::kDefaultVolumeControl);
+  if (volume_slider_) {
+    volume_slider_->SetEnabled(MainWindowLook::SliderEnabled(volume_control));
+  }
+  ApplyMuteUi(app_->player()->GetVolume());
+}
 
 void MainWindow::ApplyMuteUi(unsigned volume) {
   Settings settings;

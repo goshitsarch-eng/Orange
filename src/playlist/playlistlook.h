@@ -42,6 +42,13 @@ inline bool ShouldAnimateGlow(const bool glow_enabled, const bool bars_enabled, 
   return glow_enabled && bars_enabled && playing;
 }
 
+// Qt PlaylistView::ReloadSettings re-reads glow/bars/alternating and rebuilds row styling.
+inline bool ShouldRefreshRowsOnReload() { return true; }
+
+inline bool ShouldRestartGlowOnReload(bool glow_enabled, bool bars_enabled, bool currently_glowing) {
+  return ShouldAnimateGlow(glow_enabled, bars_enabled, currently_glowing);
+}
+
 inline std::string FormatAlpha(const double value) {
   char buf[16];
   std::snprintf(buf, sizeof(buf), "%.2f", value);

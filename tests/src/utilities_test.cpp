@@ -2164,6 +2164,11 @@ TEST(MainWindowLook, SidebarAndMuteMatchQt) {
   EXPECT_FALSE(MainWindowLook::MuteVisible(false));
   EXPECT_TRUE(MainWindowLook::MuteVisibleFromSettings(true));
   EXPECT_FALSE(MainWindowLook::MuteVisibleFromSettings(false));
+  EXPECT_TRUE(MainWindowLook::SliderEnabled(true));
+  EXPECT_FALSE(MainWindowLook::SliderEnabled(false));
+  EXPECT_TRUE(MainWindowLook::MuteActionEnabled(true));
+  EXPECT_FALSE(MainWindowLook::MuteActionEnabled(false));
+  EXPECT_TRUE(MainWindowLook::ShouldApplyVolumeControl());
   EXPECT_TRUE(MainWindowLook::IsMuted(0));
   EXPECT_FALSE(MainWindowLook::IsMuted(1));
   EXPECT_FALSE(MainWindowLook::IsMuted(50));
@@ -2542,6 +2547,10 @@ TEST(PlaylistLook, GlowPulseMatchesQtSteps) {
   EXPECT_TRUE(PlaylistLook::ShouldAnimateGlow(true, true, true));
   EXPECT_FALSE(PlaylistLook::ShouldAnimateGlow(true, false, true));
   EXPECT_FALSE(PlaylistLook::ShouldAnimateGlow(true, true, false));
+  EXPECT_TRUE(PlaylistLook::ShouldRefreshRowsOnReload());
+  EXPECT_TRUE(PlaylistLook::ShouldRestartGlowOnReload(true, true, true));
+  EXPECT_FALSE(PlaylistLook::ShouldRestartGlowOnReload(false, true, true));
+  EXPECT_FALSE(PlaylistLook::ShouldRestartGlowOnReload(true, true, false));
   const std::string dim = PlaylistLook::GlowCss(true, 0);
   const std::string bright = PlaylistLook::GlowCss(true, 23);
   EXPECT_NE(dim, bright);

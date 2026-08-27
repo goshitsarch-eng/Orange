@@ -1,6 +1,7 @@
 #include "constants/edittagdialogsettings.h"
 #include "dialogs/dialogsongnav.h"
 #include "covermanager/coveroptions.h"
+#include "covermanager/coveroptionsreload.h"
 #include "dialogs/dialoglistkeyboard.h"
 #include "dialogs/edittagcompleter.h"
 #include "dialogs/edittagcover.h"
@@ -226,6 +227,23 @@ TEST(CoverOptions, TypeFilenameAndPattern) {
   options.cover_lowercase = true;
   options.cover_replace_spaces = true;
   EXPECT_EQ("portishead-dummy.jpg", options.FilenameForSong(song));
+}
+
+TEST(CoverOptionsReload, ReloadsAfterPreferencesLikeQt) {
+  EXPECT_TRUE(CoverOptionsReload::ShouldReloadOnSettingsClose());
+  CoverOptions before;
+  before.cover_type = CoverOptions::CoverType::Cache;
+  before.cover_filename = CoverOptions::CoverFilename::Hash;
+  CoverOptions after = before;
+  EXPECT_FALSE(CoverOptionsReload::OptionsDiffer(before, after));
+  after.cover_type = CoverOptions::CoverType::Album;
+  EXPECT_TRUE(CoverOptionsReload::OptionsDiffer(before, after));
+  after = before;
+  after.cover_pattern = "%artist-%album";
+  EXPECT_TRUE(CoverOptionsReload::OptionsDiffer(before, after));
+  after = before;
+  after.cover_overwrite = !before.cover_overwrite;
+  EXPECT_TRUE(CoverOptionsReload::OptionsDiffer(before, after));
 }
 
 TEST(EditTagCoverDrop, AcceptsImageUrisAndSkipsOtherFiles) {
