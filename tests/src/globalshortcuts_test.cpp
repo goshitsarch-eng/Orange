@@ -171,6 +171,16 @@ TEST(GlobalShortcutBinding, ModesMatchQtNoneDefaultCustom) {
   EXPECT_EQ("Ctrl+P", GlobalShortcutBinding::EffectiveKey(GlobalShortcutBinding::Mode::Custom, "Ctrl+P", "MediaPlay"));
   EXPECT_TRUE(GlobalShortcutBinding::CustomEnabled(GlobalShortcutBinding::Mode::Custom));
   EXPECT_FALSE(GlobalShortcutBinding::CustomEnabled(GlobalShortcutBinding::Mode::Default));
+  EXPECT_TRUE(GlobalShortcutBinding::BackendActive(true, true));
+  EXPECT_FALSE(GlobalShortcutBinding::BackendActive(false, true));
+  EXPECT_FALSE(GlobalShortcutBinding::BackendActive(true, false));
+  EXPECT_TRUE(GlobalShortcutBinding::ShortcutListEnabled(true, true, false, false));
+  EXPECT_TRUE(GlobalShortcutBinding::ShortcutListEnabled(false, false, true, true));
+  EXPECT_FALSE(GlobalShortcutBinding::ShortcutListEnabled(true, false, true, false));
+  EXPECT_FALSE(GlobalShortcutBinding::ShortcutListEnabled(false, true, false, true));
+  EXPECT_TRUE(GlobalShortcutBinding::X11WarningVisible(true, true));
+  EXPECT_FALSE(GlobalShortcutBinding::X11WarningVisible(true, false));
+  EXPECT_FALSE(GlobalShortcutBinding::X11WarningVisible(false, true));
   EXPECT_EQ("MediaPlay", GlobalShortcutBinding::ResolveStoredKey(false, "", false, "", "MediaPlay"));
   EXPECT_TRUE(GlobalShortcutBinding::ResolveStoredKey(true, "", false, "", "MediaPlay").empty());
   EXPECT_EQ("Ctrl+P", GlobalShortcutBinding::ResolveStoredKey(false, "", true, "Ctrl+P", "MediaPlay"));

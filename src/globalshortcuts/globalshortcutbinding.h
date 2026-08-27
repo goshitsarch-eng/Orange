@@ -67,6 +67,15 @@ inline int IndexOf(Mode mode) { return static_cast<int>(mode); }
 
 inline bool CustomEnabled(Mode mode) { return mode == Mode::Custom; }
 
+// Qt GlobalShortcutsSettingsPage::ShortcutOptionsChanged
+inline bool BackendActive(bool visible, bool enabled) { return visible && enabled; }
+
+inline bool ShortcutListEnabled(bool kglobalaccel_visible, bool kglobalaccel_on, bool x11_visible, bool x11_on) {
+  return BackendActive(kglobalaccel_visible, kglobalaccel_on) || BackendActive(x11_visible, x11_on);
+}
+
+inline bool X11WarningVisible(bool x11_visible, bool x11_on) { return x11_visible && x11_on; }
+
 inline std::string EffectiveKey(Mode mode, const std::string &custom, const std::string &default_key) {
   switch (mode) {
     case Mode::None:

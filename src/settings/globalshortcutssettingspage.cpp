@@ -1,3 +1,4 @@
+#include "config.h"
 #include "settings/globalshortcutssettingspage.h"
 
 #include "constants/globalshortcutssettings.h"
@@ -5,11 +6,35 @@
 #include "core/settings.h"
 #include "globalshortcuts/globalshortcutbinding.h"
 #include "globalshortcuts/globalshortcuts.h"
+#include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
 #include "ui/dialogs.h"
 
 namespace {
+
+struct BackendEnableState {
+  GtkWidget *kglobalaccel = nullptr;
+  GtkWidget *x11 = nullptr;
+  GtkWidget *keys = nullptr;
+  GtkWidget *warning = nullptr;
+  bool kglobalaccel_visible = false;
+  bool x11_visible = false;
+};
+
+void ApplyShortcutListEnable(BackendEnableState *state) {
+  if (!state) {
+    return;
+  }
+  const bool k_on = state->kglobalaccel && adw_switch_row_get_active(ADW_SWITCH_ROW(state->kglobalaccel));
+  const bool x_on = state->x11 && adw_switch_row_get_active(ADW_SWITCH_ROW(state->x11));
+  if (state->keys) {
+    gtk_widget_set_sensitive(state->keys, GlobalShortcutBinding::ShortcutListEnabled(state->kglobalaccel_visible, k_on, state->x11_visible, x_on));
+  }
+  if (state->warning) {
+    gtk_widget_set_visible(state->warning, GlobalShortcutBinding::X11WarningVisible(state->x11_visible, x_on));
+  }
+}
 
 struct ShortcutRowWidgets {
   Settings *settings = nullptr;
@@ -83,23 +108,36 @@ AdwPreferencesPage *GlobalShortcutsSettingsPage::Create(Settings *settings, Appl
   AdwPreferencesPage *page = SettingsPage::MakePage(GlobalShortcutBinding::PageTitle(), "input-keyboard-symbolic");
   AdwPreferencesGroup *backends = SettingsPage::AddGroup(page, "Backends");
   SettingsPage::AddToggle(backends, settings, "enabled", "Enable global shortcuts", nullptr, true);
-  SettingsPage::AddToggle(backends, settings, GlobalShortcutsSettings::kUseKGlobalAccel, GlobalShortcutBinding::UseKGlobalAccel(), nullptr,
-                          GlobalShortcutsSettings::kDefaultUseKGlobalAccel);
-  GtkWidget *x11 = SettingsPage::AddToggle(backends, settings, GlobalShortcutsSettings::kUseX11, GlobalShortcutBinding::UseX11(), nullptr,
-                                           GlobalShortcutsSettings::kDefaultUseX11);
-  GtkWidget *warning = gtk_label_new(GlobalShortcutBinding::X11Warning());
-  gtk_label_set_wrap(GTK_LABEL(warning), TRUE);
-  gtk_label_set_xalign(GTK_LABEL(warning), 0.0f);
-  gtk_widget_set_margin_start(warning, 12);
-  gtk_widget_set_margin_end(warning, 12);
-  gtk_widget_set_visible(warning, adw_switch_row_get_active(ADW_SWITCH_ROW(x11)));
-  g_signal_connect(x11, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
-                     gtk_widget_set_visible(GTK_WIDGET(data), adw_switch_row_get_active(row));
-                   }),
-                   warning);
-  adw_preferences_group_add(backends, warning);
+  auto *enable = new BackendEnableState();
+  enable->kglobalaccel_visible = GlobalShortcutsBackendKGlobalAccel::IsKGlobalAccelAvailable();
+#ifdef HAVE_X11
+  enable->x11_visible = true;
+#endif
+  enable->kglobalaccel = SettingsPage::AddToggle(backends, settings, GlobalShortcutsSettings::kUseKGlobalAccel,
+                                                GlobalShortcutBinding::UseKGlobalAccel(), nullptr,
+                                                GlobalShortcutsSettings::kDefaultUseKGlobalAccel);
+  gtk_widget_set_visible(enable->kglobalaccel, enable->kglobalaccel_visible);
+  enable->x11 = SettingsPage::AddToggle(backends, settings, GlobalShortcutsSettings::kUseX11, GlobalShortcutBinding::UseX11(), nullptr,
+                                       GlobalShortcutsSettings::kDefaultUseX11);
+  gtk_widget_set_visible(enable->x11, enable->x11_visible);
+  enable->warning = gtk_label_new(GlobalShortcutBinding::X11Warning());
+  gtk_label_set_wrap(GTK_LABEL(enable->warning), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(enable->warning), 0.0f);
+  gtk_widget_set_margin_start(enable->warning, 12);
+  gtk_widget_set_margin_end(enable->warning, 12);
+  adw_preferences_group_add(backends, enable->warning);
+  g_object_set_data_full(G_OBJECT(page), "shortcut-enable", enable, [](gpointer p) { delete static_cast<BackendEnableState *>(p); });
+  g_signal_connect(enable->kglobalaccel, "notify::active", G_CALLBACK((+[](AdwSwitchRow *, GParamSpec *, gpointer data) {
+                     ApplyShortcutListEnable(static_cast<BackendEnableState *>(data));
+                   })),
+                   enable);
+  g_signal_connect(enable->x11, "notify::active", G_CALLBACK((+[](AdwSwitchRow *, GParamSpec *, gpointer data) {
+                     ApplyShortcutListEnable(static_cast<BackendEnableState *>(data));
+                   })),
+                   enable);
 
   AdwPreferencesGroup *keys = SettingsPage::AddGroup(page, "Shortcuts");
+  enable->keys = GTK_WIDGET(keys);
   for (const auto &def : GlobalShortcutsManager::Catalog()) {
     settings->BeginGroup(GlobalShortcutsSettings::kSettingsGroup);
     const bool contains = settings->Contains(def.id);
@@ -178,5 +216,6 @@ AdwPreferencesPage *GlobalShortcutsSettingsPage::Create(Settings *settings, Appl
     adw_action_row_add_suffix(ADW_ACTION_ROW(combo), grab);
     adw_preferences_group_add(keys, GTK_WIDGET(combo));
   }
+  ApplyShortcutListEnable(enable);
   return page;
 }
