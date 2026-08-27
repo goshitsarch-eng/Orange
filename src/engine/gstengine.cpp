@@ -3,6 +3,7 @@
 #include "core/enginemetadata.h"
 #include "core/taskmanager.h"
 #include "engine/enginebuffering.h"
+#include "engine/engineplay.h"
 #include "engine/engineexclusive.h"
 #include "engine/enginefade.h"
 #include "engine/engineseek.h"
@@ -315,7 +316,17 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
   if (!current_ || !current_->valid()) {
     return false;
   }
+  if (EnginePlay::IsBuffering(buffering_task_id_)) {
+    return false;
+  }
   if (gapless_pending_ && current_->is_playing()) {
+    return true;
+  }
+  if (EnginePlay::ShouldShortCircuitPlayingPipeline(current_->is_playing(), buffering_task_id_)) {
+    if (EnginePlay::ShouldSeekWhenAlreadyPlaying(offset_nanosec, current_->beginning_offset_nanosec())) {
+      Seek(offset_nanosec);
+      PlayDone(false);
+    }
     return true;
   }
   if (!current_->Play(pause, offset_nanosec)) {
@@ -407,6 +418,11 @@ void GstEngine::SeekNow() {
   if (current_) {
     current_->Seek(pending_seek_nanosec_);
   }
+}
+
+void GstEngine::PlayDone(bool pause) {
+  SetState(pause ? State::Paused : State::Playing);
+  ValidSongRequested.Emit(stream_url_);
 }
 
 void GstEngine::CancelSeek() {

@@ -43,6 +43,7 @@ class GstEnginePipeline {
 
   int id() const { return id_; }
   const std::string &url() const { return url_; }
+  uint64_t beginning_offset_nanosec() const { return beginning_offset_nanosec_; }
   bool valid() const { return playbin_ != nullptr; }
 
   bool Create(const std::string &url, const std::string &output, const std::string &device, uint64_t beginning_offset_nanosec,
