@@ -1398,8 +1398,9 @@ TEST(CollectionFilterFocus, EscapeClearsAndBackspaceDeletesLastLikeQt) {
   EXPECT_EQ("radiohead", CollectionFilterFocus::Apply("radiohead", CollectionFilterFocus::Effect::None));
   EXPECT_TRUE(CollectionFilterFocus::Apply("", CollectionFilterFocus::Effect::DeleteLast).empty());
   EXPECT_EQ("caf", CollectionFilterFocus::DeleteLastUtf8("café"));
-  EXPECT_EQ("", CollectionFilterFocus::DeleteLastUtf8("é"));
-  EXPECT_EQ("a", CollectionFilterFocus::DeleteLastUtf8("a"));
+  EXPECT_TRUE(CollectionFilterFocus::DeleteLastUtf8("é").empty());
+  EXPECT_EQ("a", CollectionFilterFocus::DeleteLastUtf8("ab"));
+  EXPECT_TRUE(CollectionFilterFocus::DeleteLastUtf8("a").empty());
 }
 
 TEST(CollectionFilterKeyboard, ReturnActivatesAndEscapeFocusesFilter) {
