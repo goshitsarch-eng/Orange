@@ -6,6 +6,7 @@
 #include "streaming/streamingauth.h"
 #include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchopts.h"
+#include "spotify/spotifycredentials.h"
 #include "spotify/spotifyfavoriterequest.h"
 #include "spotify/spotifymetadatarequest.h"
 #include "spotify/spotifyplayback.h"
@@ -30,8 +31,8 @@ void SpotifyService::ReloadSettings() {
   refresh_token_ = settings.Value(SpotifySettings::kRefreshToken);
   expires_in_ = settings.IntValue(SpotifySettings::kExpiresIn);
   login_time_ = settings.Int64Value(SpotifySettings::kLoginTime);
-  client_id_ = settings.Value("clientid");
-  client_secret_ = settings.Value("clientsecret");
+  client_id_ = SpotifyCredentials::EffectiveClientId(settings.Value("clientid"));
+  client_secret_ = SpotifyCredentials::EffectiveClientSecret(settings.Value("clientsecret"));
   logged_in_ = !token_.empty();
 }
 

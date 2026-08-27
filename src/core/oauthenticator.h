@@ -23,7 +23,7 @@ class OAuthenticator {
   };
 
   void AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback,
-                          guint16 preferred_port = 0);
+                          guint16 preferred_port = 0, const std::string &redirect_uri = {});
   static constexpr guint16 kGeniusRedirectPort = 63111;
   static std::string RedirectUriForPort(guint16 port) {
     if (port == kGeniusRedirectPort) {

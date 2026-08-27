@@ -111,7 +111,9 @@ bool OAuthenticator::StartRedirectServer(guint16 preferred_port) {
     StopRedirectServer();
     return false;
   }
-  redirect_uri_ = RedirectUriForPort(port);
+  if (redirect_uri_.empty()) {
+    redirect_uri_ = RedirectUriForPort(port);
+  }
   g_signal_connect(service_, "incoming", G_CALLBACK(+[](GSocketService *, GSocketConnection *connection, GObject *, gpointer data) -> gboolean {
                      auto *self = static_cast<OAuthenticator *>(data);
                      GInputStream *input = g_io_stream_get_input_stream(G_IO_STREAM(connection));
@@ -155,8 +157,9 @@ void OAuthenticator::StopRedirectServer() {
 }
 
 void OAuthenticator::AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback,
-                                        guint16 preferred_port) {
+                                        guint16 preferred_port, const std::string &redirect_uri) {
   callback_ = std::move(callback);
+  redirect_uri_ = redirect_uri;
   if (!StartRedirectServer(preferred_port)) {
     if (callback_) {
       callback_({}, "Could not start redirect server");

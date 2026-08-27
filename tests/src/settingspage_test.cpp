@@ -20,7 +20,9 @@
 #include "constants/transcodersettings.h"
 #include "constants/waveformsettings.h"
 #include "core/appearancestyle.h"
+#include "core/oauthenticator.h"
 #include "settings/backendoutputchoices.h"
+#include "spotify/spotifycredentials.h"
 #include "spotify/spotifyplayback.h"
 #include "settings/behaviourstartupchoices.h"
 #include "settings/networkproxylabels.h"
@@ -615,6 +617,18 @@ TEST(StreamingSettingsLabels, SubsonicCopyAndConnectionCheck) {
   EXPECT_STREQ("Authenticate", SpotifySettingsLabels::Authenticate());
   EXPECT_STREQ("spotifyaudiosrc", SpotifySettingsLabels::PluginFeature());
   EXPECT_NE(std::string::npos, std::string(SpotifyPlayback::kOAuthScope).find("streaming"));
+  EXPECT_EQ("e6ccf69497654a758c9015ebc7b1d317", SpotifyCredentials::DefaultClientId());
+  EXPECT_EQ("7fe03189550e417db5ed5317dfefe611", SpotifyCredentials::DefaultClientSecret());
+  EXPECT_EQ("e6ccf69497654a758c9015ebc7b1d317", SpotifyCredentials::EffectiveClientId({}));
+  EXPECT_EQ("custom", SpotifyCredentials::EffectiveClientId("custom"));
+  EXPECT_TRUE(SpotifyCredentials::UsesEmbedded({}));
+  EXPECT_FALSE(SpotifyCredentials::UsesEmbedded("custom"));
+  EXPECT_TRUE(SpotifyCredentials::ShouldOpenBrowser({}));
+  EXPECT_STREQ("https://accounts.spotify.com/authorize", SpotifyCredentials::kAuthorizeUrl);
+  EXPECT_STREQ("https://accounts.spotify.com/api/token", SpotifyCredentials::kTokenUrl);
+  EXPECT_STREQ("http://127.0.0.1:63111", SpotifyCredentials::kRedirectUri);
+  EXPECT_EQ(63111, SpotifyCredentials::kRedirectPort);
+  EXPECT_NE(std::string(SpotifyCredentials::kRedirectUri), OAuthenticator::RedirectUriForPort(OAuthenticator::kGeniusRedirectPort));
   EXPECT_NE(std::string::npos, SpotifySettingsLabels::PluginWarningMarkup().find(SpotifySettingsLabels::PluginWikiUrl()));
   EXPECT_STREQ("Radios", RadioSettingsLabels::PageTitle());
   EXPECT_STREQ("Stream quality:", RadioSettingsLabels::StreamQuality());
