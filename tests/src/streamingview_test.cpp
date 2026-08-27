@@ -2,6 +2,7 @@
 #include "collection/collectiontree.h"
 #include "streaming/streamingabort.h"
 #include "streaming/streamingalbum.h"
+#include "streaming/streamingcollectionactions.h"
 #include "streaming/streamingcollectionlabels.h"
 #include "streaming/streamingcollectionstore.h"
 #include "streaming/streamingcollectiontree.h"
@@ -675,6 +676,25 @@ TEST(StreamingCollectionTree, CollapsedHidesSongsUntilExpanded) {
   EXPECT_FALSE(StreamingCollectionTree::RepresentativeSong(model.root()).title().empty());
   EXPECT_EQ("2 items", StreamingCollectionTree::StatusText(2));
   EXPECT_EQ("1 item", StreamingCollectionTree::StatusText(1));
+}
+
+TEST(StreamingCollectionActions, PlaylistActionsRequireSelection) {
+  EXPECT_FALSE(StreamingCollectionActions::ShouldShowContextMenu(false));
+  EXPECT_TRUE(StreamingCollectionActions::ShouldShowContextMenu(true));
+  EXPECT_FALSE(StreamingCollectionActions::SelectionActionsEnabled(0));
+  EXPECT_TRUE(StreamingCollectionActions::SelectionActionsEnabled(1));
+  EXPECT_FALSE(StreamingCollectionActions::LoadEnabled(0));
+  EXPECT_TRUE(StreamingCollectionActions::AppendEnabled(2));
+  EXPECT_FALSE(StreamingCollectionActions::OpenInNewEnabled(0));
+  EXPECT_FALSE(StreamingCollectionActions::EnqueueEnabled(0));
+  EXPECT_TRUE(StreamingCollectionActions::EnqueueEnabled(1));
+  EXPECT_TRUE(StreamingCollectionActions::EnqueueNextEnabled(0));
+  EXPECT_TRUE(StreamingCollectionActions::EnqueueNextEnabled(3));
+  EXPECT_FALSE(StreamingCollectionActions::RemoveFromFavoritesEnabled(0));
+  EXPECT_TRUE(StreamingCollectionActions::SearchContextActionsEnabled(1));
+  EXPECT_EQ(1u, StreamingCollectionActions::VisibleItems(0).size());
+  EXPECT_EQ(StreamingCollectionActions::Action::EnqueueNext, StreamingCollectionActions::VisibleItems(0).front().id);
+  EXPECT_EQ(StreamingCollectionActions::Items().size(), StreamingCollectionActions::VisibleItems(2).size());
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {

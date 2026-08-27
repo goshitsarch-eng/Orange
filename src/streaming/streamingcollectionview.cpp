@@ -8,6 +8,7 @@
 #include "collection/collectiontree.h"
 #include "collection/groupbydialog.h"
 #include "dialogs/dialoghelpers.h"
+#include "streaming/streamingcollectionactions.h"
 #include "streaming/streamingcollectionlabels.h"
 #include "streaming/streamingcollectiontree.h"
 #include "streaming/streamingcover.h"
@@ -121,13 +122,16 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   GtkGesture *menu = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(menu));
-  g_signal_connect(menu, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble, gpointer data) {
+  g_signal_connect(menu, "pressed",
+                   G_CALLBACK((+[](GtkGestureClick *click, gint, gdouble, gdouble y, gpointer data) {
                      auto *self = static_cast<StreamingCollectionView *>(data);
-                     if (self->menu_) {
+                     GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(self->list_), static_cast<int>(y));
+                     const bool empty = row && GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "empty-streaming"));
+                     if (self->menu_ && StreamingCollectionActions::ShouldShowContextMenu(row && !empty)) {
                        self->menu_(self->SelectedSongs());
                      }
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
-                   }),
+                   })),
                    this);
   gtk_box_append(GTK_BOX(widget_), header);
   gtk_box_append(GTK_BOX(widget_), filter_entry_);

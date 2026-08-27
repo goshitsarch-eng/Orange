@@ -68,6 +68,7 @@
 #include "constants/collectionsettings.h"
 #include "constants/playlistsettings.h"
 #include "dialogs/deletefilespolicy.h"
+#include "streaming/streamingcollectionactions.h"
 #include "streaming/streamingfavoriteaction.h"
 #include "streaming/streamingsearchopts.h"
 #include "constants/scrobblersettings.h"
@@ -640,6 +641,10 @@ void MainWindow::BuildUi() {
   add_action("streaming-enqueue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                self->ApplyCollectionPlan(CollectionBehaviour::Enqueue(), self->streaming_menu_songs_);
+             }));
+  add_action("streaming-enqueue-next", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->ApplyCollectionPlan(CollectionBehaviour::EnqueueNext(), self->streaming_menu_songs_);
              }));
   add_action("streaming-favorite", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                static_cast<MainWindow *>(data)->StreamingFavorite(true);
@@ -3071,25 +3076,26 @@ void MainWindow::ShowCollectionMenu() {
 
 void MainWindow::ShowStreamingMenu(const SongList &songs) {
   streaming_menu_songs_ = songs;
-  if (streaming_menu_songs_.empty()) {
-    return;
-  }
+  const int songs_selected = static_cast<int>(streaming_menu_songs_.size());
   GMenu *menu = g_menu_new();
-  g_menu_append(menu, Translations::Tr("Append to current playlist").c_str(), "win.streaming-append");
-  g_menu_append(menu, Translations::Tr("Replace current playlist").c_str(), "win.streaming-replace");
-  g_menu_append(menu, Translations::Tr("Open in new playlist").c_str(), "win.streaming-new");
-  g_menu_append(menu, Translations::Tr("Queue track").c_str(), "win.streaming-enqueue");
-  g_menu_append(menu, Translations::Tr("Add to favorites").c_str(), "win.streaming-favorite");
-  g_menu_append(menu, Translations::Tr("Remove from favorites").c_str(), "win.streaming-unfavorite");
-  g_menu_append(menu, Translations::Tr(StreamingSearchOpts::SearchForThisLabel()).c_str(), "win.streaming-search");
-  for (StreamingCollectionStore::List list : StreamingCollectionStore::AddableLists(streaming_service_name_)) {
-    const char *action = "win.streaming-add-songs";
-    if (list == StreamingCollectionStore::List::Artists) {
-      action = "win.streaming-add-artists";
-    } else if (list == StreamingCollectionStore::List::Albums) {
-      action = "win.streaming-add-albums";
+  for (const StreamingCollectionActions::Item &item : StreamingCollectionActions::VisibleItems(songs_selected)) {
+    g_menu_append(menu, Translations::Tr(item.label).c_str(), item.action);
+  }
+  if (StreamingCollectionActions::SearchContextActionsEnabled(songs_selected)) {
+    g_menu_append(menu, Translations::Tr(StreamingSearchOpts::SearchForThisLabel()).c_str(), "win.streaming-search");
+    for (StreamingCollectionStore::List list : StreamingCollectionStore::AddableLists(streaming_service_name_)) {
+      const char *action = "win.streaming-add-songs";
+      if (list == StreamingCollectionStore::List::Artists) {
+        action = "win.streaming-add-artists";
+      } else if (list == StreamingCollectionStore::List::Albums) {
+        action = "win.streaming-add-albums";
+      }
+      g_menu_append(menu, Translations::Tr(StreamingCollectionStore::AddLabel(list)).c_str(), action);
     }
-    g_menu_append(menu, Translations::Tr(StreamingCollectionStore::AddLabel(list)).c_str(), action);
+  }
+  if (g_menu_model_get_n_items(G_MENU_MODEL(menu)) == 0) {
+    g_object_unref(menu);
+    return;
   }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   GtkWidget *parent = streaming_stack_ ? streaming_stack_ : GTK_WIDGET(window_);
