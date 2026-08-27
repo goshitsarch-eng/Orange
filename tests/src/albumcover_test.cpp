@@ -1,5 +1,6 @@
 #include "collection/collectionalbumart.h"
 #include "playlist/playlistcoverpersist.h"
+#include "covermanager/coveractionenable.h"
 #include "covermanager/coverchoicemenu.h"
 #include "covermanager/covermanageractivate.h"
 #include "covermanager/covermanageractions.h"
@@ -541,6 +542,39 @@ TEST(CoverChoiceMenu, ItemsAndWhenToShow) {
   EXPECT_FALSE(CoverChoiceMenu::IsSearchAutomatically("search"));
   EXPECT_EQ(10, CoverChoiceMenu::ItemCountWithAutoSearch());
   EXPECT_EQ(9, CoverChoiceMenu::ItemCount());
+}
+
+TEST(CoverActionEnable, GatesPlayingMenuLikeQt) {
+  Song stream(Song::Source::Tidal);
+  stream.set_valid(true);
+  stream.set_title("Roads");
+  stream.set_album("Dummy");
+  stream.set_albumartist("Portishead");
+  stream.set_art_automatic("https://i/l.jpg");
+  EXPECT_FALSE(CoverActionEnable::CanChangeArt(stream));
+  EXPECT_TRUE(CoverActionEnable::HasValidArt(stream));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Show, stream));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Save, stream));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::File, stream));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Search, stream, true));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Unset, stream));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Delete, stream));
+
+  Song collection(Song::Source::Collection);
+  collection.set_valid(true);
+  collection.set_album("Dummy");
+  collection.set_albumartist("Portishead");
+  collection.set_art_manual("file:///cover.jpg");
+  EXPECT_TRUE(CoverActionEnable::CanChangeArt(collection));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::File, collection));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Search, collection, true));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Search, collection, false));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Unset, collection));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Clear, collection));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Delete, collection));
+  collection.set_art_manual({});
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Clear, collection));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Show, collection));
 }
 
 TEST(CoverManagerMenu, UsesCoverChoiceAndPlaylist) {

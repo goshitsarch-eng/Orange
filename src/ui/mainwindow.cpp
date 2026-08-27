@@ -1879,6 +1879,9 @@ void MainWindow::BuildPlayerBar() {
     Song song = app_->player()->current_song();
     cover_controller_->Perform(action, GTK_WINDOW(window_), &song, playing_widget_->cover());
   });
+  if (app_->cover_providers()) {
+    playing_widget_->SetHasCoverProviders(!app_->cover_providers()->All().empty());
+  }
   playing_widget_->SetDropCallback([this](const std::vector<unsigned char> &data) {
     const Song song = app_->player()->current_song();
     CoverProviders::SaveAlbumCover(song, std::string(data.begin(), data.end()), app_->tagreader());
@@ -2836,6 +2839,9 @@ void MainWindow::OpenSettings(const char *page_name) {
     app_->network()->ReloadSettings();
     app_->osd()->ReloadSettings();
     app_->cover_providers()->ReloadSettings();
+    if (playing_widget_ && app_->cover_providers()) {
+      playing_widget_->SetHasCoverProviders(!app_->cover_providers()->All().empty());
+    }
     app_->lyrics_providers()->ReloadSettings();
     ApplyAppearance();
     if (context_view_) {

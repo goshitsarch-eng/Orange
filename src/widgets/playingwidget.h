@@ -47,6 +47,7 @@ class PlayingWidget {
   void SetFitCoverWidth(bool fit);
   void SetDropCallback(DropCallback callback);
   void SetCoverActionCallback(CoverActionCallback callback);
+  void SetHasCoverProviders(bool has_providers) { has_cover_providers_ = has_providers; }
   void SetSearchAutoChangedCallback(SearchAutoChangedCallback callback) { search_auto_changed_ = std::move(callback); }
   void Playing();
   void Stopped();
@@ -162,6 +163,7 @@ class PlayingWidget {
   DropCallback drop_;
   CoverActionCallback cover_action_;
   SearchAutoChangedCallback search_auto_changed_;
+  bool has_cover_providers_ = true;
   bool enabled_ = true;
   bool playing_ = false;
   bool active_ = false;

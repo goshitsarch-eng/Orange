@@ -3,6 +3,7 @@
 #include "constants/playingwidgetsettings.h"
 #include "context/contextcover.h"
 #include "core/settings.h"
+#include "covermanager/coveractionenable.h"
 #include "covermanager/coverchoicemenu.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
@@ -437,6 +438,7 @@ void PlayingWidget::ShowMenu(double x, double y) {
     GSimpleActionGroup *cover_group = g_simple_action_group_new();
     for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
       GSimpleAction *action = g_simple_action_new(item.id, nullptr);
+      g_simple_action_set_enabled(action, CoverActionEnable::Enabled(item.action, song_, has_cover_providers_) ? TRUE : FALSE);
       g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer data) {
                          auto *self = static_cast<PlayingWidget *>(data);
                          if (self->cover_action_) {

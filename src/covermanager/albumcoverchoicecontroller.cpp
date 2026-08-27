@@ -1,6 +1,7 @@
 #include "covermanager/albumcoverchoicecontroller.h"
 
 #include "collection/collectionalbumart.h"
+#include "covermanager/coveractionenable.h"
 #include "covermanager/covererrormessage.h"
 #include "dialogs/uierror.h"
 
@@ -328,6 +329,7 @@ void AlbumCoverChoiceController::PopupAttachedMenu(GtkWidget *widget, GtkWindow 
     return;
   }
   auto *owned = new Song(song);
+  const bool has_providers = app_ && app_->cover_providers() && !app_->cover_providers()->All().empty();
   GMenu *menu = g_menu_new();
   for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
     g_menu_append(menu, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
@@ -338,6 +340,7 @@ void AlbumCoverChoiceController::PopupAttachedMenu(GtkWidget *widget, GtkWindow 
   GSimpleActionGroup *group = g_simple_action_group_new();
   auto add = [&](const char *name) {
     GSimpleAction *action = g_simple_action_new(name, nullptr);
+    g_simple_action_set_enabled(action, CoverActionEnable::Enabled(CoverChoiceMenu::FromId(name), song, has_providers) ? TRUE : FALSE);
     g_object_set_data(G_OBJECT(action), "song", owned);
     g_object_set_data(G_OBJECT(action), "parent", parent);
     g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer controller) {
