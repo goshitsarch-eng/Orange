@@ -33,13 +33,19 @@ class DiscordRichPresence {
 
   bool EnsureConnected();
   void Disconnect();
+  void ScheduleReconnect();
+  void CancelReconnect();
+  void OnReconnectTimer();
   bool SendFrame(Opcode opcode, const std::string &payload);
 
   bool enabled_ = false;
+  bool shutting_down_ = false;
   int status_display_type_ = 0;
   unsigned nonce_ = 1;
   gint64 start_timestamp_ = 0;
   GSocketConnection *connection_ = nullptr;
+  guint reconnect_timer_ = 0;
+  int reconnect_delay_ = 500;
 };
 
 #endif

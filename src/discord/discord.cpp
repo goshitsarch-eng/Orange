@@ -4,6 +4,7 @@
 #include "discord/discordart.h"
 #include "discord/discordcover.h"
 #include "discord/discordlifecycle.h"
+#include "discord/discordreconnect.h"
 #include "core/logging.h"
 #include "core/settings.h"
 
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <ctime>
 #include <unistd.h>
+#include <vector>
 
 namespace {
 
@@ -27,7 +29,11 @@ std::string PadArtist(const std::string &artist) {
 
 DiscordRichPresence::DiscordRichPresence() = default;
 
-DiscordRichPresence::~DiscordRichPresence() { Disconnect(); }
+DiscordRichPresence::~DiscordRichPresence() {
+  shutting_down_ = true;
+  CancelReconnect();
+  Disconnect();
+}
 
 void DiscordRichPresence::ReloadSettings() {
   Settings settings;
@@ -36,8 +42,11 @@ void DiscordRichPresence::ReloadSettings() {
   status_display_type_ = settings.IntValue(DiscordRPCSettings::kStatusDisplayType,
                                            static_cast<int>(DiscordRPCSettings::kDefaultStatusDisplayType));
   if (!enabled_) {
+    CancelReconnect();
     Disconnect();
+    return;
   }
+  shutting_down_ = false;
 }
 
 std::string DiscordRichPresence::JsonEscape(const std::string &value) {
@@ -113,22 +122,18 @@ std::string DiscordRichPresence::ClearActivityJson(int pid, unsigned nonce) {
 }
 
 std::string DiscordRichPresence::SocketPath(int index) {
-  const char *runtime = g_getenv("XDG_RUNTIME_DIR");
-  if (!runtime || !*runtime) {
-    runtime = g_getenv("TMPDIR");
+  const std::vector<std::string> dirs = DiscordReconnect::TempDirs();
+  if (dirs.empty()) {
+    return DiscordReconnect::SocketPath("/tmp", index);
   }
-  if (!runtime || !*runtime) {
-    runtime = "/tmp";
-  }
-  return std::string(runtime) + "/discord-ipc-" + std::to_string(index);
+  return DiscordReconnect::SocketPath(dirs.front(), index);
 }
 
 bool DiscordRichPresence::EnsureConnected() {
   if (connection_) {
     return true;
   }
-  for (int i = 0; i < 10; ++i) {
-    const std::string path = SocketPath(i);
+  for (const std::string &path : DiscordReconnect::SocketPaths()) {
     GError *error = nullptr;
     GSocketAddress *address = g_unix_socket_address_new(path.c_str());
     GSocketClient *client = g_socket_client_new();
@@ -146,6 +151,8 @@ bool DiscordRichPresence::EnsureConnected() {
       Disconnect();
       continue;
     }
+    reconnect_delay_ = DiscordReconnect::kMinDelayMs;
+    CancelReconnect();
     LogDebug("Discord IPC connected at %s", path.c_str());
     return true;
   }
@@ -158,6 +165,35 @@ void DiscordRichPresence::Disconnect() {
     g_object_unref(connection_);
     connection_ = nullptr;
   }
+}
+
+void DiscordRichPresence::CancelReconnect() {
+  if (reconnect_timer_) {
+    g_source_remove(reconnect_timer_);
+    reconnect_timer_ = 0;
+  }
+}
+
+void DiscordRichPresence::ScheduleReconnect() {
+  if (!DiscordReconnect::ShouldSchedule(enabled_, shutting_down_, reconnect_timer_ != 0)) {
+    return;
+  }
+  reconnect_timer_ = g_timeout_add(static_cast<guint>(reconnect_delay_), +[](gpointer data) -> gboolean {
+    static_cast<DiscordRichPresence *>(data)->OnReconnectTimer();
+    return G_SOURCE_REMOVE;
+  }, this);
+  reconnect_delay_ = DiscordReconnect::NextDelay(reconnect_delay_);
+}
+
+void DiscordRichPresence::OnReconnectTimer() {
+  reconnect_timer_ = 0;
+  if (!enabled_ || shutting_down_) {
+    return;
+  }
+  if (EnsureConnected()) {
+    return;
+  }
+  ScheduleReconnect();
 }
 
 bool DiscordRichPresence::SendFrame(Opcode opcode, const std::string &payload) {
@@ -174,6 +210,7 @@ bool DiscordRichPresence::SendFrame(Opcode opcode, const std::string &payload) {
       g_error_free(error);
     }
     Disconnect();
+    ScheduleReconnect();
     return false;
   }
   return true;
@@ -188,6 +225,7 @@ void DiscordRichPresence::UpdatePresence(const Song &song, bool playing) {
     return;
   }
   if (!EnsureConnected()) {
+    ScheduleReconnect();
     return;
   }
   if (start_timestamp_ <= 0) {

@@ -2,10 +2,13 @@
 #include "discord/discordart.h"
 #include "discord/discordcover.h"
 #include "discord/discordlifecycle.h"
+#include "discord/discordreconnect.h"
 #include "core/song.h"
 
 #include <cstdio>
+#include <string>
 #include <unistd.h>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -100,6 +103,40 @@ TEST(DiscordRichPresence, SetActivityJsonUsesResolvedArtKey) {
   song.set_title("Roads");
   const std::string json = DiscordRichPresence::SetActivityJson(song, false, 0, 0, 1, 1, "data:image/png;base64,TWFu");
   EXPECT_NE(std::string::npos, json.find("\"large_image\":\"data:image/png;base64,TWFu\""));
+}
+
+TEST(DiscordReconnect, BackoffAndScheduleMatchQt) {
+  EXPECT_EQ(500, DiscordReconnect::kMinDelayMs);
+  EXPECT_EQ(60000, DiscordReconnect::kMaxDelayMs);
+  EXPECT_EQ(10, DiscordReconnect::kSocketCount);
+  EXPECT_EQ(1000, DiscordReconnect::NextDelay(500));
+  EXPECT_EQ(2000, DiscordReconnect::NextDelay(1000));
+  EXPECT_EQ(60000, DiscordReconnect::NextDelay(30000));
+  EXPECT_EQ(60000, DiscordReconnect::NextDelay(60000));
+  EXPECT_EQ(60000, DiscordReconnect::NextDelay(40000));
+  EXPECT_TRUE(DiscordReconnect::ShouldSchedule(true, false, false));
+  EXPECT_FALSE(DiscordReconnect::ShouldSchedule(false, false, false));
+  EXPECT_FALSE(DiscordReconnect::ShouldSchedule(true, true, false));
+  EXPECT_FALSE(DiscordReconnect::ShouldSchedule(true, false, true));
+}
+
+TEST(DiscordReconnect, SocketPathsIncludeAllTempDirs) {
+  const std::vector<std::string> paths = DiscordReconnect::SocketPaths();
+  EXPECT_GE(paths.size(), 10u);
+  EXPECT_EQ(0u, paths.size() % 10u);
+  bool found_zero = false;
+  bool found_tmp9 = false;
+  for (const std::string &path : paths) {
+    if (path.find("discord-ipc-0") != std::string::npos) {
+      found_zero = true;
+    }
+    if (path == "/tmp/discord-ipc-9") {
+      found_tmp9 = true;
+    }
+  }
+  EXPECT_TRUE(found_zero);
+  EXPECT_TRUE(found_tmp9);
+  EXPECT_EQ(DiscordReconnect::SocketPath(DiscordReconnect::TempDirs().front(), 0), DiscordRichPresence::SocketPath(0));
 }
 
 TEST(DiscordRichPresence, DisabledDoesNotConnect) {
