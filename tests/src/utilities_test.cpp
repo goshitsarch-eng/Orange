@@ -122,6 +122,7 @@
 #include "widgets/fancytabmode.h"
 #include "widgets/playingcoveractivate.h"
 #include "widgets/playingwidget.h"
+#include "widgets/playingwidgettab.h"
 #include "widgets/stretchheaderview.h"
 
 #include <algorithm>
@@ -306,6 +307,21 @@ TEST(OrganizeFormat, OptionalBlocks) {
   without.set_title("Title");
   EXPECT_EQ("Artist/Album/Title", format.GetFilenameForSong(without));
   EXPECT_FALSE(OrganizeFormat::TokenHasValue("%disc", without));
+}
+
+TEST(PlayingWidgetTab, HidesOnContextAlbumLikeQt) {
+  EXPECT_STREQ("context", PlayingWidgetTab::ContextTabId());
+  EXPECT_TRUE(PlayingWidgetTab::OnContextTab("context"));
+  EXPECT_FALSE(PlayingWidgetTab::OnContextTab("collection"));
+  EXPECT_FALSE(PlayingWidgetTab::OnContextTab(nullptr));
+  EXPECT_TRUE(PlayingWidgetTab::ShouldEnable(true, true, false, true));
+  EXPECT_TRUE(PlayingWidgetTab::ShouldEnable(true, true, true, false));
+  EXPECT_FALSE(PlayingWidgetTab::ShouldEnable(true, true, true, true));
+  EXPECT_FALSE(PlayingWidgetTab::ShouldEnable(false, true, false, false));
+  EXPECT_FALSE(PlayingWidgetTab::ShouldEnable(true, false, false, false));
+  EXPECT_TRUE(PlayingWidgetTab::ShouldRefreshOnTabChange());
+  EXPECT_TRUE(PlayingWidgetTab::ShouldRefreshOnSidebarToggle());
+  EXPECT_TRUE(PlayingWidgetTab::ShouldRefreshOnAlbumEnabled());
 }
 
 TEST(ContextReload, RefreshesDisplayAfterPreferencesLikeQt) {

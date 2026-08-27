@@ -3,6 +3,7 @@
 
 #include "context/contextalbum.h"
 #include "context/contextoptions.h"
+#include "core/signal.h"
 #include "core/song.h"
 #include "lyrics/lrcparser.h"
 
@@ -43,6 +44,8 @@ class ContextView {
   void SetCollectionTotals(int songs, int artists, int albums);
   void ReloadSettings();
   gboolean OnKeyPressed(guint keyval, GdkModifierType state);
+
+  Signal<> AlbumEnabledChanged;
 
  private:
   void NoSong();

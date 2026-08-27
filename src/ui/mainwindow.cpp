@@ -106,6 +106,7 @@
 #include "widgets/playingcoveractivate.h"
 #include "utilities/seekbaranalysis.h"
 #include "widgets/playingwidget.h"
+#include "widgets/playingwidgettab.h"
 #include "widgets/seekbarmode.h"
 #include "core/playeritemoptions.h"
 #include "widgets/trackslider.h"
@@ -658,6 +659,9 @@ void MainWindow::BuildUi() {
       adw_view_stack_set_visible_child_name(sidebar_stack_, id.c_str());
     }
     PersistTabSettings();
+    if (PlayingWidgetTab::ShouldRefreshOnTabChange()) {
+      UpdatePlayingWidgetVisibility();
+    }
   });
   sidebar_tabs_->SetModeChangedCallback([this](FancyTabMode::Mode) {
     ApplyTabMode();
@@ -665,12 +669,14 @@ void MainWindow::BuildUi() {
   });
   g_signal_connect(sidebar_stack_, "notify::visible-child-name", G_CALLBACK((+[](AdwViewStack *stack, GParamSpec *, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
-                     if (!self->sidebar_tabs_) {
-                       return;
+                     if (self->sidebar_tabs_) {
+                       const char *name = adw_view_stack_get_visible_child_name(stack);
+                       if (name) {
+                         self->sidebar_tabs_->SetActive(name, false);
+                       }
                      }
-                     const char *name = adw_view_stack_get_visible_child_name(stack);
-                     if (name) {
-                       self->sidebar_tabs_->SetActive(name, false);
+                     if (PlayingWidgetTab::ShouldRefreshOnTabChange()) {
+                       self->UpdatePlayingWidgetVisibility();
                      }
                    })),
                    this);
@@ -1659,6 +1665,11 @@ void MainWindow::BuildContext() {
     const Song song = app_->player()->current_song();
     CoverProviders::SaveAlbumCover(song, std::string(data.begin(), data.end()), app_->tagreader());
     context_view_->AlbumCoverLoaded(data);
+  });
+  context_view_->AlbumEnabledChanged.Connect([this]() {
+    if (PlayingWidgetTab::ShouldRefreshOnAlbumEnabled()) {
+      UpdatePlayingWidgetVisibility();
+    }
   });
   context_view_->album_widget()->SetSearchCallback([this]() {
     if (cover_controller_) {
@@ -3498,7 +3509,7 @@ void MainWindow::ApplyBehaviourSettings() {
   Settings settings;
   settings.BeginGroup(BehaviourSettings::kSettingsGroup);
   if (playing_widget_) {
-    playing_widget_->SetEnabled(settings.BoolValue(BehaviourSettings::kPlayingWidget, BehaviourSettings::kDefaultPlayingWidget));
+    UpdatePlayingWidgetVisibility();
   }
   if (app_->tray() && TraySettingsReload::ShouldReloadOnSettingsClose()) {
     const bool show_tray =
@@ -3620,6 +3631,23 @@ void MainWindow::ApplySidebar() {
   settings.BeginGroup(MainWindowSettings::kSettingsGroup);
   const bool show = MainWindowLook::ShowSidebar(settings.BoolValue(MainWindowSettings::kShowSidebar, MainWindowSettings::kDefaultShowSidebar));
   adw_overlay_split_view_set_show_sidebar(ADW_OVERLAY_SPLIT_VIEW(split_view_), show);
+  if (PlayingWidgetTab::ShouldRefreshOnSidebarToggle()) {
+    UpdatePlayingWidgetVisibility();
+  }
+}
+
+void MainWindow::UpdatePlayingWidgetVisibility() {
+  if (!playing_widget_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const bool pref = settings.BoolValue(BehaviourSettings::kPlayingWidget, BehaviourSettings::kDefaultPlayingWidget);
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  const bool sidebar = MainWindowLook::ShowSidebar(settings.BoolValue(MainWindowSettings::kShowSidebar, MainWindowSettings::kDefaultShowSidebar));
+  const char *name = sidebar_stack_ ? adw_view_stack_get_visible_child_name(sidebar_stack_) : "";
+  playing_widget_->SetEnabled(PlayingWidgetTab::ShouldEnable(pref, sidebar, PlayingWidgetTab::OnContextTab(name),
+                                                            context_view_ && context_view_->album_enabled()));
 }
 
 void MainWindow::PopulateSidebarTabs() {

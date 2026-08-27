@@ -216,6 +216,7 @@ class MainWindow : public PlatformInterface {
   void SeekFromBar(double x, int width);
   void SetShowSidebar(bool show);
   void ApplySidebar();
+  void UpdatePlayingWidgetVisibility();
   void ApplyTabMode();
   void PersistTabSettings() const;
   void PopulateSidebarTabs();

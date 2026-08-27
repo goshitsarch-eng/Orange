@@ -453,6 +453,7 @@ void ContextView::PersistVisibility() {
 }
 
 void ContextView::ApplyVisibility() {
+  const bool was_album = show_album_;
   show_album_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_album_btn_));
   show_data_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_data_btn_));
   show_lyrics_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_));
@@ -469,4 +470,7 @@ void ContextView::ApplyVisibility() {
     gtk_widget_set_visible(lyrics_source_, show_lyrics_ && source && source[0] != '\0');
   }
   PersistVisibility();
+  if (was_album != show_album_) {
+    AlbumEnabledChanged.Emit();
+  }
 }
