@@ -3,6 +3,7 @@
 #include "config.h"
 #include "core/logging.h"
 #include "device/devicecopy.h"
+#include "device/gpodcover.h"
 #include "device/gpoddelete.h"
 #include "device/gpodloader.h"
 #include "utilities/fileutils.h"
@@ -58,7 +59,7 @@ bool GPodCopySession::Open(const std::string &mount_path) {
 #endif
 }
 
-bool GPodCopySession::CopyOne(const Song &song, const std::string &playlist) {
+bool GPodCopySession::CopyOne(const Song &song, const std::string &playlist, const std::string &cover_source) {
 #ifdef HAVE_GPOD
   auto *db = static_cast<Itdb_iTunesDB *>(db_);
   auto *mpl = static_cast<Itdb_Playlist *>(mpl_);
@@ -73,6 +74,13 @@ bool GPodCopySession::CopyOne(const Song &song, const std::string &playlist) {
   GPodLoader::SongToTrack(song, track);
   itdb_track_add(db, track, -1);
   itdb_playlist_add_track(mpl, track, -1);
+  if (GPodCover::ShouldSetThumbnails(true, cover_source) && FileUtils::IsFile(cover_source)) {
+    if (itdb_track_set_thumbnails(track, cover_source.c_str())) {
+      track->has_artwork = 1;
+    } else {
+      LogWarning("Failed to set album cover image");
+    }
+  }
   GError *error = nullptr;
   if (!itdb_cp_track_to_ipod(track, src.c_str(), &error)) {
     if (error) {
@@ -96,6 +104,7 @@ bool GPodCopySession::CopyOne(const Song &song, const std::string &playlist) {
 #else
   (void)song;
   (void)playlist;
+  (void)cover_source;
   return false;
 #endif
 }

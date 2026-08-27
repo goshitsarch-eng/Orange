@@ -1,4 +1,5 @@
 #include "config.h"
+#include "device/gpodcover.h"
 #include "device/gpoddelete.h"
 #include "device/gpoddevice.h"
 #include "device/gpodloader.h"
@@ -53,6 +54,12 @@ TEST(GPodLoader, SongFromTrackRoundTrip) {
 
 TEST(GPodLoader, LoadSongsMissingDatabase) {
   EXPECT_TRUE(GPodLoader::LoadSongs("/tmp/not-an-ipod").empty());
+}
+
+TEST(GPodCover, ShouldSetThumbnailsMatchesQt) {
+  EXPECT_FALSE(GPodCover::ShouldSetThumbnails(false, "/tmp/cover.jpg"));
+  EXPECT_FALSE(GPodCover::ShouldSetThumbnails(true, {}));
+  EXPECT_TRUE(GPodCover::ShouldSetThumbnails(true, "/tmp/cover.jpg"));
 }
 
 TEST(GPodDelete, IpodPathFromUrlMatchesQtRemoveTrack) {

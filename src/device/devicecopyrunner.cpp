@@ -10,6 +10,7 @@
 #include "device/gpoddevice.h"
 #include "device/mtpdevice.h"
 #include "organize/organize.h"
+#include "organize/organizecoversource.h"
 #include "organize/organizeformat.h"
 #include "organize/organizetranscode.h"
 #include "transcoder/transcoder.h"
@@ -163,7 +164,11 @@ bool DeviceCopyRunner::CopyOnePrepared(const Song &song) {
 #endif
 #ifdef HAVE_GPOD
   if (device_.backend == "gpod") {
-    return gpod_ && gpod_->CopyOne(song, playlist_);
+    std::string cover;
+    if (albumcover_) {
+      cover = OrganizeCoverSource::ForSong(song, tagreader_, FileUtils::Join(StandardPaths::CacheDir(), "device-cover.bin"));
+    }
+    return gpod_ && gpod_->CopyOne(song, playlist_, cover);
   }
 #endif
 #ifdef HAVE_GIO
