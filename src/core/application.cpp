@@ -11,6 +11,8 @@
 #include "collection/skipcounteligibility.h"
 #include "scrobbler/scrobblereligibility.h"
 #include "scrobbler/scrobblerlifecycle.h"
+#include "tidal/tidalloginurl.h"
+#include "tidal/tidalservice.h"
 #include "utilities/fileutils.h"
 
 Application::Application()
@@ -228,6 +230,12 @@ void Application::Exit() {
 }
 
 void Application::ApplyCommandline(const CommandlineOptions &options) {
+  if (TidalLoginUrl::ConsumesCommandline(options.urls())) {
+    if (auto *tidal = dynamic_cast<TidalService *>(streaming_services_->ServiceByName("Tidal"))) {
+      tidal->AuthorizationUrlReceived(TidalLoginUrl::Find(options.urls()));
+    }
+    return;
+  }
   if (!options.urls().empty()) {
     playlist_manager_->InsertUrls(options.urls());
     if (options.url_list_action() != CommandlineOptions::UrlListAction::None) {

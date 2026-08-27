@@ -31,6 +31,7 @@ class OAuthenticator {
     }
     return "http://127.0.0.1:" + std::to_string(port) + "/callback";
   }
+  void set_redirect_uri(const std::string &redirect_uri) { redirect_uri_ = redirect_uri; }
   void ExchangeCode(const std::string &token_url, const std::string &client_id, const std::string &client_secret, const std::string &code, Callback callback);
   void RefreshAccessToken(const std::string &token_url, const std::string &client_id, const std::string &client_secret,
                           const std::string &refresh_token, Callback callback);

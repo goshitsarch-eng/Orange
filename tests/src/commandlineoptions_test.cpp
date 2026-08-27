@@ -1,5 +1,6 @@
 #include "core/commandlineoptions.h"
 #include "core/commandlinewindow.h"
+#include "tidal/tidalloginurl.h"
 
 #include <gtest/gtest.h>
 
@@ -50,4 +51,32 @@ TEST(CommandlineOptions, ParsesResizeVersionAndLogLevels) {
   EXPECT_TRUE(verbose.debug());
   const CommandlineOptions quiet = parse({"--quiet"});
   EXPECT_EQ("*:1", quiet.log_levels());
+}
+
+TEST(TidalLoginUrl, MatchesQtSchemeAndHost) {
+  EXPECT_TRUE(TidalLoginUrl::IsLogin("tidal://login"));
+  EXPECT_TRUE(TidalLoginUrl::IsLogin("tidal://login/auth"));
+  EXPECT_TRUE(TidalLoginUrl::IsLogin("tidal://login/auth?code=abc&state=x"));
+  EXPECT_TRUE(TidalLoginUrl::IsLogin("TIDAL://login/auth?code=abc"));
+  EXPECT_FALSE(TidalLoginUrl::IsLogin("tidal://track/1"));
+  EXPECT_FALSE(TidalLoginUrl::IsLogin("tidal://1"));
+  EXPECT_FALSE(TidalLoginUrl::IsLogin("https://login.tidal.com/authorize"));
+  EXPECT_FALSE(TidalLoginUrl::IsLogin("file:///tmp/a.flac"));
+}
+
+TEST(TidalLoginUrl, ConsumesCommandlineAndExtractsCode) {
+  EXPECT_TRUE(TidalLoginUrl::ConsumesCommandline({"file:///a.flac", "tidal://login/auth?code=xyz"}));
+  EXPECT_FALSE(TidalLoginUrl::ConsumesCommandline({"tidal://99", "file:///a.flac"}));
+  EXPECT_EQ("tidal://login/auth?code=xyz", TidalLoginUrl::Find({"tidal://1", "tidal://login/auth?code=xyz"}));
+  EXPECT_TRUE(TidalLoginUrl::Find({"tidal://99"}).empty());
+  EXPECT_EQ("xyz", TidalLoginUrl::AuthorizationCode("tidal://login/auth?code=xyz&state=s"));
+  EXPECT_EQ("a b", TidalLoginUrl::AuthorizationCode("tidal://login/auth?code=a%20b"));
+  EXPECT_TRUE(TidalLoginUrl::AuthorizationCode("tidal://login/auth").empty());
+  EXPECT_STREQ("tidal://login/auth", TidalLoginUrl::kRedirectUri);
+  const std::string request = TidalLoginUrl::AuthorizationRequestUrl("client-id");
+  EXPECT_NE(std::string::npos, request.find("https://login.tidal.com/authorize"));
+  EXPECT_NE(std::string::npos, request.find("client_id=client-id"));
+  EXPECT_NE(std::string::npos, request.find("redirect_uri="));
+  EXPECT_NE(std::string::npos, request.find("tidal"));
+  EXPECT_NE(std::string::npos, request.find("login"));
 }

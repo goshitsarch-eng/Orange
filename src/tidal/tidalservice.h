@@ -31,6 +31,8 @@ class TidalService : public StreamingService {
   void GetAlbumSongs(const Song &album, SearchCallback callback) override;
   void Login(const std::string &username, const std::string &password_or_token) override;
   void Logout() override;
+  void StartAuthorization(const std::string &client_id);
+  void AuthorizationUrlReceived(const std::string &url);
   void StoreTokens(const OAuthenticator::TokenResponse &tokens);
   void ReloadSettings() override;
   LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;

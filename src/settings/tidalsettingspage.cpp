@@ -2,7 +2,6 @@
 
 #include "constants/tidalsettings.h"
 #include "core/application.h"
-#include "core/oauthenticator.h"
 #include "dialogs/messagedialog.h"
 #include "settings/settingspage.h"
 #include "settings/streaminglogincontrols.h"
@@ -31,32 +30,9 @@ AdwPreferencesPage *TidalSettingsPage::Create(Settings *settings, Application *a
         return;
       }
       gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabled(true));
-      auto *oauth = new OAuthenticator(app->network());
-      oauth->AuthorizeInBrowser("https://login.tidal.com/authorize", client_id, "r_usr r_res w_usr",
-                                [app, oauth, button](const std::string &code, const std::string &error) {
-                                  if (!code.empty()) {
-                                    Settings ts;
-                                    ts.BeginGroup(TidalSettings::kSettingsGroup);
-                                    oauth->ExchangeCode("https://auth.tidal.com/v1/oauth2/token", ts.Value(TidalSettings::kClientId),
-                                                        ts.Value("clientsecret"), code,
-                                                        [app, oauth, button](const std::string &body, const std::string &) {
-                                                          const auto tokens = OAuthenticator::ParseTokenResponse(body);
-                                                          if (auto *service = dynamic_cast<TidalService *>(app->streaming_services()->ServiceByName("Tidal"))) {
-                                                            if (!tokens.access_token.empty()) {
-                                                              service->StoreTokens(tokens);
-                                                            } else {
-                                                              service->Login({}, body);
-                                                            }
-                                                          }
-                                                          gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabledAfterAuth());
-                                                          delete oauth;
-                                                        });
-                                  } else {
-                                    (void)error;
-                                    gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabledAfterAuth());
-                                    delete oauth;
-                                  }
-                                });
+      if (auto *service = dynamic_cast<TidalService *>(app->streaming_services()->ServiceByName("Tidal"))) {
+        service->StartAuthorization(client_id);
+      }
     });
     SettingsPage::BindLoginProgress(GTK_WIDGET(g_object_get_data(G_OBJECT(login_row), "action-button")),
                                     app->streaming_services()->ServiceByName("Tidal"), GTK_WIDGET(page));

@@ -8,10 +8,13 @@
 #include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchopts.h"
 #include "tidal/tidalfavoriterequest.h"
+#include "tidal/tidalloginurl.h"
 #include "tidal/tidalrequest.h"
 #include "tidal/tidalstreamurlrequest.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
+
+#include <gio/gio.h>
 
 #include <cstdlib>
 #include <ctime>
@@ -89,6 +92,42 @@ void TidalService::Login(const std::string &username, const std::string &passwor
   settings.Sync();
   ReloadSettings();
   NotifyAuthenticationChanged();
+}
+
+void TidalService::StartAuthorization(const std::string &client_id) {
+  if (!client_id.empty()) {
+    client_id_ = client_id;
+  }
+  const std::string url = TidalLoginUrl::AuthorizationRequestUrl(client_id_);
+  g_app_info_launch_default_for_uri(url.c_str(), nullptr, nullptr);
+}
+
+void TidalService::AuthorizationUrlReceived(const std::string &url) {
+  const std::string code = TidalLoginUrl::AuthorizationCode(url);
+  if (code.empty()) {
+    NotifyAuthenticationFailed("No authorization code");
+    return;
+  }
+  if (!network_) {
+    NotifyAuthenticationFailed("No network");
+    return;
+  }
+  auto *oauth = new OAuthenticator(network_);
+  oauth->set_redirect_uri(TidalLoginUrl::kRedirectUri);
+  oauth->ExchangeCode(TidalLoginUrl::kAccessTokenUrl, client_id_, client_secret_, code,
+                      [this, oauth](const std::string &body, const std::string &error) {
+                        delete oauth;
+                        if (!error.empty()) {
+                          NotifyAuthenticationFailed(error);
+                          return;
+                        }
+                        const OAuthenticator::TokenResponse tokens = OAuthenticator::ParseTokenResponse(body);
+                        if (tokens.access_token.empty()) {
+                          NotifyAuthenticationFailed("Authentication reply from server is missing access token.");
+                          return;
+                        }
+                        StoreTokens(tokens);
+                      });
 }
 
 void TidalService::EnsureFreshToken(std::function<void()> next) {

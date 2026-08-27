@@ -278,6 +278,17 @@ TEST(SubsonicUrlHandler, BuildsStreamUrlFromPath) {
   EXPECT_NE(std::string::npos, url.find("p=enc:"));
 }
 
+TEST(TidalService, AuthorizationUrlReceivedEmptyCodeFails) {
+  TidalService tidal(nullptr);
+  std::string error;
+  tidal.AuthenticationFailed.Connect([&error](const std::string &text) { error = text; });
+  tidal.AuthorizationUrlReceived("tidal://login/auth");
+  EXPECT_EQ("No authorization code", error);
+  error.clear();
+  tidal.AuthorizationUrlReceived("tidal://login/auth?code=abc");
+  EXPECT_EQ("No network", error);
+}
+
 TEST(StreamingUrlHandlers, SchemesMatchServices) {
   TidalService tidal(nullptr);
   TidalUrlHandler tidal_handler(&tidal);
