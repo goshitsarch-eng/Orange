@@ -122,6 +122,22 @@ void Settings::Remove(const std::string &key) {
   g_key_file_remove_key(key_file_, group_.c_str(), key.c_str(), nullptr);
 }
 
+std::vector<std::string> Settings::Keys() const {
+  std::vector<std::string> keys;
+  gsize length = 0;
+  gchar **names = g_key_file_get_keys(key_file_, group_.c_str(), &length, nullptr);
+  if (!names) {
+    return keys;
+  }
+  for (gsize i = 0; i < length; ++i) {
+    if (names[i]) {
+      keys.emplace_back(names[i]);
+    }
+  }
+  g_strfreev(names);
+  return keys;
+}
+
 bool Settings::Sync() {
   GError *error = nullptr;
   if (!g_key_file_save_to_file(key_file_, path_.c_str(), &error)) {

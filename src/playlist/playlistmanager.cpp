@@ -342,6 +342,31 @@ void PlaylistManager::InsertSongs(int id, const SongList &songs, int pos) {
   Persist(found);
 }
 
+void PlaylistManager::MoveRowsBetween(int source_id, int dest_id, const std::vector<int> &rows, int dest_pos) {
+  Playlist *source = FindById(source_id);
+  Playlist *dest = FindById(dest_id);
+  if (!source || !dest || source == dest || rows.empty()) {
+    return;
+  }
+  SongList songs;
+  for (int row : rows) {
+    if (row >= 0 && row < source->row_count()) {
+      songs.push_back(source->song(row));
+    }
+  }
+  if (songs.empty()) {
+    return;
+  }
+  if (dest_pos < 0) {
+    dest->AppendSongs(songs);
+  } else {
+    dest->InsertSongs(dest_pos, songs);
+  }
+  source->RemoveRows(rows);
+  Persist(dest);
+  Persist(source);
+}
+
 void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row) {
   Playlist *playlist = Visible();
   if (!playlist) {

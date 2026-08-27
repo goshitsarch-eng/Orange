@@ -17,7 +17,10 @@
 #include "subsonic/subsonicsettingsactions.h"
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
+#include "collection/collectioncuescan.h"
+#include "collection/collectionrescanreason.h"
 #include "collection/collectionwatcher.h"
+#include "core/songuserdatamerge.h"
 #include "collection/collectiondirectorymodel.h"
 #include "collection/collectionfilter.h"
 #include "collection/collectionfilteroptions.h"
@@ -452,6 +455,66 @@ TEST(CollectionWatcher, NeedsRescanUsesMtimeAndUnavailable) {
   EXPECT_TRUE(CollectionWatcher::NeedsRescan(existing, 100, 50));
   Song missing;
   EXPECT_TRUE(CollectionWatcher::NeedsRescan(missing, 100, 50));
+}
+
+TEST(CollectionRescanReason, ForcesRescanWhenFingerprintOrLoudnessMissing) {
+  Song song;
+  song.set_valid(true);
+  song.set_mtime(100);
+  song.set_filesize(50);
+  EXPECT_FALSE(CollectionRescanReason::NeedsAnalysisRescan(song, false, false));
+  EXPECT_TRUE(CollectionRescanReason::MissingFingerprint(song, true));
+  EXPECT_TRUE(CollectionRescanReason::NeedsAnalysisRescan(song, true, false));
+  song.set_fingerprint("abc");
+  EXPECT_FALSE(CollectionRescanReason::NeedsAnalysisRescan(song, true, false));
+  EXPECT_TRUE(CollectionRescanReason::MissingLoudness(song, true));
+  EXPECT_TRUE(CollectionRescanReason::NeedsAnalysisRescan(song, false, true));
+  song.set_ebur128_integrated_loudness_lufs(-12.0);
+  EXPECT_TRUE(CollectionRescanReason::NeedsAnalysisRescan(song, false, true));
+  song.set_ebur128_loudness_range_lu(6.0);
+  EXPECT_FALSE(CollectionRescanReason::NeedsAnalysisRescan(song, true, true));
+  EXPECT_TRUE(CollectionWatcher::NeedsRescan(song, 100, 50, true, true, CollectionCueScan::Change::None));
+  EXPECT_TRUE(CollectionWatcher::NeedsRescan(song, 100, 50, false, false, CollectionCueScan::Change::Added));
+}
+
+TEST(CollectionCueScan, DetectsAddChangeDeleteAndEffectiveMtime) {
+  EXPECT_EQ(CollectionCueScan::Change::Added, CollectionCueScan::DetectCueChange(false, {}, "/tmp/album.cue", 10));
+  EXPECT_EQ(CollectionCueScan::Change::Changed, CollectionCueScan::DetectCueChange(true, "/tmp/old.cue", "/tmp/new.cue", 10));
+  EXPECT_EQ(CollectionCueScan::Change::Deleted, CollectionCueScan::DetectCueChange(true, "/tmp/old.cue", {}, 0));
+  EXPECT_EQ(CollectionCueScan::Change::None, CollectionCueScan::DetectCueChange(true, "/tmp/album.cue", "/tmp/album.cue", 10));
+  EXPECT_TRUE(CollectionCueScan::CueForcesRescan(CollectionCueScan::Change::Added));
+  EXPECT_FALSE(CollectionCueScan::CueForcesRescan(CollectionCueScan::Change::None));
+  EXPECT_EQ(200, CollectionCueScan::EffectiveMtime(100, 200));
+  EXPECT_EQ(150, CollectionCueScan::EffectiveMtime(150, 0));
+}
+
+TEST(SongUserDataMerge, PreservesPlaycountRatingSkipAndArtUnlessOverwrite) {
+  Song incoming;
+  incoming.set_playcount(0);
+  incoming.set_rating(-1.0f);
+  incoming.set_skipcount(0);
+  incoming.set_lastplayed(-1);
+  Song existing;
+  existing.set_playcount(9);
+  existing.set_rating(0.8f);
+  existing.set_skipcount(3);
+  existing.set_lastplayed(123);
+  existing.set_art_manual("file:///cover.jpg");
+  existing.set_art_unset(false);
+  SongUserDataMerge::Merge(&incoming, existing, true, true);
+  EXPECT_EQ(9u, incoming.playcount());
+  EXPECT_NEAR(0.8f, incoming.rating(), 0.001f);
+  EXPECT_EQ(3u, incoming.skipcount());
+  EXPECT_EQ(123, incoming.lastplayed());
+  EXPECT_EQ("file:///cover.jpg", incoming.art_manual());
+
+  Song overwrite;
+  overwrite.set_playcount(1);
+  overwrite.set_rating(0.2f);
+  SongUserDataMerge::Merge(&overwrite, existing, false, false);
+  EXPECT_EQ(1u, overwrite.playcount());
+  EXPECT_NEAR(0.2f, overwrite.rating(), 0.001f);
+  EXPECT_EQ(3u, overwrite.skipcount());
 }
 
 TEST(CollectionBackend, MarkMissingUnavailableLeavesSeenSongs) {
@@ -1076,5 +1139,47 @@ TEST(CollectionBackend, EmitsStatisticsAndRatingAfterUpdate) {
   backend.SetRating(id, 0.8f);
   EXPECT_EQ(2, stats);
   EXPECT_EQ(1, ratings);
+  unlink(path.c_str());
+}
+
+TEST(CollectionBackend, PersistsFingerprintCueLoudnessAndUserData) {
+  const std::string path = "/tmp/strawberry-collection-analysis-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song song = MakeSong("Roads", "Portishead", "Dummy");
+  song.set_directory_id(directory);
+  song.set_fingerprint("chromaprint");
+  song.set_cue_path("/tmp/music/dummy.cue");
+  song.set_beginning_nanosec(1000000000);
+  song.set_skipcount(4);
+  song.set_lastplayed(99);
+  song.set_art_manual("file:///tmp/cover.jpg");
+  song.set_ebur128_integrated_loudness_lufs(-14.5);
+  song.set_ebur128_loudness_range_lu(8.0);
+  const int id = backend.AddOrUpdateSong(song);
+  ASSERT_GT(id, 0);
+  const Song loaded = backend.SongByUrl(song.url(), song.beginning_nanosec());
+  EXPECT_EQ("chromaprint", loaded.fingerprint());
+  EXPECT_EQ("/tmp/music/dummy.cue", loaded.cue_path());
+  EXPECT_EQ(1000000000, loaded.beginning_nanosec());
+  EXPECT_EQ(4u, loaded.skipcount());
+  EXPECT_EQ(99, loaded.lastplayed());
+  EXPECT_EQ("file:///tmp/cover.jpg", loaded.art_manual());
+  ASSERT_TRUE(loaded.ebur128_integrated_loudness_lufs());
+  EXPECT_NEAR(-14.5, *loaded.ebur128_integrated_loudness_lufs(), 0.01);
+  ASSERT_TRUE(loaded.ebur128_loudness_range_lu());
+  EXPECT_NEAR(8.0, *loaded.ebur128_loudness_range_lu(), 0.01);
+
+  Song extra = song;
+  extra.set_beginning_nanosec(2000000000);
+  extra.set_title("Wandering Star");
+  extra.set_url(song.url());
+  ASSERT_GT(backend.AddOrUpdateSong(extra), 0);
+  EXPECT_EQ(1, backend.RetainBeginnings(song.url(), {1000000000}));
+  EXPECT_EQ(id, backend.SongByUrl(song.url(), 1000000000).id());
+  EXPECT_FALSE(backend.SongByUrl(song.url(), 2000000000).is_valid());
   unlink(path.c_str());
 }

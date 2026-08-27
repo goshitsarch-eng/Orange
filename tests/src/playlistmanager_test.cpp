@@ -3,6 +3,8 @@
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistdynamicpersist.h"
 #include "playlist/playlistitemuuid.h"
+#include "playlist/playlistdragpayload.h"
+#include "playlist/playlistlistdrop.h"
 #include "playlist/playlistqueuescope.h"
 #include "core/database.h"
 #include "tagreader/tagreader.h"
@@ -261,6 +263,47 @@ TEST(PlaylistBackend, PersistsUuidColumnsAndDynamicSearch) {
   EXPECT_EQ("Glory Box", updated->song(0).title());
   EXPECT_EQ(loaded->UuidAt(0), updated->UuidAt(0));
   FileUtils::Remove(path);
+}
+
+TEST(PlaylistDragPayload, EncodesSourceAndDetectsCrossPlaylist) {
+  const std::string encoded = PlaylistDragPayload::Encode(7, {0, 2});
+  EXPECT_EQ("strawberry-playlist-rows:7|0,2", encoded);
+  const PlaylistDragPayload::Payload decoded = PlaylistDragPayload::Decode(encoded);
+  EXPECT_EQ(7, decoded.source_id);
+  ASSERT_EQ(2u, decoded.rows.size());
+  EXPECT_EQ(0, decoded.rows[0]);
+  EXPECT_EQ(2, decoded.rows[1]);
+  const PlaylistDragPayload::Payload legacy = PlaylistDragPayload::Decode("strawberry-playlist-rows:0,3");
+  EXPECT_EQ(-1, legacy.source_id);
+  ASSERT_EQ(2u, legacy.rows.size());
+  EXPECT_EQ(0, legacy.rows[0]);
+  EXPECT_EQ(3, legacy.rows[1]);
+  EXPECT_TRUE(PlaylistDragPayload::IsCrossPlaylist(7, 3));
+  EXPECT_FALSE(PlaylistDragPayload::IsCrossPlaylist(7, 7));
+  EXPECT_FALSE(PlaylistDragPayload::IsCrossPlaylist(-1, 3));
+  EXPECT_EQ(std::vector<int>({0, 2}), PlaylistListDrop::ParsePlaylistRows(encoded));
+}
+
+TEST(PlaylistManager, MoveRowsBetweenRemovesFromSource) {
+  PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
+  manager.Init();
+  Playlist *source = manager.current();
+  ASSERT_NE(nullptr, source);
+  source->AppendSongs({MakeSong("A", "file:///a"), MakeSong("B", "file:///b"), MakeSong("C", "file:///c")});
+  Playlist *dest = manager.New("Dest");
+  ASSERT_NE(nullptr, dest);
+  manager.MoveRowsBetween(source->id(), dest->id(), {0, 2});
+  ASSERT_EQ(1, source->row_count());
+  EXPECT_EQ("B", source->song(0).title());
+  ASSERT_EQ(2, dest->row_count());
+  EXPECT_EQ("A", dest->song(0).title());
+  EXPECT_EQ("C", dest->song(1).title());
+  EXPECT_TRUE(source->CanUndo());
+  EXPECT_TRUE(dest->CanUndo());
+  dest->Undo();
+  source->Undo();
+  EXPECT_EQ(3, source->row_count());
+  EXPECT_EQ(0, dest->row_count());
 }
 
 TEST(PlaylistManager, EachPlaylistKeepsItsOwnQueue) {

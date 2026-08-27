@@ -24,6 +24,7 @@ class PlaylistView {
   using EditCommitCallback = std::function<void(int, PlaylistColumn, const std::string &)>;
   using DropUrlsCallback = std::function<void(const std::vector<std::string> &, int)>;
   using ReorderCallback = std::function<void(const std::vector<int> &, int)>;
+  using CrossDropCallback = std::function<void(int, const std::vector<int> &, int)>;
   using RateCallback = std::function<void(int, float)>;
   using QueuePositionCallback = std::function<int(int)>;
   using DeleteCallback = std::function<void()>;
@@ -52,6 +53,7 @@ class PlaylistView {
   void SetEditCommitCallback(EditCommitCallback callback);
   void SetDropUrlsCallback(DropUrlsCallback callback);
   void SetReorderCallback(ReorderCallback callback);
+  void SetCrossDropCallback(CrossDropCallback callback);
   void SetRateCallback(RateCallback callback);
   void SetQueuePositionCallback(QueuePositionCallback callback);
   void SetDeleteCallback(DeleteCallback callback);
@@ -105,6 +107,7 @@ class PlaylistView {
   EditCommitCallback edit_commit_;
   DropUrlsCallback drop_urls_;
   ReorderCallback reorder_;
+  CrossDropCallback cross_drop_;
   RateCallback rate_;
   QueuePositionCallback queue_position_;
   DeleteCallback delete_;

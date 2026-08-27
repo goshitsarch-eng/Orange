@@ -78,6 +78,7 @@
 #include "transcoder/transcoder.h"
 #include "waveform/waveformbuilder.h"
 #include "core/settings.h"
+#include "transcoder/transcodergstproperties.h"
 #include "transcoder/transcoderoptionsfields.h"
 #include "transcoder/transcoderoptionsflac.h"
 #include "transcoder/transcoderoptionsinterface.h"
@@ -1007,6 +1008,27 @@ TEST(Transcoder, PresetAndPipelineFor) {
   transcoder.set_quality(8);
   EXPECT_EQ(8, transcoder.quality());
   EXPECT_EQ(0, transcoder.job_count());
+}
+
+TEST(TranscoderGstProperties, GroupsAndFactoryGates) {
+  EXPECT_EQ("Transcoder/avenc_aac", TranscoderGstProperties::GroupForFactory("avenc_aac"));
+  EXPECT_TRUE(TranscoderGstProperties::ShouldApplyFactory("avenc_aac"));
+  EXPECT_TRUE(TranscoderGstProperties::ShouldApplyFactory("lamemp3enc"));
+  EXPECT_FALSE(TranscoderGstProperties::ShouldApplyFactory("filesrc"));
+  EXPECT_FALSE(TranscoderGstProperties::ShouldApplyFactory("filesink"));
+  EXPECT_FALSE(TranscoderGstProperties::ShouldApplyFactory("decodebin"));
+  const std::vector<std::string> aac = TranscoderGstProperties::GroupsToApply(Transcoder::Format::AAC, "avenc_aac");
+  EXPECT_NE(aac.end(), std::find(aac.begin(), aac.end(), "Transcoder/avenc_aac"));
+  EXPECT_NE(aac.end(), std::find(aac.begin(), aac.end(), "Transcoder/faac"));
+  EXPECT_TRUE(TranscoderGstProperties::ParseBool("true"));
+  EXPECT_TRUE(TranscoderGstProperties::ParseBool("1"));
+  EXPECT_FALSE(TranscoderGstProperties::ParseBool("false"));
+  Settings settings;
+  settings.BeginGroup("Transcoder/avenc_aac");
+  settings.SetIntValue("profile", 2);
+  settings.SetBoolValue("tns", true);
+  settings.Sync();
+  EXPECT_FALSE(settings.Keys().empty());
 }
 
 TEST(Transcoder, StoredFlacAndWavPackQuality) {

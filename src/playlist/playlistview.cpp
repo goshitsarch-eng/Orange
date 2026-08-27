@@ -3,6 +3,7 @@
 #include "constants/playlistsettings.h"
 #include "moodbar/moodbarcell.h"
 #include "core/settings.h"
+#include "playlist/playlistdragpayload.h"
 #include "playlist/playlistautoscroll.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistclipboard.h"
@@ -135,6 +136,8 @@ PlaylistView::PlaylistView() {
 void PlaylistView::SetDropUrlsCallback(DropUrlsCallback callback) { drop_urls_ = std::move(callback); }
 
 void PlaylistView::SetReorderCallback(ReorderCallback callback) { reorder_ = std::move(callback); }
+
+void PlaylistView::SetCrossDropCallback(CrossDropCallback callback) { cross_drop_ = std::move(callback); }
 
 void PlaylistView::SetRateCallback(RateCallback callback) { rate_ = std::move(callback); }
 
@@ -330,15 +333,15 @@ gboolean PlaylistView::OnDrop(const GValue *value, double y) {
   std::vector<std::string> urls;
   if (G_VALUE_HOLDS_STRING(value)) {
     const char *text = g_value_get_string(value);
-    if (text && std::string(text).rfind("strawberry-playlist-rows:", 0) == 0) {
-      std::vector<int> rows;
-      for (const std::string &part : StrUtils::Split(text + std::strlen("strawberry-playlist-rows:"), ',')) {
-        if (!part.empty()) {
-          rows.push_back(std::atoi(part.c_str()));
-        }
+    if (text && PlaylistDragPayload::IsPlaylistRows(text)) {
+      const PlaylistDragPayload::Payload payload = PlaylistDragPayload::Decode(text);
+      const int dest_id = playlist_ ? playlist_->id() : -1;
+      if (cross_drop_ && PlaylistDragPayload::IsCrossPlaylist(payload.source_id, dest_id)) {
+        cross_drop_(payload.source_id, payload.rows, row);
+        return TRUE;
       }
-      if (reorder_ && !rows.empty()) {
-        reorder_(rows, row);
+      if (reorder_ && !payload.rows.empty()) {
+        reorder_(payload.rows, row);
         return TRUE;
       }
     }
@@ -386,13 +389,8 @@ void PlaylistView::SetupRowDrag(GtkWidget *row, int index) {
                      if (rows.empty() || r < 0) {
                        return nullptr;
                      }
-                     std::string payload = "strawberry-playlist-rows:";
-                     for (size_t i = 0; i < rows.size(); ++i) {
-                       if (i) {
-                         payload += ",";
-                       }
-                       payload += std::to_string(rows[i]);
-                     }
+                     const std::string payload =
+                         PlaylistDragPayload::Encode(self->playlist_ ? self->playlist_->id() : -1, rows);
                      GValue v = G_VALUE_INIT;
                      g_value_init(&v, G_TYPE_STRING);
                      g_value_set_string(&v, payload.c_str());

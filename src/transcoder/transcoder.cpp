@@ -1,6 +1,7 @@
 #include "transcoder/transcoder.h"
 
 #include "core/logging.h"
+#include "transcoder/transcodergstproperties.h"
 #include "transcoder/transcoderoptionsdialog.h"
 #include "transcoder/transcoderoptionsinterface.h"
 #include "utilities/fileutils.h"
@@ -74,6 +75,7 @@ bool Transcoder::TranscodeFile(const Song &song, const std::string &destination,
     g_object_set(sink_el, "location", destination.c_str(), nullptr);
     gst_object_unref(sink_el);
   }
+  TranscoderGstProperties::ApplyStoredProperties(pipeline, format);
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
   GstBus *bus = gst_element_get_bus(pipeline);
   bool ok = false;

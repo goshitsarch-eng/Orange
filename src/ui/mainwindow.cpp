@@ -34,6 +34,7 @@
 #include "playlist/playlistfolders.h"
 #include "playlist/playlisttabnav.h"
 #include "playlist/playlisttabmenu.h"
+#include "playlist/playlistdragpayload.h"
 #include "playlist/playlistlistdrop.h"
 #include "radios/radiodrag.h"
 #include "radios/radiomenu.h"
@@ -1454,6 +1455,14 @@ void MainWindow::BuildPlaylist() {
       RefreshQueue();
     }
   });
+  playlist_container_->view()->SetCrossDropCallback([this](int source_id, const std::vector<int> &rows, int dest) {
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      app_->playlist_manager()->MoveRowsBetween(source_id, playlist->id(), rows, dest);
+      RefreshPlaylist();
+      RefreshPlaylistsList();
+      RefreshQueue();
+    }
+  });
   playlist_container_->tab_bar()->SetChangedCallback([this](const std::string &name) {
     app_->playlist_manager()->SetCurrentPlaylist(name);
     RefreshPlaylist();
@@ -1487,6 +1496,17 @@ void MainWindow::BuildPlaylist() {
   });
   playlist_container_->tab_bar()->SetLastTabCloseCallback([this] { HideToTray(); });
   playlist_container_->tab_bar()->SetDropCallback([this](int id, const std::string &payload) {
+    if (id >= 0 && PlaylistListDrop::IsPlaylistRows(payload)) {
+      const PlaylistDragPayload::Payload drag = PlaylistDragPayload::Decode(payload);
+      const int source_id = drag.source_id >= 0 ? drag.source_id : app_->playlist_manager()->current_id();
+      if (PlaylistListLook::ShouldAcceptPlaylistRowsDrop(id, source_id)) {
+        app_->playlist_manager()->MoveRowsBetween(source_id, id, drag.rows);
+      }
+      RefreshPlaylist();
+      RefreshPlaylistTabs();
+      RefreshPlaylistsList();
+      return;
+    }
     if (id >= 0) {
       app_->playlist_manager()->SetCurrentPlaylist(id);
     }
@@ -3175,17 +3195,12 @@ void MainWindow::DropOnPlaylistList(const std::string &name, const std::string &
     return;
   }
   if (PlaylistListDrop::IsPlaylistRows(payload)) {
-    if (!PlaylistListLook::ShouldAcceptPlaylistRowsDrop(target->id(), app_->playlist_manager()->active_id())) {
+    const PlaylistDragPayload::Payload drag = PlaylistDragPayload::Decode(payload);
+    const int source_id = drag.source_id >= 0 ? drag.source_id : app_->playlist_manager()->current_id();
+    if (!PlaylistListLook::ShouldAcceptPlaylistRowsDrop(target->id(), source_id)) {
       return;
     }
-    SongList songs;
-    Playlist *source = app_->playlist_manager()->current();
-    for (int row : PlaylistListDrop::ParsePlaylistRows(payload)) {
-      if (source && row >= 0 && row < source->row_count()) {
-        songs.push_back(source->song(row));
-      }
-    }
-    app_->playlist_manager()->InsertSongs(target->id(), songs);
+    app_->playlist_manager()->MoveRowsBetween(source_id, target->id(), drag.rows);
   } else {
     const std::vector<std::string> urls = PlaylistListDrop::ParseUrls(payload);
     if (urls.empty()) {

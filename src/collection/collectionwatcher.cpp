@@ -1,13 +1,25 @@
 #include "collection/collectionwatcher.h"
 
+#include "config.h"
 #include "collection/collectionbackend.h"
+#include "collection/collectioncuescan.h"
+#include "collection/collectionrescanreason.h"
 #include "collection/collectionsubdirectory.h"
 #include "constants/collectionsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "core/songuserdatamerge.h"
 #include "core/taskmanager.h"
+#include "playlistparsers/cueparser.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
+
+#ifdef HAVE_CHROMAPRINT
+#include "engine/chromaprinter.h"
+#endif
+#ifdef HAVE_EBUR128
+#include "engine/ebur128analysis.h"
+#endif
 
 #include <map>
 #include <set>
@@ -45,14 +57,39 @@ void CollectionWatcher::StartAsyncScan(ScanType type) {
   job->alive = alive_;
   job->type = type;
   job->directories = backend_->Directories();
+  Settings settings;
+  settings.BeginGroup(CollectionSettings::kSettingsGroup);
+  job->song_tracking = settings.BoolValue(CollectionSettings::kSongTracking, CollectionSettings::kDefaultSongTracking);
+  job->ebu_analysis =
+      settings.BoolValue(CollectionSettings::kSongENUR128LoudnessAnalysis, CollectionSettings::kDefaultSongENUR128LoudnessAnalysis);
+  job->overwrite_playcount =
+      settings.BoolValue(CollectionSettings::kOverwritePlaycount, CollectionSettings::kDefaultOverwritePlaycount);
+  job->overwrite_rating = settings.BoolValue(CollectionSettings::kOverwriteRating, CollectionSettings::kDefaultOverwriteRating);
+#ifndef HAVE_CHROMAPRINT
+  job->song_tracking = false;
+#endif
+#ifndef HAVE_EBUR128
+  job->ebu_analysis = false;
+#endif
   if (type == ScanType::Incremental) {
     for (const Song &song : backend_->Songs()) {
       ExistingInfo info;
       info.mtime = song.mtime();
       info.filesize = song.filesize();
+      info.beginning = song.beginning_nanosec();
       info.unavailable = song.unavailable();
       info.valid = song.is_valid();
-      job->existing[song.url()] = info;
+      info.fingerprint = song.fingerprint();
+      info.cue_path = song.cue_path();
+      info.art_manual = song.art_manual();
+      info.art_unset = song.art_unset();
+      info.playcount = song.playcount();
+      info.skipcount = song.skipcount();
+      info.lastplayed = song.lastplayed();
+      info.rating = song.rating();
+      info.ebu_lufs = song.ebur128_integrated_loudness_lufs();
+      info.ebu_range = song.ebur128_loudness_range_lu();
+      job->existing[song.url()].push_back(info);
     }
     for (const CollectionDirectory &directory : job->directories) {
       job->stored_subdirs[directory.id] = backend_->SubdirsInDirectory(directory.id);
@@ -76,6 +113,155 @@ gpointer CollectionWatcher::ScanThread(gpointer data) {
   return nullptr;
 }
 
+Song CollectionWatcher::SongFromExisting(const ExistingInfo &info) {
+  Song song;
+  song.set_valid(info.valid);
+  song.set_mtime(info.mtime);
+  song.set_filesize(info.filesize);
+  song.set_beginning_nanosec(info.beginning);
+  song.set_unavailable(info.unavailable);
+  song.set_fingerprint(info.fingerprint);
+  song.set_cue_path(info.cue_path);
+  song.set_art_manual(info.art_manual);
+  song.set_art_unset(info.art_unset);
+  song.set_playcount(info.playcount);
+  song.set_skipcount(info.skipcount);
+  song.set_lastplayed(info.lastplayed);
+  song.set_rating(info.rating);
+  song.set_ebur128_integrated_loudness_lufs(info.ebu_lufs);
+  song.set_ebur128_loudness_range_lu(info.ebu_range);
+  return song;
+}
+
+const CollectionWatcher::ExistingInfo *CollectionWatcher::FindExisting(const ScanJob *job, const std::string &url,
+                                                                       int64_t beginning) {
+  if (!job) {
+    return nullptr;
+  }
+  auto it = job->existing.find(url);
+  if (it == job->existing.end() || it->second.empty()) {
+    return nullptr;
+  }
+  for (const ExistingInfo &info : it->second) {
+    if (info.beginning == beginning) {
+      return &info;
+    }
+  }
+  return &it->second.front();
+}
+
+bool CollectionWatcher::SubdirNeedsAnalysis(const ScanJob *job, const std::string &subdir_path) {
+  if (!job || (!job->song_tracking && !job->ebu_analysis)) {
+    return false;
+  }
+  for (const auto &entry : job->existing) {
+    const std::string path = FileUtils::PathFromUri(entry.first);
+    if (CollectionSubdirectoryScan::ImmediateParent(path) != subdir_path) {
+      continue;
+    }
+    for (const ExistingInfo &info : entry.second) {
+      if (CollectionRescanReason::NeedsAnalysisRescan(SongFromExisting(info), job->song_tracking, job->ebu_analysis)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+void CollectionWatcher::ApplyAnalysis(Song *song, const ScanJob *job) {
+  if (!song || !job) {
+    return;
+  }
+#if !defined(HAVE_CHROMAPRINT) && !defined(HAVE_EBUR128)
+  (void)song;
+  (void)job;
+#endif
+#ifdef HAVE_CHROMAPRINT
+  if (job->song_tracking && song->fingerprint().empty()) {
+    Chromaprinter printer(FileUtils::PathFromUri(song->url()));
+    const std::string fingerprint = printer.CreateFingerprint();
+    song->set_fingerprint(fingerprint.empty() ? "NONE" : fingerprint);
+  }
+#endif
+#ifdef HAVE_EBUR128
+  if (job->ebu_analysis && (!song->ebur128_integrated_loudness_lufs() || !song->ebur128_loudness_range_lu())) {
+    if (const auto measures = EBUR128Analysis::Compute(*song)) {
+      song->set_ebur128_integrated_loudness_lufs(measures->loudness_lufs);
+      song->set_ebur128_loudness_range_lu(measures->range_lu);
+    }
+  }
+#endif
+}
+
+void CollectionWatcher::MergeFromExisting(Song *song, const ExistingInfo *info, const ScanJob *job) {
+  if (!song || !info || !job) {
+    return;
+  }
+  SongUserDataMerge::Merge(song, SongFromExisting(*info), !job->overwrite_playcount, !job->overwrite_rating);
+}
+
+void CollectionWatcher::CollectFile(ScanJob *job, const CollectionDirectory &directory, const std::string &entry) {
+  if (!job || !tagreader_) {
+    return;
+  }
+  const std::string url = FileUtils::UriFromPath(entry);
+  const std::string cue = CueParser::FindCueFilename(entry);
+  const int64_t cue_mtime = CollectionCueScan::CueMtime(cue);
+  const int64_t media_mtime = FileUtils::FileMtime(entry);
+  const int64_t filesize = FileUtils::FileSize(entry);
+  const ExistingInfo *existing_info = FindExisting(job, url, 0);
+  Song existing = existing_info ? SongFromExisting(*existing_info) : Song();
+  const CollectionCueScan::Change cue_change =
+      CollectionCueScan::DetectCueChange(existing.has_cue(), existing.cue_path(), cue, cue_mtime);
+  const int64_t effective_mtime = CollectionCueScan::EffectiveMtime(media_mtime, existing.has_cue() || cue_mtime > 0
+                                                                                     ? CollectionCueScan::CueMtime(existing.cue_path().empty() ? cue
+                                                                                                                                               : existing.cue_path())
+                                                                                     : 0);
+  if (job->type == ScanType::Incremental &&
+      !NeedsRescan(existing, effective_mtime > 0 ? effective_mtime : media_mtime, filesize, job->song_tracking, job->ebu_analysis,
+                   cue_change)) {
+    return;
+  }
+  Song file = tagreader_->ReadFile(entry);
+  file.set_source(Song::Source::Collection);
+  file.set_directory_id(directory.id);
+  if (file.url().empty()) {
+    file.set_url(url);
+  }
+  if (file.url().empty()) {
+    return;
+  }
+  file.set_mtime(CollectionCueScan::EffectiveMtime(media_mtime, cue_mtime));
+  file.set_filesize(filesize);
+  ApplyAnalysis(&file, job);
+
+  SongList songs;
+  if (cue_mtime > 0 && !cue.empty()) {
+    CueParser parser;
+    songs = parser.Load(FileUtils::ReadFile(cue), cue);
+    CueParser::EnrichFromAudioFile(&songs, file);
+    for (Song &song : songs) {
+      song.set_source(Song::Source::Collection);
+      song.set_directory_id(directory.id);
+      song.set_mtime(file.mtime());
+      song.set_filesize(file.filesize());
+      song.set_fingerprint(file.fingerprint());
+      song.set_ebur128_integrated_loudness_lufs(file.ebur128_integrated_loudness_lufs());
+      song.set_ebur128_loudness_range_lu(file.ebur128_loudness_range_lu());
+      song.set_cue_path(cue);
+    }
+  }
+  if (songs.empty()) {
+    file.set_cue_path({});
+    songs.push_back(file);
+  }
+  for (Song &song : songs) {
+    MergeFromExisting(&song, FindExisting(job, song.url(), song.beginning_nanosec()), job);
+    job->songs.push_back(song);
+    ++job->added;
+  }
+}
+
 void CollectionWatcher::CollectDirectory(ScanJob *job, const CollectionDirectory &directory) {
   const std::vector<std::string> entries =
       directory.subdirs ? FileUtils::ListDirectoryRecursive(directory.path) : FileUtils::ListDirectory(directory.path);
@@ -94,34 +280,13 @@ void CollectionWatcher::CollectDirectory(ScanJob *job, const CollectionDirectory
     const std::string subdir_path = parent.empty() ? directory.path : parent;
     const int64_t dir_mtime = FileUtils::FileMtime(subdir_path);
     seen_subdirs[subdir_path] = dir_mtime;
-    const std::string url = FileUtils::UriFromPath(entry);
-    job->seen_urls.push_back(url);
+    job->seen_urls.push_back(FileUtils::UriFromPath(entry));
+    const bool force = SubdirNeedsAnalysis(job, subdir_path);
     if (job->type == ScanType::Incremental &&
-        CollectionSubdirectoryScan::ShouldSkip(CollectionSubdirectoryScan::StoredMtime(stored, subdir_path), dir_mtime)) {
+        CollectionSubdirectoryScan::ShouldSkip(CollectionSubdirectoryScan::StoredMtime(stored, subdir_path), dir_mtime, force)) {
       continue;
     }
-    Song existing;
-    auto it = job->existing.find(url);
-    if (it != job->existing.end()) {
-      existing.set_valid(it->second.valid);
-      existing.set_mtime(it->second.mtime);
-      existing.set_filesize(it->second.filesize);
-      existing.set_unavailable(it->second.unavailable);
-    }
-    if (job->type == ScanType::Incremental && !NeedsRescan(existing, FileUtils::FileMtime(entry), FileUtils::FileSize(entry))) {
-      continue;
-    }
-    if (!tagreader_) {
-      continue;
-    }
-    Song song = tagreader_->ReadFile(entry);
-    song.set_source(Song::Source::Collection);
-    song.set_directory_id(directory.id);
-    if (song.url().empty()) {
-      continue;
-    }
-    job->songs.push_back(song);
-    ++job->added;
+    CollectFile(job, directory, entry);
     if (task_manager_ && (job->added % 25) == 0) {
       // Progress is applied on the main thread after the walk finishes.
     }
@@ -144,12 +309,17 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
   const int task_id = self->task_manager_ ? self->task_manager_->StartTask(job->type == ScanType::Full ? "Full collection scan" : "Scanning collection") : 0;
   self->last_added_ = 0;
   if (self->backend_) {
+    std::map<std::string, std::vector<int64_t>> beginnings;
     for (const Song &song : job->songs) {
       self->backend_->AddOrUpdateSong(song);
+      beginnings[song.url()].push_back(song.beginning_nanosec());
       ++self->last_added_;
       if (self->task_manager_ && task_id && (self->last_added_ % 25) == 0) {
         self->task_manager_->SetTaskProgress(task_id, self->last_added_);
       }
+    }
+    for (const auto &entry : beginnings) {
+      self->backend_->RetainBeginnings(entry.first, entry.second);
     }
     Settings settings;
     settings.BeginGroup(CollectionSettings::kSettingsGroup);
@@ -238,6 +408,47 @@ void CollectionWatcher::ScanDirectory(int directory_id, const std::string &path,
 }
 
 void CollectionWatcher::ScanPath(int directory_id, const std::string &path, bool recursive, int task_id, int *added) {
+  ScanJob job;
+  job.watcher = this;
+  job.type = ScanType::Full;
+  Settings settings;
+  settings.BeginGroup(CollectionSettings::kSettingsGroup);
+  job.song_tracking = settings.BoolValue(CollectionSettings::kSongTracking, CollectionSettings::kDefaultSongTracking);
+  job.ebu_analysis =
+      settings.BoolValue(CollectionSettings::kSongENUR128LoudnessAnalysis, CollectionSettings::kDefaultSongENUR128LoudnessAnalysis);
+  job.overwrite_playcount =
+      settings.BoolValue(CollectionSettings::kOverwritePlaycount, CollectionSettings::kDefaultOverwritePlaycount);
+  job.overwrite_rating = settings.BoolValue(CollectionSettings::kOverwriteRating, CollectionSettings::kDefaultOverwriteRating);
+#ifndef HAVE_CHROMAPRINT
+  job.song_tracking = false;
+#endif
+#ifndef HAVE_EBUR128
+  job.ebu_analysis = false;
+#endif
+  if (backend_) {
+    for (const Song &song : backend_->Songs()) {
+      ExistingInfo info;
+      info.mtime = song.mtime();
+      info.filesize = song.filesize();
+      info.beginning = song.beginning_nanosec();
+      info.unavailable = song.unavailable();
+      info.valid = song.is_valid();
+      info.fingerprint = song.fingerprint();
+      info.cue_path = song.cue_path();
+      info.art_manual = song.art_manual();
+      info.art_unset = song.art_unset();
+      info.playcount = song.playcount();
+      info.skipcount = song.skipcount();
+      info.lastplayed = song.lastplayed();
+      info.rating = song.rating();
+      info.ebu_lufs = song.ebur128_integrated_loudness_lufs();
+      info.ebu_range = song.ebur128_loudness_range_lu();
+      job.existing[song.url()].push_back(info);
+    }
+  }
+  CollectionDirectory directory;
+  directory.id = directory_id;
+  directory.path = path;
   for (const std::string &entry : FileUtils::ListDirectory(path)) {
     if (abort_) {
       return;
@@ -251,16 +462,22 @@ void CollectionWatcher::ScanPath(int directory_id, const std::string &path, bool
     if (!Song::IsAudioFile(entry)) {
       continue;
     }
-    Song song = tagreader_->ReadFile(entry);
-    song.set_source(Song::Source::Collection);
-    song.set_directory_id(directory_id);
-    if (song.url().empty()) {
-      continue;
+    CollectFile(&job, directory, entry);
+  }
+  std::map<std::string, std::vector<int64_t>> beginnings;
+  for (const Song &song : job.songs) {
+    if (backend_) {
+      backend_->AddOrUpdateSong(song);
+      beginnings[song.url()].push_back(song.beginning_nanosec());
     }
-    backend_->AddOrUpdateSong(song);
     ++(*added);
     if (task_manager_ && task_id && (*added % 25) == 0) {
       task_manager_->SetTaskProgress(task_id, *added);
+    }
+  }
+  if (backend_) {
+    for (const auto &entry : beginnings) {
+      backend_->RetainBeginnings(entry.first, entry.second);
     }
   }
 }

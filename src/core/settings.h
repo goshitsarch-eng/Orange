@@ -3,6 +3,7 @@
 
 #include <glib.h>
 #include <string>
+#include <vector>
 
 class Settings {
  public:
@@ -30,6 +31,7 @@ class Settings {
   void SetBoolValue(const std::string &key, bool value);
 
   void Remove(const std::string &key);
+  std::vector<std::string> Keys() const;
   bool Sync();
 
   static Settings &Instance();
