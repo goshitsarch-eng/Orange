@@ -10,6 +10,7 @@
 #include "core/musicstorage.h"
 #include "device/devicecopy.h"
 #include "device/devicecopyjob.h"
+#include "device/devicedeletejob.h"
 #include "device/deviceeject.h"
 #include "device/devicecopyrunner.h"
 #include "device/devicemanager.h"
@@ -952,6 +953,60 @@ TEST(DeviceDeleteDialog, MatchesQtDeleteCopy) {
   EXPECT_STREQ("These files will be deleted from the device, are you sure you want to continue?", DeviceDeleteDialog::Message());
   EXPECT_STREQ("Yes", DeviceDeleteDialog::Accept());
   EXPECT_STREQ("Cancel", DeviceDeleteDialog::Cancel());
+}
+
+TEST(DeviceDeleteJob, UsesDeleteFilesWithoutTrashLikeQt) {
+  EXPECT_FALSE(DeviceDeleteJob::UseTrash());
+  EXPECT_FALSE(DeviceDeleteJob::ReloadsDeviceAfterDelete());
+  EXPECT_TRUE(DeviceDeleteJob::ShouldShowErrorDialog(SongList{Song()}));
+  EXPECT_FALSE(DeviceDeleteJob::ShouldShowErrorDialog({}));
+  ConnectedDevice usb;
+  usb.backend = "gio";
+  usb.mount_path = "/media/usb";
+  EXPECT_TRUE(DeviceDeleteJob::ShouldUseDeleteFiles(usb));
+  ConnectedDevice mtp;
+  mtp.backend = "mtp";
+  EXPECT_TRUE(DeviceDeleteJob::ShouldUseDeleteFiles(mtp));
+  ConnectedDevice ipod;
+  ipod.backend = "gpod";
+  ipod.mount_path = "/media/ipod";
+  EXPECT_TRUE(DeviceDeleteJob::ShouldUseDeleteFiles(ipod));
+  ConnectedDevice cdda;
+  cdda.backend = "cdda";
+  cdda.mount_path = "/dev/sr0";
+  EXPECT_FALSE(DeviceDeleteJob::ShouldUseDeleteFiles(cdda));
+  EXPECT_TRUE(DeviceDeleteJob::ShouldRefreshAfterDelete("mtp", 2));
+  EXPECT_TRUE(DeviceDeleteJob::ShouldRefreshAfterDelete({}, 1));
+  EXPECT_FALSE(DeviceDeleteJob::ShouldRefreshAfterDelete("cdda", 2));
+  EXPECT_FALSE(DeviceDeleteJob::ShouldRefreshAfterDelete("mtp", 0));
+  EXPECT_EQ(3, DeviceDeleteJob::SongCountAfterDelete(5, 2));
+  EXPECT_EQ(0, DeviceDeleteJob::SongCountAfterDelete(1, 4));
+  EXPECT_EQ(-1, DeviceDeleteJob::SongCountAfterDelete(-1, 2));
+
+  Song a;
+  a.set_url("mtp://phone/1");
+  a.set_title("Roads");
+  Song b;
+  b.set_url("mtp://phone/2");
+  b.set_title("Mysterons");
+  Song c;
+  c.set_url("mtp://phone/3");
+  c.set_title("Sour Times");
+  const SongList remaining = DeviceDeleteJob::RemoveDeleted({a, b, c}, {b});
+  ASSERT_EQ(2u, remaining.size());
+  EXPECT_EQ("mtp://phone/1", remaining[0].url());
+  EXPECT_EQ("mtp://phone/3", remaining[1].url());
+  const SongList deleted = DeviceDeleteJob::Succeeded({a, b}, {b});
+  ASSERT_EQ(1u, deleted.size());
+  EXPECT_EQ("mtp://phone/1", deleted.front().url());
+
+  DeviceManager manager;
+  manager.RememberSongCount("usb-1", 5);
+  EXPECT_EQ(5, manager.SongCount("usb-1"));
+  manager.RefreshAfterDelete("usb-1", {b});
+  EXPECT_EQ(4, manager.SongCount("usb-1"));
+  manager.RefreshAfterDelete("usb-1", {});
+  EXPECT_EQ(4, manager.SongCount("usb-1"));
 }
 
 TEST(DeviceConnectDialog, MatchesQtFirstConnectCopy) {

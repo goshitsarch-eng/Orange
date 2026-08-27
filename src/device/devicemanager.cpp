@@ -21,6 +21,7 @@
 #include "device/mtpmusicstorage.h"
 #include "device/devicecopyrefresh.h"
 #include "device/devicecopysupported.h"
+#include "device/devicedeletejob.h"
 #include "device/deviceeject.h"
 #include "device/gpoddevice.h"
 #include "device/gpodloader.h"
@@ -669,6 +670,29 @@ void DeviceManager::RefreshAfterCopy(const std::string &device_id, int copied, c
   DevicesChanged.Emit();
 }
 
+void DeviceManager::RefreshAfterDelete(const std::string &device_id, const SongList &deleted) {
+  const ConnectedDevice *device = FindDevice(device_id);
+  const std::string backend = device ? device->backend : std::string();
+  if (!DeviceDeleteJob::ShouldRefreshAfterDelete(backend, static_cast<int>(deleted.size()))) {
+    return;
+  }
+  if (device_db_ && !deleted.empty()) {
+    const DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device_id);
+    if (stored.id >= 0) {
+      device_db_->ReplaceSongs(stored.id, DeviceDeleteJob::RemoveDeleted(device_db_->Songs(stored.id), deleted));
+    }
+  }
+  if (song_counts_.count(device_id) && song_counts_[device_id] >= 0) {
+    RememberSongCount(device_id, DeviceDeleteJob::SongCountAfterDelete(song_counts_[device_id], static_cast<int>(deleted.size())));
+  }
+  DevicesChanged.Emit();
+}
+
+int DeviceManager::SongCount(const std::string &device_id) const {
+  const auto it = song_counts_.find(device_id);
+  return it == song_counts_.end() ? -1 : it->second;
+}
+
 void DeviceManager::Remember(const std::string &device_id) {
   if (!device_db_) {
     return;
@@ -826,38 +850,26 @@ DeviceDatabaseBackend::Device DeviceManager::StoredDevice(const std::string &dev
 
 bool DeviceManager::DeleteSong(const std::string &device_id, const Song &song) {
   const ConnectedDevice *found = FindDevice(device_id);
-  if (!found) {
-    DeviceError.Emit(DeviceError::MissingDevice());
+  if (!found || !DeviceDeleteJob::ShouldUseDeleteFiles(*found)) {
+    DeviceError.Emit(found ? DeviceError::DeleteFailed() : DeviceError::MissingDevice());
     return false;
   }
-#ifdef HAVE_MTP
-  if (found->backend == "mtp") {
-    if (!MtpDevice::DeleteSong(MtpSerial(found->unique_id), song)) {
-      DeviceError.Emit(DeviceError::DeleteFailed());
-      return false;
-    }
-    return true;
+  std::unique_ptr<MusicStorage> storage = MusicStorageForDevice(*found);
+  if (!storage) {
+    DeviceError.Emit(DeviceError::DeleteFailed());
+    return false;
   }
-#endif
-#ifdef HAVE_GPOD
-  if (found->backend == "gpod") {
-    if (!GPodDevice::DeleteSong(found->mount_path, song)) {
-      DeviceError.Emit(DeviceError::DeleteFailed());
-      return false;
-    }
-    return true;
+  storage->StartDelete();
+  MusicStorage::DeleteJob job;
+  job.metadata = song;
+  job.use_trash = DeviceDeleteJob::UseTrash();
+  std::string error_text;
+  if (!storage->DeleteFromStorage(job)) {
+    storage->FinishDelete(false, error_text);
+    DeviceError.Emit(DeviceError::DeleteFailed());
+    return false;
   }
-#endif
-  if (!found->mount_path.empty()) {
-    FilesystemMusicStorage storage(found->mount_path);
-    MusicStorage::DeleteJob job;
-    job.metadata = song;
-    if (!storage.DeleteFromStorage(job)) {
-      DeviceError.Emit(DeviceError::DeleteFailed());
-      return false;
-    }
-    return true;
-  }
-  DeviceError.Emit(DeviceError::DeleteFailed());
-  return false;
+  storage->FinishDelete(true, error_text);
+  RefreshAfterDelete(device_id, {song});
+  return true;
 }

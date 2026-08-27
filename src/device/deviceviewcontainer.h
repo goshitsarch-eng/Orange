@@ -15,6 +15,7 @@ class Application;
 class DeviceViewContainer {
  public:
   explicit DeviceViewContainer(Application *app);
+  ~DeviceViewContainer();
 
   GtkWidget *widget() const { return widget_; }
   DeviceView *view() { return view_.get(); }
@@ -44,8 +45,10 @@ class DeviceViewContainer {
   void FinishForget(const std::string &id);
   void ConfirmDelete(const SongList &songs);
   void FinishDelete(const SongList &songs);
+  void ApplyDeleteFinished(const std::string &device_id, const SongList &requested, const SongList &errors);
 
   Application *app_ = nullptr;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
   GtkWidget *widget_ = nullptr;
   std::unique_ptr<DeviceView> view_;
   std::string browse_id_;

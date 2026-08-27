@@ -35,6 +35,7 @@ class DeviceView {
 
   const ConnectedDevice *SelectedDevice() const;
   SongList SelectedSongs() const;
+  const SongList &songs() const { return songs_; }
 
  private:
   void Clear();

@@ -36,6 +36,9 @@ class DeviceManager {
   const std::vector<ConnectedDevice> &devices() const { return devices_; }
   bool CopySongs(const std::string &device_id, const SongList &songs);
   bool DeleteSong(const std::string &device_id, const Song &song);
+  void RefreshAfterDelete(const std::string &device_id, const SongList &deleted);
+  int SongCount(const std::string &device_id) const;
+  const ConnectedDevice *Find(const std::string &device_id) const { return FindDevice(device_id); }
   bool Forget(const std::string &device_id);
   bool Mount(const std::string &device_id);
   bool Unmount(const std::string &device_id);
