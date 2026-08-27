@@ -21,7 +21,10 @@ void ApplyField(Song *song, const std::string &name, const std::string &value) {
   if (!song) {
     return;
   }
-  const auto as_int = [&]() -> int { return value.empty() ? -1 : std::atoi(value.c_str()); };
+  const auto as_unset_int = [&]() -> int {
+    const int n = value.empty() ? -1 : std::atoi(value.c_str());
+    return n <= 0 ? -1 : n;
+  };
   if (name == "Title") song->set_title(value);
   else if (name == "Artist") song->set_artist(value);
   else if (name == "Album") song->set_album(value);
@@ -40,10 +43,10 @@ void ApplyField(Song *song, const std::string &name, const std::string &value) {
   else if (name == "Album artist sort") song->set_albumartistsort(value);
   else if (name == "Composer sort") song->set_composersort(value);
   else if (name == "Performer sort") song->set_performersort(value);
-  else if (name == "Year") song->set_year(as_int());
-  else if (name == "Original year") song->set_originalyear(as_int());
-  else if (name == "Track") song->set_track(as_int());
-  else if (name == "Disc") song->set_disc(as_int());
+  else if (name == "Year") song->set_year(as_unset_int());
+  else if (name == "Original year") song->set_originalyear(as_unset_int());
+  else if (name == "Track") song->set_track(as_unset_int());
+  else if (name == "Disc") song->set_disc(as_unset_int());
   else if (name == "BPM") song->set_bpm(value.empty() ? -1.0f : std::strtof(value.c_str(), nullptr));
 }
 
@@ -55,6 +58,7 @@ void ApplyChangedFields(SongList *songs, const std::vector<std::pair<std::string
     for (const auto &field : changed) {
       ApplyField(&song, field.first, field.second);
     }
+    NormalizeUnsetNumeric(&song);
   }
 }
 

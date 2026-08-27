@@ -336,6 +336,90 @@ TEST(EditTagFields, ApplyFieldWritesSortTags) {
   EXPECT_EQ("Eno, Brian", song.performersort());
 }
 
+TEST(EditTagFields, IsValueModifiedMatchesQtNumericUnset) {
+  EXPECT_FALSE(EditTagFields::IsIntModified(-1, -1));
+  EXPECT_FALSE(EditTagFields::IsIntModified(-1, 0));
+  EXPECT_TRUE(EditTagFields::IsIntModified(-1, 5));
+  EXPECT_TRUE(EditTagFields::IsIntModified(5, 0));
+  EXPECT_TRUE(EditTagFields::IsIntModified(5, -1));
+  EXPECT_FALSE(EditTagFields::IsIntModified(5, 5));
+  EXPECT_TRUE(EditTagFields::IsNumericIntField("Year"));
+  EXPECT_TRUE(EditTagFields::IsNumericIntField("Original year"));
+  EXPECT_TRUE(EditTagFields::IsNumericIntField("Track"));
+  EXPECT_TRUE(EditTagFields::IsNumericIntField("Disc"));
+  EXPECT_FALSE(EditTagFields::IsNumericIntField("Title"));
+  EXPECT_FALSE(EditTagFields::IsValueModified("Year", "", ""));
+  EXPECT_FALSE(EditTagFields::IsValueModified("Year", "", "0"));
+  EXPECT_TRUE(EditTagFields::IsValueModified("Year", "1994", "0"));
+  EXPECT_TRUE(EditTagFields::IsValueModified("Year", "1994", ""));
+  EXPECT_TRUE(EditTagFields::IsValueModified("Track", "8", "1"));
+  EXPECT_FALSE(EditTagFields::IsValueModified("Original year", "", "0"));
+  EXPECT_TRUE(EditTagFields::IsValueModified("Disc", "2", ""));
+  EXPECT_FALSE(EditTagFields::IsValueModified("Title", "Roads", "Roads"));
+  EXPECT_TRUE(EditTagFields::IsValueModified("Title", "Roads", "Glory Box"));
+  EXPECT_FALSE(EditTagFields::IsRatingModified(-1.0, 0.0));
+  EXPECT_TRUE(EditTagFields::IsRatingModified(-1.0, 0.8));
+  EXPECT_TRUE(EditTagFields::IsRatingModified(0.8, 0.0));
+  EXPECT_FALSE(EditTagFields::IsRatingModified(0.8, 0.8));
+}
+
+TEST(EditTagFields, NormalizeUnsetNumericClearsNonPositive) {
+  Song song = MakeTagged("Roads", "Portishead", "Dummy");
+  song.set_track(0);
+  song.set_disc(0);
+  song.set_year(0);
+  song.set_originalyear(0);
+  song.set_lastplayed(0);
+  EditTagFields::NormalizeUnsetNumeric(&song);
+  EXPECT_EQ(-1, song.track());
+  EXPECT_EQ(-1, song.disc());
+  EXPECT_EQ(-1, song.year());
+  EXPECT_EQ(-1, song.originalyear());
+  EXPECT_EQ(-1, song.lastplayed());
+  song.set_track(8);
+  song.set_disc(1);
+  song.set_year(1994);
+  song.set_originalyear(1994);
+  song.set_lastplayed(1700000000);
+  EditTagFields::NormalizeUnsetNumeric(&song);
+  EXPECT_EQ(8, song.track());
+  EXPECT_EQ(1, song.disc());
+  EXPECT_EQ(1994, song.year());
+  EXPECT_EQ(1994, song.originalyear());
+  EXPECT_EQ(1700000000, song.lastplayed());
+}
+
+TEST(EditTagFields, ApplyFieldZeroNumericBecomesUnset) {
+  Song song = MakeTagged("Roads", "Portishead", "Dummy");
+  song.set_originalyear(1994);
+  song.set_disc(2);
+  EditTagFields::ApplyField(&song, "Year", "0");
+  EditTagFields::ApplyField(&song, "Original year", "0");
+  EditTagFields::ApplyField(&song, "Track", "0");
+  EditTagFields::ApplyField(&song, "Disc", "0");
+  EXPECT_EQ(-1, song.year());
+  EXPECT_EQ(-1, song.originalyear());
+  EXPECT_EQ(-1, song.track());
+  EXPECT_EQ(-1, song.disc());
+}
+
+TEST(EditTagFields, CommonRatingAndSliderConversion) {
+  Song unset_a = MakeTagged("Roads", "Portishead", "Dummy");
+  Song unset_b = MakeTagged("Glory Box", "Portishead", "Dummy");
+  unset_a.set_rating(-1.0f);
+  unset_b.set_rating(-1.0f);
+  EXPECT_DOUBLE_EQ(-1.0, EditTagFields::CommonRating({unset_a, unset_b}));
+  EXPECT_DOUBLE_EQ(-1.0, EditTagFields::CommonRating({}));
+  unset_a.set_rating(0.8f);
+  unset_b.set_rating(0.8f);
+  EXPECT_NEAR(0.8, EditTagFields::CommonRating({unset_a, unset_b}), 0.001);
+  unset_b.set_rating(0.4f);
+  EXPECT_DOUBLE_EQ(-1.0, EditTagFields::CommonRating({unset_a, unset_b}));
+  EXPECT_DOUBLE_EQ(0.0, EditTagFields::RatingSliderFromStored(-1.0));
+  EXPECT_NEAR(4.0, EditTagFields::RatingSliderFromStored(0.8), 0.001);
+  EXPECT_NEAR(0.8f, EditTagFields::RatingStoredFromSlider(4.0), 0.001f);
+}
+
 TEST(TagWriterFields, WritesBpmMoodKeyAndOriginalYear) {
   EXPECT_STREQ("BPM", TagWriterFields::VorbisBpm());
   EXPECT_STREQ("MOOD", TagWriterFields::VorbisMood());
