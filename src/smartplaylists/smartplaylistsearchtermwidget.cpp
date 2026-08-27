@@ -14,20 +14,28 @@ SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget() {
   gtk_box_append(GTK_BOX(widget_), op_);
   RebuildOps();
   RebuildValue();
-  g_signal_connect(field_, "notify::selected", G_CALLBACK(+[](GtkDropDown *, GParamSpec *, gpointer data) {
+  g_signal_connect(field_, "notify::selected", G_CALLBACK((+[](GtkDropDown *, GParamSpec *, gpointer data) {
                      auto *self = static_cast<SmartPlaylistSearchTermWidget *>(data);
-                     if (!self->updating_) {
-                       self->RebuildOps();
-                       self->RebuildValue();
+                     if (self->updating_) {
+                       return;
                      }
-                   }),
+                     self->updating_ = true;
+                     self->RebuildOps();
+                     self->RebuildValue();
+                     self->updating_ = false;
+                     self->EmitChanged();
+                   })),
                    this);
-  g_signal_connect(op_, "notify::selected", G_CALLBACK(+[](GtkDropDown *, GParamSpec *, gpointer data) {
+  g_signal_connect(op_, "notify::selected", G_CALLBACK((+[](GtkDropDown *, GParamSpec *, gpointer data) {
                      auto *self = static_cast<SmartPlaylistSearchTermWidget *>(data);
-                     if (!self->updating_) {
-                       self->RebuildValue();
+                     if (self->updating_) {
+                       return;
                      }
-                   }),
+                     self->updating_ = true;
+                     self->RebuildValue();
+                     self->updating_ = false;
+                     self->EmitChanged();
+                   })),
                    this);
 }
 
@@ -38,10 +46,11 @@ void SmartPlaylistSearchTermWidget::RebuildOps() {
   for (SmartPlaylistOp op : current_ops_) {
     gtk_string_list_append(model, SmartPlaylistSearch::OpName(op).c_str());
   }
+  const bool was_updating = updating_;
   updating_ = true;
   gtk_drop_down_set_model(GTK_DROP_DOWN(op_), G_LIST_MODEL(model));
   gtk_drop_down_set_selected(GTK_DROP_DOWN(op_), 0);
-  updating_ = false;
+  updating_ = was_updating;
 }
 
 void SmartPlaylistSearchTermWidget::RebuildValue() {
@@ -74,6 +83,32 @@ void SmartPlaylistSearchTermWidget::RebuildValue() {
   gtk_box_append(GTK_BOX(widget_), value_);
   if (!previous.empty()) {
     SetCurrentValue(previous);
+  }
+  ConnectValueSignals();
+}
+
+void SmartPlaylistSearchTermWidget::ConnectValueSignals() {
+  if (!value_ || GTK_IS_LABEL(value_)) {
+    return;
+  }
+  if (GTK_IS_SPIN_BUTTON(value_)) {
+    g_signal_connect(value_, "value-changed", G_CALLBACK((+[](GtkSpinButton *, gpointer data) {
+                       static_cast<SmartPlaylistSearchTermWidget *>(data)->EmitChanged();
+                     })),
+                     this);
+    return;
+  }
+  if (GTK_IS_EDITABLE(value_)) {
+    g_signal_connect(value_, "changed", G_CALLBACK((+[](GtkEditable *, gpointer data) {
+                       static_cast<SmartPlaylistSearchTermWidget *>(data)->EmitChanged();
+                     })),
+                     this);
+  }
+}
+
+void SmartPlaylistSearchTermWidget::EmitChanged() {
+  if (!updating_ && changed_) {
+    changed_();
   }
 }
 
@@ -128,9 +163,9 @@ void SmartPlaylistSearchTermWidget::SetTerm(const SmartPlaylistTerm &term) {
     }
   }
   gtk_drop_down_set_selected(GTK_DROP_DOWN(op_), op_index);
-  updating_ = false;
   RebuildValue();
   SetCurrentValue(term.value);
+  updating_ = false;
 }
 
 bool SmartPlaylistSearchTermWidget::IsEmpty() const {

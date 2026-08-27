@@ -6,6 +6,7 @@
 #include "smartplaylists/playlistquerygenerator.h"
 #include "smartplaylists/smartplaylist.h"
 #include "smartplaylists/smartplaylistsummary.h"
+#include "smartplaylists/smartplaylistpreviewpolicy.h"
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
@@ -535,6 +536,40 @@ TEST(SmartPlaylistWizardFinishPage, IsCompleteRequiresNonEmptyName) {
   EXPECT_FALSE(SmartPlaylistWizardFinishPage::IsComplete(""));
   EXPECT_TRUE(SmartPlaylistWizardFinishPage::IsComplete("Favorites"));
   EXPECT_TRUE(SmartPlaylistWizardFinishPage::IsComplete(" "));
+}
+
+TEST(SmartPlaylistPreviewPolicy, TermPreviewClearsLimitAndSkipsInvalidTerms) {
+  using SmartPlaylistPreviewPolicy::Kind;
+  EXPECT_TRUE(SmartPlaylistPreviewPolicy::ShouldUpdate(Kind::Terms, true, true));
+  EXPECT_FALSE(SmartPlaylistPreviewPolicy::ShouldUpdate(Kind::Terms, false, true));
+  EXPECT_TRUE(SmartPlaylistPreviewPolicy::ShouldUpdate(Kind::Terms, false, false));
+  EXPECT_TRUE(SmartPlaylistPreviewPolicy::ShouldUpdate(Kind::Sort, true, true));
+  EXPECT_FALSE(SmartPlaylistPreviewPolicy::ShouldUpdate(Kind::Sort, false, true));
+  EXPECT_FALSE(SmartPlaylistPreviewPolicy::ShouldUpdate(Kind::Sort, false, false));
+  EXPECT_EQ(0, SmartPlaylistPreviewPolicy::LimitForPreview(Kind::Terms, 15));
+  EXPECT_EQ(0, SmartPlaylistPreviewPolicy::LimitForPreview(Kind::Terms, 0));
+  EXPECT_EQ(15, SmartPlaylistPreviewPolicy::LimitForPreview(Kind::Sort, 15));
+  EXPECT_EQ(0, SmartPlaylistPreviewPolicy::LimitForPreview(Kind::Sort, 0));
+
+  SmartPlaylistSearch a;
+  a.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "fleet"});
+  a.limit = 15;
+  a.sort_field = SmartPlaylistField::Year;
+  a.sort_descending = true;
+  SmartPlaylistSearch b = a;
+  EXPECT_TRUE(SmartPlaylistPreviewPolicy::SameSearch(a, b));
+  b.limit = 20;
+  EXPECT_FALSE(SmartPlaylistPreviewPolicy::SameSearch(a, b));
+  b = a;
+  b.terms[0].value = "shins";
+  EXPECT_FALSE(SmartPlaylistPreviewPolicy::SameSearch(a, b));
+
+  const SmartPlaylistSearch term_preview = SmartPlaylistPreviewPolicy::SearchForPreview(a, Kind::Terms);
+  EXPECT_EQ(0, term_preview.limit);
+  EXPECT_EQ(15, a.limit);
+  EXPECT_EQ(1u, term_preview.terms.size());
+  const SmartPlaylistSearch sort_preview = SmartPlaylistPreviewPolicy::SearchForPreview(a, Kind::Sort);
+  EXPECT_EQ(15, sort_preview.limit);
 }
 
 TEST(SmartPlaylistDrag, JoinsSongUrlsAndSkipsWizard) {

@@ -5,6 +5,7 @@
 #include "playlist/playlist.h"
 #include "smartplaylists/playlistgeneratorinserter.h"
 #include "smartplaylists/playlistquerygenerator.h"
+#include "smartplaylists/smartplaylistpreviewpolicy.h"
 #include "smartplaylists/smartplaylistsearchpreview.h"
 #include "smartplaylists/smartplaylistsearchtermwidget.h"
 #include "smartplaylists/smartplaylistsummary.h"
@@ -39,6 +40,7 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   gtk_widget_set_margin_bottom(box, 18);
 
   struct WizardState {
+    Application *app = nullptr;
     std::unique_ptr<SmartPlaylistWizardTypePage> type;
     GtkWidget *match = nullptr;
     GtkWidget *terms_box = nullptr;
@@ -72,13 +74,30 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
       return result;
     }
 
+    void RefreshPreview(SmartPlaylistPreviewPolicy::Kind kind, bool force = false) {
+      if (!app || !preview) {
+        return;
+      }
+      SmartPlaylistSearch current = Build();
+      if (!force && !SmartPlaylistPreviewPolicy::ShouldUpdate(kind, current.IsValid(), !terms.empty())) {
+        return;
+      }
+      current = SmartPlaylistPreviewPolicy::SearchForPreview(current, kind);
+      preview->Update(current, app->collection()->Songs());
+      if (finish) {
+        finish->SetSummary(SmartPlaylistSummary::FinishText(preview->match_count(), type ? type->name() : std::string(), current));
+      }
+    }
+
     void AddTerm(const SmartPlaylistTerm *term = nullptr) {
       auto widget = std::make_unique<SmartPlaylistSearchTermWidget>();
+      widget->SetChangedCallback([this]() { RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Terms); });
       if (term) {
         widget->SetTerm(*term);
       }
       gtk_box_append(GTK_BOX(terms_box), widget->widget());
       terms.push_back(std::move(widget));
+      RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Terms);
     }
 
     void ApplyTermsSensitive() {
@@ -112,9 +131,11 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
       ApplyTermsSensitive();
       ApplySortSensitive();
       ApplyLimitSensitive();
+      RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Terms, true);
     }
   };
   auto *state = new WizardState();
+  state->app = app;
   state->type = std::make_unique<SmartPlaylistWizardTypePage>();
   state->match = DropDownFromNames({Labels::And(), Labels::Or(), Labels::All()});
   state->preview = std::make_unique<SmartPlaylistSearchPreview>();
@@ -191,18 +212,47 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   state->ApplyTermsSensitive();
   state->ApplySortSensitive();
   state->ApplyLimitSensitive();
+  if (editing) {
+    state->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Terms);
+  }
 
-  g_signal_connect(state->match, "notify::selected", G_CALLBACK(+[](GtkDropDown *, GParamSpec *, gpointer data) {
-                     static_cast<WizardState *>(data)->ApplyTermsSensitive();
-                   }),
+  g_signal_connect(state->match, "notify::selected", G_CALLBACK((+[](GtkDropDown *, GParamSpec *, gpointer data) {
+                     auto *wizard = static_cast<WizardState *>(data);
+                     wizard->ApplyTermsSensitive();
+                     wizard->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Terms);
+                   })),
                    state);
-  g_signal_connect(state->random, "toggled", G_CALLBACK(+[](GtkCheckButton *, gpointer data) {
-                     static_cast<WizardState *>(data)->ApplySortSensitive();
-                   }),
+  g_signal_connect(state->random, "toggled", G_CALLBACK((+[](GtkCheckButton *, gpointer data) {
+                     auto *wizard = static_cast<WizardState *>(data);
+                     wizard->ApplySortSensitive();
+                     wizard->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Sort);
+                   })),
                    state);
-  g_signal_connect(state->limit_none, "toggled", G_CALLBACK(+[](GtkCheckButton *, gpointer data) {
-                     static_cast<WizardState *>(data)->ApplyLimitSensitive();
-                   }),
+  g_signal_connect(state->field_sort, "toggled", G_CALLBACK((+[](GtkCheckButton *, gpointer data) {
+                     static_cast<WizardState *>(data)->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Sort);
+                   })),
+                   state);
+  g_signal_connect(state->sort, "notify::selected", G_CALLBACK((+[](GtkDropDown *, GParamSpec *, gpointer data) {
+                     static_cast<WizardState *>(data)->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Sort);
+                   })),
+                   state);
+  g_signal_connect(state->descending, "toggled", G_CALLBACK((+[](GtkCheckButton *, gpointer data) {
+                     static_cast<WizardState *>(data)->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Sort);
+                   })),
+                   state);
+  g_signal_connect(state->limit_none, "toggled", G_CALLBACK((+[](GtkCheckButton *, gpointer data) {
+                     auto *wizard = static_cast<WizardState *>(data);
+                     wizard->ApplyLimitSensitive();
+                     wizard->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Sort);
+                   })),
+                   state);
+  g_signal_connect(state->limit_limit, "toggled", G_CALLBACK((+[](GtkCheckButton *, gpointer data) {
+                     static_cast<WizardState *>(data)->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Sort);
+                   })),
+                   state);
+  g_signal_connect(state->limit, "value-changed", G_CALLBACK((+[](GtkSpinButton *, gpointer data) {
+                     static_cast<WizardState *>(data)->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Sort);
+                   })),
                    state);
 
   GtkWidget *preview = gtk_button_new_with_label(Translations::CStr("Preview"));
@@ -218,18 +268,15 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   g_object_set_data_full(G_OBJECT(create), "wizard", state, [](gpointer p) { delete static_cast<WizardState *>(p); });
   g_object_set_data(G_OBJECT(preview), "wizard", state);
   g_object_set_data(G_OBJECT(restore), "wizard", state);
-  g_signal_connect(preview, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
-                     auto *application = static_cast<Application *>(data);
+  g_signal_connect(preview, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
                      auto *wizard = static_cast<WizardState *>(g_object_get_data(G_OBJECT(button), "wizard"));
-                     const SmartPlaylistSearch current = wizard->Build();
-                     wizard->preview->Update(current, application->collection()->Songs());
-                     wizard->finish->SetSummary(SmartPlaylistSummary::FinishText(wizard->preview->match_count(), wizard->type->name(), current));
+                     wizard->RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Sort, true);
                    })),
-                   app);
-  g_signal_connect(restore, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
+                   nullptr);
+  g_signal_connect(restore, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
                      auto *wizard = static_cast<WizardState *>(g_object_get_data(G_OBJECT(button), "wizard"));
                      wizard->RestoreDefaults();
-                   }),
+                   })),
                    nullptr);
   g_signal_connect(create, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);

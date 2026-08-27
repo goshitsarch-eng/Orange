@@ -1,5 +1,7 @@
 #include "smartplaylists/smartplaylistsearchpreview.h"
 
+#include "smartplaylists/smartplaylistpreviewpolicy.h"
+
 SmartPlaylistSearchPreview::SmartPlaylistSearchPreview() {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   label_ = gtk_label_new("Preview");
@@ -15,6 +17,11 @@ SmartPlaylistSearchPreview::SmartPlaylistSearchPreview() {
 }
 
 void SmartPlaylistSearchPreview::Update(const SmartPlaylistSearch &search, const SongList &songs) {
+  if (have_last_search_ && SmartPlaylistPreviewPolicy::SameSearch(search, last_search_)) {
+    return;
+  }
+  have_last_search_ = true;
+  last_search_ = search;
   GtkWidget *child = gtk_widget_get_first_child(list_);
   while (child) {
     GtkWidget *next = gtk_widget_get_next_sibling(child);

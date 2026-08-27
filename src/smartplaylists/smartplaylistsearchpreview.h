@@ -19,6 +19,8 @@ class SmartPlaylistSearchPreview {
   GtkWidget *label_ = nullptr;
   GtkWidget *list_ = nullptr;
   int match_count_ = 0;
+  SmartPlaylistSearch last_search_;
+  bool have_last_search_ = false;
 };
 
 #endif
