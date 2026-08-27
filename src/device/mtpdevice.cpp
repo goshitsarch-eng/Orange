@@ -12,36 +12,72 @@
 
 #include <cstdlib>
 
+bool MtpCopySession::Open(const std::string &serial) {
+#ifdef HAVE_MTP
+  connection_ = std::make_unique<MtpConnection>();
+  if (!connection_->OpenBySerial(serial)) {
+    LogError("Could not open MTP device for copy: %s", connection_->error_text().c_str());
+    connection_.reset();
+    return false;
+  }
+  return true;
+#else
+  (void)serial;
+  return false;
+#endif
+}
+
+bool MtpCopySession::is_open() const { return connection_ && connection_->is_valid(); }
+
+void MtpCopySession::Close() { connection_.reset(); }
+
+bool MtpCopySession::CopyOne(const Song &song) {
+#ifdef HAVE_MTP
+  if (!is_open()) {
+    return false;
+  }
+  const std::string src = FileUtils::PathFromUri(song.url());
+  if (src.empty() || !FileUtils::Exists(src)) {
+    return false;
+  }
+  LIBMTP_track_t *track = LIBMTP_new_track_t();
+  MtpLoader::SongToTrack(song, track);
+  if (!track->filename || !*track->filename) {
+    free(track->filename);
+    track->filename = strdup(FileUtils::BaseName(src).c_str());
+  }
+  const int ret = LIBMTP_Send_Track_From_File(connection_->device(), src.c_str(), track, nullptr, nullptr);
+  if (ret != 0) {
+    LIBMTP_error_t *error = LIBMTP_Get_Errorstack(connection_->device());
+    if (error && error->error_text) {
+      LogError("MTP copy failed: %s", error->error_text);
+    }
+    LIBMTP_Clear_Errorstack(connection_->device());
+  }
+  LIBMTP_destroy_track_t(track);
+  return ret == 0;
+#else
+  (void)song;
+  return false;
+#endif
+}
+
+bool MtpDevice::CopyOne(const std::string &serial, const Song &song) {
+  MtpCopySession session;
+  return session.Open(serial) && session.CopyOne(song);
+}
+
 bool MtpDevice::CopySongs(const std::string &serial, const SongList &songs) {
 #ifdef HAVE_MTP
-  MtpConnection connection;
-  if (!connection.OpenBySerial(serial)) {
-    LogError("Could not open MTP device for copy: %s", connection.error_text().c_str());
+  MtpCopySession session;
+  if (!session.Open(serial)) {
     return false;
   }
   int copied = 0;
   for (const Song &song : songs) {
-    const std::string src = FileUtils::PathFromUri(song.url());
-    if (src.empty() || !FileUtils::Exists(src)) {
-      continue;
-    }
-    LIBMTP_track_t *track = LIBMTP_new_track_t();
-    MtpLoader::SongToTrack(song, track);
-    if (!track->filename || !*track->filename) {
-      free(track->filename);
-      track->filename = strdup(FileUtils::BaseName(src).c_str());
-    }
-    const int ret = LIBMTP_Send_Track_From_File(connection.device(), src.c_str(), track, nullptr, nullptr);
-    if (ret == 0) {
+    if (session.CopyOne(song)) {
       ++copied;
-    } else {
-      LIBMTP_error_t *error = LIBMTP_Get_Errorstack(connection.device());
-      if (error && error->error_text) {
-        LogError("MTP copy failed: %s", error->error_text);
-      }
-      LIBMTP_Clear_Errorstack(connection.device());
     }
-    LIBMTP_destroy_track_t(track);
   }
   LogInfo("Copied %d songs to MTP device", copied);
   return copied > 0;

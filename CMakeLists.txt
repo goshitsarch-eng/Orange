@@ -520,6 +520,7 @@ set(STRAWBERRY_SOURCES
   src/device/devicelister.cpp
   src/device/devicestatefiltermodel.cpp
   src/device/devicemanager.cpp
+  src/device/devicecopyrunner.cpp
   src/device/devicedatabasebackend.cpp
   src/device/mtpconnection.cpp
   src/device/mtploader.cpp
@@ -857,6 +858,7 @@ if(GTest_FOUND)
     src/organize/organizeformatvalidator.cpp
     src/translations/translations.cpp
     src/device/devicemanager.cpp
+    src/device/devicecopyrunner.cpp
     src/device/devicedatabasebackend.cpp
     src/device/mtpconnection.cpp
     src/device/mtploader.cpp

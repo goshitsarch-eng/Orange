@@ -5,9 +5,28 @@
 
 #include <string>
 
+class GPodCopySession {
+ public:
+  GPodCopySession() = default;
+  ~GPodCopySession();
+  GPodCopySession(const GPodCopySession &) = delete;
+  GPodCopySession &operator=(const GPodCopySession &) = delete;
+
+  bool Open(const std::string &mount_path);
+  bool CopyOne(const Song &song);
+  bool Finish();
+  int copied() const { return copied_; }
+
+ private:
+  void *db_ = nullptr;
+  void *mpl_ = nullptr;
+  int copied_ = 0;
+};
+
 namespace GPodDevice {
 
 bool CopySongs(const std::string &mount_path, const SongList &songs);
+bool CopyOne(const std::string &mount_path, const Song &song);
 
 }  // namespace GPodDevice
 

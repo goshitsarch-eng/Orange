@@ -4,6 +4,9 @@
 #include "device/devicepropertiesinfo.h"
 #include "device/devicepropertieslabels.h"
 #include "device/devicecopy.h"
+#include "device/devicecopyjob.h"
+#include "device/devicecopyrunner.h"
+#include "core/taskmanager.h"
 #include "device/devicemenu.h"
 #include "device/devicesongmenu.h"
 #include "device/devicedrag.h"
@@ -334,12 +337,53 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   ConnectedDevice mtp;
   mtp.backend = "mtp";
   EXPECT_FALSE(DeviceCopy::IsFilesystemDevice(mtp));
+  EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(filesystem));
+  EXPECT_FALSE(DeviceCopy::ShouldUseOrganizeDialog(mtp));
+  ConnectedDevice ipod;
+  ipod.backend = "gpod";
+  ipod.mount_path = "/media/ipod";
+  EXPECT_FALSE(DeviceCopy::ShouldUseOrganizeDialog(ipod));
+  EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("mtp:serial"));
+  EXPECT_EQ("usb", DeviceCopyJob::MtpSerial("usb"));
+  EXPECT_STREQ("Copying to device", DeviceCopyJob::TaskName());
+  EXPECT_EQ(10, DeviceCopyJob::kBatchSize);
+  EXPECT_TRUE(DeviceCopyJob::ShouldFinish(10, 10, false));
+  EXPECT_FALSE(DeviceCopyJob::ShouldFinish(3, 10, false));
+  EXPECT_TRUE(DeviceCopyJob::ShouldScheduleNext(0, 12, false, true));
+  EXPECT_FALSE(DeviceCopyJob::ShouldScheduleNext(0, 12, false, false));
   const OrganizeDialog::Request request = DeviceCopy::CollectionRequest({song});
   ASSERT_EQ(1u, request.songs.size());
   EXPECT_EQ("Roads", request.songs.front().title());
   EXPECT_FALSE(request.move);
   EXPECT_TRUE(request.destination.empty());
   EXPECT_TRUE(DeviceCopy::CanCopyToCollection(request.songs));
+
+  SongList missing;
+  for (int i = 0; i < 12; ++i) {
+    Song track;
+    track.set_valid(true);
+    track.set_title("D" + std::to_string(i));
+    track.set_url("file:///tmp/does-not-exist-device-copy-" + std::to_string(i) + ".flac");
+    missing.push_back(track);
+  }
+  TaskManager tasks;
+  bool paused = false;
+  tasks.PauseCollectionWatchers.Connect([&paused]() { paused = true; });
+  DeviceCopyRunner runner(&tasks, nullptr);
+  ConnectedDevice none;
+  runner.Begin(none, missing);
+  runner.ProcessSome();
+  EXPECT_EQ(10, runner.next_index());
+  EXPECT_FALSE(runner.finished());
+  runner.Cancel();
+  runner.ProcessSome();
+  EXPECT_TRUE(runner.finished());
+  EXPECT_EQ(10u, runner.errors().size());
+
+  DeviceCopyRunner sync(&tasks, nullptr);
+  EXPECT_FALSE(sync.Copy(none, SongList{missing.front()}));
+  EXPECT_TRUE(paused);
+  EXPECT_TRUE(sync.finished());
 }
 
 TEST(DeviceCollectionTree, GroupsDeviceSongsUntilExpanded) {

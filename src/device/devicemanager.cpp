@@ -11,6 +11,7 @@
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "device/udisks2lister.h"
+#include "device/devicecopyrunner.h"
 #include "device/gpoddevice.h"
 #include "device/gpodloader.h"
 #include "device/mtpconnection.h"
@@ -458,40 +459,12 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
     return false;
   }
   const ConnectedDevice target = *found;
-  const SongList prepared = TranscodeForDevice(songs, target);
-#ifdef HAVE_MTP
-  if (target.backend == "mtp") {
-    return MtpDevice::CopySongs(MtpSerial(target.unique_id), prepared);
-  }
-#endif
-  if (target.mount_path.empty()) {
-    LogInfo("Device %s has no mount path", device_id.c_str());
-    return false;
-  }
-#ifdef HAVE_GPOD
-  if (target.backend == "gpod") {
-    return GPodDevice::CopySongs(target.mount_path, prepared);
-  }
-#endif
-#ifdef HAVE_GIO
-  const std::string music = MusicPath(target);
-  g_mkdir_with_parents(music.c_str(), 0755);
   const DeviceDatabaseBackend::Device stored = StoredDevice(target.unique_id);
-  OrganizeFormat format("%albumartist/%album/{%track - }%title");
-  Organize::Options options;
-  options.albumcover = true;
-  options.tagreader = tagreader_;
-  options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "device-cover.bin");
-  options.transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
-  options.transcode_format = stored.id >= 0 ? stored.transcode_format : Song::FileType::Unknown;
-  class Organize organize;
-  const auto errors = organize.Copy(prepared, music, format, options);
-  LogInfo("Copied %d songs to %s (%zu failed)", static_cast<int>(prepared.size() - errors.size()), music.c_str(), errors.size());
-  return !prepared.empty() && errors.size() < prepared.size();
-#else
-  (void)prepared;
-  return false;
-#endif
+  DeviceCopyRunner runner(task_manager_, tagreader_);
+  runner.set_transcode(OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode
+                                                                       : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported),
+                       stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG);
+  return runner.Copy(target, songs);
 }
 
 void DeviceManager::Remember(const std::string &device_id) {

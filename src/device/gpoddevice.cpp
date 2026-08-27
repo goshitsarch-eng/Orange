@@ -9,7 +9,17 @@
 #include <gpod/itdb.h>
 #endif
 
-bool GPodDevice::CopySongs(const std::string &mount_path, const SongList &songs) {
+GPodCopySession::~GPodCopySession() {
+#ifdef HAVE_GPOD
+  if (db_) {
+    itdb_free(static_cast<Itdb_iTunesDB *>(db_));
+    db_ = nullptr;
+    mpl_ = nullptr;
+  }
+#endif
+}
+
+bool GPodCopySession::Open(const std::string &mount_path) {
 #ifdef HAVE_GPOD
   if (mount_path.empty()) {
     return false;
@@ -36,36 +46,89 @@ bool GPodDevice::CopySongs(const std::string &mount_path, const SongList &songs)
     itdb_playlist_add(db, mpl, -1);
     itdb_playlist_set_mpl(mpl);
   }
-  int copied = 0;
-  for (const Song &song : songs) {
-    const std::string src = FileUtils::PathFromUri(song.url());
-    if (src.empty() || !FileUtils::Exists(src)) {
-      continue;
-    }
-    Itdb_Track *track = itdb_track_new();
-    GPodLoader::SongToTrack(song, track);
-    itdb_track_add(db, track, -1);
-    itdb_playlist_add_track(mpl, track, -1);
-    error = nullptr;
-    if (!itdb_cp_track_to_ipod(track, src.c_str(), &error)) {
-      if (error) {
-        LogWarning("Copying %s to iPod failed: %s", src.c_str(), error->message);
-        g_error_free(error);
-      }
-      itdb_track_remove(track);
-      continue;
-    }
-    ++copied;
+  db_ = db;
+  mpl_ = mpl;
+  copied_ = 0;
+  return true;
+#else
+  (void)mount_path;
+  return false;
+#endif
+}
+
+bool GPodCopySession::CopyOne(const Song &song) {
+#ifdef HAVE_GPOD
+  auto *db = static_cast<Itdb_iTunesDB *>(db_);
+  auto *mpl = static_cast<Itdb_Playlist *>(mpl_);
+  if (!db || !mpl) {
+    return false;
   }
-  error = nullptr;
+  const std::string src = FileUtils::PathFromUri(song.url());
+  if (src.empty() || !FileUtils::Exists(src)) {
+    return false;
+  }
+  Itdb_Track *track = itdb_track_new();
+  GPodLoader::SongToTrack(song, track);
+  itdb_track_add(db, track, -1);
+  itdb_playlist_add_track(mpl, track, -1);
+  GError *error = nullptr;
+  if (!itdb_cp_track_to_ipod(track, src.c_str(), &error)) {
+    if (error) {
+      LogWarning("Copying %s to iPod failed: %s", src.c_str(), error->message);
+      g_error_free(error);
+    }
+    itdb_track_remove(track);
+    return false;
+  }
+  ++copied_;
+  return true;
+#else
+  (void)song;
+  return false;
+#endif
+}
+
+bool GPodCopySession::Finish() {
+#ifdef HAVE_GPOD
+  auto *db = static_cast<Itdb_iTunesDB *>(db_);
+  if (!db) {
+    return false;
+  }
+  GError *error = nullptr;
   const bool wrote = itdb_write(db, &error);
   if (!wrote && error) {
     LogWarning("Writing iPod database failed: %s", error->message);
     g_error_free(error);
   }
   itdb_free(db);
-  LogInfo("Copied %d songs to iPod at %s", copied, mount_path.c_str());
-  return copied > 0 && wrote;
+  db_ = nullptr;
+  mpl_ = nullptr;
+  return wrote;
+#else
+  return false;
+#endif
+}
+
+bool GPodDevice::CopyOne(const std::string &mount_path, const Song &song) {
+  GPodCopySession session;
+  if (!session.Open(mount_path) || !session.CopyOne(song)) {
+    return false;
+  }
+  return session.Finish();
+}
+
+bool GPodDevice::CopySongs(const std::string &mount_path, const SongList &songs) {
+#ifdef HAVE_GPOD
+  GPodCopySession session;
+  if (!session.Open(mount_path)) {
+    return false;
+  }
+  for (const Song &song : songs) {
+    session.CopyOne(song);
+  }
+  const bool wrote = session.Finish();
+  LogInfo("Copied %d songs to iPod at %s", session.copied(), mount_path.c_str());
+  return session.copied() > 0 && wrote;
 #else
   (void)mount_path;
   (void)songs;

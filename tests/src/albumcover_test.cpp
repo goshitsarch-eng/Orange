@@ -11,6 +11,7 @@
 #include "covermanager/coverarttypes.h"
 #include "covermanager/covermanagerexportscope.h"
 #include "covermanager/albumcoverexporter.h"
+#include "covermanager/coverexportjob.h"
 #include "covermanager/albumcoverfetcher.h"
 #include "covermanager/albumcoverfetchersearch.h"
 #include "covermanager/albumcoversearcher.h"
@@ -312,6 +313,31 @@ TEST(CoverExportRunnable, CopiesManualCoverAndSkipsExisting) {
   EXPECT_EQ(1, exporter.request_count());
   EXPECT_EQ(0, exporter.exported());
   EXPECT_EQ(1, exporter.skipped());
+  EXPECT_TRUE(exporter.finished());
+
+  EXPECT_EQ(3, CoverExportJob::kMaxConcurrent);
+  EXPECT_TRUE(CoverExportJob::ShouldPump(2, 1));
+  EXPECT_FALSE(CoverExportJob::ShouldPump(3, 1));
+  EXPECT_DOUBLE_EQ(0.5, CoverExportJob::ProgressFraction(1, 1, 4));
+  EXPECT_EQ("Exported 1 of 4 (1 skipped)", CoverExportJob::StatusText(1, 1, 4));
+  EXPECT_TRUE(CoverExportJob::ShouldFinish(4, 4, false));
+  EXPECT_FALSE(CoverExportJob::ShouldScheduleNext(0, 4, false, false));
+
+  AlbumCoverExporter batched(nullptr);
+  batched.SetDialogResult(dialog);
+  batched.SetCoverTypes({AlbumCoverLoaderOptions::Type::Manual});
+  for (int i = 0; i < 4; ++i) {
+    Song extra;
+    extra.set_url(FileUtils::UriFromPath(FileUtils::Join(root, "missing-" + std::to_string(i) + ".mp3")));
+    batched.AddExportRequest(extra);
+  }
+  batched.ProcessSome();
+  EXPECT_EQ(3, batched.next_index());
+  EXPECT_FALSE(batched.finished());
+  EXPECT_EQ(3, batched.skipped());
+  batched.ProcessSome();
+  EXPECT_TRUE(batched.finished());
+  EXPECT_EQ(4, batched.skipped());
 
   FileUtils::Remove(FileUtils::Join(root, "cover.png"));
   FileUtils::Remove(source);

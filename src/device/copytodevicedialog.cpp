@@ -1,8 +1,11 @@
 #include "device/copytodevicedialog.h"
 
 #include "core/application.h"
+#include "device/devicecopy.h"
+#include "device/devicecopyrunner.h"
 #include "device/devicemanager.h"
 #include "organize/organizedialog.h"
+#include "organize/organizeerrordialog.h"
 #include "organize/organizetranscode.h"
 #include "translations/translations.h"
 #include "widgets/freespacebar.h"
@@ -34,7 +37,7 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongLis
     g_object_set_data_full(G_OBJECT(copy), "device", owned_device, [](gpointer p) { delete static_cast<ConnectedDevice *>(p); });
     g_object_set_data_full(G_OBJECT(copy), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });
     g_object_set_data(G_OBJECT(copy), "parent", parent);
-    g_signal_connect(copy, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+    g_signal_connect(copy, "clicked", G_CALLBACK((+[](GtkButton *btn, gpointer data) {
                        auto *application = static_cast<Application *>(data);
                        auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(btn), "device"));
                        auto *songs = static_cast<SongList *>(g_object_get_data(G_OBJECT(btn), "songs"));
@@ -44,7 +47,7 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongLis
                        if (!device || source.empty()) {
                          return;
                        }
-                       if (!device->mount_path.empty() && device->backend != "gpod") {
+                       if (DeviceCopy::ShouldUseOrganizeDialog(*device)) {
                          OrganizeDialog::Request request;
                          request.songs = source;
                          request.destination = DeviceManager::MusicPath(*device);
@@ -58,9 +61,27 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongLis
                          OrganizeDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(btn), "parent")), application, request);
                          return;
                        }
-                       const bool ok = application->device_manager()->CopySongs(device->unique_id, source);
-                       gtk_button_set_label(btn, ok ? "Copied" : "Failed");
-                     }),
+                       gtk_widget_set_sensitive(GTK_WIDGET(btn), FALSE);
+                       gtk_button_set_label(btn, DeviceCopyJob::TaskName());
+                       const DeviceDatabaseBackend::Device stored = application->device_manager()->StoredDevice(device->unique_id);
+                       auto *runner = new DeviceCopyRunner(application->task_manager(), application->tagreader());
+                       runner->set_transcode(OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode
+                                                                                             : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported),
+                                             stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG);
+                       GtkWindow *parent = GTK_WINDOW(g_object_get_data(G_OBJECT(btn), "parent"));
+                       runner->Finished.Connect([btn, runner, parent](bool ok) {
+                         gtk_widget_set_sensitive(GTK_WIDGET(btn), TRUE);
+                         gtk_button_set_label(btn, ok ? "Copied" : "Failed");
+                         if (!runner->errors().empty()) {
+                           OrganizeErrorDialog::Show(parent, OrganizeErrorDialog::OperationType::Copy, runner->errors());
+                         }
+                         g_idle_add(+[](gpointer data) -> gboolean {
+                           delete static_cast<DeviceCopyRunner *>(data);
+                           return G_SOURCE_REMOVE;
+                         }, runner);
+                       });
+                       runner->StartAsync(*device, source);
+                     })),
                      app);
     adw_action_row_add_suffix(ADW_ACTION_ROW(row), copy);
     gtk_list_box_append(GTK_LIST_BOX(list), row);
