@@ -34,7 +34,28 @@ inline bool DeletePath(const std::string &path, bool use_trash) {
   if (use_trash && FileUtils::MoveToTrash(path)) {
     return true;
   }
+  if (FileUtils::IsDirectory(path)) {
+    return FileUtils::RemoveRecursive(path);
+  }
   return FileUtils::Remove(path);
+}
+
+// Qt DeleteFiles::Start(QStringList) keeps directory entries so File View can delete folders.
+inline SongList SongsFromPaths(const std::vector<std::string> &paths) {
+  SongList songs;
+  songs.reserve(paths.size());
+  for (const std::string &path : paths) {
+    if (path.empty()) {
+      continue;
+    }
+    Song song(Song::Source::LocalFile);
+    song.set_url(FileUtils::UriFromPath(path));
+    song.set_basefilename(FileUtils::BaseName(path));
+    song.set_title(FileUtils::BaseName(path));
+    song.set_valid(true);
+    songs.push_back(song);
+  }
+  return songs;
 }
 
 inline std::vector<Organize::Error> ToOrganizeErrors(const SongList &songs) {

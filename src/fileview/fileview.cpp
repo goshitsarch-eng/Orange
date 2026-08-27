@@ -363,50 +363,51 @@ void FileView::ShowMenu(const std::vector<std::string> &paths) {
                          return;
                        }
                        const FileViewMenu::Action action = FileViewMenu::FromId(g_action_get_name(G_ACTION(act)));
+                       const std::vector<std::string> paths = FileViewMenu::PathsForAction(action, pair->second);
                        switch (action) {
                          case FileViewMenu::Action::Append:
                            if (self->add_to_playlist_) {
-                             self->add_to_playlist_(FileViewMenu::ExpandPaths(pair->second));
+                             self->add_to_playlist_(paths);
                            }
                            break;
                          case FileViewMenu::Action::Replace:
                            if (self->replace_playlist_) {
-                             self->replace_playlist_(FileViewMenu::ExpandPaths(pair->second));
+                             self->replace_playlist_(paths);
                            }
                            break;
                          case FileViewMenu::Action::New:
                            if (self->open_in_new_) {
-                             self->open_in_new_(FileViewMenu::ExpandPaths(pair->second));
+                             self->open_in_new_(paths);
                            }
                            break;
                          case FileViewMenu::Action::Copy:
                            if (self->copy_to_collection_) {
-                             self->copy_to_collection_(pair->second);
+                             self->copy_to_collection_(paths);
                            }
                            break;
                          case FileViewMenu::Action::Move:
                            if (self->move_to_collection_) {
-                             self->move_to_collection_(pair->second);
+                             self->move_to_collection_(paths);
                            }
                            break;
                          case FileViewMenu::Action::Device:
                            if (self->copy_to_device_) {
-                             self->copy_to_device_(FileViewMenu::ExpandPaths(pair->second));
+                             self->copy_to_device_(paths);
                            }
                            break;
                          case FileViewMenu::Action::EditTags:
                            if (self->edit_tags_) {
-                             self->edit_tags_(FileViewMenu::ExpandPaths(pair->second));
+                             self->edit_tags_(paths);
                            }
                            break;
                          case FileViewMenu::Action::Delete:
                            if (self->delete_) {
-                             self->delete_(FileViewMenu::ExpandPaths(pair->second));
+                             self->delete_(paths);
                            }
                            break;
                          case FileViewMenu::Action::Browse:
                            if (self->show_in_browser_) {
-                             self->show_in_browser_(pair->second);
+                             self->show_in_browser_(paths);
                            }
                            break;
                        }

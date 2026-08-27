@@ -69,6 +69,7 @@
 #include "playlist/playlistmenu.h"
 #include "playlist/playliststopafter.h"
 #include "core/playerstopafter.h"
+#include "core/deletefilesjob.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistlistlook.h"
 #include "playlist/playlistsequence.h"
@@ -1361,7 +1362,7 @@ void MainWindow::BuildSidebar() {
     Dialogs::EditTag(GTK_WINDOW(window_), app_, songs);
   });
   file_view_->SetDeleteCallback([this](const std::vector<std::string> &paths) {
-    const SongList songs = FileViewSongs::FromPaths(paths);
+    const SongList songs = DeleteFilesJob::SongsFromPaths(paths);
     Dialogs::DeleteFiles(GTK_WINDOW(window_), app_, songs, DeleteFilesPolicy::SourceForSongs(songs));
     if (file_view_) {
       g_timeout_add(800, [](gpointer data) -> gboolean {

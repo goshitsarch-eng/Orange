@@ -1661,6 +1661,58 @@ TEST(GioDeviceFilter, MatchesQtSuitableRules) {
   EXPECT_TRUE(GioDeviceFilter::IsSuitable(true, false, true, true, "ext4"));
 }
 
+TEST(FileUtils, RemoveRecursiveDeletesDirectoryTree) {
+  const std::string root = "/tmp/strawberry-rm-recursive-" + std::to_string(getpid());
+  const std::string nested = FileUtils::Join(root, "album");
+  g_mkdir_with_parents(nested.c_str(), 0755);
+  const std::string track = FileUtils::Join(nested, "track.flac");
+  const std::string cover = FileUtils::Join(root, "cover.jpg");
+  const std::string hidden = FileUtils::Join(root, ".hidden.txt");
+  ASSERT_TRUE(FileUtils::WriteFile(track, "x"));
+  ASSERT_TRUE(FileUtils::WriteFile(cover, "y"));
+  ASSERT_TRUE(FileUtils::WriteFile(hidden, "z"));
+  EXPECT_TRUE(FileUtils::RemoveRecursive(root));
+  EXPECT_FALSE(FileUtils::Exists(track));
+  EXPECT_FALSE(FileUtils::Exists(cover));
+  EXPECT_FALSE(FileUtils::Exists(hidden));
+  EXPECT_FALSE(FileUtils::Exists(root));
+}
+
+TEST(DeleteFilesJob, DeletePathRemovesDirectoryRecursively) {
+  const std::string root = "/tmp/strawberry-delpath-" + std::to_string(getpid());
+  const std::string nested = FileUtils::Join(root, "CD1");
+  g_mkdir_with_parents(nested.c_str(), 0755);
+  const std::string track = FileUtils::Join(nested, "a.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(track, "x"));
+  EXPECT_TRUE(DeleteFilesJob::DeletePath(root, false));
+  EXPECT_FALSE(FileUtils::Exists(root));
+}
+
+TEST(DeleteFilesJob, SongsFromPathsKeepsDirectories) {
+  const std::string dir = "/tmp/album";
+  const std::string file = "/tmp/album/a.flac";
+  const SongList songs = DeleteFilesJob::SongsFromPaths({dir, file, ""});
+  ASSERT_EQ(2u, songs.size());
+  EXPECT_EQ(FileUtils::UriFromPath(dir), songs[0].url());
+  EXPECT_EQ("album", songs[0].title());
+  EXPECT_EQ(FileUtils::UriFromPath(file), songs[1].url());
+  EXPECT_EQ(Song::Source::LocalFile, songs[0].source());
+}
+
+TEST(FilesystemMusicStorage, DeletesDirectoryFromStorage) {
+  const std::string root = "/tmp/strawberry-storage-dir-" + std::to_string(getpid());
+  const std::string album = FileUtils::Join(root, "album");
+  g_mkdir_with_parents(album.c_str(), 0755);
+  ASSERT_TRUE(FileUtils::WriteFile(FileUtils::Join(album, "a.flac"), "x"));
+  ASSERT_TRUE(FileUtils::WriteFile(FileUtils::Join(album, "cover.jpg"), "y"));
+  FilesystemMusicStorage storage(root);
+  Song song(Song::Source::LocalFile);
+  song.set_url(FileUtils::UriFromPath(album));
+  EXPECT_TRUE(storage.DeleteFromStorage({song, false}));
+  EXPECT_FALSE(FileUtils::Exists(album));
+  rmdir(root.c_str());
+}
+
 TEST(FileUtils, ListDirectoryRecursive) {
   const std::string root = "/tmp/strawberry-recursive-" + std::to_string(getpid());
   const std::string nested = FileUtils::Join(root, "album");

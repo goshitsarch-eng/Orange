@@ -99,6 +99,28 @@ inline std::vector<std::string> ExpandPaths(const std::vector<std::string> &path
   return files;
 }
 
+// Qt File View delete/copy/move/browse keep the selected folder; playlist actions expand it.
+inline bool ExpandsPaths(Action action) {
+  switch (action) {
+    case Action::Append:
+    case Action::Replace:
+    case Action::New:
+    case Action::Device:
+    case Action::EditTags:
+      return true;
+    case Action::Copy:
+    case Action::Move:
+    case Action::Delete:
+    case Action::Browse:
+    default:
+      return false;
+  }
+}
+
+inline std::vector<std::string> PathsForAction(Action action, const std::vector<std::string> &selection) {
+  return ExpandsPaths(action) ? ExpandPaths(selection) : selection;
+}
+
 inline std::string BrowserPath(const std::vector<std::string> &paths) {
   if (paths.empty()) {
     return {};

@@ -41,5 +41,8 @@ bool FilesystemMusicStorage::DeleteFromStorage(const DeleteJob &job) {
   if (job.use_trash && FileUtils::MoveToTrash(path)) {
     return true;
   }
+  if (FileUtils::IsDirectory(path)) {
+    return FileUtils::RemoveRecursive(path);
+  }
   return FileUtils::Remove(path);
 }

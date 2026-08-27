@@ -149,6 +149,21 @@ bool CopyFile(const std::string &source, const std::string &destination) {
 
 bool Remove(const std::string &path) { return g_unlink(path.c_str()) == 0; }
 
+bool RemoveRecursive(const std::string &path) {
+  if (path.empty() || !Exists(path)) {
+    return false;
+  }
+  if (IsDirectory(path)) {
+    for (const std::string &entry : ListDirectory(path)) {
+      if (!RemoveRecursive(entry)) {
+        return false;
+      }
+    }
+    return g_rmdir(path.c_str()) == 0;
+  }
+  return Remove(path);
+}
+
 bool MoveToTrash(const std::string &path) {
   if (path.empty()) {
     return false;

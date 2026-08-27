@@ -272,6 +272,18 @@ TEST(FileViewMenu, ExpandPathsRecursesNestedAlbums) {
   rmdir(album.c_str());
 }
 
+TEST(FileViewMenu, DeleteUsesRawSelectionPaths) {
+  const std::string album = "/tmp/album";
+  const std::vector<std::string> selection = {album};
+  EXPECT_FALSE(FileViewMenu::ExpandsPaths(FileViewMenu::Action::Delete));
+  EXPECT_TRUE(FileViewMenu::ExpandsPaths(FileViewMenu::Action::Append));
+  const auto deleted = FileViewMenu::PathsForAction(FileViewMenu::Action::Delete, selection);
+  ASSERT_EQ(1u, deleted.size());
+  EXPECT_EQ(album, deleted.front());
+  EXPECT_TRUE(FileViewMenu::PathsForAction(FileViewMenu::Action::Copy, selection) == selection);
+  EXPECT_TRUE(FileViewMenu::PathsForAction(FileViewMenu::Action::Browse, selection) == selection);
+}
+
 TEST(FileViewHistory, BackForwardAndTruncate) {
   FileViewHistory history;
   EXPECT_FALSE(history.CanBack());
