@@ -28,7 +28,7 @@ class OSDPretty {
   int pos_y() const { return pos_y_; }
   void set_pos(int x, int y);
   void SavePosition() const;
-  bool IsTransparencyAvailable() const { return true; }
+  bool IsTransparencyAvailable() const;
   static bool Supported();
   static std::vector<std::pair<std::string, std::string>> MonitorChoices();
   bool fading() const { return fading_; }
@@ -40,6 +40,7 @@ class OSDPretty {
   void EnsureWindow();
   void ApplyStyle();
   void ApplyPosition();
+  void ApplyShape();
   void ApplyLimits();
   void ConnectDrag();
   void ConnectPopup();

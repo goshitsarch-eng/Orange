@@ -13,6 +13,7 @@
 #include "osd/osdprettylimits.h"
 #include "osd/osdprettyplacement.h"
 #include "osd/osdprettypopup.h"
+#include "osd/osdprettytransparency.h"
 #include "utilities/colorutils.h"
 #include "utilities/fontutils.h"
 #include "queue/queueview.h"
@@ -168,6 +169,30 @@ TEST(OSDPretty, SupportedRequiresX11Display) {
     EXPECT_FALSE(OSDPretty::Supported());
     EXPECT_FALSE(OSDBase::SupportsOSDPretty());
   }
+}
+
+TEST(OSDPrettyTransparency, ShapeMaskMatchesQtCompositorRules) {
+  EXPECT_EQ(10, OSDPrettyTransparency::kBorderRadius);
+  EXPECT_FALSE(OSDPrettyTransparency::Available(true, false, false));
+  EXPECT_TRUE(OSDPrettyTransparency::Available(true, true, false));
+  EXPECT_TRUE(OSDPrettyTransparency::Available(false, false, true));
+  EXPECT_TRUE(OSDPrettyTransparency::Available(false, false, false));
+  EXPECT_TRUE(OSDPrettyTransparency::ShouldApplyShape(true, false));
+  EXPECT_FALSE(OSDPrettyTransparency::ShouldApplyShape(true, true));
+  EXPECT_FALSE(OSDPrettyTransparency::ShouldApplyShape(false, false));
+  EXPECT_TRUE(OSDPrettyTransparency::ShouldClearShape(true, true));
+  EXPECT_FALSE(OSDPrettyTransparency::ShouldClearShape(true, false));
+  EXPECT_EQ(10, OSDPrettyTransparency::ClampRadius(320, 80));
+  EXPECT_EQ(4, OSDPrettyTransparency::ClampRadius(8, 20));
+  EXPECT_EQ(0, OSDPrettyTransparency::ClampRadius(0, 80));
+  EXPECT_EQ(40, OSDPrettyTransparency::MaskByteCount(320, 1));
+  EXPECT_TRUE(OSDPrettyTransparency::PixelInsideRoundedRect(40, 40, 80, 80, 10));
+  EXPECT_FALSE(OSDPrettyTransparency::PixelInsideRoundedRect(0, 0, 80, 80, 10));
+  EXPECT_TRUE(OSDPrettyTransparency::PixelInsideRoundedRect(10, 10, 80, 80, 10));
+  const auto bits = OSDPrettyTransparency::RoundedMaskBits(16, 16, 4);
+  ASSERT_EQ(static_cast<size_t>(OSDPrettyTransparency::MaskByteCount(16, 16)), bits.size());
+  EXPECT_EQ(0, bits[0] & 0x01);
+  EXPECT_NE(0, bits[static_cast<size_t>(8 * OSDPrettyTransparency::MaskStride(16) + 1)]);
 }
 
 TEST(OSDPrettyPlacement, AbsolutePositionUsesMonitorOriginAndNegativeEdges) {

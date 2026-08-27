@@ -7,6 +7,7 @@
 #include "osd/osdprettylimits.h"
 #include "osd/osdprettyplacement.h"
 #include "osd/osdprettypopup.h"
+#include "osd/osdprettytransparency.h"
 #include "osd/osdprettywayland.h"
 #include "utilities/fontutils.h"
 
@@ -16,6 +17,7 @@
 #ifdef HAVE_X11
 #include <gdk/x11/gdkx.h>
 #include <X11/Xlib.h>
+#include <X11/extensions/shape.h>
 #endif
 
 namespace {
@@ -310,6 +312,61 @@ void OSDPretty::ApplyPosition() {
   const OSDPrettyPlacement::Rect size = WindowSize(window_);
   const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::AbsolutePosition(workarea, {pos_x_, pos_y_}, size.width, size.height);
   MoveWindow(window_, abs.x, abs.y);
+  ApplyShape();
+}
+
+bool OSDPretty::IsTransparencyAvailable() const {
+  GdkDisplay *display = gdk_display_get_default();
+  if (!display) {
+    return true;
+  }
+#ifdef HAVE_X11
+  if (GDK_IS_X11_DISPLAY(display)) {
+    return OSDPrettyTransparency::Available(true, gdk_display_is_composited(display), false);
+  }
+#endif
+  return OSDPrettyTransparency::Available(false, true, true);
+}
+
+void OSDPretty::ApplyShape() {
+#ifdef HAVE_X11
+  if (!window_) {
+    return;
+  }
+  GdkDisplay *display = gtk_widget_get_display(window_);
+  if (!display || !GDK_IS_X11_DISPLAY(display)) {
+    return;
+  }
+  GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window_));
+  if (!surface || !GDK_IS_X11_SURFACE(surface)) {
+    return;
+  }
+  Display *xdisplay = GDK_SURFACE_XDISPLAY(surface);
+  const Window xid = gdk_x11_surface_get_xid(surface);
+  const OSDPrettyPlacement::Rect size = WindowSize(window_);
+  const bool transparent = IsTransparencyAvailable();
+  if (OSDPrettyTransparency::ShouldClearShape(true, transparent)) {
+    XRectangle rect{0, 0, static_cast<unsigned short>(std::max(1, size.width)), static_cast<unsigned short>(std::max(1, size.height))};
+    XShapeCombineRectangles(xdisplay, xid, ShapeBounding, 0, 0, &rect, 1, ShapeSet, Unsorted);
+    return;
+  }
+  if (!OSDPrettyTransparency::ShouldApplyShape(true, transparent) || size.width <= 0 || size.height <= 0) {
+    return;
+  }
+  const std::vector<unsigned char> bits = OSDPrettyTransparency::RoundedMaskBits(size.width, size.height);
+  if (bits.empty()) {
+    return;
+  }
+  Pixmap pixmap = XCreateBitmapFromData(xdisplay, xid, reinterpret_cast<const char *>(bits.data()), static_cast<unsigned>(size.width),
+                                        static_cast<unsigned>(size.height));
+  if (!pixmap) {
+    return;
+  }
+  XShapeCombineMask(xdisplay, xid, ShapeBounding, 0, 0, pixmap, ShapeSet);
+  XFreePixmap(xdisplay, pixmap);
+#else
+  (void)0;
+#endif
 }
 
 void OSDPretty::ApplyStyle() {
