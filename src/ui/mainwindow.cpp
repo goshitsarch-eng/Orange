@@ -1579,7 +1579,7 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->view()->SetSeekBackwardCallback([this]() { app_->player()->SeekBackward(); });
   playlist_container_->view()->SetSeekForwardCallback([this]() { app_->player()->SeekForward(); });
   playlist_container_->view()->SetSelectCallback([this](int index, bool add) { SelectPlaylistRow(index, add); });
-  playlist_container_->view()->SetRateCallback([this](int row, float rating) { RateRow(row, rating); });
+  playlist_container_->view()->SetRateCallback([this](const std::vector<int> &rows, float rating) { RateRows(rows, rating); });
   playlist_container_->view()->SetQueuePositionCallback([this](int row) {
     Playlist *playlist = app_->playlist_manager()->current();
     if (!playlist) {

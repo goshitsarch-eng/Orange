@@ -229,6 +229,13 @@ TEST(PlaylistRating, WritesCollectionLikeQt) {
   EXPECT_EQ(7, ids[0]);
 }
 
+TEST(PlaylistRating, RowsForStarClickMatchesQtSelection) {
+  EXPECT_TRUE(PlaylistRating::RowsForStarClick(-1, {1, 2}).empty());
+  EXPECT_EQ((std::vector<int>{2}), PlaylistRating::RowsForStarClick(2, {}));
+  EXPECT_EQ((std::vector<int>{2}), PlaylistRating::RowsForStarClick(2, {5, 7}));
+  EXPECT_EQ((std::vector<int>{1, 3, 5}), PlaylistRating::RowsForStarClick(3, {1, 3, 5}));
+}
+
 TEST(PlaylistListModel, ReloadAndLookup) {
   PlaylistListModel model;
   model.Reload(nullptr);

@@ -12,6 +12,7 @@
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlisteditpolicy.h"
 #include "playlist/playlistplayingicon.h"
+#include "playlist/playlistrating.h"
 #include "playlist/playlistratingclick.h"
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistfilter.h"
@@ -640,8 +641,9 @@ void PlaylistView::Refresh(Playlist *playlist) {
                        self->last_clicked_row_ = index;
                        self->RecordClickedColumn(widget, x);
                        self->InhibitAutoscroll();
+                       const std::vector<int> selected_before = self->selected_rows_;
                        const bool already_selected =
-                           std::find(self->selected_rows_.begin(), self->selected_rows_.end(), index) != self->selected_rows_.end();
+                           std::find(selected_before.begin(), selected_before.end(), index) != selected_before.end();
                        if (self->select_) {
                          self->select_(index, (mods & GDK_CONTROL_MASK) != 0);
                        }
@@ -651,7 +653,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
                            PlaylistRatingClick::ShouldRate(self->last_clicked_column_, PlaylistColumnLayout::RatingLocked(),
                                                            static_cast<int>(self->last_click_cell_x_),
                                                            static_cast<int>(self->last_click_cell_width_), &rating)) {
-                         self->rate_(index, rating);
+                         self->rate_(PlaylistRating::RowsForStarClick(index, selected_before), rating);
                          rated = true;
                        }
                        Settings settings;

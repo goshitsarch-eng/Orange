@@ -25,7 +25,7 @@ class PlaylistView {
   using DropUrlsCallback = std::function<void(const std::vector<std::string> &, int)>;
   using ReorderCallback = std::function<void(const std::vector<int> &, int)>;
   using CrossDropCallback = std::function<void(int, const std::vector<int> &, int)>;
-  using RateCallback = std::function<void(int, float)>;
+  using RateCallback = std::function<void(const std::vector<int> &, float)>;
   using QueuePositionCallback = std::function<int(int)>;
   using DeleteCallback = std::function<void()>;
   using FocusFilterCallback = std::function<void()>;

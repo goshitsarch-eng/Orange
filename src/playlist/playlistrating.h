@@ -3,6 +3,7 @@
 
 #include "core/song.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace PlaylistRating {
@@ -21,6 +22,17 @@ inline std::vector<int> CollectionIdsToRate(const SongList &songs) {
 }
 
 inline bool ShouldSaveRatingTags(bool save_ratings_in_tags, bool editable) { return save_ratings_in_tags && editable; }
+
+// Qt PlaylistView: if the clicked rating cell is already selected, rate the whole selection.
+inline std::vector<int> RowsForStarClick(int clicked_row, const std::vector<int> &selected_rows) {
+  if (clicked_row < 0) {
+    return {};
+  }
+  if (std::find(selected_rows.begin(), selected_rows.end(), clicked_row) == selected_rows.end()) {
+    return {clicked_row};
+  }
+  return selected_rows;
+}
 
 }  // namespace PlaylistRating
 
