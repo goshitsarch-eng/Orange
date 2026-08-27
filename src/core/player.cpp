@@ -28,6 +28,7 @@
 #include "core/playerstopafter.h"
 #include "core/songsegment.h"
 #include "core/playerresume.h"
+#include "core/playlistsloadedgate.h"
 #include "core/settings.h"
 #include "core/urlhandlers.h"
 #include "playlist/playlist.h"
@@ -117,6 +118,22 @@ void Player::SavePlaybackStatus() {
   settings.Sync();
 }
 
+void Player::PlaylistsLoaded() {
+  playlists_loaded_ = true;
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const bool resume = settings.BoolValue(BehaviourSettings::kResumePlayback, BehaviourSettings::kDefaultResumePlayback);
+  settings.EndGroup();
+  settings.BeginGroup(PlayerResume::kSettingsGroup);
+  const int state = settings.IntValue(PlayerResume::kPlaybackState, static_cast<int>(EngineBase::State::Empty));
+  if (PlaylistsLoadedGate::ShouldResumeAfterLoad(resume, state)) {
+    ResumePlayback();
+  } else if (PlaylistsLoadedGate::ShouldHonorPlayRequest(resume, state, play_requested_)) {
+    Play();
+  }
+  play_requested_ = false;
+}
+
 void Player::ResumePlayback() {
   Settings settings;
   settings.BeginGroup(BehaviourSettings::kSettingsGroup);
@@ -140,6 +157,10 @@ void Player::ResumePlayback() {
 }
 
 void Player::Play() {
+  if (PlaylistsLoadedGate::DeferPlay(playlists_loaded_)) {
+    play_requested_ = true;
+    return;
+  }
   if (playlist_manager_) {
     playlist_manager_->SetActiveToCurrent();
   }

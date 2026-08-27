@@ -20,6 +20,7 @@
 #include "core/mainwindowsponsor.h"
 #include "core/commandlinewindow.h"
 #include "core/mainwindowsettings.h"
+#include "core/playlistsloadedgate.h"
 #include "dialogs/edittagloading.h"
 #include "dialogs/edittagsave.h"
 #include "dialogs/messagedialog.h"
@@ -198,8 +199,11 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
   RefreshStreaming();
   RefreshQueue();
   ApplyBehaviourSettings();
-  app_->player()->ResumePlayback();
-  app_->ApplyCommandline(options);
+  pending_options_ = options;
+  has_pending_options_ = true;
+  if (app_->playlist_manager()->playlists_loaded()) {
+    HandlePlaylistsLoaded();
+  }
 }
 
 MainWindow::~MainWindow() {
@@ -256,8 +260,25 @@ void MainWindow::MaybeShowSponsor() {
                       });
 }
 
+void MainWindow::HandlePlaylistsLoaded() {
+  if (playlists_loaded_) {
+    return;
+  }
+  playlists_loaded_ = true;
+  if (has_pending_options_) {
+    app_->ApplyCommandline(pending_options_);
+    has_pending_options_ = false;
+  }
+  app_->player()->PlaylistsLoaded();
+}
+
 void MainWindow::CommandlineReceived(const CommandlineOptions &options) {
-  app_->ApplyCommandline(options);
+  if (PlaylistsLoadedGate::ShouldDeferCommandline(playlists_loaded_)) {
+    pending_options_ = options;
+    has_pending_options_ = true;
+  } else {
+    app_->ApplyCommandline(options);
+  }
   if (CommandlineWindow::ShouldResize(options.player_action(), options.resize_width(), options.resize_height())) {
     gtk_window_set_default_size(GTK_WINDOW(window_), options.resize_width(), options.resize_height());
   }
@@ -1926,6 +1947,7 @@ void MainWindow::ConnectSignals() {
     ApplyMuteUi(volume);
   });
   app_->playlist_manager()->PlaylistsLoaded.Connect([this]() {
+    HandlePlaylistsLoaded();
     ApplyPlaylistBehaviour();
     RefreshPlaylistsList();
     RefreshPlaylist();

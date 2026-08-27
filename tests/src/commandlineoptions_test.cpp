@@ -1,5 +1,6 @@
 #include "core/commandlineoptions.h"
 #include "core/commandlinewindow.h"
+#include "core/playlistsloadedgate.h"
 #include "tidal/tidalloginurl.h"
 
 #include <gtest/gtest.h>
@@ -51,6 +52,20 @@ TEST(CommandlineOptions, ParsesResizeVersionAndLogLevels) {
   EXPECT_TRUE(verbose.debug());
   const CommandlineOptions quiet = parse({"--quiet"});
   EXPECT_EQ("*:1", quiet.log_levels());
+}
+
+TEST(PlaylistsLoadedGate, DefersCommandlineAndPlayUntilLoaded) {
+  EXPECT_TRUE(PlaylistsLoadedGate::ShouldDeferCommandline(false));
+  EXPECT_FALSE(PlaylistsLoadedGate::ShouldDeferCommandline(true));
+  EXPECT_TRUE(PlaylistsLoadedGate::DeferPlay(false));
+  EXPECT_FALSE(PlaylistsLoadedGate::DeferPlay(true));
+  EXPECT_TRUE(PlaylistsLoadedGate::ShouldResumeAfterLoad(true, static_cast<int>(EngineBase::State::Playing)));
+  EXPECT_TRUE(PlaylistsLoadedGate::ShouldResumeAfterLoad(true, static_cast<int>(EngineBase::State::Paused)));
+  EXPECT_FALSE(PlaylistsLoadedGate::ShouldResumeAfterLoad(false, static_cast<int>(EngineBase::State::Playing)));
+  EXPECT_FALSE(PlaylistsLoadedGate::ShouldResumeAfterLoad(true, static_cast<int>(EngineBase::State::Empty)));
+  EXPECT_TRUE(PlaylistsLoadedGate::ShouldHonorPlayRequest(false, static_cast<int>(EngineBase::State::Playing), true));
+  EXPECT_FALSE(PlaylistsLoadedGate::ShouldHonorPlayRequest(true, static_cast<int>(EngineBase::State::Playing), true));
+  EXPECT_FALSE(PlaylistsLoadedGate::ShouldHonorPlayRequest(false, static_cast<int>(EngineBase::State::Empty), false));
 }
 
 TEST(TidalLoginUrl, MatchesQtSchemeAndHost) {

@@ -75,6 +75,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   void SaveCurrent();
   void FlushPendingSaves();
   void LoadAll();
+  bool playlists_loaded() const { return playlists_loaded_; }
   void RefillDynamic();
   void ExpandDynamic();
   void RepopulateDynamic();
@@ -134,6 +135,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   PlaylistSaveSchedule::Intent pending_intent_ = PlaylistSaveSchedule::Intent::None;
   guint save_timeout_id_ = 0;
   guint tag_pump_id_ = 0;
+  bool playlists_loaded_ = false;
 };
 
 #endif  // STRAWBERRY_PLAYLISTMANAGER_H

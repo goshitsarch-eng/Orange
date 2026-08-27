@@ -55,6 +55,7 @@ class Player : public PlayerInterface {
   void SaveVolume();
   void SavePlaybackStatus();
   void ResumePlayback();
+  void PlaylistsLoaded();
   void ShowOSD();
   void TogglePrettyOSD();
 
@@ -118,6 +119,8 @@ class Player : public PlayerInterface {
   int64_t pause_started_sec_ = 0;
   int64_t last_previous_press_sec_ = 0;
   BehaviourSettings::PreviousBehaviour menu_previous_mode_ = BehaviourSettings::kDefaultMenuPreviousMode;
+  bool playlists_loaded_ = false;
+  bool play_requested_ = false;
 };
 
 #endif  // STRAWBERRY_PLAYER_H

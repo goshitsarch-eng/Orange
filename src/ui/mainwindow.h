@@ -46,6 +46,7 @@ class MainWindow {
   void CommandlineReceived(const CommandlineOptions &options);
 
  private:
+  void HandlePlaylistsLoaded();
   void BuildUi();
   void BuildSidebar();
   void BuildPlaylist();
@@ -273,6 +274,9 @@ class MainWindow {
   std::shared_ptr<bool> metadata_alive_ = std::make_shared<bool>(true);
   bool refreshing_devices_ = false;
   bool sponsor_prompted_ = false;
+  bool playlists_loaded_ = false;
+  bool has_pending_options_ = false;
+  CommandlineOptions pending_options_;
   TaskbarProgress taskbar_;
 };
 

@@ -32,7 +32,9 @@ Song MakeSong(const std::string &title, const std::string &url) {
 
 TEST(PlaylistManager, InitCreatesDefaultPlaylist) {
   PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
+  EXPECT_FALSE(manager.playlists_loaded());
   manager.Init();
+  EXPECT_TRUE(manager.playlists_loaded());
   ASSERT_NE(nullptr, manager.current());
   EXPECT_EQ(manager.current(), manager.active());
   EXPECT_FALSE(manager.playlist_ids().empty());

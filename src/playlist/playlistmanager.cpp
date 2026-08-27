@@ -118,6 +118,7 @@ void PlaylistManager::LoadAll() {
       }
     }
   }
+  playlists_loaded_ = true;
   PlaylistsLoaded.Emit();
 }
 
