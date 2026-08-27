@@ -3700,6 +3700,7 @@ void MainWindow::ApplyMuteUi(unsigned volume) {
   }
   if (app_ && app_->tray()) {
     app_->tray()->SetMuteEnabled(visible);
+    app_->tray()->SetMuteChecked(muted);
   }
 }
 

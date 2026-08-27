@@ -246,6 +246,28 @@ TEST(MacStartupActions, ReopenDockAndMediaKeysMatchQt) {
   EXPECT_TRUE(MacStartupActions::DockItemIsSeparator(SystemTrayIcon::kMenuSeparator));
 }
 
+TEST(TrayMenuMute, CheckedStateMatchesQt) {
+  EXPECT_TRUE(TrayMenuMute::IsToggleId(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute));
+  EXPECT_FALSE(TrayMenuMute::IsToggleId(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuMute));
+  EXPECT_STREQ("checkmark", TrayMenuMute::ToggleType());
+  EXPECT_EQ(0, TrayMenuMute::ToggleState(false));
+  EXPECT_EQ(1, TrayMenuMute::ToggleState(true));
+  EXPECT_EQ(-2, TrayMenuMute::ToggleStateForId(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuMute, true));
+  EXPECT_EQ(1, TrayMenuMute::ToggleStateForId(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute, true));
+  EXPECT_TRUE(TrayMenuMute::ItemChecked(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute, true));
+  EXPECT_FALSE(TrayMenuMute::ItemChecked(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute, false));
+  EXPECT_FALSE(TrayMenuMute::ItemChecked(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuMute, true));
+  EXPECT_TRUE(MainWindowLook::IsMuted(0));
+  EXPECT_FALSE(MainWindowLook::IsMuted(1));
+
+  SystemTrayIcon tray;
+  EXPECT_FALSE(tray.mute_checked());
+  tray.SetMuteChecked(true);
+  EXPECT_TRUE(tray.mute_checked());
+  tray.SetMuteChecked(false);
+  EXPECT_FALSE(tray.mute_checked());
+}
+
 TEST(TrayMenuMute, FollowsVolumeControlLikeQt) {
   EXPECT_TRUE(TrayMenuMute::ShouldShow(true));
   EXPECT_FALSE(TrayMenuMute::ShouldShow(false));

@@ -162,7 +162,7 @@ void SetPopupArt(GtkWidget *image, const std::vector<unsigned char> &data, int p
   g_object_unref(loader);
 }
 
-GVariant *ItemProps(const char *label, const char *type = "standard", bool enabled = true, bool visible = true) {
+GVariant *ItemProps(const char *label, const char *type = "standard", bool enabled = true, bool visible = true, int toggle_state = -2) {
   GVariantBuilder props;
   g_variant_builder_init(&props, G_VARIANT_TYPE("a{sv}"));
   g_variant_builder_add(&props, "{sv}", "type", g_variant_new_string(type));
@@ -170,6 +170,10 @@ GVariant *ItemProps(const char *label, const char *type = "standard", bool enabl
     g_variant_builder_add(&props, "{sv}", "label", g_variant_new_string(label));
     g_variant_builder_add(&props, "{sv}", "enabled", g_variant_new_boolean(enabled));
     g_variant_builder_add(&props, "{sv}", "visible", g_variant_new_boolean(visible));
+    if (toggle_state >= 0) {
+      g_variant_builder_add(&props, "{sv}", "toggle-type", g_variant_new_string(TrayMenuMute::ToggleType()));
+      g_variant_builder_add(&props, "{sv}", "toggle-state", g_variant_new_int32(toggle_state));
+    }
   }
   return g_variant_builder_end(&props);
 }
@@ -201,6 +205,14 @@ void SystemTrayIcon::SetMuteEnabled(bool enabled) {
     return;
   }
   mute_enabled_ = enabled;
+  EmitLayoutUpdated();
+}
+
+void SystemTrayIcon::SetMuteChecked(bool checked) {
+  if (mute_checked_ == checked) {
+    return;
+  }
+  mute_checked_ = checked;
   EmitLayoutUpdated();
 }
 
@@ -533,7 +545,18 @@ void SystemTrayIcon::ShowMenu(int x, int y) {
   connect(box, gtk_button_new_with_label(Translations::CStr("Next")), &Next);
   connect(box, gtk_button_new_with_label(Translations::CStr("Previous")), &Previous);
   if (mute_enabled_) {
-    connect(box, gtk_button_new_with_label(Translations::CStr("Mute")), &Mute);
+    GtkWidget *mute = gtk_check_button_new_with_label(Translations::CStr("Mute"));
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(mute), mute_checked_ ? TRUE : FALSE);
+    gtk_widget_add_css_class(mute, "flat");
+    g_signal_connect(mute, "toggled",
+                     G_CALLBACK((+[](GtkCheckButton *btn, gpointer data) {
+                       static_cast<Signal<> *>(data)->Emit();
+                       if (GtkWidget *win = gtk_widget_get_ancestor(GTK_WIDGET(btn), GTK_TYPE_WINDOW)) {
+                         gtk_window_destroy(GTK_WINDOW(win));
+                       }
+                     })),
+                     &Mute);
+    gtk_box_append(GTK_BOX(box), mute);
   }
   connect(box, gtk_button_new_with_label(Translations::CStr("Stop after this track")), &StopAfter);
   if (love_visible_) {
@@ -646,7 +669,8 @@ GVariant *SystemTrayIcon::MenuLayout(int parent_id) const {
     const char *type = IsSeparatorId(id) ? "separator" : "standard";
     const bool enabled = TrayMenuLove::ItemEnabled(id, kMenuLove, love_enabled_);
     const bool visible = TrayMenuLove::ItemVisible(id, kMenuLove, love_visible_) && TrayMenuMute::ItemVisible(id, kMenuMute, mute_enabled_);
-    GVariant *item = g_variant_new("(i@a{sv}av)", id, ItemProps(MenuLabel(id, playing_), type, enabled, visible), &empty);
+    const int toggle_state = TrayMenuMute::ToggleStateForId(id, kMenuMute, mute_checked_);
+    GVariant *item = g_variant_new("(i@a{sv}av)", id, ItemProps(MenuLabel(id, playing_), type, enabled, visible, toggle_state), &empty);
     g_variant_builder_add(&children, "v", item);
   }
   return g_variant_new("(ia{sv}av)", 0, &root_props, &children);

@@ -32,9 +32,11 @@ class SystemTrayIcon {
   void SetLoveVisible(bool visible);
   void SetLoveEnabled(bool enabled);
   void SetMuteEnabled(bool enabled);
+  void SetMuteChecked(bool checked);
   bool love_visible() const { return love_visible_; }
   bool love_enabled() const { return love_enabled_; }
   bool mute_enabled() const { return mute_enabled_; }
+  bool mute_checked() const { return mute_checked_; }
 
   bool available() const { return available_; }
   bool visible() const { return visible_; }
@@ -139,6 +141,7 @@ class SystemTrayIcon {
   bool love_visible_ = true;
   bool love_enabled_ = true;
   bool mute_enabled_ = true;
+  bool mute_checked_ = false;
   GtkWidget *popup_window_ = nullptr;
   GtkWidget *popup_title_ = nullptr;
   GtkWidget *popup_body_ = nullptr;
