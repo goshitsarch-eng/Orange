@@ -3,6 +3,7 @@
 #include "core/enginemetadata.h"
 #include "core/taskmanager.h"
 #include "engine/enginebuffering.h"
+#include "engine/engineexclusive.h"
 #include "engine/enginefade.h"
 #include "engine/engineseek.h"
 #include "engine/ebur128normalization.h"
@@ -215,6 +216,12 @@ void GstEngine::StartPreloading(const std::string &media_url, const std::string 
   DiscardNext();
   next_media_url_ = media_url;
   next_url_ = url;
+  if (!EngineExclusive::AllowsSecondPipeline(exclusive_mode_) && current_ && current_->valid()) {
+    current_->SetNextUri(url);
+    gapless_pending_ = true;
+    RequestDiscover(media_url, url);
+    return;
+  }
   next_ = CreatePipeline(url, static_cast<uint64_t>(std::max<int64_t>(0, beginning_offset_nanosec)), end_offset_nanosec);
   if (next_) {
     next_->SetVolume(0.0);
@@ -232,9 +239,10 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   const bool auto_crossfade = BackendOptions::AllowAutoCrossfade(autocrossfade_enabled_, no_crossfade_same_album_, current_album_,
                                                                 next_album_, same_album) &&
                               !BackendOptions::SuppressSameAlbumCrossfade(auto_change, same_album, no_crossfade_same_album_);
-  const bool crossfade = current_ && current_->valid() &&
-                         ((crossfade_enabled_ && (track_change_flags & Manual)) || (auto_crossfade && auto_change) ||
-                          ((crossfade_enabled_ || auto_crossfade) && (track_change_flags & Intro)));
+  const bool want_crossfade = current_ && current_->valid() &&
+                              ((crossfade_enabled_ && (track_change_flags & Manual)) || (auto_crossfade && auto_change) ||
+                               ((crossfade_enabled_ || auto_crossfade) && (track_change_flags & Intro)));
+  const bool crossfade = EngineExclusive::ShouldCrossfade(want_crossfade, exclusive_mode_);
 
   if (auto_change && current_ && current_->valid() && !crossfade) {
     DiscardNext();
@@ -286,6 +294,13 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
 }
 
 bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
+  if (EngineExclusive::ShouldDelayPlay(exclusive_mode_, fadeout_ != nullptr)) {
+    delayed_play_pending_ = true;
+    delayed_play_pause_ = pause;
+    delayed_play_offset_nanosec_ = offset_nanosec;
+    return true;
+  }
+  delayed_play_pending_ = false;
   if (next_ && next_->valid() && current_ && current_->valid()) {
     if (!next_->Play(pause, offset_nanosec)) {
       Error.Emit("Failed to start next pipeline");
@@ -318,6 +333,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
 
 void GstEngine::Stop(bool stop_after) {
   pending_pause_ = false;
+  delayed_play_pending_ = false;
   CancelFade();
   CancelSeek();
   DiscardNext();
@@ -515,6 +531,12 @@ gboolean GstEngine::StopFadeTick(gpointer data) {
       self->fadeout_->Stop();
       self->fadeout_.reset();
     }
+    if (self->delayed_play_pending_) {
+      const bool pause = self->delayed_play_pause_;
+      const uint64_t offset = self->delayed_play_offset_nanosec_;
+      self->delayed_play_pending_ = false;
+      self->Play(pause, offset);
+    }
     return G_SOURCE_REMOVE;
   }
   return G_SOURCE_CONTINUE;
@@ -535,6 +557,7 @@ void GstEngine::FinishStopImmediate() {
   stream_url_.clear();
   gapless_pending_ = false;
   faded_out_to_pause_ = false;
+  delayed_play_pending_ = false;
   SetState(State::Empty);
 }
 
@@ -566,7 +589,7 @@ void GstEngine::OnAboutToFinish(int pipeline_id) {
   if (!current_ || current_->id() != pipeline_id) {
     return;
   }
-  if ((crossfade_enabled_ || autocrossfade_enabled_) && !next_) {
+  if ((crossfade_enabled_ || autocrossfade_enabled_) && !next_ && EngineExclusive::AllowsSecondPipeline(exclusive_mode_)) {
     StartFade(-1);
   }
   TrackAboutToEnd.Emit();

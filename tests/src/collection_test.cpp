@@ -22,6 +22,7 @@
 #include "subsonic/subsonicsettingsactions.h"
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
+#include "engine/engineexclusive.h"
 #include "engine/enginefade.h"
 #include "engine/engineseek.h"
 #include "collection/collectionalbumart.h"
@@ -1011,6 +1012,17 @@ TEST(EngineFade, StopFadeGatingMatchesQt) {
   EXPECT_DOUBLE_EQ(1.0, EngineFade::VolumeAtStep(1.0, -1, 0.0));
   EXPECT_DOUBLE_EQ(0.5, EngineFade::VolumeAtStep(1.0, 1, 0.5));
   EXPECT_DOUBLE_EQ(0.0, EngineFade::VolumeAtStep(1.0, 1, 0.0));
+}
+
+TEST(EngineExclusive, BlocksSecondPipelineAndDelaysPlay) {
+  EXPECT_FALSE(EngineExclusive::AllowsSecondPipeline(true));
+  EXPECT_TRUE(EngineExclusive::AllowsSecondPipeline(false));
+  EXPECT_FALSE(EngineExclusive::ShouldCrossfade(true, true));
+  EXPECT_TRUE(EngineExclusive::ShouldCrossfade(true, false));
+  EXPECT_FALSE(EngineExclusive::ShouldCrossfade(false, false));
+  EXPECT_TRUE(EngineExclusive::ShouldDelayPlay(true, true));
+  EXPECT_FALSE(EngineExclusive::ShouldDelayPlay(true, false));
+  EXPECT_FALSE(EngineExclusive::ShouldDelayPlay(false, true));
 }
 
 TEST(EngineSeek, CoalescesRapidSeeksLikeQt) {
