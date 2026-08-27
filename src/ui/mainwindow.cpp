@@ -62,6 +62,7 @@
 #include "radios/radiomenu.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/radioviewcontainer.h"
+#include "smartplaylists/smartplaylistactivate.h"
 #include "smartplaylists/smartplaylistsview.h"
 #include "smartplaylists/smartplaylistsviewcontainer.h"
 #include "playlist/playlistcolumnlayout.h"
@@ -1230,16 +1231,7 @@ void MainWindow::BuildSidebar() {
   adw_view_stack_add_titled_with_icon(sidebar_stack_, playlist_list_container_->widget(), "playlists", "Playlists",
                                       "view-list-symbolic");
   smart_container_ = std::make_unique<SmartPlaylistsViewContainer>();
-  smart_container_->SetActivateCallback([this](const SmartPlaylistsItem &item) {
-    if (item.kind == SmartPlaylistsItem::Kind::Wizard) {
-      Dialogs::SmartPlaylistWizard(GTK_WINDOW(window_), app_);
-      smart_container_->Reload();
-      RefreshPlaylistsList();
-      RefreshPlaylist();
-      return;
-    }
-    RunSmartPlaylist(item.key);
-  });
+  smart_container_->SetActivateCallback([this](const SmartPlaylistsItem &item) { ActivateSmartPlaylist(item); });
   smart_container_->SetDeleteCallback([this](const SmartPlaylistsItem &item) {
     if (item.kind != SmartPlaylistsItem::Kind::Saved) {
       return;
@@ -1251,7 +1243,7 @@ void MainWindow::BuildSidebar() {
   smart_container_->SetActionCallback([this](const SmartPlaylistsItem &item, SmartPlaylistsAction action) {
     switch (action) {
       case SmartPlaylistsAction::Activate:
-        RunSmartPlaylist(item.key);
+        ActivateSmartPlaylist(item);
         break;
       case SmartPlaylistsAction::Append:
         app_->playlist_manager()->PlaySmartPlaylist(item.key, false, false);
@@ -3150,6 +3142,54 @@ void MainWindow::RunSmartPlaylist(const std::string &kind) {
   app_->playlist_manager()->PlaySmartPlaylist(kind, true, true);
   RefreshPlaylistsList();
   RefreshPlaylist();
+}
+
+void MainWindow::ActivateSmartPlaylist(const SmartPlaylistsItem &item) {
+  if (item.kind == SmartPlaylistsItem::Kind::Wizard) {
+    Dialogs::SmartPlaylistWizard(GTK_WINDOW(window_), app_);
+    if (smart_container_) {
+      smart_container_->Reload();
+    }
+    RefreshPlaylistsList();
+    RefreshPlaylist();
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const auto add = static_cast<BehaviourSettings::AddBehaviour>(
+      settings.IntValue(BehaviourSettings::kDoubleClickAddMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickAddMode)));
+  const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+      settings.IntValue(BehaviourSettings::kDoubleClickPlayMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlayMode)));
+  const SmartPlaylistActivate::PlayParams params = SmartPlaylistActivate::FromDoubleClick(add, play, EngineStopped());
+  int play_at = 0;
+  if (!params.as_new && !params.clear) {
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      play_at = playlist->row_count();
+    }
+  }
+  app_->playlist_manager()->PlaySmartPlaylist(item.key, params.as_new, params.clear);
+  if (params.enqueue || params.enqueue_next) {
+    const SongList songs = item.search.Search(app_->collection()->Songs());
+    if (params.enqueue) {
+      for (const Song &song : songs) {
+        app_->queue()->Append(song);
+      }
+    } else {
+      for (auto it = songs.rbegin(); it != songs.rend(); ++it) {
+        app_->queue()->InsertNext(*it);
+      }
+    }
+  }
+  RefreshPlaylistsList();
+  RefreshPlaylist();
+  RefreshQueue();
+  if (params.should_play) {
+    if (params.as_new && app_->playlist_manager()->current()) {
+      app_->player()->PlayPlaylist(app_->playlist_manager()->current()->name());
+    } else {
+      app_->player()->PlayAt(play_at);
+    }
+  }
 }
 
 void MainWindow::PlayRadioChannel(const RadioChannel &channel) {

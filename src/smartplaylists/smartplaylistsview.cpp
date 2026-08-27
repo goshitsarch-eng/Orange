@@ -1,5 +1,6 @@
 #include "smartplaylists/smartplaylistsview.h"
 
+#include "smartplaylists/smartplaylistactivate.h"
 #include "smartplaylists/smartplaylistdrag.h"
 #include "smartplaylists/smartplaylistslabel.h"
 #include "translations/translations.h"
@@ -11,6 +12,7 @@ SmartPlaylistsView::SmartPlaylistsView() {
   gtk_widget_set_vexpand(widget_, TRUE);
   list_ = gtk_list_box_new();
   gtk_widget_add_css_class(list_, "boxed-list");
+  gtk_list_box_set_activate_on_single_click(GTK_LIST_BOX(list_), SmartPlaylistActivate::ActivateOnSingleClick() ? TRUE : FALSE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<SmartPlaylistsView *>(data);
@@ -60,7 +62,9 @@ void SmartPlaylistsView::ResetTypeAhead() {
 gboolean SmartPlaylistsView::OnKeyPressed(guint keyval) {
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
   if (action == ListBoxKeyboard::Action::Activate) {
-    ListBoxKeyboardGtk::ActivateSelected(list_);
+    if (SmartPlaylistActivate::ShouldRun(SmartPlaylistActivate::Trigger::Enter)) {
+      ListBoxKeyboardGtk::ActivateSelected(list_);
+    }
     return TRUE;
   }
   if (action == ListBoxKeyboard::Action::Delete) {

@@ -105,6 +105,7 @@ class MainWindow {
   void EnsureAnalyzerTimer();
   void TickAnalyzer();
   void RunSmartPlaylist(const std::string &kind);
+  void ActivateSmartPlaylist(const SmartPlaylistsItem &item);
   void RefreshPlaylistTabs();
   void GoToPlaylistIndex(int index);
   void NextPlaylistTab();

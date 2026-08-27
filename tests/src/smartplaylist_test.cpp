@@ -17,6 +17,7 @@
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
+#include "smartplaylists/smartplaylistactivate.h"
 #include "smartplaylists/smartplaylistdrag.h"
 #include "smartplaylists/smartplaylistgeneratemore.h"
 #include "smartplaylists/smartplaylistsmodel.h"
@@ -881,6 +882,40 @@ TEST(SmartPlaylistPreviewDisplay, CapsAtGeneratorLimitAndUsesQtCountStrings) {
   EXPECT_TRUE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(true, false));
   EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(true, true));
   EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(false, false));
+}
+
+TEST(SmartPlaylistActivate, EnterDoesNotRunAndDefaultsAppend) {
+  EXPECT_FALSE(SmartPlaylistActivate::ShouldRun(SmartPlaylistActivate::Trigger::Enter));
+  EXPECT_TRUE(SmartPlaylistActivate::ShouldRun(SmartPlaylistActivate::Trigger::DoubleClick));
+  EXPECT_TRUE(SmartPlaylistActivate::IsEnter(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(SmartPlaylistActivate::IsEnter(ListBoxKeyboard::kKPEnter));
+  EXPECT_FALSE(SmartPlaylistActivate::IsEnter(ListBoxKeyboard::kEscape));
+  EXPECT_FALSE(SmartPlaylistActivate::ActivateOnSingleClick());
+
+  const SmartPlaylistActivate::PlayParams defaults = SmartPlaylistActivate::FromDoubleClick(
+      BehaviourSettings::kDefaultDoubleClickAddMode, BehaviourSettings::kDefaultDoubleClickPlayMode, true);
+  EXPECT_FALSE(defaults.as_new);
+  EXPECT_FALSE(defaults.clear);
+  EXPECT_FALSE(defaults.should_play);
+  EXPECT_FALSE(defaults.enqueue);
+  EXPECT_FALSE(defaults.enqueue_next);
+
+  const SmartPlaylistActivate::PlayParams load_always =
+      SmartPlaylistActivate::FromDoubleClick(BehaviourSettings::AddBehaviour::Load, BehaviourSettings::PlayBehaviour::Always, false);
+  EXPECT_FALSE(load_always.as_new);
+  EXPECT_TRUE(load_always.clear);
+  EXPECT_TRUE(load_always.should_play);
+
+  const SmartPlaylistActivate::PlayParams open_if_stopped =
+      SmartPlaylistActivate::FromDoubleClick(BehaviourSettings::AddBehaviour::OpenInNew, BehaviourSettings::PlayBehaviour::IfStopped, true);
+  EXPECT_TRUE(open_if_stopped.as_new);
+  EXPECT_TRUE(open_if_stopped.should_play);
+
+  const SmartPlaylistActivate::PlayParams enqueue =
+      SmartPlaylistActivate::FromDoubleClick(BehaviourSettings::AddBehaviour::Enqueue, BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_TRUE(enqueue.enqueue);
+  EXPECT_FALSE(enqueue.enqueue_next);
+  EXPECT_FALSE(enqueue.clear);
 }
 
 TEST(SmartPlaylistDrag, JoinsSongUrlsAndSkipsWizard) {
