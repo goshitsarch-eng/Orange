@@ -1235,8 +1235,10 @@ TEST(CollectionFingerprintMatch, RejectsEmptyAndKeepsGonePaths) {
   Song same;
   same.set_valid(true);
   same.set_url("file:///tmp/strawberry-fp-new.flac");
-  EXPECT_EQ(&gone, CollectionFingerprintMatch::PickMovedMatch({gone, same}, "file:///tmp/strawberry-fp-new.flac"));
-  EXPECT_EQ(nullptr, CollectionFingerprintMatch::PickMovedMatch({same}, "file:///tmp/strawberry-fp-new.flac"));
+  const Song match = CollectionFingerprintMatch::PickMovedMatch({gone, same}, "file:///tmp/strawberry-fp-new.flac");
+  EXPECT_TRUE(match.is_valid());
+  EXPECT_EQ(gone.url(), match.url());
+  EXPECT_FALSE(CollectionFingerprintMatch::PickMovedMatch({same}, "file:///tmp/strawberry-fp-new.flac").is_valid());
 }
 
 TEST(CollectionArtPersist, UnsetClearsAutomatic) {

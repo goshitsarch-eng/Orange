@@ -18,16 +18,16 @@ inline bool OldPathGone(const std::string &url) {
   return path.empty() || !FileUtils::Exists(path);
 }
 
-inline const Song *PickMovedMatch(const SongList &candidates, const std::string &new_url) {
+inline Song PickMovedMatch(const SongList &candidates, const std::string &new_url) {
   for (const Song &song : candidates) {
     if (!song.is_valid() || song.url() == new_url) {
       continue;
     }
     if (OldPathGone(song.url())) {
-      return &song;
+      return song;
     }
   }
-  return nullptr;
+  return Song();
 }
 
 }  // namespace CollectionFingerprintMatch

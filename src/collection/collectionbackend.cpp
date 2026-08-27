@@ -265,8 +265,9 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
     existing = SongById(song.id());
   }
   if (!existing.is_valid() && CollectionFingerprintMatch::IsUsable(song.fingerprint())) {
-    if (const Song *moved = CollectionFingerprintMatch::PickMovedMatch(SongsByFingerprint(song.fingerprint()), song.url())) {
-      existing = *moved;
+    const Song moved = CollectionFingerprintMatch::PickMovedMatch(SongsByFingerprint(song.fingerprint()), song.url());
+    if (moved.is_valid()) {
+      existing = moved;
     }
   }
   if (existing.is_valid()) {
