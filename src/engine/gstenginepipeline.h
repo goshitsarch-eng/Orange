@@ -112,6 +112,7 @@ class GstEnginePipeline {
   bool about_to_finish_ = false;
   bool buffering_ = false;
   bool restore_playing_ = false;
+  bool volume_full_range_ = false;
 };
 
 #endif  // STRAWBERRY_GSTENGINEPIPELINE_H

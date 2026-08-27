@@ -1395,6 +1395,12 @@ TEST(Ebur128Normalization, GainDbMatchesQtFormula) {
   EXPECT_FALSE(Ebur128Normalization::NormalizingGainDb(false, -14.0, -23.0));
   EXPECT_NEAR(0.354813, Ebur128Normalization::VolumeMultiplierFromGainDb(-9.0), 1e-5);
   EXPECT_NEAR(0.281838, Ebur128Normalization::VolumeMultiplierFromGainDb(-11.0), 1e-5);
+  EXPECT_FALSE(Ebur128Normalization::VolumeFullRangeSupported(1, 22));
+  EXPECT_TRUE(Ebur128Normalization::VolumeFullRangeSupported(1, 24));
+  EXPECT_TRUE(Ebur128Normalization::VolumeFullRangeSupported(1, 26));
+  EXPECT_TRUE(Ebur128Normalization::VolumeFullRangeSupported(2, 0));
+  EXPECT_STREQ("volume", Ebur128Normalization::VolumeProperty(false));
+  EXPECT_STREQ("volume-full-range", Ebur128Normalization::VolumeProperty(true));
 }
 
 TEST(MoodbarBuilder, FromPcm) {

@@ -162,7 +162,9 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
       g_object_set(panorama, "panorama", stereo_balance, nullptr);
     }
     if (volume_ebur128_) {
-      g_object_set(volume_ebur128_, "volume", Ebur128Normalization::VolumeMultiplierFromGainDb(extras.ebur128_gain_db), nullptr);
+      volume_full_range_ = g_object_class_find_property(G_OBJECT_GET_CLASS(volume_ebur128_), "volume-full-range") != nullptr;
+      g_object_set(volume_ebur128_, Ebur128Normalization::VolumeProperty(volume_full_range_),
+                   Ebur128Normalization::VolumeMultiplierFromGainDb(extras.ebur128_gain_db), nullptr);
     }
     GstPad *pad = gst_element_get_static_pad(head, "sink");
     GstPad *ghost = gst_ghost_pad_new("sink", pad);
@@ -281,7 +283,8 @@ void GstEnginePipeline::SetVolume(double fraction) {
 
 void GstEnginePipeline::SetEbur128GainDb(double gain_db) {
   if (volume_ebur128_) {
-    g_object_set(volume_ebur128_, "volume", Ebur128Normalization::VolumeMultiplierFromGainDb(gain_db), nullptr);
+    g_object_set(volume_ebur128_, Ebur128Normalization::VolumeProperty(volume_full_range_),
+                 Ebur128Normalization::VolumeMultiplierFromGainDb(gain_db), nullptr);
   }
 }
 
