@@ -162,6 +162,16 @@ TEST(SeekbarAnalysis, CanLoadAndAcceptResult) {
   EXPECT_FALSE(SeekbarAnalysis::CanLoad(stream));
 }
 
+TEST(SeekbarAnalysis, SaveSidecarFollowsPreferencesLikeQt) {
+  EXPECT_FALSE(SeekbarAnalysis::ShouldWriteSidecar(false, "/music/song.flac", true));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldWriteSidecar(true, "", true));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldWriteSidecar(true, "/music/song.flac", false));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldWriteSidecar(true, "/music/song.flac", true));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldHonorLiveSave(false, true));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldHonorLiveSave(true, false));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldRedrawOnSettingsClose());
+}
+
 TEST(AnalysisAsync, GenerateOnlyWhenEnabledAndCacheMisses) {
   EXPECT_TRUE(AnalysisAsync::NeedsGenerate(true, false));
   EXPECT_FALSE(AnalysisAsync::NeedsGenerate(true, true));

@@ -14,6 +14,7 @@ class MoodbarLoader {
   std::vector<uint8_t> Load(const Song &song);
   std::vector<uint8_t> LoadCached(const Song &song) const;
   std::vector<uint8_t> Generate(const Song &song, bool save, const std::string &cache_dir) const;
+  void WriteSidecar(const std::string &url, const std::vector<uint8_t> &mood) const;
 };
 
 class MoodbarController {
@@ -30,6 +31,7 @@ class MoodbarController {
   const std::vector<uint8_t> &data() const { return data_; }
   const Song &current_song() const { return current_song_; }
   bool enabled() const { return enabled_; }
+  bool save() const { return save_; }
   bool playback_active() const { return playback_active_; }
   bool busy() const { return busy_; }
   int generation() const { return generation_; }
@@ -46,6 +48,7 @@ class MoodbarController {
   int generation_ = 0;
   bool busy_ = false;
   bool enabled_ = false;
+  bool save_ = false;
   bool playback_active_ = false;
 };
 

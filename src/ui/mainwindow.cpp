@@ -60,6 +60,7 @@
 #include "covermanager/coverproviders.h"
 #include "device/deviceviewcontainer.h"
 #include "constants/moodbarsettings.h"
+#include "utilities/seekbaranalysis.h"
 #include "moodbar/moodbarrenderer.h"
 #include "moodbar/moodbarstyle.h"
 #include "waveform/waveformrenderer.h"
@@ -103,6 +104,7 @@
 #include "widgets/fancytabbar.h"
 #include "widgets/fancytabmode.h"
 #include "widgets/playingcoveractivate.h"
+#include "utilities/seekbaranalysis.h"
 #include "widgets/playingwidget.h"
 #include "widgets/seekbarmode.h"
 #include "core/playeritemoptions.h"
@@ -2820,6 +2822,14 @@ void MainWindow::OpenSettings(const char *page_name) {
     ApplyAnalyzer();
     app_->moodbar()->ReloadSettings();
     app_->waveform()->ReloadSettings();
+    if (SeekbarAnalysis::ShouldRedrawOnSettingsClose()) {
+      if (moodbar_drawing_) {
+        gtk_widget_queue_draw(moodbar_drawing_);
+      }
+      if (waveform_drawing_) {
+        gtk_widget_queue_draw(waveform_drawing_);
+      }
+    }
   }, page_name);
 }
 
