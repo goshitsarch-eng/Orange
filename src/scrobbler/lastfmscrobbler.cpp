@@ -171,6 +171,10 @@ void LastFmScrobbler::Scrobble(const Song &song) {
   ScheduleSubmit(false);
 }
 
+void LastFmScrobbler::WriteCache() { cache_.Save(); }
+
+void LastFmScrobbler::Submit() { SubmitCache(); }
+
 void LastFmScrobbler::ScheduleSubmit(bool had_error) {
   Settings settings;
   settings.BeginGroup(ScrobblerSettings::kSettingsGroup);

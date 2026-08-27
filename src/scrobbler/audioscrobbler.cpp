@@ -5,6 +5,7 @@
 #include "core/settings.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
+#include "scrobbler/scrobblerlifecycle.h"
 #include "scrobbler/scrobblersources.h"
 #ifdef HAVE_SUBSONIC
 #  include "scrobbler/subsonicscrobbler.h"
@@ -94,6 +95,32 @@ void AudioScrobbler::ToggleScrobbling() {
   settings.SetBoolValue(ScrobblerSettings::kEnabled, !enabled);
   settings.Sync();
   EnabledChanged.Emit(this->enabled());
+}
+
+void AudioScrobbler::ToggleOffline() {
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  const bool was_offline = settings.BoolValue(ScrobblerSettings::kOffline, ScrobblerSettings::kDefaultOffline);
+  const bool now_offline = !was_offline;
+  settings.SetBoolValue(ScrobblerSettings::kOffline, now_offline);
+  settings.Sync();
+  if (ScrobblerLifecycle::ShouldSubmitAfterOfflineToggle(was_offline, now_offline)) {
+    Submit();
+  }
+}
+
+void AudioScrobbler::WriteCache() {
+  for (auto &service : services_) {
+    service->WriteCache();
+  }
+}
+
+void AudioScrobbler::Submit() {
+  for (auto &service : services_) {
+    if (service->enabled()) {
+      service->Submit();
+    }
+  }
 }
 
 ScrobblerService *AudioScrobbler::ServiceByName(const std::string &name) const {

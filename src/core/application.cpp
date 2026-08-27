@@ -10,6 +10,7 @@
 #include "core/settings.h"
 #include "collection/skipcounteligibility.h"
 #include "scrobbler/scrobblereligibility.h"
+#include "scrobbler/scrobblerlifecycle.h"
 #include "utilities/fileutils.h"
 
 Application::Application()
@@ -207,6 +208,9 @@ void Application::Exit() {
   }
   if (playlist_manager_) {
     playlist_manager_->SaveActive();
+  }
+  if (scrobbler_ && ScrobblerLifecycle::ShouldFlushOnExit(scrobbler_->enabled())) {
+    scrobbler_->WriteCache();
   }
   if (database_) {
     database_->Backup();

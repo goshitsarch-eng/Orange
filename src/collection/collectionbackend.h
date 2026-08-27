@@ -3,6 +3,7 @@
 
 #include "collection/collectiondirectory.h"
 #include "collection/collectionfilteroptions.h"
+#include "collection/collectionsubdirectory.h"
 #include "core/database.h"
 #include "core/signal.h"
 #include "core/song.h"
@@ -17,6 +18,8 @@ class CollectionBackend {
   std::vector<CollectionDirectory> Directories() const;
   int AddDirectory(const std::string &path, bool subdirs = true);
   void RemoveDirectory(int id);
+  std::vector<CollectionSubdirectory> SubdirsInDirectory(int directory_id) const;
+  void AddOrUpdateSubdirs(int directory_id, const std::vector<CollectionSubdirectory> &subdirs);
 
   SongList Songs(const std::string &filter = {}) const;
   SongList Songs(const CollectionFilterOptions &options) const;

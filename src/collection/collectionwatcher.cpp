@@ -1,6 +1,7 @@
 #include "collection/collectionwatcher.h"
 
 #include "collection/collectionbackend.h"
+#include "collection/collectionsubdirectory.h"
 #include "constants/collectionsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
@@ -8,6 +9,7 @@
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
+#include <map>
 #include <set>
 
 CollectionWatcher::CollectionWatcher(CollectionBackend *backend, TagReader *tagreader, TaskManager *task_manager)
@@ -52,6 +54,9 @@ void CollectionWatcher::StartAsyncScan(ScanType type) {
       info.valid = song.is_valid();
       job->existing[song.url()] = info;
     }
+    for (const CollectionDirectory &directory : job->directories) {
+      job->stored_subdirs[directory.id] = backend_->SubdirsInDirectory(directory.id);
+    }
   }
   g_thread_unref(g_thread_new("collection-scan", ScanThread, job));
 }
@@ -74,6 +79,9 @@ gpointer CollectionWatcher::ScanThread(gpointer data) {
 void CollectionWatcher::CollectDirectory(ScanJob *job, const CollectionDirectory &directory) {
   const std::vector<std::string> entries =
       directory.subdirs ? FileUtils::ListDirectoryRecursive(directory.path) : FileUtils::ListDirectory(directory.path);
+  const std::vector<CollectionSubdirectory> stored = job->stored_subdirs.count(directory.id) ? job->stored_subdirs[directory.id]
+                                                                                             : std::vector<CollectionSubdirectory>{};
+  std::map<std::string, int64_t> seen_subdirs;
   for (const std::string &entry : entries) {
     if (abort_) {
       job->aborted = true;
@@ -82,8 +90,16 @@ void CollectionWatcher::CollectDirectory(ScanJob *job, const CollectionDirectory
     if (FileUtils::IsDirectory(entry) || !Song::IsAudioFile(entry)) {
       continue;
     }
+    const std::string parent = CollectionSubdirectoryScan::ImmediateParent(entry);
+    const std::string subdir_path = parent.empty() ? directory.path : parent;
+    const int64_t dir_mtime = FileUtils::FileMtime(subdir_path);
+    seen_subdirs[subdir_path] = dir_mtime;
     const std::string url = FileUtils::UriFromPath(entry);
     job->seen_urls.push_back(url);
+    if (job->type == ScanType::Incremental &&
+        CollectionSubdirectoryScan::ShouldSkip(CollectionSubdirectoryScan::StoredMtime(stored, subdir_path), dir_mtime)) {
+      continue;
+    }
     Song existing;
     auto it = job->existing.find(url);
     if (it != job->existing.end()) {
@@ -109,6 +125,13 @@ void CollectionWatcher::CollectDirectory(ScanJob *job, const CollectionDirectory
     if (task_manager_ && (job->added % 25) == 0) {
       // Progress is applied on the main thread after the walk finishes.
     }
+  }
+  for (const auto &entry : seen_subdirs) {
+    CollectionSubdirectory subdir;
+    subdir.directory_id = directory.id;
+    subdir.path = entry.first;
+    subdir.mtime = entry.second;
+    job->updated_subdirs.push_back(subdir);
   }
 }
 
@@ -143,6 +166,13 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
       }
     }
     self->backend_->UpdateCompilations();
+    std::map<int, std::vector<CollectionSubdirectory>> by_directory;
+    for (const CollectionSubdirectory &subdir : job->updated_subdirs) {
+      by_directory[subdir.directory_id].push_back(subdir);
+    }
+    for (const auto &entry : by_directory) {
+      self->backend_->AddOrUpdateSubdirs(entry.first, entry.second);
+    }
   }
   if (self->task_manager_ && task_id) {
     self->task_manager_->SetTaskFinished(task_id);

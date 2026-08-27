@@ -21,6 +21,8 @@ class ScrobblerService {
   virtual void Logout() {}
   virtual bool authenticated() const { return false; }
   virtual std::string username() const { return {}; }
+  virtual void WriteCache() {}
+  virtual void Submit() {}
 
   Signal<std::string> Error;
 

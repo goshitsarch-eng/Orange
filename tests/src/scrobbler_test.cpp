@@ -3,6 +3,7 @@
 #include "scrobbler/scrobbletoggleicon.h"
 #include "scrobbler/scrobblereligibility.h"
 #include "scrobbler/scrobblererror.h"
+#include "scrobbler/scrobblerlifecycle.h"
 #include "scrobbler/scrobblerlovestate.h"
 #include "scrobbler/scrobblerplayingstate.h"
 #include "scrobbler/scrobblersubmittiming.h"
@@ -14,6 +15,14 @@
 #include "scrobbler/subsonicscrobbler.h"
 
 #include <gtest/gtest.h>
+
+TEST(ScrobblerLifecycle, FlushesOnExitAndSubmitsWhenLeavingOffline) {
+  EXPECT_TRUE(ScrobblerLifecycle::ShouldFlushOnExit(true));
+  EXPECT_FALSE(ScrobblerLifecycle::ShouldFlushOnExit(false));
+  EXPECT_TRUE(ScrobblerLifecycle::ShouldSubmitAfterOfflineToggle(true, false));
+  EXPECT_FALSE(ScrobblerLifecycle::ShouldSubmitAfterOfflineToggle(false, true));
+  EXPECT_FALSE(ScrobblerLifecycle::ShouldSubmitAfterOfflineToggle(false, false));
+}
 
 TEST(ScrobblerCache, RoundTripJson) {
   ScrobblerCacheItem item;

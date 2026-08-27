@@ -25,6 +25,8 @@ class ListenBrainzScrobbler : public ScrobblerService {
   void Logout() override;
   bool authenticated() const override { return !token_.empty(); }
   std::string username() const override { return username_; }
+  void WriteCache() override;
+  void Submit() override;
 
   static std::string SubmitBody(const std::string &listen_type, const std::vector<ScrobblerCacheItem> &items);
   static std::string LoveBody(const std::string &recording_mbid);

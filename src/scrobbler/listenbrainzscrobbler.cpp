@@ -126,6 +126,17 @@ void ListenBrainzScrobbler::Scrobble(const Song &song) {
   Submit("single", items, true);
 }
 
+void ListenBrainzScrobbler::WriteCache() { cache_.Save(); }
+
+void ListenBrainzScrobbler::Submit() {
+  const std::vector<ScrobblerCacheItem> items = cache_.Unsent();
+  if (items.empty()) {
+    return;
+  }
+  cache_.MarkSent();
+  Submit("single", items, true);
+}
+
 void ListenBrainzScrobbler::Love(const Song &song) {
   if (!enabled_ || !network_ || song.musicbrainz_recording_id().empty() || OfflineMode()) {
     return;

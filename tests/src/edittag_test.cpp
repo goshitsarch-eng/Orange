@@ -345,6 +345,10 @@ TEST(TagWriterFields, WritesBpmMoodKeyAndOriginalYear) {
   EXPECT_STREQ("TKEY", TagWriterFields::Id3InitialKey());
   EXPECT_STREQ("TORY", TagWriterFields::Id3OriginalYear());
   EXPECT_STREQ("MOOD", TagWriterFields::Id3Mood());
+  EXPECT_STREQ("tmpo", TagWriterFields::Mp4Bpm());
+  EXPECT_STREQ("----:com.apple.iTunes:MOOD", TagWriterFields::Mp4Mood());
+  EXPECT_STREQ("----:com.apple.iTunes:initialkey", TagWriterFields::Mp4InitialKey());
+  EXPECT_STREQ("----:com.apple.iTunes:originalyear", TagWriterFields::Mp4OriginalYear());
   EXPECT_TRUE(TagWriterFields::HasBpm(128.0f));
   EXPECT_FALSE(TagWriterFields::HasBpm(0.0f));
   EXPECT_TRUE(TagWriterFields::HasOriginalYear(1994));

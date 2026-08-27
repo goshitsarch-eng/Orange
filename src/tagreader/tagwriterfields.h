@@ -18,6 +18,11 @@ inline const char *ApeMood() { return "MOOD"; }
 inline const char *ApeInitialKey() { return "INITIALKEY"; }
 inline const char *ApeOriginalYear() { return "ORIGINALYEAR"; }
 
+inline const char *Mp4Bpm() { return "tmpo"; }
+inline const char *Mp4Mood() { return "----:com.apple.iTunes:MOOD"; }
+inline const char *Mp4InitialKey() { return "----:com.apple.iTunes:initialkey"; }
+inline const char *Mp4OriginalYear() { return "----:com.apple.iTunes:originalyear"; }
+
 inline bool HasBpm(float bpm) { return bpm > 0.0f; }
 inline bool HasOriginalYear(int year) { return year > 0; }
 

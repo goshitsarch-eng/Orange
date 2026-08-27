@@ -20,6 +20,9 @@ class AudioScrobbler {
   void Scrobble(const Song &song);
   void Love(const Song &song);
   void ToggleScrobbling();
+  void ToggleOffline();
+  void WriteCache();
+  void Submit();
   ScrobblerService *ServiceByName(const std::string &name) const;
   std::vector<ScrobblerService *> All() const;
   Signal<std::string> Error;

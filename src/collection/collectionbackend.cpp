@@ -39,10 +39,46 @@ int CollectionBackend::AddDirectory(const std::string &path, bool subdirs) {
 
 void CollectionBackend::RemoveDirectory(int id) {
   DeleteSongsInDirectory(id);
+  SqlQuery subdirs(database_, "DELETE FROM subdirectories WHERE directory_id = ?");
+  subdirs.Bind(1, id);
+  subdirs.Exec();
   SqlQuery query(database_, "DELETE FROM directories WHERE rowid = ?");
   query.Bind(1, id);
   query.Exec();
   DirectoryDeleted.Emit();
+}
+
+std::vector<CollectionSubdirectory> CollectionBackend::SubdirsInDirectory(int directory_id) const {
+  std::vector<CollectionSubdirectory> result;
+  if (!database_ || !database_->handle()) {
+    return result;
+  }
+  SqlQuery query(database_, "SELECT directory_id, path, mtime FROM subdirectories WHERE directory_id = ? ORDER BY path");
+  query.Bind(1, directory_id);
+  while (query.Step()) {
+    CollectionSubdirectory subdir;
+    subdir.directory_id = query.ColumnInt(0);
+    subdir.path = query.ColumnText(1);
+    subdir.mtime = query.ColumnInt64(2);
+    result.push_back(subdir);
+  }
+  return result;
+}
+
+void CollectionBackend::AddOrUpdateSubdirs(int directory_id, const std::vector<CollectionSubdirectory> &subdirs) {
+  if (!database_ || !database_->handle()) {
+    return;
+  }
+  SqlQuery clear(database_, "DELETE FROM subdirectories WHERE directory_id = ?");
+  clear.Bind(1, directory_id);
+  clear.Exec();
+  for (const CollectionSubdirectory &subdir : subdirs) {
+    SqlQuery insert(database_, "INSERT INTO subdirectories (directory_id, path, mtime) VALUES (?, ?, ?)");
+    insert.Bind(1, directory_id);
+    insert.Bind(2, subdir.path);
+    insert.Bind(3, subdir.mtime);
+    insert.Exec();
+  }
 }
 
 Song CollectionBackend::SongFromQuery(const SqlQuery &query) const {

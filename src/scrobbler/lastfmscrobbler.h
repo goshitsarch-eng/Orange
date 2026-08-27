@@ -31,6 +31,8 @@ class LastFmScrobbler : public ScrobblerService {
   void Logout() override;
   bool authenticated() const override { return !session_key_.empty(); }
   std::string username() const override { return username_; }
+  void WriteCache() override;
+  void Submit() override;
 
   void Authenticate(const std::string &username, const std::string &password, const std::function<void(bool)> &done);
   void GetToken(const std::function<void(bool)> &done);

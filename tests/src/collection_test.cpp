@@ -7,6 +7,7 @@
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectionbackend.h"
+#include "collection/collectionsubdirectory.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectioncover.h"
 #include "collection/collectiondivider.h"
@@ -401,6 +402,41 @@ TEST(CollectionBackend, SongsFromQueryMapsColumnsAndAppliesOptions) {
   ASSERT_TRUE(directories.At(0));
   EXPECT_EQ("/tmp/music", directories.At(0)->path);
 
+  unlink(path.c_str());
+}
+
+TEST(CollectionSubdirectoryScan, SkipsUnchangedMtime) {
+  EXPECT_TRUE(CollectionSubdirectoryScan::ShouldSkip(100, 100, false));
+  EXPECT_FALSE(CollectionSubdirectoryScan::ShouldSkip(100, 101, false));
+  EXPECT_FALSE(CollectionSubdirectoryScan::ShouldSkip(100, 100, true));
+  EXPECT_FALSE(CollectionSubdirectoryScan::ShouldSkip(-1, 100, false));
+  EXPECT_EQ("/tmp/music/album", CollectionSubdirectoryScan::ImmediateParent("/tmp/music/album/track.flac"));
+  CollectionSubdirectory stored;
+  stored.path = "/tmp/music/album";
+  stored.mtime = 42;
+  EXPECT_EQ(42, CollectionSubdirectoryScan::StoredMtime({stored}, "/tmp/music/album"));
+  EXPECT_EQ(-1, CollectionSubdirectoryScan::StoredMtime({stored}, "/tmp/other"));
+}
+
+TEST(CollectionBackend, SubdirsRoundTrip) {
+  const std::string path = "/tmp/strawberry-collection-subdirs.db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  CollectionSubdirectory album;
+  album.directory_id = directory;
+  album.path = "/tmp/music/album";
+  album.mtime = 123;
+  backend.AddOrUpdateSubdirs(directory, {album});
+  const auto loaded = backend.SubdirsInDirectory(directory);
+  ASSERT_EQ(1u, loaded.size());
+  EXPECT_EQ("/tmp/music/album", loaded.front().path);
+  EXPECT_EQ(123, loaded.front().mtime);
+  backend.AddOrUpdateSubdirs(directory, {});
+  EXPECT_TRUE(backend.SubdirsInDirectory(directory).empty());
+  backend.RemoveDirectory(directory);
   unlink(path.c_str());
 }
 

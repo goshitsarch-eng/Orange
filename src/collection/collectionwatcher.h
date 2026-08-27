@@ -2,6 +2,7 @@
 #define STRAWBERRY_COLLECTIONWATCHER_H
 
 #include "collection/collectiondirectory.h"
+#include "collection/collectionsubdirectory.h"
 #include "core/filesystemwatcherinotify.h"
 #include "core/signal.h"
 #include "core/song.h"
@@ -58,6 +59,8 @@ class CollectionWatcher {
     ScanType type = ScanType::Incremental;
     std::vector<CollectionDirectory> directories;
     std::map<std::string, ExistingInfo> existing;
+    std::map<int, std::vector<CollectionSubdirectory>> stored_subdirs;
+    std::vector<CollectionSubdirectory> updated_subdirs;
     SongList songs;
     std::vector<std::string> seen_urls;
     bool aborted = false;

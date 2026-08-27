@@ -620,6 +620,18 @@ void SetMP4Tag(TagLib::MP4::Tag *tag, const Song &song) {
   if (!song.musicbrainz_recording_id().empty()) {
     SetMP4String(tag, kMp4MusicBrainzRecording, song.musicbrainz_recording_id());
   }
+  if (TagWriterFields::HasBpm(song.bpm())) {
+    tag->setItem(TagWriterFields::Mp4Bpm(), TagLib::MP4::Item(static_cast<int>(song.bpm())));
+  } else {
+    tag->removeItem(TagWriterFields::Mp4Bpm());
+  }
+  SetMP4String(tag, TagWriterFields::Mp4Mood(), song.mood());
+  SetMP4String(tag, TagWriterFields::Mp4InitialKey(), song.initial_key());
+  if (TagWriterFields::HasOriginalYear(song.originalyear())) {
+    SetMP4String(tag, TagWriterFields::Mp4OriginalYear(), std::to_string(song.originalyear()));
+  } else {
+    tag->removeItem(TagWriterFields::Mp4OriginalYear());
+  }
 }
 
 void SetMP4Playcount(TagLib::MP4::Tag *tag, unsigned playcount) {
@@ -910,6 +922,18 @@ void ReadFromFileRef(TagLib::FileRef *file, Song *song) {
       }
       if (tag->contains(kMp4FmpsPlaycount)) {
         ApplyPlaycount(song, tag->item(kMp4FmpsPlaycount).toStringList().toString().toInt());
+      }
+      if (tag->contains(TagWriterFields::Mp4Bpm())) {
+        song->set_bpm(static_cast<float>(tag->item(TagWriterFields::Mp4Bpm()).toInt()));
+      }
+      if (tag->contains(TagWriterFields::Mp4Mood())) {
+        song->set_mood(FromTagLib(tag->item(TagWriterFields::Mp4Mood()).toStringList().toString()));
+      }
+      if (tag->contains(TagWriterFields::Mp4InitialKey())) {
+        song->set_initial_key(FromTagLib(tag->item(TagWriterFields::Mp4InitialKey()).toStringList().toString()));
+      }
+      if (tag->contains(TagWriterFields::Mp4OriginalYear())) {
+        song->set_originalyear(tag->item(TagWriterFields::Mp4OriginalYear()).toStringList().toString().toInt());
       }
     }
   }
