@@ -5,6 +5,7 @@
 #include "playlist/playlistheadersort.h"
 #include "playlist/playlistautoscroll.h"
 #include "playlist/playlistinsertscroll.h"
+#include "playlist/playlistremoveselect.h"
 #include "playlist/playlistclipboard.h"
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistheaderreorder.h"
@@ -806,6 +807,16 @@ TEST(PlaylistColumnLayout, PixelWidthsFollowSavedProportions) {
   EXPECT_EQ(220, PlaylistColumnLayout::PixelWidth(PlaylistColumn::Title, 800));
   EXPECT_EQ(180, PlaylistColumnLayout::PixelWidth(PlaylistColumn::Artist, 800));
   PlaylistColumnLayout::Reset();
+}
+
+TEST(PlaylistRemoveSelect, SelectsRowAfterDeletedLikeQt) {
+  EXPECT_EQ(-1, PlaylistRemoveSelect::NextRow({}, 10));
+  EXPECT_EQ(-1, PlaylistRemoveSelect::NextRow({0, 1}, 2));
+  EXPECT_EQ(0, PlaylistRemoveSelect::NextRow({0}, 10));
+  EXPECT_EQ(8, PlaylistRemoveSelect::NextRow({9}, 10));
+  EXPECT_EQ(3, PlaylistRemoveSelect::NextRow({3, 4, 5}, 10));
+  EXPECT_EQ(7, PlaylistRemoveSelect::NextRow({8, 9}, 10));
+  EXPECT_EQ(7, PlaylistRemoveSelect::NextRow({2, 8}, 10));
 }
 
 TEST(PlaylistInsertScroll, ScrollsAppendedRowsLikeQt) {

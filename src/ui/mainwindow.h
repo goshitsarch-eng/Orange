@@ -85,6 +85,7 @@ class MainWindow {
   void SavePlaylistById(int id);
   void NewPlaylist();
   void ClearPlaylist();
+  void RemoveSelectedPlaylistRows();
   void CloseCurrentPlaylist();
   void TryClosePlaylist(int id);
   void FinishClosePlaylist(int id);

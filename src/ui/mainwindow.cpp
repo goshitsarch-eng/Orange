@@ -71,6 +71,7 @@
 #include "playlist/playlistclipboard.h"
 #include "playlist/playlisteditcolumn.h"
 #include "playlist/playlistmenu.h"
+#include "playlist/playlistremoveselect.h"
 #include "playlist/playliststopafter.h"
 #include "core/playerstopafter.h"
 #include "core/deletefilesjob.h"
@@ -1072,16 +1073,7 @@ void MainWindow::BuildUi() {
                self->ShowToast(all_queued ? "Removed from queue" : "Added to queue");
              }));
   add_action("playlist-remove", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
-               auto *self = static_cast<MainWindow *>(data);
-               if (Playlist *playlist = self->app_->playlist_manager()->current()) {
-                 const std::vector<int> rows = self->SelectedPlaylistRows();
-                 self->app_->queue()->RemapAfterPlaylistRemove(playlist->id(), rows);
-                 playlist->RemoveRows(rows);
-                 self->selected_playlist_rows_.clear();
-                 self->app_->playlist_manager()->SaveCurrent();
-                 self->RefreshPlaylist();
-                 self->RefreshQueue();
-               }
+               static_cast<MainWindow *>(data)->RemoveSelectedPlaylistRows();
              }));
   auto set_accels = [this](const char *action, const char *accel) {
     const char *accels[] = {accel, nullptr};
@@ -1628,17 +1620,7 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->view()->SetSortCallback([this](PlaylistColumn column, PlaylistSortOrder order) { SortPlaylistBy(column, order); });
   playlist_container_->view()->SetMenuCallback([this](double x, double y) { ShowPlaylistMenu(x, y); });
   playlist_container_->view()->SetEditRequestCallback([this]() { EditColumnValue(); });
-  playlist_container_->view()->SetDeleteCallback([this]() {
-    if (Playlist *playlist = app_->playlist_manager()->current()) {
-      const std::vector<int> rows = SelectedPlaylistRows();
-      app_->queue()->RemapAfterPlaylistRemove(playlist->id(), rows);
-      playlist->RemoveRows(rows);
-      selected_playlist_rows_.clear();
-      app_->playlist_manager()->SaveCurrent();
-      RefreshPlaylist();
-      RefreshQueue();
-    }
-  });
+  playlist_container_->view()->SetDeleteCallback([this]() { RemoveSelectedPlaylistRows(); });
   playlist_container_->view()->SetEditCommitCallback([this](int row, PlaylistColumn column, const std::string &value) {
     ApplyColumnValue(column, value, {row});
   });
@@ -2827,6 +2809,25 @@ void MainWindow::NewPlaylist() {
   }
   RefreshPlaylistsList();
   RefreshPlaylist();
+}
+
+void MainWindow::RemoveSelectedPlaylistRows() {
+  Playlist *playlist = app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  if (!playlist) {
+    return;
+  }
+  const std::vector<int> rows = SelectedPlaylistRows();
+  const int next = PlaylistRemoveSelect::NextRow(rows, playlist->row_count());
+  app_->queue()->RemapAfterPlaylistRemove(playlist->id(), rows);
+  playlist->RemoveRows(rows);
+  selected_playlist_rows_.clear();
+  if (next >= 0) {
+    selected_playlist_rows_ = {next};
+    selection_playlist_name_ = playlist->name();
+  }
+  app_->playlist_manager()->SaveCurrent();
+  RefreshPlaylist();
+  RefreshQueue();
 }
 
 void MainWindow::ClearPlaylist() {
