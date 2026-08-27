@@ -100,6 +100,13 @@ TEST(TrackSelectionLabels, QtCopyAndEmptyResults) {
   EXPECT_STREQ("Strawberry was unable to find results for this file", TrackSelectionLabels::UnableToFind());
   EXPECT_STREQ("Error", TrackSelectionLabels::Error());
   EXPECT_STREQ("Original tags", TrackSelectionLabels::OriginalTags());
+  EXPECT_STREQ("Saving tracks...", TrackSelectionLabels::SavingTracks());
+  EXPECT_FALSE(TrackSelectionLabels::ButtonsEnabled(true));
+  EXPECT_TRUE(TrackSelectionLabels::ButtonsEnabled(false));
+  EXPECT_FALSE(TrackSelectionLabels::SplitterEnabled(true));
+  EXPECT_TRUE(TrackSelectionLabels::SplitterEnabled(false));
+  EXPECT_TRUE(TrackSelectionLabels::LoadingVisible(true));
+  EXPECT_FALSE(TrackSelectionLabels::LoadingVisible(false));
   EXPECT_TRUE(TrackSelectionLabels::ShowEmptyResults(false, false));
   EXPECT_FALSE(TrackSelectionLabels::ShowEmptyResults(true, false));
   EXPECT_FALSE(TrackSelectionLabels::ShowEmptyResults(false, true));

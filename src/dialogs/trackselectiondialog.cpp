@@ -41,6 +41,9 @@ struct State {
   GtkWidget *next = nullptr;
   GtkWidget *apply = nullptr;
   GtkWidget *apply_all = nullptr;
+  GtkWidget *paned = nullptr;
+  GtkWidget *buttons = nullptr;
+  GtkWidget *loading = nullptr;
 
   ~State() {
     *alive = false;
@@ -184,6 +187,24 @@ void RefreshResults(State *state) {
   }
 }
 
+void SetLoading(State *state, bool loading) {
+  if (!state) {
+    return;
+  }
+  if (state->paned) {
+    gtk_widget_set_sensitive(state->paned, TrackSelectionLabels::SplitterEnabled(loading));
+  }
+  if (state->buttons) {
+    gtk_widget_set_sensitive(state->buttons, TrackSelectionLabels::ButtonsEnabled(loading));
+  }
+  if (state->loading) {
+    gtk_widget_set_visible(state->loading, TrackSelectionLabels::LoadingVisible(loading));
+    if (loading) {
+      gtk_label_set_text(GTK_LABEL(state->loading), Translations::CStr(TrackSelectionLabels::SavingTracks()));
+    }
+  }
+}
+
 void UpdateProgress(State *state) {
   if (!state) {
     return;
@@ -255,6 +276,11 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
   state->progress = gtk_progress_bar_new();
   gtk_box_append(GTK_BOX(box), state->status);
   gtk_box_append(GTK_BOX(box), state->progress);
+  state->loading = gtk_label_new(Translations::CStr(TrackSelectionLabels::SavingTracks()));
+  gtk_widget_add_css_class(state->loading, "dim-label");
+  gtk_widget_set_halign(state->loading, GTK_ALIGN_START);
+  gtk_widget_set_visible(state->loading, TrackSelectionLabels::LoadingVisible(false));
+  gtk_box_append(GTK_BOX(box), state->loading);
 
   GtkWidget *paned = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
   gtk_widget_set_hexpand(paned, TRUE);
@@ -287,6 +313,7 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
   gtk_box_append(GTK_BOX(paned), left);
   gtk_box_append(GTK_BOX(paned), right);
   gtk_box_append(GTK_BOX(box), paned);
+  state->paned = paned;
 
   GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   state->prev = gtk_button_new_with_label(Translations::CStr("Previous"));
@@ -303,6 +330,7 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
   gtk_box_append(GTK_BOX(buttons), state->apply_all);
   gtk_box_append(GTK_BOX(buttons), state->apply);
   gtk_box_append(GTK_BOX(box), buttons);
+  state->buttons = buttons;
 
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
@@ -387,7 +415,9 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
                      if (self->songs.empty()) {
                        return;
                      }
+                     SetLoading(self, true);
                      ApplyPending(self, &self->songs[static_cast<size_t>(self->current)]);
+                     SetLoading(self, false);
                      RefreshSongList(self);
                      RefreshResults(self);
                      UpdateProgress(self);
@@ -395,9 +425,11 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
                    state);
   g_signal_connect(state->apply_all, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<State *>(data);
+                     SetLoading(self, true);
                      for (PendingSong &pending : self->songs) {
                        ApplyPending(self, &pending);
                      }
+                     SetLoading(self, false);
                      RefreshSongList(self);
                      RefreshResults(self);
                      UpdateProgress(self);
