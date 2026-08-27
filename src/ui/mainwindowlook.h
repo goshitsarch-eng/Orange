@@ -27,6 +27,9 @@ inline const char *MuteAccel() { return "<Control>m"; }
 
 inline const char *ClosePlaylistAccel() { return "<Control>w"; }
 
+// Qt MainWindow Ctrl+Shift+W → ToggleHide (hide to tray, or minimize if no tray).
+inline const char *HideWindowAccel() { return "<Control><Shift>w"; }
+
 inline const char *PlaylistQueueAccel() { return "<Control>d"; }
 
 inline const char *QueuePlayNextAccel() { return "<Control><Shift>d"; }

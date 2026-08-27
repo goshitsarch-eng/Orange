@@ -1,5 +1,6 @@
 #include "smartplaylists/smartplaylistquerywizardpluginsortpage.h"
 
+#include "settings/settingswheelthrough.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 
 #include <vector>
@@ -25,6 +26,7 @@ SmartPlaylistQueryWizardPluginSortPage::SmartPlaylistQueryWizardPluginSortPage()
   gtk_check_button_set_active(GTK_CHECK_BUTTON(limit_none_), TRUE);
   limit_ = gtk_spin_button_new_with_range(1, 1000, 1);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(limit_), 15);
+  SettingsWheelThrough::Attach(limit_);
   gtk_box_append(GTK_BOX(widget_), gtk_label_new(SmartPlaylistWizardLabels::Sorting()));
   gtk_box_append(GTK_BOX(widget_), random_);
   gtk_box_append(GTK_BOX(widget_), field_radio_);

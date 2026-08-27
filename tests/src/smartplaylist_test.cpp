@@ -17,6 +17,7 @@
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
+#include "settings/settingswheelthrough.h"
 #include "smartplaylists/smartplaylistactivate.h"
 #include "smartplaylists/smartplaylistcontextmenu.h"
 #include "smartplaylists/smartplaylistdrag.h"
@@ -954,4 +955,10 @@ TEST(SmartPlaylistDrag, JoinsSongUrlsAndSkipsWizard) {
   EXPECT_EQ("file:///a\nfile:///b", SmartPlaylistDrag::DragPayload({a, b, empty}));
   EXPECT_TRUE(SmartPlaylistDrag::CanDrag(false));
   EXPECT_FALSE(SmartPlaylistDrag::CanDrag(true));
+}
+
+TEST(SmartPlaylistWheelThrough, UnfocusedSpinShouldPropagateLikeQt) {
+  EXPECT_TRUE(SettingsWheelThrough::AppliesToSpin());
+  EXPECT_TRUE(SettingsWheelThrough::ShouldPropagateToParent(false));
+  EXPECT_FALSE(SettingsWheelThrough::ShouldPropagateToParent(true));
 }

@@ -66,6 +66,12 @@ inline void Attach(GtkWidget *widget) {
                    nullptr);
 }
 
+inline void AttachSpin(GtkWidget *widget) {
+  if (widget && GTK_IS_SPIN_BUTTON(widget)) {
+    Attach(widget);
+  }
+}
+
 }  // namespace SettingsWheelThrough
 
 #endif

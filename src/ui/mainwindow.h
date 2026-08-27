@@ -91,6 +91,7 @@ class MainWindow {
   void TryClosePlaylist(int id);
   void FinishClosePlaylist(int id);
   void HideToTray();
+  void ToggleHide();
   void SelectPlayingTrack();
   void ApplyPlaylistBehaviour();
   void DeleteCurrentPlaylist();

@@ -226,6 +226,7 @@ TEST(ShortcutsCatalog, ListsWiredMainWindowAccels) {
   EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Shift+D"));
   EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Tab"));
   EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+W"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Shift+W"));
   EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+9"));
   EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+M"));
   EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Shift+P"));

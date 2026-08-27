@@ -10,6 +10,7 @@
 #include "transcoder/transcoder.h"
 #include "transcoder/transcoderprogress.h"
 #include "transcoder/transcoderoptionsdialog.h"
+#include "settings/settingswheelthrough.h"
 #include "translations/translations.h"
 #include "utilities/filefilters.h"
 #include "utilities/fileutils.h"
@@ -599,6 +600,7 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   state->formats = gtk_drop_down_new_from_strings(format_names);
   gtk_drop_down_set_selected(GTK_DROP_DOWN(state->formats), static_cast<guint>(format_index));
   state->quality = gtk_spin_button_new_with_range(0, 10, 1);
+  SettingsWheelThrough::Attach(state->quality);
   SyncQualitySpin(state);
   g_signal_connect(state->formats, "notify::selected", G_CALLBACK(+[](GtkDropDown *, GParamSpec *, gpointer data) {
                      SyncQualitySpin(static_cast<State *>(data));

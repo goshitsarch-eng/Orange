@@ -4,6 +4,7 @@
 #include "smartplaylists/smartplaylistsearchtermwidgetoverlay.h"
 #include "smartplaylists/smartplaylistdateunits.h"
 #include "smartplaylists/smartplaylisttagcompleter.h"
+#include "settings/settingswheelthrough.h"
 #include "smartplaylists/smartplaylisttermrow.h"
 #include "widgets/ratingwidget.h"
 
@@ -33,6 +34,9 @@ SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget(SongList library) :
   gtk_spin_button_set_digits(GTK_SPIN_BUTTON(time_minutes_), 0);
   time_seconds_ = gtk_spin_button_new_with_range(0, 59, 1);
   gtk_spin_button_set_digits(GTK_SPIN_BUTTON(time_seconds_), 0);
+  SettingsWheelThrough::Attach(time_hours_);
+  SettingsWheelThrough::Attach(time_minutes_);
+  SettingsWheelThrough::Attach(time_seconds_);
   gtk_box_append(GTK_BOX(time_box_), time_hours_);
   gtk_box_append(GTK_BOX(time_box_), gtk_label_new("h"));
   gtk_box_append(GTK_BOX(time_box_), time_minutes_);
@@ -66,6 +70,8 @@ SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget(SongList library) :
   range_to_ = gtk_spin_button_new_with_range(1, 3650, 1);
   gtk_spin_button_set_digits(GTK_SPIN_BUTTON(range_to_), 0);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(range_to_), 7);
+  SettingsWheelThrough::Attach(range_from_);
+  SettingsWheelThrough::Attach(range_to_);
   gtk_box_append(GTK_BOX(range_box_), range_from_);
   gtk_box_append(GTK_BOX(range_box_), gtk_label_new("and"));
   gtk_box_append(GTK_BOX(range_box_), range_to_);
@@ -232,6 +238,7 @@ void SmartPlaylistSearchTermWidget::RebuildValue() {
 
   if (value_) {
     gtk_widget_set_hexpand(value_, TRUE);
+    SettingsWheelThrough::AttachSpin(value_);
     gtk_box_insert_child_after(GTK_BOX(row_), value_, op_);
   }
   if (range_box_) {

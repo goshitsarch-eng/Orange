@@ -659,6 +659,7 @@ void MainWindow::BuildUi() {
   add_action("save-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SavePlaylistFile(); }));
   add_action("rename-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RenameCurrentPlaylist(); }));
   add_action("close-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CloseCurrentPlaylist(); }));
+  add_action("hide-window", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ToggleHide(); }));
   add_action("delete-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->DeleteCurrentPlaylist(); }));
   add_action("clear-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ClearPlaylist(); }));
   add_action("shuffle-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ShuffleCurrent(); }));
@@ -1126,6 +1127,7 @@ void MainWindow::BuildUi() {
   set_accels("win.active-playlist", "<Control><Shift>p");
   set_accels("win.mute", MainWindowLook::MuteAccel());
   set_accels("win.close-playlist", MainWindowLook::ClosePlaylistAccel());
+  set_accels("win.hide-window", MainWindowLook::HideWindowAccel());
   set_accels("win.playlist-queue", MainWindowLook::PlaylistQueueAccel());
   set_accels("win.queue-next", MainWindowLook::QueuePlayNextAccel());
   set_accels("win.play-pause", MainWindowKeyboard::PlayPauseAccel());
@@ -1707,7 +1709,7 @@ void MainWindow::BuildPlaylist() {
     RefreshPlaylistsList();
     RefreshPlaylistTabs();
   });
-  playlist_container_->tab_bar()->SetLastTabCloseCallback([this] { HideToTray(); });
+  playlist_container_->tab_bar()->SetLastTabCloseCallback([this] { ToggleHide(); });
   playlist_container_->tab_bar()->SetDropCallback([this](int id, const std::string &payload) {
     if (id >= 0 && PlaylistListDrop::IsPlaylistRows(payload)) {
       const PlaylistDragPayload::Payload drag = PlaylistDragPayload::Decode(payload);
@@ -2884,10 +2886,21 @@ void MainWindow::HideToTray() {
   }
 }
 
+void MainWindow::ToggleHide() {
+  if (!window_ || !gtk_widget_get_visible(GTK_WIDGET(window_))) {
+    return;
+  }
+  if (app_->tray() && app_->tray()->available()) {
+    HideToTray();
+    return;
+  }
+  gtk_window_minimize(GTK_WINDOW(window_));
+}
+
 void MainWindow::CloseCurrentPlaylist() {
   const int count = static_cast<int>(app_->playlist_manager()->playlists().size());
   if (PlaylistTabMenu::CloseCurrentHidesWindow(count)) {
-    HideToTray();
+    ToggleHide();
     return;
   }
   TryClosePlaylist(app_->playlist_manager()->current_id());

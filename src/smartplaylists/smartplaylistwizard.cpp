@@ -1,6 +1,7 @@
 #include "smartplaylists/smartplaylistwizard.h"
 
 #include "core/application.h"
+#include "settings/settingswheelthrough.h"
 #include "dialogs/dialoghelpers.h"
 #include "playlist/playlist.h"
 #include "smartplaylists/playlistgeneratorinserter.h"
@@ -196,6 +197,7 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   state->finish = std::make_unique<SmartPlaylistWizardFinishPage>();
   state->limit = gtk_spin_button_new_with_range(1, 1000, 1);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(state->limit), 15);
+  SettingsWheelThrough::Attach(state->limit);
   state->sort = DropDownFromNames(SmartPlaylistSearch::FieldNames());
   state->descending = gtk_check_button_new_with_label(Translations::CStr("Sort descending"));
   state->terms_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);

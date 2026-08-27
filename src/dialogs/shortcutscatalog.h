@@ -45,6 +45,7 @@ inline std::vector<Entry> Entries() {
       {"Ctrl+9", "Last playlist"},
       {"Ctrl+Shift+P", "Active playlist"},
       {"Ctrl+W", "Close playlist"},
+      {"Ctrl+Shift+W", "Hide window"},
       {"Ctrl+M", "Mute"},
       {"Ctrl+Alt+V", "Stop after this track"},
       {"Ctrl+Shift+H", "Shuffle playlist"},
