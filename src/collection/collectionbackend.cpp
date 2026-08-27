@@ -1,6 +1,7 @@
 #include "collection/collectionbackend.h"
 
 #include "collection/collectioncompilation.h"
+#include "collection/collectioncompilationdetect.h"
 #include "collection/collectionquery.h"
 #include "filterparser/filterparser.h"
 #include "utilities/strutils.h"
@@ -130,13 +131,65 @@ Song CollectionBackend::SongById(int id) const {
   return Song();
 }
 
-Song CollectionBackend::SongByUrl(const std::string &url) const {
-  SqlQuery query(database_, "SELECT ROWID, " + std::string(Song::kColumnSpec) + " FROM songs WHERE url = ?");
+Song CollectionBackend::SongByUrl(const std::string &url, int64_t beginning_nanosec) const {
+  std::string sql = "SELECT ROWID, " + std::string(Song::kColumnSpec) + " FROM songs WHERE url = ?";
+  if (beginning_nanosec >= 0) {
+    sql += " AND beginning = ?";
+  }
+  SqlQuery query(database_, sql);
   query.Bind(1, url);
+  if (beginning_nanosec >= 0) {
+    query.Bind(2, beginning_nanosec);
+  }
   if (query.Step()) {
     return SongFromQuery(query);
   }
   return Song();
+}
+
+void CollectionBackend::UpdateCompilations() {
+  if (!database_ || !database_->handle()) {
+    return;
+  }
+  SqlQuery query(database_,
+                 "SELECT directory_id, album, COUNT(DISTINCT CASE WHEN albumartist != '' THEN albumartist ELSE artist END) "
+                 "FROM songs WHERE unavailable = 0 AND album != '' GROUP BY directory_id, album");
+  while (query.Step()) {
+    const int directory_id = query.ColumnInt(0);
+    const std::string album = query.ColumnText(1);
+    const bool detected = CollectionCompilationDetect::IsCompilationAlbum(query.ColumnInt(2));
+    SqlQuery update(database_,
+                    "UPDATE songs SET compilation_detected = ?, "
+                    "compilation_effective = ((compilation OR ? OR compilation_on) AND NOT compilation_off) + 0 "
+                    "WHERE directory_id = ? AND album = ? AND unavailable = 0");
+    update.Bind(1, detected ? 1 : 0);
+    update.Bind(2, detected ? 1 : 0);
+    update.Bind(3, directory_id);
+    update.Bind(4, album);
+    update.Exec();
+  }
+}
+
+void CollectionBackend::UpdateSongUrl(int song_id, const std::string &url, int directory_id) {
+  if (song_id <= 0 || url.empty() || !database_ || !database_->handle()) {
+    return;
+  }
+  if (directory_id >= 0) {
+    SqlQuery query(database_, "UPDATE songs SET url = ?, directory_id = ? WHERE ROWID = ?");
+    query.Bind(1, url);
+    query.Bind(2, directory_id);
+    query.Bind(3, song_id);
+    query.Exec();
+  } else {
+    SqlQuery query(database_, "UPDATE songs SET url = ? WHERE ROWID = ?");
+    query.Bind(1, url);
+    query.Bind(2, song_id);
+    query.Exec();
+  }
+  const Song song = SongById(song_id);
+  if (song.id() > 0) {
+    SongsStatisticsChanged.Emit({song});
+  }
 }
 
 int CollectionBackend::AddOrUpdateSong(const Song &song) {

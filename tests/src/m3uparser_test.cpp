@@ -5,6 +5,7 @@
 #include "playlistparsers/cueparser.h"
 #include "playlistparsers/m3uparser.h"
 #include "playlistparsers/parserbase.h"
+#include "playlistparsers/parsercollectionlookup.h"
 #include "playlistparsers/playlistparser.h"
 #include "playlistparsers/plsparser.h"
 #include "playlistparsers/wplparser.h"
@@ -30,6 +31,16 @@ TEST(PlaylistParser, RoundTripM3U) {
   ASSERT_FALSE(loaded.empty());
   EXPECT_FALSE(loaded.front().url().empty());
   unlink(path.c_str());
+}
+
+TEST(ParserCollectionLookup, ReturnsStubWhenBackendMissing) {
+  Song stub;
+  stub.set_url("file:///tmp/roads.flac");
+  stub.set_title("roads.flac");
+  stub.set_valid(true);
+  const Song resolved = ParserCollectionLookup::Resolve(stub, nullptr);
+  EXPECT_EQ("roads.flac", resolved.title());
+  EXPECT_EQ("file:///tmp/roads.flac", resolved.url());
 }
 
 TEST(ParserBase, URLOrFilenameHonorsPathType) {
@@ -73,6 +84,7 @@ TEST(PlaylistParser, CueIndexAndTracks) {
   EXPECT_EQ("Artist", songs[0].artist());
   EXPECT_EQ(0, songs[0].beginning_nanosec());
   EXPECT_EQ(2000000000LL, songs[0].length_nanosec());
+  EXPECT_EQ(2000000000LL, songs[0].end_nanosec());
   EXPECT_EQ("Two", songs[1].title());
   EXPECT_EQ(2000000000LL, songs[1].beginning_nanosec());
   EXPECT_FALSE(songs[0].cue_path().empty());

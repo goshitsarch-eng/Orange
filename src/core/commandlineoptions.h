@@ -41,7 +41,16 @@ class CommandlineOptions {
   const std::string &log_levels() const { return log_levels_; }
   const std::string &playlist_name() const { return playlist_name_; }
   bool debug() const { return debug_; }
+  bool version() const { return version_; }
+  int resize_width() const { return resize_width_; }
+  int resize_height() const { return resize_height_; }
   void set_urls(const std::vector<std::string> &urls) { urls_ = urls; }
+  void set_player_action(PlayerAction action) { player_action_ = action; }
+  void set_resize(int width, int height) {
+    resize_width_ = width;
+    resize_height_ = height;
+    player_action_ = PlayerAction::ResizeWindow;
+  }
 
  private:
   UrlListAction url_list_action_ = UrlListAction::Append;
@@ -54,6 +63,9 @@ class CommandlineOptions {
   bool show_osd_ = false;
   bool toggle_pretty_osd_ = false;
   bool debug_ = false;
+  bool version_ = false;
+  int resize_width_ = 0;
+  int resize_height_ = 0;
   std::vector<std::string> urls_;
   std::string language_;
   std::string log_levels_;

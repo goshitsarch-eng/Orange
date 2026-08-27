@@ -1,5 +1,6 @@
 #include "playlistparsers/playlistparser.h"
 
+#include "collection/collectionbackend.h"
 #include "playlistparsers/asxiniparser.h"
 #include "playlistparsers/asxparser.h"
 #include "playlistparsers/cueparser.h"
@@ -12,7 +13,8 @@
 
 #include <algorithm>
 
-PlaylistParser::PlaylistParser() {
+PlaylistParser::PlaylistParser(CollectionBackend *backend) {
+  ParserBase::SetCollectionBackend(backend);
   parsers_.push_back(std::make_unique<M3UParser>());
   parsers_.push_back(std::make_unique<PLSParser>());
   parsers_.push_back(std::make_unique<XSPFParser>());

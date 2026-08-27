@@ -142,6 +142,7 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
         self->backend_->MarkMissingUnavailable(directory_id, job->seen_urls);
       }
     }
+    self->backend_->UpdateCompilations();
   }
   if (self->task_manager_ && task_id) {
     self->task_manager_->SetTaskFinished(task_id);

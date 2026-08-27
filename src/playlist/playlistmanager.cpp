@@ -123,7 +123,7 @@ Playlist *PlaylistManager::New(const std::string &name, const SongList &songs) {
 }
 
 void PlaylistManager::Load(const std::string &filename) {
-  const SongList songs = PlaylistParser().Load(filename);
+  const SongList songs = PlaylistParser(collection_backend_).Load(filename);
   std::string name = FileUtils::BaseName(filename);
   const auto dot = name.rfind('.');
   if (dot != std::string::npos && dot > 0) {

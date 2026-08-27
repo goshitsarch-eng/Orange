@@ -25,6 +25,19 @@ void Init() {
 
 void SetDebugEnabled(bool enabled) { g_debug_enabled = enabled; }
 
+void SetLevels(const std::string &levels) {
+  if (levels.empty()) {
+    return;
+  }
+  if (levels.find("*:4") != std::string::npos || levels.find(":4") != std::string::npos) {
+    SetDebugEnabled(true);
+    return;
+  }
+  if (levels.find("*:1") != std::string::npos || levels == "1") {
+    SetDebugEnabled(false);
+  }
+}
+
 void Log(Level level, const char *domain, const char *format, ...) {
   if (level == Level::Debug && !g_debug_enabled) {
     return;

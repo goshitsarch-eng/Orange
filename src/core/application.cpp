@@ -65,6 +65,7 @@ void Application::Init() {
   player_->Init();
   player_->SetQueue(queue_.get());
   device_finders_->Init();
+  device_manager_->set_tagreader(tagreader_.get());
   device_manager_->Init();
   url_handlers_->AddHandler(device_manager_->url_handler());
   osd_->set_tray_icon(tray_.get());
@@ -245,8 +246,14 @@ void Application::ApplyCommandline(const CommandlineOptions &options) {
     case CommandlineOptions::PlayerAction::PlayPlaylist:
       player_->PlayPlaylist(options.playlist_name());
       break;
+    case CommandlineOptions::PlayerAction::ResizeWindow:
+      RaiseRequested.Emit();
+      break;
     default:
       break;
+  }
+  if (!options.log_levels().empty()) {
+    logging::SetLevels(options.log_levels());
   }
   if (options.set_volume() >= 0) {
     player_->SetVolume(static_cast<unsigned>(options.set_volume()));

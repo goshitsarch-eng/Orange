@@ -21,7 +21,9 @@ class CollectionBackend {
   SongList Songs(const std::string &filter = {}) const;
   SongList Songs(const CollectionFilterOptions &options) const;
   Song SongById(int id) const;
-  Song SongByUrl(const std::string &url) const;
+  Song SongByUrl(const std::string &url, int64_t beginning_nanosec = -1) const;
+  void UpdateCompilations();
+  void UpdateSongUrl(int song_id, const std::string &url, int directory_id = -1);
   int AddOrUpdateSong(const Song &song);
   void DeleteSongsInDirectory(int directory_id);
   int DeleteSongsBySource(Song::Source source);

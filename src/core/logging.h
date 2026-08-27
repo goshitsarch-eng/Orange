@@ -10,6 +10,7 @@ enum class Level { Debug, Info, Warning, Error };
 
 void Init();
 void SetDebugEnabled(bool enabled);
+void SetLevels(const std::string &levels);
 void Log(Level level, const char *domain, const char *format, ...) G_GNUC_PRINTF(3, 4);
 
 }  // namespace logging

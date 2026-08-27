@@ -12,6 +12,7 @@
 #include "constants/backendsettings.h"
 #include "constants/coverssettings.h"
 #include "core/mainwindowsponsor.h"
+#include "core/commandlinewindow.h"
 #include "core/mainwindowsettings.h"
 #include "dialogs/messagedialog.h"
 #include "ui/mainwindowmenu.h"
@@ -218,6 +219,9 @@ void MainWindow::MaybeShowSponsor() {
 
 void MainWindow::CommandlineReceived(const CommandlineOptions &options) {
   app_->ApplyCommandline(options);
+  if (CommandlineWindow::ShouldResize(options.player_action(), options.resize_width(), options.resize_height())) {
+    gtk_window_set_default_size(GTK_WINDOW(window_), options.resize_width(), options.resize_height());
+  }
   RefreshPlaylist();
   Present();
 }

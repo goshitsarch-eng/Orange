@@ -22,6 +22,11 @@ class Organize {
     MusicStorage::TranscodeMode transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
     Song::FileType transcode_format = Song::FileType::Unknown;
     std::vector<Song::FileType> supported_filetypes;
+    class CollectionBackend *collection_backend = nullptr;
+    class TagReader *tagreader = nullptr;
+    int collection_directory_id = -1;
+    bool destination_is_collection = false;
+    std::string cover_cache_path;
   };
 
   std::vector<Error> Copy(const SongList &songs, const std::string &destination, const OrganizeFormat &format, bool move);

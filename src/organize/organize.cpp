@@ -1,6 +1,9 @@
 #include "organize/organize.h"
 
+#include "collection/collectionbackend.h"
 #include "core/filesystemmusicstorage.h"
+#include "organize/organizecoversource.h"
+#include "organize/organizepathnotify.h"
 #include "core/standardpaths.h"
 #include "organize/organizepreview.h"
 #include "organize/organizetranscode.h"
@@ -88,14 +91,19 @@ std::vector<Organize::Error> Organize::Copy(const SongList &songs, const std::st
     job.remove_original = options.move && temp.empty();
     job.albumcover = options.albumcover;
     if (options.albumcover) {
-      job.cover_source = CoverPathForSong(song);
+      job.cover_source = OrganizeCoverSource::ForSong(song, options.tagreader, options.cover_cache_path);
       job.cover_dest = FileUtils::Join(FileUtils::DirName(dest), "cover.jpg");
     }
     std::string error_text;
     if (!storage.CopyToStorage(job, error_text)) {
       errors.push_back({song.PrettyTitleWithArtist(), error_text.empty() ? ("Could not write " + dest) : error_text});
-    } else if (options.move && !temp.empty()) {
-      FileUtils::Remove(src);
+    } else {
+      if (OrganizePathNotify::ShouldNotify(options.move, song, options.destination_is_collection) && options.collection_backend) {
+        options.collection_backend->UpdateSongUrl(song.id(), FileUtils::UriFromPath(dest), options.collection_directory_id);
+      }
+      if (options.move && !temp.empty()) {
+        FileUtils::Remove(src);
+      }
     }
     if (!temp.empty()) {
       FileUtils::Remove(temp);

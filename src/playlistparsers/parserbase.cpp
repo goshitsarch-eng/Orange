@@ -1,5 +1,6 @@
 #include "playlistparsers/parserbase.h"
 
+#include "playlistparsers/parsercollectionlookup.h"
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "utilities/fileutils.h"
@@ -11,10 +12,13 @@
 namespace {
 
 int g_path_type_override = -1;
+CollectionBackend *g_collection_backend = nullptr;
 
 }  // namespace
 
 void ParserBase::SetPathTypeOverride(int type) { g_path_type_override = type; }
+
+void ParserBase::SetCollectionBackend(CollectionBackend *backend) { g_collection_backend = backend; }
 
 bool ParserBase::HasUrlScheme(const std::string &value) {
   const size_t colon = value.find(':');
@@ -40,7 +44,7 @@ Song ParserBase::LoadSong(const std::string &playlist_dir, const std::string &en
     song.set_url(path);
     song.set_title(FileUtils::BaseName(FileUtils::PathFromUri(path)));
     song.set_valid(true);
-    return song;
+    return ParserCollectionLookup::Resolve(song, g_collection_backend);
   }
   if (!path.empty() && path[0] != '/') {
     path = FileUtils::Join(playlist_dir, path);
@@ -50,7 +54,7 @@ Song ParserBase::LoadSong(const std::string &playlist_dir, const std::string &en
   song.set_title(FileUtils::BaseName(path));
   song.set_basefilename(FileUtils::BaseName(path));
   song.set_valid(true);
-  return song;
+  return ParserCollectionLookup::Resolve(song, g_collection_backend);
 }
 
 std::string ParserBase::URLOrFilename(const std::string &url, const std::string &playlist_dir) {

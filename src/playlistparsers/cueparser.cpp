@@ -184,6 +184,7 @@ SongList CueParser::Load(const std::string &data, const std::string &playlist_pa
     const int64_t start = songs[i].beginning_nanosec();
     if (next > start) {
       songs[i].set_length_nanosec(next - start);
+      songs[i].set_end_nanosec(next);
     }
   }
   return songs;
@@ -220,5 +221,6 @@ void CueParser::EnrichFromAudioFile(SongList *songs, const Song &file) {
   }
   if (!songs->empty() && songs->back().length_nanosec() <= 0 && file.length_nanosec() > songs->back().beginning_nanosec()) {
     songs->back().set_length_nanosec(file.length_nanosec() - songs->back().beginning_nanosec());
+    songs->back().set_end_nanosec(file.length_nanosec());
   }
 }

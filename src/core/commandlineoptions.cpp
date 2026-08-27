@@ -1,5 +1,6 @@
 #include "core/commandlineoptions.h"
 
+#include "core/commandlinewindow.h"
 #include "version.h"
 
 #include <glib.h>
@@ -18,11 +19,16 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   gboolean show_osd = false;
   gboolean toggle_pretty_osd = false;
   gboolean debug = false;
+  gboolean version = false;
+  gboolean quiet = false;
+  gboolean verbose = false;
   gboolean create_new = false;
   gboolean append = false;
   gboolean load = false;
   gchar *play_playlist = nullptr;
   gchar *language = nullptr;
+  gchar *log_levels = nullptr;
+  gchar *resize_window = nullptr;
   gint volume = -1;
   gint volume_increase = 0;
   gint volume_decrease = 0;
@@ -53,6 +59,11 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
       {"toggle-pretty-osd", 0, 0, G_OPTION_ARG_NONE, &toggle_pretty_osd, "Toggle the pretty OSD", nullptr},
       {"language", 0, 0, G_OPTION_ARG_STRING, &language, "Override the language", "LANG"},
       {"debug", 0, 0, G_OPTION_ARG_NONE, &debug, "Enable debug output", nullptr},
+      {"version", 'v', 0, G_OPTION_ARG_NONE, &version, "Print version and exit", nullptr},
+      {"quiet", 'q', 0, G_OPTION_ARG_NONE, &quiet, "Equivalent to --log-levels *:1", nullptr},
+      {"verbose", 0, 0, G_OPTION_ARG_NONE, &verbose, "Equivalent to --log-levels *:4", nullptr},
+      {"log-levels", 0, 0, G_OPTION_ARG_STRING, &log_levels, "Comma-separated log levels (e.g. *:4)", "LEVELS"},
+      {"resize-window", 0, 0, G_OPTION_ARG_STRING, &resize_window, "Resize the main window", "WxH"},
       {nullptr, 0, 0, G_OPTION_ARG_NONE, nullptr, nullptr, nullptr},
   };
 
@@ -94,6 +105,28 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   show_osd_ = show_osd;
   toggle_pretty_osd_ = toggle_pretty_osd;
   debug_ = debug;
+  version_ = version;
+  if (quiet) {
+    log_levels_ = "*:1";
+  }
+  if (verbose) {
+    log_levels_ = "*:4";
+    debug_ = true;
+  }
+  if (log_levels) {
+    log_levels_ = log_levels;
+    g_free(log_levels);
+  }
+  if (resize_window) {
+    int width = 0;
+    int height = 0;
+    if (CommandlineWindow::ParseSize(resize_window, &width, &height)) {
+      player_action_ = PlayerAction::ResizeWindow;
+      resize_width_ = width;
+      resize_height_ = height;
+    }
+    g_free(resize_window);
+  }
   if (language) {
     language_ = language;
     g_free(language);

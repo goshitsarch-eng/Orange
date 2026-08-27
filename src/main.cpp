@@ -33,6 +33,30 @@ void Activate(AdwApplication *gtk_app, gpointer user_data) {
   runtime->window->Present();
 }
 
+int CommandLine(GApplication *gapp, GApplicationCommandLine *cmdline, gpointer user_data) {
+  auto *runtime = static_cast<Runtime *>(user_data);
+  int argc = 0;
+  char **argv = g_application_command_line_get_arguments(cmdline, &argc);
+  CommandlineOptions options;
+  options.Parse(argc, argv);
+  g_strfreev(argv);
+  if (options.version()) {
+    g_application_command_line_print(cmdline, "Strawberry %s\n", STRAWBERRY_VERSION_DISPLAY);
+    return 0;
+  }
+  if (options.debug() || options.log_levels().find("*:4") != std::string::npos) {
+    logging::SetDebugEnabled(true);
+  }
+  if (!options.log_levels().empty()) {
+    logging::SetLevels(options.log_levels());
+  }
+  Activate(ADW_APPLICATION(gapp), user_data);
+  if (runtime->window) {
+    runtime->window->CommandlineReceived(options);
+  }
+  return 0;
+}
+
 void Open(GApplication *gapp, gpointer files, gint n_files, const gchar *, gpointer user_data) {
   auto *runtime = static_cast<Runtime *>(user_data);
   Activate(ADW_APPLICATION(gapp), user_data);
@@ -57,8 +81,15 @@ int main(int argc, char **argv) {
   if (!options.Parse(argc, argv)) {
     return 1;
   }
+  if (options.version()) {
+    g_print("Strawberry %s\n", STRAWBERRY_VERSION_DISPLAY);
+    return 0;
+  }
   if (options.debug()) {
     logging::SetDebugEnabled(true);
+  }
+  if (!options.log_levels().empty()) {
+    logging::SetLevels(options.log_levels());
   }
 
   GstStartup::Initialize();
@@ -67,10 +98,13 @@ int main(int argc, char **argv) {
   adw_init();
 
   Runtime runtime;
-  AdwApplication *gtk_app = adw_application_new(STRAWBERRY_APPLICATION_ID, G_APPLICATION_HANDLES_OPEN);
+  AdwApplication *gtk_app =
+      adw_application_new(STRAWBERRY_APPLICATION_ID,
+                          static_cast<GApplicationFlags>(G_APPLICATION_HANDLES_OPEN | G_APPLICATION_HANDLES_COMMAND_LINE));
   g_application_set_application_id(G_APPLICATION(gtk_app), STRAWBERRY_APPLICATION_ID);
   g_signal_connect(gtk_app, "activate", G_CALLBACK(Activate), &runtime);
   g_signal_connect(gtk_app, "open", G_CALLBACK(Open), &runtime);
+  g_signal_connect(gtk_app, "command-line", G_CALLBACK(CommandLine), &runtime);
 
   const int status = g_application_run(G_APPLICATION(gtk_app), argc, argv);
   if (runtime.app) {

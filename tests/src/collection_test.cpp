@@ -1,4 +1,6 @@
+#include "collection/collectioncompilationdetect.h"
 #include "collection/collectionsongpatch.h"
+#include "organize/organizepathnotify.h"
 #include "collection/skipcounteligibility.h"
 #include "collection/collectionautoopen.h"
 #include "collection/collectionempty.h"
@@ -556,6 +558,44 @@ TEST(CollectionCompilation, EffectiveAndAlbumKeys) {
   const auto keys = CollectionCompilation::AlbumArtistKeys({a, b, c});
   ASSERT_EQ(2u, keys.size());
   EXPECT_EQ("Album", keys.front().first);
+}
+
+TEST(CollectionCompilationDetect, MarksMultiArtistAlbums) {
+  EXPECT_FALSE(CollectionCompilationDetect::IsCompilationAlbum(1));
+  EXPECT_TRUE(CollectionCompilationDetect::IsCompilationAlbum(2));
+}
+
+TEST(CollectionBackend, UpdateCompilationsDetectsMixedArtists) {
+  const std::string path = "/tmp/strawberry-collection-detect-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song a = MakeSong("One", "Artist A", "Shared");
+  a.set_directory_id(directory);
+  a.set_url("file:///tmp/music/one.flac");
+  Song b = MakeSong("Two", "Artist B", "Shared");
+  b.set_directory_id(directory);
+  b.set_url("file:///tmp/music/two.flac");
+  ASSERT_GT(backend.AddOrUpdateSong(a), 0);
+  ASSERT_GT(backend.AddOrUpdateSong(b), 0);
+  backend.UpdateCompilations();
+  EXPECT_TRUE(backend.SongByUrl("file:///tmp/music/one.flac").compilation());
+  EXPECT_TRUE(backend.SongByUrl("file:///tmp/music/two.flac").compilation());
+  unlink(path.c_str());
+}
+
+TEST(OrganizePathNotify, GatesCollectionMoves) {
+  Song collection;
+  collection.set_id(4);
+  collection.set_source(Song::Source::Collection);
+  EXPECT_TRUE(OrganizePathNotify::ShouldNotify(true, collection, true));
+  EXPECT_FALSE(OrganizePathNotify::ShouldNotify(false, collection, true));
+  Song local;
+  local.set_id(4);
+  local.set_source(Song::Source::LocalFile);
+  EXPECT_FALSE(OrganizePathNotify::ShouldNotify(true, local, true));
 }
 
 TEST(CollectionBackend, ForceCompilationSetsEffectiveFlag) {

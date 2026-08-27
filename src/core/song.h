@@ -98,6 +98,7 @@ class Song {
   const std::string &song_id() const { return song_id_; }
 
   int64_t beginning_nanosec() const { return beginning_nanosec_; }
+  int64_t end_nanosec() const { return end_nanosec_; }
   int64_t length_nanosec() const { return length_nanosec_; }
   int bitrate() const { return bitrate_; }
   int samplerate() const { return samplerate_; }
@@ -174,6 +175,7 @@ class Song {
   void set_album_id(const std::string &v) { album_id_ = v; }
   void set_song_id(const std::string &v) { song_id_ = v; }
   void set_beginning_nanosec(int64_t v) { beginning_nanosec_ = v; }
+  void set_end_nanosec(int64_t v) { end_nanosec_ = v; }
   void set_length_nanosec(int64_t v) { length_nanosec_ = v; }
   void set_bitrate(int v) { bitrate_ = v; }
   void set_samplerate(int v) { samplerate_ = v; }
@@ -293,6 +295,7 @@ class Song {
   std::string album_id_;
   std::string song_id_;
   int64_t beginning_nanosec_ = 0;
+  int64_t end_nanosec_ = -1;
   int64_t length_nanosec_ = 0;
   int bitrate_ = -1;
   int samplerate_ = -1;

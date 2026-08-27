@@ -10,7 +10,7 @@
 
 class PlaylistParser {
  public:
-  PlaylistParser();
+  explicit PlaylistParser(class CollectionBackend *backend = nullptr);
 
   SongList Load(const std::string &path) const;
   SongList LoadFromData(const std::string &data, const std::string &hint = {}) const;

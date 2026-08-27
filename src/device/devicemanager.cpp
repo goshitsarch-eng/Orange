@@ -480,6 +480,8 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
   OrganizeFormat format("%albumartist/%album/{%track - }%title");
   Organize::Options options;
   options.albumcover = true;
+  options.tagreader = tagreader_;
+  options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "device-cover.bin");
   options.transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
   options.transcode_format = stored.id >= 0 ? stored.transcode_format : Song::FileType::Unknown;
   class Organize organize;

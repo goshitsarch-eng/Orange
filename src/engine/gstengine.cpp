@@ -157,6 +157,7 @@ void GstEngine::StartPreloading(const std::string &media_url, const std::string 
     return;
   }
   DiscardNext();
+  next_url_ = url;
   next_ = CreatePipeline(url, static_cast<uint64_t>(std::max<int64_t>(0, beginning_offset_nanosec)), end_offset_nanosec);
   if (next_) {
     next_->SetVolume(0.0);
@@ -176,13 +177,18 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
                           ((fading_enabled_ || auto_crossfade) && (track_change_flags & Intro)));
 
   if (auto_change && current_ && current_->valid() && !crossfade) {
+    DiscardNext();
     current_->SetNextUri(url);
     gapless_pending_ = true;
     return true;
   }
 
   if (crossfade) {
+    if (next_ && next_->valid() && next_url_ == url) {
+      return true;
+    }
     DiscardNext();
+    next_url_ = url;
     next_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec);
     if (!next_) {
       Error.Emit("Could not create next playbin");
@@ -374,6 +380,7 @@ void GstEngine::DiscardNext() {
     next_->Stop();
     next_.reset();
   }
+  next_url_.clear();
 }
 
 void GstEngine::OnAboutToFinish(int pipeline_id) {

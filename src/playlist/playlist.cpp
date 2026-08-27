@@ -1,5 +1,6 @@
 #include "playlist/playlist.h"
 
+#include "core/playermetadatasync.h"
 #include "playlist/dynamicplaylistmaintenance.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlistbehaviour.h"
@@ -398,6 +399,27 @@ void Playlist::ReplaceRow(int row, const Song &song) {
 }
 
 void Playlist::SetFilterString(const std::string &filter) { filter_string_ = filter; }
+
+bool Playlist::MergeFromEngine(const Song &engine) {
+  if (engine.url().empty()) {
+    return false;
+  }
+  bool changed = false;
+  for (Song &existing : songs_) {
+    if (existing.url() != engine.url()) {
+      continue;
+    }
+    const Song before = existing;
+    PlayerMetadataSync::Merge(&existing, engine);
+    if (PlayerMetadataSync::ShouldRefreshPlaylist(before, existing)) {
+      changed = true;
+    }
+  }
+  if (changed) {
+    Changed.Emit();
+  }
+  return changed;
+}
 
 void Playlist::UpdateSongsByUrl(const Song &song) {
   if (song.url().empty()) {

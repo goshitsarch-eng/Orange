@@ -5,6 +5,8 @@
 #include "core/application.h"
 #include "core/settings.h"
 #include "organize/organize.h"
+#include "organize/organizepathnotify.h"
+#include "core/standardpaths.h"
 #include "organize/organizeerrordialog.h"
 #include "organize/organizeformat.h"
 #include "organize/organizeformatvalidator.h"
@@ -521,6 +523,16 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      if (auto *supported = static_cast<std::vector<Song::FileType> *>(g_object_get_data(G_OBJECT(button), "supported"))) {
                        options.supported_filetypes = *supported;
                      }
+                     if (application && application->collection()) {
+                       options.collection_backend = application->collection()->backend();
+                       options.destination_is_collection =
+                           OrganizePathNotify::DestinationIsCollection(dest_dir, options.collection_backend);
+                       options.collection_directory_id = OrganizePathNotify::DirectoryIdForPath(dest_dir, options.collection_backend);
+                     }
+                     if (application) {
+                       options.tagreader = application->tagreader();
+                     }
+                     options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "organize-cover.bin");
                      PersistFromState(static_cast<DialogState *>(g_object_get_data(G_OBJECT(button), "state")));
                      auto *owned = static_cast<SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
                      SongList songs = owned && !owned->empty() ? *owned

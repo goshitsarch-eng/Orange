@@ -90,6 +90,7 @@ class GstEngine : public EngineBase {
 
   std::unique_ptr<GstEnginePipeline> current_;
   std::unique_ptr<GstEnginePipeline> next_;
+  std::string next_url_;
   int next_pipeline_id_ = 1;
   int replaygain_mode_ = 0;
   double replaygain_preamp_ = 0.0;

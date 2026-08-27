@@ -14,6 +14,7 @@
 #include <vector>
 
 class Database;
+class TagReader;
 class TaskManager;
 
 class DeviceManager {
@@ -22,6 +23,7 @@ class DeviceManager {
   ~DeviceManager();
 
   void Init();
+  void set_tagreader(class TagReader *tagreader) { tagreader_ = tagreader; }
   void Rescan();
   const std::vector<ConnectedDevice> &devices() const { return devices_; }
   bool CopySongs(const std::string &device_id, const SongList &songs);
@@ -73,6 +75,7 @@ class DeviceManager {
   std::vector<std::string> forgotten_;
   std::map<std::string, int> song_counts_;
   TaskManager *task_manager_ = nullptr;
+  TagReader *tagreader_ = nullptr;
   int scan_task_id_ = 0;
   int last_scan_percent_ = -1;
   std::string scan_device_id_;

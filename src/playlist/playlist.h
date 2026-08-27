@@ -83,6 +83,7 @@ class Playlist {
   void SetFilterString(const std::string &filter);
   const std::string &filter_string() const { return filter_string_; }
   void UpdateSongsByUrl(const Song &song);
+  bool MergeFromEngine(const Song &engine);
   PlaylistSequence::RepeatMode repeat_mode() const { return repeat_mode_; }
   PlaylistSequence::ShuffleMode shuffle_mode() const { return shuffle_mode_; }
   void SetDynamic(bool dynamic, const SmartPlaylistSearch &search = {});

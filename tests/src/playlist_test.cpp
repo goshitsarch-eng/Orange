@@ -1,4 +1,8 @@
+#include "core/playermetadatasync.h"
+#include "core/playerpreload.h"
 #include "core/playerrepeat.h"
+#include "core/playerstopafter.h"
+#include "core/songsegment.h"
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistfilterdelay.h"
@@ -437,6 +441,50 @@ TEST(Playlist, UpdateSongsByUrlReplacesMatchingRows) {
   EXPECT_EQ("Other", playlist.song(1).title());
 }
 
+TEST(PlayerPreload, AdvancesOnlyForAutoCrossfadeAcrossAlbums) {
+  EXPECT_FALSE(PlayerPreload::ShouldPreload(true, true));
+  EXPECT_FALSE(PlayerPreload::ShouldPreload(false, false));
+  EXPECT_TRUE(PlayerPreload::ShouldPreload(false, true));
+  EXPECT_FALSE(PlayerPreload::ShouldAdvanceOnAboutToEnd(false, false, true));
+  EXPECT_TRUE(PlayerPreload::ShouldAdvanceOnAboutToEnd(true, false, true));
+  EXPECT_FALSE(PlayerPreload::ShouldAdvanceOnAboutToEnd(true, true, true));
+  EXPECT_TRUE(PlayerPreload::ShouldAdvanceOnAboutToEnd(true, true, false));
+}
+
+TEST(PlayerStopAfter, PreparesNextRowBeforeStop) {
+  EXPECT_TRUE(PlayerStopAfter::ShouldPrepareResume(true));
+  EXPECT_FALSE(PlayerStopAfter::ShouldPrepareResume(false));
+  EXPECT_EQ(3, PlayerStopAfter::ResumeRow(3));
+  EXPECT_EQ(-1, PlayerStopAfter::ResumeRow(-1));
+}
+
+TEST(PlayerMetadataSync, MergesEngineTagsAndDetectsRefresh) {
+  Song current;
+  current.set_url("http://radio.example/live");
+  Song engine;
+  engine.set_title("Roads");
+  engine.set_artist("Portishead");
+  engine.set_length_nanosec(180000000000LL);
+  PlayerMetadataSync::Merge(&current, engine);
+  EXPECT_EQ("Roads", current.title());
+  EXPECT_EQ("Portishead", current.artist());
+  EXPECT_EQ(180000000000LL, current.length_nanosec());
+  Song same = current;
+  EXPECT_FALSE(PlayerMetadataSync::ShouldRefreshPlaylist(current, same));
+  same.set_title("Glory Box");
+  EXPECT_TRUE(PlayerMetadataSync::ShouldRefreshPlaylist(current, same));
+}
+
+TEST(SongSegment, UsesStoredEndOrBeginningPlusLength) {
+  Song song;
+  song.set_beginning_nanosec(2000000000LL);
+  song.set_length_nanosec(4000000000LL);
+  EXPECT_EQ(6000000000LL, SongSegment::EffectiveEndNanosec(song));
+  song.set_end_nanosec(5000000000LL);
+  EXPECT_EQ(5000000000LL, SongSegment::EffectiveEndNanosec(song));
+  EXPECT_TRUE(SongSegment::HasForcedEnd(song));
+}
+
 TEST(PlayerRepeat, OneByOneStopsAfterCurrent) {
   EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::OneByOne, false));
   EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, true));
@@ -641,6 +689,21 @@ TEST(DynamicPlaylistMaintenance, HistoryFutureAndTrimCounts) {
   EXPECT_EQ(3, DynamicPlaylistMaintenance::FutureInsertCount(10, PlaylistGenerator::kDefaultDynamicFuture, 18));
   EXPECT_TRUE(DynamicPlaylistMaintenance::ShouldClearUndo(true, true));
   EXPECT_FALSE(DynamicPlaylistMaintenance::ShouldClearUndo(false, true));
+}
+
+TEST(Playlist, MergeFromEngineUpdatesMatchingUrl) {
+  Playlist playlist;
+  Song song;
+  song.set_url("http://radio.example/live");
+  song.set_valid(true);
+  playlist.AppendSongs({song});
+  Song engine;
+  engine.set_url("http://radio.example/live");
+  engine.set_title("Roads");
+  engine.set_artist("Portishead");
+  EXPECT_TRUE(playlist.MergeFromEngine(engine));
+  EXPECT_EQ("Roads", playlist.song(0).title());
+  EXPECT_EQ("Portishead", playlist.song(0).artist());
 }
 
 TEST(Playlist, PatchSongByIdUpdatesWithoutUndo) {

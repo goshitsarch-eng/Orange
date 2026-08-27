@@ -9,7 +9,11 @@
 #include "constants/behavioursettings.h"
 #include "constants/playlistsettings.h"
 #include "core/logging.h"
+#include "core/playermetadatasync.h"
+#include "core/playerpreload.h"
 #include "core/playerrepeat.h"
+#include "core/playerstopafter.h"
+#include "core/songsegment.h"
 #include "core/playerresume.h"
 #include "core/settings.h"
 #include "core/urlhandlers.h"
@@ -32,9 +36,16 @@ void Player::Init() {
   engine_->TrackAboutToEnd.Connect([this]() { PreloadNext(); });
   engine_->Error.Connect([this](const std::string &error) { HandleEngineError(error); });
   engine_->MetadataReceived.Connect([this](const Song &song) {
-    if (current_song_.title().empty() && song.is_valid()) {
-      if (!song.title().empty()) current_song_.set_title(song.title());
-      if (!song.artist().empty()) current_song_.set_artist(song.artist());
+    const Song before = current_song_;
+    PlayerMetadataSync::Merge(&current_song_, song);
+    if (playlist_manager_ && playlist_manager_->active()) {
+      Song patch = current_song_;
+      if (patch.url().empty()) {
+        patch.set_url(before.url());
+      }
+      playlist_manager_->active()->MergeFromEngine(patch);
+    }
+    if (PlayerMetadataSync::ShouldRefreshPlaylist(before, current_song_)) {
       SongChanged.Emit(current_song_);
     }
   });
@@ -402,8 +413,8 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_
         ApplyLoadResult(&current_song_, async);
         if (!async.stream_url.empty()) {
           engine_->SetNextAlbum(current_song_.EffectiveAlbum());
-          engine_->Load(current_song_.url(), async.stream_url, track_change_flags, false, current_song_.beginning_nanosec(),
-                        current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
+          engine_->Load(current_song_.url(), async.stream_url, track_change_flags, SongSegment::HasForcedEnd(current_song_),
+                        current_song_.beginning_nanosec(), SongSegment::EffectiveEndNanosec(current_song_),
                         current_song_.ebur128_integrated_loudness_lufs());
           engine_->SetCurrentAlbum(current_song_.EffectiveAlbum());
           engine_->Play(pause, offset_nanosec);
@@ -415,8 +426,8 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_
     }
   }
   engine_->SetNextAlbum(current_song_.EffectiveAlbum());
-  engine_->Load(current_song_.url(), current_song_.stream_url(), track_change_flags, false, current_song_.beginning_nanosec(),
-                current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
+  engine_->Load(current_song_.url(), current_song_.stream_url(), track_change_flags, SongSegment::HasForcedEnd(current_song_),
+                current_song_.beginning_nanosec(), SongSegment::EffectiveEndNanosec(current_song_),
                 current_song_.ebur128_integrated_loudness_lufs());
   engine_->SetCurrentAlbum(current_song_.EffectiveAlbum());
   engine_->Play(pause, offset_nanosec);
@@ -490,9 +501,6 @@ void Player::HandleEngineError(const std::string &error) {
 }
 
 void Player::PreloadNext() {
-  if (stop_after_current_) {
-    return;
-  }
   if (playlist_manager_) {
     playlist_manager_->RefillDynamic();
   }
@@ -502,11 +510,16 @@ void Player::PreloadNext() {
   } else if (playlist_manager_) {
     next_song = playlist_manager_->PeekNextSong();
   }
-  if (!next_song.is_valid() && next_song.url().empty()) {
+  if (!PlayerPreload::ShouldPreload(stop_after_current_, next_song.is_valid() || !next_song.url().empty())) {
     return;
   }
-  Advance(GstEngine::Auto);
-  preloaded_ = true;
+  const bool same_album = current_song_.IsOnSameAlbum(next_song);
+  if (PlayerPreload::ShouldAdvanceOnAboutToEnd(engine_->autocrossfade_enabled(), same_album, engine_->no_crossfade_same_album())) {
+    Advance(GstEngine::Auto);
+    return;
+  }
+  engine_->StartPreloading(next_song.url(), next_song.stream_url(), SongSegment::HasForcedEnd(next_song),
+                           next_song.beginning_nanosec(), SongSegment::EffectiveEndNanosec(next_song));
 }
 
 void Player::HandleEngineState(EngineBase::State state) {
@@ -536,10 +549,14 @@ void Player::HandleTrackEnded() {
                                                  ? playlist_manager_->active()->repeat_mode()
                                                  : PlaylistSequence::RepeatMode::Off;
   if (PlayerRepeat::ShouldStopAfterTrack(repeat, stop_after_current_)) {
-    stop_after_current_ = false;
-    if (playlist_manager_ && playlist_manager_->current()) {
-      playlist_manager_->current()->set_stop_after_row(-1);
+    if (PlayerStopAfter::ShouldPrepareResume(true) && playlist_manager_ && playlist_manager_->active()) {
+      const int next = PlayerStopAfter::ResumeRow(playlist_manager_->active()->PeekNextRow());
+      if (next >= 0) {
+        playlist_manager_->active()->set_current_row(next);
+      }
+      playlist_manager_->active()->set_stop_after_row(-1);
     }
+    stop_after_current_ = false;
     Stop();
     return;
   }

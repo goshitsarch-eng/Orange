@@ -173,3 +173,11 @@ TEST(Song, IsOnSameAlbumMatchesQtRules) {
   other.set_artist("Portishead");
   EXPECT_FALSE(a.IsOnSameAlbum(other));
 }
+
+TEST(Song, StoresCueEndMarker) {
+  Song song;
+  EXPECT_EQ(-1, song.end_nanosec());
+  song.set_beginning_nanosec(1000);
+  song.set_end_nanosec(5000);
+  EXPECT_EQ(5000, song.end_nanosec());
+}
