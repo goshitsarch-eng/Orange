@@ -88,6 +88,10 @@ class GstEngine : public EngineBase {
   void FinishCrossfade();
   void DiscardNext();
   void OnAboutToFinish(int pipeline_id);
+  void MaybeAboutToFinish();
+  void StartAboutToEndTimer();
+  void StopAboutToEndTimer();
+  static gboolean AboutToEndTick(gpointer data);
   void OnEos(int pipeline_id);
   void StartFade(int direction, int duration_ms = 0);
   void CancelFade();
@@ -181,6 +185,7 @@ class GstEngine : public EngineBase {
   uint64_t pending_seek_nanosec_ = 0;
   bool waiting_to_seek_ = false;
   guint seek_timeout_id_ = 0;
+  guint about_to_end_timer_id_ = 0;
   bool delayed_play_pending_ = false;
   bool delayed_play_pause_ = false;
   uint64_t delayed_play_offset_nanosec_ = 0;

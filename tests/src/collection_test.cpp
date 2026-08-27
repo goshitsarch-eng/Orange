@@ -22,6 +22,7 @@
 #include "subsonic/subsonicsettingsactions.h"
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
+#include "engine/engineabouttoend.h"
 #include "engine/engineexclusive.h"
 #include "core/exitfade.h"
 #include "engine/enginefade.h"
@@ -1004,6 +1005,21 @@ TEST(BackendOptions, PlaybinCrossfadeAndPauseFade) {
   EXPECT_STREQ("1", BackendOptions::SoupForceHttp1(false));
   EXPECT_EQ(500, BackendOptions::WarmupMs(true, 500));
   EXPECT_EQ(0, BackendOptions::WarmupMs(false, 500));
+}
+
+TEST(EngineAboutToEnd, LeadTimeAndShouldEmit) {
+  const int64_t normal = EngineAboutToEnd::LeadTimeNanosec(4000, false, 2000);
+  EXPECT_EQ(4000 * BackendOptions::kNsecPerMsec + EngineAboutToEnd::kPreloadGapNanosec, normal);
+  const int64_t crossfade = EngineAboutToEnd::LeadTimeNanosec(4000, true, 2000);
+  EXPECT_EQ(4000 * BackendOptions::kNsecPerMsec + EngineAboutToEnd::FadeDurationNanosec(2000), crossfade);
+  EXPECT_EQ(2000 * BackendOptions::kNsecPerMsec, EngineAboutToEnd::FadeDurationNanosec(2000));
+  EXPECT_EQ(100 * BackendOptions::kNsecPerMsec, EngineAboutToEnd::FadeDurationNanosec(0));
+  EXPECT_EQ(1000, EngineAboutToEnd::kTimerIntervalMs);
+  const int64_t length = 180000 * BackendOptions::kNsecPerMsec;
+  EXPECT_FALSE(EngineAboutToEnd::ShouldEmit(normal + EngineAboutToEnd::kFudgeNanosec, length, normal, EngineAboutToEnd::kFudgeNanosec, false));
+  EXPECT_TRUE(EngineAboutToEnd::ShouldEmit(normal, length, normal, EngineAboutToEnd::kFudgeNanosec, false));
+  EXPECT_FALSE(EngineAboutToEnd::ShouldEmit(normal, length, normal, EngineAboutToEnd::kFudgeNanosec, true));
+  EXPECT_FALSE(EngineAboutToEnd::ShouldEmit(0, 0, normal, EngineAboutToEnd::kFudgeNanosec, false));
 }
 
 TEST(ExitFade, DecideMatchesQtMainWindow) {

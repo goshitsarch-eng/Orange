@@ -17,6 +17,7 @@
 #include "core/settings.h"
 #include "core/networkproxyfactory.h"
 #include "engine/backendoptions.h"
+#include "engine/engineabouttoend.h"
 #include "equalizer/equalizerpersist.h"
 
 #include <gst/pbutils/pbutils.h>
@@ -28,6 +29,7 @@
 GstEngine::GstEngine() = default;
 
 GstEngine::~GstEngine() {
+  StopAboutToEndTimer();
   CancelFade();
   CancelStopFade();
   CancelSeek();
@@ -289,6 +291,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   DiscardNext();
   current_.reset();
   faded_out_to_pause_ = false;
+  about_to_end_emitted_ = false;
   media_url_ = media_url;
   stream_url_ = url;
   current_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec, ebur128_loudness_normalizing_gain_db_);
@@ -523,6 +526,7 @@ gboolean GstEngine::FadeTick(gpointer data) {
       }
       self->SetState(State::Paused);
     } else if (self->next_) {
+      self->about_to_end_emitted_ = false;
       self->FinishCrossfade();
     }
     return G_SOURCE_REMOVE;
@@ -620,10 +624,40 @@ void GstEngine::OnAboutToFinish(int pipeline_id) {
   if (!current_ || current_->id() != pipeline_id) {
     return;
   }
+  MaybeAboutToFinish();
+}
+
+void GstEngine::MaybeAboutToFinish() {
   if ((crossfade_enabled_ || autocrossfade_enabled_) && !next_ && EngineExclusive::AllowsSecondPipeline(exclusive_mode_)) {
     StartFade(-1);
   }
-  TrackAboutToEnd.Emit();
+  EmitAboutToFinish();
+}
+
+void GstEngine::StartAboutToEndTimer() {
+  StopAboutToEndTimer();
+  about_to_end_timer_id_ = g_timeout_add(static_cast<guint>(EngineAboutToEnd::kTimerIntervalMs), AboutToEndTick, this);
+}
+
+void GstEngine::StopAboutToEndTimer() {
+  if (about_to_end_timer_id_ != 0) {
+    g_source_remove(about_to_end_timer_id_);
+    about_to_end_timer_id_ = 0;
+  }
+}
+
+gboolean GstEngine::AboutToEndTick(gpointer data) {
+  auto *self = static_cast<GstEngine *>(data);
+  if (!self->current_) {
+    return G_SOURCE_CONTINUE;
+  }
+  const int64_t length = self->length_nanosec();
+  const int64_t remaining = length - self->position_nanosec();
+  const int64_t lead = EngineAboutToEnd::LeadTimeNanosec(self->buffer_duration_ms_, self->autocrossfade_enabled_, self->fade_duration_ms_);
+  if (EngineAboutToEnd::ShouldEmit(remaining, length, lead, EngineAboutToEnd::kFudgeNanosec, self->about_to_end_emitted_)) {
+    self->MaybeAboutToFinish();
+  }
+  return G_SOURCE_CONTINUE;
 }
 
 void GstEngine::OnEos(int pipeline_id) {
@@ -643,6 +677,7 @@ void GstEngine::OnEos(int pipeline_id) {
         current_->SetEbur128GainDb(next_ebur128_gain_db_);
       }
       gapless_pending_ = false;
+      about_to_end_emitted_ = false;
       return;
     }
     SetState(State::Idle);
@@ -715,6 +750,11 @@ void GstEngine::SetState(State state) {
     return;
   }
   state_ = state;
+  if (state_ == State::Playing) {
+    StartAboutToEndTimer();
+  } else {
+    StopAboutToEndTimer();
+  }
   StateChanged.Emit(state);
 }
 

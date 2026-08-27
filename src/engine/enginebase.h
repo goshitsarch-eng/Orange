@@ -59,9 +59,11 @@ class EngineBase {
 
  protected:
   virtual void SetSpotifyAccessToken() {}
+  void EmitAboutToFinish();
 
   Scope scope_;
   std::string spotify_access_token_;
+  bool about_to_end_emitted_ = false;
 };
 
 #endif
