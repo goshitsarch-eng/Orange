@@ -42,6 +42,7 @@ class TrackSlider {
   void PersistRemaining();
   void OnWheel(double dy);
   void OnHover(double x);
+  bool OnKey(unsigned keyval);
 
   PrettySlider slider_;
   TrackSliderPopup popup_;

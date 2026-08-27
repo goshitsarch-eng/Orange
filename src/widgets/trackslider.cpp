@@ -3,6 +3,7 @@
 #include "core/settings.h"
 #include "widgets/tracksliderstate.h"
 #include "widgets/trackslidertime.h"
+#include "widgets/tracksliderkeyboard.h"
 #include "widgets/tracksliderwheel.h"
 
 TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
@@ -38,6 +39,15 @@ TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
     }
     seek_(static_cast<int64_t>(value / 1000.0 * static_cast<double>(length_nanosec_)));
   });
+  gtk_widget_set_focusable(slider_.widget(), TRUE);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_event_controller_set_propagation_phase(keys, GTK_PROPAGATION_PHASE_CAPTURE);
+  gtk_widget_add_controller(slider_.widget(), keys);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<TrackSlider *>(data)->OnKey(keyval) ? TRUE : FALSE;
+                   })),
+                   this);
   GtkEventController *scroll = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_VERTICAL);
   gtk_widget_add_controller(slider_.widget(), scroll);
   g_signal_connect(scroll, "scroll", G_CALLBACK((+[](GtkEventControllerScroll *, gdouble, gdouble dy, gpointer data) -> gboolean {
@@ -124,6 +134,22 @@ void TrackSlider::OnWheel(double dy) {
 }
 
 void TrackSlider::OnHover(double x) { ShowHoverAt(slider_.widget(), x, gtk_widget_get_width(slider_.widget())); }
+
+bool TrackSlider::OnKey(unsigned keyval) {
+  const TrackSliderKeyboard::Action action = TrackSliderKeyboard::FromKey(keyval);
+  if (!TrackSliderKeyboard::ShouldHandle(TrackSliderState::ShouldAcceptSeek(stopped_, can_seek_), action)) {
+    return false;
+  }
+  if (action == TrackSliderKeyboard::Action::SeekForward && seek_forward_) {
+    seek_forward_();
+    return true;
+  }
+  if (action == TrackSliderKeyboard::Action::SeekBack && seek_backward_) {
+    seek_backward_();
+    return true;
+  }
+  return action != TrackSliderKeyboard::Action::None;
+}
 
 void TrackSlider::ShowHoverAt(GtkWidget *relative, double x, int width) {
   if (!TrackSliderState::ShouldAcceptSeek(stopped_, can_seek_)) {

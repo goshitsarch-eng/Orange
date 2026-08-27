@@ -4,6 +4,7 @@
 #include "settings/waveformsettingslabels.h"
 #include "widgets/seekbarfade.h"
 #include "widgets/seekbarmode.h"
+#include "widgets/tracksliderkeyboard.h"
 #include "widgets/tracksliderwheel.h"
 #include "core/song.h"
 #include "moodbar/moodbarcell.h"
@@ -189,6 +190,17 @@ TEST(TrackSliderWheel, AccumulatesQtNotches) {
   EXPECT_EQ(1, gtk_up.steps);
   const TrackSliderWheel::Result gtk_down = TrackSliderWheel::FromGtkScroll(0, 1.0);
   EXPECT_EQ(-1, gtk_down.steps);
+}
+
+TEST(TrackSliderKeyboard, ArrowsSeekLikeQt) {
+  EXPECT_EQ(TrackSliderKeyboard::Action::SeekBack, TrackSliderKeyboard::FromKey(TrackSliderKeyboard::kLeft));
+  EXPECT_EQ(TrackSliderKeyboard::Action::SeekBack, TrackSliderKeyboard::FromKey(TrackSliderKeyboard::kDown));
+  EXPECT_EQ(TrackSliderKeyboard::Action::SeekForward, TrackSliderKeyboard::FromKey(TrackSliderKeyboard::kRight));
+  EXPECT_EQ(TrackSliderKeyboard::Action::SeekForward, TrackSliderKeyboard::FromKey(TrackSliderKeyboard::kUp));
+  EXPECT_EQ(TrackSliderKeyboard::Action::None, TrackSliderKeyboard::FromKey(0x020));
+  EXPECT_TRUE(TrackSliderKeyboard::ShouldHandle(true, TrackSliderKeyboard::Action::SeekBack));
+  EXPECT_FALSE(TrackSliderKeyboard::ShouldHandle(false, TrackSliderKeyboard::Action::SeekForward));
+  EXPECT_FALSE(TrackSliderKeyboard::ShouldHandle(true, TrackSliderKeyboard::Action::None));
 }
 
 TEST(TrackSliderHover, MapsXToTimeAndDelta) {
