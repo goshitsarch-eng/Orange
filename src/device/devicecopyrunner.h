@@ -23,6 +23,7 @@ class DeviceCopyRunner {
     transcode_mode_ = mode;
     transcode_format_ = format;
   }
+  void set_playlist(const std::string &name) { playlist_ = name; }
 
   bool Copy(const ConnectedDevice &device, const SongList &songs);
   void Begin(const ConnectedDevice &device, const SongList &songs);
@@ -61,6 +62,7 @@ class DeviceCopyRunner {
   unsigned idle_id_ = 0;
   MusicStorage::TranscodeMode transcode_mode_ = MusicStorage::TranscodeMode::Transcode_Never;
   Song::FileType transcode_format_ = Song::FileType::Unknown;
+  std::string playlist_;
   std::unique_ptr<MtpCopySession> mtp_;
   std::unique_ptr<GPodCopySession> gpod_;
 };

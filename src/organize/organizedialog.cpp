@@ -45,6 +45,7 @@ struct DialogState {
   GtkWidget *albumcover = nullptr;
   GtkWidget *eject = nullptr;
   GtkWidget *format_error = nullptr;
+  std::string playlist;
   FreeSpaceBar *space = nullptr;
   Organize *job = nullptr;
   std::shared_ptr<bool> alive = std::make_shared<bool>(true);
@@ -457,6 +458,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   state->transcode_format = request.transcode_format;
   state->supported = request.supported_filetypes;
   state->persist_dest = request.destination.empty();
+  state->playlist = request.playlist;
   g_signal_connect(space->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) { delete static_cast<FreeSpaceBar *>(data); }), space);
   g_object_set_data_full(G_OBJECT(run), "state", state, [](gpointer p) { delete static_cast<DialogState *>(p); });
 
@@ -551,6 +553,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      }
                      options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "organize-cover.bin");
                      auto *state = static_cast<DialogState *>(g_object_get_data(G_OBJECT(button), "state"));
+                     if (state) {
+                       options.playlist = state->playlist;
+                     }
                      PersistFromState(state);
                      if (state && state->job) {
                        return;

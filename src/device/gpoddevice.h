@@ -13,7 +13,7 @@ class GPodCopySession {
   GPodCopySession &operator=(const GPodCopySession &) = delete;
 
   bool Open(const std::string &mount_path);
-  bool CopyOne(const Song &song);
+  bool CopyOne(const Song &song, const std::string &playlist = {});
   bool Finish();
   int copied() const { return copied_; }
 

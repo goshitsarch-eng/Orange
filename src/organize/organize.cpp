@@ -200,6 +200,7 @@ void Organize::ProcessOne(const OrganizePreview::Entry &entry) {
   job.overwrite = options_.overwrite;
   job.remove_original = options_.move && temp.empty();
   job.albumcover = options_.albumcover;
+  job.playlist = options_.playlist;
   if (options_.albumcover) {
     job.cover_source = OrganizeCoverSource::ForSong(song, options_.tagreader, options_.cover_cache_path);
     job.cover_dest = FileUtils::Join(FileUtils::DirName(dest), "cover.jpg");

@@ -87,7 +87,9 @@ void Dialogs::DeleteFiles(GtkWindow *parent, Application *app, const SongList &s
   DeleteConfirmationDialog::Show(parent, app, songs, source);
 }
 
-void Dialogs::CopyToDevice(GtkWindow *parent, Application *app, const SongList &songs) { CopyToDeviceDialog::Show(parent, app, songs); }
+void Dialogs::CopyToDevice(GtkWindow *parent, Application *app, const SongList &songs, const std::string &playlist) {
+  CopyToDeviceDialog::Show(parent, app, songs, playlist);
+}
 
 void Dialogs::SaveAllPlaylists(GtkWindow *parent, Application *app) { SavePlaylistsDialog::Show(parent, app); }
 

@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "core/logging.h"
+#include "device/devicecopy.h"
 #include "device/gpodloader.h"
 #include "utilities/fileutils.h"
 
@@ -56,7 +57,7 @@ bool GPodCopySession::Open(const std::string &mount_path) {
 #endif
 }
 
-bool GPodCopySession::CopyOne(const Song &song) {
+bool GPodCopySession::CopyOne(const Song &song, const std::string &playlist) {
 #ifdef HAVE_GPOD
   auto *db = static_cast<Itdb_iTunesDB *>(db_);
   auto *mpl = static_cast<Itdb_Playlist *>(mpl_);
@@ -80,10 +81,20 @@ bool GPodCopySession::CopyOne(const Song &song) {
     itdb_track_remove(track);
     return false;
   }
+  if (DeviceCopyPlaylist::ShouldWriteNamedPlaylist(playlist)) {
+    std::string name = playlist;
+    Itdb_Playlist *named = itdb_playlist_by_name(db, name.data());
+    if (!named) {
+      named = itdb_playlist_new(name.c_str(), FALSE);
+      itdb_playlist_add(db, named, -1);
+    }
+    itdb_playlist_add_track(named, track, -1);
+  }
   ++copied_;
   return true;
 #else
   (void)song;
+  (void)playlist;
   return false;
 #endif
 }

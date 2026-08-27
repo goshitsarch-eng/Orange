@@ -1065,7 +1065,7 @@ void MainWindow::BuildSidebar() {
   });
   playlist_list_container_->SetCopyCallback([this](const std::string &name) {
     SelectPlaylistByName(name);
-    Dialogs::CopyToDevice(GTK_WINDOW(window_), app_);
+    Dialogs::CopyToDevice(GTK_WINDOW(window_), app_, {}, name);
   });
   playlist_list_container_->SetMenuCallback([this](const std::string &name) { ShowPlaylistListMenu(name); });
   playlist_list_container_->SetFavoriteCallback([this](const std::string &name, bool on) {

@@ -22,6 +22,7 @@ class OrganizeDialog {
     std::vector<Song::FileType> supported_filetypes;
     bool show_eject = false;
     std::string device_id;
+    std::string playlist;
   };
 
   static void Show(GtkWindow *parent, Application *app, const SongList &songs = {}, bool move = false);

@@ -31,6 +31,7 @@ class Organize {
     int collection_directory_id = -1;
     bool destination_is_collection = false;
     std::string cover_cache_path;
+    std::string playlist;
   };
 
   explicit Organize(TaskManager *task_manager = nullptr);

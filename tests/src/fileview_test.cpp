@@ -356,7 +356,13 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_EQ("Roads", request.songs.front().title());
   EXPECT_FALSE(request.move);
   EXPECT_TRUE(request.destination.empty());
+  EXPECT_TRUE(request.playlist.empty());
   EXPECT_TRUE(DeviceCopy::CanCopyToCollection(request.songs));
+  EXPECT_EQ("Summer", DeviceCopyPlaylist::NameForCopy("Summer", false, "Other"));
+  EXPECT_EQ("Current", DeviceCopyPlaylist::NameForCopy("", true, "Current"));
+  EXPECT_TRUE(DeviceCopyPlaylist::NameForCopy("", false, "Current").empty());
+  EXPECT_TRUE(DeviceCopyPlaylist::ShouldWriteNamedPlaylist("Summer"));
+  EXPECT_FALSE(DeviceCopyPlaylist::ShouldWriteNamedPlaylist(""));
 
   SongList missing;
   for (int i = 0; i < 12; ++i) {

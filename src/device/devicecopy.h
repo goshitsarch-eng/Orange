@@ -23,4 +23,17 @@ inline OrganizeDialog::Request CollectionRequest(const SongList &songs) {
 
 }  // namespace DeviceCopy
 
+namespace DeviceCopyPlaylist {
+
+inline std::string NameForCopy(const std::string &requested, const bool copying_whole_playlist, const std::string &current) {
+  if (!requested.empty()) {
+    return requested;
+  }
+  return copying_whole_playlist ? current : std::string();
+}
+
+inline bool ShouldWriteNamedPlaylist(const std::string &name) { return !name.empty(); }
+
+}  // namespace DeviceCopyPlaylist
+
 #endif

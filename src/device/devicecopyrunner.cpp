@@ -148,7 +148,7 @@ bool DeviceCopyRunner::CopyOnePrepared(const Song &song) {
 #endif
 #ifdef HAVE_GPOD
   if (device_.backend == "gpod") {
-    return gpod_ && gpod_->CopyOne(song);
+    return gpod_ && gpod_->CopyOne(song, playlist_);
   }
 #endif
 #ifdef HAVE_GIO
@@ -163,6 +163,7 @@ bool DeviceCopyRunner::CopyOnePrepared(const Song &song) {
   options.tagreader = tagreader_;
   options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "device-cover.bin");
   options.transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
+  options.playlist = playlist_;
   class Organize organize;
   return organize.Copy({song}, music, format, options).empty();
 #else
