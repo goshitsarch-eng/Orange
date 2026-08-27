@@ -966,8 +966,8 @@ TEST(EqualizerPersist, SelectedPresetAndStereoBalancer) {
   EXPECT_EQ(0, EqualizerPersist::EffectivePreamp(false, 6));
   EXPECT_EQ(6, EqualizerPersist::EffectivePreamp(true, 6));
   EXPECT_DOUBLE_EQ(1.0, EqualizerPersist::PreampVolume(0));
-  EXPECT_NEAR(2.0, EqualizerPersist::PreampVolume(6), 1e-6);
-  EXPECT_NEAR(0.5, EqualizerPersist::PreampVolume(-6), 1e-6);
+  EXPECT_NEAR(1.995262, EqualizerPersist::PreampVolume(6), 1e-5);
+  EXPECT_NEAR(0.501187, EqualizerPersist::PreampVolume(-6), 1e-5);
   const std::vector<int> rock(10, 4);
   EXPECT_EQ(std::vector<int>(10, 0), EqualizerPersist::EffectiveGains(false, rock));
   EXPECT_EQ(rock, EqualizerPersist::EffectiveGains(true, rock));
