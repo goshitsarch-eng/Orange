@@ -4,6 +4,8 @@
 #include "device/macosdeviceclassify.h"
 #include "engine/enginebase.h"
 #include "engine/platformdeviceoutputs.h"
+#include "engine/uwpdeviceenum.h"
+#include "globalshortcuts/keymapper_macos.h"
 #include "globalshortcuts/keymapper_win.h"
 #include "utilities/strutils.h"
 #include "utilities/winblurbehind.h"
@@ -2708,6 +2710,39 @@ TEST(MacOsDeviceClassify, CDAndMTP) {
   EXPECT_STREQ("cdda", MacOsDeviceClassify::BackendForKind(true, false));
   EXPECT_STREQ("mtp", MacOsDeviceClassify::BackendForKind(false, true));
   EXPECT_STREQ("media-optical-symbolic", MacOsDeviceClassify::IconForKind(true, false));
+}
+
+TEST(UwpDeviceEnum, DefaultFirstAndSkipDisabled) {
+  EXPECT_EQ(2, UwpDeviceEnum::kAudioRenderClass);
+  EXPECT_STREQ("uwpdevice", UwpDeviceEnum::kFinderName);
+  EXPECT_STREQ("wasapi2sink_", UwpDeviceEnum::kOutput);
+  EXPECT_TRUE(UwpDeviceEnum::ShouldInclude(true));
+  EXPECT_FALSE(UwpDeviceEnum::ShouldInclude(false));
+  EXPECT_STREQ("Default device", UwpDeviceEnum::DefaultDevice().description.c_str());
+  EXPECT_TRUE(UwpDeviceEnum::DefaultDevice().value.empty());
+  const EngineDevice device = UwpDeviceEnum::FromWinRt("{id}", "Speakers");
+  EXPECT_EQ("{id}", device.value);
+  EXPECT_EQ("Speakers", device.description);
+}
+
+TEST(KeyMapperMacOs, MapsMediaKeys) {
+  EXPECT_STREQ("macos", KeyMapperMacOs::Name());
+  EXPECT_EQ(16, KeyMapperMacOs::kNxPlay);
+  EXPECT_EQ(17, KeyMapperMacOs::kNxFast);
+  EXPECT_EQ(18, KeyMapperMacOs::kNxRewind);
+  EXPECT_STREQ("play_pause", KeyMapperMacOs::IdFromMediaKey(16));
+  EXPECT_STREQ("next_track", KeyMapperMacOs::IdFromMediaKey(17));
+  EXPECT_STREQ("prev_track", KeyMapperMacOs::IdFromMediaKey(18));
+  EXPECT_STREQ("MediaPlay", KeyMapperMacOs::KeyNameFromMediaKey(16));
+  EXPECT_TRUE(KeyMapperMacOs::IsAuxControlEvent(8));
+  EXPECT_FALSE(KeyMapperMacOs::IsAuxControlEvent(0));
+  EXPECT_EQ(16, KeyMapperMacOs::MediaKeyFromData1((16 << 16) | (0x0A << 8)));
+  EXPECT_TRUE(KeyMapperMacOs::IsMediaKeyDown((16 << 16) | (0x0A << 8)));
+  EXPECT_FALSE(KeyMapperMacOs::IsMediaKeyDown((16 << 16) | (0x0B << 8)));
+  EXPECT_STREQ("play_pause", KeyMapperMacOs::ShortcutIdFromKey("MediaPlay"));
+  EXPECT_STREQ("next_track", KeyMapperMacOs::ShortcutIdFromKey("MediaNext"));
+  EXPECT_TRUE(KeyMapperMacOs::KeysMatch("MediaPlay", "mediaplay"));
+  EXPECT_EQ("<Ctrl><Alt>A", KeyMapperMacOs::AcceleratorFromEvent(KeyMapperMacOs::kControl | KeyMapperMacOs::kOption, "A"));
 }
 
 TEST(KeyMapperWin, ParsesMediaKeys) {

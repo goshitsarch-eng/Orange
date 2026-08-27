@@ -9,10 +9,18 @@ class GlobalShortcutsBackendMacOs : public GlobalShortcutsBackend {
   ~GlobalShortcutsBackendMacOs() override;
 
   bool IsAvailable() const override;
+  bool IsAccessibilityEnabled() const;
 
  protected:
   bool DoRegister() override;
   void DoUnregister() override;
+
+ private:
+  bool HandleAccel(const std::string &accel);
+  void HandleMediaKey(int nx_key);
+
+  void *global_monitor_ = nullptr;
+  void *local_monitor_ = nullptr;
 };
 
 #endif
