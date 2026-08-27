@@ -13,6 +13,10 @@ PlaylistListView::PlaylistListView() {
   gtk_widget_add_css_class(list_, "boxed-list");
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
   ListBoxTreePressGtk::Attach(list_, this);
+  g_signal_connect(list_, "selected-rows-changed", G_CALLBACK(+[](GtkListBox *, gpointer data) {
+                     static_cast<PlaylistListView *>(data)->NotifySelectionChanged();
+                   }),
+                   this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<PlaylistListView *>(data);
                      const gboolean folder = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "playlist-folder")) == 1;
@@ -146,6 +150,14 @@ gboolean PlaylistListView::OnKeyPressed(guint keyval) {
 
 void PlaylistListView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
+bool PlaylistListView::HasSelection() const { return !SelectedName().empty() || SelectedIsFolder(); }
+
+void PlaylistListView::NotifySelectionChanged() {
+  if (selection_changed_) {
+    selection_changed_();
+  }
+}
+
 void PlaylistListView::CancelDragHover() {
   hover_name_.clear();
   if (hover_timeout_) {
@@ -220,6 +232,7 @@ void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, c
     gtk_widget_set_margin_bottom(label, 24);
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
+    NotifySelectionChanged();
     return;
   }
   for (const PlaylistListDrop::Row &item : rows) {
@@ -280,6 +293,7 @@ void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, c
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
   }
   SelectName(current);
+  NotifySelectionChanged();
 }
 
 void PlaylistListView::SetupRowDrop(GtkWidget *row, const PlaylistListDrop::Row &item) {

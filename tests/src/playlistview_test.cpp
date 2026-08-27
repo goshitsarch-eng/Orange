@@ -12,6 +12,7 @@
 #include "playlist/playlist.h"
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlistfolders.h"
+#include "playlist/playlistlistactions.h"
 #include "playlist/playlistlistdrop.h"
 #include "playlist/playlistlistkeyboard.h"
 #include "playlist/playlistlistlook.h"
@@ -463,6 +464,17 @@ TEST(PlaylistListLook, PlaybackIconsAndDropRules) {
   EXPECT_TRUE(PlaylistListLook::ShouldShowEmptyHint(0));
   EXPECT_FALSE(PlaylistListLook::ShouldShowEmptyHint(1));
   EXPECT_NE(std::string::npos, std::string(PlaylistListLook::EmptyHint()).find("favorite playlists"));
+}
+
+TEST(PlaylistListActions, EnableRemoveSaveAndCopyOnlyWithASelection) {
+  EXPECT_FALSE(PlaylistListActions::SelectionActionsEnabled(false));
+  EXPECT_TRUE(PlaylistListActions::SelectionActionsEnabled(true));
+  EXPECT_FALSE(PlaylistListActions::RemoveEnabled(false));
+  EXPECT_TRUE(PlaylistListActions::RemoveEnabled(true));
+  EXPECT_FALSE(PlaylistListActions::SaveEnabled(false));
+  EXPECT_TRUE(PlaylistListActions::SaveEnabled(true));
+  EXPECT_FALSE(PlaylistListActions::CopyEnabled(false));
+  EXPECT_TRUE(PlaylistListActions::CopyEnabled(true));
 }
 
 TEST(PlaylistListModel, StoresIdsThroughFilter) {

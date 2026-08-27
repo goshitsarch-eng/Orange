@@ -48,6 +48,7 @@ class PlaylistListContainer {
   void SetPlayback(PlaylistListLook::Playback playback);
   void SetActive(const std::string &name, int id);
   void SelectName(const std::string &name);
+  bool HasSelection() const;
   PlaylistListLook::Playback playback() const { return playback_; }
   const std::string &active_name() const { return active_name_; }
   int active_id() const { return active_id_; }
@@ -58,10 +59,14 @@ class PlaylistListContainer {
   void ToggleFolder(const std::string &path);
   void LoadExtraFolders();
   void SaveExtraFolders();
+  void UpdateSelectionChrome();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *search_ = nullptr;
   GtkWidget *favorites_toggle_ = nullptr;
+  GtkWidget *remove_button_ = nullptr;
+  GtkWidget *save_button_ = nullptr;
+  GtkWidget *copy_button_ = nullptr;
   PlaylistListModel model_;
   PlaylistListSortFilterModel filter_;
   std::unique_ptr<PlaylistListView> view_;

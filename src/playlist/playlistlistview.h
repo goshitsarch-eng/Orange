@@ -35,11 +35,14 @@ class PlaylistListView {
   void SetFolderToggleCallback(FolderCallback callback) { toggle_ = std::move(callback); }
   void SetDeleteCallback(ActivateCallback callback) { delete_ = std::move(callback); }
   void SetFavoriteCallback(FavoriteCallback callback) { favorite_ = std::move(callback); }
+  void SetSelectionChangedCallback(std::function<void()> callback) { selection_changed_ = std::move(callback); }
   std::string SelectedName() const;
   std::string SelectedFolderPath() const;
   bool SelectedIsFolder() const;
+  bool HasSelection() const;
 
  private:
+  void NotifySelectionChanged();
   void SetupRowDrop(GtkWidget *row, const PlaylistListDrop::Row &item);
   void SetupRowDrag(GtkWidget *row, const std::string &name);
   void StartDragHover(const std::string &name);
@@ -55,6 +58,7 @@ class PlaylistListView {
   FolderCallback toggle_;
   ActivateCallback delete_;
   FavoriteCallback favorite_;
+  std::function<void()> selection_changed_;
   std::vector<std::unique_ptr<FavoriteWidget>> favorites_;
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
