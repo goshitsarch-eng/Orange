@@ -10,6 +10,7 @@ class SmartPlaylistWizardTypePage {
   SmartPlaylistWizardTypePage();
 
   GtkWidget *widget() const { return widget_; }
+  GtkWidget *name_widget() const { return name_; }
   std::string name() const;
   bool dynamic() const;
   void SetName(const std::string &name);

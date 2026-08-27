@@ -209,6 +209,12 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   GtkWidget *restore = gtk_button_new_with_label(Translations::CStr("Restore defaults"));
   GtkWidget *create = gtk_button_new_with_label(editing ? Translations::CStr("Save") : Translations::CStr("Create"));
   gtk_widget_add_css_class(create, "suggested-action");
+  gtk_widget_set_sensitive(create, SmartPlaylistWizardFinishPage::IsComplete(state->type->name()));
+  g_signal_connect(state->type->name_widget(), "changed", G_CALLBACK(+[](GtkEditable *editable, gpointer data) {
+                     const char *text = gtk_editable_get_text(editable);
+                     gtk_widget_set_sensitive(GTK_WIDGET(data), SmartPlaylistWizardFinishPage::IsComplete(text ? text : ""));
+                   }),
+                   create);
   g_object_set_data_full(G_OBJECT(create), "wizard", state, [](gpointer p) { delete static_cast<WizardState *>(p); });
   g_object_set_data(G_OBJECT(preview), "wizard", state);
   g_object_set_data(G_OBJECT(restore), "wizard", state);
@@ -230,6 +236,9 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
                      auto *wizard = static_cast<WizardState *>(g_object_get_data(G_OBJECT(button), "wizard"));
                      const SmartPlaylistSearch current = wizard->Build();
                      const std::string saved_name = wizard->type->name();
+                     if (!SmartPlaylistWizardFinishPage::IsComplete(saved_name)) {
+                       return;
+                     }
                      if (wizard->editing) {
                        SmartPlaylistSearch::RenameSaved(wizard->original_name, saved_name, current);
                        return;

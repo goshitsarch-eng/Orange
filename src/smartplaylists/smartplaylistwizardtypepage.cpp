@@ -21,7 +21,7 @@ SmartPlaylistWizardTypePage::SmartPlaylistWizardTypePage() {
 
 std::string SmartPlaylistWizardTypePage::name() const {
   const char *text = gtk_editable_get_text(GTK_EDITABLE(name_));
-  return text && *text ? text : "Smart playlist";
+  return text ? text : "";
 }
 
 bool SmartPlaylistWizardTypePage::dynamic() const { return gtk_check_button_get_active(GTK_CHECK_BUTTON(dynamic_)); }

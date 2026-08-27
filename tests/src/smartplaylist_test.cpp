@@ -6,6 +6,7 @@
 #include "smartplaylists/playlistquerygenerator.h"
 #include "smartplaylists/smartplaylist.h"
 #include "smartplaylists/smartplaylistsummary.h"
+#include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
 #include "smartplaylists/smartplaylistdrag.h"
@@ -528,6 +529,12 @@ TEST(SmartPlaylistWizardLabels, SearchSortLimitAndDynamicCopy) {
   EXPECT_FALSE(SmartPlaylistWizardLabels::LimitSpinSensitive(true));
   EXPECT_TRUE(SmartPlaylistWizardLabels::LimitSpinSensitive(false));
   EXPECT_EQ(3u, SmartPlaylistWizardLabels::SearchTypeChoices().size());
+}
+
+TEST(SmartPlaylistWizardFinishPage, IsCompleteRequiresNonEmptyName) {
+  EXPECT_FALSE(SmartPlaylistWizardFinishPage::IsComplete(""));
+  EXPECT_TRUE(SmartPlaylistWizardFinishPage::IsComplete("Favorites"));
+  EXPECT_TRUE(SmartPlaylistWizardFinishPage::IsComplete(" "));
 }
 
 TEST(SmartPlaylistDrag, JoinsSongUrlsAndSkipsWizard) {
