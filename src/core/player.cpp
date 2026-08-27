@@ -22,6 +22,7 @@
 #include "engine/gstengineerror.h"
 #include "core/playerloadresult.h"
 #include "core/playerprevious.h"
+#include "core/playerrestartorprevious.h"
 #include "core/playerseeknotify.h"
 #include "core/playerstreamexpire.h"
 #include "core/playerintro.h"
@@ -367,11 +368,11 @@ void Player::Previous() {
 }
 
 void Player::RestartOrPrevious() {
-  if (engine_->position_nanosec() > 2 * 1000000000LL) {
-    SeekTo(0);
-  } else {
+  if (PlayerRestartOrPrevious::ShouldGoToPrevious(engine_->position_nanosec())) {
     Previous();
+    return;
   }
+  SeekTo(0);
 }
 
 void Player::SeekTo(int64_t seconds) { Seek(seconds * 1000000000LL); }

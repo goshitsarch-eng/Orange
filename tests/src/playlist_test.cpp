@@ -3,6 +3,7 @@
 #include "core/playererrorloop.h"
 #include "core/playerloadresult.h"
 #include "core/playerprevious.h"
+#include "core/playerrestartorprevious.h"
 #include "core/playerpreload.h"
 #include "core/playerseeknotify.h"
 #include "core/playerstreamexpire.h"
@@ -1005,6 +1006,17 @@ TEST(PlayerStreamExpire, RefreshesAfterThirtySeconds) {
   Song flac;
   flac.set_source(Song::Source::Collection);
   EXPECT_FALSE(PlayerStreamExpire::NeedsRefresh(flac, true, 100, 200));
+}
+
+TEST(PlayerRestartOrPrevious, UsesEightSecondThreshold) {
+  EXPECT_EQ(8, PlayerRestartOrPrevious::kThresholdSec);
+  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(0));
+  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(1 * 1000000000LL));
+  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(5 * 1000000000LL));
+  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(7 * 1000000000LL));
+  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(7999999999LL));
+  EXPECT_FALSE(PlayerRestartOrPrevious::ShouldGoToPrevious(8 * 1000000000LL));
+  EXPECT_FALSE(PlayerRestartOrPrevious::ShouldGoToPrevious(10 * 1000000000LL));
 }
 
 TEST(PlayerPrevious, RestartModeAndDontRestartSeek) {
