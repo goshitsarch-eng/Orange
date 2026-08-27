@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+class CddaDevice;
 class Database;
 class TagReader;
 class TaskManager;
@@ -70,6 +71,8 @@ class DeviceManager {
   void StartVolumeMonitor();
   void StopVolumeMonitor();
   void ScheduleRescan();
+  void EnsureCddaWatch();
+  void OnCddaDiscChanged();
 
   bool IsForgotten(const std::string &device_id) const;
 
@@ -85,6 +88,7 @@ class DeviceManager {
   std::unique_ptr<DeviceDatabaseBackend> device_db_;
   void *volume_monitor_ = nullptr;
   unsigned rescan_idle_ = 0;
+  std::unique_ptr<CddaDevice> cdda_;
 };
 
 #endif

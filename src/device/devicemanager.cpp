@@ -40,6 +40,7 @@
 #include <cdio/cdio.h>
 #endif
 #include "device/cddahelpers.h"
+#include "device/cddadiscchange.h"
 #include "device/devicescanprogress.h"
 #include "core/taskmanager.h"
 
@@ -54,7 +55,10 @@ DeviceManager::DeviceManager(Database *database, TaskManager *task_manager)
       url_handler_(std::make_unique<DeviceUrlHandler>(this)),
       device_db_(database ? std::make_unique<DeviceDatabaseBackend>(database) : nullptr) {}
 
-DeviceManager::~DeviceManager() { StopVolumeMonitor(); }
+DeviceManager::~DeviceManager() {
+  cdda_.reset();
+  StopVolumeMonitor();
+}
 
 void DeviceManager::Init() {
   if (device_db_) {
@@ -293,6 +297,63 @@ void DeviceManager::Rescan() {
     const auto it = song_counts_.find(device.unique_id);
     if (it != song_counts_.end()) {
       device.song_count = it->second;
+    }
+  }
+  EnsureCddaWatch();
+  DevicesChanged.Emit();
+}
+
+void DeviceManager::EnsureCddaWatch() {
+#ifdef HAVE_AUDIOCD
+  bool have_cdda = false;
+  for (const ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      have_cdda = true;
+      break;
+    }
+  }
+  if (!have_cdda) {
+    cdda_.reset();
+    return;
+  }
+  if (cdda_) {
+    return;
+  }
+  ConnectedDevice cd;
+  cd.backend = "cdda";
+  cd.unique_id = "cdda";
+  for (const ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      cd = device;
+      break;
+    }
+  }
+  cdda_ = std::make_unique<CddaDevice>(cd);
+  cdda_->DiscChanged.Connect([this]() { OnCddaDiscChanged(); });
+  if (!cdda_->Init()) {
+    cdda_.reset();
+  }
+#else
+  cdda_.reset();
+#endif
+}
+
+void DeviceManager::OnCddaDiscChanged() {
+  if (cdda_ && CddaDiscChange::ShouldPauseWatchWhileLoading()) {
+    cdda_->WatchForDiscChanges(false);
+    cdda_->set_loader_active(true);
+  }
+  const SongList songs = SongsFromCdda();
+  if (cdda_) {
+    if (CddaDiscChange::ShouldAckAfterLoad()) {
+      cdda_->AckMediaChanged();
+    }
+    cdda_->set_loader_active(false);
+    cdda_->WatchForDiscChanges(true);
+  }
+  for (ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      RememberSongCount(device.unique_id, static_cast<int>(songs.size()));
     }
   }
   DevicesChanged.Emit();

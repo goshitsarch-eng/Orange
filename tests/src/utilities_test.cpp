@@ -11,6 +11,7 @@
 #include "core/oauthpkce.h"
 #include "core/oauthenticator.h"
 #include "device/cddahelpers.h"
+#include "device/cddadiscchange.h"
 #include "device/cddasongloader.h"
 #include "device/deviceerror.h"
 #include "device/devicemanager.h"
@@ -1529,6 +1530,21 @@ TEST(CddaHelpers, SkipsImageFilesAndInvalidTrackRanges) {
   EXPECT_TRUE(CddaHelpers::IsValidTrackRange(1, 8));
   EXPECT_TRUE(CddaHelpers::ShouldAddGenericCdda(0));
   EXPECT_FALSE(CddaHelpers::ShouldAddGenericCdda(1));
+}
+
+TEST(CddaDiscChange, PollsLikeQtAndReloadsOnMediaChanged) {
+  EXPECT_EQ(1000, CddaDiscChange::kPollMs);
+  EXPECT_TRUE(CddaDiscChange::ShouldCheck(true, false));
+  EXPECT_FALSE(CddaDiscChange::ShouldCheck(false, false));
+  EXPECT_FALSE(CddaDiscChange::ShouldCheck(true, true));
+  EXPECT_TRUE(CddaDiscChange::MediaChanged(1));
+  EXPECT_FALSE(CddaDiscChange::MediaChanged(0));
+  EXPECT_TRUE(CddaDiscChange::ShouldStartWatch(true, false));
+  EXPECT_FALSE(CddaDiscChange::ShouldStartWatch(true, true));
+  EXPECT_TRUE(CddaDiscChange::ShouldStopWatch(false, true));
+  EXPECT_FALSE(CddaDiscChange::ShouldStopWatch(false, false));
+  EXPECT_TRUE(CddaDiscChange::ShouldPauseWatchWhileLoading());
+  EXPECT_TRUE(CddaDiscChange::ShouldAckAfterLoad());
 }
 
 TEST(GioDeviceFilter, MatchesQtSuitableRules) {
