@@ -17,6 +17,7 @@
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlistfolders.h"
 #include "playlist/playlistlistactions.h"
+#include "playlist/playlistlistscroll.h"
 #include "playlist/playlistlistdrop.h"
 #include "playlist/playlistlistkeyboard.h"
 #include "playlist/playlistlistlook.h"
@@ -276,6 +277,15 @@ TEST(PlaylistRating, RowsForStarClickMatchesQtSelection) {
   EXPECT_EQ((std::vector<int>{2}), PlaylistRating::RowsForStarClick(2, {}));
   EXPECT_EQ((std::vector<int>{2}), PlaylistRating::RowsForStarClick(2, {5, 7}));
   EXPECT_EQ((std::vector<int>{1, 3, 5}), PlaylistRating::RowsForStarClick(3, {1, 3, 5}));
+}
+
+TEST(PlaylistListScroll, EnsuresCurrentPlaylistVisibleLikeQt) {
+  EXPECT_EQ(PlaylistListScroll::Hint::None, PlaylistListScroll::FromBounds(40.0, 24.0, 0.0, 200.0));
+  EXPECT_EQ(PlaylistListScroll::Hint::Top, PlaylistListScroll::FromBounds(10.0, 24.0, 40.0, 200.0));
+  EXPECT_EQ(PlaylistListScroll::Hint::Bottom, PlaylistListScroll::FromBounds(220.0, 24.0, 0.0, 200.0));
+  EXPECT_DOUBLE_EQ(10.0, PlaylistListScroll::Value(PlaylistListScroll::Hint::Top, 10.0, 24.0, 40.0, 200.0, 0.0, 800.0));
+  EXPECT_DOUBLE_EQ(44.0, PlaylistListScroll::Value(PlaylistListScroll::Hint::Bottom, 220.0, 24.0, 0.0, 200.0, 0.0, 800.0));
+  EXPECT_DOUBLE_EQ(40.0, PlaylistListScroll::Value(PlaylistListScroll::Hint::None, 80.0, 24.0, 40.0, 200.0, 0.0, 800.0));
 }
 
 TEST(PlaylistListModel, ReloadAndLookup) {

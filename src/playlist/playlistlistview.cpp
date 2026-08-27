@@ -5,6 +5,7 @@
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 #include "widgets/listboxtreepressgtk.h"
+#include "widgets/listboxensurevisible.h"
 
 PlaylistListView::PlaylistListView() {
   widget_ = gtk_scrolled_window_new();
@@ -203,6 +204,7 @@ void PlaylistListView::SelectName(const std::string &name) {
     gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
     gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
     gtk_widget_grab_focus(child);
+    ListBoxEnsureVisible::Row(list_, child);
     return;
   }
 }
