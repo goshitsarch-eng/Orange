@@ -69,6 +69,11 @@ struct SmartPlaylistTerm {
   std::string value;
   std::string second_value;
   SmartPlaylistDateType date_type = SmartPlaylistDateType::Day;
+
+  SmartPlaylistTerm() = default;
+  SmartPlaylistTerm(SmartPlaylistField field, SmartPlaylistOp op, std::string value)
+      : field(field), op(op), value(std::move(value)) {}
+
   bool Matches(const Song &song) const;
   bool IsValid() const;
 };
