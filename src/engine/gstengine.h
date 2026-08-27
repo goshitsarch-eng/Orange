@@ -95,6 +95,8 @@ class GstEngine : public EngineBase {
   static gboolean AboutToEndTick(gpointer data);
   void OnEos(int pipeline_id);
   void StartFade(int direction, int duration_ms = 0);
+  void StartPauseFade();
+  void StopPauseFade();
   void CancelFade();
   static gboolean FadeTick(gpointer data);
   void StartFadeout(std::unique_ptr<GstEnginePipeline> pipeline);

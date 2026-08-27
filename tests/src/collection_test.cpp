@@ -1071,6 +1071,15 @@ TEST(EngineFade, StopFadeGatingMatchesQt) {
   EXPECT_TRUE(EngineFade::ShouldFadeOnPause(true, false));
   EXPECT_FALSE(EngineFade::ShouldFadeOnPause(true, true));
   EXPECT_FALSE(EngineFade::ShouldFadeOnPause(false, false));
+  EXPECT_TRUE(EngineFade::ShouldIgnorePause(true));
+  EXPECT_FALSE(EngineFade::ShouldIgnorePause(false));
+  EXPECT_TRUE(EngineFade::ShouldAbortPauseFade(true));
+  EXPECT_FALSE(EngineFade::ShouldAbortPauseFade(false));
+  EXPECT_TRUE(EngineFade::ShouldStartPauseFade(true, false, false));
+  EXPECT_FALSE(EngineFade::ShouldStartPauseFade(true, false, true));
+  EXPECT_FALSE(EngineFade::ShouldStartPauseFade(true, true, false));
+  EXPECT_TRUE(EngineFade::ShouldMarkFadedOutToPause(true));
+  EXPECT_FALSE(EngineFade::ShouldMarkFadedOutToPause(false));
   EXPECT_DOUBLE_EQ(0.5, EngineFade::VolumeAtStep(1.0, -1, 0.5));
   EXPECT_DOUBLE_EQ(0.0, EngineFade::VolumeAtStep(1.0, -1, 1.0));
   EXPECT_DOUBLE_EQ(1.0, EngineFade::VolumeAtStep(1.0, -1, 0.0));

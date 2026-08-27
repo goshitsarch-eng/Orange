@@ -24,6 +24,16 @@ inline bool ShouldFadeInOnResume(bool faded_out_to_pause, bool fadeout_pause_ena
 // Qt FadeoutPauseFinished + StopFadeoutPause: latch after pause-fade completes or is aborted.
 inline bool ShouldMarkFadedOutToPause(bool pause_fade_active) { return pause_fade_active; }
 
+// Qt GstEngine::Pause: ignore while fadeout_pause_pipeline_ is already set.
+inline bool ShouldIgnorePause(bool pause_fade_active) { return pause_fade_active; }
+
+// Qt Play / Stop / Load: StopFadeoutPause() aborts the pause fader and latches faded-out.
+inline bool ShouldAbortPauseFade(bool pause_fade_active) { return pause_fade_active; }
+
+inline bool ShouldStartPauseFade(bool fadeout_pause_enabled, bool exclusive_active, bool pause_fade_active) {
+  return ShouldFadeOnPause(fadeout_pause_enabled, exclusive_active) && !pause_fade_active;
+}
+
 // Qt GstEngine::FinishPipeline: emit Finished when no current or fadeout pipeline remains.
 inline bool ShouldEmitFinished(bool has_current, int fadeout_count) { return !has_current && fadeout_count <= 0; }
 

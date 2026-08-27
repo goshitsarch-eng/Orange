@@ -285,6 +285,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
     return true;
   }
 
+  StopPauseFade();
   CancelFade();
   CancelSeek();
   DiscardNext();
@@ -309,6 +310,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
 }
 
 bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
+  StopPauseFade();
   if (EngineFadeout::ShouldDelayExclusivePlay(exclusive_mode_, static_cast<int>(fadeout_pipelines_.size()), OldPipelineCount())) {
     delayed_play_pending_ = true;
     delayed_play_pause_ = pause;
@@ -366,7 +368,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
 }
 
 void GstEngine::Stop(bool stop_after) {
-  pending_pause_ = false;
+  StopPauseFade();
   delayed_play_pending_ = false;
   CancelFade();
   CancelSeek();
@@ -389,9 +391,12 @@ void GstEngine::Pause() {
   if (!current_ || current_->is_buffering()) {
     return;
   }
-  if (EngineFade::ShouldFadeOnPause(fadeout_pause_enabled_, exclusive_mode_)) {
+  if (EngineFade::ShouldIgnorePause(pending_pause_)) {
+    return;
+  }
+  if (EngineFade::ShouldStartPauseFade(fadeout_pause_enabled_, exclusive_mode_, pending_pause_)) {
     pending_pause_ = true;
-    StartFade(-1, fadeout_pause_duration_ms_);
+    StartPauseFade();
     return;
   }
   current_->Pause();
@@ -402,7 +407,7 @@ void GstEngine::Unpause() {
   if (!current_ || current_->is_buffering()) {
     return;
   }
-  pending_pause_ = false;
+  StopPauseFade();
   if (EngineFade::ShouldFadeInOnResume(faded_out_to_pause_, fadeout_pause_enabled_, exclusive_mode_)) {
     ApplyCurrentVolume(0.0);
     current_->Unpause();
@@ -487,6 +492,31 @@ void GstEngine::CancelFade() {
   if (EngineFade::ShouldMarkFadedOutToPause(pending_pause_)) {
     faded_out_to_pause_ = true;
   }
+  pending_pause_ = false;
+  if (fade_timeout_id_) {
+    g_source_remove(fade_timeout_id_);
+    fade_timeout_id_ = 0;
+  }
+  fade_direction_ = 0;
+}
+
+void GstEngine::StartPauseFade() {
+  if (fade_timeout_id_) {
+    g_source_remove(fade_timeout_id_);
+    fade_timeout_id_ = 0;
+  }
+  fade_direction_ = -1;
+  fade_step_ = 0;
+  fade_steps_ = std::max(1, fadeout_pause_duration_ms_ / 50);
+  fade_timeout_id_ = g_timeout_add(50, FadeTick, this);
+}
+
+void GstEngine::StopPauseFade() {
+  if (!EngineFade::ShouldAbortPauseFade(pending_pause_)) {
+    return;
+  }
+  faded_out_to_pause_ = true;
+  pending_pause_ = false;
   if (fade_timeout_id_) {
     g_source_remove(fade_timeout_id_);
     fade_timeout_id_ = 0;
