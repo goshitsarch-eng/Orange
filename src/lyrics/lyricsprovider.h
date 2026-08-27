@@ -23,6 +23,7 @@ class LyricsProvider {
                            const std::function<void(int, const LyricsSearchResults &)> &finished);
   virtual void Authenticate(const std::string &, const std::string &) {}
   virtual void Logout() {}
+  virtual bool authentication_required() const { return false; }
   virtual bool authenticated() const { return false; }
   virtual std::string username() const { return {}; }
 

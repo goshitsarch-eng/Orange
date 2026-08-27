@@ -50,6 +50,7 @@
 #include "widgets/loginstatevisibility.h"
 #include "settings/transcodersettingspage.h"
 #include "covermanager/coverproviderauth.h"
+#include "lyrics/lyricsproviderauth.h"
 #include "settings/settingspages.h"
 #include "streaming/streamingchoices.h"
 
@@ -472,6 +473,34 @@ TEST(CoverProviderAuth, StatusTextAndServiceSettings) {
   EXPECT_TRUE(CoverProviderAuth::MoveDownEnabled(0, 3));
   EXPECT_FALSE(CoverProviderAuth::MoveDownEnabled(2, 3));
   EXPECT_FALSE(CoverProviderAuth::MoveDownEnabled(0, 0));
+}
+
+TEST(LyricsProviderAuth, SelectionPanelMatchesQt) {
+  EXPECT_STREQ("Authentication", LyricsProviderAuth::AuthenticationGroup());
+  EXPECT_STREQ("No provider selected.", LyricsProviderAuth::NoProviderSelected());
+  EXPECT_STREQ("Login", LyricsProviderAuth::Login());
+  EXPECT_TRUE(LyricsProviderAuth::RequiresAuthentication("Genius"));
+  EXPECT_FALSE(LyricsProviderAuth::RequiresAuthentication("LrcLib"));
+  EXPECT_FALSE(LyricsProviderAuth::RequiresAuthentication(""));
+  EXPECT_EQ(LyricsProviderAuth::Panel::Hidden, LyricsProviderAuth::PanelFor("", true));
+  EXPECT_EQ(LyricsProviderAuth::Panel::Hidden, LyricsProviderAuth::PanelFor("LrcLib", false));
+  EXPECT_EQ(LyricsProviderAuth::Panel::Direct, LyricsProviderAuth::PanelFor("Genius", true));
+  EXPECT_TRUE(LyricsProviderAuth::AuthenticateVisible(LyricsProviderAuth::Panel::Direct));
+  EXPECT_FALSE(LyricsProviderAuth::AuthenticateVisible(LyricsProviderAuth::Panel::Hidden));
+  EXPECT_TRUE(LyricsProviderAuth::AuthenticateEnabled(LyricsProviderAuth::Panel::Direct, false));
+  EXPECT_FALSE(LyricsProviderAuth::AuthenticateEnabled(LyricsProviderAuth::Panel::Direct, true));
+  EXPECT_FALSE(LyricsProviderAuth::AuthenticateEnabled(LyricsProviderAuth::Panel::Hidden, false));
+  EXPECT_TRUE(LyricsProviderAuth::LoginStateVisible(LyricsProviderAuth::Panel::Direct));
+  EXPECT_FALSE(LyricsProviderAuth::LoginStateVisible(LyricsProviderAuth::Panel::Hidden));
+  EXPECT_TRUE(LyricsProviderAuth::CredentialsVisible(LyricsProviderAuth::Panel::Direct));
+  EXPECT_FALSE(LyricsProviderAuth::CredentialsVisible(LyricsProviderAuth::Panel::Hidden));
+  EXPECT_EQ("No provider selected.", LyricsProviderAuth::SelectionStatusText({}, false));
+  EXPECT_EQ("LrcLib does not need authentication.", LyricsProviderAuth::SelectionStatusText("LrcLib", false));
+  EXPECT_EQ("Genius needs authentication.", LyricsProviderAuth::SelectionStatusText("Genius", true));
+  EXPECT_FALSE(LyricsProviderAuth::MoveUpEnabled(0, 3));
+  EXPECT_TRUE(LyricsProviderAuth::MoveUpEnabled(1, 3));
+  EXPECT_TRUE(LyricsProviderAuth::MoveDownEnabled(0, 3));
+  EXPECT_FALSE(LyricsProviderAuth::MoveDownEnabled(2, 3));
 }
 
 TEST(StreamingChoices, QualityAndAuthLabels) {

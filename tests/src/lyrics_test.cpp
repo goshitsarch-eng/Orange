@@ -62,6 +62,7 @@ TEST(GeniusLyricsProvider, AuthorizationAndSearchUrl) {
   EXPECT_NE(std::string::npos, auth.find("localhost%3A63111"));
   const std::string json = R"json({"response":{"hits":[{"result":{"url":"https://genius.com/portishead-roads-lyrics"}}]}})json";
   EXPECT_EQ("https://genius.com/portishead-roads-lyrics", GeniusLyricsProvider::ParseSearchResultUrl(json));
+  EXPECT_TRUE(GeniusLyricsProvider().authentication_required());
 }
 
 TEST(LrcParser, TimestampsAndActiveLine) {

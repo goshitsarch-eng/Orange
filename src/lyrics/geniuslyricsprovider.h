@@ -14,6 +14,7 @@ class GeniusLyricsProvider : public HtmlLyricsProvider {
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
   void Authenticate(const std::string &username, const std::string &token) override;
   void Logout() override;
+  bool authentication_required() const override { return true; }
   bool authenticated() const override { return !access_token_.empty(); }
   std::string username() const override { return username_; }
 
