@@ -2655,7 +2655,7 @@ TEST(Windows7ThumbBarActions, DefaultOrderAndFlags) {
             Windows7ThumbBarActions::ButtonMask(false));
   EXPECT_EQ(Windows7ThumbBarActions::Id::Stop, Windows7ThumbBarActions::ActionAtCommand(2, actions));
   EXPECT_EQ(Windows7ThumbBarActions::Id::Spacer, Windows7ThumbBarActions::ActionAtCommand(99, actions));
-  EXPECT_EQ(3, Windows7ThumbBarActions::CommandId(0x00030001u));
+  EXPECT_EQ(3, Windows7ThumbBarActions::CommandId(0x12340003u));
   EXPECT_EQ(Windows7ThumbBarActions::WinMessage::Command, Windows7ThumbBarActions::ClassifyMessage(0x0111, 0));
   EXPECT_EQ(Windows7ThumbBarActions::WinMessage::TaskbarCreated, Windows7ThumbBarActions::ClassifyMessage(42, 42));
   EXPECT_EQ(300, Windows7ThumbBarActions::kUpdateDelayMs);
