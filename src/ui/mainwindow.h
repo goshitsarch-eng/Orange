@@ -3,6 +3,7 @@
 
 #include "collection/collectionbehaviour.h"
 #include "collection/collectiongrouping.h"
+#include "collection/collectionmodelupdate.h"
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "desktop/taskbarprogress.h"
 #include "collection/collectionviewcontainer.h"
@@ -50,6 +51,7 @@ class MainWindow {
   void BuildContext();
   void ConnectSignals();
   void RefreshCollection(const std::string &filter = {}, bool update_text = false);
+  void ApplyCollectionIncremental(CollectionModelUpdateType type, const SongList &songs);
   void RefreshPlaylist();
   void RefreshPlaylistsList();
   void RefreshQueue();

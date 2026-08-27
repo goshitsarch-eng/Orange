@@ -40,7 +40,9 @@
 #include "collection/collectiongroupingsave.h"
 #include "collection/collectionmenu.h"
 #include "collection/collectionkeyboard.h"
+#include "collection/collectionincremental.h"
 #include "collection/collectionmodel.h"
+#include "collection/collectionmodelmerge.h"
 #include "collection/collectionplaylistitem.h"
 #include "collection/collectiontree.h"
 #include "collection/collectionquery.h"
@@ -201,6 +203,79 @@ TEST(CollectionModel, BuildsGroupedTreeAndPlaylistItem) {
   CollectionPlaylistItem item(a);
   EXPECT_EQ(a.PrettyTitleWithArtist(), item.DisplayText());
   EXPECT_EQ(a.url(), item.url());
+}
+
+TEST(CollectionModelMerge, AddsRemovesAndUpdatesById) {
+  Song first = MakeSong("Roads", "Portishead", "Dummy");
+  first.set_id(1);
+  Song second = MakeSong("Glory Box", "Portishead", "Dummy");
+  second.set_id(2);
+  SongList songs = CollectionModelMerge::Add({}, {first, second});
+  ASSERT_EQ(2u, songs.size());
+  Song replacement = first;
+  replacement.set_title("Roads (live)");
+  songs = CollectionModelMerge::Add(songs, {replacement});
+  ASSERT_EQ(2u, songs.size());
+  EXPECT_EQ("Roads (live)", songs.front().title());
+  Song extra = MakeSong("Wandering Star", "Portishead", "Dummy");
+  extra.set_id(3);
+  CollectionModelUpdate add;
+  add.type = CollectionModelUpdateType::AddSongs;
+  add.songs = {extra};
+  songs = CollectionModelMerge::Apply(songs, add);
+  EXPECT_EQ(3u, songs.size());
+  Song updated = second;
+  updated.set_playcount(4);
+  CollectionModelUpdate patch;
+  patch.type = CollectionModelUpdateType::UpdateSongs;
+  patch.songs = {updated};
+  songs = CollectionModelMerge::Apply(songs, patch);
+  EXPECT_EQ(4, songs[1].playcount());
+  CollectionModelUpdate remove;
+  remove.type = CollectionModelUpdateType::RemoveSongs;
+  remove.songs = {first};
+  songs = CollectionModelMerge::Apply(songs, remove);
+  ASSERT_EQ(2u, songs.size());
+  EXPECT_EQ(2, songs.front().id());
+  EXPECT_FALSE(CollectionIncremental::ShouldApply(true));
+  EXPECT_TRUE(CollectionIncremental::ShouldApply(false));
+  CollectionModelUpdate reset = CollectionIncremental::Make(CollectionModelUpdateType::Reset, {first});
+  EXPECT_EQ(CollectionModelUpdateType::Reset, reset.type);
+  EXPECT_EQ(1u, reset.songs.size());
+}
+
+TEST(CollectionModel, ApplyUpdateMergesWithoutResetList) {
+  Song first = MakeSong("Roads", "Portishead", "Dummy");
+  first.set_id(11);
+  Song second = MakeSong("Helplessness Blues", "Fleet Foxes", "Helplessness Blues");
+  second.set_id(12);
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::Album;
+  grouping.third = CollectionGrouping::GroupBy::None;
+  CollectionModel model;
+  model.Reset({first}, grouping, false, true, false);
+  EXPECT_EQ(1, model.TotalSongs());
+  CollectionModelUpdate add;
+  add.type = CollectionModelUpdateType::AddSongs;
+  add.songs = {second};
+  model.ApplyUpdate(add);
+  EXPECT_EQ(2, model.TotalSongs());
+  EXPECT_EQ(2u, model.model_songs().size());
+  Song patched = first;
+  patched.set_playcount(7);
+  CollectionModelUpdate update;
+  update.type = CollectionModelUpdateType::UpdateSongs;
+  update.songs = {patched};
+  model.ApplyUpdate(update);
+  ASSERT_EQ(2u, model.model_songs().size());
+  EXPECT_EQ(7, model.model_songs().front().playcount());
+  CollectionModelUpdate remove;
+  remove.type = CollectionModelUpdateType::RemoveSongs;
+  remove.songs = {second};
+  model.ApplyUpdate(remove);
+  EXPECT_EQ(1, model.TotalSongs());
+  EXPECT_EQ(11, model.model_songs().front().id());
 }
 
 TEST(CollectionDivider, KeysAndDisplayMatchQt) {

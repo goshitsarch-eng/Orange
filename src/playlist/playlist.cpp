@@ -5,6 +5,7 @@
 #include "playlist/playlistitemuuid.h"
 #include "playlist/dynamicplaylistmaintenance.h"
 #include "playlist/playlistdynamicadvance.h"
+#include "playlist/playlistplayrow.h"
 #include "playlist/playlistlocalartdiscover.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlistbehaviour.h"
@@ -50,6 +51,7 @@ void Playlist::set_current_row(int row) {
     }
   }
   current_row_ = next_row;
+  last_played_row_ = PlaylistPlayRow::Remember(current_row_, last_played_row_);
   SyncVirtualIndex();
   UpdateScrobblePoint();
   CurrentChanged.Emit(current_row_);

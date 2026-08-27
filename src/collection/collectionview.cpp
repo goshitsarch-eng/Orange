@@ -199,6 +199,11 @@ void CollectionView::SetModelSongs(const SongList &songs, const CollectionGroupi
   Rebuild();
 }
 
+void CollectionView::ApplyUpdate(const CollectionModelUpdate &update) {
+  model_.ApplyUpdate(update);
+  Rebuild();
+}
+
 void CollectionView::ActivateRow(GtkListBoxRow *row) {
   OpenEmptyIfNeeded(row, CollectionTreeClick::kPrimaryButton);
   auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));

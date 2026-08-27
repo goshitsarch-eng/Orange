@@ -2,6 +2,7 @@
 
 #include "collection/collectionbackend.h"
 #include "collection/collectiondivider.h"
+#include "collection/collectionmodelmerge.h"
 
 CollectionModel::CollectionModel(CollectionBackend *backend) : backend_(backend), root_(std::make_unique<CollectionItem>(CollectionItem::Type::Root)) {}
 
@@ -51,6 +52,10 @@ void CollectionModel::Reset(const SongList &songs, const CollectionGrouping::Gro
                             bool skip_artist_articles, bool skip_album_articles, bool show_dividers) {
   grouping_ = grouping;
   show_dividers_ = show_dividers;
+  separate_albums_by_grouping_ = separate_albums_by_grouping;
+  skip_artist_articles_ = skip_artist_articles;
+  skip_album_articles_ = skip_album_articles;
+  songs_ = songs;
   root_ = std::make_unique<CollectionItem>(CollectionItem::Type::Root);
   const CollectionGrouping::Node tree =
       CollectionGrouping::BuildTree(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles);
@@ -71,10 +76,8 @@ void CollectionModel::Reset(const SongList &songs, const CollectionGrouping::Gro
 }
 
 void CollectionModel::ApplyUpdate(const CollectionModelUpdate &update) {
-  if (update.type == CollectionModelUpdateType::Reset) {
-    Reset(update.songs, CollectionGrouping::LoadCurrent(), CollectionGrouping::SeparateAlbumsByGrouping(), true, false,
-          CollectionDivider::LoadShowDividers());
-  }
+  Reset(CollectionModelMerge::Apply(songs_, update), grouping_, separate_albums_by_grouping_, skip_artist_articles_, skip_album_articles_,
+        show_dividers_);
 }
 
 SongList CollectionModel::Songs() const { return root_ ? root_->Songs() : SongList{}; }

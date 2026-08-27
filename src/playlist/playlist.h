@@ -33,6 +33,7 @@ class Playlist {
   const SongList &songs() const { return songs_; }
   int row_count() const { return static_cast<int>(songs_.size()); }
   int current_row() const { return current_row_; }
+  int last_played_row() const { return last_played_row_; }
   void set_current_row(int row);
   void UpdateScrobblePoint(int64_t seek_point_nanosec = 0);
   int64_t scrobble_point_nanosec() const { return scrobble_point_nanosec_; }
@@ -146,6 +147,7 @@ class Playlist {
   bool favorite_ = false;
   SongList songs_;
   int current_row_ = -1;
+  int last_played_row_ = -1;
   SequenceMode mode_ = SequenceMode::Sequential;
   PlaylistSequence::RepeatMode repeat_mode_ = PlaylistSequence::RepeatMode::Off;
   PlaylistSequence::ShuffleMode shuffle_mode_ = PlaylistSequence::ShuffleMode::Off;

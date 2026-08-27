@@ -1,3 +1,4 @@
+#include "core/playeritemoptions.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistitem.h"
@@ -45,14 +46,46 @@ TEST(PlaylistItem, NewFromSongAndStreamMetadata) {
   EXPECT_EQ(item->uuid(), saved.uuid);
 }
 
-TEST(StreamPlaylistItem, DisablesSeek) {
+TEST(StreamPlaylistItem, RadioDisablesPauseAndSeek) {
+  Song radio(Song::Source::SomaFM);
+  radio.set_title("Groove Salad");
+  radio.set_url("https://somafm.example/groove");
+  radio.set_valid(true);
+  PlaylistItemPtr item = PlaylistItem::NewFromSong(radio);
+  ASSERT_TRUE(item);
+  EXPECT_TRUE(PlayerItemOptions::Has(item->options(), PlaylistItem::Option::PauseDisabled));
+  EXPECT_TRUE(PlayerItemOptions::Has(item->options(), PlaylistItem::Option::SeekDisabled));
+  EXPECT_TRUE(PlayerItemOptions::ShouldStopInsteadOfPause(radio));
+  EXPECT_TRUE(PlayerItemOptions::ShouldIgnoreSeek(radio));
+}
+
+TEST(StreamPlaylistItem, StreamServiceKeepsPauseAndSeek) {
   Song song(Song::Source::Tidal);
   song.set_title("Roads");
   song.set_url("tidal://track/1");
+  song.set_valid(true);
   PlaylistItemPtr item = PlaylistItem::NewFromSong(song);
   ASSERT_TRUE(item);
   EXPECT_EQ(Song::Source::Tidal, item->source());
-  EXPECT_EQ(PlaylistItem::Option::SeekDisabled, item->options());
+  EXPECT_EQ(PlaylistItem::Option::Default, item->options());
+  EXPECT_FALSE(PlayerItemOptions::ShouldStopInsteadOfPause(song));
+  EXPECT_FALSE(PlayerItemOptions::ShouldIgnoreSeek(song));
+}
+
+TEST(PlayerItemOptions, RadioSourcesMatchQtPauseAndSeek) {
+  EXPECT_TRUE(PlayerItemOptions::PauseDisabled(Song::Source::Stream));
+  EXPECT_TRUE(PlayerItemOptions::PauseDisabled(Song::Source::SomaFM));
+  EXPECT_TRUE(PlayerItemOptions::PauseDisabled(Song::Source::RadioParadise));
+  EXPECT_TRUE(PlayerItemOptions::PauseDisabled(Song::Source::RadioBrowser));
+  EXPECT_FALSE(PlayerItemOptions::PauseDisabled(Song::Source::Tidal));
+  EXPECT_FALSE(PlayerItemOptions::PauseDisabled(Song::Source::Qobuz));
+  EXPECT_FALSE(PlayerItemOptions::PauseDisabled(Song::Source::Spotify));
+  EXPECT_FALSE(PlayerItemOptions::PauseDisabled(Song::Source::Subsonic));
+  EXPECT_FALSE(PlayerItemOptions::PauseDisabled(Song::Source::Collection));
+  Song radio(Song::Source::RadioBrowser);
+  EXPECT_TRUE(PlayerItemOptions::SeekDisabled(radio));
+  EXPECT_TRUE(PlayerItemOptions::Has(PlayerItemOptions::ForSong(radio), PlaylistItem::Option::PauseDisabled));
+  EXPECT_TRUE(PlayerItemOptions::Has(PlayerItemOptions::ForSong(radio), PlaylistItem::Option::SeekDisabled));
 }
 
 TEST(PlaylistItemMimeData, CollectsEffectiveSongs) {

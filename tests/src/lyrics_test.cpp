@@ -3,6 +3,7 @@
 #include "lyrics/htmllyricsprovider.h"
 #include "lyrics/lrcparser.h"
 #include "lyrics/lyricssearchscore.h"
+#include "lyrics/lyricssearchtimeout.h"
 
 #include "utilities/strutils.h"
 
@@ -85,6 +86,25 @@ TEST(LrcParser, TimestampsAndActiveLine) {
   EXPECT_EQ(12000, multi[0].timestamp_ms);
   EXPECT_EQ(45000, multi[1].timestamp_ms);
   EXPECT_EQ("Chorus", multi[0].text);
+}
+
+TEST(LyricsSearchTimeout, EarlyHardAndCommercialSkip) {
+  EXPECT_EQ(6000, LyricsSearchTimeout::kEarlyMs);
+  EXPECT_EQ(15000, LyricsSearchTimeout::kHardMs);
+  EXPECT_EQ(60, LyricsSearchTimeout::kGoodLyricsLength);
+  EXPECT_FALSE(LyricsSearchTimeout::ShouldFinishEarly(5999, true));
+  EXPECT_TRUE(LyricsSearchTimeout::ShouldFinishEarly(6000, true));
+  EXPECT_FALSE(LyricsSearchTimeout::ShouldFinishEarly(6000, false));
+  EXPECT_FALSE(LyricsSearchTimeout::ShouldFinishHard(14999));
+  EXPECT_TRUE(LyricsSearchTimeout::ShouldFinishHard(15000));
+  EXPECT_FALSE(LyricsSearchTimeout::ShouldFinish(5999, true));
+  EXPECT_TRUE(LyricsSearchTimeout::ShouldFinish(6000, true));
+  EXPECT_TRUE(LyricsSearchTimeout::ShouldFinish(15000, false));
+  EXPECT_TRUE(LyricsSearchTimeout::HasUsableResult(true, 60));
+  EXPECT_FALSE(LyricsSearchTimeout::HasUsableResult(true, 12));
+  EXPECT_TRUE(LyricsSearchTimeout::ShouldSkipCommercial("commercial-free", "listener-supported"));
+  EXPECT_TRUE(LyricsSearchTimeout::ShouldSkipCommercial("Commercial-Free", "Listener-Supported"));
+  EXPECT_FALSE(LyricsSearchTimeout::ShouldSkipCommercial("Portishead", "Roads"));
 }
 
 TEST(ContextLyrics, Attribution) {

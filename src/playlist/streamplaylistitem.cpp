@@ -1,5 +1,7 @@
 #include "playlist/streamplaylistitem.h"
 
+#include "core/playeritemoptions.h"
+
 StreamPlaylistItem::StreamPlaylistItem(Song::Source source, const std::string &uuid) : PlaylistItem(source, uuid) {
   song_.set_source(source);
   InitMetadata();
@@ -17,3 +19,5 @@ void StreamPlaylistItem::InitMetadata() {
 }
 
 void StreamPlaylistItem::SetArtManual(const std::string &cover_url) { song_.set_art_manual(cover_url); }
+
+PlaylistItem::Option StreamPlaylistItem::options() const { return PlayerItemOptions::ForSong(song_); }

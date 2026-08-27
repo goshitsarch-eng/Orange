@@ -21,6 +21,7 @@ class CollectionModel {
   void Reset(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
              bool skip_artist_articles, bool skip_album_articles, bool show_dividers = false);
   void ApplyUpdate(const CollectionModelUpdate &update);
+  const SongList &model_songs() const { return songs_; }
 
   int TotalSongs() const { return total_songs_; }
   int TotalArtists() const { return total_artists_; }
@@ -36,6 +37,10 @@ class CollectionModel {
   CollectionBackend *backend_ = nullptr;
   CollectionGrouping::Grouping grouping_;
   bool show_dividers_ = false;
+  bool separate_albums_by_grouping_ = false;
+  bool skip_artist_articles_ = true;
+  bool skip_album_articles_ = false;
+  SongList songs_;
   std::unique_ptr<CollectionItem> root_;
   int total_songs_ = 0;
   int total_artists_ = 0;

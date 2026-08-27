@@ -12,7 +12,7 @@ class StreamPlaylistItem : public PlaylistItem {
   std::string OriginalUrl() const override { return song_.url(); }
   void SetOriginalMetadata(const Song &song) override { song_ = song; }
   void SetArtManual(const std::string &cover_url) override;
-  Option options() const override { return Option::SeekDisabled; }
+  Option options() const override;
 
  protected:
   Song DatabaseSongMetadata() const override { return song_; }

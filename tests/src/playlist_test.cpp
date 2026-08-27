@@ -18,6 +18,7 @@
 #include "playlist/playlistsaveschedule.h"
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistplayrow.h"
 #include "playlist/playlistcoverpersist.h"
 #include "playlist/playlistdynamicadvance.h"
 #include "playlist/playlistlocalartdiscover.h"
@@ -1185,6 +1186,38 @@ TEST(PlaylistLocalArtDiscover, WritesSidecarOnPlaylistOnlyRow) {
   playlist.AppendSongs({local});
   playlist.ApplyDiscoveredArt(local, "file:///tmp/music/cover.jpg");
   EXPECT_EQ("file:///tmp/music/cover.jpg", playlist.song(0).art_manual());
+}
+
+TEST(PlaylistPlayRow, ResolvesCurrentThenLastPlayedThenFirst) {
+  EXPECT_EQ(2, PlaylistPlayRow::Resolve(2, 5, 10));
+  EXPECT_EQ(5, PlaylistPlayRow::Resolve(-1, 5, 10));
+  EXPECT_EQ(0, PlaylistPlayRow::Resolve(-1, -1, 10));
+  EXPECT_EQ(-1, PlaylistPlayRow::Resolve(-1, -1, 0));
+  EXPECT_EQ(-1, PlaylistPlayRow::Resolve(3, 3, 0));
+  EXPECT_EQ(4, PlaylistPlayRow::Remember(4, 1));
+  EXPECT_EQ(1, PlaylistPlayRow::Remember(-1, 1));
+}
+
+TEST(Playlist, RemembersLastPlayedRow) {
+  Playlist playlist;
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  playlist.AppendSongs({a, b});
+  EXPECT_EQ(-1, playlist.last_played_row());
+  playlist.set_current_row(1);
+  EXPECT_EQ(1, playlist.last_played_row());
+  playlist.set_current_row(0);
+  EXPECT_EQ(0, playlist.last_played_row());
+  playlist.Clear();
+  EXPECT_EQ(-1, playlist.current_row());
+  EXPECT_EQ(0, playlist.last_played_row());
+  EXPECT_EQ(-1, PlaylistPlayRow::Resolve(playlist.current_row(), playlist.last_played_row(), playlist.row_count()));
 }
 
 TEST(DynamicPlaylistPersist, EncodesQueryTypeAndRoundTripsSearch) {

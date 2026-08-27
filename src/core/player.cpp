@@ -1,5 +1,8 @@
 #include "core/player.h"
 
+#include "core/playeritemoptions.h"
+#include "playlist/playlistplayrow.h"
+
 #include <algorithm>
 #include <ctime>
 #include <memory>
@@ -137,7 +140,12 @@ void Player::Play() {
   if (playlist_manager_) {
     playlist_manager_->SetActiveToCurrent();
   }
-  PlayAt(playlist_manager_ ? playlist_manager_->current_row() : 0, false);
+  int row = 0;
+  if (playlist_manager_ && playlist_manager_->active()) {
+    Playlist *playlist = playlist_manager_->active();
+    row = PlaylistPlayRow::Resolve(playlist->current_row(), playlist->last_played_row(), playlist->row_count());
+  }
+  PlayAt(row, false);
   if (playlist_manager_) {
     playlist_manager_->SetActivePlaying();
   }
@@ -158,6 +166,10 @@ void Player::PlayPause() {
 }
 
 void Player::Pause() {
+  if (PlayerItemOptions::ShouldStopInsteadOfPause(current_song_)) {
+    Stop();
+    return;
+  }
   engine_->Pause();
   if (playlist_manager_) {
     playlist_manager_->SetActivePaused();
@@ -316,6 +328,9 @@ void Player::RestartOrPrevious() {
 void Player::SeekTo(int64_t seconds) { Seek(seconds * 1000000000LL); }
 
 void Player::Seek(int64_t nanosec) {
+  if (PlayerItemOptions::ShouldIgnoreSeek(current_song_)) {
+    return;
+  }
   const int64_t length = current_song_.length_nanosec() > 0 ? current_song_.length_nanosec() : engine_->length_nanosec();
   const int64_t clamped = PlayerSeekNotify::Clamp(nanosec, length);
   engine_->Seek(static_cast<uint64_t>(clamped));

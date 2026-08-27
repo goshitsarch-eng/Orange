@@ -1,6 +1,7 @@
 #include "ui/mainwindow.h"
 
 #include "collection/collectionbehaviour.h"
+#include "collection/collectionincremental.h"
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectionmenu.h"
@@ -1872,13 +1873,19 @@ void MainWindow::ConnectSignals() {
     RefreshCollection();
     ShowToast("Collection scan finished");
   });
+  app_->collection()->backend()->SongsDiscovered.Connect([this](const SongList &songs) {
+    ApplyCollectionIncremental(CollectionModelUpdateType::AddSongs, songs);
+  });
+  app_->collection()->backend()->SongsDeleted.Connect([this](const SongList &songs) {
+    ApplyCollectionIncremental(CollectionModelUpdateType::RemoveSongs, songs);
+  });
   auto patch_collection_songs = [this](const SongList &songs) {
     if (Playlist *playlist = app_->playlist_manager()->current()) {
       for (const Song &song : songs) {
         playlist->PatchSongById(song);
       }
     }
-    RefreshCollection();
+    ApplyCollectionIncremental(CollectionModelUpdateType::UpdateSongs, songs);
     RefreshPlaylist();
   };
   app_->collection()->backend()->SongsStatisticsChanged.Connect(patch_collection_songs);
@@ -1960,6 +1967,21 @@ void MainWindow::ConnectSignals() {
     }
     return G_SOURCE_CONTINUE;
   }, this);
+}
+
+void MainWindow::ApplyCollectionIncremental(CollectionModelUpdateType type, const SongList &songs) {
+  if (!CollectionIncremental::ShouldApply(app_->collection()->scanning())) {
+    return;
+  }
+  if (!collection_container_ || !collection_container_->view()) {
+    return;
+  }
+  collection_container_->view()->ApplyUpdate(CollectionIncremental::Make(type, songs));
+  if (context_view_) {
+    context_view_->SetCollectionTotals(collection_container_->view()->model()->TotalSongs(),
+                                      collection_container_->view()->model()->TotalArtists(),
+                                      collection_container_->view()->model()->TotalAlbums());
+  }
 }
 
 void MainWindow::RefreshCollection(const std::string &filter, bool update_text) {

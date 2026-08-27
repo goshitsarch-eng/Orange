@@ -85,6 +85,14 @@ TEST(Mpris2Helpers, CapabilitiesMatchQt) {
   stream.set_valid(true);
   stream.set_source(Song::Source::Stream);
   EXPECT_FALSE(Mpris2Helpers::CanSeek(stream, EngineBase::State::Playing));
+  Song radio;
+  radio.set_valid(true);
+  radio.set_source(Song::Source::SomaFM);
+  EXPECT_FALSE(Mpris2Helpers::CanSeek(radio, EngineBase::State::Playing));
+  Song tidal;
+  tidal.set_valid(true);
+  tidal.set_source(Song::Source::Tidal);
+  EXPECT_FALSE(Mpris2Helpers::CanSeek(tidal, EngineBase::State::Playing));
   EXPECT_TRUE(Mpris2Helpers::SetPositionAllowed("/id", "/id", 1000, 5000000000LL, true));
   EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/other", "/id", 1000, 5000000000LL, true));
   EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/id", "/id", -1, 5000000000LL, true));

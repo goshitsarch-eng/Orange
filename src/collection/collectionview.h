@@ -34,6 +34,7 @@ class CollectionView {
 
   void SetModelSongs(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
                      bool skip_artist_articles, bool skip_album_articles);
+  void ApplyUpdate(const CollectionModelUpdate &update);
   void SetFilterString(const std::string &filter);
   void SetActivateCallback(ActivateCallback callback);
   void SetEnqueueCallback(EnqueueCallback callback);
