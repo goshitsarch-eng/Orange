@@ -2,6 +2,7 @@
 
 #include "core/taskmanager.h"
 #include "engine/enginebuffering.h"
+#include "engine/gstengineerror.h"
 #include "constants/backendsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
@@ -139,9 +140,8 @@ void GstEngine::WirePipeline(GstEnginePipeline *pipeline) {
       SetState(State::Playing);
     }
   };
-  pipeline->ErrorOccurred = [this](int, const std::string &text) {
-    SetState(State::Error);
-    Error.Emit(text);
+  pipeline->ErrorOccurred = [this](int id, int domain, int code, const std::string &text) {
+    HandlePipelineError(id, domain, code, text);
   };
   pipeline->SpectrumReady = [this](int id, const std::vector<int16_t> &scope) {
     if (current_ && current_->id() == id) {
@@ -177,6 +177,7 @@ void GstEngine::StartPreloading(const std::string &media_url, const std::string 
 bool GstEngine::Load(const std::string &media_url, const std::string &stream_url, int track_change_flags, bool, uint64_t beginning_offset_nanosec,
                      int64_t end_offset_nanosec, std::optional<double>) {
   const std::string url = stream_url.empty() ? media_url : stream_url;
+  stream_url_ = url;
   const bool auto_change = (track_change_flags & Auto) != 0;
   const bool same_album = (track_change_flags & SameAlbum) != 0;
   const bool auto_crossfade = BackendOptions::AllowAutoCrossfade(autocrossfade_enabled_, no_crossfade_same_album_, current_album_,
@@ -214,6 +215,8 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   current_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec);
   if (!current_) {
     Error.Emit("Could not create playbin");
+    SetState(State::Error);
+    FatalError.Emit();
     return false;
   }
   gapless_pending_ = false;
@@ -230,6 +233,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
     }
     StartFade(1);
     SetState(pause ? State::Paused : State::Playing);
+    ValidSongRequested.Emit(stream_url_);
     return true;
   }
   if (!current_ || !current_->valid()) {
@@ -239,8 +243,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
     return true;
   }
   if (!current_->Play(pause, offset_nanosec)) {
-    Error.Emit("Failed to start playback");
-    SetState(State::Error);
+    // A GST_MESSAGE_ERROR is still on its way to HandlePipelineError.
     return false;
   }
   if (fading_enabled_ && !pause && !gapless_pending_) {
@@ -248,6 +251,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
     StartFade(1);
   }
   SetState(pause ? State::Paused : State::Playing);
+  ValidSongRequested.Emit(stream_url_);
   return true;
 }
 
@@ -260,6 +264,7 @@ void GstEngine::Stop(bool) {
     current_->Stop();
   }
   current_.reset();
+  stream_url_.clear();
   gapless_pending_ = false;
   SetState(State::Empty);
 }
@@ -486,6 +491,28 @@ void GstEngine::SetState(State state) {
   }
   state_ = state;
   StateChanged.Emit(state);
+}
+
+void GstEngine::HandlePipelineError(int pipeline_id, int domain, int code, const std::string &text) {
+  Error.Emit(text);
+  if (GstEngineError::ShouldTearDownCurrent(current_ != nullptr, current_ ? current_->id() : 0, pipeline_id)) {
+    const std::string url = stream_url_;
+    CancelFade();
+    current_.reset();
+    DiscardNext();
+    gapless_pending_ = false;
+    BufferingFinished();
+    SetState(State::Error);
+    if (GstEngineError::IsInvalidSongError(domain, code)) {
+      InvalidSongRequested.Emit(url);
+    } else {
+      FatalError.Emit();
+    }
+    return;
+  }
+  if (next_ && next_->id() == pipeline_id) {
+    DiscardNext();
+  }
 }
 
 void GstEngine::HandleBuffering(int percent) {

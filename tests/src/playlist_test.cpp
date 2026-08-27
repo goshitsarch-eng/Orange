@@ -320,6 +320,18 @@ TEST(Playlist, ApplyValidityOnCurrentSong) {
   EXPECT_TRUE(playlist.current_song().unavailable());
   EXPECT_TRUE(playlist.ApplyValidityOnCurrentSong("file:///a", true));
   EXPECT_FALSE(playlist.current_song().unavailable());
+  Song stream;
+  stream.set_title("B");
+  stream.set_url("tidal://track/1");
+  stream.set_stream_url("https://cdn.example/b.flac");
+  stream.set_valid(true);
+  playlist.Clear();
+  playlist.AppendSongs({stream});
+  playlist.set_current_row(0);
+  EXPECT_TRUE(playlist.ApplyValidityOnCurrentSong("https://cdn.example/b.flac", false));
+  EXPECT_TRUE(playlist.current_song().unavailable());
+  EXPECT_FALSE(playlist.ApplyValidityOnCurrentSong("https://other.example/c.flac", true));
+  EXPECT_TRUE(playlist.current_song().unavailable());
 }
 
 TEST(Playlist, AutoSortAfterInsert) {

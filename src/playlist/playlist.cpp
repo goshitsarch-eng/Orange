@@ -391,7 +391,7 @@ bool Playlist::ApplyValidityOnCurrentSong(const std::string &url, bool valid) {
     return false;
   }
   Song &song = songs_[static_cast<size_t>(current_row_)];
-  if (!url.empty() && song.url() != url) {
+  if (!url.empty() && song.url() != url && song.stream_url() != url) {
     return false;
   }
   if (PlaylistBehaviour::ApplyValidity(&song, valid)) {

@@ -46,6 +46,9 @@ class EngineBase {
   Signal<> TrackEnded;
   Signal<> TrackAboutToEnd;
   Signal<std::string> Error;
+  Signal<> FatalError;
+  Signal<std::string> InvalidSongRequested;
+  Signal<std::string> ValidSongRequested;
   Signal<Song> MetadataReceived;
 
  protected:

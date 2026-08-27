@@ -356,6 +356,8 @@ void GstEnginePipeline::HandleError(GstMessage *message) {
   GError *error = nullptr;
   gchar *debug = nullptr;
   gst_message_parse_error(message, &error, &debug);
+  const int domain = error ? static_cast<int>(error->domain) : 0;
+  const int code = error ? error->code : 0;
   const std::string text = error ? error->message : "Unknown GStreamer error";
   LogError("GStreamer error: %s (%s)", text.c_str(), debug ? debug : "");
   if (error) {
@@ -363,7 +365,7 @@ void GstEnginePipeline::HandleError(GstMessage *message) {
   }
   g_free(debug);
   if (ErrorOccurred) {
-    ErrorOccurred(id_, text);
+    ErrorOccurred(id_, domain, code, text);
   }
 }
 

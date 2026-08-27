@@ -91,12 +91,14 @@ class GstEngine : public EngineBase {
   double VolumeFraction() const;
   GstPipelineExtras PipelineExtras() const;
   void HandleBuffering(int percent);
+  void HandlePipelineError(int pipeline_id, int domain, int code, const std::string &text);
   void BufferingStarted();
   void BufferingProgress(int percent);
   void BufferingFinished();
 
   std::unique_ptr<GstEnginePipeline> current_;
   std::unique_ptr<GstEnginePipeline> next_;
+  std::string stream_url_;
   std::string next_url_;
   int next_pipeline_id_ = 1;
   int replaygain_mode_ = 0;

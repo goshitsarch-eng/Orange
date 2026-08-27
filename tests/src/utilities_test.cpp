@@ -84,6 +84,7 @@
 #include "engine/ebur128analysis.h"
 #include "engine/enginebuffering.h"
 #include "engine/enginedevice.h"
+#include "engine/gstengineerror.h"
 #include "engine/gststartup.h"
 #include "moodbar/moodbarbuilder.h"
 #include "transcoder/transcoder.h"
@@ -1282,6 +1283,28 @@ TEST(DeviceFinders, OutputsAndDefaultDevice) {
   AlsaDeviceFinder alsa;
   EXPECT_EQ("alsa", alsa.name());
   EXPECT_TRUE(alsa.Initialize());
+}
+
+TEST(GstEngineError, ClassifiesFatalAndInvalidSongLikeQt) {
+  EXPECT_TRUE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_RESOURCE_ERROR), GST_RESOURCE_ERROR_NOT_FOUND));
+  EXPECT_TRUE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_RESOURCE_ERROR), GST_RESOURCE_ERROR_OPEN_READ));
+  EXPECT_TRUE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_RESOURCE_ERROR), GST_RESOURCE_ERROR_NOT_AUTHORIZED));
+  EXPECT_FALSE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_RESOURCE_ERROR), GST_RESOURCE_ERROR_BUSY));
+  EXPECT_FALSE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_RESOURCE_ERROR), GST_RESOURCE_ERROR_WRITE));
+  EXPECT_FALSE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_RESOURCE_ERROR), GST_RESOURCE_ERROR_OPEN_WRITE));
+  EXPECT_TRUE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_STREAM_ERROR), GST_STREAM_ERROR_DECODE));
+  EXPECT_TRUE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_STREAM_ERROR), GST_STREAM_ERROR_FAILED));
+  EXPECT_FALSE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_CORE_ERROR), GST_CORE_ERROR_MISSING_PLUGIN));
+  EXPECT_FALSE(GstEngineError::IsInvalidSongError(static_cast<int>(GST_LIBRARY_ERROR), GST_LIBRARY_ERROR_FAILED));
+  EXPECT_EQ(GstEngineError::Kind::InvalidSong,
+            GstEngineError::Classify(static_cast<int>(GST_RESOURCE_ERROR), GST_RESOURCE_ERROR_NOT_FOUND));
+  EXPECT_EQ(GstEngineError::Kind::Fatal, GstEngineError::Classify(static_cast<int>(GST_RESOURCE_ERROR), GST_RESOURCE_ERROR_BUSY));
+  EXPECT_EQ(GstEngineError::Kind::Fatal, GstEngineError::Classify(static_cast<int>(GST_CORE_ERROR), GST_CORE_ERROR_FAILED));
+  EXPECT_TRUE(GstEngineError::ShouldTearDownCurrent(true, 4, 4));
+  EXPECT_FALSE(GstEngineError::ShouldTearDownCurrent(true, 4, 5));
+  EXPECT_FALSE(GstEngineError::ShouldTearDownCurrent(false, 4, 4));
+  EXPECT_TRUE(GstEngineError::ShouldStopOnInvalidSong(false));
+  EXPECT_FALSE(GstEngineError::ShouldStopOnInvalidSong(true));
 }
 
 TEST(EngineBuffering, NearEndIgnoreAndPercentGates) {

@@ -18,6 +18,7 @@
 #include "core/playermetadatasync.h"
 #include "core/playernextmetadata.h"
 #include "core/playererrorloop.h"
+#include "engine/gstengineerror.h"
 #include "core/playerloadresult.h"
 #include "core/playerprevious.h"
 #include "core/playerseeknotify.h"
@@ -50,6 +51,9 @@ void Player::Init() {
   engine_->TrackEnded.Connect([this]() { HandleTrackEnded(); });
   engine_->TrackAboutToEnd.Connect([this]() { PreloadNext(); });
   engine_->Error.Connect([this](const std::string &error) { HandleEngineError(error); });
+  engine_->FatalError.Connect([this]() { HandleFatalError(); });
+  engine_->InvalidSongRequested.Connect([this](const std::string &url) { HandleInvalidSongRequested(url); });
+  engine_->ValidSongRequested.Connect([this](const std::string &url) { HandleValidSongRequested(url); });
   engine_->MetadataReceived.Connect([this](const Song &song) { HandleEngineMetadata(song); });
   ReloadSettings();
   LoadVolume();
@@ -449,9 +453,6 @@ void Player::StartEnginePlayback(bool pause, int track_change_flags, uint64_t of
   engine_->SetCurrentAlbum(current_song_.EffectiveAlbum());
   engine_->Play(pause, offset_nanosec);
   error_count_ = 0;
-  if (greyout_ && playlist_manager_) {
-    playlist_manager_->SongChangeRequestProcessed(current_song_.url(), true);
-  }
   SongChanged.Emit(current_song_);
   ArmIntroTimeout();
 }
@@ -464,6 +465,7 @@ void Player::HandleLoadResult(const UrlHandler::LoadResult &result) {
   const auto target = PlayerLoadResult::MatchMediaUrl(media, current_song_.url(), next.url());
   if (PlayerLoadResult::ShouldTreatAsError(result.type)) {
     if (target == PlayerLoadResult::Target::Current) {
+      HandleInvalidSongRequested(media);
       HandleEngineError(result.error.empty() ? "URL handler error" : result.error);
     }
     return;
@@ -607,8 +609,26 @@ void Player::HandleEngineError(const std::string &error) {
     Error.Emit(error);
   }
   LogError("%s", error.c_str());
+}
+
+void Player::HandleFatalError() {
+  error_count_ = 0;
+  Stop();
+}
+
+void Player::HandleValidSongRequested(const std::string &url) {
   if (greyout_ && playlist_manager_) {
-    playlist_manager_->SongChangeRequestProcessed(current_song_.url(), false);
+    playlist_manager_->SongChangeRequestProcessed(url, true);
+  }
+}
+
+void Player::HandleInvalidSongRequested(const std::string &url) {
+  if (greyout_ && playlist_manager_) {
+    playlist_manager_->SongChangeRequestProcessed(url, false);
+  }
+  if (GstEngineError::ShouldStopOnInvalidSong(continue_on_error_)) {
+    HandleFatalError();
+    return;
   }
   const PlaylistSequence::RepeatMode repeat = playlist_manager_ && playlist_manager_->active()
                                                  ? playlist_manager_->active()->repeat_mode()
@@ -616,12 +636,12 @@ void Player::HandleEngineError(const std::string &error) {
   const int rows = playlist_manager_ && playlist_manager_->active() ? playlist_manager_->active()->row_count() : 0;
   ++error_count_;
   if (PlayerErrorLoop::ShouldStopAutoAdvance(repeat, error_count_, rows) ||
-      PlaylistBehaviour::ShouldStopAfterError(continue_on_error_, error_count_, rows)) {
+      PlaylistBehaviour::ShouldStopAfterError(true, error_count_, rows)) {
     error_count_ = 0;
     Stop();
     return;
   }
-  Next();
+  Advance(GstEngine::Auto);
 }
 
 void Player::PreloadNext() {
@@ -681,6 +701,7 @@ void Player::HandleEngineState(EngineBase::State state) {
       Paused.Emit();
       break;
     case GstEngine::State::Empty:
+    case GstEngine::State::Error:
       Stopped.Emit();
       break;
     default:

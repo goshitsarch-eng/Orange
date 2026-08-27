@@ -62,7 +62,7 @@ class GstEnginePipeline {
   std::function<void(int)> AboutToFinish;
   std::function<void(int)> EosReached;
   std::function<void(int)> StreamStarted;
-  std::function<void(int, const std::string &)> ErrorOccurred;
+  std::function<void(int, int, int, const std::string &)> ErrorOccurred;
   std::function<void(int, const std::vector<int16_t> &)> SpectrumReady;
   std::function<void(int, const Song &)> TagsReady;
   std::function<void(int, int)> Buffering;

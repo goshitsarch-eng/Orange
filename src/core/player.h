@@ -108,6 +108,9 @@ class Player : public PlayerInterface {
   int intro_generation_ = 0;
 
   void HandleEngineError(const std::string &error);
+  void HandleFatalError();
+  void HandleInvalidSongRequested(const std::string &url);
+  void HandleValidSongRequested(const std::string &url);
   void HandleEngineMetadata(const Song &song);
   void HandleLoadResult(const UrlHandler::LoadResult &result);
   void StartEnginePlayback(bool pause, int track_change_flags, uint64_t offset_nanosec);
