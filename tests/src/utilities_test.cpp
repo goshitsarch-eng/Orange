@@ -10,6 +10,7 @@
 #include "collection/groupbydialoglabels.h"
 #include "core/oauthpkce.h"
 #include "core/oauthenticator.h"
+#include "engine/ebur128normalization.h"
 #include "device/cddahelpers.h"
 #include "device/cddadiscchange.h"
 #include "device/cddasongloader.h"
@@ -1365,6 +1366,17 @@ TEST(Chromaprinter, EmptyUrlReportsError) {
 
 TEST(EBUR128Analysis, EmptySongIsNullopt) {
   EXPECT_FALSE(EBUR128Analysis::Compute(Song()).has_value());
+}
+
+TEST(Ebur128Normalization, GainDbMatchesQtFormula) {
+  EXPECT_DOUBLE_EQ(-11.0, Ebur128Normalization::GainDbFromLufs(-12.0, -23.0));
+  EXPECT_DOUBLE_EQ(0.0, Ebur128Normalization::EffectiveGainDb(true, -23.0, -23.0));
+  EXPECT_DOUBLE_EQ(-11.0, Ebur128Normalization::EffectiveGainDb(true, -12.0, -23.0));
+  EXPECT_DOUBLE_EQ(0.0, Ebur128Normalization::EffectiveGainDb(false, -12.0, -23.0));
+  EXPECT_FALSE(Ebur128Normalization::NormalizingGainDb(true, std::nullopt, -23.0));
+  EXPECT_FALSE(Ebur128Normalization::NormalizingGainDb(false, -14.0, -23.0));
+  EXPECT_NEAR(0.354813, Ebur128Normalization::VolumeMultiplierFromGainDb(-9.0), 1e-5);
+  EXPECT_NEAR(0.281838, Ebur128Normalization::VolumeMultiplierFromGainDb(-11.0), 1e-5);
 }
 
 TEST(MoodbarBuilder, FromPcm) {

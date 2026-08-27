@@ -1,6 +1,7 @@
 #include "engine/gstenginepipeline.h"
 
 #include "engine/enginebuffering.h"
+#include "engine/ebur128normalization.h"
 #include "core/logging.h"
 #include "engine/backendoptions.h"
 #include "utilities/audioanalysis.h"
@@ -23,6 +24,7 @@ GstEnginePipeline::~GstEnginePipeline() {
     playbin_ = nullptr;
     audioqueue_ = nullptr;
     volume_ = nullptr;
+    volume_ebur128_ = nullptr;
     equalizer_ = nullptr;
     panorama_ = nullptr;
   }
@@ -93,6 +95,7 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
     equalizer_ = gst_element_factory_make("equalizer-10bands", "equalizer");
     GstElement *rgvolume = replaygain ? gst_element_factory_make("rgvolume", "rgvolume") : nullptr;
     GstElement *rglimiter = replaygain ? gst_element_factory_make("rglimiter", "rglimiter") : nullptr;
+    volume_ebur128_ = extras.ebur128_loudness_normalization ? gst_element_factory_make("volume", "ebur128_volume") : nullptr;
     panorama_ = gst_element_factory_make("audiopanorama", "panorama");
     GstElement *panorama = panorama_;
     GstElement *bs2b = extras.bs2b ? gst_element_factory_make("bs2b", "bs2b") : nullptr;
@@ -123,13 +126,22 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
     add(equalizer_);
     add(rgvolume);
     add(rglimiter);
+    add(volume_ebur128_);
     add(panorama);
     add(bs2b);
     add(spectrum);
     add(capsfilter);
     add(sink);
     for (size_t i = 0; i + 1 < chain.size(); ++i) {
-      gst_element_link(chain[i], chain[i + 1]);
+      if (chain[i + 1] == volume_ebur128_) {
+        GstCaps *fp_caps = gst_caps_from_string("audio/x-raw, format = (string) { F32LE, F64LE }");
+        if (!gst_element_link_filtered(chain[i], chain[i + 1], fp_caps)) {
+          gst_element_link(chain[i], chain[i + 1]);
+        }
+        gst_caps_unref(fp_caps);
+      } else {
+        gst_element_link(chain[i], chain[i + 1]);
+      }
     }
     GstElement *head = chain.empty() ? sink : chain.front();
     if (rgvolume) {
@@ -141,6 +153,9 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
     }
     if (panorama) {
       g_object_set(panorama, "panorama", stereo_balance, nullptr);
+    }
+    if (volume_ebur128_) {
+      g_object_set(volume_ebur128_, "volume", Ebur128Normalization::VolumeMultiplierFromGainDb(extras.ebur128_gain_db), nullptr);
     }
     GstPad *pad = gst_element_get_static_pad(head, "sink");
     GstPad *ghost = gst_ghost_pad_new("sink", pad);
@@ -236,6 +251,12 @@ void GstEnginePipeline::SetVolume(double fraction) {
     g_object_set(volume_, "volume", fraction, nullptr);
   } else if (playbin_) {
     g_object_set(playbin_, "volume", fraction, nullptr);
+  }
+}
+
+void GstEnginePipeline::SetEbur128GainDb(double gain_db) {
+  if (volume_ebur128_) {
+    g_object_set(volume_ebur128_, "volume", Ebur128Normalization::VolumeMultiplierFromGainDb(gain_db), nullptr);
   }
 }
 

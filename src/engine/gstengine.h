@@ -81,7 +81,7 @@ class GstEngine : public EngineBase {
 
  private:
   std::unique_ptr<GstEnginePipeline> CreatePipeline(const std::string &url, uint64_t beginning_offset_nanosec,
-                                                    int64_t end_offset_nanosec);
+                                                    int64_t end_offset_nanosec, double ebur128_gain_db = 0.0);
   void WirePipeline(GstEnginePipeline *pipeline);
   void FinishCrossfade();
   void DiscardNext();
@@ -119,6 +119,10 @@ class GstEngine : public EngineBase {
   double replaygain_preamp_ = 0.0;
   double replaygain_fallback_ = 0.0;
   bool replaygain_compression_ = true;
+  bool ebur128_loudness_normalization_ = false;
+  double ebur128_target_level_lufs_ = -23.0;
+  double ebur128_loudness_normalizing_gain_db_ = 0.0;
+  double next_ebur128_gain_db_ = 0.0;
   float stereo_balance_ = 0.0f;
   int eq_preamp_ = 0;
   std::vector<int> eq_gains_ = std::vector<int>(10, 0);

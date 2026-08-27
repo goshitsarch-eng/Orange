@@ -3,6 +3,7 @@
 #include "core/enginemetadata.h"
 #include "core/taskmanager.h"
 #include "engine/enginebuffering.h"
+#include "engine/ebur128normalization.h"
 #include "engine/enginediscoverer.h"
 #include "engine/gstengineerror.h"
 #include "constants/backendsettings.h"
@@ -91,6 +92,10 @@ void GstEngine::ReloadBackendOptions() {
   device_warmup_ms_ = settings.IntValue(BackendSettings::kDeviceWarmupDuration, BackendSettings::kDefaultDeviceWarmupDuration);
   replaygain_fallback_ = settings.DoubleValue(BackendSettings::kRgFallbackGain, BackendSettings::kDefaultRgFallbackGain);
   replaygain_compression_ = settings.BoolValue(BackendSettings::kRgCompression, BackendSettings::kDefaultRgCompression);
+  ebur128_loudness_normalization_ =
+      settings.BoolValue(BackendSettings::kEBUR128LoudnessNormalization, BackendSettings::kDefaultEBUR128LoudnessNormalization);
+  ebur128_target_level_lufs_ =
+      settings.DoubleValue(BackendSettings::kEBUR128TargetLevelLUFS, BackendSettings::kDefaultEBUR128TargetLevelLUFS);
   setenv("SOUP_FORCE_HTTP1", BackendOptions::SoupForceHttp1(http2_enabled_), 1);
   NetworkProxyFactory proxy;
   proxy.ReloadSettings();
@@ -143,14 +148,18 @@ GstPipelineExtras GstEngine::PipelineExtras() const {
   extras.buffer_high_watermark = buffer_high_watermark_;
   extras.device_warmup_ms = BackendOptions::WarmupMs(!current_, static_cast<int>(device_warmup_ms_));
   extras.spotify_access_token = spotify_access_token_;
+  extras.ebur128_loudness_normalization = ebur128_loudness_normalization_;
+  extras.ebur128_gain_db = ebur128_loudness_normalizing_gain_db_;
   return extras;
 }
 
 std::unique_ptr<GstEnginePipeline> GstEngine::CreatePipeline(const std::string &url, uint64_t beginning_offset_nanosec,
-                                                             int64_t end_offset_nanosec) {
+                                                             int64_t end_offset_nanosec, double ebur128_gain_db) {
+  GstPipelineExtras extras = PipelineExtras();
+  extras.ebur128_gain_db = ebur128_gain_db;
   auto pipeline = std::make_unique<GstEnginePipeline>(next_pipeline_id_++);
   if (!pipeline->Create(url, output_, device_, beginning_offset_nanosec, end_offset_nanosec, replaygain_enabled_, replaygain_mode_,
-                        replaygain_preamp_, stereo_balance_, playbin3_, PipelineExtras())) {
+                        replaygain_preamp_, stereo_balance_, playbin3_, extras)) {
     return nullptr;
   }
   pipeline->SetEqualizer(eq_enabled_ ? eq_preamp_ : 0, eq_enabled_ ? eq_gains_ : std::vector<int>(10, 0));
@@ -204,8 +213,10 @@ void GstEngine::StartPreloading(const std::string &media_url, const std::string 
 }
 
 bool GstEngine::Load(const std::string &media_url, const std::string &stream_url, int track_change_flags, bool, uint64_t beginning_offset_nanosec,
-                     int64_t end_offset_nanosec, std::optional<double>) {
+                     int64_t end_offset_nanosec, std::optional<double> ebur128_lufs) {
   const std::string url = EngineDiscoverer::PlayUrl(media_url, stream_url);
+  ebur128_loudness_normalizing_gain_db_ =
+      Ebur128Normalization::EffectiveGainDb(ebur128_loudness_normalization_, ebur128_lufs, ebur128_target_level_lufs_);
   const bool auto_change = (track_change_flags & Auto) != 0;
   const bool same_album = (track_change_flags & SameAlbum) != 0;
   const bool auto_crossfade = BackendOptions::AllowAutoCrossfade(autocrossfade_enabled_, no_crossfade_same_album_, current_album_,
@@ -219,6 +230,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
     DiscardNext();
     next_media_url_ = media_url;
     next_url_ = url;
+    next_ebur128_gain_db_ = ebur128_loudness_normalizing_gain_db_;
     current_->SetNextUri(url);
     gapless_pending_ = true;
     RequestDiscover(media_url, url);
@@ -227,12 +239,13 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
 
   if (crossfade) {
     if (next_ && next_->valid() && next_url_ == url) {
+      next_->SetEbur128GainDb(ebur128_loudness_normalizing_gain_db_);
       return true;
     }
     DiscardNext();
     next_media_url_ = media_url;
     next_url_ = url;
-    next_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec);
+    next_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec, ebur128_loudness_normalizing_gain_db_);
     if (!next_) {
       Error.Emit("Could not create next playbin");
       return false;
@@ -247,7 +260,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   current_.reset();
   media_url_ = media_url;
   stream_url_ = url;
-  current_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec);
+  current_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec, ebur128_loudness_normalizing_gain_db_);
   if (!current_) {
     Error.Emit("Could not create playbin");
     SetState(State::Error);
@@ -463,6 +476,10 @@ void GstEngine::OnEos(int pipeline_id) {
       stream_url_ = next_url_;
       next_media_url_.clear();
       next_url_.clear();
+      ebur128_loudness_normalizing_gain_db_ = next_ebur128_gain_db_;
+      if (current_) {
+        current_->SetEbur128GainDb(next_ebur128_gain_db_);
+      }
       gapless_pending_ = false;
       return;
     }
