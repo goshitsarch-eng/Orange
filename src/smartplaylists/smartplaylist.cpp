@@ -45,6 +45,18 @@ std::string FieldText(const Song &song, SmartPlaylistField field) {
       return song.mood();
     case SmartPlaylistField::InitialKey:
       return song.initial_key();
+    case SmartPlaylistField::ArtistSort:
+      return song.artistsort();
+    case SmartPlaylistField::AlbumArtistSort:
+      return song.albumartistsort();
+    case SmartPlaylistField::AlbumSort:
+      return song.albumsort();
+    case SmartPlaylistField::ComposerSort:
+      return song.composersort();
+    case SmartPlaylistField::PerformerSort:
+      return song.performersort();
+    case SmartPlaylistField::TitleSort:
+      return song.titlesort();
     default:
       return {};
   }
@@ -359,7 +371,8 @@ std::vector<std::string> SmartPlaylistSearch::FieldNames() {
           "Rating",    "Play count",    "Skip count", "Length",       "Bitrate",  "Date created", "Last played",
           "Track",     "Disc",          "Original year", "Performer", "Grouping", "Comment",    "File path",
           "File type", "File size",     "Date modified", "Sample rate", "Bit depth", "BPM",     "Mood",
-          "Initial key"};
+          "Initial key", "Artist sort", "Album artist sort", "Album sort", "Composer sort", "Performer sort",
+          "Title sort"};
 }
 
 std::vector<std::string> SmartPlaylistSearch::OpNames() {

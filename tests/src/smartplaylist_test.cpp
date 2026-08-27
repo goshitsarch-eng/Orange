@@ -206,10 +206,10 @@ TEST(SmartPlaylistSummary, DescribesTermsLimitAndEmpty) {
 
 TEST(SmartPlaylist, FieldAndOpIndex) {
   EXPECT_EQ(SmartPlaylistField::Title, SmartPlaylistSearch::FieldFromIndex(0));
-  EXPECT_EQ(SmartPlaylistField::InitialKey, SmartPlaylistSearch::FieldFromIndex(static_cast<int>(SmartPlaylistSearch::FieldNames().size()) - 1));
+  EXPECT_EQ(SmartPlaylistField::TitleSort, SmartPlaylistSearch::FieldFromIndex(static_cast<int>(SmartPlaylistSearch::FieldNames().size()) - 1));
   EXPECT_EQ(SmartPlaylistOp::Contains, SmartPlaylistSearch::OpFromIndex(0));
   EXPECT_EQ(SmartPlaylistOp::RelativeRange, SmartPlaylistSearch::OpFromIndex(static_cast<int>(SmartPlaylistSearch::OpNames().size()) - 1));
-  EXPECT_EQ(SmartPlaylistSearch::FieldNames().size(), 29u);
+  EXPECT_EQ(SmartPlaylistSearch::FieldNames().size(), 35u);
   EXPECT_EQ(SmartPlaylistSearch::OpNames().size(), 14u);
   EXPECT_EQ(SmartPlaylistFieldKind::Date, SmartPlaylistSearch::KindOf(SmartPlaylistField::LastPlayed));
   EXPECT_EQ(SmartPlaylistFieldKind::Number, SmartPlaylistSearch::KindOf(SmartPlaylistField::Year));
@@ -219,6 +219,31 @@ TEST(SmartPlaylist, FieldAndOpIndex) {
   EXPECT_NE(date_ops.end(), std::find(date_ops.begin(), date_ops.end(), SmartPlaylistOp::RelativeDate));
   EXPECT_NE(date_ops.end(), std::find(date_ops.begin(), date_ops.end(), SmartPlaylistOp::NumericDateNot));
   EXPECT_NE(date_ops.end(), std::find(date_ops.begin(), date_ops.end(), SmartPlaylistOp::RelativeRange));
+}
+
+TEST(SmartPlaylist, SortFieldsMatchQt) {
+  EXPECT_EQ("Artist sort", SmartPlaylistSearch::FieldNames()[static_cast<int>(SmartPlaylistField::ArtistSort)]);
+  EXPECT_EQ("Album artist sort", SmartPlaylistSearch::FieldNames()[static_cast<int>(SmartPlaylistField::AlbumArtistSort)]);
+  EXPECT_EQ("Album sort", SmartPlaylistSearch::FieldNames()[static_cast<int>(SmartPlaylistField::AlbumSort)]);
+  EXPECT_EQ("Composer sort", SmartPlaylistSearch::FieldNames()[static_cast<int>(SmartPlaylistField::ComposerSort)]);
+  EXPECT_EQ("Performer sort", SmartPlaylistSearch::FieldNames()[static_cast<int>(SmartPlaylistField::PerformerSort)]);
+  EXPECT_EQ("Title sort", SmartPlaylistSearch::FieldNames()[static_cast<int>(SmartPlaylistField::TitleSort)]);
+  EXPECT_EQ(SmartPlaylistFieldKind::Text, SmartPlaylistSearch::KindOf(SmartPlaylistField::ArtistSort));
+  EXPECT_EQ(SmartPlaylistFieldKind::Text, SmartPlaylistSearch::KindOf(SmartPlaylistField::TitleSort));
+  Song song;
+  song.set_artistsort("Beatles, The");
+  song.set_titlesort("Help!");
+  song.set_albumsort("Help! (Album)");
+  SmartPlaylistTerm artist_sort{SmartPlaylistField::ArtistSort, SmartPlaylistOp::Contains, "Beatles"};
+  EXPECT_TRUE(artist_sort.Matches(song));
+  SmartPlaylistTerm title_sort{SmartPlaylistField::TitleSort, SmartPlaylistOp::Equals, "Help!"};
+  EXPECT_TRUE(title_sort.Matches(song));
+  SmartPlaylistSearch search;
+  search.terms.push_back(artist_sort);
+  search.sort_field = SmartPlaylistField::TitleSort;
+  const auto results = search.Search({song});
+  ASSERT_EQ(1u, results.size());
+  EXPECT_EQ("Help!", results.front().titlesort());
 }
 
 TEST(SmartPlaylist, DateAndLengthOperators) {

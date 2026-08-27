@@ -39,7 +39,13 @@ enum class SmartPlaylistField {
   Bitdepth,
   BPM,
   Mood,
-  InitialKey
+  InitialKey,
+  ArtistSort,
+  AlbumArtistSort,
+  AlbumSort,
+  ComposerSort,
+  PerformerSort,
+  TitleSort
 };
 
 enum class SmartPlaylistOp {
