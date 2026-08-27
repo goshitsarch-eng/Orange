@@ -1,6 +1,7 @@
 #include "collection/collectionview.h"
 
 #include "collection/collectionautoopen.h"
+#include "collection/collectioncontextmenu.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionempty.h"
 #include "collection/collectionfilterkeyboard.h"
@@ -73,9 +74,10 @@ CollectionView::CollectionView() {
 
   GtkEventController *keys = gtk_event_controller_key_new();
   gtk_widget_add_controller(list_, keys);
-  g_signal_connect(keys, "key-pressed", G_CALLBACK(+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<CollectionView *>(data)->OnKeyPressed(keyval);
-                   }),
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<CollectionView *>(data)->OnKeyPressed(keyval, state);
+                   })),
                    this);
 }
 
@@ -538,7 +540,13 @@ bool CollectionView::ApplyTreeLeft() {
   return true;
 }
 
-gboolean CollectionView::OnKeyPressed(guint keyval) {
+gboolean CollectionView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (CollectionContextMenu::IsTrigger(keyval, static_cast<unsigned>(state))) {
+    if (menu_ && CollectionContextMenu::ShouldShowMenu(SelectedItem() != nullptr)) {
+      menu_(0, -1);
+    }
+    return TRUE;
+  }
   if (CollectionFilterKeyboard::FromTreeKey(keyval) == CollectionFilterKeyboard::Action::FocusFilter) {
     ResetTypeAhead();
     if (focus_filter_) {

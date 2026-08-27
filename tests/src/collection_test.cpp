@@ -56,6 +56,7 @@
 #include "collection/collectionfilterchoices.h"
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectiongroupingsave.h"
+#include "collection/collectioncontextmenu.h"
 #include "collection/collectionmenu.h"
 #include "collection/collectionkeyboard.h"
 #include "collection/collectionchangenotify.h"
@@ -1286,6 +1287,15 @@ TEST(CollectionTreeLeft, CollapseOrJumpToParent) {
   EXPECT_EQ(album, CollectionTreeLeft::CollapseItem(song, CollectionTreeLeft::Action::SelectParentAndCollapse, true));
   EXPECT_EQ(nullptr, CollectionTreeLeft::CollapseItem(song, CollectionTreeLeft::Action::SelectParentAndCollapse, false));
   EXPECT_EQ(album, CollectionTreeLeft::CollapseItem(album, CollectionTreeLeft::Action::CollapseCurrent, true));
+}
+
+TEST(CollectionContextMenu, KeyboardTriggerAndSelectionGate) {
+  EXPECT_TRUE(CollectionContextMenu::IsTrigger(CollectionContextMenu::kMenu, 0));
+  EXPECT_TRUE(CollectionContextMenu::IsTrigger(CollectionContextMenu::kF10, CollectionContextMenu::kShiftMask));
+  EXPECT_FALSE(CollectionContextMenu::IsTrigger(CollectionContextMenu::kF10, 0));
+  EXPECT_FALSE(CollectionContextMenu::IsTrigger(ListBoxKeyboard::kReturn, 0));
+  EXPECT_FALSE(CollectionContextMenu::ShouldShowMenu(false));
+  EXPECT_TRUE(CollectionContextMenu::ShouldShowMenu(true));
 }
 
 TEST(CollectionMenu, CatalogAndEmptySelection) {

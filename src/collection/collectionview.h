@@ -68,7 +68,7 @@ class CollectionView {
   void TypeAhead(gunichar ch);
   void ResetTypeAhead();
   void ScrollRowToTop(GtkWidget *row);
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
   bool ApplyTreeLeft();
   void ActivateRow(GtkListBoxRow *row);
   void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
