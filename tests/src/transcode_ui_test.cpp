@@ -6,9 +6,11 @@
 #include "transcoder/transcodelog.h"
 #include "transcoder/transcodequality.h"
 #include "transcoder/transcoder.h"
+#include "transcoder/transcoderprogress.h"
 
 #include <gtest/gtest.h>
 
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -131,10 +133,45 @@ TEST(Transcoder, CancelClearsQueuedJobs) {
   song.set_url("file:///tmp/roads.flac");
   transcoder.AddJob(song, "/tmp/roads.mp3", Transcoder::Format::MP3);
   EXPECT_EQ(1, transcoder.job_count());
+  EXPECT_EQ(0, transcoder.current_job_count());
+  EXPECT_TRUE(transcoder.GetProgress().empty());
+  EXPECT_GE(transcoder.max_threads(), 1);
   EXPECT_FALSE(transcoder.cancelled());
+  EXPECT_TRUE(TranscoderProgress::ShouldStartNextJob(transcoder.current_job_count(), transcoder.job_count(), transcoder.max_threads()));
   transcoder.Cancel();
   EXPECT_EQ(0, transcoder.job_count());
+  EXPECT_EQ(0, transcoder.current_job_count());
   EXPECT_TRUE(transcoder.cancelled());
   EXPECT_EQ(0, transcoder.finished_success());
   EXPECT_EQ(0, transcoder.finished_failed());
+  EXPECT_TRUE(transcoder.GetProgress().empty());
+  EXPECT_FALSE(TranscoderProgress::ShouldStartNextJob(transcoder.current_job_count(), transcoder.job_count(), transcoder.max_threads()));
+  EXPECT_TRUE(TranscoderProgress::AllIdle(transcoder.current_job_count(), transcoder.job_count()));
+}
+
+TEST(TranscoderProgress, FractionStartNextAndRemaining) {
+  EXPECT_EQ(500, TranscoderProgress::kProgressIntervalMs);
+  EXPECT_FLOAT_EQ(0.0f, TranscoderProgress::FractionFromPosition(0, 0));
+  EXPECT_FLOAT_EQ(0.0f, TranscoderProgress::FractionFromPosition(-1, 1000));
+  EXPECT_FLOAT_EQ(0.0f, TranscoderProgress::FractionFromPosition(0, 1000));
+  EXPECT_FLOAT_EQ(0.5f, TranscoderProgress::FractionFromPosition(500, 1000));
+  EXPECT_FLOAT_EQ(1.0f, TranscoderProgress::FractionFromPosition(1000, 1000));
+  EXPECT_FLOAT_EQ(1.0f, TranscoderProgress::FractionFromPosition(1500, 1000));
+  EXPECT_TRUE(TranscoderProgress::ShouldStartNextJob(0, 1, 4));
+  EXPECT_FALSE(TranscoderProgress::ShouldStartNextJob(4, 1, 4));
+  EXPECT_FALSE(TranscoderProgress::ShouldStartNextJob(0, 0, 4));
+  EXPECT_FALSE(TranscoderProgress::ShouldStartNextJob(0, 1, 0));
+  EXPECT_TRUE(TranscoderProgress::AllIdle(0, 0));
+  EXPECT_FALSE(TranscoderProgress::AllIdle(1, 0));
+  EXPECT_FALSE(TranscoderProgress::AllIdle(0, 1));
+  EXPECT_EQ(1, TranscoderProgress::ClampMaxThreads(0));
+  EXPECT_EQ(1, TranscoderProgress::ClampMaxThreads(-3));
+  EXPECT_EQ(8, TranscoderProgress::ClampMaxThreads(8));
+  EXPECT_EQ(2, TranscoderProgress::Remaining(4, 1, 1));
+  EXPECT_EQ(0, TranscoderProgress::Remaining(2, 1, 1));
+  EXPECT_EQ(0, TranscoderProgress::Remaining(1, 1, 1));
+  const std::map<std::string, float> progress = {{"/tmp/a.flac", 0.25f}, {"/tmp/b.flac", 0.5f}};
+  const std::vector<float> fractions = TranscoderProgress::FractionsFromProgress(progress);
+  EXPECT_EQ(2u, fractions.size());
+  EXPECT_EQ(150, TranscodeUi::ProgressBarValue(1, 0, 2, {0.5f}));
 }

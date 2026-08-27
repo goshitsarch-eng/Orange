@@ -8,6 +8,7 @@
 #include "transcoder/transcodelog.h"
 #include "transcoder/transcodelogdialog.h"
 #include "transcoder/transcoder.h"
+#include "transcoder/transcoderprogress.h"
 #include "transcoder/transcoderoptionsdialog.h"
 #include "translations/translations.h"
 #include "utilities/filefilters.h"
@@ -53,14 +54,61 @@ struct State {
   int remaining = 0;
   int success = 0;
   int failed = 0;
+  int batch_total = 0;
+  guint progress_timer = 0;
 
-  ~State() { *alive = false; }
+  ~State();
 };
 
 struct ChooserJob {
   std::shared_ptr<bool> alive;
   State *state = nullptr;
 };
+
+struct ProgressTick {
+  std::shared_ptr<bool> alive;
+  State *state = nullptr;
+};
+
+void UpdateProgress(State *state);
+
+void StopProgressTimer(State *state) {
+  if (!state || state->progress_timer == 0) {
+    return;
+  }
+  g_source_remove(state->progress_timer);
+  state->progress_timer = 0;
+}
+
+gboolean OnProgressTick(gpointer data) {
+  auto *tick = static_cast<ProgressTick *>(data);
+  if (!*tick->alive || !tick->state) {
+    return G_SOURCE_REMOVE;
+  }
+  UpdateProgress(tick->state);
+  return G_SOURCE_CONTINUE;
+}
+
+void StartProgressTimer(State *state) {
+  if (!state || state->progress_timer != 0) {
+    return;
+  }
+  state->progress_timer = g_timeout_add_full(G_PRIORITY_DEFAULT, TranscoderProgress::kProgressIntervalMs, OnProgressTick, new ProgressTick{state->alive, state},
+                                             +[](gpointer p) { delete static_cast<ProgressTick *>(p); });
+}
+
+State::~State() {
+  *alive = false;
+  StopProgressTimer(this);
+  if (working && app && app->transcoder()) {
+    app->transcoder()->Cancel();
+    app->transcoder()->Progress.Clear();
+    app->transcoder()->Finished.Clear();
+    app->transcoder()->AllJobsComplete.Clear();
+    app->transcoder()->JobComplete.Clear();
+    app->transcoder()->LogLine.Clear();
+  }
+}
 
 void SyncQualitySpin(State *state) {
   if (!state || !state->formats || !state->quality) {
@@ -102,6 +150,11 @@ void SetWorking(State *state, bool working) {
     return;
   }
   state->working = working;
+  if (working) {
+    StartProgressTimer(state);
+  } else {
+    StopProgressTimer(state);
+  }
   const gboolean sensitive = working ? FALSE : TRUE;
   if (state->start) {
     gtk_widget_set_visible(state->start, TranscodeUi::ShouldShowCancel(working) ? FALSE : TRUE);
@@ -142,8 +195,16 @@ void UpdateProgress(State *state) {
   if (!state) {
     return;
   }
-  const int total = state->remaining + state->success + state->failed;
-  const int value = TranscodeUi::ProgressBarValue(state->success, state->failed, total, {});
+  std::vector<float> fractions;
+  if (state->app && state->app->transcoder()) {
+    Transcoder *transcoder = state->app->transcoder();
+    state->success = transcoder->finished_success();
+    state->failed = transcoder->finished_failed();
+    state->remaining = TranscoderProgress::Remaining(state->batch_total, state->success, state->failed);
+    fractions = TranscoderProgress::FractionsFromProgress(transcoder->GetProgress());
+  }
+  const int total = state->batch_total;
+  const int value = TranscodeUi::ProgressBarValue(state->success, state->failed, total, fractions);
   if (state->progress) {
     gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(state->progress), TranscodeUi::ProgressFraction(value, total));
   }
@@ -224,6 +285,8 @@ void StartJobs(State *state) {
   transcoder->Cancel();
   transcoder->Progress.Clear();
   transcoder->Finished.Clear();
+  transcoder->AllJobsComplete.Clear();
+  transcoder->JobComplete.Clear();
   transcoder->LogLine.Clear();
   const auto format = static_cast<Transcoder::Format>(gtk_drop_down_get_selected(GTK_DROP_DOWN(state->formats)));
   const std::string dest_dir = SelectedDest(state);
@@ -250,7 +313,8 @@ void StartJobs(State *state) {
     g_mkdir_with_parents(FileUtils::DirName(output).c_str(), 0755);
     transcoder->AddJob(song, output, format);
   }
-  state->remaining = transcoder->job_count();
+  state->batch_total = transcoder->job_count();
+  state->remaining = state->batch_total;
   state->success = 0;
   state->failed = 0;
   if (state->remaining <= 0) {
@@ -260,14 +324,33 @@ void StartJobs(State *state) {
     return;
   }
   const std::shared_ptr<bool> alive = state->alive;
-  transcoder->Progress.Connect([alive, state, transcoder](int done, int total) {
+  transcoder->Progress.Connect([alive, state](int, int) {
     if (!*alive) {
       return;
     }
-    state->success = transcoder->finished_success();
-    state->failed = transcoder->finished_failed();
-    state->remaining = std::max(0, total - done);
     UpdateProgress(state);
+  });
+  transcoder->JobComplete.Connect([alive, state](const std::string &, const std::string &, bool) {
+    if (!*alive) {
+      return;
+    }
+    UpdateProgress(state);
+  });
+  transcoder->AllJobsComplete.Connect([alive, state]() {
+    if (!*alive) {
+      return;
+    }
+    UpdateProgress(state);
+    SetWorking(state, false);
+    RefreshLogView(state);
+  });
+  transcoder->Finished.Connect([alive, state]() {
+    if (!*alive) {
+      return;
+    }
+    UpdateProgress(state);
+    SetWorking(state, false);
+    RefreshLogView(state);
   });
   transcoder->LogLine.Connect([alive, state](const std::string &line) {
     if (!*alive) {
@@ -279,20 +362,6 @@ void StartJobs(State *state) {
   SetWorking(state, true);
   UpdateProgress(state);
   transcoder->Start();
-  if (*alive) {
-    state->success = transcoder->finished_success();
-    state->failed = transcoder->finished_failed();
-    state->remaining = 0;
-    UpdateProgress(state);
-    SetWorking(state, false);
-    if (state->log) {
-      gtk_label_set_text(GTK_LABEL(state->log), TranscodeLog::LastLine(state->log_lines).c_str());
-    }
-    RefreshLogView(state);
-  }
-  transcoder->Progress.Clear();
-  transcoder->Finished.Clear();
-  transcoder->LogLine.Clear();
 }
 
 void OpenAddFiles(State *state) {
@@ -603,12 +672,14 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
                    }),
                    state);
   g_signal_connect(state->start, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { StartJobs(static_cast<State *>(data)); }), state);
-  g_signal_connect(state->cancel, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+  g_signal_connect(state->cancel, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<State *>(data);
                      if (self->app && self->app->transcoder()) {
                        self->app->transcoder()->Cancel();
                      }
-                   }),
+                     SetWorking(self, false);
+                     UpdateProgress(self);
+                   })),
                    state);
 
   adw_dialog_set_child(dialog, box);

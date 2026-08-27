@@ -4,13 +4,28 @@
 #include "transcoder/transcodergstproperties.h"
 #include "transcoder/transcoderoptionsdialog.h"
 #include "transcoder/transcoderoptionsinterface.h"
+#include "transcoder/transcoderprogress.h"
 #include "utilities/fileutils.h"
 
+#include <glib.h>
 #include <gst/gst.h>
+
+#include <algorithm>
+
+Transcoder::Transcoder() {
+  max_threads_ = TranscoderProgress::ClampMaxThreads(static_cast<int>(g_get_num_processors()));
+}
+
+Transcoder::~Transcoder() {
+  *alive_ = false;
+  Cancel();
+}
 
 void Transcoder::AddJob(const Song &song, const std::string &destination, Format format) {
   jobs_.push_back({song, destination, format});
 }
+
+void Transcoder::set_max_threads(int count) { max_threads_ = TranscoderProgress::ClampMaxThreads(count); }
 
 Transcoder::Preset Transcoder::PresetFor(Format format) {
   switch (format) {
@@ -43,27 +58,31 @@ std::string Transcoder::PipelineFor(Format format, int quality) {
   return options->PipelineFragment();
 }
 
-bool Transcoder::TranscodeFile(const Song &song, const std::string &destination, Format format) {
-  const std::string src = FileUtils::PathFromUri(song.url());
+std::string Transcoder::JobInput(const Job &job) { return FileUtils::PathFromUri(job.song.url()); }
+
+GstElement *Transcoder::CreatePipeline(const Job &job, std::string *error) {
+  const std::string src = JobInput(job);
   if (!FileUtils::IsFile(src)) {
-    log_.push_back("Missing source: " + src);
-    LogLine.Emit(log_.back());
-    return false;
-  }
-  FileUtils::WriteFile(destination, {});
-  const std::string fragment = PipelineFor(format, quality_);
-  const std::string desc = "filesrc name=src ! decodebin ! audioconvert ! audioresample ! " + fragment + " ! filesink name=sink";
-  GError *error = nullptr;
-  GstElement *pipeline = gst_parse_launch(desc.c_str(), &error);
-  if (!pipeline) {
-    const std::string message = error ? error->message : "Could not create transcoder pipeline";
     if (error) {
-      g_error_free(error);
+      *error = "Missing source: " + src;
     }
-    log_.push_back(message + " (" + fragment + ")");
-    LogLine.Emit(log_.back());
-    FileUtils::Remove(destination);
-    return false;
+    return nullptr;
+  }
+  FileUtils::WriteFile(job.destination, {});
+  const std::string fragment = PipelineFor(job.format, quality_);
+  const std::string desc = "filesrc name=src ! decodebin ! audioconvert ! audioresample ! " + fragment + " ! filesink name=sink";
+  GError *gst_error = nullptr;
+  GstElement *pipeline = gst_parse_launch(desc.c_str(), &gst_error);
+  if (!pipeline) {
+    const std::string message = gst_error ? gst_error->message : "Could not create transcoder pipeline";
+    if (gst_error) {
+      g_error_free(gst_error);
+    }
+    if (error) {
+      *error = message + " (" + fragment + ")";
+    }
+    FileUtils::Remove(job.destination);
+    return nullptr;
   }
   GstElement *src_el = gst_bin_get_by_name(GST_BIN(pipeline), "src");
   GstElement *sink_el = gst_bin_get_by_name(GST_BIN(pipeline), "sink");
@@ -72,11 +91,23 @@ bool Transcoder::TranscodeFile(const Song &song, const std::string &destination,
     gst_object_unref(src_el);
   }
   if (sink_el) {
-    g_object_set(sink_el, "location", destination.c_str(), nullptr);
+    g_object_set(sink_el, "location", job.destination.c_str(), nullptr);
     gst_object_unref(sink_el);
   }
-  TranscoderGstProperties::ApplyStoredProperties(pipeline, format);
+  TranscoderGstProperties::ApplyStoredProperties(pipeline, job.format);
   gst_element_set_state(pipeline, GST_STATE_PLAYING);
+  return pipeline;
+}
+
+bool Transcoder::TranscodeFile(const Song &song, const std::string &destination, Format format) {
+  const Job job{song, destination, format};
+  std::string error;
+  GstElement *pipeline = CreatePipeline(job, &error);
+  if (!pipeline) {
+    log_.push_back(error.empty() ? "Transcode failed" : error);
+    LogLine.Emit(log_.back());
+    return false;
+  }
   GstBus *bus = gst_element_get_bus(pipeline);
   bool ok = false;
   int idle = 0;
@@ -85,14 +116,13 @@ bool Transcoder::TranscodeFile(const Song &song, const std::string &destination,
       log_.push_back("Cancelled");
       break;
     }
-    GstMessage *message = gst_bus_timed_pop_filtered(bus, 100 * GST_MSECOND,
-                                                     static_cast<GstMessageType>(GST_MESSAGE_EOS | GST_MESSAGE_ERROR));
+    GstMessage *message = gst_bus_timed_pop_filtered(bus, 100 * GST_MSECOND, static_cast<GstMessageType>(GST_MESSAGE_EOS | GST_MESSAGE_ERROR));
     while (g_main_context_pending(nullptr)) {
       g_main_context_iteration(nullptr, FALSE);
     }
     if (!message) {
       if (++idle >= 300) {
-        log_.push_back("Timed out transcoding " + src);
+        log_.push_back("Timed out transcoding " + JobInput(job));
         break;
       }
       continue;
@@ -128,31 +158,155 @@ void Transcoder::Start() {
   cancelled_ = false;
   finished_success_ = 0;
   finished_failed_ = 0;
-  const int total = static_cast<int>(jobs_.size());
-  int i = 0;
-  while (i < static_cast<int>(jobs_.size())) {
-    if (cancelled_) {
-      break;
+  total_ = static_cast<int>(jobs_.size());
+  log_.push_back("Transcoding " + std::to_string(total_) + " files using " + std::to_string(max_threads_) + " threads");
+  LogLine.Emit(log_.back());
+  PumpJobs();
+}
+
+void Transcoder::PumpJobs() {
+  while (TranscoderProgress::ShouldStartNextJob(static_cast<int>(current_jobs_.size()), static_cast<int>(jobs_.size()), max_threads_)) {
+    const Job job = jobs_.front();
+    jobs_.erase(jobs_.begin());
+    if (StartJob(job)) {
+      continue;
     }
-    const Job job = jobs_[static_cast<size_t>(i)];
-    if (TranscodeFile(job.song, job.destination, job.format)) {
-      ++finished_success_;
-    } else {
-      ++finished_failed_;
+    ++finished_failed_;
+    JobComplete.Emit(JobInput(job), job.destination, false);
+    Progress.Emit(finished_success_ + finished_failed_, total_);
+  }
+  if (TranscoderProgress::AllIdle(static_cast<int>(current_jobs_.size()), static_cast<int>(jobs_.size()))) {
+    Finished.Emit();
+    AllJobsComplete.Emit();
+  }
+}
+
+bool Transcoder::StartJob(const Job &job) {
+  const std::string input = JobInput(job);
+  log_.push_back("Starting " + input);
+  LogLine.Emit(log_.back());
+  std::string error;
+  GstElement *pipeline = CreatePipeline(job, &error);
+  if (!pipeline) {
+    if (!error.empty()) {
+      log_.push_back(error);
+      LogLine.Emit(log_.back());
     }
-    ++i;
-    Progress.Emit(finished_success_ + finished_failed_, total);
-    while (g_main_context_pending(nullptr)) {
-      g_main_context_iteration(nullptr, FALSE);
+    return false;
+  }
+  GstBus *bus = gst_element_get_bus(pipeline);
+  gst_bus_add_watch(bus, Transcoder::BusWatch, this);
+  gst_object_unref(bus);
+  current_jobs_.push_back({job, pipeline});
+  return true;
+}
+
+gboolean Transcoder::BusWatch(GstBus *, GstMessage *msg, gpointer data) {
+  auto *self = static_cast<Transcoder *>(data);
+  const GstMessageType type = GST_MESSAGE_TYPE(msg);
+  if (type != GST_MESSAGE_EOS && type != GST_MESSAGE_ERROR) {
+    return TRUE;
+  }
+  GstObject *obj = GST_MESSAGE_SRC(msg);
+  while (obj && !GST_IS_PIPELINE(obj)) {
+    obj = GST_OBJECT_PARENT(obj);
+  }
+  if (!obj) {
+    return TRUE;
+  }
+  auto *finish = new FinishData();
+  finish->alive = self->alive_;
+  finish->self = self;
+  finish->pipeline = GST_ELEMENT(obj);
+  finish->success = type == GST_MESSAGE_EOS;
+  finish->generation = self->finish_generation_;
+  if (type == GST_MESSAGE_ERROR) {
+    GError *gst_error = nullptr;
+    gst_message_parse_error(msg, &gst_error, nullptr);
+    finish->error = gst_error ? gst_error->message : "Transcode failed";
+    if (gst_error) {
+      g_error_free(gst_error);
     }
   }
-  jobs_.clear();
-  Finished.Emit();
+  g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, Transcoder::FinishIdle, finish, +[](gpointer p) { delete static_cast<FinishData *>(p); });
+  return FALSE;
+}
+
+gboolean Transcoder::FinishIdle(gpointer data) {
+  auto *finish = static_cast<FinishData *>(data);
+  if (*finish->alive && finish->generation == finish->self->finish_generation_) {
+    finish->self->FinishJob(finish->pipeline, finish->success, finish->error);
+  }
+  return G_SOURCE_REMOVE;
+}
+
+void Transcoder::FinishJob(GstElement *pipeline, bool success, const std::string &error) {
+  auto it = std::find_if(current_jobs_.begin(), current_jobs_.end(), [pipeline](const CurrentJob &job) { return job.pipeline == pipeline; });
+  if (it == current_jobs_.end()) {
+    return;
+  }
+  const Job job = it->job;
+  GstBus *bus = gst_element_get_bus(pipeline);
+  if (bus) {
+    gst_bus_remove_watch(bus);
+    gst_object_unref(bus);
+  }
+  gst_element_set_state(pipeline, GST_STATE_NULL);
+  gst_object_unref(pipeline);
+  current_jobs_.erase(it);
+  if (success) {
+    ++finished_success_;
+    log_.push_back("Wrote " + job.destination);
+  } else {
+    ++finished_failed_;
+    FileUtils::Remove(job.destination);
+    log_.push_back(error.empty() ? "Transcode failed" : error);
+  }
+  LogLine.Emit(log_.back());
+  JobComplete.Emit(JobInput(job), job.destination, success);
+  Progress.Emit(finished_success_ + finished_failed_, total_);
+  PumpJobs();
+}
+
+void Transcoder::StopCurrentJobs() {
+  ++finish_generation_;
+  std::vector<CurrentJob> running;
+  running.swap(current_jobs_);
+  for (CurrentJob &job : running) {
+    if (!job.pipeline) {
+      continue;
+    }
+    GstBus *bus = gst_element_get_bus(job.pipeline);
+    if (bus) {
+      gst_bus_remove_watch(bus);
+      gst_object_unref(bus);
+    }
+    if (gst_element_set_state(job.pipeline, GST_STATE_NULL) == GST_STATE_CHANGE_ASYNC) {
+      gst_element_get_state(job.pipeline, nullptr, nullptr, GST_CLOCK_TIME_NONE);
+    }
+    gst_object_unref(job.pipeline);
+  }
 }
 
 void Transcoder::Cancel() {
   cancelled_ = true;
   jobs_.clear();
+  StopCurrentJobs();
+}
+
+std::map<std::string, float> Transcoder::GetProgress() const {
+  std::map<std::string, float> progress;
+  for (const CurrentJob &job : current_jobs_) {
+    if (!job.pipeline) {
+      continue;
+    }
+    gint64 position = 0;
+    gint64 duration = 0;
+    gst_element_query_position(job.pipeline, GST_FORMAT_TIME, &position);
+    gst_element_query_duration(job.pipeline, GST_FORMAT_TIME, &duration);
+    progress[JobInput(job.job)] = TranscoderProgress::FractionFromPosition(position, duration);
+  }
+  return progress;
 }
 
 std::string Transcoder::FormatName(Format format) { return PresetFor(format).name; }
