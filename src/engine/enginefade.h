@@ -25,7 +25,9 @@ inline bool ShouldFadeInOnResume(bool faded_out_to_pause, bool fadeout_pause_ena
 inline bool ShouldMarkFadedOutToPause(bool pause_fade_active) { return pause_fade_active; }
 
 // Qt GstEngine::FinishPipeline: emit Finished when no current or fadeout pipeline remains.
-inline bool ShouldEmitFinished(bool has_current, bool has_fadeout) { return !has_current && !has_fadeout; }
+inline bool ShouldEmitFinished(bool has_current, int fadeout_count) { return !has_current && fadeout_count <= 0; }
+
+inline bool ShouldEmitFinished(bool has_current, bool has_fadeout) { return ShouldEmitFinished(has_current, has_fadeout ? 1 : 0); }
 
 // Linear volume at fade progress t ∈ [0, 1]. direction < 0 fades out.
 inline double VolumeAtStep(double target_fraction, int direction, double t) {

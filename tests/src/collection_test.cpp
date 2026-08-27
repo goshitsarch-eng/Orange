@@ -26,6 +26,7 @@
 #include "engine/engineexclusive.h"
 #include "core/exitfade.h"
 #include "engine/enginefade.h"
+#include "engine/enginefadeout.h"
 #include "engine/engineplay.h"
 #include "engine/engineseek.h"
 #include "collection/collectionalbumart.h"
@@ -1034,6 +1035,25 @@ TEST(ExitFade, DecideMatchesQtMainWindow) {
   EXPECT_TRUE(EngineFade::ShouldEmitFinished(false, false));
   EXPECT_FALSE(EngineFade::ShouldEmitFinished(true, false));
   EXPECT_FALSE(EngineFade::ShouldEmitFinished(false, true));
+}
+
+TEST(EngineFadeout, OverlappingFadesMatchQtMap) {
+  EXPECT_TRUE(EngineFadeout::ShouldInsert(1, false));
+  EXPECT_FALSE(EngineFadeout::ShouldInsert(1, true));
+  EXPECT_FALSE(EngineFadeout::ShouldInsert(0, false));
+  EXPECT_EQ(40, EngineFadeout::StepsForDurationMs(2000));
+  EXPECT_EQ(1, EngineFadeout::StepsForDurationMs(0));
+  EXPECT_FALSE(EngineFadeout::EntryFinished(39, 40));
+  EXPECT_TRUE(EngineFadeout::EntryFinished(40, 40));
+  EXPECT_TRUE(EngineFadeout::TimerNeeded(2));
+  EXPECT_FALSE(EngineFadeout::TimerNeeded(0));
+  EXPECT_TRUE(EngineFadeout::ShouldEmitFinished(false, 0));
+  EXPECT_FALSE(EngineFadeout::ShouldEmitFinished(false, 2));
+  EXPECT_FALSE(EngineFadeout::ShouldEmitFinished(true, 0));
+  EXPECT_TRUE(EngineFadeout::ShouldDelayExclusivePlay(true, 1));
+  EXPECT_FALSE(EngineFadeout::ShouldDelayExclusivePlay(true, 0));
+  EXPECT_TRUE(EngineFadeout::PromoteNextOnPlay(true, true));
+  EXPECT_FALSE(EngineFadeout::PromoteNextOnPlay(true, false));
 }
 
 TEST(EngineFade, StopFadeGatingMatchesQt) {

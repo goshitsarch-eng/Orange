@@ -14,6 +14,7 @@ typedef struct _GstDiscoverer GstDiscoverer;
 typedef struct _GstDiscovererInfo GstDiscovererInfo;
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -96,8 +97,11 @@ class GstEngine : public EngineBase {
   void StartFade(int direction, int duration_ms = 0);
   void CancelFade();
   static gboolean FadeTick(gpointer data);
+  void StartFadeout(std::unique_ptr<GstEnginePipeline> pipeline);
   void StartStopFade();
   void CancelStopFade();
+  void StopAllFadeouts();
+  void RemoveFadeout(int pipeline_id);
   static gboolean StopFadeTick(gpointer data);
   void FinishStopImmediate();
   void SeekNow();
@@ -119,9 +123,15 @@ class GstEngine : public EngineBase {
   void RequestDiscover(const std::string &media_url, const std::string &play_url);
   void OnStreamDiscovered(GstDiscovererInfo *info, GError *error);
 
+  struct FadeoutState {
+    std::unique_ptr<GstEnginePipeline> pipeline;
+    int step = 0;
+    int steps = 1;
+  };
+
   std::unique_ptr<GstEnginePipeline> current_;
   std::unique_ptr<GstEnginePipeline> next_;
-  std::unique_ptr<GstEnginePipeline> fadeout_;
+  std::map<int, FadeoutState> fadeout_pipelines_;
   GstDiscoverer *discoverer_ = nullptr;
   gulong discovered_handler_ = 0;
   gulong finished_handler_ = 0;
@@ -179,8 +189,6 @@ class GstEngine : public EngineBase {
   int fade_step_ = 0;
   int fade_steps_ = 1;
   guint fade_timeout_id_ = 0;
-  int fadeout_step_ = 0;
-  int fadeout_steps_ = 1;
   guint fadeout_timeout_id_ = 0;
   uint64_t pending_seek_nanosec_ = 0;
   bool waiting_to_seek_ = false;
