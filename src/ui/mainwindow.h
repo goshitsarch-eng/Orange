@@ -104,6 +104,8 @@ class MainWindow {
   void ActivePlaylistTab();
   void PlayRadioChannel(const RadioChannel &channel);
   void ShowPlaylistMenu(double x, double y);
+  void PlaylistStopAfter();
+  void PlayPlaylistMenuRow();
   void ShowCollectionMenu();
   void ShowStreamingMenu(const SongList &songs, StreamingCollectionActions::MenuContext ctx);
   StreamingTabsView *CurrentStreamingTabs() const;
@@ -255,6 +257,7 @@ class MainWindow {
   PlaylistColumn sort_column_ = PlaylistColumn::Count;
   bool sort_descending_ = false;
   std::vector<int> selected_playlist_rows_;
+  int playlist_menu_row_ = -1;
   std::string selection_playlist_name_;
   guint position_timeout_ = 0;
   guint analyzer_timeout_ = 0;

@@ -610,7 +610,13 @@ void Player::PreloadNext() {
   } else if (playlist_manager_) {
     next_song = playlist_manager_->PeekNextSong();
   }
-  if (!PlayerPreload::CanPreload(stop_after_current_, next_song.is_valid() || !next_song.url().empty(),
+  bool stop_after = stop_after_current_;
+  if (playlist_manager_ && playlist_manager_->active()) {
+    stop_after = PlayerRepeat::ShouldStopAfterTrack(playlist_manager_->active()->repeat_mode(), stop_after_current_,
+                                                    playlist_manager_->active()->stop_after_row(),
+                                                    playlist_manager_->active()->current_row());
+  }
+  if (!PlayerPreload::CanPreload(stop_after, next_song.is_valid() || !next_song.url().empty(),
                                  current_song_.is_module_music())) {
     return;
   }
@@ -674,7 +680,9 @@ void Player::HandleTrackEnded() {
   const PlaylistSequence::RepeatMode repeat = playlist_manager_ && playlist_manager_->active()
                                                  ? playlist_manager_->active()->repeat_mode()
                                                  : PlaylistSequence::RepeatMode::Off;
-  if (PlayerRepeat::ShouldStopAfterTrack(repeat, stop_after_current_)) {
+  const int stop_after_row = playlist_manager_ && playlist_manager_->active() ? playlist_manager_->active()->stop_after_row() : -1;
+  const int current_row = playlist_manager_ && playlist_manager_->active() ? playlist_manager_->active()->current_row() : -1;
+  if (PlayerRepeat::ShouldStopAfterTrack(repeat, stop_after_current_, stop_after_row, current_row)) {
     if (PlayerStopAfter::ShouldPrepareResume(true) && playlist_manager_ && playlist_manager_->active()) {
       const int next = PlayerStopAfter::ResumeRow(playlist_manager_->active()->PeekNextRow());
       if (next >= 0) {

@@ -63,6 +63,7 @@ TEST(PlaylistMenu, CatalogMatchesQt) {
   EXPECT_EQ(PlaylistMenu::Action::CopyToDevice, PlaylistMenu::FromId("copy-device"));
   EXPECT_EQ(PlaylistMenu::Action::ClearPlaylist, PlaylistMenu::FromId("clear"));
   EXPECT_STREQ("win.stop", PlaylistMenu::WinAction(PlaylistMenu::Action::Stop));
+  EXPECT_STREQ("win.playlist-stop-after", PlaylistMenu::WinAction(PlaylistMenu::Action::StopAfter));
   EXPECT_STREQ("win.organize-selected", PlaylistMenu::WinAction(PlaylistMenu::Action::Organize));
   EXPECT_STREQ("win.playlist-copy-device", PlaylistMenu::WinAction(PlaylistMenu::Action::CopyToDevice));
   EXPECT_STREQ("", PlaylistMenu::WinAction(PlaylistMenu::Action::AddToPlaylist));
@@ -81,6 +82,19 @@ TEST(PlaylistMenu, EmptySelectionKeepsMaintenanceItems) {
   EXPECT_FALSE(PlaylistMenu::Contains(items, PlaylistMenu::Action::Queue));
   EXPECT_FALSE(PlaylistMenu::Contains(items, PlaylistMenu::Action::Remove));
   EXPECT_FALSE(PlaylistMenu::PlayEnabled(PlaylistMenu::Analyze({})));
+  EXPECT_FALSE(PlaylistMenu::StopAfterEnabled(PlaylistMenu::Analyze({})));
+}
+
+TEST(PlaylistMenu, ContextRowMatchesQtIndexAt) {
+  EXPECT_EQ(-1, PlaylistMenu::ContextRow(0, 0));
+  EXPECT_EQ(-1, PlaylistMenu::ContextRow(3, 3));
+  EXPECT_EQ(-1, PlaylistMenu::ContextRow(-1, 5));
+  EXPECT_EQ(0, PlaylistMenu::ContextRow(0, 5));
+  EXPECT_EQ(2, PlaylistMenu::ContextRow(2, 5));
+  PlaylistMenu::SelectionState valid;
+  valid.index_valid = true;
+  EXPECT_TRUE(PlaylistMenu::StopAfterEnabled(valid));
+  EXPECT_TRUE(PlaylistMenu::PlayEnabled(valid));
 }
 
 TEST(PlaylistMenu, QueueLabelsMatchQt) {

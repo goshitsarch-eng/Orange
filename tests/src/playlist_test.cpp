@@ -608,6 +608,14 @@ TEST(PlayerRepeat, OneByOneStopsAfterCurrent) {
   EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, true));
   EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, false));
   EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Playlist, false));
+  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterRow(4, 4));
+  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterRow(4, 3));
+  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterRow(-1, 4));
+  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, false, 4, 4));
+  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, false, 4, 3));
+  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, true, 4, 3));
+  EXPECT_TRUE(PlayerStopAfter::SyncCurrentFlag(2, 2));
+  EXPECT_FALSE(PlayerStopAfter::SyncCurrentFlag(2, 1));
 }
 
 TEST(PlayerRepeat, IntroUsesTenSecondWindow) {

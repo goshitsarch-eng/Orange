@@ -247,6 +247,16 @@ inline bool PlayEnabled(const SelectionState &state) {
   return !state.playing_selected || !state.pause_disabled;
 }
 
+// Qt indexAt / playlist_menu_index_: only a real row is a context target.
+inline int ContextRow(int row_at_y, int row_count) {
+  if (row_at_y < 0 || row_at_y >= row_count) {
+    return -1;
+  }
+  return row_at_y;
+}
+
+inline bool StopAfterEnabled(const SelectionState &state) { return state.index_valid; }
+
 inline bool CopyToDeviceEnabled(const SelectionState &state) { return state.devices_connected; }
 
 inline bool SetColumnOpensDialog() { return false; }
@@ -363,7 +373,7 @@ inline const char *WinAction(Action action) {
     case Action::Stop:
       return "win.stop";
     case Action::StopAfter:
-      return "win.stop-after";
+      return "win.playlist-stop-after";
     case Action::Queue:
       return "win.playlist-queue";
     case Action::QueueNext:

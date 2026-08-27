@@ -51,6 +51,8 @@
 #include "playlist/playlistheadersort.h"
 #include "playlist/playlisteditpolicy.h"
 #include "playlist/playlistmenu.h"
+#include "playlist/playliststopafter.h"
+#include "core/playerstopafter.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistlistlook.h"
 #include "playlist/playlistsequence.h"
@@ -889,18 +891,10 @@ void MainWindow::BuildUi() {
              }));
   add_action("cycle-analyzer", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CycleAnalyzer(); }));
   add_action("playlist-play", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
-               auto *self = static_cast<MainWindow *>(data);
-               Playlist *playlist = self->app_->playlist_manager()->current();
-               if (playlist && !self->SelectedPlaylistRows().empty()) {
-                 const int row = self->SelectedPlaylistRows().front();
-                 if (playlist->current_row() == row && self->app_->player()->GetState() == GstEngine::State::Playing) {
-                   self->app_->player()->Pause();
-                 } else {
-                   self->app_->player()->PlayAt(row);
-                 }
-               } else {
-                 self->app_->player()->Play();
-               }
+               static_cast<MainWindow *>(data)->PlayPlaylistMenuRow();
+             }));
+  add_action("playlist-stop-after", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               static_cast<MainWindow *>(data)->PlaylistStopAfter();
              }));
   add_action("playlist-queue", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
@@ -1707,7 +1701,13 @@ void MainWindow::BuildPlayerBar() {
   play_button_ = gtk_button_new_from_icon_name("media-playback-start-symbolic");
   gtk_widget_add_css_class(play_button_, "suggested-action");
   gtk_widget_add_css_class(play_button_, "circular");
-  GtkWidget *stop = gtk_button_new_from_icon_name("media-playback-stop-symbolic");
+  GtkWidget *stop = adw_split_button_new();
+  adw_split_button_set_icon_name(ADW_SPLIT_BUTTON(stop), "media-playback-stop-symbolic");
+  gtk_widget_set_tooltip_text(stop, Translations::CStr(MainWindowMenu::Stop()));
+  GMenu *stop_menu = g_menu_new();
+  g_menu_append(stop_menu, Translations::CStr(MainWindowMenu::Stop()), "win.stop");
+  g_menu_append(stop_menu, Translations::CStr(MainWindowMenu::StopAfter()), "win.stop-after");
+  adw_split_button_set_menu_model(ADW_SPLIT_BUTTON(stop), G_MENU_MODEL(stop_menu));
   GtkWidget *next = gtk_button_new_from_icon_name("media-skip-forward-symbolic");
   scrobble_button_ = gtk_button_new_from_icon_name("document-send-symbolic");
   gtk_widget_set_tooltip_text(scrobble_button_, "Scrobble current track");
@@ -1767,7 +1767,8 @@ void MainWindow::BuildPlayerBar() {
   gtk_box_append(GTK_BOX(box), status_bar_stack_);
 
   g_signal_connect(play_button_, "clicked", G_CALLBACK(OnPlayPause), this);
-  g_signal_connect(stop, "clicked", G_CALLBACK(OnStop), this);
+  g_signal_connect(stop, "clicked", G_CALLBACK(+[](AdwSplitButton *, gpointer data) { static_cast<MainWindow *>(data)->app_->player()->Stop(); }),
+                   this);
   g_signal_connect(next, "clicked", G_CALLBACK(OnNext), this);
   g_signal_connect(prev, "clicked", G_CALLBACK(OnPrevious), this);
   g_signal_connect(scrobble_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->ScrobbleCurrent(); }),
@@ -3474,12 +3475,17 @@ SongList MainWindow::SongsFromUrls(const std::vector<std::string> &urls) const {
   return songs;
 }
 
-void MainWindow::ShowPlaylistMenu(double, double) {
+void MainWindow::ShowPlaylistMenu(double, double y) {
   Playlist *playlist = app_->playlist_manager()->current();
   const std::vector<int> rows = SelectedPlaylistRows();
+  playlist_menu_row_ = -1;
+  if (playlist && playlist_container_ && playlist_container_->view()) {
+    playlist_menu_row_ =
+        PlaylistMenu::ContextRow(playlist_container_->view()->RowAtY(y, playlist_container_->view()->grid()), playlist->row_count());
+  }
   const PlaylistColumn column = playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Title;
   PlaylistMenu::SelectionState opts;
-  opts.index_valid = playlist && !rows.empty();
+  opts.index_valid = playlist_menu_row_ >= 0;
   opts.track_column = column == PlaylistColumn::Track;
   opts.column_editable = PlaylistDelegates::ColumnIsEditable(column);
   opts.column = column;
@@ -3491,14 +3497,12 @@ void MainWindow::ShowPlaylistMenu(double, double) {
       break;
     }
   }
-  if (playlist && !rows.empty()) {
-    const int row = rows.front();
-    if (row >= 0 && row < playlist->row_count()) {
-      const Song &song = playlist->song(row);
-      opts.column_value = PlaylistDelegates::ColumnText(song, column);
-      opts.collection_item = song.source() == Song::Source::Collection && song.id() > 0;
-      opts.playing_selected = playlist->current_row() == row && app_->player()->GetState() == GstEngine::State::Playing;
-    }
+  const int info_row = playlist_menu_row_ >= 0 ? playlist_menu_row_ : (rows.empty() ? -1 : rows.front());
+  if (playlist && info_row >= 0 && info_row < playlist->row_count()) {
+    const Song &song = playlist->song(info_row);
+    opts.column_value = PlaylistDelegates::ColumnText(song, column);
+    opts.collection_item = song.source() == Song::Source::Collection && song.id() > 0;
+    opts.playing_selected = playlist->current_row() == info_row && app_->player()->GetState() == GstEngine::State::Playing;
   }
   std::vector<PlaylistMenu::RowInfo> infos;
   if (playlist) {
@@ -3603,6 +3607,36 @@ void MainWindow::StopAfterCurrent() {
   app_->osd()->StopAfterToggle(app_->player()->stop_after_current());
   RefreshPlaylist();
   ShowToast(app_->player()->stop_after_current() ? "Will stop after the current track" : "Stop after this track cancelled");
+}
+
+void MainWindow::PlayPlaylistMenuRow() {
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (!playlist || playlist_menu_row_ < 0 || playlist_menu_row_ >= playlist->row_count()) {
+    return;
+  }
+  PlaylistMenu::SelectionState state;
+  state.index_valid = true;
+  state.playing_selected = playlist->current_row() == playlist_menu_row_ && app_->player()->GetState() == GstEngine::State::Playing;
+  if (!PlaylistMenu::PlayEnabled(state)) {
+    return;
+  }
+  if (state.playing_selected) {
+    app_->player()->Pause();
+  } else {
+    app_->player()->PlayAt(playlist_menu_row_);
+  }
+}
+
+void MainWindow::PlaylistStopAfter() {
+  Playlist *playlist = app_->playlist_manager()->current();
+  if (!playlist || playlist_menu_row_ < 0) {
+    return;
+  }
+  playlist->ToggleStopAfter(playlist_menu_row_);
+  app_->player()->set_stop_after_current(PlayerStopAfter::SyncCurrentFlag(playlist->stop_after_row(), playlist->current_row()));
+  RefreshPlaylist();
+  ShowToast(PlaylistStopAfter::IsRow(playlist->stop_after_row(), playlist_menu_row_) ? "Will stop after this track"
+                                                                                     : "Stop after this track cancelled");
 }
 
 void MainWindow::QueuePlayNext() {

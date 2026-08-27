@@ -36,6 +36,7 @@ class Player : public PlayerInterface {
   void Stop(bool stop_after = false) override;
   void StopAfterCurrent();
   bool stop_after_current() const { return stop_after_current_; }
+  void set_stop_after_current(bool stop) { stop_after_current_ = stop; }
   void Next() override;
   void Previous() override;
   void RestartOrPrevious();

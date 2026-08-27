@@ -64,6 +64,8 @@ class PlaylistView {
   void FilterReturnPressed();
   void FocusAndMove(unsigned keyval);
   int RowAtY(double y) const;
+  int RowAtY(double y, GtkWidget *relative) const;
+  void RememberClickAt(double x, double y);
   PlaylistColumn last_clicked_column() const { return last_clicked_column_; }
   void SetLastClickedColumn(PlaylistColumn column) { last_clicked_column_ = column; }
   double last_click_cell_x() const { return last_click_cell_x_; }

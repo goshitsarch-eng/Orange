@@ -93,6 +93,7 @@ PlaylistView::PlaylistView() {
   gtk_widget_add_controller(grid_, GTK_EVENT_CONTROLLER(gesture));
   g_signal_connect(gesture, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble x, gdouble y, gpointer data) {
                      auto *self = static_cast<PlaylistView *>(data);
+                     self->RememberClickAt(x, y);
                      if (self->menu_) {
                        self->menu_(x, y);
                      }
@@ -267,8 +268,10 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
   return FALSE;
 }
 
-int PlaylistView::RowAtY(double y) const {
-  if (!grid_) {
+int PlaylistView::RowAtY(double y) const { return RowAtY(y, widget_); }
+
+int PlaylistView::RowAtY(double y, GtkWidget *relative) const {
+  if (!grid_ || !relative) {
     return 0;
   }
   GtkWidget *child = gtk_widget_get_first_child(grid_);
@@ -278,7 +281,7 @@ int PlaylistView::RowAtY(double y) const {
   int last_index = 0;
   while (child) {
     graphene_rect_t bounds{};
-    if (gtk_widget_compute_bounds(child, widget_, &bounds)) {
+    if (gtk_widget_compute_bounds(child, relative, &bounds)) {
       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
       if (y < bounds.origin.y + bounds.size.height) {
         return index;
@@ -288,6 +291,25 @@ int PlaylistView::RowAtY(double y) const {
     child = gtk_widget_get_next_sibling(child);
   }
   return last_index;
+}
+
+void PlaylistView::RememberClickAt(double x, double y) {
+  if (!grid_) {
+    return;
+  }
+  GtkWidget *child = gtk_widget_get_first_child(grid_);
+  if (child) {
+    child = gtk_widget_get_next_sibling(child);
+  }
+  while (child) {
+    graphene_rect_t bounds{};
+    if (gtk_widget_compute_bounds(child, grid_, &bounds) && y >= bounds.origin.y &&
+        y < bounds.origin.y + bounds.size.height) {
+      RecordClickedColumn(child, x - bounds.origin.x);
+      return;
+    }
+    child = gtk_widget_get_next_sibling(child);
+  }
 }
 
 void PlaylistView::ClearDropIndicator() {
