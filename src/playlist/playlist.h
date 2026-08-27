@@ -54,6 +54,7 @@ class Playlist {
 
   void InsertSongs(int row, const SongList &songs);
   void AppendSongs(const SongList &songs);
+  int TakeInsertScrollRow();
   void RemoveRows(const std::vector<int> &rows);
   void Clear();
   void Move(int from, int to);
@@ -184,6 +185,7 @@ class Playlist {
   int64_t scrobble_point_nanosec_ = -1;
   bool scrobbled_ = false;
   bool loading_ = false;
+  int insert_scroll_row_ = -1;
   Queue queue_;
   std::vector<std::string> uuids_;
   TagReaderClient *tagreader_client_ = nullptr;

@@ -3,6 +3,7 @@
 #include "core/playermetadatasync.h"
 #include "playlist/playlistmetadataupdate.h"
 #include "playlist/playlistautosort.h"
+#include "playlist/playlistinsertscroll.h"
 #include "playlist/playlistitemuuid.h"
 #include "playlist/dynamicplaylistmaintenance.h"
 #include "playlist/playlistdynamicadvance.h"
@@ -218,16 +219,27 @@ void Playlist::InsertSongs(int row, const SongList &songs) {
   if (row < 0 || row > static_cast<int>(songs_.size())) {
     row = static_cast<int>(songs_.size());
   }
+  const int start = row;
+  const int inserted = static_cast<int>(songs.size());
   songs_.insert(songs_.begin() + row, songs.begin(), songs.end());
   uuids_.insert(uuids_.begin() + row, static_cast<size_t>(songs.size()), {});
   EnsureUuids();
-  played_indexes_ = PlaylistPlayed::AfterInsert(played_indexes_, row, static_cast<int>(songs.size()));
+  played_indexes_ = PlaylistPlayed::AfterInsert(played_indexes_, row, inserted);
   if (PlaylistPlayRow::ShouldAssignFirstRowOnInsert(loading_, current_row_) && !songs_.empty()) {
     current_row_ = 0;
   }
+  const bool at_end = PlaylistInsertScroll::AtEnd(start, inserted, static_cast<int>(songs_.size()));
+  const bool will_sort = PlaylistAutoSort::ShouldSort(auto_sort_, loading_, sort_column_);
   MaybeAutoSort();
   RebuildVirtualItems();
+  insert_scroll_row_ = PlaylistInsertScroll::ScrollRow(PlaylistInsertScroll::ShouldScroll(at_end, is_dynamic(), loading_, will_sort), start);
   Changed.Emit();
+}
+
+int Playlist::TakeInsertScrollRow() {
+  const int row = insert_scroll_row_;
+  insert_scroll_row_ = -1;
+  return row;
 }
 
 void Playlist::AppendSongs(const SongList &songs) { InsertSongs(static_cast<int>(songs_.size()), songs); }

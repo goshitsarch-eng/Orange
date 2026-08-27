@@ -4,6 +4,7 @@
 #include "playlist/playlistmoodcolumn.h"
 #include "playlist/playlistheadersort.h"
 #include "playlist/playlistautoscroll.h"
+#include "playlist/playlistinsertscroll.h"
 #include "playlist/playlistclipboard.h"
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistheaderreorder.h"
@@ -776,6 +777,40 @@ TEST(PlaylistColumnLayout, PixelWidthsFollowSavedProportions) {
   EXPECT_EQ(220, PlaylistColumnLayout::PixelWidth(PlaylistColumn::Title, 800));
   EXPECT_EQ(180, PlaylistColumnLayout::PixelWidth(PlaylistColumn::Artist, 800));
   PlaylistColumnLayout::Reset();
+}
+
+TEST(PlaylistInsertScroll, ScrollsAppendedRowsLikeQt) {
+  EXPECT_TRUE(PlaylistInsertScroll::AtEnd(10, 3, 13));
+  EXPECT_FALSE(PlaylistInsertScroll::AtEnd(2, 3, 13));
+  EXPECT_FALSE(PlaylistInsertScroll::AtEnd(0, 0, 0));
+  EXPECT_TRUE(PlaylistInsertScroll::ShouldScroll(true, false, false, false));
+  EXPECT_FALSE(PlaylistInsertScroll::ShouldScroll(true, true, false, false));
+  EXPECT_FALSE(PlaylistInsertScroll::ShouldScroll(true, false, true, false));
+  EXPECT_FALSE(PlaylistInsertScroll::ShouldScroll(true, false, false, true));
+  EXPECT_EQ(10, PlaylistInsertScroll::ScrollRow(true, 10));
+  EXPECT_EQ(-1, PlaylistInsertScroll::ScrollRow(false, 10));
+
+  Playlist playlist;
+  Song first;
+  first.set_url("file:///first");
+  first.set_title("First");
+  playlist.AppendSongs({first});
+  EXPECT_EQ(0, playlist.TakeInsertScrollRow());
+  EXPECT_EQ(-1, playlist.TakeInsertScrollRow());
+
+  Song extra;
+  extra.set_url("file:///extra");
+  extra.set_title("Extra");
+  playlist.InsertSongs(0, {extra});
+  EXPECT_EQ(-1, playlist.TakeInsertScrollRow());
+
+  playlist.SetDynamic(true);
+  playlist.AppendSongs({extra});
+  EXPECT_EQ(-1, playlist.TakeInsertScrollRow());
+  playlist.SetDynamic(false);
+  playlist.BeginLoad();
+  playlist.AppendSongs({extra});
+  EXPECT_EQ(-1, playlist.TakeInsertScrollRow());
 }
 
 TEST(PlaylistAutoscroll, MaybeAlwaysNeverAndCenter) {

@@ -769,6 +769,10 @@ void PlaylistView::Refresh(Playlist *playlist) {
   }
   ApplyColumnWidths();
   UpdateNoMatchesOverlay();
+  const int insert_row = playlist->TakeInsertScrollRow();
+  if (insert_row >= 0) {
+    ScrollToRow(insert_row, false);
+  }
 }
 
 void PlaylistView::UpdateNoMatchesOverlay() {
