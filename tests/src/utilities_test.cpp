@@ -1,6 +1,7 @@
 #include "utilities/strutils.h"
 #include "utilities/timeutils.h"
 #include "widgets/multiloadingtext.h"
+#include "widgets/tracksliderstate.h"
 #include "widgets/trackslidertime.h"
 #include "widgets/volumesliderwheel.h"
 #include "utilities/fileutils.h"
@@ -119,6 +120,32 @@ TEST(TrackSliderTime, DurationTogglesRemainingLikeQt) {
   EXPECT_EQ("-0:00", TrackSliderTime::DurationLabel(true, 180000000000LL, 180000000000LL));
   EXPECT_EQ("1:30 / -1:30", TrackSliderTime::PopupText(true, 90000000000LL, 180000000000LL));
   EXPECT_STREQ("Click to toggle between remaining time and total time", TrackSliderTime::DurationTooltip());
+}
+
+TEST(TrackSliderState, StoppedAndCanSeekMatchQt) {
+  EXPECT_STREQ("0:00:00", TrackSliderState::StoppedLabel());
+  EXPECT_FALSE(TrackSliderState::SliderEnabled(true, true));
+  EXPECT_FALSE(TrackSliderState::SliderEnabled(false, false));
+  EXPECT_TRUE(TrackSliderState::SliderEnabled(false, true));
+  EXPECT_FALSE(TrackSliderState::LabelsEnabled(true));
+  EXPECT_TRUE(TrackSliderState::LabelsEnabled(false));
+  EXPECT_FALSE(TrackSliderState::ShouldAcceptSeek(true, true));
+  EXPECT_FALSE(TrackSliderState::ShouldAcceptSeek(false, false));
+  EXPECT_TRUE(TrackSliderState::ShouldAcceptSeek(false, true));
+  EXPECT_FALSE(TrackSliderState::ShouldUpdateTimes(true));
+  EXPECT_TRUE(TrackSliderState::ShouldUpdateTimes(false));
+
+  Song radio;
+  radio.set_source(Song::Source::RadioBrowser);
+  radio.set_url("http://example.com/radio");
+  EXPECT_FALSE(TrackSliderState::CanSeekFromSong(radio));
+  EXPECT_FALSE(TrackSliderState::CanSeekFromOptions(PlayerItemOptions::ForSong(radio)));
+
+  Song local;
+  local.set_source(Song::Source::LocalFile);
+  local.set_url("file:///tmp/a.flac");
+  EXPECT_TRUE(TrackSliderState::CanSeekFromSong(local));
+  EXPECT_TRUE(TrackSliderState::CanSeekFromOptions(PlayerItemOptions::ForSong(local)));
 }
 
 TEST(VolumeSliderWheel, AccumulatesNotchesAndPresets) {

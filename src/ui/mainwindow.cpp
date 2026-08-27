@@ -58,7 +58,9 @@
 #include "ui/statusbarstack.h"
 #include "widgets/playingwidget.h"
 #include "widgets/seekbarmode.h"
+#include "core/playeritemoptions.h"
 #include "widgets/trackslider.h"
+#include "widgets/tracksliderstate.h"
 #include "widgets/tracksliderwheel.h"
 #include "widgets/volumeslider.h"
 #include "collection/collectiondirectory.h"
@@ -1774,8 +1776,10 @@ void MainWindow::ConnectSignals() {
   app_->player()->SongChanged.Connect([this](const Song &) {
     UpdateNowPlaying();
     SelectPlayingTrack();
+    ApplySeekbarPlaybackState();
   });
   app_->player()->Playing.Connect([this]() {
+    ApplySeekbarPlaybackState();
     if (playlist_list_container_) {
       playlist_list_container_->SetPlayback(PlaylistListLook::Playback::Playing);
     }
@@ -1796,6 +1800,7 @@ void MainWindow::ConnectSignals() {
     RefreshPlaylistTabs();
   });
   app_->player()->Stopped.Connect([this]() {
+    ApplySeekbarPlaybackState();
     if (playing_widget_) {
       playing_widget_->Stopped();
     }
@@ -1949,7 +1954,11 @@ void MainWindow::ConnectSignals() {
     const int64_t pos = self->app_->player()->engine()->position_nanosec();
     const int64_t len = self->app_->player()->engine()->length_nanosec();
     if (self->track_slider_) {
-      self->track_slider_->SetTimes(pos, len);
+      if (self->EngineStopped()) {
+        self->track_slider_->SetStopped();
+      } else {
+        self->track_slider_->SetTimes(pos, len);
+      }
     }
     if (len > 0) {
       self->app_->tray()->SetProgress(static_cast<int>(pos * 100 / len));
@@ -3946,6 +3955,17 @@ void MainWindow::DrawAnalyzer(GtkDrawingArea *, cairo_t *cr, int width, int heig
   self->app_->analyzer()->Draw(cr, width, height);
 }
 
+void MainWindow::ApplySeekbarPlaybackState() {
+  if (!track_slider_) {
+    return;
+  }
+  if (EngineStopped()) {
+    track_slider_->SetStopped();
+    return;
+  }
+  track_slider_->SetCanSeek(TrackSliderState::CanSeekFromSong(app_->player()->current_song()));
+}
+
 void MainWindow::ApplySeekbarMode() {
   Settings settings;
   settings.BeginGroup(SeekbarSettings::kSettingsGroup);
@@ -4054,6 +4074,9 @@ void MainWindow::ShowSeekbarMenu(GtkWidget *relative) {
 }
 
 void MainWindow::OnSeekbarScroll(double dy) {
+  if (!track_slider_ || !TrackSliderState::ShouldAcceptSeek(track_slider_->stopped(), track_slider_->can_seek())) {
+    return;
+  }
   const TrackSliderWheel::Result result = TrackSliderWheel::FromGtkScroll(seekbar_wheel_accum_, dy);
   seekbar_wheel_accum_ = result.accumulator;
   const TrackSliderWheel::Direction direction = TrackSliderWheel::DirectionFromSteps(result.steps);
@@ -4065,7 +4088,8 @@ void MainWindow::OnSeekbarScroll(double dy) {
 }
 
 void MainWindow::SeekFromBar(double x, int width) {
-  if (width <= 0 || !app_->player()->engine()) {
+  if (width <= 0 || !app_->player()->engine() || !track_slider_ ||
+      !TrackSliderState::ShouldAcceptSeek(track_slider_->stopped(), track_slider_->can_seek())) {
     return;
   }
   const int64_t length = app_->player()->engine()->length_nanosec();

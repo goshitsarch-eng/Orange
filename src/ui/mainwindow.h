@@ -163,6 +163,7 @@ class MainWindow {
   void PersistEditedSongs(const std::vector<int> &rows);
   void FocusCollectionSearch();
   void ShowToast(const std::string &text);
+  void ApplySeekbarPlaybackState();
   void ApplySeekbarMode();
   void CycleSeekbarMode();
   void SetSeekbarMode(SeekbarSettings::Mode mode);

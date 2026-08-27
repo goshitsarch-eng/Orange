@@ -1,6 +1,7 @@
 #include "widgets/trackslider.h"
 
 #include "core/settings.h"
+#include "widgets/tracksliderstate.h"
 #include "widgets/trackslidertime.h"
 #include "widgets/tracksliderwheel.h"
 
@@ -29,7 +30,7 @@ TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
                    }),
                    this);
   slider_.SetChangedCallback([this](double value) {
-    if (length_nanosec_ <= 0 || !seek_) {
+    if (!TrackSliderState::ShouldAcceptSeek(stopped_, can_seek_) || length_nanosec_ <= 0 || !seek_) {
       return;
     }
     seek_(static_cast<int64_t>(value / 1000.0 * static_cast<double>(length_nanosec_)));
@@ -51,9 +52,13 @@ TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
                      static_cast<TrackSlider *>(data)->HideHover();
                    }),
                    this);
+  SetStopped();
 }
 
 void TrackSlider::SetTimes(int64_t position_nanosec, int64_t length_nanosec) {
+  if (!TrackSliderState::ShouldUpdateTimes(stopped_)) {
+    return;
+  }
   position_nanosec_ = position_nanosec;
   length_nanosec_ = length_nanosec;
   slider_.BlockSignals(true);
@@ -66,6 +71,34 @@ void TrackSlider::SetTimes(int64_t position_nanosec, int64_t length_nanosec) {
   UpdateLabels();
 }
 
+void TrackSlider::SetStopped() {
+  stopped_ = true;
+  can_seek_ = false;
+  position_nanosec_ = 0;
+  length_nanosec_ = 0;
+  slider_.BlockSignals(true);
+  slider_.set_value(0);
+  slider_.BlockSignals(false);
+  gtk_label_set_text(GTK_LABEL(position_label_), TrackSliderState::StoppedLabel());
+  gtk_label_set_text(GTK_LABEL(duration_label_), TrackSliderState::StoppedLabel());
+  position_text_ = TrackSliderState::StoppedLabel();
+  duration_text_ = TrackSliderState::StoppedLabel();
+  ApplySensitivity();
+}
+
+void TrackSlider::SetCanSeek(bool can_seek) {
+  stopped_ = false;
+  can_seek_ = can_seek;
+  ApplySensitivity();
+}
+
+void TrackSlider::ApplySensitivity() {
+  gtk_widget_set_sensitive(slider_.widget(), TrackSliderState::SliderEnabled(stopped_, can_seek_) ? TRUE : FALSE);
+  const gboolean labels = TrackSliderState::LabelsEnabled(stopped_) ? TRUE : FALSE;
+  gtk_widget_set_sensitive(position_label_, labels);
+  gtk_widget_set_sensitive(duration_label_, labels);
+}
+
 void TrackSlider::SetSeekCallback(SeekCallback callback) { seek_ = std::move(callback); }
 
 void TrackSlider::SetSeekStepCallbacks(StepCallback backward, StepCallback forward) {
@@ -74,6 +107,9 @@ void TrackSlider::SetSeekStepCallbacks(StepCallback backward, StepCallback forwa
 }
 
 void TrackSlider::OnWheel(double dy) {
+  if (!TrackSliderState::ShouldAcceptSeek(stopped_, can_seek_)) {
+    return;
+  }
   const TrackSliderWheel::Result result = TrackSliderWheel::FromGtkScroll(wheel_accumulator_, dy);
   wheel_accumulator_ = result.accumulator;
   const TrackSliderWheel::Direction direction = TrackSliderWheel::DirectionFromSteps(result.steps);
@@ -87,6 +123,10 @@ void TrackSlider::OnWheel(double dy) {
 void TrackSlider::OnHover(double x) { ShowHoverAt(slider_.widget(), x, gtk_widget_get_width(slider_.widget())); }
 
 void TrackSlider::ShowHoverAt(GtkWidget *relative, double x, int width) {
+  if (!TrackSliderState::ShouldAcceptSeek(stopped_, can_seek_)) {
+    HideHover();
+    return;
+  }
   const int length_sec = static_cast<int>(length_nanosec_ / 1000000000LL);
   const int position_sec = static_cast<int>(position_nanosec_ / 1000000000LL);
   const int hover_sec = TrackSliderHover::SecondsAtX(x, static_cast<double>(width), length_sec);

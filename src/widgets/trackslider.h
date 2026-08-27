@@ -21,6 +21,10 @@ class TrackSlider {
   PrettySlider *slider() { return &slider_; }
 
   void SetTimes(int64_t position_nanosec, int64_t length_nanosec);
+  void SetStopped();
+  void SetCanSeek(bool can_seek);
+  bool can_seek() const { return can_seek_; }
+  bool stopped() const { return stopped_; }
   void SetSeekCallback(SeekCallback callback);
   void SetSeekStepCallbacks(StepCallback backward, StepCallback forward);
   void SetSliderVisible(bool visible);
@@ -33,6 +37,7 @@ class TrackSlider {
 
  private:
   void UpdateLabels();
+  void ApplySensitivity();
   void PersistRemaining();
   void OnWheel(double dy);
   void OnHover(double x);
@@ -45,6 +50,8 @@ class TrackSlider {
   int64_t position_nanosec_ = 0;
   int64_t length_nanosec_ = 0;
   bool show_remaining_ = false;
+  bool can_seek_ = true;
+  bool stopped_ = true;
   int wheel_accumulator_ = 0;
   SeekCallback seek_;
   StepCallback seek_backward_;
