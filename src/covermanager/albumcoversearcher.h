@@ -3,6 +3,7 @@
 
 #include "covermanager/albumcoverfetcher.h"
 #include "covermanager/albumcoverfetchersearch.h"
+#include "covermanager/albumcoversearcherlabels.h"
 
 #include "core/song.h"
 
@@ -52,6 +53,21 @@ class AlbumCoverSearcher {
   static bool CanLoadThumb(const CoverProviderSearchResult &result) {
     return !result.image_data.empty() || AlbumCoverFetcherSearch::IsHttpUrl(result.image_url);
   }
+
+  // Qt AlbumCoverSearcher::Search: album enabled means idle; click starts. Disabled means in-flight; click aborts.
+  static const char *SearchButtonLabel(bool searching) { return searching ? AlbumCoverSearcherLabels::Abort() : AlbumCoverSearcherLabels::Search(); }
+
+  static bool FieldsEnabled(bool searching) { return !searching; }
+
+  static bool GridEnabled(bool searching) { return !searching; }
+
+  static bool BusyVisible(bool searching) { return searching; }
+
+  static bool ShouldStartSearch(bool searching) { return !searching; }
+
+  static bool ShouldAbortSearch(bool searching) { return searching; }
+
+  static bool ShouldAutoSearch(const std::string &artist, const std::string &album) { return !artist.empty() || !album.empty(); }
 };
 
 #endif

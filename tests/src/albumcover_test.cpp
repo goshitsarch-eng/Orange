@@ -394,6 +394,25 @@ TEST(AlbumCoverSearcherLabels, QtCopy) {
   EXPECT_STREQ("Artist", AlbumCoverSearcherLabels::Artist());
   EXPECT_STREQ("Album", AlbumCoverSearcherLabels::Album());
   EXPECT_STREQ("Search", AlbumCoverSearcherLabels::Search());
+  EXPECT_STREQ("Abort", AlbumCoverSearcherLabels::Abort());
+}
+
+TEST(AlbumCoverSearcher, SearchLockAndAbort) {
+  EXPECT_STREQ("Search", AlbumCoverSearcher::SearchButtonLabel(false));
+  EXPECT_STREQ("Abort", AlbumCoverSearcher::SearchButtonLabel(true));
+  EXPECT_TRUE(AlbumCoverSearcher::FieldsEnabled(false));
+  EXPECT_FALSE(AlbumCoverSearcher::FieldsEnabled(true));
+  EXPECT_TRUE(AlbumCoverSearcher::GridEnabled(false));
+  EXPECT_FALSE(AlbumCoverSearcher::GridEnabled(true));
+  EXPECT_FALSE(AlbumCoverSearcher::BusyVisible(false));
+  EXPECT_TRUE(AlbumCoverSearcher::BusyVisible(true));
+  EXPECT_TRUE(AlbumCoverSearcher::ShouldStartSearch(false));
+  EXPECT_FALSE(AlbumCoverSearcher::ShouldStartSearch(true));
+  EXPECT_FALSE(AlbumCoverSearcher::ShouldAbortSearch(false));
+  EXPECT_TRUE(AlbumCoverSearcher::ShouldAbortSearch(true));
+  EXPECT_FALSE(AlbumCoverSearcher::ShouldAutoSearch("", ""));
+  EXPECT_TRUE(AlbumCoverSearcher::ShouldAutoSearch("Portishead", ""));
+  EXPECT_TRUE(AlbumCoverSearcher::ShouldAutoSearch("", "Dummy"));
 }
 
 TEST(AlbumCoverSearcher, GridHelpers) {

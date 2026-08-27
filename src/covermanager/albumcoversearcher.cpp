@@ -26,10 +26,14 @@ struct SearcherState {
   GtkWidget *title = nullptr;
   GtkWidget *status = nullptr;
   GtkWidget *grid = nullptr;
+  GtkWidget *search = nullptr;
+  GtkWidget *spinner = nullptr;
   std::unique_ptr<AlbumCoverFetcher> fetcher;
   std::shared_ptr<bool> alive = std::make_shared<bool>(true);
   std::function<void(bool)> done;
   int search_gen = 0;
+  uint64_t search_id = 0;
+  bool searching = false;
 };
 
 void ClearGrid(GtkWidget *grid) {
@@ -116,6 +120,35 @@ void AddResult(SearcherState *state, const CoverProviderSearchResult &result) {
   LoadThumb(state, thumb, caption, hit, state->search_gen);
 }
 
+void ApplySearchUi(SearcherState *state) {
+  if (!state) {
+    return;
+  }
+  if (state->search) {
+    gtk_button_set_label(GTK_BUTTON(state->search), Translations::CStr(AlbumCoverSearcher::SearchButtonLabel(state->searching)));
+  }
+  if (state->artist) {
+    gtk_widget_set_sensitive(state->artist, AlbumCoverSearcher::FieldsEnabled(state->searching));
+  }
+  if (state->album) {
+    gtk_widget_set_sensitive(state->album, AlbumCoverSearcher::FieldsEnabled(state->searching));
+  }
+  if (state->title) {
+    gtk_widget_set_sensitive(state->title, AlbumCoverSearcher::FieldsEnabled(state->searching));
+  }
+  if (state->grid) {
+    gtk_widget_set_sensitive(state->grid, AlbumCoverSearcher::GridEnabled(state->searching));
+  }
+  if (state->spinner) {
+    gtk_widget_set_visible(state->spinner, AlbumCoverSearcher::BusyVisible(state->searching));
+    if (state->searching) {
+      gtk_spinner_start(GTK_SPINNER(state->spinner));
+    } else {
+      gtk_spinner_stop(GTK_SPINNER(state->spinner));
+    }
+  }
+}
+
 void StartSearch(SearcherState *state) {
   if (!state || !state->fetcher || !state->app) {
     return;
@@ -130,7 +163,38 @@ void StartSearch(SearcherState *state) {
   ++state->search_gen;
   ClearGrid(state->grid);
   gtk_label_set_text(GTK_LABEL(state->status), AlbumCoverFetcherSearch::StatusSearching(album).c_str());
-  state->fetcher->SearchForCovers(artist, album, title);
+  state->searching = true;
+  ApplySearchUi(state);
+  state->search_id = state->fetcher->SearchForCovers(artist, album, title);
+}
+
+void AbortSearch(SearcherState *state) {
+  if (!state) {
+    return;
+  }
+  ++state->search_gen;
+  state->search_id = 0;
+  ClearGrid(state->grid);
+  if (state->fetcher) {
+    state->fetcher->Clear();
+  }
+  state->searching = false;
+  if (state->status) {
+    gtk_label_set_text(GTK_LABEL(state->status), "");
+  }
+  ApplySearchUi(state);
+}
+
+void OnSearchClicked(SearcherState *state) {
+  if (!state) {
+    return;
+  }
+  ClearGrid(state->grid);
+  if (AlbumCoverSearcher::ShouldStartSearch(state->searching)) {
+    StartSearch(state);
+  } else {
+    AbortSearch(state);
+  }
 }
 
 }  // namespace
@@ -166,9 +230,14 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &s
   state->album = add_entry(AlbumCoverSearcherLabels::Album(), target.album());
   state->title = add_entry("Title", target.title());
 
-  GtkWidget *search = gtk_button_new_with_label(Translations::CStr(AlbumCoverSearcherLabels::Search()));
-  gtk_widget_add_css_class(search, "suggested-action");
-  gtk_box_append(GTK_BOX(box), search);
+  GtkWidget *search_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  state->search = gtk_button_new_with_label(Translations::CStr(AlbumCoverSearcherLabels::Search()));
+  gtk_widget_add_css_class(state->search, "suggested-action");
+  state->spinner = gtk_spinner_new();
+  gtk_widget_set_visible(state->spinner, FALSE);
+  gtk_box_append(GTK_BOX(search_row), state->search);
+  gtk_box_append(GTK_BOX(search_row), state->spinner);
+  gtk_box_append(GTK_BOX(box), search_row);
 
   state->status = gtk_label_new(AlbumCoverFetcherSearch::StatusSearching(target.album()).c_str());
   gtk_label_set_wrap(GTK_LABEL(state->status), TRUE);
@@ -201,10 +270,13 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &s
   });
 
   const auto alive = state->alive;
-  state->fetcher->SearchFinished.Connect([state, alive](uint64_t, const CoverProviderSearchResults &results, const CoverSearchStatistics &) {
-    if (!alive || !*alive || !state) {
+  state->fetcher->SearchFinished.Connect([state, alive](uint64_t id, const CoverProviderSearchResults &results, const CoverSearchStatistics &) {
+    if (!alive || !*alive || !state || id != state->search_id) {
       return;
     }
+    state->searching = false;
+    state->search_id = 0;
+    ApplySearchUi(state);
     ClearGrid(state->grid);
     for (const CoverProviderSearchResult &result : results) {
       AddResult(state, result);
@@ -212,10 +284,10 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &s
     gtk_label_set_text(GTK_LABEL(state->status), AlbumCoverFetcherSearch::StatusFound(static_cast<int>(results.size())).c_str());
   });
 
-  g_signal_connect(search, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { StartSearch(static_cast<SearcherState *>(data)); }), state);
-  g_signal_connect(state->album, "apply", G_CALLBACK(+[](AdwEntryRow *, gpointer data) { StartSearch(static_cast<SearcherState *>(data)); }), state);
-  g_signal_connect(state->artist, "apply", G_CALLBACK(+[](AdwEntryRow *, gpointer data) { StartSearch(static_cast<SearcherState *>(data)); }), state);
-  g_signal_connect(state->title, "apply", G_CALLBACK(+[](AdwEntryRow *, gpointer data) { StartSearch(static_cast<SearcherState *>(data)); }), state);
+  g_signal_connect(state->search, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { OnSearchClicked(static_cast<SearcherState *>(data)); }), state);
+  g_signal_connect(state->album, "apply", G_CALLBACK(+[](AdwEntryRow *, gpointer data) { OnSearchClicked(static_cast<SearcherState *>(data)); }), state);
+  g_signal_connect(state->artist, "apply", G_CALLBACK(+[](AdwEntryRow *, gpointer data) { OnSearchClicked(static_cast<SearcherState *>(data)); }), state);
+  g_signal_connect(state->title, "apply", G_CALLBACK(+[](AdwEntryRow *, gpointer data) { OnSearchClicked(static_cast<SearcherState *>(data)); }), state);
   g_signal_connect(state->grid, "child-activated", G_CALLBACK((+[](GtkFlowBox *, GtkFlowBoxChild *child, gpointer data) {
                      auto *self = static_cast<SearcherState *>(data);
                      GtkWidget *cell = gtk_flow_box_child_get_child(child);
@@ -242,5 +314,7 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &s
 
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
-  StartSearch(state);
+  if (AlbumCoverSearcher::ShouldAutoSearch(target.EffectiveAlbumartist(), target.album())) {
+    StartSearch(state);
+  }
 }
