@@ -245,8 +245,10 @@ std::string SmartPlaylistSearchTermWidget::CurrentValue() const {
     if (!date) {
       return {};
     }
-    return SmartPlaylistTermValue::FormatDate(g_date_time_get_year(date), g_date_time_get_month(date),
-                                              g_date_time_get_day_of_month(date));
+    const std::string formatted = SmartPlaylistTermValue::FormatDate(g_date_time_get_year(date), g_date_time_get_month(date),
+                                                                     g_date_time_get_day_of_month(date));
+    g_date_time_unref(date);
+    return formatted;
   }
   if (GTK_IS_SPIN_BUTTON(value_)) {
     return std::to_string(gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(value_)));
@@ -294,7 +296,7 @@ void SmartPlaylistSearchTermWidget::SetCurrentValue(const std::string &value) {
       }
     }
     if (date) {
-      gtk_calendar_set_date(GTK_CALENDAR(value_), date);
+      gtk_calendar_select_day(GTK_CALENDAR(value_), date);
       g_date_time_unref(date);
     }
     return;
