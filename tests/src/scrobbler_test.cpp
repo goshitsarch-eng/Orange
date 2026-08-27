@@ -13,6 +13,7 @@
 #include "scrobbler/scrobblercache.h"
 #include "scrobbler/scrobblersources.h"
 #include "scrobbler/subsonicscrobbler.h"
+#include "scrobbler/subsonicscrobblestate.h"
 
 #include <gtest/gtest.h>
 
@@ -91,6 +92,23 @@ TEST(SubsonicScrobbler, ScrobbleUrlUsesRestEndpoint) {
   EXPECT_NE(std::string::npos, url.find("id=12"));
   EXPECT_NE(std::string::npos, url.find("submission=true"));
   EXPECT_NE(std::string::npos, url.find("p=enc:"));
+}
+
+TEST(SubsonicScrobbleState, GatesNowPlayingAndSubmit) {
+  Song subsonic(Song::Source::Subsonic);
+  subsonic.set_url("subsonic://12");
+  subsonic.set_song_id("12");
+  EXPECT_TRUE(SubsonicScrobbleState::ShouldNowPlaying(subsonic, true));
+  EXPECT_FALSE(SubsonicScrobbleState::ShouldNowPlaying(subsonic, false));
+  Song local(Song::Source::Collection);
+  local.set_url("file:///a");
+  EXPECT_FALSE(SubsonicScrobbleState::ShouldNowPlaying(local, true));
+  EXPECT_TRUE(SubsonicScrobbleState::ShouldSubmit(subsonic, "subsonic://12", "12"));
+  EXPECT_FALSE(SubsonicScrobbleState::ShouldSubmit(subsonic, "subsonic://99", "99"));
+  EXPECT_EQ("12", SubsonicScrobbleState::TrackId(subsonic));
+  const std::string timed = SubsonicScrobbler::ScrobbleUrl("https://music.example.com", "alice", "secret", "12", false, true, 1700000000000);
+  EXPECT_NE(std::string::npos, timed.find("time=1700000000000"));
+  EXPECT_NE(std::string::npos, timed.find("submission=false"));
 }
 
 TEST(ScrobblerPlayingState, SameSongTimestampAndRadioPrev) {

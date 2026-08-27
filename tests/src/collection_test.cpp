@@ -17,6 +17,7 @@
 #include "subsonic/subsonicsettingsactions.h"
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
+#include "collection/collectionalbumart.h"
 #include "collection/collectionartpersist.h"
 #include "collection/collectioncuescan.h"
 #include "collection/collectiondirectoryart.h"
@@ -1151,6 +1152,39 @@ TEST(CollectionBackend, EmitsStatisticsAndRatingAfterUpdate) {
   backend.SetRating(id, 0.8f);
   EXPECT_EQ(2, stats);
   EXPECT_EQ(1, ratings);
+  unlink(path.c_str());
+}
+
+TEST(CollectionAlbumArt, PropagatesManualArtAcrossAlbum) {
+  EXPECT_TRUE(CollectionAlbumArt::ShouldPropagate(Song::Source::Collection));
+  EXPECT_FALSE(CollectionAlbumArt::ShouldPropagate(Song::Source::SomaFM));
+  const std::string path = "/tmp/strawberry-collection-albumart-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song first = MakeSong("Roads", "Portishead", "Dummy");
+  first.set_directory_id(directory);
+  first.set_art_manual("file:///tmp/old.jpg");
+  Song second = MakeSong("Wandering Star", "Portishead", "Dummy");
+  second.set_directory_id(directory);
+  second.set_url("file:///tmp/music/wandering.flac");
+  ASSERT_GT(backend.AddOrUpdateSong(first), 0);
+  ASSERT_GT(backend.AddOrUpdateSong(second), 0);
+  EXPECT_EQ(2, backend.UpdateManualAlbumArt("Portishead", "Dummy", "file:///tmp/cover.jpg"));
+  const SongList album = backend.GetAlbumSongs("Portishead", "Dummy");
+  ASSERT_EQ(2u, album.size());
+  EXPECT_EQ("file:///tmp/cover.jpg", album[0].art_manual());
+  EXPECT_EQ("file:///tmp/cover.jpg", album[1].art_manual());
+  EXPECT_FALSE(album[0].art_unset());
+  EXPECT_EQ(2, backend.UnsetAlbumArt("Portishead", "Dummy"));
+  const SongList unset = backend.GetAlbumSongs("Portishead", "Dummy");
+  ASSERT_EQ(2u, unset.size());
+  EXPECT_TRUE(unset[0].art_unset());
+  EXPECT_TRUE(unset[0].art_manual().empty());
+  EXPECT_EQ(2, backend.ClearAlbumArt("Portishead", "Dummy", false));
+  EXPECT_FALSE(backend.GetAlbumSongs("Portishead", "Dummy").front().art_unset());
   unlink(path.c_str());
 }
 

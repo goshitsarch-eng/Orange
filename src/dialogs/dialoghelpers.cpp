@@ -1,6 +1,9 @@
 #include "dialogs/dialoghelpers.h"
 
+#include "collection/collectionalbumart.h"
 #include "covermanager/coverproviders.h"
+#include "playlist/playlist.h"
+#include "playlist/playlistcoverpersist.h"
 #include "utilities/fileutils.h"
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -99,8 +102,19 @@ bool ApplyCover(Application *app, Song *song, const std::string &image, const Co
   } else if (!dest.empty()) {
     song->set_art_manual(FileUtils::UriFromPath(dest));
   }
-  if (song->id() > 0) {
+  if (CollectionAlbumArt::ShouldPropagate(song->source()) && CollectionAlbumArt::AlbumKeyValid(*song) && song->id() > 0) {
+    if (options.EffectiveType(*song) == CoverOptions::CoverType::Embedded) {
+      app->collection()->backend()->UpdateEmbeddedAlbumArt(song->EffectiveAlbumartist(), song->album(), true);
+    } else {
+      app->collection()->backend()->UpdateManualAlbumArt(song->EffectiveAlbumartist(), song->album(), song->art_manual());
+    }
+  } else if (song->id() > 0) {
     app->collection()->backend()->AddOrUpdateSong(*song);
+  }
+  if (Playlist *playlist = app->playlist_manager() ? app->playlist_manager()->active() : nullptr) {
+    if (PlaylistCoverPersist::ShouldPersistLocalArt(playlist->current_song(), *song, song->art_manual())) {
+      playlist->ReplaceRow(playlist->current_row(), *song);
+    }
   }
   return true;
 }

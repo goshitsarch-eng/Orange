@@ -38,6 +38,11 @@ class CollectionBackend {
   void SetRating(int song_id, float rating);
   void SetUnavailable(int song_id, bool unavailable);
   int ForceCompilation(const SongList &songs, bool on);
+  SongList GetAlbumSongs(const std::string &effective_albumartist, const std::string &album) const;
+  int UpdateManualAlbumArt(const std::string &effective_albumartist, const std::string &album, const std::string &art_manual);
+  int UpdateEmbeddedAlbumArt(const std::string &effective_albumartist, const std::string &album, bool embedded);
+  int ClearAlbumArt(const std::string &effective_albumartist, const std::string &album, bool art_unset = false);
+  int UnsetAlbumArt(const std::string &effective_albumartist, const std::string &album);
   int MarkMissingUnavailable(int directory_id, const std::vector<std::string> &seen_urls);
   void UpdateLastSeen(int directory_id);
   int ExpireSongs(int directory_id, int expire_days, int64_t now_sec = 0);

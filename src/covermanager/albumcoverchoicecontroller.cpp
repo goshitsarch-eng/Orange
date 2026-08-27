@@ -1,5 +1,7 @@
 #include "covermanager/albumcoverchoicecontroller.h"
 
+#include "collection/collectionalbumart.h"
+
 #include "constants/coverssettings.h"
 #include "context/contextcover.h"
 #include "core/application.h"
@@ -113,7 +115,9 @@ void AlbumCoverChoiceController::UnsetCover(Song *song, GtkWidget *image) {
   song->set_art_manual({});
   song->set_art_automatic({});
   song->set_art_embedded(false);
-  if (song->id() > 0) {
+  if (CollectionAlbumArt::ShouldPropagate(song->source()) && CollectionAlbumArt::AlbumKeyValid(*song)) {
+    app_->collection()->backend()->UnsetAlbumArt(song->EffectiveAlbumartist(), song->album());
+  } else if (song->id() > 0) {
     app_->collection()->backend()->AddOrUpdateSong(*song);
   }
   ApplyImage(song, image, {});
@@ -126,7 +130,9 @@ void AlbumCoverChoiceController::ClearCover(Song *song, GtkWidget *image) {
   song->set_art_manual({});
   song->set_art_automatic({});
   song->set_art_unset(false);
-  if (song->id() > 0) {
+  if (CollectionAlbumArt::ShouldPropagate(song->source()) && CollectionAlbumArt::AlbumKeyValid(*song)) {
+    app_->collection()->backend()->ClearAlbumArt(song->EffectiveAlbumartist(), song->album(), false);
+  } else if (song->id() > 0) {
     app_->collection()->backend()->AddOrUpdateSong(*song);
   }
   const auto data = app_->albumcover_loader()->LoadData(*song);
@@ -155,7 +161,9 @@ void AlbumCoverChoiceController::DeleteCover(Song *song, GtkWidget *image) {
   song->set_art_automatic({});
   song->set_art_embedded(false);
   song->set_art_unset(false);
-  if (song->id() > 0) {
+  if (CollectionAlbumArt::ShouldPropagate(song->source()) && CollectionAlbumArt::AlbumKeyValid(*song)) {
+    app_->collection()->backend()->ClearAlbumArt(song->EffectiveAlbumartist(), song->album(), false);
+  } else if (song->id() > 0) {
     app_->collection()->backend()->AddOrUpdateSong(*song);
   }
   ApplyImage(song, image, {});

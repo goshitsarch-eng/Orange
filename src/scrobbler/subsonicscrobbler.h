@@ -3,6 +3,7 @@
 
 #include "scrobbler/audioscrobbler.h"
 
+#include <cstdint>
 #include <string>
 
 class SubsonicScrobbler : public ScrobblerService {
@@ -16,12 +17,15 @@ class SubsonicScrobbler : public ScrobblerService {
   void Authenticate(const std::string &username, const std::string &password) override;
 
   static std::string ScrobbleUrl(const std::string &server_url, const std::string &username, const std::string &password, const std::string &id,
-                                 bool submission, bool hex_auth);
+                                 bool submission, bool hex_auth, int64_t time_ms = 0);
 
  private:
-  void Ping(const Song &song, bool submission);
+  void Ping(const Song &song, bool submission, int64_t time_ms);
 
   NetworkAccessManager *network_ = nullptr;
+  std::string playing_url_;
+  std::string playing_song_id_;
+  int64_t playing_time_ms_ = 0;
 };
 
 #endif

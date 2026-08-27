@@ -8,6 +8,10 @@
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistfilterindex.h"
+#include "playlist/playlistcoverpersist.h"
+#include "playlist/playlistqueuedequeue.h"
+#include "playlist/playlistreloadrows.h"
+#include "playlist/playliststreamstate.h"
 #include "playlist/playlistplayed.h"
 #include "playlist/playlistshuffle.h"
 #include "playlist/playlistdelegates.h"
@@ -31,7 +35,17 @@ void Playlist::set_current_row(int row) {
     CurrentChanged.Emit(current_row_);
     return;
   }
-  current_row_ = std::clamp(row, 0, static_cast<int>(songs_.size()) - 1);
+  const int next_row = std::clamp(row, 0, static_cast<int>(songs_.size()) - 1);
+  if (next_row != current_row_) {
+    Song *current = current_row_ >= 0 && current_row_ < row_count() ? &songs_[static_cast<size_t>(current_row_)] : nullptr;
+    const int peek = PeekNextRow();
+    Song *next = peek >= 0 && peek < row_count() ? &songs_[static_cast<size_t>(peek)] : nullptr;
+    PlaylistStreamState::ClearForRowChange(current, next);
+    if (PlaylistQueueDequeue::ShouldDequeue(id_, next_row, queue_)) {
+      queue_.TakeNext();
+    }
+  }
+  current_row_ = next_row;
   SyncVirtualIndex();
   UpdateScrobblePoint();
   CurrentChanged.Emit(current_row_);
@@ -329,16 +343,21 @@ void Playlist::RemoveDuplicates() {
   Changed.Emit();
 }
 
-void Playlist::InvalidateDeletedSongs() {
+void Playlist::InvalidateDeletedSongs(TagReader *tagreader) {
   bool changed = false;
-  for (Song &song : songs_) {
+  for (int i = 0; i < row_count(); ++i) {
+    Song &song = songs_[static_cast<size_t>(i)];
     if (!PlaylistBehaviour::IsLocalMedia(song)) {
       continue;
     }
     const std::string path = FileUtils::PathFromUri(song.url());
     const bool exists = !path.empty() && FileUtils::Exists(path);
+    const Song before = song;
     if (PlaylistBehaviour::ApplyLocalExistence(&song, exists)) {
       changed = true;
+    }
+    if (tagreader && PlaylistReloadRows::ShouldReload(before, exists)) {
+      ReloadRow(i, tagreader);
     }
   }
   if (changed) {
@@ -347,11 +366,14 @@ void Playlist::InvalidateDeletedSongs() {
 }
 
 bool Playlist::ApplyValidityOnCurrentSong(const std::string &url, bool valid) {
-  (void)url;
   if (current_row_ < 0 || current_row_ >= row_count()) {
     return false;
   }
-  if (PlaylistBehaviour::ApplyValidity(&songs_[static_cast<size_t>(current_row_)], valid)) {
+  Song &song = songs_[static_cast<size_t>(current_row_)];
+  if (!url.empty() && song.url() != url) {
+    return false;
+  }
+  if (PlaylistBehaviour::ApplyValidity(&song, valid)) {
     Changed.Emit();
   }
   return true;

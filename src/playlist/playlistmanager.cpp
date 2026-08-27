@@ -50,7 +50,7 @@ void PlaylistManager::LoadAll() {
     settings.BeginGroup(PlaylistSettings::kSettingsGroup);
     if (settings.BoolValue(PlaylistSettings::kGreyoutSongsStartup, PlaylistSettings::kDefaultGreyoutSongsStartup)) {
       for (const auto &playlist : playlists_) {
-        playlist->InvalidateDeletedSongs();
+        playlist->InvalidateDeletedSongs(tagreader_);
       }
     }
   }

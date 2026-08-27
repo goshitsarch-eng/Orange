@@ -52,7 +52,7 @@ class Playlist {
   void Shuffle();
   void RemoveDuplicates();
   void RemoveUnavailable();
-  void InvalidateDeletedSongs();
+  void InvalidateDeletedSongs(class TagReader *tagreader = nullptr);
   bool ApplyValidityOnCurrentSong(const std::string &url, bool valid);
   void set_auto_sort(bool auto_sort) { auto_sort_ = auto_sort; }
   bool auto_sort() const { return auto_sort_; }

@@ -1,5 +1,6 @@
 #include "collection/collectionbackend.h"
 
+#include "collection/collectionalbumart.h"
 #include "collection/collectionartpersist.h"
 #include "collection/collectioncompilation.h"
 #include "collection/collectioncompilationdetect.h"
@@ -572,6 +573,71 @@ int CollectionBackend::ExpireSongs(int directory_id, int expire_days, int64_t no
     SongsDeleted.Emit(expired);
   }
   return removed;
+}
+
+SongList CollectionBackend::GetAlbumSongs(const std::string &effective_albumartist, const std::string &album) const {
+  SongList songs;
+  if (!CollectionAlbumArt::AlbumKeyValid(effective_albumartist, album) || !database_ || !database_->handle()) {
+    return songs;
+  }
+  SqlQuery query(database_,
+                 "SELECT ROWID, " + std::string(Song::kColumnSpec) +
+                     " FROM songs WHERE effective_albumartist = ? AND album = ? AND unavailable = 0");
+  query.Bind(1, effective_albumartist);
+  query.Bind(2, album);
+  while (query.Step()) {
+    songs.push_back(SongFromQuery(query));
+  }
+  return songs;
+}
+
+int CollectionBackend::UpdateManualAlbumArt(const std::string &effective_albumartist, const std::string &album,
+                                            const std::string &art_manual) {
+  if (!CollectionAlbumArt::AlbumKeyValid(effective_albumartist, album) || !database_ || !database_->handle()) {
+    return 0;
+  }
+  SqlQuery query(database_,
+                 "UPDATE songs SET art_manual = ?, art_unset = 0 WHERE effective_albumartist = ? AND album = ? AND unavailable = 0");
+  query.Bind(1, art_manual);
+  query.Bind(2, effective_albumartist);
+  query.Bind(3, album);
+  query.Exec();
+  const SongList songs = GetAlbumSongs(effective_albumartist, album);
+  if (!songs.empty()) {
+    SongsDiscovered.Emit(songs);
+  }
+  return static_cast<int>(songs.size());
+}
+
+int CollectionBackend::UpdateEmbeddedAlbumArt(const std::string &effective_albumartist, const std::string &album, bool embedded) {
+  if (!CollectionAlbumArt::AlbumKeyValid(effective_albumartist, album) || !database_ || !database_->handle()) {
+    return 0;
+  }
+  SqlQuery query(database_,
+                 "UPDATE songs SET art_embedded = ?, art_unset = 0 WHERE effective_albumartist = ? AND album = ? AND unavailable = 0");
+  query.Bind(1, embedded ? 1 : 0);
+  query.Bind(2, effective_albumartist);
+  query.Bind(3, album);
+  query.Exec();
+  return static_cast<int>(GetAlbumSongs(effective_albumartist, album).size());
+}
+
+int CollectionBackend::ClearAlbumArt(const std::string &effective_albumartist, const std::string &album, bool art_unset) {
+  if (!CollectionAlbumArt::AlbumKeyValid(effective_albumartist, album) || !database_ || !database_->handle()) {
+    return 0;
+  }
+  SqlQuery query(database_,
+                 "UPDATE songs SET art_embedded = 0, art_automatic = '', art_manual = '', art_unset = ? "
+                 "WHERE effective_albumartist = ? AND album = ? AND unavailable = 0");
+  query.Bind(1, art_unset ? 1 : 0);
+  query.Bind(2, effective_albumartist);
+  query.Bind(3, album);
+  query.Exec();
+  return static_cast<int>(GetAlbumSongs(effective_albumartist, album).size());
+}
+
+int CollectionBackend::UnsetAlbumArt(const std::string &effective_albumartist, const std::string &album) {
+  return ClearAlbumArt(effective_albumartist, album, true);
 }
 
 int CollectionBackend::SongCount() const {

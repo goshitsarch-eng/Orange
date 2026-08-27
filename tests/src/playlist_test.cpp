@@ -18,6 +18,10 @@
 #include "playlist/playlistsaveschedule.h"
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistcoverpersist.h"
+#include "playlist/playlistqueuedequeue.h"
+#include "playlist/playlistreloadrows.h"
+#include "playlist/playliststreamstate.h"
 #include "playlist/playlistfilterindex.h"
 #include "playlist/playlistfilterdelay.h"
 #include "playlist/playlistfilterempty.h"
@@ -777,6 +781,92 @@ TEST(DynamicPlaylistMaintenance, HistoryFutureAndTrimCounts) {
   EXPECT_EQ(3, DynamicPlaylistMaintenance::FutureInsertCount(10, PlaylistGenerator::kDefaultDynamicFuture, 18));
   EXPECT_TRUE(DynamicPlaylistMaintenance::ShouldClearUndo(true, true));
   EXPECT_FALSE(DynamicPlaylistMaintenance::ShouldClearUndo(false, true));
+}
+
+TEST(PlaylistStreamState, ClearsResolvedStreamUrl) {
+  Song song;
+  song.set_url("tidal://1");
+  song.set_stream_url("https://cdn.example/a.flac");
+  song.set_valid(true);
+  PlaylistStreamState::ClearResolved(&song);
+  EXPECT_EQ("tidal://1", song.url());
+  EXPECT_EQ("tidal://1", song.stream_url());
+  Song next;
+  next.set_url("tidal://2");
+  next.set_stream_url("https://cdn.example/b.flac");
+  PlaylistStreamState::ClearForRowChange(&song, &next);
+  EXPECT_EQ("tidal://2", next.stream_url());
+}
+
+TEST(Playlist, ClearingStreamUrlOnRowChange) {
+  Playlist playlist;
+  Song current;
+  current.set_title("Now");
+  current.set_url("tidal://1");
+  current.set_stream_url("https://cdn.example/a.flac");
+  current.set_valid(true);
+  Song upcoming;
+  upcoming.set_title("Next");
+  upcoming.set_url("tidal://2");
+  upcoming.set_stream_url("https://cdn.example/b.flac");
+  upcoming.set_valid(true);
+  playlist.AppendSongs({current, upcoming});
+  playlist.set_current_row(0);
+  playlist.ReplaceRow(0, current);
+  playlist.ReplaceRow(1, upcoming);
+  EXPECT_EQ("https://cdn.example/a.flac", playlist.song(0).stream_url());
+  playlist.set_current_row(1);
+  EXPECT_EQ("tidal://1", playlist.song(0).stream_url());
+  EXPECT_EQ("tidal://2", playlist.song(1).url());
+}
+
+TEST(PlaylistQueueDequeue, FrontQueuedRow) {
+  Queue queue;
+  Song song;
+  song.set_url("file:///a");
+  song.set_valid(true);
+  queue.Append(song, 7, 3);
+  EXPECT_TRUE(PlaylistQueueDequeue::ShouldDequeue(7, 3, queue));
+  EXPECT_FALSE(PlaylistQueueDequeue::ShouldDequeue(7, 4, queue));
+  EXPECT_FALSE(PlaylistQueueDequeue::ShouldDequeue(8, 3, queue));
+  Playlist playlist;
+  playlist.set_id(7);
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  playlist.AppendSongs({a, b});
+  playlist.set_current_row(1);
+  playlist.queue()->Append(a, 7, 0);
+  EXPECT_EQ(1, playlist.queue()->size());
+  playlist.set_current_row(0);
+  EXPECT_EQ(0, playlist.queue()->size());
+}
+
+TEST(PlaylistReloadRows, ReloadsUnavailableLocalFiles) {
+  Song local(Song::Source::Collection);
+  local.set_url("file:///tmp/music/a.flac");
+  local.set_unavailable(true);
+  EXPECT_TRUE(PlaylistReloadRows::ShouldReload(local, true));
+  EXPECT_FALSE(PlaylistReloadRows::ShouldReload(local, false));
+  Song stream(Song::Source::Tidal);
+  stream.set_url("tidal://1");
+  stream.set_unavailable(true);
+  EXPECT_FALSE(PlaylistReloadRows::ShouldReload(stream, true));
+}
+
+TEST(PlaylistCoverPersist, LocalFileWithoutCollectionId) {
+  Song row(Song::Source::LocalFile);
+  row.set_url("file:///tmp/a.flac");
+  row.set_id(-1);
+  Song playing = row;
+  EXPECT_TRUE(PlaylistCoverPersist::ShouldPersistLocalArt(row, playing, "file:///cover.jpg"));
+  row.set_id(4);
+  EXPECT_FALSE(PlaylistCoverPersist::ShouldPersistLocalArt(row, playing, "file:///cover.jpg"));
 }
 
 TEST(PlayerLoadResult, MatchesNextRowAndAppliesStreamUrl) {

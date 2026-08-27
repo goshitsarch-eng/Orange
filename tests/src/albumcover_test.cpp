@@ -1,3 +1,5 @@
+#include "collection/collectionalbumart.h"
+#include "playlist/playlistcoverpersist.h"
 #include "covermanager/coverchoicemenu.h"
 #include "covermanager/covermanageractions.h"
 #include "covermanager/covermanagermenu.h"
@@ -71,6 +73,18 @@ TEST(CoverSearchStatistics, AverageDimensionsAndAccumulate) {
   EXPECT_EQ(4u, a.total_images_by_provider["Last.fm"]);
   EXPECT_EQ(2u, a.total_images_by_provider["Deezer"]);
   EXPECT_EQ("400x300", a.AverageDimensions());
+}
+
+TEST(CollectionAlbumArt, PropagatesCollectionNotRadio) {
+  EXPECT_TRUE(CollectionAlbumArt::ShouldPropagate(Song::Source::Collection));
+  EXPECT_TRUE(CollectionAlbumArt::ShouldPropagate(Song::Source::Device));
+  EXPECT_FALSE(CollectionAlbumArt::ShouldPropagate(Song::Source::SomaFM));
+  Song song;
+  song.set_album("Dummy");
+  song.set_artist("Portishead");
+  EXPECT_TRUE(CollectionAlbumArt::AlbumKeyValid(song));
+  song.set_album({});
+  EXPECT_FALSE(CollectionAlbumArt::AlbumKeyValid(song));
 }
 
 TEST(CoverFetchPolicy, StopsFetchWhenScoreIsGood) {
