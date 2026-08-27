@@ -38,6 +38,7 @@ GstEngine::~GstEngine() {
   BufferingFinished();
   StopAllFadeouts();
   current_.reset();
+  old_pipelines_.clear();
   DestroyDiscoverer();
 }
 
@@ -287,7 +288,9 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   CancelFade();
   CancelSeek();
   DiscardNext();
-  current_.reset();
+  if (current_) {
+    FinishPipeline(std::move(current_));
+  }
   faded_out_to_pause_ = false;
   about_to_end_emitted_ = false;
   media_url_ = media_url;
@@ -306,7 +309,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
 }
 
 bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
-  if (EngineFadeout::ShouldDelayExclusivePlay(exclusive_mode_, static_cast<int>(fadeout_pipelines_.size()))) {
+  if (EngineFadeout::ShouldDelayExclusivePlay(exclusive_mode_, static_cast<int>(fadeout_pipelines_.size()), OldPipelineCount())) {
     delayed_play_pending_ = true;
     delayed_play_pause_ = pause;
     delayed_play_offset_nanosec_ = offset_nanosec;
@@ -540,7 +543,7 @@ void GstEngine::StartFadeout(std::unique_ptr<GstEnginePipeline> pipeline) {
     return;
   }
   if (!EngineFadeout::ShouldInsert(pipeline->id(), fadeout_pipelines_.count(pipeline->id()) != 0)) {
-    pipeline->Stop();
+    FinishPipeline(std::move(pipeline));
     return;
   }
   FadeoutState state;
@@ -568,12 +571,15 @@ void GstEngine::CancelStopFade() {
 
 void GstEngine::StopAllFadeouts() {
   CancelStopFade();
+  std::vector<std::unique_ptr<GstEnginePipeline>> outgoing;
+  outgoing.reserve(fadeout_pipelines_.size());
   for (auto &entry : fadeout_pipelines_) {
-    if (entry.second.pipeline) {
-      entry.second.pipeline->Stop();
-    }
+    outgoing.push_back(std::move(entry.second.pipeline));
   }
   fadeout_pipelines_.clear();
+  for (auto &pipeline : outgoing) {
+    FinishPipeline(std::move(pipeline));
+  }
 }
 
 void GstEngine::RemoveFadeout(int pipeline_id) {
@@ -581,13 +587,12 @@ void GstEngine::RemoveFadeout(int pipeline_id) {
   if (it == fadeout_pipelines_.end()) {
     return;
   }
-  if (it->second.pipeline) {
-    it->second.pipeline->Stop();
-  }
+  auto pipeline = std::move(it->second.pipeline);
   fadeout_pipelines_.erase(it);
   if (fadeout_pipelines_.empty()) {
     CancelStopFade();
   }
+  FinishPipeline(std::move(pipeline));
 }
 
 gboolean GstEngine::StopFadeTick(gpointer data) {
@@ -608,21 +613,13 @@ gboolean GstEngine::StopFadeTick(gpointer data) {
     if (it == self->fadeout_pipelines_.end()) {
       continue;
     }
-    if (it->second.pipeline) {
-      it->second.pipeline->Stop();
-    }
+    auto pipeline = std::move(it->second.pipeline);
     self->fadeout_pipelines_.erase(it);
+    self->FinishPipeline(std::move(pipeline));
   }
   if (!EngineFadeout::TimerNeeded(static_cast<int>(self->fadeout_pipelines_.size()))) {
     self->fadeout_timeout_id_ = 0;
-    if (self->delayed_play_pending_) {
-      const bool pause = self->delayed_play_pause_;
-      const uint64_t offset = self->delayed_play_offset_nanosec_;
-      self->delayed_play_pending_ = false;
-      self->Play(pause, offset);
-    } else if (EngineFadeout::ShouldEmitFinished(self->current_ != nullptr, static_cast<int>(self->fadeout_pipelines_.size()))) {
-      self->Finished.Emit();
-    }
+    self->MaybeFinishDelayedPlay();
     return G_SOURCE_REMOVE;
   }
   return G_SOURCE_CONTINUE;
@@ -632,23 +629,59 @@ void GstEngine::FinishStopImmediate() {
   CancelSeek();
   StopAllFadeouts();
   if (current_) {
-    current_->Stop();
+    FinishPipeline(std::move(current_));
   }
-  current_.reset();
   media_url_.clear();
   stream_url_.clear();
   gapless_pending_ = false;
   faded_out_to_pause_ = false;
   delayed_play_pending_ = false;
   SetState(State::Empty);
-  if (EngineFadeout::ShouldEmitFinished(current_ != nullptr, static_cast<int>(fadeout_pipelines_.size()))) {
+  if (EngineFadeout::ShouldEmitFinished(current_ != nullptr, static_cast<int>(fadeout_pipelines_.size()), OldPipelineCount())) {
+    Finished.Emit();
+  }
+}
+
+void GstEngine::FinishPipeline(std::unique_ptr<GstEnginePipeline> pipeline) {
+  if (!pipeline) {
+    return;
+  }
+  const int id = pipeline->id();
+  if (old_pipelines_.count(id) != 0) {
+    return;
+  }
+  pipeline->Finished = [this, id]() { OnPipelineFinished(id); };
+  if (pipeline->Finish()) {
+    pipeline.reset();
+    return;
+  }
+  old_pipelines_[id] = std::move(pipeline);
+}
+
+void GstEngine::OnPipelineFinished(int pipeline_id) {
+  old_pipelines_.erase(pipeline_id);
+  MaybeFinishDelayedPlay();
+}
+
+void GstEngine::MaybeFinishDelayedPlay() {
+  if (delayed_play_pending_) {
+    if (EngineFadeout::ShouldDelayExclusivePlay(exclusive_mode_, static_cast<int>(fadeout_pipelines_.size()), OldPipelineCount())) {
+      return;
+    }
+    const bool pause = delayed_play_pause_;
+    const uint64_t offset = delayed_play_offset_nanosec_;
+    delayed_play_pending_ = false;
+    Play(pause, offset);
+    return;
+  }
+  if (EngineFadeout::ShouldEmitFinished(current_ != nullptr, static_cast<int>(fadeout_pipelines_.size()), OldPipelineCount())) {
     Finished.Emit();
   }
 }
 
 void GstEngine::FinishCrossfade() {
   if (current_) {
-    current_->Stop();
+    FinishPipeline(std::move(current_));
   }
   current_ = std::move(next_);
   media_url_ = std::move(next_media_url_);
@@ -663,8 +696,7 @@ void GstEngine::FinishCrossfade() {
 
 void GstEngine::DiscardNext() {
   if (next_) {
-    next_->Stop();
-    next_.reset();
+    FinishPipeline(std::move(next_));
   }
   next_media_url_.clear();
   next_url_.clear();
@@ -817,7 +849,9 @@ void GstEngine::HandlePipelineError(int pipeline_id, int domain, int code, const
   if (GstEngineError::ShouldTearDownCurrent(current_ != nullptr, current_ ? current_->id() : 0, pipeline_id)) {
     const std::string url = stream_url_;
     CancelFade();
-    current_.reset();
+    if (current_) {
+      FinishPipeline(std::move(current_));
+    }
     DiscardNext();
     gapless_pending_ = false;
     BufferingFinished();

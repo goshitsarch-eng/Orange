@@ -24,6 +24,7 @@
 #include "engine/backendoptions.h"
 #include "engine/engineabouttoend.h"
 #include "engine/engineexclusive.h"
+#include "engine/enginepipelinefinish.h"
 #include "core/exitfade.h"
 #include "engine/enginefade.h"
 #include "engine/enginefadeout.h"
@@ -1052,6 +1053,11 @@ TEST(EngineFadeout, OverlappingFadesMatchQtMap) {
   EXPECT_FALSE(EngineFadeout::ShouldEmitFinished(true, 0));
   EXPECT_TRUE(EngineFadeout::ShouldDelayExclusivePlay(true, 1));
   EXPECT_FALSE(EngineFadeout::ShouldDelayExclusivePlay(true, 0));
+  EXPECT_TRUE(EngineFadeout::ShouldDelayExclusivePlay(true, 0, 1));
+  EXPECT_FALSE(EngineFadeout::ShouldDelayExclusivePlay(true, 0, 0));
+  EXPECT_FALSE(EngineFadeout::ShouldDelayExclusivePlay(false, 1, 1));
+  EXPECT_TRUE(EngineFadeout::ShouldEmitFinished(false, 0, 0));
+  EXPECT_FALSE(EngineFadeout::ShouldEmitFinished(false, 0, 1));
   EXPECT_TRUE(EngineFadeout::PromoteNextOnPlay(true, true));
   EXPECT_FALSE(EngineFadeout::PromoteNextOnPlay(true, false));
 }
@@ -1081,6 +1087,25 @@ TEST(EngineExclusive, BlocksSecondPipelineAndDelaysPlay) {
   EXPECT_TRUE(EngineExclusive::ShouldDelayPlay(true, true));
   EXPECT_FALSE(EngineExclusive::ShouldDelayPlay(true, false));
   EXPECT_FALSE(EngineExclusive::ShouldDelayPlay(false, true));
+  EXPECT_TRUE(EngineExclusive::OldExclusivePipelineActive(true, 0, 1));
+  EXPECT_TRUE(EngineExclusive::OldExclusivePipelineActive(true, 1, 0));
+  EXPECT_FALSE(EngineExclusive::OldExclusivePipelineActive(true, 0, 0));
+  EXPECT_FALSE(EngineExclusive::OldExclusivePipelineActive(false, 1, 1));
+}
+
+TEST(EnginePipelineFinish, KeepUntilBusWhenNotAlreadyIdle) {
+  EXPECT_TRUE(EnginePipelineFinish::AlreadyFinished(false, false, false));
+  EXPECT_TRUE(EnginePipelineFinish::AlreadyFinished(true, true, false));
+  EXPECT_FALSE(EnginePipelineFinish::AlreadyFinished(true, true, true));
+  EXPECT_FALSE(EnginePipelineFinish::AlreadyFinished(true, false, false));
+  EXPECT_TRUE(EnginePipelineFinish::ChangeInProgress(true, false));
+  EXPECT_TRUE(EnginePipelineFinish::ChangeInProgress(false, true));
+  EXPECT_FALSE(EnginePipelineFinish::ChangeInProgress(false, false));
+  EXPECT_TRUE(EnginePipelineFinish::KeepUntilFinished(false));
+  EXPECT_FALSE(EnginePipelineFinish::KeepUntilFinished(true));
+  EXPECT_TRUE(EnginePipelineFinish::ShouldEmitIdleFinished(true, false, true));
+  EXPECT_FALSE(EnginePipelineFinish::ShouldEmitIdleFinished(true, true, true));
+  EXPECT_FALSE(EnginePipelineFinish::ShouldEmitIdleFinished(false, false, true));
 }
 
 TEST(EngineSeek, CoalescesRapidSeeksLikeQt) {

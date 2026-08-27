@@ -1,6 +1,7 @@
 #include "engine/gstenginepipeline.h"
 
 #include "engine/enginebuffering.h"
+#include "engine/enginepipelinefinish.h"
 #include "engine/ebur128normalization.h"
 #include "engine/gstenginesourcesetup.h"
 #include "engine/gsturl.h"
@@ -21,10 +22,7 @@ GstEnginePipeline::GstEnginePipeline(int id) : id_(id) {}
 GstEnginePipeline::~GstEnginePipeline() {
   CancelWarmup();
   Stop();
-  if (bus_watch_id_) {
-    g_source_remove(bus_watch_id_);
-    bus_watch_id_ = 0;
-  }
+  DisconnectBus();
   if (playbin_) {
     gst_object_unref(playbin_);
     playbin_ = nullptr;
@@ -278,6 +276,74 @@ void GstEnginePipeline::Stop() {
   }
 }
 
+void GstEnginePipeline::DisconnectEngineCallbacks() {
+  AboutToFinish = nullptr;
+  EosReached = nullptr;
+  StreamStarted = nullptr;
+  ErrorOccurred = nullptr;
+  SpectrumReady = nullptr;
+  TagsReady = nullptr;
+  Buffering = nullptr;
+  VolumeChanged = nullptr;
+}
+
+void GstEnginePipeline::DisconnectBus() {
+  if (bus_watch_id_) {
+    g_source_remove(bus_watch_id_);
+    bus_watch_id_ = 0;
+  }
+}
+
+bool GstEnginePipeline::Finish() {
+  finish_requested_ = true;
+  DisconnectEngineCallbacks();
+  CancelWarmup();
+  buffering_ = false;
+  restore_playing_ = false;
+  if (!playbin_) {
+    finished_ = true;
+    return true;
+  }
+  GstState state = GST_STATE_NULL;
+  GstState pending = GST_STATE_VOID_PENDING;
+  const GstStateChangeReturn query = gst_element_get_state(playbin_, &state, &pending, 0);
+  const bool in_progress =
+      EnginePipelineFinish::ChangeInProgress(query == GST_STATE_CHANGE_ASYNC, pending != GST_STATE_VOID_PENDING);
+  if (EnginePipelineFinish::AlreadyFinished(true, state == GST_STATE_NULL, in_progress)) {
+    finished_ = true;
+    DisconnectBus();
+    return true;
+  }
+  const GstStateChangeReturn set = gst_element_set_state(playbin_, GST_STATE_NULL);
+  if (set == GST_STATE_CHANGE_SUCCESS || set == GST_STATE_CHANGE_NO_PREROLL) {
+    GstState now = GST_STATE_NULL;
+    GstState pend = GST_STATE_VOID_PENDING;
+    gst_element_get_state(playbin_, &now, &pend, 0);
+    if (now == GST_STATE_NULL && pend == GST_STATE_VOID_PENDING) {
+      finished_ = true;
+      DisconnectBus();
+      return true;
+    }
+  }
+  return false;
+}
+
+void GstEnginePipeline::MaybeEmitFinished(bool reached_null) {
+  if (!EnginePipelineFinish::ShouldEmitIdleFinished(finish_requested_, finished_, reached_null)) {
+    return;
+  }
+  finished_ = true;
+  g_idle_add(GstEnginePipeline::FinishedIdle, this);
+}
+
+gboolean GstEnginePipeline::FinishedIdle(gpointer data) {
+  auto *self = static_cast<GstEnginePipeline *>(data);
+  if (self->Finished) {
+    self->Finished();
+  }
+  return G_SOURCE_REMOVE;
+}
+
 void GstEnginePipeline::Pause() {
   if (playbin_) {
     gst_element_set_state(playbin_, GST_STATE_PAUSED);
@@ -418,6 +484,17 @@ gboolean GstEnginePipeline::BusCallback(GstBus *, GstMessage *message, gpointer 
       break;
     case GST_MESSAGE_BUFFERING:
       self->HandleBuffering(message);
+      break;
+    case GST_MESSAGE_STATE_CHANGED:
+      if (self->playbin_ && GST_MESSAGE_SRC(message) == GST_OBJECT(self->playbin_)) {
+        GstState old_state = GST_STATE_NULL;
+        GstState new_state = GST_STATE_NULL;
+        GstState pending = GST_STATE_VOID_PENDING;
+        gst_message_parse_state_changed(message, &old_state, &new_state, &pending);
+        (void)old_state;
+        (void)pending;
+        self->MaybeEmitFinished(new_state == GST_STATE_NULL);
+      }
       break;
     default:
       break;

@@ -11,6 +11,10 @@ inline bool ShouldCrossfade(bool want_crossfade, bool exclusive) { return want_c
 // Qt GstEngine::Play: OldExclusivePipelineActive() delays Play until fadeout finishes.
 inline bool ShouldDelayPlay(bool exclusive, bool exclusive_fadeout_active) { return exclusive && exclusive_fadeout_active; }
 
+inline bool OldExclusivePipelineActive(bool exclusive, int fadeout_count, int old_count) {
+  return exclusive && (fadeout_count > 0 || old_count > 0);
+}
+
 }  // namespace EngineExclusive
 
 #endif  // STRAWBERRY_ENGINEEXCLUSIVE_H

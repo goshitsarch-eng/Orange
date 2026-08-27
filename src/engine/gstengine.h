@@ -104,6 +104,10 @@ class GstEngine : public EngineBase {
   void RemoveFadeout(int pipeline_id);
   static gboolean StopFadeTick(gpointer data);
   void FinishStopImmediate();
+  void FinishPipeline(std::unique_ptr<GstEnginePipeline> pipeline);
+  void OnPipelineFinished(int pipeline_id);
+  void MaybeFinishDelayedPlay();
+  int OldPipelineCount() const { return static_cast<int>(old_pipelines_.size()); }
   void SeekNow();
   void CancelSeek();
   void PlayDone(bool pause);
@@ -132,6 +136,7 @@ class GstEngine : public EngineBase {
   std::unique_ptr<GstEnginePipeline> current_;
   std::unique_ptr<GstEnginePipeline> next_;
   std::map<int, FadeoutState> fadeout_pipelines_;
+  std::map<int, std::unique_ptr<GstEnginePipeline>> old_pipelines_;
   GstDiscoverer *discoverer_ = nullptr;
   gulong discovered_handler_ = 0;
   gulong finished_handler_ = 0;

@@ -52,6 +52,9 @@ class GstEnginePipeline {
               bool playbin3 = false, const GstPipelineExtras &extras = {});
   bool Play(bool pause, uint64_t offset_nanosec);
   void Stop();
+  // Async NULL teardown. Returns true when already idle. Do not call from unit tests.
+  bool Finish();
+  void DisconnectEngineCallbacks();
   void Pause();
   void Unpause();
   void Seek(uint64_t offset_nanosec);
@@ -76,10 +79,14 @@ class GstEnginePipeline {
   std::function<void(int, const Song &)> TagsReady;
   std::function<void(int, int)> Buffering;
   std::function<void(unsigned)> VolumeChanged;
+  std::function<void()> Finished;
 
  private:
   static gboolean BusCallback(GstBus *bus, GstMessage *message, gpointer data);
   static void AboutToFinishCb(GstElement *playbin, gpointer data);
+  static gboolean FinishedIdle(gpointer data);
+  void DisconnectBus();
+  void MaybeEmitFinished(bool reached_null);
   void HandleBuffering(GstMessage *message);
   void FinishBufferingOnSourceSetup();
   GstElement *MakeAudioSink(const std::string &output, const std::string &device) const;
@@ -116,6 +123,8 @@ class GstEnginePipeline {
   bool buffering_ = false;
   bool restore_playing_ = false;
   bool volume_full_range_ = false;
+  bool finish_requested_ = false;
+  bool finished_ = false;
 };
 
 #endif  // STRAWBERRY_GSTENGINEPIPELINE_H
