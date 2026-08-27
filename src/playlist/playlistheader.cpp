@@ -17,6 +17,7 @@ PlaylistHeader::PlaylistHeader() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
   gtk_widget_add_css_class(widget_, "toolbar");
   gtk_widget_add_css_class(widget_, "strawberry-playlist-buttons");
+  gtk_widget_set_focusable(widget_, TRUE);
   GtkGesture *gesture = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(gesture));
@@ -24,6 +25,13 @@ PlaylistHeader::PlaylistHeader() {
                      auto *self = static_cast<PlaylistHeader *>(data);
                      self->ShowMenu(self->ColumnAtX(x));
                    }),
+                   this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(widget_, keys);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<PlaylistHeader *>(data)->OnKeyPressed(keyval, state);
+                   })),
                    this);
   GtkEventController *motion = gtk_event_controller_motion_new();
   gtk_widget_add_controller(widget_, motion);
@@ -48,6 +56,18 @@ PlaylistHeader::PlaylistHeader() {
                      static_cast<PlaylistHeader *>(data)->OnDragEnd();
                    }),
                    this);
+}
+
+gboolean PlaylistHeader::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (!PlaylistHeaderSort::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    return FALSE;
+  }
+  if (PlaylistHeaderSort::ShouldShowMenu()) {
+    const auto visible = PlaylistColumnLayout::Visible();
+    const PlaylistColumn first = visible.empty() ? PlaylistColumn::Title : visible.front();
+    ShowMenu(PlaylistHeaderSort::ColumnForMenu(true, ColumnAtX(0), first));
+  }
+  return TRUE;
 }
 
 void PlaylistHeader::SetSortState(PlaylistColumn column, bool descending) {

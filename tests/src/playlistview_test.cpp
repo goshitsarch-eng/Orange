@@ -728,6 +728,15 @@ TEST(PlaylistTabNavigation, WrapsLikeQtShortcuts) {
   EXPECT_EQ(-1, PlaylistTabNavigation::ActiveIndex(-1, 3));
 }
 
+TEST(PlaylistHeaderSort, KeyboardUsesFirstVisibleColumn) {
+  EXPECT_TRUE(PlaylistHeaderSort::IsKeyboardTrigger(PlaylistHeaderSort::kMenu, 0));
+  EXPECT_TRUE(PlaylistHeaderSort::IsKeyboardTrigger(PlaylistHeaderSort::kF10, PlaylistHeaderSort::kShiftMask));
+  EXPECT_FALSE(PlaylistHeaderSort::IsKeyboardTrigger(PlaylistHeaderSort::kF10, 0));
+  EXPECT_TRUE(PlaylistHeaderSort::ShouldShowMenu());
+  EXPECT_EQ(PlaylistColumn::Title, PlaylistHeaderSort::ColumnForMenu(true, PlaylistColumn::Artist, PlaylistColumn::Title));
+  EXPECT_EQ(PlaylistColumn::Artist, PlaylistHeaderSort::ColumnForMenu(false, PlaylistColumn::Artist, PlaylistColumn::Title));
+}
+
 TEST(PlaylistHeaderSort, MarksAndMenuChecksMatchQtHeader) {
   EXPECT_FALSE(PlaylistHeaderSort::IsSorted(PlaylistColumn::Title, PlaylistColumn::Count));
   EXPECT_TRUE(PlaylistHeaderSort::IsSorted(PlaylistColumn::Title, PlaylistColumn::Title));
