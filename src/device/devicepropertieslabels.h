@@ -30,7 +30,30 @@ inline const char *Never() { return "Do not convert any music"; }
 inline const char *Unsupported() { return "Convert any music that the device can't play"; }
 inline const char *Always() { return "Convert all music"; }
 inline const char *PreferredFormat() { return "Preferred format"; }
+inline const char *SupportedFormats() { return "Supported formats"; }
 inline const char *Save() { return "Save"; }
+
+inline bool UnsupportedEnabled(const bool has_supported) { return has_supported; }
+
+inline bool SupportedListVisible(const bool has_supported) { return has_supported; }
+
+inline bool ShouldFallbackToNever(const bool unsupported_checked, const bool has_supported) {
+  return unsupported_checked && !has_supported;
+}
+
+inline bool ShouldPickBestFormat(const bool has_saved_format, const Song::FileType stored) {
+  return !has_saved_format || stored == Song::FileType::Unknown;
+}
+
+inline std::vector<std::string> SupportedFormatNames(const std::vector<Song::FileType> &types) {
+  std::vector<std::string> names;
+  names.reserve(types.size());
+  for (Song::FileType type : types) {
+    names.push_back(Song::FiletypeToString(type));
+  }
+  std::sort(names.begin(), names.end());
+  return names;
+}
 
 inline int RadioIndex(DeviceDatabaseBackend::TranscodeMode mode) {
   switch (mode) {

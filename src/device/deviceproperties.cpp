@@ -5,6 +5,7 @@
 #include "device/devicepropertiesicons.h"
 #include "device/devicepropertiesinfo.h"
 #include "device/devicepropertieslabels.h"
+#include "organize/organizetranscode.h"
 #include "translations/translations.h"
 #include "widgets/freespacebar.h"
 
@@ -151,6 +152,32 @@ void DeviceProperties::Show(GtkWindow *parent, Application *app, const Connected
   gtk_box_append(GTK_BOX(formats_box), unsupported);
   gtk_box_append(GTK_BOX(formats_box), always);
 
+  const std::vector<Song::FileType> supported = OrganizeTranscode::SupportedForBackend(device.backend);
+  const bool has_supported = !supported.empty();
+  gtk_widget_set_sensitive(unsupported, DevicePropertiesLabels::UnsupportedEnabled(has_supported) ? TRUE : FALSE);
+  if (DevicePropertiesLabels::ShouldFallbackToNever(radio == 1, has_supported)) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(never), TRUE);
+  }
+
+  GtkWidget *supported_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+  GtkWidget *supported_title = gtk_label_new(Translations::CStr(DevicePropertiesLabels::SupportedFormats()));
+  gtk_widget_set_halign(supported_title, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(supported_box), supported_title);
+  GtkWidget *supported_list = gtk_list_box_new();
+  gtk_widget_add_css_class(supported_list, "boxed-list");
+  for (const std::string &name : DevicePropertiesLabels::SupportedFormatNames(supported)) {
+    GtkWidget *row = gtk_label_new(name.c_str());
+    gtk_label_set_xalign(GTK_LABEL(row), 0.0f);
+    gtk_widget_set_margin_start(row, 8);
+    gtk_widget_set_margin_end(row, 8);
+    gtk_widget_set_margin_top(row, 4);
+    gtk_widget_set_margin_bottom(row, 4);
+    gtk_list_box_append(GTK_LIST_BOX(supported_list), row);
+  }
+  gtk_box_append(GTK_BOX(supported_box), supported_list);
+  gtk_widget_set_visible(supported_box, DevicePropertiesLabels::SupportedListVisible(has_supported) ? TRUE : FALSE);
+  gtk_box_append(GTK_BOX(formats_box), supported_box);
+
   gtk_box_append(GTK_BOX(formats_box), gtk_label_new(Translations::CStr(DevicePropertiesLabels::PreferredFormat())));
   const auto formats = DevicePropertiesLabels::FormatChoices();
   std::vector<const char *> format_labels;
@@ -160,7 +187,11 @@ void DeviceProperties::Show(GtkWindow *parent, Application *app, const Connected
   }
   format_labels.push_back(nullptr);
   GtkWidget *format = gtk_drop_down_new_from_strings(format_labels.data());
-  gtk_drop_down_set_selected(GTK_DROP_DOWN(format), static_cast<guint>(DevicePropertiesLabels::IndexOfFormat(stored.transcode_format)));
+  Song::FileType preferred = stored.id >= 0 ? stored.transcode_format : Song::FileType::Unknown;
+  if (DevicePropertiesLabels::ShouldPickBestFormat(stored.id >= 0, preferred)) {
+    preferred = OrganizeTranscode::PickBestFormat(supported);
+  }
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(format), static_cast<guint>(DevicePropertiesLabels::IndexOfFormat(preferred)));
   gtk_box_append(GTK_BOX(formats_box), format);
 
   if (!DevicePropertiesInfo::OpenEnabled(device)) {
