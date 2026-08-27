@@ -68,6 +68,7 @@ class PlaylistView {
   void RememberClickAt(double x, double y);
   PlaylistColumn last_clicked_column() const { return last_clicked_column_; }
   void SetLastClickedColumn(PlaylistColumn column) { last_clicked_column_ = column; }
+  int last_clicked_row() const { return last_clicked_row_; }
   double last_click_cell_x() const { return last_click_cell_x_; }
   double last_click_cell_width() const { return last_click_cell_width_; }
   void StartInlineEdit(int row, PlaylistColumn column);
@@ -117,7 +118,8 @@ class PlaylistView {
   PlayPauseCallback play_pause_;
   SeekCallback seek_backward_;
   SeekCallback seek_forward_;
-  PlaylistColumn last_clicked_column_ = PlaylistColumn::Title;
+  PlaylistColumn last_clicked_column_ = PlaylistColumn::Count;
+  int last_clicked_row_ = -1;
   double last_click_cell_x_ = 0;
   double last_click_cell_width_ = 0;
   int visible_count_ = 0;

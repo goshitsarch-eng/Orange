@@ -26,6 +26,7 @@
 #include "ui/mainwindowmenu.h"
 #include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
+#include "ui/mainwindowsearchfocus.h"
 #include "context/contextcover.h"
 #include "context/contextview.h"
 #include "covermanager/coverproviders.h"
@@ -54,6 +55,8 @@
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistheadersort.h"
 #include "playlist/playlisteditpolicy.h"
+#include "playlist/playlistclipboard.h"
+#include "playlist/playlisteditcolumn.h"
 #include "playlist/playlistmenu.h"
 #include "playlist/playliststopafter.h"
 #include "core/playerstopafter.h"
@@ -544,7 +547,7 @@ void MainWindow::BuildUi() {
   }
   add_action("edit-value", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->EditColumnValue(); }));
   add_action("set-column", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SetColumnTo(); }));
-  add_action("focus-search", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->FocusCollectionSearch(); }));
+  add_action("focus-search", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->FocusSearchField(); }));
   add_action("playlist-skip", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SkipSelected(); }));
   add_action("jump-playing", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->JumpToPlaying(); }));
   add_action("next-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->NextPlaylistTab(); }));
@@ -3988,6 +3991,31 @@ void MainWindow::FocusCollectionSearch() {
   }
 }
 
+void MainWindow::FocusSearchField() {
+  const char *page = sidebar_stack_ ? adw_view_stack_get_visible_child_name(sidebar_stack_) : "";
+  StreamingTabsView *tabs = CurrentStreamingTabs();
+  const MainWindowSearchFocus::Target target = MainWindowSearchFocus::Resolve(
+      page ? page : "", collection_search_ && gtk_widget_has_focus(collection_search_),
+      tabs && tabs->SearchFieldHasFocus(), playlist_container_ && playlist_container_->SearchFieldHasFocus());
+  switch (target) {
+    case MainWindowSearchFocus::Target::Collection:
+      FocusCollectionSearch();
+      break;
+    case MainWindowSearchFocus::Target::Streaming:
+      if (tabs) {
+        tabs->FocusSearchField();
+      }
+      break;
+    case MainWindowSearchFocus::Target::Playlist:
+      if (playlist_container_) {
+        playlist_container_->FocusFilter();
+      }
+      break;
+    case MainWindowSearchFocus::Target::None:
+      break;
+  }
+}
+
 void MainWindow::PersistEditedSongs(const std::vector<int> &rows) {
   Playlist *playlist = app_->playlist_manager()->current();
   if (!playlist) {
@@ -4038,7 +4066,9 @@ void MainWindow::EditColumnValue() {
   if (!playlist || rows.empty()) {
     return;
   }
-  const PlaylistColumn column = playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Title;
+  const PlaylistColumn column =
+      PlaylistEditColumn::Resolve(playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Count,
+                                  PlaylistColumnLayout::Visible());
   if (!PlaylistDelegates::ColumnIsEditable(column)) {
     ShowToast("This column is not editable");
     return;
@@ -4077,7 +4107,9 @@ void MainWindow::SetColumnTo() {
   if (!playlist || rows.empty()) {
     return;
   }
-  const PlaylistColumn column = playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Title;
+  const PlaylistColumn column =
+      PlaylistEditColumn::Resolve(playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Count,
+                                  PlaylistColumnLayout::Visible());
   if (!PlaylistDelegates::ColumnIsEditable(column)) {
     ShowToast("This column is not editable");
     return;
@@ -4087,12 +4119,13 @@ void MainWindow::SetColumnTo() {
 }
 
 void MainWindow::CopySelectedUrl() {
-  const SongList songs = SelectedSongs();
-  if (songs.empty()) {
+  const std::vector<std::string> urls = PlaylistClipboard::EffectiveUrls(SelectedSongs());
+  const std::string text = PlaylistClipboard::UrlsText(urls);
+  if (text.empty()) {
     return;
   }
-  gdk_clipboard_set_text(gtk_widget_get_clipboard(GTK_WIDGET(window_)), songs.front().url().c_str());
-  ShowToast("Copied URL");
+  gdk_clipboard_set_text(gtk_widget_get_clipboard(GTK_WIDGET(window_)), text.c_str());
+  ShowToast(urls.size() == 1 ? "Copied URL" : ("Copied " + std::to_string(urls.size()) + " URLs"));
 }
 
 bool MainWindow::FocusIsEditable() const {

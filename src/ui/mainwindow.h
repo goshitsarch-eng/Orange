@@ -156,6 +156,7 @@ class MainWindow {
   void ScrobbleCurrent();
   void UpdateScrobblerButtons();
   void CopySelectedUrl();
+  void FocusSearchField();
   void SkipSelected();
   void JumpToPlaying();
   void RescanSelected();

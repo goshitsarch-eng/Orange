@@ -51,6 +51,8 @@ class StreamingTabsView {
   StreamingCollectionView *albums_collection_view() const { return albums_->view(); }
   StreamingCollectionView *songs_collection_view() const { return songs_->view(); }
   StreamingSearchView *search_view() const { return search_.get(); }
+  bool SearchFieldHasFocus() const;
+  void FocusSearchField();
 
  private:
   void HandleActivate(StreamingCollectionView *view, const Song &song);

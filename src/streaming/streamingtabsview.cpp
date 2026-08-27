@@ -585,3 +585,47 @@ void StreamingTabsView::GetFavorites() {
     }
   });
 }
+
+bool StreamingTabsView::SearchFieldHasFocus() const {
+  if (!stack_) {
+    return false;
+  }
+  const char *name = gtk_stack_get_visible_child_name(GTK_STACK(stack_));
+  if (!name) {
+    return false;
+  }
+  const std::string tab(name);
+  if (tab == "artists") {
+    return artists_->view()->SearchFieldHasFocus();
+  }
+  if (tab == "albums") {
+    return albums_->view()->SearchFieldHasFocus();
+  }
+  if (tab == "songs") {
+    return songs_->view()->SearchFieldHasFocus();
+  }
+  if (tab == "search") {
+    return search_->SearchFieldHasFocus();
+  }
+  return false;
+}
+
+void StreamingTabsView::FocusSearchField() {
+  if (!stack_) {
+    return;
+  }
+  const char *name = gtk_stack_get_visible_child_name(GTK_STACK(stack_));
+  if (!name) {
+    return;
+  }
+  const std::string tab(name);
+  if (tab == "artists") {
+    artists_->view()->FocusFilter();
+  } else if (tab == "albums") {
+    albums_->view()->FocusFilter();
+  } else if (tab == "songs") {
+    songs_->view()->FocusFilter();
+  } else if (tab == "search") {
+    search_->FocusSearch();
+  }
+}

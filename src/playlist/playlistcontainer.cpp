@@ -236,6 +236,10 @@ void PlaylistContainer::FocusFilter() {
   gtk_widget_grab_focus(filter_entry_);
 }
 
+bool PlaylistContainer::SearchFieldHasFocus() const {
+  return filter_entry_ && PlaylistToolbar::FocusEnabled(toolbar_ && gtk_widget_get_visible(toolbar_)) && gtk_widget_has_focus(filter_entry_);
+}
+
 void PlaylistContainer::SetFilterText(const std::string &text) {
   if (!filter_entry_ || !PlaylistFilterSync::ShouldSyncEntry(filter_, text)) {
     return;

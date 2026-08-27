@@ -35,6 +35,7 @@ class StreamingSearchView {
   void SetMenuCallback(MenuCallback callback);
   void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
   void FocusSearch();
+  bool SearchFieldHasFocus() const;
   void FocusResultsAndMove(unsigned keyval);
   void SetConfigureCallback(ConfigureCallback callback);
   GMenuModel *GroupMenuModel() const { return group_menu_model_; }

@@ -41,6 +41,7 @@ class PlaylistContainer {
   void SetSummary(const std::string &text);
   void ApplyLook();
   void FocusFilter();
+  bool SearchFieldHasFocus() const;
   void SetFilterText(const std::string &text);
   void UpdateNoMatchesOverlay();
   void UpdateUndoRedoChrome(bool can_undo, bool can_redo);

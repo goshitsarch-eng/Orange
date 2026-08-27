@@ -10,6 +10,7 @@
 #include "playlist/playlistcolumnwidths.h"
 #include "playlist/playlistplayingicon.h"
 #include "playlist/playlist.h"
+#include "playlist/playlisteditcolumn.h"
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlistfolders.h"
 #include "playlist/playlistlistactions.h"
@@ -736,6 +737,36 @@ TEST(PlaylistClipboard, JoinsVisibleColumnsAndCopyShortcut) {
   EXPECT_TRUE(PlaylistClipboard::IsCopyShortcut('C', 4, 4));
   EXPECT_FALSE(PlaylistClipboard::IsCopyShortcut('c', 0, 4));
   EXPECT_FALSE(PlaylistClipboard::IsCopyShortcut('x', 4, 4));
+}
+
+TEST(PlaylistClipboard, CopyUrlJoinsEffectiveUrls) {
+  Song local(Song::Source::LocalFile);
+  local.set_url("file:///music/roads.flac");
+  Song stream(Song::Source::Tidal);
+  stream.set_url("tidal://1");
+  stream.set_stream_url("https://cdn.example/roads.flac");
+  Song empty(Song::Source::LocalFile);
+  EXPECT_EQ("file:///music/roads.flac", PlaylistClipboard::EffectiveUrl(local));
+  EXPECT_EQ("https://cdn.example/roads.flac", PlaylistClipboard::EffectiveUrl(stream));
+  EXPECT_EQ("https://a\nhttps://b", PlaylistClipboard::UrlsText({"https://a", "", "https://b"}));
+  EXPECT_TRUE(PlaylistClipboard::UrlsText({}).empty());
+  const auto urls = PlaylistClipboard::EffectiveUrls({local, empty, stream});
+  ASSERT_EQ(2u, urls.size());
+  EXPECT_EQ("file:///music/roads.flac", urls[0]);
+  EXPECT_EQ("https://cdn.example/roads.flac", urls[1]);
+}
+
+TEST(PlaylistEditColumn, KeyboardRowClearsLastClicked) {
+  EXPECT_TRUE(PlaylistEditColumn::ShouldClearLastClicked(2, 3));
+  EXPECT_FALSE(PlaylistEditColumn::ShouldClearLastClicked(2, 2));
+  EXPECT_FALSE(PlaylistEditColumn::ShouldClearLastClicked(-1, 3));
+  EXPECT_FALSE(PlaylistEditColumn::HasLastClicked(PlaylistColumn::Count));
+  EXPECT_TRUE(PlaylistEditColumn::HasLastClicked(PlaylistColumn::Artist));
+  const std::vector<PlaylistColumn> visible = {PlaylistColumn::Track, PlaylistColumn::Title, PlaylistColumn::Artist};
+  EXPECT_EQ(PlaylistColumn::Track, PlaylistEditColumn::DefaultEditColumn(visible));
+  EXPECT_EQ(PlaylistColumn::Artist, PlaylistEditColumn::Resolve(PlaylistColumn::Artist, visible));
+  EXPECT_EQ(PlaylistColumn::Track, PlaylistEditColumn::Resolve(PlaylistColumn::Count, visible));
+  EXPECT_EQ(PlaylistColumn::Track, PlaylistEditColumn::Resolve(PlaylistColumn::Length, visible));
 }
 
 TEST(PlaylistHeaderReorder, ModeAndOrderAfterMove) {

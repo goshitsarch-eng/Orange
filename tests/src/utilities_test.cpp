@@ -24,6 +24,7 @@
 #include "constants/collectionsettings.h"
 #include "analyzer/analyzerframerate.h"
 #include "playlist/playlistbehaviour.h"
+#include "ui/mainwindowsearchfocus.h"
 #include "playlist/playlistlook.h"
 #include "context/contextalbum.h"
 #include "context/contextcover.h"
@@ -1735,6 +1736,19 @@ TEST(MainWindowLook, SidebarAndMuteMatchQt) {
   EXPECT_STREQ("<Control>w", MainWindowLook::ClosePlaylistAccel());
   EXPECT_STREQ("<Control>d", MainWindowLook::PlaylistQueueAccel());
   EXPECT_STREQ("<Control><Shift>d", MainWindowLook::QueuePlayNextAccel());
+}
+
+TEST(MainWindowSearchFocus, RoutesLikeQtFocusSearchField) {
+  using T = MainWindowSearchFocus::Target;
+  EXPECT_EQ(T::Collection, MainWindowSearchFocus::Resolve("collection", false, false, false));
+  EXPECT_EQ(T::Playlist, MainWindowSearchFocus::Resolve("collection", true, false, false));
+  EXPECT_EQ(T::Streaming, MainWindowSearchFocus::Resolve("streaming", false, false, false));
+  EXPECT_EQ(T::Playlist, MainWindowSearchFocus::Resolve("streaming", false, true, false));
+  EXPECT_EQ(T::Playlist, MainWindowSearchFocus::Resolve("files", false, false, false));
+  EXPECT_EQ(T::Playlist, MainWindowSearchFocus::Resolve("radio", false, false, false));
+  EXPECT_EQ(T::None, MainWindowSearchFocus::Resolve("collection", true, false, true));
+  EXPECT_EQ(T::None, MainWindowSearchFocus::Resolve("streaming", false, true, true));
+  EXPECT_EQ(T::None, MainWindowSearchFocus::Resolve("queue", false, false, true));
 }
 
 TEST(MainWindowKeyboard, MatchesQtTransportKeys) {

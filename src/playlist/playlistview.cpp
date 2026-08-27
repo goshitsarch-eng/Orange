@@ -8,6 +8,7 @@
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistclipboard.h"
 #include "playlist/playlistcolumnlayout.h"
+#include "playlist/playlisteditcolumn.h"
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlisteditpolicy.h"
 #include "playlist/playlistplayingicon.h"
@@ -235,9 +236,14 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
     }
     const int next = ListBoxKeyboard::NextIndex(current, static_cast<int>(visible_rows_.size()), action);
     if (next >= 0 && select_) {
+      const int next_row = visible_rows_[static_cast<size_t>(next)];
+      if (PlaylistEditColumn::ShouldClearLastClicked(last_clicked_row_, next_row)) {
+        last_clicked_column_ = PlaylistColumn::Count;
+        last_clicked_row_ = -1;
+      }
       InhibitAutoscroll();
-      select_(visible_rows_[static_cast<size_t>(next)], false);
-      ScrollToRow(visible_rows_[static_cast<size_t>(next)]);
+      select_(next_row, false);
+      ScrollToRow(next_row);
     }
     return TRUE;
   }
@@ -305,6 +311,7 @@ void PlaylistView::RememberClickAt(double x, double y) {
     graphene_rect_t bounds{};
     if (gtk_widget_compute_bounds(child, grid_, &bounds) && y >= bounds.origin.y &&
         y < bounds.origin.y + bounds.size.height) {
+      last_clicked_row_ = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
       RecordClickedColumn(child, x - bounds.origin.x);
       return;
     }
@@ -630,6 +637,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
                        GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
                        const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "row-index"));
                        const GdkModifierType mods = gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
+                       self->last_clicked_row_ = index;
                        self->RecordClickedColumn(widget, x);
                        self->InhibitAutoscroll();
                        const bool already_selected =

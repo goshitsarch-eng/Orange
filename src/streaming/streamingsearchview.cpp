@@ -691,6 +691,8 @@ void StreamingSearchView::FocusSearch() {
   }
 }
 
+bool StreamingSearchView::SearchFieldHasFocus() const { return search_entry_ && gtk_widget_has_focus(search_entry_); }
+
 void StreamingSearchView::FocusResultsAndMove(unsigned keyval) {
   gtk_widget_grab_focus(list_);
   const ListBoxKeyboard::Action move = FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::FromSearchKey(keyval));

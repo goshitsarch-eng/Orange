@@ -640,6 +640,8 @@ void StreamingCollectionView::FocusFilter() {
   }
 }
 
+bool StreamingCollectionView::SearchFieldHasFocus() const { return filter_entry_ && gtk_widget_has_focus(filter_entry_); }
+
 void StreamingCollectionView::FocusListAndMove(unsigned keyval) {
   gtk_widget_grab_focus(list_);
   const ListBoxKeyboard::Action move = FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::FromSearchKey(keyval));
