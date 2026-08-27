@@ -1,7 +1,9 @@
+#include "config.h"
 #include "dialogs/edittagdialog.h"
 
 #include "constants/edittagdialogsettings.h"
 #include "core/application.h"
+#include "covermanager/covermanagermenu.h"
 #include "core/settings.h"
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "dialogs/dialoghelpers.h"
@@ -63,6 +65,25 @@ struct State {
   GtkWidget *next = nullptr;
   GtkWidget *id3v2 = nullptr;
   GtkWidget *embedded_cover = nullptr;
+  GtkWidget *stack = nullptr;
+  GtkWidget *actions = nullptr;
+  GtkWidget *fetch_tags = nullptr;
+  GtkWidget *loading_label = nullptr;
+  GtkWidget *fetch_cover = nullptr;
+  GtkWidget *search_cover = nullptr;
+  GtkWidget *url_cover = nullptr;
+  GtkWidget *file_cover = nullptr;
+  GtkWidget *unset_cover = nullptr;
+  GtkWidget *clear_cover = nullptr;
+  GtkWidget *delete_cover = nullptr;
+  GtkWidget *show_cover = nullptr;
+  GtkWidget *save_cover = nullptr;
+  bool loading = false;
+#ifdef HAVE_TAGFETCHER
+  bool have_tagfetcher = true;
+#else
+  bool have_tagfetcher = false;
+#endif
   std::unique_ptr<AlbumCoverChoiceController> covers;
   std::vector<std::pair<std::string, GtkWidget *>> fields;
   std::vector<std::string> initial;
@@ -248,8 +269,82 @@ std::string TechnicalLine(const Song &song) {
   return line;
 }
 
+void ApplyCoverEnable(State *state) {
+  if (!state) {
+    return;
+  }
+  const bool change_art = EditTagCover::ChangeArtEnabled(state->song);
+  bool has_providers = false;
+  if (state->app && state->app->cover_providers()) {
+    has_providers = CoverManagerMenu::HasAnyProviders(state->app->cover_providers()->All().size());
+  }
+  const bool art_different = false;
+  if (state->fetch_cover) {
+    gtk_widget_set_sensitive(state->fetch_cover, EditTagCover::FetchCoverEnabled(change_art));
+  }
+  if (state->search_cover) {
+    gtk_widget_set_sensitive(state->search_cover, EditTagCover::SearchCoverEnabled(has_providers, change_art, art_different));
+  }
+  if (state->url_cover) {
+    gtk_widget_set_sensitive(state->url_cover, EditTagCover::FromUrlEnabled(change_art));
+  }
+  if (state->file_cover) {
+    gtk_widget_set_sensitive(state->file_cover, EditTagCover::FromFileEnabled(change_art));
+  }
+  if (state->unset_cover) {
+    gtk_widget_set_sensitive(state->unset_cover, EditTagCover::UnsetCoverEnabled(state->song, change_art, art_different));
+  }
+  if (state->clear_cover) {
+    gtk_widget_set_sensitive(state->clear_cover, EditTagCover::ClearCoverEnabled(state->song, change_art, art_different));
+  }
+  if (state->delete_cover) {
+    gtk_widget_set_sensitive(state->delete_cover, EditTagCover::DeleteCoverEnabled(state->song, change_art, art_different));
+  }
+  if (state->show_cover) {
+    gtk_widget_set_sensitive(state->show_cover, EditTagCover::ShowCoverEnabled(state->song, art_different));
+  }
+  if (state->save_cover) {
+    gtk_widget_set_sensitive(state->save_cover, EditTagCover::SaveCoverEnabled(state->song, art_different));
+  }
+}
+
+void ApplyEditEnable(State *state) {
+  if (!state) {
+    return;
+  }
+  const bool has_valid = !state->songs.empty();
+  const bool list_visible = EditTagFields::SongListVisible(state->songs.size());
+  if (state->actions) {
+    gtk_widget_set_sensitive(state->actions, EditTagFields::ButtonsEnabled(state->loading));
+  }
+  if (state->stack) {
+    gtk_widget_set_sensitive(state->stack, EditTagFields::FieldsEnabled(state->loading, has_valid));
+  }
+  if (state->song_list) {
+    gtk_widget_set_visible(state->song_list, list_visible);
+    gtk_widget_set_sensitive(state->song_list, EditTagFields::SongListEnabled(state->loading, has_valid));
+  }
+  if (state->prev) {
+    gtk_widget_set_sensitive(state->prev, EditTagFields::SongListNavEnabled(list_visible, state->loading));
+  }
+  if (state->next) {
+    gtk_widget_set_sensitive(state->next, EditTagFields::SongListNavEnabled(list_visible, state->loading));
+  }
+  if (state->fetch_tags) {
+    gtk_widget_set_sensitive(state->fetch_tags, EditTagFields::FetchTagsEnabled(state->have_tagfetcher, state->loading));
+  }
+  if (state->loading_label) {
+    gtk_widget_set_visible(state->loading_label, EditTagFields::LoadingLabelVisible(state->loading));
+  }
+  ApplyCoverEnable(state);
+}
+
 void UpdateDisplay(State *state) {
-  if (!state || state->index >= state->songs.size()) {
+  if (!state) {
+    return;
+  }
+  if (state->index >= state->songs.size()) {
+    ApplyEditEnable(state);
     return;
   }
   state->song = state->songs[state->index];
@@ -276,12 +371,6 @@ void UpdateDisplay(State *state) {
     gtk_label_set_text(GTK_LABEL(state->stats_path),
                        (FileUtils::PathFromUri(state->song.url()) + "\n" + TechnicalLine(state->song)).c_str());
   }
-  if (state->prev) {
-    gtk_widget_set_sensitive(state->prev, state->songs.size() > 1);
-  }
-  if (state->next) {
-    gtk_widget_set_sensitive(state->next, state->songs.size() > 1);
-  }
   if (state->song_list) {
     GtkListBoxRow *row = gtk_list_box_get_row_at_index(GTK_LIST_BOX(state->song_list), static_cast<int>(state->index));
     if (row) {
@@ -293,6 +382,7 @@ void UpdateDisplay(State *state) {
                                 EditTagCover::DefaultEmbeddedChecked(state->song, state->covers->get_collection_save_album_cover_type()));
     gtk_widget_set_sensitive(state->embedded_cover, state->song.save_embedded_cover_supported());
   }
+  ApplyEditEnable(state);
 }
 
 void SelectSong(State *state, int index) {
@@ -319,16 +409,19 @@ void PersistPlayStatistics(State *state, Song *song) {
 }  // namespace
 
 void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
-  SongList targets = songs;
-  if (targets.empty()) {
-    targets.push_back(SongForDialog(app));
+  SongList incoming = songs;
+  if (incoming.empty()) {
+    incoming.push_back(SongForDialog(app));
   }
+  const SongList targets = EditTagFields::ValidSongs(incoming);
   auto *state = new State();
   state->app = app;
   state->parent = parent;
   state->songs = targets;
   state->index = 0;
-  state->song = targets.front();
+  if (!targets.empty()) {
+    state->song = targets.front();
+  }
   state->covers = std::make_unique<AlbumCoverChoiceController>(app);
 
   AdwDialog *dialog = adw_dialog_new();
@@ -341,7 +434,15 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   g_object_set_data_full(G_OBJECT(dialog), "state", state, [](gpointer p) { delete static_cast<State *>(p); });
 
-  if (targets.size() > 1) {
+  state->loading_label = gtk_label_new(Translations::CStr(EditTagFields::LoadingTracksMessage()));
+  gtk_widget_add_css_class(state->loading_label, "dim-label");
+  gtk_widget_set_margin_start(state->loading_label, 12);
+  gtk_widget_set_margin_end(state->loading_label, 12);
+  gtk_widget_set_margin_top(state->loading_label, 8);
+  gtk_widget_set_visible(state->loading_label, EditTagFields::LoadingLabelVisible(state->loading));
+  gtk_box_append(GTK_BOX(box), state->loading_label);
+
+  if (EditTagFields::SongListVisible(targets.size())) {
     GtkWidget *nav = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     gtk_widget_set_margin_start(nav, 12);
     gtk_widget_set_margin_end(nav, 12);
@@ -398,6 +499,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   }
 
   AdwViewStack *stack = ADW_VIEW_STACK(adw_view_stack_new());
+  state->stack = GTK_WIDGET(stack);
   GtkWidget *switcher = adw_view_switcher_new();
   adw_view_switcher_set_stack(ADW_VIEW_SWITCHER(switcher), stack);
 
@@ -457,25 +559,25 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_widget_set_hexpand(cover_buttons, TRUE);
   GtkWidget *cover_buttons2 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   gtk_widget_set_halign(cover_buttons2, GTK_ALIGN_CENTER);
-  GtkWidget *fetch_cover = gtk_button_new_with_label(Translations::CStr("Fetch cover"));
-  GtkWidget *search_cover = gtk_button_new_with_label(Translations::CStr("Search…"));
-  GtkWidget *url_cover = gtk_button_new_with_label(Translations::CStr("From URL"));
-  GtkWidget *file_cover = gtk_button_new_with_label(Translations::CStr("From file"));
-  GtkWidget *unset_cover = gtk_button_new_with_label(Translations::CStr("Unset"));
-  GtkWidget *clear_cover = gtk_button_new_with_label(Translations::CStr("Clear"));
-  GtkWidget *delete_cover = gtk_button_new_with_label(Translations::CStr("Delete"));
-  GtkWidget *show_cover = gtk_button_new_with_label(Translations::CStr("Show"));
-  GtkWidget *save_cover = gtk_button_new_with_label(Translations::CStr("Save…"));
+  state->fetch_cover = gtk_button_new_with_label(Translations::CStr("Fetch cover"));
+  state->search_cover = gtk_button_new_with_label(Translations::CStr("Search…"));
+  state->url_cover = gtk_button_new_with_label(Translations::CStr("From URL"));
+  state->file_cover = gtk_button_new_with_label(Translations::CStr("From file"));
+  state->unset_cover = gtk_button_new_with_label(Translations::CStr("Unset"));
+  state->clear_cover = gtk_button_new_with_label(Translations::CStr("Clear"));
+  state->delete_cover = gtk_button_new_with_label(Translations::CStr("Delete"));
+  state->show_cover = gtk_button_new_with_label(Translations::CStr("Show"));
+  state->save_cover = gtk_button_new_with_label(Translations::CStr("Save…"));
   GtkWidget *stats_cover = gtk_button_new_with_label(Translations::CStr("Statistics"));
-  gtk_box_append(GTK_BOX(cover_buttons), fetch_cover);
-  gtk_box_append(GTK_BOX(cover_buttons), search_cover);
-  gtk_box_append(GTK_BOX(cover_buttons), url_cover);
-  gtk_box_append(GTK_BOX(cover_buttons), file_cover);
-  gtk_box_append(GTK_BOX(cover_buttons), unset_cover);
-  gtk_box_append(GTK_BOX(cover_buttons2), clear_cover);
-  gtk_box_append(GTK_BOX(cover_buttons2), delete_cover);
-  gtk_box_append(GTK_BOX(cover_buttons2), show_cover);
-  gtk_box_append(GTK_BOX(cover_buttons2), save_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), state->fetch_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), state->search_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), state->url_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), state->file_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), state->unset_cover);
+  gtk_box_append(GTK_BOX(cover_buttons2), state->clear_cover);
+  gtk_box_append(GTK_BOX(cover_buttons2), state->delete_cover);
+  gtk_box_append(GTK_BOX(cover_buttons2), state->show_cover);
+  gtk_box_append(GTK_BOX(cover_buttons2), state->save_cover);
   gtk_box_append(GTK_BOX(cover_buttons2), stats_cover);
   gtk_box_append(GTK_BOX(summary), cover_buttons);
   gtk_box_append(GTK_BOX(summary), cover_buttons2);
@@ -678,19 +780,19 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_box_append(GTK_BOX(stats_page), reset_stats);
   adw_view_stack_add_titled(stack, stats_page, "Statistics", Translations::CStr("Statistics"));
 
-  GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  gtk_widget_set_margin_start(actions, 12);
-  gtk_widget_set_margin_end(actions, 12);
-  gtk_widget_set_margin_bottom(actions, 8);
+  state->actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_margin_start(state->actions, 12);
+  gtk_widget_set_margin_end(state->actions, 12);
+  gtk_widget_set_margin_bottom(state->actions, 8);
   GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save"));
   gtk_widget_add_css_class(save, "suggested-action");
   GtkWidget *reset_fields = gtk_button_new_with_label(Translations::CStr("Reset fields"));
-  GtkWidget *fetch_tags = gtk_button_new_with_label(Translations::CStr(EditTagSummaryLabels::FetchTags()));
+  state->fetch_tags = gtk_button_new_with_label(Translations::CStr(EditTagSummaryLabels::FetchTags()));
   GtkWidget *fetch_lyrics = gtk_button_new_with_label(Translations::CStr(EditTagSummaryLabels::FetchLyrics()));
-  gtk_box_append(GTK_BOX(actions), save);
-  gtk_box_append(GTK_BOX(actions), reset_fields);
-  gtk_box_append(GTK_BOX(actions), fetch_tags);
-  gtk_box_append(GTK_BOX(actions), fetch_lyrics);
+  gtk_box_append(GTK_BOX(state->actions), save);
+  gtk_box_append(GTK_BOX(state->actions), reset_fields);
+  gtk_box_append(GTK_BOX(state->actions), state->fetch_tags);
+  gtk_box_append(GTK_BOX(state->actions), fetch_lyrics);
 
   g_signal_connect(save, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *self = static_cast<State *>(data);
@@ -748,7 +850,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                    })),
                    state);
 
-  g_signal_connect(fetch_tags, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+  g_signal_connect(state->fetch_tags, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<State *>(data);
                      TrackSelectionDialog::Show(self->parent, self->app, self->songs);
                    })),
@@ -806,15 +908,15 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      })),
                      state);
   };
-  connect_cover(fetch_cover, "fetch");
-  connect_cover(search_cover, "search");
-  connect_cover(url_cover, "url");
-  connect_cover(file_cover, "file");
-  connect_cover(unset_cover, "unset");
-  connect_cover(clear_cover, "clear");
-  connect_cover(delete_cover, "delete");
-  connect_cover(show_cover, "show");
-  connect_cover(save_cover, "save");
+  connect_cover(state->fetch_cover, "fetch");
+  connect_cover(state->search_cover, "search");
+  connect_cover(state->url_cover, "url");
+  connect_cover(state->file_cover, "file");
+  connect_cover(state->unset_cover, "unset");
+  connect_cover(state->clear_cover, "clear");
+  connect_cover(state->delete_cover, "delete");
+  connect_cover(state->show_cover, "show");
+  connect_cover(state->save_cover, "save");
   connect_cover(stats_cover, "stats");
 
   gtk_box_append(GTK_BOX(box), switcher);
@@ -833,7 +935,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      tab_settings.Sync();
                    }),
                    nullptr);
-  gtk_box_append(GTK_BOX(box), actions);
+  gtk_box_append(GTK_BOX(box), state->actions);
   adw_dialog_set_child(dialog, box);
   UpdateDisplay(state);
   adw_dialog_present(dialog, GTK_WIDGET(parent));

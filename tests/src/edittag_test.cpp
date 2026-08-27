@@ -420,6 +420,98 @@ TEST(EditTagFields, CommonRatingAndSliderConversion) {
   EXPECT_NEAR(0.8f, EditTagFields::RatingStoredFromSlider(4.0), 0.001f);
 }
 
+TEST(EditTagFields, FetchTagsAndFieldEnableMatchQt) {
+  EXPECT_TRUE(EditTagFields::FetchTagsEnabled(true, false));
+  EXPECT_FALSE(EditTagFields::FetchTagsEnabled(true, true));
+  EXPECT_FALSE(EditTagFields::FetchTagsEnabled(false, false));
+  EXPECT_FALSE(EditTagFields::FetchTagsEnabled(false, true));
+  EXPECT_TRUE(EditTagFields::FieldsEnabled(false, true));
+  EXPECT_FALSE(EditTagFields::FieldsEnabled(true, true));
+  EXPECT_FALSE(EditTagFields::FieldsEnabled(false, false));
+  EXPECT_TRUE(EditTagFields::ButtonsEnabled(false));
+  EXPECT_FALSE(EditTagFields::ButtonsEnabled(true));
+  EXPECT_FALSE(EditTagFields::SongListVisible(0));
+  EXPECT_FALSE(EditTagFields::SongListVisible(1));
+  EXPECT_TRUE(EditTagFields::SongListVisible(2));
+  EXPECT_TRUE(EditTagFields::SongListEnabled(false, true));
+  EXPECT_FALSE(EditTagFields::SongListEnabled(true, true));
+  EXPECT_FALSE(EditTagFields::SongListEnabled(false, false));
+  EXPECT_TRUE(EditTagFields::SongListNavEnabled(true, false));
+  EXPECT_FALSE(EditTagFields::SongListNavEnabled(true, true));
+  EXPECT_FALSE(EditTagFields::SongListNavEnabled(false, false));
+  EXPECT_TRUE(EditTagFields::LoadingLabelVisible(true));
+  EXPECT_FALSE(EditTagFields::LoadingLabelVisible(false));
+  EXPECT_STREQ("Loading tracks...", EditTagFields::LoadingTracksMessage());
+  EXPECT_STREQ("Saving tracks...", EditTagFields::SavingTracksMessage());
+
+  Song collection = MakeTagged("Roads", "Portishead", "Dummy");
+  Song stream(Song::Source::Tidal);
+  stream.set_valid(true);
+  stream.set_url("https://tidal.example/roads");
+  const SongList valid = EditTagFields::ValidSongs({collection, stream});
+  ASSERT_EQ(1u, valid.size());
+  EXPECT_EQ("Roads", valid.front().title());
+  EXPECT_TRUE(EditTagFields::ValidSongs({stream}).empty());
+}
+
+TEST(EditTagCover, ChangeArtAndActionEnableMatchQt) {
+  Song collection = MakeTagged("Roads", "Portishead", "Dummy");
+  EXPECT_TRUE(EditTagCover::ChangeArtEnabled(collection));
+  EXPECT_TRUE(EditTagCover::ChangeArtEnabledWithAlbum(collection));
+
+  Song local(Song::Source::LocalFile);
+  local.set_valid(true);
+  local.set_url("file:///tmp/roads.flac");
+  local.set_artist("Portishead");
+  local.set_album("Dummy");
+  EXPECT_FALSE(EditTagCover::ChangeArtEnabled(local));
+  EXPECT_FALSE(EditTagCover::ChangeArtEnabledWithAlbum(local));
+
+  Song missing_album = MakeTagged("Roads", "Portishead", "");
+  EXPECT_TRUE(EditTagCover::ChangeArtEnabled(missing_album));
+  EXPECT_FALSE(EditTagCover::ChangeArtEnabledWithAlbum(missing_album));
+
+  EXPECT_FALSE(EditTagCover::HasValidArt(collection));
+  EXPECT_FALSE(EditTagCover::ShowCoverEnabled(collection, false));
+  EXPECT_FALSE(EditTagCover::SaveCoverEnabled(collection, false));
+  collection.set_art_embedded(true);
+  EXPECT_TRUE(EditTagCover::HasValidArt(collection));
+  EXPECT_TRUE(EditTagCover::ShowCoverEnabled(collection, false));
+  EXPECT_TRUE(EditTagCover::SaveCoverEnabled(collection, false));
+  EXPECT_FALSE(EditTagCover::ShowCoverEnabled(collection, true));
+  collection.set_art_unset(true);
+  EXPECT_FALSE(EditTagCover::ShowCoverEnabled(collection, false));
+
+  const bool change_art = true;
+  EXPECT_TRUE(EditTagCover::FetchCoverEnabled(change_art));
+  EXPECT_FALSE(EditTagCover::FetchCoverEnabled(false));
+  EXPECT_TRUE(EditTagCover::FromFileEnabled(change_art));
+  EXPECT_TRUE(EditTagCover::FromUrlEnabled(change_art));
+  EXPECT_FALSE(EditTagCover::FromFileEnabled(false));
+  EXPECT_TRUE(EditTagCover::SearchCoverEnabled(true, change_art, false));
+  EXPECT_FALSE(EditTagCover::SearchCoverEnabled(false, change_art, false));
+  EXPECT_TRUE(EditTagCover::SearchCoverEnabled(false, change_art, true));
+  EXPECT_FALSE(EditTagCover::SearchCoverEnabled(true, false, false));
+
+  Song art;
+  art.set_source(Song::Source::Collection);
+  EXPECT_TRUE(EditTagCover::UnsetCoverEnabled(art, change_art, false));
+  art.set_art_unset(true);
+  EXPECT_FALSE(EditTagCover::UnsetCoverEnabled(art, change_art, false));
+  EXPECT_TRUE(EditTagCover::UnsetCoverEnabled(art, change_art, true));
+  EXPECT_TRUE(EditTagCover::ClearCoverEnabled(art, change_art, false));
+  art.set_art_unset(false);
+  EXPECT_FALSE(EditTagCover::ClearCoverEnabled(art, change_art, false));
+  art.set_art_manual("/covers/dummy.jpg");
+  EXPECT_TRUE(EditTagCover::ClearCoverEnabled(art, change_art, false));
+  EXPECT_TRUE(EditTagCover::DeleteCoverEnabled(art, change_art, false));
+  art.set_art_manual("");
+  EXPECT_FALSE(EditTagCover::DeleteCoverEnabled(art, change_art, false));
+  art.set_art_embedded(true);
+  EXPECT_TRUE(EditTagCover::DeleteCoverEnabled(art, change_art, false));
+  EXPECT_FALSE(EditTagCover::DeleteCoverEnabled(art, false, false));
+}
+
 TEST(TagWriterFields, WritesBpmMoodKeyAndOriginalYear) {
   EXPECT_STREQ("BPM", TagWriterFields::VorbisBpm());
   EXPECT_STREQ("MOOD", TagWriterFields::VorbisMood());

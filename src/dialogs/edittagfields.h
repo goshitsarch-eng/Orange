@@ -78,6 +78,34 @@ inline double RatingSliderFromStored(double stored) { return stored >= 0 ? store
 
 inline float RatingStoredFromSlider(double slider) { return static_cast<float>(slider / 5.0); }
 
+inline bool FetchTagsEnabled(bool have_tagfetcher, bool loading) { return have_tagfetcher && !loading; }
+
+inline bool FieldsEnabled(bool loading, bool has_valid_songs) { return !loading && has_valid_songs; }
+
+inline bool ButtonsEnabled(bool loading) { return !loading; }
+
+inline bool SongListVisible(size_t count) { return count > 1; }
+
+inline bool SongListEnabled(bool loading, bool has_valid_songs) { return !loading && has_valid_songs; }
+
+inline bool SongListNavEnabled(bool list_visible, bool loading) { return list_visible && !loading; }
+
+inline bool LoadingLabelVisible(bool loading) { return loading; }
+
+inline const char *LoadingTracksMessage() { return "Loading tracks..."; }
+
+inline const char *SavingTracksMessage() { return "Saving tracks..."; }
+
+inline SongList ValidSongs(const SongList &songs) {
+  SongList valid;
+  for (const Song &song : songs) {
+    if (song.IsEditable()) {
+      valid.push_back(song);
+    }
+  }
+  return valid;
+}
+
 }  // namespace EditTagFields
 
 #endif

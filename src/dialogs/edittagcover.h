@@ -30,6 +30,46 @@ inline std::string ImageBytes(const std::string &image_or_path) {
   return image_or_path;
 }
 
+// Qt EditTagDialog::is_local_collection_song — cover changes apply to collection albums only.
+inline bool ChangeArtEnabled(const Song &song) { return song.is_collection_song(); }
+
+// After a cover load finishes, Qt also requires album identity before changing art.
+inline bool ChangeArtEnabledWithAlbum(const Song &song) {
+  return song.is_collection_song() && !song.EffectiveAlbumartist().empty() && !song.album().empty();
+}
+
+inline bool HasValidArt(const Song &song) {
+  return song.art_embedded() || !song.art_automatic().empty() || !song.art_manual().empty();
+}
+
+inline bool ShowCoverEnabled(const Song &song, bool art_different) {
+  return !art_different && HasValidArt(song) && !song.art_unset();
+}
+
+inline bool SaveCoverEnabled(const Song &song, bool art_different) { return ShowCoverEnabled(song, art_different); }
+
+inline bool FromFileEnabled(bool change_art) { return change_art; }
+
+inline bool FromUrlEnabled(bool change_art) { return change_art; }
+
+inline bool SearchCoverEnabled(bool has_providers, bool change_art, bool art_different) {
+  return change_art && (art_different || has_providers);
+}
+
+inline bool FetchCoverEnabled(bool change_art) { return change_art; }
+
+inline bool UnsetCoverEnabled(const Song &song, bool change_art, bool art_different) {
+  return change_art && (art_different || !song.art_unset());
+}
+
+inline bool ClearCoverEnabled(const Song &song, bool change_art, bool art_different) {
+  return change_art && (art_different || !song.art_manual().empty() || song.art_unset());
+}
+
+inline bool DeleteCoverEnabled(const Song &song, bool change_art, bool art_different) {
+  return change_art && (art_different || song.art_embedded() || !song.art_automatic().empty() || !song.art_manual().empty());
+}
+
 }  // namespace EditTagCover
 
 #endif
