@@ -41,6 +41,7 @@ class PlaylistContainer {
   void SetSummary(const std::string &text);
   void ApplyLook();
   void FocusFilter();
+  void FocusFilterFromKey(unsigned keyval, const char *utf8);
   bool SearchFieldHasFocus() const;
   void SetFilterText(const std::string &text);
   void UpdateNoMatchesOverlay();

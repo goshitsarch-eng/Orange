@@ -8,6 +8,7 @@
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistheaderreorder.h"
 #include "playlist/playlistkeyboard.h"
+#include "playlist/playlistfilterfocus.h"
 #include "playlist/playlistcolumnwidths.h"
 #include "playlist/playlistplayingicon.h"
 #include "playlist/playlist.h"
@@ -876,6 +877,27 @@ TEST(PlaylistKeyboard, SpacePlayPauseAndArrowsSeek) {
   EXPECT_EQ(PlaylistKeyboard::Action::SeekBack, PlaylistKeyboard::FromKey(PlaylistKeyboard::kLeft, 0));
   EXPECT_EQ(PlaylistKeyboard::Action::SeekForward, PlaylistKeyboard::FromKey(PlaylistKeyboard::kRight, 0));
   EXPECT_EQ(PlaylistKeyboard::Action::None, PlaylistKeyboard::FromKey('c', 0));
+}
+
+TEST(PlaylistFilterFocus, RoutesTypingToFilterLikeQt) {
+  EXPECT_TRUE(PlaylistFilterFocus::ShouldRouteToFilter('a', 0, true));
+  EXPECT_TRUE(PlaylistFilterFocus::ShouldRouteToFilter('A', 0, true));
+  EXPECT_TRUE(PlaylistFilterFocus::ShouldRouteToFilter('!', 0, true));
+  EXPECT_TRUE(PlaylistFilterFocus::ShouldRouteToFilter(ListBoxKeyboard::kBackSpace, 0, false));
+  EXPECT_TRUE(PlaylistFilterFocus::ShouldRouteToFilter(ListBoxKeyboard::kEscape, 0, false));
+  EXPECT_FALSE(PlaylistFilterFocus::ShouldRouteToFilter(PlaylistKeyboard::kSpace, 0, true));
+  EXPECT_FALSE(PlaylistFilterFocus::ShouldRouteToFilter('c', PlaylistKeyboard::kControlMask, true));
+  EXPECT_FALSE(PlaylistFilterFocus::ShouldRouteToFilter(ListBoxKeyboard::kReturn, 0, false));
+  EXPECT_EQ(PlaylistFilterFocus::Effect::Append, PlaylistFilterFocus::KeyEffect('b'));
+  EXPECT_EQ(PlaylistFilterFocus::Effect::Clear, PlaylistFilterFocus::KeyEffect(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(PlaylistFilterFocus::Effect::FocusOnly, PlaylistFilterFocus::KeyEffect(ListBoxKeyboard::kBackSpace));
+  EXPECT_EQ("beatl", PlaylistFilterFocus::Apply("beat", PlaylistFilterFocus::Effect::Append, "l"));
+  EXPECT_EQ("beatles", PlaylistFilterFocus::Apply("beatles", PlaylistFilterFocus::Effect::FocusOnly, "x"));
+  EXPECT_TRUE(PlaylistFilterFocus::Apply("beatles", PlaylistFilterFocus::Effect::Clear, "").empty());
+  EXPECT_EQ("ab", PlaylistFilterFocus::AppendUtf8("a", "b"));
+  EXPECT_EQ("a", PlaylistFilterFocus::AppendUtf8("a", ""));
+  EXPECT_FALSE(PlaylistFilterFocus::ShouldTypeahead(true));
+  EXPECT_TRUE(PlaylistFilterFocus::ShouldTypeahead(false));
 }
 
 TEST(PlaylistPlayingIcon, PauseAndPlayNames) {

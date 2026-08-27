@@ -20,6 +20,7 @@
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistfilterdelay.h"
+#include "playlist/playlistfilterfocus.h"
 #include "playlist/playlistrestorescroll.h"
 #include "playlist/playlistfilterempty.h"
 #include "playlist/playlistkeyboard.h"
@@ -29,7 +30,6 @@
 #include "translations/translations.h"
 #include "utilities/strutils.h"
 #include "utilities/styleutils.h"
-#include "widgets/filtersearchkeyboard.h"
 #include "widgets/listboxkeyboard.h"
 
 #include <algorithm>
@@ -226,10 +226,16 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
     CopyCurrentToClipboard();
     return TRUE;
   }
-  if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
+  const gunichar ch = gdk_keyval_to_unicode(keyval);
+  const bool printable_nonspace = ch && g_unichar_isprint(ch) && ch != ' ';
+  if (PlaylistFilterFocus::ShouldRouteToFilter(keyval, state, printable_nonspace, GDK_CONTROL_MASK)) {
     ResetTypeAhead();
+    gchar utf8[8] = {};
+    if (ch) {
+      g_unichar_to_utf8(ch, utf8);
+    }
     if (focus_filter_) {
-      focus_filter_();
+      focus_filter_(keyval, utf8);
     }
     return TRUE;
   }
@@ -274,8 +280,7 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
     ResetTypeAhead();
     return TRUE;
   }
-  const gunichar ch = gdk_keyval_to_unicode(keyval);
-  if (ch && g_unichar_isprint(ch)) {
+  if (ch && g_unichar_isprint(ch) && PlaylistFilterFocus::ShouldTypeahead(false)) {
     gchar utf8[8] = {};
     typeahead_.append(utf8, static_cast<size_t>(g_unichar_to_utf8(ch, utf8)));
     if (typeahead_timeout_) {

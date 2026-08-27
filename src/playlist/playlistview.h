@@ -28,7 +28,7 @@ class PlaylistView {
   using RateCallback = std::function<void(const std::vector<int> &, float)>;
   using QueuePositionCallback = std::function<int(int)>;
   using DeleteCallback = std::function<void()>;
-  using FocusFilterCallback = std::function<void()>;
+  using FocusFilterCallback = std::function<void(unsigned keyval, const char *utf8)>;
   using PlayPauseCallback = std::function<void()>;
   using SeekCallback = std::function<void()>;
 

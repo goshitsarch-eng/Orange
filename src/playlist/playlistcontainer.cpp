@@ -4,6 +4,7 @@
 #include "core/settings.h"
 #include "filterparser/filterparser.h"
 #include "playlist/playlistfilterdelay.h"
+#include "playlist/playlistfilterfocus.h"
 #include "playlist/playlistfiltersync.h"
 #include "playlist/playlisttoolbar.h"
 #include "playlist/playlistundostate.h"
@@ -170,7 +171,7 @@ PlaylistContainer::PlaylistContainer()
                    })),
                    this);
   gtk_box_append(GTK_BOX(toolbar_), filter_entry_);
-  view_->SetFocusFilterCallback([this]() { FocusFilter(); });
+  view_->SetFocusFilterCallback([this](unsigned keyval, const char *utf8) { FocusFilterFromKey(keyval, utf8); });
   summary_ = gtk_label_new("");
   gtk_widget_add_css_class(summary_, "dim-label");
   gtk_widget_set_visible(summary_, FALSE);
@@ -234,6 +235,30 @@ void PlaylistContainer::FocusFilter() {
     return;
   }
   gtk_widget_grab_focus(filter_entry_);
+}
+
+void PlaylistContainer::FocusFilterFromKey(unsigned keyval, const char *utf8) {
+  FocusFilter();
+  if (!filter_entry_ || !PlaylistToolbar::FocusEnabled(toolbar_ && gtk_widget_get_visible(toolbar_))) {
+    return;
+  }
+  const PlaylistFilterFocus::Effect effect = PlaylistFilterFocus::KeyEffect(keyval);
+  if (effect == PlaylistFilterFocus::Effect::None && utf8 && utf8[0] != '\0') {
+    const std::string next = PlaylistFilterFocus::AppendUtf8(gtk_editable_get_text(GTK_EDITABLE(filter_entry_)), utf8);
+    gtk_editable_set_text(GTK_EDITABLE(filter_entry_), next.c_str());
+    gtk_editable_set_position(GTK_EDITABLE(filter_entry_), -1);
+    return;
+  }
+  if (effect == PlaylistFilterFocus::Effect::FocusOnly) {
+    return;
+  }
+  const std::string next = PlaylistFilterFocus::Apply(gtk_editable_get_text(GTK_EDITABLE(filter_entry_)), effect, utf8);
+  if (effect == PlaylistFilterFocus::Effect::Clear || effect == PlaylistFilterFocus::Effect::Append) {
+    gtk_editable_set_text(GTK_EDITABLE(filter_entry_), next.c_str());
+    if (effect == PlaylistFilterFocus::Effect::Append) {
+      gtk_editable_set_position(GTK_EDITABLE(filter_entry_), -1);
+    }
+  }
 }
 
 bool PlaylistContainer::SearchFieldHasFocus() const {
