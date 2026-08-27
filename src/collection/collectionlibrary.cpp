@@ -80,19 +80,9 @@ void CollectionLibrary::AbortScan() {
 bool CollectionLibrary::scanning() const { return watcher_ && watcher_->scanning(); }
 
 void CollectionLibrary::Rescan(const SongList &songs) {
-  for (const Song &song : songs) {
-    const std::string path = FileUtils::PathFromUri(song.url());
-    if (path.empty() || !FileUtils::Exists(path) || !tagreader_) {
-      continue;
-    }
-    Song updated = tagreader_->ReadFile(path);
-    if (!updated.is_valid()) {
-      continue;
-    }
-    if (song.id() > 0) {
-      updated.set_id(song.id());
-    }
-    backend_->AddOrUpdateSong(updated);
+  if (watcher_) {
+    watcher_->RescanSongs(songs);
+    return;
   }
   ScanFinished.Emit();
 }

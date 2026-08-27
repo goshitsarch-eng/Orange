@@ -40,6 +40,7 @@
 #include "collection/collectionexpire.h"
 #include "collection/collectionfingerprintmatch.h"
 #include "collection/collectionrescanreason.h"
+#include "collection/collectionrescansongs.h"
 #include "collection/collectionunavailablerestore.h"
 #include "collection/collectionscanprogress.h"
 #include "collection/collectiontagsave.h"
@@ -640,6 +641,52 @@ TEST(CollectionWatcher, NeedsRescanUsesMtimeAndUnavailable) {
   EXPECT_TRUE(CollectionWatcher::NeedsRescan(existing, 100, 50));
   Song missing;
   EXPECT_TRUE(CollectionWatcher::NeedsRescan(missing, 100, 50));
+}
+
+TEST(CollectionRescanSongs, DedupsParentDirsAndSplitsPlaylistReloads) {
+  EXPECT_STREQ("Rescanning songs", CollectionRescanSongs::TaskName());
+  EXPECT_FALSE(CollectionRescanSongs::MarksMissingUnavailable());
+  CollectionDirectory root;
+  root.id = 1;
+  root.path = "/music";
+  std::vector<CollectionDirectory> directories = {root};
+  EXPECT_TRUE(CollectionRescanSongs::DirectoryWatched(1, directories));
+  EXPECT_FALSE(CollectionRescanSongs::DirectoryWatched(2, directories));
+  EXPECT_EQ(1, CollectionRescanSongs::DirectoryIdForPath("/music/Portishead", directories));
+  EXPECT_EQ(-1, CollectionRescanSongs::DirectoryIdForPath("/other/album", directories));
+
+  Song collection;
+  collection.set_source(Song::Source::Collection);
+  collection.set_directory_id(1);
+  collection.set_url("file:///music/Portishead/roads.flac");
+  Song same_album;
+  same_album.set_source(Song::Source::Collection);
+  same_album.set_directory_id(1);
+  same_album.set_url("file:///music/Portishead/mysterons.flac");
+  Song other_album;
+  other_album.set_source(Song::Source::Collection);
+  other_album.set_directory_id(1);
+  other_album.set_url("file:///music/Dummy/sour.flac");
+  Song local;
+  local.set_source(Song::Source::LocalFile);
+  local.set_url("file:///tmp/outside.flac");
+  EXPECT_TRUE(CollectionRescanSongs::ShouldRescanInCollection(collection));
+  EXPECT_FALSE(CollectionRescanSongs::ShouldReloadPlaylistItem(collection));
+  EXPECT_TRUE(CollectionRescanSongs::ShouldReloadPlaylistItem(local));
+  EXPECT_FALSE(CollectionRescanSongs::ShouldRescanInCollection(local));
+  EXPECT_EQ("/music/Portishead", CollectionRescanSongs::SongPath(collection));
+  const std::vector<CollectionRescanSongs::Target> targets =
+      CollectionRescanSongs::Targets({collection, same_album, other_album, local}, directories);
+  ASSERT_EQ(2u, targets.size());
+  EXPECT_EQ(1, targets[0].first);
+  EXPECT_EQ("/music/Portishead", targets[0].second);
+  EXPECT_EQ("/music/Dummy", targets[1].second);
+  const SongList collection_only = CollectionRescanSongs::CollectionSongs({collection, local});
+  ASSERT_EQ(1u, collection_only.size());
+  EXPECT_EQ("file:///music/Portishead/roads.flac", collection_only.front().url());
+  std::vector<std::string> scanned;
+  EXPECT_TRUE(CollectionRescanSongs::ShouldScanPath("/music/Portishead", &scanned));
+  EXPECT_FALSE(CollectionRescanSongs::ShouldScanPath("/music/Portishead", &scanned));
 }
 
 TEST(CollectionRescanReason, ForcesRescanWhenFingerprintOrLoudnessMissing) {

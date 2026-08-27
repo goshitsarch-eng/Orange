@@ -13,6 +13,7 @@
 #include "ui/mainwindow.h"
 
 #include "collection/collectionfullrescan.h"
+#include "collection/collectionrescansongs.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionincremental.h"
 #include "playlist/playlistactivate.h"
@@ -4501,14 +4502,21 @@ void MainWindow::RescanSelected() {
     ShowToast("No songs selected");
     return;
   }
-  app_->collection()->Rescan(songs);
+  const SongList collection_songs = CollectionRescanSongs::CollectionSongs(songs);
+  if (!collection_songs.empty()) {
+    app_->collection()->Rescan(collection_songs);
+  }
   if (Playlist *playlist = app_->playlist_manager()->current()) {
     for (int row : SelectedPlaylistRows()) {
-      playlist->ReloadRow(row, app_->tagreader());
+      if (row < 0 || static_cast<size_t>(row) >= playlist->songs().size()) {
+        continue;
+      }
+      if (CollectionRescanSongs::ShouldReloadPlaylistItem(playlist->songs()[static_cast<size_t>(row)])) {
+        playlist->ReloadRow(row, app_->tagreader());
+      }
     }
     app_->playlist_manager()->SaveCurrent();
   }
-  RefreshCollection();
   RefreshPlaylist();
   ShowToast("Rescanned " + std::to_string(songs.size()) + " song(s)");
 }

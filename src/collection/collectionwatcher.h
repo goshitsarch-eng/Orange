@@ -35,6 +35,7 @@ class CollectionWatcher {
   void Scan();
   void Scan(ScanType type);
   void ScanDirectory(int directory_id, const std::string &path, bool recursive);
+  void RescanSongs(const SongList &songs);
   void Abort();
   bool scanning() const { return scanning_; }
   void StartWatching();
@@ -102,8 +103,11 @@ class CollectionWatcher {
     bool overwrite_rating = false;
     int expire_days = CollectionSettings::kDefaultExpireUnavailableSongs;
     std::vector<std::string> cover_filters;
+    bool song_rescan = false;
+    std::vector<std::pair<int, std::string>> rescan_targets;
   };
 
+  void FillScanJob(ScanJob *job, bool load_existing);
   void ScanPath(int directory_id, const std::string &path, bool recursive, int task_id, int *added);
   void WatchPath(const std::string &path);
   void ScheduleIncremental();
@@ -111,6 +115,7 @@ class CollectionWatcher {
   void StartPeriodicScan();
   void StartAsyncScan(ScanType type);
   static gpointer ScanThread(gpointer data);
+  static gpointer RescanThread(gpointer data);
   static gboolean ApplyScanJob(gpointer data);
   static gboolean OnRescanTimeout(gpointer data);
   static gboolean OnPeriodicTimeout(gpointer data);
