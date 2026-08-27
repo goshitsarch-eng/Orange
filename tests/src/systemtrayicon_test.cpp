@@ -3,6 +3,7 @@
 #include "systemtrayicon/systemtrayicon.h"
 #include "systemtrayicon/traymenulove.h"
 #include "systemtrayicon/traymenumute.h"
+#include "systemtrayicon/traymenustop.h"
 #include "widgets/busyindicatoranim.h"
 
 #include "constants/behavioursettings.h"
@@ -266,6 +267,28 @@ TEST(TrayMenuMute, CheckedStateMatchesQt) {
   EXPECT_TRUE(tray.mute_checked());
   tray.SetMuteChecked(false);
   EXPECT_FALSE(tray.mute_checked());
+}
+
+TEST(TrayMenuStop, DisabledWhenStoppedLikeQt) {
+  EXPECT_TRUE(TrayMenuStop::PlaybackActive(true, false));
+  EXPECT_TRUE(TrayMenuStop::PlaybackActive(false, true));
+  EXPECT_FALSE(TrayMenuStop::PlaybackActive(false, false));
+  EXPECT_TRUE(TrayMenuStop::IsStopId(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter));
+  EXPECT_TRUE(TrayMenuStop::IsStopId(SystemTrayIcon::kMenuStopAfter, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter));
+  EXPECT_FALSE(TrayMenuStop::IsStopId(SystemTrayIcon::kMenuNext, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter));
+  EXPECT_FALSE(TrayMenuStop::ItemEnabled(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter, false));
+  EXPECT_FALSE(TrayMenuStop::ItemEnabled(SystemTrayIcon::kMenuStopAfter, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter, false));
+  EXPECT_TRUE(TrayMenuStop::ItemEnabled(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter, true));
+  EXPECT_TRUE(TrayMenuStop::ItemEnabled(SystemTrayIcon::kMenuNext, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter, false));
+
+  SystemTrayIcon tray;
+  EXPECT_FALSE(TrayMenuStop::PlaybackActive(tray.playing(), tray.paused()));
+  tray.SetPlaying(true);
+  EXPECT_TRUE(TrayMenuStop::PlaybackActive(tray.playing(), tray.paused()));
+  tray.SetPaused();
+  EXPECT_TRUE(TrayMenuStop::PlaybackActive(tray.playing(), tray.paused()));
+  tray.SetStopped();
+  EXPECT_FALSE(TrayMenuStop::PlaybackActive(tray.playing(), tray.paused()));
 }
 
 TEST(TrayMenuMute, FollowsVolumeControlLikeQt) {
