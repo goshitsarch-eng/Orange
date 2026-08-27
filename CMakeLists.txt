@@ -772,7 +772,7 @@ if(WIN32)
     src/globalshortcuts/globalshortcutsbackend-win.cpp
     src/globalshortcuts/globalshortcut-win.cpp
   )
-  target_link_libraries(strawberry PRIVATE dwmapi ole32 oleaut32 uuid dsound)
+  target_link_libraries(strawberry PRIVATE dwmapi ole32 oleaut32 uuid dsound runtimeobject)
 endif()
 if(APPLE)
   target_sources(strawberry PRIVATE
@@ -1186,7 +1186,7 @@ if(GTest_FOUND)
       src/globalshortcuts/globalshortcutsbackend-win.cpp
       src/globalshortcuts/globalshortcut-win.cpp
     )
-    target_link_libraries(strawberry_tests PRIVATE dwmapi ole32 oleaut32 uuid dsound)
+    target_link_libraries(strawberry_tests PRIVATE dwmapi ole32 oleaut32 uuid dsound runtimeobject)
   endif()
   if(APPLE)
     target_sources(strawberry_tests PRIVATE

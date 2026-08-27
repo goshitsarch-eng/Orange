@@ -15,6 +15,7 @@
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "device/udisks2lister.h"
+#include "device/devicecopyjob.h"
 #include "device/devicecopyrunner.h"
 #include "device/devicecopyrefresh.h"
 #include "device/devicecopysupported.h"
@@ -67,6 +68,9 @@ DeviceManager::~DeviceManager() {
   }
   musicbrainz_.reset();
   cdda_.reset();
+#ifdef __APPLE__
+  macos_lister_.reset();
+#endif
   StopVolumeMonitor();
 }
 
@@ -86,6 +90,12 @@ void DeviceManager::Init() {
   if (device_db_) {
     device_db_->Init();
   }
+#ifdef __APPLE__
+  if (!macos_lister_) {
+    macos_lister_ = std::make_unique<MacOsDeviceLister>();
+    macos_lister_->DevicesChanged.Connect([this]() { ScheduleRescan(); });
+  }
+#endif
   StartVolumeMonitor();
   Rescan();
 }
@@ -135,12 +145,7 @@ void DeviceManager::ScheduleRescan() {
       this);
 }
 
-std::string DeviceManager::MtpSerial(const std::string &unique_id) {
-  if (unique_id.rfind("mtp:", 0) == 0) {
-    return unique_id.substr(4);
-  }
-  return unique_id;
-}
+std::string DeviceManager::MtpSerial(const std::string &unique_id) { return DeviceCopyJob::MtpSerial(unique_id); }
 
 const ConnectedDevice *DeviceManager::FindDevice(const std::string &device_id) const {
   for (const ConnectedDevice &device : devices_) {
@@ -239,12 +244,12 @@ void DeviceManager::Rescan() {
   const std::vector<ConnectedDevice> cds = CddaLister().List();
   devices_.insert(devices_.end(), cds.begin(), cds.end());
 #ifdef __APPLE__
-  {
-    const std::vector<ConnectedDevice> macos = MacOsDeviceLister().List();
+  if (macos_lister_) {
+    const std::vector<ConnectedDevice> macos = macos_lister_->List();
     devices_.insert(devices_.end(), macos.begin(), macos.end());
   }
 #endif
-#ifdef HAVE_MTP
+#if defined(HAVE_MTP) && !defined(__APPLE__)
   {
     MtpConnection::InitLibMtp();
     LIBMTP_raw_device_t *raw = nullptr;

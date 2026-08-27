@@ -16,6 +16,9 @@
 
 class CddaDevice;
 class Database;
+#ifdef __APPLE__
+class MacOsDeviceLister;
+#endif
 class NetworkAccessManager;
 class TagReader;
 class TaskManager;
@@ -101,6 +104,9 @@ class DeviceManager {
   std::string cdda_disc_id_;
   std::string cdda_lookup_id_;
   bool cdda_lookup_started_ = false;
+#ifdef __APPLE__
+  std::unique_ptr<MacOsDeviceLister> macos_lister_;
+#endif
 };
 
 #endif

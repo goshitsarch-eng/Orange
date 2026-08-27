@@ -16,6 +16,9 @@ FileSystemWatcherWinThread *FileSystemWatcherWin::ThreadForNewWatch() {
   threads_.push_back(std::make_unique<FileSystemWatcherWinThread>());
   FileSystemWatcherWinThread *thread = threads_.back().get();
   thread->PathChanged.Connect([this](const std::string &path) { PathChanged.Emit(path); });
+  thread->WatchDropped.Connect([this](const std::string &path) {
+    thread_from_path_.erase(FileSystemWatcherWinPolicy::PathKey(path));
+  });
   return thread;
 }
 

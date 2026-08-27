@@ -555,6 +555,7 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(ipod));
   EXPECT_TRUE(DeviceCopy::UsesDeviceCopyRunner(ipod));
   EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("mtp:serial"));
+  EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("MTP/serial"));
   EXPECT_EQ("usb", DeviceCopyJob::MtpSerial("usb"));
   EXPECT_STREQ("Copying to device", DeviceCopyJob::TaskName());
   EXPECT_EQ(10, DeviceCopyJob::kBatchSize);

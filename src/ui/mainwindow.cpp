@@ -2250,10 +2250,17 @@ void MainWindow::ConnectSignals() {
                                        StatusBarStack::ChildName(StatusBarStack::PageForTaskCount(static_cast<int>(tasks.size()))));
     }
   });
-  app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &, const std::vector<unsigned char> &data) {
+  app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &song, const std::vector<unsigned char> &data) {
     if (!data.empty()) {
       UpdateCover(data);
     }
+#ifdef _WIN32
+    if (smtc_) {
+      smtc_->AlbumCoverLoaded(song, data);
+    }
+#else
+    (void)song;
+#endif
   });
   app_->queue()->Changed.Connect([this]() {
     RefreshQueue();

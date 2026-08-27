@@ -22,7 +22,7 @@ inline bool ShouldUseOrganizeDialog(const ConnectedDevice &device) {
 }
 
 inline std::string MtpSerial(const std::string &unique_id) {
-  if (unique_id.rfind("mtp:", 0) == 0) {
+  if (unique_id.rfind("mtp:", 0) == 0 || unique_id.rfind("MTP/", 0) == 0) {
     return unique_id.substr(4);
   }
   return unique_id;

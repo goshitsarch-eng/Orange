@@ -1,6 +1,7 @@
 #include "core/filesystemwatcherwinpolicy.h"
 #include "core/windows7thumbbaractions.h"
 #include "core/winsmtcstatus.h"
+#include "device/macosdeviceclassify.h"
 #include "engine/enginebase.h"
 #include "engine/platformdeviceoutputs.h"
 #include "globalshortcuts/keymapper_win.h"
@@ -2641,11 +2642,35 @@ TEST(WinSmtcStatus, MapsEngineState) {
   EXPECT_EQ(WinSmtcStatus::Playback::Playing, WinSmtcStatus::FromEngine(EngineBase::State::Playing));
   EXPECT_EQ(WinSmtcStatus::Playback::Paused, WinSmtcStatus::FromEngine(EngineBase::State::Paused));
   EXPECT_EQ(WinSmtcStatus::Playback::Stopped, WinSmtcStatus::FromEngine(EngineBase::State::Idle));
-  EXPECT_EQ(WinSmtcStatus::Playback::Closed, WinSmtcStatus::FromEngine(EngineBase::State::Error));
+  EXPECT_EQ(WinSmtcStatus::Playback::Stopped, WinSmtcStatus::FromEngine(EngineBase::State::Error));
   EXPECT_TRUE(WinSmtcStatus::ButtonsEnabled(WinSmtcStatus::Playback::Playing));
   EXPECT_FALSE(WinSmtcStatus::ButtonsEnabled(WinSmtcStatus::Playback::Stopped));
   EXPECT_TRUE(WinSmtcStatus::TimelineEnabled(WinSmtcStatus::Playback::Paused));
   EXPECT_FALSE(WinSmtcStatus::TimelineEnabled(WinSmtcStatus::Playback::Closed));
+}
+
+TEST(WinSmtcStatus, ButtonsThumbnailAndTimeline) {
+  EXPECT_EQ(0, static_cast<int>(WinSmtcStatus::Button::Play));
+  EXPECT_EQ(4, static_cast<int>(WinSmtcStatus::Button::Next));
+  EXPECT_EQ(5, static_cast<int>(WinSmtcStatus::Button::Previous));
+  EXPECT_STREQ("play", WinSmtcStatus::ButtonAction(WinSmtcStatus::Button::Play));
+  EXPECT_STREQ("next", WinSmtcStatus::ButtonAction(WinSmtcStatus::Button::Next));
+  EXPECT_TRUE(WinSmtcStatus::DispatchesToPlayer(WinSmtcStatus::Button::Stop));
+  EXPECT_FALSE(WinSmtcStatus::DispatchesToPlayer(WinSmtcStatus::Button::Record));
+  EXPECT_TRUE(WinSmtcStatus::ShouldRunTimelineTimer(EngineBase::State::Playing));
+  EXPECT_FALSE(WinSmtcStatus::ShouldRunTimelineTimer(EngineBase::State::Paused));
+  EXPECT_TRUE(WinSmtcStatus::ShouldClearMetadata(false));
+  EXPECT_FALSE(WinSmtcStatus::ShouldClearMetadata(true));
+  EXPECT_TRUE(WinSmtcStatus::ShouldApplyCover("file:///a", "file:///a"));
+  EXPECT_FALSE(WinSmtcStatus::ShouldApplyCover("file:///a", "file:///b"));
+  EXPECT_TRUE(WinSmtcStatus::ShouldSetThumbnail(true, true));
+  EXPECT_FALSE(WinSmtcStatus::ShouldSetThumbnail(false, true));
+  EXPECT_TRUE(WinSmtcStatus::ShouldClearThumbnail(true, false));
+  EXPECT_TRUE(WinSmtcStatus::LooksLikeJpeg({0xFF, 0xD8, 0xFF, 0xE0}));
+  EXPECT_FALSE(WinSmtcStatus::LooksLikeJpeg({0x89, 0x50, 0x4E, 0x47}));
+  EXPECT_EQ(10000000, WinSmtcStatus::TimelineHundredNs(1000000000));
+  EXPECT_EQ(42, WinSmtcStatus::TimelineDurationNs(42, 99));
+  EXPECT_EQ(99, WinSmtcStatus::TimelineDurationNs(0, 99));
 }
 
 TEST(WinBlurBehind, AppliesOnWindowsMask) {
@@ -2660,6 +2685,29 @@ TEST(FileSystemWatcherWinPolicy, BatchesAndNormalizes) {
   EXPECT_TRUE(FileSystemWatcherWinPolicy::ThreadHasRoom(62));
   EXPECT_FALSE(FileSystemWatcherWinPolicy::ThreadHasRoom(63));
   EXPECT_EQ("c:\\music", FileSystemWatcherWinPolicy::PathKey("C:/Music"));
+  EXPECT_EQ(0x0000001Fu, FileSystemWatcherWinPolicy::kNotifyFlags);
+  EXPECT_FALSE(FileSystemWatcherWinPolicy::kWatchSubtree);
+}
+
+TEST(MacOsDeviceClassify, CDAndMTP) {
+  EXPECT_TRUE(MacOsDeviceClassify::IsCDKind("IOCDMedia"));
+  EXPECT_FALSE(MacOsDeviceClassify::IsCDKind("IOMedia"));
+  EXPECT_EQ("MTP/ABC123", MacOsDeviceClassify::MTPUniqueId("ABC123"));
+  EXPECT_EQ("MTP/ABC123", MacOsDeviceClassify::MTPUniqueId("MTP/ABC123"));
+  EXPECT_TRUE(MacOsDeviceClassify::IsMTPUniqueId("MTP/ABC123"));
+  EXPECT_EQ("ABC123", MacOsDeviceClassify::MTPSerial("MTP/ABC123"));
+  EXPECT_EQ("ABC123", MacOsDeviceClassify::MTPSerial("mtp:ABC123"));
+  EXPECT_EQ("Vendor Product", MacOsDeviceClassify::FriendlyName("Vendor", "Product"));
+  EXPECT_EQ("MTP device", MacOsDeviceClassify::FriendlyName("", ""));
+  EXPECT_TRUE(MacOsDeviceClassify::ShouldSkipUsbDevice(0x05ac, 0x12a8, -1));
+  EXPECT_TRUE(MacOsDeviceClassify::ShouldSkipUsbDevice(0x1234, 0x5678, 3));
+  EXPECT_FALSE(MacOsDeviceClassify::ShouldSkipUsbDevice(0x18d1, 0x4ee1, -1));
+  EXPECT_TRUE(MacOsDeviceClassify::MatchesMtpDevice(0x18d1, 0x4ee1, 0x18d1, 0x4ee1));
+  EXPECT_EQ("/dev/rdisk2", MacOsDeviceClassify::RawDevicePath("disk2"));
+  EXPECT_EQ("/dev/rdisk2", MacOsDeviceClassify::RawDevicePath("rdisk2"));
+  EXPECT_STREQ("cdda", MacOsDeviceClassify::BackendForKind(true, false));
+  EXPECT_STREQ("mtp", MacOsDeviceClassify::BackendForKind(false, true));
+  EXPECT_STREQ("media-optical-symbolic", MacOsDeviceClassify::IconForKind(true, false));
 }
 
 TEST(KeyMapperWin, ParsesMediaKeys) {
