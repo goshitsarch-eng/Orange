@@ -1,4 +1,5 @@
 #include "dialogs/shortcutscatalog.h"
+#include "ui/mainwindowshowhide.h"
 #include "globalshortcuts/globalshortcutbinding.h"
 #include "globalshortcuts/globalshortcutgrab.h"
 #include "globalshortcuts/globalshortcuts.h"
@@ -243,6 +244,23 @@ TEST(PlaylistManager, CycleRepeatAndShuffleModes) {
   EXPECT_EQ(PlaylistSequence::RepeatMode::Track, manager.current()->repeat_mode());
   manager.CycleShuffleMode();
   EXPECT_EQ(PlaylistSequence::ShuffleMode::All, manager.current()->shuffle_mode());
+}
+
+TEST(MainWindowShowHide, ShortcutAndCloseMatchQtKeepRunning) {
+  EXPECT_TRUE(MainWindowShowHide::EffectiveKeepRunning(true, true, true));
+  EXPECT_FALSE(MainWindowShowHide::EffectiveKeepRunning(true, true, false));
+  EXPECT_FALSE(MainWindowShowHide::EffectiveKeepRunning(true, false, true));
+  EXPECT_FALSE(MainWindowShowHide::EffectiveKeepRunning(false, true, true));
+  EXPECT_TRUE(MainWindowShowHide::ShouldHideInsteadOfExit(true));
+  EXPECT_FALSE(MainWindowShowHide::ShouldHideInsteadOfExit(false));
+  EXPECT_EQ(MainWindowShowHide::Action::HideToTray, MainWindowShowHide::CloseAction(true));
+  EXPECT_EQ(MainWindowShowHide::Action::Exit, MainWindowShowHide::CloseAction(false));
+  EXPECT_EQ(MainWindowShowHide::Action::HideToTray, MainWindowShowHide::HideAction(true));
+  EXPECT_EQ(MainWindowShowHide::Action::Minimize, MainWindowShowHide::HideAction(false));
+  EXPECT_EQ(MainWindowShowHide::Action::Present, MainWindowShowHide::ShortcutAction(false, false, true));
+  EXPECT_EQ(MainWindowShowHide::Action::HideToTray, MainWindowShowHide::ShortcutAction(true, true, true));
+  EXPECT_EQ(MainWindowShowHide::Action::Minimize, MainWindowShowHide::ShortcutAction(true, true, false));
+  EXPECT_EQ(MainWindowShowHide::Action::Present, MainWindowShowHide::ShortcutAction(true, false, true));
 }
 
 TEST(ShortcutsCatalog, ListsWiredMainWindowAccels) {

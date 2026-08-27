@@ -101,6 +101,7 @@ class MainWindow : public PlatformInterface {
   void FinishClosePlaylist(int id);
   void HideToTray();
   void ToggleHide();
+  void ToggleShowHide();
   void SelectPlayingTrack();
   void ApplyPlaylistBehaviour();
   void ApplyBackendSettings();

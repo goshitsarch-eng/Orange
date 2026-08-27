@@ -228,7 +228,7 @@ void Application::Init() {
   shortcuts_->Mute.Connect([this]() { player_->Mute(); });
   shortcuts_->SeekForward.Connect([this]() { player_->SeekForward(); });
   shortcuts_->SeekBackward.Connect([this]() { player_->SeekBackward(); });
-  shortcuts_->ShowHide.Connect([this]() { RaiseRequested.Emit(); });
+  shortcuts_->ShowHide.Connect([this]() { ShowHideRequested.Emit(); });
   shortcuts_->ShowOSD.Connect([this]() { player_->ShowOSD(); });
   shortcuts_->TogglePrettyOSD.Connect([this]() { player_->TogglePrettyOSD(); });
   shortcuts_->CycleShuffle.Connect([this]() { playlist_manager_->CycleShuffleMode(); });

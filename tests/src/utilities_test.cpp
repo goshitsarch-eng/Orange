@@ -2615,6 +2615,9 @@ TEST(TaskbarProgressHelpers, FractionAndVisibility) {
   EXPECT_FALSE(TaskbarProgressHelpers::ShouldShow(false, true, 100));
   EXPECT_FALSE(TaskbarProgressHelpers::ShouldShow(true, false, 100));
   EXPECT_FALSE(TaskbarProgressHelpers::ShouldShow(true, true, 0));
+  EXPECT_TRUE(TaskbarProgressHelpers::ShouldClearImmediately(true, false));
+  EXPECT_FALSE(TaskbarProgressHelpers::ShouldClearImmediately(false, false));
+  EXPECT_FALSE(TaskbarProgressHelpers::ShouldClearImmediately(true, true));
   EXPECT_STREQ("application://org.strawberrymusicplayer.strawberry.desktop", TaskbarProgressHelpers::AppUri());
   EXPECT_STREQ("com.canonical.Unity.LauncherEntry", TaskbarProgressHelpers::Interface());
   EXPECT_EQ("/com/canonical/unity/launcherentry/strawberry", TaskbarProgressHelpers::ObjectPath());

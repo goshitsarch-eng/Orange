@@ -19,6 +19,9 @@ inline double Fraction(int64_t position, int64_t length) {
 
 inline bool ShouldShow(bool enabled, bool playing, int64_t length) { return enabled && playing && length > 0; }
 
+// Qt MainWindow::ReloadSettings clears Unity progress immediately when the pref is turned off.
+inline bool ShouldClearImmediately(bool currently_visible, bool now_enabled) { return currently_visible && !now_enabled; }
+
 inline const char *AppUri() { return "application://org.strawberrymusicplayer.strawberry.desktop"; }
 
 inline const char *Interface() { return "com.canonical.Unity.LauncherEntry"; }

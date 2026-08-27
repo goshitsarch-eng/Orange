@@ -49,6 +49,7 @@
 #include "ui/mainwindowmenu.h"
 #include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
+#include "ui/mainwindowshowhide.h"
 #include "systemtrayicon/traysettingsreload.h"
 #include "ui/mainwindowsearchfocus.h"
 #include "context/contextcover.h"
@@ -230,6 +231,13 @@ bool OpenAllFileViewBrowserPaths(const std::vector<std::string> &paths) {
     }
   }
   return any;
+}
+
+bool KeepRunningEffective(Application *app) {
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  return MainWindowShowHide::EffectiveKeepRunning(app->tray() && app->tray()->available(), app->tray() && app->tray()->visible(),
+                                                 settings.BoolValue(BehaviourSettings::kKeepRunning, BehaviourSettings::kDefaultKeepRunning));
 }
 
 }  // namespace
@@ -685,10 +693,7 @@ void MainWindow::BuildUi() {
   g_signal_connect(window_, "close-request", G_CALLBACK(+[](GtkWindow *, gpointer data) -> gboolean {
                      auto *self = static_cast<MainWindow *>(data);
                      self->SaveGeometry();
-                     Settings settings;
-                     settings.BeginGroup(BehaviourSettings::kSettingsGroup);
-                     if (settings.BoolValue(BehaviourSettings::kKeepRunning, BehaviourSettings::kDefaultKeepRunning) &&
-                         self->app_->tray()->available()) {
+                     if (MainWindowShowHide::ShouldHideInsteadOfExit(KeepRunningEffective(self->app_))) {
                        self->RememberHiddenWindowState();
                        gtk_widget_set_visible(GTK_WIDGET(self->window_), FALSE);
                        return TRUE;
@@ -708,14 +713,7 @@ void MainWindow::BuildUi() {
       gtk_window_destroy(GTK_WINDOW(window_));
     }
   });
-  app_->tray()->ShowHide.Connect([this]() {
-    if (gtk_widget_get_visible(GTK_WIDGET(window_))) {
-      RememberHiddenWindowState();
-      gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
-    } else {
-      Present();
-    }
-  });
+  app_->tray()->ShowHide.Connect([this]() { ToggleShowHide(); });
   app_->tray()->Quit.Connect([this]() {
     app_->Exit();
     if (!app_->WaitingForExitFade()) {
@@ -2108,6 +2106,7 @@ void MainWindow::PlacePlayingWidget() {
 
 void MainWindow::ConnectSignals() {
   app_->RaiseRequested.Connect([this]() { Present(); });
+  app_->ShowHideRequested.Connect([this]() { ToggleShowHide(); });
   app_->playlist_manager()->SequenceChanged.Connect([this]() {
     Playlist *playlist = app_->playlist_manager()->current();
     if (!playlist) {
@@ -3112,11 +3111,31 @@ void MainWindow::ToggleHide() {
   if (!window_ || !gtk_widget_get_visible(GTK_WIDGET(window_))) {
     return;
   }
-  if (app_->tray() && app_->tray()->available()) {
+  if (MainWindowShowHide::HideAction(KeepRunningEffective(app_)) == MainWindowShowHide::Action::HideToTray) {
     HideToTray();
     return;
   }
   gtk_window_minimize(GTK_WINDOW(window_));
+}
+
+void MainWindow::ToggleShowHide() {
+  if (!window_) {
+    return;
+  }
+  const bool visible = gtk_widget_get_visible(GTK_WIDGET(window_)) == TRUE;
+  const bool active = gtk_window_is_active(GTK_WINDOW(window_)) == TRUE;
+  switch (MainWindowShowHide::ShortcutAction(visible, active, KeepRunningEffective(app_))) {
+    case MainWindowShowHide::Action::HideToTray:
+      HideToTray();
+      break;
+    case MainWindowShowHide::Action::Minimize:
+      gtk_window_minimize(GTK_WINDOW(window_));
+      break;
+    case MainWindowShowHide::Action::Present:
+    case MainWindowShowHide::Action::Exit:
+      Present();
+      break;
+  }
 }
 
 void MainWindow::CloseCurrentPlaylist() {
@@ -3478,6 +3497,10 @@ void MainWindow::ApplyBehaviourSettings() {
     if (window_ && TraySettingsReload::ShouldPresentWindowAfterDisable(show_tray, gtk_widget_get_visible(GTK_WIDGET(window_)) == TRUE)) {
       Present();
     }
+  }
+  const bool taskbar = settings.BoolValue(BehaviourSettings::kTaskbarProgress, BehaviourSettings::kDefaultTaskbarProgress);
+  if (TaskbarProgressHelpers::ShouldClearImmediately(taskbar_.visible(), taskbar)) {
+    taskbar_.Set(0.0, false);
   }
   ApplyPlaylistBehaviour();
 }
