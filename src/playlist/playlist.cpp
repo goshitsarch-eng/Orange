@@ -4,6 +4,8 @@
 #include "playlist/playlistautosort.h"
 #include "playlist/playlistitemuuid.h"
 #include "playlist/dynamicplaylistmaintenance.h"
+#include "playlist/playlistdynamicadvance.h"
+#include "playlist/playlistlocalartdiscover.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistfilter.h"
@@ -18,10 +20,12 @@
 #include "playlist/playlistundolimits.h"
 #include "scrobbler/scrobblepoint.h"
 #include "smartplaylists/playlistgenerator.h"
+#include "smartplaylists/playlistquerygenerator.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
 #include <algorithm>
+#include <memory>
 #include <numeric>
 #include <random>
 
@@ -842,16 +846,38 @@ void Playlist::RecordAndSetCurrentRow(int row) {
 }
 
 void Playlist::MaintainDynamicAfterAdvance(int old_row) {
-  if (!DynamicPlaylistMaintenance::ShouldClearUndo(dynamic_, current_row_ > old_row && old_row >= 0)) {
+  if (!PlaylistDynamicAdvance::ShouldReplenish(dynamic_, current_row_ > old_row && old_row >= 0)) {
     return;
   }
-  const int trim = DynamicPlaylistMaintenance::HistoryTrimCount(DynamicPlaylistMaintenance::HistoryLength(current_row_));
   undo_.clear();
   redo_.clear();
+  const int max_history = PlaylistDynamicAdvance::MaxHistory(dynamic_generator_.get());
+  const int max_future = PlaylistDynamicAdvance::MaxFuture(dynamic_generator_.get());
+  const int trim = DynamicPlaylistMaintenance::HistoryTrimCount(DynamicPlaylistMaintenance::HistoryLength(current_row_), max_history);
   if (trim > 0) {
     std::vector<int> rows(static_cast<size_t>(trim));
     std::iota(rows.begin(), rows.end(), 0);
     RemoveRowsInternal(rows, false);
+  }
+  const int want = PlaylistDynamicAdvance::ReplenishCount(DynamicPlaylistMaintenance::HistoryLength(current_row_), max_future, row_count());
+  if (want > 0) {
+    InsertDynamicMore(want);
+  }
+}
+
+void Playlist::InsertDynamicMore(int count) {
+  if (count <= 0) {
+    return;
+  }
+  if (dynamic_generator_) {
+    if (auto *query = dynamic_cast<PlaylistQueryGenerator *>(dynamic_generator_.get())) {
+      query->Remember(songs_);
+    }
+    SongList extra = PlaylistDynamicAdvance::DedupByIdThenUrl(dynamic_generator_->GenerateMore(count), songs_);
+    if (!extra.empty()) {
+      AppendSongs(extra);
+    }
+    return;
   }
 }
 
@@ -865,9 +891,44 @@ void Playlist::SetDynamic(bool dynamic, const SmartPlaylistSearch &search) {
   dynamic_search_ = search;
   if (dynamic) {
     mode_ = SequenceMode::Dynamic;
+    CollectionBackend *backend = dynamic_generator_ ? dynamic_generator_->collection() : nullptr;
+    auto query = std::make_shared<PlaylistQueryGenerator>(name_, search, true);
+    query->set_collection_backend(backend);
+    query->Remember(songs_);
+    dynamic_generator_ = std::move(query);
+  } else {
+    if (mode_ == SequenceMode::Dynamic) {
+      mode_ = SequenceMode::Sequential;
+    }
+    dynamic_generator_.reset();
+  }
+}
+
+void Playlist::SetDynamicGenerator(std::shared_ptr<PlaylistGenerator> generator) {
+  dynamic_generator_ = std::move(generator);
+  dynamic_ = static_cast<bool>(dynamic_generator_);
+  if (dynamic_generator_) {
+    mode_ = SequenceMode::Dynamic;
+    dynamic_generator_->set_dynamic(true);
+    if (auto *query = dynamic_cast<PlaylistQueryGenerator *>(dynamic_generator_.get())) {
+      dynamic_search_ = query->search();
+      query->Remember(songs_);
+    }
   } else if (mode_ == SequenceMode::Dynamic) {
     mode_ = SequenceMode::Sequential;
   }
+}
+
+void Playlist::ApplyDiscoveredArt(const Song &playing, const std::string &discovered) {
+  if (current_row_ < 0 || current_row_ >= row_count()) {
+    return;
+  }
+  Song row = current_song();
+  if (!PlaylistLocalArtDiscover::ShouldWriteSidecar(row, playing, discovered)) {
+    return;
+  }
+  PlaylistLocalArtDiscover::ApplySidecar(&row, discovered);
+  ReplaceRow(current_row_, row);
 }
 
 void Playlist::RefillDynamic(const SongList &pool, bool force) {
@@ -875,7 +936,7 @@ void Playlist::RefillDynamic(const SongList &pool, bool force) {
     return;
   }
   const int upcoming = DynamicPlaylistMaintenance::FutureCount(row_count(), current_row_);
-  const int max_future = PlaylistGenerator::kDefaultDynamicFuture;
+  const int max_future = PlaylistDynamicAdvance::MaxFuture(dynamic_generator_.get());
   if (!force && upcoming >= max_future) {
     return;
   }
@@ -883,22 +944,13 @@ void Playlist::RefillDynamic(const SongList &pool, bool force) {
   if (want <= 0) {
     return;
   }
-  SongList candidates = dynamic_search_.Search(pool);
-  SongList extra;
-  for (const Song &song : candidates) {
-    bool seen = false;
-    for (const Song &existing : songs_) {
-      if (existing.url() == song.url()) {
-        seen = true;
-        break;
-      }
-    }
-    if (!seen) {
-      extra.push_back(song);
-    }
-    if (static_cast<int>(extra.size()) >= want) {
-      break;
-    }
+  if (dynamic_generator_) {
+    InsertDynamicMore(want);
+    return;
+  }
+  SongList extra = PlaylistDynamicAdvance::DedupByIdThenUrl(dynamic_search_.Search(pool), songs_);
+  if (static_cast<int>(extra.size()) > want) {
+    extra.resize(static_cast<size_t>(want));
   }
   if (!extra.empty()) {
     AppendSongs(extra);

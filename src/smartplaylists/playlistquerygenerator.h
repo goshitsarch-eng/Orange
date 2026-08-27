@@ -23,6 +23,7 @@ class PlaylistQueryGenerator : public PlaylistGenerator {
   void set_dynamic(bool dynamic) override { dynamic_ = dynamic; }
 
   const SmartPlaylistSearch &search() const { return search_; }
+  void Remember(const SongList &songs);
   int GetDynamicFuture() const override { return search_.limit > 0 ? search_.limit : kDefaultDynamicFuture; }
 
  private:

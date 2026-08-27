@@ -3606,7 +3606,7 @@ void MainWindow::RateRows(const std::vector<int> &rows, float rating) {
       app_->collection()->backend()->SetRating(song.id(), rating);
     }
     if (save_ratings && song.IsEditable()) {
-      app_->tagreader()->SaveRating(FileUtils::PathFromUri(song.url()), rating);
+      app_->collection()->SongsRatingChanged({song}, true);
     }
   }
   RefreshPlaylist();

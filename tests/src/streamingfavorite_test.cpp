@@ -150,6 +150,10 @@ TEST(SubsonicFavoriteRequest, StarParamsAndStarredJson) {
   EXPECT_EQ("unstar", SubsonicFavoriteRequest::StarResource(true));
   const auto params = SubsonicFavoriteRequest::StarParams(Type::Songs, "42");
   ASSERT_EQ("42", params.at("id"));
+  const auto batch = SubsonicFavoriteRequest::StarParamsForIds(Type::Songs, {"42", "99"});
+  ASSERT_EQ(2u, batch.size());
+  EXPECT_EQ("42", batch[0].at("id"));
+  EXPECT_EQ("99", batch[1].at("id"));
 
   const std::string url = SubsonicService::CreateUrl("https://music.example.com", "alice", "secret", "star", {{"id", "42"}}, true);
   EXPECT_NE(std::string::npos, url.find("/rest/star.view"));

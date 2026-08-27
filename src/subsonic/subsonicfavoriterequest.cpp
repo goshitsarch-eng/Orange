@@ -4,6 +4,7 @@
 #include "utilities/jsonutils.h"
 
 #include <algorithm>
+#include <memory>
 
 namespace SubsonicFavoriteRequest {
 
@@ -75,17 +76,28 @@ void Get(NetworkAccessManager *network, const std::string &list_url, SearchCallb
 }
 
 void Mutate(NetworkAccessManager *network, const std::string &url, const SongList &songs, SearchCallback callback) {
-  if (!network) {
+  MutateMany(network, url.empty() ? std::vector<std::string>{} : std::vector<std::string>{url}, songs, std::move(callback));
+}
+
+void MutateMany(NetworkAccessManager *network, const std::vector<std::string> &urls, const SongList &songs, SearchCallback callback) {
+  if (!network || urls.empty()) {
     if (callback) {
       callback({});
     }
     return;
   }
-  network->Get(url, [callback, songs](const NetworkAccessManager::Response &response) {
-    if (callback) {
-      callback(response.ok() ? songs : SongList{});
-    }
-  });
+  auto remaining = std::make_shared<int>(static_cast<int>(urls.size()));
+  auto ok = std::make_shared<bool>(true);
+  for (const std::string &url : urls) {
+    network->Get(url, [callback, songs, remaining, ok](const NetworkAccessManager::Response &response) {
+      if (!response.ok()) {
+        *ok = false;
+      }
+      if (--*remaining == 0 && callback) {
+        callback(*ok ? songs : SongList{});
+      }
+    });
+  }
 }
 
 }  // namespace SubsonicFavoriteRequest

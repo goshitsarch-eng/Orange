@@ -19,6 +19,8 @@
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistcoverpersist.h"
+#include "playlist/playlistdynamicadvance.h"
+#include "playlist/playlistlocalartdiscover.h"
 #include "playlist/playlistqueuedequeue.h"
 #include "playlist/playlistreloadrows.h"
 #include "playlist/playliststreamstate.h"
@@ -33,11 +35,17 @@
 #include "playlist/dynamicplaylistmaintenance.h"
 #include "playlist/playlistundolimits.h"
 #include "scrobbler/scrobblepoint.h"
+#include "collection/collectionbackend.h"
+#include "core/database.h"
 #include "smartplaylists/playlistgenerator.h"
+#include "smartplaylists/playlistgeneratorinserter.h"
+#include "smartplaylists/playlistquerygenerator.h"
 #include "playlist/playlistundostate.h"
 #include "utilities/fileutils.h"
 
+#include <memory>
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 TEST(Playlist, AppendAndNavigate) {
   Playlist playlist;
@@ -1101,6 +1109,82 @@ TEST(PlaylistSaveSchedule, CoalescesIntentsAndSkipsLoad) {
             PlaylistSaveSchedule::Merge(PlaylistSaveSchedule::Intent::LastPlayed, PlaylistSaveSchedule::Intent::Items));
   EXPECT_EQ(PlaylistSaveSchedule::Intent::LastPlayed,
             PlaylistSaveSchedule::Merge(PlaylistSaveSchedule::Intent::None, PlaylistSaveSchedule::Intent::LastPlayed));
+}
+
+TEST(PlaylistDynamicAdvance, ReplenishesAfterHistoryTrim) {
+  EXPECT_TRUE(PlaylistDynamicAdvance::ShouldReplenish(true, true));
+  EXPECT_FALSE(PlaylistDynamicAdvance::ShouldReplenish(true, false));
+  EXPECT_EQ(1, PlaylistDynamicAdvance::ReplenishCount(10, 10, 20));
+  EXPECT_EQ(0, PlaylistDynamicAdvance::ReplenishCount(10, 10, 21));
+  Song first;
+  first.set_id(1);
+  first.set_url("file:///a.flac");
+  Song second;
+  second.set_id(2);
+  second.set_url("file:///b.flac");
+  Song again = first;
+  EXPECT_EQ(std::vector<int>({1, 2}), PlaylistDynamicAdvance::ExistingIds({first, second}));
+  EXPECT_EQ(1u, PlaylistDynamicAdvance::DedupByIdThenUrl({first, again, second}, {first}).size());
+  EXPECT_EQ(PlaylistGenerator::kDefaultDynamicHistory, PlaylistDynamicAdvance::MaxHistory(nullptr));
+  EXPECT_EQ(PlaylistGenerator::kDefaultDynamicFuture, PlaylistDynamicAdvance::MaxFuture(nullptr));
+}
+
+TEST(PlaylistDynamicAdvance, NextInsertsFromGenerator) {
+  const std::string path = "/tmp/strawberry-dynamic-advance-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  ASSERT_GE(directory, 0);
+  for (const char *title : {"Alpha", "Beta", "Charlie", "Delta"}) {
+    Song song;
+    song.set_title(title);
+    song.set_artist("Fleet Foxes");
+    song.set_url(std::string("file:///tmp/music/") + title + ".flac");
+    song.set_directory_id(directory);
+    song.set_valid(true);
+    ASSERT_GT(backend.AddOrUpdateSong(song), 0);
+  }
+  SmartPlaylistSearch search;
+  search.type = SmartPlaylistSearch::SearchType::All;
+  search.limit = 1;
+  search.sort_field = SmartPlaylistField::Title;
+  auto query = std::make_shared<PlaylistQueryGenerator>("Advance", search, true);
+  query->set_collection_backend(&backend);
+  Playlist playlist;
+  playlist.SetDynamicGenerator(query);
+  PlaylistGeneratorInserter inserter;
+  ASSERT_EQ(1, inserter.Insert(&playlist, query));
+  EXPECT_EQ(1, playlist.row_count());
+  EXPECT_EQ("Alpha", playlist.song(0).title());
+  playlist.RefillDynamic({});
+  EXPECT_GE(playlist.row_count(), 2);
+  EXPECT_EQ("Beta", playlist.song(1).title());
+  playlist.Next();
+  EXPECT_EQ(1, playlist.current_row());
+  EXPECT_GE(playlist.row_count(), 3);
+  EXPECT_EQ("Charlie", playlist.song(2).title());
+  unlink(path.c_str());
+}
+
+TEST(PlaylistLocalArtDiscover, WritesSidecarOnPlaylistOnlyRow) {
+  Song row(Song::Source::LocalFile);
+  row.set_url("file:///tmp/music/a.flac");
+  row.set_id(-1);
+  Song playing = row;
+  EXPECT_TRUE(PlaylistLocalArtDiscover::ShouldWriteSidecar(row, playing, "file:///tmp/music/cover.jpg"));
+  PlaylistLocalArtDiscover::ApplySidecar(&row, "file:///tmp/music/cover.jpg");
+  EXPECT_EQ("file:///tmp/music/cover.jpg", row.art_manual());
+  row.set_id(4);
+  EXPECT_FALSE(PlaylistLocalArtDiscover::ShouldWriteSidecar(row, playing, "file:///tmp/music/cover.jpg"));
+  Playlist playlist;
+  Song local(Song::Source::LocalFile);
+  local.set_url("file:///tmp/music/a.flac");
+  local.set_valid(true);
+  playlist.AppendSongs({local});
+  playlist.ApplyDiscoveredArt(local, "file:///tmp/music/cover.jpg");
+  EXPECT_EQ("file:///tmp/music/cover.jpg", playlist.song(0).art_manual());
 }
 
 TEST(DynamicPlaylistPersist, EncodesQueryTypeAndRoundTripsSearch) {

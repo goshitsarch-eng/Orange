@@ -91,6 +91,9 @@ std::unique_ptr<Playlist> PlaylistBackend::LoadPlaylist(int id) {
   playlist->EndLoad();
   if (DynamicPlaylistPersist::IsDynamic(dynamic_type)) {
     playlist->SetDynamic(true, DynamicPlaylistPersist::Decode(dynamic_data));
+    if (collection_backend_ && playlist->dynamic_generator()) {
+      playlist->dynamic_generator()->set_collection_backend(collection_backend_);
+    }
   }
   if (last_played >= 0 && last_played < playlist->row_count()) {
     playlist->set_current_row(last_played);

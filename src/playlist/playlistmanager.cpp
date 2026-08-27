@@ -416,8 +416,11 @@ void PlaylistManager::RemoveCurrentSong() {
 
 void PlaylistManager::RefillDynamic() {
   if (Playlist *playlist = Playing()) {
-    if (playlist->is_dynamic() && collection_backend_) {
-      playlist->RefillDynamic(collection_backend_->Songs());
+    if (playlist->is_dynamic()) {
+      if (playlist->dynamic_generator() && collection_backend_) {
+        playlist->dynamic_generator()->set_collection_backend(collection_backend_);
+      }
+      playlist->RefillDynamic(collection_backend_ ? collection_backend_->Songs() : SongList{});
     }
   }
 }
@@ -532,7 +535,7 @@ void PlaylistManager::PlaySmartPlaylist(const std::string &name, bool as_new, bo
     }
   }
   if (as_new || clear) {
-    playlist->SetDynamic(true, search);
+    playlist->SetDynamicGenerator(generator);
   }
   PlaylistGeneratorInserter inserter;
   inserter.Insert(playlist, generator);

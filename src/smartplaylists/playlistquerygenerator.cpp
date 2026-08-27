@@ -16,6 +16,18 @@ void PlaylistQueryGenerator::Load(const std::string &data) { SmartPlaylistSearch
 
 std::string PlaylistQueryGenerator::Save() const { return search_.Serialize(); }
 
+void PlaylistQueryGenerator::Remember(const SongList &songs) {
+  for (const Song &song : songs) {
+    if (song.id() > 0 && std::find(previous_ids_.begin(), previous_ids_.end(), song.id()) == previous_ids_.end()) {
+      previous_ids_.push_back(song.id());
+    }
+    if (!song.url().empty() &&
+        std::find(previous_urls_.begin(), previous_urls_.end(), song.url()) == previous_urls_.end()) {
+      previous_urls_.push_back(song.url());
+    }
+  }
+}
+
 SongList PlaylistQueryGenerator::Generate() {
   previous_urls_.clear();
   previous_ids_.clear();

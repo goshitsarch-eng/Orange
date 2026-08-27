@@ -7,8 +7,10 @@
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistsequence.h"
 #include "queue/queue.h"
+#include "smartplaylists/playlistgenerator.h"
 #include "smartplaylists/smartplaylist.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -90,11 +92,14 @@ class Playlist {
   PlaylistSequence::RepeatMode repeat_mode() const { return repeat_mode_; }
   PlaylistSequence::ShuffleMode shuffle_mode() const { return shuffle_mode_; }
   void SetDynamic(bool dynamic, const SmartPlaylistSearch &search = {});
+  void SetDynamicGenerator(std::shared_ptr<PlaylistGenerator> generator);
+  std::shared_ptr<PlaylistGenerator> dynamic_generator() const { return dynamic_generator_; }
   bool is_dynamic() const { return dynamic_; }
   const SmartPlaylistSearch &dynamic_search() const { return dynamic_search_; }
   void RefillDynamic(const SongList &pool, bool force = false);
   void ExpandDynamic(const SongList &pool);
   void RepopulateDynamic(const SongList &pool);
+  void ApplyDiscoveredArt(const Song &playing, const std::string &discovered);
   void set_stop_after_row(int row);
   void ToggleStopAfter(int row);
   int stop_after_row() const { return stop_after_row_; }
@@ -131,6 +136,7 @@ class Playlist {
   void MaybeRecordUndo(int item_count);
   void RemoveRowsInternal(const std::vector<int> &rows, bool record_undo);
   void MaintainDynamicAfterAdvance(int old_row);
+  void InsertDynamicMore(int count);
   void MaybeAutoSort();
   void SortInPlace();
 
@@ -147,6 +153,7 @@ class Playlist {
   std::vector<Snapshot> redo_;
   bool dynamic_ = false;
   SmartPlaylistSearch dynamic_search_;
+  std::shared_ptr<PlaylistGenerator> dynamic_generator_;
   bool auto_sort_ = false;
   PlaylistColumn sort_column_ = PlaylistColumn::Count;
   bool sort_descending_ = false;

@@ -6,6 +6,7 @@
 #include "core/player.h"
 #include "engine/enginebase.h"
 #include "mpris2/mpris2helpers.h"
+#include "mpris2/mpris2playlists.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistmanager.h"
 
@@ -82,6 +83,20 @@ static const gchar *kMprisXml =
     "      <arg type='o' name='TrackId'/>"
     "      <arg type='a{sv}' name='Metadata'/>"
     "    </signal>"
+    "  </interface>"
+    "  <interface name='org.mpris.MediaPlayer2.Playlists'>"
+    "    <method name='ActivatePlaylist'><arg type='o' name='PlaylistId'/></method>"
+    "    <method name='GetPlaylists'>"
+    "      <arg type='u' name='Index' direction='in'/>"
+    "      <arg type='u' name='MaxCount' direction='in'/>"
+    "      <arg type='s' name='Order' direction='in'/>"
+    "      <arg type='b' name='ReverseOrder' direction='in'/>"
+    "      <arg type='a(oss)' name='Playlists' direction='out'/>"
+    "    </method>"
+    "    <property name='PlaylistCount' type='u' access='read'/>"
+    "    <property name='Orderings' type='as' access='read'/>"
+    "    <property name='ActivePlaylist' type='(b(oss))' access='read'/>"
+    "    <signal name='PlaylistChanged'><arg type='(oss)' name='Playlist'/></signal>"
     "  </interface>"
     "</node>";
 
@@ -258,6 +273,37 @@ static void HandleMethod(GDBusConnection *, const gchar *, const gchar *, const 
         if (row >= 0) {
           app->player()->PlayAt(row);
         }
+      } else if (g_strcmp0(method, "ActivatePlaylist") == 0) {
+        const gchar *path = nullptr;
+        g_variant_get(parameters, "(&o)", &path);
+        const int id = Mpris2Playlists::IdFromPath(path ? path : "");
+        if (id >= 0 && app->playlist_manager() && app->playlist_manager()->playlist(id)) {
+          app->playlist_manager()->SetActivePlaylist(id);
+          app->player()->Next();
+          if (self) {
+            self->EmitTrackListReplaced();
+          }
+        }
+      } else if (g_strcmp0(method, "GetPlaylists") == 0) {
+        guint index = 0;
+        guint max_count = 0;
+        const gchar *order = nullptr;
+        gboolean reverse = FALSE;
+        g_variant_get(parameters, "(uu&sb)", &index, &max_count, &order, &reverse);
+        std::vector<Mpris2Playlists::Entry> entries;
+        if (app->playlist_manager()) {
+          for (Playlist *playlist : app->playlist_manager()->GetAllPlaylists()) {
+            entries.push_back({Mpris2Playlists::ObjectPath(playlist->id()), playlist->name(), {}});
+          }
+        }
+        entries = Mpris2Playlists::SortAndSlice(std::move(entries), order ? order : "", reverse != FALSE, index, max_count);
+        GVariantBuilder b;
+        g_variant_builder_init(&b, G_VARIANT_TYPE("a(oss)"));
+        for (const Mpris2Playlists::Entry &entry : entries) {
+          g_variant_builder_add(&b, "(oss)", entry.id.c_str(), entry.name.c_str(), entry.icon.c_str());
+        }
+        g_dbus_method_invocation_return_value(invocation, g_variant_new("(a(oss))", &b));
+        return;
       }
     }
   }
@@ -370,6 +416,22 @@ static GVariant *HandleGet(GDBusConnection *, const gchar *, const gchar *, cons
     }
     return MetadataVariant(song, row);
   }
+  if (g_strcmp0(property, "PlaylistCount") == 0) {
+    const guint count = app && app->playlist_manager() ? static_cast<guint>(app->playlist_manager()->GetAllPlaylists().size()) : 0;
+    return g_variant_new_uint32(count);
+  }
+  if (g_strcmp0(property, "Orderings") == 0) {
+    const std::vector<const char *> orders = Mpris2Playlists::Orderings();
+    return g_variant_new_strv(orders.data(), static_cast<gssize>(orders.size()));
+  }
+  if (g_strcmp0(property, "ActivePlaylist") == 0) {
+    Playlist *current = app && app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
+    if (!current) {
+      return g_variant_new("(b(oss))", FALSE, "/", "", "");
+    }
+    const std::string path = Mpris2Playlists::ObjectPath(current->id());
+    return g_variant_new("(b(oss))", TRUE, path.c_str(), current->name().c_str(), "");
+  }
   (void)interface;
   return nullptr;
 }
@@ -443,6 +505,9 @@ void Mpris2::OnBusAcquired(GDBusConnection *connection, const gchar *, gpointer 
   g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[1], &kVtable, self, nullptr, nullptr);
   if (info->interfaces[2]) {
     g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[2], &kVtable, self, nullptr, nullptr);
+  }
+  if (info->interfaces[3]) {
+    g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[3], &kVtable, self, nullptr, nullptr);
   }
   g_dbus_node_info_unref(info);
 #else

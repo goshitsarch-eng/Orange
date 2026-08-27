@@ -270,10 +270,11 @@ void SubsonicService::AddFavorites(FavoriteType type, const SongList &songs, Sea
     }
     return;
   }
-  SubsonicFavoriteRequest::Mutate(network_,
-                                  CreateUrl(server_url_, username_, password_, SubsonicFavoriteRequest::StarResource(false),
-                                            SubsonicFavoriteRequest::StarParams(type, ids.front()), hex_auth_),
-                                  songs, std::move(callback));
+  std::vector<std::string> urls;
+  for (const auto &params : SubsonicFavoriteRequest::StarParamsForIds(type, ids)) {
+    urls.push_back(CreateUrl(server_url_, username_, password_, SubsonicFavoriteRequest::StarResource(false), params, hex_auth_));
+  }
+  SubsonicFavoriteRequest::MutateMany(network_, urls, songs, std::move(callback));
 }
 
 void SubsonicService::RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
@@ -284,8 +285,9 @@ void SubsonicService::RemoveFavorites(FavoriteType type, const SongList &songs, 
     }
     return;
   }
-  SubsonicFavoriteRequest::Mutate(network_,
-                                  CreateUrl(server_url_, username_, password_, SubsonicFavoriteRequest::StarResource(true),
-                                            SubsonicFavoriteRequest::StarParams(type, ids.front()), hex_auth_),
-                                  songs, std::move(callback));
+  std::vector<std::string> urls;
+  for (const auto &params : SubsonicFavoriteRequest::StarParamsForIds(type, ids)) {
+    urls.push_back(CreateUrl(server_url_, username_, password_, SubsonicFavoriteRequest::StarResource(true), params, hex_auth_));
+  }
+  SubsonicFavoriteRequest::MutateMany(network_, urls, songs, std::move(callback));
 }

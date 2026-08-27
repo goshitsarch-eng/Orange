@@ -102,8 +102,12 @@ void Application::Init() {
   mpris_ = std::make_unique<Mpris2>(this);
 
   player_->SongChanged.Connect([this](const Song &song) {
+    collection_->CurrentSongChanged(song);
     scrobbler_->NowPlaying(song);
     current_albumcover_loader_->Load(song);
+    if (Playlist *playlist = playlist_manager_->active()) {
+      playlist->ApplyDiscoveredArt(song, albumcover_loader_->LoadPath(song));
+    }
     osd_->SongChanged(song, current_albumcover_loader_->current());
     moodbar_->Load(song);
     waveform_->Load(song);
@@ -120,7 +124,6 @@ void Application::Init() {
     }
   });
   player_->PlaybackFinished.Connect([this](const Song &song, int64_t listened_nanosec) {
-    Settings settings;
     Playlist *playlist = playlist_manager_->active();
     const bool already_scrobbled = playlist && playlist->scrobbled();
     const bool played = already_scrobbled || ScrobblerEligibility::ShouldScrobble(song, listened_nanosec);
@@ -131,10 +134,9 @@ void Application::Init() {
       if (song.id() > 0) {
         collection_->backend()->IncrementPlayCount(song.id());
       }
-      settings.BeginGroup(CollectionSettings::kSettingsGroup);
-      if (settings.BoolValue(CollectionSettings::kSavePlayCounts, CollectionSettings::kDefaultSavePlayCounts) && song.IsEditable()) {
-        tagreader_->SavePlaycount(FileUtils::PathFromUri(song.url()), song.playcount() + 1);
-      }
+      Song tagged = song;
+      tagged.set_playcount(song.playcount() + 1);
+      collection_->SongsPlaycountChanged({tagged});
     }
   });
   player_->ForceShowOSD.Connect([this](const Song &song) { osd_->SongChanged(song, current_albumcover_loader_->current()); });
@@ -159,6 +161,7 @@ void Application::Init() {
   });
   player_->Stopped.Connect([this]() {
     playback_was_paused_ = false;
+    collection_->Stopped();
     scrobbler_->ClearPlaying();
     discord_->Clear();
     tray_->SetStopped();

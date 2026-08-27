@@ -26,6 +26,7 @@
 #include "collection/collectionrescanreason.h"
 #include "collection/collectionunavailablerestore.h"
 #include "collection/collectionscanprogress.h"
+#include "collection/collectiontagsave.h"
 #include "collection/collectionscandelay.h"
 #include "collection/collectionwatcher.h"
 #include "core/songuserdatamerge.h"
@@ -51,6 +52,7 @@
 #include <unistd.h>
 
 #include <ctime>
+#include <map>
 #include <set>
 #include <string>
 
@@ -1206,6 +1208,33 @@ TEST(CollectionScanDelay, UsesTwoSecondRescanAndDailyPeriod) {
   EXPECT_FALSE(CollectionScanDelay::ShouldArm(true, false));
   EXPECT_FALSE(CollectionScanDelay::ShouldArm(false, true));
   EXPECT_TRUE(CollectionScanDelay::ShouldRunAfterFinish(true));
+}
+
+TEST(CollectionTagSave, DefersOggAndMpegWhilePlaying) {
+  Song ogg(Song::Source::Collection);
+  ogg.set_url("file:///tmp/music/a.ogg");
+  ogg.set_filetype(Song::FileType::OggVorbis);
+  EXPECT_TRUE(CollectionTagSave::FiletypeNeedsDefer(Song::FileType::OggVorbis));
+  EXPECT_TRUE(CollectionTagSave::FiletypeNeedsDefer(Song::FileType::MPEG));
+  EXPECT_FALSE(CollectionTagSave::FiletypeNeedsDefer(Song::FileType::FLAC));
+  EXPECT_TRUE(CollectionTagSave::ShouldDefer(ogg, "file:///tmp/music/a.ogg"));
+  EXPECT_FALSE(CollectionTagSave::ShouldDefer(ogg, "file:///tmp/music/other.ogg"));
+  Song flac(Song::Source::Collection);
+  flac.set_url("file:///tmp/music/a.flac");
+  flac.set_filetype(Song::FileType::FLAC);
+  EXPECT_FALSE(CollectionTagSave::ShouldDefer(flac, "file:///tmp/music/a.flac"));
+  std::map<std::string, CollectionTagSave::Pending> pending;
+  ogg.set_playcount(4);
+  CollectionTagSave::Queue(&pending, ogg, true, false);
+  ogg.set_rating(0.8f);
+  CollectionTagSave::Queue(&pending, ogg, false, true);
+  ASSERT_EQ(1u, pending.size());
+  EXPECT_TRUE(pending.begin()->second.save_playcount);
+  EXPECT_TRUE(pending.begin()->second.save_rating);
+  EXPECT_EQ(4u, pending.begin()->second.song.playcount());
+  EXPECT_FLOAT_EQ(0.8f, pending.begin()->second.song.rating());
+  EXPECT_TRUE(CollectionTagSave::ReadyToFlush(pending, "file:///tmp/music/a.ogg").empty());
+  EXPECT_EQ(1u, CollectionTagSave::ReadyToFlush(pending, "file:///tmp/music/b.ogg").size());
 }
 
 TEST(CollectionExpire, CutoffAndShouldExpire) {

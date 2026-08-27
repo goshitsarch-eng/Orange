@@ -2,7 +2,9 @@
 
 #include "collection/collectiondirectory.h"
 #include "collection/collectionstats.h"
+#include "constants/collectionsettings.h"
 #include "core/logging.h"
+#include "core/settings.h"
 #include "core/taskmanager.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
@@ -95,4 +97,85 @@ void CollectionLibrary::SyncPlaycountAndRatingToFiles() {
 
 void CollectionLibrary::SyncPlaycountAndRatingToFilesAsync() {
   std::thread([this]() { SyncPlaycountAndRatingToFiles(); }).detach();
+}
+
+void CollectionLibrary::CurrentSongChanged(const Song &song) {
+  current_song_url_ = song.url();
+  if (!pending_song_saves_.empty()) {
+    SavePendingPlaycountsAndRatings();
+  }
+}
+
+void CollectionLibrary::Stopped() {
+  current_song_url_.clear();
+  if (!pending_song_saves_.empty()) {
+    SavePendingPlaycountsAndRatings();
+  }
+}
+
+void CollectionLibrary::SongsPlaycountChanged(const SongList &songs, bool save_tags) {
+  Settings settings;
+  settings.BeginGroup(CollectionSettings::kSettingsGroup);
+  if (!save_tags && !settings.BoolValue(CollectionSettings::kSavePlayCounts, CollectionSettings::kDefaultSavePlayCounts)) {
+    return;
+  }
+  if (!tagreader_) {
+    return;
+  }
+  for (const Song &song : songs) {
+    if (CollectionTagSave::ShouldDefer(song, current_song_url_)) {
+      CollectionTagSave::Queue(&pending_song_saves_, song, true, false);
+      continue;
+    }
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (!path.empty()) {
+      tagreader_->SavePlaycount(path, song.playcount());
+    }
+  }
+}
+
+void CollectionLibrary::SongsRatingChanged(const SongList &songs, bool save_tags) {
+  Settings settings;
+  settings.BeginGroup(CollectionSettings::kSettingsGroup);
+  if (!save_tags && !settings.BoolValue(CollectionSettings::kSaveRatings, CollectionSettings::kDefaultSaveRatings)) {
+    return;
+  }
+  if (!tagreader_) {
+    return;
+  }
+  for (const Song &song : songs) {
+    if (CollectionTagSave::ShouldDefer(song, current_song_url_)) {
+      CollectionTagSave::Queue(&pending_song_saves_, song, false, true);
+      continue;
+    }
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (!path.empty()) {
+      tagreader_->SaveRating(path, song.rating());
+    }
+  }
+}
+
+void CollectionLibrary::SavePendingPlaycountsAndRatings() {
+  if (!tagreader_) {
+    pending_song_saves_.clear();
+    return;
+  }
+  const std::vector<std::string> ready = CollectionTagSave::ReadyToFlush(pending_song_saves_, current_song_url_);
+  for (const std::string &url : ready) {
+    const auto it = pending_song_saves_.find(url);
+    if (it == pending_song_saves_.end()) {
+      continue;
+    }
+    const CollectionTagSave::Pending &pending = it->second;
+    const std::string path = FileUtils::PathFromUri(pending.song.url());
+    if (!path.empty()) {
+      if (pending.save_playcount) {
+        tagreader_->SavePlaycount(path, pending.song.playcount());
+      }
+      if (pending.save_rating) {
+        tagreader_->SaveRating(path, pending.song.rating());
+      }
+    }
+    pending_song_saves_.erase(it);
+  }
 }

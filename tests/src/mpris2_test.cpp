@@ -1,4 +1,5 @@
 #include "mpris2/mpris2helpers.h"
+#include "mpris2/mpris2playlists.h"
 #include "playlist/playlist.h"
 
 #include <gtest/gtest.h>
@@ -89,6 +90,32 @@ TEST(Mpris2Helpers, CapabilitiesMatchQt) {
   EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/id", "/id", -1, 5000000000LL, true));
   EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/id", "/id", 1000, 5000000000LL, false));
   EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/id", "/id", 6000000, 5000000000LL, true));
+}
+
+TEST(Mpris2Playlists, PathPageAndOrder) {
+  EXPECT_EQ("/org/strawberrymusicplayer/strawberry/PlaylistId/7", Mpris2Playlists::ObjectPath(7));
+  EXPECT_EQ(7, Mpris2Playlists::IdFromPath("/org/strawberrymusicplayer/strawberry/PlaylistId/7"));
+  EXPECT_EQ(-1, Mpris2Playlists::IdFromPath("/org/mpris/MediaPlayer2"));
+  EXPECT_TRUE(Mpris2Playlists::IsAlphabetical("Alphabetical"));
+  EXPECT_FALSE(Mpris2Playlists::IsAlphabetical("UserDefined"));
+  std::vector<Mpris2Playlists::Entry> entries = {
+      {Mpris2Playlists::ObjectPath(2), "Zed", {}},
+      {Mpris2Playlists::ObjectPath(1), "Alpha", {}},
+  };
+  const auto alpha = Mpris2Playlists::SortAndSlice(entries, "Alphabetical", false, 0, 10);
+  ASSERT_EQ(2u, alpha.size());
+  EXPECT_EQ("Alpha", alpha[0].name);
+  EXPECT_EQ("Zed", alpha[1].name);
+  const auto user = Mpris2Playlists::SortAndSlice(entries, "UserDefined", false, 0, 10);
+  EXPECT_EQ(Mpris2Playlists::ObjectPath(1), user[0].id);
+  const auto page = Mpris2Playlists::SortAndSlice(entries, "Alphabetical", false, 1, 1);
+  ASSERT_EQ(1u, page.size());
+  EXPECT_EQ("Zed", page[0].name);
+  const auto reversed = Mpris2Playlists::SortAndSlice(entries, "Alphabetical", true, 0, 1);
+  ASSERT_EQ(1u, reversed.size());
+  EXPECT_EQ("Zed", reversed[0].name);
+  EXPECT_TRUE(Mpris2Playlists::SortAndSlice(entries, "Alphabetical", false, 5, 2).empty());
+  EXPECT_EQ(2u, Mpris2Playlists::Orderings().size());
 }
 
 TEST(Mpris2Helpers, LoopStatusRoundTrip) {
