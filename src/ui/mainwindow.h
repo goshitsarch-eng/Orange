@@ -129,6 +129,8 @@ class MainWindow {
   Playlist *PlaylistByName(const std::string &name) const;
   SongList SongsFromUrls(const std::vector<std::string> &urls) const;
   void ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, const SongList &songs, const std::string &playlist_name = {});
+  void ApplyCollectionPlanUrls(const CollectionBehaviour::Plan &plan, const std::vector<std::string> &paths,
+                               const std::string &playlist_name = {});
   void ForceCompilationSelected(bool on);
   SongList CollectionSongs() const;
   bool EngineStopped() const;

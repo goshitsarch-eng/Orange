@@ -266,6 +266,9 @@ TEST(SongLoaderInserterPlan, TaskNamesAndFirstMetadata) {
   EXPECT_TRUE(SongLoaderInserterPlan::ShouldLoadFirstMetadata(false, true));
   EXPECT_FALSE(SongLoaderInserterPlan::ShouldLoadFirstMetadata(true, true));
   EXPECT_FALSE(SongLoaderInserterPlan::ShouldLoadFirstMetadata(false, false));
+  EXPECT_EQ(3, SongLoaderInserterPlan::InsertAt(-1, 3));
+  EXPECT_EQ(3, SongLoaderInserterPlan::InsertAt(9, 3));
+  EXPECT_EQ(1, SongLoaderInserterPlan::InsertAt(1, 3));
 }
 
 TEST(SongLoader, LoadFilenamesBlockingEmptyIsError) {

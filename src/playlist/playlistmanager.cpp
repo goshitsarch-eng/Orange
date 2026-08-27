@@ -453,13 +453,20 @@ bool PlaylistManager::UndoCrossMove(int source_id, int dest_id) {
   return true;
 }
 
-void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row) {
+void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row, bool play_now, bool enqueue, bool enqueue_next) {
   Playlist *playlist = Visible();
   if (!playlist) {
     return;
   }
   auto *inserter = new SongLoaderInserter(tagreader_, task_manager_, url_handlers_, collection_backend_);
-  inserter->Start(playlist, urls, row, [this, playlist]() { Persist(playlist); });
+  SongLoaderInserter::StartOptions options;
+  options.row = row;
+  options.play_now = play_now;
+  options.enqueue = enqueue;
+  options.enqueue_next = enqueue_next;
+  options.finished = [this, playlist]() { Persist(playlist); };
+  options.play = [this](int play_row) { PlayRequested.Emit(play_row); };
+  inserter->Start(playlist, urls, options);
 }
 
 void PlaylistManager::RemoveCurrentSong() {

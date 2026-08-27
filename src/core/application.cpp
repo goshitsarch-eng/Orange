@@ -80,6 +80,11 @@ void Application::Init() {
   }
   playlist_manager_->Init();
   playlist_manager_->set_tagreader_client(tagreader_client_.get());
+  playlist_manager_->PlayRequested.Connect([this](int row) {
+    if (player_) {
+      player_->PlayAt(row);
+    }
+  });
   player_->Init();
 #ifdef HAVE_SPOTIFY
   if (auto *spotify = dynamic_cast<SpotifyService *>(streaming_services_->ServiceByName("Spotify"))) {
@@ -301,18 +306,8 @@ void Application::ApplyCommandline(const CommandlineOptions &options) {
     } else if (plan.clear_current) {
       playlist_manager_->ClearCurrent();
     }
-    Playlist *playlist = playlist_manager_->current();
-    const int before = playlist ? playlist->row_count() : 0;
-    playlist_manager_->InsertUrls(options.urls());
-    playlist = playlist_manager_->current();
-    if (plan.queue == CollectionBehaviour::QueueMode::Append && playlist && queue()) {
-      for (int i = before; i < playlist->row_count(); ++i) {
-        queue()->Append(playlist->song(i), playlist->id(), i);
-      }
-    }
-    if (plan.should_play) {
-      player_->Play();
-    }
+    playlist_manager_->InsertUrls(options.urls(), -1, plan.should_play, plan.queue == CollectionBehaviour::QueueMode::Append,
+                                 plan.queue == CollectionBehaviour::QueueMode::Next);
   }
   switch (options.player_action()) {
     case CommandlineOptions::PlayerAction::Play:

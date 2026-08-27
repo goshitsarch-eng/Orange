@@ -69,7 +69,8 @@ class PlaylistManager : public PlaylistManagerInterface {
   void InsertSongs(int id, const SongList &songs, int pos = -1) override;
   void MoveRowsBetween(int source_id, int dest_id, const std::vector<int> &rows, int dest_pos = -1);
   bool UndoCrossMove(int source_id, int dest_id);
-  void InsertUrls(const std::vector<std::string> &urls, int row = -1);
+  void InsertUrls(const std::vector<std::string> &urls, int row = -1, bool play_now = false, bool enqueue = false,
+                  bool enqueue_next = false);
   void RemoveCurrentSong() override;
   void SaveActive();
   void SaveCurrent();
@@ -109,6 +110,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   Signal<> PlaylistsLoaded;
   Signal<> SequenceChanged;
   Signal<std::string> Error;
+  Signal<int> PlayRequested;
 
  private:
   Playlist *FindByName(const std::string &name) const;

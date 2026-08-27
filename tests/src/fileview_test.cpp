@@ -32,6 +32,7 @@
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewkeyboard.h"
 #include "fileview/fileviewsongs.h"
+#include "fileview/fileviewurls.h"
 #include "fileview/fileviewtreemodel.h"
 #include "utilities/fileutils.h"
 #include "widgets/listboxkeyboard.h"
@@ -140,6 +141,19 @@ TEST(FileViewTreeModel, MissingRootIsIgnored) {
   FileViewTreeModel model;
   model.SetRootPaths({"/tmp/does-not-exist-strawberry-fileview"});
   EXPECT_EQ(0, model.DirectoryCount());
+}
+
+TEST(FileViewUrls, KeepsDirectoriesAsFileUris) {
+  const std::string dir = TempDir();
+  const std::string audio = FileUtils::Join(dir, "roads.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "x"));
+  const std::vector<std::string> urls = FileViewUrls::FromPaths({audio, dir, ""});
+  ASSERT_EQ(2u, urls.size());
+  EXPECT_EQ(FileUtils::UriFromPath(audio), urls[0]);
+  EXPECT_EQ(FileUtils::UriFromPath(dir), urls[1]);
+  EXPECT_TRUE(FileViewUrls::FromPath({}).empty());
+  FileUtils::Remove(audio);
+  rmdir(dir.c_str());
 }
 
 TEST(FileViewSongs, FromPathsSkipsDirectoriesAndReadsTags) {
@@ -324,7 +338,11 @@ TEST(FileViewMenu, DeleteUsesRawSelectionPaths) {
   const std::string album = "/tmp/album";
   const std::vector<std::string> selection = {album};
   EXPECT_FALSE(FileViewMenu::ExpandsPaths(FileViewMenu::Action::Delete));
-  EXPECT_TRUE(FileViewMenu::ExpandsPaths(FileViewMenu::Action::Append));
+  EXPECT_FALSE(FileViewMenu::ExpandsPaths(FileViewMenu::Action::Append));
+  EXPECT_FALSE(FileViewMenu::ExpandsPaths(FileViewMenu::Action::Replace));
+  EXPECT_TRUE(FileViewMenu::ExpandsPaths(FileViewMenu::Action::Device));
+  EXPECT_TRUE(FileViewMenu::ExpandsPaths(FileViewMenu::Action::EditTags));
+  EXPECT_TRUE(FileViewMenu::PathsForAction(FileViewMenu::Action::Append, selection) == selection);
   const auto deleted = FileViewMenu::PathsForAction(FileViewMenu::Action::Delete, selection);
   ASSERT_EQ(1u, deleted.size());
   EXPECT_EQ(album, deleted.front());

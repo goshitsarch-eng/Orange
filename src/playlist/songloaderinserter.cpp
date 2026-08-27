@@ -39,10 +39,14 @@ int SongLoaderInserter::Insert(Playlist *playlist, const std::vector<std::string
   return static_cast<int>(songs.size());
 }
 
-void SongLoaderInserter::Start(Playlist *destination, const std::vector<std::string> &urls, int row, std::function<void()> finished) {
+void SongLoaderInserter::Start(Playlist *destination, const std::vector<std::string> &urls, const StartOptions &options) {
   destination_ = destination;
-  row_ = row;
-  finished_ = std::move(finished);
+  row_ = options.row;
+  play_now_ = options.play_now;
+  enqueue_ = options.enqueue;
+  enqueue_next_ = options.enqueue_next;
+  finished_ = options.finished;
+  play_ = options.play;
   if (!tagreader_) {
     NotifyFinished();
     delete this;
@@ -75,10 +79,23 @@ void SongLoaderInserter::InsertSongs() {
   if (!destination_ || songs_.empty()) {
     return;
   }
+  const int insert_at = SongLoaderInserterPlan::InsertAt(row_, destination_->row_count());
   if (row_ < 0) {
     destination_->AppendSongs(songs_);
   } else {
     destination_->InsertSongs(row_, songs_);
+  }
+  if (enqueue_) {
+    for (size_t i = 0; i < songs_.size(); ++i) {
+      destination_->queue()->Append(songs_[i], destination_->id(), insert_at + static_cast<int>(i));
+    }
+  } else if (enqueue_next_) {
+    for (int i = static_cast<int>(songs_.size()) - 1; i >= 0; --i) {
+      destination_->queue()->InsertNext(songs_[static_cast<size_t>(i)], destination_->id(), insert_at + i);
+    }
+  }
+  if (play_now_ && play_) {
+    play_(insert_at);
   }
 }
 

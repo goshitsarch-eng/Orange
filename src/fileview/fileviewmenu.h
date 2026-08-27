@@ -99,14 +99,14 @@ inline std::vector<std::string> ExpandPaths(const std::vector<std::string> &path
   return files;
 }
 
-// Qt File View delete/copy/move/browse keep the selected folder; playlist actions expand it.
+// Qt File View playlist actions keep the selected folder; SongLoader walks it. Device/edit-tags still need files.
 inline bool ExpandsPaths(Action action) {
   switch (action) {
-    case Action::Append:
-    case Action::Replace:
     case Action::Device:
     case Action::EditTags:
       return true;
+    case Action::Append:
+    case Action::Replace:
     case Action::Copy:
     case Action::Move:
     case Action::Delete:

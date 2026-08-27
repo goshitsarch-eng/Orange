@@ -46,6 +46,7 @@
 #include "waveform/waveformrenderer.h"
 #include "fileview/fileview.h"
 #include "fileview/fileviewsongs.h"
+#include "fileview/fileviewurls.h"
 #include "playlist/playlistcontainer.h"
 #include "playlist/playlistfiltersync.h"
 #include "playlist/playlistundolimits.h"
@@ -1334,7 +1335,7 @@ void MainWindow::BuildSidebar() {
     settings.BeginGroup(BehaviourSettings::kSettingsGroup);
     const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
         settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
-    ApplyCollectionPlan(FileViewMenu::PlanFor(action, play, EngineStopped()), SongsFromFilePaths(paths));
+    ApplyCollectionPlanUrls(FileViewMenu::PlanFor(action, play, EngineStopped()), paths);
   };
   file_view_->SetAddToPlaylistCallback([file_playlist](const std::vector<std::string> &paths) {
     file_playlist(FileViewMenu::Action::Append, paths);
@@ -1349,10 +1350,10 @@ void MainWindow::BuildSidebar() {
     const CollectionBehaviour::Plan plan = CollectionBehaviour::FromDoubleClick(add, play, EngineStopped());
     const std::string name =
         plan.destination == CollectionBehaviour::Destination::New ? FileViewMenu::DoubleClickPlaylistName(paths) : std::string();
-    ApplyCollectionPlan(plan, SongsFromFilePaths(paths), name);
+    ApplyCollectionPlanUrls(plan, paths, name);
   });
   file_view_->SetEnqueueCallback([this](const std::vector<std::string> &paths) {
-    ApplyCollectionPlan(CollectionBehaviour::Enqueue(), SongsFromFilePaths(paths));
+    ApplyCollectionPlanUrls(CollectionBehaviour::Enqueue(), paths);
   });
   file_view_->SetReplacePlaylistCallback([file_playlist](const std::vector<std::string> &paths) {
     file_playlist(FileViewMenu::Action::Replace, paths);
@@ -1364,7 +1365,7 @@ void MainWindow::BuildSidebar() {
         settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
     const std::string name = FileViewMenu::NewPlaylistName(paths, file_view_ ? file_view_->path() : std::string(),
                                                           file_view_ && FileViewMode::TreeActive(file_view_->mode()));
-    ApplyCollectionPlan(FileViewMenu::PlanFor(FileViewMenu::Action::New, play, EngineStopped()), SongsFromFilePaths(paths), name);
+    ApplyCollectionPlanUrls(FileViewMenu::PlanFor(FileViewMenu::Action::New, play, EngineStopped()), paths, name);
   });
   file_view_->SetCopyToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, false); });
   file_view_->SetMoveToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, true); });
@@ -3256,6 +3257,25 @@ void MainWindow::ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, cons
       app_->player()->PlayAt(play_at);
     }
   }
+}
+
+void MainWindow::ApplyCollectionPlanUrls(const CollectionBehaviour::Plan &plan, const std::vector<std::string> &paths,
+                                         const std::string &playlist_name) {
+  const std::vector<std::string> urls = FileViewUrls::FromPaths(paths);
+  if (urls.empty()) {
+    return;
+  }
+  if (plan.destination == CollectionBehaviour::Destination::New) {
+    const std::string name = playlist_name.empty() ? "Playlist" : playlist_name;
+    app_->playlist_manager()->New(name);
+  } else if (plan.clear_current) {
+    app_->playlist_manager()->ClearCurrent();
+  }
+  app_->playlist_manager()->InsertUrls(urls, -1, plan.should_play, plan.queue == CollectionBehaviour::QueueMode::Append,
+                                       plan.queue == CollectionBehaviour::QueueMode::Next);
+  RefreshPlaylistsList();
+  RefreshPlaylist();
+  RefreshQueue();
 }
 
 void MainWindow::ForceCompilationSelected(bool on) {
