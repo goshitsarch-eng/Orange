@@ -25,6 +25,10 @@ struct NotificationSensitivity {
   GtkWidget *general = nullptr;
   GtkWidget *pretty = nullptr;
   GtkWidget *custom = nullptr;
+  GtkWidget *custom_toggle = nullptr;
+  GtkWidget *text1 = nullptr;
+  GtkWidget *text2 = nullptr;
+  GtkWidget *preview = nullptr;
   GtkWidget *tokens1 = nullptr;
   GtkWidget *tokens2 = nullptr;
 };
@@ -47,14 +51,24 @@ void ApplyNotificationSensitivity(AdwComboRow *combo) {
   if (state->pretty) {
     gtk_widget_set_sensitive(state->pretty, NotificationsControls::PrettyGroupSensitive(type) ? TRUE : FALSE);
   }
+  const bool custom_on = state->custom_toggle && adw_switch_row_get_active(ADW_SWITCH_ROW(state->custom_toggle));
   if (state->custom) {
     gtk_widget_set_sensitive(state->custom, NotificationsControls::CustomTextSensitive(type) ? TRUE : FALSE);
   }
+  if (state->text1) {
+    gtk_widget_set_sensitive(state->text1, NotificationsControls::CustomFieldsEnabled(type, custom_on) ? TRUE : FALSE);
+  }
+  if (state->text2) {
+    gtk_widget_set_sensitive(state->text2, NotificationsControls::CustomFieldsEnabled(type, custom_on) ? TRUE : FALSE);
+  }
+  if (state->preview) {
+    gtk_widget_set_sensitive(state->preview, NotificationsControls::PreviewEnabled(type, custom_on) ? TRUE : FALSE);
+  }
   if (state->tokens1) {
-    gtk_widget_set_sensitive(state->tokens1, NotificationsControls::CustomTextSensitive(type) ? TRUE : FALSE);
+    gtk_widget_set_sensitive(state->tokens1, NotificationsControls::TokenGroupsEnabled(type, custom_on) ? TRUE : FALSE);
   }
   if (state->tokens2) {
-    gtk_widget_set_sensitive(state->tokens2, NotificationsControls::CustomTextSensitive(type) ? TRUE : FALSE);
+    gtk_widget_set_sensitive(state->tokens2, NotificationsControls::TokenGroupsEnabled(type, custom_on) ? TRUE : FALSE);
   }
   if (state->art) {
     gtk_widget_set_sensitive(state->art, NotificationsControls::ArtSensitive(type) ? TRUE : FALSE);
@@ -123,10 +137,11 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
   SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnResumePlayback, NotificationsSettingsLabels::ShowResume(), nullptr,
                           OSDSettings::kDefaultShowOnResumePlayback);
   AdwPreferencesGroup *custom = SettingsPage::AddGroup(page, NotificationsSettingsLabels::CustomGroup());
-  SettingsPage::AddToggle(custom, settings, OSDSettings::kCustomTextEnabled, NotificationsSettingsLabels::CustomEnabled(), nullptr,
-                          OSDSettings::kDefaultCustomTextEnabled);
-  SettingsPage::AddEntry(custom, settings, OSDSettings::kCustomText1, NotificationsSettingsLabels::Summary());
-  SettingsPage::AddEntry(custom, settings, OSDSettings::kCustomText2, NotificationsSettingsLabels::Body());
+  GtkWidget *custom_toggle =
+      SettingsPage::AddToggle(custom, settings, OSDSettings::kCustomTextEnabled, NotificationsSettingsLabels::CustomEnabled(), nullptr,
+                              OSDSettings::kDefaultCustomTextEnabled);
+  GtkWidget *text1 = SettingsPage::AddEntry(custom, settings, OSDSettings::kCustomText1, NotificationsSettingsLabels::Summary());
+  GtkWidget *text2 = SettingsPage::AddEntry(custom, settings, OSDSettings::kCustomText2, NotificationsSettingsLabels::Body());
   SettingsPage::AddIntEntry(osd, settings, "posx", Translations::CStr("Pretty OSD X position"), 40);
   SettingsPage::AddIntEntry(osd, settings, "posy", Translations::CStr("Pretty OSD Y position"), 40);
 
@@ -149,8 +164,9 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
     });
   }
 
+  GtkWidget *preview = nullptr;
   if (app) {
-    SettingsPage::AddButtonRow(osd, NotificationsSettingsLabels::Preview(), NotificationsSettingsLabels::Preview(), [settings, app]() {
+    preview = SettingsPage::AddButtonRow(osd, NotificationsSettingsLabels::Preview(), NotificationsSettingsLabels::Preview(), [settings, app]() {
       settings->BeginGroup(OSDSettings::kSettingsGroup);
       settings->Sync();
       app->osd()->ReloadSettings();
@@ -241,14 +257,25 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
   sensitivity->general = GTK_WIDGET(general);
   sensitivity->pretty = GTK_WIDGET(pretty);
   sensitivity->custom = GTK_WIDGET(custom);
+  sensitivity->custom_toggle = custom_toggle;
+  sensitivity->text1 = text1;
+  sensitivity->text2 = text2;
+  sensitivity->preview = preview;
   sensitivity->tokens1 = GTK_WIDGET(tokens1);
   sensitivity->tokens2 = GTK_WIDGET(tokens2);
   g_object_set_data_full(G_OBJECT(type), "sensitivity", sensitivity, +[](gpointer data) { delete static_cast<NotificationSensitivity *>(data); });
   g_object_set_data(G_OBJECT(disable_duration), "type-row", type);
+  g_object_set_data(G_OBJECT(custom_toggle), "type-row", type);
   ApplyNotificationSensitivity(ADW_COMBO_ROW(type));
   g_signal_connect(type, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer) { ApplyNotificationSensitivity(combo); }),
                    nullptr);
   g_signal_connect(disable_duration, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
+                     if (auto *combo = ADW_COMBO_ROW(g_object_get_data(G_OBJECT(row), "type-row"))) {
+                       ApplyNotificationSensitivity(combo);
+                     }
+                   }),
+                   nullptr);
+  g_signal_connect(custom_toggle, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
                      if (auto *combo = ADW_COMBO_ROW(g_object_get_data(G_OBJECT(row), "type-row"))) {
                        ApplyNotificationSensitivity(combo);
                      }

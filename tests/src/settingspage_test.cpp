@@ -741,6 +741,15 @@ TEST(NotificationsControls, ConvertsTimeoutAndGatesDuration) {
   EXPECT_FALSE(NotificationsControls::ArtSensitive(OSDSettings::Type::TrayPopup));
   EXPECT_TRUE(NotificationsControls::ArtSensitive(OSDSettings::Type::Native));
   EXPECT_TRUE(NotificationsControls::DisableDurationSensitive(OSDSettings::Type::Pretty));
+  EXPECT_TRUE(NotificationsControls::CustomTextSensitive(OSDSettings::Type::Native));
+  EXPECT_FALSE(NotificationsControls::CustomTextSensitive(OSDSettings::Type::Disabled));
+  EXPECT_FALSE(NotificationsControls::CustomFieldsEnabled(OSDSettings::Type::Native, false));
+  EXPECT_TRUE(NotificationsControls::CustomFieldsEnabled(OSDSettings::Type::Native, true));
+  EXPECT_FALSE(NotificationsControls::CustomFieldsEnabled(OSDSettings::Type::Disabled, true));
+  EXPECT_FALSE(NotificationsControls::PreviewEnabled(OSDSettings::Type::Pretty, false));
+  EXPECT_TRUE(NotificationsControls::PreviewEnabled(OSDSettings::Type::Pretty, true));
+  EXPECT_FALSE(NotificationsControls::TokenGroupsEnabled(OSDSettings::Type::Native, false));
+  EXPECT_TRUE(NotificationsControls::TokenGroupsEnabled(OSDSettings::Type::Native, true));
   const auto types = NotificationsControls::AvailableTypes(true, false, true);
   ASSERT_EQ(3u, types.size());
   EXPECT_EQ("0", types[0].first);

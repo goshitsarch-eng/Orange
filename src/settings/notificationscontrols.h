@@ -72,6 +72,13 @@ inline bool PrettyGroupSensitive(OSDSettings::Type type) { return type == OSDSet
 
 inline bool CustomTextSensitive(OSDSettings::Type type) { return type != OSDSettings::Type::Disabled; }
 
+// Qt NotificationsSettingsPage::NotificationCustomTextChanged — fields/preview follow the checkbox.
+inline bool CustomFieldsEnabled(OSDSettings::Type type, bool custom_enabled) { return CustomTextSensitive(type) && custom_enabled; }
+
+inline bool PreviewEnabled(OSDSettings::Type type, bool custom_enabled) { return CustomFieldsEnabled(type, custom_enabled); }
+
+inline bool TokenGroupsEnabled(OSDSettings::Type type, bool custom_enabled) { return CustomFieldsEnabled(type, custom_enabled); }
+
 inline bool ArtSensitive(OSDSettings::Type type) { return type != OSDSettings::Type::Disabled && type != OSDSettings::Type::TrayPopup; }
 
 inline bool DisableDurationSensitive(OSDSettings::Type type) { return type == OSDSettings::Type::Pretty; }
