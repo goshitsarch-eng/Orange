@@ -2060,6 +2060,14 @@ TEST(CollectionFullRescan, MatchesQtRevisions) {
   EXPECT_STREQ("Collection rescan notice", CollectionFullRescan::DialogTitle());
 }
 
+TEST(AppearanceLeftPanel, ReloadsSmartAndRadioLikeQt) {
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldApplySmartPlaylists());
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldApplyRadio());
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldReloadOnSettingsClose());
+  EXPECT_EQ(AppearanceSettings::kDefaultIconSizeLeftPanelButtons, AppearanceLeftPanel::IconSize(0));
+  EXPECT_EQ(32, AppearanceLeftPanel::IconSize(32));
+}
+
 TEST(AppearanceLeftPanel, SizesFilesPlaylistsQueueLikeQt) {
   EXPECT_STREQ("strawberry-left-panel-buttons", AppearanceLeftPanel::CssClass());
   EXPECT_TRUE(AppearanceLeftPanel::ShouldApply());

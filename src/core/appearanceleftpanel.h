@@ -16,6 +16,11 @@ inline bool ShouldApply() { return true; }
 
 inline bool ShouldReloadOnSettingsClose() { return true; }
 
+// Qt ReloadAllSettings also calls SmartPlaylistsViewContainer and RadioViewContainer::ReloadSettings.
+inline bool ShouldApplySmartPlaylists() { return true; }
+
+inline bool ShouldApplyRadio() { return true; }
+
 inline int IconSize(int stored) { return AppearanceColors::ClampIcon(stored, AppearanceSettings::kDefaultIconSizeLeftPanelButtons); }
 
 inline int StoredSize() {

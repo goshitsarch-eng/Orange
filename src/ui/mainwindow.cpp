@@ -3616,6 +3616,12 @@ void MainWindow::ApplyAppearance() {
     if (playlist_list_container_) {
       playlist_list_container_->ApplyLook();
     }
+    if (smart_container_) {
+      smart_container_->ApplyLook();
+    }
+    if (radio_container_) {
+      radio_container_->ApplyLook();
+    }
   }
   for (const auto &view : streaming_views_) {
     if (view) {
