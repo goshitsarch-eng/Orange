@@ -100,3 +100,12 @@ TEST(SongLoader, UsesUrlHandler) {
   ASSERT_EQ(1u, loader.songs().size());
   EXPECT_EQ("Handled", loader.songs().front().title());
 }
+
+TEST(SongLoader, MissingLocalFileIsError) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  EXPECT_EQ(SongLoader::Result::Error, loader.Load("file:///tmp/does-not-exist-strawberry-songloader.flac"));
+  EXPECT_TRUE(loader.songs().empty());
+  ASSERT_FALSE(loader.errors().empty());
+  EXPECT_NE(std::string::npos, loader.errors().front().find("does not exist"));
+  EXPECT_EQ(SongLoader::Result::Error, loader.Load("/tmp/does-not-exist-strawberry-songloader.flac"));
+}

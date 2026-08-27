@@ -1,10 +1,15 @@
 #include "core/commandlineoptions.h"
+#include "core/commandlineurl.h"
 #include "core/commandlineurlplan.h"
 #include "core/commandlinewindow.h"
+#include "core/loadurl.h"
 #include "core/playlistsloadedgate.h"
+#include "core/songloadurl.h"
 #include "tidal/tidalloginurl.h"
+#include "utilities/fileutils.h"
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <cstring>
 #include <vector>
@@ -155,4 +160,48 @@ TEST(TidalLoginUrl, FailureForMatchesQtCallbackChecks) {
   EXPECT_EQ("Request URL is missing state!", TidalLoginUrl::FailureFor("tidal://login/auth?code=abc", "s"));
   EXPECT_EQ("Request URL has wrong state x != s", TidalLoginUrl::FailureFor("tidal://login/auth?code=abc&state=x", "s"));
   EXPECT_TRUE(TidalLoginUrl::FailureFor("tidal://login/auth?code=abc&state=s", "s").empty());
+}
+
+TEST(CommandlineUrl, ExistingFileBecomesAbsoluteFileUrl) {
+  const std::string path = "/tmp/strawberry-cli-url-" + std::to_string(getpid()) + ".flac";
+  ASSERT_TRUE(FileUtils::WriteFile(path, "x"));
+  const std::string url = CommandlineUrl::FromArg(path);
+  EXPECT_EQ(FileUtils::UriFromPath(FileUtils::CanonicalPath(path)), url);
+  EXPECT_TRUE(CommandlineUrl::IsLocalFile(url));
+  EXPECT_TRUE(CommandlineUrl::LocalFileExists(path));
+  EXPECT_TRUE(CommandlineUrl::LocalFileExists(url));
+  EXPECT_EQ("https://example.com/a.mp3", CommandlineUrl::FromArg("https://example.com/a.mp3"));
+  EXPECT_EQ("http://not-a-file", CommandlineUrl::FromUserInput("not-a-file"));
+  EXPECT_EQ("tidal://login/auth", CommandlineUrl::FromArg("tidal://login/auth"));
+  unlink(path.c_str());
+}
+
+TEST(LoadUrl, ResolvesLocalTidalAndReject) {
+  const std::string path = "/tmp/strawberry-loadurl-" + std::to_string(getpid()) + ".flac";
+  ASSERT_TRUE(FileUtils::WriteFile(path, "x"));
+  EXPECT_EQ(LoadUrl::Action::InsertLocal, LoadUrl::Resolve(path));
+  EXPECT_TRUE(LoadUrl::ShouldInsert(path));
+  EXPECT_EQ(LoadUrl::Action::TidalLogin, LoadUrl::Resolve("tidal://login/auth?code=abc"));
+  EXPECT_TRUE(LoadUrl::ShouldInsert("tidal://login/auth"));
+  EXPECT_EQ(LoadUrl::Action::Reject, LoadUrl::Resolve("file:///tmp/does-not-exist-strawberry-loadurl.flac"));
+  EXPECT_FALSE(LoadUrl::ShouldInsert("/tmp/does-not-exist-strawberry-loadurl.flac"));
+  EXPECT_STREQ("Can't open", LoadUrl::RejectMessage());
+  EXPECT_EQ("File /missing.flac does not exist.", LoadUrl::MissingFileMessage("/missing.flac"));
+  EXPECT_TRUE(SongLoadUrl::IsRawStreamScheme("rtsp"));
+  EXPECT_TRUE(SongLoadUrl::ShouldAddAsRawStream("https://example.com/x"));
+  EXPECT_FALSE(SongLoadUrl::ShouldAddAsRawStream("file:///tmp/a.flac"));
+  unlink(path.c_str());
+}
+
+TEST(CommandlineOptions, ParseNormalizesExistingFileArg) {
+  const std::string path = "/tmp/strawberry-cli-parse-" + std::to_string(getpid()) + ".flac";
+  ASSERT_TRUE(FileUtils::WriteFile(path, "x"));
+  char program[] = "strawberry";
+  std::string arg = path;
+  char *argv[] = {program, arg.data(), nullptr};
+  CommandlineOptions options;
+  ASSERT_TRUE(options.Parse(2, argv));
+  ASSERT_EQ(1u, options.urls().size());
+  EXPECT_EQ(CommandlineUrl::FromArg(path), options.urls().front());
+  unlink(path.c_str());
 }

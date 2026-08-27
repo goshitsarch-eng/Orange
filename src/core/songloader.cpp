@@ -1,6 +1,8 @@
 #include "core/songloader.h"
 
 #include "collection/collectionbackend.h"
+#include "core/commandlineurl.h"
+#include "core/loadurl.h"
 #include "core/urlhandlers.h"
 #include "device/cddasongloader.h"
 #include "playlistparsers/playlistparser.h"
@@ -35,9 +37,8 @@ SongLoader::Result SongLoader::Load(const std::string &url) {
       }
     }
   }
-  const std::string path = FileUtils::PathFromUri(url);
-  if (FileUtils::Exists(path)) {
-    return LoadLocal(path);
+  if (CommandlineUrl::IsLocalFile(url)) {
+    return LoadLocal(CommandlineUrl::LocalPath(url));
   }
   AddRawStream(url);
   return Result::Success;
@@ -95,6 +96,10 @@ SongLoader::Result SongLoader::LoadAudioCD() {
 }
 
 SongLoader::Result SongLoader::LoadLocal(const std::string &path) {
+  if (path.empty() || !FileUtils::Exists(path)) {
+    errors_.push_back(LoadUrl::MissingFileMessage(path.empty() ? "URL" : path));
+    return Result::Error;
+  }
   if (FileUtils::IsDirectory(path)) {
     pending_paths_.push_back(path);
     return Result::BlockingLoadRequired;

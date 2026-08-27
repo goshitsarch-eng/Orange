@@ -22,6 +22,8 @@
 #include "core/mainwindowsponsor.h"
 #include "core/commandlinewindow.h"
 #include "core/mainwindowsettings.h"
+#include "core/commandlineurl.h"
+#include "core/loadurl.h"
 #include "core/playlistsloadedgate.h"
 #include "dialogs/edittagloading.h"
 #include "dialogs/edittagsave.h"
@@ -306,6 +308,24 @@ void MainWindow::HandlePlaylistsLoaded() {
     has_pending_options_ = false;
   }
   app_->player()->PlaylistsLoaded();
+}
+
+bool MainWindow::LoadUrl(const std::string &url) {
+  switch (LoadUrl::Resolve(url)) {
+    case LoadUrl::Action::InsertLocal:
+      app_->playlist_manager()->InsertUrls({CommandlineUrl::FromArg(url)});
+      return true;
+    case LoadUrl::Action::TidalLogin: {
+      CommandlineOptions options;
+      options.set_urls({url});
+      app_->ApplyCommandline(options);
+      return true;
+    }
+    case LoadUrl::Action::Reject:
+    default:
+      LogError("%s %s", LoadUrl::RejectMessage(), url.c_str());
+      return false;
+  }
 }
 
 void MainWindow::CommandlineReceived(const CommandlineOptions &options) {

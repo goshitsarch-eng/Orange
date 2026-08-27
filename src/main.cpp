@@ -3,6 +3,7 @@
 
 #include "core/application.h"
 #include "core/commandlineoptions.h"
+#include "core/loadurl.h"
 #include "core/logging.h"
 #include "engine/gststartup.h"
 #include "translations/translations.h"
@@ -12,6 +13,8 @@
 #include <gst/gst.h>
 
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace {
 
@@ -65,8 +68,13 @@ void Open(GApplication *gapp, gpointer files, gint n_files, const gchar *, gpoin
   auto **gfiles = static_cast<GFile **>(files);
   for (int i = 0; i < n_files; ++i) {
     gchar *uri = g_file_get_uri(gfiles[i]);
-    urls.emplace_back(uri);
+    const std::string url = uri ? uri : "";
     g_free(uri);
+    if (!LoadUrl::ShouldInsert(url)) {
+      LogError("%s %s", LoadUrl::RejectMessage(), url.c_str());
+      continue;
+    }
+    urls.push_back(url);
   }
   options.set_urls(urls);
   runtime->window->CommandlineReceived(options);

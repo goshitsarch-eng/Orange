@@ -1,5 +1,6 @@
 #include "core/commandlineoptions.h"
 
+#include "core/commandlineurl.h"
 #include "core/commandlinewindow.h"
 #include "version.h"
 
@@ -137,7 +138,7 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   }
 
   for (int i = 1; i < argc; ++i) {
-    urls_.emplace_back(argv[i]);
+    urls_.push_back(CommandlineUrl::FromArg(argv[i]));
   }
   return true;
 }

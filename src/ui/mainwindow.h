@@ -46,6 +46,7 @@ class MainWindow {
   GtkWindow *window() const { return GTK_WINDOW(window_); }
   void Present();
   void CommandlineReceived(const CommandlineOptions &options);
+  bool LoadUrl(const std::string &url);
 
  private:
   void HandlePlaylistsLoaded();
