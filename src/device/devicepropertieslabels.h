@@ -31,6 +31,8 @@ inline const char *Unsupported() { return "Convert any music that the device can
 inline const char *Always() { return "Convert all music"; }
 inline const char *PreferredFormat() { return "Preferred format"; }
 inline const char *SupportedFormats() { return "Supported formats"; }
+inline const char *SupportedFormatsIntro() { return "This device supports the following file formats:"; }
+inline const char *QueryingDevice() { return "Querying device..."; }
 inline const char *Save() { return "Save"; }
 
 inline bool UnsupportedEnabled(const bool has_supported) { return has_supported; }

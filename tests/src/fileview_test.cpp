@@ -3,6 +3,7 @@
 #include "device/devicepropertiesicons.h"
 #include "device/devicepropertiesinfo.h"
 #include "device/devicepropertieslabels.h"
+#include "device/devicesupportedformats.h"
 #include "device/devicecopy.h"
 #include "device/devicecopyjob.h"
 #include "device/devicecopyrunner.h"
@@ -699,6 +700,8 @@ TEST(DevicePropertiesLabels, TabsModesAndSortedFormats) {
   EXPECT_STREQ("Convert all music", DevicePropertiesLabels::Always());
   EXPECT_STREQ("Preferred format", DevicePropertiesLabels::PreferredFormat());
   EXPECT_STREQ("Supported formats", DevicePropertiesLabels::SupportedFormats());
+  EXPECT_STREQ("This device supports the following file formats:", DevicePropertiesLabels::SupportedFormatsIntro());
+  EXPECT_STREQ("Querying device...", DevicePropertiesLabels::QueryingDevice());
   EXPECT_STREQ("Open device", DevicePropertiesLabels::OpenDevice());
   EXPECT_FALSE(DevicePropertiesLabels::UnsupportedEnabled(false));
   EXPECT_TRUE(DevicePropertiesLabels::UnsupportedEnabled(true));
@@ -751,4 +754,64 @@ TEST(DevicePropertiesInfo, HardwareRowsAndOpenRule) {
   EXPECT_EQ("Backend", rows.front().key);
   EXPECT_EQ("Unique ID", rows.back().key);
   EXPECT_EQ("usb:1234", rows.back().value);
+}
+
+TEST(DeviceSupportedFormats, PagesOpenAndResolveMatchQt) {
+  EXPECT_STREQ("Querying device...", DeviceSupportedFormats::QueryingDevice());
+  EXPECT_STREQ("This device supports the following file formats:", DeviceSupportedFormats::SupportedFormatsIntro());
+  EXPECT_STREQ("not-connected", DeviceSupportedFormats::StackName(DeviceSupportedFormats::Page::NotConnected));
+  EXPECT_STREQ("loading", DeviceSupportedFormats::StackName(DeviceSupportedFormats::Page::Loading));
+  EXPECT_STREQ("formats", DeviceSupportedFormats::StackName(DeviceSupportedFormats::Page::Formats));
+
+  ConnectedDevice empty;
+  EXPECT_FALSE(DeviceSupportedFormats::PhysicallyPresent(empty));
+  EXPECT_FALSE(DeviceSupportedFormats::Opened(empty));
+  EXPECT_FALSE(DeviceSupportedFormats::OpenEnabled(empty));
+  EXPECT_EQ(DeviceSupportedFormats::Page::NotConnected, DeviceSupportedFormats::PageFor(empty));
+
+  ConnectedDevice remembered;
+  remembered.unique_id = "usb:old";
+  remembered.backend = "gio";
+  remembered.remembered = true;
+  EXPECT_FALSE(DeviceSupportedFormats::PhysicallyPresent(remembered));
+  EXPECT_FALSE(DeviceSupportedFormats::OpenEnabled(remembered));
+  EXPECT_EQ(DeviceSupportedFormats::Page::NotConnected, DeviceSupportedFormats::PageFor(remembered));
+
+  ConnectedDevice unmounted;
+  unmounted.unique_id = "usb:1234";
+  unmounted.backend = "gio";
+  EXPECT_TRUE(DeviceSupportedFormats::PhysicallyPresent(unmounted));
+  EXPECT_FALSE(DeviceSupportedFormats::Opened(unmounted));
+  EXPECT_TRUE(DeviceSupportedFormats::OpenEnabled(unmounted));
+  EXPECT_EQ(DeviceSupportedFormats::Page::NotConnected, DeviceSupportedFormats::PageFor(unmounted));
+
+  ConnectedDevice mounted = unmounted;
+  mounted.mount_path = "/media/music";
+  EXPECT_TRUE(DeviceSupportedFormats::Opened(mounted));
+  EXPECT_FALSE(DeviceSupportedFormats::OpenEnabled(mounted));
+  EXPECT_FALSE(DeviceSupportedFormats::ShouldQuery(mounted));
+  EXPECT_EQ(DeviceSupportedFormats::Page::Formats, DeviceSupportedFormats::PageFor(mounted));
+
+  ConnectedDevice mtp;
+  mtp.unique_id = "mtp:serial";
+  mtp.backend = "mtp";
+  EXPECT_TRUE(DeviceSupportedFormats::Opened(mtp));
+  EXPECT_FALSE(DeviceSupportedFormats::OpenEnabled(mtp));
+  EXPECT_TRUE(DeviceSupportedFormats::ShouldQuery(mtp));
+  EXPECT_EQ(DeviceSupportedFormats::Page::Loading, DeviceSupportedFormats::PageFor(mtp));
+  EXPECT_EQ(DeviceSupportedFormats::Page::Formats, DeviceSupportedFormats::PageFor(mtp, true));
+
+  const auto gpod = DeviceSupportedFormats::GPodFormats();
+  ASSERT_EQ(3u, gpod.size());
+  EXPECT_EQ(Song::FileType::MP4, gpod[0]);
+  EXPECT_EQ(Song::FileType::MPEG, gpod[1]);
+  EXPECT_EQ(Song::FileType::ALAC, gpod[2]);
+  EXPECT_EQ(gpod, DeviceSupportedFormats::Resolve("gpod", {}, false, false));
+  EXPECT_TRUE(DeviceSupportedFormats::Resolve("gio", {}, false, false).empty());
+  EXPECT_TRUE(DeviceSupportedFormats::Resolve("mtp", {}, false, false).empty());
+  EXPECT_TRUE(DeviceSupportedFormats::Resolve("mtp", {Song::FileType::FLAC}, false, true).empty());
+  const auto queried = DeviceSupportedFormats::Resolve("mtp", {Song::FileType::MPEG, Song::FileType::MPEG, Song::FileType::FLAC}, true, true);
+  ASSERT_EQ(2u, queried.size());
+  EXPECT_EQ(Song::FileType::MPEG, queried[0]);
+  EXPECT_EQ(Song::FileType::FLAC, queried[1]);
 }

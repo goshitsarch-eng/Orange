@@ -541,6 +541,7 @@ set(STRAWBERRY_SOURCES
   src/device/udisks2lister.cpp
   src/device/cddalister.cpp
   src/device/deviceproperties.cpp
+  src/device/devicesupportedformats.h
   src/device/deviceview.cpp
   src/device/deviceviewcontainer.cpp
   src/equalizer/equalizer.cpp
