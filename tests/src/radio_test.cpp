@@ -12,6 +12,7 @@
 #include "radios/radiomodel.h"
 #include "radios/radiotree.h"
 #include "radios/radiotreeleft.h"
+#include "radios/radioviewshow.h"
 #include "radios/radioparadiseservice.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/somafmservice.h"
@@ -376,6 +377,11 @@ TEST(RadioTree, GroupsCollapsesAndServiceLabels) {
   model.Toggle(Song::Source::SomaFM);
   EXPECT_FALSE(model.Expanded(Song::Source::SomaFM));
   EXPECT_EQ(3u, model.Rows().size());
+}
+
+TEST(RadioViewShow, FetchesChannelsOnceOnFirstShow) {
+  EXPECT_TRUE(RadioViewShow::ShouldFetchOnShow(false));
+  EXPECT_FALSE(RadioViewShow::ShouldFetchOnShow(true));
 }
 
 TEST(RadioTreeLeft, CollapseChannelOrService) {

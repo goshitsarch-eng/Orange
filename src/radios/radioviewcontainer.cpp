@@ -2,6 +2,7 @@
 
 #include "radios/radiobrowsersearchopts.h"
 #include "radios/radioservices.h"
+#include "radios/radioviewshow.h"
 #include "translations/translations.h"
 
 RadioViewContainer::RadioViewContainer(RadioServices *services) : services_(services) {
@@ -38,14 +39,24 @@ RadioViewContainer::RadioViewContainer(RadioServices *services) : services_(serv
   gtk_box_append(GTK_BOX(widget_), switcher);
   gtk_box_append(GTK_BOX(widget_), stack);
   Reload();
+  g_signal_connect(view_->widget(), "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     static_cast<RadioViewContainer *>(data)->OnShown();
+                   }),
+                   this);
+}
+
+void RadioViewContainer::OnShown() {
+  if (!RadioViewShow::ShouldFetchOnShow(channels_initialized_)) {
+    return;
+  }
+  channels_initialized_ = true;
+  Reload();
+  RefreshChannels();
 }
 
 void RadioViewContainer::Reload() {
   if (!services_) {
     return;
-  }
-  if (services_->channels().empty()) {
-    RefreshChannels();
   }
   model_.SetChannels(services_->channels());
   view_->Reload(&model_);

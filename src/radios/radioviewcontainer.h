@@ -28,11 +28,14 @@ class RadioViewContainer {
   void SetMenuCallback(RadioView::MenuCallback callback);
 
  private:
+  void OnShown();
+
   RadioServices *services_ = nullptr;
   GtkWidget *widget_ = nullptr;
   RadioModel model_;
   std::unique_ptr<RadioView> view_;
   std::unique_ptr<RadioBrowserSearchView> search_view_;
+  bool channels_initialized_ = false;
 };
 
 #endif
