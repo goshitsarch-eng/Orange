@@ -71,8 +71,25 @@ void GlobalShortcutGrabber::Show(GtkWindow *parent, const std::function<void(con
                      return TRUE;
                    })),
                    dialog);
+  gtk_event_controller_set_propagation_phase(keys, GTK_PHASE_CAPTURE);
+  gtk_widget_set_can_focus(GTK_WIDGET(dialog), TRUE);
   gtk_widget_add_controller(GTK_WIDGET(dialog), keys);
+  g_signal_connect(dialog, "map", G_CALLBACK(+[](GtkWidget *widget, gpointer) {
+                     if (GlobalShortcutGrab::ShouldGrabOnShow()) {
+                       GlobalShortcutGrab::GrabKeyboard(widget);
+                     }
+                   }),
+                   nullptr);
+  g_signal_connect(dialog, "unmap", G_CALLBACK(+[](GtkWidget *widget, gpointer) {
+                     if (GlobalShortcutGrab::ShouldUngrabOnHide()) {
+                       GlobalShortcutGrab::UngrabKeyboard(widget);
+                     }
+                   }),
+                   nullptr);
   g_signal_connect(dialog, "closed", G_CALLBACK(+[](AdwDialog *closed, gpointer data) {
+                     if (GlobalShortcutGrab::ShouldUngrabOnHide()) {
+                       GlobalShortcutGrab::UngrabKeyboard(GTK_WIDGET(closed));
+                     }
                      auto *fn = static_cast<std::function<void(const std::string &)> *>(data);
                      AdwAlertDialog *alert = ADW_ALERT_DIALOG(closed);
                      const bool accepted = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(alert), "accepted")) != 0;

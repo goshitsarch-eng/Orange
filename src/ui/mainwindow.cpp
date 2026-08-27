@@ -4,6 +4,10 @@
 #include "core/windows7thumbbaractions.h"
 #include "utilities/winutils.h"
 #endif
+#ifdef __APPLE__
+#include "core/macosutils.h"
+#include "core/macoswindow.h"
+#endif
 #include "ui/mainwindow.h"
 
 #include "collection/collectionfullrescan.h"
@@ -277,6 +281,11 @@ MainWindow::~MainWindow() {
 
 void MainWindow::Present() {
   gtk_window_present(GTK_WINDOW(window_));
+#ifdef __APPLE__
+  if (MacOsWindow::ShouldEnableFullScreen()) {
+    MacOsUtils::EnableFullScreen(GTK_WINDOW(window_));
+  }
+#endif
   RestoreAfterHide();
   if (app_ && app_->shortcuts()) {
     app_->shortcuts()->Raise();

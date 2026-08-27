@@ -2,6 +2,8 @@
 #define STRAWBERRY_GLOBALSHORTCUTGRAB_H
 
 #include <gdk/gdk.h>
+#include <gdk/gdktoplevel.h>
+#include <gtk/gtk.h>
 
 #include <string>
 
@@ -39,6 +41,47 @@ inline bool IsModifier(guint keyval) {
 }
 
 inline bool ShouldAccept(guint keyval) { return !IsModifier(keyval); }
+
+// Qt GlobalShortcutGrabber::showEvent / hideEvent grabKeyboard / releaseKeyboard.
+inline bool ShouldGrabOnShow() { return true; }
+
+inline bool ShouldUngrabOnHide() { return true; }
+
+inline bool GrabOwnerEvents() { return false; }
+
+inline GdkSeatCapabilities GrabCapabilities() { return GDK_SEAT_CAPABILITY_KEYBOARD; }
+
+inline bool ShouldInhibitSystemShortcuts() { return true; }
+
+inline GdkToplevel *ToplevelFor(GtkWidget *widget) {
+  if (!widget) {
+    return nullptr;
+  }
+  GtkNative *native = gtk_widget_get_native(widget);
+  if (!native) {
+    return nullptr;
+  }
+  GdkSurface *surface = gtk_native_get_surface(native);
+  return GDK_IS_TOPLEVEL(surface) ? GDK_TOPLEVEL(surface) : nullptr;
+}
+
+inline void GrabKeyboard(GtkWidget *widget) {
+  if (!widget) {
+    return;
+  }
+  gtk_widget_grab_focus(widget);
+  if (GdkToplevel *toplevel = ToplevelFor(widget)) {
+    if (ShouldInhibitSystemShortcuts()) {
+      gdk_toplevel_inhibit_system_shortcuts(toplevel, nullptr);
+    }
+  }
+}
+
+inline void UngrabKeyboard(GtkWidget *widget) {
+  if (GdkToplevel *toplevel = ToplevelFor(widget)) {
+    gdk_toplevel_restore_system_shortcuts(toplevel);
+  }
+}
 
 inline std::string PreviewMarkup(const std::string &accel) {
   if (accel.empty()) {

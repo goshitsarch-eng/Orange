@@ -1,6 +1,7 @@
 #include "core/filesystemwatcherwinpolicy.h"
 #include "core/windows7thumbbaractions.h"
 #include "core/winsmtcstatus.h"
+#include "core/macoswindow.h"
 #include "device/macosdeviceclassify.h"
 #include "engine/enginebase.h"
 #include "engine/platformdeviceoutputs.h"
@@ -2744,6 +2745,11 @@ TEST(UwpDeviceEnum, DefaultFirstAndSkipDisabled) {
   const EngineDevice device = UwpDeviceEnum::FromWinRt("{id}", "Speakers");
   EXPECT_EQ("{id}", device.value);
   EXPECT_EQ("Speakers", device.description);
+}
+
+TEST(MacOsWindow, EnablesFullScreenPrimary) {
+  EXPECT_EQ(1u << 7, MacOsWindow::FullScreenPrimaryMask());
+  EXPECT_TRUE(MacOsWindow::ShouldEnableFullScreen());
 }
 
 TEST(KeyMapperMacOs, MapsMediaKeys) {

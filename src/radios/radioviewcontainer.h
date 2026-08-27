@@ -32,6 +32,7 @@ class RadioViewContainer {
 
   RadioServices *services_ = nullptr;
   GtkWidget *widget_ = nullptr;
+  GtkWidget *stack_ = nullptr;
   RadioModel model_;
   std::unique_ptr<RadioView> view_;
   std::unique_ptr<RadioBrowserSearchView> search_view_;

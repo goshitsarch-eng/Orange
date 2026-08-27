@@ -59,6 +59,7 @@
 #include "lyrics/lyricsproviderauth.h"
 #include "settings/settingspages.h"
 #include "settings/settingswheelthrough.h"
+#include "ui/settingsdialogshow.h"
 #include "streaming/streamingchoices.h"
 
 #include <gtest/gtest.h>
@@ -427,6 +428,17 @@ TEST(TranscoderSettingsPage, TabsMatchQtOrderAndGroups) {
   EXPECT_EQ(320000, TranscoderSettingsPage::StoreBps(320));
   EXPECT_EQ(6, TranscoderSettingsPage::ClampKbps(Transcoder::Format::Opus, 1));
   EXPECT_EQ(510, TranscoderSettingsPage::ClampKbps(Transcoder::Format::Opus, 999));
+  EXPECT_TRUE(TranscoderSettingsPage::ShouldMarkChangedOnShow(false));
+  EXPECT_FALSE(TranscoderSettingsPage::ShouldMarkChangedOnShow(true));
+  EXPECT_TRUE(TranscoderSettingsPage::ShouldMarkChangedOnLoad(true));
+  EXPECT_FALSE(TranscoderSettingsPage::ShouldMarkChangedOnLoad(false));
+}
+
+TEST(SettingsDialogShow, ReloadsPagesOnProgrammaticShow) {
+  EXPECT_TRUE(SettingsDialogShow::ShouldReloadPages(false));
+  EXPECT_FALSE(SettingsDialogShow::ShouldReloadPages(true));
+  EXPECT_TRUE(SettingsDialogShow::ShouldLoadGeometry(false));
+  EXPECT_FALSE(SettingsDialogShow::ShouldLoadGeometry(true));
 }
 
 TEST(AnalyzerSettings, KeysDefaultsAndTypes) {

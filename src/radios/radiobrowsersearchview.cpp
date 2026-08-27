@@ -3,6 +3,7 @@
 #include "constants/radiobrowsersettings.h"
 #include "core/settings.h"
 #include "radios/radiobrowsersearchopts.h"
+#include "radios/radioviewsearch.h"
 #include "radios/radiodrag.h"
 #include "radios/radiomenu.h"
 #include "radios/radioservices.h"
@@ -158,6 +159,20 @@ RadioBrowserSearchView::~RadioBrowserSearchView() {
 void RadioBrowserSearchView::SetResults(const std::vector<RadioChannel> &results) {
   model_.SetResults(results);
   ReloadResults();
+}
+
+void RadioBrowserSearchView::Search(const std::string &query) {
+  if (entry_) {
+    gtk_editable_set_text(GTK_EDITABLE(entry_), query.c_str());
+  }
+  if (search_timeout_) {
+    g_source_remove(search_timeout_);
+    search_timeout_ = 0;
+  }
+  if (RadioViewSearch::ShouldFocusSearch() && entry_) {
+    gtk_widget_grab_focus(entry_);
+  }
+  SearchTriggered();
 }
 
 void RadioBrowserSearchView::ScheduleSearch() {

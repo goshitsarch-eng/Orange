@@ -24,6 +24,8 @@ class GlobalShortcutsManager {
   void Init();
   void ReloadSettings();
   void Raise();
+  bool IsMacAccessibilityEnabled() const;
+  void ShowMacAccessibilityDialog();
   const std::vector<std::unique_ptr<GlobalShortcut>> &shortcuts() const { return shortcuts_; }
   GlobalShortcut *ShortcutById(const std::string &id) const;
   void Emit(const std::string &id);

@@ -1,1 +1,13 @@
-// Platform-specific source kept for inventory parity: src/core/mac_startup.mm\n
+#include "core/mac_startup.h"
+
+#ifdef __APPLE__
+#include "core/macosutils.h"
+
+#import <AppKit/AppKit.h>
+
+void MacStartup() {
+  [NSApplication sharedApplication];
+  [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+  MacOsUtils::SetApplicationName("Strawberry");
+}
+#endif

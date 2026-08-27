@@ -1,6 +1,9 @@
 #include "config.h"
 #include "version.h"
 
+#ifdef __APPLE__
+#include "core/mac_startup.h"
+#endif
 #include "core/application.h"
 #include "core/commandlinefingerprint.h"
 #include "core/commandlineoptions.h"
@@ -130,6 +133,9 @@ int main(int argc, char **argv) {
   }
 
   GstStartup::Initialize();
+#ifdef __APPLE__
+  MacStartup();
+#endif
   Translations::ApplySavedLanguage();
   Translations::Init();
   adw_init();

@@ -7,6 +7,7 @@
 #include "globalshortcuts/globalshortcutbinding.h"
 #include "globalshortcuts/globalshortcuts.h"
 #include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
+#include "globalshortcuts/macosaccessibility.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
 #include "ui/dialogs.h"
@@ -35,6 +36,11 @@ void ApplyShortcutListEnable(BackendEnableState *state) {
     gtk_widget_set_visible(state->warning, GlobalShortcutBinding::X11WarningVisible(state->x11_visible, x_on));
   }
 }
+
+struct MacAccessMap {
+  GtkWidget *group = nullptr;
+  Application *app = nullptr;
+};
 
 struct ShortcutRowWidgets {
   Settings *settings = nullptr;
@@ -217,5 +223,30 @@ AdwPreferencesPage *GlobalShortcutsSettingsPage::Create(Settings *settings, Appl
     adw_preferences_group_add(keys, GTK_WIDGET(combo));
   }
   ApplyShortcutListEnable(enable);
+
+  AdwPreferencesGroup *access = SettingsPage::AddGroup(page, MacOsAccessibility::GroupTitle());
+  adw_preferences_group_set_description(access, Translations::CStr(MacOsAccessibility::Warning()));
+  SettingsPage::AddButtonRow(access, "", MacOsAccessibility::OpenButton(), [app]() {
+    if (app && app->shortcuts()) {
+      app->shortcuts()->ShowMacAccessibilityDialog();
+    }
+  });
+  const bool access_enabled = app && app->shortcuts() ? app->shortcuts()->IsMacAccessibilityEnabled() : false;
+  gtk_widget_set_visible(GTK_WIDGET(access), MacOsAccessibility::ShouldShowAccessRow(MacOsAccessibility::IsMacOs(), access_enabled));
+  auto *access_map = new MacAccessMap{GTK_WIDGET(access), app};
+  g_object_set_data_full(G_OBJECT(page), "macos-access", access_map, [](gpointer p) { delete static_cast<MacAccessMap *>(p); });
+  g_signal_connect(page, "map", G_CALLBACK((+[](GtkWidget *widget, gpointer) {
+                     if (!MacOsAccessibility::ShouldRefreshOnShow()) {
+                       return;
+                     }
+                     auto *state = static_cast<MacAccessMap *>(g_object_get_data(G_OBJECT(widget), "macos-access"));
+                     if (!state || !state->group) {
+                       return;
+                     }
+                     const bool enabled = state->app && state->app->shortcuts() ? state->app->shortcuts()->IsMacAccessibilityEnabled() : false;
+                     gtk_widget_set_visible(state->group, MacOsAccessibility::ShouldShowAccessRow(MacOsAccessibility::IsMacOs(), enabled));
+                   })),
+                   nullptr);
+
   return page;
 }

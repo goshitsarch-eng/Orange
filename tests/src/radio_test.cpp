@@ -12,6 +12,7 @@
 #include "radios/radiomodel.h"
 #include "radios/radiotree.h"
 #include "radios/radiotreeleft.h"
+#include "radios/radioviewsearch.h"
 #include "radios/radioviewshow.h"
 #include "radios/radioparadiseservice.h"
 #include "radios/radiostreamplaylistitem.h"
@@ -382,6 +383,14 @@ TEST(RadioTree, GroupsCollapsesAndServiceLabels) {
 TEST(RadioViewShow, FetchesChannelsOnceOnFirstShow) {
   EXPECT_TRUE(RadioViewShow::ShouldFetchOnShow(false));
   EXPECT_FALSE(RadioViewShow::ShouldFetchOnShow(true));
+}
+
+TEST(RadioViewSearch, SwitchesToBrowserAndRunsQuery) {
+  EXPECT_STREQ("browser", RadioViewSearch::BrowserTabId());
+  EXPECT_STREQ("channels", RadioViewSearch::ChannelsTabId());
+  EXPECT_TRUE(RadioViewSearch::ShouldShowBrowserTab());
+  EXPECT_TRUE(RadioViewSearch::ShouldRunSearch());
+  EXPECT_TRUE(RadioViewSearch::ShouldFocusSearch());
 }
 
 TEST(RadioTreeLeft, CollapseChannelOrService) {

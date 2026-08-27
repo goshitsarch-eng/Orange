@@ -189,6 +189,20 @@ bool GlobalShortcutsManager::HasActiveBackend(GlobalShortcutsBackend::Type type)
 
 void GlobalShortcutsManager::Init() { ReloadSettings(); }
 
+bool GlobalShortcutsManager::IsMacAccessibilityEnabled() const {
+#ifdef __APPLE__
+  return GlobalShortcutsBackendMacOs::IsAccessibilityEnabled();
+#else
+  return false;
+#endif
+}
+
+void GlobalShortcutsManager::ShowMacAccessibilityDialog() {
+#ifdef __APPLE__
+  GlobalShortcutsBackendMacOs::ShowAccessibilityDialog();
+#endif
+}
+
 void GlobalShortcutsManager::Raise() {
   for (auto &backend : backends_) {
     if (backend->type() == GlobalShortcutsBackend::Type::Gnome && backend->is_active()) {

@@ -2,6 +2,7 @@
 #include "globalshortcuts/globalshortcutbinding.h"
 #include "globalshortcuts/globalshortcutgrab.h"
 #include "globalshortcuts/globalshortcuts.h"
+#include "globalshortcuts/macosaccessibility.h"
 #include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
 #include "globalshortcuts/globalshortcutsbackend-portal.h"
 #include "globalshortcuts/globalshortcutsportal.h"
@@ -11,6 +12,7 @@
 #include "playlist/playlistsequence.h"
 
 #include <gtest/gtest.h>
+#include <string>
 
 TEST(GlobalShortcuts, ShortcutIdsMatchQt) {
   const std::vector<std::string> ids = GlobalShortcutsManager::ShortcutIds();
@@ -206,6 +208,30 @@ TEST(GlobalShortcutGrab, AcceptsCompleteCombosOnly) {
   EXPECT_FALSE(GlobalShortcutGrab::RejectClears("<b>Ctrl</b>"));
   EXPECT_TRUE(GlobalShortcutGrab::ShouldDismissOnCancel(""));
   EXPECT_FALSE(GlobalShortcutGrab::ShouldDismissOnCancel("Ctrl"));
+  EXPECT_TRUE(GlobalShortcutGrab::ShouldGrabOnShow());
+  EXPECT_TRUE(GlobalShortcutGrab::ShouldUngrabOnHide());
+  EXPECT_FALSE(GlobalShortcutGrab::GrabOwnerEvents());
+  EXPECT_EQ(GDK_SEAT_CAPABILITY_KEYBOARD, GlobalShortcutGrab::GrabCapabilities());
+  EXPECT_TRUE(GlobalShortcutGrab::ShouldInhibitSystemShortcuts());
+  EXPECT_EQ(nullptr, GlobalShortcutGrab::ToplevelFor(nullptr));
+}
+
+TEST(MacOsAccessibility, ShowsRowUntilTrusted) {
+  EXPECT_FALSE(MacOsAccessibility::IsMacOs());
+  EXPECT_TRUE(MacOsAccessibility::ShouldShowAccessRow(true, false));
+  EXPECT_FALSE(MacOsAccessibility::ShouldShowAccessRow(true, true));
+  EXPECT_FALSE(MacOsAccessibility::ShouldShowAccessRow(false, false));
+  EXPECT_TRUE(MacOsAccessibility::ShouldRefreshOnShow());
+  EXPECT_TRUE(MacOsAccessibility::PromptWhenCheckingTrust());
+  EXPECT_STREQ("Accessibility", MacOsAccessibility::GroupTitle());
+  EXPECT_STREQ("Open...", MacOsAccessibility::OpenButton());
+  EXPECT_STREQ("Privacy_Accessibility", MacOsAccessibility::AccessibilityAnchor());
+  EXPECT_STREQ("com.apple.preference.security", MacOsAccessibility::SecurityPaneId());
+  EXPECT_STREQ("com.apple.systempreferences", MacOsAccessibility::SystemPreferencesBundle());
+  EXPECT_STREQ("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility", MacOsAccessibility::PreferencesUrl());
+  EXPECT_TRUE(std::string(MacOsAccessibility::Warning()).find("control your computer") != std::string::npos);
+  GlobalShortcutsManager manager;
+  EXPECT_FALSE(manager.IsMacAccessibilityEnabled());
 }
 
 TEST(PlaylistManager, CycleRepeatAndShuffleModes) {

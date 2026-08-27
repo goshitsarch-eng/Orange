@@ -18,6 +18,11 @@ namespace TranscoderSettingsPage {
 
 AdwPreferencesPage *Create(Settings *settings, Application *app = nullptr);
 
+// Qt TranscoderSettingsPage::showEvent / Load mark the page dirty so Apply writes encoder options.
+inline bool ShouldMarkChangedOnShow(bool spontaneous) { return !spontaneous; }
+
+inline bool ShouldMarkChangedOnLoad(bool visible) { return visible; }
+
 inline const char *IntroText() {
   return "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device.";
 }

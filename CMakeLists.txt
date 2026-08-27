@@ -777,6 +777,7 @@ endif()
 if(APPLE)
   target_sources(strawberry PRIVATE
     src/core/macosutils.mm
+    src/core/mac_startup.mm
     src/engine/macosdevicefinder.cpp
     src/device/macosdevicelister.mm
     src/globalshortcuts/globalshortcutsbackend-macos.mm
@@ -1191,6 +1192,7 @@ if(GTest_FOUND)
   if(APPLE)
     target_sources(strawberry_tests PRIVATE
       src/core/macosutils.mm
+      src/core/mac_startup.mm
       src/engine/macosdevicefinder.cpp
       src/device/macosdevicelister.mm
       src/globalshortcuts/globalshortcutsbackend-macos.mm

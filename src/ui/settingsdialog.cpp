@@ -28,14 +28,17 @@
 #include "dialogs/dialogclosekeys.h"
 #include "dialogs/dialoggeometry.h"
 #include "translations/translations.h"
+#include "ui/settingsdialogshow.h"
 
 #include <adwaita.h>
 
 void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::function<void()> &closed, const char *page_name) {
   AdwPreferencesDialog *dialog = ADW_PREFERENCES_DIALOG(adw_preferences_dialog_new());
   adw_dialog_set_title(ADW_DIALOG(dialog), Translations::CStr("Preferences"));
-  DialogGeometry::Apply(ADW_DIALOG(dialog), SettingsDialogSettings::kSettingsGroup, SettingsDialogSettings::kGeometry,
-                        SettingsDialogSettings::kDefaultWidth, SettingsDialogSettings::kDefaultHeight, false);
+  if (SettingsDialogShow::ShouldLoadGeometry(false)) {
+    DialogGeometry::Apply(ADW_DIALOG(dialog), SettingsDialogSettings::kSettingsGroup, SettingsDialogSettings::kGeometry,
+                          SettingsDialogSettings::kDefaultWidth, SettingsDialogSettings::kDefaultHeight, false);
+  }
   auto *settings = new Settings();
   auto *on_closed = new std::function<void()>(closed);
 

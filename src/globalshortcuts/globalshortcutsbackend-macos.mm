@@ -4,6 +4,7 @@
 #include "globalshortcuts/globalshortcut.h"
 #include "globalshortcuts/globalshortcuts.h"
 #include "globalshortcuts/keymapper_macos.h"
+#include "globalshortcuts/macosaccessibility.h"
 
 #ifdef __APPLE__
 #include <AppKit/AppKit.h>
@@ -24,12 +25,22 @@ bool GlobalShortcutsBackendMacOs::IsAvailable() const {
 #endif
 }
 
-bool GlobalShortcutsBackendMacOs::IsAccessibilityEnabled() const {
+bool GlobalShortcutsBackendMacOs::IsAccessibilityEnabled() {
 #ifdef __APPLE__
-  NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt : @YES};
+  const id prompt = MacOsAccessibility::PromptWhenCheckingTrust() ? @YES : @NO;
+  NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt : prompt};
   return AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
 #else
   return false;
+#endif
+}
+
+void GlobalShortcutsBackendMacOs::ShowAccessibilityDialog() {
+#ifdef __APPLE__
+  NSURL *url = [NSURL URLWithString:[NSString stringWithUTF8String:MacOsAccessibility::PreferencesUrl()]];
+  if (url) {
+    [[NSWorkspace sharedWorkspace] openURL:url];
+  }
 #endif
 }
 

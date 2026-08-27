@@ -9,7 +9,8 @@ class GlobalShortcutsBackendMacOs : public GlobalShortcutsBackend {
   ~GlobalShortcutsBackendMacOs() override;
 
   bool IsAvailable() const override;
-  bool IsAccessibilityEnabled() const;
+  static bool IsAccessibilityEnabled();
+  static void ShowAccessibilityDialog();
 
  protected:
   bool DoRegister() override;
