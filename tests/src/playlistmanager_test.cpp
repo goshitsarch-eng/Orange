@@ -4,6 +4,7 @@
 #include "playlist/playlistdynamicpersist.h"
 #include "playlist/playlistitemuuid.h"
 #include "playlist/playlistdragpayload.h"
+#include "playlist/playlistcrossundopair.h"
 #include "playlist/playlistlistdrop.h"
 #include "playlist/playlistqueuescope.h"
 #include "core/database.h"
@@ -304,6 +305,28 @@ TEST(PlaylistManager, MoveRowsBetweenRemovesFromSource) {
   source->Undo();
   EXPECT_EQ(3, source->row_count());
   EXPECT_EQ(0, dest->row_count());
+}
+
+TEST(PlaylistManager, UndoCrossMoveRestoresBoth) {
+  PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
+  manager.Init();
+  Playlist *source = manager.current();
+  ASSERT_NE(nullptr, source);
+  source->AppendSongs({MakeSong("A", "file:///a"), MakeSong("B", "file:///b"), MakeSong("C", "file:///c")});
+  Playlist *dest = manager.New("Dest");
+  ASSERT_NE(nullptr, dest);
+  manager.MoveRowsBetween(source->id(), dest->id(), {0, 2});
+  ASSERT_EQ(1, source->row_count());
+  ASSERT_EQ(2, dest->row_count());
+  EXPECT_TRUE(PlaylistCrossUndoPair::ShouldPairUndo(source->id(), dest->id()));
+  EXPECT_FALSE(PlaylistCrossUndoPair::ShouldPairUndo(source->id(), source->id()));
+  EXPECT_FALSE(PlaylistCrossUndoPair::ShouldBypass(2));
+  EXPECT_TRUE(manager.UndoCrossMove(source->id(), dest->id()));
+  EXPECT_EQ(3, source->row_count());
+  EXPECT_EQ(0, dest->row_count());
+  EXPECT_EQ("A", source->song(0).title());
+  EXPECT_EQ("B", source->song(1).title());
+  EXPECT_EQ("C", source->song(2).title());
 }
 
 TEST(PlaylistManager, EachPlaylistKeepsItsOwnQueue) {

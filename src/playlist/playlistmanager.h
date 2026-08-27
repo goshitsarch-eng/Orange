@@ -67,6 +67,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   void AppendSongs(const SongList &songs) override;
   void InsertSongs(int id, const SongList &songs, int pos = -1) override;
   void MoveRowsBetween(int source_id, int dest_id, const std::vector<int> &rows, int dest_pos = -1);
+  bool UndoCrossMove(int source_id, int dest_id);
   void InsertUrls(const std::vector<std::string> &urls, int row = -1);
   void RemoveCurrentSong() override;
   void SaveActive();

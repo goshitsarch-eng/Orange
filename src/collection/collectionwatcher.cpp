@@ -2,10 +2,13 @@
 
 #include "config.h"
 #include "collection/collectionbackend.h"
+#include "collection/collectionartpersist.h"
 #include "collection/collectioncuescan.h"
 #include "collection/collectiondirectoryart.h"
 #include "collection/collectionexpire.h"
+#include "collection/collectionfingerprintmatch.h"
 #include "collection/collectionrescanreason.h"
+#include "collection/collectionunavailablerestore.h"
 #include "collection/collectionscandelay.h"
 #include "collection/collectionsubdirectory.h"
 #include "constants/collectionsettings.h"
@@ -126,11 +129,15 @@ void CollectionWatcher::StartAsyncScan(ScanType type) {
   if (type == ScanType::Incremental) {
     for (const Song &song : backend_->Songs()) {
       ExistingInfo info;
+      info.id = song.id();
+      info.url = song.url();
       info.mtime = song.mtime();
       info.filesize = song.filesize();
       info.beginning = song.beginning_nanosec();
       info.unavailable = song.unavailable();
       info.valid = song.is_valid();
+      info.compilation_on = song.compilation_on();
+      info.compilation_off = song.compilation_off();
       info.fingerprint = song.fingerprint();
       info.cue_path = song.cue_path();
       info.art_manual = song.art_manual();
@@ -167,6 +174,8 @@ gpointer CollectionWatcher::ScanThread(gpointer data) {
 
 Song CollectionWatcher::SongFromExisting(const ExistingInfo &info) {
   Song song;
+  song.set_id(info.id);
+  song.set_url(info.url);
   song.set_valid(info.valid);
   song.set_mtime(info.mtime);
   song.set_filesize(info.filesize);
@@ -180,6 +189,8 @@ Song CollectionWatcher::SongFromExisting(const ExistingInfo &info) {
   song.set_skipcount(info.skipcount);
   song.set_lastplayed(info.lastplayed);
   song.set_rating(info.rating);
+  song.set_compilation_on(info.compilation_on);
+  song.set_compilation_off(info.compilation_off);
   song.set_ebur128_integrated_loudness_lufs(info.ebu_lufs);
   song.set_ebur128_loudness_range_lu(info.ebu_range);
   return song;
@@ -200,6 +211,28 @@ const CollectionWatcher::ExistingInfo *CollectionWatcher::FindExisting(const Sca
     }
   }
   return &it->second.front();
+}
+
+const CollectionWatcher::ExistingInfo *CollectionWatcher::FindExistingByFingerprint(const ScanJob *job,
+                                                                                    const std::string &fingerprint,
+                                                                                    const std::string &new_url) {
+  if (!job || !CollectionFingerprintMatch::IsUsable(fingerprint)) {
+    return nullptr;
+  }
+  for (const auto &entry : job->existing) {
+    if (entry.first == new_url) {
+      continue;
+    }
+    if (!CollectionFingerprintMatch::OldPathGone(entry.first)) {
+      continue;
+    }
+    for (const ExistingInfo &info : entry.second) {
+      if (info.fingerprint == fingerprint) {
+        return &info;
+      }
+    }
+  }
+  return nullptr;
 }
 
 bool CollectionWatcher::SubdirNeedsAnalysis(const ScanJob *job, const std::string &subdir_path) {
@@ -269,9 +302,19 @@ void CollectionWatcher::CollectFile(ScanJob *job, const CollectionDirectory &dir
                                                                                      ? CollectionCueScan::CueMtime(existing.cue_path().empty() ? cue
                                                                                                                                                : existing.cue_path())
                                                                                      : 0);
+  const int64_t compare_mtime = effective_mtime > 0 ? effective_mtime : media_mtime;
   if (job->type == ScanType::Incremental &&
-      !NeedsRescan(existing, effective_mtime > 0 ? effective_mtime : media_mtime, filesize, job->song_tracking, job->ebu_analysis,
-                   cue_change)) {
+      CollectionUnavailableRestore::CanRestoreWithoutRescan(existing, compare_mtime, filesize, job->song_tracking,
+                                                            job->ebu_analysis, cue_change)) {
+    existing.set_unavailable(false);
+    existing.set_url(url);
+    existing.set_directory_id(directory.id);
+    job->songs.push_back(existing);
+    ++job->added;
+    return;
+  }
+  if (job->type == ScanType::Incremental &&
+      !NeedsRescan(existing, compare_mtime, filesize, job->song_tracking, job->ebu_analysis, cue_change)) {
     return;
   }
   Song file = tagreader_->ReadFile(entry);
@@ -286,6 +329,12 @@ void CollectionWatcher::CollectFile(ScanJob *job, const CollectionDirectory &dir
   file.set_mtime(CollectionCueScan::EffectiveMtime(media_mtime, cue_mtime));
   file.set_filesize(filesize);
   ApplyAnalysis(&file, job);
+  if (!existing_info && CollectionFingerprintMatch::IsUsable(file.fingerprint())) {
+    if (const ExistingInfo *moved = FindExistingByFingerprint(job, file.fingerprint(), url)) {
+      existing_info = moved;
+      existing = SongFromExisting(*moved);
+    }
+  }
 
   SongList songs;
   if (cue_mtime > 0 && !cue.empty()) {
@@ -308,11 +357,22 @@ void CollectionWatcher::CollectFile(ScanJob *job, const CollectionDirectory &dir
     songs.push_back(file);
   }
   const std::string art = CollectionDirectoryArt::ArtForDirectory(FileUtils::DirName(entry), job->cover_filters);
+  const std::string art_uri = art.empty() ? std::string() : FileUtils::UriFromPath(art);
   for (Song &song : songs) {
-    if (song.art_automatic().empty() && !art.empty()) {
-      song.set_art_automatic(FileUtils::UriFromPath(art));
+    const ExistingInfo *match = FindExisting(job, song.url(), song.beginning_nanosec());
+    if (!match && existing_info) {
+      match = existing_info;
     }
-    MergeFromExisting(&song, FindExisting(job, song.url(), song.beginning_nanosec()), job);
+    const Song prior = match ? SongFromExisting(*match) : Song();
+    if (CollectionArtPersist::ShouldApplyAutomaticArt(prior, art_uri)) {
+      song.set_art_automatic(art_uri);
+    } else {
+      song.set_art_automatic(CollectionArtPersist::ArtAutomaticForUpdate(prior, song.art_automatic()));
+    }
+    if (prior.id() > 0) {
+      song.set_id(prior.id());
+    }
+    MergeFromExisting(&song, match, job);
     job->songs.push_back(song);
     ++job->added;
   }
@@ -499,11 +559,15 @@ void CollectionWatcher::ScanPath(int directory_id, const std::string &path, bool
   if (backend_) {
     for (const Song &song : backend_->Songs()) {
       ExistingInfo info;
+      info.id = song.id();
+      info.url = song.url();
       info.mtime = song.mtime();
       info.filesize = song.filesize();
       info.beginning = song.beginning_nanosec();
       info.unavailable = song.unavailable();
       info.valid = song.is_valid();
+      info.compilation_on = song.compilation_on();
+      info.compilation_off = song.compilation_off();
       info.fingerprint = song.fingerprint();
       info.cue_path = song.cue_path();
       info.art_manual = song.art_manual();
@@ -550,5 +614,6 @@ void CollectionWatcher::ScanPath(int directory_id, const std::string &path, bool
     for (const auto &entry : beginnings) {
       backend_->RetainBeginnings(entry.first, entry.second);
     }
+    backend_->UpdateLastSeen(directory_id);
   }
 }

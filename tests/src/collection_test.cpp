@@ -17,10 +17,13 @@
 #include "subsonic/subsonicsettingsactions.h"
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
+#include "collection/collectionartpersist.h"
 #include "collection/collectioncuescan.h"
 #include "collection/collectiondirectoryart.h"
 #include "collection/collectionexpire.h"
+#include "collection/collectionfingerprintmatch.h"
 #include "collection/collectionrescanreason.h"
+#include "collection/collectionunavailablerestore.h"
 #include "collection/collectionscandelay.h"
 #include "collection/collectionwatcher.h"
 #include "core/songuserdatamerge.h"
@@ -518,6 +521,11 @@ TEST(SongUserDataMerge, PreservesPlaycountRatingSkipAndArtUnlessOverwrite) {
   EXPECT_EQ(1u, overwrite.playcount());
   EXPECT_NEAR(0.2f, overwrite.rating(), 0.001f);
   EXPECT_EQ(3u, overwrite.skipcount());
+  existing.set_compilation_on(true);
+  existing.set_compilation_off(false);
+  SongUserDataMerge::Merge(&incoming, existing, true, true);
+  EXPECT_TRUE(incoming.compilation_on());
+  EXPECT_FALSE(incoming.compilation_off());
 }
 
 TEST(CollectionBackend, MarkMissingUnavailableLeavesSeenSongs) {
@@ -1213,6 +1221,118 @@ TEST(CollectionBackend, PersistsFingerprintCueLoudnessAndUserData) {
   EXPECT_EQ(1, backend.RetainBeginnings(song.url(), {1000000000}));
   EXPECT_EQ(id, backend.SongByUrl(song.url(), 1000000000).id());
   EXPECT_FALSE(backend.SongByUrl(song.url(), 2000000000).is_valid());
+  unlink(path.c_str());
+}
+
+TEST(CollectionFingerprintMatch, RejectsEmptyAndKeepsGonePaths) {
+  EXPECT_FALSE(CollectionFingerprintMatch::IsUsable(""));
+  EXPECT_FALSE(CollectionFingerprintMatch::IsUsable("NONE"));
+  EXPECT_TRUE(CollectionFingerprintMatch::IsUsable("abc"));
+  EXPECT_TRUE(CollectionFingerprintMatch::OldPathGone("file:///tmp/strawberry-fp-missing.flac"));
+  Song gone;
+  gone.set_valid(true);
+  gone.set_url("file:///tmp/strawberry-fp-missing.flac");
+  Song same;
+  same.set_valid(true);
+  same.set_url("file:///tmp/strawberry-fp-new.flac");
+  EXPECT_EQ(&gone, CollectionFingerprintMatch::PickMovedMatch({gone, same}, "file:///tmp/strawberry-fp-new.flac"));
+  EXPECT_EQ(nullptr, CollectionFingerprintMatch::PickMovedMatch({same}, "file:///tmp/strawberry-fp-new.flac"));
+}
+
+TEST(CollectionArtPersist, UnsetClearsAutomatic) {
+  Song existing;
+  existing.set_art_unset(true);
+  existing.set_art_automatic("file:///old.jpg");
+  EXPECT_FALSE(CollectionArtPersist::ShouldApplyAutomaticArt(existing, "file:///new.jpg"));
+  EXPECT_TRUE(CollectionArtPersist::ArtAutomaticForUpdate(existing, "file:///new.jpg").empty());
+  existing.set_art_unset(false);
+  existing.set_art_automatic("");
+  EXPECT_TRUE(CollectionArtPersist::ShouldApplyAutomaticArt(existing, "file:///new.jpg"));
+  EXPECT_EQ("file:///new.jpg", CollectionArtPersist::ArtAutomaticForUpdate(existing, "file:///new.jpg"));
+  existing.set_art_automatic("file:///kept.jpg");
+  EXPECT_EQ("file:///kept.jpg", CollectionArtPersist::ArtAutomaticForUpdate(existing, ""));
+}
+
+TEST(CollectionUnavailableRestore, RestoresUnchangedUnavailable) {
+  Song existing;
+  existing.set_valid(true);
+  existing.set_unavailable(true);
+  existing.set_mtime(100);
+  existing.set_filesize(50);
+  EXPECT_TRUE(CollectionUnavailableRestore::CanRestoreWithoutRescan(existing, 100, 50, false, false,
+                                                                    CollectionCueScan::Change::None));
+  existing.set_unavailable(false);
+  EXPECT_FALSE(CollectionUnavailableRestore::CanRestoreWithoutRescan(existing, 100, 50, false, false,
+                                                                     CollectionCueScan::Change::None));
+  existing.set_unavailable(true);
+  EXPECT_FALSE(CollectionUnavailableRestore::CanRestoreWithoutRescan(existing, 200, 50, false, false,
+                                                                     CollectionCueScan::Change::None));
+}
+
+TEST(CollectionBackend, MatchesMovedFileByFingerprint) {
+  const std::string path = "/tmp/strawberry-collection-fp-move-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song original = MakeSong("Moved", "Artist", "Album");
+  original.set_directory_id(directory);
+  original.set_url("file:///tmp/strawberry-fp-old-missing.flac");
+  original.set_fingerprint("fp-moved");
+  const int id = backend.AddOrUpdateSong(original);
+  ASSERT_GT(id, 0);
+  ASSERT_EQ(1u, backend.SongsByFingerprint("fp-moved").size());
+  EXPECT_TRUE(backend.SongsByFingerprint("NONE").empty());
+
+  Song moved = MakeSong("Moved Again", "Artist", "Album");
+  moved.set_directory_id(directory);
+  moved.set_url("file:///tmp/strawberry-fp-new.flac");
+  moved.set_fingerprint("fp-moved");
+  EXPECT_EQ(id, backend.AddOrUpdateSong(moved));
+  EXPECT_EQ(id, backend.SongByUrl("file:///tmp/strawberry-fp-new.flac").id());
+  EXPECT_FALSE(backend.SongByUrl("file:///tmp/strawberry-fp-old-missing.flac").is_valid());
+  EXPECT_EQ("Moved Again", backend.SongById(id).title());
+  unlink(path.c_str());
+}
+
+TEST(CollectionBackend, KeepsCompilationFlagsAndUnsetArt) {
+  const std::string path = "/tmp/strawberry-collection-flags-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song song = MakeSong("Comp", "Artist", "Album");
+  song.set_directory_id(directory);
+  song.set_art_automatic("file:///tmp/front.jpg");
+  const int id = backend.AddOrUpdateSong(song);
+  ASSERT_GT(id, 0);
+  ASSERT_EQ(1, backend.ForceCompilation({backend.SongById(id)}, true));
+  EXPECT_TRUE(backend.SongById(id).compilation_on());
+
+  Song rescan = MakeSong("Comp Rescan", "Artist", "Album");
+  rescan.set_directory_id(directory);
+  rescan.set_url(song.url());
+  rescan.set_art_automatic("file:///tmp/other.jpg");
+  EXPECT_EQ(id, backend.AddOrUpdateSong(rescan));
+  const Song after_comp = backend.SongById(id);
+  EXPECT_EQ("Comp Rescan", after_comp.title());
+  EXPECT_TRUE(after_comp.compilation_on());
+  EXPECT_FALSE(after_comp.compilation_off());
+
+  SqlQuery unset(&db, "UPDATE songs SET art_unset = 1, art_automatic = 'file:///tmp/old.jpg' WHERE ROWID = ?");
+  unset.Bind(1, id);
+  ASSERT_TRUE(unset.Exec());
+  EXPECT_TRUE(backend.SongById(id).art_unset());
+
+  Song art_update = backend.SongById(id);
+  art_update.set_art_unset(false);
+  art_update.set_art_automatic("file:///tmp/new.jpg");
+  EXPECT_EQ(id, backend.AddOrUpdateSong(art_update));
+  const Song kept = backend.SongById(id);
+  EXPECT_TRUE(kept.art_unset());
+  EXPECT_TRUE(kept.art_automatic().empty());
   unlink(path.c_str());
 }
 

@@ -1,6 +1,7 @@
 #include "smartplaylists/playlistquerygenerator.h"
 
 #include "collection/collectionbackend.h"
+#include "smartplaylists/smartplaylistgeneratemore.h"
 
 #include <algorithm>
 
@@ -16,33 +17,26 @@ void PlaylistQueryGenerator::Load(const std::string &data) { SmartPlaylistSearch
 std::string PlaylistQueryGenerator::Save() const { return search_.Serialize(); }
 
 SongList PlaylistQueryGenerator::Generate() {
-  SongList songs;
-  if (collection_backend_) {
-    songs = search_.Search(collection_backend_);
-  }
   previous_urls_.clear();
-  for (const Song &song : songs) {
-    previous_urls_.push_back(song.url());
-  }
-  return songs;
+  previous_ids_.clear();
+  current_pos_ = 0;
+  return GenerateMore(0);
 }
 
 SongList PlaylistQueryGenerator::GenerateMore(int count) {
-  SmartPlaylistSearch more = search_;
-  if (count > 0) {
-    more.limit = count + static_cast<int>(previous_urls_.size());
-  }
+  const SmartPlaylistSearch more = SmartPlaylistGenerateMore::Prepare(search_, previous_ids_, current_pos_, count);
+  current_pos_ = SmartPlaylistGenerateMore::NextPosition(current_pos_, more.limit, more.sort_random);
   SongList songs = collection_backend_ ? more.Search(collection_backend_) : SongList{};
-  SongList fresh;
-  for (const Song &song : songs) {
-    if (std::find(previous_urls_.begin(), previous_urls_.end(), song.url()) != previous_urls_.end()) {
-      continue;
-    }
-    fresh.push_back(song);
+  SongList fresh = SmartPlaylistGenerateMore::FilterFresh(songs, previous_ids_);
+  if (count > 0 && static_cast<int>(fresh.size()) > count) {
+    fresh.resize(static_cast<size_t>(count));
+  }
+  for (const Song &song : fresh) {
     previous_urls_.push_back(song.url());
-    if (count > 0 && static_cast<int>(fresh.size()) >= count) {
-      break;
+    if (song.id() > 0) {
+      previous_ids_.push_back(song.id());
     }
   }
+  previous_ids_ = SmartPlaylistGenerateMore::TrimHistory(previous_ids_, GetDynamicFuture() + GetDynamicHistory());
   return fresh;
 }

@@ -284,6 +284,19 @@ SongList SmartPlaylistSearch::Search(const SongList &songs) const {
       return sort_descending ? na > nb : na < nb;
     });
   }
+  if (first_item > 0 && first_item < static_cast<int>(result.size())) {
+    result.erase(result.begin(), result.begin() + first_item);
+  } else if (first_item >= static_cast<int>(result.size())) {
+    result.clear();
+  }
+  if (!id_not_in.empty()) {
+    result.erase(std::remove_if(result.begin(), result.end(),
+                                [this](const Song &song) {
+                                  return song.id() > 0 &&
+                                         std::find(id_not_in.begin(), id_not_in.end(), song.id()) != id_not_in.end();
+                                }),
+                 result.end());
+  }
   if (limit > 0 && static_cast<int>(result.size()) > limit) {
     result.resize(static_cast<size_t>(limit));
   }

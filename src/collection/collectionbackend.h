@@ -25,6 +25,7 @@ class CollectionBackend {
   SongList Songs(const CollectionFilterOptions &options) const;
   Song SongById(int id) const;
   Song SongByUrl(const std::string &url, int64_t beginning_nanosec = -1) const;
+  SongList SongsByFingerprint(const std::string &fingerprint) const;
   void UpdateCompilations();
   void UpdateSongUrl(int song_id, const std::string &url, int directory_id = -1);
   int AddOrUpdateSong(const Song &song);

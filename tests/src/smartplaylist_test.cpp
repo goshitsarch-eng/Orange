@@ -9,10 +9,13 @@
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
 #include "smartplaylists/smartplaylistdrag.h"
+#include "smartplaylists/smartplaylistgeneratemore.h"
 #include "smartplaylists/smartplaylistsmodel.h"
 
 #include <algorithm>
 #include <ctime>
+#include <memory>
+#include <vector>
 #include <gtest/gtest.h>
 #include <unistd.h>
 
@@ -299,6 +302,91 @@ TEST(PlaylistGenerator, CreateQueryRoundTripAndInsert) {
   PlaylistGeneratorInserter inserter;
   EXPECT_EQ(1, inserter.Insert(&playlist, query));
   EXPECT_EQ(1, playlist.row_count());
+  unlink(path.c_str());
+}
+
+TEST(SmartPlaylistGenerateMore, TrimHistoryKeepsNewest) {
+  EXPECT_EQ(std::vector<int>({3, 4}), SmartPlaylistGenerateMore::TrimHistory({1, 2, 3, 4}, 2));
+  EXPECT_EQ(std::vector<int>({1, 2}), SmartPlaylistGenerateMore::TrimHistory({1, 2}, 5));
+  EXPECT_TRUE(SmartPlaylistGenerateMore::Prepare(SmartPlaylistSearch{}, {7}, 3, 1).id_not_in == std::vector<int>({7}));
+}
+
+TEST(PlaylistGenerator, GenerateMorePagesByTitle) {
+  const std::string path = "/tmp/strawberry-smartgen-more-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  ASSERT_GE(directory, 0);
+  for (const char *title : {"Alpha", "Beta", "Gamma"}) {
+    Song song;
+    song.set_title(title);
+    song.set_artist("Fleet Foxes");
+    song.set_url(std::string("file:///tmp/music/") + title + ".flac");
+    song.set_directory_id(directory);
+    song.set_valid(true);
+    ASSERT_GT(backend.AddOrUpdateSong(song), 0);
+  }
+
+  SmartPlaylistSearch search;
+  search.type = SmartPlaylistSearch::SearchType::All;
+  search.limit = 1;
+  search.sort_field = SmartPlaylistField::Title;
+  auto query = std::make_shared<PlaylistQueryGenerator>("Pages", search, true);
+  query->set_collection_backend(&backend);
+  const SongList first = query->Generate();
+  ASSERT_EQ(1u, first.size());
+  EXPECT_EQ("Alpha", first.front().title());
+  const SongList second = query->GenerateMore(1);
+  ASSERT_EQ(1u, second.size());
+  EXPECT_EQ("Beta", second.front().title());
+  const SongList third = query->GenerateMore(1);
+  ASSERT_EQ(1u, third.size());
+  EXPECT_EQ("Gamma", third.front().title());
+  EXPECT_TRUE(query->GenerateMore(1).empty());
+  unlink(path.c_str());
+}
+
+TEST(PlaylistGenerator, GenerateMoreExcludesByIdNotUrl) {
+  const std::string path = "/tmp/strawberry-smartgen-ids-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  ASSERT_GE(directory, 0);
+  Song first;
+  first.set_title("Alpha Cue");
+  first.set_url("file:///tmp/music/album.flac");
+  first.set_beginning_nanosec(0);
+  first.set_directory_id(directory);
+  first.set_valid(true);
+  const int first_id = backend.AddOrUpdateSong(first);
+  ASSERT_GT(first_id, 0);
+  Song second;
+  second.set_title("Beta Cue");
+  second.set_url("file:///tmp/music/album.flac");
+  second.set_beginning_nanosec(1000000000);
+  second.set_directory_id(directory);
+  second.set_valid(true);
+  const int second_id = backend.AddOrUpdateSong(second);
+  ASSERT_GT(second_id, 0);
+  EXPECT_NE(first_id, second_id);
+
+  SmartPlaylistSearch search;
+  search.type = SmartPlaylistSearch::SearchType::All;
+  search.limit = 1;
+  search.sort_field = SmartPlaylistField::Title;
+  auto query = std::make_shared<PlaylistQueryGenerator>("Cue", search, true);
+  query->set_collection_backend(&backend);
+  const SongList page1 = query->Generate();
+  ASSERT_EQ(1u, page1.size());
+  EXPECT_EQ(first_id, page1.front().id());
+  const SongList page2 = query->GenerateMore(1);
+  ASSERT_EQ(1u, page2.size());
+  EXPECT_EQ(second_id, page2.front().id());
+  EXPECT_EQ("file:///tmp/music/album.flac", page2.front().url());
   unlink(path.c_str());
 }
 

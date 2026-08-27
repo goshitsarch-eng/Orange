@@ -1,6 +1,7 @@
 #include "playlist/playlistmanager.h"
 
 #include "collection/collectionbackend.h"
+#include "playlist/playlistcrossundopair.h"
 #include "playlist/playlistsaveschedule.h"
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
@@ -365,6 +366,20 @@ void PlaylistManager::MoveRowsBetween(int source_id, int dest_id, const std::vec
   source->RemoveRows(rows);
   Persist(dest);
   Persist(source);
+}
+
+bool PlaylistManager::UndoCrossMove(int source_id, int dest_id) {
+  if (!PlaylistCrossUndoPair::ShouldPairUndo(source_id, dest_id)) {
+    return false;
+  }
+  Playlist *source = FindById(source_id);
+  Playlist *dest = FindById(dest_id);
+  if (!PlaylistCrossUndoPair::UndoBoth(source, dest)) {
+    return false;
+  }
+  Persist(dest);
+  Persist(source);
+  return true;
 }
 
 void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row) {

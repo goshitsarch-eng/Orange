@@ -19,6 +19,8 @@ inline void Merge(Song *incoming, const Song &existing, bool merge_playcount, bo
   incoming->set_lastplayed(existing.lastplayed());
   incoming->set_art_manual(existing.art_manual());
   incoming->set_art_unset(existing.art_unset());
+  incoming->set_compilation_on(existing.compilation_on());
+  incoming->set_compilation_off(existing.compilation_off());
 }
 
 }  // namespace SongUserDataMerge

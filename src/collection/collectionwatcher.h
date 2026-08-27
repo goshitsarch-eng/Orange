@@ -63,9 +63,13 @@ class CollectionWatcher {
     int64_t mtime = -1;
     int64_t filesize = -1;
     int64_t beginning = 0;
+    int id = -1;
     bool unavailable = false;
     bool valid = false;
+    bool compilation_on = false;
+    bool compilation_off = false;
     std::string fingerprint;
+    std::string url;
     std::string cue_path;
     std::string art_manual;
     bool art_unset = false;
@@ -110,6 +114,8 @@ class CollectionWatcher {
   void CollectDirectory(ScanJob *job, const CollectionDirectory &directory);
   static Song SongFromExisting(const ExistingInfo &info);
   static const ExistingInfo *FindExisting(const ScanJob *job, const std::string &url, int64_t beginning);
+  static const ExistingInfo *FindExistingByFingerprint(const ScanJob *job, const std::string &fingerprint,
+                                                       const std::string &new_url);
   static bool SubdirNeedsAnalysis(const ScanJob *job, const std::string &subdir_path);
   static void ApplyAnalysis(Song *song, const ScanJob *job);
   static void MergeFromExisting(Song *song, const ExistingInfo *info, const ScanJob *job);

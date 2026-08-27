@@ -74,6 +74,8 @@ class SmartPlaylistSearch {
   SearchType type = SearchType::And;
   std::vector<SmartPlaylistTerm> terms;
   int limit = 0;
+  int first_item = 0;
+  std::vector<int> id_not_in;
   SmartPlaylistField sort_field = SmartPlaylistField::Title;
   bool sort_descending = false;
   bool sort_random = false;

@@ -1,8 +1,10 @@
 #include "collection/collectionbackend.h"
 
+#include "collection/collectionartpersist.h"
 #include "collection/collectioncompilation.h"
 #include "collection/collectioncompilationdetect.h"
 #include "collection/collectionexpire.h"
+#include "collection/collectionfingerprintmatch.h"
 #include "collection/collectionquery.h"
 #include "filterparser/filterparser.h"
 #include "utilities/strutils.h"
@@ -96,6 +98,8 @@ Song CollectionBackend::SongFromQuery(const SqlQuery &query) const {
   song.set_originalyear(query.ColumnInt(12));
   song.set_genre(query.ColumnText(13));
   song.set_compilation(query.ColumnInt(46) != 0);
+  song.set_compilation_on(query.ColumnInt(44) != 0);
+  song.set_compilation_off(query.ColumnInt(45) != 0);
   song.set_composer(query.ColumnText(15));
   song.set_performer(query.ColumnText(17));
   song.set_grouping(query.ColumnText(19));
@@ -197,6 +201,19 @@ Song CollectionBackend::SongByUrl(const std::string &url, int64_t beginning_nano
   return Song();
 }
 
+SongList CollectionBackend::SongsByFingerprint(const std::string &fingerprint) const {
+  SongList songs;
+  if (!CollectionFingerprintMatch::IsUsable(fingerprint) || !database_ || !database_->handle()) {
+    return songs;
+  }
+  SqlQuery query(database_, "SELECT ROWID, " + std::string(Song::kColumnSpec) + " FROM songs WHERE fingerprint = ?");
+  query.Bind(1, fingerprint);
+  while (query.Step()) {
+    songs.push_back(SongFromQuery(query));
+  }
+  return songs;
+}
+
 void CollectionBackend::UpdateCompilations() {
   if (!database_ || !database_->handle()) {
     return;
@@ -243,7 +260,15 @@ void CollectionBackend::UpdateSongUrl(int song_id, const std::string &url, int d
 }
 
 int CollectionBackend::AddOrUpdateSong(const Song &song) {
-  const Song existing = SongByUrl(song.url(), song.beginning_nanosec());
+  Song existing = SongByUrl(song.url(), song.beginning_nanosec());
+  if (!existing.is_valid() && song.id() > 0) {
+    existing = SongById(song.id());
+  }
+  if (!existing.is_valid() && CollectionFingerprintMatch::IsUsable(song.fingerprint())) {
+    if (const Song *moved = CollectionFingerprintMatch::PickMovedMatch(SongsByFingerprint(song.fingerprint()), song.url())) {
+      existing = *moved;
+    }
+  }
   if (existing.is_valid()) {
     SqlQuery query(database_,
                    "UPDATE songs SET title=?, album=?, artist=?, albumartist=?, track=?, disc=?, year=?, genre=?, "
@@ -251,7 +276,8 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
                    "bitdepth=?, filetype=?, filesize=?, mtime=?, unavailable=0, art_embedded=?, art_manual=?, fingerprint=?, "
                    "cue_path=?, skipcount=?, lastplayed=?, ebur128_integrated_loudness_lufs=?, ebur128_loudness_range_lu=?, "
                    "playcount=CASE WHEN ? > 0 THEN ? ELSE playcount END, "
-                   "rating=CASE WHEN ? >= 0 THEN ? ELSE rating END, art_automatic=? WHERE url=? AND beginning=?");
+                   "rating=CASE WHEN ? >= 0 THEN ? ELSE rating END, art_automatic=?, url=?, compilation_on=?, "
+                   "compilation_off=?, art_unset=? WHERE ROWID=?");
     query.Bind(1, song.title());
     query.Bind(2, song.album());
     query.Bind(3, song.artist());
@@ -293,9 +319,14 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
     query.Bind(31, static_cast<int>(song.playcount()));
     query.Bind(32, song.rating() >= 0 ? static_cast<int>(song.rating() * 100.0f) : -1);
     query.Bind(33, song.rating() >= 0 ? static_cast<int>(song.rating() * 100.0f) : -1);
-    query.Bind(34, song.art_automatic());
+    const bool compilation_on = song.compilation_on() || (!song.compilation_off() && existing.compilation_on());
+    const bool compilation_off = song.compilation_off() || (!song.compilation_on() && existing.compilation_off());
+    query.Bind(34, CollectionArtPersist::ArtAutomaticForUpdate(existing, song.art_automatic()));
     query.Bind(35, song.url());
-    query.Bind(36, song.beginning_nanosec());
+    query.Bind(36, compilation_on ? 1 : 0);
+    query.Bind(37, compilation_off ? 1 : 0);
+    query.Bind(38, (song.art_unset() || existing.art_unset()) ? 1 : 0);
+    query.Bind(39, existing.id());
     query.Exec();
     return existing.id();
   }

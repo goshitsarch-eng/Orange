@@ -29,6 +29,8 @@ class PlaylistQueryGenerator : public PlaylistGenerator {
   SmartPlaylistSearch search_;
   bool dynamic_ = false;
   std::vector<std::string> previous_urls_;
+  std::vector<int> previous_ids_;
+  int current_pos_ = 0;
 };
 
 #endif

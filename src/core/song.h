@@ -164,6 +164,10 @@ class Song {
   void set_originalyear(int v) { originalyear_ = v; }
   void set_genre(const std::string &v) { genre_ = v; }
   void set_compilation(bool v) { compilation_ = v; }
+  bool compilation_on() const { return compilation_on_; }
+  bool compilation_off() const { return compilation_off_; }
+  void set_compilation_on(bool v) { compilation_on_ = v; }
+  void set_compilation_off(bool v) { compilation_off_ = v; }
   void set_composer(const std::string &v) { composer_ = v; }
   void set_composersort(const std::string &v) { composersort_ = v; }
   void set_performer(const std::string &v) { performer_ = v; }
@@ -284,6 +288,8 @@ class Song {
   int originalyear_ = -1;
   std::string genre_;
   bool compilation_ = false;
+  bool compilation_on_ = false;
+  bool compilation_off_ = false;
   std::string composer_;
   std::string composersort_;
   std::string performer_;
