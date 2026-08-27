@@ -13,6 +13,7 @@
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
 #include "playlist/playlistsummary.h"
+#include "playlist/playlistrating.h"
 #include "collection/collectionsearchlabels.h"
 #include "collection/collectionsearchsync.h"
 #include "collection/collectionfilterwidget.h"
@@ -3977,10 +3978,10 @@ void MainWindow::RateRows(const std::vector<int> &rows, float rating) {
     Song song = playlist->song(row);
     song.set_rating(rating);
     playlist->ReplaceRow(row, song);
-    if (song.id() > 0) {
+    if (PlaylistRating::ShouldWriteCollectionRating(song)) {
       app_->collection()->backend()->SetRating(song.id(), rating);
     }
-    if (save_ratings && song.IsEditable()) {
+    if (PlaylistRating::ShouldSaveRatingTags(save_ratings, song.IsEditable())) {
       app_->collection()->SongsRatingChanged({song}, true);
     }
   }

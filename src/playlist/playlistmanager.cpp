@@ -3,6 +3,7 @@
 #include "collection/collectionbackend.h"
 #include "playlist/playlistcollectionsync.h"
 #include "playlist/playlistcrossundopair.h"
+#include "playlist/playlistrating.h"
 #include "playlist/playlistsaveschedule.h"
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
@@ -570,6 +571,10 @@ void PlaylistManager::RateCurrentSong(float rating) {
   if (Playlist *playlist = Playing()) {
     playlist->RateCurrentSong(rating);
     SchedulePersist(playlist, PlaylistSaveSchedule::Intent::Items);
+    const Song song = playlist->current_song();
+    if (collection_backend_ && PlaylistRating::ShouldWriteCollectionRating(song)) {
+      collection_backend_->SetRating(song.id(), rating);
+    }
   }
 }
 

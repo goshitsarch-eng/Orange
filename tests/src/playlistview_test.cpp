@@ -30,6 +30,7 @@
 #include "playlist/playlisttagcompletion.h"
 #include "widgets/favoritewidget.h"
 #include "playlist/songloaderinserter.h"
+#include "playlist/playlistrating.h"
 #include "playlist/playlistratingclick.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/ratingpainter.h"
@@ -198,6 +199,34 @@ TEST(PlaylistRatingClick, HonorsLockAndMapsStars) {
   EXPECT_FALSE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Rating, true, 100, 100, &rating));
   EXPECT_FALSE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Title, false, 100, 100, &rating));
   EXPECT_FALSE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Rating, false, 10, 0, &rating));
+}
+
+TEST(PlaylistRating, WritesCollectionLikeQt) {
+  Song empty;
+  EXPECT_FALSE(PlaylistRating::ShouldWriteCollectionRating(empty));
+  EXPECT_FALSE(PlaylistRating::ShouldSaveRatingTags(false, true));
+  EXPECT_FALSE(PlaylistRating::ShouldSaveRatingTags(true, false));
+  EXPECT_TRUE(PlaylistRating::ShouldSaveRatingTags(true, true));
+  Song file;
+  file.set_url("file:///tmp/a.flac");
+  file.set_source(Song::Source::LocalFile);
+  file.set_id(12);
+  EXPECT_FALSE(PlaylistRating::ShouldWriteCollectionRating(file));
+  Song collection;
+  collection.set_url("file:///music/a.flac");
+  collection.set_source(Song::Source::Collection);
+  collection.set_id(-1);
+  EXPECT_FALSE(PlaylistRating::ShouldWriteCollectionRating(collection));
+  collection.set_id(0);
+  EXPECT_FALSE(PlaylistRating::ShouldWriteCollectionRating(collection));
+  collection.set_id(7);
+  EXPECT_TRUE(PlaylistRating::ShouldWriteCollectionRating(collection));
+  Song other;
+  other.set_source(Song::Source::Stream);
+  other.set_id(3);
+  const auto ids = PlaylistRating::CollectionIdsToRate({empty, file, collection, other});
+  ASSERT_EQ(1u, ids.size());
+  EXPECT_EQ(7, ids[0]);
 }
 
 TEST(PlaylistListModel, ReloadAndLookup) {

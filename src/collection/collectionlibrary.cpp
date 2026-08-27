@@ -28,6 +28,14 @@ CollectionLibrary::~CollectionLibrary() {
 }
 
 void CollectionLibrary::Init() {
+  if (backend_) {
+    const std::shared_ptr<bool> alive = alive_;
+    backend_->SongsRatingChanged.Connect([this, alive](const SongList &songs) {
+      if (alive && *alive) {
+        SongsRatingChanged(songs, false);
+      }
+    });
+  }
   watcher_->StartWatching();
   if (!task_manager_) {
     return;
