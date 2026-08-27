@@ -2,7 +2,7 @@
 
 #include "constants/lyricssettings.h"
 #include "core/application.h"
-#include "core/oauthenticator.h"
+#include "lyrics/geniuslyricscredentials.h"
 #include "lyrics/geniuslyricsprovider.h"
 #include "lyrics/lyricsproviderauth.h"
 #include "lyrics/lyricsproviders.h"
@@ -10,7 +10,6 @@
 #include "lyrics/lyricsprovidersettings.h"
 #include "settings/settingspage.h"
 #include "translations/translations.h"
-#include "ui/dialogs.h"
 #include "widgets/loginstatewidget.h"
 
 #include <memory>
@@ -45,10 +44,11 @@ void ApplyAuthPanel(ProviderListState *state, const std::string &name, bool auth
     gtk_widget_set_sensitive(state->authenticate, LyricsProviderAuth::AuthenticateEnabled(panel, state->login_in_progress));
   }
   if (state->client_id) {
-    gtk_widget_set_visible(state->client_id, LyricsProviderAuth::CredentialsVisible(panel));
+    gtk_widget_set_visible(state->client_id, LyricsProviderAuth::CredentialsVisible(panel, GeniusLyricsCredentials::kHideManualFields));
   }
   if (state->client_secret) {
-    gtk_widget_set_visible(state->client_secret, LyricsProviderAuth::CredentialsVisible(panel));
+    gtk_widget_set_visible(state->client_secret,
+                          LyricsProviderAuth::CredentialsVisible(panel, GeniusLyricsCredentials::kHideManualFields));
   }
   if (state->login) {
     gtk_widget_set_visible(state->login->widget(), LyricsProviderAuth::LoginStateVisible(panel));
@@ -107,45 +107,12 @@ void StartGeniusLogin(ProviderListState *state) {
   }
   state->login_in_progress = true;
   ApplySelectedProvider(state);
-  state->settings->BeginGroup("Genius");
-  const std::string client_id = state->settings->Value("client_id");
   auto page_alive = state->page_alive;
-  if (client_id.empty()) {
-    Dialogs::Login(nullptr, "Genius", [state, genius, page_alive](const std::string &user, const std::string &token) {
-      genius->Authenticate(user, token);
-      if (*page_alive) {
-        FinishGeniusLogin(state);
-      }
-    });
-    return;
-  }
-  auto *oauth = new OAuthenticator(state->app->network());
-  Settings *settings = state->settings;
-  oauth->AuthorizeInBrowser(GeniusLyricsProvider::kAuthUrl, client_id, "me",
-                            [state, genius, page_alive, oauth, settings](const std::string &code, const std::string &error) {
-                              if (code.empty()) {
-                                (void)error;
-                                delete oauth;
-                                if (*page_alive) {
-                                  FinishGeniusLogin(state);
-                                }
-                                return;
-                              }
-                              settings->BeginGroup("Genius");
-                              oauth->ExchangeCode(std::string(GeniusLyricsProvider::kApiUrl) + "/oauth/token",
-                                                  settings->Value("client_id"), settings->Value("client_secret"), code,
-                                                  [state, genius, page_alive, oauth](const std::string &body, const std::string &) {
-                                                    const auto tokens = OAuthenticator::ParseTokenResponse(body);
-                                                    if (!tokens.access_token.empty()) {
-                                                      genius->Authenticate({}, tokens.access_token);
-                                                    }
-                                                    delete oauth;
-                                                    if (*page_alive) {
-                                                      FinishGeniusLogin(state);
-                                                    }
-                                                  });
-                            },
-                            GeniusLyricsProvider::kOAuthPort);
+  genius->Authenticate(state->app->network(), [state, page_alive]() {
+    if (*page_alive) {
+      FinishGeniusLogin(state);
+    }
+  });
 }
 
 void RefreshProviderList(ProviderListState *state) {

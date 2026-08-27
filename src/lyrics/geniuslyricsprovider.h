@@ -3,6 +3,8 @@
 
 #include "lyrics/htmllyricsprovider.h"
 
+#include <functional>
+
 class GeniusLyricsProvider : public HtmlLyricsProvider {
  public:
   static const char *kApiUrl;
@@ -13,6 +15,7 @@ class GeniusLyricsProvider : public HtmlLyricsProvider {
   GeniusLyricsProvider();
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
   void Authenticate(const std::string &username, const std::string &token) override;
+  void Authenticate(NetworkAccessManager *network, std::function<void()> done = {});
   void Logout() override;
   bool authentication_required() const override { return true; }
   bool authenticated() const override { return !access_token_.empty(); }

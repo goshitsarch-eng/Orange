@@ -1,6 +1,8 @@
 #include "lyrics/geniuslyricsprovider.h"
 
+#include "core/oauthenticator.h"
 #include "core/settings.h"
+#include "lyrics/geniuslyricscredentials.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
 
@@ -52,6 +54,42 @@ void GeniusLyricsProvider::Authenticate(const std::string &username, const std::
   username_ = username;
   access_token_ = token;
   SaveSession();
+}
+
+void GeniusLyricsProvider::Authenticate(NetworkAccessManager *network, std::function<void()> done) {
+  if (!network) {
+    if (done) {
+      done();
+    }
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup("Genius");
+  const std::string client_id = GeniusLyricsCredentials::EffectiveClientId(settings.Value("client_id"));
+  const std::string client_secret = GeniusLyricsCredentials::EffectiveClientSecret(settings.Value("client_secret"));
+  auto *oauth = new OAuthenticator(network);
+  oauth->AuthorizeInBrowser(kAuthUrl, client_id, GeniusLyricsCredentials::kScope,
+                            [this, oauth, client_id, client_secret, done](const std::string &code, const std::string &) {
+                              if (code.empty()) {
+                                delete oauth;
+                                if (done) {
+                                  done();
+                                }
+                                return;
+                              }
+                              oauth->ExchangeCode(GeniusLyricsCredentials::kTokenUrl, client_id, client_secret, code,
+                                                  [this, oauth, done](const std::string &body, const std::string &) {
+                                                    const auto tokens = OAuthenticator::ParseTokenResponse(body);
+                                                    if (!tokens.access_token.empty()) {
+                                                      Authenticate({}, tokens.access_token);
+                                                    }
+                                                    delete oauth;
+                                                    if (done) {
+                                                      done();
+                                                    }
+                                                  });
+                            },
+                            static_cast<guint16>(kOAuthPort));
 }
 
 void GeniusLyricsProvider::Logout() {

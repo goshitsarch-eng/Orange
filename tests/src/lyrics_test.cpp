@@ -1,4 +1,5 @@
 #include "context/contextlyrics.h"
+#include "lyrics/geniuslyricscredentials.h"
 #include "lyrics/geniuslyricsprovider.h"
 #include "lyrics/htmllyricsprovider.h"
 #include "lyrics/lrcparser.h"
@@ -63,6 +64,26 @@ TEST(GeniusLyricsProvider, AuthorizationAndSearchUrl) {
   const std::string json = R"json({"response":{"hits":[{"result":{"url":"https://genius.com/portishead-roads-lyrics"}}]}})json";
   EXPECT_EQ("https://genius.com/portishead-roads-lyrics", GeniusLyricsProvider::ParseSearchResultUrl(json));
   EXPECT_TRUE(GeniusLyricsProvider().authentication_required());
+}
+
+TEST(GeniusLyricsCredentials, EmbeddedDefaultsMatchQt) {
+  const std::string client_id = GeniusLyricsCredentials::DefaultClientId();
+  const std::string client_secret = GeniusLyricsCredentials::DefaultClientSecret();
+  EXPECT_FALSE(client_id.empty());
+  EXPECT_FALSE(client_secret.empty());
+  EXPECT_EQ(client_id, GeniusLyricsCredentials::EffectiveClientId({}));
+  EXPECT_EQ("custom", GeniusLyricsCredentials::EffectiveClientId("custom"));
+  EXPECT_TRUE(GeniusLyricsCredentials::UsesEmbedded({}));
+  EXPECT_FALSE(GeniusLyricsCredentials::UsesEmbedded("custom"));
+  EXPECT_STREQ("https://api.genius.com/oauth/token", GeniusLyricsCredentials::kTokenUrl);
+  EXPECT_STREQ("me", GeniusLyricsCredentials::kScope);
+  EXPECT_TRUE(GeniusLyricsCredentials::kHideManualFields);
+  const std::string auth = GeniusLyricsProvider::AuthorizationUrl(client_id, GeniusLyricsProvider::OAuthRedirectUri());
+  EXPECT_NE(std::string::npos, auth.find("client_id="));
+  EXPECT_NE(std::string::npos, auth.find("scope=me"));
+  GeniusLyricsProvider genius;
+  genius.Authenticate(nullptr);
+  EXPECT_FALSE(genius.authenticated());
 }
 
 TEST(LrcParser, TimestampsAndActiveLine) {

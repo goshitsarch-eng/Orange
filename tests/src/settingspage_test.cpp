@@ -522,6 +522,7 @@ TEST(LyricsProviderAuth, SelectionPanelMatchesQt) {
   EXPECT_FALSE(LyricsProviderAuth::LoginStateVisible(LyricsProviderAuth::Panel::Hidden));
   EXPECT_TRUE(LyricsProviderAuth::CredentialsVisible(LyricsProviderAuth::Panel::Direct));
   EXPECT_FALSE(LyricsProviderAuth::CredentialsVisible(LyricsProviderAuth::Panel::Hidden));
+  EXPECT_FALSE(LyricsProviderAuth::CredentialsVisible(LyricsProviderAuth::Panel::Direct, true));
   EXPECT_EQ("No provider selected.", LyricsProviderAuth::SelectionStatusText({}, false));
   EXPECT_EQ("LrcLib does not need authentication.", LyricsProviderAuth::SelectionStatusText("LrcLib", false));
   EXPECT_EQ("Genius needs authentication.", LyricsProviderAuth::SelectionStatusText("Genius", true));

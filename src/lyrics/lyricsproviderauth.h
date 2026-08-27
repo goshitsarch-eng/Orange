@@ -29,7 +29,7 @@ inline bool AuthenticateEnabled(Panel panel, bool login_in_progress) { return pa
 
 inline bool LoginStateVisible(Panel panel) { return panel == Panel::Direct; }
 
-inline bool CredentialsVisible(Panel panel) { return panel == Panel::Direct; }
+inline bool CredentialsVisible(Panel panel, bool hide_embedded = false) { return panel == Panel::Direct && !hide_embedded; }
 
 inline std::string SelectionStatusText(const std::string &name, bool authentication_required) {
   if (name.empty()) {
