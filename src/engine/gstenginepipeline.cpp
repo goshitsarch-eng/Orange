@@ -2,6 +2,8 @@
 
 #include "engine/enginebuffering.h"
 #include "engine/ebur128normalization.h"
+#include "engine/gstenginesourcesetup.h"
+#include "engine/gsturl.h"
 #include "core/logging.h"
 #include "engine/backendoptions.h"
 #include "utilities/audioanalysis.h"
@@ -61,6 +63,7 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
   proxy_pass_ = extras.proxy_pass;
   device_warmup_ms_ = extras.device_warmup_ms;
   spotify_access_token_ = extras.spotify_access_token;
+  source_device_ = extras.source_device;
   url_ = url;
   if (playbin3) {
     playbin_ = gst_element_factory_make("playbin3", "playbin");
@@ -170,6 +173,17 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
   g_signal_connect(playbin_, "about-to-finish", G_CALLBACK(AboutToFinishCb), this);
   g_signal_connect(playbin_, "source-setup", G_CALLBACK((+[](GstElement *, GstElement *source, gpointer data) {
                      auto *self = static_cast<GstEnginePipeline *>(data);
+                     if (GstSourceSetup::ShouldSetDevice(self->source_device_) &&
+                         g_object_class_find_property(G_OBJECT_GET_CLASS(source), "device")) {
+                       g_object_set(source, "device", self->source_device_.c_str(), nullptr);
+                     }
+                     if (g_object_class_find_property(G_OBJECT_GET_CLASS(source), "user-agent")) {
+                       const std::string user_agent = GstSourceSetup::UserAgentString();
+                       g_object_set(source, "user-agent", user_agent.c_str(), nullptr);
+                     }
+                     if (g_object_class_find_property(G_OBJECT_GET_CLASS(source), "automatic-redirect")) {
+                       g_object_set(source, "automatic-redirect", GstSourceSetup::AutomaticRedirect() ? TRUE : FALSE, nullptr);
+                     }
                      if (g_object_class_find_property(G_OBJECT_GET_CLASS(source), "ssl-strict")) {
                        g_object_set(source, "ssl-strict", self->strict_ssl_ ? TRUE : FALSE, nullptr);
                      }
@@ -279,9 +293,11 @@ void GstEnginePipeline::SetStereoBalance(float value) {
 }
 
 void GstEnginePipeline::SetNextUri(const std::string &url) {
-  if (playbin_ && !url.empty()) {
-    url_ = url;
-    g_object_set(playbin_, "uri", url.c_str(), nullptr);
+  const GstUrl gst_url = GstUrl::Fixup(url);
+  source_device_ = gst_url.source_device;
+  if (playbin_ && !gst_url.url.empty()) {
+    url_ = gst_url.url;
+    g_object_set(playbin_, "uri", gst_url.url.c_str(), nullptr);
   }
 }
 

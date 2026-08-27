@@ -31,6 +31,7 @@ struct GstPipelineExtras {
   std::string spotify_access_token;
   bool ebur128_loudness_normalization = false;
   double ebur128_gain_db = 0.0;
+  std::string source_device;
 };
 
 class GstEnginePipeline {
@@ -58,6 +59,7 @@ class GstEnginePipeline {
   void SetEqualizer(int preamp, const std::vector<int> &band_gains);
   void SetStereoBalance(float value);
   void SetNextUri(const std::string &url);
+  void set_source_device(const std::string &device) { source_device_ = device; }
   void set_spotify_access_token(const std::string &token) { spotify_access_token_ = token; }
   void SetEbur128GainDb(double gain_db);
 
@@ -103,6 +105,7 @@ class GstEnginePipeline {
   std::string proxy_pass_;
   int device_warmup_ms_ = 0;
   std::string spotify_access_token_;
+  std::string source_device_;
   bool about_to_finish_ = false;
 };
 

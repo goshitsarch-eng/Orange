@@ -47,7 +47,8 @@ class DeviceManager {
   DeviceDatabaseBackend *device_database() const { return device_db_.get(); }
 
   static SongList SongsFromDirectory(const std::string &path, const std::function<void(int, int)> &progress = {});
-  static SongList MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec);
+  static SongList MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec,
+                               const std::string &device_path = {});
   static std::string MusicPath(const ConnectedDevice &device);
   SongList TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const;
 

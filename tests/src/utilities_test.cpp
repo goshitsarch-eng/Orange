@@ -1273,6 +1273,9 @@ TEST(CddaSongLoader, SongsDelegateToDeviceManager) {
   EXPECT_EQ(Song::Source::CDDA, songs[0].source());
   EXPECT_EQ(1000, songs[0].length_nanosec());
   EXPECT_TRUE(CddaSongLoader::Songs(0, 0, {}).empty());
+  const SongList with_device = CddaSongLoader::Songs(1, 1, {1000}, "/dev/sr0");
+  ASSERT_EQ(1u, with_device.size());
+  EXPECT_EQ("cdda:///dev/sr0/1", with_device[0].url());
 }
 
 TEST(FilesystemDevice, SongsFromMountedDirectory) {
@@ -1688,6 +1691,9 @@ TEST(DeviceManager, SongsFromDirectoryAndCdda) {
   EXPECT_EQ(Song::Source::CDDA, cd[0].source());
   EXPECT_EQ(180000000000LL, cd[0].length_nanosec());
   EXPECT_TRUE(DeviceManager::MakeCddaSongs(0, 0, {}).empty());
+  const SongList cd_device = DeviceManager::MakeCddaSongs(1, 1, {1000}, "/dev/sr0");
+  ASSERT_EQ(1u, cd_device.size());
+  EXPECT_EQ("cdda:///dev/sr0/1", cd_device[0].url());
 }
 
 TEST(DeviceManager, ForgetHidesDeviceFromRescan) {

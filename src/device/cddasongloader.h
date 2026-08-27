@@ -8,7 +8,8 @@
 
 class CddaSongLoader {
  public:
-  static SongList Songs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec);
+  static SongList Songs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec,
+                       const std::string &device_path = {});
   static SongList LoadDevice(const std::string &device_path);
 };
 

@@ -2,6 +2,8 @@
 #include "core/taskmanager.h"
 #include "core/urlhandlers.h"
 #include "engine/enginediscoverer.h"
+#include "engine/gstenginesourcesetup.h"
+#include "engine/gsturl.h"
 #include "dialogs/edittagsave.h"
 #include "qobuz/qobuzmetadatarequest.h"
 #include "streaming/streamingmetadatamerge.h"
@@ -386,4 +388,34 @@ TEST(EngineDiscoverer, MapsAudioInfoAndFiletypeLikeQt) {
   EXPECT_EQ(EngineMetadata::Type::Any, EngineDiscoverer::MatchType("https://cdn.example/c", "https://cdn.example/a", "https://cdn.example/b"));
   EXPECT_STREQ("The discovery timed-out", EngineDiscoverer::ErrorMessage(EngineDiscoverer::kResultTimeout));
   EXPECT_STREQ("The URI is invalid", EngineDiscoverer::ErrorMessage(EngineDiscoverer::kResultUriInvalid));
+}
+
+TEST(GstUrl, FixupCddaSplitsDeviceLikeQt) {
+  EXPECT_EQ("cdda://3", GstUrl::CddaSongUrl(3, ""));
+  EXPECT_EQ("cdda:///dev/sr0/3", GstUrl::CddaSongUrl(3, "/dev/sr0"));
+  EXPECT_EQ("cdda:///dev/sr1/1", GstUrl::CddaSongUrl(1, "dev/sr1"));
+  const GstUrl with_device = GstUrl::Fixup("cdda:///dev/sr0/3");
+  EXPECT_EQ("cdda://3", with_device.url);
+  EXPECT_EQ("/dev/sr0", with_device.source_device);
+  const GstUrl track_only = GstUrl::Fixup("cdda://3");
+  EXPECT_EQ("cdda://3", track_only.url);
+  EXPECT_TRUE(track_only.source_device.empty());
+  const GstUrl slash_track = GstUrl::Fixup("cdda:///3");
+  EXPECT_EQ("cdda://3", slash_track.url);
+  EXPECT_TRUE(slash_track.source_device.empty());
+}
+
+TEST(GstUrl, FixupUncFileAndPassthrough) {
+  EXPECT_TRUE(GstUrl::IsUncFileUrl("file://server/share/a.mp3"));
+  EXPECT_FALSE(GstUrl::IsUncFileUrl("file:///home/user/a.mp3"));
+  EXPECT_EQ("file:////server/share/a.mp3", GstUrl::Fixup("file://server/share/a.mp3").url);
+  EXPECT_EQ("file:///home/user/a.mp3", GstUrl::Fixup("file:///home/user/a.mp3").url);
+  EXPECT_EQ("https://example.com/stream.mp3", GstUrl::Fixup("https://example.com/stream.mp3").url);
+}
+
+TEST(GstSourceSetup, UserAgentAndRedirectLikeQt) {
+  EXPECT_EQ(std::string("Strawberry ") + STRAWBERRY_VERSION_DISPLAY, GstSourceSetup::UserAgentString());
+  EXPECT_TRUE(GstSourceSetup::AutomaticRedirect());
+  EXPECT_TRUE(GstSourceSetup::ShouldSetDevice("/dev/sr0"));
+  EXPECT_FALSE(GstSourceSetup::ShouldSetDevice(""));
 }

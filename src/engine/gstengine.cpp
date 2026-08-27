@@ -9,6 +9,7 @@
 #include "engine/engineseek.h"
 #include "engine/ebur128normalization.h"
 #include "engine/enginediscoverer.h"
+#include "engine/gsturl.h"
 #include "engine/gstengineerror.h"
 #include "constants/backendsettings.h"
 #include "constants/spotifysettings.h"
@@ -167,10 +168,12 @@ GstPipelineExtras GstEngine::PipelineExtras() const {
 
 std::unique_ptr<GstEnginePipeline> GstEngine::CreatePipeline(const std::string &url, uint64_t beginning_offset_nanosec,
                                                              int64_t end_offset_nanosec, double ebur128_gain_db) {
+  const GstUrl gst_url = GstUrl::Fixup(url);
   GstPipelineExtras extras = PipelineExtras();
   extras.ebur128_gain_db = ebur128_gain_db;
+  extras.source_device = gst_url.source_device;
   auto pipeline = std::make_unique<GstEnginePipeline>(next_pipeline_id_++);
-  if (!pipeline->Create(url, output_, device_, beginning_offset_nanosec, end_offset_nanosec, replaygain_enabled_, replaygain_mode_,
+  if (!pipeline->Create(gst_url.url, output_, device_, beginning_offset_nanosec, end_offset_nanosec, replaygain_enabled_, replaygain_mode_,
                         replaygain_preamp_, stereo_balance_, playbin3_, extras)) {
     return nullptr;
   }

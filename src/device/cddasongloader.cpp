@@ -11,8 +11,9 @@
 #include <cdio/cdtext.h>
 #endif
 
-SongList CddaSongLoader::Songs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec) {
-  return DeviceManager::MakeCddaSongs(first_track, last_track, lengths_nanosec);
+SongList CddaSongLoader::Songs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec,
+                               const std::string &device_path) {
+  return DeviceManager::MakeCddaSongs(first_track, last_track, lengths_nanosec, device_path);
 }
 
 SongList CddaSongLoader::LoadDevice(const std::string &device_path) {
@@ -54,7 +55,7 @@ SongList CddaSongLoader::LoadDevice(const std::string &device_path) {
     }
   }
 
-  SongList songs = Songs(first, last, lengths);
+  SongList songs = Songs(first, last, lengths, device_path);
   for (Song &song : songs) {
     if (!disc_id.empty()) {
       song.set_musicbrainz_disc_id(disc_id);

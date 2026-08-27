@@ -11,6 +11,7 @@
 #include "device/cddadevice.h"
 #include "device/cddalister.h"
 #include "device/cddasongloader.h"
+#include "engine/gsturl.h"
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "device/udisks2lister.h"
@@ -198,14 +199,15 @@ SongList DeviceManager::SongsFromDirectory(const std::string &path, const std::f
   return songs;
 }
 
-SongList DeviceManager::MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec) {
+SongList DeviceManager::MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec,
+                                     const std::string &device_path) {
   SongList songs;
   if (first_track <= 0 || last_track < first_track) {
     return songs;
   }
   for (int track = first_track; track <= last_track; ++track) {
     Song song(Song::Source::CDDA);
-    song.set_url("cdda://" + std::to_string(track));
+    song.set_url(GstUrl::CddaSongUrl(track, device_path));
     song.set_title("Track " + std::to_string(track));
     song.set_track(track);
     song.set_filetype(Song::FileType::CDDA);
