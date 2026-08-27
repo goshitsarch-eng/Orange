@@ -2,6 +2,7 @@
 
 #include "core/settings.h"
 #include "osd/osdart.h"
+#include "osd/osdartrefresh.h"
 #include "osd/osddbus.h"
 #include "osd/osdpretty.h"
 #include "systemtrayicon/systemtrayicon.h"
@@ -155,6 +156,22 @@ void OSDBase::SongChanged(const Song &song, const std::vector<unsigned char> &ar
     return;
   }
   ShowMessage(PlayingSummary(song), PlayingBody(song), "notification-audio-play", art);
+}
+
+void OSDBase::AlbumCoverLoaded(const Song &song, const std::vector<unsigned char> &art) {
+  if (!playing_ || !OsdArtRefresh::MatchesPlaying(last_song_, song)) {
+    return;
+  }
+  const bool previous_empty = last_art_.empty();
+  if (!OsdArtRefresh::ShouldRefresh(show_art_, previous_empty, !art.empty())) {
+    last_art_ = art;
+    return;
+  }
+  last_art_ = art;
+  if (!enabled_ || type_ == OSDSettings::Type::Disabled) {
+    return;
+  }
+  ShowMessage(PlayingSummary(last_song_), PlayingBody(last_song_), "notification-audio-play", art);
 }
 
 void OSDBase::Paused() {

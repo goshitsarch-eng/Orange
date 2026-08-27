@@ -110,6 +110,9 @@ void Application::Init() {
     discord_->UpdatePresence(song, player_->GetState() == GstEngine::State::Playing);
     tray_->SetNowPlaying(song);
   });
+  current_albumcover_loader_->AlbumCoverReady.Connect([this](const Song &song, const std::vector<unsigned char> &art) {
+    osd_->AlbumCoverLoaded(song, art);
+  });
   player_->TrackSkipped.Connect([this](const Song &song, int64_t pos_ns, int64_t len_ns) {
     if (song.id() > 0 && SkipCountEligibility::ShouldIncrement(pos_ns, len_ns)) {
       collection_->backend()->IncrementSkipCount(song.id());

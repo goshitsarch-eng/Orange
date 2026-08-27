@@ -1,6 +1,7 @@
 #include "playlist/playlistmanager.h"
 
 #include "collection/collectionbackend.h"
+#include "playlist/playlistsaveschedule.h"
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "core/songloader.h"
@@ -20,6 +21,8 @@ PlaylistManager::PlaylistManager(TaskManager *task_manager, TagReader *tagreader
       url_handlers_(url_handlers),
       backend_(backend),
       collection_backend_(collection_backend) {}
+
+PlaylistManager::~PlaylistManager() { FlushPendingSaves(); }
 
 void PlaylistManager::Init() { LoadAll(); }
 
@@ -106,7 +109,7 @@ Playlist *PlaylistManager::New(const std::string &name, const SongList &songs) {
   if (!songs.empty()) {
     playlist->AppendSongs(songs);
   }
-  Persist(playlist.get());
+  PersistNow(playlist.get());
   if (playlist->id() < 0) {
     playlist->set_id(next_id_++);
   } else if (playlist->id() >= next_id_) {
@@ -185,6 +188,7 @@ void PlaylistManager::Delete(int id) {
 }
 
 bool PlaylistManager::Close(int id) {
+  FlushPendingSaves();
   Playlist *found = FindById(id);
   if (!found) {
     return false;
@@ -403,9 +407,15 @@ void PlaylistManager::TurnOffDynamic() {
   }
 }
 
-void PlaylistManager::SaveActive() { Persist(Playing()); }
+void PlaylistManager::SaveActive() {
+  FlushPendingSaves();
+  PersistNow(Playing());
+}
 
-void PlaylistManager::SaveCurrent() { Persist(Visible()); }
+void PlaylistManager::SaveCurrent() {
+  FlushPendingSaves();
+  PersistNow(Visible());
+}
 
 void PlaylistManager::ClearCurrent() {
   if (Playlist *playlist = Visible()) {
@@ -447,7 +457,7 @@ void PlaylistManager::SongChangeRequestProcessed(const std::string &url, bool va
 void PlaylistManager::RateCurrentSong(float rating) {
   if (Playlist *playlist = Playing()) {
     playlist->RateCurrentSong(rating);
-    Persist(playlist);
+    SchedulePersist(playlist, PlaylistSaveSchedule::Intent::Items);
   }
 }
 
@@ -534,15 +544,67 @@ void PlaylistManager::CycleShuffleMode() {
   SequenceChanged.Emit();
 }
 
-void PlaylistManager::Persist(Playlist *playlist) {
+void PlaylistManager::Persist(Playlist *playlist) { SchedulePersist(playlist, PlaylistSaveSchedule::Intent::Full); }
+
+void PlaylistManager::PersistNow(Playlist *playlist) {
   if (playlist && backend_) {
     backend_->SavePlaylist(playlist);
   }
 }
 
 void PlaylistManager::PersistLastPlayed(Playlist *playlist) {
-  if (playlist && backend_ && playlist->id() >= 0) {
-    backend_->SaveLastPlayed(playlist->id(), playlist->current_row());
+  SchedulePersist(playlist, PlaylistSaveSchedule::Intent::LastPlayed);
+}
+
+void PlaylistManager::SchedulePersist(Playlist *playlist, PlaylistSaveSchedule::Intent intent) {
+  if (!playlist || !backend_) {
+    return;
+  }
+  if (!PlaylistSaveSchedule::ShouldSchedule(playlist->loading(), playlist->id() >= 0)) {
+    PersistNow(playlist);
+    return;
+  }
+  pending_intent_ = PlaylistSaveSchedule::Merge(pending_intent_, intent);
+  pending_ids_.insert(playlist->id());
+  ArmSaveTimer();
+}
+
+void PlaylistManager::ArmSaveTimer() {
+  if (save_timeout_id_ != 0) {
+    return;
+  }
+  save_timeout_id_ = g_timeout_add_full(
+      G_PRIORITY_DEFAULT, PlaylistSaveSchedule::kDelayMs,
+      +[](gpointer data) -> gboolean {
+        auto *self = static_cast<PlaylistManager *>(data);
+        self->save_timeout_id_ = 0;
+        self->FlushPendingSaves();
+        return G_SOURCE_REMOVE;
+      },
+      this, nullptr);
+}
+
+void PlaylistManager::FlushPendingSaves() {
+  if (save_timeout_id_ != 0) {
+    g_source_remove(save_timeout_id_);
+    save_timeout_id_ = 0;
+  }
+  const PlaylistSaveSchedule::Intent intent = pending_intent_;
+  const std::set<int> ids = pending_ids_;
+  pending_intent_ = PlaylistSaveSchedule::Intent::None;
+  pending_ids_.clear();
+  for (int id : ids) {
+    Playlist *playlist = FindById(id);
+    if (!playlist) {
+      continue;
+    }
+    if (intent == PlaylistSaveSchedule::Intent::LastPlayed) {
+      backend_->SaveLastPlayed(playlist->id(), playlist->current_row());
+    } else if (intent == PlaylistSaveSchedule::Intent::Items) {
+      backend_->SavePlaylistItems(playlist->id(), playlist->uuids(), playlist->songs());
+    } else {
+      PersistNow(playlist);
+    }
   }
 }
 

@@ -5,6 +5,7 @@
 #include "covermanager/coverfromurldialog.h"
 #include "covermanager/coverfromurllabels.h"
 #include "osd/osdart.h"
+#include "osd/osdartrefresh.h"
 #include "osd/osdprettywayland.h"
 #include "osd/osdbase.h"
 #include "osd/osdpretty.h"
@@ -68,6 +69,21 @@ class TestOSD : public OSDBase {
 };
 
 }  // namespace
+
+TEST(OsdArtRefresh, DefersAndMatchesPlayingSong) {
+  EXPECT_TRUE(OsdArtRefresh::ShouldDeferUntilCover(true, true));
+  EXPECT_FALSE(OsdArtRefresh::ShouldDeferUntilCover(true, false));
+  EXPECT_FALSE(OsdArtRefresh::ShouldDeferUntilCover(false, true));
+  EXPECT_TRUE(OsdArtRefresh::ShouldRefresh(true, true, true));
+  EXPECT_FALSE(OsdArtRefresh::ShouldRefresh(true, false, true));
+  Song playing;
+  playing.set_url("file:///roads.flac");
+  playing.set_beginning_nanosec(0);
+  Song loaded = playing;
+  EXPECT_TRUE(OsdArtRefresh::MatchesPlaying(playing, loaded));
+  loaded.set_url("file:///other.flac");
+  EXPECT_FALSE(OsdArtRefresh::MatchesPlaying(playing, loaded));
+}
 
 TEST(OSDArt, AttachesOnlyWhenEnabledAndPresent) {
   EXPECT_FALSE(OSDArt::ShouldAttachArt(false, {1, 2, 3}));

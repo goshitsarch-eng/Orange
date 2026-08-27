@@ -101,6 +101,10 @@ class Playlist {
   void BeginLoad() { loading_ = true; }
   void EndLoad() { loading_ = false; }
   bool loading() const { return loading_; }
+  std::string UuidAt(int row) const;
+  const std::vector<std::string> &uuids() const { return uuids_; }
+  void SetRowUuids(const std::vector<std::string> &uuids);
+  void EnsureUuids();
 
   int64_t total_length_nanosec() const;
 
@@ -112,6 +116,7 @@ class Playlist {
  private:
   struct Snapshot {
     SongList songs;
+    std::vector<std::string> uuids;
     int current_row = -1;
   };
 
@@ -152,6 +157,7 @@ class Playlist {
   bool scrobbled_ = false;
   bool loading_ = false;
   Queue queue_;
+  std::vector<std::string> uuids_;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H

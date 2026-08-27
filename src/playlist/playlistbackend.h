@@ -34,6 +34,7 @@ class PlaylistBackend {
   void SetFavorite(int id, bool favorite);
   void SetPlaylistUiPath(int id, const std::string &path);
   void SaveLastPlayed(int id, int row);
+  void SavePlaylistItems(int id, const std::vector<std::string> &uuids, const SongList &songs);
 
  private:
   Database *database_;

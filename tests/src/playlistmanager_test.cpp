@@ -1,6 +1,11 @@
 #include "playlist/playlistmanager.h"
+#include "playlist/playlistbackend.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistdynamicpersist.h"
+#include "playlist/playlistitemuuid.h"
 #include "playlist/playlistqueuescope.h"
+#include "core/database.h"
+#include "tagreader/tagreader.h"
 #include "queue/queue.h"
 #include "queue/queuedrop.h"
 #include "queue/queuerows.h"
@@ -211,6 +216,51 @@ TEST(Queue, TracksPlaylistRowsAndToggle) {
 TEST(PlaylistDelegates, QueueColumnTitle) {
   EXPECT_EQ("Queue", PlaylistDelegates::ColumnTitle(PlaylistColumn::Queue));
   EXPECT_TRUE(PlaylistDelegates::ColumnText(MakeSong("A", "file:///a"), PlaylistColumn::Queue).empty());
+}
+
+TEST(PlaylistBackend, PersistsUuidColumnsAndDynamicSearch) {
+  const std::string path = "/tmp/strawberry-playlist-persist.db";
+  FileUtils::Remove(path);
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  TagReader tagreader;
+  PlaylistBackend backend(&db, &tagreader, nullptr);
+  Playlist playlist;
+  playlist.set_name("Dynamic Roads");
+  Song song;
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_album("Dummy");
+  song.set_year(1994);
+  song.set_url("file:///roads.flac");
+  song.set_lyrics("hidden");
+  song.set_valid(true);
+  playlist.AppendSongs({song});
+  SmartPlaylistSearch search;
+  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "Portishead"});
+  playlist.SetDynamic(true, search);
+  const int id = backend.SavePlaylist(&playlist);
+  ASSERT_GT(id, 0);
+  EXPECT_TRUE(PlaylistItemUuid::Valid(playlist.UuidAt(0)));
+  auto loaded = backend.LoadPlaylist(id);
+  ASSERT_NE(nullptr, loaded);
+  ASSERT_EQ(1, loaded->row_count());
+  EXPECT_EQ("Roads", loaded->song(0).title());
+  EXPECT_EQ("Portishead", loaded->song(0).artist());
+  EXPECT_EQ(1994, loaded->song(0).year());
+  EXPECT_EQ("hidden", loaded->song(0).lyrics());
+  EXPECT_TRUE(loaded->is_dynamic());
+  ASSERT_FALSE(loaded->dynamic_search().terms.empty());
+  EXPECT_EQ("Portishead", loaded->dynamic_search().terms.front().value);
+  EXPECT_EQ(playlist.UuidAt(0), loaded->UuidAt(0));
+  Song edited = loaded->song(0);
+  edited.set_title("Glory Box");
+  loaded->ReplaceRow(0, edited);
+  backend.SavePlaylistItems(id, loaded->uuids(), loaded->songs());
+  auto updated = backend.LoadPlaylist(id);
+  EXPECT_EQ("Glory Box", updated->song(0).title());
+  EXPECT_EQ(loaded->UuidAt(0), updated->UuidAt(0));
+  FileUtils::Remove(path);
 }
 
 TEST(PlaylistManager, EachPlaylistKeepsItsOwnQueue) {

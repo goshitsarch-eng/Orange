@@ -2,6 +2,7 @@
 
 #include "core/playermetadatasync.h"
 #include "playlist/playlistautosort.h"
+#include "playlist/playlistitemuuid.h"
 #include "playlist/dynamicplaylistmaintenance.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlistbehaviour.h"
@@ -81,8 +82,37 @@ Song Playlist::song(int row) const {
 
 Song Playlist::PeekNextSong() const { return song(NextIndex()); }
 
+void Playlist::EnsureUuids() {
+  if (uuids_.size() < songs_.size()) {
+    uuids_.reserve(songs_.size());
+    while (uuids_.size() < songs_.size()) {
+      uuids_.push_back(PlaylistItemUuid::New());
+    }
+  } else if (uuids_.size() > songs_.size()) {
+    uuids_.resize(songs_.size());
+  }
+  for (std::string &uuid : uuids_) {
+    if (uuid.empty()) {
+      uuid = PlaylistItemUuid::New();
+    }
+  }
+}
+
+std::string Playlist::UuidAt(int row) const {
+  if (row < 0 || row >= static_cast<int>(uuids_.size())) {
+    return {};
+  }
+  return uuids_[static_cast<size_t>(row)];
+}
+
+void Playlist::SetRowUuids(const std::vector<std::string> &uuids) {
+  uuids_ = uuids;
+  EnsureUuids();
+}
+
 void Playlist::PushUndo() {
-  undo_.push_back({songs_, current_row_});
+  EnsureUuids();
+  undo_.push_back({songs_, uuids_, current_row_});
   redo_.clear();
   if (static_cast<int>(undo_.size()) > PlaylistUndoLimits::kUndoStackLimit) {
     undo_.erase(undo_.begin());
@@ -102,8 +132,10 @@ void Playlist::Undo() {
   if (undo_.empty()) {
     return;
   }
-  redo_.push_back({songs_, current_row_});
+  EnsureUuids();
+  redo_.push_back({songs_, uuids_, current_row_});
   songs_ = undo_.back().songs;
+  uuids_ = undo_.back().uuids;
   current_row_ = undo_.back().current_row;
   undo_.pop_back();
   RebuildVirtualItems();
@@ -114,8 +146,10 @@ void Playlist::Redo() {
   if (redo_.empty()) {
     return;
   }
-  undo_.push_back({songs_, current_row_});
+  EnsureUuids();
+  undo_.push_back({songs_, uuids_, current_row_});
   songs_ = redo_.back().songs;
+  uuids_ = redo_.back().uuids;
   current_row_ = redo_.back().current_row;
   redo_.pop_back();
   RebuildVirtualItems();
@@ -125,6 +159,8 @@ void Playlist::Redo() {
 void Playlist::ReplaceSongs(const SongList &songs) {
   MaybeRecordUndo(static_cast<int>(songs.size()));
   songs_ = songs;
+  uuids_.clear();
+  EnsureUuids();
   if (songs_.empty()) {
     current_row_ = -1;
   } else if (current_row_ < 0 || current_row_ >= static_cast<int>(songs_.size())) {
@@ -139,10 +175,13 @@ void Playlist::InsertSongs(int row, const SongList &songs) {
     return;
   }
   MaybeRecordUndo(static_cast<int>(songs.size()));
+  EnsureUuids();
   if (row < 0 || row > static_cast<int>(songs_.size())) {
     row = static_cast<int>(songs_.size());
   }
   songs_.insert(songs_.begin() + row, songs.begin(), songs.end());
+  uuids_.insert(uuids_.begin() + row, static_cast<size_t>(songs.size()), {});
+  EnsureUuids();
   played_indexes_ = PlaylistPlayed::AfterInsert(played_indexes_, row, static_cast<int>(songs.size()));
   if (current_row_ < 0 && !songs_.empty()) {
     current_row_ = 0;
@@ -166,9 +205,13 @@ void Playlist::RemoveRowsInternal(const std::vector<int> &rows, bool record_undo
   played_indexes_ = PlaylistPlayed::AfterRemove(played_indexes_, rows);
   std::vector<int> sorted = rows;
   std::sort(sorted.begin(), sorted.end(), std::greater<int>());
+  EnsureUuids();
   for (int row : sorted) {
     if (row >= 0 && row < static_cast<int>(songs_.size())) {
       songs_.erase(songs_.begin() + row);
+      if (row < static_cast<int>(uuids_.size())) {
+        uuids_.erase(uuids_.begin() + row);
+      }
       if (current_row_ >= row) {
         current_row_ = std::max(-1, current_row_ - 1);
       }
@@ -184,6 +227,7 @@ void Playlist::Clear() {
   }
   MaybeRecordUndo(row_count());
   songs_.clear();
+  uuids_.clear();
   current_row_ = -1;
   played_indexes_.clear();
   RebuildVirtualItems();
@@ -199,12 +243,15 @@ void Playlist::MoveRows(const std::vector<int> &rows, int to) {
   std::vector<int> sorted = rows;
   std::sort(sorted.begin(), sorted.end());
   sorted.erase(std::unique(sorted.begin(), sorted.end()), sorted.end());
+  EnsureUuids();
   SongList moving;
+  std::vector<std::string> moving_uuids;
   for (int row : sorted) {
     if (row < 0 || row >= row_count()) {
       return;
     }
     moving.push_back(songs_[static_cast<size_t>(row)]);
+    moving_uuids.push_back(uuids_[static_cast<size_t>(row)]);
   }
   const Song playing = current_song();
   played_indexes_ = PlaylistPlayed::AfterMove(played_indexes_, row_count(), sorted, to);
@@ -212,12 +259,14 @@ void Playlist::MoveRows(const std::vector<int> &rows, int to) {
   PushUndo();
   for (auto it = sorted.rbegin(); it != sorted.rend(); ++it) {
     songs_.erase(songs_.begin() + *it);
+    uuids_.erase(uuids_.begin() + *it);
     if (*it < dest) {
       --dest;
     }
   }
   dest = std::clamp(dest, 0, row_count());
   songs_.insert(songs_.begin() + dest, moving.begin(), moving.end());
+  uuids_.insert(uuids_.begin() + dest, moving_uuids.begin(), moving_uuids.end());
   current_row_ = -1;
   if (playing.is_valid() || !playing.url().empty()) {
     for (int i = 0; i < row_count(); ++i) {
@@ -236,25 +285,43 @@ void Playlist::Shuffle() {
     return;
   }
   PushUndo();
+  EnsureUuids();
+  std::vector<size_t> order(songs_.size());
+  std::iota(order.begin(), order.end(), 0);
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::shuffle(songs_.begin(), songs_.end(), gen);
+  std::shuffle(order.begin(), order.end(), gen);
+  SongList shuffled_songs;
+  std::vector<std::string> shuffled_uuids;
+  shuffled_songs.reserve(songs_.size());
+  shuffled_uuids.reserve(uuids_.size());
+  for (size_t i : order) {
+    shuffled_songs.push_back(songs_[i]);
+    shuffled_uuids.push_back(uuids_[i]);
+  }
+  songs_ = std::move(shuffled_songs);
+  uuids_ = std::move(shuffled_uuids);
   RebuildVirtualItems();
   Changed.Emit();
 }
 
 void Playlist::RemoveDuplicates() {
   PushUndo();
+  EnsureUuids();
   SongList unique;
-  for (const Song &song : songs_) {
+  std::vector<std::string> unique_uuids;
+  for (size_t i = 0; i < songs_.size(); ++i) {
+    const Song &song = songs_[i];
     const bool exists = std::any_of(unique.begin(), unique.end(), [&](const Song &other) {
       return !song.url().empty() && other.url() == song.url();
     });
     if (!exists) {
       unique.push_back(song);
+      unique_uuids.push_back(uuids_[i]);
     }
   }
   songs_ = std::move(unique);
+  uuids_ = std::move(unique_uuids);
   if (current_row_ >= static_cast<int>(songs_.size())) {
     current_row_ = songs_.empty() ? -1 : static_cast<int>(songs_.size()) - 1;
   }
@@ -313,14 +380,27 @@ void Playlist::SortInPlace() {
   if (sort_column_ == PlaylistColumn::Count || songs_.size() < 2) {
     return;
   }
+  EnsureUuids();
   const Song playing = current_song();
   const bool numeric = PlaylistBehaviour::ColumnIsNumeric(sort_column_);
   const PlaylistColumn column = sort_column_;
   const bool descending = sort_descending_;
-  std::stable_sort(songs_.begin(), songs_.end(), [column, numeric, descending](const Song &a, const Song &b) {
-    return PlaylistBehaviour::LessThanText(PlaylistDelegates::ColumnText(a, column), PlaylistDelegates::ColumnText(b, column), numeric,
-                                           descending);
+  std::vector<size_t> order(songs_.size());
+  std::iota(order.begin(), order.end(), 0);
+  std::stable_sort(order.begin(), order.end(), [this, column, numeric, descending](size_t a, size_t b) {
+    return PlaylistBehaviour::LessThanText(PlaylistDelegates::ColumnText(songs_[a], column), PlaylistDelegates::ColumnText(songs_[b], column),
+                                           numeric, descending);
   });
+  SongList sorted_songs;
+  std::vector<std::string> sorted_uuids;
+  sorted_songs.reserve(songs_.size());
+  sorted_uuids.reserve(uuids_.size());
+  for (size_t i : order) {
+    sorted_songs.push_back(songs_[i]);
+    sorted_uuids.push_back(uuids_[i]);
+  }
+  songs_ = std::move(sorted_songs);
+  uuids_ = std::move(sorted_uuids);
   current_row_ = -1;
   if (playing.is_valid() || !playing.url().empty()) {
     for (int i = 0; i < row_count(); ++i) {
@@ -334,20 +414,27 @@ void Playlist::SortInPlace() {
 
 void Playlist::RemoveUnavailable() {
   PushUndo();
-  songs_.erase(std::remove_if(songs_.begin(), songs_.end(),
-                              [](const Song &song) {
-                                const std::string &url = song.url();
-                                if (url.empty()) {
-                                  return false;
-                                }
-                                const auto scheme = url.find("://");
-                                if (scheme != std::string::npos && url.rfind("file://", 0) != 0) {
-                                  return false;
-                                }
-                                const std::string path = FileUtils::PathFromUri(url);
-                                return !path.empty() && !FileUtils::Exists(path);
-                              }),
-               songs_.end());
+  EnsureUuids();
+  SongList keep;
+  std::vector<std::string> keep_uuids;
+  for (size_t i = 0; i < songs_.size(); ++i) {
+    const Song &song = songs_[i];
+    const std::string &url = song.url();
+    bool drop = false;
+    if (!url.empty()) {
+      const auto scheme = url.find("://");
+      if (scheme == std::string::npos || url.rfind("file://", 0) == 0) {
+        const std::string path = FileUtils::PathFromUri(url);
+        drop = !path.empty() && !FileUtils::Exists(path);
+      }
+    }
+    if (!drop) {
+      keep.push_back(song);
+      keep_uuids.push_back(uuids_[i]);
+    }
+  }
+  songs_ = std::move(keep);
+  uuids_ = std::move(keep_uuids);
   if (current_row_ >= static_cast<int>(songs_.size())) {
     current_row_ = songs_.empty() ? -1 : static_cast<int>(songs_.size()) - 1;
   }

@@ -6,8 +6,12 @@
 #include "playlist/playlist.h"
 #include "playlist/playlistbackend.h"
 #include "playlist/playlistmanagerinterface.h"
+#include "playlist/playlistsaveschedule.h"
+
+#include <glib.h>
 
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -20,6 +24,7 @@ class PlaylistManager : public PlaylistManagerInterface {
  public:
   PlaylistManager(TaskManager *task_manager, TagReader *tagreader, UrlHandlers *url_handlers, PlaylistBackend *backend,
                   CollectionBackend *collection_backend);
+  ~PlaylistManager();
 
   void Init();
 
@@ -65,6 +70,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   void RemoveCurrentSong() override;
   void SaveActive();
   void SaveCurrent();
+  void FlushPendingSaves();
   void LoadAll();
   void RefillDynamic();
   void ExpandDynamic();
@@ -100,7 +106,10 @@ class PlaylistManager : public PlaylistManagerInterface {
   Playlist *Visible() const { return current_ ? current_ : active_; }
   Playlist *Playing() const { return active_ ? active_ : current_; }
   void Persist(Playlist *playlist);
+  void PersistNow(Playlist *playlist);
   void PersistLastPlayed(Playlist *playlist);
+  void SchedulePersist(Playlist *playlist, PlaylistSaveSchedule::Intent intent);
+  void ArmSaveTimer();
 
   TaskManager *task_manager_;
   TagReader *tagreader_;
@@ -111,6 +120,9 @@ class PlaylistManager : public PlaylistManagerInterface {
   Playlist *current_ = nullptr;
   Playlist *active_ = nullptr;
   int next_id_ = 1;
+  std::set<int> pending_ids_;
+  PlaylistSaveSchedule::Intent pending_intent_ = PlaylistSaveSchedule::Intent::None;
+  guint save_timeout_id_ = 0;
 };
 
 #endif  // STRAWBERRY_PLAYLISTMANAGER_H

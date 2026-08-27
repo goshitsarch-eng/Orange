@@ -5,7 +5,11 @@
 #include "core/playerstopafter.h"
 #include "core/songsegment.h"
 #include "playlist/playlistautosort.h"
+#include "playlist/playlistdynamicpersist.h"
+#include "playlist/playlistitemuuid.h"
+#include "playlist/playlistitembind.h"
 #include "playlist/playlistqueuescope.h"
+#include "playlist/playlistsaveschedule.h"
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistfilterdelay.h"
@@ -818,4 +822,53 @@ TEST(Playlist, TrimsDynamicHistoryOnForwardAdvance) {
   EXPECT_EQ(15, playlist.row_count());
   EXPECT_EQ("D1", playlist.songs().front().title());
   EXPECT_FALSE(playlist.CanUndo());
+}
+
+TEST(Playlist, AssignsStableUuidsAcrossReorder) {
+  Playlist playlist;
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  playlist.AppendSongs({a, b});
+  playlist.EnsureUuids();
+  const std::string first = playlist.UuidAt(0);
+  const std::string second = playlist.UuidAt(1);
+  EXPECT_TRUE(PlaylistItemUuid::Valid(first));
+  EXPECT_TRUE(PlaylistItemUuid::Valid(second));
+  EXPECT_NE(first, second);
+  playlist.Move(0, 2);
+  EXPECT_EQ(second, playlist.UuidAt(0));
+  EXPECT_EQ(first, playlist.UuidAt(1));
+}
+
+TEST(PlaylistSaveSchedule, CoalescesIntentsAndSkipsLoad) {
+  EXPECT_EQ(900u, PlaylistSaveSchedule::kDelayMs);
+  EXPECT_TRUE(PlaylistSaveSchedule::ShouldSchedule(false, true));
+  EXPECT_FALSE(PlaylistSaveSchedule::ShouldSchedule(true, true));
+  EXPECT_FALSE(PlaylistSaveSchedule::ShouldSchedule(false, false));
+  EXPECT_EQ(PlaylistSaveSchedule::Intent::Full,
+            PlaylistSaveSchedule::Merge(PlaylistSaveSchedule::Intent::LastPlayed, PlaylistSaveSchedule::Intent::Full));
+  EXPECT_EQ(PlaylistSaveSchedule::Intent::Items,
+            PlaylistSaveSchedule::Merge(PlaylistSaveSchedule::Intent::LastPlayed, PlaylistSaveSchedule::Intent::Items));
+  EXPECT_EQ(PlaylistSaveSchedule::Intent::LastPlayed,
+            PlaylistSaveSchedule::Merge(PlaylistSaveSchedule::Intent::None, PlaylistSaveSchedule::Intent::LastPlayed));
+}
+
+TEST(DynamicPlaylistPersist, EncodesQueryTypeAndRoundTripsSearch) {
+  EXPECT_EQ(1, DynamicPlaylistPersist::TypeFor(true));
+  EXPECT_EQ(0, DynamicPlaylistPersist::TypeFor(false));
+  EXPECT_TRUE(DynamicPlaylistPersist::IsDynamic(1));
+  EXPECT_FALSE(DynamicPlaylistPersist::IsDynamic(0));
+  SmartPlaylistSearch search;
+  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "Portishead"});
+  const std::string blob = DynamicPlaylistPersist::Encode(search);
+  const SmartPlaylistSearch loaded = DynamicPlaylistPersist::Decode(blob);
+  ASSERT_FALSE(loaded.terms.empty());
+  EXPECT_EQ("Portishead", loaded.terms.front().value);
+  EXPECT_STREQ("songs", DynamicPlaylistPersist::DefaultBackend());
 }

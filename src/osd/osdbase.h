@@ -29,6 +29,7 @@ class OSDBase {
   static bool SupportsOSDPretty();
 
   void SongChanged(const Song &song, const std::vector<unsigned char> &art = {});
+  void AlbumCoverLoaded(const Song &song, const std::vector<unsigned char> &art);
   void Paused();
   void Resumed();
   void Stopped();
