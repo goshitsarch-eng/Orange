@@ -91,6 +91,10 @@ void Dialogs::CopyToDevice(GtkWindow *parent, Application *app, const SongList &
   CopyToDeviceDialog::Show(parent, app, songs, playlist);
 }
 
+void Dialogs::CopyToDevice(GtkWindow *parent, Application *app, const std::vector<std::string> &filenames) {
+  CopyToDeviceDialog::Show(parent, app, {}, {}, filenames);
+}
+
 void Dialogs::SaveAllPlaylists(GtkWindow *parent, Application *app) { SavePlaylistsDialog::Show(parent, app); }
 
 void Dialogs::Console(GtkWindow *parent, Application *app) { Console::Show(parent, app ? app->database() : nullptr); }

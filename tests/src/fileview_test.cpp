@@ -335,6 +335,24 @@ TEST(DeviceSongMenu, PlaylistActionsMatchQt) {
   EXPECT_EQ(CollectionBehaviour::Destination::New, open_new.destination);
 }
 
+TEST(DeviceCopy, FileViewRequestPassesFilenamesToOrganize) {
+  const std::vector<std::string> files = {"/music/album", "/tmp/a.mp3"};
+  const OrganizeDialog::Request file_view = DeviceCopy::FileViewRequest(files);
+  EXPECT_EQ(files, file_view.filenames);
+  EXPECT_TRUE(file_view.songs.empty());
+  EXPECT_FALSE(file_view.move);
+  EXPECT_TRUE(DeviceCopy::CanCopyFilenames(files));
+  EXPECT_FALSE(DeviceCopy::CanCopyFilenames({}));
+  EXPECT_TRUE(DeviceCopy::HasOrganizeSource({}, files));
+  Song song(Song::Source::LocalFile);
+  song.set_valid(true);
+  EXPECT_TRUE(DeviceCopy::HasOrganizeSource({song}, {}));
+  EXPECT_FALSE(DeviceCopy::HasOrganizeSource({}, {}));
+  EXPECT_STREQ("Copy songs", DeviceCopy::CopyButtonLabel(false, true));
+  EXPECT_STREQ("Copy songs", DeviceCopy::CopyButtonLabel(true, false));
+  EXPECT_STREQ("Copy playlist", DeviceCopy::CopyButtonLabel(false, false));
+}
+
 TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_FALSE(DeviceCopy::CanCopyToCollection({}));
   Song song(Song::Source::Device);

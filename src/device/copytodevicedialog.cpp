@@ -12,7 +12,8 @@
 
 #include <adwaita.h>
 
-void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongList &songs, const std::string &playlist) {
+void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongList &songs, const std::string &playlist,
+                              const std::vector<std::string> &filenames) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr("Copy to device"));
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -31,32 +32,38 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongLis
     GtkWidget *row = adw_action_row_new();
     adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), device.friendly_name.c_str());
     adw_action_row_set_subtitle(ADW_ACTION_ROW(row), device.mount_path.empty() ? device.backend.c_str() : device.mount_path.c_str());
-    GtkWidget *copy = gtk_button_new_with_label(songs.empty() ? Translations::CStr("Copy playlist") : Translations::CStr("Copy songs"));
+    GtkWidget *copy = gtk_button_new_with_label(Translations::CStr(DeviceCopy::CopyButtonLabel(!songs.empty(), !filenames.empty())));
     auto *owned = new SongList(songs);
+    auto *owned_files = new std::vector<std::string>(filenames);
     auto *owned_device = new ConnectedDevice(device);
     g_object_set_data_full(G_OBJECT(copy), "device", owned_device, [](gpointer p) { delete static_cast<ConnectedDevice *>(p); });
     g_object_set_data_full(G_OBJECT(copy), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });
+    g_object_set_data_full(G_OBJECT(copy), "filenames", owned_files, [](gpointer p) { delete static_cast<std::vector<std::string> *>(p); });
     g_object_set_data_full(G_OBJECT(copy), "playlist", g_strdup(playlist.c_str()), g_free);
     g_object_set_data(G_OBJECT(copy), "parent", parent);
     g_signal_connect(copy, "clicked", G_CALLBACK((+[](GtkButton *btn, gpointer data) {
                        auto *application = static_cast<Application *>(data);
                        auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(btn), "device"));
                        auto *songs = static_cast<SongList *>(g_object_get_data(G_OBJECT(btn), "songs"));
+                       auto *file_paths = static_cast<std::vector<std::string> *>(g_object_get_data(G_OBJECT(btn), "filenames"));
+                       const std::vector<std::string> filenames = file_paths ? *file_paths : std::vector<std::string>{};
                        SongList source = songs && !songs->empty() ? *songs
-                                         : application->playlist_manager()->current() ? application->playlist_manager()->current()->songs()
-                                                                                      : SongList{};
-                       if (!device || source.empty()) {
+                                         : filenames.empty() && application->playlist_manager() && application->playlist_manager()->current()
+                                               ? application->playlist_manager()->current()->songs()
+                                               : SongList{};
+                       if (!device || !DeviceCopy::HasOrganizeSource(source, filenames)) {
                          return;
                        }
                        const char *requested = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "playlist"));
                        const std::string playlist_name = DeviceCopyPlaylist::NameForCopy(
-                           requested ? requested : "", songs && songs->empty(),
+                           requested ? requested : "", songs && songs->empty() && filenames.empty(),
                            application->playlist_manager() && application->playlist_manager()->current()
                                ? application->playlist_manager()->current()->name()
                                : std::string());
                        if (DeviceCopy::ShouldUseOrganizeDialog(*device)) {
                          OrganizeDialog::Request request;
-                         request.songs = source;
+                         request.songs = filenames.empty() ? source : SongList{};
+                         request.filenames = filenames;
                          request.destination = DeviceManager::MusicPath(*device);
                          const DeviceDatabaseBackend::Device stored = application->device_manager()->StoredDevice(device->unique_id);
                          request.transcode_mode = OrganizeTranscode::FromDeviceMode(
@@ -67,6 +74,9 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongLis
                          request.device_id = device->unique_id;
                          request.playlist = playlist_name;
                          OrganizeDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(btn), "parent")), application, request);
+                         return;
+                       }
+                       if (source.empty()) {
                          return;
                        }
                        gtk_widget_set_sensitive(GTK_WIDGET(btn), FALSE);

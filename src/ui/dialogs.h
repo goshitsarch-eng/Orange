@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <string>
+#include <vector>
 
 #include <gtk/gtk.h>
 
@@ -38,6 +39,7 @@ class Dialogs {
   static void DeleteFiles(GtkWindow *parent, Application *app, const SongList &songs = {},
                           DeleteFilesPolicy::Source source = DeleteFilesPolicy::Source::Playlist);
   static void CopyToDevice(GtkWindow *parent, Application *app, const SongList &songs = {}, const std::string &playlist = {});
+  static void CopyToDevice(GtkWindow *parent, Application *app, const std::vector<std::string> &filenames);
   static void SaveAllPlaylists(GtkWindow *parent, Application *app);
   static void Console(GtkWindow *parent, Application *app = nullptr);
   static void Error(GtkWindow *parent, const std::string &message);

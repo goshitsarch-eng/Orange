@@ -23,6 +23,24 @@ inline OrganizeDialog::Request CollectionRequest(const SongList &songs) {
   return request;
 }
 
+// Qt MainWindow::CopyFilesToDevice calls OrganizeDialog::SetUrls so tags are read on the loading page.
+inline OrganizeDialog::Request FileViewRequest(const std::vector<std::string> &filenames) {
+  OrganizeDialog::Request request;
+  request.filenames = filenames;
+  request.move = false;
+  return request;
+}
+
+inline bool CanCopyFilenames(const std::vector<std::string> &filenames) { return !filenames.empty(); }
+
+inline bool HasOrganizeSource(const SongList &songs, const std::vector<std::string> &filenames) {
+  return !songs.empty() || !filenames.empty();
+}
+
+inline const char *CopyButtonLabel(bool has_songs, bool has_filenames) {
+  return (has_songs || has_filenames) ? "Copy songs" : "Copy playlist";
+}
+
 }  // namespace DeviceCopy
 
 namespace DeviceCopyPlaylist {

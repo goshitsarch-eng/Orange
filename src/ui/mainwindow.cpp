@@ -1212,7 +1212,7 @@ void MainWindow::BuildSidebar() {
   file_view_->SetCopyToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, false); });
   file_view_->SetMoveToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, true); });
   file_view_->SetCopyToDeviceCallback([this](const std::vector<std::string> &paths) {
-    Dialogs::CopyToDevice(GTK_WINDOW(window_), app_, SongsFromFilePaths(paths));
+    Dialogs::CopyToDevice(GTK_WINDOW(window_), app_, OrganizeLoading::FileViewFilenames(paths));
   });
   file_view_->SetEditTagsCallback([this](const std::vector<std::string> &paths) {
     const SongList songs = SongsFromFilePaths(paths);
