@@ -319,7 +319,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
   if (!current_ || !current_->valid()) {
     return false;
   }
-  if (EnginePlay::IsBuffering(buffering_task_id_)) {
+  if (current_->is_buffering() || EnginePlay::IsBuffering(buffering_task_id_)) {
     return false;
   }
   if (gapless_pending_ && current_->is_playing()) {
@@ -372,7 +372,7 @@ void GstEngine::Stop(bool stop_after) {
 }
 
 void GstEngine::Pause() {
-  if (!current_) {
+  if (!current_ || current_->is_buffering()) {
     return;
   }
   if (EngineFade::ShouldFadeOnPause(fadeout_pause_enabled_, exclusive_mode_)) {
@@ -385,7 +385,7 @@ void GstEngine::Pause() {
 }
 
 void GstEngine::Unpause() {
-  if (!current_) {
+  if (!current_ || current_->is_buffering()) {
     return;
   }
   pending_pause_ = false;

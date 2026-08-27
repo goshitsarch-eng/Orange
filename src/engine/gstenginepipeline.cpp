@@ -202,6 +202,7 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
                          g_object_class_find_property(G_OBJECT_GET_CLASS(source), "access-token")) {
                        g_object_set(source, "access-token", self->spotify_access_token_.c_str(), nullptr);
                      }
+                     self->FinishBufferingOnSourceSetup();
                    })),
                    this);
   return true;
@@ -235,6 +236,8 @@ bool GstEnginePipeline::Play(bool pause, uint64_t offset_nanosec) {
 
 void GstEnginePipeline::Stop() {
   CancelWarmup();
+  buffering_ = false;
+  restore_playing_ = false;
   if (playbin_) {
     gst_element_set_state(playbin_, GST_STATE_NULL);
   }
@@ -443,9 +446,6 @@ void GstEnginePipeline::HandleTags(GstMessage *message) {
 }
 
 void GstEnginePipeline::HandleBuffering(GstMessage *message) {
-  if (!Buffering) {
-    return;
-  }
   if (audioqueue_ && GST_ELEMENT(GST_MESSAGE_SRC(message)) != audioqueue_) {
     return;
   }
@@ -454,5 +454,48 @@ void GstEnginePipeline::HandleBuffering(GstMessage *message) {
   if (EngineBuffering::IgnoreNearEnd(about_to_finish_, position_nanosec(), length_nanosec())) {
     return;
   }
-  Buffering(id_, percent);
+  const bool playing = is_playing();
+  if (EngineBuffering::ShouldStart(percent, buffering_)) {
+    buffering_ = true;
+    if (EngineBuffering::ShouldPausePlaying(false, percent, playing)) {
+      restore_playing_ = true;
+      if (playbin_) {
+        gst_element_set_state(playbin_, GST_STATE_PAUSED);
+      }
+    }
+    if (Buffering) {
+      Buffering(id_, percent);
+    }
+    return;
+  }
+  if (EngineBuffering::ShouldFinish(percent, buffering_)) {
+    buffering_ = false;
+    if (EngineBuffering::ShouldRestorePlaying(true, percent, restore_playing_)) {
+      restore_playing_ = false;
+      if (playbin_) {
+        gst_element_set_state(playbin_, GST_STATE_PLAYING);
+      }
+    }
+    if (Buffering) {
+      Buffering(id_, EngineBuffering::kProgressMax);
+    }
+    return;
+  }
+  if (EngineBuffering::ShouldEmitProgress(buffering_, percent) && Buffering) {
+    Buffering(id_, percent);
+  }
+}
+
+void GstEnginePipeline::FinishBufferingOnSourceSetup() {
+  if (!EngineBuffering::ShouldClearBufferingOnSourceSetup(buffering_)) {
+    return;
+  }
+  buffering_ = false;
+  restore_playing_ = false;
+  if (playbin_) {
+    gst_element_set_state(playbin_, GST_STATE_PLAYING);
+  }
+  if (Buffering) {
+    Buffering(id_, EngineBuffering::kProgressMax);
+  }
 }

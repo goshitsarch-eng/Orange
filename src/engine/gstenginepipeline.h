@@ -66,6 +66,7 @@ class GstEnginePipeline {
   int64_t position_nanosec() const;
   int64_t length_nanosec() const;
   bool is_playing() const;
+  bool is_buffering() const { return buffering_; }
 
   std::function<void(int)> AboutToFinish;
   std::function<void(int)> EosReached;
@@ -79,6 +80,7 @@ class GstEnginePipeline {
   static gboolean BusCallback(GstBus *bus, GstMessage *message, gpointer data);
   static void AboutToFinishCb(GstElement *playbin, gpointer data);
   void HandleBuffering(GstMessage *message);
+  void FinishBufferingOnSourceSetup();
   GstElement *MakeAudioSink(const std::string &output, const std::string &device) const;
   void CancelWarmup();
   void HandleSpectrum(GstMessage *message);
@@ -107,6 +109,8 @@ class GstEnginePipeline {
   std::string spotify_access_token_;
   std::string source_device_;
   bool about_to_finish_ = false;
+  bool buffering_ = false;
+  bool restore_playing_ = false;
 };
 
 #endif  // STRAWBERRY_GSTENGINEPIPELINE_H

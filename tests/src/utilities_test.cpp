@@ -1345,6 +1345,17 @@ TEST(EngineBuffering, NearEndIgnoreAndPercentGates) {
   EXPECT_FALSE(EngineBuffering::ShouldStart(40, true));
   EXPECT_TRUE(EngineBuffering::ShouldFinish(100, true));
   EXPECT_FALSE(EngineBuffering::ShouldFinish(100, false));
+  EXPECT_TRUE(EngineBuffering::ShouldPausePlaying(false, 40, true));
+  EXPECT_FALSE(EngineBuffering::ShouldPausePlaying(true, 40, true));
+  EXPECT_FALSE(EngineBuffering::ShouldPausePlaying(false, 40, false));
+  EXPECT_TRUE(EngineBuffering::ShouldRestorePlaying(true, 100, true));
+  EXPECT_FALSE(EngineBuffering::ShouldRestorePlaying(false, 100, true));
+  EXPECT_FALSE(EngineBuffering::ShouldRestorePlaying(true, 100, false));
+  EXPECT_TRUE(EngineBuffering::ShouldEmitProgress(true, 40));
+  EXPECT_FALSE(EngineBuffering::ShouldEmitProgress(true, 100));
+  EXPECT_FALSE(EngineBuffering::ShouldEmitProgress(false, 40));
+  EXPECT_TRUE(EngineBuffering::ShouldClearBufferingOnSourceSetup(true));
+  EXPECT_FALSE(EngineBuffering::ShouldClearBufferingOnSourceSetup(false));
 }
 
 TEST(EngineDevice, GuessIconName) {

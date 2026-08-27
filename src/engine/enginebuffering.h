@@ -18,6 +18,22 @@ inline bool ShouldStart(int percent, bool already_buffering) { return percent < 
 
 inline bool ShouldFinish(int percent, bool already_buffering) { return percent >= kProgressMax && already_buffering; }
 
+// Qt GstEnginePipeline::BufferingMessageReceived pauses PLAYING while filling the queue.
+inline bool ShouldPausePlaying(bool already_buffering, int percent, bool is_playing) {
+  return ShouldStart(percent, already_buffering) && is_playing;
+}
+
+inline bool ShouldRestorePlaying(bool already_buffering, int percent, bool restore_playing) {
+  return ShouldFinish(percent, already_buffering) && restore_playing;
+}
+
+inline bool ShouldEmitProgress(bool already_buffering, int percent) {
+  return already_buffering && percent < kProgressMax;
+}
+
+// Qt SourceSetupCallback ends buffering and forces PLAYING after a new HTTP source.
+inline bool ShouldClearBufferingOnSourceSetup(bool already_buffering) { return already_buffering; }
+
 inline const char *TaskName() { return "Buffering"; }
 
 }  // namespace EngineBuffering
