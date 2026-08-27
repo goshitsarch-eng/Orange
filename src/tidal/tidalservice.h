@@ -32,6 +32,7 @@ class TidalService : public StreamingService {
   void Login(const std::string &username, const std::string &password_or_token) override;
   void Logout() override;
   void StartAuthorization(const std::string &client_id);
+  void RememberPkce(const std::string &verifier, const std::string &challenge);
   void AuthorizationUrlReceived(const std::string &url);
   void StoreTokens(const OAuthenticator::TokenResponse &tokens);
   void ReloadSettings() override;
@@ -59,6 +60,8 @@ class TidalService : public StreamingService {
   std::string coversize_ = TidalSettings::kDefaultCoverSize;
   TidalSettings::StreamUrlMethod stream_url_method_ = TidalSettings::kDefaultStreamUrl;
   uint64_t user_id_ = 0;
+  std::string code_verifier_;
+  std::string code_challenge_;
 
   SongList WithCoverSize(SongList songs) const;
 };

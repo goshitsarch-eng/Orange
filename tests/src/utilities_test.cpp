@@ -8,6 +8,7 @@
 #include "utilities/audioanalysis.h"
 #include "collection/collectiongrouping.h"
 #include "collection/groupbydialoglabels.h"
+#include "core/oauthpkce.h"
 #include "core/oauthenticator.h"
 #include "device/cddahelpers.h"
 #include "device/cddasongloader.h"
@@ -1609,6 +1610,23 @@ TEST(OAuthenticator, BuildAuthorizeUrl) {
   EXPECT_NE(std::string::npos, url.find("response_type=code"));
   EXPECT_NE(std::string::npos, url.find("client_id=client"));
   EXPECT_NE(std::string::npos, url.find("redirect_uri="));
+}
+
+TEST(OAuthPkce, ChallengeS256MatchesRfc7636) {
+  EXPECT_EQ("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", OAuthPkce::ChallengeS256("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"));
+  EXPECT_TRUE(OAuthPkce::StateMatches("abc", "abc"));
+  EXPECT_FALSE(OAuthPkce::StateMatches("abc", "xyz"));
+  EXPECT_FALSE(OAuthPkce::StateMatches("abc", ""));
+}
+
+TEST(OAuthenticator, AuthorizationCodeBodyIncludesVerifier) {
+  const std::string body = OAuthenticator::AuthorizationCodeBody("id", "secret", "tidal://login/auth", "code", "verifier");
+  EXPECT_NE(std::string::npos, body.find("grant_type=authorization_code"));
+  EXPECT_NE(std::string::npos, body.find("code=code"));
+  EXPECT_NE(std::string::npos, body.find("code_verifier=verifier"));
+  EXPECT_NE(std::string::npos, body.find("client_id=id"));
+  const std::string without = OAuthenticator::AuthorizationCodeBody("id", "secret", "http://127.0.0.1/callback", "code");
+  EXPECT_EQ(std::string::npos, without.find("code_verifier="));
 }
 
 TEST(OAuthenticator, RedirectUriUsesGeniusPort) {

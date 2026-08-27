@@ -286,6 +286,13 @@ TEST(TidalService, AuthorizationUrlReceivedEmptyCodeFails) {
   EXPECT_EQ("No authorization code", error);
   error.clear();
   tidal.AuthorizationUrlReceived("tidal://login/auth?code=abc");
+  EXPECT_EQ("Request URL is missing state!", error);
+  error.clear();
+  tidal.RememberPkce("verifier", "challenge");
+  tidal.AuthorizationUrlReceived("tidal://login/auth?code=abc&state=wrong");
+  EXPECT_EQ("Request URL has wrong state wrong != challenge", error);
+  error.clear();
+  tidal.AuthorizationUrlReceived("tidal://login/auth?code=abc&state=challenge");
   EXPECT_EQ("No network", error);
 }
 

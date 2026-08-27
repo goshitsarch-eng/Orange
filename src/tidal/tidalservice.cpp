@@ -11,7 +11,9 @@
 #include "tidal/tidalloginurl.h"
 #include "tidal/tidalrequest.h"
 #include "tidal/tidalstreamurlrequest.h"
+#include "core/oauthpkce.h"
 #include "utilities/jsonutils.h"
+#include "utilities/randutils.h"
 #include "utilities/strutils.h"
 
 #include <gio/gio.h>
@@ -94,18 +96,25 @@ void TidalService::Login(const std::string &username, const std::string &passwor
   NotifyAuthenticationChanged();
 }
 
+void TidalService::RememberPkce(const std::string &verifier, const std::string &challenge) {
+  code_verifier_ = verifier;
+  code_challenge_ = challenge;
+}
+
 void TidalService::StartAuthorization(const std::string &client_id) {
   if (!client_id.empty()) {
     client_id_ = client_id;
   }
-  const std::string url = TidalLoginUrl::AuthorizationRequestUrl(client_id_);
+  const std::string verifier = RandUtils::CryptographicRandomString(OAuthPkce::kVerifierLength);
+  RememberPkce(verifier, OAuthPkce::ChallengeS256(verifier));
+  const std::string url = TidalLoginUrl::AuthorizationRequestUrl(client_id_, code_challenge_);
   g_app_info_launch_default_for_uri(url.c_str(), nullptr, nullptr);
 }
 
 void TidalService::AuthorizationUrlReceived(const std::string &url) {
-  const std::string code = TidalLoginUrl::AuthorizationCode(url);
-  if (code.empty()) {
-    NotifyAuthenticationFailed("No authorization code");
+  const std::string failure = TidalLoginUrl::FailureFor(url, code_challenge_);
+  if (!failure.empty()) {
+    NotifyAuthenticationFailed(failure);
     return;
   }
   if (!network_) {
@@ -114,7 +123,7 @@ void TidalService::AuthorizationUrlReceived(const std::string &url) {
   }
   auto *oauth = new OAuthenticator(network_);
   oauth->set_redirect_uri(TidalLoginUrl::kRedirectUri);
-  oauth->ExchangeCode(TidalLoginUrl::kAccessTokenUrl, client_id_, client_secret_, code,
+  oauth->ExchangeCode(TidalLoginUrl::kAccessTokenUrl, client_id_, client_secret_, TidalLoginUrl::AuthorizationCode(url),
                       [this, oauth](const std::string &body, const std::string &error) {
                         delete oauth;
                         if (!error.empty()) {
@@ -127,7 +136,8 @@ void TidalService::AuthorizationUrlReceived(const std::string &url) {
                           return;
                         }
                         StoreTokens(tokens);
-                      });
+                      },
+                      code_verifier_);
 }
 
 void TidalService::EnsureFreshToken(std::function<void()> next) {
@@ -138,7 +148,7 @@ void TidalService::EnsureFreshToken(std::function<void()> next) {
     return;
   }
   auto *oauth = new OAuthenticator(network_);
-  oauth->RefreshAccessToken("https://auth.tidal.com/v1/oauth2/token", client_id_, client_secret_, refresh_token_,
+  oauth->RefreshAccessToken(TidalLoginUrl::kAccessTokenUrl, client_id_, client_secret_, refresh_token_,
                             [this, oauth, next](const std::string &body, const std::string &error) {
                               delete oauth;
                               if (!error.empty()) {

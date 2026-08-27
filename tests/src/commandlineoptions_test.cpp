@@ -135,10 +135,24 @@ TEST(TidalLoginUrl, ConsumesCommandlineAndExtractsCode) {
   EXPECT_EQ("a b", TidalLoginUrl::AuthorizationCode("tidal://login/auth?code=a%20b"));
   EXPECT_TRUE(TidalLoginUrl::AuthorizationCode("tidal://login/auth").empty());
   EXPECT_STREQ("tidal://login/auth", TidalLoginUrl::kRedirectUri);
-  const std::string request = TidalLoginUrl::AuthorizationRequestUrl("client-id");
+  EXPECT_STREQ("https://login.tidal.com/oauth2/token", TidalLoginUrl::kAccessTokenUrl);
+  const std::string request = TidalLoginUrl::AuthorizationRequestUrl("client-id", "challenge");
   EXPECT_NE(std::string::npos, request.find("https://login.tidal.com/authorize"));
   EXPECT_NE(std::string::npos, request.find("client_id=client-id"));
   EXPECT_NE(std::string::npos, request.find("redirect_uri="));
   EXPECT_NE(std::string::npos, request.find("tidal"));
   EXPECT_NE(std::string::npos, request.find("login"));
+  EXPECT_NE(std::string::npos, request.find("code_challenge_method=S256"));
+  EXPECT_NE(std::string::npos, request.find("code_challenge=challenge"));
+  EXPECT_NE(std::string::npos, request.find("state=challenge"));
+}
+
+TEST(TidalLoginUrl, FailureForMatchesQtCallbackChecks) {
+  EXPECT_EQ("access_denied", TidalLoginUrl::AuthorizationError("tidal://login/auth?error=access_denied"));
+  EXPECT_EQ("User cancelled", TidalLoginUrl::AuthorizationError("tidal://login/auth?error=access_denied&error_description=User%20cancelled"));
+  EXPECT_EQ("User cancelled", TidalLoginUrl::FailureFor("tidal://login/auth?error=access_denied&error_description=User%20cancelled", "s"));
+  EXPECT_EQ("No authorization code", TidalLoginUrl::FailureFor("tidal://login/auth", "s"));
+  EXPECT_EQ("Request URL is missing state!", TidalLoginUrl::FailureFor("tidal://login/auth?code=abc", "s"));
+  EXPECT_EQ("Request URL has wrong state x != s", TidalLoginUrl::FailureFor("tidal://login/auth?code=abc&state=x", "s"));
+  EXPECT_TRUE(TidalLoginUrl::FailureFor("tidal://login/auth?code=abc&state=s", "s").empty());
 }

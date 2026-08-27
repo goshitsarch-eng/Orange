@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_TIDALLOGINURL_H
 #define STRAWBERRY_TIDALLOGINURL_H
 
+#include "core/oauthpkce.h"
 #include "core/oauthenticator.h"
 #include "utilities/strutils.h"
 
@@ -14,7 +15,7 @@ namespace TidalLoginUrl {
 // Qt TidalService: tidal://login/auth, no local redirect server.
 constexpr char kRedirectUri[] = "tidal://login/auth";
 constexpr char kAuthorizeUrl[] = "https://login.tidal.com/authorize";
-constexpr char kAccessTokenUrl[] = "https://auth.tidal.com/v1/oauth2/token";
+constexpr char kAccessTokenUrl[] = "https://login.tidal.com/oauth2/token";
 constexpr char kScope[] = "r_usr w_usr";
 
 inline std::string Scheme(const std::string &url) {
@@ -76,8 +77,37 @@ inline std::string QueryValue(const std::string &url, const std::string &key) {
 
 inline std::string AuthorizationCode(const std::string &url) { return QueryValue(url, "code"); }
 
-inline std::string AuthorizationRequestUrl(const std::string &client_id) {
-  return OAuthenticator::BuildAuthorizeUrl(kAuthorizeUrl, client_id, kRedirectUri, kScope);
+inline std::string AuthorizationState(const std::string &url) { return QueryValue(url, "state"); }
+
+inline std::string AuthorizationError(const std::string &url) {
+  const std::string description = QueryValue(url, "error_description");
+  if (!description.empty()) {
+    return description;
+  }
+  return QueryValue(url, "error");
+}
+
+// Qt OAuthenticator::AuthorizationUrlReceived: error, missing code, missing/wrong state.
+inline std::string FailureFor(const std::string &url, const std::string &expected_state) {
+  const std::string oauth_error = AuthorizationError(url);
+  if (!oauth_error.empty()) {
+    return oauth_error;
+  }
+  if (AuthorizationCode(url).empty()) {
+    return "No authorization code";
+  }
+  const std::string state = AuthorizationState(url);
+  if (state.empty()) {
+    return "Request URL is missing state!";
+  }
+  if (!OAuthPkce::StateMatches(state, expected_state)) {
+    return "Request URL has wrong state " + state + " != " + expected_state;
+  }
+  return {};
+}
+
+inline std::string AuthorizationRequestUrl(const std::string &client_id, const std::string &code_challenge = {}) {
+  return OAuthenticator::BuildAuthorizeUrl(kAuthorizeUrl, client_id, kRedirectUri, kScope, code_challenge, code_challenge);
 }
 
 }  // namespace TidalLoginUrl

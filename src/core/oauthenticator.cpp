@@ -38,22 +38,47 @@ OAuthenticator::OAuthenticator(NetworkAccessManager *network) : network_(network
 OAuthenticator::~OAuthenticator() { StopRedirectServer(); }
 
 std::string OAuthenticator::BuildAuthorizeUrl(const std::string &authorize_url, const std::string &client_id, const std::string &redirect_uri,
-                                              const std::string &scope, const std::string &state) {
+                                              const std::string &scope, const std::string &state, const std::string &code_challenge) {
   gchar *id = g_uri_escape_string(client_id.c_str(), nullptr, TRUE);
   gchar *redir = g_uri_escape_string(redirect_uri.c_str(), nullptr, TRUE);
   gchar *sc = g_uri_escape_string(scope.c_str(), nullptr, TRUE);
   gchar *st = g_uri_escape_string(state.c_str(), nullptr, TRUE);
+  gchar *challenge = g_uri_escape_string(code_challenge.c_str(), nullptr, TRUE);
   std::string url = authorize_url;
   url += (authorize_url.find('?') == std::string::npos ? "?" : "&");
   url += std::string("response_type=code&client_id=") + (id ? id : "") + "&redirect_uri=" + (redir ? redir : "") + "&scope=" + (sc ? sc : "");
   if (state.size()) {
     url += std::string("&state=") + (st ? st : "");
   }
+  if (code_challenge.size()) {
+    url += std::string("&code_challenge_method=S256&code_challenge=") + (challenge ? challenge : "");
+  }
   g_free(id);
   g_free(redir);
   g_free(sc);
   g_free(st);
+  g_free(challenge);
   return url;
+}
+
+std::string OAuthenticator::AuthorizationCodeBody(const std::string &client_id, const std::string &client_secret, const std::string &redirect_uri,
+                                                  const std::string &code, const std::string &code_verifier) {
+  gchar *id = g_uri_escape_string(client_id.c_str(), nullptr, TRUE);
+  gchar *secret = g_uri_escape_string(client_secret.c_str(), nullptr, TRUE);
+  gchar *redir = g_uri_escape_string(redirect_uri.c_str(), nullptr, TRUE);
+  gchar *escaped_code = g_uri_escape_string(code.c_str(), nullptr, TRUE);
+  gchar *verifier = g_uri_escape_string(code_verifier.c_str(), nullptr, TRUE);
+  std::string body = std::string("grant_type=authorization_code&code=") + (escaped_code ? escaped_code : "") +
+                     "&redirect_uri=" + (redir ? redir : "") + "&client_id=" + (id ? id : "") + "&client_secret=" + (secret ? secret : "");
+  if (code_verifier.size()) {
+    body += std::string("&code_verifier=") + (verifier ? verifier : "");
+  }
+  g_free(id);
+  g_free(secret);
+  g_free(redir);
+  g_free(escaped_code);
+  g_free(verifier);
+  return body;
 }
 
 bool OAuthenticator::StartRedirectServer(guint16 preferred_port) {
@@ -154,21 +179,12 @@ void OAuthenticator::AuthorizeInBrowser(const std::string &authorize_url, const 
 }
 
 void OAuthenticator::ExchangeCode(const std::string &token_url, const std::string &client_id, const std::string &client_secret, const std::string &code,
-                                 Callback callback) {
+                                 Callback callback, const std::string &code_verifier) {
   if (!network_) {
     callback({}, "No network");
     return;
   }
-  gchar *id = g_uri_escape_string(client_id.c_str(), nullptr, TRUE);
-  gchar *secret = g_uri_escape_string(client_secret.c_str(), nullptr, TRUE);
-  gchar *redir = g_uri_escape_string(redirect_uri_.c_str(), nullptr, TRUE);
-  gchar *escaped_code = g_uri_escape_string(code.c_str(), nullptr, TRUE);
-  const std::string body = std::string("grant_type=authorization_code&code=") + (escaped_code ? escaped_code : "") +
-                           "&redirect_uri=" + (redir ? redir : "") + "&client_id=" + (id ? id : "") + "&client_secret=" + (secret ? secret : "");
-  g_free(id);
-  g_free(secret);
-  g_free(redir);
-  g_free(escaped_code);
+  const std::string body = AuthorizationCodeBody(client_id, client_secret, redirect_uri_, code, code_verifier);
   network_->Post(token_url, body, [callback](const NetworkAccessManager::Response &response) {
     if (!response.ok()) {
       callback({}, response.error.empty() ? "Token exchange failed" : response.error);

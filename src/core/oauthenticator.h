@@ -32,14 +32,17 @@ class OAuthenticator {
     return "http://127.0.0.1:" + std::to_string(port) + "/callback";
   }
   void set_redirect_uri(const std::string &redirect_uri) { redirect_uri_ = redirect_uri; }
-  void ExchangeCode(const std::string &token_url, const std::string &client_id, const std::string &client_secret, const std::string &code, Callback callback);
+  void ExchangeCode(const std::string &token_url, const std::string &client_id, const std::string &client_secret, const std::string &code, Callback callback,
+                    const std::string &code_verifier = {});
   void RefreshAccessToken(const std::string &token_url, const std::string &client_id, const std::string &client_secret,
                           const std::string &refresh_token, Callback callback);
   void ClientCredentials(const std::string &token_url, const std::string &client_id, const std::string &client_secret, Callback callback);
   std::string redirect_uri() const { return redirect_uri_; }
 
   static std::string BuildAuthorizeUrl(const std::string &authorize_url, const std::string &client_id, const std::string &redirect_uri,
-                                       const std::string &scope, const std::string &state = {});
+                                       const std::string &scope, const std::string &state = {}, const std::string &code_challenge = {});
+  static std::string AuthorizationCodeBody(const std::string &client_id, const std::string &client_secret, const std::string &redirect_uri,
+                                           const std::string &code, const std::string &code_verifier = {});
   static std::string ClientCredentialsBody(const std::string &client_id, const std::string &client_secret);
   static std::string RefreshTokenBody(const std::string &refresh_token, const std::string &client_id, const std::string &client_secret);
   static std::string BasicAuthorizationHeader(const std::string &client_id, const std::string &client_secret);
