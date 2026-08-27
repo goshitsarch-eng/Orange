@@ -1,6 +1,7 @@
 #include "constants/covermanagersettings.h"
 #include "constants/edittagdialogsettings.h"
 #include "constants/organizesettings.h"
+#include "constants/settingsdialogsettings.h"
 #include "constants/transcodersettings.h"
 #include "dialogs/dialoggeometry.h"
 #include "core/settings.h"
@@ -135,6 +136,10 @@ TEST(TranscodeUi, DestinationAlongsideMatchesQt) {
   EXPECT_STREQ("geometry", CoverManagerSettings::kGeometry);
   EXPECT_EQ(860, CoverManagerSettings::kDefaultWidth);
   EXPECT_EQ(680, CoverManagerSettings::kDefaultHeight);
+  EXPECT_STREQ("SettingsDialog", SettingsDialogSettings::kSettingsGroup);
+  EXPECT_STREQ("geometry", SettingsDialogSettings::kGeometry);
+  EXPECT_EQ(827, SettingsDialogSettings::kDefaultWidth);
+  EXPECT_EQ(768, SettingsDialogSettings::kDefaultHeight);
   EXPECT_STREQ("Select...", TranscodeUi::Select());
   EXPECT_STREQ("Preserve directory structure in output directory (import only)", TranscodeUi::Preserve());
   EXPECT_TRUE(TranscodeUi::IsAlongside(0));

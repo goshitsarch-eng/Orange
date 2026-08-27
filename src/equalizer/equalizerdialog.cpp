@@ -7,6 +7,7 @@
 #include "equalizer/equalizergain.h"
 #include "equalizer/equalizerlabels.h"
 #include "equalizer/equalizerpersist.h"
+#include "dialogs/dialogclosekeys.h"
 #include "equalizer/equalizerpresets.h"
 #include "translations/translations.h"
 
@@ -279,5 +280,6 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   gtk_box_append(GTK_BOX(box), balance_ends);
   gtk_box_append(GTK_BOX(box), balance_scale);
   adw_dialog_set_child(dialog, box);
+  DialogCloseKeys::Attach(dialog);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

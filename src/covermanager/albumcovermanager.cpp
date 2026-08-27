@@ -2,6 +2,7 @@
 
 #include "constants/covermanagersettings.h"
 #include "core/application.h"
+#include "dialogs/dialogclosekeys.h"
 #include "dialogs/dialoggeometry.h"
 #include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverchoicecontroller.h"
@@ -879,5 +880,6 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   SelectArtistRow(state, 0);
   adw_dialog_set_child(dialog, box);
   DialogGeometry::BindClosed(dialog, CoverManagerSettings::kSettingsGroup, CoverManagerSettings::kGeometry);
+  DialogCloseKeys::Attach(dialog);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

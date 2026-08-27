@@ -919,6 +919,11 @@ TEST(PlaylistAutoscroll, MaybeAlwaysNeverAndCenter) {
   EXPECT_TRUE(PlaylistAutoscroll::ShouldSkipIfVisible(true));
   EXPECT_FALSE(PlaylistAutoscroll::ShouldSkipIfVisible(false));
   EXPECT_EQ(80, PlaylistAutoscroll::CenteredOffset(200, 40, 280));
+  EXPECT_TRUE(PlaylistAutoscroll::ShouldRunOnShow());
+  EXPECT_EQ(Playlist::AutoScroll::Maybe, PlaylistAutoscroll::ShowMode());
+  EXPECT_TRUE(PlaylistAutoscroll::ShouldRestartGlowOnShow(true));
+  EXPECT_FALSE(PlaylistAutoscroll::ShouldRestartGlowOnShow(false));
+  EXPECT_TRUE(PlaylistAutoscroll::ShouldStopGlowOnHide());
 }
 
 TEST(PlaylistClipboard, JoinsVisibleColumnsAndCopyShortcut) {

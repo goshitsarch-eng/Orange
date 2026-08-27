@@ -2,6 +2,7 @@
 
 #include "core/application.h"
 #include "dialogs/dialoglistkeyboard.h"
+#include "dialogs/dialogsongnav.h"
 #include "dialogs/trackselectionlabels.h"
 #include "dialogs/uierror.h"
 #include "playlist/playlistmanager.h"
@@ -337,6 +338,22 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
   state->buttons = buttons;
 
   adw_dialog_set_child(dialog, box);
+  if (state->prev && state->next) {
+    GtkEventController *nav_keys = gtk_event_controller_key_new();
+    gtk_event_controller_set_propagation_phase(nav_keys, GTK_PHASE_CAPTURE);
+    gtk_widget_add_controller(box, nav_keys);
+    g_signal_connect(nav_keys, "key-pressed",
+                     G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                       auto *self = static_cast<State *>(data);
+                       const int delta = DialogSongNav::Delta(keyval, static_cast<unsigned>(state));
+                       if (delta == 0 || !TrackSelectionLabels::NavEnabled(static_cast<int>(self->songs.size()))) {
+                         return FALSE;
+                       }
+                       SelectSong(self, self->current + delta);
+                       return TRUE;
+                     })),
+                     state);
+  }
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 
   const int song_count = static_cast<int>(targets.size());

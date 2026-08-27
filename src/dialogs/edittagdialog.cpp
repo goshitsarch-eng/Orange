@@ -13,6 +13,7 @@
 #include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfieldreset.h"
 #include "dialogs/dialoggeometry.h"
+#include "dialogs/dialogsongnav.h"
 #include "dialogs/edittagfields.h"
 #include "settings/settingswheelthrough.h"
 #include "dialogs/edittagid3v2.h"
@@ -1281,6 +1282,22 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                    }),
                    nullptr);
   gtk_box_append(GTK_BOX(box), state->actions);
+  if (state->prev && state->next) {
+    GtkEventController *nav_keys = gtk_event_controller_key_new();
+    gtk_event_controller_set_propagation_phase(nav_keys, GTK_PHASE_CAPTURE);
+    gtk_widget_add_controller(box, nav_keys);
+    g_signal_connect(nav_keys, "key-pressed",
+                     G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                       auto *self = static_cast<State *>(data);
+                       const int delta = DialogSongNav::Delta(keyval, static_cast<unsigned>(state));
+                       if (delta == 0 || !EditTagFields::SongListNavEnabled(true, self->loading)) {
+                         return FALSE;
+                       }
+                       SelectSong(self, EditTagFields::WrapIndex(static_cast<int>(self->index), delta, static_cast<int>(self->songs.size())));
+                       return TRUE;
+                     })),
+                     state);
+  }
   adw_dialog_set_child(dialog, box);
   DialogGeometry::BindClosed(dialog, EditTagDialogSettings::kSettingsGroup, EditTagDialogSettings::kGeometry);
   state->dialog = dialog;

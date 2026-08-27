@@ -157,6 +157,8 @@ PlaylistView::PlaylistView() {
                      static_cast<PlaylistView *>(data)->ApplyColumnWidths();
                    }),
                    this);
+  g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) { static_cast<PlaylistView *>(data)->OnShown(); }), this);
+  g_signal_connect(widget_, "unmap", G_CALLBACK(+[](GtkWidget *, gpointer data) { static_cast<PlaylistView *>(data)->OnHidden(); }), this);
 }
 
 void PlaylistView::SetDropUrlsCallback(DropUrlsCallback callback) { drop_urls_ = std::move(callback); }
@@ -934,6 +936,21 @@ void PlaylistView::SetPlaybackProgress(double progress) {
 }
 
 void PlaylistView::SetPaused(bool paused) { paused_ = paused; }
+
+void PlaylistView::OnShown() {
+  if (PlaylistAutoscroll::ShouldRestartGlowOnShow(glowing_)) {
+    StartGlowTimer();
+  }
+  if (playlist_ && PlaylistAutoscroll::ShouldRunOnShow()) {
+    MaybeScrollToRow(playlist_->current_row(), PlaylistAutoscroll::ShowMode());
+  }
+}
+
+void PlaylistView::OnHidden() {
+  if (PlaylistAutoscroll::ShouldStopGlowOnHide()) {
+    StopGlowTimer();
+  }
+}
 
 void PlaylistView::StopBackgroundFade() {
   if (background_fade_id_) {

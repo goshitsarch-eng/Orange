@@ -20,6 +20,7 @@
 #include "device/giodevicefilter.h"
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
+#include "dialogs/dialogclosekeys.h"
 #include "equalizer/equalizer.h"
 #include "equalizer/equalizercontrols.h"
 #include "equalizer/equalizergain.h"
@@ -915,6 +916,13 @@ TEST(CollectionGrouping, SavedRoundTrip) {
   }
   EXPECT_TRUE(found);
   CollectionGrouping::RemoveSaved("GTK test grouping");
+}
+
+TEST(DialogCloseKeys, CtrlWClosesLikeQt) {
+  EXPECT_TRUE(DialogCloseKeys::IsClose(DialogCloseKeys::kW, DialogCloseKeys::kControlMask));
+  EXPECT_TRUE(DialogCloseKeys::IsClose(DialogCloseKeys::kWUpper, DialogCloseKeys::kControlMask));
+  EXPECT_FALSE(DialogCloseKeys::IsClose(DialogCloseKeys::kW, 0));
+  EXPECT_FALSE(DialogCloseKeys::IsClose('q', DialogCloseKeys::kControlMask));
 }
 
 TEST(EqualizerLabels, RestartHintAndQtCopy) {

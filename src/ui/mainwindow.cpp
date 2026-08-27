@@ -1574,8 +1574,9 @@ void MainWindow::BuildContext() {
       cover_controller_->SearchForCover(GTK_WINDOW(window_));
     }
   });
-  cover_controller_->AttachMenu(context_view_->album_widget()->widget(), GTK_WINDOW(window_),
-                                [this]() { return app_->player()->current_song(); });
+  cover_controller_->AttachMenu(
+      context_view_->album_widget()->widget(), GTK_WINDOW(window_), [this]() { return app_->player()->current_song(); },
+      [this]() { return context_view_->album_widget()->has_cover(); });
   context_view_->album_widget()->SetActivateCallback([this]() {
     if (cover_controller_ && PlayingCoverActivate::ShouldShow(true, 2, app_->player()->current_song().is_valid())) {
       cover_controller_->ShowCover(GTK_WINDOW(window_), app_->player()->current_song());

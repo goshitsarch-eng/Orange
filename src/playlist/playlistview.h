@@ -98,6 +98,8 @@ class PlaylistView {
   void StopBackgroundFade();
   gboolean OnBackgroundFadeTick();
   void ApplyBackgroundCss();
+  void OnShown();
+  void OnHidden();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *grid_ = nullptr;

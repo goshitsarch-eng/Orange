@@ -319,7 +319,12 @@ void AlbumCoverChoiceController::PopupAttachedMenu(GtkWidget *widget, GtkWindow 
     return;
   }
   Song song = (*fn)();
-  if (!CoverChoiceMenu::ShouldShowAttachedMenu(song.is_valid(), !song.url().empty())) {
+  auto *has_cover = static_cast<std::function<bool()> *>(g_object_get_data(G_OBJECT(widget), "cover-has-cover-fn"));
+  if (has_cover) {
+    if (!CoverChoiceMenu::ShouldShowContextAlbumMenu(song.is_valid(), !song.url().empty(), (*has_cover)())) {
+      return;
+    }
+  } else if (!CoverChoiceMenu::ShouldShowAttachedMenu(song.is_valid(), !song.url().empty())) {
     return;
   }
   auto *owned = new Song(song);
@@ -379,12 +384,17 @@ gboolean AlbumCoverChoiceController::OnAttachedKey(GtkWidget *widget, guint keyv
   return TRUE;
 }
 
-void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent, const std::function<Song()> &song_for_menu) {
+void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent, const std::function<Song()> &song_for_menu,
+                                           const std::function<bool()> &has_cover) {
   if (!widget) {
     return;
   }
   auto *holder = new std::function<Song()>(song_for_menu);
   g_object_set_data_full(G_OBJECT(widget), "cover-song-fn", holder, [](gpointer p) { delete static_cast<std::function<Song()> *>(p); });
+  if (has_cover) {
+    auto *cover = new std::function<bool()>(has_cover);
+    g_object_set_data_full(G_OBJECT(widget), "cover-has-cover-fn", cover, [](gpointer p) { delete static_cast<std::function<bool()> *>(p); });
+  }
   g_object_set_data(G_OBJECT(widget), "cover-parent", parent);
   gtk_widget_set_focusable(widget, TRUE);
   GtkGesture *gesture = gtk_gesture_click_new();

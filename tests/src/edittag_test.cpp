@@ -1,4 +1,5 @@
 #include "constants/edittagdialogsettings.h"
+#include "dialogs/dialogsongnav.h"
 #include "covermanager/coveroptions.h"
 #include "dialogs/dialoglistkeyboard.h"
 #include "dialogs/edittagcompleter.h"
@@ -112,6 +113,22 @@ TEST(EditTagFields, WrapIndexAndSongRowLabel) {
   EXPECT_EQ(2, EditTagFields::WrapIndex(0, -1, 3));
   Song song = MakeTagged("Roads", "Portishead", "Dummy");
   EXPECT_EQ("Portishead - Roads", EditTagFields::SongRowLabel(song));
+}
+
+TEST(DialogSongNav, PreviousNextAndDelta) {
+  EXPECT_TRUE(DialogSongNav::IsPrevious(DialogSongNav::kPageUp, 0));
+  EXPECT_TRUE(DialogSongNav::IsPrevious(DialogSongNav::kKPPageUp, 0));
+  EXPECT_TRUE(DialogSongNav::IsPrevious(DialogSongNav::kXF86Back, 0));
+  EXPECT_TRUE(DialogSongNav::IsPrevious(DialogSongNav::kLeft, DialogSongNav::kAltMask));
+  EXPECT_FALSE(DialogSongNav::IsPrevious(DialogSongNav::kLeft, 0));
+  EXPECT_TRUE(DialogSongNav::IsNext(DialogSongNav::kPageDown, 0));
+  EXPECT_TRUE(DialogSongNav::IsNext(DialogSongNav::kKPPageDown, 0));
+  EXPECT_TRUE(DialogSongNav::IsNext(DialogSongNav::kXF86Forward, 0));
+  EXPECT_TRUE(DialogSongNav::IsNext(DialogSongNav::kRight, DialogSongNav::kAltMask));
+  EXPECT_FALSE(DialogSongNav::IsNext(DialogSongNav::kRight, 0));
+  EXPECT_EQ(-1, DialogSongNav::Delta(DialogSongNav::kPageUp, 0));
+  EXPECT_EQ(1, DialogSongNav::Delta(DialogSongNav::kPageDown, 0));
+  EXPECT_EQ(0, DialogSongNav::Delta(DialogSongNav::kLeft, 0));
 }
 
 TEST(EditTagTabs, ClampNameAndSettingsKeys) {

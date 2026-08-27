@@ -23,6 +23,16 @@ inline int CenteredOffset(const int row_y, const int row_height, const int viewp
   return row_y - (viewport_height - row_height) / 2;
 }
 
+// Qt PlaylistView::showEvent restarts the glow timer and MaybeAutoscroll(Maybe).
+inline bool ShouldRunOnShow() { return true; }
+
+inline Playlist::AutoScroll ShowMode() { return Playlist::AutoScroll::Maybe; }
+
+inline bool ShouldRestartGlowOnShow(const bool currently_glowing) { return currently_glowing; }
+
+// Qt PlaylistView::hideEvent stops the glow timer so it is idle while hidden.
+inline bool ShouldStopGlowOnHide() { return true; }
+
 }  // namespace PlaylistAutoscroll
 
 #endif
