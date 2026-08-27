@@ -335,7 +335,11 @@ void PlaylistTabBar::StartInlineRename(int index) {
   GtkEventController *focus = gtk_event_controller_focus_new();
   gtk_widget_add_controller(rename_entry_, focus);
   g_signal_connect(focus, "leave", G_CALLBACK(+[](GtkEventControllerFocus *, gpointer data) {
-                     static_cast<PlaylistTabBar *>(data)->ApplyInlineRename();
+                     if (PlaylistTabMenu::ShouldCommitRenameOnFocusLoss()) {
+                       static_cast<PlaylistTabBar *>(data)->ApplyInlineRename();
+                       return;
+                     }
+                     static_cast<PlaylistTabBar *>(data)->HideEditor();
                    }),
                    this);
 }

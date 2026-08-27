@@ -66,6 +66,9 @@ inline bool ShouldApplyRename(const std::string &old_name, const std::string &ne
   return !new_name.empty() && new_name != old_name;
 }
 
+// Qt RenameTabLineEdit::focusOutEvent emits EditingCanceled and does not commit.
+inline bool ShouldCommitRenameOnFocusLoss() { return false; }
+
 inline bool CloseCurrentHidesWindow(int count) { return count <= 1; }
 
 // Qt PlaylistTabBar::CloseCurrentTab: discard an open rename editor before tabs shift.
