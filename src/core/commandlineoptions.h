@@ -40,6 +40,7 @@ class CommandlineOptions {
   const std::string &language() const { return language_; }
   const std::string &log_levels() const { return log_levels_; }
   const std::string &playlist_name() const { return playlist_name_; }
+  const std::string &create_fingerprint() const { return create_fingerprint_; }
   bool debug() const { return debug_; }
   bool version() const { return version_; }
   int resize_width() const { return resize_width_; }
@@ -72,6 +73,7 @@ class CommandlineOptions {
   std::string language_;
   std::string log_levels_;
   std::string playlist_name_;
+  std::string create_fingerprint_;
 };
 
 #endif

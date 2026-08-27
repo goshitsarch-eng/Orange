@@ -31,6 +31,7 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   gchar *language = nullptr;
   gchar *log_levels = nullptr;
   gchar *resize_window = nullptr;
+  gchar *create_fingerprint = nullptr;
   gint volume = -1;
   gboolean volume_up = false;
   gboolean volume_down = false;
@@ -72,6 +73,7 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
       {"verbose", 0, 0, G_OPTION_ARG_NONE, &verbose, "Equivalent to --log-levels *:4", nullptr},
       {"log-levels", 0, 0, G_OPTION_ARG_STRING, &log_levels, "Comma-separated log levels (e.g. *:4)", "LEVELS"},
       {"resize-window", 0, 0, G_OPTION_ARG_STRING, &resize_window, "Resize the main window", "WxH"},
+      {"create-fingerprint", 0, 0, G_OPTION_ARG_STRING, &create_fingerprint, "Create fingerprint", "FILENAME"},
       {nullptr, 0, 0, G_OPTION_ARG_NONE, nullptr, nullptr, nullptr},
   };
 
@@ -142,6 +144,10 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   if (language) {
     language_ = language;
     g_free(language);
+  }
+  if (create_fingerprint) {
+    create_fingerprint_ = create_fingerprint;
+    g_free(create_fingerprint);
   }
 
   for (int i = 1; i < argc; ++i) {

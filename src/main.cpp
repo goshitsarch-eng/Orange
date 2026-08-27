@@ -2,9 +2,13 @@
 #include "version.h"
 
 #include "core/application.h"
+#include "core/commandlinefingerprint.h"
 #include "core/commandlineoptions.h"
 #include "core/loadurl.h"
 #include "core/logging.h"
+#ifdef HAVE_CHROMAPRINT
+#include "engine/chromaprinter.h"
+#endif
 #include "engine/gststartup.h"
 #include "translations/translations.h"
 #include "ui/mainwindow.h"
@@ -22,6 +26,16 @@ struct Runtime {
   std::unique_ptr<Application> app;
   std::unique_ptr<MainWindow> window;
 };
+
+std::string CreateFingerprintText(const std::string &filename) {
+#ifdef HAVE_CHROMAPRINT
+  Chromaprinter printer(filename);
+  return printer.CreateFingerprint();
+#else
+  (void)filename;
+  return {};
+#endif
+}
 
 void Activate(AdwApplication *gtk_app, gpointer user_data) {
   auto *runtime = static_cast<Runtime *>(user_data);
@@ -46,6 +60,13 @@ int CommandLine(GApplication *gapp, GApplicationCommandLine *cmdline, gpointer u
   if (options.version()) {
     g_application_command_line_print(cmdline, "Strawberry %s\n", STRAWBERRY_VERSION_DISPLAY);
     return 0;
+  }
+  if (CommandlineFingerprint::ShouldRun(options.create_fingerprint())) {
+    const std::string line = CommandlineFingerprint::StdoutLine(CreateFingerprintText(options.create_fingerprint()));
+    if (!line.empty()) {
+      g_application_command_line_print(cmdline, "%s", line.c_str());
+    }
+    return CommandlineFingerprint::ExitCode();
   }
   if (options.debug() || options.log_levels().find("*:4") != std::string::npos) {
     logging::SetDebugEnabled(true);
@@ -92,6 +113,14 @@ int main(int argc, char **argv) {
   if (options.version()) {
     g_print("Strawberry %s\n", STRAWBERRY_VERSION_DISPLAY);
     return 0;
+  }
+  if (CommandlineFingerprint::ShouldRun(options.create_fingerprint())) {
+    GstStartup::Initialize();
+    const std::string line = CommandlineFingerprint::StdoutLine(CreateFingerprintText(options.create_fingerprint()));
+    if (!line.empty()) {
+      g_print("%s", line.c_str());
+    }
+    return CommandlineFingerprint::ExitCode();
   }
   if (options.debug()) {
     logging::SetDebugEnabled(true);

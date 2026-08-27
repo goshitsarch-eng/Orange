@@ -1,3 +1,4 @@
+#include "core/commandlinefingerprint.h"
 #include "core/commandlineoptions.h"
 #include "core/commandlineurl.h"
 #include "core/commandlinevolume.h"
@@ -103,6 +104,26 @@ TEST(CommandlineOptions, VolumeUpDownAndIncreaseByMatchQt) {
   EXPECT_EQ(100, CommandlineVolume::Apply(98, 4));
   EXPECT_EQ(0, CommandlineVolume::Apply(2, -4));
   EXPECT_EQ(54, CommandlineVolume::Apply(50, 4));
+}
+
+TEST(CommandlineFingerprint, CreateFingerprintExitsWithoutStartingUi) {
+  auto parse = [](std::vector<const char *> args) {
+    args.insert(args.begin(), "strawberry");
+    std::vector<char *> argv;
+    for (const char *arg : args) {
+      argv.push_back(const_cast<char *>(arg));
+    }
+    CommandlineOptions options;
+    EXPECT_TRUE(options.Parse(static_cast<int>(argv.size()), argv.data()));
+    return options;
+  };
+  const CommandlineOptions options = parse({"--create-fingerprint", "/tmp/track.flac"});
+  EXPECT_EQ("/tmp/track.flac", options.create_fingerprint());
+  EXPECT_TRUE(CommandlineFingerprint::ShouldRun(options.create_fingerprint()));
+  EXPECT_FALSE(CommandlineFingerprint::ShouldRun({}));
+  EXPECT_EQ(0, CommandlineFingerprint::ExitCode());
+  EXPECT_EQ("ABC123\n", CommandlineFingerprint::StdoutLine("ABC123"));
+  EXPECT_TRUE(CommandlineFingerprint::StdoutLine({}).empty());
 }
 
 TEST(CommandlineUrlPlan, MatchesQtLoadAppendCreateAndNone) {
