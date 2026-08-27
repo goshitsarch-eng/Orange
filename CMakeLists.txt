@@ -807,6 +807,7 @@ if(GTest_FOUND)
     src/core/taskmanager.cpp
     src/core/network.cpp
     src/core/oauthenticator.cpp
+    src/core/localredirectserver.cpp
     src/core/songloader.cpp
     src/core/enginemetadata.cpp
     src/core/filesystemmusicstorage.cpp

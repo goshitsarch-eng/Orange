@@ -20,6 +20,7 @@ bool LocalRedirectServer::Listen(int port) {
   if (!g_socket_listener_add_address(G_SOCKET_LISTENER(service_), socket_addr, G_SOCKET_TYPE_STREAM, G_SOCKET_PROTOCOL_DEFAULT, nullptr,
                                      &effective, &error)) {
     if (error) {
+      error_ = error->message;
       LogWarning("LocalRedirectServer: %s", error->message);
       g_error_free(error);
     }

@@ -17,6 +17,7 @@ class LocalRedirectServer {
   std::string url() const;
   int port() const { return port_; }
   const std::string &redirected_url() const { return redirected_url_; }
+  const std::string &error() const { return error_; }
 
   Signal<std::string> Redirected;
 
@@ -26,6 +27,7 @@ class LocalRedirectServer {
   GSocketService *service_ = nullptr;
   int port_ = 0;
   std::string redirected_url_;
+  std::string error_;
 };
 
 #endif

@@ -3,15 +3,20 @@
 
 #include "streaming/streamingservices.h"
 
+#include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
+
+class LocalRedirectServer;
 
 class QobuzService : public StreamingService {
  public:
   static const char kApiUrl[];
 
   explicit QobuzService(NetworkAccessManager *network);
+  ~QobuzService() override;
 
   std::string name() const override { return "Qobuz"; }
   std::string scheme() const override { return "qobuz"; }
@@ -24,6 +29,8 @@ class QobuzService : public StreamingService {
   void GetArtistAlbums(const Song &artist, SearchCallback callback) override;
   void GetAlbumSongs(const Song &album, SearchCallback callback) override;
   void Login(const std::string &username, const std::string &password_or_token) override;
+  void Authenticate();
+  void Authenticate(const std::string &app_id, const std::string &app_secret, const std::string &private_key);
   void Logout() override;
   void ReloadSettings() override;
   LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;
@@ -40,10 +47,18 @@ class QobuzService : public StreamingService {
  private:
   std::map<std::string, std::string> AuthHeaders() const;
 
+  void OAuthRedirectReceived(const std::string &url);
+  void ExchangeCode(const std::string &code);
+  void HandleOAuthCallback(const std::string &body, const std::string &error, unsigned status);
+  void CloseRedirectServer();
+
   NetworkAccessManager *network_ = nullptr;
+  std::unique_ptr<LocalRedirectServer> redirect_server_;
   std::string app_id_;
   std::string app_secret_;
+  std::string private_key_;
   std::string user_auth_token_;
+  int64_t user_id_ = -1;
   int format_ = 27;
 };
 

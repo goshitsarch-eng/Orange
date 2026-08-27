@@ -1,6 +1,8 @@
 #include "streaming/streamingauth.h"
 #include "streaming/streamingpage.h"
+#include "qobuz/qobuzoauth.h"
 #include "qobuz/qobuzrequest.h"
+#include "qobuz/qobuzservice.h"
 #include "spotify/spotifyrequest.h"
 #include "subsonic/subsonicrequest.h"
 #include "tidal/tidalrequest.h"
@@ -85,6 +87,45 @@ TEST(SpotifyRequest, ParsesArtistsAndAlbums) {
   EXPECT_EQ("Dummy", albums.front().album());
   EXPECT_EQ("alb", albums.front().album_id());
   EXPECT_EQ("Portishead", albums.front().artist());
+}
+
+TEST(QobuzOAuth, SigninCallbackAndCodeMatchQt) {
+  EXPECT_STREQ("https://www.qobuz.com/signin/oauth", QobuzOAuth::kSigninUrl);
+  EXPECT_STREQ("https://www.qobuz.com/api.json/0.2/oauth/callback", QobuzOAuth::kCallbackUrl);
+  EXPECT_EQ("http://127.0.0.1:43111", QobuzOAuth::RedirectUrl(43111));
+  const std::string signin = QobuzOAuth::AuthorizationUrl("app-1", 43111);
+  EXPECT_NE(std::string::npos, signin.find("https://www.qobuz.com/signin/oauth?"));
+  EXPECT_NE(std::string::npos, signin.find("ext_app_id=app-1"));
+  EXPECT_NE(std::string::npos, signin.find("redirect_url="));
+  EXPECT_NE(std::string::npos, signin.find("127.0.0.1"));
+  EXPECT_EQ("abc", QobuzOAuth::ExtractCode("http://127.0.0.1:43111/?code_autorisation=abc&code=ignored"));
+  EXPECT_EQ("xyz", QobuzOAuth::ExtractCode("http://127.0.0.1:43111/?code=xyz"));
+  EXPECT_TRUE(QobuzOAuth::ExtractCode("http://127.0.0.1:43111/").empty());
+  const std::string callback = QobuzOAuth::CallbackRequestUrl("abc", "priv");
+  EXPECT_NE(std::string::npos, callback.find("/oauth/callback?"));
+  EXPECT_NE(std::string::npos, callback.find("code=abc"));
+  EXPECT_NE(std::string::npos, callback.find("private_key=priv"));
+  EXPECT_EQ("tok", QobuzOAuth::PreferToken("tok", "legacy"));
+  EXPECT_EQ("legacy", QobuzOAuth::PreferToken("", "legacy"));
+  EXPECT_STREQ("OAuth redirect is missing authorization code.", QobuzOAuth::kMissingCode);
+  EXPECT_STREQ("OAuth callback reply is missing token", QobuzOAuth::kMissingToken);
+  EXPECT_EQ("Invalid app (401)", QobuzOAuth::ApiErrorMessage("Invalid app", 401));
+  EXPECT_STREQ("Missing app id. Please fetch credentials first.", QobuzOAuth::MissingCredential("", "s", "k"));
+  EXPECT_EQ(nullptr, QobuzOAuth::MissingCredential("id", "s", "k"));
+}
+
+TEST(QobuzOAuth, AuthenticateWithoutCredentialsFailsLocally) {
+  QobuzService qobuz(nullptr);
+  std::string error;
+  qobuz.AuthenticationFailed.Connect([&](const std::string &text) { error = text; });
+  qobuz.Authenticate("", "secret", "key");
+  EXPECT_EQ("Missing app id. Please fetch credentials first.", error);
+  error.clear();
+  qobuz.Authenticate("id", "", "key");
+  EXPECT_EQ("Missing app secret. Please fetch credentials first.", error);
+  error.clear();
+  qobuz.Authenticate("id", "secret", "");
+  EXPECT_EQ("Missing private key. Please fetch credentials first.", error);
 }
 
 TEST(QobuzRequest, UrlsAndParse) {
