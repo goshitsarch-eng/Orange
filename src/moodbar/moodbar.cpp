@@ -8,6 +8,7 @@
 #include "moodbar/moodbarpipeline.h"
 #include "utilities/analysisasync.h"
 #include "utilities/fileutils.h"
+#include "utilities/seekbaranalysis.h"
 
 #include <glib.h>
 
@@ -41,7 +42,7 @@ gpointer MoodbarGenerateThread(gpointer data) {
     if (!job->alive || !*job->alive || !job->controller) {
       return G_SOURCE_REMOVE;
     }
-    job->controller->ApplyGenerated(job->generation, std::move(job->data));
+    job->controller->ApplyGenerated(job->generation, std::move(job->data), job->song.url());
     return G_SOURCE_REMOVE;
   }, job);
   return nullptr;
@@ -85,12 +86,16 @@ std::vector<uint8_t> MoodbarLoader::Load(const Song &song) {
   return Generate(song, save, StandardPaths::MoodbarCacheDir());
 }
 
-MoodbarController::MoodbarController(MoodbarLoader *loader) : loader_(loader) {}
+MoodbarController::MoodbarController(MoodbarLoader *loader) : loader_(loader) { ReloadSettings(); }
 
 MoodbarController::~MoodbarController() { *alive_ = false; }
 
 void MoodbarController::ApplyGenerated(int generation, std::vector<uint8_t> data) {
-  if (!AnalysisAsync::AcceptGeneration(generation, generation_, alive_ && *alive_)) {
+  ApplyGenerated(generation, std::move(data), current_song_.url());
+}
+
+void MoodbarController::ApplyGenerated(int generation, std::vector<uint8_t> data, const std::string &url) {
+  if (!SeekbarAnalysis::AcceptResult(enabled_, playback_active_, url, current_song_.url(), generation, generation_, alive_ && *alive_)) {
     return;
   }
   data_ = std::move(data);
@@ -98,15 +103,63 @@ void MoodbarController::ApplyGenerated(int generation, std::vector<uint8_t> data
   Ready.Emit(data_);
 }
 
-void MoodbarController::Load(const Song &song) {
+void MoodbarController::Load(const Song &song) { CurrentSongChanged(song); }
+
+void MoodbarController::ReloadSettings() {
   Settings settings;
   settings.BeginGroup(SeekbarSettings::kSettingsGroup);
   const bool enabled = static_cast<SeekbarSettings::Mode>(settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode))) ==
                        SeekbarSettings::Mode::Moodbar;
   settings.EndGroup();
+  const bool was_enabled = enabled_;
+  enabled_ = enabled;
+  ApplyEnabledTransition(was_enabled);
+}
+
+void MoodbarController::SetEnabled(bool enabled) {
+  if (enabled == enabled_) {
+    return;
+  }
+  const bool was_enabled = enabled_;
+  enabled_ = enabled;
+  ApplyEnabledTransition(was_enabled);
+}
+
+void MoodbarController::ApplyEnabledTransition(bool was_enabled) {
+  if (SeekbarAnalysis::ShouldGenerateOnEnable(enabled_, was_enabled, current_song_.url())) {
+    Generate(current_song_);
+  } else if (SeekbarAnalysis::ShouldClearOnDisable(enabled_, was_enabled)) {
+    ++generation_;
+    busy_ = false;
+    data_.clear();
+    Ready.Emit(data_);
+  }
+}
+
+void MoodbarController::CurrentSongChanged(const Song &song) {
+  current_song_ = song;
+  playback_active_ = true;
+  if (!SeekbarAnalysis::ShouldGenerate(enabled_, song)) {
+    return;
+  }
+  Generate(song);
+}
+
+void MoodbarController::PlaybackStopped() {
+  current_song_ = Song();
+  playback_active_ = false;
   ++generation_;
   busy_ = false;
-  if (!enabled) {
+  if (SeekbarAnalysis::ShouldClearOnStop(enabled_)) {
+    data_.clear();
+    Ready.Emit(data_);
+  }
+}
+
+void MoodbarController::Generate(const Song &song) {
+  ++generation_;
+  busy_ = false;
+  if (!SeekbarAnalysis::CanLoad(song)) {
     data_.clear();
     Ready.Emit(data_);
     return;
@@ -122,6 +175,7 @@ void MoodbarController::Load(const Song &song) {
   if (!loader_) {
     return;
   }
+  Settings settings;
   settings.BeginGroup(MoodbarSettings::kSettingsGroup);
   auto *job = new MoodJob;
   job->controller = this;

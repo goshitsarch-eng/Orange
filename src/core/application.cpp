@@ -110,8 +110,8 @@ void Application::Init() {
       playlist->ApplyDiscoveredArt(song, albumcover_loader_->LoadPath(song));
     }
     osd_->SongChanged(song, current_albumcover_loader_->current());
-    moodbar_->Load(song);
-    waveform_->Load(song);
+    moodbar_->CurrentSongChanged(song);
+    waveform_->CurrentSongChanged(song);
     discord_->UpdatePresence(song, player_->GetState() == GstEngine::State::Playing);
     tray_->SetNowPlaying(song);
   });
@@ -160,6 +160,8 @@ void Application::Init() {
     playback_was_paused_ = false;
     collection_->Stopped();
     scrobbler_->ClearPlaying();
+    moodbar_->PlaybackStopped();
+    waveform_->PlaybackStopped();
     discord_->Clear();
     tray_->SetStopped();
     tray_->ClearNowPlaying();

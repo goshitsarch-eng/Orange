@@ -2362,8 +2362,8 @@ void MainWindow::OpenSettings(const char *page_name) {
     RefreshCollection();
     app_->analyzer()->ReloadSettings();
     ApplyAnalyzer();
-    app_->moodbar()->Load(app_->player()->current_song());
-    app_->waveform()->Load(app_->player()->current_song());
+    app_->moodbar()->ReloadSettings();
+    app_->waveform()->ReloadSettings();
   }, page_name);
 }
 
@@ -3968,8 +3968,8 @@ void MainWindow::SetSeekbarMode(SeekbarSettings::Mode mode) {
   settings.SetIntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarModeMenu::Clamp(static_cast<int>(mode))));
   settings.Sync();
   ApplySeekbarMode();
-  app_->moodbar()->Load(app_->player()->current_song());
-  app_->waveform()->Load(app_->player()->current_song());
+  app_->moodbar()->ReloadSettings();
+  app_->waveform()->ReloadSettings();
 }
 
 void MainWindow::SetMoodbarStyle(MoodbarSettings::Style style) {

@@ -9,6 +9,7 @@
 #include "moodbar/moodbarpaths.h"
 #include "moodbar/moodbarstyle.h"
 #include "utilities/analysisasync.h"
+#include "utilities/seekbaranalysis.h"
 #include "waveform/waveformstyle.h"
 
 #include <gtest/gtest.h>
@@ -120,6 +121,40 @@ TEST(MoodbarCell, LoadRulesMatchQtDelegate) {
   EXPECT_EQ(MoodbarCell::State::Loaded, MoodbarCell::NextState(MoodbarCell::State::Loading, true, true, false));
   EXPECT_EQ(MoodbarCell::State::Loading, MoodbarCell::NextState(MoodbarCell::State::None, true, false, true));
   EXPECT_EQ(MoodbarCell::State::None, MoodbarCell::NextState(MoodbarCell::State::None, true, false, false));
+}
+
+TEST(SeekbarAnalysis, CanLoadAndAcceptResult) {
+  Song local;
+  local.set_source(Song::Source::LocalFile);
+  local.set_url("file:///tmp/a.flac");
+  EXPECT_TRUE(SeekbarAnalysis::CanLoad(local));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldGenerate(true, local));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldGenerate(false, local));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldGenerate(true, Song()));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldGenerateOnEnable(true, false, local.url()));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldGenerateOnEnable(true, true, local.url()));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldGenerateOnEnable(true, false, {}));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldClearOnDisable(false, true));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldClearOnDisable(true, false));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldClearOnStop(true));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldClearOnStop(false));
+  EXPECT_TRUE(SeekbarAnalysis::AcceptResult(true, true, local.url(), local.url(), 3, 3, true));
+  EXPECT_FALSE(SeekbarAnalysis::AcceptResult(false, true, local.url(), local.url(), 3, 3, true));
+  EXPECT_FALSE(SeekbarAnalysis::AcceptResult(true, false, local.url(), local.url(), 3, 3, true));
+  EXPECT_FALSE(SeekbarAnalysis::AcceptResult(true, true, "file:///tmp/old.flac", local.url(), 3, 3, true));
+  EXPECT_FALSE(SeekbarAnalysis::AcceptResult(true, true, local.url(), local.url(), 2, 3, true));
+
+  Song cue;
+  cue.set_source(Song::Source::LocalFile);
+  cue.set_url("file:///tmp/album.flac");
+  cue.set_cue_path("/tmp/album.cue");
+  EXPECT_FALSE(SeekbarAnalysis::CanLoad(cue));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldGenerate(true, cue));
+
+  Song stream;
+  stream.set_source(Song::Source::Stream);
+  stream.set_url("http://example.com/radio");
+  EXPECT_FALSE(SeekbarAnalysis::CanLoad(stream));
 }
 
 TEST(AnalysisAsync, GenerateOnlyWhenEnabledAndCacheMisses) {

@@ -6,6 +6,7 @@
 #include "core/standardpaths.h"
 #include "utilities/analysisasync.h"
 #include "utilities/fileutils.h"
+#include "utilities/seekbaranalysis.h"
 #include "waveform/waveformpipeline.h"
 #include "waveform/waveformstyle.h"
 
@@ -67,7 +68,7 @@ gpointer WaveformGenerateThread(gpointer data) {
     if (!job->alive || !*job->alive || !job->controller) {
       return G_SOURCE_REMOVE;
     }
-    job->controller->ApplyGenerated(job->generation, std::move(job->data));
+    job->controller->ApplyGenerated(job->generation, std::move(job->data), job->song.url());
     return G_SOURCE_REMOVE;
   }, job);
   return nullptr;
@@ -112,12 +113,16 @@ std::vector<float> WaveformLoader::Load(const Song &song) {
   return Generate(song, save, StandardPaths::WaveformCacheDir());
 }
 
-WaveformController::WaveformController(WaveformLoader *loader) : loader_(loader) {}
+WaveformController::WaveformController(WaveformLoader *loader) : loader_(loader) { ReloadSettings(); }
 
 WaveformController::~WaveformController() { *alive_ = false; }
 
 void WaveformController::ApplyGenerated(int generation, std::vector<float> data) {
-  if (!AnalysisAsync::AcceptGeneration(generation, generation_, alive_ && *alive_)) {
+  ApplyGenerated(generation, std::move(data), current_song_.url());
+}
+
+void WaveformController::ApplyGenerated(int generation, std::vector<float> data, const std::string &url) {
+  if (!SeekbarAnalysis::AcceptResult(enabled_, playback_active_, url, current_song_.url(), generation, generation_, alive_ && *alive_)) {
     return;
   }
   data_ = std::move(data);
@@ -125,15 +130,63 @@ void WaveformController::ApplyGenerated(int generation, std::vector<float> data)
   Ready.Emit(data_);
 }
 
-void WaveformController::Load(const Song &song) {
+void WaveformController::Load(const Song &song) { CurrentSongChanged(song); }
+
+void WaveformController::ReloadSettings() {
   Settings settings;
   settings.BeginGroup(SeekbarSettings::kSettingsGroup);
   const bool enabled = static_cast<SeekbarSettings::Mode>(settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode))) ==
                        SeekbarSettings::Mode::Waveform;
   settings.EndGroup();
+  const bool was_enabled = enabled_;
+  enabled_ = enabled;
+  ApplyEnabledTransition(was_enabled);
+}
+
+void WaveformController::SetEnabled(bool enabled) {
+  if (enabled == enabled_) {
+    return;
+  }
+  const bool was_enabled = enabled_;
+  enabled_ = enabled;
+  ApplyEnabledTransition(was_enabled);
+}
+
+void WaveformController::ApplyEnabledTransition(bool was_enabled) {
+  if (SeekbarAnalysis::ShouldGenerateOnEnable(enabled_, was_enabled, current_song_.url())) {
+    Generate(current_song_);
+  } else if (SeekbarAnalysis::ShouldClearOnDisable(enabled_, was_enabled)) {
+    ++generation_;
+    busy_ = false;
+    data_.clear();
+    Ready.Emit(data_);
+  }
+}
+
+void WaveformController::CurrentSongChanged(const Song &song) {
+  current_song_ = song;
+  playback_active_ = true;
+  if (!SeekbarAnalysis::ShouldGenerate(enabled_, song)) {
+    return;
+  }
+  Generate(song);
+}
+
+void WaveformController::PlaybackStopped() {
+  current_song_ = Song();
+  playback_active_ = false;
   ++generation_;
   busy_ = false;
-  if (!enabled) {
+  if (SeekbarAnalysis::ShouldClearOnStop(enabled_)) {
+    data_.clear();
+    Ready.Emit(data_);
+  }
+}
+
+void WaveformController::Generate(const Song &song) {
+  ++generation_;
+  busy_ = false;
+  if (!SeekbarAnalysis::CanLoad(song)) {
     data_.clear();
     Ready.Emit(data_);
     return;
@@ -149,6 +202,7 @@ void WaveformController::Load(const Song &song) {
   if (!loader_) {
     return;
   }
+  Settings settings;
   settings.BeginGroup(WaveformSettings::kSettingsGroup);
   auto *job = new WaveJob;
   job->controller = this;
