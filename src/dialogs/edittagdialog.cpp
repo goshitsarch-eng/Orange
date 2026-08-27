@@ -635,7 +635,7 @@ void ApplyToPlaylist(State *state) {
       playlist->ReloadRow(row, tagreader);
     }
   }
-  state->app->playlist_manager()->Persist(playlist);
+  state->app->playlist_manager()->SaveCurrent();
 }
 
 void ApplyLoadedSongs(State *state, SongList songs) {
