@@ -3,6 +3,7 @@
 #include "constants/scrobblersettings.h"
 #include "core/settings.h"
 #include "scrobbler/scrobblemetadata.h"
+#include "scrobbler/scrobblerplayingstate.h"
 #include "scrobbler/scrobblersubmittiming.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
@@ -117,8 +118,23 @@ void LastFmScrobbler::Post(const std::map<std::string, std::string> &params) {
   network_->Post(kApiUrl, FormBody(signed_params), [](const NetworkAccessManager::Response &) {}, "application/x-www-form-urlencoded");
 }
 
+void LastFmScrobbler::CheckScrobblePrevSong() {
+  const uint64_t now = static_cast<uint64_t>(std::time(nullptr));
+  if (!ScrobblerPlayingState::ShouldScrobbleRadioPrev(song_playing_, scrobbled_,
+                                                      ScrobblerPlayingState::ElapsedSeconds(timestamp_, now))) {
+    return;
+  }
+  Song song = song_playing_;
+  song.set_length_nanosec(ScrobblerPlayingState::ElapsedSeconds(timestamp_, now) * 1000000000LL);
+  Scrobble(song);
+}
+
 void LastFmScrobbler::NowPlaying(const Song &song) {
-  if (session_key_.empty()) {
+  CheckScrobblePrevSong();
+  song_playing_ = song;
+  timestamp_ = static_cast<uint64_t>(std::time(nullptr));
+  scrobbled_ = false;
+  if (session_key_.empty() || !song.is_metadata_good()) {
     return;
   }
   const ScrobbleMetadata metadata = ScrobbleMetadata::FromSongSettings(song);
@@ -130,8 +146,20 @@ void LastFmScrobbler::NowPlaying(const Song &song) {
         {"album", metadata.album}});
 }
 
+void LastFmScrobbler::ClearPlaying() {
+  CheckScrobblePrevSong();
+  song_playing_ = Song();
+  scrobbled_ = false;
+  timestamp_ = 0;
+}
+
 void LastFmScrobbler::Scrobble(const Song &song) {
-  cache_.Add(SongFromMetadata(song, ScrobbleMetadata::FromSongSettings(song)), static_cast<uint64_t>(std::time(nullptr)));
+  if (!ScrobblerPlayingState::SameAsPlaying(song, song_playing_)) {
+    return;
+  }
+  scrobbled_ = true;
+  cache_.Add(SongFromMetadata(song, ScrobbleMetadata::FromSongSettings(song)),
+             ScrobblerPlayingState::TimestampOrNow(timestamp_, static_cast<uint64_t>(std::time(nullptr))));
   ScheduleSubmit(false);
 }
 

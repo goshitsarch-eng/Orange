@@ -13,6 +13,35 @@
 #include <string>
 #include <vector>
 
+namespace {
+
+struct EqualizerDeleteJob {
+  Equalizer *eq = nullptr;
+  GtkDropDown *drop = nullptr;
+};
+
+void ApplyEqualizerDelete(Equalizer *eq, GtkDropDown *drop, const std::string &name) {
+  if (!eq || !drop || name.empty() || eq->IsBuiltin(name)) {
+    return;
+  }
+  const std::vector<std::string> remaining = EqualizerPresets::AfterDelete(eq->Presets(), name);
+  if (!eq->DeletePreset(name)) {
+    return;
+  }
+  const std::string next = EqualizerPresets::NextSelected(remaining, name, eq->selected_preset());
+  GtkStringList *list = GTK_STRING_LIST(gtk_drop_down_get_model(drop));
+  while (g_list_model_get_n_items(G_LIST_MODEL(list)) > 0) {
+    gtk_string_list_remove(list, 0);
+  }
+  for (const std::string &preset : eq->Presets()) {
+    gtk_string_list_append(list, preset.c_str());
+  }
+  eq->LoadPreset(next);
+  gtk_drop_down_set_selected(drop, static_cast<guint>(EqualizerPresets::IndexOf(eq->Presets(), next)));
+}
+
+}  // namespace
+
 void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application *app) {
   if (!equalizer) {
     return;
@@ -76,29 +105,39 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
                    }),
                    equalizer);
   g_object_set_data(G_OBJECT(delete_preset), "drop", preset);
-  g_signal_connect(delete_preset, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+  g_signal_connect(delete_preset, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *eq = static_cast<class Equalizer *>(data);
                      GtkDropDown *drop = GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "drop"));
-                     GtkStringObject *item = GTK_STRING_OBJECT(gtk_drop_down_get_selected_item(drop));
+                     GtkStringObject *item = drop ? GTK_STRING_OBJECT(gtk_drop_down_get_selected_item(drop)) : nullptr;
                      if (!item) {
                        return;
                      }
                      const std::string name = gtk_string_object_get_string(item);
-                     const std::vector<std::string> remaining = EqualizerPresets::AfterDelete(eq->Presets(), name);
-                     if (!eq->DeletePreset(name)) {
+                     if (name.empty() || eq->IsBuiltin(name)) {
                        return;
                      }
-                     const std::string next = EqualizerPresets::NextSelected(remaining, name, eq->selected_preset());
-                     GtkStringList *list = GTK_STRING_LIST(gtk_drop_down_get_model(drop));
-                     while (g_list_model_get_n_items(G_LIST_MODEL(list)) > 0) {
-                       gtk_string_list_remove(list, 0);
-                     }
-                     for (const std::string &preset : eq->Presets()) {
-                       gtk_string_list_append(list, preset.c_str());
-                     }
-                     eq->LoadPreset(next);
-                     gtk_drop_down_set_selected(drop, static_cast<guint>(EqualizerPresets::IndexOf(eq->Presets(), next)));
-                   }),
+                     AdwAlertDialog *confirm = ADW_ALERT_DIALOG(
+                         adw_alert_dialog_new(Translations::CStr(EqualizerLabels::DeletePreset()),
+                                              EqualizerPresets::ConfirmDeleteMessage(name).c_str()));
+                     adw_alert_dialog_add_responses(confirm, "no", Translations::CStr("No"), "yes", Translations::CStr("Yes"), nullptr);
+                     adw_alert_dialog_set_response_appearance(confirm, "yes", ADW_RESPONSE_DESTRUCTIVE);
+                     adw_alert_dialog_set_default_response(confirm, "no");
+                     auto *job = new EqualizerDeleteJob{eq, drop};
+                     g_object_set_data_full(G_OBJECT(confirm), "job", job, [](gpointer p) { delete static_cast<EqualizerDeleteJob *>(p); });
+                     g_object_set_data_full(G_OBJECT(confirm), "preset-name", g_strdup(name.c_str()), g_free);
+                     g_signal_connect(confirm, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer) {
+                                        if (g_strcmp0(response, "yes") != 0) {
+                                          return;
+                                        }
+                                        auto *pending = static_cast<EqualizerDeleteJob *>(g_object_get_data(G_OBJECT(alert), "job"));
+                                        const char *preset = static_cast<const char *>(g_object_get_data(G_OBJECT(alert), "preset-name"));
+                                        if (pending && preset) {
+                                          ApplyEqualizerDelete(pending->eq, pending->drop, preset);
+                                        }
+                                      }),
+                                      nullptr);
+                     adw_dialog_present(ADW_DIALOG(confirm), GTK_WIDGET(button));
+                   })),
                    equalizer);
   gtk_box_append(GTK_BOX(preset_row), preset_name);
   gtk_box_append(GTK_BOX(preset_row), save_preset);

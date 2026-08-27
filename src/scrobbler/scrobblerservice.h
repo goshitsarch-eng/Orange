@@ -12,6 +12,7 @@ class ScrobblerService {
   virtual bool enabled() const { return enabled_; }
   virtual void set_enabled(bool e) { enabled_ = e; }
   virtual void NowPlaying(const Song &song) = 0;
+  virtual void ClearPlaying() {}
   virtual void Scrobble(const Song &song) = 0;
   virtual void Love(const Song &song) = 0;
   virtual void Authenticate(const std::string &username, const std::string &password) = 0;

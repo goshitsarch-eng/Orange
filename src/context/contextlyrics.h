@@ -30,6 +30,20 @@ inline std::string FormatFetched(const std::string &lyrics, const std::string &p
   return lyrics + Footer(provider);
 }
 
+inline bool IsNoResults(const std::string &text) { return text == NoResultsText(); }
+
+inline std::string WithoutFooter(const std::string &text) {
+  if (IsNoResults(text)) {
+    return {};
+  }
+  const std::string marker = "\n\n(Lyrics from ";
+  const size_t pos = text.rfind(marker);
+  if (pos == std::string::npos) {
+    return text;
+  }
+  return text.substr(0, pos);
+}
+
 inline std::string InitialLyricsFromSong(const Song &song) { return song.lyrics(); }
 
 inline bool ShouldFetchOnline(const std::string &current_lyrics, bool show_lyrics, bool search_lyrics, const Song &song, bool already_tried) {

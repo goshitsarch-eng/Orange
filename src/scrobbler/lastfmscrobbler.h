@@ -4,6 +4,7 @@
 #include "scrobbler/audioscrobbler.h"
 #include "scrobbler/scrobblercache.h"
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <string>
@@ -22,6 +23,7 @@ class LastFmScrobbler : public ScrobblerService {
 
   std::string name() const override { return "Last.fm"; }
   void NowPlaying(const Song &song) override;
+  void ClearPlaying() override;
   void Scrobble(const Song &song) override;
   void Love(const Song &song) override;
   void Authenticate(const std::string &username, const std::string &password) override;
@@ -45,6 +47,7 @@ class LastFmScrobbler : public ScrobblerService {
   void SubmitCache();
   void ScheduleSubmit(bool had_error);
   void SaveSession();
+  void CheckScrobblePrevSong();
 
   NetworkAccessManager *network_ = nullptr;
   std::string session_key_;
@@ -52,6 +55,9 @@ class LastFmScrobbler : public ScrobblerService {
   std::string pending_token_;
   ScrobblerCache cache_;
   unsigned submit_timeout_id_ = 0;
+  Song song_playing_;
+  uint64_t timestamp_ = 0;
+  bool scrobbled_ = false;
 };
 
 #endif

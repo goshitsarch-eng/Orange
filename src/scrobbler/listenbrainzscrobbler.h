@@ -4,6 +4,7 @@
 #include "scrobbler/audioscrobbler.h"
 #include "scrobbler/scrobblercache.h"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -17,6 +18,7 @@ class ListenBrainzScrobbler : public ScrobblerService {
 
   std::string name() const override { return "ListenBrainz"; }
   void NowPlaying(const Song &song) override;
+  void ClearPlaying() override;
   void Scrobble(const Song &song) override;
   void Love(const Song &song) override;
   void Authenticate(const std::string &username, const std::string &token) override;
@@ -29,11 +31,15 @@ class ListenBrainzScrobbler : public ScrobblerService {
 
  private:
   void Submit(const std::string &listen_type, const std::vector<ScrobblerCacheItem> &items, bool from_cache);
+  void CheckScrobblePrevSong();
 
   NetworkAccessManager *network_ = nullptr;
   std::string token_;
   std::string username_;
   ScrobblerCache cache_;
+  Song song_playing_;
+  uint64_t timestamp_ = 0;
+  bool scrobbled_ = false;
 };
 
 #endif

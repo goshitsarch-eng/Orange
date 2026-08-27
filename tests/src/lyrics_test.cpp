@@ -93,6 +93,9 @@ TEST(ContextLyrics, PrefersTagLyricsAndFormatsFetch) {
   EXPECT_EQ("\n\n(Lyrics from Genius)\n", ContextLyrics::Footer("Genius"));
   EXPECT_EQ(ContextLyrics::NoResultsText(), ContextLyrics::FormatFetched({}, "Genius"));
   EXPECT_EQ("hello\n\n(Lyrics from Genius)\n", ContextLyrics::FormatFetched("hello", "Genius"));
+  EXPECT_EQ("hello", ContextLyrics::WithoutFooter(ContextLyrics::FormatFetched("hello", "Genius")));
+  EXPECT_TRUE(ContextLyrics::WithoutFooter(ContextLyrics::NoResultsText()).empty());
+  EXPECT_TRUE(ContextLyrics::IsNoResults(ContextLyrics::NoResultsText()));
   Song song;
   song.set_artist("Portishead");
   song.set_title("Roads");

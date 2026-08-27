@@ -1,4 +1,5 @@
 #include "scrobbler/scrobblereligibility.h"
+#include "scrobbler/scrobblerplayingstate.h"
 #include "scrobbler/scrobblersubmittiming.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
@@ -76,6 +77,32 @@ TEST(SubsonicScrobbler, ScrobbleUrlUsesRestEndpoint) {
   EXPECT_NE(std::string::npos, url.find("id=12"));
   EXPECT_NE(std::string::npos, url.find("submission=true"));
   EXPECT_NE(std::string::npos, url.find("p=enc:"));
+}
+
+TEST(ScrobblerPlayingState, SameSongTimestampAndRadioPrev) {
+  Song playing;
+  playing.set_id(7);
+  playing.set_url("http://radio.example/live");
+  playing.set_artist("DJ");
+  playing.set_title("Mix");
+  playing.set_source(Song::Source::SomaFM);
+  Song same = playing;
+  EXPECT_TRUE(ScrobblerPlayingState::SameAsPlaying(same, playing));
+  same.set_url("http://other");
+  EXPECT_FALSE(ScrobblerPlayingState::SameAsPlaying(same, playing));
+  EXPECT_EQ(40, ScrobblerPlayingState::ElapsedSeconds(100, 140));
+  EXPECT_EQ(0, ScrobblerPlayingState::ElapsedSeconds(0, 140));
+  EXPECT_TRUE(ScrobblerPlayingState::ShouldScrobbleRadioPrev(playing, false, 40));
+  EXPECT_FALSE(ScrobblerPlayingState::ShouldScrobbleRadioPrev(playing, true, 40));
+  EXPECT_FALSE(ScrobblerPlayingState::ShouldScrobbleRadioPrev(playing, false, 30));
+  Song local;
+  local.set_url("file:///a.flac");
+  local.set_artist("A");
+  local.set_title("B");
+  local.set_source(Song::Source::LocalFile);
+  EXPECT_FALSE(ScrobblerPlayingState::ShouldScrobbleRadioPrev(local, false, 90));
+  EXPECT_EQ(12u, ScrobblerPlayingState::TimestampOrNow(12, 99));
+  EXPECT_EQ(99u, ScrobblerPlayingState::TimestampOrNow(0, 99));
 }
 
 TEST(ScrobblerSources, EmptyAllowsEverySource) {

@@ -85,11 +85,17 @@ std::string Song::EffectiveAlbumartist() const {
   return artist_;
 }
 
-bool Song::is_stream() const {
-  return source_ == Source::Stream || source_ == Source::Tidal || source_ == Source::Subsonic ||
-         source_ == Source::Qobuz || source_ == Source::Spotify || source_ == Source::SomaFM ||
-         source_ == Source::RadioParadise || source_ == Source::RadioBrowser || filetype_ == FileType::Stream;
+bool Song::is_radio() const {
+  return source_ == Source::Stream || source_ == Source::SomaFM || source_ == Source::RadioParadise || source_ == Source::RadioBrowser;
 }
+
+bool Song::is_stream_service() const {
+  return source_ == Source::Subsonic || source_ == Source::Tidal || source_ == Source::Qobuz || source_ == Source::Spotify;
+}
+
+bool Song::is_stream() const { return is_radio() || is_stream_service() || filetype_ == FileType::Stream; }
+
+bool Song::is_metadata_good() const { return !url_.empty() && !artist_.empty() && !title_.empty(); }
 
 bool Song::IsEditable() const {
   return valid_ && is_local_file() && !is_stream() && !is_cdda() && !unavailable_ && cue_path_.empty();

@@ -105,7 +105,7 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
                      GtkTextIter end;
                      gtk_text_buffer_get_bounds(buffer, &start, &end);
                      gchar *text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
-                     self->save_lyrics_(text ? text : "");
+                     self->save_lyrics_(ContextLyrics::WithoutFooter(text ? text : ""));
                      g_free(text);
                    }),
                    this);

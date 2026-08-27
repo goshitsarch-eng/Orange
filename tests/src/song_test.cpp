@@ -73,6 +73,30 @@ TEST(Song, EqualityByUrl) {
   EXPECT_EQ(a, b);
 }
 
+TEST(Song, RadioAndMetadataMatchQt) {
+  Song radio;
+  radio.set_source(Song::Source::SomaFM);
+  radio.set_url("http://somafm.example/groove");
+  radio.set_artist("DJ");
+  radio.set_title("Mix");
+  EXPECT_TRUE(radio.is_radio());
+  EXPECT_FALSE(radio.is_stream_service());
+  EXPECT_TRUE(radio.is_stream());
+  EXPECT_TRUE(radio.is_metadata_good());
+  Song tidal;
+  tidal.set_source(Song::Source::Tidal);
+  tidal.set_url("tidal://track/1");
+  tidal.set_artist("A");
+  tidal.set_title("B");
+  EXPECT_FALSE(tidal.is_radio());
+  EXPECT_TRUE(tidal.is_stream_service());
+  EXPECT_TRUE(tidal.is_stream());
+  Song incomplete;
+  incomplete.set_source(Song::Source::Stream);
+  incomplete.set_url("http://x");
+  EXPECT_FALSE(incomplete.is_metadata_good());
+}
+
 TEST(Song, IsEditableRequiresLocalWritableFile) {
   Song local;
   local.set_valid(true);

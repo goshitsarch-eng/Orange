@@ -138,6 +138,7 @@ void Application::Init() {
   });
   player_->Stopped.Connect([this]() {
     playback_was_paused_ = false;
+    scrobbler_->ClearPlaying();
     discord_->Clear();
     tray_->SetStopped();
     tray_->ClearNowPlaying();

@@ -30,6 +30,10 @@ inline std::string NextSelected(const std::vector<std::string> &remaining, const
   return remaining.empty() ? std::string(EqualizerPersist::kDefaultPreset) : remaining.front();
 }
 
+inline std::string ConfirmDeleteMessage(const std::string &name) {
+  return "Are you sure you want to delete the \"" + name + "\" preset?";
+}
+
 inline int IndexOf(const std::vector<std::string> &names, const std::string &name) {
   for (size_t i = 0; i < names.size(); ++i) {
     if (names[i] == name) {

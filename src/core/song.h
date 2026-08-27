@@ -221,6 +221,9 @@ class Song {
   std::string PrettyTitleWithArtist() const;
   std::string EffectiveAlbumartist() const;
   bool is_stream() const;
+  bool is_radio() const;
+  bool is_stream_service() const;
+  bool is_metadata_good() const;
   bool is_cdda() const { return source_ == Source::CDDA || filetype_ == FileType::CDDA; }
   bool is_collection_song() const { return source_ == Source::Collection; }
   bool is_local_file() const { return source_ == Source::LocalFile || source_ == Source::Collection; }

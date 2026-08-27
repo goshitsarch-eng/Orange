@@ -54,6 +54,14 @@ void AudioScrobbler::NowPlaying(const Song &song) {
   }
 }
 
+void AudioScrobbler::ClearPlaying() {
+  for (auto &service : services_) {
+    if (service->enabled()) {
+      service->ClearPlaying();
+    }
+  }
+}
+
 void AudioScrobbler::Scrobble(const Song &song) {
   Settings settings;
   settings.BeginGroup(ScrobblerSettings::kSettingsGroup);

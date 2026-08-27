@@ -3,6 +3,7 @@
 #include "constants/scrobblersettings.h"
 #include "core/settings.h"
 #include "scrobbler/scrobblemetadata.h"
+#include "scrobbler/scrobblerplayingstate.h"
 #include "utilities/strutils.h"
 
 #include <ctime>
@@ -75,7 +76,25 @@ void ListenBrainzScrobbler::Submit(const std::string &listen_type, const std::ve
   }, "application/json", {{"Authorization", "Token " + token}});
 }
 
+void ListenBrainzScrobbler::CheckScrobblePrevSong() {
+  const uint64_t now = static_cast<uint64_t>(std::time(nullptr));
+  if (!ScrobblerPlayingState::ShouldScrobbleRadioPrev(song_playing_, scrobbled_,
+                                                      ScrobblerPlayingState::ElapsedSeconds(timestamp_, now))) {
+    return;
+  }
+  Song song = song_playing_;
+  song.set_length_nanosec(ScrobblerPlayingState::ElapsedSeconds(timestamp_, now) * 1000000000LL);
+  Scrobble(song);
+}
+
 void ListenBrainzScrobbler::NowPlaying(const Song &song) {
+  CheckScrobblePrevSong();
+  song_playing_ = song;
+  timestamp_ = static_cast<uint64_t>(std::time(nullptr));
+  scrobbled_ = false;
+  if (!song.is_metadata_good()) {
+    return;
+  }
   const ScrobbleMetadata metadata = ScrobbleMetadata::FromSongSettings(song);
   ScrobblerCacheItem item;
   item.artist = metadata.artist;
@@ -84,8 +103,20 @@ void ListenBrainzScrobbler::NowPlaying(const Song &song) {
   Submit("playing_now", {item}, false);
 }
 
+void ListenBrainzScrobbler::ClearPlaying() {
+  CheckScrobblePrevSong();
+  song_playing_ = Song();
+  scrobbled_ = false;
+  timestamp_ = 0;
+}
+
 void ListenBrainzScrobbler::Scrobble(const Song &song) {
-  cache_.Add(SongFromMetadata(song, ScrobbleMetadata::FromSongSettings(song)), static_cast<uint64_t>(std::time(nullptr)));
+  if (!ScrobblerPlayingState::SameAsPlaying(song, song_playing_)) {
+    return;
+  }
+  scrobbled_ = true;
+  cache_.Add(SongFromMetadata(song, ScrobbleMetadata::FromSongSettings(song)),
+             ScrobblerPlayingState::TimestampOrNow(timestamp_, static_cast<uint64_t>(std::time(nullptr))));
   const std::vector<ScrobblerCacheItem> items = cache_.Unsent();
   cache_.MarkSent();
   Submit("single", items, true);

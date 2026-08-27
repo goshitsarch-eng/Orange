@@ -16,6 +16,7 @@ class AudioScrobbler {
   void ReloadSettings();
   bool enabled() const;
   void NowPlaying(const Song &song);
+  void ClearPlaying();
   void Scrobble(const Song &song);
   void Love(const Song &song);
   void ToggleScrobbling();
