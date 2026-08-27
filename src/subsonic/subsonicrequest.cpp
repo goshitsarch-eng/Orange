@@ -1,7 +1,11 @@
 #include "subsonic/subsonicrequest.h"
 
+#include "core/networktimeoutpolicy.h"
+#include "core/networktimeouts.h"
 #include "streaming/streamingabort.h"
 #include "utilities/jsonutils.h"
+
+#include <memory>
 
 namespace SubsonicRequest {
 
@@ -123,10 +127,15 @@ void Get(NetworkAccessManager *network, const std::string &url, Type type, Searc
     }
     return;
   }
-  network->Get(url, [type, callback, error](const NetworkAccessManager::Response &response) {
+  auto timeouts = std::make_shared<NetworkTimeouts>();
+  timeouts->SetTimeout(NetworkTimeoutPolicy::kSubsonicTimeoutMs);
+  timeouts->SetAbort([network](int req_id) { network->Cancel(req_id); });
+  auto req_id = std::make_shared<int>(0);
+  *req_id = network->Get(url, [type, callback, error, timeouts, req_id](const NetworkAccessManager::Response &response) {
+    timeouts->Cancel(*req_id);
     if (!response.ok()) {
       if (error) {
-        error(StreamingAbort::HttpError(response.status, response.error));
+        error(StreamingAbort::HttpError(response.status, NetworkTimeoutPolicy::FailureMessage(response.error, {})));
       }
       if (callback) {
         callback({});
@@ -137,6 +146,7 @@ void Get(NetworkAccessManager *network, const std::string &url, Type type, Searc
       callback(Parse(type, response.body));
     }
   });
+  timeouts->AddReply(*req_id);
 }
 
 void GetAll(NetworkAccessManager *network, StreamingPage::UrlForOffset url_for, Type type, SearchCallback callback,

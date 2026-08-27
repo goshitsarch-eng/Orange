@@ -2,9 +2,11 @@
 #define STRAWBERRY_MUSICBRAINZCLIENT_H
 
 #include "core/network.h"
+#include "core/networktimeouts.h"
 #include "core/signal.h"
 #include "core/song.h"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -38,6 +40,8 @@ class MusicBrainzClient {
 
  private:
   NetworkAccessManager *network_ = nullptr;
+  NetworkTimeouts timeouts_;
+  std::map<int, int> requests_;
 };
 
 #endif

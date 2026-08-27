@@ -6,6 +6,18 @@
 
 #include <glib.h>
 
+namespace {
+
+struct PendingRequest {
+  NetworkAccessManager::Callback callback;
+  SoupMessage *message = nullptr;
+  GCancellable *cancellable = nullptr;
+  int id = 0;
+  NetworkAccessManager *self = nullptr;
+};
+
+}  // namespace
+
 NetworkAccessManager::NetworkAccessManager() {
   session_ = soup_session_new();
   g_object_set(session_, "user-agent", "Strawberry/1.2.0 (+https://www.strawberrymusicplayer.org)", nullptr);
@@ -14,6 +26,7 @@ NetworkAccessManager::NetworkAccessManager() {
 
 NetworkAccessManager::~NetworkAccessManager() {
   if (session_) {
+    soup_session_abort(session_);
     g_object_unref(session_);
   }
 }
@@ -41,14 +54,23 @@ void NetworkAccessManager::ReloadSettings() {
   SetProxy(proxy.ProxyUri());
 }
 
-void NetworkAccessManager::Send(SoupMessage *message, Callback callback) {
-  struct PendingRequest {
-    Callback callback;
-    SoupMessage *message = nullptr;
-  };
-  auto *pending = new PendingRequest{std::move(callback), message};
+void NetworkAccessManager::Forget(int id) { cancellables_.erase(id); }
+
+void NetworkAccessManager::Cancel(int id) {
+  auto it = cancellables_.find(id);
+  if (it == cancellables_.end() || !it->second) {
+    return;
+  }
+  g_cancellable_cancel(it->second);
+}
+
+int NetworkAccessManager::Send(SoupMessage *message, Callback callback) {
+  const int id = next_id_++;
+  GCancellable *cancellable = g_cancellable_new();
+  auto *pending = new PendingRequest{std::move(callback), message, cancellable, id, this};
   g_object_ref(message);
-  soup_session_send_and_read_async(session_, message, G_PRIORITY_DEFAULT, nullptr,
+  cancellables_[id] = cancellable;
+  soup_session_send_and_read_async(session_, message, G_PRIORITY_DEFAULT, cancellable,
                                    +[](GObject *source, GAsyncResult *result, gpointer user_data) {
                                      auto *pending = static_cast<PendingRequest *>(user_data);
                                      GError *error = nullptr;
@@ -67,39 +89,47 @@ void NetworkAccessManager::Send(SoupMessage *message, Callback callback) {
                                        response.body.assign(data, size);
                                        g_bytes_unref(bytes);
                                      }
+                                     if (pending->self) {
+                                       pending->self->Forget(pending->id);
+                                     }
                                      pending->callback(response);
                                      if (pending->message) {
                                        g_object_unref(pending->message);
                                      }
+                                     if (pending->cancellable) {
+                                       g_object_unref(pending->cancellable);
+                                     }
                                      delete pending;
                                    },
                                    pending);
+  return id;
 }
 
-void NetworkAccessManager::Get(const std::string &url, Callback callback, const std::map<std::string, std::string> &headers) {
+int NetworkAccessManager::Get(const std::string &url, Callback callback, const std::map<std::string, std::string> &headers) {
   SoupMessage *message = soup_message_new("GET", url.c_str());
   if (!message) {
     Response response;
     response.error = "Invalid URL";
     callback(response);
-    return;
+    return 0;
   }
   SoupMessageHeaders *request_headers = soup_message_get_request_headers(message);
   for (const auto &header : headers) {
     soup_message_headers_append(request_headers, header.first.c_str(), header.second.c_str());
   }
-  Send(message, std::move(callback));
+  const int id = Send(message, std::move(callback));
   g_object_unref(message);
+  return id;
 }
 
-void NetworkAccessManager::Post(const std::string &url, const std::string &body, Callback callback, const std::string &content_type,
-                                const std::map<std::string, std::string> &headers) {
+int NetworkAccessManager::Post(const std::string &url, const std::string &body, Callback callback, const std::string &content_type,
+                               const std::map<std::string, std::string> &headers) {
   SoupMessage *message = soup_message_new("POST", url.c_str());
   if (!message) {
     Response response;
     response.error = "Invalid URL";
     callback(response);
-    return;
+    return 0;
   }
   GBytes *bytes = g_bytes_new(body.data(), body.size());
   soup_message_set_request_body_from_bytes(message, content_type.c_str(), bytes);
@@ -108,18 +138,19 @@ void NetworkAccessManager::Post(const std::string &url, const std::string &body,
   for (const auto &header : headers) {
     soup_message_headers_append(request_headers, header.first.c_str(), header.second.c_str());
   }
-  Send(message, std::move(callback));
+  const int id = Send(message, std::move(callback));
   g_object_unref(message);
+  return id;
 }
 
-void NetworkAccessManager::Put(const std::string &url, const std::string &body, Callback callback, const std::string &content_type,
-                               const std::map<std::string, std::string> &headers) {
+int NetworkAccessManager::Put(const std::string &url, const std::string &body, Callback callback, const std::string &content_type,
+                              const std::map<std::string, std::string> &headers) {
   SoupMessage *message = soup_message_new("PUT", url.c_str());
   if (!message) {
     Response response;
     response.error = "Invalid URL";
     callback(response);
-    return;
+    return 0;
   }
   GBytes *bytes = g_bytes_new(body.data(), body.size());
   soup_message_set_request_body_from_bytes(message, content_type.c_str(), bytes);
@@ -128,24 +159,26 @@ void NetworkAccessManager::Put(const std::string &url, const std::string &body, 
   for (const auto &header : headers) {
     soup_message_headers_append(request_headers, header.first.c_str(), header.second.c_str());
   }
-  Send(message, std::move(callback));
+  const int id = Send(message, std::move(callback));
   g_object_unref(message);
+  return id;
 }
 
-void NetworkAccessManager::Delete(const std::string &url, Callback callback, const std::map<std::string, std::string> &headers) {
+int NetworkAccessManager::Delete(const std::string &url, Callback callback, const std::map<std::string, std::string> &headers) {
   SoupMessage *message = soup_message_new("DELETE", url.c_str());
   if (!message) {
     Response response;
     response.error = "Invalid URL";
     callback(response);
-    return;
+    return 0;
   }
   SoupMessageHeaders *request_headers = soup_message_get_request_headers(message);
   for (const auto &header : headers) {
     soup_message_headers_append(request_headers, header.first.c_str(), header.second.c_str());
   }
-  Send(message, std::move(callback));
+  const int id = Send(message, std::move(callback));
   g_object_unref(message);
+  return id;
 }
 
 NetworkAccessManager::Response NetworkAccessManager::GetSync(const std::string &url, const std::map<std::string, std::string> &headers) {

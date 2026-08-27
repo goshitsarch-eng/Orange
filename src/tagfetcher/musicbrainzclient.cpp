@@ -1,10 +1,18 @@
 #include "tagfetcher/musicbrainzclient.h"
 
+#include "core/networktimeoutpolicy.h"
 #include "utilities/jsonutils.h"
 
 #include <glib.h>
 
-MusicBrainzClient::MusicBrainzClient(NetworkAccessManager *network) : network_(network) {}
+MusicBrainzClient::MusicBrainzClient(NetworkAccessManager *network) : network_(network) {
+  timeouts_.SetTimeout(NetworkTimeoutPolicy::kMusicBrainzTimeoutMs);
+  timeouts_.SetAbort([this](int req_id) {
+    if (network_) {
+      network_->Cancel(req_id);
+    }
+  });
+}
 
 MusicBrainzClient::ResultList MusicBrainzClient::ParseResults(const std::string &json) {
   ResultList results;
@@ -56,15 +64,43 @@ void MusicBrainzClient::Start(int id, const std::vector<std::string> &mbid_list)
   }
   const std::string url = std::string("https://musicbrainz.org/ws/2/recording/") + mbid_list.front() +
                           "?inc=artists+releases+release-groups&fmt=json";
-  network_->Get(url, [this, id](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      Finished.Emit(id, {}, response.error.empty() ? "MusicBrainz request failed" : response.error);
-      return;
-    }
-    Finished.Emit(id, ParseResults(response.body), {});
-  }, {{"User-Agent", "Strawberry/1.0 (https://www.strawberrymusicplayer.org/)"}});
+  const int req = network_->Get(
+      url,
+      [this, id](const NetworkAccessManager::Response &response) {
+        auto it = requests_.find(id);
+        if (it != requests_.end()) {
+          timeouts_.Cancel(it->second);
+          requests_.erase(it);
+        }
+        if (!response.ok()) {
+          Finished.Emit(id, {}, NetworkTimeoutPolicy::FailureMessage(response.error, "MusicBrainz request failed"));
+          return;
+        }
+        Finished.Emit(id, ParseResults(response.body), {});
+      },
+      {{"User-Agent", "Strawberry/1.0 (https://www.strawberrymusicplayer.org/)"}});
+  requests_[id] = req;
+  timeouts_.AddReply(req);
 }
 
-void MusicBrainzClient::Cancel(int) {}
+void MusicBrainzClient::Cancel(int id) {
+  auto it = requests_.find(id);
+  if (it == requests_.end()) {
+    return;
+  }
+  timeouts_.Cancel(it->second);
+  if (network_) {
+    network_->Cancel(it->second);
+  }
+  requests_.erase(it);
+}
 
-void MusicBrainzClient::CancelAll() {}
+void MusicBrainzClient::CancelAll() {
+  for (const auto &entry : requests_) {
+    timeouts_.Cancel(entry.second);
+    if (network_) {
+      network_->Cancel(entry.second);
+    }
+  }
+  requests_.clear();
+}

@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_ALBUMCOVERFETCHER_H
 #define STRAWBERRY_ALBUMCOVERFETCHER_H
 
+#include "core/networktimeouts.h"
 #include "core/signal.h"
 #include "covermanager/albumcoverimageresult.h"
 #include "covermanager/coversearchstatistics.h"
@@ -76,6 +77,7 @@ class AlbumCoverFetcher {
 
   CoverProviders *cover_providers_;
   NetworkAccessManager *network_;
+  NetworkTimeouts image_timeouts_;
   uint64_t next_id_ = 1;
   std::queue<CoverSearchRequest> queued_;
   std::map<uint64_t, std::shared_ptr<Job>> active_;

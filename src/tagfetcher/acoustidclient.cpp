@@ -1,5 +1,6 @@
 #include "tagfetcher/acoustidclient.h"
 
+#include "core/networktimeoutpolicy.h"
 #include "utilities/strutils.h"
 
 #include <json-glib/json-glib.h>
@@ -7,7 +8,14 @@
 #include <algorithm>
 #include <glib.h>
 
-AcoustidClient::AcoustidClient(NetworkAccessManager *network) : network_(network) {}
+AcoustidClient::AcoustidClient(NetworkAccessManager *network) : network_(network) {
+  timeouts_.SetTimeout(NetworkTimeoutPolicy::kAcoustidTimeoutMs);
+  timeouts_.SetAbort([this](int req_id) {
+    if (network_) {
+      network_->Cancel(req_id);
+    }
+  });
+}
 
 std::vector<std::string> AcoustidClient::ParseMbids(const std::string &json) {
   std::vector<std::string> mbids;
@@ -58,16 +66,41 @@ void AcoustidClient::Start(int id, const std::string &fingerprint, int duration_
   const std::string url = std::string("https://api.acoustid.org/v2/lookup?client=strawberry&meta=recordingids&duration=") +
                           std::to_string(std::max(1, duration_msec / 1000)) + "&fingerprint=" + (escaped ? escaped : "");
   g_free(escaped);
-  (void)timeout_msec_;
-  network_->Get(url, [this, id](const NetworkAccessManager::Response &response) {
+  timeouts_.SetTimeout(timeout_msec_);
+  const int req = network_->Get(url, [this, id](const NetworkAccessManager::Response &response) {
+    auto it = requests_.find(id);
+    if (it != requests_.end()) {
+      timeouts_.Cancel(it->second);
+      requests_.erase(it);
+    }
     if (!response.ok()) {
-      Finished.Emit(id, {}, response.error.empty() ? "AcoustID request failed" : response.error);
+      Finished.Emit(id, {}, NetworkTimeoutPolicy::FailureMessage(response.error, "AcoustID request failed"));
       return;
     }
     Finished.Emit(id, ParseMbids(response.body), {});
   });
+  requests_[id] = req;
+  timeouts_.AddReply(req);
 }
 
-void AcoustidClient::Cancel(int) {}
+void AcoustidClient::Cancel(int id) {
+  auto it = requests_.find(id);
+  if (it == requests_.end()) {
+    return;
+  }
+  timeouts_.Cancel(it->second);
+  if (network_) {
+    network_->Cancel(it->second);
+  }
+  requests_.erase(it);
+}
 
-void AcoustidClient::CancelAll() {}
+void AcoustidClient::CancelAll() {
+  for (const auto &entry : requests_) {
+    timeouts_.Cancel(entry.second);
+    if (network_) {
+      network_->Cancel(entry.second);
+    }
+  }
+  requests_.clear();
+}

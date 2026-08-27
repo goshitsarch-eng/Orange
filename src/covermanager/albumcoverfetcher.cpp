@@ -1,14 +1,23 @@
 #include "covermanager/albumcoverfetcher.h"
 
+#include "core/networktimeoutpolicy.h"
 #include "covermanager/albumcoverfetchersearch.h"
 #include "covermanager/coverfetchpolicy.h"
 #include "covermanager/coverproviders.h"
 #include "utilities/jsonutils.h"
 
 #include <algorithm>
+#include <memory>
 
 AlbumCoverFetcher::AlbumCoverFetcher(CoverProviders *cover_providers, NetworkAccessManager *network)
-    : cover_providers_(cover_providers), network_(network) {}
+    : cover_providers_(cover_providers), network_(network) {
+  image_timeouts_.SetTimeout(NetworkTimeoutPolicy::kCoverImageTimeoutMs);
+  image_timeouts_.SetAbort([this](int req_id) {
+    if (network_) {
+      network_->Cancel(req_id);
+    }
+  });
+}
 
 AlbumCoverFetcher::~AlbumCoverFetcher() { Clear(); }
 
@@ -42,6 +51,7 @@ void AlbumCoverFetcher::Clear() {
     }
   }
   active_.clear();
+  image_timeouts_.CancelAll();
 }
 
 void AlbumCoverFetcher::StartRequests() {
@@ -143,7 +153,9 @@ void AlbumCoverFetcher::FetchBestCover(const std::shared_ptr<Job> &job) {
   ++job->statistics.network_requests_made;
   const std::string provider = best->provider;
   const std::string image_url = best->image_url;
-  network_->Get(image_url, [this, job, provider, image_url](const NetworkAccessManager::Response &response) {
+  auto req_id = std::make_shared<int>(0);
+  *req_id = network_->Get(image_url, [this, job, provider, image_url, req_id](const NetworkAccessManager::Response &response) {
+    image_timeouts_.Cancel(*req_id);
     if (job->cancelled) {
       return;
     }
@@ -160,4 +172,5 @@ void AlbumCoverFetcher::FetchBestCover(const std::shared_ptr<Job> &job) {
     AlbumCoverFetched.Emit(job->request.id, image, job->statistics);
     StartRequests();
   });
+  image_timeouts_.AddReply(*req_id);
 }

@@ -2,8 +2,10 @@
 #define STRAWBERRY_ACOUSTIDCLIENT_H
 
 #include "core/network.h"
+#include "core/networktimeouts.h"
 #include "core/signal.h"
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -11,7 +13,10 @@ class AcoustidClient {
  public:
   explicit AcoustidClient(NetworkAccessManager *network);
 
-  void SetTimeout(int msec) { timeout_msec_ = msec; }
+  void SetTimeout(int msec) {
+    timeout_msec_ = msec;
+    timeouts_.SetTimeout(msec);
+  }
   void Start(int id, const std::string &fingerprint, int duration_msec);
   void Cancel(int id);
   void CancelAll();
@@ -22,7 +27,9 @@ class AcoustidClient {
 
  private:
   NetworkAccessManager *network_ = nullptr;
+  NetworkTimeouts timeouts_;
   int timeout_msec_ = 5000;
+  std::map<int, int> requests_;
 };
 
 #endif

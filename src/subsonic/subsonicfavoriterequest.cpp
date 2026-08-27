@@ -1,5 +1,7 @@
 #include "subsonic/subsonicfavoriterequest.h"
 
+#include "core/networktimeoutpolicy.h"
+#include "core/networktimeouts.h"
 #include "streaming/streamingabort.h"
 #include "utilities/jsonutils.h"
 
@@ -59,10 +61,15 @@ void Get(NetworkAccessManager *network, const std::string &list_url, SearchCallb
     }
     return;
   }
-  network->Get(list_url, [callback, error](const NetworkAccessManager::Response &response) {
+  auto timeouts = std::make_shared<NetworkTimeouts>();
+  timeouts->SetTimeout(NetworkTimeoutPolicy::kSubsonicTimeoutMs);
+  timeouts->SetAbort([network](int req_id) { network->Cancel(req_id); });
+  auto req_id = std::make_shared<int>(0);
+  *req_id = network->Get(list_url, [callback, error, timeouts, req_id](const NetworkAccessManager::Response &response) {
+    timeouts->Cancel(*req_id);
     if (!response.ok()) {
       if (error) {
-        error(StreamingAbort::HttpError(response.status, response.error));
+        error(StreamingAbort::HttpError(response.status, NetworkTimeoutPolicy::FailureMessage(response.error, {})));
       }
       if (callback) {
         callback({});
@@ -73,6 +80,7 @@ void Get(NetworkAccessManager *network, const std::string &list_url, SearchCallb
       callback(JsonUtils::ParseSubsonicSongs(response.body));
     }
   });
+  timeouts->AddReply(*req_id);
 }
 
 void Mutate(NetworkAccessManager *network, const std::string &url, const SongList &songs, SearchCallback callback) {

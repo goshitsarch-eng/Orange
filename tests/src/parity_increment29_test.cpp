@@ -2,6 +2,7 @@
 #include "core/httpbaserequest.h"
 #include "core/jsonbaserequest.h"
 #include "core/networkproxyfactory.h"
+#include "core/networktimeoutpolicy.h"
 #include "core/networktimeouts.h"
 #include "core/settings.h"
 #include "covermanager/coverutils.h"
@@ -141,6 +142,16 @@ TEST(NetworkHelpers, ProxyAndParams) {
   NetworkTimeouts timeouts;
   timeouts.SetTimeout(10);
   EXPECT_EQ(10, timeouts.timeout());
+  EXPECT_EQ(5000, NetworkTimeoutPolicy::kAcoustidTimeoutMs);
+  EXPECT_EQ(8000, NetworkTimeoutPolicy::kMusicBrainzTimeoutMs);
+  EXPECT_EQ(6000, NetworkTimeoutPolicy::kCoverImageTimeoutMs);
+  EXPECT_EQ(30000, NetworkTimeoutPolicy::kSubsonicTimeoutMs);
+  EXPECT_EQ("Request timed out", NetworkTimeoutPolicy::TimedOutMessage());
+  EXPECT_TRUE(NetworkTimeoutPolicy::IsCancelled("Operation was cancelled"));
+  EXPECT_TRUE(NetworkTimeoutPolicy::IsCancelled("Request timed out"));
+  EXPECT_FALSE(NetworkTimeoutPolicy::IsCancelled("connection refused"));
+  EXPECT_EQ("Request timed out", NetworkTimeoutPolicy::FailureMessage("Cancelled", "fallback"));
+  EXPECT_EQ("fallback", NetworkTimeoutPolicy::FailureMessage({}, "fallback"));
 }
 
 TEST(UtilitiesParity, ColorCryptXmlRandEnvMime) {

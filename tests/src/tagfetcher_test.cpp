@@ -1,7 +1,10 @@
 #include "dialogs/trackselectionlabels.h"
 #include "tagfetcher/musicbrainzclient.h"
+#include "core/networktimeoutpolicy.h"
+#include "core/networktimeouts.h"
 #include "tagfetcher/tagfetchhelpers.h"
 
+#include <glib.h>
 #include <gtest/gtest.h>
 
 TEST(MusicBrainzClient, ToSongsPreservesRecordingIds) {
@@ -122,4 +125,42 @@ TEST(TrackSelectionLabels, QtCopyAndEmptyResults) {
   EXPECT_TRUE(TrackSelectionLabels::NavEnabled(3));
   EXPECT_FALSE(TrackSelectionLabels::ApplyAllVisible(1));
   EXPECT_TRUE(TrackSelectionLabels::ApplyAllVisible(2));
+}
+
+TEST(NetworkTimeouts, AbortFiresAfterTimeout) {
+  NetworkTimeouts timeouts;
+  timeouts.SetTimeout(1);
+  int aborted = -1;
+  timeouts.SetAbort([&aborted](int id) { aborted = id; });
+  timeouts.AddReply(42);
+  EXPECT_TRUE(timeouts.Contains(42));
+  const gint64 deadline = g_get_monotonic_time() + 500 * G_TIME_SPAN_MILLISECOND;
+  while (aborted < 0 && g_get_monotonic_time() < deadline) {
+    g_main_context_iteration(nullptr, TRUE);
+  }
+  EXPECT_EQ(42, aborted);
+  EXPECT_FALSE(timeouts.Contains(42));
+}
+
+TEST(NetworkTimeouts, CancelPreventsAbort) {
+  NetworkTimeouts timeouts;
+  timeouts.SetTimeout(50);
+  bool aborted = false;
+  timeouts.SetAbort([&aborted](int) { aborted = true; });
+  timeouts.AddReply(7);
+  timeouts.Cancel(7);
+  EXPECT_FALSE(timeouts.Contains(7));
+  const gint64 deadline = g_get_monotonic_time() + 80 * G_TIME_SPAN_MILLISECOND;
+  while (g_get_monotonic_time() < deadline) {
+    g_main_context_iteration(nullptr, FALSE);
+    g_usleep(1000);
+  }
+  EXPECT_FALSE(aborted);
+}
+
+TEST(NetworkTimeouts, AddReplyZeroIsIgnored) {
+  NetworkTimeouts timeouts;
+  timeouts.SetTimeout(1);
+  timeouts.AddReply(0);
+  EXPECT_FALSE(timeouts.Contains(0));
 }
