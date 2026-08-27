@@ -512,6 +512,33 @@ TEST(EditTagCover, ChangeArtAndActionEnableMatchQt) {
   EXPECT_FALSE(EditTagCover::DeleteCoverEnabled(art, false, false));
 }
 
+TEST(EditTagCover, ArtDifferentAndTabEnableMatchQt) {
+  EXPECT_STREQ("Different art across multiple songs.", EditTagCover::ArtDifferentHint());
+  EXPECT_STREQ("(different across multiple songs)", EditTagCover::TagsDifferentHint());
+  EXPECT_TRUE(EditTagCover::SummaryTabEnabled(1));
+  EXPECT_TRUE(EditTagCover::LyricsTabEnabled(0));
+  EXPECT_TRUE(EditTagCover::LyricsTabEnabled(1));
+  EXPECT_FALSE(EditTagCover::SummaryTabEnabled(2));
+  EXPECT_FALSE(EditTagCover::LyricsTabEnabled(2));
+
+  Song a = MakeTagged("Roads", "Portishead", "Dummy");
+  Song b = MakeTagged("Glory Box", "Portishead", "Dummy");
+  EXPECT_FALSE(EditTagCover::ArtDifferent(a, b));
+  EXPECT_FALSE(EditTagCover::ArtDifferentAcrossSongs({a}));
+  EXPECT_FALSE(EditTagCover::ArtDifferentAcrossSongs({a, b}));
+  b.set_art_manual("/covers/glory.jpg");
+  EXPECT_TRUE(EditTagCover::ArtDifferent(a, b));
+  EXPECT_TRUE(EditTagCover::ArtDifferentAcrossSongs({a, b}));
+  a.set_art_embedded(true);
+  b.set_art_manual("");
+  b.set_art_embedded(true);
+  EXPECT_FALSE(EditTagCover::ArtDifferent(a, b));
+  b.set_album("Portishead");
+  EXPECT_TRUE(EditTagCover::ArtDifferent(a, b));
+  EXPECT_TRUE(EditTagCover::ShowCoverEnabled(a, false));
+  EXPECT_FALSE(EditTagCover::ShowCoverEnabled(a, EditTagCover::ArtDifferentAcrossSongs({a, b})));
+}
+
 TEST(EditTagFields, FieldEnabledMatchesQtFiletypeSupport) {
   Song flac;
   flac.set_filetype(Song::FileType::FLAC);

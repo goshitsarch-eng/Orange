@@ -70,6 +70,34 @@ inline bool DeleteCoverEnabled(const Song &song, bool change_art, bool art_diffe
   return change_art && (art_different || song.art_embedded() || !song.art_automatic().empty() || !song.art_manual().empty());
 }
 
+inline const char *ArtDifferentHint() { return "Different art across multiple songs."; }
+
+inline const char *TagsDifferentHint() { return "(different across multiple songs)"; }
+
+inline bool ArtDifferent(const Song &first, const Song &other) {
+  return other.art_manual() != first.art_manual() || other.art_embedded() != first.art_embedded() ||
+         other.art_automatic() != first.art_automatic() ||
+         (other.art_embedded() && first.art_embedded() &&
+          (first.EffectiveAlbumartist() != other.EffectiveAlbumartist() || first.album() != other.album()));
+}
+
+inline bool ArtDifferentAcrossSongs(const SongList &songs) {
+  if (songs.size() < 2) {
+    return false;
+  }
+  const Song &first = songs.front();
+  for (size_t i = 1; i < songs.size(); ++i) {
+    if (ArtDifferent(first, songs[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+inline bool SummaryTabEnabled(size_t selected_count) { return selected_count <= 1; }
+
+inline bool LyricsTabEnabled(size_t selected_count) { return selected_count <= 1; }
+
 }  // namespace EditTagCover
 
 #endif
