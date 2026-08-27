@@ -8,6 +8,7 @@
 #include "smartplaylists/smartplaylistpreviewpolicy.h"
 #include "smartplaylists/smartplaylistsearchpreview.h"
 #include "smartplaylists/smartplaylistsearchtermwidget.h"
+#include "smartplaylists/smartplaylisttermrow.h"
 #include "smartplaylists/smartplaylistsummary.h"
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
@@ -44,8 +45,8 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
     std::unique_ptr<SmartPlaylistWizardTypePage> type;
     GtkWidget *match = nullptr;
     GtkWidget *terms_box = nullptr;
-    GtkWidget *add_term = nullptr;
     std::vector<std::unique_ptr<SmartPlaylistSearchTermWidget>> terms;
+    std::unique_ptr<SmartPlaylistSearchTermWidget> placeholder;
     GtkWidget *random = nullptr;
     GtkWidget *field_sort = nullptr;
     GtkWidget *limit_none = nullptr;
@@ -89,23 +90,44 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
       }
     }
 
+    void PinPlaceholder() {
+      if (!placeholder || !terms_box || !SmartPlaylistTermRow::KeepsPlaceholder()) {
+        return;
+      }
+      GtkWidget *after = terms.empty() ? nullptr : terms.back()->widget();
+      if (after) {
+        gtk_box_reorder_child_after(GTK_BOX(terms_box), placeholder->widget(), after);
+      }
+    }
+
+    void RemoveTerm(SmartPlaylistSearchTermWidget *target) {
+      for (auto it = terms.begin(); it != terms.end(); ++it) {
+        if (it->get() == target) {
+          gtk_box_remove(GTK_BOX(terms_box), (*it)->widget());
+          terms.erase(it);
+          RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Terms);
+          return;
+        }
+      }
+    }
+
     void AddTerm(const SmartPlaylistTerm *term = nullptr) {
       auto widget = std::make_unique<SmartPlaylistSearchTermWidget>();
       widget->SetChangedCallback([this]() { RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Terms); });
+      SmartPlaylistSearchTermWidget *raw = widget.get();
+      widget->SetRemoveCallback([this, raw]() { RemoveTerm(raw); });
       if (term) {
         widget->SetTerm(*term);
       }
       gtk_box_append(GTK_BOX(terms_box), widget->widget());
       terms.push_back(std::move(widget));
+      PinPlaceholder();
       RefreshPreview(SmartPlaylistPreviewPolicy::Kind::Terms);
     }
 
     void ApplyTermsSensitive() {
       const bool on = Labels::TermsSensitive(Labels::TypeFromIndex(static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(match)))));
       gtk_widget_set_sensitive(terms_box, on);
-      if (add_term) {
-        gtk_widget_set_sensitive(add_term, on);
-      }
     }
 
     void ApplySortSensitive() {
@@ -161,7 +183,13 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   gtk_box_append(GTK_BOX(box), state->match);
   gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(Labels::SearchTerms())));
   gtk_box_append(GTK_BOX(box), state->terms_box);
-  const int initial_terms = editing ? std::max(3, static_cast<int>(search.terms.size())) : 3;
+  if (SmartPlaylistTermRow::KeepsPlaceholder()) {
+    state->placeholder = std::make_unique<SmartPlaylistSearchTermWidget>();
+    state->placeholder->SetActive(false);
+    state->placeholder->SetClickedCallback([state]() { state->AddTerm(); });
+    gtk_box_append(GTK_BOX(state->terms_box), state->placeholder->widget());
+  }
+  const int initial_terms = SmartPlaylistTermRow::InitialActiveTerms(editing, static_cast<int>(search.terms.size()));
   for (int i = 0; i < initial_terms; ++i) {
     if (editing && i < static_cast<int>(search.terms.size())) {
       state->AddTerm(&search.terms[static_cast<size_t>(i)]);
@@ -169,14 +197,6 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
       state->AddTerm();
     }
   }
-  state->add_term = gtk_button_new_with_label(Translations::CStr("Add term"));
-  g_object_set_data(G_OBJECT(state->add_term), "wizard", state);
-  g_signal_connect(state->add_term, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
-                     auto *wizard = static_cast<WizardState *>(g_object_get_data(G_OBJECT(button), "wizard"));
-                     wizard->AddTerm();
-                   }),
-                   nullptr);
-  gtk_box_append(GTK_BOX(box), state->add_term);
   gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(Labels::Sorting())));
   gtk_box_append(GTK_BOX(box), state->random);
   gtk_box_append(GTK_BOX(box), state->field_sort);

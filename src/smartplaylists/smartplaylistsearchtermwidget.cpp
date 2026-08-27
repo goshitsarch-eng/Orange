@@ -1,19 +1,33 @@
 #include "smartplaylists/smartplaylistsearchtermwidget.h"
 
 #include "dialogs/dialoghelpers.h"
+#include "smartplaylists/smartplaylistsearchtermwidgetoverlay.h"
+#include "smartplaylists/smartplaylisttermrow.h"
 
 #include <algorithm>
 
 using DialogHelpers::DropDownFromNames;
 
 SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget() {
-  widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  widget_ = gtk_overlay_new();
+  row_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   field_ = DropDownFromNames(SmartPlaylistSearch::FieldNames());
   op_ = DropDownFromNames(SmartPlaylistSearch::OpNames());
-  gtk_box_append(GTK_BOX(widget_), field_);
-  gtk_box_append(GTK_BOX(widget_), op_);
+  remove_ = gtk_button_new_from_icon_name("list-remove-symbolic");
+  gtk_widget_set_tooltip_text(remove_, "Remove search term");
+  gtk_widget_set_valign(remove_, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(row_), field_);
+  gtk_box_append(GTK_BOX(row_), op_);
   RebuildOps();
   RebuildValue();
+  gtk_box_append(GTK_BOX(row_), remove_);
+  gtk_overlay_set_child(GTK_OVERLAY(widget_), row_);
+  overlay_ = gtk_button_new_with_label(SmartPlaylistTermRow::OverlayLabel());
+  gtk_widget_add_css_class(overlay_, "suggested-action");
+  gtk_widget_set_halign(overlay_, GTK_ALIGN_FILL);
+  gtk_widget_set_valign(overlay_, GTK_ALIGN_FILL);
+  gtk_overlay_add_overlay(GTK_OVERLAY(widget_), overlay_);
+  SmartPlaylistSearchTermWidgetOverlay::Apply(widget_);
   g_signal_connect(field_, "notify::selected", G_CALLBACK((+[](GtkDropDown *, GParamSpec *, gpointer data) {
                      auto *self = static_cast<SmartPlaylistSearchTermWidget *>(data);
                      if (self->updating_) {
@@ -37,6 +51,36 @@ SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget() {
                      self->EmitChanged();
                    })),
                    this);
+  g_signal_connect(remove_, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<SmartPlaylistSearchTermWidget *>(data);
+                     if (self->active_ && self->removed_) {
+                       self->removed_();
+                     }
+                   })),
+                   this);
+  g_signal_connect(overlay_, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<SmartPlaylistSearchTermWidget *>(data);
+                     if (!self->active_ && self->clicked_) {
+                       self->clicked_();
+                     }
+                   })),
+                   this);
+  ApplyActive();
+}
+
+void SmartPlaylistSearchTermWidget::SetActive(bool active) {
+  active_ = active;
+  ApplyActive();
+}
+
+void SmartPlaylistSearchTermWidget::ApplyActive() {
+  gtk_widget_set_sensitive(row_, SmartPlaylistTermRow::RowSensitive(active_) ? TRUE : FALSE);
+  if (remove_) {
+    gtk_widget_set_visible(remove_, SmartPlaylistTermRow::ShowsRemove(active_) ? TRUE : FALSE);
+  }
+  if (overlay_) {
+    gtk_widget_set_visible(overlay_, active_ ? FALSE : TRUE);
+  }
 }
 
 void SmartPlaylistSearchTermWidget::RebuildOps() {
@@ -56,7 +100,7 @@ void SmartPlaylistSearchTermWidget::RebuildOps() {
 void SmartPlaylistSearchTermWidget::RebuildValue() {
   const std::string previous = CurrentValue();
   if (value_) {
-    gtk_box_remove(GTK_BOX(widget_), value_);
+    gtk_box_remove(GTK_BOX(row_), value_);
     value_ = nullptr;
   }
   const SmartPlaylistField field = SmartPlaylistSearch::FieldFromIndex(static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(field_))));
@@ -80,7 +124,7 @@ void SmartPlaylistSearchTermWidget::RebuildValue() {
     gtk_entry_set_placeholder_text(GTK_ENTRY(value_), "Value");
   }
   gtk_widget_set_hexpand(value_, TRUE);
-  gtk_box_append(GTK_BOX(widget_), value_);
+  gtk_box_insert_child_after(GTK_BOX(row_), value_, op_);
   if (!previous.empty()) {
     SetCurrentValue(previous);
   }
@@ -107,7 +151,7 @@ void SmartPlaylistSearchTermWidget::ConnectValueSignals() {
 }
 
 void SmartPlaylistSearchTermWidget::EmitChanged() {
-  if (!updating_ && changed_) {
+  if (!updating_ && active_ && changed_) {
     changed_();
   }
 }

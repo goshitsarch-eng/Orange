@@ -7,6 +7,8 @@
 #include "smartplaylists/smartplaylist.h"
 #include "smartplaylists/smartplaylistsummary.h"
 #include "smartplaylists/smartplaylistpreviewpolicy.h"
+#include "smartplaylists/smartplaylistsearchtermwidgetoverlay.h"
+#include "smartplaylists/smartplaylisttermrow.h"
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
@@ -530,6 +532,20 @@ TEST(SmartPlaylistWizardLabels, SearchSortLimitAndDynamicCopy) {
   EXPECT_FALSE(SmartPlaylistWizardLabels::LimitSpinSensitive(true));
   EXPECT_TRUE(SmartPlaylistWizardLabels::LimitSpinSensitive(false));
   EXPECT_EQ(3u, SmartPlaylistWizardLabels::SearchTypeChoices().size());
+}
+
+TEST(SmartPlaylistTermRow, PlaceholderAndRemoveMatchQt) {
+  EXPECT_STREQ("Add search term", SmartPlaylistTermRow::OverlayLabel());
+  EXPECT_STREQ("Add search term", SmartPlaylistSearchTermWidgetOverlay::Label());
+  EXPECT_TRUE(SmartPlaylistTermRow::RowSensitive(true));
+  EXPECT_FALSE(SmartPlaylistTermRow::RowSensitive(false));
+  EXPECT_TRUE(SmartPlaylistTermRow::ShowsRemove(true));
+  EXPECT_FALSE(SmartPlaylistTermRow::ShowsRemove(false));
+  EXPECT_EQ(1, SmartPlaylistTermRow::InitialActiveTerms(false, 0));
+  EXPECT_EQ(1, SmartPlaylistTermRow::InitialActiveTerms(false, 5));
+  EXPECT_EQ(2, SmartPlaylistTermRow::InitialActiveTerms(true, 2));
+  EXPECT_EQ(0, SmartPlaylistTermRow::InitialActiveTerms(true, 0));
+  EXPECT_TRUE(SmartPlaylistTermRow::KeepsPlaceholder());
 }
 
 TEST(SmartPlaylistWizardFinishPage, IsCompleteRequiresNonEmptyName) {
