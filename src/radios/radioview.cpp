@@ -2,6 +2,7 @@
 
 #include "radios/radiodrag.h"
 #include "radios/radiotree.h"
+#include "radios/radiotreeleft.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 #include "widgets/listboxtreepressgtk.h"
@@ -168,6 +169,40 @@ std::vector<RadioChannel> RadioView::SelectedChannels() const {
 
 SongList RadioView::SelectedSongs() const { return RadioDrag::Songs(SelectedChannels()); }
 
+void RadioView::SelectService(Song::Source source) {
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    const RadioTree::Kind kind = static_cast<RadioTree::Kind>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-kind")) - 1);
+    const auto row_source = static_cast<Song::Source>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-source")));
+    if (kind != RadioTree::Kind::Service || row_source != source) {
+      continue;
+    }
+    gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+    gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
+    gtk_widget_grab_focus(child);
+    return;
+  }
+}
+
+bool RadioView::ApplyTreeLeft() {
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  if (!row || !model_) {
+    return false;
+  }
+  const RadioTree::Kind kind = static_cast<RadioTree::Kind>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-kind")) - 1);
+  const auto source = static_cast<Song::Source>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-source")));
+  const bool expanded = model_->Expanded(source);
+  if (!RadioTreeLeft::ShouldCollapse(kind, expanded)) {
+    return false;
+  }
+  model_->Toggle(source);
+  Reload(model_);
+  SelectService(source);
+  return true;
+}
+
 void RadioView::ResetTypeAhead() {
   typeahead_.clear();
   if (typeahead_timeout_) {
@@ -182,6 +217,23 @@ gboolean RadioView::OnKeyPressed(guint keyval) {
     return TRUE;
   }
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
+  if (keyval == ListBoxKeyboard::kLeft && ApplyTreeLeft()) {
+    return TRUE;
+  }
+  if (keyval == ListBoxKeyboard::kRight) {
+    GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+    if (!row || !model_) {
+      return FALSE;
+    }
+    const RadioTree::Kind kind = static_cast<RadioTree::Kind>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-kind")) - 1);
+    const auto source = static_cast<Song::Source>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-source")));
+    if (RadioTreeLeft::ShouldExpand(kind, model_->Expanded(source))) {
+      model_->Toggle(source);
+      Reload(model_);
+      SelectService(source);
+    }
+    return kind == RadioTree::Kind::Service ? TRUE : FALSE;
+  }
   if (action == ListBoxKeyboard::Action::Activate) {
     ListBoxKeyboardGtk::ActivateSelected(list_);
     return TRUE;

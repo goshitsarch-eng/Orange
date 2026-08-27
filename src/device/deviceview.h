@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_DEVICEVIEW_H
 #define STRAWBERRY_DEVICEVIEW_H
 
+#include "collection/collectionfocus.h"
 #include "collection/collectionitem.h"
 #include "collection/collectionmodel.h"
 #include "core/song.h"
@@ -40,6 +41,9 @@ class DeviceView {
   void RebuildSongs();
   void AppendItem(const CollectionItem *item, int depth);
   void ToggleExpanded(const CollectionItem *item);
+  const CollectionItem *SelectedItem() const;
+  void SelectFocusItem();
+  bool ApplyTreeLeft();
   void AttachMenu(GtkWidget *row);
   void SetupRowDrag(GtkWidget *row, const Song &song);
   gboolean OnKeyPressed(guint keyval);
@@ -49,6 +53,7 @@ class DeviceView {
   GtkWidget *list_ = nullptr;
   CollectionModel model_;
   std::set<std::string> expanded_;
+  CollectionFocus::State focus_;
   SongList songs_;
   std::function<void(const std::string &)> device_cb_;
   std::function<void(const Song &)> song_cb_;

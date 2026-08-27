@@ -33,6 +33,8 @@ class RadioView {
  private:
   void SetupRowDrag(GtkWidget *row, const RadioChannel &channel);
   gboolean OnKeyPressed(guint keyval);
+  bool ApplyTreeLeft();
+  void SelectService(Song::Source source);
   void ResetTypeAhead();
 
   GtkWidget *widget_ = nullptr;

@@ -11,6 +11,7 @@
 #include "radios/radiomenu.h"
 #include "radios/radiomodel.h"
 #include "radios/radiotree.h"
+#include "radios/radiotreeleft.h"
 #include "radios/radioparadiseservice.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/somafmservice.h"
@@ -368,4 +369,16 @@ TEST(RadioTree, GroupsCollapsesAndServiceLabels) {
   model.Toggle(Song::Source::SomaFM);
   EXPECT_FALSE(model.Expanded(Song::Source::SomaFM));
   EXPECT_EQ(3u, model.Rows().size());
+}
+
+TEST(RadioTreeLeft, CollapseChannelOrService) {
+  EXPECT_EQ(RadioTreeLeft::Action::SelectParentAndCollapse, RadioTreeLeft::FromRow(RadioTree::Kind::Channel, true));
+  EXPECT_EQ(RadioTreeLeft::Action::CollapseCurrent, RadioTreeLeft::FromRow(RadioTree::Kind::Service, true));
+  EXPECT_EQ(RadioTreeLeft::Action::None, RadioTreeLeft::FromRow(RadioTree::Kind::Service, false));
+  EXPECT_TRUE(RadioTreeLeft::ShouldCollapse(RadioTree::Kind::Channel, true));
+  EXPECT_TRUE(RadioTreeLeft::ShouldCollapse(RadioTree::Kind::Service, true));
+  EXPECT_FALSE(RadioTreeLeft::ShouldCollapse(RadioTree::Kind::Service, false));
+  EXPECT_TRUE(RadioTreeLeft::ShouldExpand(RadioTree::Kind::Service, false));
+  EXPECT_FALSE(RadioTreeLeft::ShouldExpand(RadioTree::Kind::Service, true));
+  EXPECT_FALSE(RadioTreeLeft::ShouldExpand(RadioTree::Kind::Channel, false));
 }

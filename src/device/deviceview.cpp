@@ -3,6 +3,7 @@
 #include "collection/collectiongrouping.h"
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectiontree.h"
+#include "collection/collectiontreeleft.h"
 #include "device/devicekeyboard.h"
 #include "device/devicedrag.h"
 #include "device/deviceviewlook.h"
@@ -96,11 +97,70 @@ void DeviceView::ResetTypeAhead() {
   }
 }
 
+const CollectionItem *DeviceView::SelectedItem() const {
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  return row ? static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item")) : nullptr;
+}
+
+void DeviceView::SelectFocusItem() {
+  const CollectionItem *target = CollectionFocus::FindTarget(model_.root(), focus_);
+  if (!target) {
+    return;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(child), "item"));
+    if (item != target) {
+      continue;
+    }
+    gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+    gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
+    gtk_widget_grab_focus(child);
+    return;
+  }
+}
+
+bool DeviceView::ApplyTreeLeft() {
+  const CollectionItem *item = SelectedItem();
+  if (!item) {
+    return false;
+  }
+  const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
+  const CollectionTreeLeft::Action action = CollectionTreeLeft::FromItem(item, expanded);
+  if (action == CollectionTreeLeft::Action::None) {
+    return false;
+  }
+  const CollectionItem *focus = CollectionTreeLeft::FocusItem(item, action);
+  const CollectionItem *parent = CollectionTreeLeft::SelectableParent(item);
+  const bool parent_expanded = CollectionTree::ShowChildren(parent, false, expanded_);
+  const CollectionItem *collapse = CollectionTreeLeft::CollapseItem(item, action, parent_expanded);
+  CollectionFocus::Capture(focus, &focus_);
+  if (collapse) {
+    ToggleExpanded(collapse);
+  }
+  SelectFocusItem();
+  return true;
+}
+
 gboolean DeviceView::OnKeyPressed(guint keyval) {
   const DeviceKeyboard::Action action = DeviceKeyboard::FromKey(keyval);
   if (action == DeviceKeyboard::Action::Activate) {
     ListBoxKeyboardGtk::ActivateSelected(list_);
     return TRUE;
+  }
+  if (action == DeviceKeyboard::Action::Collapse && ApplyTreeLeft()) {
+    return TRUE;
+  }
+  if (action == DeviceKeyboard::Action::Expand) {
+    const CollectionItem *item = SelectedItem();
+    if (CollectionTree::IsExpandable(item) && !CollectionTree::ShowChildren(item, false, expanded_)) {
+      CollectionFocus::Capture(item, &focus_);
+      ToggleExpanded(item);
+      SelectFocusItem();
+    }
+    return CollectionTree::IsExpandable(item) ? TRUE : FALSE;
   }
   if (action == DeviceKeyboard::Action::Back && back_cb_) {
     back_cb_();

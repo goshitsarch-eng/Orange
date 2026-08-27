@@ -448,6 +448,8 @@ TEST(DeviceKeyboard, FromKeyBackAndSpecialRows) {
   EXPECT_EQ(DeviceKeyboard::Action::End, DeviceKeyboard::FromKey(ListBoxKeyboard::kEnd));
   EXPECT_EQ(DeviceKeyboard::Action::Back, DeviceKeyboard::FromKey(ListBoxKeyboard::kBackSpace));
   EXPECT_EQ(DeviceKeyboard::Action::Escape, DeviceKeyboard::FromKey(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(DeviceKeyboard::Action::Expand, DeviceKeyboard::FromKey(ListBoxKeyboard::kRight));
+  EXPECT_EQ(DeviceKeyboard::Action::Collapse, DeviceKeyboard::FromKey(ListBoxKeyboard::kLeft));
   EXPECT_EQ(DeviceKeyboard::Action::None, DeviceKeyboard::FromKey('a'));
   EXPECT_EQ(ListBoxKeyboard::Action::Home, DeviceKeyboard::MoveAction(DeviceKeyboard::Action::Home));
   EXPECT_EQ(ListBoxKeyboard::Action::None, DeviceKeyboard::MoveAction(DeviceKeyboard::Action::Back));

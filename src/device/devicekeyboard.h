@@ -7,7 +7,7 @@
 
 namespace DeviceKeyboard {
 
-enum class Action { None, Activate, MoveUp, MoveDown, Home, End, Escape, Back, TypeAhead };
+enum class Action { None, Activate, MoveUp, MoveDown, Home, End, Escape, Back, Expand, Collapse, TypeAhead };
 
 inline Action FromKey(unsigned keyval) {
   if (keyval == ListBoxKeyboard::kReturn || keyval == ListBoxKeyboard::kKPEnter) {
@@ -24,6 +24,12 @@ inline Action FromKey(unsigned keyval) {
   }
   if (keyval == ListBoxKeyboard::kEnd) {
     return Action::End;
+  }
+  if (keyval == ListBoxKeyboard::kRight) {
+    return Action::Expand;
+  }
+  if (keyval == ListBoxKeyboard::kLeft) {
+    return Action::Collapse;
   }
   if (keyval == ListBoxKeyboard::kEscape || keyval == ListBoxKeyboard::kBackSpace) {
     return keyval == ListBoxKeyboard::kBackSpace ? Action::Back : Action::Escape;
