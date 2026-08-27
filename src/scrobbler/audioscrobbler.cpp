@@ -45,6 +45,12 @@ bool AudioScrobbler::enabled() const {
   return false;
 }
 
+bool AudioScrobbler::offline() const {
+  Settings settings;
+  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  return settings.BoolValue(ScrobblerSettings::kOffline, ScrobblerSettings::kDefaultOffline);
+}
+
 void AudioScrobbler::NowPlaying(const Song &song) {
   Settings settings;
   settings.BeginGroup(ScrobblerSettings::kSettingsGroup);

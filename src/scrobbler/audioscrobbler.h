@@ -15,6 +15,7 @@ class AudioScrobbler {
   explicit AudioScrobbler(NetworkAccessManager *network);
   void ReloadSettings();
   bool enabled() const;
+  bool offline() const;
   void NowPlaying(const Song &song);
   void ClearPlaying();
   void Scrobble(const Song &song);

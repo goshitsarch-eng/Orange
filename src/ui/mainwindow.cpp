@@ -5,6 +5,7 @@
 #include "collection/collectionfullrescan.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionincremental.h"
+#include "playlist/playlistactivate.h"
 #include "playlist/playlistqueuerefresh.h"
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectionfiltermenu.h"
@@ -87,6 +88,7 @@
 #include "streaming/streamingsearchopts.h"
 #include "constants/scrobblersettings.h"
 #include "playlist/playlistrestorescroll.h"
+#include "scrobbler/scrobblerlifecycle.h"
 #include "scrobbler/scrobblepoint.h"
 #include "scrobbler/scrobbletoggleicon.h"
 #include "scrobbler/scrobblererror.h"
@@ -204,6 +206,9 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
   has_pending_options_ = true;
   if (app_->playlist_manager()->playlists_loaded()) {
     HandlePlaylistsLoaded();
+  }
+  if (ScrobblerLifecycle::ShouldSubmitOnStartup(app_->scrobbler()->enabled(), app_->scrobbler()->offline())) {
+    app_->scrobbler()->Submit();
   }
   CheckFullRescanRevisions();
 }
@@ -1509,7 +1514,30 @@ void MainWindow::BuildPlaylist() {
     Playlist *playlist = app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
     return playlist ? playlist->row_count() : 0;
   });
-  playlist_container_->view()->SetActivateCallback([this](int index) { app_->player()->PlayAt(index); });
+  playlist_container_->view()->SetActivateCallback([this](int index) {
+    Settings settings;
+    settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+    const auto mode = static_cast<BehaviourSettings::PlaylistAddBehaviour>(settings.IntValue(
+        BehaviourSettings::kDoubleClickPlaylistAddMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlaylistAddMode)));
+    const bool playing = app_->player()->GetState() == GstEngine::State::Playing;
+    const PlaylistActivate::Action action = PlaylistActivate::Resolve(mode, playing);
+    if (action == PlaylistActivate::Action::Play) {
+      app_->player()->PlayAt(index);
+      return;
+    }
+    Playlist *playlist = app_->playlist_manager()->current();
+    if (!playlist) {
+      return;
+    }
+    app_->queue()->TogglePlaylistRow(playlist->id(), index, playlist->song(index));
+    if (action == PlaylistActivate::Action::EnqueueAndPlay) {
+      app_->playlist_manager()->SetActiveToCurrent();
+      const QueueRows::Source source = app_->queue()->PeekSource();
+      app_->queue()->TakeNext();
+      app_->player()->PlayAt(source.row >= 0 ? source.row : index);
+    }
+    RefreshQueue();
+  });
   playlist_container_->view()->SetPlayPauseCallback([this]() { app_->player()->PlayPause(); });
   playlist_container_->view()->SetSeekBackwardCallback([this]() { app_->player()->SeekBackward(); });
   playlist_container_->view()->SetSeekForwardCallback([this]() { app_->player()->SeekForward(); });

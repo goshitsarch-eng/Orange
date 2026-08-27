@@ -1,3 +1,4 @@
+#include "playlist/playlistactivate.h"
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistmoodcolumn.h"
@@ -834,4 +835,11 @@ TEST(PlaylistRestoreScroll, PrefersLastPlayedThenCurrent) {
   EXPECT_EQ(-1, PlaylistRestoreScroll::TargetRow(-1, -1));
   EXPECT_TRUE(PlaylistRestoreScroll::ShouldJump(0));
   EXPECT_FALSE(PlaylistRestoreScroll::ShouldJump(-1));
+}
+
+TEST(PlaylistActivate, MatchesQtDoubleClickModes) {
+  EXPECT_EQ(PlaylistActivate::Action::Play, PlaylistActivate::Resolve(BehaviourSettings::PlaylistAddBehaviour::Play, false));
+  EXPECT_EQ(PlaylistActivate::Action::Play, PlaylistActivate::Resolve(BehaviourSettings::PlaylistAddBehaviour::Play, true));
+  EXPECT_EQ(PlaylistActivate::Action::EnqueueAndPlay, PlaylistActivate::Resolve(BehaviourSettings::PlaylistAddBehaviour::Enqueue, false));
+  EXPECT_EQ(PlaylistActivate::Action::Enqueue, PlaylistActivate::Resolve(BehaviourSettings::PlaylistAddBehaviour::Enqueue, true));
 }

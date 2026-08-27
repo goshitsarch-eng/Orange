@@ -23,6 +23,9 @@ TEST(ScrobblerLifecycle, FlushesOnExitAndSubmitsWhenLeavingOffline) {
   EXPECT_TRUE(ScrobblerLifecycle::ShouldSubmitAfterOfflineToggle(true, false));
   EXPECT_FALSE(ScrobblerLifecycle::ShouldSubmitAfterOfflineToggle(false, true));
   EXPECT_FALSE(ScrobblerLifecycle::ShouldSubmitAfterOfflineToggle(false, false));
+  EXPECT_TRUE(ScrobblerLifecycle::ShouldSubmitOnStartup(true, false));
+  EXPECT_FALSE(ScrobblerLifecycle::ShouldSubmitOnStartup(true, true));
+  EXPECT_FALSE(ScrobblerLifecycle::ShouldSubmitOnStartup(false, false));
 }
 
 TEST(ScrobblerCache, RoundTripJson) {
