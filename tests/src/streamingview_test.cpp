@@ -563,6 +563,17 @@ TEST(StreamingCollectionStore, TableNamesAndPersistRules) {
   EXPECT_EQ(1u, StreamingCollectionStore::AddableLists("Subsonic").size());
   EXPECT_STREQ("Add to artists", StreamingCollectionStore::AddLabel(StreamingCollectionStore::List::Artists));
   EXPECT_STREQ("Added to songs", StreamingCollectionStore::AddedStatus(StreamingCollectionStore::List::Songs));
+  EXPECT_STREQ("Removed from artists", StreamingCollectionStore::RemovedStatus(StreamingCollectionStore::List::Artists));
+  StreamingCollectionStore::List list = StreamingCollectionStore::List::Songs;
+  EXPECT_TRUE(StreamingCollectionStore::ListFromTab("artists", &list));
+  EXPECT_EQ(StreamingCollectionStore::List::Artists, list);
+  EXPECT_TRUE(StreamingCollectionStore::ListFromTab("albums", &list));
+  EXPECT_EQ(StreamingCollectionStore::List::Albums, list);
+  EXPECT_TRUE(StreamingCollectionStore::ListFromTab("songs", &list));
+  EXPECT_EQ(StreamingCollectionStore::List::Songs, list);
+  EXPECT_FALSE(StreamingCollectionStore::ListFromTab("favorites", &list));
+  EXPECT_FALSE(StreamingCollectionStore::ListFromTab("search", &list));
+  EXPECT_FALSE(StreamingCollectionStore::ListFromTab(nullptr, &list));
 }
 
 TEST(StreamingCollectionStore, ReplaceAndLoad) {
@@ -639,6 +650,38 @@ TEST(StreamingCollectionStore, MergeAppendsAndUpdatesByUrl) {
   const SongList merged = StreamingCollectionStore::MergeSongs({first}, {missing, second});
   EXPECT_EQ(2u, merged.size());
   EXPECT_EQ(1, StreamingCollectionStore::AddedCount({first}, merged));
+  unlink(path.c_str());
+}
+
+TEST(StreamingCollectionStore, SubtractRemovesMatchingPersistKeys) {
+  Song first(Song::Source::Tidal);
+  first.set_title("Roads");
+  first.set_url("tidal://99");
+  Song second(Song::Source::Tidal);
+  second.set_title("Mysterons");
+  second.set_url("tidal://100");
+  Song drop(Song::Source::Tidal);
+  drop.set_url("tidal://99");
+  const SongList remaining = StreamingCollectionStore::SubtractSongs({first, second}, {drop});
+  ASSERT_EQ(1u, remaining.size());
+  EXPECT_EQ("tidal://100", remaining.front().url());
+  EXPECT_EQ(1, StreamingCollectionStore::RemovedCount({first, second}, remaining));
+  EXPECT_EQ(0, StreamingCollectionStore::RemovedCount({first}, {first}));
+  Song missing;
+  missing.set_title("No key");
+  EXPECT_EQ(2u, StreamingCollectionStore::SubtractSongs({first, second}, {missing}).size());
+
+  const std::string path = "/tmp/strawberry-streaming-remove-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  StreamingCollectionStore::Replace(&db, "tidal_songs", {first, second});
+  EXPECT_EQ(1, StreamingCollectionStore::Remove(&db, "tidal_songs", {drop}));
+  const SongList loaded = StreamingCollectionStore::Load(&db, "tidal_songs");
+  ASSERT_EQ(1u, loaded.size());
+  EXPECT_EQ("tidal://100", loaded.front().url());
+  EXPECT_EQ(0, StreamingCollectionStore::Remove(&db, "tidal_songs", {}));
+  EXPECT_EQ(0, StreamingCollectionStore::Remove(&db, "not_a_table", {second}));
   unlink(path.c_str());
 }
 

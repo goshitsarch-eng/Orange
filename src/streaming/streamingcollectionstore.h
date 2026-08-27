@@ -3,6 +3,7 @@
 
 #include "core/song.h"
 
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -146,9 +147,72 @@ inline int AddedCount(const SongList &existing, const SongList &merged) {
   return static_cast<int>(merged.size() - existing.size());
 }
 
+// Qt StreamingCollectionView::RemoveSelectedSongs → CollectionBackend::DeleteSongs.
+inline bool SamePersistKey(const Song &left, const Song &right) {
+  const std::string key = PersistUrl(left);
+  return !key.empty() && key == PersistUrl(right);
+}
+
+inline SongList SubtractSongs(const SongList &existing, const SongList &removed) {
+  SongList out;
+  for (const Song &have : existing) {
+    bool drop = false;
+    for (const Song &song : removed) {
+      if (SamePersistKey(have, song)) {
+        drop = true;
+        break;
+      }
+    }
+    if (!drop) {
+      out.push_back(have);
+    }
+  }
+  return out;
+}
+
+inline int RemovedCount(const SongList &existing, const SongList &remaining) {
+  if (remaining.size() >= existing.size()) {
+    return 0;
+  }
+  return static_cast<int>(existing.size() - remaining.size());
+}
+
+inline const char *RemovedStatus(List list) {
+  switch (list) {
+    case List::Artists:
+      return "Removed from artists";
+    case List::Albums:
+      return "Removed from albums";
+    case List::Songs:
+    default:
+      return "Removed from songs";
+  }
+}
+
+// Artists/Albums/Songs tabs persist a local catalogue; Favorites/Search do not.
+inline bool ListFromTab(const char *tab, List *list) {
+  if (!tab || !list) {
+    return false;
+  }
+  if (std::strcmp(tab, "artists") == 0) {
+    *list = List::Artists;
+    return true;
+  }
+  if (std::strcmp(tab, "albums") == 0) {
+    *list = List::Albums;
+    return true;
+  }
+  if (std::strcmp(tab, "songs") == 0) {
+    *list = List::Songs;
+    return true;
+  }
+  return false;
+}
+
 SongList Load(Database *database, const std::string &table);
 void Replace(Database *database, const std::string &table, const SongList &songs);
 int Merge(Database *database, const std::string &table, const SongList &songs);
+int Remove(Database *database, const std::string &table, const SongList &songs);
 
 }  // namespace StreamingCollectionStore
 

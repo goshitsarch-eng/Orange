@@ -404,6 +404,29 @@ void StreamingTabsView::AddToCollection(StreamingCollectionStore::List list, con
   ShowCached(view, list);
 }
 
+void StreamingTabsView::RemoveFromCollection(StreamingCollectionStore::List list, const SongList &songs) {
+  if (!service_ || !database_ || songs.empty() || !StreamingCollectionStore::CanStore(service_->name(), list)) {
+    return;
+  }
+  StreamingCollectionStore::Remove(database_, StreamingCollectionStore::TableName(service_->name(), list), songs);
+  StreamingCollectionView *view = songs_->view();
+  if (list == StreamingCollectionStore::List::Artists) {
+    view = artists_->view();
+  } else if (list == StreamingCollectionStore::List::Albums) {
+    view = albums_->view();
+  }
+  if (view) {
+    view->SetSongs(StreamingCollectionStore::Load(database_, StreamingCollectionStore::TableName(service_->name(), list)));
+  }
+}
+
+bool StreamingTabsView::CurrentStoreList(StreamingCollectionStore::List *list) const {
+  if (!stack_ || !list) {
+    return false;
+  }
+  return StreamingCollectionStore::ListFromTab(gtk_stack_get_visible_child_name(GTK_STACK(stack_)), list);
+}
+
 void StreamingTabsView::PersistList(StreamingCollectionStore::List list, const SongList &songs) {
   if (!service_ || !database_) {
     return;

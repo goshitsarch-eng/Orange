@@ -93,4 +93,14 @@ int Merge(Database *database, const std::string &table, const SongList &songs) {
   return AddedCount(existing, merged);
 }
 
+int Remove(Database *database, const std::string &table, const SongList &songs) {
+  if (!database || !database->handle() || !ValidTable(table) || songs.empty()) {
+    return 0;
+  }
+  const SongList existing = Load(database, table);
+  const SongList remaining = SubtractSongs(existing, songs);
+  Replace(database, table, remaining);
+  return RemovedCount(existing, remaining);
+}
+
 }  // namespace StreamingCollectionStore

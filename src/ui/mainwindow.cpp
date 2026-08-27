@@ -3125,7 +3125,19 @@ void MainWindow::StreamingFavorite(bool add) {
   if (!service || streaming_menu_songs_.empty()) {
     return;
   }
-  const auto type = StreamingFavoriteAction::TypeForSongs(streaming_menu_songs_);
+  StreamingTabsView *tabs = nullptr;
+  for (const auto &view : streaming_views_) {
+    if (view && view->service() && view->service()->name() == streaming_service_name_) {
+      tabs = view.get();
+      break;
+    }
+  }
+  StreamingCollectionStore::List store_list = StreamingCollectionStore::List::Songs;
+  const bool remove_store = !add && tabs && tabs->CurrentStoreList(&store_list);
+  if (remove_store) {
+    tabs->RemoveFromCollection(store_list, streaming_menu_songs_);
+  }
+  const auto type = remove_store ? StreamingFavoriteAction::TypeFromList(store_list) : StreamingFavoriteAction::TypeForSongs(streaming_menu_songs_);
   auto done = [this, add](const SongList &) {
     ShowToast(add ? "Added to favorites" : "Removed from favorites");
     for (const auto &view : streaming_views_) {
