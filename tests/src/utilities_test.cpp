@@ -16,6 +16,7 @@
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "equalizer/equalizer.h"
+#include "equalizer/equalizercontrols.h"
 #include "equalizer/equalizerlabels.h"
 #include "equalizer/equalizerpersist.h"
 #include "equalizer/equalizerpresets.h"
@@ -822,6 +823,17 @@ TEST(EqualizerLabels, RestartHintAndQtCopy) {
   EXPECT_STREQ("Left", EqualizerLabels::Left());
   EXPECT_STREQ("Balance", EqualizerLabels::Balance());
   EXPECT_STREQ("Right", EqualizerLabels::Right());
+}
+
+TEST(EqualizerControls, SliderContainerFollowsEnabled) {
+  EXPECT_TRUE(EqualizerControls::SliderContainerEnabled(true));
+  EXPECT_FALSE(EqualizerControls::SliderContainerEnabled(false));
+  EXPECT_TRUE(EqualizerControls::StereoBalanceSliderEnabled(true));
+  EXPECT_FALSE(EqualizerControls::StereoBalanceSliderEnabled(false));
+  EXPECT_TRUE(EqualizerControls::StereoBalanceLabelsEnabled(true));
+  EXPECT_FALSE(EqualizerControls::StereoBalanceLabelsEnabled(false));
+  EXPECT_EQ(40, EqualizerControls::DisplayBalanceAfterToggle(true, 40));
+  EXPECT_EQ(0, EqualizerControls::DisplayBalanceAfterToggle(false, 40));
 }
 
 TEST(Equalizer, BuiltinPresets) {

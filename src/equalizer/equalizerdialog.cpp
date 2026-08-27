@@ -3,6 +3,7 @@
 #include "core/application.h"
 #include "core/player.h"
 #include "equalizer/equalizer.h"
+#include "equalizer/equalizercontrols.h"
 #include "equalizer/equalizerlabels.h"
 #include "equalizer/equalizerpersist.h"
 #include "equalizer/equalizerpresets.h"
@@ -56,10 +57,6 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   GtkWidget *enable = gtk_check_button_new_with_label(Translations::CStr(EqualizerLabels::Enable()));
   gtk_widget_set_tooltip_text(enable, Translations::CStr(EqualizerLabels::RestartHint()));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(enable), equalizer->enabled());
-  g_signal_connect(enable, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
-                     static_cast<class Equalizer *>(data)->set_enabled(gtk_check_button_get_active(button));
-                   }),
-                   equalizer);
   gtk_box_append(GTK_BOX(box), enable);
   GtkWidget *enable_hint = gtk_label_new(Translations::CStr(EqualizerLabels::RestartHint()));
   gtk_label_set_wrap(GTK_LABEL(enable_hint), TRUE);
@@ -159,6 +156,7 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   gtk_box_append(GTK_BOX(preset_row), save_preset);
   gtk_box_append(GTK_BOX(preset_row), delete_preset);
   gtk_box_append(GTK_BOX(box), preset_row);
+  GtkWidget *slider_container = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
   GtkWidget *preamp_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
   GtkWidget *preamp_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   GtkWidget *preamp_title = gtk_label_new(Translations::CStr("Preamp"));
@@ -182,7 +180,7 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
                    equalizer);
   gtk_box_append(GTK_BOX(preamp_box), preamp_header);
   gtk_box_append(GTK_BOX(preamp_box), preamp);
-  gtk_box_append(GTK_BOX(box), preamp_box);
+  gtk_box_append(GTK_BOX(slider_container), preamp_box);
   GtkWidget *bands = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   static const char *kHz[] = {"60", "170", "310", "600", "1k", "3k", "6k", "12k", "14k", "16k"};
   for (int i = 0; i < 10; ++i) {
@@ -209,7 +207,18 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
     gtk_box_append(GTK_BOX(col), gtk_label_new(kHz[i]));
     gtk_box_append(GTK_BOX(bands), col);
   }
-  gtk_box_append(GTK_BOX(box), bands);
+  gtk_box_append(GTK_BOX(slider_container), bands);
+  gtk_widget_set_sensitive(slider_container, EqualizerControls::SliderContainerEnabled(equalizer->enabled()));
+  g_object_set_data(G_OBJECT(enable), "slider-container", slider_container);
+  g_signal_connect(enable, "toggled", G_CALLBACK((+[](GtkCheckButton *button, gpointer data) {
+                     auto *eq = static_cast<class Equalizer *>(data);
+                     eq->set_enabled(gtk_check_button_get_active(button));
+                     if (auto *container = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "slider-container"))) {
+                       gtk_widget_set_sensitive(container, EqualizerControls::SliderContainerEnabled(eq->enabled()));
+                     }
+                   })),
+                   equalizer);
+  gtk_box_append(GTK_BOX(box), slider_container);
   GtkWidget *enable_balance = gtk_check_button_new_with_label(Translations::CStr(EqualizerLabels::EnableBalancer()));
   gtk_widget_set_tooltip_text(enable_balance, Translations::CStr(EqualizerLabels::RestartHint()));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(enable_balance), equalizer->stereo_balancer_enabled());
@@ -230,17 +239,30 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   gtk_range_set_value(GTK_RANGE(balance_scale), equalizer->stereo_balance());
   gtk_scale_add_mark(GTK_SCALE(balance_scale), 0, GTK_POS_BOTTOM, Translations::CStr(EqualizerLabels::Balance()));
   gtk_widget_set_tooltip_text(balance_scale, Translations::CStr(EqualizerLabels::Balance()));
-  gtk_widget_set_sensitive(balance_scale, equalizer->stereo_balancer_enabled());
+  gtk_widget_set_sensitive(balance_scale, EqualizerControls::StereoBalanceSliderEnabled(equalizer->stereo_balancer_enabled()));
+  gtk_widget_set_sensitive(balance_ends, EqualizerControls::StereoBalanceLabelsEnabled(equalizer->stereo_balancer_enabled()));
   g_object_set_data(G_OBJECT(enable_balance), "scale", balance_scale);
+  g_object_set_data(G_OBJECT(enable_balance), "labels", balance_ends);
   g_object_set_data(G_OBJECT(enable_balance), "equalizer-app", app);
-  g_signal_connect(enable_balance, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+  g_signal_connect(enable_balance, "toggled", G_CALLBACK((+[](GtkCheckButton *button, gpointer data) {
                      auto *eq = static_cast<class Equalizer *>(data);
-                     eq->set_stereo_balancer_enabled(gtk_check_button_get_active(button));
-                     gtk_widget_set_sensitive(GTK_WIDGET(g_object_get_data(G_OBJECT(button), "scale")), eq->stereo_balancer_enabled());
+                     const bool on = gtk_check_button_get_active(button);
+                     GtkWidget *scale = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "scale"));
+                     GtkWidget *labels = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "labels"));
+                     if (scale) {
+                       gtk_range_set_value(GTK_RANGE(scale), EqualizerControls::DisplayBalanceAfterToggle(on, eq->stereo_balance()));
+                     }
+                     eq->set_stereo_balancer_enabled(on);
+                     if (scale) {
+                       gtk_widget_set_sensitive(scale, EqualizerControls::StereoBalanceSliderEnabled(on));
+                     }
+                     if (labels) {
+                       gtk_widget_set_sensitive(labels, EqualizerControls::StereoBalanceLabelsEnabled(on));
+                     }
                      if (auto *application = static_cast<Application *>(g_object_get_data(G_OBJECT(button), "equalizer-app"))) {
                        application->player()->engine()->SetStereoBalance(eq->EffectiveBalanceFraction());
                      }
-                   }),
+                   })),
                    equalizer);
   g_object_set_data(G_OBJECT(balance_scale), "equalizer-app", app);
   g_signal_connect(balance_scale, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer data) {
