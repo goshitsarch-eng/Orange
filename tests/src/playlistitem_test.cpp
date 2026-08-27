@@ -86,6 +86,22 @@ TEST(PlaylistFilter, AcceptsFilterParserRows) {
   EXPECT_EQ(0, filter.VisibleRows({match, other}).front());
 }
 
+TEST(PlaylistFilter, CachesParsedTree) {
+  PlaylistFilter filter;
+  EXPECT_FALSE(filter.has_parser());
+  filter.SetFilterString("artist:Portishead");
+  ASSERT_TRUE(filter.has_parser());
+  const FilterParser *first = filter.parser();
+  Song match;
+  match.set_artist("Portishead");
+  match.set_valid(true);
+  EXPECT_TRUE(filter.Accepts(match));
+  EXPECT_EQ(first, filter.parser());
+  filter.SetFilterString("");
+  EXPECT_FALSE(filter.has_parser());
+  EXPECT_TRUE(filter.Accepts(match));
+}
+
 TEST(PlaylistSequence, CyclesOriginalRepeatAndShuffleModes) {
   PlaylistSequence sequence;
   sequence.SetRepeatMode(PlaylistSequence::RepeatMode::Off);

@@ -1,5 +1,7 @@
 #include "core/playermetadatasync.h"
+#include "core/playernextmetadata.h"
 #include "core/playerpreload.h"
+#include "core/playerseeknotify.h"
 #include "core/playerintro.h"
 #include "core/playerrepeat.h"
 #include "core/playerstopafter.h"
@@ -12,6 +14,7 @@
 #include "playlist/playlistsaveschedule.h"
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistfilterindex.h"
 #include "playlist/playlistfilterdelay.h"
 #include "playlist/playlistfilterempty.h"
 #include "playlist/playlistfiltersync.h"
@@ -507,6 +510,8 @@ TEST(PlayerPreload, AdvancesOnlyForAutoCrossfadeAcrossAlbums) {
   EXPECT_FALSE(PlayerPreload::ShouldPreload(true, true));
   EXPECT_FALSE(PlayerPreload::ShouldPreload(false, false));
   EXPECT_TRUE(PlayerPreload::ShouldPreload(false, true));
+  EXPECT_FALSE(PlayerPreload::CanPreload(false, true, true));
+  EXPECT_TRUE(PlayerPreload::CanPreload(false, true, false));
   EXPECT_FALSE(PlayerPreload::ShouldAdvanceOnAboutToEnd(false, false, true));
   EXPECT_TRUE(PlayerPreload::ShouldAdvanceOnAboutToEnd(true, false, true));
   EXPECT_FALSE(PlayerPreload::ShouldAdvanceOnAboutToEnd(true, true, true));
@@ -768,6 +773,76 @@ TEST(DynamicPlaylistMaintenance, HistoryFutureAndTrimCounts) {
   EXPECT_EQ(3, DynamicPlaylistMaintenance::FutureInsertCount(10, PlaylistGenerator::kDefaultDynamicFuture, 18));
   EXPECT_TRUE(DynamicPlaylistMaintenance::ShouldClearUndo(true, true));
   EXPECT_FALSE(DynamicPlaylistMaintenance::ShouldClearUndo(false, true));
+}
+
+TEST(PlayerNextMetadata, RoutesCurrentAndNextUrls) {
+  EXPECT_EQ(PlayerNextMetadata::Target::Current,
+            PlayerNextMetadata::TargetForUrl("", "file:///a", "", "file:///b", ""));
+  EXPECT_EQ(PlayerNextMetadata::Target::Current,
+            PlayerNextMetadata::TargetForUrl("file:///a", "file:///a", "", "file:///b", ""));
+  EXPECT_EQ(PlayerNextMetadata::Target::Next,
+            PlayerNextMetadata::TargetForUrl("file:///b", "file:///a", "", "file:///b", ""));
+  EXPECT_EQ(PlayerNextMetadata::Target::Next,
+            PlayerNextMetadata::TargetForUrl("http://stream/b", "file:///a", "", "file:///b", "http://stream/b"));
+  EXPECT_EQ(PlayerNextMetadata::Target::None,
+            PlayerNextMetadata::TargetForUrl("file:///c", "file:///a", "", "file:///b", ""));
+  EXPECT_TRUE(PlayerNextMetadata::ShouldApplyToNext(PlayerNextMetadata::Target::Next));
+  EXPECT_FALSE(PlayerNextMetadata::ShouldApplyToNext(PlayerNextMetadata::Target::Current));
+}
+
+TEST(PlayerSeekNotify, ClampsAndRefreshesNowPlaying) {
+  EXPECT_EQ(0, PlayerSeekNotify::Clamp(-5, 100));
+  EXPECT_EQ(100, PlayerSeekNotify::Clamp(200, 100));
+  EXPECT_EQ(40, PlayerSeekNotify::Clamp(40, 100));
+  EXPECT_EQ(40, PlayerSeekNotify::Clamp(40, 0));
+  EXPECT_TRUE(PlayerSeekNotify::ShouldRefreshNowPlaying(0, 100));
+  EXPECT_FALSE(PlayerSeekNotify::ShouldRefreshNowPlaying(1, 100));
+  EXPECT_FALSE(PlayerSeekNotify::ShouldRefreshNowPlaying(0, 0));
+}
+
+TEST(Playlist, UpdateRowMetadataLeavesOtherRows) {
+  Playlist playlist;
+  Song current;
+  current.set_title("Now");
+  current.set_url("file:///now.flac");
+  current.set_valid(true);
+  Song next;
+  next.set_title("Next");
+  next.set_url("file:///next.flac");
+  next.set_valid(true);
+  playlist.AppendSongs({current, next});
+  playlist.set_current_row(0);
+  Song engine;
+  engine.set_title("Preloaded");
+  engine.set_length_nanosec(180000000000);
+  EXPECT_TRUE(playlist.UpdateRowMetadata(1, engine));
+  EXPECT_EQ("Now", playlist.song(0).title());
+  EXPECT_EQ("Preloaded", playlist.song(1).title());
+  EXPECT_EQ(180000000000, playlist.song(1).length_nanosec());
+  EXPECT_FALSE(playlist.UpdateRowMetadata(-1, engine));
+}
+
+TEST(Playlist, RepeatTrackHiddenByFilter) {
+  Playlist playlist;
+  Song keep;
+  keep.set_title("Keep");
+  keep.set_artist("Portishead");
+  keep.set_url("file:///keep");
+  keep.set_valid(true);
+  Song skip;
+  skip.set_title("Skip");
+  skip.set_artist("Fleet Foxes");
+  skip.set_url("file:///skip");
+  skip.set_valid(true);
+  playlist.AppendSongs({keep, skip});
+  playlist.set_current_row(1);
+  playlist.SetRepeatMode(PlaylistSequence::RepeatMode::Track);
+  EXPECT_EQ(1, playlist.PeekNextRow());
+  playlist.SetFilterString("artist:Portishead");
+  EXPECT_EQ(-1, playlist.PeekNextRow());
+  playlist.set_current_row(0);
+  EXPECT_EQ(0, playlist.PeekNextRow());
+  EXPECT_EQ(0, PlaylistFilterIndex::RepeatTrackRow(0, PlaylistFilter{}, keep));
 }
 
 TEST(Playlist, MergeFromEngineUpdatesMatchingUrl) {

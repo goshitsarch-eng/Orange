@@ -39,6 +39,7 @@ class GstEnginePipeline {
   GstEnginePipeline &operator=(const GstEnginePipeline &) = delete;
 
   int id() const { return id_; }
+  const std::string &url() const { return url_; }
   bool valid() const { return playbin_ != nullptr; }
 
   bool Create(const std::string &url, const std::string &output, const std::string &device, uint64_t beginning_offset_nanosec,
@@ -75,6 +76,7 @@ class GstEnginePipeline {
   void HandleTags(GstMessage *message);
 
   int id_ = 0;
+  std::string url_;
   GstElement *playbin_ = nullptr;
   GstElement *volume_ = nullptr;
   GstElement *equalizer_ = nullptr;

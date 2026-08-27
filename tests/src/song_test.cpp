@@ -28,6 +28,20 @@ TEST(Song, FiletypeAndAudio) {
   EXPECT_EQ("Collection", Song::SourceToString(Song::Source::Collection));
 }
 
+TEST(Song, IsModuleMusic) {
+  Song module;
+  module.set_filetype(Song::FileType::MOD);
+  EXPECT_TRUE(module.is_module_music());
+  module.set_filetype(Song::FileType::IT);
+  EXPECT_TRUE(module.is_module_music());
+  module.set_filetype(Song::FileType::S3M);
+  EXPECT_TRUE(module.is_module_music());
+  module.set_filetype(Song::FileType::XM);
+  EXPECT_TRUE(module.is_module_music());
+  module.set_filetype(Song::FileType::FLAC);
+  EXPECT_FALSE(module.is_module_music());
+}
+
 TEST(Song, ExoticFiletypesMatchQt) {
   EXPECT_EQ(Song::FileType::OggSpeex, Song::FiletypeByExtension("spx"));
   EXPECT_EQ(Song::FileType::OggSpeex, Song::FiletypeByExtension("speex"));

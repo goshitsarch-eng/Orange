@@ -56,6 +56,7 @@ class Player : public PlayerInterface {
   void TogglePrettyOSD();
 
   Signal<Song> SongChanged;
+  Signal<Song> NowPlayingRefresh;
   Signal<unsigned> VolumeChanged;
   Signal<EngineBase::State> StateChanged;
   Signal<int64_t, int64_t> PositionChanged;
@@ -101,6 +102,7 @@ class Player : public PlayerInterface {
   int intro_generation_ = 0;
 
   void HandleEngineError(const std::string &error);
+  void HandleEngineMetadata(const Song &song);
 };
 
 #endif  // STRAWBERRY_PLAYER_H

@@ -4,6 +4,7 @@
 #include "core/signal.h"
 #include "core/song.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistfilter.h"
 #include "playlist/playlistsequence.h"
 #include "queue/queue.h"
 #include "smartplaylists/smartplaylist.h"
@@ -85,6 +86,7 @@ class Playlist {
   const std::string &filter_string() const { return filter_string_; }
   void UpdateSongsByUrl(const Song &song);
   bool MergeFromEngine(const Song &engine);
+  bool UpdateRowMetadata(int row, const Song &engine);
   PlaylistSequence::RepeatMode repeat_mode() const { return repeat_mode_; }
   PlaylistSequence::ShuffleMode shuffle_mode() const { return shuffle_mode_; }
   void SetDynamic(bool dynamic, const SmartPlaylistSearch &search = {});
@@ -151,6 +153,7 @@ class Playlist {
   std::vector<int> virtual_items_;
   int current_virtual_index_ = -1;
   std::string filter_string_;
+  PlaylistFilter filter_;
   std::vector<int> played_indexes_;
   int stop_after_row_ = -1;
   int64_t scrobble_point_nanosec_ = -1;

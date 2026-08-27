@@ -110,6 +110,9 @@ class Song {
   const std::string &stream_url() const { return stream_url_.empty() ? url_ : stream_url_; }
   const std::string &basefilename() const { return basefilename_; }
   FileType filetype() const { return filetype_; }
+  bool is_module_music() const {
+    return filetype_ == FileType::MOD || filetype_ == FileType::S3M || filetype_ == FileType::XM || filetype_ == FileType::IT;
+  }
   int64_t filesize() const { return filesize_; }
   int64_t mtime() const { return mtime_; }
   int64_t ctime() const { return ctime_; }

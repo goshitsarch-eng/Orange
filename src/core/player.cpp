@@ -10,6 +10,8 @@
 #include "constants/playlistsettings.h"
 #include "core/logging.h"
 #include "core/playermetadatasync.h"
+#include "core/playernextmetadata.h"
+#include "core/playerseeknotify.h"
 #include "core/playerintro.h"
 #include "core/playerpreload.h"
 #include "core/playerrepeat.h"
@@ -36,20 +38,7 @@ void Player::Init() {
   engine_->TrackEnded.Connect([this]() { HandleTrackEnded(); });
   engine_->TrackAboutToEnd.Connect([this]() { PreloadNext(); });
   engine_->Error.Connect([this](const std::string &error) { HandleEngineError(error); });
-  engine_->MetadataReceived.Connect([this](const Song &song) {
-    const Song before = current_song_;
-    PlayerMetadataSync::Merge(&current_song_, song);
-    if (playlist_manager_ && playlist_manager_->active()) {
-      Song patch = current_song_;
-      if (patch.url().empty()) {
-        patch.set_url(before.url());
-      }
-      playlist_manager_->active()->MergeFromEngine(patch);
-    }
-    if (PlayerMetadataSync::ShouldRefreshPlaylist(before, current_song_)) {
-      SongChanged.Emit(current_song_);
-    }
-  });
+  engine_->MetadataReceived.Connect([this](const Song &song) { HandleEngineMetadata(song); });
   ReloadSettings();
   LoadVolume();
 }
@@ -288,12 +277,16 @@ void Player::RestartOrPrevious() {
 void Player::SeekTo(int64_t seconds) { Seek(seconds * 1000000000LL); }
 
 void Player::Seek(int64_t nanosec) {
-  const int64_t clamped = std::max<int64_t>(0, nanosec);
+  const int64_t length = current_song_.length_nanosec() > 0 ? current_song_.length_nanosec() : engine_->length_nanosec();
+  const int64_t clamped = PlayerSeekNotify::Clamp(nanosec, length);
   engine_->Seek(static_cast<uint64_t>(clamped));
   if (playlist_manager_ && playlist_manager_->active()) {
     playlist_manager_->active()->UpdateScrobblePoint(clamped);
   }
   PositionChanged.Emit(clamped, current_song_.length_nanosec());
+  if (PlayerSeekNotify::ShouldRefreshNowPlaying(clamped, length)) {
+    NowPlayingRefresh.Emit(current_song_);
+  }
 }
 
 void Player::SeekForward() { SeekTo(engine_->position_nanosec() / 1000000000LL + seek_step_sec_); }
@@ -490,6 +483,32 @@ void Player::ArmIntroTimeout() {
       job, +[](gpointer data) { delete static_cast<IntroJob *>(data); });
 }
 
+void Player::HandleEngineMetadata(const Song &song) {
+  Playlist *playlist = playlist_manager_ ? playlist_manager_->active() : nullptr;
+  const Song next = playlist ? playlist->PeekNextSong() : Song();
+  const auto target = PlayerNextMetadata::TargetForUrl(song.url(), current_song_.url(), current_song_.stream_url(), next.url(),
+                                                       next.stream_url());
+  if (PlayerNextMetadata::ShouldApplyToNext(target) && playlist) {
+    playlist->UpdateRowMetadata(playlist->PeekNextRow(), song);
+    return;
+  }
+  if (target == PlayerNextMetadata::Target::None) {
+    return;
+  }
+  const Song before = current_song_;
+  PlayerMetadataSync::Merge(&current_song_, song);
+  if (playlist) {
+    Song patch = current_song_;
+    if (patch.url().empty()) {
+      patch.set_url(before.url());
+    }
+    playlist->MergeFromEngine(patch);
+  }
+  if (PlayerMetadataSync::ShouldRefreshPlaylist(before, current_song_)) {
+    SongChanged.Emit(current_song_);
+  }
+}
+
 void Player::HandleEngineError(const std::string &error) {
   LogError("%s", error.c_str());
   if (greyout_ && playlist_manager_) {
@@ -515,7 +534,8 @@ void Player::PreloadNext() {
   } else if (playlist_manager_) {
     next_song = playlist_manager_->PeekNextSong();
   }
-  if (!PlayerPreload::ShouldPreload(stop_after_current_, next_song.is_valid() || !next_song.url().empty())) {
+  if (!PlayerPreload::CanPreload(stop_after_current_, next_song.is_valid() || !next_song.url().empty(),
+                                 current_song_.is_module_music())) {
     return;
   }
   const bool same_album = current_song_.IsOnSameAlbum(next_song);

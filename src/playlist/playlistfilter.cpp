@@ -1,14 +1,19 @@
 #include "playlist/playlistfilter.h"
 
-#include "filterparser/filterparser.h"
-
-void PlaylistFilter::SetFilterString(const std::string &filter_string) { filter_string_ = filter_string; }
+void PlaylistFilter::SetFilterString(const std::string &filter_string) {
+  filter_string_ = filter_string;
+  if (filter_string_.empty()) {
+    parser_.reset();
+    return;
+  }
+  parser_ = std::make_unique<FilterParser>(filter_string_);
+}
 
 bool PlaylistFilter::Accepts(const Song &song) const {
-  if (filter_string_.empty()) {
+  if (!parser_) {
     return true;
   }
-  return FilterParser(filter_string_).Matches(song);
+  return parser_->Matches(song);
 }
 
 bool PlaylistFilter::filterAcceptsRow(int source_row, const SongList &songs) const {
@@ -19,7 +24,7 @@ bool PlaylistFilter::filterAcceptsRow(int source_row, const SongList &songs) con
 }
 
 SongList PlaylistFilter::FilterSongs(const SongList &songs) const {
-  if (filter_string_.empty()) {
+  if (!parser_) {
     return songs;
   }
   SongList visible;

@@ -110,6 +110,7 @@ void Application::Init() {
     discord_->UpdatePresence(song, player_->GetState() == GstEngine::State::Playing);
     tray_->SetNowPlaying(song);
   });
+  player_->NowPlayingRefresh.Connect([this](const Song &song) { scrobbler_->NowPlaying(song); });
   current_albumcover_loader_->AlbumCoverReady.Connect([this](const Song &song, const std::vector<unsigned char> &art) {
     osd_->AlbumCoverLoaded(song, art);
   });

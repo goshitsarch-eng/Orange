@@ -7,6 +7,7 @@
 #include "playlist/playliststopafter.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistfilter.h"
+#include "playlist/playlistfilterindex.h"
 #include "playlist/playlistplayed.h"
 #include "playlist/playlistshuffle.h"
 #include "playlist/playlistdelegates.h"
@@ -486,7 +487,24 @@ void Playlist::ReplaceRow(int row, const Song &song) {
   Changed.Emit();
 }
 
-void Playlist::SetFilterString(const std::string &filter) { filter_string_ = filter; }
+void Playlist::SetFilterString(const std::string &filter) {
+  filter_string_ = filter;
+  filter_.SetFilterString(filter);
+}
+
+bool Playlist::UpdateRowMetadata(int row, const Song &engine) {
+  if (row < 0 || row >= row_count()) {
+    return false;
+  }
+  Song &existing = songs_[static_cast<size_t>(row)];
+  const Song before = existing;
+  PlayerMetadataSync::Merge(&existing, engine);
+  if (PlayerMetadataSync::ShouldRefreshPlaylist(before, existing)) {
+    Changed.Emit();
+    return true;
+  }
+  return false;
+}
 
 bool Playlist::MergeFromEngine(const Song &engine) {
   if (engine.url().empty()) {
@@ -676,7 +694,7 @@ int Playlist::NextIndex() const {
     return -1;
   }
   if (mode_ == SequenceMode::RepeatTrack || repeat_mode_ == PlaylistSequence::RepeatMode::Track) {
-    return current_row_;
+    return PlaylistFilterIndex::RepeatTrackRow(current_row_, filter_, current_song());
   }
   if (static_cast<int>(virtual_items_.size()) != row_count()) {
     const_cast<Playlist *>(this)->RebuildVirtualItems();
@@ -695,12 +713,8 @@ int Playlist::NextIndex() const {
     if (candidate.skipped()) {
       return -1;
     }
-    if (!filter_string_.empty()) {
-      PlaylistFilter filter;
-      filter.SetFilterString(filter_string_);
-      if (!filter.Accepts(candidate)) {
-        return -1;
-      }
+    if (!filter_.Accepts(candidate)) {
+      return -1;
     }
     if (album_only && current_row_ >= 0 && !SameAlbum(row, current_row_)) {
       return -1;
@@ -746,12 +760,8 @@ int Playlist::PreviousIndex() const {
     if (candidate.skipped()) {
       return -1;
     }
-    if (!filter_string_.empty()) {
-      PlaylistFilter filter;
-      filter.SetFilterString(filter_string_);
-      if (!filter.Accepts(candidate)) {
-        return -1;
-      }
+    if (!filter_.Accepts(candidate)) {
+      return -1;
     }
     if (album_only && current_row_ >= 0 && !SameAlbum(row, current_row_)) {
       return -1;

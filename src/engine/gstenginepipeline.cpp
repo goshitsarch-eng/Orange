@@ -56,6 +56,7 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
   proxy_user_ = extras.proxy_user;
   proxy_pass_ = extras.proxy_pass;
   device_warmup_ms_ = extras.device_warmup_ms;
+  url_ = url;
   if (playbin3) {
     playbin_ = gst_element_factory_make("playbin3", "playbin");
   }
@@ -250,6 +251,7 @@ void GstEnginePipeline::SetStereoBalance(float value) {
 
 void GstEnginePipeline::SetNextUri(const std::string &url) {
   if (playbin_ && !url.empty()) {
+    url_ = url;
     g_object_set(playbin_, "uri", url.c_str(), nullptr);
   }
 }
@@ -376,6 +378,9 @@ void GstEnginePipeline::HandleTags(GstMessage *message) {
     g_free(artist);
   }
   song.set_valid(true);
+  if (song.url().empty()) {
+    song.set_url(url_);
+  }
   gst_tag_list_unref(tags);
   if (TagsReady) {
     TagsReady(id_, song);

@@ -147,7 +147,13 @@ void GstEngine::WirePipeline(GstEnginePipeline *pipeline) {
       ScopeUpdated.Emit(last_scope_);
     }
   };
-  pipeline->TagsReady = [this](int, const Song &song) { MetadataReceived.Emit(song); };
+  pipeline->TagsReady = [this, pipeline](int, const Song &song) {
+    Song tagged = song;
+    if (tagged.url().empty()) {
+      tagged.set_url(pipeline->url());
+    }
+    MetadataReceived.Emit(tagged);
+  };
 }
 
 void GstEngine::StartPreloading(const std::string &media_url, const std::string &stream_url, bool, int64_t beginning_offset_nanosec,
