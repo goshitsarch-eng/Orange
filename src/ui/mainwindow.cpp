@@ -108,6 +108,7 @@
 #include "widgets/playingwidget.h"
 #include "widgets/playingwidgettab.h"
 #include "widgets/seekbarmode.h"
+#include "core/playbackcontrolsstate.h"
 #include "core/playeritemoptions.h"
 #include "widgets/trackslider.h"
 #include "widgets/tracksliderstate.h"
@@ -2137,6 +2138,7 @@ void MainWindow::ConnectSignals() {
     UpdateNowPlaying();
     SelectPlayingTrack();
     ApplySeekbarPlaybackState();
+    UpdatePlaybackButtons();
 #ifdef _WIN32
     if (smtc_) {
       smtc_->CurrentSongChanged(song);
@@ -2779,10 +2781,28 @@ void MainWindow::UpdateCover(const std::vector<unsigned char> &data) {
 
 void MainWindow::UpdatePlaybackButtons() {
   const bool playing = app_->player()->GetState() == GstEngine::State::Playing;
-  gtk_button_set_icon_name(GTK_BUTTON(play_button_), playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic");
+  const bool paused = app_->player()->GetState() == GstEngine::State::Paused;
+  const bool play_pause_enabled = PlaybackControlsState::PlayPauseEnabled(playing, PlayerItemOptions::PauseDisabled(app_->player()->current_song()));
+  if (play_button_) {
+    gtk_button_set_icon_name(GTK_BUTTON(play_button_), playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic");
+    gtk_widget_set_sensitive(play_button_, play_pause_enabled);
+  }
+  if (window_) {
+    if (GAction *action = g_action_map_lookup_action(G_ACTION_MAP(window_), "play-pause")) {
+      g_simple_action_set_enabled(G_SIMPLE_ACTION(action), play_pause_enabled);
+    }
+  }
+  if (app_ && app_->tray()) {
+    if (playing) {
+      app_->tray()->SetPlaying(true, play_pause_enabled);
+    } else if (paused) {
+      app_->tray()->SetPaused();
+    } else {
+      app_->tray()->SetStopped();
+    }
+  }
 #ifdef __APPLE__
   if (macos_tray_ && app_->tray()) {
-    app_->tray()->SetPlaying(playing);
     macos_tray_->Setup(app_->tray());
   }
 #endif

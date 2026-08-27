@@ -161,7 +161,11 @@ TEST(Mpris2Helpers, CapabilitiesMatchQt) {
   EXPECT_FALSE(Mpris2Helpers::CanGoNext(&playlist));
   EXPECT_TRUE(Mpris2Helpers::CanPause(EngineBase::State::Playing));
   EXPECT_TRUE(Mpris2Helpers::CanPause(EngineBase::State::Idle));
+  EXPECT_TRUE(Mpris2Helpers::CanPause(EngineBase::State::Paused));
   EXPECT_FALSE(Mpris2Helpers::CanPause(EngineBase::State::Empty));
+  EXPECT_FALSE(Mpris2Helpers::CanPause(EngineBase::State::Playing, true));
+  EXPECT_TRUE(Mpris2Helpers::CanPause(EngineBase::State::Idle, true));
+  EXPECT_TRUE(Mpris2Helpers::CanPause(EngineBase::State::Paused, true));
   EXPECT_TRUE(Mpris2Helpers::CanSeek(first, EngineBase::State::Playing));
   EXPECT_FALSE(Mpris2Helpers::CanSeek(first, EngineBase::State::Empty));
   Song stream;

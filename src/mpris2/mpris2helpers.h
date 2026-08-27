@@ -127,8 +127,15 @@ inline bool MetadataNeedsUpdate(const Song &before, const Song &after) {
 
 inline bool CanPlay(const Playlist *playlist) { return playlist && playlist->row_count() > 0; }
 
-inline bool CanPause(EngineBase::State state) {
-  return state == EngineBase::State::Playing || state == EngineBase::State::Paused || state == EngineBase::State::Idle;
+// Qt Mpris2::CanPause is true when paused/stopped, or when playing an item that is not PauseDisabled.
+inline bool CanPause(EngineBase::State state, bool pause_disabled = false) {
+  if (state == EngineBase::State::Paused || state == EngineBase::State::Idle) {
+    return true;
+  }
+  if (state == EngineBase::State::Playing) {
+    return !pause_disabled;
+  }
+  return false;
 }
 
 inline bool CanGoNext(const Playlist *playlist) { return playlist && playlist->PeekNextRow() != -1; }

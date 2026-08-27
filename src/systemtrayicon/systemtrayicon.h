@@ -17,7 +17,7 @@ class SystemTrayIcon {
   SystemTrayIcon();
   ~SystemTrayIcon();
 
-  void SetPlaying(bool playing);
+  void SetPlaying(bool playing, bool enable_play_pause = true);
   void SetPaused();
   void SetStopped();
   void SetProgress(int percentage);
@@ -37,6 +37,7 @@ class SystemTrayIcon {
   bool love_enabled() const { return love_enabled_; }
   bool mute_enabled() const { return mute_enabled_; }
   bool mute_checked() const { return mute_checked_; }
+  bool play_pause_enabled() const { return play_pause_enabled_; }
 
   bool available() const { return available_; }
   bool visible() const { return visible_; }
@@ -142,6 +143,7 @@ class SystemTrayIcon {
   bool love_enabled_ = true;
   bool mute_enabled_ = true;
   bool mute_checked_ = false;
+  bool play_pause_enabled_ = true;
   GtkWidget *popup_window_ = nullptr;
   GtkWidget *popup_title_ = nullptr;
   GtkWidget *popup_body_ = nullptr;

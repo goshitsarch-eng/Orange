@@ -1,8 +1,11 @@
 #include "core/macstartupactions.h"
 #include "ui/mainwindowlook.h"
+#include "core/playbackcontrolsstate.h"
+#include "core/playeritemoptions.h"
 #include "systemtrayicon/systemtrayicon.h"
 #include "systemtrayicon/traymenulove.h"
 #include "systemtrayicon/traymenumute.h"
+#include "systemtrayicon/traymenuplaypause.h"
 #include "systemtrayicon/traymenustop.h"
 #include "widgets/busyindicatoranim.h"
 
@@ -267,6 +270,32 @@ TEST(TrayMenuMute, CheckedStateMatchesQt) {
   EXPECT_TRUE(tray.mute_checked());
   tray.SetMuteChecked(false);
   EXPECT_FALSE(tray.mute_checked());
+}
+
+TEST(TrayMenuPlayPause, DisabledForRadioLikeQt) {
+  EXPECT_TRUE(PlaybackControlsState::PlayPauseEnabled(false, true));
+  EXPECT_TRUE(PlaybackControlsState::PlayPauseEnabled(false, false));
+  EXPECT_TRUE(PlaybackControlsState::PlayPauseEnabled(true, false));
+  EXPECT_FALSE(PlaybackControlsState::PlayPauseEnabled(true, true));
+  Song radio;
+  radio.set_source(Song::Source::Stream);
+  EXPECT_TRUE(PlayerItemOptions::PauseDisabled(radio));
+  EXPECT_FALSE(PlaybackControlsState::PlayPauseEnabled(true, PlayerItemOptions::PauseDisabled(radio)));
+  EXPECT_TRUE(TrayMenuPlayPause::ItemEnabled(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuPlayPause, false));
+  EXPECT_FALSE(TrayMenuPlayPause::ItemEnabled(SystemTrayIcon::kMenuPlayPause, SystemTrayIcon::kMenuPlayPause, false));
+  EXPECT_TRUE(TrayMenuPlayPause::ItemEnabled(SystemTrayIcon::kMenuPlayPause, SystemTrayIcon::kMenuPlayPause, true));
+
+  SystemTrayIcon tray;
+  EXPECT_TRUE(tray.play_pause_enabled());
+  tray.SetPlaying(true, false);
+  EXPECT_TRUE(tray.playing());
+  EXPECT_FALSE(tray.play_pause_enabled());
+  tray.SetPaused();
+  EXPECT_TRUE(tray.play_pause_enabled());
+  tray.SetPlaying(true, true);
+  EXPECT_TRUE(tray.play_pause_enabled());
+  tray.SetStopped();
+  EXPECT_TRUE(tray.play_pause_enabled());
 }
 
 TEST(TrayMenuStop, DisabledWhenStoppedLikeQt) {

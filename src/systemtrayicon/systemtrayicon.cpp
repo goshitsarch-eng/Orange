@@ -11,6 +11,7 @@
 #include "systemtrayicon/trayiconpixmap.h"
 #include "systemtrayicon/traymenulove.h"
 #include "systemtrayicon/traymenumute.h"
+#include "systemtrayicon/traymenuplaypause.h"
 #include "systemtrayicon/traymenustop.h"
 #include "systemtrayicon/traymenuposition.h"
 #include "systemtrayicon/traypopup.h"
@@ -322,10 +323,11 @@ void SystemTrayIcon::RefreshPresentation() {
   EmitLayoutUpdated();
 }
 
-void SystemTrayIcon::SetPlaying(bool playing) {
+void SystemTrayIcon::SetPlaying(bool playing, bool enable_play_pause) {
   if (playing) {
     playing_ = true;
     paused_ = false;
+    play_pause_enabled_ = enable_play_pause;
   } else {
     SetStopped();
     return;
@@ -336,12 +338,14 @@ void SystemTrayIcon::SetPlaying(bool playing) {
 void SystemTrayIcon::SetPaused() {
   playing_ = false;
   paused_ = true;
+  play_pause_enabled_ = true;
   RefreshPresentation();
 }
 
 void SystemTrayIcon::SetStopped() {
   playing_ = false;
   paused_ = false;
+  play_pause_enabled_ = true;
   RefreshPresentation();
 }
 
@@ -541,7 +545,11 @@ void SystemTrayIcon::ShowMenu(int x, int y) {
                      signal);
     gtk_box_append(GTK_BOX(box), button);
   };
-  connect(box, gtk_button_new_with_label(playing_ ? Translations::CStr("Pause") : Translations::CStr("Play")), &PlayPause);
+  {
+    GtkWidget *play_pause = gtk_button_new_with_label(playing_ ? Translations::CStr("Pause") : Translations::CStr("Play"));
+    gtk_widget_set_sensitive(play_pause, play_pause_enabled_ ? TRUE : FALSE);
+    connect(box, play_pause, &PlayPause);
+  }
   {
     GtkWidget *stop = gtk_button_new_with_label(Translations::CStr("Stop"));
     gtk_widget_set_sensitive(stop, TrayMenuStop::PlaybackActive(playing_, paused_) ? TRUE : FALSE);
@@ -677,7 +685,8 @@ GVariant *SystemTrayIcon::MenuLayout(int parent_id) const {
     g_variant_builder_init(&empty, G_VARIANT_TYPE("av"));
     const char *type = IsSeparatorId(id) ? "separator" : "standard";
     const bool enabled = TrayMenuLove::ItemEnabled(id, kMenuLove, love_enabled_) &&
-                         TrayMenuStop::ItemEnabled(id, kMenuStop, kMenuStopAfter, TrayMenuStop::PlaybackActive(playing_, paused_));
+                         TrayMenuStop::ItemEnabled(id, kMenuStop, kMenuStopAfter, TrayMenuStop::PlaybackActive(playing_, paused_)) &&
+                         TrayMenuPlayPause::ItemEnabled(id, kMenuPlayPause, play_pause_enabled_);
     const bool visible = TrayMenuLove::ItemVisible(id, kMenuLove, love_visible_) && TrayMenuMute::ItemVisible(id, kMenuMute, mute_enabled_);
     const int toggle_state = TrayMenuMute::ToggleStateForId(id, kMenuMute, mute_checked_);
     GVariant *item = g_variant_new("(i@a{sv}av)", id, ItemProps(MenuLabel(id, playing_), type, enabled, visible, toggle_state), &empty);

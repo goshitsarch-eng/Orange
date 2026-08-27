@@ -4,6 +4,7 @@
 #include "core/application.h"
 #include "core/logging.h"
 #include "core/player.h"
+#include "core/playeritemoptions.h"
 #include "engine/enginebase.h"
 #include "mpris2/mpris2helpers.h"
 #include "mpris2/mpris2playlists.h"
@@ -208,7 +209,7 @@ static void HandleMethod(GDBusConnection *, const gchar *, const gchar *, const 
           app->player()->Play();
         }
       } else if (g_strcmp0(method, "Pause") == 0) {
-        if (Mpris2Helpers::CanPause(state)) {
+        if (Mpris2Helpers::CanPause(state, PlayerItemOptions::PauseDisabled(current))) {
           app->player()->Pause();
         }
       } else if (g_strcmp0(method, "PlayPause") == 0) {
@@ -369,7 +370,7 @@ static GVariant *HandleGet(GDBusConnection *, const gchar *, const gchar *, cons
     return g_variant_new_boolean(Mpris2Helpers::CanPlay(playlist));
   }
   if (g_strcmp0(property, "CanPause") == 0) {
-    return g_variant_new_boolean(Mpris2Helpers::CanPause(state));
+    return g_variant_new_boolean(Mpris2Helpers::CanPause(state, PlayerItemOptions::PauseDisabled(current)));
   }
   if (g_strcmp0(property, "CanGoNext") == 0) {
     return g_variant_new_boolean(Mpris2Helpers::CanGoNext(playlist));
@@ -643,7 +644,8 @@ void Mpris2::EmitPlayerCapabilities() {
   const Song current = app_ && app_->player() ? app_->player()->current_song() : Song();
   const int64_t position_ns = app_ && app_->player() && app_->player()->engine() ? app_->player()->engine()->position_nanosec() : 0;
   EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanPlay", g_variant_new_boolean(Mpris2Helpers::CanPlay(playlist)));
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanPause", g_variant_new_boolean(Mpris2Helpers::CanPause(state)));
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanPause",
+                        g_variant_new_boolean(Mpris2Helpers::CanPause(state, PlayerItemOptions::PauseDisabled(current))));
   EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanGoNext", g_variant_new_boolean(Mpris2Helpers::CanGoNext(playlist)));
   EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanGoPrevious",
                         g_variant_new_boolean(Mpris2Helpers::CanGoPrevious(playlist, position_ns)));

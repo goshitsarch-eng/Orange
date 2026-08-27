@@ -17,6 +17,8 @@
 #include "core/commandlinevolume.h"
 #include "tidal/tidalloginurl.h"
 #include "tidal/tidalservice.h"
+#include "core/playbackcontrolsstate.h"
+#include "core/playeritemoptions.h"
 #include "utilities/fileutils.h"
 
 #include "config.h"
@@ -172,7 +174,7 @@ void Application::Init() {
     osd_->ReshowCurrentSong(song, current_albumcover_loader_->current());
   });
   player_->Playing.Connect([this]() {
-    tray_->SetPlaying(true);
+    tray_->SetPlaying(true, PlaybackControlsState::PlayPauseEnabled(true, PlayerItemOptions::PauseDisabled(player_->current_song())));
     if (playback_was_paused_) {
       osd_->Resumed();
     }
