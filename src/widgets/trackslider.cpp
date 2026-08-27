@@ -17,8 +17,11 @@ TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
   gtk_widget_set_tooltip_text(duration_label_, TrackSliderTime::DurationTooltip());
   gtk_widget_set_cursor_from_name(duration_label_, "pointer");
   gtk_widget_set_hexpand(slider_.widget(), TRUE);
+  slider_overlay_ = gtk_overlay_new();
+  gtk_widget_set_hexpand(slider_overlay_, TRUE);
+  gtk_overlay_set_child(GTK_OVERLAY(slider_overlay_), slider_.widget());
   gtk_box_append(GTK_BOX(widget_), position_label_);
-  gtk_box_append(GTK_BOX(widget_), slider_.widget());
+  gtk_box_append(GTK_BOX(widget_), slider_overlay_);
   gtk_box_append(GTK_BOX(widget_), duration_label_);
   GtkGesture *click = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);

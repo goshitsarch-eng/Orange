@@ -194,6 +194,10 @@ MainWindow::~MainWindow() {
   if (collection_filter_timeout_) {
     g_source_remove(collection_filter_timeout_);
   }
+  if (seekbar_fade_source_) {
+    g_source_remove(seekbar_fade_source_);
+    seekbar_fade_source_ = 0;
+  }
   if (seekbar_menu_) {
     gtk_widget_unparent(seekbar_menu_);
     seekbar_menu_ = nullptr;
@@ -1624,12 +1628,18 @@ void MainWindow::BuildPlayerBar() {
 
   waveform_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(waveform_drawing_, -1, 28);
+  gtk_widget_set_hexpand(waveform_drawing_, TRUE);
+  gtk_widget_set_halign(waveform_drawing_, GTK_ALIGN_FILL);
+  gtk_widget_set_valign(waveform_drawing_, GTK_ALIGN_FILL);
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(waveform_drawing_), DrawWaveform, this, nullptr);
-  gtk_box_append(GTK_BOX(box), waveform_drawing_);
   moodbar_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(moodbar_drawing_, -1, 16);
+  gtk_widget_set_hexpand(moodbar_drawing_, TRUE);
+  gtk_widget_set_halign(moodbar_drawing_, GTK_ALIGN_FILL);
+  gtk_widget_set_valign(moodbar_drawing_, GTK_ALIGN_FILL);
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(moodbar_drawing_), DrawMoodbar, this, nullptr);
-  gtk_box_append(GTK_BOX(box), moodbar_drawing_);
+  gtk_overlay_add_overlay(GTK_OVERLAY(track_slider_->slider_overlay()), waveform_drawing_);
+  gtk_overlay_add_overlay(GTK_OVERLAY(track_slider_->slider_overlay()), moodbar_drawing_);
   gtk_box_append(GTK_BOX(box), track_slider_->widget());
   auto attach_seek = [&](GtkWidget *widget, bool hover_and_wheel) {
     GtkGesture *click = gtk_gesture_click_new();
@@ -4051,20 +4061,62 @@ void MainWindow::ApplySeekbarPlaybackState() {
   track_slider_->SetCanSeek(TrackSliderState::CanSeekFromSong(app_->player()->current_song()));
 }
 
+void MainWindow::ApplySeekbarFadeWidgets() {
+  if (moodbar_drawing_) {
+    gtk_widget_set_visible(moodbar_drawing_, moodbar_fade_.Visible());
+    gtk_widget_set_opacity(moodbar_drawing_, moodbar_fade_.Opacity());
+    gtk_widget_set_can_target(moodbar_drawing_, moodbar_fade_.Visible() && moodbar_fade_.Opacity() > 0.05F);
+  }
+  if (waveform_drawing_) {
+    gtk_widget_set_visible(waveform_drawing_, waveform_fade_.Visible());
+    gtk_widget_set_opacity(waveform_drawing_, waveform_fade_.Opacity());
+    gtk_widget_set_can_target(waveform_drawing_, waveform_fade_.Visible() && waveform_fade_.Opacity() > 0.05F);
+  }
+  if (track_slider_) {
+    const bool show_slider = SeekbarFade::ShowSlider(moodbar_fade_, waveform_fade_);
+    gtk_widget_set_visible(track_slider_->slider()->widget(), TRUE);
+    gtk_widget_set_opacity(track_slider_->slider()->widget(), show_slider ? 1.0 : 0.0);
+    gtk_widget_set_can_target(track_slider_->slider()->widget(), show_slider);
+  }
+}
+
+void MainWindow::StartSeekbarFadeTimer() {
+  if (seekbar_fade_source_ || (!SeekbarFade::IsFading(moodbar_fade_.state) && !SeekbarFade::IsFading(waveform_fade_.state))) {
+    return;
+  }
+  seekbar_fade_source_ = g_timeout_add(SeekbarFade::kTickMs, OnSeekbarFadeTick, this);
+}
+
+gboolean MainWindow::OnSeekbarFadeTick(gpointer data) {
+  auto *self = static_cast<MainWindow *>(data);
+  const bool mood_running = self->moodbar_fade_.Tick(SeekbarFade::kTickMs);
+  const bool wave_running = self->waveform_fade_.Tick(SeekbarFade::kTickMs);
+  self->ApplySeekbarFadeWidgets();
+  if (!mood_running && !wave_running) {
+    self->seekbar_fade_source_ = 0;
+    return G_SOURCE_REMOVE;
+  }
+  return G_SOURCE_CONTINUE;
+}
+
 void MainWindow::ApplySeekbarMode() {
   Settings settings;
   settings.BeginGroup(SeekbarSettings::kSettingsGroup);
   const auto mode = static_cast<SeekbarSettings::Mode>(
       settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode)));
-  if (moodbar_drawing_) {
-    gtk_widget_set_visible(moodbar_drawing_, mode == SeekbarSettings::Mode::Moodbar);
+  const bool show_moodbar = mode == SeekbarSettings::Mode::Moodbar;
+  const bool show_waveform = mode == SeekbarSettings::Mode::Waveform;
+  if (!seekbar_fade_inited_) {
+    moodbar_fade_.Snap(show_moodbar);
+    waveform_fade_.Snap(show_waveform);
+    seekbar_fade_inited_ = true;
+    ApplySeekbarFadeWidgets();
+    return;
   }
-  if (waveform_drawing_) {
-    gtk_widget_set_visible(waveform_drawing_, mode == SeekbarSettings::Mode::Waveform);
-  }
-  if (track_slider_) {
-    track_slider_->SetSliderVisible(mode == SeekbarSettings::Mode::Normal);
-  }
+  moodbar_fade_.Request(show_moodbar);
+  waveform_fade_.Request(show_waveform);
+  ApplySeekbarFadeWidgets();
+  StartSeekbarFadeTimer();
 }
 
 void MainWindow::SetSeekbarMode(SeekbarSettings::Mode mode) {

@@ -18,6 +18,7 @@ class TrackSlider {
   TrackSlider();
 
   GtkWidget *widget() const { return widget_; }
+  GtkWidget *slider_overlay() const { return slider_overlay_; }
   PrettySlider *slider() { return &slider_; }
 
   void SetTimes(int64_t position_nanosec, int64_t length_nanosec);
@@ -45,6 +46,7 @@ class TrackSlider {
   PrettySlider slider_;
   TrackSliderPopup popup_;
   GtkWidget *widget_ = nullptr;
+  GtkWidget *slider_overlay_ = nullptr;
   GtkWidget *position_label_ = nullptr;
   GtkWidget *duration_label_ = nullptr;
   int64_t position_nanosec_ = 0;

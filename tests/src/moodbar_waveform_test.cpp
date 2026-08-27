@@ -2,6 +2,7 @@
 #include "constants/waveformsettings.h"
 #include "settings/moodbarsettingslabels.h"
 #include "settings/waveformsettingslabels.h"
+#include "widgets/seekbarfade.h"
 #include "widgets/seekbarmode.h"
 #include "widgets/tracksliderwheel.h"
 #include "core/song.h"
@@ -214,6 +215,49 @@ TEST(SeekbarModeMenu, LabelsAndCycleMatchQt) {
   EXPECT_TRUE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Moodbar));
   EXPECT_FALSE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Normal));
   EXPECT_STREQ("Moodbar style", SeekbarModeMenu::StyleSubmenuTitle());
+}
+
+TEST(SeekbarFade, StateMachineMatchesQtTimeline) {
+  EXPECT_EQ(1000, SeekbarFade::kDurationMs);
+  EXPECT_EQ(WaveformPlayhead::kFadeDurationMs, SeekbarFade::kDurationMs);
+  EXPECT_TRUE(SeekbarFade::AlreadyHeading(SeekbarFade::State::On, true));
+  EXPECT_TRUE(SeekbarFade::AlreadyHeading(SeekbarFade::State::FadingToOn, true));
+  EXPECT_TRUE(SeekbarFade::AlreadyHeading(SeekbarFade::State::Off, false));
+  EXPECT_FALSE(SeekbarFade::AlreadyHeading(SeekbarFade::State::Off, true));
+  EXPECT_TRUE(SeekbarFade::StartsFreshFade(SeekbarFade::State::Off));
+  EXPECT_FALSE(SeekbarFade::StartsFreshFade(SeekbarFade::State::FadingToOn));
+  EXPECT_FLOAT_EQ(0.0F, SeekbarFade::FadeValue(SeekbarFade::State::Off, 0));
+  EXPECT_FLOAT_EQ(1.0F, SeekbarFade::FadeValue(SeekbarFade::State::On, 0));
+  EXPECT_FLOAT_EQ(0.4F, SeekbarFade::FadeValue(SeekbarFade::State::FadingToOn, 400));
+  EXPECT_FLOAT_EQ(0.6F, SeekbarFade::FadeValue(SeekbarFade::State::FadingToOff, 400));
+  EXPECT_EQ(600, SeekbarFade::ReverseElapsed(400));
+  EXPECT_EQ(SeekbarFade::State::On, SeekbarFade::FinishIfDone(SeekbarFade::State::FadingToOn, 1000));
+  EXPECT_EQ(SeekbarFade::State::Off, SeekbarFade::FinishIfDone(SeekbarFade::State::FadingToOff, 1000));
+  EXPECT_EQ(SeekbarFade::State::FadingToOn, SeekbarFade::FinishIfDone(SeekbarFade::State::FadingToOn, 999));
+
+  SeekbarFade::Machine moodbar;
+  SeekbarFade::Machine waveform;
+  moodbar.Snap(false);
+  waveform.Snap(false);
+  EXPECT_TRUE(SeekbarFade::ShowSlider(moodbar, waveform));
+  moodbar.Request(true);
+  EXPECT_EQ(SeekbarFade::State::FadingToOn, moodbar.state);
+  EXPECT_FLOAT_EQ(0.0F, moodbar.Opacity());
+  EXPECT_TRUE(moodbar.Tick(400));
+  EXPECT_FLOAT_EQ(0.4F, moodbar.Opacity());
+  EXPECT_TRUE(SeekbarFade::ShowSlider(moodbar, waveform));
+  moodbar.Request(false);
+  EXPECT_EQ(SeekbarFade::State::FadingToOff, moodbar.state);
+  EXPECT_EQ(600, moodbar.elapsed_ms);
+  EXPECT_FLOAT_EQ(0.4F, moodbar.Opacity());
+  EXPECT_FALSE(moodbar.Tick(600));
+  EXPECT_EQ(SeekbarFade::State::Off, moodbar.state);
+  EXPECT_FALSE(moodbar.Visible());
+  moodbar.Request(true);
+  while (moodbar.Tick(SeekbarFade::kTickMs)) {
+  }
+  EXPECT_EQ(SeekbarFade::State::On, moodbar.state);
+  EXPECT_FALSE(SeekbarFade::ShowSlider(moodbar, waveform));
 }
 
 TEST(WaveformPlayhead, SplitAndPlayedAlphaMatchQt) {
