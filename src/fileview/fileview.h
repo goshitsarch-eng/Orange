@@ -33,6 +33,7 @@ class FileView {
   void FileBack();
   void FileForward();
   void Reload();
+  void ApplyLook();
   void SetShowHidden(bool show_hidden);
   void SetShowAllFiles(bool show_all);
   void ToggleViewMode();

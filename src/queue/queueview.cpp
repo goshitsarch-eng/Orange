@@ -1,5 +1,6 @@
 #include "queue/queueview.h"
 
+#include "core/appearanceleftpanel.h"
 #include "playlist/playlistdropindicator.h"
 #include "queue/queue.h"
 #include "queue/queuedrop.h"
@@ -127,6 +128,18 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
                    })),
                    this);
   SetQueue(queue);
+  ApplyLook();
+}
+
+void QueueView::ApplyLook() {
+  if (!AppearanceLeftPanel::ShouldApply()) {
+    return;
+  }
+  const int size = AppearanceLeftPanel::StoredSize();
+  AppearanceLeftPanel::ApplyWidget(move_down_, size);
+  AppearanceLeftPanel::ApplyWidget(move_up_, size);
+  AppearanceLeftPanel::ApplyWidget(remove_, size);
+  AppearanceLeftPanel::ApplyWidget(clear_, size);
 }
 
 void QueueView::SetQueue(Queue *queue) {

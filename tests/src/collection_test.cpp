@@ -1,4 +1,5 @@
 #include "core/appearanceconfigurebuttons.h"
+#include "core/appearanceleftpanel.h"
 #include "collection/collectionwatcherreload.h"
 #include "collection/collectionfullrescan.h"
 #include "collection/collectioncompilationdetect.h"
@@ -2057,6 +2058,16 @@ TEST(CollectionFullRescan, MatchesQtRevisions) {
   EXPECT_NE(std::string::npos, message.find("full collection rescan"));
   EXPECT_NE(std::string::npos, message.find(reasons.front()));
   EXPECT_STREQ("Collection rescan notice", CollectionFullRescan::DialogTitle());
+}
+
+TEST(AppearanceLeftPanel, SizesFilesPlaylistsQueueLikeQt) {
+  EXPECT_STREQ("strawberry-left-panel-buttons", AppearanceLeftPanel::CssClass());
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldApply());
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldReloadOnSettingsClose());
+  EXPECT_EQ(AppearanceSettings::kDefaultIconSizeLeftPanelButtons, AppearanceLeftPanel::IconSize(0));
+  EXPECT_EQ(22, AppearanceLeftPanel::IconSize(22));
+  EXPECT_EQ(32, AppearanceLeftPanel::IconSize(32));
+  EXPECT_EQ(128, AppearanceLeftPanel::IconSize(256));
 }
 
 TEST(AppearanceConfigureButtons, SizesCollectionAndStreamingLikeQt) {

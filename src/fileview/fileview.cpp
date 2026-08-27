@@ -1,5 +1,6 @@
 #include "fileview/fileview.h"
 
+#include "core/appearanceleftpanel.h"
 #include "core/settings.h"
 #include "fileview/fileviewmode.h"
 #include "fileview/fileviewnav.h"
@@ -132,6 +133,21 @@ FileView::FileView() {
   history_.Push(path_);
   ApplyViewMode();
   Reload();
+  ApplyLook();
+}
+
+void FileView::ApplyLook() {
+  if (!AppearanceLeftPanel::ShouldApply()) {
+    return;
+  }
+  const int size = AppearanceLeftPanel::StoredSize();
+  AppearanceLeftPanel::ApplyWidget(back_, size);
+  AppearanceLeftPanel::ApplyWidget(forward_, size);
+  AppearanceLeftPanel::ApplyWidget(up_, size);
+  AppearanceLeftPanel::ApplyWidget(home_btn_, size);
+  AppearanceLeftPanel::ApplyWidget(add_root_, size);
+  AppearanceLeftPanel::ApplyWidget(remove_root_, size);
+  AppearanceLeftPanel::ApplyWidget(toggle_, size);
 }
 
 void FileView::SetPath(const std::string &path, bool record) {

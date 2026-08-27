@@ -158,6 +158,7 @@
 #include "streaming/streamingserviceenable.h"
 #include "streaming/streamingtabsview.h"
 #include "core/appearanceconfigurebuttons.h"
+#include "core/appearanceleftpanel.h"
 #include "core/urlhandler.h"
 #include "dialogs/aboutdialog.h"
 #include "dialogs/trackselectiondialog.h"
@@ -3604,6 +3605,17 @@ void MainWindow::ApplyAppearance() {
   }
   if (collection_container_) {
     collection_container_->ApplyLook();
+  }
+  if (AppearanceLeftPanel::ShouldReloadOnSettingsClose()) {
+    if (queue_view_) {
+      queue_view_->ApplyLook();
+    }
+    if (file_view_) {
+      file_view_->ApplyLook();
+    }
+    if (playlist_list_container_) {
+      playlist_list_container_->ApplyLook();
+    }
   }
   for (const auto &view : streaming_views_) {
     if (view) {

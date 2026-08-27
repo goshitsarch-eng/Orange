@@ -1,5 +1,6 @@
 #include "playlist/playlistlistcontainer.h"
 
+#include "core/appearanceleftpanel.h"
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "playlist/playlistfolders.h"
@@ -28,12 +29,12 @@ PlaylistListContainer::PlaylistListContainer()
   gtk_widget_set_margin_start(bar, 8);
   gtk_widget_set_margin_end(bar, 8);
   gtk_widget_set_margin_bottom(bar, 4);
-  GtkWidget *add = gtk_button_new_from_icon_name("list-add-symbolic");
-  gtk_widget_add_css_class(add, "flat");
-  gtk_widget_set_tooltip_text(add, Translations::CStr("New playlist"));
-  GtkWidget *folder = gtk_button_new_from_icon_name("folder-new-symbolic");
-  gtk_widget_add_css_class(folder, "flat");
-  gtk_widget_set_tooltip_text(folder, Translations::CStr("New folder"));
+  add_button_ = gtk_button_new_from_icon_name("list-add-symbolic");
+  gtk_widget_add_css_class(add_button_, "flat");
+  gtk_widget_set_tooltip_text(add_button_, Translations::CStr("New playlist"));
+  folder_button_ = gtk_button_new_from_icon_name("folder-new-symbolic");
+  gtk_widget_add_css_class(folder_button_, "flat");
+  gtk_widget_set_tooltip_text(folder_button_, Translations::CStr("New folder"));
   remove_button_ = gtk_button_new_from_icon_name("list-remove-symbolic");
   gtk_widget_add_css_class(remove_button_, "flat");
   gtk_widget_set_tooltip_text(remove_button_, Translations::CStr("Delete playlist"));
@@ -47,14 +48,14 @@ PlaylistListContainer::PlaylistListContainer()
   gtk_button_set_icon_name(GTK_BUTTON(favorites_toggle_), "starred-symbolic");
   gtk_widget_add_css_class(favorites_toggle_, "flat");
   gtk_widget_set_tooltip_text(favorites_toggle_, Translations::CStr("Show favorite playlists only"));
-  g_signal_connect(add, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+  g_signal_connect(add_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<PlaylistListContainer *>(data);
                      if (self->new_) {
                        self->new_();
                      }
                    }),
                    this);
-  g_signal_connect(folder, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+  g_signal_connect(folder_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<PlaylistListContainer *>(data);
                      if (self->new_folder_) {
                        self->new_folder_();
@@ -94,8 +95,8 @@ PlaylistListContainer::PlaylistListContainer()
                      self->Rebuild();
                    }),
                    this);
-  gtk_box_append(GTK_BOX(bar), add);
-  gtk_box_append(GTK_BOX(bar), folder);
+  gtk_box_append(GTK_BOX(bar), add_button_);
+  gtk_box_append(GTK_BOX(bar), folder_button_);
   gtk_box_append(GTK_BOX(bar), remove_button_);
   gtk_box_append(GTK_BOX(bar), save_button_);
   gtk_box_append(GTK_BOX(bar), copy_button_);
@@ -132,6 +133,20 @@ PlaylistListContainer::PlaylistListContainer()
   });
   view_->SetSelectionChangedCallback([this]() { UpdateSelectionChrome(); });
   UpdateSelectionChrome();
+  ApplyLook();
+}
+
+void PlaylistListContainer::ApplyLook() {
+  if (!AppearanceLeftPanel::ShouldApply()) {
+    return;
+  }
+  const int size = AppearanceLeftPanel::StoredSize();
+  AppearanceLeftPanel::ApplyWidget(add_button_, size);
+  AppearanceLeftPanel::ApplyWidget(folder_button_, size);
+  AppearanceLeftPanel::ApplyWidget(remove_button_, size);
+  AppearanceLeftPanel::ApplyWidget(save_button_, size);
+  AppearanceLeftPanel::ApplyWidget(copy_button_, size);
+  AppearanceLeftPanel::ApplyWidget(favorites_toggle_, size);
 }
 
 void PlaylistListContainer::Reload(PlaylistManager *manager) {
