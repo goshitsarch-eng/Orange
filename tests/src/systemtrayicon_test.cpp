@@ -1,6 +1,8 @@
 #include "core/macstartupactions.h"
+#include "ui/mainwindowlook.h"
 #include "systemtrayicon/systemtrayicon.h"
 #include "systemtrayicon/traymenulove.h"
+#include "systemtrayicon/traymenumute.h"
 #include "widgets/busyindicatoranim.h"
 
 #include "constants/behavioursettings.h"
@@ -242,6 +244,29 @@ TEST(MacStartupActions, ReopenDockAndMediaKeysMatchQt) {
   const auto ids = MacStartupActions::DockMenuIds(true);
   EXPECT_EQ(SystemTrayIcon::RootMenuIds(true), ids);
   EXPECT_TRUE(MacStartupActions::DockItemIsSeparator(SystemTrayIcon::kMenuSeparator));
+}
+
+TEST(TrayMenuMute, FollowsVolumeControlLikeQt) {
+  EXPECT_TRUE(TrayMenuMute::ShouldShow(true));
+  EXPECT_FALSE(TrayMenuMute::ShouldShow(false));
+  EXPECT_TRUE(MainWindowLook::MuteVisible(true));
+  EXPECT_FALSE(MainWindowLook::MuteVisible(false));
+  const auto all = SystemTrayIcon::RootMenuIds();
+  EXPECT_NE(all.end(), std::find(all.begin(), all.end(), SystemTrayIcon::kMenuMute));
+  const auto hidden = SystemTrayIcon::RootMenuIds(true, false);
+  EXPECT_EQ(9u, hidden.size());
+  EXPECT_EQ(hidden.end(), std::find(hidden.begin(), hidden.end(), SystemTrayIcon::kMenuMute));
+  EXPECT_NE(hidden.end(), std::find(hidden.begin(), hidden.end(), SystemTrayIcon::kMenuLove));
+  EXPECT_EQ(hidden, TrayMenuMute::FilterMenuIds(SystemTrayIcon::AllMenuIds(), SystemTrayIcon::kMenuMute, false));
+  EXPECT_FALSE(TrayMenuMute::ItemVisible(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute, false));
+  EXPECT_TRUE(TrayMenuMute::ItemVisible(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuMute, false));
+
+  SystemTrayIcon tray;
+  EXPECT_TRUE(tray.mute_enabled());
+  tray.SetMuteEnabled(false);
+  EXPECT_FALSE(tray.mute_enabled());
+  tray.SetMuteEnabled(true);
+  EXPECT_TRUE(tray.mute_enabled());
 }
 
 TEST(TraySettingsReload, RegistersAndPresentsLikeQt) {

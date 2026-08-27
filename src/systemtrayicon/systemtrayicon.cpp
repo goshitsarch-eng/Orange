@@ -10,6 +10,7 @@
 #include "systemtrayicon/trayiconmask.h"
 #include "systemtrayicon/trayiconpixmap.h"
 #include "systemtrayicon/traymenulove.h"
+#include "systemtrayicon/traymenumute.h"
 #include "systemtrayicon/traymenuposition.h"
 #include "systemtrayicon/traypopup.h"
 #include "systemtrayicon/traysettingsreload.h"
@@ -175,8 +176,8 @@ GVariant *ItemProps(const char *label, const char *type = "standard", bool enabl
 
 }  // namespace
 
-std::vector<int> SystemTrayIcon::RootMenuIds(bool show_love) {
-  return TrayMenuLove::FilterMenuIds(AllMenuIds(), kMenuLove, show_love);
+std::vector<int> SystemTrayIcon::RootMenuIds(bool show_love, bool show_mute) {
+  return TrayMenuMute::FilterMenuIds(TrayMenuLove::FilterMenuIds(AllMenuIds(), kMenuLove, show_love), kMenuMute, show_mute);
 }
 
 void SystemTrayIcon::SetLoveVisible(bool visible) {
@@ -192,6 +193,14 @@ void SystemTrayIcon::SetLoveEnabled(bool enabled) {
     return;
   }
   love_enabled_ = enabled;
+  EmitLayoutUpdated();
+}
+
+void SystemTrayIcon::SetMuteEnabled(bool enabled) {
+  if (mute_enabled_ == enabled) {
+    return;
+  }
+  mute_enabled_ = enabled;
   EmitLayoutUpdated();
 }
 
@@ -523,7 +532,9 @@ void SystemTrayIcon::ShowMenu(int x, int y) {
   connect(box, gtk_button_new_with_label(Translations::CStr("Stop")), &Stop);
   connect(box, gtk_button_new_with_label(Translations::CStr("Next")), &Next);
   connect(box, gtk_button_new_with_label(Translations::CStr("Previous")), &Previous);
-  connect(box, gtk_button_new_with_label(Translations::CStr("Mute")), &Mute);
+  if (mute_enabled_) {
+    connect(box, gtk_button_new_with_label(Translations::CStr("Mute")), &Mute);
+  }
   connect(box, gtk_button_new_with_label(Translations::CStr("Stop after this track")), &StopAfter);
   if (love_visible_) {
     GtkWidget *love = gtk_button_new_with_label(Translations::CStr("Love"));
@@ -628,13 +639,13 @@ GVariant *SystemTrayIcon::MenuLayout(int parent_id) const {
   g_variant_builder_add(&root_props, "{sv}", "children-display", g_variant_new_string("submenu"));
   GVariantBuilder children;
   g_variant_builder_init(&children, G_VARIANT_TYPE("av"));
-  const std::vector<int> ids = RootMenuIds(love_visible_);
+  const std::vector<int> ids = RootMenuIds(love_visible_, mute_enabled_);
   for (int id : ids) {
     GVariantBuilder empty;
     g_variant_builder_init(&empty, G_VARIANT_TYPE("av"));
     const char *type = IsSeparatorId(id) ? "separator" : "standard";
     const bool enabled = TrayMenuLove::ItemEnabled(id, kMenuLove, love_enabled_);
-    const bool visible = TrayMenuLove::ItemVisible(id, kMenuLove, love_visible_);
+    const bool visible = TrayMenuLove::ItemVisible(id, kMenuLove, love_visible_) && TrayMenuMute::ItemVisible(id, kMenuMute, mute_enabled_);
     GVariant *item = g_variant_new("(i@a{sv}av)", id, ItemProps(MenuLabel(id, playing_), type, enabled, visible), &empty);
     g_variant_builder_add(&children, "v", item);
   }

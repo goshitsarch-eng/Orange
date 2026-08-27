@@ -3698,6 +3698,9 @@ void MainWindow::ApplyMuteUi(unsigned volume) {
     g_simple_action_set_enabled(mute_action_, visible);
     g_simple_action_set_state(mute_action_, g_variant_new_boolean(muted));
   }
+  if (app_ && app_->tray()) {
+    app_->tray()->SetMuteEnabled(visible);
+  }
 }
 
 void MainWindow::SaveGeometry() {
