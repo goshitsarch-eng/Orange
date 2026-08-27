@@ -1,6 +1,7 @@
 #include "smartplaylists/smartplaylistsview.h"
 
 #include "smartplaylists/smartplaylistactivate.h"
+#include "smartplaylists/smartplaylistcontextmenu.h"
 #include "smartplaylists/smartplaylistdrag.h"
 #include "smartplaylists/smartplaylistslabel.h"
 #include "translations/translations.h"
@@ -35,7 +36,7 @@ SmartPlaylistsView::SmartPlaylistsView() {
                        }
                        item = static_cast<SmartPlaylistsItem *>(g_object_get_data(G_OBJECT(row), "item"));
                      }
-                     self->ShowMenu(GTK_WIDGET(self->list_), item);
+                     self->ShowMenu(GTK_WIDGET(self->list_), SmartPlaylistContextMenu::ItemForMenu(false, self->SelectedItem(), item));
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
@@ -43,8 +44,8 @@ SmartPlaylistsView::SmartPlaylistsView() {
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<SmartPlaylistsView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<SmartPlaylistsView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
 }
@@ -59,7 +60,11 @@ void SmartPlaylistsView::ResetTypeAhead() {
   }
 }
 
-gboolean SmartPlaylistsView::OnKeyPressed(guint keyval) {
+gboolean SmartPlaylistsView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (SmartPlaylistContextMenu::IsTrigger(keyval, static_cast<unsigned>(state))) {
+    ShowMenu(list_, SmartPlaylistContextMenu::ItemForMenu(true, SelectedItem(), nullptr));
+    return TRUE;
+  }
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
   if (action == ListBoxKeyboard::Action::Activate) {
     if (SmartPlaylistActivate::ShouldRun(SmartPlaylistActivate::Trigger::Enter)) {

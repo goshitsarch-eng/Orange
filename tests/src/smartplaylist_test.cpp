@@ -18,6 +18,7 @@
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
 #include "smartplaylists/smartplaylistactivate.h"
+#include "smartplaylists/smartplaylistcontextmenu.h"
 #include "smartplaylists/smartplaylistdrag.h"
 #include "smartplaylists/smartplaylistgeneratemore.h"
 #include "smartplaylists/smartplaylistsmodel.h"
@@ -882,6 +883,22 @@ TEST(SmartPlaylistPreviewDisplay, CapsAtGeneratorLimitAndUsesQtCountStrings) {
   EXPECT_TRUE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(true, false));
   EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(true, true));
   EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(false, false));
+}
+
+TEST(SmartPlaylistContextMenu, KeyboardUsesSelectionNotPointer) {
+  EXPECT_TRUE(SmartPlaylistContextMenu::IsTrigger(SmartPlaylistContextMenu::kMenu, 0));
+  EXPECT_TRUE(SmartPlaylistContextMenu::IsTrigger(SmartPlaylistContextMenu::kF10, SmartPlaylistContextMenu::kShiftMask));
+  EXPECT_FALSE(SmartPlaylistContextMenu::IsTrigger(SmartPlaylistContextMenu::kF10, 0));
+  EXPECT_FALSE(SmartPlaylistContextMenu::IsTrigger(ListBoxKeyboard::kReturn, 0));
+
+  SmartPlaylistsItem selected;
+  selected.title = "50 Random tracks";
+  SmartPlaylistsItem pointer;
+  pointer.kind = SmartPlaylistsItem::Kind::Wizard;
+  pointer.title = "Custom wizard…";
+  EXPECT_EQ(&selected, SmartPlaylistContextMenu::ItemForMenu(true, &selected, &pointer));
+  EXPECT_EQ(&pointer, SmartPlaylistContextMenu::ItemForMenu(false, &selected, &pointer));
+  EXPECT_EQ(nullptr, SmartPlaylistContextMenu::ItemForMenu(true, nullptr, &pointer));
 }
 
 TEST(SmartPlaylistActivate, EnterDoesNotRunAndDefaultsAppend) {
