@@ -48,7 +48,7 @@ class PlaylistListView {
   void SetupRowDrag(GtkWidget *row, const std::string &name);
   void StartDragHover(const std::string &name);
   void CancelDragHover();
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
   bool ApplyTreeLeft();
   void ResetTypeAhead();
   std::string SelectedPath() const;

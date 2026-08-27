@@ -1,5 +1,6 @@
 #include "playlist/playlistlistview.h"
 
+#include "playlist/playlistlistcontextmenu.h"
 #include "playlist/playlistlistkeyboard.h"
 #include "playlist/playlistlistleft.h"
 #include "translations/translations.h"
@@ -52,8 +53,8 @@ PlaylistListView::PlaylistListView() {
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<PlaylistListView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<PlaylistListView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
 }
@@ -130,7 +131,13 @@ void PlaylistListView::ResetTypeAhead() {
   }
 }
 
-gboolean PlaylistListView::OnKeyPressed(guint keyval) {
+gboolean PlaylistListView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (PlaylistListContextMenu::IsTrigger(keyval, static_cast<unsigned>(state))) {
+    if (menu_ && PlaylistListContextMenu::ShouldShowMenu()) {
+      menu_(SelectedName());
+    }
+    return TRUE;
+  }
   const PlaylistListKeyboard::Action action = PlaylistListKeyboard::FromKey(keyval);
   if (action == PlaylistListKeyboard::Action::Activate) {
     ListBoxKeyboardGtk::ActivateSelected(list_);

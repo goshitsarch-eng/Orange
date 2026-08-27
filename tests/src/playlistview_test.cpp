@@ -20,6 +20,7 @@
 #include "playlist/playlistlistactions.h"
 #include "playlist/playlistlistscroll.h"
 #include "playlist/playlistlistdrop.h"
+#include "playlist/playlistlistcontextmenu.h"
 #include "playlist/playlistlistkeyboard.h"
 #include "playlist/playlistlistleft.h"
 #include "playlist/playlistlistlook.h"
@@ -422,6 +423,13 @@ TEST(PlaylistListKeyboard, FromKeyExpandCollapseAndLabels) {
   ASSERT_EQ(2u, labels.size());
   EXPECT_EQ("Rock", labels[0]);
   EXPECT_EQ("Favorites", labels[1]);
+}
+
+TEST(PlaylistListContextMenu, KeyboardAlwaysShowsMenu) {
+  EXPECT_TRUE(PlaylistListContextMenu::IsTrigger(PlaylistListContextMenu::kMenu, 0));
+  EXPECT_TRUE(PlaylistListContextMenu::IsTrigger(PlaylistListContextMenu::kF10, PlaylistListContextMenu::kShiftMask));
+  EXPECT_FALSE(PlaylistListContextMenu::IsTrigger(PlaylistListContextMenu::kF10, 0));
+  EXPECT_TRUE(PlaylistListContextMenu::ShouldShowMenu());
 }
 
 TEST(PlaylistListLeft, CollapseOrJumpToParent) {
