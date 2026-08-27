@@ -5,6 +5,8 @@
 #include "osd/osdart.h"
 #include "osd/osdartrefresh.h"
 #include "osd/osddbus.h"
+#include "osd/osdmac.h"
+#include "osd/osdnative.h"
 #include "osd/osdpretty.h"
 #include "systemtrayicon/systemtrayicon.h"
 #include "translations/translations.h"
@@ -75,17 +77,21 @@ bool OSDBase::IsTypeSupported(OSDSettings::Type type) const {
   return false;
 }
 
-bool OSDBase::SupportsNativeNotifications() const { return true; }
+bool OSDBase::SupportsNativeNotifications() const { return OSDNative::SupportsNativeNotifications(tray_icon_ != nullptr); }
 
-bool OSDBase::SupportsTrayPopups() const { return tray_icon_ != nullptr; }
+bool OSDBase::SupportsTrayPopups() const { return OSDNative::SupportsTrayPopups(tray_icon_ != nullptr); }
 
 bool OSDBase::SupportsOSDPretty() { return OSDPretty::Supported(); }
 
 void OSDBase::ShowNative(const std::string &summary, const std::string &body, const std::string &icon,
                          const std::vector<unsigned char> &art) {
+#ifdef __APPLE__
+  OSDMac::ShowMessageNative(summary, body, icon, OSDArt::EffectiveArt(show_art_, art));
+#else
   if (dbus_) {
     dbus_->ShowMessage(summary, body, icon, OSDArt::EffectiveArt(show_art_, art));
   }
+#endif
 }
 
 std::string OSDBase::PlayingSummary(const Song &song) const {
@@ -135,7 +141,25 @@ void OSDBase::ShowMessage(const std::string &summary, const std::string &body, c
     return;
   }
   switch (type) {
+    case OSDSettings::Type::Native:
+      if (!OSDNative::NativeFallsThroughToTray()) {
+        ShowNative(summary, body, icon, art);
+        break;
+      }
+      [[fallthrough]];
+    case OSDSettings::Type::TrayPopup:
+      if (!OSDNative::TrayFallsThroughToPretty()) {
+        if (tray_icon_) {
+          tray_icon_->ShowPopup(summary, body, timeout_ms_, show_art_ ? art : std::vector<unsigned char>());
+        } else {
+          ShowNative(summary, body, icon, art);
+        }
+        break;
+      }
+      [[fallthrough]];
     case OSDSettings::Type::Pretty:
+    case OSDSettings::Type::Disabled:
+    default:
       if (pretty_) {
         pretty_->ShowMessage(summary, body, show_art_ ? art : std::vector<unsigned char>());
       } else if (tray_icon_) {
@@ -143,18 +167,6 @@ void OSDBase::ShowMessage(const std::string &summary, const std::string &body, c
       } else {
         ShowNative(summary, body, icon, art);
       }
-      break;
-    case OSDSettings::Type::TrayPopup:
-      if (tray_icon_) {
-        tray_icon_->ShowPopup(summary, body, timeout_ms_, show_art_ ? art : std::vector<unsigned char>());
-      } else {
-        ShowNative(summary, body, icon, art);
-      }
-      break;
-    case OSDSettings::Type::Native:
-    case OSDSettings::Type::Disabled:
-    default:
-      ShowNative(summary, body, icon, art);
       break;
   }
 }

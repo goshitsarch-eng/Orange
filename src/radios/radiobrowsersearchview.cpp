@@ -131,7 +131,7 @@ RadioBrowserSearchView::RadioBrowserSearchView(RadioServices *services) : servic
 
   g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
                      auto *self = static_cast<RadioBrowserSearchView *>(data);
-                     if (!self->countries_loaded_) {
+                     if (RadioBrowserSearchOpts::ShouldFetchCountriesOnShow(self->countries_loaded_)) {
                        self->FetchCountries();
                      }
                    }),
@@ -256,7 +256,7 @@ void RadioBrowserSearchView::FetchCountries() {
 
 void RadioBrowserSearchView::ApplyCountries(const std::vector<RadioBrowserService::Country> &countries) {
   applying_countries_ = true;
-  countries_loaded_ = true;
+  countries_loaded_ = RadioBrowserSearchOpts::ShouldMarkCountriesLoaded(true);
   gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(country_));
   gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(country_), RadioBrowserSearchOpts::AllCountriesId(),
                             Translations::CStr(RadioBrowserSearchOpts::AllCountriesLabel()));

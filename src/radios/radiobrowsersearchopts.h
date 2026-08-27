@@ -97,6 +97,14 @@ inline std::string SearchFailed(const std::string &error) {
   return "Radio Browser search failed: " + error;
 }
 
+// Qt RadioBrowserSearchView::showEvent retries FetchCountries until CountriesLoaded succeeds.
+inline bool ShouldFetchCountriesOnShow(bool countries_loaded) { return !countries_loaded; }
+
+// Qt CountriesReply returns without emitting CountriesLoaded when the network request fails.
+inline bool ShouldInvokeCountriesCallback(bool fetch_ok) { return fetch_ok; }
+
+inline bool ShouldMarkCountriesLoaded(bool fetch_ok) { return fetch_ok; }
+
 }  // namespace RadioBrowserSearchOpts
 
 #endif

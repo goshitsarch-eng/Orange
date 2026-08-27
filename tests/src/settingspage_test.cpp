@@ -660,6 +660,11 @@ TEST(StreamingSettingsLabels, SubsonicCopyAndConnectionCheck) {
   EXPECT_STREQ("Default country:", RadioSettingsLabels::DefaultCountry());
 }
 
+TEST(SubsonicSettingsActions, ReenablesTestOnShowAndEnter) {
+  EXPECT_TRUE(SubsonicSettingsActions::ShouldReenableTestOnShow());
+  EXPECT_TRUE(SubsonicSettingsActions::ShouldReenableTestOnEnter());
+}
+
 TEST(BackendOutputChoices, AppendsCustomAndDetectsUnlistedDevice) {
   EXPECT_STREQ("Custom", BackendOutputChoices::CustomLabel());
   EXPECT_STREQ("__custom__", BackendOutputChoices::CustomChoiceKey());

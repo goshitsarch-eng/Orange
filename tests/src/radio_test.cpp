@@ -194,6 +194,15 @@ TEST(RadioBrowserSearchOpts, SortStatusAndPagingMatchQt) {
   EXPECT_EQ("Radio Browser search failed.", RadioBrowserSearchOpts::SearchFailed({}));
 }
 
+TEST(RadioBrowserSearchOpts, RetriesCountriesUntilFetchSucceeds) {
+  EXPECT_TRUE(RadioBrowserSearchOpts::ShouldFetchCountriesOnShow(false));
+  EXPECT_FALSE(RadioBrowserSearchOpts::ShouldFetchCountriesOnShow(true));
+  EXPECT_TRUE(RadioBrowserSearchOpts::ShouldInvokeCountriesCallback(true));
+  EXPECT_FALSE(RadioBrowserSearchOpts::ShouldInvokeCountriesCallback(false));
+  EXPECT_TRUE(RadioBrowserSearchOpts::ShouldMarkCountriesLoaded(true));
+  EXPECT_FALSE(RadioBrowserSearchOpts::ShouldMarkCountriesLoaded(false));
+}
+
 TEST(RadioServices, PlaylistParserResolvesSomaFMPls) {
   PlaylistParser parser;
   const std::string pls = "[playlist]\nNumberOfEntries=1\nFile1=https://ice1.somafm.com/groovesalad-128-mp3\n";

@@ -782,8 +782,9 @@ if(APPLE)
     src/device/macosdevicelister.mm
     src/globalshortcuts/globalshortcutsbackend-macos.mm
     src/systemtrayicon/macsystemtrayicon.mm
+    src/osd/osdmac.mm
   )
-  target_link_libraries(strawberry PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon")
+  target_link_libraries(strawberry PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon" "-framework UserNotifications")
 endif()
 
 install(TARGETS strawberry RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -1198,8 +1199,9 @@ if(GTest_FOUND)
       src/device/macosdevicelister.mm
       src/globalshortcuts/globalshortcutsbackend-macos.mm
       src/systemtrayicon/macsystemtrayicon.mm
+      src/osd/osdmac.mm
     )
-    target_link_libraries(strawberry_tests PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon")
+    target_link_libraries(strawberry_tests PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon" "-framework UserNotifications")
   endif()
   add_test(NAME strawberry_tests COMMAND strawberry_tests)
   add_custom_target(build_tests DEPENDS strawberry_tests)

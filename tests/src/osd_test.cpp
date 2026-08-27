@@ -10,6 +10,8 @@
 #include "osd/osdprettywayland.h"
 #include "osd/osdbase.h"
 #include "osd/osdforce.h"
+#include "osd/osdmac.h"
+#include "osd/osdnative.h"
 #include "osd/osdpretty.h"
 #include "osd/osdprettyfade.h"
 #include "osd/osdprettylimits.h"
@@ -188,6 +190,28 @@ TEST(OSDBase, CustomTextAndPlaylistFinished) {
   osd.PlaylistFinished();
   EXPECT_EQ("Strawberry", tray.popup_summary());
   EXPECT_EQ("Playlist finished", tray.popup_message());
+}
+
+TEST(OSDNative, PlatformCapabilitiesMatchQt) {
+  EXPECT_FALSE(OSDNative::IsWindows());
+  EXPECT_FALSE(OSDNative::IsMacOs());
+  EXPECT_TRUE(OSDNative::UsesDbusNative());
+  EXPECT_FALSE(OSDNative::UsesNotificationCenter());
+  EXPECT_FALSE(OSDNative::NativeFallsThroughToTray());
+  EXPECT_FALSE(OSDNative::TrayFallsThroughToPretty());
+  EXPECT_FALSE(OSDNative::BaseSupportsNativeNotifications(true));
+  EXPECT_TRUE(OSDNative::SupportsNativeNotifications(true));
+  EXPECT_TRUE(OSDNative::SupportsNativeNotifications(false));
+  EXPECT_TRUE(OSDNative::SupportsTrayPopups(true));
+  EXPECT_FALSE(OSDNative::SupportsTrayPopups(false));
+  EXPECT_FALSE(OSDMacNative::SupportsTrayPopups());
+  EXPECT_TRUE(OSDMacNative::NotificationCenterAvailable(true));
+  EXPECT_FALSE(OSDMacNative::NotificationCenterAvailable(false));
+
+  SystemTrayIcon tray;
+  TestOSD osd(&tray);
+  EXPECT_TRUE(osd.SupportsNativeNotifications());
+  EXPECT_TRUE(osd.SupportsTrayPopups());
 }
 
 TEST(OSDPrettyWayland, SupportedWhenADisplayExists) {
