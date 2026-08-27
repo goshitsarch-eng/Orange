@@ -136,6 +136,7 @@
 #include "ui/settingsdialog.h"
 #include "filterparser/filterparser.h"
 #include "utilities/filefilters.h"
+#include "utilities/filemanagerreveal.h"
 #include "utilities/filemanagerutils.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
@@ -974,10 +975,7 @@ void MainWindow::BuildUi() {
              }));
   add_action("collection-browse", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               const SongList songs = self->CollectionSongs();
-               if (songs.empty() || !FileManagerUtils::OpenInFileManager(FileUtils::PathFromUri(songs.front().url()))) {
-                 self->ShowToast("Could not open the file manager");
-               }
+               self->ShowSongsInFileBrowser(self->CollectionSongs());
              }));
   add_action("collection-delete", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
@@ -1358,37 +1356,7 @@ void MainWindow::BuildSidebar() {
       }, file_view_.get());
     }
   });
-  file_view_->SetShowInBrowserCallback([this](const std::vector<std::string> &paths) {
-    const std::vector<std::string> unique = FileViewMenu::BrowserPaths(paths);
-    const FileViewMenu::BrowserOpenPolicy policy = FileViewMenu::BrowserPolicy(static_cast<int>(unique.size()));
-    if (policy == FileViewMenu::BrowserOpenPolicy::TooMany) {
-      AdwAlertDialog *dialog =
-          ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Show in file browser"), FileViewMenu::BrowserTooManyMessage()));
-      adw_alert_dialog_add_responses(dialog, "close", Translations::CStr("Close"), nullptr);
-      adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
-      return;
-    }
-    if (policy == FileViewMenu::BrowserOpenPolicy::Confirm) {
-      auto *req = new FileViewBrowserOpen{unique};
-      const std::string body = FileViewMenu::BrowserConfirmMessage(static_cast<int>(paths.size()), static_cast<int>(unique.size()));
-      AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Show in file browser"), body.c_str()));
-      adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "open", Translations::CStr("Open"), nullptr);
-      adw_alert_dialog_set_default_response(dialog, "open");
-      g_signal_connect(dialog, "response", G_CALLBACK((+[](AdwAlertDialog *, const char *response, gpointer data) {
-                         auto *req = static_cast<FileViewBrowserOpen *>(data);
-                         if (g_strcmp0(response, "open") == 0) {
-                           OpenAllFileViewBrowserPaths(req->paths);
-                         }
-                         delete req;
-                       })),
-                       req);
-      adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
-      return;
-    }
-    if (unique.empty() || !OpenAllFileViewBrowserPaths(unique)) {
-      ShowToast("Could not open the file manager");
-    }
-  });
+  file_view_->SetShowInBrowserCallback([this](const std::vector<std::string> &paths) { ShowInFileBrowser(paths); });
   adw_view_stack_add_titled_with_icon(sidebar_stack_, file_view_->widget(), "files", "Files", "folder-symbolic");
   radio_container_ = std::make_unique<RadioViewContainer>(app_->radio_services());
   radio_container_->SetActivateCallback([this](const RadioChannel &channel) { PlayRadioChannel(channel); });
@@ -3882,10 +3850,48 @@ void MainWindow::OpenSelectedInFileManager() {
     ShowToast("No song selected");
     return;
   }
-  const std::string path = FileUtils::PathFromUri(songs.front().url());
-  if (path.empty() || !FileManagerUtils::OpenInFileManager(path)) {
-    ShowToast("Could not open the file manager");
+  ShowSongsInFileBrowser(songs);
+}
+
+void MainWindow::ShowSongsInFileBrowser(const SongList &songs) {
+  std::vector<std::string> urls;
+  urls.reserve(songs.size());
+  for (const Song &song : songs) {
+    urls.push_back(song.url());
+  }
+  ShowInFileBrowser(urls);
+}
+
+void MainWindow::ShowInFileBrowser(const std::vector<std::string> &urls_or_paths) {
+  const std::vector<std::string> existing = FileManagerReveal::LocalExistingPaths(urls_or_paths);
+  const std::vector<std::string> unique = FileViewMenu::BrowserPaths(existing);
+  const FileViewMenu::BrowserOpenPolicy policy = FileViewMenu::BrowserPolicy(static_cast<int>(unique.size()));
+  if (policy == FileViewMenu::BrowserOpenPolicy::TooMany) {
+    AdwAlertDialog *dialog =
+        ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Show in file browser"), FileViewMenu::BrowserTooManyMessage()));
+    adw_alert_dialog_add_responses(dialog, "close", Translations::CStr("Close"), nullptr);
+    adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
     return;
+  }
+  if (policy == FileViewMenu::BrowserOpenPolicy::Confirm) {
+    auto *req = new FileViewBrowserOpen{unique};
+    const std::string body = FileViewMenu::BrowserConfirmMessage(static_cast<int>(existing.size()), static_cast<int>(unique.size()));
+    AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Show in file browser"), body.c_str()));
+    adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "open", Translations::CStr("Open"), nullptr);
+    adw_alert_dialog_set_default_response(dialog, "open");
+    g_signal_connect(dialog, "response", G_CALLBACK((+[](AdwAlertDialog *, const char *response, gpointer data) {
+                       auto *req = static_cast<FileViewBrowserOpen *>(data);
+                       if (g_strcmp0(response, "open") == 0) {
+                         OpenAllFileViewBrowserPaths(req->paths);
+                       }
+                       delete req;
+                     })),
+                     req);
+    adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
+    return;
+  }
+  if (unique.empty() || !OpenAllFileViewBrowserPaths(unique)) {
+    ShowToast("Could not open the file manager");
   }
 }
 

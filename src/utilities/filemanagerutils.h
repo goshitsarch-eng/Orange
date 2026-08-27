@@ -6,6 +6,7 @@
 namespace FileManagerUtils {
 
 bool OpenInFileManager(const std::string &path);
+bool OpenInFileManager(const std::string &directory, const std::string &file);
 bool OpenFolder(const std::string &path);
 
 }  // namespace FileManagerUtils

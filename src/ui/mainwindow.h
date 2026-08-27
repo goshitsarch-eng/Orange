@@ -147,6 +147,8 @@ class MainWindow {
   void QueuePlayNext();
   void ShowInCollection();
   void OpenSelectedInFileManager();
+  void ShowInFileBrowser(const std::vector<std::string> &urls_or_paths);
+  void ShowSongsInFileBrowser(const SongList &songs);
   SongList SongsFromFilePaths(const std::vector<std::string> &paths) const;
   void CopyFileViewToCollection(const std::vector<std::string> &paths, bool move);
   void CopySelectedToCollection(bool move);

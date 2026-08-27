@@ -5,6 +5,7 @@
 #include "widgets/trackslidertime.h"
 #include "widgets/volumesliderwheel.h"
 #include "utilities/fileutils.h"
+#include "utilities/filemanagerreveal.h"
 #include "utilities/audioanalysis.h"
 #include "collection/collectiongrouping.h"
 #include "collection/groupbydialoglabels.h"
@@ -2233,4 +2234,50 @@ TEST(UserPassLabels, MatchQtDialogCopy) {
   EXPECT_STREQ("Enter username and password", UserPassLabels::Prompt());
   EXPECT_STREQ("Username", UserPassLabels::Username());
   EXPECT_STREQ("Password", UserPassLabels::Password());
+}
+
+TEST(FileManagerReveal, StripDesktopExecFieldsLikeQt) {
+  EXPECT_EQ("nautilus --select ", FileManagerReveal::StripDesktopExecFields("nautilus --select %F"));
+  EXPECT_EQ("nautilus --new-window ", FileManagerReveal::StripDesktopExecFields("nautilus --new-window %U"));
+  EXPECT_EQ("nautilus", FileManagerReveal::CommandBasename("/usr/bin/nautilus"));
+  EXPECT_EQ("/usr/local/bin/nautilus", FileManagerReveal::CommandBasename("/usr/local/bin/nautilus"));
+}
+
+TEST(FileManagerReveal, LaunchSpecMatchesQtFileManagers) {
+  EXPECT_EQ(FileManagerReveal::Style::SelectFile, FileManagerReveal::StyleFor("nautilus"));
+  EXPECT_EQ(FileManagerReveal::Style::SelectFile, FileManagerReveal::StyleFor("dolphin"));
+  EXPECT_EQ(FileManagerReveal::Style::DirectoryOnly, FileManagerReveal::StyleFor("thunar"));
+  EXPECT_EQ(FileManagerReveal::Style::Caja, FileManagerReveal::StyleFor("caja"));
+  EXPECT_EQ(FileManagerReveal::Style::FallbackDirectory, FileManagerReveal::StyleFor("exo-open"));
+  EXPECT_EQ(FileManagerReveal::Style::FallbackDirectory, FileManagerReveal::StyleFor(""));
+  const FileManagerReveal::Launch nautilus = FileManagerReveal::BuildLaunch("nautilus", {}, "/music", "/music/a.flac");
+  ASSERT_EQ(2u, nautilus.args.size());
+  EXPECT_EQ("--select", nautilus.args[0]);
+  EXPECT_EQ("/music/a.flac", nautilus.args[1]);
+  EXPECT_FALSE(nautilus.fallback_open_directory);
+  const FileManagerReveal::Launch thunar = FileManagerReveal::BuildLaunch("thunar", {}, "/music", "/music/a.flac");
+  ASSERT_EQ(1u, thunar.args.size());
+  EXPECT_EQ("/music", thunar.args.front());
+  const FileManagerReveal::Launch caja = FileManagerReveal::BuildLaunch("caja", {}, "/music", "/music/a.flac");
+  ASSERT_EQ(2u, caja.args.size());
+  EXPECT_EQ("--no-desktop", caja.args[0]);
+  EXPECT_EQ("/music", caja.args[1]);
+  EXPECT_TRUE(FileManagerReveal::BuildLaunch("", {}, "/music", "/music/a.flac").fallback_open_directory);
+}
+
+TEST(FileManagerReveal, LocalExistingPathsSkipStreams) {
+  EXPECT_FALSE(FileManagerReveal::IsLocalUrl("tidal://99"));
+  EXPECT_FALSE(FileManagerReveal::IsLocalUrl("https://example.com/a.mp3"));
+  EXPECT_TRUE(FileManagerReveal::IsLocalUrl("file:///tmp/a.flac"));
+  EXPECT_TRUE(FileManagerReveal::IsLocalUrl("/tmp/a.flac"));
+  EXPECT_TRUE(FileManagerReveal::LocalPath("tidal://99").empty());
+  const std::string root = "/tmp/strawberry-reveal-" + std::to_string(getpid());
+  g_mkdir_with_parents(root.c_str(), 0755);
+  const std::string audio = FileUtils::Join(root, "a.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "x"));
+  const auto existing = FileManagerReveal::LocalExistingPaths({audio, "tidal://99", FileUtils::Join(root, "missing.flac"), "file://" + audio});
+  ASSERT_EQ(2u, existing.size());
+  EXPECT_EQ(audio, existing.front());
+  FileUtils::Remove(audio);
+  rmdir(root.c_str());
 }
