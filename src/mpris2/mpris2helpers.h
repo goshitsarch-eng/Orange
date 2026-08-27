@@ -112,7 +112,8 @@ inline TrackListDiff DiffTrackIds(const std::vector<std::string> &before, const 
 
 inline bool MetadataNeedsUpdate(const Song &before, const Song &after) {
   return before.title() != after.title() || before.artist() != after.artist() || before.album() != after.album() ||
-         before.url() != after.url() || before.length_nanosec() != after.length_nanosec() || ArtUrl(before) != ArtUrl(after);
+         before.url() != after.url() || before.length_nanosec() != after.length_nanosec() || ArtUrl(before) != ArtUrl(after) ||
+         before.rating() != after.rating() || before.bitrate() != after.bitrate();
 }
 
 inline bool CanPlay(const Playlist *playlist) { return playlist && playlist->row_count() > 0; }
@@ -141,6 +142,24 @@ inline bool SetPositionAllowed(const std::string &requested_id, const std::strin
   return can_seek && !requested_id.empty() && requested_id == current_id && position_us >= 0 &&
          (length_nanosec <= 0 || position_us * 1000 < length_nanosec);
 }
+
+// Qt Mpris2::Rating: unset/negative ratings are exposed as 0.
+inline double RatingProperty(float rating) { return rating <= 0 ? 0.0 : static_cast<double>(rating); }
+
+// Qt Mpris2::SetRating: clamp above 1.0 and treat 0 or below as unset (-1).
+inline float RatingFromProperty(double rating) {
+  if (rating > 1.0) {
+    return 1.0f;
+  }
+  if (rating <= 0.0) {
+    return -1.0f;
+  }
+  return static_cast<float>(rating);
+}
+
+inline bool ShouldAddUserRating(float rating) { return rating != -1.0f; }
+
+inline bool ShouldAddBitrate(int bitrate) { return bitrate > 0; }
 
 inline PlaylistSequence::RepeatMode RepeatFromLoopStatus(const std::string &status) {
   if (status == "Track") {

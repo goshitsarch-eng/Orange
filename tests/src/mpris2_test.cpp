@@ -53,6 +53,28 @@ TEST(Mpris2Helpers, MetadataNeedsUpdate) {
   EXPECT_FALSE(Mpris2Helpers::MetadataNeedsUpdate(a, b));
   b.set_title("Glory Box");
   EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(a, b));
+  Song rated = a;
+  rated.set_rating(0.8f);
+  EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(a, rated));
+  rated.set_title("Roads");
+  Song bitrate = a;
+  bitrate.set_bitrate(320);
+  EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(a, bitrate));
+}
+
+TEST(Mpris2Helpers, RatingMatchesQt) {
+  EXPECT_DOUBLE_EQ(0.0, Mpris2Helpers::RatingProperty(-1.0f));
+  EXPECT_DOUBLE_EQ(0.0, Mpris2Helpers::RatingProperty(0.0f));
+  EXPECT_DOUBLE_EQ(0.8, Mpris2Helpers::RatingProperty(0.8f));
+  EXPECT_FLOAT_EQ(1.0f, Mpris2Helpers::RatingFromProperty(1.5));
+  EXPECT_FLOAT_EQ(-1.0f, Mpris2Helpers::RatingFromProperty(0.0));
+  EXPECT_FLOAT_EQ(-1.0f, Mpris2Helpers::RatingFromProperty(-0.2));
+  EXPECT_FLOAT_EQ(0.4f, Mpris2Helpers::RatingFromProperty(0.4));
+  EXPECT_FALSE(Mpris2Helpers::ShouldAddUserRating(-1.0f));
+  EXPECT_TRUE(Mpris2Helpers::ShouldAddUserRating(0.0f));
+  EXPECT_TRUE(Mpris2Helpers::ShouldAddUserRating(0.8f));
+  EXPECT_FALSE(Mpris2Helpers::ShouldAddBitrate(0));
+  EXPECT_TRUE(Mpris2Helpers::ShouldAddBitrate(320));
 }
 
 TEST(Mpris2Helpers, CapabilitiesMatchQt) {

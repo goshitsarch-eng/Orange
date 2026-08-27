@@ -41,6 +41,7 @@ static const gchar *kMprisXml =
     "    <property name='Rate' type='d' access='readwrite'/>"
     "    <property name='Shuffle' type='b' access='readwrite'/>"
     "    <property name='Metadata' type='a{sv}' access='read'/>"
+    "    <property name='Rating' type='d' access='readwrite'/>"
     "    <property name='Volume' type='d' access='readwrite'/>"
     "    <property name='Position' type='x' access='read'/>"
     "    <property name='CanGoNext' type='b' access='read'/>"
@@ -123,6 +124,12 @@ static GVariant *MetadataVariant(const Song &song, int row = -1, const std::stri
   if (!song.albumartist().empty()) {
     const gchar *albumartists[] = {song.albumartist().c_str(), nullptr};
     g_variant_builder_add(&b, "{sv}", "xesam:albumArtist", g_variant_new_strv(albumartists, -1));
+  }
+  if (Mpris2Helpers::ShouldAddUserRating(song.rating())) {
+    g_variant_builder_add(&b, "{sv}", "xesam:userRating", g_variant_new_double(song.rating()));
+  }
+  if (Mpris2Helpers::ShouldAddBitrate(song.bitrate())) {
+    g_variant_builder_add(&b, "{sv}", "bitrate", g_variant_new_int32(song.bitrate()));
   }
   return g_variant_builder_end(&b);
 }
@@ -368,6 +375,9 @@ static GVariant *HandleGet(GDBusConnection *, const gchar *, const gchar *, cons
   if (g_strcmp0(property, "Rate") == 0) {
     return g_variant_new_double(1.0);
   }
+  if (g_strcmp0(property, "Rating") == 0) {
+    return g_variant_new_double(Mpris2Helpers::RatingProperty(current.rating()));
+  }
   if (g_strcmp0(property, "Volume") == 0) {
     return g_variant_new_double(app && app->player() ? app->player()->GetVolume() / 100.0 : 1.0);
   }
@@ -445,6 +455,8 @@ static gboolean HandleSet(GDBusConnection *, const gchar *, const gchar *, const
   }
   if (g_strcmp0(property, "Volume") == 0 && app->player()) {
     app->player()->SetVolume(static_cast<unsigned>(std::clamp(g_variant_get_double(value) * 100.0, 0.0, 100.0)));
+  } else if (g_strcmp0(property, "Rating") == 0 && app->playlist_manager()) {
+    app->playlist_manager()->RateCurrentSong(Mpris2Helpers::RatingFromProperty(g_variant_get_double(value)));
   } else if (g_strcmp0(property, "Shuffle") == 0 && app->playlist_manager() && app->playlist_manager()->active()) {
     app->playlist_manager()->active()->SetShuffleMode(g_variant_get_boolean(value) ? PlaylistSequence::ShuffleMode::All
                                                                                    : PlaylistSequence::ShuffleMode::Off);
@@ -633,6 +645,7 @@ void Mpris2::EmitMetadata() {
   }
   const std::string art = app_ && app_->current_albumcover_loader() ? app_->current_albumcover_loader()->current_url() : std::string();
   EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Metadata", MetadataVariant(song, row, art));
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Rating", g_variant_new_double(Mpris2Helpers::RatingProperty(song.rating())));
 #endif
 }
 
