@@ -46,6 +46,8 @@ class CommandlineOptions {
   int resize_height() const { return resize_height_; }
   void set_urls(const std::vector<std::string> &urls) { urls_ = urls; }
   void set_player_action(PlayerAction action) { player_action_ = action; }
+  void set_url_list_action(UrlListAction action) { url_list_action_ = action; }
+  void set_playlist_name(const std::string &name) { playlist_name_ = name; }
   void set_resize(int width, int height) {
     resize_width_ = width;
     resize_height_ = height;
@@ -53,7 +55,7 @@ class CommandlineOptions {
   }
 
  private:
-  UrlListAction url_list_action_ = UrlListAction::Append;
+  UrlListAction url_list_action_ = UrlListAction::None;
   PlayerAction player_action_ = PlayerAction::None;
   int set_volume_ = -1;
   int volume_modifier_ = 0;

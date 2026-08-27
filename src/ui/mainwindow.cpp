@@ -311,7 +311,9 @@ void MainWindow::CommandlineReceived(const CommandlineOptions &options) {
     gtk_window_set_default_size(GTK_WINDOW(window_), options.resize_width(), options.resize_height());
   }
   RefreshPlaylist();
-  Present();
+  if (CommandlineWindow::ShouldRaise(options)) {
+    Present();
+  }
 }
 
 void MainWindow::BuildUi() {

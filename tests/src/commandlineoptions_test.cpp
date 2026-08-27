@@ -1,4 +1,5 @@
 #include "core/commandlineoptions.h"
+#include "core/commandlineurlplan.h"
 #include "core/commandlinewindow.h"
 #include "core/playlistsloadedgate.h"
 #include "tidal/tidalloginurl.h"
@@ -17,6 +18,11 @@ TEST(CommandlineOptions, SetUrlsAreApplied) {
   EXPECT_TRUE(options.contains_play_options());
 }
 
+TEST(CommandlineOptions, DefaultUrlListActionIsNone) {
+  CommandlineOptions options;
+  EXPECT_EQ(CommandlineOptions::UrlListAction::None, options.url_list_action());
+}
+
 TEST(CommandlineWindow, ParsesResizeAndRaise) {
   int width = 0;
   int height = 0;
@@ -28,6 +34,9 @@ TEST(CommandlineWindow, ParsesResizeAndRaise) {
   EXPECT_FALSE(CommandlineWindow::ShouldResize(CommandlineOptions::PlayerAction::Play, 800, 600));
   CommandlineOptions empty;
   EXPECT_TRUE(CommandlineWindow::ShouldRaise(empty));
+  CommandlineOptions pause;
+  pause.set_player_action(CommandlineOptions::PlayerAction::Pause);
+  EXPECT_FALSE(CommandlineWindow::ShouldRaise(pause));
 }
 
 TEST(CommandlineOptions, ParsesResizeVersionAndLogLevels) {
@@ -52,6 +61,44 @@ TEST(CommandlineOptions, ParsesResizeVersionAndLogLevels) {
   EXPECT_TRUE(verbose.debug());
   const CommandlineOptions quiet = parse({"--quiet"});
   EXPECT_EQ("*:1", quiet.log_levels());
+  const CommandlineOptions load = parse({"--load", "file:///tmp/a.flac"});
+  EXPECT_EQ(CommandlineOptions::UrlListAction::Load, load.url_list_action());
+  EXPECT_EQ("file:///tmp/a.flac", load.urls().front());
+  const CommandlineOptions append = parse({"--append", "file:///tmp/b.flac"});
+  EXPECT_EQ(CommandlineOptions::UrlListAction::Append, append.url_list_action());
+  const CommandlineOptions created = parse({"--create", "Mix", "file:///tmp/c.flac"});
+  EXPECT_EQ(CommandlineOptions::UrlListAction::CreateNew, created.url_list_action());
+  EXPECT_EQ("Mix", created.playlist_name());
+}
+
+TEST(CommandlineUrlPlan, MatchesQtLoadAppendCreateAndNone) {
+  using Url = CommandlineOptions::UrlListAction;
+  using Player = CommandlineOptions::PlayerAction;
+  const auto none_never = CommandlineUrlPlan::FromOptions(Url::None, Player::None, BehaviourSettings::AddBehaviour::Append,
+                                                          BehaviourSettings::PlayBehaviour::Never, false);
+  EXPECT_FALSE(none_never.clear_current);
+  EXPECT_EQ(CollectionBehaviour::Destination::Current, none_never.destination);
+  EXPECT_FALSE(none_never.should_play);
+  const auto play_urls = CommandlineUrlPlan::FromOptions(Url::None, Player::Play, BehaviourSettings::AddBehaviour::Append,
+                                                         BehaviourSettings::PlayBehaviour::Never, false);
+  EXPECT_TRUE(play_urls.should_play);
+  EXPECT_TRUE(CommandlineUrlPlan::SkipStandalonePlay(true, Player::Play));
+  EXPECT_FALSE(CommandlineUrlPlan::SkipStandalonePlay(false, Player::Play));
+  const auto load = CommandlineUrlPlan::FromOptions(Url::Load, Player::None, BehaviourSettings::AddBehaviour::Append,
+                                                    BehaviourSettings::PlayBehaviour::Never, false);
+  EXPECT_TRUE(load.clear_current);
+  EXPECT_FALSE(load.should_play);
+  const auto created = CommandlineUrlPlan::FromOptions(Url::CreateNew, Player::Play, BehaviourSettings::AddBehaviour::Append,
+                                                       BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_EQ(CollectionBehaviour::Destination::New, created.destination);
+  EXPECT_TRUE(created.should_play);
+  const auto enqueue = CommandlineUrlPlan::FromOptions(Url::None, Player::None, BehaviourSettings::AddBehaviour::Enqueue,
+                                                       BehaviourSettings::PlayBehaviour::Never, false);
+  EXPECT_EQ(CollectionBehaviour::QueueMode::Append, enqueue.queue);
+  EXPECT_EQ("Mix", CommandlineUrlPlan::NewPlaylistName("Mix"));
+  EXPECT_EQ("Playlist", CommandlineUrlPlan::NewPlaylistName(""));
+  EXPECT_TRUE(CommandlineUrlPlan::PlayNow(Player::None, BehaviourSettings::PlayBehaviour::IfStopped, false));
+  EXPECT_FALSE(CommandlineUrlPlan::PlayNow(Player::None, BehaviourSettings::PlayBehaviour::IfStopped, true));
 }
 
 TEST(PlaylistsLoadedGate, DefersCommandlineAndPlayUntilLoaded) {

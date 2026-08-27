@@ -22,9 +22,9 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   gboolean version = false;
   gboolean quiet = false;
   gboolean verbose = false;
-  gboolean create_new = false;
   gboolean append = false;
   gboolean load = false;
+  gchar *create_new = nullptr;
   gchar *play_playlist = nullptr;
   gchar *language = nullptr;
   gchar *log_levels = nullptr;
@@ -46,9 +46,9 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
       {"restart-or-previous", 0, 0, G_OPTION_ARG_NONE, &restart_or_previous, "Restart the current track or go to the previous track", nullptr},
       {"next", 0, 0, G_OPTION_ARG_NONE, &next, "Skip forward", nullptr},
       {"play-playlist", 0, 0, G_OPTION_ARG_STRING, &play_playlist, "Play the named playlist", "NAME"},
-      {"append", 0, 0, G_OPTION_ARG_NONE, &append, "Append files/URLs to the playlist", nullptr},
-      {"load", 0, 0, G_OPTION_ARG_NONE, &load, "Load files/URLs into a new playlist", nullptr},
-      {"create", 0, 0, G_OPTION_ARG_NONE, &create_new, "Create a new playlist from files/URLs", nullptr},
+      {"append", 'a', 0, G_OPTION_ARG_NONE, &append, "Append files/URLs to the playlist", nullptr},
+      {"load", 'l', 0, G_OPTION_ARG_NONE, &load, "Replace the current playlist with files/URLs", nullptr},
+      {"create", 'c', 0, G_OPTION_ARG_STRING, &create_new, "Create a new playlist from files/URLs", "NAME"},
       {"volume", 0, 0, G_OPTION_ARG_INT, &volume, "Set the volume to LEVEL (0-100)", "LEVEL"},
       {"volume-increase", 0, 0, G_OPTION_ARG_INT, &volume_increase, "Increase volume by LEVEL", "LEVEL"},
       {"volume-decrease", 0, 0, G_OPTION_ARG_INT, &volume_decrease, "Decrease volume by LEVEL", "LEVEL"},
@@ -96,7 +96,11 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   }
   if (load) url_list_action_ = UrlListAction::Load;
   if (append) url_list_action_ = UrlListAction::Append;
-  if (create_new) url_list_action_ = UrlListAction::CreateNew;
+  if (create_new) {
+    url_list_action_ = UrlListAction::CreateNew;
+    playlist_name_ = create_new;
+    g_free(create_new);
+  }
   set_volume_ = volume;
   volume_modifier_ = volume_increase - volume_decrease;
   seek_to_ = seek_to;

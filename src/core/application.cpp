@@ -11,6 +11,8 @@
 #include "collection/skipcounteligibility.h"
 #include "scrobbler/scrobblereligibility.h"
 #include "scrobbler/scrobblerlifecycle.h"
+#include "constants/behavioursettings.h"
+#include "core/commandlineurlplan.h"
 #include "tidal/tidalloginurl.h"
 #include "tidal/tidalservice.h"
 #include "utilities/fileutils.h"
@@ -237,14 +239,38 @@ void Application::ApplyCommandline(const CommandlineOptions &options) {
     return;
   }
   if (!options.urls().empty()) {
+    Settings settings;
+    settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+    const auto add_mode = static_cast<BehaviourSettings::AddBehaviour>(
+        settings.IntValue(BehaviourSettings::kDoubleClickAddMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickAddMode)));
+    const auto play_mode = static_cast<BehaviourSettings::PlayBehaviour>(
+        settings.IntValue(BehaviourSettings::kDoubleClickPlayMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlayMode)));
+    const bool playing = player_ && player_->GetState() == GstEngine::State::Playing;
+    const CollectionBehaviour::Plan plan =
+        CommandlineUrlPlan::FromOptions(options.url_list_action(), options.player_action(), add_mode, play_mode, playing);
+    if (plan.destination == CollectionBehaviour::Destination::New) {
+      playlist_manager_->New(CommandlineUrlPlan::NewPlaylistName(options.playlist_name()));
+    } else if (plan.clear_current) {
+      playlist_manager_->ClearCurrent();
+    }
+    Playlist *playlist = playlist_manager_->current();
+    const int before = playlist ? playlist->row_count() : 0;
     playlist_manager_->InsertUrls(options.urls());
-    if (options.url_list_action() != CommandlineOptions::UrlListAction::None) {
+    playlist = playlist_manager_->current();
+    if (plan.queue == CollectionBehaviour::QueueMode::Append && playlist && queue()) {
+      for (int i = before; i < playlist->row_count(); ++i) {
+        queue()->Append(playlist->song(i), playlist->id(), i);
+      }
+    }
+    if (plan.should_play) {
       player_->Play();
     }
   }
   switch (options.player_action()) {
     case CommandlineOptions::PlayerAction::Play:
-      player_->Play();
+      if (!CommandlineUrlPlan::SkipStandalonePlay(!options.urls().empty(), options.player_action())) {
+        player_->Play();
+      }
       break;
     case CommandlineOptions::PlayerAction::PlayPause:
       player_->PlayPause();
