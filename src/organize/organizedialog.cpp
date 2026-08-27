@@ -5,6 +5,7 @@
 #include "core/application.h"
 #include "core/settings.h"
 #include "organize/organize.h"
+#include "organize/organizejob.h"
 #include "organize/organizepathnotify.h"
 #include "core/standardpaths.h"
 #include "organize/organizeerrordialog.h"
@@ -20,6 +21,7 @@
 
 #include <adwaita.h>
 
+#include <memory>
 #include <vector>
 
 namespace {
@@ -36,6 +38,7 @@ struct DialogState {
   GtkWidget *replace_spaces = nullptr;
   GtkWidget *preview_list = nullptr;
   GtkWidget *run = nullptr;
+  GtkWidget *cancel = nullptr;
   GtkWidget *status = nullptr;
   GtkWidget *after_copy = nullptr;
   GtkWidget *overwrite = nullptr;
@@ -43,10 +46,21 @@ struct DialogState {
   GtkWidget *eject = nullptr;
   GtkWidget *format_error = nullptr;
   FreeSpaceBar *space = nullptr;
+  Organize *job = nullptr;
+  std::shared_ptr<bool> alive = std::make_shared<bool>(true);
   bool persist_dest = true;
   MusicStorage::TranscodeMode transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
   Song::FileType transcode_format = Song::FileType::Unknown;
   std::vector<Song::FileType> supported;
+
+  ~DialogState() {
+    if (alive) {
+      *alive = false;
+    }
+    if (job) {
+      job->Cancel();
+    }
+  }
 };
 
 OrganizeFormat FormatFromState(const DialogState *state) {
@@ -414,6 +428,8 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   space->SetPath(saved_dest);
   GtkWidget *run = gtk_button_new_with_label(Translations::CStr("Organize"));
   gtk_widget_add_css_class(run, "suggested-action");
+  GtkWidget *cancel = gtk_button_new_with_label(Translations::CStr("Cancel"));
+  gtk_widget_set_sensitive(cancel, FALSE);
   GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save settings"));
   GtkWidget *restore = gtk_button_new_with_label(Translations::CStr("Restore defaults"));
 
@@ -429,6 +445,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   state->replace_spaces = replace_spaces;
   state->preview_list = preview_list;
   state->run = run;
+  state->cancel = cancel;
   state->status = status;
   state->after_copy = after_copy;
   state->overwrite = overwrite;
@@ -490,7 +507,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
     g_signal_connect(toggle, "toggled", G_CALLBACK(+[](GtkCheckButton *, gpointer data) { RefreshPreview(static_cast<DialogState *>(data)); }),
                      state);
   }
-  g_signal_connect(run, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+  g_signal_connect(run, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
                      auto *buf = GTK_TEXT_BUFFER(g_object_get_data(G_OBJECT(button), "buffer"));
                      GtkTextIter start;
@@ -533,30 +550,58 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                        options.tagreader = application->tagreader();
                      }
                      options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "organize-cover.bin");
-                     PersistFromState(static_cast<DialogState *>(g_object_get_data(G_OBJECT(button), "state")));
+                     auto *state = static_cast<DialogState *>(g_object_get_data(G_OBJECT(button), "state"));
+                     PersistFromState(state);
+                     if (state && state->job) {
+                       return;
+                     }
                      auto *owned = static_cast<SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
                      SongList songs = owned && !owned->empty() ? *owned
                                       : application->playlist_manager()->current() ? application->playlist_manager()->current()->songs()
                                                                                    : SongList{};
-                     class Organize organize;
-                     const auto errors = organize.Copy(songs, dest_dir, format, options);
+                     auto *job = new Organize(application ? application->task_manager() : nullptr);
+                     if (state) {
+                       state->job = job;
+                     }
+                     gtk_widget_set_sensitive(GTK_WIDGET(button), FALSE);
+                     if (state && state->cancel) {
+                       gtk_widget_set_sensitive(state->cancel, TRUE);
+                     }
                      GtkWidget *status_label = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
-                     if (application && application->collection()) {
-                       application->collection()->IncrementalScan();
-                     }
-                     if (errors.empty()) {
-                       gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
-                       gpointer eject_ptr = g_object_get_data(G_OBJECT(button), "eject");
-                       const char *device_id = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "device-id"));
-                       if (eject_ptr && device_id && gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)) && application &&
-                           application->device_manager()) {
-                         application->device_manager()->Unmount(device_id);
+                     gtk_label_set_text(GTK_LABEL(status_label), OrganizeJob::TaskName());
+                     const std::shared_ptr<bool> alive = state ? state->alive : std::make_shared<bool>(true);
+                     job->Finished.Connect([state, alive, job, application, button](Organize *) {
+                       if (alive && *alive && state && state->job == job) {
+                         state->job = nullptr;
+                         gtk_widget_set_sensitive(GTK_WIDGET(button), TRUE);
+                         if (state->cancel) {
+                           gtk_widget_set_sensitive(state->cancel, FALSE);
+                         }
+                         GtkWidget *status_label = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
+                         const std::vector<Organize::Error> &errors = job->errors();
+                         if (errors.empty()) {
+                           gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
+                           gpointer eject_ptr = g_object_get_data(G_OBJECT(button), "eject");
+                           const char *device_id = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "device-id"));
+                           if (eject_ptr && device_id && gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)) && application &&
+                               application->device_manager()) {
+                             application->device_manager()->Unmount(device_id);
+                           }
+                         } else {
+                           OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), errors);
+                           gtk_label_set_text(GTK_LABEL(status_label), (std::to_string(errors.size()) + " file(s) failed.").c_str());
+                         }
                        }
-                       return;
-                     }
-                     OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), errors);
-                     gtk_label_set_text(GTK_LABEL(status_label), (std::to_string(errors.size()) + " file(s) failed.").c_str());
-                   }),
+                       if (application && application->collection()) {
+                         application->collection()->IncrementalScan();
+                       }
+                       g_idle_add(+[](gpointer data) -> gboolean {
+                         delete static_cast<Organize *>(data);
+                         return G_SOURCE_REMOVE;
+                       }, job);
+                     });
+                     job->Start(songs, dest_dir, format, options);
+                   })),
                    app);
 
   gtk_box_append(GTK_BOX(box), format_header);
@@ -587,7 +632,18 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   gtk_box_append(GTK_BOX(actions), save);
   gtk_widget_set_hexpand(save, TRUE);
   gtk_widget_set_halign(save, GTK_ALIGN_END);
+  gtk_box_append(GTK_BOX(actions), cancel);
   gtk_box_append(GTK_BOX(actions), run);
+  g_signal_connect(cancel, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *state = static_cast<DialogState *>(data);
+                     if (state && state->job) {
+                       state->job->Cancel();
+                       if (state->status) {
+                         gtk_label_set_text(GTK_LABEL(state->status), Translations::CStr("Cancelling..."));
+                       }
+                     }
+                   }),
+                   state);
   gtk_box_append(GTK_BOX(box), actions);
   gtk_box_append(GTK_BOX(box), status);
   g_signal_connect(save, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {

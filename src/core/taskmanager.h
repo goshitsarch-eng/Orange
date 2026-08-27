@@ -19,10 +19,13 @@ class TaskManager {
 
   int StartTask(const std::string &name);
   void SetTaskProgress(int id, int progress, int progress_max = 0);
+  void SetTaskBlocksCollectionScans(int id);
   void SetTaskFinished(int id);
   std::vector<Task> GetTasks() const;
 
   Signal<int> TasksChanged;
+  Signal<> PauseCollectionWatchers;
+  Signal<> ResumeCollectionWatchers;
 
  private:
   mutable std::mutex mutex_;

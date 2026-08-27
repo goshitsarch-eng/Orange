@@ -39,6 +39,9 @@ class CollectionWatcher {
   bool scanning() const { return scanning_; }
   void StartWatching();
   void StopWatching();
+  void SetRescanPaused(bool pause);
+  bool rescan_paused() const { return rescan_paused_; }
+  bool incremental_queued() const { return queued_incremental_; }
   int last_added() const { return last_added_; }
 
   static bool NeedsRescan(const Song &existing, int64_t mtime, int64_t filesize) {
@@ -133,6 +136,7 @@ class CollectionWatcher {
   guint rescan_timeout_id_ = 0;
   guint periodic_timeout_id_ = 0;
   bool queued_incremental_ = false;
+  bool rescan_paused_ = false;
 };
 
 #endif  // STRAWBERRY_COLLECTIONWATCHER_H

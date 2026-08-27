@@ -34,6 +34,7 @@
 #include "dialogs/deletefilespolicy.h"
 #include "dialogs/userpasslabels.h"
 #include "organize/organize.h"
+#include "organize/organizejob.h"
 #include "organize/organizefilename.h"
 #include "organize/organizeformatvalidator.h"
 #include "organize/organizetokenhelp.h"
@@ -620,6 +621,59 @@ TEST(OrganizePreview, DisambiguatesOnlyWhenUnique) {
   EXPECT_TRUE(OrganizePreview::FitsOnDevice(50, 40, 100));
   EXPECT_FALSE(OrganizePreview::FitsOnDevice(70, 40, 100));
   EXPECT_TRUE(OrganizePreview::FitsOnDevice(999, 0, 0));
+}
+
+TEST(OrganizeJob, BatchesTenAndSupportsCancel) {
+  EXPECT_EQ(10, OrganizeJob::kBatchSize);
+  EXPECT_STREQ("Organizing files", OrganizeJob::TaskName());
+  EXPECT_TRUE(OrganizeJob::ShouldProcessBatch(false, false));
+  EXPECT_FALSE(OrganizeJob::ShouldProcessBatch(true, false));
+  EXPECT_FALSE(OrganizeJob::ShouldProcessBatch(false, true));
+  EXPECT_TRUE(OrganizeJob::ShouldFinish(10, 10, false, false));
+  EXPECT_FALSE(OrganizeJob::ShouldFinish(5, 10, false, false));
+  EXPECT_TRUE(OrganizeJob::ShouldFinish(5, 10, false, true));
+  EXPECT_FALSE(OrganizeJob::ShouldFinish(10, 10, true, false));
+  EXPECT_TRUE(OrganizeJob::ShouldWaitForTranscode(1));
+  EXPECT_FALSE(OrganizeJob::ShouldWaitForTranscode(0));
+  EXPECT_TRUE(OrganizeJob::ShouldScheduleNext(0, 12, false, false, true));
+  EXPECT_FALSE(OrganizeJob::ShouldScheduleNext(0, 12, false, false, false));
+  EXPECT_EQ(500, OrganizeJob::Progress(5));
+  EXPECT_EQ(1000, OrganizeJob::ProgressMax(10));
+  Song invalid;
+  EXPECT_TRUE(OrganizeJob::ShouldSkipInvalid(invalid));
+  Song valid;
+  valid.set_valid(true);
+  EXPECT_FALSE(OrganizeJob::ShouldSkipInvalid(valid));
+  EXPECT_TRUE(OrganizeJob::ShouldSkipExisting(false, true));
+  EXPECT_FALSE(OrganizeJob::ShouldSkipExisting(true, true));
+
+  SongList songs;
+  for (int i = 0; i < 12; ++i) {
+    Song song;
+    song.set_valid(true);
+    song.set_title("T" + std::to_string(i));
+    song.set_url("file:///tmp/does-not-exist-organize-batch-" + std::to_string(i) + ".flac");
+    songs.push_back(song);
+  }
+  Organize org;
+  org.Begin(songs, "/tmp", OrganizeFormat("%title"), Organize::Options{});
+  EXPECT_FALSE(org.finished());
+  org.ProcessSome();
+  EXPECT_EQ(10, org.next_index());
+  EXPECT_FALSE(org.finished());
+  EXPECT_EQ(10u, org.errors().size());
+  org.Cancel();
+  org.ProcessSome();
+  EXPECT_TRUE(org.cancelled());
+  EXPECT_TRUE(org.finished());
+  EXPECT_EQ(10u, org.errors().size());
+
+  Organize second;
+  second.Begin(songs, "/tmp", OrganizeFormat("%title"), Organize::Options{});
+  second.ProcessSome();
+  second.ProcessSome();
+  EXPECT_TRUE(second.finished());
+  EXPECT_EQ(12u, second.errors().size());
 }
 
 TEST(Organize, CopiesDisambiguatedCollisions) {

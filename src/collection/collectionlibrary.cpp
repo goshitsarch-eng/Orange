@@ -20,7 +20,41 @@ CollectionLibrary::CollectionLibrary(Database *database, TaskManager *task_manag
   watcher_->ScanFinished.Connect([this]() { ScanFinished.Emit(); });
 }
 
-void CollectionLibrary::Init() { watcher_->StartWatching(); }
+CollectionLibrary::~CollectionLibrary() {
+  if (alive_) {
+    *alive_ = false;
+  }
+}
+
+void CollectionLibrary::Init() {
+  watcher_->StartWatching();
+  if (!task_manager_) {
+    return;
+  }
+  const std::shared_ptr<bool> alive = alive_;
+  task_manager_->PauseCollectionWatchers.Connect([this, alive]() {
+    if (alive && *alive) {
+      PauseWatcher();
+    }
+  });
+  task_manager_->ResumeCollectionWatchers.Connect([this, alive]() {
+    if (alive && *alive) {
+      ResumeWatcher();
+    }
+  });
+}
+
+void CollectionLibrary::PauseWatcher() {
+  if (watcher_) {
+    watcher_->SetRescanPaused(true);
+  }
+}
+
+void CollectionLibrary::ResumeWatcher() {
+  if (watcher_) {
+    watcher_->SetRescanPaused(false);
+  }
+}
 
 void CollectionLibrary::IncrementalScan() { watcher_->Scan(CollectionWatcher::ScanType::Incremental); }
 

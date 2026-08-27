@@ -22,10 +22,14 @@ class CollectionLibrary {
   CollectionBackend *backend() const { return backend_.get(); }
   CollectionWatcher *watcher() const { return watcher_.get(); }
 
+  ~CollectionLibrary();
+
   void Init();
   void IncrementalScan();
   void FullScan();
   void AbortScan();
+  void PauseWatcher();
+  void ResumeWatcher();
   bool scanning() const;
   void Rescan(const SongList &songs);
   void RescanDirectory(int id);
@@ -53,6 +57,7 @@ class CollectionLibrary {
   std::unique_ptr<CollectionWatcher> watcher_;
   std::string current_song_url_;
   std::map<std::string, CollectionTagSave::Pending> pending_song_saves_;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 };
 
 #endif  // STRAWBERRY_COLLECTIONLIBRARY_H

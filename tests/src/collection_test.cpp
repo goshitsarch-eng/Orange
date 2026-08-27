@@ -28,6 +28,7 @@
 #include "collection/collectionscanprogress.h"
 #include "collection/collectiontagsave.h"
 #include "collection/collectionscandelay.h"
+#include "collection/collectionscangates.h"
 #include "collection/collectionwatcher.h"
 #include "core/songuserdatamerge.h"
 #include "collection/collectiondirectorymodel.h"
@@ -1341,7 +1342,35 @@ TEST(CollectionScanDelay, UsesTwoSecondRescanAndDailyPeriod) {
   EXPECT_TRUE(CollectionScanDelay::ShouldArm(false, false));
   EXPECT_FALSE(CollectionScanDelay::ShouldArm(true, false));
   EXPECT_FALSE(CollectionScanDelay::ShouldArm(false, true));
+  EXPECT_FALSE(CollectionScanDelay::ShouldArm(false, false, true));
   EXPECT_TRUE(CollectionScanDelay::ShouldRunAfterFinish(true));
+}
+
+TEST(CollectionScanGates, SkipsIncrementalWhileTaskBlocks) {
+  TaskManager manager;
+  bool paused = false;
+  bool resumed = false;
+  manager.PauseCollectionWatchers.Connect([&paused]() { paused = true; });
+  manager.ResumeCollectionWatchers.Connect([&resumed]() { resumed = true; });
+  EXPECT_FALSE(CollectionScanGates::ShouldSkipIncremental(&manager));
+  EXPECT_FALSE(CollectionScanGates::ShouldSkipIncremental(nullptr));
+  const int id = manager.StartTask("Organizing files");
+  EXPECT_FALSE(manager.GetTasks().front().blocks_collection_scans);
+  manager.SetTaskBlocksCollectionScans(id);
+  EXPECT_TRUE(paused);
+  EXPECT_TRUE(manager.GetTasks().front().blocks_collection_scans);
+  EXPECT_TRUE(CollectionScanGates::AnyBlocksCollectionScans(manager.GetTasks()));
+  EXPECT_TRUE(CollectionScanGates::ShouldSkipIncremental(&manager));
+  EXPECT_TRUE(CollectionScanGates::ShouldResumeWatchers(true, false));
+  EXPECT_FALSE(CollectionScanGates::ShouldResumeWatchers(true, true));
+  EXPECT_FALSE(CollectionScanGates::ShouldResumeWatchers(false, false));
+  const int id2 = manager.StartTask("Copying files");
+  manager.SetTaskBlocksCollectionScans(id2);
+  manager.SetTaskFinished(id);
+  EXPECT_FALSE(resumed);
+  manager.SetTaskFinished(id2);
+  EXPECT_TRUE(resumed);
+  EXPECT_FALSE(CollectionScanGates::ShouldSkipIncremental(&manager));
 }
 
 TEST(CollectionTagSave, DefersOggAndMpegWhilePlaying) {

@@ -11,6 +11,7 @@
 #include "collection/collectionunavailablerestore.h"
 #include "collection/collectionscanprogress.h"
 #include "collection/collectionscandelay.h"
+#include "collection/collectionscangates.h"
 #include "collection/collectionsubdirectory.h"
 #include "constants/collectionsettings.h"
 #include "core/logging.h"
@@ -55,6 +56,10 @@ void CollectionWatcher::Abort() { abort_ = true; }
 void CollectionWatcher::Scan() { Scan(ScanType::Incremental); }
 
 void CollectionWatcher::Scan(ScanType type) {
+  if (type == ScanType::Incremental && (rescan_paused_ || CollectionScanGates::ShouldSkipIncremental(task_manager_))) {
+    queued_incremental_ = true;
+    return;
+  }
   if (scanning_) {
     if (type == ScanType::Incremental) {
       queued_incremental_ = true;
@@ -65,14 +70,26 @@ void CollectionWatcher::Scan(ScanType type) {
 }
 
 void CollectionWatcher::ScheduleIncremental() {
-  if (scanning_) {
+  if (rescan_paused_ || CollectionScanGates::ShouldSkipIncremental(task_manager_) || scanning_) {
     queued_incremental_ = true;
     return;
   }
   ArmRescanTimer();
 }
 
+void CollectionWatcher::SetRescanPaused(bool pause) {
+  rescan_paused_ = pause;
+  if (!pause && queued_incremental_ && !scanning_) {
+    queued_incremental_ = false;
+    Scan(ScanType::Incremental);
+  }
+}
+
 void CollectionWatcher::ArmRescanTimer() {
+  if (rescan_paused_ || CollectionScanGates::ShouldSkipIncremental(task_manager_)) {
+    queued_incremental_ = true;
+    return;
+  }
   if (rescan_timeout_id_) {
     g_source_remove(rescan_timeout_id_);
     rescan_timeout_id_ = 0;
