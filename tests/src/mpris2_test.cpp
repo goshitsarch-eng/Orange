@@ -138,6 +138,18 @@ TEST(Mpris2Helpers, XesamTitleAndUrlMatchQt) {
   EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(before, after));
 }
 
+TEST(Mpris2Helpers, RefreshesCapabilitiesOnSongAndWatchLikeQt) {
+  EXPECT_TRUE(Mpris2Helpers::ShouldRefreshCapabilitiesOnSongChanged());
+  EXPECT_TRUE(Mpris2Helpers::ShouldRefreshCapabilitiesOnWatch());
+  const auto properties = Mpris2Helpers::SongChangedCapabilityProperties();
+  ASSERT_EQ(5u, properties.size());
+  EXPECT_STREQ("CanPlay", properties[0]);
+  EXPECT_STREQ("CanPause", properties[1]);
+  EXPECT_STREQ("CanGoNext", properties[2]);
+  EXPECT_STREQ("CanGoPrevious", properties[3]);
+  EXPECT_STREQ("CanSeek", properties[4]);
+}
+
 TEST(Mpris2Helpers, CapabilitiesMatchQt) {
   EXPECT_FALSE(Mpris2Helpers::CanPlay(nullptr));
   Playlist playlist;

@@ -153,6 +153,16 @@ inline bool CanSeek(const Song &song, EngineBase::State state) {
   return song.is_valid() && state != EngineBase::State::Empty && !song.is_stream();
 }
 
+// Qt Mpris2::CurrentSongChanged re-emits CanPlay/CanPause/CanGoNext/CanGoPrevious/CanSeek with Metadata.
+inline bool ShouldRefreshCapabilitiesOnSongChanged() { return true; }
+
+// Qt Mpris2::AllPlaylistsLoaded emits the same capability properties once playlists are ready.
+inline bool ShouldRefreshCapabilitiesOnWatch() { return true; }
+
+inline std::vector<const char *> SongChangedCapabilityProperties() {
+  return {"CanPlay", "CanPause", "CanGoNext", "CanGoPrevious", "CanSeek"};
+}
+
 inline bool SetPositionAllowed(const std::string &requested_id, const std::string &current_id, int64_t position_us, int64_t length_nanosec,
                                bool can_seek) {
   return can_seek && !requested_id.empty() && requested_id == current_id && position_us >= 0 &&

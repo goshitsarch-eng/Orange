@@ -506,7 +506,12 @@ Mpris2::Mpris2(Application *app) : app_(app) {
 #ifdef HAVE_MPRIS2
   if (app_ && app_->player()) {
     app_->player()->StateChanged.Connect([this](EngineBase::State) { EmitPlaybackStatus(); });
-    app_->player()->SongChanged.Connect([this](const Song &) { EmitMetadata(); });
+    app_->player()->SongChanged.Connect([this](const Song &) {
+      EmitMetadata();
+      if (Mpris2Helpers::ShouldRefreshCapabilitiesOnSongChanged()) {
+        EmitPlayerCapabilities();
+      }
+    });
     app_->player()->VolumeChanged.Connect([this](unsigned) { EmitVolume(); });
   }
   if (app_ && app_->current_albumcover_loader()) {
@@ -725,6 +730,9 @@ void Mpris2::WatchCurrentPlaylist() {
     EmitLoopAndShuffle();
     EmitPlayerCapabilities();
   });
+  if (Mpris2Helpers::ShouldRefreshCapabilitiesOnWatch()) {
+    EmitPlayerCapabilities();
+  }
 #endif
 }
 
