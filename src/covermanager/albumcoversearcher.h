@@ -6,6 +6,7 @@
 #include "covermanager/albumcoversearcherlabels.h"
 
 #include "core/song.h"
+#include "widgets/listboxkeyboard.h"
 
 #include <gtk/gtk.h>
 
@@ -68,6 +69,11 @@ class AlbumCoverSearcher {
   static bool ShouldAbortSearch(bool searching) { return searching; }
 
   static bool ShouldAutoSearch(const std::string &artist, const std::string &album) { return !artist.empty() || !album.empty(); }
+
+  // Qt AlbumCoverSearcher::keyPressEvent ignores Enter so the default OK does not accept.
+  static bool ShouldIgnoreEnter(unsigned keyval) {
+    return keyval == ListBoxKeyboard::kReturn || keyval == ListBoxKeyboard::kKPEnter;
+  }
 };
 
 #endif

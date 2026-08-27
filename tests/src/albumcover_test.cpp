@@ -417,6 +417,13 @@ TEST(AlbumCoverSearcher, SearchLockAndAbort) {
   EXPECT_TRUE(AlbumCoverSearcher::ShouldAutoSearch("", "Dummy"));
 }
 
+TEST(AlbumCoverSearcher, IgnoresEnterLikeQt) {
+  EXPECT_TRUE(AlbumCoverSearcher::ShouldIgnoreEnter(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(AlbumCoverSearcher::ShouldIgnoreEnter(ListBoxKeyboard::kKPEnter));
+  EXPECT_FALSE(AlbumCoverSearcher::ShouldIgnoreEnter(ListBoxKeyboard::kEscape));
+  EXPECT_FALSE(AlbumCoverSearcher::ShouldIgnoreEnter('a'));
+}
+
 TEST(AlbumCoverSearcher, GridHelpers) {
   EXPECT_EQ(3, AlbumCoverSearcher::ColumnsForWidth(0));
   EXPECT_EQ(2, AlbumCoverSearcher::ColumnsForWidth(100));
