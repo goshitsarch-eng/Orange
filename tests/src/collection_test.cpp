@@ -6,6 +6,7 @@
 #include "collection/collectionautoopen.h"
 #include "collection/collectionempty.h"
 #include "collection/collectionfilterfocus.h"
+#include "collection/collectiontypeaheadscroll.h"
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectionbackend.h"
@@ -1387,6 +1388,15 @@ TEST(CollectionAutoOpen, DrillsSingleChildAndMatchesQtBudget) {
     node->AddChild(CollectionItem::Type::Song)->metadata = MakeSong("T", node->key, "A");
   }
   EXPECT_TRUE(CollectionAutoOpen::RecursivelyExpandKeys(&crowded, true).empty());
+}
+
+TEST(CollectionTypeAheadScroll, PositionsMatchAtTopLikeQt) {
+  EXPECT_TRUE(CollectionTypeAheadScroll::ForceTop(true));
+  EXPECT_FALSE(CollectionTypeAheadScroll::ForceTop(false));
+  EXPECT_DOUBLE_EQ(240.0, CollectionTypeAheadScroll::PositionAtTop(240.0, 0.0, 2000.0, 400.0));
+  EXPECT_DOUBLE_EQ(0.0, CollectionTypeAheadScroll::PositionAtTop(-10.0, 0.0, 2000.0, 400.0));
+  EXPECT_DOUBLE_EQ(1600.0, CollectionTypeAheadScroll::PositionAtTop(1900.0, 0.0, 2000.0, 400.0));
+  EXPECT_DOUBLE_EQ(0.0, CollectionTypeAheadScroll::PositionAtTop(50.0, 0.0, 300.0, 400.0));
 }
 
 TEST(CollectionFilterFocus, EscapeClearsAndBackspaceDeletesLastLikeQt) {

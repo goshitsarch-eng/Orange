@@ -66,6 +66,7 @@ class CollectionView {
   void SetupRowDrag(GtkWidget *row, const CollectionItem *item);
   void TypeAhead(gunichar ch);
   void ResetTypeAhead();
+  void ScrollRowToTop(GtkWidget *row);
   gboolean OnKeyPressed(guint keyval);
   void ActivateRow(GtkListBoxRow *row);
   void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
