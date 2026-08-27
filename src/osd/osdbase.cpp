@@ -1,6 +1,7 @@
 #include "osd/osdbase.h"
 
 #include "core/settings.h"
+#include "osd/osdforce.h"
 #include "osd/osdart.h"
 #include "osd/osdartrefresh.h"
 #include "osd/osddbus.h"
@@ -124,13 +125,23 @@ void OSDBase::ShowMessage(const std::string &summary, const std::string &body, c
     pretty_->ShowMessage(summary, body, show_art_ ? art : std::vector<unsigned char>());
     return;
   }
-  if (!enabled_ || type_ == OSDSettings::Type::Disabled) {
+  OSDSettings::Type type = type_;
+  if (type == OSDSettings::Type::Disabled) {
+    if (!OSDForce::ConsumeForce(&force_show_next_)) {
+      return;
+    }
+    type = OSDSettings::Type::Pretty;
+  } else if (!enabled_) {
     return;
   }
-  switch (type_) {
+  switch (type) {
     case OSDSettings::Type::Pretty:
       if (pretty_) {
         pretty_->ShowMessage(summary, body, show_art_ ? art : std::vector<unsigned char>());
+      } else if (tray_icon_) {
+        tray_icon_->ShowPopup(summary, body, timeout_ms_, show_art_ ? art : std::vector<unsigned char>());
+      } else {
+        ShowNative(summary, body, icon, art);
       }
       break;
     case OSDSettings::Type::TrayPopup:
@@ -156,6 +167,16 @@ void OSDBase::SongChanged(const Song &song, const std::vector<unsigned char> &ar
     return;
   }
   ShowMessage(PlayingSummary(song), PlayingBody(song), "notification-audio-play", art);
+}
+
+void OSDBase::ReshowCurrentSong(const Song &song, const std::vector<unsigned char> &art) {
+  if (song.is_valid()) {
+    last_song_ = song;
+    last_art_ = art;
+    playing_ = true;
+  }
+  force_show_next_ = true;
+  ShowMessage(PlayingSummary(last_song_), PlayingBody(last_song_), "notification-audio-play", last_art_);
 }
 
 void OSDBase::AlbumCoverLoaded(const Song &song, const std::vector<unsigned char> &art) {

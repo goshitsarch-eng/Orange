@@ -1,6 +1,7 @@
 #include "settings/notificationssettingspage.h"
 
 #include "constants/notificationssettings.h"
+#include "settings/notificationpreviewsong.h"
 #include "context/contextformattokens.h"
 #include "core/application.h"
 #include "core/song.h"
@@ -170,18 +171,15 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
       settings->BeginGroup(OSDSettings::kSettingsGroup);
       settings->Sync();
       app->osd()->ReloadSettings();
-      Song song;
-      song.set_valid(true);
-      song.set_title("Roads");
-      song.set_artist("Portishead");
-      song.set_album("Dummy");
+      const SongList playlist_songs = app->playlist_manager() && app->playlist_manager()->current()
+                                          ? app->playlist_manager()->current()->songs()
+                                          : SongList{};
+      const Song song = NotificationPreviewSong::FromPlaylist(playlist_songs);
       const int type = settings->IntValue(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType));
-      const std::string line1 = settings->BoolValue(OSDSettings::kCustomTextEnabled, false)
-                                    ? settings->Value(OSDSettings::kCustomText1, "%artist% - %title%")
-                                    : "Portishead - Roads";
-      const std::string line2 = settings->BoolValue(OSDSettings::kCustomTextEnabled, false) ? settings->Value(OSDSettings::kCustomText2, "%album%")
-                                                                                           : "Dummy";
-      app->osd()->ShowPreview(static_cast<OSDSettings::Type>(type), line1, line2, song);
+      const std::string stored1 = settings->Value(OSDSettings::kCustomText1);
+      const std::string stored2 = settings->Value(OSDSettings::kCustomText2);
+      app->osd()->ShowPreview(static_cast<OSDSettings::Type>(type), stored1.empty() ? "%artist% - %title%" : stored1,
+                              stored2.empty() ? "%album%" : stored2, song);
     });
   }
 

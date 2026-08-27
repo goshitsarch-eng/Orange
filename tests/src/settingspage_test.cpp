@@ -39,6 +39,7 @@
 #include "engine/gstengineproxy.h"
 #include "settings/notificationscontrols.h"
 #include "settings/notificationssettingslabels.h"
+#include "settings/notificationpreviewsong.h"
 #include "settings/playlistsettingscontrols.h"
 #include "settings/playlistsettingslabels.h"
 #include "settings/scrobblersettingslabels.h"
@@ -717,6 +718,26 @@ TEST(MainWindowSponsor, MatchesQtFirstRunCopy) {
   EXPECT_NE(std::string::npos, MainWindowSponsor::Message().find("please consider sponsoring the project"));
   EXPECT_STREQ("MainWindow", MainWindowSettings::kSettingsGroup);
   EXPECT_STREQ("do_not_show_sponsor_message", MainWindowSettings::kDoNotShowSponsorMessage);
+}
+
+TEST(NotificationPreviewSong, UsesPlaylistOrQtFake) {
+  const Song fake = NotificationPreviewSong::Fake();
+  EXPECT_EQ("Title", fake.title());
+  EXPECT_EQ("Artist", fake.artist());
+  EXPECT_EQ("Album", fake.album());
+  EXPECT_EQ("Classical", fake.genre());
+  EXPECT_EQ("Anonymous", fake.composer());
+  EXPECT_EQ("Anonymous", fake.performer());
+  EXPECT_EQ(1, fake.track());
+  EXPECT_EQ(1, fake.disc());
+  EXPECT_EQ(2011, fake.year());
+  EXPECT_EQ(123000000000LL, fake.length_nanosec());
+  EXPECT_EQ("Title", NotificationPreviewSong::FromPlaylist({}).title());
+  Song playing(Song::Source::LocalFile);
+  playing.set_valid(true);
+  playing.set_title("Roads");
+  playing.set_artist("Portishead");
+  EXPECT_EQ("Roads", NotificationPreviewSong::FromPlaylist({playing}).title());
 }
 
 TEST(NotificationsControls, ConvertsTimeoutAndGatesDuration) {

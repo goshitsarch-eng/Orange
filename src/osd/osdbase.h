@@ -29,6 +29,8 @@ class OSDBase {
   static bool SupportsOSDPretty();
 
   void SongChanged(const Song &song, const std::vector<unsigned char> &art = {});
+  void ReshowCurrentSong(const Song &song = Song(), const std::vector<unsigned char> &art = {});
+  bool force_show_next() const { return force_show_next_; }
   void AlbumCoverLoaded(const Song &song, const std::vector<unsigned char> &art);
   void Paused();
   void Resumed();
@@ -61,6 +63,7 @@ class OSDBase {
   bool use_custom_text_ = false;
   bool playing_ = false;
   bool ignore_next_stopped_ = false;
+  bool force_show_next_ = false;
   OSDSettings::Type type_ = OSDSettings::Type::Native;
   int timeout_ms_ = 4000;
   std::string custom_text1_;

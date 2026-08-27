@@ -391,9 +391,9 @@ void Player::PlayPlaylist(const std::string &name) {
   Play();
 }
 
-void Player::ShowOSD() { ForceShowOSD.Emit(current_song_); }
+void Player::ShowOSD() { ForceShowOSD.Emit(current_song_, false); }
 
-void Player::TogglePrettyOSD() { ForceShowOSD.Emit(current_song_); }
+void Player::TogglePrettyOSD() { ForceShowOSD.Emit(current_song_, true); }
 
 void Player::PlayCurrent(bool pause, uint64_t offset_nanosec, int track_change_flags) {
   if (!playlist_manager_) {

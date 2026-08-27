@@ -203,6 +203,8 @@ TEST(GlobalShortcutGrab, AcceptsCompleteCombosOnly) {
   EXPECT_TRUE(GlobalShortcutGrab::PreviewMarkup("").empty());
   EXPECT_TRUE(GlobalShortcutGrab::RejectClears(""));
   EXPECT_FALSE(GlobalShortcutGrab::RejectClears("<b>Ctrl</b>"));
+  EXPECT_TRUE(GlobalShortcutGrab::ShouldDismissOnCancel(""));
+  EXPECT_FALSE(GlobalShortcutGrab::ShouldDismissOnCancel("Ctrl"));
 }
 
 TEST(PlaylistManager, CycleRepeatAndShuffleModes) {

@@ -63,7 +63,7 @@ class Player : public PlayerInterface {
   Signal<unsigned> VolumeChanged;
   Signal<EngineBase::State> StateChanged;
   Signal<int64_t, int64_t> PositionChanged;
-  Signal<Song> ForceShowOSD;
+  Signal<Song, bool> ForceShowOSD;
   Signal<Song, int64_t> PlaybackFinished;
   Signal<Song> TrackEndedPlaycount;
   Signal<Song, int64_t, int64_t> TrackSkipped;

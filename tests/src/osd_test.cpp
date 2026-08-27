@@ -8,6 +8,7 @@
 #include "osd/osdartrefresh.h"
 #include "osd/osdprettywayland.h"
 #include "osd/osdbase.h"
+#include "osd/osdforce.h"
 #include "osd/osdpretty.h"
 #include "osd/osdprettyfade.h"
 #include "osd/osdprettylimits.h"
@@ -65,6 +66,16 @@ class TestOSD : public OSDBase {
     custom_text2_ = line2;
   }
 
+  void DisablePrettyForTests() {
+    delete pretty_;
+    pretty_ = nullptr;
+  }
+
+  void SetEnabledType(bool enabled, OSDSettings::Type type) {
+    enabled_ = enabled;
+    type_ = type;
+  }
+
   using OSDBase::PlayingBody;
   using OSDBase::PlayingSummary;
 };
@@ -119,6 +130,36 @@ TEST(OSDBase, StopAfterToggleAndPlayModes) {
   EXPECT_STREQ("Repeat track", tray.popup_message().c_str());
   osd.ShuffleModeChanged(PlaylistSequence::ShuffleMode::All);
   EXPECT_STREQ("Shuffle all", tray.popup_message().c_str());
+}
+
+TEST(OSDForce, DisabledFallsThroughToPretty) {
+  EXPECT_TRUE(OSDForce::ShouldShowWhenDisabled(true));
+  EXPECT_FALSE(OSDForce::ShouldShowWhenDisabled(false));
+  EXPECT_EQ(OSDSettings::Type::Pretty, OSDForce::TypeAfterForce(OSDSettings::Type::Disabled, true));
+  EXPECT_EQ(OSDSettings::Type::Disabled, OSDForce::TypeAfterForce(OSDSettings::Type::Disabled, false));
+  EXPECT_EQ(OSDSettings::Type::Native, OSDForce::TypeAfterForce(OSDSettings::Type::Native, true));
+  bool force = true;
+  EXPECT_TRUE(OSDForce::ConsumeForce(&force));
+  EXPECT_FALSE(force);
+  EXPECT_FALSE(OSDForce::ConsumeForce(&force));
+}
+
+TEST(OSDBase, ReshowCurrentSongIgnoresDisabled) {
+  SystemTrayIcon tray;
+  TestOSD osd(&tray);
+  osd.DisablePrettyForTests();
+  osd.SetEnabledType(false, OSDSettings::Type::Disabled);
+  Song song;
+  song.set_valid(true);
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_album("Dummy");
+  osd.SongChanged(song);
+  EXPECT_TRUE(tray.popup_summary().empty());
+  osd.ReshowCurrentSong(song);
+  EXPECT_FALSE(osd.force_show_next());
+  EXPECT_EQ("Portishead - Roads", tray.popup_summary());
+  EXPECT_EQ("Dummy", tray.popup_message());
 }
 
 TEST(OSDBase, ShowPreviewReplacesSampleSong) {

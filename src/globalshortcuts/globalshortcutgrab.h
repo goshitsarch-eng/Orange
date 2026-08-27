@@ -49,6 +49,9 @@ inline std::string PreviewMarkup(const std::string &accel) {
 
 inline bool RejectClears(const std::string &preview) { return preview.empty(); }
 
+// Qt GlobalShortcutGrabber::Rejected: Cancel only closes when the preview is empty.
+inline bool ShouldDismissOnCancel(const std::string &accel) { return RejectClears(PreviewMarkup(accel)); }
+
 }  // namespace GlobalShortcutGrab
 
 #endif  // STRAWBERRY_GLOBALSHORTCUTGRAB_H

@@ -136,7 +136,12 @@ void Application::Init() {
       scrobbler_->Scrobble(song);
     }
   });
-  player_->ForceShowOSD.Connect([this](const Song &song) { osd_->SongChanged(song, current_albumcover_loader_->current()); });
+  player_->ForceShowOSD.Connect([this](const Song &song, bool toggle) {
+    if (toggle) {
+      osd_->SetPrettyOSDToggleMode(true);
+    }
+    osd_->ReshowCurrentSong(song, current_albumcover_loader_->current());
+  });
   player_->Playing.Connect([this]() {
     tray_->SetPlaying(true);
     if (playback_was_paused_) {
@@ -196,10 +201,7 @@ void Application::Init() {
   shortcuts_->SeekBackward.Connect([this]() { player_->SeekBackward(); });
   shortcuts_->ShowHide.Connect([this]() { RaiseRequested.Emit(); });
   shortcuts_->ShowOSD.Connect([this]() { player_->ShowOSD(); });
-  shortcuts_->TogglePrettyOSD.Connect([this]() {
-    osd_->SetPrettyOSDToggleMode(true);
-    player_->ShowOSD();
-  });
+  shortcuts_->TogglePrettyOSD.Connect([this]() { player_->TogglePrettyOSD(); });
   shortcuts_->CycleShuffle.Connect([this]() { playlist_manager_->CycleShuffleMode(); });
   shortcuts_->CycleRepeat.Connect([this]() { playlist_manager_->CycleRepeatMode(); });
   shortcuts_->ToggleScrobbling.Connect([this]() { scrobbler_->ToggleScrobbling(); });
@@ -288,8 +290,7 @@ void Application::ApplyCommandline(const CommandlineOptions &options) {
     player_->ShowOSD();
   }
   if (options.toggle_pretty_osd()) {
-    osd_->SetPrettyOSDToggleMode(true);
-    player_->ShowOSD();
+    player_->TogglePrettyOSD();
   }
 }
 
