@@ -3,6 +3,7 @@
 
 #include "collection/collectioncover.h"
 #include "collection/collectionfilter.h"
+#include "collection/collectionfocus.h"
 #include "collection/collectionkeyboard.h"
 #include "collection/collectionmodel.h"
 
@@ -46,6 +47,8 @@ class CollectionView {
   void SetCoverLoader(AlbumCoverLoader *loader) { cover_loader_ = loader; }
   void ApplyLook();
   void Rebuild();
+  void SaveFocus();
+  void RestoreFocus();
   void ExpandAll();
   void CollapseAll();
   void ToggleExpanded(const CollectionItem *item);
@@ -56,6 +59,8 @@ class CollectionView {
   std::vector<const CollectionItem *> SelectedItems() const;
 
  private:
+  void RebuildRows();
+  void SelectFocusItem();
   void AppendItem(GtkWidget *parent, const CollectionItem *item, int depth);
   void LoadCover(GtkWidget *image, const Song &song);
   void SetupRowDrag(GtkWidget *row, const CollectionItem *item);
@@ -79,6 +84,7 @@ class CollectionView {
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
   std::set<std::string> expanded_;
+  CollectionFocus::State focus_;
   std::map<std::string, std::string> cover_cache_;
   bool pretty_covers_ = CollectionSettings::kDefaultPrettyCovers;
   bool auto_open_ = CollectionSettings::kDefaultAutoOpen;

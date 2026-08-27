@@ -192,16 +192,20 @@ void CollectionView::SetFilterString(const std::string &filter) {
 
 void CollectionView::SetModelSongs(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
                                    bool skip_artist_articles, bool skip_album_articles) {
+  SaveFocus();
   grouping_ = grouping;
   ApplyLook();
   model_.Reset(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles,
                CollectionDivider::LoadShowDividers());
-  Rebuild();
+  RebuildRows();
+  RestoreFocus();
 }
 
 void CollectionView::ApplyUpdate(const CollectionModelUpdate &update) {
+  SaveFocus();
   model_.ApplyUpdate(update);
-  Rebuild();
+  RebuildRows();
+  RestoreFocus();
 }
 
 void CollectionView::ActivateRow(GtkListBoxRow *row) {
@@ -355,7 +359,7 @@ void CollectionView::ExpandAll() {
 
 void CollectionView::CollapseAll() {
   expanded_.clear();
-  Rebuild();
+  RebuildRows();
 }
 
 void CollectionView::ToggleExpanded(const CollectionItem *item) {
@@ -366,7 +370,7 @@ void CollectionView::ToggleExpanded(const CollectionItem *item) {
   if (now_expanded) {
     CollectionAutoOpen::ApplyDrill(&expanded_, auto_open_, item);
   }
-  Rebuild();
+  RebuildRows();
 }
 
 bool CollectionView::IsExpanded(const CollectionItem *item) const {
@@ -374,6 +378,12 @@ bool CollectionView::IsExpanded(const CollectionItem *item) const {
 }
 
 void CollectionView::Rebuild() {
+  SaveFocus();
+  RebuildRows();
+  RestoreFocus();
+}
+
+void CollectionView::RebuildRows() {
   ResetTypeAhead();
   GtkWidget *child = gtk_widget_get_first_child(list_);
   while (child) {
@@ -395,6 +405,40 @@ void CollectionView::Rebuild() {
       gtk_widget_set_cursor_from_name(row, "pointer");
     }
     gtk_list_box_append(GTK_LIST_BOX(list_), row);
+  }
+}
+
+void CollectionView::SaveFocus() { CollectionFocus::Capture(SelectedItem(), &focus_); }
+
+void CollectionView::RestoreFocus() {
+  if (!CollectionFocus::ShouldRestore(focus_)) {
+    return;
+  }
+  const std::set<std::string> needed = CollectionFocus::ExpandKeys(model_.root(), focus_);
+  if (CollectionFocus::NeedsExpand(expanded_, needed)) {
+    CollectionFocus::MergeExpand(&expanded_, needed);
+    RebuildRows();
+  }
+  SelectFocusItem();
+}
+
+void CollectionView::SelectFocusItem() {
+  const CollectionItem *target = CollectionFocus::FindTarget(model_.root(), focus_);
+  if (!target) {
+    return;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(child), "item"));
+    if (item != target) {
+      continue;
+    }
+    gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+    gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
+    gtk_widget_grab_focus(child);
+    return;
   }
 }
 

@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_STREAMINGCOLLECTIONVIEW_H
 #define STRAWBERRY_STREAMINGCOLLECTIONVIEW_H
 
+#include "collection/collectionfocus.h"
 #include "collection/collectiongrouping.h"
 #include "collection/collectionitem.h"
 #include "collection/collectionmodel.h"
@@ -58,7 +59,11 @@ class StreamingCollectionView {
     std::string status;
   };
 
-  void Rebuild();
+  void Rebuild(bool preserve_focus = true);
+  void SaveFocus();
+  void RestoreFocus();
+  void SelectFocusItem();
+  const CollectionItem *SelectedItem() const;
   void AppendItem(const CollectionItem *item, int depth, bool filter_active);
   void ToggleExpanded(const CollectionItem *item);
   void BuildGroupMenu();
@@ -81,6 +86,7 @@ class StreamingCollectionView {
   SongList songs_;
   CollectionModel model_;
   std::set<std::string> expanded_;
+  CollectionFocus::State focus_;
   std::vector<Level> stack_;
   std::string filter_;
   CollectionGrouping::Grouping grouping_;

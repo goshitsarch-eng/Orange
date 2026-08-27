@@ -32,6 +32,7 @@
 #include "collection/collectionwatcher.h"
 #include "core/songuserdatamerge.h"
 #include "collection/collectiondirectorymodel.h"
+#include "collection/collectionfocus.h"
 #include "collection/collectionfilter.h"
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectionitem.h"
@@ -404,6 +405,85 @@ TEST(CollectionTree, ExpandKeysAndDragPayload) {
   EXPECT_EQ(1u, CollectionTree::SongsFromItem(&root).size());
   EXPECT_EQ(0, CollectionTree::VisibleSongCount(&root, false, {}));
   EXPECT_EQ(1, CollectionTree::VisibleSongCount(&root, true, {}));
+}
+
+const CollectionItem *FindSongItem(const CollectionItem *item, const Song &song) {
+  if (!item) {
+    return nullptr;
+  }
+  if (item->type == CollectionItem::Type::Song && item->metadata == song) {
+    return item;
+  }
+  for (const auto &child : item->children) {
+    if (const CollectionItem *found = FindSongItem(child.get(), song)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+TEST(CollectionFocus, CaptureAndRestoreSongAcrossRebuild) {
+  Song roads = MakeSong("Roads", "Portishead", "Dummy");
+  Song helpless = MakeSong("Helplessness Blues", "Fleet Foxes", "Helplessness Blues");
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::Album;
+  grouping.third = CollectionGrouping::GroupBy::None;
+  CollectionModel model;
+  model.Reset({roads, helpless}, grouping, false, true, false);
+  const CollectionItem *item = FindSongItem(model.root(), roads);
+  ASSERT_TRUE(item);
+  EXPECT_TRUE(CollectionFocus::ShouldSave(item->type));
+
+  CollectionFocus::State state;
+  CollectionFocus::Capture(item, &state);
+  EXPECT_TRUE(CollectionFocus::ShouldRestore(state));
+  EXPECT_EQ(roads.url(), state.last_selected_song.url());
+  EXPECT_TRUE(state.last_selected_container.empty());
+  EXPECT_FALSE(state.last_selected_path.empty());
+
+  model.Reset({roads, helpless}, grouping, false, true, false);
+  const CollectionItem *found = CollectionFocus::FindTarget(model.root(), state);
+  ASSERT_TRUE(found);
+  EXPECT_EQ(roads.url(), found->metadata.url());
+  const std::set<std::string> keys = CollectionFocus::ExpandKeys(model.root(), state);
+  EXPECT_FALSE(keys.empty());
+  EXPECT_TRUE(CollectionFocus::NeedsExpand({}, keys));
+  std::set<std::string> expanded;
+  CollectionFocus::MergeExpand(&expanded, keys);
+  EXPECT_FALSE(CollectionFocus::NeedsExpand(expanded, keys));
+}
+
+TEST(CollectionFocus, RestoreContainerAndMissingSong) {
+  Song roads = MakeSong("Roads", "Portishead", "Dummy");
+  Song glory = MakeSong("Glory Box", "Portishead", "Dummy");
+  CollectionGrouping::Grouping grouping;
+  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
+  grouping.second = CollectionGrouping::GroupBy::Album;
+  grouping.third = CollectionGrouping::GroupBy::None;
+  CollectionModel model;
+  model.Reset({roads, glory}, grouping, false, true, false);
+  const CollectionItem *song = FindSongItem(model.root(), roads);
+  ASSERT_TRUE(song);
+  ASSERT_TRUE(song->parent);
+  CollectionFocus::State container_state;
+  CollectionFocus::Capture(song->parent, &container_state);
+  EXPECT_FALSE(container_state.last_selected_container.empty());
+  EXPECT_TRUE(container_state.last_selected_song.url().empty());
+
+  model.Reset({roads, glory}, grouping, false, true, false);
+  const CollectionItem *container = CollectionFocus::FindTarget(model.root(), container_state);
+  ASSERT_TRUE(container);
+  EXPECT_EQ(container_state.last_selected_container, container->sort_text);
+
+  CollectionFocus::State missing;
+  CollectionFocus::Capture(song, &missing);
+  Song other = MakeSong("Wanderlust", "Bjork", "Homogenic");
+  model.Reset({other}, grouping, false, true, false);
+  EXPECT_EQ(nullptr, CollectionFocus::FindTarget(model.root(), missing));
+  EXPECT_TRUE(CollectionFocus::ExpandKeys(model.root(), missing).empty());
+  CollectionFocus::State empty;
+  EXPECT_FALSE(CollectionFocus::ShouldRestore(empty));
 }
 
 TEST(CollectionTask, StartsAndFinishesTaskManagerEntry) {

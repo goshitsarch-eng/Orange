@@ -271,7 +271,7 @@ SongList StreamingCollectionView::Visible() const {
 
 void StreamingCollectionView::ToggleExpanded(const CollectionItem *item) {
   if (CollectionTree::Toggle(&expanded_, item) || CollectionTree::IsExpandable(item)) {
-    Rebuild();
+    Rebuild(false);
   }
 }
 
@@ -337,7 +337,59 @@ void StreamingCollectionView::AppendItem(const CollectionItem *item, int depth, 
   }
 }
 
-void StreamingCollectionView::Rebuild() {
+void StreamingCollectionView::SaveFocus() { CollectionFocus::Capture(SelectedItem(), &focus_); }
+
+const CollectionItem *StreamingCollectionView::SelectedItem() const {
+  const CollectionItem *item = nullptr;
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto **out = static_cast<const CollectionItem **>(data);
+        if (*out) {
+          return;
+        }
+        *out = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+      },
+      &item);
+  return item;
+}
+
+void StreamingCollectionView::RestoreFocus() {
+  if (!CollectionFocus::ShouldRestore(focus_)) {
+    return;
+  }
+  const std::set<std::string> needed = CollectionFocus::ExpandKeys(model_.root(), focus_);
+  if (CollectionFocus::NeedsExpand(expanded_, needed)) {
+    CollectionFocus::MergeExpand(&expanded_, needed);
+    Rebuild(false);
+  }
+  SelectFocusItem();
+}
+
+void StreamingCollectionView::SelectFocusItem() {
+  const CollectionItem *target = CollectionFocus::FindTarget(model_.root(), focus_);
+  if (!target) {
+    return;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(child), "item"));
+    if (item != target) {
+      continue;
+    }
+    gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+    gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
+    gtk_widget_grab_focus(child);
+    return;
+  }
+}
+
+void StreamingCollectionView::Rebuild(bool preserve_focus) {
+  if (preserve_focus) {
+    SaveFocus();
+  }
   GtkWidget *child = gtk_widget_get_first_child(list_);
   while (child) {
     GtkWidget *next = gtk_widget_get_next_sibling(child);
@@ -394,6 +446,9 @@ void StreamingCollectionView::Rebuild() {
     }
   }
   SetStatus(StreamingCollectionTree::StatusText(static_cast<int>(visible.size())));
+  if (preserve_focus) {
+    RestoreFocus();
+  }
 }
 
 void StreamingCollectionView::LoadCover(GtkWidget *image, const Song &song) {
