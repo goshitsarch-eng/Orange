@@ -1,18 +1,19 @@
 #include "core/database.h"
 
+#include "core/databaseschema.h"
 #include "core/logging.h"
 #include "core/standardpaths.h"
 
 #include <gio/gio.h>
 
-#include <cstring>
+#include <vector>
 
 namespace {
 
 const int kSchemaVersion = Database::kCurrentSchemaVersion;
 
-std::string LoadSchemaResource() {
-  GBytes *bytes = g_resources_lookup_data("/org/strawberrymusicplayer/Strawberry/schema/schema.sql", G_RESOURCE_LOOKUP_FLAGS_NONE, nullptr);
+std::string LoadSchemaResource(const std::string &path) {
+  GBytes *bytes = g_resources_lookup_data(path.c_str(), G_RESOURCE_LOOKUP_FLAGS_NONE, nullptr);
   if (!bytes) {
     return {};
   }
@@ -21,6 +22,48 @@ std::string LoadSchemaResource() {
   std::string sql(data, size);
   g_bytes_unref(bytes);
   return sql;
+}
+
+int CountUserTables(sqlite3 *db) {
+  int count = 0;
+  sqlite3_stmt *stmt = nullptr;
+  if (sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", -1, &stmt, nullptr) != SQLITE_OK) {
+    return 0;
+  }
+  if (sqlite3_step(stmt) == SQLITE_ROW) {
+    count = sqlite3_column_int(stmt, 0);
+  }
+  sqlite3_finalize(stmt);
+  return count;
+}
+
+std::vector<std::string> ListUserTables(sqlite3 *db) {
+  std::vector<std::string> tables;
+  sqlite3_stmt *stmt = nullptr;
+  if (sqlite3_prepare_v2(db, "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", -1, &stmt, nullptr) != SQLITE_OK) {
+    return tables;
+  }
+  while (sqlite3_step(stmt) == SQLITE_ROW) {
+    const unsigned char *text = sqlite3_column_text(stmt, 0);
+    if (text) {
+      tables.emplace_back(reinterpret_cast<const char *>(text));
+    }
+  }
+  sqlite3_finalize(stmt);
+  return tables;
+}
+
+int ReadSchemaVersion(sqlite3 *db) {
+  int version = 0;
+  sqlite3_stmt *stmt = nullptr;
+  if (sqlite3_prepare_v2(db, "SELECT version FROM schema_version LIMIT 1", -1, &stmt, nullptr) != SQLITE_OK) {
+    return 0;
+  }
+  if (sqlite3_step(stmt) == SQLITE_ROW) {
+    version = sqlite3_column_int(stmt, 0);
+  }
+  sqlite3_finalize(stmt);
+  return version;
 }
 
 }  // namespace
@@ -86,31 +129,66 @@ void Database::Backup() {
   BackupFinished.Emit();
 }
 
-std::string Database::SchemaSql() { return LoadSchemaResource(); }
+std::string Database::SchemaSql() { return LoadSchemaResource(DatabaseSchema::ResourcePath(0)); }
+
+bool Database::ApplySchemaFile(int version) {
+  const std::string path = DatabaseSchema::ResourcePath(version);
+  const std::string sql = LoadSchemaResource(path);
+  if (sql.empty()) {
+    LogError("Embedded schema file is missing: %s", path.c_str());
+    return false;
+  }
+  if (version <= 0) {
+    return Exec(sql);
+  }
+  LogInfo("Applying database schema update %d from %s", version, path.c_str());
+  const std::vector<std::string> commands = DatabaseSchema::SplitCommands(sql);
+  const std::vector<std::string> song_tables = DatabaseSchema::SongsTables(ListUserTables(db_));
+  if (!Exec("BEGIN")) {
+    return false;
+  }
+  for (const std::string &command : commands) {
+    for (const std::string &statement : DatabaseSchema::ExpandCommand(command, song_tables)) {
+      if (!Exec(statement)) {
+        Exec("ROLLBACK");
+        return false;
+      }
+    }
+  }
+  return Exec("COMMIT");
+}
 
 bool Database::Migrate() {
-  Exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)");
-  int version = 0;
-  sqlite3_stmt *stmt = nullptr;
-  if (Prepare("SELECT version FROM schema_version LIMIT 1", &stmt)) {
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-      version = sqlite3_column_int(stmt, 0);
+  const int table_count = CountUserTables(db_);
+  if (DatabaseSchema::IsEmptyDatabase(table_count)) {
+    startup_schema_version_ = 0;
+    if (!ApplySchemaFile(0)) {
+      LogError("Embedded schema.sql is missing or failed to apply");
+      return false;
     }
-    sqlite3_finalize(stmt);
+    LogInfo("Initialized collection database schema version %d", kSchemaVersion);
+    return true;
   }
+
+  const int version = ReadSchemaVersion(db_);
   startup_schema_version_ = version;
+  if (version > kSchemaVersion) {
+    LogWarning("The database schema (version %d) is newer than I was expecting", version);
+    return true;
+  }
   if (version >= kSchemaVersion) {
     return true;
   }
-  const std::string schema = SchemaSql();
-  if (schema.empty()) {
-    LogError("Embedded schema.sql is missing");
+  if (!DatabaseSchema::IsSupported(version)) {
+    LogError("Database schema too old (%d). Minimum supported version is %d.", version, DatabaseSchema::kMinSupportedSchemaVersion);
     return false;
   }
-  if (!Exec(schema)) {
-    return false;
+  for (int next : DatabaseSchema::IncrementalVersions(version, kSchemaVersion)) {
+    if (!ApplySchemaFile(next)) {
+      return false;
+    }
   }
-  LogInfo("Initialized collection database schema version %d", kSchemaVersion);
+  LogInfo("Updated collection database schema from %d to %d", version, kSchemaVersion);
   return true;
 }
 

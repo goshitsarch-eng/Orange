@@ -133,7 +133,22 @@ add_custom_command(
           --sourcedir=${CMAKE_CURRENT_SOURCE_DIR}/data
           --generate-source
           ${GRESOURCE_XML}
-  DEPENDS ${GRESOURCE_XML} ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema.sql ${CMAKE_CURRENT_SOURCE_DIR}/data/pictures/nomusic.png
+  DEPENDS ${GRESOURCE_XML} ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-10.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-11.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-12.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-13.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-14.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-15.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-16.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-17.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-18.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-19.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-20.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-21.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-22.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema-23.sql
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/pictures/nomusic.png
           ${CMAKE_CURRENT_SOURCE_DIR}/data/pictures/musicbrainz.png ${CMAKE_CURRENT_SOURCE_DIR}/data/mood/sample.mood
   VERBATIM
 )

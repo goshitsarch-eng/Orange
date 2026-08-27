@@ -42,6 +42,7 @@ class Database {
 
  private:
   bool Migrate();
+  bool ApplySchemaFile(int version);
 
   std::string path_;
   sqlite3 *db_ = nullptr;
