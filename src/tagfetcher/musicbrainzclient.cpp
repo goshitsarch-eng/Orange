@@ -1,6 +1,7 @@
 #include "tagfetcher/musicbrainzclient.h"
 
 #include "core/networktimeoutpolicy.h"
+#include "tagfetcher/musicbrainzdiscid.h"
 #include "utilities/jsonutils.h"
 
 #include <glib.h>
@@ -12,6 +13,10 @@ MusicBrainzClient::MusicBrainzClient(NetworkAccessManager *network) : network_(n
       network_->Cancel(req_id);
     }
   });
+}
+
+MusicBrainzClient::ResultList MusicBrainzClient::ParseDiscResults(const std::string &json, const std::string &disc_id) {
+  return MusicBrainzDiscId::ParseDiscResults(json, disc_id);
 }
 
 MusicBrainzClient::ResultList MusicBrainzClient::ParseResults(const std::string &json) {
@@ -55,6 +60,25 @@ SongList MusicBrainzClient::ToSongs(const ResultList &results) {
     songs.push_back(song);
   }
   return songs;
+}
+
+void MusicBrainzClient::StartDiscId(const std::string &disc_id) {
+  if (!network_ || disc_id.empty()) {
+    DiscIdFinished.Emit(disc_id, {}, "No MusicBrainz disc ID");
+    return;
+  }
+  const std::string url = MusicBrainzDiscId::DiscUrl(disc_id);
+  const int req = network_->Get(
+      url,
+      [this, disc_id](const NetworkAccessManager::Response &response) {
+        if (!response.ok()) {
+          DiscIdFinished.Emit(disc_id, {}, NetworkTimeoutPolicy::FailureMessage(response.error, "MusicBrainz request failed"));
+          return;
+        }
+        DiscIdFinished.Emit(disc_id, ParseDiscResults(response.body, disc_id), {});
+      },
+      {{"User-Agent", "Strawberry/1.0 (https://www.strawberrymusicplayer.org/)"}});
+  timeouts_.AddReply(req);
 }
 
 void MusicBrainzClient::Start(int id, const std::vector<std::string> &mbid_list) {

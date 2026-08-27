@@ -42,6 +42,8 @@
 #include "device/cddahelpers.h"
 #include "device/cddadiscchange.h"
 #include "device/devicescanprogress.h"
+#include "tagfetcher/musicbrainzdiscid.h"
+#include "core/network.h"
 #include "core/taskmanager.h"
 
 #include <algorithm>
@@ -56,8 +58,24 @@ DeviceManager::DeviceManager(Database *database, TaskManager *task_manager)
       device_db_(database ? std::make_unique<DeviceDatabaseBackend>(database) : nullptr) {}
 
 DeviceManager::~DeviceManager() {
+  if (musicbrainz_) {
+    musicbrainz_->CancelAll();
+  }
+  musicbrainz_.reset();
   cdda_.reset();
   StopVolumeMonitor();
+}
+
+void DeviceManager::set_network(NetworkAccessManager *network) {
+  network_ = network;
+  if (!network_) {
+    musicbrainz_.reset();
+    return;
+  }
+  musicbrainz_ = std::make_unique<MusicBrainzClient>(network_);
+  musicbrainz_->DiscIdFinished.Connect([this](const std::string &disc_id, const MusicBrainzClient::ResultList &results, const std::string &) {
+    OnCddaTags(disc_id, results);
+  });
 }
 
 void DeviceManager::Init() {
@@ -339,6 +357,10 @@ void DeviceManager::EnsureCddaWatch() {
 }
 
 void DeviceManager::OnCddaDiscChanged() {
+  cdda_songs_.clear();
+  cdda_disc_id_.clear();
+  cdda_lookup_id_.clear();
+  cdda_lookup_started_ = false;
   if (cdda_ && CddaDiscChange::ShouldPauseWatchWhileLoading()) {
     cdda_->WatchForDiscChanges(false);
     cdda_->set_loader_active(true);
@@ -388,6 +410,10 @@ SongList DeviceManager::Songs(const std::string &device_id) {
   SongList songs;
   if (device->backend == "cdda") {
     songs = SongsFromCdda();
+    MaybeStartCddaLookup(device_id, songs);
+    if (!cdda_songs_.empty() && cdda_disc_id_ == MusicBrainzDiscId::DiscIdFromSongs(songs)) {
+      songs = cdda_songs_;
+    }
   } else if (device->backend == "mtp") {
     songs = SongsFromMtp(*device);
   } else if (device->backend == "gpod") {
@@ -415,33 +441,53 @@ SongList DeviceManager::Songs(const std::string &device_id) {
 
 SongList DeviceManager::SongsFromCdda() const {
 #ifdef HAVE_AUDIOCD
-  CddaHelpers::EnsureInit();
-  CdIo_t *cdio = cdio_open(nullptr, DRIVER_DEVICE);
-  if (!cdio) {
-    return {};
-  }
-  const track_t first = cdio_get_first_track_num(cdio);
-  const track_t last = cdio_get_last_track_num(cdio);
-  if (!CddaHelpers::IsValidTrackRange(first, last)) {
-    cdio_destroy(cdio);
-    return {};
-  }
-  std::vector<int64_t> lengths;
-  for (track_t track = first; track <= last; ++track) {
-    if (cdio_get_track_format(cdio, track) != TRACK_FORMAT_AUDIO) {
-      lengths.push_back(0);
-      continue;
+  std::string path;
+  for (const ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      path = device.mount_path;
+      break;
     }
-    const lsn_t start = cdio_get_track_lsn(cdio, track);
-    const lsn_t end = cdio_get_track_last_lsn(cdio, track);
-    const int64_t sectors = end >= start ? static_cast<int64_t>(end - start + 1) : 0;
-    lengths.push_back(sectors * 1000000000LL / 75);
   }
-  cdio_destroy(cdio);
-  return MakeCddaSongs(first, last, lengths);
+  return CddaSongLoader::LoadDevice(path);
 #else
   return {};
 #endif
+}
+
+void DeviceManager::MaybeStartCddaLookup(const std::string &device_id, const SongList &songs) {
+  const std::string disc_id = MusicBrainzDiscId::DiscIdFromSongs(songs);
+  if (!MusicBrainzDiscId::ShouldLookup(disc_id) || !musicbrainz_) {
+    return;
+  }
+  if (cdda_lookup_started_ && cdda_lookup_id_ == disc_id) {
+    return;
+  }
+  if (!cdda_songs_.empty() && cdda_disc_id_ == disc_id) {
+    return;
+  }
+  cdda_lookup_started_ = true;
+  cdda_lookup_id_ = disc_id;
+  scan_device_id_ = device_id;
+  musicbrainz_->StartDiscId(disc_id);
+}
+
+void DeviceManager::OnCddaTags(const std::string &disc_id, const MusicBrainzClient::ResultList &results) {
+  cdda_lookup_started_ = false;
+  if (disc_id != cdda_lookup_id_ || results.empty()) {
+    return;
+  }
+  SongList base = cdda_songs_.empty() ? SongsFromCdda() : cdda_songs_;
+  if (MusicBrainzDiscId::DiscIdFromSongs(base) != disc_id) {
+    base = SongsFromCdda();
+  }
+  cdda_songs_ = MusicBrainzDiscId::MergeByTrack(base, results);
+  cdda_disc_id_ = disc_id;
+  for (ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      RememberSongCount(device.unique_id, static_cast<int>(cdda_songs_.size()));
+    }
+  }
+  DevicesChanged.Emit();
 }
 
 SongList DeviceManager::SongsFromMtp(const ConnectedDevice &device) const {

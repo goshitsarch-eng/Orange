@@ -6,6 +6,7 @@
 #include "core/urlhandlers.h"
 #include "device/connecteddevice.h"
 #include "device/devicedatabasebackend.h"
+#include "tagfetcher/musicbrainzclient.h"
 
 #include <functional>
 #include <map>
@@ -15,6 +16,7 @@
 
 class CddaDevice;
 class Database;
+class NetworkAccessManager;
 class TagReader;
 class TaskManager;
 
@@ -25,6 +27,7 @@ class DeviceManager {
 
   void Init();
   void set_tagreader(class TagReader *tagreader) { tagreader_ = tagreader; }
+  void set_network(NetworkAccessManager *network);
   void Rescan();
   const std::vector<ConnectedDevice> &devices() const { return devices_; }
   bool CopySongs(const std::string &device_id, const SongList &songs);
@@ -73,6 +76,8 @@ class DeviceManager {
   void ScheduleRescan();
   void EnsureCddaWatch();
   void OnCddaDiscChanged();
+  void MaybeStartCddaLookup(const std::string &device_id, const SongList &songs);
+  void OnCddaTags(const std::string &disc_id, const MusicBrainzClient::ResultList &results);
 
   bool IsForgotten(const std::string &device_id) const;
 
@@ -89,6 +94,12 @@ class DeviceManager {
   void *volume_monitor_ = nullptr;
   unsigned rescan_idle_ = 0;
   std::unique_ptr<CddaDevice> cdda_;
+  NetworkAccessManager *network_ = nullptr;
+  std::unique_ptr<MusicBrainzClient> musicbrainz_;
+  SongList cdda_songs_;
+  std::string cdda_disc_id_;
+  std::string cdda_lookup_id_;
+  bool cdda_lookup_started_ = false;
 };
 
 #endif

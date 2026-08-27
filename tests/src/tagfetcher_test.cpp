@@ -1,5 +1,8 @@
 #include "dialogs/trackselectionlabels.h"
 #include "tagfetcher/musicbrainzclient.h"
+#include "tagfetcher/musicbrainzdiscid.h"
+#include "device/cddadiscid.h"
+#include "device/cddatext.h"
 #include "core/networkresume.h"
 #include "core/networktimeoutpolicy.h"
 #include "core/networktimeouts.h"
@@ -82,6 +85,77 @@ TEST(TagFetchHelpers, BatchProgressTracksCompletion) {
   EXPECT_EQ("2 / 4", progress.StatusText());
   EXPECT_TRUE(TagFetchHelpers::BatchProgress::FromCounts(3, 3).Done());
   EXPECT_DOUBLE_EQ(0.0, TagFetchHelpers::BatchProgress::FromCounts(0, 0).Fraction());
+}
+
+TEST(CddaDiscId, EncodesMusicBrainzTocLikeLibdiscid) {
+  EXPECT_EQ(804u, CddaDiscId::TocString(1, 1, 225, {150}).size());
+  EXPECT_EQ("CcFXtqAhBZrz0_LQF8dyg5RvOm0-", CddaDiscId::FromOffsets(1, 1, 225, {150}));
+  EXPECT_TRUE(CddaDiscId::FromOffsets(0, 0, 0, {}).empty());
+}
+
+TEST(CddaText, AppliesAlbumAndReplacesGenericTitle) {
+  EXPECT_TRUE(CddaText::TitleIsGeneric("Track 3", 3));
+  EXPECT_FALSE(CddaText::TitleIsGeneric("Mysterons", 1));
+  Song song(Song::Source::CDDA);
+  song.set_title("Track 1");
+  song.set_track(1);
+  CddaText::Apply(&song, "Dummy", "Portishead", "Mysterons", "Portishead");
+  EXPECT_EQ("Dummy", song.album());
+  EXPECT_EQ("Portishead", song.albumartist());
+  EXPECT_EQ("Mysterons", song.title());
+  EXPECT_EQ("Portishead", song.artist());
+  SongList incomplete = {song};
+  incomplete.front().set_title("Track 1");
+  EXPECT_FALSE(CddaText::HasCompleteTitles(incomplete));
+  EXPECT_TRUE(CddaText::HasCompleteTitles({song}));
+}
+
+TEST(MusicBrainzDiscId, ParsesFirstReleaseTracksLikeQt) {
+  EXPECT_EQ("https://musicbrainz.org/ws/2/discid/abc?inc=recordings+artists&fmt=json", MusicBrainzDiscId::DiscUrl("abc"));
+  EXPECT_TRUE(MusicBrainzDiscId::ShouldLookup("abc"));
+  EXPECT_FALSE(MusicBrainzDiscId::ShouldLookup({}));
+  const std::string json = R"json({
+    "id": "abc",
+    "releases": [{
+      "id": "rel-1",
+      "title": "Dummy",
+      "date": "1994-08-22",
+      "artist-credit": [{"name": "Portishead", "artist": {"name": "Portishead"}}],
+      "media": [{
+        "discs": [{"id": "abc"}],
+        "tracks": [
+          {"position": 1, "title": "Mysterons", "length": 301000, "artist-credit": [{"name": "Portishead"}],
+           "recording": {"id": "rec-1"}},
+          {"position": 8, "title": "Roads", "length": 300000, "artist-credit": [{"name": "Portishead"}]}
+        ]
+      }]
+    }]
+  })json";
+  const auto results = MusicBrainzClient::ParseDiscResults(json, "abc");
+  ASSERT_EQ(2u, results.size());
+  EXPECT_EQ("Mysterons", results[0].title);
+  EXPECT_EQ("Portishead", results[0].artist);
+  EXPECT_EQ("Dummy", results[0].album);
+  EXPECT_EQ(1994, results[0].year);
+  EXPECT_EQ(1, results[0].track);
+  EXPECT_EQ("rec-1", results[0].musicbrainz_recording_id);
+  EXPECT_EQ("Roads", results[1].title);
+  EXPECT_EQ(8, results[1].track);
+
+  SongList cdda;
+  for (int track = 1; track <= 8; ++track) {
+    Song song(Song::Source::CDDA);
+    song.set_title("Track " + std::to_string(track));
+    song.set_track(track);
+    song.set_valid(true);
+    song.set_musicbrainz_disc_id("abc");
+    cdda.push_back(song);
+  }
+  const SongList merged = MusicBrainzDiscId::MergeByTrack(cdda, results);
+  EXPECT_EQ("Mysterons", merged[0].title());
+  EXPECT_EQ("Roads", merged[7].title());
+  EXPECT_EQ("Track 2", merged[1].title());
+  EXPECT_EQ("abc", MusicBrainzDiscId::DiscIdFromSongs(merged));
 }
 
 TEST(MusicBrainzClient, ParseResultsCopiesIdsFromJson) {

@@ -30,13 +30,16 @@ class MusicBrainzClient {
   explicit MusicBrainzClient(NetworkAccessManager *network);
 
   void Start(int id, const std::vector<std::string> &mbid_list);
+  void StartDiscId(const std::string &disc_id);
   void Cancel(int id);
   void CancelAll();
 
   static ResultList ParseResults(const std::string &json);
+  static ResultList ParseDiscResults(const std::string &json, const std::string &disc_id);
   static SongList ToSongs(const ResultList &results);
 
   Signal<int, ResultList, std::string> Finished;
+  Signal<std::string, ResultList, std::string> DiscIdFinished;
 
  private:
   NetworkAccessManager *network_ = nullptr;

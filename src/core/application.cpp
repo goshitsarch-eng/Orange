@@ -88,6 +88,7 @@ void Application::Init() {
   playlist_manager_->PlaylistsLoaded.Connect([this]() { BindPlayerQueue(); });
   device_finders_->Init();
   device_manager_->set_tagreader(tagreader_.get());
+  device_manager_->set_network(network_.get());
   device_manager_->Init();
   url_handlers_->AddHandler(device_manager_->url_handler());
   osd_->set_tray_icon(tray_.get());
