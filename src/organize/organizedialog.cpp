@@ -642,7 +642,6 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   GtkWidget *preview_label = gtk_label_new(Translations::CStr("Preview"));
   gtk_box_append(GTK_BOX(box), preview_label);
   gtk_box_append(GTK_BOX(box), preview_scroll);
-  state->preview_label = preview_label;
   GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_box_append(GTK_BOX(actions), restore);
   gtk_box_append(GTK_BOX(actions), save);
