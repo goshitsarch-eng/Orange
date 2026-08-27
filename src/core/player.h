@@ -53,6 +53,7 @@ class Player : public PlayerInterface {
   void SavePlaybackStatus();
   void ResumePlayback();
   void ShowOSD();
+  void TogglePrettyOSD();
 
   Signal<Song> SongChanged;
   Signal<unsigned> VolumeChanged;

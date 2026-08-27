@@ -3384,6 +3384,7 @@ void MainWindow::RescanCollection(bool full) {
 
 void MainWindow::StopAfterCurrent() {
   app_->player()->StopAfterCurrent();
+  app_->osd()->StopAfterToggle(app_->player()->stop_after_current());
   RefreshPlaylist();
   ShowToast(app_->player()->stop_after_current() ? "Will stop after the current track" : "Stop after this track cancelled");
 }

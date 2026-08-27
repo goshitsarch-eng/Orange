@@ -43,6 +43,11 @@ inline std::string ArtUrl(const Song &song) {
   return song.art_automatic();
 }
 
+inline std::string ArtUrlOrOverride(const Song &song, const std::string &override_url) {
+  const std::string url = ArtUrl(song);
+  return url.empty() ? override_url : url;
+}
+
 inline std::string LoopStatus(PlaylistSequence::RepeatMode mode) {
   switch (mode) {
     case PlaylistSequence::RepeatMode::Track:

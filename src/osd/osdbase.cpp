@@ -119,6 +119,10 @@ void OSDBase::ShowMessage(const std::string &summary, const std::string &body, c
 
 void OSDBase::ShowMessage(const std::string &summary, const std::string &body, const std::string &icon,
                           const std::vector<unsigned char> &art) {
+  if (pretty_ && pretty_->toggle_mode()) {
+    pretty_->ShowMessage(summary, body, show_art_ ? art : std::vector<unsigned char>());
+    return;
+  }
   if (!enabled_ || type_ == OSDSettings::Type::Disabled) {
     return;
   }
@@ -207,14 +211,28 @@ void OSDBase::PlayModeChanged(const std::string &mode) {
   ShowMessage("Strawberry", mode);
 }
 
-void OSDBase::ShowPreview(OSDSettings::Type type, const std::string &line1, const std::string &line2, const Song &) {
+void OSDBase::RepeatModeChanged(PlaylistSequence::RepeatMode mode) { PlayModeChanged(PlaylistSequence::RepeatLabel(mode)); }
+
+void OSDBase::ShuffleModeChanged(PlaylistSequence::ShuffleMode mode) { PlayModeChanged(PlaylistSequence::ShuffleLabel(mode)); }
+
+void OSDBase::SetPrettyOSDToggleMode(bool toggle) {
+  if (pretty_) {
+    pretty_->set_toggle_mode(toggle);
+  }
+}
+
+void OSDBase::ShowPreview(OSDSettings::Type type, const std::string &line1, const std::string &line2, const Song &song) {
+  type_ = type;
+  enabled_ = type != OSDSettings::Type::Disabled;
+  const std::string summary = StrUtils::ReplaceMessage(line1, song);
+  const std::string body = StrUtils::ReplaceMessage(line2, song);
   if (type == OSDSettings::Type::Pretty && pretty_) {
-    pretty_->ShowMessage(line1, line2);
+    pretty_->ShowMessage(summary, body);
     return;
   }
   if (type == OSDSettings::Type::TrayPopup && tray_icon_) {
-    tray_icon_->ShowPopup(line1, line2, timeout_ms_);
+    tray_icon_->ShowPopup(summary, body, timeout_ms_);
     return;
   }
-  ShowNative(line1, line2);
+  ShowNative(summary, body);
 }

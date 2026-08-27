@@ -36,7 +36,9 @@ Transcoder::Preset Transcoder::PresetFor(Format format) {
 std::string Transcoder::PipelineFor(Format format, int quality) {
   auto options = TranscoderOptionsDialog::OptionsFor(format);
   options->Load();
-  options->ApplyQuality(quality);
+  if (quality >= 0) {
+    options->ApplyQuality(quality);
+  }
   return options->PipelineFragment();
 }
 

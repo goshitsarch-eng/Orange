@@ -11,6 +11,9 @@ TEST(Mpris2Helpers, TrackIdAndArtUrl) {
   EXPECT_EQ("file:///covers/auto.jpg", Mpris2Helpers::ArtUrl(song));
   song.set_art_manual("file:///covers/manual.jpg");
   EXPECT_EQ("file:///covers/manual.jpg", Mpris2Helpers::ArtUrl(song));
+  Song embedded;
+  EXPECT_EQ("file:///tmp/current-albumcover.jpg", Mpris2Helpers::ArtUrlOrOverride(embedded, "file:///tmp/current-albumcover.jpg"));
+  EXPECT_EQ("file:///covers/manual.jpg", Mpris2Helpers::ArtUrlOrOverride(song, "file:///tmp/current-albumcover.jpg"));
   Song local;
   EXPECT_EQ("/org/strawberrymusicplayer/Strawberry/Track/row3", Mpris2Helpers::TrackIdForRow(local, 3));
   EXPECT_EQ(3, Mpris2Helpers::RowFromTrackId("/org/strawberrymusicplayer/Strawberry/Track/row3"));

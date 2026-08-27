@@ -7,6 +7,8 @@ class GeniusLyricsProvider : public HtmlLyricsProvider {
  public:
   static const char *kApiUrl;
   static const char *kAuthUrl;
+  static constexpr int kOAuthPort = 63111;
+  static const char *OAuthRedirectUri() { return "http://localhost:63111/"; }
 
   GeniusLyricsProvider();
   void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;

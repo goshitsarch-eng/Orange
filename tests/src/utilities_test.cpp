@@ -77,8 +77,11 @@
 #include "moodbar/moodbarbuilder.h"
 #include "transcoder/transcoder.h"
 #include "waveform/waveformbuilder.h"
+#include "core/settings.h"
 #include "transcoder/transcoderoptionsfields.h"
+#include "transcoder/transcoderoptionsflac.h"
 #include "transcoder/transcoderoptionsinterface.h"
+#include "transcoder/transcoderoptionswavpack.h"
 #include "widgets/playingwidget.h"
 #include "widgets/stretchheaderview.h"
 
@@ -992,9 +995,32 @@ TEST(Transcoder, PresetAndPipelineFor) {
   EXPECT_NE(std::string::npos, vbr.find("quality=4"));
   EXPECT_NE(std::string::npos, vbr.find("cbr=true"));
   Transcoder transcoder;
+  EXPECT_EQ(-1, transcoder.quality());
   transcoder.set_quality(8);
   EXPECT_EQ(8, transcoder.quality());
   EXPECT_EQ(0, transcoder.job_count());
+}
+
+TEST(Transcoder, StoredFlacAndWavPackQuality) {
+  Settings settings;
+  settings.BeginGroup(TranscoderOptionsFields::GroupFor(Transcoder::Format::FLAC));
+  settings.SetIntValue("quality", 2);
+  settings.Sync();
+  TranscoderOptionsFlac flac;
+  flac.Load();
+  EXPECT_EQ(2, flac.quality());
+  EXPECT_NE(std::string::npos, Transcoder::PipelineFor(Transcoder::Format::FLAC, -1).find("flacenc quality=2"));
+  EXPECT_NE(std::string::npos, Transcoder::PipelineFor(Transcoder::Format::FLAC).find("flacenc quality=2"));
+  EXPECT_NE(std::string::npos, Transcoder::PipelineFor(Transcoder::Format::FLAC, 8).find("flacenc quality=8"));
+
+  settings.BeginGroup(TranscoderOptionsFields::GroupFor(Transcoder::Format::WavPack));
+  settings.SetIntValue("quality", 2);
+  settings.Sync();
+  TranscoderOptionsWavPack wavpack;
+  wavpack.Load();
+  EXPECT_EQ(2, wavpack.quality());
+  EXPECT_NE(std::string::npos, Transcoder::PipelineFor(Transcoder::Format::WavPack, -1).find("wavpackenc mode=0"));
+  EXPECT_NE(std::string::npos, Transcoder::PipelineFor(Transcoder::Format::WavPack, 9).find("wavpackenc mode=2"));
 }
 
 TEST(CddaSongLoader, SongsDelegateToDeviceManager) {
@@ -1276,6 +1302,11 @@ TEST(OAuthenticator, BuildAuthorizeUrl) {
   EXPECT_NE(std::string::npos, url.find("response_type=code"));
   EXPECT_NE(std::string::npos, url.find("client_id=client"));
   EXPECT_NE(std::string::npos, url.find("redirect_uri="));
+}
+
+TEST(OAuthenticator, RedirectUriUsesGeniusPort) {
+  EXPECT_EQ("http://localhost:63111/", OAuthenticator::RedirectUriForPort(OAuthenticator::kGeniusRedirectPort));
+  EXPECT_EQ("http://127.0.0.1:9/callback", OAuthenticator::RedirectUriForPort(9));
 }
 
 TEST(OAuthenticator, ClientCredentialsBodyAndToken) {

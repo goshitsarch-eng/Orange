@@ -9,6 +9,7 @@ class TranscoderOptionsFlac : public TranscoderOptionsInterface {
   std::string EncoderElement() const override { return "flacenc"; }
   std::string MuxerElement() const override { return {}; }
   void ApplyQuality(int quality) override { quality_ = quality; }
+  void Load() override;
   std::string PipelineFragment() const override;
   int quality() const { return quality_; }
 

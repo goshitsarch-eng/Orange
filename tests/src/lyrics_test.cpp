@@ -50,10 +50,13 @@ TEST(HtmlLyricsProvider, ElyricsSlugAndFirstLetter) {
 TEST(GeniusLyricsProvider, AuthorizationAndSearchUrl) {
   EXPECT_EQ(std::string(GeniusLyricsProvider::kApiUrl) + "/search?q=Portishead%20Roads",
             GeniusLyricsProvider::SearchApiUrl("Portishead Roads"));
-  const std::string auth = GeniusLyricsProvider::AuthorizationUrl("client", "http://127.0.0.1/callback");
+  const std::string auth = GeniusLyricsProvider::AuthorizationUrl("client", GeniusLyricsProvider::OAuthRedirectUri());
   EXPECT_NE(std::string::npos, auth.find(GeniusLyricsProvider::kAuthUrl));
   EXPECT_NE(std::string::npos, auth.find("client_id=client"));
   EXPECT_NE(std::string::npos, auth.find("response_type=code"));
+  EXPECT_EQ(63111, GeniusLyricsProvider::kOAuthPort);
+  EXPECT_STREQ("http://localhost:63111/", GeniusLyricsProvider::OAuthRedirectUri());
+  EXPECT_NE(std::string::npos, auth.find("localhost%3A63111"));
   const std::string json = R"json({"response":{"hits":[{"result":{"url":"https://genius.com/portishead-roads-lyrics"}}]}})json";
   EXPECT_EQ("https://genius.com/portishead-roads-lyrics", GeniusLyricsProvider::ParseSearchResultUrl(json));
 }

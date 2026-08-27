@@ -166,7 +166,8 @@ AdwPreferencesPage *LyricsSettingsPage::Create(Settings *settings, Application *
                                                                                genius->username());
                                                           }
                                                         });
-                                  });
+                                  },
+                                  GeniusLyricsProvider::kOAuthPort);
       });
       login->SetLogoutCallback([genius, login, page_alive]() {
         genius->Logout();

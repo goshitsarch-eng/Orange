@@ -34,7 +34,7 @@ class Transcoder {
   static std::string FormatName(Format format);
   static std::string Extension(Format format);
   static Preset PresetFor(Format format);
-  static std::string PipelineFor(Format format, int quality);
+  static std::string PipelineFor(Format format, int quality = -1);
 
   Signal<int, int> Progress;
   Signal<> Finished;
@@ -48,7 +48,7 @@ class Transcoder {
   };
   std::vector<Job> jobs_;
   std::vector<std::string> log_;
-  int quality_ = 5;
+  int quality_ = -1;
   bool cancelled_ = false;
   int finished_success_ = 0;
   int finished_failed_ = 0;

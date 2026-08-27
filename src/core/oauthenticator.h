@@ -22,7 +22,15 @@ class OAuthenticator {
     int expires_in = 0;
   };
 
-  void AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback);
+  void AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback,
+                          guint16 preferred_port = 0);
+  static constexpr guint16 kGeniusRedirectPort = 63111;
+  static std::string RedirectUriForPort(guint16 port) {
+    if (port == kGeniusRedirectPort) {
+      return "http://localhost:63111/";
+    }
+    return "http://127.0.0.1:" + std::to_string(port) + "/callback";
+  }
   void ExchangeCode(const std::string &token_url, const std::string &client_id, const std::string &client_secret, const std::string &code, Callback callback);
   void RefreshAccessToken(const std::string &token_url, const std::string &client_id, const std::string &client_secret,
                           const std::string &refresh_token, Callback callback);
@@ -39,7 +47,7 @@ class OAuthenticator {
   static bool AccessTokenExpired(gint64 login_time, int expires_in, gint64 now = 0, int skew_seconds = 60);
 
  private:
-  bool StartRedirectServer();
+  bool StartRedirectServer(guint16 preferred_port = 0);
   void StopRedirectServer();
 
   NetworkAccessManager *network_ = nullptr;

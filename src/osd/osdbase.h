@@ -3,6 +3,7 @@
 
 #include "constants/notificationssettings.h"
 #include "core/song.h"
+#include "playlist/playlistsequence.h"
 
 #include <string>
 #include <vector>
@@ -35,6 +36,9 @@ class OSDBase {
   void PlaylistFinished();
   void VolumeChanged(unsigned value);
   void PlayModeChanged(const std::string &mode);
+  void RepeatModeChanged(PlaylistSequence::RepeatMode mode);
+  void ShuffleModeChanged(PlaylistSequence::ShuffleMode mode);
+  void SetPrettyOSDToggleMode(bool toggle);
   void ShowPreview(OSDSettings::Type type, const std::string &line1, const std::string &line2, const Song &song);
   void ShowMessage(const std::string &summary, const std::string &body, const std::string &icon = "audio-x-generic");
   void ShowMessage(const std::string &summary, const std::string &body, const std::string &icon, const std::vector<unsigned char> &art);

@@ -4,7 +4,7 @@
 #include "constants/notificationssettings.h"
 #include "core/appearance.h"
 #include "equalizer/equalizerpersist.h"
-#include "playlist/playlistsequence.h"
+#include "playlist/playlist.h"
 #include "core/logging.h"
 #include "core/settings.h"
 #include "scrobbler/scrobblereligibility.h"
@@ -76,7 +76,10 @@ void Application::Init() {
   tray_->Next.Connect([this]() { player_->Next(); });
   tray_->Previous.Connect([this]() { player_->Previous(); });
   tray_->Mute.Connect([this]() { player_->Mute(); });
-  tray_->StopAfter.Connect([this]() { player_->StopAfterCurrent(); });
+  tray_->StopAfter.Connect([this]() {
+    player_->StopAfterCurrent();
+    osd_->StopAfterToggle(player_->stop_after_current());
+  });
   tray_->Love.Connect([this]() { scrobbler_->Love(player_->current_song()); });
   tray_->Quit.Connect([this]() { Exit(); });
   player_->engine()->SetEqualizerEnabled(equalizer_->enabled());
@@ -146,14 +149,9 @@ void Application::Init() {
   });
   player_->VolumeChanged.Connect([this](unsigned volume) { osd_->VolumeChanged(volume); });
   player_->PlaylistFinished.Connect([this]() { osd_->PlaylistFinished(); });
-  playlist_manager_->SequenceChanged.Connect([this]() {
-    Playlist *playlist = playlist_manager_->current();
-    if (!playlist) {
-      return;
-    }
-    osd_->PlayModeChanged(std::string(PlaylistSequence::RepeatLabel(playlist->repeat_mode())) + " / " +
-                          PlaylistSequence::ShuffleLabel(playlist->shuffle_mode()));
-  });
+  WatchPlaylistOsd(playlist_manager_->current());
+  playlist_manager_->CurrentChanged.Connect([this](Playlist *playlist) { WatchPlaylistOsd(playlist); });
+  playlist_manager_->PlaylistsLoaded.Connect([this]() { WatchPlaylistOsd(playlist_manager_->current()); });
   equalizer_->ParametersChanged.Connect([this](bool enabled, int preamp, const std::vector<int> &gains) {
     player_->engine()->SetEqualizerEnabled(enabled);
     player_->engine()->SetEqualizerParameters(EqualizerPersist::EffectivePreamp(enabled, preamp),
@@ -166,7 +164,7 @@ void Application::Init() {
   shortcuts_->Stop.Connect([this]() { player_->Stop(); });
   shortcuts_->StopAfter.Connect([this]() {
     player_->StopAfterCurrent();
-    osd_->StopAfterToggle(true);
+    osd_->StopAfterToggle(player_->stop_after_current());
   });
   shortcuts_->Next.Connect([this]() { player_->Next(); });
   shortcuts_->Previous.Connect([this]() { player_->Previous(); });
@@ -179,14 +177,8 @@ void Application::Init() {
   shortcuts_->ShowHide.Connect([this]() { RaiseRequested.Emit(); });
   shortcuts_->ShowOSD.Connect([this]() { player_->ShowOSD(); });
   shortcuts_->TogglePrettyOSD.Connect([this]() {
-    Settings settings;
-    settings.BeginGroup(OSDSettings::kSettingsGroup);
-    const int type = settings.IntValue(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType));
-    const int next = type == static_cast<int>(OSDSettings::Type::Pretty) ? static_cast<int>(OSDSettings::Type::Native)
-                                                                         : static_cast<int>(OSDSettings::Type::Pretty);
-    settings.SetIntValue(OSDSettings::kType, next);
-    settings.Sync();
-    osd_->ReloadSettings();
+    osd_->SetPrettyOSDToggleMode(true);
+    player_->ShowOSD();
   });
   shortcuts_->CycleShuffle.Connect([this]() { playlist_manager_->CycleShuffleMode(); });
   shortcuts_->CycleRepeat.Connect([this]() { playlist_manager_->CycleRepeatMode(); });
@@ -266,4 +258,28 @@ void Application::ApplyCommandline(const CommandlineOptions &options) {
   if (options.show_osd()) {
     player_->ShowOSD();
   }
+  if (options.toggle_pretty_osd()) {
+    osd_->SetPrettyOSDToggleMode(true);
+    player_->ShowOSD();
+  }
+}
+
+void Application::WatchPlaylistOsd(Playlist *playlist) {
+  ++playlist_osd_gen_;
+  const int gen = playlist_osd_gen_;
+  if (!playlist) {
+    return;
+  }
+  playlist->RepeatModeChanged.Connect([this, gen]() {
+    if (gen != playlist_osd_gen_ || !playlist_manager_->current()) {
+      return;
+    }
+    osd_->RepeatModeChanged(playlist_manager_->current()->repeat_mode());
+  });
+  playlist->ShuffleModeChanged.Connect([this, gen]() {
+    if (gen != playlist_osd_gen_ || !playlist_manager_->current()) {
+      return;
+    }
+    osd_->ShuffleModeChanged(playlist_manager_->current()->shuffle_mode());
+  });
 }

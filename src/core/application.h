@@ -85,6 +85,7 @@ class Application {
   Signal<> RaiseRequested;
 
  private:
+  void WatchPlaylistOsd(class Playlist *playlist);
   std::unique_ptr<TaskManager> task_manager_;
   std::unique_ptr<Database> database_;
   std::unique_ptr<NetworkAccessManager> network_;
@@ -120,6 +121,7 @@ class Application {
   std::unique_ptr<DiscordRichPresence> discord_;
   std::unique_ptr<TagFetcher> tag_fetcher_;
   bool playback_was_paused_ = false;
+  int playlist_osd_gen_ = 0;
 };
 
 #endif

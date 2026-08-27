@@ -90,6 +90,32 @@ TEST(OSDBase, TrayPopupRoutesToTrayIcon) {
   EXPECT_EQ(2500, tray.popup_timeout_ms());
 }
 
+TEST(OSDBase, StopAfterToggleAndPlayModes) {
+  SystemTrayIcon tray;
+  TestOSD osd(&tray);
+  osd.StopAfterToggle(true);
+  EXPECT_EQ("Strawberry", tray.popup_summary());
+  EXPECT_NE(std::string::npos, tray.popup_message().find("On"));
+  osd.StopAfterToggle(false);
+  EXPECT_NE(std::string::npos, tray.popup_message().find("Off"));
+  osd.RepeatModeChanged(PlaylistSequence::RepeatMode::Track);
+  EXPECT_STREQ("Repeat track", tray.popup_message().c_str());
+  osd.ShuffleModeChanged(PlaylistSequence::ShuffleMode::All);
+  EXPECT_STREQ("Shuffle all", tray.popup_message().c_str());
+}
+
+TEST(OSDBase, ShowPreviewReplacesSampleSong) {
+  SystemTrayIcon tray;
+  TestOSD osd(&tray);
+  Song song;
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_album("Dummy");
+  osd.ShowPreview(OSDSettings::Type::TrayPopup, "%artist% - %title%", "%album%", song);
+  EXPECT_EQ("Portishead - Roads", tray.popup_summary());
+  EXPECT_EQ("Dummy", tray.popup_message());
+}
+
 TEST(OSDBase, CustomTextAndPlaylistFinished) {
   SystemTrayIcon tray;
   TestOSD osd(&tray);

@@ -56,27 +56,37 @@ std::string OAuthenticator::BuildAuthorizeUrl(const std::string &authorize_url, 
   return url;
 }
 
-bool OAuthenticator::StartRedirectServer() {
+bool OAuthenticator::StartRedirectServer(guint16 preferred_port) {
   StopRedirectServer();
   service_ = g_socket_service_new();
-  GError *error = nullptr;
-  GSocketAddress *effective = nullptr;
-  GInetAddress *loopback = g_inet_address_new_loopback(G_SOCKET_FAMILY_IPV4);
-  GSocketAddress *address = g_inet_socket_address_new(loopback, 0);
-  const gboolean added = g_socket_listener_add_address(G_SOCKET_LISTENER(service_), address, G_SOCKET_TYPE_STREAM, G_SOCKET_PROTOCOL_DEFAULT, nullptr,
-                                                       &effective, &error);
-  g_object_unref(address);
-  g_object_unref(loopback);
-  if (!added || !effective) {
-    if (error) {
-      g_error_free(error);
+  auto bind_port = [this](guint16 port) -> guint16 {
+    GError *error = nullptr;
+    GSocketAddress *effective = nullptr;
+    GInetAddress *loopback = g_inet_address_new_loopback(G_SOCKET_FAMILY_IPV4);
+    GSocketAddress *address = g_inet_socket_address_new(loopback, port);
+    const gboolean added =
+        g_socket_listener_add_address(G_SOCKET_LISTENER(service_), address, G_SOCKET_TYPE_STREAM, G_SOCKET_PROTOCOL_DEFAULT, nullptr, &effective, &error);
+    g_object_unref(address);
+    g_object_unref(loopback);
+    if (!added || !effective) {
+      if (error) {
+        g_error_free(error);
+      }
+      return 0;
     }
+    const guint16 bound = g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(effective));
+    g_object_unref(effective);
+    return bound;
+  };
+  guint16 port = preferred_port > 0 ? bind_port(preferred_port) : 0;
+  if (port == 0) {
+    port = bind_port(0);
+  }
+  if (port == 0) {
     StopRedirectServer();
     return false;
   }
-  const guint16 port = g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(effective));
-  g_object_unref(effective);
-  redirect_uri_ = "http://127.0.0.1:" + std::to_string(port) + "/callback";
+  redirect_uri_ = RedirectUriForPort(port);
   g_signal_connect(service_, "incoming", G_CALLBACK(+[](GSocketService *, GSocketConnection *connection, GObject *, gpointer data) -> gboolean {
                      auto *self = static_cast<OAuthenticator *>(data);
                      GInputStream *input = g_io_stream_get_input_stream(G_IO_STREAM(connection));
@@ -119,9 +129,10 @@ void OAuthenticator::StopRedirectServer() {
   }
 }
 
-void OAuthenticator::AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback) {
+void OAuthenticator::AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback,
+                                        guint16 preferred_port) {
   callback_ = std::move(callback);
-  if (!StartRedirectServer()) {
+  if (!StartRedirectServer(preferred_port)) {
     if (callback_) {
       callback_({}, "Could not start redirect server");
       callback_ = {};

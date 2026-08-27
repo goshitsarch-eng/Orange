@@ -85,7 +85,7 @@ static const gchar *kMprisXml =
     "  </interface>"
     "</node>";
 
-static GVariant *MetadataVariant(const Song &song, int row = -1) {
+static GVariant *MetadataVariant(const Song &song, int row = -1, const std::string &art_override = {}) {
   GVariantBuilder b;
   g_variant_builder_init(&b, G_VARIANT_TYPE("a{sv}"));
   const std::string track_id = row >= 0 ? Mpris2Helpers::TrackIdForRow(song, row) : Mpris2Helpers::TrackId(song);
@@ -98,7 +98,7 @@ static GVariant *MetadataVariant(const Song &song, int row = -1) {
   if (song.length_nanosec() > 0) {
     g_variant_builder_add(&b, "{sv}", "mpris:length", g_variant_new_int64(song.length_nanosec() / 1000));
   }
-  const std::string art = Mpris2Helpers::ArtUrl(song);
+  const std::string art = Mpris2Helpers::ArtUrlOrOverride(song, art_override);
   if (!art.empty()) {
     g_variant_builder_add(&b, "{sv}", "mpris:artUrl", g_variant_new_string(art.c_str()));
   }
@@ -403,6 +403,9 @@ Mpris2::Mpris2(Application *app) : app_(app) {
     app_->player()->SongChanged.Connect([this](const Song &) { EmitMetadata(); });
     app_->player()->VolumeChanged.Connect([this](unsigned) { EmitVolume(); });
   }
+  if (app_ && app_->current_albumcover_loader()) {
+    app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &, const std::vector<unsigned char> &) { EmitMetadata(); });
+  }
   if (app_ && app_->playlist_manager()) {
     app_->playlist_manager()->CurrentChanged.Connect([this](Playlist *) {
       WatchCurrentPlaylist();
@@ -550,7 +553,8 @@ void Mpris2::EmitMetadata() {
   if (app_ && app_->playlist_manager() && app_->playlist_manager()->active()) {
     row = app_->playlist_manager()->active()->current_row();
   }
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Metadata", MetadataVariant(song, row));
+  const std::string art = app_ && app_->current_albumcover_loader() ? app_->current_albumcover_loader()->current_url() : std::string();
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Metadata", MetadataVariant(song, row, art));
 #endif
 }
 
