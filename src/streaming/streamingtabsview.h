@@ -31,6 +31,7 @@ class StreamingTabsView {
   void SetEnqueueCallback(EnqueueCallback callback);
   void SetMenuCallback(MenuCallback callback);
   void SetConfigureCallback(ConfigureCallback callback);
+  void SetFilterMenuCallback(CollectionFilterWidget::MenuActionCallback callback);
   void SearchForThis(const std::string &query);
   std::string SelectedSearchQuery() const;
   void ReloadSettings();

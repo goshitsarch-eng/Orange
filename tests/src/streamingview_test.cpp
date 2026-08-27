@@ -3,6 +3,7 @@
 #include "streaming/streamingabort.h"
 #include "streaming/streamingalbum.h"
 #include "streaming/streamingcollectionactions.h"
+#include "streaming/streamingcollectionfilter.h"
 #include "streaming/streamingcollectionlabels.h"
 #include "streaming/streamingcollectionstore.h"
 #include "streaming/streamingcollectiontree.h"
@@ -24,6 +25,7 @@
 #include "core/settings.h"
 #include "utilities/fileutils.h"
 
+#include <ctime>
 #include <gtest/gtest.h>
 #include <unistd.h>
 
@@ -711,6 +713,58 @@ TEST(StreamingCollectionActions, PlaylistActionsRequireSelection) {
                                                     StreamingCollectionActions::Action::EnqueueNext));
   EXPECT_TRUE(StreamingCollectionActions::Contains(StreamingCollectionActions::VisibleItems(2, StreamingCollectionActions::MenuContext::Collection),
                                                    StreamingCollectionActions::Action::EnqueueNext));
+}
+
+TEST(StreamingCollectionFilter, AgeRatingUntaggedDuplicatesAndText) {
+  Song tagged(Song::Source::Tidal);
+  tagged.set_title("Roads");
+  tagged.set_artist("Portishead");
+  tagged.set_album("Dummy");
+  tagged.set_ctime(static_cast<int>(std::time(nullptr)));
+  tagged.set_rating(0.8f);
+  tagged.set_url("tidal://track/1");
+  Song old(Song::Source::Tidal);
+  old.set_title("Wandering Star");
+  old.set_artist("Portishead");
+  old.set_album("Dummy");
+  old.set_ctime(static_cast<int>(std::time(nullptr) - 10 * 86400));
+  old.set_rating(0.2f);
+  old.set_url("tidal://track/2");
+  Song untagged(Song::Source::Tidal);
+  untagged.set_title("Untitled");
+  untagged.set_ctime(static_cast<int64_t>(std::time(nullptr)));
+  untagged.set_url("tidal://track/3");
+  Song dup(Song::Source::Tidal);
+  dup.set_title("Roads");
+  dup.set_artist("Portishead");
+  dup.set_album("Dummy");
+  dup.set_ctime(static_cast<int>(std::time(nullptr)));
+  dup.set_rating(0.8f);
+  dup.set_url("tidal://track/4");
+
+  CollectionFilterOptions age;
+  age.set_max_age(86400);
+  EXPECT_EQ(3u, StreamingCollectionFilter::Apply({tagged, old, untagged, dup}, age, {}).size());
+
+  CollectionFilterOptions rating;
+  rating.set_min_rating(0.6f);
+  EXPECT_EQ(2u, StreamingCollectionFilter::Apply({tagged, old, untagged, dup}, rating, {}).size());
+
+  CollectionFilterOptions untagged_mode;
+  untagged_mode.set_filter_mode(CollectionFilterOptions::FilterMode::Untagged);
+  const SongList only_untagged = StreamingCollectionFilter::Apply({tagged, old, untagged, dup}, untagged_mode, "roads");
+  ASSERT_EQ(1u, only_untagged.size());
+  EXPECT_EQ("Untitled", only_untagged.front().title());
+  EXPECT_FALSE(StreamingCollectionFilter::TextSearchEnabled(untagged_mode));
+
+  CollectionFilterOptions duplicates;
+  duplicates.set_filter_mode(CollectionFilterOptions::FilterMode::Duplicates);
+  EXPECT_EQ(2u, StreamingCollectionFilter::Apply({tagged, old, untagged, dup}, duplicates, {}).size());
+
+  CollectionFilterOptions all;
+  const SongList text = StreamingCollectionFilter::Apply({tagged, old, untagged, dup}, all, "wandering");
+  ASSERT_EQ(1u, text.size());
+  EXPECT_EQ("Wandering Star", text.front().title());
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {

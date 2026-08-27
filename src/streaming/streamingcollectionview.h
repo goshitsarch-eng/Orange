@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_STREAMINGCOLLECTIONVIEW_H
 #define STRAWBERRY_STREAMINGCOLLECTIONVIEW_H
 
+#include "collection/collectionfilteroptions.h"
 #include "collection/collectionfocus.h"
 #include "collection/collectiongrouping.h"
 #include "collection/collectionitem.h"
@@ -35,6 +36,8 @@ class StreamingCollectionView {
   bool CanGoBack() const { return !stack_.empty(); }
   void SetStatus(const std::string &status);
   void SetFilter(const std::string &filter);
+  void SetFilterOptions(const CollectionFilterOptions &options);
+  CollectionFilterOptions filter_options() const { return filter_options_; }
   void SetActivateCallback(ActivateCallback callback);
   void SetEnqueueCallback(EnqueueCallback callback);
   void SetRefreshCallback(RefreshCallback callback);
@@ -89,6 +92,7 @@ class StreamingCollectionView {
   CollectionFocus::State focus_;
   std::vector<Level> stack_;
   std::string filter_;
+  CollectionFilterOptions filter_options_;
   CollectionGrouping::Grouping grouping_;
   ActivateCallback activate_;
   EnqueueCallback enqueue_;

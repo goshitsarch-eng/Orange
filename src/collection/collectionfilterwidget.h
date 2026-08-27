@@ -4,6 +4,7 @@
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectionfilteroptions.h"
 #include "collection/collectiongrouping.h"
+#include "settings/settingspages.h"
 
 #include <gtk/gtk.h>
 
@@ -24,6 +25,7 @@ class CollectionFilterWidget {
   void SetChangedCallback(ChangedCallback callback);
   void SetGroupingChangedCallback(GroupingCallback callback) { grouping_changed_ = std::move(callback); }
   void SetMenuActionCallback(MenuActionCallback callback) { menu_action_ = std::move(callback); }
+  void SetConfigureLabel(const std::string &label);
   void SetGrouping(const CollectionGrouping::Grouping &grouping);
   void ReloadMenu();
 
@@ -44,6 +46,7 @@ class CollectionFilterWidget {
   ChangedCallback changed_;
   GroupingCallback grouping_changed_;
   MenuActionCallback menu_action_;
+  std::string configure_label_ = SettingsPages::ConfigureCollectionLabel();
 };
 
 #endif

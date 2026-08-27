@@ -1256,6 +1256,21 @@ void MainWindow::BuildSidebar() {
     view->SetMenuCallback([this](const SongList &songs, StreamingCollectionActions::MenuContext ctx) { ShowStreamingMenu(songs, ctx); });
     const char *page = SettingsPages::ForService(service->name());
     view->SetConfigureCallback([this, page]() { OpenSettings(page); });
+    view->SetFilterMenuCallback([this, page](CollectionFilterMenu::ActionKind kind) {
+      if (kind == CollectionFilterMenu::ActionKind::Manage) {
+        Dialogs::ManageSavedGroupings(GTK_WINDOW(window_), [this](const CollectionGrouping::Grouping &grouping) {
+          grouping_ = grouping;
+          CollectionGrouping::SaveCurrent(grouping);
+          for (const auto &tabs : streaming_views_) {
+            if (tabs && tabs->artists_collection_view()) {
+              tabs->artists_collection_view()->ApplyGrouping(grouping);
+            }
+          }
+        });
+      } else if (kind == CollectionFilterMenu::ActionKind::Configure) {
+        OpenSettings(page);
+      }
+    });
     gtk_stack_add_titled(GTK_STACK(streaming_stack_), view->widget(), service->name().c_str(), service->name().c_str());
     streaming_views_.push_back(std::move(view));
   }

@@ -41,7 +41,16 @@ StreamingTabsView::StreamingTabsView(StreamingService *service, Database *databa
     albums_->view()->SetGrouping(grouping);
     songs_->view()->SetGrouping(grouping);
     favorites_->view()->SetGrouping(grouping);
+    artists_->filter_widget()->SetGrouping(grouping);
+    albums_->filter_widget()->SetGrouping(grouping);
+    songs_->filter_widget()->SetGrouping(grouping);
+    favorites_->filter_widget()->SetGrouping(grouping);
   };
+  const std::string configure = StreamingSearchOpts::ConfigureServiceLabel(service_ ? service_->name() : std::string());
+  artists_->filter_widget()->SetConfigureLabel(configure);
+  albums_->filter_widget()->SetConfigureLabel(configure);
+  songs_->filter_widget()->SetConfigureLabel(configure);
+  favorites_->filter_widget()->SetConfigureLabel(configure);
   artists_->view()->SetGroupingChangedCallback(sync_grouping);
   albums_->view()->SetGroupingChangedCallback(sync_grouping);
   songs_->view()->SetGroupingChangedCallback(sync_grouping);
@@ -245,6 +254,13 @@ void StreamingTabsView::SetMenuCallback(MenuCallback callback) {
 }
 
 void StreamingTabsView::SetConfigureCallback(ConfigureCallback callback) { search_->SetConfigureCallback(std::move(callback)); }
+
+void StreamingTabsView::SetFilterMenuCallback(CollectionFilterWidget::MenuActionCallback callback) {
+  artists_->SetMenuActionCallback(callback);
+  albums_->SetMenuActionCallback(callback);
+  songs_->SetMenuActionCallback(callback);
+  favorites_->SetMenuActionCallback(std::move(callback));
+}
 
 std::string StreamingTabsView::SelectedSearchQuery() const {
   if (!stack_) {

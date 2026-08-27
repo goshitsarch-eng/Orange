@@ -1,10 +1,11 @@
 #include "streaming/streamingcollectionviewcontainer.h"
 
+#include "collection/groupbydialog.h"
 #include "streaming/streamingabort.h"
 #include "translations/translations.h"
 
 StreamingCollectionViewContainer::StreamingCollectionViewContainer(const std::string &title)
-    : view_(std::make_unique<StreamingCollectionView>(title)) {
+    : filter_widget_(std::make_unique<CollectionFilterWidget>()), view_(std::make_unique<StreamingCollectionView>(title)) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   progress_ = gtk_progress_bar_new();
   gtk_widget_set_margin_start(progress_, 8);
@@ -25,6 +26,22 @@ StreamingCollectionViewContainer::StreamingCollectionViewContainer(const std::st
                      static_cast<StreamingCollectionViewContainer *>(data)->OnActionClicked();
                    }),
                    this);
+  filter_widget_->SetChangedCallback([this]() { view_->SetFilterOptions(filter_widget_->options()); });
+  filter_widget_->SetGroupingChangedCallback([this](const CollectionGrouping::Grouping &grouping) { view_->ApplyGrouping(grouping); });
+  filter_widget_->SetMenuActionCallback([this](CollectionFilterMenu::ActionKind kind) {
+    if (kind == CollectionFilterMenu::ActionKind::Advanced) {
+      GtkRoot *root = gtk_widget_get_root(widget_);
+      GtkWindow *parent = GTK_IS_WINDOW(root) ? GTK_WINDOW(root) : nullptr;
+      GroupByDialog::Show(parent, view_->grouping(), [this](const CollectionGrouping::Grouping &grouping) {
+        view_->ApplyGrouping(grouping);
+      });
+      return;
+    }
+    if (menu_action_) {
+      menu_action_(kind);
+    }
+  });
+  gtk_box_append(GTK_BOX(widget_), filter_widget_->widget());
   gtk_box_append(GTK_BOX(widget_), view_->widget());
   gtk_box_append(GTK_BOX(widget_), progress_);
   gtk_box_append(GTK_BOX(widget_), status_);

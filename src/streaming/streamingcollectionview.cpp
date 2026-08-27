@@ -9,6 +9,7 @@
 #include "collection/groupbydialog.h"
 #include "dialogs/dialoghelpers.h"
 #include "streaming/streamingcollectionactions.h"
+#include "streaming/streamingcollectionfilter.h"
 #include "streaming/streamingcollectionlabels.h"
 #include "streaming/streamingcollectiontree.h"
 #include "streaming/streamingcover.h"
@@ -214,7 +215,24 @@ void StreamingCollectionView::ApplyGrouping(const CollectionGrouping::Grouping &
 }
 
 void StreamingCollectionView::SetFilter(const std::string &filter) {
+  if (!StreamingCollectionFilter::TextSearchEnabled(filter_options_)) {
+    return;
+  }
   filter_ = filter;
+  Rebuild();
+}
+
+void StreamingCollectionView::SetFilterOptions(const CollectionFilterOptions &options) {
+  filter_options_ = options;
+  if (!StreamingCollectionFilter::TextSearchEnabled(filter_options_)) {
+    filter_.clear();
+    if (filter_entry_) {
+      gtk_editable_set_text(GTK_EDITABLE(filter_entry_), "");
+    }
+  }
+  if (filter_entry_) {
+    gtk_widget_set_sensitive(filter_entry_, StreamingCollectionFilter::TextSearchEnabled(filter_options_));
+  }
   Rebuild();
 }
 
@@ -260,18 +278,7 @@ void StreamingCollectionView::ActivateSong(const Song &song) {
   }
 }
 
-SongList StreamingCollectionView::Visible() const {
-  if (filter_.empty()) {
-    return songs_;
-  }
-  SongList visible;
-  for (const Song &song : songs_) {
-    if (StrUtils::ContainsInsensitive(song.PrettyTitleWithArtist(), filter_) || StrUtils::ContainsInsensitive(song.album(), filter_)) {
-      visible.push_back(song);
-    }
-  }
-  return visible;
-}
+SongList StreamingCollectionView::Visible() const { return StreamingCollectionFilter::Apply(songs_, filter_options_, filter_); }
 
 void StreamingCollectionView::ToggleExpanded(const CollectionItem *item) {
   if (CollectionTree::Toggle(&expanded_, item) || CollectionTree::IsExpandable(item)) {

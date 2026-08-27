@@ -34,6 +34,11 @@ void CollectionFilterWidget::SetGrouping(const CollectionGrouping::Grouping &gro
 
 void CollectionFilterWidget::ReloadMenu() { BuildMenu(); }
 
+void CollectionFilterWidget::SetConfigureLabel(const std::string &label) {
+  configure_label_ = label.empty() ? SettingsPages::ConfigureCollectionLabel() : label;
+  ReloadMenu();
+}
+
 void CollectionFilterWidget::ApplyFilterIndices(int age, int rating, int mode) {
   age_index_ = CollectionFilterChoices::ClampIndex(age, CollectionFilterChoices::kAgeCount);
   rating_index_ = CollectionFilterChoices::ClampIndex(rating, CollectionFilterChoices::kRatingCount);
@@ -150,7 +155,7 @@ void CollectionFilterWidget::BuildMenu() {
     g_menu_append(mode_section, Translations::CStr(CollectionFilterChoices::kModeLabels[i]), action);
   }
   g_menu_append_section(root, nullptr, G_MENU_MODEL(mode_section));
-  g_menu_append(root, Translations::CStr(SettingsPages::ConfigureCollectionLabel()), "collfilter.configure");
+  g_menu_append(root, Translations::CStr(configure_label_.c_str()), "collfilter.configure");
 
   GSimpleActionGroup *group = g_simple_action_group_new();
   GSimpleAction *groupby = g_simple_action_new_stateful("groupby", G_VARIANT_TYPE_STRING, g_variant_new_string(group_state.c_str()));
