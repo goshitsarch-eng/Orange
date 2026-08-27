@@ -45,6 +45,9 @@ inline bool EnqueueNextEnabled(int) { return true; }
 
 inline bool SearchContextActionsEnabled(int songs_selected) { return songs_selected > 0; }
 
+// Qt StreamingSearchView::ResultsContextMenuEvent: Search for this only when one row is selected.
+inline bool SearchForThisEnabled(int songs_selected) { return songs_selected == 1; }
+
 inline bool ActionEnabled(Action action, int songs_selected) {
   switch (action) {
     case Action::EnqueueNext:

@@ -3081,8 +3081,10 @@ void MainWindow::ShowStreamingMenu(const SongList &songs) {
   for (const StreamingCollectionActions::Item &item : StreamingCollectionActions::VisibleItems(songs_selected)) {
     g_menu_append(menu, Translations::Tr(item.label).c_str(), item.action);
   }
-  if (StreamingCollectionActions::SearchContextActionsEnabled(songs_selected)) {
+  if (StreamingCollectionActions::SearchForThisEnabled(songs_selected)) {
     g_menu_append(menu, Translations::Tr(StreamingSearchOpts::SearchForThisLabel()).c_str(), "win.streaming-search");
+  }
+  if (StreamingCollectionActions::SearchContextActionsEnabled(songs_selected)) {
     for (StreamingCollectionStore::List list : StreamingCollectionStore::AddableLists(streaming_service_name_)) {
       const char *action = "win.streaming-add-songs";
       if (list == StreamingCollectionStore::List::Artists) {

@@ -692,6 +692,9 @@ TEST(StreamingCollectionActions, PlaylistActionsRequireSelection) {
   EXPECT_TRUE(StreamingCollectionActions::EnqueueNextEnabled(3));
   EXPECT_FALSE(StreamingCollectionActions::RemoveFromFavoritesEnabled(0));
   EXPECT_TRUE(StreamingCollectionActions::SearchContextActionsEnabled(1));
+  EXPECT_FALSE(StreamingCollectionActions::SearchForThisEnabled(0));
+  EXPECT_TRUE(StreamingCollectionActions::SearchForThisEnabled(1));
+  EXPECT_FALSE(StreamingCollectionActions::SearchForThisEnabled(2));
   EXPECT_EQ(1u, StreamingCollectionActions::VisibleItems(0).size());
   EXPECT_EQ(StreamingCollectionActions::Action::EnqueueNext, StreamingCollectionActions::VisibleItems(0).front().id);
   EXPECT_EQ(StreamingCollectionActions::Items().size(), StreamingCollectionActions::VisibleItems(2).size());
