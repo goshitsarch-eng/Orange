@@ -761,7 +761,6 @@ TEST(PlaylistToolbar, HideClearsFilterLikeQt) {
   EXPECT_EQ(32, PlaylistToolbar::IconSize(32));
   EXPECT_EQ(128, PlaylistToolbar::IconSize(256));
 }
-}
 
 TEST(PlaylistUndoLimits, ConfirmsClearWhenOverUndoLimit) {
   EXPECT_EQ(500, PlaylistUndoLimits::kUndoItemLimit);
