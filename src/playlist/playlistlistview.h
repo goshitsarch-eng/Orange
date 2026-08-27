@@ -28,6 +28,7 @@ class PlaylistListView {
   void Refresh(const std::vector<PlaylistListDrop::Row> &rows, const std::string &current, const std::string &active = {},
                PlaylistListLook::Playback playback = PlaylistListLook::Playback::Stopped);
   void SelectName(const std::string &name);
+  void SelectFolder(const std::string &path);
   void SetActivateCallback(ActivateCallback callback);
   void SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
   void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
@@ -48,7 +49,10 @@ class PlaylistListView {
   void StartDragHover(const std::string &name);
   void CancelDragHover();
   gboolean OnKeyPressed(guint keyval);
+  bool ApplyTreeLeft();
   void ResetTypeAhead();
+  std::string SelectedPath() const;
+  bool SelectedExpanded() const;
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;

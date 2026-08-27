@@ -1,6 +1,7 @@
 #include "playlist/playlistlistview.h"
 
 #include "playlist/playlistlistkeyboard.h"
+#include "playlist/playlistlistleft.h"
 #include "translations/translations.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
@@ -88,6 +89,39 @@ void PlaylistListView::HandlePress(guint button, gint n_press, double x, double 
   }
 }
 
+bool PlaylistListView::ApplyTreeLeft() {
+  const bool folder = SelectedIsFolder();
+  const std::string path = SelectedPath();
+  if (path.empty() && !folder) {
+    return false;
+  }
+  const bool expanded = SelectedExpanded();
+  const std::string focus = PlaylistListLeft::FocusPath(folder, expanded, path);
+  const std::string collapse = PlaylistListLeft::CollapsePath(folder, expanded, path);
+  if (focus.empty() && collapse.empty()) {
+    return false;
+  }
+  if (!collapse.empty() && toggle_) {
+    toggle_(collapse);
+  }
+  SelectFolder(focus);
+  return true;
+}
+
+std::string PlaylistListView::SelectedPath() const {
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  if (!row) {
+    return {};
+  }
+  const char *path = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "playlist-path"));
+  return path ? path : "";
+}
+
+bool PlaylistListView::SelectedExpanded() const {
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  return row && GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "playlist-expanded")) == 1;
+}
+
 void PlaylistListView::ResetTypeAhead() {
   typeahead_.clear();
   if (typeahead_timeout_) {
@@ -102,8 +136,11 @@ gboolean PlaylistListView::OnKeyPressed(guint keyval) {
     ListBoxKeyboardGtk::ActivateSelected(list_);
     return TRUE;
   }
-  if (action == PlaylistListKeyboard::Action::Expand || action == PlaylistListKeyboard::Action::Collapse) {
-    if (SelectedIsFolder() && toggle_) {
+  if (action == PlaylistListKeyboard::Action::Collapse && ApplyTreeLeft()) {
+    return TRUE;
+  }
+  if (action == PlaylistListKeyboard::Action::Expand && SelectedIsFolder() && toggle_) {
+    if (!SelectedExpanded()) {
       toggle_(SelectedFolderPath());
     }
     return TRUE;
@@ -187,6 +224,29 @@ void PlaylistListView::StartDragHover(const std::string &name) {
     }
     return G_SOURCE_REMOVE;
   }, this);
+}
+
+void PlaylistListView::SelectFolder(const std::string &path) {
+  if (path.empty()) {
+    return;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "playlist-folder")) != 1) {
+      continue;
+    }
+    const char *row_path = static_cast<const char *>(g_object_get_data(G_OBJECT(child), "playlist-path"));
+    if (!row_path || path != row_path) {
+      continue;
+    }
+    gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+    gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
+    gtk_widget_grab_focus(child);
+    ListBoxEnsureVisible::Row(list_, child);
+    return;
+  }
 }
 
 void PlaylistListView::SelectName(const std::string &name) {
@@ -284,6 +344,7 @@ void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, c
     g_object_set_data_full(G_OBJECT(row), "playlist-name", g_strdup(item.folder ? "" : item.name.c_str()), g_free);
     g_object_set_data_full(G_OBJECT(row), "playlist-path", g_strdup(item.path.c_str()), g_free);
     g_object_set_data(G_OBJECT(row), "playlist-folder", GINT_TO_POINTER(item.folder ? 1 : 2));
+    g_object_set_data(G_OBJECT(row), "playlist-expanded", GINT_TO_POINTER(item.expanded ? 1 : 2));
     g_object_set_data(G_OBJECT(row), "playlist-id", GINT_TO_POINTER(item.id + 1));
     if (!item.folder && item.name == current) {
       gtk_widget_add_css_class(row, "accent");

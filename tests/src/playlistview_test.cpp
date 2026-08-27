@@ -21,6 +21,7 @@
 #include "playlist/playlistlistscroll.h"
 #include "playlist/playlistlistdrop.h"
 #include "playlist/playlistlistkeyboard.h"
+#include "playlist/playlistlistleft.h"
 #include "playlist/playlistlistlook.h"
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
@@ -421,6 +422,27 @@ TEST(PlaylistListKeyboard, FromKeyExpandCollapseAndLabels) {
   ASSERT_EQ(2u, labels.size());
   EXPECT_EQ("Rock", labels[0]);
   EXPECT_EQ("Favorites", labels[1]);
+}
+
+TEST(PlaylistListLeft, CollapseOrJumpToParent) {
+  EXPECT_TRUE(PlaylistListLeft::IsRootRow(false, ""));
+  EXPECT_TRUE(PlaylistListLeft::IsRootRow(true, "Jazz"));
+  EXPECT_FALSE(PlaylistListLeft::IsRootRow(false, "Jazz"));
+  EXPECT_FALSE(PlaylistListLeft::IsRootRow(true, "Jazz/Live"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::ParentPath(false, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::ParentPath(true, "Jazz/Live"));
+  EXPECT_TRUE(PlaylistListLeft::ParentPath(true, "Jazz").empty());
+
+  EXPECT_EQ(PlaylistListLeft::Action::SelectParentAndCollapse, PlaylistListLeft::FromRow(false, false, "Jazz"));
+  EXPECT_EQ(PlaylistListLeft::Action::CollapseCurrent, PlaylistListLeft::FromRow(true, true, "Jazz"));
+  EXPECT_EQ(PlaylistListLeft::Action::None, PlaylistListLeft::FromRow(true, false, "Jazz"));
+  EXPECT_EQ(PlaylistListLeft::Action::SelectParentAndCollapse, PlaylistListLeft::FromRow(true, false, "Jazz/Live"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::FocusPath(false, false, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::CollapsePath(false, false, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::FocusPath(true, true, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::CollapsePath(true, true, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::FocusPath(true, false, "Jazz/Live"));
+  EXPECT_TRUE(PlaylistListLeft::FocusPath(true, false, "Jazz").empty());
 }
 
 TEST(PlaylistSaveOptionsDialog, PathTypeLabels) {
