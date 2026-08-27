@@ -754,6 +754,13 @@ TEST(PlaylistToolbar, HideClearsFilterLikeQt) {
   EXPECT_FALSE(PlaylistToolbar::FilterApplies(false));
   EXPECT_TRUE(PlaylistToolbar::FocusEnabled(true));
   EXPECT_FALSE(PlaylistToolbar::FocusEnabled(false));
+  EXPECT_STREQ("strawberry-playlist-buttons", PlaylistToolbar::CssClass());
+  EXPECT_TRUE(PlaylistToolbar::ShouldApplyIconSizes(true));
+  EXPECT_FALSE(PlaylistToolbar::ShouldApplyIconSizes(false));
+  EXPECT_EQ(AppearanceSettings::kDefaultIconSizePlaylistButtons, PlaylistToolbar::IconSize(0));
+  EXPECT_EQ(32, PlaylistToolbar::IconSize(32));
+  EXPECT_EQ(128, PlaylistToolbar::IconSize(256));
+}
 }
 
 TEST(PlaylistUndoLimits, ConfirmsClearWhenOverUndoLimit) {

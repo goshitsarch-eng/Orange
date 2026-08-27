@@ -1,5 +1,6 @@
 #include "playlist/playlistcontainer.h"
 
+#include "constants/appearancesettings.h"
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "filterparser/filterparser.h"
@@ -26,6 +27,7 @@ PlaylistContainer::PlaylistContainer()
       view_(std::make_unique<PlaylistView>()),
       dynamic_controls_(std::make_unique<DynamicPlaylistControls>()) {
   toolbar_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_add_css_class(toolbar_, PlaylistToolbar::CssClass());
   gtk_widget_set_margin_start(toolbar_, 8);
   gtk_widget_set_margin_end(toolbar_, 8);
   gtk_widget_set_margin_top(toolbar_, 8);
@@ -341,12 +343,42 @@ void PlaylistContainer::SetShuffleMode(PlaylistSequence::ShuffleMode mode) {
 
 void PlaylistContainer::SetSummary(const std::string &text) { gtk_label_set_text(GTK_LABEL(summary_), text.c_str()); }
 
+namespace {
+
+void ApplyButtonIconSize(GtkWidget *widget, int size) {
+  if (!widget || size < 8) {
+    return;
+  }
+  GtkWidget *image = nullptr;
+  if (GTK_IS_BUTTON(widget)) {
+    image = gtk_button_get_child(GTK_BUTTON(widget));
+  } else if (GTK_IS_MENU_BUTTON(widget)) {
+    image = gtk_widget_get_first_child(widget);
+  } else if (GTK_IS_SEARCH_ENTRY(widget) || GTK_IS_ENTRY(widget)) {
+    image = gtk_widget_get_first_child(widget);
+  }
+  if (image && GTK_IS_IMAGE(image)) {
+    gtk_image_set_pixel_size(GTK_IMAGE(image), size);
+  }
+}
+
+}  // namespace
+
 void PlaylistContainer::ApplyLook() {
   Settings settings;
   settings.BeginGroup(PlaylistSettings::kSettingsGroup);
   const bool show_toolbar = settings.BoolValue(PlaylistSettings::kShowToolbar, PlaylistSettings::kDefaultShowToolbar);
   if (toolbar_) {
     gtk_widget_set_visible(toolbar_, PlaylistToolbar::Visible(show_toolbar));
+  }
+  if (toolbar_ && PlaylistToolbar::ShouldApplyIconSizes(show_toolbar)) {
+    Settings appearance;
+    appearance.BeginGroup(AppearanceSettings::kSettingsGroup);
+    const int size = PlaylistToolbar::IconSize(
+        appearance.IntValue(AppearanceSettings::kIconSizePlaylistButtons, AppearanceSettings::kDefaultIconSizePlaylistButtons));
+    for (GtkWidget *child = gtk_widget_get_first_child(toolbar_); child; child = gtk_widget_get_next_sibling(child)) {
+      ApplyButtonIconSize(child, size);
+    }
   }
   if (PlaylistToolbar::ShouldClearFilter(show_toolbar) && filter_entry_) {
     updating_filter_ = true;

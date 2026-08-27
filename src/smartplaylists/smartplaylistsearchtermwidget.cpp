@@ -105,8 +105,21 @@ SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget(SongList library) :
   gtk_widget_add_css_class(overlay_, "suggested-action");
   gtk_widget_set_halign(overlay_, GTK_ALIGN_FILL);
   gtk_widget_set_valign(overlay_, GTK_ALIGN_FILL);
+  gtk_widget_set_can_focus(overlay_, TRUE);
   gtk_overlay_add_overlay(GTK_OVERLAY(widget_), overlay_);
   SmartPlaylistSearchTermWidgetOverlay::Apply(widget_);
+  g_signal_connect(overlay_, "map", G_CALLBACK((+[](GtkWidget *, gpointer data) {
+                     static_cast<SmartPlaylistSearchTermWidget *>(data)->OnOverlayMapped();
+                   })),
+                   this);
+  GtkEventController *overlay_keys = gtk_event_controller_key_new();
+  gtk_event_controller_set_propagation_phase(overlay_keys, GTK_PHASE_CAPTURE);
+  g_signal_connect(overlay_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<SmartPlaylistSearchTermWidget *>(data)->OnOverlayActivateKey(keyval) ? TRUE : FALSE;
+                   })),
+                   this);
+  gtk_widget_add_controller(overlay_, overlay_keys);
   g_signal_connect(field_, "notify::selected", G_CALLBACK((+[](GtkDropDown *, GParamSpec *, gpointer data) {
                      auto *self = static_cast<SmartPlaylistSearchTermWidget *>(data);
                      if (self->updating_) {
@@ -148,6 +161,22 @@ SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget(SongList library) :
 }
 
 SmartPlaylistSearchTermWidget::~SmartPlaylistSearchTermWidget() = default;
+
+void SmartPlaylistSearchTermWidget::OnOverlayMapped() {
+  if (overlay_ && SmartPlaylistSearchTermWidgetOverlay::ShouldGrabOnShow(active_)) {
+    gtk_widget_grab_focus(overlay_);
+  }
+}
+
+bool SmartPlaylistSearchTermWidget::OnOverlayActivateKey(unsigned keyval) {
+  if (!SmartPlaylistSearchTermWidgetOverlay::IsActivateKey(keyval) || active_) {
+    return false;
+  }
+  if (clicked_) {
+    clicked_();
+  }
+  return true;
+}
 
 void SmartPlaylistSearchTermWidget::SetActive(bool active) {
   active_ = active;

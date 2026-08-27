@@ -13,6 +13,7 @@
 #include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfieldreset.h"
 #include "dialogs/dialoggeometry.h"
+#include "dialogs/edittagshow.h"
 #include "dialogs/dialogsongnav.h"
 #include "dialogs/edittagfields.h"
 #include "settings/settingswheelthrough.h"
@@ -731,7 +732,8 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                                       : Translations::Tr("Edit tags");
   adw_dialog_set_title(dialog, dialog_title.c_str());
   DialogGeometry::Apply(dialog, EditTagDialogSettings::kSettingsGroup, EditTagDialogSettings::kGeometry,
-                        EditTagDialogSettings::kDefaultWidth, EditTagDialogSettings::kDefaultHeight);
+                        EditTagDialogSettings::kDefaultWidth, EditTagDialogSettings::kDefaultHeight,
+                        !EditTagShow::ShouldShrinkOnPresent());
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   g_object_set_data_full(G_OBJECT(dialog), "state", state, [](gpointer p) { delete static_cast<State *>(p); });
 

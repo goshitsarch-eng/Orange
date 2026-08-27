@@ -13,6 +13,7 @@
 #include "dialogs/edittagloading.h"
 #include "dialogs/edittagsave.h"
 #include "dialogs/edittagtabs.h"
+#include "dialogs/edittagshow.h"
 #include "tagreader/tagreaderresult.h"
 #include "utilities/fileutils.h"
 
@@ -129,6 +130,13 @@ TEST(DialogSongNav, PreviousNextAndDelta) {
   EXPECT_EQ(-1, DialogSongNav::Delta(DialogSongNav::kPageUp, 0));
   EXPECT_EQ(1, DialogSongNav::Delta(DialogSongNav::kPageDown, 0));
   EXPECT_EQ(0, DialogSongNav::Delta(DialogSongNav::kLeft, 0));
+}
+
+TEST(EditTagShow, ShrinksHeightOnPresentLikeQt) {
+  EXPECT_TRUE(EditTagShow::ShouldShrinkOnPresent());
+  EXPECT_FALSE(EditTagShow::ShouldShrinkOnPresent(true));
+  EXPECT_FALSE(EditTagShow::ShouldApplyDefaultHeight(false));
+  EXPECT_TRUE(EditTagShow::ShouldApplyDefaultHeight(true));
 }
 
 TEST(EditTagTabs, ClampNameAndSettingsKeys) {

@@ -3471,6 +3471,9 @@ void MainWindow::ApplyAppearance() {
   if (sidebar_tabs_) {
     sidebar_tabs_->ReloadIconSizes();
   }
+  if (playlist_container_) {
+    playlist_container_->ApplyLook();
+  }
   if (play_button_) {
     const int size = appearance.icon_sizes().play_controls;
     for (GtkWidget *child = gtk_widget_get_first_child(gtk_widget_get_parent(play_button_)); child; child = gtk_widget_get_next_sibling(child)) {

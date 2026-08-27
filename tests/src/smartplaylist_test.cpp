@@ -638,6 +638,11 @@ TEST(SmartPlaylistTermRow, PlaceholderAndRemoveMatchQt) {
   EXPECT_EQ(2, SmartPlaylistTermRow::InitialActiveTerms(true, 2));
   EXPECT_EQ(0, SmartPlaylistTermRow::InitialActiveTerms(true, 0));
   EXPECT_TRUE(SmartPlaylistTermRow::KeepsPlaceholder());
+  EXPECT_TRUE(SmartPlaylistSearchTermWidgetOverlay::ShouldGrabOnShow(false));
+  EXPECT_FALSE(SmartPlaylistSearchTermWidgetOverlay::ShouldGrabOnShow(true));
+  EXPECT_TRUE(SmartPlaylistSearchTermWidgetOverlay::IsActivateKey(0x0020));
+  EXPECT_TRUE(SmartPlaylistSearchTermWidgetOverlay::IsActivateKey(0xff0d));
+  EXPECT_FALSE(SmartPlaylistSearchTermWidgetOverlay::IsActivateKey(0xff1b));
 }
 
 TEST(SmartPlaylistTermValue, EditorsAndDateTimeMatchQt) {
