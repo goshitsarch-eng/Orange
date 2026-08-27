@@ -122,6 +122,7 @@
 #include "widgets/fancytabmode.h"
 #include "widgets/playingcoveractivate.h"
 #include "widgets/playingwidget.h"
+#include "core/playbackcontrolsstate.h"
 #include "widgets/playingwidgettab.h"
 #include "widgets/stretchheaderview.h"
 
@@ -307,6 +308,15 @@ TEST(OrganizeFormat, OptionalBlocks) {
   without.set_title("Title");
   EXPECT_EQ("Artist/Album/Title", format.GetFilenameForSong(without));
   EXPECT_FALSE(OrganizeFormat::TokenHasValue("%disc", without));
+}
+
+TEST(PlaybackControlsState, StopDisabledWhenStoppedLikeQt) {
+  EXPECT_TRUE(PlaybackControlsState::PlaybackActive(true, false));
+  EXPECT_TRUE(PlaybackControlsState::PlaybackActive(false, true));
+  EXPECT_FALSE(PlaybackControlsState::PlaybackActive(false, false));
+  EXPECT_TRUE(PlaybackControlsState::StopEnabled(true));
+  EXPECT_FALSE(PlaybackControlsState::StopEnabled(false));
+  EXPECT_TRUE(PlaybackControlsState::PlayPauseEnabled(false, true));
 }
 
 TEST(PlayingWidgetTab, HidesOnContextAlbumLikeQt) {

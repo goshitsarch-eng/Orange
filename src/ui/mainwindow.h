@@ -267,6 +267,7 @@ class MainWindow : public PlatformInterface {
   GtkWidget *streaming_service_drop_ = nullptr;
   std::vector<std::unique_ptr<StreamingTabsView>> streaming_views_;
   GtkWidget *play_button_ = nullptr;
+  GtkWidget *stop_button_ = nullptr;
   GtkWidget *love_button_ = nullptr;
   GtkWidget *scrobble_button_ = nullptr;
   bool loved_current_track_ = false;

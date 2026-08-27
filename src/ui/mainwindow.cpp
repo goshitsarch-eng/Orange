@@ -2015,7 +2015,8 @@ void MainWindow::BuildPlayerBar() {
   play_button_ = gtk_button_new_from_icon_name("media-playback-start-symbolic");
   gtk_widget_add_css_class(play_button_, "suggested-action");
   gtk_widget_add_css_class(play_button_, "circular");
-  GtkWidget *stop = adw_split_button_new();
+  stop_button_ = adw_split_button_new();
+  GtkWidget *stop = stop_button_;
   adw_split_button_set_icon_name(ADW_SPLIT_BUTTON(stop), "media-playback-stop-symbolic");
   gtk_widget_set_tooltip_text(stop, Translations::CStr(MainWindowMenu::Stop()));
   GMenu *stop_menu = g_menu_new();
@@ -2096,7 +2097,7 @@ void MainWindow::BuildPlayerBar() {
   g_signal_connect(scrobble_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->ScrobbleCurrent(); }),
                    this);
   g_signal_connect(love_button_, "clicked", G_CALLBACK(OnLove), this);
-  UpdateScrobblerButtons();
+  UpdatePlaybackButtons();
   g_object_set_data(G_OBJECT(play_button_), "player-box", box);
   PlacePlayingWidget();
 }
@@ -2783,14 +2784,23 @@ void MainWindow::UpdatePlaybackButtons() {
   const bool playing = app_->player()->GetState() == GstEngine::State::Playing;
   const bool paused = app_->player()->GetState() == GstEngine::State::Paused;
   const bool play_pause_enabled = PlaybackControlsState::PlayPauseEnabled(playing, PlayerItemOptions::PauseDisabled(app_->player()->current_song()));
+  const bool stop_enabled = PlaybackControlsState::StopEnabled(PlaybackControlsState::PlaybackActive(playing, paused));
   if (play_button_) {
     gtk_button_set_icon_name(GTK_BUTTON(play_button_), playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic");
     gtk_widget_set_sensitive(play_button_, play_pause_enabled);
   }
+  if (stop_button_) {
+    gtk_widget_set_sensitive(stop_button_, stop_enabled);
+  }
   if (window_) {
-    if (GAction *action = g_action_map_lookup_action(G_ACTION_MAP(window_), "play-pause")) {
-      g_simple_action_set_enabled(G_SIMPLE_ACTION(action), play_pause_enabled);
-    }
+    auto set_action = [this](const char *name, bool enabled) {
+      if (GAction *action = g_action_map_lookup_action(G_ACTION_MAP(window_), name)) {
+        g_simple_action_set_enabled(G_SIMPLE_ACTION(action), enabled);
+      }
+    };
+    set_action("play-pause", play_pause_enabled);
+    set_action("stop", stop_enabled);
+    set_action("stop-after", stop_enabled);
   }
   if (app_ && app_->tray()) {
     if (playing) {
@@ -2814,6 +2824,7 @@ void MainWindow::UpdatePlaybackButtons() {
     smtc_->EngineStateChanged(app_->player()->GetState());
   }
 #endif
+  UpdateScrobblerButtons();
 }
 
 void MainWindow::OpenSettings(const char *page_name) {
@@ -4618,7 +4629,10 @@ void MainWindow::UpdateScrobblerButtons() {
   const bool show_love = settings.BoolValue(ScrobblerSettings::kLoveButton, ScrobblerSettings::kDefaultLoveButton);
   const bool scrobbler_on = app_ && app_->scrobbler() && app_->scrobbler()->enabled();
   const Song song = app_ && app_->player() ? app_->player()->current_song() : Song();
-  const bool love_enabled = ScrobblerLoveState::CanLove(scrobbler_on, song) && !loved_current_track_;
+  const bool playing = app_ && app_->player() && app_->player()->GetState() == GstEngine::State::Playing;
+  const bool paused = app_ && app_->player() && app_->player()->GetState() == GstEngine::State::Paused;
+  const bool love_enabled =
+      ScrobblerLoveState::CanLove(scrobbler_on, song, PlaybackControlsState::PlaybackActive(playing, paused)) && !loved_current_track_;
   if (scrobble_button_) {
     gtk_widget_set_visible(scrobble_button_, show_scrobble);
     gtk_button_set_icon_name(GTK_BUTTON(scrobble_button_), ScrobbleToggleIcon::Name(scrobbler_on));
@@ -4626,6 +4640,11 @@ void MainWindow::UpdateScrobblerButtons() {
   if (love_button_) {
     gtk_widget_set_visible(love_button_, show_love);
     gtk_widget_set_sensitive(love_button_, love_enabled);
+  }
+  if (window_) {
+    if (GAction *action = g_action_map_lookup_action(G_ACTION_MAP(window_), "love")) {
+      g_simple_action_set_enabled(G_SIMPLE_ACTION(action), love_enabled);
+    }
   }
   if (app_ && app_->tray()) {
     app_->tray()->SetLoveVisible(show_love);
