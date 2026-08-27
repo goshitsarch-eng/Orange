@@ -1063,6 +1063,7 @@ TEST(EqualizerPersist, SelectedPresetAndStereoBalancer) {
   eq.set_stereo_balancer_enabled(false);
   EXPECT_FLOAT_EQ(0.0f, eq.EffectiveBalanceFraction());
   eq.set_enabled(false);
+  eq.LoadPreset("Custom");
   eq.set_preamp(8);
   EXPECT_EQ("Custom", eq.selected_preset());
   EXPECT_EQ(0, eq.EffectivePreamp());
