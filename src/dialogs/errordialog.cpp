@@ -1,114 +1,69 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2017-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "dialogs/errordialog.h"
 
-#include "config.h"
+#include "dialogs/errordialoglabels.h"
+#include "dialogs/errordialogqueue.h"
+#include "translations/translations.h"
 
-#include <utility>
+#include <adwaita.h>
 
-#include <QWidget>
-#include <QApplication>
-#include <QString>
-#include <QIcon>
-#include <QPalette>
-#include <QPixmap>
-#include <QStyle>
-#include <QLabel>
-#include <QTextEdit>
-#include <QCloseEvent>
-
-#include "utilities/screenutils.h"
-
-#include "errordialog.h"
-#include "ui_errordialog.h"
-
-using namespace Qt::Literals::StringLiterals;
-
-ErrorDialog::ErrorDialog(QWidget *parent)
-    : QDialog(parent),
-      ui_(new Ui_ErrorDialog) {
-
-  ui_->setupUi(this);
-
-  QIcon warning_icon(style()->standardIcon(QStyle::SP_MessageBoxWarning));
-  QPixmap warning_pixmap(warning_icon.pixmap(48));
-
-  QPalette messages_palette(ui_->messages->palette());
-  messages_palette.setColor(QPalette::Base, messages_palette.color(QPalette::Window));
-
-  ui_->messages->setPalette(messages_palette);
-  ui_->icon->setPixmap(warning_pixmap);
-
+void ErrorDialog::Show(GtkWindow *parent, const std::string &message) {
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(ErrorDialogLabels::Title()), message.c_str()));
+  adw_alert_dialog_add_response(dialog, "ok", Translations::CStr("OK"));
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
 }
 
-ErrorDialog::~ErrorDialog() {
-  delete ui_;
-}
+QueuedErrorDialog::QueuedErrorDialog(GtkWindow *parent) : parent_(parent) {}
 
-void ErrorDialog::ShowDialog() {
-
-  QWidget *active_window = QApplication::activeWindow();
-  if (active_window && screen() && active_window->screen() && screen() != active_window->screen()) {
-    Utilities::CenterWidgetOnScreen(active_window->screen(), this);
+QueuedErrorDialog::~QueuedErrorDialog() {
+  if (dialog_) {
+    g_signal_handlers_disconnect_by_data(dialog_, this);
+    dialog_ = nullptr;
   }
-  setWindowState((windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
-  show();
-  raise();
-  activateWindow();
-
 }
 
-void ErrorDialog::ShowMessage(const QString &message) {
-
-  if (message.isEmpty()) return;
-
-  current_messages_ << message;
-  UpdateContent();
-
-  if (QApplication::activeWindow()) {
-    ShowDialog();
+void QueuedErrorDialog::ShowMessage(const std::string &message) {
+  if (!ErrorDialogQueue::Enqueue(&messages_, message)) {
+    return;
   }
-  else if (!isVisible()) {
-    showMinimized();
+  EnsureDialog();
+  RefreshBody();
+  if (ErrorDialogQueue::ShouldShowNow(parent_ && gtk_widget_get_mapped(GTK_WIDGET(parent_)))) {
+    Present();
   }
-
 }
 
-void ErrorDialog::closeEvent(QCloseEvent *e) {
-
-  current_messages_.clear();
-  UpdateContent();
-
-  QDialog::closeEvent(e);
-
+void QueuedErrorDialog::Present() {
+  if (messages_.empty() || !parent_) {
+    return;
+  }
+  EnsureDialog();
+  RefreshBody();
+  adw_dialog_present(ADW_DIALOG(dialog_), GTK_WIDGET(parent_));
+  visible_ = true;
+  active_ = true;
 }
 
-void ErrorDialog::UpdateContent() {
-
-  QString html;
-  for (const QString &message : std::as_const(current_messages_)) {
-    if (!html.isEmpty()) {
-      html += "<hr/>"_L1;
-    }
-    html += message.toHtmlEscaped();
+void QueuedErrorDialog::EnsureDialog() {
+  if (dialog_) {
+    return;
   }
-  ui_->messages->setHtml(html);
+  dialog_ = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(ErrorDialogLabels::Title()), ""));
+  adw_alert_dialog_add_response(dialog_, "ok", Translations::CStr("OK"));
+  g_signal_connect(dialog_, "closed", G_CALLBACK((+[](AdwDialog *, gpointer data) {
+                     static_cast<QueuedErrorDialog *>(data)->OnClosed();
+                   })),
+                   this);
+}
 
+void QueuedErrorDialog::RefreshBody() {
+  if (dialog_) {
+    adw_alert_dialog_set_body(dialog_, ErrorDialogQueue::JoinPlain(messages_).c_str());
+  }
+}
+
+void QueuedErrorDialog::OnClosed() {
+  ErrorDialogQueue::Clear(&messages_);
+  dialog_ = nullptr;
+  visible_ = false;
+  active_ = false;
 }

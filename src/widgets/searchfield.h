@@ -1,75 +1,32 @@
-/*
-Copyright (C) 2011 by Mike McQuaid
-Copyright (C) 2018-2024 by Jonas Kvinge <jonas@jkvinge.net>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
-
 #ifndef SEARCHFIELD_H
 #define SEARCHFIELD_H
 
-#include <QWidget>
-#include <QPointer>
-#include <QMenu>
+#include <functional>
+#include <string>
 
-class QResizeEvent;
-class SearchFieldPrivate;
+#include <gtk/gtk.h>
 
-class SearchField : public QWidget {
-  Q_OBJECT
-
-  Q_PROPERTY(QString text READ text WRITE setText NOTIFY textChanged USER true)
-  Q_PROPERTY(QString placeholderText READ placeholderText WRITE setPlaceholderText NOTIFY placeholderTextChanged)
-
+class SearchField {
  public:
-  explicit SearchField(QWidget *parent);
+  explicit SearchField();
+  ~SearchField();
 
-  void setIconSize(const int iconsize);
+  SearchField(const SearchField &) = delete;
+  SearchField &operator=(const SearchField &) = delete;
 
-  QString text() const;
-  QString placeholderText() const;
+  GtkWidget *widget() const { return entry_; }
 
-#ifndef Q_OS_MACOS
-  bool hasFocus() const;
-#endif
-  void setFocus(Qt::FocusReason reason);
+  std::string text() const;
+  void SetText(const std::string &text);
+  void Clear();
 
- public Q_SLOTS:
-  void setText(const QString &new_text);
-  void setPlaceholderText(const QString &text);
-  void clear();
-  void selectAll();
-  void setFocus();
-
- Q_SIGNALS:
-  void textChanged(const QString &text);
-  void placeholderTextChanged(const QString &text);
-  void editingFinished();
-  void returnPressed();
-
- protected:
-  void resizeEvent(QResizeEvent *e) override;
-  bool eventFilter(QObject *o, QEvent *e) override;
+  void SetChangedCallback(std::function<void(const std::string &)> callback) { changed_cb_ = std::move(callback); }
+  void SetActivatedCallback(std::function<void(const std::string &)> callback) { activated_cb_ = std::move(callback); }
 
  private:
-  friend class SearchFieldPrivate;
-  SearchFieldPrivate *pimpl;
+  GtkWidget *entry_ = nullptr;
+  std::function<void(const std::string &)> changed_cb_;
+  std::function<void(const std::string &)> activated_cb_;
 };
 
 #endif  // SEARCHFIELD_H

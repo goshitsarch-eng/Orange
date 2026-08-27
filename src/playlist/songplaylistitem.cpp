@@ -1,45 +1,13 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "playlist/songplaylistitem.h"
 
-#include "config.h"
-
-#include <QUuid>
-#include <QUrl>
-
-#include "core/song.h"
-#include "core/sqlrow.h"
-#include "playlistitem.h"
-#include "songplaylistitem.h"
-
-SongPlaylistItem::SongPlaylistItem(const Song::Source source, const QUuid &uuid) : PlaylistItem(source, uuid) {}
-SongPlaylistItem::SongPlaylistItem(const Song &song, const bool signal) : PlaylistItem(song.source(), QUuid(), signal), song_(song) {}
-
-bool SongPlaylistItem::InitFromQuery(const SqlRow &query) {
-  song_.InitFromQuery(query, false, static_cast<int>(Song::kRowIdColumns.count()));
-  return true;
+SongPlaylistItem::SongPlaylistItem(Song::Source source, const std::string &uuid) : PlaylistItem(source, uuid) {
+  song_.set_source(source);
 }
 
-void SongPlaylistItem::SetArtManual(const QUrl &cover_url) {
-
-  song_.set_art_manual(cover_url);
-  if (HasStreamMetadata()) stream_song_.set_art_manual(cover_url);
-
+SongPlaylistItem::SongPlaylistItem(const Song &song) : PlaylistItem(song.source() == Song::Source::Unknown ? Song::Source::LocalFile : song.source()), song_(song) {
+  if (song_.source() == Song::Source::Unknown) {
+    song_.set_source(Song::Source::LocalFile);
+  }
 }
+
+void SongPlaylistItem::SetArtManual(const std::string &cover_url) { song_.set_art_manual(cover_url); }

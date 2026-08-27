@@ -1,81 +1,87 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_STREAMINGTABSVIEW_H
+#define STRAWBERRY_STREAMINGTABSVIEW_H
 
-#ifndef STREAMINGTABSVIEW_H
-#define STREAMINGTABSVIEW_H
+#include "streaming/streamingcollectionactions.h"
+#include "streaming/streamingcollectionstore.h"
+#include "streaming/streamingcollectionviewcontainer.h"
+#include "streaming/streamingsearchview.h"
+#include "streaming/streamingservices.h"
 
-#include "config.h"
+#include <gtk/gtk.h>
 
-#include <QObject>
-#include <QWidget>
-#include <QMap>
-#include <QString>
+#include <functional>
+#include <memory>
+#include <string>
 
-#include "includes/shared_ptr.h"
-#include "streamingcollectionviewcontainer.h"
-#include "core/song.h"
+class Database;
 
-#include "ui_streamingtabsview.h"
-
-class QContextMenuEvent;
-
-class StreamingService;
-class StreamingCollectionView;
-class StreamingSearchView;
-class AlbumCoverLoader;
-
-class StreamingTabsView : public QWidget {
-  Q_OBJECT
-
+class StreamingTabsView {
  public:
-  explicit StreamingTabsView(const SharedPtr<StreamingService> service, const SharedPtr<AlbumCoverLoader> albumcover_loader, const QString &settings_group, QWidget *parent = nullptr);
-  ~StreamingTabsView() override;
+  using ActivateCallback = std::function<void(const Song &)>;
+  using EnqueueCallback = std::function<void(const SongList &)>;
+  using MenuCallback = std::function<void(const SongList &, StreamingCollectionActions::MenuContext)>;
+  using ConfigureCallback = std::function<void()>;
 
+  explicit StreamingTabsView(StreamingService *service, Database *database = nullptr);
+  ~StreamingTabsView();
+
+  GtkWidget *widget() const { return widget_; }
+  StreamingService *service() const { return service_; }
+  void SetActivateCallback(ActivateCallback callback);
+  void SetEnqueueCallback(EnqueueCallback callback);
+  void SetMenuCallback(MenuCallback callback);
+  void SetConfigureCallback(ConfigureCallback callback);
+  void SetFilterMenuCallback(CollectionFilterWidget::MenuActionCallback callback);
+  void SearchForThis(const std::string &query);
+  std::string SelectedSearchQuery() const;
   void ReloadSettings();
-
-  StreamingCollectionView *artists_collection_view() const { return ui_->artists_collection->view(); }
-  StreamingCollectionView *albums_collection_view() const { return ui_->albums_collection->view(); }
-  StreamingCollectionView *songs_collection_view() const { return ui_->songs_collection->view(); }
-  StreamingSearchView *search_view() const { return ui_->search_view; }
-
-  bool SearchFieldHasFocus() const;
-  void FocusSearchField();
-
- private Q_SLOTS:
-  void Configure();
   void GetArtists();
   void GetAlbums();
   void GetSongs();
+  void GetFavorites();
+  void AddToCollection(StreamingCollectionStore::List list, const SongList &songs);
+  void RemoveFromCollection(StreamingCollectionStore::List list, const SongList &songs);
+  bool CurrentStoreList(StreamingCollectionStore::List *list) const;
+  CollectionFilterWidget *CurrentFilterWidget() const;
   void AbortGetArtists();
   void AbortGetAlbums();
   void AbortGetSongs();
-  void ArtistsFinished(const SongMap &songs, const QString &error);
-  void AlbumsFinished(const SongMap &songs, const QString &error);
-  void SongsFinished(const SongMap &songs, const QString &error);
-
- Q_SIGNALS:
-  void OpenSettingsDialog(const Song::Source source);
+  void AbortGetFavorites();
+  StreamingCollectionView *artists_collection_view() const { return artists_->view(); }
+  StreamingCollectionView *albums_collection_view() const { return albums_->view(); }
+  StreamingCollectionView *songs_collection_view() const { return songs_->view(); }
+  StreamingSearchView *search_view() const { return search_.get(); }
+  bool SearchFieldHasFocus() const;
+  void FocusSearchField();
 
  private:
-  const SharedPtr<StreamingService> service_;
-  QString settings_group_;
-  Ui_StreamingTabsView *ui_;
+  void HandleActivate(StreamingCollectionView *view, const Song &song);
+  void BrowseArtist(StreamingCollectionView *view, const Song &artist);
+  void BrowseAlbum(StreamingCollectionView *view, const Song &album);
+  void ShowCached(StreamingCollectionView *view, StreamingCollectionStore::List list);
+  void PersistList(StreamingCollectionStore::List list, const SongList &songs);
+  void BuildFavoriteTypes();
+  void SetFavoriteType(StreamingService::FavoriteType type, bool reload);
+  void PersistFavoriteType();
+  void LoadFavoriteType();
+
+  void ConnectBrowseProgress();
+
+  StreamingService *service_ = nullptr;
+  Database *database_ = nullptr;
+  ActivateCallback activate_;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
+  GtkWidget *widget_ = nullptr;
+  GtkWidget *stack_ = nullptr;
+  std::unique_ptr<StreamingCollectionViewContainer> artists_;
+  std::unique_ptr<StreamingCollectionViewContainer> albums_;
+  std::unique_ptr<StreamingCollectionViewContainer> songs_;
+  std::unique_ptr<StreamingCollectionViewContainer> favorites_;
+  std::unique_ptr<StreamingSearchView> search_;
+  StreamingService::FavoriteType favorite_type_ = StreamingService::FavoriteType::Songs;
+  GtkWidget *fav_artists_ = nullptr;
+  GtkWidget *fav_albums_ = nullptr;
+  GtkWidget *fav_songs_ = nullptr;
 };
 
-#endif  // STREAMINGTABSVIEW_H
+#endif

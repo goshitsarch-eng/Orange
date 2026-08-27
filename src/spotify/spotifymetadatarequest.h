@@ -1,58 +1,24 @@
-/*
- * Strawberry Music Player
- * Copyright 2025-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_SPOTIFYMETADATAREQUEST_H
+#define STRAWBERRY_SPOTIFYMETADATAREQUEST_H
 
-#ifndef SPOTIFYMETADATAREQUEST_H
-#define SPOTIFYMETADATAREQUEST_H
-
-#include "config.h"
-
-#include <QObject>
-#include <QString>
-#include <QMap>
-
-#include "includes/shared_ptr.h"
+#include "core/network.h"
 #include "core/song.h"
-#include "spotifybaserequest.h"
 
-class QNetworkReply;
-class NetworkAccessManager;
-class SpotifyService;
+#include <functional>
+#include <map>
+#include <string>
 
-class SpotifyMetadataRequest : public SpotifyBaseRequest {
-  Q_OBJECT
+namespace SpotifyMetadataRequest {
 
- public:
-  explicit SpotifyMetadataRequest(SpotifyService *service, const SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
+using Callback = std::function<void(const Song &, const std::string &error)>;
 
-  void FetchTrackMetadata(const QString &track_id);
+std::string TrackUrl(const std::string &api_url, const std::string &track_id);
+std::string ArtistUrl(const std::string &api_url, const std::string &artist_id);
+Song ParseTrack(const std::string &json);
+std::string ParseArtistGenre(const std::string &json);
 
- Q_SIGNALS:
-  void MetadataReceived(QString track_id, Song song);
-  void MetadataFailure(QString track_id, QString error);
+void Get(NetworkAccessManager *network, const std::string &url, const std::map<std::string, std::string> &headers, Callback callback);
 
- private Q_SLOTS:
-  void TrackMetadataReceived(QNetworkReply *reply, const QString &track_id);
-  void ArtistMetadataReceived(QNetworkReply *reply, const QString &track_id);
+}  // namespace SpotifyMetadataRequest
 
- private:
-  void Error(const QString &error_message, const QVariant &debug_output = QVariant()) override;
-  QMap<QString, Song> pending_songs_;  // track_id -> partial Song (waiting for artist genre)
-};
-
-#endif  // SPOTIFYMETADATAREQUEST_H
+#endif

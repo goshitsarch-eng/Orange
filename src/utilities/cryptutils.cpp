@@ -1,65 +1,40 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "utilities/cryptutils.h"
 
-#include <QByteArray>
-#include <QString>
-#include <QCryptographicHash>
+#include <glib.h>
 
-#include "cryptutils.h"
+#include <cstdio>
 
-namespace Utilities {
+namespace CryptUtils {
 
-QByteArray Hmac(const QByteArray &key, const QByteArray &data, const QCryptographicHash::Algorithm method) {
-
-  constexpr int block_size = 64;
-  Q_ASSERT(key.length() <= block_size);
-
-  QByteArray inner_padding(block_size, static_cast<char>(0x36));
-  QByteArray outer_padding(block_size, static_cast<char>(0x5c));
-
-  for (int i = 0; i < key.length(); ++i) {
-    inner_padding[i] = static_cast<char>(inner_padding[i] ^ key[i]);
-    outer_padding[i] = static_cast<char>(outer_padding[i] ^ key[i]);
+std::string HexEncode(const std::string &data) {
+  std::string out;
+  out.reserve(data.size() * 2);
+  for (unsigned char ch : data) {
+    char buf[3];
+    std::snprintf(buf, sizeof(buf), "%02x", ch);
+    out += buf;
   }
-
-  QByteArray part;
-  part.append(inner_padding);
-  part.append(data);
-
-  QByteArray total;
-  total.append(outer_padding);
-  total.append(QCryptographicHash::hash(part, method));
-
-  return QCryptographicHash::hash(total, method);
-
+  return out;
 }
 
-QByteArray HmacSha256(const QByteArray &key, const QByteArray &data) {
-  return Hmac(key, data, QCryptographicHash::Sha256);
+std::string HmacSha1(const std::string &key, const std::string &data) {
+  GHmac *hmac = g_hmac_new(G_CHECKSUM_SHA1, reinterpret_cast<const guchar *>(key.data()), key.size());
+  g_hmac_update(hmac, reinterpret_cast<const guchar *>(data.data()), data.size());
+  gsize len = 20;
+  guint8 digest[20];
+  g_hmac_get_digest(hmac, digest, &len);
+  g_hmac_unref(hmac);
+  return std::string(reinterpret_cast<char *>(digest), len);
 }
 
-QByteArray HmacMd5(const QByteArray &key, const QByteArray &data) {
-  return Hmac(key, data, QCryptographicHash::Md5);
+std::string HmacSha256(const std::string &key, const std::string &data) {
+  GHmac *hmac = g_hmac_new(G_CHECKSUM_SHA256, reinterpret_cast<const guchar *>(key.data()), key.size());
+  g_hmac_update(hmac, reinterpret_cast<const guchar *>(data.data()), data.size());
+  gsize len = 32;
+  guint8 digest[32];
+  g_hmac_get_digest(hmac, digest, &len);
+  g_hmac_unref(hmac);
+  return std::string(reinterpret_cast<char *>(digest), len);
 }
 
-QByteArray HmacSha1(const QByteArray &key, const QByteArray &data) {
-  return Hmac(key, data, QCryptographicHash::Sha1);
-}
-
-}  // namespace Utilities
+}  // namespace CryptUtils

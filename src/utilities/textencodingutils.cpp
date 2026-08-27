@@ -1,55 +1,19 @@
-/*
- * Strawberry Music Player
- * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "utilities/textencodingutils.h"
 
-#include <unicode/ucsdet.h>
+#include <glib.h>
 
-#include <QByteArray>
-#include <QString>
-#include <QScopeGuard>
+bool TextEncodingUtils::IsUtf8(const std::string &value) { return g_utf8_validate(value.c_str(), static_cast<gssize>(value.size()), nullptr); }
 
-#include "textencodingutils.h"
-
-namespace Utilities {
-
-QByteArray TextEncodingFromData(const QByteArray &data) {
-
-  UErrorCode error_code = U_ZERO_ERROR;
-  UCharsetDetector *csd = ucsdet_open(&error_code);
-  if (error_code != U_ZERO_ERROR) {
-    return QByteArray();
+std::string TextEncodingUtils::ToUtf8(const std::string &value, const std::string &from_encoding) {
+  if (from_encoding.empty() || IsUtf8(value)) {
+    return value;
   }
-  const QScopeGuard scopeguard_csd = qScopeGuard([csd]() { ucsdet_close(csd); });
-  ucsdet_setText(csd, data.constData(), static_cast<int>(data.length()), &error_code);
-  if (error_code != U_ZERO_ERROR) {
-    return QByteArray();
+  gsize bytes = 0;
+  gchar *converted = g_convert(value.data(), static_cast<gssize>(value.size()), "UTF-8", from_encoding.c_str(), nullptr, &bytes, nullptr);
+  if (!converted) {
+    return value;
   }
-  const UCharsetMatch *ucm = ucsdet_detect(csd, &error_code);
-  if (error_code != U_ZERO_ERROR) {
-    return QByteArray();
-  }
-  const char *encoding_name = ucsdet_getName(ucm, &error_code);
-  if (error_code != U_ZERO_ERROR) {
-    return QByteArray();
-  }
-
-  return encoding_name;
-
+  std::string result(converted, bytes);
+  g_free(converted);
+  return result;
 }
-
-}  // namespace Utilities

@@ -1,35 +1,47 @@
-/*
- * Strawberry Music Player
- * Copyright 2024-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_SETTINGS_H
+#define STRAWBERRY_SETTINGS_H
 
-#ifndef SETTINGS_H
-#define SETTINGS_H
+#include <glib.h>
+#include <string>
+#include <vector>
 
-#include <QSettings>
-#include <QString>
-
-class Settings : public QSettings {
-  Q_OBJECT
-
+class Settings {
  public:
-  explicit Settings(QObject *parent = nullptr);
-  explicit Settings(const QSettings::Scope scope, QObject *parent = nullptr);
-  explicit Settings(const QString &filename, const Format format, QObject *parent = nullptr);
+  Settings();
+  ~Settings();
+
+  Settings(const Settings &) = delete;
+  Settings &operator=(const Settings &) = delete;
+
+  void BeginGroup(const std::string &group);
+  void EndGroup();
+
+  bool Contains(const std::string &key) const;
+
+  std::string Value(const std::string &key, const std::string &fallback = {}) const;
+  int IntValue(const std::string &key, int fallback = 0) const;
+  gint64 Int64Value(const std::string &key, gint64 fallback = 0) const;
+  double DoubleValue(const std::string &key, double fallback = 0.0) const;
+  bool BoolValue(const std::string &key, bool fallback = false) const;
+
+  void SetValue(const std::string &key, const std::string &value);
+  void SetIntValue(const std::string &key, int value);
+  void SetInt64Value(const std::string &key, gint64 value);
+  void SetDoubleValue(const std::string &key, double value);
+  void SetBoolValue(const std::string &key, bool value);
+
+  void Remove(const std::string &key);
+  std::vector<std::string> Keys() const;
+  bool Sync();
+
+  static Settings &Instance();
+
+ private:
+  std::string FullKey(const std::string &key) const;
+
+  GKeyFile *key_file_;
+  std::string path_;
+  std::string group_;
 };
 
-#endif  // SETTINGS_H
+#endif

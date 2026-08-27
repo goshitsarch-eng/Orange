@@ -1,48 +1,26 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2012, David Sansome <me@davidsansome.com>
- * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_FILTERTREECOLUMNTERM_H
+#define STRAWBERRY_FILTERTREECOLUMNTERM_H
 
-#ifndef FILTERTREECOLUMNTERM_H
-#define FILTERTREECOLUMNTERM_H
+#include "filterparser/filtercolumn.h"
+#include "filterparser/filterparsersearchtermcomparator.h"
+#include "filterparser/filtertree.h"
 
-#include <QString>
-#include <QScopedPointer>
-
-#include "filtertree.h"
-#include "filtercolumn.h"
-#include "core/song.h"
-
-class FilterParserSearchTermComparator;
+#include <memory>
+#include <string>
 
 class FilterTreeColumnTerm : public FilterTree {
  public:
-  explicit FilterTreeColumnTerm(const FilterColumn filter_column, FilterParserSearchTermComparator *comparator);
-
+  FilterTreeColumnTerm(FilterColumn column, std::unique_ptr<FilterParserSearchTermComparator> comparator, std::string sql = "1=1",
+                       bool also_albumartist = false);
   FilterType type() const override { return FilterType::Column; }
   bool accept(const Song &song) const override;
+  std::string ToSql() const override { return sql_; }
 
  private:
-  const FilterColumn filter_column_;
-  QScopedPointer<FilterParserSearchTermComparator> cmp_;
-
-  Q_DISABLE_COPY(FilterTreeColumnTerm)
+  FilterColumn column_ = FilterColumn::Unknown;
+  std::unique_ptr<FilterParserSearchTermComparator> cmp_;
+  std::string sql_;
+  bool also_albumartist_ = false;
 };
 
-#endif  // FILTERTREECOLUMNTERM_H
+#endif

@@ -1,100 +1,51 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_QUEUE_H
+#define STRAWBERRY_QUEUE_H
 
-#ifndef QUEUE_H
-#define QUEUE_H
+#include "core/signal.h"
+#include "core/song.h"
+#include "queue/queuerows.h"
 
-#include "config.h"
+#include <vector>
 
-#include <QObject>
-#include <QAbstractItemModel>
-#include <QAbstractProxyModel>
-#include <QList>
-#include <QVariant>
-#include <QString>
-#include <QStringList>
-
-class QMimeData;
-class Playlist;
-
-class Queue : public QAbstractProxyModel {
-  Q_OBJECT
-
+class Queue {
  public:
-  explicit Queue(Playlist *playlist, QObject *parent = nullptr);
-
-  // Query the queue
-  bool is_empty() const;
-  int PositionOf(const QModelIndex &source_index) const;
-  bool ContainsSourceRow(const int source_row) const;
-  int PeekNext() const;
-  int ItemCount() const;
-  quint64 GetTotalLength() const;
-
-  // Modify the queue
-  int TakeNext();
-  void ToggleTracks(const QModelIndexList &source_indexes);
-  void InsertFirst(const QModelIndexList &source_indexes);
+  void Append(const Song &song);
+  void Append(const Song &song, int playlist_id, int playlist_row);
+  void InsertNext(const Song &song);
+  void InsertNext(const Song &song, int playlist_id, int playlist_row);
+  void Insert(int index, const Song &song);
+  void Insert(int index, const Song &song, int playlist_id, int playlist_row);
+  void Insert(int index, const SongList &songs);
+  void Insert(int index, const SongList &songs, const std::vector<QueueRows::Source> &sources);
+  Song TakeNext();
+  QueueRows::Source PeekSource() const;
+  QueueRows::Source last_taken_source() const { return last_taken_; }
+  void Remove(int index);
+  void RemoveRows(const std::vector<int> &indexes);
+  void RemoveSong(const Song &song);
+  void TogglePlaylistRow(int playlist_id, int playlist_row, const Song &song);
+  bool Contains(const Song &song) const;
+  bool ContainsPlaylistRow(int playlist_id, int playlist_row) const;
+  int PositionForPlaylistRow(int playlist_id, int playlist_row) const;
+  void RemapAfterPlaylistRemove(int playlist_id, const std::vector<int> &removed);
+  void RemapAfterPlaylistInsert(int playlist_id, int at, int count);
+  void RemapAfterPlaylistMove(int playlist_id, int count, const std::vector<int> &from, int to);
   void Clear();
-  void Move(const QList<int> &proxy_rows, int pos);
-  void MoveUp(const int row);
-  void MoveDown(const int row);
-  void Remove(QList<int> &proxy_rows);
+  void Move(int from, int to);
+  void MoveRows(const std::vector<int> &from, int to);
+  const SongList &songs() const { return songs_; }
+  const std::vector<QueueRows::Source> &sources() const { return sources_; }
+  bool empty() const { return songs_.empty(); }
+  int size() const { return static_cast<int>(songs_.size()); }
 
-  // QAbstractProxyModel
-  void setSourceModel(QAbstractItemModel *source_model) override;
-  QModelIndex mapFromSource(const QModelIndex &source_index) const override;
-  QModelIndex mapToSource(const QModelIndex &proxy_index) const override;
-
-  // QAbstractItemModel
-  QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const override;
-  QModelIndex parent(const QModelIndex &child) const override;
-  int rowCount(const QModelIndex &parent = QModelIndex()) const override;
-  int columnCount(const QModelIndex &parent = QModelIndex()) const override;
-  QVariant data(const QModelIndex &proxy_index, int role) const override;
-  QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
-  QStringList mimeTypes() const override;
-  Qt::DropActions supportedDropActions() const override;
-  QMimeData *mimeData(const QModelIndexList &indexes) const override;
-  bool dropMimeData(const QMimeData *data, Qt::DropAction action, const int row, const int column, const QModelIndex &parent_index) override;
-  Qt::ItemFlags flags(const QModelIndex &idx) const override;
-
- public Q_SLOTS:
-  void UpdateSummaryText();
-
- Q_SIGNALS:
-  void TotalLengthChanged(const quint64 length);
-  void ItemCountChanged(const int count);
-  void SummaryTextChanged(const QString &message);
-
- private Q_SLOTS:
-  void SourceDataChanged(const QModelIndex &top_left, const QModelIndex &bottom_right);
-  void SourceLayoutChanged();
-  void UpdateTotalLength();
+  Signal<> Changed;
 
  private:
-  QList<QPersistentModelIndex> source_indexes_;
-  const Playlist *playlist_;
-  quint64 total_length_ns_;
-  QMetaObject::Connection signal_item_count_changed_;
+  void SyncSources();
+
+  SongList songs_;
+  std::vector<QueueRows::Source> sources_;
+  QueueRows::Source last_taken_;
 };
 
-#endif  // QUEUE_H
+#endif  // STRAWBERRY_QUEUE_H

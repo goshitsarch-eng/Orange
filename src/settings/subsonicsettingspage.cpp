@@ -1,181 +1,92 @@
-/*
- * Strawberry Music Player
- * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "settings/subsonicsettingspage.h"
 
 #include "config.h"
-
-#include <QObject>
-#include <QVariant>
-#include <QByteArray>
-#include <QString>
-#include <QUrl>
-#include <QSettings>
-#include <QCheckBox>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QMessageBox>
-#include <QEvent>
-
-#include "settingsdialog.h"
-#include "subsonicsettingspage.h"
-#include "ui_subsonicsettingspage.h"
-#include "core/iconloader.h"
-#include "core/settings.h"
-#include "subsonic/subsonicservice.h"
 #include "constants/subsonicsettings.h"
+#include "core/application.h"
+#include "core/network.h"
+#include "dialogs/messagedialog.h"
+#include "settings/settingspage.h"
+#include "settings/streamingsettingslabels.h"
+#include "streaming/streamingchoices.h"
+#include "subsonic/subsonicping.h"
+#include "subsonic/subsonicsettingsactions.h"
+#include "ui/dialogs.h"
+#include "widgets/loginstatewidget.h"
 
-using namespace SubsonicSettings;
+AdwPreferencesPage *SubsonicSettingsPage::Create(Settings *settings, Application *app) {
+  settings->BeginGroup(SubsonicSettings::kSettingsGroup);
+  AdwPreferencesPage *page = SettingsPage::MakePage("Subsonic", "network-server-symbolic");
+  AdwPreferencesGroup *enable = SettingsPage::AddGroup(page);
+  SettingsPage::AddToggle(enable, settings, SubsonicSettings::kEnabled, StreamingSettingsLabels::Enable(), nullptr,
+                          SubsonicSettings::kDefaultEnabled);
 
-SubsonicSettingsPage::SubsonicSettingsPage(SettingsDialog *dialog, const SharedPtr<SubsonicService> service, QWidget *parent)
-    : SettingsPage(dialog, parent),
-      ui_(new Ui::SubsonicSettingsPage),
-      service_(service) {
+  AdwPreferencesGroup *server = SettingsPage::AddGroup(page, SubsonicSettingsLabels::ServerUrl());
+  GtkWidget *url = SettingsPage::AddEntry(server, settings, SubsonicSettings::kUrl, SubsonicSettingsLabels::ServerUrl());
 
-  ui_->setupUi(this);
-  setWindowIcon(IconLoader::Load(QStringLiteral("subsonic"), true, 0, 32));
-
-  QObject::connect(ui_->button_test, &QPushButton::clicked, this, &SubsonicSettingsPage::TestClicked);
-  QObject::connect(ui_->button_deletesongs, &QPushButton::clicked, &*service_, &SubsonicService::DeleteSongs);
-  QObject::connect(ui_->checkbox_download_album_covers, &QCheckBox::toggled, this, &SubsonicSettingsPage::CheckboxDownloadAlbumCoversToggled);
-
-  QObject::connect(this, &SubsonicSettingsPage::Test, &*service_, &SubsonicService::SendPingWithCredentials);
-
-  QObject::connect(&*service_, &SubsonicService::TestFailure, this, &SubsonicSettingsPage::TestFailure);
-  QObject::connect(&*service_, &SubsonicService::TestSuccess, this, &SubsonicSettingsPage::TestSuccess);
-
-  dialog->installEventFilter(this);
-
-  ui_->checkbox_http2->show();
-
-}
-
-SubsonicSettingsPage::~SubsonicSettingsPage() { delete ui_; }
-
-void SubsonicSettingsPage::Load() {
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  ui_->enable->setChecked(s.value(kEnabled, kDefaultEnabled).toBool());
-  ui_->server_url->setText(s.value(kUrl).toString());
-  ui_->username->setText(s.value(kUsername).toString());
-  QByteArray password = s.value(kPassword).toByteArray();
-  if (password.isEmpty()) ui_->password->clear();
-  else ui_->password->setText(QString::fromUtf8(QByteArray::fromBase64(password)));
-  ui_->checkbox_http2->setChecked(s.value(kHTTP2, kDefaultHTTP2).toBool());
-  ui_->checkbox_verify_certificate->setChecked(s.value(kVerifyCertificate, kDefaultVerifyCertificate).toBool());
-  ui_->checkbox_download_album_covers->setChecked(s.value(kDownloadAlbumCovers, kDefaultDownloadAlbumCovers).toBool());
-  ui_->checkbox_use_album_id_for_album_covers->setChecked(s.value(kUseAlbumIdForAlbumCovers, kDefaultUseAlbumIdForAlbumCovers).toBool());
-  ui_->checkbox_server_scrobbling->setChecked(s.value(kServerSideScrobbling, kDefaultServerSideScrobbling).toBool());
-
-  const AuthMethod auth_method = static_cast<AuthMethod>(s.value(kAuthMethod, static_cast<int>(kDefaultAuthMethod)).toInt());
-  switch (auth_method) {
-    case AuthMethod::Hex:
-      ui_->auth_method_hex->setChecked(true);
-      break;
-    case AuthMethod::MD5:
-      ui_->auth_method_md5->setChecked(true);
-      break;
+  AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, StreamingSettingsLabels::Authentication());
+  GtkWidget *username = SettingsPage::AddEntry(auth, settings, SubsonicSettings::kUsername, StreamingSettingsLabels::Username());
+  GtkWidget *password = SettingsPage::AddPasswordEntry(auth, settings, SubsonicSettings::kPassword, StreamingSettingsLabels::Password());
+  SettingsPage::AddCombo(auth, settings, SubsonicSettings::kAuthMethod, SubsonicSettingsLabels::AuthMethod(),
+                         StreamingChoices::SubsonicAuthMethods(), std::to_string(static_cast<int>(SubsonicSettings::kDefaultAuthMethod)),
+                         [settings](const std::string &id) {
+                           settings->BeginGroup(SubsonicSettings::kSettingsGroup);
+                           settings->SetIntValue(SubsonicSettings::kAuthMethod, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
+                           settings->Sync();
+                         });
+  SettingsPage::AddButtonRow(auth, "", SubsonicSettingsLabels::Test(), [url, username, password, settings, app](GtkWidget *button) {
+    const std::string server = gtk_editable_get_text(GTK_EDITABLE(url));
+    const std::string user = gtk_editable_get_text(GTK_EDITABLE(username));
+    const std::string pass = gtk_editable_get_text(GTK_EDITABLE(password));
+    const SubsonicConnectionCheck::Result check = SubsonicConnectionCheck::Validate(server, user, pass);
+    if (check != SubsonicConnectionCheck::Result::Ok) {
+      MessageDialog::Show(nullptr, SubsonicConnectionCheck::Title(check), SubsonicConnectionCheck::Body(check));
+      return;
+    }
+    if (!app || !app->network()) {
+      MessageDialog::Show(nullptr, SubsonicSettingsLabels::TestFailed(), "Network is unavailable.");
+      return;
+    }
+    settings->BeginGroup(SubsonicSettings::kSettingsGroup);
+    const bool hex_auth = settings->IntValue(SubsonicSettings::kAuthMethod, static_cast<int>(SubsonicSettings::kDefaultAuthMethod)) ==
+                          static_cast<int>(SubsonicSettings::AuthMethod::Hex);
+    gtk_widget_set_sensitive(button, FALSE);
+    g_object_ref(button);
+    app->network()->Get(SubsonicPing::Url(server, user, pass, hex_auth), [button](const NetworkAccessManager::Response &response) {
+      const SubsonicPing::Result result = SubsonicPing::Parse(response.body, response.status, response.error);
+      if (GTK_IS_WIDGET(button)) {
+        gtk_widget_set_sensitive(button, TRUE);
+      }
+      g_object_unref(button);
+      MessageDialog::Show(nullptr, SubsonicPing::Title(result), SubsonicPing::Body(result));
+    });
+  });
+  if (app) {
+    if (LoginStateWidget *login = SettingsPage::AddLoginState(auth, app, "Subsonic")) {
+      login->AddCredentialGroup(username);
+      login->AddCredentialGroup(password);
+    }
   }
 
-  ui_->checkbox_use_album_id_for_album_covers->setEnabled(ui_->checkbox_download_album_covers->isChecked());
-
-  s.endGroup();
-
-  Init(ui_->layout_subsonicsettingspage->parentWidget());
-
-  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
-
-}
-
-void SubsonicSettingsPage::Save() {
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  s.setValue(kEnabled, ui_->enable->isChecked());
-  s.setValue(kUrl, QUrl(ui_->server_url->text()));
-  s.setValue(kUsername, ui_->username->text());
-  s.setValue(kPassword, QString::fromUtf8(ui_->password->text().toUtf8().toBase64()));
-  s.setValue(kHTTP2, ui_->checkbox_http2->isChecked());
-  s.setValue(kVerifyCertificate, ui_->checkbox_verify_certificate->isChecked());
-  s.setValue(kDownloadAlbumCovers, ui_->checkbox_download_album_covers->isChecked());
-  s.setValue(kUseAlbumIdForAlbumCovers, ui_->checkbox_use_album_id_for_album_covers->isChecked());
-  s.setValue(kServerSideScrobbling, ui_->checkbox_server_scrobbling->isChecked());
-  if (ui_->auth_method_hex->isChecked()) {
-    s.setValue(kAuthMethod, static_cast<int>(AuthMethod::Hex));
-  }
-  else {
-    s.setValue(kAuthMethod, static_cast<int>(AuthMethod::MD5));
-  }
-
-  ui_->checkbox_use_album_id_for_album_covers->setEnabled(ui_->checkbox_download_album_covers->isChecked());
-
-  s.endGroup();
-
-}
-
-void SubsonicSettingsPage::CheckboxDownloadAlbumCoversToggled(bool enabled) {
-
-  ui_->checkbox_use_album_id_for_album_covers->setEnabled(enabled);
-
-}
-
-void SubsonicSettingsPage::TestClicked() {
-
-  if (ui_->server_url->text().isEmpty() || ui_->username->text().isEmpty() || ui_->password->text().isEmpty()) {
-    QMessageBox::critical(this, tr("Configuration incomplete"), tr("Missing server url, username or password."));
-    return;
-  }
-
-  QUrl server_url(ui_->server_url->text());
-  if (!server_url.isValid() || server_url.scheme().isEmpty() || server_url.host().isEmpty()) {
-    QMessageBox::critical(this, tr("Configuration incorrect"), tr("Server URL is invalid."));
-    return;
-  }
-
-  Q_EMIT Test(server_url, ui_->username->text(), ui_->password->text(), ui_->auth_method_hex->isChecked() ? AuthMethod::Hex : AuthMethod::MD5);
-  ui_->button_test->setEnabled(false);
-
-}
-
-bool SubsonicSettingsPage::eventFilter(QObject *object, QEvent *event) {
-
-  if (object == dialog() && event->type() == QEvent::Enter) {
-    ui_->button_test->setEnabled(true);
-  }
-
-  return SettingsPage::eventFilter(object, event);
-
-}
-
-void SubsonicSettingsPage::TestSuccess() {
-
-  if (!isVisible()) return;
-  ui_->button_test->setEnabled(true);
-
-  QMessageBox::information(this, tr("Test successful!"), tr("Test successful!"));
-
-}
-
-void SubsonicSettingsPage::TestFailure(const QString &failure_reason) {
-
-  if (!isVisible()) return;
-  ui_->button_test->setEnabled(true);
-
-  QMessageBox::warning(this, tr("Test failed!"), failure_reason);
-
+  AdwPreferencesGroup *prefs = SettingsPage::AddGroup(page, StreamingSettingsLabels::Preferences());
+  SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kHTTP2, SubsonicSettingsLabels::Http2(), nullptr, SubsonicSettings::kDefaultHTTP2);
+  SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kVerifyCertificate, SubsonicSettingsLabels::VerifyCertificate(), nullptr,
+                          SubsonicSettings::kDefaultVerifyCertificate);
+  GtkWidget *covers = SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kDownloadAlbumCovers, StreamingSettingsLabels::DownloadAlbumCovers(),
+                                              nullptr, SubsonicSettings::kDefaultDownloadAlbumCovers);
+  GtkWidget *album_id = SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kUseAlbumIdForAlbumCovers,
+                                               SubsonicSettingsLabels::UseAlbumIdForCovers(), nullptr,
+                                               SubsonicSettings::kDefaultUseAlbumIdForAlbumCovers);
+  gtk_widget_set_sensitive(album_id, adw_switch_row_get_active(ADW_SWITCH_ROW(covers)));
+  g_signal_connect(covers, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
+                     gtk_widget_set_sensitive(GTK_WIDGET(data), adw_switch_row_get_active(row));
+                   }),
+                   album_id);
+  SettingsPage::AddToggle(prefs, settings, SubsonicSettings::kServerSideScrobbling, SubsonicSettingsLabels::ServerSideScrobbling(), nullptr,
+                          SubsonicSettings::kDefaultServerSideScrobbling);
+  SettingsPage::AddButtonRow(prefs, "", SubsonicSettingsActions::DeleteSongs(), [app]() {
+    if (app && app->collection() && app->collection()->backend()) {
+      SubsonicSettingsActions::DeleteCachedSongs(app->collection()->backend());
+    }
+  });
+  return page;
 }

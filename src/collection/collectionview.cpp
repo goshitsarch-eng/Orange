@@ -1,840 +1,559 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "collection/collectionview.h"
 
-#include "config.h"
+#include "collection/collectionautoopen.h"
+#include "collection/collectionbehaviour.h"
+#include "collection/collectionempty.h"
+#include "collection/collectionfilterkeyboard.h"
+#include "collection/collectiontypeaheadscroll.h"
+#include "collection/collectiontreeclick.h"
+#include "collection/collectiondivider.h"
+#include "collection/collectioniconcache.h"
+#include "collection/collectionitemdelegate.h"
+#include "collection/collectionkeyboard.h"
+#include "collection/collectiontree.h"
+#include "covermanager/albumcoverloader.h"
+#include "dialogs/dialoghelpers.h"
+#include "translations/translations.h"
+#include "utilities/strutils.h"
+#include "widgets/listboxkeyboard.h"
+#include "widgets/listboxkeyboardgtk.h"
+#include "widgets/listboxscrolltop.h"
 
-#include <utility>
-#include <memory>
+#include <gdk/gdkkeysyms.h>
 
-#include <QtGlobal>
-#include <QAbstractItemView>
-#include <QTreeView>
-#include <QItemSelectionModel>
-#include <QSortFilterProxyModel>
-#include <QMimeData>
-#include <QSet>
-#include <QList>
-#include <QMap>
-#include <QVariant>
-#include <QString>
-#include <QUrl>
-#include <QPixmap>
-#include <QPainter>
-#include <QRect>
-#include <QFont>
-#include <QFontMetrics>
-#include <QMenu>
-#include <QAction>
-#include <QMessageBox>
-#include <QSettings>
-#include <QPaintEvent>
-#include <QMouseEvent>
-#include <QKeyEvent>
-#include <QContextMenuEvent>
+CollectionView::CollectionView() {
+  widget_ = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(widget_, TRUE);
+  gtk_widget_set_hexpand(widget_, TRUE);
+  list_ = gtk_list_box_new();
+  gtk_widget_add_css_class(list_, "boxed-list");
+  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
+  g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     static_cast<CollectionView *>(data)->ActivateRow(row);
+                   }),
+                   this);
 
-#include "core/iconloader.h"
-#include "core/mimedata.h"
-#include "core/musicstorage.h"
-#include "core/deletefiles.h"
-#include "core/settings.h"
-#include "utilities/filemanagerutils.h"
-#include "collectionlibrary.h"
-#include "collectionbackend.h"
-#include "collectiondirectorymodel.h"
-#include "collectionmodel.h"
-#include "collectionfilter.h"
-#include "collectionfilterwidget.h"
-#include "collectionitem.h"
-#include "collectionitemdelegate.h"
-#include "collectionview.h"
-#include "device/devicemanager.h"
-#include "device/devicestatefiltermodel.h"
-#include "dialogs/edittagdialog.h"
-#include "dialogs/deleteconfirmationdialog.h"
-#include "organize/organizedialog.h"
-#include "organize/organizeerrordialog.h"
-#include "constants/collectionsettings.h"
+  GtkGesture *primary = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(primary), GDK_BUTTON_PRIMARY);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(primary));
+  g_signal_connect(primary, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint n_press, gdouble x, gdouble y, gpointer data) {
+                     auto *self = static_cast<CollectionView *>(data);
+                     self->HandlePress(GDK_BUTTON_PRIMARY, n_press, x, y, gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(click)));
+                   }),
+                   this);
 
-using std::make_unique;
-using namespace Qt::Literals::StringLiterals;
+  GtkGesture *middle = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(middle), GDK_BUTTON_MIDDLE);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(middle));
+  g_signal_connect(middle, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint n_press, gdouble x, gdouble y, gpointer data) {
+                     auto *self = static_cast<CollectionView *>(data);
+                     self->HandlePress(GDK_BUTTON_MIDDLE, n_press, x, y, gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(click)));
+                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
+                   }),
+                   this);
 
-CollectionView::CollectionView(QWidget *parent)
-    : AutoExpandingTreeView(parent),
-      model_(nullptr),
-      filter_(nullptr),
-      filter_widget_(nullptr),
-      total_song_count_(-1),
-      total_artist_count_(-1),
-      total_album_count_(-1),
-      nomusic_(u":/pictures/nomusic.png"_s),
-      context_menu_(nullptr),
-      action_load_(nullptr),
-      action_add_to_playlist_(nullptr),
-      action_add_to_playlist_enqueue_(nullptr),
-      action_add_to_playlist_enqueue_next_(nullptr),
-      action_open_in_new_playlist_(nullptr),
-      action_organize_(nullptr),
-      action_search_for_this_(nullptr),
-      action_copy_to_device_(nullptr),
-      action_edit_track_(nullptr),
-      action_edit_tracks_(nullptr),
-      action_rescan_songs_(nullptr),
-      action_show_in_browser_(nullptr),
-      action_show_in_various_(nullptr),
-      action_no_show_in_various_(nullptr),
-      action_delete_files_(nullptr),
-      is_in_keyboard_search_(false),
-      delete_files_(false) {
+  GtkGesture *menu = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(menu));
+  g_signal_connect(menu, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble x, gdouble y, gpointer data) {
+                     auto *self = static_cast<CollectionView *>(data);
+                     GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(self->list_), static_cast<int>(y));
+                     if (row && !gtk_list_box_row_is_selected(row)) {
+                       gtk_list_box_unselect_all(GTK_LIST_BOX(self->list_));
+                       gtk_list_box_select_row(GTK_LIST_BOX(self->list_), row);
+                     }
+                     if (self->menu_) {
+                       self->menu_(x, y);
+                     }
+                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
+                   }),
+                   this);
 
-  setObjectName(QLatin1String(QObject::metaObject()->className()));
-
-  setItemDelegate(new CollectionItemDelegate(this));
-  setAttribute(Qt::WA_MacShowFocusRect, false);
-  setHeaderHidden(true);
-  setAllColumnsShowFocus(true);
-  setDragEnabled(true);
-  setDragDropMode(QAbstractItemView::DragOnly);
-  setSelectionMode(QAbstractItemView::ExtendedSelection);
-
-  setStyleSheet(u"QTreeView::item{padding-top:1px;}"_s);
-
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(list_, keys);
+  g_signal_connect(keys, "key-pressed", G_CALLBACK(+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<CollectionView *>(data)->OnKeyPressed(keyval);
+                   }),
+                   this);
 }
 
-CollectionView::~CollectionView() = default;
+CollectionView::~CollectionView() { ResetTypeAhead(); }
 
-void CollectionView::Init(const SharedPtr<TaskManager> task_manager,
-                          const SharedPtr<TagReaderClient> tagreader_client,
-                          const SharedPtr<NetworkAccessManager> network,
-                          const SharedPtr<AlbumCoverLoader> albumcover_loader,
-                          const SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader,
-                          const SharedPtr<CoverProviders> cover_providers,
-                          const SharedPtr<LyricsProviders> lyrics_providers,
-                          const SharedPtr<CollectionLibrary> collection,
-                          const SharedPtr<DeviceManager> device_manager,
-                          const SharedPtr<StreamingServices> streaming_services) {
+void CollectionView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
-  task_manager_ = task_manager;
-  tagreader_client_ = tagreader_client;
-  network_ = network;
-  albumcover_loader_ = albumcover_loader;
-  current_albumcover_loader_ = current_albumcover_loader;
-  cover_providers_ = cover_providers;
-  lyrics_providers_ = lyrics_providers;
-  collection_ = collection;
-  device_manager_ = device_manager;
-  streaming_services_ = streaming_services;
-  backend_ = collection_->backend();
-  model_ = collection_->model();
-  filter_ = collection_->model()->filter();
+void CollectionView::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
 
-  ReloadSettings();
+void CollectionView::SetEmptyCallback(EmptyCallback callback) { empty_ = std::move(callback); }
 
-}
+void CollectionView::SetFocusFilterCallback(FocusFilterCallback callback) { focus_filter_ = std::move(callback); }
 
-void CollectionView::SaveFocus() {
-
-  const QModelIndex current = currentIndex();
-  const QVariant role_type = model()->data(current, CollectionModel::Role_Type);
-  if (!role_type.isValid()) {
-    return;
-  }
-
-  const CollectionItem::Type item_type = role_type.value<CollectionItem::Type>();
-  if (item_type != CollectionItem::Type::Song && item_type != CollectionItem::Type::Container && item_type != CollectionItem::Type::Divider) {
-    return;
-  }
-
-  last_selected_path_.clear();
-  last_selected_song_ = Song();
-  last_selected_container_ = QString();
-
-  switch (item_type) {
-    case CollectionItem::Type::Song:{
-      QModelIndex index = filter_->mapToSource(current);
-      SongList songs = model_->GetChildSongs(index);
-      if (!songs.isEmpty()) {
-        last_selected_song_ = songs.last();
-      }
-      break;
-    }
-
-    case CollectionItem::Type::Container:
-    case CollectionItem::Type::Divider:{
-      QString text = model()->data(current, CollectionModel::Role_SortText).toString();
-      last_selected_container_ = text;
-      break;
-    }
-
-    default:
-      return;
-  }
-
-  SaveContainerPath(current);
-
-}
-
-void CollectionView::SaveContainerPath(const QModelIndex &child) {
-
-  const QModelIndex current = model()->parent(child);
-  const QVariant role_type = model()->data(current, CollectionModel::Role_Type);
-  if (!role_type.isValid()) {
-    return;
-  }
-
-  const CollectionItem::Type item_type = role_type.value<CollectionItem::Type>();
-  if (item_type != CollectionItem::Type::Container && item_type != CollectionItem::Type::Divider) {
-    return;
-  }
-
-  QString text = model()->data(current, CollectionModel::Role_SortText).toString();
-  last_selected_path_ << text;
-  SaveContainerPath(current);
-
-}
-
-void CollectionView::RestoreFocus() {
-
-  if (last_selected_container_.isEmpty() && last_selected_song_.url().isEmpty()) {
-    return;
-  }
-  RestoreLevelFocus();
-
-}
-
-bool CollectionView::RestoreLevelFocus(const QModelIndex &parent) {
-
-  if (model()->canFetchMore(parent)) {
-    model()->fetchMore(parent);
-  }
-  const int rows = model()->rowCount(parent);
-  for (int i = 0; i < rows; i++) {
-    QModelIndex current = model()->index(i, 0, parent);
-    const QVariant role_type = model()->data(current, CollectionModel::Role_Type);
-    if (!role_type.isValid()) return false;
-    const CollectionItem::Type item_type = role_type.value<CollectionItem::Type>();
-    switch (item_type) {
-      case CollectionItem::Type::Root:
-      case CollectionItem::Type::LoadingIndicator:
-        break;
-      case CollectionItem::Type::Song:
-        if (!last_selected_song_.url().isEmpty()) {
-          QModelIndex index = filter_->mapToSource(current);
-          const SongList songs = model_->GetChildSongs(index);
-          if (std::any_of(songs.begin(), songs.end(), [this](const Song &song) { return song == last_selected_song_; })) {
-            setCurrentIndex(current);
-            return true;
-          }
-        }
-        break;
-
-      case CollectionItem::Type::Container:
-      case CollectionItem::Type::Divider:{
-        QString text = model()->data(current, CollectionModel::Role_SortText).toString();
-        if (!last_selected_container_.isEmpty() && last_selected_container_ == text) {
-          expand(current);
-          setCurrentIndex(current);
-          return true;
-        }
-        else if (last_selected_path_.contains(text)) {
-          expand(current);
-          // If a selected container or song were not found, we've got into a wrong subtree (happens with "unknown" all the time)
-          if (!RestoreLevelFocus(current)) {
-            collapse(current);
-          }
-          else {
-            return true;
-          }
-        }
-        break;
-      }
-    }
-  }
-
-  return false;
-
-}
-
-void CollectionView::ReloadSettings() {
-
-  Settings settings;
-  settings.beginGroup(CollectionSettings::kSettingsGroup);
-  SetAutoOpen(settings.value(CollectionSettings::kAutoOpen, CollectionSettings::kDefaultAutoOpen).toBool());
-  delete_files_ = settings.value(CollectionSettings::kDeleteFiles, CollectionSettings::kDefaultDeleteFiles).toBool();
-  settings.endGroup();
-
-}
-
-void CollectionView::SetFilterWidget(CollectionFilterWidget *filter_widget) { filter_widget_ = filter_widget; }
-
-void CollectionView::TotalSongCountUpdated(const int count) {
-
-  int old = total_song_count_;
-  total_song_count_ = count;
-  if (old != total_song_count_) update();
-
-  if (total_song_count_ == 0) {
-    setCursor(Qt::PointingHandCursor);
-  }
-  else {
-    unsetCursor();
-  }
-
-  Q_EMIT TotalSongCountUpdated_();
-
-}
-
-void CollectionView::TotalArtistCountUpdated(const int count) {
-
-  int old = total_artist_count_;
-  total_artist_count_ = count;
-  if (old != total_artist_count_) update();
-
-  if (total_artist_count_ == 0) {
-    setCursor(Qt::PointingHandCursor);
-  }
-  else {
-    unsetCursor();
-  }
-
-  Q_EMIT TotalArtistCountUpdated_();
-
-}
-
-void CollectionView::TotalAlbumCountUpdated(const int count) {
-
-  int old = total_album_count_;
-  total_album_count_ = count;
-  if (old != total_album_count_) update();
-
-  if (total_album_count_ == 0) {
-    setCursor(Qt::PointingHandCursor);
-  }
-  else {
-    unsetCursor();
-  }
-
-  Q_EMIT TotalAlbumCountUpdated_();
-
-}
-
-void CollectionView::paintEvent(QPaintEvent *event) {
-
-  if (total_song_count_ == 0) {
-    QPainter p(viewport());
-    QRect rect(viewport()->rect());
-
-    // Draw the confused strawberry
-    QRect image_rect((rect.width() - nomusic_.width()) / 2, 50, nomusic_.width(), nomusic_.height());
-    p.drawPixmap(image_rect, nomusic_);
-
-    // Draw the title text
-    QFont bold_font;
-    bold_font.setBold(true);
-    p.setFont(bold_font);
-
-    QFontMetrics metrics(bold_font);
-
-    QRect title_rect(0, image_rect.bottom() + 20, rect.width(), metrics.height());
-    p.drawText(title_rect, Qt::AlignHCenter, tr("Your collection is empty!"));
-
-    // Draw the other text
-    p.setFont(QFont());
-
-    QRect text_rect(0, title_rect.bottom() + 5, rect.width(), metrics.height());
-    p.drawText(text_rect, Qt::AlignHCenter, tr("Click here to add some music"));
-  }
-  else {
-    QTreeView::paintEvent(event);
-  }
-
-}
-
-void CollectionView::mouseReleaseEvent(QMouseEvent *e) {
-
-  QTreeView::mouseReleaseEvent(e);
-
-  if (total_song_count_ == 0) {
-    Q_EMIT ShowSettingsDialog();
-  }
-
-}
-
-void CollectionView::keyPressEvent(QKeyEvent *e) {
-
-  switch (e->key()) {
-    case Qt::Key_Enter:
-    case Qt::Key_Return:
-      if (currentIndex().isValid()) {
-        Q_EMIT doubleClicked(currentIndex());
-      }
-      e->accept();
-      break;
-    default:
-      break;
-  }
-
-  AutoExpandingTreeView::keyPressEvent(e);
-
-}
-
-void CollectionView::contextMenuEvent(QContextMenuEvent *e) {
-
-  if (!context_menu_) {
-    context_menu_ = new QMenu(this);
-    action_add_to_playlist_ = context_menu_->addAction(IconLoader::Load(u"media-playback-start"_s), tr("Append to current playlist"), this, &CollectionView::AddToPlaylist);
-    action_load_ = context_menu_->addAction(IconLoader::Load(u"media-playback-start"_s), tr("Replace current playlist"), this, &CollectionView::Load);
-    action_open_in_new_playlist_ = context_menu_->addAction(IconLoader::Load(u"document-new"_s), tr("Open in new playlist"), this, &CollectionView::OpenInNewPlaylist);
-
-    context_menu_->addSeparator();
-    action_add_to_playlist_enqueue_ = context_menu_->addAction(IconLoader::Load(u"go-next"_s), tr("Queue track"), this, &CollectionView::AddToPlaylistEnqueue);
-    action_add_to_playlist_enqueue_next_ = context_menu_->addAction(IconLoader::Load(u"go-next"_s), tr("Queue to play next"), this, &CollectionView::AddToPlaylistEnqueueNext);
-
-    context_menu_->addSeparator();
-
-    action_search_for_this_ = context_menu_->addAction(IconLoader::Load(u"edit-find"_s), tr("Search for this"), this, &CollectionView::SearchForThis);
-
-    context_menu_->addSeparator();
-    action_organize_ = context_menu_->addAction(IconLoader::Load(u"edit-copy"_s), tr("Organize files..."), this, &CollectionView::Organize);
-    action_copy_to_device_ = context_menu_->addAction(IconLoader::Load(u"device"_s), tr("Copy to device..."), this, &CollectionView::CopyToDevice);
-    action_delete_files_ = context_menu_->addAction(IconLoader::Load(u"edit-delete"_s), tr("Delete from disk..."), this, &CollectionView::Delete);
-
-    context_menu_->addSeparator();
-    action_edit_track_ = context_menu_->addAction(IconLoader::Load(u"edit-rename"_s), tr("Edit track information..."), this, &CollectionView::EditTracks);
-    action_edit_tracks_ = context_menu_->addAction(IconLoader::Load(u"edit-rename"_s), tr("Edit tracks information..."), this, &CollectionView::EditTracks);
-    action_show_in_browser_ = context_menu_->addAction(IconLoader::Load(u"document-open-folder"_s), tr("Show in file browser..."), this, &CollectionView::ShowInBrowser);
-
-    context_menu_->addSeparator();
-
-    action_rescan_songs_ = context_menu_->addAction(tr("Rescan song(s)"), this, &CollectionView::RescanSongs);
-
-    context_menu_->addSeparator();
-    action_show_in_various_ = context_menu_->addAction(tr("Show in various artists"), this, &CollectionView::ShowInVarious);
-    action_no_show_in_various_ = context_menu_->addAction(tr("Don't show in various artists"), this, &CollectionView::NoShowInVarious);
-
-    context_menu_->addSeparator();
-
-    context_menu_->addMenu(filter_widget_->menu());
-
-    action_copy_to_device_->setDisabled(device_manager_->connected_devices_model()->rowCount() == 0);
-    QObject::connect(device_manager_->connected_devices_model(), &DeviceStateFilterModel::IsEmptyChanged, action_copy_to_device_, &QAction::setDisabled);
-
-  }
-
-  context_menu_index_ = indexAt(e->pos());
-  if (!context_menu_index_.isValid()) return;
-
-  context_menu_index_ = filter_->mapToSource(context_menu_index_);
-
-  const QModelIndexList selected_indexes = filter_->mapSelectionToSource(selectionModel()->selection()).indexes();
-
-  int regular_elements = 0;
-  int regular_editable = 0;
-
-  for (const QModelIndex &idx : selected_indexes) {
-    ++regular_elements;
-    if (model_->data(idx, CollectionModel::Role_Editable).toBool()) {
-      ++regular_editable;
-    }
-  }
-
-  const int songs_selected = regular_elements;
-
-  // in all modes
-  action_load_->setEnabled(songs_selected > 0);
-  action_add_to_playlist_->setEnabled(songs_selected > 0);
-  action_open_in_new_playlist_->setEnabled(songs_selected > 0);
-  action_add_to_playlist_enqueue_->setEnabled(songs_selected > 0);
-
-  // if neither edit_track not edit_tracks are available, we show disabled edit_track element
-  action_edit_track_->setVisible(regular_editable == 1);
-  action_edit_track_->setEnabled(regular_editable == 1);
-  action_edit_tracks_->setVisible(regular_editable > 1);
-  action_edit_tracks_->setEnabled(regular_editable > 1);
-
-  action_rescan_songs_->setVisible(regular_editable > 0);
-  action_rescan_songs_->setEnabled(regular_editable > 0);
-
-  action_organize_->setVisible(regular_elements == regular_editable);
-  action_copy_to_device_->setVisible(regular_elements == regular_editable);
-
-  action_delete_files_->setVisible(delete_files_);
-
-  action_show_in_various_->setVisible(songs_selected > 0);
-  action_no_show_in_various_->setVisible(songs_selected > 0);
-
-  // only when all selected items are editable
-  action_organize_->setEnabled(regular_elements == regular_editable);
-  action_copy_to_device_->setEnabled(regular_elements == regular_editable);
-
-  action_delete_files_->setEnabled(delete_files_);
-
-  context_menu_->popup(e->globalPos());
-
-}
-
-void CollectionView::ShowInVarious() { SetShowInVarious(true); }
-
-void CollectionView::NoShowInVarious() { SetShowInVarious(false); }
-
-void CollectionView::SetShowInVarious(const bool on) {
-
-  if (!context_menu_index_.isValid()) return;
-
-  // Map is from album name -> all artists sharing that album name, built from each selected song.
-  // We put through "Various Artists" changes one album at a time,
-  // to make sure the old album node gets removed (due to all children removed), before the new one gets added
-  QMultiMap<QString, QString> albums;
-  const SongList songs = GetSelectedSongs();
-  for (const Song &song : songs) {
-    if (albums.find(song.album(), song.artist()) == albums.end())
-      albums.insert(song.album(), song.artist());
-  }
-
-  // If we have only one album and we are putting it into Various Artists, check to see
-  // if there are other Artists in this album and prompt the user if they'd like them moved, too
-  if (on && albums.size() == 1) {
-    const QString album = albums.cbegin().key();
-    const SongList all_of_album = backend_->GetSongsByAlbum(album);
-    QSet<QString> other_artists;
-    for (const Song &s : all_of_album) {
-      if (!albums.contains(album, s.artist()) && !other_artists.contains(s.artist())) {
-        other_artists.insert(s.artist());
-      }
-    }
-    if (other_artists.count() > 0) {
-      if (QMessageBox::question(this, tr("There are other songs in this album"), tr("Would you like to move the other songs on this album to Various Artists as well?"), QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes) == QMessageBox::Yes) {
-        for (const QString &s : other_artists) {
-          albums.insert(album, s);
-        }
-      }
-    }
-  }
-
-  const QSet<QString> albums_set = QSet<QString>(albums.keyBegin(), albums.keyEnd());
-  for (const QString &album : albums_set) {
-    backend_->ForceCompilation(album, albums.values(album), on);
-  }
-
-}
-
-void CollectionView::Load() {
-
-  QMimeData *q_mimedata = model()->mimeData(selectedIndexes());
-  if (MimeData *mimedata = qobject_cast<MimeData*>(q_mimedata)) {
-    mimedata->clear_first_ = true;
-  }
-  Q_EMIT AddToPlaylistSignal(q_mimedata);
-
-}
-
-void CollectionView::AddToPlaylist() {
-
-  Q_EMIT AddToPlaylistSignal(model()->mimeData(selectedIndexes()));
-
-}
-
-void CollectionView::AddToPlaylistEnqueue() {
-
-  QMimeData *q_mimedata = model()->mimeData(selectedIndexes());
-  if (MimeData *mimedata = qobject_cast<MimeData*>(q_mimedata)) {
-    mimedata->enqueue_now_ = true;
-  }
-  Q_EMIT AddToPlaylistSignal(q_mimedata);
-
-}
-
-void CollectionView::AddToPlaylistEnqueueNext() {
-
-  QMimeData *q_mimedata = model()->mimeData(selectedIndexes());
-  if (MimeData *mimedata = qobject_cast<MimeData*>(q_mimedata)) {
-    mimedata->enqueue_next_now_ = true;
-  }
-  Q_EMIT AddToPlaylistSignal(q_mimedata);
-
-}
-
-void CollectionView::OpenInNewPlaylist() {
-
-  QMimeData *q_mimedata = model()->mimeData(selectedIndexes());
-  if (MimeData *mimedata = qobject_cast<MimeData*>(q_mimedata)) {
-    mimedata->open_in_new_playlist_ = true;
-  }
-  Q_EMIT AddToPlaylistSignal(q_mimedata);
-
-}
-
-void CollectionView::SearchForThis() {
-
-  const QModelIndex current = currentIndex();
-  const QVariant role_type = model()->data(current, CollectionModel::Role_Type);
-  if (!role_type.isValid()) {
-    return;
-  }
-
-  const CollectionItem::Type item_type = role_type.value<CollectionItem::Type>();
-  if (item_type != CollectionItem::Type::Song && item_type != CollectionItem::Type::Container && item_type != CollectionItem::Type::Divider) {
-    return;
-  }
-  QString search;
-
-  QModelIndex index = filter_->mapToSource(current);
-
-  switch (item_type) {
-    case CollectionItem::Type::Song:{
-      SongList songs = model_->GetChildSongs(index);
-      if (!songs.isEmpty()) {
-        last_selected_song_ = songs.last();
-      }
-      search = QStringLiteral("title:\"%1\"").arg(last_selected_song_.title());
-      break;
-    }
-
-    case CollectionItem::Type::Divider:{
-      break;
-    }
-
-    case CollectionItem::Type::Container:{
-      CollectionItem *item = model_->IndexToItem(index);
-      const CollectionModel::GroupBy group_by = model_->GetGroupBy()[item->container_level];
-      while (!item->children.isEmpty()) {
-        item = item->children.constFirst();
-      }
-
-      switch (group_by) {
-        case CollectionModel::GroupBy::AlbumArtist:
-          search = QStringLiteral("albumartist:\"%1\"").arg(item->metadata.effective_albumartist());
-          break;
-        case CollectionModel::GroupBy::Artist:
-          search = QStringLiteral("artist:\"%1\"").arg(item->metadata.artist());
-          break;
-        case CollectionModel::GroupBy::Album:
-        case CollectionModel::GroupBy::AlbumDisc:
-          search = QStringLiteral("album:\"%1\"").arg(item->metadata.album());
-          break;
-        case CollectionModel::GroupBy::YearAlbum:
-        case CollectionModel::GroupBy::YearAlbumDisc:
-          search = QStringLiteral("year:%1 album:\"%2\"").arg(item->metadata.year()).arg(item->metadata.album());
-          break;
-        case CollectionModel::GroupBy::OriginalYearAlbum:
-        case CollectionModel::GroupBy::OriginalYearAlbumDisc:
-          search = QStringLiteral("year:%1 album:\"%2\"").arg(item->metadata.effective_originalyear()).arg(item->metadata.album());
-          break;
-        case CollectionModel::GroupBy::Year:
-          search = QStringLiteral("year:%1").arg(item->metadata.year());
-          break;
-        case CollectionModel::GroupBy::OriginalYear:
-          search = QStringLiteral("year:%1").arg(item->metadata.effective_originalyear());
-          break;
-        case CollectionModel::GroupBy::Genre:
-          search = QStringLiteral("genre:\"%1\"").arg(item->metadata.genre());
-          break;
-        case CollectionModel::GroupBy::Composer:
-          search = QStringLiteral("composer:\"%1\"").arg(item->metadata.composer());
-          break;
-        case CollectionModel::GroupBy::Performer:
-          search = QStringLiteral("performer:\"%1\"").arg(item->metadata.performer());
-          break;
-        case CollectionModel::GroupBy::Grouping:
-          search = QStringLiteral("grouping:\"%1\"").arg(item->metadata.grouping());
-          break;
-        case CollectionModel::GroupBy::Samplerate:
-          search = QStringLiteral("samplerate:%1").arg(item->metadata.samplerate());
-          break;
-        case CollectionModel::GroupBy::Bitdepth:
-          search = QStringLiteral("bitdepth:%1").arg(item->metadata.bitdepth());
-          break;
-        case CollectionModel::GroupBy::Bitrate:
-          search = QStringLiteral("bitrate:%1").arg(item->metadata.bitrate());
-          break;
-        default:
-          search = model()->data(current, Qt::DisplayRole).toString();
-      }
-      break;
-    }
-
-    default:
-      return;
-  }
-
-  filter_widget_->ShowInCollection(search);
-
-}
-
-void CollectionView::keyboardSearch(const QString &search) {
-
-  is_in_keyboard_search_ = true;
-  QTreeView::keyboardSearch(search);
-  is_in_keyboard_search_ = false;
-
-}
-
-void CollectionView::scrollTo(const QModelIndex &idx, ScrollHint hint) {
-
-  if (is_in_keyboard_search_) {
-    QTreeView::scrollTo(idx, QAbstractItemView::PositionAtTop);
-  }
-  else {
-    QTreeView::scrollTo(idx, hint);
-  }
-
-}
-
-SongList CollectionView::GetSelectedSongs() const {
-
-  QModelIndexList selected_indexes = filter_->mapSelectionToSource(selectionModel()->selection()).indexes();
-  return model_->GetChildSongs(selected_indexes);
-
-}
-
-void CollectionView::Organize() {
-
-  if (!organize_dialog_) {
-    organize_dialog_ = make_unique<OrganizeDialog>(task_manager_, tagreader_client_, backend_, this);
-  }
-
-  organize_dialog_->SetDestinationModel(model_->directory_model());
-  organize_dialog_->SetCopy(false);
-  const SongList songs = GetSelectedSongs();
-  if (organize_dialog_->SetSongs(songs)) {
-    organize_dialog_->show();
-  }
-  else {
-    QMessageBox::warning(this, tr("Error"), tr("None of the selected songs were suitable for copying to a device"));
-  }
-
-}
-
-void CollectionView::EditTracks() {
-
-  if (!edit_tag_dialog_) {
-    edit_tag_dialog_ = make_unique<EditTagDialog>(network_, tagreader_client_, backend_, albumcover_loader_, current_albumcover_loader_, cover_providers_, lyrics_providers_, streaming_services_, this);
-    QObject::connect(&*edit_tag_dialog_, &EditTagDialog::Error, this, &CollectionView::EditTagError);
-  }
-  const SongList songs = GetSelectedSongs();
-  edit_tag_dialog_->SetSongs(songs);
-  edit_tag_dialog_->show();
-
-}
-
-void CollectionView::EditTagError(const QString &message) {
-  Q_EMIT Error(message);
-}
-
-void CollectionView::RescanSongs() {
-
-  collection_->Rescan(GetSelectedSongs());
-
-}
-
-void CollectionView::CopyToDevice() {
-
-  if (!organize_dialog_) {
-    organize_dialog_ = make_unique<OrganizeDialog>(task_manager_, tagreader_client_, nullptr, this);
-  }
-
-  organize_dialog_->SetDestinationModel(device_manager_->connected_devices_model(), true);
-  organize_dialog_->SetCopy(true);
-  organize_dialog_->SetSongs(GetSelectedSongs());
-  organize_dialog_->show();
-
-}
+void CollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
 void CollectionView::FilterReturnPressed() {
-
-  if (!currentIndex().isValid()) {
-    // Pick the first thing that isn't a divider
-    for (int row = 0; row < model()->rowCount(); ++row) {
-      const QModelIndex idx = model()->index(row, 0);
-      const QVariant role_type = idx.data(CollectionModel::Role_Type);
-      if (!role_type.isValid()) continue;
-      const CollectionItem::Type item_type = role_type.value<CollectionItem::Type>();
-      if (item_type != CollectionItem::Type::Divider) {
-        setCurrentIndex(idx);
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  auto *item = row ? static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item")) : nullptr;
+  if (!CollectionFilterKeyboard::CanActivate(item)) {
+    for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+      if (!GTK_IS_LIST_BOX_ROW(child)) {
+        continue;
+      }
+      item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(child), "item"));
+      if (CollectionFilterKeyboard::CanActivate(item)) {
+        row = GTK_LIST_BOX_ROW(child);
+        gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+        gtk_list_box_select_row(GTK_LIST_BOX(list_), row);
         break;
       }
     }
   }
-
-  if (!currentIndex().isValid()) return;
-
-  Q_EMIT doubleClicked(currentIndex());
-}
-
-void CollectionView::ShowInBrowser() const {
-
-  const SongList songs = GetSelectedSongs();
-  QList<QUrl> urls;
-  urls.reserve(songs.count());
-  for (const Song &song : songs) {
-    urls << song.url();
+  if (row && CollectionFilterKeyboard::CanActivate(item)) {
+    ActivateRow(row);
   }
-
-  Utilities::OpenInFileBrowser(urls);
-
 }
 
-int CollectionView::TotalSongs() const {
-  return total_song_count_;
+void CollectionView::FocusAndMove(CollectionKeyboard::Action action) {
+  gtk_widget_grab_focus(list_);
+  if (action == CollectionKeyboard::Action::MoveUp || action == CollectionKeyboard::Action::MoveDown ||
+      action == CollectionKeyboard::Action::Home || action == CollectionKeyboard::Action::End) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), CollectionKeyboard::MoveAction(action)));
+  }
 }
-int CollectionView::TotalArtists() const {
-  return total_artist_count_;
+
+GtkWidget *CollectionView::CreateEmptyPlaceholder(bool collection_empty) const {
+  if (!collection_empty) {
+    return gtk_label_new(Translations::CStr(CollectionEmpty::NoMatches()));
+  }
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_top(box, 24);
+  gtk_widget_set_margin_bottom(box, 24);
+  gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
+  GtkWidget *image = gtk_image_new_from_resource(CollectionEmpty::kResourcePath);
+  gtk_image_set_pixel_size(GTK_IMAGE(image), 75);
+  gtk_widget_set_halign(image, GTK_ALIGN_CENTER);
+  GtkWidget *title = gtk_label_new(Translations::CStr(CollectionEmpty::Title()));
+  gtk_widget_add_css_class(title, "heading");
+  gtk_widget_set_halign(title, GTK_ALIGN_CENTER);
+  GtkWidget *hint = gtk_label_new(Translations::CStr(CollectionEmpty::Hint()));
+  gtk_widget_add_css_class(hint, "dim-label");
+  gtk_widget_set_halign(hint, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(box), image);
+  gtk_box_append(GTK_BOX(box), title);
+  gtk_box_append(GTK_BOX(box), hint);
+  return box;
 }
-int CollectionView::TotalAlbums() const {
-  return total_album_count_;
+
+void CollectionView::OpenEmptyIfNeeded(GtkListBoxRow *row, guint button) {
+  if (!row || !empty_) {
+    return;
+  }
+  const bool empty_collection = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "empty-collection")) != 0;
+  if (CollectionEmpty::OpensOnPrimaryClick(empty_collection, button)) {
+    empty_();
+  }
 }
 
-void CollectionView::Delete() {
+void CollectionView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(list_), static_cast<int>(y));
+  OpenEmptyIfNeeded(row, button);
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
+  if (action == CollectionTreeClick::Action::Enqueue) {
+    if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+      gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+      gtk_list_box_select_row(GTK_LIST_BOX(list_), row);
+    }
+    if (enqueue_) {
+      enqueue_(SelectedSongs());
+    }
+    return;
+  }
+  if (action != CollectionTreeClick::Action::ToggleExpand || !row) {
+    return;
+  }
+  GtkWidget *picked = gtk_widget_pick(list_, x, y, GTK_PICK_DEFAULT);
+  const bool on_expand_control = picked && gtk_widget_get_ancestor(picked, GTK_TYPE_BUTTON);
+  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+  if (CollectionTreeClick::ShouldToggleFromRowClick(on_expand_control, CollectionTree::IsExpandable(item))) {
+    ToggleExpanded(item);
+  }
+}
 
-  if (!delete_files_) return;
+void CollectionView::ApplyLook() {
+  pretty_covers_ = CollectionCover::LoadPrettyCovers();
+  auto_open_ = CollectionAutoOpen::LoadAutoOpen();
+  if (!CollectionIconCache::DiskCacheEnabled()) {
+    CollectionIconCache::Clear();
+  }
+}
 
-  const SongList selected_songs = GetSelectedSongs();
+void CollectionView::SetFilterString(const std::string &filter) {
+  filter_.SetFilterString(filter);
+  Rebuild();
+}
 
-  SongList songs;
-  QStringList files;
-  songs.reserve(selected_songs.count());
-  files.reserve(selected_songs.count());
-  for (const Song &song : selected_songs) {
-    QString filename = song.url().toLocalFile();
-    if (!files.contains(filename)) {
-      songs << song;
-      files << filename;
+void CollectionView::SetModelSongs(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
+                                   bool skip_artist_articles, bool skip_album_articles) {
+  SaveFocus();
+  grouping_ = grouping;
+  ApplyLook();
+  model_.Reset(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles,
+               CollectionDivider::LoadShowDividers());
+  RebuildRows();
+  RestoreFocus();
+}
+
+void CollectionView::ApplyUpdate(const CollectionModelUpdate &update) {
+  SaveFocus();
+  model_.ApplyUpdate(update);
+  RebuildRows();
+  RestoreFocus();
+}
+
+void CollectionView::ActivateRow(GtkListBoxRow *row) {
+  OpenEmptyIfNeeded(row, CollectionTreeClick::kPrimaryButton);
+  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+  if (item && !CollectionItemDelegate::IsDivider(item) && activate_) {
+    activate_(model_.SongsFromItem(item));
+  }
+}
+
+void CollectionView::AppendItem(GtkWidget *parent, const CollectionItem *item, int depth) {
+  if (!item || !filter_.AcceptsItem(item)) {
+    return;
+  }
+  const bool expandable = CollectionTree::IsExpandable(item);
+  const bool expanded = CollectionTree::ShowChildren(item, !filter_.filter_string().empty(), expanded_);
+  GtkWidget *row = gtk_list_box_row_new();
+  GtkWidget *outer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+  gtk_widget_set_margin_start(outer, 8 + depth * 12);
+  gtk_widget_set_margin_end(outer, 8);
+  gtk_widget_set_margin_top(outer, 4);
+  gtk_widget_set_margin_bottom(outer, 4);
+  if (expandable) {
+    GtkWidget *toggle = gtk_button_new_from_icon_name(expanded ? "pan-down-symbolic" : "pan-end-symbolic");
+    gtk_widget_add_css_class(toggle, "flat");
+    gtk_widget_add_css_class(toggle, "circular");
+    gtk_widget_set_tooltip_text(toggle, expanded ? Translations::CStr("Collapse") : Translations::CStr("Expand"));
+    g_object_set_data(G_OBJECT(toggle), "item", const_cast<CollectionItem *>(item));
+    g_signal_connect(toggle, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                       auto *self = static_cast<CollectionView *>(data);
+                       auto *clicked = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(button), "item"));
+                       self->ToggleExpanded(clicked);
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(outer), toggle);
+  }
+  const Song cover_song = CollectionCover::RepresentativeSong(item);
+  if (CollectionCover::ShouldShowThumb(pretty_covers_, item->type, item->container_level, grouping_)) {
+    GtkWidget *image = gtk_image_new_from_icon_name(CollectionCover::kPlaceholderIcon);
+    gtk_image_set_pixel_size(GTK_IMAGE(image), CollectionCover::kArtHeight);
+    gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
+    gtk_box_append(GTK_BOX(outer), image);
+    LoadCover(image, cover_song);
+  }
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_set_hexpand(box, TRUE);
+  const std::string primary_text = CollectionItemDelegate::PrimaryText(item);
+  GtkWidget *primary = gtk_label_new(primary_text.c_str());
+  gtk_widget_set_halign(primary, GTK_ALIGN_START);
+  gtk_label_set_ellipsize(GTK_LABEL(primary), PANGO_ELLIPSIZE_END);
+  if (CollectionItemDelegate::ShouldShowTooltip(primary_text)) {
+    gtk_widget_set_tooltip_text(primary, CollectionItemDelegate::TooltipText(primary_text).c_str());
+  }
+  if (CollectionItemDelegate::IsDivider(item)) {
+    gtk_widget_add_css_class(primary, "heading");
+    gtk_widget_add_css_class(row, "collection-divider");
+  }
+  gtk_box_append(GTK_BOX(box), primary);
+  const std::string secondary = CollectionItemDelegate::SecondaryText(item);
+  if (!secondary.empty()) {
+    GtkWidget *sub = gtk_label_new(secondary.c_str());
+    gtk_widget_add_css_class(sub, "dim-label");
+    gtk_widget_set_halign(sub, GTK_ALIGN_START);
+    gtk_label_set_ellipsize(GTK_LABEL(sub), PANGO_ELLIPSIZE_END);
+    if (CollectionItemDelegate::ShouldShowTooltip(secondary)) {
+      gtk_widget_set_tooltip_text(sub, CollectionItemDelegate::TooltipText(secondary).c_str());
+    }
+    gtk_box_append(GTK_BOX(box), sub);
+  }
+  gtk_box_append(GTK_BOX(outer), box);
+  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), outer);
+  g_object_set_data(G_OBJECT(row), "item", const_cast<CollectionItem *>(item));
+  SetupRowDrag(row, item);
+  if (GTK_IS_LIST_BOX(parent)) {
+    gtk_list_box_append(GTK_LIST_BOX(parent), row);
+  }
+  if (expanded) {
+    for (const auto &child : item->children) {
+      AppendItem(parent, child.get(), depth + 1);
     }
   }
-  if (DeleteConfirmationDialog::warning(files) != QDialogButtonBox::Yes) return;
-
-  // We can cheat and always take the storage of the first directory, since they'll all be FilesystemMusicStorage in a collection and deleting doesn't check the actual directory.
-  SharedPtr<MusicStorage> storage = model_->directory_model()->index(0, 0).data(MusicStorage::Role_Storage).value<SharedPtr<MusicStorage>>();
-
-  DeleteFiles *delete_files = new DeleteFiles(task_manager_, storage, true);
-  QObject::connect(delete_files, &DeleteFiles::Finished, this, &CollectionView::DeleteFilesFinished);
-  delete_files->Start(songs);
-
 }
 
-void CollectionView::DeleteFilesFinished(const SongList &songs_with_errors) {
+void CollectionView::LoadCover(GtkWidget *image, const Song &song) {
+  if (!image) {
+    return;
+  }
+  const std::string key = CollectionCover::CacheKey(song);
+  const auto cached = cover_cache_.find(key);
+  if (cached != cover_cache_.end()) {
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(cached->second.begin(), cached->second.end()),
+                                     CollectionCover::kArtHeight);
+    return;
+  }
+  if (CollectionIconCache::DiskCacheEnabled()) {
+    const std::string disk = CollectionIconCache::Read(key);
+    if (!disk.empty()) {
+      cover_cache_[key] = disk;
+      DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(disk.begin(), disk.end()), CollectionCover::kArtHeight);
+      return;
+    }
+  }
+  if (!cover_loader_) {
+    return;
+  }
+  const std::vector<unsigned char> data = cover_loader_->LoadData(song);
+  if (data.empty()) {
+    return;
+  }
+  cover_cache_[key] = std::string(data.begin(), data.end());
+  if (CollectionIconCache::DiskCacheEnabled()) {
+    CollectionIconCache::Write(key, cover_cache_[key]);
+  }
+  DialogHelpers::SetImageFromBytes(image, data, CollectionCover::kArtHeight);
+}
 
-  if (songs_with_errors.isEmpty()) return;
+void CollectionView::SetupRowDrag(GtkWidget *row, const CollectionItem *item) {
+  GtkDragSource *src = gtk_drag_source_new();
+  gtk_drag_source_set_actions(src, GDK_ACTION_COPY);
+  g_object_set_data(G_OBJECT(src), "item", const_cast<CollectionItem *>(item));
+  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
+                     auto *self = static_cast<CollectionView *>(data);
+                     auto *dragged = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(s), "item"));
+                     SongList songs = self->model_.SongsFromItem(dragged);
+                     for (const CollectionItem *selected : self->SelectedItems()) {
+                       if (selected == dragged) {
+                         songs = self->SelectedSongs();
+                         break;
+                       }
+                     }
+                     const std::string payload = CollectionTree::DragPayload(songs);
+                     if (payload.empty()) {
+                       return nullptr;
+                     }
+                     GValue v = G_VALUE_INIT;
+                     g_value_init(&v, G_TYPE_STRING);
+                     g_value_set_string(&v, payload.c_str());
+                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
+                     g_value_unset(&v);
+                     return provider;
+                   })),
+                   this);
+  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
+}
 
-  OrganizeErrorDialog *dialog = new OrganizeErrorDialog(this);
-  dialog->setAttribute(Qt::WA_DeleteOnClose);
-  dialog->Show(OrganizeErrorDialog::OperationType::Delete, songs_with_errors);
+void CollectionView::ExpandAll() {
+  expanded_.clear();
+  CollectionTree::CollectExpandableKeys(model_.root(), &expanded_);
+  Rebuild();
+}
 
+void CollectionView::CollapseAll() {
+  expanded_.clear();
+  RebuildRows();
+}
+
+void CollectionView::ToggleExpanded(const CollectionItem *item) {
+  if (!CollectionTree::IsExpandable(item)) {
+    return;
+  }
+  const bool now_expanded = CollectionTree::Toggle(&expanded_, item);
+  if (now_expanded) {
+    CollectionAutoOpen::ApplyDrill(&expanded_, auto_open_, item);
+  }
+  RebuildRows();
+}
+
+bool CollectionView::IsExpanded(const CollectionItem *item) const {
+  return CollectionTree::ShowChildren(item, !filter_.filter_string().empty(), expanded_);
+}
+
+void CollectionView::Rebuild() {
+  SaveFocus();
+  RebuildRows();
+  RestoreFocus();
+}
+
+void CollectionView::RebuildRows() {
+  ResetTypeAhead();
+  GtkWidget *child = gtk_widget_get_first_child(list_);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_list_box_remove(GTK_LIST_BOX(list_), child);
+    child = next;
+  }
+  if (model_.root()) {
+    for (const auto &child : model_.root()->children) {
+      AppendItem(list_, child.get(), 0);
+    }
+  }
+  if (!gtk_widget_get_first_child(list_)) {
+    const bool collection_empty = CollectionEmpty::IsEmptyCollection(model_.TotalSongs());
+    GtkWidget *row = gtk_list_box_row_new();
+    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), CreateEmptyPlaceholder(collection_empty));
+    if (collection_empty) {
+      g_object_set_data(G_OBJECT(row), "empty-collection", GINT_TO_POINTER(1));
+      gtk_widget_set_cursor_from_name(row, "pointer");
+    }
+    gtk_list_box_append(GTK_LIST_BOX(list_), row);
+  }
+}
+
+void CollectionView::SaveFocus() { CollectionFocus::Capture(SelectedItem(), &focus_); }
+
+void CollectionView::RestoreFocus() {
+  if (!CollectionFocus::ShouldRestore(focus_)) {
+    return;
+  }
+  const std::set<std::string> needed = CollectionFocus::ExpandKeys(model_.root(), focus_);
+  if (CollectionFocus::NeedsExpand(expanded_, needed)) {
+    CollectionFocus::MergeExpand(&expanded_, needed);
+    RebuildRows();
+  }
+  SelectFocusItem();
+}
+
+void CollectionView::SelectFocusItem() {
+  const CollectionItem *target = CollectionFocus::FindTarget(model_.root(), focus_);
+  if (!target) {
+    return;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(child), "item"));
+    if (item != target) {
+      continue;
+    }
+    gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+    gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
+    gtk_widget_grab_focus(child);
+    return;
+  }
+}
+
+std::vector<const CollectionItem *> CollectionView::SelectedItems() const {
+  std::vector<const CollectionItem *> items;
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+        if (item) {
+          static_cast<std::vector<const CollectionItem *> *>(data)->push_back(item);
+        }
+      },
+      &items);
+  return items;
+}
+
+const CollectionItem *CollectionView::SelectedItem() const {
+  const auto items = SelectedItems();
+  return items.empty() ? nullptr : items.front();
+}
+
+SongList CollectionView::SelectedSongs() const {
+  SongList songs;
+  for (const CollectionItem *item : SelectedItems()) {
+    const SongList from_item = model_.SongsFromItem(item);
+    songs.insert(songs.end(), from_item.begin(), from_item.end());
+  }
+  return CollectionBehaviour::UniqueByUrl(songs);
+}
+
+void CollectionView::ScrollRowToTop(GtkWidget *row) { ListBoxScrollTop::RowToTop(list_, row); }
+
+void CollectionView::ResetTypeAhead() {
+  typeahead_.clear();
+  if (typeahead_timeout_id_) {
+    g_source_remove(typeahead_timeout_id_);
+    typeahead_timeout_id_ = 0;
+  }
+}
+
+void CollectionView::TypeAhead(gunichar ch) {
+  gchar utf8[8] = {};
+  const gint len = g_unichar_to_utf8(ch, utf8);
+  typeahead_.append(utf8, static_cast<size_t>(len));
+  if (typeahead_timeout_id_) {
+    g_source_remove(typeahead_timeout_id_);
+  }
+  typeahead_timeout_id_ = g_timeout_add(1000, [](gpointer data) -> gboolean {
+    auto *self = static_cast<CollectionView *>(data);
+    self->typeahead_timeout_id_ = 0;
+    self->typeahead_.clear();
+    return G_SOURCE_REMOVE;
+  }, this);
+
+  const std::string needle = StrUtils::ToLower(typeahead_);
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(child), "item"));
+    if (!item) {
+      continue;
+    }
+    if (StrUtils::StartsWith(StrUtils::ToLower(CollectionItemDelegate::PrimaryText(item)), needle)) {
+      gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+      gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
+      gtk_widget_grab_focus(child);
+      ScrollRowToTop(child);
+      return;
+    }
+  }
+}
+
+gboolean CollectionView::OnKeyPressed(guint keyval) {
+  if (CollectionFilterKeyboard::FromTreeKey(keyval) == CollectionFilterKeyboard::Action::FocusFilter) {
+    ResetTypeAhead();
+    if (focus_filter_) {
+      focus_filter_(keyval);
+    }
+    return TRUE;
+  }
+  const CollectionKeyboard::Action action = CollectionKeyboard::FromKey(keyval);
+  if (action == CollectionKeyboard::Action::Expand || action == CollectionKeyboard::Action::Collapse) {
+    const CollectionItem *item = SelectedItem();
+    if (CollectionTree::IsExpandable(item) && filter_.filter_string().empty()) {
+      const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
+      if ((action == CollectionKeyboard::Action::Expand && !expanded) || (action == CollectionKeyboard::Action::Collapse && expanded)) {
+        ToggleExpanded(item);
+      }
+      return TRUE;
+    }
+  }
+  if (action == CollectionKeyboard::Action::Activate) {
+    if (GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_))) {
+      ActivateRow(row);
+      return TRUE;
+    }
+  }
+  if (action == CollectionKeyboard::Action::MoveUp || action == CollectionKeyboard::Action::MoveDown ||
+      action == CollectionKeyboard::Action::Home || action == CollectionKeyboard::Action::End) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), CollectionKeyboard::MoveAction(action)));
+    return TRUE;
+  }
+  if (action == CollectionKeyboard::Action::Escape) {
+    ResetTypeAhead();
+    return TRUE;
+  }
+  const gunichar ch = gdk_keyval_to_unicode(keyval);
+  if (ch && g_unichar_isprint(ch)) {
+    TypeAhead(ch);
+    return TRUE;
+  }
+  return FALSE;
 }

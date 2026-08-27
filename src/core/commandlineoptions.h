@@ -1,54 +1,12 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_COMMANDLINEOPTIONS_H
+#define STRAWBERRY_COMMANDLINEOPTIONS_H
 
-#ifndef COMMANDLINEOPTIONS_H
-#define COMMANDLINEOPTIONS_H
-
-#include "config.h"
-
-#include <QtGlobal>
-#include <QDataStream>
-#include <QByteArray>
-#include <QList>
-#include <QString>
-#include <QUrl>
-
-#ifdef Q_OS_WIN32
-#  include <windows.h>
-#endif
+#include <string>
+#include <vector>
 
 class CommandlineOptions {
-  friend QDataStream &operator<<(QDataStream &s, const CommandlineOptions &a);
-  friend QDataStream &operator>>(QDataStream &s, CommandlineOptions &a);
-
  public:
-  explicit CommandlineOptions(int argc = 0, char **argv = nullptr);
-
-  // Don't change the values or order, these get serialised and sent to
-  // possibly a different version of Strawberry
-  enum class UrlListAction {
-    Append = 0,
-    Load = 1,
-    None = 2,
-    CreateNew = 3
-  };
+  enum class UrlListAction { Append = 0, Load = 1, None = 2, CreateNew = 3 };
   enum class PlayerAction {
     None = 0,
     Play = 1,
@@ -63,7 +21,8 @@ class CommandlineOptions {
     ResizeWindow = 10
   };
 
-  bool Parse();
+  CommandlineOptions() = default;
+  bool Parse(int argc, char **argv);
 
   bool is_empty() const;
   bool contains_play_options() const;
@@ -77,70 +36,44 @@ class CommandlineOptions {
   int play_track_at() const { return play_track_at_; }
   bool show_osd() const { return show_osd_; }
   bool toggle_pretty_osd() const { return toggle_pretty_osd_; }
-  const QList<QUrl> &urls() const { return urls_; }
-  QString language() const { return language_; }
-  QString log_levels() const { return log_levels_; }
-  QString playlist_name() const { return playlist_name_; }
-  QString window_size() const { return window_size_; }
-
-  QByteArray Serialize() const;
-  void Load(const QByteArray &serialized);
-
- private:
-  // These are "invalid" characters to pass to getopt_long for options that shouldn't have a short (single character) option.
-  enum LongOptions {
-    VolumeUp = 256,
-    VolumeDown,
-    SeekTo,
-    SeekBy,
-    Quiet,
-    Verbose,
-    LogLevels,
-    Version,
-    VolumeIncreaseBy,
-    VolumeDecreaseBy,
-    RestartOrPrevious,
-    CreateFingerPrint,
-  };
-
-  void RemoveArg(const QString &starts_with, int count);
-
-#ifdef Q_OS_WIN32
-  static QString OptArgToString(const wchar_t *opt);
-  static QString DecodeName(wchar_t *opt);
-#else
-  static QString OptArgToString(const char *opt);
-  static QString DecodeName(char *opt);
-#endif
+  const std::vector<std::string> &urls() const { return urls_; }
+  const std::string &language() const { return language_; }
+  const std::string &log_levels() const { return log_levels_; }
+  const std::string &playlist_name() const { return playlist_name_; }
+  const std::string &create_fingerprint() const { return create_fingerprint_; }
+  bool debug() const { return debug_; }
+  bool version() const { return version_; }
+  int resize_width() const { return resize_width_; }
+  int resize_height() const { return resize_height_; }
+  void set_urls(const std::vector<std::string> &urls) { urls_ = urls; }
+  void set_player_action(PlayerAction action) { player_action_ = action; }
+  void set_url_list_action(UrlListAction action) { url_list_action_ = action; }
+  void set_playlist_name(const std::string &name) { playlist_name_ = name; }
+  void set_resize(int width, int height) {
+    resize_width_ = width;
+    resize_height_ = height;
+    player_action_ = PlayerAction::ResizeWindow;
+  }
 
  private:
-  int argc_;
-#ifdef Q_OS_WIN32
-  LPWSTR *argv_;
-#else
-  char **argv_;
-#endif
-
-  UrlListAction url_list_action_;
-  PlayerAction player_action_;
-
-  // Don't change the type of these.
-  int set_volume_;
-  int volume_modifier_;
-  int seek_to_;
-  int seek_by_;
-  int play_track_at_;
-  bool show_osd_;
-  bool toggle_pretty_osd_;
-  QString language_;
-  QString log_levels_;
-  QString playlist_name_;
-  QString window_size_;
-
-  QList<QUrl> urls_;
+  UrlListAction url_list_action_ = UrlListAction::None;
+  PlayerAction player_action_ = PlayerAction::None;
+  int set_volume_ = -1;
+  int volume_modifier_ = 0;
+  int seek_to_ = -1;
+  int seek_by_ = 0;
+  int play_track_at_ = -1;
+  bool show_osd_ = false;
+  bool toggle_pretty_osd_ = false;
+  bool debug_ = false;
+  bool version_ = false;
+  int resize_width_ = 0;
+  int resize_height_ = 0;
+  std::vector<std::string> urls_;
+  std::string language_;
+  std::string log_levels_;
+  std::string playlist_name_;
+  std::string create_fingerprint_;
 };
 
-QDataStream &operator<<(QDataStream &s, const CommandlineOptions &a);
-QDataStream &operator>>(QDataStream &s, CommandlineOptions &a);
-
-#endif  // COMMANDLINEOPTIONS_H
+#endif

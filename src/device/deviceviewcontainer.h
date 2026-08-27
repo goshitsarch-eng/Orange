@@ -1,49 +1,57 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2012, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_DEVICEVIEWCONTAINER_H
+#define STRAWBERRY_DEVICEVIEWCONTAINER_H
 
-#ifndef DEVICEVIEWCONTAINER_H
-#define DEVICEVIEWCONTAINER_H
+#include "device/devicesongmenu.h"
+#include "device/deviceview.h"
 
-#include "config.h"
+#include <functional>
+#include <memory>
+#include <string>
 
-#include <QObject>
-#include <QWidget>
-#include <QString>
+#include <gtk/gtk.h>
 
-class DeviceView;
-class Ui_DeviceViewContainer;
+class Application;
 
-class DeviceViewContainer : public QWidget {
-  Q_OBJECT
-
+class DeviceViewContainer {
  public:
-  explicit DeviceViewContainer(QWidget *parent = nullptr);
-  ~DeviceViewContainer() override;
+  explicit DeviceViewContainer(Application *app);
 
-  DeviceView *view() const;
-
- protected:
+  GtkWidget *widget() const { return widget_; }
+  DeviceView *view() { return view_.get(); }
+  void Reload();
+  void SetSongCallback(std::function<void(const Song &)> callback) { song_cb_ = std::move(callback); }
+  void SetActivateSongsCallback(std::function<void(const SongList &)> callback) {
+    if (view_) {
+      view_->SetActivateSongsCallback(std::move(callback));
+    }
+  }
+  void SetEnqueueCallback(std::function<void(const SongList &)> callback) {
+    if (view_) {
+      view_->SetEnqueueCallback(std::move(callback));
+    }
+  }
+  void SetAddAllCallback(std::function<void(const SongList &)> callback) { add_all_cb_ = std::move(callback); }
+  void SetPlaylistCallback(std::function<void(DeviceSongMenu::Action, const SongList &)> callback) {
+    playlist_cb_ = std::move(callback);
+  }
 
  private:
-  Ui_DeviceViewContainer *ui_;
+  GtkWindow *ParentWindow() const;
+  void OpenDevice(const std::string &id);
+  void ShowDeviceMenu(const ConnectedDevice &device);
+  void ShowSongMenu(const Song &song);
+  void ConfirmForget(const std::string &id, const std::string &backend);
+  void FinishForget(const std::string &id);
+  void ConfirmDelete(const SongList &songs);
+  void FinishDelete(const SongList &songs);
+
+  Application *app_ = nullptr;
+  GtkWidget *widget_ = nullptr;
+  std::unique_ptr<DeviceView> view_;
+  std::string browse_id_;
+  std::function<void(const Song &)> song_cb_;
+  std::function<void(const SongList &)> add_all_cb_;
+  std::function<void(DeviceSongMenu::Action, const SongList &)> playlist_cb_;
 };
 
-#endif  // DEVICEVIEWCONTAINER_H
+#endif

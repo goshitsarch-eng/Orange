@@ -1,41 +1,29 @@
-/* This file is part of Strawberry.
-   Copyright 2010, Andrea Decorte <adecorte@gmail.com>
-
-   Strawberry is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   Strawberry is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #ifndef CLICKABLELABEL_H
 #define CLICKABLELABEL_H
 
-#include <QObject>
-#include <QString>
-#include <QLabel>
+#include <functional>
+#include <string>
 
-class QWidget;
-class QMouseEvent;
+#include <gtk/gtk.h>
 
-class ClickableLabel : public QLabel {
-  Q_OBJECT
-
+class ClickableLabel {
  public:
-  explicit ClickableLabel(QWidget *parent = nullptr);
+  explicit ClickableLabel(const std::string &text = {});
+  ~ClickableLabel();
 
- Q_SIGNALS:
-  void Clicked();
+  ClickableLabel(const ClickableLabel &) = delete;
+  ClickableLabel &operator=(const ClickableLabel &) = delete;
 
- protected:
-  void mousePressEvent(QMouseEvent *event) override;
+  GtkWidget *widget() const { return button_; }
+
+  void SetText(const std::string &text);
+  std::string text() const;
+  void SetClickedCallback(std::function<void()> callback) { clicked_cb_ = std::move(callback); }
+
+ private:
+  GtkWidget *button_ = nullptr;
+  GtkWidget *label_ = nullptr;
+  std::function<void()> clicked_cb_;
 };
 
 #endif  // CLICKABLELABEL_H

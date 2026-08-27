@@ -1,42 +1,22 @@
-/*
- * Strawberry Music Player
- * Copyright 2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_COLLECTIONTASK_H
+#define STRAWBERRY_COLLECTIONTASK_H
 
-#ifndef COLLECTIONTASK_H
-#define COLLECTIONTASK_H
+#include "core/taskmanager.h"
 
-#include <QtGlobal>
-#include <QString>
-
-#include "includes/shared_ptr.h"
-
-class TaskManager;
+#include <string>
 
 class CollectionTask {
  public:
-  explicit CollectionTask(SharedPtr<TaskManager> task_manager, const QString &message);
+  CollectionTask(TaskManager *task_manager, const std::string &name);
   ~CollectionTask();
 
- private:
-  SharedPtr<TaskManager> task_manager_;
-  int task_id_;
+  int id() const { return id_; }
+  void SetProgress(int progress, int progress_max = 0);
+  void Finish();
 
-  Q_DISABLE_COPY(CollectionTask)
+ private:
+  TaskManager *task_manager_ = nullptr;
+  int id_ = 0;
 };
 
-#endif  // COLLECTIONTASK_H
+#endif

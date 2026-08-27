@@ -1,290 +1,145 @@
-/*
- * Strawberry Music Player
- * Copyright 2020-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "covermanager/qobuzcoverprovider.h"
 
-#include "config.h"
-
-#include <algorithm>
-#include <utility>
-
-#include <QVariant>
-#include <QByteArray>
-#include <QString>
-#include <QUrl>
-#include <QUrlQuery>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QJsonDocument>
-#include <QJsonValue>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QScopeGuard>
-
-#include "includes/shared_ptr.h"
-#include "core/networkaccessmanager.h"
-#include "core/logging.h"
-#include "core/song.h"
+#include "core/settings.h"
+#include "covermanager/albumcoverfetchersearch.h"
+#include "covermanager/coverproviderauth.h"
 #include "qobuz/qobuzservice.h"
-#include "albumcoverfetcher.h"
-#include "jsoncoverprovider.h"
-#include "qobuzcoverprovider.h"
+#include "utilities/strutils.h"
 
-using namespace Qt::Literals::StringLiterals;
+#include <json-glib/json-glib.h>
+
+const int QobuzCoverProvider::kLimit = 10;
+
+bool QobuzCoverProvider::authenticated() const { return CoverProviderAuth::HasServiceToken(name()); }
 
 namespace {
-constexpr int kLimit = 10;
+
+std::string ObjectString(JsonObject *object, const char *name) {
+  if (!object || !json_object_has_member(object, name) || !JSON_NODE_HOLDS_VALUE(json_object_get_member(object, name))) {
+    return {};
+  }
+  if (json_node_get_value_type(json_object_get_member(object, name)) != G_TYPE_STRING) {
+    return {};
+  }
+  const char *value = json_object_get_string_member(object, name);
+  return value ? value : "";
+}
+
 }  // namespace
 
-QobuzCoverProvider::QobuzCoverProvider(const QobuzServicePtr service, SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : JsonCoverProvider(u"Qobuz"_s, true, true, 2.0, true, true, network, parent),
-      service_(service) {}
-
-bool QobuzCoverProvider::authenticated() const {
-
-  return service_->authenticated();
-
-}
-
-void QobuzCoverProvider::ClearSession() {
-
-  service_->ClearSession();
-
-}
-
-bool QobuzCoverProvider::StartSearch(const QString &artist, const QString &album, const QString &title, const int id) {
-
-  if (!service_->authenticated() || (artist.isEmpty() && album.isEmpty() && title.isEmpty())) return false;
-
-  QString resource;
-  QString query = artist;
-  if (album.isEmpty() && !title.isEmpty()) {
-    resource = "track/search"_L1;
-    if (!query.isEmpty()) query.append(u' ');
-    query.append(title);
-  }
-  else {
-    resource = "album/search"_L1;
-    if (!album.isEmpty()) {
-      if (!query.isEmpty()) query.append(u' ');
-      query.append(album);
+std::string QobuzCoverProvider::SearchUrl(const std::string &artist, const std::string &album, const std::string &title) {
+  std::string resource;
+  std::string query = artist;
+  if (album.empty() && !title.empty()) {
+    resource = "track/search";
+    if (!query.empty()) {
+      query += " ";
     }
-  }
-
-  ParamList params = ParamList() << Param(u"query"_s, query)
-                                 << Param(u"limit"_s, QString::number(kLimit))
-                                 << Param(u"app_id"_s, service_->app_id());
-
-  std::sort(params.begin(), params.end());
-
-  QUrlQuery url_query;
-  for (const Param &param : std::as_const(params)) {
-    url_query.addQueryItem(QString::fromLatin1(QUrl::toPercentEncoding(param.first)), QString::fromLatin1(QUrl::toPercentEncoding(param.second)));
-  }
-
-  QUrl url(QLatin1String(QobuzService::kApiUrl) + QLatin1Char('/') + resource);
-  url.setQuery(url_query);
-
-  QNetworkRequest network_request(url);
-  network_request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-  network_request.setHeader(QNetworkRequest::ContentTypeHeader, u"application/x-www-form-urlencoded"_s);
-  network_request.setRawHeader("X-App-Id", service_->app_id().toUtf8());
-  network_request.setRawHeader("X-User-Auth-Token", service_->user_auth_token().toUtf8());
-  QNetworkReply *reply = network_->get(network_request);
-  replies_ << reply;
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, id]() { HandleSearchReply(reply, id); });
-
-  return true;
-
-}
-
-void QobuzCoverProvider::CancelSearch(const int id) { Q_UNUSED(id); }
-
-JsonBaseRequest::JsonObjectResult QobuzCoverProvider::ParseJsonObject(QNetworkReply *reply) {
-
-  if (reply->error() != QNetworkReply::NoError && reply->error() < 200) {
-    return ReplyDataResult(ErrorCode::NetworkError, QStringLiteral("%1 (%2)").arg(reply->errorString()).arg(reply->error()));
-  }
-
-  JsonObjectResult result(ErrorCode::Success);
-  result.network_error = reply->error();
-  if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).isValid()) {
-    result.http_status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-  }
-
-  const QByteArray data = reply->readAll();
-  if (!data.isEmpty()) {
-    QJsonParseError json_parse_error;
-    const QJsonDocument json_document = QJsonDocument::fromJson(data, &json_parse_error);
-    if (json_parse_error.error == QJsonParseError::NoError) {
-      const QJsonObject json_object = json_document.object();
-      if (json_object.contains("code"_L1) && json_object.contains("status"_L1) && json_object.contains("message"_L1)) {
-        const int code = json_object["code"_L1].toInt();
-        const QString message = json_object["message"_L1].toString();
-        result.error_code = ErrorCode::APIError;
-        result.error_message = QStringLiteral("%1 (%2)").arg(message).arg(code);
+    query += title;
+  } else {
+    resource = "album/search";
+    if (!album.empty()) {
+      if (!query.empty()) {
+        query += " ";
       }
-      else {
-        result.json_object = json_document.object();
-      }
-    }
-    else {
-      result.error_code = ErrorCode::ParseError;
-      result.error_message = json_parse_error.errorString();
+      query += album;
     }
   }
-
-  if (result.error_code != ErrorCode::APIError) {
-    if (reply->error() != QNetworkReply::NoError) {
-      result.error_code = ErrorCode::NetworkError;
-      result.error_message = QStringLiteral("%1 (%2)").arg(reply->errorString()).arg(reply->error());
-    }
-    else if (result.http_status_code != 200) {
-      result.error_code = ErrorCode::HttpError;
-      result.error_message = QStringLiteral("Received HTTP code %1").arg(result.http_status_code);
-    }
-  }
-
-  if (reply->error() == QNetworkReply::AuthenticationRequiredError) {
-    service_->ClearSession();
-  }
-
-  return result;
-
+  return std::string(QobuzService::kApiUrl) + "/" + resource + "?query=" + StrUtils::UriEscape(query) + "&limit=" + std::to_string(kLimit);
 }
 
-void QobuzCoverProvider::HandleSearchReply(QNetworkReply *reply, const int id) {
-
-  if (!replies_.contains(reply)) return;
-  replies_.removeAll(reply);
-  QObject::disconnect(reply, nullptr, this, nullptr);
-  reply->deleteLater();
-
-  CoverProviderSearchResults results;
-  const QScopeGuard search_finished = qScopeGuard([this, id, &results]() { Q_EMIT SearchFinished(id, results); });
-
-  const JsonObjectResult json_object_result = ParseJsonObject(reply);
-  if (!json_object_result.success()) {
-    Error(json_object_result.error_message);
-    return;
+std::vector<QobuzCoverProvider::SearchResult> QobuzCoverProvider::ParseResults(const std::string &json) {
+  std::vector<SearchResult> results;
+  if (json.empty()) {
+    return results;
   }
-
-  const QJsonObject &json_object = json_object_result.json_object;
-  if (json_object.isEmpty()) {
-    return;
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
+    g_object_unref(parser);
+    return results;
   }
-
-  QJsonValue value_type;
-  if (json_object.contains("albums"_L1)) {
-    value_type = json_object["albums"_L1];
+  JsonNode *root = json_parser_get_root(parser);
+  if (!root || !JSON_NODE_HOLDS_OBJECT(root)) {
+    g_object_unref(parser);
+    return results;
   }
-  else if (json_object.contains("tracks"_L1)) {
-    value_type = json_object["tracks"_L1];
+  JsonObject *object = json_node_get_object(root);
+  const char *group_key = json_object_has_member(object, "albums") ? "albums" : (json_object_has_member(object, "tracks") ? "tracks" : nullptr);
+  if (!group_key || !JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, group_key))) {
+    g_object_unref(parser);
+    return results;
   }
-  else {
-    Error(u"Json reply is missing albums and tracks object."_s, json_object);
-    return;
+  JsonObject *group = json_object_get_object_member(object, group_key);
+  if (!json_object_has_member(group, "items") || !JSON_NODE_HOLDS_ARRAY(json_object_get_member(group, "items"))) {
+    g_object_unref(parser);
+    return results;
   }
-
-  if (!value_type.isObject()) {
-    Error(u"Json albums or tracks is not a object."_s, value_type);
-    return;
-  }
-  const QJsonObject object_type = value_type.toObject();
-
-  if (!object_type.contains("items"_L1)) {
-    Error(u"Json albums or tracks object does not contain items."_s, object_type);
-    return;
-  }
-  const QJsonValue value_items = object_type["items"_L1];
-
-  if (!value_items.isArray()) {
-    Error(u"Json albums or track object items is not a array."_s, value_items);
-    return;
-  }
-  const QJsonArray array_items = value_items.toArray();
-
-  for (const QJsonValue &value : array_items) {
-
-    if (!value.isObject()) {
-      Error(u"Invalid Json reply, value in items is not a object."_s);
+  JsonArray *items = json_object_get_array_member(group, "items");
+  const guint n = json_array_get_length(items);
+  for (guint i = 0; i < n; ++i) {
+    JsonNode *item_node = json_array_get_element(items, i);
+    if (!item_node || !JSON_NODE_HOLDS_OBJECT(item_node)) {
       continue;
     }
-    const QJsonObject item_object = value.toObject();
-
-    QJsonObject object_album;
-    if (item_object.contains("album"_L1)) {
-      if (!item_object["album"_L1].isObject()) {
-        Error(u"Invalid Json reply, items album is not a object."_s, item_object);
-        continue;
-      }
-      object_album = item_object["album"_L1].toObject();
+    JsonObject *item = json_node_get_object(item_node);
+    JsonObject *album = item;
+    if (json_object_has_member(item, "album") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(item, "album"))) {
+      album = json_object_get_object_member(item, "album");
     }
-    else {
-      object_album = item_object;
-    }
-
-    if (!object_album.contains("artist"_L1) || !object_album.contains("image"_L1) || !object_album.contains("title"_L1)) {
-      Error(u"Invalid Json reply, item is missing artist, title or image."_s, object_album);
+    if (!json_object_has_member(album, "artist") || !json_object_has_member(album, "image") ||
+        !JSON_NODE_HOLDS_OBJECT(json_object_get_member(album, "artist")) || !JSON_NODE_HOLDS_OBJECT(json_object_get_member(album, "image"))) {
       continue;
     }
-
-    const QString album = object_album["title"_L1].toString();
-
-    // Artist
-    const QJsonValue value_artist = object_album["artist"_L1];
-    if (!value_artist.isObject()) {
-      Error(u"Invalid Json reply, items (album) artist is not a object."_s, value_artist);
+    const std::string artist = ObjectString(json_object_get_object_member(album, "artist"), "name");
+    const std::string title = ObjectString(album, "title");
+    const std::string cover = ObjectString(json_object_get_object_member(album, "image"), "large");
+    if (title.empty() || cover.empty()) {
       continue;
     }
-    const QJsonObject object_artist = value_artist.toObject();
-    if (!object_artist.contains("name"_L1)) {
-      Error(u"Invalid Json reply, items (album) artist is missing name."_s, object_artist);
-      continue;
-    }
-    const QString artist = object_artist["name"_L1].toString();
-
-    // Image
-    const QJsonValue image = object_album["image"_L1];
-    if (!image.isObject()) {
-      Error(u"Invalid Json reply, items (album) image is not a object."_s, image);
-      continue;
-    }
-    const QJsonObject object_image = image.toObject();
-    if (!object_image.contains("large"_L1)) {
-      Error(u"Invalid Json reply, items (album) image is missing large."_s, object_image);
-      continue;
-    }
-    const QUrl cover_url(object_image["large"_L1].toString());
-
-    CoverProviderSearchResult cover_result;
-    cover_result.artist = artist;
-    cover_result.album = Song::AlbumRemoveDiscMisc(album);
-    cover_result.image_url = cover_url;
-    cover_result.image_size = QSize(600, 600);
-    results << cover_result;
-
+    SearchResult result;
+    result.artist = artist;
+    result.album = Song::AlbumRemoveDiscMisc(title);
+    result.image_url = cover;
+    results.push_back(result);
   }
-
+  g_object_unref(parser);
+  return results;
 }
 
-void QobuzCoverProvider::Error(const QString &error, const QVariant &debug) {
+void QobuzCoverProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
+  Search(song, network, [callback](const CoverProviderSearchResults &results) {
+    if (results.empty()) {
+      callback({}, "No Qobuz cover");
+      return;
+    }
+    callback(results.front().image_url, {});
+  });
+}
 
-  qLog(Error) << "Qobuz:" << error;
-  if (debug.isValid()) qLog(Debug) << debug;
-
+void QobuzCoverProvider::Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) {
+  if (!network || (song.EffectiveAlbumartist().empty() && song.album().empty() && song.title().empty())) {
+    callback({});
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup("Qobuz");
+  const std::string app_id = settings.Value("appid");
+  const std::string token = settings.Value("token").empty() ? settings.Value("user_auth_token") : settings.Value("token");
+  if (app_id.empty() || token.empty()) {
+    callback({});
+    return;
+  }
+  network->Get(SearchUrl(song.EffectiveAlbumartist(), song.album(), song.title()),
+               [this, callback](const NetworkAccessManager::Response &response) {
+                 CoverProviderSearchResults results;
+                 if (!response.ok()) {
+                   callback(results);
+                   return;
+                 }
+                 for (const SearchResult &hit : ParseResults(response.body)) {
+                   results.push_back(AlbumCoverFetcherSearch::FromHit(name(), hit.artist, hit.album, hit.image_url));
+                 }
+                 callback(results);
+               },
+               {{"X-App-Id", app_id}, {"X-User-Auth-Token", token}});
 }

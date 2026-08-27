@@ -1,142 +1,99 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_FILEVIEW_H
+#define STRAWBERRY_FILEVIEW_H
 
-#ifndef FILEVIEW_H
-#define FILEVIEW_H
+#include "fileview/fileviewhistory.h"
+#include "fileview/fileviewlist.h"
+#include "fileview/fileviewmenu.h"
+#include "fileview/fileviewmode.h"
+#include "fileview/fileviewtree.h"
+#include "fileview/fileviewtreemodel.h"
 
-#include <QObject>
-#include <QWidget>
-#include <QAbstractItemModel>
-#include <QList>
-#include <QString>
-#include <QStringList>
-#include <QUrl>
-#include <QUndoCommand>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "includes/scoped_ptr.h"
-#include "includes/shared_ptr.h"
-#include "core/song.h"
+#include <gtk/gtk.h>
 
-class QMimeData;
-class QFileSystemModel;
-class QFileIconProvider;
-class QUndoStack;
-class QKeyEvent;
-class QShowEvent;
-class QSpacerItem;
-
-class MusicStorage;
-class TaskManager;
-class Ui_FileView;
-class FileViewTreeModel;
-
-class FileView : public QWidget {
-  Q_OBJECT
-
+class FileView {
  public:
-  explicit FileView(QWidget *parent = nullptr);
-  ~FileView() override;
+  using PathsCallback = std::function<void(const std::vector<std::string> &)>;
 
-  void ReloadSettings();
+  FileView();
 
-  void SetPath(const QString &path);
-  void SetTaskManager(SharedPtr<TaskManager> task_manager);
+  GtkWidget *widget() const { return widget_; }
+  FileViewTreeModel *model() { return &model_; }
+  FileViewList *list() { return list_.get(); }
+  FileViewTree *tree() { return tree_.get(); }
+  const std::string &path() const { return path_; }
 
- protected:
-  void showEvent(QShowEvent *e) override;
-  void keyPressEvent(QKeyEvent *e) override;
-
- Q_SIGNALS:
-  void PathChanged(const QString &path);
-
-  void AddToPlaylist(QMimeData *data);
-  void CopyToCollection(const QList<QUrl> &urls);
-  void MoveToCollection(const QList<QUrl> &urls);
-  void CopyToDevice(const QList<QUrl> &urls);
-  void EditTags(const QList<QUrl> &urls);
-
- private Q_SLOTS:
+  void SetPath(const std::string &path, bool record = true);
   void FileUp();
   void FileHome();
-  void ChangeFilePath(const QString &new_path);
-  void ItemActivated(const QModelIndex &idx);
-  void ItemDoubleClick(const QModelIndex &idx);
+  void FileBack();
+  void FileForward();
+  void Reload();
+  void SetShowHidden(bool show_hidden);
+  void SetShowAllFiles(bool show_all);
   void ToggleViewMode();
-
-  void Delete(const QStringList &filenames);
-  void DeleteFinished(const SongList &songs_with_errors);
-
- public Q_SLOTS:
-  void AddTreeRootPath(const QString &path);
-  void RemoveTreeRootPath(const QString &path);
+  void AddTreeRootPath(const std::string &path);
+  void RemoveTreeRootPath(const std::string &path);
+  FileViewMode::Mode mode() const { return mode_; }
+  const std::vector<std::string> &tree_root_paths() const { return roots_; }
+  FileViewHistory *history() { return &history_; }
+  void SetAddToPlaylistCallback(PathsCallback callback);
+  void SetDoubleClickPlaylistCallback(PathsCallback callback);
+  void SetEnqueueCallback(PathsCallback callback);
+  void SetReplacePlaylistCallback(PathsCallback callback);
+  void SetOpenInNewCallback(PathsCallback callback);
+  void SetCopyToCollectionCallback(PathsCallback callback);
+  void SetMoveToCollectionCallback(PathsCallback callback);
+  void SetCopyToDeviceCallback(PathsCallback callback);
+  void SetEditTagsCallback(PathsCallback callback);
+  void SetDeleteCallback(PathsCallback callback);
+  void SetShowInBrowserCallback(PathsCallback callback);
 
  private:
-  void ChangeFilePathWithoutUndo(const QString &new_path);
-  void SetupTreeView();
-  void SaveTreeRootPaths();
+  void ShowMenu(const std::vector<std::string> &paths);
+  void Activate(const std::string &path);
+  void DoubleClick(const std::string &path);
+  void UpdateNavButtons();
+  void ApplyViewMode();
   void AddRootButtonClicked();
   void RemoveRootButtonClicked();
-  void UpdateViewModeUI();
 
- private:
-  class UndoCommand : public QUndoCommand {
-   public:
-    UndoCommand(FileView *view, const QString &new_path);
+  void PersistSettings();
 
-    QString undo_path() const { return old_state_.path; }
-
-    void undo() override;
-    void redo() override;
-
-   private:
-    struct State {
-      State() : scroll_pos(-1) {}
-
-      QString path;
-      QModelIndex index;
-      int scroll_pos;
-    };
-
-    FileView *view_;
-    State old_state_;
-    State new_state_;
-  };
-
-  Ui_FileView *ui_;
-
-  QFileSystemModel *model_;
-  FileViewTreeModel *tree_model_;
-  QUndoStack *undo_stack_;
-
-  SharedPtr<TaskManager> task_manager_;
-  SharedPtr<MusicStorage> storage_;
-
-  QString lazy_set_path_;
-  QStringList tree_root_paths_;
-
-  QStringList filter_list_;
-
-  ScopedPtr<QFileIconProvider> file_icon_provider_;
-
-  bool tree_view_active_;
-  QSpacerItem *view_mode_spacer_;
+  GtkWidget *widget_ = nullptr;
+  GtkWidget *path_entry_ = nullptr;
+  GtkWidget *back_ = nullptr;
+  GtkWidget *forward_ = nullptr;
+  GtkWidget *up_ = nullptr;
+  GtkWidget *home_btn_ = nullptr;
+  GtkWidget *add_root_ = nullptr;
+  GtkWidget *remove_root_ = nullptr;
+  GtkWidget *toggle_ = nullptr;
+  GtkWidget *hidden_btn_ = nullptr;
+  GtkWidget *all_files_btn_ = nullptr;
+  FileViewTreeModel model_;
+  std::unique_ptr<FileViewTree> tree_;
+  std::unique_ptr<FileViewList> list_;
+  FileViewHistory history_;
+  std::string path_;
+  std::string home_;
+  FileViewMode::Mode mode_ = FileViewMode::DefaultMode();
+  std::vector<std::string> roots_;
+  PathsCallback add_to_playlist_;
+  PathsCallback double_click_playlist_;
+  PathsCallback enqueue_;
+  PathsCallback replace_playlist_;
+  PathsCallback open_in_new_;
+  PathsCallback copy_to_collection_;
+  PathsCallback move_to_collection_;
+  PathsCallback copy_to_device_;
+  PathsCallback edit_tags_;
+  PathsCallback delete_;
+  PathsCallback show_in_browser_;
 };
 
-#endif  // FILEVIEW_H
+#endif

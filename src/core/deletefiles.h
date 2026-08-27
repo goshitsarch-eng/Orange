@@ -1,70 +1,52 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_DELETEFILES_H
+#define STRAWBERRY_DELETEFILES_H
 
-#ifndef DELETEFILES_H
-#define DELETEFILES_H
+#include "core/musicstorage.h"
+#include "core/signal.h"
+#include "core/song.h"
+#include "core/taskmanager.h"
 
-#include "config.h"
+#include <string>
+#include <vector>
 
-#include <QObject>
-#include <QStringList>
-
-#include "includes/shared_ptr.h"
-#include "song.h"
-
-class QThread;
-class TaskManager;
-class MusicStorage;
-
-class DeleteFiles : public QObject {
-  Q_OBJECT
-
+class DeleteFiles {
  public:
-  explicit DeleteFiles(SharedPtr<TaskManager> task_manager, SharedPtr<MusicStorage> storage, const bool use_trash, QObject *parent = nullptr);
-  ~DeleteFiles() override;
+  DeleteFiles(TaskManager *task_manager, MusicStorage *storage, bool use_trash);
+  ~DeleteFiles();
 
   void Start(const SongList &songs);
-  void Start(const QStringList &filenames);
+  void Start(const std::vector<std::string> &filenames);
+  void Begin(const SongList &songs);
+  void StartAsync(const SongList &songs);
+  void ProcessSome();
+  void Cancel();
+  void IdleTick();
 
- Q_SIGNALS:
-  void Finished(const SongList &songs_with_errors);
+  bool finished() const { return finished_; }
+  bool cancelled() const { return cancelled_; }
+  int next_index() const { return next_; }
+  int task_id() const { return task_id_; }
+  const SongList &errors() const { return errors_; }
 
- private Q_SLOTS:
-  void ProcessSomeFiles();
+  Signal<SongList> Finished;
 
  private:
-  QThread *thread_;
-  QThread *original_thread_;
-  SharedPtr<TaskManager> task_manager_;
-  SharedPtr<MusicStorage> storage_;
+  void ProcessOne(const Song &song);
+  void Complete();
+  void ScheduleIdle();
 
+  TaskManager *task_manager_ = nullptr;
+  MusicStorage *storage_ = nullptr;
+  bool use_trash_ = false;
   SongList songs_;
-  bool use_trash_;
-
-  bool started_;
-
-  int task_id_;
-  int progress_;
-
-  SongList songs_with_errors_;
+  SongList errors_;
+  int next_ = 0;
+  int task_id_ = 0;
+  bool cancelled_ = false;
+  bool finished_ = false;
+  bool async_ = false;
+  bool started_storage_ = false;
+  unsigned idle_id_ = 0;
 };
 
-#endif  // DELETEFILES_H
+#endif

@@ -1,0 +1,4478 @@
+# Translation catalog for Strawberry Music Player.
+# Generated from the Qt .ts files on origin/master.
+msgid ""
+msgstr ""
+"Project-Id-Version: strawberry\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-26 00:00+0000\n"
+"PO-Revision-Date: 2026-08-26 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: nb_NO\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "ASX playlist is too large"
+msgstr "ASX playlist is too large"
+
+msgid "Failed to write ASX playlist"
+msgstr "Failed to write ASX playlist"
+
+msgid "About"
+msgstr "Om"
+
+msgid "About Strawberry"
+msgstr "Om Strawberry"
+
+msgid "Version %1"
+msgstr "Versjon %1"
+
+msgid "Strawberry is a music player and music collection organizer."
+msgstr "Strawberry er en musikkspiller og musikksamlingsbehandler."
+
+msgid "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."
+msgstr "Det er en fork av Clementine utgitt i 2018."
+
+msgid "Strawberry is free software released under GPL. The source code is available on %1"
+msgstr "Strawberry er fri programvare lisensiert under GPL. Kildekoden er tilgjengelig på %1"
+
+msgid "You should have received a copy of the GNU General Public License along with this program.  If not, see %1"
+msgstr "Du skal å mottatt en kopi av GNU lisensen, hvis ikke, se %1."
+
+msgid "If you like Strawberry and can make use of it, consider sponsoring or donating."
+msgstr "Hvis du liker Strawberry og kan bruke det, vurder om du kan donere eller bli sponsor."
+
+msgid "You can sponsor the author on %1 or %2. You can also make a one-time payment through %3."
+msgstr "Du kan sponse Strawberry på %1 eller %2. Du kan også gi en engangsbetaling gjennom %3."
+
+msgid "Author and maintainer"
+msgstr "Utvikler og vedlikeholder"
+
+msgid "Contributors"
+msgstr "Bidragsytere"
+
+msgid "Clementine authors"
+msgstr "Clementine-utviklere"
+
+msgid "Clementine contributors"
+msgstr "Clementine-bidragsytere"
+
+msgid "Thanks to"
+msgstr "Takk til"
+
+msgid "Thanks to all the other Amarok and Clementine contributors."
+msgstr "Takk til alle de andre Amarok- og Clementine-bidragsyterne."
+
+msgid "Add Stream"
+msgstr "Legg til strøm"
+
+msgid "Enter the URL of a stream:"
+msgstr "Skriv inn URL for strøm:"
+
+msgid "Load cover from disk..."
+msgstr "Last inn omslag fra disk..."
+
+msgid "Save cover to disk..."
+msgstr "Lagre omslag til disk..."
+
+msgid "Load cover from URL..."
+msgstr "Last inn omslag fra URL..."
+
+msgid "Search for album covers..."
+msgstr "Søk etter plateomslag..."
+
+msgid "Unset cover"
+msgstr "Fjern omslagsvalg"
+
+msgid "Delete cover"
+msgstr "Slett omslag"
+
+msgid "Clear cover"
+msgstr "Fjern omslag"
+
+msgid "Show fullsize..."
+msgstr "Fullskjermvisning..."
+
+msgid "Search automatically"
+msgstr "Automatisk søk"
+
+msgid "Load cover from disk"
+msgstr "Hent omslag fra disk"
+
+msgid "Failed to open cover file %1 for reading: %2"
+msgstr "Feil ved åpning av omslagsfil %1 for lesing: %2"
+
+msgid "Cover file %1 is empty."
+msgstr "Omslagsfil %1 er tom."
+
+msgid "unknown"
+msgstr "ukjent"
+
+msgid "Save album cover"
+msgstr "Lagre plateomslag"
+
+msgid "Failed to open cover file %1 for writing: %2"
+msgstr "Feil ved åpning av omslagsfil %1 for skriving: %2"
+
+msgid "Failed writing cover to file %1: %2"
+msgstr "Feil ved lagring av omslagsfil %1: %2"
+
+msgid "Failed writing cover to file %1."
+msgstr "Feil ved lagring av omslagsfil %1."
+
+msgid "Failed to delete cover file %1: %2"
+msgstr "Feil ved sletting av omslagsfil %1: %2"
+
+msgid "Failed to write cover to file %1: %2"
+msgstr "Feil ved lagring av omslagsfil %1: %2"
+
+msgid "Could not save cover to file %1."
+msgstr "Klarte ikke lagre omslaget til fil %1."
+
+msgid "Export covers"
+msgstr "Eksporter omslag"
+
+msgid "Output"
+msgstr "Utgang"
+
+msgid "Enter a filename for exported covers (no extension):"
+msgstr "Angi et filnavn for eksporterte plateomslag (uten filendelse):"
+
+msgid "Export downloaded covers"
+msgstr "Eksporter nedlastede omslag"
+
+msgid "Export embedded covers"
+msgstr "Eksporter innebygde omslag"
+
+msgid "Existing covers"
+msgstr "Eksisterende omslag"
+
+msgid "Do not overwrite"
+msgstr "Ikke overskriv"
+
+msgid "O&verwrite all"
+msgstr "O&verskriv alle"
+
+msgid "Overwrite s&maller ones only"
+msgstr "Bare overskriv mindre"
+
+msgid "Size"
+msgstr "Størrelse"
+
+msgid "Scale size"
+msgstr "Skaler størrelse"
+
+msgid "Size:"
+msgstr "Størrelse:"
+
+msgid "Pixel"
+msgstr "Piksel"
+
+msgid "Abort"
+msgstr "Avbryt"
+
+msgid "All albums"
+msgstr "Alle album"
+
+msgid "Albums with covers"
+msgstr "Album med omslag"
+
+msgid "Albums without covers"
+msgstr "Album uten omslag"
+
+msgid "Really cancel?"
+msgstr "Vil du virkelig avbryte?"
+
+msgid "Closing this window will stop searching for album covers."
+msgstr "Lukking av dette vinduet vil medføre stopp i søk etter plateomslag."
+
+msgid "Don't stop!"
+msgstr "Ikke stopp!"
+
+msgid "All artists"
+msgstr "Alle artister"
+
+msgid "Various artists"
+msgstr "Diverse artister"
+
+msgid "Got %1 covers out of %2 (%3 failed)"
+msgstr "Hentet %1 av %2 omslag (%3 feilet)"
+
+msgid "%1 transferred"
+msgstr "overført %1"
+
+msgid "Export finished"
+msgstr "Eksport fullført"
+
+msgid "No covers to export."
+msgstr "Ingen omslag å eksportere."
+
+msgid "Exported %1 covers out of %2 (%3 skipped)"
+msgstr "%1 av %2 omslag eksportert (hoppet over %3)"
+
+msgid "Cover Manager"
+msgstr "Behandling av plateomslag"
+
+msgid "Artist"
+msgstr "Artist"
+
+msgid "Album"
+msgstr "Album"
+
+msgid "Search"
+msgstr "Søk"
+
+msgid "Covers from %1"
+msgstr "Omslag fra %1"
+
+msgid "Framerate"
+msgstr "Bildetakt"
+
+msgid "Low (%1 fps)"
+msgstr "Lav (%1 bilder/sekund)"
+
+msgid "Medium (%1 fps)"
+msgstr "Medium (%1 bilder/sekund)"
+
+msgid "High (%1 fps)"
+msgstr "Høy (%1 bilder/sekund)"
+
+msgid "Super high (%1 fps)"
+msgstr "Superhøy (%1 bilder/sek)"
+
+msgid "No analyzer"
+msgstr "Ingen analyse"
+
+msgid "Block analyzer"
+msgstr "Blokkanalyse"
+
+msgid "Boom analyzer"
+msgstr "Boomanalysator"
+
+msgid "Turbine"
+msgstr "Turbine"
+
+msgid "Sonogram"
+msgstr "Sonogram"
+
+msgid "WaveRubber"
+msgstr "WaveRubber"
+
+msgid "Appearance"
+msgstr "Utseende"
+
+msgid "Style"
+msgstr "Stil"
+
+msgid "Tabbar colors"
+msgstr "Tabbar farger"
+
+msgid "&Use the system default color"
+msgstr "&bruk standard system farger"
+
+msgid "Use custom color"
+msgstr "Bruk egendefinert farge"
+
+msgid "Use gradient background"
+msgstr "Bruk gradient bakgrunn"
+
+msgid "Select tabbar color:"
+msgstr "Velg tabbar farge:"
+
+msgid "Background image"
+msgstr "Bakgrunnsbilde"
+
+msgid "Default bac&kground image"
+msgstr "Forhåndsvalgt bak&grunnsbilde"
+
+msgid "&No background image"
+msgstr "&Ingen bakgrunn"
+
+msgid "The album cover of the currently playing song"
+msgstr "Plateomslaget til sangen som spilles av for øyeblikket"
+
+msgid "Albu&m cover"
+msgstr "Albu&momslag"
+
+msgid "Custom image:"
+msgstr "Egendefinert bilde:"
+
+msgid "Browse..."
+msgstr "Bla gjennom…"
+
+msgid "Position"
+msgstr "Posisjon"
+
+msgid "Upper Left"
+msgstr "Oppe til venstre"
+
+msgid "Upper Right"
+msgstr "Oppe til høyre"
+
+msgid "Middle"
+msgstr "Midten"
+
+msgid "Bottom Left"
+msgstr "Nede til venstre"
+
+msgid "Bottom Right"
+msgstr "Nede til høyre"
+
+msgid "Max cover size"
+msgstr "Maksimal omslagsstørrelse"
+
+msgid "Stretch image to fill playlist"
+msgstr "Utvid bildet til å fylle spilleliste"
+
+msgid "Keep aspect ratio"
+msgstr "Keep aspect ratio"
+
+msgid "Do not cut image"
+msgstr "Ikke kutt bildet"
+
+msgid "Blur amount"
+msgstr "Mengde slør"
+
+msgid "0px"
+msgstr "0px"
+
+msgid "Opacity"
+msgstr "Dekkevne"
+
+msgid "40%"
+msgstr "40%"
+
+msgid "Icon sizes"
+msgstr "Ikon størrelser"
+
+msgid "Playlist buttons"
+msgstr "Spilleliste knapper"
+
+msgid "Tabbar large mode"
+msgstr "Tabbar stor modus"
+
+msgid "Play control buttons"
+msgstr "Spillekontrolknapper"
+
+msgid "Configure buttons"
+msgstr "Konfigurere knapper"
+
+msgid "Files, playlists and queue buttons"
+msgstr "Filer, spillelister og kø knapper"
+
+msgid "Tabbar small mode"
+msgstr "Tabbar liten modus"
+
+msgid "Playlist playing song color"
+msgstr "Spilleliste spiller sang farge"
+
+msgid "System highlight color"
+msgstr "System markeringsfarge"
+
+msgid "Custom color"
+msgstr "Kustom farge"
+
+msgid "Select playlist playing song color:"
+msgstr "Velg spilleliste sang farge:"
+
+msgid "Window"
+msgstr "Window"
+
+msgid "Window text"
+msgstr "Window text"
+
+msgid "Base"
+msgstr "Base"
+
+msgid "Alternate base"
+msgstr "Alternate base"
+
+msgid "Tooltip base"
+msgstr "Tooltip base"
+
+msgid "Tooltip text"
+msgstr "Tooltip text"
+
+msgid "Placeholder text"
+msgstr "Placeholder text"
+
+msgid "Text"
+msgstr "Text"
+
+msgid "Button"
+msgstr "Button"
+
+msgid "Button text"
+msgstr "Button text"
+
+msgid "Bright text"
+msgstr "Bright text"
+
+msgid "Select color"
+msgstr "Select color"
+
+msgid "Select background image"
+msgstr "Velg bakgrunnsbilde"
+
+msgid "Colors"
+msgstr "Colors"
+
+msgid "&Use the system default color set"
+msgstr "&Use the system default color set"
+
+msgid "Use a custom color set"
+msgstr "Use a custom color set"
+
+msgid "Set a custom color set suitable for a dark theme"
+msgstr "Set a custom color set suitable for a dark theme"
+
+msgid "Dark mode"
+msgstr "Dark mode"
+
+msgid "Reset the custom color set to the system default colors"
+msgstr "Reset the custom color set to the system default colors"
+
+msgid "Reset to default"
+msgstr "Reset to default"
+
+msgid "You might need to restart Strawberry for this setting to fully apply"
+msgstr "You might need to restart Strawberry for this setting to fully apply"
+
+msgid "You need to restart Strawberry for this setting to take affect"
+msgstr "You need to restart Strawberry for this setting to take affect"
+
+msgid "System icons"
+msgstr "System icons"
+
+msgid "Changing colors is only supported with some styles"
+msgstr "Changing colors is only supported with some styles"
+
+msgid "Dark colors"
+msgstr "Dark colors"
+
+msgid "Backend"
+msgstr "Backend"
+
+msgid "Audio output"
+msgstr "Lyd-utenhet"
+
+msgid "Device"
+msgstr "Enhet"
+
+msgid "ALSA plugin:"
+msgstr "ALSA plugin:"
+
+msgid "hw"
+msgstr "hw"
+
+msgid "p&lughw"
+msgstr "p&lughw"
+
+msgid "pcm"
+msgstr "pcm"
+
+msgid "Exclusive mode (Experimental)"
+msgstr "Exclusive mode (Experimental)"
+
+msgid "Options"
+msgstr "Valg"
+
+msgid "Enable volume control"
+msgstr "Aktiver volumkontroll"
+
+msgid "Upmix / downmix to"
+msgstr "Upmix / downmix to"
+
+msgid "channels"
+msgstr "kanaler"
+
+msgid "Improve headphone listening of stereo audio records (bs2b)"
+msgstr "Improve headphone listening of stereo audio records (bs2b)"
+
+msgid "Use playbin3 when available"
+msgstr "Use playbin3 when available"
+
+msgid "Enable HTTP/2 for streaming"
+msgstr "Enable HTTP/2 for streaming"
+
+msgid "Use strict SSL mode"
+msgstr "Use strict SSL mode"
+
+msgid "Buffer"
+msgstr "Buffer"
+
+msgid " ms"
+msgstr "ms"
+
+msgid "Buffer duration"
+msgstr "Mellomlagringslengde"
+
+msgid "High watermark"
+msgstr "High watermark"
+
+msgid "Low watermark"
+msgstr "Low watermark"
+
+msgid "Defaults"
+msgstr "Standard"
+
+msgid "Audio normalization"
+msgstr "Audio normalization"
+
+msgid "No audio normalization"
+msgstr "No audio normalization"
+
+msgid "Replay Gain"
+msgstr "Normalisering"
+
+msgid "Use Replay Gain metadata if it is available"
+msgstr "Bruk normalisering-metadata hvis tilgjengelig"
+
+msgid "Replay Gain mode"
+msgstr "ReplayGain-modus"
+
+msgid "Radio (equal loudness for all tracks)"
+msgstr "Radio (lik lydstyrkeutgjevning for alle spor)"
+
+msgid "Album (ideal loudness for all tracks)"
+msgstr "Album (ideell lydstyrkeutgjevning for alle spor)"
+
+msgid "Pre-amp"
+msgstr "Forforsterker"
+
+msgid "Apply compression to prevent clipping"
+msgstr "Legg til kompressor, for å unngå klipping"
+
+msgid "Fallback-gain"
+msgstr "Fallback-gain"
+
+msgid "EBU R 128 Loudness Normalization"
+msgstr "EBU R 128 Loudness Normalization"
+
+msgid "Perform track loudness normalization"
+msgstr "Perform track loudness normalization"
+
+msgid "Target Level"
+msgstr "Target Level"
+
+msgid "Fading"
+msgstr "Ton inn/ut"
+
+msgid "Fade out when stopping a track"
+msgstr "Ton ut når sporet stoppes"
+
+msgid "Cross-fade when changing tracks manually"
+msgstr "Mikse overgang når du skifter spor selv"
+
+msgid "Cross-fade when changing tracks automatically"
+msgstr "Miks overgang når spor skiftes automatisk"
+
+msgid "Except between tracks on the same album or in the same CUE sheet"
+msgstr "Unntatt mellom spor fra samme album eller CUE-fil"
+
+msgid "Fading duration"
+msgstr "Tonings-varighet"
+
+msgid "Fade out on pause / fade in on resume"
+msgstr "Ton ut/inn ved pause/start"
+
+msgid "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+msgstr "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+
+msgid "Exponential volume scaling"
+msgstr "Exponential volume scaling"
+
+msgid "Device warm-up"
+msgstr "Device warm-up"
+
+msgid "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+msgstr "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+
+msgid "Behavior"
+msgstr "Adferd"
+
+msgid "Show system tray icon"
+msgstr "Vis systemikon"
+
+msgid "Keep running in the background when the window is closed"
+msgstr "Fortsett i bakgrunnen selv om vinduet lukkes"
+
+msgid "Show song progress on system tray icon"
+msgstr "Vis sang prosess på systemikon"
+
+msgid "Show song progress on taskbar"
+msgstr "Show song progress on taskbar"
+
+msgid "Resume playback on start"
+msgstr "Gjenoppta avspilling etter oppstart"
+
+msgid "Show playing widget"
+msgstr "Vis spille widget"
+
+msgid "On startup"
+msgstr "Ved oppstart"
+
+msgid "Remember from &last time"
+msgstr "Husk fra siste gang"
+
+msgid "Show the main window"
+msgstr "Vis hovedvinduet"
+
+msgid "Hide the main window"
+msgstr "Skjul hovedvindu"
+
+msgid "Show the main window maximized"
+msgstr "Vis hovedvinduet maksimert"
+
+msgid "Show the main window minimized"
+msgstr "Vis hovedvinduet minimert"
+
+msgid "Language"
+msgstr "Språk"
+
+msgid "Use the system default"
+msgstr "Bruk systemforevalg"
+
+msgid "You will need to restart Strawberry if you change the language."
+msgstr "Du må starte Strawberry på nytt for å bytte språk."
+
+msgid "Using the menu to add a song will..."
+msgstr "Bruk av menyen for å legge til et spor vil…"
+
+msgid "Never start playing"
+msgstr "Aldri begynn avspilling"
+
+msgid "Play if there is nothing already playing"
+msgstr "Spill hvis det ikke er noe annet som spilles av for øyeblikket"
+
+msgid "Always start playing"
+msgstr "Alltid start avspilling"
+
+msgid "Pressing \"Previous\" in player will..."
+msgstr "Når du trykker \"Forrige\" i spilleren vil…"
+
+msgid "Jump to previous song right away"
+msgstr "Gå til forrige sang nå"
+
+msgid "Restart song, then jump to previous if pressed again"
+msgstr "Omstart av sang eller tilbake til forrige ved ytterligere trykk"
+
+msgid "Double clicking a song will..."
+msgstr "Dobbeltklikking på en sang vil…"
+
+msgid "Append to the playlist"
+msgstr "Legg til i spillelista"
+
+msgid "Replace the playlist"
+msgstr "Erstatt spillelista"
+
+msgid "Open in new playlist"
+msgstr "Åpne i ny spilleliste"
+
+msgid "Add to the queue"
+msgstr "Legg i kø"
+
+msgid "Double clicking a song in the playlist will..."
+msgstr "Dobbeltklikking på vilkårlig sang i spillelisten vil…"
+
+msgid "Change the currently playing song"
+msgstr "Bytt låten som spilles"
+
+msgid "Seeking using a keyboard shortcut or mouse wheel"
+msgstr "Gå frem-/bakover ved bruk av en tastatursnarvei eller musehjulet"
+
+msgid "Time step"
+msgstr "Tidstrinn"
+
+msgid " s"
+msgstr " s"
+
+msgid "Volume Increment"
+msgstr "Volume Increment"
+
+msgid "Could not create cdiocddasrc"
+msgstr "Could not create cdiocddasrc"
+
+msgid "Error while setting CDDA device to ready state."
+msgstr "Error while setting CDDA device to ready state."
+
+msgid "Error while setting CDDA device to pause state."
+msgstr "Error while setting CDDA device to pause state."
+
+msgid "The 'track' format is not supported by GStreamer."
+msgstr "The 'track' format is not supported by GStreamer."
+
+msgid "Error while querying CDDA tracks."
+msgstr "Error while querying CDDA tracks."
+
+msgid "Unable to execute collection SQL query: %1"
+msgstr "Unable to execute collection SQL query: %1"
+
+msgid "Failed SQL query: %1"
+msgstr "Failed SQL query: %1"
+
+msgid "Updating %1 database."
+msgstr "Oppdaterer %1 database."
+
+msgid "Collection Filter"
+msgstr "Collection Filter"
+
+msgid "Enter search terms here"
+msgstr "Skriv inn søkeord her"
+
+msgid "MenuPopupToolButton"
+msgstr "MenuPopupToolButton"
+
+msgid "Entire collection"
+msgstr "Hele samlingen"
+
+msgid "Added today"
+msgstr "Lagt til i dag"
+
+msgid "Added this week"
+msgstr "Lagt til denne uken"
+
+msgid "Added within three months"
+msgstr "Lagt til innen tre måneder"
+
+msgid "Added this year"
+msgstr "Lagt til i år"
+
+msgid "Added this month"
+msgstr "Lagt til denne måneden"
+
+msgid "Save current grouping"
+msgstr "Lagre nåværende gruppering"
+
+msgid "Manage saved groupings"
+msgstr "Behandle lagrede grupperinger"
+
+msgid "Any rating"
+msgstr "Any rating"
+
+msgid "Rating non null"
+msgstr "Rating non null"
+
+msgid "Rating greater than 1 star"
+msgstr "Rating greater than 1 star"
+
+msgid "Rating greater than 2 stars"
+msgstr "Rating greater than 2 stars"
+
+msgid "Rating greater than 3 stars"
+msgstr "Rating greater than 3 stars"
+
+msgid "Rating greater than 4 stars"
+msgstr "Rating greater than 4 stars"
+
+msgid "Group by"
+msgstr "Grupper etter"
+
+msgid "Filter by age"
+msgstr "Filter by age"
+
+msgid "Filter by rating"
+msgstr "Filter by rating"
+
+msgid "Display options"
+msgstr "Visningsalternativ"
+
+msgid "Group by Album artist/Album"
+msgstr "Grupper etter album artist/album"
+
+msgid "Group by Album artist/Album - Disc"
+msgstr "Grupper etter album artist/album - disc"
+
+msgid "Group by Album artist/Year - Album"
+msgstr "Grupper etter album artist/år - album"
+
+msgid "Group by Album artist/Year - Album - Disc"
+msgstr "Grupper etter album artist/år - album - disc"
+
+msgid "Group by Artist/Album"
+msgstr "Grupper etter artist/album"
+
+msgid "Group by Artist/Album - Disc"
+msgstr "Grupper etter artist/album - disc"
+
+msgid "Group by Artist/Year - Album"
+msgstr "Grupper etter artist/år - album"
+
+msgid "Group by Artist/Year - Album - Disc"
+msgstr "Grupper etter artist/år - album - disc"
+
+msgid "Group by Genre/Album artist/Album"
+msgstr "Grupper etter sjanger/album artist/album"
+
+msgid "Group by Genre/Artist/Album"
+msgstr "Grupper etter sjanger/artist/album"
+
+msgid "Group by Album Artist"
+msgstr "Grupper etter album artist"
+
+msgid "Group by Artist"
+msgstr "Grupper etter artist"
+
+msgid "Group by Album"
+msgstr "Grupper etter album"
+
+msgid "Group by Genre/Album"
+msgstr "Grupper etter sjanger/album"
+
+msgid "Advanced grouping..."
+msgstr "Avansert gruppering…"
+
+msgid "Grouping Name"
+msgstr "Grupperingsnavn"
+
+msgid "Grouping name:"
+msgstr "Grupperingsnavn:"
+
+msgid "Support for sort tags artist, album, album artist, title, composer and performer"
+msgstr "Support for sort tags artist, album, album artist, title, composer and performer"
+
+msgid "Saving playcounts and ratings"
+msgstr "Saving playcounts and ratings"
+
+msgid "Loading..."
+msgstr "Åpner…"
+
+msgid "Unknown"
+msgstr "Ukjent"
+
+msgid "Collection"
+msgstr "Samling"
+
+msgid "These folders will be scanned for music to make up your collection"
+msgstr "Disse katalogene vil skannes for musikk som kan legges til samlingen ditt"
+
+msgid "Add new folder..."
+msgstr "Legg til mappe…"
+
+msgid "Remove folder"
+msgstr "Fjern mappe"
+
+msgid "Automatic updating"
+msgstr "Automatisk oppdatering"
+
+msgid "Update the collection when Strawberry starts"
+msgstr "Oppdater samlingen når Strawberry starter"
+
+msgid "Monitor the collection for changes"
+msgstr "Overvåk endringer i samlingen"
+
+msgid "Song fingerprinting and tracking"
+msgstr "Song fingerprinting and tracking"
+
+msgid "Mark disappeared songs unavailable"
+msgstr "Merk tapte sanger utilgjengelige"
+
+msgid "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+msgstr "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+
+msgid "Expire unavailable songs after"
+msgstr "Utløp utilgjengelige sanger etter"
+
+msgid "days"
+msgstr "dager"
+
+msgid "Preferred album art filenames (comma separated)"
+msgstr "Foretrukne filnavn for omslag (inndelt med komma)"
+
+msgid "When looking for album art Strawberry will first look for picture files that contain one of these words.\nIf there are no matches then it will use the largest image in the directory."
+msgstr "Strawberry søker først etter bildefiler som inneholder ett av disse ordene.\nHvis ingen ord passer, blir det største bildet i mappen brukt."
+
+msgid "Automatically open single categories in the collection tree"
+msgstr "Åpne enkeltkategorier i bibliotektreet automatisk"
+
+msgid "Show dividers"
+msgstr "Vis adskillere"
+
+msgid "Show album cover art in collection"
+msgstr "Vis albumbilder i samlingen"
+
+msgid "Use various artists for compilation albums"
+msgstr "Use various artists for compilation albums"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+
+msgid "Use sort tags for sorting when available"
+msgstr "Use sort tags for sorting when available"
+
+msgid "Album cover pixmap cache"
+msgstr "Plateomslag pixmap cache"
+
+msgid "Enable Disk Cache"
+msgstr "Aktiver disk cache"
+
+msgid "Disk Cache Size"
+msgstr "Disk Cache Size"
+
+msgid "Current disk cache in use:"
+msgstr "Nåværende disk cache i bruk:"
+
+msgid "Clear Disk Cache"
+msgstr "Slett disk cache"
+
+msgid "Song playcounts and ratings"
+msgstr "Spilleteller og vurdering"
+
+msgid "Save playcounts to song tags when possible"
+msgstr "Lagre spilletellere til filer når mulig"
+
+msgid "Save ratings to song tags when possible"
+msgstr "Lagre vurderinger til filer når mulig"
+
+msgid "Overwrite database playcount when songs are re-read from disk"
+msgstr "Overskriv database spilleteller når sanger er lest på nytt fra disk"
+
+msgid "Overwrite database rating when songs are re-read from disk"
+msgstr "Overskriv database vurdering når sanger er lest på nytt fra disk"
+
+msgid "Save playcounts and ratings to files now"
+msgstr "Lagre spilletellere og vurderinger til filer nå"
+
+msgid "Enable delete files in the right click context menu"
+msgstr "Aktiv slett filer i høyreklikk-meny"
+
+msgid "Add directory..."
+msgstr "Legg til mappe…"
+
+msgid "Write all playcounts and ratings to files"
+msgstr "Skriv alle spilletellere og vurdering til filer"
+
+msgid "Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"
+msgstr "Er du sikker på at du vil skrive spilletellere og vurderinger til alle sangene i samlingen?"
+
+msgid "Your collection is empty!"
+msgstr "Samlingen din er tom!"
+
+msgid "Click here to add some music"
+msgstr "Klikk her for å legge til musikk"
+
+msgid "Append to current playlist"
+msgstr "Legg til i gjeldende spilleliste"
+
+msgid "Replace current playlist"
+msgstr "Erstatt gjeldende spilleliste"
+
+msgid "Queue track"
+msgstr "Legg spor i kø"
+
+msgid "Queue to play next"
+msgstr "Legg i kø for å spille som neste"
+
+msgid "Search for this"
+msgstr "Søk etter dette"
+
+msgid "Organize files..."
+msgstr "Organiser filene..."
+
+msgid "Copy to device..."
+msgstr "Kopier til enhet…"
+
+msgid "Delete from disk..."
+msgstr "Slett fra disk…"
+
+msgid "Edit track information..."
+msgstr "Rediger spor informasjon…"
+
+msgid "Edit tracks information..."
+msgstr "Rediger spor informasjon…"
+
+msgid "Show in file browser..."
+msgstr "Vis i fil utforsker"
+
+msgid "Rescan song(s)"
+msgstr "Reskann sang(er)"
+
+msgid "Show in various artists"
+msgstr "Vis under diverse artister"
+
+msgid "Don't show in various artists"
+msgstr "Ikke vis under diverse artister"
+
+msgid "There are other songs in this album"
+msgstr "Det er andre sanger i dette albumet"
+
+msgid "Would you like to move the other songs on this album to Various Artists as well?"
+msgstr "Ønsker du å flytte andre sanger på dette albumet til \"Various Artists\" også?"
+
+msgid "Error"
+msgstr "Feil"
+
+msgid "None of the selected songs were suitable for copying to a device"
+msgstr "Kunne ikke kopiere noen av de valgte sangene til en enhet"
+
+msgid "Form"
+msgstr "Skjema"
+
+msgid "Updating collection"
+msgstr "Oppdaterer samling"
+
+msgid "Updating %1"
+msgstr "Oppdaterer %1"
+
+msgid "Console"
+msgstr "Konsoll"
+
+msgid "Run"
+msgstr "Kjør"
+
+msgid "Context"
+msgstr "Kontekst"
+
+msgid "Custom text settings"
+msgstr "Egendefinert tekst innstilling"
+
+msgid "Title"
+msgstr "Tittel"
+
+msgid "Summary"
+msgstr "Sammendrag"
+
+msgid "Enable Items"
+msgstr "Aktiver items"
+
+msgid "Technical Data"
+msgstr "Teknisk Data"
+
+msgid "Song Lyrics"
+msgstr "Sangtekst"
+
+msgid "Automatically search for album cover"
+msgstr "Automatisk søk etter plateomslag"
+
+msgid "Automatically search for song lyrics"
+msgstr "Automatisk søk for sang lyrikk"
+
+msgid "Font for headline"
+msgstr "Font for headline"
+
+msgid "Font"
+msgstr "Font"
+
+msgid "Font size"
+msgstr "Font størrelse"
+
+msgid " pt"
+msgstr " pt"
+
+msgid "Preview"
+msgstr "Forhåndsvisning"
+
+msgid "Font for data and lyrics"
+msgstr "Font for data og lyrikk"
+
+msgid "Add song artist tag"
+msgstr "Fest artistetikett på sporet"
+
+msgid "Add song album tag"
+msgstr "Fest album-etikett på sporet"
+
+msgid "Add song title tag"
+msgstr "Fest låttittel-etikett til sporet"
+
+msgid "Add song albumartist tag"
+msgstr "Fest albumsartist-etikett på sporet"
+
+msgid "Add song year tag"
+msgstr "Fest etikett for utgivelsesår på sporet"
+
+msgid "Add song composer tag"
+msgstr "Fest komponist-etikett på sporet"
+
+msgid "Add song performer tag"
+msgstr "Fest utøver-etikett på sporet"
+
+msgid "Add song grouping tag"
+msgstr "Fest sanggrupperings-etikett på sporet"
+
+msgid "Add song disc tag"
+msgstr "Fest spor/disk-etikett på sporet"
+
+msgid "Add song track tag"
+msgstr "Fest etikett for låtnummer til sporet"
+
+msgid "Add song genre tag"
+msgstr "Fest sjangeretikett på sporet"
+
+msgid "Add song length tag"
+msgstr "Fest låtlengde på sporet"
+
+msgid "Add song play count"
+msgstr "Fest avspillingsantall på sporet"
+
+msgid "Add song skip count"
+msgstr "Fest antall overhoppninger til sporet"
+
+msgid "Add a new line if supported by the notification type"
+msgstr "Legg til en linje, hvis meddelelsestypen støtter det"
+
+msgid "%filename%"
+msgstr "%filnavn%"
+
+msgid "Add song filename"
+msgstr "Fest låtnavn til sporet"
+
+msgid "%url%"
+msgstr "%url%"
+
+msgid "Add song URL"
+msgstr "Legg til sang URL"
+
+msgid "%rating%"
+msgstr "%rating%"
+
+msgid "Add song rating"
+msgstr "Fest poenggivning for låt til sporet"
+
+msgid "Add song original year tag"
+msgstr "Legg til sang orignalt år tagg"
+
+msgid "Add song artistsort tag"
+msgstr "Add song artistsort tag"
+
+msgid "Add song albumartistsort tag"
+msgstr "Add song albumartistsort tag"
+
+msgid "Add song titlesort tag"
+msgstr "Add song titlesort tag"
+
+msgid "Add song composersort tag"
+msgstr "Add song composersort tag"
+
+msgid "Add song performersort tag"
+msgstr "Add song performersort tag"
+
+msgid "Add song albumsort tag"
+msgstr "Add song albumsort tag"
+
+msgid "Filetype"
+msgstr "Filtype"
+
+msgid "Length"
+msgstr "Lengde"
+
+msgid "Samplerate"
+msgstr "Samplingsrate"
+
+msgid "Bit depth"
+msgstr "Bit dybde"
+
+msgid "Bitrate"
+msgstr "Bitrate"
+
+msgid "Show album cover"
+msgstr "Vis plateomslag"
+
+msgid "Show song technical data"
+msgstr "Vis teknisk informasjon om sangen"
+
+msgid "Show song lyrics"
+msgstr "Vis sangtekster"
+
+msgid "No song playing"
+msgstr "Ingen sang spilles"
+
+msgid "%1 song"
+msgstr "%1 sang"
+
+msgid "%1 songs"
+msgstr "%1 sanger"
+
+msgid "%1 artist"
+msgstr "%1 artist"
+
+msgid "%1 artists"
+msgstr "%1 artister"
+
+msgid "%1 album"
+msgstr "%1 album"
+
+msgid "%1 albums"
+msgstr "%1 albumer"
+
+msgid "kbps"
+msgstr "kbps"
+
+msgid "Load cover from URL"
+msgstr "Hent omslag fra URL"
+
+msgid "Enter a URL to download a cover from the Internet:"
+msgstr "Skriv inn en URL for å laste ned albumgrafikk fra Internett:"
+
+msgid "Fetching cover error"
+msgstr "Kunne ikke hente albumgrafikk"
+
+msgid "The site you requested does not exist!"
+msgstr "Siden du forespurte finnes ikke!"
+
+msgid "The site you requested is not an image!"
+msgstr "Siden du forespurte er ikke et bilde!"
+
+msgid "View"
+msgstr "Vis"
+
+msgid "Total albums:"
+msgstr "Totalt antall album:"
+
+msgid "Without cover:"
+msgstr "Uten omslag:"
+
+msgid "0"
+msgstr "0"
+
+msgid "Fetch Missing Covers"
+msgstr "Hent manglende omslag"
+
+msgid "Export Covers"
+msgstr "Eksporter omslag"
+
+msgid "Fetch automatically"
+msgstr "Hent automatisk"
+
+msgid "Load"
+msgstr "Hent"
+
+msgid "Add to playlist"
+msgstr "Legg til i spilleliste"
+
+msgid "Fetch completed"
+msgstr "Innhenting fullført"
+
+msgid "Total network requests made"
+msgstr "Antall nettverkforespørsler totalt"
+
+msgid "Average image size"
+msgstr "Gjennomsnittlig bildestørrelse"
+
+msgid "Total bytes transferred"
+msgstr "Antall byte overført totalt"
+
+msgid "Covers"
+msgstr "Omslag"
+
+msgid "Cover providers"
+msgstr "Omslagstilbydere"
+
+msgid "Choose the providers you want to use when searching for covers."
+msgstr "Velg tilbydere du vil bruke for å søke etter omslag."
+
+msgid "Move up"
+msgstr "Flytt oppover"
+
+msgid "Move down"
+msgstr "Flytt nedover"
+
+msgid "Authentication"
+msgstr "Autentisering"
+
+msgid "Login"
+msgstr "Innlogging"
+
+msgid "Album cover types"
+msgstr "Plateomslagstype"
+
+msgid "Saving album covers"
+msgstr "Lagrer plateomslag"
+
+msgid "Save album covers in album directory"
+msgstr "Lagre plateomslag i albummappen"
+
+msgid "Save album covers in cache directory"
+msgstr "Lagre album kober i cache mappen"
+
+msgid "Save album covers as embedded cover"
+msgstr "Lagre plateomslag som innebygd omslag"
+
+msgid "Filename:"
+msgstr "Filnavn:"
+
+msgid "Pattern"
+msgstr "Pattern"
+
+msgid "Random"
+msgstr "Tilfeldig"
+
+msgid "Overwrite existing file"
+msgstr "Overskriv eksisterende fil"
+
+msgid "Lowercase filename"
+msgstr "Små bokstaver filnavn"
+
+msgid "Replace spaces with dashes"
+msgstr "Erstatt mellomrom med streker"
+
+msgid "Use Tidal settings to authenticate."
+msgstr "Bruk TIdal innstillinger for å autentisere"
+
+msgid "Use Spotify settings to authenticate."
+msgstr "Use Spotify settings to authenticate."
+
+msgid "Use Qobuz settings to authenticate."
+msgstr "Bruk Qobuz innstillingene for å autentisere"
+
+msgid "%1 needs authentication."
+msgstr "%1 Scrobbler krever autentisering"
+
+msgid "%1 does not need authentication."
+msgstr "%1 Scrobbler bruker autentisering"
+
+msgid "No provider selected."
+msgstr "Ingen tilbyder valgt."
+
+msgid "Authentication failed"
+msgstr "Identitetsbekreftelse feilet"
+
+msgid "Manually unset (%1)"
+msgstr "Manually unset (%1)"
+
+msgid "Set through album cover search (%1)"
+msgstr "Set through album cover search (%1)"
+
+msgid "Automatically picked up from album directory (%1)"
+msgstr "Automatically picked up from album directory (%1)"
+
+msgid "Embedded album cover art (%1)"
+msgstr "Embedded album cover art (%1)"
+
+msgid "Saving CUE files is not supported."
+msgstr "Saving CUE files is not supported."
+
+msgid "Unable to execute SQL query: %1"
+msgstr "Unable to execute SQL query: %1"
+
+msgid "Integrity check"
+msgstr "Integritetskontrol"
+
+msgid "Database corruption detected."
+msgstr "Oppdaget feil i databasen."
+
+msgid "Backing up database"
+msgstr "Tar sikkerhetskopi av databasen"
+
+msgid "Delete files"
+msgstr "Slett filer"
+
+msgid "The following files will be deleted from disk:"
+msgstr "Følgende filer vil bli slettet fra disk:"
+
+msgid "Are you sure you want to continue?"
+msgstr "Er du sikker på at du vil fortsette?"
+
+msgid "Deleting files"
+msgstr "Sletter filer"
+
+msgid "Updating %1%..."
+msgstr "Oppdaterer %1% …"
+
+msgid "Not connected"
+msgstr "Ikke tilkoblet"
+
+msgid "Not mounted - double click to mount"
+msgstr "Ikke montert - dobbelklikk for å montere"
+
+msgid "Double click to open"
+msgstr "Dobbelklikk for å åpne"
+
+msgid "%1 song%2"
+msgstr "%1 sanger"
+
+msgid "Connect device"
+msgstr "Koble til enhet"
+
+msgid "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+msgstr "Det er første gang du kobler til denne enheten. Strawberry skanner enheten for musikkfiler. Dette kan ta noe tid."
+
+msgid "This device will not work properly"
+msgstr "Enheten vil ikke fungere ordentlig"
+
+msgid "This is an MTP device, but you compiled Strawberry without libmtp support."
+msgstr "Dette er en MTP enhet, men Strawberry ble kompilert uten libmtp-støtte."
+
+msgid "If you continue, this device will work slowly and songs copied to it may not work."
+msgstr "Hvis du fortsetter, vil enheten bli treg, og du vil kanskje ikke kunne spille av sanger kopiert til den."
+
+msgid "This is an iPod, but you compiled Strawberry without libgpod support."
+msgstr "Dette er en iPod enhet, men Strawberry ble kompilert uten libgpod-støtte."
+
+msgid "This type of device is not supported: %1"
+msgstr "Denne enhetstypen (%1) støttes ikke."
+
+msgid "Device Properties"
+msgstr "Egenskaper for enhet"
+
+msgid "Information"
+msgstr "Informasjon"
+
+msgid "Name"
+msgstr "Navn"
+
+msgid "Icon"
+msgstr "Ikon"
+
+msgid "Hardware information"
+msgstr "Maskinvareinformasjon"
+
+msgid "Hardware information is only available while the device is connected."
+msgstr "Informasjon om maskinvaren er bare tilgjengelig når enheten er tilkoblet."
+
+msgid "File formats"
+msgstr "Filformat"
+
+msgid "Supported formats"
+msgstr "Støttede formater"
+
+msgid "This device supports the following file formats:"
+msgstr "Denne enheten støtter følgende filformat:"
+
+msgid "Strawberry can automatically convert the music you copy to this device into a format that it can play."
+msgstr "Strawberry kan automatisk konvertere musikken til et format enheten kan spille når musikken kopieres til enheten."
+
+msgid "Do not convert any music"
+msgstr "Ikke konverter musikk"
+
+msgid "Convert any music that the device can't play"
+msgstr "Konverter all musikk som enheten ikke kan spille"
+
+msgid "Convert all music"
+msgstr "Konverter all musikk"
+
+msgid "Preferred format"
+msgstr "Foretrukket format"
+
+msgid "This device must be connected and opened before Strawberry can see what file formats it supports."
+msgstr "Denne enheten må kobles til og åpnes før Strawberry kan se hvilke formater som støttes."
+
+msgid "Open device"
+msgstr "Åpne enhet"
+
+msgid "Querying device..."
+msgstr "Spør enhet…"
+
+msgid "Model"
+msgstr "Modell"
+
+msgid "Manufacturer"
+msgstr "Fabrikant"
+
+msgid "Safely remove device"
+msgstr "Trygg fjerning av enhet"
+
+msgid "Forget device"
+msgstr "Glem enhet"
+
+msgid "Device properties..."
+msgstr "Egenskaper for enhet…"
+
+msgid "Copy to collection..."
+msgstr "Kopier til samling…"
+
+msgid "Delete from device..."
+msgstr "Slett fra enhet…"
+
+msgid "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+msgstr "Hvis du glemmer enheten, forsvinner den fra denne listen, og Strawberry må lete gjennom alle sangene på enheten neste gang du kobler den til."
+
+msgid "These files will be deleted from the device, are you sure you want to continue?"
+msgstr "Filene vil bli slettet fra enheten. Er du sikker?"
+
+msgid "on "
+msgstr "on "
+
+msgid "Dynamic mode is on"
+msgstr "Dynamisk modus er på"
+
+msgid "New tracks will be added automatically."
+msgstr "Nye spor vil bli lagt til automatisk."
+
+msgid "Expand"
+msgstr "Utvid"
+
+msgid "Repopulate"
+msgstr "Repopulate"
+
+msgid "Turn off"
+msgstr "Slå av"
+
+msgid "Edit track information"
+msgstr "Rediger spor informasjon"
+
+msgid "Date created"
+msgstr "Opprettelse dato"
+
+msgid "Art Automatic"
+msgstr "Automatisk omslag"
+
+msgid "Date modified"
+msgstr "Endrings dato"
+
+msgid "Art Embedded"
+msgstr "Art Embedded"
+
+#. A playlist's tag.
+msgid "Last played"
+msgstr "Sist spilt"
+
+msgid "File type"
+msgstr "Filtype"
+
+msgid "Play count"
+msgstr "Antall avspillinger"
+
+msgid "EBU R 128 integrated loudness"
+msgstr "EBU R 128 integrated loudness"
+
+msgid "Bit rate"
+msgstr "Bitrate"
+
+msgid "Skip count"
+msgstr "Antall ganger hoppet over"
+
+msgid "Sample rate"
+msgstr "Samplingsrate"
+
+msgid "Path"
+msgstr "Filsti"
+
+msgid "Filename"
+msgstr "Filnavn"
+
+msgid "Art Unset"
+msgstr "Art Unset"
+
+msgid "File size"
+msgstr "Filstørrelse"
+
+msgid "Art Manual"
+msgstr "Manuelt omslag"
+
+msgid "EBU R 128 loudness range"
+msgstr "EBU R 128 loudness range"
+
+msgid "Reset play counts"
+msgstr "Tilbakestill avspillingsteller"
+
+msgid "Tags"
+msgstr "Tagger"
+
+msgid "Change art"
+msgstr "Endre omslag"
+
+msgid "Embedded cover"
+msgstr "Innebygd omslag"
+
+msgid "Disc"
+msgstr "Disk"
+
+msgid "Grouping"
+msgstr "Gruppering"
+
+msgid "Album artist"
+msgstr "Album artist"
+
+msgid "Year"
+msgstr "År"
+
+msgid "Composer"
+msgstr "Komponist"
+
+msgid "Complete tags automatically"
+msgstr "Fyll ut etiketter automatisk"
+
+msgid "Genre"
+msgstr "Sjanger"
+
+msgid "Comment"
+msgstr "Kommentar"
+
+msgid "Performer"
+msgstr "Utøver"
+
+msgid "Compilation"
+msgstr "Compilation"
+
+msgid "Track"
+msgstr "Spor"
+
+msgid "Rating"
+msgstr "Vurdering"
+
+msgid "Lyrics"
+msgstr "Lyrikk"
+
+msgid "Complete lyrics automatically"
+msgstr "Complete lyrics automatically"
+
+msgid "(different across multiple songs)"
+msgstr "(different across multiple songs)"
+
+msgid "Different art across multiple songs."
+msgstr "Different art across multiple songs."
+
+msgid "Previous"
+msgstr "Forrige"
+
+msgid "Next"
+msgstr "Neste"
+
+msgid "Saving tracks"
+msgstr "Lagrer spor"
+
+msgid "Loading tracks"
+msgstr "Åpner spor"
+
+msgid "%1 songs selected."
+msgstr "%1 sanger valgt"
+
+msgid "Yes"
+msgstr "Yes"
+
+msgid "No"
+msgstr "No"
+
+msgid "None"
+msgstr "Ingen"
+
+msgid "Cover is unset."
+msgstr "Cover is unset."
+
+msgid "Cover from embedded image."
+msgstr "Cover from embedded image."
+
+msgid "Cover from %1"
+msgstr "Cover from %1"
+
+msgid "Cover art not set"
+msgstr "Har ikke omslaggrafikk"
+
+msgid "Album cover editing is only available for collection songs."
+msgstr "Redigering av plateomslag er bare tilgjengelig for sanger i samlingen."
+
+msgid "Cover changed: Will be cleared when saved."
+msgstr "Omslag endret: Fjernes ved lagring."
+
+msgid "Cover changed: Will be unset when saved."
+msgstr "Omslag endret: Blir deaktivert når det lagres."
+
+msgid "Cover changed: Will be deleted when saved."
+msgstr "Omslag endret: Slettes ved lagring."
+
+msgid "Cover changed: Will set new when saved."
+msgstr "Omslag endret: Vil settes nytt når det lagres."
+
+msgid "Never"
+msgstr "Aldri"
+
+msgid "Reset song play statistics"
+msgstr "Reset song play statistics"
+
+msgid "Are you sure you want to reset this song's play statistics?"
+msgstr "Are you sure you want to reset this song's play statistics?"
+
+msgid "loading..."
+msgstr "loading..."
+
+msgid "Not found."
+msgstr "Not found."
+
+msgid "Could not write metadata to %1"
+msgstr "Could not write metadata to %1"
+
+msgid "Could not write metadata to %1: %2"
+msgstr "Could not write metadata to %1: %2"
+
+msgid "ID3v2 version:"
+msgstr "ID3v2 version:"
+
+msgid "2.3"
+msgstr "2.3"
+
+msgid "2.4"
+msgstr "2.4"
+
+msgid "Performer sort"
+msgstr "Performer sort"
+
+msgid "Title sort"
+msgstr "Title sort"
+
+msgid "Album artist sort"
+msgstr "Album artist sort"
+
+msgid "Artist sort"
+msgstr "Artist sort"
+
+msgid "Album sort"
+msgstr "Album sort"
+
+msgid "Composer sort"
+msgstr "Composer sort"
+
+msgid "Equalizer"
+msgstr "Tonekontroll"
+
+msgid "Preset:"
+msgstr "Forhåndsinnstilling:"
+
+msgid "Save preset"
+msgstr "Lagre forhåndsinnstilling"
+
+msgid "Delete preset"
+msgstr "Slett forhåndsinnstilling"
+
+msgid "Enable equalizer"
+msgstr "Slå på tonekontroll (EQ)"
+
+msgid "Enable stereo balancer"
+msgstr "Aktiver stereo balanse"
+
+msgid "Left"
+msgstr "Venstre"
+
+msgid "Balance"
+msgstr "Balanse"
+
+msgid "Right"
+msgstr "Høyre"
+
+msgid "Custom"
+msgstr "Egendefinert"
+
+msgid "Classical"
+msgstr "Klassisk"
+
+msgid "Club"
+msgstr "Klubbmusikk"
+
+msgid "Dance"
+msgstr "Dansemusikk"
+
+msgid "Full Bass"
+msgstr "Full bass"
+
+msgid "Full Treble"
+msgstr "Full diskant"
+
+msgid "Full Bass + Treble"
+msgstr "Full bass + diskant"
+
+msgid "Laptop/Headphones"
+msgstr "Laptop/hodetelefoner"
+
+msgid "Large Hall"
+msgstr "Storsal"
+
+msgid "Live"
+msgstr "Live"
+
+msgid "Party"
+msgstr "Fest"
+
+msgid "Pop"
+msgstr "Pop"
+
+msgid "Reggae"
+msgstr "Reggae"
+
+msgid "Rock"
+msgstr "Rock"
+
+msgid "Soft"
+msgstr "Myk"
+
+msgid "Ska"
+msgstr "Ska"
+
+msgid "Soft Rock"
+msgstr "Soft rock"
+
+msgid "Techno"
+msgstr "Tekno"
+
+msgid "Zero"
+msgstr "Null"
+
+msgid "Are you sure you want to delete the \"%1\" preset?"
+msgstr "Er du sikker på at du vil slette \"%1\"-forhåndsinnstillingen?"
+
+msgid "You need to restart playback for this setting to take affect."
+msgstr "You need to restart playback for this setting to take affect."
+
+msgid "%1 dB"
+msgstr "%1 dB"
+
+msgid "Strawberry Error"
+msgstr "Strawberry Feil"
+
+msgid "Large sidebar"
+msgstr "Stort sidefelt"
+
+msgid "Icons sidebar"
+msgstr "Icons sidebar"
+
+msgid "Small sidebar"
+msgstr "Lite sidefelt"
+
+msgid "Plain sidebar"
+msgstr "Enkelt sidefelt"
+
+msgid "Tabs on top"
+msgstr "Faner på toppen"
+
+msgid "Icons on top"
+msgstr "Ikoner øverst"
+
+msgid "Add root directory"
+msgstr "Add root directory"
+
+msgid "Remove selected root directory"
+msgstr "Remove selected root directory"
+
+msgid "Toggle between list and tree view"
+msgstr "Toggle between list and tree view"
+
+msgid "Select folder to add as tree root"
+msgstr "Select folder to add as tree root"
+
+msgid "Move to collection..."
+msgstr "Flytt til samling…"
+
+msgid "Files"
+msgstr "Files"
+
+msgid "Available"
+msgstr "Tilgjengelig"
+
+msgid "New songs"
+msgstr "Nye sanger"
+
+msgid "Exceeded by"
+msgstr "Exceeded by"
+
+msgid "Used"
+msgstr "Brukt"
+
+msgid "Could not copy %1 to %2: %3"
+msgstr "Could not copy %1 to %2: %3"
+
+msgid "Writing database failed: %1"
+msgstr "Writing database failed: %1"
+
+msgid "Writing database failed."
+msgstr "Writing database failed."
+
+msgid "Loading iPod database"
+msgstr "Åpner iPod-database"
+
+msgid "An error occurred loading the iTunes database"
+msgstr "En feil oppsto ved innlasting av iTunes-databasen"
+
+msgid "Mount point"
+msgstr "Monteringspunkt"
+
+msgid "URI"
+msgstr "URI"
+
+msgid "Press a key"
+msgstr "Trykk en tast"
+
+msgid "Press a key combination to use for %1..."
+msgstr "Trykk en tastekombinasjon å bruke til %1…"
+
+msgid "Play"
+msgstr "Spill"
+
+msgid "Pause"
+msgstr "Pause"
+
+msgid "Play/Pause"
+msgstr "Play/Pause"
+
+msgid "Stop"
+msgstr "Stopp"
+
+msgid "Stop playing after current track"
+msgstr "Stopp spilling etter gjeldene spor"
+
+msgid "Next track"
+msgstr "Neste spor"
+
+msgid "Previous track"
+msgstr "Forrige spor"
+
+msgid "Restart or previous track"
+msgstr "Restart or previous track"
+
+msgid "Increase volume"
+msgstr "Øk volum"
+
+msgid "Decrease volume"
+msgstr "Senk volum"
+
+msgid "Mute"
+msgstr "Demp"
+
+msgid "Seek forward"
+msgstr "Seek forward"
+
+msgid "Seek backward"
+msgstr "Seek backward"
+
+msgid "Show/Hide"
+msgstr "Vis/Skul"
+
+msgid "Show OSD"
+msgstr "Vis OSD"
+
+msgid "Toggle Pretty OSD"
+msgstr "Slå av/på OSD"
+
+msgid "Change shuffle mode"
+msgstr "Endre shufflemodus"
+
+msgid "Change repeat mode"
+msgstr "Endre gjentagelsemodus"
+
+msgid "Enable/disable scrobbling"
+msgstr "Aktiver/Deaktiver skrobbling"
+
+msgid "Love"
+msgstr "Kjærlighet"
+
+msgid "Global Shortcuts"
+msgstr "Global Shortcuts"
+
+msgid "Open..."
+msgstr "Åpne…"
+
+msgid "Use X11 shortcuts when available"
+msgstr "Bruk X11 snarveier når tilgjengelige"
+
+msgid "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+msgstr "Du må åpne Systemvalg og gi Strawberry tilgang til \"<span style=\"font-style:italic\">styre datamaskinen din</span>\" for å bruke globale snarveier i Strawberry."
+
+#. Category label
+msgid "Action"
+msgstr "Handling"
+
+msgid "Shortcut"
+msgstr "Hurtigtast"
+
+msgid "Shortcut for %1"
+msgstr "Hurtigtast for %1"
+
+msgid "&None"
+msgstr "&Ingen"
+
+msgid "&Default"
+msgstr "&Standard"
+
+msgid "&Custom"
+msgstr "&Egendefinert"
+
+msgid "Change shortcut..."
+msgstr "Endre snarvei…"
+
+msgid "Use KGlobalAccel shortcuts when available"
+msgstr "Use KGlobalAccel shortcuts when available"
+
+msgid "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+msgstr "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+
+msgid "Collection advanced grouping"
+msgstr "Avansert samlingsgruppering"
+
+msgid "You can change the way the songs in the collection are organized."
+msgstr "Du kan endre måten sanger i samlingen er organisert."
+
+msgid "Group Collection by..."
+msgstr "Grupper samling etter…"
+
+msgid "First level"
+msgstr "Første nivå"
+
+msgid "Album - Disc"
+msgstr "Album - Disc"
+
+msgid "Format"
+msgstr "Format"
+
+msgid "Year - Album"
+msgstr "År - album"
+
+msgid "Year - Album - Disc"
+msgstr "År - album - disc"
+
+msgid "Original year"
+msgstr "Opprinnelig år"
+
+msgid "Original year - Album"
+msgstr "Opprinnelig år - album"
+
+msgid "Second level"
+msgstr "Andre nivå"
+
+msgid "Third level"
+msgstr "Tredje nivå"
+
+msgid "Separate albums by grouping tag"
+msgstr "Separate albums by grouping tag"
+
+msgid "Original year - Album - Disc"
+msgstr "Original year - Album - Disc"
+
+msgid "Buffering"
+msgstr "Mellomlagring"
+
+msgid "%1 Scrobbler Authentication"
+msgstr "%1 Scrobbler Authentication"
+
+msgid "Open URL in web browser?"
+msgstr "Open URL in web browser?"
+
+msgid "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+msgstr "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+
+msgid "Could not open URL. Please open this URL in your browser"
+msgstr "Could not open URL. Please open this URL in your browser"
+
+msgid "Invalid reply from web browser. Missing token."
+msgstr "Invalid reply from web browser. Missing token."
+
+msgid "Received invalid reply from web browser. Try another browser."
+msgstr "Received invalid reply from web browser. Try another browser."
+
+msgid "Scrobbler %1 is not authenticated!"
+msgstr "Scrobbler %1 is not authenticated!"
+
+msgid "Scrobbler %1 error: %2"
+msgstr "Scrobbler %1 error: %2"
+
+msgid "Least favourite tracks"
+msgstr "Minst favoritt spor"
+
+msgid "Unable to scrobble %1 - %2 because of error: %3"
+msgstr "Unable to scrobble %1 - %2 because of error: %3"
+
+msgid "Missing MusicBrainz recording ID for %1 %2 %3"
+msgstr "Missing MusicBrainz recording ID for %1 %2 %3"
+
+msgid "ListenBrainz error: %1"
+msgstr "ListenBrainz error: %1"
+
+msgid "You are not signed in."
+msgstr "Du har ikke logget inn."
+
+msgid "Sign out"
+msgstr "Logg ut"
+
+msgid "Signing in..."
+msgstr "Logger inn…"
+
+msgid "You are signed in."
+msgstr "Du er innlogget"
+
+msgid "You are signed in as %1."
+msgstr "Du er innlogget som %1."
+
+msgid "Expires on %1"
+msgstr "Utgår den %1"
+
+msgid "Lyrics providers"
+msgstr "Lyrikk tilbyder"
+
+msgid "Choose the providers you want to use when searching for lyrics."
+msgstr "Velg tilbydere du vil bruke for å søke etter lyrikk"
+
+msgid "Strawberry Music Player"
+msgstr "Strawberry Music Player"
+
+msgid "&Music"
+msgstr "Musikk"
+
+msgid "P&laylist"
+msgstr "Spilleliste"
+
+msgid "Help"
+msgstr "Hjelp"
+
+msgid "&Tools"
+msgstr "&Verktøy"
+
+msgid "F5"
+msgstr "F5"
+
+msgid "&Play"
+msgstr "&Spill"
+
+msgid "F6"
+msgstr "F6"
+
+msgid "&Stop"
+msgstr "&Stopp"
+
+msgid "F7"
+msgstr "F7"
+
+msgid "&Next track"
+msgstr "&Neste spor"
+
+msgid "F8"
+msgstr "F8"
+
+msgid "&Quit"
+msgstr "&Avslutt"
+
+msgid "Ctrl+Q"
+msgstr "Ctrl+Q"
+
+msgid "Stop after this track"
+msgstr "Stopp etter denne sangen"
+
+msgid "Ctrl+Alt+V"
+msgstr "Ctrl+Alt+V"
+
+msgid "&Clear playlist"
+msgstr "&Slett spilleliste"
+
+msgid "Clear playlist"
+msgstr "Tøm spillelisten"
+
+msgid "Ctrl+K"
+msgstr "Ctrl+K"
+
+msgid "Ctrl+E"
+msgstr "Ctrl+E"
+
+msgid "Renumber tracks in this order..."
+msgstr "Renummerer sporene i denne rekkefølgen…"
+
+msgid "Set value for all selected tracks..."
+msgstr "Sett verdi for alle valgte spor…"
+
+msgid "Edit tag..."
+msgstr "Rediger etikett…"
+
+msgid "&Settings..."
+msgstr "&Innstillinger"
+
+msgid "Ctrl+P"
+msgstr "Ctrl+P"
+
+msgid "&About Strawberry"
+msgstr "&Om Strawberry"
+
+msgid "F1"
+msgstr "F1"
+
+msgid "S&huffle playlist"
+msgstr "Stokk om spillelista"
+
+msgid "&Add file..."
+msgstr "&Legg til fil"
+
+msgid "Ctrl+Shift+A"
+msgstr "Ctrl+Shift+A"
+
+msgid "&Open file..."
+msgstr "&Åpne fil"
+
+msgid "Open audio &CD..."
+msgstr "Åpne lyd &CD"
+
+msgid "&Cover Manager"
+msgstr "&Behandling av plateomslag"
+
+msgid "C&onsole"
+msgstr "K&onsoll"
+
+msgid "&Shuffle mode"
+msgstr "&Stokkemodus"
+
+msgid "&Repeat mode"
+msgstr "&Gjentagelsesmodus"
+
+msgid "Remove from playlist"
+msgstr "Fjern fra spillelisten"
+
+msgid "&Equalizer"
+msgstr "&Equalizer"
+
+msgid "&Transcode Music"
+msgstr "&Omkod musikk"
+
+msgid "Add &folder..."
+msgstr "Legg til &mappe..."
+
+msgid "&Jump to the currently playing track"
+msgstr "&Gå til sporet som spilles av nå"
+
+msgid "Ctrl+J"
+msgstr "Ctrl+J"
+
+msgid "&New playlist"
+msgstr "&Ny spilleliste"
+
+msgid "Ctrl+N"
+msgstr "Ctrl+N"
+
+msgid "Save &playlist..."
+msgstr "Lagre &spilleliste..."
+
+msgid "Ctrl+S"
+msgstr "Ctrl+S"
+
+msgid "&Load playlist..."
+msgstr "&Start spilleliste"
+
+msgid "Ctrl+Shift+O"
+msgstr "Ctrl+Shift+O"
+
+msgid "&Save all playlists..."
+msgstr "&Save all playlists..."
+
+msgid "Go to next playlist tab"
+msgstr "Gå til neste fane på spillelista"
+
+msgid "Go to previous playlist tab"
+msgstr "Gå til forrige fane på spillelista"
+
+msgid "&Update changed collection folders"
+msgstr "Oppdater endrede samling"
+
+msgid "About &Qt"
+msgstr "Om &Qt"
+
+msgid "&Mute"
+msgstr "&Demp"
+
+msgid "Ctrl+M"
+msgstr "Ctrl+M"
+
+msgid "&Do a full collection rescan"
+msgstr "&Utfør fullstendig skann av samling"
+
+msgid "Stop collection scan"
+msgstr "Stop collection scan"
+
+msgid "Complete tags automatically..."
+msgstr "Full ut etiketter automatisk…"
+
+msgid "Ctrl+T"
+msgstr "Ctrl+T"
+
+msgid "Toggle scrobbling"
+msgstr "Slå av/på deling av lyttevaner"
+
+msgid "Remove &duplicates from playlist"
+msgstr "Fjern &duplikater fra spillelisten"
+
+msgid "Remove &unavailable tracks from playlist"
+msgstr "Fjern &utilgjengelige spor fra spilleliste"
+
+msgid "Add file(s) to transcoder"
+msgstr "Legg fil(er) til omkoder"
+
+msgid "Add file to transcoder"
+msgstr "Legg fil til omkoder"
+
+msgid "Add stream..."
+msgstr "Legg til strøm..."
+
+msgid "Show sidebar"
+msgstr "Vis sidebar"
+
+msgid "Queue"
+msgstr "Kø"
+
+msgid "Playlists"
+msgstr "Spillelister"
+
+msgid "Smart playlists"
+msgstr "Smarte spillelister"
+
+msgid "Radios"
+msgstr "Radioer"
+
+msgid "Devices"
+msgstr "Enheter"
+
+msgid "Subsonic"
+msgstr "Subsonic"
+
+msgid "Tidal"
+msgstr "Tidal"
+
+msgid "Spotify"
+msgstr "Spotify"
+
+msgid "Qobuz"
+msgstr "Qobuz"
+
+msgid "Show all songs"
+msgstr "Vis alle sanger"
+
+msgid "Show only duplicates"
+msgstr "Bare vis duplikater"
+
+msgid "Show only untagged"
+msgstr "Bare vis filer uten etiketter"
+
+msgid "Configure collection..."
+msgstr "Sett opp samling…"
+
+msgid "Toggle queue status"
+msgstr "Slå av/på køstatus"
+
+msgid "Queue selected tracks to play next"
+msgstr "Legg valgte spor i kø for å spille som neste"
+
+msgid "Toggle skip status"
+msgstr "Slå av/på hopp over status"
+
+msgid "Rescan song(s)..."
+msgstr "Skann sanger på nytt..."
+
+msgid "Fetch metadata from service"
+msgstr "Fetch metadata from service"
+
+msgid "Copy URL(s)..."
+msgstr "Kopier URL(s)"
+
+msgid "Show in collection..."
+msgstr "Vis i samling…"
+
+msgid "Check for updates..."
+msgstr "Se etter oppdateringer…"
+
+msgid "Strawberry running under Rosetta"
+msgstr "Strawberry running under Rosetta"
+
+msgid "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+msgstr "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+
+msgid "Sponsoring Strawberry"
+msgstr "Sponsoring Strawberry"
+
+msgid "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+msgstr "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+
+msgid "Dequeue track"
+msgstr "Fjern sporet fra avspillingskøen"
+
+msgid "Dequeue selected tracks"
+msgstr "Fjern valgte spor fra avspillingskøen"
+
+msgid "Queue selected tracks"
+msgstr "Legg valgte spor i kø"
+
+msgid "Unskip track"
+msgstr "Ikke hopp over sporet"
+
+msgid "Unskip selected tracks"
+msgstr "Ikke hopp over de valgte sporene"
+
+msgid "Skip track"
+msgstr "Hopp over spor"
+
+msgid "Skip selected tracks"
+msgstr "Hopp over valgte spor"
+
+msgid "Set %1 to \"%2\"..."
+msgstr "Sett %1 til \"%2\"…"
+
+msgid "Edit tag \"%1\"..."
+msgstr "Rediger etiketten \"%1\"…"
+
+msgid "Add to another playlist"
+msgstr "Legg til i annen spilleliste"
+
+msgid "New playlist"
+msgstr "Ny spilleliste"
+
+msgid "Add file"
+msgstr "Legg til fil"
+
+msgid "Music"
+msgstr "Musikk"
+
+msgid "Add folder"
+msgstr "Legg til mappe"
+
+msgid "Playlist has %1 songs, too large to undo, are you sure you want to clear the playlist?"
+msgstr "Spilleliste har %1 sanger, for mange for å angre, ønsker du likevel å fjerne sangene fra spillelisten?"
+
+msgid "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:"
+msgstr "Fordi du har oppdatert Strawberry til en nyere versjon, må hele samlingen søkes gjennom på nytt, som følge av disse nye funksjonene:"
+
+msgid "Would you like to run a full rescan right now?"
+msgstr "Vil du søke gjennom hele samlingen på ny nå?"
+
+msgid "Collection rescan notice"
+msgstr "Melding om gjennomsøk av samlingen"
+
+msgid "Ctrl+Shift+H"
+msgstr "Ctrl+Shift+H"
+
+msgid "Go to last playlist tab"
+msgstr "Go to last playlist tab"
+
+msgid "Go to active playlist tab"
+msgstr "Go to active playlist tab"
+
+msgid "Close current playlist tab"
+msgstr "Close current playlist tab"
+
+msgid "Message Dialog"
+msgstr "Message Dialog"
+
+msgid "Do not show this message again."
+msgstr "Ikke vis denne meldingen igjen."
+
+msgid "Playlist"
+msgstr "Spilleliste"
+
+msgid "Moodbar"
+msgstr "Moodbar"
+
+msgid "Moodbar style"
+msgstr "Moodbar stil"
+
+msgid "Save the .mood files directly in the songs folders"
+msgstr "Lagre .mood filene direkte i mappen til sangen"
+
+msgid "Invalid MTP device: %1"
+msgstr "Invalid MTP device: %1"
+
+msgid "Could not open MTP device."
+msgstr "Could not open MTP device."
+
+msgid "MTP error: %1"
+msgstr "MTP error: %1"
+
+msgid "MTP device not found."
+msgstr "MTP device not found."
+
+msgid "Loading MTP device"
+msgstr "Åpner MTP-enhet"
+
+msgid "Error connecting MTP device %1"
+msgstr "Feil ved tilkobling til MTP enhet %1"
+
+msgid "Error connecting MTP device %1: %2"
+msgstr "Error connecting MTP device %1: %2"
+
+msgid "Network Proxy"
+msgstr "Mellomtjener"
+
+msgid "&Use the system proxy settings"
+msgstr "&Bruk forvalgte mellomtjener-innstillinger"
+
+msgid "Direct internet connection"
+msgstr "Koblet direkte til Internett"
+
+msgid "&Manual proxy configuration"
+msgstr "&Manuell mellomtjener-innstilling"
+
+msgid "HTTP proxy"
+msgstr "Mellomtjener for HTTP"
+
+msgid "SOCKS proxy"
+msgstr "Mellomtjener for SOCKS"
+
+msgid "Port"
+msgstr "Port"
+
+msgid "Use authentication"
+msgstr "Bruk autentisering"
+
+msgid "Username"
+msgstr "Brukernavn"
+
+msgid "Password"
+msgstr "Passord"
+
+msgid "Use proxy settings for streaming"
+msgstr "Bruk proxy for strømming"
+
+msgid "Only HTTP proxy is supported for streaming."
+msgstr "Only HTTP proxy is supported for streaming."
+
+msgid "Notifications"
+msgstr "Meddelelsetype"
+
+msgid "Strawberry can show a message when the track changes."
+msgstr "Strawberry kan vise en melding ved sporendring."
+
+msgid "Notification type"
+msgstr "Meddelelsetype"
+
+#. Refers to a disabled notification type in Notification settings.
+msgid "Disabled"
+msgstr "Avskrudd"
+
+msgid "Show a &native desktop notification"
+msgstr "Vis en skrivebordsmedledelse som passer inn i ditt operativsystem"
+
+msgid "Show a pretty OSD"
+msgstr "Vis et pent skjermbildeoverlegg"
+
+msgid "Show a popup fro&m the system tray"
+msgstr "Vis et oppsprettsvindu fra systemskuffa"
+
+msgid "General settings"
+msgstr "Generelle innstillinger"
+
+msgid "Popup duration"
+msgstr "Oppsprettsvinduets varighet"
+
+msgid " seconds"
+msgstr " sekunder"
+
+msgid "Disable duration"
+msgstr "Slå av varighet"
+
+msgid "Show a notification when I change the volume"
+msgstr "Vis en meddelelse når jeg endrer lydstyrke"
+
+msgid "Show a notification when I change the repeat/shuffle mode"
+msgstr "Vis en meddelelse når jeg endrer gjentakelse- og stokke -modus"
+
+msgid "Show a notification when I pause playback"
+msgstr "Vis meddelelse når jeg setter avspillingen på pause"
+
+msgid "Show a notification when I resume playback"
+msgstr "Vis a meddelelse når avspillingen fortsetter"
+
+msgid "Include album art in the notification"
+msgstr "Inkluder omslag i meddelelsen"
+
+msgid "Custom message settings"
+msgstr "Egendefinerte melding-innstillinger"
+
+msgid "Use a custom message for notifications"
+msgstr "Bruk egendefinert melding for meddelelser"
+
+msgid "Body"
+msgstr "Brødtekst"
+
+msgid "Pretty OSD options"
+msgstr "Pene skjermbildeoverleggsvalg"
+
+msgid "Background color"
+msgstr "Bakgrunnsfarge"
+
+msgid "Text options"
+msgstr "Tekstinnstillinger"
+
+msgid "Choose font..."
+msgstr "Velg skrifttype…"
+
+msgid "Choose color..."
+msgstr "Velg farge…"
+
+msgid "Background opacity"
+msgstr "Bakgrunnsdekkevne"
+
+msgid "Basic Blue"
+msgstr "Blå"
+
+msgid "Strawberry Red"
+msgstr "Jordbær rød"
+
+msgid "Custom..."
+msgstr "Egendefinert…"
+
+msgid "Enable fading"
+msgstr "Aktiver fading"
+
+msgid "%originalyear%"
+msgstr "%originalyear%"
+
+msgid "OSD Preview"
+msgstr "Forhåndsvisning av skjermbildeoverlegg"
+
+msgid "Drag to reposition"
+msgstr "Dra for å endre posisjon"
+
+msgid "Discord"
+msgstr "Discord"
+
+msgid "Enable Rich Presence"
+msgstr "Enable Rich Presence"
+
+msgid "\"Listening to...\""
+msgstr "\"Listening to...\""
+
+msgid "Strawberry"
+msgstr "Strawberry"
+
+msgid "Artist name"
+msgstr "Artist name"
+
+msgid "Song title"
+msgstr "Song title"
+
+msgid "Please open this URL in your browser"
+msgstr "Please open this URL in your browser"
+
+msgid "Received invalid reply from web browser."
+msgstr "Received invalid reply from web browser."
+
+msgid "Redirect URL is missing query."
+msgstr "Redirect URL is missing query."
+
+msgid "Request URL is missing code!"
+msgstr "Request URL is missing code!"
+
+msgid "Request URL is missing state!"
+msgstr "Request URL is missing state!"
+
+msgid "Request URL has wrong state %1 != %2"
+msgstr "Request URL has wrong state %1 != %2"
+
+msgid "disc %1"
+msgstr "disk %1"
+
+msgid "track %1"
+msgstr "spor %1"
+
+msgid "Paused"
+msgstr "På pause"
+
+msgid "Stopped"
+msgstr "Stoppet"
+
+msgid "Stop playing after track: %1"
+msgstr "Stopp avspilling etter spor: %1"
+
+msgid "On"
+msgstr "På"
+
+msgid "Off"
+msgstr "Av"
+
+msgid "Playlist finished"
+msgstr "Spillelisten er ferdigspilt"
+
+msgid "Volume %1%"
+msgstr "Volum %1%"
+
+msgid "Don't shuffle"
+msgstr "Ikke stokk"
+
+msgid "Shuffle all"
+msgstr "Stokk alle"
+
+msgid "Shuffle tracks in this album"
+msgstr "Stokk om dette albumet"
+
+msgid "Shuffle albums"
+msgstr "Stokk om album"
+
+msgid "Shuffle grouping"
+msgstr "Stokk om gruppering"
+
+msgid "Don't repeat"
+msgstr "Ikke gjenta"
+
+msgid "Repeat track"
+msgstr "Gjenta spor"
+
+msgid "Repeat album"
+msgstr "Gjenta album"
+
+msgid "Repeat playlist"
+msgstr "Gjenta spilleliste"
+
+msgid "Stop after every track"
+msgstr "Stopp etter hvert spor"
+
+msgid "Intro tracks"
+msgstr "Introspor"
+
+msgid "Organizing files"
+msgstr "Organiserer filene"
+
+msgid "Organize Files"
+msgstr "Organiser filene"
+
+msgid "Destination"
+msgstr "Mål"
+
+msgid "After copying..."
+msgstr "Etter kopiering…"
+
+msgid "Keep the original files"
+msgstr "Behold originalfilene"
+
+msgid "Delete the original files"
+msgstr "Slett de originale filene"
+
+msgid "Naming options"
+msgstr "Navnevalg"
+
+msgid "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+msgstr "<p>Kodene begynner med %, for eksempel: %artist %album %title </p>\n\n<p>Hvis du setter klammeparenteser rundt tekst som inneholder en kode, vil teksten skjules om koden er tom.</p>"
+
+msgid "Insert..."
+msgstr "Sett inn…"
+
+msgid "Remove problematic characters from filenames"
+msgstr "Fjern problematiske tegn fra filnavn"
+
+msgid "Restrict to characters allowed on FAT filesystems"
+msgstr "Begrens til tegn tillat på FAT filsystem"
+
+msgid "Restrict characters to ASCII"
+msgstr "Begrens til tegn i ASCII"
+
+msgid "Allow extended ASCII characters"
+msgstr "Tillat utvidet ASCII tegn"
+
+msgid "Replace spaces with underscores"
+msgstr "Erstatt mellomrom med understrek"
+
+msgid "Overwrite existing files"
+msgstr "Overskriv eksisterende filer"
+
+msgid "Copy album cover artwork"
+msgstr "Kopier album omslaggrafikk"
+
+msgid "Safely remove the device after copying"
+msgstr "Kjør trygg fjerning av enhet etter kopiering"
+
+msgid "Artist's initial"
+msgstr "Artistens initialer"
+
+msgid "File extension"
+msgstr "Fil etternavn"
+
+msgid "Error copying songs"
+msgstr "Kunne ikke kopiere sanger"
+
+msgid "There were problems copying some songs.  The following files could not be copied:"
+msgstr "Fikk problemer med å kopiere enkelte sanger.  Følgende filer kunne ikke kopieres:"
+
+msgid "Error deleting songs"
+msgstr "Kunne ikke slette sanger"
+
+msgid "There were problems deleting some songs.  The following files could not be deleted:"
+msgstr "Fikk problemer med å slette enkelte sanger.  Følgende filer kunne ikke slettes:"
+
+msgid "Don't know how to handle %1"
+msgstr "Don't know how to handle %1"
+
+msgid "File %1 does not exist"
+msgstr "File %1 does not exist"
+
+msgid "Could not read file %1: %2"
+msgstr "Could not read file %1: %2"
+
+msgid "Small album cover"
+msgstr "Lite plateomslag"
+
+msgid "Large album cover"
+msgstr "Stort omslag"
+
+msgid "Fit cover to width"
+msgstr "Tilpass omslag til bredde"
+
+msgid "Show above status bar"
+msgstr "Vis over statuslinja"
+
+msgid "Title Sort"
+msgstr "Title Sort"
+
+msgid "Artist Sort"
+msgstr "Artist Sort"
+
+msgid "Album Sort"
+msgstr "Album Sort"
+
+msgid "Original Year"
+msgstr "Original Year"
+
+msgid "Album Artist"
+msgstr "Album Artist"
+
+msgid "Album Artist Sort"
+msgstr "Album Artist Sort"
+
+msgid "Composer Sort"
+msgstr "Composer Sort"
+
+msgid "Performer Sort"
+msgstr "Performer Sort"
+
+msgid "Play Count"
+msgstr "Play Count"
+
+msgid "Skip Count"
+msgstr "Skip Count"
+
+msgid "Last Played"
+msgstr "Last Played"
+
+msgid "Sample Rate"
+msgstr "Sample Rate"
+
+msgid "Bit Depth"
+msgstr "Bit Depth"
+
+msgid "Initial key"
+msgstr "Initial key"
+
+msgid "File Name (without path)"
+msgstr "File Name (without path)"
+
+msgid "File Size"
+msgstr "File Size"
+
+msgid "File Type"
+msgstr "File Type"
+
+msgid "Date Modified"
+msgstr "Date Modified"
+
+msgid "Date Created"
+msgstr "Date Created"
+
+msgid "Source"
+msgstr "Kilde"
+
+msgid "BPM"
+msgstr "BPM"
+
+msgid "Mood"
+msgstr "Mood"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "CUE"
+msgstr "CUE"
+
+msgid "Integrated Loudness"
+msgstr "Integrated Loudness"
+
+msgid "Loudness Range"
+msgstr "Loudness Range"
+
+msgid "Undo"
+msgstr "Undo"
+
+msgid "Redo"
+msgstr "Redo"
+
+msgid "Load playlist"
+msgstr "Åpne spilleliste"
+
+msgid "No matches found.  Clear the search box to show the whole playlist again."
+msgstr "Ingen treff.  Visk ut søkefeltet for å vise hele spillelisten igjen."
+
+msgid "stop"
+msgstr "stopp"
+
+msgid "Loading smart playlist"
+msgstr "Laster smart spilleliste"
+
+msgid "&Hide..."
+msgstr "Skjul…"
+
+msgid "&Stretch columns to fit window"
+msgstr "Tilpass &kolonner til vinduet"
+
+msgid "&Reset columns to default"
+msgstr "&Tilbakestill kolonner til standard"
+
+msgid "&Lock rating"
+msgstr "&Lås vurdering"
+
+msgid "&Align text"
+msgstr "&Still opp tekst"
+
+msgid "&Left"
+msgstr "&Venstre"
+
+msgid "&Center"
+msgstr "Sentr&er"
+
+msgid "&Right"
+msgstr "&Høyre"
+
+msgid "&Hide %1"
+msgstr "Skjul %1"
+
+msgid "New folder"
+msgstr "Ny mappe"
+
+msgid "Delete"
+msgstr "Slett"
+
+#. Save playlist menu action.
+msgid "Save playlist"
+msgstr "Lagre spilleliste"
+
+msgid "Enter the name of the folder"
+msgstr "Skriv inn navn på mappa"
+
+msgid "Copy songs to playlist"
+msgstr "Copy songs to playlist"
+
+msgid "Copy to device"
+msgstr "Kopier til enhet"
+
+msgid "Playlist must be open first."
+msgstr "Spillelisten må være åpen først."
+
+msgid "Remove playlists"
+msgstr "Fjern spillelister"
+
+msgid "You are about to remove %1 playlists from your favorites, are you sure?"
+msgstr "Du sletter nå %1 spillelister fra favorittene dine, er du sikker?"
+
+msgid "You can favorite playlists by clicking the star icon next to a playlist name"
+msgstr "Du kan merke en spilleliste som favoritt ved å klikke på stjerneikonet nær listenavnet."
+
+msgid "Favorited playlists will be saved here"
+msgstr "Favoritt-spillelister vil lagres her"
+
+msgid "Couldn't create playlist"
+msgstr "Kunne ikke opprette spilleliste"
+
+msgid "Unknown playlist extension"
+msgstr "Ukjent fil type."
+
+msgid "Unknown file extension for playlist."
+msgstr "Ukjent fil type for spilleliste."
+
+msgid "%1 selected of"
+msgstr "%1 valgte av"
+
+msgid "%n track(s)"
+msgid_plural "%n track(s)"
+msgstr[0] "%n track(s)"
+msgstr[1] "%n track(s)"
+
+msgid "All playlists (%1)"
+msgstr "Alle spillelister (%1)"
+
+msgid "%1 playlists (%2)"
+msgstr "%1 spillelister (%2)"
+
+msgid "Unknown filetype: %1"
+msgstr "Unknown filetype: %1"
+
+msgid "Could not open file %1"
+msgstr "Could not open file %1"
+
+msgid "Directory %1 does not exist."
+msgstr "Directory %1 does not exist."
+
+msgid "Failed to open %1 for writing."
+msgstr "Failed to open %1 for writing."
+
+msgid "Playlist options"
+msgstr "Innstillinger for spilleliste"
+
+msgid "File paths"
+msgstr "Filstier"
+
+msgid "This can be changed later through the preferences"
+msgstr "Dette kan endres i innstillingene seinere"
+
+msgid "Remember my choice"
+msgstr "Husk valg"
+
+msgid "Automatic"
+msgstr "Automatisk"
+
+msgid "Relative"
+msgstr "Relativ"
+
+msgid "Absolute"
+msgstr "Absolutt"
+
+msgid "Repeat"
+msgstr "Gjenta"
+
+msgid "Shuffle"
+msgstr "Stokk om"
+
+msgid "Stop after each track"
+msgstr "Stopp etter hvert spor"
+
+msgid "Use alternating row colors"
+msgstr "Bruk alternative radfarger"
+
+msgid "Show bars on the currently playing track"
+msgstr "Vis barer på nåværende spilte spor"
+
+msgid "Show a glowing animation on the currently playing track"
+msgstr "Vis en glødende animasjon på gjeldende spilt spor"
+
+msgid "Warn me when closing a playlist tab"
+msgstr "Advarsel når jeg lukker en spilleliste-fane"
+
+msgid "Continue to the next item in the playlist if a song is unavailable"
+msgstr "Fortsett til neste sang i stillelisten dersom en sang ikke er tilgjengelig"
+
+msgid "Grey out unavailable songs in playlists on playback"
+msgstr "Merk ikke-eksisterende sanger med grått når de spilles"
+
+msgid "Grey out unavailable songs in playlists on startup"
+msgstr "Merk ikke-eksisterende sanger med grått på oppstart"
+
+msgid "Automatically select current playing track"
+msgstr "Velg spor automatisk"
+
+msgid "Enable playlist toolbar"
+msgstr "Aktiver spilleliste toolbar"
+
+msgid "Enable playlist clear button"
+msgstr "Aktiver fjern spilleliste knapp"
+
+msgid "Automatically sort playlist when inserting songs"
+msgstr "Automatisk sorter spilleliste når du legger til sanger"
+
+msgid "When saving a playlist, file paths should be"
+msgstr "Når du lagrer spillelisten, skal fil plasseringen"
+
+msgid "A&utomatic"
+msgstr "A&utomatisk"
+
+msgid "Absolu&te"
+msgstr "Absolu&tt"
+
+msgid "Re&lative"
+msgstr "Relativ"
+
+msgid "As&k when saving"
+msgstr "Spør ved lagring"
+
+msgid "Metadata"
+msgstr "Metadata"
+
+msgid "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+msgstr "Skrur på direkte redigering ved å klikke på en sang i spillelisten"
+
+msgid "Enable song metadata inline edition with click"
+msgstr "Slå på direkteredigering med ett klikk"
+
+msgid "Write metadata when saving playlists"
+msgstr "Skrev metadata når spilleliste lagres"
+
+msgid "Star playlist"
+msgstr "Star playlist"
+
+msgid "Close playlist"
+msgstr "Lukk spillelista"
+
+msgid "Rename playlist..."
+msgstr "Gi nytt navn til spillelista…"
+
+msgid "Save playlist..."
+msgstr "Lagre spilleliste…"
+
+msgid "Rename playlist"
+msgstr "Gi nytt navn til spillelista"
+
+msgid "Enter a new name for this playlist"
+msgstr "Gi denne spillelista et nytt navn"
+
+msgid "Remove playlist"
+msgstr "Fjern spilleliste"
+
+msgid "You are about to remove a playlist which is not part of your favorite playlists: the playlist will be deleted (this action cannot be undone). \nAre you sure you want to continue?"
+msgstr "Du er i ferd med å slette en spilleliste som ikke er lagret i Favoritter. Denne spillelisten vil bli slettet (og du kan ikke angre). \nEr du sikker?"
+
+msgid "This option can be changed in the \"Behavior\" preferences"
+msgstr "Dette valget kan endres under innstillinger for \"Oppførsel\""
+
+msgid "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+msgstr "Dobbelklikk her for å favorisere denne spillelisten slik at den blir lagret og tilgjengelig gjennom \"Spillelister\"  i panelet på venstre side."
+
+msgid "Hz"
+msgstr "Hz"
+
+msgid "Bit"
+msgstr "Bit"
+
+msgid "Usage"
+msgstr "Bruk"
+
+msgid "options"
+msgstr "innstillinger"
+
+msgid "URL(s)"
+msgstr "URL(er)"
+
+msgid "Player options"
+msgstr "Innstillinger for avspiller"
+
+msgid "Start the playlist currently playing"
+msgstr "Begynn på spillelista som spilles nå"
+
+msgid "Play if stopped, pause if playing"
+msgstr "Hvis stoppet: Spill av. Hvis spiller: pause"
+
+msgid "Pause playback"
+msgstr "Sett avspilling på pause"
+
+msgid "Stop playback"
+msgstr "Stopp avspilling"
+
+msgid "Stop playback after current track"
+msgstr "Stopp avspilling etter dette sporet"
+
+msgid "Skip backwards in playlist"
+msgstr "Gå bakover i spillelista"
+
+msgid "Skip forwards in playlist"
+msgstr "Gå fremover i spillelista"
+
+msgid "Set the volume to <value> percent"
+msgstr "Sett lydstyrken til <value> prosent"
+
+msgid "Increase the volume by 4 percent"
+msgstr "Øk lydstyrken med 4 prosent"
+
+msgid "Decrease the volume by 4 percent"
+msgstr "Senk volum med 4 prosent"
+
+msgid "Increase the volume by <value> percent"
+msgstr "Øk lydstyrken <value> prosent"
+
+msgid "Decrease the volume by <value> percent"
+msgstr "Demp lydstyrken med <value> prosent"
+
+msgid "Seek the currently playing track to an absolute position"
+msgstr "Gå til et bestemt tidspunkt i sporet"
+
+msgid "Seek the currently playing track by a relative amount"
+msgstr "Gå frem-/bakover en del av sporlengden"
+
+msgid "Restart the track, or play the previous track if within 8 seconds of start."
+msgstr "Start sporet igjen, eller spill forrige spor hvis du er innen de første 8 sekundene av sporet"
+
+msgid "Create a new playlist with files"
+msgstr "Opprett ny spilleliste med filer"
+
+msgid "Append files/URLs to the playlist"
+msgstr "Tilføy filer/URLer til spillelista"
+
+msgid "Loads files/URLs, replacing current playlist"
+msgstr "Åpne filer/URL-er; erstatt gjeldende spilleliste"
+
+msgid "Play the <n>th track in the playlist"
+msgstr "Spill av <n>ende spor i spillelista"
+
+msgid "Play given playlist"
+msgstr "Spill angitt spilleliste"
+
+msgid "Other options"
+msgstr "Andre innstillinger"
+
+msgid "Display the on-screen-display"
+msgstr "Overleggsvisning"
+
+msgid "Toggle visibility for the pretty on-screen-display"
+msgstr "Slå av/på synlighet for det pene skjermbilde overlegget"
+
+msgid "Change the language"
+msgstr "Endre språk"
+
+msgid "Resize the window"
+msgstr "Endre størrelse på vinduet"
+
+msgid "Equivalent to --log-levels *:1"
+msgstr "Tilsvarer --log-levels *:1"
+
+msgid "Equivalent to --log-levels *:3"
+msgstr "Tilsvarer --log-levels *:3"
+
+msgid "Comma separated list of class:level, level is 0-3"
+msgstr "Komma-separert liste av klasse:level, level er 0-3"
+
+msgid "Print out version information"
+msgstr "Vis versjonsinformasjon"
+
+msgid "Create fingerprint"
+msgstr "Create fingerprint"
+
+msgid "Failed to create directory %1."
+msgstr "Failed to create directory %1."
+
+msgid "Destination file %1 exists, but not allowed to overwrite."
+msgstr "Destination file %1 exists, but not allowed to overwrite."
+
+msgid "Destination file %1 exists, but not allowed to overwrite"
+msgstr "Destination file %1 exists, but not allowed to overwrite"
+
+msgid "Could not copy file %1 to %2."
+msgstr "Could not copy file %1 to %2."
+
+msgid "LUFS"
+msgstr "LUFS"
+
+msgid "LU"
+msgstr "LU"
+
+msgid "1 day"
+msgstr "1 dag"
+
+msgid "%1 days"
+msgstr "%1 dager"
+
+msgid "Today"
+msgstr "I dag"
+
+msgid "Yesterday"
+msgstr "I går"
+
+msgid "%1 days ago"
+msgstr "%1 dager siden"
+
+msgid "Tomorrow"
+msgstr "I morgen"
+
+msgid "In %1 days"
+msgstr "Om %1 dager"
+
+msgid "Next week"
+msgstr "Neste uke"
+
+msgid "In %1 weeks"
+msgstr "Om %1 uker"
+
+msgid "Show in file browser"
+msgstr "Vis i fil utforsker"
+
+msgid "Too many songs selected."
+msgstr "For mange sanger er valgt."
+
+msgid "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+msgstr "%1 sanger valgt, er du sikker på at du vil åpne dem alle?"
+
+msgid "Failed to load image from data for %1"
+msgstr "Failed to load image from data for %1"
+
+msgid "Success"
+msgstr "Success"
+
+msgid "File is unsupported"
+msgstr "File is unsupported"
+
+msgid "Filename is missing"
+msgstr "Filename is missing"
+
+msgid "File does not exist"
+msgstr "File does not exist"
+
+msgid "File could not be opened"
+msgstr "File could not be opened"
+
+msgid "Could not parse file"
+msgstr "Could not parse file"
+
+msgid "Could not save file"
+msgstr "Could not save file"
+
+msgid "Unknown error"
+msgstr "Ukjent feil"
+
+msgid "Prefix a search term with a field name to limit the search to that field, e.g.:"
+msgstr "Prefix a search term with a field name to limit the search to that field, e.g.:"
+
+msgid "artist"
+msgstr "artist"
+
+msgid "searches for all artists containing the word %1."
+msgstr "searches for all artists containing the word %1."
+
+msgid "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+msgstr "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+
+msgid "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+msgstr "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+
+msgid "rating"
+msgstr "rating"
+
+msgid "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+msgstr "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+
+msgid "Available fields"
+msgstr "Tilgjengelige felt"
+
+msgid "after"
+msgstr "etter"
+
+msgid "before"
+msgstr "etter"
+
+msgid "on"
+msgstr "på"
+
+msgid "not on"
+msgstr "ikke på"
+
+msgid "in the last"
+msgstr "som siste"
+
+msgid "not in the last"
+msgstr "ikke som siste"
+
+msgid "between"
+msgstr "mellom"
+
+msgid "contains"
+msgstr "inneholder"
+
+msgid "does not contain"
+msgstr "inneholder ikke"
+
+msgid "starts with"
+msgstr "starter på"
+
+msgid "ends with"
+msgstr "slutter på"
+
+msgid "greater than"
+msgstr "større enn"
+
+msgid "less than"
+msgstr "mindre enn"
+
+msgid "equals"
+msgstr "er lik"
+
+msgid "not equals"
+msgstr "ikke lik"
+
+msgid "empty"
+msgstr "tom"
+
+msgid "not empty"
+msgstr "ikke tom"
+
+msgid "A-Z"
+msgstr "A-Z"
+
+msgid "Z-A"
+msgstr "Z-A"
+
+msgid "oldest first"
+msgstr "eldre først"
+
+msgid "newest first"
+msgstr "nyeste først"
+
+msgid "shortest first"
+msgstr "korteste først"
+
+msgid "longest first"
+msgstr "lengre først"
+
+msgid "smallest first"
+msgstr "minste først"
+
+msgid "biggest first"
+msgstr "største først"
+
+msgid "Hours"
+msgstr "Timer"
+
+msgid "Days"
+msgstr "Dager"
+
+msgid "Weeks"
+msgstr "Uker"
+
+msgid "Months"
+msgstr "Måneder"
+
+msgid "Years"
+msgstr "År"
+
+msgid "Normal"
+msgstr "Normal"
+
+msgid "Angry"
+msgstr "Sint"
+
+msgid "Frozen"
+msgstr "Frossen"
+
+msgid "Happy"
+msgstr "Glad"
+
+msgid "System colors"
+msgstr "Systemfarger"
+
+msgid "add %n songs"
+msgid_plural "add %n songs"
+msgstr[0] "add %n songs"
+msgstr[1] "add %n songs"
+
+msgid "remove %n songs"
+msgid_plural "remove %n songs"
+msgstr[0] "remove %n songs"
+msgstr[1] "remove %n songs"
+
+msgid "move %n songs"
+msgid_plural "move %n songs"
+msgstr[0] "move %n songs"
+msgstr[1] "move %n songs"
+
+msgid "sort songs"
+msgstr "sort songs"
+
+msgid "shuffle songs"
+msgstr "shuffle songs"
+
+msgid "Invalid collection directory"
+msgstr "Invalid collection directory"
+
+msgid "Can't add directory %1 with special filesystem %2 to collection"
+msgstr "Can't add directory %1 with special filesystem %2 to collection"
+
+msgid "Clear"
+msgstr "Tøm"
+
+msgid "Reset"
+msgstr "Tilbakestill"
+
+msgid "Not authenticated"
+msgstr "Not authenticated"
+
+msgid "No track ID"
+msgstr "No track ID"
+
+msgid "Receiving artists..."
+msgstr "Receiving artists..."
+
+msgid "Receiving albums..."
+msgstr "Receiving albums..."
+
+msgid "Receiving songs..."
+msgstr "Receiving songs..."
+
+msgid "Searching..."
+msgstr "Søker..."
+
+msgid "Receiving albums for %1 artist..."
+msgstr "Receiving albums for %1 artist..."
+
+msgid "Receiving albums for %1 artists..."
+msgstr "Receiving albums for %1 artists..."
+
+msgid "Receiving songs for %1 album..."
+msgstr "Receiving songs for %1 album..."
+
+msgid "Receiving songs for %1 albums..."
+msgstr "Receiving songs for %1 albums..."
+
+msgid "Receiving album cover for %1 album..."
+msgstr "Receiving album cover for %1 album..."
+
+msgid "Receiving album covers for %1 albums..."
+msgstr "Receiving album covers for %1 albums..."
+
+msgid "No match."
+msgstr "Ingen treff."
+
+msgid "Missing Qobuz app ID."
+msgstr "Mangler Qobuz app ID."
+
+msgid "Missing app ID. Please fetch credentials first."
+msgstr "Missing app ID. Please fetch credentials first."
+
+msgid "Missing app secret. Please fetch credentials first."
+msgstr "Missing app secret. Please fetch credentials first."
+
+msgid "Missing private key. Please fetch credentials first."
+msgstr "Missing private key. Please fetch credentials first."
+
+msgid "Failed to start local server for OAuth redirect: %1"
+msgstr "Failed to start local server for OAuth redirect: %1"
+
+msgid "Failed to open the web browser. Please open this URL manually: %1"
+msgstr "Failed to open the web browser. Please open this URL manually: %1"
+
+msgid "Waiting for browser authentication..."
+msgstr "Waiting for browser authentication..."
+
+msgid "OAuth redirect failed: %1"
+msgstr "OAuth redirect failed: %1"
+
+msgid "OAuth redirect is missing authorization code."
+msgstr "OAuth redirect is missing authorization code."
+
+msgid "Exchanging authorization code..."
+msgstr "Exchanging authorization code..."
+
+msgid "Not authenticated with Qobuz."
+msgstr "Ikke autentisert med Qobuz."
+
+msgid "Missing Qobuz app ID or secret."
+msgstr "Mangler Qobuz app ID eller secret."
+
+msgid "Not authenticated. Please login to Qobuz in the settings."
+msgstr "Not authenticated. Please login to Qobuz in the settings."
+
+msgid "Enable"
+msgstr "Aktiver"
+
+msgid "App ID"
+msgstr "App ID"
+
+msgid "App Secret"
+msgstr "App Secret"
+
+msgid "Preferences"
+msgstr "Innstillinger"
+
+msgid "Audio format"
+msgstr "Lydformat"
+
+msgid "Search delay"
+msgstr "Søke forsinkelse"
+
+msgid "ms"
+msgstr "ms"
+
+msgid "Artists search limit"
+msgstr "Artist søkebegrensning"
+
+msgid "Albums search limit"
+msgstr "Album søke begrensning"
+
+msgid "Songs search limit"
+msgstr "Søkebegrensing for sanger"
+
+msgid "Download album covers"
+msgstr "Last ned plateomslag"
+
+msgid "Configuration incomplete"
+msgstr "Oppsett ikke komplett"
+
+msgid "Missing app id. Please fetch credentials first."
+msgstr "Missing app id. Please fetch credentials first."
+
+msgid "Fetching..."
+msgstr "Fetching..."
+
+msgid "Credentials fetched"
+msgstr "Credentials fetched"
+
+msgid "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+msgstr "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+
+msgid "Credential fetch failed"
+msgstr "Credential fetch failed"
+
+msgid "Fetch Credentials"
+msgstr "Fetch Credentials"
+
+msgid "Remove (Remastered), etc from song titles"
+msgstr "Remove (Remastered), etc from song titles"
+
+msgid "Private key"
+msgstr "Private key"
+
+msgid "Automatically fetch app ID, app secret and private key from Qobuz web player"
+msgstr "Automatically fetch app ID, app secret and private key from Qobuz web player"
+
+msgid "Not authenticated. Please log in on the Qobuz settings page."
+msgstr "Not authenticated. Please log in on the Qobuz settings page."
+
+msgid "Cancelled."
+msgstr "Avbrutt"
+
+msgid "QueueView"
+msgstr "Køoversikt"
+
+msgid "Ctrl+Up"
+msgstr "Ctrl+Opp"
+
+msgid "Ctrl+Down"
+msgstr "Ctrl+Ned"
+
+msgid "Remove"
+msgstr "Fjern"
+
+msgid "Country"
+msgstr "Country"
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "Load more..."
+msgstr "Load more..."
+
+msgid "Search for radio stations using radio-browser.info"
+msgstr "Search for radio stations using radio-browser.info"
+
+msgid "Search radio stations..."
+msgstr "Search radio stations..."
+
+msgid "All countries"
+msgstr "All countries"
+
+msgid "By votes"
+msgstr "By votes"
+
+msgid "By clicks"
+msgstr "By clicks"
+
+msgid "By name"
+msgstr "By name"
+
+msgid "By bitrate"
+msgstr "By bitrate"
+
+msgid "No stations found."
+msgstr "No stations found."
+
+msgid "%1 stations found"
+msgstr "%1 stations found"
+
+msgid "No Radio Browser server available."
+msgstr "No Radio Browser server available."
+
+msgid "Searching Radio Browser"
+msgstr "Searching Radio Browser"
+
+msgid "Radio Browser search failed: %1"
+msgstr "Radio Browser search failed: %1"
+
+msgid "Getting %1 channels"
+msgstr "Mottar %1 kanaler"
+
+msgid "SomaFM"
+msgstr "SomaFM"
+
+msgid "Stream quality:"
+msgstr "Stream quality:"
+
+msgid "Radio Browser"
+msgstr "Radio Browser"
+
+msgid "Search results limit:"
+msgstr "Search results limit:"
+
+msgid "Hide broken stations"
+msgstr "Hide broken stations"
+
+msgid "Default sort order:"
+msgstr "Default sort order:"
+
+msgid "Default country:"
+msgstr "Default country:"
+
+msgid "Highest"
+msgstr "Highest"
+
+msgid "High"
+msgstr "High"
+
+msgid "Low"
+msgstr "Low"
+
+msgid "Open homepage"
+msgstr "Åpne hjemmeside"
+
+msgid "Donate"
+msgstr "Doner"
+
+msgid "Refresh channels"
+msgstr "Oppfrisk kanler"
+
+msgid "Channels"
+msgstr "Channels"
+
+msgid "Select directory for saving playlists"
+msgstr "Select directory for saving playlists"
+
+msgid "Type"
+msgstr "Type"
+
+msgid "Select directory for the playlists"
+msgstr "Velg mappe for spillelister"
+
+msgid "Directory does not exist."
+msgstr "Directory does not exist."
+
+msgid "Saved Grouping Manager"
+msgstr "Behandler for lagrede grupperinger"
+
+msgid "Second Level"
+msgstr "Andre nivå"
+
+msgid "Third Level"
+msgstr "Tredje nivå"
+
+msgid "Scrobbler"
+msgstr "Scrobbler"
+
+msgid "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+msgstr "Sanger blir scrobblet når de har gyldig metadata, er lengre enn 30 seconds, og har blitt spilt for minst halve tiden, eller 30 sekunder (det som skjer tidligst)."
+
+msgid "Show scrobble button"
+msgstr "Vis knappen for rapportering av lyttevaner"
+
+msgid "Show love button"
+msgstr "Vis love knapp"
+
+msgid "Submit scrobbles every"
+msgstr "Send scrobbles hver"
+
+msgid "Prefer album artist when sending scrobbles"
+msgstr "Foretrekk album artist når scrobbler sendes"
+
+msgid "Show dialog for errors"
+msgstr "Vis dialog for feil"
+
+msgid "Strip \"remastered\" and similar from album and title"
+msgstr "Strip \"remastered\" and similar from album and title"
+
+msgid "Enable scrobbling for the following sources:"
+msgstr "Aktiver skrobbling for følgende kilder:"
+
+msgid "Local file"
+msgstr "Lokal fil"
+
+msgid "CDDA"
+msgstr "CDDA"
+
+msgid "Stream"
+msgstr "Strøm"
+
+msgid "Radio Paradise"
+msgstr "Radio Paradise"
+
+msgid "Last.fm"
+msgstr "Last.fm"
+
+msgid "Listenbrainz"
+msgstr "Listenbrainz"
+
+msgid "User token:"
+msgstr "Bruker nøkkel:"
+
+msgid "Enter your user token from"
+msgstr "Tast inn din bruker token fra"
+
+msgid "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+msgstr "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+
+msgid "Offline mode (Only cache scrobbles)"
+msgstr "Offline mode (Only cache scrobbles)"
+
+msgid "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+msgstr "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+
+msgid "Settings"
+msgstr "Innstillinger"
+
+msgid "General"
+msgstr "Generelt"
+
+msgid "User interface"
+msgstr "Brukergrensesnitt"
+
+msgid "Streaming"
+msgstr "Strømming"
+
+msgid "Search mode"
+msgstr "Søkemodus"
+
+msgid "Match every search term (AND)"
+msgstr "Match alle søke valg (AND)"
+
+msgid "Match one or more search terms (OR)"
+msgstr "Match en eller flere søkevalg (OR)"
+
+msgid "Include all songs"
+msgstr "Inkluder  alle sanger"
+
+msgid "Search terms"
+msgstr "Søkekriterier"
+
+msgid "Sorting"
+msgstr "Sortering"
+
+msgid "Put songs in a random order"
+msgstr "Putt sangene i tilfeldig rekkefølge"
+
+msgid "Sort songs by"
+msgstr "Sorter sanger etter"
+
+msgid "Limits"
+msgstr "Begrensninger"
+
+msgid "Show all the songs"
+msgstr "Vis alle sanger"
+
+msgid "Only show the first"
+msgstr "Bare vis de første"
+
+msgid " songs"
+msgstr " sanger"
+
+msgid "Collection search"
+msgstr "Samlingsøk"
+
+msgid "Find songs in your collection that match the criteria you specify."
+msgstr "Finn sanger i samlingen som svarer til kriteriene du spesifiserer"
+
+msgid "A song will be included in the playlist if it matches these conditions."
+msgstr "En sang vil bli inkludert i spillelisten dersom den matcher disse kreteriene"
+
+msgid "Search options"
+msgstr "Søkevalg"
+
+msgid "Choose how the playlist is sorted and how many songs it will contain."
+msgstr "Velg hvordan spillelisten er sortert og hvor mange sanger den skal inneholde"
+
+msgid "%1 songs found (showing %2)"
+msgstr "%1 sanger funnet (viser %2)"
+
+msgid "%1 songs found"
+msgstr "%1 sanger funnet"
+
+msgid "and"
+msgstr "og"
+
+msgid "ago"
+msgstr "siden"
+
+msgid "The second value must be greater than the first one!"
+msgstr "Andre verdi må være høyere enne den første!"
+
+msgid "Add search term"
+msgstr "Legg til søkekreterie"
+
+msgid "Smart playlist"
+msgstr "Smart spilleliste"
+
+msgid "Playlist type"
+msgstr "Spilleliste type"
+
+msgid "A smart playlist is a dynamic list of songs that come from your collection.  There are different types of smart playlist that offer different ways of selecting songs."
+msgstr "En smart spilleliste er en dynamisk liste over sanger fra din samling. Det er flere typer smarte spillelister som tilbyr forskjellige veier å velge sanger"
+
+msgid "Finish"
+msgstr "Ferdig"
+
+msgid "Choose a name for your smart playlist"
+msgstr "Velg et navn for din smarte spilleliste"
+
+msgid "Use dynamic mode"
+msgstr "Bruk dynamisk modus"
+
+msgid "In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes."
+msgstr "I dynamisk modus nye spor vil bli valgt og lagt til spillelisten hver gang en sang er fullført."
+
+msgid "Newest tracks"
+msgstr "Nyeste spor"
+
+msgid "50 random tracks"
+msgstr "50 tilfeldige spor"
+
+msgid "Ever played"
+msgstr "Aldri spilt"
+
+msgid "Never played"
+msgstr "Aldri spilt"
+
+msgid "Most played"
+msgstr "Mest spilte"
+
+msgid "Favourite tracks"
+msgstr "Favorittspor"
+
+msgid "All tracks"
+msgstr "Alle spor"
+
+msgid "Dynamic random mix"
+msgstr "Dynamisk tilfeldig miks"
+
+msgid "New smart playlist"
+msgstr "Ny smart spilleliste"
+
+msgid "Edit smart playlist"
+msgstr "Rediger smart spilleliste"
+
+msgid "Delete smart playlist"
+msgstr "Slett smart spilleliste"
+
+msgid "New smart playlist..."
+msgstr "Ny smart spilleliste..."
+
+msgid "Play next"
+msgstr "Spill neste"
+
+msgid "Edit smart playlist..."
+msgstr "Rediger smart spilleliste..."
+
+msgid "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+msgstr "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+
+msgid "Restore defaults"
+msgstr "Restore defaults"
+
+msgid "Preload function was not set for blocking operation."
+msgstr "Preload function was not set for blocking operation."
+
+msgid "File %1 does not exist."
+msgstr "Fil %1 eksisterer ikke."
+
+msgid "Could not open file %1 for reading: %2"
+msgstr "Kunne ikke åpne fil %1 for lesing: %2"
+
+msgid "Could not open CUE file %1 for reading: %2"
+msgstr "Kunne ikke åpne CUE fil %1 for lesing: %2"
+
+msgid "Could not open playlist file %1 for reading: %2"
+msgstr "Kunne ikke åpne spilleliste %1 for lesing: %2"
+
+msgid "Couldn't create GStreamer source element for %1"
+msgstr "Kunne ikke opprette gstreamer kilde element for %1"
+
+msgid "Couldn't create GStreamer typefind element for %1"
+msgstr "Couldn't create GStreamer typefind element for %1"
+
+msgid "Couldn't create GStreamer fakesink element for %1"
+msgstr "Couldn't create GStreamer fakesink element for %1"
+
+msgid "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+msgstr "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+
+msgid "Missing CDDA playback."
+msgstr "Missing CDDA playback."
+
+msgid "Error while loading audio CD."
+msgstr "Feil ved lasting av CD"
+
+msgid "Loading tracks info"
+msgstr "Henter informasjon om spor"
+
+msgid "No pending song for track ID"
+msgstr "No pending song for track ID"
+
+msgid "Authenticating..."
+msgstr "Autentiserer..."
+
+msgid "Data missing error"
+msgstr "Data missing error"
+
+msgid "Not authenticated with Spotify."
+msgstr "Not authenticated with Spotify."
+
+msgid "Basic authentication"
+msgstr "Basic authentication"
+
+msgid "Authenticate"
+msgstr "Authenticate"
+
+msgid "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+msgstr "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+
+msgid "Fetch entire albums when searching songs"
+msgstr "Hent hele album når en søker etter sanger"
+
+msgid "The streaming collection is empty!"
+msgstr "The streaming collection is empty!"
+
+msgid "Click here to retrieve music"
+msgstr "Klikk her for å få inn musikk"
+
+msgid "Remove from favorites"
+msgstr "Fjern fra favoritter"
+
+msgid "Close"
+msgstr "Lukk"
+
+msgid "Refresh catalogue"
+msgstr "Oppfrisk katalog"
+
+msgid "Streaming Search View"
+msgstr "Streaming Search View"
+
+msgid "artists"
+msgstr "artister"
+
+msgid "albums"
+msgstr "albumer"
+
+msgid "songs"
+msgstr "sanger"
+
+msgid "Enter search terms above to find music"
+msgstr "Skriv inn søkeord ovenfor for å finne musikk"
+
+msgid "Configure %1..."
+msgstr "Sett opp %1…"
+
+msgid "Add to artists"
+msgstr "Legg til artister"
+
+msgid "Add to albums"
+msgstr "Legg til albumer"
+
+msgid "Add to songs"
+msgstr "Legg til sanger"
+
+msgid "Streaming Tabs View"
+msgstr "Streaming Tabs View"
+
+msgid "Artists"
+msgstr "Artister"
+
+msgid "Albums"
+msgstr "Albumer"
+
+msgid "Songs"
+msgstr "Sanger"
+
+msgid "Retrieving albums..."
+msgstr "Mottar albumer..."
+
+msgid "Retrieving songs for %1 album..."
+msgstr "Mottar sanger for %1 album..."
+
+msgid "Retrieving songs for %1 albums..."
+msgstr "Mottar sanger for %1 albumer..."
+
+msgid "Retrieving album cover for %1 album..."
+msgstr "Henter plateomslag for %1 album..."
+
+msgid "Retrieving album covers for %1 albums..."
+msgstr "Henter plateomslag for %1 album..."
+
+msgid "Server URL is invalid."
+msgstr "Server URL er ugyldig."
+
+msgid "Missing username or password."
+msgstr "Mangler brukernavn eller passord."
+
+msgid "Server URL"
+msgstr "Server URL"
+
+msgid "Authentication method:"
+msgstr "Autentiseringsmetode"
+
+msgid "Hex"
+msgstr "Hex"
+
+msgid "MD5 token (Recommended)"
+msgstr "MD5 token (Recommended)"
+
+msgid "Use HTTP/2 when possible"
+msgstr "Bruk HTTP2 når tilgjengelig"
+
+msgid "Verify server certificate"
+msgstr "Verifiser server sertifikat"
+
+msgid "Use album ID for album covers"
+msgstr "Bruk album-ID for albumomslag"
+
+msgid "Server-side scrobbling"
+msgstr "Server-siding skrobbling"
+
+msgid "Test"
+msgstr "Test"
+
+msgid "Delete songs"
+msgstr "Slett sanger"
+
+msgid "Missing server url, username or password."
+msgstr "Mangler server URL, brukernavn eller passord."
+
+msgid "Configuration incorrect"
+msgstr "Uriktig oppsett"
+
+msgid "Test successful!"
+msgstr "Test successful!"
+
+msgid "Test failed!"
+msgstr "Test feilet!"
+
+msgid "Subsonic server URL is invalid."
+msgstr "Subsonic server URL er ugyldig."
+
+msgid "Missing Subsonic username or password."
+msgstr "Mangler Subsonic brukernavn eller passord."
+
+msgid "Stage: %1"
+msgstr "Stage: %1"
+
+msgid "Reason: %1"
+msgstr "Reason: %1"
+
+msgid "Identifying song"
+msgstr "Identifying song"
+
+msgid "Fingerprinting song"
+msgstr "Fingerprinting song"
+
+msgid "Generated fingerprint is empty or invalid"
+msgstr "Generated fingerprint is empty or invalid"
+
+msgid "Fingerprinting"
+msgstr "Fingerprinting"
+
+msgid "Fingerprint length: %1"
+msgstr "Fingerprint length: %1"
+
+msgid "Minimum required length: %1"
+msgstr "Minimum required length: %1"
+
+msgid "Downloading metadata"
+msgstr "Downloading metadata"
+
+msgid "No MusicBrainz metadata was found for this track"
+msgstr "No MusicBrainz metadata was found for this track"
+
+msgid "MusicBrainz metadata"
+msgstr "MusicBrainz metadata"
+
+msgid "Candidate metadata rows: 0"
+msgstr "Candidate metadata rows: 0"
+
+msgid "Not authenticated with Tidal."
+msgstr "Ikke autentisert med Tidal."
+
+msgid "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+msgstr "Tidal støtte er ikke offisiell og krever en API nøkkel."
+
+msgid "Client ID"
+msgstr "Client ID"
+
+msgid "Audio quality"
+msgstr "Lydkvalitet"
+
+msgid "Album cover size"
+msgstr "Plateomslag størrelse"
+
+msgid "Stream URL method"
+msgstr "Strøm URL metode"
+
+msgid "Append explicit to album title for explicit albums"
+msgstr "Legg til explicit i album tittel for explicit albumer"
+
+msgid "Missing Tidal client ID."
+msgstr "Mangler Tidal client ID."
+
+msgid "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Mottokk URL med %1 kryptert strøm fra Tidal, Strawberry støtter ikke kryptert strøm."
+
+msgid "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Mottokk URL med kryptert strøm fra Tidal, Strawberry støtter ikke kryptert strøm."
+
+msgid "Tag fetcher"
+msgstr "Etikett-henter"
+
+msgid "Strawberry was unable to find results for this file"
+msgstr "Strawberry klarte ikke å finne resultater for denne filen"
+
+msgid "Select best possible match"
+msgstr "Velg det beste treffet"
+
+msgid "Original tags"
+msgstr "Opprinnelige tagger"
+
+msgid "Suggested tags"
+msgstr "Foreslåtte etiketter"
+
+msgid "No results"
+msgstr "No results"
+
+msgid "0:00:00"
+msgstr "0:00:00"
+
+msgid "Click to toggle between remaining time and total time"
+msgstr "Klikk for å bytte mellom gjenværende og total tid"
+
+msgid "Waveform"
+msgstr "Waveform"
+
+msgid "Transcode Music"
+msgstr "Omkod musikk"
+
+msgid "Files to transcode"
+msgstr "Filer som skal omkodes"
+
+msgid "Directory"
+msgstr "Mappe"
+
+msgid "Add..."
+msgstr "Legg til..."
+
+msgid "Add all tracks from a directory and all its subdirectories"
+msgstr "Legg til alle filer fra ei mappe og dens undermapper"
+
+msgid "Import..."
+msgstr "Importer..."
+
+msgid "Output options"
+msgstr "Utgangsinnstillinger"
+
+msgid "Options..."
+msgstr "Innstillinger…"
+
+msgid "Alongside the originals"
+msgstr "Sammen med originalene"
+
+msgid "Select..."
+msgstr "Velg…"
+
+msgid "Progress"
+msgstr "Framdrift"
+
+msgid "Details..."
+msgstr "Detaljer…"
+
+msgid "Start transcoding"
+msgstr "Start omkoding"
+
+msgid "%n remaining"
+msgid_plural "%n remaining"
+msgstr[0] "%n gjenstående"
+msgstr[1] "%n remaining"
+
+msgid "%n finished"
+msgid_plural "%n finished"
+msgstr[0] "%n ferdige"
+msgstr[1] "%n finished"
+
+msgid "%n failed"
+msgid_plural "%n failed"
+msgstr[0] "%n feilet"
+msgstr[1] "%n failed"
+
+msgid "Add files to transcode"
+msgstr "Legg filer til for omkoding"
+
+msgid "Open a directory to import music from"
+msgstr "Importer musikk fra ei mappe"
+
+msgid "Import Directory"
+msgstr "Import Directory"
+
+msgid "Preserve directory structure in output directory (import only)"
+msgstr "Preserve directory structure in output directory (import only)"
+
+msgid "Transcoder Log"
+msgstr "Logg for omkoder"
+
+msgid "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+msgstr "Kunne ikke opprette GStreamer-elementet \"%1\" - sørg for at du har alle nødvendige GStreamer-programutvidelser installert"
+
+msgid "Successfully written %1"
+msgstr "Skrev %1"
+
+msgid "Transcoding %1 files using %2 threads"
+msgstr "Omkoder %1 filer i %2 tråder"
+
+msgid "Error processing %1: %2"
+msgstr "Kunne ikke behandle %1: %2"
+
+msgid "Starting %1"
+msgstr "Starter %1"
+
+msgid "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+msgstr "Kunne ikke finne noen koder for %1, kontroller at du har de riktige GStreamer-modulene installert"
+
+msgid "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+msgstr "Kunne ikke finne multiplekser for %1, sjekk at du har de riktige GStreamer-programutvidelsene installert"
+
+msgid " kbps"
+msgstr "kbps"
+
+msgid "Profile"
+msgstr "Profil"
+
+msgid "Main profile (MAIN)"
+msgstr "Hovedprofil (MAIN)"
+
+msgid "Low complexity profile (LC)"
+msgstr "Profil for lavkompleksitet (LC)"
+
+msgid "Scalable sampling rate profile (SSR)"
+msgstr "Skalerbar samplingsrate-profil (SSR)"
+
+msgid "Long term prediction profile (LTP)"
+msgstr "Profil for langtidspredikie (LTP)"
+
+msgid "Use temporal noise shaping"
+msgstr "Bruk midlertidig støyforming"
+
+msgid "Allow mid/side encoding"
+msgstr "Tillat midt/side-koding"
+
+msgid "Block type"
+msgstr "Blokktype"
+
+msgid "Normal block type"
+msgstr "Normal blokktype"
+
+msgid "No short blocks"
+msgstr "Ikke korte blokker"
+
+msgid "No long blocks"
+msgstr "Ingen lange blokker"
+
+msgid "Transcoding options"
+msgstr "Innstillinger for omkoding"
+
+#. Sound quality
+msgid "Quality"
+msgstr "Kvalitet"
+
+msgid "Fast"
+msgstr "Rask"
+
+msgid "Best"
+msgstr "Best"
+
+msgid "Optimize for &quality"
+msgstr "Optimize for &quality"
+
+msgid "Opti&mize for bitrate"
+msgstr "Optimalisere for bitrate"
+
+msgid "Constant bitrate"
+msgstr "Konstant bitrate"
+
+msgid "Encoding engine quality"
+msgstr "Koding motorens kvalitetsinnstilling"
+
+msgid "Standard"
+msgstr "Standard"
+
+msgid "Force mono encoding"
+msgstr "Tving monolyd-koding"
+
+msgid "automatic"
+msgstr "automatisk"
+
+msgid "Average bitrate"
+msgstr "Gjennomsnittlig bitrate"
+
+msgid "disabled"
+msgstr "slått av"
+
+msgid "Encoding mode"
+msgstr "Kodingsmodus"
+
+msgid "Auto"
+msgstr "Automatisk"
+
+msgid "Ultra wide band (UWB)"
+msgstr "Ultrabredt bånd (UWB)"
+
+msgid "Wide band (WB)"
+msgstr "Bredbånd (WB)"
+
+msgid "Narrow band (NB)"
+msgstr "Smalbånd (SB)"
+
+msgid "Variable bit rate"
+msgstr "Variabel bitrate"
+
+msgid "Voice activity detection"
+msgstr "Taledeteksjon"
+
+msgid "Discontinuous transmission"
+msgstr "Uregelmessig overføring"
+
+msgid "Encoding complexity"
+msgstr "Koding-kompleksitet"
+
+msgid "Frames per buffer"
+msgstr "Bilder per buffer"
+
+msgid "Use bitrate management engine"
+msgstr "Bruk kontrollert bitrate"
+
+msgid "Target bitrate"
+msgstr "Ønsket bitrate"
+
+msgid "Minimum bitrate"
+msgstr "Minimal bitrate"
+
+msgid "Maximum bitrate"
+msgstr "Høyeste bitrate"
+
+msgid "Transcoding"
+msgstr "Omkoding"
+
+msgid "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+msgstr "Disse innstillingene brukes i \"Omkod musikk\"-dialogvinduet, og når musikken omkodes før kopiering til en enhet."
+
+msgid "FLAC"
+msgstr "FLAC"
+
+msgid "WavPack"
+msgstr "WavPack"
+
+msgid "Vorbis"
+msgstr "Vorbis"
+
+msgid "Opus"
+msgstr "Opus"
+
+msgid "Speex"
+msgstr "Speex"
+
+msgid "AAC"
+msgstr "AAC"
+
+msgid "ASF (WMA)"
+msgstr "ASF (WMA)"
+
+msgid "MP3"
+msgstr "MP3"
+
+msgid "D-Bus path"
+msgstr "D-Bus sti"
+
+msgid "Serial number"
+msgstr "Serienummer"
+
+msgid "Mount points"
+msgstr "Monteringspunkter"
+
+msgid "Partition label"
+msgstr "Partisjonsnavn"
+
+msgid "UUID"
+msgstr "UUID"
+
+msgid "Enter username and password"
+msgstr "Skriv inn brukernavn og passord"
+
+msgid "Color"
+msgstr "Color"
+
+msgid "Select waveform color"
+msgstr "Select waveform color"
+
+msgid "Save the .waveform files directly in the songs folders"
+msgstr "Save the .waveform files directly in the songs folders"
+
+msgid "Failed to write XSPF playlist"
+msgstr "Failed to write XSPF playlist"
+

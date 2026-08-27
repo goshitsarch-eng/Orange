@@ -1,128 +1,90 @@
-/*
- * Strawberry Music Player
- * Copyright 2021-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "radios/radioparadiseservice.h"
 
-#include <QObject>
-#include <QUrl>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QJsonValue>
-#include <QJsonObject>
-#include <QJsonArray>
+#include <json-glib/json-glib.h>
 
-#include "core/taskmanager.h"
-#include "core/networkaccessmanager.h"
-#include "core/iconloader.h"
-#include "radioparadiseservice.h"
-#include "radiochannel.h"
+#include <cctype>
 
-using namespace Qt::Literals::StringLiterals;
+const char *RadioParadiseService::kApiChannelsUrl = "https://api.radioparadise.com/api/list_streams";
 
-namespace {
-constexpr char kApiChannelsUrl[] = "https://api.radioparadise.com/api/list_streams";
-}  // namespace
+std::string RadioParadiseService::Homepage() { return "https://radioparadise.com/"; }
 
-RadioParadiseService::RadioParadiseService(const SharedPtr<TaskManager> task_manager, const SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : RadioService(Song::Source::RadioParadise, u"Radio Paradise"_s, IconLoader::Load(u"radioparadise"_s), task_manager, network, parent) {}
-
-QUrl RadioParadiseService::Homepage() { return QUrl(u"https://radioparadise.com/"_s); }
-QUrl RadioParadiseService::Donate() { return QUrl(u"https://payments.radioparadise.com/rp2s-content.php?name=Support&file=support"_s); }
-
-void RadioParadiseService::Abort() {
-
-  while (!replies_.isEmpty()) {
-    QNetworkReply *reply = replies_.takeFirst();
-    QObject::disconnect(reply, nullptr, this, nullptr);
-    if (reply->isRunning()) reply->abort();
-    reply->deleteLater();
-  }
-
-  channels_.clear();
-
+std::string RadioParadiseService::Donate() {
+  return "https://payments.radioparadise.com/rp2s-content.php?name=Support&file=support";
 }
 
-void RadioParadiseService::GetChannels() {
-
-  Abort();
-
-  QNetworkRequest network_request(QUrl(QString::fromLatin1(kApiChannelsUrl)));
-  QNetworkReply *reply = network_->get(network_request);
-  replies_ << reply;
-  const int task_id = task_manager_->StartTask(tr("Getting %1 channels").arg(name_));
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, task_id]() { GetChannelsReply(reply, task_id); });
-
+std::string RadioParadiseService::EnsureAbsoluteUrl(const std::string &url) {
+  if (url.empty()) {
+    return {};
+  }
+  size_t scheme = 0;
+  while (scheme < url.size() && std::isalnum(static_cast<unsigned char>(url[scheme]))) {
+    ++scheme;
+  }
+  if (scheme > 0 && scheme + 2 < url.size() && url[scheme] == ':' && url[scheme + 1] == '/' && url[scheme + 2] == '/') {
+    return url;
+  }
+  return "https://" + url;
 }
 
-void RadioParadiseService::GetChannelsReply(QNetworkReply *reply, const int task_id) {
-
-  if (replies_.contains(reply)) replies_.removeAll(reply);
-  reply->deleteLater();
-
-  const QJsonObject object = ExtractJsonObj(reply);
-  if (object.isEmpty()) {
-    task_manager_->SetTaskFinished(task_id);
-    Q_EMIT NewChannels();
-    return;
+std::vector<RadioChannel> RadioParadiseService::ParseChannels(const std::string &json) {
+  std::vector<RadioChannel> channels;
+  if (json.empty()) {
+    return channels;
   }
-
-  if (!object.contains("channels"_L1) || !object["channels"_L1].isArray()) {
-    Error(u"Missing JSON channels array."_s, object);
-    task_manager_->SetTaskFinished(task_id);
-    Q_EMIT NewChannels();
-    return;
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
+    g_object_unref(parser);
+    return channels;
   }
-  const QJsonArray array_channels = object["channels"_L1].toArray();
-
-  RadioChannelList channels;
-  for (const QJsonValue &value_channel : array_channels) {
-    if (!value_channel.isObject()) continue;
-    const QJsonObject obj_channel = value_channel.toObject();
-    if (!obj_channel.contains("chan_name"_L1) || !obj_channel.contains("streams"_L1)) {
+  JsonNode *root = json_parser_get_root(parser);
+  if (!root || !JSON_NODE_HOLDS_OBJECT(root)) {
+    g_object_unref(parser);
+    return channels;
+  }
+  JsonObject *object = json_node_get_object(root);
+  if (!json_object_has_member(object, "channels") || !JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "channels"))) {
+    g_object_unref(parser);
+    return channels;
+  }
+  JsonArray *array = json_object_get_array_member(object, "channels");
+  const guint n = json_array_get_length(array);
+  for (guint i = 0; i < n; ++i) {
+    JsonNode *item = json_array_get_element(array, i);
+    if (!item || !JSON_NODE_HOLDS_OBJECT(item)) {
       continue;
     }
-    const QString name = obj_channel["chan_name"_L1].toString();
-    const QJsonValue value_streams = obj_channel["streams"_L1];
-    if (!value_streams.isArray()) {
+    JsonObject *channel_obj = json_node_get_object(item);
+    if (!json_object_has_member(channel_obj, "chan_name") || !json_object_has_member(channel_obj, "streams") ||
+        !JSON_NODE_HOLDS_ARRAY(json_object_get_member(channel_obj, "streams"))) {
       continue;
     }
-    const QJsonArray array_streams = obj_channel["streams"_L1].toArray();
-    for (const QJsonValue &value_stream : array_streams) {
-      if (!value_stream.isObject()) continue;
-      const QJsonObject obj_stream = value_stream.toObject();
-      if (!obj_stream.contains("label"_L1) || !obj_stream.contains("url"_L1)) {
+    const char *name = json_object_get_string_member(channel_obj, "chan_name");
+    if (!name) {
+      continue;
+    }
+    JsonArray *streams = json_object_get_array_member(channel_obj, "streams");
+    const guint stream_count = json_array_get_length(streams);
+    for (guint s = 0; s < stream_count; ++s) {
+      JsonNode *stream_node = json_array_get_element(streams, s);
+      if (!stream_node || !JSON_NODE_HOLDS_OBJECT(stream_node)) {
         continue;
       }
-      const QString label = obj_stream["label"_L1].toString();
-      QString url = obj_stream["url"_L1].toString();
-      static const QRegularExpression regex_url_schema(u"^[0-9a-zA-Z]*:\\/\\/"_s, QRegularExpression::CaseInsensitiveOption);
-      if (!url.contains(regex_url_schema)) {
-        url.prepend("https://"_L1);
+      JsonObject *stream = json_node_get_object(stream_node);
+      if (!json_object_has_member(stream, "label") || !json_object_has_member(stream, "url")) {
+        continue;
+      }
+      const char *label = json_object_get_string_member(stream, "label");
+      const char *url = json_object_get_string_member(stream, "url");
+      if (!label || !url) {
+        continue;
       }
       RadioChannel channel;
-      channel.source = source_;
-      channel.name = name + " - "_L1 + label;
-      channel.url.setUrl(url);
-      channels << channel;
+      channel.source = Song::Source::RadioParadise;
+      channel.name = std::string(name) + " - " + label;
+      channel.url = EnsureAbsoluteUrl(url);
+      channels.push_back(channel);
     }
   }
-
-  task_manager_->SetTaskFinished(task_id);
-
-  Q_EMIT NewChannels(channels);
-
+  g_object_unref(parser);
+  return channels;
 }

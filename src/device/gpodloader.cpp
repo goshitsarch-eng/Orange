@@ -1,127 +1,120 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "device/gpodloader.h"
 
-#include "config.h"
-
-#include <glib.h>
-#include <gpod/itdb.h>
-
-#include <QObject>
-#include <QDir>
-#include <QByteArray>
-#include <QString>
-
-#include "includes/shared_ptr.h"
 #include "core/logging.h"
-#include "core/song.h"
-#include "core/taskmanager.h"
-#include "collection/collectionbackend.h"
-#include "gpodloader.h"
+#include "utilities/fileutils.h"
+#include "utilities/strutils.h"
 
-GPodLoader::GPodLoader(const QString &mount_point,
-                       const SharedPtr<TaskManager> task_manager,
-                       const SharedPtr<CollectionBackend> backend,
-                       const SharedPtr<ConnectedDevice> device,
-                       QObject *parent)
-    : QObject(parent),
-      device_(device),
-      mount_point_(mount_point),
-      type_(Song::FileType::Unknown),
-      task_manager_(task_manager),
-      backend_(backend),
-      abort_(false) {
-  original_thread_ = thread();
+#ifdef HAVE_GPOD
+
+namespace {
+
+std::string FromUtf8(const char *value) {
+  return value ? value : "";
 }
 
-GPodLoader::~GPodLoader() = default;
+}  // namespace
 
-void GPodLoader::LoadDatabase() {
-
-  int task_id = task_manager_->StartTask(tr("Loading iPod database"));
-  Q_EMIT TaskStarted(task_id);
-
-  Itdb_iTunesDB *db = TryLoad();
-
-  moveToThread(original_thread_);
-
-  task_manager_->SetTaskFinished(task_id);
-  Q_EMIT LoadFinished(db, !abort_);
-
+Song GPodLoader::SongFromTrack(Itdb_Track *track, const std::string &prefix) {
+  Song song(Song::Source::Device);
+  if (!track) {
+    return song;
+  }
+  song.set_valid(true);
+  song.set_title(FromUtf8(track->title));
+  song.set_album(FromUtf8(track->album));
+  song.set_artist(FromUtf8(track->artist));
+  song.set_albumartist(FromUtf8(track->albumartist));
+  song.set_track(track->track_nr);
+  song.set_disc(track->cd_nr);
+  song.set_year(track->year);
+  song.set_genre(FromUtf8(track->genre));
+  song.set_compilation(track->compilation == 1);
+  song.set_composer(FromUtf8(track->composer));
+  song.set_grouping(FromUtf8(track->grouping));
+  song.set_comment(FromUtf8(track->comment));
+  song.set_length_nanosec(static_cast<int64_t>(track->tracklen) * 1000000LL);
+  song.set_bitrate(track->bitrate);
+  song.set_samplerate(track->samplerate);
+  std::string filename = FromUtf8(track->ipod_path);
+  filename = StrUtils::Replace(filename, ":", "/");
+  if (!prefix.empty() && !filename.empty() && filename.front() != '/') {
+    filename = "/" + filename;
+  }
+  const std::string path = prefix + filename;
+  song.set_url(FileUtils::UriFromPath(path));
+  song.set_basefilename(FileUtils::BaseName(filename));
+  song.set_filetype(track->type2 ? Song::FileType::MPEG : Song::FileType::MP4);
+  song.set_filesize(track->size);
+  song.set_mtime(track->time_modified);
+  song.set_ctime(track->time_added);
+  song.set_playcount(track->playcount);
+  song.set_skipcount(track->skipcount);
+  song.set_lastplayed(track->time_played);
+  return song;
 }
 
-Itdb_iTunesDB *GPodLoader::TryLoad() {
+void GPodLoader::SongToTrack(const Song &song, Itdb_Track *track) {
+  if (!track) {
+    return;
+  }
+  g_free(track->title);
+  g_free(track->album);
+  g_free(track->artist);
+  g_free(track->albumartist);
+  g_free(track->genre);
+  g_free(track->composer);
+  g_free(track->grouping);
+  g_free(track->comment);
+  track->title = g_strdup(song.title().c_str());
+  track->album = g_strdup(song.album().c_str());
+  track->artist = g_strdup(song.artist().c_str());
+  track->albumartist = g_strdup(song.albumartist().c_str());
+  track->track_nr = song.track();
+  track->cd_nr = song.disc();
+  track->year = song.year();
+  track->genre = g_strdup(song.genre().c_str());
+  track->compilation = song.compilation() ? 1 : 0;
+  track->composer = g_strdup(song.composer().c_str());
+  track->grouping = g_strdup(song.grouping().c_str());
+  track->comment = g_strdup(song.comment().c_str());
+  track->tracklen = static_cast<gint32>(song.length_nanosec() / 1000000LL);
+  track->bitrate = song.bitrate();
+  track->samplerate = song.samplerate();
+  track->type1 = song.filetype() == Song::FileType::MPEG ? 1 : 0;
+  track->type2 = song.filetype() == Song::FileType::MPEG ? 1 : 0;
+  track->mediatype = 1;
+  track->size = static_cast<guint32>(song.filesize() > 0 ? song.filesize() : 0);
+  track->time_modified = static_cast<guint32>(song.mtime() > 0 ? song.mtime() : 0);
+  track->time_added = static_cast<guint32>(song.ctime() > 0 ? song.ctime() : 0);
+  track->playcount = song.playcount();
+  track->skipcount = song.skipcount();
+  track->time_played = static_cast<guint32>(song.lastplayed() > 0 ? song.lastplayed() : 0);
+}
 
-  // Load the iTunes database
-  const QByteArray mountpoint = QDir::toNativeSeparators(mount_point_).toLocal8Bit();
+#endif  // HAVE_GPOD
+
+SongList GPodLoader::LoadSongs(const std::string &mount_path) {
+#ifdef HAVE_GPOD
+  if (mount_path.empty()) {
+    return {};
+  }
   GError *error = nullptr;
-  Itdb_iTunesDB *db = itdb_parse(mountpoint.constData(), &error);
-
-  // Check for errors
+  Itdb_iTunesDB *db = itdb_parse(mount_path.c_str(), &error);
   if (!db) {
     if (error) {
-      qLog(Error) << "loading database failed:" << error->message;
-      Q_EMIT Error(QString::fromUtf8(error->message));
+      LogWarning("Loading iPod database failed: %s", error->message);
       g_error_free(error);
     }
-    else {
-      Q_EMIT Error(tr("An error occurred loading the iTunes database"));
-    }
-
-    return db;
+    return {};
   }
-
-  // Convert all the tracks from libgpod structs into Song classes
-  const QString prefix = path_prefix_.isEmpty() ? QDir::fromNativeSeparators(mount_point_) : path_prefix_;
-
   SongList songs;
-  for (GList *tracks = db->tracks; tracks != nullptr; tracks = tracks->next) {
-
-    if (abort_) break;
-
-    Itdb_Track *track = static_cast<Itdb_Track*>(tracks->data);
-
-    Song song(Song::Source::Device);
-    song.InitFromItdb(track, prefix);
-    song.set_directory_id(1);
-
-    if (type_ != Song::FileType::Unknown) song.set_filetype(type_);
-    songs << song;
+  for (GList *tracks = db->tracks; tracks; tracks = tracks->next) {
+    songs.push_back(SongFromTrack(static_cast<Itdb_Track *>(tracks->data), mount_path));
   }
-
-  // If the load was aborted, don't touch the collection (deleting here without re-adding would wipe it), and don't hand a half-populated database back to the caller.
-  if (abort_) {
-    itdb_free(db);
-    backend_->Close();
-    return nullptr;
-  }
-
-  // Need to remove all the existing songs in the database first
-  backend_->DeleteSongs(backend_->FindSongsInDirectory(1));
-
-  // Add the songs we've just loaded
-  backend_->AddOrUpdateSongs(songs);
-
-  // This is done in the loader thread so close the unique DB connection.
-  backend_->Close();
-
-  return db;
-
+  itdb_free(db);
+  return songs;
+#else
+  (void)mount_path;
+  return {};
+#endif
 }

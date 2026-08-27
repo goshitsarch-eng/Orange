@@ -1,315 +1,226 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "collection/collectionlibrary.h"
 
-#include "config.h"
-
-#include <memory>
-
-#include <QtGlobal>
-#include <QObject>
-#include <QThread>
-#include <QList>
-#include <QSettings>
-#include <QtConcurrentRun>
-
-#include "core/taskmanager.h"
-#include "core/database.h"
-#include "core/thread.h"
-#include "core/song.h"
+#include "collection/collectionfullrescan.h"
+#include "collection/collectiondirectory.h"
+#include "collection/collectionstats.h"
+#include "constants/collectionsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
-#include "tagreader/tagreaderclient.h"
-#include "utilities/threadutils.h"
-#include "collectionlibrary.h"
-#include "collectionwatcher.h"
-#include "collectionbackend.h"
-#include "collectionmodel.h"
-#include "constants/collectionsettings.h"
+#include "core/taskmanager.h"
+#include "tagreader/tagreader.h"
+#include "utilities/fileutils.h"
 
-using std::make_shared;
+#include <thread>
 
-const char *CollectionLibrary::kSongsTable = "songs";
-const char *CollectionLibrary::kDirsTable = "directories";
-const char *CollectionLibrary::kSubdirsTable = "subdirectories";
-
-CollectionLibrary::CollectionLibrary(const SharedPtr<Database> database,
-                                     const SharedPtr<TaskManager> task_manager,
-                                     const SharedPtr<TagReaderClient> tagreader_client,
-                                     const SharedPtr<AlbumCoverLoader> albumcover_loader,
-                                     QObject *parent)
-    : QObject(parent),
+CollectionLibrary::CollectionLibrary(Database *database, TaskManager *task_manager, TagReader *tagreader)
+    : database_(database),
       task_manager_(task_manager),
-      tagreader_client_(tagreader_client),
-      backend_(nullptr),
-      model_(nullptr),
-      watcher_(nullptr),
-      watcher_thread_(nullptr),
-      original_thread_(thread()),
-      save_playcounts_to_files_(false),
-      save_ratings_to_files_(false) {
-
-  setObjectName(QLatin1String(QObject::metaObject()->className()));
-
-  backend_ = make_shared<CollectionBackend>();
-  backend()->moveToThread(database->thread());
-  qLog(Debug) << &*backend_ << "moved to thread" << database->thread();
-
-  backend_->Init(database, task_manager, Song::Source::Collection, QLatin1String(kSongsTable), QLatin1String(kDirsTable), QLatin1String(kSubdirsTable));
-
-  model_ = new CollectionModel(backend_, albumcover_loader, this);
-
-  full_rescan_revisions_[21] = tr("Support for sort tags artist, album, album artist, title, composer and performer");
-
-  ReloadSettings();
-
+      tagreader_(tagreader),
+      backend_(std::make_unique<CollectionBackend>(database)),
+      watcher_(std::make_unique<CollectionWatcher>(backend_.get(), tagreader, task_manager)) {
+  watcher_->ScanFinished.Connect([this]() { ScanFinished.Emit(); });
 }
 
 CollectionLibrary::~CollectionLibrary() {
-
-  if (watcher_) {
-    watcher_->Abort();
-    watcher_->deleteLater();
+  if (alive_) {
+    *alive_ = false;
   }
-  if (watcher_thread_) {
-    watcher_thread_->exit();
-    watcher_thread_->wait(5000);
-  }
-
 }
 
 void CollectionLibrary::Init() {
-
-  watcher_ = new CollectionWatcher(Song::Source::Collection, task_manager_, tagreader_client_, backend_);
-  watcher_thread_ = new Thread(this);
-  watcher_thread_->setObjectName(watcher_->objectName());
-
-  watcher_thread_->SetIoPriority(Utilities::IoPriority::IOPRIO_CLASS_IDLE);
-
-  watcher_->moveToThread(watcher_thread_);
-
-  qLog(Debug) << watcher_ << "moved to thread" << watcher_thread_;
-
-  watcher_thread_->start(QThread::IdlePriority);
-
-  QObject::connect(&*backend_, &CollectionBackend::Error, this, &CollectionLibrary::Error);
-  QObject::connect(&*backend_, &CollectionBackend::DirectoryAdded, watcher_, &CollectionWatcher::AddDirectory);
-  QObject::connect(&*backend_, &CollectionBackend::DirectoryDeleted, watcher_, &CollectionWatcher::RemoveDirectory);
-  QObject::connect(&*backend_, &CollectionBackend::SongsRatingChanged, this, &CollectionLibrary::SongsRatingChanged);
-  QObject::connect(&*backend_, &CollectionBackend::SongsStatisticsChanged, this, &CollectionLibrary::SongsPlaycountChanged);
-
-  QObject::connect(watcher_, &CollectionWatcher::NewOrUpdatedSongs, &*backend_, &CollectionBackend::AddOrUpdateSongs);
-  QObject::connect(watcher_, &CollectionWatcher::SongsMTimeUpdated, &*backend_, &CollectionBackend::UpdateMTimesOnly);
-  QObject::connect(watcher_, &CollectionWatcher::SongsDeleted, &*backend_, &CollectionBackend::DeleteSongs);
-  QObject::connect(watcher_, &CollectionWatcher::SongsUnavailable, &*backend_, &CollectionBackend::MarkSongsUnavailable);
-  QObject::connect(watcher_, &CollectionWatcher::SongsReadded, &*backend_, &CollectionBackend::MarkSongsUnavailable);
-  QObject::connect(watcher_, &CollectionWatcher::SubdirsDiscovered, &*backend_, &CollectionBackend::AddOrUpdateSubdirs);
-  QObject::connect(watcher_, &CollectionWatcher::SubdirsMTimeUpdated, &*backend_, &CollectionBackend::AddOrUpdateSubdirs);
-  QObject::connect(watcher_, &CollectionWatcher::SubdirsDeleted, &*backend_, &CollectionBackend::DeleteSubdirs);
-  QObject::connect(watcher_, &CollectionWatcher::CompilationsNeedUpdating, &*backend_, &CollectionBackend::CompilationsNeedUpdating);
-  QObject::connect(watcher_, &CollectionWatcher::UpdateLastSeen, &*backend_, &CollectionBackend::UpdateLastSeen);
-
-  // This will start the watcher checking for updates
-  backend_->LoadDirectoriesAsync();
-
+  if (backend_) {
+    const std::shared_ptr<bool> alive = alive_;
+    backend_->SongsRatingChanged.Connect([this, alive](const SongList &songs) {
+      if (alive && *alive) {
+        SongsRatingChanged(songs, false);
+      }
+    });
+  }
+  watcher_->StartWatching();
+  if (!task_manager_) {
+    return;
+  }
+  const std::shared_ptr<bool> alive = alive_;
+  task_manager_->PauseCollectionWatchers.Connect([this, alive]() {
+    if (alive && *alive) {
+      PauseWatcher();
+    }
+  });
+  task_manager_->ResumeCollectionWatchers.Connect([this, alive]() {
+    if (alive && *alive) {
+      ResumeWatcher();
+    }
+  });
 }
 
-void CollectionLibrary::Exit() {
-
-  wait_for_exit_ << &*backend_ << watcher_;
-
-  QObject::disconnect(&*backend_, nullptr, watcher_, nullptr);
-  QObject::disconnect(watcher_, nullptr, &*backend_, nullptr);
-
-  QObject::connect(&*backend_, &CollectionBackend::ExitFinished, this, &CollectionLibrary::ExitReceived);
-  QObject::connect(watcher_, &CollectionWatcher::ExitFinished, this, &CollectionLibrary::ExitReceived);
-  backend_->ExitAsync();
-  watcher_->Abort();
-  watcher_->ExitAsync();
-
+void CollectionLibrary::PauseWatcher() {
+  if (watcher_) {
+    watcher_->SetRescanPaused(true);
+  }
 }
 
-void CollectionLibrary::ExitReceived() {
-
-  QObject *obj = sender();
-  QObject::disconnect(obj, nullptr, this, nullptr);
-  qLog(Debug) << obj << "successfully exited.";
-  wait_for_exit_.removeAll(obj);
-  if (wait_for_exit_.isEmpty()) Q_EMIT ExitFinished();
-
+void CollectionLibrary::ResumeWatcher() {
+  if (watcher_) {
+    watcher_->SetRescanPaused(false);
+  }
 }
 
-void CollectionLibrary::IncrementalScan() { watcher_->IncrementalScanAsync(); }
+void CollectionLibrary::IncrementalScan() { watcher_->Scan(CollectionWatcher::ScanType::Incremental); }
 
-void CollectionLibrary::FullScan() { watcher_->FullScanAsync(); }
+void CollectionLibrary::FullScan() { watcher_->Scan(CollectionWatcher::ScanType::Full); }
 
-void CollectionLibrary::StopScan() { watcher_->Stop(); }
+std::string CollectionLibrary::full_rescan_reason(int schema_version) const { return CollectionFullRescan::ReasonFor(schema_version); }
+
+void CollectionLibrary::AbortScan() {
+  if (watcher_) {
+    watcher_->Abort();
+  }
+}
+
+bool CollectionLibrary::scanning() const { return watcher_ && watcher_->scanning(); }
 
 void CollectionLibrary::Rescan(const SongList &songs) {
-
-  qLog(Debug) << "Rescan" << songs.size() << "songs";
-  if (!songs.isEmpty()) {
-    watcher_->RescanSongsAsync(songs);
+  for (const Song &song : songs) {
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (path.empty() || !FileUtils::Exists(path) || !tagreader_) {
+      continue;
+    }
+    Song updated = tagreader_->ReadFile(path);
+    if (!updated.is_valid()) {
+      continue;
+    }
+    if (song.id() > 0) {
+      updated.set_id(song.id());
+    }
+    backend_->AddOrUpdateSong(updated);
   }
-
+  ScanFinished.Emit();
 }
 
-void CollectionLibrary::PauseWatcher() { watcher_->SetRescanPausedAsync(true); }
-
-void CollectionLibrary::ResumeWatcher() { watcher_->SetRescanPausedAsync(false); }
-
-void CollectionLibrary::ReloadSettings() {
-
-  watcher_->ReloadSettingsAsync();
-  model_->ReloadSettings();
-
-  Settings s;
-  s.beginGroup(CollectionSettings::kSettingsGroup);
-  save_playcounts_to_files_ = s.value(CollectionSettings::kSavePlayCounts, CollectionSettings::kDefaultSavePlayCounts).toBool();
-  save_ratings_to_files_ = s.value(CollectionSettings::kSaveRatings, CollectionSettings::kDefaultSaveRatings).toBool();
-  s.endGroup();
-
+void CollectionLibrary::RescanDirectory(int id) {
+  for (const CollectionDirectory &directory : backend_->Directories()) {
+    if (directory.id == id) {
+      watcher_->ScanDirectory(id, directory.path, directory.subdirs);
+      return;
+    }
+  }
 }
 
-void CollectionLibrary::CurrentSongChanged(const Song &song) {
-
-  current_song_url_ = song.url();
-
-  if (!pending_song_saves_.isEmpty()) {
-    SavePendingPlaycountsAndRatings();
+void CollectionLibrary::AddDirectory(const std::string &path, bool subdirs) {
+  const int id = backend_->AddDirectory(path, subdirs);
+  if (id >= 0) {
+    watcher_->ScanDirectory(id, path, subdirs);
+    watcher_->StartWatching();
   }
-
+  ScanFinished.Emit();
 }
 
-void CollectionLibrary::Stopped() {
+void CollectionLibrary::RemoveDirectory(int id) { backend_->RemoveDirectory(id); }
 
-  current_song_url_ = QUrl();
+SongList CollectionLibrary::Songs(const std::string &filter) const { return backend_->Songs(filter); }
 
-  if (!pending_song_saves_.isEmpty()) {
-    SavePendingPlaycountsAndRatings();
+SongList CollectionLibrary::Songs(const CollectionFilterOptions &options) const { return backend_->Songs(options); }
+
+void CollectionLibrary::SyncPlaycountAndRatingToFiles() {
+  if (!tagreader_ || !backend_ || !task_manager_) {
+    return;
   }
-
+  const int task_id = task_manager_->StartTask(CollectionStats::TaskName());
+  const SongList songs = backend_->Songs();
+  int i = 0;
+  for (const Song &song : songs) {
+    ++i;
+    if (CollectionStats::ShouldWriteStatistics(song)) {
+      const std::string path = FileUtils::PathFromUri(song.url());
+      tagreader_->SavePlaycount(path, song.playcount());
+      tagreader_->SaveRating(path, song.rating());
+    }
+    task_manager_->SetTaskProgress(task_id, i, static_cast<int>(songs.size()));
+  }
+  task_manager_->SetTaskFinished(task_id);
 }
 
 void CollectionLibrary::SyncPlaycountAndRatingToFilesAsync() {
-
-  (void)QtConcurrent::run(&CollectionLibrary::SyncPlaycountAndRatingToFiles, this);
-
+  std::thread([this]() { SyncPlaycountAndRatingToFiles(); }).detach();
 }
 
-void CollectionLibrary::SyncPlaycountAndRatingToFiles() {
+void CollectionLibrary::CurrentSongChanged(const Song &song) {
+  current_song_url_ = song.url();
+  if (!pending_song_saves_.empty()) {
+    SavePendingPlaycountsAndRatings();
+  }
+}
 
-  const int task_id = task_manager_->StartTask(tr("Saving playcounts and ratings"));
-  task_manager_->SetTaskBlocksCollectionScans(task_id);
+void CollectionLibrary::Stopped() {
+  current_song_url_.clear();
+  if (!pending_song_saves_.empty()) {
+    SavePendingPlaycountsAndRatings();
+  }
+}
 
-  const SongList songs = backend_->GetAllSongs();
-  const quint64 nb_songs = static_cast<quint64>(songs.size());
-  quint64 i = 0;
+void CollectionLibrary::SongsPlaycountChanged(const SongList &songs, bool save_tags) {
+  Settings settings;
+  settings.BeginGroup(CollectionSettings::kSettingsGroup);
+  if (!save_tags && !settings.BoolValue(CollectionSettings::kSavePlayCounts, CollectionSettings::kDefaultSavePlayCounts)) {
+    return;
+  }
+  if (!tagreader_) {
+    return;
+  }
   for (const Song &song : songs) {
-    (void)tagreader_client_->SaveSongPlaycountBlocking(song.url().toLocalFile(), song.playcount());
-    (void)tagreader_client_->SaveSongRatingBlocking(song.url().toLocalFile(), song.rating());
-    task_manager_->SetTaskProgress(task_id, ++i, nb_songs);
+    if (CollectionTagSave::ShouldDefer(song, current_song_url_)) {
+      CollectionTagSave::Queue(&pending_song_saves_, song, true, false);
+      continue;
+    }
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (!path.empty()) {
+      tagreader_->SavePlaycount(path, song.playcount());
+    }
   }
-  task_manager_->SetTaskFinished(task_id);
-
 }
 
-void CollectionLibrary::SongsPlaycountChanged(const SongList &songs, const bool save_tags) {
-
-  if (save_tags || save_playcounts_to_files_) {
-    SongList songs_to_save_now;
-    for (const Song &song : songs) {
-      if (song.url().isLocalFile() && song.url() == current_song_url_ &&
-          (song.filetype() == Song::FileType::OggFlac || song.filetype() == Song::FileType::OggVorbis || song.filetype() == Song::FileType::OggOpus || song.filetype() == Song::FileType::MPEG)) {
-        qLog(Debug) << "Deferring playcount save for currently playing file" << song.url().toLocalFile();
-        if (pending_song_saves_.contains(song.url())) {
-          SharedPtr<PendingSongSave> pending_song_save = pending_song_saves_.value(song.url());
-          pending_song_save->save_playcount = true;
-          pending_song_save->song.set_playcount(song.playcount());
-        }
-        else {
-          SharedPtr<PendingSongSave> pending_song_save = make_shared<PendingSongSave>();
-          pending_song_save->save_playcount = true;
-          pending_song_save->song = song;
-          pending_song_saves_.insert(song.url(), pending_song_save);
-        }
-      }
-      else {
-        songs_to_save_now << song;
-      }
+void CollectionLibrary::SongsRatingChanged(const SongList &songs, bool save_tags) {
+  Settings settings;
+  settings.BeginGroup(CollectionSettings::kSettingsGroup);
+  if (!save_tags && !settings.BoolValue(CollectionSettings::kSaveRatings, CollectionSettings::kDefaultSaveRatings)) {
+    return;
+  }
+  if (!tagreader_) {
+    return;
+  }
+  for (const Song &song : songs) {
+    if (CollectionTagSave::ShouldDefer(song, current_song_url_)) {
+      CollectionTagSave::Queue(&pending_song_saves_, song, false, true);
+      continue;
     }
-    if (!songs_to_save_now.isEmpty()) {
-      tagreader_client_->SaveSongsPlaycountAsync(songs_to_save_now);
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (!path.empty()) {
+      tagreader_->SaveRating(path, song.rating());
     }
   }
-
-}
-
-void CollectionLibrary::SongsRatingChanged(const SongList &songs, const bool save_tags) {
-
-  if (save_tags || save_ratings_to_files_) {
-    SongList songs_to_save_now;
-    for (const Song &song : songs) {
-      if (song.url().isLocalFile() && song.url() == current_song_url_ &&
-          (song.filetype() == Song::FileType::OggFlac || song.filetype() == Song::FileType::OggVorbis || song.filetype() == Song::FileType::OggOpus || song.filetype() == Song::FileType::MPEG)) {
-        qLog(Debug) << "Deferring rating save for currently playing file" << song.url().toLocalFile();
-        if (pending_song_saves_.contains(song.url())) {
-          SharedPtr<PendingSongSave> pending_song_save = pending_song_saves_.value(song.url());
-          pending_song_save->save_rating = true;
-          pending_song_save->song.set_rating(song.rating());
-        }
-        else {
-          SharedPtr<PendingSongSave> pending_song_save = make_shared<PendingSongSave>();
-          pending_song_save->save_rating = true;
-          pending_song_save->song = song;
-          pending_song_saves_.insert(song.url(), pending_song_save);
-        }
-      }
-      else {
-        songs_to_save_now << song;
-      }
-    }
-    if (!songs_to_save_now.isEmpty()) {
-      tagreader_client_->SaveSongsRatingAsync(songs_to_save_now);
-    }
-  }
-
 }
 
 void CollectionLibrary::SavePendingPlaycountsAndRatings() {
-
-  for (QMap<QUrl, SharedPtr<PendingSongSave>>::iterator it = pending_song_saves_.begin(); it != pending_song_saves_.end();) {
-    const QUrl url = it.key();
-    SharedPtr<PendingSongSave> pending_song_save = it.value();
-    if (url == current_song_url_) {
-      ++it;
+  if (!tagreader_) {
+    pending_song_saves_.clear();
+    return;
+  }
+  const std::vector<std::string> ready = CollectionTagSave::ReadyToFlush(pending_song_saves_, current_song_url_);
+  for (const std::string &url : ready) {
+    const auto it = pending_song_saves_.find(url);
+    if (it == pending_song_saves_.end()) {
       continue;
     }
-    qLog(Debug) << "Saving deferred playcount/rating for" << url.toLocalFile();
-    if (pending_song_save->save_playcount) {
-      tagreader_client_->SaveSongsPlaycountAsync(SongList() << pending_song_save->song);
+    const CollectionTagSave::Pending &pending = it->second;
+    const std::string path = FileUtils::PathFromUri(pending.song.url());
+    if (!path.empty()) {
+      if (pending.save_playcount) {
+        tagreader_->SavePlaycount(path, pending.song.playcount());
+      }
+      if (pending.save_rating) {
+        tagreader_->SaveRating(path, pending.song.rating());
+      }
     }
-    if (pending_song_save->save_rating) {
-      tagreader_client_->SaveSongsRatingAsync(SongList() << pending_song_save->song);
-    }
-    it = pending_song_saves_.erase(it);
+    pending_song_saves_.erase(it);
   }
-
 }

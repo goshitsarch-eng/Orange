@@ -1,82 +1,42 @@
-/*
- * Strawberry Music Player
- * Copyright 2019-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_QOBUZFAVORITEREQUEST_H
+#define STRAWBERRY_QOBUZFAVORITEREQUEST_H
 
-#ifndef QOBUZFAVORITEREQUEST_H
-#define QOBUZFAVORITEREQUEST_H
-
-#include "config.h"
-
-#include <QVariant>
-#include <QString>
-
-#include "qobuzbaserequest.h"
-#include "includes/shared_ptr.h"
+#include "core/network.h"
 #include "core/song.h"
+#include "streaming/streamingpage.h"
+#include "streaming/streamingservices.h"
 
-class QNetworkReply;
-class QobuzService;
-class NetworkAccessManager;
-class QobuzService;
+#include <map>
+#include <string>
+#include <vector>
 
-class QobuzFavoriteRequest : public QobuzBaseRequest {
-  Q_OBJECT
+namespace QobuzFavoriteRequest {
 
- public:
-  explicit QobuzFavoriteRequest(QobuzService *service, SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
+using FavoriteType = StreamingService::FavoriteType;
+using SearchCallback = StreamingService::SearchCallback;
 
- private:
-  enum class FavoriteType {
-    Artists,
-    Albums,
-    Songs
-  };
+std::string FavoriteText(FavoriteType type);
+std::string FavoriteMethod(FavoriteType type);
+std::vector<std::string> IdsFromSongs(FavoriteType type, const SongList &songs);
 
- Q_SIGNALS:
-  void ArtistsAdded(const SongList &songs);
-  void AlbumsAdded(const SongList &songs);
-  void SongsAdded(const SongList &songs);
-  void ArtistsRemoved(const SongList &songs);
-  void AlbumsRemoved(const SongList &songs);
-  void SongsRemoved(const SongList &songs);
+std::string ListUrl(const std::string &api_url, FavoriteType type, const std::string &app_id, const std::string &user_auth_token,
+                    int offset = 0, int limit = 50);
+std::string CreateUrl(const std::string &api_url, FavoriteType type, const std::vector<std::string> &ids, const std::string &app_id,
+                      const std::string &user_auth_token);
+std::string DeleteUrl(const std::string &api_url, FavoriteType type, const std::vector<std::string> &ids, const std::string &app_id,
+                      const std::string &user_auth_token);
 
- private Q_SLOTS:
-  void AddFavoritesReply(QNetworkReply *reply, const QobuzFavoriteRequest::FavoriteType type, const SongList &songs);
-  void RemoveFavoritesReply(QNetworkReply *reply, const QobuzFavoriteRequest::FavoriteType type, const SongList &songs);
+SongList Parse(FavoriteType type, const std::string &json);
 
- public Q_SLOTS:
-  void AddArtists(const SongList &songs);
-  void AddAlbums(const SongList &songs);
-  void AddSongs(const SongList &songs);
-  void AddSongs(const SongMap &songs);
-  void RemoveArtists(const SongList &songs);
-  void RemoveAlbums(const SongList &songs);
-  void RemoveSongs(const SongList &songs);
-  void RemoveSongs(const SongMap &songs);
+void Get(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
+         const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback,
+         StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {},
+         StreamingPage::ErrorCallback error = {});
+void Add(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
+         const std::map<std::string, std::string> &headers, FavoriteType type, const SongList &songs, SearchCallback callback);
+void Remove(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
+            const std::map<std::string, std::string> &headers, FavoriteType type, const SongList &songs, SearchCallback callback);
 
- private:
-  void Error(const QString &error, const QVariant &debug = QVariant()) override;
-  static QString FavoriteText(const FavoriteType type);
-  static QString FavoriteMethod(const FavoriteType type);
-  void AddFavorites(const FavoriteType type, const SongList &songs);
-  void AddFavoritesRequest(const FavoriteType type, const QStringList &ids_list, const SongList &songs);
-  void RemoveFavorites(const FavoriteType type, const SongList &songs);
-  void RemoveFavoritesRequest(const FavoriteType type, const QStringList &ids_list, const SongList &songs);
-};
+}  // namespace QobuzFavoriteRequest
 
-#endif  // QOBUZFAVORITEREQUEST_H
+#endif

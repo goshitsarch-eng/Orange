@@ -1,58 +1,42 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2017-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_ERRORDIALOG_H
+#define STRAWBERRY_ERRORDIALOG_H
 
-#ifndef ERRORDIALOG_H
-#define ERRORDIALOG_H
+#include <adwaita.h>
+#include <gtk/gtk.h>
 
-#include "config.h"
+#include <string>
+#include <vector>
 
-#include <QObject>
-#include <QDialog>
-#include <QWidget>
-#include <QString>
-#include <QStringList>
-
-class QCloseEvent;
-class Ui_ErrorDialog;
-
-class ErrorDialog : public QDialog {
-  Q_OBJECT
-
+class ErrorDialog {
  public:
-  explicit ErrorDialog(QWidget *parent = nullptr);
-  ~ErrorDialog() override;
-
- public Q_SLOTS:
-  void ShowDialog();
-  void ShowMessage(const QString &message);
-
- protected:
-  void closeEvent(QCloseEvent *e) override;
-
- private:
-  void UpdateContent();
-
-  Ui_ErrorDialog *ui_;
-
-  QStringList current_messages_;
+  static void Show(GtkWindow *parent, const std::string &message);
 };
 
-#endif  // ERRORDIALOG_H
+// Qt ErrorDialog: accumulate messages and keep the dialog until the user closes it.
+class QueuedErrorDialog {
+ public:
+  explicit QueuedErrorDialog(GtkWindow *parent);
+  ~QueuedErrorDialog();
+
+  QueuedErrorDialog(const QueuedErrorDialog &) = delete;
+  QueuedErrorDialog &operator=(const QueuedErrorDialog &) = delete;
+
+  void ShowMessage(const std::string &message);
+  void Present();
+  bool visible() const { return visible_; }
+  bool active() const { return active_; }
+  const std::vector<std::string> &messages() const { return messages_; }
+
+ private:
+  void EnsureDialog();
+  void RefreshBody();
+  void OnClosed();
+
+  GtkWindow *parent_ = nullptr;
+  AdwAlertDialog *dialog_ = nullptr;
+  std::vector<std::string> messages_;
+  bool visible_ = false;
+  bool active_ = false;
+};
+
+#endif

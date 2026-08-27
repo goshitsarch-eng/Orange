@@ -1,504 +1,402 @@
-/*
- * Strawberry Music Player
- * Copyright 2020-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "settings/coverssettingspage.h"
 
-#include "config.h"
-
-#include <algorithm>
-#include <utility>
-
-#include <QObject>
-#include <QList>
-#include <QByteArray>
-#include <QString>
-#include <QStringList>
-#include <QPalette>
-#include <QSettings>
-#include <QGroupBox>
-#include <QPushButton>
-#include <QListWidget>
-#include <QListWidgetItem>
-#include <QMessageBox>
-
-#include "settingsdialog.h"
-#include "coverssettingspage.h"
-#include "ui_coverssettingspage.h"
-#include "core/iconloader.h"
-#include "core/settings.h"
-#include "utilities/coveroptions.h"
-#include "covermanager/coverproviders.h"
-#include "covermanager/coverprovider.h"
-#include "widgets/loginstatewidget.h"
 #include "constants/coverssettings.h"
+#include "core/application.h"
+#include "covermanager/coverarttypes.h"
+#include "covermanager/coverproviderauth.h"
+#include "covermanager/coverproviders.h"
+#include "covermanager/coverprovidersettings.h"
+#include "settings/coverssettingslabels.h"
+#include "settings/settingspage.h"
+#include "streaming/streamingservices.h"
+#include "translations/translations.h"
+#include "widgets/loginstatewidget.h"
 
-using namespace Qt::Literals::StringLiterals;
-using namespace CoversSettings;
+#include <memory>
 
-CoversSettingsPage::CoversSettingsPage(SettingsDialog *dialog, const SharedPtr<CoverProviders> cover_providers, QWidget *parent)
-    : SettingsPage(dialog, parent),
-      ui_(new Ui::CoversSettingsPage),
-      cover_providers_(cover_providers),
-      provider_selected_(false),
-      types_selected_(false) {
+namespace {
 
-  ui_->setupUi(this);
-  setWindowIcon(IconLoader::Load(u"cdcase"_s, true, 0, 32));
+struct ProviderListState {
+  Application *app = nullptr;
+  Settings *settings = nullptr;
+  GtkWidget *list = nullptr;
+  GtkWidget *info = nullptr;
+  GtkWidget *authenticate = nullptr;
+  GtkWidget *open_settings = nullptr;
+  std::unique_ptr<LoginStateWidget> login;
+  bool login_in_progress = false;
+};
 
-  QObject::connect(ui_->providers_up, &QPushButton::clicked, this, &CoversSettingsPage::ProvidersMoveUp);
-  QObject::connect(ui_->providers_down, &QPushButton::clicked, this, &CoversSettingsPage::ProvidersMoveDown);
-  QObject::connect(ui_->providers, &QListWidget::currentItemChanged, this, &CoversSettingsPage::ProvidersCurrentItemChanged);
-  QObject::connect(ui_->providers, &QListWidget::itemSelectionChanged, this, &CoversSettingsPage::ProvidersItemSelectionChanged);
-  QObject::connect(ui_->providers, &QListWidget::itemChanged, this, &CoversSettingsPage::ProvidersItemChanged);
-
-  QObject::connect(ui_->button_authenticate, &QPushButton::clicked, this, &CoversSettingsPage::AuthenticateClicked);
-  QObject::connect(ui_->login_state, &LoginStateWidget::LogoutClicked, this, &CoversSettingsPage::LogoutClicked);
-
-  QObject::connect(ui_->types_up, &QPushButton::clicked, this, &CoversSettingsPage::TypesMoveUp);
-  QObject::connect(ui_->types_down, &QPushButton::clicked, this, &CoversSettingsPage::TypesMoveDown);
-  QObject::connect(ui_->types, &QListWidget::currentItemChanged, this, &CoversSettingsPage::TypesCurrentItemChanged);
-  QObject::connect(ui_->types, &QListWidget::itemSelectionChanged, this, &CoversSettingsPage::TypesItemSelectionChanged);
-  QObject::connect(ui_->types, &QListWidget::itemChanged, this, &CoversSettingsPage::TypesItemChanged);
-
-  QObject::connect(ui_->radiobutton_save_albumcover_albumdir, &QRadioButton::toggled, this, &CoversSettingsPage::CoverSaveInAlbumDirChanged);
-  QObject::connect(ui_->radiobutton_cover_hash, &QRadioButton::toggled, this, &CoversSettingsPage::CoverSaveInAlbumDirChanged);
-  QObject::connect(ui_->radiobutton_cover_pattern, &QRadioButton::toggled, this, &CoversSettingsPage::CoverSaveInAlbumDirChanged);
-
-  ui_->login_state->AddCredentialGroup(ui_->widget_authenticate);
-
-  NoProviderSelected();
-  DisableAuthentication();
-
-  dialog->installEventFilter(this);
-
-}
-
-CoversSettingsPage::~CoversSettingsPage() { delete ui_; }
-
-void CoversSettingsPage::showEvent(QShowEvent *e) {
-
-  ProvidersCurrentItemChanged(ui_->providers->currentItem(), nullptr);
-
-  SettingsPage::showEvent(e);
-
-}
-
-void CoversSettingsPage::Load() {
-
-  ui_->providers->clear();
-
-  QList<CoverProvider*> cover_providers_sorted = cover_providers_->List();
-  std::stable_sort(cover_providers_sorted.begin(), cover_providers_sorted.end(), ProviderCompareOrder);
-
-  for (CoverProvider *provider : std::as_const(cover_providers_sorted)) {
-    QListWidgetItem *item = new QListWidgetItem(ui_->providers);
-    item->setText(provider->name());
-    item->setCheckState(provider->enabled() ? Qt::Checked : Qt::Unchecked);
-    item->setForeground(provider->enabled() ? palette().color(QPalette::Active, QPalette::Text) : palette().color(QPalette::Disabled, QPalette::Text));
+void ApplyAuthPanel(ProviderListState *state, const std::string &name, bool authentication_required, bool authenticated) {
+  if (!state) {
+    return;
   }
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-
-  const QStringList all_types = QStringList() << u"art_unset"_s
-                                              << u"art_manual"_s
-                                              << u"art_automatic"_s
-                                              << u"art_embedded"_s;
-
-  const QStringList types = s.value(kTypes, all_types).toStringList();
-
-  ui_->types->clear();
-  for (const QString &type : types) {
-    AddAlbumCoverArtType(type, AlbumCoverArtTypeDescription(type), true);
+  const CoverProviderAuth::Panel panel = CoverProviderAuth::PanelFor(name, authentication_required, authenticated);
+  if (state->info) {
+    gtk_label_set_text(GTK_LABEL(state->info), Translations::Tr(CoverProviderAuth::SelectionStatusText(name, authentication_required, authenticated)).c_str());
   }
-
-  for (const QString &type : all_types) {
-    if (!types.contains(type)) {
-      AddAlbumCoverArtType(type, AlbumCoverArtTypeDescription(type), false);
+  if (state->authenticate) {
+    gtk_widget_set_visible(state->authenticate, CoverProviderAuth::AuthenticateVisible(panel));
+    gtk_widget_set_sensitive(state->authenticate, CoverProviderAuth::AuthenticateEnabled(panel, state->login_in_progress));
+  }
+  if (state->open_settings) {
+    gtk_widget_set_visible(state->open_settings, CoverProviderAuth::OpenSettingsVisible(panel));
+    if (CoverProviderAuth::OpenSettingsVisible(panel)) {
+      gtk_button_set_label(GTK_BUTTON(state->open_settings), Translations::Tr(CoverProviderAuth::OpenSettingsLabel(name)).c_str());
+      g_object_set_data_full(G_OBJECT(state->open_settings), "settings-page", g_strdup(CoverProviderAuth::SettingsPageName(name)), g_free);
     }
   }
-
-  const CoverOptions::CoverType save_cover_type = static_cast<CoverOptions::CoverType>(s.value(kSaveType, static_cast<int>(CoverOptions::CoverType::Cache)).toInt());
-  switch (save_cover_type) {
-    case CoverOptions::CoverType::Cache:
-      ui_->radiobutton_save_albumcover_cache->setChecked(true);
-      break;
-    case CoverOptions::CoverType::Album:
-      ui_->radiobutton_save_albumcover_albumdir->setChecked(true);
-      break;
-    case CoverOptions::CoverType::Embedded:
-      ui_->radiobutton_save_albumcover_embedded->setChecked(true);
-      break;
-  }
-
-  const CoverOptions::CoverFilename save_cover_filename = static_cast<CoverOptions::CoverFilename>(s.value(kSaveFilename, static_cast<int>(CoverOptions::CoverFilename::Pattern)).toInt());
-  switch (save_cover_filename) {
-    case CoverOptions::CoverFilename::Hash:
-      ui_->radiobutton_cover_hash->setChecked(true);
-      break;
-    case CoverOptions::CoverFilename::Pattern:
-      ui_->radiobutton_cover_pattern->setChecked(true);
-      break;
-  }
-  QString cover_pattern = s.value(kSavePattern).toString();
-  if (!cover_pattern.isEmpty()) ui_->lineedit_cover_pattern->setText(cover_pattern);
-  ui_->checkbox_cover_overwrite->setChecked(s.value(kSaveOverwrite, kDefaultSaveOverwrite).toBool());
-  ui_->checkbox_cover_lowercase->setChecked(s.value(kSaveLowercase, kDefaultSaveLowercase).toBool());
-  ui_->checkbox_cover_replace_spaces->setChecked(s.value(kSaveReplaceSpaces, kDefaultSaveReplaceSpaces).toBool());
-
-  s.endGroup();
-
-  Init(ui_->layout_coverssettingspage->parentWidget());
-
-  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
-
-}
-
-void CoversSettingsPage::Save() {
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-
-  QStringList providers;
-  for (int i = 0; i < ui_->providers->count(); ++i) {
-    const QListWidgetItem *item = ui_->providers->item(i);
-    if (item->checkState() == Qt::Checked) providers << item->text();
-  }
-  s.setValue(kProviders, providers);
-
-  QStringList types;
-  for (int i = 0; i < ui_->types->count(); ++i) {
-    const QListWidgetItem *item = ui_->types->item(i);
-    if (item->checkState() == Qt::Checked) {
-      types << item->data(Type_Role_Name).toString();
-    }
-  }
-
-  s.setValue(kTypes, types);
-
-  CoverOptions::CoverType save_cover_type = CoverOptions::CoverType::Cache;
-  if (ui_->radiobutton_save_albumcover_cache->isChecked()) save_cover_type = CoverOptions::CoverType::Cache;
-  else if (ui_->radiobutton_save_albumcover_albumdir->isChecked()) save_cover_type = CoverOptions::CoverType::Album;
-  else if (ui_->radiobutton_save_albumcover_embedded->isChecked()) save_cover_type = CoverOptions::CoverType::Embedded;
-  s.setValue(kSaveType, static_cast<int>(save_cover_type));
-
-  CoverOptions::CoverFilename save_cover_filename = CoverOptions::CoverFilename::Hash;
-  if (ui_->radiobutton_cover_hash->isChecked()) save_cover_filename = CoverOptions::CoverFilename::Hash;
-  else if (ui_->radiobutton_cover_pattern->isChecked()) save_cover_filename = CoverOptions::CoverFilename::Pattern;
-  s.setValue(kSaveFilename, static_cast<int>(save_cover_filename));
-
-  s.setValue(kSavePattern, ui_->lineedit_cover_pattern->text());
-  s.setValue(kSaveOverwrite, ui_->checkbox_cover_overwrite->isChecked());
-  s.setValue(kSaveLowercase, ui_->checkbox_cover_lowercase->isChecked());
-  s.setValue(kSaveReplaceSpaces, ui_->checkbox_cover_replace_spaces->isChecked());
-
-  s.endGroup();
-
-}
-
-void CoversSettingsPage::ProvidersCurrentItemChanged(QListWidgetItem *item_current, QListWidgetItem *item_previous) {
-
-  if (item_previous) {
-    CoverProvider *provider = cover_providers_->ProviderByName(item_previous->text());
-    if (provider && provider->authentication_required()) DisconnectAuthentication(provider);
-  }
-
-  if (item_current) {
-    const int row = ui_->providers->row(item_current);
-    ui_->providers_up->setEnabled(row != 0);
-    ui_->providers_down->setEnabled(row != ui_->providers->count() - 1);
-    CoverProvider *provider = cover_providers_->ProviderByName(item_current->text());
-    if (provider) {
-      if (provider->authentication_required()) {
-        if (provider->name() == "Tidal"_L1 && !provider->authenticated()) {
-          DisableAuthentication();
-          ui_->label_auth_info->setText(tr("Use Tidal settings to authenticate."));
-        }
-        else if (provider->name() == "Spotify"_L1 && !provider->authenticated()) {
-          DisableAuthentication();
-          ui_->label_auth_info->setText(tr("Use Spotify settings to authenticate."));
-        }
-        else if (provider->name() == "Qobuz"_L1 && !provider->authenticated()) {
-          DisableAuthentication();
-          ui_->label_auth_info->setText(tr("Use Qobuz settings to authenticate."));
-        }
-        else {
-          ui_->login_state->SetLoggedIn(provider->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut);
-          ui_->button_authenticate->setEnabled(true);
-          ui_->button_authenticate->show();
-          ui_->login_state->show();
-          ui_->label_auth_info->setText(tr("%1 needs authentication.").arg(provider->name()));
-        }
+  if (state->login) {
+    gtk_widget_set_visible(state->login->widget(), CoverProviderAuth::LoginStateVisible(panel));
+    if (CoverProviderAuth::LoginStateVisible(panel)) {
+      LoginStateWidget::State login_state = LoginStateWidget::State::LoggedOut;
+      if (state->login_in_progress) {
+        login_state = LoginStateWidget::State::LoginInProgress;
+      } else if (authenticated) {
+        login_state = LoginStateWidget::State::LoggedIn;
       }
-      else {
-        DisableAuthentication();
-        ui_->label_auth_info->setText(tr("%1 does not need authentication.").arg(provider->name()));
+      state->login->SetLoggedIn(login_state);
+    }
+  }
+}
+
+bool ProviderAuthenticated(Application *app, const std::string &name) {
+  if (app && app->streaming_services()) {
+    if (StreamingService *service = app->streaming_services()->ServiceByName(name)) {
+      return service->logged_in();
+    }
+  }
+  return CoverProviderAuth::HasServiceToken(name);
+}
+
+void OpenCoverSettingsPage(GtkButton *btn, gpointer) {
+  const char *page_name = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "settings-page"));
+  GtkWidget *dialog = gtk_widget_get_ancestor(GTK_WIDGET(btn), ADW_TYPE_PREFERENCES_DIALOG);
+  if (dialog && page_name) {
+    adw_preferences_dialog_set_visible_page_name(ADW_PREFERENCES_DIALOG(dialog), page_name);
+  }
+}
+
+void ApplySelectedProvider(ProviderListState *state) {
+  if (!state || !state->list) {
+    ApplyAuthPanel(state, {}, false, false);
+    return;
+  }
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(state->list));
+  if (!row) {
+    ApplyAuthPanel(state, {}, false, false);
+    return;
+  }
+  const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "provider-name"));
+  const std::string provider_name = name ? name : "";
+  bool required = false;
+  if (state->app && state->app->cover_providers()) {
+    for (CoverProvider *provider : state->app->cover_providers()->All()) {
+      if (provider && provider->name() == provider_name) {
+        required = provider->authentication_required();
+        break;
       }
     }
-    provider_selected_ = true;
   }
-  else {
-    DisableAuthentication();
-    NoProviderSelected();
-    ui_->providers_up->setEnabled(false);
-    ui_->providers_down->setEnabled(false);
-    provider_selected_ = false;
-  }
-
+  ApplyAuthPanel(state, provider_name, required, ProviderAuthenticated(state->app, provider_name));
 }
 
-void CoversSettingsPage::ProvidersItemSelectionChanged() {
+struct TypeListState {
+  Settings *settings = nullptr;
+  GtkWidget *list = nullptr;
+  std::vector<CoverArtTypes::Entry> entries;
+};
 
-  if (ui_->providers->selectedItems().count() == 0) {
-    DisableAuthentication();
-    NoProviderSelected();
-    ui_->providers_up->setEnabled(false);
-    ui_->providers_down->setEnabled(false);
-    provider_selected_ = false;
+struct SaveFilenameState {
+  GtkWidget *filename = nullptr;
+  GtkWidget *pattern = nullptr;
+  GtkWidget *overwrite = nullptr;
+  GtkWidget *lowercase = nullptr;
+  GtkWidget *replace_spaces = nullptr;
+  std::string save_type;
+  std::string filename_mode;
+};
+
+void RefreshProviderList(ProviderListState *state) {
+  if (!state || !state->list || !state->app) {
+    return;
   }
-  else {
-    if (ui_->providers->currentItem() && !provider_selected_) {
-      ProvidersCurrentItemChanged(ui_->providers->currentItem(), nullptr);
-    }
+  while (GtkWidget *child = gtk_widget_get_first_child(state->list)) {
+    gtk_list_box_remove(GTK_LIST_BOX(state->list), child);
   }
-
-}
-
-void CoversSettingsPage::ProvidersMoveUp() { ProvidersMove(-1); }
-
-void CoversSettingsPage::ProvidersMoveDown() { ProvidersMove(+1); }
-
-void CoversSettingsPage::ProvidersMove(const int d) {
-
-  const int row = ui_->providers->currentRow();
-  QListWidgetItem *item = ui_->providers->takeItem(row);
-  ui_->providers->insertItem(row + d, item);
-  ui_->providers->setCurrentRow(row + d);
-
-  set_changed();
-
-}
-
-void CoversSettingsPage::ProvidersItemChanged(QListWidgetItem *item) {
-
-  item->setForeground((item->checkState() == Qt::Checked) ? palette().color(QPalette::Active, QPalette::Text) : palette().color(QPalette::Disabled, QPalette::Text));
-
-  set_changed();
-
-}
-
-void CoversSettingsPage::NoProviderSelected() {
-  ui_->label_auth_info->setText(tr("No provider selected."));
-}
-
-void CoversSettingsPage::DisableAuthentication() {
-
-  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedOut);
-  ui_->button_authenticate->setEnabled(false);
-  ui_->login_state->hide();
-  ui_->button_authenticate->hide();
-
-}
-
-void CoversSettingsPage::DisconnectAuthentication(CoverProvider *provider) const {
-
-  QObject::disconnect(provider, &CoverProvider::AuthenticationFailure, this, &CoversSettingsPage::AuthenticationFailure);
-  QObject::disconnect(provider, &CoverProvider::AuthenticationSuccess, this, &CoversSettingsPage::AuthenticationSuccess);
-
-}
-
-void CoversSettingsPage::AuthenticateClicked() {
-
-  if (!ui_->providers->currentItem()) return;
-  CoverProvider *provider = cover_providers_->ProviderByName(ui_->providers->currentItem()->text());
-  if (!provider) return;
-  ui_->button_authenticate->setEnabled(false);
-  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
-  QObject::connect(provider, &CoverProvider::AuthenticationFailure, this, &CoversSettingsPage::AuthenticationFailure);
-  QObject::connect(provider, &CoverProvider::AuthenticationSuccess, this, &CoversSettingsPage::AuthenticationSuccess);
-  provider->Authenticate();
-
-}
-
-void CoversSettingsPage::LogoutClicked() {
-
-  if (!ui_->providers->currentItem()) return;
-  CoverProvider *provider = cover_providers_->ProviderByName(ui_->providers->currentItem()->text());
-  if (!provider) return;
-  provider->ClearSession();
-
-  if (provider->name() == "Tidal"_L1) {
-    DisableAuthentication();
-    ui_->label_auth_info->setText(tr("Use Tidal settings to authenticate."));
+  const std::vector<CoverProvider *> providers = state->app->cover_providers()->All();
+  for (size_t i = 0; i < providers.size(); ++i) {
+    CoverProvider *provider = providers[i];
+    AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), provider->name().c_str());
+    g_object_set_data_full(G_OBJECT(row), "provider-name", g_strdup(provider->name().c_str()), g_free);
+    GtkWidget *enabled = gtk_switch_new();
+    gtk_switch_set_active(GTK_SWITCH(enabled), provider->enabled() ? TRUE : FALSE);
+    gtk_widget_set_valign(enabled, GTK_ALIGN_CENTER);
+    g_object_set_data(G_OBJECT(enabled), "provider-state", state);
+    g_object_set_data(G_OBJECT(enabled), "provider-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+    g_signal_connect(enabled, "notify::active", G_CALLBACK(+[](GtkSwitch *toggle, GParamSpec *, gpointer) {
+                       auto *self = static_cast<ProviderListState *>(g_object_get_data(G_OBJECT(toggle), "provider-state"));
+                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(toggle), "provider-index")) - 1;
+                       if (!self || !self->app) {
+                         return;
+                       }
+                       const std::vector<CoverProvider *> providers = self->app->cover_providers()->All();
+                       if (index < 0 || static_cast<size_t>(index) >= providers.size()) {
+                         return;
+                       }
+                       self->app->cover_providers()->SetEnabled(providers[static_cast<size_t>(index)], gtk_switch_get_active(toggle));
+                     }),
+                     nullptr);
+    GtkWidget *up = gtk_button_new_from_icon_name("go-up-symbolic");
+    GtkWidget *down = gtk_button_new_from_icon_name("go-down-symbolic");
+    gtk_widget_set_tooltip_text(up, Translations::CStr(CoverProviderSettings::MoveUp()));
+    gtk_widget_set_tooltip_text(down, Translations::CStr(CoverProviderSettings::MoveDown()));
+    gtk_widget_set_sensitive(up, CoverProviderAuth::MoveUpEnabled(static_cast<int>(i), static_cast<int>(providers.size())));
+    gtk_widget_set_sensitive(down, CoverProviderAuth::MoveDownEnabled(static_cast<int>(i), static_cast<int>(providers.size())));
+    g_object_set_data(G_OBJECT(up), "provider-state", state);
+    g_object_set_data(G_OBJECT(down), "provider-state", state);
+    g_object_set_data(G_OBJECT(up), "provider-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+    g_object_set_data(G_OBJECT(down), "provider-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+    g_signal_connect(up, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
+                       auto *self = static_cast<ProviderListState *>(g_object_get_data(G_OBJECT(button), "provider-state"));
+                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "provider-index")) - 1;
+                       if (self && self->app) {
+                         self->app->cover_providers()->Move(index, -1);
+                         RefreshProviderList(self);
+                         ApplySelectedProvider(self);
+                       }
+                     })),
+                     nullptr);
+    g_signal_connect(down, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
+                       auto *self = static_cast<ProviderListState *>(g_object_get_data(G_OBJECT(button), "provider-state"));
+                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "provider-index")) - 1;
+                       if (self && self->app) {
+                         self->app->cover_providers()->Move(index, 1);
+                         RefreshProviderList(self);
+                         ApplySelectedProvider(self);
+                       }
+                     })),
+                     nullptr);
+    adw_action_row_add_suffix(row, enabled);
+    adw_action_row_add_suffix(row, up);
+    adw_action_row_add_suffix(row, down);
+    gtk_list_box_append(GTK_LIST_BOX(state->list), GTK_WIDGET(row));
   }
-  else if (provider->name() == "Spotify"_L1) {
-    DisableAuthentication();
-    ui_->label_auth_info->setText(tr("Use Spotify settings to authenticate."));
-  }
-  else if (provider->name() == "Qobuz"_L1) {
-    DisableAuthentication();
-    ui_->label_auth_info->setText(tr("Use Qobuz settings to authenticate."));
-  }
-  else {
-    ui_->button_authenticate->setEnabled(true);
-    ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedOut);
-  }
-
 }
 
-void CoversSettingsPage::AuthenticationSuccess() {
-
-  CoverProvider *provider = qobject_cast<CoverProvider*>(sender());
-  if (!provider) return;
-  DisconnectAuthentication(provider);
-
-  if (!isVisible() || !ui_->providers->currentItem() || ui_->providers->currentItem()->text() != provider->name()) return;
-
-  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedIn);
-  ui_->button_authenticate->setEnabled(true);
-
-}
-
-void CoversSettingsPage::AuthenticationFailure(const QString &error) {
-
-  CoverProvider *provider = qobject_cast<CoverProvider*>(sender());
-  if (!provider) return;
-  DisconnectAuthentication(provider);
-
-  if (!isVisible() || !ui_->providers->currentItem() || ui_->providers->currentItem()->text() != provider->name()) return;
-
-  QMessageBox::warning(this, tr("Authentication failed"), error);
-
-  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedOut);
-  ui_->button_authenticate->setEnabled(true);
-
-}
-
-bool CoversSettingsPage::ProviderCompareOrder(CoverProvider *a, CoverProvider *b) {
-  return a->order() < b->order();
-}
-
-void CoversSettingsPage::CoverSaveInAlbumDirChanged() {
-
-  if (ui_->radiobutton_save_albumcover_albumdir->isChecked()) {
-    if (!ui_->groupbox_cover_filename->isEnabled()) {
-      ui_->groupbox_cover_filename->setEnabled(true);
-    }
-    if (ui_->radiobutton_cover_pattern->isChecked()) {
-      if (!ui_->lineedit_cover_pattern->isEnabled()) ui_->lineedit_cover_pattern->setEnabled(true);
-      if (!ui_->checkbox_cover_overwrite->isEnabled()) ui_->checkbox_cover_overwrite->setEnabled(true);
-      if (!ui_->checkbox_cover_lowercase->isEnabled()) ui_->checkbox_cover_lowercase->setEnabled(true);
-      if (!ui_->checkbox_cover_replace_spaces->isEnabled()) ui_->checkbox_cover_replace_spaces->setEnabled(true);
-    }
-    else {
-      if (ui_->lineedit_cover_pattern->isEnabled()) ui_->lineedit_cover_pattern->setEnabled(false);
-      if (ui_->checkbox_cover_overwrite->isEnabled()) ui_->checkbox_cover_overwrite->setEnabled(false);
-      if (ui_->checkbox_cover_lowercase->isEnabled()) ui_->checkbox_cover_lowercase->setEnabled(false);
-      if (ui_->checkbox_cover_replace_spaces->isEnabled()) ui_->checkbox_cover_replace_spaces->setEnabled(false);
-    }
+void PersistTypes(TypeListState *state) {
+  if (!state || !state->settings) {
+    return;
   }
-  else {
-    if (ui_->groupbox_cover_filename->isEnabled()) {
-      ui_->groupbox_cover_filename->setEnabled(false);
-    }
-  }
-
+  state->settings->BeginGroup(CoversSettings::kSettingsGroup);
+  state->settings->SetValue(CoversSettings::kTypes, CoverArtTypes::Save(state->entries));
+  state->settings->Sync();
 }
 
-void CoversSettingsPage::AddAlbumCoverArtType(const QString &name, const QString &description, const bool enabled) {
-
-  QListWidgetItem *item = new QListWidgetItem;
-  item->setData(Type_Role_Name, name);
-  item->setText(description);
-  item->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
-  ui_->types->addItem(item);
-
+void RefreshTypeList(TypeListState *state) {
+  if (!state || !state->list) {
+    return;
+  }
+  while (GtkWidget *child = gtk_widget_get_first_child(state->list)) {
+    gtk_list_box_remove(GTK_LIST_BOX(state->list), child);
+  }
+  for (size_t i = 0; i < state->entries.size(); ++i) {
+    const CoverArtTypes::Entry &entry = state->entries[i];
+    AdwSwitchRow *row = ADW_SWITCH_ROW(adw_switch_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(CoverArtTypes::Description(entry.id).c_str()));
+    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), entry.id.c_str());
+    adw_switch_row_set_active(row, entry.enabled);
+    GtkWidget *up = gtk_button_new_from_icon_name("go-up-symbolic");
+    GtkWidget *down = gtk_button_new_from_icon_name("go-down-symbolic");
+    gtk_widget_set_sensitive(up, i > 0);
+    gtk_widget_set_sensitive(down, i + 1 < state->entries.size());
+    g_object_set_data(G_OBJECT(row), "type-state", state);
+    g_object_set_data(G_OBJECT(up), "type-state", state);
+    g_object_set_data(G_OBJECT(down), "type-state", state);
+    g_object_set_data(G_OBJECT(row), "type-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+    g_object_set_data(G_OBJECT(up), "type-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+    g_object_set_data(G_OBJECT(down), "type-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+    g_signal_connect(row, "notify::active", G_CALLBACK((+[](AdwSwitchRow *switch_row, GParamSpec *, gpointer) {
+                       auto *self = static_cast<TypeListState *>(g_object_get_data(G_OBJECT(switch_row), "type-state"));
+                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(switch_row), "type-index")) - 1;
+                       if (!self || index < 0 || index >= static_cast<int>(self->entries.size())) {
+                         return;
+                       }
+                       self->entries[static_cast<size_t>(index)].enabled = adw_switch_row_get_active(switch_row);
+                       PersistTypes(self);
+                     })),
+                     nullptr);
+    g_signal_connect(up, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
+                       auto *self = static_cast<TypeListState *>(g_object_get_data(G_OBJECT(button), "type-state"));
+                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "type-index")) - 1;
+                       if (!self) {
+                         return;
+                       }
+                       self->entries = CoverArtTypes::Move(self->entries, index, -1);
+                       PersistTypes(self);
+                       RefreshTypeList(self);
+                     })),
+                     nullptr);
+    g_signal_connect(down, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
+                       auto *self = static_cast<TypeListState *>(g_object_get_data(G_OBJECT(button), "type-state"));
+                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "type-index")) - 1;
+                       if (!self) {
+                         return;
+                       }
+                       self->entries = CoverArtTypes::Move(self->entries, index, 1);
+                       PersistTypes(self);
+                       RefreshTypeList(self);
+                     })),
+                     nullptr);
+    adw_action_row_add_suffix(ADW_ACTION_ROW(row), up);
+    adw_action_row_add_suffix(ADW_ACTION_ROW(row), down);
+    gtk_list_box_append(GTK_LIST_BOX(state->list), GTK_WIDGET(row));
+  }
 }
 
-QString CoversSettingsPage::AlbumCoverArtTypeDescription(const QString &type) const {
-
-  if (type == "art_unset"_L1) {
-    return tr("Manually unset (%1)").arg(type);
+void ApplySaveFilenameSensitivity(SaveFilenameState *state) {
+  if (!state) {
+    return;
   }
-  if (type == "art_manual"_L1) {
-    return tr("Set through album cover search (%1)").arg(type);
+  const bool group = CoverArtTypes::FilenameGroupEnabled(state->save_type);
+  const bool pattern = CoverArtTypes::FilenamePatternOptionsEnabled(state->save_type, state->filename_mode);
+  if (state->filename) {
+    gtk_widget_set_sensitive(state->filename, group);
   }
-  if (type == "art_automatic"_L1) {
-    return tr("Automatically picked up from album directory (%1)").arg(type);
+  if (state->pattern) {
+    gtk_widget_set_sensitive(state->pattern, pattern);
   }
-  if (type == "art_embedded"_L1) {
-    return tr("Embedded album cover art (%1)").arg(type);
+  if (state->overwrite) {
+    gtk_widget_set_sensitive(state->overwrite, pattern);
   }
-
-  return QString();
-
+  if (state->lowercase) {
+    gtk_widget_set_sensitive(state->lowercase, pattern);
+  }
+  if (state->replace_spaces) {
+    gtk_widget_set_sensitive(state->replace_spaces, pattern);
+  }
 }
 
-void CoversSettingsPage::TypesMoveUp() { TypesMove(-1); }
+}  // namespace
 
-void CoversSettingsPage::TypesMoveDown() { TypesMove(+1); }
-
-void CoversSettingsPage::TypesMove(const int d) {
-
-  const int row = ui_->types->currentRow();
-  QListWidgetItem *item = ui_->types->takeItem(row);
-  ui_->types->insertItem(row + d, item);
-  ui_->types->setCurrentRow(row + d);
-
-  set_changed();
-
-}
-
-void CoversSettingsPage::TypesItemChanged(QListWidgetItem *item) {
-
-  item->setForeground((item->checkState() == Qt::Checked) ? palette().color(QPalette::Active, QPalette::Text) : palette().color(QPalette::Disabled, QPalette::Text));
-
-  set_changed();
-
-}
-
-void CoversSettingsPage::TypesCurrentItemChanged(QListWidgetItem *item_current, QListWidgetItem *item_previous) {
-
-  Q_UNUSED(item_previous)
-
-  if (item_current) {
-    const int row = ui_->types->row(item_current);
-    ui_->types_up->setEnabled(row != 0);
-    ui_->types_down->setEnabled(row != ui_->types->count() - 1);
-    types_selected_ = true;
-  }
-  else {
-    ui_->types_up->setEnabled(false);
-    ui_->types_down->setEnabled(false);
-    types_selected_ = false;
+AdwPreferencesPage *CoversSettingsPage::Create(Settings *settings, Application *app) {
+  settings->BeginGroup(CoversSettings::kSettingsGroup);
+  AdwPreferencesPage *page = SettingsPage::MakePage("Covers", "image-x-generic-symbolic");
+  AdwPreferencesGroup *providers = SettingsPage::AddGroup(page, CoversSettingsLabels::ProvidersGroup());
+  SettingsPage::AddDescription(providers, CoversSettingsLabels::ProvidersHint());
+  if (app) {
+    GtkWidget *list = gtk_list_box_new();
+    gtk_widget_add_css_class(list, "boxed-list");
+    auto *state = new ProviderListState();
+    state->app = app;
+    state->settings = settings;
+    state->list = list;
+    g_object_set_data_full(G_OBJECT(page), "cover-provider-state", state, [](gpointer p) { delete static_cast<ProviderListState *>(p); });
+    adw_preferences_group_add(providers, list);
+    RefreshProviderList(state);
+    g_signal_connect(list, "row-selected", G_CALLBACK((+[](GtkListBox *, GtkListBoxRow *, gpointer data) {
+                       ApplySelectedProvider(static_cast<ProviderListState *>(data));
+                     })),
+                     state);
   }
 
-}
+  AdwPreferencesGroup *types = SettingsPage::AddGroup(page, CoversSettingsLabels::TypesGroup());
+  GtkWidget *types_hint = gtk_label_new(Translations::CStr("Checked types are tried in this order when loading album art."));
+  gtk_label_set_wrap(GTK_LABEL(types_hint), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(types_hint), 0);
+  gtk_widget_add_css_class(types_hint, "dim-label");
+  adw_preferences_group_add(types, types_hint);
+  GtkWidget *types_list = gtk_list_box_new();
+  gtk_widget_add_css_class(types_list, "boxed-list");
+  auto *type_state = new TypeListState();
+  type_state->settings = settings;
+  type_state->list = types_list;
+  type_state->entries = CoverArtTypes::Parse(settings->Value(CoversSettings::kTypes, CoverArtTypes::DefaultSaved()));
+  g_object_set_data_full(G_OBJECT(page), "cover-type-state", type_state, [](gpointer p) { delete static_cast<TypeListState *>(p); });
+  adw_preferences_group_add(types, types_list);
+  RefreshTypeList(type_state);
 
-void CoversSettingsPage::TypesItemSelectionChanged() {
+  AdwPreferencesGroup *save = SettingsPage::AddGroup(page, CoversSettingsLabels::SavingGroup());
+  auto *filename_state = new SaveFilenameState();
+  filename_state->save_type = settings->Value(CoversSettings::kSaveType, CoversSettingsLabels::DefaultSaveType());
+  filename_state->filename_mode = settings->Value(CoversSettings::kSaveFilename, CoversSettingsLabels::DefaultFilename());
+  g_object_set_data_full(G_OBJECT(page), "cover-filename-state", filename_state, [](gpointer p) { delete static_cast<SaveFilenameState *>(p); });
+  SettingsPage::AddChoiceRadios(save, settings, CoversSettings::kSaveType, nullptr, CoversSettingsLabels::SaveTypeChoices(),
+                               CoversSettingsLabels::DefaultSaveType(), [filename_state](const std::string &id) {
+                                 filename_state->save_type = id;
+                                 ApplySaveFilenameSensitivity(filename_state);
+                               });
+  filename_state->filename = SettingsPage::AddCombo(save, settings, CoversSettings::kSaveFilename, CoversSettingsLabels::FilenameGroup(),
+                                                   CoversSettingsLabels::FilenameChoices(), CoversSettingsLabels::DefaultFilename(),
+                                                   [filename_state](const std::string &id) {
+                                                     filename_state->filename_mode = id;
+                                                     ApplySaveFilenameSensitivity(filename_state);
+                                                   });
+  filename_state->pattern = SettingsPage::AddEntry(save, settings, CoversSettings::kSavePattern, CoversSettingsLabels::FilenamePattern(),
+                                                  CoversSettings::kDefaultSavePattern);
+  filename_state->overwrite = SettingsPage::AddToggle(save, settings, CoversSettings::kSaveOverwrite, CoversSettingsLabels::Overwrite(), nullptr,
+                                                     CoversSettings::kDefaultSaveOverwrite);
+  filename_state->lowercase = SettingsPage::AddToggle(save, settings, CoversSettings::kSaveLowercase, CoversSettingsLabels::Lowercase(), nullptr,
+                                                     CoversSettings::kDefaultSaveLowercase);
+  filename_state->replace_spaces = SettingsPage::AddToggle(save, settings, CoversSettings::kSaveReplaceSpaces, CoversSettingsLabels::ReplaceSpaces(),
+                                                          nullptr, CoversSettings::kDefaultSaveReplaceSpaces);
+  ApplySaveFilenameSensitivity(filename_state);
+  SettingsPage::AddToggle(save, settings, CoversSettings::kAutomaticSearch, CoversSettingsLabels::AutomaticSearch(), nullptr,
+                          CoversSettings::kDefaultAutomaticSearch);
 
-  if (ui_->types->selectedItems().count() == 0) {
-    ui_->types_up->setEnabled(false);
-    ui_->types_down->setEnabled(false);
+  AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, CoversSettingsLabels::Authentication());
+  SettingsPage::AddDescription(auth, CoversSettingsLabels::AuthHint());
+  ProviderListState *provider_state = static_cast<ProviderListState *>(g_object_get_data(G_OBJECT(page), "cover-provider-state"));
+  GtkWidget *info = gtk_label_new(Translations::CStr(CoverProviderAuth::NoProviderSelected()));
+  gtk_label_set_wrap(GTK_LABEL(info), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(info), 0.0f);
+  gtk_widget_add_css_class(info, "dim-label");
+  adw_preferences_group_add(auth, info);
+  GtkWidget *open_settings = gtk_button_new_with_label(Translations::Tr(CoverProviderAuth::OpenSettingsLabel("Tidal")).c_str());
+  gtk_widget_add_css_class(open_settings, "flat");
+  gtk_widget_set_halign(open_settings, GTK_ALIGN_START);
+  g_signal_connect(open_settings, "clicked", G_CALLBACK(OpenCoverSettingsPage), nullptr);
+  adw_preferences_group_add(auth, open_settings);
+  GtkWidget *authenticate = gtk_button_new_with_label(Translations::CStr(CoverProviderAuth::Authenticate()));
+  gtk_widget_set_halign(authenticate, GTK_ALIGN_START);
+  adw_preferences_group_add(auth, authenticate);
+  auto login = std::make_unique<LoginStateWidget>();
+  adw_preferences_group_add(auth, login->widget());
+  if (provider_state) {
+    provider_state->info = info;
+    provider_state->open_settings = open_settings;
+    provider_state->authenticate = authenticate;
+    provider_state->login = std::move(login);
+    g_signal_connect(authenticate, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                       auto *self = static_cast<ProviderListState *>(data);
+                       if (!self) {
+                         return;
+                       }
+                       self->login_in_progress = true;
+                       ApplySelectedProvider(self);
+                       GtkListBoxRow *row = self->list ? gtk_list_box_get_selected_row(GTK_LIST_BOX(self->list)) : nullptr;
+                       const char *name = row ? static_cast<const char *>(g_object_get_data(G_OBJECT(row), "provider-name")) : nullptr;
+                       if (name && CoverProviderAuth::ShowOpenSettings(name) && self->open_settings) {
+                         gtk_button_set_label(GTK_BUTTON(self->open_settings), Translations::Tr(CoverProviderAuth::OpenSettingsLabel(name)).c_str());
+                         g_object_set_data_full(G_OBJECT(self->open_settings), "settings-page",
+                                                g_strdup(CoverProviderAuth::SettingsPageName(name)), g_free);
+                         OpenCoverSettingsPage(GTK_BUTTON(self->open_settings), nullptr);
+                       }
+                       self->login_in_progress = false;
+                       ApplySelectedProvider(self);
+                     })),
+                     provider_state);
+    provider_state->login->SetLogoutCallback([provider_state]() {
+      provider_state->login_in_progress = false;
+      ApplySelectedProvider(provider_state);
+    });
+    ApplySelectedProvider(provider_state);
+  } else {
+    gtk_widget_set_visible(open_settings, FALSE);
+    gtk_widget_set_visible(authenticate, FALSE);
+    gtk_widget_set_visible(login->widget(), FALSE);
+    g_object_set_data_full(G_OBJECT(page), "cover-login-widget", login.release(), [](gpointer p) { delete static_cast<LoginStateWidget *>(p); });
   }
-  else {
-    if (ui_->types->currentItem() && !types_selected_) {
-      TypesCurrentItemChanged(ui_->types->currentItem(), nullptr);
-    }
-  }
-
+  return page;
 }

@@ -1,25 +1,12 @@
-/*
- * Strawberry Music Player
- * Copyright 2020-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "playlist/playlistundocommandbase.h"
 
-#include <QUndoCommand>
+PlaylistUndoCommandInsertItems::PlaylistUndoCommandInsertItems(int row, const SongList &songs) : row_(row), songs_(songs) {}
 
-#include "playlist.h"
-#include "playlistundocommandbase.h"
+PlaylistUndoCommandRemoveItems::PlaylistUndoCommandRemoveItems(const std::vector<int> &rows, const SongList &songs)
+    : rows_(rows), songs_(songs) {}
 
-PlaylistUndoCommandBase::PlaylistUndoCommandBase(Playlist *playlist) : QUndoCommand(nullptr), playlist_(playlist) {}
+PlaylistUndoCommandMoveItems::PlaylistUndoCommandMoveItems(int from, int to) : from_(from), to_(to) {}
+
+PlaylistUndoCommandReorderItems::PlaylistUndoCommandReorderItems(const std::vector<int> &order) : order_(order) {}
+
+PlaylistUndoCommandSortItems::PlaylistUndoCommandSortItems(int column, bool descending) : column_(column), descending_(descending) {}

@@ -1,90 +1,62 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_COLLECTIONQUERY_H
+#define STRAWBERRY_COLLECTIONQUERY_H
 
-#ifndef COLLECTIONQUERY_H
-#define COLLECTIONQUERY_H
+#include "collection/collectionfilteroptions.h"
+#include "core/database.h"
 
-#include "config.h"
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include <QVariant>
-#include <QString>
-#include <QStringList>
-#include <QSqlDatabase>
-
-#include "core/sqlquery.h"
-
-#include "collectionfilteroptions.h"
-
-class CollectionQuery : public SqlQuery {
+class CollectionQuery {
  public:
-  explicit CollectionQuery(const QSqlDatabase &db, const QString &songs_table, const CollectionFilterOptions &filter_options = CollectionFilterOptions());
+  CollectionQuery(Database *db, const std::string &songs_table, const CollectionFilterOptions &filter_options = CollectionFilterOptions());
 
-  QVariant Value(const int column) const;
-  QVariant value(const int column) const { return Value(column); }
+  void SetColumnSpec(const std::string &column_spec) { column_spec_ = column_spec; }
+  void SetOrderBy(const std::string &order_by) { order_by_ = order_by; }
+  void AddWhere(const std::string &column, const std::string &value, const std::string &op = "=");
+  void AddWhere(const std::string &column, int value, const std::string &op = "=");
+  void AddWhere(const std::string &column, int64_t value, const std::string &op = "=");
+  void AddWhereIn(const std::string &column, const std::vector<std::string> &values);
+  void AddWhereClause(const std::string &clause);
+  void AddCompilationRequirement(bool compilation);
+  void SetDuplicatesOnly(bool duplicates_only) { duplicates_only_ = duplicates_only; }
+  void SetIncludeUnavailable(bool include_unavailable) { include_unavailable_ = include_unavailable; }
+  void SetLimit(int limit) { limit_ = limit; }
 
-  bool Exec();
-  bool exec() { return SqlQuery::exec(); }
-
-  bool Next();
-
-  QString column_spec() const { return column_spec_; }
-  QString order_by() const { return order_by_; }
-  QStringList where_clauses() const { return where_clauses_; }
-  QVariantList bound_values() const { return bound_values_; }
+  const std::string &column_spec() const { return column_spec_; }
+  const std::string &order_by() const { return order_by_; }
+  const std::vector<std::string> &where_clauses() const { return where_clauses_; }
   bool include_unavailable() const { return include_unavailable_; }
   bool duplicates_only() const { return duplicates_only_; }
   int limit() const { return limit_; }
 
-  // Sets contents of SELECT clause on the query (list of columns to get).
-  void SetColumnSpec(const QString &column_spec) { column_spec_ = column_spec; }
+  std::string Sql() const;
+  std::string GetInnerQuery() const;
 
-  // Sets an ORDER BY clause on the query.
-  void SetOrderBy(const QString &order_by) { order_by_ = order_by; }
-
-  void SetWhereClauses(const QStringList &where_clauses) { where_clauses_ = where_clauses; }
-
-  // Adds a fragment of WHERE clause. When executed, this Query will connect all the fragments with AND operator.
-  // Please note that IN operator expects a QStringList as value.
-  void AddWhere(const QString &column, const QVariant &value, const QString &op = QStringLiteral("="));
-
-  void SetBoundValues(const QVariantList &bound_values) { bound_values_ = bound_values; }
-  void SetDuplicatesOnly(const bool duplicates_only) { duplicates_only_ = duplicates_only; }
-  void SetIncludeUnavailable(const bool include_unavailable) { include_unavailable_ = include_unavailable; }
-  void SetLimit(const int limit) { limit_ = limit; }
-  void AddCompilationRequirement(const bool compilation);
+  bool Exec();
+  bool Next();
+  SqlQuery *query() const { return query_.get(); }
 
  private:
-  QString GetInnerQuery() const;
+  struct BoundValue {
+    enum class Type { Text, Int, Int64 };
+    Type type = Type::Text;
+    std::string text;
+    int64_t number = 0;
+  };
 
-  QSqlDatabase db_;
-  QString songs_table_;
-
-  QString column_spec_;
-  QString order_by_;
-  QStringList where_clauses_;
-  QVariantList bound_values_;
-
-  bool include_unavailable_;
-  bool duplicates_only_;
-  int limit_;
+  Database *db_ = nullptr;
+  std::string songs_table_;
+  std::string column_spec_ = "*";
+  std::string order_by_;
+  std::vector<std::string> where_clauses_;
+  std::vector<BoundValue> bound_values_;
+  bool include_unavailable_ = false;
+  bool duplicates_only_ = false;
+  int limit_ = -1;
+  std::unique_ptr<SqlQuery> query_;
 };
 
-#endif  // COLLECTIONQUERY_H
+#endif

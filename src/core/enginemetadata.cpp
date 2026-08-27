@@ -1,31 +1,24 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2023, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "core/enginemetadata.h"
 
-#include "enginemetadata.h"
-#include "core/song.h"
-
-EngineMetadata::EngineMetadata()
-    : type(Type::Any),
-      length(-1),
-      year(-1),
-      track(-1),
-      filetype(Song::FileType::Unknown),
-      samplerate(-1),
-      bitdepth(-1),
-      bitrate(-1) {}
+Song EngineMetadata::ToSong(Song::Source source) const {
+  Song song(source);
+  song.set_url(media_url);
+  if (!stream_url.empty()) {
+    song.set_stream_url(stream_url);
+  }
+  song.set_title(title);
+  song.set_artist(artist);
+  song.set_album(album);
+  song.set_comment(comment);
+  song.set_genre(genre);
+  song.set_lyrics(lyrics);
+  song.set_year(year);
+  song.set_track(track);
+  song.set_length_nanosec(length_nanosec);
+  song.set_filetype(filetype);
+  song.set_bitrate(bitrate);
+  song.set_samplerate(samplerate);
+  song.set_bitdepth(bitdepth);
+  song.set_valid(true);
+  return song;
+}

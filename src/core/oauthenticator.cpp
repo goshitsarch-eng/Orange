@@ -1,605 +1,293 @@
-/*
- * Strawberry Music Player
- * Copyright 2022-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "core/oauthenticator.h"
 
-#include "config.h"
+#include "core/logging.h"
+#include "utilities/strutils.h"
 
-#include <algorithm>
+#include <gio/gio.h>
+#include <json-glib/json-glib.h>
 
-#include <QObject>
-#include <QString>
-#include <QUrl>
-#include <QUrlQuery>
-#include <QDateTime>
-#include <QTimer>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QCryptographicHash>
-#include <QJsonDocument>
-#include <QJsonValue>
-#include <QJsonObject>
-#include <QJsonParseError>
-#include <QDesktopServices>
-#include <QMessageBox>
-
-#include "constants/timeconstants.h"
-#include "utilities/randutils.h"
-#include "logging.h"
-#include "settings.h"
-#include "networkaccessmanager.h"
-#include "localredirectserver.h"
-#include "oauthenticator.h"
-
-using namespace Qt::Literals::StringLiterals;
-using namespace std::chrono_literals;
+#include <cstring>
+#include <ctime>
 
 namespace {
-constexpr char kTokenType[] = "token_type";
-constexpr char kAccessToken[] = "access_token";
-constexpr char kRefreshToken[] = "refresh_token";
-constexpr char kExpiresIn[] = "expires_in";
-constexpr char kLoginTime[] = "login_time";
-constexpr char kUserId[] = "user_id";
-constexpr char kCountryCode[] = "country_code";
-constexpr int kMaxPortInc = 20;
+
+std::string QueryValue(const std::string &query, const std::string &key) {
+  const std::string prefix = key + "=";
+  size_t pos = 0;
+  while (pos < query.size()) {
+    const size_t amp = query.find('&', pos);
+    const std::string part = query.substr(pos, amp == std::string::npos ? std::string::npos : amp - pos);
+    if (StrUtils::StartsWith(part, prefix)) {
+      gchar *unescaped = g_uri_unescape_string(part.substr(prefix.size()).c_str(), nullptr);
+      std::string value = unescaped ? unescaped : part.substr(prefix.size());
+      g_free(unescaped);
+      return value;
+    }
+    if (amp == std::string::npos) {
+      break;
+    }
+    pos = amp + 1;
+  }
+  return {};
+}
+
 }  // namespace
 
-OAuthenticator::OAuthenticator(const SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : QObject(parent),
-      network_(network),
-      timer_refresh_login_(new QTimer(this)),
-      type_(Type::Authorization_Code),
-      use_local_redirect_server_(true),
-      random_port_(true),
-      expires_in_(0LL),
-      login_time_(0LL),
-      user_id_(0) {
+OAuthenticator::OAuthenticator(NetworkAccessManager *network) : network_(network) {}
 
-  timer_refresh_login_->setSingleShot(true);
-  QObject::connect(timer_refresh_login_, &QTimer::timeout, this, &OAuthenticator::RerefreshAccessToken);
+OAuthenticator::~OAuthenticator() { StopRedirectServer(); }
 
-}
-
-OAuthenticator::~OAuthenticator() {
-
-  while (!replies_.isEmpty()) {
-    QNetworkReply *reply = replies_.takeFirst();
-    QObject::disconnect(reply, nullptr, this, nullptr);
-    reply->abort();
-    reply->deleteLater();
+std::string OAuthenticator::BuildAuthorizeUrl(const std::string &authorize_url, const std::string &client_id, const std::string &redirect_uri,
+                                              const std::string &scope, const std::string &state, const std::string &code_challenge) {
+  gchar *id = g_uri_escape_string(client_id.c_str(), nullptr, TRUE);
+  gchar *redir = g_uri_escape_string(redirect_uri.c_str(), nullptr, TRUE);
+  gchar *sc = g_uri_escape_string(scope.c_str(), nullptr, TRUE);
+  gchar *st = g_uri_escape_string(state.c_str(), nullptr, TRUE);
+  gchar *challenge = g_uri_escape_string(code_challenge.c_str(), nullptr, TRUE);
+  std::string url = authorize_url;
+  url += (authorize_url.find('?') == std::string::npos ? "?" : "&");
+  url += std::string("response_type=code&client_id=") + (id ? id : "") + "&redirect_uri=" + (redir ? redir : "") + "&scope=" + (sc ? sc : "");
+  if (state.size()) {
+    url += std::string("&state=") + (st ? st : "");
   }
-
-}
-
-void OAuthenticator::set_settings_group(const QString &settings_group) {
-
-  settings_group_ = settings_group;
-
-}
-
-void OAuthenticator::set_type(const Type type) {
-
-  type_ = type;
-
-}
-
-void OAuthenticator::set_authorize_url(const QUrl &authorize_url) {
-
-  authorize_url_ = authorize_url;
-
-}
-
-void OAuthenticator::set_redirect_url(const QUrl &redirect_url) {
-
-  redirect_url_ = redirect_url;
-
-}
-
-void OAuthenticator::set_access_token_url(const QUrl &access_token_url) {
-
-  access_token_url_ = access_token_url;
-
-}
-
-void OAuthenticator::set_client_id(const QString &client_id) {
-
-  client_id_ = client_id;
-
-}
-
-void OAuthenticator::set_client_secret(const QString &client_secret) {
-
-  client_secret_ = client_secret;
-
-}
-
-void OAuthenticator::set_scope(const QString &scope) {
-
-  scope_ = scope;
-
-}
-
-void OAuthenticator::set_use_local_redirect_server(const bool use_local_redirect_server) {
-
-  use_local_redirect_server_ = use_local_redirect_server;
-
-}
-
-void OAuthenticator::set_random_port(const bool random_port) {
-
-  random_port_ = random_port;
-
-}
-
-QByteArray OAuthenticator::authorization_header() const {
-
-  if (token_type_.isEmpty() || access_token_.isEmpty()) {
-    return QByteArray();
+  if (code_challenge.size()) {
+    url += std::string("&code_challenge_method=S256&code_challenge=") + (challenge ? challenge : "");
   }
-
-  return token_type().toUtf8() + " " + access_token().toUtf8();
-
+  g_free(id);
+  g_free(redir);
+  g_free(sc);
+  g_free(st);
+  g_free(challenge);
+  return url;
 }
 
-QString OAuthenticator::GrantType() const {
-
-  switch (type_) {
-    case Type::Authorization_Code:
-      return u"authorization_code"_s;
-      break;
-    case Type::Client_Credentials:
-      return u"client_credentials"_s;
-      break;
+std::string OAuthenticator::AuthorizationCodeBody(const std::string &client_id, const std::string &client_secret, const std::string &redirect_uri,
+                                                  const std::string &code, const std::string &code_verifier) {
+  gchar *id = g_uri_escape_string(client_id.c_str(), nullptr, TRUE);
+  gchar *secret = g_uri_escape_string(client_secret.c_str(), nullptr, TRUE);
+  gchar *redir = g_uri_escape_string(redirect_uri.c_str(), nullptr, TRUE);
+  gchar *escaped_code = g_uri_escape_string(code.c_str(), nullptr, TRUE);
+  gchar *verifier = g_uri_escape_string(code_verifier.c_str(), nullptr, TRUE);
+  std::string body = std::string("grant_type=authorization_code&code=") + (escaped_code ? escaped_code : "") +
+                     "&redirect_uri=" + (redir ? redir : "") + "&client_id=" + (id ? id : "") + "&client_secret=" + (secret ? secret : "");
+  if (code_verifier.size()) {
+    body += std::string("&code_verifier=") + (verifier ? verifier : "");
   }
-
-  return QString();
-
+  g_free(id);
+  g_free(secret);
+  g_free(redir);
+  g_free(escaped_code);
+  g_free(verifier);
+  return body;
 }
 
-void OAuthenticator::LoadSession() {
-
-  Settings s;
-  s.beginGroup(settings_group_);
-  token_type_ = s.value(kTokenType).toString();
-  access_token_ = s.value(kAccessToken).toString();
-  refresh_token_ = s.value(kRefreshToken).toString();
-  expires_in_ = s.value(kExpiresIn, 0LL).toLongLong();
-  login_time_ = s.value(kLoginTime, 0LL).toLongLong();
-  country_code_ = s.value(kCountryCode).toString();
-  user_id_ = s.value(kUserId).toULongLong();
-  s.endGroup();
-
-  StartRefreshLoginTimer();
-
-}
-
-void OAuthenticator::ClearSession() {
-
-  token_type_.clear();
-  access_token_.clear();
-  refresh_token_.clear();
-  expires_in_ = 0;
-  login_time_ = 0;
-  country_code_.clear();
-  user_id_ = 0;
-
-  Settings s;
-  s.beginGroup(settings_group_);
-  s.remove(kTokenType);
-  s.remove(kAccessToken);
-  s.remove(kRefreshToken);
-  s.remove(kExpiresIn);
-  s.remove(kLoginTime);
-  s.remove(kCountryCode);
-  s.remove(kUserId);
-  s.endGroup();
-
-  if (timer_refresh_login_->isActive()) {
-    timer_refresh_login_->stop();
-  }
-
-}
-
-void OAuthenticator::StartRefreshLoginTimer() {
-
-  if (login_time_ > 0 && !refresh_token_.isEmpty() && expires_in_ > 0) {
-    const qint64 time = std::max(1LL, expires_in_ - (QDateTime::currentSecsSinceEpoch() - login_time_));
-    qLog(Debug) << settings_group_ << "Refreshing login in" << time << "seconds";
-    timer_refresh_login_->setInterval(static_cast<int>(time * kMsecPerSec));
-    if (!timer_refresh_login_->isActive()) {
-      timer_refresh_login_->start();
+bool OAuthenticator::StartRedirectServer(guint16 preferred_port) {
+  StopRedirectServer();
+  service_ = g_socket_service_new();
+  auto bind_port = [this](guint16 port) -> guint16 {
+    GError *error = nullptr;
+    GSocketAddress *effective = nullptr;
+    GInetAddress *loopback = g_inet_address_new_loopback(G_SOCKET_FAMILY_IPV4);
+    GSocketAddress *address = g_inet_socket_address_new(loopback, port);
+    const gboolean added =
+        g_socket_listener_add_address(G_SOCKET_LISTENER(service_), address, G_SOCKET_TYPE_STREAM, G_SOCKET_PROTOCOL_DEFAULT, nullptr, &effective, &error);
+    g_object_unref(address);
+    g_object_unref(loopback);
+    if (!added || !effective) {
+      if (error) {
+        g_error_free(error);
+      }
+      return 0;
     }
+    const guint16 bound = g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(effective));
+    g_object_unref(effective);
+    return bound;
+  };
+  guint16 port = preferred_port > 0 ? bind_port(preferred_port) : 0;
+  if (port == 0) {
+    port = bind_port(0);
   }
-
+  if (port == 0) {
+    StopRedirectServer();
+    return false;
+  }
+  if (redirect_uri_.empty()) {
+    redirect_uri_ = RedirectUriForPort(port);
+  }
+  g_signal_connect(service_, "incoming", G_CALLBACK(+[](GSocketService *, GSocketConnection *connection, GObject *, gpointer data) -> gboolean {
+                     auto *self = static_cast<OAuthenticator *>(data);
+                     GInputStream *input = g_io_stream_get_input_stream(G_IO_STREAM(connection));
+                     GOutputStream *output = g_io_stream_get_output_stream(G_IO_STREAM(connection));
+                     char buffer[4096] = {};
+                     gsize read = 0;
+                     g_input_stream_read_all(input, buffer, sizeof(buffer) - 1, &read, nullptr, nullptr);
+                     const std::string request(buffer, read);
+                     std::string code;
+                     const size_t path = request.find("GET ");
+                     if (path != std::string::npos) {
+                       const size_t space = request.find(' ', path + 4);
+                       const std::string target = request.substr(path + 4, space == std::string::npos ? std::string::npos : space - (path + 4));
+                       const size_t q = target.find('?');
+                       if (q != std::string::npos) {
+                         code = QueryValue(target.substr(q + 1), "code");
+                       }
+                     }
+                     const char *body = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
+                                        "<html><body><p>You can return to Strawberry.</p></body></html>";
+                     g_output_stream_write_all(output, body, std::strlen(body), nullptr, nullptr, nullptr);
+                     if (self->callback_) {
+                       const auto cb = self->callback_;
+                       self->callback_ = {};
+                       cb(code, code.empty() ? "No authorization code" : "");
+                     }
+                     self->StopRedirectServer();
+                     return TRUE;
+                   }),
+                   this);
+  g_socket_service_start(service_);
+  return true;
 }
 
-void OAuthenticator::Authenticate() {
+void OAuthenticator::StopRedirectServer() {
+  if (service_) {
+    g_socket_service_stop(service_);
+    g_object_unref(service_);
+    service_ = nullptr;
+  }
+}
 
-  if (type_ == Type::Client_Credentials) {
-    RequestAccessToken();
+void OAuthenticator::AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback,
+                                        guint16 preferred_port, const std::string &redirect_uri) {
+  callback_ = std::move(callback);
+  redirect_uri_ = redirect_uri;
+  if (!StartRedirectServer(preferred_port)) {
+    if (callback_) {
+      callback_({}, "Could not start redirect server");
+      callback_ = {};
+    }
     return;
   }
-
-  QUrl redirect_url(redirect_url_);
-
-  if (use_local_redirect_server_) {
-    local_redirect_server_.reset(new LocalRedirectServer(this));
-    bool success = false;
-    if (random_port_) {
-      success = local_redirect_server_->Listen();
+  const std::string url = BuildAuthorizeUrl(authorize_url, client_id, redirect_uri_, scope);
+  GError *error = nullptr;
+  if (!g_app_info_launch_default_for_uri(url.c_str(), nullptr, &error)) {
+    if (callback_) {
+      callback_({}, error ? error->message : "Could not open browser");
+      callback_ = {};
     }
-    else {
-      const int max_port = redirect_url.port() + kMaxPortInc;
-      for (int port = redirect_url.port(); port < max_port; ++port) {
-        local_redirect_server_->set_port(port);
-        if (local_redirect_server_->Listen()) {
-          success = true;
-          break;
-        }
-      }
+    if (error) {
+      g_error_free(error);
     }
-    if (!success) {
-      Q_EMIT AuthenticationFinished(false, local_redirect_server_->error());
-      local_redirect_server_.reset();
+    StopRedirectServer();
+  }
+}
+
+void OAuthenticator::ExchangeCode(const std::string &token_url, const std::string &client_id, const std::string &client_secret, const std::string &code,
+                                 Callback callback, const std::string &code_verifier) {
+  if (!network_) {
+    callback({}, "No network");
+    return;
+  }
+  const std::string body = AuthorizationCodeBody(client_id, client_secret, redirect_uri_, code, code_verifier);
+  network_->Post(token_url, body, [callback](const NetworkAccessManager::Response &response) {
+    if (!response.ok()) {
+      callback({}, response.error.empty() ? "Token exchange failed" : response.error);
       return;
     }
-    QObject::connect(&*local_redirect_server_, &LocalRedirectServer::Finished, this, &OAuthenticator::RedirectArrived);
-    redirect_url.setPort(local_redirect_server_->port());
-  }
-
-  code_verifier_ = Utilities::CryptographicRandomString(44);
-  code_challenge_ = QString::fromLatin1(QCryptographicHash::hash(code_verifier_.toUtf8(), QCryptographicHash::Sha256).toBase64(QByteArray::Base64UrlEncoding));
-  if (code_challenge_.lastIndexOf(u'=') == code_challenge_.length() - 1) {
-    code_challenge_.chop(1);
-  }
-
-  ParamList params = ParamList() << Param(u"response_type"_s, u"code"_s)
-                                 << Param(u"redirect_uri"_s, redirect_url.toString())
-                                 << Param(u"state"_s, code_challenge_)
-                                 << Param(u"code_challenge_method"_s, u"S256"_s)
-                                 << Param(u"code_challenge"_s, code_challenge_);
-
-  if (!client_id_.isEmpty()) {
-    params << Param(u"client_id"_s, client_id_);
-  }
-
-  if (!scope_.isEmpty()) {
-    params << Param(u"scope"_s, scope_);
-  }
-
-  std::sort(params.begin(), params.end());
-
-  QUrlQuery url_query;
-  for (const Param &param : std::as_const(params)) {
-    url_query.addQueryItem(QString::fromLatin1(QUrl::toPercentEncoding(param.first, ";")), QString::fromLatin1(QUrl::toPercentEncoding(param.second, ";")));
-  }
-
-  QUrl url(authorize_url_);
-  url.setQuery(url_query);
-
-  const bool success = QDesktopServices::openUrl(url);
-  if (!success) {
-    QMessageBox messagebox(QMessageBox::Information, tr("Authentication"), tr("Please open this URL in your browser") + QStringLiteral(":<br /><a href=\"%1\">%1</a>").arg(url.toString()), QMessageBox::Ok);
-    messagebox.setTextFormat(Qt::RichText);
-    messagebox.exec();
-  }
-
+    callback(response.body, {});
+  }, "application/x-www-form-urlencoded");
 }
 
-void OAuthenticator::RedirectArrived() {
-
-  if (local_redirect_server_.isNull()) {
-    return;
-  }
-
-  if (local_redirect_server_->success()) {
-    QUrl redirect_url(redirect_url_);
-    redirect_url.setPort(local_redirect_server_->port());
-    AuthorizationUrlReceived(local_redirect_server_->request_url(), redirect_url);
-  }
-  else {
-    Q_EMIT AuthenticationFinished(false, local_redirect_server_->error());
-  }
-
-  local_redirect_server_.reset();
-
+std::string OAuthenticator::ClientCredentialsBody(const std::string &client_id, const std::string &client_secret) {
+  return std::string("grant_type=client_credentials&client_id=") + StrUtils::UriEscape(client_id) +
+         "&client_secret=" + StrUtils::UriEscape(client_secret);
 }
 
-void OAuthenticator::ExternalAuthorizationUrlReceived(const QUrl &request_url) {
-
-  AuthorizationUrlReceived(request_url, redirect_url_);
-
+std::string OAuthenticator::BasicAuthorizationHeader(const std::string &client_id, const std::string &client_secret) {
+  const std::string raw = client_id + ":" + client_secret;
+  gchar *encoded = g_base64_encode(reinterpret_cast<const guchar *>(raw.data()), raw.size());
+  std::string header = std::string("Basic ") + (encoded ? encoded : "");
+  g_free(encoded);
+  return header;
 }
 
-void OAuthenticator::AuthorizationUrlReceived(const QUrl &request_url, const QUrl &redirect_url) {
-
-  if (!request_url.isValid()) {
-    Q_EMIT AuthenticationFinished(false, tr("Received invalid reply from web browser."));
-    return;
-  }
-
-  if (!request_url.hasQuery()) {
-    Q_EMIT AuthenticationFinished(false, tr("Redirect URL is missing query."));
-    return;
-  }
-
-  QUrlQuery url_query(request_url);
-
-  if (url_query.hasQueryItem(u"error_description"_s)) {
-    Q_EMIT AuthenticationFinished(false, url_query.queryItemValue(u"error_description"_s, QUrl::FullyDecoded));
-    return;
-  }
-
-  if (url_query.hasQueryItem(u"error"_s)) {
-    Q_EMIT AuthenticationFinished(false, url_query.queryItemValue(u"error"_s));
-    return;
-  }
-
-  if (!url_query.hasQueryItem(u"code"_s)) {
-    Q_EMIT AuthenticationFinished(false, tr("Request URL is missing code!"));
-    return;
-  }
-
-  if (!url_query.hasQueryItem(u"state"_s)) {
-    Q_EMIT AuthenticationFinished(false, tr("Request URL is missing state!"));
-    return;
-  }
-
-  if (url_query.queryItemValue(u"state"_s) != code_challenge_) {
-    Q_EMIT AuthenticationFinished(false, tr("Request URL has wrong state %1 != %2").arg(url_query.queryItemValue(u"state"_s), code_challenge_));
-    return;
-  }
-
-  RequestAccessToken(url_query.queryItemValue(u"code"_s), redirect_url);
-
+std::string OAuthenticator::RefreshTokenBody(const std::string &refresh_token, const std::string &client_id, const std::string &client_secret) {
+  return std::string("grant_type=refresh_token&refresh_token=") + StrUtils::UriEscape(refresh_token) +
+         "&client_id=" + StrUtils::UriEscape(client_id) + "&client_secret=" + StrUtils::UriEscape(client_secret);
 }
 
-QNetworkReply *OAuthenticator::CreateAccessTokenRequest(const ParamList &params, const bool refresh_token) {
-
-  QUrlQuery url_query;
-  for (const Param &param : std::as_const(params)) {
-    url_query.addQueryItem(QString::fromLatin1(QUrl::toPercentEncoding(param.first)), QString::fromLatin1(QUrl::toPercentEncoding(param.second)));
-  }
-
-  QNetworkRequest network_request(access_token_url_);
-  network_request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-  network_request.setHeader(QNetworkRequest::ContentTypeHeader, u"application/x-www-form-urlencoded"_s);
-  if (type_ == Type::Client_Credentials && !client_id_.isEmpty() && !client_secret_.isEmpty()) {
-    const QString authorization_header = client_id_ + u':' + client_secret_;
-    network_request.setRawHeader("Authorization", "Basic " + authorization_header.toUtf8().toBase64());
-  }
-
-  QNetworkReply *reply = network_->post(network_request, url_query.toString(QUrl::FullyEncoded).toUtf8());
-  replies_ << reply;
-  QObject::connect(reply, &QNetworkReply::sslErrors, this, &OAuthenticator::HandleSSLErrors);
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, refresh_token]() { AccessTokenRequestFinished(reply, refresh_token); });
-
-  return reply;
-
-}
-
-void OAuthenticator::RequestAccessToken(const QString &code, const QUrl &redirect_url) {
-
-  if (timer_refresh_login_->isActive()) {
-    timer_refresh_login_->stop();
-  }
-
-  ParamList params = ParamList() << Param(u"grant_type"_s, GrantType());
-
-  if (!code.isEmpty()) {
-    params << Param(u"code"_s, code);
-  }
-
-  if (!code_verifier_.isEmpty()) {
-    params << Param(u"code_verifier"_s, code_verifier_);
-  }
-
-  if (!code.isEmpty()) {
-    params << Param(u"redirect_uri"_s, redirect_url.toString());
-  }
-
-  if (!client_id_.isEmpty()) {
-    params << Param(u"client_id"_s, client_id_);
-  }
-
-  if (!client_secret_.isEmpty()) {
-    params << Param(u"client_secret"_s, client_secret_);
-  }
-
-  std::sort(params.begin(), params.end());
-
-  CreateAccessTokenRequest(params, false);
-
-}
-
-void OAuthenticator::RerefreshAccessToken() {
-
-  if (timer_refresh_login_->isActive()) {
-    timer_refresh_login_->stop();
-  }
-
-  if (client_id_.isEmpty() || refresh_token_.isEmpty()) {
+void OAuthenticator::RefreshAccessToken(const std::string &token_url, const std::string &client_id, const std::string &client_secret,
+                                        const std::string &refresh_token, Callback callback) {
+  if (!network_) {
+    callback({}, "No network");
     return;
   }
-
-  ParamList params = ParamList() << Param(u"grant_type"_s, u"refresh_token"_s)
-                                 << Param(u"client_id"_s, client_id_)
-                                 << Param(u"refresh_token"_s, refresh_token_);
-
-  if (!client_secret_.isEmpty()) {
-    params << Param(u"client_secret"_s, client_secret_);
-  }
-
-  CreateAccessTokenRequest(params, true);
-
+  network_->Post(token_url, RefreshTokenBody(refresh_token, client_id, client_secret),
+                 [callback](const NetworkAccessManager::Response &response) {
+                   if (!response.ok()) {
+                     callback({}, response.error.empty() ? "Token refresh failed" : response.error);
+                     return;
+                   }
+                   callback(response.body, {});
+                 },
+                 "application/x-www-form-urlencoded");
 }
 
-void OAuthenticator::HandleSSLErrors(const QList<QSslError> &ssl_errors) {
-
-  for (const QSslError &ssl_error : ssl_errors) {
-    qLog(Debug) << settings_group_ << ssl_error.errorString();
+OAuthenticator::TokenResponse OAuthenticator::ParseTokenResponse(const std::string &json) {
+  TokenResponse token;
+  if (json.empty()) {
+    return token;
   }
-
-}
-
-void OAuthenticator::AccessTokenRequestFinished(QNetworkReply *reply, const bool refresh_token) {
-
-  if (!replies_.contains(reply)) return;
-  replies_.removeAll(reply);
-  QObject::disconnect(reply, nullptr, this, nullptr);
-  reply->deleteLater();
-
-  if (reply->error() != QNetworkReply::NoError && reply->error() < 200) {
-    const QString error_message = QStringLiteral("%1 (%2)").arg(reply->errorString()).arg(reply->error());
-    Q_EMIT AuthenticationFinished(false, error_message);
-    return;
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
+    g_object_unref(parser);
+    return token;
   }
-
-  if (reply->error() != QNetworkReply::NoError || reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() != 200) {
-    const QByteArray data = reply->readAll();
-    if (!data.isEmpty()) {
-      QJsonParseError json_error;
-      const QJsonDocument json_document = QJsonDocument::fromJson(data, &json_error);
-      if (json_error.error == QJsonParseError::NoError && !json_document.isEmpty() && json_document.isObject()) {
-        const QJsonObject json_object = json_document.object();
-        if (json_object.contains("error"_L1) && json_object.contains("error_description"_L1)) {
-          const QString error = json_object["error"_L1].toString();
-          const QString error_description = json_object["error_description"_L1].toString();
-          Q_EMIT AuthenticationFinished(false, QStringLiteral("%1 (%2)").arg(error, error_description));
-          return;
-        }
-        qLog(Debug) << settings_group_ << "Unknown Json reply" << json_object;
+  JsonNode *root = json_parser_get_root(parser);
+  if (root && JSON_NODE_HOLDS_OBJECT(root)) {
+    JsonObject *object = json_node_get_object(root);
+    auto take_string = [object](const char *key) -> std::string {
+      if (!json_object_has_member(object, key) || !JSON_NODE_HOLDS_VALUE(json_object_get_member(object, key)) ||
+          json_node_get_value_type(json_object_get_member(object, key)) != G_TYPE_STRING) {
+        return {};
       }
-    }
-    if (reply->error() == QNetworkReply::NoError) {
-      Q_EMIT AuthenticationFinished(false, QStringLiteral("Received HTTP status code %1").arg(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()));
-    }
-    else {
-      Q_EMIT AuthenticationFinished(false, QStringLiteral("%1 (%2)").arg(reply->errorString()).arg(reply->error()));
-    }
-    return;
-  }
-
-  const QByteArray data = reply->readAll();
-
-  QJsonParseError json_error;
-  const QJsonDocument json_document = QJsonDocument::fromJson(data, &json_error);
-  if (json_error.error != QJsonParseError::NoError) {
-    Q_EMIT AuthenticationFinished(false, QStringLiteral("Failed to parse Json data in authentication reply: %1").arg(json_error.errorString()));
-    return;
-  }
-
-  if (json_document.isEmpty()) {
-    Q_EMIT AuthenticationFinished(false, u"Authentication reply from server has empty Json document."_s);
-    return;
-  }
-
-  if (!json_document.isObject()) {
-    Q_EMIT AuthenticationFinished(false, u"Authentication reply from server has Json document that is not an object."_s);
-    return;
-  }
-
-  const QJsonObject json_object = json_document.object();
-  if (json_object.isEmpty()) {
-    Q_EMIT AuthenticationFinished(false, u"Authentication reply from server has empty Json object."_s);
-    return;
-  }
-
-  if (!json_object.contains("token_type"_L1)) {
-    Q_EMIT AuthenticationFinished(false, u"Authentication reply from server is missing token type."_s);
-    return;
-  }
-
-  if (!json_object.contains("access_token"_L1)) {
-    Q_EMIT AuthenticationFinished(false, u"Authentication reply from server is missing access token."_s);
-    return;
-  }
-
-  token_type_ = json_object["token_type"_L1].toString();
-  access_token_ = json_object["access_token"_L1].toString();
-
-  if (json_object.contains("refresh_token"_L1)) {
-    refresh_token_ = json_object["refresh_token"_L1].toString();
-  }
-  else if (!refresh_token) {
-    refresh_token_.clear();
-  }
-
-  if (json_object.contains("expires_in"_L1)) {
-    expires_in_ = json_object["expires_in"_L1].toInt();
-  }
-  else {
-    expires_in_ = 0;
-  }
-
-  login_time_ = QDateTime::currentSecsSinceEpoch();
-  country_code_.clear();
-  user_id_ = 0;
-
-  if (json_object.contains("user"_L1) && json_object["user"_L1].isObject()) {
-    const QJsonObject object_user = json_object["user"_L1].toObject();
-    if (object_user.contains("countryCode"_L1) && object_user.contains("userId"_L1)) {
-      country_code_ = object_user["countryCode"_L1].toString();
-      user_id_ = static_cast<quint64>(object_user["userId"_L1].toInt());
+      const char *value = json_object_get_string_member(object, key);
+      return value ? value : "";
+    };
+    token.access_token = take_string("access_token");
+    token.refresh_token = take_string("refresh_token");
+    token.token_type = take_string("token_type");
+    if (json_object_has_member(object, "expires_in") && JSON_NODE_HOLDS_VALUE(json_object_get_member(object, "expires_in"))) {
+      token.expires_in = static_cast<int>(json_object_get_int_member(object, "expires_in"));
     }
   }
+  g_object_unref(parser);
+  return token;
+}
 
-  Settings s;
+std::string OAuthenticator::ParseAccessToken(const std::string &json) { return ParseTokenResponse(json).access_token; }
 
-  s.beginGroup(settings_group_);
-  s.setValue(kTokenType, token_type_);
-  s.setValue(kAccessToken, access_token_);
-  s.setValue(kLoginTime, login_time_);
-
-  if (refresh_token_.isEmpty()) {
-    s.remove(kRefreshToken);
+bool OAuthenticator::AccessTokenExpired(gint64 login_time, int expires_in, gint64 now, int skew_seconds) {
+  if (login_time <= 0 || expires_in <= 0) {
+    return false;
   }
-  else {
-    s.setValue(kRefreshToken, refresh_token_);
+  if (now <= 0) {
+    now = static_cast<gint64>(std::time(nullptr));
   }
+  return now + skew_seconds >= login_time + expires_in;
+}
 
-  if (expires_in_ == 0) {
-    s.remove(kExpiresIn);
+void OAuthenticator::ClientCredentials(const std::string &token_url, const std::string &client_id, const std::string &client_secret, Callback callback) {
+  if (!network_) {
+    callback({}, "No network");
+    return;
   }
-  else {
-    s.setValue(kExpiresIn, expires_in_);
-  }
-
-  if (country_code_.isEmpty()) {
-    s.remove(kCountryCode);
-  }
-  else {
-    s.setValue(kCountryCode, country_code_);
-  }
-
-  if (user_id_ == 0) {
-    s.remove(kUserId);
-  }
-  else {
-    s.setValue(kUserId, user_id_);
-  }
-
-  s.endGroup();
-
-  StartRefreshLoginTimer();
-
-  qLog(Debug) << settings_group_ << "Authentication was successful, login expires in" << expires_in_;
-
-  Q_EMIT AuthenticationFinished(true);
-
+  network_->Post(token_url, ClientCredentialsBody(client_id, client_secret),
+                 [callback](const NetworkAccessManager::Response &response) {
+                   if (!response.ok()) {
+                     callback({}, response.error.empty() ? "Client credentials failed" : response.error);
+                     return;
+                   }
+                   callback(response.body, {});
+                 },
+                 "application/x-www-form-urlencoded", {{"Authorization", BasicAuthorizationHeader(client_id, client_secret)}});
 }

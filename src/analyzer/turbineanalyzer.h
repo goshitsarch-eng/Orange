@@ -1,41 +1,17 @@
-/*
-   Strawberry Music Player
-   This file was part of Clementine.
-   Copyright 2003, Stanislav Karchebny <berkus@users.sf.net>
-   Copyright 2009-2010, David Sansome <davidsansome@gmail.com>
-   Copyright 2014, Krzysztof Sobiecki <sobkas@gmail.com>
-   Copyright 2014, John Maguire <john.maguire@gmail.com>
+#ifndef STRAWBERRY_TURBINEANALYZER_H
+#define STRAWBERRY_TURBINEANALYZER_H
 
-   Clementine is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
+#include "analyzer/analyzerbase.h"
+#include "analyzer/baranalyzerstate.h"
 
-   Clementine is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Clementine.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#ifndef TURBINEANALYZER_H
-#define TURBINEANALYZER_H
-
-#include "boomanalyzer.h"
-
-class QPainter;
-
-class TurbineAnalyzer : public BoomAnalyzer {
-  Q_OBJECT
-
+class TurbineAnalyzer : public AnalyzerBase {
  public:
-  Q_INVOKABLE explicit TurbineAnalyzer(QWidget *parent);
+  std::string name() const override { return "Turbine"; }
+  void Draw(cairo_t *cr, int width, int height, const std::vector<float> &bands) const override;
+  void Advance(int width, int height, const std::vector<float> &bands) override;
 
-  void analyze(QPainter &p, const Scope &scope, const bool new_frame) override;
-
-  static const char *kName;
+ private:
+  BarAnalyzerState state_;
 };
 
-#endif  // TURBINEANALYZER_H
+#endif

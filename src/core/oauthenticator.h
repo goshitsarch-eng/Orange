@@ -1,127 +1,63 @@
-/*
- * Strawberry Music Player
- * Copyright 2022-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_OAUTHENTICATOR_H
+#define STRAWBERRY_OAUTHENTICATOR_H
 
-#ifndef OAUTHENTICATOR_H
-#define OAUTHENTICATOR_H
+#include "core/network.h"
 
-#include "config.h"
+#include <gio/gio.h>
 
-#include <QObject>
-#include <QList>
-#include <QString>
-#include <QUrl>
-#include <QScopedPointer>
-#include <QSharedPointer>
-#include <QSslError>
+#include <functional>
+#include <string>
 
-#include "includes/shared_ptr.h"
-
-class QTimer;
-class QNetworkReply;
-class NetworkAccessManager;
-class LocalRedirectServer;
-
-class OAuthenticator : public QObject {
-  Q_OBJECT
-
+class OAuthenticator {
  public:
-  explicit OAuthenticator(const SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
-  ~OAuthenticator() override;
+  using Callback = std::function<void(const std::string &code_or_token, const std::string &error)>;
 
-  enum class Type {
-    Authorization_Code,
-    Client_Credentials
+  explicit OAuthenticator(NetworkAccessManager *network);
+  ~OAuthenticator();
+
+  struct TokenResponse {
+    std::string access_token;
+    std::string refresh_token;
+    std::string token_type;
+    int expires_in = 0;
   };
 
-  void set_settings_group(const QString &settings_group);
-  void set_type(const Type type);
-  void set_authorize_url(const QUrl &authorize_url);
-  void set_redirect_url(const QUrl &redirect_url);
-  void set_access_token_url(const QUrl &access_token_url);
-  void set_client_id(const QString &client_id);
-  void set_client_secret(const QString &client_secret);
-  void set_scope(const QString &scope);
-  void set_use_local_redirect_server(const bool use_local_redirect_server);
-  void set_random_port(const bool random_port);
+  void AuthorizeInBrowser(const std::string &authorize_url, const std::string &client_id, const std::string &scope, Callback callback,
+                          guint16 preferred_port = 0, const std::string &redirect_uri = {});
+  static constexpr guint16 kGeniusRedirectPort = 63111;
+  static std::string RedirectUriForPort(guint16 port) {
+    if (port == kGeniusRedirectPort) {
+      return "http://localhost:63111/";
+    }
+    return "http://127.0.0.1:" + std::to_string(port) + "/callback";
+  }
+  void set_redirect_uri(const std::string &redirect_uri) { redirect_uri_ = redirect_uri; }
+  void ExchangeCode(const std::string &token_url, const std::string &client_id, const std::string &client_secret, const std::string &code, Callback callback,
+                    const std::string &code_verifier = {});
+  void RefreshAccessToken(const std::string &token_url, const std::string &client_id, const std::string &client_secret,
+                          const std::string &refresh_token, Callback callback);
+  void ClientCredentials(const std::string &token_url, const std::string &client_id, const std::string &client_secret, Callback callback);
+  std::string redirect_uri() const { return redirect_uri_; }
 
-  QString token_type() const { return token_type_; }
-  QString access_token() const { return access_token_; }
-  qint64 expires_in() const { return expires_in_; }
-  QString country_code() const { return country_code_; }
-  quint64 user_id() const { return user_id_; }
-  bool authenticated() const { return !token_type_.isEmpty() && !access_token_.isEmpty(); }
-
-  QByteArray authorization_header() const;
-
-  void Authenticate();
-  void ClearSession();
-  void LoadSession();
-  void ExternalAuthorizationUrlReceived(const QUrl &request_url);
-
- private:
-  using Param = QPair<QString, QString>;
-  using ParamList = QList<Param>;
-
-  QString GrantType() const;
-  void StartRefreshLoginTimer();
-  QNetworkReply *CreateAccessTokenRequest(const ParamList &params, const bool refresh_token);
-  void RequestAccessToken(const QString &code = QString(), const QUrl &redirect_url = QUrl());
-  void RerefreshAccessToken();
-  void AuthorizationUrlReceived(const QUrl &request_url, const QUrl &redirect_url);
-
- Q_SIGNALS:
-  void Error(const QString &error);
-  void AuthenticationFinished(const bool success, const QString &error = QString());
-
- private Q_SLOTS:
-  void RedirectArrived();
-  void HandleSSLErrors(const QList<QSslError> &ssl_errors);
-  void AccessTokenRequestFinished(QNetworkReply *reply, const bool refresh_token);
+  static std::string BuildAuthorizeUrl(const std::string &authorize_url, const std::string &client_id, const std::string &redirect_uri,
+                                       const std::string &scope, const std::string &state = {}, const std::string &code_challenge = {});
+  static std::string AuthorizationCodeBody(const std::string &client_id, const std::string &client_secret, const std::string &redirect_uri,
+                                           const std::string &code, const std::string &code_verifier = {});
+  static std::string ClientCredentialsBody(const std::string &client_id, const std::string &client_secret);
+  static std::string RefreshTokenBody(const std::string &refresh_token, const std::string &client_id, const std::string &client_secret);
+  static std::string BasicAuthorizationHeader(const std::string &client_id, const std::string &client_secret);
+  static std::string ParseAccessToken(const std::string &json);
+  static TokenResponse ParseTokenResponse(const std::string &json);
+  static bool AccessTokenExpired(gint64 login_time, int expires_in, gint64 now = 0, int skew_seconds = 60);
 
  private:
-  const SharedPtr<NetworkAccessManager> network_;
-  QScopedPointer<LocalRedirectServer, QScopedPointerDeleteLater> local_redirect_server_;
-  QTimer *timer_refresh_login_;
+  bool StartRedirectServer(guint16 preferred_port = 0);
+  void StopRedirectServer();
 
-  QString settings_group_;
-  Type type_;
-  QUrl authorize_url_;
-  QUrl redirect_url_;
-  QUrl access_token_url_;
-  QString client_id_;
-  QString client_secret_;
-  QString scope_;
-  bool use_local_redirect_server_;
-  bool random_port_;
-
-  QString code_verifier_;
-  QString code_challenge_;
-
-  QString token_type_;
-  QString access_token_;
-  QString refresh_token_;
-  qint64 expires_in_;
-  qint64 login_time_;
-  QString country_code_;
-  quint64 user_id_;
-
-  QList<QNetworkReply*> replies_;
+  NetworkAccessManager *network_ = nullptr;
+  GSocketService *service_ = nullptr;
+  std::string redirect_uri_;
+  Callback callback_;
 };
 
-#endif  // OAUTHENTICATOR_H
+#endif

@@ -1,72 +1,35 @@
-/*
- * Strawberry Music Player
- * Copyright 2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_FILEVIEWTREEMODEL_H
+#define STRAWBERRY_FILEVIEWTREEMODEL_H
 
-#ifndef FILEVIEWTREEMODEL_H
-#define FILEVIEWTREEMODEL_H
+#include "fileview/fileviewtreeitem.h"
 
-#include "config.h"
+#include <memory>
+#include <string>
+#include <vector>
 
-#include <QObject>
-#include <QVariant>
-#include <QStringList>
-#include <QIcon>
-
-#include "core/simpletreemodel.h"
-#include "fileviewtreeitem.h"
-
-class QFileIconProvider;
-class QMimeData;
-
-class FileViewTreeModel : public SimpleTreeModel<FileViewTreeItem> {
-  Q_OBJECT
-
+class FileViewTreeModel {
  public:
-  explicit FileViewTreeModel(QObject *parent = nullptr);
-  ~FileViewTreeModel() override;
-
-  enum Role {
-    Role_Type = Qt::UserRole + 1,
-    Role_FilePath,
-    Role_FileName,
-    RoleCount
-  };
-
-  // QAbstractItemModel
-  Qt::ItemFlags flags(const QModelIndex &idx) const override;
-  QVariant data(const QModelIndex &idx, const int role) const override;
-  bool hasChildren(const QModelIndex &parent) const override;
-  bool canFetchMore(const QModelIndex &parent) const override;
-  void fetchMore(const QModelIndex &parent) override;
-  QStringList mimeTypes() const override;
-  QMimeData *mimeData(const QModelIndexList &indexes) const override;
-
-  void SetRootPaths(const QStringList &paths);
-  void SetNameFilters(const QStringList &filters);
+  void SetRootPaths(const std::vector<std::string> &paths);
+  void SetNameFilters(const std::vector<std::string> &filters);
+  void SetShowHidden(bool show_hidden);
+  void SetShowAllFiles(bool show_all);
+  void LazyLoad(FileViewTreeItem *item);
+  FileViewTreeItem *root() { return root_.get(); }
+  const FileViewTreeItem *root() const { return root_.get(); }
+  int DirectoryCount() const;
+  std::vector<std::string> FilesIn(const std::string &directory) const;
+  const std::vector<std::string> &name_filters() const { return name_filters_; }
+  bool show_hidden() const { return show_hidden_; }
+  bool show_all_files() const { return show_all_files_; }
 
  private:
   void Reset();
-  void LazyLoad(FileViewTreeItem *item);
-  QIcon GetIcon(const FileViewTreeItem *item) const;
+  bool AcceptsFile(const std::string &path) const;
 
- private:
-  QFileIconProvider *icon_provider_;
-  QStringList name_filters_;
+  std::unique_ptr<FileViewTreeItem> root_;
+  std::vector<std::string> name_filters_;
+  bool show_hidden_ = false;
+  bool show_all_files_ = false;
 };
 
-#endif  // FILEVIEWTREEMODEL_H
+#endif

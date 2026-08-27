@@ -1,491 +1,295 @@
-/*
- * Strawberry Music Player
- * Copyright 2019-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "tagreader/tagreaderclient.h"
 
-#include "config.h"
+#include "utilities/fileutils.h"
 
-#include <QtGlobal>
-#include <QObject>
-#include <QThread>
-#include <QMutex>
-#include <QByteArray>
-#include <QString>
-#include <QUrl>
-#include <QImage>
-#include <QScopeGuard>
+#include <utility>
 
-#include "core/logging.h"
-#include "core/song.h"
+namespace {
 
-#include "tagreaderclient.h"
-#include "tagreadertaglib.h"
-#include "tagreaderresult.h"
-#include "tagreaderrequest.h"
-#include "tagreaderismediafilerequest.h"
-#include "tagreaderreadfilerequest.h"
-#include "tagreaderreadstreamrequest.h"
-#include "tagreaderwritefilerequest.h"
-#include "tagreaderloadcoverdatarequest.h"
-#include "tagreaderloadcoverimagerequest.h"
-#include "tagreadersavecoverrequest.h"
-#include "tagreadersaveplaycountrequest.h"
-#include "tagreadersaveratingrequest.h"
-#include "tagreaderreply.h"
-#include "tagreaderreadfilereply.h"
-#include "tagreaderreadstreamreply.h"
-#include "tagreaderloadcoverdatareply.h"
-#include "tagreaderloadcoverimagereply.h"
-#include "tagid3v2version.h"
-
-using std::dynamic_pointer_cast;
-using namespace Qt::Literals::StringLiterals;
-
-TagReaderClient::TagReaderClient(QObject *parent)
-    : QObject(parent),
-      original_thread_(thread()),
-      abort_(false),
-      processing_(false) {
-
-  setObjectName(QLatin1String(QObject::metaObject()->className()));
-
-}
-
-void TagReaderClient::ExitAsync() {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  abort_ = true;
-  QMetaObject::invokeMethod(this, &TagReaderClient::Exit, Qt::QueuedConnection);
-
-}
-
-void TagReaderClient::Exit() {
-
-  Q_ASSERT(QThread::currentThread() == thread());
-
-  moveToThread(original_thread_);
-  Q_EMIT ExitFinished();
-
-}
-
-bool TagReaderClient::HaveRequests() const {
-
-  Q_ASSERT(QThread::currentThread() == thread());
-
-  {
-    QMutexLocker l(&mutex_requests_);
-    return !requests_.isEmpty();
+TagReader::CoverData ToCoverData(const SaveTagCoverData &cover) {
+  TagReader::CoverData data;
+  data.data = cover.cover_data;
+  data.mime_type = cover.cover_mimetype.empty() ? "image/jpeg" : cover.cover_mimetype;
+  if (data.data.empty() && !cover.cover_filename.empty() && FileUtils::Exists(cover.cover_filename)) {
+    const std::string bytes = FileUtils::ReadFile(cover.cover_filename);
+    data.data.assign(bytes.begin(), bytes.end());
   }
-
+  return data;
 }
 
-void TagReaderClient::EnqueueRequest(TagReaderRequestPtr request) {
+}  // namespace
 
-  Q_ASSERT(QThread::currentThread() != thread());
+TagReaderClient::TagReaderClient(TagReader *tagreader) : tagreader_(tagreader ? tagreader : &owned_) {}
 
-  {
-    QMutexLocker l(&mutex_requests_);
-    requests_.enqueue(request);
-  }
+bool TagReaderClient::HaveRequests() const { return !requests_.empty(); }
 
-  // Atomically claim the "processing" flag false → true.
-  // The thread that wins the transition is responsible for kicking off ProcessRequests; the others can rely on the in-flight processor draining the queue.
-  bool expected = false;
-  if (processing_.compare_exchange_strong(expected, true)) {
-    ProcessRequestsAsync();
-  }
-
-}
+void TagReaderClient::EnqueueRequest(TagReaderRequestPtr request) { requests_.push(std::move(request)); }
 
 TagReaderRequestPtr TagReaderClient::DequeueRequest() {
-
-  Q_ASSERT(QThread::currentThread() == thread());
-
-  {
-    QMutexLocker l(&mutex_requests_);
-    if (requests_.isEmpty()) return TagReaderRequestPtr();
-    return requests_.dequeue();
+  if (requests_.empty()) {
+    return {};
   }
-
+  TagReaderRequestPtr request = requests_.front();
+  requests_.pop();
+  return request;
 }
 
-void TagReaderClient::ProcessRequestsAsync() {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  QMetaObject::invokeMethod(this, &TagReaderClient::ProcessRequests, Qt::QueuedConnection);
-
+void TagReaderClient::Clear() {
+  while (!requests_.empty()) {
+    requests_.pop();
+  }
 }
 
 void TagReaderClient::ProcessRequests() {
-
-  Q_ASSERT(QThread::currentThread() == thread());
-
-  // processing_ was already set to true by the EnqueueRequest CAS that scheduled this invocation, so we own the flag here.
-
-  for (;;) {
-    while (HaveRequests()) {
-      if (abort_.load()) {
-        processing_ = false;
-        return;
-      }
-      ProcessRequest(DequeueRequest());
-    }
-
-    // Drop the flag, then re-check the queue to close the race where a producer enqueues *after* HaveRequests() returned false
-    // but *before* we released the flag — without this, that producer's CAS would fail (it'd see processing_=true) and the request would never be drained.
-    processing_ = false;
-    if (!HaveRequests()) return;
-
-    // Something arrived. Try to reclaim the flag; if a producer beat us to it, they will drive the next ProcessRequests invocation themselves.
-    bool expected = false;
-    if (!processing_.compare_exchange_strong(expected, true)) return;
+  while (HaveRequests()) {
+    ProcessRequest(DequeueRequest());
   }
-
 }
 
-void TagReaderClient::ProcessRequest(TagReaderRequestPtr request) {
-
-  Q_ASSERT(QThread::currentThread() == thread());
-
-  TagReaderReplyPtr reply = request->reply;
-
-  TagReaderResult result;
-
-  if (TagReaderIsMediaFileRequestPtr is_media_file_request = dynamic_pointer_cast<TagReaderIsMediaFileRequest>(request)) {
-    result = tagreader_.IsMediaFile(is_media_file_request->filename);
-    if (result.error_code == TagReaderResult::ErrorCode::FileOpenError || result.error_code == TagReaderResult::ErrorCode::Unsupported) {
-      result = gmereader_.IsMediaFile(is_media_file_request->filename);
-    }
+bool TagReaderClient::ProcessNext() {
+  if (!HaveRequests()) {
+    return false;
   }
-  else if (TagReaderReadFileRequestPtr read_file_request = dynamic_pointer_cast<TagReaderReadFileRequest>(request)) {
-    Song song = read_file_request->song;
-    result = ReadFileBlocking(read_file_request->filename, &song);
-    if (result.error_code == TagReaderResult::ErrorCode::FileOpenError || result.error_code == TagReaderResult::ErrorCode::Unsupported) {
-      result = gmereader_.ReadFile(read_file_request->filename, &song);
-    }
-    if (result.success()) {
-      if (TagReaderReadFileReplyPtr read_file_reply = qSharedPointerDynamicCast<TagReaderReadFileReply>(reply)) {
-        read_file_reply->set_song(song);
-      }
-    }
-  }
-#ifdef HAVE_STREAMTAGREADER
-  else if (TagReaderReadStreamRequestPtr read_stream_request = dynamic_pointer_cast<TagReaderReadStreamRequest>(request)) {
-    Song song;
-    result = ReadStreamBlocking(read_stream_request->url, read_stream_request->filename, read_stream_request->size, read_stream_request->mtime, read_stream_request->token_type, read_stream_request->access_token, &song);
-    if (result.success()) {
-      if (TagReaderReadStreamReplyPtr read_stream_reply = qSharedPointerDynamicCast<TagReaderReadStreamReply>(reply)) {
-        read_stream_reply->set_song(song);
-      }
-    }
-  }
-#endif  // HAVE_STREAMTAGREADER
-  else if (TagReaderWriteFileRequestPtr write_file_request = dynamic_pointer_cast<TagReaderWriteFileRequest>(request)) {
-    result = WriteFileBlocking(write_file_request->filename, write_file_request->song, write_file_request->save_tags_options, write_file_request->save_tag_cover_data, write_file_request->tag_id3v2_version);
-  }
-  else if (TagReaderLoadCoverDataRequestPtr load_cover_data_request = dynamic_pointer_cast<TagReaderLoadCoverDataRequest>(request)) {
-    QByteArray cover_data;
-    result = LoadCoverDataBlocking(load_cover_data_request->filename, cover_data);
-    if (result.success()) {
-      if (TagReaderLoadCoverDataReplyPtr load_cover_data_reply = qSharedPointerDynamicCast<TagReaderLoadCoverDataReply>(reply)) {
-        load_cover_data_reply->set_data(cover_data);
-      }
-    }
-  }
-  else if (TagReaderLoadCoverImageRequestPtr load_cover_image_request = dynamic_pointer_cast<TagReaderLoadCoverImageRequest>(request)) {
-    QImage cover_image;
-    result = LoadCoverImageBlocking(load_cover_image_request->filename, cover_image);
-    if (result.success()) {
-      if (TagReaderLoadCoverImageReplyPtr load_cover_image_reply = qSharedPointerDynamicCast<TagReaderLoadCoverImageReply>(reply)) {
-        load_cover_image_reply->set_image(cover_image);
-      }
-    }
-  }
-  else if (TagReaderSaveCoverRequestPtr save_cover_request = dynamic_pointer_cast<TagReaderSaveCoverRequest>(request)) {
-    result = SaveCoverBlocking(save_cover_request->filename, save_cover_request->save_tag_cover_data);
-  }
-  else if (TagReaderSavePlaycountRequestPtr save_playcount_request = dynamic_pointer_cast<TagReaderSavePlaycountRequest>(request)) {
-    result = SaveSongPlaycountBlocking(save_playcount_request->filename, save_playcount_request->playcount);
-  }
-  else if (TagReaderSaveRatingRequestPtr save_rating_request = dynamic_pointer_cast<TagReaderSaveRatingRequest>(request)) {
-    result = SaveSongRatingBlocking(save_rating_request->filename, save_rating_request->rating);
-  }
-  else {
-    result = TagReaderResult::ErrorCode::Unsupported;
-    qLog(Error) << "Unknown tagreader request type";
-  }
-
-  reply->set_result(result);
-
-  reply->Finish();
-
+  ProcessRequest(DequeueRequest());
+  return HaveRequests();
 }
 
-bool TagReaderClient::IsMediaFileBlocking(const QString &filename) const {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  return tagreader_.IsMediaFile(filename).success() || gmereader_.IsMediaFile(filename).success();
-
+TagReaderResult TagReaderClient::PathResult(const std::string &filename) const {
+  if (filename.empty()) {
+    return {TagReaderResult::ErrorCode::FilenameMissing};
+  }
+  if (!FileUtils::Exists(filename)) {
+    return {TagReaderResult::ErrorCode::FileDoesNotExist};
+  }
+  return {TagReaderResult::ErrorCode::Success};
 }
 
-TagReaderReplyPtr TagReaderClient::IsMediaFileAsync(const QString &filename) {
+bool TagReaderClient::IsMediaFileBlocking(const std::string &filename) const {
+  return PathResult(filename).success() && tagreader_->IsMediaFile(filename);
+}
 
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  TagReaderReplyPtr reply = TagReaderReply::Create<TagReaderReply>(filename);
-
-  TagReaderIsMediaFileRequestPtr request = TagReaderIsMediaFileRequest::Create(filename);
+TagReaderReplyPtr TagReaderClient::IsMediaFileAsync(const std::string &filename) {
+  auto reply = std::make_shared<TagReaderReply>(filename);
+  auto request = TagReaderIsMediaFileRequest::Create(filename);
   request->reply = reply;
-  request->filename = filename;
-
   EnqueueRequest(request);
-
   return reply;
-
 }
 
-TagReaderResult TagReaderClient::ReadFileBlocking(const QString &filename, Song *song) {
-
-  const TagReaderResult result = tagreader_.ReadFile(filename, song);
-  if (result.error_code == TagReaderResult::ErrorCode::FileOpenError || result.error_code == TagReaderResult::ErrorCode::Unsupported) {
-    return gmereader_.ReadFile(filename, song);
+TagReaderResult TagReaderClient::ReadFileBlocking(const std::string &filename, Song *song) {
+  const TagReaderResult path = PathResult(filename);
+  if (!path.success()) {
+    return path;
   }
-
-  return result;
-
+  if (!tagreader_->IsMediaFile(filename)) {
+    return {TagReaderResult::ErrorCode::Unsupported};
+  }
+  Song read = tagreader_->ReadFile(filename);
+  if (song) {
+    *song = read;
+  }
+  return {TagReaderResult::ErrorCode::Success};
 }
 
-TagReaderReadFileReplyPtr TagReaderClient::ReadFileAsync(const QString &filename, const Song &song) {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  TagReaderReadFileReplyPtr reply = TagReaderReply::Create<TagReaderReadFileReply>(filename);
-
-  TagReaderReadFileRequestPtr request = TagReaderReadFileRequest::Create(filename);
+TagReaderReadFileReplyPtr TagReaderClient::ReadFileAsync(const std::string &filename) {
+  auto reply = std::make_shared<TagReaderReadFileReply>(filename);
+  auto request = TagReaderReadFileRequest::Create(filename);
   request->reply = reply;
-  request->filename = filename;
-  request->song = song;
-
   EnqueueRequest(request);
-
   return reply;
-
 }
 
-#ifdef HAVE_STREAMTAGREADER
-TagReaderResult TagReaderClient::ReadStreamBlocking(const QUrl &url, const QString &filename, const quint64 size, const quint64 mtime, const QString &token_type, const QString &access_token, Song *song) {
-
-  return tagreader_.ReadStream(url, filename, size, mtime, token_type, access_token, song);
-
+TagReaderResult TagReaderClient::ReadStreamBlocking(const std::string &url, const std::string &filename, uint64_t size, uint64_t mtime,
+                                                    const std::string &token_type, const std::string &access_token, Song *song) {
+  if (url.empty()) {
+    return {TagReaderResult::ErrorCode::FilenameMissing};
+  }
+  Song read = tagreader_->ReadStream(url, filename, size, mtime, token_type, access_token);
+  if (song) {
+    *song = read;
+  }
+  return read.is_valid() ? TagReaderResult{TagReaderResult::ErrorCode::Success} : TagReaderResult{TagReaderResult::ErrorCode::FileParseError};
 }
 
-TagReaderReadStreamReplyPtr TagReaderClient::ReadStreamAsync(const QUrl &url, const QString &filename, const quint64 size, const quint64 mtime, const QString &token_type, const QString &access_token) {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  TagReaderReadStreamReplyPtr reply = TagReaderReply::Create<TagReaderReadStreamReply>(url, filename);
-
-  TagReaderReadStreamRequestPtr request = TagReaderReadStreamRequest::Create(url, filename);
-  request->reply = reply;
+TagReaderReadStreamReplyPtr TagReaderClient::ReadStreamAsync(const std::string &url, const std::string &filename, uint64_t size, uint64_t mtime,
+                                                             const std::string &token_type, const std::string &access_token) {
+  auto reply = std::make_shared<TagReaderReadStreamReply>(url, filename);
+  auto request = TagReaderReadStreamRequest::Create(url, filename);
   request->size = size;
   request->mtime = mtime;
   request->token_type = token_type;
   request->access_token = access_token;
-
-  EnqueueRequest(request);
-
-  return reply;
-
-}
-#endif  // HAVE_STREAMTAGREADER
-
-TagReaderResult TagReaderClient::WriteFileBlocking(const QString &filename, const Song &song, const SaveTagsOptions save_tags_options, const SaveTagCoverData &save_tag_cover_data, const TagID3v2Version tag_id3v2_version) {
-
-  return tagreader_.WriteFile(filename, song, save_tags_options, save_tag_cover_data, tag_id3v2_version);
-
-}
-
-TagReaderReplyPtr TagReaderClient::WriteFileAsync(const QString &filename, const Song &song, const SaveTagsOptions save_tags_options, const SaveTagCoverData &save_tag_cover_data, const TagID3v2Version tag_id3v2_version) {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  TagReaderReplyPtr reply = TagReaderReply::Create<TagReaderReply>(filename);
-
-  TagReaderWriteFileRequestPtr request = TagReaderWriteFileRequest::Create(filename);
   request->reply = reply;
-  request->filename = filename;
+  EnqueueRequest(request);
+  return reply;
+}
+
+TagReaderResult TagReaderClient::WriteFileBlocking(const std::string &filename, const Song &song, SaveTagsOptions save_tags_options,
+                                                   const SaveTagCoverData &save_tag_cover_data, TagID3v2Version tag_id3v2_version) {
+  const TagReaderResult path = PathResult(filename);
+  if (!path.success()) {
+    return path;
+  }
+  Song written = song;
+  if (written.url().empty()) {
+    written.set_url(FileUtils::UriFromPath(filename));
+  }
+  const bool ok = tagreader_->WriteFile(filename, written, save_tags_options, ToCoverData(save_tag_cover_data), tag_id3v2_version);
+  return ok ? TagReaderResult{TagReaderResult::ErrorCode::Success} : TagReaderResult{TagReaderResult::ErrorCode::FileSaveError};
+}
+
+TagReaderReplyPtr TagReaderClient::WriteFileAsync(const std::string &filename, const Song &song, SaveTagsOptions save_tags_options,
+                                                  const SaveTagCoverData &save_tag_cover_data, TagID3v2Version tag_id3v2_version) {
+  auto reply = std::make_shared<TagReaderReply>(filename);
+  auto request = TagReaderWriteFileRequest::Create(filename);
   request->song = song;
   request->save_tags_options = save_tags_options;
   request->save_tag_cover_data = save_tag_cover_data;
   request->tag_id3v2_version = tag_id3v2_version;
-
+  request->reply = reply;
   EnqueueRequest(request);
-
   return reply;
-
 }
 
-TagReaderResult TagReaderClient::LoadCoverDataBlocking(const QString &filename, QByteArray &data) {
-
-  return tagreader_.LoadEmbeddedCover(filename, data);
-
-}
-
-TagReaderResult TagReaderClient::LoadCoverImageBlocking(const QString &filename, QImage &image) {
-
-  QByteArray data;
-  TagReaderResult result = LoadCoverDataBlocking(filename, data);
-  if (result.error_code == TagReaderResult::ErrorCode::Success && !image.loadFromData(data)) {
-    result.error_code = TagReaderResult::ErrorCode::Unsupported;
-    result.error_text = QObject::tr("Failed to load image from data for %1").arg(filename);
+TagReaderResult TagReaderClient::LoadCoverDataBlocking(const std::string &filename, std::vector<unsigned char> *data) {
+  const TagReaderResult path = PathResult(filename);
+  if (!path.success()) {
+    return path;
   }
-
-  return result;
-
+  const TagReader::CoverData cover = tagreader_->LoadCoverData(filename);
+  if (data) {
+    *data = cover.data;
+  }
+  return cover.data.empty() ? TagReaderResult{TagReaderResult::ErrorCode::FileParseError} : TagReaderResult{TagReaderResult::ErrorCode::Success};
 }
 
-TagReaderLoadCoverDataReplyPtr TagReaderClient::LoadCoverDataAsync(const QString &filename) {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  TagReaderLoadCoverDataReplyPtr reply = TagReaderReply::Create<TagReaderLoadCoverDataReply>(filename);
-
-  TagReaderLoadCoverDataRequestPtr request = TagReaderLoadCoverDataRequest::Create(filename);
+TagReaderLoadCoverDataReplyPtr TagReaderClient::LoadCoverDataAsync(const std::string &filename) {
+  auto reply = std::make_shared<TagReaderLoadCoverDataReply>(filename);
+  auto request = TagReaderLoadCoverDataRequest::Create(filename);
   request->reply = reply;
-  request->filename = filename;
-
   EnqueueRequest(request);
-
   return reply;
-
 }
 
-TagReaderLoadCoverImageReplyPtr TagReaderClient::LoadCoverImageAsync(const QString &filename) {
+TagReaderLoadCoverImageReplyPtr TagReaderClient::LoadCoverImageAsync(const std::string &filename) { return LoadCoverDataAsync(filename); }
 
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  TagReaderLoadCoverImageReplyPtr reply = TagReaderReply::Create<TagReaderLoadCoverImageReply>(filename);
-
-  TagReaderLoadCoverImageRequestPtr request = TagReaderLoadCoverImageRequest::Create(filename);
-  request->reply = reply;
-  request->filename = filename;
-
-  EnqueueRequest(request);
-
-  return reply;
-
+TagReaderResult TagReaderClient::SaveCoverBlocking(const std::string &filename, const SaveTagCoverData &save_tag_cover_data) {
+  const TagReaderResult path = PathResult(filename);
+  if (!path.success()) {
+    return path;
+  }
+  return tagreader_->SaveCover(filename, ToCoverData(save_tag_cover_data)) ? TagReaderResult{TagReaderResult::ErrorCode::Success}
+                                                                           : TagReaderResult{TagReaderResult::ErrorCode::FileSaveError};
 }
 
-TagReaderResult TagReaderClient::SaveCoverBlocking(const QString &filename, const SaveTagCoverData &save_tag_cover_data) {
-
-  return tagreader_.SaveEmbeddedCover(filename, save_tag_cover_data);
-
-}
-
-TagReaderReplyPtr TagReaderClient::SaveCoverAsync(const QString &filename, const SaveTagCoverData &save_tag_cover_data) {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  TagReaderReplyPtr reply = TagReaderReply::Create<TagReaderReply>(filename);
-
-  TagReaderSaveCoverRequestPtr request = TagReaderSaveCoverRequest::Create(filename);
-  request->reply = reply;
-  request->filename = filename;
+TagReaderReplyPtr TagReaderClient::SaveCoverAsync(const std::string &filename, const SaveTagCoverData &save_tag_cover_data) {
+  auto reply = std::make_shared<TagReaderReply>(filename);
+  auto request = TagReaderSaveCoverRequest::Create(filename);
   request->save_tag_cover_data = save_tag_cover_data;
-
-  EnqueueRequest(request);
-
-  return reply;
-
-}
-
-TagReaderReplyPtr TagReaderClient::SaveSongPlaycountAsync(const QString &filename, const uint playcount) {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  TagReaderReplyPtr reply = TagReaderReply::Create<TagReaderReply>(filename);
-
-  TagReaderSavePlaycountRequestPtr request = TagReaderSavePlaycountRequest::Create(filename);
   request->reply = reply;
-  request->filename = filename;
-  request->playcount = playcount;
-
   EnqueueRequest(request);
-
   return reply;
-
 }
 
-TagReaderResult TagReaderClient::SaveSongPlaycountBlocking(const QString &filename, const uint playcount) {
+TagReaderResult TagReaderClient::SaveSongPlaycountBlocking(const std::string &filename, unsigned playcount) {
+  const TagReaderResult path = PathResult(filename);
+  if (!path.success()) {
+    return path;
+  }
+  return tagreader_->SavePlaycount(filename, playcount) ? TagReaderResult{TagReaderResult::ErrorCode::Success}
+                                                        : TagReaderResult{TagReaderResult::ErrorCode::FileSaveError};
+}
 
-  return tagreader_.SaveSongPlaycount(filename, playcount);
+TagReaderReplyPtr TagReaderClient::SaveSongPlaycountAsync(const std::string &filename, unsigned playcount) {
+  auto reply = std::make_shared<TagReaderReply>(filename);
+  auto request = TagReaderSavePlaycountRequest::Create(filename);
+  request->playcount = playcount;
+  request->reply = reply;
+  EnqueueRequest(request);
+  return reply;
+}
 
+TagReaderResult TagReaderClient::SaveSongRatingBlocking(const std::string &filename, float rating) {
+  const TagReaderResult path = PathResult(filename);
+  if (!path.success()) {
+    return path;
+  }
+  return tagreader_->SaveRating(filename, rating) ? TagReaderResult{TagReaderResult::ErrorCode::Success}
+                                                  : TagReaderResult{TagReaderResult::ErrorCode::FileSaveError};
+}
+
+TagReaderReplyPtr TagReaderClient::SaveSongRatingAsync(const std::string &filename, float rating) {
+  auto reply = std::make_shared<TagReaderReply>(filename);
+  auto request = TagReaderSaveRatingRequest::Create(filename);
+  request->rating = rating;
+  request->reply = reply;
+  EnqueueRequest(request);
+  return reply;
 }
 
 void TagReaderClient::SaveSongsPlaycountAsync(const SongList &songs) {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
   for (const Song &song : songs) {
-    SharedPtr<QMetaObject::Connection> connection = make_shared<QMetaObject::Connection>();
-    TagReaderReplyPtr reply = SaveSongPlaycountAsync(song.url().toLocalFile(), song.playcount());
-    *connection = QObject::connect(&*reply, &TagReaderReply::Finished, this, [reply, connection]() {
-      QObject::disconnect(*connection);
-    }, Qt::QueuedConnection);
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (!path.empty()) {
+      SaveSongPlaycountAsync(path, song.playcount());
+    }
   }
-
-}
-
-TagReaderResult TagReaderClient::SaveSongRatingBlocking(const QString &filename, const float rating) {
-
-  return tagreader_.SaveSongRating(filename, rating);
-
-}
-
-TagReaderReplyPtr TagReaderClient::SaveSongRatingAsync(const QString &filename, const float rating) {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
-  TagReaderReplyPtr reply = TagReaderReply::Create<TagReaderReply>(filename);
-
-  TagReaderSaveRatingRequestPtr request = TagReaderSaveRatingRequest::Create(filename);
-  request->reply = reply;
-  request->filename = filename;
-  request->rating = rating;
-
-  EnqueueRequest(request);
-
-  return reply;
-
 }
 
 void TagReaderClient::SaveSongsRatingAsync(const SongList &songs) {
-
-  Q_ASSERT(QThread::currentThread() != thread());
-
   for (const Song &song : songs) {
-    SharedPtr<QMetaObject::Connection> connection = make_shared<QMetaObject::Connection>();
-    TagReaderReplyPtr reply = SaveSongRatingAsync(song.url().toLocalFile(), song.rating());
-    *connection = QObject::connect(&*reply, &TagReaderReply::Finished, this, [reply, connection]() {
-      QObject::disconnect(*connection);
-    }, Qt::QueuedConnection);
+    const std::string path = FileUtils::PathFromUri(song.url());
+    if (!path.empty()) {
+      SaveSongRatingAsync(path, song.rating());
+    }
   }
+}
 
+void TagReaderClient::ProcessRequest(const TagReaderRequestPtr &request) {
+  if (!request) {
+    return;
+  }
+  TagReaderResult result{TagReaderResult::ErrorCode::Unsupported};
+  if (auto typed = std::dynamic_pointer_cast<TagReaderIsMediaFileRequest>(request)) {
+    const TagReaderResult path = PathResult(typed->filename);
+    result = !path.success() ? path
+                             : (IsMediaFileBlocking(typed->filename) ? TagReaderResult{TagReaderResult::ErrorCode::Success}
+                                                                     : TagReaderResult{TagReaderResult::ErrorCode::Unsupported});
+  } else if (auto typed = std::dynamic_pointer_cast<TagReaderReadFileRequest>(request)) {
+    Song song;
+    result = ReadFileBlocking(typed->filename, &song);
+    if (auto reply = std::dynamic_pointer_cast<TagReaderReadFileReply>(request->reply)) {
+      reply->set_song(song);
+    }
+  } else if (auto typed = std::dynamic_pointer_cast<TagReaderReadStreamRequest>(request)) {
+    Song song;
+    result = ReadStreamBlocking(typed->url, typed->filename, typed->size, typed->mtime, typed->token_type, typed->access_token, &song);
+    if (auto reply = std::dynamic_pointer_cast<TagReaderReadStreamReply>(request->reply)) {
+      reply->set_song(song);
+    }
+  } else if (auto typed = std::dynamic_pointer_cast<TagReaderWriteFileRequest>(request)) {
+    result = WriteFileBlocking(typed->filename, typed->song, typed->save_tags_options, typed->save_tag_cover_data, typed->tag_id3v2_version);
+  } else if (auto typed = std::dynamic_pointer_cast<TagReaderLoadCoverDataRequest>(request)) {
+    std::vector<unsigned char> data;
+    result = LoadCoverDataBlocking(typed->filename, &data);
+    if (auto reply = std::dynamic_pointer_cast<TagReaderLoadCoverDataReply>(request->reply)) {
+      reply->set_data(data);
+    }
+  } else if (auto typed = std::dynamic_pointer_cast<TagReaderLoadCoverImageRequest>(request)) {
+    std::vector<unsigned char> data;
+    result = LoadCoverDataBlocking(typed->filename, &data);
+    if (auto reply = std::dynamic_pointer_cast<TagReaderLoadCoverDataReply>(request->reply)) {
+      reply->set_data(data);
+    }
+  } else if (auto typed = std::dynamic_pointer_cast<TagReaderSaveCoverRequest>(request)) {
+    result = SaveCoverBlocking(typed->filename, typed->save_tag_cover_data);
+  } else if (auto typed = std::dynamic_pointer_cast<TagReaderSavePlaycountRequest>(request)) {
+    result = SaveSongPlaycountBlocking(typed->filename, typed->playcount);
+  } else if (auto typed = std::dynamic_pointer_cast<TagReaderSaveRatingRequest>(request)) {
+    result = SaveSongRatingBlocking(typed->filename, typed->rating);
+  }
+  if (request->reply) {
+    request->reply->set_result(result);
+    request->reply->Finish();
+  }
 }

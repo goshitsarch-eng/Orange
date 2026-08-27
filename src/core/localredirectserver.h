@@ -1,76 +1,33 @@
-/*
- * Strawberry Music Player
- * Copyright 2012, 2014, John Maguire <john.maguire@gmail.com>
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_LOCALREDIRECTSERVER_H
+#define STRAWBERRY_LOCALREDIRECTSERVER_H
 
-#ifndef LOCALREDIRECTSERVER_H
-#define LOCALREDIRECTSERVER_H
+#include "core/signal.h"
 
-#include <QtGlobal>
-#include <QByteArray>
-#include <QObject>
-#include <QList>
-#include <QString>
-#include <QUrl>
-#include <QTcpServer>
+#include <gio/gio.h>
 
-class QAbstractSocket;
+#include <string>
 
-class LocalRedirectServer : public QTcpServer {
-  Q_OBJECT
-
+class LocalRedirectServer {
  public:
-  explicit LocalRedirectServer(QObject *parent = nullptr);
-  ~LocalRedirectServer() override;
+  LocalRedirectServer();
+  ~LocalRedirectServer();
 
-  const QUrl &url() const { return url_; }
-  const QUrl &request_url() const { return request_url_; }
-  bool success() const { return success_; }
-  const QString &error() const { return error_; }
-
+  bool Listen(int port = 0);
+  void Close();
+  std::string url() const;
   int port() const { return port_; }
-  void set_port(const int port) { port_ = port; }
+  const std::string &redirected_url() const { return redirected_url_; }
+  const std::string &error() const { return error_; }
 
-  bool Listen();
-
- Q_SIGNALS:
-  void Finished();
-
- public Q_SLOTS:
-  void NewConnection();
-  void incomingConnection(qintptr socket_descriptor) override;
-  void Encrypted();
-  void Connected();
-  void Disconnected();
-  void ReadyRead();
+  Signal<std::string> Redirected;
 
  private:
-  void WriteTemplate() const;
-  QUrl ParseUrlFromRequest(const QByteArray &request) const;
+  static gboolean OnIncoming(GSocketService *service, GSocketConnection *connection, GObject *source, gpointer data);
 
- private:
-  int port_;
-  QUrl url_;
-  QUrl request_url_;
-  QAbstractSocket *socket_;
-  QByteArray buffer_;
-  bool success_;
-  QString error_;
+  GSocketService *service_ = nullptr;
+  int port_ = 0;
+  std::string redirected_url_;
+  std::string error_;
 };
 
-#endif  // LOCALREDIRECTSERVER_H
+#endif

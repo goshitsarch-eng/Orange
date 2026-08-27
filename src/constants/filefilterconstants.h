@@ -1,40 +1,66 @@
-/*
- * Strawberry Music Player
- * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_FILEFILTERCONSTANTS_H
+#define STRAWBERRY_FILEFILTERCONSTANTS_H
 
-#ifndef FILEFILTERCONSTANTS_H
-#define FILEFILTERCONSTANTS_H
+#include "utilities/strutils.h"
 
-#include <QtGlobal>
+#include <string>
+#include <vector>
 
-constexpr char kAllFilesFilterSpec[] = QT_TRANSLATE_NOOP("FileFilter", "All Files (*)");
+namespace FileFilterConstants {
 
+// Combined audio + playlist filter matching Qt kFileFilter.
 constexpr char kFileFilter[] =
     "*.wav *.flac *.wv *.ogg *.oga *.opus *.spx *.ape *.mpc "
     "*.mp2 *.mp3 *.m4a *.mp4 *.aac *.asf *.asx *.wma "
-    "*.aif *.aiff *.mka *.tta *.dsf *.dsd *.webm "
+    "*.aif *.aiff *.mka *.tta *.dsf *.dsd *.dff *.webm "
     "*.cue *.m3u *.m3u8 *.pls *.xspf *.asxini "
     "*.ac3 *.dts "
     "*.mod *.s3m *.xm *.it "
-    "*.spc *.vgm "
-    ".tak" ;
+    "*.spc *.vgm";
 
-constexpr char kLoadImageFileFilter[] = QT_TRANSLATE_NOOP("FileFilter", "Images (*.png *.jpg *.jpeg *.bmp *.gif *.xpm *.pbm *.pgm *.ppm *.xbm *.webp)");
-constexpr char kSaveImageFileFilter[] = QT_TRANSLATE_NOOP("FileFilter", "Images (*.png *.jpg *.jpeg *.bmp *.xpm *.pbm *.ppm *.xbm *.webp)");
+constexpr char kAudio[] =
+    "*.mp3 *.mp2 *.flac *.ogg *.opus *.oga *.spx *.m4a *.mp4 *.aac *.wma *.asf "
+    "*.wav *.aif *.aiff *.ape *.mpc *.wv *.tta *.dsf *.dsd *.dff *.mka *.webm "
+    "*.ac3 *.dts *.mod *.s3m *.xm *.it *.spc *.vgm";
 
-#endif  // FILEFILTERCONSTANTS_H
+constexpr char kPlaylist[] = "*.m3u *.m3u8 *.pls *.xspf *.asx *.asxini *.wpl *.cue";
+
+constexpr char kLoadImages[] = "*.png *.jpg *.jpeg *.bmp *.gif *.xpm *.pbm *.pgm *.ppm *.xbm *.webp";
+constexpr char kSaveImages[] = "*.png *.jpg *.jpeg *.bmp *.xpm *.pbm *.ppm *.xbm *.webp";
+constexpr char kAllFiles[] = "*";
+
+inline std::vector<std::string> SplitGlobs(const char *globs) {
+  std::vector<std::string> out;
+  for (const std::string &part : StrUtils::Split(globs ? globs : "", ' ')) {
+    if (!part.empty()) {
+      out.push_back(part);
+    }
+  }
+  return out;
+}
+
+inline bool ContainsExtension(const char *globs, const std::string &extension) {
+  const std::string needle = "*." + StrUtils::ToLower(extension);
+  for (const std::string &glob : SplitGlobs(globs)) {
+    if (StrUtils::ToLower(glob) == needle) {
+      return true;
+    }
+  }
+  return false;
+}
+
+inline bool PathMatchesGlobs(const std::string &path, const char *globs) {
+  const std::string lower = StrUtils::ToLower(path);
+  for (const std::string &glob : SplitGlobs(globs)) {
+    if (glob.size() > 1 && glob[0] == '*') {
+      if (StrUtils::EndsWith(lower, StrUtils::ToLower(glob.substr(1)))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+}  // namespace FileFilterConstants
+
+#endif

@@ -1,37 +1,26 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "lyrics/lyricsprovider.h"
 
-#include "config.h"
-
-#include <QString>
-
-#include "includes/shared_ptr.h"
-#include "core/networkaccessmanager.h"
-#include "lyricsprovider.h"
-
-LyricsProvider::LyricsProvider(const QString &name, const bool enabled, const bool authentication_required, const SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : HttpBaseRequest(network, parent), network_(network), name_(name), enabled_(enabled), order_(0), authentication_required_(authentication_required) {}
-
-bool LyricsProvider::StartSearchAsync(const int id, const LyricsSearchRequest &request) {
-
-  QMetaObject::invokeMethod(this, "StartSearch", Qt::QueuedConnection, Q_ARG(int, id), Q_ARG(LyricsSearchRequest, request));
-
+bool LyricsProvider::StartSearch(int id, const LyricsSearchRequest &request, NetworkAccessManager *network,
+                                 const std::function<void(int, const LyricsSearchResults &)> &finished) {
+  Song song;
+  song.set_artist(request.artist.empty() ? request.albumartist : request.artist);
+  song.set_albumartist(request.albumartist);
+  song.set_album(request.album);
+  song.set_title(request.title);
+  if (!enabled()) {
+    finished(id, {});
+    return false;
+  }
+  Fetch(song, network, [this, id, finished](const std::string &lyrics, const std::string &) {
+    LyricsSearchResults results;
+    if (!lyrics.empty()) {
+      LyricsSearchResult result;
+      result.provider = name();
+      result.lyrics = lyrics;
+      result.score = 1.0f;
+      results.push_back(result);
+    }
+    finished(id, results);
+  });
   return true;
-
 }

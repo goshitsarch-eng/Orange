@@ -1,105 +1,43 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2012, David Sansome <me@davidsansome.com>
- * Copyright 2019-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_MOODBARITEMDELEGATE_H
+#define STRAWBERRY_MOODBARITEMDELEGATE_H
 
-#ifndef MOODBARITEMDELEGATE_H
-#define MOODBARITEMDELEGATE_H
+#include "core/song.h"
+#include "moodbar/moodbar.h"
+#include "moodbar/moodbarcell.h"
+#include "moodbar/moodbarrenderer.h"
 
-#include "moodbarrenderer.h"
+#include <cairo.h>
+#include <gtk/gtk.h>
 
-#include <QObject>
-#include <QItemDelegate>
-#include <QCache>
-#include <QSet>
-#include <QByteArray>
-#include <QString>
-#include <QUrl>
-#include <QImage>
-#include <QPixmap>
-#include <QSize>
-#include <QStyleOption>
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "includes/shared_ptr.h"
-#include "constants/moodbarsettings.h"
-#include "moodbarpipeline.h"
-
-class QPainter;
-class MoodbarLoader;
-class PlaylistView;
-
-class MoodbarItemDelegate : public QItemDelegate {
-  Q_OBJECT
-
+class MoodbarItemDelegate {
  public:
-  explicit MoodbarItemDelegate(const SharedPtr<MoodbarLoader> moodbar_loader, PlaylistView *view, QObject *parent = nullptr);
+  MoodbarItemDelegate();
+  ~MoodbarItemDelegate();
 
-  void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &idx) const override;
+  static void Paint(cairo_t *cr, int width, int height, const std::vector<uint8_t> &mood);
 
- private Q_SLOTS:
-  void ReloadSettings();
-
- Q_SIGNALS:
-  void StyleChanged();
-
- private:
-  void DataLoaded(const QUrl &url, MoodbarPipelinePtr pipeline);
-  void ColorsLoaded(const QUrl &url, const ColorVector &colors);
-  void ImageLoaded(const QUrl &url, const QImage &image);
+  const std::vector<uint8_t> *Peek(const std::string &url) const;
+  const std::vector<uint8_t> &Ensure(const Song &song);
+  void SetUpdatedCallback(const std::function<void()> &callback);
+  void FinishGenerate(const std::string &key, std::vector<uint8_t> data);
 
  private:
-  struct Data {
-    Data();
+  void StartGenerate(const Song &song);
+  void MaybeStartNext();
 
-    enum class State {
-      None,
-      CannotLoad,
-      LoadingData,
-      LoadingColors,
-      LoadingImage,
-      Loaded
-    };
-
-    QSet<QPersistentModelIndex> indexes_;
-
-    State state_;
-    ColorVector colors_;
-    QSize desired_size_;
-    QPixmap pixmap_;
-  };
-
- private:
-  QPixmap PixmapForIndex(const QModelIndex &idx, const QSize size);
-  void StartLoadingData(const QUrl &url, const bool has_cue, Data *data);
-  void StartLoadingColors(const QUrl &url, const QByteArray &bytes, Data *data);
-  void StartLoadingImage(const QUrl &url, Data *data);
-
-  bool RemoveFromCacheIfIndexesInvalid(const QUrl &url, Data *data);
-
-  void ReloadAllColors();
-
- private:
-  const SharedPtr<MoodbarLoader> moodbar_loader_;
-  PlaylistView *playlist_view_;
-  QCache<QUrl, Data> data_;
-
-  MoodbarSettings::Style style_;
+  MoodbarLoader loader_;
+  std::map<std::string, std::vector<uint8_t>> cache_;
+  std::map<std::string, bool> loading_;
+  std::vector<Song> pending_;
+  int inflight_ = 0;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
+  std::function<void()> updated_;
 };
 
-#endif  // MOODBARITEMDELEGATE_H
+#endif

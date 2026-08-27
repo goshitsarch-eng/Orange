@@ -1,69 +1,27 @@
-/*
- * Strawberry Music Player
- * Copyright 2019-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_QOBUZSTREAMURLREQUEST_H
+#define STRAWBERRY_QOBUZSTREAMURLREQUEST_H
 
-#ifndef QOBUZSTREAMURLREQUEST_H
-#define QOBUZSTREAMURLREQUEST_H
+#include "core/network.h"
+#include "core/urlhandlers.h"
 
-#include "config.h"
+#include <cstdint>
+#include <map>
+#include <string>
 
-#include <QVariant>
-#include <QString>
-#include <QUrl>
-#include <QSharedPointer>
+namespace QobuzStreamUrlRequest {
 
-#include "includes/shared_ptr.h"
-#include "core/song.h"
-#include "qobuzbaserequest.h"
+std::string TrackId(const std::string &url);
+std::string Md5Hex(const std::string &value);
+std::string SignaturePayload(const std::string &track_id, int format_id, uint64_t timestamp, const std::string &app_secret);
+std::string Sign(const std::string &track_id, int format_id, uint64_t timestamp, const std::string &app_secret);
+std::string Url(const std::string &api_url, const std::string &track_id, int format_id, uint64_t timestamp, const std::string &app_id,
+                const std::string &app_secret, const std::string &user_auth_token);
+Song::FileType FiletypeFromMime(const std::string &mimetype);
+UrlHandler::LoadResult Parse(const std::string &json, const std::string &media_url, const std::string &expected_track_id);
 
-class QNetworkReply;
-class NetworkAccessManager;
-class QobuzService;
+void Get(NetworkAccessManager *network, const std::string &url, const std::map<std::string, std::string> &headers,
+         const std::string &media_url, const std::string &expected_track_id, UrlHandler::AsyncCallback callback);
 
-class QobuzStreamURLRequest : public QobuzBaseRequest {
-  Q_OBJECT
+}  // namespace QobuzStreamUrlRequest
 
- public:
-  explicit QobuzStreamURLRequest(QobuzService *service, const SharedPtr<NetworkAccessManager> network, const QUrl &media_url, const uint id, QObject *parent = nullptr);
-  ~QobuzStreamURLRequest() override;
-
-  void GetStreamURL();
-  void Process();
-  void Cancel();
-
-  QUrl media_url() const { return media_url_; }
-  int song_id() const { return song_id_; }
-
- Q_SIGNALS:
-  void StreamURLFailure(const uint id, const QUrl &media_url, const QString &error);
-  void StreamURLSuccess(const uint id, const QUrl &media_url, const QUrl &stream_url, const Song::FileType filetype, const int samplerate, const int bit_depth, const qint64 duration);
-
- private Q_SLOTS:
-  void StreamURLReceived();
-
- private:
-  QNetworkReply *reply_;
-  QUrl media_url_;
-  uint id_;
-  int song_id_;
-  int tries_;
-};
-
-using QobuzStreamURLRequestPtr = QSharedPointer<QobuzStreamURLRequest>;
-
-#endif  // QOBUZSTREAMURLREQUEST_H
+#endif

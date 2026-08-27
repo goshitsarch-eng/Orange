@@ -1,171 +1,93 @@
-/*
- * Strawberry Music Player
- * Copyright 2022-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "settings/spotifysettingspage.h"
 
-#include "config.h"
+#include "constants/spotifysettings.h"
+#include "core/application.h"
+#include "core/oauthenticator.h"
+#include "settings/settingspage.h"
+#include "settings/streaminglogincontrols.h"
+#include "settings/streamingsettingslabels.h"
+#include "spotify/spotifycredentials.h"
+#include "spotify/spotifyplayback.h"
+#include "spotify/spotifyservice.h"
 
 #include <gst/gst.h>
-#include <gst/pbutils/pbutils.h>
 
-#include <QObject>
-#include <QVariant>
-#include <QByteArray>
-#include <QString>
-#include <QSettings>
-#include <QCheckBox>
-#include <QComboBox>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QSpinBox>
-#include <QMessageBox>
-#include <QEvent>
+AdwPreferencesPage *SpotifySettingsPage::Create(Settings *settings, Application *app) {
+  settings->BeginGroup(SpotifySettings::kSettingsGroup);
+  AdwPreferencesPage *page = SettingsPage::MakePage("Spotify", "emblem-shared-symbolic");
+  AdwPreferencesGroup *enable = SettingsPage::AddGroup(page);
+  SettingsPage::AddToggle(enable, settings, SpotifySettings::kEnabled, StreamingSettingsLabels::Enable(), nullptr,
+                          SpotifySettings::kDefaultEnabled);
 
-#include "settingsdialog.h"
-#include "spotifysettingspage.h"
-#include "ui_spotifysettingspage.h"
-#include "core/iconloader.h"
-#include "core/settings.h"
-#include "spotify/spotifyservice.h"
-#include "widgets/loginstatewidget.h"
-#include "constants/spotifysettings.h"
-
-using namespace Qt::Literals::StringLiterals;
-using namespace SpotifySettings;
-
-SpotifySettingsPage::SpotifySettingsPage(SettingsDialog *dialog, const SharedPtr<SpotifyService> service, QWidget *parent)
-    : SettingsPage(dialog, parent),
-      ui_(new Ui::SpotifySettingsPage),
-      service_(service) {
-
-  ui_->setupUi(this);
-  setWindowIcon(IconLoader::Load(u"spotify"_s));
-
-  QObject::connect(ui_->button_login, &QPushButton::clicked, this, &SpotifySettingsPage::LoginClicked);
-  QObject::connect(ui_->login_state, &LoginStateWidget::LogoutClicked, this, &SpotifySettingsPage::LogoutClicked);
-
-  QObject::connect(this, &SpotifySettingsPage::Authorize, &*service_, &SpotifyService::Authenticate);
-
-  QObject::connect(&*service_, &StreamingService::LoginFailure, this, &SpotifySettingsPage::LoginFailure);
-  QObject::connect(&*service_, &StreamingService::LoginSuccess, this, &SpotifySettingsPage::LoginSuccess);
-
-  dialog->installEventFilter(this);
-
-  GstRegistry *reg = gst_registry_get();
-  if (reg) {
-    GstPluginFeature *spotifyaudiosrc = gst_registry_lookup_feature(reg, "spotifyaudiosrc");
-    if (spotifyaudiosrc) {
-      gst_object_unref(spotifyaudiosrc);
-      ui_->widget_warning->hide();
-    }
-    else {
-      ui_->widget_warning->show();
-    }
+  AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, SpotifySettingsLabels::BasicAuth());
+  if (app) {
+    GtkWidget *login_row = SettingsPage::AddButtonRow(auth, "", SpotifySettingsLabels::Authenticate(), [app](GtkWidget *button) {
+      gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabled(true));
+      Settings s;
+      s.BeginGroup(SpotifySettings::kSettingsGroup);
+      const std::string client_id = SpotifyCredentials::EffectiveClientId(s.Value("clientid"));
+      const std::string client_secret = SpotifyCredentials::EffectiveClientSecret(s.Value("clientsecret"));
+      if (!SpotifyCredentials::ShouldOpenBrowser(s.Value("clientid"))) {
+        gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabledAfterAuth());
+        return;
+      }
+      auto *oauth = new OAuthenticator(app->network());
+      oauth->AuthorizeInBrowser(SpotifyCredentials::kAuthorizeUrl, client_id, SpotifyPlayback::kOAuthScope,
+                                [app, oauth, button, client_id, client_secret](const std::string &code, const std::string &error) {
+                                  if (code.empty()) {
+                                    (void)error;
+                                    gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabledAfterAuth());
+                                    delete oauth;
+                                    return;
+                                  }
+                                  oauth->ExchangeCode(SpotifyCredentials::kTokenUrl, client_id, client_secret, code,
+                                                      [app, oauth, button](const std::string &body, const std::string &) {
+                                                        const auto tokens = OAuthenticator::ParseTokenResponse(body);
+                                                        if (auto *service = dynamic_cast<SpotifyService *>(app->streaming_services()->ServiceByName("Spotify"))) {
+                                                          if (!tokens.access_token.empty()) {
+                                                            service->StoreTokens(tokens);
+                                                          } else {
+                                                            service->Login({}, body);
+                                                          }
+                                                        }
+                                                        gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabledAfterAuth());
+                                                        delete oauth;
+                                                      });
+                                },
+                                SpotifyCredentials::kRedirectPort, SpotifyCredentials::RedirectUri());
+    });
+    SettingsPage::BindLoginProgress(GTK_WIDGET(g_object_get_data(G_OBJECT(login_row), "action-button")),
+                                    app->streaming_services()->ServiceByName("Spotify"), GTK_WIDGET(page));
+    SettingsPage::AddLoginState(auth, app, "Spotify");
   }
 
-}
-
-SpotifySettingsPage::~SpotifySettingsPage() { delete ui_; }
-
-void SpotifySettingsPage::showEvent(QShowEvent *e) {
-
-  ui_->login_state->SetLoggedIn(service_->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut);
-  SettingsPage::showEvent(e);
-
-}
-
-void SpotifySettingsPage::Load() {
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  ui_->enable->setChecked(s.value(kEnabled, kDefaultEnabled).toBool());
-
-  ui_->searchdelay->setValue(s.value(kSearchDelay, kDefaultSearchDelay).toInt());
-  ui_->artistssearchlimit->setValue(s.value(kArtistsSearchLimit, kDefaultArtistsSearchLimit).toInt());
-  ui_->albumssearchlimit->setValue(s.value(kAlbumsSearchLimit, kDefaultAlbumsSearchLimit).toInt());
-  ui_->songssearchlimit->setValue(s.value(kSongsSearchLimit, kDefaultSongsSearchLimit).toInt());
-  ui_->checkbox_fetchalbums->setChecked(s.value(kFetchAlbums, kDefaultFetchAlbums).toBool());
-  ui_->checkbox_download_album_covers->setChecked(s.value(kDownloadAlbumCovers, kDefaultDownloadAlbumCovers).toBool());
-  ui_->checkbox_remove_remastered->setChecked(s.value(kRemoveRemastered, kDefaultRemoveRemastered).toBool());
-
-  s.endGroup();
-
-  if (service_->authenticated()) ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedIn);
-
-  Init(ui_->layout_spotifysettingspage->parentWidget());
-
-  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
-
-}
-
-void SpotifySettingsPage::Save() {
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  s.setValue(kEnabled, ui_->enable->isChecked());
-  s.setValue(kSearchDelay, ui_->searchdelay->value());
-  s.setValue(kArtistsSearchLimit, ui_->artistssearchlimit->value());
-  s.setValue(kAlbumsSearchLimit, ui_->albumssearchlimit->value());
-  s.setValue(kSongsSearchLimit, ui_->songssearchlimit->value());
-  s.setValue(kFetchAlbums, ui_->checkbox_fetchalbums->isChecked());
-  s.setValue(kDownloadAlbumCovers, ui_->checkbox_download_album_covers->isChecked());
-  s.setValue(kRemoveRemastered, ui_->checkbox_remove_remastered->isChecked());
-  s.endGroup();
-
-}
-
-void SpotifySettingsPage::LoginClicked() {
-
-  Q_EMIT Authorize();
-
-  ui_->button_login->setEnabled(false);
-
-}
-
-bool SpotifySettingsPage::eventFilter(QObject *object, QEvent *event) {
-
-  if (object == dialog() && event->type() == QEvent::Enter) {
-    ui_->button_login->setEnabled(true);
+  bool has_plugin = false;
+  if (GstRegistry *reg = gst_registry_get()) {
+    if (GstPluginFeature *feature = gst_registry_lookup_feature(reg, SpotifySettingsLabels::PluginFeature())) {
+      gst_object_unref(feature);
+      has_plugin = true;
+    }
+  }
+  if (!has_plugin) {
+    AdwPreferencesGroup *warning = SettingsPage::AddGroup(page);
+    const std::string markup = SpotifySettingsLabels::PluginWarningMarkup();
+    SettingsPage::AddDescription(warning, markup.c_str(), true);
   }
 
-  return SettingsPage::eventFilter(object, event);
-
-}
-
-void SpotifySettingsPage::LogoutClicked() {
-
-  service_->ClearSession();
-  ui_->button_login->setEnabled(true);
-  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedOut);
-
-}
-
-void SpotifySettingsPage::LoginSuccess() {
-
-  if (!isVisible()) return;
-  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedIn);
-  ui_->button_login->setEnabled(true);
-
-}
-
-void SpotifySettingsPage::LoginFailure(const QString &failure_reason) {
-
-  if (!isVisible()) return;
-  QMessageBox::warning(this, tr("Authentication failed"), failure_reason);
-  ui_->button_login->setEnabled(true);
-
+  AdwPreferencesGroup *prefs = SettingsPage::AddGroup(page, StreamingSettingsLabels::Preferences());
+  SettingsPage::AddIntEntry(prefs, settings, SpotifySettings::kSearchDelay, StreamingSettingsLabels::SearchDelay(),
+                            SpotifySettings::kDefaultSearchDelay);
+  SettingsPage::AddIntEntry(prefs, settings, SpotifySettings::kArtistsSearchLimit, StreamingSettingsLabels::ArtistsSearchLimit(),
+                            SpotifySettings::kDefaultArtistsSearchLimit);
+  SettingsPage::AddIntEntry(prefs, settings, SpotifySettings::kAlbumsSearchLimit, StreamingSettingsLabels::AlbumsSearchLimit(),
+                            SpotifySettings::kDefaultAlbumsSearchLimit);
+  SettingsPage::AddIntEntry(prefs, settings, SpotifySettings::kSongsSearchLimit, StreamingSettingsLabels::SongsSearchLimit(),
+                            SpotifySettings::kDefaultSongsSearchLimit);
+  SettingsPage::AddToggle(prefs, settings, SpotifySettings::kDownloadAlbumCovers, StreamingSettingsLabels::DownloadAlbumCovers(), nullptr,
+                          SpotifySettings::kDefaultDownloadAlbumCovers);
+  SettingsPage::AddToggle(prefs, settings, SpotifySettings::kFetchAlbums, StreamingSettingsLabels::FetchEntireAlbums(), nullptr,
+                          SpotifySettings::kDefaultFetchAlbums);
+  SettingsPage::AddToggle(prefs, settings, SpotifySettings::kRemoveRemastered, StreamingSettingsLabels::RemoveRemastered(), nullptr,
+                          SpotifySettings::kDefaultRemoveRemastered);
+  return page;
 }

@@ -1,61 +1,75 @@
-/*
- * Strawberry Music Player
- * Copyright 2026, Malte Zilinski <malte@zilinski.eu>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_RADIOBROWSERSEARCHMODEL_H
+#define STRAWBERRY_RADIOBROWSERSEARCHMODEL_H
 
-#ifndef RADIOBROWSERSEARCHMODEL_H
-#define RADIOBROWSERSEARCHMODEL_H
+#include "radios/radiochannel.h"
 
-#include <QAbstractTableModel>
-#include <QMimeData>
-#include <QStringList>
-#include <QVariant>
+#include <string>
+#include <vector>
 
-#include "radiochannel.h"
-
-class RadioBrowserSearchModel : public QAbstractTableModel {
-  Q_OBJECT
-
+class RadioBrowserSearchModel {
  public:
-  explicit RadioBrowserSearchModel(QObject *parent = nullptr);
+  enum class Column { Name, Country, Tags, Codec };
 
-  enum class Column {
-    Name = 0,
-    Country,
-    Tags,
-    Codec,
-    ColumnCount
-  };
+  static constexpr int kColumnCount = 4;
 
-  int rowCount(const QModelIndex &parent = QModelIndex()) const override;
-  int columnCount(const QModelIndex &parent = QModelIndex()) const override;
-  QVariant data(const QModelIndex &idx, const int role = Qt::DisplayRole) const override;
-  QVariant headerData(const int section, const Qt::Orientation orientation, const int role = Qt::DisplayRole) const override;
-  Qt::ItemFlags flags(const QModelIndex &idx) const override;
+  void SetResults(const std::vector<RadioChannel> &results) { results_ = results; }
+  void Clear() { results_.clear(); }
+  void AddChannels(const std::vector<RadioChannel> &channels) {
+    results_.insert(results_.end(), channels.begin(), channels.end());
+  }
+  const std::vector<RadioChannel> &results() const { return results_; }
+  int row_count() const { return static_cast<int>(results_.size()); }
+  RadioChannel ChannelForRow(int row) const {
+    if (row < 0 || row >= row_count()) {
+      return RadioChannel();
+    }
+    return results_[static_cast<size_t>(row)];
+  }
 
-  QMimeData *mimeData(const QModelIndexList &indexes) const override;
-  QStringList mimeTypes() const override;
+  static const char *ColumnLabel(Column column) {
+    switch (column) {
+      case Column::Country:
+        return "Country";
+      case Column::Tags:
+        return "Tags";
+      case Column::Codec:
+        return "Codec";
+      case Column::Name:
+      default:
+        return "Name";
+    }
+  }
 
-  void AddChannels(const RadioChannelList &channels);
-  RadioChannel ChannelForRow(const int row) const;
-  void Clear();
+  static std::string CellText(const RadioChannel &channel, Column column) {
+    switch (column) {
+      case Column::Country:
+        return channel.country;
+      case Column::Tags:
+        return channel.tags;
+      case Column::Codec:
+        return channel.codec;
+      case Column::Name:
+      default:
+        return channel.name;
+    }
+  }
+
+  static std::string RowSummary(const RadioChannel &channel) {
+    std::string text = channel.name;
+    if (!channel.country.empty()) {
+      text += " · " + channel.country;
+    }
+    if (!channel.codec.empty()) {
+      text += " (" + channel.codec + ")";
+    }
+    if (!channel.tags.empty()) {
+      text += " — " + channel.tags;
+    }
+    return text;
+  }
 
  private:
-  RadioChannelList channels_;
+  std::vector<RadioChannel> results_;
 };
 
-#endif  // RADIOBROWSERSEARCHMODEL_H
+#endif

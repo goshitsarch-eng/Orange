@@ -7,9 +7,6 @@
 
 #cmakedefine USE_INSTALL_PREFIX
 
-#cmakedefine HAVE_WINPTHREADS
-
-#cmakedefine HAVE_BACKTRACE
 #cmakedefine HAVE_ALSA
 #cmakedefine HAVE_PULSE
 #cmakedefine HAVE_GIO
@@ -20,8 +17,6 @@
 #cmakedefine HAVE_AUDIOCD
 #cmakedefine HAVE_MTP
 #cmakedefine HAVE_GPOD
-#cmakedefine HAVE_SPARKLE
-#cmakedefine HAVE_QTSPARKLE
 #cmakedefine HAVE_CHROMAPRINT
 #cmakedefine HAVE_SONGTRACKING
 #cmakedefine HAVE_TAGFETCHER
@@ -30,27 +25,20 @@
 #cmakedefine HAVE_WAVEFORM
 #cmakedefine HAVE_EBUR128
 #cmakedefine HAVE_GLOBALSHORTCUTS
-#cmakedefine HAVE_X11_GLOBALSHORTCUTS
-#cmakedefine HAVE_KGLOBALACCEL_GLOBALSHORTCUTS
-#cmakedefine HAVE_STREAMTAGREADER
 #cmakedefine HAVE_SUBSONIC
 #cmakedefine HAVE_TIDAL
 #cmakedefine HAVE_SPOTIFY
 #cmakedefine HAVE_QOBUZ
 #cmakedefine HAVE_DISCORD_RPC
-
 #cmakedefine HAVE_TAGLIB_DSFFILE
 #cmakedefine HAVE_TAGLIB_DSDIFFFILE
-
-#cmakedefine USE_BUNDLE
-
 #cmakedefine HAVE_TRANSLATIONS
 #cmakedefine INSTALL_TRANSLATIONS
+#cmakedefine HAVE_GTK4
+#cmakedefine HAVE_ADWAITA
+#cmakedefine HAVE_X11
+
 #define TRANSLATIONS_DIR "${CMAKE_INSTALL_PREFIX}/share/strawberry/translations"
+#define STRAWBERRY_APPLICATION_ID "org.strawberrymusicplayer.Strawberry"
 
-#cmakedefine HAVE_QPA_QPLATFORMNATIVEINTERFACE
-#cmakedefine HAVE_QX11APPLICATION
-
-#cmakedefine ENABLE_WIN32_CONSOLE
-
-#endif // CONFIG_H_IN
+#endif

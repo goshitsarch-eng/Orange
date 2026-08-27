@@ -1,74 +1,43 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2012, David Sansome <me@davidsansome.com>
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- * Copyright 2023, Daniel Ostertag <daniel.ostertag@dakes.de>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_FILTERPARSER_H
+#define STRAWBERRY_FILTERPARSER_H
 
-#ifndef FILTERPARSER_H
-#define FILTERPARSER_H
+#include "core/song.h"
+#include "filterparser/filtercolumn.h"
+#include "filterparser/filtertree.h"
 
-#include <QString>
+#include <memory>
+#include <string>
 
-class FilterTree;
-
-// A utility class to parse search filter strings into a decision tree
-// that can decide whether a song matches the filter.
-//
-// Here's a grammar describing the filters we expect:
-//   　expr      ::= or-group
-//     or-group  ::= and-group ('OR' and-group)*
-//     and-group ::= sexpr ('AND' sexpr)*
-//     sexpr     ::= sterm | '-' sexpr | '(' or-group ')'
-//     sterm     ::= col ':' sstring | sstring
-//     sstring   ::= prefix? string
-//     string    ::= [^:-()" ]+ | '"' [^"]+ '"'
-//     prefix    ::= '=' | '<' | '>' | '<=' | '>='
-//     col       ::= "title" | "artist" | ...
 class FilterParser {
  public:
-  explicit FilterParser(const QString &filter_string);
+  explicit FilterParser(const std::string &filter);
 
-  FilterTree *parse();
+  FilterTree *parse() const { return tree_.get(); }
+  bool Matches(const Song &song) const;
+  const std::string &filter() const { return filter_; }
+  std::string ToSql() const;
+  static std::string ToolTip();
 
-  static QString ToolTip();
+ private:
+  void Parse();
+  std::unique_ptr<FilterTree> ParseOr();
+  std::unique_ptr<FilterTree> ParseAnd();
+  std::unique_ptr<FilterTree> ParseUnary();
+  std::unique_ptr<FilterTree> ParseTerm();
+  std::unique_ptr<FilterTree> CreateSearchTerm(const std::string &column, const std::string &prefix, const std::string &value) const;
+  void SkipSpace();
+  bool Consume(const std::string &word);
+  static FilterOperator OperatorFromPrefix(const std::string &prefix);
+  static FilterColumn ColumnFromName(const std::string &name);
+  static bool IsNumeric(FilterColumn column);
+  static bool IsTimeDays(FilterColumn column);
+  static std::string ColumnSql(FilterColumn column);
+  static std::string TermSql(FilterColumn column, FilterOperator op, const std::string &value);
+  static std::string FreeTextSql(const std::string &value);
 
- protected:
-  void advance();
-  // Check if iter is at the start of 'AND' if so, step over it and return true if not, return false and leave iter where it was
-  bool checkAnd();
-  // Check if iter is at the start of 'OR'
-  bool checkOr(const bool step_over = true);
-
-  FilterTree *parseOrGroup();
-  FilterTree *parseAndGroup();
-  FilterTree *parseSearchExpression();
-  FilterTree *parseSearchTerm();
-
-  FilterTree *createSearchTermTreeNode(const QString &column, const QString &prefix, const QString &value) const;
-
-  static qint64 ParseTime(const QString &time_str);
-  static float ParseRating(const QString &rating_str);
-
-  const QString filter_string_;
-  QString::const_iterator iter_;
-  QString::const_iterator end_;
-  QString buf_;
+  std::string filter_;
+  size_t pos_ = 0;
+  std::unique_ptr<FilterTree> tree_;
 };
 
-#endif  // FILTERPARSER_H
+#endif

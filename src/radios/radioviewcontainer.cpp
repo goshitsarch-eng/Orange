@@ -1,57 +1,74 @@
-/*
- * Strawberry Music Player
- * Copyright 2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "radios/radioviewcontainer.h"
 
-#include <QWidget>
-#include <QSettings>
-#include <QToolButton>
+#include "radios/radiobrowsersearchopts.h"
+#include "radios/radioservices.h"
+#include "translations/translations.h"
 
-#include "core/iconloader.h"
-#include "core/settings.h"
-#include "constants/appearancesettings.h"
-#include "radioviewcontainer.h"
-#include "ui_radioviewcontainer.h"
+RadioViewContainer::RadioViewContainer(RadioServices *services) : services_(services) {
+  widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  search_view_ = std::make_unique<RadioBrowserSearchView>(services_);
+  view_ = std::make_unique<RadioView>();
+  gtk_widget_set_vexpand(view_->widget(), TRUE);
 
-using namespace Qt::Literals::StringLiterals;
+  GtkWidget *channels = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  GtkWidget *toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_set_margin_start(toolbar, 8);
+  gtk_widget_set_margin_end(toolbar, 8);
+  gtk_widget_set_margin_top(toolbar, 4);
+  gtk_widget_set_margin_bottom(toolbar, 4);
+  GtkWidget *refresh = gtk_button_new_from_icon_name("view-refresh-symbolic");
+  gtk_widget_set_tooltip_text(refresh, Translations::CStr("Refresh channels"));
+  gtk_box_append(GTK_BOX(toolbar), refresh);
+  gtk_box_append(GTK_BOX(channels), toolbar);
+  gtk_box_append(GTK_BOX(channels), view_->widget());
+  g_signal_connect(refresh, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     static_cast<RadioViewContainer *>(data)->RefreshChannels();
+                   }),
+                   this);
+  view_->SetRefreshCallback([this]() { RefreshChannels(); });
 
-RadioViewContainer::RadioViewContainer(QWidget *parent)
-    : QWidget(parent),
-      ui_(new Ui_RadioViewContainer) {
-
-  ui_->setupUi(this);
-
-  QObject::connect(ui_->refresh, &QToolButton::clicked, this, &RadioViewContainer::Refresh);
-
-  ui_->refresh->setIcon(IconLoader::Load(u"view-refresh"_s));
-
-  ReloadSettings();
-
+  GtkWidget *stack = gtk_stack_new();
+  gtk_widget_set_vexpand(stack, TRUE);
+  gtk_stack_add_titled(GTK_STACK(stack), channels, "channels", Translations::CStr(RadioBrowserSearchOpts::ChannelsTab()));
+  gtk_stack_add_titled(GTK_STACK(stack), search_view_->widget(), "browser", Translations::CStr(RadioBrowserSearchOpts::BrowserTab()));
+  GtkWidget *switcher = gtk_stack_switcher_new();
+  gtk_widget_set_halign(switcher, GTK_ALIGN_CENTER);
+  gtk_widget_set_margin_top(switcher, 4);
+  gtk_stack_switcher_set_stack(GTK_STACK_SWITCHER(switcher), GTK_STACK(stack));
+  gtk_box_append(GTK_BOX(widget_), switcher);
+  gtk_box_append(GTK_BOX(widget_), stack);
+  Reload();
 }
 
-RadioViewContainer::~RadioViewContainer() { delete ui_; }
+void RadioViewContainer::Reload() {
+  if (!services_) {
+    return;
+  }
+  if (services_->channels().empty()) {
+    RefreshChannels();
+  }
+  model_.SetChannels(services_->channels());
+  view_->Reload(&model_);
+}
 
-void RadioViewContainer::ReloadSettings() {
+void RadioViewContainer::RefreshChannels() {
+  if (!services_) {
+    return;
+  }
+  services_->FetchSomaFM();
+  services_->FetchRadioParadise();
+}
 
-  Settings s;
-  s.beginGroup(AppearanceSettings::kSettingsGroup);
-  int iconsize = s.value(AppearanceSettings::kIconSizeLeftPanelButtons, AppearanceSettings::kDefaultIconSizeLeftPanelButtons).toInt();
-  s.endGroup();
+void RadioViewContainer::Search(const std::string &) {}
 
-  ui_->refresh->setIconSize(QSize(iconsize, iconsize));
+void RadioViewContainer::SetActivateCallback(std::function<void(const RadioChannel &)> callback) {
+  view_->SetActivateCallback(callback);
+  search_view_->SetActivateCallback(std::move(callback));
+}
 
+void RadioViewContainer::SetEnqueueCallback(RadioView::EnqueueCallback callback) { view_->SetEnqueueCallback(std::move(callback)); }
+
+void RadioViewContainer::SetMenuCallback(RadioView::MenuCallback callback) {
+  view_->SetMenuCallback(callback);
+  search_view_->SetMenuCallback(std::move(callback));
 }

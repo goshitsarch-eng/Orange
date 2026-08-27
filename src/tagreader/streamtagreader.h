@@ -1,94 +1,74 @@
-/*
- * Strawberry Music Player
- * Copyright 2012, David Sansome <me@davidsansome.com>
- * Copyright 2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_STREAMTAGREADER_H
+#define STRAWBERRY_STREAMTAGREADER_H
 
-#ifndef STREAMTAGREADER_H
-#define STREAMTAGREADER_H
-
+#include <taglib/taglib.h>
 #include <taglib/tiostream.h>
-#include <google/sparsetable>
 
-#include <QByteArray>
-#include <QString>
-#include <QUrl>
-
-#include "includes/scoped_ptr.h"
-#include "core/networkaccessmanager.h"
+#include <functional>
+#include <string>
+#include <vector>
 
 #if TAGLIB_MAJOR_VERSION >= 2
 using TagLibLengthType = size_t;
 using TagLibUOffsetType = TagLib::offset_t;
 using TagLibOffsetType = TagLib::offset_t;
 #else
-using TagLibLengthType = ulong;
-using TagLibUOffsetType = ulong;
+using TagLibLengthType = unsigned long;
+using TagLibUOffsetType = unsigned long;
 using TagLibOffsetType = long;
 #endif
 
 class StreamTagReader : public TagLib::IOStream {
-
  public:
-  explicit StreamTagReader(const QUrl &url,
-                           const QString &filename,
-                           const quint64 length,
-                           const QString &token_type,
-                           const QString &access_token);
+  using RangeFetcher = std::function<std::string(TagLibLengthType start, TagLibLengthType end)>;
 
-  virtual TagLib::FileName name() const override;
-  virtual TagLib::ByteVector readBlock(const TagLibLengthType length) override;
-  virtual void writeBlock(const TagLib::ByteVector &data) override;
-  virtual void insert(const TagLib::ByteVector &data, const TagLibUOffsetType start, const TagLibLengthType replace) override;
-  virtual void removeBlock(const TagLibUOffsetType start, const TagLibLengthType length) override;
-  virtual bool readOnly() const override;
-  virtual bool isOpen() const override;
-  virtual void seek(const TagLibOffsetType offset, const TagLib::IOStream::Position position) override;
-  virtual void clear() override;
-  virtual TagLibOffsetType tell() const override;
-  virtual TagLibOffsetType length() override;
-  virtual void truncate(const TagLibOffsetType length) override;
+  static const TagLibLengthType kPrefixCacheBytes;
+  static const TagLibLengthType kSuffixCacheBytes;
 
-  google::sparsetable<char>::size_type cached_bytes() const {
-    return cache_.num_nonempty();
-  }
+  StreamTagReader(const std::string &url, const std::string &filename, TagLibLengthType length, const std::string &token_type = {},
+                  const std::string &access_token = {}, RangeFetcher fetcher = {});
+
+  TagLib::FileName name() const override;
+  TagLib::ByteVector readBlock(TagLibLengthType length) override;
+  void writeBlock(const TagLib::ByteVector &data) override;
+  void insert(const TagLib::ByteVector &data, TagLibUOffsetType start, TagLibLengthType replace) override;
+  void removeBlock(TagLibUOffsetType start, TagLibLengthType length) override;
+  bool readOnly() const override;
+  bool isOpen() const override;
+  void seek(TagLibOffsetType offset, TagLib::IOStream::Position position) override;
+  void clear() override;
+  TagLibOffsetType tell() const override;
+  TagLibOffsetType length() override;
+  void truncate(TagLibOffsetType length) override;
 
   int num_requests() const { return num_requests_; }
-
+  TagLibLengthType cached_bytes() const;
   void PreCache();
 
- private:
-  bool CheckCache(const TagLibLengthType start, const TagLibLengthType end);
-  void FillCache(const TagLibLengthType start, const TagLib::ByteVector &data);
-  TagLib::ByteVector GetCache(const TagLibLengthType start, const TagLibLengthType end);
+  static std::string RangeHeader(TagLibLengthType start, TagLibLengthType end);
+  static std::string AuthorizationHeader(const std::string &token_type, const std::string &access_token);
+  static RangeFetcher HttpFetcher(const std::string &url, const std::string &token_type, const std::string &access_token);
 
  private:
-  const QUrl url_;
-  const QString filename_;
-  const QByteArray encoded_filename_;
-  const TagLibLengthType length_;
-  const QString token_type_;
-  const QString access_token_;
+  bool CheckCache(TagLibLengthType start, TagLibLengthType end) const;
+  void FillCache(TagLibLengthType start, const TagLib::ByteVector &data);
+  TagLib::ByteVector GetCache(TagLibLengthType start, TagLibLengthType end) const;
+  std::string FetchRange(TagLibLengthType start, TagLibLengthType end);
 
-  ScopedPtr<NetworkAccessManager> network_;
+  std::string url_;
+  std::string filename_;
+  TagLibLengthType length_ = 0;
+  std::string token_type_;
+  std::string access_token_;
+  RangeFetcher fetcher_;
+  TagLibLengthType cursor_ = 0;
+  int num_requests_ = 0;
 
-  TagLibLengthType cursor_;
-  google::sparsetable<char> cache_;
-  int num_requests_;
+  struct Span {
+    TagLibLengthType start = 0;
+    std::vector<char> data;
+  };
+  std::vector<Span> cache_;
 };
 
-#endif  // STREAMTAGREADER_H
+#endif

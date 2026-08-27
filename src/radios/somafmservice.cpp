@@ -1,177 +1,98 @@
-/*
- * Strawberry Music Player
- * Copyright 2021-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "radios/somafmservice.h"
 
-#include <utility>
+#include "utilities/strutils.h"
 
-#include <QObject>
-#include <QString>
-#include <QUrl>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QJsonValue>
-#include <QJsonObject>
-#include <QJsonArray>
+#include <json-glib/json-glib.h>
 
-#include "core/networkaccessmanager.h"
-#include "core/taskmanager.h"
-#include "core/iconloader.h"
-#include "core/settings.h"
-#include "constants/somafmsettings.h"
-#include "playlistparsers/playlistparser.h"
-#include "somafmservice.h"
-#include "radiochannel.h"
+const char *SomaFMService::kApiChannelsUrl = "https://somafm.com/channels.json";
+const char *SomaFMService::kQualityDefault = "highest";
 
-using namespace Qt::Literals::StringLiterals;
+std::string SomaFMService::Homepage() { return "https://somafm.com/"; }
 
-namespace {
-constexpr char kApiChannelsUrl[] = "https://somafm.com/channels.json";
-}  // namespace
+std::string SomaFMService::Donate() { return "https://somafm.com/support/"; }
 
-SomaFMService::SomaFMService(const SharedPtr<TaskManager> task_manager, const SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : RadioService(Song::Source::SomaFM, u"SomaFM"_s, IconLoader::Load(u"somafm"_s), task_manager, network, parent) {}
-
-SomaFMService::~SomaFMService() {
-  Abort();
+std::string SomaFMService::NormalizeQuality(const std::string &quality) {
+  const std::string lower = StrUtils::ToLower(quality);
+  if (lower == "128" || lower == "256" || lower == "high") {
+    return "highest";
+  }
+  if (lower == "64" || lower == "slow") {
+    return "low";
+  }
+  if (lower.empty()) {
+    return kQualityDefault;
+  }
+  return lower;
 }
 
-QUrl SomaFMService::Homepage() { return QUrl(u"https://somafm.com/"_s); }
-QUrl SomaFMService::Donate() { return QUrl(u"https://somafm.com/support/"_s); }
-
-void SomaFMService::Abort() {
-
-  while (!replies_.isEmpty()) {
-    QNetworkReply *reply = replies_.takeFirst();
-    QObject::disconnect(reply, nullptr, this, nullptr);
-    if (reply->isRunning()) reply->abort();
-    reply->deleteLater();
+std::vector<RadioChannel> SomaFMService::ParseChannels(const std::string &json, const std::string &quality) {
+  std::vector<RadioChannel> channels;
+  if (json.empty()) {
+    return channels;
   }
-
-  channels_.clear();
-
-}
-
-void SomaFMService::GetChannels() {
-
-  Abort();
-
-  const QUrl url(QString::fromLatin1(kApiChannelsUrl));
-  QNetworkRequest network_request(url);
-  QNetworkReply *reply = network_->get(network_request);
-  replies_ << reply;
-  const int task_id = task_manager_->StartTask(tr("Getting %1 channels").arg(name_));
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, task_id]() { GetChannelsReply(reply, task_id); });
-
-}
-
-void SomaFMService::GetChannelsReply(QNetworkReply *reply, const int task_id) {
-
-  if (replies_.contains(reply)) replies_.removeAll(reply);
-  reply->deleteLater();
-
-  const QJsonObject object = ExtractJsonObj(reply);
-  if (object.isEmpty()) {
-    task_manager_->SetTaskFinished(task_id);
-    Q_EMIT NewChannels();
-    return;
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
+    g_object_unref(parser);
+    return channels;
   }
-
-  if (!object.contains("channels"_L1) || !object["channels"_L1].isArray()) {
-    Error(u"Missing JSON channels array."_s, object);
-    task_manager_->SetTaskFinished(task_id);
-    Q_EMIT NewChannels();
-    return;
+  JsonNode *root = json_parser_get_root(parser);
+  if (!root || !JSON_NODE_HOLDS_OBJECT(root)) {
+    g_object_unref(parser);
+    return channels;
   }
-  const QJsonArray array_channels = object["channels"_L1].toArray();
-
-  Settings s;
-  s.beginGroup(QLatin1String(SomaFMSettings::kSettingsGroup));
-  const QString preferred_quality = s.value(QLatin1String(SomaFMSettings::kQuality), QLatin1String(SomaFMSettings::kQualityDefault)).toString();
-  s.endGroup();
-
-  RadioChannelList channels;
-  for (const QJsonValue &value_channel : array_channels) {
-    if (!value_channel.isObject()) continue;
-    QJsonObject obj_channel = value_channel.toObject();
-    if (!obj_channel.contains("title"_L1) || !obj_channel.contains("image"_L1)) {
+  JsonObject *object = json_node_get_object(root);
+  if (!json_object_has_member(object, "channels") || !JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "channels"))) {
+    g_object_unref(parser);
+    return channels;
+  }
+  const std::string preferred = NormalizeQuality(quality);
+  JsonArray *array = json_object_get_array_member(object, "channels");
+  const guint n = json_array_get_length(array);
+  for (guint i = 0; i < n; ++i) {
+    JsonNode *item = json_array_get_element(array, i);
+    if (!item || !JSON_NODE_HOLDS_OBJECT(item)) {
       continue;
     }
-    QString name = obj_channel["title"_L1].toString();
-    QString image = obj_channel["image"_L1].toString();
-    const QJsonArray playlists = obj_channel["playlists"_L1].toArray();
-    for (const QJsonValue &playlist : playlists) {
-      if (!playlist.isObject()) continue;
-      QJsonObject obj_playlist = playlist.toObject();
-      if (!obj_playlist.contains("url"_L1) || !obj_playlist.contains("quality"_L1)) {
+    JsonObject *channel_obj = json_node_get_object(item);
+    if (!json_object_has_member(channel_obj, "title") || !json_object_has_member(channel_obj, "image")) {
+      continue;
+    }
+    const char *title = json_object_get_string_member(channel_obj, "title");
+    const char *image = json_object_get_string_member(channel_obj, "image");
+    if (!title || !json_object_has_member(channel_obj, "playlists") ||
+        !JSON_NODE_HOLDS_ARRAY(json_object_get_member(channel_obj, "playlists"))) {
+      continue;
+    }
+    JsonArray *playlists = json_object_get_array_member(channel_obj, "playlists");
+    const guint playlist_count = json_array_get_length(playlists);
+    for (guint p = 0; p < playlist_count; ++p) {
+      JsonNode *playlist_node = json_array_get_element(playlists, p);
+      if (!playlist_node || !JSON_NODE_HOLDS_OBJECT(playlist_node)) {
+        continue;
+      }
+      JsonObject *playlist = json_node_get_object(playlist_node);
+      if (!json_object_has_member(playlist, "url") || !json_object_has_member(playlist, "quality")) {
+        continue;
+      }
+      const char *playlist_quality = json_object_get_string_member(playlist, "quality");
+      const char *url = json_object_get_string_member(playlist, "url");
+      if (!url || !playlist_quality || NormalizeQuality(playlist_quality) != preferred) {
         continue;
       }
       RadioChannel channel;
-      QString quality = obj_playlist["quality"_L1].toString();
-      if (quality != preferred_quality) continue;
-      channel.source = source_;
-      channel.name = name;
-      channel.url.setUrl(obj_playlist["url"_L1].toString());
-      channel.thumbnail_url.setUrl(image);
-      if (obj_playlist.contains("format"_L1)) {
-        channel.name.append(QLatin1Char(' ') + obj_playlist[QLatin1String("format")].toString().toUpper());
+      channel.source = Song::Source::SomaFM;
+      channel.name = title;
+      channel.url = url;
+      channel.thumbnail_url = image ? image : "";
+      if (json_object_has_member(playlist, "format")) {
+        const char *format = json_object_get_string_member(playlist, "format");
+        if (format && *format) {
+          channel.name += " " + StrUtils::ToUpper(format);
+        }
       }
-      channels << channel;
+      channels.push_back(channel);
     }
   }
-
-  if (channels.isEmpty()) {
-    task_manager_->SetTaskFinished(task_id);
-    Q_EMIT NewChannels();
-  }
-  else {
-    for (const RadioChannel &channel : std::as_const(channels)) {
-      GetStreamUrl(task_id, channel);
-    }
-  }
-
-}
-
-void SomaFMService::GetStreamUrl(const int task_id, const RadioChannel &channel) {
-
-  QNetworkRequest network_request(channel.url);
-  QNetworkReply *reply = network_->get(network_request);
-  replies_ << reply;
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, task_id, channel]() { GetStreamUrlsReply(reply, task_id, channel); });
-
-}
-
-void SomaFMService::GetStreamUrlsReply(QNetworkReply *reply, const int task_id, RadioChannel channel) {  // clazy:exclude=function-args-by-ref
-
-  if (replies_.contains(reply)) replies_.removeAll(reply);
-  reply->deleteLater();
-
-  PlaylistParser parser(nullptr, nullptr);
-  SongList songs = parser.LoadFromDevice(reply);
-  if (!songs.isEmpty()) {
-    channel.url = songs.first().url();
-  }
-
-  channels_ << channel;
-
-  if (replies_.isEmpty()) {
-    task_manager_->SetTaskFinished(task_id);
-    Q_EMIT NewChannels(channels_);
-    channels_.clear();
-  }
-
+  g_object_unref(parser);
+  return channels;
 }

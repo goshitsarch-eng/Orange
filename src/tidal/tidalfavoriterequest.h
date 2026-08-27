@@ -1,89 +1,42 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_TIDALFAVORITEREQUEST_H
+#define STRAWBERRY_TIDALFAVORITEREQUEST_H
 
-#ifndef TIDALFAVORITEREQUEST_H
-#define TIDALFAVORITEREQUEST_H
-
-#include "config.h"
-
-#include <QObject>
-#include <QList>
-#include <QVariant>
-#include <QString>
-
-#include "includes/shared_ptr.h"
+#include "core/network.h"
 #include "core/song.h"
+#include "streaming/streamingpage.h"
+#include "streaming/streamingservices.h"
 
-#include "tidalbaserequest.h"
+#include <cstdint>
+#include <map>
+#include <string>
+#include <vector>
 
-class QNetworkReply;
-class TidalService;
-class NetworkAccessManager;
+namespace TidalFavoriteRequest {
 
-class TidalFavoriteRequest : public TidalBaseRequest {
-  Q_OBJECT
+using FavoriteType = StreamingService::FavoriteType;
+using SearchCallback = StreamingService::SearchCallback;
 
- public:
-  explicit TidalFavoriteRequest(TidalService *service, const SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
+std::string FavoriteText(FavoriteType type);
+std::string FavoriteMethod(FavoriteType type);
+std::vector<std::string> IdsFromSongs(FavoriteType type, const SongList &songs);
 
- private:
-  enum class FavoriteType {
-    Artists,
-    Albums,
-    Songs
-  };
+std::string ListUrl(const std::string &api_url, uint64_t user_id, FavoriteType type, const std::string &country_code, int offset = 0,
+                    int limit = 50);
+std::string AddUrl(const std::string &api_url, uint64_t user_id, FavoriteType type);
+std::string AddFormBody(FavoriteType type, const std::string &country_code, const std::vector<std::string> &ids);
+std::string RemoveUrl(const std::string &api_url, uint64_t user_id, FavoriteType type, const std::string &id, const std::string &country_code);
 
- Q_SIGNALS:
-  void ArtistsAdded(const SongList &songs);
-  void AlbumsAdded(const SongList &songs);
-  void SongsAdded(const SongList &songs);
-  void ArtistsRemoved(const SongList &songs);
-  void AlbumsRemoved(const SongList &songs);
-  void SongsRemoved(const SongList &songs);
+SongList Parse(FavoriteType type, const std::string &json);
 
- private Q_SLOTS:
-  void AddFavoritesReply(QNetworkReply *reply, const TidalFavoriteRequest::FavoriteType type, const SongList &songs);
-  void RemoveFavoritesReply(QNetworkReply *reply, const TidalFavoriteRequest::FavoriteType type, const SongList &songs);
+void Get(NetworkAccessManager *network, const std::string &api_url, uint64_t user_id, const std::string &country_code,
+         const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback,
+         StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {},
+         StreamingPage::ErrorCallback error = {});
+void Add(NetworkAccessManager *network, const std::string &api_url, uint64_t user_id, const std::string &country_code,
+         const std::map<std::string, std::string> &headers, FavoriteType type, const SongList &songs, SearchCallback callback);
+void Remove(NetworkAccessManager *network, const std::string &api_url, uint64_t user_id, const std::string &country_code,
+            const std::map<std::string, std::string> &headers, FavoriteType type, const SongList &songs, SearchCallback callback);
 
- public Q_SLOTS:
-  void AddArtists(const SongList &songs);
-  void AddAlbums(const SongList &songs);
-  void AddSongs(const SongList &songs);
-  void AddSongs(const SongMap &songs);
+}  // namespace TidalFavoriteRequest
 
-  void RemoveArtists(const SongList &songs);
-  void RemoveAlbums(const SongList &songs);
-  void RemoveSongs(const SongList &songs);
-  void RemoveSongs(const SongMap &songs);
-
- private:
-  void Error(const QString &error, const QVariant &debug = QVariant()) override;
-  static QString FavoriteText(const FavoriteType type);
-  static QString FavoriteMethod(const FavoriteType type);
-  void AddFavorites(const FavoriteType type, const SongList &songs);
-  void AddFavoritesRequest(const FavoriteType type, const QStringList &id_list, const SongList &songs);
-  void RemoveFavorites(const FavoriteType type, const SongList &songs);
-  void RemoveFavorites(const FavoriteType type, const QString &id, const SongList &songs);
-  void RemoveFavoritesRequest(const FavoriteType type, const QString &id, const SongList &songs);
-
-  TidalService *service_;
-  const SharedPtr<NetworkAccessManager> network_;
-};
-
-#endif  // TIDALFAVORITEREQUEST_H
+#endif

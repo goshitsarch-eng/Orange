@@ -1,38 +1,34 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2012, David Sansome <me@davidsansome.com>
- * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "filterparser/filtertreeor.h"
 
-#include <QString>
-
-#include "filtertreeor.h"
-
-FilterTreeOr::FilterTreeOr() = default;
-
-FilterTreeOr::~FilterTreeOr() {
-  qDeleteAll(children_);
+void FilterTreeOr::Add(std::unique_ptr<FilterTree> child) {
+  if (child) {
+    children_.push_back(std::move(child));
+  }
 }
 
-void FilterTreeOr::add(FilterTree *child) {
-  children_.append(child);
+std::string FilterTreeOr::ToSql() const {
+  if (children_.empty()) {
+    return "1=1";
+  }
+  std::string sql = "(";
+  for (size_t i = 0; i < children_.size(); ++i) {
+    if (i) {
+      sql += " OR ";
+    }
+    sql += children_[i] ? children_[i]->ToSql() : "1=1";
+  }
+  sql += ")";
+  return sql;
 }
 
 bool FilterTreeOr::accept(const Song &song) const {
-  return std::any_of(children_.begin(), children_.end(), [&song](FilterTree *child) { return child->accept(song); });
+  if (children_.empty()) {
+    return true;
+  }
+  for (const auto &child : children_) {
+    if (child && child->accept(song)) {
+      return true;
+    }
+  }
+  return false;
 }

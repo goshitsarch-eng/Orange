@@ -1,62 +1,34 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2013, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_FAVORITEWIDGET_H
+#define STRAWBERRY_FAVORITEWIDGET_H
 
-#ifndef FAVORITEWIDGET_H
-#define FAVORITEWIDGET_H
+#include <gtk/gtk.h>
 
-#include <QObject>
-#include <QWidget>
-#include <QString>
-#include <QIcon>
-#include <QRect>
-#include <QSize>
+#include <functional>
 
-class QMouseEvent;
-class QPaintEvent;
-
-class FavoriteWidget : public QWidget {
-  Q_OBJECT
-
+class FavoriteWidget {
  public:
-  explicit FavoriteWidget(const int tab_index, const bool favorite = false, QWidget *parent = nullptr);
+  using ChangedCallback = std::function<void(int, bool)>;
 
-  // Change the value if different from the current one and then update display and emit FavoriteStateChanged signal
+  explicit FavoriteWidget(int tab_index = -1, bool favorite = false);
+
+  GtkWidget *widget() const { return widget_; }
   bool IsFavorite() const { return favorite_; }
-  void SetFavorite(const bool favorite);
+  void SetFavorite(bool favorite);
+  void SetChangedCallback(ChangedCallback callback);
+  int tab_index() const { return tab_index_; }
 
-  QSize sizeHint() const override;
-
- Q_SIGNALS:
-  void FavoriteStateChanged(const int tab_index, const bool favorite);
-
- protected:
-  void paintEvent(QPaintEvent *e) override;
-  void mouseDoubleClickEvent(QMouseEvent *e) override;
+  static const char *TooltipText() {
+    return "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar";
+  }
 
  private:
-  // The playlist's id this widget belongs to
-  int tab_index_;
-  bool favorite_;
-  QIcon on_;
-  QIcon off_;
-  QRect rect_;
+  void Refresh();
+  void Toggle();
+
+  GtkWidget *widget_ = nullptr;
+  int tab_index_ = -1;
+  bool favorite_ = false;
+  ChangedCallback changed_;
 };
 
-#endif  // FAVORITEWIDGET_H
+#endif

@@ -1,153 +1,105 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_TRANSCODER_H
+#define STRAWBERRY_TRANSCODER_H
 
-#ifndef TRANSCODER_H
-#define TRANSCODER_H
-
-#include "config.h"
+#include "core/song.h"
+#include "core/signal.h"
 
 #include <glib.h>
-#include <glib-object.h>
 #include <gst/gst.h>
 
-#include <QObject>
-#include <QList>
-#include <QMap>
-#include <QMetaType>
-#include <QSet>
-#include <QString>
-#include <QEvent>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "includes/shared_ptr.h"
-#include "core/song.h"
-
-struct TranscoderPreset {
-  explicit TranscoderPreset() : filetype_(Song::FileType::Unknown) {}
-  TranscoderPreset(const Song::FileType filetype, const QString &name, const QString &extension, const QString &codec_mimetype, const QString &muxer_mimetype_ = QString());
-
-  Song::FileType filetype_;
-  QString name_;
-  QString extension_;
-  QString codec_mimetype_;
-  QString muxer_mimetype_;
-};
-Q_DECLARE_METATYPE(TranscoderPreset)
-
-class Transcoder : public QObject {
-  Q_OBJECT
-
+class Transcoder {
  public:
-  explicit Transcoder(QObject *parent = nullptr, const QString &settings_postfix = QLatin1String(""));
+  enum class Format { MP3, AAC, FLAC, OggVorbis, Opus, Speex, WavPack, ASF, WAV, OggFlac, ALAC };
 
-  static TranscoderPreset PresetForFileType(const Song::FileType filetype);
-  static QList<TranscoderPreset> GetAllPresets();
-  static Song::FileType PickBestFormat(const QList<Song::FileType> &supported);
+  struct Preset {
+    Format format = Format::FLAC;
+    std::string name;
+    std::string extension;
+    std::string codec_mimetype;
+    std::string muxer_mimetype;
+  };
 
+  Transcoder();
+  ~Transcoder();
+
+  Transcoder(const Transcoder &) = delete;
+  Transcoder &operator=(const Transcoder &) = delete;
+
+  void AddJob(const Song &song, const std::string &destination, Format format);
+  void set_quality(int quality) { quality_ = quality; }
+  int quality() const { return quality_; }
   int max_threads() const { return max_threads_; }
-  void set_max_threads(int count) { max_threads_ = count; }
-
-  static QString GetFile(const QString &input, const TranscoderPreset &preset, const QString &output = QString());
-  void AddJob(const QString &input, const TranscoderPreset &preset, const QString &output);
-
-  QMap<QString, float> GetProgress() const;
-  qint64 QueuedJobsCount() const { return queued_jobs_.count(); }
-
- public Q_SLOTS:
+  void set_max_threads(int count);
   void Start();
   void Cancel();
+  bool cancelled() const { return cancelled_; }
+  int finished_success() const { return finished_success_; }
+  int finished_failed() const { return finished_failed_; }
+  bool TranscodeFile(const Song &song, const std::string &destination, Format format);
+  std::map<std::string, float> GetProgress() const;
+  const std::vector<std::string> &log() const { return log_; }
+  int job_count() const { return static_cast<int>(jobs_.size()); }
+  int current_job_count() const { return static_cast<int>(current_jobs_.size()); }
 
- Q_SIGNALS:
-  void JobComplete(const QString &input, const QString &output, const bool success);
-  void LogLine(const QString &message);
-  void AllJobsComplete();
+  static std::string FormatName(Format format);
+  static std::string Extension(Format format);
+  static Preset PresetFor(Format format);
+  static Preset PresetForFileType(Song::FileType type);
+  static std::vector<Preset> GetAllPresets();
+  static Format FormatFromFileType(Song::FileType type);
+  static std::string PipelineFor(Format format, int quality = -1);
 
- protected:
-  bool event(QEvent *e) override;
+  Signal<int, int> Progress;
+  Signal<> Finished;
+  Signal<> AllJobsComplete;
+  Signal<std::string, std::string, bool> JobComplete;
+  Signal<std::string> LogLine;
 
  private:
-  // The description of a file to transcode - lives in the main thread.
   struct Job {
-    QString input;
-    QString output;
-    TranscoderPreset preset;
+    Song song;
+    std::string destination;
+    Format format;
+  };
+  struct CurrentJob {
+    Job job;
+    GstElement *pipeline = nullptr;
+  };
+  struct FinishData {
+    std::shared_ptr<bool> alive;
+    Transcoder *self = nullptr;
+    GstElement *pipeline = nullptr;
+    bool success = false;
+    int generation = 0;
+    std::string error;
   };
 
-  // State held by a job and shared across gstreamer callbacks - lives in the job's thread.
-  struct JobState {
-    explicit JobState(const Job &job, Transcoder *parent)
-        : job_(job),
-          parent_(parent),
-          pipeline_(nullptr),
-          convert_element_(nullptr) {}
-    ~JobState();
-
-    void PostFinished(const bool success);
-    void ReportError(GstMessage *msg) const;
-
-    Job job_;
-    Transcoder *parent_;
-    GstElement *pipeline_;
-    GstElement *convert_element_;
-
-   private:
-    Q_DISABLE_COPY(JobState)
-  };
-
-  // Event passed from a GStreamer callback to the Transcoder when a job finishes.
-  struct JobFinishedEvent : public QEvent {
-    explicit JobFinishedEvent(JobState *state, bool success);
-
-    static int sEventType;
-
-    JobState *state_;
-    bool success_;
-
-   private:
-    Q_DISABLE_COPY(JobFinishedEvent)
-  };
-
-  enum class StartJobStatus {
-    StartedSuccessfully,
-    FailedToStart,
-    NoMoreJobs,
-    AllThreadsBusy,
-  };
-
-  StartJobStatus MaybeStartNextJob();
+  void PumpJobs();
   bool StartJob(const Job &job);
+  void FinishJob(GstElement *pipeline, bool success, const std::string &error);
+  GstElement *CreatePipeline(const Job &job, std::string *error);
+  void StopCurrentJobs();
+  static std::string JobInput(const Job &job);
 
-  GstElement *CreateElement(const QString &factory_name, GstElement *bin = nullptr, const QString &name = QString());
-  GstElement *CreateElementForMimeType(GstElementFactoryListType element_type, const QString &mime_type, GstElement *bin = nullptr);
-  void SetElementProperties(const QString &name, GObject *object);
+  static gboolean BusWatch(GstBus *bus, GstMessage *msg, gpointer data);
+  static gboolean FinishIdle(gpointer data);
 
-  static void NewPadCallback(GstElement *element, GstPad *pad, gpointer data);
-  static GstBusSyncReply BusCallbackSync(GstBus *bus, GstMessage *msg, gpointer data);
-
- private:
-  using JobStateList = QList<SharedPtr<JobState>>;
-
-  int max_threads_;
-  QList<Job> queued_jobs_;
-  JobStateList current_jobs_;
-  QString settings_postfix_;
+  std::vector<Job> jobs_;
+  std::vector<CurrentJob> current_jobs_;
+  std::vector<std::string> log_;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
+  int quality_ = -1;
+  int max_threads_ = 1;
+  int total_ = 0;
+  int finish_generation_ = 0;
+  bool cancelled_ = false;
+  int finished_success_ = 0;
+  int finished_failed_ = 0;
 };
 
-#endif  // TRANSCODER_H
+#endif

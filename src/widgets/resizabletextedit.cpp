@@ -1,57 +1,25 @@
-/*
- * Strawberry Music Player
- * Copyright 2022, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "widgets/resizabletextedit.h"
 
-#include <QTextEdit>
-#include <QResizeEvent>
-
-#include "resizabletextedit.h"
-
-ResizableTextEdit::ResizableTextEdit(QWidget *parent)
-    : QTextEdit(parent) {
-
-  setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
-  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  setWordWrapMode(QTextOption::WordWrap);
-  setLineWrapMode(QTextEdit::WidgetWidth);
-
+ResizableTextEdit::ResizableTextEdit() {
+  view_ = gtk_text_view_new();
+  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(view_), GTK_WRAP_WORD_CHAR);
+  widget_ = gtk_scrolled_window_new();
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), view_);
+  gtk_widget_set_size_request(widget_, -1, 80);
 }
 
-QSize ResizableTextEdit::sizeHint() const {
-
-  return QSize(std::max(QTextEdit::sizeHint().width(), 10), std::max(document()->size().toSize().height(), 10));
-
+void ResizableTextEdit::SetText(const std::string &text) {
+  GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view_));
+  gtk_text_buffer_set_text(buffer, text.c_str(), static_cast<int>(text.size()));
 }
 
-void ResizableTextEdit::resizeEvent(QResizeEvent *e) {
-
-  QTextEdit::resizeEvent(e);
-  updateGeometry();
-
-}
-
-void ResizableTextEdit::SetText(const QString &text) {
-
-  text_ = text;
-
-  QTextEdit::setText(text);
-
-  updateGeometry();
-
+std::string ResizableTextEdit::Text() const {
+  GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view_));
+  GtkTextIter start;
+  GtkTextIter end;
+  gtk_text_buffer_get_bounds(buffer, &start, &end);
+  gchar *text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+  std::string out = text ? text : "";
+  g_free(text);
+  return out;
 }

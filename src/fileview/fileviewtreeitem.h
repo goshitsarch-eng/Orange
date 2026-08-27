@@ -1,52 +1,20 @@
-/*
- * Strawberry Music Player
- * Copyright 2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_FILEVIEWTREEITEM_H
+#define STRAWBERRY_FILEVIEWTREEITEM_H
 
-#ifndef FILEVIEWTREEITEM_H
-#define FILEVIEWTREEITEM_H
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "config.h"
-
-#include <QFileInfo>
-
-#include "core/simpletreeitem.h"
-
-class FileViewTreeItem : public SimpleTreeItem<FileViewTreeItem> {
+class FileViewTreeItem {
  public:
-  enum class Type {
-    Root,          // Hidden root
-    VirtualRoot,   // User-configured root paths
-    Directory,     // File system directory
-    File           // File system file
-  };
+  enum class Type { Root, Directory, File };
 
-  explicit FileViewTreeItem(SimpleTreeModel<FileViewTreeItem> *_model) : SimpleTreeItem<FileViewTreeItem>(_model), type(Type::Root), lazy_loaded(false) {}
-  explicit FileViewTreeItem(const Type _type, FileViewTreeItem *_parent = nullptr) : SimpleTreeItem<FileViewTreeItem>(_parent), type(_type), lazy_loaded(false) {}
-
-  Type type;
-  QString file_path;        // Absolute file system path
-  QFileInfo file_info;      // Cached file info
-  bool lazy_loaded;         // Whether children have been loaded
-
- private:
-  Q_DISABLE_COPY(FileViewTreeItem)
+  std::string path;
+  std::string name;
+  Type type = Type::Directory;
+  bool loaded = false;
+  FileViewTreeItem *parent = nullptr;
+  std::vector<std::unique_ptr<FileViewTreeItem>> children;
 };
 
-Q_DECLARE_METATYPE(FileViewTreeItem::Type)
-
-#endif  // FILEVIEWTREEITEM_H
+#endif

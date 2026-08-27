@@ -1,95 +1,39 @@
-/*
- * Strawberry Music Player
- * Copyright 2020-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_GENIUSLYRICSPROVIDER_H
+#define STRAWBERRY_GENIUSLYRICSPROVIDER_H
 
-#ifndef GENIUSLYRICSPROVIDER_H
-#define GENIUSLYRICSPROVIDER_H
+#include "lyrics/htmllyricsprovider.h"
 
-#include "config.h"
+#include <functional>
 
-#include <QFutureWatcher>
-#include <QMutex>
-#include <QMap>
-#include <QString>
-#include <QUrl>
-
-#include "includes/shared_ptr.h"
-#include "jsonlyricsprovider.h"
-#include "lyricssearchrequest.h"
-#include "lyricssearchresult.h"
-
-class QNetworkReply;
-class NetworkAccessManager;
-class OAuthenticator;
-
-class GeniusLyricsProvider : public JsonLyricsProvider {
-  Q_OBJECT
-
+class GeniusLyricsProvider : public HtmlLyricsProvider {
  public:
-  explicit GeniusLyricsProvider(const SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
+  static const char *kApiUrl;
+  static const char *kAuthUrl;
+  static constexpr int kOAuthPort = 63111;
+  static const char *OAuthRedirectUri() { return "http://localhost:63111/"; }
 
-  void Authenticate() override;
-  void ClearSession() override;
+  GeniusLyricsProvider();
+  void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
+  void Authenticate(const std::string &username, const std::string &token) override;
+  void Authenticate(NetworkAccessManager *network, std::function<void()> done = {});
+  void Logout() override;
+  bool authentication_required() const override { return true; }
+  bool authenticated() const override { return !access_token_.empty(); }
+  std::string username() const override { return username_; }
 
-  virtual bool authenticated() const override;
-  virtual bool use_authorization_header() const override;
-  virtual QByteArray authorization_header() const override;
+  static std::string SearchApiUrl(const std::string &query);
+  static std::string AuthorizationUrl(const std::string &client_id, const std::string &redirect_uri);
+  static std::string ParseSearchResultUrl(const std::string &json);
 
- protected Q_SLOTS:
-  void StartSearch(const int id, const LyricsSearchRequest &request) override;
-
- private:
-  struct GeniusLyricsLyricContext {
-    explicit GeniusLyricsLyricContext() {}
-    QString artist;
-    QString title;
-    QUrl url;
-  };
-  struct GeniusLyricsSearchContext {
-    explicit GeniusLyricsSearchContext() : id(-1) {}
-    int id;
-    LyricsSearchRequest request;
-    QMap<QUrl, GeniusLyricsLyricContext> requests_lyric_;
-    LyricsSearchResults results;
-  };
-
-  using GeniusLyricsSearchContextPtr = SharedPtr<GeniusLyricsSearchContext>;
+ protected:
+  std::string UrlFor(const Song &song) const override;
 
  private:
-  JsonObjectResult ParseJsonObject(QNetworkReply *reply);
-  void ParseLyricsFromHTMLFinished(QFutureWatcher<QString> *watcher, GeniusLyricsSearchContextPtr search, const GeniusLyricsLyricContext &lyric);
-  void EndSearch(GeniusLyricsSearchContextPtr search, const GeniusLyricsLyricContext &lyric = GeniusLyricsLyricContext());
-  void EndSearch(const int id, const LyricsSearchRequest &request, const LyricsSearchResults &results = LyricsSearchResults());
+  void FetchPage(const std::string &page_url, NetworkAccessManager *network, Callback callback);
+  void SaveSession() const;
 
- private Q_SLOTS:
-  void OAuthFinished(const bool success, const QString &error);
-  void HandleSearchReply(QNetworkReply *reply, const int id);
-  void HandleLyricReply(QNetworkReply *reply, const int search_id, const QUrl &url);
-
- private:
-  static bool StartsOrEndsMatch(QString s, QString t);
-
- private:
-  OAuthenticator *oauth_;
-  mutable QMutex mutex_access_token_;
-  QMap<int, SharedPtr<GeniusLyricsSearchContext>> requests_search_;
-
-  Q_DISABLE_COPY_MOVE(GeniusLyricsProvider)
+  std::string access_token_;
+  std::string username_;
 };
 
-#endif  // GENIUSLYRICSPROVIDER_H
+#endif

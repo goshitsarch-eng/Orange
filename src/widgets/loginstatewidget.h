@@ -1,86 +1,54 @@
-/*
-   This file was part of Clementine.
-   Copyright 2010, David Sansome <me@davidsansome.com>
-   Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
-
-   Strawberry is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   Strawberry is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
-
- */
-
 #ifndef LOGINSTATEWIDGET_H
 #define LOGINSTATEWIDGET_H
 
-#include <QWidget>
-#include <QObject>
-#include <QList>
-#include <QString>
-#include <QDate>
+#include <functional>
+#include <string>
+#include <vector>
 
-class QEvent;
+#include <gtk/gtk.h>
 
-class Ui_LoginStateWidget;
-
-class LoginStateWidget : public QWidget {
-  Q_OBJECT
-
+class LoginStateWidget {
  public:
-  explicit LoginStateWidget(QWidget *parent = nullptr);
-  ~LoginStateWidget() override;
+  enum class State { LoggedIn, LoginInProgress, LoggedOut };
 
-  enum class State {
-    LoggedIn,
-    LoginInProgress,
-    LoggedOut
-  };
+  explicit LoginStateWidget();
+  ~LoginStateWidget();
 
-  // Installs an event handler on the field so that pressing enter will emit
-  // LoginClicked() instead of doing the default action (closing the dialog).
-  void AddCredentialField(QWidget *widget);
+  LoginStateWidget(const LoginStateWidget &) = delete;
+  LoginStateWidget &operator=(const LoginStateWidget &) = delete;
 
-  // This widget (usually a QGroupBox) will be hidden when SetLoggedIn(true) is called.
-  void AddCredentialGroup(QWidget *widget);
+  GtkWidget *widget() const { return root_; }
 
-  // QObject
-  bool eventFilter(QObject *object, QEvent *event) override;
+  void SetLoggedIn(State state, const std::string &account_name = {});
+  State state() const { return state_; }
+  std::string account_name() const { return account_name_; }
 
- public Q_SLOTS:
-  // Changes the "You are logged in/out" label, shows/hides any QGroupBoxes added with AddCredentialGroup.
-  void SetLoggedIn(const LoginStateWidget::State state, const QString &account_name = QString());
+  void AddCredentialField(GtkWidget *widget);
+  void AddCredentialGroup(GtkWidget *widget);
 
-  // Hides the "You are logged in/out" label completely.
-  void HideLoggedInState();
+  void HideExpires();
+  void SetAccountTypeVisible(bool visible);
 
-  void SetAccountTypeText(const QString &text);
-  void SetAccountTypeVisible(const bool visible);
-
-  void SetExpires(const QDate expires);
-
- Q_SIGNALS:
-  void LogoutClicked();
-  void LoginClicked();
-
- private Q_SLOTS:
-  void Logout();
-  void FocusLastCredentialField();
+  void SetLoginCallback(std::function<void()> callback) { login_cb_ = std::move(callback); }
+  void SetLogoutCallback(std::function<void()> callback) { logout_cb_ = std::move(callback); }
 
  private:
-  Ui_LoginStateWidget *ui_;
+  void ApplyState();
+  void ApplyCredentials();
 
-  State state_;
-
-  QList<QObject*> credential_fields_;
-  QList<QWidget*> credential_groups_;
+  GtkWidget *root_ = nullptr;
+  GtkWidget *status_ = nullptr;
+  GtkWidget *account_ = nullptr;
+  GtkWidget *login_ = nullptr;
+  GtkWidget *logout_ = nullptr;
+  GtkWidget *progress_ = nullptr;
+  GtkWidget *account_type_ = nullptr;
+  GtkWidget *expires_ = nullptr;
+  std::vector<GtkWidget *> credentials_;
+  State state_ = State::LoggedOut;
+  std::string account_name_;
+  std::function<void()> login_cb_;
+  std::function<void()> logout_cb_;
 };
 
 #endif  // LOGINSTATEWIDGET_H

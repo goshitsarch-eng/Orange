@@ -1,41 +1,20 @@
-/*
- * Strawberry Music Player
- * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_TAGREADERREADFILEREQUEST_H
+#define STRAWBERRY_TAGREADERREADFILEREQUEST_H
 
-#ifndef TAGREADERREADFILEREQUEST_H
-#define TAGREADERREADFILEREQUEST_H
-
-#include <QString>
-
-#include "includes/shared_ptr.h"
 #include "core/song.h"
-#include "tagreaderrequest.h"
+#include "tagreader/tagreaderrequest.h"
 
-using std::make_shared;
+#include <memory>
 
 class TagReaderReadFileRequest : public TagReaderRequest {
  public:
-  explicit TagReaderReadFileRequest(const QString &_filename);
-  static SharedPtr<TagReaderReadFileRequest> Create(const QString &filename) { return make_shared<TagReaderReadFileRequest>(filename); }
-
+  explicit TagReaderReadFileRequest(const std::string &filename) : TagReaderRequest(filename) {}
+  static std::shared_ptr<TagReaderReadFileRequest> Create(const std::string &filename) {
+    return std::make_shared<TagReaderReadFileRequest>(filename);
+  }
   Song song;
 };
 
-using TagReaderReadFileRequestPtr = SharedPtr<TagReaderReadFileRequest>;
+using TagReaderReadFileRequestPtr = std::shared_ptr<TagReaderReadFileRequest>;
 
-#endif  // TAGREADERREADFILEREQUEST_H
+#endif

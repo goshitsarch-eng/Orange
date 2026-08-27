@@ -1,55 +1,43 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_ALBUMCOVERMANAGERLIST_H
+#define STRAWBERRY_ALBUMCOVERMANAGERLIST_H
 
-#ifndef ALBUMCOVERMANAGERLIST_H
-#define ALBUMCOVERMANAGERLIST_H
+#include "core/song.h"
 
-#include "config.h"
+#include <string>
+#include <vector>
 
-#include <QObject>
-#include <QString>
-#include <QList>
-#include <QListWidget>
-
-class QWidget;
-class QMimeData;
-class QListWidgetItem;
-class QDropEvent;
-class AlbumCoverManager;
-
-class AlbumCoverManagerList : public QListWidget {
-  Q_OBJECT
-
+class AlbumCoverManagerList {
  public:
-  explicit AlbumCoverManagerList(QWidget *parent = nullptr);
+  enum class HideCovers { None, WithCovers, WithoutCovers };
 
-  void set_cover_manager(AlbumCoverManager *manager) { manager_ = manager; }
+  static constexpr char kAllArtists[] = "";
+  static constexpr char kVariousArtists[] = "Various artists";
 
- protected:
-  QMimeData *mimeData(const QList<QListWidgetItem*> &items) const override;
+  struct Album {
+    std::string artist;
+    std::string album;
+    Song song;
+    bool has_cover = false;
+    bool various = false;
+  };
 
-  void dropEvent(QDropEvent *e) override { Q_UNUSED(e) }
+  void SetSongs(const SongList &songs);
+  void SetCoverFlag(const std::string &artist, const std::string &album, bool has_cover);
+
+  const std::vector<Album> &albums() const { return albums_; }
+  int album_count() const { return static_cast<int>(albums_.size()); }
+  int with_cover_count() const;
+  int without_cover_count() const { return album_count() - with_cover_count(); }
+
+  std::vector<std::string> Artists() const;
+  std::vector<Album> Filtered(const std::string &artist, HideCovers hide, const std::string &filter) const;
+  static bool ShouldHide(const Album &album, HideCovers hide, const std::string &filter);
+  static SongList SongsInAlbum(const SongList &all, const Album &album);
+  static std::string Key(const std::string &artist, const std::string &album);
+  static bool IsVarious(const Song &song);
 
  private:
-  AlbumCoverManager *manager_;
+  std::vector<Album> albums_;
 };
 
-#endif  // ALBUMCOVERMANAGERLIST_H
+#endif

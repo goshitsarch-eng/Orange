@@ -1,26 +1,7 @@
-/*
- * Strawberry Music Player
- * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_TAGREADERRESULT_H
+#define STRAWBERRY_TAGREADERRESULT_H
 
-#ifndef TAGREADERRESULT_H
-#define TAGREADERRESULT_H
-
-#include <QString>
+#include <string>
 
 class TagReaderResult {
  public:
@@ -34,11 +15,15 @@ class TagReaderResult {
     FileSaveError,
     CustomError,
   };
-  TagReaderResult(const ErrorCode _error_code = ErrorCode::Unsupported, const QString &_error_text = QString()) : error_code(_error_code), error_text(_error_text) {}
-  ErrorCode error_code;
-  QString error_text;
+
+  TagReaderResult(ErrorCode error_code = ErrorCode::Unsupported, const std::string &error_text = {})
+      : error_code(error_code), error_text(error_text) {}
+
   bool success() const { return error_code == ErrorCode::Success; }
-  QString error_string() const;
+  std::string error_string() const;
+
+  ErrorCode error_code;
+  std::string error_text;
 };
 
-#endif  // TAGREADERRESULT_H
+#endif

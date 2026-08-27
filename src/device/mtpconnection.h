@@ -1,61 +1,50 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
-#ifndef MTPCONNECTION_H
-#define MTPCONNECTION_H
+#ifndef STRAWBERRY_MTPCONNECTION_H
+#define STRAWBERRY_MTPCONNECTION_H
 
 #include "config.h"
-
-#include <memory>
-
-#include <libmtp.h>
-
-#include <QtGlobal>
-#include <QObject>
-#include <QList>
-#include <QUrl>
-
 #include "core/song.h"
 
-using std::enable_shared_from_this;
+#ifdef HAVE_MTP
+#include <libmtp.h>
+#endif
 
-class MtpConnection : public QObject, public enable_shared_from_this<MtpConnection> {
-  Q_OBJECT
+#include <string>
+#include <vector>
 
+class MtpConnection {
  public:
-  explicit MtpConnection(const QUrl &url, QObject *parent = nullptr);
-  ~MtpConnection() override;
+  MtpConnection();
+  ~MtpConnection();
 
-  bool is_valid() const { return device_; }
-  QString error_text() const { return error_text_; }
+  MtpConnection(const MtpConnection &) = delete;
+  MtpConnection &operator=(const MtpConnection &) = delete;
+
+  bool is_valid() const;
+  const std::string &error_text() const { return error_text_; }
+#ifdef HAVE_MTP
   LIBMTP_mtpdevice_t *device() const { return device_; }
-  bool GetSupportedFiletypes(QList<Song::FileType> *ret);
+#endif
 
-  static QString ErrorString(const LIBMTP_error_number_t error_number);
+  bool OpenBySerial(const std::string &serial);
+  bool OpenFirst();
+  void Close();
+  std::string serial() const;
+  std::string friendly_name() const;
+  std::vector<Song::FileType> SupportedFiletypes() const;
+
+  static void InitLibMtp();
+#ifdef HAVE_MTP
+  static std::string ErrorString(LIBMTP_error_number_t error_number);
+  static Song::FileType FileTypeFromMtp(LIBMTP_filetype_t type);
+  static LIBMTP_filetype_t MtpFileTypeFromSong(Song::FileType type);
+#endif
 
  private:
-  Q_DISABLE_COPY(MtpConnection)
-
-  LIBMTP_mtpdevice_t *device_;
-  QString error_text_;
+#ifdef HAVE_MTP
+  LIBMTP_mtpdevice_t *device_ = nullptr;
+#endif
+  std::string error_text_;
+  static bool initialized_;
 };
 
-#endif  // MTPCONNECTION_H
+#endif

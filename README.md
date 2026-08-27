@@ -4,7 +4,7 @@
 [![PayPal](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/jonaskvinge)
 
 Strawberry is a **music player and music collection organizer**, originally forked from *Clementine* in 2018.
-It’s written in **C++ using the Qt framework**, designed for **audiophiles and music collectors**.
+It’s written in **C++ using GTK 4 and libadwaita**, designed for **audiophiles and music collectors**.
 
 ![Screenshot of Strawberry Music Player](https://raw.githubusercontent.com/strawberrymusicplayer/strawberry/master/data/screenshot/screenshot.png)
 
@@ -97,13 +97,15 @@ To build Strawberry from source, you’ll need:
 - [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/) or [pkgconf](https://github.com/pkgconf/pkgconf)
 - [Boost](https://www.boost.org/)
 - [GLib](https://developer.gnome.org/glib/)
-- [Qt 6.4 or higher](https://www.qt.io/) (Core, Concurrent, Gui, Widgets, Network, SQL, D-Bus)
+- [GTK 4](https://www.gtk.org/)
+- [libadwaita](https://gnome.pages.gitlab.gnome.org/libadwaita/)
+- [libsoup 3](https://libsoup.gnome.org/)
+- [json-glib](https://wiki.gnome.org/Projects/JsonGlib)
 - [SQLite 3.9 or higher](https://www.sqlite.org)
 - [ALSA (Linux only)](https://www.alsa-project.org/)
 - [GStreamer](https://gstreamer.freedesktop.org/)
 - [TagLib 1.12 or higher](https://www.taglib.org/)
 - [ICU](https://unicode-org.github.io/icu/)
-- [KDSingleApplication 1.1.0 or higher](https://github.com/KDAB/KDSingleApplication)
 
 **Dependencies for optional features:**
 - Fingerprinting & tagging: [Chromaprint](https://acoustid.org/chromaprint)

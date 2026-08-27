@@ -1,57 +1,50 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
-#ifndef GLOBALSHORTCUTSBACKEND_X11_H
-#define GLOBALSHORTCUTSBACKEND_X11_H
+#ifndef STRAWBERRY_GLOBALSHORTCUTSBACKEND_X11_H
+#define STRAWBERRY_GLOBALSHORTCUTSBACKEND_X11_H
 
 #include "config.h"
+#include "globalshortcuts/globalshortcutsbackend.h"
 
-#include <QObject>
-#include <QList>
-#include <QString>
+#ifdef HAVE_X11
+#include <glib.h>
+#endif
 
-#include "globalshortcutsbackend.h"
-
-class QAction;
-class GlobalShortcutsManager;
-class GlobalShortcut;
+#include <string>
+#include <vector>
 
 class GlobalShortcutsBackendX11 : public GlobalShortcutsBackend {
-  Q_OBJECT
-
  public:
-  explicit GlobalShortcutsBackendX11(GlobalShortcutsManager *manager, QObject *parent = nullptr);
+  explicit GlobalShortcutsBackendX11(GlobalShortcutsManager *manager);
   ~GlobalShortcutsBackendX11() override;
 
   bool IsAvailable() const override;
-  static bool IsX11Available();
 
  protected:
   bool DoRegister() override;
   void DoUnregister() override;
 
  private:
-  bool AddShortcut(QAction *action);
-  bool RemoveShortcut(QAction *action);
+#ifdef HAVE_X11
+  static gboolean OnX11Fd(gint fd, GIOCondition condition, gpointer data);
+  void HandleX11Event();
+  void GrabKey(unsigned int code, unsigned int modifiers, bool any_modifier, const std::string &id);
+#endif
 
-  QList<GlobalShortcut*> shortcuts_;
-  GlobalShortcut *gshortcut_init_;
+  struct Binding {
+    unsigned int code = 0;
+    unsigned int modifiers = 0;
+    bool any_modifier = false;
+    std::string id;
+  };
+
+  struct Grab {
+    unsigned int code = 0;
+    unsigned int modifiers = 0;
+  };
+
+  void *x11_display_ = nullptr;
+  unsigned int x11_watch_id_ = 0;
+  std::vector<Binding> bindings_;
+  std::vector<Grab> grabs_;
 };
 
-#endif  // GLOBALSHORTCUTSBACKEND_X11_H
+#endif

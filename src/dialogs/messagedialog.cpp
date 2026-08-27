@@ -1,83 +1,37 @@
-/*
- * Strawberry Music Player
- * Copyright 2020-2023, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "dialogs/messagedialog.h"
 
-#include "config.h"
+#include "translations/translations.h"
 
-#include <QDialog>
-#include <QDialogButtonBox>
-#include <QString>
-#include <QPixmap>
-#include <QIcon>
-#include <QLabel>
-#include <QPushButton>
-#include <QKeySequence>
-#include <QCheckBox>
-#include <QSettings>
+#include <adwaita.h>
 
-#include "core/settings.h"
-#include "utilities/screenutils.h"
-#include "messagedialog.h"
-#include "ui_messagedialog.h"
-
-MessageDialog::MessageDialog(QWidget *parent) : QDialog(parent), ui_(new Ui_MessageDialog), parent_(parent) {
-
-  ui_->setupUi(this);
-
-  setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
-
-  ui_->buttonBox->button(QDialogButtonBox::Ok)->setShortcut(QKeySequence::Close);
-
-  QObject::connect(ui_->checkbox_do_not_show_message_again, &QCheckBox::toggled, this, &MessageDialog::DoNotShowMessageAgain);
-
+void MessageDialog::Show(GtkWindow *parent, const std::string &title, const std::string &message) {
+  Show(parent, title, message, {}, false, {});
 }
 
-MessageDialog::~MessageDialog() { delete ui_; }
-
-void MessageDialog::ShowMessage(const QString &title, const QString &message, const QIcon &icon) {
-
-  setWindowTitle(title);
-
-  if (!icon.isNull()) {
-    const QPixmap pixmap = icon.pixmap(QSize(64, 64), devicePixelRatioF());
-    ui_->label_logo->setPixmap(pixmap);
+void MessageDialog::Show(GtkWindow *parent, const std::string &title, const std::string &message, const std::string &checkbox_label,
+                         bool checkbox_checked, const std::function<void(bool checked)> &closed) {
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(title.c_str()), Translations::CStr(message.c_str())));
+  adw_alert_dialog_add_response(dialog, "ok", Translations::CStr("OK"));
+  GtkWidget *check = nullptr;
+  if (!checkbox_label.empty()) {
+    check = gtk_check_button_new_with_label(Translations::CStr(checkbox_label.c_str()));
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(check), checkbox_checked ? TRUE : FALSE);
+    adw_alert_dialog_set_extra_child(dialog, check);
   }
-
-  ui_->label_text->setText(message);
-  ui_->label_text->adjustSize();
-  adjustSize();
-  setMinimumWidth(520);
-
-  if (parent_) {
-    Utilities::CenterWidgetOnScreen(Utilities::GetScreen(parent_), this);
+  if (closed) {
+    auto *fn = new std::function<void(bool)>(closed);
+    g_object_set_data_full(G_OBJECT(dialog), "message-closed", fn, [](gpointer p) { delete static_cast<std::function<void(bool)> *>(p); });
+    if (check) {
+      g_object_set_data(G_OBJECT(dialog), "message-check", check);
+    }
+    g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *, gpointer) {
+                       auto *callback = static_cast<std::function<void(bool)> *>(g_object_get_data(G_OBJECT(alert), "message-closed"));
+                       auto *box = GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(alert), "message-check"));
+                       if (callback && *callback) {
+                         (*callback)(box && gtk_check_button_get_active(box));
+                       }
+                     }),
+                     nullptr);
   }
-
-  show();
-
-}
-
-void MessageDialog::DoNotShowMessageAgain() {
-
-  if (!settings_group_.isEmpty() && !do_not_show_message_again_.isEmpty()) {
-    Settings s;
-    s.beginGroup(settings_group_);
-    s.setValue(do_not_show_message_again_, ui_->checkbox_do_not_show_message_again->isChecked());
-    s.endGroup();
-  }
-
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
 }

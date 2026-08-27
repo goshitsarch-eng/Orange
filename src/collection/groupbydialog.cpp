@@ -1,145 +1,108 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "collection/groupbydialog.h"
 
-#include "config.h"
+#include "collection/collectiongroupingsave.h"
+#include "collection/groupbydialoglabels.h"
+#include "collection/savedgroupingmanager.h"
+#include "translations/translations.h"
 
-#include <memory>
+#include <adwaita.h>
 
-#include <QDialog>
-#include <QWidget>
-#include <QComboBox>
-#include <QDialogButtonBox>
-#include <QPushButton>
-
-#include "collectionmodel.h"
-#include "groupbydialog.h"
-#include "ui_groupbydialog.h"
-
-#include <boost/multi_index/indexed_by.hpp>
-#include <boost/multi_index/member.hpp>
-#include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index/tag.hpp>
-#include <boost/multi_index_container.hpp>
-#include <boost/multi_index_container_fwd.hpp>
-#include <boost/operators.hpp>
-
-using std::make_unique;
-
-using boost::multi_index_container;
-using boost::multi_index::indexed_by;
-using boost::multi_index::ordered_unique;
-using boost::multi_index::tag;
-using boost::multi_index::member;
-
-namespace {
-
-struct Mapping {
-  Mapping(CollectionModel::GroupBy g, int i) : group_by(g), combo_box_index(i) {}
-
-  CollectionModel::GroupBy group_by;
-  int combo_box_index;
-};
-
-struct tag_index {};
-struct tag_group_by {};
-
-}  // namespace
-
-class GroupByDialogPrivate {
- private:
-  using MappingContainer = multi_index_container<Mapping, indexed_by<ordered_unique<tag<tag_index>, member<Mapping, int, &Mapping::combo_box_index>>, ordered_unique<tag<tag_group_by>, member<Mapping, CollectionModel::GroupBy, &Mapping::group_by>>>>;
-
- public:
-  MappingContainer mapping_;
-};
-
-GroupByDialog::GroupByDialog(QWidget *parent) : QDialog(parent), ui_(make_unique<Ui_GroupByDialog>()), p_(make_unique<GroupByDialogPrivate>()) {
-
-  ui_->setupUi(this);
-  Reset();
-
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::None, 0));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Artist, 1));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::AlbumArtist, 2));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Album, 3));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::AlbumDisc, 4));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Disc, 5));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Format, 6));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Genre, 7));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Year, 8));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::YearAlbum, 9));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::YearAlbumDisc, 10));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::OriginalYear, 11));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::OriginalYearAlbum, 12));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::OriginalYearAlbumDisc, 13));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Composer, 14));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Performer, 15));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Grouping, 16));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::FileType, 17));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Samplerate, 18));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Bitdepth, 19));
-  p_->mapping_.insert(Mapping(CollectionModel::GroupBy::Bitrate, 20));
-
-  QObject::connect(ui_->buttonbox->button(QDialogButtonBox::Reset), &QPushButton::clicked, this, &GroupByDialog::Reset);
-
-  resize(sizeHint());
-
-}
-
-GroupByDialog::~GroupByDialog() = default;
-
-void GroupByDialog::Reset() {
-
-  ui_->combobox_first->setCurrentIndex(2);   // Album Artist
-  ui_->combobox_second->setCurrentIndex(4);  // Album Disc
-  ui_->combobox_third->setCurrentIndex(0);   // None
-  ui_->checkbox_separate_albums_by_grouping->setChecked(false);
-
-}
-
-void GroupByDialog::accept() {
-
-  const auto &by_index = p_->mapping_.get<tag_index>();
-  const auto it1 = by_index.find(ui_->combobox_first->currentIndex());
-  const auto it2 = by_index.find(ui_->combobox_second->currentIndex());
-  const auto it3 = by_index.find(ui_->combobox_third->currentIndex());
-  Q_EMIT Accepted(CollectionModel::Grouping(
-      it1 != by_index.end() ? it1->group_by : CollectionModel::GroupBy::None,
-      it2 != by_index.end() ? it2->group_by : CollectionModel::GroupBy::None,
-      it3 != by_index.end() ? it3->group_by : CollectionModel::GroupBy::None),
-    ui_->checkbox_separate_albums_by_grouping->isChecked()
-   );
-  QDialog::accept();
-
-}
-
-void GroupByDialog::CollectionGroupingChanged(const CollectionModel::Grouping g, const bool separate_albums_by_grouping) {
-
-  const auto &by_group = p_->mapping_.get<tag_group_by>();
-  const auto it1 = by_group.find(g[0]);
-  const auto it2 = by_group.find(g[1]);
-  const auto it3 = by_group.find(g[2]);
-  ui_->combobox_first->setCurrentIndex(it1 != by_group.end() ? it1->combo_box_index : 0);
-  ui_->combobox_second->setCurrentIndex(it2 != by_group.end() ? it2->combo_box_index : 0);
-  ui_->combobox_third->setCurrentIndex(it3 != by_group.end() ? it3->combo_box_index : 0);
-  ui_->checkbox_separate_albums_by_grouping->setChecked(separate_albums_by_grouping);
-
+void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &current,
+                         const std::function<void(const CollectionGrouping::Grouping &)> &callback) {
+  AdwDialog *dialog = adw_dialog_new();
+  adw_dialog_set_title(dialog, Translations::CStr(GroupByDialogLabels::Title()));
+  adw_dialog_set_content_width(dialog, 420);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  gtk_widget_set_margin_start(box, 16);
+  gtk_widget_set_margin_end(box, 16);
+  gtk_widget_set_margin_top(box, 16);
+  gtk_widget_set_margin_bottom(box, 16);
+  GtkWidget *first = gtk_drop_down_new_from_strings(CollectionGrouping::kComboLabels);
+  GtkWidget *second = gtk_drop_down_new_from_strings(CollectionGrouping::kComboLabels);
+  GtkWidget *third = gtk_drop_down_new_from_strings(CollectionGrouping::kComboLabels);
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(first), CollectionGrouping::ComboIndex(current.first));
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(second), CollectionGrouping::ComboIndex(current.second));
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(third), CollectionGrouping::ComboIndex(current.third));
+  GtkWidget *separate = gtk_check_button_new_with_label("Separate albums by grouping tag");
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(separate), CollectionGrouping::SeparateAlbumsByGrouping());
+  GtkWidget *name = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(name), "Save as…");
+  GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  GtkWidget *apply = gtk_button_new_with_label(Translations::CStr("Apply"));
+  gtk_widget_add_css_class(apply, "suggested-action");
+  GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save"));
+  gtk_widget_set_sensitive(save, FALSE);
+  GtkWidget *manage = gtk_button_new_with_label(Translations::CStr("Manage"));
+  gtk_box_append(GTK_BOX(buttons), apply);
+  gtk_box_append(GTK_BOX(buttons), save);
+  gtk_box_append(GTK_BOX(buttons), manage);
+  auto *cb = new std::function<void(const CollectionGrouping::Grouping &)>(callback);
+  g_object_set_data_full(G_OBJECT(dialog), "callback", cb, [](gpointer p) {
+    delete static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(p);
+  });
+  g_object_set_data(G_OBJECT(dialog), "first", first);
+  g_object_set_data(G_OBJECT(dialog), "second", second);
+  g_object_set_data(G_OBJECT(dialog), "third", third);
+  g_object_set_data(G_OBJECT(dialog), "separate", separate);
+  g_object_set_data(G_OBJECT(dialog), "name", name);
+  g_object_set_data(G_OBJECT(apply), "dialog", dialog);
+  g_signal_connect(apply, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *fn = static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(data);
+                     GtkWidget *dlg = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "dialog"));
+                     CollectionGrouping::Grouping grouping;
+                     grouping.first = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "first")))));
+                     grouping.second = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "second")))));
+                     grouping.third = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "third")))));
+                     CollectionGrouping::SetSeparateAlbumsByGrouping(
+                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(dlg), "separate"))));
+                     (*fn)(grouping);
+                     adw_dialog_close(ADW_DIALOG(dlg));
+                   }),
+                   cb);
+  g_object_set_data(G_OBJECT(save), "dialog", dialog);
+  g_signal_connect(name, "changed", G_CALLBACK(+[](GtkEditable *editable, gpointer data) {
+                     const char *text = gtk_editable_get_text(editable);
+                     gtk_widget_set_sensitive(GTK_WIDGET(data), CollectionGroupingSave::AcceptName(text ? text : ""));
+                   }),
+                   save);
+  g_signal_connect(save, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
+                     GtkWidget *dlg = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "dialog"));
+                     const char *title = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(dlg), "name")));
+                     CollectionGrouping::Grouping grouping;
+                     grouping.first = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "first")))));
+                     grouping.second = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "second")))));
+                     grouping.third = CollectionGrouping::FromComboIndex(
+                         static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "third")))));
+                     if (!CollectionGroupingSave::Save(title ? title : "", grouping)) {
+                       return;
+                     }
+                   }),
+                   nullptr);
+  g_object_set_data(G_OBJECT(manage), "parent", parent);
+  g_signal_connect(manage, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *fn = static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(data);
+                     SavedGroupingManager::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), *fn);
+                   }),
+                   cb);
+  GtkWidget *intro = gtk_label_new(Translations::CStr(GroupByDialogLabels::Intro()));
+  gtk_label_set_wrap(GTK_LABEL(intro), TRUE);
+  gtk_widget_set_halign(intro, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(box), intro);
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(GroupByDialogLabels::GroupBy())));
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(GroupByDialogLabels::FirstLevel())));
+  gtk_box_append(GTK_BOX(box), first);
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(GroupByDialogLabels::SecondLevel())));
+  gtk_box_append(GTK_BOX(box), second);
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(GroupByDialogLabels::ThirdLevel())));
+  gtk_box_append(GTK_BOX(box), third);
+  gtk_box_append(GTK_BOX(box), separate);
+  gtk_box_append(GTK_BOX(box), name);
+  gtk_box_append(GTK_BOX(box), buttons);
+  adw_dialog_set_child(dialog, box);
+  adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

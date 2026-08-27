@@ -1,68 +1,39 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "globalshortcuts/globalshortcutsbackend.h"
 
-#include "config.h"
+GlobalShortcutsBackend::GlobalShortcutsBackend(GlobalShortcutsManager *manager, Type type) : manager_(manager), type_(type) {}
 
-#include <QObject>
-
-#include "globalshortcutsbackend.h"
-#include "globalshortcutsmanager.h"
-
-using namespace Qt::Literals::StringLiterals;
-
-GlobalShortcutsBackend::GlobalShortcutsBackend(GlobalShortcutsManager *manager, const Type type, QObject *parent)
-    : QObject(parent),
-      manager_(manager),
-      type_(type),
-      active_(false) {}
-
-QString GlobalShortcutsBackend::name() const {
-
+std::string GlobalShortcutsBackend::name() const {
   switch (type_) {
-    case Type::None:
-      return u"None"_s;
     case Type::KGlobalAccel:
-      return u"KGlobalAccel"_s;
+      return "KGlobalAccel";
+    case Type::Gnome:
+      return "Gnome";
     case Type::X11:
-      return u"X11"_s;
+      return "X11";
+    case Type::Portal:
+      return "Portal";
     case Type::macOS:
-      return u"macOS"_s;
+      return "macOS";
     case Type::Win:
-      return u"Windows"_s;
+      return "Win";
+    case Type::None:
+    default:
+      return "None";
   }
-
-  return QString();
-
 }
 
 bool GlobalShortcutsBackend::Register() {
-
-  bool ret = DoRegister();
-  if (ret) active_ = true;
-  return ret;
-
+  if (active_) {
+    return true;
+  }
+  active_ = DoRegister();
+  return active_;
 }
 
 void GlobalShortcutsBackend::Unregister() {
-
+  if (!active_) {
+    return;
+  }
   DoUnregister();
   active_ = false;
-
 }

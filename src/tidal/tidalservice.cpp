@@ -1,508 +1,375 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "tidal/tidalservice.h"
 
-#include "config.h"
-
-#include <memory>
-
-#include <QByteArray>
-#include <QString>
-#include <QUrl>
-#include <QTimer>
-
-#include "includes/shared_ptr.h"
-#include "core/logging.h"
-#include "core/settings.h"
-#include "core/database.h"
-#include "core/song.h"
-#include "core/taskmanager.h"
-#include "core/networkaccessmanager.h"
-#include "core/urlhandlers.h"
-#include "core/oauthenticator.h"
 #include "constants/tidalsettings.h"
-#include "streaming/streamingsearchview.h"
-#include "collection/collectionbackend.h"
-#include "collection/collectionmodel.h"
-#include "covermanager/albumcoverloader.h"
-#include "tidalservice.h"
-#include "tidalurlhandler.h"
-#include "tidalbaserequest.h"
-#include "tidalrequest.h"
-#include "tidalfavoriterequest.h"
-#include "tidalstreamurlrequest.h"
+#include "core/settings.h"
+#include "streaming/streamingalbum.h"
+#include "streaming/streamingauth.h"
+#include "streaming/streamingcover.h"
+#include "streaming/streamingprogress.h"
+#include "streaming/streamingsearchopts.h"
+#include "tidal/tidalfavoriterequest.h"
+#include "tidal/tidalloginurl.h"
+#include "tidal/tidalrequest.h"
+#include "tidal/tidalstreamurlrequest.h"
+#include "core/oauthpkce.h"
+#include "utilities/jsonutils.h"
+#include "utilities/randutils.h"
+#include "utilities/strutils.h"
 
-using namespace std::chrono_literals;
-using namespace Qt::Literals::StringLiterals;
-using std::make_shared;
-using namespace TidalSettings;
+#include <gio/gio.h>
 
-const Song::Source TidalService::kSource = Song::Source::Tidal;
+#include <cstdlib>
+#include <ctime>
 
 const char TidalService::kApiUrl[] = "https://api.tidalhifi.com/v1";
 const char TidalService::kResourcesUrl[] = "https://resources.tidal.com";
 
-namespace {
-
-constexpr char kOAuthUrl[] = "https://login.tidal.com/authorize";
-constexpr char kOAuthAccessTokenUrl[] = "https://login.tidal.com/oauth2/token";
-constexpr char kOAuthRedirectUrl[] = "tidal://login/auth";
-constexpr char kOAuthScope[] = "r_usr w_usr";
-
-constexpr char kArtistsSongsTable[] = "tidal_artists_songs";
-constexpr char kAlbumsSongsTable[] = "tidal_albums_songs";
-constexpr char kSongsTable[] = "tidal_songs";
-
-}  // namespace
-
-TidalService::TidalService(const SharedPtr<TaskManager> task_manager,
-                           const SharedPtr<Database> database,
-                           const SharedPtr<NetworkAccessManager> network,
-                           const SharedPtr<UrlHandlers> url_handlers,
-                           const SharedPtr<AlbumCoverLoader> albumcover_loader,
-                           QObject *parent)
-    : StreamingService(Song::Source::Tidal, u"Tidal"_s, u"tidal"_s, QLatin1String(TidalSettings::kSettingsGroup), parent),
-      network_(network),
-      url_handler_(new TidalUrlHandler(task_manager, this)),
-      oauth_(new OAuthenticator(network, this)),
-      artists_collection_backend_(nullptr),
-      albums_collection_backend_(nullptr),
-      songs_collection_backend_(nullptr),
-      artists_collection_model_(nullptr),
-      albums_collection_model_(nullptr),
-      songs_collection_model_(nullptr),
-      timer_search_delay_(new QTimer(this)),
-      favorite_request_(new TidalFavoriteRequest(this, network_, this)),
-      enabled_(false),
-      artistssearchlimit_(1),
-      albumssearchlimit_(1),
-      songssearchlimit_(1),
-      fetchalbums_(true),
-      download_album_covers_(true),
-      stream_url_method_(TidalSettings::StreamUrlMethod::StreamUrl),
-      album_explicit_(false),
-      remove_remastered_(true),
-      pending_search_id_(0),
-      next_pending_search_id_(1),
-      pending_search_type_(SearchType::Artists),
-      search_id_(0),
-      next_stream_url_request_id_(0) {
-
-  url_handlers->Register(url_handler_);
-
-  oauth_->set_settings_group(QLatin1String(kSettingsGroup));
-  oauth_->set_type(OAuthenticator::Type::Authorization_Code);
-  oauth_->set_authorize_url(QUrl(QLatin1String(kOAuthUrl)));
-  oauth_->set_redirect_url(QUrl(QLatin1String(kOAuthRedirectUrl)));
-  oauth_->set_access_token_url(QUrl(QLatin1String(kOAuthAccessTokenUrl)));
-  oauth_->set_scope(QLatin1String(kOAuthScope));
-  oauth_->set_use_local_redirect_server(false);
-  oauth_->set_random_port(false);
-  QObject::connect(oauth_, &OAuthenticator::AuthenticationFinished, this, &TidalService::OAuthFinished);
-
-  // Backends
-
-  artists_collection_backend_ = make_shared<CollectionBackend>();
-  artists_collection_backend_->moveToThread(database->thread());
-  artists_collection_backend_->Init(database, task_manager, Song::Source::Tidal, QLatin1String(kArtistsSongsTable));
-
-  albums_collection_backend_ = make_shared<CollectionBackend>();
-  albums_collection_backend_->moveToThread(database->thread());
-  albums_collection_backend_->Init(database, task_manager, Song::Source::Tidal, QLatin1String(kAlbumsSongsTable));
-
-  songs_collection_backend_ = make_shared<CollectionBackend>();
-  songs_collection_backend_->moveToThread(database->thread());
-  songs_collection_backend_->Init(database, task_manager, Song::Source::Tidal, QLatin1String(kSongsTable));
-
-  // Models
-  artists_collection_model_ = new CollectionModel(artists_collection_backend_, albumcover_loader, this);
-  albums_collection_model_ = new CollectionModel(albums_collection_backend_, albumcover_loader, this);
-  songs_collection_model_ = new CollectionModel(songs_collection_backend_, albumcover_loader, this);
-
-  // Search
-
-  timer_search_delay_->setSingleShot(true);
-  QObject::connect(timer_search_delay_, &QTimer::timeout, this, &TidalService::StartSearch);
-
-  QObject::connect(this, &TidalService::AddArtists, favorite_request_, &TidalFavoriteRequest::AddArtists);
-  QObject::connect(this, &TidalService::AddAlbums, favorite_request_, &TidalFavoriteRequest::AddAlbums);
-  QObject::connect(this, &TidalService::AddSongs, favorite_request_, QOverload<const SongList&>::of(&TidalFavoriteRequest::AddSongs));
-
-  QObject::connect(this, &TidalService::RemoveArtists, favorite_request_, &TidalFavoriteRequest::RemoveArtists);
-  QObject::connect(this, &TidalService::RemoveAlbums, favorite_request_, &TidalFavoriteRequest::RemoveAlbums);
-  QObject::connect(this, &TidalService::RemoveSongsByList, favorite_request_, QOverload<const SongList&>::of(&TidalFavoriteRequest::RemoveSongs));
-  QObject::connect(this, &TidalService::RemoveSongsByMap, favorite_request_, QOverload<const SongMap&>::of(&TidalFavoriteRequest::RemoveSongs));
-
-  QObject::connect(favorite_request_, &TidalFavoriteRequest::ArtistsAdded, &*artists_collection_backend_, &CollectionBackend::AddOrUpdateSongs);
-  QObject::connect(favorite_request_, &TidalFavoriteRequest::AlbumsAdded, &*albums_collection_backend_, &CollectionBackend::AddOrUpdateSongs);
-  QObject::connect(favorite_request_, &TidalFavoriteRequest::SongsAdded, &*songs_collection_backend_, &CollectionBackend::AddOrUpdateSongs);
-
-  QObject::connect(favorite_request_, &TidalFavoriteRequest::ArtistsRemoved, &*artists_collection_backend_, &CollectionBackend::DeleteSongs);
-  QObject::connect(favorite_request_, &TidalFavoriteRequest::AlbumsRemoved, &*albums_collection_backend_, &CollectionBackend::DeleteSongs);
-  QObject::connect(favorite_request_, &TidalFavoriteRequest::SongsRemoved, &*songs_collection_backend_, &CollectionBackend::DeleteSongs);
-
-  TidalService::ReloadSettings();
-  oauth_->LoadSession();
-
-}
-
-TidalService::~TidalService() {
-
-  while (!stream_url_requests_.isEmpty()) {
-    TidalStreamURLRequestPtr stream_url_request = stream_url_requests_.take(stream_url_requests_.firstKey());
-    QObject::disconnect(&*stream_url_request, nullptr, this, nullptr);
-  }
-
-}
-
-bool TidalService::authenticated() const {
-
-  return oauth_->authenticated();
-
-}
-
-QByteArray TidalService::authorization_header() const {
-
-  return oauth_->authorization_header();
-
-}
-
-QString TidalService::country_code() const {
-
-  return oauth_->country_code();
-
-}
-
-quint64 TidalService::user_id() const {
-
-  return oauth_->user_id();
-
-}
-
-void TidalService::Exit() {
-
-  wait_for_exit_ << &*artists_collection_backend_ << &*albums_collection_backend_ << &*songs_collection_backend_;
-
-  QObject::connect(&*artists_collection_backend_, &CollectionBackend::ExitFinished, this, &TidalService::ExitReceived);
-  QObject::connect(&*albums_collection_backend_, &CollectionBackend::ExitFinished, this, &TidalService::ExitReceived);
-  QObject::connect(&*songs_collection_backend_, &CollectionBackend::ExitFinished, this, &TidalService::ExitReceived);
-
-  artists_collection_backend_->ExitAsync();
-  albums_collection_backend_->ExitAsync();
-  songs_collection_backend_->ExitAsync();
-
-}
-
-void TidalService::ExitReceived() {
-
-  QObject *obj = sender();
-  QObject::disconnect(obj, nullptr, this, nullptr);
-  qLog(Debug) << obj << "successfully exited.";
-  wait_for_exit_.removeAll(obj);
-  if (wait_for_exit_.isEmpty()) Q_EMIT ExitFinished();
-
-}
+TidalService::TidalService(NetworkAccessManager *network) : network_(network) { ReloadSettings(); }
 
 void TidalService::ReloadSettings() {
-
-  Settings s;
-  s.beginGroup(TidalSettings::kSettingsGroup);
-  enabled_ = s.value(TidalSettings::kEnabled, TidalSettings::kDefaultEnabled).toBool();
-  client_id_ = s.value(TidalSettings::kClientId).toString();
-  quality_ = s.value(TidalSettings::kQuality, QLatin1String(TidalSettings::kDefaultQuality)).toString();
-  quint64 search_delay = s.value(TidalSettings::kSearchDelay, TidalSettings::kDefaultSearchDelay).toULongLong();
-  artistssearchlimit_ = s.value(TidalSettings::kArtistsSearchLimit, TidalSettings::kDefaultArtistsSearchLimit).toInt();
-  albumssearchlimit_ = s.value(TidalSettings::kAlbumsSearchLimit, TidalSettings::kDefaultAlbumsSearchLimit).toInt();
-  songssearchlimit_ = s.value(TidalSettings::kSongsSearchLimit, TidalSettings::kDefaultSongsSearchLimit).toInt();
-  fetchalbums_ = s.value(TidalSettings::kFetchAlbums, TidalSettings::kDefaultFetchAlbums).toBool();
-  coversize_ = s.value(TidalSettings::kCoverSize, QLatin1String(TidalSettings::kDefaultCoverSize)).toString();
-  download_album_covers_ = s.value(TidalSettings::kDownloadAlbumCovers, TidalSettings::kDefaultDownloadAlbumCovers).toBool();
-  stream_url_method_ = static_cast<TidalSettings::StreamUrlMethod>(s.value(TidalSettings::kStreamUrl, static_cast<int>(TidalSettings::kDefaultStreamUrl)).toInt());
-  album_explicit_ = s.value(TidalSettings::kAlbumExplicit, TidalSettings::kDefaultAlbumExplicit).toBool();
-  remove_remastered_ = s.value(TidalSettings::kRemoveRemastered, TidalSettings::kDefaultRemoveRemastered).toBool();
-  s.endGroup();
-
-  oauth_->set_client_id(client_id_);
-  timer_search_delay_->setInterval(static_cast<int>(search_delay));
-
-}
-
-void TidalService::StartAuthorization(const QString &client_id) {
-
-  oauth_->set_client_id(client_id);
-  oauth_->Authenticate();
-
-}
-
-void TidalService::OAuthFinished(const bool success, const QString &error) {
-
-  if (success) {
-    qLog(Debug) << "Tidal: Login successful" << "user id" << user_id();
-    Q_EMIT LoginFinished(true);
-    Q_EMIT LoginSuccess();
+  Settings settings;
+  settings.BeginGroup(TidalSettings::kSettingsGroup);
+  token_ = settings.Value("token");
+  if (token_.empty()) {
+    token_ = settings.Value(TidalSettings::kAccessToken);
   }
-  else {
-    Q_EMIT LoginFailure(error);
-    Q_EMIT LoginFinished(false);
+  refresh_token_ = settings.Value(TidalSettings::kRefreshToken);
+  expires_in_ = settings.IntValue(TidalSettings::kExpiresIn);
+  login_time_ = settings.Int64Value(TidalSettings::kLoginTime);
+  client_id_ = settings.Value(TidalSettings::kClientId);
+  client_secret_ = settings.Value("clientsecret");
+  country_code_ = settings.Value("countrycode", "US");
+  quality_ = settings.Value(TidalSettings::kQuality, TidalSettings::kDefaultQuality);
+  coversize_ = StreamingCover::ClampTidalCoverSize(settings.Value(TidalSettings::kCoverSize, TidalSettings::kDefaultCoverSize));
+  stream_url_method_ = TidalStreamUrlRequest::MethodFromSettings(
+      settings.IntValue(TidalSettings::kStreamUrl, static_cast<int>(TidalSettings::kDefaultStreamUrl)));
+  const std::string user_id = settings.Value("user_id");
+  user_id_ = user_id.empty() ? 0 : static_cast<uint64_t>(std::strtoull(user_id.c_str(), nullptr, 10));
+  logged_in_ = !token_.empty();
+}
+
+SongList TidalService::WithCoverSize(SongList songs) const {
+  StreamingCover::ApplyTidalCoverSize(songs, coversize_);
+  return songs;
+}
+
+void TidalService::StoreTokens(const OAuthenticator::TokenResponse &tokens) {
+  Settings settings;
+  settings.BeginGroup(TidalSettings::kSettingsGroup);
+  if (!tokens.access_token.empty()) {
+    settings.SetValue("token", tokens.access_token);
+    settings.SetValue(TidalSettings::kAccessToken, tokens.access_token);
   }
-
+  if (!tokens.refresh_token.empty()) {
+    settings.SetValue(TidalSettings::kRefreshToken, tokens.refresh_token);
+  }
+  if (tokens.expires_in > 0) {
+    settings.SetIntValue(TidalSettings::kExpiresIn, tokens.expires_in);
+    settings.SetInt64Value(TidalSettings::kLoginTime, static_cast<gint64>(std::time(nullptr)));
+  }
+  settings.Sync();
+  ReloadSettings();
+  NotifyAuthenticationChanged();
 }
 
-void TidalService::AuthorizationUrlReceived(const QUrl &url) {
-
-  oauth_->ExternalAuthorizationUrlReceived(url);
-
+void TidalService::Logout() {
+  StreamingAuth::ClearKeys(TidalSettings::kSettingsGroup,
+                           {"token", TidalSettings::kAccessToken, TidalSettings::kRefreshToken, TidalSettings::kExpiresIn,
+                            TidalSettings::kLoginTime});
+  token_.clear();
+  refresh_token_.clear();
+  expires_in_ = 0;
+  login_time_ = 0;
+  StreamingService::Logout();
 }
 
-void TidalService::ClearSession() {
-
-  oauth_->ClearSession();
-
+void TidalService::Login(const std::string &username, const std::string &password_or_token) {
+  Settings settings;
+  settings.BeginGroup(TidalSettings::kSettingsGroup);
+  if (!username.empty()) {
+    settings.SetValue("username", username);
+  }
+  settings.SetValue("token", password_or_token);
+  settings.SetValue(TidalSettings::kAccessToken, password_or_token);
+  settings.Sync();
+  ReloadSettings();
+  NotifyAuthenticationChanged();
 }
 
-void TidalService::GetArtists() {
+void TidalService::RememberPkce(const std::string &verifier, const std::string &challenge) {
+  code_verifier_ = verifier;
+  code_challenge_ = challenge;
+}
 
-  if (!authenticated()) {
-    Q_EMIT ArtistsResults(SongMap(), tr("Not authenticated with Tidal."));
-    Q_EMIT OpenSettingsDialog(kSource);
+void TidalService::StartAuthorization(const std::string &client_id) {
+  if (!client_id.empty()) {
+    client_id_ = client_id;
+  }
+  const std::string verifier = RandUtils::CryptographicRandomString(OAuthPkce::kVerifierLength);
+  RememberPkce(verifier, OAuthPkce::ChallengeS256(verifier));
+  const std::string url = TidalLoginUrl::AuthorizationRequestUrl(client_id_, code_challenge_);
+  g_app_info_launch_default_for_uri(url.c_str(), nullptr, nullptr);
+}
+
+void TidalService::AuthorizationUrlReceived(const std::string &url) {
+  const std::string failure = TidalLoginUrl::FailureFor(url, code_challenge_);
+  if (!failure.empty()) {
+    NotifyAuthenticationFailed(failure);
     return;
   }
-
-  artists_request_.reset(new TidalRequest(this, url_handler_, network_, TidalBaseRequest::Type::FavouriteArtists, this));
-  QObject::connect(&*artists_request_, &TidalRequest::Results, this, &TidalService::ArtistsResultsReceived);
-  QObject::connect(&*artists_request_, &TidalRequest::UpdateStatus, this, &TidalService::ArtistsUpdateStatusReceived);
-  QObject::connect(&*artists_request_, &TidalRequest::UpdateProgress, this, &TidalService::ArtistsUpdateProgressReceived);
-
-  artists_request_->Process();
-
-}
-
-
-void TidalService::ResetArtistsRequest() {
-
-  artists_request_.reset();
-
-}
-
-void TidalService::ArtistsResultsReceived(const int id, const SongMap &songs, const QString &error) {
-
-  Q_UNUSED(id);
-  Q_EMIT ArtistsResults(songs, error);
-  ResetArtistsRequest();
-
-}
-
-void TidalService::ArtistsUpdateStatusReceived(const int id, const QString &text) {
-  Q_UNUSED(id);
-  Q_EMIT ArtistsUpdateStatus(text);
-}
-
-void TidalService::ArtistsUpdateProgressReceived(const int id, const int progress) {
-  Q_UNUSED(id);
-  Q_EMIT ArtistsUpdateProgress(progress);
-}
-
-void TidalService::GetAlbums() {
-
-  if (!authenticated()) {
-    Q_EMIT AlbumsResults(SongMap(), tr("Not authenticated with Tidal."));
-    Q_EMIT OpenSettingsDialog(kSource);
+  if (!network_) {
+    NotifyAuthenticationFailed("No network");
     return;
   }
-
-  albums_request_.reset(new TidalRequest(this, url_handler_, network_, TidalBaseRequest::Type::FavouriteAlbums, this));
-  QObject::connect(&*albums_request_, &TidalRequest::Results, this, &TidalService::AlbumsResultsReceived);
-  QObject::connect(&*albums_request_, &TidalRequest::UpdateStatus, this, &TidalService::AlbumsUpdateStatusReceived);
-  QObject::connect(&*albums_request_, &TidalRequest::UpdateProgress, this, &TidalService::AlbumsUpdateProgressReceived);
-
-  albums_request_->Process();
-
+  auto *oauth = new OAuthenticator(network_);
+  oauth->set_redirect_uri(TidalLoginUrl::kRedirectUri);
+  oauth->ExchangeCode(TidalLoginUrl::kAccessTokenUrl, client_id_, client_secret_, TidalLoginUrl::AuthorizationCode(url),
+                      [this, oauth](const std::string &body, const std::string &error) {
+                        delete oauth;
+                        if (!error.empty()) {
+                          NotifyAuthenticationFailed(error);
+                          return;
+                        }
+                        const OAuthenticator::TokenResponse tokens = OAuthenticator::ParseTokenResponse(body);
+                        if (tokens.access_token.empty()) {
+                          NotifyAuthenticationFailed("Authentication reply from server is missing access token.");
+                          return;
+                        }
+                        StoreTokens(tokens);
+                      },
+                      code_verifier_);
 }
 
-void TidalService::ResetAlbumsRequest() {
-
-  albums_request_.reset();
-
-}
-
-void TidalService::AlbumsResultsReceived(const int id, const SongMap &songs, const QString &error) {
-
-  Q_UNUSED(id);
-  Q_EMIT AlbumsResults(songs, error);
-  ResetAlbumsRequest();
-
-}
-
-void TidalService::AlbumsUpdateStatusReceived(const int id, const QString &text) {
-  Q_UNUSED(id);
-  Q_EMIT AlbumsUpdateStatus(text);
-}
-
-void TidalService::AlbumsUpdateProgressReceived(const int id, const int progress) {
-  Q_UNUSED(id);
-  Q_EMIT AlbumsUpdateProgress(progress);
-}
-
-void TidalService::GetSongs() {
-
-  if (!authenticated()) {
-    Q_EMIT SongsResults(SongMap(), tr("Not authenticated with Tidal."));
-    Q_EMIT OpenSettingsDialog(kSource);
+void TidalService::EnsureFreshToken(std::function<void()> next) {
+  if (StreamingAuth::EnsureAction(login_time_, expires_in_, refresh_token_) == StreamingAuth::Action::Proceed) {
+    if (next) {
+      next();
+    }
     return;
   }
-
-  songs_request_.reset(new TidalRequest(this, url_handler_, network_, TidalBaseRequest::Type::FavouriteSongs, this));
-  QObject::connect(&*songs_request_, &TidalRequest::Results, this, &TidalService::SongsResultsReceived);
-  QObject::connect(&*songs_request_, &TidalRequest::UpdateStatus, this, &TidalService::SongsUpdateStatusReceived);
-  QObject::connect(&*songs_request_, &TidalRequest::UpdateProgress, this, &TidalService::SongsUpdateProgressReceived);
-
-  songs_request_->Process();
-
+  auto *oauth = new OAuthenticator(network_);
+  oauth->RefreshAccessToken(TidalLoginUrl::kAccessTokenUrl, client_id_, client_secret_, refresh_token_,
+                            [this, oauth, next](const std::string &body, const std::string &error) {
+                              delete oauth;
+                              if (!error.empty()) {
+                                Logout();
+                                NotifyAuthenticationFailed(error);
+                                return;
+                              }
+                              StoreTokens(OAuthenticator::ParseTokenResponse(body));
+                              if (next) {
+                                next();
+                              }
+                            });
 }
 
-void TidalService::ResetSongsRequest() {
-
-  songs_request_.reset();
-
-}
-
-void TidalService::SongsResultsReceived(const int id, const SongMap &songs, const QString &error) {
-
-  Q_UNUSED(id);
-  Q_EMIT SongsResults(songs, error);
-  ResetSongsRequest();
-
-}
-
-void TidalService::SongsUpdateStatusReceived(const int id, const QString &text) {
-  Q_UNUSED(id);
-  Q_EMIT SongsUpdateStatus(text);
-}
-
-void TidalService::SongsUpdateProgressReceived(const int id, const int progress) {
-  Q_UNUSED(id);
-  Q_EMIT SongsUpdateProgress(progress);
-}
-
-int TidalService::Search(const QString &text, const SearchType type) {
-
-  pending_search_id_ = next_pending_search_id_;
-  pending_search_text_ = text;
-  pending_search_type_ = type;
-
-  next_pending_search_id_++;
-
-  if (text.isEmpty()) {
-    timer_search_delay_->stop();
-    return pending_search_id_;
+std::map<std::string, std::string> TidalService::AuthHeaders() const {
+  if (token_.empty()) {
+    return {};
   }
-  timer_search_delay_->start();
-
-  return pending_search_id_;
-
+  return {{"Authorization", "Bearer " + token_}};
 }
 
-void TidalService::StartSearch() {
+void TidalService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
 
-  if (!authenticated()) {
-    Q_EMIT SearchResults(pending_search_id_, SongMap(), tr("Not authenticated with Tidal."));
-    Q_EMIT OpenSettingsDialog(kSource);
+void TidalService::Search(const std::string &query, SearchType type, SearchCallback callback) {
+  auto guarded = GuardSearch(std::move(callback));
+  const int gen = search_generation();
+  EnsureFreshToken([this, query, type, guarded, gen]() {
+    const auto request_type = TidalRequest::FromSearchType(type);
+    const int limit = StreamingSearchOpts::LimitFor(name(), type);
+    TidalRequest::GetAll(
+        network_,
+        [this, request_type, query](int offset, int page_limit) {
+          return TidalRequest::Url(kApiUrl, request_type, query, country_code_, user_id_, offset, page_limit);
+        },
+        AuthHeaders(), request_type,
+        [this, type, guarded, gen](const SongList &songs) {
+          const SongList cleaned = StreamingSearchOpts::Finish(songs, name());
+          auto deliver = [this, guarded, gen](const SongList &ready) {
+            DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(ready), guarded,
+                              [this](const std::string &text) { SearchUpdateStatus.Emit(last_search_id_, text); },
+                              [this](int received, int total) { ReportSearchProgress(received, total); },
+                              [this, gen]() { return SearchRequestCurrent(gen); });
+          };
+          if (!StreamingSearchOpts::ShouldFetchAlbums(name(), type)) {
+            deliver(cleaned);
+            return;
+          }
+          const std::vector<std::string> ids = StreamingSearchOpts::UniqueAlbumIds(cleaned);
+          if (ids.empty()) {
+            deliver(cleaned);
+            return;
+          }
+          SearchUpdateStatus.Emit(last_search_id_, StreamingProgress::RetrievingSongsForAlbums(static_cast<int>(ids.size())));
+          StreamingSearchOpts::FetchEachAlbum(
+              ids,
+              [this, gen](const std::string &id, SearchCallback done) {
+                if (!SearchRequestCurrent(gen)) {
+                  done({});
+                  return;
+                }
+                TidalRequest::GetAll(
+                    network_, [this, id](int offset, int page_limit) { return TidalRequest::AlbumSongsUrl(kApiUrl, id, country_code_, offset, page_limit); },
+                    AuthHeaders(), TidalRequest::Type::SearchSongs, std::move(done));
+              },
+              deliver, [this, gen]() { return SearchRequestCurrent(gen); },
+              [this](int received, int total) { ReportSearchProgress(received, total); });
+        },
+        [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit,
+        [this](const std::string &error) { NotifySearchFailed(error); });
+  });
+}
+
+void TidalService::GetArtists(SearchCallback callback) {
+  auto guarded = GuardArtists(std::move(callback));
+  const int gen = artists_generation();
+  EnsureFreshToken([this, guarded, gen]() {
+    TidalRequest::GetAll(
+        network_,
+        [this](int offset, int limit) {
+          return TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteArtists, {}, country_code_, user_id_, offset, limit);
+        },
+        AuthHeaders(), TidalRequest::Type::FavouriteArtists,
+        [this, guarded, gen](const SongList &songs) {
+          DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(songs), guarded, [this](const std::string &text) { ArtistsUpdateStatus.Emit(text); },
+                            [this](int received, int total) { ReportArtistsProgress(received, total); },
+                            [this, gen]() { return ArtistsRequestCurrent(gen); });
+        },
+        [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); },
+        StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyArtistsFailed(error); });
+  });
+}
+
+void TidalService::GetAlbums(SearchCallback callback) {
+  auto guarded = GuardAlbums(std::move(callback));
+  const int gen = albums_generation();
+  EnsureFreshToken([this, guarded, gen]() {
+    TidalRequest::GetAll(
+        network_,
+        [this](int offset, int limit) {
+          return TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteAlbums, {}, country_code_, user_id_, offset, limit);
+        },
+        AuthHeaders(), TidalRequest::Type::FavouriteAlbums,
+        [this, guarded, gen](const SongList &songs) {
+          DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(songs), guarded, [this](const std::string &text) { AlbumsUpdateStatus.Emit(text); },
+                            [this](int received, int total) { ReportAlbumsProgress(received, total); },
+                            [this, gen]() { return AlbumsRequestCurrent(gen); });
+        },
+        [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); },
+        StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyAlbumsFailed(error); });
+  });
+}
+
+void TidalService::GetSongs(SearchCallback callback) {
+  auto guarded = GuardSongs(std::move(callback));
+  const int gen = songs_generation();
+  EnsureFreshToken([this, guarded, gen]() {
+    TidalRequest::GetAll(
+        network_,
+        [this](int offset, int limit) {
+          return TidalRequest::Url(kApiUrl, TidalRequest::Type::FavouriteSongs, {}, country_code_, user_id_, offset, limit);
+        },
+        AuthHeaders(), TidalRequest::Type::FavouriteSongs,
+        [this, guarded, gen](const SongList &songs) {
+          DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(songs), guarded, [this](const std::string &text) { SongsUpdateStatus.Emit(text); },
+                            [this](int received, int total) { ReportSongsProgress(received, total); },
+                            [this, gen]() { return SongsRequestCurrent(gen); });
+        },
+        [this](int received, int total) { ReportSongsProgress(received, total); }, [this, gen]() { return SongsRequestCurrent(gen); },
+        StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifySongsFailed(error); });
+  });
+}
+
+void TidalService::GetArtistAlbums(const Song &artist, SearchCallback callback) {
+  const std::string id = artist.artist_id();
+  if (id.empty()) {
+    if (callback) {
+      callback({});
+    }
     return;
   }
-
-  search_id_ = pending_search_id_;
-  search_text_ = pending_search_text_;
-
-  SendSearch();
-
+  EnsureFreshToken([this, id, callback]() {
+    TidalRequest::GetAll(network_,
+                         [this, id](int offset, int limit) { return TidalRequest::ArtistAlbumsUrl(kApiUrl, id, country_code_, offset, limit); },
+                         AuthHeaders(), TidalRequest::Type::SearchAlbums,
+                         [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(songs), callback); });
+  });
 }
 
-void TidalService::CancelSearch() {}
+void TidalService::GetAlbumSongs(const Song &album, SearchCallback callback) {
+  const std::string id = album.album_id();
+  if (id.empty()) {
+    if (callback) {
+      callback({});
+    }
+    return;
+  }
+  EnsureFreshToken([this, id, album, callback]() {
+    TidalRequest::GetAll(network_,
+                         [this, id](int offset, int limit) { return TidalRequest::AlbumSongsUrl(kApiUrl, id, country_code_, offset, limit); },
+                         AuthHeaders(), TidalRequest::Type::SearchSongs, [this, album, callback](const SongList &songs) {
+                           SongList copy = songs;
+                           StreamingAlbum::ApplyParent(copy, album);
+                           DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(copy), callback);
+                         });
+  });
+}
 
-void TidalService::SendSearch() {
-
-  TidalBaseRequest::Type query_type = TidalBaseRequest::Type::None;
-
-  switch (pending_search_type_) {
-    case SearchType::Artists:
-      query_type = TidalBaseRequest::Type::SearchArtists;
-      break;
-    case SearchType::Albums:
-      query_type = TidalBaseRequest::Type::SearchAlbums;
-      break;
-    case SearchType::Songs:
-      query_type = TidalBaseRequest::Type::SearchSongs;
-      break;
-    default:
-      // Error("Invalid search type.");
+UrlHandler::LoadResult TidalService::Load(const std::string &url, AsyncCallback callback) {
+  LoadResult result;
+  result.media_url = url;
+  const std::string id = TidalStreamUrlRequest::TrackId(url);
+  if (!network_ || id.empty()) {
+    result.error = "Tidal is not signed in";
+    if (callback) {
+      callback(result);
+    }
+    return result;
+  }
+  result.type = LoadResult::Type::WillLoadAsynchronously;
+  EnsureFreshToken([this, url, id, callback]() {
+    if (token_.empty()) {
+      LoadResult async;
+      async.media_url = url;
+      async.error = "Tidal is not signed in";
+      async.type = LoadResult::Type::Error;
+      if (callback) {
+        callback(async);
+      }
       return;
-  }
-
-  search_request_.reset(new TidalRequest(this, url_handler_, network_, query_type, this));
-  QObject::connect(&*search_request_, &TidalRequest::Results, this, &TidalService::SearchResultsReceived);
-  QObject::connect(&*search_request_, &TidalRequest::UpdateStatus, this, &TidalService::SearchUpdateStatus);
-  QObject::connect(&*search_request_, &TidalRequest::UpdateProgress, this, &TidalService::SearchUpdateProgress);
-
-  search_request_->Search(search_id_, search_text_);
-  search_request_->Process();
-
+    }
+    TidalStreamUrlRequest::Get(network_, TidalStreamUrlRequest::Url(kApiUrl, stream_url_method_, id, country_code_, quality_), AuthHeaders(),
+                               url, id, callback);
+  });
+  return result;
 }
 
-void TidalService::SearchResultsReceived(const int id, const SongMap &songs, const QString &error) {
-
-  Q_EMIT SearchResults(id, songs, error);
-  search_request_.reset();
-
+void TidalService::GetFavorites(FavoriteType type, SearchCallback callback) {
+  auto guarded = GuardFavorites(std::move(callback));
+  const int gen = favorites_generation();
+  EnsureFreshToken([this, type, guarded, gen]() {
+    TidalFavoriteRequest::Get(
+        network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type,
+        [this, guarded, gen](const SongList &songs) {
+          DeliverWithCovers(network_, AuthHeaders(), WithCoverSize(songs), guarded,
+                            [this](const std::string &text) { FavoritesUpdateStatus.Emit(text); },
+                            [this](int received, int total) { ReportFavoritesProgress(received, total); },
+                            [this, gen]() { return FavoritesRequestCurrent(gen); });
+        },
+        [this](int received, int total) { ReportFavoritesProgress(received, total); }, [this, gen]() { return FavoritesRequestCurrent(gen); },
+        [this](const std::string &error) { NotifyFavoritesFailed(error); });
+  });
 }
 
-uint TidalService::GetStreamURL(const QUrl &url, QString &error) {
-
-  if (!authenticated()) {
-    error = tr("Not authenticated with Tidal.");
-    return 0;
-  }
-
-  uint id = 0;
-  while (id == 0) id = ++next_stream_url_request_id_;
-  TidalStreamURLRequestPtr stream_url_request = TidalStreamURLRequestPtr(new TidalStreamURLRequest(this, network_, url, id), &QObject::deleteLater);
-  stream_url_requests_.insert(id, stream_url_request);
-  QObject::connect(&*stream_url_request, &TidalStreamURLRequest::StreamURLFailure, this, &TidalService::HandleStreamURLFailure);
-  QObject::connect(&*stream_url_request, &TidalStreamURLRequest::StreamURLSuccess, this, &TidalService::HandleStreamURLSuccess);
-  stream_url_request->Process();
-
-  return id;
-
+void TidalService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  EnsureFreshToken([this, type, songs, callback]() {
+    TidalFavoriteRequest::Add(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, songs, callback);
+  });
 }
 
-void TidalService::HandleStreamURLFailure(const uint id, const QUrl &media_url, const QString &error) {
-
-  if (!stream_url_requests_.contains(id)) return;
-  stream_url_requests_.remove(id);
-
-  Q_EMIT StreamURLFailure(id, media_url, error);
-
-}
-
-void TidalService::HandleStreamURLSuccess(const uint id, const QUrl &media_url, const QUrl &stream_url, const Song::FileType filetype, const int samplerate, const int bit_depth, const qint64 duration) {
-
-  if (!stream_url_requests_.contains(id)) return;
-  stream_url_requests_.remove(id);
-
-  Q_EMIT StreamURLSuccess(id, media_url, stream_url, filetype, samplerate, bit_depth, duration);
-
+void TidalService::RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
+  EnsureFreshToken([this, type, songs, callback]() {
+    TidalFavoriteRequest::Remove(network_, kApiUrl, user_id_, country_code_, AuthHeaders(), type, songs, callback);
+  });
 }

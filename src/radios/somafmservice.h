@@ -1,62 +1,20 @@
-/*
- * Strawberry Music Player
- * Copyright 2021-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_SOMAFMSERVICE_H
+#define STRAWBERRY_SOMAFMSERVICE_H
 
-#ifndef SOMAFMSERVICE_H
-#define SOMAFMSERVICE_H
+#include "radios/radioservices.h"
 
-#include <QObject>
-#include <QList>
-#include <QUrl>
+#include <string>
+#include <vector>
 
-#include "radioservice.h"
-#include "radiochannel.h"
-
-class QNetworkReply;
-
-class TaskManager;
-class NetworkAccessManager;
-
-class SomaFMService : public RadioService {
-  Q_OBJECT
-
+class SomaFMService {
  public:
-  explicit SomaFMService(const SharedPtr<TaskManager> task_manager, const SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
-  ~SomaFMService() override;
+  static const char *kApiChannelsUrl;
+  static const char *kQualityDefault;
 
-  QUrl Homepage() override;
-  QUrl Donate() override;
-
-  void Abort();
-
- public Q_SLOTS:
-  void GetChannels() override;
-
- private:
-  void GetStreamUrl(const int task_id, const RadioChannel &channel);
-
- private Q_SLOTS:
-  void GetChannelsReply(QNetworkReply *reply, const int task_id);
-  void GetStreamUrlsReply(QNetworkReply *reply, const int task_id, RadioChannel channel);
-
- private:
-  QList<QNetworkReply*> replies_;
-  RadioChannelList channels_;
+  static std::string Homepage();
+  static std::string Donate();
+  static std::string NormalizeQuality(const std::string &quality);
+  static std::vector<RadioChannel> ParseChannels(const std::string &json, const std::string &quality);
 };
 
-#endif  // SOMAFMSERVICE_H
+#endif

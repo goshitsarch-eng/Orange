@@ -1,259 +1,152 @@
-/*
- * Strawberry Music Player
- * Copyright 2019-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "qobuz/qobuzfavoriterequest.h"
 
-#include "config.h"
+#include "qobuz/qobuzrequest.h"
+#include "utilities/jsonutils.h"
+#include "utilities/strutils.h"
 
-#include <QByteArray>
-#include <QString>
-#include <QStringList>
-#include <QUrl>
-#include <QNetworkReply>
+#include <algorithm>
 
-#include "includes/shared_ptr.h"
-#include "core/logging.h"
-#include "core/networkaccessmanager.h"
-#include "core/song.h"
-#include "qobuzservice.h"
-#include "qobuzbaserequest.h"
-#include "qobuzfavoriterequest.h"
+namespace QobuzFavoriteRequest {
 
-using namespace Qt::Literals::StringLiterals;
-
-QobuzFavoriteRequest::QobuzFavoriteRequest(QobuzService *service, const SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : QobuzBaseRequest(service, network, parent) {}
-
-QString QobuzFavoriteRequest::FavoriteText(const FavoriteType type) {
-
+std::string FavoriteText(FavoriteType type) {
   switch (type) {
     case FavoriteType::Artists:
-      return u"artists"_s;
+      return "artists";
     case FavoriteType::Albums:
-      return u"albums"_s;
+      return "albums";
     case FavoriteType::Songs:
-      return u"tracks"_s;
+      return "tracks";
   }
-
-  return QString();
-
+  return {};
 }
 
-QString QobuzFavoriteRequest::FavoriteMethod(const FavoriteType type) {
-
+std::string FavoriteMethod(FavoriteType type) {
   switch (type) {
     case FavoriteType::Artists:
-      return u"artist_ids"_s;
-      break;
+      return "artist_ids";
     case FavoriteType::Albums:
-      return u"album_ids"_s;
-      break;
+      return "album_ids";
     case FavoriteType::Songs:
-      return u"track_ids"_s;
-      break;
+      return "track_ids";
   }
-
-  return QString();
-
+  return {};
 }
 
-void QobuzFavoriteRequest::AddArtists(const SongList &songs) {
-  AddFavorites(FavoriteType::Artists, songs);
-}
-
-void QobuzFavoriteRequest::AddAlbums(const SongList &songs) {
-  AddFavorites(FavoriteType::Albums, songs);
-}
-
-void QobuzFavoriteRequest::AddSongs(const SongList &songs) {
-  AddFavorites(FavoriteType::Songs, songs);
-}
-
-void QobuzFavoriteRequest::AddSongs(const SongMap &songs) {
-  AddFavoritesRequest(FavoriteType::Songs, songs.keys(), songs.values());
-}
-
-void QobuzFavoriteRequest::AddFavorites(const FavoriteType type, const SongList &songs) {
-
-  QStringList ids_list;
+std::vector<std::string> IdsFromSongs(FavoriteType type, const SongList &songs) {
+  std::vector<std::string> ids;
   for (const Song &song : songs) {
-    QString id;
+    std::string id;
     switch (type) {
       case FavoriteType::Artists:
-        if (song.artist_id().isEmpty()) continue;
         id = song.artist_id();
         break;
       case FavoriteType::Albums:
-        if (song.album_id().isEmpty()) continue;
         id = song.album_id();
         break;
       case FavoriteType::Songs:
-        if (song.song_id().isEmpty()) continue;
         id = song.song_id();
         break;
     }
-    if (!id.isEmpty() && !ids_list.contains(id)) {
-      ids_list << id;
+    if (id.empty()) {
+      continue;
+    }
+    if (std::find(ids.begin(), ids.end(), id) == ids.end()) {
+      ids.push_back(id);
     }
   }
-
-  if (ids_list.isEmpty()) return;
-
-  AddFavoritesRequest(type, ids_list, songs);
-
+  return ids;
 }
 
-void QobuzFavoriteRequest::AddFavoritesRequest(const FavoriteType type, const QStringList &ids_list, const SongList &songs) {
-
-  const ParamList params = ParamList() << Param(u"app_id"_s, service_->app_id())
-                                       << Param(u"user_auth_token"_s, service_->user_auth_token())
-                                       << Param(FavoriteMethod(type), ids_list.join(u','));
-
-  QNetworkReply *reply = CreateRequest(u"favorite/create"_s, params);
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, type, songs]() { AddFavoritesReply(reply, type, songs); });
-
-}
-
-void QobuzFavoriteRequest::AddFavoritesReply(QNetworkReply *reply, const FavoriteType type, const SongList &songs) {
-
-  if (replies_.contains(reply)) {
-    replies_.removeAll(reply);
-    QObject::disconnect(reply, nullptr, this, nullptr);
-    reply->deleteLater();
-  }
-  else {
-    return;
-  }
-
-  const JsonObjectResult json_object_result = ParseJsonObject(reply);
-  if (!json_object_result.success()) {
-    Error(json_object_result.error_message);
-    return;
-  }
-
-  qLog(Debug) << "Qobuz:" << songs.count() << "songs added to" << FavoriteText(type) << "favorites.";
-
-  switch (type) {
-    case FavoriteType::Artists:
-      Q_EMIT ArtistsAdded(songs);
-      break;
-    case FavoriteType::Albums:
-      Q_EMIT AlbumsAdded(songs);
-      break;
-    case FavoriteType::Songs:
-      Q_EMIT SongsAdded(songs);
-      break;
-  }
-
-}
-
-void QobuzFavoriteRequest::RemoveArtists(const SongList &songs) {
-  RemoveFavorites(FavoriteType::Artists, songs);
-}
-
-void QobuzFavoriteRequest::RemoveAlbums(const SongList &songs) {
-  RemoveFavorites(FavoriteType::Albums, songs);
-}
-
-void QobuzFavoriteRequest::RemoveSongs(const SongList &songs) {
-  RemoveFavorites(FavoriteType::Songs, songs);
-}
-
-void QobuzFavoriteRequest::RemoveSongs(const SongMap &songs) {
-  RemoveFavoritesRequest(FavoriteType::Songs, songs.keys(), songs.values());
-}
-
-void QobuzFavoriteRequest::RemoveFavorites(const FavoriteType type, const SongList &songs) {
-
-  QStringList ids_list;
-  for (const Song &song : songs) {
-    QString id;
-    switch (type) {
-      case FavoriteType::Artists:
-        if (song.artist_id().isEmpty()) continue;
-        id = song.artist_id();
-        break;
-      case FavoriteType::Albums:
-        if (song.album_id().isEmpty()) continue;
-        id = song.album_id();
-        break;
-      case FavoriteType::Songs:
-        if (song.song_id().isEmpty()) continue;
-        id = song.song_id();
-        break;
+std::string JoinedIds(const std::vector<std::string> &ids) {
+  std::string joined;
+  for (size_t i = 0; i < ids.size(); ++i) {
+    if (i > 0) {
+      joined += ",";
     }
-    if (!id.isEmpty() && !ids_list.contains(id)) {
-      ids_list << id;
+    joined += ids[i];
+  }
+  return joined;
+}
+
+std::string AuthQuery(const std::string &app_id, const std::string &user_auth_token) {
+  std::string query;
+  if (!app_id.empty()) {
+    query += "&app_id=" + StrUtils::UriEscape(app_id);
+  }
+  if (!user_auth_token.empty()) {
+    query += "&user_auth_token=" + StrUtils::UriEscape(user_auth_token);
+  }
+  return query;
+}
+
+std::string ListUrl(const std::string &api_url, FavoriteType type, const std::string &app_id, const std::string &user_auth_token, int offset,
+                    int limit) {
+  std::string url = api_url + "/favorite/getUserFavorites?type=" + FavoriteText(type) + AuthQuery(app_id, user_auth_token);
+  if (limit > 0) {
+    url += "&limit=" + std::to_string(limit);
+  }
+  if (offset > 0) {
+    url += "&offset=" + std::to_string(offset);
+  }
+  return url;
+}
+
+std::string CreateUrl(const std::string &api_url, FavoriteType type, const std::vector<std::string> &ids, const std::string &app_id,
+                      const std::string &user_auth_token) {
+  return api_url + "/favorite/create?" + FavoriteMethod(type) + "=" + StrUtils::UriEscape(JoinedIds(ids)) + AuthQuery(app_id, user_auth_token);
+}
+
+std::string DeleteUrl(const std::string &api_url, FavoriteType type, const std::vector<std::string> &ids, const std::string &app_id,
+                      const std::string &user_auth_token) {
+  return api_url + "/favorite/delete?" + FavoriteMethod(type) + "=" + StrUtils::UriEscape(JoinedIds(ids)) + AuthQuery(app_id, user_auth_token);
+}
+
+SongList Parse(FavoriteType type, const std::string &json) { return QobuzRequest::Parse(QobuzRequest::FromFavoriteType(type), json); }
+
+void Get(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
+         const std::map<std::string, std::string> &headers, FavoriteType type, SearchCallback callback,
+         StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current, StreamingPage::ErrorCallback error) {
+  QobuzRequest::GetAll(
+      network,
+      [api_url, app_id, user_auth_token, type](int offset, int limit) { return ListUrl(api_url, type, app_id, user_auth_token, offset, limit); },
+      headers, QobuzRequest::FromFavoriteType(type), std::move(callback), std::move(progress), std::move(still_current),
+      StreamingPage::kDefaultLimit, 0, std::move(error));
+}
+
+void Add(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
+         const std::map<std::string, std::string> &headers, FavoriteType type, const SongList &songs, SearchCallback callback) {
+  const std::vector<std::string> ids = IdsFromSongs(type, songs);
+  if (!network || ids.empty()) {
+    if (callback) {
+      callback({});
     }
-  }
-
-  if (ids_list.isEmpty()) return;
-
-  RemoveFavoritesRequest(type, ids_list, songs);
-
-}
-
-void QobuzFavoriteRequest::RemoveFavoritesRequest(const FavoriteType type, const QStringList &ids_list, const SongList &songs) {
-
-  const ParamList params = ParamList() << Param(u"app_id"_s, service_->app_id())
-                                       << Param(u"user_auth_token"_s, service_->user_auth_token())
-                                       << Param(FavoriteMethod(type), ids_list.join(u','));
-
-  QNetworkReply *reply = CreateRequest(u"favorite/delete"_s, params);
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, type, songs]() { RemoveFavoritesReply(reply, type, songs); });
-
-}
-
-void QobuzFavoriteRequest::RemoveFavoritesReply(QNetworkReply *reply, const FavoriteType type, const SongList &songs) {
-
-  if (replies_.contains(reply)) {
-    replies_.removeAll(reply);
-    QObject::disconnect(reply, nullptr, this, nullptr);
-    reply->deleteLater();
-  }
-  else {
     return;
   }
+  network->Get(CreateUrl(api_url, type, ids, app_id, user_auth_token),
+               [callback, songs](const NetworkAccessManager::Response &response) {
+                 if (callback) {
+                   callback(response.ok() ? songs : SongList{});
+                 }
+               },
+               headers);
+}
 
-  const JsonObjectResult json_object_result = ParseJsonObject(reply);
-  if (!json_object_result.success()) {
-    Error(json_object_result.error_message);
+void Remove(NetworkAccessManager *network, const std::string &api_url, const std::string &app_id, const std::string &user_auth_token,
+            const std::map<std::string, std::string> &headers, FavoriteType type, const SongList &songs, SearchCallback callback) {
+  const std::vector<std::string> ids = IdsFromSongs(type, songs);
+  if (!network || ids.empty()) {
+    if (callback) {
+      callback({});
+    }
     return;
   }
-
-  qLog(Debug) << "Qobuz:" << songs.count() << "songs removed from" << FavoriteText(type) << "favorites.";
-
-  switch (type) {
-    case FavoriteType::Artists:
-      Q_EMIT ArtistsRemoved(songs);
-      break;
-    case FavoriteType::Albums:
-      Q_EMIT AlbumsRemoved(songs);
-      break;
-    case FavoriteType::Songs:
-      Q_EMIT SongsRemoved(songs);
-      break;
-  }
-
+  network->Get(DeleteUrl(api_url, type, ids, app_id, user_auth_token),
+               [callback, songs](const NetworkAccessManager::Response &response) {
+                 if (callback) {
+                   callback(response.ok() ? songs : SongList{});
+                 }
+               },
+               headers);
 }
 
-void QobuzFavoriteRequest::Error(const QString &error, const QVariant &debug) {
-
-  qLog(Error) << "Qobuz:" << error;
-  if (debug.isValid()) qLog(Debug) << debug;
-
-}
+}  // namespace QobuzFavoriteRequest

@@ -1,589 +1,890 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "organize/organizedialog.h"
 
-#include "config.h"
-
-#include <algorithm>
-#include <utility>
-#include <functional>
-#include <memory>
-
-#include <QtGlobal>
-#include <QGuiApplication>
-#include <QtConcurrentRun>
-#include <QFuture>
-#include <QFutureWatcher>
-#include <QAbstractItemModel>
-#include <QDialog>
-#include <QScreen>
-#include <QHash>
-#include <QMap>
-#include <QDir>
-#include <QFileInfo>
-#include <QString>
-#include <QStringList>
-#include <QUrl>
-#include <QAction>
-#include <QMenu>
-#include <QCheckBox>
-#include <QComboBox>
-#include <QDialogButtonBox>
-#include <QGroupBox>
-#include <QListWidget>
-#include <QPushButton>
-#include <QStackedWidget>
-#include <QToolButton>
-#include <QShowEvent>
-#include <QCloseEvent>
-#include <QSettings>
-
-#include "includes/shared_ptr.h"
-#include "core/logging.h"
-#include "core/iconloader.h"
-#include "core/musicstorage.h"
+#include "collection/collectionlibrary.h"
+#include "constants/organizesettings.h"
+#include "core/application.h"
 #include "core/settings.h"
-#include "utilities/strutils.h"
-#include "utilities/screenutils.h"
-#include "widgets/freespacebar.h"
-#include "widgets/linetextedit.h"
+#include "device/connecteddevice.h"
+#include "device/devicecopyjob.h"
+#include "device/devicecopyrunner.h"
+#include "device/devicemanager.h"
+#include "organize/organize.h"
+#include "organize/organizejob.h"
+#include "organize/organizepathnotify.h"
+#include "core/standardpaths.h"
+#include "organize/organizeerrordialog.h"
+#include "organize/organizeformat.h"
+#include "organize/organizeformatvalidator.h"
+#include "organize/organizeloading.h"
+#include "organize/organizepreview.h"
+#include "organize/organizesyntaxhighlighter.h"
 #include "tagreader/tagreaderclient.h"
-#include "collection/collectionbackend.h"
-#include "organize.h"
-#include "organizeformat.h"
-#include "organizesyntaxhighlighter.h"
-#include "organizedialog.h"
-#include "organizeerrordialog.h"
-#include "ui_organizedialog.h"
-#include "transcoder/transcoder.h"
+#include "organize/organizetokenhelp.h"
+#include "organize/organizetranscode.h"
+#include "translations/translations.h"
+#include "utilities/fileutils.h"
+#include "widgets/freespacebar.h"
 
-using std::make_unique;
-using namespace Qt::Literals::StringLiterals;
+#include <adwaita.h>
+
+#include <memory>
+#include <thread>
+#include <vector>
 
 namespace {
-constexpr char kSettingsGroup[] = "OrganizeDialog";
-constexpr char kDefaultFormat[] = "%albumartist/%album{ (Disc %disc)}/{%track - }{%albumartist - }%album{ (Disc %disc)} - %title.%extension";
-constexpr char kGeometry[] = "geometry";
-constexpr char kFormat[] = "format";
-constexpr char kRemoveProblematic[] = "remove_problematic";
-constexpr char kRemoveNonFat[] = "remove_non_fat";
-constexpr char kRemoveNonAscii[] = "remove_non_ascii";
-constexpr char kAllowAsciiExt[] = "allow_ascii_ext";
-constexpr char kReplaceSpaces[] = "replace_spaces";
-constexpr char kOverwrite[] = "overwrite";
-constexpr char kAlbumCover[] = "albumcover";
-constexpr char kEjectAfter[] = "eject_after";
-constexpr char kDestination[] = "destination";
-}  // namespace
 
-OrganizeDialog::OrganizeDialog(const SharedPtr<TaskManager> task_manager,
-                               const SharedPtr<TagReaderClient> tagreader_client,
-                               const SharedPtr<CollectionBackend> collection_backend,
-                               QWidget *parentwindow,
-                               QWidget *parent)
-    : QDialog(parent),
-      parentwindow_(parentwindow),
-      ui_(new Ui_OrganizeDialog),
-      task_manager_(task_manager),
-      tagreader_client_(tagreader_client),
-      collection_backend_(collection_backend),
-      total_size_(0),
-      devices_(false) {
-
-  ui_->setupUi(this);
-
-  setWindowFlags(windowFlags() | Qt::WindowMaximizeButtonHint);
-
-  QPushButton *button_save = ui_->button_box->addButton(u"Save settings"_s, QDialogButtonBox::ApplyRole);
-  QObject::connect(button_save, &QPushButton::clicked, this, &OrganizeDialog::SaveSettings);
-  button_save->setIcon(IconLoader::Load(u"document-save"_s));
-  ui_->button_box->button(QDialogButtonBox::RestoreDefaults)->setIcon(IconLoader::Load(u"edit-undo"_s));
-  QObject::connect(ui_->button_box->button(QDialogButtonBox::RestoreDefaults), &QPushButton::clicked, this, &OrganizeDialog::RestoreDefaults);
-
-  ui_->aftercopying->setItemIcon(1, IconLoader::Load(u"edit-delete"_s));
-
-  // Valid tags
-  QMap<QString, QString> tags;
-  tags[tr("Title")] = u"title"_s;
-  tags[tr("Album")] = u"album"_s;
-  tags[tr("Artist")] = u"artist"_s;
-  tags[tr("Artist's initial")] = u"artistinitial"_s;
-  tags[tr("Album artist")] = u"albumartist"_s;
-  tags[tr("Composer")] = u"composer"_s;
-  tags[tr("Performer")] = u"performer"_s;
-  tags[tr("Grouping")] = u"grouping"_s;
-  tags[tr("Track")] = u"track"_s;
-  tags[tr("Disc")] = u"disc"_s;
-  tags[tr("Year")] = u"year"_s;
-  tags[tr("Original year")] = u"originalyear"_s;
-  tags[tr("Genre")] = u"genre"_s;
-  tags[tr("Comment")] = u"comment"_s;
-  tags[tr("Length")] = u"length"_s;
-  tags[tr("Bitrate", "Refers to bitrate in file organize dialog.")] = u"bitrate"_s;
-  tags[tr("Sample rate")] = u"samplerate"_s;
-  tags[tr("Bit depth")] = u"bitdepth"_s;
-  tags[tr("File extension")] = u"extension"_s;
-
-  // Naming scheme input field
-  new OrganizeSyntaxHighlighter(ui_->naming);
-
-  QObject::connect(ui_->destination, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &OrganizeDialog::UpdatePreviews);
-  QObject::connect(ui_->naming, &LineTextEdit::textChanged, this, &OrganizeDialog::UpdatePreviews);
-  QObject::connect(ui_->remove_problematic, &QCheckBox::toggled, this, &OrganizeDialog::UpdatePreviews);
-  QObject::connect(ui_->remove_non_fat, &QCheckBox::toggled, this, &OrganizeDialog::UpdatePreviews);
-  QObject::connect(ui_->remove_non_ascii, &QCheckBox::toggled, this, &OrganizeDialog::UpdatePreviews);
-  QObject::connect(ui_->allow_ascii_ext, &QCheckBox::toggled, this, &OrganizeDialog::UpdatePreviews);
-  QObject::connect(ui_->replace_spaces, &QCheckBox::toggled, this, &OrganizeDialog::UpdatePreviews);
-  QObject::connect(ui_->remove_non_ascii, &QCheckBox::toggled, this, &OrganizeDialog::AllowExtASCII);
-
-  // Get the titles of the tags to put in the insert menu
-  QStringList tag_titles = tags.keys();
-  std::stable_sort(tag_titles.begin(), tag_titles.end());
-
-  // Build the insert menu
-  QMenu *tag_menu = new QMenu(this);
-  for (const QString &title : std::as_const(tag_titles)) {
-    QAction *action = tag_menu->addAction(title);
-    QString tag = tags[title];
-    QObject::connect(action, &QAction::triggered, this, [this, tag]() { InsertTag(tag); });
-  }
-
-  ui_->insert->setMenu(tag_menu);
-
-}
-
-OrganizeDialog::~OrganizeDialog() {
-  delete ui_;
-}
-
-void OrganizeDialog::SetDestinationModel(QAbstractItemModel *model, const bool devices) {
-
-  ui_->destination->setModel(model);
-
-  ui_->eject_after->setVisible(devices);
-
-  devices_ = devices;
-
-}
-
-void OrganizeDialog::showEvent(QShowEvent *e) {
-
-  Q_UNUSED(e)
-
-  LoadGeometry();
-  LoadSettings();
-
-}
-
-void OrganizeDialog::closeEvent(QCloseEvent *e) {
-
-  Q_UNUSED(e)
-
-  if (!devices_) SaveGeometry();
-
-}
-
-void OrganizeDialog::accept() {
-
-  SaveGeometry();
-
-  const QModelIndex destination = ui_->destination->model()->index(ui_->destination->currentIndex(), 0);
-  SharedPtr<MusicStorage> storage = destination.data(MusicStorage::Role_StorageForceConnect).value<SharedPtr<MusicStorage>>();
-
-  if (!storage) return;
-
-  // It deletes itself when it's finished.
-  const bool copy = ui_->aftercopying->currentIndex() == 0;
-  Organize *organize = new Organize(task_manager_, tagreader_client_, storage, format_, copy, ui_->overwrite->isChecked(), ui_->albumcover->isChecked(), new_songs_info_, ui_->eject_after->isChecked(), playlist_);
-  QObject::connect(organize, &Organize::Finished, this, &OrganizeDialog::OrganizeFinished);
-  QObject::connect(organize, &Organize::FileCopied, this, &OrganizeDialog::FileCopied);
-  if (collection_backend_) {
-    QObject::connect(organize, &Organize::SongPathChanged, &*collection_backend_, &CollectionBackend::SongPathChanged);
-  }
-
-  organize->Start();
-
-  QDialog::accept();
-
-}
-
-void OrganizeDialog::reject() {
-
-  SaveGeometry();
-  QDialog::reject();
-
-}
-
-void OrganizeDialog::LoadGeometry() {
-
-  if (devices_) {
-    AdjustSize();
-  }
-  else {
-    Settings s;
-    s.beginGroup(kSettingsGroup);
-    if (s.contains(kGeometry)) {
-      restoreGeometry(s.value(kGeometry).toByteArray());
-    }
-    s.endGroup();
-  }
-
-  if (parentwindow_) {
-    // Center the window on the same screen as the parentwindow.
-    Utilities::CenterWidgetOnScreen(Utilities::GetScreen(parentwindow_), this);
-  }
-
-}
-
-void OrganizeDialog::SaveGeometry() {
-
-  if (parentwindow_) {
-    Settings s;
-    s.beginGroup(kSettingsGroup);
-    s.setValue(kGeometry, saveGeometry());
-    s.endGroup();
-  }
-
-}
-
-void OrganizeDialog::AdjustSize() {
-
-  QScreen *screen = Utilities::GetScreen(this);
-  int max_width = 0;
-  int max_height = 0;
-  if (screen) {
-    max_width = static_cast<int>(static_cast<float>(screen->geometry().size().width()) / static_cast<float>(0.5));
-    max_height = static_cast<int>(static_cast<float>(screen->geometry().size().height()) / static_cast<float>(1.5));
-  }
-
-  int min_width = 0;
-  int min_height = 0;
-  if (ui_->preview->isVisible()) {
-    int h = ui_->layout_copying->sizeHint().height() +
-            ui_->button_box->sizeHint().height() +
-            ui_->eject_after->sizeHint().height() +
-            ui_->free_space->sizeHint().height() +
-            ui_->groupbox_naming->sizeHint().height();
-    if (ui_->preview->count() > 0) h += ui_->preview->sizeHintForRow(0) * ui_->preview->count();
-    else h += ui_->loading_page->sizeHint().height();
-    min_width = std::min(ui_->preview->sizeHintForColumn(0), max_width);
-    min_height = std::min(h, max_height);
-  }
-
-  setMinimumSize(min_width, min_height);
-  adjustSize();
-
-}
-
-void OrganizeDialog::RestoreDefaults() {
-
-  ui_->naming->setPlainText(QLatin1String(kDefaultFormat));
-  ui_->remove_problematic->setChecked(true);
-  ui_->remove_non_fat->setChecked(false);
-  ui_->remove_non_ascii->setChecked(false);
-  ui_->allow_ascii_ext->setChecked(false);
-  ui_->replace_spaces->setChecked(true);
-  ui_->overwrite->setChecked(false);
-  ui_->albumcover->setChecked(true);
-  ui_->eject_after->setChecked(false);
-
-}
-
-void OrganizeDialog::LoadSettings() {
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  ui_->naming->setPlainText(s.value(kFormat, QLatin1String(kDefaultFormat)).toString());
-  ui_->remove_problematic->setChecked(s.value(kRemoveProblematic, true).toBool());
-  ui_->remove_non_fat->setChecked(s.value(kRemoveNonFat, false).toBool());
-  ui_->remove_non_ascii->setChecked(s.value(kRemoveNonAscii, false).toBool());
-  ui_->allow_ascii_ext->setChecked(s.value(kAllowAsciiExt, false).toBool());
-  ui_->replace_spaces->setChecked(s.value(kReplaceSpaces, true).toBool());
-  ui_->overwrite->setChecked(s.value(kOverwrite, false).toBool());
-  ui_->albumcover->setChecked(s.value(kAlbumCover, true).toBool());
-  ui_->eject_after->setChecked(s.value(kEjectAfter, false).toBool());
-
-  QString destination = s.value(kDestination).toString();
-  int index = ui_->destination->findText(destination);
-  if (index != -1 && !destination.isEmpty()) {
-    ui_->destination->setCurrentIndex(index);
-  }
-
-  s.endGroup();
-
-  AllowExtASCII(ui_->remove_non_ascii->isChecked());
-
-}
-
-void OrganizeDialog::SaveSettings() {
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  s.setValue(kFormat, ui_->naming->toPlainText());
-  s.setValue(kRemoveProblematic, ui_->remove_problematic->isChecked());
-  s.setValue(kRemoveNonFat, ui_->remove_non_fat->isChecked());
-  s.setValue(kRemoveNonAscii, ui_->remove_non_ascii->isChecked());
-  s.setValue(kAllowAsciiExt, ui_->allow_ascii_ext->isChecked());
-  s.setValue(kReplaceSpaces, ui_->replace_spaces->isChecked());
-  s.setValue(kOverwrite, ui_->overwrite->isChecked());
-  s.setValue(kAlbumCover, ui_->albumcover->isChecked());
-  s.setValue(kDestination, ui_->destination->currentText());
-  s.setValue(kEjectAfter, ui_->eject_after->isChecked());
-  s.endGroup();
-
-}
-
-bool OrganizeDialog::SetSongs(const SongList &songs) {
-
-  total_size_ = 0;
-  songs_.clear();
-
-  for (const Song &song : songs) {
-    if (!song.url().isLocalFile()) {
-      continue;
-    }
-
-    if (song.filesize() > 0) total_size_ += song.filesize();
-
-    songs_ << song;
-  }
-
-  ui_->free_space->set_additional_bytes(total_size_);
-  UpdatePreviews();
-  SetLoadingSongs(false);
-
-  if (songs_future_.isRunning()) {
-    songs_future_.cancel();
-  }
-  songs_future_ = QFuture<SongList>();
-
-  return !songs_.isEmpty();
-
-}
-
-bool OrganizeDialog::SetUrls(const QList<QUrl> &urls) {
-
-  QStringList filenames;
-  for (const QUrl &url : urls) {
-    if (url.isLocalFile()) {
-      filenames << url.toLocalFile();
-    }
-  }
-
-  return SetFilenames(filenames);
-
-}
-
-bool OrganizeDialog::SetFilenames(const QStringList &filenames) {
-
-  songs_future_ = QtConcurrent::run(&OrganizeDialog::LoadSongsBlocking, this, filenames);
-  QFutureWatcher<SongList> *watcher = new QFutureWatcher<SongList>(this);
-  QObject::connect(watcher, &QFutureWatcher<SongList>::finished, this, [this, watcher]() {
-    SetSongs(watcher->result());
-    watcher->deleteLater();
-  });
-  watcher->setFuture(songs_future_);
-
-  SetLoadingSongs(true);
-  return true;
-
-}
-
-void OrganizeDialog::SetLoadingSongs(const bool loading) {
-
-  if (loading) {
-    ui_->preview_stack->setCurrentWidget(ui_->loading_page);
-    ui_->button_box->button(QDialogButtonBox::Ok)->setEnabled(false);
-  }
-  else {
-    ui_->preview_stack->setCurrentWidget(ui_->preview_page);
-    // The Ok button is enabled by UpdatePreviews
-  }
-
-}
-
-SongList OrganizeDialog::LoadSongsBlocking(const QStringList &filenames) const {
-
+struct DialogState {
+  Application *app = nullptr;
   SongList songs;
+  SongList *owned_songs = nullptr;
+  std::vector<std::string> filenames;
+  bool loading = false;
+  bool loaded_from_filenames = false;
+  GtkTextBuffer *buffer = nullptr;
+  GtkWidget *dest = nullptr;
+  GtkWidget *remove_problematic = nullptr;
+  GtkWidget *remove_non_fat = nullptr;
+  GtkWidget *remove_non_ascii = nullptr;
+  GtkWidget *allow_ascii_ext = nullptr;
+  GtkWidget *replace_spaces = nullptr;
+  GtkWidget *preview_stack = nullptr;
+  GtkWidget *preview_label = nullptr;
+  GtkWidget *preview_list = nullptr;
+  GtkWidget *run = nullptr;
+  GtkWidget *cancel = nullptr;
+  GtkWidget *status = nullptr;
+  GtkWidget *after_copy = nullptr;
+  GtkWidget *overwrite = nullptr;
+  GtkWidget *albumcover = nullptr;
+  GtkWidget *eject = nullptr;
+  GtkWidget *format_error = nullptr;
+  std::string playlist;
+  std::string device_id;
+  FreeSpaceBar *space = nullptr;
+  Organize *job = nullptr;
+  DeviceCopyRunner *copy_job = nullptr;
+  std::shared_ptr<bool> alive = std::make_shared<bool>(true);
+  bool persist_dest = true;
+  bool has_local_destination = true;
+  MusicStorage::TranscodeMode transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
+  Song::FileType transcode_format = Song::FileType::Unknown;
+  std::vector<Song::FileType> supported;
 
-  QStringList filenames_copy = filenames;
-  while (!filenames_copy.isEmpty()) {
-    const QString filename = filenames_copy.takeFirst();
-
-    // If it's a directory, add all the files inside.
-    if (QFileInfo(filename).isDir()) {
-      const QDir dir(filename);
-      const QStringList entries = dir.entryList(QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot | QDir::Readable);
-      for (const QString &entry : entries) {
-        filenames_copy << dir.filePath(entry);
-      }
-      continue;
+  ~DialogState() {
+    if (alive) {
+      *alive = false;
     }
-
-    Song song;
-    const TagReaderResult result = tagreader_client_->ReadFileBlocking(filename, &song);
-    if (result.success() && song.is_valid()) {
-      songs << song;
+    if (job) {
+      job->Cancel();
     }
-    else {
-      qLog(Error) << "Could not read file" << filename << result.error_string();
+    if (copy_job) {
+      copy_job->Cancel();
     }
   }
+};
 
-  return songs;
-
-}
-
-void OrganizeDialog::SetCopy(const bool copy) {
-  ui_->aftercopying->setCurrentIndex(copy ? 0 : 1);
-}
-
-void OrganizeDialog::SetPlaylist(const QString &playlist) {
-  playlist_ = playlist;
-}
-
-void OrganizeDialog::InsertTag(const QString &tag) {
-  ui_->naming->insertPlainText(QLatin1Char('%') + tag);
-}
-
-Organize::NewSongInfoList OrganizeDialog::ComputeNewSongsFilenames(const SongList &songs, const OrganizeFormat &format, const QString &extension) {
-
-  // Check if we will have multiple files with the same name.
-  // If so, they will erase each other if the overwrite flag is set.
-  // Better to rename them: e.g. foo.bar -> foo(2).bar
-  QHash<QString, int> filenames;
-  Organize::NewSongInfoList new_songs_info;
-  new_songs_info.reserve(songs.count());
-  for (const Song &song : songs) {
-    OrganizeFormat::GetFilenameForSongResult result = format.GetFilenameForSong(song, extension);
-    if (result.filename.isEmpty()) {
-      return Organize::NewSongInfoList();
-    }
-    if (result.unique_filename) {
-      if (filenames.contains(result.filename)) {
-        QString song_number = QString::number(++filenames[result.filename]);
-        result.filename = Utilities::PathWithoutFilenameExtension(result.filename) + u"("_s + song_number + u")."_s + QFileInfo(result.filename).suffix();
-      }
-      else {
-        filenames.insert(result.filename, 1);
-      }
-    }
-    new_songs_info << Organize::NewSongInfo(song, result.filename, result.unique_filename);
+OrganizeFormat FormatFromState(const DialogState *state) {
+  OrganizeFormat format;
+  if (state && state->buffer) {
+    GtkTextIter start;
+    GtkTextIter end;
+    gtk_text_buffer_get_bounds(state->buffer, &start, &end);
+    gchar *text = gtk_text_buffer_get_text(state->buffer, &start, &end, FALSE);
+    format.set_format(text ? text : "");
+    g_free(text);
   }
-
-  return new_songs_info;
-
+  if (state) {
+    format.set_remove_problematic(state->remove_problematic && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->remove_problematic)));
+    format.set_remove_non_fat(state->remove_non_fat && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->remove_non_fat)));
+    format.set_remove_non_ascii(state->remove_non_ascii && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->remove_non_ascii)));
+    format.set_allow_ascii_ext(state->allow_ascii_ext && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->allow_ascii_ext)));
+    format.set_replace_spaces(state->replace_spaces && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->replace_spaces)));
+  }
+  return format;
 }
 
-void OrganizeDialog::UpdatePreviews() {
+SongList SongsFromState(const DialogState *state) {
+  if (!state || state->loading) {
+    return {};
+  }
+  if (!state->songs.empty()) {
+    return state->songs;
+  }
+  if (!OrganizeLoading::UsesPlaylistFallback(state->loading, state->loaded_from_filenames)) {
+    return {};
+  }
+  if (state->app && state->app->playlist_manager() && state->app->playlist_manager()->current()) {
+    return state->app->playlist_manager()->current()->songs();
+  }
+  return {};
+}
 
-  if (songs_future_.isRunning()) {
+const ConnectedDevice *FindCopyDevice(Application *app, const std::string &device_id) {
+  if (!app || !app->device_manager() || device_id.empty()) {
+    return nullptr;
+  }
+  for (const ConnectedDevice &device : app->device_manager()->devices()) {
+    if (device.unique_id == device_id || device.friendly_name == device_id) {
+      return &device;
+    }
+  }
+  return nullptr;
+}
+
+bool StartDeviceCopy(DialogState *state, GtkButton *button, Application *application, const SongList &songs, const Organize::Options &options) {
+  if (!state || state->device_id.empty() || !application) {
+    return false;
+  }
+  const ConnectedDevice *found = FindCopyDevice(application, state->device_id);
+  if (!found || !DeviceCopyJob::UsesDeviceCopyRunner(*found)) {
+    return false;
+  }
+  const ConnectedDevice target = *found;
+  auto *runner = new DeviceCopyRunner(application->task_manager(), application->tagreader());
+  runner->set_transcode(options.transcode_mode, options.transcode_format);
+  runner->set_playlist(options.playlist);
+  runner->set_copy_options(options.overwrite, options.albumcover, options.move);
+  state->copy_job = runner;
+  gtk_widget_set_sensitive(GTK_WIDGET(button), FALSE);
+  if (state->cancel) {
+    gtk_widget_set_sensitive(state->cancel, TRUE);
+  }
+  if (state->status) {
+    gtk_label_set_text(GTK_LABEL(state->status), DeviceCopyJob::TaskName());
+  }
+  const std::shared_ptr<bool> alive = state->alive;
+  const std::string device_id = state->device_id;
+  runner->Finished.Connect([state, alive, runner, application, button, device_id](bool) {
+    if (application && application->device_manager() && runner->copied() > 0) {
+      application->device_manager()->RefreshAfterCopy(device_id, runner->copied(), runner->copied_songs());
+    }
+    if (alive && *alive && state && state->copy_job == runner) {
+      state->copy_job = nullptr;
+      gtk_widget_set_sensitive(GTK_WIDGET(button), TRUE);
+      if (state->cancel) {
+        gtk_widget_set_sensitive(state->cancel, FALSE);
+      }
+      GtkWidget *status_label = state->status ? state->status : GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
+      if (runner->errors().empty()) {
+        if (status_label) {
+          gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
+        }
+        if (state->eject && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->eject)) && application && application->device_manager() &&
+            !state->device_id.empty()) {
+          application->device_manager()->Unmount(state->device_id);
+        }
+      } else {
+        OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), OrganizeErrorDialog::OperationType::Copy,
+                                  runner->errors());
+        if (status_label) {
+          gtk_label_set_text(GTK_LABEL(status_label), (std::to_string(runner->errors().size()) + " file(s) failed.").c_str());
+        }
+      }
+    }
+    g_idle_add(+[](gpointer data) -> gboolean {
+      delete static_cast<DeviceCopyRunner *>(data);
+      return G_SOURCE_REMOVE;
+    }, runner);
+  });
+  runner->StartAsync(target, songs);
+  return true;
+}
+
+struct OrganizeLoadIdle {
+  DialogState *state = nullptr;
+  SongList songs;
+  std::shared_ptr<bool> alive;
+};
+
+void ClearPreview(GtkWidget *list) {
+  if (!list) {
     return;
   }
+  GtkWidget *child = gtk_widget_get_first_child(list);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_list_box_remove(GTK_LIST_BOX(list), child);
+    child = next;
+  }
+}
 
-  const QModelIndex destination = ui_->destination->model()->index(ui_->destination->currentIndex(), 0);
-  SharedPtr<MusicStorage> storage;
-  bool has_local_destination = false;
+void SetLoadingSongs(DialogState *state, bool loading) {
+  if (!state) {
+    return;
+  }
+  state->loading = loading;
+  if (state->preview_stack) {
+    gtk_stack_set_visible_child_name(GTK_STACK(state->preview_stack), OrganizeLoading::VisibleChild(loading));
+    gtk_widget_set_visible(state->preview_stack, (state->has_local_destination || loading) ? TRUE : FALSE);
+  }
+  if (state->preview_label) {
+    gtk_widget_set_visible(state->preview_label, (state->has_local_destination || loading) ? TRUE : FALSE);
+  }
+  if (loading && state->run) {
+    gtk_widget_set_sensitive(state->run, FALSE);
+  }
+}
 
-  if (destination.isValid()) {
-    storage = destination.data(MusicStorage::Role_Storage).value<SharedPtr<MusicStorage>>();
-    if (storage) {
-      has_local_destination = !storage->LocalPath().isEmpty();
+void RefreshPreview(DialogState *state) {
+  if (!state) {
+    return;
+  }
+  if (state->loading) {
+    if (state->run) {
+      gtk_widget_set_sensitive(state->run, OrganizeLoading::RunEnabled(true, false));
+    }
+    return;
+  }
+  const OrganizeFormat format = FormatFromState(state);
+  std::string error;
+  const bool valid = !OrganizePreview::FormatRequired(state->has_local_destination) || OrganizeFormatValidator::IsValid(format.format(), &error);
+  const std::string dest = state->dest ? gtk_editable_get_text(GTK_EDITABLE(state->dest)) : "";
+  const SongList songs = SongsFromState(state);
+  std::vector<OrganizePreview::Entry> entries;
+  if (state->has_local_destination && valid) {
+    entries = OrganizePreview::Compute(songs, format, state->transcode_mode, state->transcode_format, state->supported);
+    if (OrganizePreview::AnyEmptyPath(entries)) {
+      entries.clear();
     }
   }
-
-  // Update the free space bar
-  quint64 capacity = destination.data(MusicStorage::Role_Capacity).toULongLong();
-  quint64 free = destination.data(MusicStorage::Role_FreeSpace).toULongLong();
-
-  if (capacity > 0) {
-    ui_->free_space->show();
-    ui_->free_space->set_free_bytes(free);
-    ui_->free_space->set_total_bytes(capacity);
-  }
-  else {
-    ui_->free_space->hide();
-  }
-
-  // Update the format object
-  format_.set_format(ui_->naming->toPlainText());
-  format_.set_remove_problematic(ui_->remove_problematic->isChecked());
-  format_.set_remove_non_fat(ui_->remove_non_fat->isChecked());
-  format_.set_remove_non_ascii(ui_->remove_non_ascii->isChecked());
-  format_.set_allow_ascii_ext(ui_->allow_ascii_ext->isChecked());
-  format_.set_replace_spaces(ui_->replace_spaces->isChecked());
-
-  const bool format_valid = !has_local_destination || format_.IsValid();
-
-  // Are we going to enable the ok button?
-  bool ok = format_valid && !songs_.isEmpty();
-  if (capacity != 0 && total_size_ > free) ok = false;
-
-  if (ok) {
-    QString extension;
-    if (storage && storage->GetTranscodeMode() == MusicStorage::TranscodeMode::Transcode_Always) {
-      const Song::FileType format = storage->GetTranscodeFormat();
-      TranscoderPreset preset = Transcoder::PresetForFileType(format);
-      extension = preset.extension_;
-    }
-    new_songs_info_ = ComputeNewSongsFilenames(songs_, format_, extension);
-    if (new_songs_info_.isEmpty()) {
-      ok = false;
+  ClearPreview(state->preview_list);
+  if (state->has_local_destination && state->preview_list) {
+    for (const OrganizePreview::Entry &entry : entries) {
+      GtkWidget *row = gtk_list_box_row_new();
+      GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+      gtk_widget_set_margin_start(box, 8);
+      gtk_widget_set_margin_end(box, 8);
+      gtk_widget_set_margin_top(box, 4);
+      gtk_widget_set_margin_bottom(box, 4);
+      gtk_box_append(GTK_BOX(box), gtk_image_new_from_icon_name(OrganizePreview::PreviewIconName(entry)));
+      GtkWidget *label = gtk_label_new(FileUtils::Join(dest, entry.relative_path).c_str());
+      gtk_widget_set_halign(label, GTK_ALIGN_START);
+      gtk_widget_set_hexpand(label, TRUE);
+      gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_MIDDLE);
+      gtk_box_append(GTK_BOX(box), label);
+      gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+      gtk_list_box_append(GTK_LIST_BOX(state->preview_list), row);
     }
   }
-  else {
-    new_songs_info_.clear();
+  if (state->space) {
+    state->space->SetPath(dest);
+    if (state->space->total() > 0) {
+      state->space->SetBytes(state->space->used(), OrganizePreview::TotalBytes(songs), state->space->total());
+    }
+  }
+  if (state->run) {
+    const int64_t used = state->space ? state->space->used() : 0;
+    const int64_t total = state->space ? state->space->total() : 0;
+    gtk_widget_set_sensitive(state->run, OrganizeLoading::RunEnabled(state->loading,
+                                                                      OrganizePreview::CanRun(valid, dest, entries, OrganizePreview::TotalBytes(songs),
+                                                                                              used, total, state->has_local_destination, !songs.empty())));
+  }
+}
+
+void StartFilenameLoad(DialogState *state) {
+  if (!state) {
+    return;
+  }
+  TagReaderClient *client = state->app ? state->app->tagreader_client() : nullptr;
+  const std::vector<std::string> filenames = state->filenames;
+  const std::shared_ptr<bool> alive = state->alive;
+  std::thread([state, client, filenames, alive]() {
+    SongList songs;
+    if (client) {
+      songs = OrganizeLoading::SongsFromFilenames(filenames, [client](const std::string &path, Song *song) {
+        return client->ReadFileBlocking(path, song);
+      });
+    }
+    auto *idle = new OrganizeLoadIdle{state, std::move(songs), alive};
+    g_idle_add(+[](gpointer data) -> gboolean {
+      auto *loaded = static_cast<OrganizeLoadIdle *>(data);
+      if (loaded->alive && *loaded->alive && loaded->state) {
+        loaded->state->songs = loaded->songs;
+        if (loaded->state->owned_songs) {
+          *loaded->state->owned_songs = loaded->songs;
+        }
+        SetLoadingSongs(loaded->state, false);
+        if (loaded->state->status) {
+          gtk_label_set_text(GTK_LABEL(loaded->state->status), OrganizeLoading::StatusText(false, loaded->songs, true).c_str());
+        }
+        RefreshPreview(loaded->state);
+      }
+      delete loaded;
+      return G_SOURCE_REMOVE;
+    }, idle);
+  }).detach();
+}
+
+void PersistFromState(const DialogState *state) {
+  if (!state || !state->buffer) {
+    return;
+  }
+  GtkTextIter start;
+  GtkTextIter end;
+  gtk_text_buffer_get_bounds(state->buffer, &start, &end);
+  gchar *text = gtk_text_buffer_get_text(state->buffer, &start, &end, FALSE);
+  const std::string format_text = text ? text : "";
+  g_free(text);
+  Settings persist;
+  persist.BeginGroup(OrganizeSettings::kSettingsGroup);
+  persist.SetValue(OrganizeSettings::kFormat, format_text);
+  if (state->persist_dest && state->dest) {
+    persist.SetValue(OrganizeSettings::kDestination, gtk_editable_get_text(GTK_EDITABLE(state->dest)));
+  }
+  if (state->after_copy) {
+    persist.SetBoolValue(OrganizeSettings::kMove, gtk_drop_down_get_selected(GTK_DROP_DOWN(state->after_copy)) == 1);
+  }
+  if (state->overwrite) {
+    persist.SetBoolValue(OrganizeSettings::kOverwrite, gtk_check_button_get_active(GTK_CHECK_BUTTON(state->overwrite)));
+  }
+  if (state->replace_spaces) {
+    persist.SetBoolValue(OrganizeSettings::kReplaceSpaces, gtk_check_button_get_active(GTK_CHECK_BUTTON(state->replace_spaces)));
+  }
+  if (state->remove_problematic) {
+    persist.SetBoolValue(OrganizeSettings::kRemoveProblematic, gtk_check_button_get_active(GTK_CHECK_BUTTON(state->remove_problematic)));
+  }
+  if (state->remove_non_fat) {
+    persist.SetBoolValue(OrganizeSettings::kRemoveNonFat, gtk_check_button_get_active(GTK_CHECK_BUTTON(state->remove_non_fat)));
+  }
+  if (state->remove_non_ascii) {
+    persist.SetBoolValue(OrganizeSettings::kRemoveNonAscii, gtk_check_button_get_active(GTK_CHECK_BUTTON(state->remove_non_ascii)));
+  }
+  if (state->allow_ascii_ext) {
+    persist.SetBoolValue(OrganizeSettings::kAllowAsciiExt, gtk_check_button_get_active(GTK_CHECK_BUTTON(state->allow_ascii_ext)));
+  }
+  if (state->albumcover) {
+    persist.SetBoolValue(OrganizeSettings::kAlbumCover, gtk_check_button_get_active(GTK_CHECK_BUTTON(state->albumcover)));
+  }
+  if (state->eject) {
+    persist.SetBoolValue(OrganizeSettings::kEjectAfter, gtk_check_button_get_active(GTK_CHECK_BUTTON(state->eject)));
+  }
+  persist.Sync();
+}
+
+void RestoreDefaults(DialogState *state) {
+  if (!state || !state->buffer) {
+    return;
+  }
+  gtk_text_buffer_set_text(state->buffer, OrganizeSettings::kDefaultFormat, -1);
+  if (state->remove_problematic) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->remove_problematic), TRUE);
+  }
+  if (state->remove_non_fat) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->remove_non_fat), FALSE);
+  }
+  if (state->remove_non_ascii) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->remove_non_ascii), FALSE);
+  }
+  if (state->allow_ascii_ext) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->allow_ascii_ext), FALSE);
+    gtk_widget_set_sensitive(state->allow_ascii_ext, FALSE);
+  }
+  if (state->replace_spaces) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->replace_spaces), TRUE);
+  }
+  if (state->overwrite) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->overwrite), FALSE);
+  }
+  if (state->albumcover) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->albumcover), TRUE);
+  }
+  if (state->eject) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->eject), FALSE);
+  }
+}
+
+}  // namespace
+
+void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &songs, bool move) {
+  Request request;
+  request.songs = songs;
+  request.move = move;
+  Show(parent, app, request);
+}
+
+void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &request) {
+  AdwDialog *dialog = adw_dialog_new();
+  adw_dialog_set_title(dialog, Translations::CStr("Organize files"));
+  adw_dialog_set_content_width(dialog, 560);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+  gtk_widget_set_margin_start(box, 18);
+  gtk_widget_set_margin_end(box, 18);
+  gtk_widget_set_margin_top(box, 18);
+  gtk_widget_set_margin_bottom(box, 18);
+
+  Settings settings;
+  settings.BeginGroup(OrganizeSettings::kSettingsGroup);
+  const std::string saved_format = settings.Value(OrganizeSettings::kFormat, OrganizeSettings::kDefaultFormat);
+  const std::string music_dir = g_get_user_special_dir(G_USER_DIRECTORY_MUSIC) ? g_get_user_special_dir(G_USER_DIRECTORY_MUSIC)
+                                                                              : g_get_home_dir();
+  std::string saved_dest = request.destination.empty() ? settings.Value(OrganizeSettings::kDestination, music_dir)
+                                                       : request.destination;
+  const std::vector<CollectionDirectory> dirs = app && app->collection() && app->collection()->backend()
+                                                   ? app->collection()->backend()->Directories()
+                                                   : std::vector<CollectionDirectory>{};
+  if (saved_dest.empty() && !dirs.empty()) {
+    saved_dest = dirs.front().path;
   }
 
-  // Update the previews
-  ui_->preview->clear();
-  ui_->groupbox_preview->setVisible(has_local_destination);
-  ui_->groupbox_naming->setVisible(has_local_destination);
-  if (has_local_destination) {
-    for (const Organize::NewSongInfo &song_info : std::as_const(new_songs_info_)) {
-      QString filename = storage->LocalPath() + QLatin1Char('/') + song_info.new_filename_;
-      QListWidgetItem *item = new QListWidgetItem(song_info.unique_filename_ ? IconLoader::Load(u"dialog-ok-apply"_s) : IconLoader::Load(u"dialog-warning"_s), QDir::toNativeSeparators(filename), ui_->preview);
-      ui_->preview->addItem(item);
-      if (!song_info.unique_filename_) {
-        ok = false;
+  const bool local_naming = OrganizePreview::ShowsNamingPreview(request.destination, request.device_id);
+  const bool lock_dest = OrganizePreview::LocksDestination(request.destination, request.device_id);
+
+  GtkWidget *format_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_box_append(GTK_BOX(format_header), gtk_label_new(Translations::CStr("Filename format")));
+  GtkWidget *insert = gtk_menu_button_new();
+  gtk_menu_button_set_label(GTK_MENU_BUTTON(insert), Translations::CStr("Insert..."));
+  gtk_widget_set_hexpand(insert, TRUE);
+  gtk_widget_set_halign(insert, GTK_ALIGN_END);
+  gtk_box_append(GTK_BOX(format_header), insert);
+
+  GtkWidget *format_view = gtk_text_view_new();
+  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(format_view), GTK_WRAP_WORD_CHAR);
+  gtk_widget_set_size_request(format_view, -1, 56);
+  gtk_widget_set_tooltip_text(format_view, Translations::CStr(OrganizeTokenHelp::Tooltip()));
+  GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(format_view));
+  OrganizeSyntaxHighlighter highlighter;
+  highlighter.Apply(buffer, saved_format);
+
+  GtkWidget *tag_box = gtk_flow_box_new();
+  gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(tag_box), 3);
+  gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(tag_box), GTK_SELECTION_NONE);
+  for (const auto &tag : OrganizeFormat::InsertTags()) {
+    GtkWidget *btn = gtk_button_new_with_label(Translations::CStr(tag.first));
+    g_object_set_data(G_OBJECT(btn), "buffer", buffer);
+    g_object_set_data_full(G_OBJECT(btn), "token", g_strdup((std::string("%") + tag.second).c_str()), g_free);
+    g_signal_connect(btn, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
+                       auto *buf = GTK_TEXT_BUFFER(g_object_get_data(G_OBJECT(button), "buffer"));
+                       const char *token = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "token"));
+                       if (!buf || !token) {
+                         return;
+                       }
+                       GtkTextIter iter;
+                       gtk_text_buffer_get_iter_at_mark(buf, &iter, gtk_text_buffer_get_insert(buf));
+                       gtk_text_buffer_insert(buf, &iter, token, -1);
+                     })),
+                     nullptr);
+    gtk_flow_box_append(GTK_FLOW_BOX(tag_box), btn);
+  }
+  GtkWidget *popover = gtk_popover_new();
+  gtk_popover_set_child(GTK_POPOVER(popover), tag_box);
+  gtk_menu_button_set_popover(GTK_MENU_BUTTON(insert), popover);
+
+  GtkWidget *format_error = gtk_label_new("");
+  gtk_widget_add_css_class(format_error, "error");
+  gtk_label_set_xalign(GTK_LABEL(format_error), 0.0f);
+  GtkWidget *dest = gtk_entry_new();
+  gtk_editable_set_text(GTK_EDITABLE(dest), saved_dest.c_str());
+  GtkWidget *dest_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  GtkWidget *browse = gtk_button_new_with_label(Translations::CStr("Choose folder…"));
+  gtk_widget_set_hexpand(dest, TRUE);
+  gtk_box_append(GTK_BOX(dest_row), dest);
+  gtk_box_append(GTK_BOX(dest_row), browse);
+  g_object_set_data(G_OBJECT(browse), "dest", dest);
+  g_object_set_data(G_OBJECT(browse), "parent", parent);
+  g_signal_connect(browse, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
+                     GtkFileDialog *chooser = gtk_file_dialog_new();
+                     gtk_file_dialog_set_title(chooser, Translations::CStr("Organize destination"));
+                     gtk_file_dialog_select_folder(chooser, GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), nullptr,
+                                                   +[](GObject *source, GAsyncResult *result, gpointer user) {
+                                                     auto *entry = GTK_EDITABLE(user);
+                                                     GError *error = nullptr;
+                                                     GFile *folder = gtk_file_dialog_select_folder_finish(GTK_FILE_DIALOG(source), result, &error);
+                                                     if (!folder) {
+                                                       if (error) {
+                                                         g_error_free(error);
+                                                       }
+                                                       return;
+                                                     }
+                                                     gchar *path = g_file_get_path(folder);
+                                                     if (path) {
+                                                       gtk_editable_set_text(entry, path);
+                                                     }
+                                                     g_free(path);
+                                                     g_object_unref(folder);
+                                                   },
+                                                   g_object_get_data(G_OBJECT(button), "dest"));
+                   })),
+                   nullptr);
+
+  GtkWidget *dest_drop = nullptr;
+  if (!dirs.empty()) {
+    std::vector<std::string> labels;
+    auto *paths = new std::vector<std::string>();
+    guint selected = 0;
+    for (size_t i = 0; i < dirs.size(); ++i) {
+      labels.push_back(dirs[i].path);
+      paths->push_back(dirs[i].path);
+      if (dirs[i].path == saved_dest) {
+        selected = static_cast<guint>(i);
       }
     }
+    labels.push_back(Translations::Tr("Other folder…"));
+    paths->push_back({});
+    std::vector<const char *> cstr;
+    cstr.reserve(labels.size() + 1);
+    for (const std::string &label : labels) {
+      cstr.push_back(label.c_str());
+    }
+    cstr.push_back(nullptr);
+    dest_drop = gtk_drop_down_new_from_strings(cstr.data());
+    gtk_drop_down_set_selected(GTK_DROP_DOWN(dest_drop), selected);
+    g_object_set_data_full(G_OBJECT(dest_drop), "dest-paths", paths, [](gpointer p) { delete static_cast<std::vector<std::string> *>(p); });
+    g_object_set_data(G_OBJECT(dest_drop), "dest", dest);
+    g_signal_connect(dest_drop, "notify::selected", G_CALLBACK((+[](GtkDropDown *drop, GParamSpec *, gpointer) {
+                       auto *dest_paths = static_cast<std::vector<std::string> *>(g_object_get_data(G_OBJECT(drop), "dest-paths"));
+                       auto *entry = GTK_EDITABLE(g_object_get_data(G_OBJECT(drop), "dest"));
+                       const guint index = gtk_drop_down_get_selected(drop);
+                       if (!dest_paths || !entry || index >= dest_paths->size() || (*dest_paths)[index].empty()) {
+                         return;
+                       }
+                       gtk_editable_set_text(entry, (*dest_paths)[index].c_str());
+                     })),
+                     nullptr);
   }
 
-  if (devices_) {
-    AdjustSize();
+  const char *after_labels[] = {Translations::CStr("Keep the original files"), Translations::CStr("Delete the original files"), nullptr};
+  GtkWidget *after_copy = gtk_drop_down_new_from_strings(after_labels);
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(after_copy),
+                             request.move || settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove) ? 1 : 0);
+  GtkWidget *overwrite = gtk_check_button_new_with_label(Translations::CStr("Overwrite existing files"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(overwrite), settings.BoolValue(OrganizeSettings::kOverwrite, OrganizeSettings::kDefaultOverwrite));
+  GtkWidget *remove_problematic = gtk_check_button_new_with_label(Translations::CStr("Remove problematic characters from filenames"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(remove_problematic),
+                              settings.BoolValue(OrganizeSettings::kRemoveProblematic, OrganizeSettings::kDefaultRemoveProblematic));
+  GtkWidget *remove_non_fat = gtk_check_button_new_with_label(Translations::CStr("Restrict to characters allowed on FAT filesystems"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(remove_non_fat),
+                              settings.BoolValue(OrganizeSettings::kRemoveNonFat, OrganizeSettings::kDefaultRemoveNonFat));
+  GtkWidget *remove_non_ascii = gtk_check_button_new_with_label(Translations::CStr("Restrict characters to ASCII"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(remove_non_ascii),
+                              settings.BoolValue(OrganizeSettings::kRemoveNonAscii, OrganizeSettings::kDefaultRemoveNonAscii));
+  GtkWidget *allow_ascii_ext = gtk_check_button_new_with_label(Translations::CStr("Allow extended ASCII characters"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(allow_ascii_ext),
+                              settings.BoolValue(OrganizeSettings::kAllowAsciiExt, OrganizeSettings::kDefaultAllowAsciiExt));
+  gtk_widget_set_sensitive(allow_ascii_ext, gtk_check_button_get_active(GTK_CHECK_BUTTON(remove_non_ascii)));
+  g_object_set_data(G_OBJECT(remove_non_ascii), "allow-ascii-ext", allow_ascii_ext);
+  g_signal_connect(remove_non_ascii, "toggled", G_CALLBACK((+[](GtkCheckButton *button, gpointer) {
+                     gtk_widget_set_sensitive(GTK_WIDGET(g_object_get_data(G_OBJECT(button), "allow-ascii-ext")),
+                                              gtk_check_button_get_active(button));
+                   })),
+                   nullptr);
+  GtkWidget *replace_spaces = gtk_check_button_new_with_label(Translations::CStr("Replace spaces with underscores"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(replace_spaces),
+                              settings.BoolValue(OrganizeSettings::kReplaceSpaces, OrganizeSettings::kDefaultReplaceSpaces));
+  GtkWidget *albumcover = gtk_check_button_new_with_label(Translations::CStr("Copy album cover art"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(albumcover), settings.BoolValue(OrganizeSettings::kAlbumCover, OrganizeSettings::kDefaultAlbumCover));
+  GtkWidget *eject = nullptr;
+  if (request.show_eject) {
+    eject = gtk_check_button_new_with_label(Translations::CStr("Eject device afterwards"));
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(eject), settings.BoolValue(OrganizeSettings::kEjectAfter, OrganizeSettings::kDefaultEjectAfter));
   }
+  auto *owned_songs = new SongList(request.songs);
+  const bool load_filenames = OrganizeLoading::ShouldLoadFilenames(request.songs, request.filenames);
+  const std::string status_text = OrganizeLoading::StatusText(load_filenames, *owned_songs, load_filenames);
+  GtkWidget *status = gtk_label_new(Translations::CStr(status_text.c_str()));
+  gtk_label_set_wrap(GTK_LABEL(status), TRUE);
+  GtkWidget *preview_scroll = gtk_scrolled_window_new();
+  gtk_widget_set_size_request(preview_scroll, -1, 140);
+  gtk_widget_set_vexpand(preview_scroll, TRUE);
+  GtkWidget *preview_list = gtk_list_box_new();
+  gtk_widget_add_css_class(preview_list, "boxed-list");
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(preview_scroll), preview_list);
+  GtkWidget *loading_page = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_halign(loading_page, GTK_ALIGN_START);
+  gtk_widget_set_valign(loading_page, GTK_ALIGN_CENTER);
+  GtkWidget *spinner = gtk_spinner_new();
+  gtk_spinner_start(GTK_SPINNER(spinner));
+  gtk_box_append(GTK_BOX(loading_page), spinner);
+  gtk_box_append(GTK_BOX(loading_page), gtk_label_new(Translations::CStr(OrganizeLoading::LoadingText())));
+  GtkWidget *preview_stack = gtk_stack_new();
+  gtk_widget_set_vexpand(preview_stack, TRUE);
+  gtk_stack_add_named(GTK_STACK(preview_stack), preview_scroll, OrganizeLoading::PreviewChild());
+  gtk_stack_add_named(GTK_STACK(preview_stack), loading_page, OrganizeLoading::LoadingChild());
+  auto *space = new FreeSpaceBar();
+  space->SetPath(saved_dest);
+  GtkWidget *run = gtk_button_new_with_label(Translations::CStr("Organize"));
+  gtk_widget_add_css_class(run, "suggested-action");
+  GtkWidget *cancel = gtk_button_new_with_label(Translations::CStr("Cancel"));
+  gtk_widget_set_sensitive(cancel, FALSE);
+  GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save settings"));
+  GtkWidget *restore = gtk_button_new_with_label(Translations::CStr("Restore defaults"));
 
-  ui_->button_box->button(QDialogButtonBox::Ok)->setEnabled(ok);
+  auto *state = new DialogState;
+  state->app = app;
+  state->songs = *owned_songs;
+  state->owned_songs = owned_songs;
+  state->filenames = request.filenames;
+  state->loaded_from_filenames = load_filenames;
+  state->buffer = buffer;
+  state->dest = dest;
+  state->remove_problematic = remove_problematic;
+  state->remove_non_fat = remove_non_fat;
+  state->remove_non_ascii = remove_non_ascii;
+  state->allow_ascii_ext = allow_ascii_ext;
+  state->replace_spaces = replace_spaces;
+  state->preview_stack = preview_stack;
+  state->preview_list = preview_list;
+  state->run = run;
+  state->cancel = cancel;
+  state->status = status;
+  state->after_copy = after_copy;
+  state->overwrite = overwrite;
+  state->albumcover = albumcover;
+  state->eject = eject;
+  state->format_error = format_error;
+  state->space = space;
+  state->transcode_mode = request.transcode_mode;
+  state->transcode_format = request.transcode_format;
+  state->supported = request.supported_filetypes;
+  state->persist_dest = request.destination.empty();
+  state->playlist = request.playlist;
+  state->device_id = request.device_id;
+  state->has_local_destination = local_naming;
+  g_signal_connect(space->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) { delete static_cast<FreeSpaceBar *>(data); }), space);
+  g_object_set_data_full(G_OBJECT(run), "state", state, [](gpointer p) { delete static_cast<DialogState *>(p); });
 
-}
+  g_object_set_data(G_OBJECT(run), "buffer", buffer);
+  g_object_set_data(G_OBJECT(run), "dest", dest);
+  g_object_set_data(G_OBJECT(run), "after-copy", after_copy);
+  g_object_set_data(G_OBJECT(run), "overwrite", overwrite);
+  g_object_set_data(G_OBJECT(run), "remove-problematic", remove_problematic);
+  g_object_set_data(G_OBJECT(run), "remove-non-fat", remove_non_fat);
+  g_object_set_data(G_OBJECT(run), "remove-non-ascii", remove_non_ascii);
+  g_object_set_data(G_OBJECT(run), "allow-ascii-ext", allow_ascii_ext);
+  g_object_set_data(G_OBJECT(run), "replace-spaces", replace_spaces);
+  g_object_set_data(G_OBJECT(run), "albumcover", albumcover);
+  g_object_set_data(G_OBJECT(run), "status", status);
+  g_object_set_data(G_OBJECT(run), "parent", parent);
+  g_object_set_data(G_OBJECT(run), "transcode-mode", GINT_TO_POINTER(static_cast<int>(request.transcode_mode)));
+  g_object_set_data(G_OBJECT(run), "transcode-format", GINT_TO_POINTER(static_cast<int>(request.transcode_format)));
+  g_object_set_data(G_OBJECT(run), "persist-dest", GINT_TO_POINTER(request.destination.empty() ? 1 : 2));
+  auto *supported = new std::vector<Song::FileType>(request.supported_filetypes);
+  g_object_set_data_full(G_OBJECT(run), "supported", supported, [](gpointer p) { delete static_cast<std::vector<Song::FileType> *>(p); });
+  if (eject) {
+    g_object_set_data(G_OBJECT(run), "eject", eject);
+  }
+  if (!request.device_id.empty()) {
+    g_object_set_data_full(G_OBJECT(run), "device-id", g_strdup(request.device_id.c_str()), g_free);
+  }
+  g_object_set_data_full(G_OBJECT(run), "songs", owned_songs, [](gpointer p) { delete static_cast<SongList *>(p); });
+  g_object_set_data(G_OBJECT(buffer), "error", format_error);
+  g_object_set_data(G_OBJECT(buffer), "state", state);
 
-void OrganizeDialog::OrganizeFinished(const QStringList &files_with_errors, const QStringList &log) {
+  g_signal_connect(buffer, "changed", G_CALLBACK(+[](GtkTextBuffer *buf, gpointer data) {
+                     GtkTextIter start;
+                     GtkTextIter end;
+                     gtk_text_buffer_get_bounds(buf, &start, &end);
+                     gchar *text = gtk_text_buffer_get_text(buf, &start, &end, FALSE);
+                     const std::string format = text ? text : "";
+                     g_free(text);
+                     OrganizeSyntaxHighlighter highlight;
+                     highlight.Highlight(buf, format);
+                     std::string error;
+                     const bool valid = OrganizeFormatValidator::IsValid(format, &error);
+                     gtk_label_set_text(GTK_LABEL(g_object_get_data(G_OBJECT(buf), "error")), valid ? "" : error.c_str());
+                     RefreshPreview(static_cast<DialogState *>(data));
+                   }),
+                   state);
+  g_signal_connect(dest, "changed", G_CALLBACK(+[](GtkEditable *, gpointer data) { RefreshPreview(static_cast<DialogState *>(data)); }), state);
+  for (GtkWidget *toggle : {remove_problematic, remove_non_fat, remove_non_ascii, allow_ascii_ext, replace_spaces}) {
+    g_signal_connect(toggle, "toggled", G_CALLBACK(+[](GtkCheckButton *, gpointer data) { RefreshPreview(static_cast<DialogState *>(data)); }),
+                     state);
+  }
+  g_signal_connect(run, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     auto *buf = GTK_TEXT_BUFFER(g_object_get_data(G_OBJECT(button), "buffer"));
+                     GtkTextIter start;
+                     GtkTextIter end;
+                     gtk_text_buffer_get_bounds(buf, &start, &end);
+                     gchar *text = gtk_text_buffer_get_text(buf, &start, &end, FALSE);
+                     const std::string format_text = text ? text : "";
+                     g_free(text);
+                     std::string error;
+                     auto *state = static_cast<DialogState *>(g_object_get_data(G_OBJECT(button), "state"));
+                     if (OrganizePreview::FormatRequired(state ? state->has_local_destination : true) &&
+                         !OrganizeFormatValidator::IsValid(format_text, &error)) {
+                       gtk_label_set_text(GTK_LABEL(g_object_get_data(G_OBJECT(button), "status")), error.c_str());
+                       return;
+                     }
+                     OrganizeFormat format(format_text);
+                     format.set_remove_problematic(
+                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-problematic"))));
+                     format.set_remove_non_fat(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-non-fat"))));
+                     format.set_remove_non_ascii(
+                         gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "remove-non-ascii"))));
+                     format.set_allow_ascii_ext(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "allow-ascii-ext"))));
+                     format.set_replace_spaces(gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "replace-spaces"))));
+                     const std::string dest_dir = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "dest")));
+                     Organize::Options options;
+                     options.move = gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "after-copy"))) == 1;
+                     options.overwrite = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "overwrite")));
+                     options.albumcover = gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "albumcover")));
+                     options.transcode_mode = static_cast<MusicStorage::TranscodeMode>(
+                         GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "transcode-mode")));
+                     options.transcode_format = static_cast<Song::FileType>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "transcode-format")));
+                     if (auto *supported = static_cast<std::vector<Song::FileType> *>(g_object_get_data(G_OBJECT(button), "supported"))) {
+                       options.supported_filetypes = *supported;
+                     }
+                     if (application && application->collection()) {
+                       options.collection_backend = application->collection()->backend();
+                       options.destination_is_collection =
+                           OrganizePathNotify::DestinationIsCollection(dest_dir, options.collection_backend);
+                       options.collection_directory_id = OrganizePathNotify::DirectoryIdForPath(dest_dir, options.collection_backend);
+                     }
+                     if (application) {
+                       options.tagreader = application->tagreader();
+                     }
+                     options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "organize-cover.bin");
+                     if (state) {
+                       options.playlist = state->playlist;
+                     }
+                     PersistFromState(state);
+                     if (state && (state->job || state->copy_job)) {
+                       return;
+                     }
+                     const SongList songs = SongsFromState(state);
+                     if (StartDeviceCopy(state, button, application, songs, options)) {
+                       return;
+                     }
+                     auto *job = new Organize(application ? application->task_manager() : nullptr);
+                     if (state) {
+                       state->job = job;
+                     }
+                     gtk_widget_set_sensitive(GTK_WIDGET(button), FALSE);
+                     if (state && state->cancel) {
+                       gtk_widget_set_sensitive(state->cancel, TRUE);
+                     }
+                     GtkWidget *status_label = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
+                     gtk_label_set_text(GTK_LABEL(status_label), OrganizeJob::TaskName());
+                     const std::shared_ptr<bool> alive = state ? state->alive : std::make_shared<bool>(true);
+                     const std::string device_id = state ? state->device_id : std::string();
+                     job->Finished.Connect([state, alive, job, application, button, device_id](Organize *) {
+                       if (application && application->device_manager() && !device_id.empty()) {
+                         const int failed = static_cast<int>(job->errors().size());
+                         const int copied = job->next_index() > failed ? job->next_index() - failed : 0;
+                         application->device_manager()->RefreshAfterCopy(device_id, copied);
+                       }
+                       if (alive && *alive && state && state->job == job) {
+                         state->job = nullptr;
+                         gtk_widget_set_sensitive(GTK_WIDGET(button), TRUE);
+                         if (state->cancel) {
+                           gtk_widget_set_sensitive(state->cancel, FALSE);
+                         }
+                         GtkWidget *status_label = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
+                         const std::vector<Organize::Error> &errors = job->errors();
+                         if (errors.empty()) {
+                           gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
+                           gpointer eject_ptr = g_object_get_data(G_OBJECT(button), "eject");
+                           const char *device_id = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "device-id"));
+                           if (eject_ptr && device_id && gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)) && application &&
+                               application->device_manager()) {
+                             application->device_manager()->Unmount(device_id);
+                           }
+                         } else {
+                           OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), errors);
+                           gtk_label_set_text(GTK_LABEL(status_label), (std::to_string(errors.size()) + " file(s) failed.").c_str());
+                         }
+                       }
+                       if (application && application->collection()) {
+                         application->collection()->IncrementalScan();
+                       }
+                       g_idle_add(+[](gpointer data) -> gboolean {
+                         delete static_cast<Organize *>(data);
+                         return G_SOURCE_REMOVE;
+                       }, job);
+                     });
+                     job->Start(songs, dest_dir, format, options);
+                   })),
+                   app);
 
-  if (files_with_errors.isEmpty()) return;
-
-  error_dialog_ = make_unique<OrganizeErrorDialog>();
-  error_dialog_->Show(OrganizeErrorDialog::OperationType::Copy, files_with_errors, log);
-
-}
-
-void OrganizeDialog::AllowExtASCII(const bool checked) {
-  ui_->allow_ascii_ext->setEnabled(checked);
+  gtk_box_append(GTK_BOX(box), format_header);
+  gtk_box_append(GTK_BOX(box), format_view);
+  gtk_box_append(GTK_BOX(box), format_error);
+  GtkWidget *dest_label = gtk_label_new(Translations::CStr("Destination"));
+  gtk_box_append(GTK_BOX(box), dest_label);
+  if (dest_drop) {
+    gtk_box_append(GTK_BOX(box), dest_drop);
+  }
+  gtk_box_append(GTK_BOX(box), dest_row);
+  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("After copying")));
+  gtk_box_append(GTK_BOX(box), after_copy);
+  gtk_box_append(GTK_BOX(box), space->widget());
+  gtk_box_append(GTK_BOX(box), overwrite);
+  gtk_box_append(GTK_BOX(box), remove_problematic);
+  gtk_box_append(GTK_BOX(box), remove_non_fat);
+  gtk_box_append(GTK_BOX(box), remove_non_ascii);
+  gtk_box_append(GTK_BOX(box), allow_ascii_ext);
+  gtk_box_append(GTK_BOX(box), replace_spaces);
+  gtk_box_append(GTK_BOX(box), albumcover);
+  if (eject) {
+    gtk_box_append(GTK_BOX(box), eject);
+  }
+  GtkWidget *preview_label = gtk_label_new(Translations::CStr("Preview"));
+  state->preview_label = preview_label;
+  gtk_box_append(GTK_BOX(box), preview_label);
+  gtk_box_append(GTK_BOX(box), preview_stack);
+  GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_box_append(GTK_BOX(actions), restore);
+  gtk_box_append(GTK_BOX(actions), save);
+  gtk_widget_set_hexpand(save, TRUE);
+  gtk_widget_set_halign(save, GTK_ALIGN_END);
+  gtk_box_append(GTK_BOX(actions), cancel);
+  gtk_box_append(GTK_BOX(actions), run);
+  g_signal_connect(cancel, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *state = static_cast<DialogState *>(data);
+                     if (state && state->job) {
+                       state->job->Cancel();
+                       if (state->status) {
+                         gtk_label_set_text(GTK_LABEL(state->status), Translations::CStr("Cancelling..."));
+                       }
+                     }
+                     if (state && state->copy_job) {
+                       state->copy_job->Cancel();
+                       if (state->status) {
+                         gtk_label_set_text(GTK_LABEL(state->status), Translations::CStr("Cancelling..."));
+                       }
+                     }
+                   }),
+                   state);
+  gtk_box_append(GTK_BOX(box), actions);
+  gtk_box_append(GTK_BOX(box), status);
+  g_signal_connect(save, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *s = static_cast<DialogState *>(data);
+                     PersistFromState(s);
+                     if (s && s->status) {
+                       gtk_label_set_text(GTK_LABEL(s->status), Translations::CStr("Settings saved."));
+                     }
+                   }),
+                   state);
+  g_signal_connect(restore, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     RestoreDefaults(static_cast<DialogState *>(data));
+                   }),
+                   state);
+  adw_dialog_set_child(dialog, box);
+  std::string format_error_text;
+  gtk_label_set_text(GTK_LABEL(format_error), OrganizeFormatValidator::IsValid(saved_format, &format_error_text) ? "" : format_error_text.c_str());
+  gtk_widget_set_visible(format_header, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(format_view, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(format_error, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(remove_problematic, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(remove_non_fat, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(remove_non_ascii, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(allow_ascii_ext, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(replace_spaces, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(preview_label, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(preview_stack, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(dest_label, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(dest_row, local_naming ? TRUE : FALSE);
+  if (dest_drop) {
+    gtk_widget_set_visible(dest_drop, (!lock_dest && local_naming) ? TRUE : FALSE);
+  }
+  gtk_widget_set_visible(browse, (!lock_dest && local_naming) ? TRUE : FALSE);
+  gtk_editable_set_editable(GTK_EDITABLE(dest), lock_dest ? FALSE : TRUE);
+  if (load_filenames) {
+    SetLoadingSongs(state, true);
+    StartFilenameLoad(state);
+  } else {
+    SetLoadingSongs(state, false);
+  }
+  RefreshPreview(state);
+  adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

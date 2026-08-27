@@ -1,198 +1,213 @@
-/***************************************************************************
-*   Copyright (C) 2003-2005 by Mark Kretschmann <markey@web.de>           *
-*   Copyright (C) 2005 by Jakub Stachowski <qbast@go2.pl>                 *
-*   Copyright (C) 2006 Paul Cifarelli <paul@cifarelli.net>                *
-*   Copyright (C) 2017-2026 Jonas Kvinge <jonas@jkvinge.net>              *
-*                                                                         *
-*   This program is free software; you can redistribute it and/or modify  *
-*   it under the terms of the GNU General Public License as published by  *
-*   the Free Software Foundation; either version 2 of the License, or     *
-*   (at your option) any later version.                                   *
-*                                                                         *
-*   This program is distributed in the hope that it will be useful,       *
-*   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
-*   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
-*   GNU General Public License for more details.                          *
-*                                                                         *
-*   You should have received a copy of the GNU General Public License     *
-*   along with this program; if not, write to the                         *
-*   Free Software Foundation, Inc.,                                       *
-*   51 Franklin Steet, Fifth Floor, Boston, MA  02111-1307, USA.          *
-***************************************************************************/
+#ifndef STRAWBERRY_GSTENGINE_H
+#define STRAWBERRY_GSTENGINE_H
 
-#ifndef GSTENGINE_H
-#define GSTENGINE_H
+#include "core/signal.h"
+#include "core/song.h"
+#include "engine/enginebase.h"
+#include "engine/gstenginepipeline.h"
 
-#include "config.h"
-
-#include <optional>
-
-#include <gst/gst.h>
-#include <gst/pbutils/pbutils.h>
-
-#include <QtGlobal>
-#include <QObject>
-#include <QFuture>
-#include <QByteArray>
-#include <QList>
-#include <QMap>
-#include <QString>
-#include <QUrl>
-
-#include "includes/shared_ptr.h"
-#include "enginebase.h"
-#include "gsturl.h"
-#include "gstenginepipeline.h"
-#include "gstbufferconsumer.h"
-
-class QTimer;
-class QTimerEvent;
 class TaskManager;
 
-class GstEngine : public EngineBase, public GstBufferConsumer {
-  Q_OBJECT
+#include <gst/gst.h>
 
+typedef struct _GstDiscoverer GstDiscoverer;
+typedef struct _GstDiscovererInfo GstDiscovererInfo;
+
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+class GstEngine : public EngineBase {
  public:
-  explicit GstEngine(SharedPtr<TaskManager> task_manager, QObject *parent = nullptr);
+  using EngineBase::State;
+  using EngineBase::TrackChangeType;
+  using EngineBase::OutputDetails;
+
+  GstEngine();
   ~GstEngine() override;
 
-  static const char *kAutoSink;
-  static const char *kALSASink;
-
   bool Init() override;
-  State state() const override;
-  void StartPreloading(const QUrl &media_url, const QUrl &stream_url, const bool force_stop_at_end, const qint64 beginning_offset_nanosec, const qint64 end_offset_nanosec) override;
-  bool Load(const QUrl &media_url, const QUrl &stream_url, const EngineBase::TrackChangeFlags change, const bool force_stop_at_end, const quint64 beginning_offset_nanosec, const qint64 end_offset_nanosec, const std::optional<double> ebur128_integrated_loudness_lufs) override;
-  bool Play(const bool pause, const quint64 offset_nanosec) override;
-  void Stop(const bool stop_after = false) override;
+  State state() const override { return state_; }
+
+  void StartPreloading(const std::string &media_url, const std::string &stream_url, bool force_stop_at_end,
+                       int64_t beginning_offset_nanosec, int64_t end_offset_nanosec) override;
+  bool Load(const std::string &media_url, const std::string &stream_url, int track_change_flags, bool force_stop_at_end,
+            uint64_t beginning_offset_nanosec, int64_t end_offset_nanosec, std::optional<double> ebur128_lufs) override;
+  bool Play(bool pause, uint64_t offset_nanosec) override;
+  void Stop(bool stop_after = false) override;
   void Pause() override;
   void Unpause() override;
-  void Seek(const quint64 offset_nanosec) override;
+  void Seek(uint64_t offset_nanosec) override;
+  void SetVolumeSW(unsigned percent) override;
 
- protected:
-  void SetVolumeSW(const uint volume) override;
+  int64_t position_nanosec() const override;
+  int64_t length_nanosec() const override;
+  const Scope &scope() const override { return last_scope_; }
 
- public:
-  qint64 position_nanosec() const override;
-  qint64 length_nanosec() const override;
-  const EngineBase::Scope &scope(const int chunk_length) override;
+  std::vector<OutputDetails> GetOutputsList() const;
+  bool ValidOutput(const std::string &output) const;
+  std::string DefaultOutput() const;
+  void SetOutput(const std::string &output, const std::string &device);
 
-  OutputDetailsList GetOutputsList() const override;
-  bool ValidOutput(const QString &output) override;
-  QString DefaultOutput() const override { return QLatin1String(kAutoSink); }
-  bool CustomDeviceSupport(const QString &output) const override;
-  bool ALSADeviceSupport(const QString &output) const override;
-  bool ExclusiveModeSupport(const QString &output) const override;
+  void SetEqualizerEnabled(bool enabled);
+  void SetEqualizerParameters(int preamp, const std::vector<int> &band_gains);
+  void SetReplayGainEnabled(bool enabled);
+  void SetReplayGainMode(int mode);
+  void SetReplayGainPreamp(double preamp);
+  void SetStereoBalance(float value);
+  void SetFadingEnabled(bool enabled);
+  void SetCrossfadeEnabled(bool enabled);
+  void SetAutoCrossfadeEnabled(bool enabled);
+  void SetFadeDurationMs(int milliseconds);
+  void SetPlaybin3(bool enabled) { playbin3_ = enabled; }
+  void SetNoCrossfadeSameAlbum(bool enabled) { no_crossfade_same_album_ = enabled; }
+  void SetFadeoutPauseEnabled(bool enabled) { fadeout_pause_enabled_ = enabled; }
+  void SetFadeoutPauseDurationMs(int milliseconds);
+  void ReloadBackendOptions();
+  void ReloadSpotifyAccessToken();
+  void SetTaskManager(TaskManager *task_manager) { task_manager_ = task_manager; }
+  void SetCurrentAlbum(const std::string &album) { current_album_ = album; }
+  void SetNextAlbum(const std::string &album) { next_album_ = album; }
+  bool fading_enabled() const { return fading_enabled_; }
+  bool crossfade_enabled() const { return crossfade_enabled_; }
+  bool autocrossfade_enabled() const { return autocrossfade_enabled_; }
+  bool playbin3() const { return playbin3_; }
+  bool no_crossfade_same_album() const { return no_crossfade_same_album_; }
+  bool fadeout_pause_enabled() const { return fadeout_pause_enabled_; }
+  bool has_next_pipeline() const { return next_ != nullptr; }
+  const std::vector<int16_t> &last_scope() const { return last_scope_; }
 
-  void ConsumeBuffer(GstBuffer *buffer, const int pipeline_id, const QString &format) override;
+  Signal<std::vector<int16_t>> ScopeUpdated;
 
- public Q_SLOTS:
-  void ReloadSettings() override;
-
-  // Set whether stereo balancer is enabled
-  void SetStereoBalancerEnabled(const bool enabled) override;
-
-  // Set Stereo balance, range -1.0f..1.0f
-  void SetStereoBalance(const float value) override;
-
-  // Set whether equalizer is enabled
-  void SetEqualizerEnabled(const bool enabled) override;
-
-  // Set equalizer preamp and gains, range -100..100. Gains are 10 values.
-  void SetEqualizerParameters(const int preamp, const QList<int> &band_gains) override;
-
-  void AddBufferConsumer(GstBufferConsumer *consumer);
-  void RemoveBufferConsumer(GstBufferConsumer *consumer);
-
- protected:
-  void timerEvent(QTimerEvent *e) override;
-
- private Q_SLOTS:
-  void EndOfStreamReached(const int pipeline_id, const bool has_next_track);
-  void HandlePipelineError(const int pipeline_id, const int domain, const int error_code, const QString &message, const QString &debugstr);
-  void NewMetaData(const int pipeline_id, const EngineMetadata &engine_metadata);
-  void AddBufferToScope(GstBuffer *buf, const int pipeline_id, const QString &format);
-  void FadeoutFinished(const int pipeline_id);
-  void FadeoutPauseFinished();
+ private:
+  std::unique_ptr<GstEnginePipeline> CreatePipeline(const std::string &url, uint64_t beginning_offset_nanosec,
+                                                    int64_t end_offset_nanosec, double ebur128_gain_db = 0.0);
+  void WirePipeline(GstEnginePipeline *pipeline);
+  void FinishCrossfade();
+  void DiscardNext();
+  void OnAboutToFinish(int pipeline_id);
+  void MaybeAboutToFinish();
+  void StartAboutToEndTimer();
+  void StopAboutToEndTimer();
+  static gboolean AboutToEndTick(gpointer data);
+  void OnEos(int pipeline_id);
+  void StartFade(int direction, int duration_ms = 0);
+  void StartPauseFade();
+  void StopPauseFade();
+  void CancelFade();
+  static gboolean FadeTick(gpointer data);
+  void StartFadeout(std::unique_ptr<GstEnginePipeline> pipeline);
+  void StartStopFade();
+  void CancelStopFade();
+  void StopAllFadeouts();
+  void RemoveFadeout(int pipeline_id);
+  static gboolean StopFadeTick(gpointer data);
+  void FinishStopImmediate();
+  void FinishPipeline(std::unique_ptr<GstEnginePipeline> pipeline);
+  void OnPipelineFinished(int pipeline_id);
+  void MaybeFinishDelayedPlay();
+  int OldPipelineCount() const { return static_cast<int>(old_pipelines_.size()); }
   void SeekNow();
-  void PlayDone(const GstStateChangeReturn ret, const bool pause, const int pipeline_id);
-
+  void CancelSeek();
+  void PlayDone(bool pause);
+  static gboolean SeekTimeout(gpointer data);
+  void SetState(State state);
+  void ApplyCurrentVolume(double fraction);
+  double VolumeFraction() const;
+  GstPipelineExtras PipelineExtras() const;
+  void HandleBuffering(int percent);
+  void HandlePipelineError(int pipeline_id, int domain, int code, const std::string &text);
   void BufferingStarted();
   void BufferingProgress(int percent);
   void BufferingFinished();
-
-  void PipelineFinished(const int pipeline_id);
-
- private:
-  GstUrl FixupUrl(const QUrl &url);
-
-  void StartFadeout(GstEnginePipelinePtr pipeline);
-  void StartFadeoutPause();
-  void StopFadeoutPause();
-
-  void StartTimers();
-  void StopTimers();
-
-  GstEnginePipelinePtr CreatePipeline();
-  GstEnginePipelinePtr CreatePipeline(const QUrl &media_url, const QUrl &stream_url, const QByteArray &gst_url, const qint64 beginning_offset_nanosec, const qint64 end_offset_nanosec, const double ebur128_loudness_normalizing_gain_db);
-
-  void FinishPipeline(GstEnginePipelinePtr pipeline);
-
-  void UpdateScope(int chunk_length);
-
-  static void StreamDiscovered(GstDiscoverer *discoverer, GstDiscovererInfo *info, GError *error, gpointer self);
-  static void StreamDiscoveryFinished(GstDiscoverer *discoverer, gpointer self);
-  static QString GSTdiscovererErrorMessage(GstDiscovererResult result);
-
-  bool OldExclusivePipelineActive() const;
-  bool AnyExclusivePipelineActive() const;
-
-#ifdef HAVE_SPOTIFY
   void SetSpotifyAccessToken() override;
-#endif
+  void EnsureDiscoverer();
+  void DestroyDiscoverer();
+  void RequestDiscover(const std::string &media_url, const std::string &play_url);
+  void OnStreamDiscovered(GstDiscovererInfo *info, GError *error);
 
- private:
-  SharedPtr<TaskManager> task_manager_;
-  GstDiscoverer *discoverer_;
+  struct FadeoutState {
+    std::unique_ptr<GstEnginePipeline> pipeline;
+    int step = 0;
+    int steps = 1;
+  };
 
-  int buffering_task_id_;
-
-  GstEnginePipelinePtr current_pipeline_;
-  QMap<int, GstEnginePipelinePtr> fadeout_pipelines_;
-  GstEnginePipelinePtr fadeout_pause_pipeline_;
-  QMap<int, GstEnginePipelinePtr> old_pipelines_;
-
-  QList<GstBufferConsumer*> buffer_consumers_;
-
-  GstBuffer *latest_buffer_;
-
-  bool stereo_balancer_enabled_;
-  float stereo_balance_;
-
-  bool equalizer_enabled_;
-  int equalizer_preamp_;
-  QList<int> equalizer_gains_;
-
-  // Hack to stop seeks happening too often
-  QTimer *seek_timer_;
-  bool waiting_to_seek_;
-  quint64 seek_pos_;
-
-  int timer_id_;
-
-  bool has_faded_out_to_pause_;
-
-  int scope_chunk_;
-  bool have_new_buffer_;
-  int scope_chunks_;
-  QString buffer_format_;
-
-  int discovery_finished_cb_id_;
-  int discovery_discovered_cb_id_;
-
-  State delayed_state_;
-  bool delayed_state_pause_;
-  quint64 delayed_state_offset_nanosec_;
+  std::unique_ptr<GstEnginePipeline> current_;
+  std::unique_ptr<GstEnginePipeline> next_;
+  std::map<int, FadeoutState> fadeout_pipelines_;
+  std::map<int, std::unique_ptr<GstEnginePipeline>> old_pipelines_;
+  GstDiscoverer *discoverer_ = nullptr;
+  gulong discovered_handler_ = 0;
+  gulong finished_handler_ = 0;
+  std::string media_url_;
+  std::string stream_url_;
+  std::string next_media_url_;
+  std::string next_url_;
+  int next_pipeline_id_ = 1;
+  int replaygain_mode_ = 0;
+  double replaygain_preamp_ = 0.0;
+  double replaygain_fallback_ = 0.0;
+  bool replaygain_compression_ = true;
+  bool ebur128_loudness_normalization_ = false;
+  double ebur128_target_level_lufs_ = -23.0;
+  double ebur128_loudness_normalizing_gain_db_ = 0.0;
+  double next_ebur128_gain_db_ = 0.0;
+  float stereo_balance_ = 0.0f;
+  int eq_preamp_ = 0;
+  std::vector<int> eq_gains_ = std::vector<int>(10, 0);
+  bool eq_enabled_ = false;
+  State state_ = State::Empty;
+  std::string output_ = "autoaudiosink";
+  std::string device_;
+  unsigned volume_percent_ = 100;
+  bool replaygain_enabled_ = false;
+  bool fading_enabled_ = false;
+  bool crossfade_enabled_ = false;
+  bool autocrossfade_enabled_ = false;
+  bool playbin3_ = true;
+  bool no_crossfade_same_album_ = true;
+  bool fadeout_pause_enabled_ = false;
+  bool exclusive_mode_ = false;
+  bool volume_control_ = true;
+  bool volume_exponential_ = false;
+  bool channels_enabled_ = false;
+  int channels_ = 0;
+  bool bs2b_enabled_ = false;
+  bool http2_enabled_ = false;
+  bool strict_ssl_enabled_ = false;
+  std::string proxy_address_;
+  bool proxy_authentication_ = false;
+  std::string proxy_user_;
+  std::string proxy_pass_;
+  int64_t buffer_duration_ms_ = 4000;
+  double buffer_low_watermark_ = 0.33;
+  double buffer_high_watermark_ = 0.99;
+  int device_warmup_ms_ = 500;
+  bool pending_pause_ = false;
+  bool faded_out_to_pause_ = false;
+  int fade_duration_ms_ = 2000;
+  int fadeout_pause_duration_ms_ = 250;
+  std::string current_album_;
+  std::string next_album_;
+  int fade_direction_ = 0;
+  int fade_step_ = 0;
+  int fade_steps_ = 1;
+  guint fade_timeout_id_ = 0;
+  guint fadeout_timeout_id_ = 0;
+  uint64_t pending_seek_nanosec_ = 0;
+  bool waiting_to_seek_ = false;
+  guint seek_timeout_id_ = 0;
+  guint about_to_end_timer_id_ = 0;
+  bool delayed_play_pending_ = false;
+  bool delayed_play_pause_ = false;
+  uint64_t delayed_play_offset_nanosec_ = 0;
+  bool gapless_pending_ = false;
+  std::vector<int16_t> last_scope_;
+  TaskManager *task_manager_ = nullptr;
+  int buffering_task_id_ = -1;
 };
 
-#endif  // GSTENGINE_H
+#endif  // STRAWBERRY_GSTENGINE_H

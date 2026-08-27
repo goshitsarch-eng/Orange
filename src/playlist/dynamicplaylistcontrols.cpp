@@ -1,56 +1,64 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "playlist/dynamicplaylistcontrols.h"
 
-#include <QString>
-#include <QIODevice>
-#include <QFile>
-#include <QPalette>
+#include "smartplaylists/smartplaylistsummary.h"
+#include "translations/translations.h"
 
-#include "core/logging.h"
-
-#include "dynamicplaylistcontrols.h"
-#include "ui_dynamicplaylistcontrols.h"
-
-using namespace Qt::Literals::StringLiterals;
-
-DynamicPlaylistControls::DynamicPlaylistControls(QWidget *parent)
-    : QWidget(parent),
-      ui_(new Ui_DynamicPlaylistControls) {
-
-  ui_->setupUi(this);
-
-  QObject::connect(ui_->expand, &QPushButton::clicked, this, &DynamicPlaylistControls::Expand);
-  QObject::connect(ui_->repopulate, &QPushButton::clicked, this, &DynamicPlaylistControls::Repopulate);
-  QObject::connect(ui_->off, &QPushButton::clicked, this, &DynamicPlaylistControls::TurnOff);
-
-  QFile stylesheet_file(u":/style/dynamicplaylistcontrols.css"_s);
-  if (stylesheet_file.open(QIODevice::ReadOnly)) {
-    QString stylesheet = QString::fromLatin1(stylesheet_file.readAll());
-    stylesheet_file.close();
-    QColor color = palette().color(QPalette::AlternateBase).lighter(80);
-    color.setAlpha(50);
-    stylesheet.replace("%background"_L1, QStringLiteral("rgba(%1, %2, %3, %4%5)").arg(QString::number(color.red()), QString::number(color.green()), QString::number(color.blue()), QString::number(color.alpha()), u"%"_s));
-    setStyleSheet(stylesheet);
-  }
-
+DynamicPlaylistControls::DynamicPlaylistControls() {
+  widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_set_margin_start(widget_, 8);
+  gtk_widget_set_margin_end(widget_, 8);
+  GtkWidget *expand = gtk_button_new_with_label(Translations::CStr("Expand"));
+  GtkWidget *repopulate = gtk_button_new_with_label(Translations::CStr("Repopulate"));
+  GtkWidget *off = gtk_button_new_with_label(Translations::CStr("Turn off"));
+  GtkWidget *labels = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_set_hexpand(labels, TRUE);
+  GtkWidget *title = gtk_label_new(Translations::CStr(SmartPlaylistSummary::Title()));
+  gtk_widget_set_halign(title, GTK_ALIGN_START);
+  summary_label_ = gtk_label_new(Translations::CStr(SmartPlaylistSummary::EmptyTerms()));
+  gtk_widget_add_css_class(summary_label_, "dim-label");
+  gtk_widget_set_halign(summary_label_, GTK_ALIGN_START);
+  gtk_label_set_ellipsize(GTK_LABEL(summary_label_), PANGO_ELLIPSIZE_END);
+  gtk_box_append(GTK_BOX(labels), title);
+  gtk_box_append(GTK_BOX(labels), summary_label_);
+  gtk_box_append(GTK_BOX(widget_), labels);
+  gtk_box_append(GTK_BOX(widget_), expand);
+  gtk_box_append(GTK_BOX(widget_), repopulate);
+  gtk_box_append(GTK_BOX(widget_), off);
+  g_signal_connect(expand, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<DynamicPlaylistControls *>(data);
+                     if (self->expand_) {
+                       self->expand_();
+                     }
+                   }),
+                   this);
+  g_signal_connect(repopulate, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<DynamicPlaylistControls *>(data);
+                     if (self->repopulate_) {
+                       self->repopulate_();
+                     }
+                   }),
+                   this);
+  g_signal_connect(off, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<DynamicPlaylistControls *>(data);
+                     if (self->turn_off_) {
+                       self->turn_off_();
+                     }
+                   }),
+                   this);
+  gtk_widget_set_visible(widget_, FALSE);
 }
 
-DynamicPlaylistControls::~DynamicPlaylistControls() { delete ui_; }
+void DynamicPlaylistControls::SetSearch(const SmartPlaylistSearch &search) {
+  search_ = search;
+  if (summary_label_) {
+    gtk_label_set_text(GTK_LABEL(summary_label_), SmartPlaylistSummary::Summary(search_).c_str());
+  }
+}
+
+void DynamicPlaylistControls::SetExpandCallback(ExpandCallback callback) { expand_ = std::move(callback); }
+
+void DynamicPlaylistControls::SetRepopulateCallback(RepopulateCallback callback) { repopulate_ = std::move(callback); }
+
+void DynamicPlaylistControls::SetTurnOffCallback(TurnOffCallback callback) { turn_off_ = std::move(callback); }
+
+void DynamicPlaylistControls::SetVisible(bool visible) { gtk_widget_set_visible(widget_, visible); }

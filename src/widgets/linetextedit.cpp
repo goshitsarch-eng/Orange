@@ -1,67 +1,18 @@
-/*
-   Strawberry Music Player
-   This file was part of Clementine.
-   Copyright 2010, David Sansome <me@davidsansome.com>
+#include "widgets/linetextedit.h"
 
-   Strawberry is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   Strawberry is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
-
- */
-
-#include <QtGlobal>
-#include <QWidget>
-#include <QSize>
-#include <QTextEdit>
-#include <QTextOption>
-#include <QFontMetrics>
-#include <QSizePolicy>
-#include <QtEvents>
-
-#include "linetextedit.h"
-
-using namespace Qt::Literals::StringLiterals;
-
-LineTextEdit::LineTextEdit(QWidget *parent) : QTextEdit(parent) {
-
-  setWordWrapMode(QTextOption::NoWrap);
-  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  setTabChangesFocus(true);
-  setSizePolicy(sizePolicy().horizontalPolicy(), QSizePolicy::Fixed);
-
+LineTextEdit::LineTextEdit() {
+  widget_ = gtk_entry_new();
+  g_signal_connect(widget_, "changed", G_CALLBACK(+[](GtkEditable *editable, gpointer data) {
+                     auto *self = static_cast<LineTextEdit *>(data);
+                     if (self->changed_) {
+                       self->changed_(gtk_editable_get_text(editable));
+                     }
+                   }),
+                   this);
 }
 
-QSize LineTextEdit::sizeHint() const {
+void LineTextEdit::SetText(const std::string &text) { gtk_editable_set_text(GTK_EDITABLE(widget_), text.c_str()); }
 
-  QFontMetrics fm(font());
+std::string LineTextEdit::Text() const { return gtk_editable_get_text(GTK_EDITABLE(widget_)); }
 
-  static const int kMargin = 5;
-  int h = 2 * kMargin + qMax(fm.height(), 14);
-  int w = 2 * kMargin + fm.horizontalAdvance(u"W"_s) * 15;
-
-  return QSize(w, h);
-
-}
-
-QSize LineTextEdit::minimumSizeHint() const {
-  return sizeHint();
-}
-
-void LineTextEdit::keyPressEvent(QKeyEvent *e) {
-  if (e->key() == Qt::Key_Enter || e->key() == Qt::Key_Return) {
-    e->ignore();
-  }
-  else {
-    QTextEdit::keyPressEvent(e);
-  }
-}
+void LineTextEdit::SetChangedCallback(std::function<void(const std::string &)> callback) { changed_ = std::move(callback); }

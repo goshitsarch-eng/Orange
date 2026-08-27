@@ -1,0 +1,4478 @@
+# Translation catalog for Strawberry Music Player.
+# Generated from the Qt .ts files on origin/master.
+msgid ""
+msgstr ""
+"Project-Id-Version: strawberry\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-26 00:00+0000\n"
+"PO-Revision-Date: 2026-08-26 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: et_EE\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "ASX playlist is too large"
+msgstr "ASX-esitusloend on liiga pikk"
+
+msgid "Failed to write ASX playlist"
+msgstr "ASX-esitusloendi salvestamine ei õnnestunud"
+
+msgid "About"
+msgstr "Rakenduse teave"
+
+msgid "About Strawberry"
+msgstr "Rakenduse teave: Strawberry"
+
+msgid "Version %1"
+msgstr "Versioon %1"
+
+msgid "Strawberry is a music player and music collection organizer."
+msgstr "Strawberry on muusikapleier ja muusikakogu haldur."
+
+msgid "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."
+msgstr "See on 2018. aastal välja antud Clementine'i haru, mis on mõeldud muusikakollektsionääridele ja audiofiilidele."
+
+msgid "Strawberry is free software released under GPL. The source code is available on %1"
+msgstr "Strawberry on avatud lähtekoodiga tasuta tarkvara, mis on avaldatud GPL-i alusel. Lähtekood on saadaval siin: %1"
+
+msgid "You should have received a copy of the GNU General Public License along with this program.  If not, see %1"
+msgstr "Said ilmselt koos selle programmiga ka GNU Üldise Avaliku Litsentsi koopia. Kui ei, siis leiad ta siit: %1"
+
+msgid "If you like Strawberry and can make use of it, consider sponsoring or donating."
+msgstr "Kui Strawberry sulle meeldib ja leiad ta olevat kasulik, kaalu rahalist toetust või annetamist."
+
+msgid "You can sponsor the author on %1 or %2. You can also make a one-time payment through %3."
+msgstr "Võid toetada autorit saidis %1 või %2. Samuti on võimalik ühekordne makse %3 kaudu."
+
+msgid "Author and maintainer"
+msgstr "Autor ja hooldaja"
+
+msgid "Contributors"
+msgstr "Kaasautorid"
+
+msgid "Clementine authors"
+msgstr "Clementine'i autorid"
+
+msgid "Clementine contributors"
+msgstr "Clementine'i kaasautorid"
+
+msgid "Thanks to"
+msgstr "Tänud"
+
+msgid "Thanks to all the other Amarok and Clementine contributors."
+msgstr "Täname kõiki teisi Amaroki ja Clementine'i kaasautoreid."
+
+msgid "Add Stream"
+msgstr "Lisa voogedastus"
+
+msgid "Enter the URL of a stream:"
+msgstr "Sisesta voogedastuse võrguaadress:"
+
+msgid "Load cover from disk..."
+msgstr "Laadi kaanepilt kettalt..."
+
+msgid "Save cover to disk..."
+msgstr "Salvesta kaanepilt kettale..."
+
+msgid "Load cover from URL..."
+msgstr "Laadi kaaanepilt võrguaadressilt..."
+
+msgid "Search for album covers..."
+msgstr "Otsi kaanepilte..."
+
+msgid "Unset cover"
+msgstr "Tühista kaanepilt"
+
+msgid "Delete cover"
+msgstr "Kustuta kaanepilt"
+
+msgid "Clear cover"
+msgstr "Eemalda kaanepilt"
+
+msgid "Show fullsize..."
+msgstr "Näita täissuuruses..."
+
+msgid "Search automatically"
+msgstr "Otsi automaatselt"
+
+msgid "Load cover from disk"
+msgstr "Laadi kaanepilt kettalt"
+
+msgid "Failed to open cover file %1 for reading: %2"
+msgstr "Kaanepildi faili %1 avamine lugemiseks ei õnnestunud: %2"
+
+msgid "Cover file %1 is empty."
+msgstr "Kaanepildi fail %1 on tühi."
+
+msgid "unknown"
+msgstr "tundmatu"
+
+msgid "Save album cover"
+msgstr "Salvesta kaanepilt"
+
+msgid "Failed to open cover file %1 for writing: %2"
+msgstr "Kaanepildi faili %1 avamine salvestamiseks ei õnnestunud: %2"
+
+msgid "Failed writing cover to file %1: %2"
+msgstr "Kaanepildi salvestamine %1 faili ei õnnestunud: %2"
+
+msgid "Failed writing cover to file %1."
+msgstr "Kaanepildi salvestamine %1 faili ei õnnestunud."
+
+msgid "Failed to delete cover file %1: %2"
+msgstr "Kaanepildi faili %1 kustutamine ei õnnestunud: %2"
+
+msgid "Failed to write cover to file %1: %2"
+msgstr "Kaanepildi salvestamine %1 faili ei õnnestunud: %2"
+
+msgid "Could not save cover to file %1."
+msgstr "Ei õnnestunud salvestada kaanepilti %1 faili."
+
+msgid "Export covers"
+msgstr "Ekspordi kaanepildid"
+
+msgid "Output"
+msgstr "Väljund"
+
+msgid "Enter a filename for exported covers (no extension):"
+msgstr "Sisesta failinimi eksporditud kaanepiltidele (laiendita):"
+
+msgid "Export downloaded covers"
+msgstr "Ekspordi allalaaditud kaanepildid"
+
+msgid "Export embedded covers"
+msgstr "Ekspordi lõimitud kaanepildid"
+
+msgid "Existing covers"
+msgstr "Olemasolevad kaanepildid"
+
+msgid "Do not overwrite"
+msgstr "Ära kirjuta üle"
+
+msgid "O&verwrite all"
+msgstr "Kirjuta &kõik üle"
+
+msgid "Overwrite s&maller ones only"
+msgstr "Kirjuta üle ainult väik&semad"
+
+msgid "Size"
+msgstr "Suurus"
+
+msgid "Scale size"
+msgstr "Skaala suurus"
+
+msgid "Size:"
+msgstr "Suurus:"
+
+msgid "Pixel"
+msgstr "Piksel"
+
+msgid "Abort"
+msgstr "Katkesta"
+
+msgid "All albums"
+msgstr "Kõik albumid"
+
+msgid "Albums with covers"
+msgstr "Kaanepildiga albumid"
+
+msgid "Albums without covers"
+msgstr "Kaanepildita albumid"
+
+msgid "Really cancel?"
+msgstr "Kas tõesti katkestame?"
+
+msgid "Closing this window will stop searching for album covers."
+msgstr "Selle akna sulgemine lõpetab kaanepiltide otsimise."
+
+msgid "Don't stop!"
+msgstr "Ära peatu!"
+
+msgid "All artists"
+msgstr "Kõik esitajad"
+
+msgid "Various artists"
+msgstr "Erinevad esitajad"
+
+msgid "Got %1 covers out of %2 (%3 failed)"
+msgstr "%2-st kaanepildist saadi %1 (%3 ei õnnestunud)"
+
+msgid "%1 transferred"
+msgstr "%1 on üle tõstetud"
+
+msgid "Export finished"
+msgstr "Eksportimine on lõpetatud"
+
+msgid "No covers to export."
+msgstr "Eksporditavaid kaanepilte pole."
+
+msgid "Exported %1 covers out of %2 (%3 skipped)"
+msgstr "%2-st kaanepildist eksporditi %1 (%3 jäeti vahele)"
+
+msgid "Cover Manager"
+msgstr "Kaanepiltide haldur"
+
+msgid "Artist"
+msgstr "Esitaja"
+
+msgid "Album"
+msgstr "Album"
+
+msgid "Search"
+msgstr "Otsing"
+
+msgid "Covers from %1"
+msgstr "Kaanepildid teenusest %1"
+
+msgid "Framerate"
+msgstr "Kaadrisagedus"
+
+msgid "Low (%1 fps)"
+msgstr "Madal (%1 fps)"
+
+msgid "Medium (%1 fps)"
+msgstr "Keskmine (%1 fps)"
+
+msgid "High (%1 fps)"
+msgstr "Kõrge (%1 fps)"
+
+msgid "Super high (%1 fps)"
+msgstr "Ülikõrge (%1 kaadrit sekundis)"
+
+msgid "No analyzer"
+msgstr "Analüsaator puudub"
+
+msgid "Block analyzer"
+msgstr "Blokk-analüsaator"
+
+msgid "Boom analyzer"
+msgstr "Kõmisev analüsaator"
+
+msgid "Turbine"
+msgstr "Turbiin"
+
+msgid "Sonogram"
+msgstr "Sonogramm"
+
+msgid "WaveRubber"
+msgstr "WaveRubber"
+
+msgid "Appearance"
+msgstr "Välimus"
+
+msgid "Style"
+msgstr "Stiil"
+
+msgid "Tabbar colors"
+msgstr "Kaardiriba värvid"
+
+msgid "&Use the system default color"
+msgstr "&Kasuta süsteemi vaikimisi värvi"
+
+msgid "Use custom color"
+msgstr "Kasuta sinu määratud värvi"
+
+msgid "Use gradient background"
+msgstr "Kasuta taustaks värvi üleminekut"
+
+msgid "Select tabbar color:"
+msgstr "Vali kaardiriba värv:"
+
+msgid "Background image"
+msgstr "Taustapilt"
+
+msgid "Default bac&kground image"
+msgstr "Vaikimisi &taustapilt"
+
+msgid "&No background image"
+msgstr "&Taustapilti pole"
+
+msgid "The album cover of the currently playing song"
+msgstr "Hetkel esitamisel oleva loo kaanepilt"
+
+msgid "Albu&m cover"
+msgstr "Albu&mi kaanepilt"
+
+msgid "Custom image:"
+msgstr "Kohandatud pilt:"
+
+msgid "Browse..."
+msgstr "Sirvi..."
+
+msgid "Position"
+msgstr "Asukoht"
+
+msgid "Upper Left"
+msgstr "Üleval vasakul"
+
+msgid "Upper Right"
+msgstr "Üleval paremal"
+
+msgid "Middle"
+msgstr "Keskel"
+
+msgid "Bottom Left"
+msgstr "All vasakul"
+
+msgid "Bottom Right"
+msgstr "All paremal"
+
+msgid "Max cover size"
+msgstr "Kaanepildi maksimaalne suurus"
+
+msgid "Stretch image to fill playlist"
+msgstr "Venita kujutist esitusloendi täitmiseks"
+
+msgid "Keep aspect ratio"
+msgstr "Säilita kuvasuhe"
+
+msgid "Do not cut image"
+msgstr "Ära lõika pilti"
+
+msgid "Blur amount"
+msgstr "Hägustuse määr"
+
+msgid "0px"
+msgstr "0px"
+
+msgid "Opacity"
+msgstr "Läbipaistmatus"
+
+msgid "40%"
+msgstr "40%"
+
+msgid "Icon sizes"
+msgstr "Ikoonide suurus"
+
+msgid "Playlist buttons"
+msgstr "Esitusloendi nupud"
+
+msgid "Tabbar large mode"
+msgstr "Suur kaardiriba"
+
+msgid "Play control buttons"
+msgstr "Esituse juhtnupud"
+
+msgid "Configure buttons"
+msgstr "Seadistuse nupud"
+
+msgid "Files, playlists and queue buttons"
+msgstr "Failid, esitusloendid ja järjekorranupud"
+
+msgid "Tabbar small mode"
+msgstr "Väike kaardiriba"
+
+msgid "Playlist playing song color"
+msgstr "Esitatava loo värv esitusloendis"
+
+msgid "System highlight color"
+msgstr "Süsteemne esiletõstmisvärv"
+
+msgid "Custom color"
+msgstr "Kohandatud värv"
+
+msgid "Select playlist playing song color:"
+msgstr "Vali esitusloendis esitatatava loo värv:"
+
+msgid "Window"
+msgstr "Aken"
+
+msgid "Window text"
+msgstr "Akna tekst"
+
+msgid "Base"
+msgstr "Baasvärv"
+
+msgid "Alternate base"
+msgstr "Alternatiivne baasvärv"
+
+msgid "Tooltip base"
+msgstr "Kohtvihje baasvärv"
+
+msgid "Tooltip text"
+msgstr "Kohtvihje tekst"
+
+msgid "Placeholder text"
+msgstr "Kohatäitja tekst"
+
+msgid "Text"
+msgstr "Tekst"
+
+msgid "Button"
+msgstr "Nupp"
+
+msgid "Button text"
+msgstr "Nupu tekst"
+
+msgid "Bright text"
+msgstr "Ere tekst"
+
+msgid "Select color"
+msgstr "Vali värv"
+
+msgid "Select background image"
+msgstr "Vali taustpilt"
+
+msgid "Colors"
+msgstr "Värvid"
+
+msgid "&Use the system default color set"
+msgstr "&Kasuta süsteemi vaikimisi värvikomplekti"
+
+msgid "Use a custom color set"
+msgstr "Kasuta enda koostatud värvikomplekti"
+
+msgid "Set a custom color set suitable for a dark theme"
+msgstr "Seadista enda koostatud värvikomplekt, mis sobib tumeda kujunduse jaoks"
+
+msgid "Dark mode"
+msgstr "Tume kujundus"
+
+msgid "Reset the custom color set to the system default colors"
+msgstr "Lähtesta enda koostatud värvikomplekt ja kasuta süsteemi vaikimisi valikut"
+
+msgid "Reset to default"
+msgstr "Lähtesta vaikimisi väärtusteks"
+
+msgid "You might need to restart Strawberry for this setting to fully apply"
+msgstr "Selle seadistuse täismahus jõustumiseks pead ilmselt Strawberry uuesti käivitama"
+
+msgid "You need to restart Strawberry for this setting to take affect"
+msgstr "Selle seadistuse jõustumiseks pead Strawberry uuesti käivitama"
+
+msgid "System icons"
+msgstr "Süsteemiikoonid"
+
+msgid "Changing colors is only supported with some styles"
+msgstr "Värvide muutmine on toetatud vaid mõnede stiilide puhul"
+
+msgid "Dark colors"
+msgstr "Tumedad värvid"
+
+msgid "Backend"
+msgstr "Taustaprogramm"
+
+msgid "Audio output"
+msgstr "Heli väljund"
+
+msgid "Device"
+msgstr "Seade"
+
+msgid "ALSA plugin:"
+msgstr "ALSA pistikprogramm:"
+
+msgid "hw"
+msgstr "hw"
+
+msgid "p&lughw"
+msgstr "p&lughw"
+
+msgid "pcm"
+msgstr "pcm"
+
+msgid "Exclusive mode (Experimental)"
+msgstr "Eksklusiivne režiim (eksperimentaalne)"
+
+msgid "Options"
+msgstr "Valikud"
+
+msgid "Enable volume control"
+msgstr "Luba helivaljuse juhtimine"
+
+msgid "Upmix / downmix to"
+msgstr "Teisenda heli"
+
+msgid "channels"
+msgstr "kanaliseks"
+
+msgid "Improve headphone listening of stereo audio records (bs2b)"
+msgstr "Paranda stereo helisalvestuste kuulamist kõrvaklappidega (bs2b)"
+
+msgid "Use playbin3 when available"
+msgstr "Kasuta playbin3, kui see on saadaval"
+
+msgid "Enable HTTP/2 for streaming"
+msgstr "Luba voogesituseks HTTP/2"
+
+msgid "Use strict SSL mode"
+msgstr "Kasuta ranget SSL-režiimi"
+
+msgid "Buffer"
+msgstr "Puhver"
+
+msgid " ms"
+msgstr " ms"
+
+msgid "Buffer duration"
+msgstr "Puhvri kestus"
+
+msgid "High watermark"
+msgstr "Kõrgeim väärtus"
+
+msgid "Low watermark"
+msgstr "Madalaim väärtus"
+
+msgid "Defaults"
+msgstr "Vaikeväärtused"
+
+msgid "Audio normalization"
+msgstr "Heli normaliseerimine"
+
+msgid "No audio normalization"
+msgstr "Heli ei normaliseerita"
+
+msgid "Replay Gain"
+msgstr "Esitusvaljuse tundlikkus"
+
+msgid "Use Replay Gain metadata if it is available"
+msgstr "Kui esitusvaljuse tundlikkuse metainfo on failis olemas, siis kasuta seda"
+
+msgid "Replay Gain mode"
+msgstr "Esitusvaljuse tundlikkuse režiim"
+
+msgid "Radio (equal loudness for all tracks)"
+msgstr "Raadio (kõigil paladel võrdne valjus)"
+
+msgid "Album (ideal loudness for all tracks)"
+msgstr "Album (kõigil radadel ideaalne valjus)"
+
+msgid "Pre-amp"
+msgstr "Eelmoonutus"
+
+msgid "Apply compression to prevent clipping"
+msgstr "Ülevõimenduse vältimiseks kasuta kompressorit"
+
+msgid "Fallback-gain"
+msgstr "Esitusvaljuse samm"
+
+msgid "EBU R 128 Loudness Normalization"
+msgstr "EBU R 128 valjuse normaliseerimine"
+
+msgid "Perform track loudness normalization"
+msgstr "Normaliseeri loo valjus"
+
+msgid "Target Level"
+msgstr "Sihttase"
+
+msgid "Fading"
+msgstr "Hajumine"
+
+msgid "Fade out when stopping a track"
+msgstr "Hajuta heli loo peatamisel"
+
+msgid "Cross-fade when changing tracks manually"
+msgstr "Risthajuta heli lugude käsitsi vahetamisel"
+
+msgid "Cross-fade when changing tracks automatically"
+msgstr "Risthajuta heli lugude automaatsel vahetamisel"
+
+msgid "Except between tracks on the same album or in the same CUE sheet"
+msgstr "Välja arvatud samal albumil või samas asukohatabelis asuvate lugude vahel"
+
+msgid "Fading duration"
+msgstr "Hajumise kestus"
+
+msgid "Fade out on pause / fade in on resume"
+msgstr "Kasuta peatamisel ja jätkamisel hajumist"
+
+msgid "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+msgstr "Seosta helitugevuse liugurnupp detsibellipõhise skaalaga nii, et tajutav helitugevus muutuks ühtlaselt. Iga 1% samm vastab 0,5 dB-le, 100% on 0 dB ja 0% on vaikus."
+
+msgid "Exponential volume scaling"
+msgstr "Helivaljuse skaleerimine eksponentsiaalselt"
+
+msgid "Device warm-up"
+msgstr "Seadme ettevalmistusaeg"
+
+msgid "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+msgstr "Aeg heliseadme avamise ja taasesituse alusetamise vahel. Mõeldud vältimaks olukorda, kus loo algus jääb esitamata, sest seade (DAC) on veel valmendumas. 0 lülitab selle seadistuse väja."
+
+msgid "Behavior"
+msgstr "Käitumine"
+
+msgid "Show system tray icon"
+msgstr "Kuva süsteemisalve ikoon"
+
+msgid "Keep running in the background when the window is closed"
+msgstr "Jäta taustal tööle ka siis, kui programmiaken on suletud"
+
+msgid "Show song progress on system tray icon"
+msgstr "Kuva süsteemisalve ikoonil edenemist"
+
+msgid "Show song progress on taskbar"
+msgstr "Näita loo edenemist tegumiribal"
+
+msgid "Resume playback on start"
+msgstr "Käivitamisel jätka taasesitust"
+
+msgid "Show playing widget"
+msgstr "Kuva esitusvidin"
+
+msgid "On startup"
+msgstr "Käivitamisel"
+
+msgid "Remember from &last time"
+msgstr "Jätka pooleli jäänud kohast"
+
+msgid "Show the main window"
+msgstr "Kuva peaaken"
+
+msgid "Hide the main window"
+msgstr "Peida peaaken"
+
+msgid "Show the main window maximized"
+msgstr "Kuva peaaken maksimeerituna"
+
+msgid "Show the main window minimized"
+msgstr "Kuva peaaken minimeerituna"
+
+msgid "Language"
+msgstr "Keel"
+
+msgid "Use the system default"
+msgstr "Kasuta süsteemi vaikeväärtust"
+
+msgid "You will need to restart Strawberry if you change the language."
+msgstr "Keele muutmisel tuleb Strawberry taaskäivitada."
+
+msgid "Using the menu to add a song will..."
+msgstr "Menüü kaudu loo lisamisel..."
+
+msgid "Never start playing"
+msgstr "Ära kunagi alusta esitust"
+
+msgid "Play if there is nothing already playing"
+msgstr "Esita, kui hetkel juba pole midagi esitamisel"
+
+msgid "Always start playing"
+msgstr "Alusta alati esitust"
+
+msgid "Pressing \"Previous\" in player will..."
+msgstr "Vajutades nuppu \"Eelmine\"..."
+
+msgid "Jump to previous song right away"
+msgstr "Hüppa kohe eelmisele loole"
+
+msgid "Restart song, then jump to previous if pressed again"
+msgstr "Esita uuesti algusest, seejärel uuesti vajutamisel hüppa eelmisele"
+
+msgid "Double clicking a song will..."
+msgstr "Topeltklõpsuga lool..."
+
+msgid "Append to the playlist"
+msgstr "Lisa esitusloendisse"
+
+msgid "Replace the playlist"
+msgstr "Asenda esitusloend"
+
+msgid "Open in new playlist"
+msgstr "Ava uues esitusloendis"
+
+msgid "Add to the queue"
+msgstr "Lisa esitusjärjekorda"
+
+msgid "Double clicking a song in the playlist will..."
+msgstr "Topeltklõpsuga lool esitusloendis..."
+
+msgid "Change the currently playing song"
+msgstr "Käivita valitud lugu"
+
+msgid "Seeking using a keyboard shortcut or mouse wheel"
+msgstr "Kiirklahvi või hiireratta abil kerimine"
+
+msgid "Time step"
+msgstr "Aja samm"
+
+msgid " s"
+msgstr " s"
+
+msgid "Volume Increment"
+msgstr "Helivaljuse samm"
+
+msgid "Could not create cdiocddasrc"
+msgstr "cdiocddasrc meetodi loomine ei õnnestunud"
+
+msgid "Error while setting CDDA device to ready state."
+msgstr "Viga CDDA seadme valmisolekusse seadmisel."
+
+msgid "Error while setting CDDA device to pause state."
+msgstr "Viga CDDA seadme peatatud olekusse seadmisel."
+
+msgid "The 'track' format is not supported by GStreamer."
+msgstr "GStreamer ei toeta 'loo' vormingut."
+
+msgid "Error while querying CDDA tracks."
+msgstr "Viga lugude CDDA päringul."
+
+msgid "Unable to execute collection SQL query: %1"
+msgstr "Muusikakogu SQL päring ei õnnestunud: %1"
+
+msgid "Failed SQL query: %1"
+msgstr "SQL päring ei õnnestunud: %1"
+
+msgid "Updating %1 database."
+msgstr "%1 andmebaasi värskendamine."
+
+msgid "Collection Filter"
+msgstr "Muusikakogu filter"
+
+msgid "Enter search terms here"
+msgstr "Sisesta siia otsingusõnad"
+
+msgid "MenuPopupToolButton"
+msgstr "MenuPopupToolButton"
+
+msgid "Entire collection"
+msgstr "Terve muusikakogu"
+
+msgid "Added today"
+msgstr "Lisatud täna"
+
+msgid "Added this week"
+msgstr "Lisatud sel nädalal"
+
+msgid "Added within three months"
+msgstr "Lisatud kolme kuu jooksul"
+
+msgid "Added this year"
+msgstr "Lisatud sel aastal"
+
+msgid "Added this month"
+msgstr "Lisatud sel kuul"
+
+msgid "Save current grouping"
+msgstr "Salvesta praegune rühmitus"
+
+msgid "Manage saved groupings"
+msgstr "Halda salvestatud rühmitusi"
+
+msgid "Any rating"
+msgstr "Mis tahes hinnang"
+
+msgid "Rating non null"
+msgstr "Hinnang, mis pole null"
+
+msgid "Rating greater than 1 star"
+msgstr "Hinnang suurem kui 1 tärn"
+
+msgid "Rating greater than 2 stars"
+msgstr "Hinnang suurem kui 2 tärni"
+
+msgid "Rating greater than 3 stars"
+msgstr "Hinnang suurem kui 3 tärni"
+
+msgid "Rating greater than 4 stars"
+msgstr "Hinnang suurem kui 4 tärni"
+
+msgid "Group by"
+msgstr "Rühmitamise alus"
+
+msgid "Filter by age"
+msgstr "Filtreeri vanuse järgi"
+
+msgid "Filter by rating"
+msgstr "Filtreeri hinnangu järgi"
+
+msgid "Display options"
+msgstr "Kuvamise valikud"
+
+msgid "Group by Album artist/Album"
+msgstr "Rühmita: album esitaja/album"
+
+msgid "Group by Album artist/Album - Disc"
+msgstr "Rühmita: album esitaja/album - plaat"
+
+msgid "Group by Album artist/Year - Album"
+msgstr "Rühmita: album esitaja/aasta - album"
+
+msgid "Group by Album artist/Year - Album - Disc"
+msgstr "Rühmita: album esitaja/aasta - album - plaat"
+
+msgid "Group by Artist/Album"
+msgstr "Rühmita: esitaja/album"
+
+msgid "Group by Artist/Album - Disc"
+msgstr "Rühmita: esitaja/album - plaat"
+
+msgid "Group by Artist/Year - Album"
+msgstr "Rühmita: esitaja/aasta - album"
+
+msgid "Group by Artist/Year - Album - Disc"
+msgstr "Rühmita: esitaja/aasta - album - plaat"
+
+msgid "Group by Genre/Album artist/Album"
+msgstr "Rühmita: žanr/album esitaja/album"
+
+msgid "Group by Genre/Artist/Album"
+msgstr "Rühmita: žanr/esitaja/album"
+
+msgid "Group by Album Artist"
+msgstr "Rühmita: album esitaja"
+
+msgid "Group by Artist"
+msgstr "Rühmita: esitaja"
+
+msgid "Group by Album"
+msgstr "Rühmita: album"
+
+msgid "Group by Genre/Album"
+msgstr "Rühmita: žanr/album"
+
+msgid "Advanced grouping..."
+msgstr "Täpsem rühmitamine..."
+
+msgid "Grouping Name"
+msgstr "Rühmitamise nimi"
+
+msgid "Grouping name:"
+msgstr "Rühmitamise nimi:"
+
+msgid "Support for sort tags artist, album, album artist, title, composer and performer"
+msgstr "Esitaja, albumi, albumi esitaja, pealkirja, helilooja ja esineja järjestuse siltide tugi"
+
+msgid "Saving playcounts and ratings"
+msgstr "Salvestame esituskordi ja hinnanguid"
+
+msgid "Loading..."
+msgstr "Laadime..."
+
+msgid "Unknown"
+msgstr "Tundmatu"
+
+msgid "Collection"
+msgstr "Muusikakogu"
+
+msgid "These folders will be scanned for music to make up your collection"
+msgstr "Muusikakogu moodustamiseks skaneeritakse muusikat nendest kaustadest"
+
+msgid "Add new folder..."
+msgstr "Lisa uus kaust..."
+
+msgid "Remove folder"
+msgstr "Eemalda kaust"
+
+msgid "Automatic updating"
+msgstr "Automaatne uuendamine"
+
+msgid "Update the collection when Strawberry starts"
+msgstr "Värskenda muusikakogu Strawberry käivitumisel"
+
+msgid "Monitor the collection for changes"
+msgstr "Jälgi muudatusi muusikakogus"
+
+msgid "Song fingerprinting and tracking"
+msgstr "Sõrmejäljesta ja jälgi lugusid"
+
+msgid "Mark disappeared songs unavailable"
+msgstr "Märgi kadunud lood kättesaamatuks"
+
+msgid "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+msgstr "Teosta loo EBU R 128 analüüs (vajalik EBU R 128 valjuse normaliseerimiseks)"
+
+msgid "Expire unavailable songs after"
+msgstr "Kättesaamatud lood aeguvad pärast"
+
+msgid "days"
+msgstr "päeva"
+
+msgid "Preferred album art filenames (comma separated)"
+msgstr "Eelistatud kaanepildi failinimed (komadega eraldatud)"
+
+msgid "When looking for album art Strawberry will first look for picture files that contain one of these words.\nIf there are no matches then it will use the largest image in the directory."
+msgstr "Kaanepilte otsides vaatab Strawberry esmalt pildifaile, mis sisaldavad ühte neist sõnadest.\nKui vasteid pole, kasutab ta kaustas asuvat suurimat pilti."
+
+msgid "Automatically open single categories in the collection tree"
+msgstr "Ava üksikud kategooriad kogumikupuus automaatselt"
+
+msgid "Show dividers"
+msgstr "Kuva eraldajad"
+
+msgid "Show album cover art in collection"
+msgstr "Kuva muusikakogus kaanepilte"
+
+msgid "Use various artists for compilation albums"
+msgstr "Kogumike puhul kasuta albumi esitajanimena märget „Erinevad esitajad“"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+msgstr "Esitajate nimede sortimisel eira eesliiteid (\"the\", \"a\", \"an\")"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+msgstr "Esitajate nimede sortimisel eira eesliiteid (\"the\", \"a\", \"an\")"
+
+msgid "Use sort tags for sorting when available"
+msgstr "Kasuta sortimiseks sortimissilte, kui need on saadaval"
+
+msgid "Album cover pixmap cache"
+msgstr "Kaanepiltide vahemälu"
+
+msgid "Enable Disk Cache"
+msgstr "Luba ketta vahemälu"
+
+msgid "Disk Cache Size"
+msgstr "Ketta vahemälu suurus"
+
+msgid "Current disk cache in use:"
+msgstr "Praegu kasutatav ketta vahemälu:"
+
+msgid "Clear Disk Cache"
+msgstr "Tühjenda ketta vahemälu"
+
+msgid "Song playcounts and ratings"
+msgstr "Loo esituskorrad ja hinnangud"
+
+msgid "Save playcounts to song tags when possible"
+msgstr "Salvesta esituskorrad ja hinnangud failidesse esimesel võimalusel"
+
+msgid "Save ratings to song tags when possible"
+msgstr "Salvesta hinnangud lugude siltidesse esimesel võimalusel"
+
+msgid "Overwrite database playcount when songs are re-read from disk"
+msgstr "Kirjuta lugude uuesti sisselugemisel andmebaasi esituskorrad üle"
+
+msgid "Overwrite database rating when songs are re-read from disk"
+msgstr "Kirjuta lugude uuesti sisselugemisel andmebaasi hinnangud üle"
+
+msgid "Save playcounts and ratings to files now"
+msgstr "Salvesta esituskorrad ja hinnangud failidesse kohe"
+
+msgid "Enable delete files in the right click context menu"
+msgstr "Luba failide kustutamine paremklõpsuga kontekstimenüüs"
+
+msgid "Add directory..."
+msgstr "Lisa kaust..."
+
+msgid "Write all playcounts and ratings to files"
+msgstr "Kirjuta kõik esituskorrad ja hinnangud failidesse"
+
+msgid "Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"
+msgstr "Kas soovid salvestada esituskorrad ja hinnangud kõigi oma muusikakogus olevate lugude jaoks?"
+
+msgid "Your collection is empty!"
+msgstr "Su muusikakogu on tühi!"
+
+msgid "Click here to add some music"
+msgstr "Muusika lisamiseks klõpsa siin"
+
+msgid "Append to current playlist"
+msgstr "Lisa praegusesse esitusloendisse"
+
+msgid "Replace current playlist"
+msgstr "Asenda praegune esitusloend"
+
+msgid "Queue track"
+msgstr "Lisa järjekorda"
+
+msgid "Queue to play next"
+msgstr "Lisa järgmisena esitamiseks järjekorda"
+
+msgid "Search for this"
+msgstr "Otsi seda"
+
+msgid "Organize files..."
+msgstr "Korrasta faile..."
+
+msgid "Copy to device..."
+msgstr "Kopeeri seadmesse..."
+
+msgid "Delete from disk..."
+msgstr "Kustuta kettalt..."
+
+msgid "Edit track information..."
+msgstr "Muuda loo teavet..."
+
+msgid "Edit tracks information..."
+msgstr "Muuda lugude infot..."
+
+msgid "Show in file browser..."
+msgstr "Näita failihalduris..."
+
+msgid "Rescan song(s)"
+msgstr "Skaneeri lugu või lood uuesti"
+
+msgid "Show in various artists"
+msgstr "Näita loendis „Erinevad esitajad“"
+
+msgid "Don't show in various artists"
+msgstr "Ära näita loendis „Erinevad esitajad“"
+
+msgid "There are other songs in this album"
+msgstr "Sellel albumil on ka teisi lugusid"
+
+msgid "Would you like to move the other songs on this album to Various Artists as well?"
+msgstr "Kas soovid teisaldada ka teised selle albumi lood loendisse „Erinevad esitajad“?"
+
+msgid "Error"
+msgstr "Viga"
+
+msgid "None of the selected songs were suitable for copying to a device"
+msgstr "Valitud lood ei olnud sobilikud seadmesse kopeerimiseks"
+
+msgid "Form"
+msgstr "Vorm"
+
+msgid "Updating collection"
+msgstr "Uuendame muusikakogu"
+
+msgid "Updating %1"
+msgstr "%1 uuendamine"
+
+msgid "Console"
+msgstr "Konsool"
+
+msgid "Run"
+msgstr "Käivita"
+
+msgid "Context"
+msgstr "Kontekst"
+
+msgid "Custom text settings"
+msgstr "Kohandatud seadistused teksti jaoks"
+
+msgid "Title"
+msgstr "Pealkiri"
+
+msgid "Summary"
+msgstr "Kokkuvõte"
+
+msgid "Enable Items"
+msgstr "Luba üksused"
+
+msgid "Technical Data"
+msgstr "Tehnilised andmed"
+
+msgid "Song Lyrics"
+msgstr "Laulusõnad"
+
+msgid "Automatically search for album cover"
+msgstr "Otsi kaanepilti automaatselt"
+
+msgid "Automatically search for song lyrics"
+msgstr "Otsi laulusõnu automaatselt"
+
+msgid "Font for headline"
+msgstr "Pealkirja kirjatüüp"
+
+msgid "Font"
+msgstr "Kirjatüüp"
+
+msgid "Font size"
+msgstr "Kirjatüübi suurus"
+
+msgid " pt"
+msgstr " punkti"
+
+msgid "Preview"
+msgstr "Eelvaade"
+
+msgid "Font for data and lyrics"
+msgstr "Andmete ja laulusõnade kirjatüüp"
+
+msgid "Add song artist tag"
+msgstr "Lisa loole esitaja silt"
+
+msgid "Add song album tag"
+msgstr "Lisa loole albumi silt"
+
+msgid "Add song title tag"
+msgstr "Lisa loole pealkirja silt"
+
+msgid "Add song albumartist tag"
+msgstr "Lisa loole albumi esitaja silt"
+
+msgid "Add song year tag"
+msgstr "Lisa loole aasta silt"
+
+msgid "Add song composer tag"
+msgstr "Lisa loole helilooja silt"
+
+msgid "Add song performer tag"
+msgstr "Lisa loole esineja silt"
+
+msgid "Add song grouping tag"
+msgstr "Lisa loole rühmitamise silt"
+
+msgid "Add song disc tag"
+msgstr "Lisa loole plaadi numbri silt"
+
+msgid "Add song track tag"
+msgstr "Lisa loole plaadijärjekorra silt"
+
+msgid "Add song genre tag"
+msgstr "Lisage loole žanri silt"
+
+msgid "Add song length tag"
+msgstr "Lisa loole pikkuse silt"
+
+msgid "Add song play count"
+msgstr "Lisa loole esituskorrad"
+
+msgid "Add song skip count"
+msgstr "Lisa loole vahelejätmiskorrad"
+
+msgid "Add a new line if supported by the notification type"
+msgstr "Lisa uus rida, kui teavituse tüüp seda toetab"
+
+msgid "%filename%"
+msgstr "%filename%"
+
+msgid "Add song filename"
+msgstr "Lisa loole failinimi"
+
+msgid "%url%"
+msgstr "%url%"
+
+msgid "Add song URL"
+msgstr "Lisa loo võrguaadress"
+
+msgid "%rating%"
+msgstr "%rating%"
+
+msgid "Add song rating"
+msgstr "Lisa loole hinnang"
+
+msgid "Add song original year tag"
+msgstr "Lisa loole algse aasta silt"
+
+msgid "Add song artistsort tag"
+msgstr "Lisa loole esitaja sortimise silt"
+
+msgid "Add song albumartistsort tag"
+msgstr "Lisa loole albumi esitaja sortimise silt"
+
+msgid "Add song titlesort tag"
+msgstr "Lisa loole pealkirja sortimise silt"
+
+msgid "Add song composersort tag"
+msgstr "Lisa loole helilooja sortimise silt"
+
+msgid "Add song performersort tag"
+msgstr "Lisa loole esineja sortimise silt"
+
+msgid "Add song albumsort tag"
+msgstr "Lisa loole albumi sortimise silt"
+
+msgid "Filetype"
+msgstr "Faili tüüp"
+
+msgid "Length"
+msgstr "Kestus"
+
+msgid "Samplerate"
+msgstr "Diskreetimissagedus"
+
+msgid "Bit depth"
+msgstr "Bitisügavus"
+
+msgid "Bitrate"
+msgstr "Bitikiirus"
+
+msgid "Show album cover"
+msgstr "Kuva kaanepilte"
+
+msgid "Show song technical data"
+msgstr "Kuva loo tehnilisi andmeid"
+
+msgid "Show song lyrics"
+msgstr "Kuva laulusõnad"
+
+msgid "No song playing"
+msgstr "Mitte midagi pole esitamisel"
+
+msgid "%1 song"
+msgstr "%1 lugu"
+
+msgid "%1 songs"
+msgstr "%1 lugu"
+
+msgid "%1 artist"
+msgstr "%1 esitaja"
+
+msgid "%1 artists"
+msgstr "%1 esitajat"
+
+msgid "%1 album"
+msgstr "%1 album"
+
+msgid "%1 albums"
+msgstr "%1 albumit"
+
+msgid "kbps"
+msgstr "kbps"
+
+msgid "Load cover from URL"
+msgstr "Laadi kaanepilt võrguaadressilt"
+
+msgid "Enter a URL to download a cover from the Internet:"
+msgstr "Kaanepiltide laadimiseks internetist sisesta võrguaadress:"
+
+msgid "Fetching cover error"
+msgstr "Viga kaanepildi hankimisel"
+
+msgid "The site you requested does not exist!"
+msgstr "Sinu soovitud veebisaiti pole olemas!"
+
+msgid "The site you requested is not an image!"
+msgstr "Sinu soovitud veebisait pole pilt!"
+
+msgid "View"
+msgstr "Vaade"
+
+msgid "Total albums:"
+msgstr "Albumeid kokku:"
+
+msgid "Without cover:"
+msgstr "Kaanepildita:"
+
+msgid "0"
+msgstr "0"
+
+msgid "Fetch Missing Covers"
+msgstr "Laadi puuduvad kaanepildid"
+
+msgid "Export Covers"
+msgstr "Ekspordi kaanepildid"
+
+msgid "Fetch automatically"
+msgstr "Tõmba automaatselt"
+
+msgid "Load"
+msgstr "Laadi"
+
+msgid "Add to playlist"
+msgstr "Lisa esitusloendisse"
+
+msgid "Fetch completed"
+msgstr "Hankimine on tehtud"
+
+msgid "Total network requests made"
+msgstr "Tehtud võrgupäringuid kokku"
+
+msgid "Average image size"
+msgstr "Pildi keskmine suurus"
+
+msgid "Total bytes transferred"
+msgstr "Edastatud baite kokku"
+
+msgid "Covers"
+msgstr "Kaanepildid"
+
+msgid "Cover providers"
+msgstr "Kaanepildi pakkujad"
+
+msgid "Choose the providers you want to use when searching for covers."
+msgstr "Vali teenused, mida soovid kaanepildi otsimisel kasutada."
+
+msgid "Move up"
+msgstr "Liiguta üles"
+
+msgid "Move down"
+msgstr "Liiguta alla"
+
+msgid "Authentication"
+msgstr "Autentimine"
+
+msgid "Login"
+msgstr "Logi sisse"
+
+msgid "Album cover types"
+msgstr "Kaanepildi tüübid"
+
+msgid "Saving album covers"
+msgstr "Kaanepiltide salvestamine"
+
+msgid "Save album covers in album directory"
+msgstr "Salvesta kaanepildid albumi kausta"
+
+msgid "Save album covers in cache directory"
+msgstr "Salvesta kaanepildid vahemälu kausta"
+
+msgid "Save album covers as embedded cover"
+msgstr "Salvesta kaanepildid lõimitud kaanepildina"
+
+msgid "Filename:"
+msgstr "Failinimi:"
+
+msgid "Pattern"
+msgstr "Muster"
+
+msgid "Random"
+msgstr "Juhuslik"
+
+msgid "Overwrite existing file"
+msgstr "Kirjuta olemasolev fail üle"
+
+msgid "Lowercase filename"
+msgstr "Väiketähtedes failinimi"
+
+msgid "Replace spaces with dashes"
+msgstr "Asenda tühikud kriipsudega"
+
+msgid "Use Tidal settings to authenticate."
+msgstr "Kasuta autentimiseks Tidali seadistusi."
+
+msgid "Use Spotify settings to authenticate."
+msgstr "Kasuta autentimiseks Spotify seadistusi."
+
+msgid "Use Qobuz settings to authenticate."
+msgstr "Kasuta autentimiseks Qobuzi seadistusi."
+
+msgid "%1 needs authentication."
+msgstr "%1 vajab autentimist."
+
+msgid "%1 does not need authentication."
+msgstr "%1 ei vaja autentimist."
+
+msgid "No provider selected."
+msgstr "Teenuseid pole valitud."
+
+msgid "Authentication failed"
+msgstr "Autentimine ebaõnnestus"
+
+msgid "Manually unset (%1)"
+msgstr "Käsitsi määramata (%1)"
+
+msgid "Set through album cover search (%1)"
+msgstr "Määra kaanepildi otsinguga (%1)"
+
+msgid "Automatically picked up from album directory (%1)"
+msgstr "Automaatselt võetud albumi kaustast (%1)"
+
+msgid "Embedded album cover art (%1)"
+msgstr "Albumi lõimitud kaanepilt (%1)"
+
+msgid "Saving CUE files is not supported."
+msgstr "CUE-failide salvestamine pole toetatud."
+
+msgid "Unable to execute SQL query: %1"
+msgstr "SQL päring ei õnnestunud: %1"
+
+msgid "Integrity check"
+msgstr "Terviklikkuse kontroll"
+
+msgid "Database corruption detected."
+msgstr "Tuvastati rikutud andmebaas."
+
+msgid "Backing up database"
+msgstr "Andmebaasi varundamine"
+
+msgid "Delete files"
+msgstr "Kustuta failid"
+
+msgid "The following files will be deleted from disk:"
+msgstr "Järgnevad failid kustutatakse kettalt:"
+
+msgid "Are you sure you want to continue?"
+msgstr "Kas soovid jätkata?"
+
+msgid "Deleting files"
+msgstr "Failide kustutamine"
+
+msgid "Updating %1%..."
+msgstr "%1% värskendamine..."
+
+msgid "Not connected"
+msgstr "Pole ühendatud"
+
+msgid "Not mounted - double click to mount"
+msgstr "Haakimata - topeltklõps haakimiseks"
+
+msgid "Double click to open"
+msgstr "Avamiseks tee topeltklikk"
+
+msgid "%1 song%2"
+msgstr "%1 lugu%2"
+
+msgid "Connect device"
+msgstr "Ühenda seade"
+
+msgid "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+msgstr "Ühendasid selle seadme esimest korda.  Strawberry skaneerib nüüd seadet muusikafailide leidmiseks – selleks võib kuluda veidi aega."
+
+msgid "This device will not work properly"
+msgstr "See seade ei tööta korralikult"
+
+msgid "This is an MTP device, but you compiled Strawberry without libmtp support."
+msgstr "See on MTP seade, kuid kompileerisid Strawberry libmtp toeta."
+
+msgid "If you continue, this device will work slowly and songs copied to it may not work."
+msgstr "Kui jätkad, töötab see seade aeglaselt ja sinna kopeeritud lood ei pruugi töötada."
+
+msgid "This is an iPod, but you compiled Strawberry without libgpod support."
+msgstr "See on iPod, kuid kompileerisid Strawberry libgpod toeta."
+
+msgid "This type of device is not supported: %1"
+msgstr "Seda tüüpi seadet ei toetata: %1"
+
+msgid "Device Properties"
+msgstr "Seadme omadused"
+
+msgid "Information"
+msgstr "Informatsioon"
+
+msgid "Name"
+msgstr "Nimi"
+
+msgid "Icon"
+msgstr "Ikoon"
+
+msgid "Hardware information"
+msgstr "Riistvara info"
+
+msgid "Hardware information is only available while the device is connected."
+msgstr "Riistvara info on ainult siis saadaval, kui seade on ühendatud."
+
+msgid "File formats"
+msgstr "Failivormingud"
+
+msgid "Supported formats"
+msgstr "Toetatud vormingud"
+
+msgid "This device supports the following file formats:"
+msgstr "See seade toetab järgmisi failivorminguid:"
+
+msgid "Strawberry can automatically convert the music you copy to this device into a format that it can play."
+msgstr "Strawberry saab sellesse seadmesse kopeeritud muusika automaatselt teisendada vormingusse, mida ta suudab esitada."
+
+msgid "Do not convert any music"
+msgstr "Ära teisenda mitte midagi"
+
+msgid "Convert any music that the device can't play"
+msgstr "Teisenda kogu muusika, mida seade ei suuda esitada"
+
+msgid "Convert all music"
+msgstr "Konverteeri kõik failid"
+
+msgid "Preferred format"
+msgstr "Eelistatud vorming"
+
+msgid "This device must be connected and opened before Strawberry can see what file formats it supports."
+msgstr "See seade peab olema ühendatud ja avatud, enne kui Strawberry näeb, milliseid failivorminguid see toetab."
+
+msgid "Open device"
+msgstr "Ava seade"
+
+msgid "Querying device..."
+msgstr "Vaatame, mida seadmes leidub..."
+
+msgid "Model"
+msgstr "Mudel"
+
+msgid "Manufacturer"
+msgstr "Tootja"
+
+msgid "Safely remove device"
+msgstr "Eemalda seade ohutult"
+
+msgid "Forget device"
+msgstr "Unusta seade"
+
+msgid "Device properties..."
+msgstr "Seadme omadused..."
+
+msgid "Copy to collection..."
+msgstr "Kopeeri muusikakogusse..."
+
+msgid "Delete from device..."
+msgstr "Kustuta seadmest..."
+
+msgid "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+msgstr "Seadme unustamine eemaldab selle siit loendist, mistõttu peab Strawberry järgmisel ühendamisel kõik lood uuesti skaneerima."
+
+msgid "These files will be deleted from the device, are you sure you want to continue?"
+msgstr "Need failid kustutatakse seadmest. Kas soovid jätkata?"
+
+msgid "on "
+msgstr "teenuses "
+
+msgid "Dynamic mode is on"
+msgstr "Kasutusel on dünaamiline režiim"
+
+msgid "New tracks will be added automatically."
+msgstr "Uued lood lisatakse automaatselt."
+
+msgid "Expand"
+msgstr "Laienda"
+
+msgid "Repopulate"
+msgstr "Täida uuesti andmetega"
+
+msgid "Turn off"
+msgstr "Lülita välja"
+
+msgid "Edit track information"
+msgstr "Muuda loo teavet"
+
+msgid "Date created"
+msgstr "Loomise kuupäev"
+
+msgid "Art Automatic"
+msgstr "Automaatne kaanepilt"
+
+msgid "Date modified"
+msgstr "Muutmise kuupäev"
+
+msgid "Art Embedded"
+msgstr "Lõimitud kaanepilt"
+
+#. A playlist's tag.
+msgid "Last played"
+msgstr "Viimati esitatud"
+
+msgid "File type"
+msgstr "Faili tüüp"
+
+msgid "Play count"
+msgstr "Esituskordi"
+
+msgid "EBU R 128 integrated loudness"
+msgstr "EBU R 128 lõimitud valjus"
+
+msgid "Bit rate"
+msgstr "Bitikiirus"
+
+msgid "Skip count"
+msgstr "Vahelejätmisi"
+
+msgid "Sample rate"
+msgstr "Diskreetimissagedus"
+
+msgid "Path"
+msgstr "Asukoht"
+
+msgid "Filename"
+msgstr "Failinimi"
+
+msgid "Art Unset"
+msgstr "Kaanepilt määramata"
+
+msgid "File size"
+msgstr "Faili suurus"
+
+msgid "Art Manual"
+msgstr "Käsitsi kaanepilt"
+
+msgid "EBU R 128 loudness range"
+msgstr "EBU R 128 valjuse vahemik"
+
+msgid "Reset play counts"
+msgstr "Lähtesta esituskorrad"
+
+msgid "Tags"
+msgstr "Sildid"
+
+msgid "Change art"
+msgstr "Muuda kaanepilti"
+
+msgid "Embedded cover"
+msgstr "Lõimitud kaanepilt"
+
+msgid "Disc"
+msgstr "Plaat"
+
+msgid "Grouping"
+msgstr "Rühmitamine"
+
+msgid "Album artist"
+msgstr "Albumi esitaja"
+
+msgid "Year"
+msgstr "Aasta"
+
+msgid "Composer"
+msgstr "Helilooja"
+
+msgid "Complete tags automatically"
+msgstr "Täida sildid automaatselt"
+
+msgid "Genre"
+msgstr "Žanr"
+
+msgid "Comment"
+msgstr "Märkus"
+
+msgid "Performer"
+msgstr "Esineja"
+
+msgid "Compilation"
+msgstr "Kogumik"
+
+msgid "Track"
+msgstr "Rada"
+
+msgid "Rating"
+msgstr "Hinnang"
+
+msgid "Lyrics"
+msgstr "Laulusõnad"
+
+msgid "Complete lyrics automatically"
+msgstr "Täida laulusõnad automaatselt"
+
+msgid "(different across multiple songs)"
+msgstr "(erinev eri lugude puhul)"
+
+msgid "Different art across multiple songs."
+msgstr "Erinevatel lugudel erinevad pildid."
+
+msgid "Previous"
+msgstr "Eelmine"
+
+msgid "Next"
+msgstr "Järgmine"
+
+msgid "Saving tracks"
+msgstr "Lugude salvestamine"
+
+msgid "Loading tracks"
+msgstr "Radade laadimine"
+
+msgid "%1 songs selected."
+msgstr "%1 lugu valitud."
+
+msgid "Yes"
+msgstr "Jah"
+
+msgid "No"
+msgstr "Ei"
+
+msgid "None"
+msgstr "Puudub"
+
+msgid "Cover is unset."
+msgstr "Kaanepilt on kinnitamata."
+
+msgid "Cover from embedded image."
+msgstr "Kaanepilt lõimitud pildist."
+
+msgid "Cover from %1"
+msgstr "Kaanepilt allikast %1"
+
+msgid "Cover art not set"
+msgstr "Kaanepilt määramata"
+
+msgid "Album cover editing is only available for collection songs."
+msgstr "Kaanepildi muutmine on võimalik ainult muusikakogu lugudel."
+
+msgid "Cover changed: Will be cleared when saved."
+msgstr "Kaanepilt muudetud: salvestamisel eemaldatakse."
+
+msgid "Cover changed: Will be unset when saved."
+msgstr "Kaanepilt muudetud: salvestamisel tühistatakse."
+
+msgid "Cover changed: Will be deleted when saved."
+msgstr "Kaanepilt muudetud: salvestamisel kustutatakse."
+
+msgid "Cover changed: Will set new when saved."
+msgstr "Kaanepilt muudetud: salvestamisel määratakse uus."
+
+msgid "Never"
+msgstr "Mitte kunagi"
+
+msgid "Reset song play statistics"
+msgstr "Lähtest loo esitamise statistika"
+
+msgid "Are you sure you want to reset this song's play statistics?"
+msgstr "Kas soovid selle loo esitusstatistika lähtestada?"
+
+msgid "loading..."
+msgstr "laadimine..."
+
+msgid "Not found."
+msgstr "Ei leitud."
+
+msgid "Could not write metadata to %1"
+msgstr "Metaandmete salvestamine faili „%1“ ei õnnestunud"
+
+msgid "Could not write metadata to %1: %2"
+msgstr "Metaandmete salvestamine faili „%1“ ei õnnestunud: %2"
+
+msgid "ID3v2 version:"
+msgstr "ID3v2 versioon:"
+
+msgid "2.3"
+msgstr "2.3"
+
+msgid "2.4"
+msgstr "2.4"
+
+msgid "Performer sort"
+msgstr "Esineja järjestus"
+
+msgid "Title sort"
+msgstr "Pealkirja järjestus"
+
+msgid "Album artist sort"
+msgstr "Albumi esitaja järjestus"
+
+msgid "Artist sort"
+msgstr "Esitaja järjestus"
+
+msgid "Album sort"
+msgstr "Albumi järjestus"
+
+msgid "Composer sort"
+msgstr "Helilooja järjestus"
+
+msgid "Equalizer"
+msgstr "Ekvalaiser"
+
+msgid "Preset:"
+msgstr "Valmisvalik:"
+
+msgid "Save preset"
+msgstr "Salvesta valmisseadistus"
+
+msgid "Delete preset"
+msgstr "Kustuta valmisseadistus"
+
+msgid "Enable equalizer"
+msgstr "Kasuta ekvalaiserit"
+
+msgid "Enable stereo balancer"
+msgstr "Kasuta stereo tasakaalustamist"
+
+msgid "Left"
+msgstr "Vasak"
+
+msgid "Balance"
+msgstr "Tasakaal"
+
+msgid "Right"
+msgstr "Parem"
+
+msgid "Custom"
+msgstr "Kohanda"
+
+msgid "Classical"
+msgstr "Klassikaline"
+
+msgid "Club"
+msgstr "Klubi"
+
+msgid "Dance"
+msgstr "Tantsumuusika"
+
+msgid "Full Bass"
+msgstr "Täisbass"
+
+msgid "Full Treble"
+msgstr "Täiskõrged"
+
+msgid "Full Bass + Treble"
+msgstr "Täisbass + kõrged"
+
+msgid "Laptop/Headphones"
+msgstr "Sülearvuti/kõrvaklapid"
+
+msgid "Large Hall"
+msgstr "Suur ruum"
+
+msgid "Live"
+msgstr "Kontsert"
+
+msgid "Party"
+msgstr "Pidu"
+
+msgid "Pop"
+msgstr "Pop"
+
+msgid "Reggae"
+msgstr "Reggae"
+
+msgid "Rock"
+msgstr "Rokk"
+
+msgid "Soft"
+msgstr "Mahe"
+
+msgid "Ska"
+msgstr "Ska"
+
+msgid "Soft Rock"
+msgstr "Pehme rokk"
+
+msgid "Techno"
+msgstr "Tehno"
+
+msgid "Zero"
+msgstr "Null"
+
+msgid "Are you sure you want to delete the \"%1\" preset?"
+msgstr "Kas oled kindel, et soovid kustutada eelseadistuse „%1“?"
+
+msgid "You need to restart playback for this setting to take affect."
+msgstr "Selle seadistuse jõustumiseks pead taasesituse uuesti käivitama."
+
+msgid "%1 dB"
+msgstr "%1 dB"
+
+msgid "Strawberry Error"
+msgstr "Strawberry viga"
+
+msgid "Large sidebar"
+msgstr "Suur külgriba"
+
+msgid "Icons sidebar"
+msgstr "Ikoonide külgriba"
+
+msgid "Small sidebar"
+msgstr "Väike külgriba"
+
+msgid "Plain sidebar"
+msgstr "Lihtne külgriba"
+
+msgid "Tabs on top"
+msgstr "Kaardid üleval"
+
+msgid "Icons on top"
+msgstr "Ikoonid üleval"
+
+msgid "Add root directory"
+msgstr "Lisa juurkaust"
+
+msgid "Remove selected root directory"
+msgstr "Eemalda valitud juurkaust"
+
+msgid "Toggle between list and tree view"
+msgstr "Vaheta omavahel loendi- ja puuvaadet"
+
+msgid "Select folder to add as tree root"
+msgstr "Vali kaust puuvaate alguseks"
+
+msgid "Move to collection..."
+msgstr "Teisalda muusikakogusse..."
+
+msgid "Files"
+msgstr "Failid"
+
+msgid "Available"
+msgstr "Saadaolevad"
+
+msgid "New songs"
+msgstr "Uued lood"
+
+msgid "Exceeded by"
+msgstr "Ületatud"
+
+msgid "Used"
+msgstr "Kasutuses"
+
+msgid "Could not copy %1 to %2: %3"
+msgstr "%1 -> %2 kopeerimine ei õnnestunud: %3"
+
+msgid "Writing database failed: %1"
+msgstr "Andmebaasi salvestamine ei õnnestunud: %1"
+
+msgid "Writing database failed."
+msgstr "Andmebaasi salvestamine ei õnnestunud."
+
+msgid "Loading iPod database"
+msgstr "Laadin iPodi andmekogu"
+
+msgid "An error occurred loading the iTunes database"
+msgstr "iTunesi andmebaasi laadimisel tekkis viga"
+
+msgid "Mount point"
+msgstr "Haakepunkt"
+
+msgid "URI"
+msgstr "URI"
+
+msgid "Press a key"
+msgstr "Vajuta klahvi"
+
+msgid "Press a key combination to use for %1..."
+msgstr "Vajuta klahvikombinatsiooni %1 kasutamiseks..."
+
+msgid "Play"
+msgstr "Esita"
+
+msgid "Pause"
+msgstr "Paus"
+
+msgid "Play/Pause"
+msgstr "Esita/paus"
+
+msgid "Stop"
+msgstr "Peata"
+
+msgid "Stop playing after current track"
+msgstr "Peata taasesitus pärast praegust lugu"
+
+msgid "Next track"
+msgstr "Järgmine lugu"
+
+msgid "Previous track"
+msgstr "Eelmine lugu"
+
+msgid "Restart or previous track"
+msgstr "Käivita uuesti või esita eelmine lugu"
+
+msgid "Increase volume"
+msgstr "Heli valjemaks"
+
+msgid "Decrease volume"
+msgstr "Heli vaiksemaks"
+
+msgid "Mute"
+msgstr "Vaigista"
+
+msgid "Seek forward"
+msgstr "Samm edasi"
+
+msgid "Seek backward"
+msgstr "Samm tagasi"
+
+msgid "Show/Hide"
+msgstr "Kuva/peida"
+
+msgid "Show OSD"
+msgstr "Kuva ekraanimenüü"
+
+msgid "Toggle Pretty OSD"
+msgstr "Ilusa ekraanimenüü lüliti"
+
+msgid "Change shuffle mode"
+msgstr "Muuda juhuesituse režiimi"
+
+msgid "Change repeat mode"
+msgstr "Muuda kordusrežiimi"
+
+msgid "Enable/disable scrobbling"
+msgstr "Luba/keela kraasimine"
+
+msgid "Love"
+msgstr "Meeldib"
+
+msgid "Global Shortcuts"
+msgstr "Globaalsed kiirklahvid"
+
+msgid "Open..."
+msgstr "Ava..."
+
+msgid "Use X11 shortcuts when available"
+msgstr "Kasuta võimalusel X11 kiirklahve"
+
+msgid "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+msgstr "Et Strawberry saaks üldiseid kiirklahve kasutada, ava süsteemi seadistused ja märgi eelistus „<span style=\"font-style:italic\">juhi oma arvutit</span>“."
+
+#. Category label
+msgid "Action"
+msgstr "Tegevus"
+
+msgid "Shortcut"
+msgstr "Kiirklahv"
+
+msgid "Shortcut for %1"
+msgstr "%1 kiirklahv"
+
+msgid "&None"
+msgstr "&Puudub"
+
+msgid "&Default"
+msgstr "&Vaikimisi"
+
+msgid "&Custom"
+msgstr "&Kohandatud"
+
+msgid "Change shortcut..."
+msgstr "Muuda kiirklahvi..."
+
+msgid "Use KGlobalAccel shortcuts when available"
+msgstr "Kasuta võimalusel KGlobalAccel kiirklahve"
+
+msgid "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+msgstr "Kuna see võib põhjustada klahvistiku hangumist, siis X11 kiirklahvide kasutame pole soovitatav! Tavaliselt peaksid kasutama kiirklahve MPRIS2 või KGlobalAccel vahendusel."
+
+msgid "Collection advanced grouping"
+msgstr "Muusikakogu täpsem rühmitamine"
+
+msgid "You can change the way the songs in the collection are organized."
+msgstr "Saad muuta viisi, kuidas muusikakogus olevad lood on korraldatud."
+
+msgid "Group Collection by..."
+msgstr "Järjesta muusikakogu..."
+
+msgid "First level"
+msgstr "Esimene tase"
+
+msgid "Album - Disc"
+msgstr "Album – plaat"
+
+msgid "Format"
+msgstr "Vorming"
+
+msgid "Year - Album"
+msgstr "Aasta - Album"
+
+msgid "Year - Album - Disc"
+msgstr "Aasta - Album - Plaat"
+
+msgid "Original year"
+msgstr "Algne aasta"
+
+msgid "Original year - Album"
+msgstr "Algne aasta – album"
+
+msgid "Second level"
+msgstr "Teine tase"
+
+msgid "Third level"
+msgstr "Kolmas tase"
+
+msgid "Separate albums by grouping tag"
+msgstr "Eralda albumid rühmitamise sildi järgi"
+
+msgid "Original year - Album - Disc"
+msgstr "Algne aasta - album - plaat"
+
+msgid "Buffering"
+msgstr "Puhvedamine"
+
+msgid "%1 Scrobbler Authentication"
+msgstr "%1 kraasija autentimine"
+
+msgid "Open URL in web browser?"
+msgstr "Kas avada URL veebibrauseris?"
+
+msgid "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+msgstr "Võrguaadressi lõikepuhvrisse kopeerimiseks ja veebibrauseris käsitsi avamiseks vajuta nuppu „Salvesta“."
+
+msgid "Could not open URL. Please open this URL in your browser"
+msgstr "Võrguaadressi ei saanud avada. Ava see võrguaadress oma veebibrauseriga"
+
+msgid "Invalid reply from web browser. Missing token."
+msgstr "Vigane vastus veebibrauserist. Tunnusluba on puudu."
+
+msgid "Received invalid reply from web browser. Try another browser."
+msgstr "Sain veebibrauserist vigase vastuse. Proovi mõnda muud brauserit."
+
+msgid "Scrobbler %1 is not authenticated!"
+msgstr "Kraasija %1 ei ole autenditud!"
+
+msgid "Scrobbler %1 error: %2"
+msgstr "Kraasija %1 viga: %2"
+
+msgid "Least favourite tracks"
+msgstr "Vähim kuulatud lood"
+
+msgid "Unable to scrobble %1 - %2 because of error: %3"
+msgstr "%1 kraasimine ei õnnestunud - %2 põhjuseks: %3"
+
+msgid "Missing MusicBrainz recording ID for %1 %2 %3"
+msgstr "MusicBrainzi salvestuse ID puudub %1 %2 %3 jaoks"
+
+msgid "ListenBrainz error: %1"
+msgstr "ListenBrainz viga: %1"
+
+msgid "You are not signed in."
+msgstr "Sa ei ole sisse logitud."
+
+msgid "Sign out"
+msgstr "Logi välja"
+
+msgid "Signing in..."
+msgstr "Sisselogimine..."
+
+msgid "You are signed in."
+msgstr "Oled sisse logitud."
+
+msgid "You are signed in as %1."
+msgstr "Oled sisse logitud kui %1."
+
+msgid "Expires on %1"
+msgstr "Aegub %1"
+
+msgid "Lyrics providers"
+msgstr "Laulusõnade pakkujad"
+
+msgid "Choose the providers you want to use when searching for lyrics."
+msgstr "Vali teenused, mida soovid laulusõnade otsimisel kasutada."
+
+msgid "Strawberry Music Player"
+msgstr "Strawberry muusikamängija"
+
+msgid "&Music"
+msgstr "Muusika"
+
+msgid "P&laylist"
+msgstr "Esitusloend"
+
+msgid "Help"
+msgstr "Abi"
+
+msgid "&Tools"
+msgstr "Töövahendid"
+
+msgid "F5"
+msgstr "F5"
+
+msgid "&Play"
+msgstr "&Esita"
+
+msgid "F6"
+msgstr "F6"
+
+msgid "&Stop"
+msgstr "&Peata"
+
+msgid "F7"
+msgstr "F7"
+
+msgid "&Next track"
+msgstr "&Järgmine lugu"
+
+msgid "F8"
+msgstr "F8"
+
+msgid "&Quit"
+msgstr "&Välju"
+
+msgid "Ctrl+Q"
+msgstr "Ctrl+Q"
+
+msgid "Stop after this track"
+msgstr "Peata pärast seda lugu"
+
+msgid "Ctrl+Alt+V"
+msgstr "Ctrl+Alt+V"
+
+msgid "&Clear playlist"
+msgstr "&Tühjenda esitusloend"
+
+msgid "Clear playlist"
+msgstr "Tühjenda esitusloend"
+
+msgid "Ctrl+K"
+msgstr "Ctrl+K"
+
+msgid "Ctrl+E"
+msgstr "Ctrl+E"
+
+msgid "Renumber tracks in this order..."
+msgstr "Nummerda lood ümber selles järjekorras..."
+
+msgid "Set value for all selected tracks..."
+msgstr "Määra väärtus kõikidel valitud lugudel..."
+
+msgid "Edit tag..."
+msgstr "Muuda silti..."
+
+msgid "&Settings..."
+msgstr "&Seaded..."
+
+msgid "Ctrl+P"
+msgstr "Ctrl+P"
+
+msgid "&About Strawberry"
+msgstr "Strawberry teave"
+
+msgid "F1"
+msgstr "F1"
+
+msgid "S&huffle playlist"
+msgstr "Sega esitusloend"
+
+msgid "&Add file..."
+msgstr "Lisa fail..."
+
+msgid "Ctrl+Shift+A"
+msgstr "Ctrl+Shift+A"
+
+msgid "&Open file..."
+msgstr "&Ava fail..."
+
+msgid "Open audio &CD..."
+msgstr "Ava CD plaat..."
+
+msgid "&Cover Manager"
+msgstr "&Kaanepildi haldur"
+
+msgid "C&onsole"
+msgstr "Konsool"
+
+msgid "&Shuffle mode"
+msgstr "Juhuesituse režiim"
+
+msgid "&Repeat mode"
+msgstr "&Kordusrežiim"
+
+msgid "Remove from playlist"
+msgstr "Eemalda esitusloendist"
+
+msgid "&Equalizer"
+msgstr "&Ekvalaiser"
+
+msgid "&Transcode Music"
+msgstr "&Teisenda muusikat"
+
+msgid "Add &folder..."
+msgstr "Lisa &kaust..."
+
+msgid "&Jump to the currently playing track"
+msgstr "&Hüppa esitatavale loole"
+
+msgid "Ctrl+J"
+msgstr "Ctrl+J"
+
+msgid "&New playlist"
+msgstr "&Uus esitusloend"
+
+msgid "Ctrl+N"
+msgstr "Ctrl+N"
+
+msgid "Save &playlist..."
+msgstr "Salvesta esitusloend..."
+
+msgid "Ctrl+S"
+msgstr "Ctrl+S"
+
+msgid "&Load playlist..."
+msgstr "&Laadi esitusloend..."
+
+msgid "Ctrl+Shift+O"
+msgstr "Ctrl+Shift+O"
+
+msgid "&Save all playlists..."
+msgstr "&Salvesta kõik esitusloendid..."
+
+msgid "Go to next playlist tab"
+msgstr "Liigu järgmisele esitusloendi vahekaardile"
+
+msgid "Go to previous playlist tab"
+msgstr "Liigu eelmisele esitusloendi vahekaardile"
+
+msgid "&Update changed collection folders"
+msgstr "&Värskenda muudetud kaustu muusikakogus"
+
+msgid "About &Qt"
+msgstr "&Qt teave"
+
+msgid "&Mute"
+msgstr "&Vaigista"
+
+msgid "Ctrl+M"
+msgstr "Ctrl+M"
+
+msgid "&Do a full collection rescan"
+msgstr "&Skaneeri kogu muusikakogu"
+
+msgid "Stop collection scan"
+msgstr "Peata muusikakogu skaneerimine"
+
+msgid "Complete tags automatically..."
+msgstr "Täida sildid automaatselt..."
+
+msgid "Ctrl+T"
+msgstr "Ctrl+T"
+
+msgid "Toggle scrobbling"
+msgstr "Kraasimise lüliti"
+
+msgid "Remove &duplicates from playlist"
+msgstr "Eemalda esitusloendist topeltkirjed"
+
+msgid "Remove &unavailable tracks from playlist"
+msgstr "Eemalda esitusloendist kättesaamatud lood"
+
+msgid "Add file(s) to transcoder"
+msgstr "Lisa fail(id) teisendamiseks"
+
+msgid "Add file to transcoder"
+msgstr "Lisa fail teisendamiseks"
+
+msgid "Add stream..."
+msgstr "Lisa voog..."
+
+msgid "Show sidebar"
+msgstr "Kuva külgriba"
+
+msgid "Queue"
+msgstr "Järjekord"
+
+msgid "Playlists"
+msgstr "Esitusloendid"
+
+msgid "Smart playlists"
+msgstr "Nutikad esitusloendid"
+
+msgid "Radios"
+msgstr "Raadiod"
+
+msgid "Devices"
+msgstr "Seadmed"
+
+msgid "Subsonic"
+msgstr "Subsonic"
+
+msgid "Tidal"
+msgstr "Tidal"
+
+msgid "Spotify"
+msgstr "Spotify"
+
+msgid "Qobuz"
+msgstr "Qobuz"
+
+msgid "Show all songs"
+msgstr "Kuva kõik lood"
+
+msgid "Show only duplicates"
+msgstr "Kuva ainult duplikaadid"
+
+msgid "Show only untagged"
+msgstr "Näita ainult sildistamata lugusid"
+
+msgid "Configure collection..."
+msgstr "Seadista muusikakogu..."
+
+msgid "Toggle queue status"
+msgstr "Muuda järjekorra olekut"
+
+msgid "Queue selected tracks to play next"
+msgstr "Lisa valitud lood järgmiseks esitamiseks järjekorda"
+
+msgid "Toggle skip status"
+msgstr "Muuda vahelejätmise olekut"
+
+msgid "Rescan song(s)..."
+msgstr "Skaneeri lood uuesti..."
+
+msgid "Fetch metadata from service"
+msgstr "Too metaandmeid teenusest"
+
+msgid "Copy URL(s)..."
+msgstr "Kopeeri URL(id)..."
+
+msgid "Show in collection..."
+msgstr "Kuva muusikakogus..."
+
+msgid "Check for updates..."
+msgstr "Kontrolli uuendusi..."
+
+msgid "Strawberry running under Rosetta"
+msgstr "Strawberry töötab Rosetta all"
+
+msgid "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+msgstr "Kasutad Strawberryt Rosetta all.  Strawberry käitamist Rosetta all ei toetata ja sellel on teadaolevalt probleeme.  Õige CPU arhitektuuri jaoks tuleks Strawberry alla laadida saidilt %1"
+
+msgid "Sponsoring Strawberry"
+msgstr "Strawberry toetamine"
+
+msgid "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+msgstr "Strawberry on tasuta ja avatud lähtekoodiga tarkvara. Kui sulle meeldib Strawberry, kaalu projekti toetamist. Lisateavet sponsorluse kohta leiad meie veebisaidilt %1"
+
+msgid "Dequeue track"
+msgstr "Eemalda lugu järjekorrast"
+
+msgid "Dequeue selected tracks"
+msgstr "Eemalda valitud lood järjekorrast"
+
+msgid "Queue selected tracks"
+msgstr "Lisa valitud lood järjekorda"
+
+msgid "Unskip track"
+msgstr "Tühista loo vahelejätmine"
+
+msgid "Unskip selected tracks"
+msgstr "Tühista valitud lugude vahelejätmine"
+
+msgid "Skip track"
+msgstr "Jäta vahele"
+
+msgid "Skip selected tracks"
+msgstr "Jäta valitud lood vahele"
+
+msgid "Set %1 to \"%2\"..."
+msgstr "Määra %1 väärtuseks „%2“..."
+
+msgid "Edit tag \"%1\"..."
+msgstr "Muuda silti \"%1\"..."
+
+msgid "Add to another playlist"
+msgstr "Lisa teise esitusloendisse"
+
+msgid "New playlist"
+msgstr "Uus esitusloend"
+
+msgid "Add file"
+msgstr "Lisa fail"
+
+msgid "Music"
+msgstr "Muusika"
+
+msgid "Add folder"
+msgstr "Lisa kaust"
+
+msgid "Playlist has %1 songs, too large to undo, are you sure you want to clear the playlist?"
+msgstr "Esitusloendis on %1 lugu, liiga suur, et seda tagasi võtta. Kas oled kindel, et soovid esitusloendi tühjendada?"
+
+msgid "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:"
+msgstr "Strawberry versioon, millele äsja uuendasid, nõuab muusikakogu täielikku uuesti skaneerimist allpool loetletud uute funktsioonide tõttu:"
+
+msgid "Would you like to run a full rescan right now?"
+msgstr "Kas teeme täieliku skaneerimise kohe?"
+
+msgid "Collection rescan notice"
+msgstr "Muusikakogu uuesti skaneerimise teade"
+
+msgid "Ctrl+Shift+H"
+msgstr "Ctrl+Shift+H"
+
+msgid "Go to last playlist tab"
+msgstr "Ava viimane esitusloendi vahekaart"
+
+msgid "Go to active playlist tab"
+msgstr "Ava aktiivne esitusloendi vahekaart"
+
+msgid "Close current playlist tab"
+msgstr "Sulge praegune esitusloendi vahekaart"
+
+msgid "Message Dialog"
+msgstr "Sõnumiaken"
+
+msgid "Do not show this message again."
+msgstr "Ära seda teadet enam näita."
+
+msgid "Playlist"
+msgstr "Esitusloend"
+
+msgid "Moodbar"
+msgstr "Meeleoluriba"
+
+msgid "Moodbar style"
+msgstr "Meeleoluriba stiil"
+
+msgid "Save the .mood files directly in the songs folders"
+msgstr "Salvesta .mood failid lugude kaustadesse"
+
+msgid "Invalid MTP device: %1"
+msgstr "Kehtetu MTP-seade: %1"
+
+msgid "Could not open MTP device."
+msgstr "MTP seadme avamine ei õnnestunud."
+
+msgid "MTP error: %1"
+msgstr "MTP viga: %1"
+
+msgid "MTP device not found."
+msgstr "MTP-seadet ei leitud."
+
+msgid "Loading MTP device"
+msgstr "Laadin MTP-seadet"
+
+msgid "Error connecting MTP device %1"
+msgstr "Viga MTP seadme %1 ühendamisel"
+
+msgid "Error connecting MTP device %1: %2"
+msgstr "Viga MTP-seadme %1 ühendamisel: %2"
+
+msgid "Network Proxy"
+msgstr "Võrgu puhverserver"
+
+msgid "&Use the system proxy settings"
+msgstr "&Kasuta süsteemi puhverserveri seadeid"
+
+msgid "Direct internet connection"
+msgstr "Interneti otseühendus"
+
+msgid "&Manual proxy configuration"
+msgstr "&Puhverserveri käsitsi seadistamine"
+
+msgid "HTTP proxy"
+msgstr "HTTP-puhverserver"
+
+msgid "SOCKS proxy"
+msgstr "SOCKS puhverserver"
+
+msgid "Port"
+msgstr "Port"
+
+msgid "Use authentication"
+msgstr "Kasuta autentimist"
+
+msgid "Username"
+msgstr "Kasutajanimi"
+
+msgid "Password"
+msgstr "Salasõna"
+
+msgid "Use proxy settings for streaming"
+msgstr "Kasuta voogesituseks puhverserveri seadistusi"
+
+msgid "Only HTTP proxy is supported for streaming."
+msgstr "Voogedastuse kontekstis on toetatud vaid HTTP-proksi."
+
+msgid "Notifications"
+msgstr "Teavitused"
+
+msgid "Strawberry can show a message when the track changes."
+msgstr "Strawberry võib loo vahetumisel kuvada märguande."
+
+msgid "Notification type"
+msgstr "Teavituse tüüp"
+
+#. Refers to a disabled notification type in Notification settings.
+msgid "Disabled"
+msgstr "Välja lülitatud"
+
+msgid "Show a &native desktop notification"
+msgstr "Kuva &töölaua teavitusena"
+
+msgid "Show a pretty OSD"
+msgstr "Kuva ilus ekraanimenüü"
+
+msgid "Show a popup fro&m the system tray"
+msgstr "Kuva hüpikaken süsteemisalves"
+
+msgid "General settings"
+msgstr "Üldised seadistused"
+
+msgid "Popup duration"
+msgstr "Hüpikakna kuvamise kestus"
+
+msgid " seconds"
+msgstr " sekundit"
+
+msgid "Disable duration"
+msgstr "Lülita kestus välja"
+
+msgid "Show a notification when I change the volume"
+msgstr "Kuva teavitus helivaljuse muutmisel"
+
+msgid "Show a notification when I change the repeat/shuffle mode"
+msgstr "Kuva teavitus kordus-/juhuesitusrežiimi muutmisel"
+
+msgid "Show a notification when I pause playback"
+msgstr "Kuva teavitus taasesituse peatamisel"
+
+msgid "Show a notification when I resume playback"
+msgstr "Kuva teavitus taasesituse jätkamisel"
+
+msgid "Include album art in the notification"
+msgstr "Kuva teavituses albumi kaanepilti"
+
+msgid "Custom message settings"
+msgstr "Kohandatud seadistused sõnumite jaoks"
+
+msgid "Use a custom message for notifications"
+msgstr "Kasuta teavitustes kohandatud sõnumit"
+
+msgid "Body"
+msgstr "Sisu"
+
+msgid "Pretty OSD options"
+msgstr "Ilusa ekraanimenüü seadistused"
+
+msgid "Background color"
+msgstr "Taustavärv"
+
+msgid "Text options"
+msgstr "Tekstivalikud"
+
+msgid "Choose font..."
+msgstr "Vali kirjatüüp..."
+
+msgid "Choose color..."
+msgstr "Vali värv..."
+
+msgid "Background opacity"
+msgstr "Tausta läbipaistvus"
+
+msgid "Basic Blue"
+msgstr "Tavaline sinine"
+
+msgid "Strawberry Red"
+msgstr "Maasikapunane"
+
+msgid "Custom..."
+msgstr "Kohandatud..."
+
+msgid "Enable fading"
+msgstr "Luba hajumine"
+
+msgid "%originalyear%"
+msgstr "%originalyear%"
+
+msgid "OSD Preview"
+msgstr "Ekraanimenüü eelvaade"
+
+msgid "Drag to reposition"
+msgstr "Lohista asukoha muutmiseks"
+
+msgid "Discord"
+msgstr "Discord"
+
+msgid "Enable Rich Presence"
+msgstr "Kasuta olekuteates kujundust"
+
+msgid "\"Listening to...\""
+msgstr "\"Kuulamas...\""
+
+msgid "Strawberry"
+msgstr "Strawberry"
+
+msgid "Artist name"
+msgstr "Esitaja nimi"
+
+msgid "Song title"
+msgstr "Loo pealkiri"
+
+msgid "Please open this URL in your browser"
+msgstr "Ava see võrguaadress oma veebibrauseris"
+
+msgid "Received invalid reply from web browser."
+msgstr "Vigane vastus veebibrauserist."
+
+msgid "Redirect URL is missing query."
+msgstr "Edasisuunamise võrguaadressist on puudu päring."
+
+msgid "Request URL is missing code!"
+msgstr "Edasisuunamise võrguaadressist on puudu kood!"
+
+msgid "Request URL is missing state!"
+msgstr "Edasisuunamise võrguaadressist on puudu olek!"
+
+msgid "Request URL has wrong state %1 != %2"
+msgstr "Edasisuunamise võrguaadressi olek on vale: %1 !=%2."
+
+msgid "disc %1"
+msgstr "plaat %1"
+
+msgid "track %1"
+msgstr "lugu %1"
+
+msgid "Paused"
+msgstr "Peatatud"
+
+msgid "Stopped"
+msgstr "Lõpetatud"
+
+msgid "Stop playing after track: %1"
+msgstr "Lõpeta taasesitus pärast lugu: %1"
+
+msgid "On"
+msgstr "Sees"
+
+msgid "Off"
+msgstr "Väljas"
+
+msgid "Playlist finished"
+msgstr "Esitusnimekiri on läbi"
+
+msgid "Volume %1%"
+msgstr "Helivaljus %1%"
+
+msgid "Don't shuffle"
+msgstr "Juhuesitus väljas"
+
+msgid "Shuffle all"
+msgstr "Kõige juhuesitus"
+
+msgid "Shuffle tracks in this album"
+msgstr "Selle albumi lugude juhuesitus"
+
+msgid "Shuffle albums"
+msgstr "Albumite juhuesitus"
+
+msgid "Shuffle grouping"
+msgstr "Rühmitamise juhuesitus"
+
+msgid "Don't repeat"
+msgstr "Ära korda"
+
+msgid "Repeat track"
+msgstr "Korda lugu"
+
+msgid "Repeat album"
+msgstr "Korda albumit"
+
+msgid "Repeat playlist"
+msgstr "Korda esitusloendit"
+
+msgid "Stop after every track"
+msgstr "Lõpeta pärast iga lugu"
+
+msgid "Intro tracks"
+msgstr "Introd"
+
+msgid "Organizing files"
+msgstr "Failide korrastamine"
+
+msgid "Organize Files"
+msgstr "Korrasta faile"
+
+msgid "Destination"
+msgstr "Sihtkoht"
+
+msgid "After copying..."
+msgstr "Pärast kopeerimist..."
+
+msgid "Keep the original files"
+msgstr "Säilita algsed failid"
+
+msgid "Delete the original files"
+msgstr "Kustuta algsed failid"
+
+msgid "Naming options"
+msgstr "Nimetamise valikud"
+
+msgid "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+msgstr "<p>Asendusmärkid algavad %'ga, näiteks %artist, %album %title</p>\n\n<p>Kui Kui ümbritsed asendusmärkidega tekstilõigu looksulgudega, siis see tekstilõik jäetakse kuvamata, kui asendusmärgi väärtus on tühi.</p>"
+
+msgid "Insert..."
+msgstr "Lisa..."
+
+msgid "Remove problematic characters from filenames"
+msgstr "Eemalda failinimedest probleemsed tähemärgid"
+
+msgid "Restrict to characters allowed on FAT filesystems"
+msgstr "Piira FAT failisüsteemides lubatud tähemärkidega"
+
+msgid "Restrict characters to ASCII"
+msgstr "Piira ASCII tähemärkidega"
+
+msgid "Allow extended ASCII characters"
+msgstr "Luba laiendatud ASCII tähemärgid"
+
+msgid "Replace spaces with underscores"
+msgstr "Asenda tühikud allkriipsudega"
+
+msgid "Overwrite existing files"
+msgstr "Kirjuta olemasolevad failid üle"
+
+msgid "Copy album cover artwork"
+msgstr "Kopeeri albumi kaanepildid"
+
+msgid "Safely remove the device after copying"
+msgstr "Pärast kopeerimist eemalda seade ohutult"
+
+msgid "Artist's initial"
+msgstr "Esitaja initsiaalid"
+
+msgid "File extension"
+msgstr "Faililaiend"
+
+msgid "Error copying songs"
+msgstr "Viga lugude kopeerimisel"
+
+msgid "There were problems copying some songs.  The following files could not be copied:"
+msgstr "Mõne loo kopeerimisel ilmnes probleeme.  Järgnevaid faile ei kopeeritud:"
+
+msgid "Error deleting songs"
+msgstr "Viga lugude kustutamisel"
+
+msgid "There were problems deleting some songs.  The following files could not be deleted:"
+msgstr "Mõne loo kustutamisel ilmnes probleeme.  Järgnevaid faile ei kustutatud:"
+
+msgid "Don't know how to handle %1"
+msgstr "Ei tea, kuidas peaks kasutama: %1"
+
+msgid "File %1 does not exist"
+msgstr "%1 faili pole olemas"
+
+msgid "Could not read file %1: %2"
+msgstr "%1 faili lugemine ei õnnestunud: %2"
+
+msgid "Small album cover"
+msgstr "Väike kaanepilt"
+
+msgid "Large album cover"
+msgstr "Suur kaanepilt"
+
+msgid "Fit cover to width"
+msgstr "Sobita kaanepilt laiusega"
+
+msgid "Show above status bar"
+msgstr "Kuva olekuriba kohal"
+
+msgid "Title Sort"
+msgstr "Pealkirja järjestus"
+
+msgid "Artist Sort"
+msgstr "Esitaja järjestus"
+
+msgid "Album Sort"
+msgstr "Albumi järjestus"
+
+msgid "Original Year"
+msgstr "Algne aasta"
+
+msgid "Album Artist"
+msgstr "Albumi esitaja"
+
+msgid "Album Artist Sort"
+msgstr "Albumi esitaja järjestus"
+
+msgid "Composer Sort"
+msgstr "Helilooja järjestus"
+
+msgid "Performer Sort"
+msgstr "Esineja järjestus"
+
+msgid "Play Count"
+msgstr "Esituskordi"
+
+msgid "Skip Count"
+msgstr "Vahelejätmisi"
+
+msgid "Last Played"
+msgstr "Viimati esitatud"
+
+msgid "Sample Rate"
+msgstr "Diskreetimissagedus"
+
+msgid "Bit Depth"
+msgstr "Bitisügavus"
+
+msgid "Initial key"
+msgstr "Algne võti"
+
+msgid "File Name (without path)"
+msgstr "Failinimi (asukohata)"
+
+msgid "File Size"
+msgstr "Faili suurus"
+
+msgid "File Type"
+msgstr "Faili tüüp"
+
+msgid "Date Modified"
+msgstr "Muutmise aeg"
+
+msgid "Date Created"
+msgstr "Loomise aeg"
+
+msgid "Source"
+msgstr "Allikas"
+
+msgid "BPM"
+msgstr "BPM"
+
+msgid "Mood"
+msgstr "Meeleolu"
+
+msgid "URL"
+msgstr "Võrguaadress"
+
+msgid "CUE"
+msgstr "CUE"
+
+msgid "Integrated Loudness"
+msgstr "Lõimitud valjus"
+
+msgid "Loudness Range"
+msgstr "Valjuse vahemik"
+
+msgid "Undo"
+msgstr "Võta tagasi"
+
+msgid "Redo"
+msgstr "Tee uuesti"
+
+msgid "Load playlist"
+msgstr "Laadi esitusloend"
+
+msgid "No matches found.  Clear the search box to show the whole playlist again."
+msgstr "Vasteid ei leitud. Puhasta otsingukast, et näha kogu esitusloendit."
+
+msgid "stop"
+msgstr "peata"
+
+msgid "Loading smart playlist"
+msgstr "Nutika esitusloendi laadimine"
+
+msgid "&Hide..."
+msgstr "&Peida..."
+
+msgid "&Stretch columns to fit window"
+msgstr "&Sobita veerud akna laiusega"
+
+msgid "&Reset columns to default"
+msgstr "&Lähtesta veerud vaikeväärtustele"
+
+msgid "&Lock rating"
+msgstr "&Lukusta hinnang"
+
+msgid "&Align text"
+msgstr "&Joonda tekst"
+
+msgid "&Left"
+msgstr "&Vasak"
+
+msgid "&Center"
+msgstr "&Keskele"
+
+msgid "&Right"
+msgstr "&Parem"
+
+msgid "&Hide %1"
+msgstr "&Peida %1"
+
+msgid "New folder"
+msgstr "Uus kaust"
+
+msgid "Delete"
+msgstr "Kustuta"
+
+#. Save playlist menu action.
+msgid "Save playlist"
+msgstr "Salvesta esitusloend"
+
+msgid "Enter the name of the folder"
+msgstr "Sisesta kausta nimi"
+
+msgid "Copy songs to playlist"
+msgstr "Kopeeri lood esitusloendisse"
+
+msgid "Copy to device"
+msgstr "Kopeeri seadmesse"
+
+msgid "Playlist must be open first."
+msgstr "Esitusloend peab esmalt olema avatud."
+
+msgid "Remove playlists"
+msgstr "Eemalda esitusloendid"
+
+msgid "You are about to remove %1 playlists from your favorites, are you sure?"
+msgstr "Oled eemaldamas oma lemmikutest %1 esitusloendit. Kas oled kindel?"
+
+msgid "You can favorite playlists by clicking the star icon next to a playlist name"
+msgstr "Esitusloendi saab määrata lemmikuks vajutades selle nime juures olevale täheikoonile"
+
+msgid "Favorited playlists will be saved here"
+msgstr "Lemmikuks määratud esitusloendid salvestatakse siia"
+
+msgid "Couldn't create playlist"
+msgstr "Esitusloendit ei saanud luua"
+
+msgid "Unknown playlist extension"
+msgstr "Tundmatu esitusloendi laiend"
+
+msgid "Unknown file extension for playlist."
+msgstr "Esitusloendi jaoks tundmatu faililaiend."
+
+msgid "%1 selected of"
+msgstr "%1 on valitud"
+
+msgid "%n track(s)"
+msgid_plural "%n track(s)"
+msgstr[0] "%n lugu"
+msgstr[1] "%n lugu"
+
+msgid "All playlists (%1)"
+msgstr "Kõik esitusloendid (%1)"
+
+msgid "%1 playlists (%2)"
+msgstr "%1 esitusloendit (%2)"
+
+msgid "Unknown filetype: %1"
+msgstr "Tundmatu failitüüp: %1"
+
+msgid "Could not open file %1"
+msgstr "Faili avamine ei õnnestu: %1"
+
+msgid "Directory %1 does not exist."
+msgstr "„%1“ kausta pole olemas."
+
+msgid "Failed to open %1 for writing."
+msgstr "%1 avamine salvestamiseks ei õnnestunud."
+
+msgid "Playlist options"
+msgstr "Esitusloendi valikud"
+
+msgid "File paths"
+msgstr "Failide asukohad"
+
+msgid "This can be changed later through the preferences"
+msgstr "Seda saab hiljem eelistuste kaudu muuta"
+
+msgid "Remember my choice"
+msgstr "Jäta minu valik meelde"
+
+msgid "Automatic"
+msgstr "Automaatne"
+
+msgid "Relative"
+msgstr "Suhteline"
+
+msgid "Absolute"
+msgstr "Absoluutne"
+
+msgid "Repeat"
+msgstr "Korda"
+
+msgid "Shuffle"
+msgstr "Juhuesitus"
+
+msgid "Stop after each track"
+msgstr "Peata pärast iga lugu"
+
+msgid "Use alternating row colors"
+msgstr "Kasuta vahelduvaid reavärve"
+
+msgid "Show bars on the currently playing track"
+msgstr "Kuva hetkel esitataval lool riba"
+
+msgid "Show a glowing animation on the currently playing track"
+msgstr "Kuva esitataval lool helendav kuma"
+
+msgid "Warn me when closing a playlist tab"
+msgstr "Hoiata esitusloendi vahekaardi sulgemisel"
+
+msgid "Continue to the next item in the playlist if a song is unavailable"
+msgstr "Kui lugu pole saadaval, jätka esitusloendi järgmise üksusega"
+
+msgid "Grey out unavailable songs in playlists on playback"
+msgstr "Kuva kättesaamatud lood esitusloendites hallina"
+
+msgid "Grey out unavailable songs in playlists on startup"
+msgstr "Kuva käivitamisel kättesaamatud lood esitusloendites hallina"
+
+msgid "Automatically select current playing track"
+msgstr "Vali hetkel esitatav lugu automaatselt"
+
+msgid "Enable playlist toolbar"
+msgstr "Luba esitusloendi tööriistariba"
+
+msgid "Enable playlist clear button"
+msgstr "Luba esitusloendi tühjendamise nupp"
+
+msgid "Automatically sort playlist when inserting songs"
+msgstr "Sordi esitusloend lugude sisestamisel automaatselt"
+
+msgid "When saving a playlist, file paths should be"
+msgstr "Esitusloendi salvestamisel on failitee"
+
+msgid "A&utomatic"
+msgstr "A&utomaatne"
+
+msgid "Absolu&te"
+msgstr "Absoluut&ne"
+
+msgid "Re&lative"
+msgstr "Suhteline"
+
+msgid "As&k when saving"
+msgstr "Küsi salvestamisel"
+
+msgid "Metadata"
+msgstr "Metaandmed"
+
+msgid "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+msgstr "Kui lubatud, saab esitusloendivaates valitud lool klõpsates sildi väärtust otse muuta"
+
+msgid "Enable song metadata inline edition with click"
+msgstr "Luba klõpsates loo metaandmete muutmine"
+
+msgid "Write metadata when saving playlists"
+msgstr "Salvesta metaandmed esitusloendite salvestamisel"
+
+msgid "Star playlist"
+msgstr "Standardne"
+
+msgid "Close playlist"
+msgstr "Sulge esitusloend"
+
+msgid "Rename playlist..."
+msgstr "Nimeta esitusloend ümber..."
+
+msgid "Save playlist..."
+msgstr "Salvesta esitusloend..."
+
+msgid "Rename playlist"
+msgstr "Nimeta esitusloend ümber"
+
+msgid "Enter a new name for this playlist"
+msgstr "Sisesta sellele esitusloendile uus nimi"
+
+msgid "Remove playlist"
+msgstr "Eemalda esitusloend"
+
+msgid "You are about to remove a playlist which is not part of your favorite playlists: the playlist will be deleted (this action cannot be undone). \nAre you sure you want to continue?"
+msgstr "Oled eemaldamas esitusloendit, mis ei kuulu lemmikesitusloendite hulka: esitusloend kustutatakse (seda toimingut ei saa tagasi võtta). \nKas soovid jätkata?"
+
+msgid "This option can be changed in the \"Behavior\" preferences"
+msgstr "Seda valikut saab muuta eelistustes \"Käitumine\""
+
+msgid "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+msgstr "Selle esitusloendi lemmikuks lisamiseks topeltklõpsa siin. See salvestatakse ja jääb juurdepääsetavaks vasakpoolsel küljeribal oleva paneeli \"Esitusloendid\" kaudu"
+
+msgid "Hz"
+msgstr "Hz"
+
+msgid "Bit"
+msgstr "bitt"
+
+msgid "Usage"
+msgstr "Kasutus"
+
+msgid "options"
+msgstr "valikud"
+
+msgid "URL(s)"
+msgstr "Võrguaadress(id)"
+
+msgid "Player options"
+msgstr "Meediapleieri valikud"
+
+msgid "Start the playlist currently playing"
+msgstr "Alusta hetkel esitatav esitusloend uuesti algusest"
+
+msgid "Play if stopped, pause if playing"
+msgstr "Lõpetamise korral esita, esitamise korral peata"
+
+msgid "Pause playback"
+msgstr "Peata taasesitus"
+
+msgid "Stop playback"
+msgstr "Lõpeta taasesitus"
+
+msgid "Stop playback after current track"
+msgstr "Lõpeta taasesitus pärast praegust lugu"
+
+msgid "Skip backwards in playlist"
+msgstr "Hüppa esitusloendis tagasi"
+
+msgid "Skip forwards in playlist"
+msgstr "Hüppa esitusloendis edasi"
+
+msgid "Set the volume to <value> percent"
+msgstr "Määra helivaljuseks <value> protsenti"
+
+msgid "Increase the volume by 4 percent"
+msgstr "Heli valjemaks 4 protsenti"
+
+msgid "Decrease the volume by 4 percent"
+msgstr "Heli vaiksemaks 4 protsenti"
+
+msgid "Increase the volume by <value> percent"
+msgstr "Heli valjemaks <value> protsenti"
+
+msgid "Decrease the volume by <value> percent"
+msgstr "Heli vaiksemaks <value> protsenti"
+
+msgid "Seek the currently playing track to an absolute position"
+msgstr "Jätka praeguse loo esitust uuest absoluutsest asukohast"
+
+msgid "Seek the currently playing track by a relative amount"
+msgstr "Jätka praeguse loo esitust uuest suhtelisest asukohast"
+
+msgid "Restart the track, or play the previous track if within 8 seconds of start."
+msgstr "Käivita lugu uuesti või esita eelmine lugu, kui see on 8 sekundi jooksul pärast alustamist."
+
+msgid "Create a new playlist with files"
+msgstr "Loo uus esitusloend failidega"
+
+msgid "Append files/URLs to the playlist"
+msgstr "Lisa failid/võrguaadressid esitusloendisse"
+
+msgid "Loads files/URLs, replacing current playlist"
+msgstr "Laadib failid/URL-id, asendades praeguse esitusloendi"
+
+msgid "Play the <n>th track in the playlist"
+msgstr "Esita esitusloendi lugu nr <n>"
+
+msgid "Play given playlist"
+msgstr "Esita antud esitusloendit"
+
+msgid "Other options"
+msgstr "Muud valikud"
+
+msgid "Display the on-screen-display"
+msgstr "Kuva ekraanigraafika"
+
+msgid "Toggle visibility for the pretty on-screen-display"
+msgstr "Muuda ilusa ekraanimenüü nähtavust"
+
+msgid "Change the language"
+msgstr "Muuda keelt"
+
+msgid "Resize the window"
+msgstr "Muuda akna suurust"
+
+msgid "Equivalent to --log-levels *:1"
+msgstr "Võrdne käivitusvõtmega --log-levels *:1"
+
+msgid "Equivalent to --log-levels *:3"
+msgstr "Võrdne käivitusvõtmega --log-levels *:3"
+
+msgid "Comma separated list of class:level, level is 0-3"
+msgstr "Komadega eraldatud loend klass:tase, kus tase võib olla 0-3"
+
+msgid "Print out version information"
+msgstr "Trüki teave käesoleva versiooni kohta"
+
+msgid "Create fingerprint"
+msgstr "Loo sõrmejälg"
+
+msgid "Failed to create directory %1."
+msgstr "„%1“ kausta loomine ei õnnestunud."
+
+msgid "Destination file %1 exists, but not allowed to overwrite."
+msgstr "Sihtfail %1 on olemas, kuid seda ei lubata üle kirjutada."
+
+msgid "Destination file %1 exists, but not allowed to overwrite"
+msgstr "Sihtfail %1 on olemas, kuid seda ei lubata üle kirjutada"
+
+msgid "Could not copy file %1 to %2."
+msgstr "Ei õnnestunud kopeerida faili %1 seadmesse %2."
+
+msgid "LUFS"
+msgstr "LUFS"
+
+msgid "LU"
+msgstr "LU"
+
+msgid "1 day"
+msgstr "1 päev"
+
+msgid "%1 days"
+msgstr "%1 päeva"
+
+msgid "Today"
+msgstr "Täna"
+
+msgid "Yesterday"
+msgstr "Eile"
+
+msgid "%1 days ago"
+msgstr "%1 päeva tagasi"
+
+msgid "Tomorrow"
+msgstr "Homme"
+
+msgid "In %1 days"
+msgstr "%1 päeva jooksul"
+
+msgid "Next week"
+msgstr "järgmisel nädalal"
+
+msgid "In %1 weeks"
+msgstr "%1 nädala jooksul"
+
+msgid "Show in file browser"
+msgstr "Kuva failihalduris"
+
+msgid "Too many songs selected."
+msgstr "Valitud on liiga palju lugusi."
+
+msgid "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+msgstr "Valitud on %1 lugu %2 erinevas kataloogis. Kas oled kindel, et soovid need kõik avada?"
+
+msgid "Failed to load image from data for %1"
+msgstr "%1 jaoks ei õnnestunud andmetest tuvastada pildifaili"
+
+msgid "Success"
+msgstr "Valmis"
+
+msgid "File is unsupported"
+msgstr "Fail pole toetatud"
+
+msgid "Filename is missing"
+msgstr "Faili nimi on puudu"
+
+msgid "File does not exist"
+msgstr "Faili pole olemas"
+
+msgid "File could not be opened"
+msgstr "Faili avamine ei õnnestunud"
+
+msgid "Could not parse file"
+msgstr "Faili süntaksi analüüsimine ei õnnestunud"
+
+msgid "Could not save file"
+msgstr "Faili salvestamine ei õnnestunud"
+
+msgid "Unknown error"
+msgstr "Tundmatu viga"
+
+msgid "Prefix a search term with a field name to limit the search to that field, e.g.:"
+msgstr "Otsingusõnale välja nime lisamine võimaldab piirata otsingut selle väljaga, näiteks:"
+
+msgid "artist"
+msgstr "esitaja"
+
+msgid "searches for all artists containing the word %1."
+msgstr "kõikide esitajate otsing, kus leidub %1."
+
+msgid "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+msgstr "Otsingu täpsustamiseks võib numbriväljade otsisõnade eesliiteks lisada %1 või %2, nt: "
+
+msgid "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+msgstr "\"%1\" lisamisel sõna ette saad ta välistada. Kui tahad otsida sõna, kus on \"%1\", siis lisa jutumärgid sõna ümber."
+
+msgid "rating"
+msgstr "hinnang"
+
+msgid "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+msgstr "Mitut otsinguterminit saab kombineerida ka sõnadega \"%1\" (vaikimisi) ja \"%2\" ning rühmitada need sulgudega."
+
+msgid "Available fields"
+msgstr "Saadaolevad väljad"
+
+msgid "after"
+msgstr "pärast"
+
+msgid "before"
+msgstr "enne"
+
+msgid "on"
+msgstr "kuupäeval"
+
+msgid "not on"
+msgstr "ei ole kuupäeval"
+
+msgid "in the last"
+msgstr "on vähem kui viimased"
+
+msgid "not in the last"
+msgstr "on enam kui viimased"
+
+msgid "between"
+msgstr "vahemikus"
+
+msgid "contains"
+msgstr "sisaldab"
+
+msgid "does not contain"
+msgstr "ei sisalda"
+
+msgid "starts with"
+msgstr "alguses on"
+
+msgid "ends with"
+msgstr "lõpus on"
+
+msgid "greater than"
+msgstr "suurem kui"
+
+msgid "less than"
+msgstr "on väiksem kui"
+
+msgid "equals"
+msgstr "võrdub"
+
+msgid "not equals"
+msgstr "ei võrdu"
+
+msgid "empty"
+msgstr "tühi"
+
+msgid "not empty"
+msgstr "pole tühi"
+
+msgid "A-Z"
+msgstr "A-Ü"
+
+msgid "Z-A"
+msgstr "Z-A"
+
+msgid "oldest first"
+msgstr "vanimad esimesena"
+
+msgid "newest first"
+msgstr "uusim esimesena"
+
+msgid "shortest first"
+msgstr "lühimad esimesena"
+
+msgid "longest first"
+msgstr "pikim esimesena"
+
+msgid "smallest first"
+msgstr "väikseim esimesena"
+
+msgid "biggest first"
+msgstr "suurimad esimesena"
+
+msgid "Hours"
+msgstr "tundi"
+
+msgid "Days"
+msgstr "päeva"
+
+msgid "Weeks"
+msgstr "nädalat"
+
+msgid "Months"
+msgstr "kuud"
+
+msgid "Years"
+msgstr "aastat"
+
+msgid "Normal"
+msgstr "Tavaline"
+
+msgid "Angry"
+msgstr "Vihane"
+
+msgid "Frozen"
+msgstr "Külmunud"
+
+msgid "Happy"
+msgstr "Õnnelik"
+
+msgid "System colors"
+msgstr "Süsteemi värvid"
+
+msgid "add %n songs"
+msgid_plural "add %n songs"
+msgstr[0] "lisa %n lugu"
+msgstr[1] "lisa %n lugu"
+
+msgid "remove %n songs"
+msgid_plural "remove %n songs"
+msgstr[0] "eemalda %n lugu"
+msgstr[1] "eemalda %n lugu"
+
+msgid "move %n songs"
+msgid_plural "move %n songs"
+msgstr[0] "teisalda %n lugu"
+msgstr[1] "teisalda %n lugu"
+
+msgid "sort songs"
+msgstr "sordi lugusid"
+
+msgid "shuffle songs"
+msgstr "sega lood"
+
+msgid "Invalid collection directory"
+msgstr "Vigane muusikakogu kaust"
+
+msgid "Can't add directory %1 with special filesystem %2 to collection"
+msgstr "Kuna kasutusel on „%2“ failisüsteem, siis „%1“ kausta lisamine muusikakogusse ei õnnestu"
+
+msgid "Clear"
+msgstr "Puhasta"
+
+msgid "Reset"
+msgstr "Lähtesta"
+
+msgid "Not authenticated"
+msgstr "Pole autentitud"
+
+msgid "No track ID"
+msgstr "Loo tunnus puudub"
+
+msgid "Receiving artists..."
+msgstr "Esitajate vastuvõtmine..."
+
+msgid "Receiving albums..."
+msgstr "Albumite vastuvõtmine..."
+
+msgid "Receiving songs..."
+msgstr "Lugude vastuvõtmine..."
+
+msgid "Searching..."
+msgstr "Otsin..."
+
+msgid "Receiving albums for %1 artist..."
+msgstr "%1 esitaja albumite vastuvõtmine..."
+
+msgid "Receiving albums for %1 artists..."
+msgstr "%1 esitaja albumite vastuvõtmine..."
+
+msgid "Receiving songs for %1 album..."
+msgstr "%1 albumi lugude vastuvõtmine..."
+
+msgid "Receiving songs for %1 albums..."
+msgstr "%1 albumi lugude vastuvõtmine..."
+
+msgid "Receiving album cover for %1 album..."
+msgstr "%1 albumi kaanepildi vastuvõtmine..."
+
+msgid "Receiving album covers for %1 albums..."
+msgstr "%1 albumi kaanepildi vastuvõtmine..."
+
+msgid "No match."
+msgstr "Vasteid ei leitud."
+
+msgid "Missing Qobuz app ID."
+msgstr "Qobuzi rakenduse tunnus puudub."
+
+msgid "Missing app ID. Please fetch credentials first."
+msgstr "Rakenduse tunnus on puudu. Palun laadi esmalt autentimistunnused."
+
+msgid "Missing app secret. Please fetch credentials first."
+msgstr "Rakenduse saladus on puudu. Palun laadi esmalt autentimistunnused."
+
+msgid "Missing private key. Please fetch credentials first."
+msgstr "Privaatvõti on puudu. Palun esmalt laadi kasutajanimi/salasõna."
+
+msgid "Failed to start local server for OAuth redirect: %1"
+msgstr "OAuthi edasisuunamiseks vajaliku kohaliku serveri käivitamine ei õnnestunud: %1"
+
+msgid "Failed to open the web browser. Please open this URL manually: %1"
+msgstr "Veebibrauseri avamine ei õnnestunud. Palun ava see võrguaadress käsitsi: %1"
+
+msgid "Waiting for browser authentication..."
+msgstr "Ootan autentimist veebibrauseris..."
+
+msgid "OAuth redirect failed: %1"
+msgstr "OAuthi edasisuunamine ei õnnestunud: %1"
+
+msgid "OAuth redirect is missing authorization code."
+msgstr "OAuthi edasisuunamises on autentimiskood puudu."
+
+msgid "Exchanging authorization code..."
+msgstr "Vahetan autentimiskoodi..."
+
+msgid "Not authenticated with Qobuz."
+msgstr "Pole Qobuzi teenuses autenditud."
+
+msgid "Missing Qobuz app ID or secret."
+msgstr "Qobuzi rakenduse ID või võti puudub."
+
+msgid "Not authenticated. Please login to Qobuz in the settings."
+msgstr "Autentimata. Palun ava seadistused ja logi Qobuzi sisse."
+
+msgid "Enable"
+msgstr "Luba"
+
+msgid "App ID"
+msgstr "Rakenduse tunnus"
+
+msgid "App Secret"
+msgstr "Rakenduse saladus"
+
+msgid "Preferences"
+msgstr "Eelistused"
+
+msgid "Audio format"
+msgstr "Helivorming"
+
+msgid "Search delay"
+msgstr "Otsingu viivitus"
+
+msgid "ms"
+msgstr "ms"
+
+msgid "Artists search limit"
+msgstr "Esitajate otsingu piirang"
+
+msgid "Albums search limit"
+msgstr "Albumite otsingu piirang"
+
+msgid "Songs search limit"
+msgstr "Lugude otsingu piirang"
+
+msgid "Download album covers"
+msgstr "Laadi alla albumi kaanepilte"
+
+msgid "Configuration incomplete"
+msgstr "Seadistamine on pooleli"
+
+msgid "Missing app id. Please fetch credentials first."
+msgstr "Rakenduse tunnus on puudu. Palun laadi esmalt autentimistunnused."
+
+msgid "Fetching..."
+msgstr "Laadin..."
+
+msgid "Credentials fetched"
+msgstr "Autentimistunnuste laadimine õnnestus"
+
+msgid "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+msgstr "Autentimistunnuste laadimine õnnestus. Autentimiseks veebibrauserist klõpsa nuppu „Logi sisse“."
+
+msgid "Credential fetch failed"
+msgstr "Autentimistunnuste laadimine ei õnnestunud"
+
+msgid "Fetch Credentials"
+msgstr "Laadi autentimistunnused"
+
+msgid "Remove (Remastered), etc from song titles"
+msgstr "Eemalda laulude pealkirjadest (Remaster) jne"
+
+msgid "Private key"
+msgstr "Privaatvõti"
+
+msgid "Automatically fetch app ID, app secret and private key from Qobuz web player"
+msgstr "Laadi rakenduse tunnus, saladus ja privaatvõti Qobuzi veebipõhisest pleierist automaatselt"
+
+msgid "Not authenticated. Please log in on the Qobuz settings page."
+msgstr "Autentimata. Palun ava seadistused ja logi Qobuzi sisse."
+
+msgid "Cancelled."
+msgstr "Tühistatud."
+
+msgid "QueueView"
+msgstr "Järjekorravaade"
+
+msgid "Ctrl+Up"
+msgstr "Ctrl+Nool üles"
+
+msgid "Ctrl+Down"
+msgstr "Ctrl+Nool alla"
+
+msgid "Remove"
+msgstr "Eemalda"
+
+msgid "Country"
+msgstr "Riik"
+
+msgid "Codec"
+msgstr "Koodek"
+
+msgid "Load more..."
+msgstr "Laadi veel..."
+
+msgid "Search for radio stations using radio-browser.info"
+msgstr "Otsi veebiraadiojaamu radio-browser.info saidist"
+
+msgid "Search radio stations..."
+msgstr "Otsi raadiojaamu..."
+
+msgid "All countries"
+msgstr "Kõik riigid"
+
+msgid "By votes"
+msgstr "Meeldimiste alusel"
+
+msgid "By clicks"
+msgstr "Klikkide alusel"
+
+msgid "By name"
+msgstr "Nime alusel"
+
+msgid "By bitrate"
+msgstr "Bitikiiruse alusel"
+
+msgid "No stations found."
+msgstr "Ühtegi veebiraadiojaama ei leidunud."
+
+msgid "%1 stations found"
+msgstr "Leidus %1 veebiraadiojaama"
+
+msgid "No Radio Browser server available."
+msgstr "Ühtegi raadiojaamade otsinguserverit pole saadaval."
+
+msgid "Searching Radio Browser"
+msgstr "Otsin raadiojaamade otsinguserverist"
+
+msgid "Radio Browser search failed: %1"
+msgstr "Otsing raadiojaamade otsinguserverist ei õnnestunud: %1"
+
+msgid "Getting %1 channels"
+msgstr "%1 kanali hankimine"
+
+msgid "SomaFM"
+msgstr "SomaFM"
+
+msgid "Stream quality:"
+msgstr "Voogedastuse kvaliteet:"
+
+msgid "Radio Browser"
+msgstr "Raadiojaamade otsinguserver"
+
+msgid "Search results limit:"
+msgstr "Otsingutulemuste piirang:"
+
+msgid "Hide broken stations"
+msgstr "Peida vigased raadiojaamad"
+
+msgid "Default sort order:"
+msgstr "Vaikimisi järjestus:"
+
+msgid "Default country:"
+msgstr "Vaikimisi riik:"
+
+msgid "Highest"
+msgstr "Kõrgeim"
+
+msgid "High"
+msgstr "Kõrge"
+
+msgid "Low"
+msgstr "Madal"
+
+msgid "Open homepage"
+msgstr "Ava koduleht"
+
+msgid "Donate"
+msgstr "Anneta"
+
+msgid "Refresh channels"
+msgstr "Värskenda kanaleid"
+
+msgid "Channels"
+msgstr "Kanalid"
+
+msgid "Select directory for saving playlists"
+msgstr "Vali esitusloendite salvestamise kaust"
+
+msgid "Type"
+msgstr "Tüüp"
+
+msgid "Select directory for the playlists"
+msgstr "Vali esitusloendite jaoks kataloog"
+
+msgid "Directory does not exist."
+msgstr "Kausta pole olemas."
+
+msgid "Saved Grouping Manager"
+msgstr "Salvestatud rühmituste haldur"
+
+msgid "Second Level"
+msgstr "Teine tase"
+
+msgid "Third Level"
+msgstr "Kolmas tase"
+
+msgid "Scrobbler"
+msgstr "Kraasimine"
+
+msgid "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+msgstr "Lood kraasitakse, kui neil on kehtivad metaandmed ja need on pikemad kui 30 sekundit, neid on esitatud vähemalt pool kestusest või 4 minutit (olenevalt sellest, kumb saabub varem)."
+
+msgid "Show scrobble button"
+msgstr "Kuva kraasimise nupp"
+
+msgid "Show love button"
+msgstr "Kuva meeldimise nupp"
+
+msgid "Submit scrobbles every"
+msgstr "Saada kraasmed iga"
+
+msgid "Prefer album artist when sending scrobbles"
+msgstr "Kraasmete saatmisel eelista albumi esitajat"
+
+msgid "Show dialog for errors"
+msgstr "Kuva veaaken"
+
+msgid "Strip \"remastered\" and similar from album and title"
+msgstr "Eemalda albumi nimest ja loo pealkirjast „remastered“ ja muud sarnased sõnad"
+
+msgid "Enable scrobbling for the following sources:"
+msgstr "Luba kraasimine järgmiste allikate jaoks:"
+
+msgid "Local file"
+msgstr "Kohalik fail"
+
+msgid "CDDA"
+msgstr "CDDA"
+
+msgid "Stream"
+msgstr "Voog"
+
+msgid "Radio Paradise"
+msgstr "Radio Paradise"
+
+msgid "Last.fm"
+msgstr "Last.fm"
+
+msgid "Listenbrainz"
+msgstr "Listenbrainz"
+
+msgid "User token:"
+msgstr "Kasutaja tunnuskood:"
+
+msgid "Enter your user token from"
+msgstr "Sisesta oma tunnusluba teenusest"
+
+msgid "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+msgstr "Kui see eelistus on kasutusel, siis kraasimised salvestatakse kohalikus andmekogus ega saadeta serverile. Selline valik on mõeldud kasutamiseks, kui server ei toimi või internetiühendus on katkendlik. Valiku väljalülitamisel kogutud kraasimised salvestatakse serveris."
+
+msgid "Offline mode (Only cache scrobbles)"
+msgstr "Tööta võrguühenduseta režiimis (kraasi kohalikku vahemällu)"
+
+msgid "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+msgstr "See on viivitus loo kraasimise ja selle serverile saatmise vahel. Kui määrad ajaks 0 sekundit, salvestatakse kraasimised kohe."
+
+msgid "Settings"
+msgstr "Seadistused"
+
+msgid "General"
+msgstr "Üldine"
+
+msgid "User interface"
+msgstr "Kasutajaliides"
+
+msgid "Streaming"
+msgstr "Voogesitus"
+
+msgid "Search mode"
+msgstr "Otsingurežiim"
+
+msgid "Match every search term (AND)"
+msgstr "Klapita iga otsingusõnaga (JA)"
+
+msgid "Match one or more search terms (OR)"
+msgstr "Klapita ühe või enama otsingusõnaga (VÕI)"
+
+msgid "Include all songs"
+msgstr "Kaasa kõik lood"
+
+msgid "Search terms"
+msgstr "Otsisõnad"
+
+msgid "Sorting"
+msgstr "Sortimine"
+
+msgid "Put songs in a random order"
+msgstr "Pane lood juhuslikku järjekorda"
+
+msgid "Sort songs by"
+msgstr "Lugude sortimise alus"
+
+msgid "Limits"
+msgstr "Piirid"
+
+msgid "Show all the songs"
+msgstr "Kuva kõik lood"
+
+msgid "Only show the first"
+msgstr "Kuva ainult esimene"
+
+msgid " songs"
+msgstr " lugu"
+
+msgid "Collection search"
+msgstr "Muusikakogu otsing"
+
+msgid "Find songs in your collection that match the criteria you specify."
+msgstr "Otsi oma muusikakogust lugusid, mis vastavad sinu määratud tingimustele."
+
+msgid "A song will be included in the playlist if it matches these conditions."
+msgstr "Lugu lisatakse esitusloendisse, kui see vastab nendele tingimustele."
+
+msgid "Search options"
+msgstr "Otsingu valikud"
+
+msgid "Choose how the playlist is sorted and how many songs it will contain."
+msgstr "Vali, kuidas esitusloend sorditakse ja kui palju lugusid see sisaldab."
+
+msgid "%1 songs found (showing %2)"
+msgstr "%1 lugu leitud (näidatakse %2)"
+
+msgid "%1 songs found"
+msgstr "%1 lugu leitud"
+
+msgid "and"
+msgstr "ja"
+
+msgid "ago"
+msgstr "tagasi"
+
+msgid "The second value must be greater than the first one!"
+msgstr "Teine väärtus peab olema suurem kui esimene!"
+
+msgid "Add search term"
+msgstr "Lisa otsingusõna"
+
+msgid "Smart playlist"
+msgstr "Nutikas esitusloend"
+
+msgid "Playlist type"
+msgstr "Esitusloendi tüüp"
+
+msgid "A smart playlist is a dynamic list of songs that come from your collection.  There are different types of smart playlist that offer different ways of selecting songs."
+msgstr "Nutikas esitusloend on dünaamiline loend lugudest sinu muusikakogus. On olemas erinevat tüüpi nutikaid esitusloendeid, mis pakuvad erinevaid viise lugude valimiseks."
+
+msgid "Finish"
+msgstr "Lõpeta"
+
+msgid "Choose a name for your smart playlist"
+msgstr "Vali oma nutikale esitusloendile nimi"
+
+msgid "Use dynamic mode"
+msgstr "Kasuta dünaamilist režiimi"
+
+msgid "In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes."
+msgstr "Dünaamilises režiimis valitakse uued lood ja lisatakse need esitusloendisse iga kord, kui lugu lõpeb."
+
+msgid "Newest tracks"
+msgstr "Uusimad lood"
+
+msgid "50 random tracks"
+msgstr "50 juhuslikku lugu"
+
+msgid "Ever played"
+msgstr "Läbi aegade esitatud"
+
+msgid "Never played"
+msgstr "Pole esitatud"
+
+msgid "Most played"
+msgstr "Enim esitatud"
+
+msgid "Favourite tracks"
+msgstr "Lemmiklood"
+
+msgid "All tracks"
+msgstr "Kõik lood"
+
+msgid "Dynamic random mix"
+msgstr "Dünaamiline juhuslik valik"
+
+msgid "New smart playlist"
+msgstr "Uus nutikas esitusloend"
+
+msgid "Edit smart playlist"
+msgstr "Muuda nutikat esitusloendit"
+
+msgid "Delete smart playlist"
+msgstr "Kustuta nutikas esitusloend"
+
+msgid "New smart playlist..."
+msgstr "Uus nutikas esitusloend..."
+
+msgid "Play next"
+msgstr "Esita järgmisena"
+
+msgid "Edit smart playlist..."
+msgstr "Muuda nutikat esitusloendit..."
+
+msgid "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+msgstr "Kas oled kindel, et soovid taastada algsed nutikad esitusloendid? See eemaldab kõik kohandatud nutikad esitusloendid"
+
+msgid "Restore defaults"
+msgstr "Taasta vaikeväärtused"
+
+msgid "Preload function was not set for blocking operation."
+msgstr "Eellaadimise funktsionaalsus polnud määratud blokeerimiseks."
+
+msgid "File %1 does not exist."
+msgstr "Faili %1 pole olemas."
+
+msgid "Could not open file %1 for reading: %2"
+msgstr "Ei õnnestunud avada %1 faili lugemiseks: %2"
+
+msgid "Could not open CUE file %1 for reading: %2"
+msgstr "Ei õnnestunud avada CUE faili %1 lugemiseks: %2"
+
+msgid "Could not open playlist file %1 for reading: %2"
+msgstr "Esitusloendi faili %1 ei õnnestunud lugemiseks avada: %2"
+
+msgid "Couldn't create GStreamer source element for %1"
+msgstr "GStreameri lähteelemendi loomine %1 jaoks ei õnnestunud"
+
+msgid "Couldn't create GStreamer typefind element for %1"
+msgstr "GStreameri typefind elemendi loomine %1 jaoks ei õnnestunud"
+
+msgid "Couldn't create GStreamer fakesink element for %1"
+msgstr "GStreameri fakesink elemendi loomine %1 jaoks ei õnnestunud"
+
+msgid "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+msgstr "GStreameri fakesink, typefind ja lähteelementide linkimine %1 jaoks ei õnnestunud"
+
+msgid "Missing CDDA playback."
+msgstr "Taasesituse jaoks puuduvad CDDA andmed."
+
+msgid "Error while loading audio CD."
+msgstr "Viga audio CD laadimisel."
+
+msgid "Loading tracks info"
+msgstr "Lugude teabe laadimine"
+
+msgid "No pending song for track ID"
+msgstr "Selle loo tunnuse jaoks pole ühtegi ootel lugu"
+
+msgid "Authenticating..."
+msgstr "Autentimine..."
+
+msgid "Data missing error"
+msgstr "Viga: andmed puuduvad"
+
+msgid "Not authenticated with Spotify."
+msgstr "Pole autenditud Spotify teenuses."
+
+msgid "Basic authentication"
+msgstr "Lihtne autentimine"
+
+msgid "Authenticate"
+msgstr "Autendi"
+
+msgid "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+msgstr "<html><head/><body><p>GStreameri Spotify pistikprogrammi ei õnnestu tuvastada, aga Spotify voogedastus ilma selleta ei toimi. Lisateavet leiad: <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\"></span></a> selle pistikprogrammi paigaldamise lehelt meie vikis.</p></body></html>"
+
+msgid "Fetch entire albums when searching songs"
+msgstr "Lugude otsimisel laadi tervikalbumid"
+
+msgid "The streaming collection is empty!"
+msgstr "Voogesituste kogu on tühi!"
+
+msgid "Click here to retrieve music"
+msgstr "Muusika hankimiseks klõpsa siia"
+
+msgid "Remove from favorites"
+msgstr "Eemalda lemmikutest"
+
+msgid "Close"
+msgstr "Sulge"
+
+msgid "Refresh catalogue"
+msgstr "Värskenda kataloog"
+
+msgid "Streaming Search View"
+msgstr "Voogedastuse otsinguvaade"
+
+msgid "artists"
+msgstr "esitajad"
+
+msgid "albums"
+msgstr "albumit"
+
+msgid "songs"
+msgstr "lugu"
+
+msgid "Enter search terms above to find music"
+msgstr "Muusika leidmiseks sisesta üles otsingusõnad"
+
+msgid "Configure %1..."
+msgstr "Seadista %1..."
+
+msgid "Add to artists"
+msgstr "Lisa esitajate hulka"
+
+msgid "Add to albums"
+msgstr "Lisa albumitesse"
+
+msgid "Add to songs"
+msgstr "Lisa lugude hulka"
+
+msgid "Streaming Tabs View"
+msgstr "Voogedastuse kaardivaade"
+
+msgid "Artists"
+msgstr "Esitajad"
+
+msgid "Albums"
+msgstr "Albumid"
+
+msgid "Songs"
+msgstr "Lood"
+
+msgid "Retrieving albums..."
+msgstr "Albumite toomine..."
+
+msgid "Retrieving songs for %1 album..."
+msgstr "%1 albumi lugude toomine..."
+
+msgid "Retrieving songs for %1 albums..."
+msgstr "%1 albumi lugude toomine..."
+
+msgid "Retrieving album cover for %1 album..."
+msgstr "Kaanepildi toomine albumile %1..."
+
+msgid "Retrieving album covers for %1 albums..."
+msgstr "Kaanepiltide toomine albumitele %1..."
+
+msgid "Server URL is invalid."
+msgstr "Serveri võrguaadress on vigane."
+
+msgid "Missing username or password."
+msgstr "Kasutajanimi või salasõna puudub."
+
+msgid "Server URL"
+msgstr "Serveri võrguaadress"
+
+msgid "Authentication method:"
+msgstr "Autentimise viis:"
+
+msgid "Hex"
+msgstr "Hex"
+
+msgid "MD5 token (Recommended)"
+msgstr "MD5 tunnuskood (soovitatav)"
+
+msgid "Use HTTP/2 when possible"
+msgstr "Kasuta võimalusel HTTP/2"
+
+msgid "Verify server certificate"
+msgstr "Kontrolli serveri sertifikaati"
+
+msgid "Use album ID for album covers"
+msgstr "Kasuta albumi ID-d albumi kaante jaoks"
+
+msgid "Server-side scrobbling"
+msgstr "Serveripoolne kraasimine"
+
+msgid "Test"
+msgstr "Testi"
+
+msgid "Delete songs"
+msgstr "Kustuta lood"
+
+msgid "Missing server url, username or password."
+msgstr "Serveri võrguaadress, kasutajanimi või salasõna puudub."
+
+msgid "Configuration incorrect"
+msgstr "Seadistus on vale"
+
+msgid "Test successful!"
+msgstr "Test õnnestus!"
+
+msgid "Test failed!"
+msgstr "Test ebaõnnestus!"
+
+msgid "Subsonic server URL is invalid."
+msgstr "Subsonicu serveri võrguaadress on vigane."
+
+msgid "Missing Subsonic username or password."
+msgstr "Subsonicu kasutajanimi või salasõna puudub."
+
+msgid "Stage: %1"
+msgstr "Samm: %1"
+
+msgid "Reason: %1"
+msgstr "Põhjus: %1"
+
+msgid "Identifying song"
+msgstr "Lugu on tuvastamisel"
+
+msgid "Fingerprinting song"
+msgstr "Sõrmejäljestame lugu"
+
+msgid "Generated fingerprint is empty or invalid"
+msgstr "Loodud sõrmejälg on tühi või vigane"
+
+msgid "Fingerprinting"
+msgstr "Sõrmejäljestamisel"
+
+msgid "Fingerprint length: %1"
+msgstr "Sõrmejälje pikkus: %1"
+
+msgid "Minimum required length: %1"
+msgstr "Minimaalne nõutav pikkus: %1"
+
+msgid "Downloading metadata"
+msgstr "Laadime alla metaandmeid"
+
+msgid "No MusicBrainz metadata was found for this track"
+msgstr "Selle loo kohta ei leidu MusicBrainzist metaandmeid"
+
+msgid "MusicBrainz metadata"
+msgstr "Metaandmed MusicBrainzist"
+
+msgid "Candidate metadata rows: 0"
+msgstr "Väljapakutud metaandmete ridu: 0"
+
+msgid "Not authenticated with Tidal."
+msgstr "Pole Tidali teenuses autenditud."
+
+msgid "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+msgstr "Tidali tugi ei ole ametlik ja selle toimimiseks on vaja registreeritud rakenduse API tunnuskood. Meie ei saa aidata neid hankida."
+
+msgid "Client ID"
+msgstr "Kliendi ID"
+
+msgid "Audio quality"
+msgstr "Heli kvaliteet"
+
+msgid "Album cover size"
+msgstr "Kaanepildi suurus"
+
+msgid "Stream URL method"
+msgstr "Voogedastuse võrguaadressi meetod"
+
+msgid "Append explicit to album title for explicit albums"
+msgstr "Lisa vajadusel albumi nimele silt „explicit“"
+
+msgid "Missing Tidal client ID."
+msgstr "Tidali kliendi ID puudub."
+
+msgid "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Laadisime Tidalilst võrguaadressi %1 krüptitud meediavooga. Strawberry ei toeta praegu krüptitud voogedastust."
+
+msgid "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Laadisime Tidalist võrguaadressi krüptitud meediavooga. Strawberry ei toeta praegu krüptitud voogedastust."
+
+msgid "Tag fetcher"
+msgstr "Siltide laadija"
+
+msgid "Strawberry was unable to find results for this file"
+msgstr "Strawberry ei leidnud selle faili jaoks tulemusi"
+
+msgid "Select best possible match"
+msgstr "Vali parim võimalik vaste"
+
+msgid "Original tags"
+msgstr "Algsed sildid"
+
+msgid "Suggested tags"
+msgstr "Soovitatud sildid"
+
+msgid "No results"
+msgstr "Tulemusi pole"
+
+msgid "0:00:00"
+msgstr "0:00:00"
+
+msgid "Click to toggle between remaining time and total time"
+msgstr "Klõpsa järelejäänud aja ja kestuse vahel vahetamiseks"
+
+msgid "Waveform"
+msgstr "Signaalikuju"
+
+msgid "Transcode Music"
+msgstr "Teisenda muusikat"
+
+msgid "Files to transcode"
+msgstr "Teisendatavad failid"
+
+msgid "Directory"
+msgstr "Kaust"
+
+msgid "Add..."
+msgstr "Lisa..."
+
+msgid "Add all tracks from a directory and all its subdirectories"
+msgstr "Lisa kõik lood kaustast ja kõigist tema alamkaustadest"
+
+msgid "Import..."
+msgstr "Impordi..."
+
+msgid "Output options"
+msgstr "Väljundi valikud"
+
+msgid "Options..."
+msgstr "Valikud..."
+
+msgid "Alongside the originals"
+msgstr "Lähtefailide kõrval"
+
+msgid "Select..."
+msgstr "Vali..."
+
+msgid "Progress"
+msgstr "Edenemine"
+
+msgid "Details..."
+msgstr "Üksikasjad..."
+
+msgid "Start transcoding"
+msgstr "Alusta teisendamist"
+
+msgid "%n remaining"
+msgid_plural "%n remaining"
+msgstr[0] "jäänud %n"
+msgstr[1] "jäänud %n"
+
+msgid "%n finished"
+msgid_plural "%n finished"
+msgstr[0] "%n lõpetatud"
+msgstr[1] "%n lõpetatud"
+
+msgid "%n failed"
+msgid_plural "%n failed"
+msgstr[0] "%n ebaõnnestus"
+msgstr[1] "%n ei õnnestunud"
+
+msgid "Add files to transcode"
+msgstr "Lisa failid teisendamiseks"
+
+msgid "Open a directory to import music from"
+msgstr "Ava kaust, millest impordime muusikat"
+
+msgid "Import Directory"
+msgstr "Impordikaust"
+
+msgid "Preserve directory structure in output directory (import only)"
+msgstr "Säilita väljundkausta puhul kaustastruktuur (vaid importimisel)"
+
+msgid "Transcoder Log"
+msgstr "Teisendamise logi"
+
+msgid "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+msgstr "Ei suutnud luua GStreamer'i elementi \"%1\" - palun kontrolli, et arvutis oleks paigaldatud kõik vajalikud GStreamer'i pistikprogrammid"
+
+msgid "Successfully written %1"
+msgstr "Kodeerimine õnnestus: %1"
+
+msgid "Transcoding %1 files using %2 threads"
+msgstr "Teisendatakse %1 faili kasutades %2 lõime"
+
+msgid "Error processing %1: %2"
+msgstr "Viga %1 töötlemisel: %2"
+
+msgid "Starting %1"
+msgstr "Käivitatakse %1"
+
+msgid "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+msgstr "Ei leidnud kodeerijat %1 jaoks, palun kontrolli et arvutis oleks paigaldatud õiged GStreamer'i pistikprogrammid"
+
+msgid "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+msgstr "Ei leidnud mukserit %1 jaoks, palun kontrolli et arvutis oleks paigaldatud õiged GStreamer'i pistikprogrammid"
+
+msgid " kbps"
+msgstr " kbps"
+
+msgid "Profile"
+msgstr "Profiil"
+
+msgid "Main profile (MAIN)"
+msgstr "Põhiprofiil (MAIN)"
+
+msgid "Low complexity profile (LC)"
+msgstr "Vähese keerukusega profiil (LC)"
+
+msgid "Scalable sampling rate profile (SSR)"
+msgstr "Skaleeritava diskreetimissageduse profiil (Scalable sampling rate profile - SSR)"
+
+msgid "Long term prediction profile (LTP)"
+msgstr "Pikaajalisel ennustusel põhinev profiil (LTP)"
+
+msgid "Use temporal noise shaping"
+msgstr "Kasuta ajutist müravormimist (temporal noise shaping)"
+
+msgid "Allow mid/side encoding"
+msgstr "Luba keskmist/külgmist kodeerimist (mid/side encoding)"
+
+msgid "Block type"
+msgstr "Blokitüüp"
+
+msgid "Normal block type"
+msgstr "Tavaline blokitüüp"
+
+msgid "No short blocks"
+msgstr "Ära kasuta lühikesi blokke"
+
+msgid "No long blocks"
+msgstr "Ära kasuta pikki blokke"
+
+msgid "Transcoding options"
+msgstr "Teisendamise valikud"
+
+#. Sound quality
+msgid "Quality"
+msgstr "Kvaliteet"
+
+msgid "Fast"
+msgstr "Kiire"
+
+msgid "Best"
+msgstr "Parim"
+
+msgid "Optimize for &quality"
+msgstr "Optimeerige kvaliteedile"
+
+msgid "Opti&mize for bitrate"
+msgstr "Optimeeri bitikiirusele"
+
+msgid "Constant bitrate"
+msgstr "Ühtlane bitikiirus"
+
+msgid "Encoding engine quality"
+msgstr "Kodeerimismootori kvaliteet"
+
+msgid "Standard"
+msgstr "Tavaline"
+
+msgid "Force mono encoding"
+msgstr "Sunni monoheli"
+
+msgid "automatic"
+msgstr "automaatne"
+
+msgid "Average bitrate"
+msgstr "Keskmine bitikiirus"
+
+msgid "disabled"
+msgstr "keelatud"
+
+msgid "Encoding mode"
+msgstr "Kodeerimisrežiim"
+
+msgid "Auto"
+msgstr "Automaatne"
+
+msgid "Ultra wide band (UWB)"
+msgstr "Ülilairiba (UWB)"
+
+msgid "Wide band (WB)"
+msgstr "Lairiba (WB)"
+
+msgid "Narrow band (NB)"
+msgstr "Kitsasribaühendus (NB)"
+
+msgid "Variable bit rate"
+msgstr "Varieeruv bitikiirus"
+
+msgid "Voice activity detection"
+msgstr "Häältegevuse tuvastamine"
+
+msgid "Discontinuous transmission"
+msgstr "Katkestustega edastamine"
+
+msgid "Encoding complexity"
+msgstr "Kodeerimise keerukus"
+
+msgid "Frames per buffer"
+msgstr "Kaadreid puhvri kohta"
+
+msgid "Use bitrate management engine"
+msgstr "Kasuta bitikiiruse haldust"
+
+msgid "Target bitrate"
+msgstr "Sihtbitikiirus"
+
+msgid "Minimum bitrate"
+msgstr "Vähim bitikiirus"
+
+msgid "Maximum bitrate"
+msgstr "Suurim bitikiirus"
+
+msgid "Transcoding"
+msgstr "Teisendamine"
+
+msgid "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+msgstr "Neid seadistusi kasutatakse aknas \"Teisenda muusikat\" ja muusika teisendamisel enne selle seadmesse kopeerimist."
+
+msgid "FLAC"
+msgstr "FLAC"
+
+msgid "WavPack"
+msgstr "WavPack"
+
+msgid "Vorbis"
+msgstr "Vorbis"
+
+msgid "Opus"
+msgstr "Opus"
+
+msgid "Speex"
+msgstr "Speex"
+
+msgid "AAC"
+msgstr "AAC"
+
+msgid "ASF (WMA)"
+msgstr "ASF (WMA)"
+
+msgid "MP3"
+msgstr "MP3"
+
+msgid "D-Bus path"
+msgstr "D-Busi asukoht"
+
+msgid "Serial number"
+msgstr "Seerianumber"
+
+msgid "Mount points"
+msgstr "Haakepunktid"
+
+msgid "Partition label"
+msgstr "Partitsiooni silt"
+
+msgid "UUID"
+msgstr "UUID"
+
+msgid "Enter username and password"
+msgstr "Sisesta kasutajanimi ja parool"
+
+msgid "Color"
+msgstr "Värv"
+
+msgid "Select waveform color"
+msgstr "Vali signaalikujude värv"
+
+msgid "Save the .waveform files directly in the songs folders"
+msgstr "Salvesta .waveform failid lugude kaustadesse"
+
+msgid "Failed to write XSPF playlist"
+msgstr "XSPF-esitusloendi salvestamine ei õnnestunud"
+

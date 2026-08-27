@@ -1,135 +1,65 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_DEVICEVIEW_H
+#define STRAWBERRY_DEVICEVIEW_H
 
-#ifndef DEVICEVIEW_H
-#define DEVICEVIEW_H
-
-#include "config.h"
-
-#include <QObject>
-#include <QStyleOption>
-#include <QStyleOptionViewItem>
-#include <QAbstractItemModel>
-#include <QString>
-
-#include "includes/scoped_ptr.h"
-#include "includes/shared_ptr.h"
+#include "collection/collectionitem.h"
+#include "collection/collectionmodel.h"
 #include "core/song.h"
-#include "collection/collectionitemdelegate.h"
-#include "widgets/autoexpandingtreeview.h"
+#include "device/connecteddevice.h"
 
-class QSortFilterProxyModel;
-class QPainter;
-class QWidget;
-class QMenu;
-class QAction;
-class QMouseEvent;
-class QContextMenuEvent;
+#include <functional>
+#include <set>
+#include <string>
+#include <vector>
 
-class TaskManager;
-class TagReaderClient;
-class DeviceManager;
-class DeviceProperties;
-class CollectionDirectoryModel;
-class MergedProxyModel;
-class OrganizeDialog;
+#include <gtk/gtk.h>
 
-class DeviceItemDelegate : public CollectionItemDelegate {
-  Q_OBJECT
-
+class DeviceView {
  public:
-  explicit DeviceItemDelegate(QObject *parent);
+  DeviceView();
+  ~DeviceView();
 
-  static const int kIconPadding;
+  GtkWidget *widget() const { return widget_; }
+  GtkWidget *list() const { return list_; }
+  void ShowDevices(const std::vector<ConnectedDevice> &devices);
+  void ShowSongs(const SongList &songs);
+  void SetDeviceCallback(std::function<void(const std::string &)> callback) { device_cb_ = std::move(callback); }
+  void SetSongCallback(std::function<void(const Song &)> callback) { song_cb_ = std::move(callback); }
+  void SetActivateSongsCallback(std::function<void(const SongList &)> callback) { songs_cb_ = std::move(callback); }
+  void SetEnqueueCallback(std::function<void(const SongList &)> callback) { enqueue_ = std::move(callback); }
+  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
+  void SetBackCallback(std::function<void()> callback) { back_cb_ = std::move(callback); }
+  void SetAddAllCallback(std::function<void()> callback) { add_all_cb_ = std::move(callback); }
+  void SetDeviceMenuCallback(std::function<void(const ConnectedDevice &)> callback) { device_menu_cb_ = std::move(callback); }
+  void SetSongMenuCallback(std::function<void(const Song &)> callback) { song_menu_cb_ = std::move(callback); }
 
-  void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &idx) const override;
-};
-
-class DeviceView : public AutoExpandingTreeView {
-  Q_OBJECT
-
- public:
-  explicit DeviceView(QWidget *parent = nullptr);
-  ~DeviceView() override;
-
-  void Init(const SharedPtr<TaskManager> task_manager,
-            const SharedPtr<TagReaderClient> tagreader_client,
-            const SharedPtr<DeviceManager> device_manager,
-            CollectionDirectoryModel *collection_directory_model);
-
-  // AutoExpandingTreeView
-  bool CanRecursivelyExpand(const QModelIndex &idx) const override;
-
- protected:
-  void contextMenuEvent(QContextMenuEvent *e) override;
-  void mouseDoubleClickEvent(QMouseEvent *e) override;
-
- private Q_SLOTS:
-  // Device menu actions
-  void Connect();
-  void Unmount();
-  void Forget();
-  void Properties();
-
-  // Collection menu actions
-  void Load();
-  void AddToPlaylist();
-  void OpenInNewPlaylist();
-  void Organize();
-  void Delete();
-
-  void DeviceConnected(const QModelIndex &idx);
-  void DeviceDisconnected(const QModelIndex &idx);
-
-  void DeleteFinished(const SongList &songs_with_errors);
+  const ConnectedDevice *SelectedDevice() const;
+  SongList SelectedSongs() const;
 
  private:
-  QModelIndex MapToDevice(const QModelIndex &merged_model_index) const;
-  QModelIndex MapToCollection(const QModelIndex &merged_model_index) const;
-  QModelIndex FindParentDevice(const QModelIndex &merged_model_index) const;
-  SongList GetSelectedSongs() const;
+  void Clear();
+  void RebuildSongs();
+  void AppendItem(const CollectionItem *item, int depth);
+  void ToggleExpanded(const CollectionItem *item);
+  void AttachMenu(GtkWidget *row);
+  void SetupRowDrag(GtkWidget *row, const Song &song);
+  gboolean OnKeyPressed(guint keyval);
+  void ResetTypeAhead();
 
- private:
-  SharedPtr<TaskManager> task_manager_;
-  SharedPtr<TagReaderClient> tagreader_client_;
-  SharedPtr<DeviceManager> device_manager_;
-  MergedProxyModel *merged_model_;
-  QSortFilterProxyModel *sort_model_;
-
-  ScopedPtr<DeviceProperties> properties_dialog_;
-  ScopedPtr<OrganizeDialog> organize_dialog_;
-
-  QMenu *device_menu_;
-  QAction *eject_action_;
-  QAction *forget_action_;
-  QAction *properties_action_;
-
-  QMenu *collection_menu_;
-  QAction *load_action_;
-  QAction *add_to_playlist_action_;
-  QAction *open_in_new_playlist_;
-  QAction *organize_action_;
-  QAction *delete_action_;
-
-  QModelIndex menu_index_;
+  GtkWidget *widget_ = nullptr;
+  GtkWidget *list_ = nullptr;
+  CollectionModel model_;
+  std::set<std::string> expanded_;
+  SongList songs_;
+  std::function<void(const std::string &)> device_cb_;
+  std::function<void(const Song &)> song_cb_;
+  std::function<void(const SongList &)> songs_cb_;
+  std::function<void(const SongList &)> enqueue_;
+  std::function<void()> back_cb_;
+  std::function<void()> add_all_cb_;
+  std::function<void(const ConnectedDevice &)> device_menu_cb_;
+  std::function<void(const Song &)> song_menu_cb_;
+  std::string typeahead_;
+  guint typeahead_timeout_ = 0;
 };
 
-#endif  // DEVICEVIEW_H
+#endif

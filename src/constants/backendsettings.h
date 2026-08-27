@@ -20,7 +20,7 @@
 #ifndef BACKENDSETTINGS_H
 #define BACKENDSETTINGS_H
 
-#include <QtGlobal>
+#include <cstdint>
 
 namespace BackendSettings {
 
@@ -70,7 +70,7 @@ constexpr bool kDefaultBS2B = false;
 constexpr bool kDefaultPlaybin3 = true;
 constexpr bool kDefaultHTTP2 = false;
 constexpr bool kDefaultStrictSSL = false;
-constexpr qint64 kDefaultBufferDuration = 4000LL;
+constexpr int64_t kDefaultBufferDuration = 4000LL;
 constexpr double kDefaultBufferLowWatermark = 0.33;
 constexpr double kDefaultBufferHighWatermark = 0.99;
 constexpr int kDefaultDeviceWarmupDuration = 500;
@@ -86,8 +86,8 @@ constexpr bool kDefaultCrossfadeEnabled = false;
 constexpr bool kDefaultAutoCrossfadeEnabled = false;
 constexpr bool kDefaultNoCrossfadeSameAlbum = true;
 constexpr bool kDefaultFadeoutPauseEnabled = false;
-constexpr qint64 kDefaultFadeoutDuration = 2000LL;
-constexpr qint64 kDefaultFadeoutPauseDuration = 250LL;
+constexpr int64_t kDefaultFadeoutDuration = 2000LL;
+constexpr int64_t kDefaultFadeoutPauseDuration = 250LL;
 
 }  // namespace BackendSettings
 

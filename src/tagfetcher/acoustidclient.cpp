@@ -1,250 +1,106 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2019-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "tagfetcher/acoustidclient.h"
 
-#include "config.h"
+#include "core/networktimeoutpolicy.h"
+#include "utilities/strutils.h"
+
+#include <json-glib/json-glib.h>
 
 #include <algorithm>
-#include <utility>
+#include <glib.h>
 
-#include <QtGlobal>
-#include <QPair>
-#include <QList>
-#include <QString>
-#include <QStringList>
-#include <QUrl>
-#include <QUrlQuery>
-#include <QtAlgorithms>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QJsonParseError>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonValue>
-
-#include "includes/shared_ptr.h"
-#include "core/logging.h"
-#include "core/networkaccessmanager.h"
-#include "core/networktimeouts.h"
-#include "constants/timeconstants.h"
-
-#include "acoustidclient.h"
-
-using namespace Qt::Literals::StringLiterals;
-
-namespace {
-constexpr char kClientId[] = "0qjUoxbowg";
-constexpr char kUrl[] = "https://api.acoustid.org/v2/lookup";
-constexpr int kDefaultTimeout = 5000;  // msec
-}  // namespace
-
-AcoustidClient::AcoustidClient(SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : QObject(parent),
-      network_(network),
-      timeouts_(new NetworkTimeouts(kDefaultTimeout, this)) {}
-
-AcoustidClient::~AcoustidClient() {
-
-  CancelAll();
-
+AcoustidClient::AcoustidClient(NetworkAccessManager *network) : network_(network) {
+  timeouts_.SetTimeout(NetworkTimeoutPolicy::kAcoustidTimeoutMs);
+  timeouts_.SetAbort([this](int req_id) {
+    if (network_) {
+      network_->Cancel(req_id);
+    }
+  });
 }
 
-void AcoustidClient::SetTimeout(const int msec) { timeouts_->SetTimeout(msec); }
-
-void AcoustidClient::Start(const int id, const QString &fingerprint, const int duration_msec) {
-
-  using Param = QPair<QString, QString>;
-  using ParamList = QList<Param>;
-
-  const qint64 duration_secs = qMax(1LL, duration_msec / kMsecPerSec);
-
-  const ParamList params = ParamList() << Param(u"format"_s, u"json"_s)
-                                       << Param(u"client"_s, QLatin1String(kClientId))
-                                       << Param(u"duration"_s, QString::number(duration_secs))
-                                       << Param(u"meta"_s, u"recordingids+sources"_s)
-                                       << Param(u"fingerprint"_s, fingerprint);
-
-  QUrlQuery url_query;
-  url_query.setQueryItems(params);
-  const QByteArray data = url_query.toString(QUrl::FullyEncoded).toUtf8();
-  QNetworkRequest network_request(QUrl(QString::fromLatin1(kUrl)));
-  network_request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-  network_request.setHeader(QNetworkRequest::ContentTypeHeader, u"application/x-www-form-urlencoded"_s);
-  qLog(Debug) << "AcoustID request ID" << id << "duration(s)" << duration_secs << "fingerprint length" << fingerprint.size();
-  QNetworkReply *reply = network_->post(network_request, data);
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, id]() { RequestFinished(reply, id); });
-  requests_[id] = reply;
-
-  timeouts_->AddReply(reply);
-
-}
-
-void AcoustidClient::Cancel(const int id) {
-
-  if (requests_.contains(id)) {
-    QNetworkReply *reply = requests_.take(id);
-    QObject::disconnect(reply, nullptr, this, nullptr);
-    reply->abort();
-    reply->deleteLater();
+std::vector<std::string> AcoustidClient::ParseMbids(const std::string &json) {
+  std::vector<std::string> mbids;
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, json.c_str(), static_cast<gssize>(json.size()), nullptr)) {
+    g_object_unref(parser);
+    return mbids;
   }
+  JsonNode *root = json_parser_get_root(parser);
+  if (!root || !JSON_NODE_HOLDS_OBJECT(root)) {
+    g_object_unref(parser);
+    return mbids;
+  }
+  JsonObject *object = json_node_get_object(root);
+  if (!json_object_has_member(object, "results") || !JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "results"))) {
+    g_object_unref(parser);
+    return mbids;
+  }
+  JsonArray *results = json_object_get_array_member(object, "results");
+  const guint n = json_array_get_length(results);
+  for (guint i = 0; i < n; ++i) {
+    JsonObject *result = json_array_get_object_element(results, i);
+    if (!result || !json_object_has_member(result, "recordings") || !JSON_NODE_HOLDS_ARRAY(json_object_get_member(result, "recordings"))) {
+      continue;
+    }
+    JsonArray *recordings = json_object_get_array_member(result, "recordings");
+    const guint rec_n = json_array_get_length(recordings);
+    for (guint j = 0; j < rec_n; ++j) {
+      JsonObject *recording = json_array_get_object_element(recordings, j);
+      if (recording && json_object_has_member(recording, "id")) {
+        const char *id = json_object_get_string_member(recording, "id");
+        if (id) {
+          mbids.emplace_back(id);
+        }
+      }
+    }
+  }
+  g_object_unref(parser);
+  return mbids;
+}
 
+void AcoustidClient::Start(int id, const std::string &fingerprint, int duration_msec) {
+  if (!network_ || fingerprint.empty()) {
+    Finished.Emit(id, {}, "Missing fingerprint");
+    return;
+  }
+  gchar *escaped = g_uri_escape_string(fingerprint.c_str(), nullptr, TRUE);
+  const std::string url = std::string("https://api.acoustid.org/v2/lookup?client=strawberry&meta=recordingids&duration=") +
+                          std::to_string(std::max(1, duration_msec / 1000)) + "&fingerprint=" + (escaped ? escaped : "");
+  g_free(escaped);
+  timeouts_.SetTimeout(timeout_msec_);
+  const int req = network_->Get(url, [this, id](const NetworkAccessManager::Response &response) {
+    auto it = requests_.find(id);
+    if (it != requests_.end()) {
+      timeouts_.Cancel(it->second);
+      requests_.erase(it);
+    }
+    if (!response.ok()) {
+      Finished.Emit(id, {}, NetworkTimeoutPolicy::FailureMessage(response.error, "AcoustID request failed"));
+      return;
+    }
+    Finished.Emit(id, ParseMbids(response.body), {});
+  });
+  requests_[id] = req;
+  timeouts_.AddReply(req);
+}
+
+void AcoustidClient::Cancel(int id) {
+  auto it = requests_.find(id);
+  if (it == requests_.end()) {
+    return;
+  }
+  timeouts_.Cancel(it->second);
+  if (network_) {
+    network_->Cancel(it->second);
+  }
+  requests_.erase(it);
 }
 
 void AcoustidClient::CancelAll() {
-
-  const QList<QNetworkReply*> replies = requests_.values();
+  for (const auto &entry : requests_) {
+    timeouts_.Cancel(entry.second);
+    if (network_) {
+      network_->Cancel(entry.second);
+    }
+  }
   requests_.clear();
-  for (QNetworkReply *reply : replies) {
-    QObject::disconnect(reply, nullptr, this, nullptr);
-    reply->abort();
-    reply->deleteLater();
-  }
-
-}
-
-namespace {
-// Struct used when extracting results in RequestFinished
-struct IdSource {
-  IdSource(const QString &id, const int source) : id_(id), nb_sources_(source) {}
-
-  bool operator<(const IdSource &other) const {
-    // We want the items with more sources to be at the beginning of the list
-    return nb_sources_ > other.nb_sources_;
-  }
-
-  QString id_;
-  int nb_sources_;
-};
-
-}  // namespace
-
-void AcoustidClient::RequestFinished(QNetworkReply *reply, const int request_id) {
-
-  QObject::disconnect(reply, nullptr, this, nullptr);
-  reply->deleteLater();
-  requests_.remove(request_id);
-
-  const int http_status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-  const QByteArray data = reply->readAll();
-
-  QString api_error_message;
-  QJsonObject json_object;
-  // Keep only a short snippet for diagnostics to avoid dumping full responses in logs
-  const QString response_preview = QString::fromUtf8(data.left(512)).trimmed();
-  if (!data.isEmpty()) {
-    QJsonParseError parse_error;
-    const QJsonDocument json_document = QJsonDocument::fromJson(data, &parse_error);
-    if (parse_error.error == QJsonParseError::NoError) {
-      json_object = json_document.object();
-      const QString status = json_object["status"_L1].toString();
-      if (status != "ok"_L1) {
-        if (json_object["error"_L1].isObject()) {
-          const QJsonObject error_object = json_object["error"_L1].toObject();
-          const int api_error_code = error_object["code"_L1].toInt();
-          const QString api_error_text = error_object["message"_L1].toString();
-          if (!api_error_text.isEmpty()) {
-            api_error_message = QStringLiteral("%1 (%2)").arg(api_error_text).arg(api_error_code);
-          }
-        }
-        else if (json_object["error"_L1].isString()) {
-          api_error_message = json_object["error"_L1].toString();
-        }
-        if (api_error_message.isEmpty()) {
-          api_error_message = status;
-        }
-      }
-    }
-    else if (reply->error() == QNetworkReply::NoError && http_status_code == 200) {
-      Q_EMIT Finished(request_id, QStringList(), parse_error.errorString());
-      return;
-    }
-  }
-
-  if (reply->error() != QNetworkReply::NoError || http_status_code != 200) {
-    QString error_message = api_error_message;
-    if (error_message.isEmpty()) {
-      if (reply->error() == QNetworkReply::NoError) {
-        error_message = QStringLiteral("Received HTTP code %1").arg(http_status_code);
-      }
-      else {
-        error_message = QStringLiteral("%1 (%2)").arg(reply->errorString()).arg(reply->error());
-      }
-    }
-    qLog(Error) << QStringLiteral("Acoustid: %1").arg(error_message);
-    if (!response_preview.isEmpty()) {
-      qLog(Debug) << "AcoustID non-200 response body preview:" << response_preview;
-    }
-    Q_EMIT Finished(request_id, QStringList(), error_message);
-    return;
-  }
-
-  if (json_object.isEmpty()) {
-    Q_EMIT Finished(request_id, QStringList(), u"Empty response from AcoustID"_s);
-    return;
-  }
-
-  const QString status = json_object["status"_L1].toString();
-  if (status != "ok"_L1) {
-    const QString status_error = api_error_message.isEmpty() ? status : api_error_message;
-    qLog(Warning) << "AcoustID request ID" << request_id << "status not ok:" << status_error;
-    if (!response_preview.isEmpty()) {
-      qLog(Debug) << "AcoustID status!=ok body preview:" << response_preview;
-    }
-    Q_EMIT Finished(request_id, QStringList(), status_error);
-    return;
-  }
-
-  // Get the results:
-  // -in a first step, gather ids and their corresponding number of sources
-  // -then sort results by number of sources (the results are originally
-  //  unsorted but results with more sources are likely to be more accurate)
-  // -keep only the ids, as sources where useful only to sort the results
-  const QJsonArray json_results = json_object["results"_L1].toArray();
-
-  // List of <id, nb of sources> pairs
-  QList<IdSource> id_source_list;
-
-  for (const QJsonValue &v : json_results) {
-    const QJsonObject r = v.toObject();
-    if (!r["recordings"_L1].isUndefined()) {
-      const QJsonArray json_recordings = r["recordings"_L1].toArray();
-      for (const QJsonValue &recording : json_recordings) {
-        const QJsonObject o = recording.toObject();
-        if (!o["id"_L1].isUndefined()) {
-          id_source_list << IdSource(o["id"_L1].toString(), o["sources"_L1].toInt());
-        }
-      }
-    }
-  }
-
-  std::stable_sort(id_source_list.begin(), id_source_list.end());
-
-  QStringList id_list;
-  id_list.reserve(id_source_list.count());
-  for (const IdSource &is : std::as_const(id_source_list)) {
-    id_list << is.id_;
-  }
-
-  qLog(Debug) << "AcoustID request ID" << request_id << "returned" << id_list.count() << "recording id(s)";
-
-  Q_EMIT Finished(request_id, id_list);
-
 }

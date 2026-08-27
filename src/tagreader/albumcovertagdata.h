@@ -1,34 +1,20 @@
-/*
- * Strawberry Music Player
- * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_ALBUMCOVERTAGDATA_H
+#define STRAWBERRY_ALBUMCOVERTAGDATA_H
 
-#ifndef ALBUMCOVERTAGDATA_H
-#define ALBUMCOVERTAGDATA_H
-
-#include <QByteArray>
-#include <QString>
+#include <string>
+#include <vector>
 
 class AlbumCoverTagData {
  public:
-  explicit AlbumCoverTagData(const QByteArray &_data = QByteArray(), const QString &_mimetype = QString());
-  QByteArray data;
-  QString mimetype;
-  QString error;
+  AlbumCoverTagData() = default;
+  explicit AlbumCoverTagData(const std::vector<unsigned char> &data, const std::string &mimetype = {}) : data(data), mimetype(mimetype) {}
+
+  std::vector<unsigned char> data;
+  std::string mimetype;
+  std::string error;
+
+  static std::string GuessMimeType(const std::vector<unsigned char> &data);
+  static AlbumCoverTagData FromBytes(const std::vector<unsigned char> &data, const std::string &mimetype = {});
 };
 
-#endif  // ALBUMCOVERTAGDATA_H
+#endif

@@ -1,202 +1,242 @@
-/*
- * Strawberry Music Player
- * Copyright 2022-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "lyrics/htmllyricsprovider.h"
 
-#include "config.h"
-
-#include <QtConcurrentRun>
-#include <QFuture>
-#include <QFutureWatcher>
-#include <QByteArray>
-#include <QVariant>
-#include <QString>
-#include <QUrl>
-#include <QRegularExpression>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-
-#include "includes/shared_ptr.h"
-#include "core/logging.h"
-#include "core/networkaccessmanager.h"
+#include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
-#include "htmllyricsprovider.h"
-#include "lyricssearchrequest.h"
 
-using namespace Qt::Literals::StringLiterals;
+#include <cctype>
 
-HtmlLyricsProvider::HtmlLyricsProvider(const QString &name, const bool enabled, const QString &start_tag, const QString &end_tag, const QString &lyrics_start, const bool multiple, const SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : LyricsProvider(name, enabled, false, network, parent),
-      start_tag_(start_tag),
-      end_tag_(end_tag),
-      lyrics_start_(lyrics_start),
-      multiple_(multiple),
-      start_tag_re_(start_tag),
-      end_tag_re_(end_tag),
-      lyrics_start_re_(lyrics_start) {}
+namespace {
 
-void HtmlLyricsProvider::StartSearch(const int id, const LyricsSearchRequest &request) {
-
-  if (request.artist.isEmpty() || request.title.isEmpty()) {
-    Q_EMIT SearchFinished(id);
-    return;
+std::string TagName(std::string pattern) {
+  pattern = StrUtils::Replace(pattern, "\\/", "/");
+  pattern = StrUtils::Replace(pattern, "[^>]*", "");
+  pattern = StrUtils::Replace(pattern, "[^>]+", "");
+  if (!pattern.empty() && pattern.front() == '<') {
+    pattern.erase(pattern.begin());
   }
-
-  const QUrl url = Url(request);
-  QNetworkReply *reply = CreateGetRequest(url, true);
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, id, request]() { HandleLyricsReply(reply, id, request); });
-
-  qLog(Debug) << name_ << "Sending request for" << url;
-
+  if (!pattern.empty() && pattern.back() == '>') {
+    pattern.pop_back();
+  }
+  if (StrUtils::StartsWith(pattern, "/")) {
+    pattern.erase(0, 1);
+  }
+  const auto space = pattern.find_first_of(" \t");
+  if (space != std::string::npos) {
+    pattern = pattern.substr(0, space);
+  }
+  return StrUtils::ToLower(pattern);
 }
 
-void HtmlLyricsProvider::HandleLyricsReply(QNetworkReply *reply, const int id, const LyricsSearchRequest &request) {
+size_t FindInsensitive(const std::string &haystack, const std::string &needle, size_t from) {
+  if (needle.empty() || from >= haystack.size()) {
+    return std::string::npos;
+  }
+  const std::string lower_needle = StrUtils::ToLower(needle);
+  for (size_t i = from; i + lower_needle.size() <= haystack.size(); ++i) {
+    bool match = true;
+    for (size_t j = 0; j < lower_needle.size(); ++j) {
+      if (std::tolower(static_cast<unsigned char>(haystack[i + j])) != static_cast<unsigned char>(lower_needle[j])) {
+        match = false;
+        break;
+      }
+    }
+    if (match) {
+      return i;
+    }
+  }
+  return std::string::npos;
+}
 
-  if (!replies_.contains(reply)) return;
-  replies_.removeAll(reply);
-  QObject::disconnect(reply, nullptr, this, nullptr);
-  reply->deleteLater();
+size_t FindOpenTag(const std::string &content, const std::string &tag, size_t from, size_t *after) {
+  const std::string needle = "<" + tag;
+  size_t pos = from;
+  while (pos < content.size()) {
+    pos = FindInsensitive(content, needle, pos);
+    if (pos == std::string::npos) {
+      return std::string::npos;
+    }
+    if (pos + needle.size() < content.size()) {
+      const unsigned char next = static_cast<unsigned char>(content[pos + needle.size()]);
+      if (std::isalnum(next) || next == '-') {
+        pos += needle.size();
+        continue;
+      }
+    }
+    const size_t gt = content.find('>', pos);
+    if (gt == std::string::npos) {
+      return std::string::npos;
+    }
+    if (after) {
+      *after = gt + 1;
+    }
+    return pos;
+  }
+  return std::string::npos;
+}
 
-  if (reply->error() != QNetworkReply::NoError) {
-    if (reply->error() >= 200) {
-      reply->readAll(); // QTBUG-135641
+size_t FindCloseTag(const std::string &content, const std::string &tag, size_t from, size_t *after) {
+  const std::string needle = "</" + tag + ">";
+  const size_t pos = FindInsensitive(content, needle, from);
+  if (pos == std::string::npos) {
+    return std::string::npos;
+  }
+  if (after) {
+    *after = pos + needle.size();
+  }
+  return pos;
+}
+
+std::string Collapse(const std::string &text, char ch) {
+  std::string result;
+  result.reserve(text.size());
+  bool last = false;
+  for (char c : text) {
+    if (c == ch) {
+      if (!last) {
+        result.push_back(c);
+      }
+      last = true;
+    } else {
+      result.push_back(c);
+      last = false;
     }
-    if (reply->error() == QNetworkReply::ContentNotFoundError) {
-      qLog(Debug) << name_ << "No lyrics for" << request.artist << request.album << request.title;
+  }
+  return result;
+}
+
+}  // namespace
+
+HtmlLyricsProvider::HtmlLyricsProvider(std::string name, std::string start_tag, std::string end_tag, std::string lyrics_start, bool multiple)
+    : name_(std::move(name)), start_tag_(std::move(start_tag)), end_tag_(std::move(end_tag)), lyrics_start_(std::move(lyrics_start)), multiple_(multiple) {}
+
+std::string HtmlLyricsProvider::ParseLyricsFromHTML(const std::string &content, const std::string &start_tag, const std::string &end_tag,
+                                                    const std::string &lyrics_start, bool multiple) {
+  if (content.empty() || lyrics_start.empty()) {
+    return {};
+  }
+  const std::string open_name = TagName(start_tag);
+  const std::string close_name = TagName(end_tag.empty() ? start_tag : end_tag);
+  std::string lyrics;
+  size_t search_from = 0;
+  do {
+    size_t marker = content.find(lyrics_start, search_from);
+    if (marker == std::string::npos) {
+      break;
     }
-    else {
-      qLog(Error) << name_ << reply->errorString() << reply->error();
+    size_t start_lyrics = marker + lyrics_start.size();
+    if (!lyrics_start.empty() && lyrics_start.back() != '>') {
+      const size_t gt = content.find('>', start_lyrics);
+      if (gt != std::string::npos && gt - start_lyrics < 200) {
+        start_lyrics = gt + 1;
+      }
     }
-    Q_EMIT SearchFinished(id);
+    size_t idx = start_lyrics;
+    int tags = 1;
+    size_t end_lyrics = std::string::npos;
+    while (tags > 0 && idx < content.size()) {
+      size_t after_open = 0;
+      size_t after_close = 0;
+      const size_t open_pos = FindOpenTag(content, open_name, idx, &after_open);
+      const size_t close_pos = FindCloseTag(content, close_name, idx, &after_close);
+      if (open_pos != std::string::npos && (close_pos == std::string::npos || open_pos <= close_pos)) {
+        ++tags;
+        idx = after_open;
+      } else if (close_pos != std::string::npos) {
+        --tags;
+        idx = after_close;
+        if (tags == 0) {
+          end_lyrics = close_pos;
+          search_from = after_close;
+        }
+      } else {
+        break;
+      }
+    }
+    if (end_lyrics != std::string::npos && start_lyrics < end_lyrics) {
+      if (!lyrics.empty()) {
+        lyrics.push_back('\n');
+      }
+      lyrics += content.substr(start_lyrics, end_lyrics - start_lyrics);
+    } else {
+      break;
+    }
+  } while (multiple && search_from > 0);
+
+  lyrics = JsonUtils::StripHtml(lyrics);
+  if (lyrics.size() > 6000 || StrUtils::ContainsInsensitive(lyrics, "there are no lyrics to") ||
+      StrUtils::ContainsInsensitive(lyrics, "we do not have the lyrics for")) {
+    return {};
+  }
+  return lyrics;
+}
+
+std::string HtmlLyricsProvider::SlugAzLyrics(const std::string &text) {
+  std::string slug;
+  for (unsigned char ch : StrUtils::ToLower(StrUtils::Transliterate(text))) {
+    if (std::isalnum(ch) || ch == '-') {
+      slug.push_back(static_cast<char>(ch));
+    }
+  }
+  return slug;
+}
+
+std::string HtmlLyricsProvider::SlugDashed(const std::string &text) {
+  std::string slug = StrUtils::Replace(text, "/", "-");
+  slug = StrUtils::Replace(slug, "'", "-");
+  std::string cleaned;
+  for (unsigned char ch : slug) {
+    if (std::isalnum(ch) || ch == '-' || ch == ' ') {
+      cleaned.push_back(static_cast<char>(ch));
+    }
+  }
+  cleaned = StrUtils::Replace(StrUtils::Trim(Collapse(cleaned, ' ')), " ", "-");
+  return StrUtils::ToLower(Collapse(cleaned, '-'));
+}
+
+std::string HtmlLyricsProvider::SlugElyrics(const std::string &text) {
+  std::string slug;
+  for (unsigned char ch : StrUtils::Transliterate(text)) {
+    if (std::isalnum(ch) || ch == '_' || ch == ',' || ch == '&' || ch == '-' || ch == '(' || ch == ')' || ch == ' ') {
+      slug.push_back(static_cast<char>(ch));
+    } else {
+      slug.push_back('_');
+    }
+  }
+  slug = StrUtils::Replace(StrUtils::Trim(Collapse(slug, ' ')), " ", "-");
+  return StrUtils::ToLower(slug);
+}
+
+std::string HtmlLyricsProvider::SlugLetras(const std::string &text) {
+  std::string slug;
+  for (unsigned char ch : StrUtils::Transliterate(text)) {
+    if (std::isalnum(ch) || ch == ' ' || ch == '-') {
+      slug.push_back(static_cast<char>(ch));
+    }
+  }
+  slug = StrUtils::Replace(StrUtils::Trim(Collapse(slug, ' ')), " ", "-");
+  return StrUtils::ToLower(slug);
+}
+
+void HtmlLyricsProvider::Fetch(const Song &song, NetworkAccessManager *network, Callback callback) {
+  if (!network || song.artist().empty() || song.title().empty()) {
+    callback({}, "No artist or title");
     return;
   }
-
-  if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).isValid()) {
-    const int http_status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    if (http_status_code < 200 || http_status_code > 207) {
-      qLog(Error) << name_ << "Received HTTP code" << http_status_code;
-      reply->readAll(); // QTBUG-135641
-      Q_EMIT SearchFinished(id);
+  const std::string url = UrlFor(song);
+  if (url.empty()) {
+    callback({}, "No lyrics URL");
+    return;
+  }
+  network->Get(url, [this, callback](const NetworkAccessManager::Response &response) {
+    if (!response.ok()) {
+      callback({}, response.error.empty() ? "Lyrics request failed" : response.error);
       return;
     }
-  }
-
-  const QByteArray data = reply->readAll();
-  if (data.isEmpty()) {
-    qLog(Error) << name_ << "Empty reply received from server.";
-    Q_EMIT SearchFinished(id);
-    return;
-  }
-
-  QFutureWatcher<QString> *watcher = new QFutureWatcher<QString>(this);
-  QObject::connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, id, request]() {
-    ParseLyricsFromHTMLFinished(watcher, id, request);
-  });
-  watcher->setFuture(QtConcurrent::run([content = QString::fromUtf8(data), start_re = start_tag_re_, end_re = end_tag_re_, lyrics_re = lyrics_start_re_, multiple = multiple_]() {
-    return ParseLyricsFromHTML(content, start_re, end_re, lyrics_re, multiple);
-  }));
-
-}
-
-QString HtmlLyricsProvider::ParseLyricsFromHTML(const QString &content, const QRegularExpression &start_tag, const QRegularExpression &end_tag, const QRegularExpression &lyrics_start, const bool multiple, const QList<QRegularExpression> &regex_removes) {
-
-  QString lyrics;
-  qint64 start_idx = 0;
-
-  do {
-
-    QRegularExpressionMatch rematch = lyrics_start.match(content, start_idx);
-    if (!rematch.hasMatch()) break;
-
-    const qint64 start_lyrics_idx = rematch.capturedEnd();
-    qint64 end_lyrics_idx = -1;
-
-    // Find the index of the end tag.
-    qint64 idx = start_lyrics_idx;
-    QRegularExpressionMatch rematch_start_tag;
-    QRegularExpressionMatch rematch_end_tag;
-    int tags = 1;
-    do {
-      rematch_start_tag = start_tag.match(content, idx);
-      const qint64 start_tag_idx = rematch_start_tag.hasMatch() ? rematch_start_tag.capturedStart() : -1;
-      rematch_end_tag = end_tag.match(content, idx);
-      const qint64 end_tag_idx = rematch_end_tag.hasMatch() ? rematch_end_tag.capturedStart() : -1;
-      if (rematch_start_tag.hasMatch() && start_tag_idx <= end_tag_idx) {
-        ++tags;
-        idx = start_tag_idx + rematch_start_tag.capturedLength();
-      }
-      else if (rematch_end_tag.hasMatch()) {
-        --tags;
-        idx = end_tag_idx + rematch_end_tag.capturedLength();
-        if (tags == 0) {
-          end_lyrics_idx = rematch_end_tag.capturedStart();
-          start_idx = rematch_end_tag.capturedEnd();
-        }
-      }
-    } while (tags > 0 && (rematch_start_tag.hasMatch() || rematch_end_tag.hasMatch()));
-
-    if (end_lyrics_idx != -1 && start_lyrics_idx < end_lyrics_idx) {
-      if (!lyrics.isEmpty()) {
-        lyrics.append(u'\n');
-      }
-      lyrics.append(content.mid(start_lyrics_idx, end_lyrics_idx - start_lyrics_idx).remove(u'\r').remove(u'\n').remove(u'\t'));
+    const std::string lyrics = ParseLyricsFromHTML(response.body, start_tag_, end_tag_, lyrics_start_, multiple_);
+    if (lyrics.empty()) {
+      callback({}, "No lyrics in provider response");
+      return;
     }
-
-  } while (start_idx > 0 && multiple);
-
-  for (auto it = regex_removes.cbegin(); it != regex_removes.cend(); it++) {
-    lyrics.remove(*it);
-  }
-  static const QRegularExpression regex_html_tag_a(u"<a [^>]*>[^<]*</a>"_s);
-  static const QRegularExpression regex_html_tag_script(u"<script>[^>]*</script>"_s);
-  static const QRegularExpression regex_html_tag_div(u"<div [^>]*>×</div>"_s);
-  static const QRegularExpression regex_html_tag_br(u"<br[^>]*>"_s);
-  static const QRegularExpression regex_html_tag_p_close(u"</p>"_s);
-  static const QRegularExpression regex_html_tags(u"<[^>]*>"_s);
-  static const QRegularExpression regex_newlines_squash(u"\\n{3,}"_s);
-  lyrics.remove(regex_html_tag_a)
-        .remove(regex_html_tag_script)
-        .remove(regex_html_tag_div)
-        .replace(regex_html_tag_br, u"\n"_s)
-        .replace(regex_html_tag_p_close, u"\n\n"_s)
-        .remove(regex_html_tags)
-        .replace(regex_newlines_squash, u"\n\n"_s);
-  lyrics = lyrics.trimmed();
-
-  if (lyrics.size() > 6000 || lyrics.contains("there are no lyrics to"_L1, Qt::CaseInsensitive)) {
-    return QString();
-  }
-
-  return Utilities::DecodeHtmlEntities(lyrics);
-
-}
-
-void HtmlLyricsProvider::ParseLyricsFromHTMLFinished(QFutureWatcher<QString> *watcher, const int id, const LyricsSearchRequest &request) {
-
-  watcher->deleteLater();
-  const QString lyrics = watcher->result();
-  LyricsSearchResults results;
-  if (lyrics.isEmpty() || lyrics.contains("we do not have the lyrics for"_L1, Qt::CaseInsensitive)) {
-    qLog(Debug) << name_ << "No lyrics for" << request.artist << request.album << request.title;
-  }
-  else {
-    qLog(Debug) << name_ << "Got lyrics for" << request.artist << request.album << request.title;
-    results << LyricsSearchResult(lyrics);
-  }
-  Q_EMIT SearchFinished(id, results);
-
+    callback(lyrics, {});
+  }, RequestHeaders());
 }

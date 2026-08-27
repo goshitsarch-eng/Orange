@@ -1,142 +1,86 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_ALBUMCOVERFETCHER_H
+#define STRAWBERRY_ALBUMCOVERFETCHER_H
 
-#ifndef ALBUMCOVERFETCHER_H
-#define ALBUMCOVERFETCHER_H
+#include "core/networktimeouts.h"
+#include "core/signal.h"
+#include "covermanager/albumcoverimageresult.h"
+#include "covermanager/coversearchstatistics.h"
 
-#include "config.h"
+#include <cstdint>
+#include <map>
+#include <memory>
+#include <queue>
+#include <string>
+#include <vector>
 
-#include <QtGlobal>
-#include <QObject>
-#include <QMetaType>
-#include <QSet>
-#include <QList>
-#include <QHash>
-#include <QQueue>
-#include <QByteArray>
-#include <QString>
-#include <QUrl>
-#include <QImage>
-
-#include "includes/shared_ptr.h"
-
-#include "coversearchstatistics.h"
-#include "albumcoverimageresult.h"
-
-class QTimer;
-class NetworkAccessManager;
-class CoverProviders;
-class AlbumCoverFetcherSearch;
-
-// This class represents a single search-for-cover request. It identifies and describes the request.
 struct CoverSearchRequest {
-  explicit CoverSearchRequest() : id(0), search(false), batch(false) {}
-
-  // An unique (for one AlbumCoverFetcher) request identifier
-  quint64 id;
-
-  // A search query
-  QString artist;
-  QString album;
-  QString title;
-
-  // Is this only a search request or should we also fetch the first cover that's found?
-  bool search;
-
-  // Is the request part of a batch (fetching all missing covers)
-  bool batch;
+  uint64_t id = 0;
+  std::string artist;
+  std::string album;
+  std::string title;
+  bool search = false;
+  bool batch = false;
 };
 
-// This structure represents a single result of some album's cover search request.
 struct CoverProviderSearchResult {
-  explicit CoverProviderSearchResult() : score_provider(0.0), score_match(0.0), score_quality(0.0), number(0) {}
+  std::string provider;
+  std::string artist;
+  std::string album;
+  std::string image_url;
+  std::string image_data;
+  int image_width = 0;
+  int image_height = 0;
+  float score_provider = 0.0f;
+  float score_match = 0.0f;
+  float score_quality = 0.0f;
+  int number = 0;
 
-  // Used for grouping in the user interface.
-  QString provider;
-
-  // Artist and album returned by the provider
-  QString artist;
-  QString album;
-
-  // An URL of a cover image
-  QUrl image_url;
-
-  // Image size
-  QSize image_size;
-
-  // Score for this provider
-  float score_provider;
-
-  // Score for match
-  float score_match;
-
-  // Score for image quality
-  float score_quality;
-
-  // The result number
-  int number;
-
-  // Total score for this result
   float score() const { return score_provider + score_match + score_quality; }
-
 };
-Q_DECLARE_METATYPE(CoverProviderSearchResult)
 
-// This is a complete result of a single search request (a list of results, each describing one image, actually).
-using CoverProviderSearchResults = QList<CoverProviderSearchResult>;
-Q_DECLARE_METATYPE(CoverProviderSearchResults)
+using CoverProviderSearchResults = std::vector<CoverProviderSearchResult>;
 
-// This class searches for album covers for a given query or artist/album and returns URLs. It's NOT thread-safe.
-class AlbumCoverFetcher : public QObject {
-  Q_OBJECT
+class CoverProviders;
+class NetworkAccessManager;
 
+class AlbumCoverFetcher {
  public:
-  explicit AlbumCoverFetcher(SharedPtr<CoverProviders> cover_providers, SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
-  ~AlbumCoverFetcher() override;
+  AlbumCoverFetcher(CoverProviders *cover_providers, NetworkAccessManager *network);
+  ~AlbumCoverFetcher();
 
-  quint64 SearchForCovers(const QString &artist, const QString &album, const QString &title = QString());
-  quint64 FetchAlbumCover(const QString &artist, const QString &album, const QString &title, const bool batch);
-
+  uint64_t SearchForCovers(const std::string &artist, const std::string &album, const std::string &title = {});
+  uint64_t FetchAlbumCover(const std::string &artist, const std::string &album, const std::string &title, bool batch);
   void Clear();
+  uint64_t next_id() const { return next_id_; }
+  size_t queued() const { return queued_.size(); }
+  size_t active() const { return active_.size(); }
 
- Q_SIGNALS:
-  void AlbumCoverFetched(const quint64 request_id, const AlbumCoverImageResult &result, const CoverSearchStatistics &statistics);
-  void SearchFinished(const quint64 request_id, const CoverProviderSearchResults &results, const CoverSearchStatistics &statistics);
-
- private Q_SLOTS:
-  void SingleSearchFinished(const quint64 id, const CoverProviderSearchResults &results);
-  void SingleCoverFetched(const quint64 id, const AlbumCoverImageResult &result);
-  void StartRequests();
+  Signal<uint64_t, CoverProviderSearchResults, CoverSearchStatistics> SearchFinished;
+  Signal<uint64_t, AlbumCoverImageResult, CoverSearchStatistics> AlbumCoverFetched;
 
  private:
-  void AddRequest(const CoverSearchRequest &req);
+  struct Job {
+    CoverSearchRequest request;
+    CoverProviderSearchResults results;
+    CoverSearchStatistics statistics;
+    int pending = 0;
+    bool cancelled = false;
+    bool finished = false;
+    float best_score = 0.0f;
+  };
 
-  SharedPtr<CoverProviders> cover_providers_;
-  SharedPtr<NetworkAccessManager> network_;
-  quint64 next_id_;
+  void AddRequest(const CoverSearchRequest &request);
+  void StartRequests();
+  void StartJob(const CoverSearchRequest &request);
+  void FinishJob(const std::shared_ptr<Job> &job);
+  void FetchBestCover(const std::shared_ptr<Job> &job);
 
-  QQueue<CoverSearchRequest> queued_requests_;
-  QHash<quint64, AlbumCoverFetcherSearch*> active_requests_;
-
-  QTimer *request_starter_;
+  CoverProviders *cover_providers_;
+  NetworkAccessManager *network_;
+  NetworkTimeouts image_timeouts_;
+  uint64_t next_id_ = 1;
+  std::queue<CoverSearchRequest> queued_;
+  std::map<uint64_t, std::shared_ptr<Job>> active_;
 };
 
-#endif  // ALBUMCOVERFETCHER_H
+#endif

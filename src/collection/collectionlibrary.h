@@ -1,132 +1,65 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_COLLECTIONLIBRARY_H
+#define STRAWBERRY_COLLECTIONLIBRARY_H
 
-#ifndef COLLECTION_H
-#define COLLECTION_H
+#include "collection/collectionbackend.h"
+#include "collection/collectionfilteroptions.h"
+#include "collection/collectiontagsave.h"
+#include "collection/collectionwatcher.h"
+#include "core/signal.h"
 
-#include "config.h"
+#include <map>
+#include <memory>
+#include <string>
 
-#include <QObject>
-#include <QList>
-#include <QHash>
-#include <QMap>
-#include <QString>
-
-#include "includes/shared_ptr.h"
-#include "core/song.h"
-
-class QThread;
-class Thread;
 class Database;
+class TagReader;
 class TaskManager;
-class TagReaderClient;
-class CollectionBackend;
-class CollectionModel;
-class CollectionWatcher;
-class AlbumCoverLoader;
 
-class CollectionLibrary : public QObject {
-  Q_OBJECT
-
+class CollectionLibrary {
  public:
-  explicit CollectionLibrary(const SharedPtr<Database> database,
-                             const SharedPtr<TaskManager> task_manager,
-                             const SharedPtr<TagReaderClient> tagreader_client,
-                             const SharedPtr<AlbumCoverLoader> albumcover_loader,
-                             QObject *parent = nullptr);
+  CollectionLibrary(Database *database, TaskManager *task_manager, TagReader *tagreader);
 
-  ~CollectionLibrary() override;
+  CollectionBackend *backend() const { return backend_.get(); }
+  CollectionWatcher *watcher() const { return watcher_.get(); }
 
-  static const char *kSongsTable;
-  static const char *kFtsTable;
-  static const char *kDirsTable;
-  static const char *kSubdirsTable;
+  ~CollectionLibrary();
 
   void Init();
-  void Exit();
-
-  SharedPtr<CollectionBackend> backend() const { return backend_; }
-  CollectionModel *model() const { return model_; }
-
-  QString full_rescan_reason(const int schema_version) const { return full_rescan_revisions_.value(schema_version, QString()); }
-
-  void SyncPlaycountAndRatingToFilesAsync();
-
- private:
-  void SyncPlaycountAndRatingToFiles();
-  void SavePendingPlaycountsAndRatings();
-
- public Q_SLOTS:
-  void ReloadSettings();
-
+  void IncrementalScan();
+  void FullScan();
+  std::string full_rescan_reason(int schema_version) const;
+  void AbortScan();
   void PauseWatcher();
   void ResumeWatcher();
-
-  void FullScan();
-  void StopScan();
+  bool scanning() const;
   void Rescan(const SongList &songs);
-
-  void IncrementalScan();
-
+  void RescanDirectory(int id);
+  void AddDirectory(const std::string &path, bool subdirs = true);
+  void RemoveDirectory(int id);
+  SongList Songs(const std::string &filter = {}) const;
+  SongList Songs(const CollectionFilterOptions &options) const;
+  void SyncPlaycountAndRatingToFiles();
+  void SyncPlaycountAndRatingToFilesAsync();
   void CurrentSongChanged(const Song &song);
   void Stopped();
+  void SongsPlaycountChanged(const SongList &songs, bool save_tags = false);
+  void SongsRatingChanged(const SongList &songs, bool save_tags = false);
+  void SavePendingPlaycountsAndRatings();
+  const std::string &current_song_url() const { return current_song_url_; }
+  const std::map<std::string, CollectionTagSave::Pending> &pending_song_saves() const { return pending_song_saves_; }
 
- private Q_SLOTS:
-  void ExitReceived();
-  void SongsPlaycountChanged(const SongList &songs, const bool save_tags = false);
-  void SongsRatingChanged(const SongList &songs, const bool save_tags = false);
-
- Q_SIGNALS:
-  void Error(const QString &error);
-  void ExitFinished();
+  Signal<> ScanFinished;
+  Signal<std::string> Error;
 
  private:
-  class PendingSongSave {
-   public:
-    Song song;
-    bool save_playcount = false;
-    bool save_rating = false;
-  };
-
-  const SharedPtr<TaskManager> task_manager_;
-  const SharedPtr<TagReaderClient> tagreader_client_;
-
-  SharedPtr<CollectionBackend> backend_;
-  CollectionModel *model_;
-
-  CollectionWatcher *watcher_;
-  Thread *watcher_thread_;
-  QThread *original_thread_;
-
-  // DB schema versions which should trigger a full collection rescan (each of those with a short reason why).
-  QHash<int, QString> full_rescan_revisions_;
-
-  QList<QObject*> wait_for_exit_;
-
-  bool save_playcounts_to_files_;
-  bool save_ratings_to_files_;
-
-  QUrl current_song_url_;
-
-  QMap<QUrl, SharedPtr<PendingSongSave>> pending_song_saves_;
+  Database *database_;
+  TaskManager *task_manager_;
+  TagReader *tagreader_;
+  std::unique_ptr<CollectionBackend> backend_;
+  std::unique_ptr<CollectionWatcher> watcher_;
+  std::string current_song_url_;
+  std::map<std::string, CollectionTagSave::Pending> pending_song_saves_;
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 };
 
-#endif
+#endif  // STRAWBERRY_COLLECTIONLIBRARY_H

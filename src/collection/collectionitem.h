@@ -1,51 +1,38 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_COLLECTIONITEM_H
+#define STRAWBERRY_COLLECTIONITEM_H
 
-#ifndef COLLECTIONITEM_H
-#define COLLECTIONITEM_H
-
-#include "core/simpletreeitem.h"
 #include "core/song.h"
 
-class CollectionItem : public SimpleTreeItem<CollectionItem> {
+#include <memory>
+#include <string>
+#include <vector>
+
+class CollectionItem {
  public:
   enum class Type {
     Root,
     Divider,
     Container,
     Song,
-    LoadingIndicator,
+    LoadingIndicator
   };
 
-  explicit CollectionItem(SimpleTreeModel<CollectionItem> *_model);
-  explicit CollectionItem(const Type _type, CollectionItem *_parent = nullptr);
+  CollectionItem() = default;
+  explicit CollectionItem(Type type, CollectionItem *parent = nullptr);
 
-  Type type;
-  int container_level;
+  Type type = Type::Root;
+  int container_level = -1;
   Song metadata;
-  CollectionItem *compilation_artist_node_;
-  QString divider_key;
+  std::string key;
+  std::string display_text;
+  std::string sort_text;
+  std::string divider_key;
+  CollectionItem *parent = nullptr;
+  CollectionItem *compilation_artist_node = nullptr;
+  std::vector<std::unique_ptr<CollectionItem>> children;
 
- private:
-  Q_DISABLE_COPY(CollectionItem)
+  CollectionItem *AddChild(Type child_type);
+  SongList Songs() const;
 };
 
-Q_DECLARE_METATYPE(CollectionItem::Type)
-
-#endif  // COLLECTIONITEM_H
+#endif

@@ -1,234 +1,244 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "settings/scrobblersettingspage.h"
 
-#include "scrobblersettingspage.h"
-#include "ui_scrobblersettingspage.h"
-
-#include <QObject>
-#include <QMessageBox>
-#include <QSettings>
-#include <QCheckBox>
-#include <QLabel>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QSpinBox>
-
-#include "settingsdialog.h"
-#include "settingspage.h"
-#include "core/iconloader.h"
-#include "core/song.h"
-#include "core/settings.h"
-#include "widgets/loginstatewidget.h"
-
-#include "scrobbler/audioscrobbler.h"
+#include "config.h"
+#include "constants/scrobblersettings.h"
+#include "core/application.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
-#include "constants/scrobblersettings.h"
+#include "scrobbler/listenbrainzoauth.h"
+#include "scrobbler/scrobblersources.h"
+#include "settings/scrobblersettingslabels.h"
+#include "settings/settingspage.h"
+#include "translations/translations.h"
+#include "ui/dialogs.h"
+#include "widgets/loginstatewidget.h"
 
-using namespace Qt::Literals::StringLiterals;
-using namespace ScrobblerSettings;
+#include <functional>
+#include <memory>
 
-ScrobblerSettingsPage::ScrobblerSettingsPage(SettingsDialog *dialog, const SharedPtr<AudioScrobbler> scrobbler, QWidget *parent)
-    : SettingsPage(dialog, parent),
-      ui_(new Ui_ScrobblerSettingsPage),
-      scrobbler_(scrobbler),
-      lastfmscrobbler_(scrobbler_->Service<LastFMScrobbler>()),
-      listenbrainzscrobbler_(scrobbler_->Service<ListenBrainzScrobbler>()),
-      lastfm_waiting_for_auth_(false),
-      listenbrainz_waiting_for_auth_(false) {
+namespace {
 
-  ui_->setupUi(this);
-  setWindowIcon(IconLoader::Load(u"scrobble"_s, true, 0, 32));
-
-  // Last.fm
-  QObject::connect(&*lastfmscrobbler_, &LastFMScrobbler::AuthenticationComplete, this, &ScrobblerSettingsPage::LastFM_AuthenticationComplete);
-  QObject::connect(ui_->button_lastfm_login, &QPushButton::clicked, this, &ScrobblerSettingsPage::LastFM_Login);
-  QObject::connect(ui_->widget_lastfm_login_state, &LoginStateWidget::LoginClicked, this, &ScrobblerSettingsPage::LastFM_Login);
-  QObject::connect(ui_->widget_lastfm_login_state, &LoginStateWidget::LogoutClicked, this, &ScrobblerSettingsPage::LastFM_Logout);
-  ui_->widget_lastfm_login_state->AddCredentialGroup(ui_->widget_lastfm_login);
-
-  // ListenBrainz
-  QObject::connect(&*listenbrainzscrobbler_, &ListenBrainzScrobbler::AuthenticationComplete, this, &ScrobblerSettingsPage::ListenBrainz_AuthenticationComplete);
-  QObject::connect(ui_->button_listenbrainz_login, &QPushButton::clicked, this, &ScrobblerSettingsPage::ListenBrainz_Login);
-  QObject::connect(ui_->widget_listenbrainz_login_state, &LoginStateWidget::LoginClicked, this, &ScrobblerSettingsPage::ListenBrainz_Login);
-  QObject::connect(ui_->widget_listenbrainz_login_state, &LoginStateWidget::LogoutClicked, this, &ScrobblerSettingsPage::ListenBrainz_Logout);
-  ui_->widget_listenbrainz_login_state->AddCredentialGroup(ui_->widget_listenbrainz_login);
-
-  ui_->label_listenbrainz_token->setText(u"<html><head/><body><p>"_s + tr("Enter your user token from") + QLatin1Char(' ') + u"<a href=\"https://listenbrainz.org/profile/\"><span style=\"text-decoration: underline; color:#0000ff;\">https://listenbrainz.org/profile/</span></a></p></body></html>"_s);
-
-  resize(sizeHint());
-
+AdwEntryRow *AddGroupedEntry(AdwPreferencesGroup *group, Settings *settings, const char *settings_group, const char *key, const char *title) {
+  settings->BeginGroup(settings_group);
+  AdwEntryRow *row = ADW_ENTRY_ROW(adw_entry_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
+  gtk_editable_set_text(GTK_EDITABLE(row), settings->Value(key).c_str());
+  settings->BeginGroup(ScrobblerSettings::kSettingsGroup);
+  g_object_set_data_full(G_OBJECT(row), "settings-group", g_strdup(settings_group), g_free);
+  g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
+  g_signal_connect(row, "changed", G_CALLBACK(+[](AdwEntryRow *entry, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     const char *settings_group_name = static_cast<const char *>(g_object_get_data(G_OBJECT(entry), "settings-group"));
+                     const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(entry), "settings-key"));
+                     s->BeginGroup(settings_group_name);
+                     s->SetValue(settings_key, gtk_editable_get_text(GTK_EDITABLE(entry)));
+                     s->Sync();
+                     s->BeginGroup(ScrobblerSettings::kSettingsGroup);
+                   }),
+                   settings);
+  adw_preferences_group_add(group, GTK_WIDGET(row));
+  return row;
 }
 
-ScrobblerSettingsPage::~ScrobblerSettingsPage() { delete ui_; }
+struct SourceFilterState {
+  Settings *settings = nullptr;
+  std::vector<AdwSwitchRow *> rows;
+  std::vector<Song::Source> sources;
+};
 
-void ScrobblerSettingsPage::Load() {
-
-  Settings s;
-  if (!s.contains(kSettingsGroup)) set_changed();
-
-  ui_->checkbox_enable->setChecked(scrobbler_->enabled());
-  ui_->checkbox_scrobble_button->setChecked(scrobbler_->scrobble_button());
-  ui_->checkbox_love_button->setChecked(scrobbler_->love_button());
-  ui_->checkbox_offline->setChecked(scrobbler_->offline());
-  ui_->spinbox_submit->setValue(scrobbler_->submit_delay());
-  ui_->checkbox_albumartist->setChecked(scrobbler_->prefer_albumartist());
-  ui_->checkbox_show_error_dialog->setChecked(scrobbler_->ShowErrorDialog());
-  ui_->checkbox_strip_remastered->setChecked(scrobbler_->strip_remastered());
-
-  ui_->checkbox_source_collection->setChecked(scrobbler_->sources().contains(Song::Source::Collection));
-  ui_->checkbox_source_local->setChecked(scrobbler_->sources().contains(Song::Source::LocalFile));
-  ui_->checkbox_source_cdda->setChecked(scrobbler_->sources().contains(Song::Source::CDDA));
-  ui_->checkbox_source_device->setChecked(scrobbler_->sources().contains(Song::Source::Device));
-  ui_->checkbox_source_subsonic->setChecked(scrobbler_->sources().contains(Song::Source::Subsonic));
-  ui_->checkbox_source_tidal->setChecked(scrobbler_->sources().contains(Song::Source::Tidal));
-  ui_->checkbox_source_qobuz->setChecked(scrobbler_->sources().contains(Song::Source::Qobuz));
-  ui_->checkbox_source_spotify->setChecked(scrobbler_->sources().contains(Song::Source::Spotify));
-  ui_->checkbox_source_stream->setChecked(scrobbler_->sources().contains(Song::Source::Stream));
-  ui_->checkbox_source_somafm->setChecked(scrobbler_->sources().contains(Song::Source::SomaFM));
-  ui_->checkbox_source_radioparadise->setChecked(scrobbler_->sources().contains(Song::Source::RadioParadise));
-  ui_->checkbox_source_unknown->setChecked(scrobbler_->sources().contains(Song::Source::Unknown));
-
-  ui_->checkbox_lastfm_enable->setChecked(lastfmscrobbler_->enabled());
-  LastFM_RefreshControls(lastfmscrobbler_->authenticated());
-
-  ui_->checkbox_listenbrainz_enable->setChecked(listenbrainzscrobbler_->enabled());
-  ui_->lineedit_listenbrainz_user_token->setText(listenbrainzscrobbler_->user_token());
-  ListenBrainz_RefreshControls(listenbrainzscrobbler_->authenticated());
-
-  Init(ui_->layout_scrobblersettingspage->parentWidget());
-
-  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
-
-}
-
-void ScrobblerSettingsPage::Save() {
-
-  Settings s;
-
-  s.beginGroup(kSettingsGroup);
-  s.setValue(kEnabled, ui_->checkbox_enable->isChecked());
-  s.setValue(kScrobbleButton, ui_->checkbox_scrobble_button->isChecked());
-  s.setValue(kLoveButton, ui_->checkbox_love_button->isChecked());
-  s.setValue(kOffline, ui_->checkbox_offline->isChecked());
-  s.setValue(kSubmit, ui_->spinbox_submit->value());
-  s.setValue(kAlbumArtist, ui_->checkbox_albumartist->isChecked());
-  s.setValue(kShowErrorDialog, ui_->checkbox_show_error_dialog->isChecked());
-  s.setValue(kStripRemastered, ui_->checkbox_strip_remastered->isChecked());
-
-  QStringList sources;
-  if (ui_->checkbox_source_collection->isChecked()) sources << Song::TextForSource(Song::Source::Collection);
-  if (ui_->checkbox_source_local->isChecked()) sources << Song::TextForSource(Song::Source::LocalFile);
-  if (ui_->checkbox_source_cdda->isChecked()) sources << Song::TextForSource(Song::Source::CDDA);
-  if (ui_->checkbox_source_device->isChecked()) sources << Song::TextForSource(Song::Source::Device);
-  if (ui_->checkbox_source_subsonic->isChecked()) sources << Song::TextForSource(Song::Source::Subsonic);
-  if (ui_->checkbox_source_tidal->isChecked()) sources << Song::TextForSource(Song::Source::Tidal);
-  if (ui_->checkbox_source_qobuz->isChecked()) sources << Song::TextForSource(Song::Source::Qobuz);
-  if (ui_->checkbox_source_spotify->isChecked()) sources << Song::TextForSource(Song::Source::Spotify);
-  if (ui_->checkbox_source_stream->isChecked()) sources << Song::TextForSource(Song::Source::Stream);
-  if (ui_->checkbox_source_somafm->isChecked()) sources << Song::TextForSource(Song::Source::SomaFM);
-  if (ui_->checkbox_source_radioparadise->isChecked()) sources << Song::TextForSource(Song::Source::RadioParadise);
-  if (ui_->checkbox_source_unknown->isChecked()) sources << Song::TextForSource(Song::Source::Unknown);
-
-  s.setValue(kSources, sources);
-
-  s.endGroup();
-
-  s.beginGroup(LastFMScrobbler::kSettingsGroup);
-  s.setValue(kEnabled, ui_->checkbox_lastfm_enable->isChecked());
-  s.endGroup();
-
-  s.beginGroup(ListenBrainzScrobbler::kSettingsGroup);
-  s.setValue(kEnabled, ui_->checkbox_listenbrainz_enable->isChecked());
-  s.setValue(kUserToken, ui_->lineedit_listenbrainz_user_token->text());
-  s.endGroup();
-
-  scrobbler_->ReloadSettings();
-
-}
-
-void ScrobblerSettingsPage::LastFM_Login() {
-
-  lastfm_waiting_for_auth_ = true;
-  ui_->widget_lastfm_login_state->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
-  lastfmscrobbler_->Authenticate();
-
-}
-
-void ScrobblerSettingsPage::LastFM_Logout() {
-
-  lastfmscrobbler_->ClearSession();
-  LastFM_RefreshControls(false);
-
-}
-
-void ScrobblerSettingsPage::LastFM_AuthenticationComplete(const bool success, const QString &error) {
-
-  if (!lastfm_waiting_for_auth_) return;
-  lastfm_waiting_for_auth_ = false;
-
-  if (success) {
-    Save();
+void SaveSources(SourceFilterState *state) {
+  if (!state || !state->settings) {
+    return;
   }
-  else {
-    if (!error.isEmpty()) QMessageBox::warning(this, u"Authentication failed"_s, error);
+  std::vector<int> selected;
+  bool all = true;
+  for (size_t i = 0; i < state->rows.size(); ++i) {
+    if (adw_switch_row_get_active(state->rows[i])) {
+      selected.push_back(static_cast<int>(state->sources[i]));
+    } else {
+      all = false;
+    }
+  }
+  state->settings->BeginGroup(ScrobblerSettings::kSettingsGroup);
+  state->settings->SetValue(ScrobblerSettings::kSources, all ? std::string() : ScrobblerSources::Join(selected));
+  state->settings->Sync();
+}
+
+void AttachLoginWidget(AdwPreferencesGroup *group, LoginStateWidget *login) {
+  login->SetAccountTypeVisible(false);
+  login->HideExpires();
+  adw_preferences_group_add(group, login->widget());
+  g_signal_connect(login->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     delete static_cast<LoginStateWidget *>(data);
+                   }),
+                   login);
+}
+
+}  // namespace
+
+AdwPreferencesPage *ScrobblerSettingsPage::Create(Settings *settings, Application *app) {
+  settings->BeginGroup(ScrobblerSettings::kSettingsGroup);
+  AdwPreferencesPage *page = SettingsPage::MakePage("Scrobbler", "send-to-symbolic");
+  AdwPreferencesGroup *group = SettingsPage::AddGroup(page, "Services");
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kEnabled, ScrobblerSettingsLabels::Enable(), nullptr,
+                          ScrobblerSettings::kDefaultEnabled);
+  SettingsPage::AddDescription(group, ScrobblerSettingsLabels::ScrobbleInfo());
+  SettingsPage::AddToggle(group, settings, "Last.fm", "Last.fm", nullptr, false);
+  SettingsPage::AddToggle(group, settings, "ListenBrainz", "ListenBrainz", nullptr, false);
+#ifdef HAVE_SUBSONIC
+  SettingsPage::AddToggle(group, settings, "Subsonic", "Subsonic scrobble", nullptr, false);
+#endif
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kScrobbleButton, ScrobblerSettingsLabels::ScrobbleButton(), nullptr,
+                          ScrobblerSettings::kDefaultScrobbleButton);
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kLoveButton, ScrobblerSettingsLabels::LoveButton(), nullptr,
+                          ScrobblerSettings::kDefaultLoveButton);
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kOffline, ScrobblerSettingsLabels::Offline(),
+                          ScrobblerSettingsLabels::OfflineInfo(), ScrobblerSettings::kDefaultOffline);
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kAlbumArtist, ScrobblerSettingsLabels::AlbumArtist(), nullptr,
+                          ScrobblerSettings::kDefaultAlbumArtist);
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kShowErrorDialog, ScrobblerSettingsLabels::ShowErrors(), nullptr,
+                          ScrobblerSettings::kDefaultShowErrorDialog);
+  SettingsPage::AddToggle(group, settings, ScrobblerSettings::kStripRemastered, ScrobblerSettingsLabels::StripRemastered(), nullptr,
+                          ScrobblerSettings::kDefaultStripRemastered);
+  SettingsPage::AddDescription(group, ScrobblerSettingsLabels::SubmitInfo());
+  SettingsPage::AddIntEntry(group, settings, ScrobblerSettings::kSubmit, ScrobblerSettingsLabels::SubmitEvery(),
+                            ScrobblerSettings::kDefaultSubmit);
+  SettingsPage::AddDescription(group, ScrobblerSettingsLabels::SubmitSeconds());
+
+  AdwPreferencesGroup *sources = SettingsPage::AddGroup(page, ScrobblerSettingsLabels::SourcesTitle());
+  GtkWidget *hint = gtk_label_new(Translations::CStr("Leave every source enabled to scrobble everything."));
+  gtk_label_set_wrap(GTK_LABEL(hint), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(hint), 0);
+  gtk_widget_add_css_class(hint, "dim-label");
+  adw_preferences_group_add(sources, hint);
+  auto *source_state = new SourceFilterState();
+  source_state->settings = settings;
+  source_state->sources = ScrobblerSources::All();
+  const std::string saved_sources = settings->Value(ScrobblerSettings::kSources);
+  g_object_set_data_full(G_OBJECT(page), "source-state", source_state, [](gpointer p) { delete static_cast<SourceFilterState *>(p); });
+  for (Song::Source source : source_state->sources) {
+    AdwSwitchRow *row = ADW_SWITCH_ROW(adw_switch_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Song::SourceToString(source).c_str());
+    adw_switch_row_set_active(row, ScrobblerSources::Allows(saved_sources, source));
+    source_state->rows.push_back(row);
+    g_object_set_data(G_OBJECT(row), "source-state", source_state);
+    g_signal_connect(row, "notify::active", G_CALLBACK(+[](AdwSwitchRow *switch_row, GParamSpec *, gpointer) {
+                       SaveSources(static_cast<SourceFilterState *>(g_object_get_data(G_OBJECT(switch_row), "source-state")));
+                     }),
+                     nullptr);
+    adw_preferences_group_add(sources, GTK_WIDGET(row));
   }
 
-  LastFM_RefreshControls(success);
+  auto page_alive = std::make_shared<bool>(true);
+  auto *alive_ptr = new std::shared_ptr<bool>(page_alive);
+  g_object_set_data_full(G_OBJECT(page), "page-alive", alive_ptr, [](gpointer p) {
+    auto *alive = static_cast<std::shared_ptr<bool> *>(p);
+    **alive = false;
+    delete alive;
+  });
 
-}
+  if (app) {
+    if (auto *lastfm = dynamic_cast<LastFmScrobbler *>(app->scrobbler()->ServiceByName("Last.fm"))) {
+      AdwPreferencesGroup *lastfm_group = SettingsPage::AddGroup(page, "Last.fm account");
+      auto *login = new LoginStateWidget();
+      login->SetLoggedIn(lastfm->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut, lastfm->username());
+      login->SetLoginCallback([lastfm, login, page_alive]() {
+        login->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
+        lastfm->GetToken([lastfm, login, page_alive](bool ok) {
+          if (!*page_alive) {
+            return;
+          }
+          if (!ok) {
+            login->SetLoggedIn(LoginStateWidget::State::LoggedOut);
+            return;
+          }
+          lastfm->OpenAuthorizationUrl();
+          login->SetLoggedIn(LoginStateWidget::State::LoggedOut, lastfm->username());
+        });
+      });
+      login->SetLogoutCallback([lastfm, login, page_alive]() {
+        lastfm->Logout();
+        if (*page_alive) {
+          login->SetLoggedIn(LoginStateWidget::State::LoggedOut);
+        }
+      });
+      AttachLoginWidget(lastfm_group, login);
+      SettingsPage::AddButtonRow(lastfm_group, "Browser authorization", "Complete authorization", [lastfm, login, page_alive]() {
+        login->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
+        lastfm->CompleteAuthorization([lastfm, login, page_alive](bool ok) {
+          if (!*page_alive) {
+            return;
+          }
+          login->SetLoggedIn(ok ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut, lastfm->username());
+        });
+      });
+      SettingsPage::AddButtonRow(lastfm_group, "Password", "Sign in with password", [lastfm, login, page_alive]() {
+        Dialogs::Login(nullptr, "Last.fm", [lastfm, login, page_alive](const std::string &user, const std::string &pass) {
+          if (!*page_alive) {
+            return;
+          }
+          login->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
+          lastfm->Authenticate(user, pass, [lastfm, login, page_alive](bool ok) {
+            if (!*page_alive) {
+              return;
+            }
+            login->SetLoggedIn(ok ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut, lastfm->username());
+          });
+        });
+      });
+    }
 
-void ScrobblerSettingsPage::LastFM_RefreshControls(const bool authenticated) {
-  ui_->widget_lastfm_login_state->SetLoggedIn(authenticated ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut, lastfmscrobbler_->username());
-}
-
-void ScrobblerSettingsPage::ListenBrainz_Login() {
-
-  listenbrainz_waiting_for_auth_ = true;
-  ui_->widget_listenbrainz_login_state->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
-  listenbrainzscrobbler_->Authenticate();
-
-}
-
-void ScrobblerSettingsPage::ListenBrainz_Logout() {
-
-  listenbrainzscrobbler_->Logout();
-  ListenBrainz_RefreshControls(false);
-
-}
-
-void ScrobblerSettingsPage::ListenBrainz_AuthenticationComplete(const bool success, const QString &error) {
-
-  if (!listenbrainz_waiting_for_auth_) return;
-  listenbrainz_waiting_for_auth_ = false;
-
-  if (success) {
-    Save();
+    if (auto *listenbrainz = dynamic_cast<ListenBrainzScrobbler *>(app->scrobbler()->ServiceByName("ListenBrainz"))) {
+      AdwPreferencesGroup *lb_group = SettingsPage::AddGroup(page, "ListenBrainz account");
+      AdwEntryRow *user_row = AddGroupedEntry(lb_group, settings, "ListenBrainz", "username", "Username");
+      AdwEntryRow *token_row = AddGroupedEntry(lb_group, settings, "ListenBrainz", "token", ScrobblerSettingsLabels::UserToken());
+      SettingsPage::AddDescription(lb_group, ScrobblerSettingsLabels::ListenBrainzTokenHint());
+      auto *login = new LoginStateWidget();
+      login->SetLoggedIn(ListenBrainzOAuth::LoginWidgetSignedIn(listenbrainz->authenticated(), listenbrainz->oauth_authenticated())
+                             ? LoginStateWidget::State::LoggedIn
+                             : LoginStateWidget::State::LoggedOut,
+                         listenbrainz->username());
+      auto *apply_token = new std::function<void()>([listenbrainz, login, user_row, token_row, page_alive]() {
+        listenbrainz->Authenticate(gtk_editable_get_text(GTK_EDITABLE(user_row)), gtk_editable_get_text(GTK_EDITABLE(token_row)));
+        if (*page_alive) {
+          login->SetLoggedIn(ListenBrainzOAuth::LoginWidgetSignedIn(listenbrainz->authenticated(), listenbrainz->oauth_authenticated())
+                                 ? LoginStateWidget::State::LoggedIn
+                                 : LoginStateWidget::State::LoggedOut,
+                             listenbrainz->username());
+        }
+      });
+      g_object_set_data_full(G_OBJECT(page), "listenbrainz-apply", apply_token, [](gpointer p) { delete static_cast<std::function<void()> *>(p); });
+      login->SetLoginCallback([listenbrainz, login, page_alive, app]() {
+        login->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
+        listenbrainz->StartAuthorization(app ? app->network() : nullptr, [listenbrainz, login, page_alive](bool ok) {
+          if (!*page_alive) {
+            return;
+          }
+          login->SetLoggedIn(ok || listenbrainz->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut,
+                             listenbrainz->username());
+        });
+      });
+      login->SetLogoutCallback([listenbrainz, login, user_row, token_row, page_alive]() {
+        listenbrainz->Logout();
+        if (*page_alive) {
+          gtk_editable_set_text(GTK_EDITABLE(user_row), "");
+          gtk_editable_set_text(GTK_EDITABLE(token_row), "");
+          login->SetLoggedIn(LoginStateWidget::State::LoggedOut);
+        }
+      });
+      login->AddCredentialGroup(GTK_WIDGET(user_row));
+      login->AddCredentialGroup(GTK_WIDGET(token_row));
+      g_signal_connect(user_row, "changed", G_CALLBACK(+[](AdwEntryRow *, gpointer data) {
+                         (*static_cast<std::function<void()> *>(data))();
+                       }),
+                       apply_token);
+      g_signal_connect(token_row, "changed", G_CALLBACK(+[](AdwEntryRow *, gpointer data) {
+                         (*static_cast<std::function<void()> *>(data))();
+                       }),
+                       apply_token);
+      AttachLoginWidget(lb_group, login);
+    }
   }
-  else {
-    QMessageBox::warning(this, u"Authentication failed"_s, error);
-  }
 
-  ListenBrainz_RefreshControls(success);
-
-}
-
-void ScrobblerSettingsPage::ListenBrainz_RefreshControls(const bool authenticated) {
-  ui_->widget_listenbrainz_login_state->SetLoggedIn(authenticated ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut);
+  return page;
 }

@@ -1,133 +1,88 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "lyrics/lyricsfetcher.h"
 
-#include "config.h"
-
-#include <chrono>
-
-#include <QtGlobal>
-#include <QTimer>
-#include <QString>
-
-#include "includes/shared_ptr.h"
 #include "core/song.h"
-#include "lyricsfetcher.h"
-#include "lyricsfetchersearch.h"
-#include "lyricssearchrequest.h"
-#include "lyricssearchresult.h"
-
-using namespace std::chrono_literals;
+#include "lyrics/lyricsfetcherpacing.h"
+#include "lyrics/lyricsfetchersearch.h"
 
 namespace {
-constexpr int kMaxConcurrentRequests = 5;
+
+gboolean LyricsFetcherStarterCb(gpointer data) {
+  auto *self = static_cast<LyricsFetcher *>(data);
+  return self->StartNext() ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
 }
 
-LyricsFetcher::LyricsFetcher(const SharedPtr<LyricsProviders> lyrics_providers, QObject *parent)
-    : QObject(parent),
-      lyrics_providers_(lyrics_providers),
-      next_id_(0),
-      request_starter_(new QTimer(this)) {
+}  // namespace
 
-  request_starter_->setInterval(500ms);
-  QObject::connect(request_starter_, &QTimer::timeout, this, &LyricsFetcher::StartRequests);
+LyricsFetcher::LyricsFetcher(LyricsProviders *lyrics_providers) : lyrics_providers_(lyrics_providers) {}
 
+LyricsFetcher::~LyricsFetcher() {
+  CancelStarter();
+  Clear();
 }
 
-quint64 LyricsFetcher::Search(const QString &effective_albumartist, const QString &artist, const QString &album, const QString &title, const qint64 duration) {
-
-  LyricsSearchRequest search_request;
-  search_request.albumartist = effective_albumartist;
-  search_request.artist = artist;
-  search_request.album = Song::AlbumRemoveDiscMisc(album);
-  search_request.title = Song::TitleRemoveMisc(title);
-  search_request.duration = duration;
-
-  Request request;
-  request.id = ++next_id_;
-  request.search_request = search_request;
-  AddRequest(request);
-
-  return request.id;
-
-}
-
-void LyricsFetcher::AddRequest(const Request &request) {
-
-  queued_requests_.enqueue(request);
-
-  if (!request_starter_->isActive()) request_starter_->start();
-
-  if (active_requests_.size() < kMaxConcurrentRequests) StartRequests();
-
+uint64_t LyricsFetcher::Search(const std::string &effective_albumartist, const std::string &artist, const std::string &album,
+                               const std::string &title, int64_t duration) {
+  LyricsSearchRequest request;
+  request.albumartist = effective_albumartist;
+  request.artist = artist;
+  request.album = album;
+  request.title = title;
+  request.duration = duration;
+  request = LyricsFetcherPacing::Normalize(request);
+  const uint64_t id = next_id_++;
+  queued_.emplace(id, request);
+  if (!starter_id_) {
+    starter_id_ = g_timeout_add(LyricsFetcherPacing::kStarterDelayMs, LyricsFetcherStarterCb, this);
+  }
+  if (LyricsFetcherPacing::CanStartMore(static_cast<int>(active_.size()))) {
+    StartNext();
+  }
+  return id;
 }
 
 void LyricsFetcher::Clear() {
-
-  queued_requests_.clear();
-
-  const QList<LyricsFetcherSearch*> searches = active_requests_.values();
-  for (LyricsFetcherSearch *search : searches) {
-    search->Cancel();
-    search->deleteLater();
+  CancelStarter();
+  while (!queued_.empty()) {
+    queued_.pop();
   }
-  active_requests_.clear();
-
+  for (auto &entry : active_) {
+    delete entry.second;
+  }
+  active_.clear();
 }
 
-void LyricsFetcher::StartRequests() {
-
-  if (queued_requests_.isEmpty()) {
-    request_starter_->stop();
-    return;
+bool LyricsFetcher::StartNext() {
+  while (!queued_.empty() && LyricsFetcherPacing::CanStartMore(static_cast<int>(active_.size()))) {
+    auto item = queued_.front();
+    queued_.pop();
+    auto *search = new LyricsFetcherSearch(item.first, item.second, lyrics_providers_);
+    search->LyricsFetched.Connect([this](uint64_t id, const std::string &provider, const std::string &lyrics) {
+      LyricsFetched.Emit(id, provider, lyrics);
+    });
+    search->SearchFinished.Connect([this](uint64_t id, const LyricsSearchResults &results) {
+      SearchFinished.Emit(id, results);
+      auto it = active_.find(id);
+      if (it != active_.end()) {
+        delete it->second;
+        active_.erase(it);
+      }
+      if (!starter_id_ && !queued_.empty()) {
+        starter_id_ = g_timeout_add(LyricsFetcherPacing::kStarterDelayMs, LyricsFetcherStarterCb, this);
+      }
+    });
+    active_[item.first] = search;
+    search->Start();
   }
-
-  while (!queued_requests_.isEmpty() && active_requests_.size() < kMaxConcurrentRequests) {
-
-    Request request = queued_requests_.dequeue();
-
-    LyricsFetcherSearch *search = new LyricsFetcherSearch(request.id, request.search_request, this);
-    active_requests_.insert(request.id, search);
-
-    QObject::connect(search, &LyricsFetcherSearch::SearchFinished, this, &LyricsFetcher::SingleSearchFinished);
-    QObject::connect(search, &LyricsFetcherSearch::LyricsFetched, this, &LyricsFetcher::SingleLyricsFetched);
-
-    search->Start(lyrics_providers_);
+  if (queued_.empty()) {
+    starter_id_ = 0;
+    return false;
   }
-
+  return true;
 }
 
-void LyricsFetcher::SingleSearchFinished(const quint64 request_id, const LyricsSearchResults &results) {
-
-  if (!active_requests_.contains(request_id)) return;
-
-  LyricsFetcherSearch *search = active_requests_.take(request_id);
-  search->deleteLater();
-  Q_EMIT SearchFinished(request_id, results);
-
-}
-
-void LyricsFetcher::SingleLyricsFetched(const quint64 request_id, const QString &provider, const QString &lyrics) {
-
-  if (!active_requests_.contains(request_id)) return;
-
-  LyricsFetcherSearch *search = active_requests_.take(request_id);
-  search->deleteLater();
-  Q_EMIT LyricsFetched(request_id, provider, lyrics);
-
+void LyricsFetcher::CancelStarter() {
+  if (starter_id_) {
+    g_source_remove(starter_id_);
+    starter_id_ = 0;
+  }
 }

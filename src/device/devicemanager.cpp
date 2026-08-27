@@ -1,951 +1,815 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "device/devicemanager.h"
+
+#include "device/deviceerror.h"
 
 #include "config.h"
-
-#include <utility>
-#include <functional>
-#include <memory>
-
-#include <QtGlobal>
-#include <QApplication>
-#include <QObject>
-#include <QMetaObject>
-#include <QThread>
-#include <QtConcurrentRun>
-#include <QAbstractItemModel>
-#include <QDir>
-#include <QList>
-#include <QVariant>
-#include <QString>
-#include <QStringList>
-#include <QUrl>
-#include <QPixmap>
-#include <QPainter>
-#include <QMessageBox>
-#include <QPushButton>
-
-#include "devicemanager.h"
-
-#include "includes/scoped_ptr.h"
-#include "includes/shared_ptr.h"
 #include "core/logging.h"
+#include "core/standardpaths.h"
 #include "core/database.h"
-#include "core/iconloader.h"
-#include "core/musicstorage.h"
+#include "core/filesystemmusicstorage.h"
+#include "device/devicedatabasebackend.h"
+#include "device/cddadevice.h"
+#include "device/cddalister.h"
+#include "device/cddasongloader.h"
+#include "engine/gsturl.h"
+#include "device/filesystemdevice.h"
+#include "device/giolister.h"
+#include "device/udisks2lister.h"
+#include "device/devicecopyrunner.h"
+#include "device/devicecopyrefresh.h"
+#include "device/devicecopysupported.h"
+#include "device/gpoddevice.h"
+#include "device/gpodloader.h"
+#include "device/mtpconnection.h"
+#include "device/mtpdevice.h"
+#include "device/mtploader.h"
+#include "organize/organize.h"
+#include "organize/organizeformat.h"
+#include "organize/organizetranscode.h"
+#include "transcoder/transcoder.h"
+#include "utilities/fileutils.h"
+#include <glib.h>
+#ifdef HAVE_GIO
+#include <gio/gio.h>
+#include <glib/gstdio.h>
+#endif
+#ifdef HAVE_MTP
+#include <libmtp.h>
+#include <cstdlib>
+#endif
+#ifdef HAVE_AUDIOCD
+#include <cdio/cdio.h>
+#endif
+#include "device/cddahelpers.h"
+#include "device/cddadiscchange.h"
+#include "device/devicescanprogress.h"
+#include "tagfetcher/musicbrainzdiscid.h"
+#include "core/network.h"
 #include "core/taskmanager.h"
-#include "core/simpletreemodel.h"
-#include "utilities/strutils.h"
-#include "filesystemdevice.h"
-#include "connecteddevice.h"
-#include "devicelister.h"
-#include "devicedatabasebackend.h"
-#include "devicestatefiltermodel.h"
-#include "deviceinfo.h"
 
-#ifdef HAVE_GIO
-#  include "giolister.h"
-#endif
-#ifdef HAVE_AUDIOCD
-#  include "cddalister.h"
-#  include "cddadevice.h"
-#endif
-#ifdef HAVE_UDISKS2
-#  include "udisks2lister.h"
-#endif
-#ifdef HAVE_MTP
-#  include "mtpdevice.h"
-#endif
-#ifdef Q_OS_MACOS
-#  include "macosdevicelister.h"
-#endif
-#ifdef HAVE_GPOD
-#  include "gpoddevice.h"
-#endif
+#include <algorithm>
+#include <functional>
+#include <taglib/fileref.h>
+#include <taglib/tag.h>
+#include <taglib/audioproperties.h>
 
-using namespace Qt::Literals::StringLiterals;
-using std::make_unique;
-
-const int DeviceManager::kDeviceIconSize = 32;
-const int DeviceManager::kDeviceIconOverlaySize = 16;
-
-DeviceManager::DeviceManager(const SharedPtr<TaskManager> task_manager,
-                             const SharedPtr<Database> database,
-                             const SharedPtr<TagReaderClient> tagreader_client,
-                             const SharedPtr<AlbumCoverLoader> albumcover_loader,
-                             QObject *parent)
-    : SimpleTreeModel<DeviceInfo>(new DeviceInfo(this), parent),
-      task_manager_(task_manager),
-      database_(database),
-      tagreader_client_(tagreader_client),
-      albumcover_loader_(albumcover_loader),
-      not_connected_overlay_(IconLoader::Load(u"edit-delete"_s)) {
-
-  setObjectName(QLatin1String(QObject::metaObject()->className()));
-
-  thread_pool_.setMaxThreadCount(1);
-  QObject::connect(&*task_manager, &TaskManager::TasksChanged, this, &DeviceManager::TasksChanged);
-
-  // Create the backend in the database thread
-  backend_ = make_unique<DeviceDatabaseBackend>();
-  backend_->moveToThread(database->thread());
-  backend_->Init(database);
-
-  QObject::connect(this, &DeviceManager::DevicesLoaded, this, &DeviceManager::AddDevicesFromDB);
-
-  // This reads from the database and contents on the database mutex, which can be very slow on startup.
-  (void)QtConcurrent::run(&thread_pool_, &DeviceManager::LoadAllDevices, this);
-
-  // This proxy model only shows connected devices
-  connected_devices_model_ = new DeviceStateFilterModel(this);
-  connected_devices_model_->setSourceModel(this);
-
-// CD devices are detected via the DiskArbitration framework instead on MacOs.
-#if defined(HAVE_AUDIOCD) && !defined(Q_OS_MACOS)
-  AddLister(new CDDALister);
-#endif
-#ifdef HAVE_UDISKS2
-  AddLister(new Udisks2Lister);
-#endif
-#ifdef HAVE_GIO
-  AddLister(new GioLister);
-#endif
-#ifdef Q_OS_MACOS
-  AddLister(new MacOsDeviceLister);
-#endif
-
-#ifdef HAVE_AUDIOCD
-  AddDeviceClass<CDDADevice>();
-#endif
-
-  AddDeviceClass<FilesystemDevice>();
-
-#ifdef HAVE_GPOD
-  AddDeviceClass<GPodDevice>();
-#endif
-
-#ifdef HAVE_MTP
-  AddDeviceClass<MtpDevice>();
-#endif
-
-}
+DeviceManager::DeviceManager(Database *database, TaskManager *task_manager)
+    : task_manager_(task_manager),
+      url_handler_(std::make_unique<DeviceUrlHandler>(this)),
+      device_db_(database ? std::make_unique<DeviceDatabaseBackend>(database) : nullptr) {}
 
 DeviceManager::~DeviceManager() {
-
-  for (DeviceLister *lister : std::as_const(listers_)) {
-    lister->ShutDown();
-    // Stop the lister's thread before deleting it, so it is not still delivering events to the object once the derived destructor has run.
-    // Normally Exit() has already moved the lister back to this thread, but this destructor also runs when the event loop ended without that happening.
-    lister->StopThread();
-    delete lister;
+  if (musicbrainz_) {
+    musicbrainz_->CancelAll();
   }
-  listers_.clear();
-
-  delete root_;
-  root_ = nullptr;
-
+  musicbrainz_.reset();
+  cdda_.reset();
+  StopVolumeMonitor();
 }
 
-void DeviceManager::Exit() {
-  CloseDevices();
-}
-
-void DeviceManager::CloseDevices() {
-
-  const QList<DeviceInfo*> devices = root_->children;
-  for (DeviceInfo *device_info : devices) {
-    if (!device_info->device_) continue;
-    if (wait_for_exit_.contains(&*device_info->device_)) continue;
-    wait_for_exit_ << &*device_info->device_;
-    QObject::connect(&*device_info->device_, &ConnectedDevice::destroyed, this, &DeviceManager::DeviceDestroyed);
-    device_info->device_->Close();
+void DeviceManager::set_network(NetworkAccessManager *network) {
+  network_ = network;
+  if (!network_) {
+    musicbrainz_.reset();
+    return;
   }
-  if (wait_for_exit_.isEmpty()) CloseListers();
-
+  musicbrainz_ = std::make_unique<MusicBrainzClient>(network_);
+  musicbrainz_->DiscIdFinished.Connect([this](const std::string &disc_id, const MusicBrainzClient::ResultList &results, const std::string &) {
+    OnCddaTags(disc_id, results);
+  });
 }
 
-void DeviceManager::CloseListers() {
-
-  for (DeviceLister *lister : std::as_const(listers_)) {
-    if (wait_for_exit_.contains(lister)) continue;
-    wait_for_exit_ << lister;
-    QObject::connect(lister, &DeviceLister::ExitFinished, this, &DeviceManager::ListerClosed);
-    lister->ExitAsync();
+void DeviceManager::Init() {
+  if (device_db_) {
+    device_db_->Init();
   }
-  if (wait_for_exit_.isEmpty()) CloseBackend();
-
+  StartVolumeMonitor();
+  Rescan();
 }
 
-void DeviceManager::CloseBackend() {
-
-  if (!backend_ || wait_for_exit_.contains(&*backend_)) return;
-  wait_for_exit_ << &*backend_;
-  QObject::connect(&*backend_, &DeviceDatabaseBackend::ExitFinished, this, &DeviceManager::BackendClosed);
-  backend_->ExitAsync();
-
-}
-
-void DeviceManager::BackendClosed() {
-
-  QObject *obj = sender();
-  QObject::disconnect(obj, nullptr, this, nullptr);
-  qLog(Debug) << obj << "successfully closed.";
-  wait_for_exit_.removeAll(obj);
-  if (wait_for_exit_.isEmpty()) Q_EMIT ExitFinished();
-
-}
-
-void DeviceManager::ListerClosed() {
-
-  DeviceLister *lister = qobject_cast<DeviceLister*>(sender());
-  if (!lister) return;
-
-  QObject::disconnect(lister, nullptr, this, nullptr);
-  qLog(Debug) << lister << "successfully closed.";
-  wait_for_exit_.removeAll(lister);
-
-  if (wait_for_exit_.isEmpty()) CloseBackend();
-
-}
-
-void DeviceManager::DeviceDestroyed() {
-
-  ConnectedDevice *connected_device = static_cast<ConnectedDevice*>(sender());
-  if (!wait_for_exit_.contains(connected_device) || !backend_) return;
-
-  wait_for_exit_.removeAll(connected_device);
-  if (wait_for_exit_.isEmpty()) CloseListers();
-
-}
-
-void DeviceManager::LoadAllDevices() {
-
-  Q_ASSERT(QThread::currentThread() != qApp->thread());
-
-  const DeviceDatabaseBackend::DeviceList devices = backend_->GetAllDevices();
-
-  Q_EMIT DevicesLoaded(devices);
-
-  // This is done in a concurrent thread so close the unique DB connection.
-  backend_->Close();
-
-}
-
-void DeviceManager::AddDevicesFromDB(const DeviceDatabaseBackend::DeviceList &devices) {
-
-  for (const DeviceDatabaseBackend::Device &device : devices) {
-    const QStringList unique_ids = device.unique_id_.split(u',');
-    DeviceInfo *device_info = FindEquivalentDevice(unique_ids);
-    if (device_info && device_info->database_id_ == -1) {
-      qLog(Info) << "Database device linked to physical device:" << device.friendly_name_;
-      device_info->database_id_ = device.id_;
-      device_info->icon_name_ = device.icon_name_;
-      device_info->InitIcon();
-      const QModelIndex idx = ItemToIndex(device_info);
-      if (idx.isValid()) {
-        Q_EMIT dataChanged(idx, idx);
-      }
-    }
-    else {
-      qLog(Info) << "Database device:" << device.friendly_name_;
-      beginInsertRows(ItemToIndex(root_), static_cast<int>(root_->children.count()), static_cast<int>(root_->children.count()));
-      device_info = new DeviceInfo(DeviceInfo::Type::Device, root_);
-      device_info->InitFromDb(device);
-      endInsertRows();
-    }
+void DeviceManager::StartVolumeMonitor() {
+#ifdef HAVE_GIO
+  if (volume_monitor_) {
+    return;
   }
-
-}
-
-QVariant DeviceManager::data(const QModelIndex &idx, int role) const {
-
-  if (!idx.isValid() || idx.column() != 0) return QVariant();
-
-  DeviceInfo *device_info = IndexToItem(idx);
-  if (!device_info) return QVariant();
-
-  switch (role) {
-    case Qt::DisplayRole:{
-      QString text;
-      if (!device_info->friendly_name_.isEmpty()) {
-        text = device_info->friendly_name_;
-      }
-      else if (device_info->BestBackend()) {
-        text = device_info->BestBackend()->unique_id_;
-      }
-
-      if (device_info->size_ > 0) {
-        text = text + QStringLiteral(" (%1)").arg(Utilities::PrettySize(device_info->size_));
-      }
-      return text;
-    }
-
-    case Qt::DecorationRole:{
-      QPixmap pixmap = device_info->icon_.pixmap(kDeviceIconSize);
-
-      if (device_info->backends_.isEmpty() || !device_info->BestBackend() || !device_info->BestBackend()->lister_) {
-        // Disconnected but remembered
-        QPainter p(&pixmap);
-        p.drawPixmap(kDeviceIconSize - kDeviceIconOverlaySize, kDeviceIconSize - kDeviceIconOverlaySize, not_connected_overlay_.pixmap(kDeviceIconOverlaySize));
-      }
-
-      return pixmap;
-    }
-
-    case Role_FriendlyName:
-      return device_info->friendly_name_;
-
-    case Role_UniqueId:
-      if (!device_info->BestBackend()) return QString();
-      return device_info->BestBackend()->unique_id_;
-
-    case Role_IconName:
-      return device_info->icon_name_;
-
-    case Role_Capacity:
-    case MusicStorage::Role_Capacity:
-      return device_info->size_;
-
-    case Role_FreeSpace:
-    case MusicStorage::Role_FreeSpace:
-      return ((device_info->BestBackend() && device_info->BestBackend()->lister_) ? device_info->BestBackend()->lister_->DeviceFreeSpace(device_info->BestBackend()->unique_id_) : QVariant());
-
-    case Role_State:
-      if (device_info->device_) return QVariant::fromValue(State::Connected);
-      if (device_info->BestBackend() && device_info->BestBackend()->lister_) {
-        if (device_info->BestBackend()->lister_->DeviceNeedsMount(device_info->BestBackend()->unique_id_)) return QVariant::fromValue(State::NotMounted);
-        return QVariant::fromValue(State::NotConnected);
-      }
-      return QVariant::fromValue(State::Remembered);
-
-    case Role_UpdatingPercentage:
-      if (device_info->task_percentage_ == -1) return QVariant();
-      return device_info->task_percentage_;
-
-    case MusicStorage::Role_Storage:
-      if (!device_info->device_ && device_info->database_id_ != -1) {
-        const_cast<DeviceManager*>(this)->Connect(device_info);
-      }
-      if (!device_info->device_) return QVariant();
-      return QVariant::fromValue<SharedPtr<MusicStorage>>(device_info->device_);
-
-    case MusicStorage::Role_StorageForceConnect:
-      if (!device_info->BestBackend()) return QVariant();
-      if (!device_info->device_) {
-        if (device_info->database_id_ == -1 && !device_info->BestBackend()->lister_->DeviceNeedsMount(device_info->BestBackend()->unique_id_)) {
-          if (device_info->BestBackend()->lister_->AskForScan(device_info->BestBackend()->unique_id_)) {
-            ScopedPtr<QMessageBox> dialog(new QMessageBox(QMessageBox::Information, tr("Connect device"), tr("This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."), QMessageBox::Cancel));
-            QPushButton *pushbutton = dialog->addButton(tr("Connect device"), QMessageBox::AcceptRole);
-            dialog->exec();
-            if (dialog->clickedButton() != pushbutton) return QVariant();
-          }
-        }
-        const_cast<DeviceManager*>(this)->Connect(device_info);
-      }
-      if (!device_info->device_) return QVariant();
-      return QVariant::fromValue<SharedPtr<MusicStorage>>(device_info->device_);
-
-    case Role_MountPath:{
-      if (!device_info->device_) return QVariant();
-
-      QString ret = device_info->device_->url().path();
-#ifdef Q_OS_WIN32
-      if (ret.startsWith(u'/')) ret.remove(0, 1);
+  auto *monitor = g_volume_monitor_get();
+  volume_monitor_ = monitor;
+  auto added = +[](GVolumeMonitor *, GObject *, gpointer data) {
+    static_cast<DeviceManager *>(data)->ScheduleRescan();
+  };
+  g_signal_connect(monitor, "volume-added", G_CALLBACK(added), this);
+  g_signal_connect(monitor, "volume-removed", G_CALLBACK(added), this);
+  g_signal_connect(monitor, "mount-added", G_CALLBACK(added), this);
+  g_signal_connect(monitor, "mount-removed", G_CALLBACK(added), this);
 #endif
-      return QDir::toNativeSeparators(ret);
-    }
-
-    case Role_TranscodeMode:
-      return static_cast<int>(device_info->transcode_mode_);
-
-    case Role_TranscodeFormat:
-      return static_cast<int>(device_info->transcode_format_);
-
-    case Role_SongCount:
-      if (!device_info->device_) return QVariant();
-      return device_info->device_->song_count();
-
-    case Role_CopyMusic:
-      if (device_info->BestBackend() && device_info->BestBackend()->lister_) return device_info->BestBackend()->lister_->CopyMusic();
-      else return false;
-
-    default:
-      return QVariant();
-  }
-
 }
 
-void DeviceManager::AddLister(DeviceLister *lister) {
-
-  listers_ << lister;
-  QObject::connect(lister, &DeviceLister::DeviceAdded, this, &DeviceManager::PhysicalDeviceAdded);
-  QObject::connect(lister, &DeviceLister::DeviceRemoved, this, &DeviceManager::PhysicalDeviceRemoved);
-  QObject::connect(lister, &DeviceLister::DeviceChanged, this, &DeviceManager::PhysicalDeviceChanged);
-
-  lister->Start();
-
+void DeviceManager::StopVolumeMonitor() {
+  if (rescan_idle_) {
+    g_source_remove(rescan_idle_);
+    rescan_idle_ = 0;
+  }
+#ifdef HAVE_GIO
+  if (volume_monitor_) {
+    g_signal_handlers_disconnect_by_data(volume_monitor_, this);
+    g_object_unref(static_cast<GVolumeMonitor *>(volume_monitor_));
+    volume_monitor_ = nullptr;
+  }
+#endif
 }
 
-DeviceInfo *DeviceManager::FindDeviceById(const QString &id) const {
+void DeviceManager::ScheduleRescan() {
+  if (rescan_idle_) {
+    return;
+  }
+  rescan_idle_ = g_idle_add(
+      +[](gpointer data) -> gboolean {
+        auto *self = static_cast<DeviceManager *>(data);
+        self->rescan_idle_ = 0;
+        self->Rescan();
+        return G_SOURCE_REMOVE;
+      },
+      this);
+}
 
-  for (DeviceInfo *device_info : std::as_const(root_->children)) {
-    for (const DeviceInfo::Backend &backend : std::as_const(device_info->backends_)) {
-      if (backend.unique_id_ == id) {
-        return device_info;
-      }
+std::string DeviceManager::MtpSerial(const std::string &unique_id) {
+  if (unique_id.rfind("mtp:", 0) == 0) {
+    return unique_id.substr(4);
+  }
+  return unique_id;
+}
+
+const ConnectedDevice *DeviceManager::FindDevice(const std::string &device_id) const {
+  for (const ConnectedDevice &device : devices_) {
+    if (device.unique_id == device_id || device.friendly_name == device_id) {
+      return &device;
     }
   }
-
   return nullptr;
-
 }
 
-DeviceInfo *DeviceManager::FindDeviceByUrl(const QList<QUrl> &urls) const {
+SongList DeviceManager::SongsFromDirectory(const std::string &path, const std::function<void(int, int)> &progress) {
+  SongList songs;
+  if (path.empty()) {
+    return songs;
+  }
+  const std::vector<std::string> entries = FileUtils::ListDirectoryRecursive(path);
+  std::vector<std::string> audio;
+  for (const std::string &entry : entries) {
+    if (Song::IsAudioFile(entry)) {
+      audio.push_back(entry);
+    }
+  }
+  int done = 0;
+  const int total = static_cast<int>(audio.size());
+  if (progress) {
+    progress(0, total);
+  }
+  for (const std::string &entry : audio) {
+    Song song(Song::Source::Device);
+    song.set_url(FileUtils::UriFromPath(entry));
+    song.set_basefilename(FileUtils::BaseName(entry));
+    song.set_valid(true);
+    TagLib::FileRef file(entry.c_str(), true, TagLib::AudioProperties::Fast);
+    if (!file.isNull() && file.tag()) {
+      const TagLib::Tag *tag = file.tag();
+      song.set_title(tag->title().to8Bit(true));
+      song.set_artist(tag->artist().to8Bit(true));
+      song.set_album(tag->album().to8Bit(true));
+      song.set_genre(tag->genre().to8Bit(true));
+      song.set_year(static_cast<int>(tag->year()));
+      song.set_track(static_cast<int>(tag->track()));
+      song.set_comment(tag->comment().to8Bit(true));
+    }
+    if (file.audioProperties()) {
+      song.set_length_nanosec(static_cast<int64_t>(file.audioProperties()->lengthInMilliseconds()) * 1000000LL);
+      song.set_bitrate(file.audioProperties()->bitrate());
+      song.set_samplerate(file.audioProperties()->sampleRate());
+    }
+    if (song.title().empty()) {
+      song.set_title(FileUtils::BaseName(entry));
+    }
+    songs.push_back(song);
+    ++done;
+    if (progress) {
+      progress(done, total);
+    }
+  }
+  std::sort(songs.begin(), songs.end(), [](const Song &a, const Song &b) { return a.PrettyTitleWithArtist() < b.PrettyTitleWithArtist(); });
+  return songs;
+}
 
-  if (urls.isEmpty()) return nullptr;
+SongList DeviceManager::MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec,
+                                     const std::string &device_path) {
+  SongList songs;
+  if (first_track <= 0 || last_track < first_track) {
+    return songs;
+  }
+  for (int track = first_track; track <= last_track; ++track) {
+    Song song(Song::Source::CDDA);
+    song.set_url(GstUrl::CddaSongUrl(track, device_path));
+    song.set_title("Track " + std::to_string(track));
+    song.set_track(track);
+    song.set_filetype(Song::FileType::CDDA);
+    const size_t index = static_cast<size_t>(track - first_track);
+    if (index < lengths_nanosec.size()) {
+      song.set_length_nanosec(lengths_nanosec[index]);
+    }
+    song.set_valid(true);
+    songs.push_back(song);
+  }
+  return songs;
+}
 
-  for (DeviceInfo *device_info : std::as_const(root_->children)) {
-    for (const DeviceInfo::Backend &backend : std::as_const(device_info->backends_)) {
-      if (!backend.lister_) continue;
-      const QList<QUrl> device_urls = backend.lister_->MakeDeviceUrls(backend.unique_id_);
-      for (const QUrl &url : device_urls) {
-        if (urls.contains(url)) {
-          return device_info;
+void DeviceManager::Rescan() {
+  devices_.clear();
+#ifdef HAVE_GIO
+  const std::vector<ConnectedDevice> volumes = GioLister().List();
+  devices_.insert(devices_.end(), volumes.begin(), volumes.end());
+#endif
+#ifdef HAVE_UDISKS2
+  {
+    const std::vector<ConnectedDevice> udisks = Udisks2Lister().List();
+    devices_.insert(devices_.end(), udisks.begin(), udisks.end());
+  }
+#endif
+  const std::vector<ConnectedDevice> cds = CddaLister().List();
+  devices_.insert(devices_.end(), cds.begin(), cds.end());
+#ifdef HAVE_MTP
+  {
+    MtpConnection::InitLibMtp();
+    LIBMTP_raw_device_t *raw = nullptr;
+    int count = 0;
+    if (LIBMTP_Detect_Raw_Devices(&raw, &count) == LIBMTP_ERROR_NONE && raw) {
+      for (int i = 0; i < count; ++i) {
+        ConnectedDevice entry;
+        entry.backend = "mtp";
+        entry.icon = "multimedia-player-symbolic";
+        LIBMTP_mtpdevice_t *device = LIBMTP_Open_Raw_Device_Uncached(&raw[i]);
+        if (device) {
+          char *name = LIBMTP_Get_Friendlyname(device);
+          char *serial = LIBMTP_Get_Serialnumber(device);
+          entry.friendly_name = name && *name ? name : "MTP device";
+          entry.unique_id = std::string("mtp:") + (serial ? serial : std::to_string(i));
+          free(name);
+          free(serial);
+          LIBMTP_Release_Device(device);
+        } else {
+          entry.friendly_name = "MTP device";
+          entry.unique_id = "mtp:" + std::to_string(i);
+        }
+        devices_.push_back(entry);
+        if (device_db_) {
+          DeviceDatabaseBackend::Device stored;
+          stored.unique_id = entry.unique_id;
+          stored.friendly_name = entry.friendly_name;
+          stored.icon_name = entry.icon;
+          device_db_->AddDevice(stored);
         }
       }
+      free(raw);
     }
   }
-
-  return nullptr;
-
-}
-
-DeviceInfo *DeviceManager::FindEquivalentDevice(const QStringList &unique_ids) const {
-
-  for (const QString &unique_id : unique_ids) {
-    DeviceInfo *device_info_match = FindDeviceById(unique_id);
-    if (device_info_match) {
-      return device_info_match;
+#endif
+#ifdef HAVE_GPOD
+  for (ConnectedDevice &device : devices_) {
+    if (device.mount_path.empty()) {
+      continue;
     }
-  }
-
-  return nullptr;
-
-}
-
-void DeviceManager::PhysicalDeviceAdded(const QString &id) {
-
-  DeviceLister *lister = qobject_cast<DeviceLister*>(sender());
-  if (!lister) return;
-
-  qLog(Info) << "Device added:" << id << lister->DeviceUniqueIDs();
-
-  // Do we have this device already?
-  DeviceInfo *device_info = FindDeviceById(id);
-  if (device_info) {
-    for (int backend_index = 0; backend_index < device_info->backends_.count(); ++backend_index) {
-      if (device_info->backends_[backend_index].unique_id_ == id) {
-        device_info->backends_[backend_index].lister_ = lister;
-        break;
+    if (FileUtils::Exists(FileUtils::Join(device.mount_path, "iPod_Control")) ||
+        FileUtils::Exists(FileUtils::Join(device.mount_path, "iTunes_Control"))) {
+      device.backend = "gpod";
+      device.icon = "multimedia-player-symbolic";
+      if (device.friendly_name.find("iPod") == std::string::npos) {
+        device.friendly_name += " (iPod)";
       }
     }
-    QModelIndex idx = ItemToIndex(device_info);
-    if (idx.isValid()) Q_EMIT dataChanged(idx, idx);
   }
-  else {
-    // Check if we have another device with the same URL
-    device_info = FindDeviceByUrl(lister->MakeDeviceUrls(id));
-    if (device_info) {
-      // Add this device's lister to the existing device
-      device_info->backends_ << DeviceInfo::Backend(lister, id);
-
-      // If the user hasn't saved the device in the DB yet then overwrite the device's name and icon etc.
-      if (device_info->database_id_ == -1 && device_info->BestBackend() && device_info->BestBackend()->lister_ == lister) {
-        device_info->friendly_name_ = lister->MakeFriendlyName(id);
-        device_info->size_ = lister->DeviceCapacity(id);
-        device_info->LoadIcon(lister->DeviceIcons(id), device_info->friendly_name_);
+#endif
+#ifdef HAVE_AUDIOCD
+  if (CddaHelpers::ShouldAddGenericCdda(static_cast<int>(cds.size()))) {
+    ConnectedDevice cd;
+    cd.friendly_name = "Audio CD";
+    cd.unique_id = "cdda";
+    cd.icon = "media-optical-symbolic";
+    cd.backend = "cdda";
+    devices_.push_back(cd);
+  }
+#endif
+  if (device_db_) {
+    for (const DeviceDatabaseBackend::Device &stored : device_db_->GetAllDevices()) {
+      if (FindDevice(stored.unique_id) || IsForgotten(stored.unique_id)) {
+        continue;
       }
-      QModelIndex idx = ItemToIndex(device_info);
-      if (idx.isValid()) Q_EMIT dataChanged(idx, idx);
-    }
-    else {
-      // It's a completely new device
-      beginInsertRows(ItemToIndex(root_), static_cast<int>(root_->children.count()), static_cast<int>(root_->children.count()));
-      device_info = new DeviceInfo(DeviceInfo::Type::Device, root_);
-      device_info->backends_ << DeviceInfo::Backend(lister, id);
-      device_info->friendly_name_ = lister->MakeFriendlyName(id);
-      device_info->size_ = lister->DeviceCapacity(id);
-      device_info->LoadIcon(lister->DeviceIcons(id), device_info->friendly_name_);
-      endInsertRows();
+      ConnectedDevice remembered;
+      remembered.unique_id = stored.unique_id;
+      remembered.friendly_name = stored.friendly_name.empty() ? stored.unique_id : stored.friendly_name;
+      remembered.icon = stored.icon_name;
+      remembered.backend = "filesystem";
+      remembered.remembered = true;
+      devices_.push_back(remembered);
     }
   }
-
+  devices_.erase(std::remove_if(devices_.begin(), devices_.end(),
+                                [this](const ConnectedDevice &device) { return IsForgotten(device.unique_id); }),
+                 devices_.end());
+  for (ConnectedDevice &device : devices_) {
+    const auto it = song_counts_.find(device.unique_id);
+    if (it != song_counts_.end()) {
+      device.song_count = it->second;
+    }
+  }
+  EnsureCddaWatch();
+  DevicesChanged.Emit();
 }
 
-void DeviceManager::PhysicalDeviceRemoved(const QString &id) {
-
-  DeviceLister *lister = qobject_cast<DeviceLister*>(sender());
-
-  qLog(Info) << "Device removed:" << id;
-
-  DeviceInfo *device_info = FindDeviceById(id);
-  if (!device_info) return;
-
-  const QModelIndex idx = ItemToIndex(device_info);
-  if (!idx.isValid()) return;
-
-  if (device_info->database_id_ != -1) {
-    // Keep the structure around, but just "disconnect" it
-    for (int backend_index = 0; backend_index < device_info->backends_.count(); ++backend_index) {
-      if (device_info->backends_[backend_index].unique_id_ == id) {
-        device_info->backends_[backend_index].lister_ = nullptr;
-        break;
-      }
-    }
-
-    if (device_info->device_ && device_info->device_->lister() == lister) {
-      device_info->device_->Close();
-    }
-
-    if (!device_info->device_) Q_EMIT DeviceDisconnected(idx);
-
-    Q_EMIT dataChanged(idx, idx);
-  }
-  else {
-    // If this was the last lister for the device then remove it from the model
-    for (int backend_index = 0; backend_index < device_info->backends_.count(); ++backend_index) {
-      if (device_info->backends_[backend_index].unique_id_ == id) {
-        device_info->backends_.removeAt(backend_index);
-        break;
-      }
-    }
-
-    if (device_info->backends_.isEmpty()) {
-      beginRemoveRows(ItemToIndex(root_), idx.row(), idx.row());
-      root_->Delete(device_info->row);
-      endRemoveRows();
-    }
-  }
-
-}
-
-void DeviceManager::PhysicalDeviceChanged(const QString &id) {
-
-  DeviceLister *lister = qobject_cast<DeviceLister*>(sender());
-  Q_UNUSED(lister);
-
-  DeviceInfo *device_info = FindDeviceById(id);
-  if (!device_info) return;
-
-  // TODO
-
-}
-
-SharedPtr<ConnectedDevice> DeviceManager::Connect(const QModelIndex &idx) {
-
-  SharedPtr<ConnectedDevice> ret;
-
-  DeviceInfo *device_info = IndexToItem(idx);
-  if (!device_info) return ret;
-
-  return Connect(device_info);
-
-}
-
-SharedPtr<ConnectedDevice> DeviceManager::Connect(DeviceInfo *device_info) {
-
-  if (!device_info) {
-    return SharedPtr<ConnectedDevice>();
-  }
-
-  if (device_info->device_) {  // Already connected
-    return device_info->device_;
-  }
-
-  if (!device_info->BestBackend() || !device_info->BestBackend()->lister_) {  // Not physically connected
-    return SharedPtr<ConnectedDevice>();
-  }
-
-  if (device_info->BestBackend()->lister_->DeviceNeedsMount(device_info->BestBackend()->unique_id_)) {  // Mount the device
-    device_info->BestBackend()->lister_->MountDeviceAsync(device_info->BestBackend()->unique_id_);
-    return SharedPtr<ConnectedDevice>();
-  }
-
-  const bool first_time = device_info->database_id_ == -1;
-  if (first_time) {
-    // We haven't stored this device in the database before
-    device_info->database_id_ = backend_->AddDevice(device_info->SaveToDb());
-  }
-
-  // Get the device URLs
-  const QList<QUrl> urls = device_info->BestBackend()->lister_->MakeDeviceUrls(device_info->BestBackend()->unique_id_);
-  if (urls.isEmpty()) return SharedPtr<ConnectedDevice>();
-
-  // Take the first URL that we have a handler for
-  QUrl device_url;
-  for (const QUrl &url : urls) {
-    qLog(Info) << "Connecting" << url;
-
-    // Find a device class for this URL's scheme
-    if (device_classes_.contains(url.scheme())) {
-      device_url = url;
+void DeviceManager::EnsureCddaWatch() {
+#ifdef HAVE_AUDIOCD
+  bool have_cdda = false;
+  for (const ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      have_cdda = true;
       break;
     }
-
-    // If we get here it means that this URL scheme wasn't supported.
-    // If it was "ipod" or "mtp" then the user compiled out support and the device won't work properly.
-    if (url.scheme() == "mtp"_L1 || url.scheme() == "gphoto2"_L1) {
-      if (QMessageBox::critical(nullptr, tr("This device will not work properly"),
-          tr("This is an MTP device, but you compiled Strawberry without libmtp support.") + u"  "_s +
-          tr("If you continue, this device will work slowly and songs copied to it may not work."),
-              QMessageBox::Abort, QMessageBox::Ignore) == QMessageBox::Abort)
-        return SharedPtr<ConnectedDevice>();
-    }
-
-    if (url.scheme() == "ipod"_L1) {
-      if (QMessageBox::critical(nullptr, tr("This device will not work properly"),
-          tr("This is an iPod, but you compiled Strawberry without libgpod support.") + "  "_L1 +
-          tr("If you continue, this device will work slowly and songs copied to it may not work."),
-              QMessageBox::Abort, QMessageBox::Ignore) == QMessageBox::Abort)
-        return SharedPtr<ConnectedDevice>();
+  }
+  if (!have_cdda) {
+    cdda_.reset();
+    return;
+  }
+  if (cdda_) {
+    return;
+  }
+  ConnectedDevice cd;
+  cd.backend = "cdda";
+  cd.unique_id = "cdda";
+  for (const ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      cd = device;
+      break;
     }
   }
+  cdda_ = std::make_unique<CddaDevice>(cd);
+  cdda_->DiscChanged.Connect([this]() { OnCddaDiscChanged(); });
+  if (!cdda_->Init()) {
+    cdda_.reset();
+  }
+#else
+  cdda_.reset();
+#endif
+}
 
-  if (device_url.isEmpty()) {
-    // Munge the URL list into a string list
-    QStringList url_strings;
-    url_strings.reserve(urls.count());
-    for (const QUrl &url : urls) {
-      url_strings << url.toString();
+void DeviceManager::OnCddaDiscChanged() {
+  cdda_songs_.clear();
+  cdda_disc_id_.clear();
+  cdda_lookup_id_.clear();
+  cdda_lookup_started_ = false;
+  if (cdda_ && CddaDiscChange::ShouldPauseWatchWhileLoading()) {
+    cdda_->WatchForDiscChanges(false);
+    cdda_->set_loader_active(true);
+  }
+  const SongList songs = SongsFromCdda();
+  if (cdda_) {
+    if (CddaDiscChange::ShouldAckAfterLoad()) {
+      cdda_->AckMediaChanged();
     }
-
-    Q_EMIT DeviceError(tr("This type of device is not supported: %1").arg(url_strings.join(", "_L1)));
-    return SharedPtr<ConnectedDevice>();
+    cdda_->set_loader_active(false);
+    cdda_->WatchForDiscChanges(true);
   }
-
-  QMetaObject meta_object = device_classes_.value(device_url.scheme());
-  QObject *instance = meta_object.newInstance(
-      Q_ARG(QUrl, device_url),
-      Q_ARG(DeviceLister*, device_info->BestBackend()->lister_),
-      Q_ARG(QString, device_info->BestBackend()->unique_id_),
-      Q_ARG(DeviceManager*, this),
-      Q_ARG(SharedPtr<TaskManager>, task_manager_),
-      Q_ARG(SharedPtr<Database>, database_),
-      Q_ARG(SharedPtr<TagReaderClient>, tagreader_client_),
-      Q_ARG(SharedPtr<AlbumCoverLoader>, albumcover_loader_),
-      Q_ARG(int, device_info->database_id_),
-      Q_ARG(bool, first_time));
-
-  SharedPtr<ConnectedDevice> connected_device = SharedPtr<ConnectedDevice>(qobject_cast<ConnectedDevice*>(instance));
-  if (!connected_device) {
-    qLog(Warning) << "Could not create device for" << device_url.toString();
-    delete instance;
-    return nullptr;
+  for (ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      RememberSongCount(device.unique_id, static_cast<int>(songs.size()));
+    }
   }
-
-  bool result = connected_device->Init();
-  if (!result) {
-    qLog(Warning) << "Could not connect to device" << device_url.toString();
-    return connected_device;
-  }
-  device_info->device_ = connected_device;
-
-  QModelIndex idx = ItemToIndex(device_info);
-  if (!idx.isValid()) return connected_device;
-
-  Q_EMIT dataChanged(idx, idx);
-
-  QObject::connect(&*device_info->device_, &ConnectedDevice::TaskStarted, this, &DeviceManager::DeviceTaskStarted);
-  QObject::connect(&*device_info->device_, &ConnectedDevice::SongCountUpdated, this, &DeviceManager::DeviceSongCountUpdated);
-  QObject::connect(&*device_info->device_, &ConnectedDevice::DeviceConnectFinished, this, &DeviceManager::DeviceConnectFinished);
-  QObject::connect(&*device_info->device_, &ConnectedDevice::DeviceCloseFinished, this, &DeviceManager::DeviceCloseFinished);
-  QObject::connect(&*device_info->device_, &ConnectedDevice::Error, this, &DeviceManager::DeviceError);
-
-  connected_device->ConnectAsync();
-
-  return connected_device;
-
+  DevicesChanged.Emit();
 }
 
-void DeviceManager::DeviceConnectFinished(const QString &id, const bool success) {
+bool DeviceManager::IsForgotten(const std::string &device_id) const {
+  return std::find(forgotten_.begin(), forgotten_.end(), device_id) != forgotten_.end();
+}
 
-  DeviceInfo *device_info = FindDeviceById(id);
-  if (!device_info) return;
-
-  QModelIndex idx = ItemToIndex(device_info);
-  if (!idx.isValid()) return;
-
-  if (success) {
-    Q_EMIT DeviceConnected(idx);
+SongList DeviceManager::Songs(const std::string &device_id) {
+  const ConnectedDevice *device = FindDevice(device_id);
+  if (!device) {
+    return {};
   }
-  else {
-    device_info->device_->Close();
+  scan_device_id_ = device_id;
+  last_scan_percent_ = -1;
+  if (task_manager_) {
+    scan_task_id_ = task_manager_->StartTask(DeviceScanProgress::TaskName());
   }
-
-}
-
-void DeviceManager::DeviceCloseFinished(const QString &id) {
-
-  DeviceInfo *device_info = FindDeviceById(id);
-  if (!device_info) return;
-
-  device_info->device_.reset();
-
-  QModelIndex idx = ItemToIndex(device_info);
-  if (!idx.isValid()) return;
-
-  Q_EMIT DeviceDisconnected(idx);
-  Q_EMIT dataChanged(idx, idx);
-
-  if (device_info->unmount_ && device_info->BestBackend() && device_info->BestBackend()->lister_) {
-    device_info->BestBackend()->lister_->UnmountDeviceAsync(device_info->BestBackend()->unique_id_);
+  SetUpdatingPercent(device_id, 0);
+  auto progress = [this, device_id](int done, int total) {
+    const int percent = DeviceScanProgress::Percent(done, total);
+    if (!DeviceScanProgress::ShouldReport(last_scan_percent_, percent)) {
+      return;
+    }
+    last_scan_percent_ = percent;
+    if (task_manager_ && scan_task_id_) {
+      task_manager_->SetTaskProgress(scan_task_id_, done, total);
+    }
+    SetUpdatingPercent(device_id, percent);
+  };
+  SongList songs;
+  if (device->backend == "cdda") {
+    songs = SongsFromCdda();
+    MaybeStartCddaLookup(device_id, songs);
+    if (!cdda_songs_.empty() && cdda_disc_id_ == MusicBrainzDiscId::DiscIdFromSongs(songs)) {
+      songs = cdda_songs_;
+    }
+  } else if (device->backend == "mtp") {
+    songs = SongsFromMtp(*device);
+  } else if (device->backend == "gpod") {
+    songs = GPodLoader::LoadSongs(device->mount_path);
+    if (songs.empty()) {
+      std::string root = device->mount_path;
+      const std::string music = FileUtils::Join(root, "iPod_Control/Music");
+      if (FileUtils::IsDirectory(music)) {
+        root = music;
+      }
+      songs = SongsFromDirectory(root, progress);
+    }
+  } else {
+    songs = SongsFromDirectory(device->mount_path, progress);
   }
-
-  if (device_info->forget_) {
-    RemoveFromDB(device_info, idx);
+  RememberSongCount(device_id, static_cast<int>(songs.size()));
+  SetUpdatingPercent(device_id, DeviceScanProgress::FinishedPercent());
+  if (task_manager_ && scan_task_id_) {
+    task_manager_->SetTaskFinished(scan_task_id_);
+    scan_task_id_ = 0;
   }
-
+  scan_device_id_.clear();
+  return songs;
 }
 
-DeviceInfo *DeviceManager::GetDevice(const QModelIndex &idx) const {
-
-  DeviceInfo *device_info = IndexToItem(idx);
-  return device_info;
-
-}
-
-SharedPtr<ConnectedDevice> DeviceManager::GetConnectedDevice(const QModelIndex &idx) const {
-
-  SharedPtr<ConnectedDevice> connected_device;
-  DeviceInfo *device_info = IndexToItem(idx);
-  if (!device_info) return connected_device;
-  return device_info->device_;
-
-}
-
-SharedPtr<ConnectedDevice> DeviceManager::GetConnectedDevice(DeviceInfo *device_info) const {
-
-  SharedPtr<ConnectedDevice> connected_device;
-  if (!device_info) return connected_device;
-  return device_info->device_;
-
-}
-
-int DeviceManager::GetDatabaseId(const QModelIndex &idx) const {
-
-  if (!idx.isValid()) return -1;
-
-  DeviceInfo *device_info = IndexToItem(idx);
-  if (!device_info) return -1;
-  return device_info->database_id_;
-
-}
-
-DeviceLister *DeviceManager::GetLister(const QModelIndex &idx) const {
-
-  if (!idx.isValid()) return nullptr;
-
-  DeviceInfo *device_info = IndexToItem(idx);
-  if (!device_info || !device_info->BestBackend()) return nullptr;
-  return device_info->BestBackend()->lister_;
-
-}
-
-void DeviceManager::Disconnect(DeviceInfo *device_info, const QModelIndex &idx) {
-
-  Q_UNUSED(idx);
-
-  device_info->device_->Close();
-
-}
-
-void DeviceManager::Forget(const QModelIndex &idx) {
-
-  if (!idx.isValid()) return;
-
-  DeviceInfo *device_info = IndexToItem(idx);
-  if (!device_info) return;
-
-  if (device_info->database_id_ == -1) return;
-
-  if (device_info->device_) {
-    device_info->forget_ = true;
-    Disconnect(device_info, idx);
+SongList DeviceManager::SongsFromCdda() const {
+#ifdef HAVE_AUDIOCD
+  std::string path;
+  for (const ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      path = device.mount_path;
+      break;
+    }
   }
-  else {
-    RemoveFromDB(device_info, idx);
-  }
-
+  return CddaSongLoader::LoadDevice(path);
+#else
+  return {};
+#endif
 }
 
-void DeviceManager::RemoveFromDB(DeviceInfo *device_info, const QModelIndex &idx) {
-
-  backend_->RemoveDevice(device_info->database_id_);
-  device_info->database_id_ = -1;
-
-  if (!device_info->BestBackend() || !device_info->BestBackend()->lister_) {  // It's not attached any more so remove it from the list
-    beginRemoveRows(ItemToIndex(root_), idx.row(), idx.row());
-    root_->Delete(device_info->row);
-    endRemoveRows();
+void DeviceManager::MaybeStartCddaLookup(const std::string &device_id, const SongList &songs) {
+  const std::string disc_id = MusicBrainzDiscId::DiscIdFromSongs(songs);
+  if (!MusicBrainzDiscId::ShouldLookup(disc_id) || !musicbrainz_) {
+    return;
   }
-  else {  // It's still attached, set the name and icon back to what they were originally
-    const QString id = device_info->BestBackend()->unique_id_;
-
-    device_info->friendly_name_ = device_info->BestBackend()->lister_->MakeFriendlyName(id);
-    device_info->LoadIcon(device_info->BestBackend()->lister_->DeviceIcons(id), device_info->friendly_name_);
-    Q_EMIT dataChanged(idx, idx);
+  if (cdda_lookup_started_ && cdda_lookup_id_ == disc_id) {
+    return;
   }
-
+  if (!cdda_songs_.empty() && cdda_disc_id_ == disc_id) {
+    return;
+  }
+  cdda_lookup_started_ = true;
+  cdda_lookup_id_ = disc_id;
+  scan_device_id_ = device_id;
+  musicbrainz_->StartDiscId(disc_id);
 }
 
-void DeviceManager::SetDeviceOptions(const QModelIndex &idx, const QString &friendly_name, const QString &icon_name, const MusicStorage::TranscodeMode mode, const Song::FileType format) {
-
-  if (!idx.isValid()) return;
-
-  DeviceInfo *device_info = IndexToItem(idx);
-  if (!device_info) return;
-
-  device_info->friendly_name_ = friendly_name;
-  device_info->LoadIcon(QVariantList() << icon_name, friendly_name);
-  device_info->transcode_mode_ = mode;
-  device_info->transcode_format_ = format;
-
-  Q_EMIT dataChanged(idx, idx);
-
-  if (device_info->database_id_ != -1) {
-    backend_->SetDeviceOptions(device_info->database_id_, friendly_name, icon_name, mode, format);
+void DeviceManager::OnCddaTags(const std::string &disc_id, const MusicBrainzClient::ResultList &results) {
+  cdda_lookup_started_ = false;
+  if (disc_id != cdda_lookup_id_ || results.empty()) {
+    return;
   }
-
+  SongList base = cdda_songs_.empty() ? SongsFromCdda() : cdda_songs_;
+  if (MusicBrainzDiscId::DiscIdFromSongs(base) != disc_id) {
+    base = SongsFromCdda();
+  }
+  cdda_songs_ = MusicBrainzDiscId::MergeByTrack(base, results);
+  cdda_disc_id_ = disc_id;
+  for (ConnectedDevice &device : devices_) {
+    if (device.backend == "cdda") {
+      RememberSongCount(device.unique_id, static_cast<int>(cdda_songs_.size()));
+    }
+  }
+  DevicesChanged.Emit();
 }
 
-void DeviceManager::DeviceTaskStarted(const int id) {
+SongList DeviceManager::SongsFromMtp(const ConnectedDevice &device) const {
+#ifdef HAVE_MTP
+  SongList songs = MtpLoader::LoadSongs(MtpSerial(device.unique_id));
+  if (device_db_) {
+    const DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device.unique_id);
+    if (!songs.empty() && stored.id >= 0) {
+      device_db_->ReplaceSongs(stored.id, songs);
+    } else if (songs.empty() && stored.id >= 0) {
+      songs = device_db_->Songs(stored.id);
+    }
+  }
+  return songs;
+#else
+  (void)device;
+  return {};
+#endif
+}
 
-  ConnectedDevice *device = qobject_cast<ConnectedDevice*>(sender());
-  if (!device) return;
+std::string DeviceManager::DownloadMtpTrack(const std::string &url) const { return MtpDevice::DownloadTrack(url); }
 
-  for (DeviceInfo *device_info : std::as_const(root_->children)) {
-    if (device_info->device_ && &*device_info->device_ == device) {
-      QModelIndex index = ItemToIndex(device_info);
-      if (!index.isValid()) continue;
-      active_tasks_[id] = index;
-      device_info->task_percentage_ = 0;
-      Q_EMIT dataChanged(index, index);
+UrlHandler::LoadResult DeviceManager::DeviceUrlHandler::Load(const std::string &url, AsyncCallback) {
+  UrlHandler::LoadResult result;
+  const std::string path = manager_->DownloadMtpTrack(url);
+  if (path.empty()) {
+    result.type = UrlHandler::LoadResult::Type::Error;
+    result.error = DeviceError::MtpCopyFailed();
+    if (manager_) {
+      manager_->DeviceError.Emit(result.error);
+    }
+    return result;
+  }
+  result.type = UrlHandler::LoadResult::Type::TrackAvailable;
+  result.media_url = url;
+  result.stream_url = FileUtils::UriFromPath(path);
+  return result;
+}
+
+std::string DeviceManager::MusicPath(const ConnectedDevice &device) {
+  if (device.mount_path.empty()) {
+    return {};
+  }
+  if (device.backend == "gpod") {
+    return device.mount_path;
+  }
+  return FileUtils::Join(device.mount_path, "Music");
+}
+
+SongList DeviceManager::TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const {
+  const DeviceDatabaseBackend::Device stored = StoredDevice(device.unique_id);
+  const MusicStorage::TranscodeMode mode =
+      OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported);
+  const Song::FileType format = stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG;
+  const std::vector<Song::FileType> supported = DeviceCopySupported::ForDevice(device);
+  SongList prepared;
+  prepared.reserve(songs.size());
+  for (const Song &song : songs) {
+    const Song::FileType dest_type = OrganizeTranscode::Check(song.filetype(), mode, format, supported);
+    if (dest_type == Song::FileType::Unknown || !OrganizeTranscode::CanTranscode(dest_type)) {
+      prepared.push_back(song);
+      continue;
+    }
+    const std::string src = FileUtils::PathFromUri(song.url());
+    const std::string temp = OrganizeTranscode::FiddleExtension(
+        FileUtils::Join(StandardPaths::CacheDir(), "device-" + FileUtils::BaseName(src)), OrganizeTranscode::ExtensionForFileType(dest_type));
+    Transcoder transcoder;
+    if (!transcoder.TranscodeFile(song, temp, OrganizeTranscode::FormatFromFileType(dest_type))) {
+      LogWarning("Could not transcode %s for device %s", src.c_str(), device.unique_id.c_str());
+      continue;
+    }
+    Song copy = song;
+    copy.set_url(FileUtils::UriFromPath(temp));
+    copy.set_filetype(dest_type);
+    copy.set_basefilename(FileUtils::BaseName(temp));
+    prepared.push_back(copy);
+  }
+  return prepared;
+}
+
+bool DeviceManager::CopySongs(const std::string &device_id, const SongList &songs) {
+  const ConnectedDevice *found = FindDevice(device_id);
+  if (!found) {
+    DeviceError.Emit(DeviceError::MissingDevice());
+    return false;
+  }
+  const ConnectedDevice target = *found;
+  const DeviceDatabaseBackend::Device stored = StoredDevice(target.unique_id);
+  DeviceCopyRunner runner(task_manager_, tagreader_);
+  runner.set_transcode(OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode
+                                                                       : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported),
+                       stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG);
+  if (!runner.Copy(target, songs)) {
+    DeviceError.Emit(DeviceError::CopyFailed());
+    return false;
+  }
+  RefreshAfterCopy(device_id, runner.copied(), runner.copied_songs());
+  return true;
+}
+
+void DeviceManager::RefreshAfterCopy(const std::string &device_id, int copied, const SongList &on_device) {
+  const ConnectedDevice *device = FindDevice(device_id);
+  const std::string backend = device ? device->backend : std::string();
+  if (!DeviceCopyRefresh::ShouldRefreshAfterCopy(backend, copied)) {
+    return;
+  }
+  if (device_db_ && !on_device.empty()) {
+    const DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device_id);
+    if (stored.id >= 0) {
+      SongList songs = device_db_->Songs(stored.id);
+      songs.insert(songs.end(), on_device.begin(), on_device.end());
+      device_db_->ReplaceSongs(stored.id, songs);
+    }
+  }
+  if (song_counts_.count(device_id) && song_counts_[device_id] >= 0) {
+    RememberSongCount(device_id, song_counts_[device_id] + copied);
+  }
+  DevicesChanged.Emit();
+}
+
+void DeviceManager::Remember(const std::string &device_id) {
+  if (!device_db_) {
+    return;
+  }
+  const ConnectedDevice *found = FindDevice(device_id);
+  if (!found) {
+    return;
+  }
+  if (device_db_->FindByUniqueId(device_id).id >= 0) {
+    return;
+  }
+  DeviceDatabaseBackend::Device stored;
+  stored.unique_id = found->unique_id;
+  stored.friendly_name = found->friendly_name;
+  stored.icon_name = found->icon;
+  stored.size = found->size;
+  device_db_->AddDevice(stored);
+}
+
+void DeviceManager::RememberSongCount(const std::string &device_id, const int count) {
+  song_counts_[device_id] = count;
+  for (ConnectedDevice &device : devices_) {
+    if (device.unique_id == device_id) {
+      device.song_count = count;
       return;
     }
   }
-
 }
 
-void DeviceManager::TasksChanged() {
-
-  const QList<TaskManager::Task> tasks = task_manager_->GetTasks();
-  QList<QPersistentModelIndex> finished_tasks = active_tasks_.values();
-
-  for (const TaskManager::Task &task : tasks) {
-    if (!active_tasks_.contains(task.id)) continue;
-
-    const QPersistentModelIndex idx = active_tasks_.value(task.id);
-    if (!idx.isValid()) continue;
-
-    DeviceInfo *device_info = IndexToItem(idx);
-    if (!device_info) continue;
-    if (task.progress_max) {
-      device_info->task_percentage_ = static_cast<int>(static_cast<float>(task.progress) / static_cast<float>(task.progress_max) * 100);
+void DeviceManager::SetUpdatingPercent(const std::string &device_id, const int percent) {
+  for (ConnectedDevice &device : devices_) {
+    if (device.unique_id == device_id) {
+      device.updating_percent = percent;
+      DevicesChanged.Emit();
+      return;
     }
-    else {
-      device_info->task_percentage_ = 0;
+  }
+}
+
+bool DeviceManager::Forget(const std::string &device_id) {
+  if (device_id.empty()) {
+    return false;
+  }
+  song_counts_.erase(device_id);
+  if (!IsForgotten(device_id)) {
+    forgotten_.push_back(device_id);
+  }
+  if (device_db_) {
+    const DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device_id);
+    if (stored.id >= 0) {
+      device_db_->RemoveDevice(stored.id);
     }
-
-    Q_EMIT dataChanged(idx, idx);
-    finished_tasks.removeAll(idx);
-
   }
-
-  for (const QPersistentModelIndex &idx : std::as_const(finished_tasks)) {
-
-    if (!idx.isValid()) continue;
-
-    DeviceInfo *device_info = IndexToItem(idx);
-    if (!device_info) continue;
-
-    device_info->task_percentage_ = -1;
-    Q_EMIT dataChanged(idx, idx);
-
-    active_tasks_.remove(active_tasks_.key(idx));
-  }
-
+  Rescan();
+  return true;
 }
 
-void DeviceManager::UnmountAsync(const QModelIndex &idx) {
-
-  if (!QMetaObject::invokeMethod(this, "Unmount", Q_ARG(QModelIndex, idx))) {
-    qLog(Error) << "Failed to invoke Unmount.";
+bool DeviceManager::Mount(const std::string &device_id) {
+#ifdef HAVE_GIO
+  if (device_id.empty()) {
+    DeviceError.Emit(DeviceError::MountFailed());
+    return false;
   }
-
+  GVolumeMonitor *monitor = g_volume_monitor_get();
+  if (!monitor) {
+    return false;
+  }
+  GList *volumes = g_volume_monitor_get_volumes(monitor);
+  GVolume *match = nullptr;
+  for (GList *l = volumes; l; l = l->next) {
+    GVolume *volume = G_VOLUME(l->data);
+    gchar *id = g_volume_get_identifier(volume, G_VOLUME_IDENTIFIER_KIND_UNIX_DEVICE);
+    gchar *name = g_volume_get_name(volume);
+    const bool same = (id && device_id == id) || (name && device_id == name);
+    g_free(id);
+    g_free(name);
+    if (same) {
+      match = volume;
+      g_object_ref(match);
+      break;
+    }
+  }
+  for (GList *l = volumes; l; l = l->next) {
+    g_object_unref(l->data);
+  }
+  g_list_free(volumes);
+  g_object_unref(monitor);
+  if (!match) {
+    DeviceError.Emit(DeviceError::MountFailed());
+    return false;
+  }
+  g_volume_mount(match, G_MOUNT_MOUNT_NONE, nullptr, nullptr,
+                 +[](GObject *source, GAsyncResult *result, gpointer data) {
+                   g_volume_mount_finish(G_VOLUME(source), result, nullptr);
+                   static_cast<DeviceManager *>(data)->Rescan();
+                   g_object_unref(source);
+                 },
+                 this);
+  return true;
+#else
+  (void)device_id;
+  DeviceError.Emit(DeviceError::MountFailed());
+  return false;
+#endif
 }
 
-void DeviceManager::Unmount(const QModelIndex &idx) {
-
-  if (!idx.isValid()) return;
-
-  DeviceInfo *device_info = IndexToItem(idx);
-  if (!device_info) return;
-
-  if (device_info->database_id_ != -1 && !device_info->device_) return;
-
-  if (device_info->device_) {
-    device_info->unmount_ = true;
-    Disconnect(device_info, idx);
+bool DeviceManager::Unmount(const std::string &device_id) {
+#ifdef HAVE_GIO
+  const ConnectedDevice *found = FindDevice(device_id);
+  if (!found || found->mount_path.empty()) {
+    DeviceError.Emit(DeviceError::UnmountFailed());
+    return false;
   }
-  else if (device_info->BestBackend() && device_info->BestBackend()->lister_) {
-    device_info->BestBackend()->lister_->UnmountDeviceAsync(device_info->BestBackend()->unique_id_);
+  GFile *file = g_file_new_for_path(found->mount_path.c_str());
+  if (!file) {
+    return false;
   }
-
+  g_file_unmount_mountable_with_operation(file, G_MOUNT_UNMOUNT_NONE, nullptr, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+    g_file_unmount_mountable_with_operation_finish(G_FILE(source), result, nullptr);
+    static_cast<DeviceManager *>(data)->Rescan();
+    g_object_unref(source);
+  }, this);
+  return true;
+#else
+  (void)device_id;
+  DeviceError.Emit(DeviceError::UnmountFailed());
+  return false;
+#endif
 }
 
-void DeviceManager::DeviceSongCountUpdated(const int count) {
-
-  Q_UNUSED(count);
-
-  ConnectedDevice *connected_device = qobject_cast<ConnectedDevice*>(sender());
-  if (!connected_device) return;
-
-  DeviceInfo *device_info = FindDeviceById(connected_device->unique_id());
-  if (!device_info) return;
-
-  QModelIndex idx = ItemToIndex(device_info);
-  if (!idx.isValid()) return;
-
-  Q_EMIT dataChanged(idx, idx);
-
+bool DeviceManager::SetDeviceOptions(const std::string &device_id, const std::string &friendly_name,
+                                     DeviceDatabaseBackend::TranscodeMode mode, Song::FileType format, const std::string &icon_name) {
+  if (!device_db_) {
+    return false;
+  }
+  DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device_id);
+  const std::string icon = icon_name.empty() ? stored.icon_name : icon_name;
+  if (stored.id < 0) {
+    stored.unique_id = device_id;
+    stored.friendly_name = friendly_name;
+    stored.icon_name = icon;
+    stored.transcode_mode = mode;
+    stored.transcode_format = format;
+    return device_db_->AddDevice(stored) >= 0;
+  }
+  device_db_->SetDeviceOptions(stored.id, friendly_name.empty() ? stored.friendly_name : friendly_name, icon, mode, format);
+  for (ConnectedDevice &device : devices_) {
+    if (device.unique_id == device_id) {
+      if (!friendly_name.empty()) {
+        device.friendly_name = friendly_name;
+      }
+      if (!icon.empty()) {
+        device.icon = icon;
+      }
+    }
+  }
+  return true;
 }
 
-QString DeviceManager::DeviceNameByID(const QString &unique_id) {
+DeviceDatabaseBackend::Device DeviceManager::StoredDevice(const std::string &device_id) const {
+  if (!device_db_) {
+    return {};
+  }
+  return device_db_->FindByUniqueId(device_id);
+}
 
-  DeviceInfo *device_info = FindDeviceById(unique_id);
-  if (!device_info) return QString();
-
-  QModelIndex idx = ItemToIndex(device_info);
-  if (!idx.isValid()) return QString();
-
-  return data(idx, DeviceManager::Role_FriendlyName).toString();
-
+bool DeviceManager::DeleteSong(const std::string &device_id, const Song &song) {
+  const ConnectedDevice *found = FindDevice(device_id);
+  if (!found) {
+    DeviceError.Emit(DeviceError::MissingDevice());
+    return false;
+  }
+#ifdef HAVE_MTP
+  if (found->backend == "mtp") {
+    if (!MtpDevice::DeleteSong(MtpSerial(found->unique_id), song)) {
+      DeviceError.Emit(DeviceError::DeleteFailed());
+      return false;
+    }
+    return true;
+  }
+#endif
+#ifdef HAVE_GPOD
+  if (found->backend == "gpod") {
+    if (!GPodDevice::DeleteSong(found->mount_path, song)) {
+      DeviceError.Emit(DeviceError::DeleteFailed());
+      return false;
+    }
+    return true;
+  }
+#endif
+  if (!found->mount_path.empty()) {
+    FilesystemMusicStorage storage(found->mount_path);
+    MusicStorage::DeleteJob job;
+    job.metadata = song;
+    if (!storage.DeleteFromStorage(job)) {
+      DeviceError.Emit(DeviceError::DeleteFailed());
+      return false;
+    }
+    return true;
+  }
+  DeviceError.Emit(DeviceError::DeleteFailed());
+  return false;
 }

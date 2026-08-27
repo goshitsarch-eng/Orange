@@ -1,417 +1,217 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "equalizer/equalizer.h"
 
-#include "config.h"
+#include "core/settings.h"
+#include "equalizer/equalizergain.h"
+#include "equalizer/equalizerpersist.h"
+#include "utilities/strutils.h"
 
 #include <algorithm>
-
-#include <QtGlobal>
-#include <QWidget>
-#include <QDialog>
-#include <QDataStream>
-#include <QList>
-#include <QVariant>
-#include <QString>
-#include <QFrame>
-#include <QKeySequence>
-#include <QLayout>
-#include <QLineEdit>
-#include <QShortcut>
-#include <QSlider>
-#include <QMessageBox>
-#include <QInputDialog>
-#include <QToolButton>
-#include <QCheckBox>
-#include <QComboBox>
-#include <QBoxLayout>
-#include <QSettings>
-
-#include "core/iconloader.h"
-#include "core/settings.h"
-#include "equalizer.h"
-#include "equalizerslider.h"
-#include "ui_equalizer.h"
-
-using namespace Qt::Literals::StringLiterals;
+#include <cstdlib>
+#include <sstream>
 
 namespace {
-constexpr char kSettingsGroup[] = "Equalizer";
-constexpr char kPresets[] = "presets";
-constexpr char kName[] = "name";
-constexpr char kParams[] = "params";
-constexpr char kSelectedPreset[] = "selected_preset";
-constexpr char kEnabled[] = "enabled";
-constexpr char kEnableStereoBalancer[] = "enable_stereo_balancer";
-constexpr char kStereoBalance[] = "stereo_balance";
-constexpr char kCustom[] = "custom";
-const char *kGainText[] = { "60", "170", "310", "600", "1k", "3k", "6k", "12k", "14k", "16k" };
-}  // namespace
 
-Equalizer::Equalizer(QWidget *parent)
-    : QDialog(parent),
-      ui_(new Ui_Equalizer),
-      loading_(false) {
-
-  ui_->setupUi(this);
-
-  // Icons
-  ui_->preset_del->setIcon(IconLoader::Load(u"list-remove"_s));
-  ui_->preset_save->setIcon(IconLoader::Load(u"document-save"_s));
-
-  preamp_ = AddSlider(tr("Pre-amp"));
-
-  QFrame *line = new QFrame(ui_->slider_container);
-  line->setFrameShape(QFrame::VLine);
-  line->setFrameShadow(QFrame::Sunken);
-  ui_->slider_container->layout()->addWidget(line);
-
-  for (int i = 0; i < kBands; ++i) gain_[i] = AddSlider(QString::fromLatin1(kGainText[i]));
-
-  // Must be done before the signals are connected
-  ReloadSettings();
-
-  QObject::connect(ui_->enable_equalizer, &QCheckBox::toggled, this, &Equalizer::EqualizerEnabledChangedSlot);
-
-  QObject::connect(ui_->preset, QOverload<int>::of(&QComboBox::currentIndexChanged), this, QOverload<int>::of(&Equalizer::PresetChanged));
-  QObject::connect(ui_->preset_save, &QToolButton::clicked, this, &Equalizer::SavePreset);
-  QObject::connect(ui_->preset_del, &QToolButton::clicked, this, &Equalizer::DelPreset);
-
-  QObject::connect(ui_->enable_stereo_balancer, &QCheckBox::toggled, this, &Equalizer::StereoBalancerEnabledChangedSlot);
-  QObject::connect(ui_->stereo_balance_slider, &QSlider::valueChanged, this, &Equalizer::StereoBalanceSliderChanged);
-
-  QShortcut *close = new QShortcut(QKeySequence::Close, this);
-  QObject::connect(close, &QShortcut::activated, this, &Equalizer::close);
-
+std::vector<int> ParseGains(const std::string &text) {
+  std::vector<int> gains(EqualizerGain::kBandCount, 0);
+  std::istringstream stream(text);
+  std::string part;
+  size_t i = 0;
+  while (i < gains.size() && std::getline(stream, part, ',')) {
+    gains[i++] = EqualizerGain::ClampSlider(std::atoi(part.c_str()));
+  }
+  return gains;
 }
 
-Equalizer::~Equalizer() {
-  delete ui_;
+std::string JoinGains(const std::vector<int> &gains) {
+  std::string text;
+  for (size_t i = 0; i < gains.size(); ++i) {
+    if (i > 0) {
+      text += ",";
+    }
+    text += std::to_string(gains[i]);
+  }
+  return text;
+}
+
+}  // namespace
+
+Equalizer::Equalizer() : gains_(EqualizerGain::kBandCount, 0) { ReloadSettings(); }
+
+void Equalizer::LoadBuiltinPresets() {
+  presets_["Custom"] = std::vector<int>(EqualizerGain::kBandCount, 0);
+  presets_["Classical"] = {0, 0, 0, 0, 0, 0, -40, -40, -40, -50};
+  presets_["Club"] = {0, 0, 20, 30, 30, 30, 20, 0, 0, 0};
+  presets_["Dance"] = {50, 35, 10, 0, 0, -30, -40, -40, 0, 0};
+  presets_["Full Bass"] = {70, 70, 70, 40, 20, -45, -50, -55, -55, -55};
+  presets_["Full Treble"] = {-50, -50, -50, -25, 15, 55, 80, 80, 80, 85};
+  presets_["Full Bass + Treble"] = {35, 30, 0, -40, -25, 10, 45, 55, 60, 60};
+  presets_["Laptop/Headphones"] = {25, 50, 25, -20, 0, -30, -40, -40, 0, 0};
+  presets_["Large Hall"] = {50, 50, 30, 30, 0, -25, -25, -25, 0, 0};
+  presets_["Live"] = {-25, 0, 20, 25, 30, 30, 20, 15, 15, 10};
+  presets_["Party"] = {35, 35, 0, 0, 0, 0, 0, 0, 35, 35};
+  presets_["Pop"] = {-10, 25, 35, 40, 25, -5, -15, -15, -10, -10};
+  presets_["Reggae"] = {0, 0, -5, -30, 0, -35, -35, 0, 0, 0};
+  presets_["Rock"] = {40, 25, -30, -40, -20, 20, 45, 55, 55, 55};
+  presets_["Soft"] = {25, 10, -5, -15, -5, 20, 45, 50, 55, 60};
+  presets_["Ska"] = {-15, -25, -25, -5, 20, 30, 45, 50, 55, 50};
+  presets_["Soft Rock"] = {20, 20, 10, -5, -25, -30, -20, -5, 15, 45};
+  presets_["Techno"] = {40, 30, 0, -30, -25, 0, 40, 50, 50, 45};
+  presets_["Zero"] = std::vector<int>(EqualizerGain::kBandCount, 0);
+}
+
+std::vector<std::string> Equalizer::BuiltinPresetNames() {
+  return {"Custom",
+          "Classical",
+          "Club",
+          "Dance",
+          "Full Bass",
+          "Full Treble",
+          "Full Bass + Treble",
+          "Laptop/Headphones",
+          "Large Hall",
+          "Live",
+          "Party",
+          "Pop",
+          "Reggae",
+          "Rock",
+          "Soft",
+          "Ska",
+          "Soft Rock",
+          "Techno",
+          "Zero"};
 }
 
 void Equalizer::ReloadSettings() {
-
   Settings s;
-  s.beginGroup(kSettingsGroup);
-
-  presets_.clear();
-  ui_->preset->clear();
-
-  const int count = s.beginReadArray(kPresets);
-  for (int i = 0; i < count; ++i) {
-    s.setArrayIndex(i);
-#ifdef __GNUC__
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Warray-bounds"
-#endif
-    AddPreset(s.value(kName).toString(), s.value(kParams).value<Equalizer::Params>());
-#ifdef __GNUC__
-#  pragma GCC diagnostic pop
-#endif
-  }
-  s.endArray();
-
-  if (count == 0) LoadDefaultPresets();
-
-  const QString selected_preset = s.value(kSelectedPreset, QLatin1String(kCustom)).toString();
-  const QString selected_preset_display_name = tr(qUtf8Printable(selected_preset));
-  const int selected_index = ui_->preset->findText(selected_preset_display_name);
-  if (selected_index != -1) ui_->preset->setCurrentIndex(selected_index);
-
-  ui_->enable_equalizer->setChecked(s.value(kEnabled, false).toBool());
-  ui_->slider_container->setEnabled(ui_->enable_equalizer->isChecked());
-
-  ui_->enable_stereo_balancer->setChecked(s.value(kEnableStereoBalancer, false).toBool());
-  ui_->slider_label_layout->setEnabled(ui_->enable_stereo_balancer->isChecked());
-  ui_->stereo_balance_slider->setEnabled(ui_->enable_stereo_balancer->isChecked());
-
-  const int stereo_balance = s.value(kStereoBalance, 0).toInt();
-  ui_->stereo_balance_slider->setValue(stereo_balance);
-  StereoBalanceSliderChanged(stereo_balance);
-
-  PresetChanged(selected_preset);
-
-}
-
-void Equalizer::LoadDefaultPresets() {
-
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Custom")),             Params(0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Classical")),          Params(0, 0, 0, 0, 0, 0, -40, -40, -40, -50));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Club")),               Params(0, 0, 20, 30, 30, 30, 20, 0, 0, 0));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Dance")),              Params(50, 35, 10, 0, 0, -30, -40, -40, 0, 0));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Full Bass")),          Params(70, 70, 70, 40, 20, -45, -50, -55, -55, -55));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Full Treble")),        Params(-50, -50, -50, -25, 15, 55, 80, 80, 80, 85));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Full Bass + Treble")), Params(35, 30, 0, -40, -25, 10, 45, 55, 60, 60));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Laptop/Headphones")),  Params(25, 50, 25, -20, 0, -30, -40, -40, 0, 0));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Large Hall")),         Params(50, 50, 30, 30, 0, -25, -25, -25, 0, 0));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Live")),               Params(-25, 0, 20, 25, 30, 30, 20, 15, 15, 10));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Party")),              Params(35, 35, 0, 0, 0, 0, 0, 0, 35, 35));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Pop")),                Params(-10, 25, 35, 40, 25, -5, -15, -15, -10, -10));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Reggae")),             Params(0, 0, -5, -30, 0, -35, -35, 0, 0, 0));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Rock")),               Params(40, 25, -30, -40, -20, 20, 45, 55, 55, 55));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Soft")),               Params(25, 10, -5, -15, -5, 20, 45, 50, 55, 60));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Ska")),                Params(-15, -25, -25, -5, 20, 30, 45, 50, 55, 50));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Soft Rock")),          Params(20, 20, 10, -5, -25, -30, -20, -5, 15, 45));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Techno")),             Params(40, 30, 0, -30, -25, 0, 40, 50, 50, 45));
-  AddPreset(QStringLiteral(QT_TRANSLATE_NOOP("Equalizer", "Zero")),               Params(0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
-
-}
-
-void Equalizer::AddPreset(const QString &name, const Params &params) {
-
-  QString name_displayed = tr(qUtf8Printable(name));
-  presets_[name] = params;
-
-  if (ui_->preset->findText(name_displayed) == -1) {
-    ui_->preset->addItem(name_displayed, QVariant(name));
-  }
-
-}
-
-void Equalizer::PresetChanged(const int index) {
-
-  PresetChanged(ui_->preset->itemData(index).toString());
-}
-
-void Equalizer::PresetChanged(const QString &name) {
-
-  if (presets_.contains(last_preset_)) {
-    if (presets_[last_preset_] != current_params()) {
-      SaveCurrentPreset();
+  s.BeginGroup(EqualizerPersist::kSettingsGroup);
+  enabled_ = s.BoolValue("enabled", false);
+  preamp_ = s.IntValue("preamp", 0);
+  selected_preset_ = EqualizerPersist::PresetOrDefault(s.Value(EqualizerPersist::kSelectedPreset, EqualizerPersist::kDefaultPreset));
+  for (int i = 0; i < EqualizerGain::kBandCount; ++i) {
+    if (static_cast<int>(gains_.size()) < EqualizerGain::kBandCount) {
+      gains_.resize(EqualizerGain::kBandCount, 0);
     }
+    gains_[i] = EqualizerGain::ClampSlider(s.IntValue("band" + std::to_string(i), 0));
   }
-  last_preset_ = name;
-
-  const Params p = presets_.value(name);
-
-  loading_ = true;
-  preamp_->set_value(p.preamp);
-  for (int i = 0; i < kBands; ++i) gain_[i]->set_value(p.gain[i]);
-  loading_ = false;
-
-  EqualizerParametersChangedSlot();
-  Save();
-
-}
-
-void Equalizer::SavePreset() {
-
-  QString name = SaveCurrentPreset();
-  if (!name.isEmpty()) {
-    last_preset_ = name;
-    ui_->preset->setCurrentIndex(ui_->preset->findText(tr(qUtf8Printable(name))));
+  LoadBuiltinPresets();
+  user_names_.clear();
+  for (const std::string &entry : StrUtils::Split(s.Value("user_presets"), '|')) {
+    const auto colon = entry.find(':');
+    if (colon == std::string::npos) {
+      continue;
+    }
+    const std::string name = entry.substr(0, colon);
+    presets_[name] = ParseGains(entry.substr(colon + 1));
+    user_names_.push_back(name);
   }
-
-}
-
-QString Equalizer::SaveCurrentPreset() {
-
-  QString name = QInputDialog::getText(this, tr("Save preset"), tr("Name"), QLineEdit::Normal, tr(qUtf8Printable(last_preset_)));
-  if (name.isEmpty()) {
-    return QString();
-  }
-
-  AddPreset(name, current_params());
-  Save();
-  return name;
-
-}
-
-void Equalizer::DelPreset() {
-
-  QString name = ui_->preset->itemData(ui_->preset->currentIndex()).toString();
-  QString name_displayed = ui_->preset->currentText();
-  if (!presets_.contains(name) || name.isEmpty()) return;
-
-  const int ret = QMessageBox::question( this, tr("Delete preset"), tr("Are you sure you want to delete the \"%1\" preset?").arg(name_displayed), QMessageBox::Yes, QMessageBox::No);
-  if (ret == QMessageBox::No) return;
-
-  presets_.remove(name);
-  ui_->preset->removeItem(ui_->preset->currentIndex());
-  Save();
-
-}
-
-EqualizerSlider *Equalizer::AddSlider(const QString &label) {
-
-  EqualizerSlider *ret = new EqualizerSlider(label, ui_->slider_container);
-  ui_->slider_container->layout()->addWidget(ret);
-  QObject::connect(ret, &EqualizerSlider::ValueChanged, this, &Equalizer::EqualizerParametersChangedSlot);
-
-  return ret;
-
-}
-
-bool Equalizer::is_stereo_balancer_enabled() const {
-  return ui_->enable_stereo_balancer->isChecked();
-}
-
-bool Equalizer::is_equalizer_enabled() const {
-  return ui_->enable_equalizer->isChecked();
-}
-
-int Equalizer::preamp_value() const {
-  return preamp_->value();
-}
-
-QList<int> Equalizer::gain_values() const {
-
-  QList<int> ret;
-  ret.reserve(kBands);
-  for (int i = 0; i < kBands; ++i) {
-    ret << gain_[i]->value();
-  }
-  return ret;
-
-}
-
-Equalizer::Params Equalizer::current_params() const {
-
-  QList<int> gains = gain_values();
-
-  Params ret;
-  ret.preamp = preamp_value();
-  std::copy(gains.begin(), gains.end(), ret.gain);
-  return ret;
-
-}
-
-float Equalizer::stereo_balance() const {
-  return qBound(-1.0F, static_cast<float>(ui_->stereo_balance_slider->value()) / 100.0F, 1.0F);
-}
-
-void Equalizer::StereoBalancerEnabledChangedSlot(const bool enabled) {
-
-  if (!enabled) {
-    ui_->stereo_balance_slider->setValue(0);
-    Q_EMIT StereoBalanceChanged(stereo_balance());
-  }
-  ui_->stereo_balance_slider->setEnabled(enabled);
-  Q_EMIT StereoBalancerEnabledChanged(enabled);
-  Save();
-
-}
-
-void Equalizer::StereoBalanceSliderChanged(const int value) {
-
-  Q_UNUSED(value)
-
-  Q_EMIT StereoBalanceChanged(stereo_balance());
-  Save();
-
-}
-
-void Equalizer::EqualizerEnabledChangedSlot(const bool enabled) {
-
-  Q_EMIT EqualizerEnabledChanged(enabled);
-  ui_->slider_container->setEnabled(enabled);
-  Save();
-
-}
-
-void Equalizer::EqualizerParametersChangedSlot() {
-
-  if (loading_) return;
-  Q_EMIT EqualizerParametersChanged(preamp_value(), gain_values());
-
+  Settings backend;
+  backend.BeginGroup("Backend");
+  const int legacy_balance = backend.IntValue("stereobalance", 0);
+  stereo_balance_ = EqualizerPersist::ClampBalance(
+      s.Contains(EqualizerPersist::kStereoBalance) ? s.IntValue(EqualizerPersist::kStereoBalance, 0) : legacy_balance);
+  stereo_balancer_enabled_ = EqualizerPersist::MigrateBalancerEnabled(s.Contains(EqualizerPersist::kEnableStereoBalancer),
+                                                                      s.BoolValue(EqualizerPersist::kEnableStereoBalancer, false),
+                                                                      stereo_balance_);
 }
 
 void Equalizer::Save() {
-
   Settings s;
-  s.beginGroup(kSettingsGroup);
-
-  s.beginWriteArray(kPresets, static_cast<int>(presets_.count()));
-  int i = 0;
-  for (auto it = presets_.cbegin(); it != presets_.cend(); ++it) {
-    s.setArrayIndex(i++);
-    s.setValue(kName, it.key());
-    s.setValue(kParams, QVariant::fromValue(it.value()));
+  s.BeginGroup(EqualizerPersist::kSettingsGroup);
+  s.SetBoolValue("enabled", enabled_);
+  s.SetIntValue("preamp", preamp_);
+  s.SetValue(EqualizerPersist::kSelectedPreset, selected_preset_);
+  s.SetBoolValue(EqualizerPersist::kEnableStereoBalancer, stereo_balancer_enabled_);
+  s.SetIntValue(EqualizerPersist::kStereoBalance, stereo_balance_);
+  for (int i = 0; i < EqualizerGain::kBandCount; ++i) {
+    s.SetIntValue("band" + std::to_string(i), gains_[i]);
   }
-  s.endArray();
-
-  s.setValue(kSelectedPreset, ui_->preset->itemData(ui_->preset->currentIndex()).toString());
-  s.setValue(kEnabled, ui_->enable_equalizer->isChecked());
-  s.setValue(kEnableStereoBalancer, ui_->enable_stereo_balancer->isChecked());
-  s.setValue(kStereoBalance, ui_->stereo_balance_slider->value());
-
-}
-
-void Equalizer::closeEvent(QCloseEvent *e) {
-
-  Q_UNUSED(e)
-
-  const QString name = ui_->preset->itemData(ui_->preset->currentIndex()).toString();
-  if (!presets_.contains(name)) return;
-
-  if (presets_[name] == current_params()) return;
-
-  SavePreset();
-
-}
-
-Equalizer::Params::Params() : preamp(0) {
-  for (int i = 0; i < Equalizer::kBands; ++i) gain[i] = 0;
-}
-
-Equalizer::Params::Params(int g0, int g1, int g2, int g3, int g4, int g5, int g6, int g7, int g8, int g9, int pre) : preamp(pre) {
-
-  gain[0] = g0;
-  gain[1] = g1;
-  gain[2] = g2;
-  gain[3] = g3;
-  gain[4] = g4;
-  gain[5] = g5;
-  gain[6] = g6;
-  gain[7] = g7;
-  gain[8] = g8;
-  gain[9] = g9;
-
-}
-
-bool Equalizer::Params::operator==(const Equalizer::Params &other) const {
-
-  if (preamp != other.preamp) return false;
-  for (int i = 0; i < Equalizer::kBands; ++i) {
-    if (gain[i] != other.gain[i]) return false;
+  std::string blob;
+  for (size_t i = 0; i < user_names_.size(); ++i) {
+    if (i > 0) {
+      blob += "|";
+    }
+    blob += user_names_[i] + ":" + JoinGains(presets_[user_names_[i]]);
   }
+  s.SetValue("user_presets", blob);
+  s.BeginGroup("Backend");
+  s.SetIntValue("stereobalance", EqualizerPersist::EffectiveBalance(stereo_balancer_enabled_, stereo_balance_));
+  s.Sync();
+}
+
+void Equalizer::set_enabled(bool enabled) {
+  enabled_ = enabled;
+  Save();
+  ParametersChanged.Emit(enabled_, preamp_, gains_);
+}
+
+void Equalizer::set_preamp(int preamp) {
+  preamp_ = preamp;
+  selected_preset_ = EqualizerPersist::kDefaultPreset;
+  Save();
+  ParametersChanged.Emit(enabled_, preamp_, gains_);
+}
+
+void Equalizer::set_gain(int band, int gain) {
+  if (band >= 0 && band < EqualizerGain::kBandCount) {
+    gains_[band] = EqualizerGain::ClampSlider(gain);
+    selected_preset_ = EqualizerPersist::kDefaultPreset;
+    Save();
+    ParametersChanged.Emit(enabled_, preamp_, gains_);
+  }
+}
+
+void Equalizer::set_stereo_balancer_enabled(bool enabled) {
+  stereo_balancer_enabled_ = enabled;
+  Save();
+  StereoBalanceChanged.Emit(EffectiveBalanceFraction());
+}
+
+void Equalizer::set_stereo_balance(int balance) {
+  stereo_balance_ = EqualizerPersist::ClampBalance(balance);
+  Save();
+  StereoBalanceChanged.Emit(EffectiveBalanceFraction());
+}
+
+void Equalizer::LoadPreset(const std::string &name) {
+  const auto it = presets_.find(name);
+  if (it == presets_.end()) {
+    return;
+  }
+  gains_ = it->second;
+  selected_preset_ = name;
+  Save();
+  ParametersChanged.Emit(enabled_, preamp_, gains_);
+}
+
+bool Equalizer::IsBuiltin(const std::string &name) const {
+  const auto names = BuiltinPresetNames();
+  return std::find(names.begin(), names.end(), name) != names.end();
+}
+
+bool Equalizer::SavePreset(const std::string &name) {
+  if (name.empty() || IsBuiltin(name)) {
+    return false;
+  }
+  presets_[name] = gains_;
+  if (std::find(user_names_.begin(), user_names_.end(), name) == user_names_.end()) {
+    user_names_.push_back(name);
+  }
+  Save();
   return true;
-
 }
 
-bool Equalizer::Params::operator!=(const Equalizer::Params &other) const {
-  return !(*this == other);
+bool Equalizer::DeletePreset(const std::string &name) {
+  if (IsBuiltin(name)) {
+    return false;
+  }
+  presets_.erase(name);
+  user_names_.erase(std::remove(user_names_.begin(), user_names_.end(), name), user_names_.end());
+  Save();
+  return true;
 }
 
-QDataStream &operator<<(QDataStream &s, const Equalizer::Params &p) {
-
-  s << p.preamp;
-  for (int i = 0; i < Equalizer::kBands; ++i) s << p.gain[i];
-  return s;
-
-}
-
-QDataStream &operator>>(QDataStream &s, Equalizer::Params &p) {
-
-  s >> p.preamp;
-  for (int i = 0; i < Equalizer::kBands; ++i) s >> p.gain[i];
-  return s;
-
+std::vector<std::string> Equalizer::Presets() const {
+  std::vector<std::string> names = BuiltinPresetNames();
+  names.insert(names.end(), user_names_.begin(), user_names_.end());
+  return names;
 }

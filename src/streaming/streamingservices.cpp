@@ -1,97 +1,75 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "streaming/streamingservices.h"
 
 #include "config.h"
+#ifdef HAVE_QOBUZ
+#include "qobuz/qobuzservice.h"
+#include "qobuz/qobuzurlhandler.h"
+#endif
+#ifdef HAVE_SPOTIFY
+#include "spotify/spotifyservice.h"
+#endif
+#ifdef HAVE_SUBSONIC
+#include "subsonic/subsonicservice.h"
+#include "subsonic/subsonicurlhandler.h"
+#endif
+#ifdef HAVE_TIDAL
+#include "tidal/tidalservice.h"
+#include "tidal/tidalurlhandler.h"
+#endif
 
-#include <QObject>
-#include <QMap>
-#include <QString>
-
-#include "core/logging.h"
-#include "streamingservices.h"
-#include "streamingservice.h"
-
-StreamingServices::StreamingServices(QObject *parent) : QObject(parent) {}
-
-StreamingServices::~StreamingServices() {
-
-  while (!services_.isEmpty()) {
-    StreamingServicePtr service = services_.value(services_.firstKey());
-    RemoveService(service);
+StreamingServices::StreamingServices(NetworkAccessManager *network, UrlHandlers *url_handlers, TaskManager *task_manager) {
+#ifdef HAVE_SUBSONIC
+  auto subsonic = std::make_unique<SubsonicService>(network);
+  auto subsonic_handler = std::make_unique<SubsonicUrlHandler>(subsonic.get());
+  if (url_handlers) {
+    url_handlers->AddHandler(subsonic_handler.get());
   }
-
+  handlers_.push_back(std::move(subsonic_handler));
+  services_.push_back(std::move(subsonic));
+#endif
+#ifdef HAVE_TIDAL
+  auto tidal = std::make_unique<TidalService>(network);
+  auto tidal_handler = std::make_unique<TidalUrlHandler>(tidal.get(), task_manager);
+  if (url_handlers) {
+    url_handlers->AddHandler(tidal_handler.get());
+  }
+  handlers_.push_back(std::move(tidal_handler));
+  services_.push_back(std::move(tidal));
+#endif
+#ifdef HAVE_SPOTIFY
+  auto spotify = std::make_unique<SpotifyService>(network);
+  if (url_handlers) {
+    url_handlers->AddHandler(spotify.get());
+  }
+  services_.push_back(std::move(spotify));
+#endif
+#ifdef HAVE_QOBUZ
+  auto qobuz = std::make_unique<QobuzService>(network);
+  auto qobuz_handler = std::make_unique<QobuzUrlHandler>(qobuz.get(), task_manager);
+  if (url_handlers) {
+    url_handlers->AddHandler(qobuz_handler.get());
+  }
+  handlers_.push_back(std::move(qobuz_handler));
+  services_.push_back(std::move(qobuz));
+#endif
+  (void)network;
+  (void)url_handlers;
+  (void)task_manager;
 }
 
-void StreamingServices::AddService(StreamingServicePtr service) {
-
-  services_.insert(service->source(), service);
-  if (service->has_initial_load_settings()) service->InitialLoadSettings();
-  else service->ReloadSettings();
-
-  qLog(Debug) << "Added streaming service" << service->name();
-
+std::vector<StreamingService *> StreamingServices::All() const {
+  std::vector<StreamingService *> result;
+  for (const auto &service : services_) {
+    result.push_back(service.get());
+  }
+  return result;
 }
 
-void StreamingServices::RemoveService(StreamingServicePtr service) {
-
-  if (!services_.contains(service->source())) return;
-  services_.remove(service->source());
-  QObject::disconnect(&*service, nullptr, this, nullptr);
-
-  qLog(Debug) << "Removed streaming service" << service->name();
-
-}
-
-StreamingServicePtr StreamingServices::ServiceBySource(const Song::Source source) const {
-
-  if (services_.contains(source)) return services_.value(source);
+StreamingService *StreamingServices::ServiceByName(const std::string &name) const {
+  for (const auto &service : services_) {
+    if (service->name() == name) {
+      return service.get();
+    }
+  }
   return nullptr;
-
-}
-
-void StreamingServices::ReloadSettings() {
-
-  const QList<StreamingServicePtr> services = services_.values();
-  for (StreamingServicePtr service : services) {
-    service->ReloadSettings();
-  }
-
-}
-
-void StreamingServices::Exit() {
-
-  const QList<StreamingServicePtr> services = services_.values();
-  for (StreamingServicePtr service : services) {
-    wait_for_exit_ << &*service;
-    QObject::connect(&*service, &StreamingService::ExitFinished, this, &StreamingServices::ExitReceived);
-    service->Exit();
-  }
-  if (wait_for_exit_.isEmpty()) Q_EMIT ExitFinished();
-
-}
-
-void StreamingServices::ExitReceived() {
-
-  StreamingService *service = qobject_cast<StreamingService*>(sender());
-  wait_for_exit_.removeAll(service);
-  if (wait_for_exit_.isEmpty()) Q_EMIT ExitFinished();
-
 }

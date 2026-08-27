@@ -1,181 +1,74 @@
-/*
- * Strawberry Music Player
- * Copyright 2012, 2014, John Maguire <john.maguire@gmail.com>
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "core/localredirectserver.h"
 
-#include "localredirectserver.h"
+#include "core/logging.h"
 
-#include <QApplication>
-#include <QIODevice>
-#include <QBuffer>
-#include <QFile>
-#include <QList>
-#include <QByteArray>
-#include <QByteArrayList>
-#include <QString>
-#include <QUrl>
-#include <QRegularExpression>
-#include <QStyle>
-#include <QHostAddress>
-#include <QTcpServer>
-#include <QAbstractSocket>
-#include <QTcpSocket>
-#include <QDateTime>
-#include <QRandomGenerator>
+#include <cstring>
+#include <string>
 
-using namespace Qt::Literals::StringLiterals;
+LocalRedirectServer::LocalRedirectServer() = default;
 
-LocalRedirectServer::LocalRedirectServer(QObject *parent)
-    : QTcpServer(parent),
-      port_(0),
-      socket_(nullptr),
-      success_(false) {}
+LocalRedirectServer::~LocalRedirectServer() { Close(); }
 
-LocalRedirectServer::~LocalRedirectServer() {
-  if (isListening()) close();
-}
-
-bool LocalRedirectServer::Listen() {
-
-  if (!listen(QHostAddress::LocalHost, static_cast<quint16>(port_))) {
-    success_ = false;
-    error_ = errorString();
+bool LocalRedirectServer::Listen(int port) {
+  Close();
+  service_ = g_socket_service_new();
+  GError *error = nullptr;
+  GInetAddress *addr = g_inet_address_new_loopback(G_SOCKET_FAMILY_IPV4);
+  GSocketAddress *socket_addr = g_inet_socket_address_new(addr, static_cast<guint16>(port));
+  g_object_unref(addr);
+  GSocketAddress *effective = nullptr;
+  if (!g_socket_listener_add_address(G_SOCKET_LISTENER(service_), socket_addr, G_SOCKET_TYPE_STREAM, G_SOCKET_PROTOCOL_DEFAULT, nullptr,
+                                     &effective, &error)) {
+    if (error) {
+      error_ = error->message;
+      LogWarning("LocalRedirectServer: %s", error->message);
+      g_error_free(error);
+    }
+    g_object_unref(socket_addr);
+    g_object_unref(service_);
+    service_ = nullptr;
     return false;
   }
-
-  url_.setScheme(u"http"_s);
-  url_.setHost(u"localhost"_s);
-  url_.setPort(serverPort());
-  url_.setPath(u"/"_s);
-  port_ = serverPort();
-  QObject::connect(this, &QTcpServer::newConnection, this, &LocalRedirectServer::NewConnection);
-
-  return true;
-
+  g_object_unref(socket_addr);
+  if (effective && G_IS_INET_SOCKET_ADDRESS(effective)) {
+    port_ = g_inet_socket_address_get_port(G_INET_SOCKET_ADDRESS(effective));
+    g_object_unref(effective);
+  }
+  g_signal_connect(service_, "incoming", G_CALLBACK(+[](GSocketService *svc, GSocketConnection *connection, GObject *source, gpointer data) {
+                     return LocalRedirectServer::OnIncoming(svc, connection, source, data);
+                   }),
+                   this);
+  g_socket_service_start(service_);
+  return port_ > 0;
 }
 
-void LocalRedirectServer::NewConnection() {
-
-  while (hasPendingConnections()) {
-    incomingConnection(nextPendingConnection()->socketDescriptor());
+void LocalRedirectServer::Close() {
+  if (service_) {
+    g_socket_service_stop(service_);
+    g_object_unref(service_);
+    service_ = nullptr;
   }
-
+  port_ = 0;
 }
 
-void LocalRedirectServer::incomingConnection(qintptr socket_descriptor) {
+std::string LocalRedirectServer::url() const { return "http://127.0.0.1:" + std::to_string(port_) + "/"; }
 
-  if (socket_ != nullptr) {
-    if (socket_->state() == QAbstractSocket::ConnectedState) socket_->close();
-    socket_->deleteLater();
-    socket_ = nullptr;
-  }
-  buffer_.clear();
-
-  QTcpSocket *tcp_socket = new QTcpSocket(this);
-  if (!tcp_socket->setSocketDescriptor(socket_descriptor)) {
-    delete tcp_socket;
-    close();
-    success_ = false;
-    error_ = "Unable to set socket descriptor"_L1;
-    Q_EMIT Finished();
-    return;
-  }
-  socket_ = tcp_socket;
-
-  QObject::connect(socket_, &QAbstractSocket::connected, this, &LocalRedirectServer::Connected);
-  QObject::connect(socket_, &QAbstractSocket::disconnected, this, &LocalRedirectServer::Disconnected);
-  QObject::connect(socket_, &QAbstractSocket::readyRead, this, &LocalRedirectServer::ReadyRead);
-
-}
-
-void LocalRedirectServer::Encrypted() {}
-
-void LocalRedirectServer::Connected() {}
-
-void LocalRedirectServer::Disconnected() {}
-
-void LocalRedirectServer::ReadyRead() {
-
-  buffer_.append(socket_->readAll());
-  if (socket_->atEnd() || buffer_.endsWith("\r\n\r\n")) {
-    WriteTemplate();
-    socket_->close();
-    socket_->deleteLater();
-    socket_ = nullptr;
-    request_url_ = ParseUrlFromRequest(buffer_);
-    success_ = request_url_.isValid();
-    if (!request_url_.isValid()) {
-      error_ = "Invalid request URL"_L1;
+gboolean LocalRedirectServer::OnIncoming(GSocketService *, GSocketConnection *connection, GObject *, gpointer data) {
+  auto *self = static_cast<LocalRedirectServer *>(data);
+  GInputStream *input = g_io_stream_get_input_stream(G_IO_STREAM(connection));
+  gchar buffer[1024] = {};
+  gsize read = 0;
+  if (g_input_stream_read_all(input, buffer, sizeof(buffer) - 1, &read, nullptr, nullptr) && read > 0) {
+    const std::string request(buffer, read);
+    const auto start = request.find(' ');
+    const auto end = request.find(' ', start == std::string::npos ? 0 : start + 1);
+    if (start != std::string::npos && end != std::string::npos) {
+      self->redirected_url_ = "http://127.0.0.1:" + std::to_string(self->port_) + request.substr(start + 1, end - start - 1);
     }
-    close();
-    Q_EMIT Finished();
   }
-
-}
-
-void LocalRedirectServer::WriteTemplate() const {
-
-  QFile page_file(u":/html/oauthsuccess.html"_s);
-  if (!page_file.open(QIODevice::ReadOnly)) return;
-  QString page_data = QString::fromUtf8(page_file.readAll());
-  page_file.close();
-
-  static const QRegularExpression tr_regexp(u"tr\\(\"([^\"]+)\"\\)"_s);
-  qint64 offset = 0;
-  Q_FOREVER {
-    QRegularExpressionMatch re_match = tr_regexp.match(page_data, offset);
-    if (!re_match.hasMatch()) break;
-    offset = re_match.capturedStart();
-    if (offset == -1) {
-      break;
-    }
-
-    const QByteArray captured_data = re_match.captured(1).toUtf8();
-    page_data.replace(offset, re_match.capturedLength(), tr(captured_data.constData()));
-    offset += re_match.capturedLength();
-  }
-
-  QBuffer image_buffer;
-  if (image_buffer.open(QIODevice::ReadWrite)) {
-    QApplication::style()->standardIcon(QStyle::SP_DialogOkButton).pixmap(16).toImage().save(&image_buffer, "PNG");
-    page_data.replace("@IMAGE_DATA@"_L1, QString::fromUtf8(image_buffer.data().toBase64()));
-    image_buffer.close();
-  }
-
-  socket_->write("HTTP/1.0 200 OK\r\n");
-  socket_->write("Content-type: text/html;charset=UTF-8\r\n");
-  socket_->write("\r\n\r\n");
-  socket_->write(page_data.toUtf8());
-  socket_->flush();
-
-}
-
-QUrl LocalRedirectServer::ParseUrlFromRequest(const QByteArray &request) const {
-
-  const QByteArrayList lines = request.split('\r');
-  if (lines.isEmpty()) return QUrl();
-  const QByteArray &request_line = lines[0];
-  const QByteArrayList request_line_parts = request_line.split(' ');
-  if (request_line_parts.size() < 2) return QUrl();
-  const QByteArray path = request_line_parts[1];
-  const QUrl base_url = url_;
-  const QUrl request_url(base_url.toString() + QString::fromLatin1(path.mid(1)), QUrl::StrictMode);
-
-  return request_url;
-
+  const char *response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><body>You can close this window.</body></html>";
+  GOutputStream *output = g_io_stream_get_output_stream(G_IO_STREAM(connection));
+  g_output_stream_write_all(output, response, strlen(response), nullptr, nullptr, nullptr);
+  self->Redirected.Emit(self->redirected_url_);
+  return TRUE;
 }

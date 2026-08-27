@@ -1,39 +1,13 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2019-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_SETTINGSITEMDELEGATE_H
+#define STRAWBERRY_SETTINGSITEMDELEGATE_H
 
-#ifndef SETTINGSITEMDELEGATE_H
-#define SETTINGSITEMDELEGATE_H
+#include <gtk/gtk.h>
 
-#include <QStyledItemDelegate>
-#include <QStyleOptionViewItem>
+#include <string>
 
-class QPainter;
-
-class SettingsItemDelegate : public QStyledItemDelegate {
-  Q_OBJECT
-
+class SettingsItemDelegate {
  public:
-  explicit SettingsItemDelegate(QObject *parent);
-  QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &idx) const override;
-  void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &idx) const override;
+  static GtkWidget *MakeRow(const std::string &title, const std::string &subtitle = {});
 };
 
-#endif  // SETTINGSITEMDELEGATE_H
+#endif

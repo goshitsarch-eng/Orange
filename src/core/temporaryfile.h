@@ -1,39 +1,17 @@
-/*
- * Strawberry Music Player
- * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_TEMPORARYFILE_H
+#define STRAWBERRY_TEMPORARYFILE_H
 
-#ifndef TEMPORARYFILE_H
-#define TEMPORARYFILE_H
-
-#include <QString>
+#include <string>
 
 class TemporaryFile {
  public:
-  explicit TemporaryFile(const QString &filename_pattern);
+  explicit TemporaryFile(const std::string &filename_pattern = "strawberry-XXXXXX");
   ~TemporaryFile();
 
-  QString filename() const { return filename_; }
+  const std::string &filename() const { return filename_; }
 
  private:
-  QString GenerateFilename(const QString &filename_pattern) const;
-
- private:
-  QString filename_;
+  std::string filename_;
 };
 
-#endif  // TEMPORARYFILE_H
+#endif

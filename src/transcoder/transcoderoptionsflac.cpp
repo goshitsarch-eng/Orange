@@ -1,63 +1,24 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "transcoder/transcoderoptionsflac.h"
+#include "transcoder/transcoderoptionsplain.h"
 
-#include "config.h"
+#include "transcoder/transcoderoptionsfields.h"
 
-#include <QWidget>
-#include <QString>
-#include <QSlider>
-#include <QSettings>
-
-#include "transcoderoptionsinterface.h"
-#include "transcoderoptionsflac.h"
-#include "ui_transcoderoptionsflac.h"
-
-#include "core/settings.h"
-
-namespace {
-constexpr char kSettingsGroup[] = "Transcoder/flacenc";
-constexpr char kQuality[] = "quality";
+void TranscoderOptionsFlac::Load() {
+  TranscoderOptionsFields::QualityEncoder encoder;
+  encoder.Load(Transcoder::Format::FLAC);
+  quality_ = encoder.quality;
 }
 
-TranscoderOptionsFLAC::TranscoderOptionsFLAC(QWidget *parent) : TranscoderOptionsInterface(parent), ui_(new Ui_TranscoderOptionsFLAC) {
-  ui_->setupUi(this);
+std::string TranscoderOptionsFlac::PipelineFragment() const {
+  return "flacenc quality=" + std::to_string(quality_);
 }
 
-TranscoderOptionsFLAC::~TranscoderOptionsFLAC() {
-  delete ui_;
+void TranscoderOptionsOggFlac::Load() {
+  TranscoderOptionsFields::QualityEncoder encoder;
+  encoder.Load(Transcoder::Format::OggFlac);
+  quality_ = encoder.quality;
 }
 
-void TranscoderOptionsFLAC::Load() {
-
-  Settings s;
-  s.beginGroup(QLatin1String(kSettingsGroup) + settings_postfix_);
-  ui_->quality->setValue(s.value(kQuality, 5).toInt());
-  s.endGroup();
-
-}
-
-void TranscoderOptionsFLAC::Save() {
-
-  Settings s;
-  s.beginGroup(QLatin1String(kSettingsGroup) + settings_postfix_);
-  s.setValue(kQuality, ui_->quality->value());
-  s.endGroup();
-
+std::string TranscoderOptionsOggFlac::PipelineFragment() const {
+  return "flacenc quality=" + std::to_string(quality_) + " ! oggmux";
 }

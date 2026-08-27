@@ -1,295 +1,105 @@
-/***************************************************************************
-                        volumeslider.cpp
-                        -------------------
-   begin                : Dec 15 2003
-   copyright            : (C) 2003 by Mark Kretschmann
-   email                : markey@web.de
-   copyright            : (C) 2005 by Gábor Lehel
-   email                : illissius@gmail.com
-   copyright            : (C) 2018-2023 by Jonas Kvinge
-   email                : jonas@jkvinge.net
-***************************************************************************/
+#include "widgets/volumeslider.h"
 
-/***************************************************************************
-*                                                                         *
-*   This program is free software; you can redistribute it and/or modify  *
-*   it under the terms of the GNU General Public License as published by  *
-*   the Free Software Foundation; either version 2 of the License, or     *
-*   (at your option) any later version.                                   *
-*                                                                         *
-***************************************************************************/
+#include "widgets/volumesliderwheel.h"
 
-#include <QSlider>
-#include <QHash>
-#include <QString>
-#include <QImage>
-#include <QPixmap>
-#include <QPalette>
-#include <QPainter>
-#include <QPainterPath>
-#include <QFont>
-#include <QBrush>
-#include <QPen>
-#include <QPoint>
-#include <QPolygon>
-#include <QRect>
-#include <QMenu>
-#include <QStyle>
-#include <QStyleOption>
-#include <QTimer>
-#include <QAction>
-#include <QLinearGradient>
-#include <QStyleOptionViewItem>
-#include <QEnterEvent>
-#include <QPaintEvent>
-#include <QContextMenuEvent>
-#include <QMouseEvent>
-#include <QWheelEvent>
+#include <algorithm>
 
-#include "volumeslider.h"
-
-using namespace Qt::Literals::StringLiterals;
-
-VolumeSlider::VolumeSlider(QWidget *parent, const uint max)
-    : SliderSlider(Qt::Horizontal, parent, static_cast<int>(max)),
-      wheel_accumulator_(0),
-      anim_enter_(false),
-      anim_count_(0),
-      timer_anim_(new QTimer(this)),
-      pixmap_inset_(drawVolumePixmap()) {
-
-  setFocusPolicy(Qt::NoFocus);
-
-  // Store theme colors to check theme change at paintEvent
-  previous_theme_text_color_ = palette().color(QPalette::WindowText);
-  previous_theme_highlight_color_ = palette().color(QPalette::Highlight);
-
-  drawVolumeSliderHandle();
-  generateGradient();
-
-  setMinimumWidth(pixmap_inset_.width());
-  setMinimumHeight(pixmap_inset_.height());
-
-  QObject::connect(timer_anim_, &QTimer::timeout, this, &VolumeSlider::slotAnimTimer);
-
+VolumeSlider::VolumeSlider(unsigned max) : StickySlider(0, max, 50) {
+  gtk_widget_set_size_request(widget(), 120, -1);
+  gtk_scale_set_draw_value(GTK_SCALE(widget()), TRUE);
+  gtk_scale_set_value_pos(GTK_SCALE(widget()), GTK_POS_TOP);
+  gtk_scale_set_format_value_func(
+      GTK_SCALE(widget()),
+      +[](GtkScale *, double value, gpointer) -> char * { return g_strdup(VolumeSliderWheel::PercentLabel(static_cast<unsigned>(value)).c_str()); },
+      nullptr, nullptr);
+  UpdatePercent();
+  SetChangedCallback([this](double value) {
+    SnapToSticky();
+    UpdatePercent();
+    if (volume_changed_) {
+      volume_changed_(static_cast<unsigned>(value));
+    }
+  });
+  GtkEventController *scroll = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_VERTICAL);
+  gtk_widget_add_controller(widget(), scroll);
+  g_signal_connect(scroll, "scroll", G_CALLBACK((+[](GtkEventControllerScroll *, gdouble, gdouble dy, gpointer data) -> gboolean {
+                     static_cast<VolumeSlider *>(data)->HandleGtkScroll(dy);
+                     return TRUE;
+                   })),
+                   this);
+  GtkGesture *menu = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(widget(), GTK_EVENT_CONTROLLER(menu));
+  g_signal_connect(menu, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
+                     static_cast<VolumeSlider *>(data)->ShowPresetMenu();
+                   }),
+                   this);
 }
 
-void VolumeSlider::SetEnabled(const bool enabled) {
-  QSlider::setEnabled(enabled);
-  QSlider::setVisible(enabled);
-}
-
-void VolumeSlider::HandleWheel(const int delta) {
-
-  const int scroll_state = wheel_accumulator_ + delta;
-  const int steps = scroll_state / WHEEL_ROTATION_PER_STEP;
-  wheel_accumulator_ = scroll_state % WHEEL_ROTATION_PER_STEP;
-
-  if (steps != 0) {
-    wheeling_ = true;
-
-    QSlider::setValue(SliderSlider::value() + steps);
-    Q_EMIT SliderReleased(value());
-
-    wheeling_ = false;
+VolumeSlider::~VolumeSlider() {
+  if (menu_) {
+    gtk_widget_unparent(menu_);
+    menu_ = nullptr;
   }
-
 }
 
-void VolumeSlider::paintEvent(QPaintEvent *e) {
+void VolumeSlider::SetEnabled(bool enabled) { gtk_widget_set_sensitive(widget(), enabled); }
 
-  Q_UNUSED(e)
+void VolumeSlider::SetVolume(unsigned volume) {
+  BlockSignals(true);
+  set_value(volume);
+  BlockSignals(false);
+  UpdatePercent();
+}
 
-  QPainter p(this);
+unsigned VolumeSlider::volume() const { return static_cast<unsigned>(value()); }
 
-  const int padding = 7;
-  const int offset = static_cast<int>(static_cast<double>((width() - 2 * padding) * value()) / qMax(1, maximum()));
+void VolumeSlider::SetVolumeCallback(ChangedCallback callback) { volume_changed_ = std::move(callback); }
 
-  // If theme changed since last paintEvent, redraw the volume pixmap with new theme colors
-  if (previous_theme_text_color_ != palette().color(QPalette::WindowText)) {
-    pixmap_inset_ = drawVolumePixmap();
-    previous_theme_text_color_ = palette().color(QPalette::WindowText);
+void VolumeSlider::UpdatePercent() { gtk_widget_set_tooltip_text(widget(), VolumeSliderWheel::PercentLabel(volume()).c_str()); }
+
+void VolumeSlider::HandleWheel(int delta) {
+  const VolumeSliderWheel::Result result = VolumeSliderWheel::FromAngleDelta(wheel_accumulator_, delta);
+  wheel_accumulator_ = result.accumulator;
+  if (result.steps == 0) {
+    return;
   }
+  set_value(VolumeSliderWheel::ApplySteps(volume(), result.steps));
+}
 
-  if (previous_theme_highlight_color_ != palette().color(QPalette::Highlight)) {
-    drawVolumeSliderHandle();
-    previous_theme_highlight_color_ = palette().color(QPalette::Highlight);
+void VolumeSlider::HandleGtkScroll(double dy) {
+  const VolumeSliderWheel::Result result = VolumeSliderWheel::FromGtkScroll(wheel_accumulator_, dy);
+  wheel_accumulator_ = result.accumulator;
+  if (result.steps == 0) {
+    return;
   }
-
-  p.drawPixmap(0, 0, pixmap_gradient_, 0, 0, offset + padding, 0);
-  p.drawPixmap(0, 0, pixmap_inset_);
-  p.drawPixmap(offset - handle_pixmaps_.value(0).width() / 2 + padding, 0, handle_pixmaps_[anim_count_]);
-
-  // Draw percentage number
-  QStyleOptionViewItem opt;
-  p.setPen(opt.palette.color(QPalette::Normal, QPalette::Text));
-  QFont vol_font(opt.font);
-  vol_font.setPixelSize(9);
-  p.setFont(vol_font);
-  const QRect rect(0, 0, 34, 15);
-  p.drawText(rect, Qt::AlignRight | Qt::AlignVCenter, QString::number(value()) + QLatin1Char('%'));
-
+  set_value(VolumeSliderWheel::ApplySteps(volume(), result.steps));
 }
 
-void VolumeSlider::generateGradient() {
+void VolumeSlider::ApplyPreset(int percent) { set_value(std::clamp(percent, 0, 100)); }
 
-  const QImage mask(u":/pictures/volumeslider-gradient.png"_s);
-
-  QImage gradient_image(mask.size(), QImage::Format_ARGB32_Premultiplied);
-  QPainter p(&gradient_image);
-
-  QLinearGradient gradient(gradient_image.rect().topLeft(), gradient_image.rect().topRight());
-  gradient.setColorAt(0, palette().color(QPalette::Window));
-  gradient.setColorAt(1, palette().color(QPalette::Highlight));
-  p.fillRect(gradient_image.rect(), QBrush(gradient));
-
-  p.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-  p.drawImage(0, 0, mask);
-  p.end();
-
-  pixmap_gradient_ = QPixmap::fromImage(gradient_image);
-
-}
-
-void VolumeSlider::slotAnimTimer() {
-
-  if (anim_enter_) {
-    ++anim_count_;
-    update();
-    if (anim_count_ == ANIM_MAX - 1) timer_anim_->stop();
+void VolumeSlider::ShowPresetMenu() {
+  if (menu_) {
+    gtk_widget_unparent(menu_);
+    menu_ = nullptr;
   }
-  else {
-    --anim_count_;
-    update();
-    if (anim_count_ == 0) timer_anim_->stop();
+  GMenu *model = g_menu_new();
+  for (int preset : VolumeSliderWheel::Presets()) {
+    char action[32];
+    g_snprintf(action, sizeof(action), "volume.preset(%d)", preset);
+    g_menu_append(model, VolumeSliderWheel::PercentLabel(static_cast<unsigned>(preset)).c_str(), action);
   }
-
-}
-
-void VolumeSlider::paletteChange(const QPalette &palette) {
-  Q_UNUSED(palette)
-  generateGradient();
-}
-
-QPixmap VolumeSlider::drawVolumePixmap() const {
-
-  QPixmap pixmap(112, 36);
-  pixmap.fill(Qt::transparent);
-  QPainter painter(&pixmap);
-  QPen pen(palette().color(QPalette::WindowText), 0.3, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-  painter.setPen(pen);
-
-  painter.setRenderHint(QPainter::Antialiasing);
-  painter.setRenderHint(QPainter::SmoothPixmapTransform);
-  // Draw volume control pixmap
-  QPolygon poly;
-  poly << QPoint(6, 21) << QPoint(104, 21) << QPoint(104, 7) << QPoint(6, 16) << QPoint(6, 21);
-  QPainterPath path;
-  path.addPolygon(poly);
-  painter.drawPolygon(poly);
-  painter.drawLine(6, 29, 104, 29);
-
-  // Return QPixmap
-  return pixmap;
-
-}
-
-void VolumeSlider::drawVolumeSliderHandle() {
-
-  QImage pixmapHandle(u":/pictures/volumeslider-handle.png"_s);
-  QImage pixmapHandleGlow(u":/pictures/volumeslider-handle_glow.png"_s);
-
-  QImage pixmapHandleGlow_image(pixmapHandleGlow.size(), QImage::Format_ARGB32_Premultiplied);
-  QPainter painter(&pixmapHandleGlow_image);
-
-  painter.setRenderHint(QPainter::Antialiasing);
-  painter.setRenderHint(QPainter::SmoothPixmapTransform);
-
-  // Repaint volume slider handle glow image with theme highlight color
-  painter.fillRect(pixmapHandleGlow_image.rect(), QBrush(palette().color(QPalette::Highlight)));
-  painter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-  painter.drawImage(0, 0, pixmapHandleGlow);
-
-  // Overlay the volume slider handle image
-  painter.setCompositionMode(QPainter::CompositionMode_SourceAtop);
-  painter.drawImage(0, 0, pixmapHandle);
-
-  // BEGIN Calculate handle animation pixmaps for mouse-over effect
-  float opacity = 0.0F;
-  const float step = 1.0F / ANIM_MAX;
-  QImage dst;
-  handle_pixmaps_.clear();
-  for (int i = 0; i < ANIM_MAX; ++i) {
-    dst = pixmapHandle.copy();
-
-    QPainter p(&dst);
-    p.setOpacity(opacity);
-    p.drawImage(0, 0, pixmapHandleGlow_image);
-    p.end();
-
-    handle_pixmaps_.append(QPixmap::fromImage(dst));
-    opacity += step;
-  }
-  // END
-
-}
-
-void VolumeSlider::enterEvent(QEnterEvent *e) {
-
-  Q_UNUSED(e)
-
-  anim_enter_ = true;
-  anim_count_ = 0;
-
-  timer_anim_->start(ANIM_INTERVAL);
-
-}
-
-void VolumeSlider::leaveEvent(QEvent *e) {
-
-  Q_UNUSED(e)
-
-  // This can happen if you enter and leave the widget quickly
-  if (anim_count_ == 0) anim_count_ = 1;
-
-  anim_enter_ = false;
-  timer_anim_->start(ANIM_INTERVAL);
-
-}
-
-void VolumeSlider::contextMenuEvent(QContextMenuEvent *e) {
-
-  QHash<QAction*, int> values;
-  QMenu menu;
-  menu.setTitle(u"Volume"_s);
-  values[menu.addAction(u"100%"_s)] = 100;
-  values[menu.addAction(u"80%"_s)] = 80;
-  values[menu.addAction(u"60%"_s)] = 60;
-  values[menu.addAction(u"40%"_s)] = 40;
-  values[menu.addAction(u"20%"_s)] = 20;
-  values[menu.addAction(u"0%"_s)] = 0;
-
-  QAction *ret = menu.exec(mapToGlobal(e->pos()));
-  if (ret) {
-    QSlider::setValue(values[ret]);
-    Q_EMIT SliderReleased(values[ret]);
-  }
-
-}
-
-void VolumeSlider::slideEvent(QMouseEvent *e) {
-  QSlider::setValue(QStyle::sliderValueFromPosition(minimum(), maximum(), e->pos().x(), width() - 2));
-}
-
-void VolumeSlider::mousePressEvent(QMouseEvent *e) {
-
-  if (e->button() != Qt::RightButton) {
-    SliderSlider::mousePressEvent(e);
-    slideEvent(e);
-  }
-
-}
-
-void VolumeSlider::wheelEvent(QWheelEvent *e) {
-  HandleWheel(e->angleDelta().y());
+  GSimpleActionGroup *group = g_simple_action_group_new();
+  GSimpleAction *preset = g_simple_action_new("preset", G_VARIANT_TYPE_INT32);
+  g_signal_connect(preset, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
+                     static_cast<VolumeSlider *>(data)->ApplyPreset(g_variant_get_int32(param));
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(preset));
+  menu_ = gtk_popover_menu_new_from_model(G_MENU_MODEL(model));
+  gtk_widget_insert_action_group(menu_, "volume", G_ACTION_GROUP(group));
+  gtk_widget_set_parent(menu_, widget());
+  gtk_popover_popup(GTK_POPOVER(menu_));
+  g_object_unref(group);
+  g_object_unref(model);
 }

@@ -1,92 +1,94 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "filterparser/filtertree.h"
 
-#include <QString>
+#include "utilities/fileutils.h"
 
-#include "filtertree.h"
-#include "filtercolumn.h"
-#include "core/song.h"
-
-using namespace Qt::Literals::StringLiterals;
-
-FilterTree::FilterTree() = default;
-FilterTree::~FilterTree() = default;
-
-QVariant FilterTree::DataFromColumn(const FilterColumn filter_column, const Song &song) {
-
-  switch (filter_column) {
-    case FilterColumn::AlbumArtist:
-      return song.effective_albumartist();
-    case FilterColumn::AlbumArtistSort:
-      return song.effective_albumartistsort();
-    case FilterColumn::Artist:
-      return song.artist();
-    case FilterColumn::ArtistSort:
-      return song.effective_artistsort();
+std::string FilterTree::DataFromColumn(FilterColumn column, const Song &song) {
+  switch (column) {
+    case FilterColumn::Title:
+      return song.title();
+    case FilterColumn::TitleSort:
+      return song.titlesort();
     case FilterColumn::Album:
       return song.album();
     case FilterColumn::AlbumSort:
-      return song.effective_albumsort();
-    case FilterColumn::Title:
-      return song.PrettyTitle();
-    case FilterColumn::TitleSort:
-      return song.effective_titlesort();
+      return song.albumsort();
+    case FilterColumn::Artist:
+      return song.artist();
+    case FilterColumn::ArtistSort:
+      return song.artistsort();
+    case FilterColumn::AlbumArtist:
+      return song.albumartist();
+    case FilterColumn::AlbumArtistSort:
+      return song.albumartistsort();
     case FilterColumn::Composer:
       return song.composer();
     case FilterColumn::ComposerSort:
-      return song.effective_composersort();
+      return song.composersort();
     case FilterColumn::Performer:
       return song.performer();
     case FilterColumn::PerformerSort:
-      return song.effective_performersort();
+      return song.performersort();
     case FilterColumn::Grouping:
       return song.grouping();
     case FilterColumn::Genre:
       return song.genre();
     case FilterColumn::Comment:
       return song.comment();
+    case FilterColumn::Filename:
+      return song.basefilename().empty() ? FileUtils::BaseName(FileUtils::PathFromUri(song.url())) : song.basefilename();
+    case FilterColumn::URL:
+      return song.url();
+    default:
+      return {};
+  }
+}
+
+double FilterTree::NumericFromColumn(FilterColumn column, const Song &song) {
+  switch (column) {
     case FilterColumn::Track:
       return song.track();
     case FilterColumn::Year:
       return song.year();
-    case FilterColumn::Length:
-      return song.length_nanosec();
     case FilterColumn::Samplerate:
       return song.samplerate();
     case FilterColumn::Bitdepth:
       return song.bitdepth();
     case FilterColumn::Bitrate:
       return song.bitrate();
-    case FilterColumn::Rating:
-      return song.rating();
     case FilterColumn::Playcount:
       return song.playcount();
     case FilterColumn::Skipcount:
       return song.skipcount();
-    case FilterColumn::Filename:
-      return song.basefilename();
-    case FilterColumn::URL:
-      return song.effective_url().toString();
-    case FilterColumn::Unknown:
-      break;
+    case FilterColumn::Length:
+      return static_cast<double>(song.length_nanosec());
+    case FilterColumn::Rating:
+      return song.rating();
+    case FilterColumn::Age:
+    case FilterColumn::Added:
+      return static_cast<double>(song.ctime());
+    case FilterColumn::LastPlayed:
+      return static_cast<double>(song.lastplayed());
+    default:
+      return 0;
   }
+}
 
-  return QVariant();
-
+bool FilterTree::IsNumeric(FilterColumn column) {
+  switch (column) {
+    case FilterColumn::Track:
+    case FilterColumn::Year:
+    case FilterColumn::Samplerate:
+    case FilterColumn::Bitdepth:
+    case FilterColumn::Bitrate:
+    case FilterColumn::Playcount:
+    case FilterColumn::Skipcount:
+    case FilterColumn::Length:
+    case FilterColumn::Rating:
+    case FilterColumn::Age:
+    case FilterColumn::Added:
+    case FilterColumn::LastPlayed:
+      return true;
+    default:
+      return false;
+  }
 }

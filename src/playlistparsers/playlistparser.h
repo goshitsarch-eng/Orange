@@ -1,84 +1,33 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_PLAYLISTPARSER_H
+#define STRAWBERRY_PLAYLISTPARSER_H
 
-#ifndef PLAYLISTPARSER_H
-#define PLAYLISTPARSER_H
-
-#include "config.h"
-
-#include <QObject>
-#include <QDir>
-#include <QByteArray>
-#include <QList>
-#include <QString>
-#include <QStringList>
-
-#include "includes/shared_ptr.h"
 #include "core/song.h"
-#include "constants/playlistsettings.h"
+#include "playlistparsers/parserbase.h"
 
-class QIODevice;
-class TagReaderClient;
-class CollectionBackendInterface;
-class ParserBase;
+#include <memory>
+#include <string>
+#include <vector>
 
-class PlaylistParser : public QObject {
-  Q_OBJECT
-
+class PlaylistParser {
  public:
-  explicit PlaylistParser(const SharedPtr<TagReaderClient> tagreader_client, const SharedPtr<CollectionBackendInterface> collection_backend = nullptr, QObject *parent = nullptr);
+  explicit PlaylistParser(class CollectionBackend *backend = nullptr);
 
-  enum class Type {
-    Load,
-    Save
-  };
+  SongList Load(const std::string &path) const;
+  SongList LoadFromData(const std::string &data, const std::string &hint = {}) const;
+  bool Save(const std::string &path, const SongList &songs) const;
 
-  static const int kMagicSize;
+  ParserBase *ParserForExtension(const std::string &suffix) const;
+  ParserBase *ParserForMagic(const std::string &data) const;
+  std::vector<ParserBase *> parsers() const;
 
-  QStringList file_extensions(const Type type) const;
-  QString filters(const Type type) const;
-
-  QStringList mime_types(const Type type) const;
-
-  QString default_extension() const;
-  QString default_filter() const;
-
-  ParserBase *ParserForMagic(const QByteArray &data, const QString &mime_type = QString()) const;
-  ParserBase *ParserForExtension(const Type type, const QString &suffix) const;
-  ParserBase *ParserForMimeType(const Type type, const QString &mime) const;
-
-  SongList LoadFromFile(const QString &filename) const;
-  SongList LoadFromDevice(QIODevice *device, const QString &path_hint = QString(), const QDir &dir_hint = QDir()) const;
-  void Save(const QString &playlist_name, const SongList &songs, const QString &filename, const PlaylistSettings::PathType) const;
-
- Q_SIGNALS:
-  void Error(const QString &error) const;
+  static bool IsPlaylist(const std::string &path);
+  static std::vector<std::string> SupportedExtensions();
+  static std::string FindCueForAudio(const std::string &audio_path);
+  static int64_t CueIndexToNanosec(const std::string &index);
+  static void EnrichFromAudioFile(SongList *songs, const Song &file);
 
  private:
-  void AddParser(ParserBase *parser);
-  bool ParserIsSupported(const Type type, ParserBase *parser) const;
-  static QString FilterForParser(const ParserBase *parser, QStringList *all_extensions = nullptr);
-
- private:
-  QList<ParserBase*> parsers_;
-  ParserBase *default_parser_;
+  std::vector<std::unique_ptr<ParserBase>> parsers_;
 };
 
-#endif  // PLAYLISTPARSER_H
+#endif

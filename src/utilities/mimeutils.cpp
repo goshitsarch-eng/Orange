@@ -1,36 +1,33 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "utilities/mimeutils.h"
 
-#include <QByteArray>
-#include <QString>
-#include <QMimeDatabase>
+#include "utilities/fileutils.h"
+#include "utilities/strutils.h"
 
-#include "mimeutils.h"
+#include <gio/gio.h>
 
-namespace Utilities {
+namespace MimeUtils {
 
-QString MimeTypeFromData(const QByteArray &data) {
-
-  if (data.isEmpty()) return QString();
-
-  return QMimeDatabase().mimeTypeForData(data).name();
-
+std::string MimeTypeFromData(const std::string &data) {
+  gboolean uncertain = FALSE;
+  gchar *type = g_content_type_guess(nullptr, reinterpret_cast<const guchar *>(data.data()), data.size(), &uncertain);
+  std::string result = type ? type : "application/octet-stream";
+  g_free(type);
+  return result;
 }
 
-}  // namespace Utilities
+std::string MimeTypeFromPath(const std::string &path) {
+  const std::string ext = StrUtils::ToLower(FileUtils::Extension(path));
+  if (ext == "mp3") return "audio/mpeg";
+  if (ext == "flac") return "audio/flac";
+  if (ext == "ogg" || ext == "oga") return "audio/ogg";
+  if (ext == "opus") return "audio/opus";
+  if (ext == "m4a" || ext == "mp4") return "audio/mp4";
+  if (ext == "wav") return "audio/wav";
+  gboolean uncertain = FALSE;
+  gchar *type = g_content_type_guess(path.c_str(), nullptr, 0, &uncertain);
+  std::string result = type ? type : "application/octet-stream";
+  g_free(type);
+  return result;
+}
+
+}  // namespace MimeUtils

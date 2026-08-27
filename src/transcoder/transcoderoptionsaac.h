@@ -1,46 +1,22 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_TRANSCODEROPTIONSAAC_H
+#define STRAWBERRY_TRANSCODEROPTIONSAAC_H
 
-#ifndef TRANSCODEROPTIONSAAC_H
-#define TRANSCODEROPTIONSAAC_H
+#include "transcoder/transcoderoptionsfields.h"
+#include "transcoder/transcoderoptionsinterface.h"
 
-#include "config.h"
-
-#include <QWidget>
-
-#include "transcoderoptionsinterface.h"
-
-class Ui_TranscoderOptionsAAC;
-
-class TranscoderOptionsAAC : public TranscoderOptionsInterface {
-  Q_OBJECT
-
+class TranscoderOptionsAac : public TranscoderOptionsInterface {
  public:
-  explicit TranscoderOptionsAAC(QWidget *parent = nullptr);
-  ~TranscoderOptionsAAC() override;
-
-  void Load() override;
-  void Save() override;
+  Transcoder::Format format() const override { return Transcoder::Format::AAC; }
+  std::string EncoderElement() const override { return "avenc_aac"; }
+  std::string MuxerElement() const override { return "mp4mux"; }
+  void ApplyQuality(int quality) override { options_.ApplyQuality(quality); }
+  void Load() override { options_.Load(); }
+  std::string PipelineFragment() const override { return options_.Pipeline(); }
+  int quality() const { return options_.quality; }
+  TranscoderOptionsFields::Aac *options() { return &options_; }
 
  private:
-  Ui_TranscoderOptionsAAC *ui_;
+  TranscoderOptionsFields::Aac options_;
 };
 
-#endif  // TRANSCODEROPTIONSAAC_H
+#endif

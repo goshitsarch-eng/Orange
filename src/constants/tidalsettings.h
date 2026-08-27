@@ -48,6 +48,10 @@ constexpr char kOAuth[] = "oauth";
 constexpr char kApiToken[] = "api_token";
 constexpr char kUsername[] = "username";
 constexpr char kPassword[] = "password";
+constexpr char kAccessToken[] = "access_token";
+constexpr char kRefreshToken[] = "refresh_token";
+constexpr char kExpiresIn[] = "expires_in";
+constexpr char kLoginTime[] = "login_time";
 
 constexpr bool kDefaultEnabled = false;
 constexpr char kDefaultQuality[] = "LOSSLESS";

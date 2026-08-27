@@ -1,69 +1,55 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_STREAMINGCOLLECTIONVIEWCONTAINER_H
+#define STRAWBERRY_STREAMINGCOLLECTIONVIEWCONTAINER_H
 
-#ifndef STREAMINGCOLLECTIONVIEWCONTAINER_H
-#define STREAMINGCOLLECTIONVIEWCONTAINER_H
+#include "collection/collectionfilterwidget.h"
+#include "streaming/streamingcollectionview.h"
+#include "streaming/streamingprogress.h"
 
-#include "config.h"
+#include <functional>
+#include <gtk/gtk.h>
 
-#include <QObject>
-#include <QWidget>
-#include <QString>
+#include <memory>
+#include <string>
 
-#include "streamingcollectionview.h"
-
-class QStackedWidget;
-class QPushButton;
-class QLabel;
-class QProgressBar;
-class QContextMenuEvent;
-class CollectionFilterWidget;
-
-#include "ui_streamingcollectionviewcontainer.h"
-
-class StreamingCollectionViewContainer : public QWidget {
-  Q_OBJECT
-
+class StreamingCollectionViewContainer {
  public:
-  explicit StreamingCollectionViewContainer(QWidget *parent = nullptr);
-  ~StreamingCollectionViewContainer() override;
+  using AbortCallback = std::function<void()>;
+  using MenuActionCallback = CollectionFilterWidget::MenuActionCallback;
 
-  void ReloadSettings() const;
-  bool SearchFieldHasFocus() const;
-  void FocusSearchField();
+  explicit StreamingCollectionViewContainer(const std::string &title);
 
-  QStackedWidget *stacked() const { return ui_->stacked; }
-  QWidget *help_page() const { return ui_->help_page; }
-  QWidget *streamingcollection_page() const { return ui_->streamingcollection_page; }
-  StreamingCollectionView *view() const { return ui_->view; }
-  CollectionFilterWidget *filter_widget() const { return ui_->filter_widget; }
-  QPushButton *button_refresh() const { return ui_->refresh; }
-  QPushButton *button_close() const { return ui_->close; }
-  QPushButton *button_abort() const { return ui_->abort; }
-  QLabel *status() const { return ui_->status; }
-  QProgressBar *progressbar() const { return ui_->progressbar; }
-
- private Q_SLOTS:
-  void contextMenuEvent(QContextMenuEvent *e) override;
+  GtkWidget *widget() const { return widget_; }
+  GtkWidget *progressbar() const { return progress_; }
+  GtkWidget *abort_button() const { return abort_; }
+  StreamingCollectionView *view() const { return view_.get(); }
+  CollectionFilterWidget *filter_widget() const { return filter_widget_.get(); }
+  void ShowProgress(const std::string &status = {});
+  void ShowError(const std::string &status);
+  void HideProgress();
+  void HideProgressUnlessError();
+  void SetProgress(int value, int maximum = StreamingProgress::kDefaultMaximum);
+  void SetProgressMaximum(int maximum);
+  void SetProgressStatus(const std::string &status);
+  void SetAbortCallback(AbortCallback callback);
+  void SetMenuActionCallback(MenuActionCallback callback) { menu_action_ = std::move(callback); }
+  bool has_error() const { return has_error_; }
+  bool working() const { return working_; }
 
  private:
-  Ui_StreamingCollectionViewContainer *ui_;
+  void UpdateActionButton();
+  void OnActionClicked();
+
+  std::unique_ptr<CollectionFilterWidget> filter_widget_;
+  std::unique_ptr<StreamingCollectionView> view_;
+  GtkWidget *widget_ = nullptr;
+  GtkWidget *progress_ = nullptr;
+  GtkWidget *status_ = nullptr;
+  GtkWidget *abort_ = nullptr;
+  AbortCallback abort_callback_;
+  MenuActionCallback menu_action_;
+  int progress_max_ = StreamingProgress::kDefaultMaximum;
+  bool working_ = false;
+  bool has_error_ = false;
 };
 
-#endif  // STREAMINGCOLLECTIONVIEWCONTAINER_H
+#endif

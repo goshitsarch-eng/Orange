@@ -1,474 +1,202 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_PLAYLIST_H
+#define STRAWBERRY_PLAYLIST_H
 
-#ifndef PLAYLIST_H
-#define PLAYLIST_H
-
-#include "config.h"
-
-#include <QtGlobal>
-#include <QObject>
-#include <QAbstractItemModel>
-#include <QAbstractListModel>
-#include <QPersistentModelIndex>
-#include <QFuture>
-#include <QList>
-#include <QMap>
-#include <QSet>
-#include <QMultiMap>
-#include <QMetaType>
-#include <QVariant>
-#include <QString>
-#include <QStringList>
-#include <QUrl>
-#include <QUuid>
-#include <QColor>
-#include <QRgb>
-
-#include "includes/shared_ptr.h"
+#include "core/signal.h"
 #include "core/song.h"
-#include "tagreader/tagreaderclient.h"
-#include "covermanager/albumcoverloaderresult.h"
-#include "playlistitem.h"
-#include "playlistsequence.h"
-#include "smartplaylists/playlistgenerator_fwd.h"
-#include <streaming/streamingservice.h>
+#include "playlist/playlistdelegates.h"
+#include "playlist/playlistfilter.h"
+#include "playlist/playlistsequence.h"
+#include "queue/queue.h"
+#include "tagreader/tagreaderreply.h"
+#include "smartplaylists/playlistgenerator.h"
+#include "smartplaylists/smartplaylist.h"
 
-class QMimeData;
-class QUndoStack;
-class QTimer;
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
 
-class TaskManager;
-class UrlHandlers;
-class CollectionBackend;
-class PlaylistBackend;
-class PlaylistFilter;
-class Queue;
-class RadioService;
+class TagReaderClient;
 
-namespace PlaylistUndoCommands {
-class InsertItems;
-class MoveItems;
-class ReOrderItems;
-class RemoveItems;
-class ShuffleItems;
-class SortItems;
-}  // namespace PlaylistUndoCommands
-
-using ColumnAlignmentMap = QMap<int, Qt::Alignment>;
-Q_DECLARE_METATYPE(Qt::Alignment)
-Q_DECLARE_METATYPE(ColumnAlignmentMap)
-
-class Playlist : public QAbstractListModel {
-  Q_OBJECT
-
-  friend class PlaylistUndoCommandInsertItems;
-  friend class PlaylistUndoCommandRemoveItems;
-  friend class PlaylistUndoCommandMoveItems;
-  friend class PlaylistUndoCommandReOrderItems;
-  friend class PlaylistUndoCommandSortItems;
-  friend class PlaylistTest;
-
+class Playlist {
  public:
-  explicit Playlist(const SharedPtr<TaskManager> task_manager,
-                    const SharedPtr<UrlHandlers> url_handlers,
-                    const SharedPtr<PlaylistBackend> playlist_backend,
-                    const SharedPtr<CollectionBackend> collection_backend,
-                    const SharedPtr<TagReaderClient> tagreader_client,
-                    const int id,
-                    const QString &special_type = QString(),
-                    const bool favorite = false,
-                    QObject *parent = nullptr);
+  enum class SequenceMode { Sequential, RepeatAll, RepeatTrack, Shuffle, AlbumShuffle, Dynamic };
+  enum class AutoScroll { Never, Maybe, Always };
 
-  ~Playlist() override;
-
-  void SkipTracks(const QModelIndexList &source_indexes);
-
-  // Always add new columns to the end of this enum - the values are persisted
-  enum class Column {
-    Title = 0,
-    TitleSort,
-    Artist,
-    ArtistSort,
-    Album,
-    AlbumSort,
-    AlbumArtist,
-    AlbumArtistSort,
-    Performer,
-    PerformerSort,
-    Composer,
-    ComposerSort,
-    Year,
-    OriginalYear,
-    Track,
-    Disc,
-    Length,
-    Genre,
-    Samplerate,
-    Bitdepth,
-    Bitrate,
-    URL,
-    BaseFilename,
-    Filesize,
-    Filetype,
-    DateCreated,
-    DateModified,
-    PlayCount,
-    SkipCount,
-    LastPlayed,
-    Comment,
-    Grouping,
-    Source,
-    Moodbar,
-    Rating,
-    HasCUE,
-    EBUR128IntegratedLoudness,
-    EBUR128LoudnessRange,
-    BPM,
-    Mood,
-    InitialKey,
-    ColumnCount
-  };
-  using Columns = QList<Column>;
-  static constexpr int ColumnCount = static_cast<int>(Column::ColumnCount);
-
-  enum Role {
-    Role_IsCurrent = Qt::UserRole + 1,
-    Role_IsPaused,
-    Role_StopAfter,
-    Role_QueuePosition,
-    Role_CanSetRating,
-  };
-
-  enum class AutoScroll {
-    Never,
-    Maybe,
-    Always
-  };
-
-  static const char *kCddaMimeType;
-  static const char *kRowsMimetype;
-  static const char *kPlayNowMimetype;
-  static const int kUndoStackSize;
-  static const int kUndoItemLimit;
-
-  static bool CompareItems(const Column column, const Qt::SortOrder sort_order, PlaylistItemPtr a, PlaylistItemPtr b);
-
-  static QString column_name(const Column column);
-  static QString abbreviated_column_name(const Column column);
-
-  static bool column_is_editable(const Column column);
-  static bool set_column_value(Song &song, Column column, const QVariant &value);
-
-  // Persistence
-  void Restore();
-
-  void ScheduleSave();
-
-  // Accessors
-  PlaylistFilter *filter() const;
-  Queue *queue() const { return queue_; }
+  Playlist();
+  ~Playlist();
 
   int id() const { return id_; }
-  const QString &ui_path() const { return ui_path_; }
-  void set_ui_path(const QString &path) { ui_path_ = path; }
-  bool is_favorite() const { return favorite_; }
-  void set_favorite(const bool favorite) { favorite_ = favorite; }
+  void set_id(int id) { id_ = id; }
+  const std::string &name() const { return name_; }
+  void set_name(const std::string &name) { name_ = name; }
+  bool favorite() const { return favorite_; }
+  void set_favorite(bool favorite) { favorite_ = favorite; }
+  const std::string &ui_path() const { return ui_path_; }
+  void set_ui_path(const std::string &path) { ui_path_ = path; }
 
-  int current_row() const;
-  int last_played_row() const;
-  void reset_last_played() { last_played_item_index_ = QPersistentModelIndex(); }
-  void reset_played_indexes() { played_indexes_.clear(); }
-  int next_row(const bool ignore_repeat_track = false);
-  int previous_row(const bool ignore_repeat_track = false) const;
-  int take_previous_row(const bool ignore_repeat_track = false);
-
-  QModelIndex current_index() const;
-
-  bool stop_after_current() const;
-  bool is_dynamic() const { return static_cast<bool>(dynamic_playlist_); }
-  int dynamic_history_length() const;
-
-  QString special_type() const { return special_type_; }
-  void set_special_type(const QString &v) { special_type_ = v; }
-
-  const PlaylistItemPtr &item_at(const int index) const { return items_[index]; }
-  bool has_item_at(const int index) const { return index >= 0 && index < rowCount(); }
-
-  int row_of(const PlaylistItemPtr &item) const { return static_cast<int>(items_.indexOf(item)); }
-
-  PlaylistItemPtr current_item() const;
-  QUuid current_uuid() const;
-
-  PlaylistItem::Options current_item_options() const;
-  Song current_item_metadata() const;
-
-  PlaylistItemPtrList collection_items(const Song::Source source, const int song_id) const;
-
-  const PlaylistItemPtr ItemByUuId(const QUuid &uuid) const;
-  int IndexByUuId(const QUuid &uuid) const;
-
-  SongList GetAllSongs() const;
-  PlaylistItemPtrList GetAllItems() const;
-  quint64 GetTotalLength() const;  // in seconds
-
-  void set_sequence(PlaylistSequence *v);
-  PlaylistSequence *sequence() const { return playlist_sequence_; }
-
-  PlaylistSequence::ShuffleMode ShuffleMode() const { return playlist_sequence_ && !is_dynamic() ? playlist_sequence_->shuffle_mode() : PlaylistSequence::ShuffleMode::Off; }
-  PlaylistSequence::RepeatMode RepeatMode() const { return playlist_sequence_ && !is_dynamic() ? playlist_sequence_->repeat_mode() : PlaylistSequence::RepeatMode::Off; }
-
-  QUndoStack *undo_stack() const { return undo_stack_; }
-
+  const SongList &songs() const { return songs_; }
+  int row_count() const { return static_cast<int>(songs_.size()); }
+  int current_row() const { return current_row_; }
+  int last_played_row() const { return last_played_row_; }
+  void set_last_played_row(int row);
+  void set_current_row(int row);
+  void UpdateScrobblePoint(int64_t seek_point_nanosec = 0);
+  int64_t scrobble_point_nanosec() const { return scrobble_point_nanosec_; }
   bool scrobbled() const { return scrobbled_; }
-  void set_scrobbled(const bool state) { scrobbled_ = state; }
-  qint64 scrobble_point_nanosec() const { return scrobble_point_; }
-  void UpdateScrobblePoint(const qint64 seek_point_nanosec = 0);
+  void set_scrobbled(bool scrobbled) { scrobbled_ = scrobbled; }
+  bool PatchSongById(const Song &song);
+  Song current_song() const;
+  Song song(int row) const;
+  int PeekNextRow() const { return NextIndex(); }
+  int PeekPreviousRow() const { return PreviousIndex(); }
+  Song PeekNextSong() const;
 
-  // Changing the playlist
-  void InsertItems(const PlaylistItemPtrList &itemsIn, const int pos = -1, const bool play_now = false, const bool enqueue = false, const bool enqueue_next = false);
-  void InsertCollectionItems(const SongList &songs, const int pos = -1, const bool play_now = false, const bool enqueue = false, const bool enqueue_next = false, const bool signal = false);
-  void InsertSongs(const SongList &songs, const int pos = -1, const bool play_now = false, const bool enqueue = false, const bool enqueue_next = false, const bool signal = false);
-  void InsertSongsOrCollectionItems(const SongList &songs, const QString &playlist_name = QString(), const int pos = -1, const bool play_now = false, const bool enqueue = false, const bool enqueue_next = false, const bool signal = false);
-  void InsertSmartPlaylist(PlaylistGeneratorPtr gen, const int pos = -1, const bool play_now = false, const bool enqueue = false, const bool enqueue_next = false, const bool signal = false);
-  void InsertStreamingItems(StreamingServicePtr service, const SongList &songs, const int pos = -1, const bool play_now = false, const bool enqueue = false, const bool enqueue_next = false, const bool signal = false);
-  void InsertRadioItems(const SongList &songs, const int pos = -1, const bool play_now = false, const bool enqueue = false, const bool enqueue_next = false, const bool signal = false);
-
-  void ReshuffleIndices();
-
-  // If this playlist contains the current item, this method will apply the "valid" flag on it.
-  // If the "valid" flag is false, the song will be greyed out. Otherwise, the grey color will be undone.
-  // If the song is a local file, and it's valid but non-existent or invalid but exists, the
-  // song will be reloaded to even out the situation because obviously something has changed.
-  // This returns true if this playlist had current item when the method was invoked.
-  bool ApplyValidityOnCurrentSong(const QUrl &url, bool valid);
-
-  // Removes from the playlist all local files that don't exist anymore.
-  void RemoveDeletedSongs();
-
-  void StopAfter(const int row);
-  void ReloadItems(const QList<int> &rows);
-  void InformOfCurrentSongChange(const bool minor);
-
-  // Just emits the dataChanged() signal so the mood column is repainted.
-#ifdef HAVE_MOODBAR
-  void MoodbarUpdated(const QModelIndex &idx);
-#endif
-
-  // QAbstractListModel
-  int rowCount(const QModelIndex &parent = QModelIndex()) const override { Q_UNUSED(parent) return static_cast<int>(items_.count()); }
-  int columnCount(const QModelIndex &parent = QModelIndex()) const override { Q_UNUSED(parent) return static_cast<int>(ColumnCount); }
-  QVariant data(const QModelIndex &idx, const int role = Qt::DisplayRole) const override;
-  bool setData(const QModelIndex &idx, const QVariant &value, const int role) override;
-  QVariant headerData(const int section, const Qt::Orientation orientation, const int role = Qt::DisplayRole) const override;
-  Qt::ItemFlags flags(const QModelIndex &idx) const override;
-  QStringList mimeTypes() const override;
-  Qt::DropActions supportedDropActions() const override;
-  QMimeData *mimeData(const QModelIndexList &indexes) const override;
-  bool dropMimeData(const QMimeData *data, Qt::DropAction action, const int row, const int column, const QModelIndex &parent_index) override;
-  void sort(const int sort_column_number, const Qt::SortOrder sort_order) override;
-  bool removeRows(const int row, const int count, const QModelIndex &parent = QModelIndex()) override;
-  bool RemoveItemWithSignal(PlaylistItemPtr item);
-
-  static Columns ChangedColumns(const Song &metadata1, const Song &metadata2);
-  static bool MinorMetadataChange(const Song &old_metadata, const Song &new_metadata);
-  bool UpdateItemMetadata(PlaylistItemPtr item, const Song &new_metadata, const bool stream_metadata_update);
-  bool UpdateItemMetadata(const int row, PlaylistItemPtr item, const Song &new_metadata, const bool stream_metadata_update);
-  void RowDataChanged(const int row, const Columns &columns);
-
-  // Changes rating of a song to the given value asynchronously
-  void RateSong(const QModelIndex &idx, const float rating);
-  void RateSongs(const QModelIndexList &index_list, const float rating);
-
-  void set_auto_sort(const bool auto_sort) { auto_sort_ = auto_sort; }
-
-  void ReloadItem(const QPersistentModelIndex &idx, PlaylistItemPtr item, const bool saved = false, const quint64 save_generation = -1, const Song &fallback_metadata = Song());
-
- public Q_SLOTS:
-  void set_current_row(const int i, const Playlist::AutoScroll autoscroll = Playlist::AutoScroll::Maybe, const bool is_stopping = false, const bool force_inform = false);
-  void Paused();
-  void Playing();
-  void Stopped();
-  void IgnoreSorting(const bool value) { ignore_sorting_ = value; }
-
-  void ClearStreamMetadata();
-  void UpdateItems(SongList songs);
-
+  void InsertSongs(int row, const SongList &songs);
+  void AppendSongs(const SongList &songs);
+  int TakeInsertScrollRow();
+  void RemoveRows(const std::vector<int> &rows);
   void Clear();
-  void RemoveDuplicateSongs();
-  void RemoveUnavailableSongs();
+  void Move(int from, int to);
+  void MoveRows(const std::vector<int> &rows, int to);
   void Shuffle();
-
-  void ShuffleModeChanged(const PlaylistSequence::ShuffleMode shuffle_mode);
-
-  void SetColumnAlignment(const ColumnAlignmentMap &alignment);
-
-  void InsertUrls(const QList<QUrl> &urls, const int pos = -1, const bool play_now = false, const bool enqueue = false, const bool enqueue_next = false, const bool signal = false);
-  // Removes items with given indices from the playlist. This operation is not undoable.
-  void RemoveItemsWithoutUndo(const QList<int> &indicesIn);
-
-  void ExpandDynamicPlaylist();
-  void RepopulateDynamicPlaylist();
-  void TurnOffDynamicPlaylist();
-
-  void AlbumCoverLoaded(const Song &song, const AlbumCoverLoaderResult &result);
-
- Q_SIGNALS:
-  void RestoreFinished();
-  void PlaylistLoaded();
-  void CurrentSongChanged(const Song &metadata);
-  void CurrentSongMetadataChanged(const Song &metadata);
-  void EditingFinished(const int playlist_id, const QModelIndex idx);
-  void PlayRequested(const QModelIndex idx, const Playlist::AutoScroll autoscroll);
-  void MaybeAutoscroll(const Playlist::AutoScroll autoscroll);
-
-  // Signals that the underlying list of items was changed, meaning that something was added to it, removed from it or the ordering changed.
-  void PlaylistChanged();
-  void DynamicModeChanged(bool dynamic);
-
-  // Emitted when undoing or redoing a column sort changes which column (if any) is sorted, so the header's sort indicator can be kept in sync without triggering another sort.
-  void SortStateChanged(const bool is_sorted, const Playlist::Column column, const Qt::SortOrder sort_order);
-
-  void Error(QString message);
-
-  // Signals that the queue has changed, meaning that the remaining queued items should update their position.
-  void QueueChanged();
-
-  void PlaylistItemsAdded(const int playlist_id, const QList<QUuid> &track_ids, const QUuid after_track_id);
-  void PlaylistItemsRemoved(const int playlist_id, const QList<QUuid> &track_ids);
-  void PlaylistItemMetadataChanged(const int playlist_id, const QUuid track_id);
-
-  void Rename(const int id, const QString &name);
-
- private:
-  void SetCurrentIsPaused(const bool paused);
-  int NextVirtualIndex(int i, const bool ignore_repeat_track) const;
-  int PreviousVirtualIndex(int i, const bool ignore_repeat_track) const;
-  bool FilterContainsVirtualIndex(const int i) const;
-
-  template<typename T>
-  void InsertSongItems(const SongList &songs, const int pos, const bool play_now, const bool enqueue, const bool enqueue_next = false, const bool signal = false);
-
-  // Modify the playlist without changing the undo stack.  These are used by our friends in PlaylistUndoCommands
-  void InsertItemsWithoutUndo(const PlaylistItemPtrList &items, const int pos, const bool enqueue = false, const bool enqueue_next = false);
-  PlaylistItemPtrList RemoveItemsWithoutUndo(const int row, const int count);
-  void MoveItemsWithoutUndo(const QList<int> &source_rows, int pos);
-  void MoveItemWithoutUndo(const int source, const int dest);
-  void MoveItemsWithoutUndo(int start, const QList<int> &dest_rows);
-  void ReOrderWithoutUndo(const PlaylistItemPtrList &new_items);
-
+  void RemoveDuplicates();
+  void RemoveUnavailable();
+  void InvalidateDeletedSongs(class TagReader *tagreader = nullptr);
+  bool ApplyValidityOnCurrentSong(const std::string &url, bool valid);
+  void set_auto_sort(bool auto_sort) { auto_sort_ = auto_sort; }
+  bool auto_sort() const { return auto_sort_; }
+  void SetSort(PlaylistColumn column, bool descending);
+  PlaylistColumn sort_column() const { return sort_column_; }
+  bool sort_descending() const { return sort_descending_; }
+  void SortNow();
+  void RenumberTracks();
+  void RateCurrentSong(float rating);
+  void SkipTracks(const std::vector<int> &rows);
+  void ReplaceRow(int row, const Song &song);
+  bool SetColumnValue(int row, PlaylistColumn column, const std::string &value);
+  int SetColumnValues(const std::vector<int> &rows, PlaylistColumn column, const std::string &value);
+  void set_tagreader_client(TagReaderClient *client) { tagreader_client_ = client; }
+  TagReaderClient *tagreader_client() const { return tagreader_client_; }
+  void SaveRows(const std::vector<int> &rows);
+  unsigned long long SaveGeneration(const std::string &uuid) const;
+  unsigned long long BumpSaveGeneration(const std::string &uuid);
+  void ReloadRow(int row, class TagReader *tagreader);
+  void ReplaceSongs(const SongList &songs);
+  void Undo();
+  void Redo();
+  bool CanUndo() const { return !undo_.empty(); }
+  bool CanRedo() const { return !redo_.empty(); }
+  void Next();
+  void Previous();
+  void RecordAndSetCurrentRow(int row);
+  const std::vector<int> &played_indexes() const { return played_indexes_; }
+  void Reshuffle(unsigned seed = 0);
+  const std::vector<int> &virtual_items() const { return virtual_items_; }
+  void SetSequenceMode(SequenceMode mode);
+  SequenceMode sequence_mode() const { return mode_; }
+  void SetRepeatMode(PlaylistSequence::RepeatMode mode);
+  void SetShuffleMode(PlaylistSequence::ShuffleMode mode);
+  void SetFilterString(const std::string &filter);
+  const std::string &filter_string() const { return filter_string_; }
+  void UpdateSongsByUrl(const Song &song);
+  void UpdateItems(const SongList &songs);
+  bool MergeFromEngine(const Song &engine);
+  bool UpdateRowMetadata(int row, const Song &engine);
+  PlaylistSequence::RepeatMode repeat_mode() const { return repeat_mode_; }
+  PlaylistSequence::ShuffleMode shuffle_mode() const { return shuffle_mode_; }
+  void SetDynamic(bool dynamic, const SmartPlaylistSearch &search = {});
+  void SetDynamicGenerator(std::shared_ptr<PlaylistGenerator> generator);
+  std::shared_ptr<PlaylistGenerator> dynamic_generator() const { return dynamic_generator_; }
+  bool is_dynamic() const { return dynamic_; }
+  const SmartPlaylistSearch &dynamic_search() const { return dynamic_search_; }
+  void RefillDynamic(const SongList &pool, bool force = false);
+  void ExpandDynamic(const SongList &pool);
+  void RepopulateDynamic(const SongList &pool);
   void RemoveItemsNotInQueue();
+  void ApplyDiscoveredArt(const Song &playing, const std::string &discovered);
+  void set_stop_after_row(int row);
+  void ToggleStopAfter(int row);
+  int stop_after_row() const { return stop_after_row_; }
+  Queue *queue() { return &queue_; }
+  const Queue *queue() const { return &queue_; }
+  void BeginLoad() { loading_ = true; }
+  void EndLoad() { loading_ = false; }
+  bool loading() const { return loading_; }
+  std::string UuidAt(int row) const;
+  const std::vector<std::string> &uuids() const { return uuids_; }
+  void SetRowUuids(const std::vector<std::string> &uuids);
+  void EnsureUuids();
 
-  // Removes rows with given indices from this playlist.
-  bool removeRows(QList<int> &rows);
+  int64_t total_length_nanosec() const;
 
-  void TurnOnDynamicPlaylist(PlaylistGeneratorPtr gen);
-  void InsertDynamicItems(const int count);
-
-  // Grays out and reloads all deleted songs in all playlists. Also, "ungreys" those songs which were once deleted but now got restored somehow.
-  void InvalidateDeletedSongs();
-
-  void ClearCollectionItems();
-
-  void SaveItem(const QModelIndex &idx, PlaylistItemPtr item, const Song &song, const Song &pre_edit_metadata);
-
- private Q_SLOTS:
-  void TracksAboutToBeDequeued(const QModelIndex &idx, const int begin, const int end);
-  void TracksDequeued();
-  void TracksEnqueued(const QModelIndex &parent_idx, const int begin, const int end);
-  void QueueLayoutChanged();
-  void SaveItemComplete(TagReaderReplyPtr reply, const QPersistentModelIndex &idx, PlaylistItemPtr item, const quint64 save_generation, const Song &pre_edit_metadata);
-  void ReloadItemComplete(const QPersistentModelIndex &idx, PlaylistItemPtr item, const Song &new_metadata, const bool saved, const quint64 save_generation, const Song &fallback_metadata);
-  void ItemsLoaded();
-  void ForceScheduleSave();
-  void ScheduleSaveItem(const PlaylistItemPtr &item);
-  void ScheduleSaveLastPlayed();
-  void Save();
+  Signal<> Changed;
+  Signal<int> CurrentChanged;
+  Signal<> RepeatModeChanged;
+  Signal<> ShuffleModeChanged;
+  Signal<> SaveQueued;
+  Signal<Song> ItemSaved;
+  Signal<std::string> Error;
 
  private:
-  bool is_loading_;
-  PlaylistFilter *filter_;
-  Queue *queue_;
-  QTimer *timer_save_;
+  struct Snapshot {
+    SongList songs;
+    std::vector<std::string> uuids;
+    int current_row = -1;
+  };
 
-  QList<QModelIndex> temp_dequeue_change_indexes_;
+  int NextIndex() const;
+  int PreviousIndex() const;
+  void RebuildVirtualItems(unsigned seed = 0);
+  void SyncVirtualIndex();
+  bool SameAlbum(int left, int right) const;
+  void PushUndo();
+  void MaybeRecordUndo(int item_count);
+  void RemoveRowsInternal(const std::vector<int> &rows, bool record_undo);
+  void MaintainDynamicAfterAdvance(int old_row);
+  void InsertDynamicMore(int count);
+  void MaybeAutoSort();
+  void SortInPlace();
 
-  const SharedPtr<TaskManager> task_manager_;
-  const SharedPtr<UrlHandlers> url_handlers_;
-  const SharedPtr<PlaylistBackend> playlist_backend_;
-  const SharedPtr<CollectionBackend> collection_backend_;
-  const SharedPtr<TagReaderClient> tagreader_client_;
+  int id_ = -1;
+  std::string name_ = "Playlist";
+  std::string ui_path_;
+  bool favorite_ = false;
+  SongList songs_;
+  int current_row_ = -1;
+  int last_played_row_ = -1;
+  SequenceMode mode_ = SequenceMode::Sequential;
+  PlaylistSequence::RepeatMode repeat_mode_ = PlaylistSequence::RepeatMode::Off;
+  PlaylistSequence::ShuffleMode shuffle_mode_ = PlaylistSequence::ShuffleMode::Off;
+  std::vector<Snapshot> undo_;
+  std::vector<Snapshot> redo_;
+  bool dynamic_ = false;
+  SmartPlaylistSearch dynamic_search_;
+  std::shared_ptr<PlaylistGenerator> dynamic_generator_;
+  bool auto_sort_ = false;
+  PlaylistColumn sort_column_ = PlaylistColumn::Count;
+  bool sort_descending_ = false;
+  std::vector<int> virtual_items_;
+  int current_virtual_index_ = -1;
+  std::string filter_string_;
+  PlaylistFilter filter_;
+  std::vector<int> played_indexes_;
+  int stop_after_row_ = -1;
+  int64_t scrobble_point_nanosec_ = -1;
+  bool scrobbled_ = false;
+  bool loading_ = false;
+  int insert_scroll_row_ = -1;
+  Queue queue_;
+  std::vector<std::string> uuids_;
+  TagReaderClient *tagreader_client_ = nullptr;
+  std::map<std::string, unsigned long long> save_generations_;
+  std::vector<std::shared_ptr<bool>> pending_save_flags_;
 
-  int id_;
-  QString ui_path_;
-  bool favorite_;
-
-  PlaylistItemPtrList items_;
-
-  // Maps each item's UUID to the item, for fast lookups by UUID.
-  // Only updated when items are added or removed; moves and reorders leave it untouched.
-  QMap<QUuid, PlaylistItemPtr> items_by_uuid_;
-
-  // What the pending timer_save_ has to write. save_all_ means the whole playlist is rewritten (rows added, removed or reordered, or last played/dynamic state changed);
-  // otherwise only the rows in save_item_uuids_ are updated in place.
-  bool save_all_;
-  bool save_last_played_;
-  QSet<QUuid> save_item_uuids_;
-
-  // Contains the indices into items_ in the order that they will be played.
-  QList<int> virtual_items_;
-
-  QList<QPersistentModelIndex> played_indexes_;
-
-  QMultiMap<int, PlaylistItemPtr> collection_items_[Song::kSourceCount];
-
-  QPersistentModelIndex current_item_index_;
-  QPersistentModelIndex last_played_item_index_;
-  QPersistentModelIndex stop_after_;
-  bool current_is_paused_;
-  int current_virtual_index_;
-
-  PlaylistSequence *playlist_sequence_;
-
-  // Hack to stop QTreeView::setModel sorting the playlist
-  bool ignore_sorting_;
-
-  QUndoStack *undo_stack_;
-
-  ColumnAlignmentMap column_alignments_;
-
-  QString special_type_;
-
-  // Cancel async restore if songs are already replaced
-  bool cancel_restore_;
-
-  bool scrobbled_;
-  qint64 scrobble_point_;
-
-  PlaylistGeneratorPtr dynamic_playlist_;
-
-  bool auto_sort_;
-  bool is_sorted_;
-  Column sort_column_;
-  Qt::SortOrder sort_order_;
+  void SaveRowComplete(const std::string &uuid, unsigned long long generation, const Song &pre_edit, TagReaderReplyPtr reply);
+  void ReloadSavedRow(const std::string &uuid, unsigned long long generation, const Song &fallback);
+  void ApplyReloadedRow(const std::string &uuid, unsigned long long generation, const Song &from_file, const Song &fallback,
+                        bool read_ok);
+  int RowForUuid(const std::string &uuid) const;
 };
 
-#endif  // PLAYLIST_H
+#endif  // STRAWBERRY_PLAYLIST_H

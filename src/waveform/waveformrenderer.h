@@ -1,45 +1,14 @@
-/*
- * Strawberry Music Player
- * Copyright 2026, Strawberry contributors
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_WAVEFORMRENDERER_H
+#define STRAWBERRY_WAVEFORMRENDERER_H
 
-#ifndef WAVEFORMRENDERER_H
-#define WAVEFORMRENDERER_H
+#include <cairo.h>
+#include <cstdint>
+#include <vector>
 
-#include <QByteArray>
-#include <QSize>
-#include <QPixmap>
-#include <QPalette>
-#include <QColor>
-
-// Stateless utility that converts a cached SWVF blob into a seekbar pixmap: mirrored per-pixel min/max amplitude bars around a center line with a gentle perceptual curve.
-// The result is position-independent — it carries no played/unplayed split and no cursor line.
-// The caller (WaveformProxyStyle) owns the playhead position by rendering two pixmaps in different colors and compositing them around the live split.
-//
-// The renderer receives an already device-pixel-ratio-scaled size from the caller; HiDPI scaling is the caller's (WaveformProxyStyle) responsibility.
 class WaveformRenderer {
  public:
-  // Renders the SWVF blob to a pixmap of size, drawing every bar in bar_color.
-  // palette supplies only the Window background fill.
-  // Returns a null QPixmap when size is zero/negative or the blob is invalid.
-  static QPixmap RenderToPixmap(const QByteArray &data, const QSize size, const QPalette &palette, const QColor &bar_color);
-
- private:
-  WaveformRenderer() = delete;
+  static void Draw(cairo_t *cr, int width, int height, const std::vector<float> &peaks, int64_t position_nanosec = -1,
+                   int64_t length_nanosec = 0, double cursor_r = 0.0, double cursor_g = 0.0, double cursor_b = 0.0);
 };
 
-#endif  // WAVEFORMRENDERER_H
+#endif

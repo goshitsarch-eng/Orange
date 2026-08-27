@@ -1,39 +1,94 @@
-/*
- * Strawberry Music Player
- * Copyright 2020-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_PLAYLISTUNDOCOMMANDBASE_H
+#define STRAWBERRY_PLAYLISTUNDOCOMMANDBASE_H
 
-#ifndef PLAYLISTUNDOCOMMANDBASE_H
-#define PLAYLISTUNDOCOMMANDBASE_H
+#include "core/song.h"
 
-#include <QUndoCommand>
+#include <string>
+#include <vector>
 
-class Playlist;
-
-class PlaylistUndoCommandBase : public QUndoCommand {
+class PlaylistUndoCommandBase {
  public:
-  explicit PlaylistUndoCommandBase(Playlist *playlist);
-
   enum class Type {
-    RemoveItems = 0,
+    InsertItems,
+    RemoveItems,
+    MoveItems,
+    ReorderItems,
+    ShuffleItems,
+    SortItems
   };
 
- protected:
-  Playlist *playlist_;
+  virtual ~PlaylistUndoCommandBase() = default;
+  virtual Type type() const = 0;
+  virtual std::string text() const = 0;
 };
 
-#endif  // PLAYLISTUNDOCOMMANDBASE_H
+class PlaylistUndoCommandInsertItems : public PlaylistUndoCommandBase {
+ public:
+  PlaylistUndoCommandInsertItems(int row, const SongList &songs);
+  Type type() const override { return Type::InsertItems; }
+  std::string text() const override { return "Insert items"; }
+  int row() const { return row_; }
+  const SongList &songs() const { return songs_; }
+
+ private:
+  int row_ = 0;
+  SongList songs_;
+};
+
+class PlaylistUndoCommandRemoveItems : public PlaylistUndoCommandBase {
+ public:
+  PlaylistUndoCommandRemoveItems(const std::vector<int> &rows, const SongList &songs);
+  Type type() const override { return Type::RemoveItems; }
+  std::string text() const override { return "Remove items"; }
+  const std::vector<int> &rows() const { return rows_; }
+  const SongList &songs() const { return songs_; }
+
+ private:
+  std::vector<int> rows_;
+  SongList songs_;
+};
+
+class PlaylistUndoCommandMoveItems : public PlaylistUndoCommandBase {
+ public:
+  PlaylistUndoCommandMoveItems(int from, int to);
+  Type type() const override { return Type::MoveItems; }
+  std::string text() const override { return "Move items"; }
+  int from() const { return from_; }
+  int to() const { return to_; }
+
+ private:
+  int from_ = 0;
+  int to_ = 0;
+};
+
+class PlaylistUndoCommandReorderItems : public PlaylistUndoCommandBase {
+ public:
+  explicit PlaylistUndoCommandReorderItems(const std::vector<int> &order);
+  Type type() const override { return Type::ReorderItems; }
+  std::string text() const override { return "Reorder items"; }
+  const std::vector<int> &order() const { return order_; }
+
+ private:
+  std::vector<int> order_;
+};
+
+class PlaylistUndoCommandShuffleItems : public PlaylistUndoCommandBase {
+ public:
+  Type type() const override { return Type::ShuffleItems; }
+  std::string text() const override { return "Shuffle items"; }
+};
+
+class PlaylistUndoCommandSortItems : public PlaylistUndoCommandBase {
+ public:
+  explicit PlaylistUndoCommandSortItems(int column, bool descending);
+  Type type() const override { return Type::SortItems; }
+  std::string text() const override { return "Sort items"; }
+  int column() const { return column_; }
+  bool descending() const { return descending_; }
+
+ private:
+  int column_ = 0;
+  bool descending_ = false;
+};
+
+#endif

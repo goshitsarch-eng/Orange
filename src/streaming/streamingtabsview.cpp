@@ -1,371 +1,631 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "streaming/streamingtabsview.h"
 
-#include "config.h"
-
-#include <QtGlobal>
-#include <QWidget>
-#include <QVariant>
-#include <QString>
-#include <QLabel>
-#include <QProgressBar>
-#include <QPushButton>
-#include <QSortFilterProxyModel>
-#include <QTabWidget>
-#include <QStackedWidget>
-#include <QContextMenuEvent>
-#include <QAction>
-#include <QSettings>
-
-#include "core/iconloader.h"
+#include "collection/collectiongrouping.h"
 #include "core/settings.h"
-#include "collection/collectionbackend.h"
-#include "collection/collectionmodel.h"
-#include "collection/collectionfilter.h"
-#include "collection/collectionfilterwidget.h"
-#include "streamingservice.h"
-#include "streamingtabsview.h"
-#include "streamingcollectionview.h"
-#include "streamingcollectionviewcontainer.h"
-#include "ui_streamingtabsview.h"
+#include "streaming/streamingbrowse.h"
+#include "streaming/streamingfavoriteaction.h"
+#include "streaming/streamingprogress.h"
+#include "streaming/streamingsearchopts.h"
+#include "translations/translations.h"
 
-using namespace Qt::Literals::StringLiterals;
-
-namespace {
-constexpr char kTab[] = "tab";
-constexpr char kDefaultTab[] = "artists";
-}  // namespace
-
-StreamingTabsView::StreamingTabsView(const StreamingServicePtr service, const SharedPtr<AlbumCoverLoader> albumcover_loader, const QString &settings_group, QWidget *parent)
-    : QWidget(parent),
-      service_(service),
-      settings_group_(settings_group),
-      ui_(new Ui_StreamingTabsView) {
-
-  ui_->setupUi(this);
-
-  ui_->search_view->Init(service, albumcover_loader);
-  QObject::connect(ui_->search_view, &StreamingSearchView::AddArtistsSignal, &*service_, &StreamingService::AddArtists);
-  QObject::connect(ui_->search_view, &StreamingSearchView::AddAlbumsSignal, &*service_, &StreamingService::AddAlbums);
-  QObject::connect(ui_->search_view, &StreamingSearchView::AddSongsSignal, &*service_, &StreamingService::AddSongs);
-
-  QAction *action_configure = new QAction(IconLoader::Load(u"configure"_s), tr("Configure %1...").arg(Song::TextForSource(service_->source())), this);
-  QObject::connect(action_configure, &QAction::triggered, this, &StreamingTabsView::Configure);
-
-  if (service_->artists_collection_model()) {
-    ui_->artists_collection->stacked()->setCurrentWidget(ui_->artists_collection->streamingcollection_page());
-    ui_->artists_collection->view()->Init(service_->artists_collection_backend(), service_->artists_collection_model(), true);
-    ui_->artists_collection->view()->setModel(service_->artists_collection_filter_model());
-    ui_->artists_collection->view()->SetFilter(ui_->artists_collection->filter_widget());
-    ui_->artists_collection->filter_widget()->SetSettingsGroup(settings_group);
-    ui_->artists_collection->filter_widget()->SetSettingsPrefix(u"artists"_s);
-    ui_->artists_collection->filter_widget()->Init(service_->artists_collection_model(), service_->artists_collection_filter_model());
-    ui_->artists_collection->filter_widget()->AddMenuAction(action_configure);
-
-    QObject::connect(ui_->artists_collection->view(), &StreamingCollectionView::GetSongs, this, &StreamingTabsView::GetArtists);
-    QObject::connect(ui_->artists_collection->view(), &StreamingCollectionView::RemoveSongs, &*service_, &StreamingService::RemoveArtists);
-
-    QObject::connect(ui_->artists_collection->button_refresh(), &QPushButton::clicked, this, &StreamingTabsView::GetArtists);
-    QObject::connect(ui_->artists_collection->button_close(), &QPushButton::clicked, this, &StreamingTabsView::AbortGetArtists);
-    QObject::connect(ui_->artists_collection->button_abort(), &QPushButton::clicked, this, &StreamingTabsView::AbortGetArtists);
-    QObject::connect(&*service_, &StreamingService::ArtistsResults, this, &StreamingTabsView::ArtistsFinished);
-    QObject::connect(&*service_, &StreamingService::ArtistsUpdateStatus, ui_->artists_collection->status(), &QLabel::setText);
-    QObject::connect(&*service_, &StreamingService::ArtistsProgressSetMaximum, ui_->artists_collection->progressbar(), &QProgressBar::setMaximum);
-    QObject::connect(&*service_, &StreamingService::ArtistsUpdateProgress, ui_->artists_collection->progressbar(), &QProgressBar::setValue);
-
-    QObject::connect(service_->artists_collection_model(), &CollectionModel::TotalArtistCountUpdated, ui_->artists_collection->view(), &StreamingCollectionView::TotalArtistCountUpdated);
-    QObject::connect(service_->artists_collection_model(), &CollectionModel::TotalAlbumCountUpdated, ui_->artists_collection->view(), &StreamingCollectionView::TotalAlbumCountUpdated);
-    QObject::connect(service_->artists_collection_model(), &CollectionModel::TotalSongCountUpdated, ui_->artists_collection->view(), &StreamingCollectionView::TotalSongCountUpdated);
-    QObject::connect(service_->artists_collection_model(), &CollectionModel::modelAboutToBeReset, ui_->artists_collection->view(), &StreamingCollectionView::SaveFocus);
-    QObject::connect(service_->artists_collection_model(), &CollectionModel::modelReset, ui_->artists_collection->view(), &StreamingCollectionView::RestoreFocus);
-
-  }
-  else {
-    ui_->tabs->removeTab(ui_->tabs->indexOf(ui_->artists));
-  }
-
-  if (service_->albums_collection_model()) {
-    ui_->albums_collection->stacked()->setCurrentWidget(ui_->albums_collection->streamingcollection_page());
-    ui_->albums_collection->view()->Init(service_->albums_collection_backend(), service_->albums_collection_model(), true);
-    ui_->albums_collection->view()->setModel(service_->albums_collection_filter_model());
-    ui_->albums_collection->view()->SetFilter(ui_->albums_collection->filter_widget());
-    ui_->albums_collection->filter_widget()->SetSettingsGroup(settings_group);
-    ui_->albums_collection->filter_widget()->SetSettingsPrefix(u"albums"_s);
-    ui_->albums_collection->filter_widget()->Init(service_->albums_collection_model(), service_->albums_collection_filter_model());
-    ui_->albums_collection->filter_widget()->AddMenuAction(action_configure);
-
-    QObject::connect(ui_->albums_collection->view(), &StreamingCollectionView::GetSongs, this, &StreamingTabsView::GetAlbums);
-    QObject::connect(ui_->albums_collection->view(), &StreamingCollectionView::RemoveSongs, &*service_, &StreamingService::RemoveAlbums);
-
-    QObject::connect(ui_->albums_collection->button_refresh(), &QPushButton::clicked, this, &StreamingTabsView::GetAlbums);
-    QObject::connect(ui_->albums_collection->button_close(), &QPushButton::clicked, this, &StreamingTabsView::AbortGetAlbums);
-    QObject::connect(ui_->albums_collection->button_abort(), &QPushButton::clicked, this, &StreamingTabsView::AbortGetAlbums);
-    QObject::connect(&*service_, &StreamingService::AlbumsResults, this, &StreamingTabsView::AlbumsFinished);
-    QObject::connect(&*service_, &StreamingService::AlbumsUpdateStatus, ui_->albums_collection->status(), &QLabel::setText);
-    QObject::connect(&*service_, &StreamingService::AlbumsProgressSetMaximum, ui_->albums_collection->progressbar(), &QProgressBar::setMaximum);
-    QObject::connect(&*service_, &StreamingService::AlbumsUpdateProgress, ui_->albums_collection->progressbar(), &QProgressBar::setValue);
-
-    QObject::connect(service_->albums_collection_model(), &CollectionModel::TotalArtistCountUpdated, ui_->albums_collection->view(), &StreamingCollectionView::TotalArtistCountUpdated);
-    QObject::connect(service_->albums_collection_model(), &CollectionModel::TotalAlbumCountUpdated, ui_->albums_collection->view(), &StreamingCollectionView::TotalAlbumCountUpdated);
-    QObject::connect(service_->albums_collection_model(), &CollectionModel::TotalSongCountUpdated, ui_->albums_collection->view(), &StreamingCollectionView::TotalSongCountUpdated);
-    QObject::connect(service_->albums_collection_model(), &CollectionModel::modelAboutToBeReset, ui_->albums_collection->view(), &StreamingCollectionView::SaveFocus);
-    QObject::connect(service_->albums_collection_model(), &CollectionModel::modelReset, ui_->albums_collection->view(), &StreamingCollectionView::RestoreFocus);
-
-  }
-  else {
-    ui_->tabs->removeTab(ui_->tabs->indexOf(ui_->albums));
-  }
-
-  if (service_->songs_collection_model()) {
-    ui_->songs_collection->stacked()->setCurrentWidget(ui_->songs_collection->streamingcollection_page());
-    ui_->songs_collection->view()->Init(service_->songs_collection_backend(), service_->songs_collection_model(), true);
-    ui_->songs_collection->view()->setModel(service_->songs_collection_filter_model());
-    ui_->songs_collection->view()->SetFilter(ui_->songs_collection->filter_widget());
-    ui_->songs_collection->filter_widget()->SetSettingsGroup(settings_group);
-    ui_->songs_collection->filter_widget()->SetSettingsPrefix(u"songs"_s);
-    ui_->songs_collection->filter_widget()->Init(service_->songs_collection_model(), service_->songs_collection_filter_model());
-    ui_->songs_collection->filter_widget()->AddMenuAction(action_configure);
-
-    QObject::connect(ui_->songs_collection->view(), &StreamingCollectionView::GetSongs, this, &StreamingTabsView::GetSongs);
-    QObject::connect(ui_->songs_collection->view(), &StreamingCollectionView::RemoveSongs, &*service_, &StreamingService::RemoveSongsByList);
-
-    QObject::connect(ui_->songs_collection->button_refresh(), &QPushButton::clicked, this, &StreamingTabsView::GetSongs);
-    QObject::connect(ui_->songs_collection->button_close(), &QPushButton::clicked, this, &StreamingTabsView::AbortGetSongs);
-    QObject::connect(ui_->songs_collection->button_abort(), &QPushButton::clicked, this, &StreamingTabsView::AbortGetSongs);
-    QObject::connect(&*service_, &StreamingService::SongsResults, this, &StreamingTabsView::SongsFinished);
-    QObject::connect(&*service_, &StreamingService::SongsUpdateStatus, ui_->songs_collection->status(), &QLabel::setText);
-    QObject::connect(&*service_, &StreamingService::SongsProgressSetMaximum, ui_->songs_collection->progressbar(), &QProgressBar::setMaximum);
-    QObject::connect(&*service_, &StreamingService::SongsUpdateProgress, ui_->songs_collection->progressbar(), &QProgressBar::setValue);
-
-    QObject::connect(service_->songs_collection_model(), &CollectionModel::TotalArtistCountUpdated, ui_->songs_collection->view(), &StreamingCollectionView::TotalArtistCountUpdated);
-    QObject::connect(service_->songs_collection_model(), &CollectionModel::TotalAlbumCountUpdated, ui_->songs_collection->view(), &StreamingCollectionView::TotalAlbumCountUpdated);
-    QObject::connect(service_->songs_collection_model(), &CollectionModel::TotalSongCountUpdated, ui_->songs_collection->view(), &StreamingCollectionView::TotalSongCountUpdated);
-    QObject::connect(service_->songs_collection_model(), &CollectionModel::modelAboutToBeReset, ui_->songs_collection->view(), &StreamingCollectionView::SaveFocus);
-    QObject::connect(service_->songs_collection_model(), &CollectionModel::modelReset, ui_->songs_collection->view(), &StreamingCollectionView::RestoreFocus);
-
-  }
-  else {
-    ui_->tabs->removeTab(ui_->tabs->indexOf(ui_->songs));
-  }
-
-  Settings s;
-  s.beginGroup(settings_group_);
-  const QString tab = s.value(kTab, QLatin1String(kDefaultTab)).toString().toLower();
-  s.endGroup();
-
-  if (tab == "artists"_L1) {
-    ui_->tabs->setCurrentWidget(ui_->artists);
-  }
-  else if (tab == "albums"_L1) {
-    ui_->tabs->setCurrentWidget(ui_->albums);
-  }
-  else if (tab == "songs"_L1) {
-    ui_->tabs->setCurrentWidget(ui_->songs);
-  }
-  else if (tab == "search"_L1) {
-    ui_->tabs->setCurrentWidget(ui_->search);
-  }
-
-  ReloadSettings();
-
+StreamingTabsView::StreamingTabsView(StreamingService *service, Database *database) : service_(service), database_(database) {
+  widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  stack_ = gtk_stack_new();
+  GtkWidget *switcher = gtk_stack_switcher_new();
+  gtk_stack_switcher_set_stack(GTK_STACK_SWITCHER(switcher), GTK_STACK(stack_));
+  gtk_widget_set_halign(switcher, GTK_ALIGN_CENTER);
+  gtk_widget_set_margin_top(switcher, 4);
+  artists_ = std::make_unique<StreamingCollectionViewContainer>("Artists");
+  albums_ = std::make_unique<StreamingCollectionViewContainer>("Albums");
+  songs_ = std::make_unique<StreamingCollectionViewContainer>("Songs");
+  favorites_ = std::make_unique<StreamingCollectionViewContainer>("Favorites");
+  search_ = std::make_unique<StreamingSearchView>(service);
+  gtk_stack_add_titled(GTK_STACK(stack_), artists_->widget(), "artists", "Artists");
+  gtk_stack_add_titled(GTK_STACK(stack_), albums_->widget(), "albums", "Albums");
+  gtk_stack_add_titled(GTK_STACK(stack_), songs_->widget(), "songs", "Songs");
+  gtk_stack_add_titled(GTK_STACK(stack_), favorites_->widget(), "favorites", "Favorites");
+  gtk_stack_add_titled(GTK_STACK(stack_), search_->widget(), "search", "Search");
+  gtk_widget_set_vexpand(stack_, TRUE);
+  gtk_box_append(GTK_BOX(widget_), switcher);
+  gtk_box_append(GTK_BOX(widget_), stack_);
+  artists_->view()->SetService(service_);
+  albums_->view()->SetService(service_);
+  songs_->view()->SetService(service_);
+  favorites_->view()->SetService(service_);
+  artists_->view()->SetRefreshCallback([this]() { GetArtists(); });
+  albums_->view()->SetRefreshCallback([this]() { GetAlbums(); });
+  songs_->view()->SetRefreshCallback([this]() { GetSongs(); });
+  favorites_->view()->SetRefreshCallback([this]() { GetFavorites(); });
+  const auto sync_grouping = [this](const CollectionGrouping::Grouping &grouping) {
+    artists_->view()->SetGrouping(grouping);
+    albums_->view()->SetGrouping(grouping);
+    songs_->view()->SetGrouping(grouping);
+    favorites_->view()->SetGrouping(grouping);
+    artists_->filter_widget()->SetGrouping(grouping);
+    albums_->filter_widget()->SetGrouping(grouping);
+    songs_->filter_widget()->SetGrouping(grouping);
+    favorites_->filter_widget()->SetGrouping(grouping);
+  };
+  const std::string configure = StreamingSearchOpts::ConfigureServiceLabel(service_ ? service_->name() : std::string());
+  artists_->filter_widget()->SetConfigureLabel(configure);
+  albums_->filter_widget()->SetConfigureLabel(configure);
+  songs_->filter_widget()->SetConfigureLabel(configure);
+  favorites_->filter_widget()->SetConfigureLabel(configure);
+  artists_->view()->SetGroupingChangedCallback(sync_grouping);
+  albums_->view()->SetGroupingChangedCallback(sync_grouping);
+  songs_->view()->SetGroupingChangedCallback(sync_grouping);
+  favorites_->view()->SetGroupingChangedCallback(sync_grouping);
+  artists_->SetAbortCallback([this]() { AbortGetArtists(); });
+  albums_->SetAbortCallback([this]() { AbortGetAlbums(); });
+  songs_->SetAbortCallback([this]() { AbortGetSongs(); });
+  favorites_->SetAbortCallback([this]() { AbortGetFavorites(); });
+  LoadFavoriteType();
+  BuildFavoriteTypes();
+  ConnectBrowseProgress();
 }
 
 StreamingTabsView::~StreamingTabsView() {
-
-  Settings s;
-  s.beginGroup(settings_group_);
-  if (QWidget *current = ui_->tabs->currentWidget()) {
-    s.setValue(kTab, current->objectName().toLower());
+  if (alive_) {
+    *alive_ = false;
   }
-  s.endGroup();
+}
 
-  delete ui_;
+void StreamingTabsView::ConnectBrowseProgress() {
+  if (!service_) {
+    return;
+  }
+  const auto alive = alive_;
+  service_->ArtistsUpdateStatus.Connect([this, alive](const std::string &text) {
+    if (alive && *alive) {
+      artists_->SetProgressStatus(text);
+      artists_->ShowProgress();
+    }
+  });
+  service_->ArtistsProgressSetMaximum.Connect([this, alive](int maximum) {
+    if (alive && *alive) {
+      artists_->SetProgressMaximum(maximum);
+    }
+  });
+  service_->ArtistsUpdateProgress.Connect([this, alive](int value) {
+    if (alive && *alive) {
+      artists_->SetProgress(value);
+    }
+  });
+  service_->AlbumsUpdateStatus.Connect([this, alive](const std::string &text) {
+    if (alive && *alive) {
+      albums_->SetProgressStatus(text);
+      albums_->ShowProgress();
+    }
+  });
+  service_->AlbumsProgressSetMaximum.Connect([this, alive](int maximum) {
+    if (alive && *alive) {
+      albums_->SetProgressMaximum(maximum);
+    }
+  });
+  service_->AlbumsUpdateProgress.Connect([this, alive](int value) {
+    if (alive && *alive) {
+      albums_->SetProgress(value);
+    }
+  });
+  service_->SongsUpdateStatus.Connect([this, alive](const std::string &text) {
+    if (alive && *alive) {
+      songs_->SetProgressStatus(text);
+      songs_->ShowProgress();
+    }
+  });
+  service_->SongsProgressSetMaximum.Connect([this, alive](int maximum) {
+    if (alive && *alive) {
+      songs_->SetProgressMaximum(maximum);
+    }
+  });
+  service_->SongsUpdateProgress.Connect([this, alive](int value) {
+    if (alive && *alive) {
+      songs_->SetProgress(value);
+    }
+  });
+  service_->ArtistsFailed.Connect([this, alive](const std::string &error) {
+    if (alive && *alive) {
+      artists_->ShowError(error);
+    }
+  });
+  service_->AlbumsFailed.Connect([this, alive](const std::string &error) {
+    if (alive && *alive) {
+      albums_->ShowError(error);
+    }
+  });
+  service_->SongsFailed.Connect([this, alive](const std::string &error) {
+    if (alive && *alive) {
+      songs_->ShowError(error);
+    }
+  });
+  service_->FavoritesUpdateStatus.Connect([this, alive](const std::string &text) {
+    if (alive && *alive) {
+      favorites_->SetProgressStatus(text);
+      favorites_->ShowProgress();
+    }
+  });
+  service_->FavoritesProgressSetMaximum.Connect([this, alive](int maximum) {
+    if (alive && *alive) {
+      favorites_->SetProgressMaximum(maximum);
+    }
+  });
+  service_->FavoritesUpdateProgress.Connect([this, alive](int value) {
+    if (alive && *alive) {
+      favorites_->SetProgress(value);
+    }
+  });
+  service_->FavoritesFailed.Connect([this, alive](const std::string &error) {
+    if (alive && *alive) {
+      favorites_->ShowError(error);
+    }
+  });
+}
 
+void StreamingTabsView::SetActivateCallback(ActivateCallback callback) {
+  activate_ = std::move(callback);
+  artists_->view()->SetActivateCallback([this](const Song &song) { HandleActivate(artists_->view(), song); });
+  albums_->view()->SetActivateCallback([this](const Song &song) { HandleActivate(albums_->view(), song); });
+  songs_->view()->SetActivateCallback([this](const Song &song) { HandleActivate(songs_->view(), song); });
+  favorites_->view()->SetActivateCallback([this](const Song &song) { HandleActivate(favorites_->view(), song); });
+  search_->SetActivateCallback(activate_);
+}
+
+void StreamingTabsView::SetEnqueueCallback(EnqueueCallback callback) {
+  artists_->view()->SetEnqueueCallback(callback);
+  albums_->view()->SetEnqueueCallback(callback);
+  songs_->view()->SetEnqueueCallback(callback);
+  favorites_->view()->SetEnqueueCallback(callback);
+  search_->SetEnqueueCallback(std::move(callback));
+}
+
+void StreamingTabsView::HandleActivate(StreamingCollectionView *view, const Song &song) {
+  if (!view) {
+    return;
+  }
+  const StreamingBrowse::Kind kind = StreamingBrowse::KindOf(song);
+  if (kind == StreamingBrowse::Kind::Artist) {
+    BrowseArtist(view, song);
+    return;
+  }
+  if (kind == StreamingBrowse::Kind::Album) {
+    BrowseAlbum(view, song);
+    return;
+  }
+  if (activate_) {
+    activate_(song);
+  }
+}
+
+void StreamingTabsView::BrowseArtist(StreamingCollectionView *view, const Song &artist) {
+  if (!service_) {
+    return;
+  }
+  StreamingCollectionViewContainer *container = artists_.get();
+  if (view == albums_->view()) {
+    container = albums_.get();
+  } else if (view == songs_->view()) {
+    container = songs_.get();
+  } else if (view == favorites_->view()) {
+    container = favorites_.get();
+  }
+  if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
+    container->ShowProgress(StreamingProgress::ReceivingAlbums());
+  }
+  service_->GetArtistAlbums(artist, [this, view, container](const SongList &albums) {
+    container->HideProgressUnlessError();
+    view->PushSongs(albums);
+    if (albums.empty()) {
+      view->SetStatus(service_->logged_in() ? "No albums" : "Sign in in Preferences");
+    }
+  });
+}
+
+void StreamingTabsView::BrowseAlbum(StreamingCollectionView *view, const Song &album) {
+  if (!service_) {
+    return;
+  }
+  StreamingCollectionViewContainer *container = songs_.get();
+  if (view == artists_->view()) {
+    container = artists_.get();
+  } else if (view == albums_->view()) {
+    container = albums_.get();
+  } else if (view == favorites_->view()) {
+    container = favorites_.get();
+  }
+  if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
+    container->ShowProgress(StreamingProgress::ReceivingSongs());
+  }
+  service_->GetAlbumSongs(album, [this, view, container](const SongList &songs) {
+    container->HideProgressUnlessError();
+    view->PushSongs(songs);
+    if (songs.empty()) {
+      view->SetStatus(service_->logged_in() ? "No songs" : "Sign in in Preferences");
+    }
+  });
+}
+
+void StreamingTabsView::SetMenuCallback(MenuCallback callback) {
+  auto collection = [callback](const SongList &songs) { callback(songs, StreamingCollectionActions::MenuContext::Collection); };
+  artists_->view()->SetMenuCallback(collection);
+  albums_->view()->SetMenuCallback(collection);
+  songs_->view()->SetMenuCallback(collection);
+  favorites_->view()->SetMenuCallback(collection);
+  search_->SetMenuCallback([callback](const SongList &songs) { callback(songs, StreamingCollectionActions::MenuContext::Search); });
+}
+
+void StreamingTabsView::SetConfigureCallback(ConfigureCallback callback) { search_->SetConfigureCallback(std::move(callback)); }
+
+void StreamingTabsView::SetFilterMenuCallback(CollectionFilterWidget::MenuActionCallback callback) {
+  artists_->SetMenuActionCallback(callback);
+  albums_->SetMenuActionCallback(callback);
+  songs_->SetMenuActionCallback(callback);
+  favorites_->SetMenuActionCallback(std::move(callback));
+}
+
+std::string StreamingTabsView::SelectedSearchQuery() const {
+  if (!stack_) {
+    return {};
+  }
+  const char *name = gtk_stack_get_visible_child_name(GTK_STACK(stack_));
+  if (!name) {
+    return {};
+  }
+  if (std::string(name) == "search") {
+    return search_->SelectedSearchQuery();
+  }
+  if (std::string(name) == "artists") {
+    return artists_->view()->SelectedSearchQuery();
+  }
+  if (std::string(name) == "albums") {
+    return albums_->view()->SelectedSearchQuery();
+  }
+  if (std::string(name) == "songs") {
+    return songs_->view()->SelectedSearchQuery();
+  }
+  if (std::string(name) == "favorites") {
+    return favorites_->view()->SelectedSearchQuery();
+  }
+  return {};
+}
+
+void StreamingTabsView::SearchForThis(const std::string &query) {
+  const std::string text = query.empty() ? SelectedSearchQuery() : query;
+  if (!StreamingSearchOpts::CanSearchForThis(text)) {
+    return;
+  }
+  if (stack_) {
+    gtk_stack_set_visible_child_name(GTK_STACK(stack_), "search");
+  }
+  search_->SearchForThis(text);
 }
 
 void StreamingTabsView::ReloadSettings() {
-
-  if (service_->artists_collection_model()) {
-    ui_->artists_collection->view()->ReloadSettings();
+  if (service_) {
+    service_->ReloadSettings();
   }
-  if (service_->albums_collection_model()) {
-    ui_->albums_collection->view()->ReloadSettings();
-  }
-  if (service_->songs_collection_model()) {
-    ui_->songs_collection->view()->ReloadSettings();
-  }
-  ui_->search_view->ReloadSettings();
-
+  LoadFavoriteType();
 }
 
-bool StreamingTabsView::SearchFieldHasFocus() const {
-
-  return ((ui_->tabs->currentWidget() == ui_->artists && ui_->artists_collection->SearchFieldHasFocus()) ||
-      (ui_->tabs->currentWidget() == ui_->albums && ui_->albums_collection->SearchFieldHasFocus()) ||
-      (ui_->tabs->currentWidget() == ui_->songs && ui_->songs_collection->SearchFieldHasFocus()) ||
-      (ui_->tabs->currentWidget() == ui_->search && ui_->search_view->SearchFieldHasFocus()));
-
+void StreamingTabsView::LoadFavoriteType() {
+  if (!service_) {
+    favorite_type_ = StreamingService::FavoriteType::Songs;
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(service_->name());
+  favorite_type_ = StreamingFavoriteAction::FromInt(
+      settings.IntValue(StreamingFavoriteAction::kFavoritesType, StreamingFavoriteAction::ToInt(StreamingService::FavoriteType::Songs)));
 }
 
-void StreamingTabsView::FocusSearchField() {
+void StreamingTabsView::PersistFavoriteType() {
+  if (!service_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(service_->name());
+  settings.SetIntValue(StreamingFavoriteAction::kFavoritesType, StreamingFavoriteAction::ToInt(favorite_type_));
+  settings.Sync();
+}
 
-  if (ui_->tabs->currentWidget() == ui_->artists) {
-    ui_->artists_collection->FocusSearchField();
+void StreamingTabsView::SetFavoriteType(StreamingService::FavoriteType type, bool reload) {
+  favorite_type_ = type;
+  PersistFavoriteType();
+  if (fav_artists_) {
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_artists_), type == StreamingService::FavoriteType::Artists);
   }
-  else if (ui_->tabs->currentWidget() == ui_->albums) {
-    ui_->albums_collection->FocusSearchField();
+  if (fav_albums_) {
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_albums_), type == StreamingService::FavoriteType::Albums);
   }
-  else if (ui_->tabs->currentWidget() == ui_->songs) {
-    ui_->songs_collection->FocusSearchField();
+  if (fav_songs_) {
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_songs_), type == StreamingService::FavoriteType::Songs);
   }
-  else if (ui_->tabs->currentWidget() == ui_->search) {
-    ui_->search_view->FocusSearchField();
+  if (reload) {
+    GetFavorites();
   }
+}
 
+void StreamingTabsView::BuildFavoriteTypes() {
+  GtkWidget *types = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+  gtk_widget_set_margin_start(types, 8);
+  gtk_widget_set_margin_end(types, 8);
+  gtk_widget_set_margin_top(types, 4);
+  gtk_widget_set_margin_bottom(types, 4);
+  fav_artists_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingFavoriteAction::Label(StreamingService::FavoriteType::Artists)));
+  fav_albums_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingFavoriteAction::Label(StreamingService::FavoriteType::Albums)));
+  fav_songs_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingFavoriteAction::Label(StreamingService::FavoriteType::Songs)));
+  gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(fav_albums_), GTK_TOGGLE_BUTTON(fav_artists_));
+  gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(fav_songs_), GTK_TOGGLE_BUTTON(fav_artists_));
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_artists_), favorite_type_ == StreamingService::FavoriteType::Artists);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_albums_), favorite_type_ == StreamingService::FavoriteType::Albums);
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fav_songs_), favorite_type_ == StreamingService::FavoriteType::Songs);
+  gtk_box_append(GTK_BOX(types), fav_artists_);
+  gtk_box_append(GTK_BOX(types), fav_albums_);
+  gtk_box_append(GTK_BOX(types), fav_songs_);
+  auto on_toggle = +[](GtkToggleButton *button, gpointer data) {
+    if (!gtk_toggle_button_get_active(button)) {
+      return;
+    }
+    auto *self = static_cast<StreamingTabsView *>(data);
+    if (GTK_WIDGET(button) == self->fav_artists_) {
+      self->SetFavoriteType(StreamingService::FavoriteType::Artists, true);
+    } else if (GTK_WIDGET(button) == self->fav_albums_) {
+      self->SetFavoriteType(StreamingService::FavoriteType::Albums, true);
+    } else {
+      self->SetFavoriteType(StreamingService::FavoriteType::Songs, true);
+    }
+  };
+  g_signal_connect(fav_artists_, "toggled", G_CALLBACK(on_toggle), this);
+  g_signal_connect(fav_albums_, "toggled", G_CALLBACK(on_toggle), this);
+  g_signal_connect(fav_songs_, "toggled", G_CALLBACK(on_toggle), this);
+  gtk_box_prepend(GTK_BOX(favorites_->widget()), types);
+}
+
+void StreamingTabsView::ShowCached(StreamingCollectionView *view, StreamingCollectionStore::List list) {
+  if (!view || !service_ || !database_) {
+    return;
+  }
+  const SongList cached = StreamingCollectionStore::Load(database_, StreamingCollectionStore::TableName(service_->name(), list));
+  if (!cached.empty()) {
+    view->SetSongs(cached);
+  }
+}
+
+void StreamingTabsView::AddToCollection(StreamingCollectionStore::List list, const SongList &songs) {
+  if (!service_ || !database_ || songs.empty() || !StreamingCollectionStore::CanStore(service_->name(), list)) {
+    return;
+  }
+  StreamingCollectionStore::Merge(database_, StreamingCollectionStore::TableName(service_->name(), list), songs);
+  StreamingCollectionView *view = songs_->view();
+  if (list == StreamingCollectionStore::List::Artists) {
+    view = artists_->view();
+  } else if (list == StreamingCollectionStore::List::Albums) {
+    view = albums_->view();
+  }
+  ShowCached(view, list);
+}
+
+void StreamingTabsView::RemoveFromCollection(StreamingCollectionStore::List list, const SongList &songs) {
+  if (!service_ || !database_ || songs.empty() || !StreamingCollectionStore::CanStore(service_->name(), list)) {
+    return;
+  }
+  StreamingCollectionStore::Remove(database_, StreamingCollectionStore::TableName(service_->name(), list), songs);
+  StreamingCollectionView *view = songs_->view();
+  if (list == StreamingCollectionStore::List::Artists) {
+    view = artists_->view();
+  } else if (list == StreamingCollectionStore::List::Albums) {
+    view = albums_->view();
+  }
+  if (view) {
+    view->SetSongs(StreamingCollectionStore::Load(database_, StreamingCollectionStore::TableName(service_->name(), list)));
+  }
+}
+
+bool StreamingTabsView::CurrentStoreList(StreamingCollectionStore::List *list) const {
+  if (!stack_ || !list) {
+    return false;
+  }
+  return StreamingCollectionStore::ListFromTab(gtk_stack_get_visible_child_name(GTK_STACK(stack_)), list);
+}
+
+CollectionFilterWidget *StreamingTabsView::CurrentFilterWidget() const {
+  if (!stack_) {
+    return nullptr;
+  }
+  const char *name = gtk_stack_get_visible_child_name(GTK_STACK(stack_));
+  if (!StreamingCollectionActions::HasDisplayOptionsTab(name)) {
+    return nullptr;
+  }
+  const std::string tab(name);
+  if (tab == "artists") {
+    return artists_->filter_widget();
+  }
+  if (tab == "albums") {
+    return albums_->filter_widget();
+  }
+  if (tab == "songs") {
+    return songs_->filter_widget();
+  }
+  if (tab == "favorites") {
+    return favorites_->filter_widget();
+  }
+  return nullptr;
+}
+
+void StreamingTabsView::PersistList(StreamingCollectionStore::List list, const SongList &songs) {
+  if (!service_ || !database_) {
+    return;
+  }
+  StreamingCollectionStore::Replace(database_, StreamingCollectionStore::TableName(service_->name(), list), songs);
 }
 
 void StreamingTabsView::GetArtists() {
-
-  if (!service_->authenticated() && service_->oauth()) {
-    Configure();
+  if (!service_) {
     return;
   }
-
-  ui_->artists_collection->status()->clear();
-  ui_->artists_collection->progressbar()->show();
-  ui_->artists_collection->button_abort()->show();
-  ui_->artists_collection->button_close()->hide();
-  ui_->artists_collection->stacked()->setCurrentWidget(ui_->artists_collection->help_page());
-  service_->GetArtists();
-
-}
-
-void StreamingTabsView::AbortGetArtists() {
-
-  service_->ResetArtistsRequest();
-  ui_->artists_collection->progressbar()->setValue(0);
-  ui_->artists_collection->status()->clear();
-  ui_->artists_collection->stacked()->setCurrentWidget(ui_->artists_collection->streamingcollection_page());
-
-}
-
-void StreamingTabsView::ArtistsFinished(const SongMap &songs, const QString &error) {
-
-  if (songs.isEmpty() && !error.isEmpty()) {
-    ui_->artists_collection->status()->setText(error);
-    ui_->artists_collection->progressbar()->setValue(0);
-    ui_->artists_collection->progressbar()->hide();
-    ui_->artists_collection->button_abort()->hide();
-    ui_->artists_collection->button_close()->show();
+  ShowCached(artists_->view(), StreamingCollectionStore::List::Artists);
+  if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
+    artists_->ShowProgress(StreamingProgress::ReceivingArtists());
+    service_->StartArtistsProgress();
   }
-  else {
-    ui_->artists_collection->stacked()->setCurrentWidget(ui_->artists_collection->streamingcollection_page());
-    ui_->artists_collection->status()->clear();
-    service_->artists_collection_backend()->UpdateSongsBySongIDAsync(songs);
-  }
-
+  artists_->view()->SetStatus("Loading artists…");
+  service_->GetArtists([this](const SongList &songs) {
+    artists_->HideProgressUnlessError();
+    if (StreamingCollectionStore::ShouldKeepCache(artists_->has_error(), songs)) {
+      return;
+    }
+    if (StreamingCollectionStore::ShouldPersist(artists_->has_error(), service_->logged_in(), songs)) {
+      PersistList(StreamingCollectionStore::List::Artists, songs);
+    }
+    artists_->view()->SetSongs(songs);
+    if (songs.empty()) {
+      artists_->view()->SetStatus(service_->logged_in() ? "No artists" : "Sign in in Preferences");
+    }
+  });
 }
 
 void StreamingTabsView::GetAlbums() {
-
-  if (!service_->authenticated() && service_->oauth()) {
-    Configure();
+  if (!service_) {
     return;
   }
-
-  ui_->albums_collection->status()->clear();
-  ui_->albums_collection->progressbar()->show();
-  ui_->albums_collection->button_abort()->show();
-  ui_->albums_collection->button_close()->hide();
-  ui_->albums_collection->stacked()->setCurrentWidget(ui_->albums_collection->help_page());
-  service_->GetAlbums();
-
-}
-
-void StreamingTabsView::AbortGetAlbums() {
-
-  service_->ResetAlbumsRequest();
-  ui_->albums_collection->progressbar()->setValue(0);
-  ui_->albums_collection->status()->clear();
-  ui_->albums_collection->stacked()->setCurrentWidget(ui_->albums_collection->streamingcollection_page());
-
-}
-
-void StreamingTabsView::AlbumsFinished(const SongMap &songs, const QString &error) {
-
-  if (songs.isEmpty() && !error.isEmpty()) {
-    ui_->albums_collection->status()->setText(error);
-    ui_->albums_collection->progressbar()->setValue(0);
-    ui_->albums_collection->progressbar()->hide();
-    ui_->albums_collection->button_abort()->hide();
-    ui_->albums_collection->button_close()->show();
+  ShowCached(albums_->view(), StreamingCollectionStore::List::Albums);
+  if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
+    albums_->ShowProgress(StreamingProgress::ReceivingAlbums());
+    service_->StartAlbumsProgress();
   }
-  else {
-    ui_->albums_collection->stacked()->setCurrentWidget(ui_->albums_collection->streamingcollection_page());
-    ui_->albums_collection->status()->clear();
-    service_->albums_collection_backend()->UpdateSongsBySongIDAsync(songs);
-  }
-
+  albums_->view()->SetStatus("Loading albums…");
+  service_->GetAlbums([this](const SongList &songs) {
+    albums_->HideProgressUnlessError();
+    if (StreamingCollectionStore::ShouldKeepCache(albums_->has_error(), songs)) {
+      return;
+    }
+    if (StreamingCollectionStore::ShouldPersist(albums_->has_error(), service_->logged_in(), songs)) {
+      PersistList(StreamingCollectionStore::List::Albums, songs);
+    }
+    albums_->view()->SetSongs(songs);
+    if (songs.empty()) {
+      albums_->view()->SetStatus(service_->logged_in() ? "No albums" : "Sign in in Preferences");
+    }
+  });
 }
 
 void StreamingTabsView::GetSongs() {
-
-  if (!service_->authenticated() && service_->oauth()) {
-    Configure();
+  if (!service_) {
     return;
   }
+  ShowCached(songs_->view(), StreamingCollectionStore::List::Songs);
+  if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
+    songs_->ShowProgress(StreamingProgress::ReceivingSongs());
+    service_->StartSongsProgress();
+  }
+  songs_->view()->SetStatus("Loading songs…");
+  service_->GetSongs([this](const SongList &songs) {
+    songs_->HideProgressUnlessError();
+    if (StreamingCollectionStore::ShouldKeepCache(songs_->has_error(), songs)) {
+      return;
+    }
+    if (StreamingCollectionStore::ShouldPersist(songs_->has_error(), service_->logged_in(), songs)) {
+      PersistList(StreamingCollectionStore::List::Songs, songs);
+    }
+    songs_->view()->SetSongs(songs);
+    if (songs.empty()) {
+      songs_->view()->SetStatus(service_->logged_in() ? "No songs" : "Sign in in Preferences");
+    }
+  });
+}
 
-  ui_->songs_collection->status()->clear();
-  ui_->songs_collection->progressbar()->show();
-  ui_->songs_collection->button_abort()->show();
-  ui_->songs_collection->button_close()->hide();
-  ui_->songs_collection->stacked()->setCurrentWidget(ui_->songs_collection->help_page());
-  service_->GetSongs();
+void StreamingTabsView::AbortGetArtists() {
+  if (service_) {
+    service_->ResetArtistsRequest();
+  }
+  artists_->HideProgress();
+}
 
+void StreamingTabsView::AbortGetAlbums() {
+  if (service_) {
+    service_->ResetAlbumsRequest();
+  }
+  albums_->HideProgress();
 }
 
 void StreamingTabsView::AbortGetSongs() {
-
-  service_->ResetSongsRequest();
-  ui_->songs_collection->progressbar()->setValue(0);
-  ui_->songs_collection->status()->clear();
-  ui_->songs_collection->stacked()->setCurrentWidget(ui_->songs_collection->streamingcollection_page());
-
+  if (service_) {
+    service_->ResetSongsRequest();
+  }
+  songs_->HideProgress();
 }
 
-void StreamingTabsView::SongsFinished(const SongMap &songs, const QString &error) {
-
-  if (songs.isEmpty() && !error.isEmpty()) {
-    ui_->songs_collection->status()->setText(error);
-    ui_->songs_collection->progressbar()->setValue(0);
-    ui_->songs_collection->progressbar()->hide();
-    ui_->songs_collection->button_abort()->hide();
-    ui_->songs_collection->button_close()->show();
+void StreamingTabsView::AbortGetFavorites() {
+  if (service_) {
+    service_->ResetFavoritesRequest();
   }
-  else {
-    ui_->songs_collection->stacked()->setCurrentWidget(ui_->songs_collection->streamingcollection_page());
-    ui_->songs_collection->status()->clear();
-    service_->songs_collection_backend()->UpdateSongsBySongIDAsync(songs);
-  }
-
+  favorites_->HideProgress();
 }
 
-void StreamingTabsView::Configure() {
-  Q_EMIT OpenSettingsDialog(service_->source());
+void StreamingTabsView::GetFavorites() {
+  if (!service_) {
+    return;
+  }
+  ShowCached(favorites_->view(), StreamingFavoriteAction::StoreList(favorite_type_));
+  if (StreamingProgress::ShouldShowBrowse(service_->show_progress(), true)) {
+    favorites_->ShowProgress(StreamingFavoriteAction::Receiving(favorite_type_));
+    service_->StartFavoritesProgress(favorite_type_);
+  }
+  favorites_->view()->SetStatus("Loading favorites…");
+  service_->GetFavorites(favorite_type_, [this](const SongList &songs) {
+    favorites_->HideProgressUnlessError();
+    if (StreamingCollectionStore::ShouldKeepCache(favorites_->has_error(), songs)) {
+      return;
+    }
+    if (StreamingCollectionStore::ShouldPersist(favorites_->has_error(), service_->logged_in(), songs)) {
+      PersistList(StreamingFavoriteAction::StoreList(favorite_type_), songs);
+    }
+    favorites_->view()->SetSongs(songs);
+    if (songs.empty()) {
+      favorites_->view()->SetStatus(StreamingFavoriteAction::EmptyStatus(favorite_type_, service_->logged_in()));
+    }
+  });
+}
+
+bool StreamingTabsView::SearchFieldHasFocus() const {
+  if (!stack_) {
+    return false;
+  }
+  const char *name = gtk_stack_get_visible_child_name(GTK_STACK(stack_));
+  if (!name) {
+    return false;
+  }
+  const std::string tab(name);
+  if (tab == "artists") {
+    return artists_->view()->SearchFieldHasFocus();
+  }
+  if (tab == "albums") {
+    return albums_->view()->SearchFieldHasFocus();
+  }
+  if (tab == "songs") {
+    return songs_->view()->SearchFieldHasFocus();
+  }
+  if (tab == "search") {
+    return search_->SearchFieldHasFocus();
+  }
+  return false;
+}
+
+void StreamingTabsView::FocusSearchField() {
+  if (!stack_) {
+    return;
+  }
+  const char *name = gtk_stack_get_visible_child_name(GTK_STACK(stack_));
+  if (!name) {
+    return;
+  }
+  const std::string tab(name);
+  if (tab == "artists") {
+    artists_->view()->FocusFilter();
+  } else if (tab == "albums") {
+    albums_->view()->FocusFilter();
+  } else if (tab == "songs") {
+    songs_->view()->FocusFilter();
+  } else if (tab == "search") {
+    search_->FocusSearch();
+  }
 }

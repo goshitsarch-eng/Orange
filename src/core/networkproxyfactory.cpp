@@ -1,147 +1,73 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "core/networkproxyfactory.h"
 
-#include "config.h"
-
-#include <QtGlobal>
-#include <QMutex>
-#include <QString>
-#include <QStringList>
-#include <QUrl>
-#include <QNetworkProxy>
-#include <QSettings>
-
-#include "constants/networkproxysettings.h"
-#include "core/logging.h"
 #include "core/settings.h"
-#include "networkproxyfactory.h"
 
-using namespace Qt::Literals::StringLiterals;
-
-NetworkProxyFactory *NetworkProxyFactory::sInstance = nullptr;
-
-NetworkProxyFactory::NetworkProxyFactory()
-    : mode_(NetworkProxySettings::Mode::System),
-      type_(QNetworkProxy::HttpProxy),
-      port_(8080),
-      use_authentication_(false) {
-
-#ifdef Q_OS_LINUX
-  // Linux uses environment variables to pass proxy configuration information, which systemProxyForQuery doesn't support for some reason.
-
-  const QStringList urls = QStringList() << QString::fromLocal8Bit(qgetenv("HTTP_PROXY"))
-                                         << QString::fromLocal8Bit(qgetenv("http_proxy"))
-                                         << QString::fromLocal8Bit(qgetenv("ALL_PROXY"))
-                                         << QString::fromLocal8Bit(qgetenv("all_proxy"));
-
-  qLog(Debug) << "Detected system proxy URLs:" << urls;
-
-  for (const QString &url_str : urls) {
-
-    if (url_str.isEmpty()) continue;
-    env_url_ = QUrl(url_str);
-    break;
-
-  }
-#endif
-
-  ReloadSettings();
-
-}
-
-NetworkProxyFactory *NetworkProxyFactory::Instance() {
-
-  if (!sInstance) {
-    sInstance = new NetworkProxyFactory;
-  }
-
-  return sInstance;
-
-}
+#include <cstdlib>
 
 void NetworkProxyFactory::ReloadSettings() {
-
-  QMutexLocker l(&mutex_);
-
-  Settings s;
-  s.beginGroup(NetworkProxySettings::kSettingsGroup);
-
-  mode_ = static_cast<NetworkProxySettings::Mode>(s.value(NetworkProxySettings::kMode, static_cast<int>(NetworkProxySettings::kDefaultMode)).toInt());
-  type_ = QNetworkProxy::ProxyType(s.value(NetworkProxySettings::kType, NetworkProxySettings::kDefaultType).toInt());
-  hostname_ = s.value(NetworkProxySettings::kHostname).toString();
-  port_ = s.value(NetworkProxySettings::kPort, NetworkProxySettings::kDefaultPort).toULongLong();
-  use_authentication_ = s.value(NetworkProxySettings::kUseAuthentication, NetworkProxySettings::kDefaultUseAuthentication).toBool();
-  username_ = s.value(NetworkProxySettings::kUsername).toString();
-  password_ = s.value(NetworkProxySettings::kPassword).toString();
-
-  s.endGroup();
-
+  Settings settings;
+  settings.BeginGroup(NetworkProxySettings::kSettingsGroup);
+  const std::string type = settings.Value(NetworkProxySettings::kType);
+  const int mode = settings.IntValue(NetworkProxySettings::kMode, -1);
+  if (mode == static_cast<int>(NetworkProxySettings::Mode::Direct) || type == "none" || type == "direct") {
+    mode_ = Mode::Direct;
+  } else if (mode == static_cast<int>(NetworkProxySettings::Mode::Manual) || type == "manual" || type == "http" || type == "socks" ||
+             type == "3" || type == "1") {
+    mode_ = Mode::Manual;
+  } else {
+    mode_ = Mode::System;
+  }
+  if (type == "socks" || type == "1") {
+    type_ = NetworkProxySettings::ProxyType::Socks5Proxy;
+  } else if (type == "http" || type == "3" || type == "manual") {
+    type_ = NetworkProxySettings::ProxyType::HttpProxy;
+  } else if (settings.Contains(NetworkProxySettings::kType)) {
+    type_ = static_cast<NetworkProxySettings::ProxyType>(settings.IntValue(NetworkProxySettings::kType, static_cast<int>(NetworkProxySettings::kDefaultType)));
+  } else {
+    type_ = NetworkProxySettings::kDefaultType;
+  }
+  hostname_ = settings.Value(NetworkProxySettings::kHostname);
+  port_ = settings.IntValue(NetworkProxySettings::kPort, static_cast<int>(NetworkProxySettings::kDefaultPort));
+  use_authentication_ = settings.BoolValue(NetworkProxySettings::kUseAuthentication, NetworkProxySettings::kDefaultUseAuthentication);
+  username_ = settings.Value(NetworkProxySettings::kUsername);
+  password_ = settings.Value(NetworkProxySettings::kPassword);
+  engine_ = settings.BoolValue(NetworkProxySettings::kEngine, NetworkProxySettings::kDefaultEngine);
 }
 
-QList<QNetworkProxy> NetworkProxyFactory::queryProxy(const QNetworkProxyQuery &query) {
+std::string NetworkProxyFactory::Scheme() const {
+  return type_ == NetworkProxySettings::ProxyType::Socks5Proxy ? "socks5" : "http";
+}
 
-  QMutexLocker l(&mutex_);
-
-  QNetworkProxy ret;
-
-  switch (mode_) {
-    case NetworkProxySettings::Mode::System:
-#ifdef Q_OS_LINUX
-      Q_UNUSED(query);
-
-      if (env_url_.isEmpty()) {
-        ret.setType(QNetworkProxy::NoProxy);
+std::string NetworkProxyFactory::SystemProxyFromEnv() {
+  const char *keys[] = {"http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY"};
+  for (const char *key : keys) {
+    if (const char *value = std::getenv(key)) {
+      if (value[0]) {
+        return value;
       }
-      else {
-        ret.setHostName(env_url_.host());
-        ret.setPort(env_url_.port());
-        ret.setUser(env_url_.userName());
-        ret.setPassword(env_url_.password());
-        if (env_url_.scheme().startsWith("http"_L1)) {
-          ret.setType(QNetworkProxy::HttpProxy);
-        }
-        else {
-          ret.setType(QNetworkProxy::Socks5Proxy);
-        }
-        qLog(Debug) << "Using proxy URL:" << env_url_;
-      }
-      break;
-#else
-      return systemProxyForQuery(query);
-#endif
-
-    case NetworkProxySettings::Mode::Direct:
-      ret.setType(QNetworkProxy::NoProxy);
-      break;
-
-    case NetworkProxySettings::Mode::Manual:
-      ret.setType(type_);
-      ret.setHostName(hostname_);
-      ret.setPort(port_);
-      if (use_authentication_) {
-        ret.setUser(username_);
-        ret.setPassword(password_);
-      }
-      break;
+    }
   }
+  return {};
+}
 
-  return QList<QNetworkProxy>() << ret;
+std::string NetworkProxyFactory::ProxyUri() const {
+  if (mode_ == Mode::Direct) {
+    return {};
+  }
+  if (mode_ == Mode::System) {
+    return SystemProxyFromEnv();
+  }
+  if (hostname_.empty() || port_ <= 0) {
+    return {};
+  }
+  std::string auth;
+  if (use_authentication_ && !username_.empty()) {
+    auth = username_ + ":" + password_ + "@";
+  }
+  return Scheme() + "://" + auth + hostname_ + ":" + std::to_string(port_);
+}
 
+GstEngineProxy::Options NetworkProxyFactory::EngineOptions() const {
+  return GstEngineProxy::FromSettings(static_cast<NetworkProxySettings::Mode>(static_cast<int>(mode_)), type_, engine_, hostname_,
+                                      port_, use_authentication_, username_, password_);
 }

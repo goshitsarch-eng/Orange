@@ -1,246 +1,100 @@
-/*
- * Strawberry Music Player
- * Copyright 2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "fileview/fileviewtreemodel.h"
 
-#include <QObject>
-#include <QVariant>
-#include <QString>
-#include <QStringList>
-#include <QList>
-#include <QMap>
-#include <QDir>
-#include <QFileInfo>
-#include <QFileIconProvider>
-#include <QMimeData>
-#include <QUrl>
-#include <QIcon>
+#include "core/song.h"
+#include "fileview/fileviewhidden.h"
+#include "playlistparsers/playlistparser.h"
+#include "utilities/fileutils.h"
+#include "utilities/strutils.h"
 
-#include "core/simpletreemodel.h"
-#include "core/logging.h"
-#include "fileviewtreemodel.h"
-#include "fileviewtreeitem.h"
+#include <algorithm>
 
-using namespace Qt::Literals::StringLiterals;
-
-FileViewTreeModel::FileViewTreeModel(QObject *parent)
-    : SimpleTreeModel<FileViewTreeItem>(new FileViewTreeItem(this), parent),
-      icon_provider_(new QFileIconProvider()) {
-}
-
-FileViewTreeModel::~FileViewTreeModel() {
-  delete root_;
-  delete icon_provider_;
-}
-
-Qt::ItemFlags FileViewTreeModel::flags(const QModelIndex &idx) const {
-
-  const FileViewTreeItem *item = IndexToItem(idx);
-  if (!item) return Qt::NoItemFlags;
-
-  switch (item->type) {
-    case FileViewTreeItem::Type::VirtualRoot:
-    case FileViewTreeItem::Type::Directory:
-    case FileViewTreeItem::Type::File:
-      return Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDragEnabled;
-    case FileViewTreeItem::Type::Root:
-    default:
-      return Qt::ItemIsEnabled;
+void FileViewTreeModel::SetRootPaths(const std::vector<std::string> &paths) {
+  Reset();
+  root_ = std::make_unique<FileViewTreeItem>();
+  root_->type = FileViewTreeItem::Type::Root;
+  root_->name = "Computer";
+  root_->loaded = true;
+  for (const std::string &path : paths) {
+    if (!FileUtils::IsDirectory(path)) {
+      continue;
+    }
+    auto child = std::make_unique<FileViewTreeItem>();
+    child->path = path;
+    child->name = FileUtils::BaseName(path).empty() ? path : FileUtils::BaseName(path);
+    child->type = FileViewTreeItem::Type::Directory;
+    child->parent = root_.get();
+    root_->children.push_back(std::move(child));
   }
-
 }
 
-QVariant FileViewTreeModel::data(const QModelIndex &idx, const int role) const {
+void FileViewTreeModel::SetNameFilters(const std::vector<std::string> &filters) { name_filters_ = filters; }
 
-  if (!idx.isValid()) return QVariant();
+void FileViewTreeModel::SetShowHidden(bool show_hidden) { show_hidden_ = show_hidden; }
 
-  const FileViewTreeItem *item = IndexToItem(idx);
-  if (!item) return QVariant();
+void FileViewTreeModel::SetShowAllFiles(bool show_all) { show_all_files_ = show_all; }
 
-  switch (role) {
-    case Qt::DisplayRole:
-      if (item->type == FileViewTreeItem::Type::VirtualRoot) {
-        return item->display_text.isEmpty() ? item->file_path : item->display_text;
-      }
-      return item->file_info.fileName();
+void FileViewTreeModel::Reset() { root_.reset(); }
 
-    case Qt::DecorationRole:
-      return GetIcon(item);
-
-    case Role_Type:
-      return QVariant::fromValue(item->type);
-
-    case Role_FilePath:
-      return item->file_path;
-
-    case Role_FileName:
-      return item->file_info.fileName();
-
-    default:
-      return QVariant();
-  }
-
-}
-
-bool FileViewTreeModel::hasChildren(const QModelIndex &parent) const {
-
-  const FileViewTreeItem *item = IndexToItem(parent);
-  if (!item) return false;
-
-  // Root and VirtualRoot always have children (or can have them)
-  if (item->type == FileViewTreeItem::Type::Root) return true;
-  if (item->type == FileViewTreeItem::Type::VirtualRoot) return true;
-
-  // Directories can have children
-  if (item->type == FileViewTreeItem::Type::Directory) {
+bool FileViewTreeModel::AcceptsFile(const std::string &path) const {
+  if (show_all_files_) {
     return true;
   }
-
-  // Files don't have children
-  return false;
-
-}
-
-bool FileViewTreeModel::canFetchMore(const QModelIndex &parent) const {
-
-  const FileViewTreeItem *item = IndexToItem(parent);
-  if (!item) return false;
-
-  // Can fetch more if not yet lazy loaded
-  return !item->lazy_loaded && (item->type == FileViewTreeItem::Type::VirtualRoot || item->type == FileViewTreeItem::Type::Directory);
-
-}
-
-void FileViewTreeModel::fetchMore(const QModelIndex &parent) {
-
-  FileViewTreeItem *item = IndexToItem(parent);
-  if (!item || item->lazy_loaded) return;
-
-  LazyLoad(item);
-
+  if (Song::IsAudioFile(path) || PlaylistParser::IsPlaylist(path)) {
+    return true;
+  }
+  if (name_filters_.empty()) {
+    return false;
+  }
+  const std::string ext = StrUtils::ToLower(FileUtils::Extension(path));
+  return std::find(name_filters_.begin(), name_filters_.end(), ext) != name_filters_.end();
 }
 
 void FileViewTreeModel::LazyLoad(FileViewTreeItem *item) {
-
-  if (item->lazy_loaded) return;
-
-  QDir dir(item->file_path);
-  if (!dir.exists()) {
-    item->lazy_loaded = true;
+  if (!item || item->loaded || item->type == FileViewTreeItem::Type::File) {
     return;
   }
-
-  // Apply name filters
-  const QDir::Filters filters = QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot;
-  if (!name_filters_.isEmpty()) {
-    dir.setNameFilters(name_filters_);
-  }
-
-  const QFileInfoList entries = dir.entryInfoList(filters, QDir::Name | QDir::DirsFirst);
-  if (!entries.isEmpty()) {
-    BeginInsert(item, 0, static_cast<int>(entries.count()) - 1);
-
-    for (const QFileInfo &entry : entries) {
-      FileViewTreeItem *child = new FileViewTreeItem(
-        entry.isDir() ? FileViewTreeItem::Type::Directory : FileViewTreeItem::Type::File,
-        item
-      );
-      child->file_path = entry.absoluteFilePath();
-      child->file_info = entry;
-      child->lazy_loaded = false;
-      child->display_text = entry.fileName();
+  item->loaded = true;
+  std::vector<std::string> entries = FileUtils::ListDirectory(item->path);
+  std::sort(entries.begin(), entries.end());
+  for (const std::string &path : entries) {
+    const std::string name = FileUtils::BaseName(path);
+    if (!FileViewHidden::ShouldIncludeEntry(name, show_hidden_)) {
+      continue;
     }
-
-    EndInsert();
+    auto child = std::make_unique<FileViewTreeItem>();
+    child->path = path;
+    child->name = name;
+    child->parent = item;
+    if (FileUtils::IsDirectory(path)) {
+      child->type = FileViewTreeItem::Type::Directory;
+    } else if (AcceptsFile(path)) {
+      child->type = FileViewTreeItem::Type::File;
+    } else {
+      continue;
+    }
+    item->children.push_back(std::move(child));
   }
-
-  item->lazy_loaded = true;
-
 }
 
-QIcon FileViewTreeModel::GetIcon(const FileViewTreeItem *item) const {
-
-  if (!item) return QIcon();
-
-  switch (item->type) {
-    case FileViewTreeItem::Type::VirtualRoot:
-    case FileViewTreeItem::Type::Directory:
-      return icon_provider_->icon(QFileIconProvider::Folder);
-    case FileViewTreeItem::Type::File:
-      return icon_provider_->icon(item->file_info);
-    default:
-      return QIcon();
+int FileViewTreeModel::DirectoryCount() const {
+  if (!root_) {
+    return 0;
   }
-
+  return static_cast<int>(root_->children.size());
 }
 
-QStringList FileViewTreeModel::mimeTypes() const {
-  return QStringList() << u"text/uri-list"_s;
-}
-
-QMimeData *FileViewTreeModel::mimeData(const QModelIndexList &indexes) const {
-
-  if (indexes.isEmpty()) return nullptr;
-
-  QList<QUrl> urls;
-  for (const QModelIndex &idx : indexes) {
-    const FileViewTreeItem *item = IndexToItem(idx);
-    if (item && (item->type == FileViewTreeItem::Type::File || item->type == FileViewTreeItem::Type::Directory || item->type == FileViewTreeItem::Type::VirtualRoot)) {
-      urls << QUrl::fromLocalFile(item->file_path);
+std::vector<std::string> FileViewTreeModel::FilesIn(const std::string &directory) const {
+  std::vector<std::string> files;
+  std::vector<std::string> entries = FileUtils::ListDirectory(directory);
+  std::sort(entries.begin(), entries.end());
+  for (const std::string &path : entries) {
+    const std::string name = FileUtils::BaseName(path);
+    if (!FileViewHidden::ShouldIncludeEntry(name, show_hidden_)) {
+      continue;
+    }
+    if (FileUtils::IsDirectory(path) || AcceptsFile(path)) {
+      files.push_back(path);
     }
   }
-
-  if (urls.isEmpty()) return nullptr;
-
-  QMimeData *data = new QMimeData();
-  data->setUrls(urls);
-  return data;
-
-}
-
-void FileViewTreeModel::SetRootPaths(const QStringList &paths) {
-
-  Reset();
-
-  for (const QString &path : paths) {
-    QFileInfo info(path);
-    if (!info.exists() || !info.isDir()) continue;
-
-    FileViewTreeItem *virtual_root = new FileViewTreeItem(FileViewTreeItem::Type::VirtualRoot, root_);
-    virtual_root->file_path = info.absoluteFilePath();
-    virtual_root->file_info = info;
-    virtual_root->display_text = info.absoluteFilePath();
-    virtual_root->lazy_loaded = false;
-  }
-
-}
-
-void FileViewTreeModel::SetNameFilters(const QStringList &filters) {
-  name_filters_ = filters;
-}
-
-void FileViewTreeModel::Reset() {
-
-  beginResetModel();
-
-  // Clear children without notifications since we're in a reset
-  qDeleteAll(root_->children);
-  root_->children.clear();
-
-  endResetModel();
-
+  return files;
 }

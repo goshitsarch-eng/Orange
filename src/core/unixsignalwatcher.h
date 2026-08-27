@@ -1,53 +1,27 @@
-/*
- * Strawberry Music Player
- * Copyright 2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_UNIXSIGNALWATCHER_H
+#define STRAWBERRY_UNIXSIGNALWATCHER_H
 
-#ifndef UNIXSIGNALWATCHER_H
-#define UNIXSIGNALWATCHER_H
+#include "core/signal.h"
 
-#include <csignal>
+#include <glib.h>
 
-#include <QObject>
-#include <QList>
+#include <vector>
 
-class QSocketNotifier;
-
-class UnixSignalWatcher : public QObject {
-  Q_OBJECT
-
+class UnixSignalWatcher {
  public:
-  explicit UnixSignalWatcher(QObject *parent = nullptr);
-  ~UnixSignalWatcher() override;
+  UnixSignalWatcher();
+  ~UnixSignalWatcher();
 
-  void WatchForSignal(const int signal);
-
- Q_SIGNALS:
-  void UnixSignal(const int signal);
+  void Watch(int signum);
+  Signal<int> Fired;
 
  private:
-  static void SignalHandler(const int signal);
-  void HandleSignalNotification();
-
-  static UnixSignalWatcher *sInstance;
-  int signal_fd_[2];
-  QSocketNotifier *socket_notifier_;
-  QList<int> watched_signals_;
-  QList<struct sigaction> original_signal_actions_;
+  struct Entry {
+    int signum = 0;
+    guint id = 0;
+    void *payload = nullptr;
+  };
+  std::vector<Entry> watches_;
 };
 
-#endif  // UNIXSIGNALWATCHER_H
+#endif

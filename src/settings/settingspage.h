@@ -1,99 +1,57 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_SETTINGSPAGE_H
+#define STRAWBERRY_SETTINGSPAGE_H
 
-#ifndef SETTINGSPAGE_H
-#define SETTINGSPAGE_H
-
-#include "config.h"
-
-#include <QObject>
-#include <QWidget>
-#include <QPair>
-#include <QList>
-#include <QVariant>
-#include <QString>
-#include <QSettings>
-
-#include "core/logging.h"
 #include "core/settings.h"
-#include "constants/notificationssettings.h"
 
-class QCheckBox;
-class QComboBox;
-class QRadioButton;
-class QSpinBox;
-class QDoubleSpinBox;
-class QSlider;
-class QLineEdit;
-class QShowEvent;
+#include <adwaita.h>
 
-class SettingsDialog;
+#include <functional>
+#include <string>
+#include <utility>
+#include <vector>
 
-class SettingsPage : public QWidget {
-  Q_OBJECT
+class Application;
+class LoginStateWidget;
+class StreamingService;
 
- public:
-  explicit SettingsPage(SettingsDialog *dialog, QWidget *parent = nullptr);
+namespace SettingsPage {
 
-  void Init(QWidget *ui_widget);
+AdwPreferencesPage *MakePage(const char *name, const char *icon);
+AdwPreferencesGroup *AddGroup(AdwPreferencesPage *page, const char *title = nullptr);
 
-  // Return false to grey out the page's item in the list.
-  virtual bool IsEnabled() const { return true; }
+GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *subtitle, bool fallback,
+                     const char *group_name = nullptr);
+GtkWidget *AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback = "");
+GtkWidget *AddPasswordEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback = "");
+GtkWidget *AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, int fallback);
+void AddDescription(AdwPreferencesGroup *group, const char *text, bool markup = false);
+GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
+                    const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
+                    const std::function<void(const std::string &)> &changed = {}, const char *group_name = nullptr);
+GtkWidget *AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                       const std::vector<std::pair<std::string, std::string>> &choices, int fallback);
+GtkWidget *AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked,
+                        const char *tooltip = nullptr);
+GtkWidget *AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
+                        const std::function<void(GtkWidget *button)> &clicked, const char *tooltip = nullptr);
+GtkWidget *AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                          const char *fallback, const char *tooltip = nullptr);
+void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                   const char *fallback);
+void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                     double fallback);
+GtkWidget *AddDoubleScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                          double fallback, double min, double max, double step);
+GtkWidget *AddIntScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                       int fallback, int min, int max, int step);
+void AddBoolRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *false_title, const char *true_title,
+                   bool fallback, const std::function<void(bool)> &changed = {});
+void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
+                     const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
+                     const std::function<void(const std::string &)> &changed = {});
+LoginStateWidget *AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name);
+void BindLoginProgress(GtkWidget *button, StreamingService *service, GtkWidget *page);
 
-  virtual void Load() = 0;
+}  // namespace SettingsPage
 
-  void Accept();
-  void Reject();
-  void Apply();
-
-  // The dialog that this page belongs to.
-  SettingsDialog *dialog() const { return dialog_; }
-
-  void set_changed() { changed_ = true; }
-
-  static void ComboBoxLoadFromSettings(const Settings &s, QComboBox *combobox, const QString &setting, const QString &default_value);
-  static void ComboBoxLoadFromSettings(const Settings &s, QComboBox *combobox, const QString &setting, const int default_value);
-  static void ComboBoxLoadFromSettingsByIndex(const Settings &s, QComboBox *combobox, const QString &setting, const int default_value);
-
- private:
-  virtual void Save() = 0;
-  virtual void Cancel() {}
-
- protected:
-  bool eventFilter(QObject *obj, QEvent *e) override;
-
- Q_SIGNALS:
-  void NotificationPreview(const OSDSettings::Type, const QString&, const QString&);
-
- private:
-  SettingsDialog *dialog_;
-  QWidget *ui_widget_;
-  bool changed_;
-  QList<QPair<QCheckBox*, Qt::CheckState>> checkboxes_;
-  QList<QPair<QRadioButton*, bool>> radiobuttons_;
-  QList<QPair<QComboBox*, QString>> comboboxes_;
-  QList<QPair<QSpinBox*, int>> spinboxes_;
-  QList<QPair<QDoubleSpinBox*, double>> double_spinboxes_;
-  QList<QPair<QSlider*, int>> sliders_;
-  QList<QPair<QLineEdit*, QString>> lineedits_;
-};
-
-#endif  // SETTINGSPAGE_H
+#endif

@@ -1,152 +1,119 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_STREAMINGSERVICE_H
+#define STRAWBERRY_STREAMINGSERVICE_H
 
-#ifndef STREAMINGSERVICE_H
-#define STREAMINGSERVICE_H
-
-#include <QObject>
-#include <QString>
-#include <QUrl>
-#include <QIcon>
-
-#include "includes/shared_ptr.h"
+#include "core/signal.h"
 #include "core/song.h"
+#include "core/urlhandler.h"
+#include "streaming/streamingpage.h"
 
-class CollectionBackend;
-class CollectionModel;
-class CollectionFilter;
+#include <functional>
+#include <map>
+#include <string>
 
-class StreamingService : public QObject {
-  Q_OBJECT
+class NetworkAccessManager;
 
+class StreamingService : public UrlHandler {
  public:
-  explicit StreamingService(const Song::Source source, const QString &name, const QString &url_scheme, const QString &settings_group, QObject *parent = nullptr);
-  ~StreamingService() override {}
+  using SearchCallback = std::function<void(const SongList &)>;
+  enum class FavoriteType { Artists = 1, Albums = 2, Songs = 3 };
+  enum class SearchType { Artists = 1, Albums = 2, Songs = 3 };
 
-  enum class SearchType {
-    Artists = 1,
-    Albums = 2,
-    Songs = 3
-  };
-
-  virtual void Exit() = 0;
-
-  virtual Song::Source source() const { return source_; }
-  virtual QString name() const { return name_; }
-  virtual QString url_scheme() const { return url_scheme_; }
-  virtual QString settings_group() const { return settings_group_; }
-  virtual bool has_initial_load_settings() const { return false; }
-  virtual void InitialLoadSettings() {}
+  virtual std::string name() const = 0;
+  virtual NetworkAccessManager *network() const { return nullptr; }
+  virtual void Search(const std::string &query, SearchCallback callback) = 0;
+  virtual void Search(const std::string &query, SearchType type, SearchCallback callback);
+  virtual void GetArtists(SearchCallback callback);
+  virtual void GetAlbums(SearchCallback callback);
+  virtual void GetSongs(SearchCallback callback);
+  virtual void GetArtistAlbums(const Song &artist, SearchCallback callback);
+  virtual void GetAlbumSongs(const Song &album, SearchCallback callback);
+  virtual void Login(const std::string &username, const std::string &password_or_token) = 0;
+  virtual void Logout();
   virtual void ReloadSettings() {}
-  virtual QIcon Icon() const { return Song::IconForSource(source_); }
-  virtual bool oauth() const { return false; }
-  virtual bool authenticated() const { return false; }
-  virtual int Search(const QString &query, const SearchType type) { Q_UNUSED(query); Q_UNUSED(type); return 0; }
-  virtual void CancelSearch() {}
+  virtual bool logged_in() const { return logged_in_; }
+  virtual bool authenticated() const { return logged_in_; }
   virtual bool show_progress() const { return true; }
-  virtual bool enable_refresh_button() const { return true; }
+  void NotifyAuthenticationChanged();
+  void NotifyAuthenticationFailed(const std::string &error);
+  int last_search_id() const { return last_search_id_; }
+  int StartSearchProgress();
+  void StartArtistsProgress();
+  void StartAlbumsProgress();
+  void StartSongsProgress();
+  void StartFavoritesProgress(FavoriteType type = FavoriteType::Songs);
+  virtual void CancelSearch();
+  virtual void ResetArtistsRequest();
+  virtual void ResetAlbumsRequest();
+  virtual void ResetSongsRequest();
+  virtual void ResetFavoritesRequest();
+  int BeginArtistsRequest();
+  int BeginAlbumsRequest();
+  int BeginSongsRequest();
+  int BeginSearchRequest();
+  int BeginFavoritesRequest();
+  bool ArtistsRequestCurrent(int generation) const;
+  bool AlbumsRequestCurrent(int generation) const;
+  bool SongsRequestCurrent(int generation) const;
+  bool SearchRequestCurrent(int generation) const;
+  bool FavoritesRequestCurrent(int generation) const;
+  int artists_generation() const { return artists_gen_; }
+  int albums_generation() const { return albums_gen_; }
+  int songs_generation() const { return songs_gen_; }
+  int search_generation() const { return search_gen_; }
+  int favorites_generation() const { return favorites_gen_; }
+  SearchCallback GuardArtists(SearchCallback callback);
+  SearchCallback GuardAlbums(SearchCallback callback);
+  SearchCallback GuardSongs(SearchCallback callback);
+  SearchCallback GuardSearch(SearchCallback callback);
+  SearchCallback GuardFavorites(SearchCallback callback);
+  void ReportSearchProgress(int received, int total);
+  void ReportArtistsProgress(int received, int total);
+  void ReportAlbumsProgress(int received, int total);
+  void ReportSongsProgress(int received, int total);
+  void ReportFavoritesProgress(int received, int total);
+  void NotifySearchFailed(const std::string &error);
+  void NotifyArtistsFailed(const std::string &error);
+  void NotifyAlbumsFailed(const std::string &error);
+  void NotifySongsFailed(const std::string &error);
+  void NotifyFavoritesFailed(const std::string &error);
+  void DeliverWithCovers(NetworkAccessManager *network, const std::map<std::string, std::string> &headers, const SongList &songs,
+                         SearchCallback callback, std::function<void(const std::string &)> status = {},
+                         StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {});
+  virtual void GetFavorites(FavoriteType type, SearchCallback callback);
+  virtual void AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
+  virtual void RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback = {});
 
-  virtual SharedPtr<CollectionBackend> artists_collection_backend() { return nullptr; }
-  virtual SharedPtr<CollectionBackend> albums_collection_backend() { return nullptr; }
-  virtual SharedPtr<CollectionBackend> songs_collection_backend() { return nullptr; }
+  Signal<> AuthenticationChanged;
+  Signal<std::string> AuthenticationFailed;
+  Signal<int, std::string> SearchUpdateStatus;
+  Signal<int, int> SearchProgressSetMaximum;
+  Signal<int, int> SearchUpdateProgress;
+  Signal<std::string> ArtistsUpdateStatus;
+  Signal<int> ArtistsProgressSetMaximum;
+  Signal<int> ArtistsUpdateProgress;
+  Signal<std::string> AlbumsUpdateStatus;
+  Signal<int> AlbumsProgressSetMaximum;
+  Signal<int> AlbumsUpdateProgress;
+  Signal<std::string> SongsUpdateStatus;
+  Signal<int> SongsProgressSetMaximum;
+  Signal<int> SongsUpdateProgress;
+  Signal<std::string> FavoritesUpdateStatus;
+  Signal<int> FavoritesProgressSetMaximum;
+  Signal<int> FavoritesUpdateProgress;
+  Signal<int, std::string> SearchFailed;
+  Signal<std::string> ArtistsFailed;
+  Signal<std::string> AlbumsFailed;
+  Signal<std::string> SongsFailed;
+  Signal<std::string> FavoritesFailed;
 
-  virtual CollectionModel *artists_collection_model() { return nullptr; }
-  virtual CollectionModel *albums_collection_model() { return nullptr; }
-  virtual CollectionModel *songs_collection_model() { return nullptr; }
-
-  virtual CollectionFilter *artists_collection_filter_model() { return nullptr; }
-  virtual CollectionFilter *albums_collection_filter_model() { return nullptr; }
-  virtual CollectionFilter *songs_collection_filter_model() { return nullptr; }
-
- public Q_SLOTS:
-  virtual void Configure() {}
-  virtual void GetArtists() {}
-  virtual void GetAlbums() {}
-  virtual void GetSongs() {}
-  virtual void ResetArtistsRequest() {}
-  virtual void ResetAlbumsRequest() {}
-  virtual void ResetSongsRequest() {}
-
- Q_SIGNALS:
-  void ExitFinished();
-  void RequestLogin();
-  void RequestLogout();
-  void LoginWithCredentials(const QString &api_token, const QString &username, const QString &password);
-  void LoginSuccess();
-  void LoginFailure(const QString &error);
-  void LoginFinished(const bool success, const QString &error = QString());
-
-  void TestSuccess();
-  void TestFailure(const QString &error);
-  void TestComplete(const bool success, const QString &error = QString());
-
-  void ShowErrorDialog(const QString &error);
-  void Results(const SongMap &songs, const QString &error);
-  void UpdateStatus(const QString &text);
-  void ProgressSetMaximum(const int max);
-  void UpdateProgress(const int max);
-
-  void ArtistsResults(const SongMap &songs, const QString &error);
-  void ArtistsUpdateStatus(const QString &text);
-  void ArtistsProgressSetMaximum(const int max);
-  void ArtistsUpdateProgress(const int max);
-
-  void AlbumsResults(const SongMap &songs, const QString &error);
-  void AlbumsUpdateStatus(const QString &text);
-  void AlbumsProgressSetMaximum(const int max);
-  void AlbumsUpdateProgress(const int max);
-
-  void SongsResults(const SongMap &songs, const QString &error);
-  void SongsUpdateStatus(const QString &text);
-  void SongsProgressSetMaximum(const int max);
-  void SongsUpdateProgress(const int max);
-
-  void SearchResults(const int id, const SongMap &songs, const QString &error);
-  void SearchUpdateStatus(const int id, const QString &text);
-  void SearchProgressSetMaximum(const int id, const int max);
-  void SearchUpdateProgress(const int id, const int max);
-
-  void AddArtists(const SongList &songs);
-  void AddAlbums(const SongList &songs);
-  void AddSongs(const SongList &songs);
-
-  void RemoveArtists(const SongList &songs);
-  void RemoveAlbums(const SongList &songs);
-  void RemoveSongsByList(const SongList &songs);
-  void RemoveSongsByMap(const SongMap &songs);
-
-  void StreamURLFailure(const uint id, const QUrl &media_url, const QString &error);
-  void StreamURLSuccess(const uint id, const QUrl &media_url, const QUrl &stream_url, const Song::FileType filetype, const int samplerate, const int bit_depth, const qint64 duration);
-  void StreamURLRequestFinished(const uint id, const QUrl &media_url, const bool success, const QUrl &stream_url, const QString &error = QString());
-
-  void OpenSettingsDialog(const Song::Source source);
-
- private:
-  Song::Source source_;
-  QString name_;
-  QString url_scheme_;
-  QString settings_group_;
+ protected:
+  bool logged_in_ = false;
+  int last_search_id_ = 0;
+  int artists_gen_ = 0;
+  int albums_gen_ = 0;
+  int songs_gen_ = 0;
+  int search_gen_ = 0;
+  int favorites_gen_ = 0;
 };
 
-using StreamingServicePtr = SharedPtr<StreamingService>;
-
-Q_DECLARE_METATYPE(StreamingService*)
-Q_DECLARE_METATYPE(StreamingServicePtr)
-
-#endif  // STREAMINGSERVICE_H
+#endif

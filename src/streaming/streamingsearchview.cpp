@@ -1,890 +1,767 @@
-/*
- * Strawberry Music Player
- * This code was part of Clementine (GlobalSearch)
- * Copyright 2012, David Sansome <me@davidsansome.com>
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "streaming/streamingsearchview.h"
 
-#include "config.h"
-
-#include <memory>
-#include <utility>
-
-#include <QtGlobal>
-#include <QObject>
-#include <QAbstractItemModel>
-#include <QStandardItemModel>
-#include <QItemSelectionModel>
-#include <QSortFilterProxyModel>
-#include <QApplication>
-#include <QWidget>
-#include <QTimer>
-#include <QPair>
-#include <QList>
-#include <QMap>
-#include <QString>
-#include <QStringList>
-#include <QRegularExpression>
-#include <QPixmap>
-#include <QPixmapCache>
-#include <QPainter>
-#include <QPalette>
-#include <QColor>
-#include <QFont>
-#include <QSize>
-#include <QStandardItem>
-#include <QMenu>
-#include <QAction>
-#include <QActionGroup>
-#include <QSettings>
-#include <QStackedWidget>
-#include <QLabel>
-#include <QProgressBar>
-#include <QRadioButton>
-#include <QScrollArea>
-#include <QToolButton>
-#include <QEvent>
-#include <QTimerEvent>
-#include <QKeyEvent>
-#include <QContextMenuEvent>
-#include <QShowEvent>
-#include <QHideEvent>
-
-#include "core/song.h"
-#include "core/iconloader.h"
-#include "core/settings.h"
-#include "core/mimedata.h"
-#include "collection/collectionfilterwidget.h"
-#include "collection/collectionmodel.h"
+#include "collection/collectionfiltermenu.h"
+#include "collection/collectionitemdelegate.h"
+#include "collection/collectiontree.h"
 #include "collection/groupbydialog.h"
-#include "collection/savedgroupingmanager.h"
-#include "covermanager/albumcoverloader.h"
-#include "covermanager/albumcoverloaderresult.h"
-#include "streamsongmimedata.h"
-#include "streamingservice.h"
-#include "streamingsearchitemdelegate.h"
-#include "streamingsearchmodel.h"
-#include "streamingsearchsortmodel.h"
-#include "streamingsearchview.h"
-#include "ui_streamingsearchview.h"
-#include "constants/appearancesettings.h"
+#include "core/settings.h"
+#include "dialogs/dialoghelpers.h"
+#include "streaming/streamingabort.h"
+#include "streaming/streamingcollectionactions.h"
+#include "streaming/streamingcollectiontree.h"
+#include "streaming/streamingcover.h"
+#include "streaming/streamingdrag.h"
+#include "streaming/streamingprogress.h"
+#include "streaming/streamingsearchopts.h"
+#include "streaming/streamingsearchgroup.h"
+#include "utilities/fileutils.h"
+#include "streaming/streamingsearchhelp.h"
+#include "streaming/streamingsearchitemdelegate.h"
+#include "translations/translations.h"
+#include "utilities/jsonutils.h"
+#include "widgets/filterentryapply.h"
+#include "widgets/filtersearchkeyboard.h"
+#include "widgets/listboxkeyboard.h"
+#include "widgets/listboxkeyboardgtk.h"
+#include "widgets/listboxtreepressgtk.h"
 
-using std::make_unique;
-using namespace Qt::Literals::StringLiterals;
-
-namespace {
-constexpr char kPrettyCovers[] = "pretty_covers";
-constexpr char kSearchType[] = "type";
-constexpr char kSearchGroupByVersion[] = "search_group_by_version";
-constexpr char kSearchGroupBy1[] = "search_group_by1";
-constexpr char kSearchGroupBy2[] = "search_group_by2";
-constexpr char kSearchGroupBy3[] = "search_group_by3";
-constexpr int kSwapModelsTimeoutMsec = 250;
-constexpr int kDelayedSearchTimeoutMs = 200;
-constexpr int kArtHeight = 32;
-}  // namespace
-
-StreamingSearchView::StreamingSearchView(QWidget *parent)
-    : QWidget(parent),
-      service_(nullptr),
-      ui_(new Ui_StreamingSearchView),
-      context_menu_(nullptr),
-      group_by_actions_(nullptr),
-      front_model_(nullptr),
-      back_model_(nullptr),
-      current_model_(nullptr),
-      front_proxy_(nullptr),
-      back_proxy_(nullptr),
-      current_proxy_(front_proxy_),
-      swap_models_timer_(new QTimer(this)),
-      use_pretty_covers_(true),
-      search_type_(StreamingService::SearchType::Artists),
-      search_error_(false),
-      last_search_id_(0),
-      searches_next_id_(1) {
-
-  ui_->setupUi(this);
-
-  ui_->search->installEventFilter(this);
-  ui_->results_stack->installEventFilter(this);
-
-  ui_->settings->setIcon(IconLoader::Load(u"configure"_s));
-
-  // Set the appearance of the results list
-  ui_->results->setItemDelegate(new StreamingSearchItemDelegate(this));
-  ui_->results->setAttribute(Qt::WA_MacShowFocusRect, false);
-  ui_->results->setStyleSheet(u"QTreeView::item{padding-top:1px;}"_s);
-
-  // Show the help page initially
-  ui_->results_stack->setCurrentWidget(ui_->help_page);
-  ui_->help_frame->setBackgroundRole(QPalette::Base);
-
-  // Set the colour of the help text to the disabled window text colour
-  QPalette help_palette = ui_->label_helptext->palette();
-  const QColor help_color = help_palette.color(QPalette::Disabled, QPalette::WindowText);
-  help_palette.setColor(QPalette::Normal, QPalette::WindowText, help_color);
-  help_palette.setColor(QPalette::Inactive, QPalette::WindowText, help_color);
-  ui_->label_helptext->setPalette(help_palette);
-
-  // Make it bold
-  QFont help_font = ui_->label_helptext->font();
-  help_font.setBold(true);
-  ui_->label_helptext->setFont(help_font);
-
-  // Hide progressbar
-  ui_->progressbar->hide();
-  ui_->progressbar->reset();
-
-}
-
-StreamingSearchView::~StreamingSearchView() { delete ui_; }
-
-void StreamingSearchView::Init(const StreamingServicePtr service, const SharedPtr<AlbumCoverLoader> albumcover_loader) {
-
-  service_ = service;
-  albumcover_loader_ = albumcover_loader;
-
-  front_model_ = new StreamingSearchModel(service, this);
-  back_model_ = new StreamingSearchModel(service, this);
-
-  front_proxy_ = new StreamingSearchSortModel(this);
-  back_proxy_ = new StreamingSearchSortModel(this);
-
-  front_model_->set_proxy(front_proxy_);
-  back_model_->set_proxy(back_proxy_);
-
-  current_model_ = front_model_;
-  current_proxy_ = front_proxy_;
-
-  // Set up the sorting proxy model
-  front_proxy_->setSourceModel(front_model_);
-  front_proxy_->setDynamicSortFilter(true);
-  front_proxy_->sort(0);
-
-  back_proxy_->setSourceModel(back_model_);
-  back_proxy_->setDynamicSortFilter(true);
-  back_proxy_->sort(0);
-
-  // Add actions to the settings menu
-  group_by_actions_ = CollectionFilterWidget::CreateGroupByActions(SavedGroupingManager::GetSavedGroupingsSettingsGroup(service_->settings_group()), this);
-  QMenu *settings_menu = new QMenu(this);
-  settings_menu->addActions(group_by_actions_->actions());
-  settings_menu->addSeparator();
-  settings_menu->addAction(IconLoader::Load(u"configure"_s), tr("Configure %1...").arg(Song::DescriptionForSource(service_->source())), this, &StreamingSearchView::Configure);
-  ui_->settings->setMenu(settings_menu);
-
-  swap_models_timer_->setSingleShot(true);
-  swap_models_timer_->setInterval(kSwapModelsTimeoutMsec);
-  QObject::connect(swap_models_timer_, &QTimer::timeout, this, &StreamingSearchView::SwapModels);
-
-  QObject::connect(ui_->radiobutton_search_artists, &QRadioButton::clicked, this, &StreamingSearchView::SearchArtistsClicked);
-  QObject::connect(ui_->radiobutton_search_albums, &QRadioButton::clicked, this, &StreamingSearchView::SearchAlbumsClicked);
-  QObject::connect(ui_->radiobutton_search_songs, &QRadioButton::clicked, this, &StreamingSearchView::SearchSongsClicked);
-  QObject::connect(group_by_actions_, &QActionGroup::triggered, this, &StreamingSearchView::GroupByClicked);
-
-  QObject::connect(ui_->search, &SearchField::textChanged, this, &StreamingSearchView::TextEdited);
-  QObject::connect(ui_->results, &AutoExpandingTreeView::AddToPlaylistSignal, this, &StreamingSearchView::AddToPlaylist);
-  QObject::connect(ui_->results, &AutoExpandingTreeView::FocusOnFilterSignal, this, &StreamingSearchView::FocusOnFilter);
-
-  QObject::connect(&*service_, &StreamingService::SearchUpdateStatus, this, &StreamingSearchView::UpdateStatus);
-  QObject::connect(&*service_, &StreamingService::SearchProgressSetMaximum, this, &StreamingSearchView::ProgressSetMaximum);
-  QObject::connect(&*service_, &StreamingService::SearchUpdateProgress, this, &StreamingSearchView::UpdateProgress);
-  QObject::connect(&*service_, &StreamingService::SearchResults, this, &StreamingSearchView::SearchDone);
-
-  QObject::connect(&*albumcover_loader_, &AlbumCoverLoader::AlbumCoverLoaded, this, &StreamingSearchView::AlbumCoverLoaded);
-
-  QObject::connect(ui_->settings, &QToolButton::clicked, ui_->settings, &QToolButton::showMenu);
-
-  ReloadSettings();
-
-}
-
-void StreamingSearchView::ReloadSettings() {
-
-  Settings s;
-
-  // Collection settings
-
-  s.beginGroup(service_->settings_group());
-  use_pretty_covers_ = s.value(kPrettyCovers, true).toBool();
-  front_model_->set_use_pretty_covers(use_pretty_covers_);
-  back_model_->set_use_pretty_covers(use_pretty_covers_);
-
-  // Streaming search settings
-
-  search_type_ = static_cast<StreamingService::SearchType>(s.value(kSearchType, static_cast<int>(StreamingService::SearchType::Artists)).toInt());
-  switch (search_type_) {
-    case StreamingService::SearchType::Artists:
-      ui_->radiobutton_search_artists->setChecked(true);
-      break;
-    case StreamingService::SearchType::Albums:
-      ui_->radiobutton_search_albums->setChecked(true);
-      break;
-    case StreamingService::SearchType::Songs:
-      ui_->radiobutton_search_songs->setChecked(true);
-      break;
+StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(service) {
+  widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  search_entry_ = gtk_search_entry_new();
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search_entry_), Translations::CStr("Search"));
+  gtk_widget_set_margin_start(search_entry_, 8);
+  gtk_widget_set_margin_end(search_entry_, 8);
+  gtk_widget_set_margin_top(search_entry_, 6);
+  gtk_widget_set_margin_bottom(search_entry_, 4);
+  GtkWidget *types = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+  gtk_widget_set_margin_start(types, 8);
+  gtk_widget_set_margin_end(types, 8);
+  gtk_widget_set_margin_bottom(types, 4);
+  type_artists_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingSearchHelp::Artists()));
+  type_albums_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingSearchHelp::Albums()));
+  type_songs_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingSearchHelp::Songs()));
+  gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(type_albums_), GTK_TOGGLE_BUTTON(type_artists_));
+  gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(type_songs_), GTK_TOGGLE_BUTTON(type_artists_));
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(type_songs_), TRUE);
+  gtk_box_append(GTK_BOX(types), type_artists_);
+  gtk_box_append(GTK_BOX(types), type_albums_);
+  gtk_box_append(GTK_BOX(types), type_songs_);
+  pretty_covers_btn_ = gtk_check_button_new_with_label(Translations::CStr("Pretty covers"));
+  if (service_) {
+    Settings settings;
+    settings.BeginGroup(service_->name());
+    pretty_covers_ = StreamingCover::LoadPrettyCovers(service_->name());
+    grouping_ = StreamingSearchGroup::FromSaved(settings.IntValue(StreamingSearchGroup::kSearchGroupBy1, 0),
+                                                settings.IntValue(StreamingSearchGroup::kSearchGroupBy2, 0),
+                                                settings.IntValue(StreamingSearchGroup::kSearchGroupBy3, 0),
+                                                settings.Contains(StreamingSearchGroup::kSearchGroupBy1));
   }
-
-  int group_by_version = s.value(kSearchGroupByVersion, 0).toInt();
-  if (group_by_version == 1 && s.contains(kSearchGroupBy1) && s.contains(kSearchGroupBy2) && s.contains(kSearchGroupBy3)) {
-    SetGroupBy(CollectionModel::Grouping(
-        static_cast<CollectionModel::GroupBy>(s.value(kSearchGroupBy1, static_cast<int>(CollectionModel::GroupBy::AlbumArtist)).toInt()),
-        static_cast<CollectionModel::GroupBy>(s.value(kSearchGroupBy2, static_cast<int>(CollectionModel::GroupBy::AlbumDisc)).toInt()),
-        static_cast<CollectionModel::GroupBy>(s.value(kSearchGroupBy3, static_cast<int>(CollectionModel::GroupBy::None)).toInt())));
-  }
-  else {
-    SetGroupBy(CollectionModel::Grouping(CollectionModel::GroupBy::AlbumArtist, CollectionModel::GroupBy::AlbumDisc, CollectionModel::GroupBy::None));
-  }
-  s.endGroup();
-
-  s.beginGroup(AppearanceSettings::kSettingsGroup);
-  int iconsize = s.value(AppearanceSettings::kIconSizeConfigureButtons, AppearanceSettings::kDefaultIconSizeConfigureButtons).toInt();
-  s.endGroup();
-
-  ui_->settings->setIconSize(QSize(iconsize, iconsize));
-  ui_->search->setIconSize(iconsize);
-
-}
-
-void StreamingSearchView::showEvent(QShowEvent *e) {
-
-  QWidget::showEvent(e);
-
-#ifndef Q_OS_MACOS
-  FocusSearchField();
-#endif
-
-}
-
-bool StreamingSearchView::eventFilter(QObject *object, QEvent *e) {
-
-  if (object == ui_->search && e->type() == QEvent::KeyRelease) {
-    if (SearchKeyEvent(static_cast<QKeyEvent*>(e))) {
-      return true;
-    }
-  }
-  else if (object == ui_->results_stack && e->type() == QEvent::ContextMenu) {
-    if (ResultsContextMenuEvent(static_cast<QContextMenuEvent*>(e))) {
-      return true;
-    }
-  }
-
-  return QWidget::eventFilter(object, e);
-
-}
-
-bool StreamingSearchView::SearchKeyEvent(QKeyEvent *e) {
-
-  switch (e->key()) {
-    case Qt::Key_Up:
-      ui_->results->UpAndFocus();
-      break;
-
-    case Qt::Key_Down:
-      ui_->results->DownAndFocus();
-      break;
-
-    case Qt::Key_Escape:
-      ui_->search->clear();
-      break;
-
-    case Qt::Key_Return:
-      TextEdited(ui_->search->text());
-      break;
-
-    default:
-      return false;
-  }
-
-  e->accept();
-  return true;
-
-}
-
-bool StreamingSearchView::ResultsContextMenuEvent(QContextMenuEvent *e) {
-
-  if (!context_menu_) {
-    context_menu_ = new QMenu(this);
-    context_actions_ << context_menu_->addAction(IconLoader::Load(u"media-playback-start"_s), tr("Append to current playlist"), this, &StreamingSearchView::AddSelectedToPlaylist);
-    context_actions_ << context_menu_->addAction(IconLoader::Load(u"media-playback-start"_s), tr("Replace current playlist"), this, &StreamingSearchView::LoadSelected);
-    context_actions_ << context_menu_->addAction(IconLoader::Load(u"document-new"_s), tr("Open in new playlist"), this, &StreamingSearchView::OpenSelectedInNewPlaylist);
-
-    context_menu_->addSeparator();
-    context_actions_ << context_menu_->addAction(IconLoader::Load(u"go-next"_s), tr("Queue track"), this, &StreamingSearchView::AddSelectedToPlaylistEnqueue);
-
-    context_menu_->addSeparator();
-
-    if (service_->artists_collection_model() || service_->albums_collection_model() || service_->songs_collection_model()) {
-      if (service_->artists_collection_model()) {
-        context_actions_ << context_menu_->addAction(IconLoader::Load(u"folder-new"_s), tr("Add to artists"), this, &StreamingSearchView::AddArtists);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(pretty_covers_btn_), pretty_covers_);
+  gtk_widget_set_hexpand(pretty_covers_btn_, TRUE);
+  gtk_widget_set_halign(pretty_covers_btn_, GTK_ALIGN_END);
+  gtk_box_append(GTK_BOX(types), pretty_covers_btn_);
+  g_signal_connect(pretty_covers_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     self->pretty_covers_ = gtk_check_button_get_active(button);
+                     self->PersistPrettyCovers();
+                     self->Rebuild();
+                   }),
+                   this);
+  group_button_ = gtk_menu_button_new();
+  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(group_button_), "view-list-symbolic");
+  gtk_widget_set_tooltip_text(group_button_, Translations::CStr("Group by"));
+  gtk_box_append(GTK_BOX(types), group_button_);
+  BuildGroupMenu();
+  configure_button_ = gtk_button_new_from_icon_name("emblem-system-symbolic");
+  const std::string configure_tip = StreamingSearchOpts::ConfigureServiceLabel(service_ ? service_->name() : std::string());
+  gtk_widget_set_tooltip_text(configure_button_, Translations::CStr(configure_tip.c_str()));
+  gtk_box_append(GTK_BOX(types), configure_button_);
+  g_signal_connect(configure_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     if (self->configure_) {
+                       self->configure_();
+                     }
+                   }),
+                   this);
+  GtkWidget *scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(scroll, TRUE);
+  list_ = gtk_list_box_new();
+  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list_);
+  auto search_now = +[](GtkWidget *, gpointer data) {
+    auto *self = static_cast<StreamingSearchView *>(data);
+    const char *text = gtk_editable_get_text(GTK_EDITABLE(self->search_entry_));
+    self->ScheduleSearch(text ? text : "", true);
+  };
+  g_signal_connect(search_entry_, "activate", G_CALLBACK(search_now), this);
+  GtkEventController *search_keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(search_entry_, search_keys);
+  g_signal_connect(search_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     const FilterSearchKeyboard::Action action = FilterSearchKeyboard::FromSearchKey(keyval);
+                     if (action == FilterSearchKeyboard::Action::MoveUp || action == FilterSearchKeyboard::Action::MoveDown) {
+                       self->FocusResultsAndMove(keyval);
+                       return TRUE;
+                     }
+                     if (action == FilterSearchKeyboard::Action::Clear) {
+                       gtk_editable_set_text(GTK_EDITABLE(self->search_entry_), "");
+                       return TRUE;
+                     }
+                     return FALSE;
+                   })),
+                   this);
+  g_signal_connect(search_entry_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     const char *text = gtk_editable_get_text(GTK_EDITABLE(entry));
+                     const std::string query = text ? text : "";
+                     if (!StreamingProgress::HasQuery(query)) {
+                       self->CancelPendingSearch();
+                       self->Search({});
+                       return;
+                     }
+                     if (!StreamingSearchOpts::ShouldSearchOnChange(query)) {
+                       self->CancelPendingSearch();
+                       return;
+                     }
+                     self->ScheduleSearch(query, false);
+                   }),
+                   this);
+  g_signal_connect(type_artists_, "toggled", G_CALLBACK(search_now), this);
+  g_signal_connect(type_albums_, "toggled", G_CALLBACK(search_now), this);
+  g_signal_connect(type_songs_, "toggled", G_CALLBACK(search_now), this);
+  ListBoxTreePressGtk::Attach(list_, this);
+  g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
+                     if (song && self->activate_) {
+                       self->activate_(*song);
+                     }
+                   }),
+                   this);
+  GtkGesture *menu = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
+  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(menu));
+  g_signal_connect(menu, "pressed",
+                   G_CALLBACK((+[](GtkGestureClick *click, gint, gdouble, gdouble y, gpointer data) {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(self->list_), static_cast<int>(y));
+                     if (self->menu_ && StreamingCollectionActions::ShouldShowContextMenu(row != nullptr)) {
+                       self->menu_(self->SelectedSongs());
+                     }
+                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
+                   })),
+                   this);
+  progress_ = gtk_progress_bar_new();
+  gtk_widget_set_margin_start(progress_, 8);
+  gtk_widget_set_margin_end(progress_, 8);
+  gtk_widget_set_visible(progress_, FALSE);
+  status_ = gtk_label_new("");
+  gtk_widget_set_halign(status_, GTK_ALIGN_START);
+  gtk_widget_set_margin_start(status_, 8);
+  gtk_widget_set_margin_end(status_, 8);
+  gtk_widget_set_visible(status_, FALSE);
+  close_ = gtk_button_new_with_label(Translations::CStr(StreamingAbort::CloseLabel()));
+  gtk_widget_set_halign(close_, GTK_ALIGN_END);
+  gtk_widget_set_margin_start(close_, 8);
+  gtk_widget_set_margin_end(close_, 8);
+  gtk_widget_set_margin_bottom(close_, 8);
+  gtk_widget_set_visible(close_, FALSE);
+  g_signal_connect(close_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     static_cast<StreamingSearchView *>(data)->HideProgress();
+                   }),
+                   this);
+  gtk_box_append(GTK_BOX(widget_), search_entry_);
+  gtk_box_append(GTK_BOX(widget_), types);
+  gtk_box_append(GTK_BOX(widget_), progress_);
+  gtk_box_append(GTK_BOX(widget_), status_);
+  gtk_box_append(GTK_BOX(widget_), close_);
+  gtk_box_append(GTK_BOX(widget_), scroll);
+  if (service_) {
+    const auto alive = alive_;
+    service_->SearchUpdateStatus.Connect([this, alive](int id, const std::string &text) {
+      if (!alive || !*alive || id != last_search_id_) {
+        return;
       }
-      if (service_->albums_collection_model()) {
-        context_actions_ << context_menu_->addAction(IconLoader::Load(u"folder-new"_s), tr("Add to albums"), this, &StreamingSearchView::AddAlbums);
+      ApplyStatus(text);
+    });
+    service_->SearchProgressSetMaximum.Connect([this, alive](int id, int maximum) {
+      if (!alive || !*alive || id != last_search_id_ || maximum <= 0) {
+        return;
       }
-      if (service_->songs_collection_model()) {
-        context_actions_ << context_menu_->addAction(IconLoader::Load(u"folder-new"_s), tr("Add to songs"), this, &StreamingSearchView::AddSongs);
+      progress_max_ = maximum;
+    });
+    service_->SearchUpdateProgress.Connect([this, alive](int id, int value) {
+      if (!alive || !*alive || id != last_search_id_) {
+        return;
       }
-      context_menu_->addSeparator();
-    }
-
-    if (ui_->results->selectionModel() && ui_->results->selectionModel()->selectedRows().length() == 1) {
-      context_actions_ << context_menu_->addAction(IconLoader::Load(u"search"_s), tr("Search for this"), this, &StreamingSearchView::SearchForThis);
-    }
-
-    context_menu_->addSeparator();
-    context_menu_->addMenu(tr("Group by"))->addActions(group_by_actions_->actions());
-
-    context_menu_->addAction(IconLoader::Load(u"configure"_s), tr("Configure %1...").arg(Song::TextForSource(service_->source())), this, &StreamingSearchView::Configure);
-
+      ApplyProgress(value, progress_max_);
+    });
+    service_->SearchFailed.Connect([this, alive](int id, const std::string &error) {
+      if (!alive || !*alive || id != last_search_id_) {
+        return;
+      }
+      ShowError(error);
+    });
   }
-
-  const bool enable_context_actions = ui_->results->selectionModel() && ui_->results->selectionModel()->hasSelection();
-
-  for (QAction *action : std::as_const(context_actions_)) {
-    action->setEnabled(enable_context_actions);
-  }
-
-  context_menu_->popup(e->globalPos());
-
-  return true;
-
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(list_, keys);
+  gtk_widget_set_focusable(list_, TRUE);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     return static_cast<StreamingSearchView *>(data)->OnKeyPressed(keyval);
+                   })),
+                   this);
+  Rebuild();
 }
 
-void StreamingSearchView::timerEvent(QTimerEvent *e) {
+StreamingSearchView::~StreamingSearchView() {
+  if (alive_) {
+    *alive_ = false;
+  }
+  CancelPendingSearch();
+  ResetTypeAhead();
+  if (group_menu_model_) {
+    g_object_unref(group_menu_model_);
+  }
+  if (group_action_group_) {
+    g_object_unref(group_action_group_);
+  }
+}
 
-  QMap<int, DelayedSearch>::const_iterator it = delayed_searches_.constFind(e->timerId());
-  if (it != delayed_searches_.constEnd()) {
-    killTimer(e->timerId());  // startTimer() creates a repeating timer; stop it so it doesn't keep firing.
-    SearchAsync(it.value().id_, it.value().query_, it.value().type_);
-    delayed_searches_.erase(it);
+void StreamingSearchView::AttachGroupActions(GtkWidget *widget) {
+  if (!widget || !group_action_group_) {
     return;
   }
-
-  QObject::timerEvent(e);
-
+  gtk_widget_insert_action_group(widget, "streamsearch", G_ACTION_GROUP(group_action_group_));
 }
 
-void StreamingSearchView::StartSearch(const QString &query) {
+void StreamingSearchView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
-  ui_->search->setText(query);
-  TextEdited(query);
+void StreamingSearchView::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
 
-  // Swap models immediately
-  swap_models_timer_->stop();
-  SwapModels();
-
+void StreamingSearchView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
+  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  if (action == CollectionTreeClick::Action::Enqueue) {
+    if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
+      ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
+    }
+    if (enqueue_) {
+      enqueue_(SelectedSongs());
+    }
+    return;
+  }
+  if (action != CollectionTreeClick::Action::ToggleExpand || !row || ListBoxTreePressGtk::OnExpandControl(list_, x, y)) {
+    return;
+  }
+  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+  if (CollectionTreeClick::ShouldToggleFromRowClick(false, CollectionTree::IsExpandable(item))) {
+    ToggleExpanded(item);
+  }
 }
 
-void StreamingSearchView::TextEdited(const QString &text) {
+void StreamingSearchView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
-  const QString trimmed(text.trimmed());
+void StreamingSearchView::SetConfigureCallback(ConfigureCallback callback) { configure_ = std::move(callback); }
 
-  search_error_ = false;
-  cover_loader_tasks_.clear();
+StreamingService::SearchType StreamingSearchView::CurrentType() const {
+  if (type_artists_ && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(type_artists_))) {
+    return StreamingService::SearchType::Artists;
+  }
+  if (type_albums_ && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(type_albums_))) {
+    return StreamingService::SearchType::Albums;
+  }
+  return StreamingService::SearchType::Songs;
+}
 
-  // Add results to the back model, switch models after some delay.
-  back_model_->Clear();
-  current_model_ = back_model_;
-  current_proxy_ = back_proxy_;
-  swap_models_timer_->start();
+std::string StreamingSearchView::SelectedSearchQuery() const {
+  struct State {
+    std::string query;
+    StreamingService::SearchType type = StreamingService::SearchType::Songs;
+  } state;
+  state.type = CurrentType();
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto *state = static_cast<State *>(data);
+        if (!state->query.empty()) {
+          return;
+        }
+        auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+        Song song;
+        auto *row_song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
+        if (row_song) {
+          song = *row_song;
+        }
+        state->query = StreamingSearchOpts::QueryFromPrimary(CollectionItemDelegate::PrimaryText(item), song, state->type);
+      },
+      &state);
+  if (state.query.empty()) {
+    const SongList songs = SelectedSongs();
+    if (!songs.empty()) {
+      state.query = StreamingSearchOpts::QueryFromSong(songs.front(), state.type);
+    }
+  }
+  return state.query;
+}
 
-  // Cancel the last search (if any) and start the new one.
-  CancelSearch(last_search_id_);
+void StreamingSearchView::SearchForThis(const std::string &query) {
+  const std::string text = query.empty() ? SelectedSearchQuery() : query;
+  if (!search_entry_ || !StreamingSearchOpts::CanSearchForThis(text)) {
+    return;
+  }
+  gtk_editable_set_text(GTK_EDITABLE(search_entry_), text.c_str());
+  ScheduleSearch(text, true);
+}
 
-  // If text query is empty, don't start a new search
-  if (trimmed.isEmpty()) {
+void StreamingSearchView::CancelPendingSearch() {
+  ++search_timer_gen_;
+  if (search_timer_ != 0) {
+    g_source_remove(search_timer_);
+    search_timer_ = 0;
+  }
+}
+
+void StreamingSearchView::ScheduleSearch(const std::string &query, bool immediate) {
+  CancelPendingSearch();
+  pending_query_ = query;
+  const int delay = service_ ? StreamingSearchOpts::DelayMs(service_->name()) : 0;
+  if (!StreamingSearchOpts::ShouldDelay(delay, immediate)) {
+    Search(query);
+    return;
+  }
+  struct Job {
+    StreamingSearchView *view = nullptr;
+    int generation = 0;
+  };
+  auto *job = new Job{this, search_timer_gen_};
+  search_timer_ = g_timeout_add_full(
+      G_PRIORITY_DEFAULT, static_cast<guint>(delay),
+      +[](gpointer data) -> gboolean {
+        auto *job = static_cast<Job *>(data);
+        if (job->view && job->generation == job->view->search_timer_gen_) {
+          job->view->search_timer_ = 0;
+          job->view->Search(job->view->pending_query_);
+        }
+        return G_SOURCE_REMOVE;
+      },
+      job, +[](gpointer data) { delete static_cast<Job *>(data); });
+}
+
+void StreamingSearchView::HideProgress() {
+  has_error_ = false;
+  if (progress_) {
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), 0);
+    gtk_widget_set_visible(progress_, FALSE);
+  }
+  if (status_) {
+    gtk_label_set_text(GTK_LABEL(status_), "");
+    gtk_widget_set_visible(status_, FALSE);
+  }
+  if (close_) {
+    gtk_widget_set_visible(close_, FALSE);
+  }
+}
+
+void StreamingSearchView::HideProgressUnlessError() {
+  if (!has_error_) {
+    HideProgress();
+  }
+}
+
+void StreamingSearchView::ShowError(const std::string &status) {
+  has_error_ = true;
+  if (progress_) {
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), 0);
+    gtk_widget_set_visible(progress_, FALSE);
+  }
+  ApplyStatus(status);
+  if (progress_) {
+    gtk_widget_set_visible(progress_, FALSE);
+  }
+  if (close_) {
+    gtk_widget_set_visible(close_, StreamingAbort::ShouldShowClose(false, has_error_) ? TRUE : FALSE);
+  }
+}
+
+void StreamingSearchView::ApplyStatus(const std::string &text) {
+  if (status_) {
+    gtk_label_set_text(GTK_LABEL(status_), text.c_str());
+    gtk_widget_set_visible(status_, TRUE);
+  }
+  if (progress_) {
+    gtk_widget_set_visible(progress_, TRUE);
+  }
+}
+
+void StreamingSearchView::ApplyProgress(int value, int maximum) {
+  if (has_error_) {
+    return;
+  }
+  if (maximum > 0) {
+    progress_max_ = maximum;
+  }
+  if (progress_) {
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progress_), StreamingProgress::Fraction(value, progress_max_));
+    gtk_widget_set_visible(progress_, TRUE);
+  }
+}
+
+void StreamingSearchView::Search(const std::string &query) {
+  if (!service_ || !StreamingProgress::HasQuery(query)) {
     last_search_id_ = -1;
-    ui_->label_helptext->setText(tr("Enter search terms above to find music"));
-    ui_->label_status->clear();
-    ui_->progressbar->hide();
-    ui_->progressbar->reset();
-  }
-  else {
-    ui_->progressbar->reset();
-    last_search_id_ = SearchAsync(trimmed, search_type_);
-  }
-
-}
-
-void StreamingSearchView::SwapModels() {
-
-  cover_loader_tasks_.clear();
-
-  std::swap(front_model_, back_model_);
-  std::swap(front_proxy_, back_proxy_);
-
-  ui_->results->setModel(front_proxy_);
-
-  if (ui_->search->text().trimmed().isEmpty() || search_error_) {
-    ui_->results_stack->setCurrentWidget(ui_->help_page);
-  }
-  else {
-    ui_->results_stack->setCurrentWidget(ui_->results_page);
-  }
-
-}
-
-QStringList StreamingSearchView::TokenizeQuery(const QString &query) {
-
-  static const QRegularExpression regex_whitespaces(u"\\s+"_s);
-  QStringList tokens = query.split(regex_whitespaces);
-
-  for (QStringList::iterator it = tokens.begin(); it != tokens.end(); ++it) {
-    (*it).remove(u'(');
-    (*it).remove(u')');
-    (*it).remove(u'"');
-
-    const qint64 colon = (*it).indexOf(u':');
-    if (colon != -1) {
-      (*it).remove(0, colon + 1);
+    has_searched_ = false;
+    if (service_) {
+      service_->CancelSearch();
     }
-  }
-
-  return tokens;
-
-}
-
-bool StreamingSearchView::Matches(const QStringList &tokens, const QString &string) {
-
-  for (const QString &token : tokens) {
-    if (!string.contains(token, Qt::CaseInsensitive)) {
-      return false;
-    }
-  }
-
-  return true;
-
-}
-
-int StreamingSearchView::SearchAsync(const QString &query, const StreamingService::SearchType type) {
-
-  const int id = searches_next_id_++;
-
-  int timer_id = startTimer(kDelayedSearchTimeoutMs);
-  delayed_searches_[timer_id].id_ = id;
-  delayed_searches_[timer_id].query_ = query;
-  delayed_searches_[timer_id].type_ = type;
-
-  return id;
-
-}
-
-void StreamingSearchView::SearchAsync(const int id, const QString &query, const StreamingService::SearchType type) {
-
-  const int service_id = service_->Search(query, type);
-  pending_searches_[service_id] = PendingState(id, TokenizeQuery(query));
-
-}
-
-void StreamingSearchView::SearchDone(const int service_id, const SongMap &songs, const QString &error) {
-
-  if (!pending_searches_.contains(service_id)) return;
-
-  // Map back to the original id.
-  const PendingState state = pending_searches_.take(service_id);
-  const int search_id = state.orig_id_;
-
-  if (songs.isEmpty()) {
-    SearchError(search_id, error);
+    HideProgress();
+    model_.SetSongs({});
+    Rebuild();
     return;
   }
-
-  ResultList results;
-  results.reserve(songs.count());
-  for (const Song &song : songs) {
-    Result result;
-    result.metadata_ = song;
-    results << result;
+  has_searched_ = true;
+  const StreamingService::SearchType type = CurrentType();
+  model_.SetSearchType(type);
+  ++cover_gen_;
+  has_error_ = false;
+  if (close_) {
+    gtk_widget_set_visible(close_, FALSE);
   }
-
-  // Load cached pixmaps into the results
-  for (StreamingSearchView::ResultList::iterator it = results.begin(); it != results.end(); ++it) {
-    it->pixmap_cache_key_ = PixmapCacheKey(*it);
-  }
-
-  AddResults(search_id, results);
-
-}
-
-void StreamingSearchView::CancelSearch(const int id) {
-
-  for (QMap<int, DelayedSearch>::const_iterator it = delayed_searches_.constBegin(); it != delayed_searches_.constEnd(); ++it) {
-    if (it.value().id_ == id) {
-      killTimer(it.key());
-      delayed_searches_.erase(it);
+  last_search_id_ = service_->last_search_id() + 1;
+  service_->StartSearchProgress();
+  const int gen = cover_gen_;
+  const auto alive = alive_;
+  service_->Search(query, type, [this, alive, gen](const SongList &songs) {
+    if (!alive || !*alive || gen != cover_gen_) {
       return;
     }
+    HideProgressUnlessError();
+    model_.SetSongs(songs);
+    Rebuild();
+  });
+}
+
+void StreamingSearchView::ToggleExpanded(const CollectionItem *item) {
+  if (CollectionTree::Toggle(&expanded_, item) || CollectionTree::IsExpandable(item)) {
+    Rebuild();
   }
-  service_->CancelSearch();
-
 }
 
-void StreamingSearchView::AddResults(const int id, const StreamingSearchView::ResultList &results) {
-
-  if (id != last_search_id_ || results.isEmpty()) return;
-
-  ui_->label_status->clear();
-  ui_->progressbar->reset();
-  ui_->progressbar->hide();
-  current_model_->AddResults(results);
-
-}
-
-void StreamingSearchView::SearchError(const int id, const QString &error) {
-
-  if (id != last_search_id_) return;
-
-  search_error_ = true;
-  ui_->label_helptext->setText(error);
-  ui_->label_status->clear();
-  ui_->progressbar->reset();
-  ui_->progressbar->hide();
-  ui_->results_stack->setCurrentWidget(ui_->help_page);
-
-}
-
-void StreamingSearchView::UpdateStatus(const int service_id, const QString &text) {
-
-  if (!pending_searches_.contains(service_id)) return;
-  const PendingState state = pending_searches_.value(service_id);
-  const int search_id = state.orig_id_;
-  if (search_id != last_search_id_) return;
-  ui_->progressbar->show();
-  ui_->label_status->setText(text);
-
-}
-
-void StreamingSearchView::ProgressSetMaximum(const int service_id, const int max) {
-
-  if (!pending_searches_.contains(service_id)) return;
-  const PendingState state = pending_searches_.value(service_id);
-  const int search_id = state.orig_id_;
-  if (search_id != last_search_id_) return;
-  ui_->progressbar->setMaximum(max);
-
-}
-
-void StreamingSearchView::UpdateProgress(const int service_id, const int progress) {
-
-  if (!pending_searches_.contains(service_id)) return;
-  const PendingState state = pending_searches_.value(service_id);
-  const int search_id = state.orig_id_;
-  if (search_id != last_search_id_) return;
-  ui_->progressbar->setValue(progress);
-
-}
-
-MimeData *StreamingSearchView::SelectedMimeData() {
-
-  if (!ui_->results->selectionModel()) return nullptr;
-
-  // Get all selected model indexes
-  QModelIndexList indexes = ui_->results->selectionModel()->selectedRows();
-  if (indexes.isEmpty()) {
-    // There's nothing selected - take the first thing in the model that isn't a divider.
-    for (int i = 0; i < front_proxy_->rowCount(); ++i) {
-      QModelIndex idx = front_proxy_->index(i, 0);
-      if (!idx.data(CollectionModel::Role_IsDivider).toBool()) {
-        indexes << idx;  // clazy:exclude=reserve-candidates
-        ui_->results->setCurrentIndex(idx);
-        break;
-      }
-    }
-  }
-
-  // Still got nothing?  Give up.
-  if (indexes.isEmpty()) {
-    return nullptr;
-  }
-
-  // Get items for these indexes
-  QList<QStandardItem*> items;
-  for (const QModelIndex &idx : std::as_const(indexes)) {
-    items << (front_model_->itemFromIndex(front_proxy_->mapToSource(idx)));  // clazy:exclude=reserve-candidates
-  }
-
-  // Get a MimeData for these items
-  return front_model_->LoadTracks(front_model_->GetChildResults(items));
-
-}
-
-void StreamingSearchView::AddSelectedToPlaylist() {
-  Q_EMIT AddToPlaylist(SelectedMimeData());
-}
-
-void StreamingSearchView::LoadSelected() {
-
-  MimeData *mimedata = SelectedMimeData();
-  if (!mimedata) return;
-
-  mimedata->clear_first_ = true;
-  Q_EMIT AddToPlaylist(mimedata);
-
-}
-
-void StreamingSearchView::AddSelectedToPlaylistEnqueue() {
-
-  MimeData *mimedata = SelectedMimeData();
-  if (!mimedata) return;
-
-  mimedata->enqueue_now_ = true;
-  Q_EMIT AddToPlaylist(mimedata);
-
-}
-
-void StreamingSearchView::OpenSelectedInNewPlaylist() {
-
-  MimeData *mimedata = SelectedMimeData();
-  if (!mimedata) return;
-
-  mimedata->open_in_new_playlist_ = true;
-  Q_EMIT AddToPlaylist(mimedata);
-
-}
-
-void StreamingSearchView::SearchForThis() {
-  StartSearch(ui_->results->selectionModel()->selectedRows().first().data().toString());
-}
-
-bool StreamingSearchView::SearchFieldHasFocus() const {
-
-  return ui_->search->hasFocus();
-
-}
-
-void StreamingSearchView::FocusSearchField() {
-
-  ui_->search->setFocus();
-  ui_->search->selectAll();
-
-}
-
-void StreamingSearchView::FocusOnFilter(QKeyEvent *e) {
-
-  ui_->search->setFocus();
-  QApplication::sendEvent(ui_->search, e);
-
-}
-
-void StreamingSearchView::Configure() {
-  Q_EMIT OpenSettingsDialog(service_->source());
-}
-
-void StreamingSearchView::GroupByClicked(QAction *action) {
-
-  if (action->property("group_by").isNull()) {
-    if (!group_by_dialog_) {
-      group_by_dialog_ = make_unique<GroupByDialog>();
-      QObject::connect(&*group_by_dialog_, &GroupByDialog::Accepted, this, &StreamingSearchView::SetGroupBy);
-    }
-
-    group_by_dialog_->show();
+void StreamingSearchView::AppendItem(const CollectionItem *item, int depth, bool filter_active) {
+  if (!item) {
     return;
   }
-
-  SetGroupBy(action->property("group_by").value<CollectionModel::Grouping>());
-
+  const bool expandable = CollectionTree::IsExpandable(item);
+  const bool expanded = CollectionTree::ShowChildren(item, filter_active, expanded_);
+  GtkWidget *row = gtk_list_box_row_new();
+  GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_margin_start(row_box, 8 + depth * 12);
+  gtk_widget_set_margin_end(row_box, 8);
+  gtk_widget_set_margin_top(row_box, 4);
+  gtk_widget_set_margin_bottom(row_box, 4);
+  if (expandable) {
+    GtkWidget *toggle = gtk_button_new_from_icon_name(expanded ? "pan-down-symbolic" : "pan-end-symbolic");
+    gtk_widget_add_css_class(toggle, "flat");
+    gtk_widget_add_css_class(toggle, "circular");
+    gtk_widget_set_tooltip_text(toggle, expanded ? Translations::CStr("Collapse") : Translations::CStr("Expand"));
+    g_object_set_data(G_OBJECT(toggle), "item", const_cast<CollectionItem *>(item));
+    g_signal_connect(toggle, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                       auto *self = static_cast<StreamingSearchView *>(data);
+                       self->ToggleExpanded(static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(button), "item")));
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(row_box), toggle);
+  }
+  const Song cover_song = StreamingCollectionTree::RepresentativeSong(item);
+  if (StreamingCover::ShouldShowThumb(pretty_covers_) && (!cover_song.url().empty() || !StreamingCover::CoverUrl(cover_song).empty())) {
+    GtkWidget *image = gtk_image_new_from_icon_name(StreamingCover::kPlaceholderIcon);
+    gtk_image_set_pixel_size(GTK_IMAGE(image), StreamingCover::kArtHeight);
+    gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
+    gtk_box_append(GTK_BOX(row_box), image);
+    LoadCover(image, cover_song);
+  }
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_set_hexpand(box, TRUE);
+  GtkWidget *primary = gtk_label_new(CollectionItemDelegate::PrimaryText(item).c_str());
+  gtk_widget_set_halign(primary, GTK_ALIGN_START);
+  if (expandable) {
+    gtk_widget_add_css_class(primary, "heading");
+  }
+  gtk_box_append(GTK_BOX(box), primary);
+  const std::string secondary = CollectionItemDelegate::SecondaryText(item);
+  if (!secondary.empty()) {
+    GtkWidget *sub = gtk_label_new(secondary.c_str());
+    gtk_widget_add_css_class(sub, "dim-label");
+    gtk_widget_set_halign(sub, GTK_ALIGN_START);
+    gtk_box_append(GTK_BOX(box), sub);
+  }
+  gtk_box_append(GTK_BOX(row_box), box);
+  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
+  g_object_set_data(G_OBJECT(row), "item", const_cast<CollectionItem *>(item));
+  g_object_set_data_full(G_OBJECT(row), "row-data", new Song(cover_song), [](gpointer p) { delete static_cast<Song *>(p); });
+  SetupRowDrag(row, cover_song);
+  gtk_list_box_append(GTK_LIST_BOX(list_), row);
+  if (expanded) {
+    for (const auto &child : item->children) {
+      AppendItem(child.get(), depth + 1, filter_active);
+    }
+  }
 }
 
-void StreamingSearchView::SetGroupBy(const CollectionModel::Grouping g) {
+void StreamingSearchView::Rebuild() {
+  GtkWidget *child = gtk_widget_get_first_child(list_);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_list_box_remove(GTK_LIST_BOX(list_), child);
+    child = next;
+  }
+  const SongList visible = sort_model_.Visible();
+  tree_model_.Reset(visible, grouping_, CollectionGrouping::SeparateAlbumsByGrouping(), false, false);
+  if (visible.empty()) {
+    gtk_list_box_append(GTK_LIST_BOX(list_), gtk_label_new(Translations::CStr(StreamingSearchHelp::LabelFor(has_searched_))));
+    return;
+  }
+  ++cover_gen_;
+  if (tree_model_.root()) {
+    for (const auto &node : tree_model_.root()->children) {
+      AppendItem(node.get(), 0, false);
+    }
+  }
+}
 
-  // Clear requests: changing "group by" on the models will cause all the items to be removed/added again,
-  // so all the QModelIndex here will become invalid. New requests will be created for those
-  // songs when they will be displayed again anyway (when StreamingSearchItemDelegate::paint will call LazyLoadAlbumCover)
-  cover_loader_tasks_.clear();
+void StreamingSearchView::PersistPrettyCovers() {
+  StreamingCover::SavePrettyCovers(service_ ? service_->name() : std::string(), pretty_covers_);
+}
 
-  // Update the models
-  front_model_->SetGroupBy(g, true);
-  back_model_->SetGroupBy(g, false);
+void StreamingSearchView::PersistGrouping() {
+  if (!service_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(service_->name());
+  settings.SetIntValue(StreamingSearchGroup::kSearchGroupBy1, static_cast<int>(grouping_.first));
+  settings.SetIntValue(StreamingSearchGroup::kSearchGroupBy2, static_cast<int>(grouping_.second));
+  settings.SetIntValue(StreamingSearchGroup::kSearchGroupBy3, static_cast<int>(grouping_.third));
+  settings.Sync();
+}
 
-  // Save the setting
-  Settings s;
-  s.beginGroup(service_->settings_group());
-  s.setValue(kSearchGroupByVersion, 1);
-  s.setValue(kSearchGroupBy1, static_cast<int>(g.first));
-  s.setValue(kSearchGroupBy2, static_cast<int>(g.second));
-  s.setValue(kSearchGroupBy3, static_cast<int>(g.third));
-  s.endGroup();
+void StreamingSearchView::ApplyGrouping(const CollectionGrouping::Grouping &grouping) {
+  grouping_ = grouping;
+  PersistGrouping();
+  Rebuild();
+}
 
-  // Make sure the correct action is checked.
-  const QList<QAction*> actions = group_by_actions_->actions();
-  for (QAction *action : actions) {
-    if (action->property("group_by").isNull()) continue;
+void StreamingSearchView::BuildGroupMenu() {
+  if (!group_button_) {
+    return;
+  }
+  GMenu *menu = g_menu_new();
+  const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
+  for (size_t i = 0; i < presets.size(); ++i) {
+    if (presets[i].advanced) {
+      continue;
+    }
+    char action[64];
+    g_snprintf(action, sizeof(action), "streamsearch.preset(%d)", static_cast<int>(i));
+    g_menu_append(menu, Translations::CStr(presets[i].label), action);
+  }
+  g_menu_append(menu, Translations::CStr("Advanced grouping…"), "streamsearch.advanced");
+  GSimpleActionGroup *group = g_simple_action_group_new();
+  GSimpleAction *preset = g_simple_action_new("preset", G_VARIANT_TYPE_INT32);
+  g_signal_connect(preset, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *param, gpointer data) {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     const std::vector<CollectionFilterMenu::Preset> items = CollectionFilterMenu::BuiltinPresets();
+                     const int index = g_variant_get_int32(param);
+                     if (index < 0 || static_cast<size_t>(index) >= items.size() || items[static_cast<size_t>(index)].advanced) {
+                       return;
+                     }
+                     self->ApplyGrouping(items[static_cast<size_t>(index)].grouping);
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(preset));
+  GSimpleAction *advanced = g_simple_action_new("advanced", nullptr);
+  g_signal_connect(advanced, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     GtkRoot *root = gtk_widget_get_root(self->widget_);
+                     GtkWindow *parent = GTK_IS_WINDOW(root) ? GTK_WINDOW(root) : nullptr;
+                     GroupByDialog::Show(parent, self->grouping_, [self](const CollectionGrouping::Grouping &grouping) {
+                       self->ApplyGrouping(grouping);
+                     });
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(advanced));
+  if (group_action_group_) {
+    g_object_unref(group_action_group_);
+  }
+  if (group_menu_model_) {
+    g_object_unref(group_menu_model_);
+  }
+  group_action_group_ = group;
+  g_object_ref(group);
+  group_menu_model_ = G_MENU_MODEL(menu);
+  g_object_ref(menu);
+  gtk_widget_insert_action_group(group_button_, "streamsearch", G_ACTION_GROUP(group));
+  gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(group_button_), G_MENU_MODEL(menu));
+  g_object_unref(group);
+  g_object_unref(menu);
+}
 
-    if (g == action->property("group_by").value<CollectionModel::Grouping>()) {
-      action->setChecked(true);
+void StreamingSearchView::LoadCover(GtkWidget *image, const Song &song) {
+  if (!image) {
+    return;
+  }
+  const std::string key = StreamingCover::CacheKey(song);
+  const auto cached = cover_cache_.find(key);
+  if (cached != cover_cache_.end()) {
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(cached->second.begin(), cached->second.end()),
+                                     StreamingCover::kArtHeight);
+    return;
+  }
+  const std::string url = StreamingCover::CoverUrl(song);
+  if (!StreamingCover::CanLoad(url)) {
+    return;
+  }
+  if (StreamingCover::IsLocalUrl(url)) {
+    const std::string body = FileUtils::ReadFile(FileUtils::PathFromUri(url));
+    if (body.empty() || !JsonUtils::LooksLikeImage(body)) {
       return;
     }
-  }
-
-  // Check the advanced action
-  actions.last()->setChecked(true);
-
-}
-
-void StreamingSearchView::SearchArtistsClicked(const bool checked) {
-  Q_UNUSED(checked)
-  SetSearchType(StreamingService::SearchType::Artists);
-}
-
-void StreamingSearchView::SearchAlbumsClicked(const bool checked) {
-  Q_UNUSED(checked)
-  SetSearchType(StreamingService::SearchType::Albums);
-}
-
-void StreamingSearchView::SearchSongsClicked(const bool checked) {
-  Q_UNUSED(checked)
-  SetSearchType(StreamingService::SearchType::Songs);
-}
-
-void StreamingSearchView::SetSearchType(const StreamingService::SearchType type) {
-
-  search_type_ = type;
-
-  Settings s;
-  s.beginGroup(service_->settings_group());
-  s.setValue(kSearchType, static_cast<int>(search_type_));
-  s.endGroup();
-
-  TextEdited(ui_->search->text());
-
-}
-
-void StreamingSearchView::AddArtists() {
-
-  MimeData *mimedata = SelectedMimeData();
-  if (!mimedata) return;
-  if (const StreamSongMimeData *streaming_song_data = qobject_cast<const StreamSongMimeData*>(mimedata)) {
-    Q_EMIT AddArtistsSignal(streaming_song_data->songs);
-  }
-
-}
-
-void StreamingSearchView::AddAlbums() {
-
-  MimeData *mimedata = SelectedMimeData();
-  if (!mimedata) return;
-  if (const StreamSongMimeData *streaming_song_data = qobject_cast<const StreamSongMimeData*>(mimedata)) {
-    Q_EMIT AddAlbumsSignal(streaming_song_data->songs);
-  }
-
-}
-
-void StreamingSearchView::AddSongs() {
-
-  MimeData *mimedata = SelectedMimeData();
-  if (!mimedata) return;
-  if (const StreamSongMimeData *streaming_song_data = qobject_cast<const StreamSongMimeData*>(mimedata)) {
-    Q_EMIT AddSongsSignal(streaming_song_data->songs);
-  }
-
-}
-
-QString StreamingSearchView::PixmapCacheKey(const StreamingSearchView::Result &result) const {
-
-  if (result.metadata_.art_automatic_is_valid()) {
-    return Song::TextForSource(service_->source()) + QLatin1Char('/') + result.metadata_.art_automatic().toString();
-  }
-  if (!result.metadata_.effective_albumartist().isEmpty() && !result.metadata_.album().isEmpty()) {
-    return Song::TextForSource(service_->source()) + QLatin1Char('/') + result.metadata_.effective_albumartist() + QLatin1Char('/') + result.metadata_.album();
-  }
-
-  return Song::TextForSource(service_->source()) + QLatin1Char('/') + result.metadata_.url().toString();
-
-}
-
-bool StreamingSearchView::FindCachedPixmap(const StreamingSearchView::Result &result, QPixmap *pixmap) const {
-  return QPixmapCache::find(result.pixmap_cache_key_, pixmap);
-}
-
-void StreamingSearchView::LazyLoadAlbumCover(const QModelIndex &proxy_index) {
-
-  if (!proxy_index.isValid() || proxy_index.model() != front_proxy_) {
+    cover_cache_[key] = body;
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(body.begin(), body.end()), StreamingCover::kArtHeight);
     return;
   }
-
-  const QModelIndex source_index = front_proxy_->mapToSource(proxy_index);
-  if (!source_index.isValid()) {
+  if (!service_ || !service_->network()) {
     return;
   }
-
-  // Already loading art for this item?
-  if (source_index.data(StreamingSearchModel::Role_LazyLoadingArt).isValid()) {
-    return;
-  }
-
-  // Should we even load art at all?
-  if (!use_pretty_covers_) {
-    return;
-  }
-
-  // Is this an album?
-  const CollectionModel::GroupBy container_type = static_cast<CollectionModel::GroupBy>(proxy_index.data(CollectionModel::Role_ContainerType).toInt());
-  if (!CollectionModel::IsAlbumGroupBy(container_type)) return;
-
-  // Mark the item as loading art
-
-  QStandardItem *item_album = front_model_->itemFromIndex(source_index);
-  if (!item_album) {
-    return;
-  }
-  item_album->setData(true, StreamingSearchModel::Role_LazyLoadingArt);
-
-  // Walk down the item's children until we find a track
-  QStandardItem *item_song = item_album;
-  while (item_song->rowCount() > 0) {
-    item_song = item_song->child(0);
-  }
-
-  // Get the track's Result
-  const StreamingSearchView::Result result = item_song->data(StreamingSearchModel::Role_Result).value<StreamingSearchView::Result>();
-
-  QPixmap cached_pixmap;
-  if (QPixmapCache::find(result.pixmap_cache_key_, &cached_pixmap)) {
-    item_album->setData(cached_pixmap, Qt::DecorationRole);
-  }
-  else {
-    AlbumCoverLoaderOptions cover_loader_options(AlbumCoverLoaderOptions::Option::ScaledImage | AlbumCoverLoaderOptions::Option::PadScaledImage);
-    cover_loader_options.desired_scaled_size = QSize(kArtHeight, kArtHeight);
-    quint64 loader_id = albumcover_loader_->LoadImageAsync(cover_loader_options, result.metadata_);
-    cover_loader_tasks_[loader_id] = qMakePair(source_index, result.pixmap_cache_key_);
-  }
-
-}
-
-void StreamingSearchView::AlbumCoverLoaded(const quint64 id, const AlbumCoverLoaderResult &albumcover_result) {
-
-  if (!cover_loader_tasks_.contains(id)) return;
-
-  QPair<QModelIndex, QString> cover_loader_task = cover_loader_tasks_.take(id);
-  QModelIndex idx = cover_loader_task.first;
-  QString key = cover_loader_task.second;
-
-  if (albumcover_result.success && !albumcover_result.image_scaled.isNull()) {
-    QPixmap pixmap = QPixmap::fromImage(albumcover_result.image_scaled);
-    if (!pixmap.isNull()) {
-      QPixmapCache::insert(key, pixmap);
+  const int gen = cover_gen_;
+  const auto alive = alive_;
+  service_->network()->Get(url, [this, alive, gen, image, key](const NetworkAccessManager::Response &response) {
+    if (!alive || !*alive || gen != cover_gen_ || !image) {
+      return;
     }
-    if (idx.isValid()) {
-      QStandardItem *item = front_model_->itemFromIndex(idx);
-      if (item) {
-        item->setData(albumcover_result.image_scaled, Qt::DecorationRole);
-      }
+    if (!response.ok() || !JsonUtils::LooksLikeImage(response.body)) {
+      return;
     }
-  }
+    cover_cache_[key] = response.body;
+    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(response.body.begin(), response.body.end()),
+                                     StreamingCover::kArtHeight);
+  });
+}
 
+void StreamingSearchView::SetupRowDrag(GtkWidget *row, const Song &song) {
+  GtkDragSource *src = gtk_drag_source_new();
+  gtk_drag_source_set_actions(src, GDK_ACTION_COPY);
+  g_object_set_data_full(G_OBJECT(src), "row-data", new Song(song), [](gpointer p) { delete static_cast<Song *>(p); });
+  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
+                     auto *self = static_cast<StreamingSearchView *>(data);
+                     auto *dragged = static_cast<Song *>(g_object_get_data(G_OBJECT(s), "row-data"));
+                     SongList songs = dragged ? SongList{*dragged} : SongList{};
+                     for (const Song &selected : self->SelectedSongs()) {
+                       if (dragged && selected.url() == dragged->url()) {
+                         songs = self->SelectedSongs();
+                         break;
+                       }
+                     }
+                     const std::string payload = StreamingDrag::DragPayload(songs);
+                     if (payload.empty()) {
+                       return nullptr;
+                     }
+                     GValue v = G_VALUE_INIT;
+                     g_value_init(&v, G_TYPE_STRING);
+                     g_value_set_string(&v, payload.c_str());
+                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
+                     g_value_unset(&v);
+                     return provider;
+                   })),
+                   this);
+  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
+}
+
+void StreamingSearchView::ResetTypeAhead() {
+  typeahead_.clear();
+  if (typeahead_timeout_) {
+    g_source_remove(typeahead_timeout_);
+    typeahead_timeout_ = 0;
+  }
+}
+
+void StreamingSearchView::FocusSearch() {
+  if (search_entry_) {
+    gtk_widget_grab_focus(search_entry_);
+  }
+}
+
+bool StreamingSearchView::SearchFieldHasFocus() const { return search_entry_ && gtk_widget_has_focus(search_entry_); }
+
+void StreamingSearchView::FocusResultsAndMove(unsigned keyval) {
+  gtk_widget_grab_focus(list_);
+  const ListBoxKeyboard::Action move = FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::FromSearchKey(keyval));
+  if (move == ListBoxKeyboard::Action::MoveUp || move == ListBoxKeyboard::Action::MoveDown) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), move));
+  }
+}
+
+gboolean StreamingSearchView::OnKeyPressed(guint keyval) {
+  if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
+    ResetTypeAhead();
+    FilterEntryApply::FromKey(search_entry_, keyval);
+    return TRUE;
+  }
+  const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
+  if (action == ListBoxKeyboard::Action::Activate) {
+    ListBoxKeyboardGtk::ActivateSelected(list_);
+    return TRUE;
+  }
+  if (action == ListBoxKeyboard::Action::MoveUp || action == ListBoxKeyboard::Action::MoveDown || action == ListBoxKeyboard::Action::Home ||
+      action == ListBoxKeyboard::Action::End) {
+    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
+                                                                      ListBoxKeyboardGtk::Count(list_), action));
+    return TRUE;
+  }
+  if (action == ListBoxKeyboard::Action::Escape) {
+    ResetTypeAhead();
+    return TRUE;
+  }
+  const gunichar ch = gdk_keyval_to_unicode(keyval);
+  if (ch && g_unichar_isprint(ch)) {
+    gchar utf8[8] = {};
+    typeahead_.append(utf8, static_cast<size_t>(g_unichar_to_utf8(ch, utf8)));
+    if (typeahead_timeout_) {
+      g_source_remove(typeahead_timeout_);
+    }
+    typeahead_timeout_ = g_timeout_add(1000, [](gpointer data) -> gboolean {
+      auto *self = static_cast<StreamingSearchView *>(data);
+      self->typeahead_timeout_ = 0;
+      self->typeahead_.clear();
+      return G_SOURCE_REMOVE;
+    }, this);
+    const int index = ListBoxKeyboard::FirstPrefixIndex(ListBoxKeyboardGtk::Labels(list_), typeahead_);
+    if (index >= 0) {
+      ListBoxKeyboardGtk::SelectIndex(list_, index);
+    }
+    return TRUE;
+  }
+  return FALSE;
+}
+
+SongList StreamingSearchView::SelectedSongs() const {
+  SongList songs;
+  gtk_list_box_selected_foreach(
+      GTK_LIST_BOX(list_),
+      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+        auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+        const SongList more = StreamingCollectionTree::SongsFromItem(item);
+        if (!more.empty()) {
+          static_cast<SongList *>(data)->insert(static_cast<SongList *>(data)->end(), more.begin(), more.end());
+          return;
+        }
+        auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "row-data"));
+        if (song) {
+          static_cast<SongList *>(data)->push_back(*song);
+        }
+      },
+      &songs);
+  return songs;
 }

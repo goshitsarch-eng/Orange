@@ -1,37 +1,18 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_FILTERPARSERTEXTCONTAINSCOMPARATOR_H
+#define STRAWBERRY_FILTERPARSERTEXTCONTAINSCOMPARATOR_H
 
-#ifndef FILTERPARSERTEXTCONTAINSCOMPARATOR_H
-#define FILTERPARSERTEXTCONTAINSCOMPARATOR_H
-
-#include <QVariant>
-
-#include "filterparsersearchtermcomparator.h"
+#include "filterparser/filterparsersearchtermcomparator.h"
+#include <string>
 
 class FilterParserTextContainsComparator : public FilterParserSearchTermComparator {
  public:
-  explicit FilterParserTextContainsComparator(const QString &search_term);
-  bool Matches(const QVariant &value) const override;
+  explicit FilterParserTextContainsComparator(const std::string & search_term);
+  bool Matches(const std::string &value) const override;
+
+  static std::string Normalize(const std::string &value);
 
  private:
-  QString search_term_;
-  Q_DISABLE_COPY(FilterParserTextContainsComparator)
+  std::string search_term_{};
 };
 
-#endif  // FILTERPARSERTEXTCONTAINSCOMPARATOR_H
+#endif

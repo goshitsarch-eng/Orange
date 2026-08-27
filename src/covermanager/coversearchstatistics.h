@@ -1,51 +1,27 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_COVERSEARCHSTATISTICS_H
+#define STRAWBERRY_COVERSEARCHSTATISTICS_H
 
-#ifndef COVERSEARCHSTATISTICS_H
-#define COVERSEARCHSTATISTICS_H
-
-#include "config.h"
-
-#include <QtGlobal>
-#include <QList>
-#include <QMap>
-#include <QString>
+#include <cstdint>
+#include <map>
+#include <string>
 
 struct CoverSearchStatistics {
-
-  explicit CoverSearchStatistics();
+  CoverSearchStatistics() = default;
 
   CoverSearchStatistics &operator+=(const CoverSearchStatistics &other);
 
-  quint64 network_requests_made_;
-  quint64 bytes_transferred_;
-  QMap<QString, quint64> total_images_by_provider_;
-  QMap<QString, quint64> chosen_images_by_provider_;
+  std::string AverageDimensions() const;
 
-  quint64 chosen_images_;
-  quint64 missing_images_;
+  uint64_t network_requests_made = 0;
+  uint64_t bytes_transferred = 0;
+  std::map<std::string, uint64_t> total_images_by_provider;
+  std::map<std::string, uint64_t> chosen_images_by_provider;
 
-  quint64 chosen_width_;
-  quint64 chosen_height_;
+  uint64_t chosen_images = 0;
+  uint64_t missing_images = 0;
 
-  QString AverageDimensions() const;
+  uint64_t chosen_width = 0;
+  uint64_t chosen_height = 0;
 };
 
-#endif  // COVERSEARCHSTATISTICS_H
+#endif

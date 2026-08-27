@@ -1,54 +1,18 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2014, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
-#ifndef PLAYLISTSAVEOPTIONSDIALOG_H
-#define PLAYLISTSAVEOPTIONSDIALOG_H
-
-#include "config.h"
-
-#include <QObject>
-#include <QDialog>
-#include <QString>
+#ifndef STRAWBERRY_PLAYLISTSAVEOPTIONSDIALOG_H
+#define STRAWBERRY_PLAYLISTSAVEOPTIONSDIALOG_H
 
 #include "constants/playlistsettings.h"
 
-class QWidget;
+#include <gtk/gtk.h>
 
-namespace Ui {
-class PlaylistSaveOptionsDialog;
-}
+#include <functional>
 
-class PlaylistSaveOptionsDialog : public QDialog {
-  Q_OBJECT
-
+class PlaylistSaveOptionsDialog {
  public:
-  explicit PlaylistSaveOptionsDialog(QWidget *parent = nullptr);
-  ~PlaylistSaveOptionsDialog() override;
+  using PathType = PlaylistSettings::PathType;
 
-  void accept() override;
-  PlaylistSettings::PathType path_type() const;
-
- private:
-  static const char *kSettingsGroup;
-
-  Ui::PlaylistSaveOptionsDialog *ui;
+  static void Show(GtkWindow *parent, const std::function<void(PathType)> &callback);
+  static const char *Label(PathType type);
 };
 
-#endif  // PLAYLISTSAVEOPTIONSDIALOG_H
+#endif

@@ -1,152 +1,69 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_PLAYLISTITEM_H
+#define STRAWBERRY_PLAYLISTITEM_H
 
-#ifndef PLAYLISTITEM_H
-#define PLAYLISTITEM_H
-
-#include "config.h"
-
-#include <QMetaType>
-#include <QList>
-#include <QMap>
-#include <QSet>
-#include <QVariant>
-#include <QUuid>
-#include <QString>
-#include <QUrl>
-#include <QColor>
-#include <QUuid>
-
-#include "includes/shared_ptr.h"
 #include "core/song.h"
-#include "playlistitemsavedata.h"
+#include "playlist/playlistitemsavedata.h"
 
-class QAction;
-
-class SqlQuery;
-class SqlRow;
+#include <memory>
+#include <string>
+#include <vector>
 
 class PlaylistItem {
  public:
-  explicit PlaylistItem(const Song::Source source, const QUuid &uuid = QUuid(), const bool signal = false);
-  virtual ~PlaylistItem();
-
-  static SharedPtr<PlaylistItem> NewFromSource(const Song::Source source, const QUuid &uuid = QUuid());
-  static SharedPtr<PlaylistItem> NewFromSong(const Song &song, bool signal = false);
-
   enum class Option {
     Default = 0x00,
-
-    // Disables the "pause" action.
     PauseDisabled = 0x01,
-
-    // Disables the seek slider.
-    SeekDisabled = 0x04,
+    SeekDisabled = 0x04
   };
-  Q_DECLARE_FLAGS(Options, Option)
 
-  QUuid uuid() const { return uuid_; }
-  void set_uuid(const QUuid &uuid) { uuid_ = uuid; }
+  explicit PlaylistItem(Song::Source source, const std::string &uuid = {});
+  virtual ~PlaylistItem() = default;
+
+  static std::shared_ptr<PlaylistItem> NewFromSource(Song::Source source, const std::string &uuid = {});
+  static std::shared_ptr<PlaylistItem> NewFromSong(const Song &song);
+
+  const std::string &uuid() const { return uuid_; }
+  void set_uuid(const std::string &uuid) { uuid_ = uuid; }
   bool uuid_generated() const { return uuid_generated_; }
-  bool signal() const { return signal_; }
-  void set_signal(const bool signal) { signal_ = signal; }
 
   virtual Song::Source source() const { return source_; }
-  virtual Options options() const { return Option::Default; }
-  virtual QList<QAction*> actions() { return QList<QAction*>(); }
+  virtual Option options() const { return Option::Default; }
 
   virtual Song OriginalMetadata() const = 0;
-  virtual QUrl OriginalUrl() const = 0;
-  virtual void SetOriginalMetadata(const Song &song) { Q_UNUSED(song); }
+  virtual std::string OriginalUrl() const = 0;
+  virtual void SetOriginalMetadata(const Song &song) { (void)song; }
 
-  Song EffectiveMetadata() const { return HasStreamMetadata() ? stream_song_ : OriginalMetadata(); }
-  QUrl EffectiveUrl() const { return stream_song_.effective_url().isValid() ? stream_song_.effective_url() : OriginalUrl(); }
+  Song EffectiveMetadata() const;
+  std::string EffectiveUrl() const;
 
   void SetStreamMetadata(const Song &song);
   void UpdateStreamMetadata(const Song &song);
   void ClearStreamMetadata();
   bool HasStreamMetadata() const { return stream_song_.is_valid(); }
 
-  qint64 effective_beginning_nanosec() const { return stream_song_.is_valid() && stream_song_.beginning_nanosec() != -1 ? stream_song_.beginning_nanosec() : OriginalMetadata().beginning_nanosec(); }
-  qint64 effective_end_nanosec() const { return stream_song_.is_valid() && stream_song_.end_nanosec() != -1 ? stream_song_.end_nanosec() : OriginalMetadata().end_nanosec(); }
+  virtual void SetArtManual(const std::string &cover_url) = 0;
+  virtual bool IsLocalCollectionItem() const { return false; }
 
-  virtual void SetArtManual(const QUrl &cover_url) = 0;
+  void SetShouldSkip(bool should_skip) { should_skip_ = should_skip; }
+  bool GetShouldSkip() const { return should_skip_; }
 
-  virtual bool InitFromQuery(const SqlRow &query) = 0;
+  unsigned long long save_generation() const { return save_generation_; }
+  unsigned long long BumpSaveGeneration() { return ++save_generation_; }
 
-  // Must be called on the thread that owns this item; see PlaylistItemSaveData.
   PlaylistItemSaveData CreateSaveData() const;
 
-  // Identifies the most recent edit made to this item through the playlist (e.g. inline tag editing).
-  // A caller starting an asynchronous write/reload round trip should capture the value returned by BumpSaveGeneration() and compare it against save_generation() once the round trip completes: a mismatch means a newer edit has since superseded it, so the (now stale) result must not be applied.
-  quint64 save_generation() const { return save_generation_; }
-  quint64 BumpSaveGeneration() { return ++save_generation_; }
-
-  // Background colors.
-  void SetBackgroundColor(const short priority, const QColor &color);
-  bool HasBackgroundColor(const short priority) const;
-  void RemoveBackgroundColor(const short priority);
-  QColor GetCurrentBackgroundColor() const;
-  bool HasCurrentBackgroundColor() const;
-
-  // Foreground colors.
-  void SetForegroundColor(const short priority, const QColor &color);
-  bool HasForegroundColor(const short priority) const;
-  void RemoveForegroundColor(const short priority);
-  QColor GetCurrentForegroundColor() const;
-  bool HasCurrentForegroundColor() const;
-
-  // Convenience function to find out whether this item is from the local collection, as opposed to a device, a file on disk, or a stream.
-  // Remember that even if this returns true, the collection item might be invalid, so you might want to check that its id is not equal to -1 before actually using it.
-  virtual bool IsLocalCollectionItem() const { return false; }
-  void SetShouldSkip(const bool should_skip);
-  bool GetShouldSkip() const;
-
  protected:
+  virtual Song DatabaseSongMetadata() const { return OriginalMetadata(); }
+
   Song::Source source_;
-  QUuid uuid_;
-  bool uuid_generated_;
-  bool signal_;
-  bool should_skip_;
-  quint64 save_generation_;
-
-  enum class DatabaseColumn {
-    CollectionId
-  };
-
-  virtual QVariant DatabaseValue(const DatabaseColumn database_column) const { Q_UNUSED(database_column); return QVariant(QString()); }
-  virtual Song DatabaseSongMetadata() const { return Song(); }
-
+  std::string uuid_;
+  bool uuid_generated_ = false;
   Song stream_song_;
-
-  QMap<short, QColor> background_colors_;
-  QMap<short, QColor> foreground_colors_;
-
-  Q_DISABLE_COPY(PlaylistItem)
+  bool should_skip_ = false;
+  unsigned long long save_generation_ = 0;
 };
-using PlaylistItemPtr = SharedPtr<PlaylistItem>;
-using PlaylistItemPtrList = QList<PlaylistItemPtr>;
 
-Q_DECLARE_METATYPE(PlaylistItemPtr)
-Q_DECLARE_METATYPE(PlaylistItemPtrList)
-Q_DECLARE_OPERATORS_FOR_FLAGS(PlaylistItem::Options)
+using PlaylistItemPtr = std::shared_ptr<PlaylistItem>;
+using PlaylistItemPtrList = std::vector<PlaylistItemPtr>;
 
-#endif  // PLAYLISTITEM_H
+#endif

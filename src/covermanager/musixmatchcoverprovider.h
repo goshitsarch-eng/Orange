@@ -1,50 +1,27 @@
-/*
- * Strawberry Music Player
- * Copyright 2020-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_MUSIXMATCHCOVERPROVIDER_H
+#define STRAWBERRY_MUSIXMATCHCOVERPROVIDER_H
 
-#ifndef MUSIXMATCHCOVERPROVIDER_H
-#define MUSIXMATCHCOVERPROVIDER_H
+#include "covermanager/coverproviders.h"
 
-#include "config.h"
+#include <string>
+#include <vector>
 
-#include <QVariant>
-#include <QString>
-
-#include "includes/shared_ptr.h"
-#include "jsoncoverprovider.h"
-
-class QNetworkReply;
-class NetworkAccessManager;
-
-class MusixmatchCoverProvider : public JsonCoverProvider {
-  Q_OBJECT
-
+class MusixmatchCoverProvider : public CoverProvider {
  public:
-  explicit MusixmatchCoverProvider(const SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
+  struct SearchResult {
+    std::string artist;
+    std::string album;
+    std::string image_url;
+  };
 
-  bool StartSearch(const QString &artist, const QString &album, const QString &title, const int id) override;
-  void CancelSearch(const int id) override;
+  std::string name() const override { return "Musixmatch"; }
+  bool allow_missing_album() const override { return false; }
+  void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
+  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
 
- private:
-  void Error(const QString &error, const QVariant &debug = QVariant()) override;
-
- private Q_SLOTS:
-  void HandleSearchReply(QNetworkReply *reply, const int id, const QString &artist, const QString &album);
+  static std::string AlbumUrl(const std::string &artist, const std::string &album);
+  static std::string ExtractNextDataJson(const std::string &html);
+  static std::vector<SearchResult> ParseAlbumPage(const std::string &html, const std::string &artist, const std::string &album);
 };
 
-#endif  // MUSIXMATCHCOVERPROVIDER_H
+#endif

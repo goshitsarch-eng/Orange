@@ -1,219 +1,141 @@
-/*
- * Strawberry Music Player
- * This code was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "settings/contextsettingspage.h"
 
-#include "config.h"
-
-#include <QtGlobal>
-#include <QAction>
-#include <QIODevice>
-#include <QFile>
-#include <QFont>
-#include <QMenu>
-#include <QCursor>
-#include <QCheckBox>
-#include <QToolButton>
-#include <QToolTip>
-#include <QLineEdit>
-#include <QTextEdit>
-#include <QFontComboBox>
-#include <QSettings>
-
-#include "constants/mainwindowsettings.h"
-#include "core/iconloader.h"
-#include "core/settings.h"
 #include "constants/contextsettings.h"
-#include "settingspage.h"
-#include "settingsdialog.h"
-#include "contextsettingspage.h"
-#include "ui_contextsettingspage.h"
+#include "settings/contextsettingslabels.h"
+#include "context/contextcover.h"
+#include "context/contextfont.h"
+#include "context/contextfontcontrols.h"
+#include "context/contextfontpreview.h"
+#include "context/contextformattokens.h"
+#include "settings/settingspage.h"
+#include "translations/translations.h"
+#include "utilities/fontutils.h"
 
-using namespace Qt::Literals::StringLiterals;
-using namespace ContextSettings;
+#include <pango/pango.h>
 
-ContextSettingsPage::ContextSettingsPage(SettingsDialog *dialog, QWidget *parent)
-    : SettingsPage(dialog, parent),
-      ui_(new Ui_ContextSettingsPage) {
+namespace {
 
-  ui_->setupUi(this);
-  setWindowIcon(IconLoader::Load(u"view-choose"_s, true, 0, 32));
-
-  checkboxes_[QLatin1String(kAlbum)] = ui_->checkbox_album;
-  checkboxes_[QLatin1String(kTechnicalData)] = ui_->checkbox_technical_data;
-  checkboxes_[QLatin1String(kSongLyrics)] = ui_->checkbox_song_lyrics;
-  checkboxes_[QLatin1String(kSearchCover)] = ui_->checkbox_search_cover;
-  checkboxes_[QLatin1String(kSearchLyrics)] = ui_->checkbox_search_lyrics;
-
-  // Create and populate the helper menus
-  QMenu *menu = new QMenu(this);
-  menu->addAction(ui_->action_title);
-  menu->addAction(ui_->action_titlesort);
-  menu->addAction(ui_->action_album);
-  menu->addAction(ui_->action_albumsort);
-  menu->addAction(ui_->action_artist);
-  menu->addAction(ui_->action_artistsort);
-  menu->addAction(ui_->action_albumartist);
-  menu->addAction(ui_->action_albumartistsort);
-  menu->addAction(ui_->action_track);
-  menu->addAction(ui_->action_disc);
-  menu->addAction(ui_->action_year);
-  menu->addAction(ui_->action_originalyear);
-  menu->addAction(ui_->action_composer);
-  menu->addAction(ui_->action_composersort);
-  menu->addAction(ui_->action_performer);
-  menu->addAction(ui_->action_performersort);
-  menu->addAction(ui_->action_grouping);
-  menu->addAction(ui_->action_filename);
-  menu->addAction(ui_->action_url);
-  menu->addAction(ui_->action_length);
-  menu->addAction(ui_->action_genre);
-  menu->addAction(ui_->action_playcount);
-  menu->addAction(ui_->action_skipcount);
-  menu->addSeparator();
-  menu->addAction(ui_->action_newline);
-  ui_->context_exp_chooser1->setMenu(menu);
-  ui_->context_exp_chooser2->setMenu(menu);
-  ui_->context_exp_chooser1->setPopupMode(QToolButton::InstantPopup);
-  ui_->context_exp_chooser2->setPopupMode(QToolButton::InstantPopup);
-  // We need this because by default menus don't show tooltips
-  QObject::connect(menu, &QMenu::hovered, this, &ContextSettingsPage::ShowMenuTooltip);
-
-  QObject::connect(ui_->context_exp_chooser1, &QToolButton::triggered, this, &ContextSettingsPage::InsertVariableFirstLine);
-  QObject::connect(ui_->context_exp_chooser2, &QToolButton::triggered, this, &ContextSettingsPage::InsertVariableSecondLine);
-
-  // Icons
-  ui_->context_exp_chooser1->setIcon(IconLoader::Load(u"list-add"_s));
-  ui_->context_exp_chooser2->setIcon(IconLoader::Load(u"list-add"_s));
-
-  QObject::connect(ui_->font_headline, &QFontComboBox::currentFontChanged, this, &ContextSettingsPage::HeadlineFontChanged);
-  QObject::connect(ui_->font_size_headline, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &ContextSettingsPage::HeadlineFontChanged);
-  QObject::connect(ui_->font_normal, &QFontComboBox::currentFontChanged, this, &ContextSettingsPage::NormalFontChanged);
-  QObject::connect(ui_->font_size_normal, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &ContextSettingsPage::NormalFontChanged);
-
-  QFile file(u":/text/ghosts.txt"_s);
-  if (file.open(QIODevice::ReadOnly)) {
-    QString text = QString::fromUtf8(file.readAll());
-    ui_->preview_headline->setText(text);
-    ui_->preview_normal->setText(text);
-    file.close();
+void ApplyPreview(GtkWidget *label, const FontUtils::Font &font) {
+  if (!label) {
+    return;
   }
-  else {
-    qLog(Error) << "Could not open" << file.fileName() << "for reading:" << file.errorString();
-  }
-
+  PangoFontDescription *desc = pango_font_description_from_string(ContextFontPreview::Pango(font).c_str());
+  PangoAttrList *attrs = pango_attr_list_new();
+  pango_attr_list_insert(attrs, pango_attr_font_desc_new(desc));
+  gtk_label_set_attributes(GTK_LABEL(label), attrs);
+  pango_attr_list_unref(attrs);
+  pango_font_description_free(desc);
 }
 
-ContextSettingsPage::~ContextSettingsPage() { delete ui_; }
+}  // namespace
 
-void ContextSettingsPage::Load() {
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-
-  ui_->context_custom_text1->setText(s.value(kSettingsTitleFmt, QLatin1String(kDefaultTitleFmt)).toString());
-  ui_->context_custom_text2->setText(s.value(kSettingsSummaryFmt, QLatin1String(kDefaultSummaryFmt)).toString());
-
-  const QStringList checkbox_keys = checkboxes_.keys();
-  for (const QString &i : checkbox_keys) {
-    checkboxes_.value(i)->setChecked(s.value(i, checkboxes_.value(i)->isChecked()).toBool());
+AdwPreferencesPage *ContextSettingsPage::Create(Settings *settings, Application *) {
+  settings->BeginGroup(ContextSettings::kSettingsGroup);
+  AdwPreferencesPage *page = SettingsPage::MakePage("Context", "view-paged-symbolic");
+  AdwPreferencesGroup *group = SettingsPage::AddGroup(page, ContextSettingsLabels::EnableItems());
+  SettingsPage::AddEntry(group, settings, ContextSettings::kSettingsTitleFmt, ContextSettingsLabels::Title(), ContextSettings::kDefaultTitleFmt);
+  SettingsPage::AddEntry(group, settings, ContextSettings::kSettingsSummaryFmt, ContextSettingsLabels::Summary(), ContextSettings::kDefaultSummaryFmt);
+  AdwPreferencesGroup *title_tokens = SettingsPage::AddGroup(page, "Insert into title");
+  for (const auto &token : ContextFormatTokens::All()) {
+    SettingsPage::AddButtonRow(title_tokens, token.second.c_str(), token.first.c_str(), [settings, token]() {
+      settings->BeginGroup(ContextSettings::kSettingsGroup);
+      const std::string current = settings->Value(ContextSettings::kSettingsTitleFmt, ContextSettings::kDefaultTitleFmt);
+      settings->SetValue(ContextSettings::kSettingsTitleFmt, ContextFormatTokens::Insert(current, token.first));
+      settings->Sync();
+    });
   }
-
-  // Fonts
-  QString default_font;
-  int i = ui_->font_headline->findText(QLatin1String(kDefaultFontFamily));
-  if (i >= 0) {
-    default_font = QLatin1String(kDefaultFontFamily);
+  AdwPreferencesGroup *summary_tokens = SettingsPage::AddGroup(page, "Insert into summary");
+  for (const auto &token : ContextFormatTokens::All()) {
+    SettingsPage::AddButtonRow(summary_tokens, token.second.c_str(), token.first.c_str(), [settings, token]() {
+      settings->BeginGroup(ContextSettings::kSettingsGroup);
+      const std::string current = settings->Value(ContextSettings::kSettingsSummaryFmt, ContextSettings::kDefaultSummaryFmt);
+      settings->SetValue(ContextSettings::kSettingsSummaryFmt, ContextFormatTokens::Insert(current, token.first));
+      settings->Sync();
+    });
   }
-  else {
-    default_font = font().family();
-  }
-  ui_->font_headline->setCurrentFont(s.value(kFontHeadline, default_font).toString());
-  ui_->font_normal->setCurrentFont(s.value(kFontNormal, default_font).toString());
-  ui_->font_size_headline->setValue(s.value(kFontSizeHeadline, kDefaultFontSizeHeadline).toReal());
-  ui_->font_size_normal->setValue(s.value(kFontSizeNormal, font().pointSizeF()).toReal());
+  SettingsPage::AddToggle(group, settings, ContextSettings::kAlbum, ContextSettingsLabels::Album(), nullptr, ContextSettings::kDefaultAlbum);
+  SettingsPage::AddToggle(group, settings, ContextSettings::kTechnicalData, ContextSettingsLabels::TechnicalData(), nullptr,
+                          ContextSettings::kDefaultTechnicalData);
+  SettingsPage::AddToggle(group, settings, ContextSettings::kSongLyrics, ContextSettingsLabels::SongLyrics(), nullptr,
+                          ContextSettings::kDefaultSongLyrics);
+  AdwSwitchRow *search_cover = ADW_SWITCH_ROW(adw_switch_row_new());
+  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(search_cover), Translations::CStr(ContextSettingsLabels::SearchCover()));
+  adw_switch_row_set_active(search_cover, ContextCover::LoadEnabled(*settings));
+  g_signal_connect(search_cover, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
+                     auto *s = static_cast<Settings *>(data);
+                     ContextCover::PersistEnabled(*s, adw_switch_row_get_active(row));
+                   }),
+                   settings);
+  adw_preferences_group_add(group, GTK_WIDGET(search_cover));
+  settings->BeginGroup(ContextSettings::kSettingsGroup);
+  SettingsPage::AddToggle(group, settings, ContextSettings::kSearchLyrics, ContextSettingsLabels::SearchLyrics(), nullptr,
+                          ContextSettings::kDefaultSearchLyrics);
 
-  s.endGroup();
+  const FontUtils::Font headline = ContextFontControls::Headline(
+      settings->Value(ContextSettings::kFontHeadline, ContextSettings::kDefaultFontFamily),
+      settings->DoubleValue(ContextSettings::kFontSizeHeadline, ContextSettings::kDefaultFontSizeHeadline));
+  const FontUtils::Font normal = ContextFontControls::Normal(
+      settings->Value(ContextSettings::kFontNormal, ContextSettings::kDefaultFontFamily),
+      settings->DoubleValue(ContextSettings::kFontSizeNormal, ContextSettings::kDefaultFontSizeNormal));
+  const std::string headline_pango = FontUtils::ToPango(headline);
+  const std::string normal_pango = FontUtils::ToPango(normal);
 
-  s.beginGroup(MainWindowSettings::kSettingsGroup);
-  ui_->checkbox_search_cover->setChecked(s.value(MainWindowSettings::kSearchForCoverAuto, MainWindowSettings::kDefaultSearchForCoverAuto).toBool());
-  s.endGroup();
+  AdwPreferencesGroup *headline_group = SettingsPage::AddGroup(page, ContextFontControls::HeadlineGroup());
+  SettingsPage::AddFontButton(headline_group, settings, ContextSettings::kSettingsGroup, ContextSettings::kFontHeadline,
+                              ContextFontControls::FontTitle(), headline_pango.c_str());
+  GtkWidget *headline_size =
+      SettingsPage::AddDoubleScale(headline_group, settings, ContextSettings::kSettingsGroup, ContextSettings::kFontSizeHeadline,
+                                   ContextFontControls::SizeTitle(), ContextSettings::kDefaultFontSizeHeadline, ContextFontControls::MinPt(),
+                                   ContextFontControls::MaxPt(), ContextFontControls::Step());
+  GtkWidget *headline_preview = gtk_label_new(ContextFontPreview::HeadlineSample());
+  gtk_label_set_wrap(GTK_LABEL(headline_preview), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(headline_preview), 0.0f);
+  gtk_widget_set_margin_start(headline_preview, 12);
+  gtk_widget_set_tooltip_text(headline_preview, Translations::CStr(ContextFontPreview::Title()));
+  ApplyPreview(headline_preview, headline);
+  g_object_set_data(G_OBJECT(headline_size), "preview", headline_preview);
+  g_object_set_data(G_OBJECT(headline_size), "settings", settings);
+  g_signal_connect(headline_size, "value-changed", G_CALLBACK(+[](GtkRange *, gpointer data) {
+                     auto *label = GTK_WIDGET(g_object_get_data(G_OBJECT(data), "preview"));
+                     auto *s = static_cast<Settings *>(g_object_get_data(G_OBJECT(data), "settings"));
+                     if (!label || !s) {
+                       return;
+                     }
+                     s->BeginGroup(ContextSettings::kSettingsGroup);
+                     ApplyPreview(label, ContextFontControls::Headline(
+                                             s->Value(ContextSettings::kFontHeadline, ContextSettings::kDefaultFontFamily),
+                                             s->DoubleValue(ContextSettings::kFontSizeHeadline, ContextSettings::kDefaultFontSizeHeadline)));
+                   }),
+                   headline_size);
+  adw_preferences_group_add(headline_group, headline_preview);
 
-  Init(ui_->layout_contextsettingspage->parentWidget());
-
-  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
-
-}
-
-void ContextSettingsPage::Save() {
-
-  Settings s;
-
-  s.beginGroup(kSettingsGroup);
-  s.setValue(kSettingsTitleFmt, ui_->context_custom_text1->text());
-  s.setValue(kSettingsSummaryFmt, ui_->context_custom_text2->text());
-  const QStringList checkbox_keys = checkboxes_.keys();
-  for (const QString &i : checkbox_keys) {
-    s.setValue(i, checkboxes_.value(i)->isChecked());
-  }
-  s.setValue(kFontHeadline, ui_->font_headline->currentFont().family());
-  s.setValue(kFontNormal, ui_->font_normal->currentFont().family());
-  s.setValue(kFontSizeHeadline, ui_->font_size_headline->value());
-  s.setValue(kFontSizeNormal, ui_->font_size_normal->value());
-  s.endGroup();
-
-  s.beginGroup(MainWindowSettings::kSettingsGroup);
-  s.setValue(MainWindowSettings::kSearchForCoverAuto, ui_->checkbox_search_cover->isChecked());
-  s.endGroup();
-
-}
-
-void ContextSettingsPage::InsertVariableFirstLine(QAction *action) {
-  // We use action name, therefore those shouldn't be translatable
-  ui_->context_custom_text1->insert(action->text());
-}
-
-void ContextSettingsPage::InsertVariableSecondLine(QAction *action) {
-  // We use action name, therefore those shouldn't be translatable
-  ui_->context_custom_text2->insert(action->text());
-}
-
-void ContextSettingsPage::ShowMenuTooltip(QAction *action) {
-  QToolTip::showText(QCursor::pos(), action->toolTip());
-}
-
-void ContextSettingsPage::HeadlineFontChanged() {
-
-  QFont font(ui_->font_headline->currentFont());
-  if (ui_->font_size_headline->value() > 0) {
-    font.setPointSizeF(ui_->font_size_headline->value());
-  }
-  ui_->preview_headline->setFont(font);
-
-}
-
-void ContextSettingsPage::NormalFontChanged() {
-
-  QFont font(ui_->font_normal->currentFont());
-  if (ui_->font_size_normal->value() > 0) {
-    font.setPointSizeF(ui_->font_size_normal->value());
-  }
-  ui_->preview_normal->setFont(font);
-
+  AdwPreferencesGroup *normal_group = SettingsPage::AddGroup(page, ContextFontControls::NormalGroup());
+  SettingsPage::AddFontButton(normal_group, settings, ContextSettings::kSettingsGroup, ContextSettings::kFontNormal,
+                              ContextFontControls::FontTitle(), normal_pango.c_str());
+  GtkWidget *normal_size =
+      SettingsPage::AddDoubleScale(normal_group, settings, ContextSettings::kSettingsGroup, ContextSettings::kFontSizeNormal,
+                                   ContextFontControls::SizeTitle(), ContextSettings::kDefaultFontSizeNormal, ContextFontControls::MinPt(),
+                                   ContextFontControls::MaxPt(), ContextFontControls::Step());
+  GtkWidget *normal_preview = gtk_label_new(ContextFontPreview::NormalSample());
+  gtk_label_set_wrap(GTK_LABEL(normal_preview), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(normal_preview), 0.0f);
+  gtk_widget_set_margin_start(normal_preview, 12);
+  gtk_widget_set_tooltip_text(normal_preview, Translations::CStr(ContextFontPreview::Title()));
+  ApplyPreview(normal_preview, normal);
+  g_object_set_data(G_OBJECT(normal_size), "preview", normal_preview);
+  g_object_set_data(G_OBJECT(normal_size), "settings", settings);
+  g_signal_connect(normal_size, "value-changed", G_CALLBACK(+[](GtkRange *, gpointer data) {
+                     auto *label = GTK_WIDGET(g_object_get_data(G_OBJECT(data), "preview"));
+                     auto *s = static_cast<Settings *>(g_object_get_data(G_OBJECT(data), "settings"));
+                     if (!label || !s) {
+                       return;
+                     }
+                     s->BeginGroup(ContextSettings::kSettingsGroup);
+                     ApplyPreview(label, ContextFontControls::Normal(
+                                             s->Value(ContextSettings::kFontNormal, ContextSettings::kDefaultFontFamily),
+                                             s->DoubleValue(ContextSettings::kFontSizeNormal, ContextSettings::kDefaultFontSizeNormal)));
+                   }),
+                   normal_size);
+  adw_preferences_group_add(normal_group, normal_preview);
+  return page;
 }

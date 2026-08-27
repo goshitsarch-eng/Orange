@@ -1,114 +1,15 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_DEVICELISTER_H
+#define STRAWBERRY_DEVICELISTER_H
 
-#ifndef DEVICELISTER_H
-#define DEVICELISTER_H
+#include "device/connecteddevice.h"
 
-#include "config.h"
+#include <vector>
 
-#include <QtGlobal>
-#include <QObject>
-#include <QList>
-#include <QMetaType>
-#include <QVariantList>
-#include <QVariantMap>
-#include <QString>
-#include <QStringList>
-#include <QUrl>
-
-class QThread;
-
-class DeviceLister : public QObject {
-  Q_OBJECT
-
+class DeviceLister {
  public:
-  explicit DeviceLister(QObject *parent = nullptr);
-  ~DeviceLister() override;
-
-  // Tries to start the thread and initialize the engine.  This object will be moved to the new thread.
-  void Start();
-  // Stops the thread started by Start() and waits for it to finish. Safe to call more than once, and does nothing if the thread was never started.
-  // Call this before destroying the lister: once the destructor has started, the derived part of the object is gone while its thread may still be delivering events to it.
-  void StopThread();
-  virtual void ExitAsync();
-
-  // If two listers know about the same device, then the metadata will get taken from the one with the highest priority.
-  virtual int priority() const { return 100; }
-
-  // Query information about the devices that are available.  Must be thread-safe.
-  virtual QStringList DeviceUniqueIDs() = 0;
-  virtual QVariantList DeviceIcons(const QString &id) = 0;
-  virtual QString DeviceManufacturer(const QString &id) = 0;
-  virtual QString DeviceModel(const QString &id) = 0;
-  virtual quint64 DeviceCapacity(const QString &id) = 0;
-  virtual quint64 DeviceFreeSpace(const QString &id) = 0;
-  virtual QVariantMap DeviceHardwareInfo(const QString &id) = 0;
-  virtual bool DeviceNeedsMount(const QString &id) { Q_UNUSED(id); return false; }
-
-  // When connecting to a device for the first time, do we want an user's confirmation for scanning it? (by default yes)
-  virtual bool AskForScan(const QString &id) const { Q_UNUSED(id); return true; }
-
-  virtual QString MakeFriendlyName(const QString &id) = 0;
-  virtual QList<QUrl> MakeDeviceUrls(const QString &id) = 0;
-
-  // Ensure the device is mounted.  This should run asynchronously and emit DeviceMounted when it's done.
-  virtual int MountDeviceAsync(const QString &id);
-
-  // Do whatever needs to be done to safely remove the device.
-  virtual void UnmountDeviceAsync(const QString &id);
-
-  virtual bool CopyMusic() { return true; }
-
- public Q_SLOTS:
-  virtual void UpdateDeviceFreeSpace(const QString &id) = 0;
-  virtual void ShutDown() {}
-  virtual void MountDevice(const QString &id, const int request_id);
-  virtual void UnmountDevice(const QString &id) { Q_UNUSED(id); }
-  virtual void Exit();
-
- Q_SIGNALS:
-  void DeviceAdded(const QString &id);
-  void DeviceRemoved(const QString &id);
-  void DeviceChanged(const QString &id);
-  void DeviceMounted(const QString &id, const int request_id, const bool success);
-  void ExitFinished();
-
- protected:
-  virtual bool Init() = 0;
-  QUrl MakeUrlFromLocalPath(const QString &path) const;
-  static bool IsIpod(const QString &path);
-
-  QVariantList GuessIconForPath(const QString &path);
-  static QVariantList GuessIconForModel(const QString &vendor, const QString &model);
-
- protected:
-  QThread *thread_;
-  QThread *original_thread_;
-  int next_mount_request_id_;
-
- private Q_SLOTS:
-  void ThreadStarted();
-
- private:
-  Q_DISABLE_COPY(DeviceLister)
+  virtual ~DeviceLister() = default;
+  virtual std::string backend() const = 0;
+  virtual std::vector<ConnectedDevice> List() const = 0;
 };
 
-#endif  // DEVICELISTER_H
+#endif

@@ -1,162 +1,98 @@
-/*
- * Strawberry Music Player
- * Copyright 2013-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_CONTEXTVIEW_H
+#define STRAWBERRY_CONTEXTVIEW_H
 
-#ifndef CONTEXTVIEW_H
-#define CONTEXTVIEW_H
-
-#include "config.h"
-
-#include <QtGlobal>
-#include <QObject>
-#include <QWidget>
-#include <QList>
-#include <QString>
-#include <QImage>
-#include <QAction>
-
+#include "context/contextalbum.h"
+#include "context/contextoptions.h"
 #include "core/song.h"
-#include "contextalbum.h"
+#include "lyrics/lrcparser.h"
 
-class QMenu;
-class QLabel;
-class QStackedWidget;
-class QVBoxLayout;
-class QGridLayout;
-class QScrollArea;
-class QSpacerItem;
-class QResizeEvent;
-class QContextMenuEvent;
-class QDragEnterEvent;
-class QDropEvent;
+#include <gtk/gtk.h>
 
-class ResizableTextEdit;
-class CollectionView;
-class AlbumCoverChoiceController;
-class LyricsProviders;
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
 class LyricsFetcher;
+class LyricsProviders;
 
-class ContextView : public QWidget {
-  Q_OBJECT
-
+class ContextView {
  public:
-  explicit ContextView(QWidget *parent = nullptr);
+  using SaveLyricsCallback = std::function<void(const std::string &)>;
+  using CoverDropCallback = std::function<void(const std::vector<unsigned char> &)>;
 
-  void Init(CollectionView *collectionview, AlbumCoverChoiceController *album_cover_choice_controller, SharedPtr<LyricsProviders> lyrics_providers);
+  explicit ContextView(LyricsProviders *lyrics_providers = nullptr, LyricsFetcher *lyrics_fetcher = nullptr);
 
-  ContextAlbum *album_widget() const { return widget_album_; }
-  bool album_enabled() const { return action_show_album_->isChecked(); }
-  Song song_playing() const { return song_playing_; }
+  GtkWidget *widget() const { return widget_; }
+  ContextAlbum *album_widget() { return album_.get(); }
+  bool album_enabled() const { return show_album_; }
+  bool search_cover_enabled() const { return search_cover_; }
+  const Song &song_playing() const { return song_playing_; }
 
- protected:
-  void resizeEvent(QResizeEvent *e) override;
-  void contextMenuEvent(QContextMenuEvent *e) override;
-  void dragEnterEvent(QDragEnterEvent *e) override;
-  void dropEvent(QDropEvent *e) override;
-
- private:
-  void AddActions();
-  static void SetLabelText(QLabel *label, int value, const QString &suffix, const QString &def = QString());
-  void NoSong();
-  void SetSong();
-  void UpdateSong(const Song &song);
-  void ResetSong();
-  void GetCoverAutomatically();
-  void SearchLyrics();
-  void UpdateFonts();
-
- Q_SIGNALS:
-  void AlbumEnabledChanged();
-
- private Q_SLOTS:
-  void ActionShowAlbum();
-  void ActionShowData();
-  void ActionShowLyrics();
-  void ActionSearchLyrics();
-  void UpdateNoSong();
-  void FadeStopFinished();
-  void UpdateLyrics(const quint64 id, const QString &provider, const QString &lyrics);
-
- public Q_SLOTS:
-  void ReloadSettings();
   void Playing();
   void Stopped();
   void Error();
   void SongChanged(const Song &song);
-  void AlbumCoverLoaded(const Song &song, const QImage &image);
+  void AlbumCoverLoaded(const std::vector<unsigned char> &data);
+  void SetLyrics(const std::string &lyrics, const std::string &provider = {});
+  void SetPlaybackPosition(int64_t position_nanosec);
+  void SearchLyrics(bool force = false);
+  void SetSaveLyricsCallback(SaveLyricsCallback callback);
+  void SetCoverDropCallback(CoverDropCallback callback);
+  void SetCollectionTotals(int songs, int artists, int albums);
+  void ReloadSettings();
 
  private:
-  CollectionView *collectionview_;
-  AlbumCoverChoiceController *album_cover_choice_controller_;
-  LyricsFetcher *lyrics_fetcher_;
+  void NoSong();
+  void SetSong();
+  void FadeStopFinished();
+  void ApplyVisibility();
+  void PersistVisibility();
+  void ShowIdleMenu();
+  void ApplyOption(ContextOptions::Action action, bool enabled);
+  bool Idle() const;
+  void RebuildTechnicalData();
+  void UpdateTotalsLabel();
+  void HighlightLrcLine(int index);
 
-  QMenu *menu_options_;
-  QAction *action_show_album_;
-  QAction *action_show_data_;
-  QAction *action_show_lyrics_;
-  QAction *action_search_lyrics_;
-
-  QVBoxLayout *layout_container_;
-  QWidget *widget_scrollarea_;
-  QVBoxLayout *layout_scrollarea_;
-  QScrollArea *scrollarea_;
-  ResizableTextEdit *textedit_top_;
-  ContextAlbum *widget_album_;
-  QStackedWidget *widget_stacked_;
-  QWidget *widget_stop_;
-  QWidget *widget_play_;
-  QVBoxLayout *layout_stop_;
-  QVBoxLayout *layout_play_;
-  QLabel *label_stop_summary_;
-  QWidget *widget_play_data_;
-  QGridLayout *layout_play_data_;
-  ResizableTextEdit *textedit_play_lyrics_;
-
-  QSpacerItem *spacer_play_data_;
-
-  QLabel *label_filetype_title_;
-  QLabel *label_length_title_;
-  QLabel *label_samplerate_title_;
-  QLabel *label_bitdepth_title_;
-  QLabel *label_bitrate_title_;
-
-  QLabel *label_filetype_;
-  QLabel *label_length_;
-  QLabel *label_samplerate_;
-  QLabel *label_bitdepth_;
-  QLabel *label_bitrate_;
-
+  LyricsProviders *lyrics_providers_ = nullptr;
+  LyricsFetcher *lyrics_fetcher_ = nullptr;
+  uint64_t current_search_id_ = 0;
+  std::unique_ptr<ContextAlbum> album_;
+  GtkWidget *widget_ = nullptr;
+  GtkWidget *title_ = nullptr;
+  GtkWidget *artist_ = nullptr;
+  GtkWidget *album_label_ = nullptr;
+  GtkWidget *totals_ = nullptr;
+  GtkWidget *data_box_ = nullptr;
+  GtkWidget *data_grid_ = nullptr;
+  GtkWidget *lyrics_view_ = nullptr;
+  GtkWidget *lyrics_source_ = nullptr;
+  GtkWidget *search_lyrics_btn_ = nullptr;
+  GtkWidget *auto_lyrics_btn_ = nullptr;
+  GtkWidget *auto_cover_btn_ = nullptr;
+  GtkWidget *show_album_btn_ = nullptr;
+  GtkWidget *show_data_btn_ = nullptr;
+  GtkWidget *show_lyrics_btn_ = nullptr;
   Song song_playing_;
-  Song song_prev_;
-  QImage image_original_;
-  bool lyrics_tried_;
-  qint64 lyrics_id_;
-  QString lyrics_;
-  QString title_fmt_;
-  QString summary_fmt_;
-  QFont font_headline_;
-  QFont font_normal_;
-  QFont font_nosong_;
-
-  QList<QLabel*> labels_play_;
-  QList<ResizableTextEdit*> textedit_play_;
-  QList<QLabel*> labels_play_data_;
-  QList<QLabel*> labels_play_all_;
+  bool show_album_ = true;
+  bool show_data_ = false;
+  bool show_lyrics_ = true;
+  bool search_lyrics_ = true;
+  bool search_cover_ = true;
+  bool lyrics_tried_ = false;
+  std::string lyrics_;
+  int totals_songs_ = 0;
+  int totals_artists_ = 0;
+  int totals_albums_ = 0;
+  std::string title_fmt_;
+  std::string summary_fmt_;
+  SaveLyricsCallback save_lyrics_;
+  CoverDropCallback cover_drop_;
+  std::vector<LrcParser::Line> lrc_lines_;
+  int lrc_active_ = -1;
+  GtkTextTag *lrc_tag_ = nullptr;
 };
 
-#endif  // CONTEXTVIEW_H
+#endif

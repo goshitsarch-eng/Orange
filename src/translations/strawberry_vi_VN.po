@@ -1,0 +1,4471 @@
+# Translation catalog for Strawberry Music Player.
+# Generated from the Qt .ts files on origin/master.
+msgid ""
+msgstr ""
+"Project-Id-Version: strawberry\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-26 00:00+0000\n"
+"PO-Revision-Date: 2026-08-26 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: vi_VN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "ASX playlist is too large"
+msgstr "ASX playlist is too large"
+
+msgid "Failed to write ASX playlist"
+msgstr "Failed to write ASX playlist"
+
+msgid "About"
+msgstr "Giới thiệu về"
+
+msgid "About Strawberry"
+msgstr "Giới thiệu về Strawberry"
+
+msgid "Version %1"
+msgstr "Phiên bản %1"
+
+msgid "Strawberry is a music player and music collection organizer."
+msgstr "Strawberry là một trình phát nhạc và tổ chức sưu tập nhạc."
+
+msgid "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."
+msgstr "Nó là một nhánh của Clementine được phát hành vào năm 2018 nhằm vào những người sưu tập âm nhạc và những người đam mê âm thanh."
+
+msgid "Strawberry is free software released under GPL. The source code is available on %1"
+msgstr "Strawberry là phần mềm miễn phí được phát hành theo GPL. Mã nguồn có sẵn trên %1"
+
+msgid "You should have received a copy of the GNU General Public License along with this program.  If not, see %1"
+msgstr "Bạn hẳn đã nhận được một bản sao Giấy phép Công cộng GNU cùng với chương trình này.  Nếu không, hãy xem %1"
+
+msgid "If you like Strawberry and can make use of it, consider sponsoring or donating."
+msgstr "Nếu bạn thích Strawberry và có thể sử dụng được thì hãy cân nhắc tài trợ hoặc quyên góp."
+
+msgid "You can sponsor the author on %1 or %2. You can also make a one-time payment through %3."
+msgstr "Bạn có thể tài trợ cho tác giả trên %1 hoặc %2. Bạn cũng có thể thực hiện thanh toán một lần thông qua %3."
+
+msgid "Author and maintainer"
+msgstr "Tác giả và người bảo trì"
+
+msgid "Contributors"
+msgstr "Người đóng góp"
+
+msgid "Clementine authors"
+msgstr "Tác giả Clementine"
+
+msgid "Clementine contributors"
+msgstr "Người đóng góp Clementine"
+
+msgid "Thanks to"
+msgstr "Lời cảm ơn đến"
+
+msgid "Thanks to all the other Amarok and Clementine contributors."
+msgstr "Lời cảm ơn đến tất cả những người đóng góp Amarok và Clementine khác."
+
+msgid "Add Stream"
+msgstr "Thêm luồng"
+
+msgid "Enter the URL of a stream:"
+msgstr "Nhập URL của stream:"
+
+msgid "Load cover from disk..."
+msgstr "Tải ảnh bìa từ đĩa..."
+
+msgid "Save cover to disk..."
+msgstr "Lưu ảnh bìa vào đĩa..."
+
+msgid "Load cover from URL..."
+msgstr "Tải ảnh bìa từ URL..."
+
+msgid "Search for album covers..."
+msgstr "Tìm kiếm ảnh bìa album..."
+
+msgid "Unset cover"
+msgstr "Bỏ đặt ảnh bìa"
+
+msgid "Delete cover"
+msgstr "Xoá ảnh bìa"
+
+msgid "Clear cover"
+msgstr "Dọn ảnh bìa"
+
+msgid "Show fullsize..."
+msgstr "Hiển thị kích thước đầy đủ..."
+
+msgid "Search automatically"
+msgstr "Tìm kiếm tự động"
+
+msgid "Load cover from disk"
+msgstr "Tải ảnh bìa từ đĩa"
+
+msgid "Failed to open cover file %1 for reading: %2"
+msgstr "Không thể mở tệp ảnh bìa %1 để đọc: %2"
+
+msgid "Cover file %1 is empty."
+msgstr "Tệp ảnh bìa %1 trống."
+
+msgid "unknown"
+msgstr "không xác định"
+
+msgid "Save album cover"
+msgstr "Lưu ảnh bìa album"
+
+msgid "Failed to open cover file %1 for writing: %2"
+msgstr "Không thể mở tệp ảnh bìa %1 để ghi: %2"
+
+msgid "Failed writing cover to file %1: %2"
+msgstr "Không thể ghi ảnh bìa vào tệp %1: %2"
+
+msgid "Failed writing cover to file %1."
+msgstr "Không thể ghi ảnh bìa vào tệp %1."
+
+msgid "Failed to delete cover file %1: %2"
+msgstr "Không xóa được tệp ảnh bìa %1: %2"
+
+msgid "Failed to write cover to file %1: %2"
+msgstr "Không thể ghi ảnh bìa vào tệp %1: %2"
+
+msgid "Could not save cover to file %1."
+msgstr "Không thể lưu ảnh bìa vào tệp %1."
+
+msgid "Export covers"
+msgstr "Xuất ảnh bìa"
+
+msgid "Output"
+msgstr "Đầu ra"
+
+msgid "Enter a filename for exported covers (no extension):"
+msgstr "Nhập tên tệp cho ảnh bìa được xuất (không có phần mở rộng):"
+
+msgid "Export downloaded covers"
+msgstr "Xuất ảnh bìa đã tải xuống"
+
+msgid "Export embedded covers"
+msgstr "Xuất ảnh bìa nhúng"
+
+msgid "Existing covers"
+msgstr "Ảnh bìa hiện có"
+
+msgid "Do not overwrite"
+msgstr "Không ghi đè"
+
+msgid "O&verwrite all"
+msgstr "&Ghi đè tất cả"
+
+msgid "Overwrite s&maller ones only"
+msgstr "Chỉ ghi đè những ảnh bìa nhỏ hơn"
+
+msgid "Size"
+msgstr "Kích thước"
+
+msgid "Scale size"
+msgstr "Tỉ lệ kích thước"
+
+msgid "Size:"
+msgstr "Kích thước:"
+
+msgid "Pixel"
+msgstr "Pixel"
+
+msgid "Abort"
+msgstr "Hủy bỏ"
+
+msgid "All albums"
+msgstr "Tất cả album"
+
+msgid "Albums with covers"
+msgstr "Album có ảnh bìa"
+
+msgid "Albums without covers"
+msgstr "Album không ảnh bìa"
+
+msgid "Really cancel?"
+msgstr "Thực sự huỷ bỏ?"
+
+msgid "Closing this window will stop searching for album covers."
+msgstr "Đóng cửa sổ này sẽ ngừng tìm kiếm bìa album."
+
+msgid "Don't stop!"
+msgstr "Đừng dừng lại!"
+
+msgid "All artists"
+msgstr "Tất cả nghệ sĩ"
+
+msgid "Various artists"
+msgstr "Nhiều nghệ sĩ khác nhau"
+
+msgid "Got %1 covers out of %2 (%3 failed)"
+msgstr "Đã nhận được %1 trong số %2 (%3 không thành công)"
+
+msgid "%1 transferred"
+msgstr "%1 đã được chuyển giao"
+
+msgid "Export finished"
+msgstr "Xuất xong"
+
+msgid "No covers to export."
+msgstr "Không có ảnh bìa để xuất."
+
+msgid "Exported %1 covers out of %2 (%3 skipped)"
+msgstr "Đã xuất %1 ảnh bìa trong số %2 (bỏ qua %3)"
+
+msgid "Cover Manager"
+msgstr "Trình quản lý ảnh bìa"
+
+msgid "Artist"
+msgstr "Nghệ sĩ"
+
+msgid "Album"
+msgstr "Album"
+
+msgid "Search"
+msgstr "Tìm kiếm"
+
+msgid "Covers from %1"
+msgstr "Ảnh bìa từ %1"
+
+msgid "Framerate"
+msgstr "Tỉ lệ khung hình"
+
+msgid "Low (%1 fps)"
+msgstr "Thấp (%1 fps)"
+
+msgid "Medium (%1 fps)"
+msgstr "Trung bình (%1 fps)"
+
+msgid "High (%1 fps)"
+msgstr "Cao (%1 fps)"
+
+msgid "Super high (%1 fps)"
+msgstr "Rất cao (%1 fps)"
+
+msgid "No analyzer"
+msgstr "Không có trình phân tích"
+
+msgid "Block analyzer"
+msgstr "Chặn trình phân tích"
+
+msgid "Boom analyzer"
+msgstr "Trình phân tích bùng nổ"
+
+msgid "Turbine"
+msgstr "Tua bin"
+
+msgid "Sonogram"
+msgstr "Siêu âm"
+
+msgid "WaveRubber"
+msgstr "Sóng Cao Su"
+
+msgid "Appearance"
+msgstr "Giao diện"
+
+msgid "Style"
+msgstr "Phong cách"
+
+msgid "Tabbar colors"
+msgstr "Màu thanh tab"
+
+msgid "&Use the system default color"
+msgstr "&Dùng màu mặc định của hệ thống"
+
+msgid "Use custom color"
+msgstr "Dùng màu tùy chỉnh"
+
+msgid "Use gradient background"
+msgstr "Dùng nền chuyển màu"
+
+msgid "Select tabbar color:"
+msgstr "Chọn màu thanh tab:"
+
+msgid "Background image"
+msgstr "Hình nền"
+
+msgid "Default bac&kground image"
+msgstr "Hình &nền mặc định"
+
+msgid "&No background image"
+msgstr "&Không có hình nền"
+
+msgid "The album cover of the currently playing song"
+msgstr "Bìa album của bài nhạc đang phát"
+
+msgid "Albu&m cover"
+msgstr "Bìa albu&m"
+
+msgid "Custom image:"
+msgstr "Ảnh tuỳ chỉnh:"
+
+msgid "Browse..."
+msgstr "Duyệt..."
+
+msgid "Position"
+msgstr "Vị trí"
+
+msgid "Upper Left"
+msgstr "Góc trên bên trái"
+
+msgid "Upper Right"
+msgstr "Phía trên bên phải"
+
+msgid "Middle"
+msgstr "Giữa"
+
+msgid "Bottom Left"
+msgstr "Phía dưới bên trái"
+
+msgid "Bottom Right"
+msgstr "Phía dưới bên phải"
+
+msgid "Max cover size"
+msgstr "Kích thước ảnh bìa tối đa"
+
+msgid "Stretch image to fill playlist"
+msgstr "Kéo dài hình ảnh để lấp đầy danh sách phát"
+
+msgid "Keep aspect ratio"
+msgstr "Giữ tỷ lệ khung hình"
+
+msgid "Do not cut image"
+msgstr "Không cắt ảnh"
+
+msgid "Blur amount"
+msgstr "Độ mờ"
+
+msgid "0px"
+msgstr "0px"
+
+msgid "Opacity"
+msgstr "Độ trong suốt"
+
+msgid "40%"
+msgstr "40%"
+
+msgid "Icon sizes"
+msgstr "Kích thước biểu tượng"
+
+msgid "Playlist buttons"
+msgstr "Nút danh sách phát"
+
+msgid "Tabbar large mode"
+msgstr "Chế độ thanh tab lớn"
+
+msgid "Play control buttons"
+msgstr "Nút điều khiển phát"
+
+msgid "Configure buttons"
+msgstr "Nút cấu hình"
+
+msgid "Files, playlists and queue buttons"
+msgstr "Nút tệp, danh sách phát và chờ"
+
+msgid "Tabbar small mode"
+msgstr "Chế độ thanh tab nhỏ"
+
+msgid "Playlist playing song color"
+msgstr "Màu danh sách phát bài nhạc"
+
+msgid "System highlight color"
+msgstr "Màu nổi bật của hệ thống"
+
+msgid "Custom color"
+msgstr "Tùy chọn màu"
+
+msgid "Select playlist playing song color:"
+msgstr "Chọn màu bài nhạc đang phát trong danh sách phát:"
+
+msgid "Window"
+msgstr "Window"
+
+msgid "Window text"
+msgstr "Window text"
+
+msgid "Base"
+msgstr "Base"
+
+msgid "Alternate base"
+msgstr "Alternate base"
+
+msgid "Tooltip base"
+msgstr "Tooltip base"
+
+msgid "Tooltip text"
+msgstr "Tooltip text"
+
+msgid "Placeholder text"
+msgstr "Placeholder text"
+
+msgid "Text"
+msgstr "Text"
+
+msgid "Button"
+msgstr "Button"
+
+msgid "Button text"
+msgstr "Button text"
+
+msgid "Bright text"
+msgstr "Bright text"
+
+msgid "Select color"
+msgstr "Select color"
+
+msgid "Select background image"
+msgstr "Chọn hình nền"
+
+msgid "Colors"
+msgstr "Colors"
+
+msgid "&Use the system default color set"
+msgstr "&Use the system default color set"
+
+msgid "Use a custom color set"
+msgstr "Use a custom color set"
+
+msgid "Set a custom color set suitable for a dark theme"
+msgstr "Set a custom color set suitable for a dark theme"
+
+msgid "Dark mode"
+msgstr "Dark mode"
+
+msgid "Reset the custom color set to the system default colors"
+msgstr "Reset the custom color set to the system default colors"
+
+msgid "Reset to default"
+msgstr "Reset to default"
+
+msgid "You might need to restart Strawberry for this setting to fully apply"
+msgstr "You might need to restart Strawberry for this setting to fully apply"
+
+msgid "You need to restart Strawberry for this setting to take affect"
+msgstr "You need to restart Strawberry for this setting to take affect"
+
+msgid "System icons"
+msgstr "System icons"
+
+msgid "Changing colors is only supported with some styles"
+msgstr "Changing colors is only supported with some styles"
+
+msgid "Dark colors"
+msgstr "Dark colors"
+
+msgid "Backend"
+msgstr "Backend"
+
+msgid "Audio output"
+msgstr "Âm thanh đầu ra"
+
+msgid "Device"
+msgstr "Thiết bị"
+
+msgid "ALSA plugin:"
+msgstr "ALSA plugin:"
+
+msgid "hw"
+msgstr "hw"
+
+msgid "p&lughw"
+msgstr "p&lughw"
+
+msgid "pcm"
+msgstr "pcm"
+
+msgid "Exclusive mode (Experimental)"
+msgstr "Chế độ độc quyền (Thử nghiệm)"
+
+msgid "Options"
+msgstr "Tùy chọn"
+
+msgid "Enable volume control"
+msgstr "Bật điều khiển âm lượng"
+
+msgid "Upmix / downmix to"
+msgstr "Trộn lên / trộn xuống"
+
+msgid "channels"
+msgstr "kênh"
+
+msgid "Improve headphone listening of stereo audio records (bs2b)"
+msgstr "Cải thiện khả năng nghe bản ghi âm thanh nổi bằng tai nghe (bs2b)"
+
+msgid "Use playbin3 when available"
+msgstr "Use playbin3 when available"
+
+msgid "Enable HTTP/2 for streaming"
+msgstr "Kích hoạt HTTP/2 để phát trực tuyến"
+
+msgid "Use strict SSL mode"
+msgstr "Sử dụng chế độ SSL nghiêm ngặt"
+
+msgid "Buffer"
+msgstr "Bộ đệm"
+
+msgid " ms"
+msgstr " ms"
+
+msgid "Buffer duration"
+msgstr "Thời lượng bộ đệm"
+
+msgid "High watermark"
+msgstr "Hình mờ cao"
+
+msgid "Low watermark"
+msgstr "Hình mờ thấp"
+
+msgid "Defaults"
+msgstr "Mặc định"
+
+msgid "Audio normalization"
+msgstr "Chuẩn hóa âm thanh"
+
+msgid "No audio normalization"
+msgstr "Không chuẩn hóa âm thanh"
+
+msgid "Replay Gain"
+msgstr "Cân bằng âm lượng"
+
+msgid "Use Replay Gain metadata if it is available"
+msgstr "Dùng Cân bằng âm lượng nếu có thể"
+
+msgid "Replay Gain mode"
+msgstr "Chế độ Cân bằng âm lượng"
+
+msgid "Radio (equal loudness for all tracks)"
+msgstr "Radio (âm lượng bằng nhau cho tất cả các bản nhạc)"
+
+msgid "Album (ideal loudness for all tracks)"
+msgstr "Album (âm lượng lý tưởng cho tất cả các bản nhạc)"
+
+msgid "Pre-amp"
+msgstr "Tiền khuếch đại"
+
+msgid "Apply compression to prevent clipping"
+msgstr "Áp dụng nén để ngăn chặn việc cắt"
+
+msgid "Fallback-gain"
+msgstr "Dự phòng-tăng"
+
+msgid "EBU R 128 Loudness Normalization"
+msgstr "Chuẩn hóa âm lượng EBU R 128"
+
+msgid "Perform track loudness normalization"
+msgstr "Thực hiện chuẩn hóa âm lượng của bản nhạc"
+
+msgid "Target Level"
+msgstr "Cấp độ mục tiêu"
+
+msgid "Fading"
+msgstr "Giảm dần"
+
+msgid "Fade out when stopping a track"
+msgstr "Giảm dần khi dừng một bản nhạc"
+
+msgid "Cross-fade when changing tracks manually"
+msgstr "Làm phai dần chéo khi thay đổi bản nhạc theo cách thủ công"
+
+msgid "Cross-fade when changing tracks automatically"
+msgstr "Làm phai dần chéo khi tự động thay đổi bản nhạc"
+
+msgid "Except between tracks on the same album or in the same CUE sheet"
+msgstr "Ngoại trừ giữa các bài nhạc trong cùng một album hoặc trong cùng một bảng CUE"
+
+msgid "Fading duration"
+msgstr "Thời lượng phai dần"
+
+msgid "Fade out on pause / fade in on resume"
+msgstr "Giản dần khi tạm dừng / tăng dần khi tiếp tục"
+
+msgid "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+msgstr "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+
+msgid "Exponential volume scaling"
+msgstr "Exponential volume scaling"
+
+msgid "Device warm-up"
+msgstr "Device warm-up"
+
+msgid "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+msgstr "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+
+msgid "Behavior"
+msgstr "Hành vi"
+
+msgid "Show system tray icon"
+msgstr "Hiện biểu tượng khay hệ thống"
+
+msgid "Keep running in the background when the window is closed"
+msgstr "Tiếp tục chạy ở chế độ nền khi cửa sổ đóng"
+
+msgid "Show song progress on system tray icon"
+msgstr "Hiện tiến trình bài hát trên biểu tượng khay hệ thống"
+
+msgid "Show song progress on taskbar"
+msgstr "Hiện tiến trình bài hát trên thanh tác vụ"
+
+msgid "Resume playback on start"
+msgstr "Tiếp tục phát lại khi bắt đầu"
+
+msgid "Show playing widget"
+msgstr "Hiển thị tiện ích đang phát"
+
+msgid "On startup"
+msgstr "Khi khởi động"
+
+msgid "Remember from &last time"
+msgstr "Nhớ từ &lần trước"
+
+msgid "Show the main window"
+msgstr "Hiển thị cửa sổ chính"
+
+msgid "Hide the main window"
+msgstr "Ẩn cửa sổ chính"
+
+msgid "Show the main window maximized"
+msgstr "Hiển thị cửa sổ chính ở mức tối đa"
+
+msgid "Show the main window minimized"
+msgstr "Hiển thị cửa sổ chính ở mức thu nhỏ"
+
+msgid "Language"
+msgstr "Ngôn ngữ"
+
+msgid "Use the system default"
+msgstr "Dùng mặc định hệ thống"
+
+msgid "You will need to restart Strawberry if you change the language."
+msgstr "Bạn sẽ cần phải khởi động lại Strawberry nếu thay đổi ngôn ngữ."
+
+msgid "Using the menu to add a song will..."
+msgstr "Dùng menu để thêm bài hát sẽ..."
+
+msgid "Never start playing"
+msgstr "Không bao giờ bắt đầu chơi"
+
+msgid "Play if there is nothing already playing"
+msgstr "Chơi nếu chưa có gì đang chơi"
+
+msgid "Always start playing"
+msgstr "Bắt đầu phát luôn"
+
+msgid "Pressing \"Previous\" in player will..."
+msgstr "Nhấn \"Trước\" trong trình phát sẽ..."
+
+msgid "Jump to previous song right away"
+msgstr "Chuyển sang bài trước ngay lập tức"
+
+msgid "Restart song, then jump to previous if pressed again"
+msgstr "Phát lại bài hát, sau đó chuyển sang bài trước nếu nhấn lần nữa"
+
+msgid "Double clicking a song will..."
+msgstr "Nhấp đúp vào bài hát sẽ..."
+
+msgid "Append to the playlist"
+msgstr "Thêm vào danh sách phát"
+
+msgid "Replace the playlist"
+msgstr "Thay thế danh sách phát"
+
+msgid "Open in new playlist"
+msgstr "Mở trong danh sách phát mới"
+
+msgid "Add to the queue"
+msgstr "Thêm vào hàng đợi"
+
+msgid "Double clicking a song in the playlist will..."
+msgstr "Nhấp đúp vào bài hát trong danh sách phát sẽ..."
+
+msgid "Change the currently playing song"
+msgstr "Thay đổi bài hát đang phát"
+
+msgid "Seeking using a keyboard shortcut or mouse wheel"
+msgstr "Tua bằng phím tắt hoặc con lăn chuột"
+
+msgid "Time step"
+msgstr "Bước thời gian"
+
+msgid " s"
+msgstr " s"
+
+msgid "Volume Increment"
+msgstr "Bước tăng âm lượng"
+
+msgid "Could not create cdiocddasrc"
+msgstr "Could not create cdiocddasrc"
+
+msgid "Error while setting CDDA device to ready state."
+msgstr "Error while setting CDDA device to ready state."
+
+msgid "Error while setting CDDA device to pause state."
+msgstr "Error while setting CDDA device to pause state."
+
+msgid "The 'track' format is not supported by GStreamer."
+msgstr "The 'track' format is not supported by GStreamer."
+
+msgid "Error while querying CDDA tracks."
+msgstr "Error while querying CDDA tracks."
+
+msgid "Unable to execute collection SQL query: %1"
+msgstr "Không thể thực hiện truy vấn SQL bộ sưu tập: %1"
+
+msgid "Failed SQL query: %1"
+msgstr "Truy vấn SQL không thành công: %1"
+
+msgid "Updating %1 database."
+msgstr "Đang cập nhật cơ sở dữ liệu %1."
+
+msgid "Collection Filter"
+msgstr "Bộ lọc bộ sưu tập"
+
+msgid "Enter search terms here"
+msgstr "Nhập cụm từ tìm kiếm ở đây"
+
+msgid "MenuPopupToolButton"
+msgstr "MenuPopupToolButton"
+
+msgid "Entire collection"
+msgstr "Toàn bộ bộ sưu tập"
+
+msgid "Added today"
+msgstr "Thêm hôm nay"
+
+msgid "Added this week"
+msgstr "Thêm tuần nay"
+
+msgid "Added within three months"
+msgstr "Thêm trong vòng ba tháng"
+
+msgid "Added this year"
+msgstr "Thêm năm nay"
+
+msgid "Added this month"
+msgstr "Thêm tháng này"
+
+msgid "Save current grouping"
+msgstr "Lưu nhóm hiện tại"
+
+msgid "Manage saved groupings"
+msgstr "Quản lý các nhóm đã lưu"
+
+msgid "Any rating"
+msgstr "Any rating"
+
+msgid "Rating non null"
+msgstr "Rating non null"
+
+msgid "Rating greater than 1 star"
+msgstr "Rating greater than 1 star"
+
+msgid "Rating greater than 2 stars"
+msgstr "Rating greater than 2 stars"
+
+msgid "Rating greater than 3 stars"
+msgstr "Rating greater than 3 stars"
+
+msgid "Rating greater than 4 stars"
+msgstr "Rating greater than 4 stars"
+
+msgid "Group by"
+msgstr "Nhóm theo"
+
+msgid "Filter by age"
+msgstr "Filter by age"
+
+msgid "Filter by rating"
+msgstr "Filter by rating"
+
+msgid "Display options"
+msgstr "Tùy chọn hiển thị"
+
+msgid "Group by Album artist/Album"
+msgstr "Nhóm theo Nghệ sĩ album/Album"
+
+msgid "Group by Album artist/Album - Disc"
+msgstr "Nhóm theo Nghệ sĩ album/Album - Đĩa"
+
+msgid "Group by Album artist/Year - Album"
+msgstr "Nhóm theo Nghệ sĩ album/Album - Album"
+
+msgid "Group by Album artist/Year - Album - Disc"
+msgstr "Nhóm theo Nghệ sĩ album/Album - Album - Đĩa"
+
+msgid "Group by Artist/Album"
+msgstr "Nhóm theo Nghệ sĩ/Album"
+
+msgid "Group by Artist/Album - Disc"
+msgstr "Nhóm theo Nghệ sĩ/Album - Đĩa"
+
+msgid "Group by Artist/Year - Album"
+msgstr "Nhóm theo Nghệ sĩ/Năm - Album"
+
+msgid "Group by Artist/Year - Album - Disc"
+msgstr "Nhóm theo Nghệ sĩ/Năm - Album - Đĩa"
+
+msgid "Group by Genre/Album artist/Album"
+msgstr "Nhóm theo Thể loại/Nghệ sĩ album/Album"
+
+msgid "Group by Genre/Artist/Album"
+msgstr "Nhóm theo Thể loại/Nghệ sĩ/Album"
+
+msgid "Group by Album Artist"
+msgstr "Nhóm theo Nghệ sĩ album"
+
+msgid "Group by Artist"
+msgstr "Nhóm theo Nghệ sĩ"
+
+msgid "Group by Album"
+msgstr "Nhóm theo Album"
+
+msgid "Group by Genre/Album"
+msgstr "Nhóm theo Thể loại/Album"
+
+msgid "Advanced grouping..."
+msgstr "Nhóm nâng cao..."
+
+msgid "Grouping Name"
+msgstr "Tên nhóm"
+
+msgid "Grouping name:"
+msgstr "Tên nhóm:"
+
+msgid "Support for sort tags artist, album, album artist, title, composer and performer"
+msgstr "Support for sort tags artist, album, album artist, title, composer and performer"
+
+msgid "Saving playcounts and ratings"
+msgstr "Lưu số lượt phát và xếp hạng"
+
+msgid "Loading..."
+msgstr "Đang tải..."
+
+msgid "Unknown"
+msgstr "Không xác định"
+
+msgid "Collection"
+msgstr "Bộ sưu tập"
+
+msgid "These folders will be scanned for music to make up your collection"
+msgstr "Các thư mục này sẽ được quét để tìm nhạc để tạo nên bộ sưu tập của bạn"
+
+msgid "Add new folder..."
+msgstr "Thêm thư mục mới..."
+
+msgid "Remove folder"
+msgstr "Xóa thư mục"
+
+msgid "Automatic updating"
+msgstr "Tự động cập nhật"
+
+msgid "Update the collection when Strawberry starts"
+msgstr "Cập nhật bộ sưu tập khi Strawberry bắt đầu"
+
+msgid "Monitor the collection for changes"
+msgstr "Giám sát bộ sưu tập để biết những thay đổi"
+
+msgid "Song fingerprinting and tracking"
+msgstr "Lấy dấu vân tay và theo dõi bài hát"
+
+msgid "Mark disappeared songs unavailable"
+msgstr "Đánh dấu các bài hát đã biến mất không còn khả dụng"
+
+msgid "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+msgstr "Thực hiện phân tích bài hát EBU R 128 (bắt buộc để chuẩn hóa âm lượng EBU R 128)"
+
+msgid "Expire unavailable songs after"
+msgstr "Hết hạn các bài hát không có sẵn sau"
+
+msgid "days"
+msgstr "ngày"
+
+msgid "Preferred album art filenames (comma separated)"
+msgstr "Tên tệp ảnh bìa album ưa thích (được phân tách bằng dấu phẩy)"
+
+msgid "When looking for album art Strawberry will first look for picture files that contain one of these words.\nIf there are no matches then it will use the largest image in the directory."
+msgstr "Khi tìm ảnh bìa album, Strawberry trước tiên sẽ tìm các tệp hình ảnh có chứa một trong những từ này.\nNếu không có kết quả trùng khớp thì nó sẽ sử dụng hình ảnh lớn nhất trong thư mục."
+
+msgid "Automatically open single categories in the collection tree"
+msgstr "Tự động mở các danh mục riêng lẻ trong cây bộ sưu tập"
+
+msgid "Show dividers"
+msgstr "Hiện dải phân cách"
+
+msgid "Show album cover art in collection"
+msgstr "Hiện ảnh bìa album trong bộ sưu tập"
+
+msgid "Use various artists for compilation albums"
+msgstr "Dùng nhiều nghệ sĩ khác nhau cho album tổng hợp"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+
+msgid "Use sort tags for sorting when available"
+msgstr "Use sort tags for sorting when available"
+
+msgid "Album cover pixmap cache"
+msgstr "Bộ nhớ đệm pixmap bìa album"
+
+msgid "Enable Disk Cache"
+msgstr "Bật bộ nhớ đệm đĩa"
+
+msgid "Disk Cache Size"
+msgstr "Kích thước bộ nhớ đệm đĩa"
+
+msgid "Current disk cache in use:"
+msgstr "Bộ nhớ đệm đĩa hiện tại đang được sử dụng:"
+
+msgid "Clear Disk Cache"
+msgstr "Xóa bộ nhớ đệm trên đĩa"
+
+msgid "Song playcounts and ratings"
+msgstr "Số lượt phát và xếp hạng bài nhạc"
+
+msgid "Save playcounts to song tags when possible"
+msgstr "Lưu số lượt phát vào thẻ bài hát khi có thể"
+
+msgid "Save ratings to song tags when possible"
+msgstr "Lưu xếp hạng vào thẻ bài nhạc khi có thể"
+
+msgid "Overwrite database playcount when songs are re-read from disk"
+msgstr "Ghi đè số lần phát cơ sở dữ liệu khi bài hát được đọc lại từ đĩa"
+
+msgid "Overwrite database rating when songs are re-read from disk"
+msgstr "Ghi đè xếp hạng cơ sở dữ liệu khi bài hát được đọc lại từ đĩa"
+
+msgid "Save playcounts and ratings to files now"
+msgstr "Lưu số lượt phát và xếp hạng vào tệp ngay bây giờ"
+
+msgid "Enable delete files in the right click context menu"
+msgstr "Cho phép xóa tệp trong menu ngữ cảnh nhấp chuột phải"
+
+msgid "Add directory..."
+msgstr "Thêm thư mục..."
+
+msgid "Write all playcounts and ratings to files"
+msgstr "Viết tất cả số lượt phát và xếp hạng vào tệp"
+
+msgid "Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"
+msgstr "Bạn có chắc chắn muốn ghi số lượt phát bài hát và xếp hạng vào tệp cho tất cả các bài nhạc trong bộ sưu tập của mình không?"
+
+msgid "Your collection is empty!"
+msgstr "Bộ sưu tập của bạn trống rỗng!"
+
+msgid "Click here to add some music"
+msgstr "Nhấn vào đây để thêm nhạc"
+
+msgid "Append to current playlist"
+msgstr "Thêm vào danh sách phát hiện tại"
+
+msgid "Replace current playlist"
+msgstr "Thay thế danh sách phát hiện tại"
+
+msgid "Queue track"
+msgstr "Hàng chờ bài nhạc"
+
+msgid "Queue to play next"
+msgstr "Hàng chờ để phát tiếp theo"
+
+msgid "Search for this"
+msgstr "Tìm kiếm cái này"
+
+msgid "Organize files..."
+msgstr "Tổ chức tệp..."
+
+msgid "Copy to device..."
+msgstr "Sao chép vào thiết bị..."
+
+msgid "Delete from disk..."
+msgstr "Xoá khỏi đĩa..."
+
+msgid "Edit track information..."
+msgstr "Chỉnh sửa thông tin bài nhạc..."
+
+msgid "Edit tracks information..."
+msgstr "Chỉnh sửa thông tin các bài nhạc..."
+
+msgid "Show in file browser..."
+msgstr "Hiển thị trong trình duyệt tệp..."
+
+msgid "Rescan song(s)"
+msgstr "Quét lại (các) bài nhạc"
+
+msgid "Show in various artists"
+msgstr "Hiện trong nhiều nghệ sĩ khác nhau"
+
+msgid "Don't show in various artists"
+msgstr "Không hiện ở nhiều nghệ sĩ khác nhau"
+
+msgid "There are other songs in this album"
+msgstr "Có những bài nhạc khác trong album này"
+
+msgid "Would you like to move the other songs on this album to Various Artists as well?"
+msgstr "Bạn có muốn chuyển các bài hát khác trong album này sang các nghệ sĩ khác nhau không?"
+
+msgid "Error"
+msgstr "Lỗi"
+
+msgid "None of the selected songs were suitable for copying to a device"
+msgstr "Không có bài nhạc nào được chọn phù hợp để sao chép vào thiết bị"
+
+msgid "Form"
+msgstr "Mẫu"
+
+msgid "Updating collection"
+msgstr "Đang cập nhật bộ sưu tập"
+
+msgid "Updating %1"
+msgstr "Đang cập nhật %1"
+
+msgid "Console"
+msgstr "Bảng điều khiển"
+
+msgid "Run"
+msgstr "Chạy"
+
+msgid "Context"
+msgstr "Ngữ cảnh"
+
+msgid "Custom text settings"
+msgstr "Cài đặt văn bản tùy chỉnh"
+
+msgid "Title"
+msgstr "Tiêu đề"
+
+msgid "Summary"
+msgstr "Tóm tắt"
+
+msgid "Enable Items"
+msgstr "Bật mục"
+
+msgid "Technical Data"
+msgstr "Dữ liệu kỹ thuật"
+
+msgid "Song Lyrics"
+msgstr "Lời bài hát"
+
+msgid "Automatically search for album cover"
+msgstr "Tự động tìm kiếm ảnh bìa album"
+
+msgid "Automatically search for song lyrics"
+msgstr "Tự động tìm kiếm lời bài hát"
+
+msgid "Font for headline"
+msgstr "Phông chữ cho tiêu đề"
+
+msgid "Font"
+msgstr "Phông chữ"
+
+msgid "Font size"
+msgstr "Kích thước phông chữ"
+
+msgid " pt"
+msgstr " pt"
+
+msgid "Preview"
+msgstr "Xem trước"
+
+msgid "Font for data and lyrics"
+msgstr "Phông chữ cho dữ liệu và lời bài hát"
+
+msgid "Add song artist tag"
+msgstr "Thêm thẻ nghệ sĩ bài hát"
+
+msgid "Add song album tag"
+msgstr "Thêm thẻ album bài hát"
+
+msgid "Add song title tag"
+msgstr "Thêm thẻ tiêu đề bài hát"
+
+msgid "Add song albumartist tag"
+msgstr "Thêm thẻ nghệ sĩ album"
+
+msgid "Add song year tag"
+msgstr "Thêm thẻ năm phát hành"
+
+msgid "Add song composer tag"
+msgstr "Thêm thẻ nhà soạn nhạc"
+
+msgid "Add song performer tag"
+msgstr "Thêm thẻ người biểu diễn"
+
+msgid "Add song grouping tag"
+msgstr "Thêm thẻ nhóm bài hát"
+
+msgid "Add song disc tag"
+msgstr "Thêm thẻ số đĩa"
+
+msgid "Add song track tag"
+msgstr "Thêm thẻ số track"
+
+msgid "Add song genre tag"
+msgstr "Thêm thẻ thể loại"
+
+msgid "Add song length tag"
+msgstr "Thêm thẻ độ dài bài hát"
+
+msgid "Add song play count"
+msgstr "Thêm số lượt phát"
+
+msgid "Add song skip count"
+msgstr "Thêm số lượt bỏ qua"
+
+msgid "Add a new line if supported by the notification type"
+msgstr "Thêm dòng mới nếu loại thông báo hỗ trợ"
+
+msgid "%filename%"
+msgstr "%filename%"
+
+msgid "Add song filename"
+msgstr "Thêm tên tệp bài hát"
+
+msgid "%url%"
+msgstr "%url%"
+
+msgid "Add song URL"
+msgstr "Thêm URL bài hát"
+
+msgid "%rating%"
+msgstr "%rating%"
+
+msgid "Add song rating"
+msgstr "Thêm xếp hạng bài hát"
+
+msgid "Add song original year tag"
+msgstr "Thêm thẻ năm gốc"
+
+msgid "Add song artistsort tag"
+msgstr "Add song artistsort tag"
+
+msgid "Add song albumartistsort tag"
+msgstr "Add song albumartistsort tag"
+
+msgid "Add song titlesort tag"
+msgstr "Add song titlesort tag"
+
+msgid "Add song composersort tag"
+msgstr "Add song composersort tag"
+
+msgid "Add song performersort tag"
+msgstr "Add song performersort tag"
+
+msgid "Add song albumsort tag"
+msgstr "Add song albumsort tag"
+
+msgid "Filetype"
+msgstr "Loại tệp"
+
+msgid "Length"
+msgstr "Độ dài"
+
+msgid "Samplerate"
+msgstr "Tần số mẫu"
+
+msgid "Bit depth"
+msgstr "Độ sâu bit"
+
+msgid "Bitrate"
+msgstr "Bitrate"
+
+msgid "Show album cover"
+msgstr "Hiện ảnh bìa album"
+
+msgid "Show song technical data"
+msgstr "Hiện dữ liệu kỹ thuật bài hát"
+
+msgid "Show song lyrics"
+msgstr "Hiện lời bài hát"
+
+msgid "No song playing"
+msgstr "Không có bài hát nào đang phát"
+
+msgid "%1 song"
+msgstr "%1 bài hát"
+
+msgid "%1 songs"
+msgstr "%1 bài hát"
+
+msgid "%1 artist"
+msgstr "%1 nghệ sĩ"
+
+msgid "%1 artists"
+msgstr "%1 nghệ sĩ"
+
+msgid "%1 album"
+msgstr "%1 album"
+
+msgid "%1 albums"
+msgstr "%1 album"
+
+msgid "kbps"
+msgstr "kbps"
+
+msgid "Load cover from URL"
+msgstr "Tải ảnh bìa từ URL"
+
+msgid "Enter a URL to download a cover from the Internet:"
+msgstr "Nhập URL để tải ảnh bìa từ Internet:"
+
+msgid "Fetching cover error"
+msgstr "Lỗi tải ảnh bìa"
+
+msgid "The site you requested does not exist!"
+msgstr "Trang web bạn yêu cầu không tồn tại!"
+
+msgid "The site you requested is not an image!"
+msgstr "Trang web bạn yêu cầu không phải là hình ảnh!"
+
+msgid "View"
+msgstr "Xem"
+
+msgid "Total albums:"
+msgstr "Tổng số album:"
+
+msgid "Without cover:"
+msgstr "Không có ảnh bìa:"
+
+msgid "0"
+msgstr "0"
+
+msgid "Fetch Missing Covers"
+msgstr "Tải ảnh bìa bị thiếu"
+
+msgid "Export Covers"
+msgstr "Xuất ảnh bìa"
+
+msgid "Fetch automatically"
+msgstr "Tải tự động"
+
+msgid "Load"
+msgstr "Tải"
+
+msgid "Add to playlist"
+msgstr "Thêm vào danh sách phát"
+
+msgid "Fetch completed"
+msgstr "Tải hoàn tất"
+
+msgid "Total network requests made"
+msgstr "Tổng số yêu cầu mạng được thực hiện"
+
+msgid "Average image size"
+msgstr "Kích thước hình ảnh trung bình"
+
+msgid "Total bytes transferred"
+msgstr "Tổng số byte được chuyển"
+
+msgid "Covers"
+msgstr "Ảnh bìa"
+
+msgid "Cover providers"
+msgstr "Trình cung cấp ảnh bìa"
+
+msgid "Choose the providers you want to use when searching for covers."
+msgstr "Chọn trình cung cấp bạn muốn sử dụng khi tìm kiếm ảnh bìa."
+
+msgid "Move up"
+msgstr "Di chuyển lên"
+
+msgid "Move down"
+msgstr "Di chuyển xuống"
+
+msgid "Authentication"
+msgstr "Xác thực"
+
+msgid "Login"
+msgstr "Đăng nhập"
+
+msgid "Album cover types"
+msgstr "Loại ảnh bìa album"
+
+msgid "Saving album covers"
+msgstr "Lưu ảnh bìa album"
+
+msgid "Save album covers in album directory"
+msgstr "Lưu ảnh bìa album trong thư mục album"
+
+msgid "Save album covers in cache directory"
+msgstr "Lưu ảnh bìa album trong thư mục bộ nhớ đệm"
+
+msgid "Save album covers as embedded cover"
+msgstr "Lưu ảnh bìa album dạng nhúng"
+
+msgid "Filename:"
+msgstr "Tên tệp:"
+
+msgid "Pattern"
+msgstr "Mẫu"
+
+msgid "Random"
+msgstr "Ngẫu nhiên"
+
+msgid "Overwrite existing file"
+msgstr "Ghi đè tệp hiện có"
+
+msgid "Lowercase filename"
+msgstr "Tên tệp chữ thường"
+
+msgid "Replace spaces with dashes"
+msgstr "Thay khoảng trắng bằng dấu gạch ngang"
+
+msgid "Use Tidal settings to authenticate."
+msgstr "Sử dụng cài đặt Tidal để xác thực."
+
+msgid "Use Spotify settings to authenticate."
+msgstr "Sử dụng cài đặt Spotify để xác thực."
+
+msgid "Use Qobuz settings to authenticate."
+msgstr "Sử dụng cài đặt Qobuz để xác thực."
+
+msgid "%1 needs authentication."
+msgstr "%1 cần xác thực."
+
+msgid "%1 does not need authentication."
+msgstr "%1 không cần xác thực."
+
+msgid "No provider selected."
+msgstr "Chưa chọn nhà cung cấp."
+
+msgid "Authentication failed"
+msgstr "Xác thực thất bại"
+
+msgid "Manually unset (%1)"
+msgstr "Bỏ đặt thủ công (%1)"
+
+msgid "Set through album cover search (%1)"
+msgstr "Đặt qua tìm kiếm ảnh bìa album (%1)"
+
+msgid "Automatically picked up from album directory (%1)"
+msgstr "Tự động lấy từ thư mục album (%1)"
+
+msgid "Embedded album cover art (%1)"
+msgstr "Ảnh bìa nhúng trong album (%1)"
+
+msgid "Saving CUE files is not supported."
+msgstr "Không hỗ trợ lưu tệp CUE."
+
+msgid "Unable to execute SQL query: %1"
+msgstr "Không thể thực hiện truy vấn SQL: %1"
+
+msgid "Integrity check"
+msgstr "Kiểm tra tính toàn vẹn"
+
+msgid "Database corruption detected."
+msgstr "Phát hiện cơ sở dữ liệu bị hỏng."
+
+msgid "Backing up database"
+msgstr "Đang sao lưu cơ sở dữ liệu"
+
+msgid "Delete files"
+msgstr "Xóa tệp"
+
+msgid "The following files will be deleted from disk:"
+msgstr "Các tệp sau sẽ bị xóa khỏi đĩa:"
+
+msgid "Are you sure you want to continue?"
+msgstr "Bạn có chắc chắn muốn tiếp tục?"
+
+msgid "Deleting files"
+msgstr "Đang xóa tệp"
+
+msgid "Updating %1%..."
+msgstr "Đang cập nhật %1%..."
+
+msgid "Not connected"
+msgstr "Chưa kết nối"
+
+msgid "Not mounted - double click to mount"
+msgstr "Chưa gắn kết - nhấp đúp để gắn kết"
+
+msgid "Double click to open"
+msgstr "Nhấp đúp để mở"
+
+msgid "%1 song%2"
+msgstr "%1 bài hát%2"
+
+msgid "Connect device"
+msgstr "Kết nối thiết bị"
+
+msgid "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+msgstr "Đây là lần đầu tiên bạn kết nối thiết bị này. Strawberry sẽ quét thiết bị để tìm tệp nhạc - điều này có thể mất một chút thời gian."
+
+msgid "This device will not work properly"
+msgstr "Thiết bị này sẽ không hoạt động đúng cách"
+
+msgid "This is an MTP device, but you compiled Strawberry without libmtp support."
+msgstr "Đây là thiết bị MTP, nhưng bạn đã biên dịch Strawberry mà không có hỗ trợ libmtp."
+
+msgid "If you continue, this device will work slowly and songs copied to it may not work."
+msgstr "Nếu bạn tiếp tục, thiết bị này sẽ hoạt động chậm và các bài hát được sao chép vào có thể không hoạt động."
+
+msgid "This is an iPod, but you compiled Strawberry without libgpod support."
+msgstr "Đây là iPod, nhưng bạn đã biên dịch Strawberry mà không có hỗ trợ libgpod."
+
+msgid "This type of device is not supported: %1"
+msgstr "Loại thiết bị này không được hỗ trợ: %1"
+
+msgid "Device Properties"
+msgstr "Thuộc tính thiết bị"
+
+msgid "Information"
+msgstr "Thông tin"
+
+msgid "Name"
+msgstr "Tên"
+
+msgid "Icon"
+msgstr "Biểu tượng"
+
+msgid "Hardware information"
+msgstr "Thông tin phần cứng"
+
+msgid "Hardware information is only available while the device is connected."
+msgstr "Thông tin phần cứng chỉ khả dụng khi thiết bị đang kết nối."
+
+msgid "File formats"
+msgstr "Định dạng tệp"
+
+msgid "Supported formats"
+msgstr "Định dạng được hỗ trợ"
+
+msgid "This device supports the following file formats:"
+msgstr "Thiết bị này hỗ trợ các định dạng tệp sau:"
+
+msgid "Strawberry can automatically convert the music you copy to this device into a format that it can play."
+msgstr "Strawberry có thể tự động chuyển đổi nhạc bạn sao chép vào thiết bị này sang định dạng mà nó có thể phát."
+
+msgid "Do not convert any music"
+msgstr "Không chuyển đổi bất kỳ nhạc nào"
+
+msgid "Convert any music that the device can't play"
+msgstr "Chuyển đổi bất kỳ nhạc nào mà thiết bị không thể phát"
+
+msgid "Convert all music"
+msgstr "Chuyển đổi tất cả nhạc"
+
+msgid "Preferred format"
+msgstr "Định dạng ưa thích"
+
+msgid "This device must be connected and opened before Strawberry can see what file formats it supports."
+msgstr "Thiết bị này phải được kết nối và mở trước khi Strawberry có thể thấy định dạng tệp nào nó hỗ trợ."
+
+msgid "Open device"
+msgstr "Mở thiết bị"
+
+msgid "Querying device..."
+msgstr "Đang truy vấn thiết bị..."
+
+msgid "Model"
+msgstr "Kiểu máy"
+
+msgid "Manufacturer"
+msgstr "Nhà sản xuất"
+
+msgid "Safely remove device"
+msgstr "Tháo thiết bị an toàn"
+
+msgid "Forget device"
+msgstr "Quên thiết bị"
+
+msgid "Device properties..."
+msgstr "Thuộc tính thiết bị..."
+
+msgid "Copy to collection..."
+msgstr "Sao chép vào bộ sưu tập..."
+
+msgid "Delete from device..."
+msgstr "Xóa khỏi thiết bị..."
+
+msgid "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+msgstr "Quên một thiết bị sẽ loại bỏ nó khỏi danh sách này và Strawberry sẽ phải quét lại tất cả các bài hát vào lần tiếp theo bạn kết nối nó."
+
+msgid "These files will be deleted from the device, are you sure you want to continue?"
+msgstr "Các tệp này sẽ bị xóa khỏi thiết bị, bạn có chắc chắn muốn tiếp tục không?"
+
+msgid "on "
+msgstr "on "
+
+msgid "Dynamic mode is on"
+msgstr "Chế độ động đang bật"
+
+msgid "New tracks will be added automatically."
+msgstr "Các bài hát mới sẽ được thêm tự động."
+
+msgid "Expand"
+msgstr "Mở rộng"
+
+msgid "Repopulate"
+msgstr "Làm mới"
+
+msgid "Turn off"
+msgstr "Tắt"
+
+msgid "Edit track information"
+msgstr "Sửa thông tin bài hát"
+
+msgid "Date created"
+msgstr "Ngày tạo"
+
+msgid "Art Automatic"
+msgstr "Ảnh bìa tự động"
+
+msgid "Date modified"
+msgstr "Ngày chỉnh sửa"
+
+msgid "Art Embedded"
+msgstr "Ảnh bìa nhúng"
+
+#. A playlist's tag.
+msgid "Last played"
+msgstr "Phát lần cuối"
+
+msgid "File type"
+msgstr "Loại tệp"
+
+msgid "Play count"
+msgstr "Số lần phát"
+
+msgid "EBU R 128 integrated loudness"
+msgstr "Độ to tích hợp EBU R 128"
+
+msgid "Bit rate"
+msgstr "Bitrate"
+
+msgid "Skip count"
+msgstr "Số lần bỏ qua"
+
+msgid "Sample rate"
+msgstr "Tần số mẫu"
+
+msgid "Path"
+msgstr "Đường dẫn"
+
+msgid "Filename"
+msgstr "Tên tệp"
+
+msgid "Art Unset"
+msgstr "Ảnh bìa chưa đặt"
+
+msgid "File size"
+msgstr "Kích thước tệp"
+
+msgid "Art Manual"
+msgstr "Ảnh bìa thủ công"
+
+msgid "EBU R 128 loudness range"
+msgstr "Dải độ to EBU R 128"
+
+msgid "Reset play counts"
+msgstr "Đặt lại số lần phát"
+
+msgid "Tags"
+msgstr "Thẻ"
+
+msgid "Change art"
+msgstr "Thay đổi ảnh bìa"
+
+msgid "Embedded cover"
+msgstr "Ảnh bìa nhúng"
+
+msgid "Disc"
+msgstr "Đĩa"
+
+msgid "Grouping"
+msgstr "Nhóm"
+
+msgid "Album artist"
+msgstr "Nghệ sĩ album"
+
+msgid "Year"
+msgstr "Năm"
+
+msgid "Composer"
+msgstr "Nhà soạn nhạc"
+
+msgid "Complete tags automatically"
+msgstr "Tự động hoàn thành thẻ"
+
+msgid "Genre"
+msgstr "Thể loại"
+
+msgid "Comment"
+msgstr "Bình luận"
+
+msgid "Performer"
+msgstr "Người biểu diễn"
+
+msgid "Compilation"
+msgstr "Tổng hợp"
+
+msgid "Track"
+msgstr "Bài hát"
+
+msgid "Rating"
+msgstr "Đánh giá"
+
+msgid "Lyrics"
+msgstr "Lời bài hát"
+
+msgid "Complete lyrics automatically"
+msgstr "Tự động hoàn thành lời bài hát"
+
+msgid "(different across multiple songs)"
+msgstr "(khác nhau giữa các bài hát)"
+
+msgid "Different art across multiple songs."
+msgstr "Ảnh bìa khác nhau giữa các bài hát."
+
+msgid "Previous"
+msgstr "Trước"
+
+msgid "Next"
+msgstr "Tiếp"
+
+msgid "Saving tracks"
+msgstr "Đang lưu bản nhạc"
+
+msgid "Loading tracks"
+msgstr "Đang tải bản nhạc"
+
+msgid "%1 songs selected."
+msgstr "Đã chọn %1 bài hát."
+
+msgid "Yes"
+msgstr "Có"
+
+msgid "No"
+msgstr "Không"
+
+msgid "None"
+msgstr "Không có"
+
+msgid "Cover is unset."
+msgstr "Ảnh bìa chưa đặt."
+
+msgid "Cover from embedded image."
+msgstr "Ảnh bìa từ hình ảnh nhúng."
+
+msgid "Cover from %1"
+msgstr "Ảnh bìa từ %1"
+
+msgid "Cover art not set"
+msgstr "Ảnh bìa chưa đặt"
+
+msgid "Album cover editing is only available for collection songs."
+msgstr "Chỉnh sửa ảnh bìa album chỉ khả dụng cho bài hát trong bộ sưu tập."
+
+msgid "Cover changed: Will be cleared when saved."
+msgstr "Ảnh bìa đã thay đổi: Sẽ bị xóa khi lưu."
+
+msgid "Cover changed: Will be unset when saved."
+msgstr "Ảnh bìa đã thay đổi: Sẽ bị bỏ đặt khi lưu."
+
+msgid "Cover changed: Will be deleted when saved."
+msgstr "Ảnh bìa đã thay đổi: Sẽ bị xóa khi lưu."
+
+msgid "Cover changed: Will set new when saved."
+msgstr "Ảnh bìa đã thay đổi: Sẽ đặt mới khi lưu."
+
+msgid "Never"
+msgstr "Không bao giờ"
+
+msgid "Reset song play statistics"
+msgstr "Đặt lại thống kê phát bài hát"
+
+msgid "Are you sure you want to reset this song's play statistics?"
+msgstr "Bạn có chắc chắn muốn đặt lại thống kê phát của bài hát này?"
+
+msgid "loading..."
+msgstr "đang tải..."
+
+msgid "Not found."
+msgstr "Không tìm thấy."
+
+msgid "Could not write metadata to %1"
+msgstr "Không thể ghi metadata vào %1"
+
+msgid "Could not write metadata to %1: %2"
+msgstr "Không thể ghi metadata vào %1: %2"
+
+msgid "ID3v2 version:"
+msgstr "ID3v2 version:"
+
+msgid "2.3"
+msgstr "2.3"
+
+msgid "2.4"
+msgstr "2.4"
+
+msgid "Performer sort"
+msgstr "Performer sort"
+
+msgid "Title sort"
+msgstr "Title sort"
+
+msgid "Album artist sort"
+msgstr "Album artist sort"
+
+msgid "Artist sort"
+msgstr "Artist sort"
+
+msgid "Album sort"
+msgstr "Album sort"
+
+msgid "Composer sort"
+msgstr "Composer sort"
+
+msgid "Equalizer"
+msgstr "Bộ chỉnh âm"
+
+msgid "Preset:"
+msgstr "Cài đặt sẵn:"
+
+msgid "Save preset"
+msgstr "Lưu cài đặt sẵn"
+
+msgid "Delete preset"
+msgstr "Xóa cài đặt sẵn"
+
+msgid "Enable equalizer"
+msgstr "Bật bộ chỉnh âm"
+
+msgid "Enable stereo balancer"
+msgstr "Bật cân bằng stereo"
+
+msgid "Left"
+msgstr "Trái"
+
+msgid "Balance"
+msgstr "Cân bằng"
+
+msgid "Right"
+msgstr "Phải"
+
+msgid "Custom"
+msgstr "Tùy chỉnh"
+
+msgid "Classical"
+msgstr "Cổ điển"
+
+msgid "Club"
+msgstr "Club"
+
+msgid "Dance"
+msgstr "Dance"
+
+msgid "Full Bass"
+msgstr "Bass tối đa"
+
+msgid "Full Treble"
+msgstr "Treble tối đa"
+
+msgid "Full Bass + Treble"
+msgstr "Bass + Treble tối đa"
+
+msgid "Laptop/Headphones"
+msgstr "Laptop/Tai nghe"
+
+msgid "Large Hall"
+msgstr "Hội trường lớn"
+
+msgid "Live"
+msgstr "Trực tiếp"
+
+msgid "Party"
+msgstr "Tiệc tùng"
+
+msgid "Pop"
+msgstr "Pop"
+
+msgid "Reggae"
+msgstr "Reggae"
+
+msgid "Rock"
+msgstr "Rock"
+
+msgid "Soft"
+msgstr "Nhẹ nhàng"
+
+msgid "Ska"
+msgstr "Ska"
+
+msgid "Soft Rock"
+msgstr "Soft Rock"
+
+msgid "Techno"
+msgstr "Techno"
+
+msgid "Zero"
+msgstr "Không"
+
+msgid "Are you sure you want to delete the \"%1\" preset?"
+msgstr "Bạn có chắc chắn muốn xóa cài đặt sẵn \"%1\"?"
+
+msgid "You need to restart playback for this setting to take affect."
+msgstr "You need to restart playback for this setting to take affect."
+
+msgid "%1 dB"
+msgstr "%1 dB"
+
+msgid "Strawberry Error"
+msgstr "Lỗi Strawberry"
+
+msgid "Large sidebar"
+msgstr "Thanh bên lớn"
+
+msgid "Icons sidebar"
+msgstr "Thanh bên biểu tượng"
+
+msgid "Small sidebar"
+msgstr "Thanh bên nhỏ"
+
+msgid "Plain sidebar"
+msgstr "Thanh bên đơn giản"
+
+msgid "Tabs on top"
+msgstr "Thẻ trên đỉnh"
+
+msgid "Icons on top"
+msgstr "Biểu tượng trên đỉnh"
+
+msgid "Add root directory"
+msgstr "Add root directory"
+
+msgid "Remove selected root directory"
+msgstr "Remove selected root directory"
+
+msgid "Toggle between list and tree view"
+msgstr "Toggle between list and tree view"
+
+msgid "Select folder to add as tree root"
+msgstr "Select folder to add as tree root"
+
+msgid "Move to collection..."
+msgstr "Chuyển vào bộ sưu tập..."
+
+msgid "Files"
+msgstr "Files"
+
+msgid "Available"
+msgstr "Khả dụng"
+
+msgid "New songs"
+msgstr "Bài hát mới"
+
+msgid "Exceeded by"
+msgstr "Vượt quá"
+
+msgid "Used"
+msgstr "Đã dùng"
+
+msgid "Could not copy %1 to %2: %3"
+msgstr "Không thể sao chép %1 vào %2: %3"
+
+msgid "Writing database failed: %1"
+msgstr "Ghi cơ sở dữ liệu thất bại: %1"
+
+msgid "Writing database failed."
+msgstr "Ghi cơ sở dữ liệu thất bại."
+
+msgid "Loading iPod database"
+msgstr "Đang tải cơ sở dữ liệu iPod"
+
+msgid "An error occurred loading the iTunes database"
+msgstr "Đã xảy ra lỗi khi tải cơ sở dữ liệu iTunes"
+
+msgid "Mount point"
+msgstr "Điểm gắn kết"
+
+msgid "URI"
+msgstr "URI"
+
+msgid "Press a key"
+msgstr "Nhấn một phím"
+
+msgid "Press a key combination to use for %1..."
+msgstr "Nhấn tổ hợp phím để sử dụng cho %1..."
+
+msgid "Play"
+msgstr "Phát"
+
+msgid "Pause"
+msgstr "Tạm dừng"
+
+msgid "Play/Pause"
+msgstr "Phát/Tạm dừng"
+
+msgid "Stop"
+msgstr "Dừng"
+
+msgid "Stop playing after current track"
+msgstr "Dừng phát sau bản nhạc hiện tại"
+
+msgid "Next track"
+msgstr "Bản nhạc tiếp"
+
+msgid "Previous track"
+msgstr "Bản nhạc trước"
+
+msgid "Restart or previous track"
+msgstr "Phát lại hoặc bản nhạc trước"
+
+msgid "Increase volume"
+msgstr "Tăng âm lượng"
+
+msgid "Decrease volume"
+msgstr "Giảm âm lượng"
+
+msgid "Mute"
+msgstr "Tắt tiếng"
+
+msgid "Seek forward"
+msgstr "Tua tới"
+
+msgid "Seek backward"
+msgstr "Tua lùi"
+
+msgid "Show/Hide"
+msgstr "Hiển thị/Ẩn"
+
+msgid "Show OSD"
+msgstr "Hiện OSD"
+
+msgid "Toggle Pretty OSD"
+msgstr "Bật/tắt Pretty OSD"
+
+msgid "Change shuffle mode"
+msgstr "Thay đổi chế độ phát ngẫu nhiên"
+
+msgid "Change repeat mode"
+msgstr "Thay đổi chế độ lặp lại"
+
+msgid "Enable/disable scrobbling"
+msgstr "Bật/tắt scrobbling"
+
+msgid "Love"
+msgstr "Yêu thích"
+
+msgid "Global Shortcuts"
+msgstr "Phím tắt toàn cục"
+
+msgid "Open..."
+msgstr "Mở..."
+
+msgid "Use X11 shortcuts when available"
+msgstr "Sử dụng phím tắt X11 khi khả dụng"
+
+msgid "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+msgstr "Bạn cần mở Tùy chọn Hệ thống và cho phép Strawberry \"<span style=\"font-style:italic\">điều khiển máy tính của bạn</span>\" để sử dụng phím tắt toàn cục trong Strawberry."
+
+#. Category label
+msgid "Action"
+msgstr "Hành động"
+
+msgid "Shortcut"
+msgstr "Phím tắt"
+
+msgid "Shortcut for %1"
+msgstr "Phím tắt cho %1"
+
+msgid "&None"
+msgstr "&Không có"
+
+msgid "&Default"
+msgstr "&Mặc định"
+
+msgid "&Custom"
+msgstr "&Tùy chỉnh"
+
+msgid "Change shortcut..."
+msgstr "Thay đổi phím tắt..."
+
+msgid "Use KGlobalAccel shortcuts when available"
+msgstr "Sử dụng phím tắt KGlobalAccel khi khả dụng"
+
+msgid "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+msgstr "Không khuyến nghị sử dụng phím tắt X11 và có thể khiến bàn phím không phản hồi! Phím tắt thường nên được sử dụng qua MPRIS2 / KGlobalAccel."
+
+msgid "Collection advanced grouping"
+msgstr "Nhóm nâng cao bộ sưu tập"
+
+msgid "You can change the way the songs in the collection are organized."
+msgstr "Bạn có thể thay đổi cách tổ chức các bài hát trong bộ sưu tập."
+
+msgid "Group Collection by..."
+msgstr "Nhóm bộ sưu tập theo..."
+
+msgid "First level"
+msgstr "Cấp đầu tiên"
+
+msgid "Album - Disc"
+msgstr "Album - Đĩa"
+
+msgid "Format"
+msgstr "Định dạng"
+
+msgid "Year - Album"
+msgstr "Năm - Album"
+
+msgid "Year - Album - Disc"
+msgstr "Năm - Album - Đĩa"
+
+msgid "Original year"
+msgstr "Năm gốc"
+
+msgid "Original year - Album"
+msgstr "Năm gốc - Album"
+
+msgid "Second level"
+msgstr "Cấp thứ hai"
+
+msgid "Third level"
+msgstr "Cấp thứ ba"
+
+msgid "Separate albums by grouping tag"
+msgstr "Tách album theo thẻ nhóm"
+
+msgid "Original year - Album - Disc"
+msgstr "Original year - Album - Disc"
+
+msgid "Buffering"
+msgstr "Đang đệm"
+
+msgid "%1 Scrobbler Authentication"
+msgstr "%1 Scrobbler Authentication"
+
+msgid "Open URL in web browser?"
+msgstr "Open URL in web browser?"
+
+msgid "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+msgstr "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+
+msgid "Could not open URL. Please open this URL in your browser"
+msgstr "Could not open URL. Please open this URL in your browser"
+
+msgid "Invalid reply from web browser. Missing token."
+msgstr "Invalid reply from web browser. Missing token."
+
+msgid "Received invalid reply from web browser. Try another browser."
+msgstr "Received invalid reply from web browser. Try another browser."
+
+msgid "Scrobbler %1 is not authenticated!"
+msgstr "Scrobbler %1 is not authenticated!"
+
+msgid "Scrobbler %1 error: %2"
+msgstr "Scrobbler %1 error: %2"
+
+msgid "Least favourite tracks"
+msgstr "Các bản nhạc ít yêu thích nhất"
+
+msgid "Unable to scrobble %1 - %2 because of error: %3"
+msgstr "Không thể scrobble %1 - %2 vì lỗi: %3"
+
+msgid "Missing MusicBrainz recording ID for %1 %2 %3"
+msgstr "Thiếu ID bản ghi MusicBrainz cho %1 %2 %3"
+
+msgid "ListenBrainz error: %1"
+msgstr "Lỗi ListenBrainz: %1"
+
+msgid "You are not signed in."
+msgstr "Bạn chưa đăng nhập."
+
+msgid "Sign out"
+msgstr "Đăng xuất"
+
+msgid "Signing in..."
+msgstr "Đang đăng nhập..."
+
+msgid "You are signed in."
+msgstr "Bạn đã đăng nhập."
+
+msgid "You are signed in as %1."
+msgstr "Bạn đã đăng nhập với tư cách %1."
+
+msgid "Expires on %1"
+msgstr "Hết hạn vào %1"
+
+msgid "Lyrics providers"
+msgstr "Nhà cung cấp lời bài hát"
+
+msgid "Choose the providers you want to use when searching for lyrics."
+msgstr "Chọn nhà cung cấp bạn muốn sử dụng khi tìm kiếm lời bài hát."
+
+msgid "Strawberry Music Player"
+msgstr "Trình phát nhạc Strawberry"
+
+msgid "&Music"
+msgstr "&Nhạc"
+
+msgid "P&laylist"
+msgstr "&Danh sách phát"
+
+msgid "Help"
+msgstr "Trợ giúp"
+
+msgid "&Tools"
+msgstr "&Công cụ"
+
+msgid "F5"
+msgstr "F5"
+
+msgid "&Play"
+msgstr "&Phát"
+
+msgid "F6"
+msgstr "F6"
+
+msgid "&Stop"
+msgstr "Dừ&ng"
+
+msgid "F7"
+msgstr "F7"
+
+msgid "&Next track"
+msgstr "Bản nhạc &tiếp"
+
+msgid "F8"
+msgstr "F8"
+
+msgid "&Quit"
+msgstr "&Thoát"
+
+msgid "Ctrl+Q"
+msgstr "Ctrl+Q"
+
+msgid "Stop after this track"
+msgstr "Dừng sau bản nhạc này"
+
+msgid "Ctrl+Alt+V"
+msgstr "Ctrl+Alt+V"
+
+msgid "&Clear playlist"
+msgstr "&Xóa danh sách phát"
+
+msgid "Clear playlist"
+msgstr "Xóa danh sách phát"
+
+msgid "Ctrl+K"
+msgstr "Ctrl+K"
+
+msgid "Ctrl+E"
+msgstr "Ctrl+E"
+
+msgid "Renumber tracks in this order..."
+msgstr "Đánh lại số thứ tự bài hát theo thứ tự này..."
+
+msgid "Set value for all selected tracks..."
+msgstr "Đặt giá trị cho tất cả bài đã chọn..."
+
+msgid "Edit tag..."
+msgstr "Sửa thẻ..."
+
+msgid "&Settings..."
+msgstr "&Cài đặt..."
+
+msgid "Ctrl+P"
+msgstr "Ctrl+P"
+
+msgid "&About Strawberry"
+msgstr "&Giới thiệu về Strawberry"
+
+msgid "F1"
+msgstr "F1"
+
+msgid "S&huffle playlist"
+msgstr "&Trộn ngẫu nhiên danh sách phát"
+
+msgid "&Add file..."
+msgstr "&Thêm tệp..."
+
+msgid "Ctrl+Shift+A"
+msgstr "Ctrl+Shift+A"
+
+msgid "&Open file..."
+msgstr "&Mở tệp..."
+
+msgid "Open audio &CD..."
+msgstr "Mở đĩa &CD âm thanh..."
+
+msgid "&Cover Manager"
+msgstr "Trình quản lý &Ảnh bìa"
+
+msgid "C&onsole"
+msgstr "Bảng điều &khiển"
+
+msgid "&Shuffle mode"
+msgstr "Chế độ &Trộn ngẫu nhiên"
+
+msgid "&Repeat mode"
+msgstr "Chế độ &Lặp lại"
+
+msgid "Remove from playlist"
+msgstr "Xóa khỏi danh sách phát"
+
+msgid "&Equalizer"
+msgstr "&Bộ chỉnh âm"
+
+msgid "&Transcode Music"
+msgstr "&Chuyển mã nhạc"
+
+msgid "Add &folder..."
+msgstr "Thêm &thư mục..."
+
+msgid "&Jump to the currently playing track"
+msgstr "&Nhảy tới bài đang phát"
+
+msgid "Ctrl+J"
+msgstr "Ctrl+J"
+
+msgid "&New playlist"
+msgstr "&Danh sách phát mới"
+
+msgid "Ctrl+N"
+msgstr "Ctrl+N"
+
+msgid "Save &playlist..."
+msgstr "Lưu &danh sách phát..."
+
+msgid "Ctrl+S"
+msgstr "Ctrl+S"
+
+msgid "&Load playlist..."
+msgstr "Tải &danh sách phát..."
+
+msgid "Ctrl+Shift+O"
+msgstr "Ctrl+Shift+O"
+
+msgid "&Save all playlists..."
+msgstr "&Lưu tất cả danh sách phát..."
+
+msgid "Go to next playlist tab"
+msgstr "Chuyển tới thẻ danh sách phát tiếp theo"
+
+msgid "Go to previous playlist tab"
+msgstr "Chuyển tới thẻ danh sách phát trước đó"
+
+msgid "&Update changed collection folders"
+msgstr "&Cập nhật thư mục bộ sưu tập đã thay đổi"
+
+msgid "About &Qt"
+msgstr "Giới thiệu về &Qt"
+
+msgid "&Mute"
+msgstr "Tắt &âm"
+
+msgid "Ctrl+M"
+msgstr "Ctrl+M"
+
+msgid "&Do a full collection rescan"
+msgstr "&Quét lại toàn bộ bộ sưu tập"
+
+msgid "Stop collection scan"
+msgstr "Dừng quét bộ sưu tập"
+
+msgid "Complete tags automatically..."
+msgstr "Tự động điền thẻ..."
+
+msgid "Ctrl+T"
+msgstr "Ctrl+T"
+
+msgid "Toggle scrobbling"
+msgstr "Bật/tắt scrobble"
+
+msgid "Remove &duplicates from playlist"
+msgstr "Xóa &trùng lặp khỏi danh sách phát"
+
+msgid "Remove &unavailable tracks from playlist"
+msgstr "Xóa bài &không khả dụng khỏi danh sách phát"
+
+msgid "Add file(s) to transcoder"
+msgstr "Thêm tệp vào bộ chuyển mã"
+
+msgid "Add file to transcoder"
+msgstr "Thêm tệp vào bộ chuyển mã"
+
+msgid "Add stream..."
+msgstr "Thêm luồng..."
+
+msgid "Show sidebar"
+msgstr "Hiển thị thanh bên"
+
+msgid "Queue"
+msgstr "Hàng đợi"
+
+msgid "Playlists"
+msgstr "Danh sách phát"
+
+msgid "Smart playlists"
+msgstr "Danh sách phát thông minh"
+
+msgid "Radios"
+msgstr "Radio"
+
+msgid "Devices"
+msgstr "Thiết bị"
+
+msgid "Subsonic"
+msgstr "Subsonic"
+
+msgid "Tidal"
+msgstr "Tidal"
+
+msgid "Spotify"
+msgstr "Spotify"
+
+msgid "Qobuz"
+msgstr "Qobuz"
+
+msgid "Show all songs"
+msgstr "Hiển thị tất cả bài hát"
+
+msgid "Show only duplicates"
+msgstr "Chỉ hiển thị bài trùng"
+
+msgid "Show only untagged"
+msgstr "Chỉ hiển thị bài chưa có thẻ"
+
+msgid "Configure collection..."
+msgstr "Cấu hình bộ sưu tập..."
+
+msgid "Toggle queue status"
+msgstr "Bật/tắt trạng thái hàng đợi"
+
+msgid "Queue selected tracks to play next"
+msgstr "Xếp bài đã chọn để phát tiếp theo"
+
+msgid "Toggle skip status"
+msgstr "Bật/tắt trạng thái bỏ qua"
+
+msgid "Rescan song(s)..."
+msgstr "Quét lại bài hát..."
+
+msgid "Fetch metadata from service"
+msgstr "Fetch metadata from service"
+
+msgid "Copy URL(s)..."
+msgstr "Sao chép URL..."
+
+msgid "Show in collection..."
+msgstr "Hiển thị trong bộ sưu tập..."
+
+msgid "Check for updates..."
+msgstr "Kiểm tra cập nhật..."
+
+msgid "Strawberry running under Rosetta"
+msgstr "Strawberry đang chạy dưới Rosetta"
+
+msgid "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+msgstr "Bạn đang chạy Strawberry dưới Rosetta. Việc chạy Strawberry dưới Rosetta không được hỗ trợ và đã biết có vấn đề. Bạn nên tải Strawberry cho kiến trúc CPU phù hợp từ %1"
+
+msgid "Sponsoring Strawberry"
+msgstr "Tài trợ cho Strawberry"
+
+msgid "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+msgstr "Strawberry là phần mềm miễn phí và mã nguồn mở. Nếu bạn thích Strawberry, vui lòng cân nhắc tài trợ cho dự án. Xem thêm về tài trợ trên trang web của chúng tôi %1"
+
+msgid "Dequeue track"
+msgstr "Bỏ khỏi hàng đợi"
+
+msgid "Dequeue selected tracks"
+msgstr "Bỏ các bài đã chọn khỏi hàng đợi"
+
+msgid "Queue selected tracks"
+msgstr "Thêm các bài đã chọn vào hàng đợi"
+
+msgid "Unskip track"
+msgstr "Bỏ trạng thái bỏ qua"
+
+msgid "Unskip selected tracks"
+msgstr "Bỏ trạng thái bỏ qua cho các bài đã chọn"
+
+msgid "Skip track"
+msgstr "Bỏ qua bài"
+
+msgid "Skip selected tracks"
+msgstr "Bỏ qua các bài đã chọn"
+
+msgid "Set %1 to \"%2\"..."
+msgstr "Đặt %1 thành \"%2\"..."
+
+msgid "Edit tag \"%1\"..."
+msgstr "Sửa thẻ \"%1\"..."
+
+msgid "Add to another playlist"
+msgstr "Thêm vào danh sách phát khác"
+
+msgid "New playlist"
+msgstr "Danh sách phát mới"
+
+msgid "Add file"
+msgstr "Thêm tệp"
+
+msgid "Music"
+msgstr "Nhạc"
+
+msgid "Add folder"
+msgstr "Thêm thư mục"
+
+msgid "Playlist has %1 songs, too large to undo, are you sure you want to clear the playlist?"
+msgstr "Danh sách phát có %1 bài hát, quá lớn để hoàn tác. Bạn có chắc muốn xóa danh sách phát?"
+
+msgid "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:"
+msgstr "Phiên bản Strawberry vừa cập nhật yêu cầu quét lại toàn bộ bộ sưu tập vì các tính năng mới dưới đây:"
+
+msgid "Would you like to run a full rescan right now?"
+msgstr "Bạn có muốn chạy quét lại toàn bộ ngay bây giờ không?"
+
+msgid "Collection rescan notice"
+msgstr "Thông báo quét lại bộ sưu tập"
+
+msgid "Ctrl+Shift+H"
+msgstr "Ctrl+Shift+H"
+
+msgid "Go to last playlist tab"
+msgstr "Go to last playlist tab"
+
+msgid "Go to active playlist tab"
+msgstr "Go to active playlist tab"
+
+msgid "Close current playlist tab"
+msgstr "Close current playlist tab"
+
+msgid "Message Dialog"
+msgstr "Hộp thoại Thông báo"
+
+msgid "Do not show this message again."
+msgstr "Không hiển thị thông báo này nữa."
+
+msgid "Playlist"
+msgstr "Danh sách phát"
+
+msgid "Moodbar"
+msgstr "Thanh tâm trạng"
+
+msgid "Moodbar style"
+msgstr "Kiểu thanh tâm trạng"
+
+msgid "Save the .mood files directly in the songs folders"
+msgstr "Lưu các tệp .mood trực tiếp trong thư mục bài hát"
+
+msgid "Invalid MTP device: %1"
+msgstr "Thiết bị MTP không hợp lệ: %1"
+
+msgid "Could not open MTP device."
+msgstr "Không thể mở thiết bị MTP."
+
+msgid "MTP error: %1"
+msgstr "Lỗi MTP: %1"
+
+msgid "MTP device not found."
+msgstr "Không tìm thấy thiết bị MTP."
+
+msgid "Loading MTP device"
+msgstr "Đang tải thiết bị MTP"
+
+msgid "Error connecting MTP device %1"
+msgstr "Lỗi kết nối thiết bị MTP %1"
+
+msgid "Error connecting MTP device %1: %2"
+msgstr "Lỗi kết nối thiết bị MTP %1: %2"
+
+msgid "Network Proxy"
+msgstr "Proxy mạng"
+
+msgid "&Use the system proxy settings"
+msgstr "&Dùng cài đặt proxy của hệ thống"
+
+msgid "Direct internet connection"
+msgstr "Kết nối Internet trực tiếp"
+
+msgid "&Manual proxy configuration"
+msgstr "Cấu hình proxy &thủ công"
+
+msgid "HTTP proxy"
+msgstr "Proxy HTTP"
+
+msgid "SOCKS proxy"
+msgstr "Proxy SOCKS"
+
+msgid "Port"
+msgstr "Cổng"
+
+msgid "Use authentication"
+msgstr "Dùng xác thực"
+
+msgid "Username"
+msgstr "Tên người dùng"
+
+msgid "Password"
+msgstr "Mật khẩu"
+
+msgid "Use proxy settings for streaming"
+msgstr "Dùng cài đặt proxy cho phát trực tuyến"
+
+msgid "Only HTTP proxy is supported for streaming."
+msgstr "Only HTTP proxy is supported for streaming."
+
+msgid "Notifications"
+msgstr "Thông báo"
+
+msgid "Strawberry can show a message when the track changes."
+msgstr "Strawberry có thể hiển thị thông báo khi bài hát thay đổi."
+
+msgid "Notification type"
+msgstr "Loại thông báo"
+
+#. Refers to a disabled notification type in Notification settings.
+msgid "Disabled"
+msgstr "Tắt"
+
+msgid "Show a &native desktop notification"
+msgstr "Hiển thị thông báo &gốc của hệ điều hành"
+
+msgid "Show a pretty OSD"
+msgstr "Hiển thị OSD đẹp"
+
+msgid "Show a popup fro&m the system tray"
+msgstr "Hiển thị cửa sổ bật lên từ &khay hệ thống"
+
+msgid "General settings"
+msgstr "Thiết lập chung"
+
+msgid "Popup duration"
+msgstr "Thời lượng thông báo"
+
+msgid " seconds"
+msgstr " giây"
+
+msgid "Disable duration"
+msgstr "Thời lượng tắt"
+
+msgid "Show a notification when I change the volume"
+msgstr "Hiển thị thông báo khi tôi thay đổi âm lượng"
+
+msgid "Show a notification when I change the repeat/shuffle mode"
+msgstr "Hiển thị thông báo khi tôi đổi chế độ lặp/trộn"
+
+msgid "Show a notification when I pause playback"
+msgstr "Hiển thị thông báo khi tôi tạm dừng phát"
+
+msgid "Show a notification when I resume playback"
+msgstr "Hiển thị thông báo khi tôi tiếp tục phát"
+
+msgid "Include album art in the notification"
+msgstr "Bao gồm ảnh bìa album trong thông báo"
+
+msgid "Custom message settings"
+msgstr "Thiết lập thông điệp tùy chỉnh"
+
+msgid "Use a custom message for notifications"
+msgstr "Dùng thông điệp tùy chỉnh cho thông báo"
+
+msgid "Body"
+msgstr "Nội dung"
+
+msgid "Pretty OSD options"
+msgstr "Tùy chọn OSD đẹp"
+
+msgid "Background color"
+msgstr "Màu nền"
+
+msgid "Text options"
+msgstr "Tùy chọn văn bản"
+
+msgid "Choose font..."
+msgstr "Chọn phông chữ..."
+
+msgid "Choose color..."
+msgstr "Chọn màu..."
+
+msgid "Background opacity"
+msgstr "Độ mờ nền"
+
+msgid "Basic Blue"
+msgstr "Xanh cơ bản"
+
+msgid "Strawberry Red"
+msgstr "Đỏ Strawberry"
+
+msgid "Custom..."
+msgstr "Tùy chỉnh..."
+
+msgid "Enable fading"
+msgstr "Bật hiệu ứng mờ dần"
+
+msgid "%originalyear%"
+msgstr "%originalyear%"
+
+msgid "OSD Preview"
+msgstr "Xem trước OSD"
+
+msgid "Drag to reposition"
+msgstr "Kéo để thay đổi vị trí"
+
+msgid "Discord"
+msgstr "Discord"
+
+msgid "Enable Rich Presence"
+msgstr "Enable Rich Presence"
+
+msgid "\"Listening to...\""
+msgstr "\"Listening to...\""
+
+msgid "Strawberry"
+msgstr "Strawberry"
+
+msgid "Artist name"
+msgstr "Artist name"
+
+msgid "Song title"
+msgstr "Song title"
+
+msgid "Please open this URL in your browser"
+msgstr "Please open this URL in your browser"
+
+msgid "Received invalid reply from web browser."
+msgstr "Received invalid reply from web browser."
+
+msgid "Redirect URL is missing query."
+msgstr "Redirect URL is missing query."
+
+msgid "Request URL is missing code!"
+msgstr "Request URL is missing code!"
+
+msgid "Request URL is missing state!"
+msgstr "Request URL is missing state!"
+
+msgid "Request URL has wrong state %1 != %2"
+msgstr "Request URL has wrong state %1 != %2"
+
+msgid "disc %1"
+msgstr "đĩa %1"
+
+msgid "track %1"
+msgstr "bài %1"
+
+msgid "Paused"
+msgstr "Tạm dừng"
+
+msgid "Stopped"
+msgstr "Đã dừng"
+
+msgid "Stop playing after track: %1"
+msgstr "Dừng phát sau bài: %1"
+
+msgid "On"
+msgstr "Bật"
+
+msgid "Off"
+msgstr "Tắt"
+
+msgid "Playlist finished"
+msgstr "Danh sách phát đã hoàn tất"
+
+msgid "Volume %1%"
+msgstr "Âm lượng %1%"
+
+msgid "Don't shuffle"
+msgstr "Không trộn ngẫu nhiên"
+
+msgid "Shuffle all"
+msgstr "Trộn ngẫu nhiên tất cả"
+
+msgid "Shuffle tracks in this album"
+msgstr "Trộn ngẫu nhiên các bài trong album này"
+
+msgid "Shuffle albums"
+msgstr "Trộn ngẫu nhiên album"
+
+msgid "Shuffle grouping"
+msgstr "Trộn ngẫu nhiên nâng cao"
+
+msgid "Don't repeat"
+msgstr "Không lặp lại"
+
+msgid "Repeat track"
+msgstr "Lặp lại bài"
+
+msgid "Repeat album"
+msgstr "Lặp lại album"
+
+msgid "Repeat playlist"
+msgstr "Lặp lại danh sách phát"
+
+msgid "Stop after every track"
+msgstr "Dừng sau mỗi bài"
+
+msgid "Intro tracks"
+msgstr "Phát đoạn mở đầu"
+
+msgid "Organizing files"
+msgstr "Đang tổ chức tệp"
+
+msgid "Organize Files"
+msgstr "Tổ chức Tệp"
+
+msgid "Destination"
+msgstr "Đích đến"
+
+msgid "After copying..."
+msgstr "Sau khi sao chép..."
+
+msgid "Keep the original files"
+msgstr "Giữ nguyên các tệp gốc"
+
+msgid "Delete the original files"
+msgstr "Xóa các tệp gốc"
+
+msgid "Naming options"
+msgstr "Tùy chọn đặt tên"
+
+msgid "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+msgstr "<p>Token bắt đầu bằng %, ví dụ: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+
+msgid "Insert..."
+msgstr "Chèn..."
+
+msgid "Remove problematic characters from filenames"
+msgstr "Loại bỏ ký tự gây lỗi khỏi tên tệp"
+
+msgid "Restrict to characters allowed on FAT filesystems"
+msgstr "Giới hạn ký tự được phép trên hệ thống tập tin FAT"
+
+msgid "Restrict characters to ASCII"
+msgstr "Giới hạn ký tự trong ASCII"
+
+msgid "Allow extended ASCII characters"
+msgstr "Cho phép ký tự ASCII mở rộng"
+
+msgid "Replace spaces with underscores"
+msgstr "Thay khoảng trắng bằng gạch dưới"
+
+msgid "Overwrite existing files"
+msgstr "Ghi đè các tệp hiện có"
+
+msgid "Copy album cover artwork"
+msgstr "Sao chép ảnh bìa album"
+
+msgid "Safely remove the device after copying"
+msgstr "Ngắt thiết bị an toàn sau khi sao chép"
+
+msgid "Artist's initial"
+msgstr "Chữ cái đầu của nghệ sĩ"
+
+msgid "File extension"
+msgstr "Phần mở rộng tệp"
+
+msgid "Error copying songs"
+msgstr "Lỗi sao chép bài hát"
+
+msgid "There were problems copying some songs.  The following files could not be copied:"
+msgstr "Gặp vấn đề khi sao chép một số bài hát. Các tệp sau không thể sao chép:"
+
+msgid "Error deleting songs"
+msgstr "Lỗi xóa bài hát"
+
+msgid "There were problems deleting some songs.  The following files could not be deleted:"
+msgstr "Gặp vấn đề khi xóa một số bài hát. Các tệp sau không thể xóa:"
+
+msgid "Don't know how to handle %1"
+msgstr "Không biết xử lý %1 thế nào"
+
+msgid "File %1 does not exist"
+msgstr "File %1 does not exist"
+
+msgid "Could not read file %1: %2"
+msgstr "Could not read file %1: %2"
+
+msgid "Small album cover"
+msgstr "Ảnh bìa album nhỏ"
+
+msgid "Large album cover"
+msgstr "Ảnh bìa album lớn"
+
+msgid "Fit cover to width"
+msgstr "Căn ảnh bìa theo chiều rộng"
+
+msgid "Show above status bar"
+msgstr "Hiển thị phía trên thanh trạng thái"
+
+msgid "Title Sort"
+msgstr "Title Sort"
+
+msgid "Artist Sort"
+msgstr "Artist Sort"
+
+msgid "Album Sort"
+msgstr "Album Sort"
+
+msgid "Original Year"
+msgstr "Năm gốc"
+
+msgid "Album Artist"
+msgstr "Nghệ sĩ album"
+
+msgid "Album Artist Sort"
+msgstr "Album Artist Sort"
+
+msgid "Composer Sort"
+msgstr "Composer Sort"
+
+msgid "Performer Sort"
+msgstr "Performer Sort"
+
+msgid "Play Count"
+msgstr "Số lần phát"
+
+msgid "Skip Count"
+msgstr "Số lần bỏ qua"
+
+msgid "Last Played"
+msgstr "Phát lần cuối"
+
+msgid "Sample Rate"
+msgstr "Tần số mẫu"
+
+msgid "Bit Depth"
+msgstr "Độ sâu bit"
+
+msgid "Initial key"
+msgstr "Initial key"
+
+msgid "File Name (without path)"
+msgstr "Tên tệp (không kèm đường dẫn)"
+
+msgid "File Size"
+msgstr "Kích thước tệp"
+
+msgid "File Type"
+msgstr "Loại tệp"
+
+msgid "Date Modified"
+msgstr "Ngày sửa đổi"
+
+msgid "Date Created"
+msgstr "Ngày tạo"
+
+msgid "Source"
+msgstr "Nguồn"
+
+msgid "BPM"
+msgstr "BPM"
+
+msgid "Mood"
+msgstr "Tâm trạng"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "CUE"
+msgstr "CUE"
+
+msgid "Integrated Loudness"
+msgstr "Độ lớn tích hợp"
+
+msgid "Loudness Range"
+msgstr "Dải độ lớn"
+
+msgid "Undo"
+msgstr "Hoàn tác"
+
+msgid "Redo"
+msgstr "Làm lại"
+
+msgid "Load playlist"
+msgstr "Tải danh sách phát"
+
+msgid "No matches found.  Clear the search box to show the whole playlist again."
+msgstr "Không tìm thấy kết quả. Xóa ô tìm kiếm để hiển thị lại toàn bộ danh sách phát."
+
+msgid "stop"
+msgstr "dừng"
+
+msgid "Loading smart playlist"
+msgstr "Đang tải danh sách phát thông minh"
+
+msgid "&Hide..."
+msgstr "&Ẩn..."
+
+msgid "&Stretch columns to fit window"
+msgstr "&Kéo giãn cột vừa cửa sổ"
+
+msgid "&Reset columns to default"
+msgstr "&Đặt cột về mặc định"
+
+msgid "&Lock rating"
+msgstr "&Khóa điểm đánh giá"
+
+msgid "&Align text"
+msgstr "&Căn chỉnh văn bản"
+
+msgid "&Left"
+msgstr "&Trái"
+
+msgid "&Center"
+msgstr "&Giữa"
+
+msgid "&Right"
+msgstr "&Phải"
+
+msgid "&Hide %1"
+msgstr "&Ẩn %1"
+
+msgid "New folder"
+msgstr "Thư mục mới"
+
+msgid "Delete"
+msgstr "Xóa"
+
+#. Save playlist menu action.
+msgid "Save playlist"
+msgstr "Lưu danh sách phát"
+
+msgid "Enter the name of the folder"
+msgstr "Nhập tên thư mục"
+
+msgid "Copy songs to playlist"
+msgstr "Copy songs to playlist"
+
+msgid "Copy to device"
+msgstr "Sao chép vào thiết bị"
+
+msgid "Playlist must be open first."
+msgstr "Cần mở danh sách phát trước."
+
+msgid "Remove playlists"
+msgstr "Xóa danh sách phát"
+
+msgid "You are about to remove %1 playlists from your favorites, are you sure?"
+msgstr "Bạn sắp xóa %1 danh sách phát khỏi mục yêu thích, bạn có chắc không?"
+
+msgid "You can favorite playlists by clicking the star icon next to a playlist name"
+msgstr "Bạn có thể đánh dấu yêu thích danh sách phát bằng cách nhấp biểu tượng ngôi sao bên cạnh tên danh sách phát"
+
+msgid "Favorited playlists will be saved here"
+msgstr "Danh sách phát được yêu thích sẽ được lưu ở đây"
+
+msgid "Couldn't create playlist"
+msgstr "Không thể tạo danh sách phát"
+
+msgid "Unknown playlist extension"
+msgstr "Phần mở rộng danh sách phát không xác định"
+
+msgid "Unknown file extension for playlist."
+msgstr "Phần mở rộng tệp cho danh sách phát không xác định."
+
+msgid "%1 selected of"
+msgstr "Đã chọn %1 trong"
+
+msgid "%n track(s)"
+msgid_plural "%n track(s)"
+msgstr[0] "%n bài"
+
+msgid "All playlists (%1)"
+msgstr "Tất cả danh sách phát (%1)"
+
+msgid "%1 playlists (%2)"
+msgstr "%1 danh sách phát (%2)"
+
+msgid "Unknown filetype: %1"
+msgstr "Kiểu tệp không xác định: %1"
+
+msgid "Could not open file %1"
+msgstr "Không thể mở tệp %1"
+
+msgid "Directory %1 does not exist."
+msgstr "Thư mục %1 không tồn tại."
+
+msgid "Failed to open %1 for writing."
+msgstr "Mở %1 để ghi thất bại."
+
+msgid "Playlist options"
+msgstr "Tùy chọn danh sách phát"
+
+msgid "File paths"
+msgstr "Đường dẫn tệp"
+
+msgid "This can be changed later through the preferences"
+msgstr "Có thể thay đổi sau trong phần tùy chọn"
+
+msgid "Remember my choice"
+msgstr "Ghi nhớ lựa chọn của tôi"
+
+msgid "Automatic"
+msgstr "Tự động"
+
+msgid "Relative"
+msgstr "Tương đối"
+
+msgid "Absolute"
+msgstr "Tuyệt đối"
+
+msgid "Repeat"
+msgstr "Lặp lại"
+
+msgid "Shuffle"
+msgstr "Trộn ngẫu nhiên"
+
+msgid "Stop after each track"
+msgstr "Dừng sau mỗi bài"
+
+msgid "Use alternating row colors"
+msgstr "Dùng màu xen kẽ theo hàng"
+
+msgid "Show bars on the currently playing track"
+msgstr "Hiển thị thanh trên bài đang phát"
+
+msgid "Show a glowing animation on the currently playing track"
+msgstr "Hiển thị hiệu ứng phát sáng trên bài đang phát"
+
+msgid "Warn me when closing a playlist tab"
+msgstr "Cảnh báo khi đóng thẻ danh sách phát"
+
+msgid "Continue to the next item in the playlist if a song is unavailable"
+msgstr "Tiếp tục sang mục tiếp theo trong danh sách phát nếu bài không khả dụng"
+
+msgid "Grey out unavailable songs in playlists on playback"
+msgstr "Làm mờ các bài không khả dụng trong danh sách khi phát"
+
+msgid "Grey out unavailable songs in playlists on startup"
+msgstr "Làm mờ các bài không khả dụng trong danh sách khi khởi động"
+
+msgid "Automatically select current playing track"
+msgstr "Tự động chọn bài đang phát"
+
+msgid "Enable playlist toolbar"
+msgstr "Bật thanh công cụ danh sách phát"
+
+msgid "Enable playlist clear button"
+msgstr "Bật nút xóa danh sách phát"
+
+msgid "Automatically sort playlist when inserting songs"
+msgstr "Tự động sắp xếp danh sách khi chèn bài hát"
+
+msgid "When saving a playlist, file paths should be"
+msgstr "Khi lưu danh sách phát, đường dẫn tệp nên là"
+
+msgid "A&utomatic"
+msgstr "&Tự động"
+
+msgid "Absolu&te"
+msgstr "&Tuyệt đối"
+
+msgid "Re&lative"
+msgstr "&Tương đối"
+
+msgid "As&k when saving"
+msgstr "&Hỏi khi lưu"
+
+msgid "Metadata"
+msgstr "Siêu dữ liệu"
+
+msgid "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+msgstr "Nếu bật, nhấp vào bài đã chọn trong khung danh sách phát sẽ cho phép bạn chỉnh sửa trực tiếp giá trị thẻ"
+
+msgid "Enable song metadata inline edition with click"
+msgstr "Bật chỉnh sửa siêu dữ liệu bài hát trực tiếp bằng nhấp chuột"
+
+msgid "Write metadata when saving playlists"
+msgstr "Ghi siêu dữ liệu khi lưu danh sách phát"
+
+msgid "Star playlist"
+msgstr "Đánh dấu yêu thích danh sách phát"
+
+msgid "Close playlist"
+msgstr "Đóng danh sách phát"
+
+msgid "Rename playlist..."
+msgstr "Đổi tên danh sách phát..."
+
+msgid "Save playlist..."
+msgstr "Lưu danh sách phát..."
+
+msgid "Rename playlist"
+msgstr "Đổi tên danh sách phát"
+
+msgid "Enter a new name for this playlist"
+msgstr "Nhập tên mới cho danh sách phát này"
+
+msgid "Remove playlist"
+msgstr "Xóa danh sách phát"
+
+msgid "You are about to remove a playlist which is not part of your favorite playlists: the playlist will be deleted (this action cannot be undone). \nAre you sure you want to continue?"
+msgstr "Bạn sắp xóa danh sách phát không thuộc danh sách phát yêu thích của bạn: danh sách phát sẽ bị xóa (hành động này không thể hoàn tác). \nBạn có chắc chắn muốn tiếp tục không?"
+
+msgid "This option can be changed in the \"Behavior\" preferences"
+msgstr "Tùy chọn này có thể thay đổi trong phần Tùy chọn \"Hành vi\""
+
+msgid "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+msgstr "Nhấp đúp vào đây để đánh dấu yêu thích danh sách phát này để được lưu và truy cập từ bảng \"Danh sách phát\" ở thanh bên trái"
+
+msgid "Hz"
+msgstr "Hz"
+
+msgid "Bit"
+msgstr "Bit"
+
+msgid "Usage"
+msgstr "Cách dùng"
+
+msgid "options"
+msgstr "tùy chọn"
+
+msgid "URL(s)"
+msgstr "URL"
+
+msgid "Player options"
+msgstr "Tùy chọn trình phát"
+
+msgid "Start the playlist currently playing"
+msgstr "Khởi động danh sách phát hiện đang phát"
+
+msgid "Play if stopped, pause if playing"
+msgstr "Phát nếu đang dừng, tạm dừng nếu đang phát"
+
+msgid "Pause playback"
+msgstr "Tạm dừng phát"
+
+msgid "Stop playback"
+msgstr "Dừng phát"
+
+msgid "Stop playback after current track"
+msgstr "Dừng phát sau bài hiện tại"
+
+msgid "Skip backwards in playlist"
+msgstr "Nhảy lùi trong danh sách phát"
+
+msgid "Skip forwards in playlist"
+msgstr "Nhảy tới trong danh sách phát"
+
+msgid "Set the volume to <value> percent"
+msgstr "Đặt âm lượng thành <value> phần trăm"
+
+msgid "Increase the volume by 4 percent"
+msgstr "Tăng âm lượng thêm 4 phần trăm"
+
+msgid "Decrease the volume by 4 percent"
+msgstr "Giảm âm lượng đi 4 phần trăm"
+
+msgid "Increase the volume by <value> percent"
+msgstr "Tăng âm lượng thêm <value> phần trăm"
+
+msgid "Decrease the volume by <value> percent"
+msgstr "Giảm âm lượng đi <value> phần trăm"
+
+msgid "Seek the currently playing track to an absolute position"
+msgstr "Tua bài đang phát tới vị trí tuyệt đối"
+
+msgid "Seek the currently playing track by a relative amount"
+msgstr "Tua bài đang phát theo khoảng tương đối"
+
+msgid "Restart the track, or play the previous track if within 8 seconds of start."
+msgstr "Phát lại bài, hoặc phát bài trước nếu trong vòng 8 giây từ lúc bắt đầu."
+
+msgid "Create a new playlist with files"
+msgstr "Tạo danh sách phát mới với các tệp"
+
+msgid "Append files/URLs to the playlist"
+msgstr "Thêm tệp/URL vào danh sách phát"
+
+msgid "Loads files/URLs, replacing current playlist"
+msgstr "Tải tệp/URL, thay thế danh sách phát hiện tại"
+
+msgid "Play the <n>th track in the playlist"
+msgstr "Phát bài thứ <n> trong danh sách phát"
+
+msgid "Play given playlist"
+msgstr "Phát danh sách phát chỉ định"
+
+msgid "Other options"
+msgstr "Tùy chọn khác"
+
+msgid "Display the on-screen-display"
+msgstr "Hiển thị OSD"
+
+msgid "Toggle visibility for the pretty on-screen-display"
+msgstr "Bật/tắt hiển thị OSD đẹp"
+
+msgid "Change the language"
+msgstr "Thay đổi ngôn ngữ"
+
+msgid "Resize the window"
+msgstr "Đổi kích thước cửa sổ"
+
+msgid "Equivalent to --log-levels *:1"
+msgstr "Tương đương với --log-levels *:1"
+
+msgid "Equivalent to --log-levels *:3"
+msgstr "Tương đương với --log-levels *:3"
+
+msgid "Comma separated list of class:level, level is 0-3"
+msgstr "Danh sách class:mức, phân tách bằng dấu phẩy; mức từ 0-3"
+
+msgid "Print out version information"
+msgstr "In thông tin phiên bản"
+
+msgid "Create fingerprint"
+msgstr "Create fingerprint"
+
+msgid "Failed to create directory %1."
+msgstr "Tạo thư mục %1 thất bại."
+
+msgid "Destination file %1 exists, but not allowed to overwrite."
+msgstr "Tệp đích %1 đã tồn tại, nhưng không được phép ghi đè."
+
+msgid "Destination file %1 exists, but not allowed to overwrite"
+msgstr "Tệp đích %1 đã tồn tại, nhưng không được phép ghi đè"
+
+msgid "Could not copy file %1 to %2."
+msgstr "Không thể sao chép tệp %1 tới %2."
+
+msgid "LUFS"
+msgstr "LUFS"
+
+msgid "LU"
+msgstr "LU"
+
+msgid "1 day"
+msgstr "1 ngày"
+
+msgid "%1 days"
+msgstr "%1 ngày"
+
+msgid "Today"
+msgstr "Hôm nay"
+
+msgid "Yesterday"
+msgstr "Hôm qua"
+
+msgid "%1 days ago"
+msgstr "%1 ngày trước"
+
+msgid "Tomorrow"
+msgstr "Ngày mai"
+
+msgid "In %1 days"
+msgstr "Sau %1 ngày"
+
+msgid "Next week"
+msgstr "Tuần tới"
+
+msgid "In %1 weeks"
+msgstr "Sau %1 tuần"
+
+msgid "Show in file browser"
+msgstr "Hiển thị trong trình duyệt tệp"
+
+msgid "Too many songs selected."
+msgstr "Chọn quá nhiều bài hát."
+
+msgid "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+msgstr "Đã chọn %1 bài hát trong %2 thư mục khác nhau, bạn có chắc muốn mở tất cả?"
+
+msgid "Failed to load image from data for %1"
+msgstr "Không thể tải ảnh từ dữ liệu cho %1"
+
+msgid "Success"
+msgstr "Thành công"
+
+msgid "File is unsupported"
+msgstr "Tệp không được hỗ trợ"
+
+msgid "Filename is missing"
+msgstr "Thiếu tên tệp"
+
+msgid "File does not exist"
+msgstr "Tệp không tồn tại"
+
+msgid "File could not be opened"
+msgstr "Không thể mở tệp"
+
+msgid "Could not parse file"
+msgstr "Không thể phân tích tệp"
+
+msgid "Could not save file"
+msgstr "Could not save file"
+
+msgid "Unknown error"
+msgstr "Lỗi không xác định"
+
+msgid "Prefix a search term with a field name to limit the search to that field, e.g.:"
+msgstr "Thêm tiền tố tên trường vào từ khóa để giới hạn tìm kiếm trong trường đó, ví dụ:"
+
+msgid "artist"
+msgstr "nghệ sĩ"
+
+msgid "searches for all artists containing the word %1."
+msgstr "tìm tất cả nghệ sĩ chứa từ %1."
+
+msgid "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+msgstr "Các từ khóa cho trường số có thể thêm tiền tố %1 hoặc %2 để lọc tìm kiếm, ví dụ: "
+
+msgid "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+msgstr "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+
+msgid "rating"
+msgstr "đánh giá"
+
+msgid "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+msgstr "Nhiều từ khóa cũng có thể kết hợp với \"%1\" (mặc định) và \"%2\", cũng như nhóm bằng dấu ngoặc."
+
+msgid "Available fields"
+msgstr "Trường khả dụng"
+
+msgid "after"
+msgstr "sau"
+
+msgid "before"
+msgstr "trước"
+
+msgid "on"
+msgstr "vào ngày"
+
+msgid "not on"
+msgstr "không vào ngày"
+
+msgid "in the last"
+msgstr "trong"
+
+msgid "not in the last"
+msgstr "không trong"
+
+msgid "between"
+msgstr "giữa"
+
+msgid "contains"
+msgstr "chứa"
+
+msgid "does not contain"
+msgstr "không chứa"
+
+msgid "starts with"
+msgstr "bắt đầu bằng"
+
+msgid "ends with"
+msgstr "kết thúc bằng"
+
+msgid "greater than"
+msgstr "lớn hơn"
+
+msgid "less than"
+msgstr "nhỏ hơn"
+
+msgid "equals"
+msgstr "bằng"
+
+msgid "not equals"
+msgstr "không bằng"
+
+msgid "empty"
+msgstr "trống"
+
+msgid "not empty"
+msgstr "không trống"
+
+msgid "A-Z"
+msgstr "A-Z"
+
+msgid "Z-A"
+msgstr "Z-A"
+
+msgid "oldest first"
+msgstr "cũ nhất trước"
+
+msgid "newest first"
+msgstr "mới nhất trước"
+
+msgid "shortest first"
+msgstr "ngắn nhất trước"
+
+msgid "longest first"
+msgstr "dài nhất trước"
+
+msgid "smallest first"
+msgstr "nhỏ nhất trước"
+
+msgid "biggest first"
+msgstr "lớn nhất trước"
+
+msgid "Hours"
+msgstr "Giờ"
+
+msgid "Days"
+msgstr "Ngày"
+
+msgid "Weeks"
+msgstr "Tuần"
+
+msgid "Months"
+msgstr "Tháng"
+
+msgid "Years"
+msgstr "Năm"
+
+msgid "Normal"
+msgstr "Bình thường"
+
+msgid "Angry"
+msgstr "Tức giận"
+
+msgid "Frozen"
+msgstr "Lạnh giá"
+
+msgid "Happy"
+msgstr "Vui vẻ"
+
+msgid "System colors"
+msgstr "Màu hệ thống"
+
+msgid "add %n songs"
+msgid_plural "add %n songs"
+msgstr[0] "thêm %n bài"
+
+msgid "remove %n songs"
+msgid_plural "remove %n songs"
+msgstr[0] "xóa %n bài"
+
+msgid "move %n songs"
+msgid_plural "move %n songs"
+msgstr[0] "di chuyển %n bài"
+
+msgid "sort songs"
+msgstr "sắp xếp bài hát"
+
+msgid "shuffle songs"
+msgstr "trộn ngẫu nhiên bài hát"
+
+msgid "Invalid collection directory"
+msgstr "Thư mục bộ sưu tập không hợp lệ"
+
+msgid "Can't add directory %1 with special filesystem %2 to collection"
+msgstr "Không thể thêm thư mục %1 với hệ thống tập tin đặc biệt %2 vào bộ sưu tập"
+
+msgid "Clear"
+msgstr "Xóa"
+
+msgid "Reset"
+msgstr "Đặt lại"
+
+msgid "Not authenticated"
+msgstr "Not authenticated"
+
+msgid "No track ID"
+msgstr "No track ID"
+
+msgid "Receiving artists..."
+msgstr "Đang nhận nghệ sĩ..."
+
+msgid "Receiving albums..."
+msgstr "Đang nhận album..."
+
+msgid "Receiving songs..."
+msgstr "Đang nhận bài hát..."
+
+msgid "Searching..."
+msgstr "Đang tìm kiếm..."
+
+msgid "Receiving albums for %1 artist..."
+msgstr "Đang nhận album cho %1 nghệ sĩ..."
+
+msgid "Receiving albums for %1 artists..."
+msgstr "Đang nhận album cho %1 nghệ sĩ..."
+
+msgid "Receiving songs for %1 album..."
+msgstr "Đang nhận bài hát cho %1 album..."
+
+msgid "Receiving songs for %1 albums..."
+msgstr "Đang nhận bài hát cho %1 album..."
+
+msgid "Receiving album cover for %1 album..."
+msgstr "Đang nhận ảnh bìa cho %1 album..."
+
+msgid "Receiving album covers for %1 albums..."
+msgstr "Đang nhận ảnh bìa cho %1 album..."
+
+msgid "No match."
+msgstr "Không khớp."
+
+msgid "Missing Qobuz app ID."
+msgstr "Thiếu ID ứng dụng Qobuz."
+
+msgid "Missing app ID. Please fetch credentials first."
+msgstr "Missing app ID. Please fetch credentials first."
+
+msgid "Missing app secret. Please fetch credentials first."
+msgstr "Missing app secret. Please fetch credentials first."
+
+msgid "Missing private key. Please fetch credentials first."
+msgstr "Missing private key. Please fetch credentials first."
+
+msgid "Failed to start local server for OAuth redirect: %1"
+msgstr "Failed to start local server for OAuth redirect: %1"
+
+msgid "Failed to open the web browser. Please open this URL manually: %1"
+msgstr "Failed to open the web browser. Please open this URL manually: %1"
+
+msgid "Waiting for browser authentication..."
+msgstr "Waiting for browser authentication..."
+
+msgid "OAuth redirect failed: %1"
+msgstr "OAuth redirect failed: %1"
+
+msgid "OAuth redirect is missing authorization code."
+msgstr "OAuth redirect is missing authorization code."
+
+msgid "Exchanging authorization code..."
+msgstr "Exchanging authorization code..."
+
+msgid "Not authenticated with Qobuz."
+msgstr "Chưa xác thực với Qobuz."
+
+msgid "Missing Qobuz app ID or secret."
+msgstr "Thiếu ID ứng dụng hoặc mã bí mật Qobuz."
+
+msgid "Not authenticated. Please login to Qobuz in the settings."
+msgstr "Not authenticated. Please login to Qobuz in the settings."
+
+msgid "Enable"
+msgstr "Bật"
+
+msgid "App ID"
+msgstr "ID ứng dụng"
+
+msgid "App Secret"
+msgstr "Mã bí mật ứng dụng"
+
+msgid "Preferences"
+msgstr "Tùy chọn"
+
+msgid "Audio format"
+msgstr "Định dạng âm thanh"
+
+msgid "Search delay"
+msgstr "Độ trễ tìm kiếm"
+
+msgid "ms"
+msgstr "ms"
+
+msgid "Artists search limit"
+msgstr "Giới hạn tìm kiếm nghệ sĩ"
+
+msgid "Albums search limit"
+msgstr "Giới hạn tìm kiếm album"
+
+msgid "Songs search limit"
+msgstr "Giới hạn tìm kiếm bài hát"
+
+msgid "Download album covers"
+msgstr "Tải ảnh bìa album"
+
+msgid "Configuration incomplete"
+msgstr "Cấu hình chưa hoàn chỉnh"
+
+msgid "Missing app id. Please fetch credentials first."
+msgstr "Missing app id. Please fetch credentials first."
+
+msgid "Fetching..."
+msgstr "Fetching..."
+
+msgid "Credentials fetched"
+msgstr "Credentials fetched"
+
+msgid "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+msgstr "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+
+msgid "Credential fetch failed"
+msgstr "Credential fetch failed"
+
+msgid "Fetch Credentials"
+msgstr "Fetch Credentials"
+
+msgid "Remove (Remastered), etc from song titles"
+msgstr "Remove (Remastered), etc from song titles"
+
+msgid "Private key"
+msgstr "Private key"
+
+msgid "Automatically fetch app ID, app secret and private key from Qobuz web player"
+msgstr "Automatically fetch app ID, app secret and private key from Qobuz web player"
+
+msgid "Not authenticated. Please log in on the Qobuz settings page."
+msgstr "Not authenticated. Please log in on the Qobuz settings page."
+
+msgid "Cancelled."
+msgstr "Đã hủy."
+
+msgid "QueueView"
+msgstr "QueueView"
+
+msgid "Ctrl+Up"
+msgstr "Ctrl+Up"
+
+msgid "Ctrl+Down"
+msgstr "Ctrl+Down"
+
+msgid "Remove"
+msgstr "Xóa"
+
+msgid "Country"
+msgstr "Country"
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "Load more..."
+msgstr "Load more..."
+
+msgid "Search for radio stations using radio-browser.info"
+msgstr "Search for radio stations using radio-browser.info"
+
+msgid "Search radio stations..."
+msgstr "Search radio stations..."
+
+msgid "All countries"
+msgstr "All countries"
+
+msgid "By votes"
+msgstr "By votes"
+
+msgid "By clicks"
+msgstr "By clicks"
+
+msgid "By name"
+msgstr "By name"
+
+msgid "By bitrate"
+msgstr "By bitrate"
+
+msgid "No stations found."
+msgstr "No stations found."
+
+msgid "%1 stations found"
+msgstr "%1 stations found"
+
+msgid "No Radio Browser server available."
+msgstr "No Radio Browser server available."
+
+msgid "Searching Radio Browser"
+msgstr "Searching Radio Browser"
+
+msgid "Radio Browser search failed: %1"
+msgstr "Radio Browser search failed: %1"
+
+msgid "Getting %1 channels"
+msgstr "Đang lấy %1 kênh"
+
+msgid "SomaFM"
+msgstr "SomaFM"
+
+msgid "Stream quality:"
+msgstr "Stream quality:"
+
+msgid "Radio Browser"
+msgstr "Radio Browser"
+
+msgid "Search results limit:"
+msgstr "Search results limit:"
+
+msgid "Hide broken stations"
+msgstr "Hide broken stations"
+
+msgid "Default sort order:"
+msgstr "Default sort order:"
+
+msgid "Default country:"
+msgstr "Default country:"
+
+msgid "Highest"
+msgstr "Highest"
+
+msgid "High"
+msgstr "High"
+
+msgid "Low"
+msgstr "Low"
+
+msgid "Open homepage"
+msgstr "Mở trang chủ"
+
+msgid "Donate"
+msgstr "Quyên góp"
+
+msgid "Refresh channels"
+msgstr "Làm mới kênh"
+
+msgid "Channels"
+msgstr "Channels"
+
+msgid "Select directory for saving playlists"
+msgstr "Chọn thư mục để lưu danh sách phát"
+
+msgid "Type"
+msgstr "Loại"
+
+msgid "Select directory for the playlists"
+msgstr "Chọn thư mục cho danh sách phát"
+
+msgid "Directory does not exist."
+msgstr "Thư mục không tồn tại."
+
+msgid "Saved Grouping Manager"
+msgstr "Trình quản lý nhóm đã lưu"
+
+msgid "Second Level"
+msgstr "Cấp hai"
+
+msgid "Third Level"
+msgstr "Cấp ba"
+
+msgid "Scrobbler"
+msgstr "Scrobbler"
+
+msgid "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+msgstr "Các bài sẽ được scrobble nếu có siêu dữ liệu hợp lệ và dài hơn 30 giây, đã phát ít nhất một nửa thời lượng hoặc 4 phút (cái nào xảy ra trước)."
+
+msgid "Show scrobble button"
+msgstr "Hiển thị nút scrobble"
+
+msgid "Show love button"
+msgstr "Hiển thị nút yêu thích"
+
+msgid "Submit scrobbles every"
+msgstr "Gửi scrobble mỗi"
+
+msgid "Prefer album artist when sending scrobbles"
+msgstr "Ưu tiên nghệ sĩ album khi gửi scrobble"
+
+msgid "Show dialog for errors"
+msgstr "Hiển thị hộp thoại khi lỗi"
+
+msgid "Strip \"remastered\" and similar from album and title"
+msgstr "Loại bỏ \"remastered\" và tương tự khỏi album và tiêu đề"
+
+msgid "Enable scrobbling for the following sources:"
+msgstr "Bật scrobble cho các nguồn sau:"
+
+msgid "Local file"
+msgstr "Tệp cục bộ"
+
+msgid "CDDA"
+msgstr "CDDA"
+
+msgid "Stream"
+msgstr "Luồng"
+
+msgid "Radio Paradise"
+msgstr "Radio Paradise"
+
+msgid "Last.fm"
+msgstr "Last.fm"
+
+msgid "Listenbrainz"
+msgstr "ListenBrainz"
+
+msgid "User token:"
+msgstr "Mã token người dùng:"
+
+msgid "Enter your user token from"
+msgstr "Nhập mã token người dùng từ"
+
+msgid "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+msgstr "Khi bật tùy chọn này, scrobble sẽ được lưu tạm vào ổ đĩa nhưng không gửi tới máy chủ. Dùng khi máy chủ hoặc kết nối Internet không ổn định; scrobble sẽ được gửi khi tắt tùy chọn."
+
+msgid "Offline mode (Only cache scrobbles)"
+msgstr "Chế độ ngoại tuyến (Chỉ lưu tạm scrobble)"
+
+msgid "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+msgstr "Đây là độ trễ giữa lúc một bài được scrobble và lúc scrobble được gửi lên máy chủ. Đặt thời gian thành 0 giây sẽ gửi ngay lập tức."
+
+msgid "Settings"
+msgstr "Cài đặt"
+
+msgid "General"
+msgstr "Chung"
+
+msgid "User interface"
+msgstr "Giao diện người dùng"
+
+msgid "Streaming"
+msgstr "Phát trực tuyến"
+
+msgid "Search mode"
+msgstr "Chế độ tìm kiếm"
+
+msgid "Match every search term (AND)"
+msgstr "Khớp mọi từ khóa (AND)"
+
+msgid "Match one or more search terms (OR)"
+msgstr "Khớp một hoặc nhiều từ khóa (OR)"
+
+msgid "Include all songs"
+msgstr "Bao gồm tất cả bài hát"
+
+msgid "Search terms"
+msgstr "Từ khóa tìm kiếm"
+
+msgid "Sorting"
+msgstr "Sắp xếp"
+
+msgid "Put songs in a random order"
+msgstr "Sắp xếp bài hát theo thứ tự ngẫu nhiên"
+
+msgid "Sort songs by"
+msgstr "Sắp xếp bài hát theo"
+
+msgid "Limits"
+msgstr "Giới hạn"
+
+msgid "Show all the songs"
+msgstr "Hiển thị tất cả bài hát"
+
+msgid "Only show the first"
+msgstr "Chỉ hiển thị các bài đầu tiên"
+
+msgid " songs"
+msgstr " bài hát"
+
+msgid "Collection search"
+msgstr "Tìm trong bộ sưu tập"
+
+msgid "Find songs in your collection that match the criteria you specify."
+msgstr "Tìm các bài trong bộ sưu tập của bạn khớp tiêu chí bạn chỉ định."
+
+msgid "A song will be included in the playlist if it matches these conditions."
+msgstr "Một bài sẽ được đưa vào danh sách phát nếu khớp các điều kiện này."
+
+msgid "Search options"
+msgstr "Tùy chọn tìm kiếm"
+
+msgid "Choose how the playlist is sorted and how many songs it will contain."
+msgstr "Chọn cách sắp xếp danh sách phát và số bài sẽ chứa."
+
+msgid "%1 songs found (showing %2)"
+msgstr "Tìm thấy %1 bài hát (hiển thị %2)"
+
+msgid "%1 songs found"
+msgstr "Tìm thấy %1 bài hát"
+
+msgid "and"
+msgstr "và"
+
+msgid "ago"
+msgstr "trước"
+
+msgid "The second value must be greater than the first one!"
+msgstr "Giá trị thứ hai phải lớn hơn giá trị thứ nhất!"
+
+msgid "Add search term"
+msgstr "Thêm từ khóa tìm kiếm"
+
+msgid "Smart playlist"
+msgstr "Danh sách phát thông minh"
+
+msgid "Playlist type"
+msgstr "Loại danh sách phát"
+
+msgid "A smart playlist is a dynamic list of songs that come from your collection.  There are different types of smart playlist that offer different ways of selecting songs."
+msgstr "Danh sách phát thông minh là danh sách bài động đến từ bộ sưu tập của bạn. Có các loại danh sách phát thông minh khác nhau cung cấp các cách chọn bài khác nhau."
+
+msgid "Finish"
+msgstr "Hoàn tất"
+
+msgid "Choose a name for your smart playlist"
+msgstr "Chọn tên cho danh sách phát thông minh của bạn"
+
+msgid "Use dynamic mode"
+msgstr "Dùng chế độ động"
+
+msgid "In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes."
+msgstr "Ở chế độ động, bài mới sẽ được chọn và thêm vào danh sách mỗi khi một bài kết thúc."
+
+msgid "Newest tracks"
+msgstr "Bài mới nhất"
+
+msgid "50 random tracks"
+msgstr "50 bài ngẫu nhiên"
+
+msgid "Ever played"
+msgstr "Đã từng phát"
+
+msgid "Never played"
+msgstr "Chưa từng phát"
+
+msgid "Most played"
+msgstr "Phát nhiều nhất"
+
+msgid "Favourite tracks"
+msgstr "Bài yêu thích"
+
+msgid "All tracks"
+msgstr "Tất cả bài"
+
+msgid "Dynamic random mix"
+msgstr "Trộn ngẫu nhiên động"
+
+msgid "New smart playlist"
+msgstr "Danh sách phát thông minh mới"
+
+msgid "Edit smart playlist"
+msgstr "Sửa danh sách phát thông minh"
+
+msgid "Delete smart playlist"
+msgstr "Xóa danh sách phát thông minh"
+
+msgid "New smart playlist..."
+msgstr "Danh sách phát thông minh mới..."
+
+msgid "Play next"
+msgstr "Phát tiếp theo"
+
+msgid "Edit smart playlist..."
+msgstr "Sửa danh sách phát thông minh..."
+
+msgid "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+msgstr "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+
+msgid "Restore defaults"
+msgstr "Restore defaults"
+
+msgid "Preload function was not set for blocking operation."
+msgstr "Hàm nạp trước chưa được thiết lập cho thao tác chặn."
+
+msgid "File %1 does not exist."
+msgstr "Tệp %1 không tồn tại."
+
+msgid "Could not open file %1 for reading: %2"
+msgstr "Không thể mở tệp %1 để đọc: %2"
+
+msgid "Could not open CUE file %1 for reading: %2"
+msgstr "Không thể mở tệp CUE %1 để đọc: %2"
+
+msgid "Could not open playlist file %1 for reading: %2"
+msgstr "Không thể mở tệp danh sách phát %1 để đọc: %2"
+
+msgid "Couldn't create GStreamer source element for %1"
+msgstr "Không thể tạo phần tử nguồn GStreamer cho %1"
+
+msgid "Couldn't create GStreamer typefind element for %1"
+msgstr "Không thể tạo phần tử dò loại GStreamer cho %1"
+
+msgid "Couldn't create GStreamer fakesink element for %1"
+msgstr "Không thể tạo phần tử fakesink GStreamer cho %1"
+
+msgid "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+msgstr "Không thể liên kết các phần tử nguồn, typefind và fakesink của GStreamer cho %1"
+
+msgid "Missing CDDA playback."
+msgstr "Thiếu khả năng phát CDDA."
+
+msgid "Error while loading audio CD."
+msgstr "Lỗi khi tải đĩa CD âm thanh."
+
+msgid "Loading tracks info"
+msgstr "Đang tải thông tin bài"
+
+msgid "No pending song for track ID"
+msgstr "No pending song for track ID"
+
+msgid "Authenticating..."
+msgstr "Đang xác thực..."
+
+msgid "Data missing error"
+msgstr "Lỗi thiếu dữ liệu"
+
+msgid "Not authenticated with Spotify."
+msgstr "Chưa xác thực với Spotify."
+
+msgid "Basic authentication"
+msgstr "Xác thực cơ bản"
+
+msgid "Authenticate"
+msgstr "Xác thực"
+
+msgid "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+msgstr "<html><head/><body><p>Không phát hiện plugin GStreamer Spotify, bạn sẽ không thể phát nhạc từ Spotify nếu thiếu nó. Xem <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> để biết cách cài đặt plugin.</p></body></html>"
+
+msgid "Fetch entire albums when searching songs"
+msgstr "Lấy toàn bộ album khi tìm bài hát"
+
+msgid "The streaming collection is empty!"
+msgstr "Bộ sưu tập phát trực tuyến đang trống!"
+
+msgid "Click here to retrieve music"
+msgstr "Nhấp vào đây để lấy nhạc"
+
+msgid "Remove from favorites"
+msgstr "Xóa khỏi yêu thích"
+
+msgid "Close"
+msgstr "Đóng"
+
+msgid "Refresh catalogue"
+msgstr "Làm mới danh mục"
+
+msgid "Streaming Search View"
+msgstr "Khung tìm kiếm phát trực tuyến"
+
+msgid "artists"
+msgstr "nghệ sĩ"
+
+msgid "albums"
+msgstr "album"
+
+msgid "songs"
+msgstr "bài hát"
+
+msgid "Enter search terms above to find music"
+msgstr "Nhập từ khóa phía trên để tìm nhạc"
+
+msgid "Configure %1..."
+msgstr "Cấu hình %1..."
+
+msgid "Add to artists"
+msgstr "Thêm vào nghệ sĩ"
+
+msgid "Add to albums"
+msgstr "Thêm vào album"
+
+msgid "Add to songs"
+msgstr "Thêm vào bài hát"
+
+msgid "Streaming Tabs View"
+msgstr "Khung thẻ phát trực tuyến"
+
+msgid "Artists"
+msgstr "Nghệ sĩ"
+
+msgid "Albums"
+msgstr "Album"
+
+msgid "Songs"
+msgstr "Bài hát"
+
+msgid "Retrieving albums..."
+msgstr "Đang lấy album..."
+
+msgid "Retrieving songs for %1 album..."
+msgstr "Đang lấy bài hát cho %1 album..."
+
+msgid "Retrieving songs for %1 albums..."
+msgstr "Đang lấy bài hát cho %1 album..."
+
+msgid "Retrieving album cover for %1 album..."
+msgstr "Đang lấy ảnh bìa cho %1 album..."
+
+msgid "Retrieving album covers for %1 albums..."
+msgstr "Đang lấy ảnh bìa cho %1 album..."
+
+msgid "Server URL is invalid."
+msgstr "URL máy chủ không hợp lệ."
+
+msgid "Missing username or password."
+msgstr "Thiếu tên người dùng hoặc mật khẩu."
+
+msgid "Server URL"
+msgstr "URL máy chủ"
+
+msgid "Authentication method:"
+msgstr "Phương thức xác thực:"
+
+msgid "Hex"
+msgstr "Hex"
+
+msgid "MD5 token (Recommended)"
+msgstr "Mã thông báo MD5 (Khuyến nghị)"
+
+msgid "Use HTTP/2 when possible"
+msgstr "Dùng HTTP/2 khi có thể"
+
+msgid "Verify server certificate"
+msgstr "Xác minh chứng chỉ máy chủ"
+
+msgid "Use album ID for album covers"
+msgstr "Dùng ID album cho ảnh bìa"
+
+msgid "Server-side scrobbling"
+msgstr "Scrobble phía máy chủ"
+
+msgid "Test"
+msgstr "Kiểm tra"
+
+msgid "Delete songs"
+msgstr "Xóa bài hát"
+
+msgid "Missing server url, username or password."
+msgstr "Thiếu URL máy chủ, tên người dùng hoặc mật khẩu."
+
+msgid "Configuration incorrect"
+msgstr "Cấu hình không đúng"
+
+msgid "Test successful!"
+msgstr "Kiểm tra thành công!"
+
+msgid "Test failed!"
+msgstr "Kiểm tra thất bại!"
+
+msgid "Subsonic server URL is invalid."
+msgstr "URL máy chủ Subsonic không hợp lệ."
+
+msgid "Missing Subsonic username or password."
+msgstr "Thiếu tên người dùng hoặc mật khẩu Subsonic."
+
+msgid "Stage: %1"
+msgstr "Stage: %1"
+
+msgid "Reason: %1"
+msgstr "Reason: %1"
+
+msgid "Identifying song"
+msgstr "Đang nhận diện bài hát"
+
+msgid "Fingerprinting song"
+msgstr "Đang lấy dấu vân tay bài hát"
+
+msgid "Generated fingerprint is empty or invalid"
+msgstr "Generated fingerprint is empty or invalid"
+
+msgid "Fingerprinting"
+msgstr "Fingerprinting"
+
+msgid "Fingerprint length: %1"
+msgstr "Fingerprint length: %1"
+
+msgid "Minimum required length: %1"
+msgstr "Minimum required length: %1"
+
+msgid "Downloading metadata"
+msgstr "Đang tải metadata"
+
+msgid "No MusicBrainz metadata was found for this track"
+msgstr "No MusicBrainz metadata was found for this track"
+
+msgid "MusicBrainz metadata"
+msgstr "MusicBrainz metadata"
+
+msgid "Candidate metadata rows: 0"
+msgstr "Candidate metadata rows: 0"
+
+msgid "Not authenticated with Tidal."
+msgstr "Chưa xác thực với Tidal."
+
+msgid "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+msgstr "Hỗ trợ Tidal không chính thức và cần API token từ ứng dụng đã đăng ký mới hoạt động. Chúng tôi không thể giúp bạn lấy thông tin này."
+
+msgid "Client ID"
+msgstr "Client ID"
+
+msgid "Audio quality"
+msgstr "Chất lượng âm thanh"
+
+msgid "Album cover size"
+msgstr "Kích thước ảnh bìa album"
+
+msgid "Stream URL method"
+msgstr "Phương thức URL luồng"
+
+msgid "Append explicit to album title for explicit albums"
+msgstr "Thêm từ explicit vào tiêu đề album có nội dung nhạy cảm"
+
+msgid "Missing Tidal client ID."
+msgstr "Thiếu client ID Tidal."
+
+msgid "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Nhận được URL với luồng mã hóa %1 từ Tidal. Strawberry hiện không hỗ trợ luồng mã hóa."
+
+msgid "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Nhận được URL với luồng mã hóa từ Tidal. Strawberry hiện không hỗ trợ luồng mã hóa."
+
+msgid "Tag fetcher"
+msgstr "Tìm nạp thẻ tag"
+
+msgid "Strawberry was unable to find results for this file"
+msgstr "Strawberry không thể tìm thấy kết quả cho tệp này"
+
+msgid "Select best possible match"
+msgstr "Chọn kết quả phù hợp nhất"
+
+msgid "Original tags"
+msgstr "Thẻ tag gốc"
+
+msgid "Suggested tags"
+msgstr "Thẻ tag đề xuất"
+
+msgid "No results"
+msgstr "No results"
+
+msgid "0:00:00"
+msgstr "0:00:00"
+
+msgid "Click to toggle between remaining time and total time"
+msgstr "Nhấp để chuyển đổi giữa thời gian còn lại và tổng thời gian"
+
+msgid "Waveform"
+msgstr "Waveform"
+
+msgid "Transcode Music"
+msgstr "Chuyển đổi định dạng nhạc"
+
+msgid "Files to transcode"
+msgstr "Tệp cần chuyển đổi"
+
+msgid "Directory"
+msgstr "Thư mục"
+
+msgid "Add..."
+msgstr "Thêm..."
+
+msgid "Add all tracks from a directory and all its subdirectories"
+msgstr "Thêm tất cả bài hát từ thư mục và các thư mục con của nó"
+
+msgid "Import..."
+msgstr "Nhập..."
+
+msgid "Output options"
+msgstr "Tùy chọn đầu ra"
+
+msgid "Options..."
+msgstr "Tùy chọn..."
+
+msgid "Alongside the originals"
+msgstr "Cùng thư mục với tệp gốc"
+
+msgid "Select..."
+msgstr "Chọn..."
+
+msgid "Progress"
+msgstr "Tiến trình"
+
+msgid "Details..."
+msgstr "Chi tiết..."
+
+msgid "Start transcoding"
+msgstr "Bắt đầu chuyển đổi"
+
+msgid "%n remaining"
+msgid_plural "%n remaining"
+msgstr[0] "Còn lại %n"
+
+msgid "%n finished"
+msgid_plural "%n finished"
+msgstr[0] "Đã hoàn thành %n"
+
+msgid "%n failed"
+msgid_plural "%n failed"
+msgstr[0] "Thất bại %n"
+
+msgid "Add files to transcode"
+msgstr "Thêm tệp để chuyển đổi"
+
+msgid "Open a directory to import music from"
+msgstr "Mở thư mục để nhập nhạc"
+
+msgid "Import Directory"
+msgstr "Nhập thư mục"
+
+msgid "Preserve directory structure in output directory (import only)"
+msgstr "Giữ nguyên cấu trúc thư mục trong thư mục đầu ra (chỉ khi nhập)"
+
+msgid "Transcoder Log"
+msgstr "Nhật ký chuyển đổi"
+
+msgid "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+msgstr "Không thể tạo phần tử GStreamer \"%1\" - hãy chắc chắn bạn đã cài đặt tất cả plugin GStreamer cần thiết"
+
+msgid "Successfully written %1"
+msgstr "Đã ghi thành công %1"
+
+msgid "Transcoding %1 files using %2 threads"
+msgstr "Đang chuyển đổi %1 tệp dùng %2 luồng"
+
+msgid "Error processing %1: %2"
+msgstr "Lỗi xử lý %1: %2"
+
+msgid "Starting %1"
+msgstr "Đang bắt đầu %1"
+
+msgid "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+msgstr "Không tìm thấy bộ mã hóa cho %1, kiểm tra xem bạn đã cài đặt đúng plugin GStreamer chưa"
+
+msgid "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+msgstr "Không tìm thấy bộ ghép kênh cho %1, kiểm tra xem bạn đã cài đặt đúng plugin GStreamer chưa"
+
+msgid " kbps"
+msgstr " kbps"
+
+msgid "Profile"
+msgstr "Hồ sơ"
+
+msgid "Main profile (MAIN)"
+msgstr "Hồ sơ chính (MAIN)"
+
+msgid "Low complexity profile (LC)"
+msgstr "Hồ sơ độ phức tạp thấp (LC)"
+
+msgid "Scalable sampling rate profile (SSR)"
+msgstr "Hồ sơ tần số mẫu có thể mở rộng (SSR)"
+
+msgid "Long term prediction profile (LTP)"
+msgstr "Hồ sơ dự đoán dài hạn (LTP)"
+
+msgid "Use temporal noise shaping"
+msgstr "Dùng định hình nhiễu tạm thời"
+
+msgid "Allow mid/side encoding"
+msgstr "Cho phép mã hóa giữa/bên"
+
+msgid "Block type"
+msgstr "Loại khối"
+
+msgid "Normal block type"
+msgstr "Loại khối thường"
+
+msgid "No short blocks"
+msgstr "Không có khối ngắn"
+
+msgid "No long blocks"
+msgstr "Không có khối dài"
+
+msgid "Transcoding options"
+msgstr "Tùy chọn chuyển đổi"
+
+#. Sound quality
+msgid "Quality"
+msgstr "Chất lượng"
+
+msgid "Fast"
+msgstr "Nhanh"
+
+msgid "Best"
+msgstr "Tốt nhất"
+
+msgid "Optimize for &quality"
+msgstr "Tối ưu cho &chất lượng"
+
+msgid "Opti&mize for bitrate"
+msgstr "Tối ưu cho &bitrate"
+
+msgid "Constant bitrate"
+msgstr "Bitrate cố định"
+
+msgid "Encoding engine quality"
+msgstr "Chất lượng công cụ mã hóa"
+
+msgid "Standard"
+msgstr "Chuẩn"
+
+msgid "Force mono encoding"
+msgstr "Bắt buộc mã hóa mono"
+
+msgid "automatic"
+msgstr "tự động"
+
+msgid "Average bitrate"
+msgstr "Bitrate trung bình"
+
+msgid "disabled"
+msgstr "vô hiệu"
+
+msgid "Encoding mode"
+msgstr "Chế độ mã hóa"
+
+msgid "Auto"
+msgstr "Tự động"
+
+msgid "Ultra wide band (UWB)"
+msgstr "Băng tần cực rộng (UWB)"
+
+msgid "Wide band (WB)"
+msgstr "Băng tần rộng (WB)"
+
+msgid "Narrow band (NB)"
+msgstr "Băng tần hẹp (NB)"
+
+msgid "Variable bit rate"
+msgstr "Bitrate biến đổi"
+
+msgid "Voice activity detection"
+msgstr "Phát hiện hoạt động giọng nói"
+
+msgid "Discontinuous transmission"
+msgstr "Truyền tải không liên tục"
+
+msgid "Encoding complexity"
+msgstr "Độ phức tạp mã hóa"
+
+msgid "Frames per buffer"
+msgstr "Khung trên bộ đệm"
+
+msgid "Use bitrate management engine"
+msgstr "Dùng công cụ quản lý bitrate"
+
+msgid "Target bitrate"
+msgstr "Bitrate mục tiêu"
+
+msgid "Minimum bitrate"
+msgstr "Bitrate tối thiểu"
+
+msgid "Maximum bitrate"
+msgstr "Bitrate tối đa"
+
+msgid "Transcoding"
+msgstr "Chuyển đổi định dạng"
+
+msgid "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+msgstr "Các cài đặt này được dùng trong hộp thoại \"Chuyển đổi định dạng nhạc\", và khi chuyển đổi nhạc trước khi sao chép sang thiết bị."
+
+msgid "FLAC"
+msgstr "FLAC"
+
+msgid "WavPack"
+msgstr "WavPack"
+
+msgid "Vorbis"
+msgstr "Vorbis"
+
+msgid "Opus"
+msgstr "Opus"
+
+msgid "Speex"
+msgstr "Speex"
+
+msgid "AAC"
+msgstr "AAC"
+
+msgid "ASF (WMA)"
+msgstr "ASF (WMA)"
+
+msgid "MP3"
+msgstr "MP3"
+
+msgid "D-Bus path"
+msgstr "Đường dẫn D-Bus"
+
+msgid "Serial number"
+msgstr "Số serial"
+
+msgid "Mount points"
+msgstr "Điểm gắn kết"
+
+msgid "Partition label"
+msgstr "Nhãn phân vùng"
+
+msgid "UUID"
+msgstr "UUID"
+
+msgid "Enter username and password"
+msgstr "Nhập tên người dùng và mật khẩu"
+
+msgid "Color"
+msgstr "Color"
+
+msgid "Select waveform color"
+msgstr "Select waveform color"
+
+msgid "Save the .waveform files directly in the songs folders"
+msgstr "Save the .waveform files directly in the songs folders"
+
+msgid "Failed to write XSPF playlist"
+msgstr "Failed to write XSPF playlist"
+

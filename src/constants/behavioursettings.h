@@ -20,8 +20,6 @@
 #ifndef BEHAVIOURSETTINGS_H
 #define BEHAVIOURSETTINGS_H
 
-#include <QtGlobal>
-
 namespace BehaviourSettings {
 
 constexpr char kSettingsGroup[] = "Behaviour";
@@ -86,7 +84,7 @@ constexpr AddBehaviour kDefaultDoubleClickAddMode = AddBehaviour::Append;
 constexpr PlayBehaviour kDefaultDoubleClickPlayMode = PlayBehaviour::Never;
 constexpr PlaylistAddBehaviour kDefaultDoubleClickPlaylistAddMode = PlaylistAddBehaviour::Play;
 constexpr int kDefaultSeekStepSec = 10;
-constexpr uint kDefaultVolumeIncrement = 5;
+constexpr unsigned kDefaultVolumeIncrement = 5;
 
 }  // namespace BehaviourSettings
 

@@ -1,55 +1,32 @@
-/*
- * Strawberry Music Player
- * Copyright 2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
-#ifndef TAGREADERREADSTREAMREPLY_H
-#define TAGREADERREADSTREAMREPLY_H
-
-#include <QString>
-#include <QUrl>
-#include <QSharedPointer>
+#ifndef STRAWBERRY_TAGREADERREADSTREAMREPLY_H
+#define STRAWBERRY_TAGREADERREADSTREAMREPLY_H
 
 #include "core/song.h"
-#include "tagreaderreply.h"
-#include "tagreaderresult.h"
+#include "tagreader/tagreaderreply.h"
+
+#include <memory>
 
 class TagReaderReadStreamReply : public TagReaderReply {
-  Q_OBJECT
-
  public:
-  explicit TagReaderReadStreamReply(const QUrl &url, const QString &_filename, QObject *parent = nullptr);
+  TagReaderReadStreamReply(const std::string &url, const std::string &filename) : TagReaderReply(filename), url_(url) {}
 
-  void Finish() override;
-
+  const std::string &url() const { return url_; }
   Song song() const { return song_; }
   void set_song(const Song &song) { song_ = song; }
 
- Q_SIGNALS:
-  void Finished(const QUrl &url, const Song &song, const TagReaderResult &result);
+  void Finish() override {
+    finished_ = true;
+    StreamFinished.Emit(filename_, song_, result_);
+    TagReaderReply::Finished.Emit(filename_, result_);
+  }
 
- private Q_SLOTS:
-  void EmitFinished() override;
+  Signal<std::string, Song, TagReaderResult> StreamFinished;
 
  private:
+  std::string url_;
   Song song_;
-  QUrl url_;
 };
 
-using TagReaderReadStreamReplyPtr = QSharedPointer<TagReaderReadStreamReply>;
+using TagReaderReadStreamReplyPtr = std::shared_ptr<TagReaderReadStreamReply>;
 
-#endif  // TAGREADERREADSTREAMREPLY_H
+#endif

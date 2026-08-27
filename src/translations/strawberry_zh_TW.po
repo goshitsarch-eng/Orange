@@ -1,0 +1,4471 @@
+# Translation catalog for Strawberry Music Player.
+# Generated from the Qt .ts files on origin/master.
+msgid ""
+msgstr ""
+"Project-Id-Version: strawberry\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-26 00:00+0000\n"
+"PO-Revision-Date: 2026-08-26 00:00+0000\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: zh_TW\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "ASX playlist is too large"
+msgstr "ASX playlist is too large"
+
+msgid "Failed to write ASX playlist"
+msgstr "Failed to write ASX playlist"
+
+msgid "About"
+msgstr "關於我們"
+
+msgid "About Strawberry"
+msgstr "關於本程式"
+
+msgid "Version %1"
+msgstr " 版本 %1"
+
+msgid "Strawberry is a music player and music collection organizer."
+msgstr "Strawberry 是一款用來播放與整理音樂收藏的程式"
+
+msgid "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."
+msgstr "這款程式源自於 Clementine 的分支，於 2018 年問世，針對音樂收藏與高音質需求的使用者而設計"
+
+msgid "Strawberry is free software released under GPL. The source code is available on %1"
+msgstr "Strawberry 是一款依據 GPL 授權條款釋出的自由軟體。原始碼可在 %1 取得。"
+
+msgid "You should have received a copy of the GNU General Public License along with this program.  If not, see %1"
+msgstr " 您應該已隨本程式一併收到 GNU 通用公共授權條款的副本。如未收到，請參閱 %1。"
+
+msgid "If you like Strawberry and can make use of it, consider sponsoring or donating."
+msgstr "如果您喜歡 Strawberry 並覺得它對您有幫助，歡迎考慮贊助或捐款支持。"
+
+msgid "You can sponsor the author on %1 or %2. You can also make a one-time payment through %3."
+msgstr "您可以在 %1 %2 贊助作者，也可以透過 %3 進行一次性付款。"
+
+msgid "Author and maintainer"
+msgstr "作者與維護者"
+
+msgid "Contributors"
+msgstr "貢獻者"
+
+msgid "Clementine authors"
+msgstr "Clementine 開發團隊"
+
+msgid "Clementine contributors"
+msgstr "Clementine 貢獻者"
+
+msgid "Thanks to"
+msgstr "特別感謝"
+
+msgid "Thanks to all the other Amarok and Clementine contributors."
+msgstr "特別感謝所有 Amarok 與 Clementine 的貢獻者"
+
+msgid "Add Stream"
+msgstr "新增串流"
+
+msgid "Enter the URL of a stream:"
+msgstr "請輸入串流網址："
+
+msgid "Load cover from disk..."
+msgstr "從硬碟載入封面…"
+
+msgid "Save cover to disk..."
+msgstr "儲存封面至硬碟..."
+
+msgid "Load cover from URL..."
+msgstr "從網址載入封面…"
+
+msgid "Search for album covers..."
+msgstr "搜尋專輯封面…"
+
+msgid "Unset cover"
+msgstr "取消封面"
+
+msgid "Delete cover"
+msgstr "刪除封面"
+
+msgid "Clear cover"
+msgstr "清除封面"
+
+msgid "Show fullsize..."
+msgstr "顯示完整尺寸…"
+
+msgid "Search automatically"
+msgstr "自動搜尋"
+
+msgid "Load cover from disk"
+msgstr "從硬碟載入封面"
+
+msgid "Failed to open cover file %1 for reading: %2"
+msgstr "無法開啟封面檔案 %1 進行讀取：%2"
+
+msgid "Cover file %1 is empty."
+msgstr "封面檔案 %1 是空的。"
+
+msgid "unknown"
+msgstr "未知"
+
+msgid "Save album cover"
+msgstr "儲存專輯封面"
+
+msgid "Failed to open cover file %1 for writing: %2"
+msgstr "無法開啟封面檔案 %1 進行寫入：%2"
+
+msgid "Failed writing cover to file %1: %2"
+msgstr "寫入封面至檔案 %1 失敗：%2"
+
+msgid "Failed writing cover to file %1."
+msgstr "無法將封面寫入檔案 %1"
+
+msgid "Failed to delete cover file %1: %2"
+msgstr "刪除封面檔案 %1 失敗：%2"
+
+msgid "Failed to write cover to file %1: %2"
+msgstr " 無法將封面寫入檔案 %1：%2"
+
+msgid "Could not save cover to file %1."
+msgstr "無法將封面儲存至檔案 %1。"
+
+msgid "Export covers"
+msgstr "匯出封面"
+
+msgid "Output"
+msgstr "輸出"
+
+msgid "Enter a filename for exported covers (no extension):"
+msgstr "請輸入匯出封面的檔案名稱（不含副檔名）："
+
+msgid "Export downloaded covers"
+msgstr "匯出已下載的封面"
+
+msgid "Export embedded covers"
+msgstr "匯出內嵌封面"
+
+msgid "Existing covers"
+msgstr "現有封面"
+
+msgid "Do not overwrite"
+msgstr "不要覆蓋"
+
+msgid "O&verwrite all"
+msgstr " 全部覆寫(&V)"
+
+msgid "Overwrite s&maller ones only"
+msgstr "僅覆寫較小檔案"
+
+msgid "Size"
+msgstr "大小"
+
+msgid "Scale size"
+msgstr " 縮放大小"
+
+msgid "Size:"
+msgstr "實際大小 ："
+
+msgid "Pixel"
+msgstr "像素"
+
+msgid "Abort"
+msgstr "中止"
+
+msgid "All albums"
+msgstr "所有專輯"
+
+msgid "Albums with covers"
+msgstr "含封面的專輯"
+
+msgid "Albums without covers"
+msgstr "無封面的專輯"
+
+msgid "Really cancel?"
+msgstr "確定要取消？"
+
+msgid "Closing this window will stop searching for album covers."
+msgstr "關閉此視窗將停止搜尋專輯封面"
+
+msgid "Don't stop!"
+msgstr "不要停止！"
+
+msgid "All artists"
+msgstr "所有藝人"
+
+msgid "Various artists"
+msgstr "合輯"
+
+msgid "Got %1 covers out of %2 (%3 failed)"
+msgstr "已取得 %1 張封面（共 %2 張，%3 張失敗）"
+
+msgid "%1 transferred"
+msgstr "已傳輸 %1 項"
+
+msgid "Export finished"
+msgstr "匯出完成"
+
+msgid "No covers to export."
+msgstr "無封面可匯出"
+
+msgid "Exported %1 covers out of %2 (%3 skipped)"
+msgstr "已匯出 %1 張封面（共 %2 張，%3 張略過）"
+
+msgid "Cover Manager"
+msgstr "封面管理員"
+
+msgid "Artist"
+msgstr "藝人"
+
+msgid "Album"
+msgstr "專輯"
+
+msgid "Search"
+msgstr "搜尋"
+
+msgid "Covers from %1"
+msgstr "來自 %1 的封面"
+
+msgid "Framerate"
+msgstr "畫面更新率"
+
+msgid "Low (%1 fps)"
+msgstr "低（%1 fps）"
+
+msgid "Medium (%1 fps)"
+msgstr "中（%1 fps）"
+
+msgid "High (%1 fps)"
+msgstr "高(%1 fps)"
+
+msgid "Super high (%1 fps)"
+msgstr "超高(%1 fps)"
+
+msgid "No analyzer"
+msgstr "無頻譜分析器"
+
+msgid "Block analyzer"
+msgstr "區塊分析器"
+
+msgid "Boom analyzer"
+msgstr "轟鳴分析器"
+
+msgid "Turbine"
+msgstr "渦輪"
+
+msgid "Sonogram"
+msgstr "聲譜圖"
+
+msgid "WaveRubber"
+msgstr "彈性波動效果"
+
+msgid "Appearance"
+msgstr "外觀"
+
+msgid "Style"
+msgstr "風格"
+
+msgid "Tabbar colors"
+msgstr "分頁標籤顏色"
+
+msgid "&Use the system default color"
+msgstr "＆使用系統默認顏色"
+
+msgid "Use custom color"
+msgstr "使用自定顏色"
+
+msgid "Use gradient background"
+msgstr "使用漸變色背景"
+
+msgid "Select tabbar color:"
+msgstr "選擇標籤欄顏色："
+
+msgid "Background image"
+msgstr "背景圖像"
+
+msgid "Default bac&kground image"
+msgstr "預設背景圖片(&K)"
+
+msgid "&No background image"
+msgstr "無背景圖片(&N)"
+
+msgid "The album cover of the currently playing song"
+msgstr "目前播放歌曲的專輯封面"
+
+msgid "Albu&m cover"
+msgstr "專輯封面(&M)"
+
+msgid "Custom image:"
+msgstr "自定義圖片:"
+
+msgid "Browse..."
+msgstr "瀏覽…"
+
+msgid "Position"
+msgstr "位置"
+
+msgid "Upper Left"
+msgstr "左上"
+
+msgid "Upper Right"
+msgstr "右上"
+
+msgid "Middle"
+msgstr "中間"
+
+msgid "Bottom Left"
+msgstr "左下角"
+
+msgid "Bottom Right"
+msgstr "右下角"
+
+msgid "Max cover size"
+msgstr "最大封面尺寸"
+
+msgid "Stretch image to fill playlist"
+msgstr "拉伸圖像来填充播放列表"
+
+msgid "Keep aspect ratio"
+msgstr "維持縱橫比"
+
+msgid "Do not cut image"
+msgstr "請勿剪裁影像"
+
+msgid "Blur amount"
+msgstr "模糊量"
+
+msgid "0px"
+msgstr "0像素"
+
+msgid "Opacity"
+msgstr "不透明度"
+
+msgid "40%"
+msgstr "40%"
+
+msgid "Icon sizes"
+msgstr "圖示尺寸"
+
+msgid "Playlist buttons"
+msgstr "播放清單選項"
+
+msgid "Tabbar large mode"
+msgstr "大型分頁列模式"
+
+msgid "Play control buttons"
+msgstr "播放控制按鈕"
+
+msgid "Configure buttons"
+msgstr "配置按鈕"
+
+msgid "Files, playlists and queue buttons"
+msgstr "文件、播放列表和隊列按鈕"
+
+msgid "Tabbar small mode"
+msgstr "小型分頁列模式"
+
+msgid "Playlist playing song color"
+msgstr "播放列表播放歌曲顏色"
+
+msgid "System highlight color"
+msgstr "系統高亮顏色"
+
+msgid "Custom color"
+msgstr "自定義顏色"
+
+msgid "Select playlist playing song color:"
+msgstr "選擇播放清單正在播放歌曲颜色："
+
+msgid "Window"
+msgstr "Window"
+
+msgid "Window text"
+msgstr "Window text"
+
+msgid "Base"
+msgstr "Base"
+
+msgid "Alternate base"
+msgstr "Alternate base"
+
+msgid "Tooltip base"
+msgstr "Tooltip base"
+
+msgid "Tooltip text"
+msgstr "Tooltip text"
+
+msgid "Placeholder text"
+msgstr "Placeholder text"
+
+msgid "Text"
+msgstr "Text"
+
+msgid "Button"
+msgstr "Button"
+
+msgid "Button text"
+msgstr "Button text"
+
+msgid "Bright text"
+msgstr "Bright text"
+
+msgid "Select color"
+msgstr "Select color"
+
+msgid "Select background image"
+msgstr "選擇背景圖片"
+
+msgid "Colors"
+msgstr "Colors"
+
+msgid "&Use the system default color set"
+msgstr "&Use the system default color set"
+
+msgid "Use a custom color set"
+msgstr "Use a custom color set"
+
+msgid "Set a custom color set suitable for a dark theme"
+msgstr "Set a custom color set suitable for a dark theme"
+
+msgid "Dark mode"
+msgstr "Dark mode"
+
+msgid "Reset the custom color set to the system default colors"
+msgstr "Reset the custom color set to the system default colors"
+
+msgid "Reset to default"
+msgstr "Reset to default"
+
+msgid "You might need to restart Strawberry for this setting to fully apply"
+msgstr "You might need to restart Strawberry for this setting to fully apply"
+
+msgid "You need to restart Strawberry for this setting to take affect"
+msgstr "You need to restart Strawberry for this setting to take affect"
+
+msgid "System icons"
+msgstr "System icons"
+
+msgid "Changing colors is only supported with some styles"
+msgstr "Changing colors is only supported with some styles"
+
+msgid "Dark colors"
+msgstr "Dark colors"
+
+msgid "Backend"
+msgstr "後端"
+
+msgid "Audio output"
+msgstr "音訊輸出"
+
+msgid "Device"
+msgstr "裝置"
+
+msgid "ALSA plugin:"
+msgstr "ALSA 外掛："
+
+msgid "hw"
+msgstr "硬體"
+
+msgid "p&lughw"
+msgstr "p&lughw"
+
+msgid "pcm"
+msgstr "pcm"
+
+msgid "Exclusive mode (Experimental)"
+msgstr "獨占模式(實驗性）"
+
+msgid "Options"
+msgstr "選項"
+
+msgid "Enable volume control"
+msgstr "啟用音量控制"
+
+msgid "Upmix / downmix to"
+msgstr "上混/下混至"
+
+msgid "channels"
+msgstr "頻道"
+
+msgid "Improve headphone listening of stereo audio records (bs2b)"
+msgstr "改善立體音訊紀錄耳機聆聽(bs2b)"
+
+msgid "Use playbin3 when available"
+msgstr "Use playbin3 when available"
+
+msgid "Enable HTTP/2 for streaming"
+msgstr "啟用 HTTP/2 進行串流傳輸"
+
+msgid "Use strict SSL mode"
+msgstr "使用嚴格的 SSL 模式"
+
+msgid "Buffer"
+msgstr "緩衝"
+
+msgid " ms"
+msgstr "ms"
+
+msgid "Buffer duration"
+msgstr "緩衝時間"
+
+msgid "High watermark"
+msgstr "音訊緩衝上限"
+
+msgid "Low watermark"
+msgstr "音訊緩衝下限"
+
+msgid "Defaults"
+msgstr "預設值"
+
+msgid "Audio normalization"
+msgstr "音頻標準化"
+
+msgid "No audio normalization"
+msgstr "沒有音頻標準化"
+
+msgid "Replay Gain"
+msgstr "回放增益"
+
+msgid "Use Replay Gain metadata if it is available"
+msgstr "使用播放增益元數據(如果可用)"
+
+msgid "Replay Gain mode"
+msgstr "回放增益模式"
+
+msgid "Radio (equal loudness for all tracks)"
+msgstr "收音機(所有曲目採用相同的音量)"
+
+msgid "Album (ideal loudness for all tracks)"
+msgstr "專輯（所有曲目採用合适音量）"
+
+msgid "Pre-amp"
+msgstr "前置放大"
+
+msgid "Apply compression to prevent clipping"
+msgstr "使用壓縮避免破音"
+
+msgid "Fallback-gain"
+msgstr "回退增益"
+
+msgid "EBU R 128 Loudness Normalization"
+msgstr "EBU R 128 響度標準化"
+
+msgid "Perform track loudness normalization"
+msgstr "Perform track loudness normalization"
+
+msgid "Target Level"
+msgstr "Target Level"
+
+msgid "Fading"
+msgstr "Fading"
+
+msgid "Fade out when stopping a track"
+msgstr "Fade out when stopping a track"
+
+msgid "Cross-fade when changing tracks manually"
+msgstr "Cross-fade when changing tracks manually"
+
+msgid "Cross-fade when changing tracks automatically"
+msgstr "Cross-fade when changing tracks automatically"
+
+msgid "Except between tracks on the same album or in the same CUE sheet"
+msgstr "Except between tracks on the same album or in the same CUE sheet"
+
+msgid "Fading duration"
+msgstr "Fading duration"
+
+msgid "Fade out on pause / fade in on resume"
+msgstr "Fade out on pause / fade in on resume"
+
+msgid "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+msgstr "Map the volume slider to a decibel scale so that perceived loudness changes evenly. Each 1% step equals 0.5 dB, 100% is 0 dB and 0% is silence."
+
+msgid "Exponential volume scaling"
+msgstr "Exponential volume scaling"
+
+msgid "Device warm-up"
+msgstr "Device warm-up"
+
+msgid "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+msgstr "Delay between opening the audio device and starting playback, to avoid the start of the track being cut off while the device (DAC) is still becoming ready.  Set to 0 to disable."
+
+msgid "Behavior"
+msgstr "Behavior"
+
+msgid "Show system tray icon"
+msgstr "Show system tray icon"
+
+msgid "Keep running in the background when the window is closed"
+msgstr "Keep running in the background when the window is closed"
+
+msgid "Show song progress on system tray icon"
+msgstr "Show song progress on system tray icon"
+
+msgid "Show song progress on taskbar"
+msgstr "Show song progress on taskbar"
+
+msgid "Resume playback on start"
+msgstr "Resume playback on start"
+
+msgid "Show playing widget"
+msgstr "Show playing widget"
+
+msgid "On startup"
+msgstr "On startup"
+
+msgid "Remember from &last time"
+msgstr "Remember from &last time"
+
+msgid "Show the main window"
+msgstr "Show the main window"
+
+msgid "Hide the main window"
+msgstr "Hide the main window"
+
+msgid "Show the main window maximized"
+msgstr "Show the main window maximized"
+
+msgid "Show the main window minimized"
+msgstr "Show the main window minimized"
+
+msgid "Language"
+msgstr "Language"
+
+msgid "Use the system default"
+msgstr "Use the system default"
+
+msgid "You will need to restart Strawberry if you change the language."
+msgstr "You will need to restart Strawberry if you change the language."
+
+msgid "Using the menu to add a song will..."
+msgstr "Using the menu to add a song will..."
+
+msgid "Never start playing"
+msgstr "Never start playing"
+
+msgid "Play if there is nothing already playing"
+msgstr "Play if there is nothing already playing"
+
+msgid "Always start playing"
+msgstr "Always start playing"
+
+msgid "Pressing \"Previous\" in player will..."
+msgstr "Pressing \"Previous\" in player will..."
+
+msgid "Jump to previous song right away"
+msgstr "Jump to previous song right away"
+
+msgid "Restart song, then jump to previous if pressed again"
+msgstr "Restart song, then jump to previous if pressed again"
+
+msgid "Double clicking a song will..."
+msgstr "Double clicking a song will..."
+
+msgid "Append to the playlist"
+msgstr "Append to the playlist"
+
+msgid "Replace the playlist"
+msgstr "Replace the playlist"
+
+msgid "Open in new playlist"
+msgstr "Open in new playlist"
+
+msgid "Add to the queue"
+msgstr "Add to the queue"
+
+msgid "Double clicking a song in the playlist will..."
+msgstr "Double clicking a song in the playlist will..."
+
+msgid "Change the currently playing song"
+msgstr "Change the currently playing song"
+
+msgid "Seeking using a keyboard shortcut or mouse wheel"
+msgstr "Seeking using a keyboard shortcut or mouse wheel"
+
+msgid "Time step"
+msgstr "Time step"
+
+msgid " s"
+msgstr " s"
+
+msgid "Volume Increment"
+msgstr "Volume Increment"
+
+msgid "Could not create cdiocddasrc"
+msgstr "Could not create cdiocddasrc"
+
+msgid "Error while setting CDDA device to ready state."
+msgstr "Error while setting CDDA device to ready state."
+
+msgid "Error while setting CDDA device to pause state."
+msgstr "Error while setting CDDA device to pause state."
+
+msgid "The 'track' format is not supported by GStreamer."
+msgstr "The 'track' format is not supported by GStreamer."
+
+msgid "Error while querying CDDA tracks."
+msgstr "Error while querying CDDA tracks."
+
+msgid "Unable to execute collection SQL query: %1"
+msgstr "Unable to execute collection SQL query: %1"
+
+msgid "Failed SQL query: %1"
+msgstr "Failed SQL query: %1"
+
+msgid "Updating %1 database."
+msgstr "Updating %1 database."
+
+msgid "Collection Filter"
+msgstr "Collection Filter"
+
+msgid "Enter search terms here"
+msgstr "Enter search terms here"
+
+msgid "MenuPopupToolButton"
+msgstr "MenuPopupToolButton"
+
+msgid "Entire collection"
+msgstr "Entire collection"
+
+msgid "Added today"
+msgstr "Added today"
+
+msgid "Added this week"
+msgstr "Added this week"
+
+msgid "Added within three months"
+msgstr "Added within three months"
+
+msgid "Added this year"
+msgstr "Added this year"
+
+msgid "Added this month"
+msgstr "Added this month"
+
+msgid "Save current grouping"
+msgstr "Save current grouping"
+
+msgid "Manage saved groupings"
+msgstr "Manage saved groupings"
+
+msgid "Any rating"
+msgstr "Any rating"
+
+msgid "Rating non null"
+msgstr "Rating non null"
+
+msgid "Rating greater than 1 star"
+msgstr "Rating greater than 1 star"
+
+msgid "Rating greater than 2 stars"
+msgstr "Rating greater than 2 stars"
+
+msgid "Rating greater than 3 stars"
+msgstr "Rating greater than 3 stars"
+
+msgid "Rating greater than 4 stars"
+msgstr "Rating greater than 4 stars"
+
+msgid "Group by"
+msgstr "Group by"
+
+msgid "Filter by age"
+msgstr "Filter by age"
+
+msgid "Filter by rating"
+msgstr "Filter by rating"
+
+msgid "Display options"
+msgstr "Display options"
+
+msgid "Group by Album artist/Album"
+msgstr "Group by Album artist/Album"
+
+msgid "Group by Album artist/Album - Disc"
+msgstr "Group by Album artist/Album - Disc"
+
+msgid "Group by Album artist/Year - Album"
+msgstr "Group by Album artist/Year - Album"
+
+msgid "Group by Album artist/Year - Album - Disc"
+msgstr "Group by Album artist/Year - Album - Disc"
+
+msgid "Group by Artist/Album"
+msgstr "Group by Artist/Album"
+
+msgid "Group by Artist/Album - Disc"
+msgstr "Group by Artist/Album - Disc"
+
+msgid "Group by Artist/Year - Album"
+msgstr "Group by Artist/Year - Album"
+
+msgid "Group by Artist/Year - Album - Disc"
+msgstr "Group by Artist/Year - Album - Disc"
+
+msgid "Group by Genre/Album artist/Album"
+msgstr "Group by Genre/Album artist/Album"
+
+msgid "Group by Genre/Artist/Album"
+msgstr "Group by Genre/Artist/Album"
+
+msgid "Group by Album Artist"
+msgstr "Group by Album Artist"
+
+msgid "Group by Artist"
+msgstr "Group by Artist"
+
+msgid "Group by Album"
+msgstr "Group by Album"
+
+msgid "Group by Genre/Album"
+msgstr "Group by Genre/Album"
+
+msgid "Advanced grouping..."
+msgstr "Advanced grouping..."
+
+msgid "Grouping Name"
+msgstr "Grouping Name"
+
+msgid "Grouping name:"
+msgstr "Grouping name:"
+
+msgid "Support for sort tags artist, album, album artist, title, composer and performer"
+msgstr "Support for sort tags artist, album, album artist, title, composer and performer"
+
+msgid "Saving playcounts and ratings"
+msgstr "Saving playcounts and ratings"
+
+msgid "Loading..."
+msgstr "Loading..."
+
+msgid "Unknown"
+msgstr "Unknown"
+
+msgid "Collection"
+msgstr "Collection"
+
+msgid "These folders will be scanned for music to make up your collection"
+msgstr "These folders will be scanned for music to make up your collection"
+
+msgid "Add new folder..."
+msgstr "Add new folder..."
+
+msgid "Remove folder"
+msgstr "Remove folder"
+
+msgid "Automatic updating"
+msgstr "Automatic updating"
+
+msgid "Update the collection when Strawberry starts"
+msgstr "Update the collection when Strawberry starts"
+
+msgid "Monitor the collection for changes"
+msgstr "Monitor the collection for changes"
+
+msgid "Song fingerprinting and tracking"
+msgstr "Song fingerprinting and tracking"
+
+msgid "Mark disappeared songs unavailable"
+msgstr "Mark disappeared songs unavailable"
+
+msgid "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+msgstr "Perform song EBU R 128 analysis (required for EBU R 128 loudness normalization)"
+
+msgid "Expire unavailable songs after"
+msgstr "Expire unavailable songs after"
+
+msgid "days"
+msgstr "days"
+
+msgid "Preferred album art filenames (comma separated)"
+msgstr "Preferred album art filenames (comma separated)"
+
+msgid "When looking for album art Strawberry will first look for picture files that contain one of these words.\nIf there are no matches then it will use the largest image in the directory."
+msgstr "When looking for album art Strawberry will first look for picture files that contain one of these words.\nIf there are no matches then it will use the largest image in the directory."
+
+msgid "Automatically open single categories in the collection tree"
+msgstr "Automatically open single categories in the collection tree"
+
+msgid "Show dividers"
+msgstr "Show dividers"
+
+msgid "Show album cover art in collection"
+msgstr "Show album cover art in collection"
+
+msgid "Use various artists for compilation albums"
+msgstr "Use various artists for compilation albums"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting artists, composers and performers"
+
+msgid "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+msgstr "Skip leading articles (\"the\", \"a\", \"an\") when sorting albums"
+
+msgid "Use sort tags for sorting when available"
+msgstr "Use sort tags for sorting when available"
+
+msgid "Album cover pixmap cache"
+msgstr "Album cover pixmap cache"
+
+msgid "Enable Disk Cache"
+msgstr "Enable Disk Cache"
+
+msgid "Disk Cache Size"
+msgstr "Disk Cache Size"
+
+msgid "Current disk cache in use:"
+msgstr "Current disk cache in use:"
+
+msgid "Clear Disk Cache"
+msgstr "Clear Disk Cache"
+
+msgid "Song playcounts and ratings"
+msgstr "Song playcounts and ratings"
+
+msgid "Save playcounts to song tags when possible"
+msgstr "Save playcounts to song tags when possible"
+
+msgid "Save ratings to song tags when possible"
+msgstr "Save ratings to song tags when possible"
+
+msgid "Overwrite database playcount when songs are re-read from disk"
+msgstr "Overwrite database playcount when songs are re-read from disk"
+
+msgid "Overwrite database rating when songs are re-read from disk"
+msgstr "Overwrite database rating when songs are re-read from disk"
+
+msgid "Save playcounts and ratings to files now"
+msgstr "Save playcounts and ratings to files now"
+
+msgid "Enable delete files in the right click context menu"
+msgstr "Enable delete files in the right click context menu"
+
+msgid "Add directory..."
+msgstr "Add directory..."
+
+msgid "Write all playcounts and ratings to files"
+msgstr "Write all playcounts and ratings to files"
+
+msgid "Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"
+msgstr "Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"
+
+msgid "Your collection is empty!"
+msgstr "Your collection is empty!"
+
+msgid "Click here to add some music"
+msgstr "Click here to add some music"
+
+msgid "Append to current playlist"
+msgstr "Append to current playlist"
+
+msgid "Replace current playlist"
+msgstr "Replace current playlist"
+
+msgid "Queue track"
+msgstr "Queue track"
+
+msgid "Queue to play next"
+msgstr "Queue to play next"
+
+msgid "Search for this"
+msgstr "Search for this"
+
+msgid "Organize files..."
+msgstr "Organize files..."
+
+msgid "Copy to device..."
+msgstr "Copy to device..."
+
+msgid "Delete from disk..."
+msgstr "Delete from disk..."
+
+msgid "Edit track information..."
+msgstr "Edit track information..."
+
+msgid "Edit tracks information..."
+msgstr "Edit tracks information..."
+
+msgid "Show in file browser..."
+msgstr "Show in file browser..."
+
+msgid "Rescan song(s)"
+msgstr "Rescan song(s)"
+
+msgid "Show in various artists"
+msgstr "Show in various artists"
+
+msgid "Don't show in various artists"
+msgstr "Don't show in various artists"
+
+msgid "There are other songs in this album"
+msgstr "There are other songs in this album"
+
+msgid "Would you like to move the other songs on this album to Various Artists as well?"
+msgstr "Would you like to move the other songs on this album to Various Artists as well?"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "None of the selected songs were suitable for copying to a device"
+msgstr "None of the selected songs were suitable for copying to a device"
+
+msgid "Form"
+msgstr "Form"
+
+msgid "Updating collection"
+msgstr "Updating collection"
+
+msgid "Updating %1"
+msgstr "Updating %1"
+
+msgid "Console"
+msgstr "Console"
+
+msgid "Run"
+msgstr "Run"
+
+msgid "Context"
+msgstr "Context"
+
+msgid "Custom text settings"
+msgstr "Custom text settings"
+
+msgid "Title"
+msgstr "Title"
+
+msgid "Summary"
+msgstr "Summary"
+
+msgid "Enable Items"
+msgstr "Enable Items"
+
+msgid "Technical Data"
+msgstr "Technical Data"
+
+msgid "Song Lyrics"
+msgstr "Song Lyrics"
+
+msgid "Automatically search for album cover"
+msgstr "Automatically search for album cover"
+
+msgid "Automatically search for song lyrics"
+msgstr "Automatically search for song lyrics"
+
+msgid "Font for headline"
+msgstr "Font for headline"
+
+msgid "Font"
+msgstr "Font"
+
+msgid "Font size"
+msgstr "Font size"
+
+msgid " pt"
+msgstr " pt"
+
+msgid "Preview"
+msgstr "Preview"
+
+msgid "Font for data and lyrics"
+msgstr "Font for data and lyrics"
+
+msgid "Add song artist tag"
+msgstr "Add song artist tag"
+
+msgid "Add song album tag"
+msgstr "Add song album tag"
+
+msgid "Add song title tag"
+msgstr "Add song title tag"
+
+msgid "Add song albumartist tag"
+msgstr "Add song albumartist tag"
+
+msgid "Add song year tag"
+msgstr "Add song year tag"
+
+msgid "Add song composer tag"
+msgstr "Add song composer tag"
+
+msgid "Add song performer tag"
+msgstr "Add song performer tag"
+
+msgid "Add song grouping tag"
+msgstr "Add song grouping tag"
+
+msgid "Add song disc tag"
+msgstr "Add song disc tag"
+
+msgid "Add song track tag"
+msgstr "Add song track tag"
+
+msgid "Add song genre tag"
+msgstr "Add song genre tag"
+
+msgid "Add song length tag"
+msgstr "Add song length tag"
+
+msgid "Add song play count"
+msgstr "Add song play count"
+
+msgid "Add song skip count"
+msgstr "Add song skip count"
+
+msgid "Add a new line if supported by the notification type"
+msgstr "Add a new line if supported by the notification type"
+
+msgid "%filename%"
+msgstr "%filename%"
+
+msgid "Add song filename"
+msgstr "Add song filename"
+
+msgid "%url%"
+msgstr "%url%"
+
+msgid "Add song URL"
+msgstr "Add song URL"
+
+msgid "%rating%"
+msgstr "%rating%"
+
+msgid "Add song rating"
+msgstr "Add song rating"
+
+msgid "Add song original year tag"
+msgstr "Add song original year tag"
+
+msgid "Add song artistsort tag"
+msgstr "Add song artistsort tag"
+
+msgid "Add song albumartistsort tag"
+msgstr "Add song albumartistsort tag"
+
+msgid "Add song titlesort tag"
+msgstr "Add song titlesort tag"
+
+msgid "Add song composersort tag"
+msgstr "Add song composersort tag"
+
+msgid "Add song performersort tag"
+msgstr "Add song performersort tag"
+
+msgid "Add song albumsort tag"
+msgstr "Add song albumsort tag"
+
+msgid "Filetype"
+msgstr "Filetype"
+
+msgid "Length"
+msgstr "Length"
+
+msgid "Samplerate"
+msgstr "Samplerate"
+
+msgid "Bit depth"
+msgstr "Bit depth"
+
+msgid "Bitrate"
+msgstr "Bitrate"
+
+msgid "Show album cover"
+msgstr "Show album cover"
+
+msgid "Show song technical data"
+msgstr "Show song technical data"
+
+msgid "Show song lyrics"
+msgstr "Show song lyrics"
+
+msgid "No song playing"
+msgstr "No song playing"
+
+msgid "%1 song"
+msgstr "%1 song"
+
+msgid "%1 songs"
+msgstr "%1 songs"
+
+msgid "%1 artist"
+msgstr "%1 artist"
+
+msgid "%1 artists"
+msgstr "%1 artists"
+
+msgid "%1 album"
+msgstr "%1 album"
+
+msgid "%1 albums"
+msgstr "%1 albums"
+
+msgid "kbps"
+msgstr "kbps"
+
+msgid "Load cover from URL"
+msgstr "Load cover from URL"
+
+msgid "Enter a URL to download a cover from the Internet:"
+msgstr "Enter a URL to download a cover from the Internet:"
+
+msgid "Fetching cover error"
+msgstr "Fetching cover error"
+
+msgid "The site you requested does not exist!"
+msgstr "The site you requested does not exist!"
+
+msgid "The site you requested is not an image!"
+msgstr "The site you requested is not an image!"
+
+msgid "View"
+msgstr "View"
+
+msgid "Total albums:"
+msgstr "Total albums:"
+
+msgid "Without cover:"
+msgstr "Without cover:"
+
+msgid "0"
+msgstr "0"
+
+msgid "Fetch Missing Covers"
+msgstr "Fetch Missing Covers"
+
+msgid "Export Covers"
+msgstr "Export Covers"
+
+msgid "Fetch automatically"
+msgstr "Fetch automatically"
+
+msgid "Load"
+msgstr "Load"
+
+msgid "Add to playlist"
+msgstr "Add to playlist"
+
+msgid "Fetch completed"
+msgstr "Fetch completed"
+
+msgid "Total network requests made"
+msgstr "Total network requests made"
+
+msgid "Average image size"
+msgstr "Average image size"
+
+msgid "Total bytes transferred"
+msgstr "Total bytes transferred"
+
+msgid "Covers"
+msgstr "Covers"
+
+msgid "Cover providers"
+msgstr "Cover providers"
+
+msgid "Choose the providers you want to use when searching for covers."
+msgstr "Choose the providers you want to use when searching for covers."
+
+msgid "Move up"
+msgstr "Move up"
+
+msgid "Move down"
+msgstr "Move down"
+
+msgid "Authentication"
+msgstr "Authentication"
+
+msgid "Login"
+msgstr "Login"
+
+msgid "Album cover types"
+msgstr "Album cover types"
+
+msgid "Saving album covers"
+msgstr "Saving album covers"
+
+msgid "Save album covers in album directory"
+msgstr "Save album covers in album directory"
+
+msgid "Save album covers in cache directory"
+msgstr "Save album covers in cache directory"
+
+msgid "Save album covers as embedded cover"
+msgstr "Save album covers as embedded cover"
+
+msgid "Filename:"
+msgstr "Filename:"
+
+msgid "Pattern"
+msgstr "Pattern"
+
+msgid "Random"
+msgstr "Random"
+
+msgid "Overwrite existing file"
+msgstr "Overwrite existing file"
+
+msgid "Lowercase filename"
+msgstr "Lowercase filename"
+
+msgid "Replace spaces with dashes"
+msgstr "Replace spaces with dashes"
+
+msgid "Use Tidal settings to authenticate."
+msgstr "Use Tidal settings to authenticate."
+
+msgid "Use Spotify settings to authenticate."
+msgstr "Use Spotify settings to authenticate."
+
+msgid "Use Qobuz settings to authenticate."
+msgstr "Use Qobuz settings to authenticate."
+
+msgid "%1 needs authentication."
+msgstr "%1 needs authentication."
+
+msgid "%1 does not need authentication."
+msgstr "%1 does not need authentication."
+
+msgid "No provider selected."
+msgstr "No provider selected."
+
+msgid "Authentication failed"
+msgstr "Authentication failed"
+
+msgid "Manually unset (%1)"
+msgstr "Manually unset (%1)"
+
+msgid "Set through album cover search (%1)"
+msgstr "Set through album cover search (%1)"
+
+msgid "Automatically picked up from album directory (%1)"
+msgstr "Automatically picked up from album directory (%1)"
+
+msgid "Embedded album cover art (%1)"
+msgstr "Embedded album cover art (%1)"
+
+msgid "Saving CUE files is not supported."
+msgstr "Saving CUE files is not supported."
+
+msgid "Unable to execute SQL query: %1"
+msgstr "Unable to execute SQL query: %1"
+
+msgid "Integrity check"
+msgstr "Integrity check"
+
+msgid "Database corruption detected."
+msgstr "Database corruption detected."
+
+msgid "Backing up database"
+msgstr "Backing up database"
+
+msgid "Delete files"
+msgstr "Delete files"
+
+msgid "The following files will be deleted from disk:"
+msgstr "The following files will be deleted from disk:"
+
+msgid "Are you sure you want to continue?"
+msgstr "Are you sure you want to continue?"
+
+msgid "Deleting files"
+msgstr "Deleting files"
+
+msgid "Updating %1%..."
+msgstr "Updating %1%..."
+
+msgid "Not connected"
+msgstr "Not connected"
+
+msgid "Not mounted - double click to mount"
+msgstr "Not mounted - double click to mount"
+
+msgid "Double click to open"
+msgstr "Double click to open"
+
+msgid "%1 song%2"
+msgstr "%1 song%2"
+
+msgid "Connect device"
+msgstr "Connect device"
+
+msgid "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+msgstr "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time."
+
+msgid "This device will not work properly"
+msgstr "This device will not work properly"
+
+msgid "This is an MTP device, but you compiled Strawberry without libmtp support."
+msgstr "This is an MTP device, but you compiled Strawberry without libmtp support."
+
+msgid "If you continue, this device will work slowly and songs copied to it may not work."
+msgstr "If you continue, this device will work slowly and songs copied to it may not work."
+
+msgid "This is an iPod, but you compiled Strawberry without libgpod support."
+msgstr "This is an iPod, but you compiled Strawberry without libgpod support."
+
+msgid "This type of device is not supported: %1"
+msgstr "This type of device is not supported: %1"
+
+msgid "Device Properties"
+msgstr "Device Properties"
+
+msgid "Information"
+msgstr "Information"
+
+msgid "Name"
+msgstr "Name"
+
+msgid "Icon"
+msgstr "Icon"
+
+msgid "Hardware information"
+msgstr "Hardware information"
+
+msgid "Hardware information is only available while the device is connected."
+msgstr "Hardware information is only available while the device is connected."
+
+msgid "File formats"
+msgstr "File formats"
+
+msgid "Supported formats"
+msgstr "Supported formats"
+
+msgid "This device supports the following file formats:"
+msgstr "This device supports the following file formats:"
+
+msgid "Strawberry can automatically convert the music you copy to this device into a format that it can play."
+msgstr "Strawberry can automatically convert the music you copy to this device into a format that it can play."
+
+msgid "Do not convert any music"
+msgstr "Do not convert any music"
+
+msgid "Convert any music that the device can't play"
+msgstr "Convert any music that the device can't play"
+
+msgid "Convert all music"
+msgstr "Convert all music"
+
+msgid "Preferred format"
+msgstr "Preferred format"
+
+msgid "This device must be connected and opened before Strawberry can see what file formats it supports."
+msgstr "This device must be connected and opened before Strawberry can see what file formats it supports."
+
+msgid "Open device"
+msgstr "Open device"
+
+msgid "Querying device..."
+msgstr "Querying device..."
+
+msgid "Model"
+msgstr "Model"
+
+msgid "Manufacturer"
+msgstr "Manufacturer"
+
+msgid "Safely remove device"
+msgstr "Safely remove device"
+
+msgid "Forget device"
+msgstr "Forget device"
+
+msgid "Device properties..."
+msgstr "Device properties..."
+
+msgid "Copy to collection..."
+msgstr "Copy to collection..."
+
+msgid "Delete from device..."
+msgstr "Delete from device..."
+
+msgid "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+msgstr "Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."
+
+msgid "These files will be deleted from the device, are you sure you want to continue?"
+msgstr "These files will be deleted from the device, are you sure you want to continue?"
+
+msgid "on "
+msgstr "on "
+
+msgid "Dynamic mode is on"
+msgstr "Dynamic mode is on"
+
+msgid "New tracks will be added automatically."
+msgstr "New tracks will be added automatically."
+
+msgid "Expand"
+msgstr "Expand"
+
+msgid "Repopulate"
+msgstr "Repopulate"
+
+msgid "Turn off"
+msgstr "Turn off"
+
+msgid "Edit track information"
+msgstr "Edit track information"
+
+msgid "Date created"
+msgstr "Date created"
+
+msgid "Art Automatic"
+msgstr "Art Automatic"
+
+msgid "Date modified"
+msgstr "Date modified"
+
+msgid "Art Embedded"
+msgstr "Art Embedded"
+
+#. A playlist's tag.
+msgid "Last played"
+msgstr "Last played"
+
+msgid "File type"
+msgstr "File type"
+
+msgid "Play count"
+msgstr "Play count"
+
+msgid "EBU R 128 integrated loudness"
+msgstr "EBU R 128 integrated loudness"
+
+msgid "Bit rate"
+msgstr "Bit rate"
+
+msgid "Skip count"
+msgstr "Skip count"
+
+msgid "Sample rate"
+msgstr "Sample rate"
+
+msgid "Path"
+msgstr "Path"
+
+msgid "Filename"
+msgstr "Filename"
+
+msgid "Art Unset"
+msgstr "Art Unset"
+
+msgid "File size"
+msgstr "File size"
+
+msgid "Art Manual"
+msgstr "Art Manual"
+
+msgid "EBU R 128 loudness range"
+msgstr "EBU R 128 loudness range"
+
+msgid "Reset play counts"
+msgstr "Reset play counts"
+
+msgid "Tags"
+msgstr "Tags"
+
+msgid "Change art"
+msgstr "Change art"
+
+msgid "Embedded cover"
+msgstr "Embedded cover"
+
+msgid "Disc"
+msgstr "Disc"
+
+msgid "Grouping"
+msgstr "Grouping"
+
+msgid "Album artist"
+msgstr "Album artist"
+
+msgid "Year"
+msgstr "Year"
+
+msgid "Composer"
+msgstr "Composer"
+
+msgid "Complete tags automatically"
+msgstr "Complete tags automatically"
+
+msgid "Genre"
+msgstr "Genre"
+
+msgid "Comment"
+msgstr "Comment"
+
+msgid "Performer"
+msgstr "Performer"
+
+msgid "Compilation"
+msgstr "Compilation"
+
+msgid "Track"
+msgstr "Track"
+
+msgid "Rating"
+msgstr "Rating"
+
+msgid "Lyrics"
+msgstr "Lyrics"
+
+msgid "Complete lyrics automatically"
+msgstr "Complete lyrics automatically"
+
+msgid "(different across multiple songs)"
+msgstr "(different across multiple songs)"
+
+msgid "Different art across multiple songs."
+msgstr "Different art across multiple songs."
+
+msgid "Previous"
+msgstr "Previous"
+
+msgid "Next"
+msgstr "Next"
+
+msgid "Saving tracks"
+msgstr "Saving tracks"
+
+msgid "Loading tracks"
+msgstr "Loading tracks"
+
+msgid "%1 songs selected."
+msgstr "%1 songs selected."
+
+msgid "Yes"
+msgstr "Yes"
+
+msgid "No"
+msgstr "No"
+
+msgid "None"
+msgstr "None"
+
+msgid "Cover is unset."
+msgstr "Cover is unset."
+
+msgid "Cover from embedded image."
+msgstr "Cover from embedded image."
+
+msgid "Cover from %1"
+msgstr "Cover from %1"
+
+msgid "Cover art not set"
+msgstr "Cover art not set"
+
+msgid "Album cover editing is only available for collection songs."
+msgstr "Album cover editing is only available for collection songs."
+
+msgid "Cover changed: Will be cleared when saved."
+msgstr "Cover changed: Will be cleared when saved."
+
+msgid "Cover changed: Will be unset when saved."
+msgstr "Cover changed: Will be unset when saved."
+
+msgid "Cover changed: Will be deleted when saved."
+msgstr "Cover changed: Will be deleted when saved."
+
+msgid "Cover changed: Will set new when saved."
+msgstr "Cover changed: Will set new when saved."
+
+msgid "Never"
+msgstr "Never"
+
+msgid "Reset song play statistics"
+msgstr "Reset song play statistics"
+
+msgid "Are you sure you want to reset this song's play statistics?"
+msgstr "Are you sure you want to reset this song's play statistics?"
+
+msgid "loading..."
+msgstr "loading..."
+
+msgid "Not found."
+msgstr "Not found."
+
+msgid "Could not write metadata to %1"
+msgstr "Could not write metadata to %1"
+
+msgid "Could not write metadata to %1: %2"
+msgstr "Could not write metadata to %1: %2"
+
+msgid "ID3v2 version:"
+msgstr "ID3v2 version:"
+
+msgid "2.3"
+msgstr "2.3"
+
+msgid "2.4"
+msgstr "2.4"
+
+msgid "Performer sort"
+msgstr "Performer sort"
+
+msgid "Title sort"
+msgstr "Title sort"
+
+msgid "Album artist sort"
+msgstr "Album artist sort"
+
+msgid "Artist sort"
+msgstr "Artist sort"
+
+msgid "Album sort"
+msgstr "Album sort"
+
+msgid "Composer sort"
+msgstr "Composer sort"
+
+msgid "Equalizer"
+msgstr "Equalizer"
+
+msgid "Preset:"
+msgstr "Preset:"
+
+msgid "Save preset"
+msgstr "Save preset"
+
+msgid "Delete preset"
+msgstr "Delete preset"
+
+msgid "Enable equalizer"
+msgstr "Enable equalizer"
+
+msgid "Enable stereo balancer"
+msgstr "Enable stereo balancer"
+
+msgid "Left"
+msgstr "Left"
+
+msgid "Balance"
+msgstr "Balance"
+
+msgid "Right"
+msgstr "Right"
+
+msgid "Custom"
+msgstr "Custom"
+
+msgid "Classical"
+msgstr "Classical"
+
+msgid "Club"
+msgstr "Club"
+
+msgid "Dance"
+msgstr "Dance"
+
+msgid "Full Bass"
+msgstr "Full Bass"
+
+msgid "Full Treble"
+msgstr "Full Treble"
+
+msgid "Full Bass + Treble"
+msgstr "Full Bass + Treble"
+
+msgid "Laptop/Headphones"
+msgstr "Laptop/Headphones"
+
+msgid "Large Hall"
+msgstr "Large Hall"
+
+msgid "Live"
+msgstr "Live"
+
+msgid "Party"
+msgstr "Party"
+
+msgid "Pop"
+msgstr "Pop"
+
+msgid "Reggae"
+msgstr "Reggae"
+
+msgid "Rock"
+msgstr "Rock"
+
+msgid "Soft"
+msgstr "Soft"
+
+msgid "Ska"
+msgstr "Ska"
+
+msgid "Soft Rock"
+msgstr "Soft Rock"
+
+msgid "Techno"
+msgstr "Techno"
+
+msgid "Zero"
+msgstr "Zero"
+
+msgid "Are you sure you want to delete the \"%1\" preset?"
+msgstr "Are you sure you want to delete the \"%1\" preset?"
+
+msgid "You need to restart playback for this setting to take affect."
+msgstr "You need to restart playback for this setting to take affect."
+
+msgid "%1 dB"
+msgstr "%1 dB"
+
+msgid "Strawberry Error"
+msgstr "Strawberry Error"
+
+msgid "Large sidebar"
+msgstr "Large sidebar"
+
+msgid "Icons sidebar"
+msgstr "Icons sidebar"
+
+msgid "Small sidebar"
+msgstr "Small sidebar"
+
+msgid "Plain sidebar"
+msgstr "Plain sidebar"
+
+msgid "Tabs on top"
+msgstr "Tabs on top"
+
+msgid "Icons on top"
+msgstr "Icons on top"
+
+msgid "Add root directory"
+msgstr "Add root directory"
+
+msgid "Remove selected root directory"
+msgstr "Remove selected root directory"
+
+msgid "Toggle between list and tree view"
+msgstr "Toggle between list and tree view"
+
+msgid "Select folder to add as tree root"
+msgstr "Select folder to add as tree root"
+
+msgid "Move to collection..."
+msgstr "Move to collection..."
+
+msgid "Files"
+msgstr "Files"
+
+msgid "Available"
+msgstr "Available"
+
+msgid "New songs"
+msgstr "New songs"
+
+msgid "Exceeded by"
+msgstr "Exceeded by"
+
+msgid "Used"
+msgstr "Used"
+
+msgid "Could not copy %1 to %2: %3"
+msgstr "Could not copy %1 to %2: %3"
+
+msgid "Writing database failed: %1"
+msgstr "Writing database failed: %1"
+
+msgid "Writing database failed."
+msgstr "Writing database failed."
+
+msgid "Loading iPod database"
+msgstr "Loading iPod database"
+
+msgid "An error occurred loading the iTunes database"
+msgstr "An error occurred loading the iTunes database"
+
+msgid "Mount point"
+msgstr "Mount point"
+
+msgid "URI"
+msgstr "URI"
+
+msgid "Press a key"
+msgstr "Press a key"
+
+msgid "Press a key combination to use for %1..."
+msgstr "Press a key combination to use for %1..."
+
+msgid "Play"
+msgstr "Play"
+
+msgid "Pause"
+msgstr "Pause"
+
+msgid "Play/Pause"
+msgstr "Play/Pause"
+
+msgid "Stop"
+msgstr "Stop"
+
+msgid "Stop playing after current track"
+msgstr "Stop playing after current track"
+
+msgid "Next track"
+msgstr "Next track"
+
+msgid "Previous track"
+msgstr "Previous track"
+
+msgid "Restart or previous track"
+msgstr "Restart or previous track"
+
+msgid "Increase volume"
+msgstr "Increase volume"
+
+msgid "Decrease volume"
+msgstr "Decrease volume"
+
+msgid "Mute"
+msgstr "Mute"
+
+msgid "Seek forward"
+msgstr "Seek forward"
+
+msgid "Seek backward"
+msgstr "Seek backward"
+
+msgid "Show/Hide"
+msgstr "Show/Hide"
+
+msgid "Show OSD"
+msgstr "Show OSD"
+
+msgid "Toggle Pretty OSD"
+msgstr "Toggle Pretty OSD"
+
+msgid "Change shuffle mode"
+msgstr "Change shuffle mode"
+
+msgid "Change repeat mode"
+msgstr "Change repeat mode"
+
+msgid "Enable/disable scrobbling"
+msgstr "Enable/disable scrobbling"
+
+msgid "Love"
+msgstr "Love"
+
+msgid "Global Shortcuts"
+msgstr "Global Shortcuts"
+
+msgid "Open..."
+msgstr "Open..."
+
+msgid "Use X11 shortcuts when available"
+msgstr "Use X11 shortcuts when available"
+
+msgid "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+msgstr "You need to launch System Preferences and allow Strawberry to \"<span style=\"font-style:italic\">control your computer</span>\" to use global shortcuts in Strawberry."
+
+#. Category label
+msgid "Action"
+msgstr "Action"
+
+msgid "Shortcut"
+msgstr "Shortcut"
+
+msgid "Shortcut for %1"
+msgstr "Shortcut for %1"
+
+msgid "&None"
+msgstr "&None"
+
+msgid "&Default"
+msgstr "&Default"
+
+msgid "&Custom"
+msgstr "&Custom"
+
+msgid "Change shortcut..."
+msgstr "Change shortcut..."
+
+msgid "Use KGlobalAccel shortcuts when available"
+msgstr "Use KGlobalAccel shortcuts when available"
+
+msgid "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+msgstr "Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."
+
+msgid "Collection advanced grouping"
+msgstr "Collection advanced grouping"
+
+msgid "You can change the way the songs in the collection are organized."
+msgstr "You can change the way the songs in the collection are organized."
+
+msgid "Group Collection by..."
+msgstr "Group Collection by..."
+
+msgid "First level"
+msgstr "First level"
+
+msgid "Album - Disc"
+msgstr "Album - Disc"
+
+msgid "Format"
+msgstr "Format"
+
+msgid "Year - Album"
+msgstr "Year - Album"
+
+msgid "Year - Album - Disc"
+msgstr "Year - Album - Disc"
+
+msgid "Original year"
+msgstr "Original year"
+
+msgid "Original year - Album"
+msgstr "Original year - Album"
+
+msgid "Second level"
+msgstr "Second level"
+
+msgid "Third level"
+msgstr "Third level"
+
+msgid "Separate albums by grouping tag"
+msgstr "Separate albums by grouping tag"
+
+msgid "Original year - Album - Disc"
+msgstr "Original year - Album - Disc"
+
+msgid "Buffering"
+msgstr "Buffering"
+
+msgid "%1 Scrobbler Authentication"
+msgstr "%1 Scrobbler Authentication"
+
+msgid "Open URL in web browser?"
+msgstr "Open URL in web browser?"
+
+msgid "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+msgstr "Press \"Save\" to copy the URL to clipboard and manually open it in a web browser."
+
+msgid "Could not open URL. Please open this URL in your browser"
+msgstr "Could not open URL. Please open this URL in your browser"
+
+msgid "Invalid reply from web browser. Missing token."
+msgstr "Invalid reply from web browser. Missing token."
+
+msgid "Received invalid reply from web browser. Try another browser."
+msgstr "Received invalid reply from web browser. Try another browser."
+
+msgid "Scrobbler %1 is not authenticated!"
+msgstr "Scrobbler %1 is not authenticated!"
+
+msgid "Scrobbler %1 error: %2"
+msgstr "Scrobbler %1 error: %2"
+
+msgid "Least favourite tracks"
+msgstr "Least favourite tracks"
+
+msgid "Unable to scrobble %1 - %2 because of error: %3"
+msgstr "Unable to scrobble %1 - %2 because of error: %3"
+
+msgid "Missing MusicBrainz recording ID for %1 %2 %3"
+msgstr "Missing MusicBrainz recording ID for %1 %2 %3"
+
+msgid "ListenBrainz error: %1"
+msgstr "ListenBrainz error: %1"
+
+msgid "You are not signed in."
+msgstr "You are not signed in."
+
+msgid "Sign out"
+msgstr "Sign out"
+
+msgid "Signing in..."
+msgstr "Signing in..."
+
+msgid "You are signed in."
+msgstr "You are signed in."
+
+msgid "You are signed in as %1."
+msgstr "You are signed in as %1."
+
+msgid "Expires on %1"
+msgstr "Expires on %1"
+
+msgid "Lyrics providers"
+msgstr "Lyrics providers"
+
+msgid "Choose the providers you want to use when searching for lyrics."
+msgstr "Choose the providers you want to use when searching for lyrics."
+
+msgid "Strawberry Music Player"
+msgstr "Strawberry Music Player"
+
+msgid "&Music"
+msgstr "&Music"
+
+msgid "P&laylist"
+msgstr "P&laylist"
+
+msgid "Help"
+msgstr "Help"
+
+msgid "&Tools"
+msgstr "&Tools"
+
+msgid "F5"
+msgstr "F5"
+
+msgid "&Play"
+msgstr "&Play"
+
+msgid "F6"
+msgstr "F6"
+
+msgid "&Stop"
+msgstr "&Stop"
+
+msgid "F7"
+msgstr "F7"
+
+msgid "&Next track"
+msgstr "&Next track"
+
+msgid "F8"
+msgstr "F8"
+
+msgid "&Quit"
+msgstr "&Quit"
+
+msgid "Ctrl+Q"
+msgstr "Ctrl+Q"
+
+msgid "Stop after this track"
+msgstr "Stop after this track"
+
+msgid "Ctrl+Alt+V"
+msgstr "Ctrl+Alt+V"
+
+msgid "&Clear playlist"
+msgstr "&Clear playlist"
+
+msgid "Clear playlist"
+msgstr "Clear playlist"
+
+msgid "Ctrl+K"
+msgstr "Ctrl+K"
+
+msgid "Ctrl+E"
+msgstr "Ctrl+E"
+
+msgid "Renumber tracks in this order..."
+msgstr "Renumber tracks in this order..."
+
+msgid "Set value for all selected tracks..."
+msgstr "Set value for all selected tracks..."
+
+msgid "Edit tag..."
+msgstr "Edit tag..."
+
+msgid "&Settings..."
+msgstr "&Settings..."
+
+msgid "Ctrl+P"
+msgstr "Ctrl+P"
+
+msgid "&About Strawberry"
+msgstr "&About Strawberry"
+
+msgid "F1"
+msgstr "F1"
+
+msgid "S&huffle playlist"
+msgstr "S&huffle playlist"
+
+msgid "&Add file..."
+msgstr "&Add file..."
+
+msgid "Ctrl+Shift+A"
+msgstr "Ctrl+Shift+A"
+
+msgid "&Open file..."
+msgstr "&Open file..."
+
+msgid "Open audio &CD..."
+msgstr "Open audio &CD..."
+
+msgid "&Cover Manager"
+msgstr "&Cover Manager"
+
+msgid "C&onsole"
+msgstr "C&onsole"
+
+msgid "&Shuffle mode"
+msgstr "&Shuffle mode"
+
+msgid "&Repeat mode"
+msgstr "&Repeat mode"
+
+msgid "Remove from playlist"
+msgstr "Remove from playlist"
+
+msgid "&Equalizer"
+msgstr "&Equalizer"
+
+msgid "&Transcode Music"
+msgstr "&Transcode Music"
+
+msgid "Add &folder..."
+msgstr "Add &folder..."
+
+msgid "&Jump to the currently playing track"
+msgstr "&Jump to the currently playing track"
+
+msgid "Ctrl+J"
+msgstr "Ctrl+J"
+
+msgid "&New playlist"
+msgstr "&New playlist"
+
+msgid "Ctrl+N"
+msgstr "Ctrl+N"
+
+msgid "Save &playlist..."
+msgstr "Save &playlist..."
+
+msgid "Ctrl+S"
+msgstr "Ctrl+S"
+
+msgid "&Load playlist..."
+msgstr "&Load playlist..."
+
+msgid "Ctrl+Shift+O"
+msgstr "Ctrl+Shift+O"
+
+msgid "&Save all playlists..."
+msgstr "&Save all playlists..."
+
+msgid "Go to next playlist tab"
+msgstr "Go to next playlist tab"
+
+msgid "Go to previous playlist tab"
+msgstr "Go to previous playlist tab"
+
+msgid "&Update changed collection folders"
+msgstr "&Update changed collection folders"
+
+msgid "About &Qt"
+msgstr "About &Qt"
+
+msgid "&Mute"
+msgstr "&Mute"
+
+msgid "Ctrl+M"
+msgstr "Ctrl+M"
+
+msgid "&Do a full collection rescan"
+msgstr "&Do a full collection rescan"
+
+msgid "Stop collection scan"
+msgstr "Stop collection scan"
+
+msgid "Complete tags automatically..."
+msgstr "Complete tags automatically..."
+
+msgid "Ctrl+T"
+msgstr "Ctrl+T"
+
+msgid "Toggle scrobbling"
+msgstr "Toggle scrobbling"
+
+msgid "Remove &duplicates from playlist"
+msgstr "Remove &duplicates from playlist"
+
+msgid "Remove &unavailable tracks from playlist"
+msgstr "Remove &unavailable tracks from playlist"
+
+msgid "Add file(s) to transcoder"
+msgstr "Add file(s) to transcoder"
+
+msgid "Add file to transcoder"
+msgstr "Add file to transcoder"
+
+msgid "Add stream..."
+msgstr "Add stream..."
+
+msgid "Show sidebar"
+msgstr "Show sidebar"
+
+msgid "Queue"
+msgstr "Queue"
+
+msgid "Playlists"
+msgstr "Playlists"
+
+msgid "Smart playlists"
+msgstr "Smart playlists"
+
+msgid "Radios"
+msgstr "Radios"
+
+msgid "Devices"
+msgstr "Devices"
+
+msgid "Subsonic"
+msgstr "Subsonic"
+
+msgid "Tidal"
+msgstr "Tidal"
+
+msgid "Spotify"
+msgstr "Spotify"
+
+msgid "Qobuz"
+msgstr "Qobuz"
+
+msgid "Show all songs"
+msgstr "Show all songs"
+
+msgid "Show only duplicates"
+msgstr "Show only duplicates"
+
+msgid "Show only untagged"
+msgstr "Show only untagged"
+
+msgid "Configure collection..."
+msgstr "Configure collection..."
+
+msgid "Toggle queue status"
+msgstr "Toggle queue status"
+
+msgid "Queue selected tracks to play next"
+msgstr "Queue selected tracks to play next"
+
+msgid "Toggle skip status"
+msgstr "Toggle skip status"
+
+msgid "Rescan song(s)..."
+msgstr "Rescan song(s)..."
+
+msgid "Fetch metadata from service"
+msgstr "Fetch metadata from service"
+
+msgid "Copy URL(s)..."
+msgstr "Copy URL(s)..."
+
+msgid "Show in collection..."
+msgstr "Show in collection..."
+
+msgid "Check for updates..."
+msgstr "Check for updates..."
+
+msgid "Strawberry running under Rosetta"
+msgstr "Strawberry running under Rosetta"
+
+msgid "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+msgstr "You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1"
+
+msgid "Sponsoring Strawberry"
+msgstr "Sponsoring Strawberry"
+
+msgid "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+msgstr "Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1"
+
+msgid "Dequeue track"
+msgstr "Dequeue track"
+
+msgid "Dequeue selected tracks"
+msgstr "Dequeue selected tracks"
+
+msgid "Queue selected tracks"
+msgstr "Queue selected tracks"
+
+msgid "Unskip track"
+msgstr "Unskip track"
+
+msgid "Unskip selected tracks"
+msgstr "Unskip selected tracks"
+
+msgid "Skip track"
+msgstr "Skip track"
+
+msgid "Skip selected tracks"
+msgstr "Skip selected tracks"
+
+msgid "Set %1 to \"%2\"..."
+msgstr "Set %1 to \"%2\"..."
+
+msgid "Edit tag \"%1\"..."
+msgstr "Edit tag \"%1\"..."
+
+msgid "Add to another playlist"
+msgstr "Add to another playlist"
+
+msgid "New playlist"
+msgstr "New playlist"
+
+msgid "Add file"
+msgstr "Add file"
+
+msgid "Music"
+msgstr "Music"
+
+msgid "Add folder"
+msgstr "Add folder"
+
+msgid "Playlist has %1 songs, too large to undo, are you sure you want to clear the playlist?"
+msgstr "Playlist has %1 songs, too large to undo, are you sure you want to clear the playlist?"
+
+msgid "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:"
+msgstr "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:"
+
+msgid "Would you like to run a full rescan right now?"
+msgstr "Would you like to run a full rescan right now?"
+
+msgid "Collection rescan notice"
+msgstr "Collection rescan notice"
+
+msgid "Ctrl+Shift+H"
+msgstr "Ctrl+Shift+H"
+
+msgid "Go to last playlist tab"
+msgstr "Go to last playlist tab"
+
+msgid "Go to active playlist tab"
+msgstr "Go to active playlist tab"
+
+msgid "Close current playlist tab"
+msgstr "Close current playlist tab"
+
+msgid "Message Dialog"
+msgstr "Message Dialog"
+
+msgid "Do not show this message again."
+msgstr "Do not show this message again."
+
+msgid "Playlist"
+msgstr "Playlist"
+
+msgid "Moodbar"
+msgstr "Moodbar"
+
+msgid "Moodbar style"
+msgstr "Moodbar style"
+
+msgid "Save the .mood files directly in the songs folders"
+msgstr "Save the .mood files directly in the songs folders"
+
+msgid "Invalid MTP device: %1"
+msgstr "Invalid MTP device: %1"
+
+msgid "Could not open MTP device."
+msgstr "Could not open MTP device."
+
+msgid "MTP error: %1"
+msgstr "MTP error: %1"
+
+msgid "MTP device not found."
+msgstr "MTP device not found."
+
+msgid "Loading MTP device"
+msgstr "Loading MTP device"
+
+msgid "Error connecting MTP device %1"
+msgstr "Error connecting MTP device %1"
+
+msgid "Error connecting MTP device %1: %2"
+msgstr "Error connecting MTP device %1: %2"
+
+msgid "Network Proxy"
+msgstr "Network Proxy"
+
+msgid "&Use the system proxy settings"
+msgstr "&Use the system proxy settings"
+
+msgid "Direct internet connection"
+msgstr "Direct internet connection"
+
+msgid "&Manual proxy configuration"
+msgstr "&Manual proxy configuration"
+
+msgid "HTTP proxy"
+msgstr "HTTP proxy"
+
+msgid "SOCKS proxy"
+msgstr "SOCKS proxy"
+
+msgid "Port"
+msgstr "Port"
+
+msgid "Use authentication"
+msgstr "Use authentication"
+
+msgid "Username"
+msgstr "Username"
+
+msgid "Password"
+msgstr "Password"
+
+msgid "Use proxy settings for streaming"
+msgstr "Use proxy settings for streaming"
+
+msgid "Only HTTP proxy is supported for streaming."
+msgstr "Only HTTP proxy is supported for streaming."
+
+msgid "Notifications"
+msgstr "Notifications"
+
+msgid "Strawberry can show a message when the track changes."
+msgstr "Strawberry can show a message when the track changes."
+
+msgid "Notification type"
+msgstr "Notification type"
+
+#. Refers to a disabled notification type in Notification settings.
+msgid "Disabled"
+msgstr "Disabled"
+
+msgid "Show a &native desktop notification"
+msgstr "Show a &native desktop notification"
+
+msgid "Show a pretty OSD"
+msgstr "Show a pretty OSD"
+
+msgid "Show a popup fro&m the system tray"
+msgstr "Show a popup fro&m the system tray"
+
+msgid "General settings"
+msgstr "General settings"
+
+msgid "Popup duration"
+msgstr "Popup duration"
+
+msgid " seconds"
+msgstr " seconds"
+
+msgid "Disable duration"
+msgstr "Disable duration"
+
+msgid "Show a notification when I change the volume"
+msgstr "Show a notification when I change the volume"
+
+msgid "Show a notification when I change the repeat/shuffle mode"
+msgstr "Show a notification when I change the repeat/shuffle mode"
+
+msgid "Show a notification when I pause playback"
+msgstr "Show a notification when I pause playback"
+
+msgid "Show a notification when I resume playback"
+msgstr "Show a notification when I resume playback"
+
+msgid "Include album art in the notification"
+msgstr "Include album art in the notification"
+
+msgid "Custom message settings"
+msgstr "Custom message settings"
+
+msgid "Use a custom message for notifications"
+msgstr "Use a custom message for notifications"
+
+msgid "Body"
+msgstr "Body"
+
+msgid "Pretty OSD options"
+msgstr "Pretty OSD options"
+
+msgid "Background color"
+msgstr "Background color"
+
+msgid "Text options"
+msgstr "Text options"
+
+msgid "Choose font..."
+msgstr "Choose font..."
+
+msgid "Choose color..."
+msgstr "Choose color..."
+
+msgid "Background opacity"
+msgstr "Background opacity"
+
+msgid "Basic Blue"
+msgstr "Basic Blue"
+
+msgid "Strawberry Red"
+msgstr "Strawberry Red"
+
+msgid "Custom..."
+msgstr "Custom..."
+
+msgid "Enable fading"
+msgstr "Enable fading"
+
+msgid "%originalyear%"
+msgstr "%originalyear%"
+
+msgid "OSD Preview"
+msgstr "OSD Preview"
+
+msgid "Drag to reposition"
+msgstr "Drag to reposition"
+
+msgid "Discord"
+msgstr "Discord"
+
+msgid "Enable Rich Presence"
+msgstr "Enable Rich Presence"
+
+msgid "\"Listening to...\""
+msgstr "\"Listening to...\""
+
+msgid "Strawberry"
+msgstr "Strawberry"
+
+msgid "Artist name"
+msgstr "Artist name"
+
+msgid "Song title"
+msgstr "Song title"
+
+msgid "Please open this URL in your browser"
+msgstr "Please open this URL in your browser"
+
+msgid "Received invalid reply from web browser."
+msgstr "Received invalid reply from web browser."
+
+msgid "Redirect URL is missing query."
+msgstr "Redirect URL is missing query."
+
+msgid "Request URL is missing code!"
+msgstr "Request URL is missing code!"
+
+msgid "Request URL is missing state!"
+msgstr "Request URL is missing state!"
+
+msgid "Request URL has wrong state %1 != %2"
+msgstr "Request URL has wrong state %1 != %2"
+
+msgid "disc %1"
+msgstr "disc %1"
+
+msgid "track %1"
+msgstr "track %1"
+
+msgid "Paused"
+msgstr "Paused"
+
+msgid "Stopped"
+msgstr "Stopped"
+
+msgid "Stop playing after track: %1"
+msgstr "Stop playing after track: %1"
+
+msgid "On"
+msgstr "On"
+
+msgid "Off"
+msgstr "Off"
+
+msgid "Playlist finished"
+msgstr "Playlist finished"
+
+msgid "Volume %1%"
+msgstr "Volume %1%"
+
+msgid "Don't shuffle"
+msgstr "Don't shuffle"
+
+msgid "Shuffle all"
+msgstr "Shuffle all"
+
+msgid "Shuffle tracks in this album"
+msgstr "Shuffle tracks in this album"
+
+msgid "Shuffle albums"
+msgstr "Shuffle albums"
+
+msgid "Shuffle grouping"
+msgstr "Shuffle grouping"
+
+msgid "Don't repeat"
+msgstr "Don't repeat"
+
+msgid "Repeat track"
+msgstr "Repeat track"
+
+msgid "Repeat album"
+msgstr "Repeat album"
+
+msgid "Repeat playlist"
+msgstr "Repeat playlist"
+
+msgid "Stop after every track"
+msgstr "Stop after every track"
+
+msgid "Intro tracks"
+msgstr "Intro tracks"
+
+msgid "Organizing files"
+msgstr "Organizing files"
+
+msgid "Organize Files"
+msgstr "Organize Files"
+
+msgid "Destination"
+msgstr "Destination"
+
+msgid "After copying..."
+msgstr "After copying..."
+
+msgid "Keep the original files"
+msgstr "Keep the original files"
+
+msgid "Delete the original files"
+msgstr "Delete the original files"
+
+msgid "Naming options"
+msgstr "Naming options"
+
+msgid "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+msgstr "<p>Tokens start with %, for example: %artist %album %title </p>\n\n<p>If you surround sections of text that contain a token with curly-braces, that section will be hidden if the token is empty.</p>"
+
+msgid "Insert..."
+msgstr "Insert..."
+
+msgid "Remove problematic characters from filenames"
+msgstr "Remove problematic characters from filenames"
+
+msgid "Restrict to characters allowed on FAT filesystems"
+msgstr "Restrict to characters allowed on FAT filesystems"
+
+msgid "Restrict characters to ASCII"
+msgstr "Restrict characters to ASCII"
+
+msgid "Allow extended ASCII characters"
+msgstr "Allow extended ASCII characters"
+
+msgid "Replace spaces with underscores"
+msgstr "Replace spaces with underscores"
+
+msgid "Overwrite existing files"
+msgstr "Overwrite existing files"
+
+msgid "Copy album cover artwork"
+msgstr "Copy album cover artwork"
+
+msgid "Safely remove the device after copying"
+msgstr "Safely remove the device after copying"
+
+msgid "Artist's initial"
+msgstr "Artist's initial"
+
+msgid "File extension"
+msgstr "File extension"
+
+msgid "Error copying songs"
+msgstr "Error copying songs"
+
+msgid "There were problems copying some songs.  The following files could not be copied:"
+msgstr "There were problems copying some songs.  The following files could not be copied:"
+
+msgid "Error deleting songs"
+msgstr "Error deleting songs"
+
+msgid "There were problems deleting some songs.  The following files could not be deleted:"
+msgstr "There were problems deleting some songs.  The following files could not be deleted:"
+
+msgid "Don't know how to handle %1"
+msgstr "Don't know how to handle %1"
+
+msgid "File %1 does not exist"
+msgstr "File %1 does not exist"
+
+msgid "Could not read file %1: %2"
+msgstr "Could not read file %1: %2"
+
+msgid "Small album cover"
+msgstr "Small album cover"
+
+msgid "Large album cover"
+msgstr "Large album cover"
+
+msgid "Fit cover to width"
+msgstr "Fit cover to width"
+
+msgid "Show above status bar"
+msgstr "Show above status bar"
+
+msgid "Title Sort"
+msgstr "Title Sort"
+
+msgid "Artist Sort"
+msgstr "Artist Sort"
+
+msgid "Album Sort"
+msgstr "Album Sort"
+
+msgid "Original Year"
+msgstr "Original Year"
+
+msgid "Album Artist"
+msgstr "Album Artist"
+
+msgid "Album Artist Sort"
+msgstr "Album Artist Sort"
+
+msgid "Composer Sort"
+msgstr "Composer Sort"
+
+msgid "Performer Sort"
+msgstr "Performer Sort"
+
+msgid "Play Count"
+msgstr "Play Count"
+
+msgid "Skip Count"
+msgstr "Skip Count"
+
+msgid "Last Played"
+msgstr "Last Played"
+
+msgid "Sample Rate"
+msgstr "Sample Rate"
+
+msgid "Bit Depth"
+msgstr "Bit Depth"
+
+msgid "Initial key"
+msgstr "Initial key"
+
+msgid "File Name (without path)"
+msgstr "File Name (without path)"
+
+msgid "File Size"
+msgstr "File Size"
+
+msgid "File Type"
+msgstr "File Type"
+
+msgid "Date Modified"
+msgstr "Date Modified"
+
+msgid "Date Created"
+msgstr "Date Created"
+
+msgid "Source"
+msgstr "Source"
+
+msgid "BPM"
+msgstr "BPM"
+
+msgid "Mood"
+msgstr "Mood"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "CUE"
+msgstr "CUE"
+
+msgid "Integrated Loudness"
+msgstr "Integrated Loudness"
+
+msgid "Loudness Range"
+msgstr "Loudness Range"
+
+msgid "Undo"
+msgstr "Undo"
+
+msgid "Redo"
+msgstr "Redo"
+
+msgid "Load playlist"
+msgstr "Load playlist"
+
+msgid "No matches found.  Clear the search box to show the whole playlist again."
+msgstr "No matches found.  Clear the search box to show the whole playlist again."
+
+msgid "stop"
+msgstr "stop"
+
+msgid "Loading smart playlist"
+msgstr "Loading smart playlist"
+
+msgid "&Hide..."
+msgstr "&Hide..."
+
+msgid "&Stretch columns to fit window"
+msgstr "&Stretch columns to fit window"
+
+msgid "&Reset columns to default"
+msgstr "&Reset columns to default"
+
+msgid "&Lock rating"
+msgstr "&Lock rating"
+
+msgid "&Align text"
+msgstr "&Align text"
+
+msgid "&Left"
+msgstr "&Left"
+
+msgid "&Center"
+msgstr "&Center"
+
+msgid "&Right"
+msgstr "&Right"
+
+msgid "&Hide %1"
+msgstr "&Hide %1"
+
+msgid "New folder"
+msgstr "New folder"
+
+msgid "Delete"
+msgstr "Delete"
+
+#. Save playlist menu action.
+msgid "Save playlist"
+msgstr "Save playlist"
+
+msgid "Enter the name of the folder"
+msgstr "Enter the name of the folder"
+
+msgid "Copy songs to playlist"
+msgstr "Copy songs to playlist"
+
+msgid "Copy to device"
+msgstr "Copy to device"
+
+msgid "Playlist must be open first."
+msgstr "Playlist must be open first."
+
+msgid "Remove playlists"
+msgstr "Remove playlists"
+
+msgid "You are about to remove %1 playlists from your favorites, are you sure?"
+msgstr "You are about to remove %1 playlists from your favorites, are you sure?"
+
+msgid "You can favorite playlists by clicking the star icon next to a playlist name"
+msgstr "You can favorite playlists by clicking the star icon next to a playlist name"
+
+msgid "Favorited playlists will be saved here"
+msgstr "Favorited playlists will be saved here"
+
+msgid "Couldn't create playlist"
+msgstr "Couldn't create playlist"
+
+msgid "Unknown playlist extension"
+msgstr "Unknown playlist extension"
+
+msgid "Unknown file extension for playlist."
+msgstr "Unknown file extension for playlist."
+
+msgid "%1 selected of"
+msgstr "%1 selected of"
+
+msgid "%n track(s)"
+msgid_plural "%n track(s)"
+msgstr[0] "%n track(s)"
+
+msgid "All playlists (%1)"
+msgstr "All playlists (%1)"
+
+msgid "%1 playlists (%2)"
+msgstr "%1 playlists (%2)"
+
+msgid "Unknown filetype: %1"
+msgstr "Unknown filetype: %1"
+
+msgid "Could not open file %1"
+msgstr "Could not open file %1"
+
+msgid "Directory %1 does not exist."
+msgstr "Directory %1 does not exist."
+
+msgid "Failed to open %1 for writing."
+msgstr "Failed to open %1 for writing."
+
+msgid "Playlist options"
+msgstr "Playlist options"
+
+msgid "File paths"
+msgstr "File paths"
+
+msgid "This can be changed later through the preferences"
+msgstr "This can be changed later through the preferences"
+
+msgid "Remember my choice"
+msgstr "Remember my choice"
+
+msgid "Automatic"
+msgstr "Automatic"
+
+msgid "Relative"
+msgstr "Relative"
+
+msgid "Absolute"
+msgstr "Absolute"
+
+msgid "Repeat"
+msgstr "Repeat"
+
+msgid "Shuffle"
+msgstr "Shuffle"
+
+msgid "Stop after each track"
+msgstr "Stop after each track"
+
+msgid "Use alternating row colors"
+msgstr "Use alternating row colors"
+
+msgid "Show bars on the currently playing track"
+msgstr "Show bars on the currently playing track"
+
+msgid "Show a glowing animation on the currently playing track"
+msgstr "Show a glowing animation on the currently playing track"
+
+msgid "Warn me when closing a playlist tab"
+msgstr "Warn me when closing a playlist tab"
+
+msgid "Continue to the next item in the playlist if a song is unavailable"
+msgstr "Continue to the next item in the playlist if a song is unavailable"
+
+msgid "Grey out unavailable songs in playlists on playback"
+msgstr "Grey out unavailable songs in playlists on playback"
+
+msgid "Grey out unavailable songs in playlists on startup"
+msgstr "Grey out unavailable songs in playlists on startup"
+
+msgid "Automatically select current playing track"
+msgstr "Automatically select current playing track"
+
+msgid "Enable playlist toolbar"
+msgstr "Enable playlist toolbar"
+
+msgid "Enable playlist clear button"
+msgstr "Enable playlist clear button"
+
+msgid "Automatically sort playlist when inserting songs"
+msgstr "Automatically sort playlist when inserting songs"
+
+msgid "When saving a playlist, file paths should be"
+msgstr "When saving a playlist, file paths should be"
+
+msgid "A&utomatic"
+msgstr "A&utomatic"
+
+msgid "Absolu&te"
+msgstr "Absolu&te"
+
+msgid "Re&lative"
+msgstr "Re&lative"
+
+msgid "As&k when saving"
+msgstr "As&k when saving"
+
+msgid "Metadata"
+msgstr "Metadata"
+
+msgid "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+msgstr "If activated, clicking a selected song in the playlist view will let you edit the tag value directly"
+
+msgid "Enable song metadata inline edition with click"
+msgstr "Enable song metadata inline edition with click"
+
+msgid "Write metadata when saving playlists"
+msgstr "Write metadata when saving playlists"
+
+msgid "Star playlist"
+msgstr "Star playlist"
+
+msgid "Close playlist"
+msgstr "Close playlist"
+
+msgid "Rename playlist..."
+msgstr "Rename playlist..."
+
+msgid "Save playlist..."
+msgstr "Save playlist..."
+
+msgid "Rename playlist"
+msgstr "Rename playlist"
+
+msgid "Enter a new name for this playlist"
+msgstr "Enter a new name for this playlist"
+
+msgid "Remove playlist"
+msgstr "Remove playlist"
+
+msgid "You are about to remove a playlist which is not part of your favorite playlists: the playlist will be deleted (this action cannot be undone). \nAre you sure you want to continue?"
+msgstr "You are about to remove a playlist which is not part of your favorite playlists: the playlist will be deleted (this action cannot be undone). \nAre you sure you want to continue?"
+
+msgid "This option can be changed in the \"Behavior\" preferences"
+msgstr "This option can be changed in the \"Behavior\" preferences"
+
+msgid "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+msgstr "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar"
+
+msgid "Hz"
+msgstr "Hz"
+
+msgid "Bit"
+msgstr "Bit"
+
+msgid "Usage"
+msgstr "Usage"
+
+msgid "options"
+msgstr "options"
+
+msgid "URL(s)"
+msgstr "URL(s)"
+
+msgid "Player options"
+msgstr "Player options"
+
+msgid "Start the playlist currently playing"
+msgstr "Start the playlist currently playing"
+
+msgid "Play if stopped, pause if playing"
+msgstr "Play if stopped, pause if playing"
+
+msgid "Pause playback"
+msgstr "Pause playback"
+
+msgid "Stop playback"
+msgstr "Stop playback"
+
+msgid "Stop playback after current track"
+msgstr "Stop playback after current track"
+
+msgid "Skip backwards in playlist"
+msgstr "Skip backwards in playlist"
+
+msgid "Skip forwards in playlist"
+msgstr "Skip forwards in playlist"
+
+msgid "Set the volume to <value> percent"
+msgstr "Set the volume to <value> percent"
+
+msgid "Increase the volume by 4 percent"
+msgstr "Increase the volume by 4 percent"
+
+msgid "Decrease the volume by 4 percent"
+msgstr "Decrease the volume by 4 percent"
+
+msgid "Increase the volume by <value> percent"
+msgstr "Increase the volume by <value> percent"
+
+msgid "Decrease the volume by <value> percent"
+msgstr "Decrease the volume by <value> percent"
+
+msgid "Seek the currently playing track to an absolute position"
+msgstr "Seek the currently playing track to an absolute position"
+
+msgid "Seek the currently playing track by a relative amount"
+msgstr "Seek the currently playing track by a relative amount"
+
+msgid "Restart the track, or play the previous track if within 8 seconds of start."
+msgstr "Restart the track, or play the previous track if within 8 seconds of start."
+
+msgid "Create a new playlist with files"
+msgstr "Create a new playlist with files"
+
+msgid "Append files/URLs to the playlist"
+msgstr "Append files/URLs to the playlist"
+
+msgid "Loads files/URLs, replacing current playlist"
+msgstr "Loads files/URLs, replacing current playlist"
+
+msgid "Play the <n>th track in the playlist"
+msgstr "Play the <n>th track in the playlist"
+
+msgid "Play given playlist"
+msgstr "Play given playlist"
+
+msgid "Other options"
+msgstr "Other options"
+
+msgid "Display the on-screen-display"
+msgstr "Display the on-screen-display"
+
+msgid "Toggle visibility for the pretty on-screen-display"
+msgstr "Toggle visibility for the pretty on-screen-display"
+
+msgid "Change the language"
+msgstr "Change the language"
+
+msgid "Resize the window"
+msgstr "Resize the window"
+
+msgid "Equivalent to --log-levels *:1"
+msgstr "Equivalent to --log-levels *:1"
+
+msgid "Equivalent to --log-levels *:3"
+msgstr "Equivalent to --log-levels *:3"
+
+msgid "Comma separated list of class:level, level is 0-3"
+msgstr "Comma separated list of class:level, level is 0-3"
+
+msgid "Print out version information"
+msgstr "Print out version information"
+
+msgid "Create fingerprint"
+msgstr "Create fingerprint"
+
+msgid "Failed to create directory %1."
+msgstr "Failed to create directory %1."
+
+msgid "Destination file %1 exists, but not allowed to overwrite."
+msgstr "Destination file %1 exists, but not allowed to overwrite."
+
+msgid "Destination file %1 exists, but not allowed to overwrite"
+msgstr "Destination file %1 exists, but not allowed to overwrite"
+
+msgid "Could not copy file %1 to %2."
+msgstr "Could not copy file %1 to %2."
+
+msgid "LUFS"
+msgstr "LUFS"
+
+msgid "LU"
+msgstr "LU"
+
+msgid "1 day"
+msgstr "1 day"
+
+msgid "%1 days"
+msgstr "%1 days"
+
+msgid "Today"
+msgstr "Today"
+
+msgid "Yesterday"
+msgstr "Yesterday"
+
+msgid "%1 days ago"
+msgstr "%1 days ago"
+
+msgid "Tomorrow"
+msgstr "Tomorrow"
+
+msgid "In %1 days"
+msgstr "In %1 days"
+
+msgid "Next week"
+msgstr "Next week"
+
+msgid "In %1 weeks"
+msgstr "In %1 weeks"
+
+msgid "Show in file browser"
+msgstr "Show in file browser"
+
+msgid "Too many songs selected."
+msgstr "Too many songs selected."
+
+msgid "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+msgstr "%1 songs in %2 different directories selected, are you sure you want to open them all?"
+
+msgid "Failed to load image from data for %1"
+msgstr "Failed to load image from data for %1"
+
+msgid "Success"
+msgstr "Success"
+
+msgid "File is unsupported"
+msgstr "File is unsupported"
+
+msgid "Filename is missing"
+msgstr "Filename is missing"
+
+msgid "File does not exist"
+msgstr "File does not exist"
+
+msgid "File could not be opened"
+msgstr "File could not be opened"
+
+msgid "Could not parse file"
+msgstr "Could not parse file"
+
+msgid "Could not save file"
+msgstr "Could not save file"
+
+msgid "Unknown error"
+msgstr "Unknown error"
+
+msgid "Prefix a search term with a field name to limit the search to that field, e.g.:"
+msgstr "Prefix a search term with a field name to limit the search to that field, e.g.:"
+
+msgid "artist"
+msgstr "artist"
+
+msgid "searches for all artists containing the word %1."
+msgstr "searches for all artists containing the word %1."
+
+msgid "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+msgstr "Search terms for numerical fields can be prefixed with %1 or %2 to refine the search, e.g.: "
+
+msgid "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+msgstr "A word can be excluded with a preceding \"%1\", if you need to search for a word including \"%1\", place quotes around the word."
+
+msgid "rating"
+msgstr "rating"
+
+msgid "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+msgstr "Multiple search terms can also be combined with \"%1\" (default) and \"%2\", as well as grouped with parentheses."
+
+msgid "Available fields"
+msgstr "Available fields"
+
+msgid "after"
+msgstr "after"
+
+msgid "before"
+msgstr "before"
+
+msgid "on"
+msgstr "on"
+
+msgid "not on"
+msgstr "not on"
+
+msgid "in the last"
+msgstr "in the last"
+
+msgid "not in the last"
+msgstr "not in the last"
+
+msgid "between"
+msgstr "between"
+
+msgid "contains"
+msgstr "contains"
+
+msgid "does not contain"
+msgstr "does not contain"
+
+msgid "starts with"
+msgstr "starts with"
+
+msgid "ends with"
+msgstr "ends with"
+
+msgid "greater than"
+msgstr "greater than"
+
+msgid "less than"
+msgstr "less than"
+
+msgid "equals"
+msgstr "equals"
+
+msgid "not equals"
+msgstr "not equals"
+
+msgid "empty"
+msgstr "empty"
+
+msgid "not empty"
+msgstr "not empty"
+
+msgid "A-Z"
+msgstr "A-Z"
+
+msgid "Z-A"
+msgstr "Z-A"
+
+msgid "oldest first"
+msgstr "oldest first"
+
+msgid "newest first"
+msgstr "newest first"
+
+msgid "shortest first"
+msgstr "shortest first"
+
+msgid "longest first"
+msgstr "longest first"
+
+msgid "smallest first"
+msgstr "smallest first"
+
+msgid "biggest first"
+msgstr "biggest first"
+
+msgid "Hours"
+msgstr "Hours"
+
+msgid "Days"
+msgstr "Days"
+
+msgid "Weeks"
+msgstr "Weeks"
+
+msgid "Months"
+msgstr "Months"
+
+msgid "Years"
+msgstr "Years"
+
+msgid "Normal"
+msgstr "Normal"
+
+msgid "Angry"
+msgstr "Angry"
+
+msgid "Frozen"
+msgstr "Frozen"
+
+msgid "Happy"
+msgstr "Happy"
+
+msgid "System colors"
+msgstr "System colors"
+
+msgid "add %n songs"
+msgid_plural "add %n songs"
+msgstr[0] "add %n songs"
+
+msgid "remove %n songs"
+msgid_plural "remove %n songs"
+msgstr[0] "remove %n songs"
+
+msgid "move %n songs"
+msgid_plural "move %n songs"
+msgstr[0] "move %n songs"
+
+msgid "sort songs"
+msgstr "sort songs"
+
+msgid "shuffle songs"
+msgstr "shuffle songs"
+
+msgid "Invalid collection directory"
+msgstr "Invalid collection directory"
+
+msgid "Can't add directory %1 with special filesystem %2 to collection"
+msgstr "Can't add directory %1 with special filesystem %2 to collection"
+
+msgid "Clear"
+msgstr "Clear"
+
+msgid "Reset"
+msgstr "Reset"
+
+msgid "Not authenticated"
+msgstr "Not authenticated"
+
+msgid "No track ID"
+msgstr "No track ID"
+
+msgid "Receiving artists..."
+msgstr "Receiving artists..."
+
+msgid "Receiving albums..."
+msgstr "Receiving albums..."
+
+msgid "Receiving songs..."
+msgstr "Receiving songs..."
+
+msgid "Searching..."
+msgstr "Searching..."
+
+msgid "Receiving albums for %1 artist..."
+msgstr "Receiving albums for %1 artist..."
+
+msgid "Receiving albums for %1 artists..."
+msgstr "Receiving albums for %1 artists..."
+
+msgid "Receiving songs for %1 album..."
+msgstr "Receiving songs for %1 album..."
+
+msgid "Receiving songs for %1 albums..."
+msgstr "Receiving songs for %1 albums..."
+
+msgid "Receiving album cover for %1 album..."
+msgstr "Receiving album cover for %1 album..."
+
+msgid "Receiving album covers for %1 albums..."
+msgstr "Receiving album covers for %1 albums..."
+
+msgid "No match."
+msgstr "No match."
+
+msgid "Missing Qobuz app ID."
+msgstr "Missing Qobuz app ID."
+
+msgid "Missing app ID. Please fetch credentials first."
+msgstr "Missing app ID. Please fetch credentials first."
+
+msgid "Missing app secret. Please fetch credentials first."
+msgstr "Missing app secret. Please fetch credentials first."
+
+msgid "Missing private key. Please fetch credentials first."
+msgstr "Missing private key. Please fetch credentials first."
+
+msgid "Failed to start local server for OAuth redirect: %1"
+msgstr "Failed to start local server for OAuth redirect: %1"
+
+msgid "Failed to open the web browser. Please open this URL manually: %1"
+msgstr "Failed to open the web browser. Please open this URL manually: %1"
+
+msgid "Waiting for browser authentication..."
+msgstr "Waiting for browser authentication..."
+
+msgid "OAuth redirect failed: %1"
+msgstr "OAuth redirect failed: %1"
+
+msgid "OAuth redirect is missing authorization code."
+msgstr "OAuth redirect is missing authorization code."
+
+msgid "Exchanging authorization code..."
+msgstr "Exchanging authorization code..."
+
+msgid "Not authenticated with Qobuz."
+msgstr "Not authenticated with Qobuz."
+
+msgid "Missing Qobuz app ID or secret."
+msgstr "Missing Qobuz app ID or secret."
+
+msgid "Not authenticated. Please login to Qobuz in the settings."
+msgstr "Not authenticated. Please login to Qobuz in the settings."
+
+msgid "Enable"
+msgstr "Enable"
+
+msgid "App ID"
+msgstr "App ID"
+
+msgid "App Secret"
+msgstr "App Secret"
+
+msgid "Preferences"
+msgstr "Preferences"
+
+msgid "Audio format"
+msgstr "Audio format"
+
+msgid "Search delay"
+msgstr "Search delay"
+
+msgid "ms"
+msgstr "ms"
+
+msgid "Artists search limit"
+msgstr "Artists search limit"
+
+msgid "Albums search limit"
+msgstr "Albums search limit"
+
+msgid "Songs search limit"
+msgstr "Songs search limit"
+
+msgid "Download album covers"
+msgstr "Download album covers"
+
+msgid "Configuration incomplete"
+msgstr "Configuration incomplete"
+
+msgid "Missing app id. Please fetch credentials first."
+msgstr "Missing app id. Please fetch credentials first."
+
+msgid "Fetching..."
+msgstr "Fetching..."
+
+msgid "Credentials fetched"
+msgstr "Credentials fetched"
+
+msgid "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+msgstr "Credentials have been successfully fetched. Click Login to authenticate via your browser."
+
+msgid "Credential fetch failed"
+msgstr "Credential fetch failed"
+
+msgid "Fetch Credentials"
+msgstr "Fetch Credentials"
+
+msgid "Remove (Remastered), etc from song titles"
+msgstr "Remove (Remastered), etc from song titles"
+
+msgid "Private key"
+msgstr "Private key"
+
+msgid "Automatically fetch app ID, app secret and private key from Qobuz web player"
+msgstr "Automatically fetch app ID, app secret and private key from Qobuz web player"
+
+msgid "Not authenticated. Please log in on the Qobuz settings page."
+msgstr "Not authenticated. Please log in on the Qobuz settings page."
+
+msgid "Cancelled."
+msgstr "Cancelled."
+
+msgid "QueueView"
+msgstr "QueueView"
+
+msgid "Ctrl+Up"
+msgstr "Ctrl+Up"
+
+msgid "Ctrl+Down"
+msgstr "Ctrl+Down"
+
+msgid "Remove"
+msgstr "Remove"
+
+msgid "Country"
+msgstr "Country"
+
+msgid "Codec"
+msgstr "Codec"
+
+msgid "Load more..."
+msgstr "Load more..."
+
+msgid "Search for radio stations using radio-browser.info"
+msgstr "Search for radio stations using radio-browser.info"
+
+msgid "Search radio stations..."
+msgstr "Search radio stations..."
+
+msgid "All countries"
+msgstr "All countries"
+
+msgid "By votes"
+msgstr "By votes"
+
+msgid "By clicks"
+msgstr "By clicks"
+
+msgid "By name"
+msgstr "By name"
+
+msgid "By bitrate"
+msgstr "By bitrate"
+
+msgid "No stations found."
+msgstr "No stations found."
+
+msgid "%1 stations found"
+msgstr "%1 stations found"
+
+msgid "No Radio Browser server available."
+msgstr "No Radio Browser server available."
+
+msgid "Searching Radio Browser"
+msgstr "Searching Radio Browser"
+
+msgid "Radio Browser search failed: %1"
+msgstr "Radio Browser search failed: %1"
+
+msgid "Getting %1 channels"
+msgstr "Getting %1 channels"
+
+msgid "SomaFM"
+msgstr "SomaFM"
+
+msgid "Stream quality:"
+msgstr "Stream quality:"
+
+msgid "Radio Browser"
+msgstr "Radio Browser"
+
+msgid "Search results limit:"
+msgstr "Search results limit:"
+
+msgid "Hide broken stations"
+msgstr "Hide broken stations"
+
+msgid "Default sort order:"
+msgstr "Default sort order:"
+
+msgid "Default country:"
+msgstr "Default country:"
+
+msgid "Highest"
+msgstr "Highest"
+
+msgid "High"
+msgstr "High"
+
+msgid "Low"
+msgstr "Low"
+
+msgid "Open homepage"
+msgstr "Open homepage"
+
+msgid "Donate"
+msgstr "Donate"
+
+msgid "Refresh channels"
+msgstr "Refresh channels"
+
+msgid "Channels"
+msgstr "Channels"
+
+msgid "Select directory for saving playlists"
+msgstr "Select directory for saving playlists"
+
+msgid "Type"
+msgstr "Type"
+
+msgid "Select directory for the playlists"
+msgstr "Select directory for the playlists"
+
+msgid "Directory does not exist."
+msgstr "Directory does not exist."
+
+msgid "Saved Grouping Manager"
+msgstr "Saved Grouping Manager"
+
+msgid "Second Level"
+msgstr "Second Level"
+
+msgid "Third Level"
+msgstr "Third Level"
+
+msgid "Scrobbler"
+msgstr "Scrobbler"
+
+msgid "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+msgstr "Songs are scrobbled if they have valid metadata and are longer than 30 seconds, have been playing for at least half its duration or for 4 minutes (whichever occurs earlier)."
+
+msgid "Show scrobble button"
+msgstr "Show scrobble button"
+
+msgid "Show love button"
+msgstr "Show love button"
+
+msgid "Submit scrobbles every"
+msgstr "Submit scrobbles every"
+
+msgid "Prefer album artist when sending scrobbles"
+msgstr "Prefer album artist when sending scrobbles"
+
+msgid "Show dialog for errors"
+msgstr "Show dialog for errors"
+
+msgid "Strip \"remastered\" and similar from album and title"
+msgstr "Strip \"remastered\" and similar from album and title"
+
+msgid "Enable scrobbling for the following sources:"
+msgstr "Enable scrobbling for the following sources:"
+
+msgid "Local file"
+msgstr "Local file"
+
+msgid "CDDA"
+msgstr "CDDA"
+
+msgid "Stream"
+msgstr "Stream"
+
+msgid "Radio Paradise"
+msgstr "Radio Paradise"
+
+msgid "Last.fm"
+msgstr "Last.fm"
+
+msgid "Listenbrainz"
+msgstr "Listenbrainz"
+
+msgid "User token:"
+msgstr "User token:"
+
+msgid "Enter your user token from"
+msgstr "Enter your user token from"
+
+msgid "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+msgstr "With this option enabled, scrobbles will be cached to disk but not sent to the server. This option can be enabled in cases where the server or the internet connection is unstable, the scrobbles will be sent when the option is disabled."
+
+msgid "Offline mode (Only cache scrobbles)"
+msgstr "Offline mode (Only cache scrobbles)"
+
+msgid "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+msgstr "This is the delay between when a song is scrobbled and when scrobbles are submitted to the server. Setting the time to 0 seconds will submit scrobbles immediately."
+
+msgid "Settings"
+msgstr "Settings"
+
+msgid "General"
+msgstr "General"
+
+msgid "User interface"
+msgstr "User interface"
+
+msgid "Streaming"
+msgstr "Streaming"
+
+msgid "Search mode"
+msgstr "Search mode"
+
+msgid "Match every search term (AND)"
+msgstr "Match every search term (AND)"
+
+msgid "Match one or more search terms (OR)"
+msgstr "Match one or more search terms (OR)"
+
+msgid "Include all songs"
+msgstr "Include all songs"
+
+msgid "Search terms"
+msgstr "Search terms"
+
+msgid "Sorting"
+msgstr "Sorting"
+
+msgid "Put songs in a random order"
+msgstr "Put songs in a random order"
+
+msgid "Sort songs by"
+msgstr "Sort songs by"
+
+msgid "Limits"
+msgstr "Limits"
+
+msgid "Show all the songs"
+msgstr "Show all the songs"
+
+msgid "Only show the first"
+msgstr "Only show the first"
+
+msgid " songs"
+msgstr " songs"
+
+msgid "Collection search"
+msgstr "Collection search"
+
+msgid "Find songs in your collection that match the criteria you specify."
+msgstr "Find songs in your collection that match the criteria you specify."
+
+msgid "A song will be included in the playlist if it matches these conditions."
+msgstr "A song will be included in the playlist if it matches these conditions."
+
+msgid "Search options"
+msgstr "Search options"
+
+msgid "Choose how the playlist is sorted and how many songs it will contain."
+msgstr "Choose how the playlist is sorted and how many songs it will contain."
+
+msgid "%1 songs found (showing %2)"
+msgstr "%1 songs found (showing %2)"
+
+msgid "%1 songs found"
+msgstr "%1 songs found"
+
+msgid "and"
+msgstr "and"
+
+msgid "ago"
+msgstr "ago"
+
+msgid "The second value must be greater than the first one!"
+msgstr "The second value must be greater than the first one!"
+
+msgid "Add search term"
+msgstr "Add search term"
+
+msgid "Smart playlist"
+msgstr "Smart playlist"
+
+msgid "Playlist type"
+msgstr "Playlist type"
+
+msgid "A smart playlist is a dynamic list of songs that come from your collection.  There are different types of smart playlist that offer different ways of selecting songs."
+msgstr "A smart playlist is a dynamic list of songs that come from your collection.  There are different types of smart playlist that offer different ways of selecting songs."
+
+msgid "Finish"
+msgstr "Finish"
+
+msgid "Choose a name for your smart playlist"
+msgstr "Choose a name for your smart playlist"
+
+msgid "Use dynamic mode"
+msgstr "Use dynamic mode"
+
+msgid "In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes."
+msgstr "In dynamic mode new tracks will be chosen and added to the playlist every time a song finishes."
+
+msgid "Newest tracks"
+msgstr "Newest tracks"
+
+msgid "50 random tracks"
+msgstr "50 random tracks"
+
+msgid "Ever played"
+msgstr "Ever played"
+
+msgid "Never played"
+msgstr "Never played"
+
+msgid "Most played"
+msgstr "Most played"
+
+msgid "Favourite tracks"
+msgstr "Favourite tracks"
+
+msgid "All tracks"
+msgstr "All tracks"
+
+msgid "Dynamic random mix"
+msgstr "Dynamic random mix"
+
+msgid "New smart playlist"
+msgstr "New smart playlist"
+
+msgid "Edit smart playlist"
+msgstr "Edit smart playlist"
+
+msgid "Delete smart playlist"
+msgstr "Delete smart playlist"
+
+msgid "New smart playlist..."
+msgstr "New smart playlist..."
+
+msgid "Play next"
+msgstr "Play next"
+
+msgid "Edit smart playlist..."
+msgstr "Edit smart playlist..."
+
+msgid "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+msgstr "Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists"
+
+msgid "Restore defaults"
+msgstr "Restore defaults"
+
+msgid "Preload function was not set for blocking operation."
+msgstr "Preload function was not set for blocking operation."
+
+msgid "File %1 does not exist."
+msgstr "File %1 does not exist."
+
+msgid "Could not open file %1 for reading: %2"
+msgstr "Could not open file %1 for reading: %2"
+
+msgid "Could not open CUE file %1 for reading: %2"
+msgstr "Could not open CUE file %1 for reading: %2"
+
+msgid "Could not open playlist file %1 for reading: %2"
+msgstr "Could not open playlist file %1 for reading: %2"
+
+msgid "Couldn't create GStreamer source element for %1"
+msgstr "Couldn't create GStreamer source element for %1"
+
+msgid "Couldn't create GStreamer typefind element for %1"
+msgstr "Couldn't create GStreamer typefind element for %1"
+
+msgid "Couldn't create GStreamer fakesink element for %1"
+msgstr "Couldn't create GStreamer fakesink element for %1"
+
+msgid "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+msgstr "Couldn't link GStreamer source, typefind and fakesink elements for %1"
+
+msgid "Missing CDDA playback."
+msgstr "Missing CDDA playback."
+
+msgid "Error while loading audio CD."
+msgstr "Error while loading audio CD."
+
+msgid "Loading tracks info"
+msgstr "Loading tracks info"
+
+msgid "No pending song for track ID"
+msgstr "No pending song for track ID"
+
+msgid "Authenticating..."
+msgstr "Authenticating..."
+
+msgid "Data missing error"
+msgstr "Data missing error"
+
+msgid "Not authenticated with Spotify."
+msgstr "Not authenticated with Spotify."
+
+msgid "Basic authentication"
+msgstr "Basic authentication"
+
+msgid "Authenticate"
+msgstr "Authenticate"
+
+msgid "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+msgstr "<html><head/><body><p>The GStreamer Spotify plugin is not detected, you will not be able to stream songs from Spotify without it. See <a href=\"https://wiki.strawberrymusicplayer.org/wiki/Installing_GStreamer_Spotify_plugin\"><span style=\" text-decoration: underline; color:#2980b9;\">Wiki</span></a> for instructions on how to install the plugin.</p></body></html>"
+
+msgid "Fetch entire albums when searching songs"
+msgstr "Fetch entire albums when searching songs"
+
+msgid "The streaming collection is empty!"
+msgstr "The streaming collection is empty!"
+
+msgid "Click here to retrieve music"
+msgstr "Click here to retrieve music"
+
+msgid "Remove from favorites"
+msgstr "Remove from favorites"
+
+msgid "Close"
+msgstr "Close"
+
+msgid "Refresh catalogue"
+msgstr "Refresh catalogue"
+
+msgid "Streaming Search View"
+msgstr "Streaming Search View"
+
+msgid "artists"
+msgstr "artists"
+
+msgid "albums"
+msgstr "albums"
+
+msgid "songs"
+msgstr "songs"
+
+msgid "Enter search terms above to find music"
+msgstr "Enter search terms above to find music"
+
+msgid "Configure %1..."
+msgstr "Configure %1..."
+
+msgid "Add to artists"
+msgstr "Add to artists"
+
+msgid "Add to albums"
+msgstr "Add to albums"
+
+msgid "Add to songs"
+msgstr "Add to songs"
+
+msgid "Streaming Tabs View"
+msgstr "Streaming Tabs View"
+
+msgid "Artists"
+msgstr "Artists"
+
+msgid "Albums"
+msgstr "Albums"
+
+msgid "Songs"
+msgstr "Songs"
+
+msgid "Retrieving albums..."
+msgstr "Retrieving albums..."
+
+msgid "Retrieving songs for %1 album..."
+msgstr "Retrieving songs for %1 album..."
+
+msgid "Retrieving songs for %1 albums..."
+msgstr "Retrieving songs for %1 albums..."
+
+msgid "Retrieving album cover for %1 album..."
+msgstr "Retrieving album cover for %1 album..."
+
+msgid "Retrieving album covers for %1 albums..."
+msgstr "Retrieving album covers for %1 albums..."
+
+msgid "Server URL is invalid."
+msgstr "Server URL is invalid."
+
+msgid "Missing username or password."
+msgstr "Missing username or password."
+
+msgid "Server URL"
+msgstr "Server URL"
+
+msgid "Authentication method:"
+msgstr "Authentication method:"
+
+msgid "Hex"
+msgstr "Hex"
+
+msgid "MD5 token (Recommended)"
+msgstr "MD5 token (Recommended)"
+
+msgid "Use HTTP/2 when possible"
+msgstr "Use HTTP/2 when possible"
+
+msgid "Verify server certificate"
+msgstr "Verify server certificate"
+
+msgid "Use album ID for album covers"
+msgstr "使用專輯ID來獲取專輯封面"
+
+msgid "Server-side scrobbling"
+msgstr "Server-side scrobbling"
+
+msgid "Test"
+msgstr "Test"
+
+msgid "Delete songs"
+msgstr "Delete songs"
+
+msgid "Missing server url, username or password."
+msgstr "Missing server url, username or password."
+
+msgid "Configuration incorrect"
+msgstr "Configuration incorrect"
+
+msgid "Test successful!"
+msgstr "Test successful!"
+
+msgid "Test failed!"
+msgstr "Test failed!"
+
+msgid "Subsonic server URL is invalid."
+msgstr "Subsonic server URL is invalid."
+
+msgid "Missing Subsonic username or password."
+msgstr "Missing Subsonic username or password."
+
+msgid "Stage: %1"
+msgstr "Stage: %1"
+
+msgid "Reason: %1"
+msgstr "Reason: %1"
+
+msgid "Identifying song"
+msgstr "Identifying song"
+
+msgid "Fingerprinting song"
+msgstr "Fingerprinting song"
+
+msgid "Generated fingerprint is empty or invalid"
+msgstr "Generated fingerprint is empty or invalid"
+
+msgid "Fingerprinting"
+msgstr "Fingerprinting"
+
+msgid "Fingerprint length: %1"
+msgstr "Fingerprint length: %1"
+
+msgid "Minimum required length: %1"
+msgstr "Minimum required length: %1"
+
+msgid "Downloading metadata"
+msgstr "Downloading metadata"
+
+msgid "No MusicBrainz metadata was found for this track"
+msgstr "No MusicBrainz metadata was found for this track"
+
+msgid "MusicBrainz metadata"
+msgstr "MusicBrainz metadata"
+
+msgid "Candidate metadata rows: 0"
+msgstr "Candidate metadata rows: 0"
+
+msgid "Not authenticated with Tidal."
+msgstr "Not authenticated with Tidal."
+
+msgid "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+msgstr "Tidal support is not official and requires a API token from a registered application to work. We can't help you getting these."
+
+msgid "Client ID"
+msgstr "Client ID"
+
+msgid "Audio quality"
+msgstr "Audio quality"
+
+msgid "Album cover size"
+msgstr "Album cover size"
+
+msgid "Stream URL method"
+msgstr "Stream URL method"
+
+msgid "Append explicit to album title for explicit albums"
+msgstr "Append explicit to album title for explicit albums"
+
+msgid "Missing Tidal client ID."
+msgstr "Missing Tidal client ID."
+
+msgid "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Received URL with %1 encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+
+msgid "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+msgstr "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams."
+
+msgid "Tag fetcher"
+msgstr "Tag fetcher"
+
+msgid "Strawberry was unable to find results for this file"
+msgstr "Strawberry was unable to find results for this file"
+
+msgid "Select best possible match"
+msgstr "Select best possible match"
+
+msgid "Original tags"
+msgstr "Original tags"
+
+msgid "Suggested tags"
+msgstr "Suggested tags"
+
+msgid "No results"
+msgstr "No results"
+
+msgid "0:00:00"
+msgstr "0:00:00"
+
+msgid "Click to toggle between remaining time and total time"
+msgstr "Click to toggle between remaining time and total time"
+
+msgid "Waveform"
+msgstr "Waveform"
+
+msgid "Transcode Music"
+msgstr "Transcode Music"
+
+msgid "Files to transcode"
+msgstr "Files to transcode"
+
+msgid "Directory"
+msgstr "Directory"
+
+msgid "Add..."
+msgstr "Add..."
+
+msgid "Add all tracks from a directory and all its subdirectories"
+msgstr "Add all tracks from a directory and all its subdirectories"
+
+msgid "Import..."
+msgstr "Import..."
+
+msgid "Output options"
+msgstr "Output options"
+
+msgid "Options..."
+msgstr "Options..."
+
+msgid "Alongside the originals"
+msgstr "Alongside the originals"
+
+msgid "Select..."
+msgstr "Select..."
+
+msgid "Progress"
+msgstr "Progress"
+
+msgid "Details..."
+msgstr "Details..."
+
+msgid "Start transcoding"
+msgstr "Start transcoding"
+
+msgid "%n remaining"
+msgid_plural "%n remaining"
+msgstr[0] "%n remaining"
+
+msgid "%n finished"
+msgid_plural "%n finished"
+msgstr[0] "%n finished"
+
+msgid "%n failed"
+msgid_plural "%n failed"
+msgstr[0] "%n failed"
+
+msgid "Add files to transcode"
+msgstr "Add files to transcode"
+
+msgid "Open a directory to import music from"
+msgstr "Open a directory to import music from"
+
+msgid "Import Directory"
+msgstr "Import Directory"
+
+msgid "Preserve directory structure in output directory (import only)"
+msgstr "Preserve directory structure in output directory (import only)"
+
+msgid "Transcoder Log"
+msgstr "Transcoder Log"
+
+msgid "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+msgstr "Could not create the GStreamer element \"%1\" - make sure you have all the required GStreamer plugins installed"
+
+msgid "Successfully written %1"
+msgstr "Successfully written %1"
+
+msgid "Transcoding %1 files using %2 threads"
+msgstr "Transcoding %1 files using %2 threads"
+
+msgid "Error processing %1: %2"
+msgstr "Error processing %1: %2"
+
+msgid "Starting %1"
+msgstr "Starting %1"
+
+msgid "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+msgstr "Couldn't find an encoder for %1, check you have the correct GStreamer plugins installed"
+
+msgid "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+msgstr "Couldn't find a muxer for %1, check you have the correct GStreamer plugins installed"
+
+msgid " kbps"
+msgstr " kbps"
+
+msgid "Profile"
+msgstr "Profile"
+
+msgid "Main profile (MAIN)"
+msgstr "Main profile (MAIN)"
+
+msgid "Low complexity profile (LC)"
+msgstr "Low complexity profile (LC)"
+
+msgid "Scalable sampling rate profile (SSR)"
+msgstr "Scalable sampling rate profile (SSR)"
+
+msgid "Long term prediction profile (LTP)"
+msgstr "Long term prediction profile (LTP)"
+
+msgid "Use temporal noise shaping"
+msgstr "Use temporal noise shaping"
+
+msgid "Allow mid/side encoding"
+msgstr "Allow mid/side encoding"
+
+msgid "Block type"
+msgstr "Block type"
+
+msgid "Normal block type"
+msgstr "Normal block type"
+
+msgid "No short blocks"
+msgstr "No short blocks"
+
+msgid "No long blocks"
+msgstr "No long blocks"
+
+msgid "Transcoding options"
+msgstr "Transcoding options"
+
+#. Sound quality
+msgid "Quality"
+msgstr "Quality"
+
+msgid "Fast"
+msgstr "Fast"
+
+msgid "Best"
+msgstr "Best"
+
+msgid "Optimize for &quality"
+msgstr "Optimize for &quality"
+
+msgid "Opti&mize for bitrate"
+msgstr "Opti&mize for bitrate"
+
+msgid "Constant bitrate"
+msgstr "Constant bitrate"
+
+msgid "Encoding engine quality"
+msgstr "Encoding engine quality"
+
+msgid "Standard"
+msgstr "Standard"
+
+msgid "Force mono encoding"
+msgstr "Force mono encoding"
+
+msgid "automatic"
+msgstr "automatic"
+
+msgid "Average bitrate"
+msgstr "Average bitrate"
+
+msgid "disabled"
+msgstr "disabled"
+
+msgid "Encoding mode"
+msgstr "Encoding mode"
+
+msgid "Auto"
+msgstr "Auto"
+
+msgid "Ultra wide band (UWB)"
+msgstr "Ultra wide band (UWB)"
+
+msgid "Wide band (WB)"
+msgstr "Wide band (WB)"
+
+msgid "Narrow band (NB)"
+msgstr "Narrow band (NB)"
+
+msgid "Variable bit rate"
+msgstr "Variable bit rate"
+
+msgid "Voice activity detection"
+msgstr "Voice activity detection"
+
+msgid "Discontinuous transmission"
+msgstr "Discontinuous transmission"
+
+msgid "Encoding complexity"
+msgstr "Encoding complexity"
+
+msgid "Frames per buffer"
+msgstr "Frames per buffer"
+
+msgid "Use bitrate management engine"
+msgstr "Use bitrate management engine"
+
+msgid "Target bitrate"
+msgstr "Target bitrate"
+
+msgid "Minimum bitrate"
+msgstr "Minimum bitrate"
+
+msgid "Maximum bitrate"
+msgstr "Maximum bitrate"
+
+msgid "Transcoding"
+msgstr "Transcoding"
+
+msgid "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+msgstr "These settings are used in the \"Transcode Music\" dialog, and when converting music before copying it to a device."
+
+msgid "FLAC"
+msgstr "FLAC"
+
+msgid "WavPack"
+msgstr "WavPack"
+
+msgid "Vorbis"
+msgstr "Vorbis"
+
+msgid "Opus"
+msgstr "Opus"
+
+msgid "Speex"
+msgstr "Speex"
+
+msgid "AAC"
+msgstr "AAC"
+
+msgid "ASF (WMA)"
+msgstr "ASF (WMA)"
+
+msgid "MP3"
+msgstr "MP3"
+
+msgid "D-Bus path"
+msgstr "D-Bus path"
+
+msgid "Serial number"
+msgstr "Serial number"
+
+msgid "Mount points"
+msgstr "Mount points"
+
+msgid "Partition label"
+msgstr "Partition label"
+
+msgid "UUID"
+msgstr "UUID"
+
+msgid "Enter username and password"
+msgstr "Enter username and password"
+
+msgid "Color"
+msgstr "Color"
+
+msgid "Select waveform color"
+msgstr "Select waveform color"
+
+msgid "Save the .waveform files directly in the songs folders"
+msgstr "Save the .waveform files directly in the songs folders"
+
+msgid "Failed to write XSPF playlist"
+msgstr "Failed to write XSPF playlist"
+

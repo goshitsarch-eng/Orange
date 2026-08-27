@@ -1,82 +1,50 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_DEVICEDATABASEBACKEND_H
+#define STRAWBERRY_DEVICEDATABASEBACKEND_H
 
-#ifndef DEVICEDATABASEBACKEND_H
-#define DEVICEDATABASEBACKEND_H
-
-#include "config.h"
-
-#include <QtGlobal>
-#include <QObject>
-#include <QSet>
-#include <QList>
-#include <QString>
-
-#include "includes/shared_ptr.h"
+#include "core/database.h"
 #include "core/song.h"
-#include "core/musicstorage.h"
 
-class Database;
+#include <string>
+#include <vector>
 
-class DeviceDatabaseBackend : public QObject {
-  Q_OBJECT
-
+class DeviceDatabaseBackend {
  public:
-  Q_INVOKABLE explicit DeviceDatabaseBackend(QObject *parent = nullptr);
+  static const int kDeviceSchemaVersion;
+
+  enum class TranscodeMode {
+    Transcode_Never = 0,
+    Transcode_Always = 1,
+    Transcode_Unsupported = 2
+  };
 
   struct Device {
-    Device() : id_(-1), size_(0), transcode_mode_(MusicStorage::TranscodeMode::Transcode_Always), transcode_format_(Song::FileType::FLAC) {}
-
-    int id_;
-    QString unique_id_;
-    QString friendly_name_;
-    quint64 size_;
-    QString icon_name_;
-
-    MusicStorage::TranscodeMode transcode_mode_;
-    Song::FileType transcode_format_;
+    int id = -1;
+    std::string unique_id;
+    std::string friendly_name;
+    int64_t size = 0;
+    std::string icon_name;
+    TranscodeMode transcode_mode = TranscodeMode::Transcode_Unsupported;
+    Song::FileType transcode_format = Song::FileType::FLAC;
+    int schema_version = kDeviceSchemaVersion;
   };
-  using DeviceList = QList<Device>;
 
-  void Init(SharedPtr<Database> db);
-  void Close();
-  void ExitAsync();
+  explicit DeviceDatabaseBackend(Database *db);
 
-  SharedPtr<Database> db() const { return db_; }
-
-  DeviceList GetAllDevices();
+  bool Init();
+  std::vector<Device> GetAllDevices() const;
   int AddDevice(const Device &device);
-  void RemoveDevice(const int id);
+  void RemoveDevice(int id);
+  void SetDeviceOptions(int id, const std::string &friendly_name, const std::string &icon_name, TranscodeMode mode, Song::FileType format);
+  Device FindByUniqueId(const std::string &unique_id) const;
 
-  void SetDeviceOptions(const int id, const QString &friendly_name, const QString &icon_name, const MusicStorage::TranscodeMode mode, const Song::FileType format);
-
- private Q_SLOTS:
-  void Exit();
-
- Q_SIGNALS:
-  void ExitFinished();
+  bool ReplaceSongs(int device_id, const SongList &songs);
+  SongList Songs(int device_id) const;
 
  private:
-  SharedPtr<Database> db_;
-  QThread *original_thread_;
+  bool EnsureTables();
+  std::string SongsTable(int device_id) const;
+
+  Database *db_;
 };
 
-#endif  // DEVICEDATABASEBACKEND_H
+#endif

@@ -1,313 +1,177 @@
-/*
- * Strawberry Music Player
- * Copyright 2026, Malte Zilinski <malte@zilinski.eu>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "radios/radiobrowserservice.h"
 
-#include <QObject>
-#include <QPair>
-#include <QSet>
-#include <QList>
-#include <QString>
-#include <QUrl>
-#include <QUrlQuery>
-#include <QNetworkRequest>
-#include <QNetworkReply>
-#include <QJsonValue>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QRandomGenerator>
+#include "radios/radiobrowsersearchopts.h"
+#include "utilities/strutils.h"
 
-#include "core/networkaccessmanager.h"
-#include "core/taskmanager.h"
-#include "core/iconloader.h"
-#include "settings/radiosettingspage.h"
-#include "radiobrowserservice.h"
-#include "radiochannel.h"
+#include <algorithm>
+#include <json-glib/json-glib.h>
 
-using namespace Qt::Literals::StringLiterals;
+const std::vector<std::string> RadioBrowserService::kServers = {"de1.api.radio-browser.info", "de2.api.radio-browser.info"};
 
-const QStringList RadioBrowserService::kServers = {
-    u"de1.api.radio-browser.info"_s,
-    u"de2.api.radio-browser.info"_s
-};
+std::string RadioBrowserService::Homepage() { return "https://www.radio-browser.info/"; }
 
-RadioBrowserService::RadioBrowserService(const SharedPtr<TaskManager> task_manager, const SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : RadioService(Song::Source::RadioBrowser, u"Radio Browser"_s, IconLoader::Load(u"radiobrowser"_s), task_manager, network, parent),
-      server_discovered_(false),
-      has_pending_search_(false),
-      has_pending_countries_(false),
-      server_index_(0),
-      servers_tried_(0) {}
+std::string RadioBrowserService::Donate() { return "https://www.radio-browser.info/"; }
 
-RadioBrowserService::~RadioBrowserService() {
-  Abort();
-}
+std::string RadioBrowserService::DefaultServer() { return "https://" + kServers.front(); }
 
-QUrl RadioBrowserService::Homepage() { return QUrl(u"https://www.radio-browser.info/"_s); }
-QUrl RadioBrowserService::Donate() { return QUrl(u"https://www.radio-browser.info/"_s); }
+namespace {
 
-void RadioBrowserService::Abort() {
-
-  while (!replies_.isEmpty()) {
-    QNetworkReply *reply = replies_.takeFirst();
-    QObject::disconnect(reply, nullptr, this, nullptr);
-    if (reply->isRunning()) reply->abort();
-    reply->deleteLater();
+std::string HostFromServer(std::string host) {
+  if (StrUtils::StartsWith(host, "https://")) {
+    host = host.substr(8);
+  } else if (StrUtils::StartsWith(host, "http://")) {
+    host = host.substr(7);
   }
-
-  for (const int task_id : std::as_const(pending_search_tasks_)) {
-    task_manager_->SetTaskFinished(task_id);
+  if (!host.empty() && host.back() == '/') {
+    host.pop_back();
   }
-  pending_search_tasks_.clear();
-
-  has_pending_search_ = false;
-  has_pending_countries_ = false;
-
+  if (host.empty()) {
+    host = RadioBrowserService::kServers.front();
+  }
+  return host;
 }
 
-void RadioBrowserService::GetChannels() {
-  // RadioBrowser has 50,000+ stations. We don't load them all.
-  // Only emit empty list so the model doesn't break on refresh.
-  Q_EMIT NewChannels();
+}  // namespace
+
+std::string RadioBrowserService::SearchUrl(const std::string &server, const std::string &query, const std::string &country,
+                                           bool hide_broken, int limit, int offset, const std::string &order) {
+  const std::string host = HostFromServer(server);
+  std::string url = "https://" + host + "/json/stations/search?limit=" + std::to_string(limit) + "&offset=" + std::to_string(offset);
+  if (!query.empty()) {
+    url += "&name=" + StrUtils::UriEscape(query);
+  }
+  if (!country.empty()) {
+    url += "&countrycode=" + StrUtils::UriEscape(country);
+  }
+  if (hide_broken) {
+    url += "&hidebroken=true";
+  }
+  const std::string sort = order.empty() ? RadioBrowserSearchOpts::DefaultSort() : order;
+  url += "&order=" + StrUtils::UriEscape(sort);
+  if (RadioBrowserSearchOpts::ReverseOrder(sort)) {
+    url += "&reverse=true";
+  }
+  return url;
 }
 
-void RadioBrowserService::DiscoverServer() {
-
-  // The API guidelines ask clients to spread load across the mirrors, so start at a random server and advance round-robin on failure.
-  server_index_ = QRandomGenerator::global()->bounded(static_cast<int>(kServers.size()));
-  servers_tried_ = 0;
-
-  TestServer(kServers.at(server_index_));
-
+std::string RadioBrowserService::CountriesUrl(const std::string &server) {
+  return "https://" + HostFromServer(server) + "/json/countrycodes";
 }
 
-void RadioBrowserService::TestServer(const QString &hostname) {
+std::vector<RadioChannel> RadioBrowserService::ParseStations(const std::string &json) { return ParseStationPage(json).channels; }
 
-  QUrl url;
-  url.setScheme(u"https"_s);
-  url.setHost(hostname);
-  url.setPath(u"/json/stats"_s);
-
-  QNetworkRequest request(url);
-  QNetworkReply *reply = network_->get(request);
-  replies_ << reply;
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() { ServerTestReply(reply); });
-
-}
-
-void RadioBrowserService::ServerTestReply(QNetworkReply *reply) {
-
-  if (replies_.contains(reply)) replies_.removeAll(reply);
-  reply->deleteLater();
-
-  if (reply->error() != QNetworkReply::NoError) {
-    ++servers_tried_;
-    if (servers_tried_ < kServers.size()) {
-      server_index_ = (server_index_ + 1) % static_cast<int>(kServers.size());
-      TestServer(kServers.at(server_index_));
+RadioBrowserService::StationPage RadioBrowserService::ParseStationPage(const std::string &json) {
+  StationPage page;
+  if (json.empty()) {
+    return page;
+  }
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
+    g_object_unref(parser);
+    return page;
+  }
+  JsonNode *root = json_parser_get_root(parser);
+  if (!root || !JSON_NODE_HOLDS_ARRAY(root)) {
+    g_object_unref(parser);
+    return page;
+  }
+  JsonArray *array = json_node_get_array(root);
+  const guint n = json_array_get_length(array);
+  page.raw_count = static_cast<int>(n);
+  std::vector<RadioChannel> &channels = page.channels;
+  for (guint i = 0; i < n; ++i) {
+    JsonNode *item = json_array_get_element(array, i);
+    if (!item || !JSON_NODE_HOLDS_OBJECT(item)) {
+      continue;
     }
-    else {
-      Q_EMIT SearchError(tr("No Radio Browser server available."));
+    JsonObject *object = json_node_get_object(item);
+    const char *name_raw = json_object_has_member(object, "name") ? json_object_get_string_member(object, "name") : nullptr;
+    const std::string name = StrUtils::Trim(name_raw ? name_raw : "");
+    if (name.empty()) {
+      continue;
     }
-    return;
-  }
-
-  // Server works
-  QUrl url;
-  url.setScheme(u"https"_s);
-  url.setHost(reply->url().host());
-  server_url_ = url;
-  server_discovered_ = true;
-
-  // Execute pending search if any
-  if (has_pending_search_) {
-    has_pending_search_ = false;
-    Search(pending_search_.query, pending_search_.country, pending_search_.tag, pending_search_.language, pending_search_.order, pending_search_.limit, pending_search_.offset, pending_search_.hide_broken);
-  }
-
-  // Execute pending countries fetch if any
-  if (has_pending_countries_) {
-    has_pending_countries_ = false;
-    FetchCountries();
-  }
-
-}
-
-void RadioBrowserService::Search(const QString &query,
-                                  const QString &country,
-                                  const QString &tag,
-                                  const QString &language,
-                                  const QString &order,
-                                  const int limit,
-                                  const int offset,
-                                  const bool hide_broken) {
-
-  if (!server_discovered_) {
-    // Save search and discover server first
-    pending_search_ = {query, country, tag, language, order, limit, offset, hide_broken};
-    has_pending_search_ = true;
-    DiscoverServer();
-    return;
-  }
-
-  QUrl url(server_url_);
-  url.setPath(u"/json/stations/search"_s);
-
-  QUrlQuery url_query;
-  if (!query.isEmpty()) url_query.addQueryItem(u"name"_s, query);
-  if (!country.isEmpty()) url_query.addQueryItem(u"countrycode"_s, country);
-  if (!tag.isEmpty()) url_query.addQueryItem(u"tag"_s, tag);
-  if (!language.isEmpty()) url_query.addQueryItem(u"language"_s, language);
-  url_query.addQueryItem(u"limit"_s, QString::number(limit));
-  url_query.addQueryItem(u"offset"_s, QString::number(offset));
-  if (hide_broken) url_query.addQueryItem(u"hidebroken"_s, u"true"_s);
-
-  if (!order.isEmpty()) {
-    url_query.addQueryItem(u"order"_s, order);
-    if (order != u"name"_s) {
-      url_query.addQueryItem(u"reverse"_s, u"true"_s);
+    const char *resolved = json_object_has_member(object, "url_resolved") ? json_object_get_string_member(object, "url_resolved") : nullptr;
+    const char *url = json_object_has_member(object, "url") ? json_object_get_string_member(object, "url") : nullptr;
+    std::string stream = resolved && *resolved ? resolved : (url ? url : "");
+    if (stream.empty()) {
+      continue;
     }
-  }
-  else {
-    url_query.addQueryItem(u"order"_s, u"votes"_s);
-    url_query.addQueryItem(u"reverse"_s, u"true"_s);
-  }
-
-  url.setQuery(url_query);
-
-  QNetworkRequest request(url);
-  QNetworkReply *reply = network_->get(request);
-  replies_ << reply;
-  const int task_id = task_manager_->StartTask(tr("Searching Radio Browser"));
-  pending_search_tasks_ << task_id;
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, task_id, limit]() { SearchReply(reply, task_id, limit); });
-
-}
-
-void RadioBrowserService::SearchReply(QNetworkReply *reply, const int task_id, const int limit) {
-
-  if (replies_.contains(reply)) replies_.removeAll(reply);
-  reply->deleteLater();
-  task_manager_->SetTaskFinished(task_id);
-  pending_search_tasks_.removeAll(task_id);
-
-  if (reply->error() != QNetworkReply::NoError) {
-    // The server may have gone down since discovery; rediscover on the next search.
-    server_discovered_ = false;
-    Q_EMIT SearchError(tr("Radio Browser search failed: %1").arg(reply->errorString()));
-    return;
-  }
-
-  const QJsonArray array = ExtractJsonArray(reply);
-
-  if (array.isEmpty()) {
-    Q_EMIT SearchFinished(RadioChannelList(), false);
-    return;
-  }
-
-  RadioChannelList channels;
-  for (const QJsonValue &value : array) {
-    if (!value.isObject()) continue;
-    const QJsonObject obj = value.toObject();
-
-    const QString name = obj["name"_L1].toString().trimmed();
-    if (name.isEmpty()) continue;
-
-    // Prefer url_resolved over url
-    QString stream_url = obj["url_resolved"_L1].toString();
-    if (stream_url.isEmpty()) stream_url = obj["url"_L1].toString();
-    if (stream_url.isEmpty()) continue;
-
     RadioChannel channel;
-    channel.source = source_;
+    channel.source = Song::Source::RadioBrowser;
     channel.name = name;
-    channel.url.setUrl(stream_url);
-    channel.country = obj["country"_L1].toString().trimmed();
-    channel.tags = obj["tags"_L1].toString().trimmed();
-    channel.codec = obj["codec"_L1].toString().trimmed();
-
-    const QString favicon = obj["favicon"_L1].toString();
-    if (!favicon.isEmpty()) {
-      channel.thumbnail_url.setUrl(favicon);
+    channel.url = stream;
+    if (json_object_has_member(object, "favicon")) {
+      const char *favicon = json_object_get_string_member(object, "favicon");
+      if (favicon) {
+        channel.thumbnail_url = favicon;
+      }
     }
-
-    channels << channel;
+    if (json_object_has_member(object, "country")) {
+      const char *country = json_object_get_string_member(object, "country");
+      if (country) {
+        channel.country = StrUtils::Trim(country);
+      }
+    }
+    if (json_object_has_member(object, "tags")) {
+      const char *tags = json_object_get_string_member(object, "tags");
+      if (tags) {
+        channel.tags = StrUtils::Trim(tags);
+      }
+    }
+    if (json_object_has_member(object, "codec")) {
+      const char *codec = json_object_get_string_member(object, "codec");
+      if (codec) {
+        channel.codec = StrUtils::Trim(codec);
+      }
+    }
+    channels.push_back(channel);
   }
-
-  const bool has_more = (array.size() == limit);
-  Q_EMIT SearchFinished(channels, has_more);
-
+  g_object_unref(parser);
+  return page;
 }
 
-void RadioBrowserService::FetchCountries() {
-
-  if (!server_discovered_) {
-    has_pending_countries_ = true;
-    if (!has_pending_search_) {
-      DiscoverServer();
+std::vector<RadioBrowserService::Country> RadioBrowserService::ParseCountries(const std::string &json) {
+  std::vector<Country> countries;
+  if (json.empty()) {
+    return countries;
+  }
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
+    g_object_unref(parser);
+    return countries;
+  }
+  JsonNode *root = json_parser_get_root(parser);
+  if (!root || !JSON_NODE_HOLDS_ARRAY(root)) {
+    g_object_unref(parser);
+    return countries;
+  }
+  JsonArray *array = json_node_get_array(root);
+  const guint n = json_array_get_length(array);
+  for (guint i = 0; i < n; ++i) {
+    JsonNode *item = json_array_get_element(array, i);
+    if (!item || !JSON_NODE_HOLDS_OBJECT(item)) {
+      continue;
     }
-    return;
-  }
-
-  QUrl url(server_url_);
-  url.setPath(u"/json/countrycodes"_s);
-
-  QNetworkRequest request(url);
-  QNetworkReply *reply = network_->get(request);
-  replies_ << reply;
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() { CountriesReply(reply); });
-
-}
-
-void RadioBrowserService::CountriesReply(QNetworkReply *reply) {
-
-  if (replies_.contains(reply)) replies_.removeAll(reply);
-  reply->deleteLater();
-
-  if (reply->error() != QNetworkReply::NoError) {
-    // The server may have gone down since discovery; rediscover on the next request.
-    server_discovered_ = false;
-    Error(QStringLiteral("Fetching countries failed: %1").arg(reply->errorString()));
-    return;
-  }
-
-  const QJsonArray array = ExtractJsonArray(reply);
-
-  // Collect country codes that have stations
-  QSet<QString> codes_with_stations;
-  for (const QJsonValue &value : array) {
-    if (!value.isObject()) continue;
-    const QJsonObject obj = value.toObject();
-    const QString code = obj["name"_L1].toString().toUpper();
-    const int count = obj["stationcount"_L1].toInt();
-    if (!code.isEmpty() && count > 0) {
-      codes_with_stations.insert(code);
+    JsonObject *object = json_node_get_object(item);
+    const char *name_raw = json_object_has_member(object, "name") ? json_object_get_string_member(object, "name") : nullptr;
+    std::string code = StrUtils::ToUpper(StrUtils::Trim(name_raw ? name_raw : ""));
+    if (code.empty()) {
+      continue;
     }
-  }
-
-  // Filter the full country list to only include countries with stations
-  const QList<QPair<QString, QString>> all_countries = RadioSettingsPage::CountryList();
-  QList<QPair<QString, QString>> countries;
-  for (const QPair<QString, QString> &entry : all_countries) {
-    if (codes_with_stations.contains(entry.second)) {
-      countries << entry;
+    int count = 0;
+    if (json_object_has_member(object, "stationcount")) {
+      count = static_cast<int>(json_object_get_int_member(object, "stationcount"));
     }
+    if (count <= 0) {
+      continue;
+    }
+    Country country;
+    country.code = code;
+    country.name = code;
+    country.stationcount = count;
+    countries.push_back(country);
   }
-
-  Q_EMIT CountriesLoaded(countries);
-
+  g_object_unref(parser);
+  std::sort(countries.begin(), countries.end(), [](const Country &a, const Country &b) { return a.code < b.code; });
+  return countries;
 }

@@ -1,231 +1,154 @@
-/*
- * Strawberry Music Player
- * Copyright 2025-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "spotify/spotifymetadatarequest.h"
 
-#include "config.h"
+#include "utilities/jsonutils.h"
+#include "utilities/strutils.h"
 
-#include <QObject>
-#include <QString>
-#include <QUrl>
-#include <QNetworkReply>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QJsonValue>
+#include <json-glib/json-glib.h>
 
-#include "includes/shared_ptr.h"
-#include "core/logging.h"
-#include "core/networkaccessmanager.h"
-#include "core/song.h"
-#include "spotifyservice.h"
-#include "spotifymetadatarequest.h"
+#include <cstdint>
+#include <cstdlib>
 
 namespace {
-constexpr qint64 kNsecPerMsec = 1000000LL;
+
+constexpr int64_t kNsecPerMsec = 1000000LL;
+
+}  // namespace
+
+namespace SpotifyMetadataRequest {
+
+std::string TrackUrl(const std::string &api_url, const std::string &track_id) {
+  return api_url + "/tracks/" + StrUtils::UriEscape(track_id);
 }
 
-using namespace Qt::Literals::StringLiterals;
-
-SpotifyMetadataRequest::SpotifyMetadataRequest(SpotifyService *service, const SharedPtr<NetworkAccessManager> network, QObject *parent)
-    : SpotifyBaseRequest(service, network, parent) {}
-
-void SpotifyMetadataRequest::FetchTrackMetadata(const QString &track_id) {
-
-  if (!authenticated()) {
-    Q_EMIT MetadataFailure(track_id, tr("Not authenticated"));
-    return;
-  }
-
-  if (track_id.isEmpty()) {
-    Q_EMIT MetadataFailure(track_id, tr("No track ID"));
-    return;
-  }
-
-  QNetworkReply *reply = CreateRequest(u"tracks/"_s + track_id, ParamList());
-  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, track_id]() {
-    TrackMetadataReceived(reply, track_id);
-  });
-
+std::string ArtistUrl(const std::string &api_url, const std::string &artist_id) {
+  return api_url + "/artists/" + StrUtils::UriEscape(artist_id);
 }
 
-void SpotifyMetadataRequest::TrackMetadataReceived(QNetworkReply *reply, const QString &track_id) {
-
-  if (!replies_.contains(reply)) return;
-  replies_.removeAll(reply);
-  QObject::disconnect(reply, nullptr, this, nullptr);
-  reply->deleteLater();
-
-  JsonObjectResult result = ParseJsonObject(reply);
-  if (result.error_code != JsonBaseRequest::ErrorCode::Success) {
-    Error(result.error_message);
-    Q_EMIT MetadataFailure(track_id, result.error_message);
-    return;
+Song ParseTrack(const std::string &json) {
+  Song song(Song::Source::Spotify);
+  const std::string id = JsonUtils::GetString(json, {"id"});
+  if (id.empty()) {
+    return song;
   }
-
-  const QJsonObject &json_obj = result.json_object;
-
-  Song song;
-  song.set_source(Song::Source::Spotify);
-
-  // Parse song ID and URI
-  if (json_obj.contains("id"_L1)) {
-    song.set_song_id(json_obj["id"_L1].toString());
-  }
-  if (json_obj.contains("uri"_L1)) {
-    song.set_url(QUrl(json_obj["uri"_L1].toString()));
-  }
-
-  // Parse basic track info
-  if (json_obj.contains("name"_L1)) {
-    song.set_title(json_obj["name"_L1].toString());
-  }
-  if (json_obj.contains("track_number"_L1)) {
-    song.set_track(json_obj["track_number"_L1].toInt());
-  }
-  if (json_obj.contains("disc_number"_L1)) {
-    song.set_disc(json_obj["disc_number"_L1].toInt());
-  }
-  if (json_obj.contains("duration_ms"_L1)) {
-    song.set_length_nanosec(json_obj["duration_ms"_L1].toVariant().toLongLong() * kNsecPerMsec);
-  }
-
-  // Extract artist info
-  QString artist_id;
-  if (json_obj.contains("artists"_L1) && json_obj["artists"_L1].isArray()) {
-    const QJsonArray array_artists = json_obj["artists"_L1].toArray();
-    if (!array_artists.isEmpty()) {
-      const QJsonObject obj_artist = array_artists.first().toObject();
-      if (obj_artist.contains("id"_L1)) {
-        artist_id = obj_artist["id"_L1].toString();
-        song.set_artist_id(artist_id);
-      }
-      if (obj_artist.contains("name"_L1)) {
-        song.set_artist(obj_artist["name"_L1].toString());
-      }
-    }
-  }
-
-  // Extract album info
-  if (json_obj.contains("album"_L1) && json_obj["album"_L1].isObject()) {
-    QJsonObject obj_album = json_obj["album"_L1].toObject();
-    if (obj_album.contains("id"_L1)) {
-      song.set_album_id(obj_album["id"_L1].toString());
-    }
-    if (obj_album.contains("name"_L1)) {
-      song.set_album(obj_album["name"_L1].toString());
-    }
-    // Cover image - prefer larger images
-    if (obj_album.contains("images"_L1) && obj_album["images"_L1].isArray()) {
-      const QJsonArray array_images = obj_album["images"_L1].toArray();
-      for (const QJsonValue &value : array_images) {
-        if (!value.isObject()) continue;
-        QJsonObject obj_image = value.toObject();
-        if (!obj_image.contains("url"_L1) || !obj_image.contains("width"_L1) || !obj_image.contains("height"_L1)) continue;
-        int width = obj_image["width"_L1].toInt();
-        int height = obj_image["height"_L1].toInt();
-        if (width >= 300 && height >= 300) {
-          song.set_art_automatic(QUrl(obj_image["url"_L1].toString()));
-          break;
-        }
-      }
-    }
-    // Album artist
-    if (obj_album.contains("artists"_L1) && obj_album["artists"_L1].isArray()) {
-      const QJsonArray array_album_artists = obj_album["artists"_L1].toArray();
-      if (!array_album_artists.isEmpty()) {
-        const QJsonObject obj_album_artist = array_album_artists.first().toObject();
-        if (obj_album_artist.contains("name"_L1)) {
-          song.set_albumartist(obj_album_artist["name"_L1].toString());
-        }
-      }
-    }
-    // Release date
-    if (obj_album.contains("release_date"_L1)) {
-      QString release_date = obj_album["release_date"_L1].toString();
-      if (release_date.length() >= 4) {
-        song.set_year(release_date.left(4).toInt());
-      }
-    }
-  }
-
   song.set_valid(true);
-
-  if (artist_id.isEmpty()) {
-    // No artist ID - emit what we have without genre
-    qLog(Debug) << "Spotify: Track metadata received for" << track_id << "(no artist ID for genre lookup)";
-    Q_EMIT MetadataReceived(track_id, song);
-    return;
+  song.set_song_id(id);
+  const std::string uri = JsonUtils::GetString(json, {"uri"});
+  song.set_url(uri.empty() ? "spotify://" + id : uri);
+  song.set_title(JsonUtils::GetString(json, {"name"}));
+  song.set_track(JsonUtils::GetInt(json, {"track_number"}, -1));
+  song.set_disc(JsonUtils::GetInt(json, {"disc_number"}, -1));
+  const int duration_ms = JsonUtils::GetInt(json, {"duration_ms"}, -1);
+  if (duration_ms > 0) {
+    song.set_length_nanosec(static_cast<int64_t>(duration_ms) * kNsecPerMsec);
+  }
+  song.set_artist(JsonUtils::GetString(json, {"artists", "name"}));
+  song.set_artist_id(JsonUtils::GetString(json, {"artists", "id"}));
+  song.set_album(JsonUtils::GetString(json, {"album", "name"}));
+  song.set_album_id(JsonUtils::GetString(json, {"album", "id"}));
+  song.set_albumartist(JsonUtils::GetString(json, {"album", "artists", "name"}));
+  const std::string release = JsonUtils::GetString(json, {"album", "release_date"});
+  if (release.size() >= 4) {
+    song.set_year(std::atoi(release.substr(0, 4).c_str()));
+  }
+  const std::string preview = JsonUtils::GetString(json, {"preview_url"});
+  if (!preview.empty()) {
+    song.set_stream_url(preview);
   }
 
-  // Store partial song and fetch artist metadata for genre
-  pending_songs_[track_id] = song;
-
-  QNetworkReply *artist_reply = CreateRequest(u"artists/"_s + artist_id, ParamList());
-  QObject::connect(artist_reply, &QNetworkReply::finished, this, [this, artist_reply, track_id]() {
-    ArtistMetadataReceived(artist_reply, track_id);
-  });
-
-}
-
-void SpotifyMetadataRequest::ArtistMetadataReceived(QNetworkReply *reply, const QString &track_id) {
-
-  if (!replies_.contains(reply)) return;
-  replies_.removeAll(reply);
-  QObject::disconnect(reply, nullptr, this, nullptr);
-  reply->deleteLater();
-
-  // Retrieve the stored partial song
-  if (!pending_songs_.contains(track_id)) {
-    Q_EMIT MetadataFailure(track_id, tr("No pending song for track ID"));
-    return;
-  }
-  Song song = pending_songs_.take(track_id);
-
-  JsonObjectResult result = ParseJsonObject(reply);
-  if (result.error_code != JsonBaseRequest::ErrorCode::Success) {
-    // Still emit the song even without genre
-    qLog(Warning) << "Spotify: Failed to get artist metadata for genre:" << result.error_message;
-    Q_EMIT MetadataReceived(track_id, song);
-    return;
-  }
-
-  const QJsonObject &json_object = result.json_object;
-
-  // Add genre from artist
-  if (json_object.contains("genres"_L1) && json_object["genres"_L1].isArray()) {
-    const QJsonArray array_genres = json_object["genres"_L1].toArray();
-    if (!array_genres.isEmpty()) {
-      song.set_genre(array_genres.first().toString());
+  JsonParser *parser = json_parser_new();
+  if (json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
+    JsonNode *root = json_parser_get_root(parser);
+    if (root && JSON_NODE_HOLDS_OBJECT(root)) {
+      JsonObject *object = json_node_get_object(root);
+      if (json_object_has_member(object, "artists") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "artists"))) {
+        JsonArray *artists = json_object_get_array_member(object, "artists");
+        if (json_array_get_length(artists) > 0) {
+          JsonObject *artist = json_array_get_object_element(artists, 0);
+          if (song.artist().empty()) {
+            song.set_artist(json_object_has_member(artist, "name") ? json_object_get_string_member(artist, "name") : "");
+          }
+          if (song.artist_id().empty()) {
+            song.set_artist_id(json_object_has_member(artist, "id") ? json_object_get_string_member(artist, "id") : "");
+          }
+        }
+      }
+      if (json_object_has_member(object, "album") && JSON_NODE_HOLDS_OBJECT(json_object_get_member(object, "album"))) {
+        JsonObject *album = json_object_get_object_member(object, "album");
+        if (json_object_has_member(album, "images") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(album, "images"))) {
+          JsonArray *images = json_object_get_array_member(album, "images");
+          const guint n = json_array_get_length(images);
+          for (guint i = 0; i < n; ++i) {
+            JsonObject *image = json_array_get_object_element(images, i);
+            const int width = json_object_has_member(image, "width") ? static_cast<int>(json_object_get_int_member(image, "width")) : 0;
+            const int height = json_object_has_member(image, "height") ? static_cast<int>(json_object_get_int_member(image, "height")) : 0;
+            const char *url = json_object_has_member(image, "url") ? json_object_get_string_member(image, "url") : nullptr;
+            if (url && width >= 300 && height >= 300) {
+              song.set_art_automatic(url);
+              break;
+            }
+          }
+          if (song.art_automatic().empty() && n > 0) {
+            JsonObject *image = json_array_get_object_element(images, 0);
+            if (json_object_has_member(image, "url")) {
+              song.set_art_automatic(json_object_get_string_member(image, "url"));
+            }
+          }
+        }
+      }
     }
   }
-
-  qLog(Debug) << "Spotify: Track metadata received for" << track_id
-              << "- title:" << song.title()
-              << "- artist:" << song.artist()
-              << "- album:" << song.album()
-              << "- genre:" << song.genre();
-
-  Q_EMIT MetadataReceived(track_id, song);
-
+  g_object_unref(parser);
+  return song;
 }
 
-void SpotifyMetadataRequest::Error(const QString &error_message, const QVariant &debug_output) {
-
-  qLog(Error) << "Spotify:" << error_message;
-  if (debug_output.isValid()) qLog(Debug) << debug_output;
-
+std::string ParseArtistGenre(const std::string &json) {
+  JsonParser *parser = json_parser_new();
+  if (!json_parser_load_from_data(parser, json.data(), static_cast<gssize>(json.size()), nullptr)) {
+    g_object_unref(parser);
+    return {};
+  }
+  std::string genre;
+  JsonNode *root = json_parser_get_root(parser);
+  if (root && JSON_NODE_HOLDS_OBJECT(root)) {
+    JsonObject *object = json_node_get_object(root);
+    if (json_object_has_member(object, "genres") && JSON_NODE_HOLDS_ARRAY(json_object_get_member(object, "genres"))) {
+      JsonArray *genres = json_object_get_array_member(object, "genres");
+      if (json_array_get_length(genres) > 0) {
+        JsonNode *first = json_array_get_element(genres, 0);
+        if (first && JSON_NODE_HOLDS_VALUE(first) && json_node_get_value_type(first) == G_TYPE_STRING) {
+          const char *value = json_node_get_string(first);
+          if (value) {
+            genre = value;
+          }
+        }
+      }
+    }
+  }
+  g_object_unref(parser);
+  return genre;
 }
+
+void Get(NetworkAccessManager *network, const std::string &url, const std::map<std::string, std::string> &headers, Callback callback) {
+  if (!network || url.empty()) {
+    if (callback) {
+      callback(Song(), "Spotify metadata request is incomplete");
+    }
+    return;
+  }
+  network->Get(
+      url,
+      [callback](const NetworkAccessManager::Response &response) {
+        if (!callback) {
+          return;
+        }
+        if (!response.ok()) {
+          callback(Song(), response.error.empty() ? "Spotify metadata missing" : response.error);
+          return;
+        }
+        const Song song = ParseTrack(response.body);
+        callback(song, song.is_valid() ? std::string() : "Spotify metadata missing");
+      },
+      headers);
+}
+
+}  // namespace SpotifyMetadataRequest

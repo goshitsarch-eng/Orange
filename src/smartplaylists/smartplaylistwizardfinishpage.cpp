@@ -1,34 +1,14 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "smartplaylists/smartplaylistwizardfinishpage.h"
 
-#include "smartplaylistwizardfinishpage.h"
-#include "ui_smartplaylistwizardfinishpage.h"
-
-SmartPlaylistWizardFinishPage::SmartPlaylistWizardFinishPage(QWidget *parent) : QWizardPage(parent), ui_(new Ui_SmartPlaylistWizardFinishPage) {
-
-  ui_->setupUi(this);
-  QObject::connect(ui_->name, &QLineEdit::textChanged, this, &SmartPlaylistWizardFinishPage::completeChanged);
-
+SmartPlaylistWizardFinishPage::SmartPlaylistWizardFinishPage() {
+  widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  summary_ = gtk_label_new("Ready to create the playlist.");
+  gtk_label_set_wrap(GTK_LABEL(summary_), TRUE);
+  gtk_widget_set_halign(summary_, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(widget_), gtk_label_new("Finish"));
+  gtk_box_append(GTK_BOX(widget_), summary_);
 }
 
-SmartPlaylistWizardFinishPage::~SmartPlaylistWizardFinishPage() { delete ui_; }
-
-int SmartPlaylistWizardFinishPage::nextId() const { return -1; }
-bool SmartPlaylistWizardFinishPage::isComplete() const { return !ui_->name->text().isEmpty(); }
+void SmartPlaylistWizardFinishPage::SetSummary(const std::string &text) {
+  gtk_label_set_text(GTK_LABEL(summary_), text.c_str());
+}

@@ -1,60 +1,22 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
-#ifndef COLLECTIONPLAYLISTITEM_H
-#define COLLECTIONPLAYLISTITEM_H
-
-#include "config.h"
-
-#include <QVariant>
-#include <QUrl>
-#include <QUuid>
+#ifndef STRAWBERRY_COLLECTIONPLAYLISTITEM_H
+#define STRAWBERRY_COLLECTIONPLAYLISTITEM_H
 
 #include "core/song.h"
-#include "playlist/playlistitem.h"
 
-class SqlRow;
+#include <string>
 
-class CollectionPlaylistItem : public PlaylistItem {
+class CollectionPlaylistItem {
  public:
-  explicit CollectionPlaylistItem(const Song::Source source, const QUuid &uuid = QUuid());
-  explicit CollectionPlaylistItem(const Song &song, const bool signal = false);
+  CollectionPlaylistItem() = default;
+  explicit CollectionPlaylistItem(const Song &song);
 
-  Song OriginalMetadata() const override { return song_; }
-  void SetOriginalMetadata(const Song &song) override { song_ = song; }
-
-  QUrl OriginalUrl() const override { return song_.url(); }
-  bool IsLocalCollectionItem() const override { return song_.source() == Song::Source::Collection; }
-
-  bool InitFromQuery(const SqlRow &query) override;
-
-  void SetArtManual(const QUrl &cover_url) override;
-
- protected:
-  QVariant DatabaseValue(const DatabaseColumn database_column) const override;
-  Song DatabaseSongMetadata() const override { return Song(source_); }
-
- protected:
-  Song song_;
+  const Song &song() const { return song_; }
+  int collection_id() const { return song_.id(); }
+  const std::string &url() const { return song_.url(); }
+  std::string DisplayText() const;
 
  private:
-  Q_DISABLE_COPY(CollectionPlaylistItem)
+  Song song_;
 };
 
-#endif  // COLLECTIONPLAYLISTITEM_H
+#endif

@@ -1,119 +1,58 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
-#include <QtGlobal>
-#include <QWidget>
-#include <QList>
-#include <QString>
-#include <QStringList>
-#include <QPainter>
-#include <QSize>
-#include <QRect>
-#include <QSizePolicy>
-#include <QPaintEvent>
-
-#include "includes/shared_ptr.h"
-#include "core/taskmanager.h"
 #include "multiloadingindicator.h"
-#include "widgets/busyindicator.h"
 
-using namespace Qt::Literals::StringLiterals;
-
-namespace {
-constexpr int kVerticalPadding = 4;
-constexpr int kHorizontalPadding = 6;
-constexpr int kSpacing = 6;
-}  // namespace
-
-MultiLoadingIndicator::MultiLoadingIndicator(QWidget *parent)
-    : QWidget(parent),
-      task_manager_(nullptr),
-      spinner_(new BusyIndicator(this)),
-      task_count_(-1) {
-
-  spinner_->move(kHorizontalPadding, kVerticalPadding);
-  setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Fixed);
-
+MultiLoadingIndicator::MultiLoadingIndicator() {
+  root_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  g_object_ref_sink(root_);
+  spinner_ = gtk_spinner_new();
+  label_ = gtk_label_new("");
+  gtk_widget_add_css_class(label_, "dim-label");
+  gtk_label_set_ellipsize(GTK_LABEL(label_), PANGO_ELLIPSIZE_END);
+  gtk_box_append(GTK_BOX(root_), spinner_);
+  gtk_box_append(GTK_BOX(root_), label_);
+  Refresh();
 }
 
-QSize MultiLoadingIndicator::sizeHint() const {
-
-  const int width = kHorizontalPadding * 2 + spinner_->sizeHint().width() + kSpacing + fontMetrics().horizontalAdvance(text_);
-  const int height = kVerticalPadding * 2 + qMax(spinner_->sizeHint().height(), fontMetrics().height());
-
-  return QSize(width, height);
-
+MultiLoadingIndicator::~MultiLoadingIndicator() {
+  if (root_) g_object_unref(root_);
 }
 
-void MultiLoadingIndicator::SetTaskManager(SharedPtr<TaskManager> task_manager) {
-
-  task_manager_ = task_manager;
-  QObject::connect(&*task_manager_, &TaskManager::TasksChanged, this, &MultiLoadingIndicator::UpdateText);
-
+void MultiLoadingIndicator::SetTasks(const std::vector<MultiLoadingText::Task> &tasks) {
+  tasks_ = tasks;
+  Refresh();
 }
 
-void MultiLoadingIndicator::UpdateText() {
+void MultiLoadingIndicator::SetTasks(const std::vector<std::string> &names) {
+  tasks_.clear();
+  tasks_.reserve(names.size());
+  for (const std::string &name : names) {
+    tasks_.push_back({name, 0, 0});
+  }
+  Refresh();
+}
 
-  const QList<TaskManager::Task> tasks = task_manager_->GetTasks();
+void MultiLoadingIndicator::AddTask(const std::string &name) {
+  tasks_.push_back({name, 0, 0});
+  Refresh();
+}
 
-  QStringList strings;
-  strings.reserve(tasks.count());
-  for (const TaskManager::Task &task : tasks) {
-    QString task_text = task.name;
-    if (!task_text.isEmpty()) task_text[0] = task_text[0].toLower();
-
-    if (task.progress_max > 0) {
-      int percentage = static_cast<int>(static_cast<float>(task.progress) / static_cast<float>(task.progress_max) * 100.0F);
-      task_text += QStringLiteral(" %1%").arg(percentage);
+void MultiLoadingIndicator::RemoveTask(const std::string &name) {
+  for (auto it = tasks_.begin(); it != tasks_.end(); ++it) {
+    if (it->name == name) {
+      tasks_.erase(it);
+      break;
     }
-
-    strings << task_text;
   }
-
-  text_ = strings.join(", "_L1);
-  if (!text_.isEmpty()) {
-    text_[0] = text_[0].toUpper();
-    text_ += "..."_L1;
-  }
-
-  if (task_count_ != tasks.count()) {
-    task_count_ = tasks.count();
-    Q_EMIT TaskCountChange(static_cast<int>(tasks.count()));
-  }
-
-  update();
-  updateGeometry();
-
+  Refresh();
 }
 
-void MultiLoadingIndicator::paintEvent(QPaintEvent *e) {
-
-  Q_UNUSED(e)
-
-  QPainter p(this);
-
-  const QRect text_rect(
-      kHorizontalPadding + spinner_->sizeHint().width() + kSpacing, kVerticalPadding,
-      width() - kHorizontalPadding * 2 - spinner_->sizeHint().width() - kSpacing,
-      height() - kVerticalPadding * 2);
-  p.drawText(text_rect, Qt::TextSingleLine | Qt::AlignLeft, fontMetrics().elidedText(text_, Qt::ElideRight, text_rect.width()));  // NOLINT(bugprone-suspicious-enum-usage)
-
+void MultiLoadingIndicator::Refresh() {
+  if (tasks_.empty()) {
+    gtk_spinner_stop(GTK_SPINNER(spinner_));
+    gtk_widget_set_visible(root_, FALSE);
+    gtk_label_set_text(GTK_LABEL(label_), "");
+    return;
+  }
+  gtk_widget_set_visible(root_, TRUE);
+  gtk_spinner_start(GTK_SPINNER(spinner_));
+  gtk_label_set_text(GTK_LABEL(label_), MultiLoadingText::Format(tasks_).c_str());
 }

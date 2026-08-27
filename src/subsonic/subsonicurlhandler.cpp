@@ -1,49 +1,28 @@
-/*
- * Strawberry Music Player
- * Copyright 2019-2025, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "subsonic/subsonicurlhandler.h"
 
-#include "config.h"
+#include "streaming/streamingmediaid.h"
+#include "subsonic/subsonicservice.h"
 
-#include <QUrl>
-#include <QUrlQuery>
+SubsonicUrlHandler::SubsonicUrlHandler(SubsonicService *service) : service_(service) {}
 
-#include "subsonicservice.h"
-#include "subsonicbaserequest.h"
-#include "subsonicurlhandler.h"
+std::string SubsonicUrlHandler::scheme() const { return service_ ? service_->scheme() : "subsonic"; }
 
-using namespace Qt::Literals::StringLiterals;
+std::string SubsonicUrlHandler::SongId(const std::string &url) { return StreamingMediaId(url); }
 
-SubsonicUrlHandler::SubsonicUrlHandler(SubsonicService *service) : UrlHandler(service), service_(service) {}
+std::string SubsonicUrlHandler::StreamUrl(const std::string &server_url, const std::string &username, const std::string &password,
+                                          const std::string &song_id, bool hex_auth) {
+  return SubsonicService::CreateUrl(server_url, username, password, "stream", {{"id", song_id}}, hex_auth);
+}
 
-UrlHandler::LoadResult SubsonicUrlHandler::StartLoading(const QUrl &url) {
-
-  if (!server_url().isValid()) {
-    return LoadResult(url, LoadResult::Type::Error, tr("Subsonic server URL is invalid."));
+UrlHandler::LoadResult SubsonicUrlHandler::Load(const std::string &url, AsyncCallback callback) {
+  if (service_) {
+    return service_->Load(url, std::move(callback));
   }
-
-  if (username().isEmpty() || password().isEmpty()) {
-    return LoadResult(url, LoadResult::Type::Error, tr("Missing Subsonic username or password."));
+  LoadResult result;
+  result.media_url = url;
+  result.error = "Subsonic is not available";
+  if (callback) {
+    callback(result);
   }
-
-  using Param = QPair<QString, QString>;
-  using ParamList = QList<Param>;
-  const QUrl stream_url = SubsonicBaseRequest::CreateUrl(server_url(), auth_method(), username(), password(), u"stream"_s, ParamList() << Param(u"id"_s, url.path()));
-
-  return LoadResult(url, LoadResult::Type::TrackAvailable, stream_url);
-
+  return result;
 }

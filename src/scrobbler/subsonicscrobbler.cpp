@@ -1,122 +1,132 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
- * Copyright 2020, Pascal Below <spezifisch@below.fr>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "scrobbler/subsonicscrobbler.h"
 
-#include "config.h"
-
-#include <memory>
-
-#include <QVariant>
-#include <QString>
-#include <QDateTime>
-#include <QTimer>
-
-#include "includes/shared_ptr.h"
-#include "core/song.h"
-#include "core/logging.h"
-#include "core/settings.h"
-#include "constants/timeconstants.h"
+#include "constants/scrobblersettings.h"
 #include "constants/subsonicsettings.h"
+#include "core/settings.h"
+#include "scrobbler/subsonicscrobblestate.h"
 #include "subsonic/subsonicservice.h"
 
-#include "scrobblersettingsservice.h"
-#include "scrobblerservice.h"
-#include "subsonicscrobbler.h"
+#include <glib.h>
 
-namespace {
-constexpr char kName[] = "Subsonic";
+#include <ctime>
+#include <map>
+
+SubsonicScrobbler::SubsonicScrobbler(NetworkAccessManager *network) : network_(network), pending_song_(Song()) {}
+
+SubsonicScrobbler::~SubsonicScrobbler() { CancelSubmitTimer(); }
+
+void SubsonicScrobbler::CancelSubmitTimer() {
+  if (submit_timeout_id_ != 0) {
+    g_source_remove(submit_timeout_id_);
+    submit_timeout_id_ = 0;
+  }
 }
 
-SubsonicScrobbler::SubsonicScrobbler(const SharedPtr<ScrobblerSettingsService> settings, const SharedPtr<NetworkAccessManager> network, const SharedPtr<SubsonicService> service, QObject *parent)
-    : ScrobblerService(QLatin1String(kName), network, settings, parent),
-      service_(service),
-      enabled_(false),
-      submitted_(false) {
-
-  SubsonicScrobbler::ReloadSettings();
-
-  timer_submit_.setSingleShot(true);
-  QObject::connect(&timer_submit_, &QTimer::timeout, this, &SubsonicScrobbler::Submit);
-
+void SubsonicScrobbler::SubmitPending() {
+  submitted_ = false;
+  CancelSubmitTimer();
+  if (!pending_song_.is_valid() && pending_song_.song_id().empty() && pending_song_.url().empty()) {
+    return;
+  }
+  Ping(pending_song_, true, playing_time_ms_);
 }
 
-void SubsonicScrobbler::ReloadSettings() {
-
-  Settings s;
-  s.beginGroup(SubsonicSettings::kSettingsGroup);
-  enabled_ = s.value(SubsonicSettings::kServerSideScrobbling, SubsonicSettings::kDefaultServerSideScrobbling).toBool();
-  s.endGroup();
-
+std::string SubsonicScrobbler::ScrobbleUrl(const std::string &server_url, const std::string &username, const std::string &password,
+                                           const std::string &id, bool submission, bool hex_auth, int64_t time_ms) {
+  std::map<std::string, std::string> params = {{"id", id}, {"submission", submission ? "true" : "false"}};
+  if (time_ms > 0) {
+    params.emplace("time", std::to_string(time_ms));
+  }
+  return SubsonicService::CreateUrl(server_url, username, password, "scrobble", params, hex_auth);
 }
 
-SubsonicServicePtr SubsonicScrobbler::service() const {
-
-  return service_;
-
+void SubsonicScrobbler::Ping(const Song &song, bool submission, int64_t time_ms) {
+  if (!enabled_ || !network_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(SubsonicSettings::kSettingsGroup);
+  const std::string url = settings.Value(SubsonicSettings::kUrl);
+  const std::string user = settings.Value(SubsonicSettings::kUsername);
+  const std::string password = settings.Value(SubsonicSettings::kPassword);
+  const bool hex_auth = settings.Contains("hexauth")
+                            ? settings.BoolValue("hexauth", false)
+                            : settings.IntValue(SubsonicSettings::kAuthMethod, static_cast<int>(SubsonicSettings::kDefaultAuthMethod)) ==
+                                  static_cast<int>(SubsonicSettings::AuthMethod::Hex);
+  if (url.empty() || user.empty()) {
+    return;
+  }
+  const std::string id = SubsonicScrobbleState::TrackId(song);
+  if (id.empty()) {
+    return;
+  }
+  network_->Get(ScrobbleUrl(url, user, password, id, submission, hex_auth, time_ms), [](const NetworkAccessManager::Response &) {});
 }
 
-void SubsonicScrobbler::UpdateNowPlaying(const Song &song) {
-
-  if (song.source() != Song::Source::Subsonic) return;
-
-  song_playing_ = song;
-  time_ = QDateTime::currentDateTime();
-
-  if (!song.is_metadata_good() || settings_->offline() || !service()) return;
-
-  service()->Scrobble(song.song_id(), false, time_);
-
+void SubsonicScrobbler::NowPlaying(const Song &song) {
+  Settings settings;
+  settings.BeginGroup(SubsonicSettings::kSettingsGroup);
+  const bool server_side =
+      settings.BoolValue(SubsonicSettings::kServerSideScrobbling, SubsonicSettings::kDefaultServerSideScrobbling);
+  if (!SubsonicScrobbleState::ShouldNowPlaying(song, server_side)) {
+    return;
+  }
+  CancelSubmitTimer();
+  submitted_ = false;
+  pending_song_ = Song();
+  playing_url_ = song.url();
+  playing_song_id_ = song.song_id();
+  playing_time_ms_ = static_cast<int64_t>(std::time(nullptr)) * 1000;
+  Ping(song, false, playing_time_ms_);
 }
 
 void SubsonicScrobbler::ClearPlaying() {
-
-  song_playing_ = Song();
-  time_ = QDateTime();
-
+  CancelSubmitTimer();
+  submitted_ = false;
+  pending_song_ = Song();
+  playing_url_.clear();
+  playing_song_id_.clear();
+  playing_time_ms_ = 0;
 }
 
 void SubsonicScrobbler::Scrobble(const Song &song) {
-
-  if (song.source() != Song::Source::Subsonic || song.id() != song_playing_.id() || song.url() != song_playing_.url() || !song.is_metadata_good()) return;
-
-  if (settings_->offline()) return;
-
-  if (!submitted_) {
-    submitted_ = true;
-    if (settings_->submit_delay() <= 0) {
-      Submit();
-    }
-    else if (!timer_submit_.isActive()) {
-      timer_submit_.setInterval(static_cast<int>(settings_->submit_delay() * kMsecPerSec));
-      timer_submit_.start();
-    }
+  Settings settings;
+  settings.BeginGroup(SubsonicSettings::kSettingsGroup);
+  const bool server_side =
+      settings.BoolValue(SubsonicSettings::kServerSideScrobbling, SubsonicSettings::kDefaultServerSideScrobbling);
+  if (!server_side || !SubsonicScrobbleState::ShouldSubmit(song, playing_url_, playing_song_id_)) {
+    return;
   }
-
+  if (submitted_) {
+    return;
+  }
+  Settings scrobbler;
+  scrobbler.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  const int delay = scrobbler.IntValue(ScrobblerSettings::kSubmit, ScrobblerSettings::kDefaultSubmit);
+  pending_song_ = song;
+  if (SubsonicScrobbleState::ShouldSubmitImmediately(delay, submitted_)) {
+    submitted_ = true;
+    SubmitPending();
+    return;
+  }
+  if (SubsonicScrobbleState::ShouldStartSubmitTimer(delay, submitted_, submit_timeout_id_ != 0)) {
+    submitted_ = true;
+    submit_timeout_id_ = g_timeout_add_seconds(static_cast<guint>(SubsonicScrobbleState::DelaySeconds(delay)), +[](gpointer data) -> gboolean {
+                                                 auto *self = static_cast<SubsonicScrobbler *>(data);
+                                                 self->submit_timeout_id_ = 0;
+                                                 self->SubmitPending();
+                                                 return G_SOURCE_REMOVE;
+                                               },
+                                               this);
+  }
 }
 
-void SubsonicScrobbler::Submit() {
+void SubsonicScrobbler::Love(const Song &) {}
 
-  qLog(Debug) << "SubsonicScrobbler: Submitting scrobble for" << song_playing_.artist() << song_playing_.title();
-  submitted_ = false;
-
-  if (settings_->offline() || !service()) return;
-
-  service()->Scrobble(song_playing_.song_id(), true, time_);
-
+void SubsonicScrobbler::Authenticate(const std::string &username, const std::string &password) {
+  Settings settings;
+  settings.BeginGroup(SubsonicSettings::kSettingsGroup);
+  settings.SetValue(SubsonicSettings::kUsername, username);
+  settings.SetValue(SubsonicSettings::kPassword, password);
+  settings.Sync();
 }

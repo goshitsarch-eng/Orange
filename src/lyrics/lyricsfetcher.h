@@ -1,81 +1,41 @@
-/*
- * Strawberry Music Player
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_LYRICSFETCHER_H
+#define STRAWBERRY_LYRICSFETCHER_H
 
-#ifndef LYRICSFETCHER_H
-#define LYRICSFETCHER_H
+#include "core/signal.h"
+#include "lyrics/lyricssearchrequest.h"
+#include "lyrics/lyricssearchresult.h"
 
-#include "config.h"
+#include <glib.h>
 
-#include <QtGlobal>
-#include <QObject>
-#include <QMetaType>
-#include <QQueue>
-#include <QSet>
-#include <QList>
-#include <QHash>
-#include <QString>
-#include <QUrl>
+#include <cstdint>
+#include <map>
+#include <queue>
+#include <string>
 
-#include "includes/shared_ptr.h"
-#include "lyricssearchrequest.h"
-#include "lyricssearchresult.h"
-
-class QTimer;
-class LyricsProviders;
 class LyricsFetcherSearch;
+class LyricsProviders;
 
-class LyricsFetcher : public QObject {
-  Q_OBJECT
-
+class LyricsFetcher {
  public:
-  explicit LyricsFetcher(const SharedPtr<LyricsProviders> lyrics_providers, QObject *parent = nullptr);
-  ~LyricsFetcher() override {}
+  explicit LyricsFetcher(LyricsProviders *lyrics_providers);
+  ~LyricsFetcher();
 
-  struct Request {
-    Request() : id(0) {}
-    quint64 id;
-    LyricsSearchRequest search_request;
-  };
-
-  quint64 Search(const QString &effective_albumartist, const QString &artist, const QString &album, const QString &title, const qint64 duration);
+  uint64_t Search(const std::string &effective_albumartist, const std::string &artist, const std::string &album,
+                  const std::string &title, int64_t duration = -1);
   void Clear();
+  bool StartNext();
+
+  Signal<uint64_t, std::string, std::string> LyricsFetched;
+  Signal<uint64_t, LyricsSearchResults> SearchFinished;
 
  private:
-  void AddRequest(const Request &request);
+  void CancelStarter();
 
- Q_SIGNALS:
-  void LyricsFetched(const quint64 request_id, const QString &provider, const QString &lyrics);
-  void SearchFinished(const quint64 request_id, const LyricsSearchResults &results);
-
- private Q_SLOTS:
-  void SingleSearchFinished(const quint64 request_id, const LyricsSearchResults &results);
-  void SingleLyricsFetched(const quint64 request_id, const QString &provider, const QString &lyrics);
-  void StartRequests();
-
- private:
-  const SharedPtr<LyricsProviders> lyrics_providers_;
-  quint64 next_id_;
-
-  QQueue<Request> queued_requests_;
-  QHash<quint64, LyricsFetcherSearch*> active_requests_;
-
-  QTimer *request_starter_;
+  LyricsProviders *lyrics_providers_ = nullptr;
+  uint64_t next_id_ = 1;
+  std::queue<std::pair<uint64_t, LyricsSearchRequest>> queued_;
+  std::map<uint64_t, LyricsFetcherSearch *> active_;
+  guint starter_id_ = 0;
 };
 
-#endif  // LYRICSFETCHER_H
+#endif

@@ -1,323 +1,395 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
 #include "config.h"
 
-#include <functional>
-#include <utility>
+#include "device/deviceproperties.h"
 
-#include <QtGlobal>
-#include <QWidget>
-#include <QDialog>
-#include <QtConcurrentRun>
-#include <QFuture>
-#include <QFutureWatcher>
-#include <QByteArray>
-#include <QVariant>
-#include <QString>
-#include <QStringList>
-#include <QComboBox>
-#include <QGroupBox>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QRadioButton>
-#include <QScrollBar>
-#include <QListWidget>
-#include <QListWidgetItem>
-#include <QTableWidgetItem>
-#include <QStackedWidget>
-#include <QTableWidget>
-
-#include "includes/shared_ptr.h"
-#include "core/iconloader.h"
-#include "core/musicstorage.h"
+#include "core/application.h"
+#include "device/deviceconnectdialog.h"
+#include "device/devicecopyjob.h"
+#include "device/devicedatabasebackend.h"
+#include "device/devicepropertiesicons.h"
+#include "device/devicepropertiesinfo.h"
+#include "device/devicepropertieslabels.h"
+#include "device/devicesupportedformats.h"
+#include "device/mtpconnection.h"
+#include "organize/organizetranscode.h"
+#include "translations/translations.h"
 #include "widgets/freespacebar.h"
-#include "connecteddevice.h"
-#include "devicelister.h"
-#include "devicemanager.h"
-#include "deviceproperties.h"
-#include "transcoder/transcoder.h"
-#include "ui_deviceproperties.h"
 
-using namespace Qt::Literals::StringLiterals;
+#include <adwaita.h>
+#include <gio/gio.h>
 
-DeviceProperties::DeviceProperties(QWidget *parent)
-    : QDialog(parent),
-      ui_(new Ui_DeviceProperties),
-      device_manager_(nullptr),
-      updating_formats_(false) {
+#include <memory>
+#include <string>
+#include <vector>
 
-  ui_->setupUi(this);
+namespace {
 
-  QObject::connect(ui_->open_device, &QPushButton::clicked, this, &DeviceProperties::OpenDevice);
+struct FormatsWidgets {
+  GtkWidget *stack = nullptr;
+  GtkWidget *supported_box = nullptr;
+  GtkWidget *supported_list = nullptr;
+  GtkWidget *unsupported = nullptr;
+  GtkWidget *never = nullptr;
+  GtkWidget *format = nullptr;
+};
 
-  // Maximum height of the icon widget
-  ui_->icon->setMaximumHeight(ui_->icon->iconSize().height() + ui_->icon->horizontalScrollBar()->sizeHint().height() + ui_->icon->spacing() * 2 + 5);
+struct FormatsJob {
+  std::shared_ptr<bool> alive;
+  FormatsWidgets widgets;
+  std::string serial;
+  std::vector<Song::FileType> types;
+  bool ok = false;
+  bool has_saved = false;
+  Song::FileType stored = Song::FileType::Unknown;
+};
 
-}
-
-DeviceProperties::~DeviceProperties() { delete ui_; }
-
-void DeviceProperties::Init(const SharedPtr<DeviceManager> device_manager) {
-
-  device_manager_ = device_manager;
-  QObject::connect(&*device_manager_, &DeviceManager::dataChanged, this, &DeviceProperties::ModelChanged);
-  QObject::connect(&*device_manager_, &DeviceManager::rowsInserted, this, &DeviceProperties::ModelChanged);
-  QObject::connect(&*device_manager_, &DeviceManager::rowsRemoved, this, &DeviceProperties::ModelChanged);
-
-}
-
-void DeviceProperties::ShowDevice(const QModelIndex &idx) {
-
-  if (ui_->icon->count() == 0) {
-    // Only load the icons the first time the dialog is shown
-    const QStringList icon_names = QStringList() << u"device"_s
-                                                 << u"device-usb-drive"_s
-                                                 << u"device-usb-flash"_s
-                                                 << u"media-optical"_s
-                                                 << u"device-ipod"_s
-                                                 << u"device-ipod-nano"_s
-                                                 << u"device-phone"_s;
-
-
-    for (const QString &icon_name : icon_names) {
-      QListWidgetItem *item = new QListWidgetItem(IconLoader::Load(icon_name), QString(), ui_->icon);
-      item->setData(Qt::UserRole, icon_name);
-    }
-
-    // Load the transcode formats the first time the dialog is shown
-    const QList<TranscoderPreset> presets = Transcoder::GetAllPresets();
-    for (const TranscoderPreset &preset : presets) {
-      ui_->transcode_format->addItem(preset.name_, QVariant::fromValue(preset.filetype_));
-    }
-    ui_->transcode_format->model()->sort(0);
+void FillSupportedList(GtkWidget *list, const std::vector<Song::FileType> &supported) {
+  GtkWidget *child = gtk_widget_get_first_child(list);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_list_box_remove(GTK_LIST_BOX(list), child);
+    child = next;
   }
+  for (const std::string &name : DevicePropertiesLabels::SupportedFormatNames(supported)) {
+    GtkWidget *row = gtk_label_new(name.c_str());
+    gtk_label_set_xalign(GTK_LABEL(row), 0.0f);
+    gtk_widget_set_margin_start(row, 8);
+    gtk_widget_set_margin_end(row, 8);
+    gtk_widget_set_margin_top(row, 4);
+    gtk_widget_set_margin_bottom(row, 4);
+    gtk_list_box_append(GTK_LIST_BOX(list), row);
+  }
+}
 
-  index_ = idx;
+void ApplyFormats(const FormatsWidgets &widgets, const std::vector<Song::FileType> &supported, bool has_saved, Song::FileType stored) {
+  const bool has_supported = !supported.empty();
+  gtk_widget_set_sensitive(widgets.unsupported, DevicePropertiesLabels::UnsupportedEnabled(has_supported) ? TRUE : FALSE);
+  if (DevicePropertiesLabels::ShouldFallbackToNever(gtk_check_button_get_active(GTK_CHECK_BUTTON(widgets.unsupported)) == TRUE,
+                                                    has_supported)) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(widgets.never), TRUE);
+  }
+  FillSupportedList(widgets.supported_list, supported);
+  gtk_widget_set_visible(widgets.supported_box, DevicePropertiesLabels::SupportedListVisible(has_supported) ? TRUE : FALSE);
+  Song::FileType preferred = stored;
+  if (DevicePropertiesLabels::ShouldPickBestFormat(has_saved, preferred)) {
+    preferred = OrganizeTranscode::PickBestFormat(supported);
+  }
+  gtk_drop_down_set_selected(GTK_DROP_DOWN(widgets.format), static_cast<guint>(DevicePropertiesLabels::IndexOfFormat(preferred)));
+}
 
-  // Basic information
-  ui_->name->setText(index_.data(DeviceManager::Role_FriendlyName).toString());
+void ShowFormatsPage(GtkWidget *stack, DeviceSupportedFormats::Page page) {
+  gtk_stack_set_visible_child_name(GTK_STACK(stack), DeviceSupportedFormats::StackName(page));
+}
 
-  // Find the right icon
-  QString icon_name = index_.data(DeviceManager::Role_IconName).toString();
-  for (int i = 0; i < ui_->icon->count(); ++i) {
-    if (ui_->icon->item(i)->data(Qt::UserRole).toString() == icon_name) {
-      ui_->icon->setCurrentRow(i);
-      break;
+}  // namespace
+
+void DeviceProperties::Show(GtkWindow *parent, Application *app, const ConnectedDevice &device) {
+  AdwDialog *dialog = adw_dialog_new();
+  adw_dialog_set_title(dialog, Translations::CStr(DevicePropertiesLabels::Title()));
+  adw_dialog_set_content_width(dialog, 520);
+
+  GtkWidget *outer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+  gtk_widget_set_margin_start(outer, 16);
+  gtk_widget_set_margin_end(outer, 16);
+  gtk_widget_set_margin_top(outer, 16);
+  gtk_widget_set_margin_bottom(outer, 16);
+
+  GtkWidget *notebook = gtk_notebook_new();
+
+  GtkWidget *info_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  gtk_widget_set_margin_start(info_box, 8);
+  gtk_widget_set_margin_end(info_box, 8);
+  gtk_widget_set_margin_top(info_box, 8);
+  gtk_widget_set_margin_bottom(info_box, 8);
+
+  gtk_box_append(GTK_BOX(info_box), gtk_label_new(Translations::CStr(DevicePropertiesLabels::Name())));
+  GtkWidget *name = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(name), Translations::CStr("Friendly name"));
+  gtk_editable_set_text(GTK_EDITABLE(name), device.friendly_name.c_str());
+  gtk_box_append(GTK_BOX(info_box), name);
+
+  gtk_box_append(GTK_BOX(info_box), gtk_label_new(Translations::CStr(DevicePropertiesLabels::Icon())));
+  GtkWidget *icons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  std::vector<std::string> icon_names;
+  for (const char *icon_name : DevicePropertiesIcons::Names()) {
+    icon_names.emplace_back(icon_name);
+  }
+  if (!device.icon.empty() && DevicePropertiesIcons::IndexOf(device.icon) < 0) {
+    icon_names.push_back(device.icon);
+  }
+  const std::string current_icon = device.icon.empty() ? DevicePropertiesIcons::Names().front() : device.icon;
+  auto *selected_icon = new std::string(DevicePropertiesIcons::EffectiveIcon(current_icon));
+  if (!device.icon.empty() && DevicePropertiesIcons::IndexOf(device.icon) < 0) {
+    *selected_icon = device.icon;
+  }
+  GtkWidget *first_icon = nullptr;
+  for (const std::string &icon_name : icon_names) {
+    GtkWidget *button = gtk_toggle_button_new();
+    gtk_button_set_icon_name(GTK_BUTTON(button), DevicePropertiesIcons::GtkName(icon_name.c_str()));
+    gtk_widget_set_tooltip_text(button, icon_name.c_str());
+    gtk_widget_set_size_request(button, 48, 48);
+    g_object_set_data_full(G_OBJECT(button), "icon-name", g_strdup(icon_name.c_str()), g_free);
+    if (!first_icon) {
+      first_icon = button;
+    } else {
+      gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(button), GTK_TOGGLE_BUTTON(first_icon));
     }
-  }
-
-  UpdateHardwareInfo();
-  UpdateFormats();
-
-  show();
-
-}
-
-void DeviceProperties::AddHardwareInfo(const int row, const QString &key, const QString &value) {
-  ui_->hardware_info->setItem(row, 0, new QTableWidgetItem(key));
-  ui_->hardware_info->setItem(row, 1, new QTableWidgetItem(value));
-}
-
-void DeviceProperties::ModelChanged() {
-
-  if (!isVisible()) return;
-
-  if (!index_.isValid()) {
-    reject();  // Device went away
-  }
-  else {
-    UpdateHardwareInfo();
-    UpdateFormats();
-  }
-
-}
-
-void DeviceProperties::UpdateHardwareInfo() {
-
-  // Hardware information
-  QString id = index_.data(DeviceManager::Role_UniqueId).toString();
-  if (DeviceLister *lister = device_manager_->GetLister(index_)) {
-    QVariantMap info = lister->DeviceHardwareInfo(id);
-
-    // Remove empty items
-    QStringList keys = info.keys();
-    for (const QString &key : std::as_const(keys)) {
-      const QVariant v = info.value(key);
-      if (v.isNull() || v.toString().isEmpty())
-        info.remove(key);
+    if (icon_name == *selected_icon) {
+      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), TRUE);
     }
+    g_signal_connect(button, "toggled", G_CALLBACK(+[](GtkToggleButton *toggle, gpointer data) {
+                       if (!gtk_toggle_button_get_active(toggle)) {
+                         return;
+                       }
+                       const char *icon_name = static_cast<const char *>(g_object_get_data(G_OBJECT(toggle), "icon-name"));
+                       if (icon_name) {
+                         *static_cast<std::string *>(data) = icon_name;
+                       }
+                     }),
+                     selected_icon);
+    gtk_box_append(GTK_BOX(icons), button);
+  }
+  gtk_box_append(GTK_BOX(info_box), icons);
 
-    ui_->hardware_info_stack->setCurrentWidget(ui_->hardware_info_page);
-    ui_->hardware_info->clear();
-    ui_->hardware_info->setRowCount(2 + static_cast<int>(info.count()));
+  auto *space_bar = new FreeSpaceBar();
+  const DevicePropertiesInfo::Space space = DevicePropertiesInfo::SpaceFor(device);
+  if (space.available) {
+    space_bar->SetBytes(space.total - space.free, 0, space.total);
+  } else {
+    gtk_widget_set_visible(space_bar->widget(), FALSE);
+  }
+  gtk_box_append(GTK_BOX(info_box), space_bar->widget());
+  g_object_set_data_full(G_OBJECT(dialog), "freespace", space_bar, [](gpointer p) { delete static_cast<FreeSpaceBar *>(p); });
 
+  GtkWidget *hardware_title = gtk_label_new(Translations::CStr(DevicePropertiesLabels::HardwareInformation()));
+  gtk_widget_set_halign(hardware_title, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(info_box), hardware_title);
+  if (DevicePropertiesInfo::HasHardwareInfo(device)) {
+    GtkWidget *grid = gtk_grid_new();
+    gtk_grid_set_column_spacing(GTK_GRID(grid), 12);
+    gtk_grid_set_row_spacing(GTK_GRID(grid), 4);
     int row = 0;
-    AddHardwareInfo(row++, tr("Model"), lister->DeviceModel(id));
-    AddHardwareInfo(row++, tr("Manufacturer"), lister->DeviceManufacturer(id));
-    keys = info.keys();
-    for (const QString &key : std::as_const(keys)) {
-      AddHardwareInfo(row++, key, info.value(key).toString());
+    for (const DevicePropertiesInfo::Row &info : DevicePropertiesInfo::Rows(device)) {
+      GtkWidget *key = gtk_label_new(Translations::CStr(info.key.c_str()));
+      gtk_widget_add_css_class(key, "dim-label");
+      gtk_label_set_xalign(GTK_LABEL(key), 0.0f);
+      GtkWidget *value = gtk_label_new(info.value.c_str());
+      gtk_label_set_xalign(GTK_LABEL(value), 0.0f);
+      gtk_label_set_selectable(GTK_LABEL(value), TRUE);
+      gtk_grid_attach(GTK_GRID(grid), key, 0, row, 1, 1);
+      gtk_grid_attach(GTK_GRID(grid), value, 1, row, 1, 1);
+      ++row;
     }
-
-    ui_->hardware_info->sortItems(0);
-  }
-  else {
-    ui_->hardware_info_stack->setCurrentWidget(ui_->hardware_info_not_connected_page);
-  }
-
-  // Size
-  quint64 total = index_.data(DeviceManager::Role_Capacity).toULongLong();
-
-  QVariant free_var = index_.data(DeviceManager::Role_FreeSpace);
-  if (free_var.isValid()) {
-    quint64 free = free_var.toULongLong();
-
-    ui_->free_space_bar->set_total_bytes(total);
-    ui_->free_space_bar->set_free_bytes(free);
-    ui_->free_space_bar->show();
-  }
-  else {
-    ui_->free_space_bar->hide();
+    gtk_box_append(GTK_BOX(info_box), grid);
+  } else {
+    GtkWidget *missing = gtk_label_new(Translations::CStr(DevicePropertiesLabels::NotConnected()));
+    gtk_label_set_wrap(GTK_LABEL(missing), TRUE);
+    gtk_label_set_xalign(GTK_LABEL(missing), 0.0f);
+    gtk_box_append(GTK_BOX(info_box), missing);
   }
 
-}
+  gtk_notebook_append_page(GTK_NOTEBOOK(notebook), info_box, gtk_label_new(Translations::CStr(DevicePropertiesLabels::InformationTab())));
 
-void DeviceProperties::UpdateFormats() {
+  GtkWidget *formats_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  gtk_widget_set_margin_start(formats_box, 8);
+  gtk_widget_set_margin_end(formats_box, 8);
+  gtk_widget_set_margin_top(formats_box, 8);
+  gtk_widget_set_margin_bottom(formats_box, 8);
 
-  DeviceLister *lister = device_manager_->GetLister(index_);
-  SharedPtr<ConnectedDevice> device = device_manager_->GetConnectedDevice(index_);
+  GtkWidget *supported_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+  GtkWidget *supported_title = gtk_label_new(Translations::CStr(DevicePropertiesLabels::SupportedFormats()));
+  gtk_widget_set_halign(supported_title, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(supported_box), supported_title);
+  GtkWidget *supported_intro = gtk_label_new(Translations::CStr(DevicePropertiesLabels::SupportedFormatsIntro()));
+  gtk_label_set_wrap(GTK_LABEL(supported_intro), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(supported_intro), 0.0f);
+  gtk_box_append(GTK_BOX(supported_box), supported_intro);
+  GtkWidget *supported_list = gtk_list_box_new();
+  gtk_widget_add_css_class(supported_list, "boxed-list");
+  gtk_box_append(GTK_BOX(supported_box), supported_list);
+  gtk_box_append(GTK_BOX(formats_box), supported_box);
 
-  // Transcode mode
-  MusicStorage::TranscodeMode mode = static_cast<MusicStorage::TranscodeMode>(index_.data(DeviceManager::Role_TranscodeMode).toInt());
-  switch (mode) {
-    case MusicStorage::TranscodeMode::Transcode_Always:
-      ui_->transcode_all->setChecked(true);
-      break;
+  GtkWidget *intro = gtk_label_new(Translations::CStr(DevicePropertiesLabels::TranscodeIntro()));
+  gtk_label_set_wrap(GTK_LABEL(intro), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(intro), 0.0f);
+  gtk_box_append(GTK_BOX(formats_box), intro);
 
-    case MusicStorage::TranscodeMode::Transcode_Never:
-      ui_->transcode_off->setChecked(true);
-      break;
+  DeviceDatabaseBackend::Device stored;
+  if (app && app->device_manager()) {
+    stored = app->device_manager()->StoredDevice(device.unique_id);
+  }
+  const DeviceDatabaseBackend::TranscodeMode mode =
+      stored.id >= 0 ? stored.transcode_mode : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported;
+  GtkWidget *never = gtk_check_button_new_with_label(Translations::CStr(DevicePropertiesLabels::Never()));
+  GtkWidget *unsupported = gtk_check_button_new_with_label(Translations::CStr(DevicePropertiesLabels::Unsupported()));
+  gtk_check_button_set_group(GTK_CHECK_BUTTON(unsupported), GTK_CHECK_BUTTON(never));
+  GtkWidget *always = gtk_check_button_new_with_label(Translations::CStr(DevicePropertiesLabels::Always()));
+  gtk_check_button_set_group(GTK_CHECK_BUTTON(always), GTK_CHECK_BUTTON(never));
+  const int radio = DevicePropertiesLabels::RadioIndex(mode);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(never), radio == 0 ? TRUE : FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(unsupported), radio == 1 ? TRUE : FALSE);
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(always), radio == 2 ? TRUE : FALSE);
+  gtk_box_append(GTK_BOX(formats_box), never);
+  gtk_box_append(GTK_BOX(formats_box), unsupported);
+  gtk_box_append(GTK_BOX(formats_box), always);
 
-    case MusicStorage::TranscodeMode::Transcode_Unsupported:
-    default:
-      ui_->transcode_unsupported->setChecked(true);
-      break;
+  gtk_box_append(GTK_BOX(formats_box), gtk_label_new(Translations::CStr(DevicePropertiesLabels::PreferredFormat())));
+  const auto formats = DevicePropertiesLabels::FormatChoices();
+  std::vector<const char *> format_labels;
+  format_labels.reserve(formats.size() + 1);
+  for (const auto &choice : formats) {
+    format_labels.push_back(choice.second.c_str());
+  }
+  format_labels.push_back(nullptr);
+  GtkWidget *format = gtk_drop_down_new_from_strings(format_labels.data());
+  gtk_box_append(GTK_BOX(formats_box), format);
+
+  GtkWidget *not_connected = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+  gtk_widget_set_margin_start(not_connected, 8);
+  gtk_widget_set_margin_end(not_connected, 8);
+  gtk_widget_set_margin_top(not_connected, 8);
+  gtk_widget_set_margin_bottom(not_connected, 8);
+  GtkWidget *not_open = gtk_label_new(Translations::CStr(DevicePropertiesLabels::FormatsNotConnected()));
+  gtk_label_set_wrap(GTK_LABEL(not_open), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(not_open), 0.0f);
+  gtk_box_append(GTK_BOX(not_connected), not_open);
+  GtkWidget *open = gtk_button_new_with_label(Translations::CStr(DevicePropertiesLabels::OpenDevice()));
+  gtk_widget_set_halign(open, GTK_ALIGN_START);
+  gtk_widget_set_sensitive(open, DeviceSupportedFormats::OpenEnabled(device) ? TRUE : FALSE);
+  auto *owned_open = new ConnectedDevice(device);
+  g_object_set_data_full(G_OBJECT(open), "device", owned_open, [](gpointer p) { delete static_cast<ConnectedDevice *>(p); });
+  g_signal_connect(open, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(button), "device"));
+                     if (!application || !device || !application->device_manager()) {
+                       return;
+                     }
+                     if (DeviceConnectDialog::NeedsMount(*device)) {
+                       application->device_manager()->Mount(device->unique_id);
+                       return;
+                     }
+                     if (device->mount_path.empty()) {
+                       return;
+                     }
+                     GError *error = nullptr;
+                     gchar *uri = g_filename_to_uri(device->mount_path.c_str(), nullptr, &error);
+                     if (!uri) {
+                       if (error) {
+                         g_error_free(error);
+                       }
+                       return;
+                     }
+                     g_app_info_launch_default_for_uri(uri, nullptr, nullptr);
+                     g_free(uri);
+                   })),
+                   app);
+  gtk_box_append(GTK_BOX(not_connected), open);
+
+  GtkWidget *loading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_margin_start(loading, 8);
+  gtk_widget_set_margin_end(loading, 8);
+  gtk_widget_set_margin_top(loading, 8);
+  gtk_widget_set_margin_bottom(loading, 8);
+  GtkWidget *spinner = gtk_spinner_new();
+  gtk_spinner_start(GTK_SPINNER(spinner));
+  gtk_box_append(GTK_BOX(loading), spinner);
+  GtkWidget *querying = gtk_label_new(Translations::CStr(DevicePropertiesLabels::QueryingDevice()));
+  gtk_label_set_xalign(GTK_LABEL(querying), 0.0f);
+  gtk_widget_set_hexpand(querying, TRUE);
+  gtk_box_append(GTK_BOX(loading), querying);
+
+  GtkWidget *stack = gtk_stack_new();
+  gtk_stack_add_named(GTK_STACK(stack), formats_box, DeviceSupportedFormats::StackName(DeviceSupportedFormats::Page::Formats));
+  gtk_stack_add_named(GTK_STACK(stack), not_connected, DeviceSupportedFormats::StackName(DeviceSupportedFormats::Page::NotConnected));
+  gtk_stack_add_named(GTK_STACK(stack), loading, DeviceSupportedFormats::StackName(DeviceSupportedFormats::Page::Loading));
+
+  FormatsWidgets widgets;
+  widgets.stack = stack;
+  widgets.supported_box = supported_box;
+  widgets.supported_list = supported_list;
+  widgets.unsupported = unsupported;
+  widgets.never = never;
+  widgets.format = format;
+
+  const DeviceSupportedFormats::Page page = DeviceSupportedFormats::PageFor(device);
+  ShowFormatsPage(stack, page);
+  if (page == DeviceSupportedFormats::Page::Formats) {
+    ApplyFormats(widgets, DeviceSupportedFormats::Resolve(device.backend, {}, false, false), stored.id >= 0,
+                 stored.id >= 0 ? stored.transcode_format : Song::FileType::Unknown);
+  } else if (page == DeviceSupportedFormats::Page::Loading) {
+    auto *job = new FormatsJob;
+    job->alive = std::make_shared<bool>(true);
+    job->widgets = widgets;
+    job->serial = DeviceCopyJob::MtpSerial(device.unique_id);
+    job->has_saved = stored.id >= 0;
+    job->stored = stored.id >= 0 ? stored.transcode_format : Song::FileType::Unknown;
+    auto *alive = new std::shared_ptr<bool>(job->alive);
+    g_object_set_data_full(G_OBJECT(dialog), "formats-alive", alive, [](gpointer p) {
+      **static_cast<std::shared_ptr<bool> *>(p) = false;
+      delete static_cast<std::shared_ptr<bool> *>(p);
+    });
+    g_thread_unref(g_thread_new("device-formats", +[](gpointer data) -> gpointer {
+      auto *job = static_cast<FormatsJob *>(data);
+#ifdef HAVE_MTP
+      MtpConnection connection;
+      job->ok = connection.OpenBySerial(job->serial);
+      if (job->ok) {
+        job->types = connection.SupportedFiletypes();
+        job->ok = !job->types.empty();
+      }
+#else
+      job->ok = false;
+#endif
+      g_idle_add(
+          +[](gpointer idle) -> gboolean {
+            std::unique_ptr<FormatsJob> job(static_cast<FormatsJob *>(idle));
+            if (!job->alive || !*job->alive) {
+              return G_SOURCE_REMOVE;
+            }
+            ApplyFormats(job->widgets, DeviceSupportedFormats::Resolve("mtp", job->types, job->ok, true), job->has_saved, job->stored);
+            ShowFormatsPage(job->widgets.stack, DeviceSupportedFormats::Page::Formats);
+            return G_SOURCE_REMOVE;
+          },
+          job);
+      return nullptr;
+    }, job));
   }
 
-  // If there's no lister then the device is physically disconnected
-  if (!lister) {
-    ui_->formats_stack->setCurrentWidget(ui_->formats_page_not_connected);
-    ui_->open_device->setEnabled(false);
-    return;
-  }
+  gtk_notebook_append_page(GTK_NOTEBOOK(notebook), stack, gtk_label_new(Translations::CStr(DevicePropertiesLabels::FileFormatsTab())));
+  gtk_box_append(GTK_BOX(outer), notebook);
 
-  // If there's a lister but no device then the user just needs to open the
-  // device.  This will cause a rescan so we don't do it automatically.
-  if (!device) {
-    ui_->formats_stack->setCurrentWidget(ui_->formats_page_not_connected);
-    ui_->open_device->setEnabled(true);
-    return;
-  }
-
-  if (!updating_formats_) {
-    // Get the device's supported formats list.  This takes a long time and it blocks, so do it in the background.
-    supported_formats_.clear();
-
-    QFuture<bool> future = QtConcurrent::run(&ConnectedDevice::GetSupportedFiletypes, device, &supported_formats_);
-    QFutureWatcher<bool> *watcher = new QFutureWatcher<bool>(this);
-    QObject::connect(watcher, &QFutureWatcher<bool>::finished, this, &DeviceProperties::UpdateFormatsFinished);
-    watcher->setFuture(future);
-
-    ui_->formats_stack->setCurrentWidget(ui_->formats_page_loading);
-    updating_formats_ = true;
-  }
-
-}
-
-void DeviceProperties::accept() {
-
-  QDialog::accept();
-
-  // Transcode mode
-  MusicStorage::TranscodeMode mode = MusicStorage::TranscodeMode::Transcode_Unsupported;
-  if (ui_->transcode_all->isChecked())
-    mode = MusicStorage::TranscodeMode::Transcode_Always;
-  else if (ui_->transcode_off->isChecked())
-    mode = MusicStorage::TranscodeMode::Transcode_Never;
-  else if (ui_->transcode_unsupported->isChecked())
-    mode = MusicStorage::TranscodeMode::Transcode_Unsupported;
-
-  // Transcode format
-  Song::FileType format = static_cast<Song::FileType>(ui_->transcode_format->itemData(ui_->transcode_format->currentIndex()).toInt());
-
-  // By default no icon is selected and thus no current item is selected
-  QString icon_name;
-  if (ui_->icon->currentItem() != nullptr) {
-    icon_name = ui_->icon->currentItem()->data(Qt::UserRole).toString();
-  }
-
-  device_manager_->SetDeviceOptions(index_, ui_->name->text(), icon_name, mode, format);
-
-}
-
-void DeviceProperties::OpenDevice() { device_manager_->Connect(index_); }
-
-void DeviceProperties::UpdateFormatsFinished() {
-
-  QFutureWatcher<bool> *watcher = static_cast<QFutureWatcher<bool>*>(sender());
-  bool result = watcher->result();
-  watcher->deleteLater();
-
-  updating_formats_ = false;
-
-  if (!result) {
-    supported_formats_.clear();
-  }
-
-  // Hide widgets if there are no supported types
-  ui_->supported_formats_container->setVisible(!supported_formats_.isEmpty());
-  ui_->transcode_unsupported->setEnabled(!supported_formats_.isEmpty());
-
-  if (ui_->transcode_unsupported->isChecked() && supported_formats_.isEmpty()) {
-    ui_->transcode_off->setChecked(true);
-  }
-
-  // Populate supported types list
-  ui_->supported_formats->clear();
-  for (Song::FileType type : std::as_const(supported_formats_)) {
-    QListWidgetItem *item = new QListWidgetItem(Song::TextForFiletype(type));
-    ui_->supported_formats->addItem(item);
-  }
-  ui_->supported_formats->sortItems();
-
-  // Set the format combobox item
-  TranscoderPreset preset = Transcoder::PresetForFileType(static_cast<Song::FileType>(index_.data(DeviceManager::Role_TranscodeFormat).toInt()));
-  if (preset.filetype_ == Song::FileType::Unknown) {
-    // The user hasn't chosen a format for this device yet,
-    // so work our way down a list of some preferred formats, picking the first one that is supported
-    preset = Transcoder::PresetForFileType(Transcoder::PickBestFormat(supported_formats_));
-  }
-  ui_->transcode_format->setCurrentIndex(ui_->transcode_format->findText(preset.name_));
-
-  ui_->formats_stack->setCurrentWidget(ui_->formats_page);
-
+  GtkWidget *save = gtk_button_new_with_label(Translations::CStr(DevicePropertiesLabels::Save()));
+  gtk_widget_add_css_class(save, "suggested-action");
+  auto *owned = new ConnectedDevice(device);
+  g_object_set_data_full(G_OBJECT(save), "device", owned, [](gpointer p) { delete static_cast<ConnectedDevice *>(p); });
+  g_object_set_data(G_OBJECT(save), "name", name);
+  g_object_set_data(G_OBJECT(save), "never", never);
+  g_object_set_data(G_OBJECT(save), "unsupported", unsupported);
+  g_object_set_data(G_OBJECT(save), "always", always);
+  g_object_set_data(G_OBJECT(save), "format", format);
+  g_object_set_data_full(G_OBJECT(save), "icon-name", selected_icon, [](gpointer p) { delete static_cast<std::string *>(p); });
+  g_signal_connect(save, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+                     auto *application = static_cast<Application *>(data);
+                     auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(button), "device"));
+                     if (!application || !device || !application->device_manager()) {
+                       return;
+                     }
+                     const char *name = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(button), "name")));
+                     int radio = 1;
+                     if (gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "never")))) {
+                       radio = 0;
+                     } else if (gtk_check_button_get_active(GTK_CHECK_BUTTON(g_object_get_data(G_OBJECT(button), "always")))) {
+                       radio = 2;
+                     }
+                     const guint format = gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(button), "format")));
+                     const auto *icon_name = static_cast<std::string *>(g_object_get_data(G_OBJECT(button), "icon-name"));
+                     application->device_manager()->SetDeviceOptions(device->unique_id, name ? name : device->friendly_name,
+                                                                     DevicePropertiesLabels::ModeFromRadio(radio),
+                                                                     DevicePropertiesLabels::FormatAt(static_cast<int>(format)),
+                                                                     icon_name ? *icon_name : device->icon);
+                   }),
+                   app);
+  gtk_box_append(GTK_BOX(outer), save);
+  adw_dialog_set_child(dialog, outer);
+  adw_dialog_present(dialog, parent ? GTK_WIDGET(parent) : nullptr);
 }

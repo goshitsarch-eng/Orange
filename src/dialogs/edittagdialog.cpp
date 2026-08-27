@@ -1,1679 +1,1283 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2023, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
-
 #include "config.h"
+#include "dialogs/edittagdialog.h"
 
-#include <algorithm>
-#include <utility>
-#include <functional>
-#include <iterator>
-#include <limits>
-#include <memory>
-
-#include <QtGlobal>
-#include <QCoreApplication>
-#include <QtConcurrentRun>
-#include <QFuture>
-#include <QFutureWatcher>
-#include <QObject>
-#include <QWidget>
-#include <QDialog>
-#include <QItemSelectionModel>
-#include <QAbstractItemModel>
-#include <QDir>
-#include <QAction>
-#include <QDateTime>
-#include <QList>
-#include <QMap>
-#include <QVariant>
-#include <QString>
-#include <QUrl>
-#include <QPixmap>
-#include <QPalette>
-#include <QColor>
-#include <QFont>
-#include <QLabel>
-#include <QLineEdit>
-#include <QListWidget>
-#include <QLocale>
-#include <QMenu>
-#include <QMessageBox>
-#include <QShortcut>
-#include <QSize>
-#include <QSpinBox>
-#include <QCheckBox>
-#include <QSplitter>
-#include <QTabWidget>
-#include <QTextEdit>
-#include <QPlainTextEdit>
-#include <QKeySequence>
-#include <QDialogButtonBox>
-#include <QPushButton>
-#include <QAbstractButton>
-#include <QAbstractSpinBox>
-#include <QScrollArea>
-#include <QtEvents>
-#include <QSettings>
-#include <QMimeData>
-
-#include "constants/timeconstants.h"
-#include "core/iconloader.h"
-#include "core/logging.h"
+#include "constants/edittagdialogsettings.h"
+#include "core/application.h"
+#include "covermanager/covermanagermenu.h"
 #include "core/settings.h"
-#include "utilities/strutils.h"
-#include "utilities/timeutils.h"
-#include "utilities/imageutils.h"
-#include "utilities/coverutils.h"
-#include "utilities/coveroptions.h"
-#include "tagreader/tagreaderclient.h"
-#include "tagreader/tagid3v2version.h"
-#include "widgets/busyindicator.h"
-#include "widgets/lineedit.h"
-#include "collection/collectionbackend.h"
-#include "playlist/playlist.h"
-#include "playlist/playlistdelegates.h"
-#ifdef HAVE_TAGFETCHER
-#  include "tagfetcher/tagfetcher.h"
-#  include "trackselectiondialog.h"
-#endif
-#include "lyrics/lyricsfetcher.h"
 #include "covermanager/albumcoverchoicecontroller.h"
-#include "covermanager/albumcoverloader.h"
-#include "covermanager/albumcoverloaderoptions.h"
-#include "covermanager/albumcoverloaderresult.h"
-#include "covermanager/coverproviders.h"
-#include "covermanager/currentalbumcoverloader.h"
-#include "covermanager/albumcoverimageresult.h"
-#include "edittagdialog.h"
-#include "ui_edittagdialog.h"
+#include "dialogs/dialoghelpers.h"
+#include "dialogs/dialoglistkeyboard.h"
+#include "dialogs/edittagcompleter.h"
+#include "dialogs/edittagcover.h"
+#include "dialogs/edittagcoverdrop.h"
+#include "dialogs/edittagfieldreset.h"
+#include "dialogs/edittagfields.h"
+#include "dialogs/edittagid3v2.h"
+#include "dialogs/edittagloading.h"
+#include "dialogs/edittagsave.h"
+#include "dialogs/uierror.h"
+#include "dialogs/edittagsummaryfields.h"
+#include "tagreader/tagreaderclient.h"
+#include "dialogs/edittagsummarylabels.h"
+#include "dialogs/edittagtabs.h"
+#include "tagreader/savetagsoptions.h"
+#include "tagreader/tagid3v2version.h"
+#include "dialogs/trackselectiondialog.h"
+#include "translations/translations.h"
+#include "utilities/fileutils.h"
+#include "utilities/timeutils.h"
+#include "widgets/listboxkeyboardgtk.h"
 
-using std::make_shared;
-using namespace Qt::Literals::StringLiterals;
+#include <adwaita.h>
+#include <memory>
+#include <thread>
+#include <utility>
 
-#ifdef __clang__
-#  pragma clang diagnostic push
-#  pragma clang diagnostic ignored "-Wunused-const-variable"
-#endif
+using DialogHelpers::PrettyBytes;
+using DialogHelpers::PrettyUnixTime;
+using DialogHelpers::SetImageFromBytes;
+using DialogHelpers::SongForDialog;
 
 namespace {
-constexpr char kSettingsGroup[] = "EditTagDialog";
-constexpr char kGeometry[] = "geometry";
-constexpr char kCurrentTab[] = "current_tab";
-constexpr int kSmallImageSize = 128;
 
-// ID3v2 version constants
-constexpr int kID3v2_Version_3 = 3;
-constexpr int kID3v2_Version_4 = 4;
-constexpr int kComboBoxIndex_ID3v2_3 = 0;
-constexpr int kComboBoxIndex_ID3v2_4 = 1;
-}  // namespace
-
-const char EditTagDialog::kTagsDifferentHintText[] = QT_TR_NOOP("(different across multiple songs)");
-const char EditTagDialog::kArtDifferentHintText[] = QT_TR_NOOP("Different art across multiple songs.");
-
-#ifdef __clang__
-#  pragma clang diagnostic pop
-#endif
-
-EditTagDialog::EditTagDialog(const SharedPtr<NetworkAccessManager> network,
-                             const SharedPtr<TagReaderClient> tagreader_client,
-                             const SharedPtr<CollectionBackend> collection_backend,
-                             const SharedPtr<AlbumCoverLoader> albumcover_loader,
-                             const SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader,
-                             const SharedPtr<CoverProviders> cover_providers,
-                             const SharedPtr<LyricsProviders> lyrics_providers,
-                             const SharedPtr<StreamingServices> streaming_services,
-                             QWidget *parent)
-    : QDialog(parent),
-      ui_(new Ui_EditTagDialog),
-      tagreader_client_(tagreader_client),
-      collection_backend_(collection_backend),
-      albumcover_loader_(albumcover_loader),
-      current_albumcover_loader_(current_albumcover_loader),
-      cover_providers_(cover_providers),
-      album_cover_choice_controller_(new AlbumCoverChoiceController(this)),
-#ifdef HAVE_TAGFETCHER
-      tag_fetcher_(new TagFetcher(network, this)),
-      results_dialog_(new TrackSelectionDialog(tagreader_client, this)),
-#endif
-      lyrics_fetcher_(new LyricsFetcher(lyrics_providers, this)),
-      cover_menu_(new QMenu(this)),
-      image_no_cover_thumbnail_(ImageUtils::GenerateNoCoverImage(QSize(128, 128), devicePixelRatioF())),
-      loading_(false),
-      ignore_edits_(false),
-      summary_cover_art_id_(0),
-      tags_cover_art_id_(0),
-      cover_art_is_set_(false),
-      save_tag_pending_(0),
-      lyrics_id_(-1) {
-
-  QObject::connect(&*albumcover_loader_, &AlbumCoverLoader::AlbumCoverLoaded, this, &EditTagDialog::AlbumCoverLoaded);
-
-#ifdef HAVE_TAGFETCHER
-  QObject::connect(tag_fetcher_, &TagFetcher::ResultAvailable, results_dialog_, &TrackSelectionDialog::FetchTagFinished, Qt::QueuedConnection);
-  QObject::connect(tag_fetcher_, &TagFetcher::Progress, results_dialog_, &TrackSelectionDialog::FetchTagProgress);
-  QObject::connect(results_dialog_, &TrackSelectionDialog::SongChosen, this, &EditTagDialog::FetchTagSongChosen);
-  QObject::connect(results_dialog_, &TrackSelectionDialog::finished, tag_fetcher_, &TagFetcher::Cancel);
-#endif
-  QObject::connect(lyrics_fetcher_, &LyricsFetcher::LyricsFetched, this, &EditTagDialog::UpdateLyrics);
-
-  album_cover_choice_controller_->Init(network, tagreader_client, collection_backend, albumcover_loader, current_albumcover_loader, cover_providers, streaming_services);
-
-  ui_->setupUi(this);
-  ui_->splitter->setSizes(QList<int>() << 200 << width() - 200);
-  ui_->loading_label->hide();
-  ui_->label_lyrics->hide();
-
-  ui_->fetch_tag->setIcon(QPixmap::fromImage(QImage(u":/pictures/musicbrainz.png"_s)));
-#ifdef HAVE_TAGFETCHER
-  ui_->fetch_tag->setEnabled(true);
-#else
-  ui_->fetch_tag->setEnabled(false);
-#endif
-
-  // An editable field is one that has a label as a buddy.
-  // The label is important because it gets turned bold when the field is changed.
-  QList<QLabel*> labels = findChildren<QLabel*>();
-  for (QLabel *label : std::as_const(labels)) {
-    QWidget *widget = label->buddy();
-    if (widget) {
-      // Store information about the field
-      fields_ << FieldData(label, widget, widget->objectName());  // clazy:exclude=reserve-candidates
-
-      // Connect the edited signal
-      if (LineEdit *lineedit = qobject_cast<LineEdit*>(widget)) {
-        QObject::connect(lineedit, &LineEdit::textChanged, this, &EditTagDialog::FieldValueEdited);
-        QObject::connect(lineedit, &LineEdit::Reset, this, &EditTagDialog::ResetField);
-      }
-      else if (TextEdit *textedit = qobject_cast<TextEdit*>(widget)) {
-        QObject::connect(textedit, &TextEdit::textChanged, this, &EditTagDialog::FieldValueEdited);
-        QObject::connect(textedit, &TextEdit::Reset, this, &EditTagDialog::ResetField);
-      }
-      else if (SpinBox *spinbox = qobject_cast<SpinBox*>(widget)) {
-        QObject::connect(spinbox, QOverload<int>::of(&SpinBox::valueChanged), this, &EditTagDialog::FieldValueEdited);
-        QObject::connect(spinbox, &SpinBox::Reset, this, &EditTagDialog::ResetField);
-        spinbox->setFocusPolicy(Qt::StrongFocus);
-        spinbox->installEventFilter(this);
-      }
-      else if (CheckBox *checkbox = qobject_cast<CheckBox*>(widget)) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
-        QObject::connect(checkbox, &QCheckBox::checkStateChanged, this, &EditTagDialog::FieldValueEdited);
-#else
-        QObject::connect(checkbox, &QCheckBox::stateChanged, this, &EditTagDialog::FieldValueEdited);
-#endif
-        QObject::connect(checkbox, &CheckBox::Reset, this, &EditTagDialog::ResetField);
-      }
-      else if (RatingBox *ratingbox = qobject_cast<RatingBox*>(widget)) {
-        QObject::connect(ratingbox, &RatingWidget::RatingChanged, this, &EditTagDialog::FieldValueEdited);
-        QObject::connect(ratingbox, &RatingBox::Reset, this, &EditTagDialog::ResetField);
-      }
-    }
-  }
-
-  // Set the colour of all the labels on the summary page
-  const bool light = palette().color(QPalette::Base).value() > 128;
-  const QColor color = palette().color(QPalette::WindowText);
-  QPalette summary_label_palette(palette());
-  summary_label_palette.setColor(QPalette::WindowText, light ? color.lighter(150) : color.darker(150));
-
-  labels = ui_->tab_summary->findChildren<QLabel*>();
-  for (QLabel *label : std::as_const(labels)) {
-    if (label->property("field_label").toBool()) {
-      label->setPalette(summary_label_palette);
-    }
-  }
-
-  QObject::connect(ui_->song_list->selectionModel(), &QItemSelectionModel::selectionChanged, this, &EditTagDialog::SelectionChanged);
-  QObject::connect(ui_->button_box, &QDialogButtonBox::clicked, this, &EditTagDialog::ButtonClicked);
-  QObject::connect(ui_->playcount_reset, &QPushButton::clicked, this, &EditTagDialog::ResetPlayStatistics);
-  QObject::connect(ui_->rating, &RatingWidget::RatingChanged, this, &EditTagDialog::SongRated);
-#ifdef HAVE_TAGFETCHER
-  QObject::connect(ui_->fetch_tag, &QPushButton::clicked, this, &EditTagDialog::FetchTag);
-#endif
-  QObject::connect(ui_->fetch_lyrics, &QPushButton::clicked, this, &EditTagDialog::FetchLyrics);
-
-  QList<QAction*> actions = album_cover_choice_controller_->GetAllActions();
-
-  QObject::connect(album_cover_choice_controller_, &AlbumCoverChoiceController::Error, this, &EditTagDialog::Error);
-  QObject::connect(album_cover_choice_controller_->cover_from_file_action(), &QAction::triggered, this, &EditTagDialog::LoadCoverFromFile);
-  QObject::connect(album_cover_choice_controller_->cover_to_file_action(), &QAction::triggered, this, &EditTagDialog::SaveCoverToFile);
-  QObject::connect(album_cover_choice_controller_->cover_from_url_action(), &QAction::triggered, this, &EditTagDialog::LoadCoverFromURL);
-  QObject::connect(album_cover_choice_controller_->search_for_cover_action(), &QAction::triggered, this, &EditTagDialog::SearchForCover);
-  QObject::connect(album_cover_choice_controller_->unset_cover_action(), &QAction::triggered, this, &EditTagDialog::UnsetCover);
-  QObject::connect(album_cover_choice_controller_->clear_cover_action(), &QAction::triggered, this, &EditTagDialog::ClearCover);
-  QObject::connect(album_cover_choice_controller_->delete_cover_action(), &QAction::triggered, this, &EditTagDialog::DeleteCover);
-  QObject::connect(album_cover_choice_controller_->show_cover_action(), &QAction::triggered, this, &EditTagDialog::ShowCover);
-  QObject::connect(ui_->checkbox_embedded_cover, &QCheckBox::toggled, album_cover_choice_controller_, &AlbumCoverChoiceController::set_save_embedded_cover_override);
-
-  cover_menu_->addActions(actions);
-
-  ui_->tags_art_button->setMenu(cover_menu_);
-
-  ui_->tags_art->installEventFilter(this);
-  ui_->tags_art->setAcceptDrops(true);
-
-  ui_->summary_art->installEventFilter(this);
-
-  // Add the next/previous buttons
-  previous_button_ = new QPushButton(IconLoader::Load(u"go-previous"_s), tr("Previous"), this);
-  next_button_ = new QPushButton(IconLoader::Load(u"go-next"_s), tr("Next"), this);
-  ui_->button_box->addButton(previous_button_, QDialogButtonBox::ResetRole);
-  ui_->button_box->addButton(next_button_, QDialogButtonBox::ResetRole);
-
-  QObject::connect(previous_button_, &QPushButton::clicked, this, &EditTagDialog::PreviousSong);
-  QObject::connect(next_button_, &QPushButton::clicked, this, &EditTagDialog::NextSong);
-
-  // Set some shortcuts for the buttons
-  new QShortcut(QKeySequence::Back, previous_button_, SLOT(click()));
-  new QShortcut(QKeySequence::Forward, next_button_, SLOT(click()));
-  new QShortcut(QKeySequence::MoveToPreviousPage, previous_button_, SLOT(click()));
-  new QShortcut(QKeySequence::MoveToNextPage, next_button_, SLOT(click()));
-
-  // Show the shortcuts as tooltips
-  previous_button_->setToolTip(QStringLiteral("%1 (%2 / %3)").arg(
-      previous_button_->text(),
-      QKeySequence(QKeySequence::Back).toString(QKeySequence::NativeText),
-      QKeySequence(QKeySequence::MoveToPreviousPage).toString(QKeySequence::NativeText)));
-  next_button_->setToolTip(QStringLiteral("%1 (%2 / %3)").arg(
-      next_button_->text(),
-      QKeySequence(QKeySequence::Forward).toString(QKeySequence::NativeText),
-      QKeySequence(QKeySequence::MoveToNextPage).toString(QKeySequence::NativeText)));
-
-  new TagCompleter(collection_backend, Playlist::Column::Artist, ui_->artist);
-  new TagCompleter(collection_backend, Playlist::Column::ArtistSort, ui_->artistsort);
-  new TagCompleter(collection_backend, Playlist::Column::Album, ui_->album);
-  new TagCompleter(collection_backend, Playlist::Column::AlbumSort, ui_->albumsort);
-  new TagCompleter(collection_backend, Playlist::Column::AlbumArtist, ui_->albumartist);
-  new TagCompleter(collection_backend, Playlist::Column::AlbumArtistSort, ui_->albumartistsort);
-  new TagCompleter(collection_backend, Playlist::Column::Genre, ui_->genre);
-  new TagCompleter(collection_backend, Playlist::Column::Composer, ui_->composer);
-  new TagCompleter(collection_backend, Playlist::Column::ComposerSort, ui_->composersort);
-  new TagCompleter(collection_backend, Playlist::Column::Performer, ui_->performer);
-  new TagCompleter(collection_backend, Playlist::Column::PerformerSort, ui_->performersort);
-  new TagCompleter(collection_backend, Playlist::Column::Grouping, ui_->grouping);
-  new TagCompleter(collection_backend, Playlist::Column::TitleSort, ui_->titlesort);
-
-}
-
-EditTagDialog::~EditTagDialog() {
-  delete ui_;
-}
-
-void EditTagDialog::showEvent(QShowEvent *e) {
-
-  if (!e->spontaneous()) {
-
-    // Set the dialog's height to the smallest possible
-    resize(width(), sizeHint().height());
-
-    // Restore the tab that was current last time.
-    Settings s;
-    s.beginGroup(kSettingsGroup);
-    if (s.contains(kGeometry)) {
-      restoreGeometry(s.value(kGeometry).toByteArray());
-    }
-    ui_->tab_widget->setCurrentIndex(s.value(kCurrentTab).toInt());
-    s.endGroup();
-
-    album_cover_choice_controller_->ReloadSettings();
-
-    cover_types_ = AlbumCoverLoaderOptions::LoadTypes();
-
-  }
-
-  QDialog::showEvent(e);
-
-}
-
-void EditTagDialog::hideEvent(QHideEvent *e) {
-
-  // Save the current tab
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  s.setValue(kGeometry, saveGeometry());
-  s.setValue(kCurrentTab, ui_->tab_widget->currentIndex());
-  s.endGroup();
-
-  QDialog::hideEvent(e);
-
-}
-
-void EditTagDialog::accept() {
-
-  // Show the loading indicator
-  if (!SetLoading(tr("Saving tracks") + u"..."_s)) return;
-
-  SaveData();
-
-}
-
-bool EditTagDialog::eventFilter(QObject *o, QEvent *e) {
-
-  if (e->type() == QEvent::Wheel) {
-    if (QAbstractSpinBox *spinbox = qobject_cast<QAbstractSpinBox*>(o)) {
-      if (!spinbox->hasFocus()) {
-        QCoreApplication::sendEvent(ui_->scrollarea->viewport(), e);
-        return true;
-      }
-    }
-  }
-
-  if (o == ui_->tags_art) {
-    switch (e->type()) {
-      case QEvent::MouseButtonRelease:{
-        QMouseEvent *mouse_event = static_cast<QMouseEvent*>(e);
-        if (mouse_event && mouse_event->button() == Qt::RightButton) {
-          cover_menu_->popup(mouse_event->globalPosition().toPoint());
-        }
-        break;
-      }
-
-      case QEvent::MouseButtonDblClick:
-        ShowCover();
-        break;
-
-      case QEvent::DragEnter:{
-        QDragEnterEvent *event = static_cast<QDragEnterEvent*>(e);
-        if (AlbumCoverChoiceController::CanAcceptDrag(event)) {
-          event->acceptProposedAction();
-        }
-        break;
-      }
-
-      case QEvent::Drop:{
-        const QDropEvent *event = static_cast<QDropEvent*>(e);
-        if (event->mimeData()->hasImage()) {
-          QImage image = qvariant_cast<QImage>(event->mimeData()->imageData());
-          if (!image.isNull()) {
-            UpdateCover(UpdateCoverAction::New, AlbumCoverImageResult(image));
-          }
-        }
-        break;
-      }
-
-      default:
-        break;
-    }
-  }
-  if (o == ui_->summary_art) {
-    switch (e->type()) {
-      case QEvent::MouseButtonDblClick:
-        ShowCover();
-        break;
-      default:
-        break;
-    }
-  }
-
-  return QDialog::eventFilter(o, e);
-
-}
-
-SongList EditTagDialog::songs() const {
-
-  SongList result;
-  result.reserve(data_.count());
-  for (const Data &d : data_) {
-    result << d.current_;
-  }
-
-  return result;
-
-}
-
-bool EditTagDialog::SetLoading(const QString &message) {
-
-  const bool loading = !message.isEmpty();
-  if (loading == loading_) return false;
-  loading_ = loading;
-
-  ui_->button_box->setEnabled(!loading);
-  ui_->tab_widget->setEnabled(!loading);
-  ui_->song_list->setEnabled(!loading);
-#ifdef HAVE_TAGFETCHER
-  ui_->fetch_tag->setEnabled(!loading);
-#endif
-  ui_->loading_label->setVisible(loading);
-  ui_->loading_label->set_text(message);
-
-  return true;
-
-}
-
-QList<EditTagDialog::Data> EditTagDialog::LoadData(const SongList &songs) const {
-
-  QList<Data> ret;
-
-  for (const Song &song : songs) {
-    if (song.IsEditable()) {
-      // Try reloading the tags from file
-      Song copy(song);
-      const TagReaderResult result = tagreader_client_->ReadFileBlocking(copy.url().toLocalFile(), &copy);
-      if (result.success() && copy.is_valid()) {
-        copy.MergeUserSetData(song, false, false);
-        ret << Data(copy);
-      }
-    }
-  }
-
-  return ret;
-
-}
-
-void EditTagDialog::SetSongs(const SongList &s, const PlaylistItemPtrList &items) {
-
-  // Show the loading indicator
-  if (!SetLoading(tr("Loading tracks") + u"..."_s)) return;
-
-  data_.clear();
-  playlist_items_ = items;
-  ui_->song_list->clear();
-  collection_songs_.clear();
-
-  // Reload tags in the background
-  QFuture<QList<Data>> future = QtConcurrent::run(&EditTagDialog::LoadData, this, s);
-  QFutureWatcher<QList<Data>> *watcher = new QFutureWatcher<QList<Data>>(this);
-  QObject::connect(watcher, &QFutureWatcher<QList<Data>>::finished, this, &EditTagDialog::SetSongsFinished);
-  watcher->setFuture(future);
-
-}
-
-void EditTagDialog::SetSongsFinished() {
-
-  QFutureWatcher<QList<Data>> *watcher = static_cast<QFutureWatcher<QList<Data>>*>(sender());
-  QList<Data> result_data = watcher->result();
-  watcher->deleteLater();
-
-  if (!SetLoading(QString())) return;
-
-  data_ = result_data;
-
-  if (data_.count() == 0) {
-    // If there were no valid songs, disable everything
-    ui_->song_list->setEnabled(false);
-    ui_->tab_widget->setEnabled(false);
-
-    // Show a summary with empty information
-    UpdateSummaryTab(Song());
-    ui_->tab_widget->setCurrentWidget(ui_->tab_summary);
-
-    SetSongListVisibility(false);
-    return;
-  }
-
-  // Add the filenames to the list
-  for (const Data &tag_data : std::as_const(data_)) {
-    ui_->song_list->addItem(tag_data.current_.basefilename());
-  }
-
-  // Select all
-  ui_->song_list->setCurrentRow(0);
-  ui_->song_list->selectAll();
-
-  // Hide the list if there's only one song in it
-  SetSongListVisibility(data_.count() != 1);
-
-}
-
-void EditTagDialog::SetSongListVisibility(bool visible) {
-
-  ui_->song_list->setVisible(visible);
-  previous_button_->setEnabled(visible);
-  next_button_->setEnabled(visible);
-
-}
-
-QVariant EditTagDialog::Data::value(const Song &song, const QString &id) {
-
-  if (id == "title"_L1) return song.title();
-  if (id == "titlesort"_L1) return song.titlesort();
-  if (id == "artist"_L1) return song.artist();
-  if (id == "artistsort"_L1) return song.artistsort();
-  if (id == "album"_L1) return song.album();
-  if (id == "albumsort"_L1) return song.albumsort();
-  if (id == "albumartist"_L1) return song.albumartist();
-  if (id == "albumartistsort"_L1) return song.albumartistsort();
-  if (id == "composer"_L1) return song.composer();
-  if (id == "composersort"_L1) return song.composersort();
-  if (id == "performer"_L1) return song.performer();
-  if (id == "performersort"_L1) return song.performersort();
-  if (id == "grouping"_L1) return song.grouping();
-  if (id == "genre"_L1) return song.genre();
-  if (id == "comment"_L1) return song.comment();
-  if (id == "lyrics"_L1) return song.lyrics();
-  if (id == "track"_L1) return song.track();
-  if (id == "disc"_L1) return song.disc();
-  if (id == "year"_L1) return song.year();
-  if (id == "compilation"_L1) return song.compilation();
-  if (id == "rating"_L1) { return song.rating(); }
-  qLog(Warning) << "Unknown ID" << id;
-  return QVariant();
-
-}
-
-void EditTagDialog::Data::set_value(const QString &id, const QVariant &value) {
-
-  if (id == "title"_L1) current_.set_title(value.toString());
-  else if (id == "titlesort"_L1) current_.set_titlesort(value.toString());
-  else if (id == "artist"_L1) current_.set_artist(value.toString());
-  else if (id == "artistsort"_L1) current_.set_artistsort(value.toString());
-  else if (id == "album"_L1) current_.set_album(value.toString());
-  else if (id == "albumsort"_L1) current_.set_albumsort(value.toString());
-  else if (id == "albumartist"_L1) current_.set_albumartist(value.toString());
-  else if (id == "albumartistsort"_L1) current_.set_albumartistsort(value.toString());
-  else if (id == "composer"_L1) current_.set_composer(value.toString());
-  else if (id == "composersort"_L1) current_.set_composersort(value.toString());
-  else if (id == "performer"_L1) current_.set_performer(value.toString());
-  else if (id == "performersort"_L1) current_.set_performersort(value.toString());
-  else if (id == "grouping"_L1) current_.set_grouping(value.toString());
-  else if (id == "genre"_L1) current_.set_genre(value.toString());
-  else if (id == "comment"_L1) current_.set_comment(value.toString());
-  else if (id == "lyrics"_L1) current_.set_lyrics(value.toString());
-  else if (id == "track"_L1) current_.set_track(value.toInt());
-  else if (id == "disc"_L1) current_.set_disc(value.toInt());
-  else if (id == "year"_L1) current_.set_year(value.toInt());
-  else if (id == "compilation"_L1) current_.set_compilation(value.toBool());
-  else if (id == "rating"_L1) { current_.set_rating(value.toFloat()); }
-  else qLog(Warning) << "Unknown ID" << id;
-
-}
-
-bool EditTagDialog::DoesValueVary(const QModelIndexList &sel, const QString &id) const {
-
-  QVariant value = data_[sel.first().row()].current_value(id);
-  for (int i = 1; i < sel.count(); ++i) {
-    if (value != data_[sel[i].row()].current_value(id)) return true;
-  }
-  return false;
-
-}
-
-bool EditTagDialog::IsValueModified(const QModelIndexList &sel, const QString &id) const {
-
-  if (id == u"track"_s || id == u"disc"_s || id == u"year"_s) {
-    return std::any_of(sel.begin(), sel.end(), [this, id](const QModelIndex &i) {
-      const int original = data_[i.row()].original_value(id).toInt();
-      const int current = data_[i.row()].current_value(id).toInt();
-      return original != current && (original != -1 || current != 0);
-    });
-  }
-  else if (id == u"rating"_s) {
-    return std::any_of(sel.begin(), sel.end(), [this, id](const QModelIndex &i) {
-      const float original = data_[i.row()].original_value(id).toFloat();
-      const float current = data_[i.row()].current_value(id).toFloat();
-      return original != current && (original != -1 || current != 0);
-    });
-  }
-  return std::any_of(sel.begin(), sel.end(), [this, id](const QModelIndex &i) { return data_[i.row()].original_value(id) != data_[i.row()].current_value(id); });
-
-}
-
-void EditTagDialog::InitFieldValue(const FieldData &field, const QModelIndexList &sel) {
-
-  const bool varies = DoesValueVary(sel, field.id_);
-
-  if (ExtendedEditor *editor = dynamic_cast<ExtendedEditor*>(field.editor_)) {
-    editor->clear();
-    editor->clear_hint();
-    if (varies) {
-      editor->set_hint(tr(kTagsDifferentHintText));
-      editor->set_partially();
-    }
-    else {
-      editor->set_value(data_.value(sel.value(0).row()).current_value(field.id_));
-    }
-  }
-  else if (field.editor_) {
-    qLog(Error) << "Missing editor for" << field.editor_->objectName();
-  }
-
-  UpdateModifiedField(field, sel);
-
-}
-
-void EditTagDialog::UpdateFieldValue(const FieldData &field, const QModelIndexList &sel) {
-
-  // Get the value from the field
-  QVariant value;
-
-  if (ExtendedEditor *editor = dynamic_cast<ExtendedEditor*>(field.editor_)) {
-    value = editor->value();
-  }
-  else if (field.editor_) {
-    qLog(Error) << "Missing editor for" << field.editor_->objectName();
-  }
-
-  // Did we get it?
-  if (!value.isValid()) {
-    return;
-  }
-
-  // Set it in each selected song
-  for (const QModelIndex &i : sel) {
-    data_[i.row()].set_value(field.id_, value);
-  }
-
-  UpdateModifiedField(field, sel);
-
-}
-
-void EditTagDialog::UpdateModifiedField(const FieldData &field, const QModelIndexList &sel) {
-
-  const bool modified = IsValueModified(sel, field.id_);
-
-  // Update the boldness
-  QFont new_font(font());
-  new_font.setBold(modified);
-  field.label_->setFont(new_font);
-  if (field.editor_) {
-    if (ExtendedEditor *editor = dynamic_cast<ExtendedEditor*>(field.editor_)) {
-      editor->set_font(new_font);
-      editor->set_reset_button(modified);
-    }
-    else {
-      field.editor_->setFont(new_font);
-    }
-  }
-
-}
-
-void EditTagDialog::ResetFieldValue(const FieldData &field, const QModelIndexList &sel) {
-
-  // Reset each selected song
-  for (const QModelIndex &i : sel) {
-    Data tag_data = data_.value(i.row());
-    tag_data.set_value(field.id_, tag_data.original_value(field.id_));
-    data_[i.row()] = tag_data;
-  }
-
-  // Reset the field
-  InitFieldValue(field, sel);
-
-}
-
-void EditTagDialog::SelectionChanged() {
-
-  const QModelIndexList indexes = ui_->song_list->selectionModel()->selectedIndexes();
-  if (indexes.isEmpty()) return;
-
-  // Set the editable fields
-  UpdateUI(indexes);
-
-  lyrics_id_ = -1;
-
-  // If we're editing multiple songs then we have to disable certain tabs
-  const bool multiple = indexes.count() > 1;
-  ui_->tab_widget->setTabEnabled(ui_->tab_widget->indexOf(ui_->tab_summary), !multiple);
-  ui_->tab_widget->setTabEnabled(ui_->tab_widget->indexOf(ui_->tab_lyrics), !multiple);
-
-  if (multiple) {
-    UpdateSummaryTab(Song());
-    UpdateStatisticsTab(Song());
-  }
-  else {
-    UpdateSummaryTab(data_.value(indexes.first().row()).original_);
-    UpdateStatisticsTab(data_.value(indexes.first().row()).original_);
-  }
-
-  const Song first_song = data_.value(indexes.first().row()).original_;
-  const UpdateCoverAction first_cover_action = data_.value(indexes.first().row()).cover_action_;
-  bool art_different = false;
-  bool action_different = false;
-  bool albumartist_enabled = false;
-  bool albumartistsort_enabled = false;
-  bool composer_enabled = false;
-  bool composersort_enabled = false;
-  bool performer_enabled = false;
-  bool performersort_enabled = false;
-  bool grouping_enabled = false;
-  bool genre_enabled = false;
-  bool compilation_enabled = false;
-  bool rating_enabled = false;
-  bool comment_enabled = false;
-  bool lyrics_enabled = false;
-  bool titlesort_enabled = false;
-  bool artistsort_enabled = false;
-  bool albumsort_enabled = false;
-  bool has_id3v2_support = false;
-  int id3v2_version = 0;
-  bool id3v2_version_different = false;
-  for (const QModelIndex &idx : indexes) {
-    if (data_.value(idx.row()).cover_action_ == UpdateCoverAction::None) {
-      data_[idx.row()].cover_result_ = AlbumCoverImageResult();
-    }
-    const Song song = data_.value(idx.row()).original_;
-    if (data_.value(idx.row()).cover_action_ != first_cover_action || (first_cover_action != UpdateCoverAction::None && data_[idx.row()].cover_result_.image_data != data_[indexes.first().row()].cover_result_.image_data)) {
-      action_different = true;
-    }
-    if (data_.value(idx.row()).cover_action_ != first_cover_action ||
-        song.art_manual() != first_song.art_manual() ||
-        song.art_embedded() != first_song.art_embedded() ||
-        song.art_automatic() != first_song.art_automatic() ||
-        (song.art_embedded() && first_song.art_embedded() && (first_song.effective_albumartist() != song.effective_albumartist() || first_song.album() != song.album()))
-    ) {
-      art_different = true;
-    }
-    if (song.albumartist_supported()) {
-      albumartist_enabled = true;
-    }
-    if (song.albumartistsort_supported()) {
-      albumartistsort_enabled = true;
-    }
-    if (song.composer_supported()) {
-      composer_enabled = true;
-    }
-    if (song.composersort_supported()) {
-      composersort_enabled = true;
-    }
-    if (song.performer_supported()) {
-      performer_enabled = true;
-    }
-    if (song.performersort_supported()) {
-      performersort_enabled = true;
-    }
-    if (song.grouping_supported()) {
-      grouping_enabled = true;
-    }
-    if (song.genre_supported()) {
-      genre_enabled = true;
-    }
-    if (song.compilation_supported()) {
-      compilation_enabled = true;
-    }
-    if (song.rating_supported()) {
-      rating_enabled = true;
-    }
-    if (song.comment_supported()) {
-      comment_enabled = true;
-    }
-    if (song.lyrics_supported()) {
-      lyrics_enabled = true;
-    }
-    if (song.titlesort_supported()) {
-      titlesort_enabled = true;
-    }
-    if (song.artistsort_supported()) {
-      artistsort_enabled = true;
-    }
-    if (song.albumsort_supported()) {
-      albumsort_enabled = true;
-    }
-    if (song.id3v2_tags_supported()) {
-      has_id3v2_support = true;
-      if (id3v2_version == 0) {
-        id3v2_version = song.id3v2_version();
-      }
-      else if (id3v2_version != song.id3v2_version()) {
-        id3v2_version_different = true;
-      }
-    }
-  }
-
-  QString summary;
-  if (indexes.count() == 1) {
-    summary += "<p><b>"_L1 + first_song.PrettyTitleWithArtist().toHtmlEscaped() + "</b></p>"_L1;
-  }
-  else {
-    summary += "<p><b>"_L1;
-    summary += tr("%1 songs selected.").arg(indexes.count());
-    summary += "</b></p>"_L1;
-  }
-  // Keep the base HTML so the art summary can be appended later without losing the rich-text formatting (toPlainText() would strip the bold markup).
-  tags_summary_text_ = summary;
-  ui_->tags_summary->setText(summary);
-
-  const bool enable_change_art = first_song.is_local_collection_song();
-  ui_->tags_art_button->setEnabled(enable_change_art);
-  if ((art_different && first_cover_action != UpdateCoverAction::New) || action_different) {
-    tags_cover_art_id_ = 0;  // Cancels any pending art load.
-    ui_->tags_art->clear();
-    ui_->tags_art->setText(QLatin1String(kArtDifferentHintText));
-    album_cover_choice_controller_->show_cover_action()->setEnabled(false);
-    album_cover_choice_controller_->cover_to_file_action()->setEnabled(false);
-    album_cover_choice_controller_->cover_from_file_action()->setEnabled(enable_change_art);
-    album_cover_choice_controller_->cover_from_url_action()->setEnabled(enable_change_art);
-    album_cover_choice_controller_->search_for_cover_action()->setEnabled(enable_change_art);
-    album_cover_choice_controller_->unset_cover_action()->setEnabled(enable_change_art);
-    album_cover_choice_controller_->clear_cover_action()->setEnabled(enable_change_art);
-    album_cover_choice_controller_->delete_cover_action()->setEnabled(enable_change_art);
-    album_cover_choice_controller_->search_for_cover_action()->setEnabled(enable_change_art);
-  }
-  else {
-    ui_->tags_art->clear();
-    album_cover_choice_controller_->show_cover_action()->setEnabled(first_song.has_valid_art() && !first_song.art_unset());
-    album_cover_choice_controller_->cover_to_file_action()->setEnabled(first_song.has_valid_art() && !first_song.art_unset());
-    album_cover_choice_controller_->cover_from_file_action()->setEnabled(enable_change_art);
-    album_cover_choice_controller_->cover_from_url_action()->setEnabled(enable_change_art);
-    album_cover_choice_controller_->search_for_cover_action()->setEnabled(cover_providers_->HasAnyProviders() && enable_change_art);
-    album_cover_choice_controller_->unset_cover_action()->setEnabled(enable_change_art && !first_song.art_unset());
-    album_cover_choice_controller_->clear_cover_action()->setEnabled(enable_change_art && (!first_song.art_manual().isEmpty() || first_song.art_unset()));
-    album_cover_choice_controller_->delete_cover_action()->setEnabled(enable_change_art && (first_song.art_embedded() || !first_song.art_automatic().isEmpty() || !first_song.art_manual().isEmpty()));
-    AlbumCoverLoaderOptions cover_options(AlbumCoverLoaderOptions::Option::RawImageData | AlbumCoverLoaderOptions::Option::OriginalImage | AlbumCoverLoaderOptions::Option::ScaledImage | AlbumCoverLoaderOptions::Option::PadScaledImage);
-    cover_options.types = cover_types_;
-    cover_options.desired_scaled_size = QSize(kSmallImageSize, kSmallImageSize);
-    cover_options.device_pixel_ratio = devicePixelRatioF();
-    if (data_.value(indexes.first().row()).cover_action_ == UpdateCoverAction::None) {
-      tags_cover_art_id_ = albumcover_loader_->LoadImageAsync(cover_options, first_song);
-    }
-    else {
-      tags_cover_art_id_ = albumcover_loader_->LoadImageAsync(cover_options, data_[indexes.first().row()].cover_result_);
-    }
-  }
-
-  const bool embedded_cover = (first_song.save_embedded_cover_supported() && (first_song.art_embedded() || album_cover_choice_controller_->get_collection_save_album_cover_type() == CoverOptions::CoverType::Embedded));
-  ui_->checkbox_embedded_cover->setChecked(embedded_cover);
-  album_cover_choice_controller_->set_save_embedded_cover_override(embedded_cover);
-
-  ui_->albumartist->setEnabled(albumartist_enabled);
-  ui_->albumartistsort->setEnabled(albumartistsort_enabled);
-  ui_->composer->setEnabled(composer_enabled);
-  ui_->composersort->setEnabled(composersort_enabled);
-  ui_->performer->setEnabled(performer_enabled);
-  ui_->performersort->setEnabled(performersort_enabled);
-  ui_->grouping->setEnabled(grouping_enabled);
-  ui_->genre->setEnabled(genre_enabled);
-  ui_->compilation->setEnabled(compilation_enabled);
-  ui_->rating->setEnabled(rating_enabled);
-  ui_->comment->setEnabled(comment_enabled);
-  ui_->lyrics->setEnabled(lyrics_enabled);
-  ui_->titlesort->setEnabled(titlesort_enabled);
-  ui_->artistsort->setEnabled(artistsort_enabled);
-  ui_->albumsort->setEnabled(albumsort_enabled);
-
-  ui_->label_id3v2_version->setVisible(has_id3v2_support);
-  ui_->combobox_id3v2_version->setVisible(has_id3v2_support);
-
-  if (has_id3v2_support) {
-    // Set default based on existing version(s)
-    if (id3v2_version_different || id3v2_version == 0) {
-      // Mixed versions or unknown - default to ID3v2.4
-      ui_->combobox_id3v2_version->setCurrentIndex(kComboBoxIndex_ID3v2_4);
-    }
-    else if (id3v2_version == kID3v2_Version_3) {
-      ui_->combobox_id3v2_version->setCurrentIndex(kComboBoxIndex_ID3v2_3);
-    }
-    else {
-      ui_->combobox_id3v2_version->setCurrentIndex(kComboBoxIndex_ID3v2_4);
-    }
-  }
-
-}
-
-void EditTagDialog::UpdateUI(const QModelIndexList &indexes) {
-
-  ignore_edits_ = true;
-  for (const FieldData &field : std::as_const(fields_)) {
-    InitFieldValue(field, indexes);
-  }
-  ignore_edits_ = false;
-
-}
-
-void EditTagDialog::SetText(QLabel *label, const int value, const QString &suffix, const QString &def) {
-  label->setText(value <= 0 ? def : (QString::number(value) + QLatin1Char(' ') + suffix));
-}
-
-void EditTagDialog::SetDate(QLabel *label, const qint64 time) {
-
-  if (time == std::numeric_limits<qint64>::max()) {  // -1
-    label->setText(QObject::tr("Unknown"));
-  }
-  else {
-    label->setText(QDateTime::fromSecsSinceEpoch(time).toString(QLocale::system().dateTimeFormat(QLocale::LongFormat)));
-  }
-
-}
-
-void EditTagDialog::UpdateSummaryTab(const Song &song) {
-
-  AlbumCoverLoaderOptions cover_options(AlbumCoverLoaderOptions::Option::ScaledImage | AlbumCoverLoaderOptions::Option::PadScaledImage);
-  cover_options.types = cover_types_;
-  cover_options.desired_scaled_size = QSize(kSmallImageSize, kSmallImageSize);
-  cover_options.device_pixel_ratio = devicePixelRatioF();
-  summary_cover_art_id_ = albumcover_loader_->LoadImageAsync(cover_options, song);
-
-  summary_text_ = u"<p><b>"_s + song.PrettyTitleWithArtist().toHtmlEscaped() + u"</b></p>"_s;
-  ui_->summary->setText(summary_text_);
-
-  ui_->length->setText(Utilities::PrettyTimeNanosec(song.length_nanosec()));
-
-  SetText(ui_->samplerate, song.samplerate(), u"Hz"_s);
-  SetText(ui_->bitdepth, song.bitdepth(), u"Bit"_s);
-  SetText(ui_->bitrate, song.bitrate(), tr("kbps"));
-  ui_->ebur128_integrated_loudness->setText(song.Ebur128LoudnessLUFSToText());
-  ui_->ebur128_loudness_range->setText(song.Ebur128LoudnessRangeLUToText());
-  SetDate(ui_->mtime, song.mtime());
-  SetDate(ui_->ctime, song.ctime());
-
-  if (song.filesize() == -1) {
-    ui_->filesize->setText(tr("Unknown"));
-  }
-  else {
-    ui_->filesize->setText(Utilities::PrettySize(static_cast<quint64>(song.filesize())));
-  }
-
-  ui_->filetype->setText(song.TextForFiletype());
-
-  if (song.url().isLocalFile()) {
-    ui_->filename->setText(song.url().fileName());
-    ui_->path->setText(QFileInfo(QDir::toNativeSeparators(song.url().toLocalFile())).path());
-  }
-  else {
-    ui_->filename->setText(song.url().toString());
-    ui_->path->clear();
-  }
-
-  ui_->art_embedded->setText(song.art_embedded() ? tr("Yes") : tr("No"));
-
-  if (song.art_manual().isEmpty()) {
-    ui_->art_manual->setText(tr("None"));
-  }
-  else {
-    ui_->art_manual->setText(song.art_manual().toString());
-  }
-
-  if (song.art_automatic().isEmpty()) {
-    ui_->art_automatic->setText(tr("None"));
-  }
-  else {
-    ui_->art_automatic->setText(song.art_automatic().toString());
-  }
-
-  ui_->art_unset->setText(song.art_unset() ? tr("Yes") : tr("No"));
-
-}
-
-QString EditTagDialog::GetArtSummary(const Song &song, const AlbumCoverLoaderResult::Type cover_type) {
-
-  QString summary;
-
-  switch (cover_type) {
-    case AlbumCoverLoaderResult::Type::None:
-      break;
-    case AlbumCoverLoaderResult::Type::Unset:
-      summary = tr("Cover is unset.").toHtmlEscaped();
-      break;
-    case AlbumCoverLoaderResult::Type::Embedded:
-      summary = tr("Cover from embedded image.");
-      break;
-    case AlbumCoverLoaderResult::Type::Manual:
-      summary = tr("Cover from %1").arg(song.art_manual().toString()).toHtmlEscaped();
-      break;
-    case AlbumCoverLoaderResult::Type::Automatic:
-      summary = tr("Cover from %1").arg(song.art_automatic().toString()).toHtmlEscaped();
-      break;
-  }
-
-  if (summary.isEmpty()) {
-    summary = tr("Cover art not set").toHtmlEscaped();
-  }
-
-  if (!song.is_local_collection_song()) {
-    if (!summary.isEmpty()) summary += "<br />"_L1;
-    summary = tr("Album cover editing is only available for collection songs.");
-  }
-
-  return summary;
-
-}
-
-QString EditTagDialog::GetArtSummary(const UpdateCoverAction cover_action) {
-
-  switch (cover_action) {
-    case UpdateCoverAction::Clear:
-      return tr("Cover changed: Will be cleared when saved.").toHtmlEscaped();
-    case UpdateCoverAction::Unset:
-      return tr("Cover changed: Will be unset when saved.").toHtmlEscaped();
-    case UpdateCoverAction::Delete:
-      return tr("Cover changed: Will be deleted when saved.").toHtmlEscaped();
-    case UpdateCoverAction::New:
-      return tr("Cover changed: Will set new when saved.").toHtmlEscaped();
-    case UpdateCoverAction::None:
-      break;
-  }
-
-  return QString();
-
-}
-
-void EditTagDialog::UpdateStatisticsTab(const Song &song) {
-
-  ui_->playcount->setText(QString::number(song.playcount()));
-  ui_->skipcount->setText(QString::number(song.skipcount()));
-  ui_->lastplayed->setText(song.lastplayed() <= 0 ? tr("Never") : QDateTime::fromSecsSinceEpoch(song.lastplayed()).toString(QLocale::system().dateTimeFormat(QLocale::LongFormat)));
-
-}
-
-void EditTagDialog::AlbumCoverLoaded(const quint64 id, const AlbumCoverLoaderResult &result) {
-
-  if (id == summary_cover_art_id_) {
-    if (result.success && !result.image_scaled.isNull() && result.type != AlbumCoverLoaderResult::Type::Unset) {
-      ui_->summary_art->setPixmap(QPixmap::fromImage(result.image_scaled));
-    }
-    else {
-      ui_->summary_art->setPixmap(QPixmap::fromImage(image_no_cover_thumbnail_));
-    }
-    if (ui_->song_list->selectionModel()->selectedIndexes().count() > 0) {
-      const QModelIndex idx = ui_->song_list->selectionModel()->selectedIndexes().first();
-      QString summary = summary_text_;
-      summary += "<br />"_L1;
-      summary += "<br />"_L1;
-      summary += GetArtSummary(data_[idx.row()].current_, result.type);
-      ui_->summary->setText(summary);
-    }
-    summary_cover_art_id_ = 0;
-  }
-  else if (id == tags_cover_art_id_) {
-    if (result.success && !result.image_scaled.isNull() && result.type != AlbumCoverLoaderResult::Type::Unset) {
-      ui_->tags_art->setPixmap(QPixmap::fromImage(result.image_scaled));
-    }
-    else {
-      ui_->tags_art->setPixmap(QPixmap::fromImage(image_no_cover_thumbnail_));
-    }
-    Song first_song;
-    UpdateCoverAction cover_action = UpdateCoverAction::None;
-    const QModelIndexList indexes = ui_->song_list->selectionModel()->selectedIndexes();
-    for (const QModelIndex &idx : indexes) {
-      data_[idx.row()].cover_result_ = result.album_cover;
-      if (!first_song.is_valid()) {
-        first_song = data_.value(idx.row()).current_;
-        cover_action = data_.value(idx.row()).cover_action_;
-      }
-    }
-    bool enable_change_art = false;
-    if (first_song.is_valid()) {
-      QString summary = tags_summary_text_;
-      summary += "<br />"_L1;
-      summary += "<br />"_L1;
-      if (cover_action == UpdateCoverAction::None) {
-        summary += GetArtSummary(first_song, result.type);
-      }
-      else {
-        summary += GetArtSummary(cover_action);
-      }
-      ui_->tags_summary->setText(summary);
-      enable_change_art = first_song.is_local_collection_song() && !first_song.effective_albumartist().isEmpty() && !first_song.album().isEmpty();
-    }
-    tags_cover_art_id_ = 0;
-    album_cover_choice_controller_->show_cover_action()->setEnabled(result.success && result.type != AlbumCoverLoaderResult::Type::Unset);
-    album_cover_choice_controller_->cover_to_file_action()->setEnabled(result.success && result.type != AlbumCoverLoaderResult::Type::Unset);
-    album_cover_choice_controller_->delete_cover_action()->setEnabled(enable_change_art && result.success && result.type != AlbumCoverLoaderResult::Type::Unset);
-  }
-
-}
-
-void EditTagDialog::FieldValueEdited() {
-
-  if (ignore_edits_) return;
-
-  const QModelIndexList sel = ui_->song_list->selectionModel()->selectedIndexes();
-  if (sel.isEmpty()) {
-    return;
-  }
-
-  QWidget *w = qobject_cast<QWidget*>(sender());
-
-  // Find the field
-  for (const FieldData &field : std::as_const(fields_)) {
-    if (field.editor_ == w) {
-      UpdateFieldValue(field, sel);
-      return;
-    }
-  }
-
-}
-
-void EditTagDialog::ResetField() {
-
-  const QModelIndexList sel = ui_->song_list->selectionModel()->selectedIndexes();
-  if (sel.isEmpty()) {
-    return;
-  }
-
-  QWidget *w = qobject_cast<QWidget*>(sender());
-
-  // Find the field
-  for (const FieldData &field : std::as_const(fields_)) {
-    if (field.editor_ == w) {
-      ignore_edits_ = true;
-      ResetFieldValue(field, sel);
-      ignore_edits_ = false;
-      return;
-    }
-  }
-
-}
-
-Song *EditTagDialog::GetFirstSelected() {
-
-  const QModelIndexList sel = ui_->song_list->selectionModel()->selectedIndexes();
-  if (sel.isEmpty()) return nullptr;
-  return &data_[sel.first().row()].current_;
-
-}
-
-void EditTagDialog::LoadCoverFromFile() {
-
-  Song *song = GetFirstSelected();
-  if (!song) return;
-
-  const AlbumCoverImageResult result = album_cover_choice_controller_->LoadImageFromFile(song);
-  if (result.is_valid()) UpdateCover(UpdateCoverAction::New, result);
-
-}
-
-void EditTagDialog::SaveCoverToFile() {
-
-  if (ui_->song_list->selectionModel()->selectedIndexes().isEmpty()) return;
-
-  const Data first_data = data_.value(ui_->song_list->selectionModel()->selectedIndexes().first().row());
-  album_cover_choice_controller_->SaveCoverToFileManual(first_data.current_, first_data.cover_result_);
-
-}
-
-void EditTagDialog::LoadCoverFromURL() {
-
-  if (ui_->song_list->selectionModel()->selectedIndexes().isEmpty()) return;
-
-  const AlbumCoverImageResult result = album_cover_choice_controller_->LoadImageFromURL();
-  if (result.is_valid()) UpdateCover(UpdateCoverAction::New, result);
-
-}
-
-void EditTagDialog::SearchForCover() {
-
-  Song *song = GetFirstSelected();
-  if (!song) return;
-
-  const AlbumCoverImageResult result = album_cover_choice_controller_->SearchForImage(song);
-  if (result.is_valid()) UpdateCover(UpdateCoverAction::New, result);
-
-}
-
-void EditTagDialog::UnsetCover() {
-
-  Song *song = GetFirstSelected();
-  if (!song) return;
-
-  song->set_art_embedded(false);
-  song->clear_art_automatic();
-  song->clear_art_manual();
-  song->set_art_unset(true);
-
-  UpdateCover(UpdateCoverAction::Unset);
-
-}
-
-void EditTagDialog::ClearCover() {
-
-  Song *song = GetFirstSelected();
-  if (!song) return;
-
-  song->set_art_embedded(false);
-  song->clear_art_automatic();
-  song->clear_art_manual();
-  song->set_art_unset(false);
-
-  UpdateCover(UpdateCoverAction::Clear);
-
-}
-
-void EditTagDialog::DeleteCover() {
-
-  UpdateCover(UpdateCoverAction::Delete);
-
-}
-
-void EditTagDialog::ShowCover() {
-
-  if (ui_->song_list->selectionModel()->selectedIndexes().isEmpty()) return;
-  const Data first_data = data_.value(ui_->song_list->selectionModel()->selectedIndexes().first().row());
-  album_cover_choice_controller_->ShowCover(first_data.current_, first_data.cover_result_.image);
-
-}
-
-void EditTagDialog::UpdateCover(const UpdateCoverAction cover_action, const AlbumCoverImageResult &cover_result) {
-
-  const QModelIndexList indexes = ui_->song_list->selectionModel()->selectedIndexes();
-  if (indexes.isEmpty()) return;
-
-  QString artist = data_.value(indexes.first().row()).current_.effective_albumartist();
-  QString album = data_.value(indexes.first().row()).current_.album();
-
-  for (const QModelIndex &idx : indexes) {
-    data_[idx.row()].cover_action_ = cover_action;
-    data_[idx.row()].cover_result_ = cover_result;
-    if (cover_action == UpdateCoverAction::New) {
-      data_[idx.row()].current_.clear_art_manual();
-      data_[idx.row()].current_.set_art_unset(false);
-    }
-    else if (cover_action == UpdateCoverAction::Unset) {
-      data_[idx.row()].current_.set_art_unset(true);
-    }
-    else if (cover_action == UpdateCoverAction::Clear || cover_action == UpdateCoverAction::Delete) {
-      data_[idx.row()].current_.set_art_embedded(false);
-      data_[idx.row()].current_.clear_art_manual();
-      data_[idx.row()].current_.clear_art_automatic();
-      data_[idx.row()].current_.set_art_unset(false);
-    }
-    if (artist != data_[idx.row()].current_.effective_albumartist() || album != data_[idx.row()].current_.album()) {
-      artist.clear();
-      album.clear();
-    }
-  }
-
-  // Now check if we have any other songs cached that share that artist and album (and would therefore be changed as well)
-  if (!artist.isEmpty() && !album.isEmpty()) {
-    for (int i = 0; i < data_.count(); ++i) {
-      if (data_[i].current_.effective_albumartist() == artist && data_[i].current_.album() == album) {
-        data_[i].cover_action_ = cover_action;
-        data_[i].cover_result_ = cover_result;
-        if (cover_action == UpdateCoverAction::New) {
-          data_[i].current_.clear_art_manual();
-          data_[i].current_.set_art_unset(false);
-        }
-        else if (cover_action == UpdateCoverAction::Unset) {
-          data_[i].current_.set_art_unset(true);
-        }
-        else if (cover_action == UpdateCoverAction::Clear || cover_action == UpdateCoverAction::Delete) {
-          data_[i].current_.set_art_embedded(false);
-          data_[i].current_.clear_art_manual();
-          data_[i].current_.clear_art_automatic();
-          data_[i].current_.set_art_unset(false);
-        }
-      }
-    }
-  }
-
-  UpdateSummaryTab(data_[indexes.first().row()].current_);
-  SelectionChanged();
-
-}
-
-void EditTagDialog::NextSong() {
-
-  if (ui_->song_list->count() == 0) {
-    return;
-  }
-
-  int row = (ui_->song_list->currentRow() + 1) % ui_->song_list->count();
-  ui_->song_list->setCurrentRow(row);
-
-}
-
-void EditTagDialog::PreviousSong() {
-
-  if (ui_->song_list->count() == 0) {
-    return;
-  }
-
-  int row = (ui_->song_list->currentRow() - 1 + ui_->song_list->count()) % ui_->song_list->count();
-  ui_->song_list->setCurrentRow(row);
-
-}
-
-void EditTagDialog::ButtonClicked(QAbstractButton *button) {
-
-  if (button == ui_->button_box->button(QDialogButtonBox::Discard)) {
-    reject();
-  }
-
-}
-
-void EditTagDialog::SaveData() {
-
-  QMap<QString, QUrl> cover_urls;
-
-  for (int i = 0; i < data_.count(); ++i) {
-    Data &ref = data_[i];
-
-    QString embedded_cover_from_file;
-    // If embedded album cover is selected, and it isn't saved to the tags, then save it even if no action was done.
-    if (ui_->checkbox_embedded_cover->isChecked() && ref.cover_action_ == UpdateCoverAction::None && !ref.original_.art_embedded() && ref.original_.save_embedded_cover_supported()) {
-      if (ref.original_.art_manual_is_valid()) {
-        ref.cover_action_ = UpdateCoverAction::New;
-        embedded_cover_from_file = ref.original_.art_manual().toLocalFile();
-      }
-      else if (ref.original_.art_automatic_is_valid()) {
-        ref.cover_action_ = UpdateCoverAction::New;
-        embedded_cover_from_file = ref.original_.art_automatic().toLocalFile();
-      }
-    }
-
-    const bool save_tags = !ref.current_.IsMetadataEqual(ref.original_);
-    const bool save_rating = !ref.current_.IsRatingEqual(ref.original_);
-    const bool save_playcount = ref.current_.playcount() == 0 && ref.current_.skipcount() == 0 && ref.current_.lastplayed() == -1 && !ref.current_.IsPlayStatisticsEqual(ref.original_);
-    const bool save_embedded_cover = ref.cover_action_ != UpdateCoverAction::None && ui_->checkbox_embedded_cover->isChecked() && ref.original_.save_embedded_cover_supported();
-
-    if (ref.cover_action_ != UpdateCoverAction::None) {
-      switch (ref.cover_action_) {
-        case UpdateCoverAction::None:
-          break;
-        case UpdateCoverAction::New:{
-          if ((!ref.current_.effective_albumartist().isEmpty() && !ref.current_.album().isEmpty()) &&
-              (!ui_->checkbox_embedded_cover->isChecked() || !ref.original_.save_embedded_cover_supported())) {
-            QUrl cover_url;
-            if (!ref.cover_result_.cover_url.isEmpty() && ref.cover_result_.cover_url.isLocalFile() && QFile::exists(ref.cover_result_.cover_url.toLocalFile())) {
-              cover_url = ref.cover_result_.cover_url;
-            }
-            else {
-              QString cover_hash = QString::fromLatin1(CoverUtils::Sha1CoverHash(ref.current_.effective_albumartist(), ref.current_.album()).toHex());
-              if (cover_urls.contains(cover_hash)) {
-                cover_url = cover_urls[cover_hash];
-              }
-              else {
-                cover_url = album_cover_choice_controller_->SaveCoverToFileAutomatic(&ref.current_, ref.cover_result_);
-                if (cover_url.isValid()) {
-                  cover_urls.insert(cover_hash, cover_url);
-                }
-              }
-            }
-            ref.current_.set_art_manual(cover_url);
-            ref.current_.set_art_unset(false);
-          }
-          break;
-        }
-        case UpdateCoverAction::Unset:
-          ref.current_.set_art_embedded(false);
-          ref.current_.clear_art_manual();
-          ref.current_.clear_art_automatic();
-          ref.current_.set_art_unset(true);
-          break;
-        case UpdateCoverAction::Clear:
-          ref.current_.set_art_embedded(false);
-          ref.current_.clear_art_manual();
-          ref.current_.clear_art_automatic();
-          ref.current_.set_art_unset(false);
-          break;
-        case UpdateCoverAction::Delete:{
-          ref.current_.set_art_embedded(false);
-          if (!ref.original_.art_automatic().isEmpty()) {
-            if (ref.original_.art_automatic_is_valid()) {
-              const QString art_automatic = ref.original_.art_automatic().toLocalFile();
-              if (QFile::exists(art_automatic)) {
-                QFile::remove(art_automatic);
-              }
-            }
-            ref.current_.clear_art_automatic();
-          }
-          if (!ref.original_.art_manual().isEmpty()) {
-            if (ref.original_.art_manual_is_valid()) {
-              const QString art_manual = ref.original_.art_manual().toLocalFile();
-              if (QFile::exists(art_manual)) {
-                QFile::remove(art_manual);
-              }
-            }
-            ref.current_.clear_art_manual();
-          }
-          ref.current_.set_art_unset(false);
-          break;
-        }
-      }
-    }
-
-    if (save_tags || save_playcount || save_rating || save_embedded_cover) {
-      // For streaming tracks, skip tag writing since there's no local file.
-      // The metadata will be applied directly to the playlist item in MainWindow::EditTagDialogAccepted.
-      if (ref.current_.is_stream()) {
-        continue;
-      }
-
-      // Not to confuse the collection model.
-      if (ref.current_.track() <= 0) { ref.current_.set_track(-1); }
-      if (ref.current_.disc() <= 0) { ref.current_.set_disc(-1); }
-      if (ref.current_.year() <= 0) { ref.current_.set_year(-1); }
-      if (ref.current_.originalyear() <= 0) { ref.current_.set_originalyear(-1); }
-      if (ref.current_.lastplayed() <= 0) { ref.current_.set_lastplayed(-1); }
-      ++save_tag_pending_;
-      SaveTagCoverData save_tag_cover_data;
-      if (save_embedded_cover && ref.cover_action_ == UpdateCoverAction::New) {
-        if (!ref.cover_result_.image.isNull()) {
-          save_tag_cover_data.cover_mimetype = ref.cover_result_.mime_type;
-        }
-        else if (!embedded_cover_from_file.isEmpty()) {
-          save_tag_cover_data.cover_filename = embedded_cover_from_file;
-        }
-        save_tag_cover_data.cover_data = ref.cover_result_.image_data;
-      }
-
-      // Determine ID3v2 version based on user selection
-      TagID3v2Version tag_id3v2_version = TagID3v2Version::Default;
-      if (ref.current_.filetype() == Song::FileType::MPEG || ref.current_.filetype() == Song::FileType::WAV || ref.current_.filetype() == Song::FileType::AIFF) {
-        tag_id3v2_version = ui_->combobox_id3v2_version->currentIndex() == kComboBoxIndex_ID3v2_3 ? TagID3v2Version::V3 : TagID3v2Version::V4;
-      }
-
-      TagReaderClient::SaveOptions save_tags_options;
-      if (save_tags) {
-        save_tags_options |= TagReaderClient::SaveOption::Tags;
-      }
-      if (save_playcount) {
-        save_tags_options |= TagReaderClient::SaveOption::Playcount;
-      }
-      if (save_rating) {
-        save_tags_options |= TagReaderClient::SaveOption::Rating;
-      }
-      if (save_embedded_cover) {
-        save_tags_options |= TagReaderClient::SaveOption::Cover;
-      }
-      TagReaderReplyPtr reply = tagreader_client_->WriteFileAsync(ref.current_.url().toLocalFile(), ref.current_, save_tags_options, save_tag_cover_data, tag_id3v2_version);
-      SharedPtr<QMetaObject::Connection> connection = make_shared<QMetaObject::Connection>();
-      *connection = QObject::connect(&*reply, &TagReaderReply::Finished, this, [this, reply, ref, connection]() {
-        SongSaveTagsComplete(reply, ref.current_.url().toLocalFile(), ref.current_, ref.cover_action_);
-        QObject::disconnect(*connection);
-      }, Qt::QueuedConnection);
-    }
-    // If the cover was changed, but no tags written, make sure to update the collection.
-    else if (ref.cover_action_ != UpdateCoverAction::None && !ref.current_.effective_albumartist().isEmpty() && !ref.current_.album().isEmpty()) {
-      if (ref.current_.is_local_collection_song()) {
-        collection_songs_.insert(ref.current_.id(), ref.current_);
-      }
-      if (ref.current_ == current_albumcover_loader_->last_song()) {
-        current_albumcover_loader_->LoadAlbumCover(ref.current_);
-      }
-    }
-
-  }
-
-  if (save_tag_pending_ <= 0) SaveDataFinished();
-
-}
-
-void EditTagDialog::SaveDataFinished() {
-
-  if (!collection_songs_.isEmpty()) {
-    collection_backend_->AddOrUpdateSongsAsync(collection_songs_.values());
-    collection_songs_.clear();
-  }
-
-  if (!SetLoading(QString())) return;
-
-  QDialog::accept();
-
-}
-
-void EditTagDialog::ResetPlayStatistics() {
-
-  const QModelIndexList idx_list = ui_->song_list->selectionModel()->selectedIndexes();
-  if (idx_list.isEmpty()) return;
-
-  Song *song = &data_[idx_list.first().row()].current_;
-  if (!song->is_valid()) return;
-
-  if (QMessageBox::question(this, tr("Reset song play statistics"), tr("Are you sure you want to reset this song's play statistics?"), QMessageBox::Reset, QMessageBox::Cancel) != QMessageBox::Reset) {
-    return;
-  }
-
-  song->set_playcount(0);
-  song->set_skipcount(0);
-  song->set_lastplayed(-1);
-
-  UpdateStatisticsTab(*song);
-
-}
-
-void EditTagDialog::SongRated(const float rating) {
-
-  const QModelIndexList indexes = ui_->song_list->selectionModel()->selectedIndexes();
-  if (indexes.isEmpty()) return;
-
-  for (const QModelIndex &idx : indexes) {
-    if (!data_[idx.row()].current_.is_valid()) continue;
-    data_[idx.row()].current_.set_rating(rating);
-  }
-
-}
-
-void EditTagDialog::FetchTag() {
-
-#ifdef HAVE_TAGFETCHER
-
-  const QModelIndexList sel = ui_->song_list->selectionModel()->selectedIndexes();
-
+struct State {
+  Application *app = nullptr;
+  GtkWindow *parent = nullptr;
+  Song song;
   SongList songs;
+  std::vector<int> playlist_rows;
+  size_t index = 0;
+  GtkWidget *cover = nullptr;
+  GtkWidget *tags_art = nullptr;
+  GtkWidget *tags_art_button = nullptr;
+  GtkWidget *lyrics = nullptr;
+  GtkWidget *lyrics_label = nullptr;
+  GtkWidget *lyrics_reset = nullptr;
+  GtkWidget *rating = nullptr;
+  GtkWidget *rating_label = nullptr;
+  GtkWidget *rating_reset = nullptr;
+  double initial_rating = 0;
+  double initial_rating_stored = -1;
+  GtkWidget *compilation = nullptr;
+  GtkWidget *stats_label = nullptr;
+  GtkWidget *summary_title = nullptr;
+  GtkWidget *summary_grid = nullptr;
+  GtkWidget *tags_summary = nullptr;
+  GtkWidget *stats_plays = nullptr;
+  GtkWidget *stats_skips = nullptr;
+  GtkWidget *stats_last = nullptr;
+  GtkWidget *stats_path = nullptr;
+  GtkWidget *song_list = nullptr;
+  GtkWidget *prev = nullptr;
+  GtkWidget *next = nullptr;
+  GtkWidget *id3v2 = nullptr;
+  GtkWidget *embedded_cover = nullptr;
+  GtkWidget *stack = nullptr;
+  GtkWidget *actions = nullptr;
+  GtkWidget *fetch_tags = nullptr;
+  GtkWidget *loading_label = nullptr;
+  GtkWidget *fetch_cover = nullptr;
+  GtkWidget *search_cover = nullptr;
+  GtkWidget *url_cover = nullptr;
+  GtkWidget *file_cover = nullptr;
+  GtkWidget *unset_cover = nullptr;
+  GtkWidget *clear_cover = nullptr;
+  GtkWidget *delete_cover = nullptr;
+  GtkWidget *show_cover = nullptr;
+  GtkWidget *save_cover = nullptr;
+  GtkWidget *cover_hint = nullptr;
+  GtkWidget *summary_page = nullptr;
+  GtkWidget *lyrics_page = nullptr;
+  GtkWidget *fetch_lyrics = nullptr;
+  bool loading = false;
+#ifdef HAVE_TAGFETCHER
+  bool have_tagfetcher = true;
+#else
+  bool have_tagfetcher = false;
+#endif
+  std::unique_ptr<AlbumCoverChoiceController> covers;
+  std::vector<std::pair<std::string, GtkWidget *>> fields;
+  std::vector<std::string> initial;
+  AdwDialog *dialog = nullptr;
+  std::shared_ptr<bool> alive = std::make_shared<bool>(true);
 
-  for (const QModelIndex &idx : sel) {
-    const Song song = data_.value(idx.row()).original_;
-    if (!song.is_valid()) {
+  ~State() {
+    if (alive) {
+      *alive = false;
+    }
+  }
+};
+
+struct EditTagLoadIdle {
+  State *state = nullptr;
+  SongList songs;
+  std::shared_ptr<bool> alive;
+};
+
+void UpdateDisplay(State *state);
+
+std::string TextOf(GtkWidget *widget) {
+  if (!widget) {
+    return {};
+  }
+  if (GTK_IS_TEXT_VIEW(widget)) {
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget));
+    GtkTextIter start;
+    GtkTextIter end;
+    gtk_text_buffer_get_bounds(buffer, &start, &end);
+    gchar *text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
+    std::string result = text ? text : "";
+    g_free(text);
+    return result;
+  }
+  return gtk_editable_get_text(GTK_EDITABLE(widget));
+}
+
+void SetText(GtkWidget *widget, const std::string &value) {
+  if (!widget) {
+    return;
+  }
+  if (GTK_IS_TEXT_VIEW(widget)) {
+    gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget)), value.c_str(), -1);
+    return;
+  }
+  gtk_editable_set_text(GTK_EDITABLE(widget), value.c_str());
+}
+
+GtkWidget *MakeFieldResetButton() {
+  GtkWidget *reset = gtk_button_new_from_icon_name("edit-undo-symbolic");
+  gtk_widget_add_css_class(reset, "flat");
+  gtk_widget_set_tooltip_text(reset, Translations::CStr(EditTagFieldReset::ResetTooltip()));
+  gtk_widget_set_valign(reset, GTK_ALIGN_CENTER);
+  return reset;
+}
+
+void SetModifiedStyle(GtkWidget *widget, bool modified) {
+  if (!widget) {
+    return;
+  }
+  if (modified) {
+    gtk_widget_add_css_class(widget, "heading");
+  } else {
+    gtk_widget_remove_css_class(widget, "heading");
+  }
+}
+
+void AttachEntryReset(AdwEntryRow *entry, const std::string &name, const std::string &initial) {
+  GtkWidget *reset = MakeFieldResetButton();
+  adw_entry_row_add_suffix(entry, reset);
+  g_object_set_data(G_OBJECT(entry), "reset-btn", reset);
+  g_object_set_data_full(G_OBJECT(entry), "initial-text", g_strdup(initial.c_str()), g_free);
+  g_object_set_data_full(G_OBJECT(entry), "field-name", g_strdup(name.c_str()), g_free);
+  g_object_set_data(G_OBJECT(reset), "entry", entry);
+  gtk_widget_set_visible(reset, FALSE);
+  g_signal_connect(entry, "changed", G_CALLBACK((+[](AdwEntryRow *row, gpointer) {
+                     auto *btn = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "reset-btn"));
+                     const char *initial_text = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "initial-text"));
+                     const char *field_name = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "field-name"));
+                     const bool modified = EditTagFields::IsValueModified(field_name ? field_name : "", initial_text ? initial_text : "",
+                                                                          gtk_editable_get_text(GTK_EDITABLE(row)));
+                     SetModifiedStyle(GTK_WIDGET(row), modified);
+                     if (btn) {
+                       gtk_widget_set_visible(btn, modified);
+                     }
+                   })),
+                   nullptr);
+  g_signal_connect(reset, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer) {
+                     auto *field = GTK_WIDGET(g_object_get_data(G_OBJECT(btn), "entry"));
+                     const char *initial_text = field ? static_cast<const char *>(g_object_get_data(G_OBJECT(field), "initial-text")) : nullptr;
+                     if (field) {
+                       gtk_editable_set_text(GTK_EDITABLE(field), initial_text ? initial_text : "");
+                     }
+                   }),
+                   nullptr);
+}
+
+void AttachFieldCompletion(AdwEntryRow *entry, const std::string &name, const SongList &library) {
+  if (!entry || !EditTagCompleter::CompletesField(name)) {
+    return;
+  }
+  auto *values = new std::vector<std::string>(EditTagCompleter::ValuesFor(library, name));
+  GtkWidget *popover = gtk_popover_new();
+  GtkWidget *list = gtk_list_box_new();
+  gtk_popover_set_child(GTK_POPOVER(popover), list);
+  gtk_widget_set_parent(popover, GTK_WIDGET(entry));
+  g_object_set_data_full(G_OBJECT(entry), "complete-values", values, [](gpointer p) { delete static_cast<std::vector<std::string> *>(p); });
+  g_object_set_data(G_OBJECT(entry), "complete-popover", popover);
+  g_object_set_data(G_OBJECT(entry), "complete-list", list);
+  g_signal_connect(entry, "changed", G_CALLBACK(+[](AdwEntryRow *row, gpointer) {
+                     auto *values = static_cast<std::vector<std::string> *>(g_object_get_data(G_OBJECT(row), "complete-values"));
+                     auto *popover = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "complete-popover"));
+                     auto *list = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "complete-list"));
+                     if (!values || !popover || !list) {
+                       return;
+                     }
+                     gtk_list_box_remove_all(GTK_LIST_BOX(list));
+                     const std::vector<std::string> matches =
+                         EditTagCompleter::Suggestions(*values, gtk_editable_get_text(GTK_EDITABLE(row)));
+                     for (const std::string &match : matches) {
+                       GtkWidget *label = gtk_label_new(match.c_str());
+                       gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+                       gtk_list_box_append(GTK_LIST_BOX(list), label);
+                     }
+                     if (matches.empty()) {
+                       gtk_popover_popdown(GTK_POPOVER(popover));
+                     } else {
+                       gtk_popover_popup(GTK_POPOVER(popover));
+                     }
+                   }),
+                   nullptr);
+  g_signal_connect(list, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                     GtkWidget *label = gtk_list_box_row_get_child(row);
+                     auto *entry = GTK_WIDGET(data);
+                     if (label && GTK_IS_LABEL(label) && entry) {
+                       gtk_editable_set_text(GTK_EDITABLE(entry), gtk_label_get_text(GTK_LABEL(label)));
+                     }
+                     if (auto *popover = GTK_WIDGET(g_object_get_data(G_OBJECT(entry), "complete-popover"))) {
+                       gtk_popover_popdown(GTK_POPOVER(popover));
+                     }
+                   }),
+                   entry);
+  g_signal_connect(entry, "destroy", G_CALLBACK(+[](GtkWidget *widget, gpointer) {
+                     if (GtkWidget *popover = GTK_WIDGET(g_object_get_data(G_OBJECT(widget), "complete-popover"))) {
+                       gtk_widget_unparent(popover);
+                     }
+                   }),
+                   nullptr);
+}
+
+void FillSummaryGrid(State *state) {
+  if (!state) {
+    return;
+  }
+  if (state->summary_title) {
+    gtk_label_set_text(GTK_LABEL(state->summary_title), state->song.PrettyTitleWithArtist().c_str());
+  }
+  if (!state->summary_grid) {
+    return;
+  }
+  GtkWidget *child = gtk_widget_get_first_child(state->summary_grid);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_grid_remove(GTK_GRID(state->summary_grid), child);
+    child = next;
+  }
+  int row = 0;
+  for (const EditTagSummaryFields::Row &info : EditTagSummaryFields::Rows(state->song)) {
+    if (info.value.empty()) {
       continue;
     }
-    songs << song;
+    GtkWidget *key = gtk_label_new(Translations::CStr(info.label));
+    gtk_widget_add_css_class(key, "dim-label");
+    gtk_label_set_xalign(GTK_LABEL(key), 0.0f);
+    GtkWidget *value = gtk_label_new(info.value.c_str());
+    gtk_label_set_xalign(GTK_LABEL(value), 0.0f);
+    gtk_label_set_wrap(GTK_LABEL(value), TRUE);
+    gtk_label_set_selectable(GTK_LABEL(value), TRUE);
+    gtk_widget_set_hexpand(value, TRUE);
+    gtk_grid_attach(GTK_GRID(state->summary_grid), key, 0, row, 1, 1);
+    gtk_grid_attach(GTK_GRID(state->summary_grid), value, 1, row, 1, 1);
+    ++row;
   }
-
-  if (songs.isEmpty()) return;
-
-  results_dialog_->Init(songs);
-  tag_fetcher_->StartFetch(songs);
-
-  results_dialog_->show();
-
-#endif
-
 }
 
-void EditTagDialog::FetchTagSongChosen(const Song &original_song, const Song &new_metadata) {
+std::string TechnicalLine(const Song &song) {
+  std::string line = PrettyBytes(song.filesize()) + " · " + Utilities::PrettyTimeNanosec(song.length_nanosec());
+  if (song.bitrate() > 0) {
+    line += " · " + std::to_string(song.bitrate()) + " kbps";
+  }
+  if (song.samplerate() > 0) {
+    line += " · " + std::to_string(song.samplerate()) + " Hz";
+  }
+  if (song.bitdepth() > 0) {
+    line += " · " + std::to_string(song.bitdepth()) + "-bit";
+  }
+  line += " · " + Song::FiletypeToString(song.filetype());
+  return line;
+}
 
-#ifdef HAVE_TAGFETCHER
-
-  const QString filename = original_song.url().toLocalFile();
-
-  // Find the song with this filename
-  auto data_it = std::find_if(data_.begin(), data_.end(), [&filename](const Data &d) {
-    return d.original_.url().toLocalFile() == filename;
-  });
-  if (data_it == data_.end()) {
-    qLog(Warning) << "Could not find song to filename: " << filename;
+void ApplyCoverEnable(State *state) {
+  if (!state) {
     return;
   }
-
-  // Update song data
-  data_it->current_.set_title(new_metadata.title());
-  data_it->current_.set_artist(new_metadata.artist());
-  data_it->current_.set_album(new_metadata.album());
-  data_it->current_.set_track(new_metadata.track());
-  data_it->current_.set_year(new_metadata.year());
-
-  // Is it currently being displayed in the UI?
-  if (ui_->song_list->currentRow() == std::distance(data_.begin(), data_it)) {
-    // Yes! Additionally, update UI
-    const QModelIndexList sel = ui_->song_list->selectionModel()->selectedIndexes();
-    UpdateUI(sel);
+  const bool change_art = EditTagCover::ChangeArtEnabled(state->song);
+  bool has_providers = false;
+  if (state->app && state->app->cover_providers()) {
+    has_providers = CoverManagerMenu::HasAnyProviders(state->app->cover_providers()->All().size());
   }
-
-#else
-  Q_UNUSED(original_song)
-  Q_UNUSED(new_metadata)
-#endif
-
+  const bool art_different = EditTagCover::ArtDifferentAcrossSongs(state->songs);
+  if (state->cover_hint) {
+    gtk_widget_set_visible(state->cover_hint, art_different);
+  }
+  if (state->fetch_cover) {
+    gtk_widget_set_sensitive(state->fetch_cover, EditTagCover::FetchCoverEnabled(change_art));
+  }
+  if (state->search_cover) {
+    gtk_widget_set_sensitive(state->search_cover, EditTagCover::SearchCoverEnabled(has_providers, change_art, art_different));
+  }
+  if (state->url_cover) {
+    gtk_widget_set_sensitive(state->url_cover, EditTagCover::FromUrlEnabled(change_art));
+  }
+  if (state->file_cover) {
+    gtk_widget_set_sensitive(state->file_cover, EditTagCover::FromFileEnabled(change_art));
+  }
+  if (state->unset_cover) {
+    gtk_widget_set_sensitive(state->unset_cover, EditTagCover::UnsetCoverEnabled(state->song, change_art, art_different));
+  }
+  if (state->clear_cover) {
+    gtk_widget_set_sensitive(state->clear_cover, EditTagCover::ClearCoverEnabled(state->song, change_art, art_different));
+  }
+  if (state->delete_cover) {
+    gtk_widget_set_sensitive(state->delete_cover, EditTagCover::DeleteCoverEnabled(state->song, change_art, art_different));
+  }
+  if (state->show_cover) {
+    gtk_widget_set_sensitive(state->show_cover, EditTagCover::ShowCoverEnabled(state->song, art_different));
+  }
+  if (state->tags_art_button) {
+    gtk_widget_set_sensitive(state->tags_art_button, EditTagCover::ChangeArtEnabled(state->song) ? TRUE : FALSE);
+  }
+  if (state->save_cover) {
+    gtk_widget_set_sensitive(state->save_cover, EditTagCover::SaveCoverEnabled(state->song, art_different));
+  }
 }
 
-void EditTagDialog::FetchLyrics() {
-
-  if (ui_->song_list->selectionModel()->selectedIndexes().isEmpty()) return;
-  const Song song = data_.value(ui_->song_list->selectionModel()->selectedIndexes().first().row()).current_;
-  lyrics_fetcher_->Clear();
-  ui_->lyrics->setPlainText(tr("loading..."));
-  lyrics_id_ = static_cast<qint64>(lyrics_fetcher_->Search(song.effective_albumartist(), song.artist(), song.album(), song.title(), song.length_nanosec() / kNsecPerSec));
-
+void ShowCoverIfAllowed(State *state) {
+  if (!state || !state->covers) {
+    return;
+  }
+  const bool art_different = EditTagCover::ArtDifferentAcrossSongs(state->songs);
+  if (!EditTagCover::ShowOnDoubleClick(state->song, art_different)) {
+    return;
+  }
+  state->covers->ShowCover(state->parent, state->song);
 }
 
-void EditTagDialog::UpdateLyrics(const quint64 id, const QString &provider, const QString &lyrics) {
-
-  Q_UNUSED(provider);
-
-  if (static_cast<qint64>(id) != lyrics_id_) return;
-  lyrics_id_ = -1;
-  if (lyrics.isEmpty()) {
-    ui_->lyrics->setPlainText(tr("Not found."));
+void AttachCoverGesture(GtkWidget *widget, State *state, bool menu_on_click) {
+  if (!widget || !state) {
+    return;
   }
-  else {
-    ui_->lyrics->setPlainText(lyrics);
-  }
-
+  GtkGesture *click = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
+  g_object_set_data(G_OBJECT(click), "menu-on-click", GINT_TO_POINTER(menu_on_click ? 2 : 1));
+  gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(click));
+  g_signal_connect(click, "released", G_CALLBACK((+[](GtkGestureClick *gesture, gint n_press, gdouble, gdouble, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     const guint button = gtk_gesture_single_get_current_button(GTK_GESTURE_SINGLE(gesture));
+                     if (EditTagCover::IsDoubleClick(n_press, button)) {
+                       ShowCoverIfAllowed(self);
+                       return;
+                     }
+                     const bool menu_on_click = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(gesture), "menu-on-click")) == 2;
+                     if (menu_on_click && EditTagCover::IsMenuClick(n_press, button) && self && self->tags_art_button &&
+                         GTK_IS_MENU_BUTTON(self->tags_art_button)) {
+                       gtk_menu_button_popup(GTK_MENU_BUTTON(self->tags_art_button));
+                     }
+                   })),
+                   state);
 }
 
-void EditTagDialog::SongSaveTagsComplete(TagReaderReplyPtr reply, const QString &filename, Song song, const UpdateCoverAction cover_action) {
+void AttachCoverDrop(GtkWidget *widget, State *state) {
+  if (!widget || !state) {
+    return;
+  }
+  GtkDropTarget *drop = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
+  gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(drop));
+  g_signal_connect(drop, "drop", G_CALLBACK((+[](GtkDropTarget *, const GValue *value, gdouble, gdouble, gpointer data) -> gboolean {
+                     auto *self = static_cast<State *>(data);
+                     if (!self || !self->app || !G_VALUE_HOLDS_STRING(value)) {
+                       return FALSE;
+                     }
+                     const char *text = g_value_get_string(value);
+                     const std::string path = EditTagCoverDrop::FirstImagePath(text ? text : "");
+                     if (path.empty() || !self->covers || !self->covers->SaveCover(&self->song, path)) {
+                       return FALSE;
+                     }
+                     if (self->index < self->songs.size()) {
+                       self->songs[self->index] = self->song;
+                     }
+                     UpdateDisplay(self);
+                     return TRUE;
+                   })),
+                   state);
+}
 
-  --save_tag_pending_;
+void ApplyEditEnable(State *state) {
+  if (!state) {
+    return;
+  }
+  const bool has_valid = !state->songs.empty();
+  const bool list_visible = EditTagFields::SongListVisible(state->songs.size());
+  if (state->actions) {
+    gtk_widget_set_sensitive(state->actions, EditTagFields::ButtonsEnabled(state->loading));
+  }
+  if (state->stack) {
+    gtk_widget_set_sensitive(state->stack, EditTagFields::FieldsEnabled(state->loading, has_valid));
+  }
+  if (state->song_list) {
+    gtk_widget_set_visible(state->song_list, list_visible);
+    gtk_widget_set_sensitive(state->song_list, EditTagFields::SongListEnabled(state->loading, has_valid));
+  }
+  if (state->prev) {
+    gtk_widget_set_sensitive(state->prev, EditTagFields::SongListNavEnabled(list_visible, state->loading));
+  }
+  if (state->next) {
+    gtk_widget_set_sensitive(state->next, EditTagFields::SongListNavEnabled(list_visible, state->loading));
+  }
+  if (state->fetch_tags) {
+    gtk_widget_set_sensitive(state->fetch_tags, EditTagFields::FetchTagsEnabled(state->have_tagfetcher, state->loading));
+  }
+  if (state->loading_label) {
+    gtk_widget_set_visible(state->loading_label, EditTagFields::LoadingLabelVisible(state->loading));
+  }
+  const bool fields_on = EditTagFields::FieldsEnabled(state->loading, has_valid);
+  for (const auto &field : state->fields) {
+    if (field.second) {
+      gtk_widget_set_sensitive(field.second, fields_on && EditTagFields::FieldEnabled(field.first, state->songs));
+    }
+  }
+  if (state->compilation) {
+    gtk_widget_set_sensitive(state->compilation, fields_on && EditTagFields::FieldEnabled("Compilation", state->songs));
+  }
+  if (state->rating) {
+    gtk_widget_set_sensitive(state->rating, fields_on && EditTagFields::FieldEnabled("Rating", state->songs));
+  }
+  const bool lyrics_on = fields_on && EditTagCover::LyricsTabEnabled(state->songs.size());
+  if (state->lyrics_page) {
+    gtk_widget_set_sensitive(state->lyrics_page, lyrics_on);
+  }
+  if (state->fetch_lyrics) {
+    gtk_widget_set_sensitive(state->fetch_lyrics, lyrics_on);
+  }
+  const bool summary_on = fields_on && EditTagCover::SummaryTabEnabled(state->songs.size());
+  if (state->summary_page) {
+    gtk_widget_set_sensitive(state->summary_page, summary_on);
+  }
+  if (state->stack && ADW_IS_VIEW_STACK(state->stack)) {
+    const char *name = adw_view_stack_get_visible_child_name(ADW_VIEW_STACK(state->stack));
+    const int visible = EditTagTabs::VisibleIndex(EditTagTabs::IndexFromName(name ? name : ""), state->songs.size());
+    if (g_strcmp0(name, EditTagTabs::Name(visible)) != 0) {
+      adw_view_stack_set_visible_child_name(ADW_VIEW_STACK(state->stack), EditTagTabs::Name(visible));
+    }
+  }
+  ApplyCoverEnable(state);
+}
 
-  const bool success = reply->success();
-  const QString error = reply->error();
+void UpdateDisplay(State *state) {
+  if (!state) {
+    return;
+  }
+  if (state->index >= state->songs.size()) {
+    ApplyEditEnable(state);
+    return;
+  }
+  state->song = state->songs[state->index];
+  if (state->app) {
+    const std::vector<unsigned char> art = state->app->albumcover_loader()->LoadData(state->song);
+    if (state->cover) {
+      SetImageFromBytes(state->cover, art, EditTagCover::kSummaryArtSize);
+    }
+    if (state->tags_art) {
+      SetImageFromBytes(state->tags_art, art, EditTagCover::kTagsArtSize);
+    }
+  }
+  FillSummaryGrid(state);
+  if (state->stats_label) {
+    const std::string stats = "Plays: " + std::to_string(state->song.playcount()) + "   Skips: " + std::to_string(state->song.skipcount()) +
+                              "   Last played: " + PrettyUnixTime(state->song.lastplayed()) + "\n" + FileUtils::PathFromUri(state->song.url()) +
+                              "\n" + TechnicalLine(state->song);
+    gtk_label_set_text(GTK_LABEL(state->stats_label), stats.c_str());
+  }
+  if (state->stats_plays) {
+    gtk_label_set_text(GTK_LABEL(state->stats_plays), std::to_string(state->song.playcount()).c_str());
+  }
+  if (state->stats_skips) {
+    gtk_label_set_text(GTK_LABEL(state->stats_skips), std::to_string(state->song.skipcount()).c_str());
+  }
+  if (state->stats_last) {
+    gtk_label_set_text(GTK_LABEL(state->stats_last), PrettyUnixTime(state->song.lastplayed()).c_str());
+  }
+  if (state->stats_path) {
+    gtk_label_set_text(GTK_LABEL(state->stats_path),
+                       (FileUtils::PathFromUri(state->song.url()) + "\n" + TechnicalLine(state->song)).c_str());
+  }
+  if (state->song_list) {
+    GtkListBoxRow *row = gtk_list_box_get_row_at_index(GTK_LIST_BOX(state->song_list), static_cast<int>(state->index));
+    if (row) {
+      gtk_list_box_select_row(GTK_LIST_BOX(state->song_list), row);
+    }
+  }
+  if (state->embedded_cover && state->covers) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->embedded_cover),
+                                EditTagCover::DefaultEmbeddedChecked(state->song, state->covers->get_collection_save_album_cover_type()));
+    gtk_widget_set_sensitive(state->embedded_cover, state->song.save_embedded_cover_supported());
+  }
+  ApplyEditEnable(state);
+}
 
-  if (success) {
-    if (song.is_local_collection_song()) {
-      if (collection_songs_.contains(song.id())) {
-        Song old_song = collection_songs_.take(song.id());
-        song.set_art_automatic(old_song.art_automatic());
-        song.set_art_manual(old_song.art_manual());
+void SelectSong(State *state, int index) {
+  if (!state || state->songs.empty()) {
+    return;
+  }
+  state->index = static_cast<size_t>(EditTagFields::WrapIndex(index, 0, static_cast<int>(state->songs.size())));
+  UpdateDisplay(state);
+}
+
+void SetFieldValue(State *state, const std::string &name, const std::pair<std::string, bool> &value) {
+  if (!state) {
+    return;
+  }
+  for (size_t i = 0; i < state->fields.size(); ++i) {
+    if (state->fields[i].first != name || !state->fields[i].second) {
+      continue;
+    }
+    SetText(state->fields[i].second, value.first);
+    if (i < state->initial.size()) {
+      state->initial[i] = value.first;
+    }
+    g_object_set_data_full(G_OBJECT(state->fields[i].second), "initial-text", g_strdup(value.first.c_str()), g_free);
+    if (value.second) {
+      gtk_widget_set_tooltip_text(state->fields[i].second, Translations::CStr("Multiple values — type to set all selected songs"));
+    } else {
+      gtk_widget_set_tooltip_text(state->fields[i].second, nullptr);
+    }
+  }
+}
+
+void RefreshTagFields(State *state) {
+  if (!state) {
+    return;
+  }
+  const SongList &songs = state->songs;
+  SetFieldValue(state, "Title", EditTagFields::CommonValue(songs, [](const Song &s) { return s.title(); }));
+  SetFieldValue(state, "Artist", EditTagFields::CommonValue(songs, [](const Song &s) { return s.artist(); }));
+  SetFieldValue(state, "Album", EditTagFields::CommonValue(songs, [](const Song &s) { return s.album(); }));
+  SetFieldValue(state, "Album artist", EditTagFields::CommonValue(songs, [](const Song &s) { return s.albumartist(); }));
+  SetFieldValue(state, "Year",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.year() > 0 ? std::to_string(s.year()) : std::string(); }));
+  SetFieldValue(state, "Original year",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.originalyear() > 0 ? std::to_string(s.originalyear()) : std::string(); }));
+  SetFieldValue(state, "Track",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.track() > 0 ? std::to_string(s.track()) : std::string(); }));
+  SetFieldValue(state, "Genre", EditTagFields::CommonValue(songs, [](const Song &s) { return s.genre(); }));
+  SetFieldValue(state, "Composer", EditTagFields::CommonValue(songs, [](const Song &s) { return s.composer(); }));
+  SetFieldValue(state, "Performer", EditTagFields::CommonValue(songs, [](const Song &s) { return s.performer(); }));
+  SetFieldValue(state, "Grouping", EditTagFields::CommonValue(songs, [](const Song &s) { return s.grouping(); }));
+  SetFieldValue(state, "Comment", EditTagFields::CommonValue(songs, [](const Song &s) { return s.comment(); }));
+  SetFieldValue(state, "Disc",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.disc() > 0 ? std::to_string(s.disc()) : std::string(); }));
+  SetFieldValue(state, "BPM",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.bpm() > 0 ? std::to_string(s.bpm()) : std::string(); }));
+  SetFieldValue(state, "Mood", EditTagFields::CommonValue(songs, [](const Song &s) { return s.mood(); }));
+  SetFieldValue(state, "Initial key", EditTagFields::CommonValue(songs, [](const Song &s) { return s.initial_key(); }));
+  SetFieldValue(state, "Title sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.titlesort(); }));
+  SetFieldValue(state, "Artist sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.artistsort(); }));
+  SetFieldValue(state, "Album sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.albumsort(); }));
+  SetFieldValue(state, "Album artist sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.albumartistsort(); }));
+  SetFieldValue(state, "Composer sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.composersort(); }));
+  SetFieldValue(state, "Performer sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.performersort(); }));
+  SetFieldValue(state, "Lyrics", EditTagFields::CommonValue(songs, [](const Song &s) { return s.lyrics(); }));
+  if (state->rating) {
+    state->initial_rating_stored = EditTagFields::CommonRating(songs);
+    state->initial_rating = EditTagFields::RatingSliderFromStored(state->initial_rating_stored);
+    gtk_range_set_value(GTK_RANGE(state->rating), state->initial_rating);
+  }
+  if (state->compilation && !songs.empty()) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->compilation), songs.front().compilation());
+  }
+  if (state->tags_summary) {
+    gtk_label_set_text(GTK_LABEL(state->tags_summary), EditTagCompleter::TagsSummary(static_cast<int>(songs.size())).c_str());
+  }
+}
+
+void RebuildSongList(State *state) {
+  if (!state || !state->song_list) {
+    return;
+  }
+  GtkWidget *child = gtk_widget_get_first_child(state->song_list);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_list_box_remove(GTK_LIST_BOX(state->song_list), child);
+    child = next;
+  }
+  for (size_t i = 0; i < state->songs.size(); ++i) {
+    AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), EditTagFields::SongRowLabel(state->songs[i]).c_str());
+    g_object_set_data(G_OBJECT(row), "song-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+    gtk_list_box_append(GTK_LIST_BOX(state->song_list), GTK_WIDGET(row));
+  }
+}
+
+void SetLoading(State *state, bool loading) {
+  if (!state) {
+    return;
+  }
+  state->loading = loading;
+  if (state->loading_label) {
+    gtk_label_set_text(GTK_LABEL(state->loading_label), Translations::CStr(EditTagFields::LoadingTracksMessage()));
+  }
+  ApplyEditEnable(state);
+}
+
+void ApplyToPlaylist(State *state) {
+  if (!state || !state->app || !state->app->playlist_manager() || !EditTagSave::ShouldPersist(state->playlist_rows)) {
+    return;
+  }
+  Playlist *playlist = state->app->playlist_manager()->current();
+  if (!playlist) {
+    return;
+  }
+  const std::vector<int> resolved = EditTagSave::ResolvedRows(playlist->songs(), state->playlist_rows, state->songs);
+  for (const auto &update : EditTagSave::StreamMetadataUpdates(resolved, state->songs)) {
+    playlist->ReplaceRow(update.first, update.second);
+  }
+  if (TagReader *tagreader = state->app->tagreader()) {
+    for (int row : EditTagSave::RowsToReload(resolved, state->songs)) {
+      playlist->ReloadRow(row, tagreader);
+    }
+  }
+  state->app->playlist_manager()->SaveCurrent();
+}
+
+void ApplyLoadedSongs(State *state, SongList songs) {
+  if (!state) {
+    return;
+  }
+  state->playlist_rows = EditTagSave::RowsForLoaded(state->songs, state->playlist_rows, songs);
+  state->songs = std::move(songs);
+  state->index = 0;
+  if (!state->songs.empty()) {
+    state->song = state->songs.front();
+  } else {
+    state->song = Song();
+  }
+  if (state->dialog) {
+    const std::string dialog_title = state->songs.size() > 1
+                                         ? Translations::Tr("Edit tags") + " (" + std::to_string(state->songs.size()) + " " + Translations::Tr("songs") + ")"
+                                         : Translations::Tr("Edit tags");
+    adw_dialog_set_title(state->dialog, dialog_title.c_str());
+  }
+  RebuildSongList(state);
+  RefreshTagFields(state);
+  SetLoading(state, false);
+  UpdateDisplay(state);
+}
+
+void StartTagLoad(State *state, const SongList &incoming) {
+  if (!state) {
+    return;
+  }
+  TagReaderClient *client = state->app ? state->app->tagreader_client() : nullptr;
+  if (!client) {
+    SetLoading(state, false);
+    return;
+  }
+  SetLoading(state, true);
+  const std::shared_ptr<bool> alive = state->alive;
+  std::thread([state, client, incoming, alive]() {
+    const SongList songs = EditTagLoading::LoadData(incoming, [client](const std::string &path, Song *song) {
+      return client->ReadFileBlocking(path, song);
+    });
+    auto *idle = new EditTagLoadIdle{state, songs, alive};
+    g_idle_add(+[](gpointer data) -> gboolean {
+      auto *loaded = static_cast<EditTagLoadIdle *>(data);
+      if (loaded->alive && *loaded->alive && loaded->state) {
+        ApplyLoadedSongs(loaded->state, loaded->songs);
       }
-      switch (cover_action) {
-        case UpdateCoverAction::None:
-          break;
-        case UpdateCoverAction::New:
-          song.clear_art_manual();
-          song.set_art_embedded(true);
-          break;
-        case UpdateCoverAction::Clear:
-        case UpdateCoverAction::Delete:
-          song.set_art_embedded(false);
-          break;
-        case UpdateCoverAction::Unset:
-          song.set_art_embedded(false);
-          song.set_art_unset(true);
-          break;
+      delete loaded;
+      return G_SOURCE_REMOVE;
+    }, idle);
+  }).detach();
+}
+
+void PersistPlayStatistics(State *state, Song *song) {
+  if (!state || !state->app || !song) {
+    return;
+  }
+  if (song->id() > 0) {
+    state->app->collection()->backend()->ResetPlayStatistics(song->id());
+  }
+  const std::string path = FileUtils::PathFromUri(song->url());
+  if (!path.empty()) {
+    state->app->tagreader()->SavePlaycount(path, 0);
+  }
+}
+
+}  // namespace
+
+void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &songs, const std::vector<int> &playlist_rows) {
+  SongList incoming = songs;
+  if (incoming.empty()) {
+    incoming.push_back(SongForDialog(app));
+  }
+  const SongList targets = EditTagFields::ValidSongs(incoming);
+  auto *state = new State();
+  state->app = app;
+  state->parent = parent;
+  state->songs = targets;
+  state->playlist_rows = EditTagSave::RowsForValidSongs(incoming, playlist_rows);
+  state->index = 0;
+  if (!targets.empty()) {
+    state->song = targets.front();
+  }
+  state->covers = std::make_unique<AlbumCoverChoiceController>(app);
+
+  AdwDialog *dialog = adw_dialog_new();
+  const std::string dialog_title = targets.size() > 1
+                                      ? Translations::Tr("Edit tags") + " (" + std::to_string(targets.size()) + " " + Translations::Tr("songs") + ")"
+                                      : Translations::Tr("Edit tags");
+  adw_dialog_set_title(dialog, dialog_title.c_str());
+  adw_dialog_set_content_width(dialog, 640);
+  adw_dialog_set_content_height(dialog, 760);
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  g_object_set_data_full(G_OBJECT(dialog), "state", state, [](gpointer p) { delete static_cast<State *>(p); });
+
+  state->loading_label = gtk_label_new(Translations::CStr(EditTagFields::LoadingTracksMessage()));
+  gtk_widget_add_css_class(state->loading_label, "dim-label");
+  gtk_widget_set_margin_start(state->loading_label, 12);
+  gtk_widget_set_margin_end(state->loading_label, 12);
+  gtk_widget_set_margin_top(state->loading_label, 8);
+  gtk_widget_set_visible(state->loading_label, EditTagFields::LoadingLabelVisible(state->loading));
+  gtk_box_append(GTK_BOX(box), state->loading_label);
+
+  if (EditTagFields::SongListVisible(targets.size())) {
+    GtkWidget *nav = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    gtk_widget_set_margin_start(nav, 12);
+    gtk_widget_set_margin_end(nav, 12);
+    gtk_widget_set_margin_top(nav, 8);
+    state->prev = gtk_button_new_with_label(Translations::CStr("Previous"));
+    state->next = gtk_button_new_with_label(Translations::CStr("Next"));
+    gtk_box_append(GTK_BOX(nav), state->prev);
+    gtk_box_append(GTK_BOX(nav), state->next);
+    gtk_box_append(GTK_BOX(box), nav);
+    state->song_list = gtk_list_box_new();
+    gtk_widget_add_css_class(state->song_list, "boxed-list");
+    gtk_widget_set_margin_start(state->song_list, 12);
+    gtk_widget_set_margin_end(state->song_list, 12);
+    for (size_t i = 0; i < targets.size(); ++i) {
+      AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+      adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), EditTagFields::SongRowLabel(targets[i]).c_str());
+      g_object_set_data(G_OBJECT(row), "song-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+      gtk_list_box_append(GTK_LIST_BOX(state->song_list), GTK_WIDGET(row));
+    }
+    gtk_box_append(GTK_BOX(box), state->song_list);
+    g_signal_connect(state->prev, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                       auto *self = static_cast<State *>(data);
+                       SelectSong(self, EditTagFields::WrapIndex(static_cast<int>(self->index), -1, static_cast<int>(self->songs.size())));
+                     })),
+                     state);
+    g_signal_connect(state->next, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                       auto *self = static_cast<State *>(data);
+                       SelectSong(self, EditTagFields::WrapIndex(static_cast<int>(self->index), 1, static_cast<int>(self->songs.size())));
+                     })),
+                     state);
+    g_signal_connect(state->song_list, "row-activated", G_CALLBACK((+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
+                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "song-index")) - 1;
+                       SelectSong(static_cast<State *>(data), index);
+                     })),
+                     state);
+    gtk_widget_set_focusable(state->song_list, TRUE);
+    GtkEventController *keys = gtk_event_controller_key_new();
+    gtk_event_controller_set_propagation_phase(keys, GTK_PHASE_CAPTURE);
+    gtk_widget_add_controller(state->song_list, keys);
+    g_signal_connect(keys, "key-pressed",
+                     G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                       auto *self = static_cast<State *>(data);
+                       if (DialogListKeyboard::IsActivate(keyval)) {
+                         ListBoxKeyboardGtk::ActivateSelected(self->song_list);
+                         return TRUE;
+                       }
+                       if (DialogListKeyboard::IsMove(keyval)) {
+                         SelectSong(self, DialogListKeyboard::NextIndex(static_cast<int>(self->index), static_cast<int>(self->songs.size()), keyval));
+                         return TRUE;
+                       }
+                       return FALSE;
+                     })),
+                     state);
+  }
+
+  AdwViewStack *stack = ADW_VIEW_STACK(adw_view_stack_new());
+  state->stack = GTK_WIDGET(stack);
+  GtkWidget *switcher = adw_view_switcher_new();
+  adw_view_switcher_set_stack(ADW_VIEW_SWITCHER(switcher), stack);
+
+  SongList library = targets;
+  if (app && app->collection()) {
+    const SongList collection = app->collection()->Songs();
+    if (!collection.empty()) {
+      library = collection;
+    }
+  }
+
+  auto add_entries = [&](GtkWidget *page, const std::vector<std::pair<const char *, std::pair<std::string, bool>>> &rows) {
+    for (const auto &row : rows) {
+      AdwEntryRow *entry = ADW_ENTRY_ROW(adw_entry_row_new());
+      adw_preferences_row_set_title(ADW_PREFERENCES_ROW(entry), Translations::CStr(row.first));
+      gtk_editable_set_text(GTK_EDITABLE(entry), row.second.first.c_str());
+      if (row.second.second) {
+        gtk_widget_set_tooltip_text(GTK_WIDGET(entry), Translations::CStr("Multiple values — type to set all selected songs"));
       }
-      collection_songs_.insert(song.id(), song);
+      state->fields.emplace_back(row.first, GTK_WIDGET(entry));
+      state->initial.push_back(row.second.first);
+      AttachEntryReset(entry, row.first, row.second.first);
+      AttachFieldCompletion(entry, row.first, library);
+      gtk_box_append(GTK_BOX(page), GTK_WIDGET(entry));
     }
-    if (cover_action != UpdateCoverAction::None && song == current_albumcover_loader_->last_song()) {
-      current_albumcover_loader_->LoadAlbumCover(song);
+  };
+
+  GtkWidget *summary = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_start(summary, 12);
+  gtk_widget_set_margin_end(summary, 12);
+  gtk_widget_set_margin_top(summary, 12);
+  state->summary_page = summary;
+  state->cover = gtk_image_new();
+  gtk_widget_set_halign(state->cover, GTK_ALIGN_CENTER);
+  gtk_box_append(GTK_BOX(summary), state->cover);
+  state->cover_hint = gtk_label_new(Translations::CStr(EditTagCover::ArtDifferentHint()));
+  gtk_widget_add_css_class(state->cover_hint, "dim-label");
+  gtk_label_set_wrap(GTK_LABEL(state->cover_hint), TRUE);
+  gtk_widget_set_halign(state->cover_hint, GTK_ALIGN_CENTER);
+  gtk_widget_set_visible(state->cover_hint, FALSE);
+  gtk_box_append(GTK_BOX(summary), state->cover_hint);
+  AttachCoverGesture(state->cover, state, false);
+  AttachCoverDrop(state->cover, state);
+  GtkWidget *cover_buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_set_halign(cover_buttons, GTK_ALIGN_CENTER);
+  gtk_widget_set_hexpand(cover_buttons, TRUE);
+  GtkWidget *cover_buttons2 = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_set_halign(cover_buttons2, GTK_ALIGN_CENTER);
+  state->fetch_cover = gtk_button_new_with_label(Translations::CStr("Fetch cover"));
+  state->search_cover = gtk_button_new_with_label(Translations::CStr("Search…"));
+  state->url_cover = gtk_button_new_with_label(Translations::CStr("From URL"));
+  state->file_cover = gtk_button_new_with_label(Translations::CStr("From file"));
+  state->unset_cover = gtk_button_new_with_label(Translations::CStr("Unset"));
+  state->clear_cover = gtk_button_new_with_label(Translations::CStr("Clear"));
+  state->delete_cover = gtk_button_new_with_label(Translations::CStr("Delete"));
+  state->show_cover = gtk_button_new_with_label(Translations::CStr("Show"));
+  state->save_cover = gtk_button_new_with_label(Translations::CStr("Save…"));
+  GtkWidget *stats_cover = gtk_button_new_with_label(Translations::CStr("Statistics"));
+  gtk_box_append(GTK_BOX(cover_buttons), state->fetch_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), state->search_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), state->url_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), state->file_cover);
+  gtk_box_append(GTK_BOX(cover_buttons), state->unset_cover);
+  gtk_box_append(GTK_BOX(cover_buttons2), state->clear_cover);
+  gtk_box_append(GTK_BOX(cover_buttons2), state->delete_cover);
+  gtk_box_append(GTK_BOX(cover_buttons2), state->show_cover);
+  gtk_box_append(GTK_BOX(cover_buttons2), state->save_cover);
+  gtk_box_append(GTK_BOX(cover_buttons2), stats_cover);
+  gtk_box_append(GTK_BOX(summary), cover_buttons);
+  gtk_box_append(GTK_BOX(summary), cover_buttons2);
+  state->summary_title = gtk_label_new("");
+  gtk_widget_add_css_class(state->summary_title, "title-3");
+  gtk_label_set_wrap(GTK_LABEL(state->summary_title), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(state->summary_title), 0.0f);
+  gtk_box_append(GTK_BOX(summary), state->summary_title);
+  state->summary_grid = gtk_grid_new();
+  gtk_grid_set_column_spacing(GTK_GRID(state->summary_grid), 12);
+  gtk_grid_set_row_spacing(GTK_GRID(state->summary_grid), 4);
+  gtk_box_append(GTK_BOX(summary), state->summary_grid);
+  state->stats_label = gtk_label_new("");
+  gtk_label_set_wrap(GTK_LABEL(state->stats_label), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(state->stats_label), 0);
+  gtk_widget_add_css_class(state->stats_label, "dim-label");
+  gtk_widget_set_visible(state->stats_label, FALSE);
+  adw_view_stack_add_titled(stack, summary, "Summary", Translations::CStr("Summary"));
+
+  GtkWidget *tags = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+  gtk_widget_set_margin_start(tags, 12);
+  gtk_widget_set_margin_end(tags, 12);
+  gtk_widget_set_margin_top(tags, 12);
+  GtkWidget *tags_art_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+  GtkWidget *tags_art_col = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+  state->tags_art = gtk_image_new();
+  gtk_widget_set_size_request(state->tags_art, EditTagCover::kTagsArtSize, EditTagCover::kTagsArtSize);
+  gtk_widget_set_halign(state->tags_art, GTK_ALIGN_START);
+  gtk_box_append(GTK_BOX(tags_art_col), state->tags_art);
+  GtkWidget *change_art_popover = gtk_popover_new();
+  GtkWidget *change_art_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_popover_set_child(GTK_POPOVER(change_art_popover), change_art_box);
+  state->tags_art_button = gtk_menu_button_new();
+  gtk_menu_button_set_label(GTK_MENU_BUTTON(state->tags_art_button), Translations::CStr(EditTagCover::ChangeArt()));
+  gtk_menu_button_set_popover(GTK_MENU_BUTTON(state->tags_art_button), change_art_popover);
+  g_object_set_data(G_OBJECT(state->tags_art_button), "menu-box", change_art_box);
+  gtk_box_append(GTK_BOX(tags_art_col), state->tags_art_button);
+  state->embedded_cover = gtk_check_button_new_with_label(Translations::CStr("Embedded cover"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(state->embedded_cover),
+                              EditTagCover::DefaultEmbeddedChecked(state->song, state->covers->get_collection_save_album_cover_type()));
+  gtk_widget_set_sensitive(state->embedded_cover, EditTagCover::AnySupported(targets));
+  gtk_box_append(GTK_BOX(tags_art_col), state->embedded_cover);
+  g_signal_connect(state->embedded_cover, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     if (self->covers) {
+                       self->covers->set_save_embedded_cover_override(gtk_check_button_get_active(button));
+                     }
+                   }),
+                   state);
+  if (EditTagId3v2::AnySupported(targets)) {
+    GtkWidget *id3_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    GtkWidget *id3_label = gtk_label_new(Translations::CStr("ID3v2 version:"));
+    gtk_label_set_xalign(GTK_LABEL(id3_label), 0);
+    GtkStringList *versions = gtk_string_list_new(nullptr);
+    gtk_string_list_append(versions, "2.3");
+    gtk_string_list_append(versions, "2.4");
+    state->id3v2 = gtk_drop_down_new(G_LIST_MODEL(versions), nullptr);
+    gtk_drop_down_set_selected(GTK_DROP_DOWN(state->id3v2), EditTagId3v2::ComboIndex(EditTagId3v2::VersionForSongs(targets)));
+    gtk_widget_set_hexpand(state->id3v2, TRUE);
+    gtk_box_append(GTK_BOX(id3_row), id3_label);
+    gtk_box_append(GTK_BOX(id3_row), state->id3v2);
+    gtk_box_append(GTK_BOX(tags_art_col), id3_row);
+  }
+  GtkWidget *fetch_tags_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  GtkWidget *fetch_tags_icon = gtk_image_new_from_resource(EditTagSummaryLabels::MusicBrainzIconResource());
+  gtk_widget_set_size_request(fetch_tags_icon, EditTagSummaryLabels::kMusicBrainzIconWidth, EditTagSummaryLabels::kMusicBrainzIconHeight);
+  gtk_box_append(GTK_BOX(fetch_tags_box), fetch_tags_icon);
+  gtk_box_append(GTK_BOX(fetch_tags_box), gtk_label_new(Translations::CStr(EditTagSummaryLabels::FetchTags())));
+  state->fetch_tags = gtk_button_new();
+  gtk_button_set_child(GTK_BUTTON(state->fetch_tags), fetch_tags_box);
+  gtk_box_append(GTK_BOX(tags_art_col), state->fetch_tags);
+  gtk_box_append(GTK_BOX(tags_art_row), tags_art_col);
+  gtk_box_append(GTK_BOX(tags), tags_art_row);
+  AttachCoverGesture(state->tags_art, state, true);
+  AttachCoverDrop(state->tags_art, state);
+  const std::string tags_summary = EditTagCompleter::TagsSummary(static_cast<int>(targets.size()));
+  if (!tags_summary.empty()) {
+    state->tags_summary = gtk_label_new(tags_summary.c_str());
+    gtk_widget_add_css_class(state->tags_summary, "dim-label");
+    gtk_label_set_xalign(GTK_LABEL(state->tags_summary), 0.0f);
+    gtk_box_append(GTK_BOX(tags), state->tags_summary);
+  }
+  add_entries(tags, {{"Title", EditTagFields::CommonValue(targets, [](const Song &s) { return s.title(); })},
+                     {"Artist", EditTagFields::CommonValue(targets, [](const Song &s) { return s.artist(); })},
+                     {"Album", EditTagFields::CommonValue(targets, [](const Song &s) { return s.album(); })},
+                     {"Album artist", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumartist(); })},
+                     {"Year", EditTagFields::CommonValue(targets, [](const Song &s) { return s.year() > 0 ? std::to_string(s.year()) : std::string(); })},
+                     {"Original year",
+                      EditTagFields::CommonValue(targets, [](const Song &s) { return s.originalyear() > 0 ? std::to_string(s.originalyear()) : std::string(); })},
+                     {"Track", EditTagFields::CommonValue(targets, [](const Song &s) { return s.track() > 0 ? std::to_string(s.track()) : std::string(); })},
+                     {"Genre", EditTagFields::CommonValue(targets, [](const Song &s) { return s.genre(); })}});
+  GtkWidget *rating_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  state->rating_label = gtk_label_new(Translations::CStr("Rating"));
+  gtk_label_set_xalign(GTK_LABEL(state->rating_label), 0);
+  gtk_widget_set_hexpand(state->rating_label, TRUE);
+  state->rating_reset = MakeFieldResetButton();
+  gtk_widget_set_visible(state->rating_reset, FALSE);
+  gtk_box_append(GTK_BOX(rating_header), state->rating_label);
+  gtk_box_append(GTK_BOX(rating_header), state->rating_reset);
+  gtk_box_append(GTK_BOX(tags), rating_header);
+  state->rating = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 5, 0.5);
+  gtk_scale_set_digits(GTK_SCALE(state->rating), 1);
+  gtk_scale_set_draw_value(GTK_SCALE(state->rating), TRUE);
+  state->initial_rating_stored = EditTagFields::CommonRating(targets);
+  state->initial_rating = EditTagFields::RatingSliderFromStored(state->initial_rating_stored);
+  gtk_range_set_value(GTK_RANGE(state->rating), state->initial_rating);
+  g_object_set_data(G_OBJECT(state->rating), "state", state);
+  g_signal_connect(state->rating, "value-changed", G_CALLBACK((+[](GtkRange *range, gpointer) {
+                     auto *self = static_cast<State *>(g_object_get_data(G_OBJECT(range), "state"));
+                     if (!self) {
+                       return;
+                     }
+                     const bool modified = EditTagFields::IsRatingModified(self->initial_rating_stored,
+                                                                          EditTagFields::RatingStoredFromSlider(gtk_range_get_value(range)));
+                     SetModifiedStyle(self->rating_label, modified);
+                     if (self->rating_reset) {
+                       gtk_widget_set_visible(self->rating_reset, modified);
+                     }
+                   })),
+                   nullptr);
+  g_signal_connect(state->rating_reset, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     if (self && self->rating) {
+                       gtk_range_set_value(GTK_RANGE(self->rating), self->initial_rating);
+                     }
+                   }),
+                   state);
+  gtk_box_append(GTK_BOX(tags), state->rating);
+  state->compilation = gtk_check_button_new_with_label(Translations::CStr("Compilation"));
+  gtk_check_button_set_active(GTK_CHECK_BUTTON(state->compilation), state->song.compilation());
+  gtk_box_append(GTK_BOX(tags), state->compilation);
+  add_entries(tags, {{"Composer", EditTagFields::CommonValue(targets, [](const Song &s) { return s.composer(); })},
+                     {"Performer", EditTagFields::CommonValue(targets, [](const Song &s) { return s.performer(); })},
+                     {"Grouping", EditTagFields::CommonValue(targets, [](const Song &s) { return s.grouping(); })},
+                     {"Comment", EditTagFields::CommonValue(targets, [](const Song &s) { return s.comment(); })},
+                     {"Disc", EditTagFields::CommonValue(targets, [](const Song &s) { return s.disc() > 0 ? std::to_string(s.disc()) : std::string(); })},
+                     {"BPM", EditTagFields::CommonValue(targets, [](const Song &s) { return s.bpm() > 0 ? std::to_string(s.bpm()) : std::string(); })},
+                     {"Mood", EditTagFields::CommonValue(targets, [](const Song &s) { return s.mood(); })},
+                     {"Initial key", EditTagFields::CommonValue(targets, [](const Song &s) { return s.initial_key(); })},
+                     {"Title sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.titlesort(); })},
+                     {"Artist sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.artistsort(); })},
+                     {"Album sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumsort(); })},
+                     {"Album artist sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumartistsort(); })},
+                     {"Composer sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.composersort(); })},
+                     {"Performer sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.performersort(); })}});
+  adw_view_stack_add_titled(stack, tags, "Tags", Translations::CStr("Tags"));
+
+  state->lyrics_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+  gtk_widget_set_margin_start(state->lyrics_page, 12);
+  gtk_widget_set_margin_end(state->lyrics_page, 12);
+  gtk_widget_set_margin_top(state->lyrics_page, 12);
+  state->lyrics = gtk_text_view_new();
+  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(state->lyrics), GTK_WRAP_WORD);
+  gtk_widget_set_vexpand(state->lyrics, TRUE);
+  const auto lyrics_common = EditTagFields::CommonValue(targets, [](const Song &s) { return s.lyrics(); });
+  gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(state->lyrics)), lyrics_common.first.c_str(), -1);
+  state->fields.emplace_back("Lyrics", state->lyrics);
+  state->initial.push_back(lyrics_common.first);
+  GtkWidget *lyrics_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  state->lyrics_label = gtk_label_new(Translations::CStr("Lyrics"));
+  gtk_label_set_xalign(GTK_LABEL(state->lyrics_label), 0);
+  gtk_widget_set_hexpand(state->lyrics_label, TRUE);
+  state->lyrics_reset = MakeFieldResetButton();
+  gtk_widget_set_visible(state->lyrics_reset, FALSE);
+  gtk_box_append(GTK_BOX(lyrics_header), state->lyrics_label);
+  gtk_box_append(GTK_BOX(lyrics_header), state->lyrics_reset);
+  g_object_set_data(G_OBJECT(state->lyrics), "state", state);
+  g_object_set_data_full(G_OBJECT(state->lyrics), "initial-text", g_strdup(lyrics_common.first.c_str()), g_free);
+  g_signal_connect(gtk_text_view_get_buffer(GTK_TEXT_VIEW(state->lyrics)), "changed", G_CALLBACK((+[](GtkTextBuffer *, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     if (!self || !self->lyrics) {
+                       return;
+                     }
+                     const char *initial_text = static_cast<const char *>(g_object_get_data(G_OBJECT(self->lyrics), "initial-text"));
+                     const bool modified = EditTagFields::IsValueModified("Lyrics", initial_text ? initial_text : "", TextOf(self->lyrics));
+                     SetModifiedStyle(self->lyrics_label, modified);
+                     if (self->lyrics_reset) {
+                       gtk_widget_set_visible(self->lyrics_reset, modified);
+                     }
+                   })),
+                   state);
+  g_signal_connect(state->lyrics_reset, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     if (!self || !self->lyrics) {
+                       return;
+                     }
+                     const char *initial_text = static_cast<const char *>(g_object_get_data(G_OBJECT(self->lyrics), "initial-text"));
+                     SetText(self->lyrics, initial_text ? initial_text : "");
+                   }),
+                   state);
+  gtk_box_append(GTK_BOX(state->lyrics_page), lyrics_header);
+  gtk_box_append(GTK_BOX(state->lyrics_page), state->lyrics);
+  adw_view_stack_add_titled(stack, state->lyrics_page, "Lyrics", Translations::CStr("Lyrics"));
+
+  GtkWidget *stats_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_widget_set_margin_start(stats_page, 12);
+  gtk_widget_set_margin_end(stats_page, 12);
+  gtk_widget_set_margin_top(stats_page, 12);
+  GtkWidget *plays_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_box_append(GTK_BOX(plays_row), gtk_label_new(Translations::CStr("Play count")));
+  state->stats_plays = gtk_label_new("");
+  gtk_label_set_xalign(GTK_LABEL(state->stats_plays), 1);
+  gtk_widget_set_hexpand(state->stats_plays, TRUE);
+  gtk_box_append(GTK_BOX(plays_row), state->stats_plays);
+  GtkWidget *skips_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_box_append(GTK_BOX(skips_row), gtk_label_new(Translations::CStr("Skip count")));
+  state->stats_skips = gtk_label_new("");
+  gtk_label_set_xalign(GTK_LABEL(state->stats_skips), 1);
+  gtk_widget_set_hexpand(state->stats_skips, TRUE);
+  gtk_box_append(GTK_BOX(skips_row), state->stats_skips);
+  GtkWidget *last_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_box_append(GTK_BOX(last_row), gtk_label_new(Translations::CStr("Last played")));
+  state->stats_last = gtk_label_new("");
+  gtk_label_set_xalign(GTK_LABEL(state->stats_last), 1);
+  gtk_widget_set_hexpand(state->stats_last, TRUE);
+  gtk_box_append(GTK_BOX(last_row), state->stats_last);
+  state->stats_path = gtk_label_new("");
+  gtk_label_set_wrap(GTK_LABEL(state->stats_path), TRUE);
+  gtk_label_set_xalign(GTK_LABEL(state->stats_path), 0);
+  gtk_widget_add_css_class(state->stats_path, "dim-label");
+  GtkWidget *reset_stats = gtk_button_new_with_label(Translations::CStr("Reset play statistics"));
+  gtk_box_append(GTK_BOX(stats_page), plays_row);
+  gtk_box_append(GTK_BOX(stats_page), skips_row);
+  gtk_box_append(GTK_BOX(stats_page), last_row);
+  gtk_box_append(GTK_BOX(stats_page), state->stats_path);
+  gtk_box_append(GTK_BOX(stats_page), reset_stats);
+  adw_view_stack_add_titled(stack, stats_page, "Statistics", Translations::CStr("Statistics"));
+
+  state->actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_margin_start(state->actions, 12);
+  gtk_widget_set_margin_end(state->actions, 12);
+  gtk_widget_set_margin_bottom(state->actions, 8);
+  GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save"));
+  gtk_widget_add_css_class(save, "suggested-action");
+  GtkWidget *reset_fields = gtk_button_new_with_label(Translations::CStr("Reset fields"));
+  state->fetch_lyrics = gtk_button_new_with_label(Translations::CStr(EditTagSummaryLabels::FetchLyrics()));
+  gtk_box_append(GTK_BOX(state->actions), save);
+  gtk_box_append(GTK_BOX(state->actions), reset_fields);
+  gtk_box_append(GTK_BOX(state->actions), state->fetch_lyrics);
+
+  g_signal_connect(save, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     std::vector<std::pair<std::string, std::string>> changed;
+                     for (size_t i = 0; i < self->fields.size(); ++i) {
+                       const std::string value = TextOf(self->fields[i].second);
+                       const std::string initial = i < self->initial.size() ? self->initial[i] : std::string();
+                       if (!EditTagFields::IsValueModified(self->fields[i].first, initial, value)) {
+                         continue;
+                       }
+                       changed.emplace_back(self->fields[i].first, value);
+                     }
+                     EditTagFields::ApplyChangedFields(&self->songs, changed);
+                     const bool write_compilation = self->compilation != nullptr;
+                     const bool write_rating = self->rating != nullptr &&
+                                               EditTagFields::IsRatingModified(self->initial_rating_stored,
+                                                                               EditTagFields::RatingStoredFromSlider(gtk_range_get_value(GTK_RANGE(self->rating))));
+                     const TagID3v2Version id3v2_version =
+                         self->id3v2 ? EditTagId3v2::TagVersionFromIndex(static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(self->id3v2))))
+                                     : TagID3v2Version::Default;
+                     for (Song &song : self->songs) {
+                       if (write_compilation) {
+                         song.set_compilation(gtk_check_button_get_active(GTK_CHECK_BUTTON(self->compilation)));
+                       }
+                       if (write_rating) {
+                         song.set_rating(EditTagFields::RatingStoredFromSlider(gtk_range_get_value(GTK_RANGE(self->rating))));
+                       }
+                       EditTagFields::NormalizeUnsetNumeric(&song);
+                       if (!EditTagSave::ShouldWriteFile(song)) {
+                         continue;
+                       }
+                       const std::string filename = FileUtils::PathFromUri(song.url());
+                       if (!self->app->tagreader()->WriteFile(filename, song, static_cast<int>(SaveTagsOption::Tags), {}, id3v2_version)) {
+                         UiError::Report(EditTagSave::WriteFailureMessage(filename));
+                       }
+                       const std::string path = FileUtils::PathFromUri(song.url());
+                       if (!path.empty() && song.rating() >= 0) {
+                         self->app->tagreader()->SaveRating(path, song.rating());
+                       }
+                       if (song.id() > 0) {
+                         self->app->collection()->backend()->AddOrUpdateSong(song);
+                         self->app->collection()->backend()->SetRating(song.id(), song.rating());
+                       }
+                     }
+                     ApplyToPlaylist(self);
+                     if (self->index < self->songs.size()) {
+                       self->song = self->songs[self->index];
+                     }
+                     gtk_button_set_label(button, Translations::CStr("Saved"));
+                   })),
+                   state);
+
+  g_signal_connect(reset_fields, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     for (size_t i = 0; i < self->fields.size() && i < self->initial.size(); ++i) {
+                       SetText(self->fields[i].second, self->initial[i]);
+                     }
+                     if (self->rating) {
+                       gtk_range_set_value(GTK_RANGE(self->rating), self->initial_rating);
+                     }
+                   })),
+                   state);
+
+  g_signal_connect(state->fetch_tags, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     TrackSelectionDialog::Show(self->parent, self->app, self->songs);
+                   })),
+                   state);
+
+  g_signal_connect(state->fetch_lyrics, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     self->app->lyrics_providers()->Fetch(self->song, [button, self](const std::string &lyrics, const std::string &) {
+                       if (lyrics.empty()) {
+                         gtk_button_set_label(button, Translations::CStr("Missing"));
+                         return;
+                       }
+                       self->song.set_lyrics(lyrics);
+                       if (self->index < self->songs.size()) {
+                         self->songs[self->index].set_lyrics(lyrics);
+                       }
+                       if (self->lyrics) {
+                         gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(self->lyrics)), lyrics.c_str(), -1);
+                       }
+                       gtk_button_set_label(button, Translations::CStr("Fetched"));
+                     });
+                   })),
+                   state);
+
+  g_signal_connect(reset_stats, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
+                     auto *self = static_cast<State *>(data);
+                     if (self->index >= self->songs.size()) {
+                       return;
+                     }
+                     EditTagFields::ResetPlayStatistics(&self->songs[self->index]);
+                     PersistPlayStatistics(self, &self->songs[self->index]);
+                     UpdateDisplay(self);
+                     gtk_button_set_label(button, Translations::CStr("Reset"));
+                   })),
+                   state);
+
+  auto connect_cover = [&](GtkWidget *button, const char *action) {
+    g_object_set_data(G_OBJECT(button), "cover-action", const_cast<char *>(action));
+    g_signal_connect(button, "clicked", G_CALLBACK((+[](GtkButton *btn, gpointer data) {
+                       auto *self = static_cast<State *>(data);
+                       const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "cover-action"));
+                       if (g_strcmp0(name, "fetch") == 0) self->covers->FetchCover(&self->song, self->cover, GTK_WIDGET(btn));
+                       else if (g_strcmp0(name, "search") == 0) self->covers->SearchForCover(self->parent);
+                       else if (g_strcmp0(name, "url") == 0) self->covers->LoadCoverFromURL(self->parent, &self->song, self->cover);
+                       else if (g_strcmp0(name, "file") == 0) self->covers->LoadCoverFromFile(self->parent, &self->song, self->cover);
+                       else if (g_strcmp0(name, "unset") == 0) self->covers->UnsetCover(&self->song, self->cover);
+                       else if (g_strcmp0(name, "clear") == 0) self->covers->ClearCover(&self->song, self->cover);
+                       else if (g_strcmp0(name, "delete") == 0) self->covers->DeleteCover(&self->song, self->cover);
+                       else if (g_strcmp0(name, "show") == 0) self->covers->ShowCover(self->parent, self->song);
+                       else if (g_strcmp0(name, "save") == 0) self->covers->SaveCoverToFile(self->parent, self->song);
+                       else if (g_strcmp0(name, "stats") == 0) self->covers->ShowStatistics(self->parent);
+                       if (self->index < self->songs.size()) {
+                         self->songs[self->index] = self->song;
+                       }
+                       UpdateDisplay(self);
+                     })),
+                     state);
+  };
+  if (state->tags_art_button) {
+    if (auto *menu_box = static_cast<GtkWidget *>(g_object_get_data(G_OBJECT(state->tags_art_button), "menu-box"))) {
+      auto add_menu = [&](const char *label, const char *action) {
+        GtkWidget *item = gtk_button_new_with_label(Translations::CStr(label));
+        gtk_widget_add_css_class(item, "flat");
+        connect_cover(item, action);
+        gtk_box_append(GTK_BOX(menu_box), item);
+      };
+      add_menu("Fetch cover", "fetch");
+      add_menu("Search…", "search");
+      add_menu("From URL", "url");
+      add_menu("From file", "file");
+      add_menu("Unset", "unset");
+      add_menu("Clear", "clear");
+      add_menu("Delete", "delete");
+      add_menu("Show", "show");
+      add_menu("Save…", "save");
     }
   }
-  else {
-    if (error.isEmpty()) {
-      Q_EMIT Error(tr("Could not write metadata to %1").arg(filename));
-    }
-    else {
-      Q_EMIT Error(tr("Could not write metadata to %1: %2").arg(filename, error));
-    }
+  connect_cover(state->fetch_cover, "fetch");
+  connect_cover(state->search_cover, "search");
+  connect_cover(state->url_cover, "url");
+  connect_cover(state->file_cover, "file");
+  connect_cover(state->unset_cover, "unset");
+  connect_cover(state->clear_cover, "clear");
+  connect_cover(state->delete_cover, "delete");
+  connect_cover(state->show_cover, "show");
+  connect_cover(state->save_cover, "save");
+  connect_cover(stats_cover, "stats");
+
+  gtk_box_append(GTK_BOX(box), switcher);
+  gtk_widget_set_vexpand(GTK_WIDGET(stack), TRUE);
+  gtk_box_append(GTK_BOX(box), GTK_WIDGET(stack));
+  {
+    Settings tab_settings;
+    tab_settings.BeginGroup(EditTagDialogSettings::kSettingsGroup);
+    adw_view_stack_set_visible_child_name(
+        stack, EditTagTabs::Name(EditTagTabs::VisibleIndex(tab_settings.IntValue(EditTagDialogSettings::kCurrentTab), targets.size())));
   }
-
-  if (save_tag_pending_ <= 0) SaveDataFinished();
-
+  g_signal_connect(stack, "notify::visible-child-name", G_CALLBACK(+[](GObject *object, GParamSpec *, gpointer) {
+                     const char *name = adw_view_stack_get_visible_child_name(ADW_VIEW_STACK(object));
+                     Settings tab_settings;
+                     tab_settings.BeginGroup(EditTagDialogSettings::kSettingsGroup);
+                     tab_settings.SetIntValue(EditTagDialogSettings::kCurrentTab, EditTagTabs::IndexFromName(name ? name : ""));
+                     tab_settings.Sync();
+                   }),
+                   nullptr);
+  gtk_box_append(GTK_BOX(box), state->actions);
+  adw_dialog_set_child(dialog, box);
+  state->dialog = dialog;
+  SetLoading(state, true);
+  UpdateDisplay(state);
+  adw_dialog_present(dialog, GTK_WIDGET(parent));
+  StartTagLoad(state, targets);
 }

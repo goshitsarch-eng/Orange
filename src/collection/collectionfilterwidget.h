@@ -1,139 +1,60 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2019-2022, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_COLLECTIONFILTERWIDGET_H
+#define STRAWBERRY_COLLECTIONFILTERWIDGET_H
 
-#ifndef COLLECTIONFILTERWIDGET_H
-#define COLLECTIONFILTERWIDGET_H
+#include "collection/collectionfiltermenu.h"
+#include "collection/collectionfilteroptions.h"
+#include "collection/collectiongrouping.h"
+#include "settings/settingspages.h"
 
-#include "config.h"
+#include <gtk/gtk.h>
 
-#include <QWidget>
-#include <QObject>
-#include <QHash>
-#include <QString>
+#include <functional>
+#include <string>
 
-#include "collectionmodel.h"
-
-class QTimer;
-class QMenu;
-class QAction;
-class QActionGroup;
-class QKeyEvent;
-
-class GroupByDialog;
-class SavedGroupingManager;
-class CollectionFilter;
-class Ui_CollectionFilterWidget;
-
-class CollectionFilterWidget : public QWidget {
-  Q_OBJECT
-
+class CollectionFilterWidget {
  public:
-  explicit CollectionFilterWidget(QWidget *parent = nullptr);
-  ~CollectionFilterWidget() override;
+  using ChangedCallback = std::function<void()>;
+  using GroupingCallback = std::function<void(const CollectionGrouping::Grouping &)>;
+  using MenuActionCallback = std::function<void(CollectionFilterMenu::ActionKind)>;
 
-  enum class DelayBehaviour {
-    AlwaysInstant,
-    DelayedOnLargeLibraries,
-    AlwaysDelayed,
-  };
+  CollectionFilterWidget();
+  ~CollectionFilterWidget();
 
-  void Init(CollectionModel *model, CollectionFilter *filter);
+  CollectionFilterWidget(const CollectionFilterWidget &) = delete;
+  CollectionFilterWidget &operator=(const CollectionFilterWidget &) = delete;
 
-  void setFilter(CollectionFilter *filter);
-
-  static QActionGroup *CreateGroupByActions(const QString &saved_groupings_settings_group, QObject *parent);
-
-  void SetFilterHint(const QString &hint);
-  void SetApplyFilterToCollection(bool filter_applies_to_model) { filter_applies_to_model_ = filter_applies_to_model; }
-  void SetDelayBehaviour(DelayBehaviour behaviour) { delay_behaviour_ = behaviour; }
-  void SetAgeFilterEnabled(bool enabled);
-  void SetGroupByEnabled(bool enabled);
-  void ShowInCollection(const QString &search);
-
-  QMenu *menu() const { return collection_menu_; }
-  void AddMenuAction(QAction *action);
-
-  void SetSettingsGroup(const QString &group);
-  void SetSettingsPrefix(const QString &prefix);
-
-  QString group_by_version() const;
-  QString group_by_key() const;
-  QString group_by_key(const int number) const;
-  QString separate_albums_by_grouping_key() const;
-
-  void ReloadSettings();
-
-  bool SearchFieldHasFocus() const;
-  void FocusSearchField();
-
- public Q_SLOTS:
-  void UpdateGroupByActions();
-  void SetFilterMode(CollectionFilterOptions::FilterMode filter_mode);
-  void FocusOnFilter(QKeyEvent *e);
-
- Q_SIGNALS:
-  void UpPressed();
-  void DownPressed();
-  void ReturnPressed();
-
- protected:
-  void keyReleaseEvent(QKeyEvent *e) override;
-
- private Q_SLOTS:
-  void GroupingChanged(const CollectionModel::Grouping g, const bool separate_albums_by_grouping);
-  void GroupByClicked(QAction *action);
-  void SaveGroupBy();
-  void ShowGroupingManager();
-
-  void FilterTextChanged(const QString &text);
-  void FilterDelayTimeout();
+  GtkWidget *widget() const { return widget_; }
+  GMenuModel *MenuModel() const { return menu_model_; }
+  void AttachActions(GtkWidget *widget);
+  CollectionFilterOptions options() const { return options_; }
+  CollectionGrouping::Grouping grouping() const { return grouping_; }
+  void SetChangedCallback(ChangedCallback callback);
+  void SetGroupingChangedCallback(GroupingCallback callback) { grouping_changed_ = std::move(callback); }
+  void SetMenuActionCallback(MenuActionCallback callback) { menu_action_ = std::move(callback); }
+  void SetConfigureLabel(const std::string &label);
+  void SetGrouping(const CollectionGrouping::Grouping &grouping);
+  void ReloadMenu();
 
  private:
-  static QAction *CreateGroupByAction(const QString &text, QObject *parent, const CollectionModel::Grouping grouping);
-  void CheckCurrentGrouping(const CollectionModel::Grouping g);
+  void ApplyFilterIndices(int age, int rating, int mode);
+  void BuildMenu();
+  void ApplyPreset(int index);
+  void ApplySaved(int index);
+  void PromptSave();
 
- private:
-  Ui_CollectionFilterWidget *ui_;
-  CollectionModel *model_;
-  CollectionFilter *filter_;
-
-  GroupByDialog *group_by_dialog_;
-  SavedGroupingManager *groupings_manager_;
-
-  QMenu *filter_age_menu_;
-  QMenu *filter_rating_menu_;
-  QMenu *group_by_menu_;
-  QMenu *collection_menu_;
-  QActionGroup *group_by_group_;
-  QHash<QAction*, int> filter_max_ages_;
-  QHash<QAction*, float> filter_min_rating_;
-
-  QTimer *timer_filter_delay_;
-
-  bool filter_applies_to_model_;
-  DelayBehaviour delay_behaviour_;
-
-  QString settings_group_;
-  QString saved_groupings_settings_group_;
-  QString settings_prefix_;
+  GtkWidget *widget_ = nullptr;
+  GtkWidget *options_button_ = nullptr;
+  GMenuModel *menu_model_ = nullptr;
+  GSimpleActionGroup *action_group_ = nullptr;
+  CollectionFilterOptions options_;
+  CollectionGrouping::Grouping grouping_;
+  int age_index_ = 0;
+  int rating_index_ = 0;
+  int mode_index_ = 0;
+  ChangedCallback changed_;
+  GroupingCallback grouping_changed_;
+  MenuActionCallback menu_action_;
+  std::string configure_label_ = SettingsPages::ConfigureCollectionLabel();
 };
 
-#endif  // COLLECTIONFILTERWIDGET_H
+#endif

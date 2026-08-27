@@ -20,8 +20,6 @@
 #ifndef PLAYLISTSETTINGS_H
 #define PLAYLISTSETTINGS_H
 
-#include <QtGlobal>
-
 namespace PlaylistSettings {
 
 constexpr char kSettingsGroup[] = "Playlist";
@@ -53,7 +51,10 @@ constexpr char kDeleteFiles[] = "delete_files";
 
 constexpr char kStateVersion[] = "state_version";
 constexpr char kState[] = "state";
+constexpr char kColumns[] = "columns";
+constexpr char kDefaultColumns[] = "Queue,Track,Title,Artist,Album,Album artist,Length,Year,Genre,Bitrate,Sample rate,Plays,Rating,Filename";
 constexpr char kColumnAlignments[] = "column_alignments";
+constexpr char kStretchColumns[] = "stretch_columns";
 constexpr char kRatingLocked[] = "rating_locked";
 
 constexpr char kLastSaveFilter[] = "last_save_filter";
@@ -62,10 +63,11 @@ constexpr char kLastSaveExtension[] = "last_save_extension";
 
 constexpr char kLastSaveAllPath[] = "last_save_all_path";
 constexpr char kLastSaveAllExtension[] = "last_save_all_extension";
+constexpr char kUiFolders[] = "ui_folders";
 
 constexpr bool kDefaultAlternatingRowColors = true;
 constexpr bool kDefaultShowBars = true;
-#ifdef Q_OS_MACOS
+#ifdef __APPLE__
 constexpr bool kDefaultGlowEffect = false;
 #else
 constexpr bool kDefaultGlowEffect = true;
@@ -83,10 +85,9 @@ constexpr bool kDefaultEditMetadataInline = false;
 constexpr bool kDefaultWriteMetadata = true;
 constexpr bool kDefaultDeleteFiles = false;
 constexpr int kDefaultStateVersion = 0;
+constexpr bool kDefaultStretchColumns = true;
 constexpr bool kDefaultRatingLocked = false;
 
 }  // namespace PlaylistSettings
-
-Q_DECLARE_METATYPE(PlaylistSettings::PathType)
 
 #endif  // PLAYLISTSETTINGS_H

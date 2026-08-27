@@ -20,8 +20,6 @@
 #ifndef NOTIFICATIONSSETTINGS_H
 #define NOTIFICATIONSSETTINGS_H
 
-#include <QRgb>
-
 namespace OSDSettings {
 
 constexpr char kSettingsGroup[] = "OSD";
@@ -69,10 +67,10 @@ constexpr char kFont[] = "font";
 constexpr char kDisableDuration[] = "disable_duration";
 constexpr char kFading[] = "fading";
 
-constexpr QRgb kPresetBlue = qRgb(102, 150, 227);
-constexpr QRgb kPresetRed = qRgb(202, 22, 16);
+constexpr unsigned kPresetBlue = 0x6696E3;
+constexpr unsigned kPresetRed = 0xCA1610;
 
-constexpr QRgb kDefaultForegroundColor = 0;
+constexpr unsigned kDefaultForegroundColor = 0;
 constexpr double kDefaultBackgroundOpacity = 0.85;
 constexpr char kDefaultFont[] = "Verdana,9,-1,5,50,0,0,0,0,0";
 constexpr bool kDefaultDisableDuration = false;

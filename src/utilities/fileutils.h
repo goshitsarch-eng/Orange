@@ -1,39 +1,37 @@
-/*
- * Strawberry Music Player
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#ifndef STRAWBERRY_FILEUTILS_H
+#define STRAWBERRY_FILEUTILS_H
 
-#ifndef FILEUTILS_H
-#define FILEUTILS_H
+#include <cstdint>
+#include <string>
+#include <vector>
 
-#include <QString>
+namespace FileUtils {
 
-class QIODevice;
+std::string BaseName(const std::string &path);
+std::string DirName(const std::string &path);
+std::string Extension(const std::string &path);
+std::string Join(const std::string &a, const std::string &b);
+std::string CanonicalPath(const std::string &path);
+bool Exists(const std::string &path);
+bool IsDirectory(const std::string &path);
+bool IsFile(const std::string &path);
+std::vector<std::string> ListDirectory(const std::string &path);
+std::vector<std::string> ListDirectoryRecursive(const std::string &path);
+std::string PathFromUri(const std::string &uri);
+std::string UriFromPath(const std::string &path);
+std::string ReadFile(const std::string &path);
+bool WriteFile(const std::string &path, const std::string &contents);
+bool CopyFile(const std::string &source, const std::string &destination);
+bool Remove(const std::string &path);
+bool RemoveRecursive(const std::string &path);
+bool MoveToTrash(const std::string &path);
+std::string PrettySize(int64_t bytes);
+int64_t FreeSpaceBytes(const std::string &path);
+int64_t TotalSpaceBytes(const std::string &path);
+int64_t FileSize(const std::string &path);
+int64_t FileMtime(const std::string &path);
+bool FilenameOnGVFS(const std::string &path);
 
-namespace Utilities {
+}  // namespace FileUtils
 
-QByteArray ReadDataFromFile(const QString &filename);
-bool Copy(QIODevice *source, QIODevice *destination);
-bool CopyRecursive(const QString &source, const QString &destination);
-bool RemoveRecursive(const QString &path);
-bool FilenameOnGVFS(const QString &filename);
-bool CopyFileContents(const QString &source, const QString &destination);
-
-}  // namespace Utilities
-
-#endif  // FILEUTILS_H
+#endif

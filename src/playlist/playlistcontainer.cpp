@@ -1,564 +1,362 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "playlist/playlistcontainer.h"
 
-#include "config.h"
-
-#include <QApplication>
-#include <QObject>
-#include <QWidget>
-#include <QItemSelectionModel>
-#include <QSortFilterProxyModel>
-#include <QScrollBar>
-#include <QAction>
-#include <QPoint>
-#include <QString>
-#include <QSize>
-#include <QFont>
-#include <QIcon>
-#include <QColor>
-#include <QFrame>
-#include <QPalette>
-#include <QTimer>
-#include <QTimeLine>
-#include <QFileDialog>
-#include <QLabel>
-#include <QKeySequence>
-#include <QToolButton>
-#include <QUndoStack>
-#include <QtEvents>
-#include <QSettings>
-
-#include "includes/shared_ptr.h"
-#include "core/iconloader.h"
+#include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "filterparser/filterparser.h"
-#include "playlist.h"
-#include "playlisttabbar.h"
-#include "playlistview.h"
-#include "playlistcontainer.h"
-#include "playlistmanager.h"
-#include "playlistfilter.h"
-#include "playlistparsers/playlistparser.h"
-#include "ui_playlistcontainer.h"
-#include "widgets/searchfield.h"
-#include "constants/appearancesettings.h"
-#include "constants/playlistsettings.h"
-
-using namespace Qt::Literals::StringLiterals;
+#include "playlist/playlistfilterdelay.h"
+#include "playlist/playlistfilterfocus.h"
+#include "playlist/playlistfiltersync.h"
+#include "playlist/playlisttoolbar.h"
+#include "playlist/playlistundostate.h"
+#include "translations/translations.h"
+#include "widgets/filtersearchkeyboard.h"
 
 namespace {
-constexpr char kSettingsGroup[] = "Playlist";
-constexpr char kCurrentPlaylist[] = "current_playlist";
-constexpr char kLastLoadPlaylist[] = "last_load_playlist";
-constexpr int kFilterDelayMs = 100;
-constexpr int kFilterDelayPlaylistSizeThreshold = 5000;
+
+struct PlaylistFilterJob {
+  PlaylistContainer *self = nullptr;
+  int generation = 0;
+};
+
 }  // namespace
 
-PlaylistContainer::PlaylistContainer(QWidget *parent)
-    : QWidget(parent),
-      ui_(new Ui_PlaylistContainer),
-      manager_(nullptr),
-      undo_(nullptr),
-      redo_(nullptr),
-      playlist_(nullptr),
-      starting_up_(true),
-      tab_bar_visible_(false),
-      tab_bar_animation_(new QTimeLine(500, this)),
-      no_matches_label_(nullptr),
-      filter_timer_(new QTimer(this)) {
+PlaylistContainer::PlaylistContainer()
+    : widget_(gtk_box_new(GTK_ORIENTATION_VERTICAL, 0)),
+      tab_bar_(std::make_unique<PlaylistTabBar>()),
+      view_(std::make_unique<PlaylistView>()),
+      dynamic_controls_(std::make_unique<DynamicPlaylistControls>()) {
+  toolbar_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_set_margin_start(toolbar_, 8);
+  gtk_widget_set_margin_end(toolbar_, 8);
+  gtk_widget_set_margin_top(toolbar_, 8);
+  gtk_widget_set_margin_bottom(toolbar_, 4);
+  auto add_tool = [&](const char *icon, const char *tooltip, const char *name) -> GtkWidget * {
+    GtkWidget *button = gtk_button_new_from_icon_name(icon);
+    gtk_widget_set_tooltip_text(button, tooltip);
+    g_object_set_data_full(G_OBJECT(button), "action", g_strdup(name), g_free);
+    gtk_box_append(GTK_BOX(toolbar_), button);
+    g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
+                       auto *self = static_cast<PlaylistContainer *>(data);
+                       const char *action = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "action"));
+                       auto *cb = static_cast<ActionCallback *>(g_object_get_data(G_OBJECT(self->widget_), action ? action : ""));
+                       if (cb && *cb) {
+                         (*cb)();
+                       }
+                     }),
+                     this);
+    return button;
+  };
+  add_tool("document-new-symbolic", Translations::Tr("New playlist").c_str(), "new");
+  add_tool("document-open-symbolic", Translations::Tr("Load playlist").c_str(), "load");
+  add_tool("document-save-symbolic", Translations::Tr("Save playlist").c_str(), "save");
+  clear_button_ = add_tool("edit-clear-all-symbolic", Translations::Tr("Clear playlist").c_str(), "clear");
+  undo_button_ = add_tool("edit-undo-symbolic", Translations::CStr(PlaylistUndoState::UndoTooltip(false)), "undo");
+  redo_button_ = add_tool("edit-redo-symbolic", Translations::CStr(PlaylistUndoState::RedoTooltip(false)), "redo");
+  UpdateUndoRedoChrome(false, false);
 
-  ui_->setupUi(this);
+  auto make_menu_button = [](const char *icon, const char *tooltip) {
+    GtkWidget *button = gtk_menu_button_new();
+    gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(button), icon);
+    gtk_menu_button_set_always_show_arrow(GTK_MENU_BUTTON(button), FALSE);
+    gtk_widget_add_css_class(button, "flat");
+    gtk_widget_set_tooltip_text(button, tooltip);
+    return button;
+  };
+  repeat_button_ = make_menu_button("media-playlist-repeat-symbolic", Translations::CStr(PlaylistSequence::RepeatButtonTooltip()));
+  shuffle_button_ = make_menu_button("media-playlist-shuffle-symbolic", Translations::CStr(PlaylistSequence::ShuffleButtonTooltip()));
 
-  no_matches_label_ = new QLabel(ui_->playlist);
-  no_matches_label_->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
-  no_matches_label_->setAttribute(Qt::WA_TransparentForMouseEvents);
-  no_matches_label_->setWordWrap(true);
-  no_matches_label_->raise();
-  no_matches_label_->hide();
+  GtkWidget *repeat_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  GtkWidget *repeat_group = nullptr;
+  for (PlaylistSequence::RepeatMode mode : PlaylistSequence::RepeatModes()) {
+    GtkWidget *item = gtk_check_button_new_with_label(PlaylistSequence::RepeatLabel(mode));
+    gtk_check_button_set_group(GTK_CHECK_BUTTON(item), repeat_group ? GTK_CHECK_BUTTON(repeat_group) : nullptr);
+    if (!repeat_group) {
+      repeat_group = item;
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(item), TRUE);
+    }
+    g_object_set_data(G_OBJECT(item), "mode", GINT_TO_POINTER(static_cast<int>(mode) + 1));
+    g_signal_connect(item, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                       if (!gtk_check_button_get_active(button)) {
+                         return;
+                       }
+                       auto *self = static_cast<PlaylistContainer *>(data);
+                       if (self->updating_sequence_) {
+                         return;
+                       }
+                       const int mode = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "mode")) - 1;
+                       self->SetRepeatMode(static_cast<PlaylistSequence::RepeatMode>(mode));
+                       if (self->repeat_changed_) {
+                         self->repeat_changed_(static_cast<PlaylistSequence::RepeatMode>(mode));
+                       }
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(repeat_box), item);
+    repeat_items_.push_back(item);
+  }
+  GtkWidget *repeat_popover = gtk_popover_new();
+  gtk_popover_set_child(GTK_POPOVER(repeat_popover), repeat_box);
+  gtk_menu_button_set_popover(GTK_MENU_BUTTON(repeat_button_), repeat_popover);
 
-  // Set the colour of the no matches label to the disabled text colour
-  QPalette no_matches_palette = no_matches_label_->palette();
-  const QColor no_matches_color = no_matches_palette.color(QPalette::Disabled, QPalette::Text);
-  no_matches_palette.setColor(QPalette::Normal, QPalette::WindowText, no_matches_color);
-  no_matches_palette.setColor(QPalette::Inactive, QPalette::WindowText, no_matches_color);
-  no_matches_label_->setPalette(no_matches_palette);
+  GtkWidget *shuffle_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  GtkWidget *shuffle_group = nullptr;
+  for (PlaylistSequence::ShuffleMode mode : PlaylistSequence::ShuffleModes()) {
+    GtkWidget *item = gtk_check_button_new_with_label(PlaylistSequence::ShuffleLabel(mode));
+    gtk_check_button_set_group(GTK_CHECK_BUTTON(item), shuffle_group ? GTK_CHECK_BUTTON(shuffle_group) : nullptr);
+    if (!shuffle_group) {
+      shuffle_group = item;
+      gtk_check_button_set_active(GTK_CHECK_BUTTON(item), TRUE);
+    }
+    g_object_set_data(G_OBJECT(item), "mode", GINT_TO_POINTER(static_cast<int>(mode) + 1));
+    g_signal_connect(item, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
+                       if (!gtk_check_button_get_active(button)) {
+                         return;
+                       }
+                       auto *self = static_cast<PlaylistContainer *>(data);
+                       if (self->updating_sequence_) {
+                         return;
+                       }
+                       const int mode = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "mode")) - 1;
+                       self->SetShuffleMode(static_cast<PlaylistSequence::ShuffleMode>(mode));
+                       if (self->shuffle_changed_) {
+                         self->shuffle_changed_(static_cast<PlaylistSequence::ShuffleMode>(mode));
+                       }
+                     }),
+                     this);
+    gtk_box_append(GTK_BOX(shuffle_box), item);
+    shuffle_items_.push_back(item);
+  }
+  GtkWidget *shuffle_popover = gtk_popover_new();
+  gtk_popover_set_child(GTK_POPOVER(shuffle_popover), shuffle_box);
+  gtk_menu_button_set_popover(GTK_MENU_BUTTON(shuffle_button_), shuffle_popover);
 
-  // Remove QFrame border
-  ui_->toolbar->setStyleSheet(u"QFrame { border: 0px; }"_s);
-
-  // Make it bold
-  QFont no_matches_font = no_matches_label_->font();
-  no_matches_font.setBold(true);
-  no_matches_label_->setFont(no_matches_font);
-
-  // Tab bar
-  ui_->tab_bar->setExpanding(false);
-  ui_->tab_bar->setMovable(true);
-
-  QObject::connect(tab_bar_animation_, &QTimeLine::frameChanged, this, &PlaylistContainer::SetTabBarHeight);
-  ui_->tab_bar->setMaximumHeight(0);
-
-  // Connections
-  QObject::connect(ui_->tab_bar, &PlaylistTabBar::currentChanged, this, &PlaylistContainer::Save);
-  QObject::connect(ui_->tab_bar, &PlaylistTabBar::Save, this, &PlaylistContainer::SaveCurrentPlaylist);
-
-  // set up timer for delayed filter updates
-  filter_timer_->setSingleShot(true);
-  filter_timer_->setInterval(kFilterDelayMs);
-  QObject::connect(filter_timer_, &QTimer::timeout, this, &PlaylistContainer::UpdateFilter);
-
-  // Replace playlist search filter with native search box.
-  QObject::connect(ui_->search_field, &SearchField::textChanged, this, &PlaylistContainer::MaybeUpdateFilter);
-  QObject::connect(ui_->playlist, &PlaylistView::FocusOnFilterSignal, this, &PlaylistContainer::FocusOnFilter);
-  ui_->search_field->installEventFilter(this);
-
-  ui_->search_field->setToolTip(FilterParser::ToolTip());
-
-  ReloadSettings();
-
+  gtk_box_append(GTK_BOX(toolbar_), repeat_button_);
+  gtk_box_append(GTK_BOX(toolbar_), shuffle_button_);
+  filter_entry_ = gtk_search_entry_new();
+  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(filter_entry_), Translations::Tr("Filter playlist").c_str());
+  gtk_widget_set_tooltip_text(filter_entry_, Translations::CStr(FilterParser::ToolTip().c_str()));
+  gtk_widget_set_hexpand(filter_entry_, TRUE);
+  g_signal_connect(filter_entry_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
+                     auto *self = static_cast<PlaylistContainer *>(data);
+                     if (self->updating_filter_ || !PlaylistToolbar::FilterApplies(self->toolbar_ && gtk_widget_get_visible(self->toolbar_))) {
+                       return;
+                     }
+                     self->filter_ = gtk_editable_get_text(GTK_EDITABLE(entry));
+                     if (PlaylistFilterDelay::ShouldDelay(self->FilterRowCount(), self->filter_.empty())) {
+                       self->ScheduleFilter();
+                     } else {
+                       self->CancelFilterTimer();
+                       self->ApplyPendingFilter();
+                     }
+                   }),
+                   this);
+  g_signal_connect(filter_entry_, "activate", G_CALLBACK(+[](GtkSearchEntry *, gpointer data) {
+                     static_cast<PlaylistContainer *>(data)->view()->FilterReturnPressed();
+                   }),
+                   this);
+  GtkEventController *filter_keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(filter_entry_, filter_keys);
+  g_signal_connect(filter_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<PlaylistContainer *>(data);
+                     const FilterSearchKeyboard::Action action = FilterSearchKeyboard::FromSearchKey(keyval);
+                     if (action == FilterSearchKeyboard::Action::MoveUp || action == FilterSearchKeyboard::Action::MoveDown) {
+                       self->view()->FocusAndMove(keyval);
+                       return TRUE;
+                     }
+                     if (action == FilterSearchKeyboard::Action::Clear) {
+                       gtk_editable_set_text(GTK_EDITABLE(self->filter_entry_), "");
+                       return TRUE;
+                     }
+                     return FALSE;
+                   })),
+                   this);
+  gtk_box_append(GTK_BOX(toolbar_), filter_entry_);
+  view_->SetFocusFilterCallback([this](unsigned keyval, const char *utf8) { FocusFilterFromKey(keyval, utf8); });
+  summary_ = gtk_label_new("");
+  gtk_widget_add_css_class(summary_, "dim-label");
+  gtk_widget_set_visible(summary_, FALSE);
+  gtk_box_append(GTK_BOX(toolbar_), summary_);
+  gtk_widget_set_margin_start(tab_bar_->widget(), 8);
+  gtk_widget_set_margin_end(tab_bar_->widget(), 8);
+  gtk_box_append(GTK_BOX(widget_), toolbar_);
+  ApplyLook();
+  gtk_box_append(GTK_BOX(widget_), tab_bar_->widget());
+  gtk_box_append(GTK_BOX(widget_), dynamic_controls_->widget());
+  gtk_box_append(GTK_BOX(widget_), view_->widget());
 }
 
-PlaylistContainer::~PlaylistContainer() { delete ui_; }
+PlaylistContainer::~PlaylistContainer() { CancelFilterTimer(); }
 
-PlaylistView *PlaylistContainer::view() const { return ui_->playlist; }
-
-void PlaylistContainer::SetActions(const Actions &actions) {
-
-  ui_->create_new->setDefaultAction(actions.new_playlist);
-  ui_->load->setDefaultAction(actions.load_playlist);
-  ui_->save->setDefaultAction(actions.save_playlist);
-  ui_->clear->setDefaultAction(actions.clear_playlist);
-
-  ui_->tab_bar->SetActions(actions.new_playlist, actions.load_playlist);
-
-  QObject::connect(actions.new_playlist, &QAction::triggered, this, &PlaylistContainer::NewPlaylist);
-  QObject::connect(actions.load_playlist, &QAction::triggered, this, &PlaylistContainer::LoadPlaylist);
-  QObject::connect(actions.save_playlist, &QAction::triggered, this, &PlaylistContainer::SaveCurrentPlaylist);
-  QObject::connect(actions.clear_playlist, &QAction::triggered, this, &PlaylistContainer::ClearPlaylist);
-  QObject::connect(actions.next_playlist, &QAction::triggered, this, &PlaylistContainer::GoToNextPlaylistTab);
-  QObject::connect(actions.previous_playlist, &QAction::triggered, this, &PlaylistContainer::GoToPreviousPlaylistTab);
-  QObject::connect(actions.last_playlist, &QAction::triggered, this, &PlaylistContainer::GoToLastPlaylistTab);
-  QObject::connect(actions.active_playlist, &QAction::triggered, this, &PlaylistContainer::GoToActivePlaylistTab);
-  QObject::connect(actions.close_playlist, &QAction::triggered, &*ui_->tab_bar, &PlaylistTabBar::CloseCurrentTab);
-  QObject::connect(&*ui_->tab_bar, &PlaylistTabBar::LastTabCloseRequested, this, &PlaylistContainer::LastTabCloseRequested);
-  QObject::connect(actions.save_all_playlists, &QAction::triggered, &*manager_, &PlaylistManager::SaveAllPlaylists);
-
+void PlaylistContainer::SetFilterChangedCallback(const std::function<void(const std::string &)> &callback) {
+  filter_changed_ = callback;
 }
 
-void PlaylistContainer::SetManager(SharedPtr<PlaylistManager> manager) {
-
-  manager_ = manager;
-  ui_->tab_bar->SetManager(manager);
-
-  QObject::connect(ui_->tab_bar, &PlaylistTabBar::CurrentIdChanged, &*manager, &PlaylistManager::SetCurrentPlaylist);
-  QObject::connect(ui_->tab_bar, &PlaylistTabBar::Rename, &*manager, &PlaylistManager::Rename);
-  QObject::connect(ui_->tab_bar, &PlaylistTabBar::Close, &*manager, &PlaylistManager::Close);
-  QObject::connect(ui_->tab_bar, &PlaylistTabBar::PlaylistFavorited, &*manager, &PlaylistManager::Favorite);
-
-  QObject::connect(ui_->tab_bar, &PlaylistTabBar::PlaylistOrderChanged, &*manager, &PlaylistManager::ChangePlaylistOrder);
-
-  QObject::connect(&*manager, &PlaylistManager::CurrentChanged, this, &PlaylistContainer::SetViewModel);
-  QObject::connect(&*manager, &PlaylistManager::PlaylistAdded, this, &PlaylistContainer::PlaylistAdded);
-  QObject::connect(&*manager, &PlaylistManager::PlaylistManagerInitialized, this, &PlaylistContainer::Started);
-  QObject::connect(&*manager, &PlaylistManager::PlaylistClosed, this, &PlaylistContainer::PlaylistClosed);
-  QObject::connect(&*manager, &PlaylistManager::PlaylistRenamed, this, &PlaylistContainer::PlaylistRenamed);
-
+void PlaylistContainer::SetFilterRowCountCallback(const std::function<int()> &callback) {
+  filter_row_count_ = callback;
 }
 
-void PlaylistContainer::SetViewModel(Playlist *playlist, const int scroll_position) {
+int PlaylistContainer::FilterRowCount() const { return filter_row_count_ ? filter_row_count_() : 0; }
 
-  if (view()->selectionModel()) {
-    QObject::disconnect(view()->selectionModel(), &QItemSelectionModel::selectionChanged, this, &PlaylistContainer::SelectionChanged);
+void PlaylistContainer::CancelFilterTimer() {
+  ++filter_timeout_gen_;
+  if (filter_timeout_ != 0) {
+    g_source_remove(filter_timeout_);
+    filter_timeout_ = 0;
   }
-  if (playlist_ && playlist_->filter()) {
-    QObject::disconnect(playlist_->filter(), &QSortFilterProxyModel::modelReset, this, &PlaylistContainer::UpdateNoMatchesLabel);
-    QObject::disconnect(playlist_->filter(), &QSortFilterProxyModel::rowsInserted, this, &PlaylistContainer::UpdateNoMatchesLabel);
-    QObject::disconnect(playlist_->filter(), &QSortFilterProxyModel::rowsRemoved, this, &PlaylistContainer::UpdateNoMatchesLabel);
-  }
-  if (playlist_) {
-    QObject::disconnect(playlist_, &Playlist::modelReset, this, &PlaylistContainer::UpdateNoMatchesLabel);
-    QObject::disconnect(playlist_, &Playlist::rowsInserted, this, &PlaylistContainer::UpdateNoMatchesLabel);
-    QObject::disconnect(playlist_, &Playlist::rowsRemoved, this, &PlaylistContainer::UpdateNoMatchesLabel);
-  }
-
-  playlist_ = playlist;
-
-  // Set the view
-  playlist->IgnoreSorting(true);
-  view()->setModel(playlist->filter());
-  view()->SetPlaylist(playlist);
-  view()->selectionModel()->select(manager_->current_selection(), QItemSelectionModel::ClearAndSelect);
-  if (scroll_position != 0) view()->verticalScrollBar()->setValue(scroll_position);
-  playlist->IgnoreSorting(false);
-
-  QObject::connect(view()->selectionModel(), &QItemSelectionModel::selectionChanged, this, &PlaylistContainer::SelectionChanged);
-  Q_EMIT ViewSelectionModelChanged();
-
-  // Update filter
-  ui_->search_field->setText(playlist->filter()->filter_string());
-
-  // Update the no matches label
-  QObject::connect(playlist_->filter(), &QSortFilterProxyModel::modelReset, this, &PlaylistContainer::UpdateNoMatchesLabel);
-  QObject::connect(playlist_->filter(), &QSortFilterProxyModel::rowsInserted, this, &PlaylistContainer::UpdateNoMatchesLabel);
-  QObject::connect(playlist_->filter(), &QSortFilterProxyModel::rowsRemoved, this, &PlaylistContainer::UpdateNoMatchesLabel);
-  QObject::connect(playlist_, &Playlist::modelReset, this, &PlaylistContainer::UpdateNoMatchesLabel);
-  QObject::connect(playlist_, &Playlist::rowsInserted, this, &PlaylistContainer::UpdateNoMatchesLabel);
-  QObject::connect(playlist_, &Playlist::rowsRemoved, this, &PlaylistContainer::UpdateNoMatchesLabel);
-  UpdateNoMatchesLabel();
-
-  // Ensure that tab is current
-  if (ui_->tab_bar->current_id() != manager_->current_id()) {
-    ui_->tab_bar->set_current_id(manager_->current_id());
-  }
-
-  // Sort out the undo/redo actions
-  delete undo_;
-  delete redo_;
-  undo_ = playlist->undo_stack()->createUndoAction(this, tr("Undo"));
-  redo_ = playlist->undo_stack()->createRedoAction(this, tr("Redo"));
-  undo_->setIcon(IconLoader::Load(u"edit-undo"_s));
-  undo_->setShortcut(QKeySequence::Undo);
-  redo_->setIcon(IconLoader::Load(u"edit-redo"_s));
-  redo_->setShortcut(QKeySequence::Redo);
-
-  ui_->undo->setDefaultAction(undo_);
-  ui_->redo->setDefaultAction(redo_);
-
-  Q_EMIT UndoRedoActionsChanged(undo_, redo_);
-
 }
 
-void PlaylistContainer::ReloadSettings() {
+void PlaylistContainer::ScheduleFilter() {
+  CancelFilterTimer();
+  auto *job = new PlaylistFilterJob{this, filter_timeout_gen_};
+  filter_timeout_ = g_timeout_add_full(
+      G_PRIORITY_DEFAULT, static_cast<guint>(PlaylistFilterDelay::kFilterDelayMs),
+      +[](gpointer data) -> gboolean {
+        auto *job = static_cast<PlaylistFilterJob *>(data);
+        if (job->self && job->generation == job->self->filter_timeout_gen_) {
+          job->self->filter_timeout_ = 0;
+          job->self->ApplyPendingFilter();
+        }
+        return G_SOURCE_REMOVE;
+      },
+      job, +[](gpointer data) { delete static_cast<PlaylistFilterJob *>(data); });
+}
 
-  Settings s;
-  s.beginGroup(AppearanceSettings::kSettingsGroup);
-  int iconsize = s.value(AppearanceSettings::kIconSizePlaylistButtons, AppearanceSettings::kDefaultIconSizePlaylistButtons).toInt();
-  s.endGroup();
-
-  ui_->create_new->setIconSize(QSize(iconsize, iconsize));
-  ui_->load->setIconSize(QSize(iconsize, iconsize));
-  ui_->save->setIconSize(QSize(iconsize, iconsize));
-  ui_->clear->setIconSize(QSize(iconsize, iconsize));
-  ui_->undo->setIconSize(QSize(iconsize, iconsize));
-  ui_->redo->setIconSize(QSize(iconsize, iconsize));
-  ui_->search_field->setIconSize(iconsize);
-
-  s.beginGroup(PlaylistSettings::kSettingsGroup);
-  const bool playlist_clear = s.value(PlaylistSettings::kPlaylistClear, PlaylistSettings::kDefaultPlaylistClear).toBool();
-  const bool show_toolbar = s.value(PlaylistSettings::kShowToolbar, PlaylistSettings::kDefaultShowToolbar).toBool();
-  s.endGroup();
-
-  if (playlist_clear) {
-    ui_->clear->show();
+void PlaylistContainer::ApplyPendingFilter() {
+  if (filter_changed_) {
+    filter_changed_(filter_);
   }
-  else {
-    ui_->clear->hide();
+  if (view_) {
+    view_->JumpToCurrentlyPlayingTrack();
   }
+}
 
-  ui_->toolbar->setVisible(show_toolbar);
+void PlaylistContainer::FocusFilter() {
+  if (!filter_entry_ || !PlaylistToolbar::FocusEnabled(toolbar_ && gtk_widget_get_visible(toolbar_))) {
+    return;
+  }
+  gtk_widget_grab_focus(filter_entry_);
+}
 
-  if (!show_toolbar) ui_->search_field->clear();
-
+void PlaylistContainer::FocusFilterFromKey(unsigned keyval, const char *utf8) {
+  FocusFilter();
+  if (!filter_entry_ || !PlaylistToolbar::FocusEnabled(toolbar_ && gtk_widget_get_visible(toolbar_))) {
+    return;
+  }
+  const PlaylistFilterFocus::Effect effect = PlaylistFilterFocus::KeyEffect(keyval);
+  if (effect == PlaylistFilterFocus::Effect::None && utf8 && utf8[0] != '\0') {
+    const std::string next = PlaylistFilterFocus::AppendUtf8(gtk_editable_get_text(GTK_EDITABLE(filter_entry_)), utf8);
+    gtk_editable_set_text(GTK_EDITABLE(filter_entry_), next.c_str());
+    gtk_editable_set_position(GTK_EDITABLE(filter_entry_), -1);
+    return;
+  }
+  if (effect == PlaylistFilterFocus::Effect::FocusOnly) {
+    return;
+  }
+  const std::string next = PlaylistFilterFocus::Apply(gtk_editable_get_text(GTK_EDITABLE(filter_entry_)), effect, utf8);
+  if (effect == PlaylistFilterFocus::Effect::Clear || effect == PlaylistFilterFocus::Effect::Append) {
+    gtk_editable_set_text(GTK_EDITABLE(filter_entry_), next.c_str());
+    if (effect == PlaylistFilterFocus::Effect::Append) {
+      gtk_editable_set_position(GTK_EDITABLE(filter_entry_), -1);
+    }
+  }
 }
 
 bool PlaylistContainer::SearchFieldHasFocus() const {
-  return ui_->toolbar->isVisible() && ui_->search_field->hasFocus();
+  return filter_entry_ && PlaylistToolbar::FocusEnabled(toolbar_ && gtk_widget_get_visible(toolbar_)) && gtk_widget_has_focus(filter_entry_);
 }
 
-void PlaylistContainer::FocusSearchField() {
-  if (ui_->toolbar->isVisible()) ui_->search_field->setFocus();
-}
-
-void PlaylistContainer::ActivePlaying() {
-  UpdateActiveIcon(QIcon(u":/pictures/tiny-play.png"_s));
-}
-
-void PlaylistContainer::ActivePaused() {
-  UpdateActiveIcon(QIcon(u":/pictures/tiny-pause.png"_s));
-}
-
-void PlaylistContainer::ActiveStopped() { UpdateActiveIcon(QIcon()); }
-
-void PlaylistContainer::UpdateActiveIcon(const QIcon &icon) {
-
-  // Unset all existing icons
-  for (int i = 0; i < ui_->tab_bar->count(); ++i) {
-    ui_->tab_bar->setTabIcon(i, QIcon());
+void PlaylistContainer::SetFilterText(const std::string &text) {
+  if (!filter_entry_ || !PlaylistFilterSync::ShouldSyncEntry(filter_, text)) {
+    return;
   }
-
-  // Set our icon
-  if (!icon.isNull()) ui_->tab_bar->set_icon_by_id(manager_->active_id(), icon);
-
+  updating_filter_ = true;
+  filter_ = text;
+  gtk_editable_set_text(GTK_EDITABLE(filter_entry_), text.c_str());
+  updating_filter_ = false;
 }
 
-void PlaylistContainer::PlaylistAdded(const int id, const QString &name, const bool favorite) {
-
-  const int index = ui_->tab_bar->count();
-  ui_->tab_bar->InsertTab(id, index, name, favorite);
-
-  // Are we start up, should we select this tab?
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  const int current_playlist = s.value(kCurrentPlaylist, 1).toInt();
-  s.endGroup();
-
-  if (starting_up_ && current_playlist == id) {
-    starting_up_ = false;
-    ui_->tab_bar->set_current_id(id);
+void PlaylistContainer::UpdateNoMatchesOverlay() {
+  if (view_) {
+    view_->UpdateNoMatchesOverlay();
   }
+}
 
-  if (ui_->tab_bar->count() > 1) {
-    // Have to do this here because sizeHint() is only valid when there's a tab in the bar.
-    tab_bar_animation_->setFrameRange(0, ui_->tab_bar->sizeHint().height());
-
-    if (!isVisible()) {
-      // Skip the animation since the window is hidden (e.g. if we're still loading the UI).
-      tab_bar_visible_ = true;
-      ui_->tab_bar->setMaximumHeight(tab_bar_animation_->endFrame());
-    }
-    else {
-      SetTabBarVisible(true);
-    }
+void PlaylistContainer::UpdateUndoRedoChrome(bool can_undo, bool can_redo) {
+  if (undo_button_) {
+    gtk_widget_set_sensitive(undo_button_, PlaylistUndoState::UndoEnabled(can_undo) ? TRUE : FALSE);
+    gtk_widget_set_tooltip_text(undo_button_, Translations::CStr(PlaylistUndoState::UndoTooltip(can_undo)));
   }
-
-}
-
-void PlaylistContainer::Started() { starting_up_ = false; }
-
-void PlaylistContainer::PlaylistClosed(const int id) {
-
-  ui_->tab_bar->RemoveTab(id);
-
-  if (ui_->tab_bar->count() <= 1) SetTabBarVisible(false);
-
-}
-
-void PlaylistContainer::PlaylistRenamed(const int id, const QString &new_name) {
-  ui_->tab_bar->set_text_by_id(id, new_name);
-}
-
-void PlaylistContainer::NewPlaylist() { manager_->New(tr("Playlist")); }
-
-void PlaylistContainer::LoadPlaylist() {
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  QString filename = s.value(kLastLoadPlaylist).toString();
-  filename = QFileDialog::getOpenFileName(this, tr("Load playlist"), filename, manager_->parser()->filters(PlaylistParser::Type::Load));
-
-  if (filename.isNull()) return;
-
-  s.setValue(kLastLoadPlaylist, filename);
-
-  manager_->Load(filename);
-
-}
-
-void PlaylistContainer::SavePlaylist(const int id) {
-
-  // Use the tab name as the suggested name
-  QString suggested_name = ui_->tab_bar->tabText(ui_->tab_bar->currentIndex());
-
-  manager_->SaveWithUI(id, suggested_name);
-
-}
-
-void PlaylistContainer::ClearPlaylist() {}
-
-void PlaylistContainer::GoToNextPlaylistTab() {
-
-  // Get the next tab's id
-  int id_next = ui_->tab_bar->id_of((ui_->tab_bar->currentIndex() + 1) % ui_->tab_bar->count());
-  // Switch to next tab
-  manager_->SetCurrentPlaylist(id_next);
-
-}
-
-void PlaylistContainer::GoToPreviousPlaylistTab() {
-
-  // Get the next tab's id
-  int id_previous = ui_->tab_bar->id_of((ui_->tab_bar->currentIndex() + ui_->tab_bar->count() - 1) % ui_->tab_bar->count());
-  // Switch to next tab
-  manager_->SetCurrentPlaylist(id_previous);
-
-}
-
-void PlaylistContainer::GoToLastPlaylistTab() {
-
-  if (ui_->tab_bar->count() == 0) return;
-  const int id_last = ui_->tab_bar->id_of(ui_->tab_bar->count() - 1);
-  if (id_last == manager_->current_id()) return;
-  manager_->SetCurrentPlaylist(id_last);
-
-}
-
-void PlaylistContainer::GoToActivePlaylistTab() {
-
-  const int active_id = manager_->active_id();
-
-  // Do nothing if no playlist is currently playing: jumping to an arbitrary tab (e.g. the first one) would be surprising when the user asked to go to "the playing tab" and none exists.
-  if (active_id == -1 || active_id == manager_->current_id()) return;
-
-  manager_->SetCurrentPlaylist(active_id);
-
-}
-
-void PlaylistContainer::Save() {
-
-  if (starting_up_) return;
-
-  Settings s;
-  s.beginGroup(kSettingsGroup);
-  s.setValue(kCurrentPlaylist, ui_->tab_bar->current_id());
-  s.endGroup();
-
-}
-
-void PlaylistContainer::SetTabBarVisible(const bool visible) {
-
-  if (tab_bar_visible_ == visible) return;
-  tab_bar_visible_ = visible;
-
-  tab_bar_animation_->setDirection(visible ? QTimeLine::Forward : QTimeLine::Backward);
-  tab_bar_animation_->start();
-
-}
-
-void PlaylistContainer::SetTabBarHeight(const int height) {
-  ui_->tab_bar->setMaximumHeight(height);
-}
-
-void PlaylistContainer::MaybeUpdateFilter() {
-
-  if (!ui_->toolbar->isVisible()) return;
-
-  // delaying the filter update on small playlists is undesirable and an empty filter applies very quickly, too
-  if (manager_->current()->rowCount() < kFilterDelayPlaylistSizeThreshold || ui_->search_field->text().isEmpty()) {
-    UpdateFilter();
+  if (redo_button_) {
+    gtk_widget_set_sensitive(redo_button_, PlaylistUndoState::RedoEnabled(can_redo) ? TRUE : FALSE);
+    gtk_widget_set_tooltip_text(redo_button_, Translations::CStr(PlaylistUndoState::RedoTooltip(can_redo)));
   }
-  else {
-    filter_timer_->start();
-  }
-
 }
 
-void PlaylistContainer::UpdateFilter() {
-
-  if (!ui_->toolbar->isVisible()) return;
-
-  manager_->current()->filter()->SetFilterString(ui_->search_field->text());
-  ui_->playlist->JumpToCurrentlyPlayingTrack();
-
-  UpdateNoMatchesLabel();
-
+void PlaylistContainer::SetActionCallback(const char *name, ActionCallback callback) {
+  auto *cb = new ActionCallback(std::move(callback));
+  g_object_set_data_full(G_OBJECT(widget_), name, cb, [](gpointer p) { delete static_cast<ActionCallback *>(p); });
 }
 
-void PlaylistContainer::UpdateNoMatchesLabel() {
-
-  Playlist *playlist = manager_->current();
-  const bool has_rows = playlist->rowCount() != 0;
-  const bool has_results = playlist->filter()->rowCount() != 0;
-
-  QString text;
-  if (has_rows && !has_results) {
-    text = tr("No matches found.  Clear the search box to show the whole playlist again.");
-  }
-
-  if (!text.isEmpty()) {
-    no_matches_label_->setText(text);
-    RepositionNoMatchesLabel(true);
-    no_matches_label_->show();
-  }
-  else {
-    no_matches_label_->hide();
-  }
-
+void PlaylistContainer::SetRepeatChangedCallback(const std::function<void(PlaylistSequence::RepeatMode)> &callback) {
+  repeat_changed_ = callback;
 }
 
-void PlaylistContainer::resizeEvent(QResizeEvent *e) {
-  QWidget::resizeEvent(e);
-  RepositionNoMatchesLabel();
+void PlaylistContainer::SetShuffleChangedCallback(const std::function<void(PlaylistSequence::ShuffleMode)> &callback) {
+  shuffle_changed_ = callback;
 }
 
-void PlaylistContainer::FocusOnFilter(QKeyEvent *event) {
-
-  if (ui_->toolbar->isVisible()) {
-    ui_->search_field->setFocus();
-    switch (event->key()) {
-      case Qt::Key_Backspace:
-        break;
-      case Qt::Key_Escape:
-        ui_->search_field->clear();
-        break;
-      default:
-        ui_->search_field->setText(ui_->search_field->text() + event->text());
-        break;
+void PlaylistContainer::SetRepeatMode(PlaylistSequence::RepeatMode mode) {
+  updating_sequence_ = true;
+  for (GtkWidget *item : repeat_items_) {
+    const int item_mode = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(item), "mode")) - 1;
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(item), item_mode == static_cast<int>(mode));
+  }
+  if (repeat_button_) {
+    gtk_widget_set_tooltip_text(repeat_button_, PlaylistSequence::RepeatLabel(mode));
+    if (PlaylistSequence::RepeatActive(mode)) {
+      gtk_widget_add_css_class(repeat_button_, "accent");
+    } else {
+      gtk_widget_remove_css_class(repeat_button_, "accent");
     }
   }
-
+  updating_sequence_ = false;
 }
 
-void PlaylistContainer::RepositionNoMatchesLabel(const bool force) {
-
-  if (!force && !no_matches_label_->isVisible()) return;
-
-  const int kBorder = 10;
-
-  QPoint pos = ui_->playlist->viewport()->mapTo(ui_->playlist, QPoint(kBorder, kBorder));
-  QSize size = ui_->playlist->viewport()->size();
-  size.setWidth(size.width() - kBorder * 2);
-  size.setHeight(size.height() - kBorder * 2);
-
-  no_matches_label_->move(pos);
-  no_matches_label_->resize(size);
-
-}
-
-void PlaylistContainer::SelectionChanged() {
-  manager_->SelectionChanged(view()->selectionModel()->selection());
-}
-
-bool PlaylistContainer::eventFilter(QObject *objectWatched, QEvent *event) {
-
-  if (objectWatched == ui_->search_field) {
-    if (event->type() == QEvent::KeyPress) {
-      QKeyEvent *e = static_cast<QKeyEvent*>(event);
-      switch (e->key()) {
-        // case Qt::Key_Up:
-        case Qt::Key_Down:
-        case Qt::Key_PageUp:
-        case Qt::Key_PageDown:
-        case Qt::Key_Return:
-        case Qt::Key_Enter:
-          view()->setFocus(Qt::OtherFocusReason);
-          QApplication::sendEvent(ui_->playlist, event);
-          return true;
-        case Qt::Key_Escape:
-          ui_->search_field->clear();
-          return true;
-        default:
-          break;
-      }
+void PlaylistContainer::SetShuffleMode(PlaylistSequence::ShuffleMode mode) {
+  updating_sequence_ = true;
+  for (GtkWidget *item : shuffle_items_) {
+    const int item_mode = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(item), "mode")) - 1;
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(item), item_mode == static_cast<int>(mode));
+  }
+  if (shuffle_button_) {
+    gtk_widget_set_tooltip_text(shuffle_button_, PlaylistSequence::ShuffleLabel(mode));
+    if (PlaylistSequence::ShuffleActive(mode)) {
+      gtk_widget_add_css_class(shuffle_button_, "accent");
+    } else {
+      gtk_widget_remove_css_class(shuffle_button_, "accent");
     }
   }
-  return QWidget::eventFilter(objectWatched, event);
+  updating_sequence_ = false;
+}
 
+void PlaylistContainer::SetSummary(const std::string &text) { gtk_label_set_text(GTK_LABEL(summary_), text.c_str()); }
+
+void PlaylistContainer::ApplyLook() {
+  Settings settings;
+  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+  const bool show_toolbar = settings.BoolValue(PlaylistSettings::kShowToolbar, PlaylistSettings::kDefaultShowToolbar);
+  if (toolbar_) {
+    gtk_widget_set_visible(toolbar_, PlaylistToolbar::Visible(show_toolbar));
+  }
+  if (PlaylistToolbar::ShouldClearFilter(show_toolbar) && filter_entry_) {
+    updating_filter_ = true;
+    gtk_editable_set_text(GTK_EDITABLE(filter_entry_), "");
+    filter_.clear();
+    updating_filter_ = false;
+    CancelFilterTimer();
+    ApplyPendingFilter();
+  }
+  if (clear_button_) {
+    gtk_widget_set_visible(clear_button_, settings.BoolValue(PlaylistSettings::kPlaylistClear, PlaylistSettings::kDefaultPlaylistClear));
+  }
 }

@@ -1,57 +1,38 @@
-/*
- * Strawberry Music Player
- * Copyright 2020-2021, Jonas Kvinge <jonas@jkvinge.net>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "dialogs/addstreamdialog.h"
 
-#include "addstreamdialog.h"
-#include "ui_addstreamdialog.h"
+#include "dialogs/addstreamurl.h"
+#include "translations/translations.h"
 
-#include <QUrl>
-#include <QLabel>
-#include <QLineEdit>
-#include <QPushButton>
-#include <QDialogButtonBox>
-#include <QShowEvent>
+#include <adwaita.h>
 
-AddStreamDialog::AddStreamDialog(QWidget *parent) : QDialog(parent), ui_(new Ui_AddStreamDialog) {
-
-  ui_->setupUi(this);
-
-  QObject::connect(ui_->url, &QLineEdit::textChanged, this, &AddStreamDialog::TextChanged);
-  TextChanged(QString());
-
-}
-
-AddStreamDialog::~AddStreamDialog() { delete ui_; }
-
-void AddStreamDialog::showEvent(QShowEvent *e) {
-
-  if (!e->spontaneous()) {
-    ui_->url->setFocus();
-    ui_->url->selectAll();
-  }
-
-  QDialog::showEvent(e);
-
-}
-
-void AddStreamDialog::TextChanged(const QString &text) {
-
-  QUrl url(text);
-  ui_->button_box->button(QDialogButtonBox::Ok)->setEnabled(url.isValid() && !url.scheme().isEmpty() && !url.host().isEmpty());
-
+void AddStreamDialog::Show(GtkWindow *parent, const std::function<void(const std::string &, const std::string &)> &callback) {
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(AddStreamUrl::Title()), Translations::CStr(AddStreamUrl::Prompt())));
+  GtkWidget *url = gtk_entry_new();
+  gtk_entry_set_placeholder_text(GTK_ENTRY(url), "https://");
+  adw_alert_dialog_set_extra_child(dialog, url);
+  adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "add", Translations::CStr(AddStreamUrl::Add()), nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "add", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_response_enabled(dialog, "add", FALSE);
+  g_signal_connect(url, "changed", G_CALLBACK((+[](GtkEditable *editable, gpointer data) {
+                     const char *text = gtk_editable_get_text(editable);
+                     adw_alert_dialog_set_response_enabled(ADW_ALERT_DIALOG(data), "add",
+                                                           AddStreamUrl::IsComplete(text ? text : "") ? TRUE : FALSE);
+                   })),
+                   dialog);
+  auto *cb = new std::function<void(const std::string &, const std::string &)>(callback);
+  g_object_set_data(G_OBJECT(dialog), "url-entry", url);
+  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+                     auto *fn = static_cast<std::function<void(const std::string &, const std::string &)> *>(data);
+                     if (g_strcmp0(response, "add") == 0) {
+                       GtkWidget *url_entry = GTK_WIDGET(g_object_get_data(G_OBJECT(alert), "url-entry"));
+                       const char *text = gtk_editable_get_text(GTK_EDITABLE(url_entry));
+                       const std::string url_text = text ? text : "";
+                       if (AddStreamUrl::IsValid(url_text)) {
+                         (*fn)({}, url_text);
+                       }
+                     }
+                     delete fn;
+                   }),
+                   cb);
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
 }

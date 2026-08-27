@@ -1,59 +1,71 @@
-/*
- * Strawberry Music Player
- * This file was part of Clementine.
- * Copyright 2010, David Sansome <me@davidsansome.com>
- *
- * Strawberry is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Strawberry is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+#include "core/networktimeouts.h"
 
-#include "config.h"
+#include "core/network.h"
 
-#include <QObject>
-#include <QNetworkReply>
-#include <QTimerEvent>
+#include <glib.h>
 
-#include "networktimeouts.h"
+#include <algorithm>
 
-NetworkTimeouts::NetworkTimeouts(const int timeout_msec, QObject *parent)
-    : QObject(parent),
-      timeout_msec_(timeout_msec) {}
+namespace {
 
-void NetworkTimeouts::AddReply(QNetworkReply *reply) {
+struct TimeoutData {
+  NetworkTimeouts *self = nullptr;
+  int id = 0;
+};
 
-  if (timers_.contains(reply)) return;
+}  // namespace
 
-  QObject::connect(reply, &QNetworkReply::destroyed, this, &NetworkTimeouts::ReplyFinished);
-  QObject::connect(reply, &QNetworkReply::finished, this, &NetworkTimeouts::ReplyFinished);
-  timers_[reply] = startTimer(timeout_msec_);
-
+void NetworkTimeouts::AddReply(int id) {
+  if (id <= 0) {
+    return;
+  }
+  Cancel(id);
+  auto *data = new TimeoutData{this, id};
+  const guint interval = static_cast<guint>(std::max(1, timeout_msec_));
+  timers_[id] = g_timeout_add_full(
+      G_PRIORITY_DEFAULT, interval,
+      +[](gpointer user) -> gboolean {
+        auto *data = static_cast<TimeoutData *>(user);
+        NetworkTimeouts *self = data->self;
+        const int reply_id = data->id;
+        if (self) {
+          self->timers_.erase(reply_id);
+          if (self->abort_) {
+            self->abort_(reply_id);
+          }
+        }
+        return G_SOURCE_REMOVE;
+      },
+      data, +[](gpointer user) { delete static_cast<TimeoutData *>(user); });
 }
 
-void NetworkTimeouts::ReplyFinished() {
-
-  QNetworkReply *reply = reinterpret_cast<QNetworkReply*>(sender());
-  if (timers_.contains(reply)) {
-    killTimer(timers_.take(reply));
+void NetworkTimeouts::Cancel(int id) {
+  auto it = timers_.find(id);
+  if (it == timers_.end()) {
+    return;
   }
-
+  if (it->second) {
+    g_source_remove(it->second);
+  }
+  timers_.erase(it);
 }
 
-void NetworkTimeouts::timerEvent(QTimerEvent *e) {
-
-  QNetworkReply *reply = timers_.key(e->timerId());
-  if (reply) {
-    reply->abort();
+void NetworkTimeouts::CancelAll() {
+  const std::map<int, unsigned> timers = timers_;
+  timers_.clear();
+  for (const auto &entry : timers) {
+    if (entry.second) {
+      g_source_remove(entry.second);
+    }
   }
+}
 
+bool NetworkTimeouts::Contains(int id) const { return timers_.count(id) > 0; }
+
+void NetworkTimeouts::Watch(NetworkAccessManager *network, int id) {
+  if (!network || id <= 0) {
+    return;
+  }
+  SetAbort([network](int reply_id) { network->Cancel(reply_id); });
+  AddReply(id);
 }
