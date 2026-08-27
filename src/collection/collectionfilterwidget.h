@@ -18,8 +18,14 @@ class CollectionFilterWidget {
   using MenuActionCallback = std::function<void(CollectionFilterMenu::ActionKind)>;
 
   CollectionFilterWidget();
+  ~CollectionFilterWidget();
+
+  CollectionFilterWidget(const CollectionFilterWidget &) = delete;
+  CollectionFilterWidget &operator=(const CollectionFilterWidget &) = delete;
 
   GtkWidget *widget() const { return widget_; }
+  GMenuModel *MenuModel() const { return menu_model_; }
+  void AttachActions(GtkWidget *widget);
   CollectionFilterOptions options() const { return options_; }
   CollectionGrouping::Grouping grouping() const { return grouping_; }
   void SetChangedCallback(ChangedCallback callback);
@@ -38,6 +44,8 @@ class CollectionFilterWidget {
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *options_button_ = nullptr;
+  GMenuModel *menu_model_ = nullptr;
+  GSimpleActionGroup *action_group_ = nullptr;
   CollectionFilterOptions options_;
   CollectionGrouping::Grouping grouping_;
   int age_index_ = 0;

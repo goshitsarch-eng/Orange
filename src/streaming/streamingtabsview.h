@@ -42,6 +42,7 @@ class StreamingTabsView {
   void AddToCollection(StreamingCollectionStore::List list, const SongList &songs);
   void RemoveFromCollection(StreamingCollectionStore::List list, const SongList &songs);
   bool CurrentStoreList(StreamingCollectionStore::List *list) const;
+  CollectionFilterWidget *CurrentFilterWidget() const;
   void AbortGetArtists();
   void AbortGetAlbums();
   void AbortGetSongs();

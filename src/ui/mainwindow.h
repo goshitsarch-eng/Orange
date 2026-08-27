@@ -105,6 +105,7 @@ class MainWindow {
   void ShowPlaylistMenu(double x, double y);
   void ShowCollectionMenu();
   void ShowStreamingMenu(const SongList &songs, StreamingCollectionActions::MenuContext ctx);
+  StreamingTabsView *CurrentStreamingTabs() const;
   void StreamingFavorite(bool add);
   void StreamingAddToList(StreamingCollectionStore::List list);
   void StreamingSearchForThis();

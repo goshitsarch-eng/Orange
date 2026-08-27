@@ -37,6 +37,8 @@ class StreamingSearchView {
   void FocusSearch();
   void FocusResultsAndMove(unsigned keyval);
   void SetConfigureCallback(ConfigureCallback callback);
+  GMenuModel *GroupMenuModel() const { return group_menu_model_; }
+  void AttachGroupActions(GtkWidget *widget);
   void SearchForThis(const std::string &query = {});
   std::string SelectedSearchQuery() const;
   StreamingSearchModel *model() { return &model_; }
@@ -81,6 +83,8 @@ class StreamingSearchView {
   GtkWidget *pretty_covers_btn_ = nullptr;
   GtkWidget *group_button_ = nullptr;
   GtkWidget *configure_button_ = nullptr;
+  GMenuModel *group_menu_model_ = nullptr;
+  GSimpleActionGroup *group_action_group_ = nullptr;
   GtkWidget *list_ = nullptr;
   GtkWidget *progress_ = nullptr;
   GtkWidget *status_ = nullptr;

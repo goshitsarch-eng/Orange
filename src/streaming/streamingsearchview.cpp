@@ -220,6 +220,19 @@ StreamingSearchView::~StreamingSearchView() {
   }
   CancelPendingSearch();
   ResetTypeAhead();
+  if (group_menu_model_) {
+    g_object_unref(group_menu_model_);
+  }
+  if (group_action_group_) {
+    g_object_unref(group_action_group_);
+  }
+}
+
+void StreamingSearchView::AttachGroupActions(GtkWidget *widget) {
+  if (!widget || !group_action_group_) {
+    return;
+  }
+  gtk_widget_insert_action_group(widget, "streamsearch", G_ACTION_GROUP(group_action_group_));
 }
 
 void StreamingSearchView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
@@ -577,6 +590,16 @@ void StreamingSearchView::BuildGroupMenu() {
                    }),
                    this);
   g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(advanced));
+  if (group_action_group_) {
+    g_object_unref(group_action_group_);
+  }
+  if (group_menu_model_) {
+    g_object_unref(group_menu_model_);
+  }
+  group_action_group_ = group;
+  g_object_ref(group);
+  group_menu_model_ = G_MENU_MODEL(menu);
+  g_object_ref(menu);
   gtk_widget_insert_action_group(group_button_, "streamsearch", G_ACTION_GROUP(group));
   gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(group_button_), G_MENU_MODEL(menu));
   g_object_unref(group);

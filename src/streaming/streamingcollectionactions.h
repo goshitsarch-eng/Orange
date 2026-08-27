@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_STREAMINGCOLLECTIONACTIONS_H
 #define STRAWBERRY_STREAMINGCOLLECTIONACTIONS_H
 
+#include <cstring>
 #include <vector>
 
 namespace StreamingCollectionActions {
@@ -70,9 +71,28 @@ inline bool SearchForThisEnabled(int songs_selected, MenuContext ctx) {
 
 inline bool SearchForThisEnabled(int songs_selected) { return SearchForThisEnabled(songs_selected, MenuContext::Search); }
 
-inline bool FavoriteEnabled(int songs_selected, MenuContext ctx) {
-  return ctx == MenuContext::Collection && songs_selected > 0;
+// Qt StreamingCollectionView never adds "Add to favorites"; collection tabs only have Remove.
+inline bool FavoriteEnabled(int, MenuContext) { return false; }
+
+inline bool FavoriteEnabled(int songs_selected) { return FavoriteEnabled(songs_selected, MenuContext::Collection); }
+
+inline const char *DisplayOptionsLabel() { return "Display options"; }
+
+inline bool DisplayOptionsEnabled(MenuContext ctx) { return ctx == MenuContext::Collection; }
+
+inline bool DisplayOptionsEnabled(int, MenuContext ctx) { return DisplayOptionsEnabled(ctx); }
+
+inline bool HasDisplayOptionsTab(const char *tab) {
+  return tab && (std::strcmp(tab, "artists") == 0 || std::strcmp(tab, "albums") == 0 || std::strcmp(tab, "songs") == 0 ||
+                 std::strcmp(tab, "favorites") == 0);
 }
+
+inline const char *SearchGroupByLabel() { return "Group by"; }
+
+// Qt StreamingSearchView::ResultsContextMenuEvent always adds Group by and Configure.
+inline bool SearchSettingsEnabled(MenuContext ctx) { return ctx == MenuContext::Search; }
+
+inline bool SearchSettingsEnabled(int, MenuContext ctx) { return SearchSettingsEnabled(ctx); }
 
 inline bool ActionEnabled(Action action, int songs_selected, MenuContext ctx) {
   switch (action) {

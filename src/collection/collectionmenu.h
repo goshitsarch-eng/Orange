@@ -140,6 +140,11 @@ inline bool Contains(const std::vector<Item> &items, Action action) {
 
 inline bool CopyToDeviceEnabled(const SelectionState &state) { return AllEditable(state) && state.devices_connected; }
 
+// Qt CollectionView::contextMenuEvent always embeds filter_widget_->menu() as Display options.
+inline bool DisplayOptionsEnabled() { return true; }
+
+inline const char *DisplayOptionsLabel() { return "Display options"; }
+
 inline std::string LabelFor(Action action) {
   switch (action) {
     case Action::Append:

@@ -25,6 +25,22 @@ CollectionFilterWidget::CollectionFilterWidget() {
   BuildMenu();
 }
 
+CollectionFilterWidget::~CollectionFilterWidget() {
+  if (menu_model_) {
+    g_object_unref(menu_model_);
+  }
+  if (action_group_) {
+    g_object_unref(action_group_);
+  }
+}
+
+void CollectionFilterWidget::AttachActions(GtkWidget *widget) {
+  if (!widget || !action_group_) {
+    return;
+  }
+  gtk_widget_insert_action_group(widget, "collfilter", G_ACTION_GROUP(action_group_));
+}
+
 void CollectionFilterWidget::SetChangedCallback(ChangedCallback callback) { changed_ = std::move(callback); }
 
 void CollectionFilterWidget::SetGrouping(const CollectionGrouping::Grouping &grouping) {
@@ -226,6 +242,16 @@ void CollectionFilterWidget::BuildMenu() {
   g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(save));
   add_kind("manage", CollectionFilterMenu::ActionKind::Manage);
   add_kind("configure", CollectionFilterMenu::ActionKind::Configure);
+  if (action_group_) {
+    g_object_unref(action_group_);
+  }
+  if (menu_model_) {
+    g_object_unref(menu_model_);
+  }
+  action_group_ = group;
+  g_object_ref(group);
+  menu_model_ = G_MENU_MODEL(root);
+  g_object_ref(root);
   gtk_widget_insert_action_group(options_button_, "collfilter", G_ACTION_GROUP(group));
   gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(options_button_), G_MENU_MODEL(root));
   g_object_unref(group);

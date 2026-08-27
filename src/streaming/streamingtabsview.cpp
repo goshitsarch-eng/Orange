@@ -427,6 +427,30 @@ bool StreamingTabsView::CurrentStoreList(StreamingCollectionStore::List *list) c
   return StreamingCollectionStore::ListFromTab(gtk_stack_get_visible_child_name(GTK_STACK(stack_)), list);
 }
 
+CollectionFilterWidget *StreamingTabsView::CurrentFilterWidget() const {
+  if (!stack_) {
+    return nullptr;
+  }
+  const char *name = gtk_stack_get_visible_child_name(GTK_STACK(stack_));
+  if (!StreamingCollectionActions::HasDisplayOptionsTab(name)) {
+    return nullptr;
+  }
+  const std::string tab(name);
+  if (tab == "artists") {
+    return artists_->filter_widget();
+  }
+  if (tab == "albums") {
+    return albums_->filter_widget();
+  }
+  if (tab == "songs") {
+    return songs_->filter_widget();
+  }
+  if (tab == "favorites") {
+    return favorites_->filter_widget();
+  }
+  return nullptr;
+}
+
 void StreamingTabsView::PersistList(StreamingCollectionStore::List list, const SongList &songs) {
   if (!service_ || !database_) {
     return;

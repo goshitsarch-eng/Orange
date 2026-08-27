@@ -748,10 +748,23 @@ TEST(StreamingCollectionActions, PlaylistActionsRequireSelection) {
   EXPECT_FALSE(StreamingCollectionActions::SearchForThisEnabled(2));
   EXPECT_TRUE(StreamingCollectionActions::SearchForThisEnabled(1, StreamingCollectionActions::MenuContext::Search));
   EXPECT_FALSE(StreamingCollectionActions::SearchForThisEnabled(1, StreamingCollectionActions::MenuContext::Collection));
+  EXPECT_FALSE(StreamingCollectionActions::FavoriteEnabled(2));
+  EXPECT_FALSE(StreamingCollectionActions::FavoriteEnabled(2, StreamingCollectionActions::MenuContext::Collection));
+  EXPECT_TRUE(StreamingCollectionActions::DisplayOptionsEnabled(StreamingCollectionActions::MenuContext::Collection));
+  EXPECT_FALSE(StreamingCollectionActions::DisplayOptionsEnabled(StreamingCollectionActions::MenuContext::Search));
+  EXPECT_STREQ("Display options", StreamingCollectionActions::DisplayOptionsLabel());
+  EXPECT_TRUE(StreamingCollectionActions::HasDisplayOptionsTab("artists"));
+  EXPECT_TRUE(StreamingCollectionActions::HasDisplayOptionsTab("favorites"));
+  EXPECT_FALSE(StreamingCollectionActions::HasDisplayOptionsTab("search"));
+  EXPECT_TRUE(StreamingCollectionActions::SearchSettingsEnabled(StreamingCollectionActions::MenuContext::Search));
+  EXPECT_FALSE(StreamingCollectionActions::SearchSettingsEnabled(StreamingCollectionActions::MenuContext::Collection));
+  EXPECT_STREQ("Group by", StreamingCollectionActions::SearchGroupByLabel());
   EXPECT_EQ(1u, StreamingCollectionActions::VisibleItems(0).size());
   EXPECT_EQ(StreamingCollectionActions::Action::EnqueueNext, StreamingCollectionActions::VisibleItems(0).front().id);
   EXPECT_TRUE(StreamingCollectionActions::VisibleItems(0, StreamingCollectionActions::MenuContext::Search).empty());
-  EXPECT_EQ(StreamingCollectionActions::Items().size(), StreamingCollectionActions::VisibleItems(2).size());
+  EXPECT_EQ(StreamingCollectionActions::Items().size() - 1, StreamingCollectionActions::VisibleItems(2).size());
+  EXPECT_FALSE(StreamingCollectionActions::Contains(StreamingCollectionActions::VisibleItems(2), StreamingCollectionActions::Action::Favorite));
+  EXPECT_TRUE(StreamingCollectionActions::Contains(StreamingCollectionActions::VisibleItems(2), StreamingCollectionActions::Action::Unfavorite));
   EXPECT_FALSE(StreamingCollectionActions::Contains(StreamingCollectionActions::VisibleItems(2, StreamingCollectionActions::MenuContext::Search),
                                                     StreamingCollectionActions::Action::EnqueueNext));
   EXPECT_TRUE(StreamingCollectionActions::Contains(StreamingCollectionActions::VisibleItems(2, StreamingCollectionActions::MenuContext::Collection),

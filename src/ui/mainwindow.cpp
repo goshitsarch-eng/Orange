@@ -10,6 +10,7 @@
 #include "collection/collectiongrouping.h"
 #include "playlist/playlistsummary.h"
 #include "collection/collectionsearchlabels.h"
+#include "collection/collectionfilterwidget.h"
 #include "collection/collectionviewcontainer.h"
 #include "constants/backendsettings.h"
 #include "constants/coverssettings.h"
@@ -663,6 +664,10 @@ void MainWindow::BuildUi() {
              }));
   add_action("streaming-add-songs", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                static_cast<MainWindow *>(data)->StreamingAddToList(StreamingCollectionStore::List::Songs);
+             }));
+  add_action("streaming-configure", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
+               auto *self = static_cast<MainWindow *>(data);
+               self->OpenSettings(SettingsPages::ForService(self->streaming_service_name_));
              }));
   add_action("radio-append", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
@@ -3084,14 +3089,24 @@ void MainWindow::ShowCollectionMenu() {
     }
     g_menu_append(menu, Translations::Tr(CollectionMenu::LabelFor(item.action)).c_str(), CollectionMenu::WinAction(item.action));
   }
+  CollectionFilterWidget *collection_filter = collection_container_ ? collection_container_->filter_widget() : nullptr;
+  if (CollectionMenu::DisplayOptionsEnabled() && collection_filter && collection_filter->MenuModel()) {
+    g_menu_append_submenu(menu, Translations::Tr(CollectionMenu::DisplayOptionsLabel()).c_str(), collection_filter->MenuModel());
+  }
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, collection_container_ ? collection_container_->view()->list() : GTK_WIDGET(window_));
+  if (collection_filter) {
+    collection_filter->AttachActions(popover);
+  }
   gtk_popover_popup(GTK_POPOVER(popover));
 }
 
 void MainWindow::ShowStreamingMenu(const SongList &songs, StreamingCollectionActions::MenuContext ctx) {
   streaming_menu_songs_ = songs;
   const int songs_selected = static_cast<int>(streaming_menu_songs_.size());
+  StreamingTabsView *tabs = CurrentStreamingTabs();
+  CollectionFilterWidget *filter = tabs ? tabs->CurrentFilterWidget() : nullptr;
+  StreamingSearchView *search = tabs ? tabs->search_view() : nullptr;
   GMenu *menu = g_menu_new();
   for (const StreamingCollectionActions::Item &item : StreamingCollectionActions::VisibleItems(songs_selected, ctx)) {
     g_menu_append(menu, Translations::Tr(item.label).c_str(), item.action);
@@ -3110,6 +3125,16 @@ void MainWindow::ShowStreamingMenu(const SongList &songs, StreamingCollectionAct
       g_menu_append(menu, Translations::Tr(StreamingCollectionStore::AddLabel(list)).c_str(), action);
     }
   }
+  if (StreamingCollectionActions::DisplayOptionsEnabled(ctx) && filter && filter->MenuModel()) {
+    g_menu_append_submenu(menu, Translations::Tr(StreamingCollectionActions::DisplayOptionsLabel()).c_str(), filter->MenuModel());
+  }
+  if (StreamingCollectionActions::SearchSettingsEnabled(ctx) && search) {
+    if (search->GroupMenuModel()) {
+      g_menu_append_submenu(menu, Translations::Tr(StreamingCollectionActions::SearchGroupByLabel()).c_str(), search->GroupMenuModel());
+    }
+    const std::string configure = StreamingSearchOpts::ConfigureServiceLabel(streaming_service_name_);
+    g_menu_append(menu, Translations::Tr(configure.c_str()).c_str(), "win.streaming-configure");
+  }
   if (g_menu_model_get_n_items(G_MENU_MODEL(menu)) == 0) {
     g_object_unref(menu);
     return;
@@ -3117,7 +3142,22 @@ void MainWindow::ShowStreamingMenu(const SongList &songs, StreamingCollectionAct
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   GtkWidget *parent = streaming_stack_ ? streaming_stack_ : GTK_WIDGET(window_);
   gtk_widget_set_parent(popover, parent);
+  if (filter) {
+    filter->AttachActions(popover);
+  }
+  if (search) {
+    search->AttachGroupActions(popover);
+  }
   gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+StreamingTabsView *MainWindow::CurrentStreamingTabs() const {
+  for (const auto &view : streaming_views_) {
+    if (view && view->service() && view->service()->name() == streaming_service_name_) {
+      return view.get();
+    }
+  }
+  return nullptr;
 }
 
 void MainWindow::StreamingFavorite(bool add) {

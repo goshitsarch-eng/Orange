@@ -1047,6 +1047,8 @@ TEST(CollectionMenu, CatalogAndEmptySelection) {
   const auto empty = CollectionMenu::VisibleItems(CollectionMenu::Analyze({}));
   EXPECT_EQ(1u, empty.size());
   EXPECT_TRUE(CollectionMenu::Contains(empty, CollectionMenu::Action::GroupBy));
+  EXPECT_TRUE(CollectionMenu::DisplayOptionsEnabled());
+  EXPECT_STREQ("Display options", CollectionMenu::DisplayOptionsLabel());
 }
 
 TEST(CollectionMenu, EditTrackVsTracksAndOrganize) {
