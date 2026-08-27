@@ -803,6 +803,9 @@ TEST(NotificationsControls, ConvertsTimeoutAndGatesDuration) {
   EXPECT_EQ(OSDSettings::Type::Disabled, NotificationsControls::EffectiveType(OSDSettings::Type::TrayPopup, false, false, false));
   EXPECT_FALSE(NotificationsControls::GeneralSensitive(OSDSettings::Type::Disabled));
   EXPECT_TRUE(NotificationsControls::PrettyGroupSensitive(OSDSettings::Type::Pretty));
+  EXPECT_TRUE(NotificationsControls::ShouldShowPrettyPreview(true, OSDSettings::Type::Pretty));
+  EXPECT_FALSE(NotificationsControls::ShouldShowPrettyPreview(false, OSDSettings::Type::Pretty));
+  EXPECT_FALSE(NotificationsControls::ShouldShowPrettyPreview(true, OSDSettings::Type::Native));
   EXPECT_FALSE(NotificationsControls::ArtSensitive(OSDSettings::Type::TrayPopup));
   EXPECT_TRUE(NotificationsControls::ArtSensitive(OSDSettings::Type::Native));
   EXPECT_TRUE(NotificationsControls::DisableDurationSensitive(OSDSettings::Type::Pretty));

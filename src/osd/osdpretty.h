@@ -17,6 +17,7 @@ class OSDPretty {
   void ReloadSettings();
   void SetMessage(const std::string &summary, const std::string &message, const std::vector<unsigned char> &image = {});
   void ShowMessage(const std::string &summary, const std::string &message, const std::vector<unsigned char> &image = {});
+  void Hide();
   void set_popup_duration(int msec) { timeout_ms_ = msec; }
   void set_toggle_mode(bool toggle) { toggle_mode_ = toggle; }
   bool toggle_mode() const { return toggle_mode_; }

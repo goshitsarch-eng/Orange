@@ -25,6 +25,7 @@
 #include "settings/transcodersettingspage.h"
 #include "settings/waveformsettingspage.h"
 #include "constants/settingsdialogsettings.h"
+#include "dialogs/dialogclosekeys.h"
 #include "dialogs/dialoggeometry.h"
 #include "translations/translations.h"
 
@@ -83,5 +84,6 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::functi
                    }),
                    nullptr);
   DialogGeometry::BindClosed(ADW_DIALOG(dialog), SettingsDialogSettings::kSettingsGroup, SettingsDialogSettings::kGeometry);
+  DialogCloseKeys::Attach(ADW_DIALOG(dialog));
   adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
 }

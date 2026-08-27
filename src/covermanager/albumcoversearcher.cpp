@@ -3,6 +3,7 @@
 #include "covermanager/albumcoversearcherlabels.h"
 #include "core/application.h"
 #include "core/network.h"
+#include "dialogs/dialogclosekeys.h"
 #include "dialogs/dialoghelpers.h"
 #include "translations/translations.h"
 #include "utilities/jsonutils.h"
@@ -321,6 +322,7 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &s
                    state);
 
   adw_dialog_set_child(dialog, box);
+  DialogCloseKeys::Attach(dialog);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
   if (AlbumCoverSearcher::ShouldAutoSearch(target.EffectiveAlbumartist(), target.album())) {
     StartSearch(state);

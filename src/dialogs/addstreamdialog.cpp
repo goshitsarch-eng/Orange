@@ -35,4 +35,10 @@ void AddStreamDialog::Show(GtkWindow *parent, const std::function<void(const std
                    }),
                    cb);
   adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
+  if (AddStreamUrl::ShouldFocusOnShow()) {
+    gtk_widget_grab_focus(url);
+  }
+  if (AddStreamUrl::ShouldSelectAllOnShow()) {
+    gtk_editable_select_region(GTK_EDITABLE(url), 0, -1);
+  }
 }

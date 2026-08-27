@@ -418,6 +418,8 @@ void OSDPretty::ConnectPopup() {
                    this);
 }
 
+void OSDPretty::Hide() { HideNow(); }
+
 void OSDPretty::HideNow() {
   if (timeout_id_) {
     g_source_remove(timeout_id_);

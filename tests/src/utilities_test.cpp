@@ -2481,6 +2481,8 @@ TEST(AddStreamUrl, ValidatesSchemeAndHostLikeQt) {
   EXPECT_FALSE(AddStreamUrl::IsComplete(""));
   EXPECT_FALSE(AddStreamUrl::IsComplete("https://"));
   EXPECT_TRUE(AddStreamUrl::IsComplete("https://example.com/stream.mp3"));
+  EXPECT_TRUE(AddStreamUrl::ShouldFocusOnShow());
+  EXPECT_TRUE(AddStreamUrl::ShouldSelectAllOnShow());
   EXPECT_EQ("https", AddStreamUrl::Scheme("https://radio.example/live"));
   EXPECT_EQ("radio.example", AddStreamUrl::Host("https://radio.example/live"));
 }

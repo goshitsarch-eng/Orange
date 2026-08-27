@@ -10,6 +10,7 @@
 #include "transcoder/transcoder.h"
 #include "transcoder/transcoderprogress.h"
 #include "transcoder/transcoderoptionsdialog.h"
+#include "dialogs/dialogclosekeys.h"
 #include "settings/settingswheelthrough.h"
 #include "translations/translations.h"
 #include "utilities/filefilters.h"
@@ -713,5 +714,6 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
                    nullptr);
 
   adw_dialog_set_child(dialog, box);
+  DialogCloseKeys::Attach(dialog);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }
