@@ -10,6 +10,7 @@
 #include "core/musicstorage.h"
 #include "device/devicecopy.h"
 #include "device/devicecopyjob.h"
+#include "device/deviceeject.h"
 #include "device/devicecopyrunner.h"
 #include "device/devicestorage.h"
 #include "core/taskmanager.h"
@@ -561,6 +562,16 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_EQ(DeviceStorage::Kind::Mtp, DeviceStorage::KindFor(mtp));
   EXPECT_EQ(DeviceStorage::Kind::GPod, DeviceStorage::KindFor(ipod));
   EXPECT_EQ(DeviceStorage::Kind::Filesystem, DeviceStorage::KindFor(filesystem));
+  EXPECT_FALSE(DeviceCopy::ShouldUseRunnerFallback(filesystem));
+  EXPECT_FALSE(DeviceCopy::ShouldUseRunnerFallback(mtp));
+  EXPECT_FALSE(DeviceCopy::ShouldUseRunnerFallback(ipod));
+  EXPECT_TRUE(DeviceEject::Supported(filesystem));
+  EXPECT_FALSE(DeviceEject::Supported(mtp));
+  EXPECT_TRUE(DeviceEject::Supported(ipod));
+  EXPECT_TRUE(DeviceEject::ShouldShowCheckbox(true, true));
+  EXPECT_FALSE(DeviceEject::ShouldShowCheckbox(true, false));
+  EXPECT_TRUE(DeviceEject::ShouldEjectAfter(true, true, true));
+  EXPECT_FALSE(DeviceEject::ShouldEjectAfter(true, true, false));
   EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("mtp:serial"));
   EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("MTP/serial"));
   EXPECT_EQ("usb", DeviceCopyJob::MtpSerial("usb"));

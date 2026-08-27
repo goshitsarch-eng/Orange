@@ -28,6 +28,20 @@ inline bool DeleteOriginals(const std::string &id) { return id == "delete"; }
 
 inline const char *AfterCopyId(bool move) { return move ? "delete" : "keep"; }
 
+// Qt OrganizeDialog::SetCopy(true) for copy-to-device always starts on "keep originals".
+inline bool IsDeviceCopy(const std::string &device_id, bool show_eject) { return !device_id.empty() || show_eject; }
+
+inline bool DeviceCopyKeepsOriginals() { return true; }
+
+inline bool InitialMove(bool request_move, bool device_copy, bool persisted_move) {
+  if (device_copy) {
+    return request_move;
+  }
+  return request_move || persisted_move;
+}
+
+inline bool ShouldPersistMove(bool device_copy) { return !device_copy; }
+
 inline std::string InsertBeforeExtension(const std::string &path, const std::string &insert) {
   const std::string ext = FileUtils::Extension(path);
   if (ext.empty()) {

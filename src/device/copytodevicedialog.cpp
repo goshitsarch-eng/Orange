@@ -2,11 +2,10 @@
 
 #include "core/application.h"
 #include "device/devicecopy.h"
-#include "device/devicecopyrunner.h"
+#include "device/deviceeject.h"
 #include "device/devicecopysupported.h"
 #include "device/devicemanager.h"
 #include "organize/organizedialog.h"
-#include "organize/organizeerrordialog.h"
 #include "organize/organizetranscode.h"
 #include "translations/translations.h"
 #include "widgets/freespacebar.h"
@@ -61,50 +60,23 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongLis
                            application->playlist_manager() && application->playlist_manager()->current()
                                ? application->playlist_manager()->current()->name()
                                : std::string());
-                       if (DeviceCopy::ShouldUseOrganizeDialog(*device)) {
-                         OrganizeDialog::Request request;
-                         request.songs = filenames.empty() ? source : SongList{};
-                         request.filenames = filenames;
-                         request.destination = DeviceManager::MusicPath(*device);
-                         const DeviceDatabaseBackend::Device stored = application->device_manager()->StoredDevice(device->unique_id);
-                         request.transcode_mode = OrganizeTranscode::FromDeviceMode(
-                             stored.id >= 0 ? stored.transcode_mode : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported);
-                         request.transcode_format = stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG;
-                         request.supported_filetypes = DeviceCopySupported::ForDevice(*device);
-                         request.show_eject = true;
-                         request.device_id = device->unique_id;
-                         request.playlist = playlist_name;
-                         OrganizeDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(btn), "parent")), application, request);
+                       if (!DeviceCopy::ShouldUseOrganizeDialog(*device) || DeviceCopy::ShouldUseRunnerFallback(*device)) {
                          return;
                        }
-                       if (source.empty()) {
-                         return;
-                       }
-                       gtk_widget_set_sensitive(GTK_WIDGET(btn), FALSE);
-                       gtk_button_set_label(btn, DeviceCopyJob::TaskName());
+                       OrganizeDialog::Request request;
+                       request.songs = filenames.empty() ? source : SongList{};
+                       request.filenames = filenames;
+                       request.destination = DeviceManager::MusicPath(*device);
+                       request.move = false;
                        const DeviceDatabaseBackend::Device stored = application->device_manager()->StoredDevice(device->unique_id);
-                       auto *runner = new DeviceCopyRunner(application->task_manager(), application->tagreader());
-                       runner->set_transcode(OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode
-                                                                                             : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported),
-                                             stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG);
-                       runner->set_playlist(playlist_name);
-                       GtkWindow *parent = GTK_WINDOW(g_object_get_data(G_OBJECT(btn), "parent"));
-                       const std::string device_id = device->unique_id;
-                       runner->Finished.Connect([btn, runner, parent, application, device_id](bool ok) {
-                         gtk_widget_set_sensitive(GTK_WIDGET(btn), TRUE);
-                         gtk_button_set_label(btn, ok ? "Copied" : "Failed");
-                         if (!runner->errors().empty()) {
-                           OrganizeErrorDialog::Show(parent, OrganizeErrorDialog::OperationType::Copy, runner->errors());
-                         }
-                         if (application && application->device_manager() && runner->copied() > 0) {
-                           application->device_manager()->RefreshAfterCopy(device_id, runner->copied(), runner->copied_songs());
-                         }
-                         g_idle_add(+[](gpointer data) -> gboolean {
-                           delete static_cast<DeviceCopyRunner *>(data);
-                           return G_SOURCE_REMOVE;
-                         }, runner);
-                       });
-                       runner->StartAsync(*device, source);
+                       request.transcode_mode = OrganizeTranscode::FromDeviceMode(
+                           stored.id >= 0 ? stored.transcode_mode : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported);
+                       request.transcode_format = stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG;
+                       request.supported_filetypes = DeviceCopySupported::ForDevice(*device);
+                       request.show_eject = DeviceEject::Supported(*device);
+                       request.device_id = device->unique_id;
+                       request.playlist = playlist_name;
+                       OrganizeDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(btn), "parent")), application, request);
                      })),
                      app);
     adw_action_row_add_suffix(ADW_ACTION_ROW(row), copy);

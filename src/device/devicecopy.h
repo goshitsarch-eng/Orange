@@ -16,6 +16,9 @@ inline bool UsesOrganizeMusicStorage(const ConnectedDevice &device) { return Dev
 
 inline bool ShouldUseOrganizeDialog(const ConnectedDevice &device) { return DeviceCopyJob::ShouldUseOrganizeDialog(device); }
 
+// CopyToDeviceDialog always opens Organize; the DeviceCopyRunner fallback is gone.
+inline bool ShouldUseRunnerFallback(const ConnectedDevice &) { return false; }
+
 inline bool CanCopyToCollection(const SongList &songs, bool filesystem = true) { return filesystem && !songs.empty(); }
 
 inline OrganizeDialog::Request CollectionRequest(const SongList &songs) {

@@ -21,3 +21,24 @@ void SliderSlider::SetRange(double min, double max) { gtk_range_set_range(GTK_RA
 void SliderSlider::SetChangedCallback(ChangedCallback callback) { changed_ = std::move(callback); }
 
 void SliderSlider::BlockSignals(bool block) { blocked_ = block; }
+
+void SliderSlider::CancelGestures() {
+  if (!widget_) {
+    return;
+  }
+  GListModel *controllers = gtk_widget_observe_controllers(widget_);
+  if (!controllers) {
+    return;
+  }
+  const guint n = g_list_model_get_n_items(controllers);
+  for (guint i = 0; i < n; ++i) {
+    auto *controller = GTK_EVENT_CONTROLLER(g_list_model_get_item(controllers, i));
+    if (GTK_IS_GESTURE(controller)) {
+      gtk_gesture_set_state(GTK_GESTURE(controller), GTK_EVENT_SEQUENCE_DENIED);
+    }
+    if (controller) {
+      g_object_unref(controller);
+    }
+  }
+  g_object_unref(controllers);
+}

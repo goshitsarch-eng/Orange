@@ -13,6 +13,7 @@
 #include "utilities/timeutils.h"
 #include "widgets/multiloadingtext.h"
 #include "widgets/tracksliderstate.h"
+#include "widgets/tracksliderdragreset.h"
 #include "widgets/trackslidertime.h"
 #include "widgets/volumesliderwheel.h"
 #include "utilities/fileutils.h"
@@ -177,6 +178,16 @@ TEST(TrackSliderState, StoppedAndCanSeekMatchQt) {
   local.set_url("file:///tmp/a.flac");
   EXPECT_TRUE(TrackSliderState::CanSeekFromSong(local));
   EXPECT_TRUE(TrackSliderState::CanSeekFromOptions(PlayerItemOptions::ForSong(local)));
+}
+
+TEST(TrackSliderDragReset, ClearsDragWhenDisabledMidSeek) {
+  EXPECT_TRUE(TrackSliderDragReset::ShouldResetOnDisable(true, false, true));
+  EXPECT_FALSE(TrackSliderDragReset::ShouldResetOnDisable(true, false, false));
+  EXPECT_FALSE(TrackSliderDragReset::ShouldResetOnDisable(true, true, true));
+  EXPECT_FALSE(TrackSliderDragReset::ShouldResetOnDisable(false, false, true));
+  EXPECT_TRUE(TrackSliderDragReset::DraggingAfterPress(true, 1));
+  EXPECT_FALSE(TrackSliderDragReset::DraggingAfterPress(false, 1));
+  EXPECT_FALSE(TrackSliderDragReset::DraggingAfterRelease());
 }
 
 TEST(VolumeSliderWheel, AccumulatesNotchesAndPresets) {
@@ -708,6 +719,15 @@ TEST(OrganizePreview, DisambiguatesOnlyWhenUnique) {
   EXPECT_TRUE(OrganizePreview::LocksDestination("/run/media/usb", ""));
   EXPECT_TRUE(OrganizePreview::LocksDestination("", "mtp:phone"));
   EXPECT_FALSE(OrganizePreview::LocksDestination("", ""));
+  EXPECT_TRUE(OrganizePreview::IsDeviceCopy("usb:1", false));
+  EXPECT_TRUE(OrganizePreview::IsDeviceCopy("", true));
+  EXPECT_FALSE(OrganizePreview::IsDeviceCopy("", false));
+  EXPECT_TRUE(OrganizePreview::DeviceCopyKeepsOriginals());
+  EXPECT_FALSE(OrganizePreview::InitialMove(false, true, true));
+  EXPECT_TRUE(OrganizePreview::InitialMove(true, true, false));
+  EXPECT_TRUE(OrganizePreview::InitialMove(false, false, true));
+  EXPECT_FALSE(OrganizePreview::ShouldPersistMove(true));
+  EXPECT_TRUE(OrganizePreview::ShouldPersistMove(false));
   EXPECT_TRUE(OrganizePreview::CanRun(false, "", {}, 150, 0, 0, false, true));
   EXPECT_FALSE(OrganizePreview::CanRun(false, "", {}, 150, 0, 0, false, false));
 }

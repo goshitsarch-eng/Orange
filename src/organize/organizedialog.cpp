@@ -5,6 +5,7 @@
 #include "core/application.h"
 #include "core/settings.h"
 #include "device/connecteddevice.h"
+#include "device/deviceeject.h"
 #include "device/devicemanager.h"
 #include "organize/organize.h"
 #include "organize/organizejob.h"
@@ -269,7 +270,7 @@ void PersistFromState(const DialogState *state) {
   if (state->persist_dest && state->dest) {
     persist.SetValue(OrganizeSettings::kDestination, gtk_editable_get_text(GTK_EDITABLE(state->dest)));
   }
-  if (state->after_copy) {
+  if (state->after_copy && OrganizePreview::ShouldPersistMove(OrganizePreview::IsDeviceCopy(state->device_id, state->eject != nullptr))) {
     persist.SetBoolValue(OrganizeSettings::kMove, gtk_drop_down_get_selected(GTK_DROP_DOWN(state->after_copy)) == 1);
   }
   if (state->overwrite) {
@@ -493,7 +494,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   const char *after_labels[] = {Translations::CStr("Keep the original files"), Translations::CStr("Delete the original files"), nullptr};
   GtkWidget *after_copy = gtk_drop_down_new_from_strings(after_labels);
   gtk_drop_down_set_selected(GTK_DROP_DOWN(after_copy),
-                             request.move || settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove) ? 1 : 0);
+                             OrganizePreview::InitialMove(request.move, OrganizePreview::IsDeviceCopy(request.device_id, request.show_eject),
+                                                          settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove))
+                                 ? 1
+                                 : 0);
   GtkWidget *overwrite = gtk_check_button_new_with_label(Translations::CStr("Overwrite existing files"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(overwrite), settings.BoolValue(OrganizeSettings::kOverwrite, OrganizeSettings::kDefaultOverwrite));
   GtkWidget *remove_problematic = gtk_check_button_new_with_label(Translations::CStr("Remove problematic characters from filenames"));
@@ -521,7 +525,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   GtkWidget *albumcover = gtk_check_button_new_with_label(Translations::CStr("Copy album cover art"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(albumcover), settings.BoolValue(OrganizeSettings::kAlbumCover, OrganizeSettings::kDefaultAlbumCover));
   GtkWidget *eject = nullptr;
-  if (request.show_eject) {
+  if (DeviceEject::ShouldShowCheckbox(request.show_eject, DeviceEject::Supported(request.destination))) {
     eject = gtk_check_button_new_with_label(Translations::CStr("Eject device afterwards"));
     gtk_check_button_set_active(GTK_CHECK_BUTTON(eject), settings.BoolValue(OrganizeSettings::kEjectAfter, OrganizeSettings::kDefaultEjectAfter));
   }
@@ -684,6 +688,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "organize-cover.bin");
                      if (state) {
                        options.playlist = state->playlist;
+                       options.eject_after =
+                           DeviceEject::ShouldEjectAfter(state->eject != nullptr,
+                                                         state->eject && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->eject)), true);
                      }
                      PersistFromState(state);
                      if (state && state->job) {
@@ -726,10 +733,11 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                          if (errors.empty()) {
                            gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
                            gpointer eject_ptr = g_object_get_data(G_OBJECT(button), "eject");
-                           const char *device_id = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "device-id"));
-                           if (eject_ptr && device_id && gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)) && application &&
-                               application->device_manager()) {
-                             application->device_manager()->Unmount(device_id);
+                           const char *eject_device_id = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "device-id"));
+                           if (DeviceEject::ShouldEjectAfter(eject_ptr != nullptr,
+                                                             eject_ptr && gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)), true) &&
+                               eject_device_id && application && application->device_manager()) {
+                             application->device_manager()->Unmount(eject_device_id);
                            }
                          } else {
                            OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), errors);
