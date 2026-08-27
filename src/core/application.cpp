@@ -14,6 +14,7 @@
 #include "core/exitfade.h"
 #include "constants/behavioursettings.h"
 #include "core/commandlineurlplan.h"
+#include "core/commandlinevolume.h"
 #include "tidal/tidalloginurl.h"
 #include "tidal/tidalservice.h"
 #include "utilities/fileutils.h"
@@ -356,7 +357,7 @@ void Application::ApplyCommandline(const CommandlineOptions &options) {
     player_->SetVolume(static_cast<unsigned>(options.set_volume()));
   }
   if (options.volume_modifier() != 0) {
-    player_->SetVolume(static_cast<unsigned>(std::max(0, static_cast<int>(player_->GetVolume()) + options.volume_modifier())));
+    player_->SetVolume(static_cast<unsigned>(CommandlineVolume::Apply(static_cast<int>(player_->GetVolume()), options.volume_modifier())));
   }
   if (options.seek_to() >= 0) {
     player_->SeekTo(options.seek_to());

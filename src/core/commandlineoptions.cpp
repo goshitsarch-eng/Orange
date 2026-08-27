@@ -1,6 +1,7 @@
 #include "core/commandlineoptions.h"
 
 #include "core/commandlineurl.h"
+#include "core/commandlinevolume.h"
 #include "core/commandlinewindow.h"
 #include "version.h"
 
@@ -31,6 +32,8 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   gchar *log_levels = nullptr;
   gchar *resize_window = nullptr;
   gint volume = -1;
+  gboolean volume_up = false;
+  gboolean volume_down = false;
   gint volume_increase = 0;
   gint volume_decrease = 0;
   gint seek_to = -1;
@@ -51,8 +54,12 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
       {"load", 'l', 0, G_OPTION_ARG_NONE, &load, "Replace the current playlist with files/URLs", nullptr},
       {"create", 'c', 0, G_OPTION_ARG_STRING, &create_new, "Create a new playlist from files/URLs", "NAME"},
       {"volume", 0, 0, G_OPTION_ARG_INT, &volume, "Set the volume to LEVEL (0-100)", "LEVEL"},
-      {"volume-increase", 0, 0, G_OPTION_ARG_INT, &volume_increase, "Increase volume by LEVEL", "LEVEL"},
-      {"volume-decrease", 0, 0, G_OPTION_ARG_INT, &volume_decrease, "Decrease volume by LEVEL", "LEVEL"},
+      {"volume-up", 0, 0, G_OPTION_ARG_NONE, &volume_up, "Increase the volume by 4 percent", nullptr},
+      {"volume-down", 0, 0, G_OPTION_ARG_NONE, &volume_down, "Decrease the volume by 4 percent", nullptr},
+      {"volume-increase-by", 0, 0, G_OPTION_ARG_INT, &volume_increase, "Increase the volume by VALUE percent", "VALUE"},
+      {"volume-decrease-by", 0, 0, G_OPTION_ARG_INT, &volume_decrease, "Decrease the volume by VALUE percent", "VALUE"},
+      {"volume-increase", 0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_INT, &volume_increase, "Increase volume by LEVEL", "LEVEL"},
+      {"volume-decrease", 0, G_OPTION_FLAG_HIDDEN, G_OPTION_ARG_INT, &volume_decrease, "Decrease volume by LEVEL", "LEVEL"},
       {"seek-to", 0, 0, G_OPTION_ARG_INT, &seek_to, "Seek to POSITION seconds", "POSITION"},
       {"seek-by", 0, 0, G_OPTION_ARG_INT, &seek_by, "Seek by OFFSET seconds", "OFFSET"},
       {"play-track", 0, 0, G_OPTION_ARG_INT, &play_track, "Play the track at INDEX", "INDEX"},
@@ -103,7 +110,7 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
     g_free(create_new);
   }
   set_volume_ = volume;
-  volume_modifier_ = volume_increase - volume_decrease;
+  volume_modifier_ = CommandlineVolume::Modifier(volume_up, volume_down, volume_increase, volume_decrease);
   seek_to_ = seek_to;
   seek_by_ = seek_by;
   play_track_at_ = play_track;

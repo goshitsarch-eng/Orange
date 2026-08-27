@@ -1,5 +1,6 @@
 #include "core/commandlineoptions.h"
 #include "core/commandlineurl.h"
+#include "core/commandlinevolume.h"
 #include "core/commandlineurlplan.h"
 #include "core/commandlinewindow.h"
 #include "core/loadurl.h"
@@ -75,6 +76,33 @@ TEST(CommandlineOptions, ParsesResizeVersionAndLogLevels) {
   const CommandlineOptions created = parse({"--create", "Mix", "file:///tmp/c.flac"});
   EXPECT_EQ(CommandlineOptions::UrlListAction::CreateNew, created.url_list_action());
   EXPECT_EQ("Mix", created.playlist_name());
+}
+
+TEST(CommandlineOptions, VolumeUpDownAndIncreaseByMatchQt) {
+  auto parse = [](std::vector<const char *> args) {
+    args.insert(args.begin(), "strawberry");
+    std::vector<char *> argv;
+    for (const char *arg : args) {
+      argv.push_back(const_cast<char *>(arg));
+    }
+    CommandlineOptions options;
+    EXPECT_TRUE(options.Parse(static_cast<int>(argv.size()), argv.data()));
+    return options;
+  };
+  EXPECT_EQ(4, parse({"--volume-up"}).volume_modifier());
+  EXPECT_EQ(-4, parse({"--volume-down"}).volume_modifier());
+  EXPECT_EQ(10, parse({"--volume-increase-by", "10"}).volume_modifier());
+  EXPECT_EQ(-7, parse({"--volume-decrease-by", "7"}).volume_modifier());
+  EXPECT_EQ(5, parse({"--volume-increase", "5"}).volume_modifier());
+  EXPECT_EQ(-3, parse({"--volume-decrease", "3"}).volume_modifier());
+  EXPECT_EQ(4, CommandlineVolume::kUpDownStep);
+  EXPECT_EQ(4, CommandlineVolume::Modifier(true, false, 10, 0));
+  EXPECT_EQ(-4, CommandlineVolume::Modifier(false, true, 0, 10));
+  EXPECT_EQ(10, CommandlineVolume::Modifier(false, false, 10, 0));
+  EXPECT_EQ(-7, CommandlineVolume::Modifier(false, false, 0, 7));
+  EXPECT_EQ(100, CommandlineVolume::Apply(98, 4));
+  EXPECT_EQ(0, CommandlineVolume::Apply(2, -4));
+  EXPECT_EQ(54, CommandlineVolume::Apply(50, 4));
 }
 
 TEST(CommandlineUrlPlan, MatchesQtLoadAppendCreateAndNone) {
