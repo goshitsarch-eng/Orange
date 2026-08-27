@@ -2,6 +2,7 @@
 
 #include "core/settings.h"
 #include "fileview/fileviewmode.h"
+#include "fileview/fileviewnav.h"
 #include "fileview/fileviewsettings.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
@@ -144,7 +145,12 @@ void FileView::SetPath(const std::string &path, bool record) {
   Reload();
 }
 
-void FileView::FileUp() { SetPath(FileUtils::DirName(path_)); }
+void FileView::FileUp() {
+  if (!FileViewNav::UpEnabled(path_)) {
+    return;
+  }
+  SetPath(FileUtils::DirName(path_));
+}
 
 void FileView::FileHome() { SetPath(home_); }
 
@@ -166,6 +172,9 @@ void FileView::UpdateNavButtons() {
   }
   if (forward_) {
     gtk_widget_set_sensitive(forward_, history_.CanForward());
+  }
+  if (up_) {
+    gtk_widget_set_sensitive(up_, FileViewNav::UpEnabled(path_));
   }
 }
 

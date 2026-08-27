@@ -21,6 +21,7 @@
 #include "fileview/fileviewicons.h"
 #include "fileview/fileviewmenu.h"
 #include "fileview/fileviewmode.h"
+#include "fileview/fileviewnav.h"
 #include "fileview/fileviewhidden.h"
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewkeyboard.h"
@@ -219,6 +220,15 @@ TEST(FileViewHistory, BackForwardAndTruncate) {
   EXPECT_EQ(2, history.index());
   ASSERT_EQ(3u, history.items().size());
   EXPECT_EQ("/music/radiohead", history.items().back());
+}
+
+TEST(FileViewNav, UpEnabledMatchesQtCdUp) {
+  EXPECT_FALSE(FileViewNav::UpEnabled(""));
+  EXPECT_FALSE(FileViewNav::UpEnabled("/"));
+  EXPECT_FALSE(FileViewNav::UpEnabled("///"));
+  EXPECT_TRUE(FileViewNav::UpEnabled("/home"));
+  EXPECT_TRUE(FileViewNav::UpEnabled("/home/user"));
+  EXPECT_TRUE(FileViewNav::UpEnabled("/home/user/"));
 }
 
 TEST(FileViewDrag, PathsForDragUsesSelectionOrDraggedRow) {
