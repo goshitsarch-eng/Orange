@@ -76,7 +76,9 @@ class MainWindow {
   void OpenAbout();
   void MaybeShowSponsor();
   void AddFiles();
+  void AddPlaylistFolder();
   void AddCollectionFolder();
+  void AddUrlsFromMenu(const std::vector<std::string> &urls);
   void AddCdTracks();
   void LoadPlaylistFile();
   void SavePlaylistFile();

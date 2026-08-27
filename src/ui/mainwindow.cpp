@@ -23,6 +23,7 @@
 #include "core/mainwindowsponsor.h"
 #include "core/commandlinewindow.h"
 #include "core/mainwindowsettings.h"
+#include "core/mainwindowaddmedia.h"
 #include "core/commandlineurl.h"
 #include "core/loadurl.h"
 #include "core/playlistsloadedgate.h"
@@ -610,7 +611,7 @@ void MainWindow::BuildUi() {
                gtk_window_close(GTK_WINDOW(self->window_));
              }));
   add_action("open-files", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddFiles(); }));
-  add_action("add-folder", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddCollectionFolder(); }));
+  add_action("add-folder", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddPlaylistFolder(); }));
   add_action("add-cd", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddCdTracks(); }));
   add_action("rescan", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RescanCollection(false); }));
   add_action("full-scan", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RescanCollection(true); }));
@@ -2613,10 +2614,28 @@ void MainWindow::OpenSettings(const char *page_name) {
 
 void MainWindow::OpenAbout() { AboutDialog::Show(GTK_WINDOW(window_)); }
 
+void MainWindow::AddUrlsFromMenu(const std::vector<std::string> &urls) {
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+      settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+  ApplyCollectionPlanUrls(MainWindowAddMedia::MenuAppendPlan(play, EngineStopped()), urls);
+}
+
 void MainWindow::AddFiles() {
   GtkFileDialog *dialog = gtk_file_dialog_new();
-  gtk_file_dialog_set_title(dialog, Translations::CStr("Open audio files"));
+  gtk_file_dialog_set_title(dialog, Translations::CStr(MainWindowAddMedia::AddFileTitle()));
   FileFilters::Apply(dialog, FileFilters::MediaFilters());
+  Settings settings;
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  gchar *cwd = g_get_current_dir();
+  const std::string initial = MainWindowAddMedia::InitialFolder(settings.Value(MainWindowSettings::kAddMediaPath), cwd ? cwd : "");
+  g_free(cwd);
+  if (!initial.empty()) {
+    GFile *folder = g_file_new_for_path(initial.c_str());
+    gtk_file_dialog_set_initial_folder(dialog, folder);
+    g_object_unref(folder);
+  }
   gtk_file_dialog_open_multiple(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
     auto *self = static_cast<MainWindow *>(data);
     GError *error = nullptr;
@@ -2626,17 +2645,62 @@ void MainWindow::AddFiles() {
       return;
     }
     std::vector<std::string> urls;
+    std::string first_path;
     const guint n = g_list_model_get_n_items(files);
     for (guint i = 0; i < n; ++i) {
       GFile *file = G_FILE(g_list_model_get_item(files, i));
+      gchar *path = g_file_get_path(file);
+      if (path) {
+        if (first_path.empty()) {
+          first_path = path;
+        }
+        g_free(path);
+      }
       gchar *uri = g_file_get_uri(file);
       urls.emplace_back(uri);
       g_free(uri);
       g_object_unref(file);
     }
-    self->app_->playlist_manager()->InsertUrls(urls);
-    self->RefreshPlaylist();
+    if (!first_path.empty()) {
+      Settings persist;
+      persist.BeginGroup(MainWindowSettings::kSettingsGroup);
+      persist.SetValue(MainWindowSettings::kAddMediaPath, first_path);
+    }
+    self->AddUrlsFromMenu(urls);
     g_object_unref(files);
+  }, this);
+}
+
+void MainWindow::AddPlaylistFolder() {
+  GtkFileDialog *dialog = gtk_file_dialog_new();
+  gtk_file_dialog_set_title(dialog, Translations::CStr(MainWindowAddMedia::AddFolderTitle()));
+  Settings settings;
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  gchar *cwd = g_get_current_dir();
+  const std::string initial = MainWindowAddMedia::InitialFolder(settings.Value(MainWindowSettings::kAddFolderPath), cwd ? cwd : "");
+  g_free(cwd);
+  if (!initial.empty()) {
+    GFile *folder = g_file_new_for_path(initial.c_str());
+    gtk_file_dialog_set_initial_folder(dialog, folder);
+    g_object_unref(folder);
+  }
+  gtk_file_dialog_select_folder(dialog, GTK_WINDOW(window_), nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
+    auto *self = static_cast<MainWindow *>(data);
+    GError *error = nullptr;
+    GFile *file = gtk_file_dialog_select_folder_finish(GTK_FILE_DIALOG(source), result, &error);
+    if (!file) {
+      if (error) g_error_free(error);
+      return;
+    }
+    gchar *path = g_file_get_path(file);
+    if (path) {
+      Settings persist;
+      persist.BeginGroup(MainWindowSettings::kSettingsGroup);
+      persist.SetValue(MainWindowSettings::kAddFolderPath, path);
+      self->AddUrlsFromMenu({path});
+      g_free(path);
+    }
+    g_object_unref(file);
   }, this);
 }
 

@@ -72,6 +72,7 @@
 #include "core/enginemetadata.h"
 #include "core/windowgeometry.h"
 #include "core/mainwindowsettings.h"
+#include "core/mainwindowaddmedia.h"
 #include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
 #include "ui/mainwindowmenu.h"
@@ -1966,6 +1967,8 @@ TEST(MainWindowLook, SidebarAndMuteMatchQt) {
   EXPECT_TRUE(MainWindowSettings::kDefaultShowSidebar);
   EXPECT_STREQ("MainWindow", MainWindowSettings::kSettingsGroup);
   EXPECT_STREQ("show_sidebar", MainWindowSettings::kShowSidebar);
+  EXPECT_STREQ("add_media_path", MainWindowSettings::kAddMediaPath);
+  EXPECT_STREQ("add_folder_path", MainWindowSettings::kAddFolderPath);
   EXPECT_TRUE(MainWindowLook::ShowSidebar(true));
   EXPECT_FALSE(MainWindowLook::ShowSidebar(false));
   EXPECT_TRUE(MainWindowLook::DefaultShowSidebar());
@@ -2404,4 +2407,25 @@ TEST(FileManagerReveal, LocalExistingPathsSkipStreams) {
   EXPECT_EQ(audio, existing.front());
   FileUtils::Remove(audio);
   rmdir(root.c_str());
+}
+
+TEST(MainWindowAddMedia, FolderGoesToPlaylistWithLastPath) {
+  EXPECT_TRUE(MainWindowAddMedia::FolderAddsToPlaylist());
+  EXPECT_STREQ("Add file", MainWindowAddMedia::AddFileTitle());
+  EXPECT_STREQ("Add folder", MainWindowAddMedia::AddFolderTitle());
+  EXPECT_EQ("/music", MainWindowAddMedia::InitialFolder({}, "/music"));
+  EXPECT_EQ("/tmp", MainWindowAddMedia::InitialFolder("/tmp", "/music"));
+  const std::string dir = "/tmp/strawberry-addmedia-" + std::to_string(getpid());
+  g_mkdir_with_parents(dir.c_str(), 0755);
+  const std::string audio = FileUtils::Join(dir, "roads.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "x"));
+  EXPECT_EQ(dir, MainWindowAddMedia::InitialFolder(audio, "/music"));
+  const CollectionBehaviour::Plan never = MainWindowAddMedia::MenuAppendPlan(BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_FALSE(never.should_play);
+  EXPECT_EQ(CollectionBehaviour::Destination::Current, never.destination);
+  EXPECT_EQ(CollectionBehaviour::QueueMode::None, never.queue);
+  const CollectionBehaviour::Plan always = MainWindowAddMedia::MenuAppendPlan(BehaviourSettings::PlayBehaviour::Always, false);
+  EXPECT_TRUE(always.should_play);
+  FileUtils::Remove(audio);
+  rmdir(dir.c_str());
 }
