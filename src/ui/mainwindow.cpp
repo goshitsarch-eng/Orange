@@ -190,6 +190,20 @@ GtkWidget *MakeScrolledList(GtkWidget **list_out) {
   return scroll;
 }
 
+struct FileViewBrowserOpen {
+  std::vector<std::string> paths;
+};
+
+bool OpenAllFileViewBrowserPaths(const std::vector<std::string> &paths) {
+  bool any = false;
+  for (const std::string &path : paths) {
+    if (FileManagerUtils::OpenInFileManager(path)) {
+      any = true;
+    }
+  }
+  return any;
+}
+
 }  // namespace
 
 MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const CommandlineOptions &options)
@@ -1345,8 +1359,33 @@ void MainWindow::BuildSidebar() {
     }
   });
   file_view_->SetShowInBrowserCallback([this](const std::vector<std::string> &paths) {
-    const std::string path = FileViewMenu::BrowserPath(paths);
-    if (path.empty() || !FileManagerUtils::OpenInFileManager(path)) {
+    const std::vector<std::string> unique = FileViewMenu::BrowserPaths(paths);
+    const FileViewMenu::BrowserOpenPolicy policy = FileViewMenu::BrowserPolicy(static_cast<int>(unique.size()));
+    if (policy == FileViewMenu::BrowserOpenPolicy::TooMany) {
+      AdwAlertDialog *dialog =
+          ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Show in file browser"), FileViewMenu::BrowserTooManyMessage()));
+      adw_alert_dialog_add_responses(dialog, "close", Translations::CStr("Close"), nullptr);
+      adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
+      return;
+    }
+    if (policy == FileViewMenu::BrowserOpenPolicy::Confirm) {
+      auto *req = new FileViewBrowserOpen{unique};
+      const std::string body = FileViewMenu::BrowserConfirmMessage(static_cast<int>(paths.size()), static_cast<int>(unique.size()));
+      AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Show in file browser"), body.c_str()));
+      adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "open", Translations::CStr("Open"), nullptr);
+      adw_alert_dialog_set_default_response(dialog, "open");
+      g_signal_connect(dialog, "response", G_CALLBACK((+[](AdwAlertDialog *, const char *response, gpointer data) {
+                         auto *req = static_cast<FileViewBrowserOpen *>(data);
+                         if (g_strcmp0(response, "open") == 0) {
+                           OpenAllFileViewBrowserPaths(req->paths);
+                         }
+                         delete req;
+                       })),
+                       req);
+      adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
+      return;
+    }
+    if (unique.empty() || !OpenAllFileViewBrowserPaths(unique)) {
       ShowToast("Could not open the file manager");
     }
   });

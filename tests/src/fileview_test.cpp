@@ -188,6 +188,22 @@ TEST(FileViewMenu, PlaylistActionsMatchQt) {
   EXPECT_FALSE(FileViewMenu::IsPlaylistAction(FileViewMenu::Action::Browse));
   EXPECT_EQ("/tmp/song.flac", FileViewMenu::BrowserPath({"/tmp/song.flac", "/tmp/other.flac"}));
   EXPECT_TRUE(FileViewMenu::BrowserPath({}).empty());
+  EXPECT_EQ("/tmp", FileViewMenu::BrowserDirectory("/tmp/song.flac"));
+  const auto same_dir = FileViewMenu::BrowserPaths({"/tmp/song.flac", "/tmp/other.flac"});
+  ASSERT_EQ(1u, same_dir.size());
+  EXPECT_EQ("/tmp/song.flac", same_dir.front());
+  const auto two_dirs = FileViewMenu::BrowserPaths({"/tmp/song.flac", "/home/other.flac"});
+  ASSERT_EQ(2u, two_dirs.size());
+  EXPECT_EQ("/tmp/song.flac", two_dirs.front());
+  EXPECT_EQ("/home/other.flac", two_dirs.back());
+  EXPECT_TRUE(FileViewMenu::BrowserPaths({}).empty());
+  EXPECT_EQ(FileViewMenu::BrowserOpenPolicy::Open, FileViewMenu::BrowserPolicy(3));
+  EXPECT_EQ(FileViewMenu::BrowserOpenPolicy::Open, FileViewMenu::BrowserPolicy(5));
+  EXPECT_EQ(FileViewMenu::BrowserOpenPolicy::Confirm, FileViewMenu::BrowserPolicy(6));
+  EXPECT_EQ(FileViewMenu::BrowserOpenPolicy::TooMany, FileViewMenu::BrowserPolicy(51));
+  EXPECT_STREQ("Too many songs selected.", FileViewMenu::BrowserTooManyMessage());
+  EXPECT_EQ("8 songs in 6 different directories selected, are you sure you want to open them all?",
+            FileViewMenu::BrowserConfirmMessage(8, 6));
   const CollectionBehaviour::Plan replace =
       FileViewMenu::PlanFor(FileViewMenu::Action::Replace, BehaviourSettings::PlayBehaviour::Never, true);
   EXPECT_TRUE(replace.clear_current);

@@ -6,6 +6,7 @@
 #include "utilities/fileutils.h"
 
 #include <cstring>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -88,6 +89,44 @@ inline std::string BrowserPath(const std::vector<std::string> &paths) {
     return {};
   }
   return paths.front();
+}
+
+// Qt OpenInFileBrowser groups by QFileInfo::dir() and opens one window per directory.
+inline std::string BrowserDirectory(const std::string &path) { return path.empty() ? std::string() : FileUtils::DirName(path); }
+
+inline std::vector<std::string> BrowserPaths(const std::vector<std::string> &paths) {
+  std::vector<std::string> result;
+  std::set<std::string> seen_dirs;
+  for (const std::string &path : paths) {
+    const std::string dir = BrowserDirectory(path);
+    if (dir.empty() || !seen_dirs.insert(dir).second) {
+      continue;
+    }
+    result.push_back(path);
+  }
+  return result;
+}
+
+inline constexpr int kBrowserConfirmThreshold = 5;
+inline constexpr int kBrowserTooManyThreshold = 50;
+
+enum class BrowserOpenPolicy { Open, Confirm, TooMany };
+
+inline BrowserOpenPolicy BrowserPolicy(int directory_count) {
+  if (directory_count > kBrowserTooManyThreshold) {
+    return BrowserOpenPolicy::TooMany;
+  }
+  if (directory_count > kBrowserConfirmThreshold) {
+    return BrowserOpenPolicy::Confirm;
+  }
+  return BrowserOpenPolicy::Open;
+}
+
+inline const char *BrowserTooManyMessage() { return "Too many songs selected."; }
+
+inline std::string BrowserConfirmMessage(int song_count, int directory_count) {
+  return std::to_string(song_count) + " songs in " + std::to_string(directory_count) +
+         " different directories selected, are you sure you want to open them all?";
 }
 
 }  // namespace FileViewMenu
