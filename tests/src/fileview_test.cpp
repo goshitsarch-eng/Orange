@@ -348,11 +348,14 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   mtp.backend = "mtp";
   EXPECT_FALSE(DeviceCopy::IsFilesystemDevice(mtp));
   EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(filesystem));
-  EXPECT_FALSE(DeviceCopy::ShouldUseOrganizeDialog(mtp));
+  EXPECT_FALSE(DeviceCopy::UsesDeviceCopyRunner(filesystem));
+  EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(mtp));
+  EXPECT_TRUE(DeviceCopy::UsesDeviceCopyRunner(mtp));
   ConnectedDevice ipod;
   ipod.backend = "gpod";
   ipod.mount_path = "/media/ipod";
-  EXPECT_FALSE(DeviceCopy::ShouldUseOrganizeDialog(ipod));
+  EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(ipod));
+  EXPECT_TRUE(DeviceCopy::UsesDeviceCopyRunner(ipod));
   EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("mtp:serial"));
   EXPECT_EQ("usb", DeviceCopyJob::MtpSerial("usb"));
   EXPECT_STREQ("Copying to device", DeviceCopyJob::TaskName());

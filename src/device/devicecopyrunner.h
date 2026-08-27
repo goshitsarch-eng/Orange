@@ -24,6 +24,11 @@ class DeviceCopyRunner {
     transcode_format_ = format;
   }
   void set_playlist(const std::string &name) { playlist_ = name; }
+  void set_copy_options(bool overwrite, bool albumcover, bool move) {
+    overwrite_ = overwrite;
+    albumcover_ = albumcover;
+    move_ = move;
+  }
 
   bool Copy(const ConnectedDevice &device, const SongList &songs);
   void Begin(const ConnectedDevice &device, const SongList &songs);
@@ -63,6 +68,9 @@ class DeviceCopyRunner {
   MusicStorage::TranscodeMode transcode_mode_ = MusicStorage::TranscodeMode::Transcode_Never;
   Song::FileType transcode_format_ = Song::FileType::Unknown;
   std::string playlist_;
+  bool overwrite_ = false;
+  bool albumcover_ = true;
+  bool move_ = false;
   std::unique_ptr<MtpCopySession> mtp_;
   std::unique_ptr<GPodCopySession> gpod_;
 };

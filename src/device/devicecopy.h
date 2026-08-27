@@ -10,6 +10,8 @@ namespace DeviceCopy {
 
 inline bool IsFilesystemDevice(const ConnectedDevice &device) { return !device.mount_path.empty(); }
 
+inline bool UsesDeviceCopyRunner(const ConnectedDevice &device) { return DeviceCopyJob::UsesDeviceCopyRunner(device); }
+
 inline bool ShouldUseOrganizeDialog(const ConnectedDevice &device) { return DeviceCopyJob::ShouldUseOrganizeDialog(device); }
 
 inline bool CanCopyToCollection(const SongList &songs, bool filesystem = true) { return filesystem && !songs.empty(); }

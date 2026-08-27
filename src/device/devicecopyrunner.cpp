@@ -159,7 +159,9 @@ bool DeviceCopyRunner::CopyOnePrepared(const Song &song) {
   g_mkdir_with_parents(music.c_str(), 0755);
   OrganizeFormat format("%albumartist/%album/{%track - }%title");
   Organize::Options options;
-  options.albumcover = true;
+  options.overwrite = overwrite_;
+  options.albumcover = albumcover_;
+  options.move = move_;
   options.tagreader = tagreader_;
   options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "device-cover.bin");
   options.transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
@@ -215,6 +217,9 @@ void DeviceCopyRunner::ProcessSome() {
       errors_.push_back(songs_[static_cast<size_t>(next_)]);
     } else {
       ++copied_;
+      if (move_) {
+        FileUtils::Remove(FileUtils::PathFromUri(songs_[static_cast<size_t>(next_)].url()));
+      }
     }
     ++next_;
     ++processed;

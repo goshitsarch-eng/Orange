@@ -4,6 +4,10 @@
 #include "constants/organizesettings.h"
 #include "core/application.h"
 #include "core/settings.h"
+#include "device/connecteddevice.h"
+#include "device/devicecopyjob.h"
+#include "device/devicecopyrunner.h"
+#include "device/devicemanager.h"
 #include "organize/organize.h"
 #include "organize/organizejob.h"
 #include "organize/organizepathnotify.h"
@@ -46,8 +50,10 @@ struct DialogState {
   GtkWidget *eject = nullptr;
   GtkWidget *format_error = nullptr;
   std::string playlist;
+  std::string device_id;
   FreeSpaceBar *space = nullptr;
   Organize *job = nullptr;
+  DeviceCopyRunner *copy_job = nullptr;
   std::shared_ptr<bool> alive = std::make_shared<bool>(true);
   bool persist_dest = true;
   bool has_local_destination = true;
@@ -61,6 +67,9 @@ struct DialogState {
     }
     if (job) {
       job->Cancel();
+    }
+    if (copy_job) {
+      copy_job->Cancel();
     }
   }
 };
@@ -96,6 +105,73 @@ SongList SongsFromState(const DialogState *state) {
     return state->app->playlist_manager()->current()->songs();
   }
   return {};
+}
+
+const ConnectedDevice *FindCopyDevice(Application *app, const std::string &device_id) {
+  if (!app || !app->device_manager() || device_id.empty()) {
+    return nullptr;
+  }
+  for (const ConnectedDevice &device : app->device_manager()->devices()) {
+    if (device.unique_id == device_id || device.friendly_name == device_id) {
+      return &device;
+    }
+  }
+  return nullptr;
+}
+
+bool StartDeviceCopy(DialogState *state, GtkButton *button, Application *application, const SongList &songs, const Organize::Options &options) {
+  if (!state || state->device_id.empty() || !application) {
+    return false;
+  }
+  const ConnectedDevice *found = FindCopyDevice(application, state->device_id);
+  if (!found || !DeviceCopyJob::UsesDeviceCopyRunner(*found)) {
+    return false;
+  }
+  const ConnectedDevice target = *found;
+  auto *runner = new DeviceCopyRunner(application->task_manager(), application->tagreader());
+  runner->set_transcode(options.transcode_mode, options.transcode_format);
+  runner->set_playlist(options.playlist);
+  runner->set_copy_options(options.overwrite, options.albumcover, options.move);
+  state->copy_job = runner;
+  gtk_widget_set_sensitive(GTK_WIDGET(button), FALSE);
+  if (state->cancel) {
+    gtk_widget_set_sensitive(state->cancel, TRUE);
+  }
+  if (state->status) {
+    gtk_label_set_text(GTK_LABEL(state->status), DeviceCopyJob::TaskName());
+  }
+  const std::shared_ptr<bool> alive = state->alive;
+  runner->Finished.Connect([state, alive, runner, application, button](bool) {
+    if (alive && *alive && state && state->copy_job == runner) {
+      state->copy_job = nullptr;
+      gtk_widget_set_sensitive(GTK_WIDGET(button), TRUE);
+      if (state->cancel) {
+        gtk_widget_set_sensitive(state->cancel, FALSE);
+      }
+      GtkWidget *status_label = state->status ? state->status : GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
+      if (runner->errors().empty()) {
+        if (status_label) {
+          gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
+        }
+        if (state->eject && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->eject)) && application && application->device_manager() &&
+            !state->device_id.empty()) {
+          application->device_manager()->Unmount(state->device_id);
+        }
+      } else {
+        OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), OrganizeErrorDialog::OperationType::Copy,
+                                  runner->errors());
+        if (status_label) {
+          gtk_label_set_text(GTK_LABEL(status_label), (std::to_string(runner->errors().size()) + " file(s) failed.").c_str());
+        }
+      }
+    }
+    g_idle_add(+[](gpointer data) -> gboolean {
+      delete static_cast<DeviceCopyRunner *>(data);
+      return G_SOURCE_REMOVE;
+    }, runner);
+  });
+  runner->StartAsync(target, songs);
+  return true;
 }
 
 void ClearPreview(GtkWidget *list) {
@@ -465,6 +541,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   state->supported = request.supported_filetypes;
   state->persist_dest = request.destination.empty();
   state->playlist = request.playlist;
+  state->device_id = request.device_id;
   state->has_local_destination = local_naming;
   g_signal_connect(space->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) { delete static_cast<FreeSpaceBar *>(data); }), space);
   g_object_set_data_full(G_OBJECT(run), "state", state, [](gpointer p) { delete static_cast<DialogState *>(p); });
@@ -565,13 +642,16 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                        options.playlist = state->playlist;
                      }
                      PersistFromState(state);
-                     if (state && state->job) {
+                     if (state && (state->job || state->copy_job)) {
                        return;
                      }
                      auto *owned = static_cast<SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
                      SongList songs = owned && !owned->empty() ? *owned
                                       : application->playlist_manager()->current() ? application->playlist_manager()->current()->songs()
                                                                                    : SongList{};
+                     if (StartDeviceCopy(state, button, application, songs, options)) {
+                       return;
+                     }
                      auto *job = new Organize(application ? application->task_manager() : nullptr);
                      if (state) {
                        state->job = job;
@@ -653,6 +733,12 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      auto *state = static_cast<DialogState *>(data);
                      if (state && state->job) {
                        state->job->Cancel();
+                       if (state->status) {
+                         gtk_label_set_text(GTK_LABEL(state->status), Translations::CStr("Cancelling..."));
+                       }
+                     }
+                     if (state && state->copy_job) {
+                       state->copy_job->Cancel();
                        if (state->status) {
                          gtk_label_set_text(GTK_LABEL(state->status), Translations::CStr("Cancelling..."));
                        }
