@@ -5,6 +5,7 @@
 #include "core/loadurl.h"
 #include "core/network.h"
 #include "core/songloadremote.h"
+#include "core/songloadtypefind.h"
 #include "core/urlhandlers.h"
 #include "device/cddasongloader.h"
 #include "playlistparsers/parserbase.h"
@@ -14,6 +15,23 @@
 #include "utilities/strutils.h"
 
 #include <glib-object.h>
+#include <gst/gst.h>
+
+#include <mutex>
+
+namespace {
+
+struct RemoteTypefindState {
+  std::mutex mutex;
+  std::string mime;
+  std::string data;
+  bool have_type = false;
+  bool eos = false;
+  bool failed = false;
+  bool type_not_found = false;
+};
+
+}  // namespace
 
 SongLoader::SongLoader(UrlHandlers *url_handlers, CollectionBackend *collection_backend, TagReader *tagreader)
     : url_handlers_(url_handlers), collection_backend_(collection_backend), tagreader_(tagreader) {}
@@ -99,15 +117,193 @@ void SongLoader::LoadMetadataBlocking() {
 }
 
 SongLoader::Result SongLoader::LoadRemote(const std::string &url) {
-  NetworkAccessManager network;
-  constexpr guint kRemoteTimeoutSec = 5;
-  g_object_set(network.session(), "timeout", kRemoteTimeoutSec, nullptr);
-  const NetworkAccessManager::Response response = network.GetSync(url);
-  if (!response.ok()) {
-    errors_.push_back(response.error.empty() ? ("Failed to retrieve " + url) : response.error);
+  if (SongLoadRemote::LooksLikePlaylist(url)) {
+    NetworkAccessManager network;
+    constexpr guint kRemoteTimeoutSec = 5;
+    g_object_set(network.session(), "timeout", kRemoteTimeoutSec, nullptr);
+    const NetworkAccessManager::Response response = network.GetSync(url);
+    if (!response.ok()) {
+      errors_.push_back(response.error.empty() ? ("Failed to retrieve " + url) : response.error);
+      return Result::Error;
+    }
+    return LoadRemoteFromData(url, response.body);
+  }
+  return TypefindRemote(url);
+}
+
+SongLoader::Result SongLoader::ApplyRemoteTypefind(const std::string &url, const std::string &mime, const std::string &data) {
+  PlaylistParser parser;
+  ParserBase *found = parser.ParserForMagic(data);
+  const SongLoadTypefind::Decision decision = SongLoadTypefind::Decide(mime, found != nullptr);
+  if (decision == SongLoadTypefind::Decision::RawStream) {
+    AddRawStream(url);
+    return Result::Success;
+  }
+  if (decision == SongLoadTypefind::Decision::Parse && found) {
+    SongList loaded = found->Load(data, url);
+    if (!loaded.empty()) {
+      if (playlist_name_.empty()) {
+        playlist_name_ = FileUtils::BaseName(SongLoadRemote::PathWithoutQuery(url));
+      }
+      songs_.insert(songs_.end(), loaded.begin(), loaded.end());
+      return Result::Success;
+    }
+  }
+  errors_.push_back("Failed to identify " + url);
+  return Result::Error;
+}
+
+SongLoader::Result SongLoader::TypefindRemote(const std::string &url) {
+  if (!gst_is_initialized()) {
+    GError *init_error = nullptr;
+    if (!gst_init_check(nullptr, nullptr, &init_error)) {
+      if (init_error) {
+        errors_.push_back(init_error->message);
+        g_error_free(init_error);
+      }
+      AddRawStream(url);
+      return Result::Success;
+    }
+  }
+
+  GError *uri_error = nullptr;
+  GstElement *source = gst_element_make_from_uri(GST_URI_SRC, url.c_str(), nullptr, &uri_error);
+  if (!source) {
+    if (uri_error) {
+      g_error_free(uri_error);
+    }
+    // No protocol handler (this environment has no souphttpsrc): play as a stream instead of downloading.
+    AddRawStream(url);
+    return Result::Success;
+  }
+
+  GstElement *pipeline = gst_pipeline_new("songloader-typefind");
+  GstElement *typefind = gst_element_factory_make("typefind", nullptr);
+  GstElement *fakesink = gst_element_factory_make("fakesink", nullptr);
+  if (!pipeline || !typefind || !fakesink) {
+    if (source) {
+      gst_object_unref(source);
+    }
+    if (pipeline) {
+      gst_object_unref(pipeline);
+    }
+    errors_.push_back("Couldn't create GStreamer typefind pipeline for " + url);
     return Result::Error;
   }
-  return LoadRemoteFromData(url, response.body);
+
+  if (g_object_class_find_property(G_OBJECT_GET_CLASS(source), "ssl-strict")) {
+    g_object_set(source, "ssl-strict", FALSE, nullptr);
+  }
+
+  gst_bin_add_many(GST_BIN(pipeline), source, typefind, fakesink, nullptr);
+  if (!gst_element_link_many(source, typefind, fakesink, nullptr)) {
+    gst_object_unref(pipeline);
+    errors_.push_back("Couldn't link GStreamer typefind pipeline for " + url);
+    return Result::Error;
+  }
+
+  RemoteTypefindState state;
+  g_signal_connect(typefind, "have-type",
+                   G_CALLBACK((+[](GstElement *, guint, GstCaps *caps, gpointer user) {
+                     auto *st = static_cast<RemoteTypefindState *>(user);
+                     if (!caps || gst_caps_get_size(caps) == 0) {
+                       return;
+                     }
+                     const GstStructure *structure = gst_caps_get_structure(caps, 0);
+                     const gchar *name = structure ? gst_structure_get_name(structure) : nullptr;
+                     std::lock_guard<std::mutex> lock(st->mutex);
+                     st->mime = name ? name : "";
+                     st->have_type = true;
+                   })),
+                   &state);
+
+  GstPad *pad = gst_element_get_static_pad(fakesink, "sink");
+  if (pad) {
+    gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER,
+                      +[](GstPad *, GstPadProbeInfo *info, gpointer user) -> GstPadProbeReturn {
+                        auto *st = static_cast<RemoteTypefindState *>(user);
+                        GstBuffer *buffer = gst_pad_probe_info_get_buffer(info);
+                        GstMapInfo map;
+                        if (buffer && gst_buffer_map(buffer, &map, GST_MAP_READ)) {
+                          std::lock_guard<std::mutex> lock(st->mutex);
+                          st->data.append(reinterpret_cast<const char *>(map.data), static_cast<std::size_t>(map.size));
+                          gst_buffer_unmap(buffer, &map);
+                        }
+                        return GST_PAD_PROBE_OK;
+                      },
+                      &state, nullptr);
+    gst_object_unref(pad);
+  }
+
+  GstBus *bus = gst_element_get_bus(pipeline);
+  gst_element_set_state(pipeline, GST_STATE_PLAYING);
+
+  const gint64 deadline = g_get_monotonic_time() + 5 * G_USEC_PER_SEC;
+  while (g_get_monotonic_time() < deadline) {
+    GstMessage *msg = bus ? gst_bus_timed_pop(bus, 50 * GST_MSECOND) : nullptr;
+    if (msg) {
+      switch (GST_MESSAGE_TYPE(msg)) {
+        case GST_MESSAGE_ERROR: {
+          GError *err = nullptr;
+          gst_message_parse_error(msg, &err, nullptr);
+          if (err && err->domain == GST_STREAM_ERROR && err->code == GST_STREAM_ERROR_TYPE_NOT_FOUND) {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.type_not_found = true;
+          } else {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.failed = true;
+          }
+          if (err) {
+            g_error_free(err);
+          }
+          break;
+        }
+        case GST_MESSAGE_EOS: {
+          std::lock_guard<std::mutex> lock(state.mutex);
+          state.eos = true;
+          break;
+        }
+        default:
+          break;
+      }
+      gst_message_unref(msg);
+    }
+    std::lock_guard<std::mutex> lock(state.mutex);
+    if (state.failed) {
+      break;
+    }
+    if (state.have_type && !state.mime.empty() && !SongLoadTypefind::MimeMightBePlaylist(state.mime)) {
+      break;
+    }
+    if ((state.have_type || state.type_not_found) && (state.mime.empty() || SongLoadTypefind::MimeMightBePlaylist(state.mime)) &&
+        state.data.size() >= SongLoadTypefind::kMagicSize) {
+      break;
+    }
+    if (state.eos) {
+      break;
+    }
+  }
+
+  gst_element_set_state(pipeline, GST_STATE_NULL);
+  if (bus) {
+    gst_object_unref(bus);
+  }
+  gst_object_unref(pipeline);
+
+  std::string mime;
+  std::string data;
+  bool failed = false;
+  {
+    std::lock_guard<std::mutex> lock(state.mutex);
+    mime = state.mime;
+    data = state.data;
+    failed = state.failed;
+  }
+  if (failed) {
+    errors_.push_back("Failed to identify " + url);
+    return Result::Error;
+  }
+  return ApplyRemoteTypefind(url, mime, data);
 }
 
 SongLoader::Result SongLoader::LoadRemoteFromData(const std::string &url, const std::string &data) {

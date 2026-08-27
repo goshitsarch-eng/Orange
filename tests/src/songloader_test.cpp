@@ -1,5 +1,6 @@
 #include "core/songloader.h"
 #include "core/songloadremote.h"
+#include "core/songloadtypefind.h"
 #include "core/urlhandlers.h"
 #include "playlistparsers/playlistparser.h"
 #include "utilities/fileutils.h"
@@ -194,4 +195,58 @@ TEST(SongLoader, MissingLocalFileIsError) {
   ASSERT_FALSE(loader.errors().empty());
   EXPECT_NE(std::string::npos, loader.errors().front().find("does not exist"));
   EXPECT_EQ(SongLoader::Result::Error, loader.Load("/tmp/does-not-exist-strawberry-songloader.flac"));
+}
+
+TEST(SongLoader, TypefindMimePolicyMatchesQt) {
+  EXPECT_TRUE(SongLoadTypefind::MimeMightBePlaylist("text/plain"));
+  EXPECT_TRUE(SongLoadTypefind::MimeMightBePlaylist("text/uri-list"));
+  EXPECT_FALSE(SongLoadTypefind::MimeMightBePlaylist("audio/mpeg"));
+  EXPECT_FALSE(SongLoadTypefind::MimeMightBePlaylist("application/ogg"));
+  EXPECT_FALSE(SongLoadTypefind::MimeMightBePlaylist(""));
+  EXPECT_EQ(SongLoadTypefind::Decision::RawStream, SongLoadTypefind::Decide("audio/mpeg", false));
+  EXPECT_EQ(SongLoadTypefind::Decision::RawStream, SongLoadTypefind::Decide("audio/mpeg", true));
+  EXPECT_EQ(SongLoadTypefind::Decision::Parse, SongLoadTypefind::Decide("text/plain", true));
+  EXPECT_EQ(SongLoadTypefind::Decision::Fail, SongLoadTypefind::Decide("text/plain", false));
+  EXPECT_EQ(SongLoadTypefind::Decision::Parse, SongLoadTypefind::Decide("", true));
+  EXPECT_EQ(SongLoadTypefind::Decision::Fail, SongLoadTypefind::Decide("", false));
+}
+
+TEST(SongLoader, ApplyRemoteTypefindAudioIsRawStream) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  EXPECT_EQ(SongLoader::Result::Success, loader.ApplyRemoteTypefind("https://cdn.example/live", "audio/mpeg", {}));
+  ASSERT_EQ(1u, loader.songs().size());
+  EXPECT_EQ("https://cdn.example/live", loader.songs().front().url());
+}
+
+TEST(SongLoader, ApplyRemoteTypefindTextPlaylistExpands) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  const std::string body = "#EXTM3U\n#EXTINF:10,Artist - Title\nhttps://example.com/t.mp3\n";
+  EXPECT_EQ(SongLoader::Result::Success, loader.ApplyRemoteTypefind("https://cdn.example/unknown", "text/plain", body));
+  ASSERT_EQ(1u, loader.songs().size());
+  EXPECT_EQ("https://example.com/t.mp3", loader.songs().front().url());
+  EXPECT_EQ("Title", loader.songs().front().title());
+}
+
+TEST(SongLoader, ApplyRemoteTypefindTextWithoutMagicFails) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  EXPECT_EQ(SongLoader::Result::Error, loader.ApplyRemoteTypefind("https://cdn.example/unknown", "text/plain", "hello world"));
+  EXPECT_TRUE(loader.songs().empty());
+}
+
+TEST(SongLoader, ApplyRemoteTypefindUnknownMimeUsesMagic) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  const std::string body = "#EXTM3U\nhttps://example.com/t.mp3\n";
+  EXPECT_EQ(SongLoader::Result::Success, loader.ApplyRemoteTypefind("https://cdn.example/unknown", {}, body));
+  ASSERT_EQ(1u, loader.songs().size());
+  EXPECT_EQ("https://example.com/t.mp3", loader.songs().front().url());
+}
+
+TEST(SongLoader, TypefindMissingHandlerIsRawStream) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  EXPECT_EQ(SongLoader::Result::BlockingLoadRequired, loader.Load("notasource://example/live"));
+  EXPECT_TRUE(loader.songs().empty());
+  EXPECT_EQ(SongLoader::Result::Success, loader.LoadFilenamesBlocking());
+  ASSERT_EQ(1u, loader.songs().size());
+  EXPECT_EQ("notasource://example/live", loader.songs().front().url());
+  EXPECT_TRUE(loader.songs().front().is_valid());
 }
