@@ -79,6 +79,7 @@ bool MtpCopySession::CopyOne(const Song &song, const MusicStorage::ProgressFunct
   return ret == 0;
 #else
   (void)song;
+  (void)progress;
   return false;
 #endif
 }
