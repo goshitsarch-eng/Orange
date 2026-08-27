@@ -194,7 +194,11 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
                          g_object_set(source, "proxy-id", self->proxy_user_.c_str(), "proxy-pw", self->proxy_pass_.c_str(), nullptr);
                        }
                      }
-                     if (!self->spotify_access_token_.empty() &&
+                     if (GstSourceSetup::ShouldSetSpotifyBitrate(self->url_) &&
+                         g_object_class_find_property(G_OBJECT_GET_CLASS(source), "bitrate")) {
+                       g_object_set(source, "bitrate", GstSourceSetup::SpotifyBitrate(), nullptr);
+                     }
+                     if (GstSourceSetup::ShouldSetSpotifyAccessToken(self->url_, self->spotify_access_token_) &&
                          g_object_class_find_property(G_OBJECT_GET_CLASS(source), "access-token")) {
                        g_object_set(source, "access-token", self->spotify_access_token_.c_str(), nullptr);
                      }

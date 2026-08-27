@@ -418,4 +418,13 @@ TEST(GstSourceSetup, UserAgentAndRedirectLikeQt) {
   EXPECT_TRUE(GstSourceSetup::AutomaticRedirect());
   EXPECT_TRUE(GstSourceSetup::ShouldSetDevice("/dev/sr0"));
   EXPECT_FALSE(GstSourceSetup::ShouldSetDevice(""));
+  EXPECT_TRUE(GstSourceSetup::IsSpotifyUrl("spotify:track:abc"));
+  EXPECT_TRUE(GstSourceSetup::IsSpotifyUrl("spotify://track/abc"));
+  EXPECT_FALSE(GstSourceSetup::IsSpotifyUrl("https://open.spotify.com/track/abc"));
+  EXPECT_EQ(2, GstSourceSetup::SpotifyBitrate());
+  EXPECT_TRUE(GstSourceSetup::ShouldSetSpotifyBitrate("spotify:track:abc"));
+  EXPECT_FALSE(GstSourceSetup::ShouldSetSpotifyBitrate("https://example.com/a.mp3"));
+  EXPECT_TRUE(GstSourceSetup::ShouldSetSpotifyAccessToken("spotify:track:abc", "tok"));
+  EXPECT_FALSE(GstSourceSetup::ShouldSetSpotifyAccessToken("spotify:track:abc", ""));
+  EXPECT_FALSE(GstSourceSetup::ShouldSetSpotifyAccessToken("https://example.com/a.mp3", "tok"));
 }
