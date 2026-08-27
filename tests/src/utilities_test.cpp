@@ -2235,6 +2235,14 @@ TEST(ContextCover, ShouldSearch) {
   EXPECT_FALSE(ContextCover::ShouldSearchForSong(false, true, false, false, {}, {}, "Portishead", "Dummy"));
 }
 
+TEST(ContextOptions, KeyboardOpensIdleMenuOnly) {
+  EXPECT_TRUE(ContextOptions::IsKeyboardTrigger(ContextOptions::kMenu, 0));
+  EXPECT_TRUE(ContextOptions::IsKeyboardTrigger(ContextOptions::kF10, ContextOptions::kShiftMask));
+  EXPECT_FALSE(ContextOptions::IsKeyboardTrigger(ContextOptions::kF10, 0));
+  EXPECT_TRUE(ContextOptions::ShowIdleMenu(true));
+  EXPECT_FALSE(ContextOptions::ShowIdleMenu(false));
+}
+
 TEST(ContextOptions, IdleMenuMatchesQt) {
   EXPECT_EQ(4, ContextOptions::ItemCount());
   EXPECT_EQ(ContextOptions::Action::ShowAlbum, ContextOptions::FromId("album"));

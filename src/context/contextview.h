@@ -42,6 +42,7 @@ class ContextView {
   void SetCoverDropCallback(CoverDropCallback callback);
   void SetCollectionTotals(int songs, int artists, int albums);
   void ReloadSettings();
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
 
  private:
   void NoSong();

@@ -140,6 +140,7 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
   g_signal_connect(show_data_btn_, "toggled", G_CALLBACK(notify), this);
   g_signal_connect(show_lyrics_btn_, "toggled", G_CALLBACK(notify), this);
 
+  gtk_widget_set_focusable(widget_, TRUE);
   GtkGesture *idle_menu = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(idle_menu), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(idle_menu));
@@ -151,6 +152,13 @@ ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyric
                      self->ShowIdleMenu();
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
+                   this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(widget_, keys);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<ContextView *>(data)->OnKeyPressed(keyval, state);
+                   })),
                    this);
 }
 
@@ -383,6 +391,16 @@ void ContextView::ApplyOption(ContextOptions::Action action, bool enabled) {
   if (ContextOptions::TriggersLyricsSearch(action)) {
     SearchLyrics();
   }
+}
+
+gboolean ContextView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (!ContextOptions::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    return FALSE;
+  }
+  if (ContextOptions::ShowIdleMenu(Idle())) {
+    ShowIdleMenu();
+  }
+  return TRUE;
 }
 
 void ContextView::ShowIdleMenu() {
