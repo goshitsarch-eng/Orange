@@ -303,6 +303,8 @@ void FileView::RemoveRootButtonClicked() {
 
 void FileView::SetAddToPlaylistCallback(PathsCallback callback) { add_to_playlist_ = std::move(callback); }
 
+void FileView::SetDoubleClickPlaylistCallback(PathsCallback callback) { double_click_playlist_ = std::move(callback); }
+
 void FileView::SetEnqueueCallback(PathsCallback callback) {
   enqueue_ = std::move(callback);
   if (list_) {
@@ -333,8 +335,8 @@ void FileView::Activate(const std::string &path) {
 }
 
 void FileView::DoubleClick(const std::string &path) {
-  if (FileViewMode::DoubleClickAddsToPlaylist(FileUtils::IsDirectory(path)) && add_to_playlist_) {
-    add_to_playlist_({path});
+  if (FileViewMode::DoubleClickAddsToPlaylist(FileUtils::IsDirectory(path)) && double_click_playlist_) {
+    double_click_playlist_({path});
   }
 }
 

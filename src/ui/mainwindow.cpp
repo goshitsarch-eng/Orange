@@ -1339,6 +1339,18 @@ void MainWindow::BuildSidebar() {
   file_view_->SetAddToPlaylistCallback([file_playlist](const std::vector<std::string> &paths) {
     file_playlist(FileViewMenu::Action::Append, paths);
   });
+  file_view_->SetDoubleClickPlaylistCallback([this](const std::vector<std::string> &paths) {
+    Settings settings;
+    settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+    const auto add = static_cast<BehaviourSettings::AddBehaviour>(
+        settings.IntValue(BehaviourSettings::kDoubleClickAddMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickAddMode)));
+    const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+        settings.IntValue(BehaviourSettings::kDoubleClickPlayMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlayMode)));
+    const CollectionBehaviour::Plan plan = CollectionBehaviour::FromDoubleClick(add, play, EngineStopped());
+    const std::string name =
+        plan.destination == CollectionBehaviour::Destination::New ? FileViewMenu::DoubleClickPlaylistName(paths) : std::string();
+    ApplyCollectionPlan(plan, SongsFromFilePaths(paths), name);
+  });
   file_view_->SetEnqueueCallback([this](const std::vector<std::string> &paths) {
     ApplyCollectionPlan(CollectionBehaviour::Enqueue(), SongsFromFilePaths(paths));
   });

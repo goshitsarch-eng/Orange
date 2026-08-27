@@ -141,6 +141,11 @@ inline std::string PathPlaylistName(const std::string &path) {
   return base.substr(0, base.size() - ext.size() - 1);
 }
 
+// Qt FileView::ItemDoubleClick sets MimeData::name_for_new_playlist_ to the file path.
+inline std::string DoubleClickPlaylistName(const std::vector<std::string> &paths) {
+  return paths.empty() ? std::string() : paths.front();
+}
+
 inline std::string NewPlaylistName(const std::vector<std::string> &selection, const std::string &current_path, bool tree_mode) {
   if (selection.size() == 1 && FileUtils::IsDirectory(selection.front())) {
     return PathPlaylistName(selection.front());

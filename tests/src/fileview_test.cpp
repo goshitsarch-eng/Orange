@@ -272,6 +272,20 @@ TEST(FileViewMenu, ExpandPathsRecursesNestedAlbums) {
   rmdir(album.c_str());
 }
 
+TEST(FileViewMenu, DoubleClickPlaylistNameMatchesQt) {
+  EXPECT_TRUE(FileViewMenu::DoubleClickPlaylistName({}).empty());
+  EXPECT_EQ("/music/portishead/dummy.flac", FileViewMenu::DoubleClickPlaylistName({"/music/portishead/dummy.flac"}));
+  EXPECT_EQ("/music/a.flac", FileViewMenu::DoubleClickPlaylistName({"/music/a.flac", "/music/b.flac"}));
+  const CollectionBehaviour::Plan load =
+      CollectionBehaviour::FromDoubleClick(BehaviourSettings::AddBehaviour::Load, BehaviourSettings::PlayBehaviour::Always, false);
+  EXPECT_TRUE(load.clear_current);
+  EXPECT_TRUE(load.should_play);
+  const CollectionBehaviour::Plan created =
+      CollectionBehaviour::FromDoubleClick(BehaviourSettings::AddBehaviour::OpenInNew, BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_EQ(CollectionBehaviour::Destination::New, created.destination);
+  EXPECT_FALSE(created.should_play);
+}
+
 TEST(FileViewMenu, NewPlaylistNameMatchesQtFileView) {
   char short_buf[] = "/tmp/fv-XXXXXX";
   ASSERT_NE(mkdtemp(short_buf), nullptr);
