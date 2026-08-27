@@ -28,6 +28,7 @@ class FileViewTree {
  private:
   void AppendItem(GtkWidget *parent, FileViewTreeItem *item, int depth);
   void SetupRowDrag(GtkWidget *row, const std::string &path);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;

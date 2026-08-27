@@ -426,6 +426,15 @@ TEST(ListBoxKeyboard, FromKeyAndWrapAround) {
   EXPECT_EQ(-1, ListBoxKeyboard::FirstPrefixIndex({"Roads"}, ""));
 }
 
+TEST(FileViewMenu, KeyboardOpensContextMenu) {
+  EXPECT_TRUE(FileViewMenu::IsKeyboardTrigger(FileViewMenu::kMenuKey, 0));
+  EXPECT_TRUE(FileViewMenu::IsKeyboardTrigger(FileViewMenu::kF10Key, FileViewMenu::kShiftMask));
+  EXPECT_FALSE(FileViewMenu::IsKeyboardTrigger(FileViewMenu::kF10Key, 0));
+  EXPECT_TRUE(FileViewMenu::ListShouldShowMenu());
+  EXPECT_TRUE(FileViewMenu::TreeShouldShowMenu(true));
+  EXPECT_FALSE(FileViewMenu::TreeShouldShowMenu(false));
+}
+
 TEST(FileViewKeyboard, AltAndHistoryBack) {
   EXPECT_EQ(FileViewKeyboard::Action::Activate, FileViewKeyboard::FromKey(ListBoxKeyboard::kReturn, false));
   EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::FromKey(ListBoxKeyboard::kUp, true));

@@ -1,6 +1,7 @@
 #include "fileview/fileviewlist.h"
 
 #include "fileview/fileviewdrag.h"
+#include "fileview/fileviewmenu.h"
 #include "fileview/fileviewicons.h"
 #include "utilities/fileutils.h"
 #include "widgets/listboxkeyboard.h"
@@ -173,6 +174,12 @@ std::vector<std::string> FileViewList::Labels() const {
 }
 
 gboolean FileViewList::OnKeyPressed(guint keyval, GdkModifierType mods) {
+  if (FileViewMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(mods))) {
+    if (menu_ && FileViewMenu::ListShouldShowMenu()) {
+      menu_(SelectedPaths());
+    }
+    return TRUE;
+  }
   const bool alt = (mods & GDK_ALT_MASK) != 0;
   const FileViewKeyboard::Action action = FileViewKeyboard::FromKey(keyval, alt);
   if (action == FileViewKeyboard::Action::Activate) {
