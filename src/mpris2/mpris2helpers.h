@@ -2,6 +2,8 @@
 #define STRAWBERRY_MPRIS2HELPERS_H
 
 #include "core/song.h"
+#include "engine/enginebase.h"
+#include "playlist/playlist.h"
 #include "playlist/playlistsequence.h"
 
 #include <cstdint>
@@ -106,6 +108,33 @@ inline TrackListDiff DiffTrackIds(const std::vector<std::string> &before, const 
 inline bool MetadataNeedsUpdate(const Song &before, const Song &after) {
   return before.title() != after.title() || before.artist() != after.artist() || before.album() != after.album() ||
          before.url() != after.url() || before.length_nanosec() != after.length_nanosec() || ArtUrl(before) != ArtUrl(after);
+}
+
+inline bool CanPlay(const Playlist *playlist) { return playlist && playlist->row_count() > 0; }
+
+inline bool CanPause(EngineBase::State state) {
+  return state == EngineBase::State::Playing || state == EngineBase::State::Paused || state == EngineBase::State::Idle;
+}
+
+inline bool CanGoNext(const Playlist *playlist) { return playlist && playlist->PeekNextRow() != -1; }
+
+inline bool PreviousWouldRestartTrack(int64_t position_nanosec) { return position_nanosec > 3 * 1000000000LL; }
+
+inline bool CanGoPrevious(const Playlist *playlist, int64_t position_nanosec = 0) {
+  if (!playlist || playlist->row_count() == 0) {
+    return false;
+  }
+  return playlist->PeekPreviousRow() != playlist->current_row() || PreviousWouldRestartTrack(position_nanosec);
+}
+
+inline bool CanSeek(const Song &song, EngineBase::State state) {
+  return song.is_valid() && state != EngineBase::State::Empty && !song.is_stream();
+}
+
+inline bool SetPositionAllowed(const std::string &requested_id, const std::string &current_id, int64_t position_us, int64_t length_nanosec,
+                               bool can_seek) {
+  return can_seek && !requested_id.empty() && requested_id == current_id && position_us >= 0 &&
+         (length_nanosec <= 0 || position_us * 1000 < length_nanosec);
 }
 
 inline PlaylistSequence::RepeatMode RepeatFromLoopStatus(const std::string &status) {

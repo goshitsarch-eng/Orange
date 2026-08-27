@@ -34,7 +34,13 @@ void Dialogs::CoverFromUrl(GtkWindow *parent, Application *app) { CoverFromUrlDi
 
 void Dialogs::CoverSearch(GtkWindow *parent, Application *app) { AlbumCoverSearcher::Show(parent, app); }
 
-void Dialogs::CoverExport(GtkWindow *parent, Application *app) { AlbumCoverExportDialog::Show(parent, app); }
+void Dialogs::CoverExport(GtkWindow *parent, Application *app) {
+  SongList songs;
+  if (app && app->collection()) {
+    songs = app->collection()->Songs();
+  }
+  AlbumCoverExportDialog::Show(parent, app, songs);
+}
 
 void Dialogs::Equalizer(GtkWindow *parent, Application *app) {
   EqualizerDialog::Show(parent, app ? app->equalizer() : nullptr, app);

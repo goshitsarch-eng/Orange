@@ -33,6 +33,7 @@ class Playlist {
   Song current_song() const;
   Song song(int row) const;
   int PeekNextRow() const { return NextIndex(); }
+  int PeekPreviousRow() const { return PreviousIndex(); }
   Song PeekNextSong() const;
 
   void InsertSongs(int row, const SongList &songs);
@@ -93,6 +94,8 @@ class Playlist {
 
   Signal<> Changed;
   Signal<int> CurrentChanged;
+  Signal<> RepeatModeChanged;
+  Signal<> ShuffleModeChanged;
 
  private:
   struct Snapshot {

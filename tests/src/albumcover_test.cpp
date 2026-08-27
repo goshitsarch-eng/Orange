@@ -7,6 +7,7 @@
 #include "covermanager/albumcoverexport.h"
 #include "covermanager/albumcoverexportlabels.h"
 #include "covermanager/coverarttypes.h"
+#include "covermanager/covermanagerexportscope.h"
 #include "covermanager/albumcoverexporter.h"
 #include "covermanager/albumcoverfetcher.h"
 #include "covermanager/albumcoverfetchersearch.h"
@@ -237,6 +238,24 @@ TEST(AlbumCoverExportLabels, MatchQtExportDialog) {
   const auto embedded_types = AlbumCoverExportLabels::TypesFor(embedded);
   ASSERT_EQ(1u, embedded_types.size());
   EXPECT_EQ(AlbumCoverLoaderOptions::Type::Embedded, embedded_types[0]);
+}
+
+TEST(CoverManagerExportScope, VisibleAlbumsWithCoversOnly) {
+  EXPECT_STREQ("No covers to export.", CoverManagerExportScope::NoCoversText());
+  EXPECT_STREQ("Export finished", CoverManagerExportScope::FinishedTitle());
+  EXPECT_EQ("Exported 3 covers (1 skipped).", CoverManagerExportScope::FinishedBody(3, 1));
+  AlbumCoverManagerList::Album covered;
+  covered.album = "Dummy";
+  covered.has_cover = true;
+  covered.song.set_title("Track");
+  AlbumCoverManagerList::Album bare;
+  bare.album = "Bare";
+  bare.has_cover = false;
+  bare.song.set_title("Other");
+  const SongList songs = CoverManagerExportScope::SongsToExport({covered, bare});
+  ASSERT_EQ(1u, songs.size());
+  EXPECT_EQ("Track", songs.front().title());
+  EXPECT_TRUE(CoverManagerExportScope::SongsToExport({bare}).empty());
 }
 
 TEST(CoverExportRunnable, CopiesManualCoverAndSkipsExisting) {

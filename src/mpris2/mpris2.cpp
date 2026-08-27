@@ -4,6 +4,7 @@
 #include "core/application.h"
 #include "core/logging.h"
 #include "core/player.h"
+#include "engine/enginebase.h"
 #include "mpris2/mpris2helpers.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistmanager.h"
@@ -145,32 +146,51 @@ static void HandleMethod(GDBusConnection *, const gchar *, const gchar *, const 
     } else if (g_strcmp0(method, "Quit") == 0) {
       app->Exit();
     } else if (app->player()) {
+      Playlist *playlist = app->playlist_manager() ? app->playlist_manager()->active() : nullptr;
+      const EngineBase::State state = app->player()->GetState();
+      const Song current = app->player()->current_song();
+      const int64_t position_ns = app->player()->engine() ? app->player()->engine()->position_nanosec() : 0;
       if (g_strcmp0(method, "Play") == 0) {
-        app->player()->Play();
+        if (Mpris2Helpers::CanPlay(playlist)) {
+          app->player()->Play();
+        }
       } else if (g_strcmp0(method, "Pause") == 0) {
-        app->player()->Pause();
+        if (Mpris2Helpers::CanPause(state)) {
+          app->player()->Pause();
+        }
       } else if (g_strcmp0(method, "PlayPause") == 0) {
         app->player()->PlayPause();
       } else if (g_strcmp0(method, "Stop") == 0) {
         app->player()->Stop();
       } else if (g_strcmp0(method, "Next") == 0) {
-        app->player()->Next();
+        if (Mpris2Helpers::CanGoNext(playlist)) {
+          app->player()->Next();
+        }
       } else if (g_strcmp0(method, "Previous") == 0) {
-        app->player()->Previous();
+        if (Mpris2Helpers::CanGoPrevious(playlist, position_ns)) {
+          app->player()->Previous();
+        }
       } else if (g_strcmp0(method, "Seek") == 0) {
         gint64 offset = 0;
         g_variant_get(parameters, "(x)", &offset);
-        app->player()->SeekTo(app->player()->engine()->position_nanosec() / 1000000000LL + offset / 1000000);
-        if (self) {
-          self->EmitSeeked(app->player()->engine()->position_nanosec() / 1000);
+        if (Mpris2Helpers::CanSeek(current, state)) {
+          app->player()->SeekTo(position_ns / 1000000000LL + offset / 1000000);
+          if (self) {
+            self->EmitSeeked(app->player()->engine()->position_nanosec() / 1000);
+          }
         }
       } else if (g_strcmp0(method, "SetPosition") == 0) {
         const gchar *track_id = nullptr;
         gint64 position = 0;
         g_variant_get(parameters, "(&ox)", &track_id, &position);
-        app->player()->Seek(position * 1000);
-        if (self) {
-          self->EmitSeeked(position);
+        const int row = playlist ? playlist->current_row() : -1;
+        const std::string current_id = Mpris2Helpers::TrackIdForRow(current, row);
+        if (Mpris2Helpers::SetPositionAllowed(track_id ? track_id : "", current_id, position, current.length_nanosec(),
+                                              Mpris2Helpers::CanSeek(current, state))) {
+          app->player()->Seek(position * 1000);
+          if (self) {
+            self->EmitSeeked(position);
+          }
         }
       } else if (g_strcmp0(method, "OpenUri") == 0) {
         const gchar *uri = nullptr;
@@ -254,10 +274,27 @@ static GVariant *HandleGet(GDBusConnection *, const gchar *, const gchar *, cons
   if (g_strcmp0(property, "DesktopEntry") == 0) {
     return g_variant_new_string("org.strawberrymusicplayer.strawberry");
   }
-  if (g_strcmp0(property, "CanQuit") == 0 || g_strcmp0(property, "CanRaise") == 0 || g_strcmp0(property, "CanPlay") == 0 ||
-      g_strcmp0(property, "CanPause") == 0 || g_strcmp0(property, "CanGoNext") == 0 || g_strcmp0(property, "CanGoPrevious") == 0 ||
-      g_strcmp0(property, "CanSeek") == 0 || g_strcmp0(property, "CanControl") == 0) {
+  if (g_strcmp0(property, "CanQuit") == 0 || g_strcmp0(property, "CanRaise") == 0 || g_strcmp0(property, "CanControl") == 0) {
     return g_variant_new_boolean(TRUE);
+  }
+  Playlist *playlist = app && app->playlist_manager() ? app->playlist_manager()->active() : nullptr;
+  const EngineBase::State state = app && app->player() ? app->player()->GetState() : EngineBase::State::Empty;
+  const Song current = app && app->player() ? app->player()->current_song() : Song();
+  const int64_t position_ns = app && app->player() && app->player()->engine() ? app->player()->engine()->position_nanosec() : 0;
+  if (g_strcmp0(property, "CanPlay") == 0) {
+    return g_variant_new_boolean(Mpris2Helpers::CanPlay(playlist));
+  }
+  if (g_strcmp0(property, "CanPause") == 0) {
+    return g_variant_new_boolean(Mpris2Helpers::CanPause(state));
+  }
+  if (g_strcmp0(property, "CanGoNext") == 0) {
+    return g_variant_new_boolean(Mpris2Helpers::CanGoNext(playlist));
+  }
+  if (g_strcmp0(property, "CanGoPrevious") == 0) {
+    return g_variant_new_boolean(Mpris2Helpers::CanGoPrevious(playlist, position_ns));
+  }
+  if (g_strcmp0(property, "CanSeek") == 0) {
+    return g_variant_new_boolean(Mpris2Helpers::CanSeek(current, state));
   }
   if (g_strcmp0(property, "HasTrackList") == 0) {
     return g_variant_new_boolean(TRUE);
@@ -266,8 +303,8 @@ static GVariant *HandleGet(GDBusConnection *, const gchar *, const gchar *, cons
     return g_variant_new_boolean(TRUE);
   }
   if (g_strcmp0(property, "Tracks") == 0) {
-    Playlist *playlist = app && app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
-    return TrackListIds(playlist);
+    Playlist *tracks = app && app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
+    return TrackListIds(tracks);
   }
   if (g_strcmp0(property, "PlaybackStatus") == 0) {
     if (!app || !app->player()) {
@@ -471,6 +508,35 @@ void Mpris2::EmitPlaybackStatus() {
     }
   }
   EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "PlaybackStatus", g_variant_new_string(status));
+  EmitPlayerCapabilities();
+#endif
+}
+
+void Mpris2::EmitPlayerCapabilities() {
+#ifdef HAVE_MPRIS2
+  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->active() : nullptr;
+  const EngineBase::State state = app_ && app_->player() ? app_->player()->GetState() : EngineBase::State::Empty;
+  const Song current = app_ && app_->player() ? app_->player()->current_song() : Song();
+  const int64_t position_ns = app_ && app_->player() && app_->player()->engine() ? app_->player()->engine()->position_nanosec() : 0;
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanPlay", g_variant_new_boolean(Mpris2Helpers::CanPlay(playlist)));
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanPause", g_variant_new_boolean(Mpris2Helpers::CanPause(state)));
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanGoNext", g_variant_new_boolean(Mpris2Helpers::CanGoNext(playlist)));
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanGoPrevious",
+                        g_variant_new_boolean(Mpris2Helpers::CanGoPrevious(playlist, position_ns)));
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanSeek", g_variant_new_boolean(Mpris2Helpers::CanSeek(current, state)));
+#endif
+}
+
+void Mpris2::EmitLoopAndShuffle() {
+#ifdef HAVE_MPRIS2
+  PlaylistSequence::RepeatMode mode = PlaylistSequence::RepeatMode::Off;
+  bool shuffle = false;
+  if (app_ && app_->playlist_manager() && app_->playlist_manager()->active()) {
+    mode = app_->playlist_manager()->active()->repeat_mode();
+    shuffle = app_->playlist_manager()->active()->shuffle_mode() != PlaylistSequence::ShuffleMode::Off;
+  }
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "LoopStatus", g_variant_new_string(Mpris2Helpers::LoopStatus(mode).c_str()));
+  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Shuffle", g_variant_new_boolean(shuffle));
 #endif
 }
 
@@ -509,6 +575,27 @@ void Mpris2::WatchCurrentPlaylist() {
       return;
     }
     OnPlaylistContentsChanged();
+    EmitPlayerCapabilities();
+  });
+  playlist->CurrentChanged.Connect([this, gen](int) {
+    if (gen != playlist_watch_gen_) {
+      return;
+    }
+    EmitPlayerCapabilities();
+  });
+  playlist->RepeatModeChanged.Connect([this, gen]() {
+    if (gen != playlist_watch_gen_) {
+      return;
+    }
+    EmitLoopAndShuffle();
+    EmitPlayerCapabilities();
+  });
+  playlist->ShuffleModeChanged.Connect([this, gen]() {
+    if (gen != playlist_watch_gen_) {
+      return;
+    }
+    EmitLoopAndShuffle();
+    EmitPlayerCapabilities();
   });
 #endif
 }

@@ -88,6 +88,25 @@ TEST(ContextLyrics, Attribution) {
   EXPECT_EQ("Source: Genius", ContextLyrics::Attribution("Genius"));
 }
 
+TEST(ContextLyrics, PrefersTagLyricsAndFormatsFetch) {
+  EXPECT_STREQ("No lyrics found.\n", ContextLyrics::NoResultsText());
+  EXPECT_EQ("\n\n(Lyrics from Genius)\n", ContextLyrics::Footer("Genius"));
+  EXPECT_EQ(ContextLyrics::NoResultsText(), ContextLyrics::FormatFetched({}, "Genius"));
+  EXPECT_EQ("hello\n\n(Lyrics from Genius)\n", ContextLyrics::FormatFetched("hello", "Genius"));
+  Song song;
+  song.set_artist("Portishead");
+  song.set_title("Roads");
+  song.set_lyrics("embedded");
+  EXPECT_EQ("embedded", ContextLyrics::InitialLyricsFromSong(song));
+  EXPECT_FALSE(ContextLyrics::ShouldFetchOnline("embedded", true, true, song, false));
+  song.set_lyrics({});
+  EXPECT_TRUE(ContextLyrics::ShouldFetchOnline({}, true, true, song, false));
+  EXPECT_FALSE(ContextLyrics::ShouldFetchOnline({}, true, true, song, true));
+  EXPECT_FALSE(ContextLyrics::ShouldFetchOnline({}, false, true, song, false));
+  song.set_artist({});
+  EXPECT_FALSE(ContextLyrics::ShouldFetchOnline({}, true, true, song, false));
+}
+
 TEST(StrUtils, TransliterateAscii) {
   const std::string out = StrUtils::Transliterate("Café");
   EXPECT_TRUE(out == "Cafe" || out == "CAFÉ" || out == "Café" || StrUtils::ContainsInsensitive(out, "Cafe"));

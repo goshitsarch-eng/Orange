@@ -82,6 +82,7 @@ class ContextView {
   bool search_lyrics_ = true;
   bool search_cover_ = true;
   bool lyrics_tried_ = false;
+  std::string lyrics_;
   int totals_songs_ = 0;
   int totals_artists_ = 0;
   int totals_albums_ = 0;

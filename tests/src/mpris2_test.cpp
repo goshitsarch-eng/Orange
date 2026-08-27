@@ -1,4 +1,5 @@
 #include "mpris2/mpris2helpers.h"
+#include "playlist/playlist.h"
 
 #include <gtest/gtest.h>
 
@@ -48,6 +49,43 @@ TEST(Mpris2Helpers, MetadataNeedsUpdate) {
   EXPECT_FALSE(Mpris2Helpers::MetadataNeedsUpdate(a, b));
   b.set_title("Glory Box");
   EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(a, b));
+}
+
+TEST(Mpris2Helpers, CapabilitiesMatchQt) {
+  EXPECT_FALSE(Mpris2Helpers::CanPlay(nullptr));
+  Playlist playlist;
+  EXPECT_FALSE(Mpris2Helpers::CanPlay(&playlist));
+  Song first;
+  first.set_title("A");
+  first.set_url("file:///a.flac");
+  first.set_valid(true);
+  Song second = first;
+  second.set_title("B");
+  second.set_url("file:///b.flac");
+  playlist.AppendSongs({first, second});
+  playlist.set_current_row(0);
+  EXPECT_TRUE(Mpris2Helpers::CanPlay(&playlist));
+  EXPECT_TRUE(Mpris2Helpers::CanGoNext(&playlist));
+  EXPECT_FALSE(Mpris2Helpers::CanGoPrevious(&playlist, 0));
+  EXPECT_TRUE(Mpris2Helpers::CanGoPrevious(&playlist, 4LL * 1000000000LL));
+  EXPECT_TRUE(Mpris2Helpers::PreviousWouldRestartTrack(4LL * 1000000000LL));
+  playlist.set_current_row(1);
+  EXPECT_EQ(-1, playlist.PeekNextRow());
+  EXPECT_FALSE(Mpris2Helpers::CanGoNext(&playlist));
+  EXPECT_TRUE(Mpris2Helpers::CanPause(EngineBase::State::Playing));
+  EXPECT_TRUE(Mpris2Helpers::CanPause(EngineBase::State::Idle));
+  EXPECT_FALSE(Mpris2Helpers::CanPause(EngineBase::State::Empty));
+  EXPECT_TRUE(Mpris2Helpers::CanSeek(first, EngineBase::State::Playing));
+  EXPECT_FALSE(Mpris2Helpers::CanSeek(first, EngineBase::State::Empty));
+  Song stream;
+  stream.set_valid(true);
+  stream.set_source(Song::Source::Stream);
+  EXPECT_FALSE(Mpris2Helpers::CanSeek(stream, EngineBase::State::Playing));
+  EXPECT_TRUE(Mpris2Helpers::SetPositionAllowed("/id", "/id", 1000, 5000000000LL, true));
+  EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/other", "/id", 1000, 5000000000LL, true));
+  EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/id", "/id", -1, 5000000000LL, true));
+  EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/id", "/id", 1000, 5000000000LL, false));
+  EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/id", "/id", 6000000, 5000000000LL, true));
 }
 
 TEST(Mpris2Helpers, LoopStatusRoundTrip) {

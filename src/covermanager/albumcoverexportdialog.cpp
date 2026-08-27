@@ -6,6 +6,7 @@
 #include "covermanager/albumcoverexport.h"
 #include "covermanager/albumcoverexporter.h"
 #include "covermanager/albumcoverexportlabels.h"
+#include "covermanager/covermanagerexportscope.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
@@ -47,7 +48,7 @@ AlbumCoverExport::DialogResult CollectResult(const CoverExportWidgets &widgets) 
 
 }  // namespace
 
-void AlbumCoverExportDialog::Show(GtkWindow *parent, Application *app) {
+void AlbumCoverExportDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
   Settings settings;
   const AlbumCoverExport::DialogResult saved = AlbumCoverExportLabels::FromSettings(&settings);
 
@@ -126,25 +127,33 @@ void AlbumCoverExportDialog::Show(GtkWindow *parent, Application *app) {
   GtkWidget *export_btn = gtk_button_new_with_label(Translations::CStr(AlbumCoverExportLabels::Export()));
   gtk_widget_add_css_class(export_btn, "suggested-action");
   g_object_set_data_full(G_OBJECT(export_btn), "widgets", widgets, [](gpointer p) { delete static_cast<CoverExportWidgets *>(p); });
+  g_object_set_data_full(G_OBJECT(export_btn), "songs", new SongList(songs), [](gpointer p) { delete static_cast<SongList *>(p); });
   g_signal_connect(export_btn, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
                      auto *application = static_cast<Application *>(data);
                      auto *widgets = static_cast<CoverExportWidgets *>(g_object_get_data(G_OBJECT(button), "widgets"));
-                     if (!application || !widgets || !application->collection()) {
+                     auto *export_songs = static_cast<SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
+                     if (!application || !widgets) {
                        return;
                      }
                      const AlbumCoverExport::DialogResult result = CollectResult(*widgets);
                      Settings settings;
                      AlbumCoverExportLabels::ApplyToSettings(&settings, result);
+                     if (!export_songs || export_songs->empty()) {
+                       AdwAlertDialog *empty = ADW_ALERT_DIALOG(
+                           adw_alert_dialog_new(CoverManagerExportScope::FinishedTitle(), CoverManagerExportScope::NoCoversText()));
+                       adw_alert_dialog_add_response(empty, "ok", "OK");
+                       adw_dialog_present(ADW_DIALOG(empty), nullptr);
+                       return;
+                     }
                      AlbumCoverExporter exporter(application->tagreader());
                      exporter.SetDialogResult(result);
                      exporter.SetCoverTypes(AlbumCoverExportLabels::TypesFor(result));
-                     for (const Song &song : application->collection()->Songs()) {
+                     for (const Song &song : *export_songs) {
                        exporter.AddExportRequest(song);
                      }
                      exporter.StartExporting();
-                     const std::string body = "Exported " + std::to_string(exporter.exported()) + " covers (" +
-                                              std::to_string(exporter.skipped()) + " skipped).";
-                     AdwAlertDialog *done = ADW_ALERT_DIALOG(adw_alert_dialog_new(AlbumCoverExportLabels::Title(), body.c_str()));
+                     const std::string body = CoverManagerExportScope::FinishedBody(exporter.exported(), exporter.skipped());
+                     AdwAlertDialog *done = ADW_ALERT_DIALOG(adw_alert_dialog_new(CoverManagerExportScope::FinishedTitle(), body.c_str()));
                      adw_alert_dialog_add_response(done, "ok", "OK");
                      adw_dialog_present(ADW_DIALOG(done), nullptr);
                    }),

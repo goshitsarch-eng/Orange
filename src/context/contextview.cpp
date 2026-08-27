@@ -211,6 +211,7 @@ void ContextView::Playing() { SetSong(); }
 void ContextView::Stopped() {
   song_playing_ = Song();
   lyrics_tried_ = false;
+  lyrics_.clear();
   album_->SetImage({});
 }
 
@@ -225,6 +226,7 @@ void ContextView::Error() { gtk_label_set_text(GTK_LABEL(title_), Translations::
 void ContextView::NoSong() {
   song_playing_ = Song();
   lyrics_tried_ = false;
+  lyrics_.clear();
   gtk_widget_set_name(title_, "context-idle");
   gtk_label_set_text(GTK_LABEL(title_), Translations::CStr(ContextIdle::Headline()));
   gtk_label_set_text(GTK_LABEL(artist_), "");
@@ -237,8 +239,12 @@ void ContextView::NoSong() {
 
 void ContextView::SongChanged(const Song &song) {
   song_playing_ = song;
+  lyrics_ = ContextLyrics::InitialLyricsFromSong(song);
   lyrics_tried_ = false;
   SetSong();
+  if (!lyrics_.empty()) {
+    SetLyrics(lyrics_);
+  }
   SearchLyrics(false);
 }
 
@@ -282,17 +288,17 @@ void ContextView::RebuildTechnicalData() {
 void ContextView::AlbumCoverLoaded(const std::vector<unsigned char> &data) { album_->SetImage(data); }
 
 void ContextView::SetLyrics(const std::string &lyrics, const std::string &provider) {
+  lyrics_ = ContextLyrics::FormatFetched(lyrics, provider);
   lrc_lines_ = LrcParser::Parse(lyrics);
   lrc_active_ = -1;
-  const std::string display = !lrc_lines_.empty() ? LrcParser::PlainText(lrc_lines_) : lyrics;
+  const std::string display = !lrc_lines_.empty() ? LrcParser::PlainText(lrc_lines_) + ContextLyrics::Footer(provider) : lyrics_;
   GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(lyrics_view_));
-  gtk_text_buffer_set_text(buffer, display.empty() ? Translations::CStr("No lyrics") : display.c_str(), -1);
+  gtk_text_buffer_set_text(buffer, display.c_str(), -1);
   if (!lrc_tag_) {
     lrc_tag_ = gtk_text_buffer_create_tag(buffer, "lrc-current", "weight", PANGO_WEIGHT_BOLD, nullptr);
   }
-  const std::string source = ContextLyrics::Attribution(provider);
-  gtk_label_set_text(GTK_LABEL(lyrics_source_), source.c_str());
-  gtk_widget_set_visible(lyrics_source_, !source.empty());
+  gtk_label_set_text(GTK_LABEL(lyrics_source_), "");
+  gtk_widget_set_visible(lyrics_source_, FALSE);
 }
 
 void ContextView::SetPlaybackPosition(int64_t position_nanosec) {
@@ -330,10 +336,7 @@ void ContextView::HighlightLrcLine(int index) {
 }
 
 void ContextView::SearchLyrics(bool force) {
-  if (!force && !search_lyrics_) {
-    return;
-  }
-  if (!force && lyrics_tried_) {
+  if (!force && !ContextLyrics::ShouldFetchOnline(lyrics_, show_lyrics_, search_lyrics_, song_playing_, lyrics_tried_)) {
     return;
   }
   if (song_playing_.artist().empty() || song_playing_.title().empty()) {

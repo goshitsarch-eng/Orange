@@ -456,6 +456,7 @@ void Playlist::SetRepeatMode(PlaylistSequence::RepeatMode mode) {
   } else if (mode == PlaylistSequence::RepeatMode::Off) {
     mode_ = SequenceMode::Sequential;
   }
+  RepeatModeChanged.Emit();
 }
 
 void Playlist::SetShuffleMode(PlaylistSequence::ShuffleMode mode) {
@@ -466,6 +467,7 @@ void Playlist::SetShuffleMode(PlaylistSequence::ShuffleMode mode) {
     mode_ = SequenceMode::AlbumShuffle;
   }
   RebuildVirtualItems();
+  ShuffleModeChanged.Emit();
 }
 
 void Playlist::Reshuffle(unsigned seed) { RebuildVirtualItems(seed == 0 ? std::random_device{}() : seed); }

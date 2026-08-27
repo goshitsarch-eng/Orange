@@ -6,6 +6,7 @@
 #include "covermanager/albumcovermanagerselection.h"
 #include "covermanager/albumcoverexportdialog.h"
 #include "covermanager/albumcovermanagerlist.h"
+#include "covermanager/covermanagerexportscope.h"
 #include "covermanager/covermanageractions.h"
 #include "covermanager/covermanagerstats.h"
 #include "covermanager/covermanagerview.h"
@@ -798,7 +799,8 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                    state);
   g_signal_connect(export_btn, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<CoverManagerState *>(data);
-                     AlbumCoverExportDialog::Show(self->parent, self->app);
+                     AlbumCoverExportDialog::Show(self->parent, self->app,
+                                                   CoverManagerExportScope::SongsToExport(VisibleAlbums(self)));
                    }),
                    state);
 

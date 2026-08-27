@@ -18,6 +18,8 @@ class Mpris2 {
   void EmitSeeked(int64_t position_us);
   void EmitPosition();
   void EmitPlaybackStatus();
+  void EmitPlayerCapabilities();
+  void EmitLoopAndShuffle();
   void EmitMetadata();
   void EmitVolume();
   void EmitTrackListReplaced();
