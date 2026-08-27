@@ -603,6 +603,9 @@ void Player::HandleEngineMetadata(const Song &song) {
 }
 
 void Player::HandleEngineError(const std::string &error) {
+  if (!error.empty()) {
+    Error.Emit(error);
+  }
   LogError("%s", error.c_str());
   if (greyout_ && playlist_manager_) {
     playlist_manager_->SongChangeRequestProcessed(current_song_.url(), false);

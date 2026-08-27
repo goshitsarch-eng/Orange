@@ -25,6 +25,8 @@
 #include "core/playlistsloadedgate.h"
 #include "dialogs/edittagloading.h"
 #include "dialogs/edittagsave.h"
+#include "dialogs/errordialog.h"
+#include "dialogs/errordialogqueue.h"
 #include "dialogs/messagedialog.h"
 #include "ui/mainwindowmenu.h"
 #include "ui/mainwindowkeyboard.h"
@@ -246,6 +248,7 @@ void MainWindow::Present() {
   if (app_ && app_->shortcuts()) {
     app_->shortcuts()->Raise();
   }
+  CheckShowErrorDialog();
   MaybeShowSponsor();
 }
 
@@ -323,6 +326,11 @@ void MainWindow::CommandlineReceived(const CommandlineOptions &options) {
 
 void MainWindow::BuildUi() {
   window_ = ADW_APPLICATION_WINDOW(adw_application_window_new(GTK_APPLICATION(gtk_app_)));
+  error_dialog_ = std::make_unique<QueuedErrorDialog>(GTK_WINDOW(window_));
+  g_signal_connect(window_, "notify::is-active", G_CALLBACK((+[](GObject *, GParamSpec *, gpointer data) {
+                     static_cast<MainWindow *>(data)->CheckShowErrorDialog();
+                   })),
+                   this);
   gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
   gtk_widget_add_css_class(GTK_WIDGET(window_), "strawberry-main");
   RestoreGeometry();
@@ -2017,12 +2025,13 @@ void MainWindow::ConnectSignals() {
       }
     }
   });
+  app_->player()->Error.Connect([this](const std::string &message) { ShowErrorDialog(message); });
   app_->scrobbler()->Error.Connect([this](const std::string &message) {
     if (ScrobblerError::ShouldShowDialog(message)) {
-      ShowToast(message);
+      ShowErrorDialog(message);
     }
   });
-  app_->playlist_manager()->Error.Connect([this](const std::string &message) { ShowToast(message); });
+  app_->playlist_manager()->Error.Connect([this](const std::string &message) { ShowErrorDialog(message); });
   app_->scrobbler()->EnabledChanged.Connect([this](bool) { UpdateScrobblerButtons(); });
   app_->scrobbler()->TrackLoved.Connect([this](const Song &) {
     loved_current_track_ = ScrobblerLoveState::DisableAfterLove();
@@ -3676,6 +3685,25 @@ SongList MainWindow::SelectedSongs() const {
 void MainWindow::ShowToast(const std::string &text) {
   if (toast_overlay_) {
     adw_toast_overlay_add_toast(toast_overlay_, adw_toast_new(text.c_str()));
+  }
+}
+
+void MainWindow::ShowErrorDialog(const std::string &message) {
+  if (error_dialog_) {
+    error_dialog_->ShowMessage(message);
+  }
+}
+
+void MainWindow::CheckShowErrorDialog() {
+  if (!error_dialog_ || !window_) {
+    return;
+  }
+  GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window_));
+  const bool minimized = surface && GDK_IS_TOPLEVEL(surface) &&
+                         (gdk_toplevel_get_state(GDK_TOPLEVEL(surface)) & GDK_TOPLEVEL_STATE_MINIMIZED) != 0;
+  if (ErrorDialogQueue::ShouldReraise(gtk_widget_get_visible(GTK_WIDGET(window_)), minimized, error_dialog_->visible(),
+                                      error_dialog_->active())) {
+    error_dialog_->Present();
   }
 }
 

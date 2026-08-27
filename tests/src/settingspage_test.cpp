@@ -35,6 +35,7 @@
 #include "settings/collectionsettingslabels.h"
 #include "settings/contextsettingslabels.h"
 #include "dialogs/errordialoglabels.h"
+#include "dialogs/errordialogqueue.h"
 #include "transcoder/transcoderoptionslabels.h"
 #include "engine/gstengineproxy.h"
 #include "settings/notificationscontrols.h"
@@ -256,6 +257,31 @@ TEST(ContextSettingsLabels, EnableItemsCopy) {
 }
 
 TEST(ErrorDialogLabels, QtTitle) { EXPECT_STREQ("Strawberry Error", ErrorDialogLabels::Title()); }
+
+TEST(ErrorDialogQueue, EnqueuesAndJoinsLikeQt) {
+  EXPECT_FALSE(ErrorDialogQueue::ShouldEnqueue(""));
+  EXPECT_TRUE(ErrorDialogQueue::ShouldEnqueue("Failed to play"));
+  std::vector<std::string> messages;
+  EXPECT_FALSE(ErrorDialogQueue::Enqueue(&messages, ""));
+  EXPECT_TRUE(ErrorDialogQueue::Enqueue(&messages, "Failed to play"));
+  EXPECT_TRUE(ErrorDialogQueue::Enqueue(&messages, "A <B> & C"));
+  EXPECT_EQ("Failed to play<hr/>A &lt;B&gt; &amp; C", ErrorDialogQueue::JoinHtml(messages));
+  EXPECT_EQ("Failed to play\n\nA <B> & C", ErrorDialogQueue::JoinPlain(messages));
+  ErrorDialogQueue::Clear(&messages);
+  EXPECT_TRUE(messages.empty());
+}
+
+TEST(ErrorDialogQueue, ShowAndReraiseMatchQt) {
+  EXPECT_TRUE(ErrorDialogQueue::ShouldShowNow(true));
+  EXPECT_FALSE(ErrorDialogQueue::ShouldShowNow(false));
+  EXPECT_TRUE(ErrorDialogQueue::ShouldShowMinimized(false, false));
+  EXPECT_FALSE(ErrorDialogQueue::ShouldShowMinimized(true, false));
+  EXPECT_FALSE(ErrorDialogQueue::ShouldShowMinimized(false, true));
+  EXPECT_TRUE(ErrorDialogQueue::ShouldReraise(true, false, true, false));
+  EXPECT_FALSE(ErrorDialogQueue::ShouldReraise(true, false, true, true));
+  EXPECT_FALSE(ErrorDialogQueue::ShouldReraise(true, true, true, false));
+  EXPECT_FALSE(ErrorDialogQueue::ShouldReraise(false, false, true, false));
+}
 
 TEST(TranscoderOptionsLabels, QtCopy) {
   EXPECT_STREQ("Transcoding options", TranscoderOptionsLabels::Title());

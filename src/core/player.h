@@ -72,6 +72,7 @@ class Player : public PlayerInterface {
   Signal<> Playing;
   Signal<> Stopped;
   Signal<> PlaylistFinished;
+  Signal<std::string> Error;
 
  private:
   void HandleEngineState(EngineBase::State state);

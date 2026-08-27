@@ -36,6 +36,8 @@
 #include <string>
 #include <vector>
 
+class QueuedErrorDialog;
+
 class MainWindow {
  public:
   MainWindow(AdwApplication *gtk_app, Application *app, const CommandlineOptions &options);
@@ -174,6 +176,8 @@ class MainWindow {
   void PersistEditedSongs(const std::vector<int> &rows);
   void FocusCollectionSearch();
   void ShowToast(const std::string &text);
+  void ShowErrorDialog(const std::string &message);
+  void CheckShowErrorDialog();
   void ApplySeekbarPlaybackState();
   void ApplySeekbarMode();
   void ApplySeekbarFadeWidgets();
@@ -205,6 +209,7 @@ class MainWindow {
   AdwApplication *gtk_app_;
   Application *app_;
   AdwApplicationWindow *window_ = nullptr;
+  std::unique_ptr<QueuedErrorDialog> error_dialog_;
   AdwToastOverlay *toast_overlay_ = nullptr;
   AdwViewStack *sidebar_stack_ = nullptr;
   GtkWidget *split_view_ = nullptr;
