@@ -15,6 +15,7 @@ class OrganizeDialog {
  public:
   struct Request {
     SongList songs;
+    std::vector<std::string> filenames;
     bool move = false;
     std::string destination;
     MusicStorage::TranscodeMode transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;

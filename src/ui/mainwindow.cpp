@@ -97,7 +97,9 @@
 #include "device/cddasongloader.h"
 #include "device/devicesongmenu.h"
 #include "organize/organize.h"
+#include "organize/organizedialog.h"
 #include "organize/organizeformat.h"
+#include "organize/organizeloading.h"
 #include "smartplaylists/smartplaylist.h"
 #include "streaming/streamingtabsview.h"
 #include "core/urlhandler.h"
@@ -3689,24 +3691,15 @@ SongList MainWindow::SongsFromFilePaths(const std::vector<std::string> &paths) c
 }
 
 void MainWindow::CopyFileViewToCollection(const std::vector<std::string> &paths, bool move) {
-  std::vector<std::string> files;
-  for (const std::string &path : paths) {
-    if (FileUtils::IsDirectory(path)) {
-      app_->collection()->AddDirectory(path, true);
-      continue;
-    }
-    files.push_back(path);
-  }
-  const SongList songs = SongsFromFilePaths(files);
-  if (songs.empty()) {
-    if (files.empty() && !paths.empty()) {
-      RefreshCollection();
-    } else {
-      ShowToast("No files selected");
-    }
+  const std::vector<std::string> filenames = OrganizeLoading::FileViewFilenames(paths);
+  if (filenames.empty()) {
+    ShowToast("No files selected");
     return;
   }
-  Dialogs::Organize(GTK_WINDOW(window_), app_, songs, move);
+  OrganizeDialog::Request request;
+  request.filenames = filenames;
+  request.move = move;
+  OrganizeDialog::Show(GTK_WINDOW(window_), app_, request);
 }
 
 void MainWindow::CopySelectedToCollection(bool move) {

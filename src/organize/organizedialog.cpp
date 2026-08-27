@@ -15,8 +15,10 @@
 #include "organize/organizeerrordialog.h"
 #include "organize/organizeformat.h"
 #include "organize/organizeformatvalidator.h"
+#include "organize/organizeloading.h"
 #include "organize/organizepreview.h"
 #include "organize/organizesyntaxhighlighter.h"
+#include "tagreader/tagreaderclient.h"
 #include "organize/organizetokenhelp.h"
 #include "organize/organizetranscode.h"
 #include "translations/translations.h"
@@ -26,6 +28,7 @@
 #include <adwaita.h>
 
 #include <memory>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -33,6 +36,10 @@ namespace {
 struct DialogState {
   Application *app = nullptr;
   SongList songs;
+  SongList *owned_songs = nullptr;
+  std::vector<std::string> filenames;
+  bool loading = false;
+  bool loaded_from_filenames = false;
   GtkTextBuffer *buffer = nullptr;
   GtkWidget *dest = nullptr;
   GtkWidget *remove_problematic = nullptr;
@@ -40,6 +47,8 @@ struct DialogState {
   GtkWidget *remove_non_ascii = nullptr;
   GtkWidget *allow_ascii_ext = nullptr;
   GtkWidget *replace_spaces = nullptr;
+  GtkWidget *preview_stack = nullptr;
+  GtkWidget *preview_label = nullptr;
   GtkWidget *preview_list = nullptr;
   GtkWidget *run = nullptr;
   GtkWidget *cancel = nullptr;
@@ -95,11 +104,14 @@ OrganizeFormat FormatFromState(const DialogState *state) {
 }
 
 SongList SongsFromState(const DialogState *state) {
-  if (!state) {
+  if (!state || state->loading) {
     return {};
   }
   if (!state->songs.empty()) {
     return state->songs;
+  }
+  if (!OrganizeLoading::UsesPlaylistFallback(state->loading, state->loaded_from_filenames)) {
+    return {};
   }
   if (state->app && state->app->playlist_manager() && state->app->playlist_manager()->current()) {
     return state->app->playlist_manager()->current()->songs();
@@ -174,6 +186,12 @@ bool StartDeviceCopy(DialogState *state, GtkButton *button, Application *applica
   return true;
 }
 
+struct OrganizeLoadIdle {
+  DialogState *state = nullptr;
+  SongList songs;
+  std::shared_ptr<bool> alive;
+};
+
 void ClearPreview(GtkWidget *list) {
   if (!list) {
     return;
@@ -186,8 +204,31 @@ void ClearPreview(GtkWidget *list) {
   }
 }
 
+void SetLoadingSongs(DialogState *state, bool loading) {
+  if (!state) {
+    return;
+  }
+  state->loading = loading;
+  if (state->preview_stack) {
+    gtk_stack_set_visible_child_name(GTK_STACK(state->preview_stack), OrganizeLoading::VisibleChild(loading));
+    gtk_widget_set_visible(state->preview_stack, (state->has_local_destination || loading) ? TRUE : FALSE);
+  }
+  if (state->preview_label) {
+    gtk_widget_set_visible(state->preview_label, (state->has_local_destination || loading) ? TRUE : FALSE);
+  }
+  if (loading && state->run) {
+    gtk_widget_set_sensitive(state->run, FALSE);
+  }
+}
+
 void RefreshPreview(DialogState *state) {
   if (!state) {
+    return;
+  }
+  if (state->loading) {
+    if (state->run) {
+      gtk_widget_set_sensitive(state->run, OrganizeLoading::RunEnabled(true, false));
+    }
     return;
   }
   const OrganizeFormat format = FormatFromState(state);
@@ -230,9 +271,44 @@ void RefreshPreview(DialogState *state) {
   if (state->run) {
     const int64_t used = state->space ? state->space->used() : 0;
     const int64_t total = state->space ? state->space->total() : 0;
-    gtk_widget_set_sensitive(state->run, OrganizePreview::CanRun(valid, dest, entries, OrganizePreview::TotalBytes(songs), used, total,
-                                                                  state->has_local_destination, !songs.empty()));
+    gtk_widget_set_sensitive(state->run, OrganizeLoading::RunEnabled(state->loading,
+                                                                      OrganizePreview::CanRun(valid, dest, entries, OrganizePreview::TotalBytes(songs),
+                                                                                              used, total, state->has_local_destination, !songs.empty())));
   }
+}
+
+void StartFilenameLoad(DialogState *state) {
+  if (!state) {
+    return;
+  }
+  TagReaderClient *client = state->app ? state->app->tagreader_client() : nullptr;
+  const std::vector<std::string> filenames = state->filenames;
+  const std::shared_ptr<bool> alive = state->alive;
+  std::thread([state, client, filenames, alive]() {
+    SongList songs;
+    if (client) {
+      songs = OrganizeLoading::SongsFromFilenames(filenames, [client](const std::string &path, Song *song) {
+        return client->ReadFileBlocking(path, song);
+      });
+    }
+    auto *idle = new OrganizeLoadIdle{state, std::move(songs), alive};
+    g_idle_add(+[](gpointer data) -> gboolean {
+      auto *loaded = static_cast<OrganizeLoadIdle *>(data);
+      if (loaded->alive && *loaded->alive && loaded->state) {
+        loaded->state->songs = loaded->songs;
+        if (loaded->state->owned_songs) {
+          *loaded->state->owned_songs = loaded->songs;
+        }
+        SetLoadingSongs(loaded->state, false);
+        if (loaded->state->status) {
+          gtk_label_set_text(GTK_LABEL(loaded->state->status), OrganizeLoading::StatusText(false, loaded->songs, true).c_str());
+        }
+        RefreshPreview(loaded->state);
+      }
+      delete loaded;
+      return G_SOURCE_REMOVE;
+    }, idle);
+  }).detach();
 }
 
 void PersistFromState(const DialogState *state) {
@@ -498,8 +574,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
     gtk_check_button_set_active(GTK_CHECK_BUTTON(eject), settings.BoolValue(OrganizeSettings::kEjectAfter, OrganizeSettings::kDefaultEjectAfter));
   }
   auto *owned_songs = new SongList(request.songs);
-  GtkWidget *status = gtk_label_new(owned_songs->empty() ? Translations::CStr("Uses the current playlist as the source.")
-                                                         : (std::to_string(owned_songs->size()) + " selected song(s).").c_str());
+  const bool load_filenames = OrganizeLoading::ShouldLoadFilenames(request.songs, request.filenames);
+  const std::string status_text = OrganizeLoading::StatusText(load_filenames, *owned_songs, load_filenames);
+  GtkWidget *status = gtk_label_new(Translations::CStr(status_text.c_str()));
   gtk_label_set_wrap(GTK_LABEL(status), TRUE);
   GtkWidget *preview_scroll = gtk_scrolled_window_new();
   gtk_widget_set_size_request(preview_scroll, -1, 140);
@@ -507,6 +584,17 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   GtkWidget *preview_list = gtk_list_box_new();
   gtk_widget_add_css_class(preview_list, "boxed-list");
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(preview_scroll), preview_list);
+  GtkWidget *loading_page = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_halign(loading_page, GTK_ALIGN_START);
+  gtk_widget_set_valign(loading_page, GTK_ALIGN_CENTER);
+  GtkWidget *spinner = gtk_spinner_new();
+  gtk_spinner_start(GTK_SPINNER(spinner));
+  gtk_box_append(GTK_BOX(loading_page), spinner);
+  gtk_box_append(GTK_BOX(loading_page), gtk_label_new(Translations::CStr(OrganizeLoading::LoadingText())));
+  GtkWidget *preview_stack = gtk_stack_new();
+  gtk_widget_set_vexpand(preview_stack, TRUE);
+  gtk_stack_add_named(GTK_STACK(preview_stack), preview_scroll, OrganizeLoading::PreviewChild());
+  gtk_stack_add_named(GTK_STACK(preview_stack), loading_page, OrganizeLoading::LoadingChild());
   auto *space = new FreeSpaceBar();
   space->SetPath(saved_dest);
   GtkWidget *run = gtk_button_new_with_label(Translations::CStr("Organize"));
@@ -519,6 +607,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   auto *state = new DialogState;
   state->app = app;
   state->songs = *owned_songs;
+  state->owned_songs = owned_songs;
+  state->filenames = request.filenames;
+  state->loaded_from_filenames = load_filenames;
   state->buffer = buffer;
   state->dest = dest;
   state->remove_problematic = remove_problematic;
@@ -526,6 +617,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   state->remove_non_ascii = remove_non_ascii;
   state->allow_ascii_ext = allow_ascii_ext;
   state->replace_spaces = replace_spaces;
+  state->preview_stack = preview_stack;
   state->preview_list = preview_list;
   state->run = run;
   state->cancel = cancel;
@@ -645,10 +737,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      if (state && (state->job || state->copy_job)) {
                        return;
                      }
-                     auto *owned = static_cast<SongList *>(g_object_get_data(G_OBJECT(button), "songs"));
-                     SongList songs = owned && !owned->empty() ? *owned
-                                      : application->playlist_manager()->current() ? application->playlist_manager()->current()->songs()
-                                                                                   : SongList{};
+                     const SongList songs = SongsFromState(state);
                      if (StartDeviceCopy(state, button, application, songs, options)) {
                        return;
                      }
@@ -720,8 +809,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
     gtk_box_append(GTK_BOX(box), eject);
   }
   GtkWidget *preview_label = gtk_label_new(Translations::CStr("Preview"));
+  state->preview_label = preview_label;
   gtk_box_append(GTK_BOX(box), preview_label);
-  gtk_box_append(GTK_BOX(box), preview_scroll);
+  gtk_box_append(GTK_BOX(box), preview_stack);
   GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_box_append(GTK_BOX(actions), restore);
   gtk_box_append(GTK_BOX(actions), save);
@@ -771,7 +861,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   gtk_widget_set_visible(allow_ascii_ext, local_naming ? TRUE : FALSE);
   gtk_widget_set_visible(replace_spaces, local_naming ? TRUE : FALSE);
   gtk_widget_set_visible(preview_label, local_naming ? TRUE : FALSE);
-  gtk_widget_set_visible(preview_scroll, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(preview_stack, local_naming ? TRUE : FALSE);
   gtk_widget_set_visible(dest_label, local_naming ? TRUE : FALSE);
   gtk_widget_set_visible(dest_row, local_naming ? TRUE : FALSE);
   if (dest_drop) {
@@ -779,6 +869,12 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   }
   gtk_widget_set_visible(browse, (!lock_dest && local_naming) ? TRUE : FALSE);
   gtk_editable_set_editable(GTK_EDITABLE(dest), lock_dest ? FALSE : TRUE);
+  if (load_filenames) {
+    SetLoadingSongs(state, true);
+    StartFilenameLoad(state);
+  } else {
+    SetLoadingSongs(state, false);
+  }
   RefreshPreview(state);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

@@ -40,8 +40,10 @@
 #include "organize/organizefilename.h"
 #include "organize/organizeformatvalidator.h"
 #include "organize/organizetokenhelp.h"
+#include "organize/organizeloading.h"
 #include "organize/organizepreview.h"
 #include "organize/organizetranscode.h"
+#include "tagreader/tagreaderresult.h"
 #include "constants/organizesettings.h"
 #include "analyzer/analyzer.h"
 #include "analyzer/analyzerdemo.h"
@@ -671,6 +673,71 @@ TEST(OrganizePreview, DisambiguatesOnlyWhenUnique) {
   EXPECT_FALSE(OrganizePreview::LocksDestination("", ""));
   EXPECT_TRUE(OrganizePreview::CanRun(false, "", {}, 150, 0, 0, false, true));
   EXPECT_FALSE(OrganizePreview::CanRun(false, "", {}, 150, 0, 0, false, false));
+}
+
+TEST(OrganizeLoading, LoadingPageAndFilenameReadMatchQt) {
+  EXPECT_STREQ("Loading...", OrganizeLoading::LoadingText());
+  EXPECT_STREQ("preview", OrganizeLoading::PreviewChild());
+  EXPECT_STREQ("loading", OrganizeLoading::LoadingChild());
+  EXPECT_STREQ("loading", OrganizeLoading::VisibleChild(true));
+  EXPECT_STREQ("preview", OrganizeLoading::VisibleChild(false));
+  EXPECT_FALSE(OrganizeLoading::RunEnabled(true, true));
+  EXPECT_FALSE(OrganizeLoading::RunEnabled(true, false));
+  EXPECT_TRUE(OrganizeLoading::RunEnabled(false, true));
+  EXPECT_FALSE(OrganizeLoading::RunEnabled(false, false));
+  EXPECT_TRUE(OrganizeLoading::ShouldLoadFilenames({}, {"/tmp/a.mp3"}));
+  EXPECT_FALSE(OrganizeLoading::ShouldLoadFilenames({Song()}, {"/tmp/a.mp3"}));
+  EXPECT_FALSE(OrganizeLoading::ShouldLoadFilenames({}, {}));
+  EXPECT_TRUE(OrganizeLoading::UsesPlaylistFallback(false, false));
+  EXPECT_FALSE(OrganizeLoading::UsesPlaylistFallback(true, false));
+  EXPECT_FALSE(OrganizeLoading::UsesPlaylistFallback(false, true));
+  EXPECT_EQ("Loading...", OrganizeLoading::StatusText(true, {}, true));
+  EXPECT_EQ("Uses the current playlist as the source.", OrganizeLoading::StatusText(false, {}, false));
+  EXPECT_EQ("0 selected song(s).", OrganizeLoading::StatusText(false, {}, true));
+
+  const std::vector<std::string> paths = {"/music/album", "/tmp/a.mp3"};
+  EXPECT_EQ(paths, OrganizeLoading::FileViewFilenames(paths));
+
+  char dir_template[] = "/tmp/strawberry-organize-load-XXXXXX";
+  const std::string dir = mkdtemp(dir_template);
+  const std::string nested = FileUtils::Join(dir, "nested");
+  g_mkdir_with_parents(nested.c_str(), 0755);
+  const std::string audio = FileUtils::Join(nested, "song.mp3");
+  const std::string skip = FileUtils::Join(dir, "notes.txt");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "audio"));
+  ASSERT_TRUE(FileUtils::WriteFile(skip, "text"));
+
+  const std::vector<std::string> expanded = OrganizeLoading::ExpandFilenames({dir});
+  EXPECT_NE(std::find(expanded.begin(), expanded.end(), audio), expanded.end());
+  EXPECT_NE(std::find(expanded.begin(), expanded.end(), skip), expanded.end());
+
+  int reads = 0;
+  const SongList songs = OrganizeLoading::SongsFromFilenames({dir}, [&](const std::string &path, Song *song) {
+    ++reads;
+    if (path == audio) {
+      Song ok;
+      ok.set_valid(true);
+      ok.set_title("Roads");
+      *song = ok;
+      return TagReaderResult{TagReaderResult::ErrorCode::Success};
+    }
+    return TagReaderResult{TagReaderResult::ErrorCode::Unsupported};
+  });
+  EXPECT_EQ(1u, songs.size());
+  EXPECT_EQ("Roads", songs.front().title());
+  EXPECT_GE(reads, 2);
+
+  Song invalid;
+  const SongList none = OrganizeLoading::SongsFromFilenames({audio}, [&](const std::string &, Song *song) {
+    *song = invalid;
+    return TagReaderResult{TagReaderResult::ErrorCode::Success};
+  });
+  EXPECT_TRUE(none.empty());
+
+  FileUtils::Remove(audio);
+  FileUtils::Remove(skip);
+  rmdir(nested.c_str());
+  rmdir(dir.c_str());
 }
 
 TEST(OrganizeJob, BatchesTenAndSupportsCancel) {
