@@ -329,6 +329,7 @@ TEST(Playlist, SaveRowsReloadsAfterAsyncWrite) {
   song.set_title("Roads");
   song.set_artist("Portishead");
   song.set_url(FileUtils::UriFromPath(path));
+  song.set_filetype(Song::FileType::MPEG);
   song.set_valid(true);
   playlist.AppendSongs({song});
   ASSERT_EQ(1, playlist.SetColumnValues({0}, PlaylistColumn::Title, "Glory Box"));
