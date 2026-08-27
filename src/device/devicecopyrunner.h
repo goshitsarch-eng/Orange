@@ -42,6 +42,7 @@ class DeviceCopyRunner {
   bool cancelled() const { return cancelled_; }
   int next_index() const { return next_; }
   int copied() const { return copied_; }
+  const SongList &copied_songs() const { return copied_songs_; }
   const SongList &errors() const { return errors_; }
 
   Signal<bool> Finished;
@@ -57,6 +58,7 @@ class DeviceCopyRunner {
   TagReader *tagreader_ = nullptr;
   ConnectedDevice device_;
   SongList songs_;
+  SongList copied_songs_;
   SongList errors_;
   int next_ = 0;
   int copied_ = 0;

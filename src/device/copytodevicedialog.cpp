@@ -89,11 +89,15 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongLis
                                              stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG);
                        runner->set_playlist(playlist_name);
                        GtkWindow *parent = GTK_WINDOW(g_object_get_data(G_OBJECT(btn), "parent"));
-                       runner->Finished.Connect([btn, runner, parent](bool ok) {
+                       const std::string device_id = device->unique_id;
+                       runner->Finished.Connect([btn, runner, parent, application, device_id](bool ok) {
                          gtk_widget_set_sensitive(GTK_WIDGET(btn), TRUE);
                          gtk_button_set_label(btn, ok ? "Copied" : "Failed");
                          if (!runner->errors().empty()) {
                            OrganizeErrorDialog::Show(parent, OrganizeErrorDialog::OperationType::Copy, runner->errors());
+                         }
+                         if (application && application->device_manager() && runner->copied() > 0) {
+                           application->device_manager()->RefreshAfterCopy(device_id, runner->copied(), runner->copied_songs());
                          }
                          g_idle_add(+[](gpointer data) -> gboolean {
                            delete static_cast<DeviceCopyRunner *>(data);

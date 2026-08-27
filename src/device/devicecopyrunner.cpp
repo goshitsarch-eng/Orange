@@ -65,6 +65,7 @@ bool DeviceCopyRunner::Copy(const ConnectedDevice &device, const SongList &songs
 void DeviceCopyRunner::Begin(const ConnectedDevice &device, const SongList &songs) {
   device_ = device;
   songs_ = songs;
+  copied_songs_.clear();
   errors_.clear();
   next_ = 0;
   copied_ = 0;
@@ -154,12 +155,17 @@ Song DeviceCopyRunner::PrepareSong(const Song &song) {
 bool DeviceCopyRunner::CopyOnePrepared(const Song &song) {
 #ifdef HAVE_MTP
   if (device_.backend == "mtp") {
-    return mtp_ && mtp_->CopyOne(song, [this](float fraction) {
+    Song on_device(Song::Source::Device);
+    const bool ok = mtp_ && mtp_->CopyOne(song, [this](float fraction) {
       if (task_manager_ && task_id_ > 0) {
         const int total = static_cast<int>(songs_.size());
         task_manager_->SetTaskProgress(task_id_, DeviceCopyJob::ScaledProgress(next_, fraction, total), DeviceCopyJob::ScaledProgressMax(total));
       }
-    });
+    }, &on_device);
+    if (ok && on_device.is_valid()) {
+      copied_songs_.push_back(on_device);
+    }
+    return ok;
   }
 #endif
 #ifdef HAVE_GPOD
@@ -168,7 +174,12 @@ bool DeviceCopyRunner::CopyOnePrepared(const Song &song) {
     if (albumcover_) {
       cover = OrganizeCoverSource::ForSong(song, tagreader_, FileUtils::Join(StandardPaths::CacheDir(), "device-cover.bin"));
     }
-    return gpod_ && gpod_->CopyOne(song, playlist_, cover);
+    Song on_device(Song::Source::Device);
+    const bool ok = gpod_ && gpod_->CopyOne(song, playlist_, cover, &on_device);
+    if (ok && on_device.is_valid()) {
+      copied_songs_.push_back(on_device);
+    }
+    return ok;
   }
 #endif
 #ifdef HAVE_GIO

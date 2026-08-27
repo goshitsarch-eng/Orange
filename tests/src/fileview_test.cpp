@@ -19,6 +19,7 @@
 #include "device/deviceforgetdialog.h"
 #include "device/deviceviewlook.h"
 #include "device/deviceviewreload.h"
+#include "device/devicecopyrefresh.h"
 #include "device/devicescanprogress.h"
 #include "device/devicekeyboard.h"
 #include "fileview/fileviewdrag.h"
@@ -666,6 +667,26 @@ TEST(DeviceScanProgress, MapsTaskToPercent) {
 
 TEST(DeviceViewReload, DoesNotRescanOnRefresh) {
   EXPECT_FALSE(DeviceViewReload::ShouldRescanOnReload());
+}
+
+TEST(DeviceCopyRefresh, ShouldRefreshAfterCopyMatchesQtFinishCopy) {
+  EXPECT_FALSE(DeviceCopyRefresh::ShouldRefreshAfterCopy("mtp", 0));
+  EXPECT_TRUE(DeviceCopyRefresh::ShouldRefreshAfterCopy("mtp", 1));
+  EXPECT_TRUE(DeviceCopyRefresh::ShouldRefreshAfterCopy("gpod", 3));
+  EXPECT_TRUE(DeviceCopyRefresh::ShouldRefreshAfterCopy("gio", 1));
+  EXPECT_TRUE(DeviceCopyRefresh::ShouldRefreshAfterCopy("udisks2", 2));
+  EXPECT_FALSE(DeviceCopyRefresh::ShouldRefreshAfterCopy("cdda", 4));
+  EXPECT_FALSE(DeviceCopyRefresh::ShouldRefreshAfterCopy("", 2));
+  Song mtp(Song::Source::Device);
+  mtp.set_artist("Artist");
+  mtp.set_albumartist("Album Artist");
+  DeviceCopyRefresh::ApplyMtpCollectionFields(&mtp);
+  EXPECT_EQ(1, mtp.directory_id());
+  EXPECT_EQ("Album Artist", mtp.artist());
+  EXPECT_EQ("", mtp.albumartist());
+  Song ipod(Song::Source::Device);
+  DeviceCopyRefresh::ApplyGPodCollectionFields(&ipod);
+  EXPECT_EQ(1, ipod.directory_id());
 }
 
 TEST(DeviceForgetDialog, MatchesQtForgetCopy) {

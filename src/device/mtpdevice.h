@@ -13,7 +13,7 @@
 class MtpCopySession {
  public:
   bool Open(const std::string &serial);
-  bool CopyOne(const Song &song, const MusicStorage::ProgressFunction &progress = {});
+  bool CopyOne(const Song &song, const MusicStorage::ProgressFunction &progress = {}, Song *on_device = nullptr);
   void Close();
   bool is_open() const;
   std::vector<Song::FileType> SupportedFiletypes() const;

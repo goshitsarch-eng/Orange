@@ -15,6 +15,7 @@
 #include "device/giolister.h"
 #include "device/udisks2lister.h"
 #include "device/devicecopyrunner.h"
+#include "device/devicecopyrefresh.h"
 #include "device/devicecopysupported.h"
 #include "device/gpoddevice.h"
 #include "device/gpodloader.h"
@@ -476,7 +477,28 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
     DeviceError.Emit(DeviceError::CopyFailed());
     return false;
   }
+  RefreshAfterCopy(device_id, runner.copied(), runner.copied_songs());
   return true;
+}
+
+void DeviceManager::RefreshAfterCopy(const std::string &device_id, int copied, const SongList &on_device) {
+  const ConnectedDevice *device = FindDevice(device_id);
+  const std::string backend = device ? device->backend : std::string();
+  if (!DeviceCopyRefresh::ShouldRefreshAfterCopy(backend, copied)) {
+    return;
+  }
+  if (device_db_ && !on_device.empty()) {
+    const DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device_id);
+    if (stored.id >= 0) {
+      SongList songs = device_db_->Songs(stored.id);
+      songs.insert(songs.end(), on_device.begin(), on_device.end());
+      device_db_->ReplaceSongs(stored.id, songs);
+    }
+  }
+  if (song_counts_.count(device_id) && song_counts_[device_id] >= 0) {
+    RememberSongCount(device_id, song_counts_[device_id] + copied);
+  }
+  DevicesChanged.Emit();
 }
 
 void DeviceManager::Remember(const std::string &device_id) {

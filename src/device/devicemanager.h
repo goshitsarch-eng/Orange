@@ -33,6 +33,7 @@ class DeviceManager {
   bool Unmount(const std::string &device_id);
   void Remember(const std::string &device_id);
   void RememberSongCount(const std::string &device_id, int count);
+  void RefreshAfterCopy(const std::string &device_id, int copied, const SongList &on_device = {});
   void SetUpdatingPercent(const std::string &device_id, int percent);
   bool SetDeviceOptions(const std::string &device_id, const std::string &friendly_name, DeviceDatabaseBackend::TranscodeMode mode,
                         Song::FileType format, const std::string &icon_name = {});

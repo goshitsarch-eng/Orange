@@ -5,6 +5,7 @@
 #include "device/devicecopy.h"
 #include "device/gpodcover.h"
 #include "device/gpoddelete.h"
+#include "device/devicecopyrefresh.h"
 #include "device/gpodloader.h"
 #include "utilities/fileutils.h"
 
@@ -51,6 +52,7 @@ bool GPodCopySession::Open(const std::string &mount_path) {
   }
   db_ = db;
   mpl_ = mpl;
+  mount_path_ = mount_path;
   copied_ = 0;
   return true;
 #else
@@ -59,7 +61,7 @@ bool GPodCopySession::Open(const std::string &mount_path) {
 #endif
 }
 
-bool GPodCopySession::CopyOne(const Song &song, const std::string &playlist, const std::string &cover_source) {
+bool GPodCopySession::CopyOne(const Song &song, const std::string &playlist, const std::string &cover_source, Song *on_device) {
 #ifdef HAVE_GPOD
   auto *db = static_cast<Itdb_iTunesDB *>(db_);
   auto *mpl = static_cast<Itdb_Playlist *>(mpl_);
@@ -99,12 +101,17 @@ bool GPodCopySession::CopyOne(const Song &song, const std::string &playlist, con
     }
     itdb_playlist_add_track(named, track, -1);
   }
+  if (on_device) {
+    *on_device = GPodLoader::SongFromTrack(track, mount_path_);
+    DeviceCopyRefresh::ApplyGPodCollectionFields(on_device);
+  }
   ++copied_;
   return true;
 #else
   (void)song;
   (void)playlist;
   (void)cover_source;
+  (void)on_device;
   return false;
 #endif
 }

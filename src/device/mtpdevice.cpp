@@ -3,6 +3,7 @@
 #include "core/logging.h"
 #include "core/standardpaths.h"
 #include "device/devicecopyjob.h"
+#include "device/devicecopyrefresh.h"
 #include "device/mtpconnection.h"
 #include "device/mtploader.h"
 #include "utilities/fileutils.h"
@@ -50,7 +51,7 @@ int MtpSendProgressCallback(uint64_t const sent, uint64_t const total, void cons
 }  // namespace
 #endif
 
-bool MtpCopySession::CopyOne(const Song &song, const MusicStorage::ProgressFunction &progress) {
+bool MtpCopySession::CopyOne(const Song &song, const MusicStorage::ProgressFunction &progress, Song *on_device) {
 #ifdef HAVE_MTP
   if (!is_open()) {
     return false;
@@ -74,12 +75,16 @@ bool MtpCopySession::CopyOne(const Song &song, const MusicStorage::ProgressFunct
       LogError("MTP copy failed: %s", error->error_text);
     }
     LIBMTP_Clear_Errorstack(connection_->device());
+  } else if (on_device) {
+    *on_device = MtpLoader::SongFromTrack(track, connection_->serial());
+    DeviceCopyRefresh::ApplyMtpCollectionFields(on_device);
   }
   LIBMTP_destroy_track_t(track);
   return ret == 0;
 #else
   (void)song;
   (void)progress;
+  (void)on_device;
   return false;
 #endif
 }

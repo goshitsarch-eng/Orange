@@ -153,7 +153,11 @@ bool StartDeviceCopy(DialogState *state, GtkButton *button, Application *applica
     gtk_label_set_text(GTK_LABEL(state->status), DeviceCopyJob::TaskName());
   }
   const std::shared_ptr<bool> alive = state->alive;
-  runner->Finished.Connect([state, alive, runner, application, button](bool) {
+  const std::string device_id = state->device_id;
+  runner->Finished.Connect([state, alive, runner, application, button, device_id](bool) {
+    if (application && application->device_manager() && runner->copied() > 0) {
+      application->device_manager()->RefreshAfterCopy(device_id, runner->copied(), runner->copied_songs());
+    }
     if (alive && *alive && state && state->copy_job == runner) {
       state->copy_job = nullptr;
       gtk_widget_set_sensitive(GTK_WIDGET(button), TRUE);
@@ -752,7 +756,13 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      GtkWidget *status_label = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
                      gtk_label_set_text(GTK_LABEL(status_label), OrganizeJob::TaskName());
                      const std::shared_ptr<bool> alive = state ? state->alive : std::make_shared<bool>(true);
-                     job->Finished.Connect([state, alive, job, application, button](Organize *) {
+                     const std::string device_id = state ? state->device_id : std::string();
+                     job->Finished.Connect([state, alive, job, application, button, device_id](Organize *) {
+                       if (application && application->device_manager() && !device_id.empty()) {
+                         const int failed = static_cast<int>(job->errors().size());
+                         const int copied = job->next_index() > failed ? job->next_index() - failed : 0;
+                         application->device_manager()->RefreshAfterCopy(device_id, copied);
+                       }
                        if (alive && *alive && state && state->job == job) {
                          state->job = nullptr;
                          gtk_widget_set_sensitive(GTK_WIDGET(button), TRUE);

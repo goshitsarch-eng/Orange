@@ -560,6 +560,7 @@ set(STRAWBERRY_SOURCES
   src/device/devicecopysupported.h
   src/device/gpoddelete.h
   src/device/gpodcover.h
+  src/device/devicecopyrefresh.h
   src/device/deviceview.cpp
   src/device/deviceviewcontainer.cpp
   src/equalizer/equalizer.cpp
