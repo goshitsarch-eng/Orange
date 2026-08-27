@@ -604,6 +604,16 @@ TEST(CoverManagerView, LabelsAndHideIndexMatchQt) {
   EXPECT_EQ(2, CoverManagerView::ClampIndex(9));
 }
 
+TEST(CoverManagerMenu, KeyboardUsesAlbumSelection) {
+  EXPECT_TRUE(CoverManagerMenu::IsKeyboardTrigger(CoverManagerMenu::kMenu, 0));
+  EXPECT_TRUE(CoverManagerMenu::IsKeyboardTrigger(CoverManagerMenu::kF10, CoverManagerMenu::kShiftMask));
+  EXPECT_FALSE(CoverManagerMenu::IsKeyboardTrigger(CoverManagerMenu::kF10, 0));
+  EXPECT_FALSE(CoverManagerMenu::IsKeyboardTrigger(ListBoxKeyboard::kReturn, 0));
+  EXPECT_TRUE(CoverManagerMenu::ShouldShowMenu(true, true));
+  EXPECT_FALSE(CoverManagerMenu::ShouldShowMenu(true, false));
+  EXPECT_FALSE(CoverManagerMenu::ShouldShowMenu(false, true));
+}
+
 TEST(CoverManagerActivate, AlbumEnterShowsCoverNotPlaylist) {
   EXPECT_TRUE(CoverManagerActivate::IsEnter(ListBoxKeyboard::kReturn));
   EXPECT_TRUE(CoverManagerActivate::IsEnter(ListBoxKeyboard::kKPEnter));

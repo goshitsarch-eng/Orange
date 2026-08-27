@@ -68,7 +68,9 @@ int AlbumCount(CoverManagerState *state);
 int FlowColumns(CoverManagerState *state);
 std::vector<std::string> ArtistLabels(CoverManagerState *state);
 std::vector<std::string> AlbumLabels(CoverManagerState *state);
-gboolean OnCoverKey(CoverManagerState *state, guint keyval, bool albums);
+gboolean OnCoverKey(CoverManagerState *state, guint keyval, GdkModifierType modifiers, bool albums);
+void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album, GtkWidget *image);
+GtkWidget *SelectedAlbumImage(CoverManagerState *state);
 
 void UpdateBatchUi(CoverManagerState *state) {
   if (!state) {
@@ -304,6 +306,20 @@ int SelectedAlbumIndex(CoverManagerState *state) {
   return index;
 }
 
+GtkWidget *SelectedAlbumImage(CoverManagerState *state) {
+  if (!state || !state->flow) {
+    return nullptr;
+  }
+  GList *selected = gtk_flow_box_get_selected_children(GTK_FLOW_BOX(state->flow));
+  if (!selected) {
+    return nullptr;
+  }
+  GtkWidget *child = GTK_WIDGET(selected->data);
+  GtkWidget *card = GTK_IS_FLOW_BOX_CHILD(child) ? gtk_flow_box_child_get_child(GTK_FLOW_BOX_CHILD(child)) : child;
+  g_list_free(selected);
+  return card ? GTK_WIDGET(g_object_get_data(G_OBJECT(card), "image")) : nullptr;
+}
+
 void SelectArtistRow(CoverManagerState *state, int index) {
   if (!state || !state->artist_list || index < 0) {
     return;
@@ -375,12 +391,22 @@ std::vector<std::string> AlbumLabels(CoverManagerState *state) {
   return labels;
 }
 
-gboolean OnCoverKey(CoverManagerState *state, guint keyval, bool albums) {
+gboolean OnCoverKey(CoverManagerState *state, guint keyval, GdkModifierType modifiers, bool albums) {
   if (!state) {
     return FALSE;
   }
   if (keyval == GDK_KEY_Escape) {
     ResetTypeAhead(state);
+    return TRUE;
+  }
+  if (CoverManagerMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(modifiers))) {
+    if (CoverManagerMenu::ShouldShowMenu(albums, !SelectedAlbums(state).empty())) {
+      GtkWidget *image = SelectedAlbumImage(state);
+      const auto selected = SelectedAlbums(state);
+      if (image && !selected.empty()) {
+        ShowAlbumMenu(state, selected.front(), image);
+      }
+    }
     return TRUE;
   }
   if (CoverManagerActivate::IsEnter(keyval)) {
@@ -547,6 +573,7 @@ void RebuildAlbums(CoverManagerState *state) {
     gtk_widget_add_css_class(button, "flat");
     auto *owned = new AlbumCoverManagerList::Album(album);
     g_object_set_data_full(G_OBJECT(card), "album", owned, [](gpointer p) { delete static_cast<AlbumCoverManagerList::Album *>(p); });
+    g_object_set_data(G_OBJECT(card), "image", image);
     g_object_set_data(G_OBJECT(button), "album", owned);
     g_object_set_data(G_OBJECT(button), "image", image);
     g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
@@ -765,15 +792,15 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   GtkEventController *artist_keys = gtk_event_controller_key_new();
   gtk_widget_add_controller(state->artist_list, artist_keys);
   g_signal_connect(artist_keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return OnCoverKey(static_cast<CoverManagerState *>(data), keyval, false);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return OnCoverKey(static_cast<CoverManagerState *>(data), keyval, state, false);
                    })),
                    state);
   GtkEventController *album_keys = gtk_event_controller_key_new();
   gtk_widget_add_controller(state->flow, album_keys);
   g_signal_connect(album_keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return OnCoverKey(static_cast<CoverManagerState *>(data), keyval, true);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return OnCoverKey(static_cast<CoverManagerState *>(data), keyval, state, true);
                    })),
                    state);
 
