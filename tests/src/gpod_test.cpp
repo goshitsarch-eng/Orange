@@ -1,4 +1,6 @@
 #include "config.h"
+#include "device/gpoddelete.h"
+#include "device/gpoddevice.h"
 #include "device/gpodloader.h"
 
 #include <gtest/gtest.h>
@@ -51,6 +53,20 @@ TEST(GPodLoader, SongFromTrackRoundTrip) {
 
 TEST(GPodLoader, LoadSongsMissingDatabase) {
   EXPECT_TRUE(GPodLoader::LoadSongs("/tmp/not-an-ipod").empty());
+}
+
+TEST(GPodDelete, IpodPathFromUrlMatchesQtRemoveTrack) {
+  EXPECT_EQ(":iPod_Control:Music:F00:song.mp3",
+            GPodDelete::IpodPathFromUrl("file:///media/ipod/iPod_Control/Music/F00/song.mp3", "/media/ipod"));
+  EXPECT_EQ(":iPod_Control:Music:F00:song.mp3",
+            GPodDelete::IpodPathFromUrl("/media/ipod/iPod_Control/Music/F00/song.mp3", "/media/ipod"));
+  EXPECT_EQ(":iPod_Control:Music:F00:song.mp3",
+            GPodDelete::IpodPathFromUrl("/media/ipod/iPod_Control/Music/F00/song.mp3", "/media/ipod/"));
+  EXPECT_TRUE(GPodDelete::TrackMatches(":iPod_Control:Music:F00:song.mp3", ":iPod_Control:Music:F00:song.mp3"));
+  EXPECT_FALSE(GPodDelete::TrackMatches(nullptr, ":iPod_Control:Music:F00:song.mp3"));
+  Song missing;
+  missing.set_url("file:///tmp/not-an-ipod/iPod_Control/Music/F00/song.mp3");
+  EXPECT_FALSE(GPodDevice::DeleteSong("/tmp/not-an-ipod", missing));
 }
 
 #else

@@ -27,6 +27,7 @@ namespace GPodDevice {
 
 bool CopySongs(const std::string &mount_path, const SongList &songs);
 bool CopyOne(const std::string &mount_path, const Song &song);
+bool DeleteSong(const std::string &mount_path, const Song &song);
 
 }  // namespace GPodDevice
 

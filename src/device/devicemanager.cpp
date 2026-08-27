@@ -6,6 +6,7 @@
 #include "core/logging.h"
 #include "core/standardpaths.h"
 #include "core/database.h"
+#include "core/filesystemmusicstorage.h"
 #include "device/devicedatabasebackend.h"
 #include "device/cddadevice.h"
 #include "device/cddalister.h"
@@ -659,7 +660,25 @@ bool DeviceManager::DeleteSong(const std::string &device_id, const Song &song) {
     return true;
   }
 #endif
-  (void)song;
+#ifdef HAVE_GPOD
+  if (found->backend == "gpod") {
+    if (!GPodDevice::DeleteSong(found->mount_path, song)) {
+      DeviceError.Emit(DeviceError::DeleteFailed());
+      return false;
+    }
+    return true;
+  }
+#endif
+  if (!found->mount_path.empty()) {
+    FilesystemMusicStorage storage(found->mount_path);
+    MusicStorage::DeleteJob job;
+    job.metadata = song;
+    if (!storage.DeleteFromStorage(job)) {
+      DeviceError.Emit(DeviceError::DeleteFailed());
+      return false;
+    }
+    return true;
+  }
   DeviceError.Emit(DeviceError::DeleteFailed());
   return false;
 }

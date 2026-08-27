@@ -3,6 +3,7 @@
 #include "config.h"
 #include "core/logging.h"
 #include "device/devicecopy.h"
+#include "device/gpoddelete.h"
 #include "device/gpodloader.h"
 #include "utilities/fileutils.h"
 
@@ -126,6 +127,61 @@ bool GPodDevice::CopyOne(const std::string &mount_path, const Song &song) {
     return false;
   }
   return session.Finish();
+}
+
+bool GPodDevice::DeleteSong(const std::string &mount_path, const Song &song) {
+#ifdef HAVE_GPOD
+  if (mount_path.empty()) {
+    return false;
+  }
+  GError *error = nullptr;
+  Itdb_iTunesDB *db = itdb_parse(mount_path.c_str(), &error);
+  if (!db) {
+    if (error) {
+      LogWarning("Loading iPod database failed: %s", error->message);
+      g_error_free(error);
+    }
+    return false;
+  }
+  const std::string ipod_path = GPodDelete::IpodPathFromUrl(song.url(), mount_path);
+  Itdb_Track *track = nullptr;
+  for (GList *tracks = db->tracks; tracks; tracks = tracks->next) {
+    auto *candidate = static_cast<Itdb_Track *>(tracks->data);
+    if (candidate && GPodDelete::TrackMatches(candidate->ipod_path, ipod_path)) {
+      track = candidate;
+      break;
+    }
+  }
+  if (!track) {
+    LogWarning("Couldn't find song %s in iTunesDB", song.url().c_str());
+    itdb_free(db);
+    return false;
+  }
+  for (GList *playlists = db->playlists; playlists; playlists = playlists->next) {
+    auto *playlist = static_cast<Itdb_Playlist *>(playlists->data);
+    if (playlist && itdb_playlist_contains_track(playlist, track)) {
+      itdb_playlist_remove_track(playlist, track);
+    }
+  }
+  itdb_track_remove(track);
+  const std::string local = GPodDelete::LocalPath(song.url());
+  if (local.empty() || !FileUtils::Remove(local)) {
+    itdb_free(db);
+    return false;
+  }
+  error = nullptr;
+  const bool wrote = itdb_write(db, &error);
+  if (!wrote && error) {
+    LogWarning("Writing iPod database failed: %s", error->message);
+    g_error_free(error);
+  }
+  itdb_free(db);
+  return wrote;
+#else
+  (void)mount_path;
+  (void)song;
+  return false;
+#endif
 }
 
 bool GPodDevice::CopySongs(const std::string &mount_path, const SongList &songs) {
