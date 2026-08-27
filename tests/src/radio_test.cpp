@@ -3,6 +3,7 @@
 #include "playlistparsers/playlistparser.h"
 #include "radios/radiobackend.h"
 #include "radios/radiobrowsersearchmodel.h"
+#include "radios/radiobrowsercountries.h"
 #include "radios/radiobrowsersearchopts.h"
 #include "radios/radiobrowserservice.h"
 #include "radios/radiochannel.h"
@@ -130,6 +131,40 @@ TEST(RadioBrowserService, ParseCountriesSkipsEmptyAndZero) {
   EXPECT_EQ("DE", countries[0].code);
   EXPECT_EQ("NO", countries[1].code);
   EXPECT_EQ(12, countries[1].stationcount);
+}
+
+TEST(RadioBrowserSearchOpts, SortChoicesMatchQtSettingsCombo) {
+  const auto choices = RadioBrowserSearchOpts::SortChoices();
+  ASSERT_EQ(4u, choices.size());
+  EXPECT_EQ("votes", choices[0].first);
+  EXPECT_EQ("By votes", choices[0].second);
+  EXPECT_EQ("clickcount", choices[1].first);
+  EXPECT_EQ("By clicks", choices[1].second);
+  EXPECT_EQ("name", choices[2].first);
+  EXPECT_EQ("By name", choices[2].second);
+  EXPECT_EQ("bitrate", choices[3].first);
+  EXPECT_EQ("By bitrate", choices[3].second);
+}
+
+TEST(RadioBrowserCountries, SettingsListMatchesQtLocales) {
+  const auto choices = RadioBrowserCountries::SettingsChoices();
+  ASSERT_GT(choices.size(), 50u);
+  EXPECT_EQ("", choices.front().first);
+  EXPECT_STREQ("All countries", choices.front().second.c_str());
+  const auto countries = RadioBrowserCountries::CountryList();
+  ASSERT_EQ(choices.size(), countries.size() + 1);
+  EXPECT_TRUE(RadioBrowserCountries::ContainsCode(countries, "US"));
+  EXPECT_TRUE(RadioBrowserCountries::ContainsCode(countries, "DE"));
+  EXPECT_TRUE(RadioBrowserCountries::ContainsCode(countries, "NO"));
+  EXPECT_FALSE(RadioBrowserCountries::ContainsCode(countries, ""));
+  EXPECT_FALSE(RadioBrowserCountries::ContainsCode(countries, "all"));
+  for (size_t i = 0; i < countries.size(); ++i) {
+    EXPECT_TRUE(RadioBrowserCountries::IsTwoLetter(countries[i].first.c_str()));
+    EXPECT_FALSE(countries[i].second.empty());
+    if (i > 0) {
+      EXPECT_LE(RadioBrowserCountries::CompareName(countries[i - 1].second, countries[i].second), 0);
+    }
+  }
 }
 
 TEST(RadioBrowserSearchOpts, SortStatusAndPagingMatchQt) {

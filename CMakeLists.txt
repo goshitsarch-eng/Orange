@@ -513,6 +513,7 @@ set(STRAWBERRY_SOURCES
   src/radios/radioservice.cpp
   src/radios/radiomimedata.cpp
   src/radios/radiobrowsersearchmodel.cpp
+  src/radios/radiobrowsercountries.h
   src/radios/somafmservice.cpp
   src/radios/radioparadiseservice.cpp
   src/radios/radiobrowserservice.cpp

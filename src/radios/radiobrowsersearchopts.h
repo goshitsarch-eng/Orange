@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace RadioBrowserSearchOpts {
@@ -24,6 +25,14 @@ inline std::vector<SortOption> SortOptions() {
 }
 
 inline int SortCount() { return static_cast<int>(SortOptions().size()); }
+
+inline std::vector<std::pair<std::string, std::string>> SortChoices() {
+  std::vector<std::pair<std::string, std::string>> choices;
+  for (const SortOption &option : SortOptions()) {
+    choices.emplace_back(option.id, option.label);
+  }
+  return choices;
+}
 
 inline const char *DefaultSort() { return RadioBrowserSettings::kDefaultSortDefault; }
 

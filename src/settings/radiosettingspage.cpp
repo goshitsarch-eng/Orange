@@ -3,6 +3,8 @@
 #include "constants/radiobrowsersettings.h"
 #include "constants/radioparadisesettings.h"
 #include "constants/somafmsettings.h"
+#include "radios/radiobrowsercountries.h"
+#include "radios/radiobrowsersearchopts.h"
 #include "settings/settingspage.h"
 #include "settings/streamingsettingslabels.h"
 #include "streaming/streamingchoices.h"
@@ -21,9 +23,10 @@ AdwPreferencesPage *RadioSettingsPage::Create(Settings *settings, Application *)
                             RadioBrowserSettings::kSearchLimitDefault);
   SettingsPage::AddToggle(browser, settings, RadioBrowserSettings::kHideBroken, RadioSettingsLabels::HideBroken(), nullptr,
                           RadioBrowserSettings::kHideBrokenDefault);
-  SettingsPage::AddEntry(browser, settings, RadioBrowserSettings::kDefaultSort, RadioSettingsLabels::DefaultSortOrder(),
-                         RadioBrowserSettings::kDefaultSortDefault);
-  SettingsPage::AddEntry(browser, settings, RadioBrowserSettings::kDefaultCountry, RadioSettingsLabels::DefaultCountry());
+  SettingsPage::AddCombo(browser, settings, RadioBrowserSettings::kDefaultSort, RadioSettingsLabels::DefaultSortOrder(),
+                         RadioBrowserSearchOpts::SortChoices(), RadioBrowserSettings::kDefaultSortDefault);
+  SettingsPage::AddCombo(browser, settings, RadioBrowserSettings::kDefaultCountry, RadioSettingsLabels::DefaultCountry(),
+                         RadioBrowserCountries::SettingsChoices(), "");
 
   settings->BeginGroup(RadioParadiseSettings::kSettingsGroup);
   AdwPreferencesGroup *rp = SettingsPage::AddGroup(page, "Radio Paradise");
