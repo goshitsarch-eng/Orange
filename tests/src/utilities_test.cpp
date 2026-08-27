@@ -51,6 +51,7 @@
 #include "context/contextoptions.h"
 #include "context/contextidle.h"
 #include "context/contextplayingtext.h"
+#include "context/contextreload.h"
 #include "context/contexttechnical.h"
 #include "dialogs/addstreamurl.h"
 #include "dialogs/deletefilespolicy.h"
@@ -305,6 +306,14 @@ TEST(OrganizeFormat, OptionalBlocks) {
   without.set_title("Title");
   EXPECT_EQ("Artist/Album/Title", format.GetFilenameForSong(without));
   EXPECT_FALSE(OrganizeFormat::TokenHasValue("%disc", without));
+}
+
+TEST(ContextReload, RefreshesDisplayAfterPreferencesLikeQt) {
+  EXPECT_TRUE(ContextReload::ShouldRefreshDisplayOnReload());
+  EXPECT_TRUE(ContextReload::ShouldRefreshIdle(true));
+  EXPECT_FALSE(ContextReload::ShouldRefreshIdle(false));
+  EXPECT_TRUE(ContextReload::ShouldRefreshPlaying(false));
+  EXPECT_FALSE(ContextReload::ShouldRefreshPlaying(true));
 }
 
 TEST(ContextTechnical, RowsAndFormats) {

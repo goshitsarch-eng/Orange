@@ -5,6 +5,7 @@
 #include "context/contextfont.h"
 #include "context/contextidle.h"
 #include "context/contextplayingtext.h"
+#include "context/contextreload.h"
 #include "context/contextlyrics.h"
 #include "context/contextoptions.h"
 #include "context/contexttechnical.h"
@@ -211,6 +212,14 @@ void ContextView::ReloadSettings() {
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), show_lyrics_);
   gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_lyrics_btn_), search_lyrics_);
   gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_cover_btn_), search_cover_);
+  if (ContextReload::ShouldRefreshDisplayOnReload()) {
+    if (ContextReload::ShouldRefreshIdle(Idle())) {
+      NoSong();
+    } else {
+      SetSong();
+    }
+    return;
+  }
   ApplyVisibility();
 }
 
