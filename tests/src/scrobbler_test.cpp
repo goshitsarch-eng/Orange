@@ -88,6 +88,16 @@ TEST(ListenBrainzScrobbler, SubmitBodyEscapesQuotes) {
   EXPECT_NE(std::string::npos, body.find("\"listened_at\":99"));
   EXPECT_NE(std::string::npos, body.find("AC\\\"DC"));
   EXPECT_EQ(std::string::npos, body.find("\"artist_name\":\"AC\"DC\""));
+  EXPECT_NE(std::string::npos, body.find("\"additional_info\""));
+  EXPECT_NE(std::string::npos, body.find("\"media_player\":\"Strawberry\""));
+  EXPECT_TRUE(ListenBrainzScrobbleState::ShouldIncludeReleaseName("High Voltage"));
+  EXPECT_FALSE(ListenBrainzScrobbleState::ShouldIncludeReleaseName(""));
+  EXPECT_EQ(5000, ListenBrainzScrobbleState::DurationMs(5000 * 1000000LL));
+  EXPECT_EQ(0, ListenBrainzScrobbleState::DurationMs(0));
+  const std::string extra = ListenBrainzScrobbleState::AdditionalInfoJson(3, 180000000000LL, "1.2.27");
+  EXPECT_NE(std::string::npos, extra.find("\"duration_ms\":180000"));
+  EXPECT_NE(std::string::npos, extra.find("\"tracknumber\":3"));
+  EXPECT_NE(std::string::npos, extra.find("\"media_player_version\":\"1.2.27\""));
   EXPECT_STREQ("import", ListenBrainzScrobbleState::CachedListenType());
   EXPECT_EQ(5, ListenBrainzScrobbleState::DelaySeconds(0, false));
   EXPECT_EQ(30, ListenBrainzScrobbleState::DelaySeconds(0, true));

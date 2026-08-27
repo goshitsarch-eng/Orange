@@ -2,6 +2,7 @@
 
 #include "constants/scrobblersettings.h"
 #include "core/settings.h"
+#include "version.h"
 #include "scrobbler/listenbrainzscrobblestate.h"
 #include "scrobbler/scrobblemetadata.h"
 #include "scrobbler/scrobblererror.h"
@@ -62,7 +63,12 @@ std::string ListenBrainzScrobbler::SubmitBody(const std::string &listen_type, co
       body += "\"listened_at\":" + std::to_string(items[i].timestamp) + ",";
     }
     body += "\"track_metadata\":{\"artist_name\":\"" + StrUtils::JsonEscape(items[i].artist) + "\",\"track_name\":\"" +
-            StrUtils::JsonEscape(items[i].title) + "\",\"release_name\":\"" + StrUtils::JsonEscape(items[i].album) + "\"}}";
+            StrUtils::JsonEscape(items[i].title) + "\"";
+    if (ListenBrainzScrobbleState::ShouldIncludeReleaseName(items[i].album)) {
+      body += ",\"release_name\":\"" + StrUtils::JsonEscape(items[i].album) + "\"";
+    }
+    body += ",\"additional_info\":" +
+            ListenBrainzScrobbleState::AdditionalInfoJson(items[i].track, items[i].length_nanosec, STRAWBERRY_VERSION_DISPLAY) + "}}";
   }
   body += "]}";
   return body;
