@@ -59,7 +59,7 @@ inline std::string PickBestArt(const std::vector<std::string> &paths, const std:
   int64_t best_size = -1;
   for (const std::string &path : filtered) {
     const int64_t size = FileUtils::FileSize(path);
-    if (size > best_size) {
+    if (best.empty() || size > best_size) {
       best_size = size;
       best = path;
     }
