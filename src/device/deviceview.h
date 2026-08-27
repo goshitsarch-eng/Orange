@@ -49,6 +49,7 @@ class DeviceView {
   gboolean OnKeyPressed(guint keyval, GdkModifierType state);
   void ShowSelectedMenu();
   void ResetTypeAhead();
+  void RequestOpenDevice(const std::string &id);
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
@@ -66,6 +67,8 @@ class DeviceView {
   std::function<void(const Song &)> song_menu_cb_;
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
+  std::string opening_device_;
+  guint open_idle_ = 0;
 };
 
 #endif

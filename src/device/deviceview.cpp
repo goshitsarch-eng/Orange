@@ -50,9 +50,7 @@ DeviceView::DeviceView() {
                        return;
                      }
                      if (auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"))) {
-                       if (self->device_cb_) {
-                         self->device_cb_(device->unique_id);
-                       }
+                       self->RequestOpenDevice(device->unique_id);
                      }
                    }),
                    this);
@@ -66,11 +64,44 @@ DeviceView::DeviceView() {
                    this);
 }
 
-DeviceView::~DeviceView() { ResetTypeAhead(); }
+DeviceView::~DeviceView() {
+  ResetTypeAhead();
+  if (open_idle_) {
+    g_source_remove(open_idle_);
+    open_idle_ = 0;
+  }
+}
+
+void DeviceView::RequestOpenDevice(const std::string &id) {
+  if (id.empty() || !device_cb_ || DeviceKeyboard::ShouldCoalesceDeviceOpen(opening_device_, id)) {
+    return;
+  }
+  opening_device_ = id;
+  if (open_idle_) {
+    return;
+  }
+  open_idle_ = g_idle_add(
+      +[](gpointer data) -> gboolean {
+        auto *self = static_cast<DeviceView *>(data);
+        self->open_idle_ = 0;
+        const std::string id = std::move(self->opening_device_);
+        self->opening_device_.clear();
+        if (self->device_cb_ && !id.empty()) {
+          self->device_cb_(id);
+        }
+        return G_SOURCE_REMOVE;
+      },
+      this);
+}
 
 void DeviceView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
-  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
   GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  auto *device = row ? static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device")) : nullptr;
+  if (DeviceKeyboard::ShouldOpenOnDoubleClick(button, n_press, device != nullptr)) {
+    RequestOpenDevice(device->unique_id);
+    return;
+  }
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
   if (action == CollectionTreeClick::Action::Enqueue) {
     if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
       ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);

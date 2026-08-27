@@ -58,6 +58,7 @@
 #include "covermanager/coverproviderauth.h"
 #include "lyrics/lyricsproviderauth.h"
 #include "settings/settingspages.h"
+#include "settings/settingswheelthrough.h"
 #include "streaming/streamingchoices.h"
 
 #include <gtest/gtest.h>
@@ -918,4 +919,17 @@ TEST(GstEngineProxy, AppliesOnlyManualHttpWhenEngineEnabled) {
   const auto skipped = GstEngineProxy::FromSettings(NetworkProxySettings::Mode::Manual, NetworkProxySettings::ProxyType::Socks5Proxy, true,
                                                     "proxy.local", 8080, true, "user", "pw");
   EXPECT_TRUE(skipped.address.empty());
+}
+
+TEST(SettingsWheelThrough, PropagatesWhenUnfocusedLikeQt) {
+  EXPECT_TRUE(SettingsWheelThrough::ShouldPropagateToParent(false));
+  EXPECT_FALSE(SettingsWheelThrough::ShouldPropagateToParent(true));
+  EXPECT_TRUE(SettingsWheelThrough::AppliesToCombo());
+  EXPECT_TRUE(SettingsWheelThrough::AppliesToSpin());
+  EXPECT_TRUE(SettingsWheelThrough::AppliesToSlider());
+  EXPECT_DOUBLE_EQ(40.0, SettingsWheelThrough::AdjustmentDelta(1.0, 40.0));
+  EXPECT_DOUBLE_EQ(-80.0, SettingsWheelThrough::AdjustmentDelta(-2.0, 40.0));
+  EXPECT_DOUBLE_EQ(SettingsWheelThrough::kFallbackStep, SettingsWheelThrough::AdjustmentDelta(1.0, 0.0));
+  EXPECT_DOUBLE_EQ(10.0, SettingsWheelThrough::ClampedValue(5.0, 8.0, 0.0, 10.0));
+  EXPECT_DOUBLE_EQ(0.0, SettingsWheelThrough::ClampedValue(5.0, -8.0, 0.0, 10.0));
 }

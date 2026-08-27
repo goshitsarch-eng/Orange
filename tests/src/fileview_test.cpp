@@ -458,6 +458,16 @@ TEST(DeviceKeyboard, MenuTriggerAndTarget) {
   EXPECT_EQ(DeviceKeyboard::MenuTarget::None, DeviceKeyboard::MenuForSelection(false, false));
 }
 
+TEST(DeviceKeyboard, DoubleClickOpensDeviceLikeQt) {
+  EXPECT_TRUE(DeviceKeyboard::ShouldOpenOnDoubleClick(CollectionTreeClick::kPrimaryButton, 2, true));
+  EXPECT_FALSE(DeviceKeyboard::ShouldOpenOnDoubleClick(CollectionTreeClick::kPrimaryButton, 2, false));
+  EXPECT_FALSE(DeviceKeyboard::ShouldOpenOnDoubleClick(CollectionTreeClick::kPrimaryButton, 1, true));
+  EXPECT_FALSE(DeviceKeyboard::ShouldOpenOnDoubleClick(CollectionTreeClick::kMiddleButton, 2, true));
+  EXPECT_TRUE(DeviceKeyboard::ShouldCoalesceDeviceOpen("usb", "usb"));
+  EXPECT_FALSE(DeviceKeyboard::ShouldCoalesceDeviceOpen(std::string(), "usb"));
+  EXPECT_FALSE(DeviceKeyboard::ShouldCoalesceDeviceOpen("a", "b"));
+}
+
 TEST(DeviceKeyboard, FromKeyBackAndSpecialRows) {
   EXPECT_EQ(DeviceKeyboard::Action::Activate, DeviceKeyboard::FromKey(ListBoxKeyboard::kReturn));
   EXPECT_EQ(DeviceKeyboard::Action::MoveUp, DeviceKeyboard::FromKey(ListBoxKeyboard::kUp));
@@ -801,6 +811,10 @@ TEST(DeviceViewLook, IconsAndStatusMatchQtDelegate) {
   EXPECT_EQ("12 songs", DeviceViewLook::RowStatusText(volume));
   volume.mount_path.clear();
   EXPECT_TRUE(DeviceViewLook::ShouldMountOnActivate(volume));
+  EXPECT_TRUE(DeviceViewLook::ShouldConnectOnDoubleClick(DeviceViewLook::Status::NotMounted));
+  EXPECT_TRUE(DeviceViewLook::ShouldConnectOnDoubleClick(DeviceViewLook::Status::NotConnected));
+  EXPECT_TRUE(DeviceViewLook::ShouldConnectOnDoubleClick(DeviceViewLook::Status::Remembered));
+  EXPECT_FALSE(DeviceViewLook::ShouldConnectOnDoubleClick(DeviceViewLook::Status::Connected));
   volume.mount_path = "/run/media/usb";
   EXPECT_FALSE(DeviceViewLook::ShouldMountOnActivate(volume));
   volume.mount_path.clear();

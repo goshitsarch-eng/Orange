@@ -1,6 +1,7 @@
 #include "settings/settingspage.h"
 
 #include "core/application.h"
+#include "settings/settingswheelthrough.h"
 #include "settings/streaminglogincontrols.h"
 #include "streaming/streamingservice.h"
 #include "translations/translations.h"
@@ -176,6 +177,7 @@ GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *
                    }),
                    settings);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  SettingsWheelThrough::Attach(GTK_WIDGET(row));
   return GTK_WIDGET(row);
 }
 
@@ -316,6 +318,7 @@ GtkWidget *AddDoubleScale(AdwPreferencesGroup *group, Settings *settings, const 
                    settings);
   adw_action_row_add_suffix(row, scale);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  SettingsWheelThrough::Attach(scale);
   return scale;
 }
 
@@ -349,6 +352,7 @@ GtkWidget *AddIntScale(AdwPreferencesGroup *group, Settings *settings, const cha
                    settings);
   adw_action_row_add_suffix(row, scale);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  SettingsWheelThrough::Attach(scale);
   return scale;
 }
 

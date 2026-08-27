@@ -1,9 +1,11 @@
 #ifndef STRAWBERRY_DEVICEKEYBOARD_H
 #define STRAWBERRY_DEVICEKEYBOARD_H
 
+#include "collection/collectiontreeclick.h"
 #include "widgets/listboxkeyboard.h"
 
 #include <cstring>
+#include <string>
 
 namespace DeviceKeyboard {
 
@@ -75,6 +77,15 @@ inline MenuTarget MenuForSelection(bool device_row, bool song_row) {
     return MenuTarget::Song;
   }
   return MenuTarget::None;
+}
+
+// Qt DeviceView::mouseDoubleClickEvent: MapToDevice(index) && !GetConnectedDevice → Connect().
+inline bool ShouldOpenOnDoubleClick(unsigned button, int n_press, bool device_row) {
+  return device_row && button == CollectionTreeClick::kPrimaryButton && n_press == 2;
+}
+
+inline bool ShouldCoalesceDeviceOpen(const std::string &pending, const std::string &id) {
+  return !id.empty() && pending == id;
 }
 
 }  // namespace DeviceKeyboard

@@ -13,6 +13,7 @@
 #include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfieldreset.h"
 #include "dialogs/edittagfields.h"
+#include "settings/settingswheelthrough.h"
 #include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagloading.h"
 #include "dialogs/edittagsave.h"
@@ -968,6 +969,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   state->rating = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 5, 0.5);
   gtk_scale_set_digits(GTK_SCALE(state->rating), 1);
   gtk_scale_set_draw_value(GTK_SCALE(state->rating), TRUE);
+  SettingsWheelThrough::Attach(state->rating);
   state->initial_rating_stored = EditTagFields::CommonRating(targets);
   state->initial_rating = EditTagFields::RatingSliderFromStored(state->initial_rating_stored);
   gtk_range_set_value(GTK_RANGE(state->rating), state->initial_rating);
@@ -1010,7 +1012,11 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      {"Album artist sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumartistsort(); })},
                      {"Composer sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.composersort(); })},
                      {"Performer sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.performersort(); })}});
-  adw_view_stack_add_titled(stack, tags, "Tags", Translations::CStr("Tags"));
+  GtkWidget *tags_scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(tags_scroll, TRUE);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(tags_scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(tags_scroll), tags);
+  adw_view_stack_add_titled(stack, tags_scroll, "Tags", Translations::CStr("Tags"));
 
   state->lyrics_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   gtk_widget_set_margin_start(state->lyrics_page, 12);

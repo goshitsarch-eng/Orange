@@ -70,6 +70,9 @@ inline bool ShouldMountOnActivate(const ConnectedDevice &device) {
   return InferStatus(device, device.remembered) == Status::NotMounted;
 }
 
+// Qt DeviceView::mouseDoubleClickEvent calls Connect() when the device is not already connected.
+inline bool ShouldConnectOnDoubleClick(Status status) { return status != Status::Connected; }
+
 inline std::string StatusText(const ConnectedDevice &device, int song_count = -1, bool remembered_only = false) {
   switch (InferStatus(device, remembered_only)) {
     case Status::Remembered:
