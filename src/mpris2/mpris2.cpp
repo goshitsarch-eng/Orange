@@ -472,7 +472,20 @@ Mpris2::Mpris2(Application *app) : app_(app) {
     app_->playlist_manager()->CurrentChanged.Connect([this](Playlist *) {
       WatchCurrentPlaylist();
       EmitTrackListReplaced();
+      if (Mpris2Playlists::ShouldNotifyActiveOnCurrentChange()) {
+        EmitActivePlaylist();
+      }
+      if (Mpris2Playlists::ShouldNotifyCountOnCollectionChange()) {
+        EmitPlaylistCount();
+      }
     });
+    app_->playlist_manager()->PlaylistChanged.Connect([this](Playlist *playlist) {
+      if (playlist) {
+        EmitPlaylistChanged(playlist->id(), playlist->name());
+      }
+    });
+    app_->playlist_manager()->PlaylistAdded.Connect([this](Playlist *) { EmitPlaylistCount(); });
+    app_->playlist_manager()->PlaylistDeleted.Connect([this](int) { EmitPlaylistCount(); });
     app_->playlist_manager()->PlaylistsLoaded.Connect([this]() { WatchCurrentPlaylist(); });
     WatchCurrentPlaylist();
   }
@@ -754,5 +767,42 @@ void Mpris2::EmitTrackListReplaced() {
   g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.TrackList", "TrackListReplaced",
                                 g_variant_new("(@aoo)", TrackListIds(playlist), current.c_str()), nullptr);
   EmitPropertiesChanged("org.mpris.MediaPlayer2.TrackList", "Tracks", TrackListIds(playlist));
+#endif
+}
+
+void Mpris2::EmitPlaylistChanged(int id, const std::string &name) {
+#ifdef HAVE_MPRIS2
+  if (!connection_) {
+    return;
+  }
+  const Mpris2Playlists::Entry entry = Mpris2Playlists::ChangedEntry(id, name);
+  g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", Mpris2Playlists::kInterface,
+                                Mpris2Playlists::kPlaylistChangedSignal,
+                                g_variant_new("((oss))", entry.id.c_str(), entry.name.c_str(), entry.icon.c_str()), nullptr);
+  Playlist *current = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  if (current && current->id() == id) {
+    EmitActivePlaylist();
+  }
+#endif
+}
+
+void Mpris2::EmitPlaylistCount() {
+#ifdef HAVE_MPRIS2
+  const guint count = app_ && app_->playlist_manager() ? static_cast<guint>(app_->playlist_manager()->GetAllPlaylists().size()) : 0;
+  EmitPropertiesChanged(Mpris2Playlists::kInterface, Mpris2Playlists::kPlaylistCountProperty, g_variant_new_uint32(count));
+#endif
+}
+
+void Mpris2::EmitActivePlaylist() {
+#ifdef HAVE_MPRIS2
+  Playlist *current = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  if (!current) {
+    EmitPropertiesChanged(Mpris2Playlists::kInterface, Mpris2Playlists::kActivePlaylistProperty,
+                          g_variant_new("(b(oss))", FALSE, Mpris2Playlists::kInactivePlaylistPath, "", ""));
+    return;
+  }
+  const std::string path = Mpris2Playlists::ObjectPath(current->id());
+  EmitPropertiesChanged(Mpris2Playlists::kInterface, Mpris2Playlists::kActivePlaylistProperty,
+                        g_variant_new("(b(oss))", TRUE, path.c_str(), current->name().c_str(), ""));
 #endif
 }

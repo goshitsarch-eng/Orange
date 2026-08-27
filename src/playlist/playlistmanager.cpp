@@ -73,6 +73,7 @@ void PlaylistManager::WatchSaves(Playlist *playlist) {
     }
   });
   playlist->Error.Connect([this](const std::string &message) { Error.Emit(message); });
+  playlist->Changed.Connect([this, playlist]() { PlaylistChanged.Emit(playlist); });
 }
 
 void PlaylistManager::ArmTagReaderPump() {
@@ -221,6 +222,7 @@ void PlaylistManager::Rename(int id, const std::string &new_name) {
     backend_->RenamePlaylist(id, new_name);
   }
   PlaylistRenamed.Emit(id, new_name);
+  PlaylistChanged.Emit(found);
 }
 
 void PlaylistManager::Favorite(int id, bool favorite) {

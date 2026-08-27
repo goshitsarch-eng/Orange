@@ -23,6 +23,9 @@ class Mpris2 {
   void EmitMetadata();
   void EmitVolume();
   void EmitTrackListReplaced();
+  void EmitPlaylistChanged(int id, const std::string &name);
+  void EmitPlaylistCount();
+  void EmitActivePlaylist();
   Application *app() const { return app_; }
 
  private:

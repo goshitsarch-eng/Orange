@@ -99,6 +99,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   void CycleShuffleMode();
 
   Signal<Playlist *> PlaylistAdded;
+  Signal<Playlist *> PlaylistChanged;
   Signal<int> PlaylistClosed;
   Signal<int> PlaylistDeleted;
   Signal<int, std::string> PlaylistRenamed;

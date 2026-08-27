@@ -100,6 +100,20 @@ TEST(Mpris2Helpers, CapabilitiesMatchQt) {
   EXPECT_FALSE(Mpris2Helpers::SetPositionAllowed("/id", "/id", 6000000, 5000000000LL, true));
 }
 
+TEST(Mpris2Playlists, PlaylistChangedEntryMatchesQt) {
+  const Mpris2Playlists::Entry entry = Mpris2Playlists::ChangedEntry(7, "Favorites");
+  EXPECT_EQ("/org/strawberrymusicplayer/strawberry/PlaylistId/7", entry.id);
+  EXPECT_EQ("Favorites", entry.name);
+  EXPECT_TRUE(entry.icon.empty());
+  EXPECT_STREQ("org.mpris.MediaPlayer2.Playlists", Mpris2Playlists::kInterface);
+  EXPECT_STREQ("PlaylistChanged", Mpris2Playlists::kPlaylistChangedSignal);
+  EXPECT_STREQ("PlaylistCount", Mpris2Playlists::kPlaylistCountProperty);
+  EXPECT_STREQ("ActivePlaylist", Mpris2Playlists::kActivePlaylistProperty);
+  EXPECT_STREQ("/", Mpris2Playlists::kInactivePlaylistPath);
+  EXPECT_TRUE(Mpris2Playlists::ShouldNotifyCountOnCollectionChange());
+  EXPECT_TRUE(Mpris2Playlists::ShouldNotifyActiveOnCurrentChange());
+}
+
 TEST(Mpris2Playlists, PathPageAndOrder) {
   EXPECT_EQ("/org/strawberrymusicplayer/strawberry/PlaylistId/7", Mpris2Playlists::ObjectPath(7));
   EXPECT_EQ(7, Mpris2Playlists::IdFromPath("/org/strawberrymusicplayer/strawberry/PlaylistId/7"));

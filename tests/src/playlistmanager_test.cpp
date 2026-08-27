@@ -41,6 +41,29 @@ TEST(PlaylistManager, InitCreatesDefaultPlaylist) {
   EXPECT_EQ("Playlist", manager.playlist_name(manager.current_id()));
 }
 
+TEST(PlaylistManager, PlaylistChangedOnRenameAndContents) {
+  PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
+  manager.Init();
+  int changed_id = -1;
+  std::string changed_name;
+  int fires = 0;
+  manager.PlaylistChanged.Connect([&](Playlist *playlist) {
+    ++fires;
+    if (playlist) {
+      changed_id = playlist->id();
+      changed_name = playlist->name();
+    }
+  });
+  manager.Rename(manager.current_id(), "Renamed");
+  EXPECT_EQ(manager.current_id(), changed_id);
+  EXPECT_EQ("Renamed", changed_name);
+  EXPECT_GE(fires, 1);
+  const int after_rename = fires;
+  manager.AppendSongs({MakeSong("A", "file:///a")});
+  EXPECT_GT(fires, after_rename);
+  EXPECT_EQ(manager.current_id(), changed_id);
+}
+
 TEST(PlaylistManager, NewLoadSaveRenameCloseAndCurrentActive) {
   PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
   manager.Init();

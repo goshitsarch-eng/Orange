@@ -13,6 +13,10 @@ inline const char *kInterface = "org.mpris.MediaPlayer2.Playlists";
 inline const char *kPathPrefix = "/org/strawberrymusicplayer/strawberry/PlaylistId/";
 inline const char *kOrderUserDefined = "UserDefined";
 inline const char *kOrderAlphabetical = "Alphabetical";
+inline const char *kPlaylistChangedSignal = "PlaylistChanged";
+inline const char *kPlaylistCountProperty = "PlaylistCount";
+inline const char *kActivePlaylistProperty = "ActivePlaylist";
+inline const char *kInactivePlaylistPath = "/";
 
 struct Entry {
   std::string id;
@@ -21,6 +25,12 @@ struct Entry {
 };
 
 inline std::string ObjectPath(int id) { return std::string(kPathPrefix) + std::to_string(id); }
+
+inline Entry ChangedEntry(int id, const std::string &name, const std::string &icon = {}) { return {ObjectPath(id), name, icon}; }
+
+inline bool ShouldNotifyCountOnCollectionChange() { return true; }
+
+inline bool ShouldNotifyActiveOnCurrentChange() { return true; }
 
 inline int IdFromPath(const std::string &path) {
   const std::string prefix = kPathPrefix;
