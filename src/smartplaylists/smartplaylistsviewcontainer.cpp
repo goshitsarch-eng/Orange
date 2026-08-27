@@ -1,6 +1,7 @@
 #include "smartplaylists/smartplaylistsviewcontainer.h"
 
 #include "smartplaylists/smartplaylistslabel.h"
+#include "smartplaylists/smartplaylistsshow.h"
 #include "translations/translations.h"
 
 SmartPlaylistsViewContainer::SmartPlaylistsViewContainer() {
@@ -50,7 +51,17 @@ SmartPlaylistsViewContainer::SmartPlaylistsViewContainer() {
                    this);
   gtk_box_append(GTK_BOX(widget_), bar);
   gtk_box_append(GTK_BOX(widget_), view_->widget());
+  g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     static_cast<SmartPlaylistsViewContainer *>(data)->RefreshOnShow();
+                   }),
+                   this);
   Reload();
+}
+
+void SmartPlaylistsViewContainer::RefreshOnShow() {
+  if (SmartPlaylistsShow::ShouldRefreshSelectionOnShow()) {
+    UpdateButtons();
+  }
 }
 
 void SmartPlaylistsViewContainer::Reload() {

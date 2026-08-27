@@ -5,6 +5,9 @@
 #include "globalshortcuts/globalshortcuts.h"
 #include "globalshortcuts/keymapper_macos.h"
 #include "globalshortcuts/macosaccessibility.h"
+#ifdef __APPLE__
+#include "core/mac_startup.h"
+#endif
 
 #ifdef __APPLE__
 #include <AppKit/AppKit.h>
@@ -63,6 +66,8 @@ bool GlobalShortcutsBackendMacOs::HandleAccel(const std::string &accel) {
   return false;
 }
 
+void GlobalShortcutsBackendMacOs::MacMediaKeyPressed(int nx_key) { HandleMediaKey(nx_key); }
+
 void GlobalShortcutsBackendMacOs::HandleMediaKey(int nx_key) {
   const char *id = KeyMapperMacOs::IdFromMediaKey(nx_key);
   if (id && *id && manager_) {
@@ -116,6 +121,7 @@ bool GlobalShortcutsBackendMacOs::DoRegister() {
                                                                handler:^(NSEvent *event) {
                                                                  return handle_event(event, this) ? nil : event;
                                                                }];
+  MacSetShortcutHandler(this);
   return true;
 #else
   return false;
@@ -133,5 +139,6 @@ void GlobalShortcutsBackendMacOs::DoUnregister() {
     [NSEvent removeMonitor:(id)local_monitor_];
     local_monitor_ = nullptr;
   }
+  MacSetShortcutHandler(nullptr);
 #endif
 }

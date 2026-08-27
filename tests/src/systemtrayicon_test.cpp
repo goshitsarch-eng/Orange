@@ -1,5 +1,7 @@
+#include "core/macstartupactions.h"
 #include "systemtrayicon/systemtrayicon.h"
 #include "systemtrayicon/traymenulove.h"
+#include "widgets/busyindicatoranim.h"
 
 #include "constants/behavioursettings.h"
 #include "core/settings.h"
@@ -220,4 +222,28 @@ TEST(SystemTrayIcon, OverlayIconNameHonorsProgressSetting) {
   tray.ShowPopup("title", "body", 1000, {1, 2, 3});
   ASSERT_EQ(3u, tray.popup_art().size());
   EXPECT_EQ(1, tray.popup_art()[0]);
+}
+
+TEST(MacStartupActions, ReopenDockAndMediaKeysMatchQt) {
+  EXPECT_TRUE(MacStartupActions::ShouldHandleReopen());
+  EXPECT_TRUE(MacStartupActions::ReopenReturnYes());
+  EXPECT_TRUE(MacStartupActions::ShouldTerminateNow());
+  EXPECT_EQ(8, MacStartupActions::AuxControlSubtype());
+  EXPECT_TRUE(MacStartupActions::IsAuxControlSubtype(8));
+  EXPECT_FALSE(MacStartupActions::IsAuxControlSubtype(0));
+  EXPECT_EQ(16, MacStartupActions::MediaKeyCode((16 << 16) | (0x0B << 8)));
+  EXPECT_EQ(0x0B00, MacStartupActions::MediaKeyFlags((16 << 16) | (0x0B << 8)));
+  EXPECT_TRUE(MacStartupActions::IsMediaKeyReleased(0x0B00));
+  EXPECT_FALSE(MacStartupActions::IsMediaKeyReleased(0x0A00));
+  EXPECT_TRUE(MacStartupActions::ShouldHandleMediaEvent(8, 0x0B00));
+  EXPECT_FALSE(MacStartupActions::ShouldHandleMediaEvent(8, 0x0A00));
+  EXPECT_STREQ("Now Playing", MacStartupActions::NowPlayingLabel());
+  const auto ids = MacStartupActions::DockMenuIds(true);
+  EXPECT_EQ(SystemTrayIcon::RootMenuIds(true), ids);
+  EXPECT_TRUE(MacStartupActions::DockItemIsSeparator(SystemTrayIcon::kMenuSeparator));
+}
+
+TEST(BusyIndicatorAnim, StartsOnShowStopsOnHide) {
+  EXPECT_TRUE(BusyIndicatorAnim::ShouldStartOnShow());
+  EXPECT_TRUE(BusyIndicatorAnim::ShouldStopOnHide());
 }

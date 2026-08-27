@@ -35,6 +35,7 @@
 #include "settings/behavioursettingslabels.h"
 #include "collection/savedgroupinglabels.h"
 #include "smartplaylists/smartplaylistslabel.h"
+#include "smartplaylists/smartplaylistsshow.h"
 #include "settings/collectionsettingslabels.h"
 #include "settings/contextsettingslabels.h"
 #include "dialogs/errordialoglabels.h"
@@ -926,6 +927,7 @@ TEST(SmartPlaylistsLabel, MatchQtToolbarCopy) {
   EXPECT_STREQ("Edit smart playlist", SmartPlaylistsLabel::EditPlaylist());
   EXPECT_STREQ("Delete smart playlist", SmartPlaylistsLabel::DeletePlaylist());
   EXPECT_STREQ("Restore defaults", SmartPlaylistsLabel::RestoreDefaults());
+  EXPECT_TRUE(SmartPlaylistsShow::ShouldRefreshSelectionOnShow());
 }
 
 TEST(GstEngineProxy, AppliesOnlyManualHttpWhenEngineEnabled) {

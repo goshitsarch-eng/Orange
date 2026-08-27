@@ -11,6 +11,7 @@ class GlobalShortcutsBackendMacOs : public GlobalShortcutsBackend {
   bool IsAvailable() const override;
   static bool IsAccessibilityEnabled();
   static void ShowAccessibilityDialog();
+  void MacMediaKeyPressed(int nx_key);
 
  protected:
   bool DoRegister() override;

@@ -5,8 +5,10 @@
 #include "utilities/winutils.h"
 #endif
 #ifdef __APPLE__
+#include "core/mac_startup.h"
 #include "core/macosutils.h"
 #include "core/macoswindow.h"
+#include "systemtrayicon/macsystemtrayicon.h"
 #endif
 #include "ui/mainwindow.h"
 
@@ -249,6 +251,11 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
     app_->scrobbler()->Submit();
   }
   CheckFullRescanRevisions();
+#ifdef __APPLE__
+  MacSetApplicationHandler(this);
+  macos_tray_ = std::make_unique<MacSystemTrayIcon>();
+  macos_tray_->Setup(app_->tray());
+#endif
 }
 
 MainWindow::~MainWindow() {
@@ -278,6 +285,8 @@ MainWindow::~MainWindow() {
     seekbar_menu_ = nullptr;
   }
 }
+
+void MainWindow::Activate() { Present(); }
 
 void MainWindow::Present() {
   gtk_window_present(GTK_WINDOW(window_));
@@ -2680,6 +2689,15 @@ void MainWindow::UpdateNowPlaying() {
   if (context_view_) {
     context_view_->SongChanged(song);
   }
+#ifdef __APPLE__
+  if (macos_tray_) {
+    if (song.is_valid()) {
+      macos_tray_->SetNowPlaying(song);
+    } else {
+      macos_tray_->ClearNowPlaying();
+    }
+  }
+#endif
   RefreshPlaylist();
   const auto embedded = app_->albumcover_loader()->LoadData(song);
   if (!embedded.empty()) {
@@ -2725,6 +2743,12 @@ void MainWindow::UpdateCover(const std::vector<unsigned char> &data) {
 void MainWindow::UpdatePlaybackButtons() {
   const bool playing = app_->player()->GetState() == GstEngine::State::Playing;
   gtk_button_set_icon_name(GTK_BUTTON(play_button_), playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic");
+#ifdef __APPLE__
+  if (macos_tray_ && app_->tray()) {
+    app_->tray()->SetPlaying(playing);
+    macos_tray_->Setup(app_->tray());
+  }
+#endif
 #ifdef _WIN32
   if (thumbbar_) {
     thumbbar_->SetPlaying(playing);

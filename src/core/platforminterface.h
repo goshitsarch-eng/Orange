@@ -6,9 +6,8 @@
 class PlatformInterface {
  public:
   virtual ~PlatformInterface() = default;
-  virtual std::string name() const = 0;
-  virtual void SetStartup(bool enabled) = 0;
-  virtual bool IsStartupEnabled() const = 0;
+  virtual void Activate() = 0;
+  virtual bool LoadUrl(const std::string &url) = 0;
 };
 
 #endif

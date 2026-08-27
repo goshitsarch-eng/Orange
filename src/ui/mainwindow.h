@@ -10,6 +10,7 @@
 #include "context/contextview.h"
 #include "core/application.h"
 #include "core/commandlineoptions.h"
+#include "core/platforminterface.h"
 #include "constants/moodbarsettings.h"
 #include "core/seekbarsettings.h"
 #include "widgets/seekbarfade.h"
@@ -32,6 +33,9 @@
 #include "core/windows7thumbbar.h"
 #include "core/winsystemmediatransportcontrols.h"
 #endif
+#ifdef __APPLE__
+#include "systemtrayicon/macsystemtrayicon.h"
+#endif
 
 #include <adwaita.h>
 #include <gtk/gtk.h>
@@ -43,15 +47,16 @@
 class FancyTabBar;
 class QueuedErrorDialog;
 
-class MainWindow {
+class MainWindow : public PlatformInterface {
  public:
   MainWindow(AdwApplication *gtk_app, Application *app, const CommandlineOptions &options);
   ~MainWindow();
 
   GtkWindow *window() const { return GTK_WINDOW(window_); }
   void Present();
+  void Activate() override;
   void CommandlineReceived(const CommandlineOptions &options);
-  bool LoadUrl(const std::string &url);
+  bool LoadUrl(const std::string &url) override;
 
  private:
   void HandlePlaylistsLoaded();
@@ -312,6 +317,9 @@ class MainWindow {
 #ifdef _WIN32
   std::unique_ptr<Windows7ThumbBar> thumbbar_;
   std::unique_ptr<WinSystemMediaTransportControls> smtc_;
+#endif
+#ifdef __APPLE__
+  std::unique_ptr<MacSystemTrayIcon> macos_tray_;
 #endif
 };
 

@@ -781,6 +781,7 @@ if(APPLE)
     src/engine/macosdevicefinder.cpp
     src/device/macosdevicelister.mm
     src/globalshortcuts/globalshortcutsbackend-macos.mm
+    src/systemtrayicon/macsystemtrayicon.mm
   )
   target_link_libraries(strawberry PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon")
 endif()
@@ -1196,6 +1197,7 @@ if(GTest_FOUND)
       src/engine/macosdevicefinder.cpp
       src/device/macosdevicelister.mm
       src/globalshortcuts/globalshortcutsbackend-macos.mm
+      src/systemtrayicon/macsystemtrayicon.mm
     )
     target_link_libraries(strawberry_tests PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon")
   endif()

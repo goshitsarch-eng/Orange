@@ -17,6 +17,7 @@ class SmartPlaylistsViewContainer {
   SmartPlaylistsModel *model() { return &model_; }
   SmartPlaylistsView *view() { return view_.get(); }
   void Reload();
+  void RefreshOnShow();
   void SetActivateCallback(std::function<void(const SmartPlaylistsItem &)> callback);
   void SetDeleteCallback(std::function<void(const SmartPlaylistsItem &)> callback);
   void SetActionCallback(std::function<void(const SmartPlaylistsItem &, SmartPlaylistsAction)> callback);
