@@ -31,6 +31,7 @@ class Player : public PlayerInterface {
   const Song &current_song() const override { return current_song_; }
 
   void Play() override;
+  void Play(uint64_t offset_nanosec);
   void PlayPause() override;
   void Pause() override;
   void Stop(bool stop_after = false) override;
@@ -77,6 +78,7 @@ class Player : public PlayerInterface {
  private:
   void HandleEngineState(EngineBase::State state);
   void HandleTrackEnded();
+  void StartFromPlaylist(uint64_t offset_nanosec);
   void PlayQueueHead(int track_change_flags = GstEngine::Manual);
   void PreloadNext();
   void PlayCurrent(bool pause, uint64_t offset_nanosec = 0, int track_change_flags = GstEngine::Manual);

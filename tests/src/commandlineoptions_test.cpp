@@ -3,6 +3,7 @@
 #include "core/commandlineurlplan.h"
 #include "core/commandlinewindow.h"
 #include "core/loadurl.h"
+#include "core/playerplay.h"
 #include "core/playlistsloadedgate.h"
 #include "core/songloadurl.h"
 #include "tidal/tidalloginurl.h"
@@ -118,6 +119,16 @@ TEST(PlaylistsLoadedGate, DefersCommandlineAndPlayUntilLoaded) {
   EXPECT_TRUE(PlaylistsLoadedGate::ShouldHonorPlayRequest(false, static_cast<int>(EngineBase::State::Playing), true));
   EXPECT_FALSE(PlaylistsLoadedGate::ShouldHonorPlayRequest(true, static_cast<int>(EngineBase::State::Playing), true));
   EXPECT_FALSE(PlaylistsLoadedGate::ShouldHonorPlayRequest(false, static_cast<int>(EngineBase::State::Empty), false));
+}
+
+TEST(PlayerPlay, DispatchesLikeQt) {
+  EXPECT_EQ(PlayerPlay::Action::Seek, PlayerPlay::ForState(EngineBase::State::Playing));
+  EXPECT_EQ(PlayerPlay::Action::UnPause, PlayerPlay::ForState(EngineBase::State::Paused));
+  EXPECT_EQ(PlayerPlay::Action::Start, PlayerPlay::ForState(EngineBase::State::Empty));
+  EXPECT_EQ(PlayerPlay::Action::Start, PlayerPlay::ForState(EngineBase::State::Idle));
+  EXPECT_EQ(PlayerPlay::Action::Start, PlayerPlay::ForState(EngineBase::State::Error));
+  EXPECT_EQ(0, PlayerPlay::SeekSeconds(0));
+  EXPECT_EQ(5, PlayerPlay::SeekSeconds(5));
 }
 
 TEST(TidalLoginUrl, MatchesQtSchemeAndHost) {

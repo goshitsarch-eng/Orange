@@ -28,6 +28,7 @@
 #include "core/playerrepeat.h"
 #include "core/playerstopafter.h"
 #include "core/songsegment.h"
+#include "core/playerplay.h"
 #include "core/playerresume.h"
 #include "core/playlistsloadedgate.h"
 #include "core/settings.h"
@@ -162,11 +163,27 @@ void Player::ResumePlayback() {
   PlayAt(row < 0 ? 0 : row, PlayerResume::ShouldPause(state), static_cast<uint64_t>(PlayerResume::PositionToNanosec(position_sec)));
 }
 
-void Player::Play() {
+void Player::Play() { Play(0); }
+
+void Player::Play(uint64_t offset_nanosec) {
   if (PlaylistsLoadedGate::DeferPlay(playlists_loaded_)) {
     play_requested_ = true;
     return;
   }
+  switch (PlayerPlay::ForState(GetState())) {
+    case PlayerPlay::Action::Seek:
+      SeekTo(PlayerPlay::SeekSeconds(offset_nanosec));
+      break;
+    case PlayerPlay::Action::UnPause:
+      UnPause();
+      break;
+    case PlayerPlay::Action::Start:
+      StartFromPlaylist(offset_nanosec);
+      break;
+  }
+}
+
+void Player::StartFromPlaylist(uint64_t offset_nanosec) {
   if (playlist_manager_) {
     playlist_manager_->SetActiveToCurrent();
   }
@@ -175,7 +192,7 @@ void Player::Play() {
     Playlist *playlist = playlist_manager_->active();
     row = PlaylistPlayRow::Resolve(playlist->current_row(), playlist->last_played_row(), playlist->row_count());
   }
-  PlayAt(row, false);
+  PlayAt(row, false, offset_nanosec);
   if (playlist_manager_) {
     playlist_manager_->SetActivePlaying();
   }
@@ -415,7 +432,7 @@ void Player::PlayPlaylist(const std::string &name) {
   if (playlist_manager_) {
     playlist_manager_->SetCurrentPlaylist(name);
   }
-  Play();
+  StartFromPlaylist(0);
 }
 
 void Player::ShowOSD() { ForceShowOSD.Emit(current_song_, false); }
