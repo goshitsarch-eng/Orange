@@ -29,6 +29,7 @@
 #include "dialogs/edittagsave.h"
 #include "dialogs/errordialog.h"
 #include "dialogs/errordialogqueue.h"
+#include "dialogs/uierror.h"
 #include "dialogs/messagedialog.h"
 #include "ui/mainwindowmenu.h"
 #include "ui/mainwindowkeyboard.h"
@@ -2055,6 +2056,10 @@ void MainWindow::ConnectSignals() {
   app_->database()->Error.Connect([this](const std::string &message) { ShowErrorDialog(message); });
   app_->collection()->Error.Connect([this](const std::string &message) { ShowErrorDialog(message); });
   app_->device_manager()->DeviceError.Connect([this](const std::string &message) { ShowErrorDialog(message); });
+  UiError::Bus().Connect([this](const std::string &message) { ShowErrorDialog(message); });
+  if (app_->tag_fetcher()) {
+    app_->tag_fetcher()->Error.Connect([](int, const std::string &message) { UiError::Report(message); });
+  }
   app_->scrobbler()->EnabledChanged.Connect([this](bool) { UpdateScrobblerButtons(); });
   app_->scrobbler()->TrackLoved.Connect([this](const Song &) {
     loved_current_track_ = ScrobblerLoveState::DisableAfterLove();

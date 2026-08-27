@@ -105,6 +105,14 @@ inline std::vector<std::pair<int, Song>> StreamMetadataUpdates(const std::vector
 // Qt skips WriteFile for streams; metadata is applied to the playlist item instead.
 inline bool ShouldWriteFile(const Song &song) { return !song.is_stream(); }
 
+// Qt EditTagDialog::Error after a failed TagReader write.
+inline std::string WriteFailureMessage(const std::string &filename, const std::string &error = {}) {
+  if (error.empty()) {
+    return "Could not write metadata to " + filename;
+  }
+  return "Could not write metadata to " + filename + ": " + error;
+}
+
 inline bool ShouldPersist(const std::vector<int> &rows) { return HasPlaylistSource(rows); }
 
 // Playlist Edit tag: keep only in-range rows so songs and rows stay aligned.

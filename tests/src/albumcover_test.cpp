@@ -17,6 +17,8 @@
 #include "covermanager/albumcoversearcher.h"
 #include "covermanager/albumcoversearcherlabels.h"
 #include "covermanager/albumcoverloader.h"
+#include "covermanager/covererrormessage.h"
+#include "dialogs/uierror.h"
 #include "covermanager/albumcoverloaderoptions.h"
 #include "covermanager/coverexportrunnable.h"
 #include "covermanager/coversearchstatistics.h"
@@ -648,6 +650,33 @@ TEST(CoverProviderSettings, EnabledListMatchesQtSave) {
   ASSERT_EQ(2u, enabled.size());
   EXPECT_EQ("Last.fm", enabled.front());
   EXPECT_EQ("MusicBrainz", enabled.back());
+}
+
+TEST(CoverErrorMessage, MatchesQtWording) {
+  EXPECT_EQ("Failed to open cover file /tmp/a.jpg for reading: Permission denied.",
+            CoverErrorMessage::FailedToOpenForReading("/tmp/a.jpg", "Permission denied"));
+  EXPECT_EQ("Cover file /tmp/empty.jpg is empty.", CoverErrorMessage::CoverFileEmpty("/tmp/empty.jpg"));
+  EXPECT_EQ("Failed to open cover file /tmp/out.jpg for writing: Read-only file system.",
+            CoverErrorMessage::FailedToOpenForWriting("/tmp/out.jpg", "Read-only file system"));
+  EXPECT_EQ("Failed writing cover to file /tmp/out.jpg.", CoverErrorMessage::FailedWritingCover("/tmp/out.jpg"));
+  EXPECT_EQ("Failed writing cover to file /tmp/out.jpg: No space left on device",
+            CoverErrorMessage::FailedWritingCover("/tmp/out.jpg", "No space left on device"));
+  EXPECT_EQ("Failed to delete cover file /tmp/cover.jpg: Permission denied.",
+            CoverErrorMessage::FailedToDeleteCover("/tmp/cover.jpg", "Permission denied"));
+  EXPECT_EQ("Could not save cover to file /tmp/album.flac.", CoverErrorMessage::CouldNotSaveCover("/tmp/album.flac"));
+  EXPECT_TRUE(CoverErrorMessage::ShouldEmit("x"));
+  EXPECT_FALSE(CoverErrorMessage::ShouldEmit({}));
+}
+
+TEST(UiError, ReportIgnoresEmptyAndForwardsMessages) {
+  std::string seen;
+  UiError::Bus().Clear();
+  UiError::Bus().Connect([&seen](const std::string &message) { seen = message; });
+  UiError::Report({});
+  EXPECT_TRUE(seen.empty());
+  UiError::Report("Could not save cover to file /tmp/album.flac.");
+  EXPECT_EQ("Could not save cover to file /tmp/album.flac.", seen);
+  UiError::Bus().Clear();
 }
 
 TEST(CoversSettingsLabels, MatchQtCoverPage) {

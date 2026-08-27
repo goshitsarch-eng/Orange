@@ -66,6 +66,11 @@ TEST(TagFetchHelpers, ApplyResultUsesMusicBrainzFields) {
   EXPECT_EQ("mbid-wwh", written.musicbrainz_recording_id());
 }
 
+TEST(TagFetchHelpers, ShouldShowDialogIgnoresEmpty) {
+  EXPECT_FALSE(TagFetchHelpers::ShouldShowDialog({}));
+  EXPECT_TRUE(TagFetchHelpers::ShouldShowDialog("MusicBrainz request failed"));
+}
+
 TEST(TagFetchHelpers, BatchProgressTracksCompletion) {
   const auto progress = TagFetchHelpers::BatchProgress::FromCounts(2, 4, 3);
   EXPECT_DOUBLE_EQ(0.5, progress.Fraction());

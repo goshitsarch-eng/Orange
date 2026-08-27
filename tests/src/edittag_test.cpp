@@ -779,6 +779,12 @@ TEST(EditTagFields, FieldEnabledMatchesQtFiletypeSupport) {
   EXPECT_FALSE(EditTagFields::AnySupported({dsf}, &Song::albumartist_supported));
 }
 
+TEST(EditTagSave, WriteFailureMessageMatchesQt) {
+  EXPECT_EQ("Could not write metadata to /tmp/track.flac", EditTagSave::WriteFailureMessage("/tmp/track.flac"));
+  EXPECT_EQ("Could not write metadata to /tmp/track.flac: File is read-only",
+            EditTagSave::WriteFailureMessage("/tmp/track.flac", "File is read-only"));
+}
+
 TEST(TagWriterFields, WritesBpmMoodKeyAndOriginalYear) {
   EXPECT_STREQ("BPM", TagWriterFields::VorbisBpm());
   EXPECT_STREQ("MOOD", TagWriterFields::VorbisMood());

@@ -89,6 +89,9 @@ struct BatchProgress {
   }
 };
 
+// Qt TrackSelectionDialog / TagFetcher::Error → MainWindow::ShowErrorDialog.
+inline bool ShouldShowDialog(const std::string &message) { return !message.empty(); }
+
 }  // namespace TagFetchHelpers
 
 #endif

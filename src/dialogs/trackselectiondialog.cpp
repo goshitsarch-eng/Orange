@@ -3,6 +3,7 @@
 #include "core/application.h"
 #include "dialogs/dialoglistkeyboard.h"
 #include "dialogs/trackselectionlabels.h"
+#include "dialogs/uierror.h"
 #include "playlist/playlistmanager.h"
 #include "tagfetcher/tagfetcher.h"
 #include "tagfetcher/tagfetchhelpers.h"
@@ -480,6 +481,11 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
     RefreshSongList(state);
     if (!state->songs.empty() && state->songs[static_cast<size_t>(state->current)].fetch_id == id) {
       RefreshResults(state);
+    }
+  });
+  state->fetcher->Error.Connect([alive](int, const std::string &message) {
+    if (*alive) {
+      UiError::Report(message);
     }
   });
   state->fetcher->Finished.Connect([alive, state]() {

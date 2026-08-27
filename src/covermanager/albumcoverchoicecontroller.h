@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_ALBUMCOVERCHOICECONTROLLER_H
 #define STRAWBERRY_ALBUMCOVERCHOICECONTROLLER_H
 
+#include "core/signal.h"
 #include "core/song.h"
 #include "covermanager/coverchoicemenu.h"
 #include "covermanager/coveroptions.h"
@@ -55,6 +56,8 @@ class AlbumCoverChoiceController {
   static std::vector<std::string> ImageExtensions();
   static bool SaveCover(Application *app, Song *song, const std::string &image);
   bool SaveCover(Song *song, const std::string &image);
+
+  Signal<std::string> Error;
 
  private:
   void ApplyImage(Song *song, GtkWidget *image, const std::string &data);

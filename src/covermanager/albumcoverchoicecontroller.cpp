@@ -1,6 +1,8 @@
 #include "covermanager/albumcoverchoicecontroller.h"
 
 #include "collection/collectionalbumart.h"
+#include "covermanager/covererrormessage.h"
+#include "dialogs/uierror.h"
 
 #include "constants/coverssettings.h"
 #include "context/contextcover.h"
@@ -22,7 +24,25 @@
 #include <algorithm>
 #include <memory>
 
-AlbumCoverChoiceController::AlbumCoverChoiceController(Application *app) : app_(app) { ReloadSettings(); }
+namespace {
+
+struct CoverSaveFileState {
+  AlbumCoverChoiceController *controller = nullptr;
+  std::string *bytes = nullptr;
+};
+
+struct CoverOpenFileState {
+  AlbumCoverChoiceController *controller = nullptr;
+  Song *song = nullptr;
+  GtkWidget *image = nullptr;
+};
+
+}  // namespace
+
+AlbumCoverChoiceController::AlbumCoverChoiceController(Application *app) : app_(app) {
+  ReloadSettings();
+  Error.Connect([](const std::string &message) { UiError::Report(message); });
+}
 
 void AlbumCoverChoiceController::ReloadSettings() { cover_options_ = CoverOptions::LoadFromSettings(); }
 
@@ -47,7 +67,12 @@ bool AlbumCoverChoiceController::SaveCover(Application *app, Song *song, const s
 }
 
 bool AlbumCoverChoiceController::SaveCover(Song *song, const std::string &image) {
-  return DialogHelpers::ApplyCover(app_, song, image, EffectiveOptions());
+  const bool ok = DialogHelpers::ApplyCover(app_, song, image, EffectiveOptions());
+  if (!ok && song) {
+    const std::string path = FileUtils::PathFromUri(song->url());
+    Error.Emit(CoverErrorMessage::CouldNotSaveCover(path.empty() ? song->url() : path));
+  }
+  return ok;
 }
 
 void AlbumCoverChoiceController::ApplyImage(Song *song, GtkWidget *image, const std::string &data) {
@@ -152,10 +177,16 @@ void AlbumCoverChoiceController::DeleteCover(Song *song, GtkWidget *image) {
     FileUtils::Remove(FileUtils::Join(dir, name));
   }
   if (!song->art_manual().empty()) {
-    FileUtils::Remove(FileUtils::PathFromUri(song->art_manual()));
+    const std::string art = FileUtils::PathFromUri(song->art_manual());
+    if (FileUtils::Exists(art) && !FileUtils::Remove(art)) {
+      Error.Emit(CoverErrorMessage::FailedToDeleteCover(art, {}));
+    }
   }
   if (!song->art_automatic().empty()) {
-    FileUtils::Remove(FileUtils::PathFromUri(song->art_automatic()));
+    const std::string art = FileUtils::PathFromUri(song->art_automatic());
+    if (FileUtils::Exists(art) && !FileUtils::Remove(art)) {
+      Error.Emit(CoverErrorMessage::FailedToDeleteCover(art, {}));
+    }
   }
   song->set_art_manual({});
   song->set_art_automatic({});
@@ -181,25 +212,31 @@ void AlbumCoverChoiceController::SaveCoverToFile(GtkWindow *parent, const Song &
   gtk_file_dialog_set_title(dialog, "Save cover image");
   gtk_file_dialog_set_initial_name(dialog, "cover.jpg");
   FileFilters::Apply(dialog, FileFilters::ImageFilters(true));
-  auto *bytes = new std::string(data.begin(), data.end());
+  auto *state = new CoverSaveFileState{this, new std::string(data.begin(), data.end())};
   gtk_file_dialog_save(dialog, parent, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
-    auto *image = static_cast<std::string *>(data);
+    auto *pair = static_cast<CoverSaveFileState *>(data);
     GError *error = nullptr;
     GFile *file = gtk_file_dialog_save_finish(GTK_FILE_DIALOG(source), result, &error);
     if (file) {
       gchar *path = g_file_get_path(file);
       if (path) {
-        FileUtils::WriteFile(path, *image);
+        if (pair->bytes && !FileUtils::WriteFile(path, *pair->bytes) && pair->controller) {
+          pair->controller->Error.Emit(CoverErrorMessage::FailedWritingCover(path, {}));
+        }
         g_free(path);
       }
       g_object_unref(file);
     }
     if (error) {
+      if (pair->controller) {
+        pair->controller->Error.Emit(CoverErrorMessage::FailedToOpenForWriting({}, error->message ? error->message : ""));
+      }
       g_error_free(error);
     }
-    delete image;
+    delete pair->bytes;
+    delete pair;
     g_object_unref(source);
-  }, bytes);
+  }, state);
 }
 
 void AlbumCoverChoiceController::ShowCover(GtkWindow *parent, const Song &song) {
@@ -393,21 +430,18 @@ void AlbumCoverChoiceController::LoadCoverFromFile(GtkWindow *parent, Song *song
   GtkFileDialog *dialog = gtk_file_dialog_new();
   gtk_file_dialog_set_title(dialog, "Choose cover image");
   FileFilters::Apply(dialog, FileFilters::ImageFilters(false));
-  struct FileState {
-    AlbumCoverChoiceController *controller;
-    Song *song;
-    GtkWidget *image;
-  };
-  auto *state = new FileState{this, song, image};
+  auto *state = new CoverOpenFileState{this, song, image};
   gtk_file_dialog_open(dialog, parent, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
-    auto *pair = static_cast<FileState *>(data);
+    auto *pair = static_cast<CoverOpenFileState *>(data);
     GError *error = nullptr;
     GFile *file = gtk_file_dialog_open_finish(GTK_FILE_DIALOG(source), result, &error);
     if (file) {
       gchar *path = g_file_get_path(file);
       if (path) {
         const std::string bytes = FileUtils::ReadFile(path);
-        if (!bytes.empty() && pair->controller->SaveCover(pair->song, bytes)) {
+        if (bytes.empty() && pair->controller) {
+          pair->controller->Error.Emit(CoverErrorMessage::CoverFileEmpty(path));
+        } else if (!bytes.empty() && pair->controller->SaveCover(pair->song, bytes)) {
           ++pair->controller->statistics_.chosen_images;
           pair->controller->ApplyImage(pair->song, pair->image, bytes);
         }
@@ -416,6 +450,9 @@ void AlbumCoverChoiceController::LoadCoverFromFile(GtkWindow *parent, Song *song
       g_object_unref(file);
     }
     if (error) {
+      if (pair->controller) {
+        pair->controller->Error.Emit(CoverErrorMessage::FailedToOpenForReading({}, error->message ? error->message : ""));
+      }
       g_error_free(error);
     }
     delete pair;

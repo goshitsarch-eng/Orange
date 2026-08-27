@@ -16,6 +16,7 @@
 #include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagloading.h"
 #include "dialogs/edittagsave.h"
+#include "dialogs/uierror.h"
 #include "dialogs/edittagsummaryfields.h"
 #include "tagreader/tagreaderclient.h"
 #include "dialogs/edittagsummarylabels.h"
@@ -1134,8 +1135,10 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                        if (!EditTagSave::ShouldWriteFile(song)) {
                          continue;
                        }
-                       self->app->tagreader()->WriteFile(FileUtils::PathFromUri(song.url()), song, static_cast<int>(SaveTagsOption::Tags), {},
-                                                         id3v2_version);
+                       const std::string filename = FileUtils::PathFromUri(song.url());
+                       if (!self->app->tagreader()->WriteFile(filename, song, static_cast<int>(SaveTagsOption::Tags), {}, id3v2_version)) {
+                         UiError::Report(EditTagSave::WriteFailureMessage(filename));
+                       }
                        const std::string path = FileUtils::PathFromUri(song.url());
                        if (!path.empty() && song.rating() >= 0) {
                          self->app->tagreader()->SaveRating(path, song.rating());
