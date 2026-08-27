@@ -1345,8 +1345,14 @@ void MainWindow::BuildSidebar() {
   file_view_->SetReplacePlaylistCallback([file_playlist](const std::vector<std::string> &paths) {
     file_playlist(FileViewMenu::Action::Replace, paths);
   });
-  file_view_->SetOpenInNewCallback([file_playlist](const std::vector<std::string> &paths) {
-    file_playlist(FileViewMenu::Action::New, paths);
+  file_view_->SetOpenInNewCallback([this](const std::vector<std::string> &paths) {
+    Settings settings;
+    settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+    const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+        settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+    const std::string name = FileViewMenu::NewPlaylistName(paths, file_view_ ? file_view_->path() : std::string(),
+                                                          file_view_ && FileViewMode::TreeActive(file_view_->mode()));
+    ApplyCollectionPlan(FileViewMenu::PlanFor(FileViewMenu::Action::New, play, EngineStopped()), SongsFromFilePaths(paths), name);
   });
   file_view_->SetCopyToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, false); });
   file_view_->SetMoveToCollectionCallback([this](const std::vector<std::string> &paths) { CopyFileViewToCollection(paths, true); });
@@ -3202,13 +3208,14 @@ SongList MainWindow::CollectionSongs() const {
   return collection_container_ ? collection_container_->view()->SelectedSongs() : SongList{};
 }
 
-void MainWindow::ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, const SongList &songs) {
+void MainWindow::ApplyCollectionPlan(const CollectionBehaviour::Plan &plan, const SongList &songs, const std::string &playlist_name) {
   if (songs.empty()) {
     return;
   }
   int play_at = 0;
   if (plan.destination == CollectionBehaviour::Destination::New) {
-    app_->playlist_manager()->New(CollectionBehaviour::NewPlaylistName(songs), songs);
+    const std::string name = playlist_name.empty() ? CollectionBehaviour::NewPlaylistName(songs) : playlist_name;
+    app_->playlist_manager()->New(name, songs);
   } else {
     if (plan.clear_current) {
       app_->playlist_manager()->ClearCurrent();

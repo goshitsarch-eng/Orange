@@ -272,6 +272,28 @@ TEST(FileViewMenu, ExpandPathsRecursesNestedAlbums) {
   rmdir(album.c_str());
 }
 
+TEST(FileViewMenu, NewPlaylistNameMatchesQtFileView) {
+  char short_buf[] = "/tmp/fv-XXXXXX";
+  ASSERT_NE(mkdtemp(short_buf), nullptr);
+  const std::string short_dir = short_buf;
+  ASSERT_LE(short_dir.size(), static_cast<size_t>(FileViewMenu::kNewPlaylistNameMaxLength));
+  EXPECT_EQ(short_dir, FileViewMenu::NewPlaylistName({short_dir}, "/music", false));
+  EXPECT_EQ(short_dir, FileViewMenu::NewPlaylistName({short_dir}, "/music", true));
+
+  const std::string long_dir = TempDir();
+  ASSERT_GT(long_dir.size(), static_cast<size_t>(FileViewMenu::kNewPlaylistNameMaxLength));
+  EXPECT_EQ(FileUtils::BaseName(long_dir), FileViewMenu::NewPlaylistName({long_dir}, "/music", false));
+
+  EXPECT_EQ("/music", FileViewMenu::NewPlaylistName({"/tmp/song.flac"}, "/music", false));
+  EXPECT_STREQ("Files", FileViewMenu::TreeDefaultPlaylistName());
+  EXPECT_EQ("Files", FileViewMenu::NewPlaylistName({"/tmp/song.flac"}, "/music", true));
+  EXPECT_EQ("Dummy", FileViewMenu::PathPlaylistName("/home/user/Music/Portishead/Dummy"));
+  EXPECT_FALSE(FileViewMenu::ExpandsPaths(FileViewMenu::Action::New));
+
+  rmdir(long_dir.c_str());
+  rmdir(short_dir.c_str());
+}
+
 TEST(FileViewMenu, DeleteUsesRawSelectionPaths) {
   const std::string album = "/tmp/album";
   const std::vector<std::string> selection = {album};

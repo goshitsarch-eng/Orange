@@ -104,7 +104,6 @@ inline bool ExpandsPaths(Action action) {
   switch (action) {
     case Action::Append:
     case Action::Replace:
-    case Action::New:
     case Action::Device:
     case Action::EditTags:
       return true;
@@ -119,6 +118,37 @@ inline bool ExpandsPaths(Action action) {
 
 inline std::vector<std::string> PathsForAction(Action action, const std::vector<std::string> &selection) {
   return ExpandsPaths(action) ? ExpandPaths(selection) : selection;
+}
+
+inline constexpr int kNewPlaylistNameMaxLength = 20;
+
+inline const char *TreeDefaultPlaylistName() { return "Files"; }
+
+// Qt FileViewList/Tree MimeDataFromSelection: one folder uses its path (basename if longer than 20).
+// List mode otherwise uses the current root the same way. Tree mode otherwise uses "Files".
+inline std::string PathPlaylistName(const std::string &path) {
+  if (path.size() <= kNewPlaylistNameMaxLength) {
+    return path;
+  }
+  if (path.empty() || FileUtils::IsDirectory(path)) {
+    return FileUtils::BaseName(path);
+  }
+  const std::string base = FileUtils::BaseName(path);
+  const std::string ext = FileUtils::Extension(path);
+  if (ext.empty() || ext.size() + 1 >= base.size()) {
+    return base;
+  }
+  return base.substr(0, base.size() - ext.size() - 1);
+}
+
+inline std::string NewPlaylistName(const std::vector<std::string> &selection, const std::string &current_path, bool tree_mode) {
+  if (selection.size() == 1 && FileUtils::IsDirectory(selection.front())) {
+    return PathPlaylistName(selection.front());
+  }
+  if (tree_mode) {
+    return TreeDefaultPlaylistName();
+  }
+  return PathPlaylistName(current_path);
 }
 
 inline std::string BrowserPath(const std::vector<std::string> &paths) {
