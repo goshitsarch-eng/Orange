@@ -1,14 +1,35 @@
 #include "scrobbler/subsonicscrobbler.h"
 
+#include "constants/scrobblersettings.h"
 #include "constants/subsonicsettings.h"
 #include "core/settings.h"
 #include "scrobbler/subsonicscrobblestate.h"
 #include "subsonic/subsonicservice.h"
 
+#include <glib.h>
+
 #include <ctime>
 #include <map>
 
-SubsonicScrobbler::SubsonicScrobbler(NetworkAccessManager *network) : network_(network) {}
+SubsonicScrobbler::SubsonicScrobbler(NetworkAccessManager *network) : network_(network), pending_song_(Song()) {}
+
+SubsonicScrobbler::~SubsonicScrobbler() { CancelSubmitTimer(); }
+
+void SubsonicScrobbler::CancelSubmitTimer() {
+  if (submit_timeout_id_ != 0) {
+    g_source_remove(submit_timeout_id_);
+    submit_timeout_id_ = 0;
+  }
+}
+
+void SubsonicScrobbler::SubmitPending() {
+  submitted_ = false;
+  CancelSubmitTimer();
+  if (!pending_song_.is_valid() && pending_song_.song_id().empty() && pending_song_.url().empty()) {
+    return;
+  }
+  Ping(pending_song_, true, playing_time_ms_);
+}
 
 std::string SubsonicScrobbler::ScrobbleUrl(const std::string &server_url, const std::string &username, const std::string &password,
                                            const std::string &id, bool submission, bool hex_auth, int64_t time_ms) {
@@ -50,10 +71,22 @@ void SubsonicScrobbler::NowPlaying(const Song &song) {
   if (!SubsonicScrobbleState::ShouldNowPlaying(song, server_side)) {
     return;
   }
+  CancelSubmitTimer();
+  submitted_ = false;
+  pending_song_ = Song();
   playing_url_ = song.url();
   playing_song_id_ = song.song_id();
   playing_time_ms_ = static_cast<int64_t>(std::time(nullptr)) * 1000;
   Ping(song, false, playing_time_ms_);
+}
+
+void SubsonicScrobbler::ClearPlaying() {
+  CancelSubmitTimer();
+  submitted_ = false;
+  pending_song_ = Song();
+  playing_url_.clear();
+  playing_song_id_.clear();
+  playing_time_ms_ = 0;
 }
 
 void SubsonicScrobbler::Scrobble(const Song &song) {
@@ -64,7 +97,28 @@ void SubsonicScrobbler::Scrobble(const Song &song) {
   if (!server_side || !SubsonicScrobbleState::ShouldSubmit(song, playing_url_, playing_song_id_)) {
     return;
   }
-  Ping(song, true, playing_time_ms_);
+  if (submitted_) {
+    return;
+  }
+  Settings scrobbler;
+  scrobbler.BeginGroup(ScrobblerSettings::kSettingsGroup);
+  const int delay = scrobbler.IntValue(ScrobblerSettings::kSubmit, ScrobblerSettings::kDefaultSubmit);
+  pending_song_ = song;
+  if (SubsonicScrobbleState::ShouldSubmitImmediately(delay, submitted_)) {
+    submitted_ = true;
+    SubmitPending();
+    return;
+  }
+  if (SubsonicScrobbleState::ShouldStartSubmitTimer(delay, submitted_, submit_timeout_id_ != 0)) {
+    submitted_ = true;
+    submit_timeout_id_ = g_timeout_add_seconds(static_cast<guint>(SubsonicScrobbleState::DelaySeconds(delay)), +[](gpointer data) -> gboolean {
+                                                 auto *self = static_cast<SubsonicScrobbler *>(data);
+                                                 self->submit_timeout_id_ = 0;
+                                                 self->SubmitPending();
+                                                 return G_SOURCE_REMOVE;
+                                               },
+                                               this);
+  }
 }
 
 void SubsonicScrobbler::Love(const Song &) {}

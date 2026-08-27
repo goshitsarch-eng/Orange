@@ -112,6 +112,14 @@ TEST(SubsonicScrobbleState, GatesNowPlayingAndSubmit) {
   const std::string timed = SubsonicScrobbler::ScrobbleUrl("https://music.example.com", "alice", "secret", "12", false, true, 1700000000000);
   EXPECT_NE(std::string::npos, timed.find("time=1700000000000"));
   EXPECT_NE(std::string::npos, timed.find("submission=false"));
+  EXPECT_TRUE(SubsonicScrobbleState::ShouldSubmitImmediately(0, false));
+  EXPECT_FALSE(SubsonicScrobbleState::ShouldSubmitImmediately(10, false));
+  EXPECT_FALSE(SubsonicScrobbleState::ShouldSubmitImmediately(0, true));
+  EXPECT_TRUE(SubsonicScrobbleState::ShouldStartSubmitTimer(10, false, false));
+  EXPECT_FALSE(SubsonicScrobbleState::ShouldStartSubmitTimer(10, false, true));
+  EXPECT_FALSE(SubsonicScrobbleState::ShouldStartSubmitTimer(0, false, false));
+  EXPECT_EQ(10, SubsonicScrobbleState::DelaySeconds(10));
+  EXPECT_EQ(0, SubsonicScrobbleState::DelaySeconds(0));
 }
 
 TEST(ScrobblerPlayingState, SameSongTimestampAndRadioPrev) {
