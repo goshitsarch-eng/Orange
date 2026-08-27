@@ -21,6 +21,13 @@ inline bool SplitterEnabled(bool loading) { return !loading; }
 
 inline bool LoadingVisible(bool loading) { return loading; }
 
+// Qt TrackSelectionDialog::Init — song list and Prev/Next only for multi-song.
+inline bool SongListVisible(int song_count) { return song_count > 1; }
+
+inline bool NavEnabled(int song_count) { return song_count > 1; }
+
+inline bool ApplyAllVisible(int song_count) { return song_count > 1; }
+
 }  // namespace TrackSelectionLabels
 
 #endif

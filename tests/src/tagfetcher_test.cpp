@@ -110,4 +110,11 @@ TEST(TrackSelectionLabels, QtCopyAndEmptyResults) {
   EXPECT_TRUE(TrackSelectionLabels::ShowEmptyResults(false, false));
   EXPECT_FALSE(TrackSelectionLabels::ShowEmptyResults(true, false));
   EXPECT_FALSE(TrackSelectionLabels::ShowEmptyResults(false, true));
+  EXPECT_FALSE(TrackSelectionLabels::SongListVisible(0));
+  EXPECT_FALSE(TrackSelectionLabels::SongListVisible(1));
+  EXPECT_TRUE(TrackSelectionLabels::SongListVisible(2));
+  EXPECT_FALSE(TrackSelectionLabels::NavEnabled(1));
+  EXPECT_TRUE(TrackSelectionLabels::NavEnabled(3));
+  EXPECT_FALSE(TrackSelectionLabels::ApplyAllVisible(1));
+  EXPECT_TRUE(TrackSelectionLabels::ApplyAllVisible(2));
 }

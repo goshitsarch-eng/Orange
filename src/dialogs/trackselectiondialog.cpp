@@ -36,6 +36,7 @@ struct State {
   GtkWidget *status = nullptr;
   GtkWidget *progress = nullptr;
   GtkWidget *song_list = nullptr;
+  GtkWidget *song_pane = nullptr;
   GtkWidget *results = nullptr;
   GtkWidget *prev = nullptr;
   GtkWidget *next = nullptr;
@@ -107,11 +108,12 @@ void SelectSong(State *state, int index) {
     index = static_cast<int>(state->songs.size()) - 1;
   }
   state->current = index;
+  const bool nav = TrackSelectionLabels::NavEnabled(static_cast<int>(state->songs.size()));
   if (state->prev) {
-    gtk_widget_set_sensitive(state->prev, state->songs.size() > 1);
+    gtk_widget_set_sensitive(state->prev, nav);
   }
   if (state->next) {
-    gtk_widget_set_sensitive(state->next, state->songs.size() > 1);
+    gtk_widget_set_sensitive(state->next, nav);
   }
   RefreshSongList(state);
   RefreshResults(state);
@@ -297,6 +299,7 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(left_scroll), state->song_list);
   gtk_box_append(GTK_BOX(left), left_label);
   gtk_box_append(GTK_BOX(left), left_scroll);
+  state->song_pane = left;
 
   GtkWidget *right = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   gtk_widget_set_hexpand(right, TRUE);
@@ -335,12 +338,23 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 
+  const int song_count = static_cast<int>(targets.size());
+  if (state->song_pane) {
+    gtk_widget_set_visible(state->song_pane, TrackSelectionLabels::SongListVisible(song_count));
+  }
+  if (state->apply_all) {
+    gtk_widget_set_visible(state->apply_all, TrackSelectionLabels::ApplyAllVisible(song_count));
+  }
+  if (state->prev) {
+    gtk_widget_set_sensitive(state->prev, TrackSelectionLabels::NavEnabled(song_count));
+  }
+  if (state->next) {
+    gtk_widget_set_sensitive(state->next, TrackSelectionLabels::NavEnabled(song_count));
+  }
   if (targets.empty()) {
     gtk_label_set_text(GTK_LABEL(state->status), Translations::CStr("No song selected"));
     gtk_widget_set_sensitive(state->apply, FALSE);
     gtk_widget_set_sensitive(state->apply_all, FALSE);
-    gtk_widget_set_sensitive(state->prev, FALSE);
-    gtk_widget_set_sensitive(state->next, FALSE);
     return;
   }
 
