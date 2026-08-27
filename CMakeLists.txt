@@ -553,8 +553,10 @@ set(STRAWBERRY_SOURCES
   src/device/mtpconnection.cpp
   src/device/mtploader.cpp
   src/device/mtpdevice.cpp
+  src/device/mtpmusicstorage.cpp
   src/device/gpodloader.cpp
   src/device/gpoddevice.cpp
+  src/device/gpodmusicstorage.cpp
   src/device/filesystemdevice.cpp
   src/device/cddasongloader.cpp
   src/device/cddadevice.cpp
@@ -936,8 +938,10 @@ if(GTest_FOUND)
     src/device/mtpconnection.cpp
     src/device/mtploader.cpp
     src/device/mtpdevice.cpp
+    src/device/mtpmusicstorage.cpp
     src/device/gpodloader.cpp
     src/device/gpoddevice.cpp
+    src/device/gpodmusicstorage.cpp
     src/device/filesystemdevice.cpp
     src/device/cddasongloader.cpp
     src/device/cddadevice.cpp

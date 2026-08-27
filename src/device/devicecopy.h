@@ -12,6 +12,8 @@ inline bool IsFilesystemDevice(const ConnectedDevice &device) { return !device.m
 
 inline bool UsesDeviceCopyRunner(const ConnectedDevice &device) { return DeviceCopyJob::UsesDeviceCopyRunner(device); }
 
+inline bool UsesOrganizeMusicStorage(const ConnectedDevice &device) { return DeviceCopyJob::UsesOrganizeMusicStorage(device); }
+
 inline bool ShouldUseOrganizeDialog(const ConnectedDevice &device) { return DeviceCopyJob::ShouldUseOrganizeDialog(device); }
 
 inline bool CanCopyToCollection(const SongList &songs, bool filesystem = true) { return filesystem && !songs.empty(); }

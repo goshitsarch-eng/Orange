@@ -7,6 +7,7 @@
 #include "organize/organizeformat.h"
 #include "organize/organizepreview.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -32,6 +33,8 @@ class Organize {
     bool destination_is_collection = false;
     std::string cover_cache_path;
     std::string playlist;
+    MusicStorage *storage = nullptr;
+    bool eject_after = false;
   };
 
   explicit Organize(TaskManager *task_manager = nullptr);
@@ -50,6 +53,7 @@ class Organize {
   int next_index() const { return next_; }
   int task_id() const { return task_id_; }
   const std::vector<Error> &errors() const { return errors_; }
+  MusicStorage *storage() const { return storage_; }
 
   static std::string CoverPathForSong(const Song &song);
 
@@ -74,6 +78,8 @@ class Organize {
   Options options_;
   std::vector<OrganizePreview::Entry> entries_;
   std::vector<Error> errors_;
+  MusicStorage *storage_ = nullptr;
+  std::unique_ptr<MusicStorage> owned_storage_;
 };
 
 #endif

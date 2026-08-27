@@ -11,14 +11,19 @@ inline constexpr int kBatchSize = 10;
 
 inline const char *TaskName() { return "Copying to device"; }
 
-// Qt Organize always goes through MusicStorage (MTP/iPod included). GTK still copies those via DeviceCopyRunner.
-inline bool UsesDeviceCopyRunner(const std::string &backend) { return backend == "gpod" || backend == "mtp"; }
+// Qt Organize always goes through MusicStorage (MTP/iPod included).
+inline bool UsesOrganizeMusicStorage(const std::string &backend) { return backend == "gpod" || backend == "mtp"; }
 
-inline bool UsesDeviceCopyRunner(const ConnectedDevice &device) { return UsesDeviceCopyRunner(device.backend); }
+inline bool UsesOrganizeMusicStorage(const ConnectedDevice &device) { return UsesOrganizeMusicStorage(device.backend); }
+
+// DeviceCopyRunner is no longer used for organize/copy; MTP and iPod use MusicStorage.
+inline bool UsesDeviceCopyRunner(const std::string &) { return false; }
+
+inline bool UsesDeviceCopyRunner(const ConnectedDevice &) { return false; }
 
 // Qt OrganizeDialog is used for every connected device, including MTP and iPod.
 inline bool ShouldUseOrganizeDialog(const ConnectedDevice &device) {
-  return UsesDeviceCopyRunner(device) || !device.mount_path.empty();
+  return UsesOrganizeMusicStorage(device) || !device.mount_path.empty();
 }
 
 inline std::string MtpSerial(const std::string &unique_id) {

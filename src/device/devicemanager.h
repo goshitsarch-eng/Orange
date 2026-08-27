@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_DEVICEMANAGER_H
 #define STRAWBERRY_DEVICEMANAGER_H
 
+#include "core/musicstorage.h"
 #include "core/signal.h"
 #include "core/song.h"
 #include "core/urlhandlers.h"
@@ -53,6 +54,7 @@ class DeviceManager {
   static SongList MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec,
                                const std::string &device_path = {});
   static std::string MusicPath(const ConnectedDevice &device);
+  std::unique_ptr<MusicStorage> MusicStorageForDevice(const ConnectedDevice &device) const;
   SongList TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const;
 
   Signal<> DevicesChanged;

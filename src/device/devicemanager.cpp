@@ -16,7 +16,9 @@
 #include "device/giolister.h"
 #include "device/udisks2lister.h"
 #include "device/devicecopyjob.h"
-#include "device/devicecopyrunner.h"
+#include "device/devicestorage.h"
+#include "device/gpodmusicstorage.h"
+#include "device/mtpmusicstorage.h"
 #include "device/devicecopyrefresh.h"
 #include "device/devicecopysupported.h"
 #include "device/gpoddevice.h"
@@ -553,6 +555,20 @@ std::string DeviceManager::MusicPath(const ConnectedDevice &device) {
   return FileUtils::Join(device.mount_path, "Music");
 }
 
+std::unique_ptr<MusicStorage> DeviceManager::MusicStorageForDevice(const ConnectedDevice &device) const {
+  switch (DeviceStorage::KindFor(device)) {
+    case DeviceStorage::Kind::Mtp:
+      return std::make_unique<MtpMusicStorage>(DeviceCopyJob::MtpSerial(device.unique_id));
+    case DeviceStorage::Kind::GPod:
+      return std::make_unique<GPodMusicStorage>(device.mount_path);
+    case DeviceStorage::Kind::Filesystem:
+      return std::make_unique<FilesystemMusicStorage>(MusicPath(device));
+    case DeviceStorage::Kind::None:
+      break;
+  }
+  return nullptr;
+}
+
 SongList DeviceManager::TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const {
   const DeviceDatabaseBackend::Device stored = StoredDevice(device.unique_id);
   const MusicStorage::TranscodeMode mode =
@@ -592,15 +608,27 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
   }
   const ConnectedDevice target = *found;
   const DeviceDatabaseBackend::Device stored = StoredDevice(target.unique_id);
-  DeviceCopyRunner runner(task_manager_, tagreader_);
-  runner.set_transcode(OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode
-                                                                       : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported),
-                       stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG);
-  if (!runner.Copy(target, songs)) {
+  std::unique_ptr<MusicStorage> storage = MusicStorageForDevice(target);
+  if (!storage) {
     DeviceError.Emit(DeviceError::CopyFailed());
     return false;
   }
-  RefreshAfterCopy(device_id, runner.copied(), runner.copied_songs());
+  Organize organize(task_manager_);
+  Organize::Options options;
+  options.storage = storage.get();
+  options.tagreader = tagreader_;
+  options.transcode_mode = OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode
+                                                                           : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported);
+  options.transcode_format = stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG;
+  options.supported_filetypes = DeviceCopySupported::ForDevice(target);
+  OrganizeFormat format("%albumartist/%album/{%track - }%title");
+  const std::vector<Organize::Error> errors = organize.Copy(songs, storage->LocalPath(), format, options);
+  const int copied = static_cast<int>(songs.size()) - static_cast<int>(errors.size());
+  if (copied <= 0) {
+    DeviceError.Emit(DeviceError::CopyFailed());
+    return false;
+  }
+  RefreshAfterCopy(device_id, copied, storage->CopiedSongs());
   return true;
 }
 

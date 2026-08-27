@@ -56,6 +56,8 @@
 #include "dialogs/userpasslabels.h"
 #include "organize/organize.h"
 #include "organize/organizejob.h"
+#include "organize/organizestorage.h"
+#include "device/devicestorage.h"
 #include "organize/organizefilename.h"
 #include "organize/organizeformatvalidator.h"
 #include "organize/organizetokenhelp.h"
@@ -826,6 +828,87 @@ TEST(OrganizeJob, BatchesTenAndSupportsCancel) {
   second.ProcessSome();
   EXPECT_TRUE(second.finished());
   EXPECT_EQ(12u, second.errors().size());
+}
+
+namespace {
+
+class FakeMusicStorage : public MusicStorage {
+ public:
+  Song::Source source() const override { return Song::Source::Device; }
+  std::string LocalPath() const override { return local_path; }
+  bool StartCopy(std::vector<Song::FileType> *) override {
+    started = true;
+    return start_ok;
+  }
+  bool CopyToStorage(const CopyJob &job, std::string &) override {
+    destinations.push_back(job.destination);
+    sources.push_back(job.source);
+    if (job.progress) {
+      job.progress(1.0f);
+    }
+    return copy_ok;
+  }
+  bool FinishCopy(bool success, std::string &) override {
+    finished = true;
+    finish_success = success;
+    return success;
+  }
+  bool DeleteFromStorage(const DeleteJob &) override { return false; }
+
+  std::string local_path;
+  bool start_ok = true;
+  bool copy_ok = true;
+  bool started = false;
+  bool finished = false;
+  bool finish_success = false;
+  std::vector<std::string> destinations;
+  std::vector<std::string> sources;
+};
+
+}  // namespace
+
+TEST(OrganizeStorage, DeviceCopyUsesRelativeDestination) {
+  EXPECT_FALSE(OrganizeStorage::AllowsEmptyDestination(static_cast<const MusicStorage *>(nullptr)));
+  EXPECT_TRUE(OrganizeStorage::AllowsEmptyDestination(std::string()));
+  EXPECT_FALSE(OrganizeStorage::AllowsEmptyDestination("/media/usb"));
+  EXPECT_EQ("Artist/Roads.flac", OrganizeStorage::CopyDestination({}, "Artist/Roads.flac"));
+  EXPECT_EQ("/media/usb/Artist/Roads.flac", OrganizeStorage::CopyDestination("/media/usb", "Artist/Roads.flac"));
+  EXPECT_FALSE(OrganizeStorage::DestinationExists({}, "Artist/Roads.flac"));
+  EXPECT_FALSE(OrganizeStorage::ShouldMkdir({}));
+  EXPECT_TRUE(OrganizeStorage::ShouldMkdir("/media/usb"));
+  EXPECT_EQ(DeviceStorage::Kind::Mtp, DeviceStorage::KindFor("mtp", {}));
+  EXPECT_EQ(DeviceStorage::Kind::GPod, DeviceStorage::KindFor("gpod", "/media/ipod"));
+  EXPECT_EQ(DeviceStorage::Kind::Filesystem, DeviceStorage::KindFor("gio", "/run/media/usb"));
+  EXPECT_EQ(DeviceStorage::Kind::None, DeviceStorage::KindFor("cdda", {}));
+  EXPECT_TRUE(DeviceStorage::UsesOrganizeMusicStorage("mtp"));
+  EXPECT_TRUE(DeviceStorage::UsesOrganizeMusicStorage("gpod"));
+  EXPECT_FALSE(DeviceStorage::UsesOrganizeMusicStorage("gio"));
+  EXPECT_TRUE(DeviceStorage::AllowsEmptyDestination(DeviceStorage::Kind::Mtp));
+  EXPECT_FALSE(DeviceStorage::AllowsEmptyDestination(DeviceStorage::Kind::GPod));
+
+  char dir_template[] = "/tmp/strawberry-organize-storage-XXXXXX";
+  const std::string dir = mkdtemp(dir_template);
+  const std::string src = FileUtils::Join(dir, "roads.flac");
+  FileUtils::WriteFile(src, "flac");
+  Song song;
+  song.set_valid(true);
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_url(FileUtils::UriFromPath(src));
+  FakeMusicStorage storage;
+  Organize::Options options;
+  options.storage = &storage;
+  Organize organize;
+  const std::vector<Organize::Error> errors = organize.Copy({song}, "", OrganizeFormat("%artist/%title"), options);
+  EXPECT_TRUE(errors.empty());
+  EXPECT_TRUE(storage.started);
+  EXPECT_TRUE(storage.finished);
+  ASSERT_EQ(1u, storage.destinations.size());
+  EXPECT_EQ(std::string::npos, storage.destinations.front().find("/tmp"));
+  EXPECT_NE(std::string::npos, storage.destinations.front().find("Portishead"));
+  EXPECT_NE(std::string::npos, storage.destinations.front().find("Roads"));
+  FileUtils::Remove(src);
+  rmdir(dir.c_str());
 }
 
 TEST(Organize, CopiesDisambiguatedCollisions) {

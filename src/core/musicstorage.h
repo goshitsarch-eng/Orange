@@ -51,6 +51,9 @@ class MusicStorage {
   virtual bool FinishDelete(bool success, std::string &) { return success; }
 
   virtual void Eject() {}
+
+  // MTP/iPod adapters record on-device metadata for DeviceManager::RefreshAfterCopy.
+  virtual SongList CopiedSongs() const { return {}; }
 };
 
 #endif

@@ -11,6 +11,7 @@
 #include "device/devicecopy.h"
 #include "device/devicecopyjob.h"
 #include "device/devicecopyrunner.h"
+#include "device/devicestorage.h"
 #include "core/taskmanager.h"
 #include "device/devicemenu.h"
 #include "device/devicesongmenu.h"
@@ -547,13 +548,19 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_FALSE(DeviceCopy::IsFilesystemDevice(mtp));
   EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(filesystem));
   EXPECT_FALSE(DeviceCopy::UsesDeviceCopyRunner(filesystem));
+  EXPECT_FALSE(DeviceCopy::UsesOrganizeMusicStorage(filesystem));
   EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(mtp));
-  EXPECT_TRUE(DeviceCopy::UsesDeviceCopyRunner(mtp));
+  EXPECT_FALSE(DeviceCopy::UsesDeviceCopyRunner(mtp));
+  EXPECT_TRUE(DeviceCopy::UsesOrganizeMusicStorage(mtp));
   ConnectedDevice ipod;
   ipod.backend = "gpod";
   ipod.mount_path = "/media/ipod";
   EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(ipod));
-  EXPECT_TRUE(DeviceCopy::UsesDeviceCopyRunner(ipod));
+  EXPECT_FALSE(DeviceCopy::UsesDeviceCopyRunner(ipod));
+  EXPECT_TRUE(DeviceCopy::UsesOrganizeMusicStorage(ipod));
+  EXPECT_EQ(DeviceStorage::Kind::Mtp, DeviceStorage::KindFor(mtp));
+  EXPECT_EQ(DeviceStorage::Kind::GPod, DeviceStorage::KindFor(ipod));
+  EXPECT_EQ(DeviceStorage::Kind::Filesystem, DeviceStorage::KindFor(filesystem));
   EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("mtp:serial"));
   EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("MTP/serial"));
   EXPECT_EQ("usb", DeviceCopyJob::MtpSerial("usb"));
