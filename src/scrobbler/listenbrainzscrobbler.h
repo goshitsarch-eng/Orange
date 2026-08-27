@@ -5,8 +5,12 @@
 #include "scrobbler/scrobblercache.h"
 
 #include <cstdint>
+#include <functional>
+#include <memory>
 #include <string>
 #include <vector>
+
+class LocalRedirectServer;
 
 class ListenBrainzScrobbler : public ScrobblerService {
  public:
@@ -23,8 +27,10 @@ class ListenBrainzScrobbler : public ScrobblerService {
   void Scrobble(const Song &song) override;
   void Love(const Song &song) override;
   void Authenticate(const std::string &username, const std::string &token) override;
+  void StartAuthorization(NetworkAccessManager *network, std::function<void(bool)> done = {});
   void Logout() override;
   bool authenticated() const override { return !token_.empty(); }
+  bool oauth_authenticated() const { return !access_token_.empty(); }
   std::string username() const override { return username_; }
   void WriteCache() override;
   void Submit() override;
@@ -38,10 +44,18 @@ class ListenBrainzScrobbler : public ScrobblerService {
   void CancelSubmitTimer();
   void ScheduleSubmit(bool had_error);
   void FlushCache();
+  void CloseRedirectServer();
+  void CancelOAuthIdle();
+  void ExchangeAuthorizationCode(const std::string &code, const std::string &redirect_uri, const std::string &verifier,
+                                 std::function<void(bool)> done);
+  void SaveAccessToken() const;
 
   NetworkAccessManager *network_ = nullptr;
   std::string token_;
   std::string username_;
+  std::string access_token_;
+  std::unique_ptr<LocalRedirectServer> redirect_server_;
+  unsigned oauth_idle_id_ = 0;
   ScrobblerCache cache_;
   Song song_playing_;
   uint64_t timestamp_ = 0;

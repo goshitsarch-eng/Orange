@@ -10,6 +10,7 @@
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
 #include "scrobbler/listenbrainzscrobblestate.h"
+#include "scrobbler/listenbrainzoauth.h"
 #include "scrobbler/scrobblemetadata.h"
 #include "scrobbler/scrobblercache.h"
 #include "scrobbler/scrobblersources.h"
@@ -230,6 +231,25 @@ TEST(LastFmScrobbler, AuthorizationUrlIncludesKeyAndToken) {
 
 TEST(ListenBrainzScrobbler, LoveBodyEscapesMbid) {
   EXPECT_EQ("{\"recording_mbid\":\"mb\\\"id\",\"score\":1}", ListenBrainzScrobbler::LoveBody("mb\"id"));
+}
+
+TEST(ListenBrainzOAuth, AuthorizationUrlMatchesQtMusicBrainz) {
+  EXPECT_STREQ("https://musicbrainz.org/oauth2/authorize", ListenBrainzOAuth::kAuthorizeUrl);
+  EXPECT_STREQ("https://musicbrainz.org/oauth2/token", ListenBrainzOAuth::kTokenUrl);
+  EXPECT_FALSE(ListenBrainzOAuth::ClientId().empty());
+  EXPECT_FALSE(ListenBrainzOAuth::ClientSecret().empty());
+  EXPECT_EQ("http://localhost:43111/", ListenBrainzOAuth::RedirectUri(43111));
+  EXPECT_EQ("abc", ListenBrainzOAuth::ExtractCode("http://localhost:43111/?code=abc&state=x"));
+  EXPECT_TRUE(ListenBrainzOAuth::ExtractCode("http://localhost:43111/").empty());
+  EXPECT_FALSE(ListenBrainzOAuth::ShouldStartAuthorization(nullptr));
+  EXPECT_TRUE(ListenBrainzOAuth::LoginWidgetSignedIn(true, false));
+  EXPECT_TRUE(ListenBrainzOAuth::LoginWidgetSignedIn(false, true));
+  EXPECT_FALSE(ListenBrainzOAuth::LoginWidgetSignedIn(false, false));
+  const std::string url = ListenBrainzOAuth::AuthorizationUrl("http://localhost:43111/", "challenge");
+  EXPECT_NE(std::string::npos, url.find("https://musicbrainz.org/oauth2/authorize"));
+  EXPECT_NE(std::string::npos, url.find("response_type=code"));
+  EXPECT_NE(std::string::npos, url.find("code_challenge=challenge"));
+  EXPECT_NE(std::string::npos, url.find("scope="));
 }
 
 TEST(ScrobbleMetadata, StripRemasteredAndAlbumArtist) {

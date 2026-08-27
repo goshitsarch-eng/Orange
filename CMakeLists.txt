@@ -481,6 +481,7 @@ set(STRAWBERRY_SOURCES
   src/scrobbler/scrobblercache.cpp
   src/scrobbler/lastfmscrobbler.cpp
   src/scrobbler/listenbrainzscrobbler.cpp
+  src/scrobbler/listenbrainzoauth.h
   src/scrobbler/subsonicscrobbler.cpp
   src/streaming/streamingservice.cpp
   src/streaming/streamingpage.cpp

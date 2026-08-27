@@ -5,6 +5,7 @@
 #include "core/application.h"
 #include "scrobbler/lastfmscrobbler.h"
 #include "scrobbler/listenbrainzscrobbler.h"
+#include "scrobbler/listenbrainzoauth.h"
 #include "scrobbler/scrobblersources.h"
 #include "settings/scrobblersettingslabels.h"
 #include "settings/settingspage.h"
@@ -193,17 +194,30 @@ AdwPreferencesPage *ScrobblerSettingsPage::Create(Settings *settings, Applicatio
       AdwEntryRow *token_row = AddGroupedEntry(lb_group, settings, "ListenBrainz", "token", ScrobblerSettingsLabels::UserToken());
       SettingsPage::AddDescription(lb_group, ScrobblerSettingsLabels::ListenBrainzTokenHint());
       auto *login = new LoginStateWidget();
-      login->SetLoggedIn(listenbrainz->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut,
+      login->SetLoggedIn(ListenBrainzOAuth::LoginWidgetSignedIn(listenbrainz->authenticated(), listenbrainz->oauth_authenticated())
+                             ? LoginStateWidget::State::LoggedIn
+                             : LoginStateWidget::State::LoggedOut,
                          listenbrainz->username());
       auto *apply_token = new std::function<void()>([listenbrainz, login, user_row, token_row, page_alive]() {
         listenbrainz->Authenticate(gtk_editable_get_text(GTK_EDITABLE(user_row)), gtk_editable_get_text(GTK_EDITABLE(token_row)));
         if (*page_alive) {
-          login->SetLoggedIn(listenbrainz->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut,
+          login->SetLoggedIn(ListenBrainzOAuth::LoginWidgetSignedIn(listenbrainz->authenticated(), listenbrainz->oauth_authenticated())
+                                 ? LoginStateWidget::State::LoggedIn
+                                 : LoginStateWidget::State::LoggedOut,
                              listenbrainz->username());
         }
       });
       g_object_set_data_full(G_OBJECT(page), "listenbrainz-apply", apply_token, [](gpointer p) { delete static_cast<std::function<void()> *>(p); });
-      login->SetLoginCallback([apply_token]() { (*apply_token)(); });
+      login->SetLoginCallback([listenbrainz, login, page_alive, app]() {
+        login->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
+        listenbrainz->StartAuthorization(app ? app->network() : nullptr, [listenbrainz, login, page_alive](bool ok) {
+          if (!*page_alive) {
+            return;
+          }
+          login->SetLoggedIn(ok || listenbrainz->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut,
+                             listenbrainz->username());
+        });
+      });
       login->SetLogoutCallback([listenbrainz, login, user_row, token_row, page_alive]() {
         listenbrainz->Logout();
         if (*page_alive) {

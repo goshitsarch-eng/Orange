@@ -1,14 +1,20 @@
 #include "scrobbler/listenbrainzscrobbler.h"
 
 #include "constants/scrobblersettings.h"
+#include "core/localredirectserver.h"
+#include "core/oauthenticator.h"
+#include "core/oauthpkce.h"
 #include "core/settings.h"
-#include "version.h"
+#include "scrobbler/listenbrainzoauth.h"
 #include "scrobbler/listenbrainzscrobblestate.h"
 #include "scrobbler/scrobblemetadata.h"
 #include "scrobbler/scrobblererror.h"
 #include "scrobbler/scrobblerplayingstate.h"
+#include "utilities/randutils.h"
 #include "utilities/strutils.h"
+#include "version.h"
 
+#include <gio/gio.h>
 #include <glib.h>
 
 #include <ctime>
@@ -18,6 +24,14 @@ const char *ListenBrainzScrobbler::kFeedbackUrl = "https://api.listenbrainz.org/
 const char *ListenBrainzScrobbler::kCacheFile = "listenbrainzscrobbler.cache";
 
 namespace {
+
+struct ListenBrainzOAuthRedirect {
+  ListenBrainzScrobbler *self = nullptr;
+  std::string code;
+  std::string redirect_uri;
+  std::string verifier;
+  std::function<void(bool)> done;
+};
 
 bool OfflineMode() {
   Settings settings;
@@ -41,9 +55,30 @@ ListenBrainzScrobbler::ListenBrainzScrobbler(NetworkAccessManager *network) : ne
   settings.BeginGroup("ListenBrainz");
   token_ = settings.Value("token");
   username_ = settings.Value("username");
+  access_token_ = settings.Value("access_token");
 }
 
-ListenBrainzScrobbler::~ListenBrainzScrobbler() { CancelSubmitTimer(); }
+ListenBrainzScrobbler::~ListenBrainzScrobbler() {
+  CancelOAuthIdle();
+  CloseRedirectServer();
+  CancelSubmitTimer();
+}
+
+void ListenBrainzScrobbler::CloseRedirectServer() { redirect_server_.reset(); }
+
+void ListenBrainzScrobbler::CancelOAuthIdle() {
+  if (oauth_idle_id_ != 0) {
+    g_source_remove(oauth_idle_id_);
+    oauth_idle_id_ = 0;
+  }
+}
+
+void ListenBrainzScrobbler::SaveAccessToken() const {
+  Settings settings;
+  settings.BeginGroup("ListenBrainz");
+  settings.SetValue("access_token", access_token_);
+  settings.Sync();
+}
 
 void ListenBrainzScrobbler::CancelSubmitTimer() {
   if (submit_timeout_id_ != 0) {
@@ -237,12 +272,90 @@ void ListenBrainzScrobbler::Authenticate(const std::string &username, const std:
   token_ = token;
 }
 
+void ListenBrainzScrobbler::StartAuthorization(NetworkAccessManager *network, std::function<void(bool)> done) {
+  if (!ListenBrainzOAuth::ShouldStartAuthorization(network)) {
+    if (done) {
+      done(false);
+    }
+    return;
+  }
+  CloseRedirectServer();
+  redirect_server_ = std::make_unique<LocalRedirectServer>();
+  if (!redirect_server_->Listen()) {
+    CloseRedirectServer();
+    if (done) {
+      done(false);
+    }
+    return;
+  }
+  const std::string redirect_uri = ListenBrainzOAuth::RedirectUri(redirect_server_->port());
+  const std::string verifier = RandUtils::CryptographicRandomString(OAuthPkce::kVerifierLength);
+  const std::string challenge = OAuthPkce::ChallengeS256(verifier);
+  const std::string url = ListenBrainzOAuth::AuthorizationUrl(redirect_uri, challenge);
+  redirect_server_->Redirected.Connect([this, redirect_uri, verifier, done](const std::string &returned) {
+    auto *state = new ListenBrainzOAuthRedirect;
+    state->self = this;
+    state->code = ListenBrainzOAuth::ExtractCode(returned);
+    state->redirect_uri = redirect_uri;
+    state->verifier = verifier;
+    state->done = done;
+    oauth_idle_id_ = g_idle_add_full(G_PRIORITY_DEFAULT_IDLE, +[](gpointer data) -> gboolean {
+      auto *owned = static_cast<ListenBrainzOAuthRedirect *>(data);
+      owned->self->oauth_idle_id_ = 0;
+      owned->self->CloseRedirectServer();
+      if (owned->code.empty()) {
+        if (owned->done) {
+          owned->done(false);
+        }
+      } else {
+        owned->self->ExchangeAuthorizationCode(owned->code, owned->redirect_uri, owned->verifier, owned->done);
+      }
+      return G_SOURCE_REMOVE;
+    }, state, [](gpointer data) { delete static_cast<ListenBrainzOAuthRedirect *>(data); });
+  });
+  if (!g_app_info_launch_default_for_uri(url.c_str(), nullptr, nullptr)) {
+    CloseRedirectServer();
+    if (done) {
+      done(false);
+    }
+  }
+}
+
+void ListenBrainzScrobbler::ExchangeAuthorizationCode(const std::string &code, const std::string &redirect_uri, const std::string &verifier,
+                                                     std::function<void(bool)> done) {
+  if (!network_) {
+    if (done) {
+      done(false);
+    }
+    return;
+  }
+  auto *oauth = new OAuthenticator(network_);
+  oauth->set_redirect_uri(redirect_uri);
+  oauth->ExchangeCode(ListenBrainzOAuth::kTokenUrl, ListenBrainzOAuth::ClientId(), ListenBrainzOAuth::ClientSecret(), code,
+                      [this, oauth, done](const std::string &body, const std::string &error) {
+                        const auto tokens = OAuthenticator::ParseTokenResponse(body);
+                        const bool ok = error.empty() && !tokens.access_token.empty();
+                        if (ok) {
+                          access_token_ = tokens.access_token;
+                          SaveAccessToken();
+                        }
+                        delete oauth;
+                        if (done) {
+                          done(ok);
+                        }
+                      },
+                      verifier);
+}
+
 void ListenBrainzScrobbler::Logout() {
   token_.clear();
   username_.clear();
+  access_token_.clear();
+  CloseRedirectServer();
   Settings settings;
   settings.BeginGroup("ListenBrainz");
   settings.SetValue("username", "");
   settings.SetValue("token", "");
+  settings.SetValue("access_token", "");
   settings.Sync();
 }
