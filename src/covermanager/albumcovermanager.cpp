@@ -28,6 +28,7 @@ namespace {
 struct CoverManagerState {
   Application *app = nullptr;
   GtkWindow *parent = nullptr;
+  AdwDialog *dialog = nullptr;
   AlbumCoverChoiceController *covers = nullptr;
   AlbumCoverManagerList catalog;
   AlbumCoverBatch batch;
@@ -42,6 +43,7 @@ struct CoverManagerState {
   GtkWidget *progress = nullptr;
   GtkWidget *abort = nullptr;
   GtkWidget *fetch_missing = nullptr;
+  GtkWidget *export_btn = nullptr;
   std::shared_ptr<bool> alive = std::make_shared<bool>(true);
   std::string artist_filter;
   std::string typeahead;
@@ -82,7 +84,13 @@ void UpdateBatchUi(CoverManagerState *state) {
     gtk_widget_set_visible(state->abort, state->batch.running());
   }
   if (state->fetch_missing) {
-    gtk_widget_set_sensitive(state->fetch_missing, !state->batch.running());
+    gtk_widget_set_sensitive(state->fetch_missing, CoverManagerActions::FetchEnabled(state->batch.running()));
+  }
+  if (state->export_btn) {
+    gtk_widget_set_sensitive(state->export_btn, CoverManagerActions::ExportEnabled(state->batch.running()));
+  }
+  if (state->dialog) {
+    adw_dialog_set_can_close(state->dialog, CoverManagerActions::CanCloseWithoutConfirm(state->batch.running()) ? TRUE : FALSE);
   }
 }
 
@@ -623,6 +631,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   auto *state = new CoverManagerState;
   state->app = app;
   state->parent = parent;
+  state->dialog = dialog;
   state->covers = new AlbumCoverChoiceController(app);
   state->catalog.SetSongs(app->collection()->Songs());
   for (const auto &album : state->catalog.albums()) {
@@ -734,10 +743,10 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   state->fetch_missing = fetch_missing;
   state->abort = gtk_button_new_with_label(Translations::CStr("Abort"));
   gtk_widget_set_visible(state->abort, FALSE);
-  GtkWidget *export_btn = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::Export()));
+  state->export_btn = gtk_button_new_with_label(Translations::CStr(CoverManagerStats::Export()));
   gtk_box_append(GTK_BOX(actions), fetch_missing);
   gtk_box_append(GTK_BOX(actions), state->abort);
-  gtk_box_append(GTK_BOX(actions), export_btn);
+  gtk_box_append(GTK_BOX(actions), state->export_btn);
   gtk_box_append(GTK_BOX(box), actions);
 
   auto refresh = +[](GtkWidget *, gpointer data) { RebuildAlbums(static_cast<CoverManagerState *>(data)); };
@@ -797,11 +806,39 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                      UpdateAlbumStatus(static_cast<CoverManagerState *>(data));
                    }),
                    state);
-  g_signal_connect(export_btn, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
+  g_signal_connect(state->export_btn, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
                      auto *self = static_cast<CoverManagerState *>(data);
+                     if (self->batch.running()) {
+                       return;
+                     }
                      AlbumCoverExportDialog::Show(self->parent, self->app,
                                                    CoverManagerExportScope::SongsToExport(VisibleAlbums(self)));
                    }),
+                   state);
+  g_signal_connect(dialog, "close-attempt", G_CALLBACK((+[](AdwDialog *self, gpointer data) {
+                     auto *state = static_cast<CoverManagerState *>(data);
+                     if (!CoverManagerActions::ShouldConfirmCloseOnFetch(state->batch.running())) {
+                       adw_dialog_force_close(self);
+                       return;
+                     }
+                     AdwAlertDialog *confirm = ADW_ALERT_DIALOG(adw_alert_dialog_new(
+                         Translations::CStr(CoverManagerActions::CloseConfirmTitle()), Translations::CStr(CoverManagerActions::CloseConfirmMessage())));
+                     adw_alert_dialog_add_responses(confirm, "keep", Translations::CStr(CoverManagerActions::CloseDontStop()), "abort",
+                                                    Translations::CStr(CoverManagerActions::CloseAbort()), nullptr);
+                     adw_alert_dialog_set_response_appearance(confirm, "abort", ADW_RESPONSE_DESTRUCTIVE);
+                     adw_alert_dialog_set_default_response(confirm, "abort");
+                     g_signal_connect(confirm, "response", G_CALLBACK((+[](AdwAlertDialog *, const char *response, gpointer data) {
+                                        auto *state = static_cast<CoverManagerState *>(data);
+                                        if (g_strcmp0(response, "abort") != 0 || !state->dialog) {
+                                          return;
+                                        }
+                                        state->batch.Cancel();
+                                        adw_dialog_set_can_close(state->dialog, TRUE);
+                                        adw_dialog_close(state->dialog);
+                                      })),
+                                      state);
+                     adw_dialog_present(ADW_DIALOG(confirm), GTK_WIDGET(self));
+                   })),
                    state);
 
   RebuildArtists(state);

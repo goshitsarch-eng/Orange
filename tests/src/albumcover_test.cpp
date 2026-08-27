@@ -603,6 +603,21 @@ TEST(CoverManagerActions, DoubleClickAndFetchFinishMatchQt) {
   EXPECT_TRUE(CoverManagerActions::ShowStatisticsWhenFetchFinishes(true, false, 2));
 }
 
+TEST(CoverManagerActions, CloseConfirmAndButtonsDuringFetch) {
+  EXPECT_STREQ("Really cancel?", CoverManagerActions::CloseConfirmTitle());
+  EXPECT_STREQ("Closing this window will stop searching for album covers.", CoverManagerActions::CloseConfirmMessage());
+  EXPECT_STREQ("Abort", CoverManagerActions::CloseAbort());
+  EXPECT_STREQ("Don't stop!", CoverManagerActions::CloseDontStop());
+  EXPECT_FALSE(CoverManagerActions::ShouldConfirmCloseOnFetch(false));
+  EXPECT_TRUE(CoverManagerActions::ShouldConfirmCloseOnFetch(true));
+  EXPECT_TRUE(CoverManagerActions::FetchEnabled(false));
+  EXPECT_FALSE(CoverManagerActions::FetchEnabled(true));
+  EXPECT_TRUE(CoverManagerActions::ExportEnabled(false));
+  EXPECT_FALSE(CoverManagerActions::ExportEnabled(true));
+  EXPECT_TRUE(CoverManagerActions::CanCloseWithoutConfirm(false));
+  EXPECT_FALSE(CoverManagerActions::CanCloseWithoutConfirm(true));
+}
+
 TEST(CoverManagerStats, TotalAndWithoutCoverMatchQt) {
   EXPECT_STREQ("Total albums:", CoverManagerStats::TotalLabel());
   EXPECT_STREQ("Without cover:", CoverManagerStats::WithoutLabel());
