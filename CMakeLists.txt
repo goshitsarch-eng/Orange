@@ -134,6 +134,7 @@ add_custom_command(
           --generate-source
           ${GRESOURCE_XML}
   DEPENDS ${GRESOURCE_XML} ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema.sql ${CMAKE_CURRENT_SOURCE_DIR}/data/pictures/nomusic.png
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/mood/sample.mood
   VERBATIM
 )
 
@@ -557,6 +558,7 @@ set(STRAWBERRY_SOURCES
   src/moodbar/moodbarbuilder.cpp
   src/moodbar/moodbarpipeline.cpp
   src/moodbar/moodbarrenderer.cpp
+  src/moodbar/moodbarpreview.h
   src/moodbar/moodbar.cpp
   src/moodbar/moodbarcontroller.cpp
   src/moodbar/moodbarloader.cpp

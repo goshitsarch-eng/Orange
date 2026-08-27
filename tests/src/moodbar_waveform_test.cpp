@@ -7,6 +7,7 @@
 #include "core/song.h"
 #include "moodbar/moodbarcell.h"
 #include "moodbar/moodbarpaths.h"
+#include "moodbar/moodbarpreview.h"
 #include "moodbar/moodbarstyle.h"
 #include "utilities/analysisasync.h"
 #include "utilities/seekbaranalysis.h"
@@ -211,6 +212,20 @@ TEST(SeekbarModeMenu, LabelsAndCycleMatchQt) {
   EXPECT_TRUE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Moodbar));
   EXPECT_FALSE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Normal));
   EXPECT_STREQ("Moodbar style", SeekbarModeMenu::StyleSubmenuTitle());
+}
+
+TEST(MoodbarPreview, SampleThumbnailsMatchQtSizeAndStyles) {
+  EXPECT_EQ(150, MoodbarPreview::kWidth);
+  EXPECT_EQ(18, MoodbarPreview::kHeight);
+  EXPECT_STREQ("/org/strawberrymusicplayer/Strawberry/mood/sample.mood", MoodbarPreview::SampleResource());
+  const std::vector<uint8_t> sample = MoodbarPreview::LoadSample();
+  ASSERT_FALSE(sample.empty());
+  EXPECT_EQ(0u, sample.size() % 3);
+  EXPECT_EQ(static_cast<size_t>(MoodbarPreview::kWidth) * 3,
+            MoodbarPreview::Stripe(sample, MoodbarSettings::Style::Normal, MoodbarPreview::kWidth).size());
+  EXPECT_TRUE(MoodbarPreview::DistinctStyles(sample));
+  EXPECT_TRUE(MoodbarPreview::Stripe({}, MoodbarSettings::Style::Normal, MoodbarPreview::kWidth).size() ==
+              static_cast<size_t>(MoodbarPreview::kWidth) * 3);
 }
 
 TEST(MoodbarSettingsLabels, MatchQtStyleMenuAndSaveCopy) {
