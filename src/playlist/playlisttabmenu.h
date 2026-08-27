@@ -68,6 +68,9 @@ inline bool ShouldApplyRename(const std::string &old_name, const std::string &ne
 
 inline bool CloseCurrentHidesWindow(int count) { return count <= 1; }
 
+// Qt PlaylistTabBar::CloseCurrentTab: discard an open rename editor before tabs shift.
+inline bool ShouldDiscardRenameBeforeClose(bool editor_visible) { return editor_visible; }
+
 inline bool ToggledFavorite(bool favorite) { return !favorite; }
 
 inline const char *FavoriteTooltip() {

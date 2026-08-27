@@ -31,8 +31,8 @@ PlaylistTabBar::PlaylistTabBar() {
                      auto *self = static_cast<PlaylistTabBar *>(data);
                      if (PlaylistTabMenu::FromRelease(self->IndexAt(x, y), 2) == PlaylistTabMenu::Click::Close) {
                        const int id = self->TabIdAt(self->IndexAt(x, y));
-                       if (id >= 0 && self->close_) {
-                         self->close_(id);
+                       if (id >= 0) {
+                         self->RequestClose(id);
                        }
                      }
                    }),
@@ -227,8 +227,8 @@ void PlaylistTabBar::ActivateAction(PlaylistTabMenu::Action action, int index) {
       }
       break;
     case PlaylistTabMenu::Action::Close:
-      if (id >= 0 && close_) {
-        close_(id);
+      if (id >= 0) {
+        RequestClose(id);
       }
       break;
     case PlaylistTabMenu::Action::Rename:
@@ -324,6 +324,15 @@ void PlaylistTabBar::HideEditor() {
     rename_button_ = nullptr;
   }
   rename_id_ = -1;
+}
+
+void PlaylistTabBar::RequestClose(int id) {
+  if (PlaylistTabMenu::ShouldDiscardRenameBeforeClose(rename_entry_ != nullptr)) {
+    HideEditor();
+  }
+  if (id >= 0 && close_) {
+    close_(id);
+  }
 }
 
 void PlaylistTabBar::StartDragHover(int index) {
@@ -467,9 +476,7 @@ void PlaylistTabBar::Refresh(PlaylistManager *manager, const std::string &active
     g_signal_connect(close, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {
                        auto *self = static_cast<PlaylistTabBar *>(data);
                        const int id = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(btn), "playlist-id")) - 1;
-                       if (self->close_) {
-                         self->close_(id);
-                       }
+                       self->RequestClose(id);
                      }),
                      this);
     gtk_box_append(GTK_BOX(tab), button);

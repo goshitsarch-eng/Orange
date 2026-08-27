@@ -57,6 +57,7 @@ class PlaylistTabBar {
   void StartInlineRename(int index);
   void ApplyInlineRename();
   void HideEditor();
+  void RequestClose(int id);
   void StartDragHover(int index);
   void CancelDragHover();
   void SetupTab(GtkWidget *tab, int index, int id, const std::string &name);

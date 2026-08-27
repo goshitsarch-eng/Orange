@@ -542,6 +542,8 @@ TEST(PlaylistTabMenu, ContextActionsMatchQt) {
   EXPECT_FALSE(PlaylistTabMenu::ShouldApplyRename("Inbox", ""));
   EXPECT_TRUE(PlaylistTabMenu::CloseCurrentHidesWindow(1));
   EXPECT_FALSE(PlaylistTabMenu::CloseCurrentHidesWindow(2));
+  EXPECT_TRUE(PlaylistTabMenu::ShouldDiscardRenameBeforeClose(true));
+  EXPECT_FALSE(PlaylistTabMenu::ShouldDiscardRenameBeforeClose(false));
   EXPECT_TRUE(PlaylistTabMenu::ToggledFavorite(false));
   EXPECT_FALSE(PlaylistTabMenu::ToggledFavorite(true));
   EXPECT_STREQ(FavoriteWidget::TooltipText(), PlaylistTabMenu::FavoriteTooltip());
