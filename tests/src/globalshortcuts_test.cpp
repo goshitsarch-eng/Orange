@@ -1,3 +1,4 @@
+#include "dialogs/shortcutscatalog.h"
 #include "globalshortcuts/globalshortcutbinding.h"
 #include "globalshortcuts/globalshortcutgrab.h"
 #include "globalshortcuts/globalshortcuts.h"
@@ -216,4 +217,18 @@ TEST(PlaylistManager, CycleRepeatAndShuffleModes) {
   EXPECT_EQ(PlaylistSequence::RepeatMode::Track, manager.current()->repeat_mode());
   manager.CycleShuffleMode();
   EXPECT_EQ(PlaylistSequence::ShuffleMode::All, manager.current()->shuffle_mode());
+}
+
+TEST(ShortcutsCatalog, ListsWiredMainWindowAccels) {
+  const std::string text = ShortcutsCatalog::Text();
+  EXPECT_GE(ShortcutsCatalog::Entries().size(), 30u);
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+D"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Shift+D"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Tab"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+W"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+9"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+M"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Shift+P"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Space"));
+  EXPECT_FALSE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Alt+F12"));
 }
