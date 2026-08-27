@@ -798,6 +798,22 @@ TEST(PlaylistClipboard, JoinsVisibleColumnsAndCopyShortcut) {
   EXPECT_FALSE(PlaylistClipboard::IsCopyShortcut('x', 4, 4));
 }
 
+TEST(PlaylistClipboard, CopyPayloadUsesUrlColumnAndUriList) {
+  Song local(Song::Source::LocalFile);
+  local.set_url("file:///music/roads.flac");
+  Song stream(Song::Source::Tidal);
+  stream.set_url("tidal://1");
+  stream.set_stream_url("https://cdn.example/roads.flac");
+  EXPECT_EQ("file:///music/roads.flac", PlaylistClipboard::ClipboardUrl(local));
+  EXPECT_EQ("tidal://1", PlaylistClipboard::ClipboardUrl(stream));
+  EXPECT_EQ("file:///music/roads.flac\r\nhttps://b\r\n", PlaylistClipboard::UriList({"file:///music/roads.flac", "", "https://b"}));
+  EXPECT_TRUE(PlaylistClipboard::UriList({}).empty());
+  const PlaylistClipboard::CopyPayload payload = PlaylistClipboard::FromSong(stream, {"Roads", "", "Portishead"});
+  EXPECT_EQ("Roads - Portishead", payload.display_text);
+  ASSERT_EQ(1u, payload.urls.size());
+  EXPECT_EQ("tidal://1", payload.urls.front());
+}
+
 TEST(PlaylistClipboard, CopyUrlJoinsEffectiveUrls) {
   Song local(Song::Source::LocalFile);
   local.set_url("file:///music/roads.flac");

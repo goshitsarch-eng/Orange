@@ -37,6 +37,22 @@ inline std::string UrlsText(const std::vector<std::string> &urls) {
   return out;
 }
 
+// Qt CopyCurrentSongToClipboard uses Playlist::Column::URL (song.url()), not the stream URL.
+inline std::string ClipboardUrl(const Song &song) { return song.url(); }
+
+// text/uri-list is one URL per line with CRLF (RFC 2483).
+inline std::string UriList(const std::vector<std::string> &urls) {
+  std::string out;
+  for (const std::string &url : urls) {
+    if (url.empty()) {
+      continue;
+    }
+    out += url;
+    out += "\r\n";
+  }
+  return out;
+}
+
 inline std::string DisplayText(const std::vector<std::string> &column_texts) {
   std::string out;
   for (const std::string &part : column_texts) {
@@ -49,6 +65,21 @@ inline std::string DisplayText(const std::vector<std::string> &column_texts) {
     out += part;
   }
   return out;
+}
+
+struct CopyPayload {
+  std::string display_text;
+  std::vector<std::string> urls;
+};
+
+inline CopyPayload FromSong(const Song &song, const std::vector<std::string> &column_texts) {
+  CopyPayload payload;
+  payload.display_text = DisplayText(column_texts);
+  const std::string url = ClipboardUrl(song);
+  if (!url.empty()) {
+    payload.urls.push_back(url);
+  }
+  return payload;
 }
 
 inline bool IsCopyShortcut(const unsigned keyval, const unsigned modifiers, const unsigned control_mask) {

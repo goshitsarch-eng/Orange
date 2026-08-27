@@ -1043,7 +1043,23 @@ void PlaylistView::CopyCurrentToClipboard() {
   for (PlaylistColumn column : PlaylistColumnLayout::Visible()) {
     texts.push_back(PlaylistDelegates::ColumnText(song, column));
   }
-  gdk_clipboard_set_text(gtk_widget_get_clipboard(widget_), PlaylistClipboard::DisplayText(texts).c_str());
+  const PlaylistClipboard::CopyPayload payload = PlaylistClipboard::FromSong(song, texts);
+  GdkClipboard *clipboard = gtk_widget_get_clipboard(widget_);
+  if (payload.urls.empty()) {
+    gdk_clipboard_set_text(clipboard, payload.display_text.c_str());
+    return;
+  }
+  const std::string uri_list = PlaylistClipboard::UriList(payload.urls);
+  GBytes *bytes = g_bytes_new(uri_list.data(), uri_list.size());
+  GdkContentProvider *uris = gdk_content_provider_new_for_bytes("text/uri-list", bytes);
+  g_bytes_unref(bytes);
+  GdkContentProvider *text = gdk_content_provider_new_typed(G_TYPE_STRING, payload.display_text.c_str());
+  GdkContentProvider *parts[] = {text, uris};
+  GdkContentProvider *all = gdk_content_provider_new_union(parts, 2);
+  gdk_clipboard_set_content(clipboard, all);
+  g_object_unref(all);
+  g_object_unref(text);
+  g_object_unref(uris);
 }
 
 void PlaylistView::JumpToCurrentlyPlayingTrack() {
