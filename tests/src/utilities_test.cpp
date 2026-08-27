@@ -56,6 +56,8 @@
 #include "core/appearance.h"
 #include "core/appearancecolors.h"
 #include "core/deletefiles.h"
+#include "core/deletefilesjob.h"
+#include "organize/organizeerrordialog.h"
 #include "core/enginemetadata.h"
 #include "core/windowgeometry.h"
 #include "core/mainwindowsettings.h"
@@ -1229,6 +1231,83 @@ TEST(DeleteFiles, ReportsMissingFiles) {
   missing.set_url("file:///tmp/does-not-exist-strawberry.flac");
   deleter.Start(SongList{missing});
   ASSERT_EQ(1u, deleter.errors().size());
+}
+
+TEST(DeleteFilesJob, BatchesFiftyBlocksScansAndSupportsCancel) {
+  EXPECT_EQ(50, DeleteFilesJob::kBatchSize);
+  EXPECT_STREQ("Deleting files", DeleteFilesJob::TaskName());
+  EXPECT_TRUE(DeleteFilesJob::ShouldProcessBatch(false));
+  EXPECT_FALSE(DeleteFilesJob::ShouldProcessBatch(true));
+  EXPECT_TRUE(DeleteFilesJob::ShouldFinish(50, 50, false));
+  EXPECT_FALSE(DeleteFilesJob::ShouldFinish(10, 50, false));
+  EXPECT_TRUE(DeleteFilesJob::ShouldFinish(10, 50, true));
+  EXPECT_TRUE(DeleteFilesJob::ShouldScheduleNext(0, 60, false, true));
+  EXPECT_FALSE(DeleteFilesJob::ShouldScheduleNext(0, 60, false, false));
+  EXPECT_EQ(12, DeleteFilesJob::Progress(12));
+  EXPECT_EQ(60, DeleteFilesJob::ProgressMax(60));
+  EXPECT_STREQ("Error deleting songs", OrganizeErrorDialog::Title(OrganizeErrorDialog::OperationType::Delete));
+  EXPECT_STREQ("Error copying songs", OrganizeErrorDialog::Title(OrganizeErrorDialog::OperationType::Copy));
+  EXPECT_NE(std::string::npos, std::string(OrganizeErrorDialog::Message(OrganizeErrorDialog::OperationType::Delete)).find("deleted"));
+
+  SongList requested;
+  SongList playlist;
+  SongList errors;
+  for (int i = 0; i < 3; ++i) {
+    Song song;
+    song.set_url("file:///tmp/del-" + std::to_string(i) + ".flac");
+    song.set_title("T" + std::to_string(i));
+    requested.push_back(song);
+    playlist.push_back(song);
+  }
+  errors.push_back(requested[1]);
+  const std::vector<int> rows = DeleteFilesJob::RowsToRemove(playlist, requested, errors);
+  ASSERT_EQ(2u, rows.size());
+  EXPECT_EQ(0, rows[0]);
+  EXPECT_EQ(2, rows[1]);
+
+  SongList songs;
+  for (int i = 0; i < 60; ++i) {
+    Song song;
+    song.set_title("D" + std::to_string(i));
+    song.set_url("file:///tmp/does-not-exist-delete-batch-" + std::to_string(i) + ".flac");
+    songs.push_back(song);
+  }
+  TaskManager tasks;
+  bool paused = false;
+  bool resumed = false;
+  tasks.PauseCollectionWatchers.Connect([&paused]() { paused = true; });
+  tasks.ResumeCollectionWatchers.Connect([&resumed]() { resumed = true; });
+  FilesystemMusicStorage storage("/tmp");
+  DeleteFiles deleter(&tasks, &storage, false);
+  deleter.Begin(songs);
+  deleter.ProcessSome();
+  EXPECT_EQ(50, deleter.next_index());
+  EXPECT_FALSE(deleter.finished());
+  EXPECT_EQ(50u, deleter.errors().size());
+  deleter.Cancel();
+  deleter.ProcessSome();
+  EXPECT_TRUE(deleter.cancelled());
+  EXPECT_TRUE(deleter.finished());
+  EXPECT_EQ(50u, deleter.errors().size());
+
+  DeleteFiles blocking(&tasks, &storage, false);
+  Song missing;
+  missing.set_url("file:///tmp/does-not-exist-delete-block.flac");
+  blocking.Start(SongList{missing});
+  EXPECT_TRUE(paused);
+  EXPECT_TRUE(resumed);
+  EXPECT_TRUE(blocking.finished());
+}
+
+TEST(FilesystemMusicStorage, MovesDeletedFileToTrash) {
+  TemporaryFile tmp("strawberry-trash-XXXXXX");
+  ASSERT_FALSE(tmp.filename().empty());
+  ASSERT_TRUE(FileUtils::WriteFile(tmp.filename(), "trash-me"));
+  FilesystemMusicStorage storage("/tmp");
+  Song song;
+  song.set_url(FileUtils::UriFromPath(tmp.filename()));
+  EXPECT_TRUE(storage.DeleteFromStorage({song, true}));
+  EXPECT_FALSE(FileUtils::Exists(tmp.filename()));
 }
 
 TEST(MemoryDatabase, OpensAndScopedTransaction) {

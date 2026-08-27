@@ -38,5 +38,8 @@ bool FilesystemMusicStorage::DeleteFromStorage(const DeleteJob &job) {
   if (path.empty() || !FileUtils::Exists(path)) {
     return false;
   }
+  if (job.use_trash && FileUtils::MoveToTrash(path)) {
+    return true;
+  }
   return FileUtils::Remove(path);
 }

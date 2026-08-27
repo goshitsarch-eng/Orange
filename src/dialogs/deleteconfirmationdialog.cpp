@@ -2,12 +2,53 @@
 
 #include "core/application.h"
 #include "core/deletefiles.h"
+#include "core/deletefilesjob.h"
+#include "core/filesystemmusicstorage.h"
 #include "dialogs/errordialog.h"
+#include "organize/organizeerrordialog.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
 
 #include <adwaita.h>
+
+namespace {
+
+struct DeleteJobState {
+  Application *app = nullptr;
+  GtkWindow *parent = nullptr;
+  SongList requested;
+  FilesystemMusicStorage storage{""};
+  DeleteFiles *deleter = nullptr;
+};
+
+void ApplyDeleteFinished(DeleteJobState *state, const SongList &errors) {
+  if (!state || !state->app) {
+    return;
+  }
+  if (Playlist *playlist = state->app->playlist_manager() ? state->app->playlist_manager()->current() : nullptr) {
+    const std::vector<int> rows = DeleteFilesJob::RowsToRemove(playlist->songs(), state->requested, errors);
+    if (!rows.empty()) {
+      playlist->RemoveRows(rows);
+      state->app->playlist_manager()->SaveCurrent();
+    }
+  }
+  if (state->app->collection()) {
+    state->app->collection()->IncrementalScan();
+  }
+  if (!errors.empty()) {
+    OrganizeErrorDialog::Show(state->parent, OrganizeErrorDialog::OperationType::Delete, errors);
+  }
+}
+
+gboolean DeleteJobStateFree(gpointer data) {
+  auto *state = static_cast<DeleteJobState *>(data);
+  delete state->deleter;
+  delete state;
+  return G_SOURCE_REMOVE;
+}
+
+}  // namespace
 
 void DeleteConfirmationDialog::Show(GtkWindow *parent, Application *app, const SongList &songs, DeleteFilesPolicy::Source source) {
   if (!DeleteFilesPolicy::Allowed(source)) {
@@ -33,35 +74,27 @@ void DeleteConfirmationDialog::Show(GtkWindow *parent, Application *app, const S
   adw_alert_dialog_set_response_appearance(dialog, "delete", ADW_RESPONSE_DESTRUCTIVE);
   auto *owned = new SongList(targets);
   g_object_set_data_full(G_OBJECT(dialog), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });
-  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
+  g_object_set_data(G_OBJECT(dialog), "parent", parent);
+  g_signal_connect(dialog, "response", G_CALLBACK((+[](AdwAlertDialog *alert, const char *response, gpointer data) {
                      if (g_strcmp0(response, "delete") != 0) {
                        return;
                      }
                      auto *application = static_cast<Application *>(data);
                      auto *list = static_cast<SongList *>(g_object_get_data(G_OBJECT(alert), "songs"));
-                     if (!list) {
+                     if (!list || !application) {
                        return;
                      }
-                     DeleteFiles deleter(application->task_manager(), nullptr, true);
-                     deleter.Start(*list);
-                     if (application->playlist_manager()->current()) {
-                       std::vector<int> rows;
-                       const SongList playlist_songs = application->playlist_manager()->current()->songs();
-                       for (size_t i = 0; i < playlist_songs.size(); ++i) {
-                         for (const Song &song : *list) {
-                           if (playlist_songs[i].url() == song.url()) {
-                             rows.push_back(static_cast<int>(i));
-                             break;
-                           }
-                         }
-                       }
-                       if (!rows.empty()) {
-                         application->playlist_manager()->current()->RemoveRows(rows);
-                         application->playlist_manager()->SaveCurrent();
-                       }
-                     }
-                     application->collection()->IncrementalScan();
-                   }),
+                     auto *state = new DeleteJobState;
+                     state->app = application;
+                     state->parent = GTK_WINDOW(g_object_get_data(G_OBJECT(alert), "parent"));
+                     state->requested = *list;
+                     state->deleter = new DeleteFiles(application->task_manager(), &state->storage, true);
+                     state->deleter->Finished.Connect([state](const SongList &errors) {
+                       ApplyDeleteFinished(state, errors);
+                       g_idle_add(DeleteJobStateFree, state);
+                     });
+                     state->deleter->StartAsync(state->requested);
+                   })),
                    app);
   adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
 }

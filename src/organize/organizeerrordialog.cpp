@@ -1,5 +1,7 @@
 #include "organize/organizeerrordialog.h"
 
+#include "utilities/fileutils.h"
+
 #include <adwaita.h>
 
 void OrganizeErrorDialog::Show(GtkWindow *parent, const std::vector<Organize::Error> &errors) {
@@ -10,7 +12,19 @@ void OrganizeErrorDialog::Show(GtkWindow *parent, const std::vector<Organize::Er
     }
     body += error.song.empty() ? error.message : error.song + ": " + error.message;
   }
-  AdwDialog *dialog = adw_alert_dialog_new("Organize failed", body.empty() ? "Unknown error" : body.c_str());
+  AdwDialog *dialog = adw_alert_dialog_new(Title(OperationType::Copy), body.empty() ? "Unknown error" : body.c_str());
+  adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "ok", "OK");
+  adw_dialog_present(dialog, parent ? GTK_WIDGET(parent) : nullptr);
+}
+
+void OrganizeErrorDialog::Show(GtkWindow *parent, OperationType type, const SongList &songs) {
+  std::string body = Message(type);
+  for (const Song &song : songs) {
+    body += "\n";
+    const std::string path = FileUtils::PathFromUri(song.url());
+    body += path.empty() ? song.PrettyTitleWithArtist() : path;
+  }
+  AdwDialog *dialog = adw_alert_dialog_new(Title(type), body.c_str());
   adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "ok", "OK");
   adw_dialog_present(dialog, parent ? GTK_WIDGET(parent) : nullptr);
 }

@@ -149,6 +149,20 @@ bool CopyFile(const std::string &source, const std::string &destination) {
 
 bool Remove(const std::string &path) { return g_unlink(path.c_str()) == 0; }
 
+bool MoveToTrash(const std::string &path) {
+  if (path.empty()) {
+    return false;
+  }
+  GFile *file = g_file_new_for_path(path.c_str());
+  GError *error = nullptr;
+  const gboolean ok = g_file_trash(file, nullptr, &error);
+  if (error) {
+    g_error_free(error);
+  }
+  g_object_unref(file);
+  return ok == TRUE;
+}
+
 std::string PrettySize(int64_t bytes) {
   if (bytes < 0) {
     return {};
