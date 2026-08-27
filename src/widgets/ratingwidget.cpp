@@ -1,5 +1,7 @@
 #include "widgets/ratingwidget.h"
 
+#include "widgets/ratingwidgetkeys.h"
+
 RatingWidget::RatingWidget() {
   widget_ = gtk_button_new();
   gtk_widget_add_css_class(widget_, "flat");
@@ -17,6 +19,25 @@ RatingWidget::RatingWidget() {
                        self->changed_(self->rating_);
                      }
                    }),
+                   this);
+  gtk_widget_set_focusable(widget_, TRUE);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(widget_, keys);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
+                     auto *self = static_cast<RatingWidget *>(data);
+                     const float next = RatingWidgetKeys::FromKey(keyval, self->rating_);
+                     if (next < 0.0f) {
+                       return FALSE;
+                     }
+                     if (RatingWidgetKeys::ShouldApply(next, self->rating_)) {
+                       self->set_rating(next);
+                       if (self->changed_) {
+                         self->changed_(self->rating_);
+                       }
+                     }
+                     return TRUE;
+                   })),
                    this);
 }
 

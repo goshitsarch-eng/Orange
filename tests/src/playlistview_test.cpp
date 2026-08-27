@@ -37,6 +37,7 @@
 #include "playlist/playlistratinghover.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/ratingpainter.h"
+#include "widgets/ratingwidgetkeys.h"
 
 #include <gtest/gtest.h>
 
@@ -176,6 +177,24 @@ TEST(PlaylistDelegates, RatingStars) {
   EXPECT_TRUE(PlaylistDelegates::RatingStars(-1.0f).empty());
   EXPECT_EQ("★★★★★", PlaylistDelegates::RatingStars(1.0f));
   EXPECT_EQ("★★★☆☆", PlaylistDelegates::RatingStars(0.6f));
+}
+
+TEST(RatingWidgetKeys, DigitsAndArrowsMatchQt) {
+  EXPECT_FLOAT_EQ(0.1f, RatingWidgetKeys::ArrowStep());
+  EXPECT_FLOAT_EQ(0.0f, RatingWidgetKeys::FromKey('0', -1.0f));
+  EXPECT_FLOAT_EQ(0.2f, RatingWidgetKeys::FromKey('1', -1.0f));
+  EXPECT_FLOAT_EQ(1.0f, RatingWidgetKeys::FromKey('5', -1.0f));
+  EXPECT_FLOAT_EQ(1.0f, RatingWidgetKeys::FromKey('9', -1.0f));
+  EXPECT_FLOAT_EQ(0.4f, RatingWidgetKeys::FromKey(RatingWidgetKeys::kKP0 + 2, -1.0f));
+  EXPECT_FLOAT_EQ(0.0f, RatingWidgetKeys::FromKey(ListBoxKeyboard::kLeft, -1.0f));
+  EXPECT_FLOAT_EQ(0.0f, RatingWidgetKeys::FromKey(ListBoxKeyboard::kRight, -1.0f));
+  EXPECT_FLOAT_EQ(0.1f, RatingWidgetKeys::FromKey(ListBoxKeyboard::kRight, 0.0f));
+  EXPECT_FLOAT_EQ(0.5f, RatingWidgetKeys::FromKey(ListBoxKeyboard::kLeft, 0.6f));
+  EXPECT_FLOAT_EQ(0.7f, RatingWidgetKeys::FromKey(ListBoxKeyboard::kRight, 0.6f));
+  EXPECT_FLOAT_EQ(1.0f, RatingWidgetKeys::FromKey(ListBoxKeyboard::kRight, 0.95f));
+  EXPECT_FLOAT_EQ(-1.0f, RatingWidgetKeys::FromKey('a', 0.6f));
+  EXPECT_TRUE(RatingWidgetKeys::ShouldApply(0.2f, -1.0f));
+  EXPECT_FALSE(RatingWidgetKeys::ShouldApply(0.6f, 0.6f));
 }
 
 TEST(RatingPainter, MapsPositionAndStars) {
