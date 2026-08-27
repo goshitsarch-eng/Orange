@@ -5,11 +5,13 @@
 
 #include <gtk/gtk.h>
 
+#include <vector>
+
 class Application;
 
 class EditTagDialog {
  public:
-  static void Show(GtkWindow *parent, Application *app, const SongList &songs = {});
+  static void Show(GtkWindow *parent, Application *app, const SongList &songs = {}, const std::vector<int> &playlist_rows = {});
 };
 
 #endif

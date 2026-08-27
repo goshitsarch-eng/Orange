@@ -26,7 +26,7 @@ class Dialogs {
   static void Transcode(GtkWindow *parent, Application *app);
   static void Organize(GtkWindow *parent, Application *app, const SongList &songs = {}, bool move = false);
   static void TagFetcher(GtkWindow *parent, Application *app);
-  static void EditTag(GtkWindow *parent, Application *app, const SongList &songs = {});
+  static void EditTag(GtkWindow *parent, Application *app, const SongList &songs = {}, const std::vector<int> &playlist_rows = {});
   static void Shortcuts(GtkWindow *parent);
   static void GrabShortcut(GtkWindow *parent, const std::function<void(const std::string &)> &callback, const std::string &action = {});
   static void Login(GtkWindow *parent, const std::string &service, const std::function<void(const std::string &, const std::string &)> &callback);

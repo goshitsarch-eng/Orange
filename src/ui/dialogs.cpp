@@ -52,7 +52,9 @@ void Dialogs::Organize(GtkWindow *parent, Application *app, const SongList &song
 
 void Dialogs::TagFetcher(GtkWindow *parent, Application *app) { TrackSelectionDialog::Show(parent, app); }
 
-void Dialogs::EditTag(GtkWindow *parent, Application *app, const SongList &songs) { EditTagDialog::Show(parent, app, songs); }
+void Dialogs::EditTag(GtkWindow *parent, Application *app, const SongList &songs, const std::vector<int> &playlist_rows) {
+  EditTagDialog::Show(parent, app, songs, playlist_rows);
+}
 
 void Dialogs::Shortcuts(GtkWindow *parent) { ShortcutsDialog::Show(parent); }
 

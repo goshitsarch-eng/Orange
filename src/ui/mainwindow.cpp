@@ -19,6 +19,7 @@
 #include "core/commandlinewindow.h"
 #include "core/mainwindowsettings.h"
 #include "dialogs/edittagloading.h"
+#include "dialogs/edittagsave.h"
 #include "dialogs/messagedialog.h"
 #include "ui/mainwindowmenu.h"
 #include "ui/mainwindowkeyboard.h"
@@ -866,7 +867,12 @@ void MainWindow::BuildUi() {
   add_action("tagfetch", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::TagFetcher(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
   add_action("edittag", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
-               Dialogs::EditTag(GTK_WINDOW(self->window_), self->app_, self->SelectedSongs());
+               SongList songs;
+               std::vector<int> rows;
+               if (Playlist *playlist = self->app_->playlist_manager()->current()) {
+                 EditTagSave::CollectPlaylistSelection(playlist->songs(), self->SelectedPlaylistRows(), &songs, &rows);
+               }
+               Dialogs::EditTag(GTK_WINDOW(self->window_), self->app_, songs, rows);
              }));
   add_action("shortcuts", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::Shortcuts(GTK_WINDOW(static_cast<MainWindow *>(data)->window_)); }));
   add_action("undo", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->UndoPlaylist(); }));

@@ -15,6 +15,7 @@
 #include "dialogs/edittagfields.h"
 #include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagloading.h"
+#include "dialogs/edittagsave.h"
 #include "dialogs/edittagsummaryfields.h"
 #include "tagreader/tagreaderclient.h"
 #include "dialogs/edittagsummarylabels.h"
@@ -44,6 +45,7 @@ struct State {
   GtkWindow *parent = nullptr;
   Song song;
   SongList songs;
+  std::vector<int> playlist_rows;
   size_t index = 0;
   GtkWidget *cover = nullptr;
   GtkWidget *tags_art = nullptr;
@@ -616,10 +618,31 @@ void SetLoading(State *state, bool loading) {
   ApplyEditEnable(state);
 }
 
+void ApplyToPlaylist(State *state) {
+  if (!state || !state->app || !state->app->playlist_manager() || !EditTagSave::ShouldPersist(state->playlist_rows)) {
+    return;
+  }
+  Playlist *playlist = state->app->playlist_manager()->current();
+  if (!playlist) {
+    return;
+  }
+  const std::vector<int> resolved = EditTagSave::ResolvedRows(playlist->songs(), state->playlist_rows, state->songs);
+  for (const auto &update : EditTagSave::StreamMetadataUpdates(resolved, state->songs)) {
+    playlist->ReplaceRow(update.first, update.second);
+  }
+  if (TagReader *tagreader = state->app->tagreader()) {
+    for (int row : EditTagSave::RowsToReload(resolved, state->songs)) {
+      playlist->ReloadRow(row, tagreader);
+    }
+  }
+  state->app->playlist_manager()->Persist(playlist);
+}
+
 void ApplyLoadedSongs(State *state, SongList songs) {
   if (!state) {
     return;
   }
+  state->playlist_rows = EditTagSave::RowsForLoaded(state->songs, state->playlist_rows, songs);
   state->songs = std::move(songs);
   state->index = 0;
   if (!state->songs.empty()) {
@@ -681,7 +704,7 @@ void PersistPlayStatistics(State *state, Song *song) {
 
 }  // namespace
 
-void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
+void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &songs, const std::vector<int> &playlist_rows) {
   SongList incoming = songs;
   if (incoming.empty()) {
     incoming.push_back(SongForDialog(app));
@@ -691,6 +714,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   state->app = app;
   state->parent = parent;
   state->songs = targets;
+  state->playlist_rows = EditTagSave::RowsForValidSongs(incoming, playlist_rows);
   state->index = 0;
   if (!targets.empty()) {
     state->song = targets.front();
@@ -1107,6 +1131,9 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                          song.set_rating(EditTagFields::RatingStoredFromSlider(gtk_range_get_value(GTK_RANGE(self->rating))));
                        }
                        EditTagFields::NormalizeUnsetNumeric(&song);
+                       if (!EditTagSave::ShouldWriteFile(song)) {
+                         continue;
+                       }
                        self->app->tagreader()->WriteFile(FileUtils::PathFromUri(song.url()), song, static_cast<int>(SaveTagsOption::Tags), {},
                                                          id3v2_version);
                        const std::string path = FileUtils::PathFromUri(song.url());
@@ -1118,6 +1145,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                          self->app->collection()->backend()->SetRating(song.id(), song.rating());
                        }
                      }
+                     ApplyToPlaylist(self);
                      if (self->index < self->songs.size()) {
                        self->song = self->songs[self->index];
                      }

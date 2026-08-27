@@ -10,6 +10,7 @@
 #include "dialogs/edittagfields.h"
 #include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagloading.h"
+#include "dialogs/edittagsave.h"
 #include "dialogs/edittagtabs.h"
 #include "tagreader/tagreaderresult.h"
 #include "utilities/fileutils.h"
@@ -516,6 +517,75 @@ TEST(EditTagLoading, FileViewPlaceholdersAndLoadDataMatchQt) {
 
   FileUtils::Remove(audio);
   rmdir(dir.c_str());
+}
+
+TEST(EditTagSave, PlaylistReloadAndStreamApplyMatchQt) {
+  Song local = MakeTagged("Roads", "Portishead", "Dummy");
+  Song other = MakeTagged("Glory Box", "Portishead", "Dummy");
+  other.set_url("file:///tmp/music/Glory Box.flac");
+  Song tidal(Song::Source::Tidal);
+  tidal.set_valid(true);
+  tidal.set_url("https://tidal.example/roads");
+  tidal.set_title("Roads");
+  Song radio(Song::Source::Stream);
+  radio.set_valid(true);
+  radio.set_url("http://example.invalid/live");
+
+  EXPECT_FALSE(EditTagSave::ShouldApplyStreamMetadata(local));
+  EXPECT_TRUE(EditTagSave::ShouldReloadFromDisk(local));
+  EXPECT_TRUE(EditTagSave::ShouldWriteFile(local));
+  EXPECT_TRUE(EditTagSave::ShouldApplyStreamMetadata(tidal));
+  EXPECT_FALSE(EditTagSave::ShouldReloadFromDisk(tidal));
+  EXPECT_FALSE(EditTagSave::ShouldWriteFile(tidal));
+  EXPECT_FALSE(EditTagSave::ShouldApplyStreamMetadata(radio));
+  EXPECT_TRUE(EditTagSave::ShouldReloadFromDisk(radio));
+  EXPECT_FALSE(EditTagSave::ShouldWriteFile(radio));
+  EXPECT_FALSE(EditTagSave::HasPlaylistSource({}));
+  EXPECT_TRUE(EditTagSave::ShouldPersist({2, 5}));
+
+  const std::vector<int> kept = EditTagSave::RowsForValidSongs({local, tidal, other}, {4, 7, 9});
+  ASSERT_EQ(2u, kept.size());
+  EXPECT_EQ(4, kept[0]);
+  EXPECT_EQ(9, kept[1]);
+  EXPECT_TRUE(EditTagSave::RowsForValidSongs({tidal}, {3}).empty());
+
+  const std::vector<int> after_load = EditTagSave::RowsForLoaded({local, other}, {4, 9}, {other});
+  ASSERT_EQ(1u, after_load.size());
+  EXPECT_EQ(9, after_load.front());
+  EXPECT_TRUE(EditTagSave::RowsForLoaded({local}, {4}, {}).empty());
+  const std::vector<int> unmatched = EditTagSave::RowsForLoaded({local}, {4}, {tidal});
+  ASSERT_EQ(1u, unmatched.size());
+  EXPECT_EQ(-1, unmatched.front());
+
+  const SongList playlist_songs = {tidal, local, other};
+  EXPECT_EQ(1, EditTagSave::ResolveRow(playlist_songs, 1, local.url()));
+  EXPECT_EQ(2, EditTagSave::ResolveRow(playlist_songs, 0, other.url()));
+  EXPECT_EQ(-1, EditTagSave::ResolveRow(playlist_songs, 1, "file:///missing.flac"));
+  EXPECT_EQ(-1, EditTagSave::ResolveRow(playlist_songs, 1, {}));
+
+  const std::vector<int> resolved = EditTagSave::ResolvedRows(playlist_songs, {1, 0}, {local, other});
+  ASSERT_EQ(2u, resolved.size());
+  EXPECT_EQ(1, resolved[0]);
+  EXPECT_EQ(2, resolved[1]);
+
+  const std::vector<int> reload = EditTagSave::RowsToReload({1, 0, -1}, {local, tidal, other});
+  ASSERT_EQ(1u, reload.size());
+  EXPECT_EQ(1, reload.front());
+
+  const auto stream_updates = EditTagSave::StreamMetadataUpdates({0, 1}, {tidal, local});
+  ASSERT_EQ(1u, stream_updates.size());
+  EXPECT_EQ(0, stream_updates.front().first);
+  EXPECT_EQ(tidal.url(), stream_updates.front().second.url());
+
+  SongList selected;
+  std::vector<int> aligned;
+  EditTagSave::CollectPlaylistSelection(playlist_songs, {1, 8, 2, -1}, &selected, &aligned);
+  ASSERT_EQ(2u, selected.size());
+  ASSERT_EQ(2u, aligned.size());
+  EXPECT_EQ(local.url(), selected[0].url());
+  EXPECT_EQ(other.url(), selected[1].url());
+  EXPECT_EQ(1, aligned[0]);
+  EXPECT_EQ(2, aligned[1]);
 }
 
 TEST(EditTagCover, ChangeArtAndActionEnableMatchQt) {
