@@ -93,6 +93,7 @@ class GstEnginePipeline {
   GstElement *audioqueue_ = nullptr;
   GstElement *volume_ = nullptr;
   GstElement *volume_ebur128_ = nullptr;
+  GstElement *equalizer_preamp_ = nullptr;
   GstElement *equalizer_ = nullptr;
   GstElement *panorama_ = nullptr;
   guint bus_watch_id_ = 0;

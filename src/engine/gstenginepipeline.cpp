@@ -6,6 +6,7 @@
 #include "engine/gsturl.h"
 #include "core/logging.h"
 #include "engine/backendoptions.h"
+#include "equalizer/equalizerpersist.h"
 #include "utilities/audioanalysis.h"
 
 #include <algorithm>
@@ -27,6 +28,7 @@ GstEnginePipeline::~GstEnginePipeline() {
     audioqueue_ = nullptr;
     volume_ = nullptr;
     volume_ebur128_ = nullptr;
+    equalizer_preamp_ = nullptr;
     equalizer_ = nullptr;
     panorama_ = nullptr;
   }
@@ -95,6 +97,7 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
                    BackendOptions::ClampWatermark(extras.buffer_high_watermark), nullptr);
     }
     volume_ = extras.volume_control ? gst_element_factory_make("volume", "volume") : nullptr;
+    equalizer_preamp_ = gst_element_factory_make("volume", "equalizer_preamp");
     equalizer_ = gst_element_factory_make("equalizer-10bands", "equalizer");
     GstElement *rgvolume = replaygain ? gst_element_factory_make("rgvolume", "rgvolume") : nullptr;
     GstElement *rglimiter = replaygain ? gst_element_factory_make("rglimiter", "rglimiter") : nullptr;
@@ -126,6 +129,7 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
     };
     add(queue);
     add(volume_);
+    add(equalizer_preamp_);
     add(equalizer_);
     add(rgvolume);
     add(rglimiter);
@@ -282,10 +286,12 @@ void GstEnginePipeline::SetEbur128GainDb(double gain_db) {
 }
 
 void GstEnginePipeline::SetEqualizer(int preamp, const std::vector<int> &band_gains) {
+  if (equalizer_preamp_) {
+    g_object_set(equalizer_preamp_, "volume", EqualizerPersist::PreampVolume(preamp), nullptr);
+  }
   if (!equalizer_) {
     return;
   }
-  (void)preamp;
   for (size_t i = 0; i < band_gains.size() && i < 10; ++i) {
     gchar name[16];
     g_snprintf(name, sizeof(name), "band%zu", i);

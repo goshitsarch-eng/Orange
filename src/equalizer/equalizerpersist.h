@@ -2,6 +2,7 @@
 #define STRAWBERRY_EQUALIZERPERSIST_H
 
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,10 @@ inline std::vector<int> EffectiveGains(bool equalizer_enabled, const std::vector
 }
 
 inline int EffectivePreamp(bool equalizer_enabled, int preamp) { return equalizer_enabled ? preamp : 0; }
+
+// Qt GstEnginePipeline::UpdateEqualizer uses a dedicated volume element.
+// GTK sliders are dB, so convert preamp dB to a linear volume multiplier.
+inline double PreampVolume(int preamp_db) { return std::pow(10.0, static_cast<double>(preamp_db) / 20.0); }
 
 inline std::string PresetOrDefault(const std::string &name) { return name.empty() ? std::string(kDefaultPreset) : name; }
 
