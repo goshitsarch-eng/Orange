@@ -2052,6 +2052,9 @@ void MainWindow::ConnectSignals() {
     }
   });
   app_->playlist_manager()->Error.Connect([this](const std::string &message) { ShowErrorDialog(message); });
+  app_->database()->Error.Connect([this](const std::string &message) { ShowErrorDialog(message); });
+  app_->collection()->Error.Connect([this](const std::string &message) { ShowErrorDialog(message); });
+  app_->device_manager()->DeviceError.Connect([this](const std::string &message) { ShowErrorDialog(message); });
   app_->scrobbler()->EnabledChanged.Connect([this](bool) { UpdateScrobblerButtons(); });
   app_->scrobbler()->TrackLoved.Connect([this](const Song &) {
     loved_current_track_ = ScrobblerLoveState::DisableAfterLove();

@@ -49,6 +49,7 @@ class CollectionLibrary {
   const std::map<std::string, CollectionTagSave::Pending> &pending_song_saves() const { return pending_song_saves_; }
 
   Signal<> ScanFinished;
+  Signal<std::string> Error;
 
  private:
   Database *database_;

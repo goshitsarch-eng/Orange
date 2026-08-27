@@ -47,6 +47,7 @@ class DeviceManager {
   SongList TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const;
 
   Signal<> DevicesChanged;
+  Signal<std::string> DeviceError;
 
  private:
   class DeviceUrlHandler : public UrlHandler {

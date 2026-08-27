@@ -12,6 +12,7 @@
 #include "core/oauthenticator.h"
 #include "device/cddahelpers.h"
 #include "device/cddasongloader.h"
+#include "device/deviceerror.h"
 #include "device/devicemanager.h"
 #include "device/giodevicefilter.h"
 #include "device/filesystemdevice.h"
@@ -1570,6 +1571,18 @@ TEST(DeviceManager, MusicPathAndPassthroughPrepare) {
   ASSERT_EQ(1u, prepared.size());
   EXPECT_EQ(song.url(), prepared[0].url());
   EXPECT_EQ(Song::FileType::FLAC, prepared[0].filetype());
+}
+
+TEST(DeviceManager, CopyUnknownDeviceEmitsError) {
+  EXPECT_STREQ("Device not found", DeviceError::MissingDevice());
+  EXPECT_EQ(DeviceError::MissingDevice(), DeviceError::ForCopy(false, false));
+  EXPECT_EQ(DeviceError::CopyFailed(), DeviceError::ForCopy(true, false));
+  EXPECT_TRUE(DeviceError::ForCopy(true, true).empty());
+  DeviceManager manager;
+  std::string error;
+  manager.DeviceError.Connect([&error](const std::string &text) { error = text; });
+  EXPECT_FALSE(manager.CopySongs("missing-device", {}));
+  EXPECT_EQ(DeviceError::MissingDevice(), error);
 }
 
 TEST(DeviceManager, SongsFromDirectoryAndCdda) {

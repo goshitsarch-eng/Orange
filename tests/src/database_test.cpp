@@ -196,6 +196,18 @@ TEST(Database, DeduplicatesSongsOnSchemaTwentyThree) {
   unlink(path.c_str());
 }
 
+TEST(Database, EmitsErrorOnSqlFailure) {
+  const std::string path = "/tmp/strawberry-db-error-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  std::string error;
+  db.Error.Connect([&error](const std::string &text) { error = text; });
+  EXPECT_FALSE(db.Exec("THIS IS NOT SQL"));
+  EXPECT_FALSE(error.empty());
+  unlink(path.c_str());
+}
+
 TEST(Database, RejectsSchemaOlderThanMinimum) {
   const std::string path = "/tmp/strawberry-schema-too-old-" + std::to_string(getpid()) + ".db";
   unlink(path.c_str());

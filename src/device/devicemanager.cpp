@@ -1,5 +1,7 @@
 #include "device/devicemanager.h"
 
+#include "device/deviceerror.h"
+
 #include "config.h"
 #include "core/logging.h"
 #include "core/standardpaths.h"
@@ -403,7 +405,10 @@ UrlHandler::LoadResult DeviceManager::DeviceUrlHandler::Load(const std::string &
   const std::string path = manager_->DownloadMtpTrack(url);
   if (path.empty()) {
     result.type = UrlHandler::LoadResult::Type::Error;
-    result.error = "Could not copy the MTP track";
+    result.error = DeviceError::MtpCopyFailed();
+    if (manager_) {
+      manager_->DeviceError.Emit(result.error);
+    }
     return result;
   }
   result.type = UrlHandler::LoadResult::Type::TrackAvailable;
@@ -456,6 +461,7 @@ SongList DeviceManager::TranscodeForDevice(const SongList &songs, const Connecte
 bool DeviceManager::CopySongs(const std::string &device_id, const SongList &songs) {
   const ConnectedDevice *found = FindDevice(device_id);
   if (!found) {
+    DeviceError.Emit(DeviceError::MissingDevice());
     return false;
   }
   const ConnectedDevice target = *found;
@@ -464,7 +470,11 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
   runner.set_transcode(OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode
                                                                        : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported),
                        stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG);
-  return runner.Copy(target, songs);
+  if (!runner.Copy(target, songs)) {
+    DeviceError.Emit(DeviceError::CopyFailed());
+    return false;
+  }
+  return true;
 }
 
 void DeviceManager::Remember(const std::string &device_id) {
@@ -527,6 +537,7 @@ bool DeviceManager::Forget(const std::string &device_id) {
 bool DeviceManager::Mount(const std::string &device_id) {
 #ifdef HAVE_GIO
   if (device_id.empty()) {
+    DeviceError.Emit(DeviceError::MountFailed());
     return false;
   }
   GVolumeMonitor *monitor = g_volume_monitor_get();
@@ -554,6 +565,7 @@ bool DeviceManager::Mount(const std::string &device_id) {
   g_list_free(volumes);
   g_object_unref(monitor);
   if (!match) {
+    DeviceError.Emit(DeviceError::MountFailed());
     return false;
   }
   g_volume_mount(match, G_MOUNT_MOUNT_NONE, nullptr, nullptr,
@@ -566,6 +578,7 @@ bool DeviceManager::Mount(const std::string &device_id) {
   return true;
 #else
   (void)device_id;
+  DeviceError.Emit(DeviceError::MountFailed());
   return false;
 #endif
 }
@@ -574,6 +587,7 @@ bool DeviceManager::Unmount(const std::string &device_id) {
 #ifdef HAVE_GIO
   const ConnectedDevice *found = FindDevice(device_id);
   if (!found || found->mount_path.empty()) {
+    DeviceError.Emit(DeviceError::UnmountFailed());
     return false;
   }
   GFile *file = g_file_new_for_path(found->mount_path.c_str());
@@ -588,6 +602,7 @@ bool DeviceManager::Unmount(const std::string &device_id) {
   return true;
 #else
   (void)device_id;
+  DeviceError.Emit(DeviceError::UnmountFailed());
   return false;
 #endif
 }
@@ -631,13 +646,19 @@ DeviceDatabaseBackend::Device DeviceManager::StoredDevice(const std::string &dev
 bool DeviceManager::DeleteSong(const std::string &device_id, const Song &song) {
   const ConnectedDevice *found = FindDevice(device_id);
   if (!found) {
+    DeviceError.Emit(DeviceError::MissingDevice());
     return false;
   }
 #ifdef HAVE_MTP
   if (found->backend == "mtp") {
-    return MtpDevice::DeleteSong(MtpSerial(found->unique_id), song);
+    if (!MtpDevice::DeleteSong(MtpSerial(found->unique_id), song)) {
+      DeviceError.Emit(DeviceError::DeleteFailed());
+      return false;
+    }
+    return true;
   }
 #endif
   (void)song;
+  DeviceError.Emit(DeviceError::DeleteFailed());
   return false;
 }

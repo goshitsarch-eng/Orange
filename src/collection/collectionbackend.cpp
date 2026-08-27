@@ -1,5 +1,7 @@
 #include "collection/collectionbackend.h"
 
+#include "collection/collectionunavailable.h"
+
 #include "collection/collectionchangenotify.h"
 
 #include "collection/collectionalbumart.h"
@@ -526,17 +528,19 @@ int CollectionBackend::MarkMissingUnavailable(int directory_id, const std::vecto
   while (query.Step()) {
     songs.push_back(SongFromQuery(query));
   }
-  int marked = 0;
+  SongList marked_songs;
   for (const Song &song : songs) {
-    if (song.unavailable()) {
+    if (!CollectionUnavailable::IsMissing(song, seen_urls)) {
       continue;
     }
-    if (std::find(seen_urls.begin(), seen_urls.end(), song.url()) == seen_urls.end()) {
-      SetUnavailable(song.id(), true);
-      ++marked;
-    }
+    SetUnavailable(song.id(), true);
+    marked_songs.push_back(CollectionUnavailable::MarkedCopy(song));
   }
-  return marked;
+  if (CollectionUnavailable::ShouldNotify(marked_songs)) {
+    SongsChanged.Emit(marked_songs);
+    SongsDeleted.Emit(marked_songs);
+  }
+  return static_cast<int>(marked_songs.size());
 }
 
 void CollectionBackend::UpdateLastSeen(int directory_id) {

@@ -78,7 +78,9 @@ bool Database::Open() {
     return true;
   }
   if (sqlite3_open(path_.c_str(), &db_) != SQLITE_OK) {
-    LogError("Failed to open database %s: %s", path_.c_str(), LastError().c_str());
+    const std::string error = LastError();
+    LogError("Failed to open database %s: %s", path_.c_str(), error.c_str());
+    Error.Emit(error.empty() ? "Failed to open database" : error);
     return false;
   }
   sqlite3_busy_timeout(db_, 5000);
@@ -98,7 +100,9 @@ void Database::Close() {
 bool Database::Exec(const std::string &sql) {
   char *error = nullptr;
   if (sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &error) != SQLITE_OK) {
-    LogError("SQL error: %s (%s)", error ? error : "unknown", sql.c_str());
+    const std::string text = error ? error : "unknown";
+    LogError("SQL error: %s (%s)", text.c_str(), sql.c_str());
+    Error.Emit(text);
     sqlite3_free(error);
     return false;
   }

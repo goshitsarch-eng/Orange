@@ -33,6 +33,7 @@ class Database {
   void Backup();
 
   Signal<> BackupFinished;
+  Signal<std::string> Error;
 
   static constexpr int kCurrentSchemaVersion = 23;
   int startup_schema_version() const { return startup_schema_version_; }

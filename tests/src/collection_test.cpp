@@ -8,6 +8,9 @@
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectionbackend.h"
+#include "collection/collectionunavailable.h"
+#include "playlist/playlist.h"
+#include "playlist/playlistcollectionsync.h"
 #include "collection/collectionsubdirectory.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionsearchsync.h"
@@ -710,6 +713,57 @@ TEST(CollectionBackend, MarkMissingUnavailableLeavesSeenSongs) {
   EXPECT_EQ(1, backend.MarkMissingUnavailable(directory, {"file:///tmp/music/keep.flac"}));
   EXPECT_FALSE(backend.SongById(keep_id).unavailable());
   EXPECT_TRUE(backend.SongById(gone_id).unavailable());
+  unlink(path.c_str());
+}
+
+TEST(CollectionUnavailable, MissingAndNotifyMatchQt) {
+  Song seen;
+  seen.set_url("file:///keep.flac");
+  Song missing;
+  missing.set_url("file:///gone.flac");
+  Song already;
+  already.set_url("file:///old.flac");
+  already.set_unavailable(true);
+  EXPECT_FALSE(CollectionUnavailable::IsMissing(seen, {"file:///keep.flac"}));
+  EXPECT_TRUE(CollectionUnavailable::IsMissing(missing, {"file:///keep.flac"}));
+  EXPECT_FALSE(CollectionUnavailable::IsMissing(already, {}));
+  EXPECT_TRUE(CollectionUnavailable::MarkedCopy(missing).unavailable());
+  EXPECT_FALSE(CollectionUnavailable::ShouldNotify({}));
+  EXPECT_TRUE(CollectionUnavailable::ShouldNotify({missing}));
+}
+
+TEST(CollectionBackend, MarkMissingUnavailableNotifiesPlaylists) {
+  const std::string path = "/tmp/strawberry-collection-unavailable-notify-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song keep = MakeSong("Keep", "A", "Album");
+  keep.set_directory_id(directory);
+  keep.set_url("file:///tmp/music/keep.flac");
+  const int keep_id = backend.AddOrUpdateSong(keep);
+  Song gone = MakeSong("Gone", "A", "Album");
+  gone.set_directory_id(directory);
+  gone.set_url("file:///tmp/music/gone.flac");
+  const int gone_id = backend.AddOrUpdateSong(gone);
+  SongList changed;
+  SongList deleted;
+  backend.SongsChanged.Connect([&changed](const SongList &songs) { changed = songs; });
+  backend.SongsDeleted.Connect([&deleted](const SongList &songs) { deleted = songs; });
+  EXPECT_EQ(1, backend.MarkMissingUnavailable(directory, {"file:///tmp/music/keep.flac"}));
+  ASSERT_EQ(1u, changed.size());
+  EXPECT_EQ(gone_id, changed.front().id());
+  EXPECT_TRUE(changed.front().unavailable());
+  ASSERT_EQ(1u, deleted.size());
+  EXPECT_EQ(gone_id, deleted.front().id());
+  Playlist playlist;
+  Song row = backend.SongById(gone_id);
+  row.set_unavailable(false);
+  playlist.AppendSongs({row});
+  EXPECT_EQ(1, PlaylistCollectionSync::PatchAll({&playlist}, changed));
+  EXPECT_TRUE(playlist.song(0).unavailable());
+  EXPECT_FALSE(backend.SongById(keep_id).unavailable());
   unlink(path.c_str());
 }
 
