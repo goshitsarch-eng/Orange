@@ -2,6 +2,7 @@
 #define STRAWBERRY_MTPDEVICE_H
 
 #include "config.h"
+#include "core/musicstorage.h"
 #include "core/song.h"
 #include "device/mtpconnection.h"
 
@@ -12,7 +13,7 @@
 class MtpCopySession {
  public:
   bool Open(const std::string &serial);
-  bool CopyOne(const Song &song);
+  bool CopyOne(const Song &song, const MusicStorage::ProgressFunction &progress = {});
   void Close();
   bool is_open() const;
   std::vector<Song::FileType> SupportedFiletypes() const;

@@ -40,6 +40,34 @@ inline int Progress(int complete) { return complete; }
 
 inline int ProgressMax(int total) { return total; }
 
+// Qt MtpDevice::ProgressCallback: sent/total as 0..1 during LIBMTP_Send_Track_From_File.
+inline float FileFraction(unsigned long long sent, unsigned long long total) {
+  return total > 0 ? static_cast<float>(sent) / static_cast<float>(total) : 0.0f;
+}
+
+inline float ClampFileFraction(float fraction) {
+  if (fraction < 0.0f) {
+    return 0.0f;
+  }
+  if (fraction > 1.0f) {
+    return 1.0f;
+  }
+  return fraction;
+}
+
+// Task bar uses hundredths so a long send updates inside the current file.
+inline int ScaledProgress(int complete, float current_fraction, int total) {
+  if (total <= 0) {
+    return 0;
+  }
+  const float fraction = ClampFileFraction(current_fraction);
+  const int value = complete * 100 + static_cast<int>(fraction * 100.0f);
+  const int max = total * 100;
+  return value > max ? max : value;
+}
+
+inline int ScaledProgressMax(int total) { return total > 0 ? total * 100 : 0; }
+
 }  // namespace DeviceCopyJob
 
 #endif  // STRAWBERRY_DEVICECOPYJOB_H

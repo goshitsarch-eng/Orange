@@ -386,6 +386,14 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_FALSE(DeviceCopyJob::ShouldFinish(3, 10, false));
   EXPECT_TRUE(DeviceCopyJob::ShouldScheduleNext(0, 12, false, true));
   EXPECT_FALSE(DeviceCopyJob::ShouldScheduleNext(0, 12, false, false));
+  EXPECT_FLOAT_EQ(0.5f, DeviceCopyJob::FileFraction(50, 100));
+  EXPECT_FLOAT_EQ(0.0f, DeviceCopyJob::FileFraction(1, 0));
+  EXPECT_EQ(0.0f, DeviceCopyJob::ClampFileFraction(-1.0f));
+  EXPECT_EQ(1.0f, DeviceCopyJob::ClampFileFraction(1.5f));
+  EXPECT_EQ(0, DeviceCopyJob::ScaledProgress(0, 0.0f, 0));
+  EXPECT_EQ(400, DeviceCopyJob::ScaledProgressMax(4));
+  EXPECT_EQ(150, DeviceCopyJob::ScaledProgress(1, 0.5f, 4));
+  EXPECT_EQ(400, DeviceCopyJob::ScaledProgress(4, 1.0f, 4));
   const OrganizeDialog::Request request = DeviceCopy::CollectionRequest({song});
   ASSERT_EQ(1u, request.songs.size());
   EXPECT_EQ("Roads", request.songs.front().title());

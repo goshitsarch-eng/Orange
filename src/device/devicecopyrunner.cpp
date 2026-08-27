@@ -153,7 +153,12 @@ Song DeviceCopyRunner::PrepareSong(const Song &song) {
 bool DeviceCopyRunner::CopyOnePrepared(const Song &song) {
 #ifdef HAVE_MTP
   if (device_.backend == "mtp") {
-    return mtp_ && mtp_->CopyOne(song);
+    return mtp_ && mtp_->CopyOne(song, [this](float fraction) {
+      if (task_manager_ && task_id_ > 0) {
+        const int total = static_cast<int>(songs_.size());
+        task_manager_->SetTaskProgress(task_id_, DeviceCopyJob::ScaledProgress(next_, fraction, total), DeviceCopyJob::ScaledProgressMax(total));
+      }
+    });
   }
 #endif
 #ifdef HAVE_GPOD
@@ -235,7 +240,7 @@ void DeviceCopyRunner::ProcessSome() {
     ++processed;
   }
   if (task_manager_ && task_id_ > 0) {
-    task_manager_->SetTaskProgress(task_id_, DeviceCopyJob::Progress(next_), DeviceCopyJob::ProgressMax(total));
+    task_manager_->SetTaskProgress(task_id_, DeviceCopyJob::ScaledProgress(next_, 0.0f, total), DeviceCopyJob::ScaledProgressMax(total));
   }
   if (DeviceCopyJob::ShouldFinish(next_, total, cancelled_)) {
     Complete();

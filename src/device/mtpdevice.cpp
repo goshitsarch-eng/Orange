@@ -2,6 +2,7 @@
 
 #include "core/logging.h"
 #include "core/standardpaths.h"
+#include "device/devicecopyjob.h"
 #include "device/mtpconnection.h"
 #include "device/mtploader.h"
 #include "utilities/fileutils.h"
@@ -35,7 +36,21 @@ std::vector<Song::FileType> MtpCopySession::SupportedFiletypes() const {
 
 void MtpCopySession::Close() { connection_.reset(); }
 
-bool MtpCopySession::CopyOne(const Song &song) {
+#ifdef HAVE_MTP
+namespace {
+
+int MtpSendProgressCallback(uint64_t const sent, uint64_t const total, void const *const data) {
+  const auto *progress = static_cast<const MusicStorage::ProgressFunction *>(data);
+  if (progress && *progress) {
+    (*progress)(DeviceCopyJob::FileFraction(sent, total));
+  }
+  return 0;
+}
+
+}  // namespace
+#endif
+
+bool MtpCopySession::CopyOne(const Song &song, const MusicStorage::ProgressFunction &progress) {
 #ifdef HAVE_MTP
   if (!is_open()) {
     return false;
@@ -50,7 +65,9 @@ bool MtpCopySession::CopyOne(const Song &song) {
     free(track->filename);
     track->filename = strdup(FileUtils::BaseName(src).c_str());
   }
-  const int ret = LIBMTP_Send_Track_From_File(connection_->device(), src.c_str(), track, nullptr, nullptr);
+  MusicStorage::ProgressFunction callback = progress;
+  const int ret = LIBMTP_Send_Track_From_File(connection_->device(), src.c_str(), track, callback ? MtpSendProgressCallback : nullptr,
+                                              callback ? &callback : nullptr);
   if (ret != 0) {
     LIBMTP_error_t *error = LIBMTP_Get_Errorstack(connection_->device());
     if (error && error->error_text) {
