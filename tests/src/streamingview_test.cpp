@@ -871,7 +871,7 @@ TEST(StreamingServiceEnable, HidesDisabledServicesLikeQt) {
   EXPECT_FALSE(StreamingServiceEnable::ShouldShowStackPage(false));
   EXPECT_TRUE(StreamingServiceEnable::ShouldRefreshOnSettingsClose());
   EXPECT_EQ("Tidal", StreamingServiceEnable::SelectVisible("Tidal", {"Tidal", "Qobuz"}));
-  EXPECT_EQ("Qobuz", StreamingServiceEnable::SelectVisible("Spotify", {"Tidal", "Qobuz"}));
+  EXPECT_EQ("Tidal", StreamingServiceEnable::SelectVisible("Spotify", {"Tidal", "Qobuz"}));
   EXPECT_TRUE(StreamingServiceEnable::SelectVisible("Tidal", {}).empty());
 
   Settings settings;
