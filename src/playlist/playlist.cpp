@@ -944,7 +944,7 @@ void Playlist::RefillDynamic(const SongList &pool, bool force) {
   if (want <= 0) {
     return;
   }
-  if (dynamic_generator_) {
+  if (dynamic_generator_ && dynamic_generator_->collection()) {
     InsertDynamicMore(want);
     return;
   }
