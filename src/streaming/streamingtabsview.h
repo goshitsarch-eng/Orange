@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_STREAMINGTABSVIEW_H
 #define STRAWBERRY_STREAMINGTABSVIEW_H
 
+#include "streaming/streamingcollectionactions.h"
 #include "streaming/streamingcollectionstore.h"
 #include "streaming/streamingcollectionviewcontainer.h"
 #include "streaming/streamingsearchview.h"
@@ -18,7 +19,7 @@ class StreamingTabsView {
  public:
   using ActivateCallback = std::function<void(const Song &)>;
   using EnqueueCallback = std::function<void(const SongList &)>;
-  using MenuCallback = std::function<void(const SongList &)>;
+  using MenuCallback = std::function<void(const SongList &, StreamingCollectionActions::MenuContext)>;
   using ConfigureCallback = std::function<void()>;
 
   explicit StreamingTabsView(StreamingService *service, Database *database = nullptr);

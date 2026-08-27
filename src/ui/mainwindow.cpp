@@ -1253,7 +1253,7 @@ void MainWindow::BuildSidebar() {
     auto view = std::make_unique<StreamingTabsView>(service, app_->database());
     view->SetActivateCallback(activate_stream);
     view->SetEnqueueCallback([this](const SongList &songs) { ApplyCollectionPlan(CollectionBehaviour::Enqueue(), songs); });
-    view->SetMenuCallback([this](const SongList &songs) { ShowStreamingMenu(songs); });
+    view->SetMenuCallback([this](const SongList &songs, StreamingCollectionActions::MenuContext ctx) { ShowStreamingMenu(songs, ctx); });
     const char *page = SettingsPages::ForService(service->name());
     view->SetConfigureCallback([this, page]() { OpenSettings(page); });
     gtk_stack_add_titled(GTK_STACK(streaming_stack_), view->widget(), service->name().c_str(), service->name().c_str());
@@ -3074,17 +3074,17 @@ void MainWindow::ShowCollectionMenu() {
   gtk_popover_popup(GTK_POPOVER(popover));
 }
 
-void MainWindow::ShowStreamingMenu(const SongList &songs) {
+void MainWindow::ShowStreamingMenu(const SongList &songs, StreamingCollectionActions::MenuContext ctx) {
   streaming_menu_songs_ = songs;
   const int songs_selected = static_cast<int>(streaming_menu_songs_.size());
   GMenu *menu = g_menu_new();
-  for (const StreamingCollectionActions::Item &item : StreamingCollectionActions::VisibleItems(songs_selected)) {
+  for (const StreamingCollectionActions::Item &item : StreamingCollectionActions::VisibleItems(songs_selected, ctx)) {
     g_menu_append(menu, Translations::Tr(item.label).c_str(), item.action);
   }
-  if (StreamingCollectionActions::SearchForThisEnabled(songs_selected)) {
+  if (StreamingCollectionActions::SearchForThisEnabled(songs_selected, ctx)) {
     g_menu_append(menu, Translations::Tr(StreamingSearchOpts::SearchForThisLabel()).c_str(), "win.streaming-search");
   }
-  if (StreamingCollectionActions::SearchContextActionsEnabled(songs_selected)) {
+  if (StreamingCollectionActions::SearchContextActionsEnabled(songs_selected, ctx)) {
     for (StreamingCollectionStore::List list : StreamingCollectionStore::AddableLists(streaming_service_name_)) {
       const char *action = "win.streaming-add-songs";
       if (list == StreamingCollectionStore::List::Artists) {

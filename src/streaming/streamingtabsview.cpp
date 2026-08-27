@@ -236,11 +236,12 @@ void StreamingTabsView::BrowseAlbum(StreamingCollectionView *view, const Song &a
 }
 
 void StreamingTabsView::SetMenuCallback(MenuCallback callback) {
-  artists_->view()->SetMenuCallback(callback);
-  albums_->view()->SetMenuCallback(callback);
-  songs_->view()->SetMenuCallback(callback);
-  favorites_->view()->SetMenuCallback(callback);
-  search_->SetMenuCallback(std::move(callback));
+  auto collection = [callback](const SongList &songs) { callback(songs, StreamingCollectionActions::MenuContext::Collection); };
+  artists_->view()->SetMenuCallback(collection);
+  albums_->view()->SetMenuCallback(collection);
+  songs_->view()->SetMenuCallback(collection);
+  favorites_->view()->SetMenuCallback(collection);
+  search_->SetMenuCallback([callback](const SongList &songs) { callback(songs, StreamingCollectionActions::MenuContext::Search); });
 }
 
 void StreamingTabsView::SetConfigureCallback(ConfigureCallback callback) { search_->SetConfigureCallback(std::move(callback)); }

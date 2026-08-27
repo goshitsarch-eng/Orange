@@ -104,7 +104,7 @@ class MainWindow {
   void PlayRadioChannel(const RadioChannel &channel);
   void ShowPlaylistMenu(double x, double y);
   void ShowCollectionMenu();
-  void ShowStreamingMenu(const SongList &songs);
+  void ShowStreamingMenu(const SongList &songs, StreamingCollectionActions::MenuContext ctx);
   void StreamingFavorite(bool add);
   void StreamingAddToList(StreamingCollectionStore::List list);
   void StreamingSearchForThis();
