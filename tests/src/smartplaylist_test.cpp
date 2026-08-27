@@ -9,6 +9,7 @@
 #include "smartplaylists/smartplaylistpreviewpolicy.h"
 #include "smartplaylists/smartplaylistsearchtermwidgetoverlay.h"
 #include "smartplaylists/smartplaylisttermrow.h"
+#include "smartplaylists/smartplaylisttermvalue.h"
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
@@ -546,6 +547,69 @@ TEST(SmartPlaylistTermRow, PlaceholderAndRemoveMatchQt) {
   EXPECT_EQ(2, SmartPlaylistTermRow::InitialActiveTerms(true, 2));
   EXPECT_EQ(0, SmartPlaylistTermRow::InitialActiveTerms(true, 0));
   EXPECT_TRUE(SmartPlaylistTermRow::KeepsPlaceholder());
+}
+
+TEST(SmartPlaylistTermValue, EditorsAndDateTimeMatchQt) {
+  using SmartPlaylistTermValue::Editor;
+  EXPECT_EQ(Editor::Empty, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Text, SmartPlaylistOp::Empty));
+  EXPECT_EQ(Editor::Empty, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Rating, SmartPlaylistOp::NotEmpty));
+  EXPECT_EQ(Editor::RelativeDays, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Date, SmartPlaylistOp::RelativeDate));
+  EXPECT_EQ(Editor::Calendar, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Date, SmartPlaylistOp::NumericDate));
+  EXPECT_EQ(Editor::Calendar, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Date, SmartPlaylistOp::GreaterThan));
+  EXPECT_EQ(Editor::Rating, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Rating, SmartPlaylistOp::Equals));
+  EXPECT_EQ(Editor::Time, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Time, SmartPlaylistOp::LessThan));
+  EXPECT_EQ(Editor::Number, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Number, SmartPlaylistOp::GreaterThan));
+  EXPECT_EQ(Editor::Text, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Text, SmartPlaylistOp::Contains));
+
+  EXPECT_EQ("2020-03-05", SmartPlaylistTermValue::FormatDate(2020, 3, 5));
+  int year = 0;
+  int month = 0;
+  int day = 0;
+  EXPECT_TRUE(SmartPlaylistTermValue::ParseDate("2020-03-05", &year, &month, &day));
+  EXPECT_EQ(2020, year);
+  EXPECT_EQ(3, month);
+  EXPECT_EQ(5, day);
+  EXPECT_FALSE(SmartPlaylistTermValue::ParseDate("not-a-date", &year, &month, &day));
+  EXPECT_FALSE(SmartPlaylistTermValue::ParseDate("1899-01-01", &year, &month, &day));
+
+  EXPECT_EQ(125, SmartPlaylistTermValue::TimeToSeconds(0, 2, 5));
+  EXPECT_EQ(3723, SmartPlaylistTermValue::TimeToSeconds(1, 2, 3));
+  int hours = 0;
+  int minutes = 0;
+  int seconds = 0;
+  SmartPlaylistTermValue::SecondsToTime(3723, &hours, &minutes, &seconds);
+  EXPECT_EQ(1, hours);
+  EXPECT_EQ(2, minutes);
+  EXPECT_EQ(3, seconds);
+  EXPECT_EQ("0.50", SmartPlaylistTermValue::FormatRating(0.5f));
+  EXPECT_EQ("-1.00", SmartPlaylistTermValue::FormatRating(-1.0f));
+
+  Song timed;
+  timed.set_length_nanosec(125LL * 1000000000);
+  timed.set_valid(true);
+  SmartPlaylistTerm length;
+  length.field = SmartPlaylistField::Length;
+  length.op = SmartPlaylistOp::Equals;
+  length.value = std::to_string(SmartPlaylistTermValue::TimeToSeconds(0, 2, 5));
+  EXPECT_TRUE(length.Matches(timed));
+
+  Song dated;
+  dated.set_ctime(SmartPlaylistSearch::ParseDateValue("2020-03-05"));
+  dated.set_valid(true);
+  SmartPlaylistTerm on_date;
+  on_date.field = SmartPlaylistField::DateCreated;
+  on_date.op = SmartPlaylistOp::NumericDate;
+  on_date.value = SmartPlaylistTermValue::FormatDate(2020, 3, 5);
+  EXPECT_TRUE(on_date.Matches(dated));
+
+  Song rated;
+  rated.set_rating(0.5f);
+  rated.set_valid(true);
+  SmartPlaylistTerm rating;
+  rating.field = SmartPlaylistField::Rating;
+  rating.op = SmartPlaylistOp::Equals;
+  rating.value = SmartPlaylistTermValue::FormatRating(0.5f);
+  EXPECT_TRUE(rating.Matches(rated));
 }
 
 TEST(SmartPlaylistWizardFinishPage, IsCompleteRequiresNonEmptyName) {

@@ -3,8 +3,10 @@
 #include "dialogs/dialoghelpers.h"
 #include "smartplaylists/smartplaylistsearchtermwidgetoverlay.h"
 #include "smartplaylists/smartplaylisttermrow.h"
+#include "widgets/ratingwidget.h"
 
 #include <algorithm>
+#include <cstdlib>
 
 using DialogHelpers::DropDownFromNames;
 
@@ -20,6 +22,45 @@ SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget() {
   gtk_box_append(GTK_BOX(row_), op_);
   RebuildOps();
   RebuildValue();
+
+  time_box_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+  gtk_widget_set_hexpand(time_box_, TRUE);
+  time_hours_ = gtk_spin_button_new_with_range(0, 99, 1);
+  gtk_spin_button_set_digits(GTK_SPIN_BUTTON(time_hours_), 0);
+  time_minutes_ = gtk_spin_button_new_with_range(0, 59, 1);
+  gtk_spin_button_set_digits(GTK_SPIN_BUTTON(time_minutes_), 0);
+  time_seconds_ = gtk_spin_button_new_with_range(0, 59, 1);
+  gtk_spin_button_set_digits(GTK_SPIN_BUTTON(time_seconds_), 0);
+  gtk_box_append(GTK_BOX(time_box_), time_hours_);
+  gtk_box_append(GTK_BOX(time_box_), gtk_label_new("h"));
+  gtk_box_append(GTK_BOX(time_box_), time_minutes_);
+  gtk_box_append(GTK_BOX(time_box_), gtk_label_new("min"));
+  gtk_box_append(GTK_BOX(time_box_), time_seconds_);
+  gtk_box_append(GTK_BOX(time_box_), gtk_label_new("sec"));
+  gtk_box_insert_child_after(GTK_BOX(row_), time_box_, value_ ? value_ : op_);
+  gtk_widget_set_visible(time_box_, FALSE);
+
+  rating_ = std::make_unique<RatingWidget>();
+  rating_->set_rating(-1);
+  gtk_widget_set_hexpand(rating_->widget(), TRUE);
+  gtk_widget_set_valign(rating_->widget(), GTK_ALIGN_CENTER);
+  gtk_box_insert_child_after(GTK_BOX(row_), rating_->widget(), time_box_);
+  gtk_widget_set_visible(rating_->widget(), FALSE);
+  rating_->SetChangedCallback([this](float) { EmitChanged(); });
+
+  g_signal_connect(time_hours_, "value-changed", G_CALLBACK((+[](GtkSpinButton *, gpointer data) {
+                     static_cast<SmartPlaylistSearchTermWidget *>(data)->EmitChanged();
+                   })),
+                   this);
+  g_signal_connect(time_minutes_, "value-changed", G_CALLBACK((+[](GtkSpinButton *, gpointer data) {
+                     static_cast<SmartPlaylistSearchTermWidget *>(data)->EmitChanged();
+                   })),
+                   this);
+  g_signal_connect(time_seconds_, "value-changed", G_CALLBACK((+[](GtkSpinButton *, gpointer data) {
+                     static_cast<SmartPlaylistSearchTermWidget *>(data)->EmitChanged();
+                   })),
+                   this);
+
   gtk_box_append(GTK_BOX(row_), remove_);
   gtk_overlay_set_child(GTK_OVERLAY(widget_), row_);
   overlay_ = gtk_button_new_with_label(SmartPlaylistTermRow::OverlayLabel());
@@ -68,6 +109,8 @@ SmartPlaylistSearchTermWidget::SmartPlaylistSearchTermWidget() {
   ApplyActive();
 }
 
+SmartPlaylistSearchTermWidget::~SmartPlaylistSearchTermWidget() = default;
+
 void SmartPlaylistSearchTermWidget::SetActive(bool active) {
   active_ = active;
   ApplyActive();
@@ -106,25 +149,44 @@ void SmartPlaylistSearchTermWidget::RebuildValue() {
   const SmartPlaylistField field = SmartPlaylistSearch::FieldFromIndex(static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(field_))));
   const SmartPlaylistOp op = current_ops_.empty() ? SmartPlaylistOp::Contains
                                                   : current_ops_[std::min(current_ops_.size() - 1, static_cast<size_t>(gtk_drop_down_get_selected(GTK_DROP_DOWN(op_))))];
-  const SmartPlaylistFieldKind kind = SmartPlaylistSearch::KindOf(field);
-  if (op == SmartPlaylistOp::Empty || op == SmartPlaylistOp::NotEmpty) {
-    value_ = gtk_label_new("");
-  } else if (op == SmartPlaylistOp::RelativeDate) {
-    value_ = gtk_spin_button_new_with_range(1, 3650, 1);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(value_), 30);
-  } else if (kind == SmartPlaylistFieldKind::Date || op == SmartPlaylistOp::NumericDate) {
-    value_ = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(value_), "YYYY-MM-DD");
-  } else if (kind == SmartPlaylistFieldKind::Number || kind == SmartPlaylistFieldKind::Rating || kind == SmartPlaylistFieldKind::Time) {
-    const double max = kind == SmartPlaylistFieldKind::Rating ? 1.0 : 1000000.0;
-    const double step = kind == SmartPlaylistFieldKind::Rating ? 0.1 : 1.0;
-    value_ = gtk_spin_button_new_with_range(0, max, step);
-  } else {
-    value_ = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(value_), "Value");
+  editor_ = SmartPlaylistTermValue::EditorFor(SmartPlaylistSearch::KindOf(field), op);
+
+  if (time_box_) {
+    gtk_widget_set_visible(time_box_, editor_ == SmartPlaylistTermValue::Editor::Time ? TRUE : FALSE);
   }
-  gtk_widget_set_hexpand(value_, TRUE);
-  gtk_box_insert_child_after(GTK_BOX(row_), value_, op_);
+  if (rating_) {
+    gtk_widget_set_visible(rating_->widget(), editor_ == SmartPlaylistTermValue::Editor::Rating ? TRUE : FALSE);
+  }
+
+  switch (editor_) {
+    case SmartPlaylistTermValue::Editor::Empty:
+      value_ = gtk_label_new("");
+      break;
+    case SmartPlaylistTermValue::Editor::RelativeDays:
+      value_ = gtk_spin_button_new_with_range(1, 3650, 1);
+      gtk_spin_button_set_digits(GTK_SPIN_BUTTON(value_), 0);
+      gtk_spin_button_set_value(GTK_SPIN_BUTTON(value_), 30);
+      break;
+    case SmartPlaylistTermValue::Editor::Calendar:
+      value_ = gtk_calendar_new();
+      break;
+    case SmartPlaylistTermValue::Editor::Number:
+      value_ = gtk_spin_button_new_with_range(0, 1000000, 1);
+      gtk_spin_button_set_digits(GTK_SPIN_BUTTON(value_), 0);
+      break;
+    case SmartPlaylistTermValue::Editor::Text:
+      value_ = gtk_entry_new();
+      gtk_entry_set_placeholder_text(GTK_ENTRY(value_), "Value");
+      break;
+    case SmartPlaylistTermValue::Editor::Rating:
+    case SmartPlaylistTermValue::Editor::Time:
+      break;
+  }
+
+  if (value_) {
+    gtk_widget_set_hexpand(value_, TRUE);
+    gtk_box_insert_child_after(GTK_BOX(row_), value_, op_);
+  }
   if (!previous.empty()) {
     SetCurrentValue(previous);
   }
@@ -133,6 +195,13 @@ void SmartPlaylistSearchTermWidget::RebuildValue() {
 
 void SmartPlaylistSearchTermWidget::ConnectValueSignals() {
   if (!value_ || GTK_IS_LABEL(value_)) {
+    return;
+  }
+  if (GTK_IS_CALENDAR(value_)) {
+    g_signal_connect(value_, "day-selected", G_CALLBACK((+[](GtkCalendar *, gpointer data) {
+                       static_cast<SmartPlaylistSearchTermWidget *>(data)->EmitChanged();
+                     })),
+                     this);
     return;
   }
   if (GTK_IS_SPIN_BUTTON(value_)) {
@@ -157,14 +226,30 @@ void SmartPlaylistSearchTermWidget::EmitChanged() {
 }
 
 std::string SmartPlaylistSearchTermWidget::CurrentValue() const {
+  if (editor_ == SmartPlaylistTermValue::Editor::Empty) {
+    return {};
+  }
+  if (editor_ == SmartPlaylistTermValue::Editor::Rating && rating_) {
+    return SmartPlaylistTermValue::FormatRating(rating_->rating());
+  }
+  if (editor_ == SmartPlaylistTermValue::Editor::Time && time_hours_ && time_minutes_ && time_seconds_) {
+    return std::to_string(SmartPlaylistTermValue::TimeToSeconds(gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(time_hours_)),
+                                                               gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(time_minutes_)),
+                                                               gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(time_seconds_))));
+  }
   if (!value_) {
     return {};
   }
-  if (GTK_IS_SPIN_BUTTON(value_)) {
-    if (gtk_spin_button_get_digits(GTK_SPIN_BUTTON(value_)) > 0) {
-      return std::to_string(gtk_spin_button_get_value(GTK_SPIN_BUTTON(value_)));
+  if (GTK_IS_CALENDAR(value_)) {
+    GDateTime *date = gtk_calendar_get_date(GTK_CALENDAR(value_));
+    if (!date) {
+      return {};
     }
-    return std::to_string(static_cast<int>(gtk_spin_button_get_value(GTK_SPIN_BUTTON(value_))));
+    return SmartPlaylistTermValue::FormatDate(g_date_time_get_year(date), g_date_time_get_month(date),
+                                              g_date_time_get_day_of_month(date));
+  }
+  if (GTK_IS_SPIN_BUTTON(value_)) {
+    return std::to_string(gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(value_)));
   }
   if (GTK_IS_EDITABLE(value_)) {
     const char *text = gtk_editable_get_text(GTK_EDITABLE(value_));
@@ -174,7 +259,44 @@ std::string SmartPlaylistSearchTermWidget::CurrentValue() const {
 }
 
 void SmartPlaylistSearchTermWidget::SetCurrentValue(const std::string &value) {
-  if (!value_ || value.empty()) {
+  if (value.empty()) {
+    return;
+  }
+  if (editor_ == SmartPlaylistTermValue::Editor::Rating && rating_) {
+    rating_->set_rating(static_cast<float>(g_ascii_strtod(value.c_str(), nullptr)));
+    return;
+  }
+  if (editor_ == SmartPlaylistTermValue::Editor::Time && time_hours_ && time_minutes_ && time_seconds_) {
+    int hours = 0;
+    int minutes = 0;
+    int seconds = 0;
+    SmartPlaylistTermValue::SecondsToTime(static_cast<int>(g_ascii_strtod(value.c_str(), nullptr)), &hours, &minutes, &seconds);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(time_hours_), hours);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(time_minutes_), minutes);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(time_seconds_), seconds);
+    return;
+  }
+  if (!value_) {
+    return;
+  }
+  if (GTK_IS_CALENDAR(value_)) {
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    GDateTime *date = nullptr;
+    if (SmartPlaylistTermValue::ParseDate(value, &year, &month, &day)) {
+      date = g_date_time_new_local(year, month, day, 0, 0, 0);
+    }
+    else {
+      const gint64 unix_time = std::strtoll(value.c_str(), nullptr, 10);
+      if (unix_time > 0) {
+        date = g_date_time_new_from_unix_local(unix_time);
+      }
+    }
+    if (date) {
+      gtk_calendar_set_date(GTK_CALENDAR(value_), date);
+      g_date_time_unref(date);
+    }
     return;
   }
   if (GTK_IS_SPIN_BUTTON(value_)) {

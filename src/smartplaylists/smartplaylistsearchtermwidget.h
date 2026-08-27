@@ -2,11 +2,15 @@
 #define STRAWBERRY_SMARTPLAYLISTSEARCHTERMWIDGET_H
 
 #include "smartplaylists/smartplaylist.h"
+#include "smartplaylists/smartplaylisttermvalue.h"
 
 #include <gtk/gtk.h>
 
 #include <functional>
+#include <memory>
 #include <vector>
+
+class RatingWidget;
 
 class SmartPlaylistSearchTermWidget {
  public:
@@ -15,6 +19,7 @@ class SmartPlaylistSearchTermWidget {
   using RemoveCallback = std::function<void()>;
 
   SmartPlaylistSearchTermWidget();
+  ~SmartPlaylistSearchTermWidget();
 
   GtkWidget *widget() const { return widget_; }
   SmartPlaylistTerm Term() const;
@@ -42,6 +47,12 @@ class SmartPlaylistSearchTermWidget {
   GtkWidget *value_ = nullptr;
   GtkWidget *remove_ = nullptr;
   GtkWidget *overlay_ = nullptr;
+  GtkWidget *time_box_ = nullptr;
+  GtkWidget *time_hours_ = nullptr;
+  GtkWidget *time_minutes_ = nullptr;
+  GtkWidget *time_seconds_ = nullptr;
+  std::unique_ptr<RatingWidget> rating_;
+  SmartPlaylistTermValue::Editor editor_ = SmartPlaylistTermValue::Editor::Text;
   std::vector<SmartPlaylistOp> current_ops_;
   bool updating_ = false;
   bool active_ = true;
