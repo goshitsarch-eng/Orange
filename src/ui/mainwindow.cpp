@@ -84,6 +84,8 @@
 #include "widgets/multiloadingindicator.h"
 #include "widgets/multiloadingtext.h"
 #include "ui/statusbarstack.h"
+#include "widgets/fancytabbar.h"
+#include "widgets/fancytabmode.h"
 #include "widgets/playingcoveractivate.h"
 #include "widgets/playingwidget.h"
 #include "widgets/seekbarmode.h"
@@ -542,16 +544,41 @@ void MainWindow::BuildUi() {
   adw_overlay_split_view_set_sidebar_width_fraction(ADW_OVERLAY_SPLIT_VIEW(split_view_), 0.30);
 
   BuildSidebar();
-  GtkWidget *sidebar_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  GtkWidget *switcher = adw_view_switcher_new();
-  gtk_widget_add_css_class(switcher, "strawberry-tabbar");
-  gtk_widget_add_css_class(sidebar_box, "strawberry-left-panel");
-  adw_view_switcher_set_policy(ADW_VIEW_SWITCHER(switcher), ADW_VIEW_SWITCHER_POLICY_NARROW);
-  adw_view_switcher_set_stack(ADW_VIEW_SWITCHER(switcher), sidebar_stack_);
-  gtk_box_append(GTK_BOX(sidebar_box), switcher);
-  gtk_box_append(GTK_BOX(sidebar_box), GTK_WIDGET(sidebar_stack_));
+  sidebar_tabs_ = std::make_unique<FancyTabBar>();
+  PopulateSidebarTabs();
+  sidebar_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_add_css_class(sidebar_box_, "strawberry-left-panel");
+  gtk_box_append(GTK_BOX(sidebar_box_), sidebar_tabs_->widget());
+  gtk_box_append(GTK_BOX(sidebar_box_), GTK_WIDGET(sidebar_stack_));
   gtk_widget_set_vexpand(GTK_WIDGET(sidebar_stack_), TRUE);
-  adw_overlay_split_view_set_sidebar(ADW_OVERLAY_SPLIT_VIEW(split_view_), sidebar_box);
+  gtk_widget_set_hexpand(GTK_WIDGET(sidebar_stack_), TRUE);
+  sidebar_tabs_->SetActivateCallback([this](const std::string &id) {
+    if (sidebar_stack_) {
+      adw_view_stack_set_visible_child_name(sidebar_stack_, id.c_str());
+    }
+    PersistTabSettings();
+  });
+  sidebar_tabs_->SetModeChangedCallback([this](FancyTabMode::Mode) {
+    ApplyTabMode();
+    PersistTabSettings();
+  });
+  g_signal_connect(sidebar_stack_, "notify::visible-child-name", G_CALLBACK((+[](AdwViewStack *stack, GParamSpec *, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     if (!self->sidebar_tabs_) {
+                       return;
+                     }
+                     const char *name = adw_view_stack_get_visible_child_name(stack);
+                     if (name) {
+                       self->sidebar_tabs_->SetActive(name, false);
+                     }
+                   })),
+                   this);
+  Settings tab_settings;
+  tab_settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  sidebar_tabs_->SetMode(FancyTabMode::FromStored(tab_settings.IntValue(MainWindowSettings::kTabMode, FancyTabMode::ToStored(FancyTabMode::kDefaultMode))));
+  sidebar_tabs_->SetActiveIndex(tab_settings.IntValue(MainWindowSettings::kCurrentTab, FancyTabMode::kDefaultCurrentTab), true);
+  ApplyTabMode();
+  adw_overlay_split_view_set_sidebar(ADW_OVERLAY_SPLIT_VIEW(split_view_), sidebar_box_);
 
   GtkWidget *content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   BuildPlaylist();
@@ -3243,6 +3270,9 @@ void MainWindow::ApplyAppearance() {
   } else if (!css.empty()) {
     StyleUtils::LoadCss(css);
   }
+  if (sidebar_tabs_) {
+    sidebar_tabs_->ReloadIconSizes();
+  }
   if (play_button_) {
     const int size = appearance.icon_sizes().play_controls;
     for (GtkWidget *child = gtk_widget_get_first_child(gtk_widget_get_parent(play_button_)); child; child = gtk_widget_get_next_sibling(child)) {
@@ -3295,6 +3325,51 @@ void MainWindow::ApplySidebar() {
   settings.BeginGroup(MainWindowSettings::kSettingsGroup);
   const bool show = MainWindowLook::ShowSidebar(settings.BoolValue(MainWindowSettings::kShowSidebar, MainWindowSettings::kDefaultShowSidebar));
   adw_overlay_split_view_set_show_sidebar(ADW_OVERLAY_SPLIT_VIEW(split_view_), show);
+}
+
+void MainWindow::PopulateSidebarTabs() {
+  if (!sidebar_stack_ || !sidebar_tabs_) {
+    return;
+  }
+  GtkSelectionModel *pages = adw_view_stack_get_pages(sidebar_stack_);
+  if (!pages) {
+    return;
+  }
+  const guint n = g_list_model_get_n_items(G_LIST_MODEL(pages));
+  for (guint i = 0; i < n; ++i) {
+    auto *page = ADW_VIEW_STACK_PAGE(g_list_model_get_item(G_LIST_MODEL(pages), i));
+    if (!page) {
+      continue;
+    }
+    const char *name = adw_view_stack_page_get_name(page);
+    const char *title = adw_view_stack_page_get_title(page);
+    const char *icon = adw_view_stack_page_get_icon_name(page);
+    if (name) {
+      sidebar_tabs_->AddTab(name, title ? title : name, icon ? icon : "");
+    }
+    g_object_unref(page);
+  }
+}
+
+void MainWindow::ApplyTabMode() {
+  if (!sidebar_box_ || !sidebar_tabs_) {
+    return;
+  }
+  const FancyTabMode::Mode mode = sidebar_tabs_->mode();
+  gtk_orientable_set_orientation(GTK_ORIENTABLE(sidebar_box_), FancyTabMode::BarOrientation(mode));
+  gtk_widget_set_hexpand(sidebar_tabs_->widget(), FancyTabMode::IsTop(mode) ? TRUE : FALSE);
+  gtk_widget_set_vexpand(sidebar_tabs_->widget(), FancyTabMode::IsTop(mode) ? FALSE : TRUE);
+}
+
+void MainWindow::PersistTabSettings() const {
+  if (!sidebar_tabs_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  settings.SetIntValue(MainWindowSettings::kTabMode, FancyTabMode::ToStored(sidebar_tabs_->mode()));
+  settings.SetIntValue(MainWindowSettings::kCurrentTab, sidebar_tabs_->ActiveIndex());
+  settings.Sync();
 }
 
 void MainWindow::ToggleMute() { app_->player()->Mute(); }

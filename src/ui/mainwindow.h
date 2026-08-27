@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+class FancyTabBar;
 class QueuedErrorDialog;
 
 class MainWindow {
@@ -201,6 +202,9 @@ class MainWindow {
   void SeekFromBar(double x, int width);
   void SetShowSidebar(bool show);
   void ApplySidebar();
+  void ApplyTabMode();
+  void PersistTabSettings() const;
+  void PopulateSidebarTabs();
   void ToggleMute();
   void ApplyMuteUi(unsigned volume);
   bool FocusIsEditable() const;
@@ -222,6 +226,8 @@ class MainWindow {
   std::unique_ptr<QueuedErrorDialog> error_dialog_;
   AdwToastOverlay *toast_overlay_ = nullptr;
   AdwViewStack *sidebar_stack_ = nullptr;
+  GtkWidget *sidebar_box_ = nullptr;
+  std::unique_ptr<FancyTabBar> sidebar_tabs_;
   GtkWidget *split_view_ = nullptr;
   GtkWidget *mute_button_ = nullptr;
   GSimpleAction *sidebar_action_ = nullptr;

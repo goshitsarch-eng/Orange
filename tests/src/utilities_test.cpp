@@ -103,6 +103,7 @@
 #include "transcoder/transcoderoptionsflac.h"
 #include "transcoder/transcoderoptionsinterface.h"
 #include "transcoder/transcoderoptionswavpack.h"
+#include "widgets/fancytabmode.h"
 #include "widgets/playingcoveractivate.h"
 #include "widgets/playingwidget.h"
 #include "widgets/stretchheaderview.h"
@@ -2147,6 +2148,41 @@ TEST(AppearanceColors, PaletteTabPlayingAndIconCss) {
   EXPECT_EQ(AppearanceSettings::kDefaultIconSizePlayControlButtons, clamped.play_controls);
   EXPECT_EQ(128, clamped.tabbar_small);
   EXPECT_NE(std::string::npos, AppearanceColors::BuildIconSizeCss(sizes).find("32px"));
+}
+
+TEST(FancyTabMode, ModesMatchQtAndPersist) {
+  EXPECT_EQ(1, static_cast<int>(FancyTabMode::Mode::LargeSidebar));
+  EXPECT_EQ(2, static_cast<int>(FancyTabMode::Mode::SmallSidebar));
+  EXPECT_EQ(3, static_cast<int>(FancyTabMode::Mode::Tabs));
+  EXPECT_EQ(4, static_cast<int>(FancyTabMode::Mode::IconOnlyTabs));
+  EXPECT_EQ(5, static_cast<int>(FancyTabMode::Mode::PlainSidebar));
+  EXPECT_EQ(6, static_cast<int>(FancyTabMode::Mode::IconsSidebar));
+  EXPECT_EQ(FancyTabMode::Mode::LargeSidebar, FancyTabMode::kDefaultMode);
+  EXPECT_EQ(FancyTabMode::Mode::LargeSidebar, FancyTabMode::FromStored(0));
+  EXPECT_EQ(FancyTabMode::Mode::IconsSidebar, FancyTabMode::FromStored(6));
+  EXPECT_EQ(FancyTabMode::Mode::LargeSidebar, FancyTabMode::FromStored(99));
+  EXPECT_EQ(1, FancyTabMode::ToStored(FancyTabMode::Mode::None));
+  EXPECT_TRUE(FancyTabMode::IsTop(FancyTabMode::Mode::Tabs));
+  EXPECT_TRUE(FancyTabMode::IsTop(FancyTabMode::Mode::IconOnlyTabs));
+  EXPECT_FALSE(FancyTabMode::IsTop(FancyTabMode::Mode::LargeSidebar));
+  EXPECT_FALSE(FancyTabMode::ShowsText(FancyTabMode::Mode::IconsSidebar));
+  EXPECT_FALSE(FancyTabMode::ShowsText(FancyTabMode::Mode::IconOnlyTabs));
+  EXPECT_TRUE(FancyTabMode::ShowsText(FancyTabMode::Mode::PlainSidebar));
+  EXPECT_FALSE(FancyTabMode::ShowsIcon(FancyTabMode::Mode::PlainSidebar));
+  EXPECT_TRUE(FancyTabMode::IsLargeIcon(FancyTabMode::Mode::LargeSidebar));
+  EXPECT_EQ(GTK_ORIENTATION_VERTICAL, FancyTabMode::BarOrientation(FancyTabMode::Mode::LargeSidebar));
+  EXPECT_EQ(GTK_ORIENTATION_HORIZONTAL, FancyTabMode::BarOrientation(FancyTabMode::Mode::Tabs));
+  EXPECT_EQ(40, FancyTabMode::IconSize(FancyTabMode::Mode::LargeSidebar, 40, 32));
+  EXPECT_EQ(32, FancyTabMode::IconSize(FancyTabMode::Mode::SmallSidebar, 40, 32));
+  EXPECT_EQ(6, FancyTabMode::ItemCount());
+  EXPECT_STREQ("Large sidebar", FancyTabMode::MenuItems().front().label);
+  EXPECT_STREQ("Icons on top", FancyTabMode::MenuItems().back().label);
+  EXPECT_STREQ("tab_mode", FancyTabMode::kTabMode);
+  EXPECT_STREQ("current_tab", FancyTabMode::kCurrentTab);
+  EXPECT_TRUE(FancyTabMode::IsKeyboardTrigger(FancyTabMode::kMenu, 0));
+  EXPECT_TRUE(FancyTabMode::IsKeyboardTrigger(FancyTabMode::kF10, FancyTabMode::kShiftMask));
+  EXPECT_FALSE(FancyTabMode::IsKeyboardTrigger(FancyTabMode::kF10, 0));
+  EXPECT_TRUE(FancyTabMode::ShouldShowMenu());
 }
 
 TEST(PlayingCoverActivate, DoubleClickRequiresValidSongLikeQt) {
