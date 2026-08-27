@@ -1,6 +1,8 @@
 #include "settings/settingspage.h"
 
 #include "core/application.h"
+#include "settings/streaminglogincontrols.h"
+#include "streaming/streamingservice.h"
 #include "translations/translations.h"
 #include "ui/dialogs.h"
 #include "utilities/colorutils.h"
@@ -472,6 +474,7 @@ GtkWidget *AddButtonRow(AdwPreferencesGroup *group, const char *title, const cha
   g_object_set_data_full(G_OBJECT(button), "clicked-fn", fn, +[](gpointer data) { delete static_cast<std::function<void(GtkWidget *)> *>(data); });
   adw_action_row_add_suffix(row, button);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  g_object_set_data(G_OBJECT(row), "action-button", button);
   return GTK_WIDGET(row);
 }
 
@@ -521,6 +524,45 @@ LoginStateWidget *AddLoginState(AdwPreferencesGroup *group, Application *app, co
                    }),
                    login);
   return login;
+}
+
+void BindLoginProgress(GtkWidget *button, StreamingService *service, GtkWidget *page) {
+  if (!button) {
+    return;
+  }
+  auto alive = std::make_shared<bool>(true);
+  auto apply = [button, alive](bool auth_in_progress) {
+    if (!*alive || !button) {
+      return;
+    }
+    gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabled(auth_in_progress));
+  };
+  g_object_set_data_full(G_OBJECT(button), "login-progress-alive", new std::shared_ptr<bool>(alive),
+                         [](gpointer p) { delete static_cast<std::shared_ptr<bool> *>(p); });
+  g_signal_connect(button, "destroy", G_CALLBACK(+[](GtkWidget *widget, gpointer) {
+                     if (auto *flag = static_cast<std::shared_ptr<bool> *>(g_object_get_data(G_OBJECT(widget), "login-progress-alive"))) {
+                       **flag = false;
+                     }
+                   }),
+                   nullptr);
+  if (service) {
+    service->AuthenticationChanged.Connect([apply, alive]() {
+      if (*alive) {
+        apply(false);
+      }
+    });
+    service->AuthenticationFailed.Connect([apply, alive](const std::string &) {
+      if (*alive) {
+        apply(false);
+      }
+    });
+  }
+  if (page) {
+    g_signal_connect(page, "map", G_CALLBACK((+[](GtkWidget *, gpointer data) {
+                       gtk_widget_set_sensitive(GTK_WIDGET(data), StreamingLoginControls::LoginButtonEnabledOnPageShown());
+                     })),
+                     button);
+  }
 }
 
 }  // namespace SettingsPage

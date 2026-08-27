@@ -42,6 +42,7 @@
 #include "settings/playlistsettingscontrols.h"
 #include "settings/playlistsettingslabels.h"
 #include "settings/scrobblersettingslabels.h"
+#include "settings/streaminglogincontrols.h"
 #include "settings/streamingsettingslabels.h"
 #include "subsonic/subsonicping.h"
 #include "subsonic/subsonicsettingsactions.h"
@@ -520,6 +521,8 @@ TEST(StreamingSettingsLabels, MatchQtStreamingAndRadioCopy) {
   EXPECT_STREQ("Authentication", StreamingSettingsLabels::Authentication());
   EXPECT_STREQ("Preferences", StreamingSettingsLabels::Preferences());
   EXPECT_STREQ("Login", StreamingSettingsLabels::Login());
+  EXPECT_STREQ("Configuration incomplete", TidalSettingsLabels::ConfigIncomplete());
+  EXPECT_STREQ("Missing Tidal client ID.", TidalSettingsLabels::MissingClientId());
   EXPECT_STREQ("Search delay", StreamingSettingsLabels::SearchDelay());
   EXPECT_STREQ("Remove (Remastered), etc from song titles", StreamingSettingsLabels::RemoveRemastered());
   EXPECT_STREQ("Fetch entire albums when searching songs", StreamingSettingsLabels::FetchEntireAlbums());
@@ -531,6 +534,20 @@ TEST(StreamingSettingsLabels, MatchQtStreamingAndRadioCopy) {
   EXPECT_STREQ("Missing app secret. Please fetch credentials first.", QobuzSettingsLabels::MissingCredentialMessage("id", "", "k"));
   EXPECT_STREQ("Missing private key. Please fetch credentials first.", QobuzSettingsLabels::MissingCredentialMessage("id", "s", ""));
   EXPECT_EQ(nullptr, QobuzSettingsLabels::MissingCredentialMessage("id", "s", "k"));
+}
+
+TEST(StreamingLoginControls, DisablesDuringOAuth) {
+  EXPECT_TRUE(StreamingLoginControls::LoginButtonEnabled(false));
+  EXPECT_FALSE(StreamingLoginControls::LoginButtonEnabled(true));
+  EXPECT_TRUE(StreamingLoginControls::ShouldDisableOnStart(true));
+  EXPECT_FALSE(StreamingLoginControls::ShouldDisableOnStart(false));
+  EXPECT_TRUE(StreamingLoginControls::LoginButtonEnabledAfterAuth());
+  EXPECT_TRUE(StreamingLoginControls::LoginButtonEnabledOnPageShown());
+  EXPECT_TRUE(StreamingLoginControls::TidalCredentialsValid("abc"));
+  EXPECT_FALSE(StreamingLoginControls::TidalCredentialsValid(""));
+}
+
+TEST(StreamingSettingsLabels, SubsonicCopyAndConnectionCheck) {
   EXPECT_STREQ("Server URL", SubsonicSettingsLabels::ServerUrl());
   EXPECT_STREQ("Authentication method:", SubsonicSettingsLabels::AuthMethod());
   EXPECT_STREQ("Use HTTP/2 when possible", SubsonicSettingsLabels::Http2());

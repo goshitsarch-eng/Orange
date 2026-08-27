@@ -4,6 +4,7 @@
 #include "core/application.h"
 #include "core/oauthenticator.h"
 #include "settings/settingspage.h"
+#include "settings/streaminglogincontrols.h"
 #include "settings/streamingsettingslabels.h"
 #include "spotify/spotifyservice.h"
 #include "ui/dialogs.h"
@@ -19,30 +20,33 @@ AdwPreferencesPage *SpotifySettingsPage::Create(Settings *settings, Application 
 
   AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, SpotifySettingsLabels::BasicAuth());
   if (app) {
-    SettingsPage::AddButtonRow(auth, "", SpotifySettingsLabels::Authenticate(), [app]() {
+    GtkWidget *login_row = SettingsPage::AddButtonRow(auth, "", SpotifySettingsLabels::Authenticate(), [app](GtkWidget *button) {
+      gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabled(true));
       Settings s;
       s.BeginGroup(SpotifySettings::kSettingsGroup);
       const std::string client_id = s.Value("clientid");
       if (client_id.empty()) {
-        Dialogs::Login(nullptr, "Spotify", [app](const std::string &user, const std::string &token) {
+        Dialogs::Login(nullptr, "Spotify", [app, button](const std::string &user, const std::string &token) {
           if (StreamingService *service = app->streaming_services()->ServiceByName("Spotify")) {
             service->Login(user, token);
           }
+          gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabledAfterAuth());
         });
         return;
       }
       auto *oauth = new OAuthenticator(app->network());
       oauth->AuthorizeInBrowser("https://accounts.spotify.com/authorize", client_id, "user-read-private user-read-email",
-                                [app, oauth](const std::string &code, const std::string &error) {
+                                [app, oauth, button](const std::string &code, const std::string &error) {
                                   if (code.empty()) {
                                     (void)error;
+                                    gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabledAfterAuth());
                                     delete oauth;
                                     return;
                                   }
                                   Settings ss;
                                   ss.BeginGroup(SpotifySettings::kSettingsGroup);
                                   oauth->ExchangeCode("https://accounts.spotify.com/api/token", ss.Value("clientid"), ss.Value("clientsecret"), code,
-                                                      [app, oauth](const std::string &body, const std::string &) {
+                                                      [app, oauth, button](const std::string &body, const std::string &) {
                                                         const auto tokens = OAuthenticator::ParseTokenResponse(body);
                                                         if (auto *service = dynamic_cast<SpotifyService *>(app->streaming_services()->ServiceByName("Spotify"))) {
                                                           if (!tokens.access_token.empty()) {
@@ -51,10 +55,13 @@ AdwPreferencesPage *SpotifySettingsPage::Create(Settings *settings, Application 
                                                             service->Login({}, body);
                                                           }
                                                         }
+                                                        gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabledAfterAuth());
                                                         delete oauth;
                                                       });
                                 });
     });
+    SettingsPage::BindLoginProgress(GTK_WIDGET(g_object_get_data(G_OBJECT(login_row), "action-button")),
+                                    app->streaming_services()->ServiceByName("Spotify"), GTK_WIDGET(page));
     SettingsPage::AddLoginState(auth, app, "Spotify");
   }
 

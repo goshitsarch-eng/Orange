@@ -12,6 +12,7 @@
 
 class Application;
 class LoginStateWidget;
+class StreamingService;
 
 namespace SettingsPage {
 
@@ -49,6 +50,7 @@ void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char 
                      const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
                      const std::function<void(const std::string &)> &changed = {});
 LoginStateWidget *AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name);
+void BindLoginProgress(GtkWidget *button, StreamingService *service, GtkWidget *page);
 
 }  // namespace SettingsPage
 

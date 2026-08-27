@@ -5,6 +5,7 @@
 #include "dialogs/messagedialog.h"
 #include "qobuz/qobuzcredentialfetcher.h"
 #include "settings/settingspage.h"
+#include "settings/streaminglogincontrols.h"
 #include "settings/streamingsettingslabels.h"
 #include "streaming/streamingchoices.h"
 #include "translations/translations.h"
@@ -50,23 +51,27 @@ AdwPreferencesPage *QobuzSettingsPage::Create(Settings *settings, Application *a
       },
       QobuzSettingsLabels::FetchTooltip());
   if (app) {
-    SettingsPage::AddButtonRow(auth, "", StreamingSettingsLabels::Login(), [app, settings]() {
+    GtkWidget *login_row = SettingsPage::AddButtonRow(auth, "", StreamingSettingsLabels::Login(), [app, settings](GtkWidget *button) {
       if (settings) {
         settings->BeginGroup(QobuzSettings::kSettingsGroup);
       }
       const char *missing = QobuzSettingsLabels::MissingCredentialMessage(settings ? settings->Value(QobuzSettings::kAppId) : "",
                                                                          settings ? settings->Value(QobuzSettings::kAppSecret) : "",
                                                                          settings ? settings->Value(QobuzSettings::kPrivateKey) : "");
-      if (missing) {
+      if (!StreamingLoginControls::ShouldDisableOnStart(missing == nullptr)) {
         MessageDialog::Show(nullptr, QobuzSettingsLabels::ConfigIncomplete(), missing);
         return;
       }
-      Dialogs::Login(nullptr, "Qobuz", [app](const std::string &user, const std::string &token) {
+      gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabled(true));
+      Dialogs::Login(nullptr, "Qobuz", [app, button](const std::string &user, const std::string &token) {
         if (StreamingService *service = app->streaming_services()->ServiceByName("Qobuz")) {
           service->Login(user, token);
         }
+        gtk_widget_set_sensitive(button, StreamingLoginControls::LoginButtonEnabledAfterAuth());
       });
     });
+    SettingsPage::BindLoginProgress(GTK_WIDGET(g_object_get_data(G_OBJECT(login_row), "action-button")),
+                                    app->streaming_services()->ServiceByName("Qobuz"), GTK_WIDGET(page));
     SettingsPage::AddLoginState(auth, app, "Qobuz");
   }
 

@@ -129,6 +129,8 @@ inline const char *AudioQuality() { return "Audio quality"; }
 inline const char *AlbumCoverSize() { return "Album cover size"; }
 inline const char *StreamUrlMethod() { return "Stream URL method"; }
 inline const char *AlbumExplicit() { return "Append explicit to album title for explicit albums"; }
+inline const char *ConfigIncomplete() { return "Configuration incomplete"; }
+inline const char *MissingClientId() { return "Missing Tidal client ID."; }
 
 }  // namespace TidalSettingsLabels
 
