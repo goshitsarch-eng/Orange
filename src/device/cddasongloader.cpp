@@ -1,10 +1,14 @@
+#include "config.h"
 #include "device/cddasongloader.h"
 
-#include "config.h"
 #include "device/cddadiscid.h"
 #include "device/cddahelpers.h"
+#include "device/cddaload.h"
 #include "device/cddatext.h"
 #include "device/devicemanager.h"
+#include "playlist/playlistcdda.h"
+#include "tagfetcher/musicbrainzclient.h"
+#include "tagfetcher/musicbrainzdiscid.h"
 
 #ifdef HAVE_AUDIOCD
 #include <cdio/cdio.h>
@@ -79,4 +83,100 @@ SongList CddaSongLoader::LoadDevice(const std::string &device_path) {
   (void)device_path;
   return {};
 #endif
+}
+
+CddaSongLoader::CddaSongLoader() : alive_(std::make_shared<bool>(true)) {}
+
+CddaSongLoader::~CddaSongLoader() {
+  *alive_ = false;
+  if (musicbrainz_) {
+    musicbrainz_->CancelAll();
+  }
+}
+
+SongList CddaSongLoader::LoadDeviceWithFallbacks(const std::string &device_path, const std::vector<std::string> &fallbacks) {
+  SongList songs = LoadDevice(device_path);
+  if (CddaLoad::ShouldEmitTracks(songs)) {
+    return songs;
+  }
+  for (const std::string &path : fallbacks) {
+    if (path.empty() || path == device_path) {
+      continue;
+    }
+    songs = LoadDevice(path);
+    if (CddaLoad::ShouldEmitTracks(songs)) {
+      return songs;
+    }
+  }
+  return {};
+}
+
+void CddaSongLoader::Start(const std::string &device_path, NetworkAccessManager *network, const std::vector<std::string> &fallbacks) {
+  if (active_) {
+    return;
+  }
+  active_ = true;
+  device_path_ = device_path;
+  network_ = network;
+  fallbacks_ = fallbacks;
+  g_thread_unref(g_thread_new("cdda-load", CddaSongLoader::Thread, this));
+}
+
+gpointer CddaSongLoader::Thread(gpointer data) {
+  static_cast<CddaSongLoader *>(data)->LoadBlocking();
+  return nullptr;
+}
+
+void CddaSongLoader::LoadBlocking() {
+  songs_ = LoadDeviceWithFallbacks(device_path_, fallbacks_);
+  g_idle_add(CddaSongLoader::IdleLoaded, this);
+}
+
+gboolean CddaSongLoader::IdleLoaded(gpointer data) {
+  auto *self = static_cast<CddaSongLoader *>(data);
+  if (!self->alive_ || !*self->alive_) {
+    return G_SOURCE_REMOVE;
+  }
+  if (!CddaLoad::ShouldEmitTracks(self->songs_)) {
+    self->FinishWithError(PlaylistCdda::EmptyError());
+    return G_SOURCE_REMOVE;
+  }
+  self->SongsLoaded.Emit(self->songs_);
+#ifdef HAVE_TAGFETCHER
+  const bool have_tagfetcher = true;
+#else
+  const bool have_tagfetcher = false;
+#endif
+  if (!CddaLoad::ShouldLookupMusicBrainz(self->songs_, self->network_ != nullptr, have_tagfetcher)) {
+    if (CddaText::HasCompleteTitles(self->songs_)) {
+      self->SongsUpdated.Emit(self->songs_);
+    }
+    self->LoadingFinished.Emit();
+    return G_SOURCE_REMOVE;
+  }
+  self->musicbrainz_ = std::make_unique<MusicBrainzClient>(self->network_);
+  auto alive = self->alive_;
+  self->musicbrainz_->DiscIdFinished.Connect([self, alive](const std::string &disc_id, const MusicBrainzClient::ResultList &results,
+                                                           const std::string &error) {
+    if (!alive || !*alive) {
+      return;
+    }
+    if (!error.empty()) {
+      self->FinishWithError(error);
+      return;
+    }
+    if (!results.empty()) {
+      self->songs_ = MusicBrainzDiscId::MergeByTrack(self->songs_, results);
+      self->SongsUpdated.Emit(self->songs_);
+    }
+    self->LoadingFinished.Emit();
+    (void)disc_id;
+  });
+  self->musicbrainz_->StartDiscId(MusicBrainzDiscId::DiscIdFromSongs(self->songs_));
+  return G_SOURCE_REMOVE;
+}
+
+void CddaSongLoader::FinishWithError(const std::string &error) {
+  LoadError.Emit(error);
+  LoadingFinished.Emit();
 }

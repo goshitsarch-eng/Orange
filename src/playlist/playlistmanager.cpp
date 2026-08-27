@@ -458,7 +458,7 @@ void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row, 
   if (!playlist) {
     return;
   }
-  auto *inserter = new SongLoaderInserter(tagreader_, task_manager_, url_handlers_, collection_backend_);
+  auto *inserter = new SongLoaderInserter(tagreader_, task_manager_, url_handlers_, collection_backend_, network_);
   SongLoaderInserter::StartOptions options;
   options.row = row;
   options.play_now = play_now;
@@ -466,7 +466,27 @@ void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row, 
   options.enqueue_next = enqueue_next;
   options.finished = [this, playlist]() { Persist(playlist); };
   options.play = [this](int play_row) { PlayRequested.Emit(play_row); };
+  options.error = [this](const std::string &message) { Error.Emit(message); };
   inserter->Start(playlist, urls, options);
+}
+
+void PlaylistManager::LoadAudioCD(int row, bool play_now, bool enqueue, bool enqueue_next,
+                                  const std::vector<std::string> &cdda_fallbacks) {
+  Playlist *playlist = Visible();
+  if (!playlist) {
+    return;
+  }
+  auto *inserter = new SongLoaderInserter(tagreader_, task_manager_, url_handlers_, collection_backend_, network_);
+  SongLoaderInserter::StartOptions options;
+  options.row = row;
+  options.play_now = play_now;
+  options.enqueue = enqueue;
+  options.enqueue_next = enqueue_next;
+  options.cdda_fallbacks = cdda_fallbacks;
+  options.finished = [this, playlist]() { Persist(playlist); };
+  options.play = [this](int play_row) { PlayRequested.Emit(play_row); };
+  options.error = [this](const std::string &message) { Error.Emit(message); };
+  inserter->LoadAudioCD(playlist, options);
 }
 
 void PlaylistManager::RemoveCurrentSong() {

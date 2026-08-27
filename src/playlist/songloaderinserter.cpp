@@ -1,15 +1,22 @@
+#include "config.h"
 #include "playlist/songloaderinserter.h"
 
 #include "core/songloader.h"
 #include "core/taskmanager.h"
+#include "device/cddasongloader.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistcdda.h"
 #include "playlist/songloaderinserterplan.h"
 
 #include <glib.h>
 
 SongLoaderInserter::SongLoaderInserter(TagReader *tagreader, TaskManager *task_manager, UrlHandlers *url_handlers,
-                                       CollectionBackend *collection_backend)
-    : tagreader_(tagreader), task_manager_(task_manager), url_handlers_(url_handlers), collection_backend_(collection_backend) {}
+                                       CollectionBackend *collection_backend, NetworkAccessManager *network)
+    : tagreader_(tagreader),
+      task_manager_(task_manager),
+      url_handlers_(url_handlers),
+      collection_backend_(collection_backend),
+      network_(network) {}
 
 SongLoaderInserter::~SongLoaderInserter() = default;
 
@@ -47,6 +54,7 @@ void SongLoaderInserter::Start(Playlist *destination, const std::vector<std::str
   enqueue_next_ = options.enqueue_next;
   finished_ = options.finished;
   play_ = options.play;
+  error_ = options.error;
   if (!tagreader_) {
     NotifyFinished();
     delete this;
@@ -103,6 +111,57 @@ void SongLoaderInserter::NotifyFinished() {
   if (finished_) {
     finished_();
   }
+}
+
+void SongLoaderInserter::EmitError(const std::string &error) {
+  if (error_) {
+    error_(PlaylistCdda::ErrorOrFallback(error));
+  }
+}
+
+void SongLoaderInserter::DeleteLater() { g_idle_add(SongLoaderInserter::DeleteIdle, this); }
+
+gboolean SongLoaderInserter::DeleteIdle(gpointer data) {
+  delete static_cast<SongLoaderInserter *>(data);
+  return G_SOURCE_REMOVE;
+}
+
+void SongLoaderInserter::LoadAudioCD(Playlist *destination, const StartOptions &options) {
+  destination_ = destination;
+  row_ = options.row;
+  play_now_ = options.play_now;
+  enqueue_ = options.enqueue;
+  enqueue_next_ = options.enqueue_next;
+  finished_ = options.finished;
+  play_ = options.play;
+  error_ = options.error;
+#ifndef HAVE_AUDIOCD
+  EmitError(PlaylistCdda::MissingPlaybackError());
+  NotifyFinished();
+  delete this;
+  return;
+#else
+  cdda_ = std::make_unique<CddaSongLoader>();
+  cdda_->SongsLoaded.Connect([this](const SongList &songs) {
+    songs_ = songs;
+    if (songs_.empty()) {
+      EmitError(PlaylistCdda::EmptyError());
+      return;
+    }
+    InsertSongs();
+  });
+  cdda_->SongsUpdated.Connect([this](const SongList &songs) {
+    if (destination_) {
+      destination_->UpdateItems(songs);
+    }
+  });
+  cdda_->LoadError.Connect([this](const std::string &message) { EmitError(message); });
+  cdda_->LoadingFinished.Connect([this]() {
+    NotifyFinished();
+    DeleteLater();
+  });
+  cdda_->Start(options.cdda_device, network_, options.cdda_fallbacks);
+#endif
 }
 
 gpointer SongLoaderInserter::AsyncThread(gpointer data) {

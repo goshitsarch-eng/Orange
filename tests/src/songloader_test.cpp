@@ -3,6 +3,9 @@
 #include "core/songloadremote.h"
 #include "core/songloadsort.h"
 #include "core/songloadtypefind.h"
+#include "device/cddaload.h"
+#include "device/cddasongloader.h"
+#include "playlist/playlistcdda.h"
 #include "playlist/songloaderinserterplan.h"
 #include "core/urlhandlers.h"
 #include "playlistparsers/playlistparser.h"
@@ -280,6 +283,54 @@ TEST(SongLoader, LoadAudioCDIsError) {
   SongLoader loader(nullptr, nullptr, nullptr);
   EXPECT_EQ(SongLoader::Result::Error, loader.LoadAudioCD());
   EXPECT_FALSE(loader.errors().empty());
+}
+
+TEST(PlaylistCdda, OpenCdUsesMimeNewPlaylistAndMenuPlay) {
+  EXPECT_STREQ("x-content/audio-cdda", PlaylistCdda::kMimeType());
+  EXPECT_TRUE(PlaylistCdda::HasMime(PlaylistCdda::kMimeType()));
+  EXPECT_FALSE(PlaylistCdda::HasMime("text/uri-list"));
+  EXPECT_TRUE(PlaylistCdda::OpensInNewPlaylist());
+  EXPECT_STREQ("Playlist", PlaylistCdda::NewPlaylistName());
+  EXPECT_STREQ("No audio CD found", PlaylistCdda::EmptyError());
+  EXPECT_STREQ("Error while loading audio CD.", PlaylistCdda::FallbackError());
+  EXPECT_STREQ("Missing CDDA playback.", PlaylistCdda::MissingPlaybackError());
+  EXPECT_EQ("No disc", PlaylistCdda::ErrorOrFallback("No disc"));
+  EXPECT_EQ(PlaylistCdda::FallbackError(), PlaylistCdda::ErrorOrFallback({}));
+  const CollectionBehaviour::Plan always = PlaylistCdda::MenuPlan(BehaviourSettings::PlayBehaviour::Always, false);
+  EXPECT_EQ(CollectionBehaviour::Destination::New, always.destination);
+  EXPECT_TRUE(always.should_play);
+  const CollectionBehaviour::Plan never = PlaylistCdda::MenuPlan(BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_FALSE(never.should_play);
+  int current = 1;
+  EXPECT_TRUE(PlaylistCdda::ShouldRefreshView(&current, &current));
+  EXPECT_FALSE(PlaylistCdda::ShouldRefreshView(&current, nullptr));
+  std::vector<std::string> mounts;
+  PlaylistCdda::AppendCddaMount(&mounts, "mtp", "/dev/bus/usb/001");
+  PlaylistCdda::AppendCddaMount(&mounts, "cdda", {});
+  PlaylistCdda::AppendCddaMount(&mounts, "cdda", "/dev/sr0");
+  ASSERT_EQ(1u, mounts.size());
+  EXPECT_EQ("/dev/sr0", mounts[0]);
+}
+
+TEST(CddaLoad, MusicBrainzOnlyWhenCdTextIncomplete) {
+  EXPECT_FALSE(CddaLoad::ShouldEmitTracks({}));
+  EXPECT_TRUE(CddaLoad::ShouldLookupMusicBrainz(false, "abc", true, true));
+  EXPECT_FALSE(CddaLoad::ShouldLookupMusicBrainz(true, "abc", true, true));
+  EXPECT_FALSE(CddaLoad::ShouldLookupMusicBrainz(false, "abc", false, true));
+  EXPECT_FALSE(CddaLoad::ShouldLookupMusicBrainz(false, {}, true, true));
+  EXPECT_FALSE(CddaLoad::ShouldLookupMusicBrainz(false, "abc", true, false));
+  Song generic(Song::Source::CDDA);
+  generic.set_title("Track 1");
+  generic.set_track(1);
+  generic.set_musicbrainz_disc_id("abc");
+  EXPECT_TRUE(CddaLoad::ShouldLookupMusicBrainz({generic}, true, true));
+  generic.set_title("Mysterons");
+  EXPECT_FALSE(CddaLoad::ShouldLookupMusicBrainz({generic}, true, true));
+  const std::vector<std::string> paths = CddaLoad::FallbackPaths({}, {"/dev/sr0", ""});
+  ASSERT_EQ(1u, paths.size());
+  EXPECT_EQ("/dev/sr0", paths[0]);
+  EXPECT_EQ(2u, CddaLoad::FallbackPaths("/dev/sr0", {"/dev/sr0", "/dev/sr1"}).size());
+  EXPECT_TRUE(CddaSongLoader::LoadDeviceWithFallbacks({}, {}).empty());
 }
 
 TEST(SongLoader, UsesUrlHandler) {

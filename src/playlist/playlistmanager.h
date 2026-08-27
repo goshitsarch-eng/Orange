@@ -16,6 +16,7 @@
 #include <vector>
 
 class CollectionBackend;
+class NetworkAccessManager;
 class TaskManager;
 class TagReader;
 class TagReaderClient;
@@ -71,6 +72,9 @@ class PlaylistManager : public PlaylistManagerInterface {
   bool UndoCrossMove(int source_id, int dest_id);
   void InsertUrls(const std::vector<std::string> &urls, int row = -1, bool play_now = false, bool enqueue = false,
                   bool enqueue_next = false);
+  void LoadAudioCD(int row = -1, bool play_now = false, bool enqueue = false, bool enqueue_next = false,
+                   const std::vector<std::string> &cdda_fallbacks = {});
+  void set_network(NetworkAccessManager *network) { network_ = network; }
   void RemoveCurrentSong() override;
   void SaveActive();
   void SaveCurrent();
@@ -129,6 +133,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   UrlHandlers *url_handlers_;
   PlaylistBackend *backend_;
   CollectionBackend *collection_backend_;
+  NetworkAccessManager *network_ = nullptr;
   TagReaderClient *tagreader_client_ = nullptr;
   std::vector<std::unique_ptr<Playlist>> playlists_;
   Playlist *current_ = nullptr;

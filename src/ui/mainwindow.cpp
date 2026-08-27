@@ -6,6 +6,7 @@
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionincremental.h"
 #include "playlist/playlistactivate.h"
+#include "playlist/playlistcdda.h"
 #include "playlist/playlistqueuerefresh.h"
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectionfiltermenu.h"
@@ -114,7 +115,6 @@
 #include "utilities/styleutils.h"
 #include "playlist/playlistsaveoptionsdialog.h"
 #include "playlistparsers/parserbase.h"
-#include "device/cddasongloader.h"
 #include "device/devicesongmenu.h"
 #include "organize/organize.h"
 #include "organize/organizedialog.h"
@@ -2042,6 +2042,12 @@ void MainWindow::ConnectSignals() {
     }
     RefreshPlaylistTabs();
   });
+  app_->playlist_manager()->PlaylistChanged.Connect([this](Playlist *playlist) {
+    if (PlaylistCdda::ShouldRefreshView(playlist, app_->playlist_manager()->current()) &&
+        PlaylistQueueRefresh::ShouldRefreshPlaylistView()) {
+      RefreshPlaylist();
+    }
+  });
   app_->playlist_manager()->CurrentChanged.Connect([this](Playlist *playlist) {
     if (playlist_list_container_) {
       playlist_list_container_->Reload(app_->playlist_manager());
@@ -3863,23 +3869,22 @@ void MainWindow::CheckShowErrorDialog() {
 }
 
 void MainWindow::AddCdTracks() {
-  SongList songs = CddaSongLoader().LoadDevice({});
-  if (songs.empty()) {
-    for (const ConnectedDevice &device : app_->device_manager()->devices()) {
-      if (device.backend == "cdda") {
-        const SongList tracks = app_->device_manager()->Songs(device.unique_id);
-        songs.insert(songs.end(), tracks.begin(), tracks.end());
-      }
-    }
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+      settings.IntValue(BehaviourSettings::kMenuPlayMode, static_cast<int>(BehaviourSettings::kDefaultMenuPlayMode)));
+  const CollectionBehaviour::Plan plan = PlaylistCdda::MenuPlan(play, EngineStopped());
+  if (PlaylistCdda::OpensInNewPlaylist() || plan.destination == CollectionBehaviour::Destination::New) {
+    app_->playlist_manager()->New(PlaylistCdda::NewPlaylistName());
+    RefreshPlaylistsList();
   }
-  if (songs.empty()) {
-    ShowToast("No audio CD found");
-    return;
+  std::vector<std::string> fallbacks;
+  for (const ConnectedDevice &device : app_->device_manager()->devices()) {
+    PlaylistCdda::AppendCddaMount(&fallbacks, device.backend, device.mount_path);
   }
-  app_->playlist_manager()->New("Audio CD", songs);
-  RefreshPlaylistsList();
+  app_->playlist_manager()->LoadAudioCD(-1, plan.should_play, plan.queue == CollectionBehaviour::QueueMode::Append,
+                                       plan.queue == CollectionBehaviour::QueueMode::Next, fallbacks);
   RefreshPlaylist();
-  ShowToast("Added " + std::to_string(songs.size()) + " CD tracks");
 }
 
 void MainWindow::RescanCollection(bool full) {

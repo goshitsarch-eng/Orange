@@ -79,6 +79,7 @@ void Application::Init() {
     }
   }
   playlist_manager_->Init();
+  playlist_manager_->set_network(network_.get());
   playlist_manager_->set_tagreader_client(tagreader_client_.get());
   playlist_manager_->PlayRequested.Connect([this](int row) {
     if (player_) {
