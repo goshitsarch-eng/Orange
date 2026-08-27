@@ -47,6 +47,12 @@ inline const char *TabLabel(Transcoder::Format format) {
       return "ASF (WMA)";
     case Transcoder::Format::MP3:
       return "MP3";
+    case Transcoder::Format::WAV:
+      return "Wav";
+    case Transcoder::Format::OggFlac:
+      return "Ogg FLAC";
+    case Transcoder::Format::ALAC:
+      return "ALAC";
   }
   return "FLAC";
 }
@@ -69,6 +75,12 @@ inline const char *TabId(Transcoder::Format format) {
       return "asf";
     case Transcoder::Format::MP3:
       return "mp3";
+    case Transcoder::Format::WAV:
+      return "wav";
+    case Transcoder::Format::OggFlac:
+      return "oggflac";
+    case Transcoder::Format::ALAC:
+      return "alac";
   }
   return "flac";
 }
@@ -91,6 +103,12 @@ inline const char *GroupName(Transcoder::Format format) {
       return "Transcoder/wavpackenc";
     case Transcoder::Format::ASF:
       return "Transcoder/ffenc_wmav2";
+    case Transcoder::Format::WAV:
+      return "Transcoder/wavenc";
+    case Transcoder::Format::OggFlac:
+      return "Transcoder/flacenc";
+    case Transcoder::Format::ALAC:
+      return "Transcoder/avenc_alac";
   }
   return "Transcoder";
 }
@@ -110,7 +128,9 @@ inline FieldKind FieldsFor(Transcoder::Format format) {
   }
 }
 
-inline int QualityMax(Transcoder::Format format) { return format == Transcoder::Format::FLAC ? 8 : 10; }
+inline int QualityMax(Transcoder::Format format) {
+  return format == Transcoder::Format::FLAC || format == Transcoder::Format::OggFlac ? 8 : 10;
+}
 
 inline int DisplayKbps(int stored) { return stored >= 1000 ? stored / 1000 : stored; }
 
@@ -183,6 +203,12 @@ inline const char *FormatKeyFor(Transcoder::Format format) {
       return TranscodeUi::FormatKey(6);
     case Transcoder::Format::ASF:
       return TranscodeUi::FormatKey(7);
+    case Transcoder::Format::WAV:
+      return TranscodeUi::FormatKey(8);
+    case Transcoder::Format::OggFlac:
+      return TranscodeUi::FormatKey(9);
+    case Transcoder::Format::ALAC:
+      return TranscodeUi::FormatKey(10);
   }
   return TranscodeUi::FormatKey(3);
 }

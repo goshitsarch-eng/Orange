@@ -595,7 +595,7 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   gtk_box_append(GTK_BOX(queue_buttons), state->remove);
   gtk_box_append(GTK_BOX(box), queue_buttons);
 
-  static const char *format_names[] = {"MP3", "AAC", "FLAC", "Ogg Vorbis", "Opus", "Speex", "WavPack", "ASF", nullptr};
+  static const char *format_names[] = {"MP3", "AAC", "FLAC", "Ogg Vorbis", "Opus", "Speex", "WavPack", "ASF", "Wav", "Ogg FLAC", "ALAC", nullptr};
   state->formats = gtk_drop_down_new_from_strings(format_names);
   gtk_drop_down_set_selected(GTK_DROP_DOWN(state->formats), static_cast<guint>(format_index));
   state->quality = gtk_spin_button_new_with_range(0, 10, 1);

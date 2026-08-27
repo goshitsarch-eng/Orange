@@ -592,6 +592,7 @@ set(STRAWBERRY_SOURCES
   src/waveform/waveformloader.cpp
   src/waveform/waveformproxystyle.cpp
   src/transcoder/transcoder.cpp
+  src/transcoder/transcoderoptionsplain.h
   src/transcoder/transcoderoptionsinterface.cpp
   src/transcoder/transcoderoptionsmp3.cpp
   src/transcoder/transcoderoptionsflac.cpp

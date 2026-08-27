@@ -45,8 +45,55 @@ Transcoder::Preset Transcoder::PresetFor(Format format) {
       return {format, "WavPack", "wv", "audio/x-wavpack", {}};
     case Format::ASF:
       return {format, "ASF", "wma", "audio/x-wma", "video/x-ms-asf"};
+    case Format::WAV:
+      return {format, "Wav", "wav", {}, "audio/x-wav"};
+    case Format::OggFlac:
+      return {format, "Ogg FLAC", "ogg", "audio/x-flac", "application/ogg"};
+    case Format::ALAC:
+      return {format, "ALAC", "m4a", "audio/x-alac", "audio/mp4"};
   }
   return {Format::FLAC, "FLAC", "flac", "audio/x-flac", {}};
+}
+
+Transcoder::Format Transcoder::FormatFromFileType(Song::FileType type) {
+  switch (type) {
+    case Song::FileType::WAV:
+      return Format::WAV;
+    case Song::FileType::FLAC:
+      return Format::FLAC;
+    case Song::FileType::WavPack:
+      return Format::WavPack;
+    case Song::FileType::OggFlac:
+      return Format::OggFlac;
+    case Song::FileType::OggVorbis:
+      return Format::OggVorbis;
+    case Song::FileType::OggOpus:
+      return Format::Opus;
+    case Song::FileType::OggSpeex:
+      return Format::Speex;
+    case Song::FileType::MPEG:
+      return Format::MP3;
+    case Song::FileType::MP4:
+      return Format::AAC;
+    case Song::FileType::ASF:
+      return Format::ASF;
+    case Song::FileType::ALAC:
+      return Format::ALAC;
+    default:
+      return Format::FLAC;
+  }
+}
+
+Transcoder::Preset Transcoder::PresetForFileType(Song::FileType type) { return PresetFor(FormatFromFileType(type)); }
+
+std::vector<Transcoder::Preset> Transcoder::GetAllPresets() {
+  // Qt Transcoder::GetAllPresets
+  return {
+      PresetForFileType(Song::FileType::WAV),      PresetForFileType(Song::FileType::FLAC),      PresetForFileType(Song::FileType::WavPack),
+      PresetForFileType(Song::FileType::OggFlac),  PresetForFileType(Song::FileType::OggVorbis), PresetForFileType(Song::FileType::OggOpus),
+      PresetForFileType(Song::FileType::OggSpeex), PresetForFileType(Song::FileType::MPEG),     PresetForFileType(Song::FileType::MP4),
+      PresetForFileType(Song::FileType::ASF),      PresetForFileType(Song::FileType::ALAC),
+  };
 }
 
 std::string Transcoder::PipelineFor(Format format, int quality) {

@@ -14,7 +14,7 @@
 
 class Transcoder {
  public:
-  enum class Format { MP3, AAC, FLAC, OggVorbis, Opus, Speex, WavPack, ASF };
+  enum class Format { MP3, AAC, FLAC, OggVorbis, Opus, Speex, WavPack, ASF, WAV, OggFlac, ALAC };
 
   struct Preset {
     Format format = Format::FLAC;
@@ -49,6 +49,9 @@ class Transcoder {
   static std::string FormatName(Format format);
   static std::string Extension(Format format);
   static Preset PresetFor(Format format);
+  static Preset PresetForFileType(Song::FileType type);
+  static std::vector<Preset> GetAllPresets();
+  static Format FormatFromFileType(Song::FileType type);
   static std::string PipelineFor(Format format, int quality = -1);
 
   Signal<int, int> Progress;

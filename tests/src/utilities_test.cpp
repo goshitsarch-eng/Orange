@@ -1170,6 +1170,27 @@ TEST(Transcoder, PresetAndPipelineFor) {
   EXPECT_NE(std::string::npos, wavpack.find("wavpackenc mode=2"));
   const std::string asf = Transcoder::PipelineFor(Transcoder::Format::ASF, 5);
   EXPECT_NE(std::string::npos, asf.find("avenc_wmav2"));
+  const std::string wav = Transcoder::PipelineFor(Transcoder::Format::WAV);
+  EXPECT_NE(std::string::npos, wav.find("wavenc"));
+  EXPECT_EQ(std::string::npos, wav.find("flacenc"));
+  const std::string oggflac = Transcoder::PipelineFor(Transcoder::Format::OggFlac, 5);
+  EXPECT_NE(std::string::npos, oggflac.find("flacenc"));
+  EXPECT_NE(std::string::npos, oggflac.find("oggmux"));
+  const std::string alac = Transcoder::PipelineFor(Transcoder::Format::ALAC);
+  EXPECT_NE(std::string::npos, alac.find("avenc_alac"));
+  EXPECT_NE(std::string::npos, alac.find("mp4mux"));
+  const auto presets = Transcoder::GetAllPresets();
+  ASSERT_EQ(11u, presets.size());
+  EXPECT_EQ("Wav", presets[0].name);
+  EXPECT_EQ("wav", presets[0].extension);
+  EXPECT_EQ("audio/x-wav", presets[0].muxer_mimetype);
+  EXPECT_EQ("Ogg FLAC", presets[3].name);
+  EXPECT_EQ("ogg", presets[3].extension);
+  EXPECT_EQ("ALAC", presets[10].name);
+  EXPECT_EQ("m4a", presets[10].extension);
+  EXPECT_EQ("audio/x-alac", presets[10].codec_mimetype);
+  EXPECT_EQ("Wav", Transcoder::PresetForFileType(Song::FileType::WAV).name);
+  EXPECT_EQ(Transcoder::Format::WAV, Transcoder::FormatFromFileType(Song::FileType::WAV));
   EXPECT_EQ("Transcoder/faac", TranscoderOptionsFields::GroupFor(Transcoder::Format::AAC));
   EXPECT_EQ("Transcoder/ffenc_wmav2", TranscoderOptionsFields::GroupFor(Transcoder::Format::ASF));
   EXPECT_STREQ("Transcoder/avenc_aac", TranscoderOptionsFields::LegacyGroupFor(Transcoder::Format::AAC));
@@ -1561,7 +1582,9 @@ TEST(OrganizeTranscode, CheckModesAndBestFormat) {
   EXPECT_EQ(MusicStorage::TranscodeMode::Transcode_Unsupported,
             OrganizeTranscode::FromDeviceMode(DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported));
   EXPECT_EQ(Transcoder::Format::MP3, OrganizeTranscode::FormatFromFileType(Song::FileType::MPEG));
-  EXPECT_EQ(Transcoder::Format::AAC, OrganizeTranscode::FormatFromFileType(Song::FileType::ALAC));
+  EXPECT_EQ(Transcoder::Format::ALAC, OrganizeTranscode::FormatFromFileType(Song::FileType::ALAC));
+  EXPECT_EQ(Transcoder::Format::WAV, OrganizeTranscode::FormatFromFileType(Song::FileType::WAV));
+  EXPECT_EQ(Transcoder::Format::OggFlac, OrganizeTranscode::FormatFromFileType(Song::FileType::OggFlac));
   EXPECT_EQ("mp3", OrganizeTranscode::ExtensionForFileType(Song::FileType::MPEG));
   EXPECT_EQ("/tmp/song.mp3", OrganizeTranscode::FiddleExtension("/tmp/song.flac", "mp3"));
   EXPECT_EQ("song.m4a", OrganizeTranscode::FiddleExtension("song", "m4a"));

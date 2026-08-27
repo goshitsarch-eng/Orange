@@ -29,6 +29,12 @@ inline std::string GroupFor(Transcoder::Format format) {
       return "Transcoder/wavpackenc";
     case Transcoder::Format::ASF:
       return "Transcoder/ffenc_wmav2";
+    case Transcoder::Format::WAV:
+      return "Transcoder/wavenc";
+    case Transcoder::Format::OggFlac:
+      return "Transcoder/flacenc";
+    case Transcoder::Format::ALAC:
+      return "Transcoder/avenc_alac";
   }
   return TranscoderSettings::kSettingsGroup;
 }

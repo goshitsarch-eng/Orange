@@ -99,16 +99,23 @@ inline Song::FileType FileTypeFor(Transcoder::Format format) {
       return Song::FileType::WavPack;
     case Transcoder::Format::ASF:
       return Song::FileType::ASF;
+    case Transcoder::Format::WAV:
+      return Song::FileType::WAV;
+    case Transcoder::Format::OggFlac:
+      return Song::FileType::OggFlac;
+    case Transcoder::Format::ALAC:
+      return Song::FileType::ALAC;
   }
   return Song::FileType::FLAC;
 }
 
 inline std::vector<std::pair<Song::FileType, std::string>> FormatChoices() {
   static const Transcoder::Format kFormats[] = {
-      Transcoder::Format::FLAC, Transcoder::Format::MP3,      Transcoder::Format::AAC,     Transcoder::Format::OggVorbis,
-      Transcoder::Format::Opus, Transcoder::Format::Speex,    Transcoder::Format::WavPack, Transcoder::Format::ASF};
+      Transcoder::Format::FLAC,     Transcoder::Format::MP3,      Transcoder::Format::AAC,     Transcoder::Format::OggVorbis,
+      Transcoder::Format::Opus,     Transcoder::Format::Speex,    Transcoder::Format::WavPack, Transcoder::Format::ASF,
+      Transcoder::Format::WAV,      Transcoder::Format::OggFlac,  Transcoder::Format::ALAC};
   std::vector<std::pair<Song::FileType, std::string>> out;
-  out.reserve(8);
+  out.reserve(11);
   for (Transcoder::Format format : kFormats) {
     out.emplace_back(FileTypeFor(format), Transcoder::FormatName(format));
   }

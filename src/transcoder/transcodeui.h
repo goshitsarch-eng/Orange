@@ -341,13 +341,22 @@ inline int FormatIndexFromKey(const std::string &key) {
   if (key == "audio/x-wma" || key == "asf") {
     return 7;
   }
+  if (key == "audio/x-wav" || key == "wav") {
+    return 8;
+  }
+  if (key == "audio/x-flac+ogg" || key == "oggflac") {
+    return 9;
+  }
+  if (key == "audio/x-alac" || key == "alac") {
+    return 10;
+  }
   return 3;
 }
 
 inline const char *FormatKey(int index) {
-  static const char *kKeys[] = {"audio/mpeg", "audio/mp4", "audio/x-flac", "audio/x-vorbis",
-                                "audio/x-opus", "audio/x-speex", "audio/x-wavpack", "audio/x-wma"};
-  if (index < 0 || index > 7) {
+  static const char *kKeys[] = {"audio/mpeg",  "audio/mp4",      "audio/x-flac", "audio/x-vorbis", "audio/x-opus", "audio/x-speex",
+                                "audio/x-wavpack", "audio/x-wma", "audio/x-wav",  "audio/x-flac+ogg", "audio/x-alac"};
+  if (index < 0 || index > 10) {
     return kKeys[3];
   }
   return kKeys[index];

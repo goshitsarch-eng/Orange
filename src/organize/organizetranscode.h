@@ -63,29 +63,7 @@ class OrganizeTranscode {
     return Song::FileType::Unknown;
   }
 
-  static Transcoder::Format FormatFromFileType(Song::FileType type) {
-    switch (type) {
-      case Song::FileType::MPEG:
-        return Transcoder::Format::MP3;
-      case Song::FileType::MP4:
-      case Song::FileType::ALAC:
-        return Transcoder::Format::AAC;
-      case Song::FileType::OggVorbis:
-        return Transcoder::Format::OggVorbis;
-      case Song::FileType::OggOpus:
-        return Transcoder::Format::Opus;
-      case Song::FileType::OggSpeex:
-        return Transcoder::Format::Speex;
-      case Song::FileType::WavPack:
-        return Transcoder::Format::WavPack;
-      case Song::FileType::ASF:
-        return Transcoder::Format::ASF;
-      case Song::FileType::FLAC:
-      case Song::FileType::OggFlac:
-      default:
-        return Transcoder::Format::FLAC;
-    }
-  }
+  static Transcoder::Format FormatFromFileType(Song::FileType type) { return Transcoder::FormatFromFileType(type); }
 
   static bool CanTranscode(Song::FileType type) {
     switch (type) {
@@ -97,6 +75,7 @@ class OrganizeTranscode {
       case Song::FileType::OggSpeex:
       case Song::FileType::WavPack:
       case Song::FileType::ASF:
+      case Song::FileType::WAV:
       case Song::FileType::FLAC:
       case Song::FileType::OggFlac:
         return true;

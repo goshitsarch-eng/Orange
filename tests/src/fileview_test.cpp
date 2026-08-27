@@ -748,7 +748,7 @@ TEST(DevicePropertiesLabels, TabsModesAndSortedFormats) {
   EXPECT_EQ(Song::FileType::MP4, DevicePropertiesLabels::FileTypeFor(Transcoder::Format::AAC));
   EXPECT_EQ(Song::FileType::OggOpus, DevicePropertiesLabels::FileTypeFor(Transcoder::Format::Opus));
   const auto formats = DevicePropertiesLabels::FormatChoices();
-  ASSERT_EQ(8u, formats.size());
+  ASSERT_EQ(11u, formats.size());
   EXPECT_EQ("AAC", formats.front().second);
   EXPECT_EQ("WavPack", formats.back().second);
   EXPECT_EQ(Song::FileType::MP4, DevicePropertiesLabels::FormatAt(0));

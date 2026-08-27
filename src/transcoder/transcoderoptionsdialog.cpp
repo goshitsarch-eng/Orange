@@ -7,6 +7,7 @@
 #include "transcoder/transcoderoptionslabels.h"
 #include "transcoder/transcoderoptionsmp3.h"
 #include "transcoder/transcoderoptionsopus.h"
+#include "transcoder/transcoderoptionsplain.h"
 #include "transcoder/transcoderoptionsspeex.h"
 #include "transcoder/transcoderoptionsvorbis.h"
 #include "transcoder/transcoderoptionswavpack.h"
@@ -35,6 +36,12 @@ std::unique_ptr<TranscoderOptionsInterface> TranscoderOptionsDialog::OptionsFor(
       return std::make_unique<TranscoderOptionsWavPack>();
     case Transcoder::Format::ASF:
       return std::make_unique<TranscoderOptionsAsf>();
+    case Transcoder::Format::WAV:
+      return std::make_unique<TranscoderOptionsPlain>(Transcoder::Format::WAV, "wavenc");
+    case Transcoder::Format::OggFlac:
+      return std::make_unique<TranscoderOptionsOggFlac>();
+    case Transcoder::Format::ALAC:
+      return std::make_unique<TranscoderOptionsPlain>(Transcoder::Format::ALAC, "avenc_alac", "mp4mux");
   }
   return std::make_unique<TranscoderOptionsFlac>();
 }
@@ -122,7 +129,7 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
     gtk_box_append(GTK_BOX(box), engine);
     gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::ConstantBitrate()), mp3.cbr, &cbr));
     gtk_box_append(GTK_BOX(box), LabeledSwitch(Translations::CStr(TranscoderOptionsLabels::ForceMono()), mp3.mono, &mono));
-  } else if (format == Transcoder::Format::FLAC) {
+  } else if (format == Transcoder::Format::FLAC || format == Transcoder::Format::OggFlac) {
     TranscoderOptionsFields::QualityEncoder flac;
     flac.max_quality = 8;
     flac.Load(format);

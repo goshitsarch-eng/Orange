@@ -56,6 +56,12 @@ TEST(TranscodeUi, QueueAudioAndFormatKeys) {
   EXPECT_EQ(0, TranscodeUi::FormatIndexFromKey("audio/mpeg"));
   EXPECT_STREQ("audio/x-vorbis", TranscodeUi::FormatKey(3));
   EXPECT_STREQ("audio/x-vorbis", TranscodeUi::FormatKey(99));
+  EXPECT_EQ(8, TranscodeUi::FormatIndexFromKey("audio/x-wav"));
+  EXPECT_EQ(9, TranscodeUi::FormatIndexFromKey("oggflac"));
+  EXPECT_EQ(10, TranscodeUi::FormatIndexFromKey("audio/x-alac"));
+  EXPECT_STREQ("audio/x-wav", TranscodeUi::FormatKey(8));
+  EXPECT_STREQ("audio/x-flac+ogg", TranscodeUi::FormatKey(9));
+  EXPECT_STREQ("audio/x-alac", TranscodeUi::FormatKey(10));
 }
 
 TEST(TranscodeLog, FormatJoinLastAndClear) {
