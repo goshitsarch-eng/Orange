@@ -60,8 +60,8 @@ DeviceView::DeviceView() {
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<DeviceView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<DeviceView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
 }
@@ -144,7 +144,39 @@ bool DeviceView::ApplyTreeLeft() {
   return true;
 }
 
-gboolean DeviceView::OnKeyPressed(guint keyval) {
+void DeviceView::ShowSelectedMenu() {
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  if (!row) {
+    return;
+  }
+  auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"));
+  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+  auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"));
+  const DeviceKeyboard::MenuTarget target = DeviceKeyboard::MenuForSelection(device != nullptr, item != nullptr || song != nullptr);
+  if (target == DeviceKeyboard::MenuTarget::Device && device_menu_cb_) {
+    device_menu_cb_(*device);
+    return;
+  }
+  if (target != DeviceKeyboard::MenuTarget::Song || !song_menu_cb_) {
+    return;
+  }
+  if (item) {
+    const SongList songs = CollectionTree::SongsFromItem(item);
+    if (!songs.empty()) {
+      song_menu_cb_(songs.front());
+    }
+    return;
+  }
+  if (song) {
+    song_menu_cb_(*song);
+  }
+}
+
+gboolean DeviceView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (DeviceKeyboard::IsMenuTrigger(keyval, static_cast<unsigned>(state))) {
+    ShowSelectedMenu();
+    return TRUE;
+  }
   const DeviceKeyboard::Action action = DeviceKeyboard::FromKey(keyval);
   if (action == DeviceKeyboard::Action::Activate) {
     ListBoxKeyboardGtk::ActivateSelected(list_);

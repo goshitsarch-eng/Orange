@@ -46,7 +46,8 @@ class DeviceView {
   bool ApplyTreeLeft();
   void AttachMenu(GtkWidget *row);
   void SetupRowDrag(GtkWidget *row, const Song &song);
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
+  void ShowSelectedMenu();
   void ResetTypeAhead();
 
   GtkWidget *widget_ = nullptr;

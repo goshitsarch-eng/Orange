@@ -449,6 +449,15 @@ TEST(FileViewKeyboard, AltAndHistoryBack) {
   EXPECT_EQ(FileViewKeyboard::Action::Home, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::Home, false));
 }
 
+TEST(DeviceKeyboard, MenuTriggerAndTarget) {
+  EXPECT_TRUE(DeviceKeyboard::IsMenuTrigger(DeviceKeyboard::kMenuKey, 0));
+  EXPECT_TRUE(DeviceKeyboard::IsMenuTrigger(DeviceKeyboard::kF10Key, DeviceKeyboard::kShiftMask));
+  EXPECT_FALSE(DeviceKeyboard::IsMenuTrigger(DeviceKeyboard::kF10Key, 0));
+  EXPECT_EQ(DeviceKeyboard::MenuTarget::Device, DeviceKeyboard::MenuForSelection(true, true));
+  EXPECT_EQ(DeviceKeyboard::MenuTarget::Song, DeviceKeyboard::MenuForSelection(false, true));
+  EXPECT_EQ(DeviceKeyboard::MenuTarget::None, DeviceKeyboard::MenuForSelection(false, false));
+}
+
 TEST(DeviceKeyboard, FromKeyBackAndSpecialRows) {
   EXPECT_EQ(DeviceKeyboard::Action::Activate, DeviceKeyboard::FromKey(ListBoxKeyboard::kReturn));
   EXPECT_EQ(DeviceKeyboard::Action::MoveUp, DeviceKeyboard::FromKey(ListBoxKeyboard::kUp));

@@ -56,6 +56,27 @@ inline bool IsSpecialRowKind(const char *kind) {
   return kind && (std::strcmp(kind, "back") == 0 || std::strcmp(kind, "add-all") == 0);
 }
 
+// Qt DeviceView::contextMenuEvent uses currentIndex(): device menu vs collection/song menu.
+constexpr unsigned kMenuKey = 0xff67;
+constexpr unsigned kF10Key = 0xffc7;
+constexpr unsigned kShiftMask = 1u << 0;
+
+inline bool IsMenuTrigger(unsigned keyval, unsigned state) {
+  return keyval == kMenuKey || (keyval == kF10Key && (state & kShiftMask) != 0);
+}
+
+enum class MenuTarget { None, Device, Song };
+
+inline MenuTarget MenuForSelection(bool device_row, bool song_row) {
+  if (device_row) {
+    return MenuTarget::Device;
+  }
+  if (song_row) {
+    return MenuTarget::Song;
+  }
+  return MenuTarget::None;
+}
+
 }  // namespace DeviceKeyboard
 
 #endif
