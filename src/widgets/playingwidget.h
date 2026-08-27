@@ -64,6 +64,9 @@ class PlayingWidget {
 
   static bool ShouldShow(bool enabled, bool active) { return enabled && active; }
 
+  // Qt PlayingWidget::SetMode: Fit cover width stays off in the small-cover layout.
+  static bool FitCoverWidthEnabled(Mode mode) { return mode != Mode::SmallSongDetails; }
+
   static int DetailsEstimate(bool has_album) { return has_album ? 60 : 40; }
 
   static int LargeTotalHeight(int cover_size, int details_height) {

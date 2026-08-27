@@ -1799,6 +1799,8 @@ TEST(PlayingWidget, DetailsAndHeight) {
   EXPECT_FALSE(PlayingWidget::ShowHideFinished(true, 250));
   EXPECT_TRUE(PlayingWidget::IsImagePath("cover.jpg"));
   EXPECT_FALSE(PlayingWidget::IsImagePath("track.mp3"));
+  EXPECT_FALSE(PlayingWidget::FitCoverWidthEnabled(PlayingWidget::Mode::SmallSongDetails));
+  EXPECT_TRUE(PlayingWidget::FitCoverWidthEnabled(PlayingWidget::Mode::LargeSongDetails));
 }
 
 TEST(ContextFormatTokens, InsertsKnownTokens) {

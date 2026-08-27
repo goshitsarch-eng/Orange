@@ -396,12 +396,17 @@ void PlayingWidget::ShowMenu(double x, double y) {
         auto *self = static_cast<PlayingWidget *>(data);
         self->SetAboveStatusBar(!self->above_status_bar());
       })));
-  add("fit", G_CALLBACK((+[](GSimpleAction *, GVariant *, gpointer data) {
-        auto *self = static_cast<PlayingWidget *>(data);
-        if (self->mode() == Mode::LargeSongDetails) {
-          self->SetFitCoverWidth(!self->fit_cover_width());
-        }
-      })));
+  GSimpleAction *fit = g_simple_action_new("fit", nullptr);
+  g_simple_action_set_enabled(fit, FitCoverWidthEnabled(mode_) ? TRUE : FALSE);
+  g_signal_connect(fit, "activate", G_CALLBACK((+[](GSimpleAction *, GVariant *, gpointer data) {
+                     auto *self = static_cast<PlayingWidget *>(data);
+                     if (FitCoverWidthEnabled(self->mode())) {
+                       self->SetFitCoverWidth(!self->fit_cover_width());
+                     }
+                   })),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(fit));
+  g_object_unref(fit);
   gtk_widget_insert_action_group(popover, "playing", G_ACTION_GROUP(group));
   if (show_cover) {
     GSimpleActionGroup *cover_group = g_simple_action_group_new();
