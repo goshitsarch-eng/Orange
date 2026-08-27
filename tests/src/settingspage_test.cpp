@@ -285,6 +285,10 @@ TEST(ErrorDialogQueue, ShowAndReraiseMatchQt) {
   EXPECT_FALSE(ErrorDialogQueue::ShouldReraise(true, false, true, true));
   EXPECT_FALSE(ErrorDialogQueue::ShouldReraise(true, true, true, false));
   EXPECT_FALSE(ErrorDialogQueue::ShouldReraise(false, false, true, false));
+  EXPECT_TRUE(ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Show));
+  EXPECT_TRUE(ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::WindowStateChange));
+  EXPECT_TRUE(ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Activate));
+  EXPECT_FALSE(ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Other));
 }
 
 TEST(TranscoderOptionsLabels, QtCopy) {
@@ -481,6 +485,7 @@ TEST(CoverProviderAuth, StatusTextAndServiceSettings) {
   EXPECT_EQ("Open Tidal settings", CoverProviderAuth::OpenSettingsLabel("Tidal"));
   EXPECT_STREQ("No provider selected.", CoverProviderAuth::NoProviderSelected());
   EXPECT_STREQ("Authenticate", CoverProviderAuth::Authenticate());
+  EXPECT_TRUE(CoverProviderAuth::ShouldRefreshOnShow());
   EXPECT_EQ(CoverProviderAuth::Panel::Hidden, CoverProviderAuth::PanelFor("", true, false));
   EXPECT_EQ(CoverProviderAuth::Panel::Hidden, CoverProviderAuth::PanelFor("MusicBrainz", false, false));
   EXPECT_EQ(CoverProviderAuth::Panel::ServiceHint, CoverProviderAuth::PanelFor("Tidal", true, false));

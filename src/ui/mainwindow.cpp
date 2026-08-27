@@ -375,8 +375,29 @@ void MainWindow::BuildUi() {
   window_ = ADW_APPLICATION_WINDOW(adw_application_window_new(GTK_APPLICATION(gtk_app_)));
   error_dialog_ = std::make_unique<QueuedErrorDialog>(GTK_WINDOW(window_));
   g_signal_connect(window_, "notify::is-active", G_CALLBACK((+[](GObject *, GParamSpec *, gpointer data) {
-                     static_cast<MainWindow *>(data)->CheckShowErrorDialog();
+                     if (ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Activate)) {
+                       static_cast<MainWindow *>(data)->CheckShowErrorDialog();
+                     }
                    })),
+                   this);
+  g_signal_connect(window_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     if (ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Show)) {
+                       static_cast<MainWindow *>(data)->CheckShowErrorDialog();
+                     }
+                   }),
+                   this);
+  g_signal_connect(window_, "realize", G_CALLBACK(+[](GtkWidget *widget, gpointer data) {
+                     GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(widget));
+                     if (!surface || !GDK_IS_TOPLEVEL(surface)) {
+                       return;
+                     }
+                     g_signal_connect(surface, "notify::state", G_CALLBACK((+[](GObject *, GParamSpec *, gpointer inner) {
+                                        if (ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::WindowStateChange)) {
+                                          static_cast<MainWindow *>(inner)->CheckShowErrorDialog();
+                                        }
+                                      })),
+                                      data);
+                   }),
                    this);
   gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
   gtk_widget_add_css_class(GTK_WIDGET(window_), "strawberry-main");

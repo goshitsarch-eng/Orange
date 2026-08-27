@@ -78,6 +78,13 @@ inline bool ShouldReraise(bool main_visible, bool main_minimized, bool dialog_vi
   return main_visible && !main_minimized && dialog_visible && !dialog_active;
 }
 
+// Qt MainWindow::changeEvent reraises on Show, WindowStateChange, and WindowActivate.
+enum class WindowEvent { Show, WindowStateChange, Activate, Other };
+
+inline bool ShouldCheckAfterChange(WindowEvent event) {
+  return event == WindowEvent::Show || event == WindowEvent::WindowStateChange || event == WindowEvent::Activate;
+}
+
 }  // namespace ErrorDialogQueue
 
 #endif

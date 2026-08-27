@@ -392,6 +392,12 @@ AdwPreferencesPage *CoversSettingsPage::Create(Settings *settings, Application *
       ApplySelectedProvider(provider_state);
     });
     ApplySelectedProvider(provider_state);
+    g_signal_connect(page, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                       if (CoverProviderAuth::ShouldRefreshOnShow()) {
+                         ApplySelectedProvider(static_cast<ProviderListState *>(data));
+                       }
+                     }),
+                     provider_state);
   } else {
     gtk_widget_set_visible(open_settings, FALSE);
     gtk_widget_set_visible(authenticate, FALSE);
