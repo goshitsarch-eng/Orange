@@ -3,6 +3,7 @@
   <gresource prefix="/org/strawberrymusicplayer/Strawberry">
     <file>schema/schema.sql</file>
     <file>pictures/nomusic.png</file>
+    <file>pictures/musicbrainz.png</file>
     <file>mood/sample.mood</file>
   </gresource>
 </gresources>

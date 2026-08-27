@@ -27,6 +27,11 @@ inline const char *Unknown() { return "Unknown"; }
 inline const char *FetchTags() { return "Complete tags automatically"; }
 inline const char *FetchLyrics() { return "Complete lyrics automatically"; }
 
+// Qt EditTagDialog sets fetch_tag icon from :/pictures/musicbrainz.png at 38x22.
+inline const char *MusicBrainzIconResource() { return "/org/strawberrymusicplayer/Strawberry/pictures/musicbrainz.png"; }
+inline constexpr int kMusicBrainzIconWidth = 38;
+inline constexpr int kMusicBrainzIconHeight = 22;
+
 }  // namespace EditTagSummaryLabels
 
 #endif

@@ -32,6 +32,15 @@ inline int IndexFromName(const std::string &name) {
   return 0;
 }
 
+// Qt setTabEnabled(tab_summary / tab_lyrics, !multiple) — fall back to Tags.
+inline int VisibleIndex(int requested, size_t selected_count) {
+  requested = ClampIndex(requested);
+  if (selected_count > 1 && (requested == 0 || requested == 2)) {
+    return 1;
+  }
+  return requested;
+}
+
 }  // namespace EditTagTabs
 
 #endif

@@ -134,7 +134,7 @@ add_custom_command(
           --generate-source
           ${GRESOURCE_XML}
   DEPENDS ${GRESOURCE_XML} ${CMAKE_CURRENT_SOURCE_DIR}/data/schema/schema.sql ${CMAKE_CURRENT_SOURCE_DIR}/data/pictures/nomusic.png
-          ${CMAKE_CURRENT_SOURCE_DIR}/data/mood/sample.mood
+          ${CMAKE_CURRENT_SOURCE_DIR}/data/pictures/musicbrainz.png ${CMAKE_CURRENT_SOURCE_DIR}/data/mood/sample.mood
   VERBATIM
 )
 

@@ -556,6 +556,24 @@ TEST(EditTagCover, TagsArtGesturesMatchQt) {
   EXPECT_STREQ("Complete tags automatically", EditTagSummaryLabels::FetchTags());
 }
 
+TEST(EditTagCover, TagsTabLayoutMatchesQt) {
+  EXPECT_TRUE(EditTagCover::RatingOnTagsTab());
+  EXPECT_TRUE(EditTagCover::CoreFieldsOnTagsTab());
+  EXPECT_TRUE(EditTagCover::EmbeddedCoverOnTagsTab());
+  EXPECT_STREQ("/org/strawberrymusicplayer/Strawberry/pictures/musicbrainz.png", EditTagSummaryLabels::MusicBrainzIconResource());
+  EXPECT_EQ(38, EditTagSummaryLabels::kMusicBrainzIconWidth);
+  EXPECT_EQ(22, EditTagSummaryLabels::kMusicBrainzIconHeight);
+}
+
+TEST(EditTagTabs, VisibleIndexSkipsDisabledTabs) {
+  EXPECT_EQ(0, EditTagTabs::VisibleIndex(0, 1));
+  EXPECT_EQ(1, EditTagTabs::VisibleIndex(0, 2));
+  EXPECT_EQ(1, EditTagTabs::VisibleIndex(1, 2));
+  EXPECT_EQ(1, EditTagTabs::VisibleIndex(2, 2));
+  EXPECT_EQ(2, EditTagTabs::VisibleIndex(2, 1));
+  EXPECT_EQ(3, EditTagTabs::VisibleIndex(3, 2));
+}
+
 TEST(EditTagFields, FieldEnabledMatchesQtFiletypeSupport) {
   Song flac;
   flac.set_filetype(Song::FileType::FLAC);

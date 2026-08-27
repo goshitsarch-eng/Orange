@@ -111,6 +111,13 @@ inline bool SummaryTabEnabled(size_t selected_count) { return selected_count <= 
 
 inline bool LyricsTabEnabled(size_t selected_count) { return selected_count <= 1; }
 
+// Qt edittagdialog.ui: rating, title/artist/album/year/track/genre, and embedded cover live on tab_tags.
+inline bool RatingOnTagsTab() { return true; }
+
+inline bool CoreFieldsOnTagsTab() { return true; }
+
+inline bool EmbeddedCoverOnTagsTab() { return true; }
+
 }  // namespace EditTagCover
 
 #endif
