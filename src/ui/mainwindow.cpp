@@ -1928,6 +1928,14 @@ void MainWindow::BuildPlayerBar() {
   analyzer_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(analyzer_drawing_, 160, 36);
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(analyzer_drawing_), DrawAnalyzer, this, nullptr);
+  g_signal_connect(analyzer_drawing_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     static_cast<MainWindow *>(data)->EnsureAnalyzerTimer();
+                   }),
+                   this);
+  g_signal_connect(analyzer_drawing_, "unmap", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     static_cast<MainWindow *>(data)->EnsureAnalyzerTimer();
+                   }),
+                   this);
   gtk_box_append(GTK_BOX(controls), prev);
   gtk_box_append(GTK_BOX(controls), play_button_);
   gtk_box_append(GTK_BOX(controls), stop);
@@ -3100,7 +3108,8 @@ void MainWindow::ApplyAnalyzer() {
 }
 
 void MainWindow::EnsureAnalyzerTimer() {
-  if (!app_->analyzer()->enabled()) {
+  const bool mapped = analyzer_drawing_ && gtk_widget_get_mapped(analyzer_drawing_);
+  if (!AnalyzerFramerate::ShouldTick(app_->analyzer()->enabled(), mapped)) {
     if (analyzer_timeout_) {
       g_source_remove(analyzer_timeout_);
       analyzer_timeout_ = 0;
@@ -3126,7 +3135,8 @@ void MainWindow::EnsureAnalyzerTimer() {
 }
 
 void MainWindow::TickAnalyzer() {
-  if (!analyzer_drawing_ || !app_->analyzer()->enabled()) {
+  const bool mapped = analyzer_drawing_ && gtk_widget_get_mapped(analyzer_drawing_);
+  if (!AnalyzerFramerate::ShouldTick(app_->analyzer()->enabled(), mapped)) {
     return;
   }
   const auto state = app_->player()->GetState();

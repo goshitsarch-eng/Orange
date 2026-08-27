@@ -33,6 +33,9 @@ inline std::string LabelFor(int fps) {
   return "Custom (" + std::to_string(fps) + " fps)";
 }
 
+// Qt AnalyzerBase::showEvent starts the timer; hideEvent stops it.
+inline bool ShouldTick(bool enabled, bool mapped) { return enabled && mapped; }
+
 inline int Nearest(int fps) {
   int best = AnalyzerSettings::kMediumFramerate;
   int distance = 1000;

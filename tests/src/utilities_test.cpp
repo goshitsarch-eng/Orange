@@ -2439,6 +2439,10 @@ TEST(AnalyzerFramerate, QtDiscretePresets) {
   EXPECT_EQ("Medium (25 fps)", AnalyzerFramerate::LabelFor(25));
   EXPECT_EQ(25, AnalyzerFramerate::Nearest(24));
   EXPECT_EQ(60, AnalyzerFramerate::Nearest(55));
+  EXPECT_TRUE(AnalyzerFramerate::ShouldTick(true, true));
+  EXPECT_FALSE(AnalyzerFramerate::ShouldTick(true, false));
+  EXPECT_FALSE(AnalyzerFramerate::ShouldTick(false, true));
+  EXPECT_FALSE(AnalyzerFramerate::ShouldTick(false, false));
 }
 
 TEST(TaskbarProgressHelpers, FractionAndVisibility) {

@@ -1,3 +1,4 @@
+#include "config.h"
 #include "constants/notificationssettings.h"
 #include "core/seekbarsettings.h"
 #include "core/song.h"
@@ -203,6 +204,20 @@ TEST(OSDPrettyWayland, DetectsPositionBackend) {
   EXPECT_TRUE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::LayerShell));
   EXPECT_FALSE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::Unpositioned));
   EXPECT_FALSE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::None));
+#ifdef HAVE_GTK4_LAYER_SHELL
+  EXPECT_TRUE(OSDPrettyWayland::CompiledWithLayerShell());
+#else
+  EXPECT_FALSE(OSDPrettyWayland::CompiledWithLayerShell());
+#endif
+  EXPECT_FALSE(OSDPrettyWayland::RuntimeLayerShell(false, true));
+  EXPECT_FALSE(OSDPrettyWayland::RuntimeLayerShell(true, false));
+  EXPECT_TRUE(OSDPrettyWayland::RuntimeLayerShell(true, true));
+  const OSDPrettyWayland::LayerMargins origin = OSDPrettyWayland::MarginsFromAbsolute(100, 80, 0, 0);
+  EXPECT_EQ(100, origin.left);
+  EXPECT_EQ(80, origin.top);
+  const OSDPrettyWayland::LayerMargins offset = OSDPrettyWayland::MarginsFromAbsolute(1960, 40, 1920, 0);
+  EXPECT_EQ(40, offset.left);
+  EXPECT_EQ(40, offset.top);
 }
 
 TEST(OSDPretty, SupportedRequiresX11Display) {
