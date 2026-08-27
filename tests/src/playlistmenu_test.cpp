@@ -1,4 +1,5 @@
 #include "core/song.h"
+#include "playlist/playlisteditpolicy.h"
 #include "playlist/playlistmenu.h"
 
 #include <gtest/gtest.h>
@@ -178,4 +179,11 @@ TEST(PlaylistMenu, CueHidesEditsAndPlayPauseLabel) {
   EXPECT_EQ("Pause", PlaylistMenu::LabelFor(PlaylistMenu::Action::Play, playing));
   playing.pause_disabled = true;
   EXPECT_FALSE(PlaylistMenu::PlayEnabled(playing));
+}
+
+TEST(PlaylistEditPolicy, MenuEditIgnoresInlineSetting) {
+  EXPECT_FALSE(PlaylistEditPolicy::MenuEditRequiresInlineSetting());
+  EXPECT_FALSE(PlaylistEditPolicy::SelectedClickStartsEdit(false, true));
+  EXPECT_FALSE(PlaylistEditPolicy::SelectedClickStartsEdit(true, false));
+  EXPECT_TRUE(PlaylistEditPolicy::SelectedClickStartsEdit(true, true));
 }

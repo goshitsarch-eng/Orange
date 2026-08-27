@@ -9,6 +9,7 @@
 #include "collection/collectionbackend.h"
 #include "collection/collectionsubdirectory.h"
 #include "collection/collectionbehaviour.h"
+#include "collection/collectionsearchsync.h"
 #include "collection/collectioncover.h"
 #include "collection/collectiondivider.h"
 #include "collection/collectioniconcache.h"
@@ -808,6 +809,21 @@ TEST(CollectionBehaviour, SearchQueryUniqueAndPlaylistName) {
   EXPECT_EQ("albumartist:\"Portishead\"", CollectionBehaviour::SearchQuery(&artist, grouping));
   EXPECT_EQ("album:\"Dummy\"", CollectionBehaviour::SearchQuery(album, grouping));
   EXPECT_EQ("title:\"Roads\"", CollectionBehaviour::SearchQuery(track, grouping));
+
+  Song collection = MakeSong("Roads", "Portishead", "Dummy");
+  collection.set_source(Song::Source::Collection);
+  Song tidal(Song::Source::Tidal);
+  tidal.set_title("Roads");
+  tidal.set_artist("Portishead");
+  tidal.set_album("Dummy");
+  EXPECT_TRUE(CollectionBehaviour::ShowInCollectionQuery(tidal).empty());
+  EXPECT_EQ("artist:Portishead album:Dummy", CollectionBehaviour::ShowInCollectionQuery(collection));
+  EXPECT_EQ("artist:Portishead album:Dummy", CollectionBehaviour::ShowInCollectionQuery({tidal, collection}));
+  EXPECT_TRUE(CollectionBehaviour::FirstCollectionSong({tidal}).url().empty());
+  EXPECT_TRUE(CollectionSearchSync::ShouldUpdateEntry(true));
+  EXPECT_FALSE(CollectionSearchSync::ShouldUpdateEntry(false));
+  EXPECT_TRUE(CollectionSearchSync::TextDiffers("", "artist:Portishead album:Dummy"));
+  EXPECT_FALSE(CollectionSearchSync::TextDiffers("artist:Portishead album:Dummy", "artist:Portishead album:Dummy"));
 
   Song other = MakeSong("Glory Box", "Portishead", "Dummy");
   other.set_url("file:///tmp/music/Roads.flac");

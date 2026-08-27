@@ -9,6 +9,7 @@
 #include "playlist/playlistclipboard.h"
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlisteditorder.h"
+#include "playlist/playlisteditpolicy.h"
 #include "playlist/playlistplayingicon.h"
 #include "playlist/playlistratingclick.h"
 #include "playlist/playlistdropindicator.h"
@@ -609,6 +610,8 @@ void PlaylistView::Refresh(Playlist *playlist) {
                        const GdkModifierType mods = gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
                        self->RecordClickedColumn(widget, x);
                        self->InhibitAutoscroll();
+                       const bool already_selected =
+                           std::find(self->selected_rows_.begin(), self->selected_rows_.end(), index) != self->selected_rows_.end();
                        if (self->select_) {
                          self->select_(index, (mods & GDK_CONTROL_MASK) != 0);
                        }
@@ -620,6 +623,14 @@ void PlaylistView::Refresh(Playlist *playlist) {
                                                            static_cast<int>(self->last_click_cell_width_), &rating)) {
                          self->rate_(index, rating);
                          rated = true;
+                       }
+                       Settings settings;
+                       settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+                       const bool inline_edit =
+                           settings.BoolValue(PlaylistSettings::kEditMetadataInline, PlaylistSettings::kDefaultEditMetadataInline);
+                       if (!rated && n_press == 1 && self->edit_request_ &&
+                           PlaylistEditPolicy::SelectedClickStartsEdit(inline_edit, already_selected)) {
+                         self->edit_request_();
                        }
                        if (!rated && n_press >= 2 && self->activate_) {
                          self->activate_(index);

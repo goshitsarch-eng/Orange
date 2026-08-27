@@ -10,6 +10,7 @@
 #include "collection/collectiongrouping.h"
 #include "playlist/playlistsummary.h"
 #include "collection/collectionsearchlabels.h"
+#include "collection/collectionsearchsync.h"
 #include "collection/collectionfilterwidget.h"
 #include "collection/collectionviewcontainer.h"
 #include "constants/backendsettings.h"
@@ -48,6 +49,7 @@
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistheadersort.h"
+#include "playlist/playlisteditpolicy.h"
 #include "playlist/playlistmenu.h"
 #include "playlist/playlistlistcontainer.h"
 #include "playlist/playlistlistlook.h"
@@ -2036,6 +2038,10 @@ void MainWindow::ApplyCollectionIncremental(CollectionModelUpdateType type, cons
 void MainWindow::RefreshCollection(const std::string &filter, bool update_text) {
   if (update_text) {
     collection_text_filter_ = filter;
+    if (collection_search_ && CollectionSearchSync::ShouldUpdateEntry(true) &&
+        CollectionSearchSync::TextDiffers(gtk_editable_get_text(GTK_EDITABLE(collection_search_)), filter)) {
+      gtk_editable_set_text(GTK_EDITABLE(collection_search_), filter.c_str());
+    }
   }
   if (!collection_container_) {
     return;
@@ -3607,16 +3613,12 @@ void MainWindow::ShowInCollection() {
   if (songs.empty()) {
     return;
   }
-  std::string filter = songs.front().artist();
-  if (filter.empty()) {
-    filter = songs.front().album();
-  }
-  if (filter.empty()) {
-    filter = songs.front().title();
-  }
+  const std::string filter = CollectionBehaviour::ShowInCollectionQuery(songs);
   adw_view_stack_set_visible_child_name(sidebar_stack_, "collection");
   RefreshCollection(filter, true);
-  ShowToast("Showing “" + filter + "” in collection");
+  if (!filter.empty()) {
+    ShowToast("Showing “" + filter + "” in collection");
+  }
 }
 
 void MainWindow::OpenSelectedInFileManager() {
@@ -3919,11 +3921,13 @@ void MainWindow::ApplyColumnValue(PlaylistColumn column, const std::string &valu
 }
 
 void MainWindow::EditColumnValue() {
-  Settings settings;
-  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
-  if (!settings.BoolValue(PlaylistSettings::kEditMetadataInline, PlaylistSettings::kDefaultEditMetadataInline)) {
-    ShowToast("Enable “Edit metadata inline” in playlist preferences");
-    return;
+  if (PlaylistEditPolicy::MenuEditRequiresInlineSetting()) {
+    Settings settings;
+    settings.BeginGroup(PlaylistSettings::kSettingsGroup);
+    if (!settings.BoolValue(PlaylistSettings::kEditMetadataInline, PlaylistSettings::kDefaultEditMetadataInline)) {
+      ShowToast("Enable “Edit metadata inline” in playlist preferences");
+      return;
+    }
   }
   Playlist *playlist = app_->playlist_manager()->current();
   const std::vector<int> rows = SelectedPlaylistRows();
