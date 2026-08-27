@@ -90,10 +90,29 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
   SettingsPage::AddToggle(scan, settings, CollectionSettings::kStartupScan, CollectionSettingsLabels::StartupScan(), nullptr,
                           CollectionSettings::kDefaultStartupScan);
   SettingsPage::AddToggle(scan, settings, CollectionSettings::kMonitor, CollectionSettingsLabels::Monitor(), nullptr, CollectionSettings::kDefaultMonitor);
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kSongTracking, CollectionSettingsLabels::SongTracking(), nullptr,
-                          CollectionSettings::kDefaultSongTracking);
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kMarkSongsUnavailable, CollectionSettingsLabels::MarkUnavailable(), nullptr,
-                          CollectionSettings::kDefaultMarkSongsUnavailable);
+  GtkWidget *song_tracking = SettingsPage::AddToggle(scan, settings, CollectionSettings::kSongTracking, CollectionSettingsLabels::SongTracking(),
+                                                     nullptr, CollectionSettings::kDefaultSongTracking);
+  GtkWidget *mark_unavailable = SettingsPage::AddToggle(scan, settings, CollectionSettings::kMarkSongsUnavailable,
+                                                        CollectionSettingsLabels::MarkUnavailable(), nullptr,
+                                                        CollectionSettings::kDefaultMarkSongsUnavailable);
+  const bool tracking_on = adw_switch_row_get_active(ADW_SWITCH_ROW(song_tracking));
+  gtk_widget_set_sensitive(mark_unavailable, CollectionSongTracking::MarkUnavailableEnabled(tracking_on));
+  if (tracking_on) {
+    adw_switch_row_set_active(ADW_SWITCH_ROW(mark_unavailable), TRUE);
+  }
+  g_object_set_data(G_OBJECT(song_tracking), "mark-unavailable", mark_unavailable);
+  g_signal_connect(song_tracking, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
+                     auto *mark = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "mark-unavailable"));
+                     if (!mark) {
+                       return;
+                     }
+                     const bool tracking = adw_switch_row_get_active(row);
+                     gtk_widget_set_sensitive(mark, CollectionSongTracking::MarkUnavailableEnabled(tracking));
+                     if (tracking) {
+                       adw_switch_row_set_active(ADW_SWITCH_ROW(mark), TRUE);
+                     }
+                   }),
+                   nullptr);
   SettingsPage::AddToggle(scan, settings, CollectionSettings::kSongENUR128LoudnessAnalysis, CollectionSettingsLabels::EbuAnalysis(), nullptr,
                           CollectionSettings::kDefaultSongENUR128LoudnessAnalysis);
   SettingsPage::AddIntEntry(scan, settings, CollectionSettings::kExpireUnavailableSongs, CollectionSettingsLabels::ExpireUnavailable(),

@@ -82,6 +82,19 @@ TEST(CollectionSettings, OriginalKeysAndDefaults) {
   EXPECT_EQ(60, CollectionSettings::kDefaultExpireUnavailableSongs);
 }
 
+TEST(CollectionSongTracking, MarkUnavailableFollowsQt) {
+  EXPECT_FALSE(CollectionSongTracking::MarkUnavailableEnabled(true));
+  EXPECT_TRUE(CollectionSongTracking::MarkUnavailableEnabled(false));
+  EXPECT_TRUE(CollectionSongTracking::MarkUnavailableChecked(true, false));
+  EXPECT_TRUE(CollectionSongTracking::MarkUnavailableChecked(true, true));
+  EXPECT_FALSE(CollectionSongTracking::MarkUnavailableChecked(false, false));
+  EXPECT_TRUE(CollectionSongTracking::MarkUnavailableChecked(false, true));
+  EXPECT_TRUE(CollectionSongTracking::MarkUnavailableToSave(true, false));
+  EXPECT_TRUE(CollectionSongTracking::MarkUnavailableToSave(true, true));
+  EXPECT_FALSE(CollectionSongTracking::MarkUnavailableToSave(false, false));
+  EXPECT_TRUE(CollectionSongTracking::MarkUnavailableToSave(false, true));
+}
+
 TEST(SettingsControls, NormalizationAndScales) {
   EXPECT_STREQ("none", SettingsControls::NormalizationChoice(false, false));
   EXPECT_STREQ("rg", SettingsControls::NormalizationChoice(true, false));

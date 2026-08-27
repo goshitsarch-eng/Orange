@@ -38,4 +38,18 @@ inline const char *DeleteFiles() { return "Enable delete files in the right clic
 
 }  // namespace CollectionSettingsLabels
 
+namespace CollectionSongTracking {
+
+inline bool MarkUnavailableEnabled(const bool song_tracking) { return !song_tracking; }
+
+inline bool MarkUnavailableChecked(const bool song_tracking, const bool stored) {
+  return song_tracking ? true : stored;
+}
+
+inline bool MarkUnavailableToSave(const bool song_tracking, const bool widget_checked) {
+  return song_tracking ? true : widget_checked;
+}
+
+}  // namespace CollectionSongTracking
+
 #endif
