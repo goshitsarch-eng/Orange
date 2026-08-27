@@ -645,6 +645,17 @@ TEST(PlaylistTabBarVisibility, HidesSinglePlaylistAndAnimates500Ms) {
   EXPECT_EQ(0, PlaylistTabBarVisibility::HeightAt(500, 40, false));
 }
 
+TEST(PlaylistTabMenu, KeyboardUsesCurrentTab) {
+  EXPECT_TRUE(PlaylistTabMenu::IsKeyboardTrigger(PlaylistTabMenu::kMenu, 0));
+  EXPECT_TRUE(PlaylistTabMenu::IsKeyboardTrigger(PlaylistTabMenu::kF10, PlaylistTabMenu::kShiftMask));
+  EXPECT_FALSE(PlaylistTabMenu::IsKeyboardTrigger(PlaylistTabMenu::kF10, 0));
+  EXPECT_TRUE(PlaylistTabMenu::ShouldShowMenu());
+  EXPECT_EQ(2, PlaylistTabMenu::IndexForKeyboard(2));
+  EXPECT_EQ(-1, PlaylistTabMenu::IndexForKeyboard(-1));
+  EXPECT_TRUE(PlaylistTabMenu::IsKeyboardAnchor(PlaylistTabMenu::kKeyboardY));
+  EXPECT_FALSE(PlaylistTabMenu::IsKeyboardAnchor(8));
+}
+
 TEST(PlaylistTabMenu, ContextActionsMatchQt) {
   const std::vector<PlaylistTabMenu::Item> items = PlaylistTabMenu::Items();
   ASSERT_EQ(6u, items.size());
