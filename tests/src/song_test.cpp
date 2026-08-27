@@ -28,6 +28,33 @@ TEST(Song, FiletypeAndAudio) {
   EXPECT_EQ("Collection", Song::SourceToString(Song::Source::Collection));
 }
 
+TEST(Song, ShareUrlAndDomainMatchQt) {
+  EXPECT_EQ("tidal.com", Song::DomainForSource(Song::Source::Tidal));
+  EXPECT_EQ("qobuz.com", Song::DomainForSource(Song::Source::Qobuz));
+  EXPECT_EQ("spotify.com", Song::DomainForSource(Song::Source::Spotify));
+  EXPECT_EQ("somafm.com", Song::DomainForSource(Song::Source::SomaFM));
+  EXPECT_EQ("radioparadise.com", Song::DomainForSource(Song::Source::RadioParadise));
+  EXPECT_EQ("radio-browser.info", Song::DomainForSource(Song::Source::RadioBrowser));
+  EXPECT_TRUE(Song::DomainForSource(Song::Source::Collection).empty());
+  EXPECT_EQ("Tidal", Song::DescriptionForSource(Song::Source::Tidal));
+  EXPECT_EQ("Radio Paradise", Song::DescriptionForSource(Song::Source::RadioParadise));
+  Song tidal(Song::Source::Tidal);
+  tidal.set_song_id("99");
+  EXPECT_EQ("https://tidal.com/track/99", tidal.ShareURL());
+  Song qobuz(Song::Source::Qobuz);
+  qobuz.set_song_id("7");
+  EXPECT_EQ("https://open.qobuz.com/track/7", qobuz.ShareURL());
+  Song spotify(Song::Source::Spotify);
+  spotify.set_song_id("abc");
+  EXPECT_EQ("https://open.spotify.com/track/abc", spotify.ShareURL());
+  Song radio(Song::Source::SomaFM);
+  radio.set_url("https://somafm.com/groovesalad");
+  EXPECT_EQ("https://somafm.com/groovesalad", radio.ShareURL());
+  Song local(Song::Source::Collection);
+  local.set_url("file:///music/a.flac");
+  EXPECT_TRUE(local.ShareURL().empty());
+}
+
 TEST(Song, StreamUrlCanExpireForTidalAndQobuz) {
   Song tidal(Song::Source::Tidal);
   Song qobuz(Song::Source::Qobuz);

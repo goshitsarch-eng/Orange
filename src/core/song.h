@@ -328,6 +328,9 @@ class Song {
   static FileType FiletypeByFilename(const std::string &filename);
   static bool IsAudioFile(const std::string &filename);
   static std::string SourceToString(Source source);
+  static std::string DescriptionForSource(Source source) { return SourceToString(source); }
+  static std::string DomainForSource(Source source);
+  std::string ShareURL() const;
   static std::string FiletypeToString(FileType type);
   static std::string AlbumRemoveDiscMisc(const std::string &album);
   static std::string TitleRemoveMisc(const std::string &title);

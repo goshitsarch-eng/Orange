@@ -38,6 +38,10 @@ TEST(ScrobblerCache, RoundTripJson) {
   item.albumartist = "Portishead";
   item.track = 8;
   item.length_nanosec = 300000000000LL;
+  item.musicbrainz_recording_id = "rec-1";
+  item.musicbrainz_artist_id = "art-1/art-2";
+  item.music_service = "tidal.com";
+  item.share_url = "https://tidal.com/track/99";
   const std::string json = ScrobblerCache::ToJson({item});
   const auto parsed = ScrobblerCache::Parse(json);
   ASSERT_EQ(1u, parsed.size());
@@ -47,6 +51,10 @@ TEST(ScrobblerCache, RoundTripJson) {
   EXPECT_EQ("Roads", parsed.front().title);
   EXPECT_EQ(8, parsed.front().track);
   EXPECT_EQ(300000000000LL, parsed.front().length_nanosec);
+  EXPECT_EQ("rec-1", parsed.front().musicbrainz_recording_id);
+  EXPECT_EQ("art-1/art-2", parsed.front().musicbrainz_artist_id);
+  EXPECT_EQ("tidal.com", parsed.front().music_service);
+  EXPECT_EQ("https://tidal.com/track/99", parsed.front().share_url);
 }
 
 TEST(ScrobblerCache, RejectsIncompleteTracks) {
@@ -98,6 +106,31 @@ TEST(ListenBrainzScrobbler, SubmitBodyEscapesQuotes) {
   EXPECT_NE(std::string::npos, extra.find("\"duration_ms\":180000"));
   EXPECT_NE(std::string::npos, extra.find("\"tracknumber\":3"));
   EXPECT_NE(std::string::npos, extra.find("\"media_player_version\":\"1.2.27\""));
+  ScrobblerCacheItem rich;
+  rich.track = 2;
+  rich.length_nanosec = 240000000000LL;
+  rich.musicbrainz_recording_id = "rec-9";
+  rich.musicbrainz_album_id = "rel-1";
+  rich.musicbrainz_artist_id = "art-1/art-2";
+  rich.musicbrainz_album_artist_id = "art-1";
+  rich.musicbrainz_work_id = "work-1/work-2";
+  rich.music_service = "spotify.com";
+  rich.music_service_name = "Spotify";
+  rich.share_url = "https://open.spotify.com/track/abc";
+  rich.spotify_id = "abc";
+  const std::string mbids = ListenBrainzScrobbleState::AdditionalInfoJson(rich, "1.2.27");
+  EXPECT_NE(std::string::npos, mbids.find("\"recording_mbid\":\"rec-9\""));
+  EXPECT_NE(std::string::npos, mbids.find("\"release_mbid\":\"rel-1\""));
+  EXPECT_NE(std::string::npos, mbids.find("\"artist_mbids\":[\"art-1\",\"art-2\"]"));
+  EXPECT_NE(std::string::npos, mbids.find("\"work_mbids\":[\"work-1\",\"work-2\"]"));
+  EXPECT_NE(std::string::npos, mbids.find("\"music_service\":\"spotify.com\""));
+  EXPECT_NE(std::string::npos, mbids.find("\"origin_url\":\"https://open.spotify.com/track/abc\""));
+  EXPECT_NE(std::string::npos, mbids.find("\"spotify_id\":\"abc\""));
+  item.musicbrainz_recording_id = "rec-9";
+  item.music_service = "tidal.com";
+  const std::string with_mbid = ListenBrainzScrobbler::SubmitBody("single", {item});
+  EXPECT_NE(std::string::npos, with_mbid.find("\"recording_mbid\":\"rec-9\""));
+  EXPECT_NE(std::string::npos, with_mbid.find("\"music_service\":\"tidal.com\""));
   EXPECT_STREQ("import", ListenBrainzScrobbleState::CachedListenType());
   EXPECT_EQ(5, ListenBrainzScrobbleState::DelaySeconds(0, false));
   EXPECT_EQ(30, ListenBrainzScrobbleState::DelaySeconds(0, true));
@@ -208,13 +241,24 @@ TEST(ScrobbleMetadata, StripRemasteredAndAlbumArtist) {
   song.set_albumartist("Portishead");
   song.set_title("Roads (Deluxe Edition)");
   song.set_album("Dummy");
+  song.set_musicbrainz_recording_id("rec-1");
   const auto original = ScrobbleMetadata::FromSong(song, 7);
   EXPECT_EQ("Beth Gibbons", original.artist);
   EXPECT_EQ("Roads (Deluxe Edition)", original.title);
+  EXPECT_EQ("rec-1", original.musicbrainz_recording_id);
+  EXPECT_TRUE(original.music_service.empty());
   const auto preferred = ScrobbleMetadata::FromSong(song, 7, true, true);
   EXPECT_EQ("Portishead", preferred.artist);
   EXPECT_EQ("Roads", preferred.title);
   EXPECT_EQ("Portishead", preferred.albumartist);
+  Song tidal(Song::Source::Tidal);
+  tidal.set_artist("A");
+  tidal.set_title("T");
+  tidal.set_song_id("99");
+  const auto stream = ScrobbleMetadata::FromSong(tidal);
+  EXPECT_EQ("tidal.com", stream.music_service);
+  EXPECT_EQ("Tidal", stream.music_service_name);
+  EXPECT_EQ("https://tidal.com/track/99", stream.share_url);
 }
 
 TEST(ScrobblerEligibility, LastFmHalfOrFourMinutes) {

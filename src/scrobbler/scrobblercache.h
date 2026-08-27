@@ -16,6 +16,20 @@ struct ScrobblerCacheItem {
   int track = 0;
   int64_t length_nanosec = 0;
   bool sent = false;
+  std::string musicbrainz_album_artist_id;
+  std::string musicbrainz_artist_id;
+  std::string musicbrainz_original_artist_id;
+  std::string musicbrainz_album_id;
+  std::string musicbrainz_original_album_id;
+  std::string musicbrainz_recording_id;
+  std::string musicbrainz_track_id;
+  std::string musicbrainz_disc_id;
+  std::string musicbrainz_release_group_id;
+  std::string musicbrainz_work_id;
+  std::string music_service;
+  std::string music_service_name;
+  std::string share_url;
+  std::string spotify_id;
 };
 
 class ScrobblerCache {

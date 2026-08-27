@@ -53,6 +53,24 @@ void ScrobblerCache::Add(const Song &song, uint64_t timestamp) {
   item.albumartist = song.albumartist();
   item.track = song.track();
   item.length_nanosec = song.length_nanosec();
+  item.musicbrainz_album_artist_id = song.musicbrainz_album_artist_id();
+  item.musicbrainz_artist_id = song.musicbrainz_artist_id();
+  item.musicbrainz_original_artist_id = song.musicbrainz_original_artist_id();
+  item.musicbrainz_album_id = song.musicbrainz_album_id();
+  item.musicbrainz_original_album_id = song.musicbrainz_original_album_id();
+  item.musicbrainz_recording_id = song.musicbrainz_recording_id();
+  item.musicbrainz_track_id = song.musicbrainz_track_id();
+  item.musicbrainz_disc_id = song.musicbrainz_disc_id();
+  item.musicbrainz_release_group_id = song.musicbrainz_release_group_id();
+  item.musicbrainz_work_id = song.musicbrainz_work_id();
+  if (song.is_stream()) {
+    item.music_service = Song::DomainForSource(song.source());
+    item.music_service_name = Song::DescriptionForSource(song.source());
+  }
+  item.share_url = song.ShareURL();
+  if (song.source() == Song::Source::Spotify) {
+    item.spotify_id = song.song_id();
+  }
   items_.push_back(item);
   Save();
 }
@@ -103,7 +121,31 @@ std::string ScrobblerCache::ToJson(const std::vector<ScrobblerCacheItem> &items)
     json += "{\"timestamp\":" + std::to_string(items[i].timestamp) + ",\"artist\":\"" + StrUtils::JsonEscape(items[i].artist) + "\",\"album\":\"" +
             StrUtils::JsonEscape(items[i].album) + "\",\"title\":\"" + StrUtils::JsonEscape(items[i].title) + "\",\"track\":" +
             std::to_string(items[i].track) + ",\"albumartist\":\"" + StrUtils::JsonEscape(items[i].albumartist) + "\",\"length_nanosec\":" +
-            std::to_string(items[i].length_nanosec) + "}";
+            std::to_string(items[i].length_nanosec);
+    const auto append = [&](const char *key, const std::string &value) {
+      if (!value.empty()) {
+        json += ",\"";
+        json += key;
+        json += "\":\"";
+        json += StrUtils::JsonEscape(value);
+        json += "\"";
+      }
+    };
+    append("musicbrainz_album_artist_id", items[i].musicbrainz_album_artist_id);
+    append("musicbrainz_artist_id", items[i].musicbrainz_artist_id);
+    append("musicbrainz_original_artist_id", items[i].musicbrainz_original_artist_id);
+    append("musicbrainz_album_id", items[i].musicbrainz_album_id);
+    append("musicbrainz_original_album_id", items[i].musicbrainz_original_album_id);
+    append("musicbrainz_recording_id", items[i].musicbrainz_recording_id);
+    append("musicbrainz_track_id", items[i].musicbrainz_track_id);
+    append("musicbrainz_disc_id", items[i].musicbrainz_disc_id);
+    append("musicbrainz_release_group_id", items[i].musicbrainz_release_group_id);
+    append("musicbrainz_work_id", items[i].musicbrainz_work_id);
+    append("music_service", items[i].music_service);
+    append("music_service_name", items[i].music_service_name);
+    append("share_url", items[i].share_url);
+    append("spotify_id", items[i].spotify_id);
+    json += "}";
   }
   json += "]}";
   return json;
@@ -145,6 +187,20 @@ std::vector<ScrobblerCacheItem> ScrobblerCache::Parse(const std::string &json) {
     item.albumartist = ObjectString(track, "albumartist");
     item.track = static_cast<int>(ObjectInt64(track, "track"));
     item.length_nanosec = ObjectInt64(track, "length_nanosec");
+    item.musicbrainz_album_artist_id = ObjectString(track, "musicbrainz_album_artist_id");
+    item.musicbrainz_artist_id = ObjectString(track, "musicbrainz_artist_id");
+    item.musicbrainz_original_artist_id = ObjectString(track, "musicbrainz_original_artist_id");
+    item.musicbrainz_album_id = ObjectString(track, "musicbrainz_album_id");
+    item.musicbrainz_original_album_id = ObjectString(track, "musicbrainz_original_album_id");
+    item.musicbrainz_recording_id = ObjectString(track, "musicbrainz_recording_id");
+    item.musicbrainz_track_id = ObjectString(track, "musicbrainz_track_id");
+    item.musicbrainz_disc_id = ObjectString(track, "musicbrainz_disc_id");
+    item.musicbrainz_release_group_id = ObjectString(track, "musicbrainz_release_group_id");
+    item.musicbrainz_work_id = ObjectString(track, "musicbrainz_work_id");
+    item.music_service = ObjectString(track, "music_service");
+    item.music_service_name = ObjectString(track, "music_service_name");
+    item.share_url = ObjectString(track, "share_url");
+    item.spotify_id = ObjectString(track, "spotify_id");
     if (item.timestamp == 0 || item.artist.empty() || item.title.empty()) {
       continue;
     }

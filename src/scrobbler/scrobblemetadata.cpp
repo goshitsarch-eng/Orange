@@ -45,6 +45,24 @@ ScrobbleMetadata ScrobbleMetadata::FromSong(const Song &song, uint64_t timestamp
   metadata.track = song.track();
   metadata.length_nanosec = song.length_nanosec();
   metadata.timestamp = timestamp;
+  metadata.musicbrainz_album_artist_id = song.musicbrainz_album_artist_id();
+  metadata.musicbrainz_artist_id = song.musicbrainz_artist_id();
+  metadata.musicbrainz_original_artist_id = song.musicbrainz_original_artist_id();
+  metadata.musicbrainz_album_id = song.musicbrainz_album_id();
+  metadata.musicbrainz_original_album_id = song.musicbrainz_original_album_id();
+  metadata.musicbrainz_recording_id = song.musicbrainz_recording_id();
+  metadata.musicbrainz_track_id = song.musicbrainz_track_id();
+  metadata.musicbrainz_disc_id = song.musicbrainz_disc_id();
+  metadata.musicbrainz_release_group_id = song.musicbrainz_release_group_id();
+  metadata.musicbrainz_work_id = song.musicbrainz_work_id();
+  if (song.is_stream()) {
+    metadata.music_service = Song::DomainForSource(song.source());
+    metadata.music_service_name = Song::DescriptionForSource(song.source());
+  }
+  metadata.share_url = song.ShareURL();
+  if (song.source() == Song::Source::Spotify) {
+    metadata.spotify_id = song.song_id();
+  }
   return metadata;
 }
 

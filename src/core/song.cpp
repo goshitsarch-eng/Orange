@@ -223,6 +223,42 @@ std::string Song::SourceToString(Source source) {
   }
 }
 
+std::string Song::DomainForSource(Source source) {
+  switch (source) {
+    case Source::Tidal:
+      return "tidal.com";
+    case Source::Qobuz:
+      return "qobuz.com";
+    case Source::SomaFM:
+      return "somafm.com";
+    case Source::RadioParadise:
+      return "radioparadise.com";
+    case Source::RadioBrowser:
+      return "radio-browser.info";
+    case Source::Spotify:
+      return "spotify.com";
+    default:
+      return {};
+  }
+}
+
+std::string Song::ShareURL() const {
+  switch (source_) {
+    case Source::Stream:
+    case Source::SomaFM:
+    case Source::RadioBrowser:
+      return url_;
+    case Source::Tidal:
+      return song_id_.empty() ? std::string() : "https://tidal.com/track/" + song_id_;
+    case Source::Qobuz:
+      return song_id_.empty() ? std::string() : "https://open.qobuz.com/track/" + song_id_;
+    case Source::Spotify:
+      return song_id_.empty() ? std::string() : "https://open.spotify.com/track/" + song_id_;
+    default:
+      return {};
+  }
+}
+
 std::string Song::FiletypeToString(FileType type) {
   switch (type) {
     case FileType::WAV:

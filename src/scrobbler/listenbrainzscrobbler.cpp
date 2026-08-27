@@ -67,8 +67,7 @@ std::string ListenBrainzScrobbler::SubmitBody(const std::string &listen_type, co
     if (ListenBrainzScrobbleState::ShouldIncludeReleaseName(items[i].album)) {
       body += ",\"release_name\":\"" + StrUtils::JsonEscape(items[i].album) + "\"";
     }
-    body += ",\"additional_info\":" +
-            ListenBrainzScrobbleState::AdditionalInfoJson(items[i].track, items[i].length_nanosec, STRAWBERRY_VERSION_DISPLAY) + "}}";
+    body += ",\"additional_info\":" + ListenBrainzScrobbleState::AdditionalInfoJson(items[i], STRAWBERRY_VERSION_DISPLAY) + "}}";
   }
   body += "]}";
   return body;
@@ -136,6 +135,22 @@ void ListenBrainzScrobbler::NowPlaying(const Song &song) {
   item.artist = metadata.artist;
   item.album = metadata.album;
   item.title = metadata.title;
+  item.track = metadata.track;
+  item.length_nanosec = metadata.length_nanosec;
+  item.musicbrainz_album_artist_id = metadata.musicbrainz_album_artist_id;
+  item.musicbrainz_artist_id = metadata.musicbrainz_artist_id;
+  item.musicbrainz_original_artist_id = metadata.musicbrainz_original_artist_id;
+  item.musicbrainz_album_id = metadata.musicbrainz_album_id;
+  item.musicbrainz_original_album_id = metadata.musicbrainz_original_album_id;
+  item.musicbrainz_recording_id = metadata.musicbrainz_recording_id;
+  item.musicbrainz_track_id = metadata.musicbrainz_track_id;
+  item.musicbrainz_disc_id = metadata.musicbrainz_disc_id;
+  item.musicbrainz_release_group_id = metadata.musicbrainz_release_group_id;
+  item.musicbrainz_work_id = metadata.musicbrainz_work_id;
+  item.music_service = metadata.music_service;
+  item.music_service_name = metadata.music_service_name;
+  item.share_url = metadata.share_url;
+  item.spotify_id = metadata.spotify_id;
   Submit("playing_now", {item}, false);
 }
 
