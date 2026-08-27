@@ -43,7 +43,7 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   type_songs_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingSearchHelp::Songs()));
   gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(type_albums_), GTK_TOGGLE_BUTTON(type_artists_));
   gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(type_songs_), GTK_TOGGLE_BUTTON(type_artists_));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(type_songs_), TRUE);
+  ApplySearchType(StreamingSearchOpts::LoadSearchType(service_ ? service_->name() : std::string()));
   gtk_box_append(GTK_BOX(types), type_artists_);
   gtk_box_append(GTK_BOX(types), type_albums_);
   gtk_box_append(GTK_BOX(types), type_songs_);
@@ -63,6 +63,9 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   gtk_box_append(GTK_BOX(types), pretty_covers_btn_);
   g_signal_connect(pretty_covers_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
                      auto *self = static_cast<StreamingSearchView *>(data);
+                     if (self->applying_settings_) {
+                       return;
+                     }
                      self->pretty_covers_ = gtk_check_button_get_active(button);
                      self->PersistPrettyCovers();
                      self->Rebuild();
@@ -128,9 +131,27 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
                      self->ScheduleSearch(query, false);
                    }),
                    this);
-  g_signal_connect(type_artists_, "toggled", G_CALLBACK(search_now), this);
-  g_signal_connect(type_albums_, "toggled", G_CALLBACK(search_now), this);
-  g_signal_connect(type_songs_, "toggled", G_CALLBACK(search_now), this);
+  g_signal_connect(type_artists_, "toggled", G_CALLBACK(+[](GtkToggleButton *button, gpointer data) {
+                     if (!StreamingSearchOpts::ShouldSaveOnActivate(gtk_toggle_button_get_active(button) != FALSE, false)) {
+                       return;
+                     }
+                     static_cast<StreamingSearchView *>(data)->OnSearchTypeActivated();
+                   }),
+                   this);
+  g_signal_connect(type_albums_, "toggled", G_CALLBACK(+[](GtkToggleButton *button, gpointer data) {
+                     if (!StreamingSearchOpts::ShouldSaveOnActivate(gtk_toggle_button_get_active(button) != FALSE, false)) {
+                       return;
+                     }
+                     static_cast<StreamingSearchView *>(data)->OnSearchTypeActivated();
+                   }),
+                   this);
+  g_signal_connect(type_songs_, "toggled", G_CALLBACK(+[](GtkToggleButton *button, gpointer data) {
+                     if (!StreamingSearchOpts::ShouldSaveOnActivate(gtk_toggle_button_get_active(button) != FALSE, false)) {
+                       return;
+                     }
+                     static_cast<StreamingSearchView *>(data)->OnSearchTypeActivated();
+                   }),
+                   this);
   ListBoxTreePressGtk::Attach(list_, this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<StreamingSearchView *>(data);
@@ -281,6 +302,57 @@ void StreamingSearchView::ApplyLook() {
   if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingConfigure)) {
     AppearanceConfigureButtons::ApplyWidget(configure_button_, size);
   }
+}
+
+void StreamingSearchView::ApplySearchType(StreamingService::SearchType type) {
+  GtkWidget *target = type_songs_;
+  if (type == StreamingService::SearchType::Artists) {
+    target = type_artists_;
+  } else if (type == StreamingService::SearchType::Albums) {
+    target = type_albums_;
+  }
+  if (!target) {
+    return;
+  }
+  applying_settings_ = true;
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(target), TRUE);
+  applying_settings_ = false;
+}
+
+void StreamingSearchView::PersistSearchType() {
+  StreamingSearchOpts::SaveSearchType(service_ ? service_->name() : std::string(), CurrentType());
+}
+
+void StreamingSearchView::OnSearchTypeActivated() {
+  if (!StreamingSearchOpts::ShouldSaveOnActivate(true, applying_settings_)) {
+    return;
+  }
+  PersistSearchType();
+  if (!search_entry_) {
+    return;
+  }
+  const char *text = gtk_editable_get_text(GTK_EDITABLE(search_entry_));
+  ScheduleSearch(text ? text : "", true);
+}
+
+void StreamingSearchView::ReloadSettings() {
+  if (service_) {
+    Settings settings;
+    settings.BeginGroup(service_->name());
+    pretty_covers_ = StreamingCover::LoadPrettyCovers(service_->name());
+    grouping_ = StreamingSearchGroup::FromSaved(settings.IntValue(StreamingSearchGroup::kSearchGroupBy1, 0),
+                                                settings.IntValue(StreamingSearchGroup::kSearchGroupBy2, 0),
+                                                settings.IntValue(StreamingSearchGroup::kSearchGroupBy3, 0),
+                                                settings.Contains(StreamingSearchGroup::kSearchGroupBy1));
+    ApplySearchType(StreamingSearchOpts::LoadSearchType(service_->name()));
+  }
+  applying_settings_ = true;
+  if (pretty_covers_btn_) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(pretty_covers_btn_), pretty_covers_);
+  }
+  applying_settings_ = false;
+  ApplyLook();
+  Rebuild();
 }
 
 StreamingService::SearchType StreamingSearchView::CurrentType() const {

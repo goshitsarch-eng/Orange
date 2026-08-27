@@ -446,6 +446,43 @@ TEST(StreamingSearchOpts, DelayLimitsAndConfigure) {
   EXPECT_FALSE(StreamingPage::ReachedMax(10, 0));
 }
 
+TEST(StreamingSearchOpts, SearchTypePersistsLikeQt) {
+  using T = StreamingService::SearchType;
+  EXPECT_STREQ("type", StreamingSearchOpts::kSearchType);
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::DefaultSearchType());
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::ClampSearchType(0));
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::ClampSearchType(static_cast<int>(T::Artists)));
+  EXPECT_EQ(T::Albums, StreamingSearchOpts::ClampSearchType(static_cast<int>(T::Albums)));
+  EXPECT_EQ(T::Songs, StreamingSearchOpts::ClampSearchType(static_cast<int>(T::Songs)));
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::ClampSearchType(99));
+  EXPECT_TRUE(StreamingSearchOpts::ShouldSaveOnActivate(true, false));
+  EXPECT_FALSE(StreamingSearchOpts::ShouldSaveOnActivate(false, false));
+  EXPECT_FALSE(StreamingSearchOpts::ShouldSaveOnActivate(true, true));
+  EXPECT_TRUE(StreamingSearchOpts::ShouldReloadOnSettingsClose());
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::LoadSearchType({}));
+
+  const char *group = "StreamingSearchTypeTest";
+  Settings before;
+  before.BeginGroup(group);
+  const bool had = before.Contains(StreamingSearchOpts::kSearchType);
+  const int old = before.IntValue(StreamingSearchOpts::kSearchType, static_cast<int>(StreamingSearchOpts::DefaultSearchType()));
+  StreamingSearchOpts::SaveSearchType(group, T::Albums);
+  EXPECT_EQ(T::Albums, StreamingSearchOpts::LoadSearchType(group));
+  StreamingSearchOpts::SaveSearchType(group, T::Songs);
+  EXPECT_EQ(T::Songs, StreamingSearchOpts::LoadSearchType(group));
+  StreamingSearchOpts::SaveSearchType({}, T::Albums);
+  EXPECT_EQ(T::Songs, StreamingSearchOpts::LoadSearchType(group));
+
+  Settings restore;
+  restore.BeginGroup(group);
+  if (had) {
+    restore.SetIntValue(StreamingSearchOpts::kSearchType, old);
+  } else {
+    restore.Remove(StreamingSearchOpts::kSearchType);
+  }
+  restore.Sync();
+}
+
 TEST(StreamingCoverDownload, HelpersAndSettings) {
   EXPECT_TRUE(StreamingCoverDownload::HasDownloadSetting("Tidal"));
   EXPECT_TRUE(StreamingCoverDownload::HasDownloadSetting("Qobuz"));

@@ -39,6 +39,8 @@ class StreamingSearchView {
   void FocusResultsAndMove(unsigned keyval);
   void SetConfigureCallback(ConfigureCallback callback);
   void ApplyLook();
+  void ReloadSettings();
+  void OnSearchTypeActivated();
   GMenuModel *GroupMenuModel() const { return group_menu_model_; }
   void AttachGroupActions(GtkWidget *widget);
   void SearchForThis(const std::string &query = {});
@@ -55,6 +57,8 @@ class StreamingSearchView {
   void LoadCover(GtkWidget *image, const Song &song);
   void PersistPrettyCovers();
   void PersistGrouping();
+  void PersistSearchType();
+  void ApplySearchType(StreamingService::SearchType type);
   void BuildGroupMenu();
   void ApplyGrouping(const CollectionGrouping::Grouping &grouping);
   void HideProgress();
@@ -97,6 +101,7 @@ class StreamingSearchView {
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
   bool pretty_covers_ = true;
+  bool applying_settings_ = false;
   int cover_gen_ = 0;
   std::string pending_query_;
   guint search_timer_ = 0;

@@ -304,6 +304,9 @@ void StreamingTabsView::ReloadSettings() {
     service_->ReloadSettings();
   }
   LoadFavoriteType();
+  if (search_ && StreamingSearchOpts::ShouldReloadOnSettingsClose()) {
+    search_->ReloadSettings();
+  }
   ApplyLook();
 }
 
