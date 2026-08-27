@@ -76,7 +76,7 @@ class StreamingCollectionView {
   void PersistPrettyCovers();
   void UpdateBack();
   void ActivateSong(const Song &song);
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
   bool ApplyTreeLeft();
   void ResetTypeAhead();
 

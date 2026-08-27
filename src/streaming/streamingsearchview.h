@@ -64,7 +64,7 @@ class StreamingSearchView {
   void ScheduleSearch(const std::string &query, bool immediate);
   void CancelPendingSearch();
   StreamingService::SearchType CurrentType() const;
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
   void ResetTypeAhead();
 
   StreamingService *service_ = nullptr;

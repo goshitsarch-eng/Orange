@@ -208,8 +208,8 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<StreamingSearchView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<StreamingSearchView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
   Rebuild();
@@ -703,7 +703,14 @@ void StreamingSearchView::FocusResultsAndMove(unsigned keyval) {
   }
 }
 
-gboolean StreamingSearchView::OnKeyPressed(guint keyval) {
+gboolean StreamingSearchView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (StreamingCollectionActions::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+    if (menu_ && StreamingCollectionActions::ShouldShowContextMenu(row != nullptr)) {
+      menu_(SelectedSongs());
+    }
+    return TRUE;
+  }
   if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
     ResetTypeAhead();
     FilterEntryApply::FromKey(search_entry_, keyval);

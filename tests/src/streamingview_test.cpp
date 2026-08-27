@@ -727,6 +727,14 @@ TEST(StreamingCollectionTree, CollapsedHidesSongsUntilExpanded) {
   EXPECT_EQ("1 item", StreamingCollectionTree::StatusText(1));
 }
 
+TEST(StreamingCollectionActions, KeyboardOpensContextMenu) {
+  EXPECT_TRUE(StreamingCollectionActions::IsKeyboardTrigger(StreamingCollectionActions::kMenuKey, 0));
+  EXPECT_TRUE(StreamingCollectionActions::IsKeyboardTrigger(StreamingCollectionActions::kF10Key, StreamingCollectionActions::kShiftMask));
+  EXPECT_FALSE(StreamingCollectionActions::IsKeyboardTrigger(StreamingCollectionActions::kF10Key, 0));
+  EXPECT_TRUE(StreamingCollectionActions::ShouldShowContextMenu(true));
+  EXPECT_FALSE(StreamingCollectionActions::ShouldShowContextMenu(false));
+}
+
 TEST(StreamingCollectionActions, PlaylistActionsRequireSelection) {
   EXPECT_FALSE(StreamingCollectionActions::ShouldShowContextMenu(false));
   EXPECT_TRUE(StreamingCollectionActions::ShouldShowContextMenu(true));

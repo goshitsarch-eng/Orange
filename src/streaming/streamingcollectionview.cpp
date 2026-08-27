@@ -146,8 +146,8 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<StreamingCollectionView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<StreamingCollectionView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
 }
@@ -677,7 +677,15 @@ bool StreamingCollectionView::ApplyTreeLeft() {
   return true;
 }
 
-gboolean StreamingCollectionView::OnKeyPressed(guint keyval) {
+gboolean StreamingCollectionView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (StreamingCollectionActions::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+    const bool empty = row && GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "empty-streaming"));
+    if (menu_ && StreamingCollectionActions::ShouldShowContextMenu(row && !empty)) {
+      menu_(SelectedSongs());
+    }
+    return TRUE;
+  }
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
   if ((action == ListBoxKeyboard::Action::Backspace || action == ListBoxKeyboard::Action::Escape) && CanGoBack()) {
     PopBrowse();
