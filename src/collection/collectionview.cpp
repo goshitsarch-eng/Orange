@@ -514,7 +514,7 @@ gboolean CollectionView::OnKeyPressed(guint keyval) {
   if (CollectionFilterKeyboard::FromTreeKey(keyval) == CollectionFilterKeyboard::Action::FocusFilter) {
     ResetTypeAhead();
     if (focus_filter_) {
-      focus_filter_();
+      focus_filter_(keyval);
     }
     return TRUE;
   }

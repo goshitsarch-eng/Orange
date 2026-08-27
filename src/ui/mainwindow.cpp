@@ -8,6 +8,7 @@
 #include "playlist/playlistactivate.h"
 #include "playlist/playlistcdda.h"
 #include "playlist/playlistqueuerefresh.h"
+#include "collection/collectionfilterfocus.h"
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectionmenu.h"
@@ -1200,7 +1201,7 @@ void MainWindow::BuildSidebar() {
     ApplyCollectionPlan(CollectionBehaviour::Enqueue(), songs);
   });
   collection_container_->view()->SetEmptyCallback([this]() { OpenSettings(SettingsPages::Collection()); });
-  collection_container_->view()->SetFocusFilterCallback([this]() { FocusCollectionSearch(); });
+  collection_container_->view()->SetFocusFilterCallback([this](unsigned keyval) { FocusCollectionSearchFromKey(keyval); });
   collection_container_->view()->SetMenuCallback([this](double, double) { ShowCollectionMenu(); });
   gtk_box_append(GTK_BOX(collection_page), collection_container_->widget());
   adw_view_stack_add_titled_with_icon(sidebar_stack_, collection_page, "collection", "Collection",
@@ -4307,6 +4308,20 @@ void MainWindow::AutoCompleteTags() {
 void MainWindow::FocusCollectionSearch() {
   if (collection_search_) {
     gtk_widget_grab_focus(collection_search_);
+  }
+}
+
+void MainWindow::FocusCollectionSearchFromKey(unsigned keyval) {
+  if (!collection_search_) {
+    return;
+  }
+  gtk_widget_grab_focus(collection_search_);
+
+  const char *current = gtk_editable_get_text(GTK_EDITABLE(collection_search_));
+  const std::string next = CollectionFilterFocus::Apply(current ? current : "", CollectionFilterFocus::KeyEffect(keyval));
+  if (next != (current ? current : "")) {
+    gtk_editable_set_text(GTK_EDITABLE(collection_search_), next.c_str());
+    gtk_editable_set_position(GTK_EDITABLE(collection_search_), -1);
   }
 }
 

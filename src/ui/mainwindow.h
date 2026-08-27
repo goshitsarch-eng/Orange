@@ -182,6 +182,7 @@ class MainWindow {
   void ApplyColumnValue(PlaylistColumn column, const std::string &value, const std::vector<int> &rows);
   void PersistEditedSongs(const std::vector<int> &rows);
   void FocusCollectionSearch();
+  void FocusCollectionSearchFromKey(unsigned keyval);
   void ShowToast(const std::string &text);
   void ShowErrorDialog(const std::string &message);
   void CheckShowErrorDialog();

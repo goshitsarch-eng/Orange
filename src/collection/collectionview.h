@@ -22,7 +22,7 @@ class CollectionView {
   using ActivateCallback = std::function<void(const SongList &)>;
   using EnqueueCallback = std::function<void(const SongList &)>;
   using EmptyCallback = std::function<void()>;
-  using FocusFilterCallback = std::function<void()>;
+  using FocusFilterCallback = std::function<void(unsigned keyval)>;
   using MenuCallback = std::function<void(double x, double y)>;
 
   CollectionView();

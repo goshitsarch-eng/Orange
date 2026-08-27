@@ -5,6 +5,7 @@
 #include "collection/skipcounteligibility.h"
 #include "collection/collectionautoopen.h"
 #include "collection/collectionempty.h"
+#include "collection/collectionfilterfocus.h"
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectionbackend.h"
@@ -1386,6 +1387,19 @@ TEST(CollectionAutoOpen, DrillsSingleChildAndMatchesQtBudget) {
     node->AddChild(CollectionItem::Type::Song)->metadata = MakeSong("T", node->key, "A");
   }
   EXPECT_TRUE(CollectionAutoOpen::RecursivelyExpandKeys(&crowded, true).empty());
+}
+
+TEST(CollectionFilterFocus, EscapeClearsAndBackspaceDeletesLastLikeQt) {
+  EXPECT_EQ(CollectionFilterFocus::Effect::Clear, CollectionFilterFocus::KeyEffect(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(CollectionFilterFocus::Effect::DeleteLast, CollectionFilterFocus::KeyEffect(ListBoxKeyboard::kBackSpace));
+  EXPECT_EQ(CollectionFilterFocus::Effect::None, CollectionFilterFocus::KeyEffect('a'));
+  EXPECT_TRUE(CollectionFilterFocus::Apply("radiohead", CollectionFilterFocus::Effect::Clear).empty());
+  EXPECT_EQ("radiohea", CollectionFilterFocus::Apply("radiohead", CollectionFilterFocus::Effect::DeleteLast));
+  EXPECT_EQ("radiohead", CollectionFilterFocus::Apply("radiohead", CollectionFilterFocus::Effect::None));
+  EXPECT_TRUE(CollectionFilterFocus::Apply("", CollectionFilterFocus::Effect::DeleteLast).empty());
+  EXPECT_EQ("caf", CollectionFilterFocus::DeleteLastUtf8("café"));
+  EXPECT_EQ("", CollectionFilterFocus::DeleteLastUtf8("é"));
+  EXPECT_EQ("a", CollectionFilterFocus::DeleteLastUtf8("a"));
 }
 
 TEST(CollectionFilterKeyboard, ReturnActivatesAndEscapeFocusesFilter) {
