@@ -10,6 +10,7 @@
 #include "covermanager/covermanageractions.h"
 #include "covermanager/covermanagerstats.h"
 #include "covermanager/covermanagerview.h"
+#include "covermanager/covermanageractivate.h"
 #include "covermanager/covermanagermenu.h"
 #include "covermanager/coverproviders.h"
 #include "dialogs/dialoghelpers.h"
@@ -382,14 +383,15 @@ gboolean OnCoverKey(CoverManagerState *state, guint keyval, bool albums) {
     ResetTypeAhead(state);
     return TRUE;
   }
-  if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
+  if (CoverManagerActivate::IsEnter(keyval)) {
     if (albums) {
       const auto selected = SelectedAlbums(state);
-      if (!selected.empty()) {
-        AddAlbumToPlaylist(state, selected.front(), false);
-        return TRUE;
+      if (!selected.empty() && state->covers && CoverManagerActivate::ForAlbumEnter() == CoverManagerActivate::Action::ShowCover) {
+        state->covers->ShowCover(state->parent, selected.front().song);
       }
-    } else if (SelectedArtistIndex(state) >= 0) {
+      return TRUE;
+    }
+    if (SelectedArtistIndex(state) >= 0) {
       return TRUE;
     }
   }

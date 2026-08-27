@@ -1,6 +1,7 @@
 #include "collection/collectionalbumart.h"
 #include "playlist/playlistcoverpersist.h"
 #include "covermanager/coverchoicemenu.h"
+#include "covermanager/covermanageractivate.h"
 #include "covermanager/covermanageractions.h"
 #include "covermanager/covermanagermenu.h"
 #include "covermanager/covermanagerstats.h"
@@ -601,6 +602,15 @@ TEST(CoverManagerView, LabelsAndHideIndexMatchQt) {
   EXPECT_EQ(2, CoverManagerView::IndexFromHide(AlbumCoverManagerList::HideCovers::WithCovers));
   EXPECT_EQ(0, CoverManagerView::ClampIndex(-3));
   EXPECT_EQ(2, CoverManagerView::ClampIndex(9));
+}
+
+TEST(CoverManagerActivate, AlbumEnterShowsCoverNotPlaylist) {
+  EXPECT_TRUE(CoverManagerActivate::IsEnter(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(CoverManagerActivate::IsEnter(ListBoxKeyboard::kKPEnter));
+  EXPECT_FALSE(CoverManagerActivate::IsEnter(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(CoverManagerActivate::Action::ShowCover, CoverManagerActivate::ForAlbumEnter());
+  EXPECT_EQ(CoverManagerActivate::Action::None, CoverManagerActivate::ForArtistEnter());
+  EXPECT_FALSE(CoverManagerActivate::AlbumEnterAddsToPlaylist());
 }
 
 TEST(CoverManagerActions, DoubleClickAndFetchFinishMatchQt) {
