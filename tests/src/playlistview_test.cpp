@@ -32,6 +32,7 @@
 #include "playlist/songloaderinserter.h"
 #include "playlist/playlistrating.h"
 #include "playlist/playlistratingclick.h"
+#include "playlist/playlistratinghover.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/ratingpainter.h"
 
@@ -199,6 +200,26 @@ TEST(PlaylistRatingClick, HonorsLockAndMapsStars) {
   EXPECT_FALSE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Rating, true, 100, 100, &rating));
   EXPECT_FALSE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Title, false, 100, 100, &rating));
   EXPECT_FALSE(PlaylistRatingClick::ShouldRate(PlaylistColumn::Rating, false, 10, 0, &rating));
+}
+
+TEST(PlaylistRatingHover, PreviewsStarsOnHoveredAndSelectedRows) {
+  EXPECT_TRUE(PlaylistRatingHover::ShouldHover(PlaylistColumn::Rating, false, false));
+  EXPECT_FALSE(PlaylistRatingHover::ShouldHover(PlaylistColumn::Rating, true, false));
+  EXPECT_FALSE(PlaylistRatingHover::ShouldHover(PlaylistColumn::Rating, false, true));
+  EXPECT_FALSE(PlaylistRatingHover::ShouldHover(PlaylistColumn::Title, false, false));
+  EXPECT_FLOAT_EQ(1.0f, PlaylistRatingHover::PreviewRating(100, 100));
+  EXPECT_FLOAT_EQ(0.0f, PlaylistRatingHover::PreviewRating(0, 100));
+  EXPECT_TRUE(PlaylistRatingHover::IsActive(0.0f));
+  EXPECT_FALSE(PlaylistRatingHover::IsActive(-1.0f));
+  EXPECT_TRUE(PlaylistRatingHover::ShouldPreviewRow(2, 2, {0, 1}));
+  EXPECT_FALSE(PlaylistRatingHover::ShouldPreviewRow(0, 2, {0, 1}));
+  EXPECT_TRUE(PlaylistRatingHover::ShouldPreviewRow(0, 2, {0, 2}));
+  EXPECT_FALSE(PlaylistRatingHover::ShouldPreviewRow(0, -1, {0}));
+  EXPECT_EQ("★★★★★", PlaylistRatingHover::DisplayText(0.2f, 1.0f, true));
+  EXPECT_EQ("★☆☆☆☆", PlaylistRatingHover::DisplayText(0.2f, 1.0f, false));
+  EXPECT_TRUE(PlaylistRatingHover::ShouldClear(false));
+  EXPECT_FALSE(PlaylistRatingHover::ShouldClear(true));
+  EXPECT_STREQ("pointer", PlaylistRatingHover::CursorName());
 }
 
 TEST(PlaylistRating, WritesCollectionLikeQt) {

@@ -43,6 +43,8 @@ class PlaylistView {
   void ScrollToRow(int row, bool center = false);
   void JumpToCurrentlyPlayingTrack();
   void JumpToLastPlayedTrack();
+  void HandleRatingHover(GtkWidget *row, double x);
+  void ClearRatingHover();
   void MaybeScrollToRow(int row, Playlist::AutoScroll mode);
   void InhibitAutoscroll();
   void SetPaused(bool paused);
@@ -83,6 +85,7 @@ class PlaylistView {
   void Clear();
   void QueueDrawMoodbars();
   void RecordClickedColumn(GtkWidget *row, double x);
+  void UpdateRatingHoverLabels();
   void SetupRowDrag(GtkWidget *row, int index);
   gboolean OnDrop(const GValue *value, double y);
   void UpdateDropIndicator(double y);
@@ -129,6 +132,8 @@ class PlaylistView {
   SeekCallback seek_forward_;
   PlaylistColumn last_clicked_column_ = PlaylistColumn::Count;
   int last_clicked_row_ = -1;
+  int hover_rating_row_ = -1;
+  float hover_rating_ = -1.0f;
   double last_click_cell_x_ = 0;
   double last_click_cell_width_ = 0;
   int visible_count_ = 0;

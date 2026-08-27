@@ -16,6 +16,7 @@
 #include "playlist/playlistplayingicon.h"
 #include "playlist/playlistrating.h"
 #include "playlist/playlistratingclick.h"
+#include "playlist/playlistratinghover.h"
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistfilterdelay.h"
@@ -470,6 +471,60 @@ void PlaylistView::SetEditRequestCallback(EditRequestCallback callback) { edit_r
 
 void PlaylistView::SetEditCommitCallback(EditCommitCallback callback) { edit_commit_ = std::move(callback); }
 
+void PlaylistView::HandleRatingHover(GtkWidget *row, double x) {
+  if (!row) {
+    return;
+  }
+  RecordClickedColumn(row, x);
+  const bool locked = PlaylistColumnLayout::RatingLocked();
+  if (!PlaylistRatingHover::ShouldHover(last_clicked_column_, locked, false)) {
+    ClearRatingHover();
+    return;
+  }
+  const float rating = PlaylistRatingHover::PreviewRating(static_cast<int>(last_click_cell_x_), static_cast<int>(last_click_cell_width_));
+  if (!PlaylistRatingHover::IsActive(rating)) {
+    ClearRatingHover();
+    return;
+  }
+  hover_rating_row_ = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
+  hover_rating_ = rating;
+  gtk_widget_set_cursor_from_name(widget_, PlaylistRatingHover::CursorName());
+  UpdateRatingHoverLabels();
+}
+
+void PlaylistView::ClearRatingHover() {
+  if (hover_rating_row_ < 0 && hover_rating_ < 0.0f) {
+    return;
+  }
+  hover_rating_row_ = -1;
+  hover_rating_ = -1.0f;
+  if (widget_) {
+    gtk_widget_set_cursor(widget_, nullptr);
+  }
+  UpdateRatingHoverLabels();
+}
+
+void PlaylistView::UpdateRatingHoverLabels() {
+  if (!playlist_ || !grid_) {
+    return;
+  }
+  for (GtkWidget *row = gtk_widget_get_first_child(grid_); row; row = gtk_widget_get_next_sibling(row)) {
+    const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
+    if (index < 0 || index >= playlist_->row_count()) {
+      continue;
+    }
+    const bool preview = PlaylistRatingHover::ShouldPreviewRow(index, hover_rating_row_, selected_rows_);
+    const std::string text = PlaylistRatingHover::DisplayText(playlist_->song(index).rating(), hover_rating_, preview);
+    for (GtkWidget *cell = gtk_widget_get_first_child(row); cell; cell = gtk_widget_get_next_sibling(cell)) {
+      const int stored = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(cell), "column"));
+      if (stored - 1 != static_cast<int>(PlaylistColumn::Rating) || !GTK_IS_LABEL(cell)) {
+        continue;
+      }
+      gtk_label_set_text(GTK_LABEL(cell), text.c_str());
+    }
+  }
+}
+
 void PlaylistView::RecordClickedColumn(GtkWidget *row, double x) {
   last_click_cell_x_ = 0;
   last_click_cell_width_ = 0;
@@ -540,6 +595,8 @@ void PlaylistView::ApplyColumnWidths() {
 }
 
 void PlaylistView::Refresh(Playlist *playlist) {
+  hover_rating_row_ = -1;
+  hover_rating_ = -1.0f;
   playlist_ = playlist;
   Clear();
   header_->SetViewportWidth(gtk_widget_get_width(widget_));
@@ -688,6 +745,17 @@ void PlaylistView::Refresh(Playlist *playlist) {
                        if (!rated && n_press >= 2 && self->activate_) {
                          self->activate_(index);
                        }
+                     }),
+                     this);
+    GtkEventController *motion = gtk_event_controller_motion_new();
+    gtk_widget_add_controller(row, motion);
+    g_signal_connect(motion, "motion", G_CALLBACK(+[](GtkEventControllerMotion *controller, gdouble x, gdouble, gpointer data) {
+                       auto *self = static_cast<PlaylistView *>(data);
+                       self->HandleRatingHover(gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller)), x);
+                     }),
+                     this);
+    g_signal_connect(motion, "leave", G_CALLBACK(+[](GtkEventControllerMotion *, gpointer data) {
+                       static_cast<PlaylistView *>(data)->ClearRatingHover();
                      }),
                      this);
     SetupRowDrag(row, index);
