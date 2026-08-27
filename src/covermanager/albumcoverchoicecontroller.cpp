@@ -310,76 +310,100 @@ void AlbumCoverChoiceController::Perform(CoverChoiceMenu::Action action, GtkWind
   }
 }
 
+void AlbumCoverChoiceController::PopupAttachedMenu(GtkWidget *widget, GtkWindow *parent) {
+  if (!widget) {
+    return;
+  }
+  auto *fn = static_cast<std::function<Song()> *>(g_object_get_data(G_OBJECT(widget), "cover-song-fn"));
+  if (!fn) {
+    return;
+  }
+  Song song = (*fn)();
+  if (!CoverChoiceMenu::ShouldShowAttachedMenu(song.is_valid(), !song.url().empty())) {
+    return;
+  }
+  auto *owned = new Song(song);
+  GMenu *menu = g_menu_new();
+  for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
+    g_menu_append(menu, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
+  }
+  g_menu_append(menu, Translations::CStr(CoverChoiceMenu::SearchAutomaticallyLabel()), CoverChoiceMenu::SearchAutomaticallyPath("cover").c_str());
+  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
+  gtk_widget_set_parent(popover, widget);
+  GSimpleActionGroup *group = g_simple_action_group_new();
+  auto add = [&](const char *name) {
+    GSimpleAction *action = g_simple_action_new(name, nullptr);
+    g_object_set_data(G_OBJECT(action), "song", owned);
+    g_object_set_data(G_OBJECT(action), "parent", parent);
+    g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer controller) {
+                       auto *self = static_cast<AlbumCoverChoiceController *>(controller);
+                       auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(act), "song"));
+                       auto *parent = GTK_WINDOW(g_object_get_data(G_OBJECT(act), "parent"));
+                       const char *name = g_action_get_name(G_ACTION(act));
+                       if (!name) {
+                         return;
+                       }
+                       self->Perform(CoverChoiceMenu::FromId(name), parent, song, nullptr);
+                     }),
+                     this);
+    g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
+  };
+  for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
+    add(item.id);
+  }
+  Settings auto_settings;
+  GSimpleAction *auto_action = g_simple_action_new_stateful(CoverChoiceMenu::SearchAutomaticallyId(), nullptr,
+                                                           g_variant_new_boolean(ContextCover::LoadEnabled(auto_settings)));
+  g_signal_connect(auto_action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer controller) {
+                     auto *self = static_cast<AlbumCoverChoiceController *>(controller);
+                     Settings settings;
+                     const bool enabled = ContextCover::ToggleEnabled(settings);
+                     g_simple_action_set_state(act, g_variant_new_boolean(enabled));
+                     if (self->search_auto_changed_) {
+                       self->search_auto_changed_(enabled);
+                     }
+                   }),
+                   this);
+  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(auto_action));
+  gtk_widget_insert_action_group(popover, "cover", G_ACTION_GROUP(group));
+  g_object_set_data_full(G_OBJECT(popover), "song", owned, [](gpointer p) { delete static_cast<Song *>(p); });
+  gtk_popover_popup(GTK_POPOVER(popover));
+}
+
+gboolean AlbumCoverChoiceController::OnAttachedKey(GtkWidget *widget, guint keyval, GdkModifierType state) {
+  if (!CoverChoiceMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    return FALSE;
+  }
+  auto *parent = widget ? GTK_WINDOW(g_object_get_data(G_OBJECT(widget), "cover-parent")) : nullptr;
+  PopupAttachedMenu(widget, parent);
+  return TRUE;
+}
+
 void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent, const std::function<Song()> &song_for_menu) {
   if (!widget) {
     return;
   }
   auto *holder = new std::function<Song()>(song_for_menu);
   g_object_set_data_full(G_OBJECT(widget), "cover-song-fn", holder, [](gpointer p) { delete static_cast<std::function<Song()> *>(p); });
+  g_object_set_data(G_OBJECT(widget), "cover-parent", parent);
+  gtk_widget_set_focusable(widget, TRUE);
   GtkGesture *gesture = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(gesture));
-  g_object_set_data(G_OBJECT(gesture), "parent", parent);
-  g_signal_connect(gesture, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble, gpointer data) {
+  g_signal_connect(gesture, "pressed", G_CALLBACK((+[](GtkGestureClick *click, gint, gdouble, gdouble, gpointer data) {
                      auto *self = static_cast<AlbumCoverChoiceController *>(data);
                      GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(click));
-                     auto *fn = static_cast<std::function<Song()> *>(g_object_get_data(G_OBJECT(widget), "cover-song-fn"));
-                     auto *parent = GTK_WINDOW(g_object_get_data(G_OBJECT(click), "parent"));
-                     if (!fn) {
-                       return;
-                     }
-                     Song song = (*fn)();
-                     if (!song.is_valid() && song.url().empty()) {
-                       return;
-                     }
-                     auto *owned = new Song(song);
-                     GMenu *menu = g_menu_new();
-                     for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
-                       g_menu_append(menu, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
-                     }
-                     g_menu_append(menu, Translations::CStr(CoverChoiceMenu::SearchAutomaticallyLabel()),
-                                   CoverChoiceMenu::SearchAutomaticallyPath("cover").c_str());
-                     GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
-                     gtk_widget_set_parent(popover, widget);
-                     GSimpleActionGroup *group = g_simple_action_group_new();
-                     auto add = [&](const char *name) {
-                       GSimpleAction *action = g_simple_action_new(name, nullptr);
-                       g_object_set_data(G_OBJECT(action), "song", owned);
-                       g_object_set_data(G_OBJECT(action), "parent", parent);
-                       g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer controller) {
-                                          auto *self = static_cast<AlbumCoverChoiceController *>(controller);
-                                          auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(act), "song"));
-                                          auto *parent = GTK_WINDOW(g_object_get_data(G_OBJECT(act), "parent"));
-                                          const char *name = g_action_get_name(G_ACTION(act));
-                                          if (!name) {
-                                            return;
-                                          }
-                                          self->Perform(CoverChoiceMenu::FromId(name), parent, song, nullptr);
-                                        }),
-                                        self);
-                       g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
-                     };
-                     for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
-                       add(item.id);
-                     }
-                     Settings auto_settings;
-                     GSimpleAction *auto_action = g_simple_action_new_stateful(
-                         CoverChoiceMenu::SearchAutomaticallyId(), nullptr, g_variant_new_boolean(ContextCover::LoadEnabled(auto_settings)));
-                     g_signal_connect(auto_action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer controller) {
-                                        auto *self = static_cast<AlbumCoverChoiceController *>(controller);
-                                        Settings settings;
-                                        const bool enabled = ContextCover::ToggleEnabled(settings);
-                                        g_simple_action_set_state(act, g_variant_new_boolean(enabled));
-                                        if (self->search_auto_changed_) {
-                                          self->search_auto_changed_(enabled);
-                                        }
-                                      }),
-                                      self);
-                     g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(auto_action));
-                     gtk_widget_insert_action_group(popover, "cover", G_ACTION_GROUP(group));
-                     g_object_set_data_full(G_OBJECT(popover), "song", owned, [](gpointer p) { delete static_cast<Song *>(p); });
-                     gtk_popover_popup(GTK_POPOVER(popover));
-                   }),
+                     auto *parent = widget ? GTK_WINDOW(g_object_get_data(G_OBJECT(widget), "cover-parent")) : nullptr;
+                     self->PopupAttachedMenu(widget, parent);
+                   })),
+                   this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(widget, keys);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *controller, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+                     return static_cast<AlbumCoverChoiceController *>(data)->OnAttachedKey(widget, keyval, state);
+                   })),
                    this);
 }
 

@@ -479,6 +479,17 @@ TEST(AlbumCoverBatch, ProgressAbortAndStatus) {
   EXPECT_NE(std::string::npos, batch.StatusText().find("cancelled"));
 }
 
+TEST(CoverChoiceMenu, KeyboardOpensAttachedCoverMenu) {
+  EXPECT_TRUE(CoverChoiceMenu::IsKeyboardTrigger(CoverChoiceMenu::kMenu, 0));
+  EXPECT_TRUE(CoverChoiceMenu::IsKeyboardTrigger(CoverChoiceMenu::kF10, CoverChoiceMenu::kShiftMask));
+  EXPECT_FALSE(CoverChoiceMenu::IsKeyboardTrigger(CoverChoiceMenu::kF10, 0));
+  EXPECT_TRUE(CoverChoiceMenu::ShouldShowAttachedMenu(true, false));
+  EXPECT_TRUE(CoverChoiceMenu::ShouldShowAttachedMenu(false, true));
+  EXPECT_FALSE(CoverChoiceMenu::ShouldShowAttachedMenu(false, false));
+  EXPECT_TRUE(CoverChoiceMenu::ShouldShowContextAlbumMenu(true, false, true));
+  EXPECT_FALSE(CoverChoiceMenu::ShouldShowContextAlbumMenu(true, false, false));
+}
+
 TEST(CoverChoiceMenu, ItemsAndWhenToShow) {
   const auto items = CoverChoiceMenu::Items();
   ASSERT_EQ(9u, items.size());
