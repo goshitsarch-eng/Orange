@@ -60,6 +60,7 @@ class Player : public PlayerInterface {
   void PlaylistsLoaded();
   void ShowOSD();
   void TogglePrettyOSD();
+  void SyncCurrentMetadata(const Song &updated);
 
   Signal<Song> SongChanged;
   Signal<Song> NowPlayingRefresh;

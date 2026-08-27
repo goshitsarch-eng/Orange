@@ -298,6 +298,23 @@ TEST(StreamingMetadataQueue, TrackIdsAndMergeMatchQt) {
   EXPECT_EQ(0, EditTagSave::ResolveRow({original}, 2, "qobuz://7"));
 }
 
+TEST(StreamingMetadataMerge, RefreshesNowPlayingLikeQt) {
+  EXPECT_TRUE(StreamingMetadataMerge::ShouldNotifyCurrentSong(2, 2));
+  EXPECT_FALSE(StreamingMetadataMerge::ShouldNotifyCurrentSong(2, 3));
+  EXPECT_FALSE(StreamingMetadataMerge::ShouldNotifyCurrentSong(-1, -1));
+  Song playing(Song::Source::Tidal);
+  playing.set_valid(true);
+  playing.set_url("tidal://12");
+  playing.set_title("Old");
+  Song fetched = playing;
+  fetched.set_title("Roads");
+  EXPECT_TRUE(StreamingMetadataMerge::ShouldSyncPlayer(playing, fetched));
+  Song other = fetched;
+  other.set_url("tidal://13");
+  EXPECT_FALSE(StreamingMetadataMerge::ShouldSyncPlayer(playing, other));
+  EXPECT_FALSE(StreamingMetadataMerge::ShouldSyncPlayer(playing, Song()));
+}
+
 TEST(SubsonicUrlHandler, BuildsStreamUrlFromPath) {
   EXPECT_EQ("99", SubsonicUrlHandler::SongId("subsonic://99"));
   const std::string url = SubsonicUrlHandler::StreamUrl("https://music.example.com", "alice", "secret", "99", true);

@@ -4765,6 +4765,10 @@ void MainWindow::ApplyFetchedMetadata(const StreamingMetadataQueue::Entry &entry
       playlist->ReplaceRow(row, updated);
       app_->playlist_manager()->SaveCurrent();
       RefreshPlaylist();
+      if (StreamingMetadataMerge::ShouldSyncPlayer(app_->player()->current_song(), updated) ||
+          StreamingMetadataMerge::ShouldNotifyCurrentSong(row, playlist->current_row())) {
+        app_->player()->SyncCurrentMetadata(updated);
+      }
     }
   }
   ScheduleMetadataQueue();

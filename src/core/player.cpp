@@ -17,6 +17,7 @@
 #include "constants/playlistsettings.h"
 #include "core/logging.h"
 #include "core/playermetadatasync.h"
+#include "streaming/streamingmetadatamerge.h"
 #include "core/playernextmetadata.h"
 #include "core/playererrorloop.h"
 #include "engine/gstengineerror.h"
@@ -445,6 +446,14 @@ void Player::PlayPlaylist(const std::string &name) {
     playlist_manager_->SetCurrentPlaylist(name);
   }
   StartFromPlaylist(0);
+}
+
+void Player::SyncCurrentMetadata(const Song &updated) {
+  if (!StreamingMetadataMerge::ShouldSyncPlayer(current_song_, updated)) {
+    return;
+  }
+  StreamingMetadataMerge::Apply(&current_song_, updated);
+  SongChanged.Emit(current_song_);
 }
 
 void Player::ShowOSD() { ForceShowOSD.Emit(current_song_, false); }
