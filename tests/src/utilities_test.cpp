@@ -2141,6 +2141,15 @@ TEST(PlayingCoverActivate, DoubleClickRequiresValidSongLikeQt) {
   EXPECT_FALSE(PlayingCoverActivate::ShouldShowContext(true, 2, false, true));
 }
 
+TEST(PlayingCoverActivate, KeyboardAlwaysOpensMenu) {
+  EXPECT_TRUE(PlayingCoverActivate::IsKeyboardTrigger(PlayingCoverActivate::kMenu, 0));
+  EXPECT_TRUE(PlayingCoverActivate::IsKeyboardTrigger(PlayingCoverActivate::kF10, PlayingCoverActivate::kShiftMask));
+  EXPECT_FALSE(PlayingCoverActivate::IsKeyboardTrigger(PlayingCoverActivate::kF10, 0));
+  EXPECT_TRUE(PlayingCoverActivate::ShouldShowMenu());
+  EXPECT_TRUE(PlayingCoverActivate::IsKeyboardAnchor(PlayingCoverActivate::kKeyboardY));
+  EXPECT_FALSE(PlayingCoverActivate::IsKeyboardAnchor(12));
+}
+
 TEST(PlayingWidget, CoverSizeAndFade) {
   EXPECT_EQ(PlayingWidget::kSmallCover, PlayingWidget::CoverSize(PlayingWidget::Mode::SmallSongDetails, true, 400));
   EXPECT_EQ(PlayingWidget::kMaxCoverSize, PlayingWidget::CoverSize(PlayingWidget::Mode::LargeSongDetails, false, 400));

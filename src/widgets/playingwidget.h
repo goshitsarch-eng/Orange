@@ -55,6 +55,7 @@ class PlayingWidget {
   void SetCover(const std::vector<unsigned char> &data);
   void SearchCoverInProgress();
   const Song &song() const { return song_; }
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
 
   Signal<bool> AboveStatusBarChanged;
 
