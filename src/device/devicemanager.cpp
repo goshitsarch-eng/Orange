@@ -21,6 +21,7 @@
 #include "device/mtpmusicstorage.h"
 #include "device/devicecopyrefresh.h"
 #include "device/devicecopysupported.h"
+#include "device/deviceeject.h"
 #include "device/gpoddevice.h"
 #include "device/gpodloader.h"
 #include "device/mtpconnection.h"
@@ -556,17 +557,33 @@ std::string DeviceManager::MusicPath(const ConnectedDevice &device) {
 }
 
 std::unique_ptr<MusicStorage> DeviceManager::MusicStorageForDevice(const ConnectedDevice &device) const {
+  std::unique_ptr<MusicStorage> storage;
   switch (DeviceStorage::KindFor(device)) {
     case DeviceStorage::Kind::Mtp:
-      return std::make_unique<MtpMusicStorage>(DeviceCopyJob::MtpSerial(device.unique_id));
+      storage = std::make_unique<MtpMusicStorage>(DeviceCopyJob::MtpSerial(device.unique_id));
+      break;
     case DeviceStorage::Kind::GPod:
-      return std::make_unique<GPodMusicStorage>(device.mount_path);
+      storage = std::make_unique<GPodMusicStorage>(device.mount_path);
+      break;
     case DeviceStorage::Kind::Filesystem:
-      return std::make_unique<FilesystemMusicStorage>(MusicPath(device));
+      storage = std::make_unique<FilesystemMusicStorage>(MusicPath(device));
+      break;
     case DeviceStorage::Kind::None:
       break;
   }
-  return nullptr;
+  if (!storage) {
+    return nullptr;
+  }
+  const DeviceDatabaseBackend::Device stored = StoredDevice(device.unique_id);
+  if (stored.id >= 0) {
+    storage->SetTranscodeMode(OrganizeTranscode::FromDeviceMode(stored.transcode_mode));
+    storage->SetTranscodeFormat(stored.transcode_format);
+  }
+  if (DeviceEject::ShouldAttachEjectHandler(device)) {
+    const std::string mount_path = device.mount_path;
+    storage->SetEjectHandler([mount_path]() { DeviceEject::UnmountPath(mount_path); });
+  }
+  return storage;
 }
 
 SongList DeviceManager::TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const {
@@ -759,27 +776,16 @@ bool DeviceManager::Mount(const std::string &device_id) {
 }
 
 bool DeviceManager::Unmount(const std::string &device_id) {
-#ifdef HAVE_GIO
   const ConnectedDevice *found = FindDevice(device_id);
-  if (!found || found->mount_path.empty()) {
+  if (!found || !DeviceEject::Supported(*found) || DeviceEject::SkipsUnmount(found->mount_path)) {
     DeviceError.Emit(DeviceError::UnmountFailed());
     return false;
   }
-  GFile *file = g_file_new_for_path(found->mount_path.c_str());
-  if (!file) {
+  if (!DeviceEject::UnmountPath(found->mount_path, [this]() { Rescan(); })) {
+    DeviceError.Emit(DeviceError::UnmountFailed());
     return false;
   }
-  g_file_unmount_mountable_with_operation(file, G_MOUNT_UNMOUNT_NONE, nullptr, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
-    g_file_unmount_mountable_with_operation_finish(G_FILE(source), result, nullptr);
-    static_cast<DeviceManager *>(data)->Rescan();
-    g_object_unref(source);
-  }, this);
   return true;
-#else
-  (void)device_id;
-  DeviceError.Emit(DeviceError::UnmountFailed());
-  return false;
-#endif
 }
 
 bool DeviceManager::SetDeviceOptions(const std::string &device_id, const std::string &friendly_name,

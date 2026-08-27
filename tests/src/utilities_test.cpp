@@ -931,6 +931,40 @@ TEST(OrganizeStorage, DeviceCopyUsesRelativeDestination) {
   rmdir(dir.c_str());
 }
 
+TEST(OrganizeStorage, EjectsThroughMusicStorageLikeQt) {
+  char dir_template[] = "/tmp/strawberry-organize-eject-XXXXXX";
+  const std::string dir = mkdtemp(dir_template);
+  const std::string src = FileUtils::Join(dir, "roads.flac");
+  FileUtils::WriteFile(src, "flac");
+  Song song;
+  song.set_valid(true);
+  song.set_title("Roads");
+  song.set_url(FileUtils::UriFromPath(src));
+
+  FakeMusicStorage storage;
+  bool ejected = false;
+  storage.SetEjectHandler([&ejected]() { ejected = true; });
+  Organize::Options options;
+  options.storage = &storage;
+  options.eject_after = true;
+  const std::vector<Organize::Error> errors = Organize().Copy({song}, "", OrganizeFormat("%title"), options);
+  EXPECT_TRUE(errors.empty());
+  EXPECT_TRUE(storage.finished);
+  EXPECT_TRUE(ejected);
+
+  FakeMusicStorage keep;
+  bool keep_ejected = false;
+  keep.SetEjectHandler([&keep_ejected]() { keep_ejected = true; });
+  Organize::Options no_eject;
+  no_eject.storage = &keep;
+  Organize().Copy({song}, "", OrganizeFormat("%title"), no_eject);
+  EXPECT_TRUE(keep.finished);
+  EXPECT_FALSE(keep_ejected);
+
+  FileUtils::Remove(src);
+  rmdir(dir.c_str());
+}
+
 TEST(Organize, CopiesDisambiguatedCollisions) {
   char dir_template[] = "/tmp/strawberry-organize-dup-XXXXXX";
   const std::string dir = mkdtemp(dir_template);

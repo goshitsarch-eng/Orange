@@ -732,13 +732,6 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                          const std::vector<Organize::Error> &errors = job->errors();
                          if (errors.empty()) {
                            gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
-                           gpointer eject_ptr = g_object_get_data(G_OBJECT(button), "eject");
-                           const char *eject_device_id = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "device-id"));
-                           if (DeviceEject::ShouldEjectAfter(eject_ptr != nullptr,
-                                                             eject_ptr && gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)), true) &&
-                               eject_device_id && application && application->device_manager()) {
-                             application->device_manager()->Unmount(eject_device_id);
-                           }
                          } else {
                            OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), errors);
                            gtk_label_set_text(GTK_LABEL(status_label), (std::to_string(errors.size()) + " file(s) failed.").c_str());

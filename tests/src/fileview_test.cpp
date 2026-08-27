@@ -12,6 +12,7 @@
 #include "device/devicecopyjob.h"
 #include "device/deviceeject.h"
 #include "device/devicecopyrunner.h"
+#include "device/devicemanager.h"
 #include "device/devicestorage.h"
 #include "core/taskmanager.h"
 #include "device/devicemenu.h"
@@ -572,6 +573,10 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_FALSE(DeviceEject::ShouldShowCheckbox(true, false));
   EXPECT_TRUE(DeviceEject::ShouldEjectAfter(true, true, true));
   EXPECT_FALSE(DeviceEject::ShouldEjectAfter(true, true, false));
+  EXPECT_TRUE(DeviceEject::ShouldAttachEjectHandler(filesystem));
+  EXPECT_FALSE(DeviceEject::ShouldAttachEjectHandler(mtp));
+  EXPECT_TRUE(DeviceEject::ShouldAttachEjectHandler(ipod));
+  EXPECT_FALSE(DeviceEject::DialogUnmountsAfterOrganize());
   EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("mtp:serial"));
   EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("MTP/serial"));
   EXPECT_EQ("usb", DeviceCopyJob::MtpSerial("usb"));
@@ -628,6 +633,52 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_FALSE(sync.Copy(none, SongList{missing.front()}));
   EXPECT_TRUE(paused);
   EXPECT_TRUE(sync.finished());
+}
+
+TEST(DeviceEject, GioUnmountPrefersVolumeEject) {
+  using DeviceEject::UnmountAction;
+  EXPECT_TRUE(DeviceEject::SkipsUnmount("mtp://phone"));
+  EXPECT_FALSE(DeviceEject::SkipsUnmount("/media/usb"));
+  EXPECT_EQ("/media/usb", DeviceEject::NormalizeMountPath("/media/usb/"));
+  EXPECT_EQ("/", DeviceEject::NormalizeMountPath("/"));
+  EXPECT_TRUE(DeviceEject::SameMountPath("/media/usb/", "/media/usb"));
+  EXPECT_EQ(UnmountAction::None, DeviceEject::ActionFor(true, true, true, true, true, true, true));
+  EXPECT_EQ(UnmountAction::VolumeEject, DeviceEject::ActionFor(false, true, true, true, true, true, true));
+  EXPECT_EQ(UnmountAction::MountEject, DeviceEject::ActionFor(false, true, false, true, true, true, true));
+  EXPECT_EQ(UnmountAction::MountUnmount, DeviceEject::ActionFor(false, true, false, true, false, true, true));
+  EXPECT_EQ(UnmountAction::FileUnmount, DeviceEject::ActionFor(false, false, false, false, false, false, true));
+  EXPECT_EQ(UnmountAction::None, DeviceEject::ActionFor(false, false, false, false, false, false, false));
+  EXPECT_FALSE(DeviceEject::UnmountPath({}));
+  EXPECT_FALSE(DeviceEject::UnmountPath("mtp://phone"));
+
+  DeviceManager manager;
+  ConnectedDevice usb;
+  usb.backend = "gio";
+  usb.mount_path = "/media/usb";
+  usb.unique_id = "usb-1";
+  auto storage = manager.MusicStorageForDevice(usb);
+  ASSERT_TRUE(storage);
+  EXPECT_TRUE(storage->HasEjectHandler());
+  EXPECT_EQ(MusicStorage::TranscodeMode::Transcode_Never, storage->GetTranscodeMode());
+  EXPECT_EQ(Song::FileType::Unknown, storage->GetTranscodeFormat());
+  storage->SetTranscodeMode(MusicStorage::TranscodeMode::Transcode_Always);
+  storage->SetTranscodeFormat(Song::FileType::MPEG);
+  EXPECT_EQ(MusicStorage::TranscodeMode::Transcode_Always, storage->GetTranscodeMode());
+  EXPECT_EQ(Song::FileType::MPEG, storage->GetTranscodeFormat());
+
+  ConnectedDevice mtp;
+  mtp.backend = "mtp";
+  mtp.unique_id = "mtp:serial";
+  auto mtp_storage = manager.MusicStorageForDevice(mtp);
+  ASSERT_TRUE(mtp_storage);
+  EXPECT_FALSE(mtp_storage->HasEjectHandler());
+
+  ConnectedDevice ipod;
+  ipod.backend = "gpod";
+  ipod.mount_path = "/media/ipod";
+  auto ipod_storage = manager.MusicStorageForDevice(ipod);
+  ASSERT_TRUE(ipod_storage);
+  EXPECT_TRUE(ipod_storage->HasEjectHandler());
 }
 
 TEST(DeviceCollectionTree, GroupsDeviceSongsUntilExpanded) {
