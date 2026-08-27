@@ -50,6 +50,7 @@ struct DialogState {
   Organize *job = nullptr;
   std::shared_ptr<bool> alive = std::make_shared<bool>(true);
   bool persist_dest = true;
+  bool has_local_destination = true;
   MusicStorage::TranscodeMode transcode_mode = MusicStorage::TranscodeMode::Transcode_Never;
   Song::FileType transcode_format = Song::FileType::Unknown;
   std::vector<Song::FileType> supported;
@@ -115,17 +116,18 @@ void RefreshPreview(DialogState *state) {
   }
   const OrganizeFormat format = FormatFromState(state);
   std::string error;
-  const bool valid = OrganizeFormatValidator::IsValid(format.format(), &error);
+  const bool valid = !OrganizePreview::FormatRequired(state->has_local_destination) || OrganizeFormatValidator::IsValid(format.format(), &error);
   const std::string dest = state->dest ? gtk_editable_get_text(GTK_EDITABLE(state->dest)) : "";
   const SongList songs = SongsFromState(state);
-  std::vector<OrganizePreview::Entry> entries =
-      valid ? OrganizePreview::Compute(songs, format, state->transcode_mode, state->transcode_format, state->supported)
-            : std::vector<OrganizePreview::Entry>{};
-  if (OrganizePreview::AnyEmptyPath(entries)) {
-    entries.clear();
+  std::vector<OrganizePreview::Entry> entries;
+  if (state->has_local_destination && valid) {
+    entries = OrganizePreview::Compute(songs, format, state->transcode_mode, state->transcode_format, state->supported);
+    if (OrganizePreview::AnyEmptyPath(entries)) {
+      entries.clear();
+    }
   }
   ClearPreview(state->preview_list);
-  if (state->preview_list) {
+  if (state->has_local_destination && state->preview_list) {
     for (const OrganizePreview::Entry &entry : entries) {
       GtkWidget *row = gtk_list_box_row_new();
       GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
@@ -152,7 +154,8 @@ void RefreshPreview(DialogState *state) {
   if (state->run) {
     const int64_t used = state->space ? state->space->used() : 0;
     const int64_t total = state->space ? state->space->total() : 0;
-    gtk_widget_set_sensitive(state->run, OrganizePreview::CanRun(valid, dest, entries, OrganizePreview::TotalBytes(songs), used, total));
+    gtk_widget_set_sensitive(state->run, OrganizePreview::CanRun(valid, dest, entries, OrganizePreview::TotalBytes(songs), used, total,
+                                                                  state->has_local_destination, !songs.empty()));
   }
 }
 
@@ -266,6 +269,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   if (saved_dest.empty() && !dirs.empty()) {
     saved_dest = dirs.front().path;
   }
+
+  const bool local_naming = OrganizePreview::ShowsNamingPreview(request.destination, request.device_id);
+  const bool lock_dest = OrganizePreview::LocksDestination(request.destination, request.device_id);
 
   GtkWidget *format_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_box_append(GTK_BOX(format_header), gtk_label_new(Translations::CStr("Filename format")));
@@ -459,6 +465,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   state->supported = request.supported_filetypes;
   state->persist_dest = request.destination.empty();
   state->playlist = request.playlist;
+  state->has_local_destination = local_naming;
   g_signal_connect(space->widget(), "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) { delete static_cast<FreeSpaceBar *>(data); }), space);
   g_object_set_data_full(G_OBJECT(run), "state", state, [](gpointer p) { delete static_cast<DialogState *>(p); });
 
@@ -519,7 +526,9 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      const std::string format_text = text ? text : "";
                      g_free(text);
                      std::string error;
-                     if (!OrganizeFormatValidator::IsValid(format_text, &error)) {
+                     auto *state = static_cast<DialogState *>(g_object_get_data(G_OBJECT(button), "state"));
+                     if (OrganizePreview::FormatRequired(state ? state->has_local_destination : true) &&
+                         !OrganizeFormatValidator::IsValid(format_text, &error)) {
                        gtk_label_set_text(GTK_LABEL(g_object_get_data(G_OBJECT(button), "status")), error.c_str());
                        return;
                      }
@@ -552,7 +561,6 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                        options.tagreader = application->tagreader();
                      }
                      options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "organize-cover.bin");
-                     auto *state = static_cast<DialogState *>(g_object_get_data(G_OBJECT(button), "state"));
                      if (state) {
                        options.playlist = state->playlist;
                      }
@@ -612,7 +620,8 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   gtk_box_append(GTK_BOX(box), format_header);
   gtk_box_append(GTK_BOX(box), format_view);
   gtk_box_append(GTK_BOX(box), format_error);
-  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Destination")));
+  GtkWidget *dest_label = gtk_label_new(Translations::CStr("Destination"));
+  gtk_box_append(GTK_BOX(box), dest_label);
   if (dest_drop) {
     gtk_box_append(GTK_BOX(box), dest_drop);
   }
@@ -630,8 +639,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   if (eject) {
     gtk_box_append(GTK_BOX(box), eject);
   }
-  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr("Preview")));
+  GtkWidget *preview_label = gtk_label_new(Translations::CStr("Preview"));
+  gtk_box_append(GTK_BOX(box), preview_label);
   gtk_box_append(GTK_BOX(box), preview_scroll);
+  state->preview_label = preview_label;
   GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_box_append(GTK_BOX(actions), restore);
   gtk_box_append(GTK_BOX(actions), save);
@@ -666,6 +677,23 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   adw_dialog_set_child(dialog, box);
   std::string format_error_text;
   gtk_label_set_text(GTK_LABEL(format_error), OrganizeFormatValidator::IsValid(saved_format, &format_error_text) ? "" : format_error_text.c_str());
+  gtk_widget_set_visible(format_header, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(format_view, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(format_error, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(remove_problematic, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(remove_non_fat, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(remove_non_ascii, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(allow_ascii_ext, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(replace_spaces, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(preview_label, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(preview_scroll, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(dest_label, local_naming ? TRUE : FALSE);
+  gtk_widget_set_visible(dest_row, local_naming ? TRUE : FALSE);
+  if (dest_drop) {
+    gtk_widget_set_visible(dest_drop, (!lock_dest && local_naming) ? TRUE : FALSE);
+  }
+  gtk_widget_set_visible(browse, (!lock_dest && local_naming) ? TRUE : FALSE);
+  gtk_editable_set_editable(GTK_EDITABLE(dest), lock_dest ? FALSE : TRUE);
   RefreshPreview(state);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

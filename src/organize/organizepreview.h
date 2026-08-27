@@ -146,9 +146,36 @@ inline bool FitsOnDevice(int64_t additional, int64_t used, int64_t total) {
 // Qt OrganizeDialog::UpdatePreviews: OK stays off without a usable destination.
 inline bool HasDestination(const std::string &destination) { return !destination.empty(); }
 
+// Qt hides groupbox_naming / groupbox_preview unless storage->LocalPath() is set.
+inline bool HasLocalDestination(const std::string &destination) { return !destination.empty(); }
+
+inline bool ShowsNamingPreview(bool has_local_destination) { return has_local_destination; }
+
+// Organize-to-folder always names files. Device copy only does when a mount path is set.
+inline bool ShowsNamingPreview(const std::string &destination, const std::string &device_id) {
+  return ShowsNamingPreview(device_id.empty() || HasLocalDestination(destination));
+}
+
+inline bool FormatRequired(bool has_local_destination) { return has_local_destination; }
+
+inline bool FormatValidForRun(bool format_valid, bool has_local_destination) {
+  return !FormatRequired(has_local_destination) || format_valid;
+}
+
+// Copy-to-device pre-fills a mount path or device id; Qt destination combo stays on that device.
+inline bool LocksDestination(const std::string &destination, const std::string &device_id) {
+  return !destination.empty() || !device_id.empty();
+}
+
 inline bool CanRun(bool format_valid, const std::string &destination, const std::vector<Entry> &entries, int64_t additional_bytes,
-                   int64_t used_bytes, int64_t total_bytes) {
-  return format_valid && HasDestination(destination) && CanProceed(entries) && FitsOnDevice(additional_bytes, used_bytes, total_bytes);
+                   int64_t used_bytes, int64_t total_bytes, bool has_local_destination = true, bool has_songs = true) {
+  if (!FormatValidForRun(format_valid, has_local_destination) || !FitsOnDevice(additional_bytes, used_bytes, total_bytes)) {
+    return false;
+  }
+  if (!has_local_destination) {
+    return has_songs;
+  }
+  return HasDestination(destination) && CanProceed(entries);
 }
 
 inline const char *PreviewIconName(const Entry &entry) { return entry.ok ? "dialog-ok-apply-symbolic" : "dialog-warning-symbolic"; }

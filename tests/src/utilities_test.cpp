@@ -657,6 +657,20 @@ TEST(OrganizePreview, DisambiguatesOnlyWhenUnique) {
   EXPECT_TRUE(OrganizePreview::FitsOnDevice(50, 40, 100));
   EXPECT_FALSE(OrganizePreview::FitsOnDevice(70, 40, 100));
   EXPECT_TRUE(OrganizePreview::FitsOnDevice(999, 0, 0));
+  EXPECT_TRUE(OrganizePreview::ShowsNamingPreview(true));
+  EXPECT_FALSE(OrganizePreview::ShowsNamingPreview(false));
+  EXPECT_TRUE(OrganizePreview::ShowsNamingPreview("", ""));
+  EXPECT_TRUE(OrganizePreview::ShowsNamingPreview("/run/media/usb", "usb:1"));
+  EXPECT_FALSE(OrganizePreview::ShowsNamingPreview("", "mtp:phone"));
+  EXPECT_TRUE(OrganizePreview::FormatRequired(true));
+  EXPECT_FALSE(OrganizePreview::FormatRequired(false));
+  EXPECT_TRUE(OrganizePreview::FormatValidForRun(false, false));
+  EXPECT_FALSE(OrganizePreview::FormatValidForRun(false, true));
+  EXPECT_TRUE(OrganizePreview::LocksDestination("/run/media/usb", ""));
+  EXPECT_TRUE(OrganizePreview::LocksDestination("", "mtp:phone"));
+  EXPECT_FALSE(OrganizePreview::LocksDestination("", ""));
+  EXPECT_TRUE(OrganizePreview::CanRun(false, "", {}, 150, 0, 0, false, true));
+  EXPECT_FALSE(OrganizePreview::CanRun(false, "", {}, 150, 0, 0, false, false));
 }
 
 TEST(OrganizeJob, BatchesTenAndSupportsCancel) {
