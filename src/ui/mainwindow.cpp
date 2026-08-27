@@ -3813,8 +3813,10 @@ void MainWindow::ShowPlaylistMenu(double, double y) {
   const std::vector<int> rows = SelectedPlaylistRows();
   playlist_menu_row_ = -1;
   if (playlist && playlist_container_ && playlist_container_->view()) {
-    playlist_menu_row_ =
-        PlaylistMenu::ContextRow(playlist_container_->view()->RowAtY(y, playlist_container_->view()->grid()), playlist->row_count());
+    playlist_menu_row_ = PlaylistMenu::IsKeyboardAnchor(y)
+                             ? PlaylistMenu::ContextRowFromKeyboard(rows.empty() ? -1 : rows.front(), playlist->row_count())
+                             : PlaylistMenu::ContextRow(playlist_container_->view()->RowAtY(y, playlist_container_->view()->grid()),
+                                                        playlist->row_count());
   }
   const PlaylistColumn column = playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Title;
   PlaylistMenu::SelectionState opts;

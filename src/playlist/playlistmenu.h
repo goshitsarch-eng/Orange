@@ -267,6 +267,20 @@ inline int ContextRow(int row_at_y, int row_count) {
   return row_at_y;
 }
 
+// Qt PlaylistView::contextMenuEvent Keyboard (Menu / Shift+F10) uses currentIndex().
+constexpr unsigned kMenuKey = 0xff67;
+constexpr unsigned kF10Key = 0xffc7;
+constexpr unsigned kShiftMask = 1u << 0;
+constexpr double kKeyboardY = -1;
+
+inline bool IsKeyboardTrigger(unsigned keyval, unsigned state) {
+  return keyval == kMenuKey || (keyval == kF10Key && (state & kShiftMask) != 0);
+}
+
+inline bool IsKeyboardAnchor(double y) { return y < 0; }
+
+inline int ContextRowFromKeyboard(int selected_row, int row_count) { return ContextRow(selected_row, row_count); }
+
 inline bool StopAfterEnabled(const SelectionState &state) { return state.index_valid; }
 
 inline bool CopyToDeviceEnabled(const SelectionState &state) { return state.devices_connected; }

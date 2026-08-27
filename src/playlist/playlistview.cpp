@@ -24,6 +24,7 @@
 #include "playlist/playlistrestorescroll.h"
 #include "playlist/playlistfilterempty.h"
 #include "playlist/playlistkeyboard.h"
+#include "playlist/playlistmenu.h"
 #include "playlist/playlistlook.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlisttagcompletion.h"
@@ -209,6 +210,10 @@ void PlaylistView::FocusAndMove(unsigned keyval) {
 }
 
 gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (PlaylistMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state)) && menu_) {
+    menu_(0, PlaylistMenu::kKeyboardY);
+    return TRUE;
+  }
   const PlaylistKeyboard::Action key_action = PlaylistKeyboard::FromKey(keyval, state, GDK_CONTROL_MASK);
   if (key_action == PlaylistKeyboard::Action::PlayPause && play_pause_) {
     play_pause_();
