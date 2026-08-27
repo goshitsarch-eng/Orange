@@ -24,6 +24,7 @@
 #include "engine/backendoptions.h"
 #include "engine/engineexclusive.h"
 #include "engine/enginefade.h"
+#include "engine/engineplay.h"
 #include "engine/engineseek.h"
 #include "collection/collectionalbumart.h"
 #include "collection/collectionartpersist.h"
@@ -1031,6 +1032,17 @@ TEST(EngineSeek, CoalescesRapidSeeksLikeQt) {
   EXPECT_FALSE(EngineSeek::ShouldSeekImmediately(true));
   EXPECT_TRUE(EngineSeek::ShouldApplyPending(true));
   EXPECT_FALSE(EngineSeek::ShouldApplyPending(false));
+}
+
+TEST(EnginePlay, ShortCircuitsAlreadyPlayingLikeQt) {
+  EXPECT_TRUE(EnginePlay::IsBuffering(3));
+  EXPECT_FALSE(EnginePlay::IsBuffering(-1));
+  EXPECT_FALSE(EnginePlay::ShouldSeekWhenAlreadyPlaying(0, 0));
+  EXPECT_TRUE(EnginePlay::ShouldSeekWhenAlreadyPlaying(1, 0));
+  EXPECT_TRUE(EnginePlay::ShouldSeekWhenAlreadyPlaying(0, 5000000000ULL));
+  EXPECT_TRUE(EnginePlay::ShouldShortCircuitPlayingPipeline(true, -1));
+  EXPECT_FALSE(EnginePlay::ShouldShortCircuitPlayingPipeline(true, 2));
+  EXPECT_FALSE(EnginePlay::ShouldShortCircuitPlayingPipeline(false, -1));
 }
 
 TEST(EngineFade, ResumeFadeInMatchesQtLatch) {

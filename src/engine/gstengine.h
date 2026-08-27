@@ -98,6 +98,7 @@ class GstEngine : public EngineBase {
   void FinishStopImmediate();
   void SeekNow();
   void CancelSeek();
+  void PlayDone(bool pause);
   static gboolean SeekTimeout(gpointer data);
   void SetState(State state);
   void ApplyCurrentVolume(double fraction);
