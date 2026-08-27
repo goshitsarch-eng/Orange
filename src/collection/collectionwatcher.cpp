@@ -3,7 +3,10 @@
 #include "config.h"
 #include "collection/collectionbackend.h"
 #include "collection/collectioncuescan.h"
+#include "collection/collectiondirectoryart.h"
+#include "collection/collectionexpire.h"
 #include "collection/collectionrescanreason.h"
+#include "collection/collectionscandelay.h"
 #include "collection/collectionsubdirectory.h"
 #include "constants/collectionsettings.h"
 #include "core/logging.h"
@@ -32,6 +35,14 @@ CollectionWatcher::~CollectionWatcher() {
   if (alive_) {
     *alive_ = false;
   }
+  if (rescan_timeout_id_) {
+    g_source_remove(rescan_timeout_id_);
+    rescan_timeout_id_ = 0;
+  }
+  if (periodic_timeout_id_) {
+    g_source_remove(periodic_timeout_id_);
+    periodic_timeout_id_ = 0;
+  }
   StopWatching();
 }
 
@@ -41,9 +52,47 @@ void CollectionWatcher::Scan() { Scan(ScanType::Incremental); }
 
 void CollectionWatcher::Scan(ScanType type) {
   if (scanning_) {
+    if (type == ScanType::Incremental) {
+      queued_incremental_ = true;
+    }
     return;
   }
   StartAsyncScan(type);
+}
+
+void CollectionWatcher::ScheduleIncremental() {
+  if (scanning_) {
+    queued_incremental_ = true;
+    return;
+  }
+  ArmRescanTimer();
+}
+
+void CollectionWatcher::ArmRescanTimer() {
+  if (rescan_timeout_id_) {
+    g_source_remove(rescan_timeout_id_);
+    rescan_timeout_id_ = 0;
+  }
+  rescan_timeout_id_ = g_timeout_add(CollectionScanDelay::kRescanMs, OnRescanTimeout, this);
+}
+
+gboolean CollectionWatcher::OnRescanTimeout(gpointer data) {
+  auto *self = static_cast<CollectionWatcher *>(data);
+  self->rescan_timeout_id_ = 0;
+  self->Scan(ScanType::Incremental);
+  return G_SOURCE_REMOVE;
+}
+
+void CollectionWatcher::StartPeriodicScan() {
+  if (periodic_timeout_id_) {
+    return;
+  }
+  periodic_timeout_id_ = g_timeout_add(CollectionScanDelay::kPeriodicMs, OnPeriodicTimeout, this);
+}
+
+gboolean CollectionWatcher::OnPeriodicTimeout(gpointer data) {
+  static_cast<CollectionWatcher *>(data)->Scan(ScanType::Incremental);
+  return G_SOURCE_CONTINUE;
 }
 
 void CollectionWatcher::StartAsyncScan(ScanType type) {
@@ -65,6 +114,9 @@ void CollectionWatcher::StartAsyncScan(ScanType type) {
   job->overwrite_playcount =
       settings.BoolValue(CollectionSettings::kOverwritePlaycount, CollectionSettings::kDefaultOverwritePlaycount);
   job->overwrite_rating = settings.BoolValue(CollectionSettings::kOverwriteRating, CollectionSettings::kDefaultOverwriteRating);
+  job->expire_days =
+      settings.IntValue(CollectionSettings::kExpireUnavailableSongs, CollectionSettings::kDefaultExpireUnavailableSongs);
+  job->cover_filters = CollectionDirectoryArt::FiltersFromSettings();
 #ifndef HAVE_CHROMAPRINT
   job->song_tracking = false;
 #endif
@@ -255,7 +307,11 @@ void CollectionWatcher::CollectFile(ScanJob *job, const CollectionDirectory &dir
     file.set_cue_path({});
     songs.push_back(file);
   }
+  const std::string art = CollectionDirectoryArt::ArtForDirectory(FileUtils::DirName(entry), job->cover_filters);
   for (Song &song : songs) {
+    if (song.art_automatic().empty() && !art.empty()) {
+      song.set_art_automatic(FileUtils::UriFromPath(art));
+    }
     MergeFromExisting(&song, FindExisting(job, song.url(), song.beginning_nanosec()), job);
     job->songs.push_back(song);
     ++job->added;
@@ -335,6 +391,12 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
         self->backend_->MarkMissingUnavailable(directory_id, job->seen_urls);
       }
     }
+    for (const CollectionDirectory &directory : job->directories) {
+      self->backend_->UpdateLastSeen(directory.id);
+      if (job->expire_days > 0) {
+        self->backend_->ExpireSongs(directory.id, job->expire_days);
+      }
+    }
     self->backend_->UpdateCompilations();
     std::map<int, std::vector<CollectionSubdirectory>> by_directory;
     for (const CollectionSubdirectory &subdir : job->updated_subdirs) {
@@ -349,10 +411,18 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
   }
   self->scanning_ = false;
   self->ScanFinished.Emit();
+  if (CollectionScanDelay::ShouldRunAfterFinish(self->queued_incremental_)) {
+    self->queued_incremental_ = false;
+    self->ScheduleIncremental();
+  }
   return G_SOURCE_REMOVE;
 }
 
 void CollectionWatcher::StopWatching() {
+  if (periodic_timeout_id_) {
+    g_source_remove(periodic_timeout_id_);
+    periodic_timeout_id_ = 0;
+  }
   for (GFileMonitor *monitor : monitors_) {
     g_file_monitor_cancel(monitor);
     g_object_unref(monitor);
@@ -366,7 +436,7 @@ void CollectionWatcher::StopWatching() {
 void CollectionWatcher::WatchPath(const std::string &path) {
   if (!inotify_watcher_) {
     inotify_watcher_ = std::make_unique<FileSystemWatcherInotify>();
-    inotify_watcher_->PathChanged.Connect([this](const std::string &) { Scan(ScanType::Incremental); });
+    inotify_watcher_->PathChanged.Connect([this](const std::string &) { ScheduleIncremental(); });
   }
   inotify_watcher_->AddPath(path);
   GFile *file = g_file_new_for_path(path.c_str());
@@ -378,7 +448,7 @@ void CollectionWatcher::WatchPath(const std::string &path) {
   g_signal_connect(monitor, "changed", G_CALLBACK(+[](GFileMonitor *, GFile *, GFile *, GFileMonitorEvent event, gpointer data) {
                      if (event == G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT || event == G_FILE_MONITOR_EVENT_CREATED ||
                          event == G_FILE_MONITOR_EVENT_DELETED) {
-                       static_cast<CollectionWatcher *>(data)->Scan(ScanType::Incremental);
+                       static_cast<CollectionWatcher *>(data)->ScheduleIncremental();
                      }
                    }),
                    this);
@@ -395,6 +465,7 @@ void CollectionWatcher::StartWatching() {
   for (const CollectionDirectory &directory : backend_->Directories()) {
     WatchPath(directory.path);
   }
+  StartPeriodicScan();
 }
 
 void CollectionWatcher::ScanDirectory(int directory_id, const std::string &path, bool recursive) {

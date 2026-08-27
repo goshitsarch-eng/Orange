@@ -1,9 +1,11 @@
 #ifndef STRAWBERRY_COLLECTIONWATCHER_H
 #define STRAWBERRY_COLLECTIONWATCHER_H
 
+#include "constants/collectionsettings.h"
 #include "collection/collectioncuescan.h"
 #include "collection/collectiondirectory.h"
 #include "collection/collectionrescanreason.h"
+#include "collection/collectionscandelay.h"
 #include "collection/collectionsubdirectory.h"
 #include "core/filesystemwatcherinotify.h"
 #include "core/signal.h"
@@ -91,13 +93,20 @@ class CollectionWatcher {
     bool ebu_analysis = false;
     bool overwrite_playcount = false;
     bool overwrite_rating = false;
+    int expire_days = CollectionSettings::kDefaultExpireUnavailableSongs;
+    std::vector<std::string> cover_filters;
   };
 
   void ScanPath(int directory_id, const std::string &path, bool recursive, int task_id, int *added);
   void WatchPath(const std::string &path);
+  void ScheduleIncremental();
+  void ArmRescanTimer();
+  void StartPeriodicScan();
   void StartAsyncScan(ScanType type);
   static gpointer ScanThread(gpointer data);
   static gboolean ApplyScanJob(gpointer data);
+  static gboolean OnRescanTimeout(gpointer data);
+  static gboolean OnPeriodicTimeout(gpointer data);
   void CollectDirectory(ScanJob *job, const CollectionDirectory &directory);
   static Song SongFromExisting(const ExistingInfo &info);
   static const ExistingInfo *FindExisting(const ScanJob *job, const std::string &url, int64_t beginning);
@@ -115,6 +124,9 @@ class CollectionWatcher {
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
   std::vector<GFileMonitor *> monitors_;
   std::unique_ptr<FileSystemWatcherInotify> inotify_watcher_;
+  guint rescan_timeout_id_ = 0;
+  guint periodic_timeout_id_ = 0;
+  bool queued_incremental_ = false;
 };
 
 #endif  // STRAWBERRY_COLLECTIONWATCHER_H

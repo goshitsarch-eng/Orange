@@ -2,11 +2,13 @@
 
 #include "collection/collectioncompilation.h"
 #include "collection/collectioncompilationdetect.h"
+#include "collection/collectionexpire.h"
 #include "collection/collectionquery.h"
 #include "filterparser/filterparser.h"
 #include "utilities/strutils.h"
 
 #include <algorithm>
+#include <ctime>
 
 CollectionBackend::CollectionBackend(Database *database) : database_(database) {}
 
@@ -116,7 +118,9 @@ Song CollectionBackend::SongFromQuery(const SqlQuery &query) const {
   song.set_playcount(static_cast<unsigned>(query.ColumnInt(39)));
   song.set_skipcount(static_cast<unsigned>(query.ColumnInt(40)));
   song.set_lastplayed(query.ColumnInt64(41));
+  song.set_lastseen(query.ColumnInt64(42));
   song.set_art_embedded(query.ColumnInt(47) != 0);
+  song.set_art_automatic(query.ColumnText(48));
   song.set_art_manual(query.ColumnText(49));
   song.set_art_unset(query.ColumnInt(50) != 0);
   song.set_cue_path(query.ColumnText(53));
@@ -247,7 +251,7 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
                    "bitdepth=?, filetype=?, filesize=?, mtime=?, unavailable=0, art_embedded=?, art_manual=?, fingerprint=?, "
                    "cue_path=?, skipcount=?, lastplayed=?, ebur128_integrated_loudness_lufs=?, ebur128_loudness_range_lu=?, "
                    "playcount=CASE WHEN ? > 0 THEN ? ELSE playcount END, "
-                   "rating=CASE WHEN ? >= 0 THEN ? ELSE rating END WHERE url=? AND beginning=?");
+                   "rating=CASE WHEN ? >= 0 THEN ? ELSE rating END, art_automatic=? WHERE url=? AND beginning=?");
     query.Bind(1, song.title());
     query.Bind(2, song.album());
     query.Bind(3, song.artist());
@@ -289,8 +293,9 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
     query.Bind(31, static_cast<int>(song.playcount()));
     query.Bind(32, song.rating() >= 0 ? static_cast<int>(song.rating() * 100.0f) : -1);
     query.Bind(33, song.rating() >= 0 ? static_cast<int>(song.rating() * 100.0f) : -1);
-    query.Bind(34, song.url());
-    query.Bind(35, song.beginning_nanosec());
+    query.Bind(34, song.art_automatic());
+    query.Bind(35, song.url());
+    query.Bind(36, song.beginning_nanosec());
     query.Exec();
     return existing.id();
   }
@@ -300,9 +305,9 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
                  "grouping, comment, lyrics, beginning, length, bitrate, samplerate, bitdepth, source, directory_id, url, "
                  "filetype, filesize, mtime, ctime, unavailable, fingerprint, playcount, skipcount, lastplayed, lastseen, "
                  "compilation, compilation_detected, compilation_on, compilation_off, compilation_effective, "
-                 "art_embedded, art_manual, effective_albumartist, effective_originalyear, cue_path, rating, "
+                 "art_embedded, art_automatic, art_manual, effective_albumartist, effective_originalyear, cue_path, rating, "
                  "ebur128_integrated_loudness_lufs, ebur128_loudness_range_lu) "
-                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,-1,0,0,0,0,0,?,?,?,?,?,?,?,?)");
+                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,-1,0,0,0,0,0,?,?,?,?,?,?,?,?,?)");
   query.Bind(1, song.title());
   query.Bind(2, song.album());
   query.Bind(3, song.artist());
@@ -333,20 +338,21 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
   query.Bind(28, static_cast<int>(song.skipcount()));
   query.Bind(29, song.lastplayed());
   query.Bind(30, song.art_embedded() ? 1 : 0);
-  query.Bind(31, song.art_manual());
-  query.Bind(32, song.EffectiveAlbumartist());
-  query.Bind(33, song.originalyear() > 0 ? song.originalyear() : song.year());
-  query.Bind(34, song.cue_path());
-  query.Bind(35, song.rating() >= 0 ? static_cast<int>(song.rating() * 100.0f) : -1);
+  query.Bind(31, song.art_automatic());
+  query.Bind(32, song.art_manual());
+  query.Bind(33, song.EffectiveAlbumartist());
+  query.Bind(34, song.originalyear() > 0 ? song.originalyear() : song.year());
+  query.Bind(35, song.cue_path());
+  query.Bind(36, song.rating() >= 0 ? static_cast<int>(song.rating() * 100.0f) : -1);
   if (song.ebur128_integrated_loudness_lufs()) {
-    query.Bind(36, *song.ebur128_integrated_loudness_lufs());
-  } else {
-    query.BindNull(36);
-  }
-  if (song.ebur128_loudness_range_lu()) {
-    query.Bind(37, *song.ebur128_loudness_range_lu());
+    query.Bind(37, *song.ebur128_integrated_loudness_lufs());
   } else {
     query.BindNull(37);
+  }
+  if (song.ebur128_loudness_range_lu()) {
+    query.Bind(38, *song.ebur128_loudness_range_lu());
+  } else {
+    query.BindNull(38);
   }
   query.Exec();
   return static_cast<int>(database_->LastInsertRowId());
@@ -487,6 +493,53 @@ int CollectionBackend::MarkMissingUnavailable(int directory_id, const std::vecto
     }
   }
   return marked;
+}
+
+void CollectionBackend::UpdateLastSeen(int directory_id) {
+  if (!database_ || !database_->handle() || directory_id < 0) {
+    return;
+  }
+  SqlQuery query(database_, "UPDATE songs SET lastseen = ? WHERE directory_id = ? AND unavailable = 0");
+  query.Bind(1, static_cast<int64_t>(std::time(nullptr)));
+  query.Bind(2, directory_id);
+  query.Exec();
+}
+
+int CollectionBackend::ExpireSongs(int directory_id, int expire_days, int64_t now_sec) {
+  if (!database_ || !database_->handle() || directory_id < 0 || expire_days <= 0) {
+    return 0;
+  }
+  if (now_sec <= 0) {
+    now_sec = static_cast<int64_t>(std::time(nullptr));
+  }
+  const int64_t cutoff = CollectionExpire::Cutoff(now_sec, expire_days);
+  SqlQuery query(database_,
+                 "SELECT songs.ROWID FROM songs LEFT JOIN playlist_items ON songs.ROWID = playlist_items.collection_id "
+                 "WHERE songs.directory_id = ? AND songs.unavailable = 1 AND songs.lastseen > 0 AND songs.lastseen < ? "
+                 "AND playlist_items.collection_id IS NULL");
+  query.Bind(1, directory_id);
+  query.Bind(2, cutoff);
+  SongList expired;
+  while (query.Step()) {
+    const Song song = SongById(query.ColumnInt(0));
+    if (song.is_valid()) {
+      expired.push_back(song);
+    }
+  }
+  int removed = 0;
+  for (const Song &song : expired) {
+    if (!CollectionExpire::ShouldExpire(song.lastseen(), cutoff, song.unavailable(), false)) {
+      continue;
+    }
+    SqlQuery del(database_, "DELETE FROM songs WHERE ROWID = ?");
+    del.Bind(1, song.id());
+    del.Exec();
+    ++removed;
+  }
+  if (!expired.empty()) {
+    SongsDeleted.Emit(expired);
+  }
+  return removed;
 }
 
 int CollectionBackend::SongCount() const {

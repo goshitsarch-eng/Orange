@@ -38,6 +38,8 @@ class CollectionBackend {
   void SetUnavailable(int song_id, bool unavailable);
   int ForceCompilation(const SongList &songs, bool on);
   int MarkMissingUnavailable(int directory_id, const std::vector<std::string> &seen_urls);
+  void UpdateLastSeen(int directory_id);
+  int ExpireSongs(int directory_id, int expire_days, int64_t now_sec = 0);
   int SongCount() const;
 
   Signal<SongList> SongsDiscovered;

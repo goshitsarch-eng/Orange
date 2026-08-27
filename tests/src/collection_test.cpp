@@ -18,7 +18,10 @@
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
 #include "collection/collectioncuescan.h"
+#include "collection/collectiondirectoryart.h"
+#include "collection/collectionexpire.h"
 #include "collection/collectionrescanreason.h"
+#include "collection/collectionscandelay.h"
 #include "collection/collectionwatcher.h"
 #include "core/songuserdatamerge.h"
 #include "collection/collectiondirectorymodel.h"
@@ -1142,6 +1145,35 @@ TEST(CollectionBackend, EmitsStatisticsAndRatingAfterUpdate) {
   unlink(path.c_str());
 }
 
+TEST(CollectionScanDelay, UsesTwoSecondRescanAndDailyPeriod) {
+  EXPECT_EQ(2000, CollectionScanDelay::kRescanMs);
+  EXPECT_EQ(86400 * 1000, CollectionScanDelay::kPeriodicMs);
+  EXPECT_TRUE(CollectionScanDelay::ShouldArm(false, false));
+  EXPECT_FALSE(CollectionScanDelay::ShouldArm(true, false));
+  EXPECT_FALSE(CollectionScanDelay::ShouldArm(false, true));
+  EXPECT_TRUE(CollectionScanDelay::ShouldRunAfterFinish(true));
+}
+
+TEST(CollectionExpire, CutoffAndShouldExpire) {
+  EXPECT_EQ(0, CollectionExpire::Cutoff(1000, 0));
+  EXPECT_EQ(1000 - 2 * 86400, CollectionExpire::Cutoff(1000, 2));
+  EXPECT_TRUE(CollectionExpire::ShouldExpire(10, 20, true, false));
+  EXPECT_FALSE(CollectionExpire::ShouldExpire(10, 20, true, true));
+  EXPECT_FALSE(CollectionExpire::ShouldExpire(0, 20, true, false));
+  EXPECT_FALSE(CollectionExpire::ShouldExpire(10, 20, false, false));
+}
+
+TEST(CollectionDirectoryArt, PrefersFrontThenCoverThenLargest) {
+  EXPECT_TRUE(CollectionDirectoryArt::IsImageFile("/tmp/front.jpg"));
+  EXPECT_FALSE(CollectionDirectoryArt::IsImageFile("/tmp/notes.txt"));
+  const std::vector<std::string> filters = CollectionDirectoryArt::ParseFilters("front, cover");
+  ASSERT_EQ(2u, filters.size());
+  EXPECT_EQ("front", filters[0]);
+  EXPECT_TRUE(CollectionDirectoryArt::NameMatches("/tmp/Front.jpg", "front"));
+  EXPECT_EQ("/tmp/front.jpg", CollectionDirectoryArt::PickBestArt({"/tmp/back.jpg", "/tmp/front.jpg"}, filters));
+  EXPECT_EQ("/tmp/cover.png", CollectionDirectoryArt::PickBestArt({"/tmp/cover.png", "/tmp/other.jpg"}, filters));
+}
+
 TEST(CollectionBackend, PersistsFingerprintCueLoudnessAndUserData) {
   const std::string path = "/tmp/strawberry-collection-analysis-" + std::to_string(getpid()) + ".db";
   unlink(path.c_str());
@@ -1181,5 +1213,33 @@ TEST(CollectionBackend, PersistsFingerprintCueLoudnessAndUserData) {
   EXPECT_EQ(1, backend.RetainBeginnings(song.url(), {1000000000}));
   EXPECT_EQ(id, backend.SongByUrl(song.url(), 1000000000).id());
   EXPECT_FALSE(backend.SongByUrl(song.url(), 2000000000).is_valid());
+  unlink(path.c_str());
+}
+
+TEST(CollectionBackend, UpdatesLastSeenAndExpiresOldUnavailable) {
+  const std::string path = "/tmp/strawberry-collection-expire-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song keep = MakeSong("Keep", "A", "Album");
+  keep.set_directory_id(directory);
+  keep.set_url("file:///tmp/music/keep.flac");
+  keep.set_art_automatic("file:///tmp/music/front.jpg");
+  const int keep_id = backend.AddOrUpdateSong(keep);
+  Song gone = MakeSong("Gone", "A", "Album");
+  gone.set_directory_id(directory);
+  gone.set_url("file:///tmp/music/gone.flac");
+  const int gone_id = backend.AddOrUpdateSong(gone);
+  backend.UpdateLastSeen(directory);
+  EXPECT_GT(backend.SongById(keep_id).lastseen(), 0);
+  EXPECT_EQ("file:///tmp/music/front.jpg", backend.SongById(keep_id).art_automatic());
+  SqlQuery stale(&db, "UPDATE songs SET unavailable = 1, lastseen = 1 WHERE ROWID = ?");
+  stale.Bind(1, gone_id);
+  stale.Exec();
+  EXPECT_EQ(1, backend.ExpireSongs(directory, 1, 10 * 86400));
+  EXPECT_TRUE(backend.SongById(keep_id).is_valid());
+  EXPECT_FALSE(backend.SongById(gone_id).is_valid());
   unlink(path.c_str());
 }
