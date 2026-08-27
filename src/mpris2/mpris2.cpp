@@ -106,11 +106,13 @@ static GVariant *MetadataVariant(const Song &song, int row = -1, const std::stri
   g_variant_builder_init(&b, G_VARIANT_TYPE("a{sv}"));
   const std::string track_id = row >= 0 ? Mpris2Helpers::TrackIdForRow(song, row) : Mpris2Helpers::TrackId(song);
   g_variant_builder_add(&b, "{sv}", "mpris:trackid", g_variant_new_object_path(track_id.c_str()));
-  g_variant_builder_add(&b, "{sv}", "xesam:title", g_variant_new_string(song.title().c_str()));
+  const std::string title = Mpris2Helpers::XesamTitle(song);
+  g_variant_builder_add(&b, "{sv}", "xesam:title", g_variant_new_string(title.c_str()));
   g_variant_builder_add(&b, "{sv}", "xesam:album", g_variant_new_string(song.album().c_str()));
   const gchar *artists[] = {song.artist().c_str(), nullptr};
   g_variant_builder_add(&b, "{sv}", "xesam:artist", g_variant_new_strv(artists, -1));
-  g_variant_builder_add(&b, "{sv}", "xesam:url", g_variant_new_string(song.url().c_str()));
+  const std::string url = Mpris2Helpers::XesamUrl(song);
+  g_variant_builder_add(&b, "{sv}", "xesam:url", g_variant_new_string(url.c_str()));
   if (song.length_nanosec() > 0) {
     g_variant_builder_add(&b, "{sv}", "mpris:length", g_variant_new_int64(song.length_nanosec() / 1000));
   }

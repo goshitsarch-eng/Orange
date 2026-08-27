@@ -118,6 +118,26 @@ TEST(Mpris2Helpers, ToXesamFieldsMatchQt) {
   EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(empty, changed));
 }
 
+TEST(Mpris2Helpers, XesamTitleAndUrlMatchQt) {
+  Song untagged;
+  untagged.set_url("file:///music/01.flac");
+  EXPECT_EQ("01.flac", Mpris2Helpers::XesamTitle(untagged));
+  EXPECT_EQ("file:///music/01.flac", Mpris2Helpers::XesamUrl(untagged));
+  Song titled;
+  titled.set_url("file:///music/01.flac");
+  titled.set_title("Dummy");
+  EXPECT_EQ("Dummy", Mpris2Helpers::XesamTitle(titled));
+  Song stream;
+  stream.set_url("tidal://123");
+  stream.set_stream_url("https://cdn.example/track.flac");
+  EXPECT_EQ("https://cdn.example/track.flac", Mpris2Helpers::XesamUrl(stream));
+  EXPECT_NE(stream.url(), Mpris2Helpers::XesamUrl(stream));
+  Song before = stream;
+  Song after = stream;
+  after.set_stream_url("https://cdn.example/new.flac");
+  EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(before, after));
+}
+
 TEST(Mpris2Helpers, CapabilitiesMatchQt) {
   EXPECT_FALSE(Mpris2Helpers::CanPlay(nullptr));
   Playlist playlist;

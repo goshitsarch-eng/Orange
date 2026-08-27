@@ -111,9 +111,14 @@ inline TrackListDiff DiffTrackIds(const std::vector<std::string> &before, const 
   return diff;
 }
 
+// Qt Song::ToXesam: title is PrettyTitle, url is effective_url (stream URL when set).
+inline std::string XesamTitle(const Song &song) { return song.PrettyTitle(); }
+
+inline std::string XesamUrl(const Song &song) { return song.stream_url(); }
+
 inline bool MetadataNeedsUpdate(const Song &before, const Song &after) {
-  return before.title() != after.title() || before.artist() != after.artist() || before.album() != after.album() ||
-         before.url() != after.url() || before.length_nanosec() != after.length_nanosec() || ArtUrl(before) != ArtUrl(after) ||
+  return XesamTitle(before) != XesamTitle(after) || before.artist() != after.artist() || before.album() != after.album() ||
+         XesamUrl(before) != XesamUrl(after) || before.length_nanosec() != after.length_nanosec() || ArtUrl(before) != ArtUrl(after) ||
          before.rating() != after.rating() || before.bitrate() != after.bitrate() || before.genre() != after.genre() ||
          before.disc() != after.disc() || before.comment() != after.comment() || before.composer() != after.composer() ||
          before.playcount() != after.playcount() || before.ctime() != after.ctime() || before.lastplayed() != after.lastplayed() ||
