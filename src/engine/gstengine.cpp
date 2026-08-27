@@ -266,6 +266,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   CancelFade();
   DiscardNext();
   current_.reset();
+  faded_out_to_pause_ = false;
   media_url_ = media_url;
   stream_url_ = url;
   current_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec, ebur128_loudness_normalizing_gain_db_);
@@ -328,6 +329,7 @@ void GstEngine::Stop(bool stop_after) {
     fadeout_ = std::move(current_);
     media_url_.clear();
     stream_url_.clear();
+    faded_out_to_pause_ = false;
     SetState(State::Empty);
     StartStopFade();
     return;
@@ -353,11 +355,12 @@ void GstEngine::Unpause() {
     return;
   }
   pending_pause_ = false;
-  if (EngineFade::ShouldFadeOnPause(fadeout_pause_enabled_, exclusive_mode_)) {
+  if (EngineFade::ShouldFadeInOnResume(faded_out_to_pause_, fadeout_pause_enabled_, exclusive_mode_)) {
     ApplyCurrentVolume(0.0);
     current_->Unpause();
     SetState(State::Playing);
     StartFade(1, fadeout_pause_duration_ms_);
+    faded_out_to_pause_ = false;
     return;
   }
   current_->Unpause();
@@ -397,6 +400,9 @@ void GstEngine::SetFadeDurationMs(int milliseconds) { fade_duration_ms_ = std::m
 void GstEngine::SetFadeoutPauseDurationMs(int milliseconds) { fadeout_pause_duration_ms_ = std::max(50, milliseconds); }
 
 void GstEngine::CancelFade() {
+  if (EngineFade::ShouldMarkFadedOutToPause(pending_pause_)) {
+    faded_out_to_pause_ = true;
+  }
   if (fade_timeout_id_) {
     g_source_remove(fade_timeout_id_);
     fade_timeout_id_ = 0;
@@ -434,6 +440,7 @@ gboolean GstEngine::FadeTick(gpointer data) {
     self->fade_direction_ = 0;
     if (self->pending_pause_) {
       self->pending_pause_ = false;
+      self->faded_out_to_pause_ = true;
       if (self->current_) {
         self->current_->Pause();
       }
@@ -491,6 +498,7 @@ void GstEngine::FinishStopImmediate() {
   media_url_.clear();
   stream_url_.clear();
   gapless_pending_ = false;
+  faded_out_to_pause_ = false;
   SetState(State::Empty);
 }
 

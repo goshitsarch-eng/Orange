@@ -162,6 +162,7 @@ class GstEngine : public EngineBase {
   double buffer_high_watermark_ = 0.99;
   int device_warmup_ms_ = 500;
   bool pending_pause_ = false;
+  bool faded_out_to_pause_ = false;
   int fade_duration_ms_ = 2000;
   int fadeout_pause_duration_ms_ = 250;
   std::string current_album_;

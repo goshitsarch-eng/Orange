@@ -1012,6 +1012,15 @@ TEST(EngineFade, StopFadeGatingMatchesQt) {
   EXPECT_DOUBLE_EQ(0.0, EngineFade::VolumeAtStep(1.0, 1, 0.0));
 }
 
+TEST(EngineFade, ResumeFadeInMatchesQtLatch) {
+  EXPECT_TRUE(EngineFade::ShouldFadeInOnResume(true, false, false));
+  EXPECT_FALSE(EngineFade::ShouldFadeInOnResume(true, false, true));
+  EXPECT_TRUE(EngineFade::ShouldFadeInOnResume(false, true, false));
+  EXPECT_FALSE(EngineFade::ShouldFadeInOnResume(false, false, false));
+  EXPECT_TRUE(EngineFade::ShouldMarkFadedOutToPause(true));
+  EXPECT_FALSE(EngineFade::ShouldMarkFadedOutToPause(false));
+}
+
 TEST(CollectionFilterMenu, DelayAndBuiltinPresets) {
   EXPECT_FALSE(CollectionFilterMenu::ShouldDelay(CollectionFilterMenu::DelayBehaviour::AlwaysInstant, 1, 200000));
   EXPECT_TRUE(CollectionFilterMenu::ShouldDelay(CollectionFilterMenu::DelayBehaviour::AlwaysDelayed, 1, 10));
