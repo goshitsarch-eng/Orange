@@ -8,7 +8,10 @@
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistshuffle.h"
 #include "playlist/playlistsummary.h"
+#include "playlist/dynamicplaylistmaintenance.h"
 #include "playlist/playlistundolimits.h"
+#include "scrobbler/scrobblepoint.h"
+#include "smartplaylists/playlistgenerator.h"
 #include "playlist/playlistundostate.h"
 #include "utilities/fileutils.h"
 
@@ -527,6 +530,9 @@ TEST(PlaylistFilterSync, RestoresStoredFilterWhenEntryDiffers) {
 
 TEST(PlaylistUndoLimits, ConfirmsClearWhenOverUndoLimit) {
   EXPECT_EQ(500, PlaylistUndoLimits::kUndoItemLimit);
+  EXPECT_EQ(20, PlaylistUndoLimits::kUndoStackLimit);
+  EXPECT_FALSE(PlaylistUndoLimits::ShouldBypassUndo(500));
+  EXPECT_TRUE(PlaylistUndoLimits::ShouldBypassUndo(501));
   EXPECT_FALSE(PlaylistUndoLimits::NeedsClearConfirmation(0));
   EXPECT_FALSE(PlaylistUndoLimits::NeedsClearConfirmation(500));
   EXPECT_TRUE(PlaylistUndoLimits::NeedsClearConfirmation(501));
@@ -576,4 +582,102 @@ TEST(PlaylistPlayed, RemapsStackAfterRemoveAndMove) {
   const auto moved = PlaylistPlayed::AfterMove({1}, 4, {1}, 4);
   ASSERT_EQ(1u, moved.size());
   EXPECT_EQ(3, moved.front());
+}
+
+TEST(Playlist, UpdatesScrobblePointOnCurrentRowAndSeek) {
+  Playlist playlist;
+  Song song;
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_url("file:///roads.flac");
+  song.set_valid(true);
+  song.set_length_nanosec(180LL * ScrobblePoint::kNsecPerSec);
+  playlist.AppendSongs({song});
+  playlist.set_current_row(0);
+  EXPECT_EQ(90LL * ScrobblePoint::kNsecPerSec, playlist.scrobble_point_nanosec());
+  EXPECT_FALSE(playlist.scrobbled());
+  playlist.set_scrobbled(true);
+  playlist.UpdateScrobblePoint(100LL * ScrobblePoint::kNsecPerSec);
+  EXPECT_FALSE(playlist.scrobbled());
+  EXPECT_EQ(190LL * ScrobblePoint::kNsecPerSec, playlist.scrobble_point_nanosec());
+}
+
+TEST(Playlist, BypassesUndoForBulkInsertAndCapsStack) {
+  Playlist playlist;
+  SongList bulk;
+  for (int i = 0; i < 501; ++i) {
+    Song song;
+    song.set_title("T" + std::to_string(i));
+    song.set_url("file:///t" + std::to_string(i));
+    song.set_valid(true);
+    bulk.push_back(song);
+  }
+  playlist.AppendSongs(bulk);
+  EXPECT_EQ(501, playlist.row_count());
+  EXPECT_FALSE(playlist.CanUndo());
+
+  Playlist stacked;
+  for (int i = 0; i < 25; ++i) {
+    Song song;
+    song.set_title("S" + std::to_string(i));
+    song.set_url("file:///s" + std::to_string(i));
+    song.set_valid(true);
+    stacked.AppendSongs({song});
+  }
+  int undos = 0;
+  while (stacked.CanUndo()) {
+    stacked.Undo();
+    ++undos;
+  }
+  EXPECT_EQ(PlaylistUndoLimits::kUndoStackLimit, undos);
+}
+
+TEST(DynamicPlaylistMaintenance, HistoryFutureAndTrimCounts) {
+  EXPECT_EQ(0, DynamicPlaylistMaintenance::HistoryLength(-1));
+  EXPECT_EQ(4, DynamicPlaylistMaintenance::HistoryLength(4));
+  EXPECT_EQ(3, DynamicPlaylistMaintenance::FutureCount(8, 4));
+  EXPECT_EQ(2, DynamicPlaylistMaintenance::HistoryTrimCount(12, 10));
+  EXPECT_EQ(0, DynamicPlaylistMaintenance::HistoryTrimCount(10, 10));
+  EXPECT_EQ(3, DynamicPlaylistMaintenance::FutureInsertCount(10, PlaylistGenerator::kDefaultDynamicFuture, 18));
+  EXPECT_TRUE(DynamicPlaylistMaintenance::ShouldClearUndo(true, true));
+  EXPECT_FALSE(DynamicPlaylistMaintenance::ShouldClearUndo(false, true));
+}
+
+TEST(Playlist, PatchSongByIdUpdatesWithoutUndo) {
+  Playlist playlist;
+  Song song;
+  song.set_id(7);
+  song.set_title("Roads");
+  song.set_url("file:///roads.flac");
+  song.set_playcount(1);
+  song.set_valid(true);
+  playlist.AppendSongs({song});
+  EXPECT_TRUE(playlist.CanUndo());
+  Song updated = song;
+  updated.set_playcount(4);
+  EXPECT_TRUE(playlist.PatchSongById(updated));
+  EXPECT_EQ(4u, playlist.song(0).playcount());
+  playlist.Undo();
+  EXPECT_EQ(0, playlist.row_count());
+}
+
+TEST(Playlist, TrimsDynamicHistoryOnForwardAdvance) {
+  Playlist playlist;
+  SmartPlaylistSearch search;
+  playlist.SetDynamic(true, search);
+  SongList songs;
+  for (int i = 0; i < 16; ++i) {
+    Song song;
+    song.set_title("D" + std::to_string(i));
+    song.set_url("file:///d" + std::to_string(i));
+    song.set_valid(true);
+    songs.push_back(song);
+  }
+  playlist.AppendSongs(songs);
+  playlist.set_current_row(10);
+  playlist.Next();
+  EXPECT_EQ(PlaylistGenerator::kDefaultDynamicHistory, playlist.current_row());
+  EXPECT_EQ(15, playlist.row_count());
+  EXPECT_EQ("D1", playlist.songs().front().title());
+  EXPECT_FALSE(playlist.CanUndo());
 }

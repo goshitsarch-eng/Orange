@@ -1,3 +1,5 @@
+#include "collection/collectionsongpatch.h"
+#include "collection/skipcounteligibility.h"
 #include "collection/collectionautoopen.h"
 #include "collection/collectionempty.h"
 #include "collection/collectionfilterkeyboard.h"
@@ -585,6 +587,10 @@ TEST(BackendOptions, PlaybinCrossfadeAndPauseFade) {
   EXPECT_FALSE(BackendOptions::AllowAutoCrossfade(true, true, "A", "A"));
   EXPECT_TRUE(BackendOptions::AllowAutoCrossfade(true, false, "A", "A"));
   EXPECT_FALSE(BackendOptions::AllowAutoCrossfade(false, false, "A", "B"));
+  EXPECT_FALSE(BackendOptions::AllowAutoCrossfade(true, true, "A", "B", true));
+  EXPECT_TRUE(BackendOptions::SuppressSameAlbumCrossfade(true, true, true));
+  EXPECT_FALSE(BackendOptions::SuppressSameAlbumCrossfade(false, true, true));
+  EXPECT_FALSE(BackendOptions::SuppressSameAlbumCrossfade(true, true, false));
   EXPECT_EQ(0, BackendOptions::FadeDurationMs(false, 250, 250));
   EXPECT_EQ(250, BackendOptions::FadeDurationMs(true, 250, 2000));
   EXPECT_EQ(2000, BackendOptions::FadeDurationMs(true, 0, 2000));
@@ -936,4 +942,63 @@ TEST(CollectionStats, WritesLocalSongsAndKeepsQtCopy) {
   stream.set_url("https://example/a.mp3");
   EXPECT_FALSE(CollectionStats::ShouldWriteStatistics(stream));
   EXPECT_EQ(1, CollectionStats::SongsToWrite({local, stream}));
+}
+
+TEST(SkipCountEligibility, MatchesQtPercentageAndTimeMatrix) {
+  const int64_t four_min = 240LL * SkipCountEligibility::kNsecPerSec;
+  EXPECT_FALSE(SkipCountEligibility::ShouldIncrement(four_min, four_min));
+  EXPECT_FALSE(SkipCountEligibility::ShouldIncrement(four_min - 4LL * SkipCountEligibility::kNsecPerSec, four_min));
+  EXPECT_TRUE(SkipCountEligibility::ShouldIncrement(60LL * SkipCountEligibility::kNsecPerSec, four_min));
+  EXPECT_FALSE(SkipCountEligibility::ShouldIncrement(0, 0));
+  const int64_t twenty_one_min = 1260LL * SkipCountEligibility::kNsecPerSec;
+  EXPECT_TRUE(SkipCountEligibility::ShouldIncrement(static_cast<int64_t>(0.96 * twenty_one_min), twenty_one_min));
+  EXPECT_FALSE(SkipCountEligibility::ShouldIncrement(static_cast<int64_t>(0.96 * four_min), four_min));
+}
+
+TEST(CollectionSongPatch, ReplacesMatchingIds) {
+  Song a;
+  a.set_id(1);
+  a.set_playcount(1);
+  Song b;
+  b.set_id(2);
+  b.set_playcount(0);
+  SongList songs = {a, b};
+  Song updated;
+  updated.set_id(1);
+  updated.set_playcount(4);
+  EXPECT_TRUE(CollectionSongPatch::PatchById(&songs, updated));
+  EXPECT_EQ(4u, songs.front().playcount());
+  EXPECT_EQ(1, CollectionSongPatch::PatchAll(&songs, {updated}));
+}
+
+TEST(CollectionBackend, EmitsStatisticsAndRatingAfterUpdate) {
+  const std::string path = "/tmp/strawberry-collection-stats-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song song = MakeSong("Roads", "Portishead", "Dummy");
+  song.set_directory_id(directory);
+  const int id = backend.AddOrUpdateSong(song);
+  ASSERT_GT(id, 0);
+
+  int stats = 0;
+  int ratings = 0;
+  backend.SongsStatisticsChanged.Connect([&](const SongList &songs) {
+    ++stats;
+    ASSERT_FALSE(songs.empty());
+    EXPECT_EQ(id, songs.front().id());
+  });
+  backend.SongsRatingChanged.Connect([&](const SongList &songs) {
+    ++ratings;
+    ASSERT_FALSE(songs.empty());
+    EXPECT_EQ(id, songs.front().id());
+  });
+  backend.IncrementPlayCount(id);
+  backend.IncrementSkipCount(id);
+  backend.SetRating(id, 0.8f);
+  EXPECT_EQ(2, stats);
+  EXPECT_EQ(1, ratings);
+  unlink(path.c_str());
 }

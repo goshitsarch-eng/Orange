@@ -61,6 +61,7 @@ class Player : public PlayerInterface {
   Signal<int64_t, int64_t> PositionChanged;
   Signal<Song> ForceShowOSD;
   Signal<Song, int64_t> PlaybackFinished;
+  Signal<Song, int64_t, int64_t> TrackSkipped;
   Signal<> Paused;
   Signal<> Playing;
   Signal<> Stopped;
@@ -71,9 +72,12 @@ class Player : public PlayerInterface {
   void HandleTrackEnded();
   void PlayQueueHead(int track_change_flags = GstEngine::Manual);
   void PreloadNext();
-  void PlayCurrent(bool pause, uint64_t offset_nanosec = 0);
+  void PlayCurrent(bool pause, uint64_t offset_nanosec = 0, int track_change_flags = GstEngine::Manual);
   void PlayLoadedSong(bool pause, int track_change_flags = GstEngine::Manual, uint64_t offset_nanosec = 0);
   void FinishCurrentPlayback();
+  void Advance(int track_change_flags);
+  void MaybeEmitTrackSkipped();
+  int SameAlbumFlags(int track_change_flags, const Song &from, const Song &to) const;
   void CancelIntroTimeout();
   void ArmIntroTimeout();
 

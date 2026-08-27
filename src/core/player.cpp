@@ -181,10 +181,33 @@ void Player::StopAfterCurrent() {
   }
 }
 
+int Player::SameAlbumFlags(int track_change_flags, const Song &from, const Song &to) const {
+  if (from.IsOnSameAlbum(to)) {
+    return track_change_flags | GstEngine::SameAlbum;
+  }
+  return track_change_flags;
+}
+
+void Player::MaybeEmitTrackSkipped() {
+  if (finished_current_) {
+    return;
+  }
+  if (!current_song_.is_valid() && current_song_.url().empty()) {
+    return;
+  }
+  const int64_t pos = engine_ ? engine_->position_nanosec() : 0;
+  const int64_t len = current_song_.length_nanosec();
+  if (len > 0 && pos == len) {
+    return;
+  }
+  TrackSkipped.Emit(current_song_, pos, len);
+}
+
 void Player::PlayQueueHead(int track_change_flags) {
   if (!queue_ || queue_->empty()) {
     return;
   }
+  const Song previous = current_song_;
   const QueueRows::Source source = queue_->PeekSource();
   current_song_ = queue_->TakeNext();
   if (source.valid() && playlist_manager_) {
@@ -197,20 +220,32 @@ void Player::PlayQueueHead(int track_change_flags) {
       }
     }
   }
-  PlayLoadedSong(false, track_change_flags);
+  PlayLoadedSong(false, SameAlbumFlags(track_change_flags, previous, current_song_));
 }
 
-void Player::Next() {
+void Player::Next() { Advance(GstEngine::Manual); }
+
+void Player::Advance(int track_change_flags) {
+  if ((track_change_flags & GstEngine::Manual) != 0) {
+    MaybeEmitTrackSkipped();
+  }
+  Song upcoming;
+  if (queue_ && !queue_->empty()) {
+    upcoming = queue_->songs().front();
+  } else if (playlist_manager_) {
+    upcoming = playlist_manager_->PeekNextSong();
+  }
+  track_change_flags = SameAlbumFlags(track_change_flags, current_song_, upcoming);
   FinishCurrentPlayback();
   if (queue_ && !queue_->empty()) {
-    PlayQueueHead();
+    PlayQueueHead(track_change_flags);
     return;
   }
   if (!playlist_manager_) {
     return;
   }
   playlist_manager_->Next();
-  PlayCurrent(false);
+  PlayCurrent(false, 0, track_change_flags);
 }
 
 void Player::Previous() {
@@ -221,9 +256,13 @@ void Player::Previous() {
     SeekTo(0);
     return;
   }
+  MaybeEmitTrackSkipped();
+  const Song previous = current_song_;
+  const Song upcoming = playlist_manager_->active() ? playlist_manager_->active()->song(playlist_manager_->active()->PeekPreviousRow())
+                                                    : Song();
   FinishCurrentPlayback();
   playlist_manager_->Previous();
-  PlayCurrent(false);
+  PlayCurrent(false, 0, SameAlbumFlags(GstEngine::Manual, previous, upcoming));
 }
 
 void Player::RestartOrPrevious() {
@@ -239,6 +278,9 @@ void Player::SeekTo(int64_t seconds) { Seek(seconds * 1000000000LL); }
 void Player::Seek(int64_t nanosec) {
   const int64_t clamped = std::max<int64_t>(0, nanosec);
   engine_->Seek(static_cast<uint64_t>(clamped));
+  if (playlist_manager_ && playlist_manager_->active()) {
+    playlist_manager_->active()->UpdateScrobblePoint(clamped);
+  }
   PositionChanged.Emit(clamped, current_song_.length_nanosec());
 }
 
@@ -269,10 +311,15 @@ void Player::Mute() {
 }
 
 void Player::PlayAt(int index, bool pause, uint64_t offset_nanosec) {
+  int flags = GstEngine::Manual;
+  if (playlist_manager_ && playlist_manager_->active()) {
+    flags = SameAlbumFlags(flags, current_song_, playlist_manager_->active()->song(index));
+  }
+  MaybeEmitTrackSkipped();
   if (playlist_manager_) {
     playlist_manager_->SetCurrentRow(index);
   }
-  PlayCurrent(pause, offset_nanosec);
+  PlayCurrent(pause, offset_nanosec, flags);
 }
 
 void Player::PlayPlaylist(const std::string &name) {
@@ -286,13 +333,13 @@ void Player::ShowOSD() { ForceShowOSD.Emit(current_song_); }
 
 void Player::TogglePrettyOSD() { ForceShowOSD.Emit(current_song_); }
 
-void Player::PlayCurrent(bool pause, uint64_t offset_nanosec) {
+void Player::PlayCurrent(bool pause, uint64_t offset_nanosec, int track_change_flags) {
   if (!playlist_manager_) {
     return;
   }
   FinishCurrentPlayback();
   current_song_ = playlist_manager_->current_song();
-  PlayLoadedSong(pause, GstEngine::Manual, offset_nanosec);
+  PlayLoadedSong(pause, track_change_flags, offset_nanosec);
 }
 
 namespace {
@@ -354,11 +401,11 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_
       const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause, track_change_flags, offset_nanosec](const UrlHandler::LoadResult &async) {
         ApplyLoadResult(&current_song_, async);
         if (!async.stream_url.empty()) {
-          engine_->SetNextAlbum(current_song_.album());
+          engine_->SetNextAlbum(current_song_.EffectiveAlbum());
           engine_->Load(current_song_.url(), async.stream_url, track_change_flags, false, current_song_.beginning_nanosec(),
                         current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                         current_song_.ebur128_integrated_loudness_lufs());
-          engine_->SetCurrentAlbum(current_song_.album());
+          engine_->SetCurrentAlbum(current_song_.EffectiveAlbum());
           engine_->Play(pause, offset_nanosec);
         }
       });
@@ -367,11 +414,11 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_
       }
     }
   }
-  engine_->SetNextAlbum(current_song_.album());
+  engine_->SetNextAlbum(current_song_.EffectiveAlbum());
   engine_->Load(current_song_.url(), current_song_.stream_url(), track_change_flags, false, current_song_.beginning_nanosec(),
                 current_song_.length_nanosec() > 0 ? current_song_.beginning_nanosec() + current_song_.length_nanosec() : -1,
                 current_song_.ebur128_integrated_loudness_lufs());
-  engine_->SetCurrentAlbum(current_song_.album());
+  engine_->SetCurrentAlbum(current_song_.EffectiveAlbum());
   engine_->Play(pause, offset_nanosec);
   error_count_ = 0;
   if (greyout_ && playlist_manager_) {
@@ -446,27 +493,20 @@ void Player::PreloadNext() {
   if (stop_after_current_) {
     return;
   }
-  FinishCurrentPlayback();
+  if (playlist_manager_) {
+    playlist_manager_->RefillDynamic();
+  }
   Song next_song;
   if (queue_ && !queue_->empty()) {
     next_song = queue_->songs().front();
   } else if (playlist_manager_) {
-    playlist_manager_->RefillDynamic();
     next_song = playlist_manager_->PeekNextSong();
   }
   if (!next_song.is_valid() && next_song.url().empty()) {
     return;
   }
-  if (queue_ && !queue_->empty()) {
-    PlayQueueHead(GstEngine::Auto);
-    preloaded_ = true;
-    return;
-  } else if (playlist_manager_) {
-    playlist_manager_->Next();
-    current_song_ = playlist_manager_->current_song();
-  }
+  Advance(GstEngine::Auto);
   preloaded_ = true;
-  PlayLoadedSong(false, GstEngine::Auto);
 }
 
 void Player::HandleEngineState(EngineBase::State state) {
@@ -517,5 +557,5 @@ void Player::HandleTrackEnded() {
     Stop();
     return;
   }
-  Next();
+  Advance(GstEngine::Auto);
 }

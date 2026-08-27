@@ -305,6 +305,7 @@ Song PlaylistManager::PeekNextSong() const { return Playing() ? Playing()->PeekN
 void PlaylistManager::Next() {
   if (Playlist *playlist = Playing()) {
     playlist->Next();
+    RefillDynamic();
   }
 }
 

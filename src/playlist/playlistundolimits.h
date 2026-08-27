@@ -6,8 +6,11 @@
 namespace PlaylistUndoLimits {
 
 inline constexpr int kUndoItemLimit = 500;
+inline constexpr int kUndoStackLimit = 20;
 
 inline bool NeedsClearConfirmation(int row_count) { return row_count > kUndoItemLimit; }
+
+inline bool ShouldBypassUndo(int item_count) { return item_count > kUndoItemLimit; }
 
 inline const char *ClearConfirmTitle() { return "Clear playlist"; }
 

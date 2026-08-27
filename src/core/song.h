@@ -220,6 +220,20 @@ class Song {
   std::string PrettyTitle() const;
   std::string PrettyTitleWithArtist() const;
   std::string EffectiveAlbumartist() const;
+  std::string EffectiveAlbum() const { return album_.empty() ? title_ : album_; }
+  bool has_cue() const { return !cue_path_.empty(); }
+  bool IsOnSameAlbum(const Song &other) const {
+    if (compilation() != other.compilation()) {
+      return false;
+    }
+    if (has_cue() && other.has_cue() && cue_path() == other.cue_path()) {
+      return true;
+    }
+    if (compilation() && album() == other.album()) {
+      return true;
+    }
+    return EffectiveAlbum() == other.EffectiveAlbum() && EffectiveAlbumartist() == other.EffectiveAlbumartist();
+  }
   bool is_stream() const;
   bool is_radio() const;
   bool is_stream_service() const;

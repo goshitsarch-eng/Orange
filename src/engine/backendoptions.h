@@ -16,12 +16,16 @@ inline bool SameAlbum(const std::string &current_album, const std::string &next_
   return !current_album.empty() && current_album == next_album;
 }
 
+inline bool SuppressSameAlbumCrossfade(bool auto_change, bool same_album, bool no_crossfade_same_album) {
+  return auto_change && same_album && no_crossfade_same_album;
+}
+
 inline bool AllowAutoCrossfade(bool autocrossfade, bool no_crossfade_same_album, const std::string &current_album,
-                               const std::string &next_album) {
+                               const std::string &next_album, bool same_album_flag = false) {
   if (!autocrossfade) {
     return false;
   }
-  if (no_crossfade_same_album && SameAlbum(current_album, next_album)) {
+  if (no_crossfade_same_album && (same_album_flag || SameAlbum(current_album, next_album))) {
     return false;
   }
   return true;

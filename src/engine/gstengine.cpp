@@ -167,7 +167,10 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
                      int64_t end_offset_nanosec, std::optional<double>) {
   const std::string url = stream_url.empty() ? media_url : stream_url;
   const bool auto_change = (track_change_flags & Auto) != 0;
-  const bool auto_crossfade = BackendOptions::AllowAutoCrossfade(autocrossfade_enabled_, no_crossfade_same_album_, current_album_, next_album_);
+  const bool same_album = (track_change_flags & SameAlbum) != 0;
+  const bool auto_crossfade = BackendOptions::AllowAutoCrossfade(autocrossfade_enabled_, no_crossfade_same_album_, current_album_,
+                                                                next_album_, same_album) &&
+                              !BackendOptions::SuppressSameAlbumCrossfade(auto_change, same_album, no_crossfade_same_album_);
   const bool crossfade = current_ && current_->valid() &&
                          ((fading_enabled_ && (track_change_flags & Manual)) || (auto_crossfade && auto_change) ||
                           ((fading_enabled_ || auto_crossfade) && (track_change_flags & Intro)));

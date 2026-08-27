@@ -1,4 +1,5 @@
 #include "core/song.h"
+#include "scrobbler/scrobblepoint.h"
 #include "scrobbler/scrobbletoggleicon.h"
 #include "scrobbler/scrobblereligibility.h"
 #include "scrobbler/scrobblererror.h"
@@ -206,6 +207,21 @@ TEST(ScrobblerLoveState, GatesOnEnabledMetadataAndLoved) {
   EXPECT_TRUE(ScrobblerLoveState::DisableAfterLove());
   EXPECT_TRUE(ScrobblerLoveState::ResetLovedOnSongChange("file:///a", "file:///b"));
   EXPECT_FALSE(ScrobblerLoveState::ResetLovedOnSongChange("file:///a", "file:///a"));
+}
+
+TEST(ScrobblePoint, ComputesHalfLengthClampedToLastFmWindow) {
+  EXPECT_EQ(ScrobblePoint::kMaxNsecs, ScrobblePoint::Compute(0));
+  EXPECT_EQ(ScrobblePoint::kMinNsecs, ScrobblePoint::Compute(40LL * ScrobblePoint::kNsecPerSec));
+  EXPECT_EQ(90LL * ScrobblePoint::kNsecPerSec, ScrobblePoint::Compute(180LL * ScrobblePoint::kNsecPerSec));
+  EXPECT_EQ(ScrobblePoint::kMaxNsecs, ScrobblePoint::Compute(600LL * ScrobblePoint::kNsecPerSec));
+  EXPECT_EQ(100LL * ScrobblePoint::kNsecPerSec + ScrobblePoint::kMinNsecs, ScrobblePoint::Compute(40LL * ScrobblePoint::kNsecPerSec, 100LL * ScrobblePoint::kNsecPerSec));
+  EXPECT_EQ(100LL * ScrobblePoint::kNsecPerSec + ScrobblePoint::kMaxNsecs, ScrobblePoint::Compute(0, 100LL * ScrobblePoint::kNsecPerSec));
+  EXPECT_FALSE(ScrobblePoint::Reached(30LL * ScrobblePoint::kNsecPerSec, ScrobblePoint::kMinNsecs));
+  EXPECT_TRUE(ScrobblePoint::Reached(31LL * ScrobblePoint::kNsecPerSec, ScrobblePoint::kMinNsecs));
+  EXPECT_TRUE(ScrobblePoint::ShouldSubmit(true, false, true, ScrobblePoint::kMinNsecs, ScrobblePoint::kMinNsecs));
+  EXPECT_FALSE(ScrobblePoint::ShouldSubmit(false, false, true, ScrobblePoint::kMinNsecs, ScrobblePoint::kMinNsecs));
+  EXPECT_FALSE(ScrobblePoint::ShouldSubmit(true, true, true, ScrobblePoint::kMinNsecs, ScrobblePoint::kMinNsecs));
+  EXPECT_FALSE(ScrobblePoint::ShouldSubmit(true, false, false, ScrobblePoint::kMinNsecs, ScrobblePoint::kMinNsecs));
 }
 
 TEST(ScrobblerError, DialogAndMessages) {

@@ -1,11 +1,15 @@
 #include "playlist/playlist.h"
 
+#include "playlist/dynamicplaylistmaintenance.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlistbehaviour.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistplayed.h"
 #include "playlist/playlistshuffle.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistundolimits.h"
+#include "scrobbler/scrobblepoint.h"
+#include "smartplaylists/playlistgenerator.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 
@@ -19,12 +23,38 @@ void Playlist::set_current_row(int row) {
   if (songs_.empty()) {
     current_row_ = -1;
     current_virtual_index_ = -1;
+    UpdateScrobblePoint();
     CurrentChanged.Emit(current_row_);
     return;
   }
   current_row_ = std::clamp(row, 0, static_cast<int>(songs_.size()) - 1);
   SyncVirtualIndex();
+  UpdateScrobblePoint();
   CurrentChanged.Emit(current_row_);
+}
+
+void Playlist::UpdateScrobblePoint(int64_t seek_point_nanosec) {
+  scrobble_point_nanosec_ = ScrobblePoint::Compute(current_song().length_nanosec(), seek_point_nanosec);
+  scrobbled_ = false;
+}
+
+bool Playlist::PatchSongById(const Song &song) {
+  if (song.id() <= 0) {
+    return false;
+  }
+  bool changed = false;
+  for (Song &existing : songs_) {
+    if (existing.id() == song.id()) {
+      const bool skipped = existing.skipped();
+      existing = song;
+      existing.set_skipped(skipped);
+      changed = true;
+    }
+  }
+  if (changed) {
+    Changed.Emit();
+  }
+  return changed;
 }
 
 void Playlist::set_stop_after_row(int row) {
@@ -52,9 +82,18 @@ Song Playlist::PeekNextSong() const { return song(NextIndex()); }
 void Playlist::PushUndo() {
   undo_.push_back({songs_, current_row_});
   redo_.clear();
-  if (undo_.size() > 50) {
+  if (static_cast<int>(undo_.size()) > PlaylistUndoLimits::kUndoStackLimit) {
     undo_.erase(undo_.begin());
   }
+}
+
+void Playlist::MaybeRecordUndo(int item_count) {
+  if (PlaylistUndoLimits::ShouldBypassUndo(item_count)) {
+    undo_.clear();
+    redo_.clear();
+    return;
+  }
+  PushUndo();
 }
 
 void Playlist::Undo() {
@@ -82,7 +121,7 @@ void Playlist::Redo() {
 }
 
 void Playlist::ReplaceSongs(const SongList &songs) {
-  PushUndo();
+  MaybeRecordUndo(static_cast<int>(songs.size()));
   songs_ = songs;
   if (songs_.empty()) {
     current_row_ = -1;
@@ -97,7 +136,7 @@ void Playlist::InsertSongs(int row, const SongList &songs) {
   if (songs.empty()) {
     return;
   }
-  PushUndo();
+  MaybeRecordUndo(static_cast<int>(songs.size()));
   if (row < 0 || row > static_cast<int>(songs_.size())) {
     row = static_cast<int>(songs_.size());
   }
@@ -113,11 +152,15 @@ void Playlist::InsertSongs(int row, const SongList &songs) {
 
 void Playlist::AppendSongs(const SongList &songs) { InsertSongs(static_cast<int>(songs_.size()), songs); }
 
-void Playlist::RemoveRows(const std::vector<int> &rows) {
+void Playlist::RemoveRows(const std::vector<int> &rows) { RemoveRowsInternal(rows, true); }
+
+void Playlist::RemoveRowsInternal(const std::vector<int> &rows, bool record_undo) {
   if (rows.empty()) {
     return;
   }
-  PushUndo();
+  if (record_undo) {
+    MaybeRecordUndo(static_cast<int>(rows.size()));
+  }
   played_indexes_ = PlaylistPlayed::AfterRemove(played_indexes_, rows);
   std::vector<int> sorted = rows;
   std::sort(sorted.begin(), sorted.end(), std::greater<int>());
@@ -137,7 +180,7 @@ void Playlist::Clear() {
   if (songs_.empty()) {
     return;
   }
-  PushUndo();
+  MaybeRecordUndo(row_count());
   songs_.clear();
   current_row_ = -1;
   played_indexes_.clear();
@@ -624,10 +667,12 @@ int Playlist::PreviousIndex() const {
 }
 
 void Playlist::Next() {
+  const int old = current_row_;
   const int next = NextIndex();
   if (next >= 0) {
     PlaylistPlayed::Push(&played_indexes_, current_row_);
     set_current_row(next);
+    MaintainDynamicAfterAdvance(old);
   }
 }
 
@@ -644,10 +689,28 @@ void Playlist::Previous() {
 }
 
 void Playlist::RecordAndSetCurrentRow(int row) {
+  const int old = current_row_;
   if (current_row_ >= 0 && current_row_ != row) {
     PlaylistPlayed::Push(&played_indexes_, current_row_);
   }
   set_current_row(row);
+  if (row > old) {
+    MaintainDynamicAfterAdvance(old);
+  }
+}
+
+void Playlist::MaintainDynamicAfterAdvance(int old_row) {
+  if (!DynamicPlaylistMaintenance::ShouldClearUndo(dynamic_, current_row_ > old_row && old_row >= 0)) {
+    return;
+  }
+  const int trim = DynamicPlaylistMaintenance::HistoryTrimCount(DynamicPlaylistMaintenance::HistoryLength(current_row_));
+  undo_.clear();
+  redo_.clear();
+  if (trim > 0) {
+    std::vector<int> rows(static_cast<size_t>(trim));
+    std::iota(rows.begin(), rows.end(), 0);
+    RemoveRowsInternal(rows, false);
+  }
 }
 
 int64_t Playlist::total_length_nanosec() const {
@@ -669,11 +732,12 @@ void Playlist::RefillDynamic(const SongList &pool, bool force) {
   if (!dynamic_) {
     return;
   }
-  const int upcoming = current_row_ < 0 ? row_count() : row_count() - current_row_ - 1;
-  if (!force && upcoming >= 15) {
+  const int upcoming = DynamicPlaylistMaintenance::FutureCount(row_count(), current_row_);
+  const int max_future = PlaylistGenerator::kDefaultDynamicFuture;
+  if (!force && upcoming >= max_future) {
     return;
   }
-  const int want = force ? 15 : std::max(0, 15 - upcoming);
+  const int want = force ? max_future : std::max(0, max_future - upcoming);
   if (want <= 0) {
     return;
   }

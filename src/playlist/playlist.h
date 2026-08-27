@@ -30,6 +30,11 @@ class Playlist {
   int row_count() const { return static_cast<int>(songs_.size()); }
   int current_row() const { return current_row_; }
   void set_current_row(int row);
+  void UpdateScrobblePoint(int64_t seek_point_nanosec = 0);
+  int64_t scrobble_point_nanosec() const { return scrobble_point_nanosec_; }
+  bool scrobbled() const { return scrobbled_; }
+  void set_scrobbled(bool scrobbled) { scrobbled_ = scrobbled; }
+  bool PatchSongById(const Song &song);
   Song current_song() const;
   Song song(int row) const;
   int PeekNextRow() const { return NextIndex(); }
@@ -109,6 +114,9 @@ class Playlist {
   void SyncVirtualIndex();
   bool SameAlbum(int left, int right) const;
   void PushUndo();
+  void MaybeRecordUndo(int item_count);
+  void RemoveRowsInternal(const std::vector<int> &rows, bool record_undo);
+  void MaintainDynamicAfterAdvance(int old_row);
   void MaybeAutoSort();
   void SortInPlace();
 
@@ -133,6 +141,8 @@ class Playlist {
   std::string filter_string_;
   std::vector<int> played_indexes_;
   int stop_after_row_ = -1;
+  int64_t scrobble_point_nanosec_ = -1;
+  bool scrobbled_ = false;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H

@@ -7,6 +7,7 @@
 #include "playlist/playlist.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "collection/skipcounteligibility.h"
 #include "scrobbler/scrobblereligibility.h"
 #include "utilities/fileutils.h"
 
@@ -103,11 +104,20 @@ void Application::Init() {
     discord_->UpdatePresence(song, player_->GetState() == GstEngine::State::Playing);
     tray_->SetNowPlaying(song);
   });
+  player_->TrackSkipped.Connect([this](const Song &song, int64_t pos_ns, int64_t len_ns) {
+    if (song.id() > 0 && SkipCountEligibility::ShouldIncrement(pos_ns, len_ns)) {
+      collection_->backend()->IncrementSkipCount(song.id());
+    }
+  });
   player_->PlaybackFinished.Connect([this](const Song &song, int64_t listened_nanosec) {
     Settings settings;
-    const bool played = ScrobblerEligibility::ShouldScrobble(song, listened_nanosec);
+    Playlist *playlist = playlist_manager_->active();
+    const bool already_scrobbled = playlist && playlist->scrobbled();
+    const bool played = already_scrobbled || ScrobblerEligibility::ShouldScrobble(song, listened_nanosec);
     if (played) {
-      scrobbler_->Scrobble(song);
+      if (!already_scrobbled) {
+        scrobbler_->Scrobble(song);
+      }
       if (song.id() > 0) {
         collection_->backend()->IncrementPlayCount(song.id());
       }
@@ -115,8 +125,6 @@ void Application::Init() {
       if (settings.BoolValue(CollectionSettings::kSavePlayCounts, CollectionSettings::kDefaultSavePlayCounts) && song.IsEditable()) {
         tagreader_->SavePlaycount(FileUtils::PathFromUri(song.url()), song.playcount() + 1);
       }
-    } else if (song.id() > 0 && listened_nanosec > 0) {
-      collection_->backend()->IncrementSkipCount(song.id());
     }
   });
   player_->ForceShowOSD.Connect([this](const Song &song) { osd_->SongChanged(song, current_albumcover_loader_->current()); });

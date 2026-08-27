@@ -66,6 +66,7 @@
 #include "streaming/streamingsearchopts.h"
 #include "constants/scrobblersettings.h"
 #include "playlist/playlistrestorescroll.h"
+#include "scrobbler/scrobblepoint.h"
 #include "scrobbler/scrobbletoggleicon.h"
 #include "scrobbler/scrobblererror.h"
 #include "scrobbler/scrobblerlovestate.h"
@@ -1842,6 +1843,17 @@ void MainWindow::ConnectSignals() {
     RefreshCollection();
     ShowToast("Collection scan finished");
   });
+  auto patch_collection_songs = [this](const SongList &songs) {
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      for (const Song &song : songs) {
+        playlist->PatchSongById(song);
+      }
+    }
+    RefreshCollection();
+    RefreshPlaylist();
+  };
+  app_->collection()->backend()->SongsStatisticsChanged.Connect(patch_collection_songs);
+  app_->collection()->backend()->SongsRatingChanged.Connect(patch_collection_songs);
   app_->task_manager()->TasksChanged.Connect([this](int) {
     if (!loading_indicator_) {
       return;
@@ -1906,6 +1918,16 @@ void MainWindow::ConnectSignals() {
     }
     if (self->context_view_) {
       self->context_view_->SetPlaybackPosition(pos);
+    }
+    if (self->app_->scrobbler() && self->app_->playlist_manager()) {
+      Playlist *playlist = self->app_->playlist_manager()->active();
+      const Song song = self->app_->player()->current_song();
+      if (playlist &&
+          ScrobblePoint::ShouldSubmit(self->app_->scrobbler()->enabled(), playlist->scrobbled(), song.is_metadata_good(), pos,
+                                      playlist->scrobble_point_nanosec())) {
+        self->app_->scrobbler()->Scrobble(song);
+        playlist->set_scrobbled(true);
+      }
     }
     return G_SOURCE_CONTINUE;
   }, this);

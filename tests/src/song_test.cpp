@@ -132,3 +132,44 @@ TEST(Song, IsEditableRequiresLocalWritableFile) {
   invalid.set_source(Song::Source::LocalFile);
   EXPECT_FALSE(invalid.IsEditable());
 }
+
+TEST(Song, IsOnSameAlbumMatchesQtRules) {
+  Song a;
+  a.set_title("Roads");
+  a.set_album("Dummy");
+  a.set_artist("Portishead");
+  Song b = a;
+  b.set_title("Glory Box");
+  EXPECT_TRUE(a.IsOnSameAlbum(b));
+  EXPECT_EQ("Dummy", a.EffectiveAlbum());
+
+  Song untitled;
+  untitled.set_title("Untitled");
+  EXPECT_EQ("Untitled", untitled.EffectiveAlbum());
+
+  Song cue_a;
+  cue_a.set_album("Live");
+  cue_a.set_artist("A");
+  cue_a.set_cue_path("/tmp/live.cue");
+  Song cue_b;
+  cue_b.set_album("Other");
+  cue_b.set_artist("B");
+  cue_b.set_cue_path("/tmp/live.cue");
+  EXPECT_TRUE(cue_a.has_cue());
+  EXPECT_TRUE(cue_a.IsOnSameAlbum(cue_b));
+
+  Song compilation_a;
+  compilation_a.set_compilation(true);
+  compilation_a.set_album("Now 12");
+  compilation_a.set_artist("One");
+  Song compilation_b;
+  compilation_b.set_compilation(true);
+  compilation_b.set_album("Now 12");
+  compilation_b.set_artist("Two");
+  EXPECT_TRUE(compilation_a.IsOnSameAlbum(compilation_b));
+
+  Song other;
+  other.set_album("Third");
+  other.set_artist("Portishead");
+  EXPECT_FALSE(a.IsOnSameAlbum(other));
+}

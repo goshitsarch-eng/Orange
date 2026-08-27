@@ -12,9 +12,9 @@ class PlaylistGenerator {
  public:
   enum class Type { None = 0, Query = 1 };
 
-  static const int kDefaultLimit = 100;
-  static const int kDefaultDynamicHistory = 10;
-  static const int kDefaultDynamicFuture = 10;
+  static constexpr int kDefaultLimit = 100;
+  static constexpr int kDefaultDynamicHistory = 10;
+  static constexpr int kDefaultDynamicFuture = 10;
 
   virtual ~PlaylistGenerator() = default;
 

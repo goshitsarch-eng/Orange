@@ -249,18 +249,30 @@ void CollectionBackend::IncrementPlayCount(int song_id) {
   SqlQuery query(database_, "UPDATE songs SET playcount = playcount + 1, lastplayed = strftime('%s','now') WHERE ROWID = ?");
   query.Bind(1, song_id);
   query.Exec();
+  const Song song = SongById(song_id);
+  if (song.id() > 0) {
+    SongsStatisticsChanged.Emit({song});
+  }
 }
 
 void CollectionBackend::IncrementSkipCount(int song_id) {
   SqlQuery query(database_, "UPDATE songs SET skipcount = skipcount + 1 WHERE ROWID = ?");
   query.Bind(1, song_id);
   query.Exec();
+  const Song song = SongById(song_id);
+  if (song.id() > 0) {
+    SongsStatisticsChanged.Emit({song});
+  }
 }
 
 void CollectionBackend::ResetPlayStatistics(int song_id) {
   SqlQuery query(database_, "UPDATE songs SET playcount = 0, skipcount = 0, lastplayed = -1 WHERE ROWID = ?");
   query.Bind(1, song_id);
   query.Exec();
+  const Song song = SongById(song_id);
+  if (song.id() > 0) {
+    SongsStatisticsChanged.Emit({song});
+  }
 }
 
 void CollectionBackend::SetRating(int song_id, float rating) {
@@ -268,6 +280,10 @@ void CollectionBackend::SetRating(int song_id, float rating) {
   query.Bind(1, static_cast<int>(rating * 100.0f));
   query.Bind(2, song_id);
   query.Exec();
+  const Song song = SongById(song_id);
+  if (song.id() > 0) {
+    SongsRatingChanged.Emit({song});
+  }
 }
 
 int CollectionBackend::ForceCompilation(const SongList &songs, bool on) {
