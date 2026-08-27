@@ -512,6 +512,66 @@ TEST(EditTagCover, ChangeArtAndActionEnableMatchQt) {
   EXPECT_FALSE(EditTagCover::DeleteCoverEnabled(art, false, false));
 }
 
+TEST(EditTagFields, FieldEnabledMatchesQtFiletypeSupport) {
+  Song flac;
+  flac.set_filetype(Song::FileType::FLAC);
+  Song mpeg;
+  mpeg.set_filetype(Song::FileType::MPEG);
+  Song mp4;
+  mp4.set_filetype(Song::FileType::MP4);
+  Song asf;
+  asf.set_filetype(Song::FileType::ASF);
+  Song dsf;
+  dsf.set_filetype(Song::FileType::DSF);
+  Song opus;
+  opus.set_filetype(Song::FileType::OggOpus);
+
+  EXPECT_TRUE(flac.additional_tags_supported());
+  EXPECT_FALSE(dsf.additional_tags_supported());
+  EXPECT_FALSE(asf.additional_tags_supported());
+  EXPECT_TRUE(asf.albumartist_supported());
+  EXPECT_FALSE(dsf.albumartist_supported());
+  EXPECT_FALSE(asf.performer_supported());
+  EXPECT_TRUE(mpeg.performer_supported());
+  EXPECT_FALSE(mp4.performer_supported());
+  EXPECT_TRUE(asf.lyrics_supported());
+  EXPECT_FALSE(asf.grouping_supported());
+  EXPECT_FALSE(asf.compilation_supported());
+  EXPECT_FALSE(asf.comment_supported());
+  EXPECT_TRUE(asf.rating_supported());
+  EXPECT_FALSE(dsf.rating_supported());
+  EXPECT_TRUE(flac.performersort_supported());
+  EXPECT_FALSE(mpeg.performersort_supported());
+  EXPECT_FALSE(opus.performersort_supported());
+  EXPECT_TRUE(opus.titlesort_supported());
+  EXPECT_FALSE(mp4.titlesort_supported());
+
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Title", {dsf}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Artist", {dsf}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Year", {dsf}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Album artist", {dsf}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Album artist", {asf}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Album artist", {flac, dsf}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Composer", {dsf}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Composer", {asf}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Performer", {asf}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Performer", {mpeg}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Grouping", {asf}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Genre", {asf}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Compilation", {asf}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Comment", {dsf}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Lyrics", {dsf}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Lyrics", {asf}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Rating", {dsf}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Rating", {mp4}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Performer sort", {mpeg}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Performer sort", {flac}));
+  EXPECT_TRUE(EditTagFields::FieldEnabled("Title sort", {mpeg}));
+  EXPECT_FALSE(EditTagFields::FieldEnabled("Title sort", {mp4}));
+  EXPECT_TRUE(EditTagFields::AnySupported({flac, dsf}, &Song::albumartist_supported));
+  EXPECT_FALSE(EditTagFields::AnySupported({dsf}, &Song::albumartist_supported));
+}
+
 TEST(TagWriterFields, WritesBpmMoodKeyAndOriginalYear) {
   EXPECT_STREQ("BPM", TagWriterFields::VorbisBpm());
   EXPECT_STREQ("MOOD", TagWriterFields::VorbisMood());

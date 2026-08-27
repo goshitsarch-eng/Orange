@@ -336,6 +336,18 @@ void ApplyEditEnable(State *state) {
   if (state->loading_label) {
     gtk_widget_set_visible(state->loading_label, EditTagFields::LoadingLabelVisible(state->loading));
   }
+  const bool fields_on = EditTagFields::FieldsEnabled(state->loading, has_valid);
+  for (const auto &field : state->fields) {
+    if (field.second) {
+      gtk_widget_set_sensitive(field.second, fields_on && EditTagFields::FieldEnabled(field.first, state->songs));
+    }
+  }
+  if (state->compilation) {
+    gtk_widget_set_sensitive(state->compilation, fields_on && EditTagFields::FieldEnabled("Compilation", state->songs));
+  }
+  if (state->rating) {
+    gtk_widget_set_sensitive(state->rating, fields_on && EditTagFields::FieldEnabled("Rating", state->songs));
+  }
   ApplyCoverEnable(state);
 }
 

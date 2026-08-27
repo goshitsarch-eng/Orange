@@ -255,6 +255,54 @@ class Song {
 
   int id3v2_version() const { return id3v2_version_; }
   void set_id3v2_version(int v) { id3v2_version_ = v; }
+  bool additional_tags_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::WavPack || filetype_ == FileType::OggFlac ||
+           filetype_ == FileType::OggVorbis || filetype_ == FileType::OggOpus || filetype_ == FileType::OggSpeex ||
+           filetype_ == FileType::MPEG || filetype_ == FileType::MP4 || filetype_ == FileType::MPC || filetype_ == FileType::APE ||
+           filetype_ == FileType::WAV || filetype_ == FileType::AIFF;
+  }
+  bool albumartist_supported() const { return additional_tags_supported() || filetype_ == FileType::ASF; }
+  bool composer_supported() const { return additional_tags_supported() || filetype_ == FileType::ASF; }
+  bool performer_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::WavPack || filetype_ == FileType::OggFlac ||
+           filetype_ == FileType::OggVorbis || filetype_ == FileType::OggOpus || filetype_ == FileType::OggSpeex ||
+           filetype_ == FileType::MPEG || filetype_ == FileType::MPC || filetype_ == FileType::APE || filetype_ == FileType::WAV ||
+           filetype_ == FileType::AIFF;
+  }
+  bool grouping_supported() const { return additional_tags_supported(); }
+  bool genre_supported() const { return additional_tags_supported() || filetype_ == FileType::ASF; }
+  bool compilation_supported() const { return additional_tags_supported(); }
+  bool rating_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::WavPack || filetype_ == FileType::OggFlac ||
+           filetype_ == FileType::OggVorbis || filetype_ == FileType::OggOpus || filetype_ == FileType::OggSpeex ||
+           filetype_ == FileType::MPEG || filetype_ == FileType::MP4 || filetype_ == FileType::ASF || filetype_ == FileType::MPC ||
+           filetype_ == FileType::APE || filetype_ == FileType::WAV || filetype_ == FileType::AIFF;
+  }
+  bool comment_supported() const { return additional_tags_supported(); }
+  bool lyrics_supported() const { return additional_tags_supported() || filetype_ == FileType::ASF; }
+  bool albumartistsort_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
+           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
+  }
+  bool albumsort_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
+           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
+  }
+  bool artistsort_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
+           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
+  }
+  bool composersort_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
+           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
+  }
+  bool performersort_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis;
+  }
+  bool titlesort_supported() const {
+    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
+           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
+  }
   bool id3v2_tags_supported() const {
     return filetype_ == FileType::MPEG || filetype_ == FileType::WAV || filetype_ == FileType::AIFF;
   }

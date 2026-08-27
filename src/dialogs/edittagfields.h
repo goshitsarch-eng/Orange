@@ -106,6 +106,65 @@ inline SongList ValidSongs(const SongList &songs) {
   return valid;
 }
 
+inline bool AnySupported(const SongList &songs, bool (Song::*supported)() const) {
+  for (const Song &song : songs) {
+    if ((song.*supported)()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Qt EditTagDialog::SelectionChanged: optional fields enable if any selected song can write them.
+inline bool FieldEnabled(const std::string &name, const SongList &songs) {
+  if (name == "Album artist") {
+    return AnySupported(songs, &Song::albumartist_supported);
+  }
+  if (name == "Album artist sort") {
+    return AnySupported(songs, &Song::albumartistsort_supported);
+  }
+  if (name == "Composer") {
+    return AnySupported(songs, &Song::composer_supported);
+  }
+  if (name == "Composer sort") {
+    return AnySupported(songs, &Song::composersort_supported);
+  }
+  if (name == "Performer") {
+    return AnySupported(songs, &Song::performer_supported);
+  }
+  if (name == "Performer sort") {
+    return AnySupported(songs, &Song::performersort_supported);
+  }
+  if (name == "Grouping") {
+    return AnySupported(songs, &Song::grouping_supported);
+  }
+  if (name == "Genre") {
+    return AnySupported(songs, &Song::genre_supported);
+  }
+  if (name == "Compilation") {
+    return AnySupported(songs, &Song::compilation_supported);
+  }
+  if (name == "Rating") {
+    return AnySupported(songs, &Song::rating_supported);
+  }
+  if (name == "Comment") {
+    return AnySupported(songs, &Song::comment_supported);
+  }
+  if (name == "Lyrics") {
+    return AnySupported(songs, &Song::lyrics_supported);
+  }
+  if (name == "Title sort") {
+    return AnySupported(songs, &Song::titlesort_supported);
+  }
+  if (name == "Artist sort") {
+    return AnySupported(songs, &Song::artistsort_supported);
+  }
+  if (name == "Album sort") {
+    return AnySupported(songs, &Song::albumsort_supported);
+  }
+  return true;
+}
+
 }  // namespace EditTagFields
 
 #endif
