@@ -730,7 +730,7 @@ void PlaylistManager::FlushPendingSaves() {
       continue;
     }
     if (intent == PlaylistSaveSchedule::Intent::LastPlayed) {
-      backend_->SaveLastPlayed(playlist->id(), playlist->current_row());
+      backend_->SaveLastPlayed(playlist->id(), playlist->last_played_row());
     } else if (intent == PlaylistSaveSchedule::Intent::Items) {
       backend_->SavePlaylistItems(playlist->id(), playlist->uuids(), playlist->songs());
     } else {

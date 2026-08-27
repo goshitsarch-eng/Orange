@@ -19,6 +19,7 @@
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistfilter.h"
 #include "playlist/playlistfilterdelay.h"
+#include "playlist/playlistrestorescroll.h"
 #include "playlist/playlistfilterempty.h"
 #include "playlist/playlistkeyboard.h"
 #include "playlist/playlistlook.h"
@@ -977,6 +978,14 @@ void PlaylistView::JumpToCurrentlyPlayingTrack() {
     return;
   }
   ScrollToRow(playlist_->current_row(), true);
+}
+
+void PlaylistView::JumpToLastPlayedTrack() {
+  if (!playlist_ || !PlaylistRestoreScroll::ShouldJump(playlist_->last_played_row())) {
+    return;
+  }
+  selected_rows_ = {playlist_->last_played_row()};
+  ScrollToRow(playlist_->last_played_row(), true);
 }
 
 void PlaylistView::ScrollToRow(int row, bool center) {

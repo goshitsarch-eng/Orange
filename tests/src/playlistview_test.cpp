@@ -871,6 +871,9 @@ TEST(PlaylistRestoreScroll, PrefersLastPlayedThenCurrent) {
   EXPECT_EQ(-1, PlaylistRestoreScroll::TargetRow(-1, -1));
   EXPECT_TRUE(PlaylistRestoreScroll::ShouldJump(0));
   EXPECT_FALSE(PlaylistRestoreScroll::ShouldJump(-1));
+  EXPECT_EQ(std::vector<int>({5}), PlaylistRestoreScroll::SelectionForRestore(5, {}));
+  EXPECT_EQ(std::vector<int>({1, 2}), PlaylistRestoreScroll::SelectionForRestore(5, {1, 2}));
+  EXPECT_TRUE(PlaylistRestoreScroll::SelectionForRestore(-1, {}).empty());
 }
 
 TEST(PlaylistActivate, MatchesQtDoubleClickModes) {

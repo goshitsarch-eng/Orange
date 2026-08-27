@@ -46,6 +46,8 @@ Playlist::~Playlist() {
   }
 }
 
+void Playlist::set_last_played_row(int row) { last_played_row_ = PlaylistPlayRow::RestoreIndex(row, row_count()); }
+
 void Playlist::set_current_row(int row) {
   if (songs_.empty()) {
     current_row_ = -1;
@@ -220,7 +222,7 @@ void Playlist::InsertSongs(int row, const SongList &songs) {
   uuids_.insert(uuids_.begin() + row, static_cast<size_t>(songs.size()), {});
   EnsureUuids();
   played_indexes_ = PlaylistPlayed::AfterInsert(played_indexes_, row, static_cast<int>(songs.size()));
-  if (current_row_ < 0 && !songs_.empty()) {
+  if (PlaylistPlayRow::ShouldAssignFirstRowOnInsert(loading_, current_row_) && !songs_.empty()) {
     current_row_ = 0;
   }
   MaybeAutoSort();
@@ -851,22 +853,23 @@ void Playlist::RebuildVirtualItems(unsigned seed) {
   }
   std::vector<std::string> keys;
   keys.reserve(static_cast<size_t>(n));
+  const int reference = PlaylistPlayRow::ShuffleReference(current_row_, last_played_row_);
   switch (shuffle_mode_) {
     case PlaylistSequence::ShuffleMode::All:
     case PlaylistSequence::ShuffleMode::InsideAlbum:
-      virtual_items_ = PlaylistShuffle::ShuffleAll(n, seed, current_row_);
+      virtual_items_ = PlaylistShuffle::ShuffleAll(n, seed, reference);
       break;
     case PlaylistSequence::ShuffleMode::Albums:
       for (int i = 0; i < n; ++i) {
         keys.push_back(PlaylistShuffle::AlbumKey(song(i)));
       }
-      virtual_items_ = PlaylistShuffle::ShuffleByKey(keys, seed, current_row_);
+      virtual_items_ = PlaylistShuffle::ShuffleByKey(keys, seed, reference);
       break;
     case PlaylistSequence::ShuffleMode::Grouping:
       for (int i = 0; i < n; ++i) {
         keys.push_back(PlaylistShuffle::GroupingKey(song(i)));
       }
-      virtual_items_ = PlaylistShuffle::ShuffleByKey(keys, seed, current_row_);
+      virtual_items_ = PlaylistShuffle::ShuffleByKey(keys, seed, reference);
       break;
     case PlaylistSequence::ShuffleMode::Off:
     default:

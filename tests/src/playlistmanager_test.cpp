@@ -292,6 +292,37 @@ TEST(PlaylistBackend, PersistsUuidColumnsAndDynamicSearch) {
   FileUtils::Remove(path);
 }
 
+TEST(PlaylistBackend, RestoresLastPlayedWithoutMakingItCurrent) {
+  const std::string path = "/tmp/strawberry-playlist-last-played.db";
+  FileUtils::Remove(path);
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  TagReader tagreader;
+  PlaylistBackend backend(&db, &tagreader, nullptr);
+  Playlist playlist;
+  playlist.set_name("Roads");
+  Song a = MakeSong("A", "file:///a");
+  Song b = MakeSong("B", "file:///b");
+  Song c = MakeSong("C", "file:///c");
+  playlist.BeginLoad();
+  playlist.AppendSongs({a, b, c});
+  playlist.EndLoad();
+  playlist.set_last_played_row(2);
+  EXPECT_EQ(-1, playlist.current_row());
+  const int id = backend.SavePlaylist(&playlist);
+  ASSERT_GT(id, 0);
+  auto loaded = backend.LoadPlaylist(id);
+  ASSERT_NE(nullptr, loaded);
+  ASSERT_EQ(3, loaded->row_count());
+  EXPECT_EQ(-1, loaded->current_row());
+  EXPECT_EQ(2, loaded->last_played_row());
+  backend.SaveLastPlayed(id, loaded->last_played_row());
+  auto again = backend.LoadPlaylist(id);
+  EXPECT_EQ(-1, again->current_row());
+  EXPECT_EQ(2, again->last_played_row());
+  FileUtils::Remove(path);
+}
+
 TEST(PlaylistDragPayload, EncodesSourceAndDetectsCrossPlaylist) {
   const std::string encoded = PlaylistDragPayload::Encode(7, {0, 2});
   EXPECT_EQ("strawberry-playlist-rows:7|0,2", encoded);

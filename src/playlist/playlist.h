@@ -39,6 +39,7 @@ class Playlist {
   int row_count() const { return static_cast<int>(songs_.size()); }
   int current_row() const { return current_row_; }
   int last_played_row() const { return last_played_row_; }
+  void set_last_played_row(int row);
   void set_current_row(int row);
   void UpdateScrobblePoint(int64_t seek_point_nanosec = 0);
   int64_t scrobble_point_nanosec() const { return scrobble_point_nanosec_; }

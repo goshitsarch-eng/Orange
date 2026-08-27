@@ -42,6 +42,7 @@ class PlaylistView {
   void Refresh(Playlist *playlist);
   void ScrollToRow(int row, bool center = false);
   void JumpToCurrentlyPlayingTrack();
+  void JumpToLastPlayedTrack();
   void MaybeScrollToRow(int row, Playlist::AutoScroll mode);
   void InhibitAutoscroll();
   void SetPaused(bool paused);

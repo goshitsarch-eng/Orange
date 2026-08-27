@@ -1439,6 +1439,43 @@ TEST(Playlist, RemembersLastPlayedRow) {
   EXPECT_EQ(-1, PlaylistPlayRow::Resolve(playlist.current_row(), playlist.last_played_row(), playlist.row_count()));
 }
 
+TEST(PlaylistPlayRow, RestoreLeavesCurrentUnsetLikeQt) {
+  EXPECT_EQ(3, PlaylistPlayRow::RestoreIndex(3, 10));
+  EXPECT_EQ(-1, PlaylistPlayRow::RestoreIndex(-1, 10));
+  EXPECT_EQ(-1, PlaylistPlayRow::RestoreIndex(10, 10));
+  EXPECT_TRUE(PlaylistPlayRow::ShouldAssignFirstRowOnInsert(false, -1));
+  EXPECT_FALSE(PlaylistPlayRow::ShouldAssignFirstRowOnInsert(true, -1));
+  EXPECT_FALSE(PlaylistPlayRow::ShouldAssignFirstRowOnInsert(false, 2));
+  EXPECT_EQ(4, PlaylistPlayRow::ShuffleReference(4, 1));
+  EXPECT_EQ(1, PlaylistPlayRow::ShuffleReference(-1, 1));
+  EXPECT_EQ(-1, PlaylistPlayRow::ShuffleReference(-1, -1));
+
+  Playlist playlist;
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  Song c;
+  c.set_title("C");
+  c.set_url("file:///c");
+  c.set_valid(true);
+  playlist.BeginLoad();
+  playlist.AppendSongs({a, b, c});
+  playlist.EndLoad();
+  EXPECT_EQ(-1, playlist.current_row());
+  playlist.set_last_played_row(2);
+  EXPECT_EQ(-1, playlist.current_row());
+  EXPECT_EQ(2, playlist.last_played_row());
+  playlist.set_last_played_row(99);
+  EXPECT_EQ(-1, playlist.last_played_row());
+  playlist.set_last_played_row(1);
+  EXPECT_EQ(1, PlaylistPlayRow::Resolve(playlist.current_row(), playlist.last_played_row(), playlist.row_count()));
+}
+
 TEST(DynamicPlaylistPersist, EncodesQueryTypeAndRoundTripsSearch) {
   EXPECT_EQ(1, DynamicPlaylistPersist::TypeFor(true));
   EXPECT_EQ(0, DynamicPlaylistPersist::TypeFor(false));

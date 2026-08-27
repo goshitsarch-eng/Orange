@@ -2091,9 +2091,17 @@ void MainWindow::ConnectSignals() {
     RefreshPlaylist();
     if (playlist_container_ && playlist_container_->view()) {
       Playlist *playlist = app_->playlist_manager()->current();
-      const int row = PlaylistRestoreScroll::TargetRow(playlist ? playlist->current_row() : -1, playlist ? playlist->current_row() : -1);
+      const int last_played = playlist ? playlist->last_played_row() : -1;
+      const int current = playlist ? playlist->current_row() : -1;
+      const int row = PlaylistRestoreScroll::TargetRow(last_played, current);
       if (PlaylistRestoreScroll::ShouldJump(row)) {
-        playlist_container_->view()->JumpToCurrentlyPlayingTrack();
+        selected_playlist_rows_ = PlaylistRestoreScroll::SelectionForRestore(row, selected_playlist_rows_);
+        if (playlist) {
+          selection_playlist_name_ = playlist->name();
+        }
+        playlist_container_->view()->SetSelectedRows(selected_playlist_rows_);
+        playlist_container_->view()->Refresh(playlist);
+        playlist_container_->view()->JumpToLastPlayedTrack();
       }
     }
   });

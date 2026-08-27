@@ -95,9 +95,7 @@ std::unique_ptr<Playlist> PlaylistBackend::LoadPlaylist(int id) {
       playlist->dynamic_generator()->set_collection_backend(collection_backend_);
     }
   }
-  if (last_played >= 0 && last_played < playlist->row_count()) {
-    playlist->set_current_row(last_played);
-  }
+  playlist->set_last_played_row(last_played);
   return playlist;
 }
 
@@ -111,7 +109,7 @@ int PlaylistBackend::SavePlaylist(Playlist *playlist) {
                    "INSERT INTO playlists (name, last_played, ui_order, is_favorite, ui_path, dynamic_playlist_type, "
                    "dynamic_playlist_backend, dynamic_playlist_data) VALUES (?, ?, 0, ?, ?, ?, ?, ?)");
     query.Bind(1, playlist->name());
-    query.Bind(2, playlist->current_row());
+    query.Bind(2, playlist->last_played_row());
     query.Bind(3, playlist->favorite() ? 1 : 0);
     query.Bind(4, playlist->ui_path());
     query.Bind(5, DynamicPlaylistPersist::TypeFor(playlist->is_dynamic()));
@@ -125,7 +123,7 @@ int PlaylistBackend::SavePlaylist(Playlist *playlist) {
                    "dynamic_playlist_backend = ?, dynamic_playlist_data = ? WHERE ROWID = ?");
     query.Bind(1, playlist->name());
     query.Bind(2, playlist->favorite() ? 1 : 0);
-    query.Bind(3, playlist->current_row());
+    query.Bind(3, playlist->last_played_row());
     query.Bind(4, playlist->ui_path());
     query.Bind(5, DynamicPlaylistPersist::TypeFor(playlist->is_dynamic()));
     query.Bind(6, DynamicPlaylistPersist::DefaultBackend());
