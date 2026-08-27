@@ -154,12 +154,17 @@ Song::FileType Song::FiletypeByMimeType(const std::string &mimetype) {
   if (mime == "audio/mpeg" || mime == "audio/mp3" || mime == "audio/x-mpeg") return FileType::MPEG;
   if (mime == "audio/mp4" || mime == "audio/m4a" || mime == "audio/x-m4a" || mime == "audio/aac") return FileType::MP4;
   if (mime == "audio/ogg" || mime == "application/ogg" || mime == "audio/vorbis" || mime == "audio/x-vorbis") return FileType::OggVorbis;
-  if (mime == "audio/opus" || mime == "audio/ogg; codecs=opus") return FileType::OggOpus;
+  if (mime == "audio/opus" || mime == "audio/x-opus" || mime == "audio/ogg; codecs=opus") return FileType::OggOpus;
   if (mime == "audio/wav" || mime == "audio/x-wav" || mime == "audio/wave") return FileType::WAV;
   if (mime == "audio/x-wavpack") return FileType::WavPack;
-  if (mime == "audio/x-ms-wma" || mime == "audio/wma") return FileType::ASF;
+  if (mime == "audio/x-ms-wma" || mime == "audio/wma" || mime == "audio/x-wma") return FileType::ASF;
   if (mime == "audio/aiff" || mime == "audio/x-aiff") return FileType::AIFF;
   if (mime == "audio/x-speex" || mime == "audio/speex") return FileType::OggSpeex;
+  if (mime == "audio/x-musepack" || mime == "application/x-project") return FileType::MPC;
+  if (mime == "audio/x-ape" || mime == "application/x-ape" || mime == "audio/x-ffmpeg-parsed-ape") return FileType::APE;
+  if (mime == "audio/x-spc") return FileType::SPC;
+  if (mime == "audio/x-vgm") return FileType::VGM;
+  if (mime == "audio/x-alac") return FileType::ALAC;
   if (mime == "audio/x-dsf" || mime == "audio/dsf") return FileType::DSF;
   if (mime == "audio/x-dsd" || mime == "audio/x-dff" || mime == "audio/dsd") return FileType::DSDIFF;
   if (mime == "audio/x-mod" || mime == "audio/mod") return FileType::MOD;
@@ -174,6 +179,31 @@ Song::FileType Song::FiletypeByMimeType(const std::string &mimetype) {
       return by_suffix;
     }
   }
+  return FileType::Unknown;
+}
+
+Song::FileType Song::FiletypeByDescription(const std::string &text) {
+  if (g_ascii_strcasecmp(text.c_str(), "WAV") == 0) return FileType::WAV;
+  if (g_ascii_strcasecmp(text.c_str(), "Free Lossless Audio Codec (FLAC)") == 0) return FileType::FLAC;
+  if (g_ascii_strcasecmp(text.c_str(), "Wavpack") == 0) return FileType::WavPack;
+  if (g_ascii_strcasecmp(text.c_str(), "Vorbis") == 0) return FileType::OggVorbis;
+  if (g_ascii_strcasecmp(text.c_str(), "Opus") == 0) return FileType::OggOpus;
+  if (g_ascii_strcasecmp(text.c_str(), "Speex") == 0) return FileType::OggSpeex;
+  if (g_ascii_strcasecmp(text.c_str(), "MPEG-1 Layer 2 (MP2)") == 0) return FileType::MPEG;
+  if (g_ascii_strcasecmp(text.c_str(), "MPEG-1 Layer 3 (MP3)") == 0) return FileType::MPEG;
+  if (g_ascii_strcasecmp(text.c_str(), "MPEG-4 AAC") == 0) return FileType::MP4;
+  if (g_ascii_strcasecmp(text.c_str(), "WMA") == 0) return FileType::ASF;
+  if (g_ascii_strcasecmp(text.c_str(), "Audio Interchange File Format") == 0) return FileType::AIFF;
+  if (g_ascii_strcasecmp(text.c_str(), "MPC") == 0) return FileType::MPC;
+  if (g_ascii_strcasecmp(text.c_str(), "Musepack (MPC)") == 0) return FileType::MPC;
+  if (g_ascii_strcasecmp(text.c_str(), "audio/x-dsf") == 0) return FileType::DSF;
+  if (g_ascii_strcasecmp(text.c_str(), "audio/x-dsd") == 0) return FileType::DSDIFF;
+  if (g_ascii_strcasecmp(text.c_str(), "audio/x-ffmpeg-parsed-ape") == 0) return FileType::APE;
+  if (g_ascii_strcasecmp(text.c_str(), "Module Music Format (MOD)") == 0) return FileType::MOD;
+  if (g_ascii_strcasecmp(text.c_str(), "Module Music Format (S3M)") == 0) return FileType::S3M;
+  if (g_ascii_strcasecmp(text.c_str(), "SNES SPC700") == 0) return FileType::SPC;
+  if (g_ascii_strcasecmp(text.c_str(), "VGM") == 0) return FileType::VGM;
+  if (g_ascii_strcasecmp(text.c_str(), "Apple Lossless Audio Codec (ALAC)") == 0) return FileType::ALAC;
   return FileType::Unknown;
 }
 

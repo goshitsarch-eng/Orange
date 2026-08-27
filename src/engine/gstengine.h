@@ -10,6 +10,9 @@ class TaskManager;
 
 #include <gst/gst.h>
 
+typedef struct _GstDiscoverer GstDiscoverer;
+typedef struct _GstDiscovererInfo GstDiscovererInfo;
+
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -97,10 +100,19 @@ class GstEngine : public EngineBase {
   void BufferingProgress(int percent);
   void BufferingFinished();
   void SetSpotifyAccessToken() override;
+  void EnsureDiscoverer();
+  void DestroyDiscoverer();
+  void RequestDiscover(const std::string &media_url, const std::string &play_url);
+  void OnStreamDiscovered(GstDiscovererInfo *info, GError *error);
 
   std::unique_ptr<GstEnginePipeline> current_;
   std::unique_ptr<GstEnginePipeline> next_;
+  GstDiscoverer *discoverer_ = nullptr;
+  gulong discovered_handler_ = 0;
+  gulong finished_handler_ = 0;
+  std::string media_url_;
   std::string stream_url_;
+  std::string next_media_url_;
   std::string next_url_;
   int next_pipeline_id_ = 1;
   int replaygain_mode_ = 0;

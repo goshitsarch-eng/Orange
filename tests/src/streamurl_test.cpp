@@ -1,6 +1,7 @@
 #include "core/song.h"
 #include "core/taskmanager.h"
 #include "core/urlhandlers.h"
+#include "engine/enginediscoverer.h"
 #include "dialogs/edittagsave.h"
 #include "qobuz/qobuzmetadatarequest.h"
 #include "streaming/streamingmetadatamerge.h"
@@ -343,4 +344,46 @@ TEST(Song, FiletypeByMimeType) {
   EXPECT_EQ(Song::FileType::MPEG, Song::FiletypeByMimeType("audio/mpeg"));
   EXPECT_EQ(Song::FileType::MP4, Song::FiletypeByMimeType("audio/mp4"));
   EXPECT_EQ(Song::FileType::OggVorbis, Song::FiletypeByMimeType("audio/ogg"));
+  EXPECT_EQ(Song::FileType::OggOpus, Song::FiletypeByMimeType("audio/x-opus"));
+  EXPECT_EQ(Song::FileType::ALAC, Song::FiletypeByMimeType("audio/x-alac"));
+  EXPECT_EQ(Song::FileType::APE, Song::FiletypeByMimeType("audio/x-ffmpeg-parsed-ape"));
+}
+
+TEST(Song, FiletypeByDescription) {
+  EXPECT_EQ(Song::FileType::FLAC, Song::FiletypeByDescription("Free Lossless Audio Codec (FLAC)"));
+  EXPECT_EQ(Song::FileType::MPEG, Song::FiletypeByDescription("MPEG-1 Layer 3 (MP3)"));
+  EXPECT_EQ(Song::FileType::MP4, Song::FiletypeByDescription("MPEG-4 AAC"));
+  EXPECT_EQ(Song::FileType::OggVorbis, Song::FiletypeByDescription("Vorbis"));
+  EXPECT_EQ(Song::FileType::ALAC, Song::FiletypeByDescription("Apple Lossless Audio Codec (ALAC)"));
+  EXPECT_EQ(Song::FileType::Unknown, Song::FiletypeByDescription("not a codec"));
+}
+
+TEST(EngineDiscoverer, SkipsEmptyAndSpotifyUrls) {
+  EXPECT_EQ(10, EngineDiscoverer::kDiscoveryTimeoutS);
+  EXPECT_FALSE(EngineDiscoverer::ShouldDiscover(""));
+  EXPECT_FALSE(EngineDiscoverer::ShouldDiscover("spotify:track:abc"));
+  EXPECT_FALSE(EngineDiscoverer::ShouldDiscover("spotify://track/abc"));
+  EXPECT_TRUE(EngineDiscoverer::ShouldDiscover("https://cdn.example/live.mp3"));
+  EXPECT_TRUE(EngineDiscoverer::ShouldDiscover("tidal://1"));
+  EXPECT_TRUE(EngineDiscoverer::ShouldDiscover("file:///tmp/a.flac"));
+  EXPECT_EQ("https://cdn.example/a.flac", EngineDiscoverer::PlayUrl("tidal://1", "https://cdn.example/a.flac"));
+  EXPECT_EQ("file:///tmp/a.flac", EngineDiscoverer::PlayUrl("file:///tmp/a.flac", {}));
+}
+
+TEST(EngineDiscoverer, MapsAudioInfoAndFiletypeLikeQt) {
+  const EngineMetadata meta = EngineDiscoverer::FromAudioInfo(48000, 24, 320000);
+  EXPECT_EQ(48000, meta.samplerate);
+  EXPECT_EQ(24, meta.bitdepth);
+  EXPECT_EQ(320, meta.bitrate);
+  EXPECT_EQ(Song::FileType::Unknown, EngineDiscoverer::FiletypeFromCapsMimetype("audio/mpeg"));
+  EXPECT_EQ(Song::FileType::Unknown, EngineDiscoverer::FiletypeFromCapsMimetype(""));
+  EXPECT_EQ(Song::FileType::FLAC, EngineDiscoverer::FiletypeFromCapsMimetype("audio/x-flac"));
+  EXPECT_EQ(Song::FileType::MPEG, EngineDiscoverer::ResolveFiletype("audio/mpeg", "MPEG-1 Layer 3 (MP3)"));
+  EXPECT_EQ(Song::FileType::MP4, EngineDiscoverer::ResolveFiletype("audio/mpeg", "MPEG-4 AAC"));
+  EXPECT_EQ(Song::FileType::OggVorbis, EngineDiscoverer::ResolveFiletype("audio/x-vorbis", "Vorbis"));
+  EXPECT_EQ(EngineMetadata::Type::Current, EngineDiscoverer::MatchType("https://cdn.example/a", "https://cdn.example/a", "https://cdn.example/b"));
+  EXPECT_EQ(EngineMetadata::Type::Next, EngineDiscoverer::MatchType("https://cdn.example/b", "https://cdn.example/a", "https://cdn.example/b"));
+  EXPECT_EQ(EngineMetadata::Type::Any, EngineDiscoverer::MatchType("https://cdn.example/c", "https://cdn.example/a", "https://cdn.example/b"));
+  EXPECT_STREQ("The discovery timed-out", EngineDiscoverer::ErrorMessage(EngineDiscoverer::kResultTimeout));
+  EXPECT_STREQ("The URI is invalid", EngineDiscoverer::ErrorMessage(EngineDiscoverer::kResultUriInvalid));
 }

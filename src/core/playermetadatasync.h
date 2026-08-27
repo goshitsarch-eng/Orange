@@ -30,6 +30,12 @@ inline void Merge(Song *target, const Song &engine) {
   if (engine.samplerate() > 0) {
     target->set_samplerate(engine.samplerate());
   }
+  if (engine.bitdepth() > 0) {
+    target->set_bitdepth(engine.bitdepth());
+  }
+  if (engine.filetype() != Song::FileType::Unknown) {
+    target->set_filetype(engine.filetype());
+  }
   if (target->url().empty() && !engine.url().empty()) {
     target->set_url(engine.url());
   }
@@ -40,7 +46,9 @@ inline void Merge(Song *target, const Song &engine) {
 
 inline bool ShouldRefreshPlaylist(const Song &before, const Song &after) {
   return before.title() != after.title() || before.artist() != after.artist() || before.album() != after.album() ||
-         before.length_nanosec() != after.length_nanosec() || before.stream_url() != after.stream_url();
+         before.length_nanosec() != after.length_nanosec() || before.stream_url() != after.stream_url() ||
+         before.bitrate() != after.bitrate() || before.samplerate() != after.samplerate() ||
+         before.bitdepth() != after.bitdepth() || before.filetype() != after.filetype();
 }
 
 }  // namespace PlayerMetadataSync

@@ -596,13 +596,24 @@ TEST(PlayerMetadataSync, MergesEngineTagsAndDetectsRefresh) {
   engine.set_title("Roads");
   engine.set_artist("Portishead");
   engine.set_length_nanosec(180000000000LL);
+  engine.set_bitrate(320);
+  engine.set_samplerate(44100);
+  engine.set_bitdepth(16);
+  engine.set_filetype(Song::FileType::MPEG);
   PlayerMetadataSync::Merge(&current, engine);
   EXPECT_EQ("Roads", current.title());
   EXPECT_EQ("Portishead", current.artist());
   EXPECT_EQ(180000000000LL, current.length_nanosec());
+  EXPECT_EQ(320, current.bitrate());
+  EXPECT_EQ(44100, current.samplerate());
+  EXPECT_EQ(16, current.bitdepth());
+  EXPECT_EQ(Song::FileType::MPEG, current.filetype());
   Song same = current;
   EXPECT_FALSE(PlayerMetadataSync::ShouldRefreshPlaylist(current, same));
   same.set_title("Glory Box");
+  EXPECT_TRUE(PlayerMetadataSync::ShouldRefreshPlaylist(current, same));
+  same = current;
+  same.set_bitrate(256);
   EXPECT_TRUE(PlayerMetadataSync::ShouldRefreshPlaylist(current, same));
 }
 

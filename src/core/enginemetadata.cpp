@@ -2,6 +2,10 @@
 
 Song EngineMetadata::ToSong(Song::Source source) const {
   Song song(source);
+  song.set_url(media_url);
+  if (!stream_url.empty()) {
+    song.set_stream_url(stream_url);
+  }
   song.set_title(title);
   song.set_artist(artist);
   song.set_album(album);
@@ -11,6 +15,7 @@ Song EngineMetadata::ToSong(Song::Source source) const {
   song.set_year(year);
   song.set_track(track);
   song.set_length_nanosec(length_nanosec);
+  song.set_filetype(filetype);
   song.set_bitrate(bitrate);
   song.set_samplerate(samplerate);
   song.set_bitdepth(bitdepth);

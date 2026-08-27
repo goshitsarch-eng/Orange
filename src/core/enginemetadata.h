@@ -10,6 +10,8 @@ struct EngineMetadata {
   enum class Type { Any, Current, Next };
 
   Type type = Type::Any;
+  std::string media_url;
+  std::string stream_url;
   std::string title;
   std::string artist;
   std::string album;
@@ -19,6 +21,7 @@ struct EngineMetadata {
   int year = 0;
   int track = 0;
   int64_t length_nanosec = 0;
+  Song::FileType filetype = Song::FileType::Unknown;
   int bitrate = 0;
   int samplerate = 0;
   int bitdepth = 0;

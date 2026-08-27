@@ -325,6 +325,7 @@ class Song {
 
   static FileType FiletypeByExtension(const std::string &extension);
   static FileType FiletypeByMimeType(const std::string &mimetype);
+  static FileType FiletypeByDescription(const std::string &text);
   static FileType FiletypeByFilename(const std::string &filename);
   static bool IsAudioFile(const std::string &filename);
   static std::string SourceToString(Source source);

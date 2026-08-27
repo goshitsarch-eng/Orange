@@ -1,7 +1,9 @@
 #include "engine/gstengine.h"
 
+#include "core/enginemetadata.h"
 #include "core/taskmanager.h"
 #include "engine/enginebuffering.h"
+#include "engine/enginediscoverer.h"
 #include "engine/gstengineerror.h"
 #include "constants/backendsettings.h"
 #include "constants/spotifysettings.h"
@@ -10,6 +12,8 @@
 #include "core/networkproxyfactory.h"
 #include "engine/backendoptions.h"
 #include "equalizer/equalizerpersist.h"
+
+#include <gst/pbutils/pbutils.h>
 
 #include <cstdlib>
 
@@ -22,6 +26,7 @@ GstEngine::~GstEngine() {
   DiscardNext();
   BufferingFinished();
   current_.reset();
+  DestroyDiscoverer();
 }
 
 bool GstEngine::Init() {
@@ -184,22 +189,23 @@ void GstEngine::WirePipeline(GstEnginePipeline *pipeline) {
 
 void GstEngine::StartPreloading(const std::string &media_url, const std::string &stream_url, bool, int64_t beginning_offset_nanosec,
                                 int64_t end_offset_nanosec) {
-  const std::string url = stream_url.empty() ? media_url : stream_url;
+  const std::string url = EngineDiscoverer::PlayUrl(media_url, stream_url);
   if (url.empty()) {
     return;
   }
   DiscardNext();
+  next_media_url_ = media_url;
   next_url_ = url;
   next_ = CreatePipeline(url, static_cast<uint64_t>(std::max<int64_t>(0, beginning_offset_nanosec)), end_offset_nanosec);
   if (next_) {
     next_->SetVolume(0.0);
   }
+  RequestDiscover(media_url, url);
 }
 
 bool GstEngine::Load(const std::string &media_url, const std::string &stream_url, int track_change_flags, bool, uint64_t beginning_offset_nanosec,
                      int64_t end_offset_nanosec, std::optional<double>) {
-  const std::string url = stream_url.empty() ? media_url : stream_url;
-  stream_url_ = url;
+  const std::string url = EngineDiscoverer::PlayUrl(media_url, stream_url);
   const bool auto_change = (track_change_flags & Auto) != 0;
   const bool same_album = (track_change_flags & SameAlbum) != 0;
   const bool auto_crossfade = BackendOptions::AllowAutoCrossfade(autocrossfade_enabled_, no_crossfade_same_album_, current_album_,
@@ -211,8 +217,11 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
 
   if (auto_change && current_ && current_->valid() && !crossfade) {
     DiscardNext();
+    next_media_url_ = media_url;
+    next_url_ = url;
     current_->SetNextUri(url);
     gapless_pending_ = true;
+    RequestDiscover(media_url, url);
     return true;
   }
 
@@ -221,6 +230,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
       return true;
     }
     DiscardNext();
+    next_media_url_ = media_url;
     next_url_ = url;
     next_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec);
     if (!next_) {
@@ -228,12 +238,15 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
       return false;
     }
     next_->SetVolume(0.0);
+    RequestDiscover(media_url, url);
     return true;
   }
 
   CancelFade();
   DiscardNext();
   current_.reset();
+  media_url_ = media_url;
+  stream_url_ = url;
   current_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec);
   if (!current_) {
     Error.Emit("Could not create playbin");
@@ -243,6 +256,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   }
   gapless_pending_ = false;
   SetState(State::Idle);
+  RequestDiscover(media_url, url);
   return true;
 }
 
@@ -286,6 +300,7 @@ void GstEngine::Stop(bool) {
     current_->Stop();
   }
   current_.reset();
+  media_url_.clear();
   stream_url_.clear();
   gapless_pending_ = false;
   SetState(State::Empty);
@@ -407,6 +422,10 @@ void GstEngine::FinishCrossfade() {
     current_->Stop();
   }
   current_ = std::move(next_);
+  media_url_ = std::move(next_media_url_);
+  stream_url_ = next_url_;
+  next_media_url_.clear();
+  next_url_.clear();
   if (current_) {
     current_->SetVolume(VolumeFraction());
   }
@@ -418,6 +437,7 @@ void GstEngine::DiscardNext() {
     next_->Stop();
     next_.reset();
   }
+  next_media_url_.clear();
   next_url_.clear();
 }
 
@@ -439,6 +459,10 @@ void GstEngine::OnEos(int pipeline_id) {
   }
   if (current_ && current_->id() == pipeline_id) {
     if (gapless_pending_) {
+      media_url_ = std::move(next_media_url_);
+      stream_url_ = next_url_;
+      next_media_url_.clear();
+      next_url_.clear();
       gapless_pending_ = false;
       return;
     }
@@ -571,4 +595,119 @@ void GstEngine::BufferingFinished() {
     task_manager_->SetTaskFinished(buffering_task_id_);
   }
   buffering_task_id_ = -1;
+}
+
+void GstEngine::EnsureDiscoverer() {
+  if (discoverer_) {
+    return;
+  }
+  GError *error = nullptr;
+  discoverer_ = gst_discoverer_new(static_cast<GstClockTime>(EngineDiscoverer::kDiscoveryTimeoutS) * GST_SECOND, &error);
+  if (!discoverer_) {
+    if (error) {
+      LogError("Failed to create stream discoverer: %s", error->message);
+      g_error_free(error);
+    }
+    return;
+  }
+  discovered_handler_ = g_signal_connect(
+      discoverer_, "discovered",
+      G_CALLBACK((+[](GstDiscoverer *, GstDiscovererInfo *info, GError *error, gpointer self) {
+        static_cast<GstEngine *>(self)->OnStreamDiscovered(info, error);
+      })),
+      this);
+  finished_handler_ = g_signal_connect(discoverer_, "finished", G_CALLBACK((+[](GstDiscoverer *, gpointer) {})), this);
+  gst_discoverer_start(discoverer_);
+}
+
+void GstEngine::DestroyDiscoverer() {
+  if (!discoverer_) {
+    return;
+  }
+  if (discovered_handler_ != 0) {
+    g_signal_handler_disconnect(discoverer_, discovered_handler_);
+    discovered_handler_ = 0;
+  }
+  if (finished_handler_ != 0) {
+    g_signal_handler_disconnect(discoverer_, finished_handler_);
+    finished_handler_ = 0;
+  }
+  gst_discoverer_stop(discoverer_);
+  g_object_unref(discoverer_);
+  discoverer_ = nullptr;
+}
+
+void GstEngine::RequestDiscover(const std::string &media_url, const std::string &play_url) {
+  if (!EngineDiscoverer::ShouldDiscover(media_url) || play_url.empty()) {
+    return;
+  }
+  EnsureDiscoverer();
+  if (!discoverer_) {
+    return;
+  }
+  if (!gst_discoverer_discover_uri_async(discoverer_, play_url.c_str())) {
+    LogError("Failed to start stream discovery for %s", play_url.c_str());
+  }
+}
+
+void GstEngine::OnStreamDiscovered(GstDiscovererInfo *info, GError *) {
+  if (!current_ || !info) {
+    return;
+  }
+  const char *uri = gst_discoverer_info_get_uri(info);
+  const std::string discovered = uri ? uri : "";
+  const GstDiscovererResult result = gst_discoverer_info_get_result(info);
+  if (result != GST_DISCOVERER_OK) {
+    LogError("Stream discovery for %s failed: %s", discovered.c_str(), EngineDiscoverer::ErrorMessage(static_cast<int>(result)));
+    return;
+  }
+
+  GList *audio_streams = gst_discoverer_info_get_audio_streams(info);
+  if (!audio_streams) {
+    LogError("Could not detect an audio stream in %s", discovered.c_str());
+    return;
+  }
+
+  GstDiscovererStreamInfo *stream_info = reinterpret_cast<GstDiscovererStreamInfo *>(g_list_first(audio_streams)->data);
+  EngineMetadata engine_metadata;
+  engine_metadata.type = EngineDiscoverer::MatchType(discovered, current_ ? current_->url() : std::string(),
+                                                    next_ ? next_->url() : next_url_);
+  if (engine_metadata.type == EngineMetadata::Type::Current) {
+    engine_metadata.media_url = media_url_;
+    engine_metadata.stream_url = stream_url_;
+  } else if (engine_metadata.type == EngineMetadata::Type::Next) {
+    engine_metadata.media_url = next_media_url_;
+    engine_metadata.stream_url = next_url_;
+  }
+
+  GstDiscovererAudioInfo *audio = GST_DISCOVERER_AUDIO_INFO(stream_info);
+  engine_metadata.samplerate = static_cast<int>(gst_discoverer_audio_info_get_sample_rate(audio));
+  engine_metadata.bitdepth = static_cast<int>(gst_discoverer_audio_info_get_depth(audio));
+  engine_metadata.bitrate = static_cast<int>(gst_discoverer_audio_info_get_bitrate(audio) / 1000);
+
+  GstCaps *caps = gst_discoverer_stream_info_get_caps(stream_info);
+  if (caps) {
+    const guint caps_size = gst_caps_get_size(caps);
+    for (guint i = 0; i < caps_size; ++i) {
+      GstStructure *structure = gst_caps_get_structure(caps, i);
+      if (!structure) {
+        continue;
+      }
+      const char *name = gst_structure_get_name(structure);
+      const Song::FileType from_mime = EngineDiscoverer::FiletypeFromCapsMimetype(name ? name : "");
+      if (from_mime != Song::FileType::Unknown) {
+        engine_metadata.filetype = from_mime;
+      }
+    }
+    if (engine_metadata.filetype == Song::FileType::Unknown) {
+      gchar *codec_description = gst_pb_utils_get_codec_description(caps);
+      engine_metadata.filetype = EngineDiscoverer::FiletypeFromCodecDescription(codec_description ? codec_description : "");
+      g_free(codec_description);
+    }
+    gst_caps_unref(caps);
+  }
+
+  gst_discoverer_stream_info_list_free(audio_streams);
+  LogDebug("Got stream info for %s: %s", discovered.c_str(), Song::FiletypeToString(engine_metadata.filetype).c_str());
+  MetadataReceived.Emit(engine_metadata.ToSong());
 }

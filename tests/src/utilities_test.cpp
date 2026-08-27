@@ -1497,13 +1497,25 @@ TEST(MemoryDatabase, OpensAndScopedTransaction) {
 
 TEST(EngineMetadata, ToSong) {
   EngineMetadata meta;
+  meta.media_url = "tidal://1";
+  meta.stream_url = "https://cdn.example/a.flac";
   meta.title = "Roads";
   meta.artist = "Portishead";
   meta.length_nanosec = 1000;
+  meta.filetype = Song::FileType::FLAC;
+  meta.samplerate = 44100;
+  meta.bitdepth = 16;
+  meta.bitrate = 320;
   const Song song = meta.ToSong(Song::Source::LocalFile);
   EXPECT_EQ("Roads", song.title());
   EXPECT_EQ("Portishead", song.artist());
   EXPECT_EQ(Song::Source::LocalFile, song.source());
+  EXPECT_EQ("tidal://1", song.url());
+  EXPECT_EQ("https://cdn.example/a.flac", song.stream_url());
+  EXPECT_EQ(Song::FileType::FLAC, song.filetype());
+  EXPECT_EQ(44100, song.samplerate());
+  EXPECT_EQ(16, song.bitdepth());
+  EXPECT_EQ(320, song.bitrate());
 }
 
 TEST(StretchHeaderView, StretchColumnTakesRemainder) {
