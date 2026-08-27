@@ -131,6 +131,35 @@ static GVariant *MetadataVariant(const Song &song, int row = -1, const std::stri
   if (Mpris2Helpers::ShouldAddBitrate(song.bitrate())) {
     g_variant_builder_add(&b, "{sv}", "bitrate", g_variant_new_int32(song.bitrate()));
   }
+  if (Mpris2Helpers::ShouldAddString(song.genre())) {
+    const gchar *genres[] = {song.genre().c_str(), nullptr};
+    g_variant_builder_add(&b, "{sv}", "xesam:genre", g_variant_new_strv(genres, -1));
+  }
+  if (Mpris2Helpers::ShouldAddPositiveInt(song.disc())) {
+    g_variant_builder_add(&b, "{sv}", "xesam:discNumber", g_variant_new_int32(song.disc()));
+  }
+  if (Mpris2Helpers::ShouldAddString(song.comment())) {
+    const gchar *comments[] = {song.comment().c_str(), nullptr};
+    g_variant_builder_add(&b, "{sv}", "xesam:comment", g_variant_new_strv(comments, -1));
+  }
+  const std::string created = Mpris2Helpers::AsMprisDateTime(song.ctime());
+  if (!created.empty()) {
+    g_variant_builder_add(&b, "{sv}", "xesam:contentCreated", g_variant_new_string(created.c_str()));
+  }
+  const std::string last_used = Mpris2Helpers::AsMprisDateTime(song.lastplayed());
+  if (!last_used.empty()) {
+    g_variant_builder_add(&b, "{sv}", "xesam:lastUsed", g_variant_new_string(last_used.c_str()));
+  }
+  if (Mpris2Helpers::ShouldAddString(song.composer())) {
+    const gchar *composers[] = {song.composer().c_str(), nullptr};
+    g_variant_builder_add(&b, "{sv}", "xesam:composer", g_variant_new_strv(composers, -1));
+  }
+  if (Mpris2Helpers::ShouldAddPlaycount(song.playcount())) {
+    g_variant_builder_add(&b, "{sv}", "xesam:useCount", g_variant_new_int32(static_cast<gint32>(song.playcount())));
+  }
+  if (Mpris2Helpers::ShouldAddYear(song.year())) {
+    g_variant_builder_add(&b, "{sv}", "year", g_variant_new_int32(song.year()));
+  }
   return g_variant_builder_end(&b);
 }
 

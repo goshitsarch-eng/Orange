@@ -77,6 +77,47 @@ TEST(Mpris2Helpers, RatingMatchesQt) {
   EXPECT_TRUE(Mpris2Helpers::ShouldAddBitrate(320));
 }
 
+TEST(Mpris2Helpers, ToXesamFieldsMatchQt) {
+  EXPECT_TRUE(Mpris2Helpers::AsMprisDateTime(-1).empty());
+  EXPECT_EQ("1970-01-01T00:00:00Z", Mpris2Helpers::AsMprisDateTime(0));
+  EXPECT_FALSE(Mpris2Helpers::ShouldAddString(""));
+  EXPECT_TRUE(Mpris2Helpers::ShouldAddString("Trip Hop"));
+  EXPECT_FALSE(Mpris2Helpers::ShouldAddPositiveInt(0));
+  EXPECT_FALSE(Mpris2Helpers::ShouldAddPositiveInt(-1));
+  EXPECT_TRUE(Mpris2Helpers::ShouldAddPositiveInt(2));
+  EXPECT_FALSE(Mpris2Helpers::ShouldAddPlaycount(0));
+  EXPECT_TRUE(Mpris2Helpers::ShouldAddPlaycount(3));
+  EXPECT_FALSE(Mpris2Helpers::ShouldAddYear(-1));
+  EXPECT_TRUE(Mpris2Helpers::ShouldAddYear(1994));
+  Song empty;
+  EXPECT_TRUE(Mpris2Helpers::ExtraXesamKeys(empty).empty());
+  Song full;
+  full.set_genre("Trip Hop");
+  full.set_disc(2);
+  full.set_comment("Studio");
+  full.set_ctime(0);
+  full.set_lastplayed(1);
+  full.set_composer("Barrow");
+  full.set_playcount(4);
+  full.set_year(1994);
+  const auto keys = Mpris2Helpers::ExtraXesamKeys(full);
+  EXPECT_EQ(8u, keys.size());
+  EXPECT_EQ("xesam:genre", keys[0]);
+  EXPECT_EQ("xesam:discNumber", keys[1]);
+  EXPECT_EQ("xesam:comment", keys[2]);
+  EXPECT_EQ("xesam:contentCreated", keys[3]);
+  EXPECT_EQ("xesam:lastUsed", keys[4]);
+  EXPECT_EQ("xesam:composer", keys[5]);
+  EXPECT_EQ("xesam:useCount", keys[6]);
+  EXPECT_EQ("year", keys[7]);
+  Song changed = empty;
+  changed.set_genre("Jazz");
+  EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(empty, changed));
+  changed = empty;
+  changed.set_playcount(1);
+  EXPECT_TRUE(Mpris2Helpers::MetadataNeedsUpdate(empty, changed));
+}
+
 TEST(Mpris2Helpers, CapabilitiesMatchQt) {
   EXPECT_FALSE(Mpris2Helpers::CanPlay(nullptr));
   Playlist playlist;

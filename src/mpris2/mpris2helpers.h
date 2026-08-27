@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <ctime>
 #include <set>
 #include <string>
 #include <vector>
@@ -113,7 +114,10 @@ inline TrackListDiff DiffTrackIds(const std::vector<std::string> &before, const 
 inline bool MetadataNeedsUpdate(const Song &before, const Song &after) {
   return before.title() != after.title() || before.artist() != after.artist() || before.album() != after.album() ||
          before.url() != after.url() || before.length_nanosec() != after.length_nanosec() || ArtUrl(before) != ArtUrl(after) ||
-         before.rating() != after.rating() || before.bitrate() != after.bitrate();
+         before.rating() != after.rating() || before.bitrate() != after.bitrate() || before.genre() != after.genre() ||
+         before.disc() != after.disc() || before.comment() != after.comment() || before.composer() != after.composer() ||
+         before.playcount() != after.playcount() || before.ctime() != after.ctime() || before.lastplayed() != after.lastplayed() ||
+         before.year() != after.year() || before.track() != after.track() || before.albumartist() != after.albumartist();
 }
 
 inline bool CanPlay(const Playlist *playlist) { return playlist && playlist->row_count() > 0; }
@@ -160,6 +164,60 @@ inline float RatingFromProperty(double rating) {
 inline bool ShouldAddUserRating(float rating) { return rating != -1.0f; }
 
 inline bool ShouldAddBitrate(int bitrate) { return bitrate > 0; }
+
+inline bool ShouldAddString(const std::string &value) { return !value.empty(); }
+
+inline bool ShouldAddPositiveInt(int value) { return value > 0; }
+
+inline bool ShouldAddPlaycount(unsigned playcount) { return playcount > 0; }
+
+inline bool ShouldAddYear(int year) { return year > 0; }
+
+// Qt mpris::AsMPRISDateTimeType: omit -1, otherwise ISO-8601 UTC.
+inline std::string AsMprisDateTime(int64_t unix_secs) {
+  if (unix_secs == -1) {
+    return {};
+  }
+  const std::time_t t = static_cast<std::time_t>(unix_secs);
+  std::tm tm{};
+  if (!gmtime_r(&t, &tm)) {
+    return {};
+  }
+  char buf[32] = {};
+  if (std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm) == 0) {
+    return {};
+  }
+  return buf;
+}
+
+inline std::vector<std::string> ExtraXesamKeys(const Song &song) {
+  std::vector<std::string> keys;
+  if (ShouldAddString(song.genre())) {
+    keys.emplace_back("xesam:genre");
+  }
+  if (ShouldAddPositiveInt(song.disc())) {
+    keys.emplace_back("xesam:discNumber");
+  }
+  if (ShouldAddString(song.comment())) {
+    keys.emplace_back("xesam:comment");
+  }
+  if (!AsMprisDateTime(song.ctime()).empty()) {
+    keys.emplace_back("xesam:contentCreated");
+  }
+  if (!AsMprisDateTime(song.lastplayed()).empty()) {
+    keys.emplace_back("xesam:lastUsed");
+  }
+  if (ShouldAddString(song.composer())) {
+    keys.emplace_back("xesam:composer");
+  }
+  if (ShouldAddPlaycount(song.playcount())) {
+    keys.emplace_back("xesam:useCount");
+  }
+  if (ShouldAddYear(song.year())) {
+    keys.emplace_back("year");
+  }
+  return keys;
+}
 
 inline PlaylistSequence::RepeatMode RepeatFromLoopStatus(const std::string &status) {
   if (status == "Track") {
