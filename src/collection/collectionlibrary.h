@@ -27,6 +27,7 @@ class CollectionLibrary {
   void Init();
   void IncrementalScan();
   void FullScan();
+  std::string full_rescan_reason(int schema_version) const;
   void AbortScan();
   void PauseWatcher();
   void ResumeWatcher();

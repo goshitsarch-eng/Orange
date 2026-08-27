@@ -47,6 +47,7 @@ class MainWindow {
 
  private:
   void HandlePlaylistsLoaded();
+  void CheckFullRescanRevisions();
   void BuildUi();
   void BuildSidebar();
   void BuildPlaylist();

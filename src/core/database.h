@@ -34,6 +34,10 @@ class Database {
 
   Signal<> BackupFinished;
 
+  static constexpr int kCurrentSchemaVersion = 23;
+  int startup_schema_version() const { return startup_schema_version_; }
+  int current_schema_version() const { return kCurrentSchemaVersion; }
+
   static std::string SchemaSql();
 
  private:
@@ -42,6 +46,7 @@ class Database {
   std::string path_;
   sqlite3 *db_ = nullptr;
   mutable std::mutex mutex_;
+  int startup_schema_version_ = 0;
 };
 
 class SqlQuery {

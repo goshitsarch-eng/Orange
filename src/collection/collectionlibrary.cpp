@@ -1,5 +1,6 @@
 #include "collection/collectionlibrary.h"
 
+#include "collection/collectionfullrescan.h"
 #include "collection/collectiondirectory.h"
 #include "collection/collectionstats.h"
 #include "constants/collectionsettings.h"
@@ -59,6 +60,8 @@ void CollectionLibrary::ResumeWatcher() {
 void CollectionLibrary::IncrementalScan() { watcher_->Scan(CollectionWatcher::ScanType::Incremental); }
 
 void CollectionLibrary::FullScan() { watcher_->Scan(CollectionWatcher::ScanType::Full); }
+
+std::string CollectionLibrary::full_rescan_reason(int schema_version) const { return CollectionFullRescan::ReasonFor(schema_version); }
 
 void CollectionLibrary::AbortScan() {
   if (watcher_) {

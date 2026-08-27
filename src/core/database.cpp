@@ -9,7 +9,7 @@
 
 namespace {
 
-const int kSchemaVersion = 23;
+const int kSchemaVersion = Database::kCurrentSchemaVersion;
 
 std::string LoadSchemaResource() {
   GBytes *bytes = g_resources_lookup_data("/org/strawberrymusicplayer/Strawberry/schema/schema.sql", G_RESOURCE_LOOKUP_FLAGS_NONE, nullptr);
@@ -98,6 +98,7 @@ bool Database::Migrate() {
     }
     sqlite3_finalize(stmt);
   }
+  startup_schema_version_ = version;
   if (version >= kSchemaVersion) {
     return true;
   }

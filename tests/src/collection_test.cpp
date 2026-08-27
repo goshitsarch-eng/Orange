@@ -1,3 +1,4 @@
+#include "collection/collectionfullrescan.h"
 #include "collection/collectioncompilationdetect.h"
 #include "collection/collectionsongpatch.h"
 #include "organize/organizepathnotify.h"
@@ -1705,5 +1706,37 @@ TEST(CollectionBackend, UpdatesLastSeenAndExpiresOldUnavailable) {
   EXPECT_EQ(1, backend.ExpireSongs(directory, 1, 10 * 86400));
   EXPECT_TRUE(backend.SongById(keep_id).is_valid());
   EXPECT_FALSE(backend.SongById(gone_id).is_valid());
+  unlink(path.c_str());
+}
+
+TEST(CollectionFullRescan, MatchesQtRevisions) {
+  EXPECT_FALSE(CollectionFullRescan::ShouldPrompt(0, 23));
+  EXPECT_FALSE(CollectionFullRescan::ShouldPrompt(23, 23));
+  EXPECT_TRUE(CollectionFullRescan::ShouldPrompt(20, 23));
+  EXPECT_STREQ("Support for sort tags artist, album, album artist, title, composer and performer", CollectionFullRescan::ReasonFor(21));
+  EXPECT_STREQ("", CollectionFullRescan::ReasonFor(22));
+  EXPECT_STREQ("", CollectionFullRescan::ReasonFor(20));
+  const std::vector<std::string> reasons = CollectionFullRescan::Reasons(20, 23);
+  ASSERT_EQ(1u, reasons.size());
+  EXPECT_EQ(CollectionFullRescan::ReasonFor(21), reasons.front());
+  EXPECT_TRUE(CollectionFullRescan::Reasons(22, 23).empty());
+  const std::string message = CollectionFullRescan::DialogMessage(reasons);
+  EXPECT_NE(std::string::npos, message.find("full collection rescan"));
+  EXPECT_NE(std::string::npos, message.find(reasons.front()));
+  EXPECT_STREQ("Collection rescan notice", CollectionFullRescan::DialogTitle());
+}
+
+TEST(Database, RecordsStartupSchemaVersion) {
+  const std::string path = "/tmp/strawberry-schema-startup-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  EXPECT_EQ(0, db.startup_schema_version());
+  EXPECT_EQ(Database::kCurrentSchemaVersion, db.current_schema_version());
+  db.Close();
+  Database again(path);
+  ASSERT_TRUE(again.Open());
+  EXPECT_EQ(Database::kCurrentSchemaVersion, again.startup_schema_version());
+  EXPECT_EQ(again.startup_schema_version(), again.current_schema_version());
   unlink(path.c_str());
 }

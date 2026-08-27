@@ -2,6 +2,7 @@
 #include "core/logging.h"
 #include "ui/mainwindow.h"
 
+#include "collection/collectionfullrescan.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionincremental.h"
 #include "playlist/playlistqueuerefresh.h"
@@ -204,6 +205,7 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
   if (app_->playlist_manager()->playlists_loaded()) {
     HandlePlaylistsLoaded();
   }
+  CheckFullRescanRevisions();
 }
 
 MainWindow::~MainWindow() {
@@ -258,6 +260,32 @@ void MainWindow::MaybeShowSponsor() {
                           MainWindowSponsor::PersistDoNotShow(persist, true);
                         }
                       });
+}
+
+void MainWindow::CheckFullRescanRevisions() {
+  const int from = app_->database()->startup_schema_version();
+  const int to = app_->database()->current_schema_version();
+  if (!CollectionFullRescan::ShouldPrompt(from, to)) {
+    return;
+  }
+  const std::vector<std::string> reasons = CollectionFullRescan::Reasons(from, to);
+  if (reasons.empty()) {
+    return;
+  }
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(
+      adw_alert_dialog_new(Translations::CStr(CollectionFullRescan::DialogTitle()), CollectionFullRescan::DialogMessage(reasons).c_str()));
+  adw_alert_dialog_add_responses(dialog, "no", Translations::CStr("No"), "yes", Translations::CStr("Yes"), nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "yes", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response(dialog, "yes");
+  g_signal_connect(dialog, "response",
+                   G_CALLBACK((+[](AdwAlertDialog *, const char *response, gpointer data) {
+                     if (g_strcmp0(response, "yes") != 0) {
+                       return;
+                     }
+                     static_cast<MainWindow *>(data)->app_->collection()->FullScan();
+                   })),
+                   this);
+  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
 }
 
 void MainWindow::HandlePlaylistsLoaded() {
