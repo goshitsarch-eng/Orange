@@ -696,6 +696,8 @@ TEST(PlaylistTabMenu, ContextActionsMatchQt) {
   EXPECT_TRUE(PlaylistTabMenu::ToggledFavorite(false));
   EXPECT_FALSE(PlaylistTabMenu::ToggledFavorite(true));
   EXPECT_STREQ(FavoriteWidget::TooltipText(), PlaylistTabMenu::FavoriteTooltip());
+  EXPECT_TRUE(PlaylistTabMenu::ShowsNameTooltip());
+  EXPECT_STREQ("Inbox", PlaylistTabMenu::NameTooltip("Inbox"));
   EXPECT_EQ("strawberry-playlist-tab:7", PlaylistTabMenu::TabPayload(7));
   EXPECT_TRUE(PlaylistTabMenu::IsTabPayload("strawberry-playlist-tab:7"));
   EXPECT_EQ(7, PlaylistTabMenu::ParseTabId("strawberry-playlist-tab:7"));

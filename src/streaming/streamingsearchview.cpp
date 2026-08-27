@@ -172,6 +172,12 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
                    }),
                    this);
   gtk_box_append(GTK_BOX(widget_), search_entry_);
+  g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     if (StreamingSearchOpts::ShouldFocusOnShow()) {
+                       static_cast<StreamingSearchView *>(data)->FocusSearch();
+                     }
+                   }),
+                   this);
   gtk_box_append(GTK_BOX(widget_), types);
   gtk_box_append(GTK_BOX(widget_), progress_);
   gtk_box_append(GTK_BOX(widget_), status_);

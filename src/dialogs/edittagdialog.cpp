@@ -12,6 +12,7 @@
 #include "dialogs/edittagcover.h"
 #include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfieldreset.h"
+#include "dialogs/dialoggeometry.h"
 #include "dialogs/edittagfields.h"
 #include "settings/settingswheelthrough.h"
 #include "dialogs/edittagid3v2.h"
@@ -728,8 +729,8 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                                       ? Translations::Tr("Edit tags") + " (" + std::to_string(targets.size()) + " " + Translations::Tr("songs") + ")"
                                       : Translations::Tr("Edit tags");
   adw_dialog_set_title(dialog, dialog_title.c_str());
-  adw_dialog_set_content_width(dialog, 640);
-  adw_dialog_set_content_height(dialog, 760);
+  DialogGeometry::Apply(dialog, EditTagDialogSettings::kSettingsGroup, EditTagDialogSettings::kGeometry,
+                        EditTagDialogSettings::kDefaultWidth, EditTagDialogSettings::kDefaultHeight);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   g_object_set_data_full(G_OBJECT(dialog), "state", state, [](gpointer p) { delete static_cast<State *>(p); });
 
@@ -1281,6 +1282,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                    nullptr);
   gtk_box_append(GTK_BOX(box), state->actions);
   adw_dialog_set_child(dialog, box);
+  DialogGeometry::BindClosed(dialog, EditTagDialogSettings::kSettingsGroup, EditTagDialogSettings::kGeometry);
   state->dialog = dialog;
   SetLoading(state, true);
   UpdateDisplay(state);

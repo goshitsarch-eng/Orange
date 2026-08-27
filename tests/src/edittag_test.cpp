@@ -117,6 +117,9 @@ TEST(EditTagFields, WrapIndexAndSongRowLabel) {
 TEST(EditTagTabs, ClampNameAndSettingsKeys) {
   EXPECT_STREQ("EditTagDialog", EditTagDialogSettings::kSettingsGroup);
   EXPECT_STREQ("current_tab", EditTagDialogSettings::kCurrentTab);
+  EXPECT_STREQ("geometry", EditTagDialogSettings::kGeometry);
+  EXPECT_EQ(640, EditTagDialogSettings::kDefaultWidth);
+  EXPECT_EQ(760, EditTagDialogSettings::kDefaultHeight);
   EXPECT_EQ(0, EditTagTabs::ClampIndex(-2));
   EXPECT_EQ(3, EditTagTabs::ClampIndex(99));
   EXPECT_STREQ("Lyrics", EditTagTabs::Name(2));

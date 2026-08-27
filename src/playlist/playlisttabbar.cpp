@@ -497,6 +497,9 @@ void PlaylistTabBar::Refresh(PlaylistManager *manager, const std::string &active
     }
     GtkWidget *button = gtk_toggle_button_new_with_label(playlist->name().c_str());
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), playlist.get() == manager->current());
+    if (PlaylistTabMenu::ShowsNameTooltip()) {
+      gtk_widget_set_tooltip_text(button, PlaylistTabMenu::NameTooltip(playlist->name()));
+    }
     g_object_set_data(G_OBJECT(button), "tab-part", const_cast<char *>("name"));
     g_object_set_data_full(G_OBJECT(button), "playlist-name", g_strdup(playlist->name().c_str()), g_free);
     g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {

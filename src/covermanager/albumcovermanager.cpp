@@ -1,6 +1,8 @@
 #include "covermanager/albumcovermanager.h"
 
+#include "constants/covermanagersettings.h"
 #include "core/application.h"
+#include "dialogs/dialoggeometry.h"
 #include "covermanager/albumcoverbatch.h"
 #include "covermanager/albumcoverchoicecontroller.h"
 #include "covermanager/albumcovermanagerselection.h"
@@ -656,8 +658,8 @@ void RebuildArtists(CoverManagerState *state) {
 void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr(CoverManagerActions::WindowTitle()));
-  adw_dialog_set_content_width(dialog, 860);
-  adw_dialog_set_content_height(dialog, 680);
+  DialogGeometry::Apply(dialog, CoverManagerSettings::kSettingsGroup, CoverManagerSettings::kGeometry,
+                        CoverManagerSettings::kDefaultWidth, CoverManagerSettings::kDefaultHeight);
 
   auto *state = new CoverManagerState;
   state->app = app;
@@ -876,5 +878,6 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   RebuildAlbums(state);
   SelectArtistRow(state, 0);
   adw_dialog_set_child(dialog, box);
+  DialogGeometry::BindClosed(dialog, CoverManagerSettings::kSettingsGroup, CoverManagerSettings::kGeometry);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

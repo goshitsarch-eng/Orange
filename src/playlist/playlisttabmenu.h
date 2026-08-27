@@ -80,6 +80,11 @@ inline const char *FavoriteTooltip() {
   return "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar";
 }
 
+// Qt PlaylistTabBar::setTabToolTip always stores the playlist name for elided tabs.
+inline bool ShowsNameTooltip() { return true; }
+
+inline const char *NameTooltip(const std::string &name) { return name.c_str(); }
+
 inline std::string TabPayload(int id) { return std::string(kTabPrefix) + std::to_string(id); }
 
 inline bool IsTabPayload(const std::string &text) { return text.rfind(kTabPrefix, 0) == 0; }

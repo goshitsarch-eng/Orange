@@ -403,6 +403,7 @@ TEST(StreamingSearchOpts, DelayLimitsAndConfigure) {
   EXPECT_EQ("Configure Tidal…", StreamingSearchOpts::ConfigureServiceLabel("Tidal"));
   EXPECT_EQ("Configure…", StreamingSearchOpts::ConfigureServiceLabel({}));
   EXPECT_STREQ("Search for this", StreamingSearchOpts::SearchForThisLabel());
+  EXPECT_TRUE(StreamingSearchOpts::ShouldFocusOnShow());
   Song song;
   song.set_title("Roads");
   song.set_artist("Portishead");

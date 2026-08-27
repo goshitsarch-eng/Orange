@@ -12,6 +12,7 @@
 #include "organize/organizejob.h"
 #include "organize/organizepathnotify.h"
 #include "core/standardpaths.h"
+#include "dialogs/dialoggeometry.h"
 #include "organize/organizeerrordialog.h"
 #include "organize/organizeformat.h"
 #include "organize/organizeformatvalidator.h"
@@ -406,7 +407,8 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
 void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &request) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr("Organize files"));
-  adw_dialog_set_content_width(dialog, 560);
+  DialogGeometry::Apply(dialog, OrganizeSettings::kDialogGroup, OrganizeSettings::kGeometry, OrganizeSettings::kDefaultDialogWidth,
+                        OrganizeSettings::kDefaultDialogHeight, false);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
   gtk_widget_set_margin_start(box, 18);
   gtk_widget_set_margin_end(box, 18);
@@ -896,5 +898,6 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
     SetLoadingSongs(state, false);
   }
   RefreshPreview(state);
+  DialogGeometry::BindClosed(dialog, OrganizeSettings::kDialogGroup, OrganizeSettings::kGeometry);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

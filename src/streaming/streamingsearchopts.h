@@ -34,6 +34,9 @@ inline const char *ConfigureLabel() { return "Configure…"; }
 
 inline const char *SearchForThisLabel() { return "Search for this"; }
 
+// Qt StreamingSearchView::showEvent focuses the search field except on macOS.
+inline bool ShouldFocusOnShow() { return true; }
+
 inline std::string ConfigureServiceLabel(const std::string &service) {
   if (service.empty()) {
     return ConfigureLabel();

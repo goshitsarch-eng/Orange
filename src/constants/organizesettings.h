@@ -4,6 +4,10 @@
 namespace OrganizeSettings {
 
 constexpr char kSettingsGroup[] = "Organize";
+constexpr char kDialogGroup[] = "OrganizeDialog";
+constexpr char kGeometry[] = "geometry";
+constexpr int kDefaultDialogWidth = 560;
+constexpr int kDefaultDialogHeight = 640;
 constexpr char kFormat[] = "format";
 constexpr char kDestination[] = "destination";
 constexpr char kMove[] = "move";
