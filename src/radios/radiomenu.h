@@ -35,6 +35,17 @@ inline std::vector<Item> Items() {
 
 inline int ItemCount() { return static_cast<int>(Items().size()); }
 
+// Qt RadioView::contextMenuEvent always pops from Menu / Shift+F10.
+constexpr unsigned kMenuKey = 0xff67;
+constexpr unsigned kF10Key = 0xffc7;
+constexpr unsigned kShiftMask = 1u << 0;
+
+inline bool IsKeyboardTrigger(unsigned keyval, unsigned state) {
+  return keyval == kMenuKey || (keyval == kF10Key && (state & kShiftMask) != 0);
+}
+
+inline bool ShouldShowMenu() { return true; }
+
 inline Action FromId(const char *id) {
   if (!id) {
     return Action::Append;

@@ -288,6 +288,13 @@ TEST(RadioBackend, PersistAndRemoveSource) {
   unlink(path.c_str());
 }
 
+TEST(RadioMenu, KeyboardAlwaysShowsMenu) {
+  EXPECT_TRUE(RadioMenu::IsKeyboardTrigger(RadioMenu::kMenuKey, 0));
+  EXPECT_TRUE(RadioMenu::IsKeyboardTrigger(RadioMenu::kF10Key, RadioMenu::kShiftMask));
+  EXPECT_FALSE(RadioMenu::IsKeyboardTrigger(RadioMenu::kF10Key, 0));
+  EXPECT_TRUE(RadioMenu::ShouldShowMenu());
+}
+
 TEST(RadioMenu, ItemsUrlsAndSelection) {
   EXPECT_EQ(7, RadioMenu::ItemCount());
   EXPECT_STREQ("win.radio-append", RadioMenu::WinAction(RadioMenu::Action::Append));

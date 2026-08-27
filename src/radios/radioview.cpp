@@ -1,6 +1,7 @@
 #include "radios/radioview.h"
 
 #include "radios/radiodrag.h"
+#include "radios/radiomenu.h"
 #include "radios/radiotree.h"
 #include "radios/radiotreeleft.h"
 #include "widgets/listboxkeyboard.h"
@@ -46,8 +47,8 @@ RadioView::RadioView() {
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<RadioView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<RadioView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
 }
@@ -211,7 +212,13 @@ void RadioView::ResetTypeAhead() {
   }
 }
 
-gboolean RadioView::OnKeyPressed(guint keyval) {
+gboolean RadioView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (RadioMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    if (menu_ && RadioMenu::ShouldShowMenu()) {
+      menu_(SelectedChannels());
+    }
+    return TRUE;
+  }
   if (keyval == GDK_KEY_F5 && refresh_) {
     refresh_();
     return TRUE;

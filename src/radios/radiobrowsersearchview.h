@@ -39,6 +39,7 @@ class RadioBrowserSearchView {
   std::string ActiveCountry() const;
   std::string ActiveOrder() const;
   void SetupRowDrag(GtkWidget *row, const RadioChannel &channel);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
 
   RadioServices *services_ = nullptr;
   GtkWidget *widget_ = nullptr;

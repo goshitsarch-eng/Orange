@@ -4,6 +4,7 @@
 #include "core/settings.h"
 #include "radios/radiobrowsersearchopts.h"
 #include "radios/radiodrag.h"
+#include "radios/radiomenu.h"
 #include "radios/radioservices.h"
 #include "translations/translations.h"
 
@@ -118,6 +119,14 @@ RadioBrowserSearchView::RadioBrowserSearchView(RadioServices *services) : servic
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(list_, keys);
+  gtk_widget_set_focusable(list_, TRUE);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<RadioBrowserSearchView *>(data)->OnKeyPressed(keyval, state);
+                   })),
+                   this);
 
   g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
                      auto *self = static_cast<RadioBrowserSearchView *>(data);
@@ -126,6 +135,16 @@ RadioBrowserSearchView::RadioBrowserSearchView(RadioServices *services) : servic
                      }
                    }),
                    this);
+}
+
+gboolean RadioBrowserSearchView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (!RadioMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    return FALSE;
+  }
+  if (menu_ && RadioMenu::ShouldShowMenu()) {
+    menu_(SelectedChannels());
+  }
+  return TRUE;
 }
 
 RadioBrowserSearchView::~RadioBrowserSearchView() {
