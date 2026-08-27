@@ -37,6 +37,7 @@ struct State {
   GtkWidget *preserve = nullptr;
   std::vector<std::string> dest_paths;
   int dest_index = 0;
+  GtkWidget *progress_group = nullptr;
   GtkWidget *progress = nullptr;
   GtkWidget *status = nullptr;
   GtkWidget *log = nullptr;
@@ -131,15 +132,16 @@ void RefreshList(State *state) {
   for (const TranscodeUi::QueueItem &item : state->files) {
     GtkWidget *row = gtk_list_box_row_new();
     GtkWidget *cols = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 16);
-    GtkWidget *name = gtk_label_new(TranscodeUi::FilenameOf(item.path).c_str());
-    GtkWidget *dir = gtk_label_new(TranscodeUi::DirectoryOf(item.path).c_str());
-    gtk_widget_set_hexpand(name, TRUE);
-    gtk_widget_set_halign(name, GTK_ALIGN_START);
-    gtk_widget_set_halign(dir, GTK_ALIGN_START);
-    gtk_label_set_ellipsize(GTK_LABEL(name), PANGO_ELLIPSIZE_MIDDLE);
-    gtk_label_set_ellipsize(GTK_LABEL(dir), PANGO_ELLIPSIZE_MIDDLE);
-    gtk_box_append(GTK_BOX(cols), name);
-    gtk_box_append(GTK_BOX(cols), dir);
+    const std::vector<std::string> columns = TranscodeUi::QueueColumns(item);
+    for (size_t i = 0; i < columns.size(); ++i) {
+      GtkWidget *label = gtk_label_new(columns[i].c_str());
+      gtk_widget_set_halign(label, GTK_ALIGN_START);
+      gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_MIDDLE);
+      if (i == 0) {
+        gtk_widget_set_hexpand(label, TRUE);
+      }
+      gtk_box_append(GTK_BOX(cols), label);
+    }
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), cols);
     gtk_list_box_append(GTK_LIST_BOX(state->list), row);
   }
@@ -170,6 +172,9 @@ void SetWorking(State *state, bool working) {
   }
   if (state->dialog) {
     adw_dialog_set_can_close(state->dialog, working ? FALSE : TRUE);
+  }
+  if (state->progress_group) {
+    gtk_widget_set_visible(state->progress_group, TranscodeUi::ProgressGroupVisible(true) ? TRUE : FALSE);
   }
 }
 
@@ -524,8 +529,15 @@ void RemoveSelected(State *state) {
 void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &songs) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr(TranscodeUi::Title()));
-  adw_dialog_set_content_width(dialog, 640);
-  adw_dialog_set_content_height(dialog, 620);
+  int width = TranscodeUi::kDefaultWidth;
+  int height = TranscodeUi::kDefaultHeight;
+  {
+    Settings geometry;
+    geometry.BeginGroup(TranscoderSettings::kSettingsGroup);
+    TranscodeUi::DecodeGeometry(geometry.Value(TranscoderSettings::kGeometry), &width, &height);
+  }
+  adw_dialog_set_content_width(dialog, width);
+  adw_dialog_set_content_height(dialog, height);
 
   auto *state = new State();
   state->app = app;
@@ -552,13 +564,17 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   GtkWidget *columns = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 16);
   GtkWidget *filename_col = gtk_label_new(Translations::CStr(TranscodeUi::FilenameColumn()));
   GtkWidget *directory_col = gtk_label_new(Translations::CStr(TranscodeUi::DirectoryColumn()));
+  GtkWidget *import_col = gtk_label_new(Translations::CStr(TranscodeUi::ImportDirectory()));
   gtk_widget_add_css_class(filename_col, "dim-label");
   gtk_widget_add_css_class(directory_col, "dim-label");
+  gtk_widget_add_css_class(import_col, "dim-label");
   gtk_widget_set_hexpand(filename_col, TRUE);
   gtk_widget_set_halign(filename_col, GTK_ALIGN_START);
   gtk_widget_set_halign(directory_col, GTK_ALIGN_START);
+  gtk_widget_set_halign(import_col, GTK_ALIGN_START);
   gtk_box_append(GTK_BOX(columns), filename_col);
   gtk_box_append(GTK_BOX(columns), directory_col);
+  gtk_box_append(GTK_BOX(columns), import_col);
   gtk_box_append(GTK_BOX(box), columns);
 
   state->list = gtk_list_box_new();
@@ -621,7 +637,8 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   gtk_box_append(GTK_BOX(box), dest_row);
   gtk_box_append(GTK_BOX(box), state->preserve);
 
-  gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(TranscodeUi::Progress())));
+  state->progress_group = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+  gtk_box_append(GTK_BOX(state->progress_group), gtk_label_new(Translations::CStr(TranscodeUi::Progress())));
   state->progress = gtk_progress_bar_new();
   state->status = gtk_label_new("");
   gtk_widget_set_halign(state->status, GTK_ALIGN_START);
@@ -633,9 +650,11 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
   state->log = gtk_label_new("");
   gtk_label_set_wrap(GTK_LABEL(state->log), TRUE);
   gtk_widget_set_halign(state->log, GTK_ALIGN_START);
-  gtk_box_append(GTK_BOX(box), state->progress);
-  gtk_box_append(GTK_BOX(box), status_row);
-  gtk_box_append(GTK_BOX(box), state->log);
+  gtk_box_append(GTK_BOX(state->progress_group), state->progress);
+  gtk_box_append(GTK_BOX(state->progress_group), status_row);
+  gtk_box_append(GTK_BOX(state->progress_group), state->log);
+  gtk_widget_set_visible(state->progress_group, TranscodeUi::ProgressGroupVisible(false) ? TRUE : FALSE);
+  gtk_box_append(GTK_BOX(box), state->progress_group);
 
   GtkWidget *actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_widget_set_halign(actions, GTK_ALIGN_END);
@@ -681,6 +700,15 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
                      UpdateProgress(self);
                    })),
                    state);
+
+  g_signal_connect(dialog, "closed", G_CALLBACK((+[](AdwDialog *closed, gpointer) {
+                     Settings save;
+                     save.BeginGroup(TranscoderSettings::kSettingsGroup);
+                     save.SetValue(TranscoderSettings::kGeometry,
+                                   TranscodeUi::EncodeGeometry(adw_dialog_get_content_width(closed), adw_dialog_get_content_height(closed)));
+                     save.Sync();
+                   })),
+                   nullptr);
 
   adw_dialog_set_child(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));

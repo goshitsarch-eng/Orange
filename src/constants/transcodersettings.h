@@ -30,6 +30,7 @@ constexpr char kLastImportDir[] = "last_import_dir";
 constexpr char kLastOutputFormat[] = "last_output_format";
 constexpr char kLastDestDir[] = "last_dest_dir";
 constexpr char kPreserveDirStructure[] = "preserve_dir_structure";
+constexpr char kGeometry[] = "geometry";
 
 namespace LameMP3Settings {
 constexpr char kTarget[] = "target";

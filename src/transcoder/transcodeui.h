@@ -95,6 +95,80 @@ inline std::string DirectoryOf(const std::string &path) {
   return slash == std::string::npos ? std::string() : path.substr(0, slash);
 }
 
+// Qt TranscodeDialog::SetImportFilenames: filename.section('/', import_dir.count('/'), -2)
+inline int SlashCount(const std::string &path) {
+  int count = 0;
+  for (char ch : path) {
+    if (ch == '/') {
+      ++count;
+    }
+  }
+  return count;
+}
+
+inline std::string ImportDirectoryOf(const std::string &input, const std::string &import_root) {
+  if (import_root.empty() || input.empty()) {
+    return {};
+  }
+  std::vector<std::string> parts;
+  std::string current;
+  for (char ch : input) {
+    if (ch == '/') {
+      parts.push_back(current);
+      current.clear();
+    } else {
+      current.push_back(ch);
+    }
+  }
+  parts.push_back(current);
+  const int start = SlashCount(import_root);
+  const int end = static_cast<int>(parts.size()) - 2;
+  if (start < 0 || end < start || end >= static_cast<int>(parts.size())) {
+    return {};
+  }
+  std::string out;
+  for (int i = start; i <= end; ++i) {
+    if (!out.empty()) {
+      out += '/';
+    }
+    out += parts[static_cast<size_t>(i)];
+  }
+  return out;
+}
+
+inline std::vector<std::string> QueueColumns(const QueueItem &item) {
+  return {FilenameOf(item.path), DirectoryOf(item.path), ImportDirectoryOf(item.path, item.import_root)};
+}
+
+inline bool ProgressGroupVisible(bool started) { return started; }
+
+inline constexpr int kDefaultWidth = 640;
+inline constexpr int kDefaultHeight = 620;
+
+inline std::string EncodeGeometry(int width, int height) { return std::to_string(width) + "x" + std::to_string(height); }
+
+inline bool DecodeGeometry(const std::string &value, int *width, int *height) {
+  if (!width || !height || value.empty()) {
+    return false;
+  }
+  const std::string::size_type x = value.find('x');
+  if (x == std::string::npos || x == 0 || x + 1 >= value.size()) {
+    return false;
+  }
+  try {
+    const int w = std::stoi(value.substr(0, x));
+    const int h = std::stoi(value.substr(x + 1));
+    if (w < 200 || h < 200) {
+      return false;
+    }
+    *width = w;
+    *height = h;
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
 inline std::string QueueRowText(const QueueItem &item) {
   const std::string name = FilenameOf(item.path);
   const std::string dir = DirectoryOf(item.path);
