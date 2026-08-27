@@ -6,6 +6,7 @@
 #include "smartplaylists/playlistquerygenerator.h"
 #include "smartplaylists/smartplaylist.h"
 #include "smartplaylists/smartplaylistsummary.h"
+#include "smartplaylists/smartplaylistpreviewdisplay.h"
 #include "smartplaylists/smartplaylistpreviewpolicy.h"
 #include "smartplaylists/smartplaylistsearchtermwidgetoverlay.h"
 #include "smartplaylists/smartplaylisttermrow.h"
@@ -23,6 +24,7 @@
 #include <algorithm>
 #include <ctime>
 #include <memory>
+#include <string>
 #include <vector>
 #include <gtest/gtest.h>
 #include <unistd.h>
@@ -820,6 +822,65 @@ TEST(SmartPlaylistPreviewPolicy, TermPreviewClearsLimitAndSkipsInvalidTerms) {
   EXPECT_EQ(1u, term_preview.terms.size());
   const SmartPlaylistSearch sort_preview = SmartPlaylistPreviewPolicy::SearchForPreview(a, Kind::Sort);
   EXPECT_EQ(15, sort_preview.limit);
+}
+
+TEST(SmartPlaylistPreviewDisplay, CapsAtGeneratorLimitAndUsesQtCountStrings) {
+  EXPECT_EQ(PlaylistGenerator::kDefaultLimit, SmartPlaylistPreviewDisplay::DisplayLimit());
+  EXPECT_EQ(100, SmartPlaylistPreviewDisplay::DisplayLimit());
+  EXPECT_EQ(100, SmartPlaylistPreviewDisplay::ShownCount(250));
+  EXPECT_EQ(3, SmartPlaylistPreviewDisplay::ShownCount(3));
+
+  SongList songs;
+  for (int i = 0; i < 150; ++i) {
+    Song song;
+    song.set_title("Song " + std::to_string(i));
+    song.set_artist("Artist");
+    song.set_album("Album");
+    song.set_length_nanosec(5000000000LL);
+    song.set_valid(true);
+    songs.push_back(song);
+  }
+  const SongList shown = SmartPlaylistPreviewDisplay::SliceForDisplay(songs);
+  EXPECT_EQ(100u, shown.size());
+  EXPECT_EQ("Song 0", shown.front().title());
+  EXPECT_EQ("Song 99", shown.back().title());
+  EXPECT_EQ(150u, songs.size());
+
+  EXPECT_STREQ("%1 songs found", SmartPlaylistPreviewDisplay::CountTemplate(false));
+  EXPECT_STREQ("%1 songs found (showing %2)", SmartPlaylistPreviewDisplay::CountTemplate(true));
+  EXPECT_EQ("8 songs found", SmartPlaylistPreviewDisplay::CountLabel(8, 8));
+  EXPECT_EQ("150 songs found (showing 100)", SmartPlaylistPreviewDisplay::CountLabel(150, 100));
+  EXPECT_EQ("150 songs found (showing 100)", SmartPlaylistPreviewDisplay::CountLabelForTotal(150));
+  EXPECT_EQ("3 songs found", SmartPlaylistPreviewDisplay::CountLabelForTotal(3));
+  EXPECT_EQ("8 songs found (showing 3)",
+            SmartPlaylistPreviewDisplay::ApplyCountTemplate("%1 songs found (showing %2)", 8, 3));
+
+  const std::vector<PlaylistColumn> columns = SmartPlaylistPreviewDisplay::Columns();
+  ASSERT_EQ(4u, columns.size());
+  EXPECT_EQ(PlaylistColumn::Title, columns[0]);
+  EXPECT_EQ(PlaylistColumn::Artist, columns[1]);
+  EXPECT_EQ(PlaylistColumn::Album, columns[2]);
+  EXPECT_EQ(PlaylistColumn::Length, columns[3]);
+
+  Song row;
+  row.set_title("Ragged Wood");
+  row.set_artist("Fleet Foxes");
+  row.set_album("Fleet Foxes");
+  row.set_length_nanosec(5000000000LL);
+  EXPECT_EQ("Ragged Wood", SmartPlaylistPreviewDisplay::CellText(row, PlaylistColumn::Title));
+  EXPECT_EQ("Fleet Foxes", SmartPlaylistPreviewDisplay::CellText(row, PlaylistColumn::Artist));
+  EXPECT_EQ("0:05", SmartPlaylistPreviewDisplay::CellText(row, PlaylistColumn::Length));
+  EXPECT_EQ("Ragged Wood  Fleet Foxes  Fleet Foxes  0:05", SmartPlaylistPreviewDisplay::RowText(row));
+
+  EXPECT_TRUE(SmartPlaylistPreviewDisplay::ShouldDefer(true, false));
+  EXPECT_TRUE(SmartPlaylistPreviewDisplay::ShouldDefer(false, true));
+  EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldDefer(false, false));
+  EXPECT_TRUE(SmartPlaylistPreviewDisplay::ShouldRunPendingOnShow(true, false));
+  EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldRunPendingOnShow(true, true));
+  EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldRunPendingOnShow(false, false));
+  EXPECT_TRUE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(true, false));
+  EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(true, true));
+  EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(false, false));
 }
 
 TEST(SmartPlaylistDrag, JoinsSongUrlsAndSkipsWizard) {

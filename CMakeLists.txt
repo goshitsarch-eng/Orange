@@ -387,6 +387,7 @@ set(STRAWBERRY_SOURCES
   src/smartplaylists/smartplaylistwizardfinishpage.cpp
   src/smartplaylists/smartplaylistwizard.cpp
   src/smartplaylists/smartplaylistpreviewpolicy.h
+  src/smartplaylists/smartplaylistpreviewdisplay.h
   src/smartplaylists/smartplaylisttermrow.h
   src/smartplaylists/smartplaylisttermvalue.h
   src/smartplaylists/smartplaylisttagcompleter.h

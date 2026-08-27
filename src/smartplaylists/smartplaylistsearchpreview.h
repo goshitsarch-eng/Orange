@@ -17,6 +17,7 @@ class SmartPlaylistSearchPreview {
  private:
   GtkWidget *widget_ = nullptr;
   GtkWidget *label_ = nullptr;
+  GtkWidget *header_ = nullptr;
   GtkWidget *list_ = nullptr;
   int match_count_ = 0;
   SmartPlaylistSearch last_search_;
