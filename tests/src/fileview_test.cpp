@@ -373,14 +373,14 @@ TEST(FileViewDrag, PathsForDragUsesSelectionOrDraggedRow) {
   EXPECT_EQ("/c", dragged[0]);
 }
 
-TEST(FileViewDrag, SkipsDirectoriesAndEmitsFileUris) {
+TEST(FileViewDrag, EmitsDirectoryAndFileUris) {
   const std::string dir = TempDir();
   const std::string audio = FileUtils::Join(dir, "roads.flac");
   ASSERT_TRUE(FileUtils::WriteFile(audio, "a"));
   const std::string payload = FileViewDrag::DragPayload({dir, audio, ""});
-  EXPECT_EQ(FileUtils::UriFromPath(audio), payload);
-  EXPECT_TRUE(payload.find('\n') == std::string::npos);
-  EXPECT_TRUE(FileViewDrag::DragPayload({dir}).empty());
+  EXPECT_EQ(FileUtils::UriFromPath(dir) + "\n" + FileUtils::UriFromPath(audio), payload);
+  EXPECT_EQ(FileUtils::UriFromPath(dir), FileViewDrag::DragPayload({dir}));
+  EXPECT_TRUE(FileViewDrag::DragPayload({}).empty());
   FileUtils::Remove(audio);
   rmdir(dir.c_str());
 }

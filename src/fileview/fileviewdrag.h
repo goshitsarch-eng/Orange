@@ -20,10 +20,12 @@ inline std::vector<std::string> PathsForDrag(const std::vector<std::string> &sel
   return {dragged};
 }
 
+// Qt File View drag emits file:// URLs for both files and folders. Playlist drop
+// then walks directories via SongLoader::LoadLocalDirectory.
 inline std::string DragPayload(const std::vector<std::string> &paths) {
   std::string text;
   for (const std::string &path : paths) {
-    if (path.empty() || FileUtils::IsDirectory(path)) {
+    if (path.empty()) {
       continue;
     }
     if (!text.empty()) {
