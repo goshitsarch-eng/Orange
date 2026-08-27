@@ -76,6 +76,7 @@
 #include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
 #include "ui/mainwindowmenu.h"
+#include "ui/mainwindowmenulayout.h"
 #include "widgets/filtersearchkeyboard.h"
 #include "core/filesystemmusicstorage.h"
 #include "core/memorydatabase.h"
@@ -1936,6 +1937,7 @@ TEST(WindowGeometry, ClampsAndMapsStartup) {
 
 TEST(MainWindowMenu, MatchesQtDailyActionLabels) {
   EXPECT_STREQ("Open file...", MainWindowMenu::OpenFile());
+  EXPECT_STREQ("Add file...", MainWindowMenu::AddFile());
   EXPECT_STREQ("Add folder...", MainWindowMenu::AddFolder());
   EXPECT_STREQ("Open audio CD...", MainWindowMenu::OpenCD());
   EXPECT_STREQ("Add stream...", MainWindowMenu::AddStream());
@@ -2413,6 +2415,15 @@ TEST(MainWindowAddMedia, FolderGoesToPlaylistWithLastPath) {
   EXPECT_TRUE(MainWindowAddMedia::FolderAddsToPlaylist());
   EXPECT_STREQ("Add file", MainWindowAddMedia::AddFileTitle());
   EXPECT_STREQ("Add folder", MainWindowAddMedia::AddFolderTitle());
+  EXPECT_EQ(MainWindowMenuLayout::Section::Playlist, MainWindowMenuLayout::AddFile());
+  EXPECT_EQ(MainWindowMenuLayout::Section::Playlist, MainWindowMenuLayout::AddFolder());
+  EXPECT_EQ(MainWindowMenuLayout::Section::Playlist, MainWindowMenuLayout::AddStream());
+  EXPECT_EQ(MainWindowMenuLayout::Section::Music, MainWindowMenuLayout::OpenFile());
+  EXPECT_EQ(MainWindowMenuLayout::Section::Music, MainWindowMenuLayout::OpenCD());
+  EXPECT_TRUE(MainWindowMenuLayout::IsPlaylistAddAction("add-file"));
+  EXPECT_TRUE(MainWindowMenuLayout::IsPlaylistAddAction("add-folder"));
+  EXPECT_TRUE(MainWindowMenuLayout::IsPlaylistAddAction("add-stream"));
+  EXPECT_FALSE(MainWindowMenuLayout::IsPlaylistAddAction("open-files"));
   EXPECT_EQ("/music", MainWindowAddMedia::InitialFolder({}, "/music"));
   EXPECT_EQ("/tmp", MainWindowAddMedia::InitialFolder("/tmp", "/music"));
   const std::string dir = "/tmp/strawberry-addmedia-" + std::to_string(getpid());

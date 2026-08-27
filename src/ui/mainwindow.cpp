@@ -382,15 +382,16 @@ void MainWindow::BuildUi() {
   GMenu *menu = g_menu_new();
   GMenu *music = g_menu_new();
   g_menu_append(music, Translations::Tr(MainWindowMenu::OpenFile()).c_str(), "win.open-files");
-  g_menu_append(music, Translations::Tr(MainWindowMenu::AddFolder()).c_str(), "win.add-folder");
   g_menu_append(music, Translations::Tr(MainWindowMenu::OpenCD()).c_str(), "win.add-cd");
-  g_menu_append(music, Translations::Tr(MainWindowMenu::AddStream()).c_str(), "win.add-stream");
   g_menu_append(music, Translations::Tr(MainWindowMenu::UpdateCollection()).c_str(), "win.rescan");
   g_menu_append(music, Translations::Tr(MainWindowMenu::FullScan()).c_str(), "win.full-scan");
   g_menu_append(music, Translations::Tr(MainWindowMenu::StopScan()).c_str(), "win.stop-scan");
   g_menu_append(music, Translations::Tr(MainWindowMenu::Mute()).c_str(), "win.mute");
   g_menu_append_section(menu, Translations::Tr("Music").c_str(), G_MENU_MODEL(music));
   GMenu *playlist = g_menu_new();
+  g_menu_append(playlist, Translations::Tr(MainWindowMenu::AddFile()).c_str(), "win.add-file");
+  g_menu_append(playlist, Translations::Tr(MainWindowMenu::AddFolder()).c_str(), "win.add-folder");
+  g_menu_append(playlist, Translations::Tr(MainWindowMenu::AddStream()).c_str(), "win.add-stream");
   g_menu_append(playlist, Translations::Tr(MainWindowMenu::NewPlaylist()).c_str(), "win.new-playlist");
   g_menu_append(playlist, Translations::Tr("New playlist folder").c_str(), "win.new-playlist-folder");
   g_menu_append(playlist, Translations::Tr(MainWindowMenu::LoadPlaylist()).c_str(), "win.load-playlist");
@@ -611,6 +612,7 @@ void MainWindow::BuildUi() {
                gtk_window_close(GTK_WINDOW(self->window_));
              }));
   add_action("open-files", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddFiles(); }));
+  add_action("add-file", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddFiles(); }));
   add_action("add-folder", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddPlaylistFolder(); }));
   add_action("add-cd", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->AddCdTracks(); }));
   add_action("rescan", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RescanCollection(false); }));
@@ -708,7 +710,7 @@ void MainWindow::BuildUi() {
   add_action("add-stream", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
                auto *self = static_cast<MainWindow *>(data);
                Dialogs::AddStream(GTK_WINDOW(self->window_), [self](const std::string &, const std::string &url) {
-                 self->app_->playlist_manager()->InsertUrls({url});
+                 self->AddUrlsFromMenu({url});
                });
              }));
   add_action("covers", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { Dialogs::CoverManager(GTK_WINDOW(static_cast<MainWindow *>(data)->window_), static_cast<MainWindow *>(data)->app_); }));
@@ -1088,8 +1090,8 @@ void MainWindow::BuildUi() {
   set_accels("win.undo", "<Control>z");
   set_accels("win.redo", "<Control><Shift>z");
   set_accels("win.new-playlist", "<Control>n");
-  const char *open_accels[] = {MainWindowKeyboard::OpenFilesAccel(), MainWindowKeyboard::AddFileAccel(), nullptr};
-  gtk_application_set_accels_for_action(GTK_APPLICATION(gtk_app_), "win.open-files", open_accels);
+  set_accels("win.open-files", MainWindowKeyboard::OpenFilesAccel());
+  set_accels("win.add-file", MainWindowKeyboard::AddFileAccel());
   set_accels("win.save-playlist", "<Control>s");
   const char *pref_accels[] = {MainWindowKeyboard::SettingsCommaAccel(), MainWindowKeyboard::SettingsAccel(), nullptr};
   gtk_application_set_accels_for_action(GTK_APPLICATION(gtk_app_), "win.preferences", pref_accels);

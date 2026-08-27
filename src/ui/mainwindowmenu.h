@@ -4,6 +4,7 @@
 namespace MainWindowMenu {
 
 inline const char *OpenFile() { return "Open file..."; }
+inline const char *AddFile() { return "Add file..."; }
 inline const char *AddFolder() { return "Add folder..."; }
 inline const char *OpenCD() { return "Open audio CD..."; }
 inline const char *AddStream() { return "Add stream..."; }
