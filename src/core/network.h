@@ -39,15 +39,19 @@ class NetworkAccessManager {
 
   void SetProxy(const std::string &proxy_uri);
   void ReloadSettings();
+  void ResetConnectionCache();
   SoupSession *session() const { return session_; }
 
  private:
   int Send(SoupMessage *message, Callback callback);
   void Forget(int id);
+  void ApplySessionDefaults();
+  void WatchNetworkResume();
 
   SoupSession *session_ = nullptr;
   int next_id_ = 1;
   std::map<int, GCancellable *> cancellables_;
+  gulong network_changed_id_ = 0;
 };
 
 #endif

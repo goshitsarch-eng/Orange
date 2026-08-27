@@ -1,5 +1,6 @@
 #include "dialogs/trackselectionlabels.h"
 #include "tagfetcher/musicbrainzclient.h"
+#include "core/networkresume.h"
 #include "core/networktimeoutpolicy.h"
 #include "core/networktimeouts.h"
 #include "tagfetcher/tagfetchhelpers.h"
@@ -163,4 +164,11 @@ TEST(NetworkTimeouts, AddReplyZeroIsIgnored) {
   timeouts.SetTimeout(1);
   timeouts.AddReply(0);
   EXPECT_FALSE(timeouts.Contains(0));
+}
+
+TEST(NetworkResume, ClearsCacheOnlyWhenOnline) {
+  EXPECT_TRUE(NetworkResume::ShouldClearConnectionCache(true));
+  EXPECT_FALSE(NetworkResume::ShouldClearConnectionCache(false));
+  EXPECT_STREQ("network-changed", NetworkResume::kNetworkChangedSignal);
+  EXPECT_STREQ("Strawberry/1.2.0 (+https://www.strawberrymusicplayer.org)", NetworkResume::kUserAgent);
 }

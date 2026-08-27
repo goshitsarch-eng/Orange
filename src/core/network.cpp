@@ -2,6 +2,7 @@
 
 #include "core/logging.h"
 #include "core/networkproxyfactory.h"
+#include "core/networkresume.h"
 #include "core/settings.h"
 
 #include <glib.h>
@@ -16,19 +17,57 @@ struct PendingRequest {
   NetworkAccessManager *self = nullptr;
 };
 
+void OnNetworkChanged(GNetworkMonitor *, gboolean available, gpointer data) {
+  auto *self = static_cast<NetworkAccessManager *>(data);
+  if (self && NetworkResume::ShouldClearConnectionCache(available != FALSE)) {
+    self->ResetConnectionCache();
+  }
+}
+
 }  // namespace
 
 NetworkAccessManager::NetworkAccessManager() {
   session_ = soup_session_new();
-  g_object_set(session_, "user-agent", "Strawberry/1.2.0 (+https://www.strawberrymusicplayer.org)", nullptr);
+  ApplySessionDefaults();
   ReloadSettings();
+  WatchNetworkResume();
 }
 
 NetworkAccessManager::~NetworkAccessManager() {
+  if (network_changed_id_) {
+    g_signal_handler_disconnect(g_network_monitor_get_default(), network_changed_id_);
+    network_changed_id_ = 0;
+  }
   if (session_) {
     soup_session_abort(session_);
     g_object_unref(session_);
   }
+}
+
+void NetworkAccessManager::ApplySessionDefaults() {
+  if (!session_) {
+    return;
+  }
+  g_object_set(session_, "user-agent", NetworkResume::kUserAgent, nullptr);
+}
+
+void NetworkAccessManager::WatchNetworkResume() {
+  GNetworkMonitor *monitor = g_network_monitor_get_default();
+  if (!monitor) {
+    return;
+  }
+  network_changed_id_ = g_signal_connect(monitor, NetworkResume::kNetworkChangedSignal, G_CALLBACK(OnNetworkChanged), this);
+}
+
+void NetworkAccessManager::ResetConnectionCache() {
+  if (!session_) {
+    return;
+  }
+  SoupSession *old = session_;
+  session_ = soup_session_new();
+  ApplySessionDefaults();
+  ReloadSettings();
+  g_object_unref(old);
 }
 
 void NetworkAccessManager::SetProxy(const std::string &proxy_uri) {
