@@ -1,5 +1,6 @@
 #include "collection/groupbydialog.h"
 
+#include "collection/collectiongroupingsave.h"
 #include "collection/groupbydialoglabels.h"
 #include "collection/savedgroupingmanager.h"
 #include "translations/translations.h"
@@ -30,6 +31,7 @@ void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &
   GtkWidget *apply = gtk_button_new_with_label(Translations::CStr("Apply"));
   gtk_widget_add_css_class(apply, "suggested-action");
   GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save"));
+  gtk_widget_set_sensitive(save, FALSE);
   GtkWidget *manage = gtk_button_new_with_label(Translations::CStr("Manage"));
   gtk_box_append(GTK_BOX(buttons), apply);
   gtk_box_append(GTK_BOX(buttons), save);
@@ -61,6 +63,11 @@ void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &
                    }),
                    cb);
   g_object_set_data(G_OBJECT(save), "dialog", dialog);
+  g_signal_connect(name, "changed", G_CALLBACK(+[](GtkEditable *editable, gpointer data) {
+                     const char *text = gtk_editable_get_text(editable);
+                     gtk_widget_set_sensitive(GTK_WIDGET(data), CollectionGroupingSave::AcceptName(text ? text : ""));
+                   }),
+                   save);
   g_signal_connect(save, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
                      GtkWidget *dlg = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "dialog"));
                      const char *title = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(dlg), "name")));
@@ -71,7 +78,9 @@ void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &
                          static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "second")))));
                      grouping.third = CollectionGrouping::FromComboIndex(
                          static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(g_object_get_data(G_OBJECT(dlg), "third")))));
-                     CollectionGrouping::AddSaved(title ? title : "", grouping);
+                     if (!CollectionGroupingSave::Save(title ? title : "", grouping)) {
+                       return;
+                     }
                    }),
                    nullptr);
   g_object_set_data(G_OBJECT(manage), "parent", parent);

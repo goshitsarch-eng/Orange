@@ -951,6 +951,9 @@ TEST(CollectionGroupingSave, AcceptsNamesAndMarksMenuChecks) {
   EXPECT_FALSE(CollectionGroupingSave::AcceptName(""));
   EXPECT_FALSE(CollectionGroupingSave::AcceptName("   "));
   EXPECT_TRUE(CollectionGroupingSave::AcceptName("Favorites"));
+  CollectionGrouping::Grouping unnamed;
+  EXPECT_FALSE(CollectionGroupingSave::Save("", unnamed));
+  EXPECT_FALSE(CollectionGroupingSave::Save("   ", unnamed));
   EXPECT_EQ("Favorites", CollectionGroupingSave::TrimmedName("  Favorites  "));
   EXPECT_STREQ("Grouping Name", CollectionGroupingSave::DialogTitle());
   EXPECT_STREQ("Grouping name:", CollectionGroupingSave::DialogPrompt());
