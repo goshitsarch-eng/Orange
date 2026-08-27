@@ -143,6 +143,14 @@ inline bool FitsOnDevice(int64_t additional, int64_t used, int64_t total) {
   return additional <= total - used;
 }
 
+// Qt OrganizeDialog::UpdatePreviews: OK stays off without a usable destination.
+inline bool HasDestination(const std::string &destination) { return !destination.empty(); }
+
+inline bool CanRun(bool format_valid, const std::string &destination, const std::vector<Entry> &entries, int64_t additional_bytes,
+                   int64_t used_bytes, int64_t total_bytes) {
+  return format_valid && HasDestination(destination) && CanProceed(entries) && FitsOnDevice(additional_bytes, used_bytes, total_bytes);
+}
+
 inline const char *PreviewIconName(const Entry &entry) { return entry.ok ? "dialog-ok-apply-symbolic" : "dialog-warning-symbolic"; }
 
 }  // namespace OrganizePreview

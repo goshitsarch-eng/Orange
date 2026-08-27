@@ -630,6 +630,12 @@ TEST(OrganizePreview, DisambiguatesOnlyWhenUnique) {
   EXPECT_EQ("Same.flac", unique[0].relative_path);
   EXPECT_EQ("Same(2).flac", unique[1].relative_path);
   EXPECT_TRUE(OrganizePreview::CanProceed(unique));
+  EXPECT_FALSE(OrganizePreview::HasDestination(""));
+  EXPECT_TRUE(OrganizePreview::HasDestination("/music/out"));
+  EXPECT_FALSE(OrganizePreview::CanRun(true, "", unique, 150, 40, 1000));
+  EXPECT_TRUE(OrganizePreview::CanRun(true, "/tmp/out", unique, 150, 40, 1000));
+  EXPECT_FALSE(OrganizePreview::CanRun(false, "/tmp/out", unique, 150, 40, 1000));
+  EXPECT_FALSE(OrganizePreview::CanRun(true, "/tmp/out", unique, 70, 40, 100));
   EXPECT_STREQ("dialog-ok-apply-symbolic", OrganizePreview::PreviewIconName(unique[0]));
 
   const auto album = OrganizePreview::Compute({a, b}, OrganizeFormat("%album"));

@@ -149,9 +149,9 @@ void RefreshPreview(DialogState *state) {
     }
   }
   if (state->run) {
-    const bool fits = !state->space || OrganizePreview::FitsOnDevice(OrganizePreview::TotalBytes(songs), state->space->used(),
-                                                                    state->space->total());
-    gtk_widget_set_sensitive(state->run, valid && OrganizePreview::CanProceed(entries) && fits);
+    const int64_t used = state->space ? state->space->used() : 0;
+    const int64_t total = state->space ? state->space->total() : 0;
+    gtk_widget_set_sensitive(state->run, OrganizePreview::CanRun(valid, dest, entries, OrganizePreview::TotalBytes(songs), used, total));
   }
 }
 
