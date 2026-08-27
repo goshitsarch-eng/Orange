@@ -15,6 +15,9 @@ class SmartPlaylistWizardFinishPage {
   // Qt SmartPlaylistWizardFinishPage::isComplete: Finish/Create stays off until the name is non-empty.
   static bool IsComplete(const std::string &name) { return !name.empty(); }
 
+  // Qt Next/Finish also requires the search page to be complete.
+  static bool CanCreate(const std::string &name, bool search_complete) { return IsComplete(name) && search_complete; }
+
  private:
   GtkWidget *widget_ = nullptr;
   GtkWidget *summary_ = nullptr;

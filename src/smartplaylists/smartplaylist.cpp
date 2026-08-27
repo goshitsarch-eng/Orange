@@ -250,6 +250,32 @@ bool SmartPlaylistTerm::Matches(const Song &song) const {
   return false;
 }
 
+bool SmartPlaylistTerm::IsValid() const {
+  if (op == SmartPlaylistOp::Empty || op == SmartPlaylistOp::NotEmpty) {
+    return true;
+  }
+  const SmartPlaylistFieldKind kind = SmartPlaylistSearch::KindOf(field);
+  if (op == SmartPlaylistOp::RelativeDate) {
+    return std::strtoll(value.c_str(), nullptr, 10) >= 0;
+  }
+  if (kind == SmartPlaylistFieldKind::Date || op == SmartPlaylistOp::NumericDate) {
+    return SmartPlaylistSearch::ParseDateValue(value) != 0;
+  }
+  switch (kind) {
+    case SmartPlaylistFieldKind::Text:
+      return !value.empty();
+    case SmartPlaylistFieldKind::Number:
+      return std::strtod(value.c_str(), nullptr) >= 0;
+    case SmartPlaylistFieldKind::Time:
+      return true;
+    case SmartPlaylistFieldKind::Rating:
+      return std::strtod(value.c_str(), nullptr) >= 0.0;
+    case SmartPlaylistFieldKind::Date:
+      return SmartPlaylistSearch::ParseDateValue(value) != 0;
+  }
+  return false;
+}
+
 SongList SmartPlaylistSearch::Search(const SongList &songs) const {
   SongList result;
   for (const Song &song : songs) {

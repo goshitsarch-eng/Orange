@@ -11,6 +11,7 @@
 #include "smartplaylists/smartplaylisttermrow.h"
 #include "smartplaylists/smartplaylisttermvalue.h"
 #include "smartplaylists/smartplaylisttagcompleter.h"
+#include "smartplaylists/smartplaylistquerywizardpluginsearchpage.h"
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
@@ -649,6 +650,56 @@ TEST(SmartPlaylistWizardFinishPage, IsCompleteRequiresNonEmptyName) {
   EXPECT_FALSE(SmartPlaylistWizardFinishPage::IsComplete(""));
   EXPECT_TRUE(SmartPlaylistWizardFinishPage::IsComplete("Favorites"));
   EXPECT_TRUE(SmartPlaylistWizardFinishPage::IsComplete(" "));
+}
+
+TEST(SmartPlaylistTerm, IsValidMatchesQtSearchTerm) {
+  SmartPlaylistTerm empty_text;
+  empty_text.field = SmartPlaylistField::Artist;
+  empty_text.op = SmartPlaylistOp::Contains;
+  EXPECT_FALSE(empty_text.IsValid());
+  empty_text.value = "fleet";
+  EXPECT_TRUE(empty_text.IsValid());
+  empty_text.op = SmartPlaylistOp::Empty;
+  empty_text.value.clear();
+  EXPECT_TRUE(empty_text.IsValid());
+
+  SmartPlaylistTerm rating;
+  rating.field = SmartPlaylistField::Rating;
+  rating.op = SmartPlaylistOp::Equals;
+  rating.value = "-1.00";
+  EXPECT_FALSE(rating.IsValid());
+  rating.value = "0.50";
+  EXPECT_TRUE(rating.IsValid());
+
+  SmartPlaylistTerm length;
+  length.field = SmartPlaylistField::Length;
+  length.op = SmartPlaylistOp::Equals;
+  length.value = "0";
+  EXPECT_TRUE(length.IsValid());
+
+  SmartPlaylistTerm on_date;
+  on_date.field = SmartPlaylistField::DateCreated;
+  on_date.op = SmartPlaylistOp::NumericDate;
+  EXPECT_FALSE(on_date.IsValid());
+  on_date.value = "2020-03-05";
+  EXPECT_TRUE(on_date.IsValid());
+
+  SmartPlaylistTerm year;
+  year.field = SmartPlaylistField::Year;
+  year.op = SmartPlaylistOp::GreaterThan;
+  year.value = "0";
+  EXPECT_TRUE(year.IsValid());
+}
+
+TEST(SmartPlaylistQueryWizardPluginSearchPage, IsCompleteRequiresValidTermsUnlessAll) {
+  EXPECT_TRUE(SmartPlaylistQueryWizardPluginSearchPage::IsComplete(SmartPlaylistSearch::SearchType::All, {false}));
+  EXPECT_TRUE(SmartPlaylistQueryWizardPluginSearchPage::IsComplete(SmartPlaylistSearch::SearchType::And, {}));
+  EXPECT_TRUE(SmartPlaylistQueryWizardPluginSearchPage::IsComplete(SmartPlaylistSearch::SearchType::And, {true, true}));
+  EXPECT_FALSE(SmartPlaylistQueryWizardPluginSearchPage::IsComplete(SmartPlaylistSearch::SearchType::And, {true, false}));
+  EXPECT_FALSE(SmartPlaylistQueryWizardPluginSearchPage::IsComplete(SmartPlaylistSearch::SearchType::Or, {false}));
+  EXPECT_TRUE(SmartPlaylistWizardFinishPage::CanCreate("Favorites", true));
+  EXPECT_FALSE(SmartPlaylistWizardFinishPage::CanCreate("Favorites", false));
+  EXPECT_FALSE(SmartPlaylistWizardFinishPage::CanCreate("", true));
 }
 
 TEST(SmartPlaylistPreviewPolicy, TermPreviewClearsLimitAndSkipsInvalidTerms) {

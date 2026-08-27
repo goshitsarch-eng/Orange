@@ -64,6 +64,7 @@ struct SmartPlaylistTerm {
   SmartPlaylistOp op = SmartPlaylistOp::Contains;
   std::string value;
   bool Matches(const Song &song) const;
+  bool IsValid() const;
 };
 
 class SmartPlaylistSearch {
