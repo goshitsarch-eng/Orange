@@ -18,6 +18,7 @@
 #include "core/mainwindowsponsor.h"
 #include "core/commandlinewindow.h"
 #include "core/mainwindowsettings.h"
+#include "dialogs/edittagloading.h"
 #include "dialogs/messagedialog.h"
 #include "ui/mainwindowmenu.h"
 #include "ui/mainwindowkeyboard.h"
@@ -1215,8 +1216,8 @@ void MainWindow::BuildSidebar() {
     Dialogs::CopyToDevice(GTK_WINDOW(window_), app_, OrganizeLoading::FileViewFilenames(paths));
   });
   file_view_->SetEditTagsCallback([this](const std::vector<std::string> &paths) {
-    const SongList songs = SongsFromFilePaths(paths);
-    if (songs.empty()) {
+    const SongList songs = EditTagLoading::PlaceholdersFromPaths(paths);
+    if (!EditTagLoading::OpensDialog(songs)) {
       ShowToast("No files selected");
       return;
     }

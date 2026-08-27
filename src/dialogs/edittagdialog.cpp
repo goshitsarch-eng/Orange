@@ -14,7 +14,9 @@
 #include "dialogs/edittagfieldreset.h"
 #include "dialogs/edittagfields.h"
 #include "dialogs/edittagid3v2.h"
+#include "dialogs/edittagloading.h"
 #include "dialogs/edittagsummaryfields.h"
+#include "tagreader/tagreaderclient.h"
 #include "dialogs/edittagsummarylabels.h"
 #include "dialogs/edittagtabs.h"
 #include "tagreader/savetagsoptions.h"
@@ -27,6 +29,7 @@
 
 #include <adwaita.h>
 #include <memory>
+#include <thread>
 #include <utility>
 
 using DialogHelpers::PrettyBytes;
@@ -93,6 +96,20 @@ struct State {
   std::unique_ptr<AlbumCoverChoiceController> covers;
   std::vector<std::pair<std::string, GtkWidget *>> fields;
   std::vector<std::string> initial;
+  AdwDialog *dialog = nullptr;
+  std::shared_ptr<bool> alive = std::make_shared<bool>(true);
+
+  ~State() {
+    if (alive) {
+      *alive = false;
+    }
+  }
+};
+
+struct EditTagLoadIdle {
+  State *state = nullptr;
+  SongList songs;
+  std::shared_ptr<bool> alive;
 };
 
 void UpdateDisplay(State *state);
@@ -501,6 +518,152 @@ void SelectSong(State *state, int index) {
   }
   state->index = static_cast<size_t>(EditTagFields::WrapIndex(index, 0, static_cast<int>(state->songs.size())));
   UpdateDisplay(state);
+}
+
+void SetFieldValue(State *state, const std::string &name, const std::pair<std::string, bool> &value) {
+  if (!state) {
+    return;
+  }
+  for (size_t i = 0; i < state->fields.size(); ++i) {
+    if (state->fields[i].first != name || !state->fields[i].second) {
+      continue;
+    }
+    SetText(state->fields[i].second, value.first);
+    if (i < state->initial.size()) {
+      state->initial[i] = value.first;
+    }
+    g_object_set_data_full(G_OBJECT(state->fields[i].second), "initial-text", g_strdup(value.first.c_str()), g_free);
+    if (value.second) {
+      gtk_widget_set_tooltip_text(state->fields[i].second, Translations::CStr("Multiple values — type to set all selected songs"));
+    } else {
+      gtk_widget_set_tooltip_text(state->fields[i].second, nullptr);
+    }
+  }
+}
+
+void RefreshTagFields(State *state) {
+  if (!state) {
+    return;
+  }
+  const SongList &songs = state->songs;
+  SetFieldValue(state, "Title", EditTagFields::CommonValue(songs, [](const Song &s) { return s.title(); }));
+  SetFieldValue(state, "Artist", EditTagFields::CommonValue(songs, [](const Song &s) { return s.artist(); }));
+  SetFieldValue(state, "Album", EditTagFields::CommonValue(songs, [](const Song &s) { return s.album(); }));
+  SetFieldValue(state, "Album artist", EditTagFields::CommonValue(songs, [](const Song &s) { return s.albumartist(); }));
+  SetFieldValue(state, "Year",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.year() > 0 ? std::to_string(s.year()) : std::string(); }));
+  SetFieldValue(state, "Original year",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.originalyear() > 0 ? std::to_string(s.originalyear()) : std::string(); }));
+  SetFieldValue(state, "Track",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.track() > 0 ? std::to_string(s.track()) : std::string(); }));
+  SetFieldValue(state, "Genre", EditTagFields::CommonValue(songs, [](const Song &s) { return s.genre(); }));
+  SetFieldValue(state, "Composer", EditTagFields::CommonValue(songs, [](const Song &s) { return s.composer(); }));
+  SetFieldValue(state, "Performer", EditTagFields::CommonValue(songs, [](const Song &s) { return s.performer(); }));
+  SetFieldValue(state, "Grouping", EditTagFields::CommonValue(songs, [](const Song &s) { return s.grouping(); }));
+  SetFieldValue(state, "Comment", EditTagFields::CommonValue(songs, [](const Song &s) { return s.comment(); }));
+  SetFieldValue(state, "Disc",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.disc() > 0 ? std::to_string(s.disc()) : std::string(); }));
+  SetFieldValue(state, "BPM",
+                EditTagFields::CommonValue(songs, [](const Song &s) { return s.bpm() > 0 ? std::to_string(s.bpm()) : std::string(); }));
+  SetFieldValue(state, "Mood", EditTagFields::CommonValue(songs, [](const Song &s) { return s.mood(); }));
+  SetFieldValue(state, "Initial key", EditTagFields::CommonValue(songs, [](const Song &s) { return s.initial_key(); }));
+  SetFieldValue(state, "Title sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.titlesort(); }));
+  SetFieldValue(state, "Artist sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.artistsort(); }));
+  SetFieldValue(state, "Album sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.albumsort(); }));
+  SetFieldValue(state, "Album artist sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.albumartistsort(); }));
+  SetFieldValue(state, "Composer sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.composersort(); }));
+  SetFieldValue(state, "Performer sort", EditTagFields::CommonValue(songs, [](const Song &s) { return s.performersort(); }));
+  SetFieldValue(state, "Lyrics", EditTagFields::CommonValue(songs, [](const Song &s) { return s.lyrics(); }));
+  if (state->rating) {
+    state->initial_rating_stored = EditTagFields::CommonRating(songs);
+    state->initial_rating = EditTagFields::RatingSliderFromStored(state->initial_rating_stored);
+    gtk_range_set_value(GTK_RANGE(state->rating), state->initial_rating);
+  }
+  if (state->compilation && !songs.empty()) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(state->compilation), songs.front().compilation());
+  }
+  if (state->tags_summary) {
+    gtk_label_set_text(GTK_LABEL(state->tags_summary), EditTagCompleter::TagsSummary(static_cast<int>(songs.size())).c_str());
+  }
+}
+
+void RebuildSongList(State *state) {
+  if (!state || !state->song_list) {
+    return;
+  }
+  GtkWidget *child = gtk_widget_get_first_child(state->song_list);
+  while (child) {
+    GtkWidget *next = gtk_widget_get_next_sibling(child);
+    gtk_list_box_remove(GTK_LIST_BOX(state->song_list), child);
+    child = next;
+  }
+  for (size_t i = 0; i < state->songs.size(); ++i) {
+    AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
+    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), EditTagFields::SongRowLabel(state->songs[i]).c_str());
+    g_object_set_data(G_OBJECT(row), "song-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
+    gtk_list_box_append(GTK_LIST_BOX(state->song_list), GTK_WIDGET(row));
+  }
+}
+
+void SetLoading(State *state, bool loading) {
+  if (!state) {
+    return;
+  }
+  state->loading = loading;
+  if (state->loading_label) {
+    gtk_label_set_text(GTK_LABEL(state->loading_label), Translations::CStr(EditTagFields::LoadingTracksMessage()));
+  }
+  ApplyEditEnable(state);
+}
+
+void ApplyLoadedSongs(State *state, SongList songs) {
+  if (!state) {
+    return;
+  }
+  state->songs = std::move(songs);
+  state->index = 0;
+  if (!state->songs.empty()) {
+    state->song = state->songs.front();
+  } else {
+    state->song = Song();
+  }
+  if (state->dialog) {
+    const std::string dialog_title = state->songs.size() > 1
+                                         ? Translations::Tr("Edit tags") + " (" + std::to_string(state->songs.size()) + " " + Translations::Tr("songs") + ")"
+                                         : Translations::Tr("Edit tags");
+    adw_dialog_set_title(state->dialog, dialog_title.c_str());
+  }
+  RebuildSongList(state);
+  RefreshTagFields(state);
+  SetLoading(state, false);
+  UpdateDisplay(state);
+}
+
+void StartTagLoad(State *state, const SongList &incoming) {
+  if (!state) {
+    return;
+  }
+  TagReaderClient *client = state->app ? state->app->tagreader_client() : nullptr;
+  if (!client) {
+    SetLoading(state, false);
+    return;
+  }
+  SetLoading(state, true);
+  const std::shared_ptr<bool> alive = state->alive;
+  std::thread([state, client, incoming, alive]() {
+    const SongList songs = EditTagLoading::LoadData(incoming, [client](const std::string &path, Song *song) {
+      return client->ReadFileBlocking(path, song);
+    });
+    auto *idle = new EditTagLoadIdle{state, songs, alive};
+    g_idle_add(+[](gpointer data) -> gboolean {
+      auto *loaded = static_cast<EditTagLoadIdle *>(data);
+      if (loaded->alive && *loaded->alive && loaded->state) {
+        ApplyLoadedSongs(loaded->state, loaded->songs);
+      }
+      delete loaded;
+      return G_SOURCE_REMOVE;
+    }, idle);
+  }).detach();
 }
 
 void PersistPlayStatistics(State *state, Song *song) {
@@ -1081,6 +1244,9 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                    nullptr);
   gtk_box_append(GTK_BOX(box), state->actions);
   adw_dialog_set_child(dialog, box);
+  state->dialog = dialog;
+  SetLoading(state, true);
   UpdateDisplay(state);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
+  StartTagLoad(state, targets);
 }

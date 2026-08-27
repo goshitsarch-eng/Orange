@@ -9,7 +9,13 @@
 #include "dialogs/edittagfieldreset.h"
 #include "dialogs/edittagfields.h"
 #include "dialogs/edittagid3v2.h"
+#include "dialogs/edittagloading.h"
 #include "dialogs/edittagtabs.h"
+#include "tagreader/tagreaderresult.h"
+#include "utilities/fileutils.h"
+
+#include <glib/gstdio.h>
+#include <unistd.h>
 #include "lyrics/lyricsproviderorder.h"
 #include "lyrics/lyricsprovidersettings.h"
 #include "tagreader/tagwriterfields.h"
@@ -452,6 +458,64 @@ TEST(EditTagFields, FetchTagsAndFieldEnableMatchQt) {
   ASSERT_EQ(1u, valid.size());
   EXPECT_EQ("Roads", valid.front().title());
   EXPECT_TRUE(EditTagFields::ValidSongs({stream}).empty());
+}
+
+TEST(EditTagLoading, FileViewPlaceholdersAndLoadDataMatchQt) {
+  const Song placeholder = EditTagLoading::PlaceholderFromPath("/tmp/roads.mp3");
+  EXPECT_TRUE(placeholder.is_valid());
+  EXPECT_EQ(Song::Source::LocalFile, placeholder.source());
+  EXPECT_EQ(Song::FileType::MPEG, placeholder.filetype());
+  EXPECT_TRUE(placeholder.IsEditable());
+  EXPECT_TRUE(placeholder.title().empty());
+  EXPECT_TRUE(EditTagLoading::OpensDialog({placeholder}));
+  EXPECT_FALSE(EditTagLoading::OpensDialog({}));
+
+  char dir_template[] = "/tmp/strawberry-edittag-XXXXXX";
+  const std::string dir = mkdtemp(dir_template);
+  const std::string audio = FileUtils::Join(dir, "song.mp3");
+  ASSERT_TRUE(FileUtils::WriteFile(audio, "audio"));
+  const SongList placeholders = EditTagLoading::PlaceholdersFromPaths({audio, dir, ""});
+  ASSERT_EQ(1u, placeholders.size());
+  EXPECT_TRUE(placeholders.front().IsEditable());
+
+  Song incoming = placeholders.front();
+  incoming.set_skipcount(3);
+  incoming.set_art_manual("/covers/dummy.jpg");
+  incoming.set_playcount(9);
+  incoming.set_rating(0.8f);
+
+  const SongList loaded = EditTagLoading::LoadData({incoming}, [&](const std::string &path, Song *song) {
+    EXPECT_EQ(audio, path);
+    song->set_valid(true);
+    song->set_title("Roads");
+    song->set_playcount(1);
+    song->set_rating(0.2f);
+    return TagReaderResult{TagReaderResult::ErrorCode::Success};
+  });
+  ASSERT_EQ(1u, loaded.size());
+  EXPECT_EQ("Roads", loaded.front().title());
+  EXPECT_EQ(1u, loaded.front().playcount());
+  EXPECT_NEAR(0.2f, loaded.front().rating(), 0.001f);
+  EXPECT_EQ(3u, loaded.front().skipcount());
+  EXPECT_EQ("/covers/dummy.jpg", loaded.front().art_manual());
+
+  Song stream(Song::Source::Tidal);
+  stream.set_valid(true);
+  stream.set_url("https://tidal.example/roads");
+  EXPECT_TRUE(EditTagLoading::LoadData({stream}, [&](const std::string &, Song *) {
+    return TagReaderResult{TagReaderResult::ErrorCode::Success};
+  }).empty());
+
+  Song invalid;
+  const SongList dropped = EditTagLoading::LoadData(placeholders, [&](const std::string &, Song *song) {
+    *song = invalid;
+    return TagReaderResult{TagReaderResult::ErrorCode::Success};
+  });
+  EXPECT_TRUE(dropped.empty());
+  EXPECT_FALSE(EditTagLoading::KeepRead(TagReaderResult{TagReaderResult::ErrorCode::Unsupported}, placeholder));
+
+  FileUtils::Remove(audio);
+  rmdir(dir.c_str());
 }
 
 TEST(EditTagCover, ChangeArtAndActionEnableMatchQt) {

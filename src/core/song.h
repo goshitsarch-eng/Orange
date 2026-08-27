@@ -252,6 +252,7 @@ class Song {
   bool is_collection_song() const { return source_ == Source::Collection; }
   bool is_local_file() const { return source_ == Source::LocalFile || source_ == Source::Collection; }
   bool IsEditable() const;
+  void MergeUserSetData(const Song &other, bool merge_playcount, bool merge_rating);
 
   int id3v2_version() const { return id3v2_version_; }
   void set_id3v2_version(int v) { id3v2_version_ = v; }

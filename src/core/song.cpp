@@ -101,6 +101,21 @@ bool Song::IsEditable() const {
   return valid_ && is_local_file() && !is_stream() && !is_cdda() && !unavailable_ && cue_path_.empty();
 }
 
+void Song::MergeUserSetData(const Song &other, bool merge_playcount, bool merge_rating) {
+  if (merge_playcount && other.playcount() > 0) {
+    set_playcount(other.playcount());
+  }
+  if (merge_rating && other.rating() > 0.0f) {
+    set_rating(other.rating());
+  }
+  set_skipcount(other.skipcount());
+  set_lastplayed(other.lastplayed());
+  set_art_manual(other.art_manual());
+  set_art_unset(other.art_unset());
+  set_compilation_on(other.compilation_on());
+  set_compilation_off(other.compilation_off());
+}
+
 Song::FileType Song::FiletypeByExtension(const std::string &extension) {
   std::string ext = extension;
   std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
