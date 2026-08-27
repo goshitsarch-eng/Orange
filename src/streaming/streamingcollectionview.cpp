@@ -25,6 +25,7 @@
 #include <vector>
 #include "widgets/filterentryapply.h"
 #include "widgets/filtersearchkeyboard.h"
+#include "widgets/listboxscrolltop.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
 #include "widgets/listboxtreepressgtk.h"
@@ -691,8 +692,9 @@ gboolean StreamingCollectionView::OnKeyPressed(guint keyval) {
       return G_SOURCE_REMOVE;
     }, this);
     const int index = ListBoxKeyboard::FirstPrefixIndex(ListBoxKeyboardGtk::Labels(list_), typeahead_);
-    if (index >= 0) {
+    if (CollectionTypeAheadScroll::ShouldScroll(index)) {
       ListBoxKeyboardGtk::SelectIndex(list_, index);
+      ListBoxScrollTop::SelectedRowToTop(list_);
     }
     return TRUE;
   }

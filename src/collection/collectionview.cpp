@@ -17,6 +17,7 @@
 #include "utilities/strutils.h"
 #include "widgets/listboxkeyboard.h"
 #include "widgets/listboxkeyboardgtk.h"
+#include "widgets/listboxscrolltop.h"
 
 #include <gdk/gdkkeysyms.h>
 
@@ -471,22 +472,7 @@ SongList CollectionView::SelectedSongs() const {
   return CollectionBehaviour::UniqueByUrl(songs);
 }
 
-void CollectionView::ScrollRowToTop(GtkWidget *row) {
-  if (!widget_ || !list_ || !row || !GTK_IS_SCROLLED_WINDOW(widget_)) {
-    return;
-  }
-  graphene_rect_t bounds;
-  if (!gtk_widget_compute_bounds(row, list_, &bounds)) {
-    return;
-  }
-  GtkAdjustment *adjust = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(widget_));
-  if (!adjust) {
-    return;
-  }
-  gtk_adjustment_set_value(adjust, CollectionTypeAheadScroll::PositionAtTop(bounds.origin.y, gtk_adjustment_get_lower(adjust),
-                                                                            gtk_adjustment_get_upper(adjust),
-                                                                            gtk_adjustment_get_page_size(adjust)));
-}
+void CollectionView::ScrollRowToTop(GtkWidget *row) { ListBoxScrollTop::RowToTop(list_, row); }
 
 void CollectionView::ResetTypeAhead() {
   typeahead_.clear();

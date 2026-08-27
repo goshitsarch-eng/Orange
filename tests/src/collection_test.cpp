@@ -1397,6 +1397,9 @@ TEST(CollectionTypeAheadScroll, PositionsMatchAtTopLikeQt) {
   EXPECT_DOUBLE_EQ(0.0, CollectionTypeAheadScroll::PositionAtTop(-10.0, 0.0, 2000.0, 400.0));
   EXPECT_DOUBLE_EQ(1600.0, CollectionTypeAheadScroll::PositionAtTop(1900.0, 0.0, 2000.0, 400.0));
   EXPECT_DOUBLE_EQ(0.0, CollectionTypeAheadScroll::PositionAtTop(50.0, 0.0, 300.0, 400.0));
+  EXPECT_TRUE(CollectionTypeAheadScroll::ShouldScroll(0));
+  EXPECT_TRUE(CollectionTypeAheadScroll::ShouldScroll(3));
+  EXPECT_FALSE(CollectionTypeAheadScroll::ShouldScroll(-1));
 }
 
 TEST(CollectionFilterFocus, EscapeClearsAndBackspaceDeletesLastLikeQt) {

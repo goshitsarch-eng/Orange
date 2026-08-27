@@ -17,6 +17,8 @@ inline double PositionAtTop(double row_y, double lower, double upper, double pag
   return ClampValue(row_y, lower, upper, page_size);
 }
 
+inline bool ShouldScroll(int matched_index) { return matched_index >= 0; }
+
 }  // namespace CollectionTypeAheadScroll
 
 #endif

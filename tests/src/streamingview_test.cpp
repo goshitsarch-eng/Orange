@@ -4,6 +4,7 @@
 #include "streaming/streamingalbum.h"
 #include "streaming/streamingcollectionactions.h"
 #include "collection/collectionfilterfocus.h"
+#include "collection/collectiontypeaheadscroll.h"
 #include "streaming/streamingcollectionfilter.h"
 #include "widgets/filtersearchkeyboard.h"
 #include "widgets/listboxkeyboard.h"
@@ -824,6 +825,14 @@ TEST(StreamingCollectionFilter, AgeRatingUntaggedDuplicatesAndText) {
   const SongList text = StreamingCollectionFilter::Apply({tagged, old, untagged, dup}, all, "wandering");
   ASSERT_EQ(1u, text.size());
   EXPECT_EQ("Wandering Star", text.front().title());
+}
+
+TEST(StreamingTypeAheadScroll, PositionsMatchAtTopLikeQt) {
+  EXPECT_TRUE(CollectionTypeAheadScroll::ForceTop(true));
+  EXPECT_FALSE(CollectionTypeAheadScroll::ForceTop(false));
+  EXPECT_TRUE(CollectionTypeAheadScroll::ShouldScroll(0));
+  EXPECT_FALSE(CollectionTypeAheadScroll::ShouldScroll(-1));
+  EXPECT_DOUBLE_EQ(180.0, CollectionTypeAheadScroll::PositionAtTop(180.0, 0.0, 1200.0, 300.0));
 }
 
 TEST(StreamingFilterFocus, TreeKeysApplyLikeQtFocusOnFilter) {
