@@ -82,6 +82,7 @@
 #include "widgets/multiloadingindicator.h"
 #include "widgets/multiloadingtext.h"
 #include "ui/statusbarstack.h"
+#include "widgets/playingcoveractivate.h"
 #include "widgets/playingwidget.h"
 #include "widgets/seekbarmode.h"
 #include "core/playeritemoptions.h"
@@ -1563,7 +1564,7 @@ void MainWindow::BuildContext() {
   cover_controller_->AttachMenu(context_view_->album_widget()->widget(), GTK_WINDOW(window_),
                                 [this]() { return app_->player()->current_song(); });
   context_view_->album_widget()->SetActivateCallback([this]() {
-    if (cover_controller_) {
+    if (cover_controller_ && PlayingCoverActivate::ShouldShow(true, 2, app_->player()->current_song().is_valid())) {
       cover_controller_->ShowCover(GTK_WINDOW(window_), app_->player()->current_song());
     }
   });
@@ -1780,13 +1781,12 @@ void MainWindow::BuildPlayerBar() {
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(cover_activate), GDK_BUTTON_PRIMARY);
   gtk_widget_add_controller(playing_widget_->cover(), GTK_EVENT_CONTROLLER(cover_activate));
   g_signal_connect(cover_activate, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint n_press, gdouble, gdouble, gpointer data) {
-                     if (n_press != 2) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     if (!self->cover_controller_ ||
+                         !PlayingCoverActivate::ShouldShow(true, n_press, self->app_->player()->current_song().is_valid())) {
                        return;
                      }
-                     auto *self = static_cast<MainWindow *>(data);
-                     if (self->cover_controller_) {
-                       self->cover_controller_->ShowCover(GTK_WINDOW(self->window_), self->app_->player()->current_song());
-                     }
+                     self->cover_controller_->ShowCover(GTK_WINDOW(self->window_), self->app_->player()->current_song());
                    }),
                    this);
   track_slider_ = std::make_unique<TrackSlider>();

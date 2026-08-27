@@ -102,6 +102,7 @@
 #include "transcoder/transcoderoptionsflac.h"
 #include "transcoder/transcoderoptionsinterface.h"
 #include "transcoder/transcoderoptionswavpack.h"
+#include "widgets/playingcoveractivate.h"
 #include "widgets/playingwidget.h"
 #include "widgets/stretchheaderview.h"
 
@@ -2118,6 +2119,16 @@ TEST(AppearanceColors, PaletteTabPlayingAndIconCss) {
   EXPECT_EQ(AppearanceSettings::kDefaultIconSizePlayControlButtons, clamped.play_controls);
   EXPECT_EQ(128, clamped.tabbar_small);
   EXPECT_NE(std::string::npos, AppearanceColors::BuildIconSizeCss(sizes).find("32px"));
+}
+
+TEST(PlayingCoverActivate, DoubleClickRequiresValidSongLikeQt) {
+  EXPECT_TRUE(PlayingCoverActivate::ShouldShow(true, 2, true));
+  EXPECT_FALSE(PlayingCoverActivate::ShouldShow(true, 2, false));
+  EXPECT_FALSE(PlayingCoverActivate::ShouldShow(true, 1, true));
+  EXPECT_FALSE(PlayingCoverActivate::ShouldShow(false, 2, true));
+  EXPECT_TRUE(PlayingCoverActivate::ShouldShowContext(true, 2, true, true));
+  EXPECT_FALSE(PlayingCoverActivate::ShouldShowContext(true, 2, true, false));
+  EXPECT_FALSE(PlayingCoverActivate::ShouldShowContext(true, 2, false, true));
 }
 
 TEST(PlayingWidget, CoverSizeAndFade) {
