@@ -19,6 +19,9 @@
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistplayrow.h"
+#include "playlist/playlistcollectionsync.h"
+#include "playlist/playlistqueuerefresh.h"
+#include "playlist/playlistremoveitemsnotinqueue.h"
 #include "playlist/playlistcoverpersist.h"
 #include "playlist/playlistdynamicadvance.h"
 #include "playlist/playlistlocalartdiscover.h"
@@ -1196,6 +1199,73 @@ TEST(PlaylistPlayRow, ResolvesCurrentThenLastPlayedThenFirst) {
   EXPECT_EQ(-1, PlaylistPlayRow::Resolve(3, 3, 0));
   EXPECT_EQ(4, PlaylistPlayRow::Remember(4, 1));
   EXPECT_EQ(1, PlaylistPlayRow::Remember(-1, 1));
+}
+
+TEST(PlaylistRemoveItemsNotInQueue, KeepsCurrentAndQueuedRows) {
+  EXPECT_TRUE(PlaylistRemoveItemsNotInQueue::KeepRow(1, 1, false));
+  EXPECT_TRUE(PlaylistRemoveItemsNotInQueue::KeepRow(2, 1, true));
+  EXPECT_FALSE(PlaylistRemoveItemsNotInQueue::KeepRow(3, 1, false));
+  const std::vector<int> rows = PlaylistRemoveItemsNotInQueue::RowsToRemove(5, 0, [](int row) { return row == 2 || row == 4; });
+  ASSERT_EQ(2u, rows.size());
+  EXPECT_EQ(1, rows[0]);
+  EXPECT_EQ(3, rows[1]);
+  const std::vector<int> all = PlaylistRemoveItemsNotInQueue::RowsToRemove(3, -1, [](int) { return false; });
+  EXPECT_EQ(3u, all.size());
+}
+
+TEST(Playlist, RepopulateDynamicKeepsQueuedRows) {
+  Playlist playlist;
+  playlist.set_id(4);
+  SmartPlaylistSearch search;
+  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "A"});
+  playlist.SetDynamic(true, search);
+  SongList songs;
+  for (int i = 0; i < 5; ++i) {
+    Song song;
+    song.set_title(std::string(1, static_cast<char>('A' + i)));
+    song.set_artist("A");
+    song.set_url("file:///" + song.title());
+    song.set_valid(true);
+    songs.push_back(song);
+  }
+  playlist.AppendSongs(songs);
+  playlist.set_current_row(0);
+  playlist.queue()->Append(playlist.song(2), 4, 2);
+  playlist.queue()->Append(playlist.song(4), 4, 4);
+  playlist.RepopulateDynamic(songs);
+  EXPECT_GE(playlist.row_count(), 3);
+  bool kept_c = false;
+  bool kept_e = false;
+  for (const Song &song : playlist.songs()) {
+    kept_c = kept_c || song.title() == "C";
+    kept_e = kept_e || song.title() == "E";
+  }
+  EXPECT_TRUE(kept_c);
+  EXPECT_TRUE(kept_e);
+}
+
+TEST(PlaylistCollectionSync, PatchesEveryOpenPlaylist) {
+  Playlist first;
+  Playlist second;
+  Song song;
+  song.set_id(12);
+  song.set_title("Roads");
+  song.set_url("file:///roads.flac");
+  song.set_valid(true);
+  first.AppendSongs({song});
+  second.AppendSongs({song});
+  Song updated = song;
+  updated.set_title("Roads (live)");
+  EXPECT_EQ(2, PlaylistCollectionSync::PatchAll({&first, &second}, {updated}));
+  EXPECT_EQ("Roads (live)", first.song(0).title());
+  EXPECT_EQ("Roads (live)", second.song(0).title());
+  Song other = song;
+  other.set_id(12);
+  other.set_directory_id(2);
+  Song existing = first.songs().front();
+  existing.set_directory_id(1);
+  EXPECT_FALSE(PlaylistCollectionSync::SameCollectionRow(existing, other));
+  EXPECT_TRUE(PlaylistQueueRefresh::ShouldRefreshPlaylistView());
 }
 
 TEST(Playlist, RemembersLastPlayedRow) {

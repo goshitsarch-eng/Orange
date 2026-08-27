@@ -6,6 +6,8 @@
 #include "engine/enginebase.h"
 #include "engine/gstenginepipeline.h"
 
+class TaskManager;
+
 #include <gst/gst.h>
 
 #include <cstdint>
@@ -60,6 +62,7 @@ class GstEngine : public EngineBase {
   void SetFadeoutPauseEnabled(bool enabled) { fadeout_pause_enabled_ = enabled; }
   void SetFadeoutPauseDurationMs(int milliseconds);
   void ReloadBackendOptions();
+  void SetTaskManager(TaskManager *task_manager) { task_manager_ = task_manager; }
   void SetCurrentAlbum(const std::string &album) { current_album_ = album; }
   void SetNextAlbum(const std::string &album) { next_album_ = album; }
   bool fading_enabled() const { return fading_enabled_; }
@@ -87,6 +90,10 @@ class GstEngine : public EngineBase {
   void ApplyCurrentVolume(double fraction);
   double VolumeFraction() const;
   GstPipelineExtras PipelineExtras() const;
+  void HandleBuffering(int percent);
+  void BufferingStarted();
+  void BufferingProgress(int percent);
+  void BufferingFinished();
 
   std::unique_ptr<GstEnginePipeline> current_;
   std::unique_ptr<GstEnginePipeline> next_;
@@ -137,6 +144,8 @@ class GstEngine : public EngineBase {
   guint fade_timeout_id_ = 0;
   bool gapless_pending_ = false;
   std::vector<int16_t> last_scope_;
+  TaskManager *task_manager_ = nullptr;
+  int buffering_task_id_ = -1;
 };
 
 #endif  // STRAWBERRY_GSTENGINE_H

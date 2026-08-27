@@ -77,6 +77,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   void RefillDynamic();
   void ExpandDynamic();
   void RepopulateDynamic();
+  void UpdateCollectionSongs(const SongList &songs);
   void TurnOffDynamic();
   void ClearCurrent() override;
   void ShuffleCurrent() override;

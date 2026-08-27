@@ -123,20 +123,16 @@ void Application::Init() {
       collection_->backend()->IncrementSkipCount(song.id());
     }
   });
+  player_->TrackEndedPlaycount.Connect([this](const Song &song) {
+    Song tagged = song;
+    tagged.set_playcount(song.playcount() + 1);
+    collection_->SongsPlaycountChanged({tagged});
+  });
   player_->PlaybackFinished.Connect([this](const Song &song, int64_t listened_nanosec) {
     Playlist *playlist = playlist_manager_->active();
     const bool already_scrobbled = playlist && playlist->scrobbled();
-    const bool played = already_scrobbled || ScrobblerEligibility::ShouldScrobble(song, listened_nanosec);
-    if (played) {
-      if (!already_scrobbled) {
-        scrobbler_->Scrobble(song);
-      }
-      if (song.id() > 0) {
-        collection_->backend()->IncrementPlayCount(song.id());
-      }
-      Song tagged = song;
-      tagged.set_playcount(song.playcount() + 1);
-      collection_->SongsPlaycountChanged({tagged});
+    if (!already_scrobbled && ScrobblerEligibility::ShouldScrobble(song, listened_nanosec)) {
+      scrobbler_->Scrobble(song);
     }
   });
   player_->ForceShowOSD.Connect([this](const Song &song) { osd_->SongChanged(song, current_albumcover_loader_->current()); });

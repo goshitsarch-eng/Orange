@@ -50,6 +50,7 @@ class CollectionBackend {
 
   Signal<SongList> SongsDiscovered;
   Signal<SongList> SongsDeleted;
+  Signal<SongList> SongsChanged;
   Signal<SongList> SongsStatisticsChanged;
   Signal<SongList> SongsRatingChanged;
   Signal<> DirectoryAdded;

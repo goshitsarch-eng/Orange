@@ -2,6 +2,7 @@
 
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionincremental.h"
+#include "playlist/playlistqueuerefresh.h"
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectionmenu.h"
@@ -1827,7 +1828,12 @@ void MainWindow::ConnectSignals() {
     if (queue_view_) {
       queue_view_->SetQueue(app_->queue());
     }
-    app_->queue()->Changed.Connect([this]() { RefreshQueue(); });
+    app_->queue()->Changed.Connect([this]() {
+      RefreshQueue();
+      if (PlaylistQueueRefresh::ShouldRefreshPlaylistView()) {
+        RefreshPlaylist();
+      }
+    });
     RefreshQueue();
     RefreshPlaylistTabs();
   });
@@ -1873,6 +1879,9 @@ void MainWindow::ConnectSignals() {
     RefreshCollection();
     ShowToast("Collection scan finished");
   });
+  app_->collection()->backend()->SongsChanged.Connect([this](const SongList &songs) {
+    ApplyCollectionIncremental(CollectionModelUpdateType::UpdateSongs, songs);
+  });
   app_->collection()->backend()->SongsDiscovered.Connect([this](const SongList &songs) {
     ApplyCollectionIncremental(CollectionModelUpdateType::AddSongs, songs);
   });
@@ -1911,7 +1920,12 @@ void MainWindow::ConnectSignals() {
       UpdateCover(data);
     }
   });
-  app_->queue()->Changed.Connect([this]() { RefreshQueue(); });
+  app_->queue()->Changed.Connect([this]() {
+    RefreshQueue();
+    if (PlaylistQueueRefresh::ShouldRefreshPlaylistView()) {
+      RefreshPlaylist();
+    }
+  });
   app_->device_manager()->DevicesChanged.Connect([this]() { RefreshDevices(); });
   app_->radio_services()->set_updated_callback([this]() { RefreshRadio(); });
   app_->waveform()->Ready.Connect([this](const std::vector<float> &) { gtk_widget_queue_draw(waveform_drawing_); });

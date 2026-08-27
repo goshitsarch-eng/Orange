@@ -1,5 +1,6 @@
 #include "engine/gstenginepipeline.h"
 
+#include "engine/enginebuffering.h"
 #include "core/logging.h"
 #include "engine/backendoptions.h"
 #include "utilities/audioanalysis.h"
@@ -20,6 +21,7 @@ GstEnginePipeline::~GstEnginePipeline() {
   if (playbin_) {
     gst_object_unref(playbin_);
     playbin_ = nullptr;
+    audioqueue_ = nullptr;
     volume_ = nullptr;
     equalizer_ = nullptr;
     panorama_ = nullptr;
@@ -77,6 +79,7 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
     GstElement *bin = gst_bin_new("audio-bin");
     GstElement *queue = gst_element_factory_make("queue", "audioqueue");
     if (queue) {
+      audioqueue_ = queue;
       g_object_set(queue, "use-buffering", TRUE, nullptr);
       const int64_t buffer_ns = BackendOptions::BufferDurationNanosec(extras.buffer_duration_ms);
       if (buffer_ns > 0) {
@@ -292,6 +295,7 @@ bool GstEnginePipeline::is_playing() const {
 
 void GstEnginePipeline::AboutToFinishCb(GstElement *, gpointer data) {
   auto *self = static_cast<GstEnginePipeline *>(data);
+  self->about_to_finish_ = true;
   if (self->AboutToFinish) {
     self->AboutToFinish(self->id_);
   }
@@ -318,6 +322,9 @@ gboolean GstEnginePipeline::BusCallback(GstBus *, GstMessage *message, gpointer 
       break;
     case GST_MESSAGE_TAG:
       self->HandleTags(message);
+      break;
+    case GST_MESSAGE_BUFFERING:
+      self->HandleBuffering(message);
       break;
     default:
       break;
@@ -385,4 +392,19 @@ void GstEnginePipeline::HandleTags(GstMessage *message) {
   if (TagsReady) {
     TagsReady(id_, song);
   }
+}
+
+void GstEnginePipeline::HandleBuffering(GstMessage *message) {
+  if (!Buffering) {
+    return;
+  }
+  if (audioqueue_ && GST_ELEMENT(GST_MESSAGE_SRC(message)) != audioqueue_) {
+    return;
+  }
+  gint percent = 0;
+  gst_message_parse_buffering(message, &percent);
+  if (EngineBuffering::IgnoreNearEnd(about_to_finish_, position_nanosec(), length_nanosec())) {
+    return;
+  }
+  Buffering(id_, percent);
 }

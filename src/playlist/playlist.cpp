@@ -5,6 +5,8 @@
 #include "playlist/playlistitemuuid.h"
 #include "playlist/dynamicplaylistmaintenance.h"
 #include "playlist/playlistdynamicadvance.h"
+#include "playlist/playlistcollectionsync.h"
+#include "playlist/playlistremoveitemsnotinqueue.h"
 #include "playlist/playlistplayrow.h"
 #include "playlist/playlistlocalartdiscover.h"
 #include "playlist/playliststopafter.h"
@@ -48,6 +50,7 @@ void Playlist::set_current_row(int row) {
     PlaylistStreamState::ClearForRowChange(current, next);
     if (PlaylistQueueDequeue::ShouldDequeue(id_, next_row, queue_)) {
       queue_.TakeNext();
+      Changed.Emit();
     }
   }
   current_row_ = next_row;
@@ -68,12 +71,13 @@ bool Playlist::PatchSongById(const Song &song) {
   }
   bool changed = false;
   for (Song &existing : songs_) {
-    if (existing.id() == song.id()) {
-      const bool skipped = existing.skipped();
-      existing = song;
-      existing.set_skipped(skipped);
-      changed = true;
+    if (!PlaylistCollectionSync::SameCollectionRow(existing, song)) {
+      continue;
     }
+    const bool skipped = existing.skipped();
+    existing = song;
+    existing.set_skipped(skipped);
+    changed = true;
   }
   if (changed) {
     Changed.Emit();
@@ -965,12 +969,15 @@ void Playlist::RepopulateDynamic(const SongList &pool) {
   if (!dynamic_) {
     return;
   }
-  std::vector<int> after;
-  for (int i = current_row_ + 1; i < row_count(); ++i) {
-    after.push_back(i);
-  }
-  if (!after.empty()) {
-    RemoveRows(after);
-  }
+  RemoveItemsNotInQueue();
   RefillDynamic(pool, true);
+}
+
+void Playlist::RemoveItemsNotInQueue() {
+  const std::vector<int> rows = PlaylistRemoveItemsNotInQueue::RowsToRemove(row_count(), current_row_, [this](int row) {
+    return queue_.ContainsPlaylistRow(id_, row);
+  });
+  if (!rows.empty()) {
+    RemoveRows(rows);
+  }
 }

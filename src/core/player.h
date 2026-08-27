@@ -64,6 +64,7 @@ class Player : public PlayerInterface {
   Signal<int64_t, int64_t> PositionChanged;
   Signal<Song> ForceShowOSD;
   Signal<Song, int64_t> PlaybackFinished;
+  Signal<Song> TrackEndedPlaycount;
   Signal<Song, int64_t, int64_t> TrackSkipped;
   Signal<> Paused;
   Signal<> Playing;

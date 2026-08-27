@@ -40,7 +40,9 @@
 #include "collection/collectiongroupingsave.h"
 #include "collection/collectionmenu.h"
 #include "collection/collectionkeyboard.h"
+#include "collection/collectionchangenotify.h"
 #include "collection/collectionincremental.h"
+#include "collection/playcountincrement.h"
 #include "collection/collectionmodel.h"
 #include "collection/collectionmodelmerge.h"
 #include "collection/collectionplaylistitem.h"
@@ -1230,6 +1232,63 @@ TEST(CollectionBackend, EmitsStatisticsAndRatingAfterUpdate) {
   EXPECT_EQ(2, stats);
   EXPECT_EQ(1, ratings);
   unlink(path.c_str());
+}
+
+TEST(CollectionChangeNotify, EmitsChangedForExistingAndDiscoveredForNew) {
+  EXPECT_TRUE(CollectionChangeNotify::ShouldEmitChanged(true));
+  EXPECT_FALSE(CollectionChangeNotify::ShouldEmitChanged(false));
+  EXPECT_TRUE(CollectionChangeNotify::ShouldEmitDiscovered(false));
+  EXPECT_FALSE(CollectionChangeNotify::ShouldEmitDiscovered(true));
+}
+
+TEST(CollectionBackend, EmitsSongsChangedOnMetadataUpdate) {
+  const std::string path = "/tmp/strawberry-collection-changed-test-" + std::to_string(getpid()) + ".db";
+  unlink(path.c_str());
+  Database db(path);
+  ASSERT_TRUE(db.Open());
+  CollectionBackend backend(&db);
+  const int directory = backend.AddDirectory("/tmp/music");
+  Song song = MakeSong("Roads", "Portishead", "Dummy");
+  song.set_directory_id(directory);
+  int discovered = 0;
+  int changed = 0;
+  backend.SongsDiscovered.Connect([&](const SongList &songs) {
+    ++discovered;
+    ASSERT_FALSE(songs.empty());
+  });
+  backend.SongsChanged.Connect([&](const SongList &songs) {
+    ++changed;
+    ASSERT_FALSE(songs.empty());
+    EXPECT_EQ("Glory Box", songs.front().title());
+  });
+  const int id = backend.AddOrUpdateSong(song);
+  ASSERT_GT(id, 0);
+  EXPECT_EQ(1, discovered);
+  EXPECT_EQ(0, changed);
+  song.set_id(id);
+  song.set_title("Glory Box");
+  EXPECT_EQ(id, backend.AddOrUpdateSong(song));
+  EXPECT_EQ(1, discovered);
+  EXPECT_EQ(1, changed);
+  unlink(path.c_str());
+}
+
+TEST(PlayCountIncrement, CollectionSongsOnlyAtTrackEnd) {
+  Song collection(Song::Source::Collection);
+  collection.set_id(8);
+  EXPECT_TRUE(PlayCountIncrement::ShouldIncrementOnTrackEnd(collection));
+  Song short_collection(Song::Source::Collection);
+  short_collection.set_id(9);
+  short_collection.set_length_nanosec(20LL * 1000000000LL);
+  EXPECT_TRUE(PlayCountIncrement::ShouldIncrementOnTrackEnd(short_collection));
+  Song local(Song::Source::LocalFile);
+  local.set_id(10);
+  EXPECT_FALSE(PlayCountIncrement::ShouldIncrementOnTrackEnd(local));
+  Song radio(Song::Source::SomaFM);
+  radio.set_id(11);
+  EXPECT_FALSE(PlayCountIncrement::ShouldIncrementOnTrackEnd(radio));
+  Song missing_id(Song::Source::Collection);
+  EXPECT_FALSE(PlayCountIncrement::ShouldIncrementOnTrackEnd(missing_id));
 }
 
 TEST(CollectionAlbumArt, PropagatesManualArtAcrossAlbum) {

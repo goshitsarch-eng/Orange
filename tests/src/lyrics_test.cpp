@@ -4,6 +4,7 @@
 #include "lyrics/lrcparser.h"
 #include "lyrics/lyricssearchscore.h"
 #include "lyrics/lyricssearchtimeout.h"
+#include "lyrics/lyricsfetcherpacing.h"
 
 #include "utilities/strutils.h"
 
@@ -86,6 +87,19 @@ TEST(LrcParser, TimestampsAndActiveLine) {
   EXPECT_EQ(12000, multi[0].timestamp_ms);
   EXPECT_EQ(45000, multi[1].timestamp_ms);
   EXPECT_EQ("Chorus", multi[0].text);
+}
+
+TEST(LyricsFetcherPacing, ConcurrentCapDelayAndNormalization) {
+  EXPECT_EQ(5, LyricsFetcherPacing::kMaxConcurrent);
+  EXPECT_EQ(500, LyricsFetcherPacing::kStarterDelayMs);
+  EXPECT_TRUE(LyricsFetcherPacing::CanStartMore(4));
+  EXPECT_FALSE(LyricsFetcherPacing::CanStartMore(5));
+  LyricsSearchRequest request;
+  request.album = "Dummy (CD 1)";
+  request.title = "Roads (Remastered)";
+  const LyricsSearchRequest normalized = LyricsFetcherPacing::Normalize(request);
+  EXPECT_EQ("Dummy", normalized.album);
+  EXPECT_EQ("Roads", normalized.title);
 }
 
 TEST(LyricsSearchTimeout, EarlyHardAndCommercialSkip) {

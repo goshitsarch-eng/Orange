@@ -1,5 +1,7 @@
 #include "collection/collectionbackend.h"
 
+#include "collection/collectionchangenotify.h"
+
 #include "collection/collectionalbumart.h"
 #include "collection/collectionartpersist.h"
 #include "collection/collectioncompilation.h"
@@ -330,6 +332,10 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
     query.Bind(38, (song.art_unset() || existing.art_unset()) ? 1 : 0);
     query.Bind(39, existing.id());
     query.Exec();
+    const Song updated = SongById(existing.id());
+    if (CollectionChangeNotify::ShouldEmitChanged(true) && updated.id() > 0) {
+      SongsChanged.Emit({updated});
+    }
     return existing.id();
   }
 
@@ -388,7 +394,12 @@ int CollectionBackend::AddOrUpdateSong(const Song &song) {
     query.BindNull(38);
   }
   query.Exec();
-  return static_cast<int>(database_->LastInsertRowId());
+  const int id = static_cast<int>(database_->LastInsertRowId());
+  const Song inserted = SongById(id);
+  if (CollectionChangeNotify::ShouldEmitDiscovered(false) && inserted.id() > 0) {
+    SongsDiscovered.Emit({inserted});
+  }
+  return id;
 }
 
 int CollectionBackend::RetainBeginnings(const std::string &url, const std::vector<int64_t> &beginnings) {

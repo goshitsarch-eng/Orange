@@ -72,6 +72,7 @@
 #include "engine/chromaprinter.h"
 #include "engine/devicefinders.h"
 #include "engine/ebur128analysis.h"
+#include "engine/enginebuffering.h"
 #include "engine/enginedevice.h"
 #include "engine/gststartup.h"
 #include "moodbar/moodbarbuilder.h"
@@ -1093,6 +1094,19 @@ TEST(DeviceFinders, OutputsAndDefaultDevice) {
   AlsaDeviceFinder alsa;
   EXPECT_EQ("alsa", alsa.name());
   EXPECT_TRUE(alsa.Initialize());
+}
+
+TEST(EngineBuffering, NearEndIgnoreAndPercentGates) {
+  EXPECT_EQ(5, EngineBuffering::kIgnoreNearEndSeconds);
+  EXPECT_EQ(100, EngineBuffering::kProgressMax);
+  EXPECT_STREQ("Buffering", EngineBuffering::TaskName());
+  EXPECT_FALSE(EngineBuffering::IgnoreNearEnd(false, 90LL * EngineBuffering::kNsecPerSec, 100LL * EngineBuffering::kNsecPerSec));
+  EXPECT_TRUE(EngineBuffering::IgnoreNearEnd(true, 97LL * EngineBuffering::kNsecPerSec, 100LL * EngineBuffering::kNsecPerSec));
+  EXPECT_FALSE(EngineBuffering::IgnoreNearEnd(true, 90LL * EngineBuffering::kNsecPerSec, 100LL * EngineBuffering::kNsecPerSec));
+  EXPECT_TRUE(EngineBuffering::ShouldStart(40, false));
+  EXPECT_FALSE(EngineBuffering::ShouldStart(40, true));
+  EXPECT_TRUE(EngineBuffering::ShouldFinish(100, true));
+  EXPECT_FALSE(EngineBuffering::ShouldFinish(100, false));
 }
 
 TEST(EngineDevice, GuessIconName) {

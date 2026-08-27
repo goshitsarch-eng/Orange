@@ -1,6 +1,8 @@
 #include "core/player.h"
 
 #include "core/playeritemoptions.h"
+#include "collection/collectionbackend.h"
+#include "collection/playcountincrement.h"
 #include "playlist/playlistplayrow.h"
 
 #include <algorithm>
@@ -41,6 +43,7 @@ Player::Player(TaskManager *task_manager, UrlHandlers *url_handlers, PlaylistMan
 Player::~Player() { CancelIntroTimeout(); }
 
 void Player::Init() {
+  engine_->SetTaskManager(task_manager_);
   engine_->Init();
   engine_->StateChanged.Connect([this](EngineBase::State state) { HandleEngineState(state); });
   engine_->TrackEnded.Connect([this]() { HandleTrackEnded(); });
@@ -660,6 +663,12 @@ void Player::HandleTrackEnded() {
   if (preloaded_) {
     preloaded_ = false;
     return;
+  }
+  if (PlayCountIncrement::ShouldIncrementOnTrackEnd(current_song_)) {
+    if (playlist_manager_ && playlist_manager_->collection_backend()) {
+      playlist_manager_->collection_backend()->IncrementPlayCount(current_song_.id());
+    }
+    TrackEndedPlaycount.Emit(current_song_);
   }
   FinishCurrentPlayback();
   const PlaylistSequence::RepeatMode repeat = playlist_manager_ && playlist_manager_->active()

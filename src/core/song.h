@@ -273,6 +273,7 @@ class Song {
   static std::string SourceToString(Source source);
   static std::string FiletypeToString(FileType type);
   static std::string AlbumRemoveDiscMisc(const std::string &album);
+  static std::string TitleRemoveMisc(const std::string &title);
   static const char *TextSearchColumnsSql();
 
  private:

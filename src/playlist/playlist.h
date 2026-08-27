@@ -100,6 +100,7 @@ class Playlist {
   void RefillDynamic(const SongList &pool, bool force = false);
   void ExpandDynamic(const SongList &pool);
   void RepopulateDynamic(const SongList &pool);
+  void RemoveItemsNotInQueue();
   void ApplyDiscoveredArt(const Song &playing, const std::string &discovered);
   void set_stop_after_row(int row);
   void ToggleStopAfter(int row);

@@ -1,5 +1,7 @@
 #include "engine/gstengine.h"
 
+#include "core/taskmanager.h"
+#include "engine/enginebuffering.h"
 #include "constants/backendsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
@@ -16,6 +18,7 @@ GstEngine::GstEngine() = default;
 GstEngine::~GstEngine() {
   CancelFade();
   DiscardNext();
+  BufferingFinished();
   current_.reset();
 }
 
@@ -154,6 +157,7 @@ void GstEngine::WirePipeline(GstEnginePipeline *pipeline) {
     }
     MetadataReceived.Emit(tagged);
   };
+  pipeline->Buffering = [this](int, int percent) { HandleBuffering(percent); };
 }
 
 void GstEngine::StartPreloading(const std::string &media_url, const std::string &stream_url, bool, int64_t beginning_offset_nanosec,
@@ -251,6 +255,7 @@ void GstEngine::Stop(bool) {
   pending_pause_ = false;
   CancelFade();
   DiscardNext();
+  BufferingFinished();
   if (current_) {
     current_->Stop();
   }
@@ -481,4 +486,40 @@ void GstEngine::SetState(State state) {
   }
   state_ = state;
   StateChanged.Emit(state);
+}
+
+void GstEngine::HandleBuffering(int percent) {
+  if (EngineBuffering::ShouldStart(percent, buffering_task_id_ != -1)) {
+    BufferingStarted();
+  }
+  if (buffering_task_id_ != -1) {
+    BufferingProgress(percent);
+  }
+  if (EngineBuffering::ShouldFinish(percent, buffering_task_id_ != -1)) {
+    BufferingFinished();
+  }
+}
+
+void GstEngine::BufferingStarted() {
+  if (!task_manager_) {
+    return;
+  }
+  if (buffering_task_id_ != -1) {
+    task_manager_->SetTaskFinished(buffering_task_id_);
+  }
+  buffering_task_id_ = task_manager_->StartTask(EngineBuffering::TaskName());
+  task_manager_->SetTaskProgress(buffering_task_id_, 0, EngineBuffering::kProgressMax);
+}
+
+void GstEngine::BufferingProgress(int percent) {
+  if (task_manager_ && buffering_task_id_ != -1) {
+    task_manager_->SetTaskProgress(buffering_task_id_, percent, EngineBuffering::kProgressMax);
+  }
+}
+
+void GstEngine::BufferingFinished() {
+  if (task_manager_ && buffering_task_id_ != -1) {
+    task_manager_->SetTaskFinished(buffering_task_id_);
+  }
+  buffering_task_id_ = -1;
 }

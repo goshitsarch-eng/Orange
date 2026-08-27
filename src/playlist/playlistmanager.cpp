@@ -1,6 +1,7 @@
 #include "playlist/playlistmanager.h"
 
 #include "collection/collectionbackend.h"
+#include "playlist/playlistcollectionsync.h"
 #include "playlist/playlistcrossundopair.h"
 #include "playlist/playlistsaveschedule.h"
 #include "constants/playlistsettings.h"
@@ -25,7 +26,16 @@ PlaylistManager::PlaylistManager(TaskManager *task_manager, TagReader *tagreader
 
 PlaylistManager::~PlaylistManager() { FlushPendingSaves(); }
 
-void PlaylistManager::Init() { LoadAll(); }
+void PlaylistManager::Init() {
+  LoadAll();
+  if (collection_backend_) {
+    collection_backend_->SongsChanged.Connect([this](const SongList &songs) { UpdateCollectionSongs(songs); });
+    collection_backend_->SongsStatisticsChanged.Connect([this](const SongList &songs) { UpdateCollectionSongs(songs); });
+    collection_backend_->SongsRatingChanged.Connect([this](const SongList &songs) { UpdateCollectionSongs(songs); });
+  }
+}
+
+void PlaylistManager::UpdateCollectionSongs(const SongList &songs) { PlaylistCollectionSync::PatchAll(GetAllPlaylists(), songs); }
 
 void PlaylistManager::LoadAll() {
   playlists_.clear();

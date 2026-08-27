@@ -65,10 +65,12 @@ class GstEnginePipeline {
   std::function<void(int, const std::string &)> ErrorOccurred;
   std::function<void(int, const std::vector<int16_t> &)> SpectrumReady;
   std::function<void(int, const Song &)> TagsReady;
+  std::function<void(int, int)> Buffering;
 
  private:
   static gboolean BusCallback(GstBus *bus, GstMessage *message, gpointer data);
   static void AboutToFinishCb(GstElement *playbin, gpointer data);
+  void HandleBuffering(GstMessage *message);
   GstElement *MakeAudioSink(const std::string &output, const std::string &device) const;
   void CancelWarmup();
   void HandleSpectrum(GstMessage *message);
@@ -78,6 +80,7 @@ class GstEnginePipeline {
   int id_ = 0;
   std::string url_;
   GstElement *playbin_ = nullptr;
+  GstElement *audioqueue_ = nullptr;
   GstElement *volume_ = nullptr;
   GstElement *equalizer_ = nullptr;
   GstElement *panorama_ = nullptr;
@@ -92,6 +95,7 @@ class GstEnginePipeline {
   std::string proxy_user_;
   std::string proxy_pass_;
   int device_warmup_ms_ = 0;
+  bool about_to_finish_ = false;
 };
 
 #endif  // STRAWBERRY_GSTENGINEPIPELINE_H

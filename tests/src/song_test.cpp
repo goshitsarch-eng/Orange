@@ -90,6 +90,12 @@ TEST(Song, AlbumRemoveDiscMisc) {
   EXPECT_EQ("Dummy", Song::AlbumRemoveDiscMisc("Dummy (Explicit)"));
 }
 
+TEST(Song, TitleRemoveMisc) {
+  EXPECT_EQ("Roads", Song::TitleRemoveMisc("Roads (Remastered)"));
+  EXPECT_EQ("Roads", Song::TitleRemoveMisc("Roads [Explicit]"));
+  EXPECT_EQ("Roads", Song::TitleRemoveMisc("Roads"));
+}
+
 TEST(Song, EqualityByUrl) {
   Song a;
   a.set_url("file:///tmp/a.flac");

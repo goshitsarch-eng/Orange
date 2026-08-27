@@ -1,3 +1,4 @@
+#include "playlist/playlistcollectionsync.h"
 #include "playlist/playlistmanager.h"
 #include "playlist/playlistbackend.h"
 #include "playlist/playlistdelegates.h"
@@ -327,6 +328,27 @@ TEST(PlaylistManager, UndoCrossMoveRestoresBoth) {
   EXPECT_EQ("A", source->song(0).title());
   EXPECT_EQ("B", source->song(1).title());
   EXPECT_EQ("C", source->song(2).title());
+}
+
+TEST(PlaylistManager, UpdateCollectionSongsPatchesAllPlaylists) {
+  PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
+  manager.Init();
+  Playlist *first = manager.current();
+  ASSERT_NE(nullptr, first);
+  Song song;
+  song.set_id(21);
+  song.set_title("Roads");
+  song.set_url("file:///roads.flac");
+  song.set_valid(true);
+  first->AppendSongs({song});
+  Playlist *second = manager.New("Second");
+  ASSERT_NE(nullptr, second);
+  second->AppendSongs({song});
+  Song updated = song;
+  updated.set_artist("Portishead");
+  manager.UpdateCollectionSongs({updated});
+  EXPECT_EQ("Portishead", first->song(0).artist());
+  EXPECT_EQ("Portishead", second->song(0).artist());
 }
 
 TEST(PlaylistManager, EachPlaylistKeepsItsOwnQueue) {
