@@ -645,6 +645,11 @@ TEST(PlaylistTabBarVisibility, HidesSinglePlaylistAndAnimates500Ms) {
   EXPECT_EQ(0, PlaylistTabBarVisibility::HeightAt(500, 40, false));
 }
 
+TEST(PlaylistTabMenu, FocusLossCancelsInlineRename) {
+  EXPECT_FALSE(PlaylistTabMenu::ShouldCommitRenameOnFocusLoss());
+  EXPECT_TRUE(PlaylistTabMenu::ShouldApplyRename("Inbox", "Shows"));
+}
+
 TEST(PlaylistTabMenu, KeyboardUsesCurrentTab) {
   EXPECT_TRUE(PlaylistTabMenu::IsKeyboardTrigger(PlaylistTabMenu::kMenu, 0));
   EXPECT_TRUE(PlaylistTabMenu::IsKeyboardTrigger(PlaylistTabMenu::kF10, PlaylistTabMenu::kShiftMask));
