@@ -8,6 +8,7 @@
 #include "streaming/streamingsearchopts.h"
 #include "spotify/spotifyfavoriterequest.h"
 #include "spotify/spotifymetadatarequest.h"
+#include "spotify/spotifyplayback.h"
 #include "spotify/spotifyrequest.h"
 #include "streaming/streamingmediaid.h"
 #include "utilities/jsonutils.h"
@@ -245,9 +246,20 @@ void SpotifyService::GetAlbumSongs(const Song &album, SearchCallback callback) {
 UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallback callback) {
   LoadResult result;
   result.media_url = url;
-  const std::string id = StreamingMediaId(url);
+  std::string id = SpotifyPlayback::TrackId(url);
+  if (id.empty()) {
+    id = StreamingMediaId(url);
+  }
+  if (SpotifyPlayback::UseNativePlayback(url, SpotifyPlayback::PluginAvailable(), !token_.empty()) &&
+      StreamingAuth::EnsureAction(login_time_, expires_in_, refresh_token_) == StreamingAuth::Action::Proceed) {
+    result = SpotifyPlayback::NativeResult(url);
+    if (callback) {
+      callback(result);
+    }
+    return result;
+  }
   if (!network_ || id.empty()) {
-    result.error = "Spotify is not signed in";
+    result.error = token_.empty() ? "Spotify is not signed in" : "Spotify track URL is missing";
     if (callback) {
       callback(result);
     }
@@ -262,6 +274,12 @@ UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallbac
       async.type = LoadResult::Type::Error;
       if (callback) {
         callback(async);
+      }
+      return;
+    }
+    if (SpotifyPlayback::UseNativePlayback(url, SpotifyPlayback::PluginAvailable(), true)) {
+      if (callback) {
+        callback(SpotifyPlayback::NativeResult(url));
       }
       return;
     }

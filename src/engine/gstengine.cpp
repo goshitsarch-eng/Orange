@@ -4,6 +4,7 @@
 #include "engine/enginebuffering.h"
 #include "engine/gstengineerror.h"
 #include "constants/backendsettings.h"
+#include "constants/spotifysettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
 #include "core/networkproxyfactory.h"
@@ -93,6 +94,26 @@ void GstEngine::ReloadBackendOptions() {
   proxy_authentication_ = engine_proxy.authentication;
   proxy_user_ = engine_proxy.user;
   proxy_pass_ = engine_proxy.pass;
+  ReloadSpotifyAccessToken();
+}
+
+void GstEngine::ReloadSpotifyAccessToken() {
+  Settings settings;
+  settings.BeginGroup(SpotifySettings::kSettingsGroup);
+  std::string token = settings.Value(SpotifySettings::kAccessToken);
+  if (token.empty()) {
+    token = settings.Value("token");
+  }
+  UpdateSpotifyAccessToken(token);
+}
+
+void GstEngine::SetSpotifyAccessToken() {
+  if (current_) {
+    current_->set_spotify_access_token(spotify_access_token_);
+  }
+  if (next_) {
+    next_->set_spotify_access_token(spotify_access_token_);
+  }
 }
 
 double GstEngine::VolumeFraction() const { return BackendOptions::VolumeFraction(volume_percent_, volume_exponential_); }
@@ -116,6 +137,7 @@ GstPipelineExtras GstEngine::PipelineExtras() const {
   extras.buffer_low_watermark = buffer_low_watermark_;
   extras.buffer_high_watermark = buffer_high_watermark_;
   extras.device_warmup_ms = BackendOptions::WarmupMs(!current_, static_cast<int>(device_warmup_ms_));
+  extras.spotify_access_token = spotify_access_token_;
   return extras;
 }
 

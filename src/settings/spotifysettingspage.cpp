@@ -6,6 +6,7 @@
 #include "settings/settingspage.h"
 #include "settings/streaminglogincontrols.h"
 #include "settings/streamingsettingslabels.h"
+#include "spotify/spotifyplayback.h"
 #include "spotify/spotifyservice.h"
 #include "ui/dialogs.h"
 
@@ -35,7 +36,7 @@ AdwPreferencesPage *SpotifySettingsPage::Create(Settings *settings, Application 
         return;
       }
       auto *oauth = new OAuthenticator(app->network());
-      oauth->AuthorizeInBrowser("https://accounts.spotify.com/authorize", client_id, "user-read-private user-read-email",
+      oauth->AuthorizeInBrowser("https://accounts.spotify.com/authorize", client_id, SpotifyPlayback::kOAuthScope,
                                 [app, oauth, button](const std::string &code, const std::string &error) {
                                   if (code.empty()) {
                                     (void)error;

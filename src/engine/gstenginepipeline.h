@@ -28,6 +28,7 @@ struct GstPipelineExtras {
   double buffer_low_watermark = 0.33;
   double buffer_high_watermark = 0.99;
   int device_warmup_ms = 0;
+  std::string spotify_access_token;
 };
 
 class GstEnginePipeline {
@@ -54,6 +55,7 @@ class GstEnginePipeline {
   void SetEqualizer(int preamp, const std::vector<int> &band_gains);
   void SetStereoBalance(float value);
   void SetNextUri(const std::string &url);
+  void set_spotify_access_token(const std::string &token) { spotify_access_token_ = token; }
 
   int64_t position_nanosec() const;
   int64_t length_nanosec() const;
@@ -95,6 +97,7 @@ class GstEnginePipeline {
   std::string proxy_user_;
   std::string proxy_pass_;
   int device_warmup_ms_ = 0;
+  std::string spotify_access_token_;
   bool about_to_finish_ = false;
 };
 

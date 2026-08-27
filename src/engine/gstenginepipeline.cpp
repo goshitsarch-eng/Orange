@@ -58,6 +58,7 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
   proxy_user_ = extras.proxy_user;
   proxy_pass_ = extras.proxy_pass;
   device_warmup_ms_ = extras.device_warmup_ms;
+  spotify_access_token_ = extras.spotify_access_token;
   url_ = url;
   if (playbin3) {
     playbin_ = gst_element_factory_make("playbin3", "playbin");
@@ -163,6 +164,10 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
                            g_object_class_find_property(G_OBJECT_GET_CLASS(source), "proxy-pw")) {
                          g_object_set(source, "proxy-id", self->proxy_user_.c_str(), "proxy-pw", self->proxy_pass_.c_str(), nullptr);
                        }
+                     }
+                     if (!self->spotify_access_token_.empty() &&
+                         g_object_class_find_property(G_OBJECT_GET_CLASS(source), "access-token")) {
+                       g_object_set(source, "access-token", self->spotify_access_token_.c_str(), nullptr);
                      }
                    })),
                    this);

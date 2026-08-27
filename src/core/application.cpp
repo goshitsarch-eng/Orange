@@ -17,6 +17,11 @@
 #include "tidal/tidalservice.h"
 #include "utilities/fileutils.h"
 
+#include "config.h"
+#ifdef HAVE_SPOTIFY
+#include "spotify/spotifyservice.h"
+#endif
+
 Application::Application()
     : task_manager_(std::make_unique<TaskManager>()),
       database_(std::make_unique<Database>()),
@@ -70,6 +75,13 @@ void Application::Init() {
   playlist_manager_->Init();
   playlist_manager_->set_tagreader_client(tagreader_client_.get());
   player_->Init();
+#ifdef HAVE_SPOTIFY
+  if (auto *spotify = dynamic_cast<SpotifyService *>(streaming_services_->ServiceByName("Spotify"))) {
+    auto push_token = [this, spotify]() { player_->engine()->UpdateSpotifyAccessToken(spotify->access_token()); };
+    spotify->AuthenticationChanged.Connect(push_token);
+    push_token();
+  }
+#endif
   BindPlayerQueue();
   playlist_manager_->CurrentChanged.Connect([this](Playlist *) { BindPlayerQueue(); });
   playlist_manager_->ActiveChanged.Connect([this](Playlist *) { BindPlayerQueue(); });

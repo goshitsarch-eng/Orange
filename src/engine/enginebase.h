@@ -41,6 +41,10 @@ class EngineBase {
   virtual int64_t length_nanosec() const = 0;
   virtual const Scope &scope() const { return scope_; }
 
+  // Qt EngineBase::UpdateSpotifyAccessToken — stored for spotifyaudiosrc access-token.
+  void UpdateSpotifyAccessToken(const std::string &token);
+  const std::string &spotify_access_token() const { return spotify_access_token_; }
+
   Signal<State> StateChanged;
   Signal<int64_t, int64_t> PositionChanged;
   Signal<> TrackEnded;
@@ -52,7 +56,10 @@ class EngineBase {
   Signal<Song> MetadataReceived;
 
  protected:
+  virtual void SetSpotifyAccessToken() {}
+
   Scope scope_;
+  std::string spotify_access_token_;
 };
 
 #endif

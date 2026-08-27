@@ -9,6 +9,7 @@
 #include "qobuz/qobuzstreamurlrequest.h"
 #include "qobuz/qobuzurlhandler.h"
 #include "spotify/spotifymetadatarequest.h"
+#include "spotify/spotifyplayback.h"
 #include "spotify/spotifyservice.h"
 #include "subsonic/subsonicservice.h"
 #include "subsonic/subsonicurlhandler.h"
@@ -158,6 +159,30 @@ TEST(QobuzMetadataRequest, ParsesTrackGet) {
   EXPECT_EQ(1, song.disc());
   EXPECT_EQ(300000000000LL, song.length_nanosec());
   EXPECT_EQ(1994, song.year());
+}
+
+TEST(SpotifyPlayback, UsesNativeUriWhenPluginAndTokenPresent) {
+  EXPECT_TRUE(SpotifyPlayback::IsSpotifyUrl("spotify://abc"));
+  EXPECT_TRUE(SpotifyPlayback::IsSpotifyUrl("spotify:track:abc"));
+  EXPECT_FALSE(SpotifyPlayback::IsSpotifyUrl("https://open.spotify.com/track/abc"));
+  EXPECT_EQ("abc", SpotifyPlayback::TrackId("spotify://abc"));
+  EXPECT_EQ("abc", SpotifyPlayback::TrackId("spotify:track:abc"));
+  EXPECT_EQ("spotify://abc", SpotifyPlayback::CanonicalPlayUrl("spotify:track:abc"));
+  EXPECT_EQ("spotify://abc", SpotifyPlayback::CanonicalPlayUrl("spotify://abc"));
+  EXPECT_TRUE(SpotifyPlayback::UseNativePlayback("spotify://abc", true, true));
+  EXPECT_FALSE(SpotifyPlayback::UseNativePlayback("spotify://abc", false, true));
+  EXPECT_FALSE(SpotifyPlayback::UseNativePlayback("spotify://abc", true, false));
+  EXPECT_FALSE(SpotifyPlayback::UseNativePlayback("https://p.mp3", true, true));
+  EXPECT_EQ("spotify://abc", SpotifyPlayback::EffectivePlayUrl("spotify://abc", "https://p.mp3", true, true));
+  EXPECT_EQ("https://p.mp3", SpotifyPlayback::EffectivePlayUrl("spotify://abc", "https://p.mp3", false, true));
+  const auto result = SpotifyPlayback::NativeResult("spotify:track:abc");
+  EXPECT_EQ(UrlHandler::LoadResult::Type::TrackAvailable, result.type);
+  EXPECT_EQ("spotify:track:abc", result.media_url);
+  EXPECT_EQ("spotify://abc", result.stream_url);
+  EXPECT_TRUE(SpotifyPlayback::ShouldSetAccessToken("tok", true));
+  EXPECT_FALSE(SpotifyPlayback::ShouldSetAccessToken("", true));
+  EXPECT_FALSE(SpotifyPlayback::ShouldSetAccessToken("tok", false));
+  EXPECT_NE(std::string::npos, std::string(SpotifyPlayback::kOAuthScope).find("streaming"));
 }
 
 TEST(SpotifyMetadataRequest, ParsesTrackAndArtistGenre) {

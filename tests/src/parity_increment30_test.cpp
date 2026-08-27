@@ -212,6 +212,8 @@ TEST(EngineBase, DummyImplementation) {
   EngineBase *base = &engine;
   EXPECT_TRUE(base->Init());
   EXPECT_EQ(EngineBase::State::Idle, base->state());
+  base->UpdateSpotifyAccessToken("tok");
+  EXPECT_EQ("tok", base->spotify_access_token());
 }
 
 TEST(Transliterate, DelegatesToStrUtils) {

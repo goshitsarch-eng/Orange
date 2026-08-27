@@ -62,6 +62,7 @@ class GstEngine : public EngineBase {
   void SetFadeoutPauseEnabled(bool enabled) { fadeout_pause_enabled_ = enabled; }
   void SetFadeoutPauseDurationMs(int milliseconds);
   void ReloadBackendOptions();
+  void ReloadSpotifyAccessToken();
   void SetTaskManager(TaskManager *task_manager) { task_manager_ = task_manager; }
   void SetCurrentAlbum(const std::string &album) { current_album_ = album; }
   void SetNextAlbum(const std::string &album) { next_album_ = album; }
@@ -95,6 +96,7 @@ class GstEngine : public EngineBase {
   void BufferingStarted();
   void BufferingProgress(int percent);
   void BufferingFinished();
+  void SetSpotifyAccessToken() override;
 
   std::unique_ptr<GstEnginePipeline> current_;
   std::unique_ptr<GstEnginePipeline> next_;

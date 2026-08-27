@@ -21,6 +21,7 @@
 #include "constants/waveformsettings.h"
 #include "core/appearancestyle.h"
 #include "settings/backendoutputchoices.h"
+#include "spotify/spotifyplayback.h"
 #include "settings/behaviourstartupchoices.h"
 #include "settings/networkproxylabels.h"
 #include "settings/settingscontrols.h"
@@ -613,6 +614,7 @@ TEST(StreamingSettingsLabels, SubsonicCopyAndConnectionCheck) {
   EXPECT_STREQ("Basic authentication", SpotifySettingsLabels::BasicAuth());
   EXPECT_STREQ("Authenticate", SpotifySettingsLabels::Authenticate());
   EXPECT_STREQ("spotifyaudiosrc", SpotifySettingsLabels::PluginFeature());
+  EXPECT_NE(std::string::npos, std::string(SpotifyPlayback::kOAuthScope).find("streaming"));
   EXPECT_NE(std::string::npos, SpotifySettingsLabels::PluginWarningMarkup().find(SpotifySettingsLabels::PluginWikiUrl()));
   EXPECT_STREQ("Radios", RadioSettingsLabels::PageTitle());
   EXPECT_STREQ("Stream quality:", RadioSettingsLabels::StreamQuality());
