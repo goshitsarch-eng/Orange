@@ -5,6 +5,7 @@
 #include "core/loadurl.h"
 #include "core/network.h"
 #include "core/songloadremote.h"
+#include "core/songloadsort.h"
 #include "core/songloadtypefind.h"
 #include "core/urlhandlers.h"
 #include "device/cddasongloader.h"
@@ -368,6 +369,10 @@ void SongLoader::LoadLocalDirectory(const std::string &path) {
     if (PlaylistParser::IsPlaylist(entry) || Song::IsAudioFile(entry)) {
       LoadLocal(entry);
     }
+  }
+  SongLoadSort::StableSort(songs_);
+  if (!songs_.empty()) {
+    EffectiveSongLoad(&songs_.front());
   }
 }
 

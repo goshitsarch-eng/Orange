@@ -1,5 +1,6 @@
 #include "core/songloader.h"
 #include "core/songloadremote.h"
+#include "core/songloadsort.h"
 #include "core/songloadtypefind.h"
 #include "core/urlhandlers.h"
 #include "playlistparsers/playlistparser.h"
@@ -154,6 +155,44 @@ TEST(SongLoader, PlaylistFile) {
   unlink(path.c_str());
 }
 
+TEST(SongLoadSort, OrdersByArtistAlbumDiscTrackThenUrl) {
+  Song later;
+  later.set_artist("B");
+  later.set_album("Z");
+  later.set_disc(2);
+  later.set_track(9);
+  later.set_url("file:///z.flac");
+  Song earlier;
+  earlier.set_artist("A");
+  earlier.set_album("Z");
+  earlier.set_disc(2);
+  earlier.set_track(9);
+  earlier.set_url("file:///z.flac");
+  EXPECT_TRUE(SongLoadSort::LessThan(earlier, later));
+  EXPECT_FALSE(SongLoadSort::LessThan(later, earlier));
+  Song same_artist;
+  same_artist.set_artist("A");
+  same_artist.set_album("A");
+  same_artist.set_disc(1);
+  same_artist.set_track(1);
+  same_artist.set_url("file:///b.flac");
+  Song same_album_later_track = same_artist;
+  same_album_later_track.set_track(2);
+  same_album_later_track.set_url("file:///a.flac");
+  EXPECT_TRUE(SongLoadSort::LessThan(same_artist, same_album_later_track));
+  SongList songs = {later, same_album_later_track, earlier, same_artist};
+  SongLoadSort::StableSort(songs);
+  ASSERT_EQ(4u, songs.size());
+  EXPECT_EQ("A", songs[0].artist());
+  EXPECT_EQ("A", songs[0].album());
+  EXPECT_EQ(1, songs[0].track());
+  EXPECT_EQ("A", songs[1].artist());
+  EXPECT_EQ(2, songs[1].track());
+  EXPECT_EQ("A", songs[2].artist());
+  EXPECT_EQ("Z", songs[2].album());
+  EXPECT_EQ("B", songs[3].artist());
+}
+
 TEST(SongLoader, DirectoryRequiresBlockingLoad) {
   const std::string dir = TempDir();
   const std::string file = FileUtils::Join(dir, "track.flac");
@@ -164,6 +203,23 @@ TEST(SongLoader, DirectoryRequiresBlockingLoad) {
   ASSERT_EQ(1u, loader.songs().size());
   EXPECT_TRUE(loader.songs().front().is_valid());
   FileUtils::Remove(file);
+  rmdir(dir.c_str());
+}
+
+TEST(SongLoader, DirectoryImportSortsByUrlWhenTagsEmpty) {
+  const std::string dir = TempDir();
+  const std::string later = FileUtils::Join(dir, "z-track.flac");
+  const std::string earlier = FileUtils::Join(dir, "a-track.flac");
+  ASSERT_TRUE(FileUtils::WriteFile(later, "not-really-flac"));
+  ASSERT_TRUE(FileUtils::WriteFile(earlier, "not-really-flac"));
+  SongLoader loader(nullptr, nullptr, nullptr);
+  EXPECT_EQ(SongLoader::Result::BlockingLoadRequired, loader.Load(dir));
+  EXPECT_EQ(SongLoader::Result::Success, loader.LoadFilenamesBlocking());
+  ASSERT_EQ(2u, loader.songs().size());
+  EXPECT_EQ(FileUtils::UriFromPath(earlier), loader.songs().front().url());
+  EXPECT_EQ(FileUtils::UriFromPath(later), loader.songs().back().url());
+  FileUtils::Remove(later);
+  FileUtils::Remove(earlier);
   rmdir(dir.c_str());
 }
 
