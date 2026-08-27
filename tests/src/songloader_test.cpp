@@ -1,4 +1,5 @@
 #include "core/songloader.h"
+#include "core/songloadremote.h"
 #include "core/urlhandlers.h"
 #include "playlistparsers/playlistparser.h"
 #include "utilities/fileutils.h"
@@ -48,8 +49,93 @@ TEST(SongLoader, RawStreamSucceeds) {
 
 TEST(SongLoader, LoadManyStreams) {
   SongLoader loader(nullptr, nullptr, nullptr);
-  EXPECT_EQ(SongLoader::Result::Success, loader.LoadMany({"https://a.example/x", "https://b.example/y"}));
+  EXPECT_EQ(SongLoader::Result::Success, loader.LoadMany({"https://a.example/x.mp3", "https://b.example/y.flac"}));
   EXPECT_EQ(2u, loader.songs().size());
+}
+
+TEST(SongLoader, RemotePolicyClassifiesProbeVsStream) {
+  EXPECT_EQ(SongLoadRemote::Kind::RawStream, SongLoadRemote::Classify("rtsp://example.com/live"));
+  EXPECT_EQ(SongLoadRemote::Kind::RawStream, SongLoadRemote::Classify("https://example.com/stream.mp3"));
+  EXPECT_EQ(SongLoadRemote::Kind::RawStream, SongLoadRemote::Classify("https://example.com/stream.mp3?token=1"));
+  EXPECT_EQ(SongLoadRemote::Kind::Probe, SongLoadRemote::Classify("https://example.com/radio.m3u"));
+  EXPECT_EQ(SongLoadRemote::Kind::Probe, SongLoadRemote::Classify("https://example.com/radio.m3u8?id=2"));
+  EXPECT_EQ(SongLoadRemote::Kind::Probe, SongLoadRemote::Classify("https://example.com/list.pls"));
+  EXPECT_EQ(SongLoadRemote::Kind::Probe, SongLoadRemote::Classify("https://example.com/list.xspf"));
+  EXPECT_EQ(SongLoadRemote::Kind::Probe, SongLoadRemote::Classify("https://example.com/list.asx"));
+  EXPECT_EQ(SongLoadRemote::Kind::Probe, SongLoadRemote::Classify("https://cdn.example/noext"));
+  EXPECT_TRUE(SongLoadRemote::ShouldAddAsRawStream("https://example.com/stream.mp3"));
+  EXPECT_FALSE(SongLoadRemote::ShouldAddAsRawStream("https://example.com/radio.m3u"));
+}
+
+TEST(SongLoader, RemotePlaylistRequiresBlockingLoad) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  EXPECT_EQ(SongLoader::Result::BlockingLoadRequired, loader.Load("https://example.com/radio.m3u"));
+  EXPECT_TRUE(loader.songs().empty());
+  EXPECT_EQ(SongLoader::Result::BlockingLoadRequired, loader.Load("https://cdn.example/unknown"));
+  EXPECT_EQ(SongLoader::Result::BlockingLoadRequired, loader.LoadMany({"https://a.example/x.mp3", "https://b.example/y.m3u"}));
+}
+
+TEST(SongLoader, LoadRemoteFromDataExpandsM3U) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  const std::string body =
+      "#EXTM3U\n"
+      "#EXTINF:180,Fleet Foxes - White Winter Hymnal\n"
+      "https://example.com/white-winter-hymnal.mp3\n"
+      "#EXTINF:240,Bon Iver - Holocene\n"
+      "https://example.com/holocene.mp3\n";
+  EXPECT_EQ(SongLoader::Result::Success, loader.LoadRemoteFromData("https://example.com/radio.m3u", body));
+  ASSERT_EQ(2u, loader.songs().size());
+  EXPECT_EQ("https://example.com/white-winter-hymnal.mp3", loader.songs()[0].url());
+  EXPECT_EQ("White Winter Hymnal", loader.songs()[0].title());
+  EXPECT_EQ("Fleet Foxes", loader.songs()[0].artist());
+  EXPECT_EQ("https://example.com/holocene.mp3", loader.songs()[1].url());
+  EXPECT_EQ("radio.m3u", loader.playlist_name());
+}
+
+TEST(SongLoader, LoadRemoteFromDataExpandsXspfAndPls) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  const std::string xspf =
+      "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+      "<playlist version=\"1\" xmlns=\"http://xspf.org/ns/0/\">\n"
+      "  <trackList>\n"
+      "    <track>\n"
+      "      <location>https://example.com/a.mp3</location>\n"
+      "      <title>Track A</title>\n"
+      "      <creator>Artist A</creator>\n"
+      "    </track>\n"
+      "  </trackList>\n"
+      "</playlist>\n";
+  EXPECT_EQ(SongLoader::Result::Success, loader.LoadRemoteFromData("https://example.com/list.xspf", xspf));
+  ASSERT_EQ(1u, loader.songs().size());
+  EXPECT_EQ("https://example.com/a.mp3", loader.songs().front().url());
+  EXPECT_EQ("Track A", loader.songs().front().title());
+  EXPECT_EQ("Artist A", loader.songs().front().artist());
+
+  SongLoader pls_loader(nullptr, nullptr, nullptr);
+  const std::string pls =
+      "[playlist]\n"
+      "NumberOfEntries=1\n"
+      "File1=https://example.com/radio.mp3\n"
+      "Title1=SomaFM Groove\n";
+  EXPECT_EQ(SongLoader::Result::Success, pls_loader.LoadRemoteFromData("https://example.com/radio.pls", pls));
+  ASSERT_EQ(1u, pls_loader.songs().size());
+  EXPECT_EQ("https://example.com/radio.mp3", pls_loader.songs().front().url());
+  EXPECT_EQ("SomaFM Groove", pls_loader.songs().front().title());
+}
+
+TEST(SongLoader, LoadRemoteFromDataUnknownBecomesRawStream) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  EXPECT_EQ(SongLoader::Result::Success, loader.LoadRemoteFromData("https://cdn.example/unknown", "ID3notaplaylist binary data"));
+  ASSERT_EQ(1u, loader.songs().size());
+  EXPECT_EQ("https://cdn.example/unknown", loader.songs().front().url());
+  EXPECT_TRUE(loader.songs().front().is_valid());
+}
+
+TEST(SongLoader, LoadRemoteFromDataEmptyPlaylistIsError) {
+  SongLoader loader(nullptr, nullptr, nullptr);
+  EXPECT_EQ(SongLoader::Result::Error, loader.LoadRemoteFromData("https://example.com/empty.m3u", "#EXTM3U\n"));
+  EXPECT_TRUE(loader.songs().empty());
+  EXPECT_FALSE(loader.errors().empty());
 }
 
 TEST(SongLoader, PlaylistFile) {

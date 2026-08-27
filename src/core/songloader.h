@@ -25,6 +25,7 @@ class SongLoader {
   Result LoadFilenamesBlocking();
   void LoadMetadataBlocking();
   Result LoadAudioCD();
+  Result LoadRemoteFromData(const std::string &url, const std::string &data);
 
   const SongList &songs() const { return songs_; }
   const std::string &playlist_name() const { return playlist_name_; }
@@ -32,6 +33,7 @@ class SongLoader {
 
  private:
   Result LoadLocal(const std::string &path);
+  Result LoadRemote(const std::string &url);
   void LoadLocalDirectory(const std::string &path);
   void LoadPlaylistFile(const std::string &path);
   void LoadAudioFile(const std::string &path);
@@ -45,6 +47,7 @@ class SongLoader {
   std::string playlist_name_;
   std::vector<std::string> errors_;
   std::vector<std::string> pending_paths_;
+  std::vector<std::string> pending_remote_urls_;
 };
 
 #endif

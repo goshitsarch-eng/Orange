@@ -3,12 +3,17 @@
 #include "collection/collectionbackend.h"
 #include "core/commandlineurl.h"
 #include "core/loadurl.h"
+#include "core/network.h"
+#include "core/songloadremote.h"
 #include "core/urlhandlers.h"
 #include "device/cddasongloader.h"
+#include "playlistparsers/parserbase.h"
 #include "playlistparsers/playlistparser.h"
 #include "tagreader/tagreader.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
+
+#include <glib-object.h>
 
 SongLoader::SongLoader(UrlHandlers *url_handlers, CollectionBackend *collection_backend, TagReader *tagreader)
     : url_handlers_(url_handlers), collection_backend_(collection_backend), tagreader_(tagreader) {}
@@ -40,8 +45,12 @@ SongLoader::Result SongLoader::Load(const std::string &url) {
   if (CommandlineUrl::IsLocalFile(url)) {
     return LoadLocal(CommandlineUrl::LocalPath(url));
   }
-  AddRawStream(url);
-  return Result::Success;
+  if (SongLoadRemote::ShouldAddAsRawStream(url)) {
+    AddRawStream(url);
+    return Result::Success;
+  }
+  pending_remote_urls_.push_back(url);
+  return Result::BlockingLoadRequired;
 }
 
 SongLoader::Result SongLoader::LoadMany(const std::vector<std::string> &urls) {
@@ -56,7 +65,7 @@ SongLoader::Result SongLoader::LoadMany(const std::vector<std::string> &urls) {
       error = true;
     }
   }
-  if (blocking || !pending_paths_.empty()) {
+  if (blocking || !pending_paths_.empty() || !pending_remote_urls_.empty()) {
     return Result::BlockingLoadRequired;
   }
   if (songs_.empty()) {
@@ -75,6 +84,11 @@ SongLoader::Result SongLoader::LoadFilenamesBlocking() {
       LoadLocal(path);
     }
   }
+  const std::vector<std::string> remotes = pending_remote_urls_;
+  pending_remote_urls_.clear();
+  for (const std::string &url : remotes) {
+    LoadRemote(url);
+  }
   return songs_.empty() ? Result::Error : Result::Success;
 }
 
@@ -82,6 +96,43 @@ void SongLoader::LoadMetadataBlocking() {
   for (Song &song : songs_) {
     EffectiveSongLoad(&song);
   }
+}
+
+SongLoader::Result SongLoader::LoadRemote(const std::string &url) {
+  NetworkAccessManager network;
+  constexpr guint kRemoteTimeoutSec = 5;
+  g_object_set(network.session(), "timeout", kRemoteTimeoutSec, nullptr);
+  const NetworkAccessManager::Response response = network.GetSync(url);
+  if (!response.ok()) {
+    errors_.push_back(response.error.empty() ? ("Failed to retrieve " + url) : response.error);
+    return Result::Error;
+  }
+  return LoadRemoteFromData(url, response.body);
+}
+
+SongLoader::Result SongLoader::LoadRemoteFromData(const std::string &url, const std::string &data) {
+  PlaylistParser parser;
+  ParserBase *found = parser.ParserForExtension(SongLoadRemote::Extension(url));
+  if (!found) {
+    found = parser.ParserForMagic(data);
+  }
+  SongList loaded;
+  if (found) {
+    loaded = found->Load(data, url);
+  }
+  if (!loaded.empty()) {
+    if (playlist_name_.empty()) {
+      playlist_name_ = FileUtils::BaseName(SongLoadRemote::PathWithoutQuery(url));
+    }
+    songs_.insert(songs_.end(), loaded.begin(), loaded.end());
+    return Result::Success;
+  }
+  if (SongLoadRemote::LooksLikePlaylist(url)) {
+    errors_.push_back("Failed to parse playlist: " + url);
+    return Result::Error;
+  }
+  AddRawStream(url);
+  return Result::Success;
 }
 
 SongLoader::Result SongLoader::LoadAudioCD() {
