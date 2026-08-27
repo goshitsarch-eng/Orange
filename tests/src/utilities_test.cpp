@@ -1067,6 +1067,17 @@ TEST(EqualizerPersist, SelectedPresetAndStereoBalancer) {
   EXPECT_EQ("Custom", eq.selected_preset());
   EXPECT_EQ(0, eq.EffectivePreamp());
   EXPECT_EQ(std::vector<int>(10, 0), eq.EffectiveGains());
+  eq.LoadPreset("Rock");
+  EXPECT_TRUE(eq.HasPreset("Rock"));
+  EXPECT_TRUE(eq.MatchesPreset("Rock"));
+  EXPECT_FALSE(EqualizerPersist::ShouldPromptSave(eq.HasPreset("Rock"), eq.MatchesPreset("Rock")));
+  eq.set_gain(0, 12);
+  EXPECT_EQ("Rock", eq.selected_preset());
+  EXPECT_FALSE(eq.MatchesPreset("Rock"));
+  EXPECT_TRUE(EqualizerPersist::ShouldPromptSave(eq.HasPreset("Rock"), eq.MatchesPreset("Rock")));
+  EXPECT_FALSE(EqualizerPersist::ShouldPromptSave(false, false));
+  EXPECT_TRUE(EqualizerPersist::GainsMatch({1, 2}, {1, 2}));
+  EXPECT_FALSE(EqualizerPersist::GainsMatch({1, 2}, {2, 1}));
 }
 
 TEST(Analyzer, Types) {
@@ -1954,6 +1965,9 @@ TEST(WindowGeometry, ClampsAndMapsStartup) {
   EXPECT_EQ(2, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Remember), false));
   EXPECT_EQ(3, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Hide), false));
   EXPECT_EQ(5, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::ShowMinimized), true));
+  EXPECT_EQ(WindowGeometry::AfterHide::Minimize, WindowGeometry::RestoreAfterHide(true, true));
+  EXPECT_EQ(WindowGeometry::AfterHide::Maximize, WindowGeometry::RestoreAfterHide(true, false));
+  EXPECT_EQ(WindowGeometry::AfterHide::Show, WindowGeometry::RestoreAfterHide(false, false));
 }
 
 TEST(MainWindowMenu, MatchesQtDailyActionLabels) {

@@ -24,6 +24,8 @@ class Equalizer {
   void LoadPreset(const std::string &name);
   bool SavePreset(const std::string &name);
   bool DeletePreset(const std::string &name);
+  bool HasPreset(const std::string &name) const;
+  bool MatchesPreset(const std::string &name) const;
   bool IsBuiltin(const std::string &name) const;
   std::vector<std::string> Presets() const;
   static std::vector<std::string> BuiltinPresetNames();

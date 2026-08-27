@@ -227,6 +227,9 @@ TEST(SeekbarModeMenu, LabelsAndCycleMatchQt) {
   EXPECT_TRUE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Moodbar));
   EXPECT_FALSE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Normal));
   EXPECT_STREQ("Moodbar style", SeekbarModeMenu::StyleSubmenuTitle());
+  EXPECT_TRUE(SeekbarModeMenu::IsKeyboardTrigger(SeekbarModeMenu::kMenu, 0));
+  EXPECT_TRUE(SeekbarModeMenu::IsKeyboardTrigger(SeekbarModeMenu::kF10, SeekbarModeMenu::kShiftMask));
+  EXPECT_FALSE(SeekbarModeMenu::IsKeyboardTrigger(SeekbarModeMenu::kF10, 0));
 }
 
 TEST(SeekbarFade, StateMachineMatchesQtTimeline) {

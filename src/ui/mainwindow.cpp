@@ -273,6 +273,7 @@ MainWindow::~MainWindow() {
 
 void MainWindow::Present() {
   gtk_window_present(GTK_WINDOW(window_));
+  RestoreAfterHide();
   if (app_ && app_->shortcuts()) {
     app_->shortcuts()->Raise();
   }
@@ -598,6 +599,7 @@ void MainWindow::BuildUi() {
                      settings.BeginGroup(BehaviourSettings::kSettingsGroup);
                      if (settings.BoolValue(BehaviourSettings::kKeepRunning, BehaviourSettings::kDefaultKeepRunning) &&
                          self->app_->tray()->available()) {
+                       self->RememberHiddenWindowState();
                        gtk_widget_set_visible(GTK_WIDGET(self->window_), FALSE);
                        return TRUE;
                      }
@@ -618,6 +620,7 @@ void MainWindow::BuildUi() {
   });
   app_->tray()->ShowHide.Connect([this]() {
     if (gtk_widget_get_visible(GTK_WIDGET(window_))) {
+      RememberHiddenWindowState();
       gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
     } else {
       Present();
@@ -1871,6 +1874,28 @@ void MainWindow::BuildPlayerBar() {
   attach_seek(moodbar_drawing_, true);
   attach_seek(waveform_drawing_, true);
   attach_seek(track_slider_->slider()->widget(), false);
+  auto attach_seek_keys = [this](GtkWidget *widget) {
+    if (!widget) {
+      return;
+    }
+    gtk_widget_set_focusable(widget, TRUE);
+    GtkEventController *keys = gtk_event_controller_key_new();
+    gtk_widget_add_controller(widget, keys);
+    g_signal_connect(keys, "key-pressed",
+                     G_CALLBACK((+[](GtkEventControllerKey *controller, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                       if (!SeekbarModeMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+                         return FALSE;
+                       }
+                       GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+                       static_cast<MainWindow *>(data)->ShowSeekbarMenu(widget);
+                       return TRUE;
+                     })),
+                     this);
+  };
+  attach_seek_keys(moodbar_drawing_);
+  attach_seek_keys(waveform_drawing_);
+  attach_seek_keys(track_slider_->slider()->widget());
+  attach_seek_keys(track_slider_->widget());
   GtkGesture *slider_box_menu = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(slider_box_menu), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(track_slider_->widget(), GTK_EVENT_CONTROLLER(slider_box_menu));
@@ -2880,8 +2905,39 @@ void MainWindow::ClearPlaylist() {
   RefreshPlaylist();
 }
 
+void MainWindow::RememberHiddenWindowState() {
+  if (!window_) {
+    return;
+  }
+  was_maximized_ = gtk_window_is_maximized(GTK_WINDOW(window_)) == TRUE;
+  was_minimized_ = false;
+  if (GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window_))) {
+    if (GDK_IS_TOPLEVEL(surface)) {
+      was_minimized_ = (gdk_toplevel_get_state(GDK_TOPLEVEL(surface)) & GDK_TOPLEVEL_STATE_MINIMIZED) != 0;
+    }
+  }
+}
+
+void MainWindow::RestoreAfterHide() {
+  if (!window_) {
+    return;
+  }
+  switch (WindowGeometry::RestoreAfterHide(was_maximized_, was_minimized_)) {
+    case WindowGeometry::AfterHide::Maximize:
+      gtk_window_maximize(GTK_WINDOW(window_));
+      break;
+    case WindowGeometry::AfterHide::Minimize:
+      gtk_window_minimize(GTK_WINDOW(window_));
+      break;
+    case WindowGeometry::AfterHide::Show:
+    default:
+      break;
+  }
+}
+
 void MainWindow::HideToTray() {
   if (app_->tray() && app_->tray()->available()) {
+    RememberHiddenWindowState();
     SaveGeometry();
     gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
   }

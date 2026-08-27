@@ -24,6 +24,19 @@ State Clamp(State state);
 State FromValues(int width, int height, bool maximized);
 int StartupAction(int startup_behaviour, bool remembered_maximized);
 
+// Qt MainWindow::hideEvent remembers maximized/minimized so tray restore can match.
+enum class AfterHide { Show, Maximize, Minimize };
+
+inline AfterHide RestoreAfterHide(bool was_maximized, bool was_minimized) {
+  if (was_minimized) {
+    return AfterHide::Minimize;
+  }
+  if (was_maximized) {
+    return AfterHide::Maximize;
+  }
+  return AfterHide::Show;
+}
+
 }  // namespace WindowGeometry
 
 #endif

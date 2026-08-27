@@ -199,6 +199,8 @@ class MainWindow {
   static gboolean OnSeekbarFadeTick(gpointer data);
   void SetMoodbarStyle(MoodbarSettings::Style style);
   void ShowSeekbarMenu(GtkWidget *relative);
+  void RememberHiddenWindowState();
+  void RestoreAfterHide();
   void OnSeekbarScroll(double dy);
   void SeekFromBar(double x, int width);
   void SetShowSidebar(bool show);
@@ -297,6 +299,8 @@ class MainWindow {
   std::shared_ptr<bool> metadata_alive_ = std::make_shared<bool>(true);
   bool refreshing_devices_ = false;
   bool sponsor_prompted_ = false;
+  bool was_maximized_ = false;
+  bool was_minimized_ = false;
   bool playlists_loaded_ = false;
   bool has_pending_options_ = false;
   CommandlineOptions pending_options_;
