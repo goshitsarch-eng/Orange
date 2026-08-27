@@ -3910,7 +3910,8 @@ void MainWindow::ShowInFileBrowser(const std::vector<std::string> &urls_or_paths
 }
 
 SongList MainWindow::SongsFromFilePaths(const std::vector<std::string> &paths) const {
-  return FileViewSongs::FromPaths(paths, [this](const std::string &path) { return app_->tagreader()->ReadFile(path); });
+  return FileViewSongs::FromPaths(FileViewMenu::ExpandPaths(paths),
+                                 [this](const std::string &path) { return app_->tagreader()->ReadFile(path); });
 }
 
 void MainWindow::CopyFileViewToCollection(const std::vector<std::string> &paths, bool move) {

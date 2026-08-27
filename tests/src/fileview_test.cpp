@@ -222,6 +222,56 @@ TEST(FileViewMenu, PlaylistActionsMatchQt) {
   EXPECT_EQ(audio, expanded[1]);
 }
 
+TEST(FileViewMenu, ExpandPathsRecursesNestedAlbums) {
+  const std::string album = TempDir();
+  const std::string cd1 = FileUtils::Join(album, "CD1");
+  const std::string cd2 = FileUtils::Join(album, "CD2");
+  ASSERT_EQ(0, mkdir(cd1.c_str(), 0755));
+  ASSERT_EQ(0, mkdir(cd2.c_str(), 0755));
+  const std::string a = FileUtils::Join(cd1, "a.flac");
+  const std::string b = FileUtils::Join(cd2, "b.flac");
+  const std::string cover = FileUtils::Join(album, "cover.jpg");
+  const std::string playlist = FileUtils::Join(album, "set.m3u");
+  const std::string notes = FileUtils::Join(album, "notes.txt");
+  ASSERT_TRUE(FileUtils::WriteFile(a, "a"));
+  ASSERT_TRUE(FileUtils::WriteFile(b, "b"));
+  ASSERT_TRUE(FileUtils::WriteFile(cover, "cover"));
+  ASSERT_TRUE(FileUtils::WriteFile(playlist, "#EXTM3U\n"));
+  ASSERT_TRUE(FileUtils::WriteFile(notes, "notes"));
+
+  EXPECT_TRUE(FileViewMenu::IsLoadableFile(a));
+  EXPECT_TRUE(FileViewMenu::IsLoadableFile(playlist));
+  EXPECT_FALSE(FileViewMenu::IsLoadableFile(cover));
+  EXPECT_FALSE(FileViewMenu::IsLoadableFile(notes));
+
+  const std::vector<std::string> collected = FileViewMenu::CollectLoadablePaths(album);
+  ASSERT_EQ(3u, collected.size());
+  EXPECT_NE(std::find(collected.begin(), collected.end(), a), collected.end());
+  EXPECT_NE(std::find(collected.begin(), collected.end(), b), collected.end());
+  EXPECT_NE(std::find(collected.begin(), collected.end(), playlist), collected.end());
+  EXPECT_EQ(std::find(collected.begin(), collected.end(), cover), collected.end());
+  EXPECT_EQ(std::find(collected.begin(), collected.end(), notes), collected.end());
+
+  const std::vector<std::string> expanded = FileViewMenu::ExpandPaths({album, notes, playlist});
+  ASSERT_EQ(4u, expanded.size());
+  EXPECT_EQ(1, std::count(expanded.begin(), expanded.end(), a));
+  EXPECT_EQ(1, std::count(expanded.begin(), expanded.end(), b));
+  EXPECT_EQ(2, std::count(expanded.begin(), expanded.end(), playlist));
+  EXPECT_EQ(0, std::count(expanded.begin(), expanded.end(), notes));
+
+  const SongList songs = FileViewSongs::FromPaths(FileViewMenu::ExpandPaths({album}));
+  ASSERT_EQ(3u, songs.size());
+
+  FileUtils::Remove(a);
+  FileUtils::Remove(b);
+  FileUtils::Remove(cover);
+  FileUtils::Remove(playlist);
+  FileUtils::Remove(notes);
+  rmdir(cd1.c_str());
+  rmdir(cd2.c_str());
+  rmdir(album.c_str());
+}
+
 TEST(FileViewHistory, BackForwardAndTruncate) {
   FileViewHistory history;
   EXPECT_FALSE(history.CanBack());

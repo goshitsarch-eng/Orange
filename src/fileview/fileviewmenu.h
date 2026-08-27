@@ -3,6 +3,8 @@
 
 #include "collection/collectionbehaviour.h"
 #include "constants/behavioursettings.h"
+#include "core/song.h"
+#include "playlistparsers/playlistparser.h"
 #include "utilities/fileutils.h"
 
 #include <cstring>
@@ -64,22 +66,35 @@ inline CollectionBehaviour::Plan PlanFor(Action action, BehaviourSettings::PlayB
   }
 }
 
+// Qt File View selection goes through SongLoader::LoadLocalDirectory, which walks every subdirectory.
+inline bool IsLoadableFile(const std::string &path) {
+  return PlaylistParser::IsPlaylist(path) || Song::IsAudioFile(path);
+}
+
+inline std::vector<std::string> CollectLoadablePaths(const std::string &path) {
+  if (path.empty()) {
+    return {};
+  }
+  if (FileUtils::IsDirectory(path)) {
+    std::vector<std::string> files;
+    for (const std::string &entry : FileUtils::ListDirectoryRecursive(path)) {
+      if (IsLoadableFile(entry)) {
+        files.push_back(entry);
+      }
+    }
+    return files;
+  }
+  if (IsLoadableFile(path)) {
+    return {path};
+  }
+  return {};
+}
+
 inline std::vector<std::string> ExpandPaths(const std::vector<std::string> &paths) {
   std::vector<std::string> files;
   for (const std::string &path : paths) {
-    if (path.empty()) {
-      continue;
-    }
-    if (FileUtils::IsDirectory(path)) {
-      const std::vector<std::string> children = FileUtils::ListDirectory(path);
-      for (const std::string &child : children) {
-        if (!FileUtils::IsDirectory(child)) {
-          files.push_back(child);
-        }
-      }
-    } else {
-      files.push_back(path);
-    }
+    const std::vector<std::string> collected = CollectLoadablePaths(path);
+    files.insert(files.end(), collected.begin(), collected.end());
   }
   return files;
 }
