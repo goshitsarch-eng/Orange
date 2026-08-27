@@ -8,15 +8,18 @@
 
 namespace SmartPlaylistTermValue {
 
-enum class Editor { Empty, RelativeDays, Calendar, Rating, Time, Number, Text };
+enum class Editor { Empty, RelativeDays, RelativeRange, Calendar, Rating, Time, Number, Text };
 
 // Qt SmartPlaylistSearchTermWidget::FieldChanged picks the value stack page from field type and operator.
 inline Editor EditorFor(SmartPlaylistFieldKind kind, SmartPlaylistOp op) {
   if (op == SmartPlaylistOp::Empty || op == SmartPlaylistOp::NotEmpty) {
     return Editor::Empty;
   }
-  if (op == SmartPlaylistOp::RelativeDate) {
+  if (op == SmartPlaylistOp::RelativeDate || op == SmartPlaylistOp::NumericDateNot) {
     return Editor::RelativeDays;
+  }
+  if (op == SmartPlaylistOp::RelativeRange) {
+    return Editor::RelativeRange;
   }
   if (kind == SmartPlaylistFieldKind::Date || op == SmartPlaylistOp::NumericDate) {
     return Editor::Calendar;

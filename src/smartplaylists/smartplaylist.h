@@ -54,8 +54,12 @@ enum class SmartPlaylistOp {
   Empty,
   NotEmpty,
   NumericDate,
-  RelativeDate
+  RelativeDate,
+  NumericDateNot,
+  RelativeRange
 };
+
+enum class SmartPlaylistDateType { Hour = 0, Day, Week, Month, Year };
 
 enum class SmartPlaylistFieldKind { Text, Number, Date, Rating, Time };
 
@@ -63,6 +67,8 @@ struct SmartPlaylistTerm {
   SmartPlaylistField field = SmartPlaylistField::Title;
   SmartPlaylistOp op = SmartPlaylistOp::Contains;
   std::string value;
+  std::string second_value;
+  SmartPlaylistDateType date_type = SmartPlaylistDateType::Day;
   bool Matches(const Song &song) const;
   bool IsValid() const;
 };

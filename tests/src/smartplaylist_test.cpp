@@ -11,6 +11,7 @@
 #include "smartplaylists/smartplaylisttermrow.h"
 #include "smartplaylists/smartplaylisttermvalue.h"
 #include "smartplaylists/smartplaylisttagcompleter.h"
+#include "smartplaylists/smartplaylistdateunits.h"
 #include "smartplaylists/smartplaylistquerywizardpluginsearchpage.h"
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
@@ -207,15 +208,17 @@ TEST(SmartPlaylist, FieldAndOpIndex) {
   EXPECT_EQ(SmartPlaylistField::Title, SmartPlaylistSearch::FieldFromIndex(0));
   EXPECT_EQ(SmartPlaylistField::InitialKey, SmartPlaylistSearch::FieldFromIndex(static_cast<int>(SmartPlaylistSearch::FieldNames().size()) - 1));
   EXPECT_EQ(SmartPlaylistOp::Contains, SmartPlaylistSearch::OpFromIndex(0));
-  EXPECT_EQ(SmartPlaylistOp::RelativeDate, SmartPlaylistSearch::OpFromIndex(static_cast<int>(SmartPlaylistSearch::OpNames().size()) - 1));
+  EXPECT_EQ(SmartPlaylistOp::RelativeRange, SmartPlaylistSearch::OpFromIndex(static_cast<int>(SmartPlaylistSearch::OpNames().size()) - 1));
   EXPECT_EQ(SmartPlaylistSearch::FieldNames().size(), 29u);
-  EXPECT_EQ(SmartPlaylistSearch::OpNames().size(), 12u);
+  EXPECT_EQ(SmartPlaylistSearch::OpNames().size(), 14u);
   EXPECT_EQ(SmartPlaylistFieldKind::Date, SmartPlaylistSearch::KindOf(SmartPlaylistField::LastPlayed));
   EXPECT_EQ(SmartPlaylistFieldKind::Number, SmartPlaylistSearch::KindOf(SmartPlaylistField::Year));
   EXPECT_EQ(SmartPlaylistFieldKind::Text, SmartPlaylistSearch::KindOf(SmartPlaylistField::Artist));
   const auto date_ops = SmartPlaylistSearch::OperatorsFor(SmartPlaylistField::DateCreated);
   EXPECT_NE(date_ops.end(), std::find(date_ops.begin(), date_ops.end(), SmartPlaylistOp::NumericDate));
   EXPECT_NE(date_ops.end(), std::find(date_ops.begin(), date_ops.end(), SmartPlaylistOp::RelativeDate));
+  EXPECT_NE(date_ops.end(), std::find(date_ops.begin(), date_ops.end(), SmartPlaylistOp::NumericDateNot));
+  EXPECT_NE(date_ops.end(), std::find(date_ops.begin(), date_ops.end(), SmartPlaylistOp::RelativeRange));
 }
 
 TEST(SmartPlaylist, DateAndLengthOperators) {
@@ -256,6 +259,62 @@ TEST(SmartPlaylist, DateAndLengthOperators) {
   EXPECT_TRUE(length.Matches(long_song));
   length.value = "400";
   EXPECT_FALSE(length.Matches(long_song));
+}
+
+TEST(SmartPlaylistDateUnits, NamesCutoffsAndRangeMatchQt) {
+  EXPECT_STREQ("Hours", SmartPlaylistDateUnits::Name(SmartPlaylistDateType::Hour));
+  EXPECT_STREQ("Days", SmartPlaylistDateUnits::Name(SmartPlaylistDateType::Day));
+  EXPECT_STREQ("Weeks", SmartPlaylistDateUnits::Name(SmartPlaylistDateType::Week));
+  EXPECT_STREQ("Months", SmartPlaylistDateUnits::Name(SmartPlaylistDateType::Month));
+  EXPECT_STREQ("Years", SmartPlaylistDateUnits::Name(SmartPlaylistDateType::Year));
+  EXPECT_STREQ("weeks", SmartPlaylistDateUnits::QueryName(SmartPlaylistDateType::Week));
+  EXPECT_EQ(SmartPlaylistDateType::Day, SmartPlaylistDateUnits::FromIndex(-1));
+  EXPECT_EQ(SmartPlaylistDateType::Week, SmartPlaylistDateUnits::FromIndex(2));
+  EXPECT_EQ(3600, SmartPlaylistDateUnits::SecondsFor(SmartPlaylistDateType::Hour, 1));
+  EXPECT_EQ(7 * 86400, SmartPlaylistDateUnits::SecondsFor(SmartPlaylistDateType::Week, 1));
+
+  const int64_t now = static_cast<int64_t>(std::time(nullptr));
+  Song two_days;
+  two_days.set_valid(true);
+  two_days.set_lastplayed(now - 2 * 86400);
+  SmartPlaylistTerm weeks;
+  weeks.field = SmartPlaylistField::LastPlayed;
+  weeks.op = SmartPlaylistOp::RelativeDate;
+  weeks.value = "1";
+  weeks.date_type = SmartPlaylistDateType::Week;
+  EXPECT_TRUE(weeks.Matches(two_days));
+  weeks.date_type = SmartPlaylistDateType::Hour;
+  EXPECT_FALSE(weeks.Matches(two_days));
+
+  SmartPlaylistTerm not_last;
+  not_last.field = SmartPlaylistField::LastPlayed;
+  not_last.op = SmartPlaylistOp::NumericDateNot;
+  not_last.value = "1";
+  not_last.date_type = SmartPlaylistDateType::Day;
+  EXPECT_TRUE(not_last.Matches(two_days));
+  not_last.value = "7";
+  EXPECT_FALSE(not_last.Matches(two_days));
+
+  SmartPlaylistTerm between;
+  between.field = SmartPlaylistField::LastPlayed;
+  between.op = SmartPlaylistOp::RelativeRange;
+  between.value = "1";
+  between.second_value = "7";
+  between.date_type = SmartPlaylistDateType::Day;
+  EXPECT_TRUE(between.Matches(two_days));
+  between.value = "3";
+  EXPECT_FALSE(between.Matches(two_days));
+  EXPECT_TRUE(between.IsValid());
+  between.second_value = "1";
+  EXPECT_FALSE(between.IsValid());
+
+  SmartPlaylistSearch search;
+  search.terms.push_back(weeks);
+  const std::string blob = search.Serialize();
+  SmartPlaylistSearch parsed;
+  ASSERT_TRUE(SmartPlaylistSearch::Parse(blob, &parsed));
+  ASSERT_EQ(1u, parsed.terms.size());
+  EXPECT_EQ(SmartPlaylistDateType::Hour, parsed.terms[0].date_type);
 }
 
 TEST(PlaylistGenerator, CreateQueryRoundTripAndInsert) {
@@ -556,6 +615,8 @@ TEST(SmartPlaylistTermValue, EditorsAndDateTimeMatchQt) {
   EXPECT_EQ(Editor::Empty, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Text, SmartPlaylistOp::Empty));
   EXPECT_EQ(Editor::Empty, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Rating, SmartPlaylistOp::NotEmpty));
   EXPECT_EQ(Editor::RelativeDays, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Date, SmartPlaylistOp::RelativeDate));
+  EXPECT_EQ(Editor::RelativeDays, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Date, SmartPlaylistOp::NumericDateNot));
+  EXPECT_EQ(Editor::RelativeRange, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Date, SmartPlaylistOp::RelativeRange));
   EXPECT_EQ(Editor::Calendar, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Date, SmartPlaylistOp::NumericDate));
   EXPECT_EQ(Editor::Calendar, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Date, SmartPlaylistOp::GreaterThan));
   EXPECT_EQ(Editor::Rating, SmartPlaylistTermValue::EditorFor(SmartPlaylistFieldKind::Rating, SmartPlaylistOp::Equals));

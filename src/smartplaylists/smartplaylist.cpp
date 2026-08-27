@@ -2,6 +2,7 @@
 
 #include "collection/collectionbackend.h"
 #include "core/settings.h"
+#include "smartplaylists/smartplaylistdateunits.h"
 #include "utilities/fileutils.h"
 #include "utilities/strutils.h"
 
@@ -165,8 +166,8 @@ std::vector<SmartPlaylistOp> SmartPlaylistSearch::OperatorsFor(SmartPlaylistFiel
       return {SmartPlaylistOp::Equals, SmartPlaylistOp::NotEquals, SmartPlaylistOp::GreaterThan, SmartPlaylistOp::LessThan,
               SmartPlaylistOp::Empty, SmartPlaylistOp::NotEmpty};
     case SmartPlaylistFieldKind::Date:
-      return {SmartPlaylistOp::NumericDate, SmartPlaylistOp::RelativeDate, SmartPlaylistOp::GreaterThan, SmartPlaylistOp::LessThan,
-              SmartPlaylistOp::Empty, SmartPlaylistOp::NotEmpty};
+      return {SmartPlaylistOp::NumericDate, SmartPlaylistOp::RelativeDate, SmartPlaylistOp::NumericDateNot, SmartPlaylistOp::RelativeRange,
+              SmartPlaylistOp::GreaterThan, SmartPlaylistOp::LessThan, SmartPlaylistOp::Empty, SmartPlaylistOp::NotEmpty};
     case SmartPlaylistFieldKind::Text:
     default:
       return {SmartPlaylistOp::Contains, SmartPlaylistOp::NotContains, SmartPlaylistOp::Equals, SmartPlaylistOp::NotEquals,
@@ -199,7 +200,11 @@ std::string SmartPlaylistSearch::OpName(SmartPlaylistOp op) {
     case SmartPlaylistOp::NumericDate:
       return "On date";
     case SmartPlaylistOp::RelativeDate:
-      return "In the last (days)";
+      return "In the last";
+    case SmartPlaylistOp::NumericDateNot:
+      return "Not in the last";
+    case SmartPlaylistOp::RelativeRange:
+      return "Between";
   }
   return "Contains";
 }
@@ -242,9 +247,17 @@ bool SmartPlaylistTerm::Matches(const Song &song) const {
       return have >= wanted_day && have < wanted_day + 86400;
     }
     case SmartPlaylistOp::RelativeDate: {
-      const int64_t days = std::max<int64_t>(0, static_cast<int64_t>(wanted));
-      const int64_t have = static_cast<int64_t>(number);
-      return have > 0 && have >= static_cast<int64_t>(std::time(nullptr)) - days * 86400;
+      const int64_t count = std::max<int64_t>(0, static_cast<int64_t>(wanted));
+      return SmartPlaylistDateUnits::InTheLast(static_cast<int64_t>(number), date_type, count);
+    }
+    case SmartPlaylistOp::NumericDateNot: {
+      const int64_t count = std::max<int64_t>(0, static_cast<int64_t>(wanted));
+      return SmartPlaylistDateUnits::NotInTheLast(static_cast<int64_t>(number), date_type, count);
+    }
+    case SmartPlaylistOp::RelativeRange: {
+      const int64_t first = std::max<int64_t>(0, static_cast<int64_t>(wanted));
+      const int64_t second = std::max<int64_t>(0, static_cast<int64_t>(std::strtod(second_value.c_str(), nullptr)));
+      return SmartPlaylistDateUnits::Between(static_cast<int64_t>(number), date_type, first, second);
     }
   }
   return false;
@@ -255,8 +268,13 @@ bool SmartPlaylistTerm::IsValid() const {
     return true;
   }
   const SmartPlaylistFieldKind kind = SmartPlaylistSearch::KindOf(field);
-  if (op == SmartPlaylistOp::RelativeDate) {
+  if (op == SmartPlaylistOp::RelativeDate || op == SmartPlaylistOp::NumericDateNot) {
     return std::strtoll(value.c_str(), nullptr, 10) >= 0;
+  }
+  if (op == SmartPlaylistOp::RelativeRange) {
+    const int64_t first = std::strtoll(value.c_str(), nullptr, 10);
+    const int64_t second = std::strtoll(second_value.c_str(), nullptr, 10);
+    return first >= 0 && first < second;
   }
   if (kind == SmartPlaylistFieldKind::Date || op == SmartPlaylistOp::NumericDate) {
     return SmartPlaylistSearch::ParseDateValue(value) != 0;
@@ -346,7 +364,7 @@ std::vector<std::string> SmartPlaylistSearch::FieldNames() {
 
 std::vector<std::string> SmartPlaylistSearch::OpNames() {
   return {"Contains", "Not contains", "Equals", "Greater than", "Less than", "Starts with", "Ends with", "Not equals", "Empty",
-          "Not empty", "On date", "In the last (days)"};
+          "Not empty", "On date", "In the last", "Not in the last", "Between"};
 }
 
 SmartPlaylistField SmartPlaylistSearch::FieldFromIndex(int index) {
@@ -384,6 +402,9 @@ std::string SmartPlaylistSearch::Serialize() const {
   }
   for (const SmartPlaylistTerm &term : terms) {
     out << ';' << static_cast<int>(term.field) << ',' << static_cast<int>(term.op) << ',' << SanitizeToken(term.value);
+    if (!term.second_value.empty() || term.date_type != SmartPlaylistDateType::Day) {
+      out << ',' << SanitizeToken(term.second_value) << ',' << static_cast<int>(term.date_type);
+    }
   }
   return out.str();
 }
@@ -415,8 +436,13 @@ bool SmartPlaylistSearch::Parse(const std::string &blob, SmartPlaylistSearch *se
     parsed.field = FieldFromIndex(std::atoi(term[0].c_str()));
     parsed.op = OpFromIndex(std::atoi(term[1].c_str()));
     parsed.value = term[2];
-    for (size_t extra = 3; extra < term.size(); ++extra) {
-      parsed.value += "," + term[extra];
+    if (term.size() >= 5) {
+      parsed.second_value = term[3];
+      parsed.date_type = SmartPlaylistDateUnits::FromIndex(std::atoi(term[4].c_str()));
+    } else {
+      for (size_t extra = 3; extra < term.size(); ++extra) {
+        parsed.value += "," + term[extra];
+      }
     }
     search->terms.push_back(parsed);
   }

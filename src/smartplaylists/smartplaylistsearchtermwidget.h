@@ -52,6 +52,10 @@ class SmartPlaylistSearchTermWidget {
   GtkWidget *time_hours_ = nullptr;
   GtkWidget *time_minutes_ = nullptr;
   GtkWidget *time_seconds_ = nullptr;
+  GtkWidget *date_unit_ = nullptr;
+  GtkWidget *range_box_ = nullptr;
+  GtkWidget *range_from_ = nullptr;
+  GtkWidget *range_to_ = nullptr;
   std::unique_ptr<RatingWidget> rating_;
   SmartPlaylistTermValue::Editor editor_ = SmartPlaylistTermValue::Editor::Text;
   std::vector<SmartPlaylistOp> current_ops_;
