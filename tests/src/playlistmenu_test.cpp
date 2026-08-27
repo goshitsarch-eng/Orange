@@ -169,6 +169,9 @@ TEST(PlaylistMenu, RenumberAndSetColumn) {
   EXPECT_EQ("Edit tag \"Title\"...", PlaylistMenu::LabelFor(PlaylistMenu::Action::EditValue, title));
   EXPECT_FALSE(PlaylistMenu::SetColumnOpensDialog());
   EXPECT_EQ("Roads", PlaylistMenu::ClickedColumnValue("Roads"));
+  EXPECT_EQ(3, PlaylistMenu::SetColumnSourceRow(3, {0, 1, 3}));
+  EXPECT_EQ(0, PlaylistMenu::SetColumnSourceRow(-1, {0, 1, 3}));
+  EXPECT_EQ(-1, PlaylistMenu::SetColumnSourceRow(-1, {}));
 }
 
 TEST(PlaylistMenu, CopyToDeviceAndDeletePolicy) {

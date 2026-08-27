@@ -275,6 +275,14 @@ inline bool SetColumnOpensDialog() { return false; }
 
 inline std::string ClickedColumnValue(const std::string &value) { return value; }
 
+// Qt SelectionSetValue reads playlist_menu_index_ (the right-clicked cell), not selection.front().
+inline int SetColumnSourceRow(int menu_row, const std::vector<int> &selected) {
+  if (menu_row >= 0) {
+    return menu_row;
+  }
+  return selected.empty() ? -1 : selected.front();
+}
+
 inline std::string TruncatedValue(const std::string &value) {
   if (value.size() <= 25) {
     return value;

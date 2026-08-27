@@ -4240,7 +4240,8 @@ void MainWindow::EditColumnValue() {
 void MainWindow::SetColumnTo() {
   Playlist *playlist = app_->playlist_manager()->current();
   const std::vector<int> rows = SelectedPlaylistRows();
-  if (!playlist || rows.empty()) {
+  const int source_row = PlaylistMenu::SetColumnSourceRow(playlist_menu_row_, rows);
+  if (!playlist || rows.empty() || source_row < 0 || source_row >= playlist->row_count()) {
     return;
   }
   const PlaylistColumn column =
@@ -4250,7 +4251,7 @@ void MainWindow::SetColumnTo() {
     ShowToast("This column is not editable");
     return;
   }
-  const std::string value = PlaylistMenu::ClickedColumnValue(PlaylistDelegates::ColumnText(playlist->song(rows.front()), column));
+  const std::string value = PlaylistMenu::ClickedColumnValue(PlaylistDelegates::ColumnText(playlist->song(source_row), column));
   ApplyColumnValue(column, value, rows);
 }
 
