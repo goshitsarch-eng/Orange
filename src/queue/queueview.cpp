@@ -126,6 +126,11 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
                      return static_cast<QueueView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
+  SetQueue(queue);
+}
+
+void QueueView::SetQueue(Queue *queue) {
+  queue_ = queue;
   if (queue_) {
     queue_->Changed.Connect([this]() { Reload(); });
   }

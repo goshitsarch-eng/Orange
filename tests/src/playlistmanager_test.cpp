@@ -1,5 +1,6 @@
 #include "playlist/playlistmanager.h"
 #include "playlist/playlistdelegates.h"
+#include "playlist/playlistqueuescope.h"
 #include "queue/queue.h"
 #include "queue/queuedrop.h"
 #include "queue/queuerows.h"
@@ -210,4 +211,22 @@ TEST(Queue, TracksPlaylistRowsAndToggle) {
 TEST(PlaylistDelegates, QueueColumnTitle) {
   EXPECT_EQ("Queue", PlaylistDelegates::ColumnTitle(PlaylistColumn::Queue));
   EXPECT_TRUE(PlaylistDelegates::ColumnText(MakeSong("A", "file:///a"), PlaylistColumn::Queue).empty());
+}
+
+TEST(PlaylistManager, EachPlaylistKeepsItsOwnQueue) {
+  PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
+  manager.Init();
+  Playlist *first = manager.current();
+  ASSERT_NE(nullptr, first);
+  first->queue()->Append(MakeSong("A", "file:///a"));
+  Playlist *second = manager.New("Second");
+  ASSERT_NE(nullptr, second);
+  second->queue()->Append(MakeSong("B", "file:///b"));
+  EXPECT_EQ(1, first->queue()->size());
+  EXPECT_EQ("A", first->queue()->songs().front().title());
+  EXPECT_EQ(1, second->queue()->size());
+  EXPECT_EQ("B", second->queue()->songs().front().title());
+  EXPECT_EQ(second->queue(), PlaylistQueueScope::For(manager.current()));
+  manager.SetCurrentPlaylist(first->id());
+  EXPECT_EQ(first->queue(), PlaylistQueueScope::For(manager.current()));
 }

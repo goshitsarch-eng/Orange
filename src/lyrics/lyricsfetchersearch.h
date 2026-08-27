@@ -21,12 +21,16 @@ class LyricsFetcherSearch {
   Signal<uint64_t, LyricsSearchResults> SearchFinished;
 
  private:
-  void FetchFromIndex(size_t index);
+  void OnProviderFinished(const LyricsSearchResults &found);
+  void Finish();
 
   uint64_t id_ = 0;
   LyricsSearchRequest request_;
   LyricsProviders *providers_ = nullptr;
   LyricsSearchResults results_;
+  int pending_ = 0;
+  bool finished_ = false;
+  float best_score_ = 0.0f;
 };
 
 #endif

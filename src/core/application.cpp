@@ -5,6 +5,7 @@
 #include "core/appearance.h"
 #include "equalizer/equalizerpersist.h"
 #include "playlist/playlist.h"
+#include "playlist/playlistqueuescope.h"
 #include "core/logging.h"
 #include "core/settings.h"
 #include "collection/skipcounteligibility.h"
@@ -63,7 +64,10 @@ void Application::Init() {
   }
   playlist_manager_->Init();
   player_->Init();
-  player_->SetQueue(queue_.get());
+  BindPlayerQueue();
+  playlist_manager_->CurrentChanged.Connect([this](Playlist *) { BindPlayerQueue(); });
+  playlist_manager_->ActiveChanged.Connect([this](Playlist *) { BindPlayerQueue(); });
+  playlist_manager_->PlaylistsLoaded.Connect([this]() { BindPlayerQueue(); });
   device_finders_->Init();
   device_manager_->set_tagreader(tagreader_.get());
   device_manager_->Init();
@@ -276,6 +280,14 @@ void Application::ApplyCommandline(const CommandlineOptions &options) {
   if (options.toggle_pretty_osd()) {
     osd_->SetPrettyOSDToggleMode(true);
     player_->ShowOSD();
+  }
+}
+
+Queue *Application::queue() const { return PlaylistQueueScope::For(playlist_manager_ ? playlist_manager_->current() : nullptr, queue_.get()); }
+
+void Application::BindPlayerQueue() {
+  if (player_) {
+    player_->SetQueue(PlaylistQueueScope::For(playlist_manager_ ? playlist_manager_->active() : nullptr, queue_.get()));
   }
 }
 

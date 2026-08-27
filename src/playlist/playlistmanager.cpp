@@ -284,6 +284,7 @@ void PlaylistManager::SetActiveToCurrent() {
 void PlaylistManager::SetCurrentRow(int row) {
   if (Playlist *playlist = Visible()) {
     playlist->RecordAndSetCurrentRow(row);
+    PersistLastPlayed(playlist);
     if (active_ != playlist) {
       active_ = playlist;
       ActiveChanged.Emit(active_);
@@ -305,6 +306,7 @@ Song PlaylistManager::PeekNextSong() const { return Playing() ? Playing()->PeekN
 void PlaylistManager::Next() {
   if (Playlist *playlist = Playing()) {
     playlist->Next();
+    PersistLastPlayed(playlist);
     RefillDynamic();
   }
 }
@@ -312,6 +314,7 @@ void PlaylistManager::Next() {
 void PlaylistManager::Previous() {
   if (Playlist *playlist = Playing()) {
     playlist->Previous();
+    PersistLastPlayed(playlist);
   }
 }
 
@@ -534,6 +537,12 @@ void PlaylistManager::CycleShuffleMode() {
 void PlaylistManager::Persist(Playlist *playlist) {
   if (playlist && backend_) {
     backend_->SavePlaylist(playlist);
+  }
+}
+
+void PlaylistManager::PersistLastPlayed(Playlist *playlist) {
+  if (playlist && backend_ && playlist->id() >= 0) {
+    backend_->SaveLastPlayed(playlist->id(), playlist->current_row());
   }
 }
 

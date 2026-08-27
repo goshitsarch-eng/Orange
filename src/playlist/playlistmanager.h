@@ -100,6 +100,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   Playlist *Visible() const { return current_ ? current_ : active_; }
   Playlist *Playing() const { return active_ ? active_ : current_; }
   void Persist(Playlist *playlist);
+  void PersistLastPlayed(Playlist *playlist);
 
   TaskManager *task_manager_;
   TagReader *tagreader_;

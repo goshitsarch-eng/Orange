@@ -33,6 +33,7 @@ class PlaylistBackend {
   void RenamePlaylist(int id, const std::string &name);
   void SetFavorite(int id, bool favorite);
   void SetPlaylistUiPath(int id, const std::string &path);
+  void SaveLastPlayed(int id, int row);
 
  private:
   Database *database_;

@@ -1,6 +1,7 @@
 #include "playlist/playlist.h"
 
 #include "core/playermetadatasync.h"
+#include "playlist/playlistautosort.h"
 #include "playlist/dynamicplaylistmaintenance.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlistbehaviour.h"
@@ -303,7 +304,7 @@ void Playlist::SortNow() {
 }
 
 void Playlist::MaybeAutoSort() {
-  if (auto_sort_ && sort_column_ != PlaylistColumn::Count) {
+  if (PlaylistAutoSort::ShouldSort(auto_sort_, loading_, sort_column_)) {
     SortInPlace();
   }
 }

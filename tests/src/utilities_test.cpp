@@ -965,8 +965,16 @@ TEST(Transcoder, PresetAndPipelineFor) {
   EXPECT_NE(std::string::npos, speex_full.find("vad=true"));
   TranscoderOptionsFields::Aac aac_opts;
   aac_opts.ApplyQuality(5);
+  aac_opts.profile = 2;
+  aac_opts.tns = true;
+  aac_opts.midside = true;
+  aac_opts.shortctl = 1;
   EXPECT_NE(std::string::npos, aac_opts.Pipeline().find("avenc_aac"));
   EXPECT_NE(std::string::npos, aac_opts.Pipeline().find("mp4mux"));
+  EXPECT_NE(std::string::npos, aac_opts.Pipeline().find("profile=2"));
+  EXPECT_NE(std::string::npos, aac_opts.Pipeline().find("tns=true"));
+  EXPECT_NE(std::string::npos, aac_opts.Pipeline().find("midside=true"));
+  EXPECT_NE(std::string::npos, aac_opts.Pipeline().find("shortctl=1"));
   const std::string wavpack = Transcoder::PipelineFor(Transcoder::Format::WavPack, 9);
   EXPECT_NE(std::string::npos, wavpack.find("wavpackenc mode=2"));
   const std::string asf = Transcoder::PipelineFor(Transcoder::Format::ASF, 5);

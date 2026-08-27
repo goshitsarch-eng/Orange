@@ -303,7 +303,16 @@ struct Aac {
   }
 
   std::string Pipeline() const {
-    return "avenc_aac bitrate=" + std::to_string(std::max(8000, bitrate_bps)) + " ! mp4mux";
+    std::string fragment = "avenc_aac bitrate=" + std::to_string(std::max(8000, bitrate_bps));
+    fragment += " profile=" + std::to_string(profile);
+    if (tns) {
+      fragment += " tns=true";
+    }
+    if (midside) {
+      fragment += " midside=true";
+    }
+    fragment += " shortctl=" + std::to_string(shortctl);
+    return fragment + " ! mp4mux";
   }
 };
 

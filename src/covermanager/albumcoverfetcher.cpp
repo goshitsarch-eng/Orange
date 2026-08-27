@@ -1,8 +1,11 @@
 #include "covermanager/albumcoverfetcher.h"
 
 #include "covermanager/albumcoverfetchersearch.h"
+#include "covermanager/coverfetchpolicy.h"
 #include "covermanager/coverproviders.h"
 #include "utilities/jsonutils.h"
+
+#include <algorithm>
 
 AlbumCoverFetcher::AlbumCoverFetcher(CoverProviders *cover_providers, NetworkAccessManager *network)
     : cover_providers_(cover_providers), network_(network) {}
@@ -82,7 +85,10 @@ void AlbumCoverFetcher::StartJob(const CoverSearchRequest &request) {
       job->results.insert(job->results.end(), scored.begin(), scored.end());
       job->statistics.total_images_by_provider[provider->name()] += found.size();
       job->statistics.bytes_transferred += found.size();
-      if (--job->pending <= 0) {
+      for (const CoverProviderSearchResult &result : scored) {
+        job->best_score = std::max(job->best_score, result.score());
+      }
+      if (--job->pending <= 0 || CoverFetchPolicy::ShouldStop(job->best_score, job->request.search)) {
         FinishJob(job);
       }
     });

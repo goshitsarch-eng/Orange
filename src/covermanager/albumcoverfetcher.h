@@ -65,6 +65,7 @@ class AlbumCoverFetcher {
     int pending = 0;
     bool cancelled = false;
     bool finished = false;
+    float best_score = 0.0f;
   };
 
   void AddRequest(const CoverSearchRequest &request);

@@ -58,7 +58,9 @@ std::unique_ptr<Playlist> PlaylistBackend::LoadPlaylist(int id) {
     }
     songs.push_back(song);
   }
+  playlist->BeginLoad();
   playlist->AppendSongs(songs);
+  playlist->EndLoad();
   if (last_played >= 0 && last_played < playlist->row_count()) {
     playlist->set_current_row(last_played);
   }
@@ -134,6 +136,13 @@ void PlaylistBackend::SetFavorite(int id, bool favorite) {
 void PlaylistBackend::SetPlaylistUiPath(int id, const std::string &path) {
   SqlQuery query(database_, "UPDATE playlists SET ui_path = ? WHERE ROWID = ?");
   query.Bind(1, path);
+  query.Bind(2, id);
+  query.Exec();
+}
+
+void PlaylistBackend::SaveLastPlayed(int id, int row) {
+  SqlQuery query(database_, "UPDATE playlists SET last_played = ? WHERE ROWID = ?");
+  query.Bind(1, row);
   query.Bind(2, id);
   query.Exec();
 }

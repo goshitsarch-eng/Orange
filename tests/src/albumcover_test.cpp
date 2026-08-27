@@ -19,6 +19,7 @@
 #include "covermanager/coversearchstatistics.h"
 #include "covermanager/coversearchstatisticsdialog.h"
 #include "covermanager/coversearchstatisticslabels.h"
+#include "covermanager/coverfetchpolicy.h"
 #include "covermanager/coverprovidersettings.h"
 #include "covermanager/currentalbumcoverloader.h"
 #include "settings/coverssettingslabels.h"
@@ -70,6 +71,14 @@ TEST(CoverSearchStatistics, AverageDimensionsAndAccumulate) {
   EXPECT_EQ(4u, a.total_images_by_provider["Last.fm"]);
   EXPECT_EQ(2u, a.total_images_by_provider["Deezer"]);
   EXPECT_EQ("400x300", a.AverageDimensions());
+}
+
+TEST(CoverFetchPolicy, StopsFetchWhenScoreIsGood) {
+  EXPECT_FLOAT_EQ(4.0f, AlbumCoverFetcherSearch::kGoodScore);
+  EXPECT_TRUE(CoverFetchPolicy::ShouldStop(4.0f, false));
+  EXPECT_TRUE(CoverFetchPolicy::ShouldStop(5.0f, false));
+  EXPECT_FALSE(CoverFetchPolicy::ShouldStop(3.9f, false));
+  EXPECT_FALSE(CoverFetchPolicy::ShouldStop(5.0f, true));
 }
 
 TEST(AlbumCoverFetcherSearch, ScoreImageMatchesOriginalFormula) {

@@ -5,6 +5,7 @@
 #include "core/song.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistsequence.h"
+#include "queue/queue.h"
 #include "smartplaylists/smartplaylist.h"
 
 #include <string>
@@ -95,6 +96,11 @@ class Playlist {
   void set_stop_after_row(int row);
   void ToggleStopAfter(int row);
   int stop_after_row() const { return stop_after_row_; }
+  Queue *queue() { return &queue_; }
+  const Queue *queue() const { return &queue_; }
+  void BeginLoad() { loading_ = true; }
+  void EndLoad() { loading_ = false; }
+  bool loading() const { return loading_; }
 
   int64_t total_length_nanosec() const;
 
@@ -144,6 +150,8 @@ class Playlist {
   int stop_after_row_ = -1;
   int64_t scrobble_point_nanosec_ = -1;
   bool scrobbled_ = false;
+  bool loading_ = false;
+  Queue queue_;
 };
 
 #endif  // STRAWBERRY_PLAYLIST_H

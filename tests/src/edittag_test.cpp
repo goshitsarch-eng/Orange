@@ -12,6 +12,7 @@
 #include "dialogs/edittagtabs.h"
 #include "lyrics/lyricsproviderorder.h"
 #include "lyrics/lyricsprovidersettings.h"
+#include "tagreader/tagwriterfields.h"
 #include "widgets/listboxkeyboard.h"
 
 #include <gtest/gtest.h>
@@ -333,4 +334,19 @@ TEST(EditTagFields, ApplyFieldWritesSortTags) {
   EditTagFields::ApplyField(&song, "Performer sort", "Eno, Brian");
   EXPECT_EQ("Bowie, David", song.composersort());
   EXPECT_EQ("Eno, Brian", song.performersort());
+}
+
+TEST(TagWriterFields, WritesBpmMoodKeyAndOriginalYear) {
+  EXPECT_STREQ("BPM", TagWriterFields::VorbisBpm());
+  EXPECT_STREQ("MOOD", TagWriterFields::VorbisMood());
+  EXPECT_STREQ("INITIALKEY", TagWriterFields::VorbisInitialKey());
+  EXPECT_STREQ("ORIGINALYEAR", TagWriterFields::VorbisOriginalYear());
+  EXPECT_STREQ("TBPM", TagWriterFields::Id3Bpm());
+  EXPECT_STREQ("TKEY", TagWriterFields::Id3InitialKey());
+  EXPECT_STREQ("TORY", TagWriterFields::Id3OriginalYear());
+  EXPECT_STREQ("MOOD", TagWriterFields::Id3Mood());
+  EXPECT_TRUE(TagWriterFields::HasBpm(128.0f));
+  EXPECT_FALSE(TagWriterFields::HasBpm(0.0f));
+  EXPECT_TRUE(TagWriterFields::HasOriginalYear(1994));
+  EXPECT_FALSE(TagWriterFields::HasOriginalYear(0));
 }

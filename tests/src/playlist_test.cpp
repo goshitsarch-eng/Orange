@@ -1,8 +1,11 @@
 #include "core/playermetadatasync.h"
 #include "core/playerpreload.h"
+#include "core/playerintro.h"
 #include "core/playerrepeat.h"
 #include "core/playerstopafter.h"
 #include "core/songsegment.h"
+#include "playlist/playlistautosort.h"
+#include "playlist/playlistqueuescope.h"
 #include "dialogs/saveplaylistsoptions.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistfilterdelay.h"
@@ -308,6 +311,61 @@ TEST(Playlist, AutoSortAfterInsert) {
   EXPECT_EQ("B", playlist.songs()[1].title());
 }
 
+TEST(Playlist, AutoSortSkipsWhileLoading) {
+  EXPECT_TRUE(PlaylistAutoSort::ShouldSort(true, false, PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistAutoSort::ShouldSort(true, true, PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistAutoSort::ShouldSort(false, false, PlaylistColumn::Title));
+  EXPECT_FALSE(PlaylistAutoSort::ShouldSort(true, false, PlaylistColumn::Count));
+  Playlist playlist;
+  playlist.set_auto_sort(true);
+  playlist.SetSort(PlaylistColumn::Title, false);
+  playlist.BeginLoad();
+  EXPECT_TRUE(playlist.loading());
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  playlist.AppendSongs({b, a});
+  ASSERT_EQ(2, playlist.row_count());
+  EXPECT_EQ("B", playlist.songs()[0].title());
+  EXPECT_EQ("A", playlist.songs()[1].title());
+  playlist.EndLoad();
+  EXPECT_FALSE(playlist.loading());
+  playlist.AppendSongs({});
+  Song c;
+  c.set_title("C");
+  c.set_url("file:///c");
+  c.set_valid(true);
+  playlist.AppendSongs({c});
+  EXPECT_EQ("A", playlist.songs()[0].title());
+  EXPECT_EQ("B", playlist.songs()[1].title());
+  EXPECT_EQ("C", playlist.songs()[2].title());
+}
+
+TEST(Playlist, OwnsDedicatedQueue) {
+  Playlist first;
+  Playlist second;
+  Song a;
+  a.set_title("A");
+  a.set_url("file:///a");
+  a.set_valid(true);
+  Song b;
+  b.set_title("B");
+  b.set_url("file:///b");
+  b.set_valid(true);
+  first.queue()->Append(a);
+  second.queue()->Append(b);
+  EXPECT_EQ(1, first.queue()->size());
+  EXPECT_EQ("A", first.queue()->songs().front().title());
+  EXPECT_EQ("B", second.queue()->songs().front().title());
+  EXPECT_EQ(first.queue(), PlaylistQueueScope::For(&first));
+  EXPECT_EQ(nullptr, PlaylistQueueScope::For(static_cast<Playlist *>(nullptr)));
+}
+
 TEST(Playlist, SetColumnValuesUpdatesSongsAndUndo) {
   Playlist playlist;
   Song a;
@@ -498,6 +556,23 @@ TEST(PlayerRepeat, IntroUsesTenSecondWindow) {
   EXPECT_FALSE(PlayerRepeat::IntroElapsed(9 * 1000000000LL));
   EXPECT_TRUE(PlayerRepeat::IntroElapsed(10 * 1000000000LL));
   EXPECT_EQ(10000u, PlayerRepeat::IntroTimeoutMs());
+}
+
+TEST(PlayerIntro, ClampsEngineEndToTenSeconds) {
+  Song song;
+  song.set_beginning_nanosec(1000000000LL);
+  song.set_length_nanosec(180000000000LL);
+  EXPECT_EQ(SongSegment::EffectiveEndNanosec(song), PlayerIntro::EffectiveEndNanosec(song, false));
+  EXPECT_EQ(11000000000LL, PlayerIntro::EffectiveEndNanosec(song, true));
+  EXPECT_TRUE(PlayerIntro::HasForcedEnd(song, true));
+  EXPECT_FALSE(PlayerIntro::HasForcedEnd(song, false));
+  song.set_end_nanosec(4000000000LL);
+  EXPECT_EQ(4000000000LL, PlayerIntro::EffectiveEndNanosec(song, true));
+  EXPECT_EQ(EngineBase::Intro, PlayerIntro::AdvanceFlags());
+  Playlist playlist;
+  EXPECT_FALSE(PlayerIntro::Active(&playlist));
+  playlist.SetRepeatMode(PlaylistSequence::RepeatMode::Intro);
+  EXPECT_TRUE(PlayerIntro::Active(&playlist));
 }
 
 TEST(Playlist, PreviousUsesPlayedHistory) {

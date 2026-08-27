@@ -19,6 +19,8 @@ class QueueView {
   explicit QueueView(Queue *queue);
   ~QueueView();
   GtkWidget *widget() const { return widget_; }
+  void SetQueue(Queue *queue);
+  Queue *queue() const { return queue_; }
   void Reload();
   void MoveUp();
   void MoveDown();

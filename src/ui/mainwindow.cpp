@@ -1803,6 +1803,11 @@ void MainWindow::ConnectSignals() {
         playlist_list_container_->SelectName(playlist->name());
       }
     }
+    if (queue_view_) {
+      queue_view_->SetQueue(app_->queue());
+    }
+    app_->queue()->Changed.Connect([this]() { RefreshQueue(); });
+    RefreshQueue();
     RefreshPlaylistTabs();
   });
   app_->player()->StateChanged.Connect([this](GstEngine::State state) {

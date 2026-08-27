@@ -10,6 +10,7 @@
 #include "constants/playlistsettings.h"
 #include "core/logging.h"
 #include "core/playermetadatasync.h"
+#include "core/playerintro.h"
 #include "core/playerpreload.h"
 #include "core/playerrepeat.h"
 #include "core/playerstopafter.h"
@@ -403,18 +404,22 @@ void Player::FinishCurrentPlayback() {
 
 void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_nanosec) {
   finished_current_ = false;
+  const bool intro = PlayerIntro::Active(playlist_manager_);
+  if (intro) {
+    track_change_flags |= GstEngine::Intro;
+  }
   if (!current_song_.is_valid() && current_song_.url().empty()) {
     Stop();
     return;
   }
   if (url_handlers_) {
     if (UrlHandler *handler = url_handlers_->HandlerForUrl(current_song_.url())) {
-      const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause, track_change_flags, offset_nanosec](const UrlHandler::LoadResult &async) {
+      const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause, track_change_flags, offset_nanosec, intro](const UrlHandler::LoadResult &async) {
         ApplyLoadResult(&current_song_, async);
         if (!async.stream_url.empty()) {
           engine_->SetNextAlbum(current_song_.EffectiveAlbum());
-          engine_->Load(current_song_.url(), async.stream_url, track_change_flags, SongSegment::HasForcedEnd(current_song_),
-                        current_song_.beginning_nanosec(), SongSegment::EffectiveEndNanosec(current_song_),
+          engine_->Load(current_song_.url(), async.stream_url, track_change_flags, PlayerIntro::HasForcedEnd(current_song_, intro),
+                        current_song_.beginning_nanosec(), PlayerIntro::EffectiveEndNanosec(current_song_, intro),
                         current_song_.ebur128_integrated_loudness_lufs());
           engine_->SetCurrentAlbum(current_song_.EffectiveAlbum());
           engine_->Play(pause, offset_nanosec);
@@ -426,8 +431,8 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_
     }
   }
   engine_->SetNextAlbum(current_song_.EffectiveAlbum());
-  engine_->Load(current_song_.url(), current_song_.stream_url(), track_change_flags, SongSegment::HasForcedEnd(current_song_),
-                current_song_.beginning_nanosec(), SongSegment::EffectiveEndNanosec(current_song_),
+  engine_->Load(current_song_.url(), current_song_.stream_url(), track_change_flags, PlayerIntro::HasForcedEnd(current_song_, intro),
+                current_song_.beginning_nanosec(), PlayerIntro::EffectiveEndNanosec(current_song_, intro),
                 current_song_.ebur128_integrated_loudness_lufs());
   engine_->SetCurrentAlbum(current_song_.EffectiveAlbum());
   engine_->Play(pause, offset_nanosec);
@@ -478,7 +483,7 @@ void Player::ArmIntroTimeout() {
                                                      ? self->playlist_manager_->active()->repeat_mode()
                                                      : PlaylistSequence::RepeatMode::Off;
         if (PlayerRepeat::IsIntro(mode)) {
-          self->Next();
+          self->Advance(PlayerIntro::AdvanceFlags());
         }
         return G_SOURCE_REMOVE;
       },
@@ -540,6 +545,7 @@ void Player::HandleEngineState(EngineBase::State state) {
 }
 
 void Player::HandleTrackEnded() {
+  CancelIntroTimeout();
   if (preloaded_) {
     preloaded_ = false;
     return;

@@ -2,6 +2,8 @@
 
 #include "tagreader/tagreader.h"
 
+#include "tagreader/tagwriterfields.h"
+
 #include "core/filewriteguard.h"
 #include "core/logging.h"
 #include "tagreader/albumcovertagdata.h"
@@ -469,6 +471,13 @@ void SetId3v2Tag(TagLib::ID3v2::Tag *tag, const Song &song) {
   if (!song.musicbrainz_recording_id().empty()) {
     SetId3v2UserText(tag, kId3MusicBrainzRecording, song.musicbrainz_recording_id());
   }
+  SetId3v2TextFrame(tag, TagWriterFields::Id3Bpm(), TagWriterFields::HasBpm(song.bpm()) ? std::to_string(static_cast<int>(song.bpm())) : "");
+  SetId3v2TextFrame(tag, TagWriterFields::Id3InitialKey(), song.initial_key());
+  SetId3v2TextFrame(tag, TagWriterFields::Id3OriginalYear(),
+                    TagWriterFields::HasOriginalYear(song.originalyear()) ? std::to_string(song.originalyear()) : "");
+  if (!song.mood().empty()) {
+    SetId3v2UserText(tag, TagWriterFields::Id3Mood(), song.mood());
+  }
 }
 
 void SetId3v2Playcount(TagLib::ID3v2::Tag *tag, unsigned playcount) {
@@ -513,6 +522,18 @@ void SetVorbisComments(TagLib::Ogg::XiphComment *comment, const Song &song) {
   comment->removeFields("UNSYNCEDLYRICS");
   if (!song.musicbrainz_recording_id().empty()) {
     comment->addField("MUSICBRAINZ_TRACKID", ToTagLib(song.musicbrainz_recording_id()), true);
+  }
+  if (TagWriterFields::HasBpm(song.bpm())) {
+    comment->addField(TagWriterFields::VorbisBpm(), TagLib::String::number(static_cast<int>(song.bpm())), true);
+  } else {
+    comment->removeFields(TagWriterFields::VorbisBpm());
+  }
+  comment->addField(TagWriterFields::VorbisMood(), ToTagLib(song.mood()), true);
+  comment->addField(TagWriterFields::VorbisInitialKey(), ToTagLib(song.initial_key()), true);
+  if (TagWriterFields::HasOriginalYear(song.originalyear())) {
+    comment->addField(TagWriterFields::VorbisOriginalYear(), TagLib::String::number(song.originalyear()), true);
+  } else {
+    comment->removeFields(TagWriterFields::VorbisOriginalYear());
   }
 }
 
@@ -560,6 +581,11 @@ void SetAPETag(TagLib::APE::Tag *tag, const Song &song) {
   if (!song.musicbrainz_recording_id().empty()) {
     SetAPEItem(tag, "MUSICBRAINZ_TRACKID", song.musicbrainz_recording_id());
   }
+  SetAPEItem(tag, TagWriterFields::ApeBpm(), TagWriterFields::HasBpm(song.bpm()) ? std::to_string(static_cast<int>(song.bpm())) : "");
+  SetAPEItem(tag, TagWriterFields::ApeMood(), song.mood());
+  SetAPEItem(tag, TagWriterFields::ApeInitialKey(), song.initial_key());
+  SetAPEItem(tag, TagWriterFields::ApeOriginalYear(),
+             TagWriterFields::HasOriginalYear(song.originalyear()) ? std::to_string(song.originalyear()) : "");
 }
 
 void SetAPEPlaycount(TagLib::APE::Tag *tag, unsigned playcount) {

@@ -58,7 +58,7 @@ class Application {
   PlaylistBackend *playlist_backend() const { return playlist_backend_.get(); }
   PlaylistManager *playlist_manager() const { return playlist_manager_.get(); }
   Player *player() const { return player_.get(); }
-  Queue *queue() const { return queue_.get(); }
+  Queue *queue() const;
   CoverProviders *cover_providers() const { return cover_providers_.get(); }
   AlbumCoverLoader *albumcover_loader() const { return albumcover_loader_.get(); }
   CurrentAlbumCoverLoader *current_albumcover_loader() const { return current_albumcover_loader_.get(); }
@@ -86,6 +86,7 @@ class Application {
 
  private:
   void WatchPlaylistOsd(class Playlist *playlist);
+  void BindPlayerQueue();
   std::unique_ptr<TaskManager> task_manager_;
   std::unique_ptr<Database> database_;
   std::unique_ptr<NetworkAccessManager> network_;

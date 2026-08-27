@@ -2,6 +2,7 @@
 #include "lyrics/geniuslyricsprovider.h"
 #include "lyrics/htmllyricsprovider.h"
 #include "lyrics/lrcparser.h"
+#include "lyrics/lyricssearchscore.h"
 
 #include "utilities/strutils.h"
 
@@ -89,6 +90,25 @@ TEST(LrcParser, TimestampsAndActiveLine) {
 TEST(ContextLyrics, Attribution) {
   EXPECT_TRUE(ContextLyrics::Attribution({}).empty());
   EXPECT_EQ("Source: Genius", ContextLyrics::Attribution("Genius"));
+}
+
+TEST(LyricsSearchScore, ScoresAndFinishesAtHighThreshold) {
+  LyricsSearchRequest request;
+  request.artist = "Portishead";
+  request.title = "Roads";
+  request.album = "Dummy";
+  LyricsSearchResult empty;
+  EXPECT_FLOAT_EQ(0.0f, LyricsSearchScore::Score(request, empty));
+  LyricsSearchResult hit;
+  hit.provider = "Genius";
+  hit.lyrics = "Portishead\nRoads\nDummy\nI got my roads";
+  EXPECT_FLOAT_EQ(2.75f, LyricsSearchScore::Score(request, hit));
+  EXPECT_TRUE(LyricsSearchScore::ShouldFinishEarly(LyricsSearchScore::Score(request, hit)));
+  EXPECT_FALSE(LyricsSearchScore::ShouldFinishEarly(2.4f));
+  EXPECT_FLOAT_EQ(LyricsSearchScore::kHighScore, 2.5f);
+  hit.score = 2.75f;
+  empty.score = 0.0f;
+  EXPECT_FLOAT_EQ(2.75f, LyricsSearchScore::BestScore({empty, hit}));
 }
 
 TEST(ContextLyrics, PrefersTagLyricsAndFormatsFetch) {
