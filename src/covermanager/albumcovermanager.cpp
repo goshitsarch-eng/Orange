@@ -84,7 +84,9 @@ void UpdateBatchUi(CoverManagerState *state) {
     gtk_widget_set_visible(state->abort, state->batch.running());
   }
   if (state->fetch_missing) {
-    gtk_widget_set_sensitive(state->fetch_missing, CoverManagerActions::FetchEnabled(state->batch.running()));
+    const bool has_providers =
+        state->app && state->app->cover_providers() && CoverManagerMenu::HasAnyProviders(state->app->cover_providers()->All().size());
+    gtk_widget_set_sensitive(state->fetch_missing, CoverManagerActions::FetchEnabled(state->batch.running(), has_providers));
   }
   if (state->export_btn) {
     gtk_widget_set_sensitive(state->export_btn, CoverManagerActions::ExportEnabled(state->batch.running()));

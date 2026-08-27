@@ -19,8 +19,8 @@ inline const char *CloseDontStop() { return "Don't stop!"; }
 
 inline bool ShouldConfirmCloseOnFetch(bool running) { return running; }
 
-// Qt DisableCoversButtons / EnableCoversButtons: fetch and export stay off while a fetch is running.
-inline bool FetchEnabled(bool running) { return !running; }
+// Qt DisableCoversButtons / EnableCoversButtons: fetch stays off while a fetch is running or no providers are registered.
+inline bool FetchEnabled(bool running, bool has_providers) { return !running && has_providers; }
 inline bool ExportEnabled(bool running) { return !running; }
 inline bool CanCloseWithoutConfirm(bool running) { return !running; }
 

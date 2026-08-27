@@ -610,8 +610,10 @@ TEST(CoverManagerActions, CloseConfirmAndButtonsDuringFetch) {
   EXPECT_STREQ("Don't stop!", CoverManagerActions::CloseDontStop());
   EXPECT_FALSE(CoverManagerActions::ShouldConfirmCloseOnFetch(false));
   EXPECT_TRUE(CoverManagerActions::ShouldConfirmCloseOnFetch(true));
-  EXPECT_TRUE(CoverManagerActions::FetchEnabled(false));
-  EXPECT_FALSE(CoverManagerActions::FetchEnabled(true));
+  EXPECT_TRUE(CoverManagerActions::FetchEnabled(false, true));
+  EXPECT_FALSE(CoverManagerActions::FetchEnabled(true, true));
+  EXPECT_FALSE(CoverManagerActions::FetchEnabled(false, false));
+  EXPECT_FALSE(CoverManagerActions::FetchEnabled(true, false));
   EXPECT_TRUE(CoverManagerActions::ExportEnabled(false));
   EXPECT_FALSE(CoverManagerActions::ExportEnabled(true));
   EXPECT_TRUE(CoverManagerActions::CanCloseWithoutConfirm(false));
