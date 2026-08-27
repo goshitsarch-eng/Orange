@@ -558,6 +558,7 @@ set(STRAWBERRY_SOURCES
   src/moodbar/moodbarbuilder.cpp
   src/moodbar/moodbarpipeline.cpp
   src/moodbar/moodbarrenderer.cpp
+  src/moodbar/moodbarplayhead.h
   src/moodbar/moodbarpreview.h
   src/moodbar/moodbar.cpp
   src/moodbar/moodbarcontroller.cpp
@@ -566,6 +567,7 @@ set(STRAWBERRY_SOURCES
   src/moodbar/moodbarproxystyle.cpp
   src/waveform/waveformbuilder.cpp
   src/waveform/waveformpipeline.cpp
+  src/waveform/waveformplayhead.h
   src/waveform/waveformrenderer.cpp
   src/waveform/waveform.cpp
   src/waveform/waveformcontroller.cpp

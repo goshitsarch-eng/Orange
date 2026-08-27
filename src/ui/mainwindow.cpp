@@ -2003,6 +2003,12 @@ void MainWindow::ConnectSignals() {
     if (self->app_->mpris() && self->app_->player()->GetState() == EngineBase::State::Playing) {
       self->app_->mpris()->EmitPosition();
     }
+    if (self->moodbar_drawing_ && gtk_widget_get_visible(self->moodbar_drawing_)) {
+      gtk_widget_queue_draw(self->moodbar_drawing_);
+    }
+    if (self->waveform_drawing_ && gtk_widget_get_visible(self->waveform_drawing_)) {
+      gtk_widget_queue_draw(self->waveform_drawing_);
+    }
     if (self->context_view_) {
       self->context_view_->SetPlaybackPosition(pos);
     }
@@ -4177,14 +4183,37 @@ void MainWindow::SeekFromBar(double x, int width) {
   }
   const double ratio = std::clamp(x / static_cast<double>(width), 0.0, 1.0);
   app_->player()->Seek(static_cast<int64_t>(ratio * static_cast<double>(length)));
+  if (moodbar_drawing_ && gtk_widget_get_visible(moodbar_drawing_)) {
+    gtk_widget_queue_draw(moodbar_drawing_);
+  }
+  if (waveform_drawing_ && gtk_widget_get_visible(waveform_drawing_)) {
+    gtk_widget_queue_draw(waveform_drawing_);
+  }
 }
 
-void MainWindow::DrawMoodbar(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
+void MainWindow::DrawMoodbar(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data) {
   auto *self = static_cast<MainWindow *>(data);
-  MoodbarRenderer::Draw(cr, width, height, self->app_->moodbar()->data());
+  int64_t pos = 0;
+  int64_t len = 0;
+  if (self->app_->player() && self->app_->player()->engine()) {
+    pos = self->app_->player()->engine()->position_nanosec();
+    len = self->app_->player()->engine()->length_nanosec();
+  }
+  const gboolean dark = adw_style_manager_get_dark(adw_style_manager_get_default());
+  const double fill = dark ? 0.18 : 1.0;
+  (void)area;
+  MoodbarRenderer::Draw(cr, width, height, self->app_->moodbar()->data(), pos, len, fill, fill, fill);
 }
 
-void MainWindow::DrawWaveform(GtkDrawingArea *, cairo_t *cr, int width, int height, gpointer data) {
+void MainWindow::DrawWaveform(GtkDrawingArea *area, cairo_t *cr, int width, int height, gpointer data) {
   auto *self = static_cast<MainWindow *>(data);
-  WaveformRenderer::Draw(cr, width, height, self->app_->waveform()->data());
+  int64_t pos = 0;
+  int64_t len = 0;
+  if (self->app_->player() && self->app_->player()->engine()) {
+    pos = self->app_->player()->engine()->position_nanosec();
+    len = self->app_->player()->engine()->length_nanosec();
+  }
+  GdkRGBA cursor;
+  gtk_widget_get_color(GTK_WIDGET(area), &cursor);
+  WaveformRenderer::Draw(cr, width, height, self->app_->waveform()->data(), pos, len, cursor.red, cursor.green, cursor.blue);
 }

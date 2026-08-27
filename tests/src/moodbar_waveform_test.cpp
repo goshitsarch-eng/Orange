@@ -7,8 +7,10 @@
 #include "core/song.h"
 #include "moodbar/moodbarcell.h"
 #include "moodbar/moodbarpaths.h"
+#include "moodbar/moodbarplayhead.h"
 #include "moodbar/moodbarpreview.h"
 #include "moodbar/moodbarstyle.h"
+#include "waveform/waveformplayhead.h"
 #include "utilities/analysisasync.h"
 #include "utilities/seekbaranalysis.h"
 #include "waveform/waveformstyle.h"
@@ -212,6 +214,43 @@ TEST(SeekbarModeMenu, LabelsAndCycleMatchQt) {
   EXPECT_TRUE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Moodbar));
   EXPECT_FALSE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Normal));
   EXPECT_STREQ("Moodbar style", SeekbarModeMenu::StyleSubmenuTitle());
+}
+
+TEST(WaveformPlayhead, SplitAndPlayedAlphaMatchQt) {
+  EXPECT_EQ(1, WaveformPlayhead::kCursorWidth);
+  EXPECT_FLOAT_EQ(0.55F, WaveformPlayhead::kPlayedAlpha);
+  EXPECT_EQ(1000, WaveformPlayhead::kFadeDurationMs);
+  EXPECT_DOUBLE_EQ(0.0, WaveformPlayhead::Progress(0, 10));
+  EXPECT_DOUBLE_EQ(0.0, WaveformPlayhead::Progress(5, 0));
+  EXPECT_DOUBLE_EQ(0.5, WaveformPlayhead::Progress(5, 10));
+  EXPECT_DOUBLE_EQ(1.0, WaveformPlayhead::Progress(10, 10));
+  EXPECT_DOUBLE_EQ(1.0, WaveformPlayhead::Progress(12, 10));
+  EXPECT_EQ(0, WaveformPlayhead::SplitX(0, 100, 200));
+  EXPECT_EQ(100, WaveformPlayhead::SplitX(50, 100, 200));
+  EXPECT_EQ(200, WaveformPlayhead::SplitX(100, 100, 200));
+  EXPECT_EQ(200, WaveformPlayhead::SplitX(150, 100, 200));
+  EXPECT_EQ(0, WaveformPlayhead::SplitX(50, 0, 200));
+  EXPECT_EQ(0, WaveformPlayhead::SplitX(50, 100, 0));
+  EXPECT_FALSE(WaveformPlayhead::ShowPlayheadFromPosition(-1));
+  EXPECT_TRUE(WaveformPlayhead::ShowPlayheadFromPosition(0));
+}
+
+TEST(MoodbarPlayhead, ArrowAndChromeMatchQt) {
+  EXPECT_EQ(3, MoodbarPlayhead::kMarginSize);
+  EXPECT_EQ(1, MoodbarPlayhead::kBorderSize);
+  EXPECT_EQ(17, MoodbarPlayhead::kArrowWidth);
+  EXPECT_EQ(13, MoodbarPlayhead::kArrowHeight);
+  EXPECT_EQ(192, MoodbarPlayhead::InnerWidth(200));
+  EXPECT_EQ(10, MoodbarPlayhead::InnerHeight(18));
+  EXPECT_EQ(183, MoodbarPlayhead::ArrowTravel(200));
+  EXPECT_EQ(0, MoodbarPlayhead::ArrowLeft(0, 100, 200));
+  EXPECT_EQ(91, MoodbarPlayhead::ArrowLeft(50, 100, 200));
+  EXPECT_EQ(183, MoodbarPlayhead::ArrowLeft(100, 100, 200));
+  EXPECT_EQ(183, MoodbarPlayhead::ArrowLeft(150, 100, 200));
+  EXPECT_EQ(0, MoodbarPlayhead::ArrowLeft(50, 0, 200));
+  EXPECT_EQ(91 + 8, MoodbarPlayhead::ArrowCenterX(MoodbarPlayhead::ArrowLeft(50, 100, 200)));
+  EXPECT_FALSE(MoodbarPlayhead::ShowPlayheadFromPosition(-1));
+  EXPECT_TRUE(MoodbarPlayhead::ShowPlayheadFromPosition(0));
 }
 
 TEST(MoodbarPreview, SampleThumbnailsMatchQtSizeAndStyles) {
