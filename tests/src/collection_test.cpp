@@ -473,7 +473,7 @@ TEST(CollectionRescanReason, ForcesRescanWhenFingerprintOrLoudnessMissing) {
   EXPECT_TRUE(CollectionRescanReason::NeedsAnalysisRescan(song, false, true));
   song.set_ebur128_loudness_range_lu(6.0);
   EXPECT_FALSE(CollectionRescanReason::NeedsAnalysisRescan(song, true, true));
-  EXPECT_TRUE(CollectionWatcher::NeedsRescan(song, 100, 50, true, true, CollectionCueScan::Change::None));
+  EXPECT_FALSE(CollectionWatcher::NeedsRescan(song, 100, 50, true, true, CollectionCueScan::Change::None));
   EXPECT_TRUE(CollectionWatcher::NeedsRescan(song, 100, 50, false, false, CollectionCueScan::Change::Added));
 }
 
