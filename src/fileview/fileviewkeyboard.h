@@ -23,8 +23,9 @@ inline Action FromKey(unsigned keyval, bool alt) {
   if (alt && keyval == ListBoxKeyboard::kHome) {
     return Action::Home;
   }
+  // Qt FileView::keyPressEvent maps Backspace to the Up button (cdUp), not history.
   if (keyval == ListBoxKeyboard::kBackSpace) {
-    return Action::HistoryBack;
+    return Action::UpDir;
   }
   if (keyval == ListBoxKeyboard::kUp) {
     return Action::MoveUp;

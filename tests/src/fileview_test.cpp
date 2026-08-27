@@ -416,7 +416,7 @@ TEST(FileViewKeyboard, AltAndHistoryBack) {
   EXPECT_EQ(FileViewKeyboard::Action::HistoryForward, FileViewKeyboard::FromKey(ListBoxKeyboard::kRight, true));
   EXPECT_EQ(FileViewKeyboard::Action::Home, FileViewKeyboard::FromKey(ListBoxKeyboard::kHome, true));
   EXPECT_EQ(FileViewKeyboard::Action::First, FileViewKeyboard::FromKey(ListBoxKeyboard::kHome, false));
-  EXPECT_EQ(FileViewKeyboard::Action::HistoryBack, FileViewKeyboard::FromKey(ListBoxKeyboard::kBackSpace, false));
+  EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::FromKey(ListBoxKeyboard::kBackSpace, false));
   EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::HistoryBack, false));
   EXPECT_EQ(FileViewKeyboard::Action::HistoryBack, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::HistoryBack, true));
   EXPECT_EQ(FileViewKeyboard::Action::Home, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::Home, false));
