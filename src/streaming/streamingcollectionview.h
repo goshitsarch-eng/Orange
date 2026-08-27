@@ -77,6 +77,7 @@ class StreamingCollectionView {
   void UpdateBack();
   void ActivateSong(const Song &song);
   gboolean OnKeyPressed(guint keyval);
+  bool ApplyTreeLeft();
   void ResetTypeAhead();
 
   StreamingService *service_ = nullptr;

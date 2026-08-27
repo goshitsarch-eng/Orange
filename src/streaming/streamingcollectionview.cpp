@@ -6,6 +6,8 @@
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectiontree.h"
+#include "collection/collectiontreeleft.h"
+#include "collection/collectionkeyboard.h"
 #include "collection/groupbydialog.h"
 #include "dialogs/dialoghelpers.h"
 #include "streaming/streamingcollectionactions.h"
@@ -653,11 +655,46 @@ void StreamingCollectionView::FocusListAndMove(unsigned keyval) {
   }
 }
 
+bool StreamingCollectionView::ApplyTreeLeft() {
+  const CollectionItem *item = SelectedItem();
+  if (!item || StreamingCollectionTree::FilterActive(filter_)) {
+    return false;
+  }
+  const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
+  const CollectionTreeLeft::Action action = CollectionTreeLeft::FromItem(item, expanded);
+  if (action == CollectionTreeLeft::Action::None) {
+    return false;
+  }
+  const CollectionItem *focus = CollectionTreeLeft::FocusItem(item, action);
+  const CollectionItem *parent = CollectionTreeLeft::SelectableParent(item);
+  const bool parent_expanded = CollectionTree::ShowChildren(parent, false, expanded_);
+  const CollectionItem *collapse = CollectionTreeLeft::CollapseItem(item, action, parent_expanded);
+  CollectionFocus::Capture(focus, &focus_);
+  if (collapse) {
+    ToggleExpanded(collapse);
+  }
+  SelectFocusItem();
+  return true;
+}
+
 gboolean StreamingCollectionView::OnKeyPressed(guint keyval) {
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
   if ((action == ListBoxKeyboard::Action::Backspace || action == ListBoxKeyboard::Action::Escape) && CanGoBack()) {
     PopBrowse();
     return TRUE;
+  }
+  const CollectionKeyboard::Action tree = CollectionKeyboard::FromKey(keyval);
+  if (tree == CollectionKeyboard::Action::Collapse && ApplyTreeLeft()) {
+    return TRUE;
+  }
+  if (tree == CollectionKeyboard::Action::Expand && !StreamingCollectionTree::FilterActive(filter_)) {
+    const CollectionItem *item = SelectedItem();
+    if (CollectionTree::IsExpandable(item) && !CollectionTree::ShowChildren(item, false, expanded_)) {
+      CollectionFocus::Capture(item, &focus_);
+      ToggleExpanded(item);
+      SelectFocusItem();
+    }
+    return CollectionTree::IsExpandable(item) ? TRUE : FALSE;
   }
   if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
     ResetTypeAhead();

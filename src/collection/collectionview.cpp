@@ -11,6 +11,7 @@
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectionkeyboard.h"
 #include "collection/collectiontree.h"
+#include "collection/collectiontreeleft.h"
 #include "covermanager/albumcoverloader.h"
 #include "dialogs/dialoghelpers.h"
 #include "translations/translations.h"
@@ -424,8 +425,9 @@ void CollectionView::RestoreFocus() {
   SelectFocusItem();
 }
 
-void CollectionView::SelectFocusItem() {
-  const CollectionItem *target = CollectionFocus::FindTarget(model_.root(), focus_);
+void CollectionView::SelectFocusItem() { SelectItem(CollectionFocus::FindTarget(model_.root(), focus_)); }
+
+void CollectionView::SelectItem(const CollectionItem *target) {
   if (!target) {
     return;
   }
@@ -515,6 +517,27 @@ void CollectionView::TypeAhead(gunichar ch) {
   }
 }
 
+bool CollectionView::ApplyTreeLeft() {
+  const CollectionItem *item = SelectedItem();
+  if (!item || !filter_.filter_string().empty()) {
+    return false;
+  }
+  const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
+  const CollectionTreeLeft::Action action = CollectionTreeLeft::FromItem(item, expanded);
+  if (action == CollectionTreeLeft::Action::None) {
+    return false;
+  }
+  const CollectionItem *focus = CollectionTreeLeft::FocusItem(item, action);
+  const CollectionItem *parent = CollectionTreeLeft::SelectableParent(item);
+  const bool parent_expanded = CollectionTree::ShowChildren(parent, false, expanded_);
+  const CollectionItem *collapse = CollectionTreeLeft::CollapseItem(item, action, parent_expanded);
+  if (collapse) {
+    ToggleExpanded(collapse);
+  }
+  SelectItem(focus);
+  return true;
+}
+
 gboolean CollectionView::OnKeyPressed(guint keyval) {
   if (CollectionFilterKeyboard::FromTreeKey(keyval) == CollectionFilterKeyboard::Action::FocusFilter) {
     ResetTypeAhead();
@@ -524,12 +547,16 @@ gboolean CollectionView::OnKeyPressed(guint keyval) {
     return TRUE;
   }
   const CollectionKeyboard::Action action = CollectionKeyboard::FromKey(keyval);
+  if (action == CollectionKeyboard::Action::Collapse && ApplyTreeLeft()) {
+    return TRUE;
+  }
   if (action == CollectionKeyboard::Action::Expand || action == CollectionKeyboard::Action::Collapse) {
     const CollectionItem *item = SelectedItem();
     if (CollectionTree::IsExpandable(item) && filter_.filter_string().empty()) {
       const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
       if ((action == CollectionKeyboard::Action::Expand && !expanded) || (action == CollectionKeyboard::Action::Collapse && expanded)) {
         ToggleExpanded(item);
+        SelectItem(item);
       }
       return TRUE;
     }

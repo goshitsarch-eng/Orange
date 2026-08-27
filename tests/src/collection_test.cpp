@@ -7,6 +7,7 @@
 #include "collection/collectionempty.h"
 #include "collection/collectionfilterfocus.h"
 #include "collection/collectiontypeaheadscroll.h"
+#include "collection/collectiontreeleft.h"
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectionbackend.h"
@@ -1259,6 +1260,32 @@ TEST(CollectionKeyboard, FromKeyAndMoveAction) {
   EXPECT_EQ(CollectionKeyboard::Action::End, CollectionKeyboard::FromKey(ListBoxKeyboard::kEnd));
   EXPECT_EQ(ListBoxKeyboard::Action::MoveDown, CollectionKeyboard::MoveAction(CollectionKeyboard::Action::MoveDown));
   EXPECT_EQ(ListBoxKeyboard::Action::None, CollectionKeyboard::MoveAction(CollectionKeyboard::Action::Expand));
+}
+
+TEST(CollectionTreeLeft, CollapseOrJumpToParent) {
+  CollectionItem root(CollectionItem::Type::Root);
+  CollectionItem *artist = root.AddChild(CollectionItem::Type::Container);
+  artist->key = "portishead";
+  CollectionItem *album = artist->AddChild(CollectionItem::Type::Container);
+  album->key = "dummy";
+  CollectionItem *song = album->AddChild(CollectionItem::Type::Song);
+
+  EXPECT_TRUE(CollectionTreeLeft::IsRootRow(artist));
+  EXPECT_FALSE(CollectionTreeLeft::IsRootRow(album));
+  EXPECT_FALSE(CollectionTreeLeft::IsRootRow(song));
+  EXPECT_EQ(nullptr, CollectionTreeLeft::SelectableParent(artist));
+  EXPECT_EQ(artist, CollectionTreeLeft::SelectableParent(album));
+  EXPECT_EQ(album, CollectionTreeLeft::SelectableParent(song));
+
+  EXPECT_EQ(CollectionTreeLeft::Action::CollapseCurrent, CollectionTreeLeft::FromState(false, true, true));
+  EXPECT_EQ(CollectionTreeLeft::Action::SelectParentAndCollapse, CollectionTreeLeft::FromState(false, false, true));
+  EXPECT_EQ(CollectionTreeLeft::Action::SelectParentAndCollapse, CollectionTreeLeft::FromItem(song, false));
+  EXPECT_EQ(CollectionTreeLeft::Action::CollapseCurrent, CollectionTreeLeft::FromItem(album, true));
+  EXPECT_EQ(CollectionTreeLeft::Action::None, CollectionTreeLeft::FromItem(artist, false));
+  EXPECT_EQ(album, CollectionTreeLeft::FocusItem(song, CollectionTreeLeft::Action::SelectParentAndCollapse));
+  EXPECT_EQ(album, CollectionTreeLeft::CollapseItem(song, CollectionTreeLeft::Action::SelectParentAndCollapse, true));
+  EXPECT_EQ(nullptr, CollectionTreeLeft::CollapseItem(song, CollectionTreeLeft::Action::SelectParentAndCollapse, false));
+  EXPECT_EQ(album, CollectionTreeLeft::CollapseItem(album, CollectionTreeLeft::Action::CollapseCurrent, true));
 }
 
 TEST(CollectionMenu, CatalogAndEmptySelection) {
