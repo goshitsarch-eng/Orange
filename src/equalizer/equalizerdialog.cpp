@@ -93,16 +93,32 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   gtk_entry_set_placeholder_text(GTK_ENTRY(preset_name), "Custom preset name");
   GtkWidget *save_preset = gtk_button_new_with_label(Translations::CStr(EqualizerLabels::SavePreset()));
   GtkWidget *delete_preset = gtk_button_new_with_label(Translations::CStr(EqualizerLabels::DeletePreset()));
+  gtk_widget_set_sensitive(save_preset, FALSE);
   g_object_set_data(G_OBJECT(save_preset), "name", preset_name);
   g_object_set_data(G_OBJECT(save_preset), "list", preset_names);
-  g_signal_connect(save_preset, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
+  g_object_set_data(G_OBJECT(preset_name), "save", save_preset);
+  g_signal_connect(preset_name, "changed", G_CALLBACK((+[](GtkEditable *editable, gpointer data) {
+                     auto *eq = static_cast<class Equalizer *>(data);
+                     const char *name = gtk_editable_get_text(editable);
+                     GtkWidget *save = GTK_WIDGET(g_object_get_data(G_OBJECT(editable), "save"));
+                     const std::string text = name ? name : "";
+                     if (save) {
+                       gtk_widget_set_sensitive(save, EqualizerPresets::CanSave(text, eq->IsBuiltin(text)));
+                     }
+                   })),
+                   equalizer);
+  g_signal_connect(save_preset, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
                      auto *eq = static_cast<class Equalizer *>(data);
                      GtkWidget *entry = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "name"));
                      const char *name = gtk_editable_get_text(GTK_EDITABLE(entry));
-                     if (eq->SavePreset(name ? name : "")) {
-                       gtk_string_list_append(GTK_STRING_LIST(g_object_get_data(G_OBJECT(button), "list")), name);
+                     const std::string text = name ? name : "";
+                     if (!EqualizerPresets::CanSave(text, eq->IsBuiltin(text))) {
+                       return;
                      }
-                   }),
+                     if (eq->SavePreset(text)) {
+                       gtk_string_list_append(GTK_STRING_LIST(g_object_get_data(G_OBJECT(button), "list")), text.c_str());
+                     }
+                   })),
                    equalizer);
   g_object_set_data(G_OBJECT(delete_preset), "drop", preset);
   g_signal_connect(delete_preset, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {

@@ -844,6 +844,9 @@ TEST(EqualizerPresets, AfterDeleteAndNextSelected) {
   EXPECT_EQ(1, EqualizerPresets::IndexOf(remaining, "Rock"));
   EXPECT_EQ("Custom", EqualizerPresets::NextSelected({}, "User", "User"));
   EXPECT_EQ("Are you sure you want to delete the \"User\" preset?", EqualizerPresets::ConfirmDeleteMessage("User"));
+  EXPECT_FALSE(EqualizerPresets::CanSave("", false));
+  EXPECT_FALSE(EqualizerPresets::CanSave("Rock", true));
+  EXPECT_TRUE(EqualizerPresets::CanSave("My Mix", false));
 }
 
 TEST(EqualizerPersist, SelectedPresetAndStereoBalancer) {

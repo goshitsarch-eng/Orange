@@ -34,6 +34,9 @@ inline std::string ConfirmDeleteMessage(const std::string &name) {
   return "Are you sure you want to delete the \"" + name + "\" preset?";
 }
 
+// Qt Equalizer::SaveCurrentPreset returns on an empty name. Builtin names cannot be overwritten.
+inline bool CanSave(const std::string &name, bool is_builtin) { return !name.empty() && !is_builtin; }
+
 inline int IndexOf(const std::vector<std::string> &names, const std::string &name) {
   for (size_t i = 0; i < names.size(); ++i) {
     if (names[i] == name) {
