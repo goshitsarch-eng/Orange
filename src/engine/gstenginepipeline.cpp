@@ -58,6 +58,7 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
   beginning_offset_nanosec_ = beginning_offset_nanosec;
   end_offset_nanosec_ = end_offset_nanosec;
   volume_control_ = extras.volume_control;
+  volume_exponential_ = extras.volume_exponential;
   strict_ssl_ = extras.strict_ssl;
   proxy_address_ = extras.proxy_address;
   proxy_authentication_ = extras.proxy_authentication;
@@ -97,6 +98,19 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
                    BackendOptions::ClampWatermark(extras.buffer_high_watermark), nullptr);
     }
     volume_ = extras.volume_control ? gst_element_factory_make("volume", "volume") : nullptr;
+    if (volume_) {
+      g_signal_connect(volume_, "notify::volume",
+                       G_CALLBACK((+[](GstElement *element, GParamSpec *, gpointer data) {
+                         auto *self = static_cast<GstEnginePipeline *>(data);
+                         if (self->ignore_volume_notify_ || !self->VolumeChanged) {
+                           return;
+                         }
+                         double internal = 0.0;
+                         g_object_get(element, "volume", &internal, nullptr);
+                         self->VolumeChanged(BackendOptions::InternalVolumeToPercent(internal, self->volume_exponential_));
+                       })),
+                       this);
+    }
     equalizer_preamp_ = gst_element_factory_make("volume", "equalizer_preamp");
     equalizer_ = gst_element_factory_make("equalizer-10bands", "equalizer");
     GstElement *rgvolume = replaygain ? gst_element_factory_make("rgvolume", "rgvolume") : nullptr;
@@ -274,11 +288,13 @@ void GstEnginePipeline::SetVolume(double fraction) {
     return;
   }
   fraction = std::clamp(fraction, 0.0, 1.0);
+  ignore_volume_notify_ = true;
   if (volume_) {
     g_object_set(volume_, "volume", fraction, nullptr);
   } else if (playbin_) {
     g_object_set(playbin_, "volume", fraction, nullptr);
   }
+  ignore_volume_notify_ = false;
 }
 
 void GstEnginePipeline::SetEbur128GainDb(double gain_db) {

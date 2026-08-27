@@ -46,6 +46,7 @@ class Player : public PlayerInterface {
   void SeekForward();
   void SeekBackward();
   void SetVolume(unsigned volume) override;
+  void SetVolumeFromEngine(unsigned volume);
   void VolumeUp();
   void VolumeDown();
   void Mute();

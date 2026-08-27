@@ -75,6 +75,7 @@ class GstEnginePipeline {
   std::function<void(int, const std::vector<int16_t> &)> SpectrumReady;
   std::function<void(int, const Song &)> TagsReady;
   std::function<void(int, int)> Buffering;
+  std::function<void(unsigned)> VolumeChanged;
 
  private:
   static gboolean BusCallback(GstBus *bus, GstMessage *message, gpointer data);
@@ -101,6 +102,8 @@ class GstEnginePipeline {
   uint64_t beginning_offset_nanosec_ = 0;
   int64_t end_offset_nanosec_ = -1;
   bool volume_control_ = true;
+  bool volume_exponential_ = false;
+  bool ignore_volume_notify_ = false;
   bool strict_ssl_ = false;
   std::string proxy_address_;
   bool proxy_authentication_ = false;

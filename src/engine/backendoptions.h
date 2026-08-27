@@ -56,6 +56,20 @@ inline double VolumeFraction(unsigned percent, bool exponential) {
   return std::pow(10.0, (static_cast<double>(percent) - 100.0) / 40.0);
 }
 
+// Qt GstEnginePipeline::InternalVolumeToPercent: inverse of VolumeFraction.
+inline unsigned InternalVolumeToPercent(double volume_internal, bool exponential) {
+  if (!exponential) {
+    return static_cast<unsigned>(std::clamp(std::lround(volume_internal * 100.0), 0L, 100L));
+  }
+  if (volume_internal <= 0.0) {
+    return 0;
+  }
+  return static_cast<unsigned>(std::clamp(std::lround(100.0 + 40.0 * std::log10(volume_internal)), 0L, 100L));
+}
+
+// Qt Player::SetVolumeFromEngine: ignore echoes of the value we just applied.
+inline bool ShouldApplyEngineVolume(unsigned current, unsigned from_engine) { return from_engine != current; }
+
 inline int EffectiveChannels(bool enabled, int channels) { return (enabled && channels > 0) ? channels : 0; }
 
 inline const char *SoupForceHttp1(bool http2_enabled) { return http2_enabled ? "" : "1"; }

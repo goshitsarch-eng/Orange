@@ -209,6 +209,13 @@ void GstEngine::WirePipeline(GstEnginePipeline *pipeline) {
     MetadataReceived.Emit(tagged);
   };
   pipeline->Buffering = [this](int, int percent) { HandleBuffering(percent); };
+  pipeline->VolumeChanged = [this, pipeline](unsigned percent) {
+    if (!current_ || current_.get() != pipeline) {
+      return;
+    }
+    volume_percent_ = percent;
+    VolumeChanged.Emit(percent);
+  };
 }
 
 void GstEngine::StartPreloading(const std::string &media_url, const std::string &stream_url, bool, int64_t beginning_offset_nanosec,

@@ -12,6 +12,7 @@
 #include <glib.h>
 
 #include "constants/backendsettings.h"
+#include "engine/backendoptions.h"
 #include "constants/behavioursettings.h"
 #include "constants/playlistsettings.h"
 #include "core/logging.h"
@@ -56,6 +57,7 @@ void Player::Init() {
   engine_->InvalidSongRequested.Connect([this](const std::string &url) { HandleInvalidSongRequested(url); });
   engine_->ValidSongRequested.Connect([this](const std::string &url) { HandleValidSongRequested(url); });
   engine_->MetadataReceived.Connect([this](const Song &song) { HandleEngineMetadata(song); });
+  engine_->VolumeChanged.Connect([this](unsigned volume) { SetVolumeFromEngine(volume); });
   ReloadSettings();
   LoadVolume();
 }
@@ -400,6 +402,15 @@ void Player::SeekBackward() {
 void Player::SetVolume(unsigned volume) {
   volume_ = std::min(volume, 100u);
   engine_->SetVolumeSW(volume_);
+  VolumeChanged.Emit(volume_);
+}
+
+void Player::SetVolumeFromEngine(unsigned volume) {
+  const unsigned new_volume = std::min(volume, 100u);
+  if (!BackendOptions::ShouldApplyEngineVolume(volume_, new_volume)) {
+    return;
+  }
+  volume_ = new_volume;
   VolumeChanged.Emit(volume_);
 }
 

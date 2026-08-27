@@ -55,6 +55,7 @@ class EngineBase {
   Signal<std::string> ValidSongRequested;
   Signal<Song> MetadataReceived;
   Signal<> Finished;
+  Signal<unsigned> VolumeChanged;
 
  protected:
   virtual void SetSpotifyAccessToken() {}
