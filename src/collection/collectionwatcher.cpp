@@ -9,6 +9,7 @@
 #include "collection/collectionfingerprintmatch.h"
 #include "collection/collectionrescanreason.h"
 #include "collection/collectionunavailablerestore.h"
+#include "collection/collectionscanprogress.h"
 #include "collection/collectionscandelay.h"
 #include "collection/collectionsubdirectory.h"
 #include "constants/collectionsettings.h"
@@ -424,14 +425,18 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
   CollectionWatcher *self = job->watcher;
   const int task_id = self->task_manager_ ? self->task_manager_->StartTask(job->type == ScanType::Full ? "Full collection scan" : "Scanning collection") : 0;
   self->last_added_ = 0;
+  const int progress_max = CollectionScanProgress::Total(static_cast<int>(job->songs.size()));
+  if (self->task_manager_ && task_id) {
+    self->task_manager_->SetTaskProgress(task_id, 0, progress_max);
+  }
   if (self->backend_) {
     std::map<std::string, std::vector<int64_t>> beginnings;
     for (const Song &song : job->songs) {
       self->backend_->AddOrUpdateSong(song);
       beginnings[song.url()].push_back(song.beginning_nanosec());
       ++self->last_added_;
-      if (self->task_manager_ && task_id && (self->last_added_ % 25) == 0) {
-        self->task_manager_->SetTaskProgress(task_id, self->last_added_);
+      if (self->task_manager_ && task_id && CollectionScanProgress::ShouldReport(self->last_added_)) {
+        self->task_manager_->SetTaskProgress(task_id, self->last_added_, progress_max);
       }
     }
     for (const auto &entry : beginnings) {
@@ -467,6 +472,7 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
     }
   }
   if (self->task_manager_ && task_id) {
+    self->task_manager_->SetTaskProgress(task_id, self->last_added_, progress_max);
     self->task_manager_->SetTaskFinished(task_id);
   }
   self->scanning_ = false;
@@ -606,8 +612,8 @@ void CollectionWatcher::ScanPath(int directory_id, const std::string &path, bool
       beginnings[song.url()].push_back(song.beginning_nanosec());
     }
     ++(*added);
-    if (task_manager_ && task_id && (*added % 25) == 0) {
-      task_manager_->SetTaskProgress(task_id, *added);
+    if (task_manager_ && task_id && CollectionScanProgress::ShouldReport(*added)) {
+      task_manager_->SetTaskProgress(task_id, *added, CollectionScanProgress::Total(static_cast<int>(job.songs.size())));
     }
   }
   if (backend_) {

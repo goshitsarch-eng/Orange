@@ -24,6 +24,7 @@
 #include "collection/collectionfingerprintmatch.h"
 #include "collection/collectionrescanreason.h"
 #include "collection/collectionunavailablerestore.h"
+#include "collection/collectionscanprogress.h"
 #include "collection/collectionscandelay.h"
 #include "collection/collectionwatcher.h"
 #include "core/songuserdatamerge.h"
@@ -1151,6 +1152,17 @@ TEST(CollectionBackend, EmitsStatisticsAndRatingAfterUpdate) {
   EXPECT_EQ(2, stats);
   EXPECT_EQ(1, ratings);
   unlink(path.c_str());
+}
+
+TEST(CollectionScanProgress, PercentWithMax) {
+  EXPECT_EQ(0, CollectionScanProgress::Percent(10, 0));
+  EXPECT_EQ(50, CollectionScanProgress::Percent(50, 100));
+  EXPECT_EQ(100, CollectionScanProgress::Percent(200, 100));
+  EXPECT_TRUE(CollectionScanProgress::ShouldReport(25));
+  EXPECT_FALSE(CollectionScanProgress::ShouldReport(24));
+  EXPECT_EQ(3, CollectionScanProgress::Total(3));
+  EXPECT_EQ(0, CollectionScanProgress::Total(-1));
+  EXPECT_EQ(2, CollectionScanProgress::CountAudioPaths({"/tmp/a.flac", "/tmp/notes.txt", "/tmp/b.mp3"}));
 }
 
 TEST(CollectionScanDelay, UsesTwoSecondRescanAndDailyPeriod) {

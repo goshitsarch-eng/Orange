@@ -33,11 +33,14 @@ inline void Merge(Song *target, const Song &engine) {
   if (target->url().empty() && !engine.url().empty()) {
     target->set_url(engine.url());
   }
+  if (!engine.stream_url().empty() && engine.stream_url() != engine.url()) {
+    target->set_stream_url(engine.stream_url());
+  }
 }
 
 inline bool ShouldRefreshPlaylist(const Song &before, const Song &after) {
   return before.title() != after.title() || before.artist() != after.artist() || before.album() != after.album() ||
-         before.length_nanosec() != after.length_nanosec();
+         before.length_nanosec() != after.length_nanosec() || before.stream_url() != after.stream_url();
 }
 
 }  // namespace PlayerMetadataSync

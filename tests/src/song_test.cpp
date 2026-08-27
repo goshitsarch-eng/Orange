@@ -28,6 +28,17 @@ TEST(Song, FiletypeAndAudio) {
   EXPECT_EQ("Collection", Song::SourceToString(Song::Source::Collection));
 }
 
+TEST(Song, StreamUrlCanExpireForTidalAndQobuz) {
+  Song tidal(Song::Source::Tidal);
+  Song qobuz(Song::Source::Qobuz);
+  Song spotify(Song::Source::Spotify);
+  Song local(Song::Source::Collection);
+  EXPECT_TRUE(tidal.stream_url_can_expire());
+  EXPECT_TRUE(qobuz.stream_url_can_expire());
+  EXPECT_FALSE(spotify.stream_url_can_expire());
+  EXPECT_FALSE(local.stream_url_can_expire());
+}
+
 TEST(Song, IsModuleMusic) {
   Song module;
   module.set_filetype(Song::FileType::MOD);

@@ -1,9 +1,11 @@
 #ifndef STRAWBERRY_PLAYER_H
 #define STRAWBERRY_PLAYER_H
 
+#include "constants/behavioursettings.h"
 #include "core/playerinterface.h"
 #include "core/signal.h"
 #include "core/song.h"
+#include "core/urlhandler.h"
 #include "engine/gstengine.h"
 
 #include <memory>
@@ -103,6 +105,17 @@ class Player : public PlayerInterface {
 
   void HandleEngineError(const std::string &error);
   void HandleEngineMetadata(const Song &song);
+  void HandleLoadResult(const UrlHandler::LoadResult &result);
+  void StartEnginePlayback(bool pause, int track_change_flags, uint64_t offset_nanosec);
+  void UnPause();
+
+  std::vector<std::string> loading_async_;
+  bool pending_play_pause_ = false;
+  int pending_play_flags_ = 0;
+  uint64_t pending_play_offset_ = 0;
+  int64_t pause_started_sec_ = 0;
+  int64_t last_previous_press_sec_ = 0;
+  BehaviourSettings::PreviousBehaviour menu_previous_mode_ = BehaviourSettings::kDefaultMenuPreviousMode;
 };
 
 #endif  // STRAWBERRY_PLAYER_H

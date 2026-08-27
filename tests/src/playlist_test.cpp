@@ -1,7 +1,11 @@
 #include "core/playermetadatasync.h"
 #include "core/playernextmetadata.h"
+#include "core/playererrorloop.h"
+#include "core/playerloadresult.h"
+#include "core/playerprevious.h"
 #include "core/playerpreload.h"
 #include "core/playerseeknotify.h"
+#include "core/playerstreamexpire.h"
 #include "core/playerintro.h"
 #include "core/playerrepeat.h"
 #include "core/playerstopafter.h"
@@ -773,6 +777,81 @@ TEST(DynamicPlaylistMaintenance, HistoryFutureAndTrimCounts) {
   EXPECT_EQ(3, DynamicPlaylistMaintenance::FutureInsertCount(10, PlaylistGenerator::kDefaultDynamicFuture, 18));
   EXPECT_TRUE(DynamicPlaylistMaintenance::ShouldClearUndo(true, true));
   EXPECT_FALSE(DynamicPlaylistMaintenance::ShouldClearUndo(false, true));
+}
+
+TEST(PlayerLoadResult, MatchesNextRowAndAppliesStreamUrl) {
+  EXPECT_EQ(PlayerLoadResult::Target::Current, PlayerLoadResult::MatchMediaUrl("", "tidal://1", "tidal://2"));
+  EXPECT_EQ(PlayerLoadResult::Target::Current, PlayerLoadResult::MatchMediaUrl("tidal://1", "tidal://1", "tidal://2"));
+  EXPECT_EQ(PlayerLoadResult::Target::Next, PlayerLoadResult::MatchMediaUrl("tidal://2", "tidal://1", "tidal://2"));
+  EXPECT_EQ(PlayerLoadResult::Target::None, PlayerLoadResult::MatchMediaUrl("tidal://3", "tidal://1", "tidal://2"));
+  EXPECT_TRUE(PlayerLoadResult::ShouldDeferEngineStart(UrlHandler::LoadResult::Type::WillLoadAsynchronously));
+  EXPECT_TRUE(PlayerLoadResult::ShouldDeferEngineStart(UrlHandler::LoadResult::Type::Async));
+  EXPECT_FALSE(PlayerLoadResult::ShouldDeferEngineStart(UrlHandler::LoadResult::Type::TrackAvailable));
+  EXPECT_TRUE(PlayerLoadResult::ShouldAdvanceOnNoMoreTracks(UrlHandler::LoadResult::Type::NoMoreTracks));
+  EXPECT_TRUE(PlayerLoadResult::ShouldTreatAsError(UrlHandler::LoadResult::Type::Error));
+  EXPECT_TRUE(PlayerLoadResult::ShouldPreloadResolved(PlayerLoadResult::Target::Next, false));
+  EXPECT_FALSE(PlayerLoadResult::ShouldPreloadResolved(PlayerLoadResult::Target::Next, true));
+  std::vector<std::string> loading;
+  PlayerLoadResult::LoadingAsyncInsert(&loading, "tidal://1");
+  EXPECT_TRUE(PlayerLoadResult::LoadingAsyncContains(loading, "tidal://1"));
+  PlayerLoadResult::LoadingAsyncInsert(&loading, "tidal://1");
+  EXPECT_EQ(1u, loading.size());
+  PlayerLoadResult::LoadingAsyncErase(&loading, "tidal://1");
+  EXPECT_FALSE(PlayerLoadResult::LoadingAsyncContains(loading, "tidal://1"));
+  Song song;
+  song.set_url("tidal://1");
+  UrlHandler::LoadResult result;
+  result.type = UrlHandler::LoadResult::Type::TrackAvailable;
+  result.stream_url = "https://cdn.example/a.flac";
+  result.filetype = Song::FileType::FLAC;
+  result.samplerate = 44100;
+  result.bit_depth = 16;
+  result.duration = 180000000000;
+  Song meta;
+  meta.set_valid(true);
+  meta.set_title("Roads");
+  result.song = meta;
+  PlayerLoadResult::Apply(&song, result);
+  EXPECT_EQ("https://cdn.example/a.flac", song.stream_url());
+  EXPECT_EQ(Song::FileType::FLAC, song.filetype());
+  EXPECT_EQ(44100, song.samplerate());
+  EXPECT_EQ(16, song.bitdepth());
+  EXPECT_EQ(180000000000, song.length_nanosec());
+  EXPECT_EQ("Roads", song.title());
+}
+
+TEST(PlayerStreamExpire, RefreshesAfterThirtySeconds) {
+  Song tidal(Song::Source::Tidal);
+  EXPECT_TRUE(tidal.stream_url_can_expire());
+  EXPECT_FALSE(PlayerStreamExpire::NeedsRefresh(tidal, true, 100, 129));
+  EXPECT_TRUE(PlayerStreamExpire::NeedsRefresh(tidal, true, 100, 130));
+  EXPECT_FALSE(PlayerStreamExpire::NeedsRefresh(tidal, false, 100, 200));
+  Song flac;
+  flac.set_source(Song::Source::Collection);
+  EXPECT_FALSE(PlayerStreamExpire::NeedsRefresh(flac, true, 100, 200));
+}
+
+TEST(PlayerPrevious, RestartModeAndDontRestartSeek) {
+  EXPECT_TRUE(PlayerPrevious::ShouldRestartTrack(BehaviourSettings::PreviousBehaviour::Restart, 0, 10));
+  EXPECT_TRUE(PlayerPrevious::ShouldRestartTrack(BehaviourSettings::PreviousBehaviour::Restart, 1, 4));
+  EXPECT_FALSE(PlayerPrevious::ShouldRestartTrack(BehaviourSettings::PreviousBehaviour::Restart, 8, 9));
+  EXPECT_FALSE(PlayerPrevious::ShouldRestartTrack(BehaviourSettings::PreviousBehaviour::DontRestart, 0, 10));
+  EXPECT_TRUE(PlayerPrevious::ShouldSeekToStart(BehaviourSettings::PreviousBehaviour::DontRestart, 4 * 1000000000LL));
+  EXPECT_FALSE(PlayerPrevious::ShouldSeekToStart(BehaviourSettings::PreviousBehaviour::DontRestart, 2 * 1000000000LL));
+  EXPECT_FALSE(PlayerPrevious::ShouldSeekToStart(BehaviourSettings::PreviousBehaviour::Restart, 10 * 1000000000LL));
+}
+
+TEST(PlayerErrorLoop, StopsRepeatTrackAndGlobalCap) {
+  EXPECT_TRUE(PlayerErrorLoop::ShouldStopRepeatTrack(PlaylistSequence::RepeatMode::Track, 3));
+  EXPECT_FALSE(PlayerErrorLoop::ShouldStopRepeatTrack(PlaylistSequence::RepeatMode::Track, 2));
+  EXPECT_FALSE(PlayerErrorLoop::ShouldStopRepeatTrack(PlaylistSequence::RepeatMode::Off, 3));
+  EXPECT_TRUE(PlayerErrorLoop::ShouldStopAfterFilteredRows(10, 10));
+  EXPECT_FALSE(PlayerErrorLoop::ShouldStopAfterFilteredRows(9, 10));
+  EXPECT_TRUE(PlayerErrorLoop::ShouldStopGlobal(100));
+  EXPECT_TRUE(PlayerErrorLoop::ShouldStopAutoAdvance(PlaylistSequence::RepeatMode::Track, 3, 50));
+  EXPECT_TRUE(PlayerErrorLoop::ShouldStopAutoAdvance(PlaylistSequence::RepeatMode::Playlist, 8, 8));
+  EXPECT_FALSE(PlayerErrorLoop::ShouldStopAutoAdvance(PlaylistSequence::RepeatMode::Off, 8, 8));
+  EXPECT_TRUE(PlayerErrorLoop::ShouldStopAutoAdvance(PlaylistSequence::RepeatMode::Off, 100, 8));
 }
 
 TEST(PlayerNextMetadata, RoutesCurrentAndNextUrls) {

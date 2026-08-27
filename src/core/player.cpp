@@ -1,6 +1,7 @@
 #include "core/player.h"
 
 #include <algorithm>
+#include <ctime>
 #include <memory>
 
 #include <glib.h>
@@ -11,7 +12,11 @@
 #include "core/logging.h"
 #include "core/playermetadatasync.h"
 #include "core/playernextmetadata.h"
+#include "core/playererrorloop.h"
+#include "core/playerloadresult.h"
+#include "core/playerprevious.h"
 #include "core/playerseeknotify.h"
+#include "core/playerstreamexpire.h"
 #include "core/playerintro.h"
 #include "core/playerpreload.h"
 #include "core/playerrepeat.h"
@@ -55,6 +60,8 @@ void Player::ReloadSettings() {
   seek_step_sec_ = settings.Contains("seek_step_sec") ? settings.IntValue("seek_step_sec", 10) : settings.IntValue("seekstep", 10);
   volume_increment_ = static_cast<unsigned>(settings.Contains("volume_increment") ? settings.IntValue("volume_increment", 5)
                                                                                 : settings.IntValue("volumeincrement", 5));
+  menu_previous_mode_ = static_cast<BehaviourSettings::PreviousBehaviour>(
+      settings.IntValue(BehaviourSettings::kMenuPreviousMode, static_cast<int>(BehaviourSettings::kDefaultMenuPreviousMode)));
   settings.EndGroup();
   settings.BeginGroup("Backend");
   const bool fading = settings.Contains("FadeoutEnabled") ? settings.BoolValue("FadeoutEnabled") : settings.BoolValue("fading", false);
@@ -142,7 +149,7 @@ void Player::PlayPause() {
       Pause();
       break;
     case GstEngine::State::Paused:
-      engine_->Unpause();
+      UnPause();
       break;
     default:
       Play();
@@ -249,11 +256,43 @@ void Player::Advance(int track_change_flags) {
   PlayCurrent(false, 0, track_change_flags);
 }
 
+void Player::UnPause() {
+  const int64_t now = static_cast<int64_t>(std::time(nullptr));
+  const bool has_handler = url_handlers_ && url_handlers_->HandlerForUrl(current_song_.url());
+  if (PlayerStreamExpire::NeedsRefresh(current_song_, has_handler, pause_started_sec_, now)) {
+    pending_play_pause_ = false;
+    pending_play_flags_ = GstEngine::Manual;
+    pending_play_offset_ = static_cast<uint64_t>(std::max<int64_t>(0, engine_->position_nanosec()));
+    if (UrlHandler *handler = url_handlers_->HandlerForUrl(current_song_.url())) {
+      if (PlayerLoadResult::LoadingAsyncContains(loading_async_, current_song_.url())) {
+        return;
+      }
+      const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this](const UrlHandler::LoadResult &async) {
+        HandleLoadResult(async);
+      });
+      if (PlayerLoadResult::ShouldDeferEngineStart(result.type)) {
+        PlayerLoadResult::LoadingAsyncInsert(&loading_async_, current_song_.url());
+      } else {
+        HandleLoadResult(result);
+      }
+      return;
+    }
+  }
+  engine_->Unpause();
+}
+
 void Player::Previous() {
   if (!playlist_manager_) {
     return;
   }
-  if (engine_->position_nanosec() > 3 * 1000000000LL) {
+  const int64_t now = static_cast<int64_t>(std::time(nullptr));
+  if (PlayerPrevious::ShouldRestartTrack(menu_previous_mode_, last_previous_press_sec_, now)) {
+    last_previous_press_sec_ = now;
+    PlayAt(playlist_manager_->current_row());
+    return;
+  }
+  last_previous_press_sec_ = now;
+  if (PlayerPrevious::ShouldSeekToStart(menu_previous_mode_, engine_->position_nanosec())) {
     SeekTo(0);
     return;
   }
@@ -347,42 +386,6 @@ void Player::PlayCurrent(bool pause, uint64_t offset_nanosec, int track_change_f
   PlayLoadedSong(pause, track_change_flags, offset_nanosec);
 }
 
-namespace {
-
-void ApplyLoadResult(Song *song, const UrlHandler::LoadResult &result) {
-  if (!result.stream_url.empty()) {
-    song->set_stream_url(result.stream_url);
-  }
-  if (result.filetype != Song::FileType::Unknown) {
-    song->set_filetype(result.filetype);
-  }
-  if (result.samplerate > 0) {
-    song->set_samplerate(result.samplerate);
-  }
-  if (result.bit_depth > 0) {
-    song->set_bitdepth(result.bit_depth);
-  }
-  if (result.duration > 0) {
-    song->set_length_nanosec(result.duration);
-  }
-  if (result.song.is_valid()) {
-    if (!result.song.title().empty()) {
-      song->set_title(result.song.title());
-    }
-    if (!result.song.artist().empty()) {
-      song->set_artist(result.song.artist());
-    }
-    if (!result.song.album().empty()) {
-      song->set_album(result.song.album());
-    }
-    if (!result.song.genre().empty()) {
-      song->set_genre(result.song.genre());
-    }
-  }
-}
-
-}  // namespace
-
 void Player::FinishCurrentPlayback() {
   if (finished_current_) {
     return;
@@ -395,33 +398,10 @@ void Player::FinishCurrentPlayback() {
   PlaybackFinished.Emit(current_song_, listened);
 }
 
-void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_nanosec) {
-  finished_current_ = false;
+void Player::StartEnginePlayback(bool pause, int track_change_flags, uint64_t offset_nanosec) {
   const bool intro = PlayerIntro::Active(playlist_manager_);
   if (intro) {
     track_change_flags |= GstEngine::Intro;
-  }
-  if (!current_song_.is_valid() && current_song_.url().empty()) {
-    Stop();
-    return;
-  }
-  if (url_handlers_) {
-    if (UrlHandler *handler = url_handlers_->HandlerForUrl(current_song_.url())) {
-      const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this, pause, track_change_flags, offset_nanosec, intro](const UrlHandler::LoadResult &async) {
-        ApplyLoadResult(&current_song_, async);
-        if (!async.stream_url.empty()) {
-          engine_->SetNextAlbum(current_song_.EffectiveAlbum());
-          engine_->Load(current_song_.url(), async.stream_url, track_change_flags, PlayerIntro::HasForcedEnd(current_song_, intro),
-                        current_song_.beginning_nanosec(), PlayerIntro::EffectiveEndNanosec(current_song_, intro),
-                        current_song_.ebur128_integrated_loudness_lufs());
-          engine_->SetCurrentAlbum(current_song_.EffectiveAlbum());
-          engine_->Play(pause, offset_nanosec);
-        }
-      });
-      if (result.type == UrlHandler::LoadResult::Type::TrackAvailable) {
-        ApplyLoadResult(&current_song_, result);
-      }
-    }
   }
   engine_->SetNextAlbum(current_song_.EffectiveAlbum());
   engine_->Load(current_song_.url(), current_song_.stream_url(), track_change_flags, PlayerIntro::HasForcedEnd(current_song_, intro),
@@ -435,6 +415,80 @@ void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_
   }
   SongChanged.Emit(current_song_);
   ArmIntroTimeout();
+}
+
+void Player::HandleLoadResult(const UrlHandler::LoadResult &result) {
+  const std::string media = result.media_url.empty() ? current_song_.url() : result.media_url;
+  PlayerLoadResult::LoadingAsyncErase(&loading_async_, media);
+  Playlist *playlist = playlist_manager_ ? playlist_manager_->active() : nullptr;
+  const Song next = playlist ? playlist->PeekNextSong() : Song();
+  const auto target = PlayerLoadResult::MatchMediaUrl(media, current_song_.url(), next.url());
+  if (PlayerLoadResult::ShouldTreatAsError(result.type)) {
+    if (target == PlayerLoadResult::Target::Current) {
+      HandleEngineError(result.error.empty() ? "URL handler error" : result.error);
+    }
+    return;
+  }
+  if (PlayerLoadResult::ShouldAdvanceOnNoMoreTracks(result.type)) {
+    if (target == PlayerLoadResult::Target::Current) {
+      Advance(GstEngine::Auto);
+    }
+    return;
+  }
+  if (PlayerLoadResult::ShouldDeferEngineStart(result.type)) {
+    PlayerLoadResult::LoadingAsyncInsert(&loading_async_, media);
+    return;
+  }
+  if (target == PlayerLoadResult::Target::Next && playlist) {
+    Song patched = next;
+    PlayerLoadResult::Apply(&patched, result);
+    playlist->UpdateRowMetadata(playlist->PeekNextRow(), patched);
+    if (PlayerLoadResult::ShouldPreloadResolved(target, current_song_.is_module_music())) {
+      engine_->StartPreloading(next.url(), patched.stream_url(), SongSegment::HasForcedEnd(patched), patched.beginning_nanosec(),
+                               SongSegment::EffectiveEndNanosec(patched));
+    }
+    return;
+  }
+  if (target == PlayerLoadResult::Target::None) {
+    return;
+  }
+  PlayerLoadResult::Apply(&current_song_, result);
+  if (playlist) {
+    playlist->MergeFromEngine(current_song_);
+  }
+  StartEnginePlayback(pending_play_pause_, pending_play_flags_, pending_play_offset_);
+}
+
+void Player::PlayLoadedSong(bool pause, int track_change_flags, uint64_t offset_nanosec) {
+  finished_current_ = false;
+  const bool intro = PlayerIntro::Active(playlist_manager_);
+  if (intro) {
+    track_change_flags |= GstEngine::Intro;
+  }
+  if (!current_song_.is_valid() && current_song_.url().empty()) {
+    Stop();
+    return;
+  }
+  pending_play_pause_ = pause;
+  pending_play_flags_ = track_change_flags;
+  pending_play_offset_ = offset_nanosec;
+  if (url_handlers_) {
+    if (UrlHandler *handler = url_handlers_->HandlerForUrl(current_song_.url())) {
+      if (PlayerLoadResult::LoadingAsyncContains(loading_async_, current_song_.url())) {
+        return;
+      }
+      const UrlHandler::LoadResult result = handler->Load(current_song_.url(), [this](const UrlHandler::LoadResult &async) {
+        HandleLoadResult(async);
+      });
+      if (PlayerLoadResult::ShouldDeferEngineStart(result.type)) {
+        PlayerLoadResult::LoadingAsyncInsert(&loading_async_, current_song_.url());
+        return;
+      }
+      HandleLoadResult(result);
+      return;
+    }
+  }
+  StartEnginePlayback(pause, track_change_flags, offset_nanosec);
 }
 
 void Player::CancelIntroTimeout() {
@@ -514,9 +568,13 @@ void Player::HandleEngineError(const std::string &error) {
   if (greyout_ && playlist_manager_) {
     playlist_manager_->SongChangeRequestProcessed(current_song_.url(), false);
   }
+  const PlaylistSequence::RepeatMode repeat = playlist_manager_ && playlist_manager_->active()
+                                                 ? playlist_manager_->active()->repeat_mode()
+                                                 : PlaylistSequence::RepeatMode::Off;
   const int rows = playlist_manager_ && playlist_manager_->active() ? playlist_manager_->active()->row_count() : 0;
   ++error_count_;
-  if (PlaylistBehaviour::ShouldStopAfterError(continue_on_error_, error_count_, rows)) {
+  if (PlayerErrorLoop::ShouldStopAutoAdvance(repeat, error_count_, rows) ||
+      PlaylistBehaviour::ShouldStopAfterError(continue_on_error_, error_count_, rows)) {
     error_count_ = 0;
     Stop();
     return;
@@ -543,6 +601,22 @@ void Player::PreloadNext() {
     Advance(GstEngine::Auto);
     return;
   }
+  if (url_handlers_) {
+    if (UrlHandler *handler = url_handlers_->HandlerForUrl(next_song.url())) {
+      if (PlayerLoadResult::LoadingAsyncContains(loading_async_, next_song.url())) {
+        return;
+      }
+      const UrlHandler::LoadResult result = handler->Load(next_song.url(), [this](const UrlHandler::LoadResult &async) {
+        HandleLoadResult(async);
+      });
+      if (PlayerLoadResult::ShouldDeferEngineStart(result.type)) {
+        PlayerLoadResult::LoadingAsyncInsert(&loading_async_, next_song.url());
+        return;
+      }
+      HandleLoadResult(result);
+      return;
+    }
+  }
   engine_->StartPreloading(next_song.url(), next_song.stream_url(), SongSegment::HasForcedEnd(next_song),
                            next_song.beginning_nanosec(), SongSegment::EffectiveEndNanosec(next_song));
 }
@@ -551,9 +625,11 @@ void Player::HandleEngineState(EngineBase::State state) {
   StateChanged.Emit(state);
   switch (state) {
     case GstEngine::State::Playing:
+      pause_started_sec_ = 0;
       Playing.Emit();
       break;
     case GstEngine::State::Paused:
+      pause_started_sec_ = static_cast<int64_t>(std::time(nullptr));
       Paused.Emit();
       break;
     case GstEngine::State::Empty:

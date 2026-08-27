@@ -246,6 +246,7 @@ class Song {
   bool is_stream() const;
   bool is_radio() const;
   bool is_stream_service() const;
+  bool stream_url_can_expire() const { return source_ == Source::Tidal || source_ == Source::Qobuz; }
   bool is_metadata_good() const;
   bool is_cdda() const { return source_ == Source::CDDA || filetype_ == FileType::CDDA; }
   bool is_collection_song() const { return source_ == Source::Collection; }
