@@ -29,12 +29,12 @@ GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *
                     const std::function<void(const std::string &)> &changed = {}, const char *group_name = nullptr);
 GtkWidget *AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
                        const std::vector<std::pair<std::string, std::string>> &choices, int fallback);
-void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked,
-                  const char *tooltip = nullptr);
-void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
-                  const std::function<void(GtkWidget *button)> &clicked, const char *tooltip = nullptr);
-void AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
-                    const char *fallback, const char *tooltip = nullptr);
+GtkWidget *AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked,
+                        const char *tooltip = nullptr);
+GtkWidget *AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
+                        const std::function<void(GtkWidget *button)> &clicked, const char *tooltip = nullptr);
+GtkWidget *AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                          const char *fallback, const char *tooltip = nullptr);
 void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
                    const char *fallback);
 void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
@@ -44,7 +44,7 @@ GtkWidget *AddDoubleScale(AdwPreferencesGroup *group, Settings *settings, const 
 GtkWidget *AddIntScale(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
                        int fallback, int min, int max, int step);
 void AddBoolRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *false_title, const char *true_title,
-                   bool fallback);
+                   bool fallback, const std::function<void(bool)> &changed = {});
 void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title,
                      const std::vector<std::pair<std::string, std::string>> &choices, const std::string &fallback,
                      const std::function<void(const std::string &)> &changed = {});

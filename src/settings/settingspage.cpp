@@ -192,8 +192,8 @@ GtkWidget *AddIntCombo(AdwPreferencesGroup *group, Settings *settings, const cha
   });
 }
 
-void AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
-                    const char *fallback, const char *tooltip) {
+GtkWidget *AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
+                          const char *fallback, const char *tooltip) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   GtkColorDialog *dialog = gtk_color_dialog_new();
@@ -239,6 +239,7 @@ void AddColorButton(AdwPreferencesGroup *group, Settings *settings, const char *
                    settings);
   adw_action_row_add_suffix(row, button);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  return GTK_WIDGET(row);
 }
 
 void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *group_name, const char *key, const char *title,
@@ -355,7 +356,7 @@ void AddOpacityScale(AdwPreferencesGroup *group, Settings *settings, const char 
 }
 
 void AddBoolRadios(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *false_title, const char *true_title,
-                   bool fallback) {
+                   bool fallback, const std::function<void(bool)> &changed) {
   const bool value = settings && key ? settings->BoolValue(key, fallback) : fallback;
   GtkWidget *false_btn = gtk_check_button_new_with_label(Translations::CStr(false_title));
   GtkWidget *true_btn = gtk_check_button_new_with_label(Translations::CStr(true_title));
@@ -364,14 +365,21 @@ void AddBoolRadios(AdwPreferencesGroup *group, Settings *settings, const char *k
   if (key) {
     g_object_set_data_full(G_OBJECT(true_btn), "settings-key", g_strdup(key), g_free);
   }
+  if (changed) {
+    auto *fn = new std::function<void(bool)>(changed);
+    g_object_set_data(G_OBJECT(true_btn), "bool-changed", fn);
+    g_object_set_data_full(G_OBJECT(true_btn), "bool-changed-owned", fn, [](gpointer p) { delete static_cast<std::function<void(bool)> *>(p); });
+  }
   g_signal_connect(true_btn, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
                      auto *s = static_cast<Settings *>(data);
                      const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "settings-key"));
-                     if (!s || !settings_key) {
-                       return;
+                     if (s && settings_key) {
+                       s->SetBoolValue(settings_key, gtk_check_button_get_active(button));
+                       s->Sync();
                      }
-                     s->SetBoolValue(settings_key, gtk_check_button_get_active(button));
-                     s->Sync();
+                     if (auto *changed_fn = static_cast<std::function<void(bool)> *>(g_object_get_data(G_OBJECT(button), "bool-changed"))) {
+                       (*changed_fn)(gtk_check_button_get_active(button));
+                     }
                    }),
                    settings);
   AdwActionRow *false_row = ADW_ACTION_ROW(adw_action_row_new());
@@ -436,9 +444,9 @@ void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char 
   }
 }
 
-void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked,
-                  const char *tooltip) {
-  AddButtonRow(
+GtkWidget *AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label, const std::function<void()> &clicked,
+                        const char *tooltip) {
+  return AddButtonRow(
       group, title, button_label,
       [clicked](GtkWidget *) {
         if (clicked) {
@@ -448,8 +456,8 @@ void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *but
       tooltip);
 }
 
-void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
-                  const std::function<void(GtkWidget *button)> &clicked, const char *tooltip) {
+GtkWidget *AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *button_label,
+                        const std::function<void(GtkWidget *button)> &clicked, const char *tooltip) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   GtkWidget *button = gtk_button_new_with_label(Translations::CStr(button_label));
@@ -464,6 +472,7 @@ void AddButtonRow(AdwPreferencesGroup *group, const char *title, const char *but
   g_object_set_data_full(G_OBJECT(button), "clicked-fn", fn, +[](gpointer data) { delete static_cast<std::function<void(GtkWidget *)> *>(data); });
   adw_action_row_add_suffix(row, button);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  return GTK_WIDGET(row);
 }
 
 LoginStateWidget *AddLoginState(AdwPreferencesGroup *group, Application *app, const char *service_name) {

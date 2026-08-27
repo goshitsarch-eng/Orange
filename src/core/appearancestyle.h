@@ -18,6 +18,8 @@ inline std::vector<std::pair<std::string, std::string>> Choices() {
 
 inline bool ForcesDark(const std::string &id) { return id == kAdwaitaDark; }
 
+inline bool HasDarkMode(const std::string &id) { return id.empty() || id == kAdwaita; }
+
 inline bool HasCustomPalette(const std::string &id) { return id.empty() || id == kAdwaita || id == kAdwaitaDark; }
 
 inline std::string CssFor(const std::string &id) {

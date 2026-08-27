@@ -130,10 +130,41 @@ TEST(AppearanceStyle, GtkThemeChoicesAndCss) {
   EXPECT_EQ("Adwaita Dark", choices[2].second);
   EXPECT_TRUE(AppearanceStyle::ForcesDark(AppearanceStyle::kAdwaitaDark));
   EXPECT_FALSE(AppearanceStyle::ForcesDark(AppearanceStyle::kAdwaita));
+  EXPECT_TRUE(AppearanceStyle::HasDarkMode(""));
+  EXPECT_TRUE(AppearanceStyle::HasDarkMode(AppearanceStyle::kAdwaita));
+  EXPECT_FALSE(AppearanceStyle::HasDarkMode(AppearanceStyle::kAdwaitaDark));
+  EXPECT_FALSE(AppearanceStyle::HasDarkMode(AppearanceStyle::kHighContrast));
   EXPECT_TRUE(AppearanceStyle::HasCustomPalette(""));
   EXPECT_FALSE(AppearanceStyle::HasCustomPalette(AppearanceStyle::kHighContrast));
   EXPECT_TRUE(AppearanceStyle::CssFor(AppearanceStyle::kAdwaita).empty());
   EXPECT_FALSE(AppearanceStyle::CssFor(AppearanceStyle::kHighContrast).empty());
+}
+
+TEST(AppearanceEnable, FollowsQtSetEnabledChains) {
+  using Type = AppearanceSettings::BackgroundImageType;
+  EXPECT_TRUE(AppearanceEnable::CustomColorsEnabled(true));
+  EXPECT_FALSE(AppearanceEnable::CustomColorsEnabled(false));
+  EXPECT_FALSE(AppearanceEnable::BackgroundOptionsEnabled(Type::Default));
+  EXPECT_FALSE(AppearanceEnable::BackgroundOptionsEnabled(Type::None));
+  EXPECT_TRUE(AppearanceEnable::BackgroundOptionsEnabled(Type::Custom));
+  EXPECT_TRUE(AppearanceEnable::BackgroundOptionsEnabled(Type::Album));
+  EXPECT_FALSE(AppearanceEnable::BackgroundOptionsEnabled(Type::Strawbs));
+  EXPECT_TRUE(AppearanceEnable::BackgroundFilenameEnabled(Type::Custom));
+  EXPECT_FALSE(AppearanceEnable::BackgroundFilenameEnabled(Type::Album));
+  EXPECT_TRUE(AppearanceEnable::KeepAspectEnabled(true));
+  EXPECT_FALSE(AppearanceEnable::KeepAspectEnabled(false));
+  EXPECT_TRUE(AppearanceEnable::DoNotCutEnabled(true, true));
+  EXPECT_FALSE(AppearanceEnable::DoNotCutEnabled(true, false));
+  EXPECT_FALSE(AppearanceEnable::DoNotCutEnabled(false, true));
+  EXPECT_FALSE(AppearanceEnable::MaxSizeEnabled(true));
+  EXPECT_TRUE(AppearanceEnable::MaxSizeEnabled(false));
+  EXPECT_FALSE(AppearanceEnable::TabBarColorEnabled(true));
+  EXPECT_TRUE(AppearanceEnable::TabBarColorEnabled(false));
+  EXPECT_FALSE(AppearanceEnable::PlaylistCustomColorEnabled(true));
+  EXPECT_TRUE(AppearanceEnable::PlaylistCustomColorEnabled(false));
+  EXPECT_EQ(Type::Custom, AppearanceEnable::TypeFromId("2"));
+  EXPECT_EQ(Type::Album, AppearanceEnable::TypeFromId("3"));
+  EXPECT_EQ(Type::Default, AppearanceEnable::TypeFromId("0"));
 }
 
 TEST(SettingsControls, BufferDefaultsAndCacheUnitMax) {

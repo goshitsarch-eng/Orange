@@ -1,6 +1,10 @@
 #ifndef STRAWBERRY_APPEARANCESETTINGSLABELS_H
 #define STRAWBERRY_APPEARANCESETTINGSLABELS_H
 
+#include "constants/appearancesettings.h"
+
+#include <string>
+
 namespace AppearanceSettingsLabels {
 
 inline const char *StyleRestart() { return "You might need to restart Strawberry for this setting to fully apply"; }
@@ -37,5 +41,45 @@ inline const char *FilesPlaylistsQueue() { return "Files, playlists and queue bu
 inline const char *TabbarSmall() { return "Tabbar small mode"; }
 
 }  // namespace AppearanceSettingsLabels
+
+namespace AppearanceEnable {
+
+inline bool CustomColorsEnabled(const bool use_custom) { return use_custom; }
+
+inline bool BackgroundOptionsEnabled(const AppearanceSettings::BackgroundImageType type) {
+  return type == AppearanceSettings::BackgroundImageType::Custom || type == AppearanceSettings::BackgroundImageType::Album;
+}
+
+inline bool BackgroundFilenameEnabled(const AppearanceSettings::BackgroundImageType type) {
+  return type == AppearanceSettings::BackgroundImageType::Custom;
+}
+
+inline bool KeepAspectEnabled(const bool stretch) { return stretch; }
+
+inline bool DoNotCutEnabled(const bool stretch, const bool keep_aspect) { return stretch && keep_aspect; }
+
+inline bool MaxSizeEnabled(const bool stretch) { return !stretch; }
+
+inline bool TabBarColorEnabled(const bool system_color) { return !system_color; }
+
+inline bool PlaylistCustomColorEnabled(const bool system_color) { return !system_color; }
+
+inline AppearanceSettings::BackgroundImageType TypeFromId(const std::string &id) {
+  if (id == "1") {
+    return AppearanceSettings::BackgroundImageType::None;
+  }
+  if (id == "2") {
+    return AppearanceSettings::BackgroundImageType::Custom;
+  }
+  if (id == "3") {
+    return AppearanceSettings::BackgroundImageType::Album;
+  }
+  if (id == "4") {
+    return AppearanceSettings::BackgroundImageType::Strawbs;
+  }
+  return AppearanceSettings::BackgroundImageType::Default;
+}
+
+}  // namespace AppearanceEnable
 
 #endif
