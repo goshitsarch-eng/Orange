@@ -4,6 +4,9 @@
 #include "device/devicepropertiesinfo.h"
 #include "device/devicepropertieslabels.h"
 #include "device/devicesupportedformats.h"
+#include "device/devicecopysupported.h"
+#include "organize/organizetranscode.h"
+#include "core/musicstorage.h"
 #include "device/devicecopy.h"
 #include "device/devicecopyjob.h"
 #include "device/devicecopyrunner.h"
@@ -832,4 +835,20 @@ TEST(DeviceSupportedFormats, PagesOpenAndResolveMatchQt) {
   ASSERT_EQ(2u, queried.size());
   EXPECT_EQ(Song::FileType::MPEG, queried[0]);
   EXPECT_EQ(Song::FileType::FLAC, queried[1]);
+}
+
+TEST(DeviceCopySupported, ForCopyPrefersQueriedElseBackend) {
+  const auto queried = DeviceCopySupported::ForCopy("mtp", {Song::FileType::MPEG});
+  ASSERT_EQ(1u, queried.size());
+  EXPECT_EQ(Song::FileType::MPEG, queried[0]);
+  const auto fallback = DeviceCopySupported::ForCopy("mtp", {});
+  EXPECT_TRUE(OrganizeTranscode::Contains(fallback, Song::FileType::FLAC));
+  EXPECT_TRUE(OrganizeTranscode::Contains(fallback, Song::FileType::ASF));
+  EXPECT_TRUE(DeviceCopySupported::ForCopy("gio", {}).empty());
+
+  // A queried MPEG-only device transcodes FLAC; the hardcoded MTP fallback does not.
+  EXPECT_EQ(Song::FileType::MPEG, OrganizeTranscode::Check(Song::FileType::FLAC, MusicStorage::TranscodeMode::Transcode_Unsupported,
+                                                          Song::FileType::MPEG, DeviceCopySupported::ForCopy("mtp", {Song::FileType::MPEG})));
+  EXPECT_EQ(Song::FileType::Unknown, OrganizeTranscode::Check(Song::FileType::FLAC, MusicStorage::TranscodeMode::Transcode_Unsupported,
+                                                             Song::FileType::MPEG, DeviceCopySupported::ForCopy("mtp", {})));
 }

@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 class TagReader;
 class TaskManager;
@@ -67,6 +68,7 @@ class DeviceCopyRunner {
   unsigned idle_id_ = 0;
   MusicStorage::TranscodeMode transcode_mode_ = MusicStorage::TranscodeMode::Transcode_Never;
   Song::FileType transcode_format_ = Song::FileType::Unknown;
+  std::vector<Song::FileType> supported_filetypes_;
   std::string playlist_;
   bool overwrite_ = false;
   bool albumcover_ = true;

@@ -14,6 +14,7 @@
 #include "device/giolister.h"
 #include "device/udisks2lister.h"
 #include "device/devicecopyrunner.h"
+#include "device/devicecopysupported.h"
 #include "device/gpoddevice.h"
 #include "device/gpodloader.h"
 #include "device/mtpconnection.h"
@@ -432,7 +433,7 @@ SongList DeviceManager::TranscodeForDevice(const SongList &songs, const Connecte
   const MusicStorage::TranscodeMode mode =
       OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported);
   const Song::FileType format = stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG;
-  const std::vector<Song::FileType> supported = OrganizeTranscode::SupportedForBackend(device.backend);
+  const std::vector<Song::FileType> supported = DeviceCopySupported::ForDevice(device);
   SongList prepared;
   prepared.reserve(songs.size());
   for (const Song &song : songs) {

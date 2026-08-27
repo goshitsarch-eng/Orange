@@ -5,6 +5,7 @@
 #include "core/standardpaths.h"
 #include "core/taskmanager.h"
 #include "device/devicecopyjob.h"
+#include "device/devicecopysupported.h"
 #include "device/devicemanager.h"
 #include "device/gpoddevice.h"
 #include "device/mtpdevice.h"
@@ -70,6 +71,7 @@ void DeviceCopyRunner::Begin(const ConnectedDevice &device, const SongList &song
   finished_ = false;
   async_ = false;
   session_open_ = false;
+  supported_filetypes_.clear();
   mtp_.reset();
   gpod_.reset();
 }
@@ -106,6 +108,9 @@ bool DeviceCopyRunner::OpenSession() {
   if (device_.backend == "mtp") {
     mtp_ = std::make_unique<MtpCopySession>();
     session_open_ = mtp_->Open(DeviceCopyJob::MtpSerial(device_.unique_id));
+    if (session_open_) {
+      supported_filetypes_ = DeviceCopySupported::ForCopy(device_.backend, mtp_->SupportedFiletypes());
+    }
     return session_open_;
   }
 #endif
@@ -113,15 +118,20 @@ bool DeviceCopyRunner::OpenSession() {
   if (device_.backend == "gpod") {
     gpod_ = std::make_unique<GPodCopySession>();
     session_open_ = gpod_->Open(device_.mount_path);
+    if (session_open_) {
+      supported_filetypes_ = DeviceCopySupported::ForCopy(device_.backend, {});
+    }
     return session_open_;
   }
 #endif
   session_open_ = true;
+  supported_filetypes_ = DeviceCopySupported::ForCopy(device_.backend, {});
   return true;
 }
 
 Song DeviceCopyRunner::PrepareSong(const Song &song) {
-  const std::vector<Song::FileType> supported = OrganizeTranscode::SupportedForBackend(device_.backend);
+  const std::vector<Song::FileType> supported =
+      supported_filetypes_.empty() ? DeviceCopySupported::ForCopy(device_.backend, {}) : supported_filetypes_;
   const Song::FileType dest_type = OrganizeTranscode::Check(song.filetype(), transcode_mode_, transcode_format_, supported);
   if (dest_type == Song::FileType::Unknown || !OrganizeTranscode::CanTranscode(dest_type)) {
     return song;

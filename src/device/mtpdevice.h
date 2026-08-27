@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 class MtpCopySession {
  public:
@@ -14,6 +15,7 @@ class MtpCopySession {
   bool CopyOne(const Song &song);
   void Close();
   bool is_open() const;
+  std::vector<Song::FileType> SupportedFiletypes() const;
 
  private:
   std::unique_ptr<MtpConnection> connection_;

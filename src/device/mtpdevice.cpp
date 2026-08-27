@@ -29,6 +29,10 @@ bool MtpCopySession::Open(const std::string &serial) {
 
 bool MtpCopySession::is_open() const { return connection_ && connection_->is_valid(); }
 
+std::vector<Song::FileType> MtpCopySession::SupportedFiletypes() const {
+  return connection_ ? connection_->SupportedFiletypes() : std::vector<Song::FileType>{};
+}
+
 void MtpCopySession::Close() { connection_.reset(); }
 
 bool MtpCopySession::CopyOne(const Song &song) {

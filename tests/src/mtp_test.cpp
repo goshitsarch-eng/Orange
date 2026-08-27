@@ -2,6 +2,7 @@
 #include "core/database.h"
 #include "core/song.h"
 #include "device/devicedatabasebackend.h"
+#include "device/devicecopysupported.h"
 #include "device/mtpconnection.h"
 #include "device/mtploader.h"
 
@@ -9,6 +10,7 @@
 #include <unistd.h>
 
 #include <string>
+#include <vector>
 
 #ifdef HAVE_MTP
 
@@ -31,6 +33,33 @@ TEST(MtpConnection, FileTypeFromMtpMatchesInitFromMTP) {
   EXPECT_EQ(Song::FileType::OggFlac, MtpConnection::FileTypeFromMtp(LIBMTP_FILETYPE_FLAC));
   EXPECT_EQ(Song::FileType::OggVorbis, MtpConnection::FileTypeFromMtp(LIBMTP_FILETYPE_OGG));
   EXPECT_EQ(Song::FileType::Unknown, MtpConnection::FileTypeFromMtp(LIBMTP_FILETYPE_UNKNOWN));
+}
+
+TEST(DeviceCopySupported, AppendFromMtpMatchesQtGetSupportedFiletypes) {
+  std::vector<Song::FileType> types;
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_WAV, &types);
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_MP2, &types);
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_MP3, &types);
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_WMA, &types);
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_MP4, &types);
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_M4A, &types);
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_AAC, &types);
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_FLAC, &types);
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_OGG, &types);
+  DeviceCopySupported::AppendFromMtp(LIBMTP_FILETYPE_UNKNOWN, &types);
+  ASSERT_EQ(12u, types.size());
+  EXPECT_EQ(Song::FileType::WAV, types[0]);
+  EXPECT_EQ(Song::FileType::MPEG, types[1]);
+  EXPECT_EQ(Song::FileType::MPEG, types[2]);
+  EXPECT_EQ(Song::FileType::ASF, types[3]);
+  EXPECT_EQ(Song::FileType::MP4, types[4]);
+  EXPECT_EQ(Song::FileType::MP4, types[5]);
+  EXPECT_EQ(Song::FileType::MP4, types[6]);
+  EXPECT_EQ(Song::FileType::FLAC, types[7]);
+  EXPECT_EQ(Song::FileType::OggFlac, types[8]);
+  EXPECT_EQ(Song::FileType::OggVorbis, types[9]);
+  EXPECT_EQ(Song::FileType::OggSpeex, types[10]);
+  EXPECT_EQ(Song::FileType::OggFlac, types[11]);
 }
 
 TEST(MtpConnection, MtpFileTypeFromSong) {

@@ -3,6 +3,7 @@
 #include "core/application.h"
 #include "device/devicecopy.h"
 #include "device/devicecopyrunner.h"
+#include "device/devicecopysupported.h"
 #include "device/devicemanager.h"
 #include "organize/organizedialog.h"
 #include "organize/organizeerrordialog.h"
@@ -69,7 +70,7 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongLis
                          request.transcode_mode = OrganizeTranscode::FromDeviceMode(
                              stored.id >= 0 ? stored.transcode_mode : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported);
                          request.transcode_format = stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG;
-                         request.supported_filetypes = OrganizeTranscode::SupportedForBackend(device->backend);
+                         request.supported_filetypes = DeviceCopySupported::ForDevice(*device);
                          request.show_eject = true;
                          request.device_id = device->unique_id;
                          request.playlist = playlist_name;

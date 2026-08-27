@@ -1,6 +1,7 @@
 #include "device/mtpconnection.h"
 
 #include "core/logging.h"
+#include "device/devicecopysupported.h"
 
 #include <cstdlib>
 
@@ -177,34 +178,7 @@ std::vector<Song::FileType> MtpConnection::SupportedFiletypes() const {
     return types;
   }
   for (uint16_t i = 0; i < length; ++i) {
-    switch (static_cast<LIBMTP_filetype_t>(list[i])) {
-      case LIBMTP_FILETYPE_WAV:
-        types.push_back(Song::FileType::WAV);
-        break;
-      case LIBMTP_FILETYPE_MP2:
-      case LIBMTP_FILETYPE_MP3:
-        types.push_back(Song::FileType::MPEG);
-        break;
-      case LIBMTP_FILETYPE_WMA:
-        types.push_back(Song::FileType::ASF);
-        break;
-      case LIBMTP_FILETYPE_MP4:
-      case LIBMTP_FILETYPE_M4A:
-      case LIBMTP_FILETYPE_AAC:
-        types.push_back(Song::FileType::MP4);
-        break;
-      case LIBMTP_FILETYPE_FLAC:
-        types.push_back(Song::FileType::FLAC);
-        types.push_back(Song::FileType::OggFlac);
-        break;
-      case LIBMTP_FILETYPE_OGG:
-        types.push_back(Song::FileType::OggVorbis);
-        types.push_back(Song::FileType::OggSpeex);
-        types.push_back(Song::FileType::OggFlac);
-        break;
-      default:
-        break;
-    }
+    DeviceCopySupported::AppendFromMtp(static_cast<LIBMTP_filetype_t>(list[i]), &types);
   }
   free(list);
 #endif
