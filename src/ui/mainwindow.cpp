@@ -1744,6 +1744,7 @@ void MainWindow::BuildPlaylist() {
   });
   playlist_container_->SetRepeatMode(playlist_sequence_.repeat_mode());
   playlist_container_->SetShuffleMode(playlist_sequence_.shuffle_mode());
+  ApplyAppearance();
 }
 
 void MainWindow::BuildPlayerBar() {
@@ -3186,7 +3187,10 @@ void MainWindow::ApplyAppearance() {
     cover_path = FileUtils::PathFromUri(song.art_manual().empty() ? song.art_automatic() : song.art_manual());
   }
   const std::string css = appearance.BackgroundCss(cover_path);
-  if (!css.empty()) {
+  const std::string key = cover_path.empty() ? appearance.background_filename() : cover_path;
+  if (playlist_container_ && playlist_container_->view()) {
+    playlist_container_->view()->SetBackground(css, key.empty() ? std::to_string(appearance.background_type()) : key);
+  } else if (!css.empty()) {
     StyleUtils::LoadCss(css);
   }
   if (play_button_) {

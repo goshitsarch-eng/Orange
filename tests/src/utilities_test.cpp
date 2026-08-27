@@ -65,6 +65,7 @@
 #include "context/contextformattokens.h"
 #include "constants/appearancesettings.h"
 #include "core/appearance.h"
+#include "core/appearancebackgroundfade.h"
 #include "core/appearancecolors.h"
 #include "core/deletefiles.h"
 #include "core/deletefilesjob.h"
@@ -2067,6 +2068,30 @@ TEST(Appearance, BackgroundCssForTypesAndUrls) {
   EXPECT_NE(std::string::npos, stretched.find("background-size: cover"));
   const std::string contained = Appearance::BuildBackgroundCss(2, "/tmp/wall.jpg", 1, 0, 40, true, true, true, 0);
   EXPECT_NE(std::string::npos, contained.find("background-size: contain"));
+}
+
+TEST(AppearanceBackgroundFade, CrossfadesPreviousOverOneSecond) {
+  EXPECT_EQ(1000, AppearanceBackgroundFade::kDurationMs);
+  EXPECT_EQ(50, AppearanceBackgroundFade::kTickMs);
+  EXPECT_STREQ(".strawberry-playlist-previous-background", AppearanceBackgroundFade::kPreviousSelector());
+  EXPECT_DOUBLE_EQ(1.0, AppearanceBackgroundFade::PreviousOpacity(0));
+  EXPECT_DOUBLE_EQ(0.0, AppearanceBackgroundFade::CurrentOpacity(0));
+  EXPECT_DOUBLE_EQ(0.5, AppearanceBackgroundFade::PreviousOpacity(AppearanceBackgroundFade::kDurationMs / 2));
+  EXPECT_DOUBLE_EQ(0.5, AppearanceBackgroundFade::CurrentOpacity(AppearanceBackgroundFade::kDurationMs / 2));
+  EXPECT_DOUBLE_EQ(0.0, AppearanceBackgroundFade::PreviousOpacity(AppearanceBackgroundFade::kDurationMs));
+  EXPECT_DOUBLE_EQ(1.0, AppearanceBackgroundFade::CurrentOpacity(AppearanceBackgroundFade::kDurationMs));
+  EXPECT_TRUE(AppearanceBackgroundFade::ShouldReplace("a", "b"));
+  EXPECT_FALSE(AppearanceBackgroundFade::ShouldReplace("a", "a"));
+  EXPECT_TRUE(AppearanceBackgroundFade::ShouldAnimate(true, true));
+  EXPECT_FALSE(AppearanceBackgroundFade::ShouldAnimate(false, true));
+  EXPECT_FALSE(AppearanceBackgroundFade::ShouldAnimate(true, false));
+  EXPECT_TRUE(AppearanceBackgroundFade::ShouldClearPrevious(0.0));
+  EXPECT_FALSE(AppearanceBackgroundFade::ShouldClearPrevious(0.2));
+  const std::string rewritten = AppearanceBackgroundFade::RewriteSelector(".strawberry-playlist-viewport { }",
+                                                                         Appearance::kPlaylistViewportSelector,
+                                                                         AppearanceBackgroundFade::kPreviousSelector());
+  EXPECT_NE(std::string::npos, rewritten.find(AppearanceBackgroundFade::kPreviousSelector()));
+  EXPECT_EQ(std::string::npos, rewritten.find(Appearance::kPlaylistViewportSelector));
 }
 
 TEST(AppearanceColors, PaletteTabPlayingAndIconCss) {

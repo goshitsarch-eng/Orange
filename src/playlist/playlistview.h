@@ -76,6 +76,7 @@ class PlaylistView {
   void UpdateNoMatchesOverlay();
   void SetPlaybackProgress(double progress);
   void SetGlowing(bool glowing);
+  void SetBackground(const std::string &css, const std::string &key);
 
  private:
   void Clear();
@@ -90,10 +91,17 @@ class PlaylistView {
   void StartGlowTimer();
   void StopGlowTimer();
   gboolean OnGlowTick();
+  void StopBackgroundFade();
+  gboolean OnBackgroundFadeTick();
+  void ApplyBackgroundCss();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *grid_ = nullptr;
   GtkWidget *overlay_ = nullptr;
+  GtkWidget *root_overlay_ = nullptr;
+  GtkWidget *bg_overlay_ = nullptr;
+  GtkWidget *current_bg_ = nullptr;
+  GtkWidget *previous_bg_ = nullptr;
   GtkWidget *drop_overlay_ = nullptr;
   GtkWidget *no_matches_ = nullptr;
   PlaylistDropIndicator::State drop_state_;
@@ -132,6 +140,11 @@ class PlaylistView {
   guint inhibit_timeout_ = 0;
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
+  guint background_fade_id_ = 0;
+  int background_fade_elapsed_ms_ = 0;
+  std::string background_css_;
+  std::string background_key_;
+  std::string previous_background_css_;
   std::vector<std::string> visible_titles_;
   std::vector<int> visible_rows_;
 

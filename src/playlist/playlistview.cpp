@@ -1,5 +1,7 @@
 #include "playlist/playlistview.h"
 
+#include "core/appearance.h"
+#include "core/appearancebackgroundfade.h"
 #include "constants/playlistsettings.h"
 #include "moodbar/moodbarcell.h"
 #include "core/settings.h"
@@ -44,12 +46,26 @@ PlaylistView::PlaylistView() {
   header_->SetLayoutChangedCallback([this]() { Refresh(playlist_); });
   header_->SetWidthsChangedCallback([this]() { ApplyColumnWidths(); });
   widget_ = gtk_scrolled_window_new();
-  gtk_widget_add_css_class(widget_, "strawberry-playlist-viewport");
   gtk_widget_set_hexpand(widget_, TRUE);
   gtk_widget_set_vexpand(widget_, TRUE);
+  current_bg_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_add_css_class(current_bg_, "strawberry-playlist-viewport");
+  gtk_widget_set_hexpand(current_bg_, TRUE);
+  gtk_widget_set_vexpand(current_bg_, TRUE);
+  previous_bg_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_add_css_class(previous_bg_, "strawberry-playlist-previous-background");
+  gtk_widget_set_hexpand(previous_bg_, TRUE);
+  gtk_widget_set_vexpand(previous_bg_, TRUE);
+  gtk_widget_set_can_target(previous_bg_, FALSE);
+  gtk_widget_set_opacity(previous_bg_, 0.0);
+  bg_overlay_ = gtk_overlay_new();
+  gtk_overlay_set_child(GTK_OVERLAY(bg_overlay_), current_bg_);
+  gtk_overlay_add_overlay(GTK_OVERLAY(bg_overlay_), previous_bg_);
   grid_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   overlay_ = gtk_overlay_new();
   gtk_overlay_set_child(GTK_OVERLAY(overlay_), grid_);
+  gtk_widget_set_hexpand(overlay_, TRUE);
+  gtk_widget_set_vexpand(overlay_, TRUE);
   drop_overlay_ = gtk_drawing_area_new();
   gtk_widget_set_can_target(drop_overlay_, FALSE);
   gtk_widget_set_hexpand(drop_overlay_, TRUE);
@@ -89,7 +105,10 @@ PlaylistView::PlaylistView() {
   gtk_widget_set_can_target(no_matches_, FALSE);
   gtk_widget_set_visible(no_matches_, FALSE);
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay_), no_matches_);
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), overlay_);
+  root_overlay_ = gtk_overlay_new();
+  gtk_overlay_set_child(GTK_OVERLAY(root_overlay_), bg_overlay_);
+  gtk_overlay_add_overlay(GTK_OVERLAY(root_overlay_), overlay_);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), root_overlay_);
   GtkGesture *gesture = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(grid_, GTK_EVENT_CONTROLLER(gesture));
@@ -151,6 +170,7 @@ void PlaylistView::SetDeleteCallback(DeleteCallback callback) { delete_ = std::m
 
 PlaylistView::~PlaylistView() {
   StopGlowTimer();
+  StopBackgroundFade();
   if (inhibit_timeout_) {
     g_source_remove(inhibit_timeout_);
   }
@@ -830,6 +850,69 @@ void PlaylistView::SetPlaybackProgress(double progress) {
 }
 
 void PlaylistView::SetPaused(bool paused) { paused_ = paused; }
+
+void PlaylistView::StopBackgroundFade() {
+  if (background_fade_id_) {
+    g_source_remove(background_fade_id_);
+    background_fade_id_ = 0;
+  }
+  background_fade_elapsed_ms_ = 0;
+}
+
+void PlaylistView::ApplyBackgroundCss() {
+  std::string css = background_css_;
+  if (!previous_background_css_.empty()) {
+    css += AppearanceBackgroundFade::RewriteSelector(previous_background_css_, Appearance::kPlaylistViewportSelector,
+                                                     AppearanceBackgroundFade::kPreviousSelector());
+  }
+  if (!css.empty()) {
+    StyleUtils::LoadCss(css);
+  }
+}
+
+void PlaylistView::SetBackground(const std::string &css, const std::string &key) {
+  if (!AppearanceBackgroundFade::ShouldReplace(background_key_, key)) {
+    return;
+  }
+  const bool animate = AppearanceBackgroundFade::ShouldAnimate(widget_ && gtk_widget_get_mapped(widget_), !background_key_.empty());
+  previous_background_css_ = background_css_;
+  background_css_ = css;
+  background_key_ = key;
+  StopBackgroundFade();
+  ApplyBackgroundCss();
+  if (!animate || !previous_bg_ || !current_bg_) {
+    if (previous_bg_) {
+      gtk_widget_set_opacity(previous_bg_, 0.0);
+    }
+    if (current_bg_) {
+      gtk_widget_set_opacity(current_bg_, 1.0);
+    }
+    return;
+  }
+  gtk_widget_set_opacity(previous_bg_, AppearanceBackgroundFade::PreviousOpacity(0));
+  gtk_widget_set_opacity(current_bg_, AppearanceBackgroundFade::CurrentOpacity(0));
+  background_fade_id_ = g_timeout_add(static_cast<guint>(AppearanceBackgroundFade::kTickMs),
+                                      +[](gpointer data) -> gboolean { return static_cast<PlaylistView *>(data)->OnBackgroundFadeTick(); },
+                                      this);
+}
+
+gboolean PlaylistView::OnBackgroundFadeTick() {
+  background_fade_elapsed_ms_ += AppearanceBackgroundFade::kTickMs;
+  const double previous = AppearanceBackgroundFade::PreviousOpacity(background_fade_elapsed_ms_);
+  if (previous_bg_) {
+    gtk_widget_set_opacity(previous_bg_, previous);
+  }
+  if (current_bg_) {
+    gtk_widget_set_opacity(current_bg_, AppearanceBackgroundFade::CurrentOpacity(background_fade_elapsed_ms_));
+  }
+  if (AppearanceBackgroundFade::ShouldClearPrevious(previous)) {
+    previous_background_css_.clear();
+    ApplyBackgroundCss();
+    background_fade_id_ = 0;
+    return G_SOURCE_REMOVE;
+  }
+  return G_SOURCE_CONTINUE;
+}
 
 void PlaylistView::InhibitAutoscroll() {
   inhibit_autoscroll_ = true;
