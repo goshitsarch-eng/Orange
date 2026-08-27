@@ -96,6 +96,9 @@ class GstEngine : public EngineBase {
   void CancelStopFade();
   static gboolean StopFadeTick(gpointer data);
   void FinishStopImmediate();
+  void SeekNow();
+  void CancelSeek();
+  static gboolean SeekTimeout(gpointer data);
   void SetState(State state);
   void ApplyCurrentVolume(double fraction);
   double VolumeFraction() const;
@@ -174,6 +177,9 @@ class GstEngine : public EngineBase {
   int fadeout_step_ = 0;
   int fadeout_steps_ = 1;
   guint fadeout_timeout_id_ = 0;
+  uint64_t pending_seek_nanosec_ = 0;
+  bool waiting_to_seek_ = false;
+  guint seek_timeout_id_ = 0;
   bool gapless_pending_ = false;
   std::vector<int16_t> last_scope_;
   TaskManager *task_manager_ = nullptr;

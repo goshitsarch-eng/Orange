@@ -23,6 +23,7 @@
 #include "collection/collectioncompilation.h"
 #include "engine/backendoptions.h"
 #include "engine/enginefade.h"
+#include "engine/engineseek.h"
 #include "collection/collectionalbumart.h"
 #include "collection/collectionartpersist.h"
 #include "collection/collectioncuescan.h"
@@ -1010,6 +1011,14 @@ TEST(EngineFade, StopFadeGatingMatchesQt) {
   EXPECT_DOUBLE_EQ(1.0, EngineFade::VolumeAtStep(1.0, -1, 0.0));
   EXPECT_DOUBLE_EQ(0.5, EngineFade::VolumeAtStep(1.0, 1, 0.5));
   EXPECT_DOUBLE_EQ(0.0, EngineFade::VolumeAtStep(1.0, 1, 0.0));
+}
+
+TEST(EngineSeek, CoalescesRapidSeeksLikeQt) {
+  EXPECT_EQ(100, EngineSeek::kDelayMs);
+  EXPECT_TRUE(EngineSeek::ShouldSeekImmediately(false));
+  EXPECT_FALSE(EngineSeek::ShouldSeekImmediately(true));
+  EXPECT_TRUE(EngineSeek::ShouldApplyPending(true));
+  EXPECT_FALSE(EngineSeek::ShouldApplyPending(false));
 }
 
 TEST(EngineFade, ResumeFadeInMatchesQtLatch) {

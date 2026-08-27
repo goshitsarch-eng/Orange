@@ -4,6 +4,7 @@
 #include "core/taskmanager.h"
 #include "engine/enginebuffering.h"
 #include "engine/enginefade.h"
+#include "engine/engineseek.h"
 #include "engine/ebur128normalization.h"
 #include "engine/enginediscoverer.h"
 #include "engine/gstengineerror.h"
@@ -26,6 +27,7 @@ GstEngine::GstEngine() = default;
 GstEngine::~GstEngine() {
   CancelFade();
   CancelStopFade();
+  CancelSeek();
   DiscardNext();
   BufferingFinished();
   if (fadeout_) {
@@ -264,6 +266,7 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   }
 
   CancelFade();
+  CancelSeek();
   DiscardNext();
   current_.reset();
   faded_out_to_pause_ = false;
@@ -316,6 +319,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
 void GstEngine::Stop(bool stop_after) {
   pending_pause_ = false;
   CancelFade();
+  CancelSeek();
   DiscardNext();
   BufferingFinished();
   gapless_pending_ = false;
@@ -368,9 +372,40 @@ void GstEngine::Unpause() {
 }
 
 void GstEngine::Seek(uint64_t offset_nanosec) {
-  if (current_) {
-    current_->Seek(offset_nanosec);
+  if (!current_) {
+    return;
   }
+  pending_seek_nanosec_ = offset_nanosec;
+  waiting_to_seek_ = true;
+  if (EngineSeek::ShouldSeekImmediately(seek_timeout_id_ != 0)) {
+    SeekNow();
+    seek_timeout_id_ = g_timeout_add(EngineSeek::kDelayMs, SeekTimeout, this);
+  }
+}
+
+void GstEngine::SeekNow() {
+  if (!EngineSeek::ShouldApplyPending(waiting_to_seek_)) {
+    return;
+  }
+  waiting_to_seek_ = false;
+  if (current_) {
+    current_->Seek(pending_seek_nanosec_);
+  }
+}
+
+void GstEngine::CancelSeek() {
+  if (seek_timeout_id_ != 0) {
+    g_source_remove(seek_timeout_id_);
+    seek_timeout_id_ = 0;
+  }
+  waiting_to_seek_ = false;
+}
+
+gboolean GstEngine::SeekTimeout(gpointer data) {
+  auto *self = static_cast<GstEngine *>(data);
+  self->seek_timeout_id_ = 0;
+  self->SeekNow();
+  return G_SOURCE_REMOVE;
 }
 
 void GstEngine::ApplyCurrentVolume(double fraction) {
@@ -486,6 +521,7 @@ gboolean GstEngine::StopFadeTick(gpointer data) {
 }
 
 void GstEngine::FinishStopImmediate() {
+  CancelSeek();
   CancelStopFade();
   if (fadeout_) {
     fadeout_->Stop();
