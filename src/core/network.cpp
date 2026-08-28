@@ -92,6 +92,18 @@ void NetworkAccessManager::SetProxy(const std::string &proxy_uri) {
   g_object_unref(resolver);
 }
 
+void NetworkAccessManager::SetVerifyCertificate(const std::string &host, bool verify) {
+  if (host.empty()) {
+    return;
+  }
+  if (verify) {
+    unverified_hosts_.erase(host);
+  }
+  else {
+    unverified_hosts_.insert(host);
+  }
+}
+
 void NetworkAccessManager::ReloadSettings() {
   NetworkProxyFactory proxy;
   proxy.ReloadSettings();
@@ -122,6 +134,16 @@ int NetworkAccessManager::Send(SoupMessage *message, Callback callback) {
   GCancellable *cancellable = g_cancellable_new();
   auto *pending = new PendingRequest{std::move(callback), message, cancellable, id, this};
   g_object_ref(message);
+  if (!unverified_hosts_.empty()) {
+    g_signal_connect(message, "accept-certificate",
+                     G_CALLBACK(+[](SoupMessage *msg, GTlsCertificate *, GTlsCertificateFlags, gpointer data) -> gboolean {
+                       auto *self = static_cast<NetworkAccessManager *>(data);
+                       GUri *uri = soup_message_get_uri(msg);
+                       const char *host = uri ? g_uri_get_host(uri) : nullptr;
+                       return host && self->unverified_hosts_.count(host) ? TRUE : FALSE;
+                     }),
+                     this);
+  }
   pending_[id] = pending;
   soup_session_send_and_read_async(session_, message, G_PRIORITY_DEFAULT, cancellable,
                                    +[](GObject *source, GAsyncResult *result, gpointer user_data) {

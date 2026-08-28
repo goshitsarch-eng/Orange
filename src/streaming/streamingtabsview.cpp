@@ -406,7 +406,8 @@ void StreamingTabsView::ShowCached(StreamingCollectionView *view, StreamingColle
   if (!view || !service_ || !database_) {
     return;
   }
-  const SongList cached = StreamingCollectionStore::Load(database_, StreamingCollectionStore::TableName(service_->name(), list));
+  const SongList cached =
+      service_->WithCoverUrls(StreamingCollectionStore::Load(database_, StreamingCollectionStore::TableName(service_->name(), list)));
   if (!cached.empty()) {
     view->SetSongs(cached);
   }
@@ -438,7 +439,8 @@ void StreamingTabsView::RemoveFromCollection(StreamingCollectionStore::List list
     view = albums_->view();
   }
   if (view) {
-    view->SetSongs(StreamingCollectionStore::Load(database_, StreamingCollectionStore::TableName(service_->name(), list)));
+    view->SetSongs(
+        service_->WithCoverUrls(StreamingCollectionStore::Load(database_, StreamingCollectionStore::TableName(service_->name(), list))));
   }
 }
 

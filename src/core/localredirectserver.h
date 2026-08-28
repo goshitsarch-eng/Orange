@@ -5,6 +5,7 @@
 
 #include <gio/gio.h>
 
+#include <memory>
 #include <string>
 
 class LocalRedirectServer {
@@ -26,6 +27,8 @@ class LocalRedirectServer {
 
   GSocketService *service_ = nullptr;
   int port_ = 0;
+  // The request is read asynchronously, so the completion has to check that the server still exists.
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
   std::string redirected_url_;
   std::string error_;
 };

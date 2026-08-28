@@ -5,6 +5,7 @@
 #include "core/settings.h"
 #include "core/song.h"
 #include "utilities/fileutils.h"
+#include "utilities/safefilename.h"
 #include "utilities/strutils.h"
 
 #include <glib.h>
@@ -107,12 +108,16 @@ struct CoverOptions {
 
   static std::string FilenameFromPattern(const std::string &pattern, const Song &song) {
     std::string filename = pattern;
-    const std::string artist = song.EffectiveAlbumartist();
-    const std::string album = Song::AlbumRemoveDiscMisc(song.album());
+    // Tags are attacker-controlled as far as this application is concerned: an album tagged "../../.bashrc"
+    // would otherwise pick the file the cover is written over, and the caller creates the directories first.
+    const std::string artist = SafeFilename::Component(song.EffectiveAlbumartist(), "unknown artist");
+    const std::string album = SafeFilename::Component(Song::AlbumRemoveDiscMisc(song.album()), "unknown album");
     filename = StrUtils::Replace(filename, "%albumartist", artist);
     filename = StrUtils::Replace(filename, "%artist", artist);
     filename = StrUtils::Replace(filename, "%album", album);
-    return filename;
+    // The pattern itself comes from the settings dialog, so the assembled name still has to be a single
+    // component.
+    return SafeFilename::Component(filename, "cover");
   }
 
   std::string DirectoryForSong(const Song &song) const {

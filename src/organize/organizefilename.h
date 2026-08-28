@@ -131,7 +131,9 @@ inline std::string StripInvalidPrefixes(const std::string &path) {
   std::vector<std::string> cleaned;
   cleaned.reserve(parts.size());
   for (std::string part : parts) {
-    if (!part.empty() && part[0] == FilenameConstants::kInvalidPrefixCharacters[0]) {
+    // Strip every leading dot, not just one: "...album" left ".." behind, which walks out of the destination
+    // directory once the relative path is joined onto it.
+    while (!part.empty() && part[0] == FilenameConstants::kInvalidPrefixCharacters[0]) {
       part.erase(0, 1);
     }
     part = StrUtils::Trim(part);

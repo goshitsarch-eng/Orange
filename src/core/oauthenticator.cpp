@@ -1,6 +1,8 @@
 #include "core/oauthenticator.h"
 
+#include "core/httprequestreader.h"
 #include "core/logging.h"
+#include "utilities/randutils.h"
 #include "utilities/strutils.h"
 
 #include <gio/gio.h>
@@ -9,33 +11,12 @@
 #include <cstring>
 #include <ctime>
 
-namespace {
-
-std::string QueryValue(const std::string &query, const std::string &key) {
-  const std::string prefix = key + "=";
-  size_t pos = 0;
-  while (pos < query.size()) {
-    const size_t amp = query.find('&', pos);
-    const std::string part = query.substr(pos, amp == std::string::npos ? std::string::npos : amp - pos);
-    if (StrUtils::StartsWith(part, prefix)) {
-      gchar *unescaped = g_uri_unescape_string(part.substr(prefix.size()).c_str(), nullptr);
-      std::string value = unescaped ? unescaped : part.substr(prefix.size());
-      g_free(unescaped);
-      return value;
-    }
-    if (amp == std::string::npos) {
-      break;
-    }
-    pos = amp + 1;
-  }
-  return {};
-}
-
-}  // namespace
-
 OAuthenticator::OAuthenticator(NetworkAccessManager *network) : network_(network) {}
 
-OAuthenticator::~OAuthenticator() { StopRedirectServer(); }
+OAuthenticator::~OAuthenticator() {
+  *alive_ = false;
+  StopRedirectServer();
+}
 
 std::string OAuthenticator::BuildAuthorizeUrl(const std::string &authorize_url, const std::string &client_id, const std::string &redirect_uri,
                                               const std::string &scope, const std::string &state, const std::string &code_challenge) {
@@ -104,6 +85,12 @@ bool OAuthenticator::StartRedirectServer(guint16 preferred_port) {
     return bound;
   };
   guint16 port = preferred_port > 0 ? bind_port(preferred_port) : 0;
+  if (port == 0 && preferred_port > 0) {
+    // The provider has this exact redirect URI registered, so falling back to another port would advertise a
+    // URI nothing is listening on and hand the authorization code to whatever holds the fixed port instead.
+    StopRedirectServer();
+    return false;
+  }
   if (port == 0) {
     port = bind_port(0);
   }
@@ -116,31 +103,36 @@ bool OAuthenticator::StartRedirectServer(guint16 preferred_port) {
   }
   g_signal_connect(service_, "incoming", G_CALLBACK(+[](GSocketService *, GSocketConnection *connection, GObject *, gpointer data) -> gboolean {
                      auto *self = static_cast<OAuthenticator *>(data);
-                     GInputStream *input = g_io_stream_get_input_stream(G_IO_STREAM(connection));
-                     GOutputStream *output = g_io_stream_get_output_stream(G_IO_STREAM(connection));
-                     char buffer[4096] = {};
-                     gsize read = 0;
-                     g_input_stream_read_all(input, buffer, sizeof(buffer) - 1, &read, nullptr, nullptr);
-                     const std::string request(buffer, read);
-                     std::string code;
-                     const size_t path = request.find("GET ");
-                     if (path != std::string::npos) {
-                       const size_t space = request.find(' ', path + 4);
-                       const std::string target = request.substr(path + 4, space == std::string::npos ? std::string::npos : space - (path + 4));
-                       const size_t q = target.find('?');
-                       if (q != std::string::npos) {
-                         code = QueryValue(target.substr(q + 1), "code");
-                       }
-                     }
-                     const char *body = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
-                                        "<html><body><p>You can return to Orange.</p></body></html>";
-                     g_output_stream_write_all(output, body, std::strlen(body), nullptr, nullptr, nullptr);
-                     if (self->callback_) {
-                       const auto cb = self->callback_;
-                       self->callback_ = {};
-                       cb(code, code.empty() ? "No authorization code" : "");
-                     }
-                     self->StopRedirectServer();
+                     HttpRequestReader::ReadRequestLine(
+                         connection, [self, alive = self->alive_](const std::string &request_line, GSocketConnection *conn) {
+                           const std::string target = HttpRequestReader::TargetFromRequestLine(request_line);
+                           const std::string code = HttpRequestReader::QueryValue(target, "code");
+                           const std::string state = HttpRequestReader::QueryValue(target, "state");
+                           const char *body = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
+                                              "<html><body><p>You can return to Orange.</p></body></html>";
+                           if (conn) {
+                             GOutputStream *output = g_io_stream_get_output_stream(G_IO_STREAM(conn));
+                             g_output_stream_write_all(output, body, std::strlen(body), nullptr, nullptr, nullptr);
+                           }
+                           if (!*alive) {
+                             return;
+                           }
+                           std::string error;
+                           if (!OAuthState::Matches(self->state_, state)) {
+                             // Anything on this machine can hit the loopback redirect; without this check a
+                             // local process could feed us an authorization code of its own choosing.
+                             error = "Authorization response did not match the request";
+                           }
+                           else if (code.empty()) {
+                             error = "No authorization code";
+                           }
+                           if (self->callback_) {
+                             const auto cb = self->callback_;
+                             self->callback_ = {};
+                             cb(error.empty() ? code : std::string(), error);
+                           }
+                           self->StopRedirectServer();
+                         });
                      return TRUE;
                    }),
                    this);
@@ -160,6 +152,7 @@ void OAuthenticator::AuthorizeInBrowser(const std::string &authorize_url, const 
                                         guint16 preferred_port, const std::string &redirect_uri) {
   callback_ = std::move(callback);
   redirect_uri_ = redirect_uri;
+  state_ = OAuthState::Generate();
   if (!StartRedirectServer(preferred_port)) {
     if (callback_) {
       callback_({}, "Could not start redirect server");
@@ -167,7 +160,7 @@ void OAuthenticator::AuthorizeInBrowser(const std::string &authorize_url, const 
     }
     return;
   }
-  const std::string url = BuildAuthorizeUrl(authorize_url, client_id, redirect_uri_, scope);
+  const std::string url = BuildAuthorizeUrl(authorize_url, client_id, redirect_uri_, scope, state_);
   GError *error = nullptr;
   if (!g_app_info_launch_default_for_uri(url.c_str(), nullptr, &error)) {
     if (callback_) {

@@ -2,6 +2,7 @@
 #define STRAWBERRY_SAVEPLAYLISTSOPTIONS_H
 
 #include "utilities/fileutils.h"
+#include "utilities/safefilename.h"
 
 #include <string>
 #include <vector>
@@ -24,7 +25,18 @@ inline std::string DestFilename(const std::string &name, const std::string &ext)
   if (!suffix.empty() && suffix.front() != '.') {
     suffix = "." + suffix;
   }
-  return name + suffix;
+  // A playlist called "../x" would otherwise be written outside the directory the user chose.
+  return SafeFilename::Component(name, "playlist") + suffix;
+}
+
+inline const char *SaveFailedTitle() { return "Could not save all playlists"; }
+
+inline std::string SaveFailedBody(const std::vector<std::string> &failed) {
+  std::string body = "These playlists could not be written:";
+  for (const std::string &name : failed) {
+    body += "\n" + name;
+  }
+  return body;
 }
 
 inline bool ValidateDirectory(const std::string &path) { return !path.empty() && FileUtils::IsDirectory(path); }

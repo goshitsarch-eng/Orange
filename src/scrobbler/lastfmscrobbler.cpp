@@ -234,7 +234,10 @@ void LastFmScrobbler::Authenticate(const std::string &username, const std::strin
   Settings settings;
   settings.BeginGroup("Last.fm");
   settings.SetValue("username", username);
-  settings.SetValue("password", password);
+  // The password is only needed to obtain a session key; that key is what is kept, in the keyring.  Writing
+  // the password itself into strawberry.conf left it in plaintext for the life of the account, and nothing
+  // ever read it back.
+  settings.Remove("password");
   settings.Sync();
   if (!network_) {
     Error.Emit(ScrobblerError::NotAuthenticated("Last.fm"));
@@ -356,6 +359,6 @@ void LastFmScrobbler::Logout() {
   settings.BeginGroup("Last.fm");
   settings.RemoveSecret("session_key");
   settings.SetValue("username", "");
-  settings.SetValue("password", "");
+  settings.Remove("password");
   settings.Sync();
 }

@@ -2,10 +2,12 @@
 #define STRAWBERRY_OAUTHENTICATOR_H
 
 #include "core/network.h"
+#include "core/oauthstate.h"
 
 #include <gio/gio.h>
 
 #include <functional>
+#include <memory>
 #include <string>
 
 class OAuthenticator {
@@ -57,7 +59,11 @@ class OAuthenticator {
   NetworkAccessManager *network_ = nullptr;
   GSocketService *service_ = nullptr;
   std::string redirect_uri_;
+  // Ties the redirect back to the request that started it.
+  std::string state_;
   Callback callback_;
+  // The redirect is read asynchronously, so the completion has to check this object still exists.
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 };
 
 #endif

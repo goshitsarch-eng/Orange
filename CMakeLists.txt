@@ -180,6 +180,7 @@ set(STRAWBERRY_SOURCES
   src/core/temporaryfile.cpp
   src/core/memorydatabase.cpp
   src/core/localredirectserver.cpp
+  src/core/httprequestreader.cpp
   src/core/unixsignalwatcher.cpp
   src/core/filesystemwatcherinterface.cpp
   src/core/filesystemwatcherinotify.cpp
@@ -819,6 +820,7 @@ if(GTest_FOUND)
     tests/src/parity_increment30_test.cpp
     tests/src/tagfetcher_test.cpp
     tests/src/engineeos_test.cpp
+    tests/src/security_test.cpp
     tests/src/edittag_test.cpp
     tests/src/lyrics_test.cpp
     tests/src/gpod_test.cpp
@@ -868,6 +870,7 @@ if(GTest_FOUND)
     src/core/network.cpp
     src/core/oauthenticator.cpp
     src/core/localredirectserver.cpp
+    src/core/httprequestreader.cpp
     src/core/songloader.cpp
     src/core/enginemetadata.cpp
     src/core/filesystemmusicstorage.cpp

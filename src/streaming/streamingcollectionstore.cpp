@@ -1,4 +1,5 @@
 #include "streaming/streamingcollectionstore.h"
+#include "streaming/streamingcoverdownload.h"
 
 #include "core/database.h"
 #include "core/scopedtransaction.h"
@@ -42,7 +43,7 @@ void InsertSong(Database *database, const std::string &table, const Song &song) 
   query.Bind(6, song.album_id());
   query.Bind(7, song.song_id());
   query.Bind(8, url);
-  query.Bind(9, song.art_automatic());
+  query.Bind(9, StreamingCoverDownload::CacheableCoverArt(song.art_automatic()));
   query.Bind(10, song.year());
   query.Bind(11, song.genre());
   query.Bind(12, song.track());

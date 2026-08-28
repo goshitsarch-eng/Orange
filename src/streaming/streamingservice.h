@@ -30,6 +30,9 @@ class StreamingService : public UrlHandler {
   virtual void Login(const std::string &username, const std::string &password_or_token) = 0;
   virtual void Logout();
   virtual void ReloadSettings() {}
+  // Cached rows keep the bare cover art id, because the signed URL carries the user's credentials.  Services
+  // that sign their cover URLs rebuild them here from the credentials currently configured.
+  virtual SongList WithCoverUrls(SongList songs) const { return songs; }
   virtual bool logged_in() const { return logged_in_; }
   virtual bool authenticated() const { return logged_in_; }
   virtual bool show_progress() const { return true; }

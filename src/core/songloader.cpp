@@ -1,9 +1,11 @@
 #include "core/songloader.h"
 
 #include "collection/collectionbackend.h"
+#include "constants/backendsettings.h"
 #include "core/commandlineurl.h"
 #include "core/loadurl.h"
 #include "core/network.h"
+#include "core/settings.h"
 #include "core/songloadeffective.h"
 #include "core/songloadremote.h"
 #include "core/songloadsort.h"
@@ -194,7 +196,13 @@ SongLoader::Result SongLoader::TypefindRemote(const std::string &url) {
   }
 
   if (g_object_class_find_property(G_OBJECT_GET_CLASS(source), "ssl-strict")) {
-    g_object_set(source, "ssl-strict", FALSE, nullptr);
+    // The playback pipeline honours this preference; probing a URL used to disable certificate checking
+    // unconditionally, which is both inconsistent with playback and worse than what the user asked for.
+    Settings backend;
+    backend.BeginGroup(BackendSettings::kSettingsGroup);
+    const gboolean strict =
+        backend.BoolValue(BackendSettings::kStrictSSL, BackendSettings::kDefaultStrictSSL) ? TRUE : FALSE;
+    g_object_set(source, "ssl-strict", strict, nullptr);
   }
 
   gst_bin_add_many(GST_BIN(pipeline), source, typefind, fakesink, nullptr);

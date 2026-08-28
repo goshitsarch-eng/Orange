@@ -1,5 +1,6 @@
 #include "core/localredirectserver.h"
 
+#include "core/httprequestreader.h"
 #include "core/logging.h"
 
 #include <cstring>
@@ -7,7 +8,10 @@
 
 LocalRedirectServer::LocalRedirectServer() = default;
 
-LocalRedirectServer::~LocalRedirectServer() { Close(); }
+LocalRedirectServer::~LocalRedirectServer() {
+  *alive_ = false;
+  Close();
+}
 
 bool LocalRedirectServer::Listen(int port) {
   Close();
@@ -55,20 +59,22 @@ std::string LocalRedirectServer::url() const { return "http://127.0.0.1:" + std:
 
 gboolean LocalRedirectServer::OnIncoming(GSocketService *, GSocketConnection *connection, GObject *, gpointer data) {
   auto *self = static_cast<LocalRedirectServer *>(data);
-  GInputStream *input = g_io_stream_get_input_stream(G_IO_STREAM(connection));
-  gchar buffer[1024] = {};
-  gsize read = 0;
-  if (g_input_stream_read_all(input, buffer, sizeof(buffer) - 1, &read, nullptr, nullptr) && read > 0) {
-    const std::string request(buffer, read);
-    const auto start = request.find(' ');
-    const auto end = request.find(' ', start == std::string::npos ? 0 : start + 1);
-    if (start != std::string::npos && end != std::string::npos) {
-      self->redirected_url_ = "http://127.0.0.1:" + std::to_string(self->port_) + request.substr(start + 1, end - start - 1);
-    }
-  }
-  const char *response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><body>You can close this window.</body></html>";
-  GOutputStream *output = g_io_stream_get_output_stream(G_IO_STREAM(connection));
-  g_output_stream_write_all(output, response, strlen(response), nullptr, nullptr, nullptr);
-  self->Redirected.Emit(self->redirected_url_);
+  HttpRequestReader::ReadRequestLine(
+      connection, [self, alive = self->alive_](const std::string &request_line, GSocketConnection *conn) {
+        const char *response =
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n<html><body>You can close this window.</body></html>";
+        if (conn) {
+          GOutputStream *output = g_io_stream_get_output_stream(G_IO_STREAM(conn));
+          g_output_stream_write_all(output, response, strlen(response), nullptr, nullptr, nullptr);
+        }
+        if (!*alive) {
+          return;
+        }
+        const std::string target = HttpRequestReader::TargetFromRequestLine(request_line);
+        if (!target.empty()) {
+          self->redirected_url_ = "http://127.0.0.1:" + std::to_string(self->port_) + target;
+        }
+        self->Redirected.Emit(self->redirected_url_);
+      });
   return TRUE;
 }

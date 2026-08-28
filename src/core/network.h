@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -38,6 +39,9 @@ class NetworkAccessManager {
   void Cancel(int id);
 
   void SetProxy(const std::string &proxy_uri);
+  // Accept an otherwise-invalid TLS certificate for one host, for servers the user has told us not to verify.
+  // Everything else keeps full certificate checking.
+  void SetVerifyCertificate(const std::string &host, bool verify);
   void ReloadSettings();
   void ResetConnectionCache();
   SoupSession *session() const { return session_; }
@@ -53,6 +57,7 @@ class NetworkAccessManager {
   SoupSession *session_ = nullptr;
   int next_id_ = 1;
   std::map<int, PendingRequest *> pending_;
+  std::set<std::string> unverified_hosts_;
   gulong network_changed_id_ = 0;
 };
 

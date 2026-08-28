@@ -9,6 +9,7 @@
 #include "engine/enginefadeout.h"
 #include "engine/engineeos.h"
 #include "engine/alsaplugin.h"
+#include "utilities/urlredact.h"
 #include "engine/engineseek.h"
 #include "engine/ebur128normalization.h"
 #include "engine/enginediscoverer.h"
@@ -1018,7 +1019,7 @@ void GstEngine::RequestDiscover(const std::string &media_url, const std::string 
     return;
   }
   if (!gst_discoverer_discover_uri_async(discoverer_, play_url.c_str())) {
-    LogError("Failed to start stream discovery for %s", play_url.c_str());
+    LogError("Failed to start stream discovery for %s", UrlRedact::Sanitize(play_url).c_str());
   }
 }
 
@@ -1030,13 +1031,14 @@ void GstEngine::OnStreamDiscovered(GstDiscovererInfo *info, GError *) {
   const std::string discovered = uri ? uri : "";
   const GstDiscovererResult result = gst_discoverer_info_get_result(info);
   if (result != GST_DISCOVERER_OK) {
-    LogError("Stream discovery for %s failed: %s", discovered.c_str(), EngineDiscoverer::ErrorMessage(static_cast<int>(result)));
+    LogError("Stream discovery for %s failed: %s", UrlRedact::Sanitize(discovered).c_str(),
+             EngineDiscoverer::ErrorMessage(static_cast<int>(result)));
     return;
   }
 
   GList *audio_streams = gst_discoverer_info_get_audio_streams(info);
   if (!audio_streams) {
-    LogError("Could not detect an audio stream in %s", discovered.c_str());
+    LogError("Could not detect an audio stream in %s", UrlRedact::Sanitize(discovered).c_str());
     return;
   }
 
@@ -1080,6 +1082,7 @@ void GstEngine::OnStreamDiscovered(GstDiscovererInfo *info, GError *) {
   }
 
   gst_discoverer_stream_info_list_free(audio_streams);
-  LogDebug("Got stream info for %s: %s", discovered.c_str(), Song::FiletypeToString(engine_metadata.filetype).c_str());
+  LogDebug("Got stream info for %s: %s", UrlRedact::Sanitize(discovered).c_str(),
+           Song::FiletypeToString(engine_metadata.filetype).c_str());
   MetadataReceived.Emit(engine_metadata.ToSong());
 }

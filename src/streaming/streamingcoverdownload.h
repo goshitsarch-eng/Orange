@@ -9,6 +9,7 @@
 #include "streaming/streamingpage.h"
 #include "streaming/streamingservice.h"
 #include "utilities/fileutils.h"
+#include "utilities/safefilename.h"
 #include "utilities/strutils.h"
 
 #include <functional>
@@ -72,11 +73,14 @@ inline std::string CacheFilename(const std::string &group, const std::string &al
   if (album_id.empty()) {
     return {};
   }
+  // The album id and the name taken out of the URL both come from the streaming server, so neither may be
+  // trusted to stay inside the cover cache directory.
+  const std::string id = SafeFilename::Component(album_id, "cover");
   if (group == "Tidal") {
     const std::string base = FileNameFromUrl(url);
-    return base.empty() ? album_id : album_id + "-" + base;
+    return base.empty() ? id : id + "-" + SafeFilename::Component(base, "cover");
   }
-  return album_id;
+  return id;
 }
 
 inline std::string CachePath(const std::string &filename) {
@@ -131,15 +135,60 @@ inline bool IsCoverArtId(const std::string &value) {
   return !value.empty() && !StreamingCover::IsHttpUrl(value) && !StreamingCover::IsLocalUrl(value);
 }
 
-inline void ApplyCoverArtIds(SongList &songs, const std::function<std::string(const std::string &id)> &url_for) {
+// Recovers the cover art id from a signed getCoverArt URL.  The signed URL carries the user's credentials,
+// so it is the id that gets cached; the URL is rebuilt from current settings whenever it is needed.
+inline std::string CoverArtIdFromUrl(const std::string &url) {
+  if (url.find("getCoverArt") == std::string::npos) {
+    return {};
+  }
+  const std::string::size_type question = url.find('?');
+  if (question == std::string::npos) {
+    return {};
+  }
+  std::string::size_type pos = question + 1;
+  while (pos < url.size()) {
+    const std::string::size_type amp = url.find('&', pos);
+    const std::string part = url.substr(pos, amp == std::string::npos ? std::string::npos : amp - pos);
+    if (part.rfind("id=", 0) == 0) {
+      gchar *unescaped = g_uri_unescape_string(part.substr(3).c_str(), nullptr);
+      std::string value = unescaped ? unescaped : part.substr(3);
+      g_free(unescaped);
+      return value;
+    }
+    if (amp == std::string::npos) {
+      break;
+    }
+    pos = amp + 1;
+  }
+  return {};
+}
+
+// The value worth caching: the bare id when one can be recovered, otherwise the URL as it stands (other
+// services hand out plain CDN links with nothing secret in them).
+inline std::string CacheableCoverArt(const std::string &art_automatic) {
+  const std::string id = CoverArtIdFromUrl(art_automatic);
+  return id.empty() ? art_automatic : id;
+}
+
+// Subsonic's getCoverArt takes an album id just as happily as a track's own cover art id.  Asking for the
+// album gives every track on it the same cover, and the same request, instead of one per track.
+inline std::string CoverArtIdFor(const Song &song, bool prefer_album_id) {
+  if (prefer_album_id && IsCoverArtId(song.album_id())) {
+    return song.album_id();
+  }
+  return song.art_automatic();
+}
+
+inline void ApplyCoverArtIds(SongList &songs, const std::function<std::string(const std::string &id)> &url_for,
+                             bool prefer_album_id = false) {
   if (!url_for) {
     return;
   }
   for (Song &song : songs) {
-    const std::string id = song.art_automatic();
-    if (IsCoverArtId(id)) {
-      song.set_art_automatic(url_for(id));
+    if (!IsCoverArtId(song.art_automatic())) {
+      continue;
     }
+    song.set_art_automatic(url_for(CoverArtIdFor(song, prefer_album_id)));
   }
 }
 
