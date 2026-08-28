@@ -7,7 +7,7 @@
 #include "collection/collectionrescanreason.h"
 #include "collection/collectionscandelay.h"
 #include "collection/collectionsubdirectory.h"
-#include "core/filesystemwatcherinotify.h"
+#include "core/filesystemwatcherinterface.h"
 #include "core/signal.h"
 #include "core/song.h"
 
@@ -35,10 +35,12 @@ class CollectionWatcher {
   void Scan();
   void Scan(ScanType type);
   void ScanDirectory(int directory_id, const std::string &path, bool recursive);
+  void RescanSongs(const SongList &songs);
   void Abort();
   bool scanning() const { return scanning_; }
   void StartWatching();
   void StopWatching();
+  void ReloadSettings();
   void SetRescanPaused(bool pause);
   bool rescan_paused() const { return rescan_paused_; }
   bool incremental_queued() const { return queued_incremental_; }
@@ -102,8 +104,11 @@ class CollectionWatcher {
     bool overwrite_rating = false;
     int expire_days = CollectionSettings::kDefaultExpireUnavailableSongs;
     std::vector<std::string> cover_filters;
+    bool song_rescan = false;
+    std::vector<std::pair<int, std::string>> rescan_targets;
   };
 
+  void FillScanJob(ScanJob *job, bool load_existing);
   void ScanPath(int directory_id, const std::string &path, bool recursive, int task_id, int *added);
   void WatchPath(const std::string &path);
   void ScheduleIncremental();
@@ -111,6 +116,7 @@ class CollectionWatcher {
   void StartPeriodicScan();
   void StartAsyncScan(ScanType type);
   static gpointer ScanThread(gpointer data);
+  static gpointer RescanThread(gpointer data);
   static gboolean ApplyScanJob(gpointer data);
   static gboolean OnRescanTimeout(gpointer data);
   static gboolean OnPeriodicTimeout(gpointer data);
@@ -132,11 +138,12 @@ class CollectionWatcher {
   std::atomic<bool> scanning_{false};
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
   std::vector<GFileMonitor *> monitors_;
-  std::unique_ptr<FileSystemWatcherInotify> inotify_watcher_;
+  std::unique_ptr<FileSystemWatcherInterface> native_watcher_;
   guint rescan_timeout_id_ = 0;
   guint periodic_timeout_id_ = 0;
   bool queued_incremental_ = false;
   bool rescan_paused_ = false;
+  bool monitor_ = CollectionSettings::kDefaultMonitor;
 };
 
 #endif  // STRAWBERRY_COLLECTIONWATCHER_H

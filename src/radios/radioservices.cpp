@@ -185,18 +185,16 @@ void RadioServices::SearchRadioBrowser(const std::string &query, const std::stri
 }
 
 void RadioServices::FetchCountries(CountriesDone done) {
-  if (!network_) {
-    if (done) {
-      done({});
-    }
+  if (!network_ || !done) {
     return;
   }
   Settings settings;
   settings.BeginGroup(RadioBrowserSettings::kSettingsGroup);
   const std::string url = RadioBrowserService::CountriesUrl(settings.Value("server", RadioBrowserService::DefaultServer()));
   network_->Get(url, [done](const NetworkAccessManager::Response &response) {
-    if (done) {
-      done(response.ok() ? RadioBrowserService::ParseCountries(response.body) : std::vector<RadioBrowserService::Country>{});
+    if (!RadioBrowserSearchOpts::ShouldInvokeCountriesCallback(response.ok())) {
+      return;
     }
+    done(RadioBrowserService::ParseCountries(response.body));
   });
 }

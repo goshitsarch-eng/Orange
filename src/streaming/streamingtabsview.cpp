@@ -304,6 +304,28 @@ void StreamingTabsView::ReloadSettings() {
     service_->ReloadSettings();
   }
   LoadFavoriteType();
+  if (search_ && StreamingSearchOpts::ShouldReloadOnSettingsClose()) {
+    search_->ReloadSettings();
+  }
+  ApplyLook();
+}
+
+void StreamingTabsView::ApplyLook() {
+  if (artists_) {
+    artists_->ApplyLook();
+  }
+  if (albums_) {
+    albums_->ApplyLook();
+  }
+  if (songs_) {
+    songs_->ApplyLook();
+  }
+  if (favorites_) {
+    favorites_->ApplyLook();
+  }
+  if (search_) {
+    search_->ApplyLook();
+  }
 }
 
 void StreamingTabsView::LoadFavoriteType() {

@@ -22,6 +22,7 @@ class QueueView {
   void SetQueue(Queue *queue);
   Queue *queue() const { return queue_; }
   void Reload();
+  void ApplyLook();
   void MoveUp();
   void MoveDown();
   void Remove();

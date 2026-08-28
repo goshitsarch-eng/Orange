@@ -1,3 +1,4 @@
+#include "config.h"
 #include "constants/notificationssettings.h"
 #include "core/seekbarsettings.h"
 #include "core/song.h"
@@ -9,6 +10,8 @@
 #include "osd/osdprettywayland.h"
 #include "osd/osdbase.h"
 #include "osd/osdforce.h"
+#include "osd/osdmac.h"
+#include "osd/osdnative.h"
 #include "osd/osdpretty.h"
 #include "osd/osdprettyfade.h"
 #include "osd/osdprettylimits.h"
@@ -189,6 +192,28 @@ TEST(OSDBase, CustomTextAndPlaylistFinished) {
   EXPECT_EQ("Playlist finished", tray.popup_message());
 }
 
+TEST(OSDNative, PlatformCapabilitiesMatchQt) {
+  EXPECT_FALSE(OSDNative::IsWindows());
+  EXPECT_FALSE(OSDNative::IsMacOs());
+  EXPECT_TRUE(OSDNative::UsesDbusNative());
+  EXPECT_FALSE(OSDNative::UsesNotificationCenter());
+  EXPECT_FALSE(OSDNative::NativeFallsThroughToTray());
+  EXPECT_FALSE(OSDNative::TrayFallsThroughToPretty());
+  EXPECT_FALSE(OSDNative::BaseSupportsNativeNotifications(true));
+  EXPECT_TRUE(OSDNative::SupportsNativeNotifications(true));
+  EXPECT_TRUE(OSDNative::SupportsNativeNotifications(false));
+  EXPECT_TRUE(OSDNative::SupportsTrayPopups(true));
+  EXPECT_FALSE(OSDNative::SupportsTrayPopups(false));
+  EXPECT_FALSE(OSDMacNative::SupportsTrayPopups());
+  EXPECT_TRUE(OSDMacNative::NotificationCenterAvailable(true));
+  EXPECT_FALSE(OSDMacNative::NotificationCenterAvailable(false));
+
+  SystemTrayIcon tray;
+  TestOSD osd(&tray);
+  EXPECT_TRUE(osd.SupportsNativeNotifications());
+  EXPECT_TRUE(osd.SupportsTrayPopups());
+}
+
 TEST(OSDPrettyWayland, SupportedWhenADisplayExists) {
   EXPECT_TRUE(OSDPrettyWayland::SupportedOnDisplay(true));
   EXPECT_FALSE(OSDPrettyWayland::SupportedOnDisplay(false));
@@ -203,6 +228,20 @@ TEST(OSDPrettyWayland, DetectsPositionBackend) {
   EXPECT_TRUE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::LayerShell));
   EXPECT_FALSE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::Unpositioned));
   EXPECT_FALSE(OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::PositionBackend::None));
+#ifdef HAVE_GTK4_LAYER_SHELL
+  EXPECT_TRUE(OSDPrettyWayland::CompiledWithLayerShell());
+#else
+  EXPECT_FALSE(OSDPrettyWayland::CompiledWithLayerShell());
+#endif
+  EXPECT_FALSE(OSDPrettyWayland::RuntimeLayerShell(false, true));
+  EXPECT_FALSE(OSDPrettyWayland::RuntimeLayerShell(true, false));
+  EXPECT_TRUE(OSDPrettyWayland::RuntimeLayerShell(true, true));
+  const OSDPrettyWayland::LayerMargins origin = OSDPrettyWayland::MarginsFromAbsolute(100, 80, 0, 0);
+  EXPECT_EQ(100, origin.left);
+  EXPECT_EQ(80, origin.top);
+  const OSDPrettyWayland::LayerMargins offset = OSDPrettyWayland::MarginsFromAbsolute(1960, 40, 1920, 0);
+  EXPECT_EQ(40, offset.left);
+  EXPECT_EQ(40, offset.top);
 }
 
 TEST(OSDPretty, SupportedRequiresX11Display) {

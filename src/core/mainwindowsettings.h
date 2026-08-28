@@ -6,6 +6,8 @@ namespace MainWindowSettings {
 constexpr char kSettingsGroup[] = "MainWindow";
 constexpr char kSearchForCoverAuto[] = "search_for_cover_auto";
 constexpr char kShowSidebar[] = "show_sidebar";
+constexpr char kTabMode[] = "tab_mode";
+constexpr char kCurrentTab[] = "current_tab";
 constexpr char kWidth[] = "width";
 constexpr char kHeight[] = "height";
 constexpr char kMaximized[] = "maximized";

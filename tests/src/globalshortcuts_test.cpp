@@ -1,6 +1,9 @@
+#include "dialogs/shortcutscatalog.h"
+#include "ui/mainwindowshowhide.h"
 #include "globalshortcuts/globalshortcutbinding.h"
 #include "globalshortcuts/globalshortcutgrab.h"
 #include "globalshortcuts/globalshortcuts.h"
+#include "globalshortcuts/macosaccessibility.h"
 #include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
 #include "globalshortcuts/globalshortcutsbackend-portal.h"
 #include "globalshortcuts/globalshortcutsportal.h"
@@ -10,6 +13,7 @@
 #include "playlist/playlistsequence.h"
 
 #include <gtest/gtest.h>
+#include <string>
 
 TEST(GlobalShortcuts, ShortcutIdsMatchQt) {
   const std::vector<std::string> ids = GlobalShortcutsManager::ShortcutIds();
@@ -205,6 +209,30 @@ TEST(GlobalShortcutGrab, AcceptsCompleteCombosOnly) {
   EXPECT_FALSE(GlobalShortcutGrab::RejectClears("<b>Ctrl</b>"));
   EXPECT_TRUE(GlobalShortcutGrab::ShouldDismissOnCancel(""));
   EXPECT_FALSE(GlobalShortcutGrab::ShouldDismissOnCancel("Ctrl"));
+  EXPECT_TRUE(GlobalShortcutGrab::ShouldGrabOnShow());
+  EXPECT_TRUE(GlobalShortcutGrab::ShouldUngrabOnHide());
+  EXPECT_FALSE(GlobalShortcutGrab::GrabOwnerEvents());
+  EXPECT_EQ(GDK_SEAT_CAPABILITY_KEYBOARD, GlobalShortcutGrab::GrabCapabilities());
+  EXPECT_TRUE(GlobalShortcutGrab::ShouldInhibitSystemShortcuts());
+  EXPECT_EQ(nullptr, GlobalShortcutGrab::ToplevelFor(nullptr));
+}
+
+TEST(MacOsAccessibility, ShowsRowUntilTrusted) {
+  EXPECT_FALSE(MacOsAccessibility::IsMacOs());
+  EXPECT_TRUE(MacOsAccessibility::ShouldShowAccessRow(true, false));
+  EXPECT_FALSE(MacOsAccessibility::ShouldShowAccessRow(true, true));
+  EXPECT_FALSE(MacOsAccessibility::ShouldShowAccessRow(false, false));
+  EXPECT_TRUE(MacOsAccessibility::ShouldRefreshOnShow());
+  EXPECT_TRUE(MacOsAccessibility::PromptWhenCheckingTrust());
+  EXPECT_STREQ("Accessibility", MacOsAccessibility::GroupTitle());
+  EXPECT_STREQ("Open...", MacOsAccessibility::OpenButton());
+  EXPECT_STREQ("Privacy_Accessibility", MacOsAccessibility::AccessibilityAnchor());
+  EXPECT_STREQ("com.apple.preference.security", MacOsAccessibility::SecurityPaneId());
+  EXPECT_STREQ("com.apple.systempreferences", MacOsAccessibility::SystemPreferencesBundle());
+  EXPECT_STREQ("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility", MacOsAccessibility::PreferencesUrl());
+  EXPECT_TRUE(std::string(MacOsAccessibility::Warning()).find("control your computer") != std::string::npos);
+  GlobalShortcutsManager manager;
+  EXPECT_FALSE(manager.IsMacAccessibilityEnabled());
 }
 
 TEST(PlaylistManager, CycleRepeatAndShuffleModes) {
@@ -216,4 +244,36 @@ TEST(PlaylistManager, CycleRepeatAndShuffleModes) {
   EXPECT_EQ(PlaylistSequence::RepeatMode::Track, manager.current()->repeat_mode());
   manager.CycleShuffleMode();
   EXPECT_EQ(PlaylistSequence::ShuffleMode::All, manager.current()->shuffle_mode());
+}
+
+TEST(MainWindowShowHide, ShortcutAndCloseMatchQtKeepRunning) {
+  EXPECT_TRUE(MainWindowShowHide::EffectiveKeepRunning(true, true, true));
+  EXPECT_FALSE(MainWindowShowHide::EffectiveKeepRunning(true, true, false));
+  EXPECT_FALSE(MainWindowShowHide::EffectiveKeepRunning(true, false, true));
+  EXPECT_FALSE(MainWindowShowHide::EffectiveKeepRunning(false, true, true));
+  EXPECT_TRUE(MainWindowShowHide::ShouldHideInsteadOfExit(true));
+  EXPECT_FALSE(MainWindowShowHide::ShouldHideInsteadOfExit(false));
+  EXPECT_EQ(MainWindowShowHide::Action::HideToTray, MainWindowShowHide::CloseAction(true));
+  EXPECT_EQ(MainWindowShowHide::Action::Exit, MainWindowShowHide::CloseAction(false));
+  EXPECT_EQ(MainWindowShowHide::Action::HideToTray, MainWindowShowHide::HideAction(true));
+  EXPECT_EQ(MainWindowShowHide::Action::Minimize, MainWindowShowHide::HideAction(false));
+  EXPECT_EQ(MainWindowShowHide::Action::Present, MainWindowShowHide::ShortcutAction(false, false, true));
+  EXPECT_EQ(MainWindowShowHide::Action::HideToTray, MainWindowShowHide::ShortcutAction(true, true, true));
+  EXPECT_EQ(MainWindowShowHide::Action::Minimize, MainWindowShowHide::ShortcutAction(true, true, false));
+  EXPECT_EQ(MainWindowShowHide::Action::Present, MainWindowShowHide::ShortcutAction(true, false, true));
+}
+
+TEST(ShortcutsCatalog, ListsWiredMainWindowAccels) {
+  const std::string text = ShortcutsCatalog::Text();
+  EXPECT_GE(ShortcutsCatalog::Entries().size(), 30u);
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+D"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Shift+D"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Tab"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+W"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Shift+W"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+9"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+M"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Shift+P"));
+  EXPECT_TRUE(ShortcutsCatalog::ContainsKeys(text, "Space"));
+  EXPECT_FALSE(ShortcutsCatalog::ContainsKeys(text, "Ctrl+Alt+F12"));
 }

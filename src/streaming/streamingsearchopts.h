@@ -21,6 +21,7 @@ constexpr char kSongsSearchLimit[] = "songssearchlimit";
 constexpr char kFetchAlbums[] = "fetchalbums";
 constexpr char kRemoveRemastered[] = "remove_remastered";
 constexpr char kAlbumExplicit[] = "album_explicit";
+constexpr char kSearchType[] = "type";
 constexpr int kDefaultDelayMs = 1500;
 constexpr int kDefaultArtistsLimit = 4;
 constexpr int kDefaultAlbumsLimit = 10;
@@ -33,6 +34,46 @@ constexpr bool kDefaultAlbumExplicit = false;
 inline const char *ConfigureLabel() { return "Configure…"; }
 
 inline const char *SearchForThisLabel() { return "Search for this"; }
+
+// Qt StreamingSearchView::showEvent focuses the search field except on macOS.
+inline bool ShouldFocusOnShow() { return true; }
+
+// Qt StreamingSearchView persists SearchType as "type" and defaults to Artists.
+inline StreamingService::SearchType DefaultSearchType() { return StreamingService::SearchType::Artists; }
+
+inline StreamingService::SearchType ClampSearchType(int value) {
+  switch (static_cast<StreamingService::SearchType>(value)) {
+    case StreamingService::SearchType::Artists:
+    case StreamingService::SearchType::Albums:
+    case StreamingService::SearchType::Songs:
+      return static_cast<StreamingService::SearchType>(value);
+    default:
+      return DefaultSearchType();
+  }
+}
+
+inline StreamingService::SearchType LoadSearchType(const std::string &group) {
+  if (group.empty()) {
+    return DefaultSearchType();
+  }
+  Settings settings;
+  settings.BeginGroup(group);
+  return ClampSearchType(settings.IntValue(kSearchType, static_cast<int>(DefaultSearchType())));
+}
+
+inline void SaveSearchType(const std::string &group, StreamingService::SearchType type) {
+  if (group.empty()) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(group);
+  settings.SetIntValue(kSearchType, static_cast<int>(type));
+  settings.Sync();
+}
+
+inline bool ShouldSaveOnActivate(bool active, bool applying) { return active && !applying; }
+
+inline bool ShouldReloadOnSettingsClose() { return true; }
 
 inline std::string ConfigureServiceLabel(const std::string &service) {
   if (service.empty()) {

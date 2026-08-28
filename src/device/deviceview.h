@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_DEVICEVIEW_H
 #define STRAWBERRY_DEVICEVIEW_H
 
+#include "collection/collectionfocus.h"
 #include "collection/collectionitem.h"
 #include "collection/collectionmodel.h"
 #include "core/song.h"
@@ -34,21 +35,28 @@ class DeviceView {
 
   const ConnectedDevice *SelectedDevice() const;
   SongList SelectedSongs() const;
+  const SongList &songs() const { return songs_; }
 
  private:
   void Clear();
   void RebuildSongs();
   void AppendItem(const CollectionItem *item, int depth);
   void ToggleExpanded(const CollectionItem *item);
+  const CollectionItem *SelectedItem() const;
+  void SelectFocusItem();
+  bool ApplyTreeLeft();
   void AttachMenu(GtkWidget *row);
   void SetupRowDrag(GtkWidget *row, const Song &song);
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
+  void ShowSelectedMenu();
   void ResetTypeAhead();
+  void RequestOpenDevice(const std::string &id);
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *list_ = nullptr;
   CollectionModel model_;
   std::set<std::string> expanded_;
+  CollectionFocus::State focus_;
   SongList songs_;
   std::function<void(const std::string &)> device_cb_;
   std::function<void(const Song &)> song_cb_;
@@ -60,6 +68,8 @@ class DeviceView {
   std::function<void(const Song &)> song_menu_cb_;
   std::string typeahead_;
   guint typeahead_timeout_ = 0;
+  std::string opening_device_;
+  guint open_idle_ = 0;
 };
 
 #endif

@@ -1,8 +1,11 @@
 #include "device/deviceviewcontainer.h"
 
 #include "core/application.h"
+#include "core/deletefiles.h"
+#include "core/musicstorage.h"
 #include "device/copytodevicedialog.h"
 #include "device/devicecopy.h"
+#include "device/devicedeletejob.h"
 #include "device/devicemenu.h"
 #include "device/deviceproperties.h"
 #include "device/devicedeletedialog.h"
@@ -11,12 +14,37 @@
 #include "device/deviceviewlook.h"
 #include "device/deviceviewreload.h"
 #include "device/devicesongmenu.h"
+#include "organize/organizeerrordialog.h"
 #include "organize/organizedialog.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
+#include <glib.h>
 
+#include <memory>
 #include <string>
+
+namespace {
+
+struct DeviceDeleteState {
+  DeviceViewContainer *self = nullptr;
+  Application *app = nullptr;
+  GtkWindow *parent = nullptr;
+  std::shared_ptr<bool> alive;
+  std::unique_ptr<MusicStorage> storage;
+  DeleteFiles *deleter = nullptr;
+  std::string device_id;
+  SongList requested;
+};
+
+gboolean DeviceDeleteStateFree(gpointer data) {
+  auto *state = static_cast<DeviceDeleteState *>(data);
+  delete state->deleter;
+  delete state;
+  return G_SOURCE_REMOVE;
+}
+
+}  // namespace
 
 DeviceViewContainer::DeviceViewContainer(Application *app) : app_(app) {
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -42,6 +70,8 @@ DeviceViewContainer::DeviceViewContainer(Application *app) : app_(app) {
   view_->SetSongMenuCallback([this](const Song &song) { ShowSongMenu(song); });
   Reload();
 }
+
+DeviceViewContainer::~DeviceViewContainer() { *alive_ = false; }
 
 void DeviceViewContainer::Reload() {
   if (!app_ || !app_->device_manager()) {
@@ -254,14 +284,53 @@ void DeviceViewContainer::ConfirmForget(const std::string &id, const std::string
   adw_dialog_present(dialog, GTK_WIDGET(ParentWindow()));
 }
 
-void DeviceViewContainer::FinishDelete(const SongList &songs) {
-  if (!app_ || !app_->device_manager() || browse_id_.empty()) {
+void DeviceViewContainer::ApplyDeleteFinished(const std::string &device_id, const SongList &requested, const SongList &errors) {
+  if (!app_ || !app_->device_manager()) {
     return;
   }
-  for (const Song &selected : songs) {
-    app_->device_manager()->DeleteSong(browse_id_, selected);
+  const SongList deleted = DeviceDeleteJob::Succeeded(requested, errors);
+  app_->device_manager()->RefreshAfterDelete(device_id, deleted);
+  if (view_ && browse_id_ == device_id && !DeviceDeleteJob::ReloadsDeviceAfterDelete()) {
+    view_->ShowSongs(DeviceDeleteJob::RemoveDeleted(view_->songs(), deleted));
+    app_->device_manager()->RememberSongCount(device_id, static_cast<int>(view_->songs().size()));
+  } else if (browse_id_ == device_id) {
+    Reload();
   }
-  Reload();
+}
+
+void DeviceViewContainer::FinishDelete(const SongList &songs) {
+  if (!app_ || !app_->device_manager() || browse_id_.empty() || songs.empty()) {
+    return;
+  }
+  const ConnectedDevice *found = app_->device_manager()->Find(browse_id_);
+  if (!found || !DeviceDeleteJob::ShouldUseDeleteFiles(*found)) {
+    return;
+  }
+  auto *state = new DeviceDeleteState;
+  state->self = this;
+  state->app = app_;
+  state->parent = ParentWindow();
+  state->alive = alive_;
+  state->storage = app_->device_manager()->MusicStorageForDevice(*found);
+  state->device_id = browse_id_;
+  state->requested = songs;
+  if (!state->storage) {
+    delete state;
+    return;
+  }
+  state->deleter = new DeleteFiles(app_->task_manager(), state->storage.get(), DeviceDeleteJob::UseTrash());
+  state->deleter->Finished.Connect([state](const SongList &errors) {
+    if (state->alive && *state->alive && state->self) {
+      state->self->ApplyDeleteFinished(state->device_id, state->requested, errors);
+    } else if (state->app && state->app->device_manager()) {
+      state->app->device_manager()->RefreshAfterDelete(state->device_id, DeviceDeleteJob::Succeeded(state->requested, errors));
+    }
+    if (DeviceDeleteJob::ShouldShowErrorDialog(errors) && state->parent) {
+      OrganizeErrorDialog::Show(state->parent, OrganizeErrorDialog::OperationType::Delete, errors);
+    }
+    g_idle_add(DeviceDeleteStateFree, state);
+  });
+  state->deleter->StartAsync(state->requested);
 }
 
 void DeviceViewContainer::ConfirmDelete(const SongList &songs) {

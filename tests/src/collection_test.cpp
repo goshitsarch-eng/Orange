@@ -1,3 +1,6 @@
+#include "core/appearanceconfigurebuttons.h"
+#include "core/appearanceleftpanel.h"
+#include "collection/collectionwatcherreload.h"
 #include "collection/collectionfullrescan.h"
 #include "collection/collectioncompilationdetect.h"
 #include "collection/collectionsongpatch.h"
@@ -7,6 +10,7 @@
 #include "collection/collectionempty.h"
 #include "collection/collectionfilterfocus.h"
 #include "collection/collectiontypeaheadscroll.h"
+#include "collection/collectiontreeleft.h"
 #include "collection/collectionfilterkeyboard.h"
 #include "collection/collectiontreeclick.h"
 #include "collection/collectionbackend.h"
@@ -39,6 +43,7 @@
 #include "collection/collectionexpire.h"
 #include "collection/collectionfingerprintmatch.h"
 #include "collection/collectionrescanreason.h"
+#include "collection/collectionrescansongs.h"
 #include "collection/collectionunavailablerestore.h"
 #include "collection/collectionscanprogress.h"
 #include "collection/collectiontagsave.h"
@@ -55,6 +60,7 @@
 #include "collection/collectionfilterchoices.h"
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectiongroupingsave.h"
+#include "collection/collectioncontextmenu.h"
 #include "collection/collectionmenu.h"
 #include "collection/collectionkeyboard.h"
 #include "collection/collectionchangenotify.h"
@@ -638,6 +644,52 @@ TEST(CollectionWatcher, NeedsRescanUsesMtimeAndUnavailable) {
   EXPECT_TRUE(CollectionWatcher::NeedsRescan(existing, 100, 50));
   Song missing;
   EXPECT_TRUE(CollectionWatcher::NeedsRescan(missing, 100, 50));
+}
+
+TEST(CollectionRescanSongs, DedupsParentDirsAndSplitsPlaylistReloads) {
+  EXPECT_STREQ("Rescanning songs", CollectionRescanSongs::TaskName());
+  EXPECT_FALSE(CollectionRescanSongs::MarksMissingUnavailable());
+  CollectionDirectory root;
+  root.id = 1;
+  root.path = "/music";
+  std::vector<CollectionDirectory> directories = {root};
+  EXPECT_TRUE(CollectionRescanSongs::DirectoryWatched(1, directories));
+  EXPECT_FALSE(CollectionRescanSongs::DirectoryWatched(2, directories));
+  EXPECT_EQ(1, CollectionRescanSongs::DirectoryIdForPath("/music/Portishead", directories));
+  EXPECT_EQ(-1, CollectionRescanSongs::DirectoryIdForPath("/other/album", directories));
+
+  Song collection;
+  collection.set_source(Song::Source::Collection);
+  collection.set_directory_id(1);
+  collection.set_url("file:///music/Portishead/roads.flac");
+  Song same_album;
+  same_album.set_source(Song::Source::Collection);
+  same_album.set_directory_id(1);
+  same_album.set_url("file:///music/Portishead/mysterons.flac");
+  Song other_album;
+  other_album.set_source(Song::Source::Collection);
+  other_album.set_directory_id(1);
+  other_album.set_url("file:///music/Dummy/sour.flac");
+  Song local;
+  local.set_source(Song::Source::LocalFile);
+  local.set_url("file:///tmp/outside.flac");
+  EXPECT_TRUE(CollectionRescanSongs::ShouldRescanInCollection(collection));
+  EXPECT_FALSE(CollectionRescanSongs::ShouldReloadPlaylistItem(collection));
+  EXPECT_TRUE(CollectionRescanSongs::ShouldReloadPlaylistItem(local));
+  EXPECT_FALSE(CollectionRescanSongs::ShouldRescanInCollection(local));
+  EXPECT_EQ("/music/Portishead", CollectionRescanSongs::SongPath(collection));
+  const std::vector<CollectionRescanSongs::Target> targets =
+      CollectionRescanSongs::Targets({collection, same_album, other_album, local}, directories);
+  ASSERT_EQ(2u, targets.size());
+  EXPECT_EQ(1, targets[0].first);
+  EXPECT_EQ("/music/Portishead", targets[0].second);
+  EXPECT_EQ("/music/Dummy", targets[1].second);
+  const SongList collection_only = CollectionRescanSongs::CollectionSongs({collection, local});
+  ASSERT_EQ(1u, collection_only.size());
+  EXPECT_EQ("file:///music/Portishead/roads.flac", collection_only.front().url());
+  std::vector<std::string> scanned;
+  EXPECT_TRUE(CollectionRescanSongs::ShouldScanPath("/music/Portishead", &scanned));
+  EXPECT_FALSE(CollectionRescanSongs::ShouldScanPath("/music/Portishead", &scanned));
 }
 
 TEST(CollectionRescanReason, ForcesRescanWhenFingerprintOrLoudnessMissing) {
@@ -1259,6 +1311,41 @@ TEST(CollectionKeyboard, FromKeyAndMoveAction) {
   EXPECT_EQ(CollectionKeyboard::Action::End, CollectionKeyboard::FromKey(ListBoxKeyboard::kEnd));
   EXPECT_EQ(ListBoxKeyboard::Action::MoveDown, CollectionKeyboard::MoveAction(CollectionKeyboard::Action::MoveDown));
   EXPECT_EQ(ListBoxKeyboard::Action::None, CollectionKeyboard::MoveAction(CollectionKeyboard::Action::Expand));
+}
+
+TEST(CollectionTreeLeft, CollapseOrJumpToParent) {
+  CollectionItem root(CollectionItem::Type::Root);
+  CollectionItem *artist = root.AddChild(CollectionItem::Type::Container);
+  artist->key = "portishead";
+  CollectionItem *album = artist->AddChild(CollectionItem::Type::Container);
+  album->key = "dummy";
+  CollectionItem *song = album->AddChild(CollectionItem::Type::Song);
+
+  EXPECT_TRUE(CollectionTreeLeft::IsRootRow(artist));
+  EXPECT_FALSE(CollectionTreeLeft::IsRootRow(album));
+  EXPECT_FALSE(CollectionTreeLeft::IsRootRow(song));
+  EXPECT_EQ(nullptr, CollectionTreeLeft::SelectableParent(artist));
+  EXPECT_EQ(artist, CollectionTreeLeft::SelectableParent(album));
+  EXPECT_EQ(album, CollectionTreeLeft::SelectableParent(song));
+
+  EXPECT_EQ(CollectionTreeLeft::Action::CollapseCurrent, CollectionTreeLeft::FromState(false, true, true));
+  EXPECT_EQ(CollectionTreeLeft::Action::SelectParentAndCollapse, CollectionTreeLeft::FromState(false, false, true));
+  EXPECT_EQ(CollectionTreeLeft::Action::SelectParentAndCollapse, CollectionTreeLeft::FromItem(song, false));
+  EXPECT_EQ(CollectionTreeLeft::Action::CollapseCurrent, CollectionTreeLeft::FromItem(album, true));
+  EXPECT_EQ(CollectionTreeLeft::Action::None, CollectionTreeLeft::FromItem(artist, false));
+  EXPECT_EQ(album, CollectionTreeLeft::FocusItem(song, CollectionTreeLeft::Action::SelectParentAndCollapse));
+  EXPECT_EQ(album, CollectionTreeLeft::CollapseItem(song, CollectionTreeLeft::Action::SelectParentAndCollapse, true));
+  EXPECT_EQ(nullptr, CollectionTreeLeft::CollapseItem(song, CollectionTreeLeft::Action::SelectParentAndCollapse, false));
+  EXPECT_EQ(album, CollectionTreeLeft::CollapseItem(album, CollectionTreeLeft::Action::CollapseCurrent, true));
+}
+
+TEST(CollectionContextMenu, KeyboardTriggerAndSelectionGate) {
+  EXPECT_TRUE(CollectionContextMenu::IsTrigger(CollectionContextMenu::kMenu, 0));
+  EXPECT_TRUE(CollectionContextMenu::IsTrigger(CollectionContextMenu::kF10, CollectionContextMenu::kShiftMask));
+  EXPECT_FALSE(CollectionContextMenu::IsTrigger(CollectionContextMenu::kF10, 0));
+  EXPECT_FALSE(CollectionContextMenu::IsTrigger(ListBoxKeyboard::kReturn, 0));
+  EXPECT_FALSE(CollectionContextMenu::ShouldShowMenu(false));
+  EXPECT_TRUE(CollectionContextMenu::ShouldShowMenu(true));
 }
 
 TEST(CollectionMenu, CatalogAndEmptySelection) {
@@ -1941,6 +2028,21 @@ TEST(CollectionBackend, UpdatesLastSeenAndExpiresOldUnavailable) {
   unlink(path.c_str());
 }
 
+TEST(CollectionWatcherReload, RestartsWatchingAndPeriodicScanLikeQt) {
+  EXPECT_TRUE(CollectionWatcherReload::ShouldReloadOnSettingsClose());
+  EXPECT_TRUE(CollectionWatcherReload::MarkUnavailable(true, false));
+  EXPECT_FALSE(CollectionWatcherReload::MarkUnavailable(false, false));
+  EXPECT_TRUE(CollectionWatcherReload::MarkUnavailable(false, true));
+  EXPECT_TRUE(CollectionWatcherReload::ShouldRunPeriodicScan(true, true, true));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldRunPeriodicScan(false, true, true));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldRunPeriodicScan(true, false, true));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldRunPeriodicScan(true, true, false));
+  EXPECT_TRUE(CollectionWatcherReload::ShouldStopWatching(true, false));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldStopWatching(true, true));
+  EXPECT_TRUE(CollectionWatcherReload::ShouldStartWatching(false, true));
+  EXPECT_FALSE(CollectionWatcherReload::ShouldStartWatching(true, true));
+}
+
 TEST(CollectionFullRescan, MatchesQtRevisions) {
   EXPECT_FALSE(CollectionFullRescan::ShouldPrompt(0, 23));
   EXPECT_FALSE(CollectionFullRescan::ShouldPrompt(23, 23));
@@ -1956,6 +2058,37 @@ TEST(CollectionFullRescan, MatchesQtRevisions) {
   EXPECT_NE(std::string::npos, message.find("full collection rescan"));
   EXPECT_NE(std::string::npos, message.find(reasons.front()));
   EXPECT_STREQ("Collection rescan notice", CollectionFullRescan::DialogTitle());
+}
+
+TEST(AppearanceLeftPanel, ReloadsSmartAndRadioLikeQt) {
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldApplySmartPlaylists());
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldApplyRadio());
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldReloadOnSettingsClose());
+  EXPECT_EQ(AppearanceSettings::kDefaultIconSizeLeftPanelButtons, AppearanceLeftPanel::IconSize(0));
+  EXPECT_EQ(32, AppearanceLeftPanel::IconSize(32));
+}
+
+TEST(AppearanceLeftPanel, SizesFilesPlaylistsQueueLikeQt) {
+  EXPECT_STREQ("strawberry-left-panel-buttons", AppearanceLeftPanel::CssClass());
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldApply());
+  EXPECT_TRUE(AppearanceLeftPanel::ShouldReloadOnSettingsClose());
+  EXPECT_EQ(AppearanceSettings::kDefaultIconSizeLeftPanelButtons, AppearanceLeftPanel::IconSize(0));
+  EXPECT_EQ(22, AppearanceLeftPanel::IconSize(22));
+  EXPECT_EQ(32, AppearanceLeftPanel::IconSize(32));
+  EXPECT_EQ(128, AppearanceLeftPanel::IconSize(256));
+}
+
+TEST(AppearanceConfigureButtons, SizesCollectionAndStreamingLikeQt) {
+  EXPECT_STREQ("strawberry-configure-buttons", AppearanceConfigureButtons::CssClass());
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionOptions));
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionSearch));
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingSearch));
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingConfigure));
+  EXPECT_TRUE(AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingCollectionFilter));
+  EXPECT_EQ(AppearanceSettings::kDefaultIconSizeConfigureButtons, AppearanceConfigureButtons::IconSize(0));
+  EXPECT_EQ(20, AppearanceConfigureButtons::IconSize(20));
+  EXPECT_EQ(32, AppearanceConfigureButtons::IconSize(32));
+  EXPECT_EQ(128, AppearanceConfigureButtons::IconSize(256));
 }
 
 TEST(Database, RecordsStartupSchemaVersion) {

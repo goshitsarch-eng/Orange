@@ -17,6 +17,8 @@
 #include "core/commandlinevolume.h"
 #include "tidal/tidalloginurl.h"
 #include "tidal/tidalservice.h"
+#include "core/playbackcontrolsstate.h"
+#include "core/playeritemoptions.h"
 #include "utilities/fileutils.h"
 
 #include "config.h"
@@ -172,7 +174,7 @@ void Application::Init() {
     osd_->ReshowCurrentSong(song, current_albumcover_loader_->current());
   });
   player_->Playing.Connect([this]() {
-    tray_->SetPlaying(true);
+    tray_->SetPlaying(true, PlaybackControlsState::PlayPauseEnabled(true, PlayerItemOptions::PauseDisabled(player_->current_song())));
     if (playback_was_paused_) {
       osd_->Resumed();
     }
@@ -228,7 +230,7 @@ void Application::Init() {
   shortcuts_->Mute.Connect([this]() { player_->Mute(); });
   shortcuts_->SeekForward.Connect([this]() { player_->SeekForward(); });
   shortcuts_->SeekBackward.Connect([this]() { player_->SeekBackward(); });
-  shortcuts_->ShowHide.Connect([this]() { RaiseRequested.Emit(); });
+  shortcuts_->ShowHide.Connect([this]() { ShowHideRequested.Emit(); });
   shortcuts_->ShowOSD.Connect([this]() { player_->ShowOSD(); });
   shortcuts_->TogglePrettyOSD.Connect([this]() { player_->TogglePrettyOSD(); });
   shortcuts_->CycleShuffle.Connect([this]() { playlist_manager_->CycleShuffleMode(); });

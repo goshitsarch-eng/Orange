@@ -23,6 +23,7 @@ class PlaylistHeader {
   void SetViewportWidth(int width);
   void ApplyWidths();
   void Rebuild();
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
 
  private:
   void ShowMenu(PlaylistColumn column);

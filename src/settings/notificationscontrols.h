@@ -70,6 +70,11 @@ inline bool GeneralSensitive(OSDSettings::Type type) { return type != OSDSetting
 
 inline bool PrettyGroupSensitive(OSDSettings::Type type) { return type == OSDSettings::Type::Pretty; }
 
+// Qt NotificationsSettingsPage::UpdatePopupVisible: pretty OSD stays up while the page is shown.
+inline bool ShouldShowPrettyPreview(bool page_visible, OSDSettings::Type type) {
+  return page_visible && PrettyGroupSensitive(type);
+}
+
 inline bool CustomTextSensitive(OSDSettings::Type type) { return type != OSDSettings::Type::Disabled; }
 
 // Qt NotificationsSettingsPage::NotificationCustomTextChanged — fields/preview follow the checkbox.

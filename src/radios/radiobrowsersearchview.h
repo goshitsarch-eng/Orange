@@ -23,6 +23,7 @@ class RadioBrowserSearchView {
   GtkWidget *entry() const { return entry_; }
   RadioBrowserSearchModel *model() { return &model_; }
   void SetResults(const std::vector<RadioChannel> &results);
+  void Search(const std::string &query);
   void SetChangedCallback(std::function<void(const std::string &)> callback) { changed_ = std::move(callback); }
   void SetActivateCallback(std::function<void(const RadioChannel &)> callback) { activate_ = std::move(callback); }
   void SetMenuCallback(RadioView::MenuCallback callback) { menu_ = std::move(callback); }
@@ -39,6 +40,7 @@ class RadioBrowserSearchView {
   std::string ActiveCountry() const;
   std::string ActiveOrder() const;
   void SetupRowDrag(GtkWidget *row, const RadioChannel &channel);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
 
   RadioServices *services_ = nullptr;
   GtkWidget *widget_ = nullptr;

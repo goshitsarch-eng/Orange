@@ -4,6 +4,7 @@
 
 #include "translations/translations.h"
 
+#include <algorithm>
 #include <cstring>
 
 PlaylistTabBar::PlaylistTabBar() {
@@ -14,6 +15,7 @@ PlaylistTabBar::PlaylistTabBar() {
   gtk_popover_set_has_arrow(GTK_POPOVER(popover_), FALSE);
   gtk_popover_set_autohide(GTK_POPOVER(popover_), TRUE);
 
+  gtk_widget_set_focusable(widget_, TRUE);
   GtkGesture *right = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(right), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(right));
@@ -22,6 +24,13 @@ PlaylistTabBar::PlaylistTabBar() {
                      self->ShowContextMenu(self->IndexAt(x, y), x, y);
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
+                   this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(widget_, keys);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<PlaylistTabBar *>(data)->OnKeyPressed(keyval, state);
+                   })),
                    this);
 
   GtkGesture *middle = gtk_gesture_click_new();
@@ -98,6 +107,32 @@ PlaylistTabBar::~PlaylistTabBar() {
 void PlaylistTabBar::SetChangedCallback(ChangedCallback callback) { changed_ = std::move(callback); }
 
 void PlaylistTabBar::SetFavoriteCallback(FavoriteCallback callback) { favorite_ = std::move(callback); }
+
+int PlaylistTabBar::CurrentIndex() const {
+  int index = 0;
+  for (GtkWidget *child = gtk_widget_get_first_child(widget_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!g_object_get_data(G_OBJECT(child), "playlist-id")) {
+      continue;
+    }
+    for (GtkWidget *part = gtk_widget_get_first_child(child); part; part = gtk_widget_get_next_sibling(part)) {
+      if (GTK_IS_TOGGLE_BUTTON(part) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(part))) {
+        return index;
+      }
+    }
+    ++index;
+  }
+  return -1;
+}
+
+gboolean PlaylistTabBar::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (!PlaylistTabMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    return FALSE;
+  }
+  if (PlaylistTabMenu::ShouldShowMenu()) {
+    ShowContextMenu(PlaylistTabMenu::IndexForKeyboard(CurrentIndex()), 0, PlaylistTabMenu::kKeyboardY);
+  }
+  return TRUE;
+}
 
 int PlaylistTabBar::TabCount() const {
   int count = 0;
@@ -214,6 +249,13 @@ void PlaylistTabBar::ShowContextMenu(int index, double x, double y) {
   rect.y = static_cast<int>(y);
   rect.width = 1;
   rect.height = 1;
+  if (PlaylistTabMenu::IsKeyboardAnchor(y)) {
+    GtkWidget *tab = TabWidget(index >= 0 ? index : 0);
+    rect.x = 0;
+    rect.y = 0;
+    rect.width = tab ? std::max(1, gtk_widget_get_width(tab)) : 1;
+    rect.height = tab ? std::max(1, gtk_widget_get_height(tab)) : 1;
+  }
   gtk_popover_set_pointing_to(GTK_POPOVER(popover_), &rect);
   gtk_popover_popup(GTK_POPOVER(popover_));
 }
@@ -293,7 +335,11 @@ void PlaylistTabBar::StartInlineRename(int index) {
   GtkEventController *focus = gtk_event_controller_focus_new();
   gtk_widget_add_controller(rename_entry_, focus);
   g_signal_connect(focus, "leave", G_CALLBACK(+[](GtkEventControllerFocus *, gpointer data) {
-                     static_cast<PlaylistTabBar *>(data)->ApplyInlineRename();
+                     if (PlaylistTabMenu::ShouldCommitRenameOnFocusLoss()) {
+                       static_cast<PlaylistTabBar *>(data)->ApplyInlineRename();
+                       return;
+                     }
+                     static_cast<PlaylistTabBar *>(data)->HideEditor();
                    }),
                    this);
 }
@@ -451,6 +497,9 @@ void PlaylistTabBar::Refresh(PlaylistManager *manager, const std::string &active
     }
     GtkWidget *button = gtk_toggle_button_new_with_label(playlist->name().c_str());
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button), playlist.get() == manager->current());
+    if (PlaylistTabMenu::ShowsNameTooltip()) {
+      gtk_widget_set_tooltip_text(button, PlaylistTabMenu::NameTooltip(playlist->name()));
+    }
     g_object_set_data(G_OBJECT(button), "tab-part", const_cast<char *>("name"));
     g_object_set_data_full(G_OBJECT(button), "playlist-name", g_strdup(playlist->name().c_str()), g_free);
     g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {

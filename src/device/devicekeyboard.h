@@ -1,13 +1,15 @@
 #ifndef STRAWBERRY_DEVICEKEYBOARD_H
 #define STRAWBERRY_DEVICEKEYBOARD_H
 
+#include "collection/collectiontreeclick.h"
 #include "widgets/listboxkeyboard.h"
 
 #include <cstring>
+#include <string>
 
 namespace DeviceKeyboard {
 
-enum class Action { None, Activate, MoveUp, MoveDown, Home, End, Escape, Back, TypeAhead };
+enum class Action { None, Activate, MoveUp, MoveDown, Home, End, Escape, Back, Expand, Collapse, TypeAhead };
 
 inline Action FromKey(unsigned keyval) {
   if (keyval == ListBoxKeyboard::kReturn || keyval == ListBoxKeyboard::kKPEnter) {
@@ -24,6 +26,12 @@ inline Action FromKey(unsigned keyval) {
   }
   if (keyval == ListBoxKeyboard::kEnd) {
     return Action::End;
+  }
+  if (keyval == ListBoxKeyboard::kRight) {
+    return Action::Expand;
+  }
+  if (keyval == ListBoxKeyboard::kLeft) {
+    return Action::Collapse;
   }
   if (keyval == ListBoxKeyboard::kEscape || keyval == ListBoxKeyboard::kBackSpace) {
     return keyval == ListBoxKeyboard::kBackSpace ? Action::Back : Action::Escape;
@@ -48,6 +56,36 @@ inline ListBoxKeyboard::Action MoveAction(Action action) {
 
 inline bool IsSpecialRowKind(const char *kind) {
   return kind && (std::strcmp(kind, "back") == 0 || std::strcmp(kind, "add-all") == 0);
+}
+
+// Qt DeviceView::contextMenuEvent uses currentIndex(): device menu vs collection/song menu.
+constexpr unsigned kMenuKey = 0xff67;
+constexpr unsigned kF10Key = 0xffc7;
+constexpr unsigned kShiftMask = 1u << 0;
+
+inline bool IsMenuTrigger(unsigned keyval, unsigned state) {
+  return keyval == kMenuKey || (keyval == kF10Key && (state & kShiftMask) != 0);
+}
+
+enum class MenuTarget { None, Device, Song };
+
+inline MenuTarget MenuForSelection(bool device_row, bool song_row) {
+  if (device_row) {
+    return MenuTarget::Device;
+  }
+  if (song_row) {
+    return MenuTarget::Song;
+  }
+  return MenuTarget::None;
+}
+
+// Qt DeviceView::mouseDoubleClickEvent: MapToDevice(index) && !GetConnectedDevice → Connect().
+inline bool ShouldOpenOnDoubleClick(unsigned button, int n_press, bool device_row) {
+  return device_row && button == CollectionTreeClick::kPrimaryButton && n_press == 2;
+}
+
+inline bool ShouldCoalesceDeviceOpen(const std::string &pending, const std::string &id) {
+  return !id.empty() && pending == id;
 }
 
 }  // namespace DeviceKeyboard

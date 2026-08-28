@@ -5,13 +5,13 @@
 #include "core/application.h"
 #include "core/settings.h"
 #include "device/connecteddevice.h"
-#include "device/devicecopyjob.h"
-#include "device/devicecopyrunner.h"
+#include "device/deviceeject.h"
 #include "device/devicemanager.h"
 #include "organize/organize.h"
 #include "organize/organizejob.h"
 #include "organize/organizepathnotify.h"
 #include "core/standardpaths.h"
+#include "dialogs/dialoggeometry.h"
 #include "organize/organizeerrordialog.h"
 #include "organize/organizeformat.h"
 #include "organize/organizeformatvalidator.h"
@@ -24,6 +24,7 @@
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
 #include "widgets/freespacebar.h"
+#include "widgets/linetexteditkeys.h"
 
 #include <adwaita.h>
 
@@ -62,7 +63,7 @@ struct DialogState {
   std::string device_id;
   FreeSpaceBar *space = nullptr;
   Organize *job = nullptr;
-  DeviceCopyRunner *copy_job = nullptr;
+  std::unique_ptr<MusicStorage> storage;
   std::shared_ptr<bool> alive = std::make_shared<bool>(true);
   bool persist_dest = true;
   bool has_local_destination = true;
@@ -76,9 +77,6 @@ struct DialogState {
     }
     if (job) {
       job->Cancel();
-    }
-    if (copy_job) {
-      copy_job->Cancel();
     }
   }
 };
@@ -129,65 +127,6 @@ const ConnectedDevice *FindCopyDevice(Application *app, const std::string &devic
     }
   }
   return nullptr;
-}
-
-bool StartDeviceCopy(DialogState *state, GtkButton *button, Application *application, const SongList &songs, const Organize::Options &options) {
-  if (!state || state->device_id.empty() || !application) {
-    return false;
-  }
-  const ConnectedDevice *found = FindCopyDevice(application, state->device_id);
-  if (!found || !DeviceCopyJob::UsesDeviceCopyRunner(*found)) {
-    return false;
-  }
-  const ConnectedDevice target = *found;
-  auto *runner = new DeviceCopyRunner(application->task_manager(), application->tagreader());
-  runner->set_transcode(options.transcode_mode, options.transcode_format);
-  runner->set_playlist(options.playlist);
-  runner->set_copy_options(options.overwrite, options.albumcover, options.move);
-  state->copy_job = runner;
-  gtk_widget_set_sensitive(GTK_WIDGET(button), FALSE);
-  if (state->cancel) {
-    gtk_widget_set_sensitive(state->cancel, TRUE);
-  }
-  if (state->status) {
-    gtk_label_set_text(GTK_LABEL(state->status), DeviceCopyJob::TaskName());
-  }
-  const std::shared_ptr<bool> alive = state->alive;
-  const std::string device_id = state->device_id;
-  runner->Finished.Connect([state, alive, runner, application, button, device_id](bool) {
-    if (application && application->device_manager() && runner->copied() > 0) {
-      application->device_manager()->RefreshAfterCopy(device_id, runner->copied(), runner->copied_songs());
-    }
-    if (alive && *alive && state && state->copy_job == runner) {
-      state->copy_job = nullptr;
-      gtk_widget_set_sensitive(GTK_WIDGET(button), TRUE);
-      if (state->cancel) {
-        gtk_widget_set_sensitive(state->cancel, FALSE);
-      }
-      GtkWidget *status_label = state->status ? state->status : GTK_WIDGET(g_object_get_data(G_OBJECT(button), "status"));
-      if (runner->errors().empty()) {
-        if (status_label) {
-          gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
-        }
-        if (state->eject && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->eject)) && application && application->device_manager() &&
-            !state->device_id.empty()) {
-          application->device_manager()->Unmount(state->device_id);
-        }
-      } else {
-        OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), OrganizeErrorDialog::OperationType::Copy,
-                                  runner->errors());
-        if (status_label) {
-          gtk_label_set_text(GTK_LABEL(status_label), (std::to_string(runner->errors().size()) + " file(s) failed.").c_str());
-        }
-      }
-    }
-    g_idle_add(+[](gpointer data) -> gboolean {
-      delete static_cast<DeviceCopyRunner *>(data);
-      return G_SOURCE_REMOVE;
-    }, runner);
-  });
-  runner->StartAsync(target, songs);
-  return true;
 }
 
 struct OrganizeLoadIdle {
@@ -331,7 +270,7 @@ void PersistFromState(const DialogState *state) {
   if (state->persist_dest && state->dest) {
     persist.SetValue(OrganizeSettings::kDestination, gtk_editable_get_text(GTK_EDITABLE(state->dest)));
   }
-  if (state->after_copy) {
+  if (state->after_copy && OrganizePreview::ShouldPersistMove(OrganizePreview::IsDeviceCopy(state->device_id, state->eject != nullptr))) {
     persist.SetBoolValue(OrganizeSettings::kMove, gtk_drop_down_get_selected(GTK_DROP_DOWN(state->after_copy)) == 1);
   }
   if (state->overwrite) {
@@ -405,7 +344,8 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const SongList &s
 void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &request) {
   AdwDialog *dialog = adw_dialog_new();
   adw_dialog_set_title(dialog, Translations::CStr("Organize files"));
-  adw_dialog_set_content_width(dialog, 560);
+  DialogGeometry::Apply(dialog, OrganizeSettings::kDialogGroup, OrganizeSettings::kGeometry, OrganizeSettings::kDefaultDialogWidth,
+                        OrganizeSettings::kDefaultDialogHeight, false);
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
   gtk_widget_set_margin_start(box, 18);
   gtk_widget_set_margin_end(box, 18);
@@ -439,8 +379,17 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
 
   GtkWidget *format_view = gtk_text_view_new();
   gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(format_view), GTK_WRAP_WORD_CHAR);
+  gtk_text_view_set_accepts_tab(GTK_TEXT_VIEW(format_view), FALSE);
   gtk_widget_set_size_request(format_view, -1, 56);
   gtk_widget_set_tooltip_text(format_view, Translations::CStr(OrganizeTokenHelp::Tooltip()));
+  GtkEventController *format_keys = gtk_event_controller_key_new();
+  gtk_event_controller_set_propagation_phase(format_keys, GTK_PHASE_CAPTURE);
+  gtk_widget_add_controller(format_view, format_keys);
+  g_signal_connect(format_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer) -> gboolean {
+                     return LineTextEditKeys::ShouldIgnore(keyval) ? TRUE : FALSE;
+                   })),
+                   nullptr);
   GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(format_view));
   OrganizeSyntaxHighlighter highlighter;
   highlighter.Apply(buffer, saved_format);
@@ -545,7 +494,10 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   const char *after_labels[] = {Translations::CStr("Keep the original files"), Translations::CStr("Delete the original files"), nullptr};
   GtkWidget *after_copy = gtk_drop_down_new_from_strings(after_labels);
   gtk_drop_down_set_selected(GTK_DROP_DOWN(after_copy),
-                             request.move || settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove) ? 1 : 0);
+                             OrganizePreview::InitialMove(request.move, OrganizePreview::IsDeviceCopy(request.device_id, request.show_eject),
+                                                          settings.BoolValue(OrganizeSettings::kMove, OrganizeSettings::kDefaultMove))
+                                 ? 1
+                                 : 0);
   GtkWidget *overwrite = gtk_check_button_new_with_label(Translations::CStr("Overwrite existing files"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(overwrite), settings.BoolValue(OrganizeSettings::kOverwrite, OrganizeSettings::kDefaultOverwrite));
   GtkWidget *remove_problematic = gtk_check_button_new_with_label(Translations::CStr("Remove problematic characters from filenames"));
@@ -573,7 +525,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
   GtkWidget *albumcover = gtk_check_button_new_with_label(Translations::CStr("Copy album cover art"));
   gtk_check_button_set_active(GTK_CHECK_BUTTON(albumcover), settings.BoolValue(OrganizeSettings::kAlbumCover, OrganizeSettings::kDefaultAlbumCover));
   GtkWidget *eject = nullptr;
-  if (request.show_eject) {
+  if (DeviceEject::ShouldShowCheckbox(request.show_eject, DeviceEject::Supported(request.destination))) {
     eject = gtk_check_button_new_with_label(Translations::CStr("Eject device afterwards"));
     gtk_check_button_set_active(GTK_CHECK_BUTTON(eject), settings.BoolValue(OrganizeSettings::kEjectAfter, OrganizeSettings::kDefaultEjectAfter));
   }
@@ -736,14 +688,20 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      options.cover_cache_path = FileUtils::Join(StandardPaths::CacheDir(), "organize-cover.bin");
                      if (state) {
                        options.playlist = state->playlist;
+                       options.eject_after =
+                           DeviceEject::ShouldEjectAfter(state->eject != nullptr,
+                                                         state->eject && gtk_check_button_get_active(GTK_CHECK_BUTTON(state->eject)), true);
                      }
                      PersistFromState(state);
-                     if (state && (state->job || state->copy_job)) {
+                     if (state && state->job) {
                        return;
                      }
                      const SongList songs = SongsFromState(state);
-                     if (StartDeviceCopy(state, button, application, songs, options)) {
-                       return;
+                     if (state && application && application->device_manager()) {
+                       if (const ConnectedDevice *found = FindCopyDevice(application, state->device_id)) {
+                         state->storage = application->device_manager()->MusicStorageForDevice(*found);
+                         options.storage = state->storage.get();
+                       }
                      }
                      auto *job = new Organize(application ? application->task_manager() : nullptr);
                      if (state) {
@@ -761,7 +719,8 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                        if (application && application->device_manager() && !device_id.empty()) {
                          const int failed = static_cast<int>(job->errors().size());
                          const int copied = job->next_index() > failed ? job->next_index() - failed : 0;
-                         application->device_manager()->RefreshAfterCopy(device_id, copied);
+                         const SongList on_device = state && state->storage ? state->storage->CopiedSongs() : SongList{};
+                         application->device_manager()->RefreshAfterCopy(device_id, copied, on_device);
                        }
                        if (alive && *alive && state && state->job == job) {
                          state->job = nullptr;
@@ -773,12 +732,6 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                          const std::vector<Organize::Error> &errors = job->errors();
                          if (errors.empty()) {
                            gtk_label_set_text(GTK_LABEL(status_label), Translations::CStr("Organize finished."));
-                           gpointer eject_ptr = g_object_get_data(G_OBJECT(button), "eject");
-                           const char *device_id = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "device-id"));
-                           if (eject_ptr && device_id && gtk_check_button_get_active(GTK_CHECK_BUTTON(eject_ptr)) && application &&
-                               application->device_manager()) {
-                             application->device_manager()->Unmount(device_id);
-                           }
                          } else {
                            OrganizeErrorDialog::Show(GTK_WINDOW(g_object_get_data(G_OBJECT(button), "parent")), errors);
                            gtk_label_set_text(GTK_LABEL(status_label), (std::to_string(errors.size()) + " file(s) failed.").c_str());
@@ -837,12 +790,6 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                          gtk_label_set_text(GTK_LABEL(state->status), Translations::CStr("Cancelling..."));
                        }
                      }
-                     if (state && state->copy_job) {
-                       state->copy_job->Cancel();
-                       if (state->status) {
-                         gtk_label_set_text(GTK_LABEL(state->status), Translations::CStr("Cancelling..."));
-                       }
-                     }
                    }),
                    state);
   gtk_box_append(GTK_BOX(box), actions);
@@ -886,5 +833,6 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
     SetLoadingSongs(state, false);
   }
   RefreshPreview(state);
+  DialogGeometry::BindClosed(dialog, OrganizeSettings::kDialogGroup, OrganizeSettings::kGeometry);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

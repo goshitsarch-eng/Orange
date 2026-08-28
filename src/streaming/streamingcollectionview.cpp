@@ -1,11 +1,14 @@
 #include "streaming/streamingcollectionview.h"
 
+#include "core/appearanceconfigurebuttons.h"
 #include "collection/collectionempty.h"
 #include "collection/collectionsearchlabels.h"
 #include "filterparser/filterparser.h"
 #include "collection/collectionfiltermenu.h"
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectiontree.h"
+#include "collection/collectiontreeleft.h"
+#include "collection/collectionkeyboard.h"
 #include "collection/groupbydialog.h"
 #include "dialogs/dialoghelpers.h"
 #include "streaming/streamingcollectionactions.h"
@@ -140,12 +143,13 @@ StreamingCollectionView::StreamingCollectionView(const std::string &title) {
   gtk_box_append(GTK_BOX(widget_), filter_entry_);
   gtk_box_append(GTK_BOX(widget_), status_label_);
   gtk_box_append(GTK_BOX(widget_), scroll);
+  ApplyLook();
   GtkEventController *keys = gtk_event_controller_key_new();
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<StreamingCollectionView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<StreamingCollectionView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
 }
@@ -185,6 +189,12 @@ void StreamingCollectionView::HandlePress(guint button, gint n_press, double x, 
 void StreamingCollectionView::SetRefreshCallback(RefreshCallback callback) { refresh_ = std::move(callback); }
 
 void StreamingCollectionView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
+
+void StreamingCollectionView::ApplyLook() {
+  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingCollectionFilter)) {
+    AppearanceConfigureButtons::ApplyWidget(filter_entry_, AppearanceConfigureButtons::StoredSize());
+  }
+}
 
 void StreamingCollectionView::SetService(StreamingService *service) {
   service_ = service;
@@ -653,11 +663,54 @@ void StreamingCollectionView::FocusListAndMove(unsigned keyval) {
   }
 }
 
-gboolean StreamingCollectionView::OnKeyPressed(guint keyval) {
+bool StreamingCollectionView::ApplyTreeLeft() {
+  const CollectionItem *item = SelectedItem();
+  if (!item || StreamingCollectionTree::FilterActive(filter_)) {
+    return false;
+  }
+  const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
+  const CollectionTreeLeft::Action action = CollectionTreeLeft::FromItem(item, expanded);
+  if (action == CollectionTreeLeft::Action::None) {
+    return false;
+  }
+  const CollectionItem *focus = CollectionTreeLeft::FocusItem(item, action);
+  const CollectionItem *parent = CollectionTreeLeft::SelectableParent(item);
+  const bool parent_expanded = CollectionTree::ShowChildren(parent, false, expanded_);
+  const CollectionItem *collapse = CollectionTreeLeft::CollapseItem(item, action, parent_expanded);
+  CollectionFocus::Capture(focus, &focus_);
+  if (collapse) {
+    ToggleExpanded(collapse);
+  }
+  SelectFocusItem();
+  return true;
+}
+
+gboolean StreamingCollectionView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (StreamingCollectionActions::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+    const bool empty = row && GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "empty-streaming"));
+    if (menu_ && StreamingCollectionActions::ShouldShowContextMenu(row && !empty)) {
+      menu_(SelectedSongs());
+    }
+    return TRUE;
+  }
   const ListBoxKeyboard::Action action = ListBoxKeyboard::FromKey(keyval);
   if ((action == ListBoxKeyboard::Action::Backspace || action == ListBoxKeyboard::Action::Escape) && CanGoBack()) {
     PopBrowse();
     return TRUE;
+  }
+  const CollectionKeyboard::Action tree = CollectionKeyboard::FromKey(keyval);
+  if (tree == CollectionKeyboard::Action::Collapse && ApplyTreeLeft()) {
+    return TRUE;
+  }
+  if (tree == CollectionKeyboard::Action::Expand && !StreamingCollectionTree::FilterActive(filter_)) {
+    const CollectionItem *item = SelectedItem();
+    if (CollectionTree::IsExpandable(item) && !CollectionTree::ShowChildren(item, false, expanded_)) {
+      CollectionFocus::Capture(item, &focus_);
+      ToggleExpanded(item);
+      SelectFocusItem();
+    }
+    return CollectionTree::IsExpandable(item) ? TRUE : FALSE;
   }
   if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
     ResetTypeAhead();

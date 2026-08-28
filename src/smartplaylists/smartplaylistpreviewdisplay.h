@@ -72,6 +72,22 @@ inline bool ShouldRunPendingOnShow(bool pending_valid, bool busy) { return pendi
 // Qt SearchFinished discards results when a different search arrived while Generate() ran.
 inline bool ShouldDiscardForPending(bool pending_valid, bool pending_same_as_finished) { return pending_valid && !pending_same_as_finished; }
 
+// Qt busy_container label.
+inline const char *BusyText() { return "Loading..."; }
+
+enum class UpdateAction { Ignore, Defer, Run };
+
+// Qt Update: same as last completed search is ignored; busy/hidden stores pending.
+inline UpdateAction DecideUpdate(bool same_as_last, bool busy, bool hidden) {
+  if (same_as_last) {
+    return UpdateAction::Ignore;
+  }
+  if (ShouldDefer(busy, hidden)) {
+    return UpdateAction::Defer;
+  }
+  return UpdateAction::Run;
+}
+
 }  // namespace SmartPlaylistPreviewDisplay
 
 #endif

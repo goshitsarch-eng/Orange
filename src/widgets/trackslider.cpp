@@ -5,6 +5,7 @@
 #include "widgets/trackslidertime.h"
 #include "widgets/tracksliderkeyboard.h"
 #include "widgets/tracksliderwheel.h"
+#include "widgets/tracksliderdragreset.h"
 
 TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
   Settings settings;
@@ -65,7 +66,33 @@ TrackSlider::TrackSlider() : slider_(0, 1000, 1) {
                      static_cast<TrackSlider *>(data)->HideHover();
                    }),
                    this);
+  GtkGesture *drag = gtk_gesture_click_new();
+  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(drag), GDK_BUTTON_PRIMARY);
+  gtk_widget_add_controller(slider_.widget(), GTK_EVENT_CONTROLLER(drag));
+  g_signal_connect(drag, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint n_press, gdouble, gdouble, gpointer data) {
+                     static_cast<TrackSlider *>(data)->SetDragging(TrackSliderDragReset::DraggingAfterPress(true, n_press));
+                   }),
+                   this);
+  g_signal_connect(drag, "released", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
+                     static_cast<TrackSlider *>(data)->SetDragging(TrackSliderDragReset::DraggingAfterRelease());
+                   }),
+                   this);
+  g_signal_connect(slider_.widget(), "notify::sensitive", G_CALLBACK(+[](GtkWidget *, GParamSpec *, gpointer data) {
+                     static_cast<TrackSlider *>(data)->OnSensitiveChanged();
+                   }),
+                   this);
   SetStopped();
+}
+
+void TrackSlider::SetDragging(bool dragging) { dragging_ = dragging; }
+
+void TrackSlider::OnSensitiveChanged() {
+  const bool now_sensitive = gtk_widget_get_sensitive(slider_.widget());
+  if (TrackSliderDragReset::ShouldResetOnDisable(slider_sensitive_, now_sensitive, dragging_)) {
+    dragging_ = false;
+    slider_.CancelGestures();
+  }
+  slider_sensitive_ = now_sensitive;
 }
 
 void TrackSlider::SetTimes(int64_t position_nanosec, int64_t length_nanosec) {

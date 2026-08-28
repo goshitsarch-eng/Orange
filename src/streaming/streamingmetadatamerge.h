@@ -53,6 +53,13 @@ inline void Apply(Song *target, const Song &fetched) {
   }
 }
 
+// Qt Playlist::UpdateItemMetadata calls InformOfCurrentSongChange when the edited row is current.
+inline bool ShouldNotifyCurrentSong(int row, int current_row) { return row >= 0 && row == current_row; }
+
+inline bool ShouldSyncPlayer(const Song &player, const Song &updated) {
+  return !updated.url().empty() && player.url() == updated.url();
+}
+
 }  // namespace StreamingMetadataMerge
 
 #endif

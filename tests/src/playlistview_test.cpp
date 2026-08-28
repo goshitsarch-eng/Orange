@@ -5,6 +5,7 @@
 #include "playlist/playlistheadersort.h"
 #include "playlist/playlistautoscroll.h"
 #include "playlist/playlistinsertscroll.h"
+#include "playlist/playlistremoveselect.h"
 #include "playlist/playlistclipboard.h"
 #include "playlist/playlistdropindicator.h"
 #include "playlist/playlistheaderreorder.h"
@@ -17,8 +18,11 @@
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlistfolders.h"
 #include "playlist/playlistlistactions.h"
+#include "playlist/playlistlistscroll.h"
 #include "playlist/playlistlistdrop.h"
+#include "playlist/playlistlistcontextmenu.h"
 #include "playlist/playlistlistkeyboard.h"
+#include "playlist/playlistlistleft.h"
 #include "playlist/playlistlistlook.h"
 #include "playlist/playlistlistmodel.h"
 #include "playlist/playlistlistsortfiltermodel.h"
@@ -278,6 +282,15 @@ TEST(PlaylistRating, RowsForStarClickMatchesQtSelection) {
   EXPECT_EQ((std::vector<int>{1, 3, 5}), PlaylistRating::RowsForStarClick(3, {1, 3, 5}));
 }
 
+TEST(PlaylistListScroll, EnsuresCurrentPlaylistVisibleLikeQt) {
+  EXPECT_EQ(PlaylistListScroll::Hint::None, PlaylistListScroll::FromBounds(40.0, 24.0, 0.0, 200.0));
+  EXPECT_EQ(PlaylistListScroll::Hint::Top, PlaylistListScroll::FromBounds(10.0, 24.0, 40.0, 200.0));
+  EXPECT_EQ(PlaylistListScroll::Hint::Bottom, PlaylistListScroll::FromBounds(220.0, 24.0, 0.0, 200.0));
+  EXPECT_DOUBLE_EQ(10.0, PlaylistListScroll::Value(PlaylistListScroll::Hint::Top, 10.0, 24.0, 40.0, 200.0, 0.0, 800.0));
+  EXPECT_DOUBLE_EQ(44.0, PlaylistListScroll::Value(PlaylistListScroll::Hint::Bottom, 220.0, 24.0, 0.0, 200.0, 0.0, 800.0));
+  EXPECT_DOUBLE_EQ(40.0, PlaylistListScroll::Value(PlaylistListScroll::Hint::None, 80.0, 24.0, 40.0, 200.0, 0.0, 800.0));
+}
+
 TEST(PlaylistListModel, ReloadAndLookup) {
   PlaylistListModel model;
   model.Reload(nullptr);
@@ -410,6 +423,34 @@ TEST(PlaylistListKeyboard, FromKeyExpandCollapseAndLabels) {
   ASSERT_EQ(2u, labels.size());
   EXPECT_EQ("Rock", labels[0]);
   EXPECT_EQ("Favorites", labels[1]);
+}
+
+TEST(PlaylistListContextMenu, KeyboardAlwaysShowsMenu) {
+  EXPECT_TRUE(PlaylistListContextMenu::IsTrigger(PlaylistListContextMenu::kMenu, 0));
+  EXPECT_TRUE(PlaylistListContextMenu::IsTrigger(PlaylistListContextMenu::kF10, PlaylistListContextMenu::kShiftMask));
+  EXPECT_FALSE(PlaylistListContextMenu::IsTrigger(PlaylistListContextMenu::kF10, 0));
+  EXPECT_TRUE(PlaylistListContextMenu::ShouldShowMenu());
+}
+
+TEST(PlaylistListLeft, CollapseOrJumpToParent) {
+  EXPECT_TRUE(PlaylistListLeft::IsRootRow(false, ""));
+  EXPECT_TRUE(PlaylistListLeft::IsRootRow(true, "Jazz"));
+  EXPECT_FALSE(PlaylistListLeft::IsRootRow(false, "Jazz"));
+  EXPECT_FALSE(PlaylistListLeft::IsRootRow(true, "Jazz/Live"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::ParentPath(false, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::ParentPath(true, "Jazz/Live"));
+  EXPECT_TRUE(PlaylistListLeft::ParentPath(true, "Jazz").empty());
+
+  EXPECT_EQ(PlaylistListLeft::Action::SelectParentAndCollapse, PlaylistListLeft::FromRow(false, false, "Jazz"));
+  EXPECT_EQ(PlaylistListLeft::Action::CollapseCurrent, PlaylistListLeft::FromRow(true, true, "Jazz"));
+  EXPECT_EQ(PlaylistListLeft::Action::None, PlaylistListLeft::FromRow(true, false, "Jazz"));
+  EXPECT_EQ(PlaylistListLeft::Action::SelectParentAndCollapse, PlaylistListLeft::FromRow(true, false, "Jazz/Live"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::FocusPath(false, false, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::CollapsePath(false, false, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::FocusPath(true, true, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::CollapsePath(true, true, "Jazz"));
+  EXPECT_EQ("Jazz", PlaylistListLeft::FocusPath(true, false, "Jazz/Live"));
+  EXPECT_TRUE(PlaylistListLeft::FocusPath(true, false, "Jazz").empty());
 }
 
 TEST(PlaylistSaveOptionsDialog, PathTypeLabels) {
@@ -555,6 +596,7 @@ TEST(PlaylistListActions, EnableRemoveSaveAndCopyOnlyWithASelection) {
   EXPECT_TRUE(PlaylistListActions::SaveEnabled(true));
   EXPECT_FALSE(PlaylistListActions::CopyEnabled(false));
   EXPECT_TRUE(PlaylistListActions::CopyEnabled(true));
+  EXPECT_TRUE(PlaylistListActions::ShouldRefreshOnShow());
 }
 
 TEST(PlaylistListModel, StoresIdsThroughFilter) {
@@ -604,6 +646,22 @@ TEST(PlaylistTabBarVisibility, HidesSinglePlaylistAndAnimates500Ms) {
   EXPECT_EQ(0, PlaylistTabBarVisibility::HeightAt(500, 40, false));
 }
 
+TEST(PlaylistTabMenu, FocusLossCancelsInlineRename) {
+  EXPECT_FALSE(PlaylistTabMenu::ShouldCommitRenameOnFocusLoss());
+  EXPECT_TRUE(PlaylistTabMenu::ShouldApplyRename("Inbox", "Shows"));
+}
+
+TEST(PlaylistTabMenu, KeyboardUsesCurrentTab) {
+  EXPECT_TRUE(PlaylistTabMenu::IsKeyboardTrigger(PlaylistTabMenu::kMenu, 0));
+  EXPECT_TRUE(PlaylistTabMenu::IsKeyboardTrigger(PlaylistTabMenu::kF10, PlaylistTabMenu::kShiftMask));
+  EXPECT_FALSE(PlaylistTabMenu::IsKeyboardTrigger(PlaylistTabMenu::kF10, 0));
+  EXPECT_TRUE(PlaylistTabMenu::ShouldShowMenu());
+  EXPECT_EQ(2, PlaylistTabMenu::IndexForKeyboard(2));
+  EXPECT_EQ(-1, PlaylistTabMenu::IndexForKeyboard(-1));
+  EXPECT_TRUE(PlaylistTabMenu::IsKeyboardAnchor(PlaylistTabMenu::kKeyboardY));
+  EXPECT_FALSE(PlaylistTabMenu::IsKeyboardAnchor(8));
+}
+
 TEST(PlaylistTabMenu, ContextActionsMatchQt) {
   const std::vector<PlaylistTabMenu::Item> items = PlaylistTabMenu::Items();
   ASSERT_EQ(6u, items.size());
@@ -639,6 +697,8 @@ TEST(PlaylistTabMenu, ContextActionsMatchQt) {
   EXPECT_TRUE(PlaylistTabMenu::ToggledFavorite(false));
   EXPECT_FALSE(PlaylistTabMenu::ToggledFavorite(true));
   EXPECT_STREQ(FavoriteWidget::TooltipText(), PlaylistTabMenu::FavoriteTooltip());
+  EXPECT_TRUE(PlaylistTabMenu::ShowsNameTooltip());
+  EXPECT_STREQ("Inbox", PlaylistTabMenu::NameTooltip("Inbox"));
   EXPECT_EQ("strawberry-playlist-tab:7", PlaylistTabMenu::TabPayload(7));
   EXPECT_TRUE(PlaylistTabMenu::IsTabPayload("strawberry-playlist-tab:7"));
   EXPECT_EQ(7, PlaylistTabMenu::ParseTabId("strawberry-playlist-tab:7"));
@@ -674,6 +734,15 @@ TEST(PlaylistTabNavigation, WrapsLikeQtShortcuts) {
   EXPECT_EQ(1, PlaylistTabNavigation::ActiveIndex(1, 3));
   EXPECT_EQ(-1, PlaylistTabNavigation::ActiveIndex(5, 3));
   EXPECT_EQ(-1, PlaylistTabNavigation::ActiveIndex(-1, 3));
+}
+
+TEST(PlaylistHeaderSort, KeyboardUsesFirstVisibleColumn) {
+  EXPECT_TRUE(PlaylistHeaderSort::IsKeyboardTrigger(PlaylistHeaderSort::kMenu, 0));
+  EXPECT_TRUE(PlaylistHeaderSort::IsKeyboardTrigger(PlaylistHeaderSort::kF10, PlaylistHeaderSort::kShiftMask));
+  EXPECT_FALSE(PlaylistHeaderSort::IsKeyboardTrigger(PlaylistHeaderSort::kF10, 0));
+  EXPECT_TRUE(PlaylistHeaderSort::ShouldShowMenu());
+  EXPECT_EQ(PlaylistColumn::Title, PlaylistHeaderSort::ColumnForMenu(true, PlaylistColumn::Artist, PlaylistColumn::Title));
+  EXPECT_EQ(PlaylistColumn::Artist, PlaylistHeaderSort::ColumnForMenu(false, PlaylistColumn::Artist, PlaylistColumn::Title));
 }
 
 TEST(PlaylistHeaderSort, MarksAndMenuChecksMatchQtHeader) {
@@ -798,6 +867,16 @@ TEST(PlaylistColumnLayout, PixelWidthsFollowSavedProportions) {
   PlaylistColumnLayout::Reset();
 }
 
+TEST(PlaylistRemoveSelect, SelectsRowAfterDeletedLikeQt) {
+  EXPECT_EQ(-1, PlaylistRemoveSelect::NextRow({}, 10));
+  EXPECT_EQ(-1, PlaylistRemoveSelect::NextRow({0, 1}, 2));
+  EXPECT_EQ(0, PlaylistRemoveSelect::NextRow({0}, 10));
+  EXPECT_EQ(8, PlaylistRemoveSelect::NextRow({9}, 10));
+  EXPECT_EQ(3, PlaylistRemoveSelect::NextRow({3, 4, 5}, 10));
+  EXPECT_EQ(7, PlaylistRemoveSelect::NextRow({8, 9}, 10));
+  EXPECT_EQ(7, PlaylistRemoveSelect::NextRow({2, 8}, 10));
+}
+
 TEST(PlaylistInsertScroll, ScrollsAppendedRowsLikeQt) {
   EXPECT_TRUE(PlaylistInsertScroll::AtEnd(10, 3, 13));
   EXPECT_FALSE(PlaylistInsertScroll::AtEnd(2, 3, 13));
@@ -841,6 +920,11 @@ TEST(PlaylistAutoscroll, MaybeAlwaysNeverAndCenter) {
   EXPECT_TRUE(PlaylistAutoscroll::ShouldSkipIfVisible(true));
   EXPECT_FALSE(PlaylistAutoscroll::ShouldSkipIfVisible(false));
   EXPECT_EQ(80, PlaylistAutoscroll::CenteredOffset(200, 40, 280));
+  EXPECT_TRUE(PlaylistAutoscroll::ShouldRunOnShow());
+  EXPECT_EQ(Playlist::AutoScroll::Maybe, PlaylistAutoscroll::ShowMode());
+  EXPECT_TRUE(PlaylistAutoscroll::ShouldRestartGlowOnShow(true));
+  EXPECT_FALSE(PlaylistAutoscroll::ShouldRestartGlowOnShow(false));
+  EXPECT_TRUE(PlaylistAutoscroll::ShouldStopGlowOnHide());
 }
 
 TEST(PlaylistClipboard, JoinsVisibleColumnsAndCopyShortcut) {

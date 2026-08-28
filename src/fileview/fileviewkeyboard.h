@@ -7,6 +7,9 @@ namespace FileViewKeyboard {
 
 enum class Action { None, Activate, UpDir, HistoryBack, HistoryForward, Home, First, Last, MoveUp, MoveDown, TypeAhead };
 
+// Qt FileView::keyPressEvent maps Qt::Key_Back (XF86Back) and Backspace to Up.
+constexpr unsigned kXF86Back = 0x1008ff26;
+
 inline Action FromKey(unsigned keyval, bool alt) {
   if (keyval == ListBoxKeyboard::kReturn || keyval == ListBoxKeyboard::kKPEnter) {
     return Action::Activate;
@@ -23,8 +26,8 @@ inline Action FromKey(unsigned keyval, bool alt) {
   if (alt && keyval == ListBoxKeyboard::kHome) {
     return Action::Home;
   }
-  // Qt FileView::keyPressEvent maps Backspace to the Up button (cdUp), not history.
-  if (keyval == ListBoxKeyboard::kBackSpace) {
+  // Qt FileView::keyPressEvent maps Backspace and Key_Back to the Up button (cdUp), not history.
+  if (keyval == ListBoxKeyboard::kBackSpace || keyval == kXF86Back) {
     return Action::UpDir;
   }
   if (keyval == ListBoxKeyboard::kUp) {

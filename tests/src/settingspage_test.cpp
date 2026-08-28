@@ -35,6 +35,7 @@
 #include "settings/behavioursettingslabels.h"
 #include "collection/savedgroupinglabels.h"
 #include "smartplaylists/smartplaylistslabel.h"
+#include "smartplaylists/smartplaylistsshow.h"
 #include "settings/collectionsettingslabels.h"
 #include "settings/contextsettingslabels.h"
 #include "dialogs/errordialoglabels.h"
@@ -58,6 +59,8 @@
 #include "covermanager/coverproviderauth.h"
 #include "lyrics/lyricsproviderauth.h"
 #include "settings/settingspages.h"
+#include "settings/settingswheelthrough.h"
+#include "ui/settingsdialogshow.h"
 #include "streaming/streamingchoices.h"
 
 #include <gtest/gtest.h>
@@ -284,6 +287,10 @@ TEST(ErrorDialogQueue, ShowAndReraiseMatchQt) {
   EXPECT_FALSE(ErrorDialogQueue::ShouldReraise(true, false, true, true));
   EXPECT_FALSE(ErrorDialogQueue::ShouldReraise(true, true, true, false));
   EXPECT_FALSE(ErrorDialogQueue::ShouldReraise(false, false, true, false));
+  EXPECT_TRUE(ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Show));
+  EXPECT_TRUE(ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::WindowStateChange));
+  EXPECT_TRUE(ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Activate));
+  EXPECT_FALSE(ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Other));
 }
 
 TEST(TranscoderOptionsLabels, QtCopy) {
@@ -422,6 +429,17 @@ TEST(TranscoderSettingsPage, TabsMatchQtOrderAndGroups) {
   EXPECT_EQ(320000, TranscoderSettingsPage::StoreBps(320));
   EXPECT_EQ(6, TranscoderSettingsPage::ClampKbps(Transcoder::Format::Opus, 1));
   EXPECT_EQ(510, TranscoderSettingsPage::ClampKbps(Transcoder::Format::Opus, 999));
+  EXPECT_TRUE(TranscoderSettingsPage::ShouldMarkChangedOnShow(false));
+  EXPECT_FALSE(TranscoderSettingsPage::ShouldMarkChangedOnShow(true));
+  EXPECT_TRUE(TranscoderSettingsPage::ShouldMarkChangedOnLoad(true));
+  EXPECT_FALSE(TranscoderSettingsPage::ShouldMarkChangedOnLoad(false));
+}
+
+TEST(SettingsDialogShow, ReloadsPagesOnProgrammaticShow) {
+  EXPECT_TRUE(SettingsDialogShow::ShouldReloadPages(false));
+  EXPECT_FALSE(SettingsDialogShow::ShouldReloadPages(true));
+  EXPECT_TRUE(SettingsDialogShow::ShouldLoadGeometry(false));
+  EXPECT_FALSE(SettingsDialogShow::ShouldLoadGeometry(true));
 }
 
 TEST(AnalyzerSettings, KeysDefaultsAndTypes) {
@@ -480,6 +498,7 @@ TEST(CoverProviderAuth, StatusTextAndServiceSettings) {
   EXPECT_EQ("Open Tidal settings", CoverProviderAuth::OpenSettingsLabel("Tidal"));
   EXPECT_STREQ("No provider selected.", CoverProviderAuth::NoProviderSelected());
   EXPECT_STREQ("Authenticate", CoverProviderAuth::Authenticate());
+  EXPECT_TRUE(CoverProviderAuth::ShouldRefreshOnShow());
   EXPECT_EQ(CoverProviderAuth::Panel::Hidden, CoverProviderAuth::PanelFor("", true, false));
   EXPECT_EQ(CoverProviderAuth::Panel::Hidden, CoverProviderAuth::PanelFor("MusicBrainz", false, false));
   EXPECT_EQ(CoverProviderAuth::Panel::ServiceHint, CoverProviderAuth::PanelFor("Tidal", true, false));
@@ -576,6 +595,10 @@ TEST(StreamingLoginControls, DisablesDuringOAuth) {
   EXPECT_TRUE(StreamingLoginControls::LoginButtonEnabledOnPageShown());
   EXPECT_TRUE(StreamingLoginControls::TidalCredentialsValid("abc"));
   EXPECT_FALSE(StreamingLoginControls::TidalCredentialsValid(""));
+  EXPECT_TRUE(StreamingLoginControls::ShouldRefreshLoginStateOnShow());
+  EXPECT_EQ(StreamingLoginControls::LoginState::LoggedIn, StreamingLoginControls::StateFromAuth(true, false));
+  EXPECT_EQ(StreamingLoginControls::LoginState::LoginInProgress, StreamingLoginControls::StateFromAuth(false, true));
+  EXPECT_EQ(StreamingLoginControls::LoginState::LoggedOut, StreamingLoginControls::StateFromAuth(false, false));
 }
 
 TEST(StreamingSettingsLabels, SubsonicCopyAndConnectionCheck) {
@@ -635,6 +658,11 @@ TEST(StreamingSettingsLabels, SubsonicCopyAndConnectionCheck) {
   EXPECT_STREQ("Search results limit:", RadioSettingsLabels::SearchResultsLimit());
   EXPECT_STREQ("Default sort order:", RadioSettingsLabels::DefaultSortOrder());
   EXPECT_STREQ("Default country:", RadioSettingsLabels::DefaultCountry());
+}
+
+TEST(SubsonicSettingsActions, ReenablesTestOnShowAndEnter) {
+  EXPECT_TRUE(SubsonicSettingsActions::ShouldReenableTestOnShow());
+  EXPECT_TRUE(SubsonicSettingsActions::ShouldReenableTestOnEnter());
 }
 
 TEST(BackendOutputChoices, AppendsCustomAndDetectsUnlistedDevice) {
@@ -802,6 +830,9 @@ TEST(NotificationsControls, ConvertsTimeoutAndGatesDuration) {
   EXPECT_EQ(OSDSettings::Type::Disabled, NotificationsControls::EffectiveType(OSDSettings::Type::TrayPopup, false, false, false));
   EXPECT_FALSE(NotificationsControls::GeneralSensitive(OSDSettings::Type::Disabled));
   EXPECT_TRUE(NotificationsControls::PrettyGroupSensitive(OSDSettings::Type::Pretty));
+  EXPECT_TRUE(NotificationsControls::ShouldShowPrettyPreview(true, OSDSettings::Type::Pretty));
+  EXPECT_FALSE(NotificationsControls::ShouldShowPrettyPreview(false, OSDSettings::Type::Pretty));
+  EXPECT_FALSE(NotificationsControls::ShouldShowPrettyPreview(true, OSDSettings::Type::Native));
   EXPECT_FALSE(NotificationsControls::ArtSensitive(OSDSettings::Type::TrayPopup));
   EXPECT_TRUE(NotificationsControls::ArtSensitive(OSDSettings::Type::Native));
   EXPECT_TRUE(NotificationsControls::DisableDurationSensitive(OSDSettings::Type::Pretty));
@@ -901,6 +932,7 @@ TEST(SmartPlaylistsLabel, MatchQtToolbarCopy) {
   EXPECT_STREQ("Edit smart playlist", SmartPlaylistsLabel::EditPlaylist());
   EXPECT_STREQ("Delete smart playlist", SmartPlaylistsLabel::DeletePlaylist());
   EXPECT_STREQ("Restore defaults", SmartPlaylistsLabel::RestoreDefaults());
+  EXPECT_TRUE(SmartPlaylistsShow::ShouldRefreshSelectionOnShow());
 }
 
 TEST(GstEngineProxy, AppliesOnlyManualHttpWhenEngineEnabled) {
@@ -918,4 +950,17 @@ TEST(GstEngineProxy, AppliesOnlyManualHttpWhenEngineEnabled) {
   const auto skipped = GstEngineProxy::FromSettings(NetworkProxySettings::Mode::Manual, NetworkProxySettings::ProxyType::Socks5Proxy, true,
                                                     "proxy.local", 8080, true, "user", "pw");
   EXPECT_TRUE(skipped.address.empty());
+}
+
+TEST(SettingsWheelThrough, PropagatesWhenUnfocusedLikeQt) {
+  EXPECT_TRUE(SettingsWheelThrough::ShouldPropagateToParent(false));
+  EXPECT_FALSE(SettingsWheelThrough::ShouldPropagateToParent(true));
+  EXPECT_TRUE(SettingsWheelThrough::AppliesToCombo());
+  EXPECT_TRUE(SettingsWheelThrough::AppliesToSpin());
+  EXPECT_TRUE(SettingsWheelThrough::AppliesToSlider());
+  EXPECT_DOUBLE_EQ(40.0, SettingsWheelThrough::AdjustmentDelta(1.0, 40.0));
+  EXPECT_DOUBLE_EQ(-80.0, SettingsWheelThrough::AdjustmentDelta(-2.0, 40.0));
+  EXPECT_DOUBLE_EQ(SettingsWheelThrough::kFallbackStep, SettingsWheelThrough::AdjustmentDelta(1.0, 0.0));
+  EXPECT_DOUBLE_EQ(10.0, SettingsWheelThrough::ClampedValue(5.0, 8.0, 0.0, 10.0));
+  EXPECT_DOUBLE_EQ(0.0, SettingsWheelThrough::ClampedValue(5.0, -8.0, 0.0, 10.0));
 }

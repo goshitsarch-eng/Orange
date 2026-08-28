@@ -1,8 +1,19 @@
 #include "config.h"
 #include "core/logging.h"
+#ifdef _WIN32
+#include "core/windows7thumbbaractions.h"
+#include "utilities/winutils.h"
+#endif
+#ifdef __APPLE__
+#include "core/mac_startup.h"
+#include "core/macosutils.h"
+#include "core/macoswindow.h"
+#include "systemtrayicon/macsystemtrayicon.h"
+#endif
 #include "ui/mainwindow.h"
 
 #include "collection/collectionfullrescan.h"
+#include "collection/collectionrescansongs.h"
 #include "collection/collectionbehaviour.h"
 #include "collection/collectionincremental.h"
 #include "playlist/playlistactivate.h"
@@ -38,12 +49,18 @@
 #include "ui/mainwindowmenu.h"
 #include "ui/mainwindowkeyboard.h"
 #include "ui/mainwindowlook.h"
+#include "ui/mainwindowshowhide.h"
+#include "systemtrayicon/traysettingsreload.h"
 #include "ui/mainwindowsearchfocus.h"
 #include "context/contextcover.h"
 #include "context/contextview.h"
+#include "collection/collectionwatcherreload.h"
+#include "covermanager/coveroptionsreload.h"
+#include "discord/discordsettingsreload.h"
 #include "covermanager/coverproviders.h"
 #include "device/deviceviewcontainer.h"
 #include "constants/moodbarsettings.h"
+#include "utilities/seekbaranalysis.h"
 #include "moodbar/moodbarrenderer.h"
 #include "moodbar/moodbarstyle.h"
 #include "waveform/waveformrenderer.h"
@@ -62,6 +79,7 @@
 #include "radios/radiomenu.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/radioviewcontainer.h"
+#include "smartplaylists/smartplaylistactivate.h"
 #include "smartplaylists/smartplaylistsview.h"
 #include "smartplaylists/smartplaylistsviewcontainer.h"
 #include "playlist/playlistcolumnlayout.h"
@@ -71,6 +89,7 @@
 #include "playlist/playlistclipboard.h"
 #include "playlist/playlisteditcolumn.h"
 #include "playlist/playlistmenu.h"
+#include "playlist/playlistremoveselect.h"
 #include "playlist/playliststopafter.h"
 #include "core/playerstopafter.h"
 #include "core/deletefilesjob.h"
@@ -82,9 +101,14 @@
 #include "widgets/multiloadingindicator.h"
 #include "widgets/multiloadingtext.h"
 #include "ui/statusbarstack.h"
+#include "widgets/fancytabbar.h"
+#include "widgets/fancytabmode.h"
 #include "widgets/playingcoveractivate.h"
+#include "utilities/seekbaranalysis.h"
 #include "widgets/playingwidget.h"
+#include "widgets/playingwidgettab.h"
 #include "widgets/seekbarmode.h"
+#include "core/playbackcontrolsstate.h"
 #include "core/playeritemoptions.h"
 #include "widgets/trackslider.h"
 #include "widgets/tracksliderstate.h"
@@ -131,7 +155,10 @@
 #ifdef HAVE_SPOTIFY
 #include "spotify/spotifyservice.h"
 #endif
+#include "streaming/streamingserviceenable.h"
 #include "streaming/streamingtabsview.h"
+#include "core/appearanceconfigurebuttons.h"
+#include "core/appearanceleftpanel.h"
 #include "core/urlhandler.h"
 #include "dialogs/aboutdialog.h"
 #include "dialogs/trackselectiondialog.h"
@@ -211,6 +238,13 @@ bool OpenAllFileViewBrowserPaths(const std::vector<std::string> &paths) {
   return any;
 }
 
+bool KeepRunningEffective(Application *app) {
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  return MainWindowShowHide::EffectiveKeepRunning(app->tray() && app->tray()->available(), app->tray() && app->tray()->visible(),
+                                                 settings.BoolValue(BehaviourSettings::kKeepRunning, BehaviourSettings::kDefaultKeepRunning));
+}
+
 }  // namespace
 
 MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const CommandlineOptions &options)
@@ -237,6 +271,11 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
     app_->scrobbler()->Submit();
   }
   CheckFullRescanRevisions();
+#ifdef __APPLE__
+  MacSetApplicationHandler(this);
+  macos_tray_ = std::make_unique<MacSystemTrayIcon>();
+  macos_tray_->Setup(app_->tray());
+#endif
 }
 
 MainWindow::~MainWindow() {
@@ -267,8 +306,16 @@ MainWindow::~MainWindow() {
   }
 }
 
+void MainWindow::Activate() { Present(); }
+
 void MainWindow::Present() {
   gtk_window_present(GTK_WINDOW(window_));
+#ifdef __APPLE__
+  if (MacOsWindow::ShouldEnableFullScreen()) {
+    MacOsUtils::EnableFullScreen(GTK_WINDOW(window_));
+  }
+#endif
+  RestoreAfterHide();
   if (app_ && app_->shortcuts()) {
     app_->shortcuts()->Raise();
   }
@@ -370,9 +417,67 @@ void MainWindow::BuildUi() {
   window_ = ADW_APPLICATION_WINDOW(adw_application_window_new(GTK_APPLICATION(gtk_app_)));
   error_dialog_ = std::make_unique<QueuedErrorDialog>(GTK_WINDOW(window_));
   g_signal_connect(window_, "notify::is-active", G_CALLBACK((+[](GObject *, GParamSpec *, gpointer data) {
-                     static_cast<MainWindow *>(data)->CheckShowErrorDialog();
+                     if (ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Activate)) {
+                       static_cast<MainWindow *>(data)->CheckShowErrorDialog();
+                     }
                    })),
                    this);
+  g_signal_connect(window_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     if (ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Show)) {
+                       static_cast<MainWindow *>(data)->CheckShowErrorDialog();
+                     }
+                   }),
+                   this);
+  g_signal_connect(window_, "realize", G_CALLBACK(+[](GtkWidget *widget, gpointer data) {
+                     GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(widget));
+                     if (!surface || !GDK_IS_TOPLEVEL(surface)) {
+                       return;
+                     }
+                     g_signal_connect(surface, "notify::state", G_CALLBACK((+[](GObject *, GParamSpec *, gpointer inner) {
+                                        if (ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::WindowStateChange)) {
+                                          static_cast<MainWindow *>(inner)->CheckShowErrorDialog();
+                                        }
+                                      })),
+                                      data);
+                   }),
+                   this);
+#ifdef _WIN32
+  thumbbar_ = std::make_unique<Windows7ThumbBar>(GTK_WIDGET(window_));
+  thumbbar_->SetActions(Windows7ThumbBarActions::DefaultActions());
+  thumbbar_->set_activated([this](Windows7ThumbBarActions::Id id) {
+    switch (id) {
+      case Windows7ThumbBarActions::Id::Previous:
+        app_->player()->Previous();
+        break;
+      case Windows7ThumbBarActions::Id::PlayPause:
+        app_->player()->PlayPause();
+        break;
+      case Windows7ThumbBarActions::Id::Stop:
+        app_->player()->Stop();
+        break;
+      case Windows7ThumbBarActions::Id::Next:
+        app_->player()->Next();
+        break;
+      case Windows7ThumbBarActions::Id::Love:
+        app_->scrobbler()->Love(app_->player()->current_song());
+        break;
+      case Windows7ThumbBarActions::Id::Spacer:
+        break;
+    }
+  });
+  smtc_ = std::make_unique<WinSystemMediaTransportControls>(app_->player());
+  smtc_->set_button_callback([this](const std::string &id) { app_->shortcuts()->Emit(id); });
+  g_signal_connect(window_, "realize", G_CALLBACK(+[](GtkWidget *widget, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     if (self->smtc_) {
+                       self->smtc_->Initialize(WinUtils::NativeHandle(widget));
+                     }
+                     if (self->thumbbar_) {
+                       self->thumbbar_->SetActions(Windows7ThumbBarActions::DefaultActions());
+                     }
+                   }),
+                   this);
+#endif
   gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
   gtk_widget_add_css_class(GTK_WIDGET(window_), "strawberry-main");
   RestoreGeometry();
@@ -480,6 +585,9 @@ void MainWindow::BuildUi() {
   gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(collection_search_),
                                         Translations::CStr(CollectionSearchLabels::Placeholder()));
   gtk_widget_set_tooltip_text(collection_search_, Translations::CStr(FilterParser::ToolTip().c_str()));
+  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionSearch)) {
+    AppearanceConfigureButtons::ApplyWidget(collection_search_, AppearanceConfigureButtons::StoredSize());
+  }
   adw_header_bar_pack_start(ADW_HEADER_BAR(header), collection_search_);
   g_signal_connect(collection_search_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *entry, gpointer data) {
                      auto *self = static_cast<MainWindow *>(data);
@@ -540,16 +648,46 @@ void MainWindow::BuildUi() {
   adw_overlay_split_view_set_sidebar_width_fraction(ADW_OVERLAY_SPLIT_VIEW(split_view_), 0.30);
 
   BuildSidebar();
-  GtkWidget *sidebar_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  GtkWidget *switcher = adw_view_switcher_new();
-  gtk_widget_add_css_class(switcher, "strawberry-tabbar");
-  gtk_widget_add_css_class(sidebar_box, "strawberry-left-panel");
-  adw_view_switcher_set_policy(ADW_VIEW_SWITCHER(switcher), ADW_VIEW_SWITCHER_POLICY_NARROW);
-  adw_view_switcher_set_stack(ADW_VIEW_SWITCHER(switcher), sidebar_stack_);
-  gtk_box_append(GTK_BOX(sidebar_box), switcher);
-  gtk_box_append(GTK_BOX(sidebar_box), GTK_WIDGET(sidebar_stack_));
+  sidebar_tabs_ = std::make_unique<FancyTabBar>();
+  PopulateSidebarTabs();
+  sidebar_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_add_css_class(sidebar_box_, "strawberry-left-panel");
+  gtk_box_append(GTK_BOX(sidebar_box_), sidebar_tabs_->widget());
+  gtk_box_append(GTK_BOX(sidebar_box_), GTK_WIDGET(sidebar_stack_));
   gtk_widget_set_vexpand(GTK_WIDGET(sidebar_stack_), TRUE);
-  adw_overlay_split_view_set_sidebar(ADW_OVERLAY_SPLIT_VIEW(split_view_), sidebar_box);
+  gtk_widget_set_hexpand(GTK_WIDGET(sidebar_stack_), TRUE);
+  sidebar_tabs_->SetActivateCallback([this](const std::string &id) {
+    if (sidebar_stack_) {
+      adw_view_stack_set_visible_child_name(sidebar_stack_, id.c_str());
+    }
+    PersistTabSettings();
+    if (PlayingWidgetTab::ShouldRefreshOnTabChange()) {
+      UpdatePlayingWidgetVisibility();
+    }
+  });
+  sidebar_tabs_->SetModeChangedCallback([this](FancyTabMode::Mode) {
+    ApplyTabMode();
+    PersistTabSettings();
+  });
+  g_signal_connect(sidebar_stack_, "notify::visible-child-name", G_CALLBACK((+[](AdwViewStack *stack, GParamSpec *, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     if (self->sidebar_tabs_) {
+                       const char *name = adw_view_stack_get_visible_child_name(stack);
+                       if (name) {
+                         self->sidebar_tabs_->SetActive(name, false);
+                       }
+                     }
+                     if (PlayingWidgetTab::ShouldRefreshOnTabChange()) {
+                       self->UpdatePlayingWidgetVisibility();
+                     }
+                   })),
+                   this);
+  Settings tab_settings;
+  tab_settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  sidebar_tabs_->SetMode(FancyTabMode::FromStored(tab_settings.IntValue(MainWindowSettings::kTabMode, FancyTabMode::ToStored(FancyTabMode::kDefaultMode))));
+  sidebar_tabs_->SetActiveIndex(tab_settings.IntValue(MainWindowSettings::kCurrentTab, FancyTabMode::kDefaultCurrentTab), true);
+  ApplyTabMode();
+  adw_overlay_split_view_set_sidebar(ADW_OVERLAY_SPLIT_VIEW(split_view_), sidebar_box_);
 
   GtkWidget *content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   BuildPlaylist();
@@ -565,10 +703,8 @@ void MainWindow::BuildUi() {
   g_signal_connect(window_, "close-request", G_CALLBACK(+[](GtkWindow *, gpointer data) -> gboolean {
                      auto *self = static_cast<MainWindow *>(data);
                      self->SaveGeometry();
-                     Settings settings;
-                     settings.BeginGroup(BehaviourSettings::kSettingsGroup);
-                     if (settings.BoolValue(BehaviourSettings::kKeepRunning, BehaviourSettings::kDefaultKeepRunning) &&
-                         self->app_->tray()->available()) {
+                     if (MainWindowShowHide::ShouldHideInsteadOfExit(KeepRunningEffective(self->app_))) {
+                       self->RememberHiddenWindowState();
                        gtk_widget_set_visible(GTK_WIDGET(self->window_), FALSE);
                        return TRUE;
                      }
@@ -587,13 +723,7 @@ void MainWindow::BuildUi() {
       gtk_window_destroy(GTK_WINDOW(window_));
     }
   });
-  app_->tray()->ShowHide.Connect([this]() {
-    if (gtk_widget_get_visible(GTK_WIDGET(window_))) {
-      gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
-    } else {
-      Present();
-    }
-  });
+  app_->tray()->ShowHide.Connect([this]() { ToggleShowHide(); });
   app_->tray()->Quit.Connect([this]() {
     app_->Exit();
     if (!app_->WaitingForExitFade()) {
@@ -630,6 +760,7 @@ void MainWindow::BuildUi() {
   add_action("save-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->SavePlaylistFile(); }));
   add_action("rename-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->RenameCurrentPlaylist(); }));
   add_action("close-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->CloseCurrentPlaylist(); }));
+  add_action("hide-window", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ToggleHide(); }));
   add_action("delete-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->DeleteCurrentPlaylist(); }));
   add_action("clear-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ClearPlaylist(); }));
   add_action("shuffle-playlist", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) { static_cast<MainWindow *>(data)->ShuffleCurrent(); }));
@@ -1072,16 +1203,7 @@ void MainWindow::BuildUi() {
                self->ShowToast(all_queued ? "Removed from queue" : "Added to queue");
              }));
   add_action("playlist-remove", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
-               auto *self = static_cast<MainWindow *>(data);
-               if (Playlist *playlist = self->app_->playlist_manager()->current()) {
-                 const std::vector<int> rows = self->SelectedPlaylistRows();
-                 self->app_->queue()->RemapAfterPlaylistRemove(playlist->id(), rows);
-                 playlist->RemoveRows(rows);
-                 self->selected_playlist_rows_.clear();
-                 self->app_->playlist_manager()->SaveCurrent();
-                 self->RefreshPlaylist();
-                 self->RefreshQueue();
-               }
+               static_cast<MainWindow *>(data)->RemoveSelectedPlaylistRows();
              }));
   auto set_accels = [this](const char *action, const char *accel) {
     const char *accels[] = {accel, nullptr};
@@ -1106,6 +1228,7 @@ void MainWindow::BuildUi() {
   set_accels("win.active-playlist", "<Control><Shift>p");
   set_accels("win.mute", MainWindowLook::MuteAccel());
   set_accels("win.close-playlist", MainWindowLook::ClosePlaylistAccel());
+  set_accels("win.hide-window", MainWindowLook::HideWindowAccel());
   set_accels("win.playlist-queue", MainWindowLook::PlaylistQueueAccel());
   set_accels("win.queue-next", MainWindowLook::QueuePlayNextAccel());
   set_accels("win.play-pause", MainWindowKeyboard::PlayPauseAccel());
@@ -1238,16 +1361,7 @@ void MainWindow::BuildSidebar() {
   adw_view_stack_add_titled_with_icon(sidebar_stack_, playlist_list_container_->widget(), "playlists", "Playlists",
                                       "view-list-symbolic");
   smart_container_ = std::make_unique<SmartPlaylistsViewContainer>();
-  smart_container_->SetActivateCallback([this](const SmartPlaylistsItem &item) {
-    if (item.kind == SmartPlaylistsItem::Kind::Wizard) {
-      Dialogs::SmartPlaylistWizard(GTK_WINDOW(window_), app_);
-      smart_container_->Reload();
-      RefreshPlaylistsList();
-      RefreshPlaylist();
-      return;
-    }
-    RunSmartPlaylist(item.key);
-  });
+  smart_container_->SetActivateCallback([this](const SmartPlaylistsItem &item) { ActivateSmartPlaylist(item); });
   smart_container_->SetDeleteCallback([this](const SmartPlaylistsItem &item) {
     if (item.kind != SmartPlaylistsItem::Kind::Saved) {
       return;
@@ -1259,7 +1373,7 @@ void MainWindow::BuildSidebar() {
   smart_container_->SetActionCallback([this](const SmartPlaylistsItem &item, SmartPlaylistsAction action) {
     switch (action) {
       case SmartPlaylistsAction::Activate:
-        RunSmartPlaylist(item.key);
+        ActivateSmartPlaylist(item);
         break;
       case SmartPlaylistsAction::Append:
         app_->playlist_manager()->PlaySmartPlaylist(item.key, false, false);
@@ -1554,6 +1668,11 @@ void MainWindow::BuildContext() {
     CoverProviders::SaveAlbumCover(song, std::string(data.begin(), data.end()), app_->tagreader());
     context_view_->AlbumCoverLoaded(data);
   });
+  context_view_->AlbumEnabledChanged.Connect([this]() {
+    if (PlayingWidgetTab::ShouldRefreshOnAlbumEnabled()) {
+      UpdatePlayingWidgetVisibility();
+    }
+  });
   context_view_->album_widget()->SetSearchCallback([this]() {
     if (cover_controller_) {
       Song song = app_->player()->current_song();
@@ -1561,8 +1680,9 @@ void MainWindow::BuildContext() {
       cover_controller_->SearchForCover(GTK_WINDOW(window_));
     }
   });
-  cover_controller_->AttachMenu(context_view_->album_widget()->widget(), GTK_WINDOW(window_),
-                                [this]() { return app_->player()->current_song(); });
+  cover_controller_->AttachMenu(
+      context_view_->album_widget()->widget(), GTK_WINDOW(window_), [this]() { return app_->player()->current_song(); },
+      [this]() { return context_view_->album_widget()->has_cover(); });
   context_view_->album_widget()->SetActivateCallback([this]() {
     if (cover_controller_ && PlayingCoverActivate::ShouldShow(true, 2, app_->player()->current_song().is_valid())) {
       cover_controller_->ShowCover(GTK_WINDOW(window_), app_->player()->current_song());
@@ -1628,17 +1748,7 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->view()->SetSortCallback([this](PlaylistColumn column, PlaylistSortOrder order) { SortPlaylistBy(column, order); });
   playlist_container_->view()->SetMenuCallback([this](double x, double y) { ShowPlaylistMenu(x, y); });
   playlist_container_->view()->SetEditRequestCallback([this]() { EditColumnValue(); });
-  playlist_container_->view()->SetDeleteCallback([this]() {
-    if (Playlist *playlist = app_->playlist_manager()->current()) {
-      const std::vector<int> rows = SelectedPlaylistRows();
-      app_->queue()->RemapAfterPlaylistRemove(playlist->id(), rows);
-      playlist->RemoveRows(rows);
-      selected_playlist_rows_.clear();
-      app_->playlist_manager()->SaveCurrent();
-      RefreshPlaylist();
-      RefreshQueue();
-    }
-  });
+  playlist_container_->view()->SetDeleteCallback([this]() { RemoveSelectedPlaylistRows(); });
   playlist_container_->view()->SetEditCommitCallback([this](int row, PlaylistColumn column, const std::string &value) {
     ApplyColumnValue(column, value, {row});
   });
@@ -1706,7 +1816,7 @@ void MainWindow::BuildPlaylist() {
     RefreshPlaylistsList();
     RefreshPlaylistTabs();
   });
-  playlist_container_->tab_bar()->SetLastTabCloseCallback([this] { HideToTray(); });
+  playlist_container_->tab_bar()->SetLastTabCloseCallback([this] { ToggleHide(); });
   playlist_container_->tab_bar()->SetDropCallback([this](int id, const std::string &payload) {
     if (id >= 0 && PlaylistListDrop::IsPlaylistRows(payload)) {
       const PlaylistDragPayload::Payload drag = PlaylistDragPayload::Decode(payload);
@@ -1769,6 +1879,9 @@ void MainWindow::BuildPlayerBar() {
     Song song = app_->player()->current_song();
     cover_controller_->Perform(action, GTK_WINDOW(window_), &song, playing_widget_->cover());
   });
+  if (app_->cover_providers()) {
+    playing_widget_->SetHasCoverProviders(!app_->cover_providers()->All().empty());
+  }
   playing_widget_->SetDropCallback([this](const std::vector<unsigned char> &data) {
     const Song song = app_->player()->current_song();
     CoverProviders::SaveAlbumCover(song, std::string(data.begin(), data.end()), app_->tagreader());
@@ -1867,6 +1980,28 @@ void MainWindow::BuildPlayerBar() {
   attach_seek(moodbar_drawing_, true);
   attach_seek(waveform_drawing_, true);
   attach_seek(track_slider_->slider()->widget(), false);
+  auto attach_seek_keys = [this](GtkWidget *widget) {
+    if (!widget) {
+      return;
+    }
+    gtk_widget_set_focusable(widget, TRUE);
+    GtkEventController *keys = gtk_event_controller_key_new();
+    gtk_widget_add_controller(widget, keys);
+    g_signal_connect(keys, "key-pressed",
+                     G_CALLBACK((+[](GtkEventControllerKey *controller, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                       if (!SeekbarModeMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+                         return FALSE;
+                       }
+                       GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
+                       static_cast<MainWindow *>(data)->ShowSeekbarMenu(widget);
+                       return TRUE;
+                     })),
+                     this);
+  };
+  attach_seek_keys(moodbar_drawing_);
+  attach_seek_keys(waveform_drawing_);
+  attach_seek_keys(track_slider_->slider()->widget());
+  attach_seek_keys(track_slider_->widget());
   GtkGesture *slider_box_menu = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(slider_box_menu), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(track_slider_->widget(), GTK_EVENT_CONTROLLER(slider_box_menu));
@@ -1884,7 +2019,8 @@ void MainWindow::BuildPlayerBar() {
   play_button_ = gtk_button_new_from_icon_name("media-playback-start-symbolic");
   gtk_widget_add_css_class(play_button_, "suggested-action");
   gtk_widget_add_css_class(play_button_, "circular");
-  GtkWidget *stop = adw_split_button_new();
+  stop_button_ = adw_split_button_new();
+  GtkWidget *stop = stop_button_;
   adw_split_button_set_icon_name(ADW_SPLIT_BUTTON(stop), "media-playback-stop-symbolic");
   gtk_widget_set_tooltip_text(stop, Translations::CStr(MainWindowMenu::Stop()));
   GMenu *stop_menu = g_menu_new();
@@ -1899,6 +2035,14 @@ void MainWindow::BuildPlayerBar() {
   analyzer_drawing_ = gtk_drawing_area_new();
   gtk_widget_set_size_request(analyzer_drawing_, 160, 36);
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(analyzer_drawing_), DrawAnalyzer, this, nullptr);
+  g_signal_connect(analyzer_drawing_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     static_cast<MainWindow *>(data)->EnsureAnalyzerTimer();
+                   }),
+                   this);
+  g_signal_connect(analyzer_drawing_, "unmap", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     static_cast<MainWindow *>(data)->EnsureAnalyzerTimer();
+                   }),
+                   this);
   gtk_box_append(GTK_BOX(controls), prev);
   gtk_box_append(GTK_BOX(controls), play_button_);
   gtk_box_append(GTK_BOX(controls), stop);
@@ -1930,7 +2074,7 @@ void MainWindow::BuildPlayerBar() {
   g_signal_connect(mute_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->ToggleMute(); }), this);
   gtk_box_append(GTK_BOX(controls), mute_button_);
   gtk_box_append(GTK_BOX(controls), volume_slider_->widget());
-  ApplyMuteUi(app_->player()->GetVolume());
+  ApplyBackendSettings();
   gtk_box_append(GTK_BOX(box), controls);
 
   loading_indicator_ = std::make_unique<MultiLoadingIndicator>();
@@ -1957,7 +2101,7 @@ void MainWindow::BuildPlayerBar() {
   g_signal_connect(scrobble_button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<MainWindow *>(data)->ScrobbleCurrent(); }),
                    this);
   g_signal_connect(love_button_, "clicked", G_CALLBACK(OnLove), this);
-  UpdateScrobblerButtons();
+  UpdatePlaybackButtons();
   g_object_set_data(G_OBJECT(play_button_), "player-box", box);
   PlacePlayingWidget();
 }
@@ -1981,6 +2125,7 @@ void MainWindow::PlacePlayingWidget() {
 
 void MainWindow::ConnectSignals() {
   app_->RaiseRequested.Connect([this]() { Present(); });
+  app_->ShowHideRequested.Connect([this]() { ToggleShowHide(); });
   app_->playlist_manager()->SequenceChanged.Connect([this]() {
     Playlist *playlist = app_->playlist_manager()->current();
     if (!playlist) {
@@ -1994,10 +2139,18 @@ void MainWindow::ConnectSignals() {
     }
     RefreshPlaylist();
   });
-  app_->player()->SongChanged.Connect([this](const Song &) {
+  app_->player()->SongChanged.Connect([this](const Song &song) {
     UpdateNowPlaying();
     SelectPlayingTrack();
     ApplySeekbarPlaybackState();
+    UpdatePlaybackButtons();
+#ifdef _WIN32
+    if (smtc_) {
+      smtc_->CurrentSongChanged(song);
+    }
+#else
+    (void)song;
+#endif
   });
   app_->player()->Playing.Connect([this]() {
     ApplySeekbarPlaybackState();
@@ -2165,10 +2318,17 @@ void MainWindow::ConnectSignals() {
                                        StatusBarStack::ChildName(StatusBarStack::PageForTaskCount(static_cast<int>(tasks.size()))));
     }
   });
-  app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &, const std::vector<unsigned char> &data) {
+  app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &song, const std::vector<unsigned char> &data) {
     if (!data.empty()) {
       UpdateCover(data);
     }
+#ifdef _WIN32
+    if (smtc_) {
+      smtc_->AlbumCoverLoaded(song, data);
+    }
+#else
+    (void)song;
+#endif
   });
   app_->queue()->Changed.Connect([this]() {
     RefreshQueue();
@@ -2488,27 +2648,42 @@ void MainWindow::SearchRadio(const std::string &query) {
 }
 
 void MainWindow::RefreshStreaming() {
+  std::vector<std::string> enabled_names;
   if (streaming_service_drop_) {
     gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(streaming_service_drop_));
     for (StreamingService *service : app_->streaming_services()->All()) {
       service->ReloadSettings();
+      const bool enabled = StreamingServiceEnable::IsEnabled(service->name());
+      if (streaming_stack_) {
+        if (GtkWidget *page = gtk_stack_get_child_by_name(GTK_STACK(streaming_stack_), service->name().c_str())) {
+          gtk_widget_set_visible(page, StreamingServiceEnable::ShouldShowStackPage(enabled) ? TRUE : FALSE);
+        }
+      }
+      if (!StreamingServiceEnable::ShouldList(enabled)) {
+        continue;
+      }
+      enabled_names.push_back(service->name());
       const std::string label = service->name() + (service->logged_in() ? " (signed in)" : "");
       gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(streaming_service_drop_), service->name().c_str(), label.c_str());
     }
+    streaming_service_name_ = StreamingServiceEnable::SelectVisible(streaming_service_name_, enabled_names);
     if (!streaming_service_name_.empty()) {
       gtk_combo_box_set_active_id(GTK_COMBO_BOX(streaming_service_drop_), streaming_service_name_.c_str());
-    } else if (!app_->streaming_services()->All().empty()) {
-      gtk_combo_box_set_active(GTK_COMBO_BOX(streaming_service_drop_), 0);
+      if (streaming_stack_) {
+        gtk_stack_set_visible_child_name(GTK_STACK(streaming_stack_), streaming_service_name_.c_str());
+      }
+    } else {
+      gtk_combo_box_set_active(GTK_COMBO_BOX(streaming_service_drop_), -1);
     }
   }
   for (const auto &view : streaming_views_) {
     view->ReloadSettings();
   }
-  if (!streaming_list_ || !streaming_views_.empty()) {
+  if (!streaming_list_) {
     return;
   }
   ClearList(streaming_list_);
-  if (app_->streaming_services()->All().empty()) {
+  if (enabled_names.empty() && StreamingServiceEnable::EnabledAmong({"Subsonic", "Tidal", "Spotify", "Qobuz"}).empty()) {
     AppendStringRow(GTK_LIST_BOX(streaming_list_), "Subsonic — enable in Preferences", nullptr);
     AppendStringRow(GTK_LIST_BOX(streaming_list_), "Tidal — enable in Preferences", nullptr);
     AppendStringRow(GTK_LIST_BOX(streaming_list_), "Spotify — enable in Preferences", nullptr);
@@ -2558,6 +2733,15 @@ void MainWindow::UpdateNowPlaying() {
   if (context_view_) {
     context_view_->SongChanged(song);
   }
+#ifdef __APPLE__
+  if (macos_tray_) {
+    if (song.is_valid()) {
+      macos_tray_->SetNowPlaying(song);
+    } else {
+      macos_tray_->ClearNowPlaying();
+    }
+  }
+#endif
   RefreshPlaylist();
   const auto embedded = app_->albumcover_loader()->LoadData(song);
   if (!embedded.empty()) {
@@ -2602,7 +2786,49 @@ void MainWindow::UpdateCover(const std::vector<unsigned char> &data) {
 
 void MainWindow::UpdatePlaybackButtons() {
   const bool playing = app_->player()->GetState() == GstEngine::State::Playing;
-  gtk_button_set_icon_name(GTK_BUTTON(play_button_), playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic");
+  const bool paused = app_->player()->GetState() == GstEngine::State::Paused;
+  const bool play_pause_enabled = PlaybackControlsState::PlayPauseEnabled(playing, PlayerItemOptions::PauseDisabled(app_->player()->current_song()));
+  const bool stop_enabled = PlaybackControlsState::StopEnabled(PlaybackControlsState::PlaybackActive(playing, paused));
+  if (play_button_) {
+    gtk_button_set_icon_name(GTK_BUTTON(play_button_), playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic");
+    gtk_widget_set_sensitive(play_button_, play_pause_enabled);
+  }
+  if (stop_button_) {
+    gtk_widget_set_sensitive(stop_button_, stop_enabled);
+  }
+  if (window_) {
+    auto set_action = [this](const char *name, bool enabled) {
+      if (GAction *action = g_action_map_lookup_action(G_ACTION_MAP(window_), name)) {
+        g_simple_action_set_enabled(G_SIMPLE_ACTION(action), enabled);
+      }
+    };
+    set_action("play-pause", play_pause_enabled);
+    set_action("stop", stop_enabled);
+    set_action("stop-after", stop_enabled);
+  }
+  if (app_ && app_->tray()) {
+    if (playing) {
+      app_->tray()->SetPlaying(true, play_pause_enabled);
+    } else if (paused) {
+      app_->tray()->SetPaused();
+    } else {
+      app_->tray()->SetStopped();
+    }
+  }
+#ifdef __APPLE__
+  if (macos_tray_ && app_->tray()) {
+    macos_tray_->Setup(app_->tray());
+  }
+#endif
+#ifdef _WIN32
+  if (thumbbar_) {
+    thumbbar_->SetPlaying(playing);
+  }
+  if (smtc_) {
+    smtc_->EngineStateChanged(app_->player()->GetState());
+  }
+#endif
+  UpdateScrobblerButtons();
 }
 
 void MainWindow::OpenSettings(const char *page_name) {
@@ -2613,6 +2839,9 @@ void MainWindow::OpenSettings(const char *page_name) {
     app_->network()->ReloadSettings();
     app_->osd()->ReloadSettings();
     app_->cover_providers()->ReloadSettings();
+    if (playing_widget_ && app_->cover_providers()) {
+      playing_widget_->SetHasCoverProviders(!app_->cover_providers()->All().empty());
+    }
     app_->lyrics_providers()->ReloadSettings();
     ApplyAppearance();
     if (context_view_) {
@@ -2622,11 +2851,34 @@ void MainWindow::OpenSettings(const char *page_name) {
     ApplySeekbarMode();
     ApplyBehaviourSettings();
     ApplyPlaylistBehaviour();
+    if (MainWindowLook::ShouldApplyVolumeControl()) {
+      ApplyBackendSettings();
+    }
+    if (cover_controller_ && CoverOptionsReload::ShouldReloadOnSettingsClose()) {
+      cover_controller_->ReloadSettings();
+    }
+    if (DiscordSettingsReload::ShouldReloadOnSettingsClose()) {
+      app_->discord()->ReloadSettings();
+    }
+    if (CollectionWatcherReload::ShouldReloadOnSettingsClose()) {
+      app_->collection()->ReloadSettings();
+    }
     RefreshCollection();
+    if (StreamingServiceEnable::ShouldRefreshOnSettingsClose()) {
+      RefreshStreaming();
+    }
     app_->analyzer()->ReloadSettings();
     ApplyAnalyzer();
     app_->moodbar()->ReloadSettings();
     app_->waveform()->ReloadSettings();
+    if (SeekbarAnalysis::ShouldRedrawOnSettingsClose()) {
+      if (moodbar_drawing_) {
+        gtk_widget_queue_draw(moodbar_drawing_);
+      }
+      if (waveform_drawing_) {
+        gtk_widget_queue_draw(waveform_drawing_);
+      }
+    }
   }, page_name);
 }
 
@@ -2829,6 +3081,25 @@ void MainWindow::NewPlaylist() {
   RefreshPlaylist();
 }
 
+void MainWindow::RemoveSelectedPlaylistRows() {
+  Playlist *playlist = app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
+  if (!playlist) {
+    return;
+  }
+  const std::vector<int> rows = SelectedPlaylistRows();
+  const int next = PlaylistRemoveSelect::NextRow(rows, playlist->row_count());
+  app_->queue()->RemapAfterPlaylistRemove(playlist->id(), rows);
+  playlist->RemoveRows(rows);
+  selected_playlist_rows_.clear();
+  if (next >= 0) {
+    selected_playlist_rows_ = {next};
+    selection_playlist_name_ = playlist->name();
+  }
+  app_->playlist_manager()->SaveCurrent();
+  RefreshPlaylist();
+  RefreshQueue();
+}
+
 void MainWindow::ClearPlaylist() {
   Settings settings;
   settings.BeginGroup(PlaylistSettings::kSettingsGroup);
@@ -2857,17 +3128,79 @@ void MainWindow::ClearPlaylist() {
   RefreshPlaylist();
 }
 
+void MainWindow::RememberHiddenWindowState() {
+  if (!window_) {
+    return;
+  }
+  was_maximized_ = gtk_window_is_maximized(GTK_WINDOW(window_)) == TRUE;
+  was_minimized_ = false;
+  if (GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window_))) {
+    if (GDK_IS_TOPLEVEL(surface)) {
+      was_minimized_ = (gdk_toplevel_get_state(GDK_TOPLEVEL(surface)) & GDK_TOPLEVEL_STATE_MINIMIZED) != 0;
+    }
+  }
+}
+
+void MainWindow::RestoreAfterHide() {
+  if (!window_) {
+    return;
+  }
+  switch (WindowGeometry::RestoreAfterHide(was_maximized_, was_minimized_)) {
+    case WindowGeometry::AfterHide::Maximize:
+      gtk_window_maximize(GTK_WINDOW(window_));
+      break;
+    case WindowGeometry::AfterHide::Minimize:
+      gtk_window_minimize(GTK_WINDOW(window_));
+      break;
+    case WindowGeometry::AfterHide::Show:
+    default:
+      break;
+  }
+}
+
 void MainWindow::HideToTray() {
   if (app_->tray() && app_->tray()->available()) {
+    RememberHiddenWindowState();
     SaveGeometry();
     gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
+  }
+}
+
+void MainWindow::ToggleHide() {
+  if (!window_ || !gtk_widget_get_visible(GTK_WIDGET(window_))) {
+    return;
+  }
+  if (MainWindowShowHide::HideAction(KeepRunningEffective(app_)) == MainWindowShowHide::Action::HideToTray) {
+    HideToTray();
+    return;
+  }
+  gtk_window_minimize(GTK_WINDOW(window_));
+}
+
+void MainWindow::ToggleShowHide() {
+  if (!window_) {
+    return;
+  }
+  const bool visible = gtk_widget_get_visible(GTK_WIDGET(window_)) == TRUE;
+  const bool active = gtk_window_is_active(GTK_WINDOW(window_)) == TRUE;
+  switch (MainWindowShowHide::ShortcutAction(visible, active, KeepRunningEffective(app_))) {
+    case MainWindowShowHide::Action::HideToTray:
+      HideToTray();
+      break;
+    case MainWindowShowHide::Action::Minimize:
+      gtk_window_minimize(GTK_WINDOW(window_));
+      break;
+    case MainWindowShowHide::Action::Present:
+    case MainWindowShowHide::Action::Exit:
+      Present();
+      break;
   }
 }
 
 void MainWindow::CloseCurrentPlaylist() {
   const int count = static_cast<int>(app_->playlist_manager()->playlists().size());
   if (PlaylistTabMenu::CloseCurrentHidesWindow(count)) {
-    HideToTray();
+    ToggleHide();
     return;
   }
   TryClosePlaylist(app_->playlist_manager()->current_id());
@@ -3010,7 +3343,8 @@ void MainWindow::ApplyAnalyzer() {
 }
 
 void MainWindow::EnsureAnalyzerTimer() {
-  if (!app_->analyzer()->enabled()) {
+  const bool mapped = analyzer_drawing_ && gtk_widget_get_mapped(analyzer_drawing_);
+  if (!AnalyzerFramerate::ShouldTick(app_->analyzer()->enabled(), mapped)) {
     if (analyzer_timeout_) {
       g_source_remove(analyzer_timeout_);
       analyzer_timeout_ = 0;
@@ -3036,7 +3370,8 @@ void MainWindow::EnsureAnalyzerTimer() {
 }
 
 void MainWindow::TickAnalyzer() {
-  if (!analyzer_drawing_ || !app_->analyzer()->enabled()) {
+  const bool mapped = analyzer_drawing_ && gtk_widget_get_mapped(analyzer_drawing_);
+  if (!AnalyzerFramerate::ShouldTick(app_->analyzer()->enabled(), mapped)) {
     return;
   }
   const auto state = app_->player()->GetState();
@@ -3151,6 +3486,54 @@ void MainWindow::RunSmartPlaylist(const std::string &kind) {
   RefreshPlaylist();
 }
 
+void MainWindow::ActivateSmartPlaylist(const SmartPlaylistsItem &item) {
+  if (item.kind == SmartPlaylistsItem::Kind::Wizard) {
+    Dialogs::SmartPlaylistWizard(GTK_WINDOW(window_), app_);
+    if (smart_container_) {
+      smart_container_->Reload();
+    }
+    RefreshPlaylistsList();
+    RefreshPlaylist();
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const auto add = static_cast<BehaviourSettings::AddBehaviour>(
+      settings.IntValue(BehaviourSettings::kDoubleClickAddMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickAddMode)));
+  const auto play = static_cast<BehaviourSettings::PlayBehaviour>(
+      settings.IntValue(BehaviourSettings::kDoubleClickPlayMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlayMode)));
+  const SmartPlaylistActivate::PlayParams params = SmartPlaylistActivate::FromDoubleClick(add, play, EngineStopped());
+  int play_at = 0;
+  if (!params.as_new && !params.clear) {
+    if (Playlist *playlist = app_->playlist_manager()->current()) {
+      play_at = playlist->row_count();
+    }
+  }
+  app_->playlist_manager()->PlaySmartPlaylist(item.key, params.as_new, params.clear);
+  if (params.enqueue || params.enqueue_next) {
+    const SongList songs = item.search.Search(app_->collection()->Songs());
+    if (params.enqueue) {
+      for (const Song &song : songs) {
+        app_->queue()->Append(song);
+      }
+    } else {
+      for (auto it = songs.rbegin(); it != songs.rend(); ++it) {
+        app_->queue()->InsertNext(*it);
+      }
+    }
+  }
+  RefreshPlaylistsList();
+  RefreshPlaylist();
+  RefreshQueue();
+  if (params.should_play) {
+    if (params.as_new && app_->playlist_manager()->current()) {
+      app_->player()->PlayPlaylist(app_->playlist_manager()->current()->name());
+    } else {
+      app_->player()->PlayAt(play_at);
+    }
+  }
+}
+
 void MainWindow::PlayRadioChannel(const RadioChannel &channel) {
   const Song song = RadioStreamPlaylistItem(channel).EffectiveMetadata();
   app_->playlist_manager()->AppendSongs({song});
@@ -3164,7 +3547,19 @@ void MainWindow::ApplyBehaviourSettings() {
   Settings settings;
   settings.BeginGroup(BehaviourSettings::kSettingsGroup);
   if (playing_widget_) {
-    playing_widget_->SetEnabled(settings.BoolValue(BehaviourSettings::kPlayingWidget, BehaviourSettings::kDefaultPlayingWidget));
+    UpdatePlayingWidgetVisibility();
+  }
+  if (app_->tray() && TraySettingsReload::ShouldReloadOnSettingsClose()) {
+    const bool show_tray =
+        TraySettingsReload::ShowTray(settings.BoolValue(BehaviourSettings::kShowTrayIcon, BehaviourSettings::kDefaultShowTrayIcon));
+    app_->tray()->ReloadSettings();
+    if (window_ && TraySettingsReload::ShouldPresentWindowAfterDisable(show_tray, gtk_widget_get_visible(GTK_WIDGET(window_)) == TRUE)) {
+      Present();
+    }
+  }
+  const bool taskbar = settings.BoolValue(BehaviourSettings::kTaskbarProgress, BehaviourSettings::kDefaultTaskbarProgress);
+  if (TaskbarProgressHelpers::ShouldClearImmediately(taskbar_.visible(), taskbar)) {
+    taskbar_.Set(0.0, false);
   }
   ApplyPlaylistBehaviour();
 }
@@ -3184,6 +3579,9 @@ void MainWindow::ApplyPlaylistBehaviour() {
   }
   if (playlist_container_) {
     playlist_container_->ApplyLook();
+    if (playlist_container_->view()) {
+      playlist_container_->view()->ReloadSettings();
+    }
   }
 }
 
@@ -3201,6 +3599,40 @@ void MainWindow::ApplyAppearance() {
     playlist_container_->view()->SetBackground(css, key.empty() ? std::to_string(appearance.background_type()) : key);
   } else if (!css.empty()) {
     StyleUtils::LoadCss(css);
+  }
+  if (sidebar_tabs_) {
+    sidebar_tabs_->ReloadIconSizes();
+  }
+  if (playlist_container_) {
+    playlist_container_->ApplyLook();
+  }
+  if (collection_search_ && AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionSearch)) {
+    AppearanceConfigureButtons::ApplyWidget(collection_search_, AppearanceConfigureButtons::IconSize(appearance.icon_sizes().configure));
+  }
+  if (collection_container_) {
+    collection_container_->ApplyLook();
+  }
+  if (AppearanceLeftPanel::ShouldReloadOnSettingsClose()) {
+    if (queue_view_) {
+      queue_view_->ApplyLook();
+    }
+    if (file_view_) {
+      file_view_->ApplyLook();
+    }
+    if (playlist_list_container_) {
+      playlist_list_container_->ApplyLook();
+    }
+    if (smart_container_) {
+      smart_container_->ApplyLook();
+    }
+    if (radio_container_) {
+      radio_container_->ApplyLook();
+    }
+  }
+  for (const auto &view : streaming_views_) {
+    if (view) {
+      view->ApplyLook();
+    }
   }
   if (play_button_) {
     const int size = appearance.icon_sizes().play_controls;
@@ -3254,9 +3686,81 @@ void MainWindow::ApplySidebar() {
   settings.BeginGroup(MainWindowSettings::kSettingsGroup);
   const bool show = MainWindowLook::ShowSidebar(settings.BoolValue(MainWindowSettings::kShowSidebar, MainWindowSettings::kDefaultShowSidebar));
   adw_overlay_split_view_set_show_sidebar(ADW_OVERLAY_SPLIT_VIEW(split_view_), show);
+  if (PlayingWidgetTab::ShouldRefreshOnSidebarToggle()) {
+    UpdatePlayingWidgetVisibility();
+  }
+}
+
+void MainWindow::UpdatePlayingWidgetVisibility() {
+  if (!playing_widget_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+  const bool pref = settings.BoolValue(BehaviourSettings::kPlayingWidget, BehaviourSettings::kDefaultPlayingWidget);
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  const bool sidebar = MainWindowLook::ShowSidebar(settings.BoolValue(MainWindowSettings::kShowSidebar, MainWindowSettings::kDefaultShowSidebar));
+  const char *name = sidebar_stack_ ? adw_view_stack_get_visible_child_name(sidebar_stack_) : "";
+  playing_widget_->SetEnabled(PlayingWidgetTab::ShouldEnable(pref, sidebar, PlayingWidgetTab::OnContextTab(name),
+                                                            context_view_ && context_view_->album_enabled()));
+}
+
+void MainWindow::PopulateSidebarTabs() {
+  if (!sidebar_stack_ || !sidebar_tabs_) {
+    return;
+  }
+  GtkSelectionModel *pages = adw_view_stack_get_pages(sidebar_stack_);
+  if (!pages) {
+    return;
+  }
+  const guint n = g_list_model_get_n_items(G_LIST_MODEL(pages));
+  for (guint i = 0; i < n; ++i) {
+    auto *page = ADW_VIEW_STACK_PAGE(g_list_model_get_item(G_LIST_MODEL(pages), i));
+    if (!page) {
+      continue;
+    }
+    const char *name = adw_view_stack_page_get_name(page);
+    const char *title = adw_view_stack_page_get_title(page);
+    const char *icon = adw_view_stack_page_get_icon_name(page);
+    if (name) {
+      sidebar_tabs_->AddTab(name, title ? title : name, icon ? icon : "");
+    }
+    g_object_unref(page);
+  }
+}
+
+void MainWindow::ApplyTabMode() {
+  if (!sidebar_box_ || !sidebar_tabs_) {
+    return;
+  }
+  const FancyTabMode::Mode mode = sidebar_tabs_->mode();
+  gtk_orientable_set_orientation(GTK_ORIENTABLE(sidebar_box_), FancyTabMode::BarOrientation(mode));
+  gtk_widget_set_hexpand(sidebar_tabs_->widget(), FancyTabMode::IsTop(mode) ? TRUE : FALSE);
+  gtk_widget_set_vexpand(sidebar_tabs_->widget(), FancyTabMode::IsTop(mode) ? FALSE : TRUE);
+}
+
+void MainWindow::PersistTabSettings() const {
+  if (!sidebar_tabs_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  settings.SetIntValue(MainWindowSettings::kTabMode, FancyTabMode::ToStored(sidebar_tabs_->mode()));
+  settings.SetIntValue(MainWindowSettings::kCurrentTab, sidebar_tabs_->ActiveIndex());
+  settings.Sync();
 }
 
 void MainWindow::ToggleMute() { app_->player()->Mute(); }
+
+void MainWindow::ApplyBackendSettings() {
+  Settings settings;
+  settings.BeginGroup(BackendSettings::kSettingsGroup);
+  const bool volume_control = settings.BoolValue(BackendSettings::kVolumeControl, BackendSettings::kDefaultVolumeControl);
+  if (volume_slider_) {
+    volume_slider_->SetEnabled(MainWindowLook::SliderEnabled(volume_control));
+  }
+  ApplyMuteUi(app_->player()->GetVolume());
+}
 
 void MainWindow::ApplyMuteUi(unsigned volume) {
   Settings settings;
@@ -3276,6 +3780,10 @@ void MainWindow::ApplyMuteUi(unsigned volume) {
   if (mute_action_) {
     g_simple_action_set_enabled(mute_action_, visible);
     g_simple_action_set_state(mute_action_, g_variant_new_boolean(muted));
+  }
+  if (app_ && app_->tray()) {
+    app_->tray()->SetMuteEnabled(visible);
+    app_->tray()->SetMuteChecked(muted);
   }
 }
 
@@ -3772,8 +4280,10 @@ void MainWindow::ShowPlaylistMenu(double, double y) {
   const std::vector<int> rows = SelectedPlaylistRows();
   playlist_menu_row_ = -1;
   if (playlist && playlist_container_ && playlist_container_->view()) {
-    playlist_menu_row_ =
-        PlaylistMenu::ContextRow(playlist_container_->view()->RowAtY(y, playlist_container_->view()->grid()), playlist->row_count());
+    playlist_menu_row_ = PlaylistMenu::IsKeyboardAnchor(y)
+                             ? PlaylistMenu::ContextRowFromKeyboard(rows.empty() ? -1 : rows.front(), playlist->row_count())
+                             : PlaylistMenu::ContextRow(playlist_container_->view()->RowAtY(y, playlist_container_->view()->grid()),
+                                                        playlist->row_count());
   }
   const PlaylistColumn column = playlist_container_ ? playlist_container_->view()->last_clicked_column() : PlaylistColumn::Title;
   PlaylistMenu::SelectionState opts;
@@ -4143,7 +4653,10 @@ void MainWindow::UpdateScrobblerButtons() {
   const bool show_love = settings.BoolValue(ScrobblerSettings::kLoveButton, ScrobblerSettings::kDefaultLoveButton);
   const bool scrobbler_on = app_ && app_->scrobbler() && app_->scrobbler()->enabled();
   const Song song = app_ && app_->player() ? app_->player()->current_song() : Song();
-  const bool love_enabled = ScrobblerLoveState::CanLove(scrobbler_on, song) && !loved_current_track_;
+  const bool playing = app_ && app_->player() && app_->player()->GetState() == GstEngine::State::Playing;
+  const bool paused = app_ && app_->player() && app_->player()->GetState() == GstEngine::State::Paused;
+  const bool love_enabled =
+      ScrobblerLoveState::CanLove(scrobbler_on, song, PlaybackControlsState::PlaybackActive(playing, paused)) && !loved_current_track_;
   if (scrobble_button_) {
     gtk_widget_set_visible(scrobble_button_, show_scrobble);
     gtk_button_set_icon_name(GTK_BUTTON(scrobble_button_), ScrobbleToggleIcon::Name(scrobbler_on));
@@ -4151,6 +4664,11 @@ void MainWindow::UpdateScrobblerButtons() {
   if (love_button_) {
     gtk_widget_set_visible(love_button_, show_love);
     gtk_widget_set_sensitive(love_button_, love_enabled);
+  }
+  if (window_) {
+    if (GAction *action = g_action_map_lookup_action(G_ACTION_MAP(window_), "love")) {
+      g_simple_action_set_enabled(G_SIMPLE_ACTION(action), love_enabled);
+    }
   }
   if (app_ && app_->tray()) {
     app_->tray()->SetLoveVisible(show_love);
@@ -4186,14 +4704,21 @@ void MainWindow::RescanSelected() {
     ShowToast("No songs selected");
     return;
   }
-  app_->collection()->Rescan(songs);
+  const SongList collection_songs = CollectionRescanSongs::CollectionSongs(songs);
+  if (!collection_songs.empty()) {
+    app_->collection()->Rescan(collection_songs);
+  }
   if (Playlist *playlist = app_->playlist_manager()->current()) {
     for (int row : SelectedPlaylistRows()) {
-      playlist->ReloadRow(row, app_->tagreader());
+      if (row < 0 || static_cast<size_t>(row) >= playlist->songs().size()) {
+        continue;
+      }
+      if (CollectionRescanSongs::ShouldReloadPlaylistItem(playlist->songs()[static_cast<size_t>(row)])) {
+        playlist->ReloadRow(row, app_->tagreader());
+      }
     }
     app_->playlist_manager()->SaveCurrent();
   }
-  RefreshCollection();
   RefreshPlaylist();
   ShowToast("Rescanned " + std::to_string(songs.size()) + " song(s)");
 }
@@ -4246,6 +4771,10 @@ void MainWindow::ApplyFetchedMetadata(const StreamingMetadataQueue::Entry &entry
       playlist->ReplaceRow(row, updated);
       app_->playlist_manager()->SaveCurrent();
       RefreshPlaylist();
+      if (StreamingMetadataMerge::ShouldSyncPlayer(app_->player()->current_song(), updated) ||
+          StreamingMetadataMerge::ShouldNotifyCurrentSong(row, playlist->current_row())) {
+        app_->player()->SyncCurrentMetadata(updated);
+      }
     }
   }
   ScheduleMetadataQueue();

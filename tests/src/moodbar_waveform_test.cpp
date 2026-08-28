@@ -162,6 +162,16 @@ TEST(SeekbarAnalysis, CanLoadAndAcceptResult) {
   EXPECT_FALSE(SeekbarAnalysis::CanLoad(stream));
 }
 
+TEST(SeekbarAnalysis, SaveSidecarFollowsPreferencesLikeQt) {
+  EXPECT_FALSE(SeekbarAnalysis::ShouldWriteSidecar(false, "/music/song.flac", true));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldWriteSidecar(true, "", true));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldWriteSidecar(true, "/music/song.flac", false));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldWriteSidecar(true, "/music/song.flac", true));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldHonorLiveSave(false, true));
+  EXPECT_FALSE(SeekbarAnalysis::ShouldHonorLiveSave(true, false));
+  EXPECT_TRUE(SeekbarAnalysis::ShouldRedrawOnSettingsClose());
+}
+
 TEST(AnalysisAsync, GenerateOnlyWhenEnabledAndCacheMisses) {
   EXPECT_TRUE(AnalysisAsync::NeedsGenerate(true, false));
   EXPECT_FALSE(AnalysisAsync::NeedsGenerate(true, true));
@@ -227,6 +237,9 @@ TEST(SeekbarModeMenu, LabelsAndCycleMatchQt) {
   EXPECT_TRUE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Moodbar));
   EXPECT_FALSE(SeekbarModeMenu::StyleMenuEnabled(SeekbarSettings::Mode::Normal));
   EXPECT_STREQ("Moodbar style", SeekbarModeMenu::StyleSubmenuTitle());
+  EXPECT_TRUE(SeekbarModeMenu::IsKeyboardTrigger(SeekbarModeMenu::kMenu, 0));
+  EXPECT_TRUE(SeekbarModeMenu::IsKeyboardTrigger(SeekbarModeMenu::kF10, SeekbarModeMenu::kShiftMask));
+  EXPECT_FALSE(SeekbarModeMenu::IsKeyboardTrigger(SeekbarModeMenu::kF10, 0));
 }
 
 TEST(SeekbarFade, StateMachineMatchesQtTimeline) {

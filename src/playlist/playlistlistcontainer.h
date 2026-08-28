@@ -28,6 +28,7 @@ class PlaylistListContainer {
   PlaylistListModel *model() { return &model_; }
   PlaylistListSortFilterModel *filter() { return &filter_; }
   void Reload(PlaylistManager *manager);
+  void ApplyLook();
   void SetActivateCallback(const std::function<void(const std::string &)> &callback);
   void SetNewCallback(std::function<void()> callback) { new_ = std::move(callback); }
   void SetNewFolderCallback(std::function<void()> callback) { new_folder_ = std::move(callback); }
@@ -49,6 +50,7 @@ class PlaylistListContainer {
   void SetActive(const std::string &name, int id);
   void SelectName(const std::string &name);
   bool HasSelection() const;
+  void RefreshOnShow();
   PlaylistListLook::Playback playback() const { return playback_; }
   const std::string &active_name() const { return active_name_; }
   int active_id() const { return active_id_; }
@@ -63,6 +65,8 @@ class PlaylistListContainer {
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *search_ = nullptr;
+  GtkWidget *add_button_ = nullptr;
+  GtkWidget *folder_button_ = nullptr;
   GtkWidget *favorites_toggle_ = nullptr;
   GtkWidget *remove_button_ = nullptr;
   GtkWidget *save_button_ = nullptr;

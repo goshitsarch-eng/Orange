@@ -10,6 +10,7 @@
 #include "context/contextview.h"
 #include "core/application.h"
 #include "core/commandlineoptions.h"
+#include "core/platforminterface.h"
 #include "constants/moodbarsettings.h"
 #include "core/seekbarsettings.h"
 #include "widgets/seekbarfade.h"
@@ -28,6 +29,13 @@
 #include "widgets/playingwidget.h"
 #include "widgets/trackslider.h"
 #include "widgets/volumeslider.h"
+#ifdef _WIN32
+#include "core/windows7thumbbar.h"
+#include "core/winsystemmediatransportcontrols.h"
+#endif
+#ifdef __APPLE__
+#include "systemtrayicon/macsystemtrayicon.h"
+#endif
 
 #include <adwaita.h>
 #include <gtk/gtk.h>
@@ -36,17 +44,19 @@
 #include <string>
 #include <vector>
 
+class FancyTabBar;
 class QueuedErrorDialog;
 
-class MainWindow {
+class MainWindow : public PlatformInterface {
  public:
   MainWindow(AdwApplication *gtk_app, Application *app, const CommandlineOptions &options);
   ~MainWindow();
 
   GtkWindow *window() const { return GTK_WINDOW(window_); }
   void Present();
+  void Activate() override;
   void CommandlineReceived(const CommandlineOptions &options);
-  bool LoadUrl(const std::string &url);
+  bool LoadUrl(const std::string &url) override;
 
  private:
   void HandlePlaylistsLoaded();
@@ -85,12 +95,16 @@ class MainWindow {
   void SavePlaylistById(int id);
   void NewPlaylist();
   void ClearPlaylist();
+  void RemoveSelectedPlaylistRows();
   void CloseCurrentPlaylist();
   void TryClosePlaylist(int id);
   void FinishClosePlaylist(int id);
   void HideToTray();
+  void ToggleHide();
+  void ToggleShowHide();
   void SelectPlayingTrack();
   void ApplyPlaylistBehaviour();
+  void ApplyBackendSettings();
   void DeleteCurrentPlaylist();
   void RenameCurrentPlaylist();
   void RenamePlaylist(int id);
@@ -104,6 +118,7 @@ class MainWindow {
   void EnsureAnalyzerTimer();
   void TickAnalyzer();
   void RunSmartPlaylist(const std::string &kind);
+  void ActivateSmartPlaylist(const SmartPlaylistsItem &item);
   void RefreshPlaylistTabs();
   void GoToPlaylistIndex(int index);
   void NextPlaylistTab();
@@ -195,10 +210,16 @@ class MainWindow {
   static gboolean OnSeekbarFadeTick(gpointer data);
   void SetMoodbarStyle(MoodbarSettings::Style style);
   void ShowSeekbarMenu(GtkWidget *relative);
+  void RememberHiddenWindowState();
+  void RestoreAfterHide();
   void OnSeekbarScroll(double dy);
   void SeekFromBar(double x, int width);
   void SetShowSidebar(bool show);
   void ApplySidebar();
+  void UpdatePlayingWidgetVisibility();
+  void ApplyTabMode();
+  void PersistTabSettings() const;
+  void PopulateSidebarTabs();
   void ToggleMute();
   void ApplyMuteUi(unsigned volume);
   bool FocusIsEditable() const;
@@ -220,6 +241,8 @@ class MainWindow {
   std::unique_ptr<QueuedErrorDialog> error_dialog_;
   AdwToastOverlay *toast_overlay_ = nullptr;
   AdwViewStack *sidebar_stack_ = nullptr;
+  GtkWidget *sidebar_box_ = nullptr;
+  std::unique_ptr<FancyTabBar> sidebar_tabs_;
   GtkWidget *split_view_ = nullptr;
   GtkWidget *mute_button_ = nullptr;
   GSimpleAction *sidebar_action_ = nullptr;
@@ -244,6 +267,7 @@ class MainWindow {
   GtkWidget *streaming_service_drop_ = nullptr;
   std::vector<std::unique_ptr<StreamingTabsView>> streaming_views_;
   GtkWidget *play_button_ = nullptr;
+  GtkWidget *stop_button_ = nullptr;
   GtkWidget *love_button_ = nullptr;
   GtkWidget *scrobble_button_ = nullptr;
   bool loved_current_track_ = false;
@@ -288,10 +312,19 @@ class MainWindow {
   std::shared_ptr<bool> metadata_alive_ = std::make_shared<bool>(true);
   bool refreshing_devices_ = false;
   bool sponsor_prompted_ = false;
+  bool was_maximized_ = false;
+  bool was_minimized_ = false;
   bool playlists_loaded_ = false;
   bool has_pending_options_ = false;
   CommandlineOptions pending_options_;
   TaskbarProgress taskbar_;
+#ifdef _WIN32
+  std::unique_ptr<Windows7ThumbBar> thumbbar_;
+  std::unique_ptr<WinSystemMediaTransportControls> smtc_;
+#endif
+#ifdef __APPLE__
+  std::unique_ptr<MacSystemTrayIcon> macos_tray_;
+#endif
 };
 
 #endif

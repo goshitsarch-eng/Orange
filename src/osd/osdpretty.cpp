@@ -10,6 +10,10 @@
 #include "osd/osdprettytransparency.h"
 #include "osd/osdprettywayland.h"
 #include "utilities/fontutils.h"
+#include "utilities/winblurbehind.h"
+#ifdef _WIN32
+#include "utilities/winutils.h"
+#endif
 
 #include <algorithm>
 #include <utility>
@@ -18,6 +22,10 @@
 #include <gdk/x11/gdkx.h>
 #include <X11/Xlib.h>
 #include <X11/extensions/shape.h>
+#endif
+
+#ifdef HAVE_GTK4_LAYER_SHELL
+#include <gtk4-layer-shell.h>
 #endif
 
 namespace {
@@ -83,7 +91,46 @@ OSDPrettyPlacement::Rect WindowSize(GtkWidget *window) {
   return {0, 0, width, height};
 }
 
-void MoveWindow(GtkWidget *window, int x, int y) {
+bool LayerShellAvailable() {
+#ifdef HAVE_GTK4_LAYER_SHELL
+  return gtk_layer_is_supported();
+#else
+  return false;
+#endif
+}
+
+#ifdef HAVE_GTK4_LAYER_SHELL
+GdkMonitor *MonitorAt(int index) {
+  GdkDisplay *display = gdk_display_get_default();
+  if (!display || index < 0) {
+    return nullptr;
+  }
+  GListModel *model = gdk_display_get_monitors(display);
+  if (static_cast<guint>(index) >= g_list_model_get_n_items(model)) {
+    return nullptr;
+  }
+  return GDK_MONITOR(g_list_model_get_item(model, static_cast<guint>(index)));
+}
+#endif
+
+void InitLayerShell(GtkWidget *window) {
+#ifdef HAVE_GTK4_LAYER_SHELL
+  if (!window || !LayerShellAvailable()) {
+    return;
+  }
+  gtk_layer_init_for_window(GTK_WINDOW(window));
+  gtk_layer_set_layer(GTK_WINDOW(window), GTK_LAYER_SHELL_LAYER_OVERLAY);
+  gtk_layer_set_anchor(GTK_WINDOW(window), GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
+  gtk_layer_set_anchor(GTK_WINDOW(window), GTK_LAYER_SHELL_EDGE_TOP, TRUE);
+  gtk_layer_set_keyboard_mode(GTK_WINDOW(window), GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
+  gtk_layer_set_namespace(GTK_WINDOW(window), "osd");
+  gtk_layer_set_exclusive_zone(GTK_WINDOW(window), 0);
+#else
+  (void)window;
+#endif
+}
+
+void MoveWindow(GtkWidget *window, int x, int y, const OSDPrettyPlacement::Rect &workarea, int monitor_index) {
   bool is_x11 = false;
 #ifdef HAVE_X11
   if (window) {
@@ -92,12 +139,30 @@ void MoveWindow(GtkWidget *window, int x, int y) {
     }
   }
 #endif
-  if (!OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::DetectBackend(is_x11, false))) {
+  if (!OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::DetectBackend(is_x11, LayerShellAvailable()))) {
     (void)window;
     (void)x;
     (void)y;
+    (void)workarea;
+    (void)monitor_index;
     return;
   }
+#ifdef HAVE_GTK4_LAYER_SHELL
+  if (LayerShellAvailable() && window) {
+    GdkMonitor *monitor = MonitorAt(monitor_index);
+    gtk_layer_set_monitor(GTK_WINDOW(window), monitor);
+    const OSDPrettyWayland::LayerMargins margins = OSDPrettyWayland::MarginsFromAbsolute(x, y, workarea.x, workarea.y);
+    gtk_layer_set_margin(GTK_WINDOW(window), GTK_LAYER_SHELL_EDGE_LEFT, margins.left);
+    gtk_layer_set_margin(GTK_WINDOW(window), GTK_LAYER_SHELL_EDGE_TOP, margins.top);
+    if (monitor) {
+      g_object_unref(monitor);
+    }
+    return;
+  }
+#else
+  (void)workarea;
+  (void)monitor_index;
+#endif
 #ifdef HAVE_X11
   GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
   if (surface && GDK_IS_X11_SURFACE(surface)) {
@@ -311,7 +376,7 @@ void OSDPretty::ApplyPosition() {
   }
   const OSDPrettyPlacement::Rect size = WindowSize(window_);
   const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::AbsolutePosition(workarea, {pos_x_, pos_y_}, size.width, size.height);
-  MoveWindow(window_, abs.x, abs.y);
+  MoveWindow(window_, abs.x, abs.y, workarea, index);
   ApplyShape();
 }
 
@@ -367,6 +432,11 @@ void OSDPretty::ApplyShape() {
 #else
   (void)0;
 #endif
+#ifdef _WIN32
+  if (window_ && WinBlurBehind::ShouldApply(true, true)) {
+    WinUtils::EnableBlurBehindWindow(window_);
+  }
+#endif
 }
 
 void OSDPretty::ApplyStyle() {
@@ -417,6 +487,8 @@ void OSDPretty::ConnectPopup() {
                    }),
                    this);
 }
+
+void OSDPretty::Hide() { HideNow(); }
 
 void OSDPretty::HideNow() {
   if (timeout_id_) {
@@ -493,7 +565,7 @@ void OSDPretty::OnDragUpdate(GtkGestureDrag *, double offset_x, double offset_y,
   if (index >= 0 && static_cast<size_t>(index) < monitors.size()) {
     self->popup_screen_ = monitors[static_cast<size_t>(index)].name;
   }
-  MoveWindow(self->window_, abs.x, abs.y);
+  MoveWindow(self->window_, abs.x, abs.y, workarea, index);
 }
 
 void OSDPretty::OnDragEnd(GtkGestureDrag *, double, double, gpointer data) {
@@ -512,13 +584,12 @@ void OSDPretty::EnsureWindow() {
   gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
   gtk_widget_add_css_class(window_, "osd");
   gtk_widget_add_css_class(window_, "osd-pretty");
+  InitLayerShell(window_);
   ApplyStyle();
-#ifdef HAVE_X11
   g_signal_connect(window_, "realize", G_CALLBACK(+[](GtkWidget *, gpointer data) {
                      static_cast<OSDPretty *>(data)->ApplyPosition();
                    }),
                    this);
-#endif
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
   gtk_widget_set_margin_start(box, 16);
   gtk_widget_set_margin_end(box, 16);

@@ -33,7 +33,7 @@ class SmartPlaylistsView {
   void Emit(const SmartPlaylistsItem &item, SmartPlaylistsAction action);
   void ShowMenu(GtkWidget *relative, const SmartPlaylistsItem *item);
   void SetupRowDrag(GtkWidget *row, const SmartPlaylistsItem &item);
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
   void ResetTypeAhead();
 
   GtkWidget *widget_ = nullptr;

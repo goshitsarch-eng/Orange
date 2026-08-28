@@ -1,5 +1,13 @@
+#include "core/macstartupactions.h"
+#include "ui/mainwindowlook.h"
+#include "core/playbackcontrolsstate.h"
+#include "core/playeritemoptions.h"
 #include "systemtrayicon/systemtrayicon.h"
 #include "systemtrayicon/traymenulove.h"
+#include "systemtrayicon/traymenumute.h"
+#include "systemtrayicon/traymenuplaypause.h"
+#include "systemtrayicon/traymenustop.h"
+#include "widgets/busyindicatoranim.h"
 
 #include "constants/behavioursettings.h"
 #include "core/settings.h"
@@ -10,6 +18,7 @@
 #include "systemtrayicon/traymenuposition.h"
 #include "systemtrayicon/traypopup.h"
 #include "systemtrayicon/trayprogressoverlay.h"
+#include "systemtrayicon/traysettingsreload.h"
 
 #include <algorithm>
 
@@ -220,4 +229,139 @@ TEST(SystemTrayIcon, OverlayIconNameHonorsProgressSetting) {
   tray.ShowPopup("title", "body", 1000, {1, 2, 3});
   ASSERT_EQ(3u, tray.popup_art().size());
   EXPECT_EQ(1, tray.popup_art()[0]);
+}
+
+TEST(MacStartupActions, ReopenDockAndMediaKeysMatchQt) {
+  EXPECT_TRUE(MacStartupActions::ShouldHandleReopen());
+  EXPECT_TRUE(MacStartupActions::ReopenReturnYes());
+  EXPECT_TRUE(MacStartupActions::ShouldTerminateNow());
+  EXPECT_EQ(8, MacStartupActions::AuxControlSubtype());
+  EXPECT_TRUE(MacStartupActions::IsAuxControlSubtype(8));
+  EXPECT_FALSE(MacStartupActions::IsAuxControlSubtype(0));
+  EXPECT_EQ(16, MacStartupActions::MediaKeyCode((16 << 16) | (0x0B << 8)));
+  EXPECT_EQ(0x0B00, MacStartupActions::MediaKeyFlags((16 << 16) | (0x0B << 8)));
+  EXPECT_TRUE(MacStartupActions::IsMediaKeyReleased(0x0B00));
+  EXPECT_FALSE(MacStartupActions::IsMediaKeyReleased(0x0A00));
+  EXPECT_TRUE(MacStartupActions::ShouldHandleMediaEvent(8, 0x0B00));
+  EXPECT_FALSE(MacStartupActions::ShouldHandleMediaEvent(8, 0x0A00));
+  EXPECT_STREQ("Now Playing", MacStartupActions::NowPlayingLabel());
+  const auto ids = MacStartupActions::DockMenuIds(true);
+  EXPECT_EQ(SystemTrayIcon::RootMenuIds(true), ids);
+  EXPECT_TRUE(MacStartupActions::DockItemIsSeparator(SystemTrayIcon::kMenuSeparator));
+}
+
+TEST(TrayMenuMute, CheckedStateMatchesQt) {
+  EXPECT_TRUE(TrayMenuMute::IsToggleId(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute));
+  EXPECT_FALSE(TrayMenuMute::IsToggleId(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuMute));
+  EXPECT_STREQ("checkmark", TrayMenuMute::ToggleType());
+  EXPECT_EQ(0, TrayMenuMute::ToggleState(false));
+  EXPECT_EQ(1, TrayMenuMute::ToggleState(true));
+  EXPECT_EQ(-2, TrayMenuMute::ToggleStateForId(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuMute, true));
+  EXPECT_EQ(1, TrayMenuMute::ToggleStateForId(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute, true));
+  EXPECT_TRUE(TrayMenuMute::ItemChecked(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute, true));
+  EXPECT_FALSE(TrayMenuMute::ItemChecked(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute, false));
+  EXPECT_FALSE(TrayMenuMute::ItemChecked(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuMute, true));
+  EXPECT_TRUE(MainWindowLook::IsMuted(0));
+  EXPECT_FALSE(MainWindowLook::IsMuted(1));
+
+  SystemTrayIcon tray;
+  EXPECT_FALSE(tray.mute_checked());
+  tray.SetMuteChecked(true);
+  EXPECT_TRUE(tray.mute_checked());
+  tray.SetMuteChecked(false);
+  EXPECT_FALSE(tray.mute_checked());
+}
+
+TEST(TrayMenuPlayPause, DisabledForRadioLikeQt) {
+  EXPECT_TRUE(PlaybackControlsState::PlayPauseEnabled(false, true));
+  EXPECT_TRUE(PlaybackControlsState::PlayPauseEnabled(false, false));
+  EXPECT_TRUE(PlaybackControlsState::PlayPauseEnabled(true, false));
+  EXPECT_FALSE(PlaybackControlsState::PlayPauseEnabled(true, true));
+  Song radio;
+  radio.set_source(Song::Source::Stream);
+  EXPECT_TRUE(PlayerItemOptions::PauseDisabled(radio));
+  EXPECT_FALSE(PlaybackControlsState::PlayPauseEnabled(true, PlayerItemOptions::PauseDisabled(radio)));
+  EXPECT_TRUE(TrayMenuPlayPause::ItemEnabled(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuPlayPause, false));
+  EXPECT_FALSE(TrayMenuPlayPause::ItemEnabled(SystemTrayIcon::kMenuPlayPause, SystemTrayIcon::kMenuPlayPause, false));
+  EXPECT_TRUE(TrayMenuPlayPause::ItemEnabled(SystemTrayIcon::kMenuPlayPause, SystemTrayIcon::kMenuPlayPause, true));
+
+  SystemTrayIcon tray;
+  EXPECT_TRUE(tray.play_pause_enabled());
+  tray.SetPlaying(true, false);
+  EXPECT_TRUE(tray.playing());
+  EXPECT_FALSE(tray.play_pause_enabled());
+  tray.SetPaused();
+  EXPECT_TRUE(tray.play_pause_enabled());
+  tray.SetPlaying(true, true);
+  EXPECT_TRUE(tray.play_pause_enabled());
+  tray.SetStopped();
+  EXPECT_TRUE(tray.play_pause_enabled());
+}
+
+TEST(TrayMenuStop, DisabledWhenStoppedLikeQt) {
+  EXPECT_TRUE(TrayMenuStop::PlaybackActive(true, false));
+  EXPECT_TRUE(TrayMenuStop::PlaybackActive(false, true));
+  EXPECT_FALSE(TrayMenuStop::PlaybackActive(false, false));
+  EXPECT_TRUE(TrayMenuStop::IsStopId(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter));
+  EXPECT_TRUE(TrayMenuStop::IsStopId(SystemTrayIcon::kMenuStopAfter, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter));
+  EXPECT_FALSE(TrayMenuStop::IsStopId(SystemTrayIcon::kMenuNext, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter));
+  EXPECT_FALSE(TrayMenuStop::ItemEnabled(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter, false));
+  EXPECT_FALSE(TrayMenuStop::ItemEnabled(SystemTrayIcon::kMenuStopAfter, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter, false));
+  EXPECT_TRUE(TrayMenuStop::ItemEnabled(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter, true));
+  EXPECT_TRUE(TrayMenuStop::ItemEnabled(SystemTrayIcon::kMenuNext, SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuStopAfter, false));
+
+  SystemTrayIcon tray;
+  EXPECT_FALSE(TrayMenuStop::PlaybackActive(tray.playing(), tray.paused()));
+  tray.SetPlaying(true);
+  EXPECT_TRUE(TrayMenuStop::PlaybackActive(tray.playing(), tray.paused()));
+  tray.SetPaused();
+  EXPECT_TRUE(TrayMenuStop::PlaybackActive(tray.playing(), tray.paused()));
+  tray.SetStopped();
+  EXPECT_FALSE(TrayMenuStop::PlaybackActive(tray.playing(), tray.paused()));
+}
+
+TEST(TrayMenuMute, FollowsVolumeControlLikeQt) {
+  EXPECT_TRUE(TrayMenuMute::ShouldShow(true));
+  EXPECT_FALSE(TrayMenuMute::ShouldShow(false));
+  EXPECT_TRUE(MainWindowLook::MuteVisible(true));
+  EXPECT_FALSE(MainWindowLook::MuteVisible(false));
+  const auto all = SystemTrayIcon::RootMenuIds();
+  EXPECT_NE(all.end(), std::find(all.begin(), all.end(), SystemTrayIcon::kMenuMute));
+  const auto hidden = SystemTrayIcon::RootMenuIds(true, false);
+  EXPECT_EQ(9u, hidden.size());
+  EXPECT_EQ(hidden.end(), std::find(hidden.begin(), hidden.end(), SystemTrayIcon::kMenuMute));
+  EXPECT_NE(hidden.end(), std::find(hidden.begin(), hidden.end(), SystemTrayIcon::kMenuLove));
+  EXPECT_EQ(hidden, TrayMenuMute::FilterMenuIds(SystemTrayIcon::AllMenuIds(), SystemTrayIcon::kMenuMute, false));
+  EXPECT_FALSE(TrayMenuMute::ItemVisible(SystemTrayIcon::kMenuMute, SystemTrayIcon::kMenuMute, false));
+  EXPECT_TRUE(TrayMenuMute::ItemVisible(SystemTrayIcon::kMenuStop, SystemTrayIcon::kMenuMute, false));
+
+  SystemTrayIcon tray;
+  EXPECT_TRUE(tray.mute_enabled());
+  tray.SetMuteEnabled(false);
+  EXPECT_FALSE(tray.mute_enabled());
+  tray.SetMuteEnabled(true);
+  EXPECT_TRUE(tray.mute_enabled());
+}
+
+TEST(TraySettingsReload, RegistersAndPresentsLikeQt) {
+  EXPECT_TRUE(TraySettingsReload::ShouldReloadOnSettingsClose());
+  EXPECT_TRUE(TraySettingsReload::ShowTray(true));
+  EXPECT_FALSE(TraySettingsReload::ShowTray(false));
+  EXPECT_TRUE(TraySettingsReload::IsRegistered(1));
+  EXPECT_FALSE(TraySettingsReload::IsRegistered(0));
+  EXPECT_TRUE(TraySettingsReload::ShouldRegister(true, false));
+  EXPECT_FALSE(TraySettingsReload::ShouldRegister(true, true));
+  EXPECT_FALSE(TraySettingsReload::ShouldRegister(false, false));
+  EXPECT_TRUE(TraySettingsReload::ShouldUnregister(false, true));
+  EXPECT_FALSE(TraySettingsReload::ShouldUnregister(false, false));
+  EXPECT_FALSE(TraySettingsReload::ShouldUnregister(true, true));
+  EXPECT_TRUE(TraySettingsReload::ShouldRefreshProgress());
+  EXPECT_TRUE(TraySettingsReload::ShouldPresentWindowAfterDisable(false, false));
+  EXPECT_FALSE(TraySettingsReload::ShouldPresentWindowAfterDisable(false, true));
+  EXPECT_FALSE(TraySettingsReload::ShouldPresentWindowAfterDisable(true, false));
+}
+
+TEST(BusyIndicatorAnim, StartsOnShowStopsOnHide) {
+  EXPECT_TRUE(BusyIndicatorAnim::ShouldStartOnShow());
+  EXPECT_TRUE(BusyIndicatorAnim::ShouldStopOnHide());
 }

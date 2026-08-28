@@ -59,6 +59,24 @@ inline bool IsSearchAutomatically(const char *id) { return id && std::strcmp(id,
 
 inline int ItemCountWithAutoSearch() { return ItemCount() + 1; }
 
+// Qt ContextAlbum::contextMenuEvent and AlbumCoverChoiceController attached
+// menus pop from Menu / Shift+F10. GTK was pointer-only.
+constexpr unsigned kMenu = 0xff67;
+constexpr unsigned kF10 = 0xffc7;
+constexpr unsigned kShiftMask = 1u << 0;
+
+inline bool IsKeyboardTrigger(unsigned keyval, unsigned state) {
+  return keyval == kMenu || (keyval == kF10 && (state & kShiftMask) != 0);
+}
+
+// GTK AttachMenu shows when the song is valid or has a URL.
+inline bool ShouldShowAttachedMenu(bool song_valid, bool has_url) { return song_valid || has_url; }
+
+// Qt ContextAlbum::contextMenuEvent also requires a real cover (not the placeholder).
+inline bool ShouldShowContextAlbumMenu(bool song_valid, bool has_url, bool has_cover) {
+  return ShouldShowAttachedMenu(song_valid, has_url) && has_cover;
+}
+
 }  // namespace CoverChoiceMenu
 
 #endif

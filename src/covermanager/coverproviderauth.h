@@ -108,6 +108,9 @@ inline bool MoveUpEnabled(int row, int count) { return row > 0 && count > 0; }
 
 inline bool MoveDownEnabled(int row, int count) { return row >= 0 && row + 1 < count; }
 
+// Qt CoversSettingsPage::showEvent refreshes the selected provider panel.
+inline bool ShouldRefreshOnShow() { return true; }
+
 }  // namespace CoverProviderAuth
 
 #endif

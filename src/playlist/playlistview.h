@@ -79,6 +79,7 @@ class PlaylistView {
   void UpdateNoMatchesOverlay();
   void SetPlaybackProgress(double progress);
   void SetGlowing(bool glowing);
+  void ReloadSettings();
   void SetBackground(const std::string &css, const std::string &key);
 
  private:
@@ -98,6 +99,8 @@ class PlaylistView {
   void StopBackgroundFade();
   gboolean OnBackgroundFadeTick();
   void ApplyBackgroundCss();
+  void OnShown();
+  void OnHidden();
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *grid_ = nullptr;

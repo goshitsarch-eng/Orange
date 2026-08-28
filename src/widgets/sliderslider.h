@@ -17,6 +17,7 @@ class SliderSlider {
   void SetRange(double min, double max);
   void SetChangedCallback(ChangedCallback callback);
   void BlockSignals(bool block);
+  void CancelGestures();
 
  protected:
   GtkWidget *widget_ = nullptr;

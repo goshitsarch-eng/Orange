@@ -78,6 +78,22 @@ inline State ApplyOrder(const State current, const PlaylistColumn column, const 
 
 inline bool ShouldSortNow(const PlaylistColumn sort_column) { return HasSort(sort_column); }
 
+// Qt PlaylistHeader::contextMenuEvent always pops from Menu / Shift+F10.
+// Pointer uses logicalIndexAt(pos); keyboard uses the first visible column.
+constexpr unsigned kMenu = 0xff67;
+constexpr unsigned kF10 = 0xffc7;
+constexpr unsigned kShiftMask = 1u << 0;
+
+inline bool IsKeyboardTrigger(unsigned keyval, unsigned state) {
+  return keyval == kMenu || (keyval == kF10 && (state & kShiftMask) != 0);
+}
+
+inline bool ShouldShowMenu() { return true; }
+
+inline PlaylistColumn ColumnForMenu(bool keyboard, PlaylistColumn at_pointer, PlaylistColumn first_visible) {
+  return keyboard ? first_visible : at_pointer;
+}
+
 }  // namespace PlaylistHeaderSort
 
 #endif

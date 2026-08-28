@@ -11,6 +11,7 @@
 #include "transcoder/transcoderoptionsspeex.h"
 #include "transcoder/transcoderoptionsvorbis.h"
 #include "transcoder/transcoderoptionswavpack.h"
+#include "settings/settingswheelthrough.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
@@ -55,6 +56,7 @@ GtkWidget *LabeledSpin(const char *label, double min, double max, double value, 
   gtk_widget_set_halign(name, GTK_ALIGN_START);
   GtkWidget *spin = gtk_spin_button_new_with_range(min, max, 1);
   gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), value);
+  SettingsWheelThrough::Attach(spin);
   gtk_box_append(GTK_BOX(row), name);
   gtk_box_append(GTK_BOX(row), spin);
   *spin_out = spin;

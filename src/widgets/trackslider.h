@@ -30,6 +30,8 @@ class TrackSlider {
   void SetSeekStepCallbacks(StepCallback backward, StepCallback forward);
   void SetSliderVisible(bool visible);
   void ToggleRemaining();
+  void SetDragging(bool dragging);
+  void OnSensitiveChanged();
   void ShowHoverAt(GtkWidget *relative, double x, int width);
   void HideHover();
   bool show_remaining() const { return show_remaining_; }
@@ -55,6 +57,8 @@ class TrackSlider {
   bool show_remaining_ = false;
   bool can_seek_ = true;
   bool stopped_ = true;
+  bool slider_sensitive_ = true;
+  bool dragging_ = false;
   int wheel_accumulator_ = 0;
   SeekCallback seek_;
   StepCallback seek_backward_;

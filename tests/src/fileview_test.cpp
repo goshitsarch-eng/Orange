@@ -10,7 +10,11 @@
 #include "core/musicstorage.h"
 #include "device/devicecopy.h"
 #include "device/devicecopyjob.h"
+#include "device/devicedeletejob.h"
+#include "device/deviceeject.h"
 #include "device/devicecopyrunner.h"
+#include "device/devicemanager.h"
+#include "device/devicestorage.h"
 #include "core/taskmanager.h"
 #include "device/devicemenu.h"
 #include "device/devicesongmenu.h"
@@ -426,6 +430,15 @@ TEST(ListBoxKeyboard, FromKeyAndWrapAround) {
   EXPECT_EQ(-1, ListBoxKeyboard::FirstPrefixIndex({"Roads"}, ""));
 }
 
+TEST(FileViewMenu, KeyboardOpensContextMenu) {
+  EXPECT_TRUE(FileViewMenu::IsKeyboardTrigger(FileViewMenu::kMenuKey, 0));
+  EXPECT_TRUE(FileViewMenu::IsKeyboardTrigger(FileViewMenu::kF10Key, FileViewMenu::kShiftMask));
+  EXPECT_FALSE(FileViewMenu::IsKeyboardTrigger(FileViewMenu::kF10Key, 0));
+  EXPECT_TRUE(FileViewMenu::ListShouldShowMenu());
+  EXPECT_TRUE(FileViewMenu::TreeShouldShowMenu(true));
+  EXPECT_FALSE(FileViewMenu::TreeShouldShowMenu(false));
+}
+
 TEST(FileViewKeyboard, AltAndHistoryBack) {
   EXPECT_EQ(FileViewKeyboard::Action::Activate, FileViewKeyboard::FromKey(ListBoxKeyboard::kReturn, false));
   EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::FromKey(ListBoxKeyboard::kUp, true));
@@ -435,9 +448,29 @@ TEST(FileViewKeyboard, AltAndHistoryBack) {
   EXPECT_EQ(FileViewKeyboard::Action::Home, FileViewKeyboard::FromKey(ListBoxKeyboard::kHome, true));
   EXPECT_EQ(FileViewKeyboard::Action::First, FileViewKeyboard::FromKey(ListBoxKeyboard::kHome, false));
   EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::FromKey(ListBoxKeyboard::kBackSpace, false));
+  EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::FromKey(FileViewKeyboard::kXF86Back, false));
   EXPECT_EQ(FileViewKeyboard::Action::UpDir, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::HistoryBack, false));
   EXPECT_EQ(FileViewKeyboard::Action::HistoryBack, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::HistoryBack, true));
   EXPECT_EQ(FileViewKeyboard::Action::Home, FileViewKeyboard::ResolveHistoryBack(FileViewKeyboard::Action::Home, false));
+}
+
+TEST(DeviceKeyboard, MenuTriggerAndTarget) {
+  EXPECT_TRUE(DeviceKeyboard::IsMenuTrigger(DeviceKeyboard::kMenuKey, 0));
+  EXPECT_TRUE(DeviceKeyboard::IsMenuTrigger(DeviceKeyboard::kF10Key, DeviceKeyboard::kShiftMask));
+  EXPECT_FALSE(DeviceKeyboard::IsMenuTrigger(DeviceKeyboard::kF10Key, 0));
+  EXPECT_EQ(DeviceKeyboard::MenuTarget::Device, DeviceKeyboard::MenuForSelection(true, true));
+  EXPECT_EQ(DeviceKeyboard::MenuTarget::Song, DeviceKeyboard::MenuForSelection(false, true));
+  EXPECT_EQ(DeviceKeyboard::MenuTarget::None, DeviceKeyboard::MenuForSelection(false, false));
+}
+
+TEST(DeviceKeyboard, DoubleClickOpensDeviceLikeQt) {
+  EXPECT_TRUE(DeviceKeyboard::ShouldOpenOnDoubleClick(CollectionTreeClick::kPrimaryButton, 2, true));
+  EXPECT_FALSE(DeviceKeyboard::ShouldOpenOnDoubleClick(CollectionTreeClick::kPrimaryButton, 2, false));
+  EXPECT_FALSE(DeviceKeyboard::ShouldOpenOnDoubleClick(CollectionTreeClick::kPrimaryButton, 1, true));
+  EXPECT_FALSE(DeviceKeyboard::ShouldOpenOnDoubleClick(CollectionTreeClick::kMiddleButton, 2, true));
+  EXPECT_TRUE(DeviceKeyboard::ShouldCoalesceDeviceOpen("usb", "usb"));
+  EXPECT_FALSE(DeviceKeyboard::ShouldCoalesceDeviceOpen(std::string(), "usb"));
+  EXPECT_FALSE(DeviceKeyboard::ShouldCoalesceDeviceOpen("a", "b"));
 }
 
 TEST(DeviceKeyboard, FromKeyBackAndSpecialRows) {
@@ -448,6 +481,8 @@ TEST(DeviceKeyboard, FromKeyBackAndSpecialRows) {
   EXPECT_EQ(DeviceKeyboard::Action::End, DeviceKeyboard::FromKey(ListBoxKeyboard::kEnd));
   EXPECT_EQ(DeviceKeyboard::Action::Back, DeviceKeyboard::FromKey(ListBoxKeyboard::kBackSpace));
   EXPECT_EQ(DeviceKeyboard::Action::Escape, DeviceKeyboard::FromKey(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(DeviceKeyboard::Action::Expand, DeviceKeyboard::FromKey(ListBoxKeyboard::kRight));
+  EXPECT_EQ(DeviceKeyboard::Action::Collapse, DeviceKeyboard::FromKey(ListBoxKeyboard::kLeft));
   EXPECT_EQ(DeviceKeyboard::Action::None, DeviceKeyboard::FromKey('a'));
   EXPECT_EQ(ListBoxKeyboard::Action::Home, DeviceKeyboard::MoveAction(DeviceKeyboard::Action::Home));
   EXPECT_EQ(ListBoxKeyboard::Action::None, DeviceKeyboard::MoveAction(DeviceKeyboard::Action::Back));
@@ -516,14 +551,35 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_FALSE(DeviceCopy::IsFilesystemDevice(mtp));
   EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(filesystem));
   EXPECT_FALSE(DeviceCopy::UsesDeviceCopyRunner(filesystem));
+  EXPECT_FALSE(DeviceCopy::UsesOrganizeMusicStorage(filesystem));
   EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(mtp));
-  EXPECT_TRUE(DeviceCopy::UsesDeviceCopyRunner(mtp));
+  EXPECT_FALSE(DeviceCopy::UsesDeviceCopyRunner(mtp));
+  EXPECT_TRUE(DeviceCopy::UsesOrganizeMusicStorage(mtp));
   ConnectedDevice ipod;
   ipod.backend = "gpod";
   ipod.mount_path = "/media/ipod";
   EXPECT_TRUE(DeviceCopy::ShouldUseOrganizeDialog(ipod));
-  EXPECT_TRUE(DeviceCopy::UsesDeviceCopyRunner(ipod));
+  EXPECT_FALSE(DeviceCopy::UsesDeviceCopyRunner(ipod));
+  EXPECT_TRUE(DeviceCopy::UsesOrganizeMusicStorage(ipod));
+  EXPECT_EQ(DeviceStorage::Kind::Mtp, DeviceStorage::KindFor(mtp));
+  EXPECT_EQ(DeviceStorage::Kind::GPod, DeviceStorage::KindFor(ipod));
+  EXPECT_EQ(DeviceStorage::Kind::Filesystem, DeviceStorage::KindFor(filesystem));
+  EXPECT_FALSE(DeviceCopy::ShouldUseRunnerFallback(filesystem));
+  EXPECT_FALSE(DeviceCopy::ShouldUseRunnerFallback(mtp));
+  EXPECT_FALSE(DeviceCopy::ShouldUseRunnerFallback(ipod));
+  EXPECT_TRUE(DeviceEject::Supported(filesystem));
+  EXPECT_FALSE(DeviceEject::Supported(mtp));
+  EXPECT_TRUE(DeviceEject::Supported(ipod));
+  EXPECT_TRUE(DeviceEject::ShouldShowCheckbox(true, true));
+  EXPECT_FALSE(DeviceEject::ShouldShowCheckbox(true, false));
+  EXPECT_TRUE(DeviceEject::ShouldEjectAfter(true, true, true));
+  EXPECT_FALSE(DeviceEject::ShouldEjectAfter(true, true, false));
+  EXPECT_TRUE(DeviceEject::ShouldAttachEjectHandler(filesystem));
+  EXPECT_FALSE(DeviceEject::ShouldAttachEjectHandler(mtp));
+  EXPECT_TRUE(DeviceEject::ShouldAttachEjectHandler(ipod));
+  EXPECT_FALSE(DeviceEject::DialogUnmountsAfterOrganize());
   EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("mtp:serial"));
+  EXPECT_EQ("serial", DeviceCopyJob::MtpSerial("MTP/serial"));
   EXPECT_EQ("usb", DeviceCopyJob::MtpSerial("usb"));
   EXPECT_STREQ("Copying to device", DeviceCopyJob::TaskName());
   EXPECT_EQ(10, DeviceCopyJob::kBatchSize);
@@ -578,6 +634,52 @@ TEST(DeviceCopy, CollectionRequestCopiesWithoutMove) {
   EXPECT_FALSE(sync.Copy(none, SongList{missing.front()}));
   EXPECT_TRUE(paused);
   EXPECT_TRUE(sync.finished());
+}
+
+TEST(DeviceEject, GioUnmountPrefersVolumeEject) {
+  using DeviceEject::UnmountAction;
+  EXPECT_TRUE(DeviceEject::SkipsUnmount("mtp://phone"));
+  EXPECT_FALSE(DeviceEject::SkipsUnmount("/media/usb"));
+  EXPECT_EQ("/media/usb", DeviceEject::NormalizeMountPath("/media/usb/"));
+  EXPECT_EQ("/", DeviceEject::NormalizeMountPath("/"));
+  EXPECT_TRUE(DeviceEject::SameMountPath("/media/usb/", "/media/usb"));
+  EXPECT_EQ(UnmountAction::None, DeviceEject::ActionFor(true, true, true, true, true, true, true));
+  EXPECT_EQ(UnmountAction::VolumeEject, DeviceEject::ActionFor(false, true, true, true, true, true, true));
+  EXPECT_EQ(UnmountAction::MountEject, DeviceEject::ActionFor(false, true, false, true, true, true, true));
+  EXPECT_EQ(UnmountAction::MountUnmount, DeviceEject::ActionFor(false, true, false, true, false, true, true));
+  EXPECT_EQ(UnmountAction::FileUnmount, DeviceEject::ActionFor(false, false, false, false, false, false, true));
+  EXPECT_EQ(UnmountAction::None, DeviceEject::ActionFor(false, false, false, false, false, false, false));
+  EXPECT_FALSE(DeviceEject::UnmountPath({}));
+  EXPECT_FALSE(DeviceEject::UnmountPath("mtp://phone"));
+
+  DeviceManager manager;
+  ConnectedDevice usb;
+  usb.backend = "gio";
+  usb.mount_path = "/media/usb";
+  usb.unique_id = "usb-1";
+  auto storage = manager.MusicStorageForDevice(usb);
+  ASSERT_TRUE(storage);
+  EXPECT_TRUE(storage->HasEjectHandler());
+  EXPECT_EQ(MusicStorage::TranscodeMode::Transcode_Never, storage->GetTranscodeMode());
+  EXPECT_EQ(Song::FileType::Unknown, storage->GetTranscodeFormat());
+  storage->SetTranscodeMode(MusicStorage::TranscodeMode::Transcode_Always);
+  storage->SetTranscodeFormat(Song::FileType::MPEG);
+  EXPECT_EQ(MusicStorage::TranscodeMode::Transcode_Always, storage->GetTranscodeMode());
+  EXPECT_EQ(Song::FileType::MPEG, storage->GetTranscodeFormat());
+
+  ConnectedDevice mtp;
+  mtp.backend = "mtp";
+  mtp.unique_id = "mtp:serial";
+  auto mtp_storage = manager.MusicStorageForDevice(mtp);
+  ASSERT_TRUE(mtp_storage);
+  EXPECT_FALSE(mtp_storage->HasEjectHandler());
+
+  ConnectedDevice ipod;
+  ipod.backend = "gpod";
+  ipod.mount_path = "/media/ipod";
+  auto ipod_storage = manager.MusicStorageForDevice(ipod);
+  ASSERT_TRUE(ipod_storage);
+  EXPECT_TRUE(ipod_storage->HasEjectHandler());
 }
 
 TEST(DeviceCollectionTree, GroupsDeviceSongsUntilExpanded) {
@@ -781,6 +883,10 @@ TEST(DeviceViewLook, IconsAndStatusMatchQtDelegate) {
   EXPECT_EQ("12 songs", DeviceViewLook::RowStatusText(volume));
   volume.mount_path.clear();
   EXPECT_TRUE(DeviceViewLook::ShouldMountOnActivate(volume));
+  EXPECT_TRUE(DeviceViewLook::ShouldConnectOnDoubleClick(DeviceViewLook::Status::NotMounted));
+  EXPECT_TRUE(DeviceViewLook::ShouldConnectOnDoubleClick(DeviceViewLook::Status::NotConnected));
+  EXPECT_TRUE(DeviceViewLook::ShouldConnectOnDoubleClick(DeviceViewLook::Status::Remembered));
+  EXPECT_FALSE(DeviceViewLook::ShouldConnectOnDoubleClick(DeviceViewLook::Status::Connected));
   volume.mount_path = "/run/media/usb";
   EXPECT_FALSE(DeviceViewLook::ShouldMountOnActivate(volume));
   volume.mount_path.clear();
@@ -847,6 +953,60 @@ TEST(DeviceDeleteDialog, MatchesQtDeleteCopy) {
   EXPECT_STREQ("These files will be deleted from the device, are you sure you want to continue?", DeviceDeleteDialog::Message());
   EXPECT_STREQ("Yes", DeviceDeleteDialog::Accept());
   EXPECT_STREQ("Cancel", DeviceDeleteDialog::Cancel());
+}
+
+TEST(DeviceDeleteJob, UsesDeleteFilesWithoutTrashLikeQt) {
+  EXPECT_FALSE(DeviceDeleteJob::UseTrash());
+  EXPECT_FALSE(DeviceDeleteJob::ReloadsDeviceAfterDelete());
+  EXPECT_TRUE(DeviceDeleteJob::ShouldShowErrorDialog(SongList{Song()}));
+  EXPECT_FALSE(DeviceDeleteJob::ShouldShowErrorDialog({}));
+  ConnectedDevice usb;
+  usb.backend = "gio";
+  usb.mount_path = "/media/usb";
+  EXPECT_TRUE(DeviceDeleteJob::ShouldUseDeleteFiles(usb));
+  ConnectedDevice mtp;
+  mtp.backend = "mtp";
+  EXPECT_TRUE(DeviceDeleteJob::ShouldUseDeleteFiles(mtp));
+  ConnectedDevice ipod;
+  ipod.backend = "gpod";
+  ipod.mount_path = "/media/ipod";
+  EXPECT_TRUE(DeviceDeleteJob::ShouldUseDeleteFiles(ipod));
+  ConnectedDevice cdda;
+  cdda.backend = "cdda";
+  cdda.mount_path = "/dev/sr0";
+  EXPECT_FALSE(DeviceDeleteJob::ShouldUseDeleteFiles(cdda));
+  EXPECT_TRUE(DeviceDeleteJob::ShouldRefreshAfterDelete("mtp", 2));
+  EXPECT_TRUE(DeviceDeleteJob::ShouldRefreshAfterDelete({}, 1));
+  EXPECT_FALSE(DeviceDeleteJob::ShouldRefreshAfterDelete("cdda", 2));
+  EXPECT_FALSE(DeviceDeleteJob::ShouldRefreshAfterDelete("mtp", 0));
+  EXPECT_EQ(3, DeviceDeleteJob::SongCountAfterDelete(5, 2));
+  EXPECT_EQ(0, DeviceDeleteJob::SongCountAfterDelete(1, 4));
+  EXPECT_EQ(-1, DeviceDeleteJob::SongCountAfterDelete(-1, 2));
+
+  Song a;
+  a.set_url("mtp://phone/1");
+  a.set_title("Roads");
+  Song b;
+  b.set_url("mtp://phone/2");
+  b.set_title("Mysterons");
+  Song c;
+  c.set_url("mtp://phone/3");
+  c.set_title("Sour Times");
+  const SongList remaining = DeviceDeleteJob::RemoveDeleted({a, b, c}, {b});
+  ASSERT_EQ(2u, remaining.size());
+  EXPECT_EQ("mtp://phone/1", remaining[0].url());
+  EXPECT_EQ("mtp://phone/3", remaining[1].url());
+  const SongList deleted = DeviceDeleteJob::Succeeded({a, b}, {b});
+  ASSERT_EQ(1u, deleted.size());
+  EXPECT_EQ("mtp://phone/1", deleted.front().url());
+
+  DeviceManager manager;
+  manager.RememberSongCount("usb-1", 5);
+  EXPECT_EQ(5, manager.SongCount("usb-1"));
+  manager.RefreshAfterDelete("usb-1", {b});
+  EXPECT_EQ(4, manager.SongCount("usb-1"));
+  manager.RefreshAfterDelete("usb-1", {});
+  EXPECT_EQ(4, manager.SongCount("usb-1"));
 }
 
 TEST(DeviceConnectDialog, MatchesQtFirstConnectCopy) {

@@ -127,8 +127,15 @@ inline bool MetadataNeedsUpdate(const Song &before, const Song &after) {
 
 inline bool CanPlay(const Playlist *playlist) { return playlist && playlist->row_count() > 0; }
 
-inline bool CanPause(EngineBase::State state) {
-  return state == EngineBase::State::Playing || state == EngineBase::State::Paused || state == EngineBase::State::Idle;
+// Qt Mpris2::CanPause is true when paused/stopped, or when playing an item that is not PauseDisabled.
+inline bool CanPause(EngineBase::State state, bool pause_disabled = false) {
+  if (state == EngineBase::State::Paused || state == EngineBase::State::Idle) {
+    return true;
+  }
+  if (state == EngineBase::State::Playing) {
+    return !pause_disabled;
+  }
+  return false;
 }
 
 inline bool CanGoNext(const Playlist *playlist) { return playlist && playlist->PeekNextRow() != -1; }
@@ -144,6 +151,16 @@ inline bool CanGoPrevious(const Playlist *playlist, int64_t position_nanosec = 0
 
 inline bool CanSeek(const Song &song, EngineBase::State state) {
   return song.is_valid() && state != EngineBase::State::Empty && !song.is_stream();
+}
+
+// Qt Mpris2::CurrentSongChanged re-emits CanPlay/CanPause/CanGoNext/CanGoPrevious/CanSeek with Metadata.
+inline bool ShouldRefreshCapabilitiesOnSongChanged() { return true; }
+
+// Qt Mpris2::AllPlaylistsLoaded emits the same capability properties once playlists are ready.
+inline bool ShouldRefreshCapabilitiesOnWatch() { return true; }
+
+inline std::vector<const char *> SongChangedCapabilityProperties() {
+  return {"CanPlay", "CanPause", "CanGoNext", "CanGoPrevious", "CanSeek"};
 }
 
 inline bool SetPositionAllowed(const std::string &requested_id, const std::string &current_id, int64_t position_us, int64_t length_nanosec,

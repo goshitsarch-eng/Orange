@@ -1,4 +1,9 @@
+#include "constants/covermanagersettings.h"
+#include "constants/edittagdialogsettings.h"
+#include "constants/organizesettings.h"
+#include "constants/settingsdialogsettings.h"
 #include "constants/transcodersettings.h"
+#include "dialogs/dialoggeometry.h"
 #include "core/settings.h"
 #include "core/song.h"
 #include "transcoder/transcoderoptionsfields.h"
@@ -124,6 +129,17 @@ TEST(TranscodeUi, DestinationAlongsideMatchesQt) {
   EXPECT_FALSE(TranscodeUi::DecodeGeometry("50x50", &width, &height));
   EXPECT_FALSE(TranscodeUi::DecodeGeometry("wide", &width, &height));
   EXPECT_STREQ("geometry", TranscoderSettings::kGeometry);
+  EXPECT_STREQ("OrganizeDialog", OrganizeSettings::kDialogGroup);
+  EXPECT_STREQ("geometry", OrganizeSettings::kGeometry);
+  EXPECT_EQ(560, OrganizeSettings::kDefaultDialogWidth);
+  EXPECT_STREQ("CoverManager", CoverManagerSettings::kSettingsGroup);
+  EXPECT_STREQ("geometry", CoverManagerSettings::kGeometry);
+  EXPECT_EQ(860, CoverManagerSettings::kDefaultWidth);
+  EXPECT_EQ(680, CoverManagerSettings::kDefaultHeight);
+  EXPECT_STREQ("SettingsDialog", SettingsDialogSettings::kSettingsGroup);
+  EXPECT_STREQ("geometry", SettingsDialogSettings::kGeometry);
+  EXPECT_EQ(827, SettingsDialogSettings::kDefaultWidth);
+  EXPECT_EQ(768, SettingsDialogSettings::kDefaultHeight);
   EXPECT_STREQ("Select...", TranscodeUi::Select());
   EXPECT_STREQ("Preserve directory structure in output directory (import only)", TranscodeUi::Preserve());
   EXPECT_TRUE(TranscodeUi::IsAlongside(0));
@@ -203,4 +219,23 @@ TEST(TranscoderProgress, FractionStartNextAndRemaining) {
   const std::vector<float> fractions = TranscoderProgress::FractionsFromProgress(progress);
   EXPECT_EQ(2u, fractions.size());
   EXPECT_EQ(150, TranscodeUi::ProgressBarValue(1, 0, 2, {0.5f}));
+}
+
+TEST(DialogGeometry, EncodesAndRestoresLikeTranscodeUi) {
+  EXPECT_EQ("720x540", DialogGeometry::Encode(720, 540));
+  int width = 0;
+  int height = 0;
+  EXPECT_TRUE(DialogGeometry::Decode("800x600", &width, &height));
+  EXPECT_EQ(800, width);
+  EXPECT_EQ(600, height);
+  EXPECT_FALSE(DialogGeometry::Decode("50x50", &width, &height));
+  EXPECT_FALSE(DialogGeometry::ShouldRestore("wide"));
+  EXPECT_TRUE(DialogGeometry::ShouldRestore("640x760"));
+  const DialogGeometry::Size restored = DialogGeometry::RestoreOrDefault("", EditTagDialogSettings::kDefaultWidth,
+                                                                        EditTagDialogSettings::kDefaultHeight);
+  EXPECT_EQ(640, restored.width);
+  EXPECT_EQ(760, restored.height);
+  const DialogGeometry::Size stored = DialogGeometry::RestoreOrDefault("900x700", 640, 760);
+  EXPECT_EQ(900, stored.width);
+  EXPECT_EQ(700, stored.height);
 }

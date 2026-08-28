@@ -1,6 +1,8 @@
 #include "collection/collectionalbumart.h"
 #include "playlist/playlistcoverpersist.h"
+#include "covermanager/coveractionenable.h"
 #include "covermanager/coverchoicemenu.h"
+#include "covermanager/covermanageractivate.h"
 #include "covermanager/covermanageractions.h"
 #include "covermanager/covermanagermenu.h"
 #include "covermanager/covermanagerstats.h"
@@ -27,6 +29,8 @@
 #include "covermanager/coverfetchpolicy.h"
 #include "covermanager/coverprovidersettings.h"
 #include "covermanager/currentalbumcoverloader.h"
+#include "constants/coverssettings.h"
+#include "core/settings.h"
 #include "settings/coverssettingslabels.h"
 #include "utilities/fileutils.h"
 
@@ -144,34 +148,44 @@ TEST(AlbumCoverFetcherSearch, ScoresExactMatchAndCompilationPenalty) {
   EXPECT_FALSE(AlbumCoverFetcherSearch::IsCompilationOrLiveAlbum("Helplessness Blues"));
 }
 
+TEST(CoverArtTypes, DefaultsMatchQtLoaderAndSettings) {
+  EXPECT_EQ("art_unset,art_manual,art_automatic,art_embedded", CoverArtTypes::DefaultSaved());
+  EXPECT_EQ("art_unset,art_embedded,art_manual,art_automatic", CoverArtTypes::DefaultLoaderSaved());
+  EXPECT_EQ(CoverArtTypes::AllIds(), CoverArtTypes::DefaultEnabledIds());
+  ASSERT_EQ(4u, CoverArtTypes::LoaderDefaultIds().size());
+  EXPECT_EQ("art_unset", CoverArtTypes::LoaderDefaultIds().front());
+  EXPECT_EQ("art_automatic", CoverArtTypes::LoaderDefaultIds().back());
+}
+
 TEST(CoverArtTypes, ParseSaveAndFilenameSensitivity) {
   EXPECT_EQ("art_unset", CoverArtTypes::AllIds().front());
-  EXPECT_EQ("art_embedded,art_automatic,art_manual", CoverArtTypes::DefaultSaved());
+  EXPECT_EQ("art_unset,art_manual,art_automatic,art_embedded", CoverArtTypes::DefaultSaved());
+  EXPECT_EQ("art_unset,art_embedded,art_manual,art_automatic", CoverArtTypes::DefaultLoaderSaved());
   EXPECT_EQ("Embedded album cover art (art_embedded)", CoverArtTypes::Description("art_embedded"));
   EXPECT_EQ("Manually unset (art_unset)", CoverArtTypes::Description("art_unset"));
   EXPECT_EQ("Set through album cover search (art_manual)", CoverArtTypes::Description("art_manual"));
   EXPECT_EQ("Automatically picked up from album directory (art_automatic)", CoverArtTypes::Description("art_automatic"));
 
-  const auto missing_unset = CoverArtTypes::Parse(CoverArtTypes::DefaultSaved());
-  ASSERT_EQ(4u, missing_unset.size());
-  EXPECT_EQ("art_embedded", missing_unset[0].id);
-  EXPECT_TRUE(missing_unset[0].enabled);
-  EXPECT_EQ("art_automatic", missing_unset[1].id);
-  EXPECT_TRUE(missing_unset[1].enabled);
-  EXPECT_EQ("art_manual", missing_unset[2].id);
-  EXPECT_TRUE(missing_unset[2].enabled);
-  EXPECT_EQ("art_unset", missing_unset[3].id);
-  EXPECT_FALSE(missing_unset[3].enabled);
-  EXPECT_EQ(CoverArtTypes::DefaultSaved(), CoverArtTypes::Save(missing_unset));
+  const auto settings_default = CoverArtTypes::Parse(CoverArtTypes::DefaultSaved());
+  ASSERT_EQ(4u, settings_default.size());
+  EXPECT_EQ("art_unset", settings_default[0].id);
+  EXPECT_TRUE(settings_default[0].enabled);
+  EXPECT_EQ("art_manual", settings_default[1].id);
+  EXPECT_TRUE(settings_default[1].enabled);
+  EXPECT_EQ("art_automatic", settings_default[2].id);
+  EXPECT_TRUE(settings_default[2].enabled);
+  EXPECT_EQ("art_embedded", settings_default[3].id);
+  EXPECT_TRUE(settings_default[3].enabled);
+  EXPECT_EQ(CoverArtTypes::DefaultSaved(), CoverArtTypes::Save(settings_default));
 
   const auto qt_default = CoverArtTypes::Parse("art_unset,art_manual,art_automatic,art_embedded");
   ASSERT_EQ(4u, qt_default.size());
   EXPECT_EQ("art_unset", qt_default[0].id);
   EXPECT_TRUE(qt_default[0].enabled);
-  EXPECT_EQ("art_embedded,art_automatic,art_manual", CoverArtTypes::Save(CoverArtTypes::Move(missing_unset, 0, 0)));
-  const auto moved = CoverArtTypes::Move(missing_unset, 0, 1);
-  EXPECT_EQ("art_automatic", moved[0].id);
-  EXPECT_EQ("art_embedded", moved[1].id);
+  EXPECT_EQ(CoverArtTypes::DefaultSaved(), CoverArtTypes::Save(CoverArtTypes::Move(settings_default, 0, 0)));
+  const auto moved = CoverArtTypes::Move(settings_default, 0, 1);
+  EXPECT_EQ("art_manual", moved[0].id);
+  EXPECT_EQ("art_unset", moved[1].id);
 
   const auto all_disabled = CoverArtTypes::Parse("");
   EXPECT_TRUE(CoverArtTypes::EnabledIds(all_disabled).empty());
@@ -193,9 +207,26 @@ TEST(CoverArtTypes, ParseSaveAndFilenameSensitivity) {
 TEST(AlbumCoverLoaderOptions, TypeNamesAndLoadTypesDefault) {
   EXPECT_EQ("art_embedded", AlbumCoverLoaderOptions::TypeName(AlbumCoverLoaderOptions::Type::Embedded));
   EXPECT_EQ(AlbumCoverLoaderOptions::Type::Manual, AlbumCoverLoaderOptions::TypeFromName("art_manual"));
+  Settings before;
+  before.BeginGroup(CoversSettings::kSettingsGroup);
+  const bool had = before.Contains(CoversSettings::kTypes);
+  const std::string old = before.Value(CoversSettings::kTypes);
+  before.Remove(CoversSettings::kTypes);
+  before.Sync();
   const auto types = AlbumCoverLoaderOptions::LoadTypes();
-  ASSERT_FALSE(types.empty());
-  EXPECT_EQ(AlbumCoverLoaderOptions::Type::Embedded, types.front());
+  ASSERT_EQ(4u, types.size());
+  EXPECT_EQ(AlbumCoverLoaderOptions::Type::Unset, types[0]);
+  EXPECT_EQ(AlbumCoverLoaderOptions::Type::Embedded, types[1]);
+  EXPECT_EQ(AlbumCoverLoaderOptions::Type::Manual, types[2]);
+  EXPECT_EQ(AlbumCoverLoaderOptions::Type::Automatic, types[3]);
+  Settings restore;
+  restore.BeginGroup(CoversSettings::kSettingsGroup);
+  if (had) {
+    restore.SetValue(CoversSettings::kTypes, old);
+  } else {
+    restore.Remove(CoversSettings::kTypes);
+  }
+  restore.Sync();
 }
 
 TEST(AlbumCoverLoader, FindsFolderCoverAndCurrentLoader) {
@@ -417,6 +448,13 @@ TEST(AlbumCoverSearcher, SearchLockAndAbort) {
   EXPECT_TRUE(AlbumCoverSearcher::ShouldAutoSearch("", "Dummy"));
 }
 
+TEST(AlbumCoverSearcher, IgnoresEnterLikeQt) {
+  EXPECT_TRUE(AlbumCoverSearcher::ShouldIgnoreEnter(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(AlbumCoverSearcher::ShouldIgnoreEnter(ListBoxKeyboard::kKPEnter));
+  EXPECT_FALSE(AlbumCoverSearcher::ShouldIgnoreEnter(ListBoxKeyboard::kEscape));
+  EXPECT_FALSE(AlbumCoverSearcher::ShouldIgnoreEnter('a'));
+}
+
 TEST(AlbumCoverSearcher, GridHelpers) {
   EXPECT_EQ(3, AlbumCoverSearcher::ColumnsForWidth(0));
   EXPECT_EQ(2, AlbumCoverSearcher::ColumnsForWidth(100));
@@ -471,6 +509,17 @@ TEST(AlbumCoverBatch, ProgressAbortAndStatus) {
   EXPECT_NE(std::string::npos, batch.StatusText().find("cancelled"));
 }
 
+TEST(CoverChoiceMenu, KeyboardOpensAttachedCoverMenu) {
+  EXPECT_TRUE(CoverChoiceMenu::IsKeyboardTrigger(CoverChoiceMenu::kMenu, 0));
+  EXPECT_TRUE(CoverChoiceMenu::IsKeyboardTrigger(CoverChoiceMenu::kF10, CoverChoiceMenu::kShiftMask));
+  EXPECT_FALSE(CoverChoiceMenu::IsKeyboardTrigger(CoverChoiceMenu::kF10, 0));
+  EXPECT_TRUE(CoverChoiceMenu::ShouldShowAttachedMenu(true, false));
+  EXPECT_TRUE(CoverChoiceMenu::ShouldShowAttachedMenu(false, true));
+  EXPECT_FALSE(CoverChoiceMenu::ShouldShowAttachedMenu(false, false));
+  EXPECT_TRUE(CoverChoiceMenu::ShouldShowContextAlbumMenu(true, false, true));
+  EXPECT_FALSE(CoverChoiceMenu::ShouldShowContextAlbumMenu(true, false, false));
+}
+
 TEST(CoverChoiceMenu, ItemsAndWhenToShow) {
   const auto items = CoverChoiceMenu::Items();
   ASSERT_EQ(9u, items.size());
@@ -493,6 +542,39 @@ TEST(CoverChoiceMenu, ItemsAndWhenToShow) {
   EXPECT_FALSE(CoverChoiceMenu::IsSearchAutomatically("search"));
   EXPECT_EQ(10, CoverChoiceMenu::ItemCountWithAutoSearch());
   EXPECT_EQ(9, CoverChoiceMenu::ItemCount());
+}
+
+TEST(CoverActionEnable, GatesPlayingMenuLikeQt) {
+  Song stream(Song::Source::Tidal);
+  stream.set_valid(true);
+  stream.set_title("Roads");
+  stream.set_album("Dummy");
+  stream.set_albumartist("Portishead");
+  stream.set_art_automatic("https://i/l.jpg");
+  EXPECT_FALSE(CoverActionEnable::CanChangeArt(stream));
+  EXPECT_TRUE(CoverActionEnable::HasValidArt(stream));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Show, stream));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Save, stream));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::File, stream));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Search, stream, true));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Unset, stream));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Delete, stream));
+
+  Song collection(Song::Source::Collection);
+  collection.set_valid(true);
+  collection.set_album("Dummy");
+  collection.set_albumartist("Portishead");
+  collection.set_art_manual("file:///cover.jpg");
+  EXPECT_TRUE(CoverActionEnable::CanChangeArt(collection));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::File, collection));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Search, collection, true));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Search, collection, false));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Unset, collection));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Clear, collection));
+  EXPECT_TRUE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Delete, collection));
+  collection.set_art_manual({});
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Clear, collection));
+  EXPECT_FALSE(CoverActionEnable::Enabled(CoverChoiceMenu::Action::Show, collection));
 }
 
 TEST(CoverManagerMenu, UsesCoverChoiceAndPlaylist) {
@@ -594,6 +676,25 @@ TEST(CoverManagerView, LabelsAndHideIndexMatchQt) {
   EXPECT_EQ(2, CoverManagerView::IndexFromHide(AlbumCoverManagerList::HideCovers::WithCovers));
   EXPECT_EQ(0, CoverManagerView::ClampIndex(-3));
   EXPECT_EQ(2, CoverManagerView::ClampIndex(9));
+}
+
+TEST(CoverManagerMenu, KeyboardUsesAlbumSelection) {
+  EXPECT_TRUE(CoverManagerMenu::IsKeyboardTrigger(CoverManagerMenu::kMenu, 0));
+  EXPECT_TRUE(CoverManagerMenu::IsKeyboardTrigger(CoverManagerMenu::kF10, CoverManagerMenu::kShiftMask));
+  EXPECT_FALSE(CoverManagerMenu::IsKeyboardTrigger(CoverManagerMenu::kF10, 0));
+  EXPECT_FALSE(CoverManagerMenu::IsKeyboardTrigger(ListBoxKeyboard::kReturn, 0));
+  EXPECT_TRUE(CoverManagerMenu::ShouldShowMenu(true, true));
+  EXPECT_FALSE(CoverManagerMenu::ShouldShowMenu(true, false));
+  EXPECT_FALSE(CoverManagerMenu::ShouldShowMenu(false, true));
+}
+
+TEST(CoverManagerActivate, AlbumEnterShowsCoverNotPlaylist) {
+  EXPECT_TRUE(CoverManagerActivate::IsEnter(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(CoverManagerActivate::IsEnter(ListBoxKeyboard::kKPEnter));
+  EXPECT_FALSE(CoverManagerActivate::IsEnter(ListBoxKeyboard::kEscape));
+  EXPECT_EQ(CoverManagerActivate::Action::ShowCover, CoverManagerActivate::ForAlbumEnter());
+  EXPECT_EQ(CoverManagerActivate::Action::None, CoverManagerActivate::ForArtistEnter());
+  EXPECT_FALSE(CoverManagerActivate::AlbumEnterAddsToPlaylist());
 }
 
 TEST(CoverManagerActions, DoubleClickAndFetchFinishMatchQt) {

@@ -82,6 +82,26 @@ void ApplyNotificationSensitivity(AdwComboRow *combo) {
   }
 }
 
+void UpdatePrettyPreview(GtkWidget *page, AdwComboRow *type) {
+  if (!page || !type) {
+    return;
+  }
+  const bool show = NotificationsControls::ShouldShowPrettyPreview(gtk_widget_get_mapped(page), ComboOsdType(type));
+  auto *preview = static_cast<OSDPretty *>(g_object_get_data(G_OBJECT(page), "pretty-preview"));
+  if (!show) {
+    if (preview) {
+      preview->Hide();
+    }
+    return;
+  }
+  if (!preview) {
+    preview = new OSDPretty(OSDPretty::Mode::Draggable);
+    g_object_set_data_full(G_OBJECT(page), "pretty-preview", preview, +[](gpointer data) { delete static_cast<OSDPretty *>(data); });
+  }
+  preview->ReloadSettings();
+  preview->ShowMessage(Translations::Tr("OSD Preview"), Translations::Tr("Drag to reposition"));
+}
+
 }  // namespace
 
 AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Application *app) {
@@ -265,8 +285,18 @@ AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Applic
   g_object_set_data(G_OBJECT(disable_duration), "type-row", type);
   g_object_set_data(G_OBJECT(custom_toggle), "type-row", type);
   ApplyNotificationSensitivity(ADW_COMBO_ROW(type));
-  g_signal_connect(type, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer) { ApplyNotificationSensitivity(combo); }),
+  g_object_set_data(G_OBJECT(page), "osd-type-row", type);
+  g_signal_connect(type, "notify::selected",
+                   G_CALLBACK((+[](AdwComboRow *combo, GParamSpec *, gpointer) {
+                     ApplyNotificationSensitivity(combo);
+                     GtkWidget *page = gtk_widget_get_ancestor(GTK_WIDGET(combo), ADW_TYPE_PREFERENCES_PAGE);
+                     UpdatePrettyPreview(page, combo);
+                   })),
                    nullptr);
+  g_signal_connect(page, "map",
+                   G_CALLBACK((+[](GtkWidget *widget, gpointer data) { UpdatePrettyPreview(widget, ADW_COMBO_ROW(data)); })), type);
+  g_signal_connect(page, "unmap",
+                   G_CALLBACK((+[](GtkWidget *widget, gpointer data) { UpdatePrettyPreview(widget, ADW_COMBO_ROW(data)); })), type);
   g_signal_connect(disable_duration, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
                      if (auto *combo = ADW_COMBO_ROW(g_object_get_data(G_OBJECT(row), "type-row"))) {
                        ApplyNotificationSensitivity(combo);

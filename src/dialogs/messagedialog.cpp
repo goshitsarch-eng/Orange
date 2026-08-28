@@ -1,5 +1,6 @@
 #include "dialogs/messagedialog.h"
 
+#include "dialogs/dialogclosekeys.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
@@ -33,5 +34,6 @@ void MessageDialog::Show(GtkWindow *parent, const std::string &title, const std:
                      }),
                      nullptr);
   }
+  DialogCloseKeys::Attach(ADW_DIALOG(dialog));
   adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
 }

@@ -17,21 +17,27 @@ class SystemTrayIcon {
   SystemTrayIcon();
   ~SystemTrayIcon();
 
-  void SetPlaying(bool playing);
+  void SetPlaying(bool playing, bool enable_play_pause = true);
   void SetPaused();
   void SetStopped();
   void SetProgress(int percentage);
   void SetNowPlaying(const Song &song);
   void ClearNowPlaying();
   void SetupStatusNotifier();
+  void ReloadSettings();
   void SetVisible(bool visible);
   void ShowMenu(int x, int y);
   void ShowPopup(const std::string &summary, const std::string &message, int timeout_ms,
                  const std::vector<unsigned char> &art = {});
   void SetLoveVisible(bool visible);
   void SetLoveEnabled(bool enabled);
+  void SetMuteEnabled(bool enabled);
+  void SetMuteChecked(bool checked);
   bool love_visible() const { return love_visible_; }
   bool love_enabled() const { return love_enabled_; }
+  bool mute_enabled() const { return mute_enabled_; }
+  bool mute_checked() const { return mute_checked_; }
+  bool play_pause_enabled() const { return play_pause_enabled_; }
 
   bool available() const { return available_; }
   bool visible() const { return visible_; }
@@ -69,7 +75,7 @@ class SystemTrayIcon {
     return {kMenuPlayPause, kMenuStop, kMenuNext, kMenuPrevious, kMenuMute, kMenuStopAfter, kMenuLove, kMenuSeparator, kMenuShowHide,
             kMenuQuit};
   }
-  static std::vector<int> RootMenuIds(bool show_love = true);
+  static std::vector<int> RootMenuIds(bool show_love = true, bool show_mute = true);
   static bool ActivateMenuId(int id, Signal<> *play_pause, Signal<> *stop, Signal<> *next, Signal<> *previous, Signal<> *show_hide,
                              Signal<> *quit, Signal<> *mute = nullptr, Signal<> *stop_after = nullptr, Signal<> *love = nullptr);
 
@@ -107,6 +113,7 @@ class SystemTrayIcon {
   void PositionMenuWindow(GtkWidget *window, int x, int y);
   GVariant *MenuLayout(int parent_id) const;
   void RegisterMenu(GDBusConnection *connection);
+  void TeardownStatusNotifier();
 
   guint owner_id_ = 0;
   guint registration_id_ = 0;
@@ -134,6 +141,9 @@ class SystemTrayIcon {
   int popup_timeout_ms_ = 0;
   bool love_visible_ = true;
   bool love_enabled_ = true;
+  bool mute_enabled_ = true;
+  bool mute_checked_ = false;
+  bool play_pause_enabled_ = true;
   GtkWidget *popup_window_ = nullptr;
   GtkWidget *popup_title_ = nullptr;
   GtkWidget *popup_body_ = nullptr;

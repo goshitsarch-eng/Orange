@@ -24,6 +24,7 @@
 #include "playlist/playlistrestorescroll.h"
 #include "playlist/playlistfilterempty.h"
 #include "playlist/playlistkeyboard.h"
+#include "playlist/playlistmenu.h"
 #include "playlist/playlistlook.h"
 #include "playlist/playliststopafter.h"
 #include "playlist/playlisttagcompletion.h"
@@ -156,6 +157,8 @@ PlaylistView::PlaylistView() {
                      static_cast<PlaylistView *>(data)->ApplyColumnWidths();
                    }),
                    this);
+  g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) { static_cast<PlaylistView *>(data)->OnShown(); }), this);
+  g_signal_connect(widget_, "unmap", G_CALLBACK(+[](GtkWidget *, gpointer data) { static_cast<PlaylistView *>(data)->OnHidden(); }), this);
 }
 
 void PlaylistView::SetDropUrlsCallback(DropUrlsCallback callback) { drop_urls_ = std::move(callback); }
@@ -209,6 +212,10 @@ void PlaylistView::FocusAndMove(unsigned keyval) {
 }
 
 gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (PlaylistMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state)) && menu_) {
+    menu_(0, PlaylistMenu::kKeyboardY);
+    return TRUE;
+  }
   const PlaylistKeyboard::Action key_action = PlaylistKeyboard::FromKey(keyval, state, GDK_CONTROL_MASK);
   if (key_action == PlaylistKeyboard::Action::PlayPause && play_pause_) {
     play_pause_();
@@ -253,7 +260,7 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
     return TRUE;
   }
   if (action == ListBoxKeyboard::Action::MoveUp || action == ListBoxKeyboard::Action::MoveDown || action == ListBoxKeyboard::Action::Home ||
-      action == ListBoxKeyboard::Action::End) {
+      action == ListBoxKeyboard::Action::End || action == ListBoxKeyboard::Action::PageUp || action == ListBoxKeyboard::Action::PageDown) {
     int current = -1;
     if (!selected_rows_.empty() && !visible_rows_.empty()) {
       for (size_t i = 0; i < visible_rows_.size(); ++i) {
@@ -263,7 +270,8 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
         }
       }
     }
-    const int next = ListBoxKeyboard::NextIndex(current, static_cast<int>(visible_rows_.size()), action);
+    const int next = ListBoxKeyboard::NextIndex(current, static_cast<int>(visible_rows_.size()), action,
+                                                ListBoxKeyboard::PageSize(gtk_widget_get_height(widget_)));
     if (next >= 0 && select_) {
       const int next_row = visible_rows_[static_cast<size_t>(next)];
       if (PlaylistEditColumn::ShouldClearLastClicked(last_clicked_row_, next_row)) {
@@ -907,6 +915,14 @@ gboolean PlaylistView::OnGlowTick() {
   return G_SOURCE_CONTINUE;
 }
 
+void PlaylistView::ReloadSettings() {
+  ReloadLookCss();
+  SetGlowing(glowing_);
+  if (playlist_ && PlaylistLook::ShouldRefreshRowsOnReload()) {
+    Refresh(playlist_);
+  }
+}
+
 void PlaylistView::SetGlowing(bool glowing) {
   glowing_ = glowing;
   Settings look;
@@ -928,6 +944,21 @@ void PlaylistView::SetPlaybackProgress(double progress) {
 }
 
 void PlaylistView::SetPaused(bool paused) { paused_ = paused; }
+
+void PlaylistView::OnShown() {
+  if (PlaylistAutoscroll::ShouldRestartGlowOnShow(glowing_)) {
+    StartGlowTimer();
+  }
+  if (playlist_ && PlaylistAutoscroll::ShouldRunOnShow()) {
+    MaybeScrollToRow(playlist_->current_row(), PlaylistAutoscroll::ShowMode());
+  }
+}
+
+void PlaylistView::OnHidden() {
+  if (PlaylistAutoscroll::ShouldStopGlowOnHide()) {
+    StopGlowTimer();
+  }
+}
 
 void PlaylistView::StopBackgroundFade() {
   if (background_fade_id_) {

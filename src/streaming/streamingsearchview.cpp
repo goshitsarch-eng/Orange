@@ -4,6 +4,7 @@
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectiontree.h"
 #include "collection/groupbydialog.h"
+#include "core/appearanceconfigurebuttons.h"
 #include "core/settings.h"
 #include "dialogs/dialoghelpers.h"
 #include "streaming/streamingabort.h"
@@ -42,7 +43,7 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   type_songs_ = gtk_toggle_button_new_with_label(Translations::CStr(StreamingSearchHelp::Songs()));
   gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(type_albums_), GTK_TOGGLE_BUTTON(type_artists_));
   gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(type_songs_), GTK_TOGGLE_BUTTON(type_artists_));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(type_songs_), TRUE);
+  ApplySearchType(StreamingSearchOpts::LoadSearchType(service_ ? service_->name() : std::string()));
   gtk_box_append(GTK_BOX(types), type_artists_);
   gtk_box_append(GTK_BOX(types), type_albums_);
   gtk_box_append(GTK_BOX(types), type_songs_);
@@ -62,6 +63,9 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   gtk_box_append(GTK_BOX(types), pretty_covers_btn_);
   g_signal_connect(pretty_covers_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
                      auto *self = static_cast<StreamingSearchView *>(data);
+                     if (self->applying_settings_) {
+                       return;
+                     }
                      self->pretty_covers_ = gtk_check_button_get_active(button);
                      self->PersistPrettyCovers();
                      self->Rebuild();
@@ -127,9 +131,27 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
                      self->ScheduleSearch(query, false);
                    }),
                    this);
-  g_signal_connect(type_artists_, "toggled", G_CALLBACK(search_now), this);
-  g_signal_connect(type_albums_, "toggled", G_CALLBACK(search_now), this);
-  g_signal_connect(type_songs_, "toggled", G_CALLBACK(search_now), this);
+  g_signal_connect(type_artists_, "toggled", G_CALLBACK(+[](GtkToggleButton *button, gpointer data) {
+                     if (!StreamingSearchOpts::ShouldSaveOnActivate(gtk_toggle_button_get_active(button) != FALSE, false)) {
+                       return;
+                     }
+                     static_cast<StreamingSearchView *>(data)->OnSearchTypeActivated();
+                   }),
+                   this);
+  g_signal_connect(type_albums_, "toggled", G_CALLBACK(+[](GtkToggleButton *button, gpointer data) {
+                     if (!StreamingSearchOpts::ShouldSaveOnActivate(gtk_toggle_button_get_active(button) != FALSE, false)) {
+                       return;
+                     }
+                     static_cast<StreamingSearchView *>(data)->OnSearchTypeActivated();
+                   }),
+                   this);
+  g_signal_connect(type_songs_, "toggled", G_CALLBACK(+[](GtkToggleButton *button, gpointer data) {
+                     if (!StreamingSearchOpts::ShouldSaveOnActivate(gtk_toggle_button_get_active(button) != FALSE, false)) {
+                       return;
+                     }
+                     static_cast<StreamingSearchView *>(data)->OnSearchTypeActivated();
+                   }),
+                   this);
   ListBoxTreePressGtk::Attach(list_, this);
   g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
                      auto *self = static_cast<StreamingSearchView *>(data);
@@ -172,6 +194,13 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
                    }),
                    this);
   gtk_box_append(GTK_BOX(widget_), search_entry_);
+  ApplyLook();
+  g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     if (StreamingSearchOpts::ShouldFocusOnShow()) {
+                       static_cast<StreamingSearchView *>(data)->FocusSearch();
+                     }
+                   }),
+                   this);
   gtk_box_append(GTK_BOX(widget_), types);
   gtk_box_append(GTK_BOX(widget_), progress_);
   gtk_box_append(GTK_BOX(widget_), status_);
@@ -208,8 +237,8 @@ StreamingSearchView::StreamingSearchView(StreamingService *service) : service_(s
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<StreamingSearchView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<StreamingSearchView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
   Rebuild();
@@ -264,6 +293,67 @@ void StreamingSearchView::HandlePress(guint button, gint n_press, double x, doub
 void StreamingSearchView::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
 
 void StreamingSearchView::SetConfigureCallback(ConfigureCallback callback) { configure_ = std::move(callback); }
+
+void StreamingSearchView::ApplyLook() {
+  const int size = AppearanceConfigureButtons::StoredSize();
+  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingSearch)) {
+    AppearanceConfigureButtons::ApplyWidget(search_entry_, size);
+  }
+  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::StreamingConfigure)) {
+    AppearanceConfigureButtons::ApplyWidget(configure_button_, size);
+  }
+}
+
+void StreamingSearchView::ApplySearchType(StreamingService::SearchType type) {
+  GtkWidget *target = type_songs_;
+  if (type == StreamingService::SearchType::Artists) {
+    target = type_artists_;
+  } else if (type == StreamingService::SearchType::Albums) {
+    target = type_albums_;
+  }
+  if (!target) {
+    return;
+  }
+  applying_settings_ = true;
+  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(target), TRUE);
+  applying_settings_ = false;
+}
+
+void StreamingSearchView::PersistSearchType() {
+  StreamingSearchOpts::SaveSearchType(service_ ? service_->name() : std::string(), CurrentType());
+}
+
+void StreamingSearchView::OnSearchTypeActivated() {
+  if (!StreamingSearchOpts::ShouldSaveOnActivate(true, applying_settings_)) {
+    return;
+  }
+  PersistSearchType();
+  if (!search_entry_) {
+    return;
+  }
+  const char *text = gtk_editable_get_text(GTK_EDITABLE(search_entry_));
+  ScheduleSearch(text ? text : "", true);
+}
+
+void StreamingSearchView::ReloadSettings() {
+  if (service_) {
+    Settings settings;
+    settings.BeginGroup(service_->name());
+    pretty_covers_ = StreamingCover::LoadPrettyCovers(service_->name());
+    grouping_ = StreamingSearchGroup::FromSaved(settings.IntValue(StreamingSearchGroup::kSearchGroupBy1, 0),
+                                                settings.IntValue(StreamingSearchGroup::kSearchGroupBy2, 0),
+                                                settings.IntValue(StreamingSearchGroup::kSearchGroupBy3, 0),
+                                                settings.Contains(StreamingSearchGroup::kSearchGroupBy1));
+    ApplySearchType(StreamingSearchOpts::LoadSearchType(service_->name()));
+  }
+  applying_settings_ = true;
+  if (pretty_covers_btn_) {
+    gtk_check_button_set_active(GTK_CHECK_BUTTON(pretty_covers_btn_), pretty_covers_);
+  }
+  applying_settings_ = false;
+  ApplyLook();
+  Rebuild();
+}
 
 StreamingService::SearchType StreamingSearchView::CurrentType() const {
   if (type_artists_ && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(type_artists_))) {
@@ -703,7 +793,14 @@ void StreamingSearchView::FocusResultsAndMove(unsigned keyval) {
   }
 }
 
-gboolean StreamingSearchView::OnKeyPressed(guint keyval) {
+gboolean StreamingSearchView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (StreamingCollectionActions::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+    if (menu_ && StreamingCollectionActions::ShouldShowContextMenu(row != nullptr)) {
+      menu_(SelectedSongs());
+    }
+    return TRUE;
+  }
   if (FilterSearchKeyboard::FromTreeKey(keyval) == FilterSearchKeyboard::Action::FocusFilter) {
     ResetTypeAhead();
     FilterEntryApply::FromKey(search_entry_, keyval);

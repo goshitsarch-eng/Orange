@@ -1,5 +1,7 @@
 #include "constants/edittagdialogsettings.h"
+#include "dialogs/dialogsongnav.h"
 #include "covermanager/coveroptions.h"
+#include "covermanager/coveroptionsreload.h"
 #include "dialogs/dialoglistkeyboard.h"
 #include "dialogs/edittagcompleter.h"
 #include "dialogs/edittagcover.h"
@@ -12,6 +14,7 @@
 #include "dialogs/edittagloading.h"
 #include "dialogs/edittagsave.h"
 #include "dialogs/edittagtabs.h"
+#include "dialogs/edittagshow.h"
 #include "tagreader/tagreaderresult.h"
 #include "utilities/fileutils.h"
 
@@ -114,9 +117,35 @@ TEST(EditTagFields, WrapIndexAndSongRowLabel) {
   EXPECT_EQ("Portishead - Roads", EditTagFields::SongRowLabel(song));
 }
 
+TEST(DialogSongNav, PreviousNextAndDelta) {
+  EXPECT_TRUE(DialogSongNav::IsPrevious(DialogSongNav::kPageUp, 0));
+  EXPECT_TRUE(DialogSongNav::IsPrevious(DialogSongNav::kKPPageUp, 0));
+  EXPECT_TRUE(DialogSongNav::IsPrevious(DialogSongNav::kXF86Back, 0));
+  EXPECT_TRUE(DialogSongNav::IsPrevious(DialogSongNav::kLeft, DialogSongNav::kAltMask));
+  EXPECT_FALSE(DialogSongNav::IsPrevious(DialogSongNav::kLeft, 0));
+  EXPECT_TRUE(DialogSongNav::IsNext(DialogSongNav::kPageDown, 0));
+  EXPECT_TRUE(DialogSongNav::IsNext(DialogSongNav::kKPPageDown, 0));
+  EXPECT_TRUE(DialogSongNav::IsNext(DialogSongNav::kXF86Forward, 0));
+  EXPECT_TRUE(DialogSongNav::IsNext(DialogSongNav::kRight, DialogSongNav::kAltMask));
+  EXPECT_FALSE(DialogSongNav::IsNext(DialogSongNav::kRight, 0));
+  EXPECT_EQ(-1, DialogSongNav::Delta(DialogSongNav::kPageUp, 0));
+  EXPECT_EQ(1, DialogSongNav::Delta(DialogSongNav::kPageDown, 0));
+  EXPECT_EQ(0, DialogSongNav::Delta(DialogSongNav::kLeft, 0));
+}
+
+TEST(EditTagShow, ShrinksHeightOnPresentLikeQt) {
+  EXPECT_TRUE(EditTagShow::ShouldShrinkOnPresent());
+  EXPECT_FALSE(EditTagShow::ShouldShrinkOnPresent(true));
+  EXPECT_FALSE(EditTagShow::ShouldApplyDefaultHeight(false));
+  EXPECT_TRUE(EditTagShow::ShouldApplyDefaultHeight(true));
+}
+
 TEST(EditTagTabs, ClampNameAndSettingsKeys) {
   EXPECT_STREQ("EditTagDialog", EditTagDialogSettings::kSettingsGroup);
   EXPECT_STREQ("current_tab", EditTagDialogSettings::kCurrentTab);
+  EXPECT_STREQ("geometry", EditTagDialogSettings::kGeometry);
+  EXPECT_EQ(640, EditTagDialogSettings::kDefaultWidth);
+  EXPECT_EQ(760, EditTagDialogSettings::kDefaultHeight);
   EXPECT_EQ(0, EditTagTabs::ClampIndex(-2));
   EXPECT_EQ(3, EditTagTabs::ClampIndex(99));
   EXPECT_STREQ("Lyrics", EditTagTabs::Name(2));
@@ -198,6 +227,23 @@ TEST(CoverOptions, TypeFilenameAndPattern) {
   options.cover_lowercase = true;
   options.cover_replace_spaces = true;
   EXPECT_EQ("portishead-dummy.jpg", options.FilenameForSong(song));
+}
+
+TEST(CoverOptionsReload, ReloadsAfterPreferencesLikeQt) {
+  EXPECT_TRUE(CoverOptionsReload::ShouldReloadOnSettingsClose());
+  CoverOptions before;
+  before.cover_type = CoverOptions::CoverType::Cache;
+  before.cover_filename = CoverOptions::CoverFilename::Hash;
+  CoverOptions after = before;
+  EXPECT_FALSE(CoverOptionsReload::OptionsDiffer(before, after));
+  after.cover_type = CoverOptions::CoverType::Album;
+  EXPECT_TRUE(CoverOptionsReload::OptionsDiffer(before, after));
+  after = before;
+  after.cover_pattern = "%artist-%album";
+  EXPECT_TRUE(CoverOptionsReload::OptionsDiffer(before, after));
+  after = before;
+  after.cover_overwrite = !before.cover_overwrite;
+  EXPECT_TRUE(CoverOptionsReload::OptionsDiffer(before, after));
 }
 
 TEST(EditTagCoverDrop, AcceptsImageUrisAndSkipsOtherFiles) {

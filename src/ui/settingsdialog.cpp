@@ -24,13 +24,21 @@
 #include "settings/tidalsettingspage.h"
 #include "settings/transcodersettingspage.h"
 #include "settings/waveformsettingspage.h"
+#include "constants/settingsdialogsettings.h"
+#include "dialogs/dialogclosekeys.h"
+#include "dialogs/dialoggeometry.h"
 #include "translations/translations.h"
+#include "ui/settingsdialogshow.h"
 
 #include <adwaita.h>
 
 void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::function<void()> &closed, const char *page_name) {
   AdwPreferencesDialog *dialog = ADW_PREFERENCES_DIALOG(adw_preferences_dialog_new());
   adw_dialog_set_title(ADW_DIALOG(dialog), Translations::CStr("Preferences"));
+  if (SettingsDialogShow::ShouldLoadGeometry(false)) {
+    DialogGeometry::Apply(ADW_DIALOG(dialog), SettingsDialogSettings::kSettingsGroup, SettingsDialogSettings::kGeometry,
+                          SettingsDialogSettings::kDefaultWidth, SettingsDialogSettings::kDefaultHeight, false);
+  }
   auto *settings = new Settings();
   auto *on_closed = new std::function<void()>(closed);
 
@@ -78,5 +86,7 @@ void SettingsDialog::Show(GtkWindow *parent, Application *app, const std::functi
                      }
                    }),
                    nullptr);
+  DialogGeometry::BindClosed(ADW_DIALOG(dialog), SettingsDialogSettings::kSettingsGroup, SettingsDialogSettings::kGeometry);
+  DialogCloseKeys::Attach(ADW_DIALOG(dialog));
   adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
 }

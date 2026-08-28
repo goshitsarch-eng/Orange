@@ -11,6 +11,9 @@
 #include "radios/radiomenu.h"
 #include "radios/radiomodel.h"
 #include "radios/radiotree.h"
+#include "radios/radiotreeleft.h"
+#include "radios/radioviewsearch.h"
+#include "radios/radioviewshow.h"
 #include "radios/radioparadiseservice.h"
 #include "radios/radiostreamplaylistitem.h"
 #include "radios/somafmservice.h"
@@ -191,6 +194,15 @@ TEST(RadioBrowserSearchOpts, SortStatusAndPagingMatchQt) {
   EXPECT_EQ("Radio Browser search failed.", RadioBrowserSearchOpts::SearchFailed({}));
 }
 
+TEST(RadioBrowserSearchOpts, RetriesCountriesUntilFetchSucceeds) {
+  EXPECT_TRUE(RadioBrowserSearchOpts::ShouldFetchCountriesOnShow(false));
+  EXPECT_FALSE(RadioBrowserSearchOpts::ShouldFetchCountriesOnShow(true));
+  EXPECT_TRUE(RadioBrowserSearchOpts::ShouldInvokeCountriesCallback(true));
+  EXPECT_FALSE(RadioBrowserSearchOpts::ShouldInvokeCountriesCallback(false));
+  EXPECT_TRUE(RadioBrowserSearchOpts::ShouldMarkCountriesLoaded(true));
+  EXPECT_FALSE(RadioBrowserSearchOpts::ShouldMarkCountriesLoaded(false));
+}
+
 TEST(RadioServices, PlaylistParserResolvesSomaFMPls) {
   PlaylistParser parser;
   const std::string pls = "[playlist]\nNumberOfEntries=1\nFile1=https://ice1.somafm.com/groovesalad-128-mp3\n";
@@ -287,6 +299,13 @@ TEST(RadioBackend, PersistAndRemoveSource) {
   unlink(path.c_str());
 }
 
+TEST(RadioMenu, KeyboardAlwaysShowsMenu) {
+  EXPECT_TRUE(RadioMenu::IsKeyboardTrigger(RadioMenu::kMenuKey, 0));
+  EXPECT_TRUE(RadioMenu::IsKeyboardTrigger(RadioMenu::kF10Key, RadioMenu::kShiftMask));
+  EXPECT_FALSE(RadioMenu::IsKeyboardTrigger(RadioMenu::kF10Key, 0));
+  EXPECT_TRUE(RadioMenu::ShouldShowMenu());
+}
+
 TEST(RadioMenu, ItemsUrlsAndSelection) {
   EXPECT_EQ(7, RadioMenu::ItemCount());
   EXPECT_STREQ("win.radio-append", RadioMenu::WinAction(RadioMenu::Action::Append));
@@ -368,4 +387,29 @@ TEST(RadioTree, GroupsCollapsesAndServiceLabels) {
   model.Toggle(Song::Source::SomaFM);
   EXPECT_FALSE(model.Expanded(Song::Source::SomaFM));
   EXPECT_EQ(3u, model.Rows().size());
+}
+
+TEST(RadioViewShow, FetchesChannelsOnceOnFirstShow) {
+  EXPECT_TRUE(RadioViewShow::ShouldFetchOnShow(false));
+  EXPECT_FALSE(RadioViewShow::ShouldFetchOnShow(true));
+}
+
+TEST(RadioViewSearch, SwitchesToBrowserAndRunsQuery) {
+  EXPECT_STREQ("browser", RadioViewSearch::BrowserTabId());
+  EXPECT_STREQ("channels", RadioViewSearch::ChannelsTabId());
+  EXPECT_TRUE(RadioViewSearch::ShouldShowBrowserTab());
+  EXPECT_TRUE(RadioViewSearch::ShouldRunSearch());
+  EXPECT_TRUE(RadioViewSearch::ShouldFocusSearch());
+}
+
+TEST(RadioTreeLeft, CollapseChannelOrService) {
+  EXPECT_EQ(RadioTreeLeft::Action::SelectParentAndCollapse, RadioTreeLeft::FromRow(RadioTree::Kind::Channel, true));
+  EXPECT_EQ(RadioTreeLeft::Action::CollapseCurrent, RadioTreeLeft::FromRow(RadioTree::Kind::Service, true));
+  EXPECT_EQ(RadioTreeLeft::Action::None, RadioTreeLeft::FromRow(RadioTree::Kind::Service, false));
+  EXPECT_TRUE(RadioTreeLeft::ShouldCollapse(RadioTree::Kind::Channel, true));
+  EXPECT_TRUE(RadioTreeLeft::ShouldCollapse(RadioTree::Kind::Service, true));
+  EXPECT_FALSE(RadioTreeLeft::ShouldCollapse(RadioTree::Kind::Service, false));
+  EXPECT_TRUE(RadioTreeLeft::ShouldExpand(RadioTree::Kind::Service, false));
+  EXPECT_FALSE(RadioTreeLeft::ShouldExpand(RadioTree::Kind::Service, true));
+  EXPECT_FALSE(RadioTreeLeft::ShouldExpand(RadioTree::Kind::Channel, false));
 }

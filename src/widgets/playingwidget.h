@@ -47,6 +47,7 @@ class PlayingWidget {
   void SetFitCoverWidth(bool fit);
   void SetDropCallback(DropCallback callback);
   void SetCoverActionCallback(CoverActionCallback callback);
+  void SetHasCoverProviders(bool has_providers) { has_cover_providers_ = has_providers; }
   void SetSearchAutoChangedCallback(SearchAutoChangedCallback callback) { search_auto_changed_ = std::move(callback); }
   void Playing();
   void Stopped();
@@ -55,6 +56,7 @@ class PlayingWidget {
   void SetCover(const std::vector<unsigned char> &data);
   void SearchCoverInProgress();
   const Song &song() const { return song_; }
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
 
   Signal<bool> AboveStatusBarChanged;
 
@@ -161,6 +163,7 @@ class PlayingWidget {
   DropCallback drop_;
   CoverActionCallback cover_action_;
   SearchAutoChangedCallback search_auto_changed_;
+  bool has_cover_providers_ = true;
   bool enabled_ = true;
   bool playing_ = false;
   bool active_ = false;

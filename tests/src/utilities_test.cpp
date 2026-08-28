@@ -1,7 +1,19 @@
+#include "core/filesystemwatcherwinpolicy.h"
+#include "core/windows7thumbbaractions.h"
+#include "core/winsmtcstatus.h"
+#include "core/macoswindow.h"
+#include "device/macosdeviceclassify.h"
+#include "engine/enginebase.h"
+#include "engine/platformdeviceoutputs.h"
+#include "engine/uwpdeviceenum.h"
+#include "globalshortcuts/keymapper_macos.h"
+#include "globalshortcuts/keymapper_win.h"
 #include "utilities/strutils.h"
+#include "utilities/winblurbehind.h"
 #include "utilities/timeutils.h"
 #include "widgets/multiloadingtext.h"
 #include "widgets/tracksliderstate.h"
+#include "widgets/tracksliderdragreset.h"
 #include "widgets/trackslidertime.h"
 #include "widgets/volumesliderwheel.h"
 #include "utilities/fileutils.h"
@@ -20,6 +32,7 @@
 #include "device/giodevicefilter.h"
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
+#include "dialogs/dialogclosekeys.h"
 #include "equalizer/equalizer.h"
 #include "equalizer/equalizercontrols.h"
 #include "equalizer/equalizergain.h"
@@ -38,15 +51,19 @@
 #include "context/contextoptions.h"
 #include "context/contextidle.h"
 #include "context/contextplayingtext.h"
+#include "context/contextreload.h"
 #include "context/contexttechnical.h"
 #include "dialogs/addstreamurl.h"
 #include "dialogs/deletefilespolicy.h"
 #include "dialogs/userpasslabels.h"
 #include "organize/organize.h"
 #include "organize/organizejob.h"
+#include "organize/organizestorage.h"
+#include "device/devicestorage.h"
 #include "organize/organizefilename.h"
 #include "organize/organizeformatvalidator.h"
 #include "organize/organizetokenhelp.h"
+#include "widgets/linetexteditkeys.h"
 #include "organize/organizeloading.h"
 #include "organize/organizepreview.h"
 #include "organize/organizetranscode.h"
@@ -102,8 +119,11 @@
 #include "transcoder/transcoderoptionsflac.h"
 #include "transcoder/transcoderoptionsinterface.h"
 #include "transcoder/transcoderoptionswavpack.h"
+#include "widgets/fancytabmode.h"
 #include "widgets/playingcoveractivate.h"
 #include "widgets/playingwidget.h"
+#include "core/playbackcontrolsstate.h"
+#include "widgets/playingwidgettab.h"
 #include "widgets/stretchheaderview.h"
 
 #include <algorithm>
@@ -161,6 +181,16 @@ TEST(TrackSliderState, StoppedAndCanSeekMatchQt) {
   local.set_url("file:///tmp/a.flac");
   EXPECT_TRUE(TrackSliderState::CanSeekFromSong(local));
   EXPECT_TRUE(TrackSliderState::CanSeekFromOptions(PlayerItemOptions::ForSong(local)));
+}
+
+TEST(TrackSliderDragReset, ClearsDragWhenDisabledMidSeek) {
+  EXPECT_TRUE(TrackSliderDragReset::ShouldResetOnDisable(true, false, true));
+  EXPECT_FALSE(TrackSliderDragReset::ShouldResetOnDisable(true, false, false));
+  EXPECT_FALSE(TrackSliderDragReset::ShouldResetOnDisable(true, true, true));
+  EXPECT_FALSE(TrackSliderDragReset::ShouldResetOnDisable(false, false, true));
+  EXPECT_TRUE(TrackSliderDragReset::DraggingAfterPress(true, 1));
+  EXPECT_FALSE(TrackSliderDragReset::DraggingAfterPress(false, 1));
+  EXPECT_FALSE(TrackSliderDragReset::DraggingAfterRelease());
 }
 
 TEST(VolumeSliderWheel, AccumulatesNotchesAndPresets) {
@@ -244,6 +274,15 @@ TEST(OrganizeTokenHelp, MentionsQtTokensAndBraces) {
   EXPECT_TRUE(OrganizeTokenHelp::MentionsOptionalBraces(OrganizeTokenHelp::Tooltip()));
 }
 
+TEST(LineTextEditKeys, IgnoresEnterLikeQt) {
+  EXPECT_TRUE(LineTextEditKeys::IsEnter(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(LineTextEditKeys::IsEnter(ListBoxKeyboard::kKPEnter));
+  EXPECT_TRUE(LineTextEditKeys::ShouldIgnore(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(LineTextEditKeys::ShouldIgnore(ListBoxKeyboard::kKPEnter));
+  EXPECT_FALSE(LineTextEditKeys::ShouldIgnore(ListBoxKeyboard::kEscape));
+  EXPECT_FALSE(LineTextEditKeys::ShouldIgnore('a'));
+}
+
 TEST(OrganizeFormat, ExpandsTokens) {
   OrganizeFormat format("%albumartist/%album/%track - %title");
   Song song;
@@ -269,6 +308,38 @@ TEST(OrganizeFormat, OptionalBlocks) {
   without.set_title("Title");
   EXPECT_EQ("Artist/Album/Title", format.GetFilenameForSong(without));
   EXPECT_FALSE(OrganizeFormat::TokenHasValue("%disc", without));
+}
+
+TEST(PlaybackControlsState, StopDisabledWhenStoppedLikeQt) {
+  EXPECT_TRUE(PlaybackControlsState::PlaybackActive(true, false));
+  EXPECT_TRUE(PlaybackControlsState::PlaybackActive(false, true));
+  EXPECT_FALSE(PlaybackControlsState::PlaybackActive(false, false));
+  EXPECT_TRUE(PlaybackControlsState::StopEnabled(true));
+  EXPECT_FALSE(PlaybackControlsState::StopEnabled(false));
+  EXPECT_TRUE(PlaybackControlsState::PlayPauseEnabled(false, true));
+}
+
+TEST(PlayingWidgetTab, HidesOnContextAlbumLikeQt) {
+  EXPECT_STREQ("context", PlayingWidgetTab::ContextTabId());
+  EXPECT_TRUE(PlayingWidgetTab::OnContextTab("context"));
+  EXPECT_FALSE(PlayingWidgetTab::OnContextTab("collection"));
+  EXPECT_FALSE(PlayingWidgetTab::OnContextTab(nullptr));
+  EXPECT_TRUE(PlayingWidgetTab::ShouldEnable(true, true, false, true));
+  EXPECT_TRUE(PlayingWidgetTab::ShouldEnable(true, true, true, false));
+  EXPECT_FALSE(PlayingWidgetTab::ShouldEnable(true, true, true, true));
+  EXPECT_FALSE(PlayingWidgetTab::ShouldEnable(false, true, false, false));
+  EXPECT_FALSE(PlayingWidgetTab::ShouldEnable(true, false, false, false));
+  EXPECT_TRUE(PlayingWidgetTab::ShouldRefreshOnTabChange());
+  EXPECT_TRUE(PlayingWidgetTab::ShouldRefreshOnSidebarToggle());
+  EXPECT_TRUE(PlayingWidgetTab::ShouldRefreshOnAlbumEnabled());
+}
+
+TEST(ContextReload, RefreshesDisplayAfterPreferencesLikeQt) {
+  EXPECT_TRUE(ContextReload::ShouldRefreshDisplayOnReload());
+  EXPECT_TRUE(ContextReload::ShouldRefreshIdle(true));
+  EXPECT_FALSE(ContextReload::ShouldRefreshIdle(false));
+  EXPECT_TRUE(ContextReload::ShouldRefreshPlaying(false));
+  EXPECT_FALSE(ContextReload::ShouldRefreshPlaying(true));
 }
 
 TEST(ContextTechnical, RowsAndFormats) {
@@ -683,6 +754,15 @@ TEST(OrganizePreview, DisambiguatesOnlyWhenUnique) {
   EXPECT_TRUE(OrganizePreview::LocksDestination("/run/media/usb", ""));
   EXPECT_TRUE(OrganizePreview::LocksDestination("", "mtp:phone"));
   EXPECT_FALSE(OrganizePreview::LocksDestination("", ""));
+  EXPECT_TRUE(OrganizePreview::IsDeviceCopy("usb:1", false));
+  EXPECT_TRUE(OrganizePreview::IsDeviceCopy("", true));
+  EXPECT_FALSE(OrganizePreview::IsDeviceCopy("", false));
+  EXPECT_TRUE(OrganizePreview::DeviceCopyKeepsOriginals());
+  EXPECT_FALSE(OrganizePreview::InitialMove(false, true, true));
+  EXPECT_TRUE(OrganizePreview::InitialMove(true, true, false));
+  EXPECT_TRUE(OrganizePreview::InitialMove(false, false, true));
+  EXPECT_FALSE(OrganizePreview::ShouldPersistMove(true));
+  EXPECT_TRUE(OrganizePreview::ShouldPersistMove(false));
   EXPECT_TRUE(OrganizePreview::CanRun(false, "", {}, 150, 0, 0, false, true));
   EXPECT_FALSE(OrganizePreview::CanRun(false, "", {}, 150, 0, 0, false, false));
 }
@@ -805,6 +885,121 @@ TEST(OrganizeJob, BatchesTenAndSupportsCancel) {
   EXPECT_EQ(12u, second.errors().size());
 }
 
+namespace {
+
+class FakeMusicStorage : public MusicStorage {
+ public:
+  Song::Source source() const override { return Song::Source::Device; }
+  std::string LocalPath() const override { return local_path; }
+  bool StartCopy(std::vector<Song::FileType> *) override {
+    started = true;
+    return start_ok;
+  }
+  bool CopyToStorage(const CopyJob &job, std::string &) override {
+    destinations.push_back(job.destination);
+    sources.push_back(job.source);
+    if (job.progress) {
+      job.progress(1.0f);
+    }
+    return copy_ok;
+  }
+  bool FinishCopy(bool success, std::string &) override {
+    finished = true;
+    finish_success = success;
+    return success;
+  }
+  bool DeleteFromStorage(const DeleteJob &) override { return false; }
+
+  std::string local_path;
+  bool start_ok = true;
+  bool copy_ok = true;
+  bool started = false;
+  bool finished = false;
+  bool finish_success = false;
+  std::vector<std::string> destinations;
+  std::vector<std::string> sources;
+};
+
+}  // namespace
+
+TEST(OrganizeStorage, DeviceCopyUsesRelativeDestination) {
+  EXPECT_FALSE(OrganizeStorage::AllowsEmptyDestination(static_cast<const MusicStorage *>(nullptr)));
+  EXPECT_TRUE(OrganizeStorage::AllowsEmptyDestination(std::string()));
+  EXPECT_FALSE(OrganizeStorage::AllowsEmptyDestination("/media/usb"));
+  EXPECT_EQ("Artist/Roads.flac", OrganizeStorage::CopyDestination({}, "Artist/Roads.flac"));
+  EXPECT_EQ("/media/usb/Artist/Roads.flac", OrganizeStorage::CopyDestination("/media/usb", "Artist/Roads.flac"));
+  EXPECT_FALSE(OrganizeStorage::DestinationExists({}, "Artist/Roads.flac"));
+  EXPECT_FALSE(OrganizeStorage::ShouldMkdir({}));
+  EXPECT_TRUE(OrganizeStorage::ShouldMkdir("/media/usb"));
+  EXPECT_EQ(DeviceStorage::Kind::Mtp, DeviceStorage::KindFor("mtp", {}));
+  EXPECT_EQ(DeviceStorage::Kind::GPod, DeviceStorage::KindFor("gpod", "/media/ipod"));
+  EXPECT_EQ(DeviceStorage::Kind::Filesystem, DeviceStorage::KindFor("gio", "/run/media/usb"));
+  EXPECT_EQ(DeviceStorage::Kind::None, DeviceStorage::KindFor("cdda", {}));
+  EXPECT_TRUE(DeviceStorage::UsesOrganizeMusicStorage("mtp"));
+  EXPECT_TRUE(DeviceStorage::UsesOrganizeMusicStorage("gpod"));
+  EXPECT_FALSE(DeviceStorage::UsesOrganizeMusicStorage("gio"));
+  EXPECT_TRUE(DeviceStorage::AllowsEmptyDestination(DeviceStorage::Kind::Mtp));
+  EXPECT_FALSE(DeviceStorage::AllowsEmptyDestination(DeviceStorage::Kind::GPod));
+
+  char dir_template[] = "/tmp/strawberry-organize-storage-XXXXXX";
+  const std::string dir = mkdtemp(dir_template);
+  const std::string src = FileUtils::Join(dir, "roads.flac");
+  FileUtils::WriteFile(src, "flac");
+  Song song;
+  song.set_valid(true);
+  song.set_title("Roads");
+  song.set_artist("Portishead");
+  song.set_url(FileUtils::UriFromPath(src));
+  FakeMusicStorage storage;
+  Organize::Options options;
+  options.storage = &storage;
+  Organize organize;
+  const std::vector<Organize::Error> errors = organize.Copy({song}, "", OrganizeFormat("%artist/%title"), options);
+  EXPECT_TRUE(errors.empty());
+  EXPECT_TRUE(storage.started);
+  EXPECT_TRUE(storage.finished);
+  ASSERT_EQ(1u, storage.destinations.size());
+  EXPECT_EQ(std::string::npos, storage.destinations.front().find("/tmp"));
+  EXPECT_NE(std::string::npos, storage.destinations.front().find("Portishead"));
+  EXPECT_NE(std::string::npos, storage.destinations.front().find("Roads"));
+  FileUtils::Remove(src);
+  rmdir(dir.c_str());
+}
+
+TEST(OrganizeStorage, EjectsThroughMusicStorageLikeQt) {
+  char dir_template[] = "/tmp/strawberry-organize-eject-XXXXXX";
+  const std::string dir = mkdtemp(dir_template);
+  const std::string src = FileUtils::Join(dir, "roads.flac");
+  FileUtils::WriteFile(src, "flac");
+  Song song;
+  song.set_valid(true);
+  song.set_title("Roads");
+  song.set_url(FileUtils::UriFromPath(src));
+
+  FakeMusicStorage storage;
+  bool ejected = false;
+  storage.SetEjectHandler([&ejected]() { ejected = true; });
+  Organize::Options options;
+  options.storage = &storage;
+  options.eject_after = true;
+  const std::vector<Organize::Error> errors = Organize().Copy({song}, "", OrganizeFormat("%title"), options);
+  EXPECT_TRUE(errors.empty());
+  EXPECT_TRUE(storage.finished);
+  EXPECT_TRUE(ejected);
+
+  FakeMusicStorage keep;
+  bool keep_ejected = false;
+  keep.SetEjectHandler([&keep_ejected]() { keep_ejected = true; });
+  Organize::Options no_eject;
+  no_eject.storage = &keep;
+  Organize().Copy({song}, "", OrganizeFormat("%title"), no_eject);
+  EXPECT_TRUE(keep.finished);
+  EXPECT_FALSE(keep_ejected);
+
+  FileUtils::Remove(src);
+  rmdir(dir.c_str());
+}
+
 TEST(Organize, CopiesDisambiguatedCollisions) {
   char dir_template[] = "/tmp/strawberry-organize-dup-XXXXXX";
   const std::string dir = mkdtemp(dir_template);
@@ -904,6 +1099,13 @@ TEST(CollectionGrouping, SavedRoundTrip) {
   }
   EXPECT_TRUE(found);
   CollectionGrouping::RemoveSaved("GTK test grouping");
+}
+
+TEST(DialogCloseKeys, CtrlWClosesLikeQt) {
+  EXPECT_TRUE(DialogCloseKeys::IsClose(DialogCloseKeys::kW, DialogCloseKeys::kControlMask));
+  EXPECT_TRUE(DialogCloseKeys::IsClose(DialogCloseKeys::kWUpper, DialogCloseKeys::kControlMask));
+  EXPECT_FALSE(DialogCloseKeys::IsClose(DialogCloseKeys::kW, 0));
+  EXPECT_FALSE(DialogCloseKeys::IsClose('q', DialogCloseKeys::kControlMask));
 }
 
 TEST(EqualizerLabels, RestartHintAndQtCopy) {
@@ -1044,10 +1246,22 @@ TEST(EqualizerPersist, SelectedPresetAndStereoBalancer) {
   eq.set_stereo_balancer_enabled(false);
   EXPECT_FLOAT_EQ(0.0f, eq.EffectiveBalanceFraction());
   eq.set_enabled(false);
+  eq.LoadPreset("Custom");
   eq.set_preamp(8);
   EXPECT_EQ("Custom", eq.selected_preset());
   EXPECT_EQ(0, eq.EffectivePreamp());
   EXPECT_EQ(std::vector<int>(10, 0), eq.EffectiveGains());
+  eq.LoadPreset("Rock");
+  EXPECT_TRUE(eq.HasPreset("Rock"));
+  EXPECT_TRUE(eq.MatchesPreset("Rock"));
+  EXPECT_FALSE(EqualizerPersist::ShouldPromptSave(eq.HasPreset("Rock"), eq.MatchesPreset("Rock")));
+  eq.set_gain(0, 12);
+  EXPECT_EQ("Rock", eq.selected_preset());
+  EXPECT_FALSE(eq.MatchesPreset("Rock"));
+  EXPECT_TRUE(EqualizerPersist::ShouldPromptSave(eq.HasPreset("Rock"), eq.MatchesPreset("Rock")));
+  EXPECT_FALSE(EqualizerPersist::ShouldPromptSave(false, false));
+  EXPECT_TRUE(EqualizerPersist::GainsMatch({1, 2}, {1, 2}));
+  EXPECT_FALSE(EqualizerPersist::GainsMatch({1, 2}, {2, 1}));
 }
 
 TEST(Analyzer, Types) {
@@ -1915,6 +2129,8 @@ TEST(DeviceFinders, ChoiceKeyAndOutputLabels) {
   EXPECT_EQ("PulseAudio", DeviceFinders::OutputLabel("pulsesink"));
   EXPECT_EQ("PipeWire", DeviceFinders::OutputLabel("pipewiresink"));
   EXPECT_EQ("ALSA", DeviceFinders::OutputLabel("alsasink"));
+  EXPECT_EQ("WASAPI", DeviceFinders::OutputLabel("wasapisink"));
+  EXPECT_EQ("Core Audio", DeviceFinders::OutputLabel("osxaudiosink"));
 
   DeviceFinders finders;
   finders.Init();
@@ -1935,6 +2151,9 @@ TEST(WindowGeometry, ClampsAndMapsStartup) {
   EXPECT_EQ(2, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Remember), false));
   EXPECT_EQ(3, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::Hide), false));
   EXPECT_EQ(5, WindowGeometry::StartupAction(static_cast<int>(BehaviourSettings::StartupBehaviour::ShowMinimized), true));
+  EXPECT_EQ(WindowGeometry::AfterHide::Minimize, WindowGeometry::RestoreAfterHide(true, true));
+  EXPECT_EQ(WindowGeometry::AfterHide::Maximize, WindowGeometry::RestoreAfterHide(true, false));
+  EXPECT_EQ(WindowGeometry::AfterHide::Show, WindowGeometry::RestoreAfterHide(false, false));
 }
 
 TEST(MainWindowMenu, MatchesQtDailyActionLabels) {
@@ -1980,6 +2199,11 @@ TEST(MainWindowLook, SidebarAndMuteMatchQt) {
   EXPECT_FALSE(MainWindowLook::MuteVisible(false));
   EXPECT_TRUE(MainWindowLook::MuteVisibleFromSettings(true));
   EXPECT_FALSE(MainWindowLook::MuteVisibleFromSettings(false));
+  EXPECT_TRUE(MainWindowLook::SliderEnabled(true));
+  EXPECT_FALSE(MainWindowLook::SliderEnabled(false));
+  EXPECT_TRUE(MainWindowLook::MuteActionEnabled(true));
+  EXPECT_FALSE(MainWindowLook::MuteActionEnabled(false));
+  EXPECT_TRUE(MainWindowLook::ShouldApplyVolumeControl());
   EXPECT_TRUE(MainWindowLook::IsMuted(0));
   EXPECT_FALSE(MainWindowLook::IsMuted(1));
   EXPECT_FALSE(MainWindowLook::IsMuted(50));
@@ -1989,6 +2213,7 @@ TEST(MainWindowLook, SidebarAndMuteMatchQt) {
   EXPECT_STREQ("Mute", MainWindowLook::MuteTooltip(false));
   EXPECT_STREQ("<Control>m", MainWindowLook::MuteAccel());
   EXPECT_STREQ("<Control>w", MainWindowLook::ClosePlaylistAccel());
+  EXPECT_STREQ("<Control><Shift>w", MainWindowLook::HideWindowAccel());
   EXPECT_STREQ("<Control>d", MainWindowLook::PlaylistQueueAccel());
   EXPECT_STREQ("<Control><Shift>d", MainWindowLook::QueuePlayNextAccel());
 }
@@ -2044,6 +2269,24 @@ TEST(FilterSearchKeyboard, MatchesCollectionFilterKeys) {
   EXPECT_EQ(FilterSearchKeyboard::Action::Clear, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kEscape));
   EXPECT_EQ(FilterSearchKeyboard::Action::FocusFilter, FilterSearchKeyboard::FromTreeKey(ListBoxKeyboard::kBackSpace));
   EXPECT_EQ(ListBoxKeyboard::Action::MoveUp, FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::Action::MoveUp));
+}
+
+TEST(FilterSearchKeyboard, ForwardsPageKeysToPlaylist) {
+  EXPECT_EQ(FilterSearchKeyboard::Action::PageUp, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kPageUp));
+  EXPECT_EQ(FilterSearchKeyboard::Action::PageDown, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kPageDown));
+  EXPECT_EQ(FilterSearchKeyboard::Action::PageUp, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kKPPageUp));
+  EXPECT_EQ(FilterSearchKeyboard::Action::PageDown, FilterSearchKeyboard::FromSearchKey(ListBoxKeyboard::kKPPageDown));
+  EXPECT_TRUE(FilterSearchKeyboard::ForwardsToView(FilterSearchKeyboard::Action::MoveDown));
+  EXPECT_TRUE(FilterSearchKeyboard::ForwardsToView(FilterSearchKeyboard::Action::PageUp));
+  EXPECT_TRUE(FilterSearchKeyboard::ForwardsToView(FilterSearchKeyboard::Action::PageDown));
+  EXPECT_FALSE(FilterSearchKeyboard::ForwardsToView(FilterSearchKeyboard::Action::Clear));
+  EXPECT_EQ(ListBoxKeyboard::Action::PageUp, FilterSearchKeyboard::MoveAction(FilterSearchKeyboard::Action::PageUp));
+  EXPECT_EQ(ListBoxKeyboard::Action::PageDown, ListBoxKeyboard::FromKey(ListBoxKeyboard::kPageDown));
+  EXPECT_EQ(0, ListBoxKeyboard::NextIndex(3, 20, ListBoxKeyboard::Action::PageUp, 10));
+  EXPECT_EQ(13, ListBoxKeyboard::NextIndex(3, 20, ListBoxKeyboard::Action::PageDown, 10));
+  EXPECT_EQ(19, ListBoxKeyboard::NextIndex(15, 20, ListBoxKeyboard::Action::PageDown, 10));
+  EXPECT_EQ(10, ListBoxKeyboard::PageSize(280, 28));
+  EXPECT_EQ(ListBoxKeyboard::kDefaultPage, ListBoxKeyboard::PageSize(0, 28));
 }
 
 TEST(Appearance, BackgroundCssForTypesAndUrls) {
@@ -2119,6 +2362,42 @@ TEST(AppearanceColors, PaletteTabPlayingAndIconCss) {
   EXPECT_EQ(AppearanceSettings::kDefaultIconSizePlayControlButtons, clamped.play_controls);
   EXPECT_EQ(128, clamped.tabbar_small);
   EXPECT_NE(std::string::npos, AppearanceColors::BuildIconSizeCss(sizes).find("32px"));
+  EXPECT_NE(std::string::npos, AppearanceColors::BuildIconSizeCss(sizes).find(".strawberry-configure-buttons"));
+}
+
+TEST(FancyTabMode, ModesMatchQtAndPersist) {
+  EXPECT_EQ(1, static_cast<int>(FancyTabMode::Mode::LargeSidebar));
+  EXPECT_EQ(2, static_cast<int>(FancyTabMode::Mode::SmallSidebar));
+  EXPECT_EQ(3, static_cast<int>(FancyTabMode::Mode::Tabs));
+  EXPECT_EQ(4, static_cast<int>(FancyTabMode::Mode::IconOnlyTabs));
+  EXPECT_EQ(5, static_cast<int>(FancyTabMode::Mode::PlainSidebar));
+  EXPECT_EQ(6, static_cast<int>(FancyTabMode::Mode::IconsSidebar));
+  EXPECT_EQ(FancyTabMode::Mode::LargeSidebar, FancyTabMode::kDefaultMode);
+  EXPECT_EQ(FancyTabMode::Mode::LargeSidebar, FancyTabMode::FromStored(0));
+  EXPECT_EQ(FancyTabMode::Mode::IconsSidebar, FancyTabMode::FromStored(6));
+  EXPECT_EQ(FancyTabMode::Mode::LargeSidebar, FancyTabMode::FromStored(99));
+  EXPECT_EQ(1, FancyTabMode::ToStored(FancyTabMode::Mode::None));
+  EXPECT_TRUE(FancyTabMode::IsTop(FancyTabMode::Mode::Tabs));
+  EXPECT_TRUE(FancyTabMode::IsTop(FancyTabMode::Mode::IconOnlyTabs));
+  EXPECT_FALSE(FancyTabMode::IsTop(FancyTabMode::Mode::LargeSidebar));
+  EXPECT_FALSE(FancyTabMode::ShowsText(FancyTabMode::Mode::IconsSidebar));
+  EXPECT_FALSE(FancyTabMode::ShowsText(FancyTabMode::Mode::IconOnlyTabs));
+  EXPECT_TRUE(FancyTabMode::ShowsText(FancyTabMode::Mode::PlainSidebar));
+  EXPECT_FALSE(FancyTabMode::ShowsIcon(FancyTabMode::Mode::PlainSidebar));
+  EXPECT_TRUE(FancyTabMode::IsLargeIcon(FancyTabMode::Mode::LargeSidebar));
+  EXPECT_EQ(GTK_ORIENTATION_VERTICAL, FancyTabMode::BarOrientation(FancyTabMode::Mode::LargeSidebar));
+  EXPECT_EQ(GTK_ORIENTATION_HORIZONTAL, FancyTabMode::BarOrientation(FancyTabMode::Mode::Tabs));
+  EXPECT_EQ(40, FancyTabMode::IconSize(FancyTabMode::Mode::LargeSidebar, 40, 32));
+  EXPECT_EQ(32, FancyTabMode::IconSize(FancyTabMode::Mode::SmallSidebar, 40, 32));
+  EXPECT_EQ(6, FancyTabMode::ItemCount());
+  EXPECT_STREQ("Large sidebar", FancyTabMode::MenuItems().front().label);
+  EXPECT_STREQ("Icons on top", FancyTabMode::MenuItems().back().label);
+  EXPECT_STREQ("tab_mode", FancyTabMode::kTabMode);
+  EXPECT_STREQ("current_tab", FancyTabMode::kCurrentTab);
+  EXPECT_TRUE(FancyTabMode::IsKeyboardTrigger(FancyTabMode::kMenu, 0));
+  EXPECT_TRUE(FancyTabMode::IsKeyboardTrigger(FancyTabMode::kF10, FancyTabMode::kShiftMask));
+  EXPECT_FALSE(FancyTabMode::IsKeyboardTrigger(FancyTabMode::kF10, 0));
+  EXPECT_TRUE(FancyTabMode::ShouldShowMenu());
 }
 
 TEST(PlayingCoverActivate, DoubleClickRequiresValidSongLikeQt) {
@@ -2129,6 +2408,15 @@ TEST(PlayingCoverActivate, DoubleClickRequiresValidSongLikeQt) {
   EXPECT_TRUE(PlayingCoverActivate::ShouldShowContext(true, 2, true, true));
   EXPECT_FALSE(PlayingCoverActivate::ShouldShowContext(true, 2, true, false));
   EXPECT_FALSE(PlayingCoverActivate::ShouldShowContext(true, 2, false, true));
+}
+
+TEST(PlayingCoverActivate, KeyboardAlwaysOpensMenu) {
+  EXPECT_TRUE(PlayingCoverActivate::IsKeyboardTrigger(PlayingCoverActivate::kMenu, 0));
+  EXPECT_TRUE(PlayingCoverActivate::IsKeyboardTrigger(PlayingCoverActivate::kF10, PlayingCoverActivate::kShiftMask));
+  EXPECT_FALSE(PlayingCoverActivate::IsKeyboardTrigger(PlayingCoverActivate::kF10, 0));
+  EXPECT_TRUE(PlayingCoverActivate::ShouldShowMenu());
+  EXPECT_TRUE(PlayingCoverActivate::IsKeyboardAnchor(PlayingCoverActivate::kKeyboardY));
+  EXPECT_FALSE(PlayingCoverActivate::IsKeyboardAnchor(12));
 }
 
 TEST(PlayingWidget, CoverSizeAndFade) {
@@ -2216,6 +2504,14 @@ TEST(ContextCover, ShouldSearch) {
   EXPECT_FALSE(ContextCover::ShouldSearchForSong(false, true, false, false, {}, {}, "Portishead", "Dummy"));
 }
 
+TEST(ContextOptions, KeyboardOpensIdleMenuOnly) {
+  EXPECT_TRUE(ContextOptions::IsKeyboardTrigger(ContextOptions::kMenu, 0));
+  EXPECT_TRUE(ContextOptions::IsKeyboardTrigger(ContextOptions::kF10, ContextOptions::kShiftMask));
+  EXPECT_FALSE(ContextOptions::IsKeyboardTrigger(ContextOptions::kF10, 0));
+  EXPECT_TRUE(ContextOptions::ShowIdleMenu(true));
+  EXPECT_FALSE(ContextOptions::ShowIdleMenu(false));
+}
+
 TEST(ContextOptions, IdleMenuMatchesQt) {
   EXPECT_EQ(4, ContextOptions::ItemCount());
   EXPECT_EQ(ContextOptions::Action::ShowAlbum, ContextOptions::FromId("album"));
@@ -2286,6 +2582,10 @@ TEST(PlaylistLook, GlowPulseMatchesQtSteps) {
   EXPECT_TRUE(PlaylistLook::ShouldAnimateGlow(true, true, true));
   EXPECT_FALSE(PlaylistLook::ShouldAnimateGlow(true, false, true));
   EXPECT_FALSE(PlaylistLook::ShouldAnimateGlow(true, true, false));
+  EXPECT_TRUE(PlaylistLook::ShouldRefreshRowsOnReload());
+  EXPECT_TRUE(PlaylistLook::ShouldRestartGlowOnReload(true, true, true));
+  EXPECT_FALSE(PlaylistLook::ShouldRestartGlowOnReload(false, true, true));
+  EXPECT_FALSE(PlaylistLook::ShouldRestartGlowOnReload(true, true, false));
   const std::string dim = PlaylistLook::GlowCss(true, 0);
   const std::string bright = PlaylistLook::GlowCss(true, 23);
   EXPECT_NE(dim, bright);
@@ -2334,6 +2634,10 @@ TEST(AnalyzerFramerate, QtDiscretePresets) {
   EXPECT_EQ("Medium (25 fps)", AnalyzerFramerate::LabelFor(25));
   EXPECT_EQ(25, AnalyzerFramerate::Nearest(24));
   EXPECT_EQ(60, AnalyzerFramerate::Nearest(55));
+  EXPECT_TRUE(AnalyzerFramerate::ShouldTick(true, true));
+  EXPECT_FALSE(AnalyzerFramerate::ShouldTick(true, false));
+  EXPECT_FALSE(AnalyzerFramerate::ShouldTick(false, true));
+  EXPECT_FALSE(AnalyzerFramerate::ShouldTick(false, false));
 }
 
 TEST(TaskbarProgressHelpers, FractionAndVisibility) {
@@ -2346,6 +2650,9 @@ TEST(TaskbarProgressHelpers, FractionAndVisibility) {
   EXPECT_FALSE(TaskbarProgressHelpers::ShouldShow(false, true, 100));
   EXPECT_FALSE(TaskbarProgressHelpers::ShouldShow(true, false, 100));
   EXPECT_FALSE(TaskbarProgressHelpers::ShouldShow(true, true, 0));
+  EXPECT_TRUE(TaskbarProgressHelpers::ShouldClearImmediately(true, false));
+  EXPECT_FALSE(TaskbarProgressHelpers::ShouldClearImmediately(false, false));
+  EXPECT_FALSE(TaskbarProgressHelpers::ShouldClearImmediately(true, true));
   EXPECT_STREQ("application://org.strawberrymusicplayer.strawberry.desktop", TaskbarProgressHelpers::AppUri());
   EXPECT_STREQ("com.canonical.Unity.LauncherEntry", TaskbarProgressHelpers::Interface());
   EXPECT_EQ("/com/canonical/unity/launcherentry/strawberry", TaskbarProgressHelpers::ObjectPath());
@@ -2391,6 +2698,8 @@ TEST(AddStreamUrl, ValidatesSchemeAndHostLikeQt) {
   EXPECT_FALSE(AddStreamUrl::IsComplete(""));
   EXPECT_FALSE(AddStreamUrl::IsComplete("https://"));
   EXPECT_TRUE(AddStreamUrl::IsComplete("https://example.com/stream.mp3"));
+  EXPECT_TRUE(AddStreamUrl::ShouldFocusOnShow());
+  EXPECT_TRUE(AddStreamUrl::ShouldSelectAllOnShow());
   EXPECT_EQ("https", AddStreamUrl::Scheme("https://radio.example/live"));
   EXPECT_EQ("radio.example", AddStreamUrl::Host("https://radio.example/live"));
 }
@@ -2475,4 +2784,187 @@ TEST(MainWindowAddMedia, FolderGoesToPlaylistWithLastPath) {
   EXPECT_TRUE(always.should_play);
   FileUtils::Remove(audio);
   rmdir(dir.c_str());
+}
+
+TEST(PlatformDeviceOutputs, NamesMatchQt) {
+  EXPECT_STREQ("Default device", PlatformDeviceOutputs::DefaultDeviceDescription());
+  EXPECT_EQ(2u, PlatformDeviceOutputs::MMDeviceOutputs().size());
+  EXPECT_STREQ("wasapisink", PlatformDeviceOutputs::MMDeviceOutputs()[0]);
+  EXPECT_STREQ("wasapi2sink", PlatformDeviceOutputs::MMDeviceOutputs()[1]);
+  EXPECT_STREQ("directsoundsink", PlatformDeviceOutputs::DirectSoundOutputs()[2]);
+  EXPECT_STREQ("asiosink", PlatformDeviceOutputs::AsioOutputs()[0]);
+  EXPECT_STREQ("osxaudiosink", PlatformDeviceOutputs::MacOsOutputs()[2]);
+  EXPECT_STREQ("WASAPI", PlatformDeviceOutputs::OutputLabel("wasapisink"));
+  EXPECT_STREQ("DirectSound", PlatformDeviceOutputs::OutputLabel("directsoundsink"));
+  EXPECT_STREQ("ASIO", PlatformDeviceOutputs::OutputLabel("asiosink"));
+  EXPECT_STREQ("Core Audio", PlatformDeviceOutputs::OutputLabel("osxaudiosink"));
+#ifndef _WIN32
+#ifndef __APPLE__
+  EXPECT_TRUE(PlatformDeviceOutputs::ExtraSinks().empty());
+#endif
+#endif
+}
+
+TEST(Windows7ThumbBarActions, DefaultOrderAndFlags) {
+  const auto actions = Windows7ThumbBarActions::DefaultActions();
+  ASSERT_EQ(6u, actions.size());
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Previous, actions[0]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::PlayPause, actions[1]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Stop, actions[2]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Next, actions[3]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Spacer, actions[4]);
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Love, actions[5]);
+  EXPECT_TRUE(Windows7ThumbBarActions::IsSpacer(Windows7ThumbBarActions::Id::Spacer));
+  EXPECT_FALSE(Windows7ThumbBarActions::IsSpacer(Windows7ThumbBarActions::Id::Love));
+  EXPECT_EQ(7, Windows7ThumbBarActions::kMaxButtonCount);
+  EXPECT_EQ(16, Windows7ThumbBarActions::kIconSize);
+  EXPECT_TRUE(Windows7ThumbBarActions::WithinLimit(7));
+  EXPECT_FALSE(Windows7ThumbBarActions::WithinLimit(8));
+  EXPECT_EQ(Windows7ThumbBarActions::Flag::NoBackground, Windows7ThumbBarActions::FlagFor(true, true, true));
+  EXPECT_EQ(Windows7ThumbBarActions::Flag::Hidden, Windows7ThumbBarActions::FlagFor(false, false, true));
+  EXPECT_EQ(Windows7ThumbBarActions::Flag::Enabled, Windows7ThumbBarActions::FlagFor(false, true, true));
+  EXPECT_STREQ("media-playback-pause-symbolic", Windows7ThumbBarActions::IconName(Windows7ThumbBarActions::Id::PlayPause, true));
+  EXPECT_STREQ("Play/Pause", Windows7ThumbBarActions::Tooltip(Windows7ThumbBarActions::Id::PlayPause));
+  EXPECT_STREQ("love", Windows7ThumbBarActions::PlayerAction(Windows7ThumbBarActions::Id::Love));
+  EXPECT_TRUE(Windows7ThumbBarActions::ShouldDispatch(Windows7ThumbBarActions::Id::Next));
+  EXPECT_FALSE(Windows7ThumbBarActions::ShouldDispatch(Windows7ThumbBarActions::Id::Spacer));
+  EXPECT_TRUE(Windows7ThumbBarActions::ShouldRebuildOnPlayingChange(false, true));
+  EXPECT_FALSE(Windows7ThumbBarActions::ShouldRebuildOnPlayingChange(true, true));
+  EXPECT_TRUE(Windows7ThumbBarActions::ShouldAddButtons(true, false));
+  EXPECT_FALSE(Windows7ThumbBarActions::ShouldAddButtons(true, true));
+  EXPECT_TRUE(Windows7ThumbBarActions::ShouldUpdateButtons(true));
+  EXPECT_EQ(259, Windows7ThumbBarActions::ClampTipChars(400));
+  EXPECT_EQ(0, Windows7ThumbBarActions::ClampTipChars(-1));
+  EXPECT_EQ(Windows7ThumbBarActions::kThbfNoBackground, Windows7ThumbBarActions::WinFlags(Windows7ThumbBarActions::Flag::NoBackground));
+  EXPECT_EQ(Windows7ThumbBarActions::kThbFlags, Windows7ThumbBarActions::ButtonMask(true));
+  EXPECT_EQ(Windows7ThumbBarActions::kThbIcon | Windows7ThumbBarActions::kThbTooltip | Windows7ThumbBarActions::kThbFlags,
+            Windows7ThumbBarActions::ButtonMask(false));
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Stop, Windows7ThumbBarActions::ActionAtCommand(2, actions));
+  EXPECT_EQ(Windows7ThumbBarActions::Id::Spacer, Windows7ThumbBarActions::ActionAtCommand(99, actions));
+  EXPECT_EQ(3, Windows7ThumbBarActions::CommandId(0x12340003u));
+  EXPECT_EQ(Windows7ThumbBarActions::WinMessage::Command, Windows7ThumbBarActions::ClassifyMessage(0x0111, 0));
+  EXPECT_EQ(Windows7ThumbBarActions::WinMessage::TaskbarCreated, Windows7ThumbBarActions::ClassifyMessage(42, 42));
+  EXPECT_EQ(300, Windows7ThumbBarActions::kUpdateDelayMs);
+}
+
+TEST(WinSmtcStatus, MapsEngineState) {
+  EXPECT_EQ(WinSmtcStatus::Playback::Playing, WinSmtcStatus::FromEngine(EngineBase::State::Playing));
+  EXPECT_EQ(WinSmtcStatus::Playback::Paused, WinSmtcStatus::FromEngine(EngineBase::State::Paused));
+  EXPECT_EQ(WinSmtcStatus::Playback::Stopped, WinSmtcStatus::FromEngine(EngineBase::State::Idle));
+  EXPECT_EQ(WinSmtcStatus::Playback::Stopped, WinSmtcStatus::FromEngine(EngineBase::State::Error));
+  EXPECT_TRUE(WinSmtcStatus::ButtonsEnabled(WinSmtcStatus::Playback::Playing));
+  EXPECT_FALSE(WinSmtcStatus::ButtonsEnabled(WinSmtcStatus::Playback::Stopped));
+  EXPECT_TRUE(WinSmtcStatus::TimelineEnabled(WinSmtcStatus::Playback::Paused));
+  EXPECT_FALSE(WinSmtcStatus::TimelineEnabled(WinSmtcStatus::Playback::Closed));
+}
+
+TEST(WinSmtcStatus, ButtonsThumbnailAndTimeline) {
+  EXPECT_EQ(0, static_cast<int>(WinSmtcStatus::Button::Play));
+  EXPECT_EQ(4, static_cast<int>(WinSmtcStatus::Button::Next));
+  EXPECT_EQ(5, static_cast<int>(WinSmtcStatus::Button::Previous));
+  EXPECT_STREQ("play", WinSmtcStatus::ButtonAction(WinSmtcStatus::Button::Play));
+  EXPECT_STREQ("next", WinSmtcStatus::ButtonAction(WinSmtcStatus::Button::Next));
+  EXPECT_TRUE(WinSmtcStatus::DispatchesToPlayer(WinSmtcStatus::Button::Stop));
+  EXPECT_FALSE(WinSmtcStatus::DispatchesToPlayer(WinSmtcStatus::Button::Record));
+  EXPECT_TRUE(WinSmtcStatus::ShouldRunTimelineTimer(EngineBase::State::Playing));
+  EXPECT_FALSE(WinSmtcStatus::ShouldRunTimelineTimer(EngineBase::State::Paused));
+  EXPECT_TRUE(WinSmtcStatus::ShouldClearMetadata(false));
+  EXPECT_FALSE(WinSmtcStatus::ShouldClearMetadata(true));
+  EXPECT_TRUE(WinSmtcStatus::ShouldApplyCover("file:///a", "file:///a"));
+  EXPECT_FALSE(WinSmtcStatus::ShouldApplyCover("file:///a", "file:///b"));
+  EXPECT_TRUE(WinSmtcStatus::ShouldSetThumbnail(true, true));
+  EXPECT_FALSE(WinSmtcStatus::ShouldSetThumbnail(false, true));
+  EXPECT_TRUE(WinSmtcStatus::ShouldClearThumbnail(true, false));
+  EXPECT_TRUE(WinSmtcStatus::LooksLikeJpeg({0xFF, 0xD8, 0xFF, 0xE0}));
+  EXPECT_FALSE(WinSmtcStatus::LooksLikeJpeg({0x89, 0x50, 0x4E, 0x47}));
+  EXPECT_EQ(10000000, WinSmtcStatus::TimelineHundredNs(1000000000));
+  EXPECT_EQ(42, WinSmtcStatus::TimelineDurationNs(42, 99));
+  EXPECT_EQ(99, WinSmtcStatus::TimelineDurationNs(0, 99));
+}
+
+TEST(WinBlurBehind, AppliesOnWindowsMask) {
+  EXPECT_TRUE(WinBlurBehind::ShouldApply(true, true));
+  EXPECT_FALSE(WinBlurBehind::ShouldApply(true, false));
+  EXPECT_FALSE(WinBlurBehind::ShouldApply(false, true));
+}
+
+TEST(FileSystemWatcherWinPolicy, BatchesAndNormalizes) {
+  EXPECT_EQ(64, FileSystemWatcherWinPolicy::kMaxWaitObjects);
+  EXPECT_EQ(63, FileSystemWatcherWinPolicy::MaxWatchesPerThread());
+  EXPECT_TRUE(FileSystemWatcherWinPolicy::ThreadHasRoom(62));
+  EXPECT_FALSE(FileSystemWatcherWinPolicy::ThreadHasRoom(63));
+  EXPECT_EQ("c:\\music", FileSystemWatcherWinPolicy::PathKey("C:/Music"));
+  EXPECT_EQ(0x0000001Fu, FileSystemWatcherWinPolicy::kNotifyFlags);
+  EXPECT_FALSE(FileSystemWatcherWinPolicy::kWatchSubtree);
+}
+
+TEST(MacOsDeviceClassify, CDAndMTP) {
+  EXPECT_TRUE(MacOsDeviceClassify::IsCDKind("IOCDMedia"));
+  EXPECT_FALSE(MacOsDeviceClassify::IsCDKind("IOMedia"));
+  EXPECT_EQ("MTP/ABC123", MacOsDeviceClassify::MTPUniqueId("ABC123"));
+  EXPECT_EQ("MTP/ABC123", MacOsDeviceClassify::MTPUniqueId("MTP/ABC123"));
+  EXPECT_TRUE(MacOsDeviceClassify::IsMTPUniqueId("MTP/ABC123"));
+  EXPECT_EQ("ABC123", MacOsDeviceClassify::MTPSerial("MTP/ABC123"));
+  EXPECT_EQ("ABC123", MacOsDeviceClassify::MTPSerial("mtp:ABC123"));
+  EXPECT_EQ("Vendor Product", MacOsDeviceClassify::FriendlyName("Vendor", "Product"));
+  EXPECT_EQ("MTP device", MacOsDeviceClassify::FriendlyName("", ""));
+  EXPECT_TRUE(MacOsDeviceClassify::ShouldSkipUsbDevice(0x05ac, 0x12a8, -1));
+  EXPECT_TRUE(MacOsDeviceClassify::ShouldSkipUsbDevice(0x1234, 0x5678, 3));
+  EXPECT_FALSE(MacOsDeviceClassify::ShouldSkipUsbDevice(0x18d1, 0x4ee1, -1));
+  EXPECT_TRUE(MacOsDeviceClassify::MatchesMtpDevice(0x18d1, 0x4ee1, 0x18d1, 0x4ee1));
+  EXPECT_EQ("/dev/rdisk2", MacOsDeviceClassify::RawDevicePath("disk2"));
+  EXPECT_EQ("/dev/rdisk2", MacOsDeviceClassify::RawDevicePath("rdisk2"));
+  EXPECT_STREQ("cdda", MacOsDeviceClassify::BackendForKind(true, false));
+  EXPECT_STREQ("mtp", MacOsDeviceClassify::BackendForKind(false, true));
+  EXPECT_STREQ("media-optical-symbolic", MacOsDeviceClassify::IconForKind(true, false));
+}
+
+TEST(UwpDeviceEnum, DefaultFirstAndSkipDisabled) {
+  EXPECT_EQ(2, UwpDeviceEnum::kAudioRenderClass);
+  EXPECT_STREQ("uwpdevice", UwpDeviceEnum::kFinderName);
+  EXPECT_STREQ("wasapi2sink_", UwpDeviceEnum::kOutput);
+  EXPECT_TRUE(UwpDeviceEnum::ShouldInclude(true));
+  EXPECT_FALSE(UwpDeviceEnum::ShouldInclude(false));
+  EXPECT_STREQ("Default device", UwpDeviceEnum::DefaultDevice().description.c_str());
+  EXPECT_TRUE(UwpDeviceEnum::DefaultDevice().value.empty());
+  const EngineDevice device = UwpDeviceEnum::FromWinRt("{id}", "Speakers");
+  EXPECT_EQ("{id}", device.value);
+  EXPECT_EQ("Speakers", device.description);
+}
+
+TEST(MacOsWindow, EnablesFullScreenPrimary) {
+  EXPECT_EQ(1u << 7, MacOsWindow::FullScreenPrimaryMask());
+  EXPECT_TRUE(MacOsWindow::ShouldEnableFullScreen());
+}
+
+TEST(KeyMapperMacOs, MapsMediaKeys) {
+  EXPECT_STREQ("macos", KeyMapperMacOs::Name());
+  EXPECT_EQ(16, KeyMapperMacOs::kNxPlay);
+  EXPECT_EQ(17, KeyMapperMacOs::kNxFast);
+  EXPECT_EQ(18, KeyMapperMacOs::kNxRewind);
+  EXPECT_STREQ("play_pause", KeyMapperMacOs::IdFromMediaKey(16));
+  EXPECT_STREQ("next_track", KeyMapperMacOs::IdFromMediaKey(17));
+  EXPECT_STREQ("prev_track", KeyMapperMacOs::IdFromMediaKey(18));
+  EXPECT_STREQ("MediaPlay", KeyMapperMacOs::KeyNameFromMediaKey(16));
+  EXPECT_TRUE(KeyMapperMacOs::IsAuxControlEvent(8));
+  EXPECT_FALSE(KeyMapperMacOs::IsAuxControlEvent(0));
+  EXPECT_EQ(16, KeyMapperMacOs::MediaKeyFromData1((16 << 16) | (0x0A << 8)));
+  EXPECT_TRUE(KeyMapperMacOs::IsMediaKeyDown((16 << 16) | (0x0A << 8)));
+  EXPECT_FALSE(KeyMapperMacOs::IsMediaKeyDown((16 << 16) | (0x0B << 8)));
+  EXPECT_STREQ("play_pause", KeyMapperMacOs::ShortcutIdFromKey("MediaPlay"));
+  EXPECT_STREQ("next_track", KeyMapperMacOs::ShortcutIdFromKey("MediaNext"));
+  EXPECT_TRUE(KeyMapperMacOs::KeysMatch("MediaPlay", "mediaplay"));
+  EXPECT_EQ("<Ctrl><Alt>A", KeyMapperMacOs::AcceleratorFromEvent(KeyMapperMacOs::kControl | KeyMapperMacOs::kOption, "A"));
+}
+
+TEST(KeyMapperWin, ParsesMediaKeys) {
+  unsigned modifiers = 0;
+  unsigned vk = 0;
+  EXPECT_STREQ("win", KeyMapperWin::Name());
+  EXPECT_TRUE(KeyMapperWin::Parse("MediaPlay", &modifiers, &vk));
+  EXPECT_EQ(0xB3u, vk);
+  EXPECT_TRUE(KeyMapperWin::Parse("<Ctrl>MediaNext", &modifiers, &vk));
+  EXPECT_EQ(0xB0u, vk);
+  EXPECT_EQ(0x0002u, modifiers);
+  EXPECT_FALSE(KeyMapperWin::Parse("", &modifiers, &vk));
 }

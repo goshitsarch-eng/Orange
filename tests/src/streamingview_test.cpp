@@ -18,6 +18,7 @@
 #include "streaming/streamingprogress.h"
 #include "streaming/streamingsearchgroup.h"
 #include "streaming/streamingsearchhelp.h"
+#include "streaming/streamingserviceenable.h"
 #include "tidal/tidalservice.h"
 #include "streaming/streamingsearchitemdelegate.h"
 #include "streaming/streamingsearchmodel.h"
@@ -403,6 +404,7 @@ TEST(StreamingSearchOpts, DelayLimitsAndConfigure) {
   EXPECT_EQ("Configure Tidal…", StreamingSearchOpts::ConfigureServiceLabel("Tidal"));
   EXPECT_EQ("Configure…", StreamingSearchOpts::ConfigureServiceLabel({}));
   EXPECT_STREQ("Search for this", StreamingSearchOpts::SearchForThisLabel());
+  EXPECT_TRUE(StreamingSearchOpts::ShouldFocusOnShow());
   Song song;
   song.set_title("Roads");
   song.set_artist("Portishead");
@@ -442,6 +444,43 @@ TEST(StreamingSearchOpts, DelayLimitsAndConfigure) {
   EXPECT_TRUE(StreamingPage::ReachedMax(10, 10));
   EXPECT_FALSE(StreamingPage::ReachedMax(9, 10));
   EXPECT_FALSE(StreamingPage::ReachedMax(10, 0));
+}
+
+TEST(StreamingSearchOpts, SearchTypePersistsLikeQt) {
+  using T = StreamingService::SearchType;
+  EXPECT_STREQ("type", StreamingSearchOpts::kSearchType);
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::DefaultSearchType());
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::ClampSearchType(0));
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::ClampSearchType(static_cast<int>(T::Artists)));
+  EXPECT_EQ(T::Albums, StreamingSearchOpts::ClampSearchType(static_cast<int>(T::Albums)));
+  EXPECT_EQ(T::Songs, StreamingSearchOpts::ClampSearchType(static_cast<int>(T::Songs)));
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::ClampSearchType(99));
+  EXPECT_TRUE(StreamingSearchOpts::ShouldSaveOnActivate(true, false));
+  EXPECT_FALSE(StreamingSearchOpts::ShouldSaveOnActivate(false, false));
+  EXPECT_FALSE(StreamingSearchOpts::ShouldSaveOnActivate(true, true));
+  EXPECT_TRUE(StreamingSearchOpts::ShouldReloadOnSettingsClose());
+  EXPECT_EQ(T::Artists, StreamingSearchOpts::LoadSearchType({}));
+
+  const char *group = "StreamingSearchTypeTest";
+  Settings before;
+  before.BeginGroup(group);
+  const bool had = before.Contains(StreamingSearchOpts::kSearchType);
+  const int old = before.IntValue(StreamingSearchOpts::kSearchType, static_cast<int>(StreamingSearchOpts::DefaultSearchType()));
+  StreamingSearchOpts::SaveSearchType(group, T::Albums);
+  EXPECT_EQ(T::Albums, StreamingSearchOpts::LoadSearchType(group));
+  StreamingSearchOpts::SaveSearchType(group, T::Songs);
+  EXPECT_EQ(T::Songs, StreamingSearchOpts::LoadSearchType(group));
+  StreamingSearchOpts::SaveSearchType({}, T::Albums);
+  EXPECT_EQ(T::Songs, StreamingSearchOpts::LoadSearchType(group));
+
+  Settings restore;
+  restore.BeginGroup(group);
+  if (had) {
+    restore.SetIntValue(StreamingSearchOpts::kSearchType, old);
+  } else {
+    restore.Remove(StreamingSearchOpts::kSearchType);
+  }
+  restore.Sync();
 }
 
 TEST(StreamingCoverDownload, HelpersAndSettings) {
@@ -727,6 +766,14 @@ TEST(StreamingCollectionTree, CollapsedHidesSongsUntilExpanded) {
   EXPECT_EQ("1 item", StreamingCollectionTree::StatusText(1));
 }
 
+TEST(StreamingCollectionActions, KeyboardOpensContextMenu) {
+  EXPECT_TRUE(StreamingCollectionActions::IsKeyboardTrigger(StreamingCollectionActions::kMenuKey, 0));
+  EXPECT_TRUE(StreamingCollectionActions::IsKeyboardTrigger(StreamingCollectionActions::kF10Key, StreamingCollectionActions::kShiftMask));
+  EXPECT_FALSE(StreamingCollectionActions::IsKeyboardTrigger(StreamingCollectionActions::kF10Key, 0));
+  EXPECT_TRUE(StreamingCollectionActions::ShouldShowContextMenu(true));
+  EXPECT_FALSE(StreamingCollectionActions::ShouldShowContextMenu(false));
+}
+
 TEST(StreamingCollectionActions, PlaylistActionsRequireSelection) {
   EXPECT_FALSE(StreamingCollectionActions::ShouldShowContextMenu(false));
   EXPECT_TRUE(StreamingCollectionActions::ShouldShowContextMenu(true));
@@ -842,6 +889,59 @@ TEST(StreamingFilterFocus, TreeKeysApplyLikeQtFocusOnFilter) {
   EXPECT_EQ(CollectionFilterFocus::Effect::DeleteLast, CollectionFilterFocus::KeyEffect(ListBoxKeyboard::kBackSpace));
   EXPECT_TRUE(CollectionFilterFocus::Apply("portishead", CollectionFilterFocus::Effect::Clear).empty());
   EXPECT_EQ("qobu", CollectionFilterFocus::Apply("qobuz", CollectionFilterFocus::Effect::DeleteLast));
+}
+
+TEST(StreamingServiceEnable, HidesDisabledServicesLikeQt) {
+  EXPECT_STREQ(TidalSettings::kSettingsGroup, StreamingServiceEnable::GroupFor("Tidal"));
+  EXPECT_STREQ(SpotifySettings::kSettingsGroup, StreamingServiceEnable::GroupFor("Spotify"));
+  EXPECT_STREQ(QobuzSettings::kSettingsGroup, StreamingServiceEnable::GroupFor("Qobuz"));
+  EXPECT_STREQ(SubsonicSettings::kSettingsGroup, StreamingServiceEnable::GroupFor("Subsonic"));
+  EXPECT_EQ(nullptr, StreamingServiceEnable::GroupFor("SomaFM"));
+  EXPECT_FALSE(StreamingServiceEnable::DefaultEnabled("Tidal"));
+  EXPECT_FALSE(StreamingServiceEnable::DefaultEnabled("Spotify"));
+  EXPECT_FALSE(StreamingServiceEnable::DefaultEnabled("Qobuz"));
+  EXPECT_FALSE(StreamingServiceEnable::DefaultEnabled("Subsonic"));
+  EXPECT_TRUE(StreamingServiceEnable::DefaultEnabled("SomaFM"));
+  EXPECT_TRUE(StreamingServiceEnable::ShouldList(true));
+  EXPECT_FALSE(StreamingServiceEnable::ShouldList(false));
+  EXPECT_TRUE(StreamingServiceEnable::ShouldShowStackPage(true));
+  EXPECT_FALSE(StreamingServiceEnable::ShouldShowStackPage(false));
+  EXPECT_TRUE(StreamingServiceEnable::ShouldRefreshOnSettingsClose());
+  EXPECT_EQ("Tidal", StreamingServiceEnable::SelectVisible("Tidal", {"Tidal", "Qobuz"}));
+  EXPECT_EQ("Tidal", StreamingServiceEnable::SelectVisible("Spotify", {"Tidal", "Qobuz"}));
+  EXPECT_TRUE(StreamingServiceEnable::SelectVisible("Tidal", {}).empty());
+
+  Settings settings;
+  settings.BeginGroup(TidalSettings::kSettingsGroup);
+  const bool had_tidal = settings.Contains(TidalSettings::kEnabled);
+  const bool old_tidal = settings.BoolValue(TidalSettings::kEnabled, TidalSettings::kDefaultEnabled);
+  settings.BeginGroup(QobuzSettings::kSettingsGroup);
+  const bool had_qobuz = settings.Contains(QobuzSettings::kEnabled);
+  const bool old_qobuz = settings.BoolValue(QobuzSettings::kEnabled, QobuzSettings::kDefaultEnabled);
+  settings.BeginGroup(TidalSettings::kSettingsGroup);
+  settings.SetBoolValue(TidalSettings::kEnabled, false);
+  settings.BeginGroup(QobuzSettings::kSettingsGroup);
+  settings.SetBoolValue(QobuzSettings::kEnabled, true);
+  settings.Sync();
+  EXPECT_FALSE(StreamingServiceEnable::IsEnabled("Tidal"));
+  EXPECT_TRUE(StreamingServiceEnable::IsEnabled("Qobuz"));
+  const std::vector<std::string> enabled = StreamingServiceEnable::EnabledAmong({"Tidal", "Qobuz", "SomaFM"});
+  ASSERT_EQ(2u, enabled.size());
+  EXPECT_EQ("Qobuz", enabled.front());
+  EXPECT_EQ("SomaFM", enabled.back());
+  settings.BeginGroup(TidalSettings::kSettingsGroup);
+  if (had_tidal) {
+    settings.SetBoolValue(TidalSettings::kEnabled, old_tidal);
+  } else {
+    settings.Remove(TidalSettings::kEnabled);
+  }
+  settings.BeginGroup(QobuzSettings::kSettingsGroup);
+  if (had_qobuz) {
+    settings.SetBoolValue(QobuzSettings::kEnabled, old_qobuz);
+  } else {
+    settings.Remove(QobuzSettings::kEnabled);
+  }
+  settings.Sync();
 }
 
 TEST(StreamingDrag, JoinsSongUrls) {

@@ -3,11 +3,13 @@
 #include "constants/playingwidgetsettings.h"
 #include "context/contextcover.h"
 #include "core/settings.h"
+#include "covermanager/coveractionenable.h"
 #include "covermanager/coverchoicemenu.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
 #include "utilities/jsonutils.h"
 #include "utilities/strutils.h"
+#include "widgets/playingcoveractivate.h"
 
 PlayingWidget::PlayingWidget() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
@@ -42,6 +44,7 @@ PlayingWidget::PlayingWidget() {
   gtk_box_append(GTK_BOX(widget_), spinner_);
   gtk_box_append(GTK_BOX(widget_), labels_);
 
+  gtk_widget_set_focusable(widget_, TRUE);
   GtkGesture *menu = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(menu));
@@ -49,6 +52,13 @@ PlayingWidget::PlayingWidget() {
                      auto *self = static_cast<PlayingWidget *>(data);
                      self->ShowMenu(x, y);
                      gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
+                   })),
+                   this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(widget_, keys);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<PlayingWidget *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
 
@@ -358,6 +368,16 @@ gboolean PlayingWidget::OnDrop(const GValue *value) {
   return FALSE;
 }
 
+gboolean PlayingWidget::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (!PlayingCoverActivate::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    return FALSE;
+  }
+  if (PlayingCoverActivate::ShouldShowMenu()) {
+    ShowMenu(0, PlayingCoverActivate::kKeyboardY);
+  }
+  return TRUE;
+}
+
 void PlayingWidget::ShowMenu(double x, double y) {
   GMenu *menu = g_menu_new();
   g_menu_append(menu, Translations::CStr("Small album cover"), "playing.small");
@@ -378,6 +398,12 @@ void PlayingWidget::ShowMenu(double x, double y) {
   GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
   gtk_widget_set_parent(popover, widget_);
   GdkRectangle rect{static_cast<int>(x), static_cast<int>(y), 1, 1};
+  if (PlayingCoverActivate::IsKeyboardAnchor(y)) {
+    rect.x = 0;
+    rect.y = 0;
+    rect.width = std::max(1, gtk_widget_get_width(widget_));
+    rect.height = std::max(1, gtk_widget_get_height(widget_));
+  }
   gtk_popover_set_pointing_to(GTK_POPOVER(popover), &rect);
   GSimpleActionGroup *group = g_simple_action_group_new();
   auto add = [&](const char *name, GCallback callback) {
@@ -412,6 +438,7 @@ void PlayingWidget::ShowMenu(double x, double y) {
     GSimpleActionGroup *cover_group = g_simple_action_group_new();
     for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
       GSimpleAction *action = g_simple_action_new(item.id, nullptr);
+      g_simple_action_set_enabled(action, CoverActionEnable::Enabled(item.action, song_, has_cover_providers_) ? TRUE : FALSE);
       g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer data) {
                          auto *self = static_cast<PlayingWidget *>(data);
                          if (self->cover_action_) {

@@ -23,6 +23,7 @@ class StreamingCollectionViewContainer {
   GtkWidget *abort_button() const { return abort_; }
   StreamingCollectionView *view() const { return view_.get(); }
   CollectionFilterWidget *filter_widget() const { return filter_widget_.get(); }
+  void ApplyLook();
   void ShowProgress(const std::string &status = {});
   void ShowError(const std::string &status);
   void HideProgress();

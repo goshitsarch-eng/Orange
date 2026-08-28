@@ -15,9 +15,14 @@
 #include "device/filesystemdevice.h"
 #include "device/giolister.h"
 #include "device/udisks2lister.h"
-#include "device/devicecopyrunner.h"
+#include "device/devicecopyjob.h"
+#include "device/devicestorage.h"
+#include "device/gpodmusicstorage.h"
+#include "device/mtpmusicstorage.h"
 #include "device/devicecopyrefresh.h"
 #include "device/devicecopysupported.h"
+#include "device/devicedeletejob.h"
+#include "device/deviceeject.h"
 #include "device/gpoddevice.h"
 #include "device/gpodloader.h"
 #include "device/mtpconnection.h"
@@ -32,6 +37,9 @@
 #ifdef HAVE_GIO
 #include <gio/gio.h>
 #include <glib/gstdio.h>
+#endif
+#ifdef __APPLE__
+#include "device/macosdevicelister.h"
 #endif
 #ifdef HAVE_MTP
 #include <libmtp.h>
@@ -64,6 +72,9 @@ DeviceManager::~DeviceManager() {
   }
   musicbrainz_.reset();
   cdda_.reset();
+#ifdef __APPLE__
+  macos_lister_.reset();
+#endif
   StopVolumeMonitor();
 }
 
@@ -83,6 +94,12 @@ void DeviceManager::Init() {
   if (device_db_) {
     device_db_->Init();
   }
+#ifdef __APPLE__
+  if (!macos_lister_) {
+    macos_lister_ = std::make_unique<MacOsDeviceLister>();
+    macos_lister_->DevicesChanged.Connect([this]() { ScheduleRescan(); });
+  }
+#endif
   StartVolumeMonitor();
   Rescan();
 }
@@ -132,12 +149,7 @@ void DeviceManager::ScheduleRescan() {
       this);
 }
 
-std::string DeviceManager::MtpSerial(const std::string &unique_id) {
-  if (unique_id.rfind("mtp:", 0) == 0) {
-    return unique_id.substr(4);
-  }
-  return unique_id;
-}
+std::string DeviceManager::MtpSerial(const std::string &unique_id) { return DeviceCopyJob::MtpSerial(unique_id); }
 
 const ConnectedDevice *DeviceManager::FindDevice(const std::string &device_id) const {
   for (const ConnectedDevice &device : devices_) {
@@ -235,7 +247,13 @@ void DeviceManager::Rescan() {
 #endif
   const std::vector<ConnectedDevice> cds = CddaLister().List();
   devices_.insert(devices_.end(), cds.begin(), cds.end());
-#ifdef HAVE_MTP
+#ifdef __APPLE__
+  if (macos_lister_) {
+    const std::vector<ConnectedDevice> macos = macos_lister_->List();
+    devices_.insert(devices_.end(), macos.begin(), macos.end());
+  }
+#endif
+#if defined(HAVE_MTP) && !defined(__APPLE__)
   {
     MtpConnection::InitLibMtp();
     LIBMTP_raw_device_t *raw = nullptr;
@@ -539,6 +557,36 @@ std::string DeviceManager::MusicPath(const ConnectedDevice &device) {
   return FileUtils::Join(device.mount_path, "Music");
 }
 
+std::unique_ptr<MusicStorage> DeviceManager::MusicStorageForDevice(const ConnectedDevice &device) const {
+  std::unique_ptr<MusicStorage> storage;
+  switch (DeviceStorage::KindFor(device)) {
+    case DeviceStorage::Kind::Mtp:
+      storage = std::make_unique<MtpMusicStorage>(DeviceCopyJob::MtpSerial(device.unique_id));
+      break;
+    case DeviceStorage::Kind::GPod:
+      storage = std::make_unique<GPodMusicStorage>(device.mount_path);
+      break;
+    case DeviceStorage::Kind::Filesystem:
+      storage = std::make_unique<FilesystemMusicStorage>(MusicPath(device));
+      break;
+    case DeviceStorage::Kind::None:
+      break;
+  }
+  if (!storage) {
+    return nullptr;
+  }
+  const DeviceDatabaseBackend::Device stored = StoredDevice(device.unique_id);
+  if (stored.id >= 0) {
+    storage->SetTranscodeMode(OrganizeTranscode::FromDeviceMode(stored.transcode_mode));
+    storage->SetTranscodeFormat(stored.transcode_format);
+  }
+  if (DeviceEject::ShouldAttachEjectHandler(device)) {
+    const std::string mount_path = device.mount_path;
+    storage->SetEjectHandler([mount_path]() { DeviceEject::UnmountPath(mount_path); });
+  }
+  return storage;
+}
+
 SongList DeviceManager::TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const {
   const DeviceDatabaseBackend::Device stored = StoredDevice(device.unique_id);
   const MusicStorage::TranscodeMode mode =
@@ -578,15 +626,27 @@ bool DeviceManager::CopySongs(const std::string &device_id, const SongList &song
   }
   const ConnectedDevice target = *found;
   const DeviceDatabaseBackend::Device stored = StoredDevice(target.unique_id);
-  DeviceCopyRunner runner(task_manager_, tagreader_);
-  runner.set_transcode(OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode
-                                                                       : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported),
-                       stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG);
-  if (!runner.Copy(target, songs)) {
+  std::unique_ptr<MusicStorage> storage = MusicStorageForDevice(target);
+  if (!storage) {
     DeviceError.Emit(DeviceError::CopyFailed());
     return false;
   }
-  RefreshAfterCopy(device_id, runner.copied(), runner.copied_songs());
+  Organize organize(task_manager_);
+  Organize::Options options;
+  options.storage = storage.get();
+  options.tagreader = tagreader_;
+  options.transcode_mode = OrganizeTranscode::FromDeviceMode(stored.id >= 0 ? stored.transcode_mode
+                                                                           : DeviceDatabaseBackend::TranscodeMode::Transcode_Unsupported);
+  options.transcode_format = stored.id >= 0 ? stored.transcode_format : Song::FileType::MPEG;
+  options.supported_filetypes = DeviceCopySupported::ForDevice(target);
+  OrganizeFormat format("%albumartist/%album/{%track - }%title");
+  const std::vector<Organize::Error> errors = organize.Copy(songs, storage->LocalPath(), format, options);
+  const int copied = static_cast<int>(songs.size()) - static_cast<int>(errors.size());
+  if (copied <= 0) {
+    DeviceError.Emit(DeviceError::CopyFailed());
+    return false;
+  }
+  RefreshAfterCopy(device_id, copied, storage->CopiedSongs());
   return true;
 }
 
@@ -608,6 +668,29 @@ void DeviceManager::RefreshAfterCopy(const std::string &device_id, int copied, c
     RememberSongCount(device_id, song_counts_[device_id] + copied);
   }
   DevicesChanged.Emit();
+}
+
+void DeviceManager::RefreshAfterDelete(const std::string &device_id, const SongList &deleted) {
+  const ConnectedDevice *device = FindDevice(device_id);
+  const std::string backend = device ? device->backend : std::string();
+  if (!DeviceDeleteJob::ShouldRefreshAfterDelete(backend, static_cast<int>(deleted.size()))) {
+    return;
+  }
+  if (device_db_ && !deleted.empty()) {
+    const DeviceDatabaseBackend::Device stored = device_db_->FindByUniqueId(device_id);
+    if (stored.id >= 0) {
+      device_db_->ReplaceSongs(stored.id, DeviceDeleteJob::RemoveDeleted(device_db_->Songs(stored.id), deleted));
+    }
+  }
+  if (song_counts_.count(device_id) && song_counts_[device_id] >= 0) {
+    RememberSongCount(device_id, DeviceDeleteJob::SongCountAfterDelete(song_counts_[device_id], static_cast<int>(deleted.size())));
+  }
+  DevicesChanged.Emit();
+}
+
+int DeviceManager::SongCount(const std::string &device_id) const {
+  const auto it = song_counts_.find(device_id);
+  return it == song_counts_.end() ? -1 : it->second;
 }
 
 void DeviceManager::Remember(const std::string &device_id) {
@@ -717,27 +800,16 @@ bool DeviceManager::Mount(const std::string &device_id) {
 }
 
 bool DeviceManager::Unmount(const std::string &device_id) {
-#ifdef HAVE_GIO
   const ConnectedDevice *found = FindDevice(device_id);
-  if (!found || found->mount_path.empty()) {
+  if (!found || !DeviceEject::Supported(*found) || DeviceEject::SkipsUnmount(found->mount_path)) {
     DeviceError.Emit(DeviceError::UnmountFailed());
     return false;
   }
-  GFile *file = g_file_new_for_path(found->mount_path.c_str());
-  if (!file) {
+  if (!DeviceEject::UnmountPath(found->mount_path, [this]() { Rescan(); })) {
+    DeviceError.Emit(DeviceError::UnmountFailed());
     return false;
   }
-  g_file_unmount_mountable_with_operation(file, G_MOUNT_UNMOUNT_NONE, nullptr, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
-    g_file_unmount_mountable_with_operation_finish(G_FILE(source), result, nullptr);
-    static_cast<DeviceManager *>(data)->Rescan();
-    g_object_unref(source);
-  }, this);
   return true;
-#else
-  (void)device_id;
-  DeviceError.Emit(DeviceError::UnmountFailed());
-  return false;
-#endif
 }
 
 bool DeviceManager::SetDeviceOptions(const std::string &device_id, const std::string &friendly_name,
@@ -778,38 +850,26 @@ DeviceDatabaseBackend::Device DeviceManager::StoredDevice(const std::string &dev
 
 bool DeviceManager::DeleteSong(const std::string &device_id, const Song &song) {
   const ConnectedDevice *found = FindDevice(device_id);
-  if (!found) {
-    DeviceError.Emit(DeviceError::MissingDevice());
+  if (!found || !DeviceDeleteJob::ShouldUseDeleteFiles(*found)) {
+    DeviceError.Emit(found ? DeviceError::DeleteFailed() : DeviceError::MissingDevice());
     return false;
   }
-#ifdef HAVE_MTP
-  if (found->backend == "mtp") {
-    if (!MtpDevice::DeleteSong(MtpSerial(found->unique_id), song)) {
-      DeviceError.Emit(DeviceError::DeleteFailed());
-      return false;
-    }
-    return true;
+  std::unique_ptr<MusicStorage> storage = MusicStorageForDevice(*found);
+  if (!storage) {
+    DeviceError.Emit(DeviceError::DeleteFailed());
+    return false;
   }
-#endif
-#ifdef HAVE_GPOD
-  if (found->backend == "gpod") {
-    if (!GPodDevice::DeleteSong(found->mount_path, song)) {
-      DeviceError.Emit(DeviceError::DeleteFailed());
-      return false;
-    }
-    return true;
+  storage->StartDelete();
+  MusicStorage::DeleteJob job;
+  job.metadata = song;
+  job.use_trash = DeviceDeleteJob::UseTrash();
+  std::string error_text;
+  if (!storage->DeleteFromStorage(job)) {
+    storage->FinishDelete(false, error_text);
+    DeviceError.Emit(DeviceError::DeleteFailed());
+    return false;
   }
-#endif
-  if (!found->mount_path.empty()) {
-    FilesystemMusicStorage storage(found->mount_path);
-    MusicStorage::DeleteJob job;
-    job.metadata = song;
-    if (!storage.DeleteFromStorage(job)) {
-      DeviceError.Emit(DeviceError::DeleteFailed());
-      return false;
-    }
-    return true;
-  }
-  DeviceError.Emit(DeviceError::DeleteFailed());
-  return false;
+  storage->FinishDelete(true, error_text);
+  RefreshAfterDelete(device_id, {song});
+  return true;
 }

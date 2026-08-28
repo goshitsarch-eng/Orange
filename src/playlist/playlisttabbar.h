@@ -42,9 +42,11 @@ class PlaylistTabBar {
   void SetReorderCallback(ReorderCallback callback) { reorder_ = std::move(callback); }
   void SetLastTabCloseCallback(LastTabCloseCallback callback) { last_close_ = std::move(callback); }
   void SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
 
  private:
   int TabCount() const;
+  int CurrentIndex() const;
   int TabIdAt(int index) const;
   std::string TabNameAt(int index) const;
   std::vector<int> TabIds() const;

@@ -7,11 +7,13 @@
 #include "equalizer/equalizergain.h"
 #include "equalizer/equalizerlabels.h"
 #include "equalizer/equalizerpersist.h"
+#include "dialogs/dialogclosekeys.h"
 #include "equalizer/equalizerpresets.h"
 #include "translations/translations.h"
 
 #include <adwaita.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -21,6 +23,47 @@ struct EqualizerDeleteJob {
   Equalizer *eq = nullptr;
   GtkDropDown *drop = nullptr;
 };
+
+struct EqualizerSaveJob {
+  Equalizer *eq = nullptr;
+  std::function<void()> after;
+};
+
+void PromptSaveIfDirty(GtkWidget *parent, Equalizer *eq, const std::string &name, std::function<void()> after) {
+  if (!eq || !EqualizerPersist::ShouldPromptSave(eq->HasPreset(name), eq->MatchesPreset(name))) {
+    if (after) {
+      after();
+    }
+    return;
+  }
+  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(EqualizerLabels::SavePreset()), Translations::CStr("Name")));
+  GtkWidget *entry = gtk_entry_new();
+  gtk_editable_set_text(GTK_EDITABLE(entry), name.c_str());
+  adw_alert_dialog_set_extra_child(dialog, entry);
+  adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "save", Translations::CStr(EqualizerLabels::SavePreset()),
+                                 nullptr);
+  adw_alert_dialog_set_response_appearance(dialog, "save", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response(dialog, "save");
+  auto *job = new EqualizerSaveJob{eq, std::move(after)};
+  g_object_set_data_full(G_OBJECT(dialog), "save-job", job, [](gpointer p) { delete static_cast<EqualizerSaveJob *>(p); });
+  g_object_set_data(G_OBJECT(dialog), "save-entry", entry);
+  g_signal_connect(dialog, "response", G_CALLBACK((+[](AdwAlertDialog *alert, const char *response, gpointer) {
+                     auto *pending = static_cast<EqualizerSaveJob *>(g_object_get_data(G_OBJECT(alert), "save-job"));
+                     GtkWidget *field = GTK_WIDGET(g_object_get_data(G_OBJECT(alert), "save-entry"));
+                     if (pending && pending->eq && g_strcmp0(response, "save") == 0 && field) {
+                       const char *text = gtk_editable_get_text(GTK_EDITABLE(field));
+                       const std::string chosen = text ? text : "";
+                       if (EqualizerPresets::CanSave(chosen, pending->eq->IsBuiltin(chosen))) {
+                         pending->eq->SavePreset(chosen);
+                       }
+                     }
+                     if (pending && pending->after) {
+                       pending->after();
+                     }
+                   })),
+                   nullptr);
+  adw_dialog_present(ADW_DIALOG(dialog), parent);
+}
 
 void ApplyEqualizerDelete(Equalizer *eq, GtkDropDown *drop, const std::string &name) {
   if (!eq || !drop || name.empty() || eq->IsBuiltin(name)) {
@@ -76,13 +119,23 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   }
   GtkWidget *preset = gtk_drop_down_new(G_LIST_MODEL(preset_names), nullptr);
   gtk_drop_down_set_selected(GTK_DROP_DOWN(preset), selected_preset);
-  g_signal_connect(preset, "notify::selected", G_CALLBACK(+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
+  g_object_set_data_full(G_OBJECT(preset), "last-preset", g_strdup(equalizer->selected_preset().c_str()), g_free);
+  g_signal_connect(preset, "notify::selected",
+                   G_CALLBACK((+[](GtkDropDown *drop, GParamSpec *, gpointer data) {
                      auto *eq = static_cast<class Equalizer *>(data);
+                     const char *last = static_cast<const char *>(g_object_get_data(G_OBJECT(drop), "last-preset"));
                      GtkStringObject *item = GTK_STRING_OBJECT(gtk_drop_down_get_selected_item(drop));
-                     if (item) {
-                       eq->LoadPreset(gtk_string_object_get_string(item));
-                     }
-                   }),
+                     const std::string next = item ? gtk_string_object_get_string(item) : "";
+                     auto load = [eq, drop, next]() {
+                       if (eq && !next.empty()) {
+                         eq->LoadPreset(next);
+                       }
+                       if (drop) {
+                         g_object_set_data_full(G_OBJECT(drop), "last-preset", g_strdup(next.c_str()), g_free);
+                       }
+                     };
+                     PromptSaveIfDirty(GTK_WIDGET(drop), eq, last ? last : "", load);
+                   })),
                    equalizer);
   gtk_box_append(GTK_BOX(box), gtk_label_new(Translations::CStr(EqualizerLabels::Preset())));
   gtk_box_append(GTK_BOX(box), preset);
@@ -279,5 +332,14 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   gtk_box_append(GTK_BOX(box), balance_ends);
   gtk_box_append(GTK_BOX(box), balance_scale);
   adw_dialog_set_child(dialog, box);
+  DialogCloseKeys::Attach(dialog);
+  g_signal_connect(dialog, "closed",
+                   G_CALLBACK((+[](AdwDialog *, gpointer data) {
+                     auto *eq = static_cast<class Equalizer *>(data);
+                     if (eq) {
+                       PromptSaveIfDirty(nullptr, eq, eq->selected_preset(), {});
+                     }
+                   })),
+                   equalizer);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

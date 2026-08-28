@@ -146,7 +146,6 @@ void Equalizer::set_enabled(bool enabled) {
 
 void Equalizer::set_preamp(int preamp) {
   preamp_ = preamp;
-  selected_preset_ = EqualizerPersist::kDefaultPreset;
   Save();
   ParametersChanged.Emit(enabled_, preamp_, gains_);
 }
@@ -154,7 +153,6 @@ void Equalizer::set_preamp(int preamp) {
 void Equalizer::set_gain(int band, int gain) {
   if (band >= 0 && band < EqualizerGain::kBandCount) {
     gains_[band] = EqualizerGain::ClampSlider(gain);
-    selected_preset_ = EqualizerPersist::kDefaultPreset;
     Save();
     ParametersChanged.Emit(enabled_, preamp_, gains_);
   }
@@ -181,6 +179,13 @@ void Equalizer::LoadPreset(const std::string &name) {
   selected_preset_ = name;
   Save();
   ParametersChanged.Emit(enabled_, preamp_, gains_);
+}
+
+bool Equalizer::HasPreset(const std::string &name) const { return presets_.find(name) != presets_.end(); }
+
+bool Equalizer::MatchesPreset(const std::string &name) const {
+  const auto it = presets_.find(name);
+  return it != presets_.end() && EqualizerPersist::GainsMatch(gains_, it->second);
 }
 
 bool Equalizer::IsBuiltin(const std::string &name) const {

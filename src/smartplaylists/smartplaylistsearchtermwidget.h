@@ -30,6 +30,8 @@ class SmartPlaylistSearchTermWidget {
   void SetChangedCallback(ChangedCallback callback) { changed_ = std::move(callback); }
   void SetClickedCallback(ClickedCallback callback) { clicked_ = std::move(callback); }
   void SetRemoveCallback(RemoveCallback callback) { removed_ = std::move(callback); }
+  void OnOverlayMapped();
+  bool OnOverlayActivateKey(unsigned keyval);
 
  private:
   void RebuildOps();

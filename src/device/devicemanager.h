@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_DEVICEMANAGER_H
 #define STRAWBERRY_DEVICEMANAGER_H
 
+#include "core/musicstorage.h"
 #include "core/signal.h"
 #include "core/song.h"
 #include "core/urlhandlers.h"
@@ -16,6 +17,9 @@
 
 class CddaDevice;
 class Database;
+#ifdef __APPLE__
+class MacOsDeviceLister;
+#endif
 class NetworkAccessManager;
 class TagReader;
 class TaskManager;
@@ -32,6 +36,9 @@ class DeviceManager {
   const std::vector<ConnectedDevice> &devices() const { return devices_; }
   bool CopySongs(const std::string &device_id, const SongList &songs);
   bool DeleteSong(const std::string &device_id, const Song &song);
+  void RefreshAfterDelete(const std::string &device_id, const SongList &deleted);
+  int SongCount(const std::string &device_id) const;
+  const ConnectedDevice *Find(const std::string &device_id) const { return FindDevice(device_id); }
   bool Forget(const std::string &device_id);
   bool Mount(const std::string &device_id);
   bool Unmount(const std::string &device_id);
@@ -50,6 +57,7 @@ class DeviceManager {
   static SongList MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec,
                                const std::string &device_path = {});
   static std::string MusicPath(const ConnectedDevice &device);
+  std::unique_ptr<MusicStorage> MusicStorageForDevice(const ConnectedDevice &device) const;
   SongList TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const;
 
   Signal<> DevicesChanged;
@@ -101,6 +109,9 @@ class DeviceManager {
   std::string cdda_disc_id_;
   std::string cdda_lookup_id_;
   bool cdda_lookup_started_ = false;
+#ifdef __APPLE__
+  std::unique_ptr<MacOsDeviceLister> macos_lister_;
+#endif
 };
 
 #endif

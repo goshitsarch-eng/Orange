@@ -3,6 +3,7 @@
 #include "collection/collectiongrouping.h"
 #include "collection/collectionitemdelegate.h"
 #include "collection/collectiontree.h"
+#include "collection/collectiontreeleft.h"
 #include "device/devicekeyboard.h"
 #include "device/devicedrag.h"
 #include "device/deviceviewlook.h"
@@ -49,9 +50,7 @@ DeviceView::DeviceView() {
                        return;
                      }
                      if (auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"))) {
-                       if (self->device_cb_) {
-                         self->device_cb_(device->unique_id);
-                       }
+                       self->RequestOpenDevice(device->unique_id);
                      }
                    }),
                    this);
@@ -59,17 +58,50 @@ DeviceView::DeviceView() {
   gtk_widget_add_controller(list_, keys);
   gtk_widget_set_focusable(list_, TRUE);
   g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer data) -> gboolean {
-                     return static_cast<DeviceView *>(data)->OnKeyPressed(keyval);
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<DeviceView *>(data)->OnKeyPressed(keyval, state);
                    })),
                    this);
 }
 
-DeviceView::~DeviceView() { ResetTypeAhead(); }
+DeviceView::~DeviceView() {
+  ResetTypeAhead();
+  if (open_idle_) {
+    g_source_remove(open_idle_);
+    open_idle_ = 0;
+  }
+}
+
+void DeviceView::RequestOpenDevice(const std::string &id) {
+  if (id.empty() || !device_cb_ || DeviceKeyboard::ShouldCoalesceDeviceOpen(opening_device_, id)) {
+    return;
+  }
+  opening_device_ = id;
+  if (open_idle_) {
+    return;
+  }
+  open_idle_ = g_idle_add(
+      +[](gpointer data) -> gboolean {
+        auto *self = static_cast<DeviceView *>(data);
+        self->open_idle_ = 0;
+        const std::string id = std::move(self->opening_device_);
+        self->opening_device_.clear();
+        if (self->device_cb_ && !id.empty()) {
+          self->device_cb_(id);
+        }
+        return G_SOURCE_REMOVE;
+      },
+      this);
+}
 
 void DeviceView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
-  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
   GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
+  auto *device = row ? static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device")) : nullptr;
+  if (DeviceKeyboard::ShouldOpenOnDoubleClick(button, n_press, device != nullptr)) {
+    RequestOpenDevice(device->unique_id);
+    return;
+  }
+  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
   if (action == CollectionTreeClick::Action::Enqueue) {
     if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
       ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
@@ -96,11 +128,102 @@ void DeviceView::ResetTypeAhead() {
   }
 }
 
-gboolean DeviceView::OnKeyPressed(guint keyval) {
+const CollectionItem *DeviceView::SelectedItem() const {
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  return row ? static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item")) : nullptr;
+}
+
+void DeviceView::SelectFocusItem() {
+  const CollectionItem *target = CollectionFocus::FindTarget(model_.root(), focus_);
+  if (!target) {
+    return;
+  }
+  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
+    if (!GTK_IS_LIST_BOX_ROW(child)) {
+      continue;
+    }
+    auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(child), "item"));
+    if (item != target) {
+      continue;
+    }
+    gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
+    gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
+    gtk_widget_grab_focus(child);
+    return;
+  }
+}
+
+bool DeviceView::ApplyTreeLeft() {
+  const CollectionItem *item = SelectedItem();
+  if (!item) {
+    return false;
+  }
+  const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
+  const CollectionTreeLeft::Action action = CollectionTreeLeft::FromItem(item, expanded);
+  if (action == CollectionTreeLeft::Action::None) {
+    return false;
+  }
+  const CollectionItem *focus = CollectionTreeLeft::FocusItem(item, action);
+  const CollectionItem *parent = CollectionTreeLeft::SelectableParent(item);
+  const bool parent_expanded = CollectionTree::ShowChildren(parent, false, expanded_);
+  const CollectionItem *collapse = CollectionTreeLeft::CollapseItem(item, action, parent_expanded);
+  CollectionFocus::Capture(focus, &focus_);
+  if (collapse) {
+    ToggleExpanded(collapse);
+  }
+  SelectFocusItem();
+  return true;
+}
+
+void DeviceView::ShowSelectedMenu() {
+  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
+  if (!row) {
+    return;
+  }
+  auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"));
+  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
+  auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"));
+  const DeviceKeyboard::MenuTarget target = DeviceKeyboard::MenuForSelection(device != nullptr, item != nullptr || song != nullptr);
+  if (target == DeviceKeyboard::MenuTarget::Device && device_menu_cb_) {
+    device_menu_cb_(*device);
+    return;
+  }
+  if (target != DeviceKeyboard::MenuTarget::Song || !song_menu_cb_) {
+    return;
+  }
+  if (item) {
+    const SongList songs = CollectionTree::SongsFromItem(item);
+    if (!songs.empty()) {
+      song_menu_cb_(songs.front());
+    }
+    return;
+  }
+  if (song) {
+    song_menu_cb_(*song);
+  }
+}
+
+gboolean DeviceView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (DeviceKeyboard::IsMenuTrigger(keyval, static_cast<unsigned>(state))) {
+    ShowSelectedMenu();
+    return TRUE;
+  }
   const DeviceKeyboard::Action action = DeviceKeyboard::FromKey(keyval);
   if (action == DeviceKeyboard::Action::Activate) {
     ListBoxKeyboardGtk::ActivateSelected(list_);
     return TRUE;
+  }
+  if (action == DeviceKeyboard::Action::Collapse && ApplyTreeLeft()) {
+    return TRUE;
+  }
+  if (action == DeviceKeyboard::Action::Expand) {
+    const CollectionItem *item = SelectedItem();
+    if (CollectionTree::IsExpandable(item) && !CollectionTree::ShowChildren(item, false, expanded_)) {
+      CollectionFocus::Capture(item, &focus_);
+      ToggleExpanded(item);
+      SelectFocusItem();
+    }
+    return CollectionTree::IsExpandable(item) ? TRUE : FALSE;
   }
   if (action == DeviceKeyboard::Action::Back && back_cb_) {
     back_cb_();

@@ -35,6 +35,7 @@ class StreamingTabsView {
   void SearchForThis(const std::string &query);
   std::string SelectedSearchQuery() const;
   void ReloadSettings();
+  void ApplyLook();
   void GetArtists();
   void GetAlbums();
   void GetSongs();

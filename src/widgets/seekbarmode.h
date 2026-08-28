@@ -36,6 +36,15 @@ inline bool StyleMenuEnabled(SeekbarSettings::Mode mode) { return mode == Seekba
 
 inline const char *StyleSubmenuTitle() { return "Moodbar style"; }
 
+// Qt TrackSlider / moodbar / waveform context menus also open from Menu / Shift+F10.
+constexpr unsigned kMenu = 0xff67;
+constexpr unsigned kF10 = 0xffc7;
+constexpr unsigned kShiftMask = 1u << 0;
+
+inline bool IsKeyboardTrigger(unsigned keyval, unsigned state) {
+  return keyval == kMenu || (keyval == kF10 && (state & kShiftMask) != 0);
+}
+
 }  // namespace SeekbarModeMenu
 
 #endif

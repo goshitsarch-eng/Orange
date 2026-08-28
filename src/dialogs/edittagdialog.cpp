@@ -12,7 +12,11 @@
 #include "dialogs/edittagcover.h"
 #include "dialogs/edittagcoverdrop.h"
 #include "dialogs/edittagfieldreset.h"
+#include "dialogs/dialoggeometry.h"
+#include "dialogs/edittagshow.h"
+#include "dialogs/dialogsongnav.h"
 #include "dialogs/edittagfields.h"
+#include "settings/settingswheelthrough.h"
 #include "dialogs/edittagid3v2.h"
 #include "dialogs/edittagloading.h"
 #include "dialogs/edittagsave.h"
@@ -727,8 +731,9 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                                       ? Translations::Tr("Edit tags") + " (" + std::to_string(targets.size()) + " " + Translations::Tr("songs") + ")"
                                       : Translations::Tr("Edit tags");
   adw_dialog_set_title(dialog, dialog_title.c_str());
-  adw_dialog_set_content_width(dialog, 640);
-  adw_dialog_set_content_height(dialog, 760);
+  DialogGeometry::Apply(dialog, EditTagDialogSettings::kSettingsGroup, EditTagDialogSettings::kGeometry,
+                        EditTagDialogSettings::kDefaultWidth, EditTagDialogSettings::kDefaultHeight,
+                        !EditTagShow::ShouldShrinkOnPresent());
   GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   g_object_set_data_full(G_OBJECT(dialog), "state", state, [](gpointer p) { delete static_cast<State *>(p); });
 
@@ -968,6 +973,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   state->rating = gtk_scale_new_with_range(GTK_ORIENTATION_HORIZONTAL, 0, 5, 0.5);
   gtk_scale_set_digits(GTK_SCALE(state->rating), 1);
   gtk_scale_set_draw_value(GTK_SCALE(state->rating), TRUE);
+  SettingsWheelThrough::Attach(state->rating);
   state->initial_rating_stored = EditTagFields::CommonRating(targets);
   state->initial_rating = EditTagFields::RatingSliderFromStored(state->initial_rating_stored);
   gtk_range_set_value(GTK_RANGE(state->rating), state->initial_rating);
@@ -1010,7 +1016,11 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      {"Album artist sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.albumartistsort(); })},
                      {"Composer sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.composersort(); })},
                      {"Performer sort", EditTagFields::CommonValue(targets, [](const Song &s) { return s.performersort(); })}});
-  adw_view_stack_add_titled(stack, tags, "Tags", Translations::CStr("Tags"));
+  GtkWidget *tags_scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(tags_scroll, TRUE);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(tags_scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(tags_scroll), tags);
+  adw_view_stack_add_titled(stack, tags_scroll, "Tags", Translations::CStr("Tags"));
 
   state->lyrics_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   gtk_widget_set_margin_start(state->lyrics_page, 12);
@@ -1274,7 +1284,24 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                    }),
                    nullptr);
   gtk_box_append(GTK_BOX(box), state->actions);
+  if (state->prev && state->next) {
+    GtkEventController *nav_keys = gtk_event_controller_key_new();
+    gtk_event_controller_set_propagation_phase(nav_keys, GTK_PHASE_CAPTURE);
+    gtk_widget_add_controller(box, nav_keys);
+    g_signal_connect(nav_keys, "key-pressed",
+                     G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                       auto *self = static_cast<State *>(data);
+                       const int delta = DialogSongNav::Delta(keyval, static_cast<unsigned>(state));
+                       if (delta == 0 || !EditTagFields::SongListNavEnabled(true, self->loading)) {
+                         return FALSE;
+                       }
+                       SelectSong(self, EditTagFields::WrapIndex(static_cast<int>(self->index), delta, static_cast<int>(self->songs.size())));
+                       return TRUE;
+                     })),
+                     state);
+  }
   adw_dialog_set_child(dialog, box);
+  DialogGeometry::BindClosed(dialog, EditTagDialogSettings::kSettingsGroup, EditTagDialogSettings::kGeometry);
   state->dialog = dialog;
   SetLoading(state, true);
   UpdateDisplay(state);

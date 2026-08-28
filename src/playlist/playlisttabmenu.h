@@ -66,6 +66,9 @@ inline bool ShouldApplyRename(const std::string &old_name, const std::string &ne
   return !new_name.empty() && new_name != old_name;
 }
 
+// Qt RenameTabLineEdit::focusOutEvent emits EditingCanceled and does not commit.
+inline bool ShouldCommitRenameOnFocusLoss() { return false; }
+
 inline bool CloseCurrentHidesWindow(int count) { return count <= 1; }
 
 // Qt PlaylistTabBar::CloseCurrentTab: discard an open rename editor before tabs shift.
@@ -76,6 +79,11 @@ inline bool ToggledFavorite(bool favorite) { return !favorite; }
 inline const char *FavoriteTooltip() {
   return "Double-click here to favorite this playlist so it will be saved and remain accessible through the \"Playlists\" panel on the left side bar";
 }
+
+// Qt PlaylistTabBar::setTabToolTip always stores the playlist name for elided tabs.
+inline bool ShowsNameTooltip() { return true; }
+
+inline const char *NameTooltip(const std::string &name) { return name.c_str(); }
 
 inline std::string TabPayload(int id) { return std::string(kTabPrefix) + std::to_string(id); }
 
@@ -96,6 +104,23 @@ inline bool ShouldHoverForPayload(const std::string &payload) {
 }
 
 inline bool DropOnEmptyCreatesPlaylist() { return true; }
+
+// Qt PlaylistTabBar::contextMenuEvent always pops from Menu / Shift+F10.
+// Keyboard uses the current tab (tabAt(pos) for pointer events).
+constexpr unsigned kMenu = 0xff67;
+constexpr unsigned kF10 = 0xffc7;
+constexpr unsigned kShiftMask = 1u << 0;
+constexpr double kKeyboardY = -1;
+
+inline bool IsKeyboardTrigger(unsigned keyval, unsigned state) {
+  return keyval == kMenu || (keyval == kF10 && (state & kShiftMask) != 0);
+}
+
+inline bool ShouldShowMenu() { return true; }
+
+inline int IndexForKeyboard(int current_index) { return current_index; }
+
+inline bool IsKeyboardAnchor(double y) { return y < 0; }
 
 inline std::vector<int> ReorderIds(std::vector<int> ids, int from_index, int dest_index) {
   if (from_index < 0 || dest_index < 0 || from_index >= static_cast<int>(ids.size())) {

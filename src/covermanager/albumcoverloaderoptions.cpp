@@ -1,12 +1,14 @@
 #include "covermanager/albumcoverloaderoptions.h"
 
+#include "constants/coverssettings.h"
 #include "core/settings.h"
+#include "covermanager/coverarttypes.h"
 #include "utilities/strutils.h"
 
 AlbumCoverLoaderOptions::Types AlbumCoverLoaderOptions::LoadTypes() {
   Settings settings;
-  settings.BeginGroup("Covers");
-  const std::string value = settings.Value("types", "art_embedded,art_automatic,art_manual");
+  settings.BeginGroup(CoversSettings::kSettingsGroup);
+  const std::string value = settings.Value(CoversSettings::kTypes, CoverArtTypes::DefaultLoaderSaved());
   Types types;
   for (const std::string &part : StrUtils::Split(value, ',')) {
     const std::string name = StrUtils::Trim(part);
@@ -15,7 +17,9 @@ AlbumCoverLoaderOptions::Types AlbumCoverLoaderOptions::LoadTypes() {
     }
   }
   if (types.empty()) {
-    types = {Type::Embedded, Type::Automatic, Type::Manual};
+    for (const std::string &id : CoverArtTypes::LoaderDefaultIds()) {
+      types.push_back(TypeFromName(id));
+    }
   }
   return types;
 }

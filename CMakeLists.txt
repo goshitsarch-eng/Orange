@@ -114,6 +114,10 @@ if(LINUX)
   if(X11_FOUND)
     set(HAVE_X11 ON)
   endif()
+  pkg_check_modules(GTK4_LAYER_SHELL IMPORTED_TARGET gtk4-layer-shell-0)
+  if(GTK4_LAYER_SHELL_FOUND)
+    set(HAVE_GTK4_LAYER_SHELL ON)
+  endif()
 endif()
 
 set(HAVE_DBUS ON)
@@ -544,13 +548,15 @@ set(STRAWBERRY_SOURCES
   src/device/devicelister.cpp
   src/device/devicestatefiltermodel.cpp
   src/device/devicemanager.cpp
-  src/device/devicecopyrunner.cpp
+  src/device/deviceeject.cpp
   src/device/devicedatabasebackend.cpp
   src/device/mtpconnection.cpp
   src/device/mtploader.cpp
   src/device/mtpdevice.cpp
+  src/device/mtpmusicstorage.cpp
   src/device/gpodloader.cpp
   src/device/gpoddevice.cpp
+  src/device/gpodmusicstorage.cpp
   src/device/filesystemdevice.cpp
   src/device/cddasongloader.cpp
   src/device/cddadevice.cpp
@@ -751,6 +757,37 @@ if(HAVE_X11)
     target_link_libraries(strawberry PRIVATE ${X11_Xext_LIB})
   endif()
 endif()
+if(HAVE_GTK4_LAYER_SHELL)
+  target_link_libraries(strawberry PRIVATE PkgConfig::GTK4_LAYER_SHELL)
+endif()
+if(WIN32)
+  target_sources(strawberry PRIVATE
+    src/core/windows7thumbbar.cpp
+    src/core/winsystemmediatransportcontrols.cpp
+    src/core/filesystemwatcherwin.cpp
+    src/core/filesystemwatcherwinthread.cpp
+    src/utilities/winutils.cpp
+    src/engine/mmdevicefinder.cpp
+    src/engine/directsounddevicefinder.cpp
+    src/engine/asiodevicefinder.cpp
+    src/engine/uwpdevicefinder.cpp
+    src/globalshortcuts/globalshortcutsbackend-win.cpp
+    src/globalshortcuts/globalshortcut-win.cpp
+  )
+  target_link_libraries(strawberry PRIVATE dwmapi ole32 oleaut32 uuid dsound runtimeobject)
+endif()
+if(APPLE)
+  target_sources(strawberry PRIVATE
+    src/core/macosutils.mm
+    src/core/mac_startup.mm
+    src/engine/macosdevicefinder.cpp
+    src/device/macosdevicelister.mm
+    src/globalshortcuts/globalshortcutsbackend-macos.mm
+    src/systemtrayicon/macsystemtrayicon.mm
+    src/osd/osdmac.mm
+  )
+  target_link_libraries(strawberry PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon" "-framework UserNotifications")
+endif()
 
 install(TARGETS strawberry RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES dist/unix/org.strawberrymusicplayer.strawberry.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
@@ -896,13 +933,16 @@ if(GTest_FOUND)
     src/organize/organizeformatvalidator.cpp
     src/translations/translations.cpp
     src/device/devicemanager.cpp
+    src/device/deviceeject.cpp
     src/device/devicecopyrunner.cpp
     src/device/devicedatabasebackend.cpp
     src/device/mtpconnection.cpp
     src/device/mtploader.cpp
     src/device/mtpdevice.cpp
+    src/device/mtpmusicstorage.cpp
     src/device/gpodloader.cpp
     src/device/gpoddevice.cpp
+    src/device/gpodmusicstorage.cpp
     src/device/filesystemdevice.cpp
     src/device/cddasongloader.cpp
     src/device/cddadevice.cpp
@@ -1136,6 +1176,37 @@ if(GTest_FOUND)
     if(X11_Xext_LIB)
       target_link_libraries(strawberry_tests PRIVATE ${X11_Xext_LIB})
     endif()
+  endif()
+  if(HAVE_GTK4_LAYER_SHELL)
+    target_link_libraries(strawberry_tests PRIVATE PkgConfig::GTK4_LAYER_SHELL)
+  endif()
+  if(WIN32)
+    target_sources(strawberry_tests PRIVATE
+      src/core/windows7thumbbar.cpp
+      src/core/winsystemmediatransportcontrols.cpp
+      src/core/filesystemwatcherwin.cpp
+      src/core/filesystemwatcherwinthread.cpp
+      src/utilities/winutils.cpp
+      src/engine/mmdevicefinder.cpp
+      src/engine/directsounddevicefinder.cpp
+      src/engine/asiodevicefinder.cpp
+      src/engine/uwpdevicefinder.cpp
+      src/globalshortcuts/globalshortcutsbackend-win.cpp
+      src/globalshortcuts/globalshortcut-win.cpp
+    )
+    target_link_libraries(strawberry_tests PRIVATE dwmapi ole32 oleaut32 uuid dsound runtimeobject)
+  endif()
+  if(APPLE)
+    target_sources(strawberry_tests PRIVATE
+      src/core/macosutils.mm
+      src/core/mac_startup.mm
+      src/engine/macosdevicefinder.cpp
+      src/device/macosdevicelister.mm
+      src/globalshortcuts/globalshortcutsbackend-macos.mm
+      src/systemtrayicon/macsystemtrayicon.mm
+      src/osd/osdmac.mm
+    )
+    target_link_libraries(strawberry_tests PRIVATE "-framework CoreAudio" "-framework DiskArbitration" "-framework IOKit" "-framework Cocoa" "-framework Carbon" "-framework UserNotifications")
   endif()
   add_test(NAME strawberry_tests COMMAND strawberry_tests)
   add_custom_target(build_tests DEPENDS strawberry_tests)

@@ -328,6 +328,8 @@ TEST(ScrobblerLoveState, GatesOnEnabledMetadataAndLoved) {
   Song incomplete;
   incomplete.set_url("file:///tmp/x.flac");
   EXPECT_FALSE(ScrobblerLoveState::CanLove(true, incomplete));
+  EXPECT_FALSE(ScrobblerLoveState::CanLove(true, song, false));
+  EXPECT_TRUE(ScrobblerLoveState::CanLove(true, song, true));
   EXPECT_TRUE(ScrobblerLoveState::DisableAfterLove());
   EXPECT_TRUE(ScrobblerLoveState::ResetLovedOnSongChange("file:///a", "file:///b"));
   EXPECT_FALSE(ScrobblerLoveState::ResetLovedOnSongChange("file:///a", "file:///a"));

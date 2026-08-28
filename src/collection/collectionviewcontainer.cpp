@@ -29,3 +29,9 @@ CollectionViewContainer::CollectionViewContainer()
   gtk_box_append(GTK_BOX(widget_), bar);
   gtk_box_append(GTK_BOX(widget_), view_->widget());
 }
+
+void CollectionViewContainer::ApplyLook() {
+  if (filter_widget_) {
+    filter_widget_->ApplyLook();
+  }
+}

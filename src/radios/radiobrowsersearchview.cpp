@@ -3,7 +3,9 @@
 #include "constants/radiobrowsersettings.h"
 #include "core/settings.h"
 #include "radios/radiobrowsersearchopts.h"
+#include "radios/radioviewsearch.h"
 #include "radios/radiodrag.h"
+#include "radios/radiomenu.h"
 #include "radios/radioservices.h"
 #include "translations/translations.h"
 
@@ -118,14 +120,32 @@ RadioBrowserSearchView::RadioBrowserSearchView(RadioServices *services) : servic
                      gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
                    }),
                    this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(list_, keys);
+  gtk_widget_set_focusable(list_, TRUE);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<RadioBrowserSearchView *>(data)->OnKeyPressed(keyval, state);
+                   })),
+                   this);
 
   g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
                      auto *self = static_cast<RadioBrowserSearchView *>(data);
-                     if (!self->countries_loaded_) {
+                     if (RadioBrowserSearchOpts::ShouldFetchCountriesOnShow(self->countries_loaded_)) {
                        self->FetchCountries();
                      }
                    }),
                    this);
+}
+
+gboolean RadioBrowserSearchView::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (!RadioMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    return FALSE;
+  }
+  if (menu_ && RadioMenu::ShouldShowMenu()) {
+    menu_(SelectedChannels());
+  }
+  return TRUE;
 }
 
 RadioBrowserSearchView::~RadioBrowserSearchView() {
@@ -139,6 +159,20 @@ RadioBrowserSearchView::~RadioBrowserSearchView() {
 void RadioBrowserSearchView::SetResults(const std::vector<RadioChannel> &results) {
   model_.SetResults(results);
   ReloadResults();
+}
+
+void RadioBrowserSearchView::Search(const std::string &query) {
+  if (entry_) {
+    gtk_editable_set_text(GTK_EDITABLE(entry_), query.c_str());
+  }
+  if (search_timeout_) {
+    g_source_remove(search_timeout_);
+    search_timeout_ = 0;
+  }
+  if (RadioViewSearch::ShouldFocusSearch() && entry_) {
+    gtk_widget_grab_focus(entry_);
+  }
+  SearchTriggered();
 }
 
 void RadioBrowserSearchView::ScheduleSearch() {
@@ -222,7 +256,7 @@ void RadioBrowserSearchView::FetchCountries() {
 
 void RadioBrowserSearchView::ApplyCountries(const std::vector<RadioBrowserService::Country> &countries) {
   applying_countries_ = true;
-  countries_loaded_ = true;
+  countries_loaded_ = RadioBrowserSearchOpts::ShouldMarkCountriesLoaded(true);
   gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(country_));
   gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(country_), RadioBrowserSearchOpts::AllCountriesId(),
                             Translations::CStr(RadioBrowserSearchOpts::AllCountriesLabel()));

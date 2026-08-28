@@ -29,14 +29,13 @@ struct MoodJob {
   std::shared_ptr<bool> alive;
   int generation = 0;
   Song song;
-  bool save = false;
   std::string cache_dir;
   std::vector<uint8_t> data;
 };
 
 gpointer MoodbarGenerateThread(gpointer data) {
   auto *job = static_cast<MoodJob *>(data);
-  job->data = MoodbarLoader().Generate(job->song, job->save, job->cache_dir);
+  job->data = MoodbarLoader().Generate(job->song, false, job->cache_dir);
   g_idle_add(+[](gpointer idle_data) -> gboolean {
     std::unique_ptr<MoodJob> job(static_cast<MoodJob *>(idle_data));
     if (!job->alive || !*job->alive || !job->controller) {
@@ -86,6 +85,14 @@ std::vector<uint8_t> MoodbarLoader::Load(const Song &song) {
   return Generate(song, save, StandardPaths::MoodbarCacheDir());
 }
 
+void MoodbarLoader::WriteSidecar(const std::string &url, const std::vector<uint8_t> &mood) const {
+  const std::string path = FileUtils::PathFromUri(url);
+  if (!SeekbarAnalysis::ShouldWriteSidecar(true, path, !mood.empty())) {
+    return;
+  }
+  FileUtils::WriteFile(MoodbarPaths::HiddenSidecar(path), std::string(mood.begin(), mood.end()));
+}
+
 MoodbarController::MoodbarController(MoodbarLoader *loader) : loader_(loader) { ReloadSettings(); }
 
 MoodbarController::~MoodbarController() { *alive_ = false; }
@@ -100,6 +107,9 @@ void MoodbarController::ApplyGenerated(int generation, std::vector<uint8_t> data
   }
   data_ = std::move(data);
   busy_ = false;
+  if (loader_ && SeekbarAnalysis::ShouldWriteSidecar(save_, FileUtils::PathFromUri(url), !data_.empty())) {
+    loader_->WriteSidecar(url, data_);
+  }
   Ready.Emit(data_);
 }
 
@@ -107,6 +117,9 @@ void MoodbarController::Load(const Song &song) { CurrentSongChanged(song); }
 
 void MoodbarController::ReloadSettings() {
   Settings settings;
+  settings.BeginGroup(MoodbarSettings::kSettingsGroup);
+  save_ = settings.BoolValue(MoodbarSettings::kSave, MoodbarSettings::kDefaultSave);
+  settings.EndGroup();
   settings.BeginGroup(SeekbarSettings::kSettingsGroup);
   const bool enabled = static_cast<SeekbarSettings::Mode>(settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode))) ==
                        SeekbarSettings::Mode::Moodbar;
@@ -175,14 +188,11 @@ void MoodbarController::Generate(const Song &song) {
   if (!loader_) {
     return;
   }
-  Settings settings;
-  settings.BeginGroup(MoodbarSettings::kSettingsGroup);
   auto *job = new MoodJob;
   job->controller = this;
   job->alive = alive_;
   job->generation = generation_;
   job->song = song;
-  job->save = settings.BoolValue(MoodbarSettings::kSave, MoodbarSettings::kDefaultSave);
   job->cache_dir = StandardPaths::MoodbarCacheDir();
   busy_ = true;
   g_thread_unref(g_thread_new("moodbar-generate", MoodbarGenerateThread, job));

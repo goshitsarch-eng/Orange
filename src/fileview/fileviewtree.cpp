@@ -2,6 +2,7 @@
 
 #include "collection/collectiontreeclick.h"
 #include "fileview/fileviewdrag.h"
+#include "fileview/fileviewmenu.h"
 #include "fileview/fileviewicons.h"
 #include "widgets/listboxtreepressgtk.h"
 
@@ -44,6 +45,25 @@ FileViewTree::FileViewTree() {
                    }),
                    this);
   ListBoxTreePressGtk::Attach(list_, this);
+  GtkEventController *keys = gtk_event_controller_key_new();
+  gtk_widget_add_controller(list_, keys);
+  gtk_widget_set_focusable(list_, TRUE);
+  g_signal_connect(keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
+                     return static_cast<FileViewTree *>(data)->OnKeyPressed(keyval, state);
+                   })),
+                   this);
+}
+
+gboolean FileViewTree::OnKeyPressed(guint keyval, GdkModifierType state) {
+  if (!FileViewMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
+    return FALSE;
+  }
+  const std::string path = SelectedPath();
+  if (menu_ && FileViewMenu::TreeShouldShowMenu(!path.empty())) {
+    menu_(path);
+  }
+  return TRUE;
 }
 
 void FileViewTree::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }

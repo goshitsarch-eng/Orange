@@ -84,6 +84,7 @@ class Application {
 
   Signal<> ExitFinished;
   Signal<> RaiseRequested;
+  Signal<> ShowHideRequested;
   Signal<> HideForExit;
 
  private:

@@ -64,6 +64,15 @@ inline bool Toggle(Action action, bool show_album, bool show_data, bool show_lyr
   return !Checked(action, show_album, show_data, show_lyrics, search_lyrics);
 }
 
+// Qt ContextView::contextMenuEvent pops menu_options_ only on the idle/stop page.
+constexpr unsigned kMenu = 0xff67;
+constexpr unsigned kF10 = 0xffc7;
+constexpr unsigned kShiftMask = 1u << 0;
+
+inline bool IsKeyboardTrigger(unsigned keyval, unsigned state) {
+  return keyval == kMenu || (keyval == kF10 && (state & kShiftMask) != 0);
+}
+
 }  // namespace ContextOptions
 
 #endif

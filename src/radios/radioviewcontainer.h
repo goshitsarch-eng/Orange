@@ -21,6 +21,7 @@ class RadioViewContainer {
   RadioView *view() { return view_.get(); }
   RadioBrowserSearchView *search_view() { return search_view_.get(); }
   void Reload();
+  void ApplyLook();
   void RefreshChannels();
   void Search(const std::string &query);
   void SetActivateCallback(std::function<void(const RadioChannel &)> callback);
@@ -28,11 +29,16 @@ class RadioViewContainer {
   void SetMenuCallback(RadioView::MenuCallback callback);
 
  private:
+  void OnShown();
+
   RadioServices *services_ = nullptr;
   GtkWidget *widget_ = nullptr;
+  GtkWidget *refresh_button_ = nullptr;
+  GtkWidget *stack_ = nullptr;
   RadioModel model_;
   std::unique_ptr<RadioView> view_;
   std::unique_ptr<RadioBrowserSearchView> search_view_;
+  bool channels_initialized_ = false;
 };
 
 #endif

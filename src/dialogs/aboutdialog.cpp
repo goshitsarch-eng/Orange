@@ -1,6 +1,7 @@
 #include "dialogs/aboutdialog.h"
 
 #include "dialogs/aboutcredits.h"
+#include "dialogs/dialogclosekeys.h"
 #include "translations/translations.h"
 #include "version.h"
 
@@ -25,5 +26,6 @@ void AboutDialog::Show(GtkWindow *parent) {
                                       AboutCredits::ClementineContributors());
   adw_about_dialog_add_acknowledgement_section(ADW_ABOUT_DIALOG(about), Translations::CStr(AboutCredits::ThanksSection()),
                                                AboutCredits::ThanksTo());
+  DialogCloseKeys::Attach(about);
   adw_dialog_present(about, GTK_WIDGET(parent));
 }

@@ -43,6 +43,11 @@ inline bool MigrateBalancerEnabled(bool has_key, bool stored, int legacy_balance
 
 inline std::string DbLabel(int gain) { return std::to_string(gain) + " dB"; }
 
+// Qt Equalizer::closeEvent / PresetChanged prompt SavePreset when sliders differ from the named preset.
+inline bool ShouldPromptSave(bool preset_known, bool matches_stored) { return preset_known && !matches_stored; }
+
+inline bool GainsMatch(const std::vector<int> &current, const std::vector<int> &stored) { return current == stored; }
+
 }  // namespace EqualizerPersist
 
 #endif

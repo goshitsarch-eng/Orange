@@ -3,6 +3,7 @@
 #include "collection/collectionfullrescan.h"
 #include "collection/collectiondirectory.h"
 #include "collection/collectionstats.h"
+#include "collection/collectionwatcherreload.h"
 #include "constants/collectionsettings.h"
 #include "core/logging.h"
 #include "core/settings.h"
@@ -53,6 +54,12 @@ void CollectionLibrary::Init() {
   });
 }
 
+void CollectionLibrary::ReloadSettings() {
+  if (watcher_ && CollectionWatcherReload::ShouldReloadOnSettingsClose()) {
+    watcher_->ReloadSettings();
+  }
+}
+
 void CollectionLibrary::PauseWatcher() {
   if (watcher_) {
     watcher_->SetRescanPaused(true);
@@ -80,19 +87,9 @@ void CollectionLibrary::AbortScan() {
 bool CollectionLibrary::scanning() const { return watcher_ && watcher_->scanning(); }
 
 void CollectionLibrary::Rescan(const SongList &songs) {
-  for (const Song &song : songs) {
-    const std::string path = FileUtils::PathFromUri(song.url());
-    if (path.empty() || !FileUtils::Exists(path) || !tagreader_) {
-      continue;
-    }
-    Song updated = tagreader_->ReadFile(path);
-    if (!updated.is_valid()) {
-      continue;
-    }
-    if (song.id() > 0) {
-      updated.set_id(song.id());
-    }
-    backend_->AddOrUpdateSong(updated);
+  if (watcher_) {
+    watcher_->RescanSongs(songs);
+    return;
   }
   ScanFinished.Emit();
 }

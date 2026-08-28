@@ -17,6 +17,9 @@
 #include "smartplaylists/smartplaylistwizardfinishpage.h"
 #include "smartplaylists/smartplaylistwizardlabels.h"
 #include "smartplaylists/smartplaylistwizardplugin.h"
+#include "settings/settingswheelthrough.h"
+#include "smartplaylists/smartplaylistactivate.h"
+#include "smartplaylists/smartplaylistcontextmenu.h"
 #include "smartplaylists/smartplaylistdrag.h"
 #include "smartplaylists/smartplaylistgeneratemore.h"
 #include "smartplaylists/smartplaylistsmodel.h"
@@ -635,6 +638,11 @@ TEST(SmartPlaylistTermRow, PlaceholderAndRemoveMatchQt) {
   EXPECT_EQ(2, SmartPlaylistTermRow::InitialActiveTerms(true, 2));
   EXPECT_EQ(0, SmartPlaylistTermRow::InitialActiveTerms(true, 0));
   EXPECT_TRUE(SmartPlaylistTermRow::KeepsPlaceholder());
+  EXPECT_TRUE(SmartPlaylistSearchTermWidgetOverlay::ShouldGrabOnShow(false));
+  EXPECT_FALSE(SmartPlaylistSearchTermWidgetOverlay::ShouldGrabOnShow(true));
+  EXPECT_TRUE(SmartPlaylistSearchTermWidgetOverlay::IsActivateKey(0x0020));
+  EXPECT_TRUE(SmartPlaylistSearchTermWidgetOverlay::IsActivateKey(0xff0d));
+  EXPECT_FALSE(SmartPlaylistSearchTermWidgetOverlay::IsActivateKey(0xff1b));
 }
 
 TEST(SmartPlaylistTermValue, EditorsAndDateTimeMatchQt) {
@@ -883,6 +891,66 @@ TEST(SmartPlaylistPreviewDisplay, CapsAtGeneratorLimitAndUsesQtCountStrings) {
   EXPECT_FALSE(SmartPlaylistPreviewDisplay::ShouldDiscardForPending(false, false));
 }
 
+TEST(SmartPlaylistPreviewDisplay, DefersBusyOrHiddenAndShowsLoading) {
+  EXPECT_STREQ("Loading...", SmartPlaylistPreviewDisplay::BusyText());
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Ignore, SmartPlaylistPreviewDisplay::DecideUpdate(true, false, false));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Ignore, SmartPlaylistPreviewDisplay::DecideUpdate(true, true, true));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Defer, SmartPlaylistPreviewDisplay::DecideUpdate(false, true, false));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Defer, SmartPlaylistPreviewDisplay::DecideUpdate(false, false, true));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Defer, SmartPlaylistPreviewDisplay::DecideUpdate(false, true, true));
+  EXPECT_EQ(SmartPlaylistPreviewDisplay::UpdateAction::Run, SmartPlaylistPreviewDisplay::DecideUpdate(false, false, false));
+}
+
+TEST(SmartPlaylistContextMenu, KeyboardUsesSelectionNotPointer) {
+  EXPECT_TRUE(SmartPlaylistContextMenu::IsTrigger(SmartPlaylistContextMenu::kMenu, 0));
+  EXPECT_TRUE(SmartPlaylistContextMenu::IsTrigger(SmartPlaylistContextMenu::kF10, SmartPlaylistContextMenu::kShiftMask));
+  EXPECT_FALSE(SmartPlaylistContextMenu::IsTrigger(SmartPlaylistContextMenu::kF10, 0));
+  EXPECT_FALSE(SmartPlaylistContextMenu::IsTrigger(ListBoxKeyboard::kReturn, 0));
+
+  SmartPlaylistsItem selected;
+  selected.title = "50 Random tracks";
+  SmartPlaylistsItem pointer;
+  pointer.kind = SmartPlaylistsItem::Kind::Wizard;
+  pointer.title = "Custom wizard…";
+  EXPECT_EQ(&selected, SmartPlaylistContextMenu::ItemForMenu(true, &selected, &pointer));
+  EXPECT_EQ(&pointer, SmartPlaylistContextMenu::ItemForMenu(false, &selected, &pointer));
+  EXPECT_EQ(nullptr, SmartPlaylistContextMenu::ItemForMenu(true, nullptr, &pointer));
+}
+
+TEST(SmartPlaylistActivate, EnterDoesNotRunAndDefaultsAppend) {
+  EXPECT_FALSE(SmartPlaylistActivate::ShouldRun(SmartPlaylistActivate::Trigger::Enter));
+  EXPECT_TRUE(SmartPlaylistActivate::ShouldRun(SmartPlaylistActivate::Trigger::DoubleClick));
+  EXPECT_TRUE(SmartPlaylistActivate::IsEnter(ListBoxKeyboard::kReturn));
+  EXPECT_TRUE(SmartPlaylistActivate::IsEnter(ListBoxKeyboard::kKPEnter));
+  EXPECT_FALSE(SmartPlaylistActivate::IsEnter(ListBoxKeyboard::kEscape));
+  EXPECT_FALSE(SmartPlaylistActivate::ActivateOnSingleClick());
+
+  const SmartPlaylistActivate::PlayParams defaults = SmartPlaylistActivate::FromDoubleClick(
+      BehaviourSettings::kDefaultDoubleClickAddMode, BehaviourSettings::kDefaultDoubleClickPlayMode, true);
+  EXPECT_FALSE(defaults.as_new);
+  EXPECT_FALSE(defaults.clear);
+  EXPECT_FALSE(defaults.should_play);
+  EXPECT_FALSE(defaults.enqueue);
+  EXPECT_FALSE(defaults.enqueue_next);
+
+  const SmartPlaylistActivate::PlayParams load_always =
+      SmartPlaylistActivate::FromDoubleClick(BehaviourSettings::AddBehaviour::Load, BehaviourSettings::PlayBehaviour::Always, false);
+  EXPECT_FALSE(load_always.as_new);
+  EXPECT_TRUE(load_always.clear);
+  EXPECT_TRUE(load_always.should_play);
+
+  const SmartPlaylistActivate::PlayParams open_if_stopped =
+      SmartPlaylistActivate::FromDoubleClick(BehaviourSettings::AddBehaviour::OpenInNew, BehaviourSettings::PlayBehaviour::IfStopped, true);
+  EXPECT_TRUE(open_if_stopped.as_new);
+  EXPECT_TRUE(open_if_stopped.should_play);
+
+  const SmartPlaylistActivate::PlayParams enqueue =
+      SmartPlaylistActivate::FromDoubleClick(BehaviourSettings::AddBehaviour::Enqueue, BehaviourSettings::PlayBehaviour::Never, true);
+  EXPECT_TRUE(enqueue.enqueue);
+  EXPECT_FALSE(enqueue.enqueue_next);
+  EXPECT_FALSE(enqueue.clear);
+}
+
 TEST(SmartPlaylistDrag, JoinsSongUrlsAndSkipsWizard) {
   Song a;
   a.set_url("file:///a");
@@ -892,4 +960,10 @@ TEST(SmartPlaylistDrag, JoinsSongUrlsAndSkipsWizard) {
   EXPECT_EQ("file:///a\nfile:///b", SmartPlaylistDrag::DragPayload({a, b, empty}));
   EXPECT_TRUE(SmartPlaylistDrag::CanDrag(false));
   EXPECT_FALSE(SmartPlaylistDrag::CanDrag(true));
+}
+
+TEST(SmartPlaylistWheelThrough, UnfocusedSpinShouldPropagateLikeQt) {
+  EXPECT_TRUE(SettingsWheelThrough::AppliesToSpin());
+  EXPECT_TRUE(SettingsWheelThrough::ShouldPropagateToParent(false));
+  EXPECT_FALSE(SettingsWheelThrough::ShouldPropagateToParent(true));
 }

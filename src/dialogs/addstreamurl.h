@@ -39,6 +39,11 @@ inline bool IsValid(const std::string &url) { return !Scheme(url).empty() && !Ho
 // Qt AddStreamDialog::TextChanged: OK/Add stays off until the URL has a scheme and host.
 inline bool IsComplete(const std::string &url) { return IsValid(url); }
 
+// Qt AddStreamDialog::showEvent focuses and selects the URL unless the show is spontaneous.
+inline bool ShouldFocusOnShow() { return true; }
+
+inline bool ShouldSelectAllOnShow() { return true; }
+
 }  // namespace AddStreamUrl
 
 #endif

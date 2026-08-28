@@ -2,6 +2,7 @@
 
 #include "constants/transcodersettings.h"
 #include "settings/settingspage.h"
+#include "settings/settingswheelthrough.h"
 #include "transcoder/transcoderoptionslabels.h"
 #include "translations/translations.h"
 
@@ -42,6 +43,7 @@ void AddBitrateScale(AdwPreferencesGroup *group, Settings *settings, Transcoder:
                    settings);
   adw_action_row_add_suffix(row, scale);
   adw_preferences_group_add(group, GTK_WIDGET(row));
+  SettingsWheelThrough::Attach(scale);
 }
 
 void AddFormatFields(AdwPreferencesGroup *group, Settings *settings, Transcoder::Format format) {

@@ -8,12 +8,19 @@
 #include "collection/collectionexpire.h"
 #include "collection/collectionfingerprintmatch.h"
 #include "collection/collectionrescanreason.h"
+#include "collection/collectionrescansongs.h"
 #include "collection/collectionunavailablerestore.h"
 #include "collection/collectionscanprogress.h"
 #include "collection/collectionscandelay.h"
 #include "collection/collectionscangates.h"
 #include "collection/collectionsubdirectory.h"
+#include "collection/collectionwatcherreload.h"
 #include "constants/collectionsettings.h"
+#ifdef _WIN32
+#include "core/filesystemwatcherwin.h"
+#else
+#include "core/filesystemwatcherinotify.h"
+#endif
 #include "core/logging.h"
 #include "core/settings.h"
 #include "core/songuserdatamerge.h"
@@ -111,22 +118,37 @@ void CollectionWatcher::StartPeriodicScan() {
   periodic_timeout_id_ = g_timeout_add(CollectionScanDelay::kPeriodicMs, OnPeriodicTimeout, this);
 }
 
+void CollectionWatcher::ReloadSettings() {
+  Settings settings;
+  settings.BeginGroup(CollectionSettings::kSettingsGroup);
+  const bool was_monitoring = monitor_;
+  monitor_ = settings.BoolValue(CollectionSettings::kMonitor, CollectionSettings::kDefaultMonitor);
+  const bool startup_scan = settings.BoolValue(CollectionSettings::kStartupScan, CollectionSettings::kDefaultStartupScan);
+  const bool tracking = settings.BoolValue(CollectionSettings::kSongTracking, CollectionSettings::kDefaultSongTracking);
+  const bool mark_unavailable = CollectionWatcherReload::MarkUnavailable(
+      tracking, settings.BoolValue(CollectionSettings::kMarkSongsUnavailable, CollectionSettings::kDefaultMarkSongsUnavailable));
+  if (CollectionWatcherReload::ShouldStopWatching(was_monitoring, monitor_)) {
+    StopWatching();
+  } else if (CollectionWatcherReload::ShouldStartWatching(was_monitoring, monitor_)) {
+    StartWatching();
+  }
+  if (CollectionWatcherReload::ShouldRunPeriodicScan(monitor_, startup_scan, mark_unavailable)) {
+    StartPeriodicScan();
+  } else if (periodic_timeout_id_) {
+    g_source_remove(periodic_timeout_id_);
+    periodic_timeout_id_ = 0;
+  }
+}
+
 gboolean CollectionWatcher::OnPeriodicTimeout(gpointer data) {
   static_cast<CollectionWatcher *>(data)->Scan(ScanType::Incremental);
   return G_SOURCE_CONTINUE;
 }
 
-void CollectionWatcher::StartAsyncScan(ScanType type) {
-  if (!backend_ || scanning_) {
+void CollectionWatcher::FillScanJob(ScanJob *job, bool load_existing) {
+  if (!job) {
     return;
   }
-  abort_ = false;
-  scanning_ = true;
-  auto *job = new ScanJob;
-  job->watcher = this;
-  job->alive = alive_;
-  job->type = type;
-  job->directories = backend_->Directories();
   Settings settings;
   settings.BeginGroup(CollectionSettings::kSettingsGroup);
   job->song_tracking = settings.BoolValue(CollectionSettings::kSongTracking, CollectionSettings::kDefaultSongTracking);
@@ -144,35 +166,68 @@ void CollectionWatcher::StartAsyncScan(ScanType type) {
 #ifndef HAVE_EBUR128
   job->ebu_analysis = false;
 #endif
-  if (type == ScanType::Incremental) {
-    for (const Song &song : backend_->Songs()) {
-      ExistingInfo info;
-      info.id = song.id();
-      info.url = song.url();
-      info.mtime = song.mtime();
-      info.filesize = song.filesize();
-      info.beginning = song.beginning_nanosec();
-      info.unavailable = song.unavailable();
-      info.valid = song.is_valid();
-      info.compilation_on = song.compilation_on();
-      info.compilation_off = song.compilation_off();
-      info.fingerprint = song.fingerprint();
-      info.cue_path = song.cue_path();
-      info.art_manual = song.art_manual();
-      info.art_unset = song.art_unset();
-      info.playcount = song.playcount();
-      info.skipcount = song.skipcount();
-      info.lastplayed = song.lastplayed();
-      info.rating = song.rating();
-      info.ebu_lufs = song.ebur128_integrated_loudness_lufs();
-      info.ebu_range = song.ebur128_loudness_range_lu();
-      job->existing[song.url()].push_back(info);
-    }
-    for (const CollectionDirectory &directory : job->directories) {
-      job->stored_subdirs[directory.id] = backend_->SubdirsInDirectory(directory.id);
-    }
+  if (!backend_ || !load_existing) {
+    return;
   }
+  for (const Song &song : backend_->Songs()) {
+    ExistingInfo info;
+    info.id = song.id();
+    info.url = song.url();
+    info.mtime = song.mtime();
+    info.filesize = song.filesize();
+    info.beginning = song.beginning_nanosec();
+    info.unavailable = song.unavailable();
+    info.valid = song.is_valid();
+    info.compilation_on = song.compilation_on();
+    info.compilation_off = song.compilation_off();
+    info.fingerprint = song.fingerprint();
+    info.cue_path = song.cue_path();
+    info.art_manual = song.art_manual();
+    info.art_unset = song.art_unset();
+    info.playcount = song.playcount();
+    info.skipcount = song.skipcount();
+    info.lastplayed = song.lastplayed();
+    info.rating = song.rating();
+    info.ebu_lufs = song.ebur128_integrated_loudness_lufs();
+    info.ebu_range = song.ebur128_loudness_range_lu();
+    job->existing[song.url()].push_back(info);
+  }
+  for (const CollectionDirectory &directory : job->directories) {
+    job->stored_subdirs[directory.id] = backend_->SubdirsInDirectory(directory.id);
+  }
+}
+
+void CollectionWatcher::StartAsyncScan(ScanType type) {
+  if (!backend_ || scanning_) {
+    return;
+  }
+  abort_ = false;
+  scanning_ = true;
+  auto *job = new ScanJob;
+  job->watcher = this;
+  job->alive = alive_;
+  job->type = type;
+  job->directories = backend_->Directories();
+  FillScanJob(job, type == ScanType::Incremental);
   g_thread_unref(g_thread_new("collection-scan", ScanThread, job));
+}
+
+void CollectionWatcher::RescanSongs(const SongList &songs) {
+  if (!backend_ || scanning_) {
+    ScanFinished.Emit();
+    return;
+  }
+  abort_ = false;
+  scanning_ = true;
+  auto *job = new ScanJob;
+  job->watcher = this;
+  job->alive = alive_;
+  job->type = ScanType::Full;
+  job->song_rescan = true;
+  job->directories = backend_->Directories();
+  job->rescan_targets = CollectionRescanSongs::Targets(songs, job->directories);
+  FillScanJob(job, true);
+  g_thread_unref(g_thread_new("collection-rescan", RescanThread, job));
 }
 
 gpointer CollectionWatcher::ScanThread(gpointer data) {
@@ -184,6 +239,39 @@ gpointer CollectionWatcher::ScanThread(gpointer data) {
         break;
       }
       job->watcher->CollectDirectory(job, directory);
+    }
+  }
+  g_idle_add(ApplyScanJob, job);
+  return nullptr;
+}
+
+gpointer CollectionWatcher::RescanThread(gpointer data) {
+  auto *job = static_cast<ScanJob *>(data);
+  if (job->watcher) {
+    for (const auto &target : job->rescan_targets) {
+      if (job->watcher->abort_) {
+        job->aborted = true;
+        break;
+      }
+      CollectionDirectory directory;
+      directory.id = target.first;
+      directory.path = target.second;
+      for (const std::string &entry : FileUtils::ListDirectory(target.second)) {
+        if (job->watcher->abort_) {
+          job->aborted = true;
+          break;
+        }
+        if (FileUtils::IsDirectory(entry) || !Song::IsAudioFile(entry)) {
+          continue;
+        }
+        job->seen_urls.push_back(FileUtils::UriFromPath(entry));
+        job->watcher->CollectFile(job, directory, entry);
+      }
+      CollectionSubdirectory subdir;
+      subdir.directory_id = target.first;
+      subdir.path = target.second;
+      subdir.mtime = FileUtils::FileMtime(target.second);
+      job->updated_subdirs.push_back(subdir);
     }
   }
   g_idle_add(ApplyScanJob, job);
@@ -440,7 +528,11 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
     return G_SOURCE_REMOVE;
   }
   CollectionWatcher *self = job->watcher;
-  const int task_id = self->task_manager_ ? self->task_manager_->StartTask(job->type == ScanType::Full ? "Full collection scan" : "Scanning collection") : 0;
+  const int task_id = self->task_manager_
+                          ? self->task_manager_->StartTask(job->song_rescan ? CollectionRescanSongs::TaskName()
+                                                                            : (job->type == ScanType::Full ? "Full collection scan"
+                                                                                                           : "Scanning collection"))
+                          : 0;
   self->last_added_ = 0;
   const int progress_max = CollectionScanProgress::Total(static_cast<int>(job->songs.size()));
   if (self->task_manager_ && task_id) {
@@ -462,7 +554,7 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
     Settings settings;
     settings.BeginGroup(CollectionSettings::kSettingsGroup);
     const bool mark_unavailable =
-        job->type == ScanType::Full && !job->aborted &&
+        job->type == ScanType::Full && !job->aborted && !job->song_rescan &&
         settings.BoolValue(CollectionSettings::kMarkSongsUnavailable, CollectionSettings::kDefaultMarkSongsUnavailable);
     if (mark_unavailable) {
       std::set<int> directories;
@@ -475,7 +567,7 @@ gboolean CollectionWatcher::ApplyScanJob(gpointer data) {
     }
     for (const CollectionDirectory &directory : job->directories) {
       self->backend_->UpdateLastSeen(directory.id);
-      if (job->expire_days > 0) {
+      if (!job->song_rescan && job->expire_days > 0) {
         self->backend_->ExpireSongs(directory.id, job->expire_days);
       }
     }
@@ -511,17 +603,21 @@ void CollectionWatcher::StopWatching() {
     g_object_unref(monitor);
   }
   monitors_.clear();
-  if (inotify_watcher_) {
-    inotify_watcher_->Clear();
+  if (native_watcher_) {
+    native_watcher_->Clear();
   }
 }
 
 void CollectionWatcher::WatchPath(const std::string &path) {
-  if (!inotify_watcher_) {
-    inotify_watcher_ = std::make_unique<FileSystemWatcherInotify>();
-    inotify_watcher_->PathChanged.Connect([this](const std::string &) { ScheduleIncremental(); });
+  if (!native_watcher_) {
+#ifdef _WIN32
+    native_watcher_ = std::make_unique<FileSystemWatcherWin>();
+#else
+    native_watcher_ = std::make_unique<FileSystemWatcherInotify>();
+#endif
+    native_watcher_->PathChanged.Connect([this](const std::string &) { ScheduleIncremental(); });
   }
-  inotify_watcher_->AddPath(path);
+  native_watcher_->AddPath(path);
   GFile *file = g_file_new_for_path(path.c_str());
   GFileMonitor *monitor = g_file_monitor_directory(file, G_FILE_MONITOR_NONE, nullptr, nullptr);
   g_object_unref(file);
@@ -542,13 +638,20 @@ void CollectionWatcher::StartWatching() {
   StopWatching();
   Settings settings;
   settings.BeginGroup(CollectionSettings::kSettingsGroup);
-  if (!settings.BoolValue(CollectionSettings::kMonitor, CollectionSettings::kDefaultMonitor) || !backend_) {
+  monitor_ = settings.BoolValue(CollectionSettings::kMonitor, CollectionSettings::kDefaultMonitor);
+  if (!monitor_ || !backend_) {
     return;
   }
   for (const CollectionDirectory &directory : backend_->Directories()) {
     WatchPath(directory.path);
   }
-  StartPeriodicScan();
+  const bool startup_scan = settings.BoolValue(CollectionSettings::kStartupScan, CollectionSettings::kDefaultStartupScan);
+  const bool tracking = settings.BoolValue(CollectionSettings::kSongTracking, CollectionSettings::kDefaultSongTracking);
+  const bool mark_unavailable = CollectionWatcherReload::MarkUnavailable(
+      tracking, settings.BoolValue(CollectionSettings::kMarkSongsUnavailable, CollectionSettings::kDefaultMarkSongsUnavailable));
+  if (CollectionWatcherReload::ShouldRunPeriodicScan(monitor_, startup_scan, mark_unavailable)) {
+    StartPeriodicScan();
+  }
 }
 
 void CollectionWatcher::ScanDirectory(int directory_id, const std::string &path, bool recursive) {

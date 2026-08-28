@@ -48,6 +48,7 @@ class StreamingCollectionView {
   void FocusListAndMove(unsigned keyval);
   void SetGroupingChangedCallback(GroupingCallback callback) { grouping_changed_ = std::move(callback); }
   void SetService(StreamingService *service);
+  void ApplyLook();
   void SetGrouping(const CollectionGrouping::Grouping &grouping);
   void ApplyGrouping(const CollectionGrouping::Grouping &grouping);
   const CollectionGrouping::Grouping &grouping() const { return grouping_; }
@@ -76,7 +77,8 @@ class StreamingCollectionView {
   void PersistPrettyCovers();
   void UpdateBack();
   void ActivateSong(const Song &song);
-  gboolean OnKeyPressed(guint keyval);
+  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
+  bool ApplyTreeLeft();
   void ResetTypeAhead();
 
   StreamingService *service_ = nullptr;

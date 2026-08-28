@@ -55,14 +55,13 @@ struct WaveJob {
   std::shared_ptr<bool> alive;
   int generation = 0;
   Song song;
-  bool save = false;
   std::string cache_dir;
   std::vector<float> data;
 };
 
 gpointer WaveformGenerateThread(gpointer data) {
   auto *job = static_cast<WaveJob *>(data);
-  job->data = WaveformLoader().Generate(job->song, job->save, job->cache_dir);
+  job->data = WaveformLoader().Generate(job->song, false, job->cache_dir);
   g_idle_add(+[](gpointer idle_data) -> gboolean {
     std::unique_ptr<WaveJob> job(static_cast<WaveJob *>(idle_data));
     if (!job->alive || !*job->alive || !job->controller) {
@@ -113,6 +112,14 @@ std::vector<float> WaveformLoader::Load(const Song &song) {
   return Generate(song, save, StandardPaths::WaveformCacheDir());
 }
 
+void WaveformLoader::WriteSidecar(const std::string &url, const std::vector<float> &peaks) const {
+  const std::string path = FileUtils::PathFromUri(url);
+  if (!SeekbarAnalysis::ShouldWriteSidecar(true, path, !peaks.empty())) {
+    return;
+  }
+  FileUtils::WriteFile(WaveformStyle::HiddenSidecar(path), SerializePeaks(peaks));
+}
+
 WaveformController::WaveformController(WaveformLoader *loader) : loader_(loader) { ReloadSettings(); }
 
 WaveformController::~WaveformController() { *alive_ = false; }
@@ -127,6 +134,9 @@ void WaveformController::ApplyGenerated(int generation, std::vector<float> data,
   }
   data_ = std::move(data);
   busy_ = false;
+  if (loader_ && SeekbarAnalysis::ShouldWriteSidecar(save_, FileUtils::PathFromUri(url), !data_.empty())) {
+    loader_->WriteSidecar(url, data_);
+  }
   Ready.Emit(data_);
 }
 
@@ -134,6 +144,9 @@ void WaveformController::Load(const Song &song) { CurrentSongChanged(song); }
 
 void WaveformController::ReloadSettings() {
   Settings settings;
+  settings.BeginGroup(WaveformSettings::kSettingsGroup);
+  save_ = settings.BoolValue(WaveformSettings::kSave, WaveformSettings::kDefaultSave);
+  settings.EndGroup();
   settings.BeginGroup(SeekbarSettings::kSettingsGroup);
   const bool enabled = static_cast<SeekbarSettings::Mode>(settings.IntValue(SeekbarSettings::kMode, static_cast<int>(SeekbarSettings::kDefaultMode))) ==
                        SeekbarSettings::Mode::Waveform;
@@ -202,14 +215,11 @@ void WaveformController::Generate(const Song &song) {
   if (!loader_) {
     return;
   }
-  Settings settings;
-  settings.BeginGroup(WaveformSettings::kSettingsGroup);
   auto *job = new WaveJob;
   job->controller = this;
   job->alive = alive_;
   job->generation = generation_;
   job->song = song;
-  job->save = settings.BoolValue(WaveformSettings::kSave, WaveformSettings::kDefaultSave);
   job->cache_dir = StandardPaths::WaveformCacheDir();
   busy_ = true;
   g_thread_unref(g_thread_new("waveform-generate", WaveformGenerateThread, job));

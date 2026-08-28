@@ -26,6 +26,14 @@ inline bool AcceptResult(bool enabled, bool playback_active, const std::string &
   return enabled && playback_active && job_url == current_url && AnalysisAsync::AcceptGeneration(job_generation, current_generation, alive);
 }
 
+// Qt MoodbarLoader / WaveformLoader write the song-folder sidecar using the live save_ flag at completion.
+inline bool ShouldWriteSidecar(bool save, const std::string &path, bool has_data) { return save && !path.empty() && has_data; }
+
+inline bool ShouldHonorLiveSave(bool, bool completed_save) { return completed_save; }
+
+// Qt MoodbarProxyStyle / WaveformProxyStyle::ReloadSettings call slider_->update() after Preferences.
+inline bool ShouldRedrawOnSettingsClose() { return true; }
+
 }  // namespace SeekbarAnalysis
 
 #endif  // STRAWBERRY_SEEKBARANALYSIS_H

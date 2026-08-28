@@ -33,7 +33,7 @@ AdwPreferencesPage *SubsonicSettingsPage::Create(Settings *settings, Application
                            settings->SetIntValue(SubsonicSettings::kAuthMethod, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
                            settings->Sync();
                          });
-  SettingsPage::AddButtonRow(auth, "", SubsonicSettingsLabels::Test(), [url, username, password, settings, app](GtkWidget *button) {
+  GtkWidget *test_row = SettingsPage::AddButtonRow(auth, "", SubsonicSettingsLabels::Test(), [url, username, password, settings, app](GtkWidget *button) {
     const std::string server = gtk_editable_get_text(GTK_EDITABLE(url));
     const std::string user = gtk_editable_get_text(GTK_EDITABLE(username));
     const std::string pass = gtk_editable_get_text(GTK_EDITABLE(password));
@@ -60,6 +60,31 @@ AdwPreferencesPage *SubsonicSettingsPage::Create(Settings *settings, Application
       MessageDialog::Show(nullptr, SubsonicPing::Title(result), SubsonicPing::Body(result));
     });
   });
+  GtkWidget *test_button = GTK_WIDGET(g_object_get_data(G_OBJECT(test_row), "action-button"));
+  g_object_set_data(G_OBJECT(page), "test-button", test_button);
+  g_signal_connect(page, "map", G_CALLBACK(+[](GtkWidget *widget, gpointer) {
+                     if (!SubsonicSettingsActions::ShouldReenableTestOnShow()) {
+                       return;
+                     }
+                     GtkWidget *button = GTK_WIDGET(g_object_get_data(G_OBJECT(widget), "test-button"));
+                     if (GTK_IS_WIDGET(button)) {
+                       gtk_widget_set_sensitive(button, TRUE);
+                     }
+                   }),
+                   nullptr);
+  GtkEventController *motion = gtk_event_controller_motion_new();
+  gtk_widget_add_controller(GTK_WIDGET(page), motion);
+  g_signal_connect(motion, "enter",
+                   G_CALLBACK((+[](GtkEventControllerMotion *, gdouble, gdouble, gpointer data) {
+                     if (!SubsonicSettingsActions::ShouldReenableTestOnEnter()) {
+                       return;
+                     }
+                     GtkWidget *button = GTK_WIDGET(g_object_get_data(G_OBJECT(data), "test-button"));
+                     if (GTK_IS_WIDGET(button)) {
+                       gtk_widget_set_sensitive(button, TRUE);
+                     }
+                   })),
+                   page);
   if (app) {
     if (LoginStateWidget *login = SettingsPage::AddLoginState(auth, app, "Subsonic")) {
       login->AddCredentialGroup(username);

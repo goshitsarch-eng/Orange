@@ -1,6 +1,28 @@
 #ifndef STRAWBERRY_GLOBALSHORTCUTSBACKEND_MACOS_H
 #define STRAWBERRY_GLOBALSHORTCUTSBACKEND_MACOS_H
-#ifdef __APPLE__
-class GlobalShortcutsBackendMacOs {};
-#endif
+
+#include "globalshortcuts/globalshortcutsbackend.h"
+
+class GlobalShortcutsBackendMacOs : public GlobalShortcutsBackend {
+ public:
+  explicit GlobalShortcutsBackendMacOs(GlobalShortcutsManager *manager);
+  ~GlobalShortcutsBackendMacOs() override;
+
+  bool IsAvailable() const override;
+  static bool IsAccessibilityEnabled();
+  static void ShowAccessibilityDialog();
+  void MacMediaKeyPressed(int nx_key);
+
+ protected:
+  bool DoRegister() override;
+  void DoUnregister() override;
+
+ private:
+  bool HandleAccel(const std::string &accel);
+  void HandleMediaKey(int nx_key);
+
+  void *global_monitor_ = nullptr;
+  void *local_monitor_ = nullptr;
+};
+
 #endif

@@ -100,6 +100,16 @@ TEST(PlaylistMenu, ContextRowMatchesQtIndexAt) {
   EXPECT_TRUE(PlaylistMenu::PlayEnabled(valid));
 }
 
+TEST(PlaylistMenu, KeyboardContextUsesSelectedRow) {
+  EXPECT_TRUE(PlaylistMenu::IsKeyboardTrigger(PlaylistMenu::kMenuKey, 0));
+  EXPECT_TRUE(PlaylistMenu::IsKeyboardTrigger(PlaylistMenu::kF10Key, PlaylistMenu::kShiftMask));
+  EXPECT_FALSE(PlaylistMenu::IsKeyboardTrigger(PlaylistMenu::kF10Key, 0));
+  EXPECT_TRUE(PlaylistMenu::IsKeyboardAnchor(PlaylistMenu::kKeyboardY));
+  EXPECT_FALSE(PlaylistMenu::IsKeyboardAnchor(12));
+  EXPECT_EQ(2, PlaylistMenu::ContextRowFromKeyboard(2, 5));
+  EXPECT_EQ(-1, PlaylistMenu::ContextRowFromKeyboard(-1, 5));
+}
+
 TEST(PlaylistMenu, QueueLabelsMatchQt) {
   PlaylistMenu::RowInfo queued = PlaylistMenu::FromSong(LocalSong(), true);
   PlaylistMenu::RowInfo unqueued = PlaylistMenu::FromSong(LocalSong(), false);

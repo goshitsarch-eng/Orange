@@ -7,7 +7,9 @@
 #include "organize/organizecoversource.h"
 #include "organize/organizejob.h"
 #include "organize/organizepathnotify.h"
+#include "organize/organizestorage.h"
 #include "organize/organizetranscode.h"
+#include "device/devicecopyjob.h"
 #include "transcoder/transcoder.h"
 #include "utilities/fileutils.h"
 
@@ -83,9 +85,27 @@ void Organize::Begin(const SongList &songs, const std::string &destination, cons
   waiting_for_transcode_ = false;
   errors_.clear();
   entries_.clear();
-  if (destination.empty()) {
+  owned_storage_.reset();
+  storage_ = options.storage;
+  if (!storage_) {
+    if (destination.empty()) {
+      errors_.push_back({"", "Destination folder is empty"});
+      return;
+    }
+    owned_storage_ = std::make_unique<FilesystemMusicStorage>(destination);
+    storage_ = owned_storage_.get();
+  } else if (destination_.empty()) {
+    destination_ = storage_->LocalPath();
+  }
+  if (destination_.empty() && !OrganizeStorage::AllowsEmptyDestination(storage_)) {
     errors_.push_back({"", "Destination folder is empty"});
     return;
+  }
+  if (storage_) {
+    if (!storage_->StartCopy(&options_.supported_filetypes)) {
+      errors_.push_back({"", "Could not open destination"});
+      return;
+    }
   }
   entries_ = OrganizePreview::Compute(songs, format, options.transcode_mode, options.transcode_format, options.supported_filetypes);
 }
@@ -115,6 +135,13 @@ void Organize::ScheduleIdle() {
 }
 
 void Organize::Complete() {
+  if (storage_) {
+    std::string error_text;
+    storage_->FinishCopy(errors_.empty() && !cancelled_, error_text);
+    if (options_.eject_after) {
+      storage_->Eject();
+    }
+  }
   if (task_id_ > 0 && task_manager_) {
     task_manager_->SetTaskFinished(task_id_);
     task_id_ = 0;
@@ -165,7 +192,8 @@ void Organize::ProcessOne(const OrganizePreview::Entry &entry) {
     errors_.push_back({song.PrettyTitleWithArtist(), "Filename format produced an empty path"});
     return;
   }
-  std::string dest = FileUtils::Join(destination_, entry.relative_path);
+  const std::string local_root = OrganizeStorage::LocalPathOr(storage_, destination_);
+  const std::string dest = OrganizeStorage::CopyDestination(local_root, entry.relative_path);
   const Song::FileType dest_type =
       OrganizeTranscode::Check(song.filetype(), options_.transcode_mode, options_.transcode_format, options_.supported_filetypes);
   std::string temp;
@@ -184,15 +212,16 @@ void Organize::ProcessOne(const OrganizePreview::Entry &entry) {
     errors_.push_back({song.PrettyTitleWithArtist(), "Source file is missing"});
     return;
   }
-  if (OrganizeJob::ShouldSkipExisting(options_.overwrite, FileUtils::Exists(dest))) {
+  if (OrganizeJob::ShouldSkipExisting(options_.overwrite, OrganizeStorage::DestinationExists(local_root, entry.relative_path))) {
     errors_.push_back({song.PrettyTitleWithArtist(), "Destination already exists"});
     if (!temp.empty()) {
       FileUtils::Remove(temp);
     }
     return;
   }
-  g_mkdir_with_parents(FileUtils::DirName(dest).c_str(), 0755);
-  FilesystemMusicStorage storage(destination_);
+  if (OrganizeStorage::ShouldMkdir(local_root)) {
+    g_mkdir_with_parents(FileUtils::DirName(dest).c_str(), 0755);
+  }
   MusicStorage::CopyJob job;
   job.source = copy_src;
   job.destination = dest;
@@ -203,10 +232,18 @@ void Organize::ProcessOne(const OrganizePreview::Entry &entry) {
   job.playlist = options_.playlist;
   if (options_.albumcover) {
     job.cover_source = OrganizeCoverSource::ForSong(song, options_.tagreader, options_.cover_cache_path);
-    job.cover_dest = FileUtils::Join(FileUtils::DirName(dest), "cover.jpg");
+    if (OrganizeStorage::ShouldMkdir(local_root)) {
+      job.cover_dest = FileUtils::Join(FileUtils::DirName(dest), "cover.jpg");
+    }
   }
+  const int total = static_cast<int>(entries_.size());
+  job.progress = [this, total](float fraction) {
+    if (task_manager_ && task_id_ > 0) {
+      task_manager_->SetTaskProgress(task_id_, DeviceCopyJob::ScaledProgress(next_, fraction, total), DeviceCopyJob::ScaledProgressMax(total));
+    }
+  };
   std::string error_text;
-  if (!storage.CopyToStorage(job, error_text)) {
+  if (!storage_ || !storage_->CopyToStorage(job, error_text)) {
     errors_.push_back({song.PrettyTitleWithArtist(), error_text.empty() ? ("Could not write " + dest) : error_text});
   } else {
     if (OrganizePathNotify::ShouldNotify(options_.move, song, options_.destination_is_collection) && options_.collection_backend) {

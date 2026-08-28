@@ -3,6 +3,7 @@
 #include "covermanager/albumcoversearcherlabels.h"
 #include "core/application.h"
 #include "core/network.h"
+#include "dialogs/dialogclosekeys.h"
 #include "dialogs/dialoghelpers.h"
 #include "translations/translations.h"
 #include "utilities/jsonutils.h"
@@ -252,6 +253,14 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &s
   gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(state->grid), GTK_SELECTION_SINGLE);
   gtk_flow_box_set_activate_on_single_click(GTK_FLOW_BOX(state->grid), FALSE);
   gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(state->grid), TRUE);
+  GtkEventController *grid_keys = gtk_event_controller_key_new();
+  gtk_event_controller_set_propagation_phase(grid_keys, GTK_PHASE_CAPTURE);
+  gtk_widget_add_controller(state->grid, grid_keys);
+  g_signal_connect(grid_keys, "key-pressed",
+                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType, gpointer) -> gboolean {
+                     return AlbumCoverSearcher::ShouldIgnoreEnter(keyval) ? TRUE : FALSE;
+                   })),
+                   nullptr);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), state->grid);
   gtk_box_append(GTK_BOX(box), scroll);
 
@@ -313,6 +322,7 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &s
                    state);
 
   adw_dialog_set_child(dialog, box);
+  DialogCloseKeys::Attach(dialog);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
   if (AlbumCoverSearcher::ShouldAutoSearch(target.EffectiveAlbumartist(), target.album())) {
     StartSearch(state);

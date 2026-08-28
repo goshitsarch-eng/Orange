@@ -17,6 +17,8 @@ class BusyIndicator {
 
   void Show(const std::string &text = {});
   void Hide();
+  void OnMapped();
+  void OnUnmapped();
   bool visible() const { return visible_; }
 
  private:

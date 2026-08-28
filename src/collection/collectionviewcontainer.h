@@ -16,6 +16,7 @@ class CollectionViewContainer {
   GtkWidget *widget() const { return widget_; }
   CollectionView *view() const { return view_.get(); }
   CollectionFilterWidget *filter_widget() const { return filter_widget_.get(); }
+  void ApplyLook();
 
  private:
   GtkWidget *widget_ = nullptr;
