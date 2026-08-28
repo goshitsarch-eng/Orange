@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <glib.h>
+#include <pango/pangocairo.h>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -149,6 +150,36 @@ inline std::string ToCss(const Font &font) {
   out += font.family.empty() ? "Sans" : font.family;
   out += "\"";
   return out;
+}
+
+// Whether the font map actually has this family.
+// A family that is only named in the settings does not exist on every machine, and asking GTK to select a
+// font it cannot resolve is both wrong for the user and, on GTK 4.14, a critical from inside
+// gtk_font_dialog_button_set_font_desc.
+inline bool FamilyIsInstalled(const std::string &family) {
+  if (family.empty()) {
+    return false;
+  }
+  PangoFontMap *map = pango_cairo_font_map_get_default();
+  if (!map) {
+    return false;
+  }
+  PangoFontFamily **families = nullptr;
+  int count = 0;
+  pango_font_map_list_families(map, &families, &count);
+  bool found = false;
+  for (int i = 0; i < count && !found; ++i) {
+    const char *name = pango_font_family_get_name(families[i]);
+    found = name && g_ascii_strcasecmp(name, family.c_str()) == 0;
+  }
+  g_free(families);
+  return found;
+}
+
+// The family to actually render with: the requested one when it exists, otherwise a generic that always
+// resolves.
+inline std::string ResolveInstalledFamily(const std::string &family) {
+  return FamilyIsInstalled(family) ? family : std::string("Sans");
 }
 
 }  // namespace FontUtils

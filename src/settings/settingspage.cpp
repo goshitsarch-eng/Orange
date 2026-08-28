@@ -10,6 +10,8 @@
 #include "utilities/fontutils.h"
 #include "widgets/loginstatewidget.h"
 
+#include <pango/pangocairo.h>
+
 #include <cmath>
 
 #include <memory>
@@ -256,9 +258,18 @@ void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *g
   // gtk_font_dialog_button_new() takes ownership of the dialog, so there is no reference here to drop.
   // Dropping one anyway freed the dialog, and the set_font_desc() below then dereferenced it.
   GtkFontDialog *dialog = gtk_font_dialog_new();
+  // A GtkFontDialog has no font map until one is set, and setting the button's font description walks the
+  // map to resolve the family. Left unset it walks a NULL list model instead.
+  gtk_font_dialog_set_font_map(dialog, pango_cairo_font_map_get_default());
   GtkWidget *button = gtk_font_dialog_button_new(dialog);
+  if (settings && group_name) {
+    settings->BeginGroup(group_name);
+  }
   const std::string stored = settings ? settings->Value(key, fallback ? fallback : "") : (fallback ? fallback : "");
-  const std::string pango = FontUtils::ToPango(FontUtils::Parse(stored));
+  FontUtils::Font font = FontUtils::Parse(stored);
+  // Show the family that will actually be used. The configured one need not be installed on this machine.
+  font.family = FontUtils::ResolveInstalledFamily(font.family);
+  const std::string pango = FontUtils::ToPango(font);
   PangoFontDescription *desc = pango_font_description_from_string(pango.c_str());
   gtk_font_dialog_button_set_font_desc(GTK_FONT_DIALOG_BUTTON(button), desc);
   pango_font_description_free(desc);
