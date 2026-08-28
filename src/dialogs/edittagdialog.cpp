@@ -21,6 +21,7 @@
 #include "dialogs/edittagloading.h"
 #include "dialogs/edittagsave.h"
 #include "dialogs/uierror.h"
+#include "dialogs/edittagdialoglayout.h"
 #include "dialogs/edittagsummaryfields.h"
 #include "tagreader/tagreaderclient.h"
 #include "dialogs/edittagsummarylabels.h"
@@ -887,7 +888,15 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_label_set_xalign(GTK_LABEL(state->stats_label), 0);
   gtk_widget_add_css_class(state->stats_label, "dim-label");
   gtk_widget_set_visible(state->stats_label, FALSE);
-  adw_view_stack_add_titled(stack, summary, "Summary", Translations::CStr("Summary"));
+  // Every page needs to scroll, or a tall one pushes the action bar past the bottom of the dialog and the
+  // Save button becomes unreachable.
+  GtkWidget *summary_scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(summary_scroll, TRUE);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(summary_scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(summary_scroll), summary);
+  gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(summary_scroll), EditTagDialogLayout::kMinPageHeight);
+  gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(summary_scroll), TRUE);
+  adw_view_stack_add_titled_with_icon(stack, summary_scroll, "Summary", Translations::CStr("Summary"), "audio-x-generic-symbolic");
 
   GtkWidget *tags = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   gtk_widget_set_margin_start(tags, 12);
@@ -1020,7 +1029,9 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_widget_set_vexpand(tags_scroll, TRUE);
   gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(tags_scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(tags_scroll), tags);
-  adw_view_stack_add_titled(stack, tags_scroll, "Tags", Translations::CStr("Tags"));
+  gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(tags_scroll), EditTagDialogLayout::kMinPageHeight);
+  gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(tags_scroll), TRUE);
+  adw_view_stack_add_titled_with_icon(stack, tags_scroll, "Tags", Translations::CStr("Tags"), "document-edit-symbolic");
 
   state->lyrics_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
   gtk_widget_set_margin_start(state->lyrics_page, 12);
@@ -1066,8 +1077,14 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                    }),
                    state);
   gtk_box_append(GTK_BOX(state->lyrics_page), lyrics_header);
-  gtk_box_append(GTK_BOX(state->lyrics_page), state->lyrics);
-  adw_view_stack_add_titled(stack, state->lyrics_page, "Lyrics", Translations::CStr("Lyrics"));
+  GtkWidget *lyrics_scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(lyrics_scroll, TRUE);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(lyrics_scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(lyrics_scroll), state->lyrics);
+  gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(lyrics_scroll), EditTagDialogLayout::kMinPageHeight);
+  gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(lyrics_scroll), TRUE);
+  gtk_box_append(GTK_BOX(state->lyrics_page), lyrics_scroll);
+  adw_view_stack_add_titled_with_icon(stack, state->lyrics_page, "Lyrics", Translations::CStr("Lyrics"), "format-justify-left-symbolic");
 
   GtkWidget *stats_page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
   gtk_widget_set_margin_start(stats_page, 12);
@@ -1101,7 +1118,13 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
   gtk_box_append(GTK_BOX(stats_page), last_row);
   gtk_box_append(GTK_BOX(stats_page), state->stats_path);
   gtk_box_append(GTK_BOX(stats_page), reset_stats);
-  adw_view_stack_add_titled(stack, stats_page, "Statistics", Translations::CStr("Statistics"));
+  GtkWidget *stats_scroll = gtk_scrolled_window_new();
+  gtk_widget_set_vexpand(stats_scroll, TRUE);
+  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(stats_scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(stats_scroll), stats_page);
+  gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(stats_scroll), EditTagDialogLayout::kMinPageHeight);
+  gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(stats_scroll), TRUE);
+  adw_view_stack_add_titled_with_icon(stack, stats_scroll, "Statistics", Translations::CStr("Statistics"), "view-list-symbolic");
 
   state->actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
   gtk_widget_set_margin_start(state->actions, 12);
