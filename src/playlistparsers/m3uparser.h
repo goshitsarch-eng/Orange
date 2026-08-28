@@ -1,37 +1,94 @@
-#ifndef STRAWBERRY_M3UPARSER_H
-#define STRAWBERRY_M3UPARSER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlistparsers/parserbase.h"
+#ifndef M3UPARSER_H
+#define M3UPARSER_H
 
-#include <set>
-#include <string>
+#include "config.h"
+
+#include <QtGlobal>
+#include <QObject>
+#include <QByteArray>
+#include <QSet>
+#include <QHash>
+#include <QString>
+#include <QStringList>
+#include <QDir>
+
+#include "includes/shared_ptr.h"
+#include "constants/playlistsettings.h"
+#include "core/song.h"
+#include "parserbase.h"
+
+class QIODevice;
+class TagReaderClient;
+class CollectionBackendInterface;
 
 class M3UParser : public ParserBase {
+  Q_OBJECT
+
  public:
-  struct Metadata {
-    std::string artist;
-    std::string title;
-    int64_t length_nanosec = -1;
-  };
+  explicit M3UParser(const SharedPtr<TagReaderClient> tagreader_client, const SharedPtr<CollectionBackendInterface> collection_backend, QObject *parent = nullptr);
 
-  static const int kMaxNestingDepth;
-
-  std::string name() const override { return "M3U"; }
-  std::vector<std::string> file_extensions() const override { return {"m3u", "m3u8"}; }
-  std::string mime_type() const override { return "text/uri-list"; }
+  QString name() const override { return QStringLiteral("M3U"); }
+  QStringList file_extensions() const override { return QStringList() << QStringLiteral("m3u") << QStringLiteral("m3u8"); }
+  QString mime_type() const override { return QStringLiteral("text/uri-list"); }
+  bool load_supported() const override { return true; }
   bool save_supported() const override { return true; }
-  bool TryMagic(const std::string &data) const override;
-  SongList Load(const std::string &data, const std::string &playlist_path = {}) const override;
-  bool Save(const std::string &path, const SongList &songs) const override;
 
-  static bool ParseMetadata(const std::string &line, Metadata *metadata);
-  static bool IsNestedPlaylistReference(const std::string &line);
+  bool TryMagic(const QByteArray &data) const override;
+
+  LoadResult Load(QIODevice *device, const QString &playlist_path = QLatin1String(""), const QDir &dir = QDir(), const bool collection_lookup = true) const override;
+  void Save(const QString &playlist_name, const SongList &songs, QIODevice *device, const QDir &dir = QDir(), const PlaylistSettings::PathType path_type = PlaylistSettings::PathType::Automatic) const override;
+
+  static constexpr int kMaxNestingDepth = 5;
 
  private:
-  void ParsePlaylistData(const std::string &data, const std::string &dir, std::set<std::string> *ancestors, int depth,
-                         SongList *songs) const;
-  void LoadNested(const std::string &filename, const std::string &dir, std::set<std::string> *ancestors, int depth,
-                  SongList *songs) const;
+  enum class M3UType {
+    STANDARD = 0,
+    EXTENDED,  // Includes extended info (track, artist, etc.)
+    LINK,      // Points to a directory.
+  };
+
+  struct Metadata {
+    Metadata() : length(-1) {}
+    QString artist;
+    QString title;
+    qint64 length;
+  };
+
+  static bool ParseMetadata(const QString &line, Metadata *metadata);
+
+  // Returns true when a playlist entry is a local (non-URL) reference to another .m3u/.m3u8 file, which must be expanded rather than loaded as a track.
+  // Remote or stream URLs (those carrying a URL scheme, such as an HLS http .m3u8) are left for LoadSong to turn into a stream, matching its own URL-scheme detection.
+  static bool IsNestedPlaylistReference(const QString &line);
+
+  // Parses playlist data read from device, appending resolved tracks to ret.
+  // Local nested .m3u/.m3u8 references are expanded via LoadNested while every other entry loads as a track.
+  // Shared by the top-level Load and each nested descent so entry detection lives in one place.
+  void ParsePlaylistData(QIODevice *device, const QDir &dir, QSet<QString> &ancestors, QHash<QString, SongList> &expanded, int depth, bool collection_lookup, SongList &ret) const;
+
+  // Expands a single nested .m3u/.m3u8 reference into ret.
+  // ancestors holds the canonical paths currently on the recursion path and detects true cycles, while expanded memoizes each file's parsed tracks keyed by remaining depth budget so a repeated or diamond reference is not parsed again.
+  // Recursion depth is bounded by kMaxNestingDepth.
+  void LoadNested(const QString &filename, const QDir &dir, QSet<QString> &ancestors, QHash<QString, SongList> &expanded, int depth, bool collection_lookup, SongList &ret) const;
 };
 
-#endif
+#endif  // M3UPARSER_H

@@ -1,142 +1,282 @@
-#include "spotify/spotifyfavoriterequest.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2022-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "spotify/spotifyrequest.h"
-#include "utilities/jsonutils.h"
-#include "utilities/strutils.h"
+#include "config.h"
 
-#include <algorithm>
+#include <QByteArray>
+#include <QString>
+#include <QStringList>
+#include <QUrl>
+#include <QUrlQuery>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QJsonDocument>
+#include <QJsonArray>
 
-namespace SpotifyFavoriteRequest {
+#include "includes/shared_ptr.h"
+#include "core/logging.h"
+#include "core/networkaccessmanager.h"
+#include "core/song.h"
+#include "spotifyservice.h"
+#include "spotifybaserequest.h"
+#include "spotifyfavoriterequest.h"
 
-std::string FavoriteText(FavoriteType type) {
+using namespace Qt::Literals::StringLiterals;
+
+SpotifyFavoriteRequest::SpotifyFavoriteRequest(SpotifyService *service, const SharedPtr<NetworkAccessManager> network, QObject *parent)
+    : SpotifyBaseRequest(service, network, parent) {}
+
+QString SpotifyFavoriteRequest::FavoriteText(const FavoriteType type) {
+
   switch (type) {
-    case FavoriteType::Artists:
-      return "artists";
-    case FavoriteType::Albums:
-      return "albums";
-    case FavoriteType::Songs:
-      return "tracks";
+    case FavoriteType_Artists:
+      return u"artists"_s;
+    case FavoriteType_Albums:
+      return u"albums"_s;
+    case FavoriteType_Songs:
+      return u"tracks"_s;
   }
-  return {};
+
+  return QString();
+
 }
 
-std::vector<std::string> IdsFromSongs(FavoriteType type, const SongList &songs) {
-  std::vector<std::string> ids;
+void SpotifyFavoriteRequest::AddArtists(const SongList &songs) {
+  AddFavorites(FavoriteType_Artists, songs);
+}
+
+void SpotifyFavoriteRequest::AddAlbums(const SongList &songs) {
+  AddFavorites(FavoriteType_Albums, songs);
+}
+
+void SpotifyFavoriteRequest::AddSongs(const SongList &songs) {
+  AddFavorites(FavoriteType_Songs, songs);
+}
+
+void SpotifyFavoriteRequest::AddSongs(const SongMap &songs) {
+  AddFavorites(FavoriteType_Songs, songs.values());
+}
+
+void SpotifyFavoriteRequest::AddFavorites(const FavoriteType type, const SongList &songs) {
+
+  QStringList list_ids;
+  QJsonArray array_ids;
   for (const Song &song : songs) {
-    std::string id;
+    QString id;
     switch (type) {
-      case FavoriteType::Artists:
+      case FavoriteType_Artists:
         id = song.artist_id();
         break;
-      case FavoriteType::Albums:
+      case FavoriteType_Albums:
         id = song.album_id();
         break;
-      case FavoriteType::Songs:
+      case FavoriteType_Songs:
         id = song.song_id();
         break;
     }
-    if (id.empty()) {
-      continue;
+    if (!id.isEmpty()) {
+      if (!list_ids.contains(id)) {
+        list_ids << id;
+      }
+      if (!array_ids.contains(id)) {
+        array_ids << id;
+      }
     }
-    if (std::find(ids.begin(), ids.end(), id) == ids.end()) {
-      ids.push_back(id);
-    }
   }
-  return ids;
+
+  if (list_ids.isEmpty() || array_ids.isEmpty()) return;
+
+  const QByteArray json_data = QJsonDocument(array_ids).toJson();
+  const QString ids_list = list_ids.join(u',');
+
+  AddFavoritesRequest(type, ids_list, json_data, songs);
+
 }
 
-std::string JsonIdArray(const std::vector<std::string> &ids) {
-  std::string json = "[";
-  for (size_t i = 0; i < ids.size(); ++i) {
-    if (i > 0) {
-      json += ",";
-    }
-    json += "\"" + StrUtils::JsonEscape(ids[i]) + "\"";
+void SpotifyFavoriteRequest::AddFavoritesRequest(const FavoriteType type, const QString &ids_list, const QByteArray &json_data, const SongList &songs) {
+
+  QUrl url(QLatin1String(SpotifyService::kApiUrl) + (type == FavoriteType_Artists ? u"/me/following"_s : u"/me/"_s + FavoriteText(type)));
+  if (type == FavoriteType_Artists) {
+    QUrlQuery url_query;
+    url_query.addQueryItem(u"type"_s, u"artist"_s);
+    url_query.addQueryItem(u"ids"_s, ids_list);
+    url.setQuery(url_query);
   }
-  json += "]";
-  return json;
+  QNetworkRequest network_request(url);
+  network_request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+  network_request.setHeader(QNetworkRequest::ContentTypeHeader, u"application/x-www-form-urlencoded"_s);
+  if (service_->authenticated()) {
+    network_request.setRawHeader("Authorization", service_->authorization_header());
+  }
+  QNetworkReply *reply = nullptr;
+  if (type == FavoriteType_Artists) {
+    reply = network_->put(network_request, "");
+  }
+  else {
+    reply = network_->put(network_request, json_data);
+  }
+  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, type, songs]() { AddFavoritesReply(reply, type, songs); });
+  replies_ << reply;
+
 }
 
-std::string JoinedIds(const std::vector<std::string> &ids) {
-  std::string joined;
-  for (size_t i = 0; i < ids.size(); ++i) {
-    if (i > 0) {
-      joined += ",";
-    }
-    joined += ids[i];
-  }
-  return joined;
-}
+void SpotifyFavoriteRequest::AddFavoritesReply(QNetworkReply *reply, const FavoriteType type, const SongList &songs) {
 
-std::string ListUrl(const std::string &api_url, FavoriteType type, int offset, int limit) {
-  std::string url;
-  if (type == FavoriteType::Artists) {
-    url = api_url + "/me/following?type=artist";
-  } else {
-    url = api_url + "/me/" + FavoriteText(type);
-  }
-  if (limit > 0) {
-    url += (url.find('?') == std::string::npos ? "?" : "&") + std::string("limit=") + std::to_string(limit);
-  }
-  if (offset > 0) {
-    url += (url.find('?') == std::string::npos ? "?" : "&") + std::string("offset=") + std::to_string(offset);
-  }
-  return url;
-}
+  if (!replies_.contains(reply)) return;
+  replies_.removeAll(reply);
+  QObject::disconnect(reply, nullptr, this, nullptr);
+  reply->deleteLater();
 
-SongList Parse(FavoriteType type, const std::string &json) { return SpotifyRequest::Parse(SpotifyRequest::FromFavoriteType(type), json); }
-
-std::string MutateUrl(const std::string &api_url, FavoriteType type, const std::vector<std::string> &ids) {
-  if (type == FavoriteType::Artists) {
-    return api_url + "/me/following?type=artist&ids=" + StrUtils::UriEscape(JoinedIds(ids));
-  }
-  return api_url + "/me/" + FavoriteText(type) + "?ids=" + StrUtils::UriEscape(JoinedIds(ids));
-}
-
-void Get(NetworkAccessManager *network, const std::string &api_url, const std::map<std::string, std::string> &headers, FavoriteType type,
-         SearchCallback callback, StreamingPage::ProgressCallback progress, StreamingPage::StillCurrent still_current,
-         StreamingPage::ErrorCallback error) {
-  SpotifyRequest::GetAll(
-      network, [api_url, type](int offset, int limit) { return ListUrl(api_url, type, offset, limit); }, headers,
-      SpotifyRequest::FromFavoriteType(type), std::move(callback), std::move(progress), std::move(still_current),
-      StreamingPage::kDefaultLimit, 0, std::move(error));
-}
-
-void Add(NetworkAccessManager *network, const std::string &api_url, const std::map<std::string, std::string> &headers, FavoriteType type,
-         const SongList &songs, SearchCallback callback) {
-  const std::vector<std::string> ids = IdsFromSongs(type, songs);
-  if (!network || ids.empty()) {
-    if (callback) {
-      callback({});
-    }
+  const JsonObjectResult json_object_result = ParseJsonObject(reply);
+  if (!json_object_result.success()) {
+    Error(json_object_result.error_message);
     return;
   }
-  const std::string body = type == FavoriteType::Artists ? std::string() : JsonIdArray(ids);
-  network->Put(MutateUrl(api_url, type, ids), body,
-               [callback, songs](const NetworkAccessManager::Response &response) {
-                 if (callback) {
-                   callback(response.ok() ? songs : SongList{});
-                 }
-               },
-               "application/x-www-form-urlencoded", headers);
+
+  if (type == FavoriteType_Artists) {
+    qLog(Debug) << "Spotify:" << songs.count() << "songs added to followed" << FavoriteText(type);
+  }
+  else {
+    qLog(Debug) << "Spotify:" << songs.count() << "songs added to saved" << FavoriteText(type);
+  }
+
+  switch (type) {
+    case FavoriteType_Artists:
+      Q_EMIT ArtistsAdded(songs);
+      break;
+    case FavoriteType_Albums:
+      Q_EMIT AlbumsAdded(songs);
+      break;
+    case FavoriteType_Songs:
+      Q_EMIT SongsAdded(songs);
+      break;
+  }
+
 }
 
-void Remove(NetworkAccessManager *network, const std::string &api_url, const std::map<std::string, std::string> &headers, FavoriteType type,
-            const SongList &songs, SearchCallback callback) {
-  const std::vector<std::string> ids = IdsFromSongs(type, songs);
-  if (!network || ids.empty()) {
-    if (callback) {
-      callback({});
+void SpotifyFavoriteRequest::RemoveArtists(const SongList &songs) {
+  RemoveFavorites(FavoriteType_Artists, songs);
+}
+
+void SpotifyFavoriteRequest::RemoveAlbums(const SongList &songs) {
+  RemoveFavorites(FavoriteType_Albums, songs);
+}
+
+void SpotifyFavoriteRequest::RemoveSongs(const SongList &songs) {
+  RemoveFavorites(FavoriteType_Songs, songs);
+}
+
+void SpotifyFavoriteRequest::RemoveSongs(const SongMap &songs) {
+
+  RemoveFavorites(FavoriteType_Songs, songs.values());
+
+}
+
+void SpotifyFavoriteRequest::RemoveFavorites(const FavoriteType type, const SongList &songs) {
+
+  QStringList list_ids;
+  QJsonArray array_ids;
+  for (const Song &song : songs) {
+    QString id;
+    switch (type) {
+      case FavoriteType_Artists:
+        id = song.artist_id();
+        break;
+      case FavoriteType_Albums:
+        id = song.album_id();
+        break;
+      case FavoriteType_Songs:
+        id = song.song_id();
+        break;
     }
+    if (!id.isEmpty()) {
+      if (!list_ids.contains(id)) {
+        list_ids << id;
+      }
+      if (!array_ids.contains(id)) {
+        array_ids << id;
+      }
+    }
+  }
+
+  if (list_ids.isEmpty() || array_ids.isEmpty()) return;
+
+  const QByteArray json_data = QJsonDocument(array_ids).toJson();
+  const QString ids_list = list_ids.join(u',');
+
+  RemoveFavoritesRequest(type, ids_list, json_data, songs);
+
+}
+
+void SpotifyFavoriteRequest::RemoveFavoritesRequest(const FavoriteType type, const QString &ids_list, const QByteArray &json_data, const SongList &songs) {
+
+  Q_UNUSED(json_data)
+
+  QUrl url(QLatin1String(SpotifyService::kApiUrl) + (type == FavoriteType_Artists ? u"/me/following"_s : u"/me/"_s + FavoriteText(type)));
+  QUrlQuery url_query;
+  if (type == FavoriteType_Artists) {
+    url_query.addQueryItem(u"type"_s, u"artist"_s);
+  }
+  url_query.addQueryItem(u"ids"_s, ids_list);
+  url.setQuery(url_query);
+  QNetworkRequest network_request(url);
+  network_request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+  network_request.setHeader(QNetworkRequest::ContentTypeHeader, u"application/x-www-form-urlencoded"_s);
+  if (service_->authenticated()) {
+    network_request.setRawHeader("Authorization", service_->authorization_header());
+  }
+  QNetworkReply *reply = network_->deleteResource(network_request);
+  QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, type, songs]() { RemoveFavoritesReply(reply, type, songs); });
+  replies_ << reply;
+
+}
+
+void SpotifyFavoriteRequest::RemoveFavoritesReply(QNetworkReply *reply, const FavoriteType type, const SongList &songs) {
+
+  if (!replies_.contains(reply)) return;
+  replies_.removeAll(reply);
+  QObject::disconnect(reply, nullptr, this, nullptr);
+  reply->deleteLater();
+
+  const JsonObjectResult json_object_result = ParseJsonObject(reply);
+  if (!json_object_result.success()) {
+    Error(json_object_result.error_message);
     return;
   }
-  network->Delete(MutateUrl(api_url, type, ids),
-                  [callback, songs](const NetworkAccessManager::Response &response) {
-                    if (callback) {
-                      callback(response.ok() ? songs : SongList{});
-                    }
-                  },
-                  headers);
-}
 
-}  // namespace SpotifyFavoriteRequest
+  if (type == FavoriteType_Artists) {
+    qLog(Debug) << "Spotify:" << songs.count() << "songs removed from followed" << FavoriteText(type);
+  }
+  else {
+    qLog(Debug) << "Spotify:" << songs.count() << "songs removed from saved" << FavoriteText(type);
+  }
+
+  switch (type) {
+    case FavoriteType_Artists:
+      Q_EMIT ArtistsRemoved(songs);
+      break;
+    case FavoriteType_Albums:
+      Q_EMIT AlbumsRemoved(songs);
+      break;
+    case FavoriteType_Songs:
+      Q_EMIT SongsRemoved(songs);
+      break;
+  }
+
+}

@@ -1,313 +1,420 @@
-#include "settings/notificationssettingspage.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/notificationssettings.h"
-#include "settings/notificationpreviewsong.h"
-#include "context/contextformattokens.h"
-#include "core/application.h"
-#include "core/song.h"
+#include "config.h"
+
+#include <QtGlobal>
+#include <QAction>
+#include <QImage>
+#include <QColor>
+#include <QRgb>
+#include <QMenu>
+#include <QFont>
+#include <QFontDialog>
+#include <QCursor>
+#include <QGroupBox>
+#include <QLabel>
+#include <QLineEdit>
+#include <QColorDialog>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QPushButton>
+#include <QRadioButton>
+#include <QSlider>
+#include <QSpinBox>
+#include <QToolButton>
+#include <QToolTip>
+#include <QtEvents>
+#include <QSettings>
+
+#include "core/iconloader.h"
+#include "core/settings.h"
 #include "osd/osdbase.h"
 #include "osd/osdpretty.h"
-#include "settings/notificationscontrols.h"
-#include "settings/notificationssettingslabels.h"
-#include "settings/settingspage.h"
-#include "translations/translations.h"
-#include "utilities/colorutils.h"
+#include "settingspage.h"
+#include "settingsdialog.h"
+#include "notificationssettingspage.h"
+#include "ui_notificationssettingspage.h"
+#include "constants/notificationssettings.h"
 
-#include <string>
-#include <utility>
-#include <vector>
+using namespace Qt::Literals::StringLiterals;
 
-namespace {
+class QHideEvent;
+class QShowEvent;
 
-struct NotificationSensitivity {
-  GtkWidget *duration = nullptr;
-  GtkWidget *disable_duration = nullptr;
-  GtkWidget *art = nullptr;
-  GtkWidget *general = nullptr;
-  GtkWidget *pretty = nullptr;
-  GtkWidget *custom = nullptr;
-  GtkWidget *custom_toggle = nullptr;
-  GtkWidget *text1 = nullptr;
-  GtkWidget *text2 = nullptr;
-  GtkWidget *preview = nullptr;
-  GtkWidget *tokens1 = nullptr;
-  GtkWidget *tokens2 = nullptr;
-};
+NotificationsSettingsPage::NotificationsSettingsPage(SettingsDialog *dialog, OSDBase *osd, QWidget *parent)
+    : SettingsPage(dialog, parent),
+      ui_(new Ui_NotificationsSettingsPage),
+      osd_(osd),
+      pretty_popup_(new OSDPretty(OSDPretty::Mode::Draggable)) {
 
-OSDSettings::Type ComboOsdType(AdwComboRow *combo) {
-  return NotificationsControls::TypeFromSelected(
-      static_cast<std::vector<std::string> *>(g_object_get_data(G_OBJECT(combo), "choice-ids")), adw_combo_row_get_selected(combo));
+  ui_->setupUi(this);
+  setWindowIcon(IconLoader::Load(u"help-hint"_s, true, 0, 32));
+
+  pretty_popup_->SetMessage(tr("OSD Preview"), tr("Drag to reposition"), QImage(u":/pictures/cdcase.png"_s));
+
+  ui_->notifications_bg_preset->setItemData(0, QColor(OSDPrettySettings::kPresetBlue), Qt::DecorationRole);
+  ui_->notifications_bg_preset->setItemData(1, QColor(OSDPrettySettings::kPresetRed), Qt::DecorationRole);
+
+  // Create and populate the helper menus
+  QMenu *menu = new QMenu(this);
+  menu->addAction(ui_->action_title);
+  menu->addAction(ui_->action_album);
+  menu->addAction(ui_->action_artist);
+  menu->addAction(ui_->action_albumartist);
+  menu->addAction(ui_->action_disc);
+  menu->addAction(ui_->action_track);
+  menu->addAction(ui_->action_year);
+  menu->addAction(ui_->action_originalyear);
+  menu->addAction(ui_->action_genre);
+  menu->addAction(ui_->action_composer);
+  menu->addAction(ui_->action_performer);
+  menu->addAction(ui_->action_grouping);
+  menu->addAction(ui_->action_length);
+  menu->addAction(ui_->action_filename);
+  menu->addAction(ui_->action_url);
+  menu->addAction(ui_->action_playcount);
+  menu->addAction(ui_->action_skipcount);
+  menu->addAction(ui_->action_rating);
+  menu->addSeparator();
+  menu->addAction(ui_->action_newline);
+  ui_->notifications_exp_chooser1->setMenu(menu);
+  ui_->notifications_exp_chooser2->setMenu(menu);
+  ui_->notifications_exp_chooser1->setPopupMode(QToolButton::InstantPopup);
+  ui_->notifications_exp_chooser2->setPopupMode(QToolButton::InstantPopup);
+  // We need this because by default menus don't show tooltips
+  QObject::connect(menu, &QMenu::hovered, this, &NotificationsSettingsPage::ShowMenuTooltip);
+
+  QObject::connect(ui_->notifications_none, &QRadioButton::toggled, this, &NotificationsSettingsPage::NotificationTypeChanged);
+  QObject::connect(ui_->notifications_native, &QRadioButton::toggled, this, &NotificationsSettingsPage::NotificationTypeChanged);
+  QObject::connect(ui_->notifications_tray, &QRadioButton::toggled, this, &NotificationsSettingsPage::NotificationTypeChanged);
+  QObject::connect(ui_->notifications_pretty, &QRadioButton::toggled, this, &NotificationsSettingsPage::NotificationTypeChanged);
+  QObject::connect(ui_->notifications_opacity, &QSlider::valueChanged, this, &NotificationsSettingsPage::PrettyOpacityChanged);
+  QObject::connect(ui_->notifications_bg_preset, QOverload<int>::of(&QComboBox::activated), this, &NotificationsSettingsPage::PrettyColorPresetChanged);
+  QObject::connect(ui_->notifications_fg_choose, &QPushButton::clicked, this, &NotificationsSettingsPage::ChooseFgColor);
+  QObject::connect(ui_->notifications_font_choose, &QPushButton::clicked, this, &NotificationsSettingsPage::ChooseFont);
+  QObject::connect(ui_->notifications_exp_chooser1, &QToolButton::triggered, this, &NotificationsSettingsPage::InsertVariableFirstLine);
+  QObject::connect(ui_->notifications_exp_chooser2, &QToolButton::triggered, this, &NotificationsSettingsPage::InsertVariableSecondLine);
+  QObject::connect(ui_->notifications_disable_duration, &QCheckBox::toggled, ui_->notifications_duration, &NotificationsSettingsPage::setDisabled);
+
+  ui_->notifications_native->setEnabled(osd_->SupportsNativeNotifications());
+  ui_->notifications_tray->setEnabled(osd_->SupportsTrayPopups());
+  ui_->notifications_pretty->setEnabled(osd_->SupportsOSDPretty());
+
+  QObject::connect(ui_->notifications_pretty, &QRadioButton::toggled, this, &NotificationsSettingsPage::UpdatePopupVisible);
+
+  QObject::connect(ui_->notifications_custom_text_enabled, &QCheckBox::toggled, this, &NotificationsSettingsPage::NotificationCustomTextChanged);
+  QObject::connect(ui_->notifications_preview, &QPushButton::clicked, this, &NotificationsSettingsPage::PrepareNotificationPreview);
+
+  // Icons
+  ui_->notifications_exp_chooser1->setIcon(IconLoader::Load(u"list-add"_s));
+  ui_->notifications_exp_chooser2->setIcon(IconLoader::Load(u"list-add"_s));
+
+  QObject::connect(pretty_popup_, &OSDPretty::PositionChanged, this, &NotificationsSettingsPage::PrettyOSDChanged);
+  QObject::connect(ui_->richpresence_enabled, &QCheckBox::toggled, this, &NotificationsSettingsPage::DiscordRPCChanged);
+
 }
 
-void ApplyNotificationSensitivity(AdwComboRow *combo) {
-  auto *state = static_cast<NotificationSensitivity *>(g_object_get_data(G_OBJECT(combo), "sensitivity"));
-  if (!state) {
-    return;
-  }
-  const OSDSettings::Type type = ComboOsdType(combo);
-  const bool disable_duration = state->disable_duration && adw_switch_row_get_active(ADW_SWITCH_ROW(state->disable_duration));
-  if (state->general) {
-    gtk_widget_set_sensitive(state->general, NotificationsControls::GeneralSensitive(type) ? TRUE : FALSE);
-  }
-  if (state->pretty) {
-    gtk_widget_set_sensitive(state->pretty, NotificationsControls::PrettyGroupSensitive(type) ? TRUE : FALSE);
-  }
-  const bool custom_on = state->custom_toggle && adw_switch_row_get_active(ADW_SWITCH_ROW(state->custom_toggle));
-  if (state->custom) {
-    gtk_widget_set_sensitive(state->custom, NotificationsControls::CustomTextSensitive(type) ? TRUE : FALSE);
-  }
-  if (state->text1) {
-    gtk_widget_set_sensitive(state->text1, NotificationsControls::CustomFieldsEnabled(type, custom_on) ? TRUE : FALSE);
-  }
-  if (state->text2) {
-    gtk_widget_set_sensitive(state->text2, NotificationsControls::CustomFieldsEnabled(type, custom_on) ? TRUE : FALSE);
-  }
-  if (state->preview) {
-    gtk_widget_set_sensitive(state->preview, NotificationsControls::PreviewEnabled(type, custom_on) ? TRUE : FALSE);
-  }
-  if (state->tokens1) {
-    gtk_widget_set_sensitive(state->tokens1, NotificationsControls::TokenGroupsEnabled(type, custom_on) ? TRUE : FALSE);
-  }
-  if (state->tokens2) {
-    gtk_widget_set_sensitive(state->tokens2, NotificationsControls::TokenGroupsEnabled(type, custom_on) ? TRUE : FALSE);
-  }
-  if (state->art) {
-    gtk_widget_set_sensitive(state->art, NotificationsControls::ArtSensitive(type) ? TRUE : FALSE);
-  }
-  if (state->disable_duration) {
-    gtk_widget_set_sensitive(state->disable_duration, NotificationsControls::DisableDurationSensitive(type) ? TRUE : FALSE);
-  }
-  if (state->duration) {
-    gtk_widget_set_sensitive(state->duration, NotificationsControls::DurationSpinSensitive(type, disable_duration) ? TRUE : FALSE);
-  }
+NotificationsSettingsPage::~NotificationsSettingsPage() {
+  delete pretty_popup_;
+  delete ui_;
 }
 
-void UpdatePrettyPreview(GtkWidget *page, AdwComboRow *type) {
-  if (!page || !type) {
-    return;
-  }
-  const bool show = NotificationsControls::ShouldShowPrettyPreview(gtk_widget_get_mapped(page), ComboOsdType(type));
-  auto *preview = static_cast<OSDPretty *>(g_object_get_data(G_OBJECT(page), "pretty-preview"));
-  if (!show) {
-    if (preview) {
-      preview->Hide();
-    }
-    return;
-  }
-  if (!preview) {
-    preview = new OSDPretty(OSDPretty::Mode::Draggable);
-    g_object_set_data_full(G_OBJECT(page), "pretty-preview", preview, +[](gpointer data) { delete static_cast<OSDPretty *>(data); });
-  }
-  preview->ReloadSettings();
-  preview->ShowMessage(Translations::Tr("OSD Preview"), Translations::Tr("Drag to reposition"));
+void NotificationsSettingsPage::showEvent(QShowEvent *e) {
+  Q_UNUSED(e)
+  UpdatePopupVisible();
 }
 
-}  // namespace
+void NotificationsSettingsPage::hideEvent(QHideEvent *e) {
+  Q_UNUSED(e)
+  UpdatePopupVisible();
+}
 
-AdwPreferencesPage *NotificationsSettingsPage::Create(Settings *settings, Application *app) {
-  settings->BeginGroup(OSDSettings::kSettingsGroup);
-  AdwPreferencesPage *page = SettingsPage::MakePage("Notifications", "preferences-system-notifications-symbolic");
-  SettingsPage::AddDescription(SettingsPage::AddGroup(page), NotificationsSettingsLabels::Intro());
-  AdwPreferencesGroup *osd = SettingsPage::AddGroup(page, NotificationsSettingsLabels::TypeGroup());
-  const bool native = app && app->osd() ? app->osd()->SupportsNativeNotifications() : true;
-  const bool tray = app && app->osd() ? app->osd()->SupportsTrayPopups() : false;
-  const bool pretty_ok = OSDBase::SupportsOSDPretty();
-  const int type_value = settings->IntValue(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType));
-  const OSDSettings::Type effective = NotificationsControls::EffectiveType(type_value, native, tray, pretty_ok);
-  if (effective != static_cast<OSDSettings::Type>(type_value)) {
-    settings->SetIntValue(OSDSettings::kType, static_cast<int>(effective));
-  }
-  std::vector<std::pair<std::string, std::string>> type_choices;
-  for (const auto &choice : NotificationsControls::AvailableTypes(native, tray, pretty_ok)) {
-    type_choices.emplace_back(choice.first, choice.second);
-  }
-  GtkWidget *type = SettingsPage::AddCombo(osd, settings, OSDSettings::kType, NotificationsSettingsLabels::TypeGroup(), type_choices,
-                                           std::to_string(static_cast<int>(effective)), [settings](const std::string &id) {
-                                             settings->BeginGroup(OSDSettings::kSettingsGroup);
-                                             settings->SetIntValue(OSDSettings::kType, static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
-                                             settings->Sync();
-                                           });
-  AdwPreferencesGroup *general = SettingsPage::AddGroup(page, NotificationsSettingsLabels::General());
-  GtkWidget *duration = SettingsPage::AddIntScale(general, settings, nullptr, nullptr, NotificationsSettingsLabels::PopupDuration(),
-                                                  NotificationsControls::SecondsFromMs(settings->IntValue(OSDSettings::kTimeout, OSDSettings::kDefaultTimeout)),
-                                                  NotificationsControls::MinSeconds(), NotificationsControls::MaxSeconds(), 1);
-  g_object_set_data(G_OBJECT(duration), "settings", settings);
-  g_signal_connect(duration, "value-changed", G_CALLBACK(+[](GtkRange *range, gpointer) {
-                     auto *s = static_cast<Settings *>(g_object_get_data(G_OBJECT(range), "settings"));
-                     if (!s) {
-                       return;
-                     }
-                     s->BeginGroup(OSDSettings::kSettingsGroup);
-                     s->SetIntValue(OSDSettings::kTimeout, NotificationsControls::MsFromSeconds(static_cast<int>(gtk_range_get_value(range))));
-                     s->Sync();
-                   }),
-                   nullptr);
-  settings->BeginGroup(OSDPrettySettings::kSettingsGroup);
-  GtkWidget *disable_duration =
-      SettingsPage::AddToggle(general, settings, OSDPrettySettings::kDisableDuration, NotificationsSettingsLabels::DisableDuration(), nullptr,
-                              OSDPrettySettings::kDefaultDisableDuration, OSDPrettySettings::kSettingsGroup);
-  settings->BeginGroup(OSDSettings::kSettingsGroup);
-  GtkWidget *art = SettingsPage::AddToggle(general, settings, OSDSettings::kShowArt, NotificationsSettingsLabels::ShowArt(), nullptr,
-                                           OSDSettings::kDefaultShowArt);
-  SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnVolumeChange, NotificationsSettingsLabels::ShowVolume(), nullptr,
-                          OSDSettings::kDefaultShowOnVolumeChange);
-  SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnPlayModeChange, NotificationsSettingsLabels::ShowPlayMode(), nullptr,
-                          OSDSettings::kDefaultShowOnPlayModeChange);
-  SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnPausePlayback, NotificationsSettingsLabels::ShowPause(), nullptr,
-                          OSDSettings::kDefaultShowOnPausePlayback);
-  SettingsPage::AddToggle(general, settings, OSDSettings::kShowOnResumePlayback, NotificationsSettingsLabels::ShowResume(), nullptr,
-                          OSDSettings::kDefaultShowOnResumePlayback);
-  AdwPreferencesGroup *custom = SettingsPage::AddGroup(page, NotificationsSettingsLabels::CustomGroup());
-  GtkWidget *custom_toggle =
-      SettingsPage::AddToggle(custom, settings, OSDSettings::kCustomTextEnabled, NotificationsSettingsLabels::CustomEnabled(), nullptr,
-                              OSDSettings::kDefaultCustomTextEnabled);
-  GtkWidget *text1 = SettingsPage::AddEntry(custom, settings, OSDSettings::kCustomText1, NotificationsSettingsLabels::Summary());
-  GtkWidget *text2 = SettingsPage::AddEntry(custom, settings, OSDSettings::kCustomText2, NotificationsSettingsLabels::Body());
-  SettingsPage::AddIntEntry(osd, settings, "posx", Translations::CStr("Pretty OSD X position"), 40);
-  SettingsPage::AddIntEntry(osd, settings, "posy", Translations::CStr("Pretty OSD Y position"), 40);
+void NotificationsSettingsPage::Load() {
 
-  AdwPreferencesGroup *tokens1 = SettingsPage::AddGroup(page, Translations::CStr("Insert format token into line 1"));
-  for (const auto &token : ContextFormatTokens::All()) {
-    SettingsPage::AddButtonRow(tokens1, token.second.c_str(), token.first.c_str(), [settings, token]() {
-      settings->BeginGroup(OSDSettings::kSettingsGroup);
-      const std::string current = settings->Value(OSDSettings::kCustomText1);
-      settings->SetValue(OSDSettings::kCustomText1, ContextFormatTokens::Insert(current, token.first));
-      settings->Sync();
-    });
+  Settings s;
+
+  s.beginGroup(OSDSettings::kSettingsGroup);
+  OSDSettings::Type osd_type = static_cast<OSDSettings::Type>(s.value(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType)).toInt());
+  if (!osd_->IsTypeSupported(osd_type)) {
+    osd_type = osd_->GetSupportedType();
   }
-  AdwPreferencesGroup *tokens2 = SettingsPage::AddGroup(page, Translations::CStr("Insert format token into line 2"));
-  for (const auto &token : ContextFormatTokens::All()) {
-    SettingsPage::AddButtonRow(tokens2, token.second.c_str(), token.first.c_str(), [settings, token]() {
-      settings->BeginGroup(OSDSettings::kSettingsGroup);
-      const std::string current = settings->Value(OSDSettings::kCustomText2);
-      settings->SetValue(OSDSettings::kCustomText2, ContextFormatTokens::Insert(current, token.first));
-      settings->Sync();
-    });
+  switch (osd_type) {
+    case OSDSettings::Type::Native:
+      ui_->notifications_native->setChecked(true);
+      break;
+    case OSDSettings::Type::Pretty:
+      ui_->notifications_pretty->setChecked(true);
+      break;
+    case OSDSettings::Type::TrayPopup:
+      ui_->notifications_tray->setChecked(true);
+      break;
+    case OSDSettings::Type::Disabled:
+    default:
+      ui_->notifications_none->setChecked(true);
+      break;
+  }
+  ui_->notifications_duration->setValue(s.value(OSDSettings::kTimeout, OSDSettings::kDefaultTimeout).toInt() / 1000);
+  ui_->notifications_volume->setChecked(s.value(OSDSettings::kShowOnVolumeChange, OSDSettings::kDefaultShowOnVolumeChange).toBool());
+  ui_->notifications_play_mode->setChecked(s.value(OSDSettings::kShowOnPlayModeChange, OSDSettings::kDefaultShowOnPlayModeChange).toBool());
+  ui_->notifications_pause->setChecked(s.value(OSDSettings::kShowOnPausePlayback, OSDSettings::kDefaultShowOnPausePlayback).toBool());
+  ui_->notifications_resume->setChecked(s.value(OSDSettings::kShowOnResumePlayback, OSDSettings::kDefaultShowOnResumePlayback).toBool());
+  ui_->notifications_art->setChecked(s.value(OSDSettings::kShowArt, OSDSettings::kDefaultShowArt).toBool());
+  ui_->notifications_custom_text_enabled->setChecked(s.value(OSDSettings::kCustomTextEnabled, OSDSettings::kDefaultCustomTextEnabled).toBool());
+  ui_->notifications_custom_text1->setText(s.value(OSDSettings::kCustomText1).toString());
+  ui_->notifications_custom_text2->setText(s.value(OSDSettings::kCustomText2).toString());
+  s.endGroup();
+
+#ifdef Q_OS_MACOS
+  ui_->notifications_options->setEnabled(ui_->notifications_pretty->isChecked());
+#endif
+
+  // Pretty OSD
+  pretty_popup_->ReloadSettings();
+  ui_->notifications_opacity->setValue(static_cast<int>(pretty_popup_->background_opacity() * 100));
+
+  QRgb color = pretty_popup_->background_color();
+  if (color == OSDPrettySettings::kPresetBlue) {
+    ui_->notifications_bg_preset->setCurrentIndex(0);
+  }
+  else if (color == OSDPrettySettings::kPresetRed) {
+    ui_->notifications_bg_preset->setCurrentIndex(1);
+  }
+  else {
+    ui_->notifications_bg_preset->setCurrentIndex(2);
+  }
+  ui_->notifications_bg_preset->setItemData(2, QColor(color), Qt::DecorationRole);
+  ui_->notifications_disable_duration->setChecked(pretty_popup_->disable_duration());
+
+  ui_->notifications_fading->setChecked(pretty_popup_->fading());
+
+  // Discord
+  s.beginGroup(DiscordRPCSettings::kSettingsGroup);
+  ui_->richpresence_enabled->setChecked(s.value(DiscordRPCSettings::kEnabled, DiscordRPCSettings::kDefaultEnabled).toBool());
+
+  const DiscordRPCSettings::StatusDisplayType discord_status_display_type = static_cast<DiscordRPCSettings::StatusDisplayType>(s.value(DiscordRPCSettings::kStatusDisplayType, static_cast<int>(DiscordRPCSettings::kDefaultStatusDisplayType)).toInt());
+  switch (discord_status_display_type) {
+    case DiscordRPCSettings::StatusDisplayType::App:
+      ui_->richpresence_listening_to_app->setChecked(true);
+      break;
+    case DiscordRPCSettings::StatusDisplayType::Artist:
+      ui_->richpresence_listening_to_artist->setChecked(true);
+      break;
+    case DiscordRPCSettings::StatusDisplayType::Song:
+      ui_->richpresence_listening_to_song->setChecked(true);
+      break;
+  }
+  s.endGroup();
+
+  UpdatePopupVisible();
+
+  Init(ui_->layout_notificationssettingspage->parentWidget());
+
+  if (!Settings().childGroups().contains(QLatin1String(OSDSettings::kSettingsGroup))) set_changed();
+
+}
+
+void NotificationsSettingsPage::Save() {
+
+  Settings s;
+
+  OSDSettings::Type osd_type = OSDSettings::Type::Disabled;
+  if      (ui_->notifications_none->isChecked())   osd_type = OSDSettings::Type::Disabled;
+  else if (osd_->SupportsNativeNotifications() && ui_->notifications_native->isChecked()) osd_type = OSDSettings::Type::Native;
+  else if (osd_->SupportsTrayPopups() && ui_->notifications_tray->isChecked()) osd_type = OSDSettings::Type::TrayPopup;
+  else if (osd_->SupportsOSDPretty() && ui_->notifications_pretty->isChecked()) osd_type = OSDSettings::Type::Pretty;
+
+  DiscordRPCSettings::StatusDisplayType discord_status_display_type = DiscordRPCSettings::StatusDisplayType::App;
+  if      (ui_->richpresence_listening_to_app->isChecked()) discord_status_display_type = DiscordRPCSettings::StatusDisplayType::App;
+  else if (ui_->richpresence_listening_to_artist->isChecked()) discord_status_display_type = DiscordRPCSettings::StatusDisplayType::Artist;
+  else if (ui_->richpresence_listening_to_song->isChecked()) discord_status_display_type = DiscordRPCSettings::StatusDisplayType::Song;
+
+  s.beginGroup(OSDSettings::kSettingsGroup);
+  s.setValue(OSDSettings::kType, static_cast<int>(osd_type));
+  s.setValue(OSDSettings::kTimeout, ui_->notifications_duration->value() * 1000);
+  s.setValue(OSDSettings::kShowOnVolumeChange, ui_->notifications_volume->isChecked());
+  s.setValue(OSDSettings::kShowOnPlayModeChange, ui_->notifications_play_mode->isChecked());
+  s.setValue(OSDSettings::kShowOnPausePlayback, ui_->notifications_pause->isChecked());
+  s.setValue(OSDSettings::kShowOnResumePlayback, ui_->notifications_resume->isChecked());
+  s.setValue(OSDSettings::kShowArt, ui_->notifications_art->isChecked());
+  s.setValue(OSDSettings::kCustomTextEnabled, ui_->notifications_custom_text_enabled->isChecked());
+  s.setValue(OSDSettings::kCustomText1, ui_->notifications_custom_text1->text());
+  s.setValue(OSDSettings::kCustomText2, ui_->notifications_custom_text2->text());
+  s.endGroup();
+
+  s.beginGroup(OSDPrettySettings::kSettingsGroup);
+  s.setValue(OSDPrettySettings::kForegroundColor, pretty_popup_->foreground_color());
+  s.setValue(OSDPrettySettings::kBackgroundColor, pretty_popup_->background_color());
+  s.setValue(OSDPrettySettings::kBackgroundOpacity, pretty_popup_->background_opacity());
+  s.setValue(OSDPrettySettings::kPopupScreen, pretty_popup_->popup_screen());
+  s.setValue(OSDPrettySettings::kPopupPos, pretty_popup_->popup_pos());
+  s.setValue(OSDPrettySettings::kFont, pretty_popup_->font().toString());
+  s.setValue(OSDPrettySettings::kDisableDuration, ui_->notifications_disable_duration->isChecked());
+  s.setValue(OSDPrettySettings::kFading, ui_->notifications_fading->isChecked());
+  s.endGroup();
+
+  s.beginGroup(DiscordRPCSettings::kSettingsGroup);
+  s.setValue(DiscordRPCSettings::kEnabled, ui_->richpresence_enabled->isChecked());
+  s.setValue(DiscordRPCSettings::kStatusDisplayType, static_cast<int>(discord_status_display_type));
+  s.endGroup();
+
+}
+
+void NotificationsSettingsPage::PrettyOpacityChanged(int value) {
+
+  pretty_popup_->set_background_opacity(static_cast<qreal>(value) / 100.0);
+  set_changed();
+
+}
+
+void NotificationsSettingsPage::UpdatePopupVisible() {
+
+  pretty_popup_->setVisible(isVisible() && ui_->notifications_pretty->isChecked());
+
+}
+
+void NotificationsSettingsPage::PrettyColorPresetChanged(int index) {
+
+  if (dialog()->is_loading_settings()) return;
+
+  switch (index) {
+    case 0:
+      pretty_popup_->set_background_color(OSDPrettySettings::kPresetBlue);
+      break;
+
+    case 1:
+      pretty_popup_->set_background_color(OSDPrettySettings::kPresetRed);
+      break;
+
+    case 2:
+    default:
+      ChooseBgColor();
+      break;
   }
 
-  GtkWidget *preview = nullptr;
-  if (app) {
-    preview = SettingsPage::AddButtonRow(osd, NotificationsSettingsLabels::Preview(), NotificationsSettingsLabels::Preview(), [settings, app]() {
-      settings->BeginGroup(OSDSettings::kSettingsGroup);
-      settings->Sync();
-      app->osd()->ReloadSettings();
-      const SongList playlist_songs = app->playlist_manager() && app->playlist_manager()->current()
-                                          ? app->playlist_manager()->current()->songs()
-                                          : SongList{};
-      const Song song = NotificationPreviewSong::FromPlaylist(playlist_songs);
-      const int type = settings->IntValue(OSDSettings::kType, static_cast<int>(OSDSettings::kDefaultType));
-      const std::string stored1 = settings->Value(OSDSettings::kCustomText1);
-      const std::string stored2 = settings->Value(OSDSettings::kCustomText2);
-      app->osd()->ShowPreview(static_cast<OSDSettings::Type>(type), stored1.empty() ? "%artist% - %title%" : stored1,
-                              stored2.empty() ? "%album%" : stored2, song);
-    });
+  set_changed();
+
+}
+
+void NotificationsSettingsPage::ChooseBgColor() {
+
+  QColor color = QColorDialog::getColor(pretty_popup_->background_color(), this);
+  if (!color.isValid()) return;
+
+  pretty_popup_->set_background_color(color.rgb());
+  ui_->notifications_bg_preset->setItemData(2, color, Qt::DecorationRole);
+
+  set_changed();
+
+}
+
+void NotificationsSettingsPage::ChooseFgColor() {
+
+  QColor color = QColorDialog::getColor(pretty_popup_->foreground_color(), this);
+  if (!color.isValid()) return;
+
+  pretty_popup_->set_foreground_color(color.rgb());
+
+  set_changed();
+
+}
+
+void NotificationsSettingsPage::ChooseFont() {
+
+  bool ok = false;
+  QFont font = QFontDialog::getFont(&ok, pretty_popup_->font(), this);
+  if (ok) {
+    pretty_popup_->set_font(font);
+    set_changed();
   }
 
-  settings->BeginGroup(OSDPrettySettings::kSettingsGroup);
-  AdwPreferencesGroup *pretty = SettingsPage::AddGroup(page, Translations::CStr("Pretty OSD"));
-  const std::string blue = ColorUtils::HexToCss(OSDPrettySettings::kPresetBlue);
-  const std::string red = ColorUtils::HexToCss(OSDPrettySettings::kPresetRed);
-  SettingsPage::AddCombo(pretty, settings, nullptr, Translations::CStr("Color preset"),
-                         {{"custom", Translations::Tr("Custom")},
-                          {"blue", Translations::Tr("Last.fm blue")},
-                          {"red", Translations::Tr("Red")}},
-                         "custom", [settings, blue, red](const std::string &id) {
-                           if (id == "custom") {
-                             return;
-                           }
-                           settings->BeginGroup(OSDPrettySettings::kSettingsGroup);
-                           settings->SetValue(OSDPrettySettings::kForegroundColor, "#ffffff");
-                           settings->SetValue(OSDPrettySettings::kBackgroundColor, id == "red" ? red : blue);
-                           settings->Sync();
-                         });
-  SettingsPage::AddColorButton(pretty, settings, OSDPrettySettings::kSettingsGroup, OSDPrettySettings::kForegroundColor,
-                              Translations::CStr("Foreground color"), "#ffffff");
-  SettingsPage::AddColorButton(pretty, settings, OSDPrettySettings::kSettingsGroup, OSDPrettySettings::kBackgroundColor,
-                              Translations::CStr("Background color"), "#202020");
-  SettingsPage::AddOpacityScale(pretty, settings, OSDPrettySettings::kSettingsGroup, OSDPrettySettings::kBackgroundOpacity,
-                               Translations::CStr("Background opacity"), OSDPrettySettings::kDefaultBackgroundOpacity);
-  SettingsPage::AddFontButton(pretty, settings, OSDPrettySettings::kSettingsGroup, OSDPrettySettings::kFont, Translations::CStr("Font"),
-                             OSDPrettySettings::kDefaultFont);
-  auto monitors = OSDPretty::MonitorChoices();
-  if (monitors.size() == 1 && monitors.front().first.empty()) {
-    monitors.front().second = Translations::Tr("Primary");
-  }
-  const std::string current_screen = settings->Value(OSDPrettySettings::kPopupScreen);
-  SettingsPage::AddCombo(pretty, settings, nullptr, Translations::CStr("Popup screen"), monitors,
-                         current_screen.empty() ? monitors.front().first : current_screen, [settings](const std::string &id) {
-                           settings->BeginGroup(OSDPrettySettings::kSettingsGroup);
-                           settings->SetValue(OSDPrettySettings::kPopupScreen, id);
-                           settings->Sync();
-                         });
-  SettingsPage::AddToggle(pretty, settings, OSDPrettySettings::kFading, Translations::CStr("Fade the popup"), nullptr, true);
-  SettingsPage::AddButtonRow(pretty, Translations::CStr("Position preview"), Translations::CStr("Show"), [settings, page]() {
-    settings->BeginGroup(OSDPrettySettings::kSettingsGroup);
-    settings->Sync();
-    auto *preview = static_cast<OSDPretty *>(g_object_get_data(G_OBJECT(page), "pretty-preview"));
-    if (!preview) {
-      preview = new OSDPretty(OSDPretty::Mode::Draggable);
-      g_object_set_data_full(G_OBJECT(page), "pretty-preview", preview, +[](gpointer data) { delete static_cast<OSDPretty *>(data); });
-    }
-    preview->ReloadSettings();
-    preview->ShowMessage(Translations::Tr("OSD Preview"), Translations::Tr("Drag to reposition"));
-  });
+}
 
-  settings->BeginGroup(DiscordRPCSettings::kSettingsGroup);
-  AdwPreferencesGroup *discord = SettingsPage::AddGroup(page, Translations::CStr("Discord"));
-  SettingsPage::AddToggle(discord, settings, DiscordRPCSettings::kEnabled, NotificationsSettingsLabels::DiscordEnable(), nullptr,
-                          DiscordRPCSettings::kDefaultEnabled);
-  const std::string discord_id =
-      std::to_string(settings->IntValue(DiscordRPCSettings::kStatusDisplayType, static_cast<int>(DiscordRPCSettings::kDefaultStatusDisplayType)));
-  SettingsPage::AddCombo(discord, settings, DiscordRPCSettings::kStatusDisplayType, NotificationsSettingsLabels::DiscordListening(),
-                         {{"0", NotificationsSettingsLabels::DiscordApp()},
-                          {"1", NotificationsSettingsLabels::DiscordArtist()},
-                          {"2", NotificationsSettingsLabels::DiscordSong()}},
-                         discord_id, [settings](const std::string &id) {
-                           settings->BeginGroup(DiscordRPCSettings::kSettingsGroup);
-                           settings->SetIntValue(DiscordRPCSettings::kStatusDisplayType,
-                                                 static_cast<int>(g_ascii_strtoll(id.c_str(), nullptr, 10)));
-                           settings->Sync();
-                         });
-  auto *sensitivity = new NotificationSensitivity();
-  sensitivity->duration = duration;
-  sensitivity->disable_duration = disable_duration;
-  sensitivity->art = art;
-  sensitivity->general = GTK_WIDGET(general);
-  sensitivity->pretty = GTK_WIDGET(pretty);
-  sensitivity->custom = GTK_WIDGET(custom);
-  sensitivity->custom_toggle = custom_toggle;
-  sensitivity->text1 = text1;
-  sensitivity->text2 = text2;
-  sensitivity->preview = preview;
-  sensitivity->tokens1 = GTK_WIDGET(tokens1);
-  sensitivity->tokens2 = GTK_WIDGET(tokens2);
-  g_object_set_data_full(G_OBJECT(type), "sensitivity", sensitivity, +[](gpointer data) { delete static_cast<NotificationSensitivity *>(data); });
-  g_object_set_data(G_OBJECT(disable_duration), "type-row", type);
-  g_object_set_data(G_OBJECT(custom_toggle), "type-row", type);
-  ApplyNotificationSensitivity(ADW_COMBO_ROW(type));
-  g_object_set_data(G_OBJECT(page), "osd-type-row", type);
-  g_signal_connect(type, "notify::selected",
-                   G_CALLBACK((+[](AdwComboRow *combo, GParamSpec *, gpointer) {
-                     ApplyNotificationSensitivity(combo);
-                     GtkWidget *page = gtk_widget_get_ancestor(GTK_WIDGET(combo), ADW_TYPE_PREFERENCES_PAGE);
-                     UpdatePrettyPreview(page, combo);
-                   })),
-                   nullptr);
-  g_signal_connect(page, "map",
-                   G_CALLBACK((+[](GtkWidget *widget, gpointer data) { UpdatePrettyPreview(widget, ADW_COMBO_ROW(data)); })), type);
-  g_signal_connect(page, "unmap",
-                   G_CALLBACK((+[](GtkWidget *widget, gpointer data) { UpdatePrettyPreview(widget, ADW_COMBO_ROW(data)); })), type);
-  g_signal_connect(disable_duration, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
-                     if (auto *combo = ADW_COMBO_ROW(g_object_get_data(G_OBJECT(row), "type-row"))) {
-                       ApplyNotificationSensitivity(combo);
-                     }
-                   }),
-                   nullptr);
-  g_signal_connect(custom_toggle, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
-                     if (auto *combo = ADW_COMBO_ROW(g_object_get_data(G_OBJECT(row), "type-row"))) {
-                       ApplyNotificationSensitivity(combo);
-                     }
-                   }),
-                   nullptr);
-  return page;
+void NotificationsSettingsPage::NotificationCustomTextChanged(bool enabled) {
+
+  ui_->notifications_custom_text1->setEnabled(enabled);
+  ui_->notifications_custom_text2->setEnabled(enabled);
+  ui_->notifications_exp_chooser1->setEnabled(enabled);
+  ui_->notifications_exp_chooser2->setEnabled(enabled);
+  ui_->notifications_preview->setEnabled(enabled);
+  ui_->label_summary->setEnabled(enabled);
+  ui_->label_body->setEnabled(enabled);
+
+}
+
+void NotificationsSettingsPage::PrepareNotificationPreview() {
+
+  OSDSettings::Type notificationType = OSDSettings::Type::Disabled;
+  if (ui_->notifications_native->isChecked()) {
+    notificationType = OSDSettings::Type::Native;
+  }
+  else if (ui_->notifications_pretty->isChecked()) {
+    notificationType = OSDSettings::Type::Pretty;
+  }
+  else if (ui_->notifications_tray->isChecked()) {
+    notificationType = OSDSettings::Type::TrayPopup;
+  }
+
+  // If user changes timeout or other options, that won't be reflected in the preview
+  Q_EMIT NotificationPreview(notificationType, ui_->notifications_custom_text1->text(), ui_->notifications_custom_text2->text());
+
+}
+
+void NotificationsSettingsPage::InsertVariableFirstLine(QAction *action) {
+  // We use action name, therefore those shouldn't be translatable
+  ui_->notifications_custom_text1->insert(action->text());
+}
+
+void NotificationsSettingsPage::InsertVariableSecondLine(QAction *action) {
+  // We use action name, therefore those shouldn't be translatable
+  ui_->notifications_custom_text2->insert(action->text());
+}
+
+void NotificationsSettingsPage::ShowMenuTooltip(QAction *action) {
+  QToolTip::showText(QCursor::pos(), action->toolTip());
+}
+
+void NotificationsSettingsPage::NotificationTypeChanged() {
+
+  bool enabled = !ui_->notifications_none->isChecked();
+  bool pretty = ui_->notifications_pretty->isChecked();
+  bool tray = ui_->notifications_tray->isChecked();
+
+  ui_->notifications_general->setEnabled(enabled);
+  ui_->notifications_pretty_group->setEnabled(pretty);
+  ui_->notifications_custom_text_group->setEnabled(enabled);
+  ui_->notifications_art->setEnabled(!tray);
+
+#ifdef Q_OS_MACOS
+  ui_->notifications_options->setEnabled(pretty);
+#endif
+  ui_->notifications_duration->setEnabled(!pretty || !ui_->notifications_disable_duration->isChecked());
+  ui_->notifications_disable_duration->setEnabled(pretty);
+
+}
+
+void NotificationsSettingsPage::PrettyOSDChanged() {
+  set_changed();
+}
+
+void NotificationsSettingsPage::DiscordRPCChanged() {
+  set_changed();
 }

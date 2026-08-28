@@ -1,74 +1,45 @@
-#include "scrobbler/scrobblemetadata.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2023, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/scrobblersettings.h"
-#include "core/settings.h"
-#include "utilities/strutils.h"
+#include "core/song.h"
 
-std::string ScrobbleMetadata::StripRemasteredTitle(const std::string &title) {
-  std::string result = title;
-  for (int pass = 0; pass < 3; ++pass) {
-    if (result.size() < 3) {
-      break;
-    }
-    const char close = result.back();
-    const char open = close == ')' ? '(' : close == ']' ? '[' : '\0';
-    if (!open) {
-      break;
-    }
-    const auto pos = result.find_last_of(open);
-    if (pos == std::string::npos) {
-      break;
-    }
-    const std::string inner = result.substr(pos);
-    if (!StrUtils::ContainsInsensitive(inner, "remaster") && !StrUtils::ContainsInsensitive(inner, "remix") &&
-        !StrUtils::ContainsInsensitive(inner, "edition") && !StrUtils::ContainsInsensitive(inner, "anniversary")) {
-      break;
-    }
-    size_t end = pos;
-    while (end > 0 && (result[end - 1] == ' ' || result[end - 1] == '\t')) {
-      --end;
-    }
-    result.resize(end);
-  }
-  return result;
-}
+#include "scrobblemetadata.h"
 
-ScrobbleMetadata ScrobbleMetadata::FromSong(const Song &song, uint64_t timestamp, bool prefer_album_artist, bool strip_remastered) {
-  ScrobbleMetadata metadata;
-  metadata.artist = prefer_album_artist ? song.EffectiveAlbumartist() : song.artist();
-  if (metadata.artist.empty()) {
-    metadata.artist = song.artist();
-  }
-  metadata.album = song.album();
-  metadata.title = strip_remastered ? StripRemasteredTitle(song.title()) : song.title();
-  metadata.albumartist = song.EffectiveAlbumartist();
-  metadata.track = song.track();
-  metadata.length_nanosec = song.length_nanosec();
-  metadata.timestamp = timestamp;
-  metadata.musicbrainz_album_artist_id = song.musicbrainz_album_artist_id();
-  metadata.musicbrainz_artist_id = song.musicbrainz_artist_id();
-  metadata.musicbrainz_original_artist_id = song.musicbrainz_original_artist_id();
-  metadata.musicbrainz_album_id = song.musicbrainz_album_id();
-  metadata.musicbrainz_original_album_id = song.musicbrainz_original_album_id();
-  metadata.musicbrainz_recording_id = song.musicbrainz_recording_id();
-  metadata.musicbrainz_track_id = song.musicbrainz_track_id();
-  metadata.musicbrainz_disc_id = song.musicbrainz_disc_id();
-  metadata.musicbrainz_release_group_id = song.musicbrainz_release_group_id();
-  metadata.musicbrainz_work_id = song.musicbrainz_work_id();
-  if (song.is_stream()) {
-    metadata.music_service = Song::DomainForSource(song.source());
-    metadata.music_service_name = Song::DescriptionForSource(song.source());
-  }
-  metadata.share_url = song.ShareURL();
-  if (song.source() == Song::Source::Spotify) {
-    metadata.spotify_id = song.song_id();
-  }
-  return metadata;
-}
-
-ScrobbleMetadata ScrobbleMetadata::FromSongSettings(const Song &song, uint64_t timestamp) {
-  Settings settings;
-  settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
-  return FromSong(song, timestamp, settings.BoolValue(ScrobblerSettings::kAlbumArtist, ScrobblerSettings::kDefaultAlbumArtist),
-                  settings.BoolValue(ScrobblerSettings::kStripRemastered, ScrobblerSettings::kDefaultStripRemastered));
-}
+ScrobbleMetadata::ScrobbleMetadata(const Song &song)
+    : title(song.title()),
+      album(song.album()),
+      artist(song.artist()),
+      albumartist(song.albumartist()),
+      track(song.track()),
+      grouping(song.grouping()),
+      musicbrainz_album_artist_id(song.musicbrainz_album_artist_id()),
+      musicbrainz_artist_id(song.musicbrainz_artist_id()),
+      musicbrainz_original_artist_id(song.musicbrainz_original_artist_id()),
+      musicbrainz_album_id(song.musicbrainz_album_id()),
+      musicbrainz_original_album_id(song.musicbrainz_original_album_id()),
+      musicbrainz_recording_id(song.musicbrainz_recording_id()),
+      musicbrainz_track_id(song.musicbrainz_track_id()),
+      musicbrainz_disc_id(song.musicbrainz_disc_id()),
+      musicbrainz_release_group_id(song.musicbrainz_release_group_id()),
+      musicbrainz_work_id(song.musicbrainz_work_id()),
+      music_service(song.is_stream() ? song.DomainForSource() : QString()),
+      music_service_name(song.is_stream() ? song.DescriptionForSource() : QString()),
+      share_url(song.ShareURL()),
+      spotify_id(song.source() == Song::Source::Spotify ? song.song_id() : QString()),
+      length_nanosec(song.length_nanosec()) {}

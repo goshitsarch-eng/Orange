@@ -1,22 +1,43 @@
-#ifndef STRAWBERRY_STREAMSERVICEPLAYLISTITEM_H
-#define STRAWBERRY_STREAMSERVICEPLAYLISTITEM_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
+#ifndef STREAMSERVICEPLAYLISTITEM_H
+#define STREAMSERVICEPLAYLISTITEM_H
+
+#include <QUuid>
+
+#include "includes/shared_ptr.h"
 #include "core/song.h"
+#include "playlist/streamplaylistitem.h"
 
-#include <string>
+class StreamingService;
 
-class StreamServicePlaylistItem {
+class StreamServicePlaylistItem : public StreamPlaylistItem {
  public:
-  StreamServicePlaylistItem() = default;
-  explicit StreamServicePlaylistItem(const Song &song);
-
-  const Song &song() const { return song_; }
-  Song::Source source() const { return song_.source(); }
-  const std::string &url() const { return song_.url(); }
-  std::string DisplayText() const;
+  explicit StreamServicePlaylistItem(const Song::Source source, const QUuid &uuid);
+  explicit StreamServicePlaylistItem(const Song &song, const bool signal = false);
+  explicit StreamServicePlaylistItem(const SharedPtr<StreamingService> service, const Song &song, const bool signal = false);
 
  private:
-  Song song_;
+  SharedPtr<StreamingService> service_;
+
+  Q_DISABLE_COPY(StreamServicePlaylistItem)
 };
 
-#endif
+#endif  // STREAMPLAYLISTITEM_H

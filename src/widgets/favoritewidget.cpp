@@ -1,37 +1,85 @@
-#include "widgets/favoritewidget.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2013, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-FavoriteWidget::FavoriteWidget(int tab_index, bool favorite) : tab_index_(tab_index), favorite_(favorite) {
-  widget_ = gtk_button_new_from_icon_name("non-starred-symbolic");
-  gtk_widget_add_css_class(widget_, "flat");
-  g_object_set_data(G_OBJECT(widget_), "tab-part", const_cast<char *>("favorite"));
-  Refresh();
-  GtkGesture *click = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
-  gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(click));
-  g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint n_press, gdouble, gdouble, gpointer data) {
-                     if (n_press == 2) {
-                       static_cast<FavoriteWidget *>(data)->Toggle();
-                     }
-                   }),
-                   this);
+#include <QtGlobal>
+#include <QWidget>
+#include <QSize>
+#include <QStyle>
+#include <QStylePainter>
+#include <QPaintEvent>
+#include <QMouseEvent>
+
+#include "core/iconloader.h"
+
+#include "favoritewidget.h"
+
+using namespace Qt::Literals::StringLiterals;
+
+namespace {
+constexpr int kStarSize = 15;
 }
 
-void FavoriteWidget::SetFavorite(bool favorite) {
-  if (favorite_ == favorite) {
-    return;
+FavoriteWidget::FavoriteWidget(const int tab_index, const bool favorite, QWidget *parent)
+    : QWidget(parent),
+      tab_index_(tab_index),
+      favorite_(favorite),
+      on_(IconLoader::Load(u"star"_s)),
+      off_(IconLoader::Load(u"star-grey"_s)),
+      rect_(0, 0, kStarSize, kStarSize) {}
+
+void FavoriteWidget::SetFavorite(const bool favorite) {
+
+  if (favorite_ != favorite) {
+    favorite_ = favorite;
+    update();
+    Q_EMIT FavoriteStateChanged(tab_index_, favorite_);
   }
-  favorite_ = favorite;
-  Refresh();
-  if (changed_) {
-    changed_(tab_index_, favorite_);
-  }
+
 }
 
-void FavoriteWidget::Toggle() { SetFavorite(!favorite_); }
+QSize FavoriteWidget::sizeHint() const {
+  const int frame_width = 1 + style()->pixelMetric(QStyle::PM_DefaultFrameWidth);
+  return QSize(kStarSize + frame_width, kStarSize + frame_width);
+}
 
-void FavoriteWidget::SetChangedCallback(ChangedCallback callback) { changed_ = std::move(callback); }
+void FavoriteWidget::paintEvent(QPaintEvent *e) {
 
-void FavoriteWidget::Refresh() {
-  gtk_button_set_icon_name(GTK_BUTTON(widget_), favorite_ ? "starred-symbolic" : "non-starred-symbolic");
-  gtk_widget_set_tooltip_text(widget_, TooltipText());
+  Q_UNUSED(e);
+
+  QStylePainter p(this);
+
+  if (favorite_) {
+    p.drawPixmap(rect_, on_.pixmap(rect_.size(), devicePixelRatioF()));
+  }
+  else {
+    p.drawPixmap(rect_, off_.pixmap(rect_.size(), devicePixelRatioF()));
+  }
+
+}
+
+void FavoriteWidget::mouseDoubleClickEvent(QMouseEvent *e) {
+
+  Q_UNUSED(e)
+
+  favorite_ = !favorite_;
+  update();
+  Q_EMIT FavoriteStateChanged(tab_index_, favorite_);
+
 }

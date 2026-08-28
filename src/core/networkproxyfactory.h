@@ -1,37 +1,64 @@
-#ifndef STRAWBERRY_NETWORKPROXYFACTORY_H
-#define STRAWBERRY_NETWORKPROXYFACTORY_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#ifndef NETWORKPROXYFACTORY_H
+#define NETWORKPROXYFACTORY_H
+
+#include "config.h"
+
+#include <QtGlobal>
+#include <QMutex>
+#include <QList>
+#include <QString>
+#include <QUrl>
+#include <QNetworkProxy>
+#include <QNetworkProxyFactory>
 
 #include "constants/networkproxysettings.h"
-#include "engine/gstengineproxy.h"
 
-#include <string>
-
-class NetworkProxyFactory {
+class NetworkProxyFactory : public QNetworkProxyFactory {
  public:
-  enum class Mode { System, Direct, Manual };
+  static NetworkProxyFactory *Instance();
 
+  // These methods are thread-safe
   void ReloadSettings();
-  Mode mode() const { return mode_; }
-  NetworkProxySettings::ProxyType type() const { return type_; }
-  bool use_authentication() const { return use_authentication_; }
-  bool engine() const { return engine_; }
-  const std::string &hostname() const { return hostname_; }
-  int port() const { return port_; }
-  std::string ProxyUri() const;
-  std::string Scheme() const;
-  GstEngineProxy::Options EngineOptions() const;
+  QList<QNetworkProxy> queryProxy(const QNetworkProxyQuery &query) override;
 
  private:
-  static std::string SystemProxyFromEnv();
+  explicit NetworkProxyFactory();
 
-  Mode mode_ = Mode::System;
-  NetworkProxySettings::ProxyType type_ = NetworkProxySettings::kDefaultType;
-  std::string hostname_;
-  int port_ = 0;
-  bool use_authentication_ = false;
-  std::string username_;
-  std::string password_;
-  bool engine_ = NetworkProxySettings::kDefaultEngine;
+  static NetworkProxyFactory *sInstance;
+
+  QMutex mutex_;
+
+  NetworkProxySettings::Mode mode_;
+  QNetworkProxy::ProxyType type_;
+  QString hostname_;
+  quint64 port_;
+  bool use_authentication_;
+  QString username_;
+  QString password_;
+
+#ifdef Q_OS_LINUX
+  QUrl env_url_;
+#endif
 };
 
-#endif
+#endif  // NETWORKPROXYFACTORY_H

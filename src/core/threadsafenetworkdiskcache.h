@@ -1,19 +1,61 @@
-#ifndef STRAWBERRY_THREADSAFENETWORKDISKCACHE_H
-#define STRAWBERRY_THREADSAFENETWORKDISKCACHE_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <mutex>
-#include <string>
-#include <unordered_map>
+#ifndef THREADSAFENETWORKDISKCACHE_H
+#define THREADSAFENETWORKDISKCACHE_H
 
-class ThreadSafeNetworkDiskCache {
+#include "config.h"
+
+#include <QtGlobal>
+#include <QObject>
+#include <QAbstractNetworkCache>
+#include <QMutex>
+#include <QUrl>
+#include <QNetworkCacheMetaData>
+
+class QIODevice;
+class QNetworkDiskCache;
+
+class ThreadSafeNetworkDiskCache : public QAbstractNetworkCache {
+  Q_OBJECT
+
  public:
-  void Insert(const std::string &key, const std::string &data);
-  std::string Value(const std::string &key) const;
-  void Clear();
+  explicit ThreadSafeNetworkDiskCache(QObject *parent);
+  ~ThreadSafeNetworkDiskCache() override;
+
+  qint64 cacheSize() const override;
+  QIODevice *data(const QUrl &url) override;
+  void insert(QIODevice *device) override;
+  QNetworkCacheMetaData metaData(const QUrl &url) override;
+  QIODevice *prepare(const QNetworkCacheMetaData &metaData) override;
+  bool remove(const QUrl &url) override;
+  void updateMetaData(const QNetworkCacheMetaData &metaData) override;
+
+ public Q_SLOTS:
+  void clear() override;
 
  private:
-  mutable std::mutex mutex_;
-  std::unordered_map<std::string, std::string> cache_;
+  static QMutex sMutex;
+  static int sInstances;
+  static QNetworkDiskCache *sCache;
 };
 
-#endif
+#endif  // THREADSAFENETWORKDISKCACHE_H

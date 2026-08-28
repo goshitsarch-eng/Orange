@@ -1,19 +1,47 @@
-#ifndef STRAWBERRY_COLLECTIONITEMDELEGATE_H
-#define STRAWBERRY_COLLECTIONITEMDELEGATE_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "collection/collectionitem.h"
+#ifndef COLLECTIONITEMDELEGATE_H
+#define COLLECTIONITEMDELEGATE_H
 
-#include <string>
+#include "config.h"
 
-namespace CollectionItemDelegate {
+#include <QObject>
+#include <QStyledItemDelegate>
+#include <QStyleOption>
+#include <QStyleOptionViewItem>
 
-std::string PrimaryText(const CollectionItem *item);
-std::string SecondaryText(const CollectionItem *item);
-int Indent(const CollectionItem *item);
-inline bool IsDivider(const CollectionItem *item) { return item && item->type == CollectionItem::Type::Divider; }
-inline bool ShouldShowTooltip(const std::string &text) { return !text.empty(); }
-inline const std::string &TooltipText(const std::string &text) { return text; }
+class QAbstractItemView;
+class QPainter;
+class QHelpEvent;
 
-}  // namespace CollectionItemDelegate
+class CollectionItemDelegate : public QStyledItemDelegate {
+  Q_OBJECT
 
-#endif
+ public:
+  explicit CollectionItemDelegate(QObject *parent);
+  void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &idx) const override;
+
+ public Q_SLOTS:
+  bool helpEvent(QHelpEvent *event, QAbstractItemView *view, const QStyleOptionViewItem &option, const QModelIndex &idx) override;
+};
+
+#endif  // COLLECTIONITEMDELEGATE_H

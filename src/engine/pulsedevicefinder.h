@@ -1,36 +1,59 @@
-#ifndef STRAWBERRY_PULSEDEVICEFINDER_H
-#define STRAWBERRY_PULSEDEVICEFINDER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2014, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#ifndef PULSEDEVICEFINDER_H
+#define PULSEDEVICEFINDER_H
 
 #include "config.h"
-#include "engine/devicefinder.h"
 
-#ifdef HAVE_PULSE
 #include <pulse/context.h>
 #include <pulse/introspect.h>
 #include <pulse/mainloop.h>
-#endif
+
+#include "devicefinder.h"
+#include "enginedevice.h"
 
 class PulseDeviceFinder : public DeviceFinder {
  public:
-  PulseDeviceFinder();
+  explicit PulseDeviceFinder();
   ~PulseDeviceFinder() override;
 
   bool Initialize() override;
   EngineDeviceList ListDevices() override;
 
  private:
-#ifdef HAVE_PULSE
   struct ListDevicesState {
-    bool finished = false;
+    ListDevicesState() : finished(false) {}
+
+    bool finished;
     EngineDeviceList devices;
   };
 
   bool Reconnect();
-  static void GetSinkInfoCallback(pa_context *c, const pa_sink_info *info, int eol, void *state);
 
-  pa_mainloop *mainloop_ = nullptr;
-  pa_context *context_ = nullptr;
-#endif
+  static void GetSinkInfoCallback(pa_context *c, const pa_sink_info *info, int eol, void *state_voidptr);
+
+  pa_mainloop *mainloop_;
+  pa_context *context_;
+
+  Q_DISABLE_COPY(PulseDeviceFinder)
 };
 
-#endif
+#endif  // PULSEDEVICEFINDER_H

@@ -1,239 +1,663 @@
-#include "settings/appearancesettingspage.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2012, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
+#include "config.h"
+
+#include <utility>
+
+#include <QApplication>
+#include <QGuiApplication>
+#include <QWidget>
+#include <QStyleFactory>
+#include <QStyleHints>
+#include <QVariant>
+#include <QMap>
+#include <QString>
+#include <QColor>
+#include <QPalette>
+#include <QColorDialog>
+#include <QFileDialog>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QPointer>
+#include <QRadioButton>
+#include <QSlider>
+#include <QBoxLayout>
+#include <QFormLayout>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QSpinBox>
+#include <QSettings>
+
+#include "appearancesettingspage.h"
 #include "constants/appearancesettings.h"
-#include "core/appearancecolors.h"
-#include "core/appearancestyle.h"
-#include "settings/appearancesettingslabels.h"
-#include "settings/settingscontrols.h"
-#include "settings/settingspage.h"
-#include "translations/translations.h"
+#include "constants/filefilterconstants.h"
+#include "utilities/styleutils.h"
+#include "core/iconloader.h"
+#include "core/stylehelper.h"
+#include "core/settings.h"
+#include "core/appearance.h"
+#include "widgets/fancytabwidget.h"
+#include "settingspage.h"
+#include "settingsdialog.h"
+#include "ui_appearancesettingspage.h"
 
-#include <gio/gio.h>
+using namespace Qt::Literals::StringLiterals;
+using namespace AppearanceSettings;
 
-#include <string>
+AppearanceSettingsPage::AppearanceSettingsPage(SettingsDialog *dialog, SharedPtr<Appearance> appearance, QWidget *parent)
+    : SettingsPage(dialog, parent),
+      ui_(new Ui_AppearanceSettingsPage),
+      appearance_(appearance),
+      original_style_(QApplication::style() ? QApplication::style()->objectName() : QString()),
+      system_palette_(QApplication::palette()),
+      original_dark_mode_(false),
+      original_use_custom_color_set_(false),
+      background_image_type_(BackgroundImageType::Default) {
 
-namespace {
+  ui_->setupUi(this);
+  setWindowIcon(IconLoader::Load(u"view-media-visualization"_s, true, 0, 32));
 
-struct AppearanceEnableState {
-  Settings *settings = nullptr;
-  GtkWidget *dark_mode = nullptr;
-  GtkWidget *colors = nullptr;
-  GtkWidget *dark_colors = nullptr;
-  GtkWidget *reset_colors = nullptr;
-  GtkWidget *tabbar_color = nullptr;
-  GtkWidget *playlist_color = nullptr;
-  GtkWidget *filename = nullptr;
-  GtkWidget *choose = nullptr;
-  GtkWidget *position = nullptr;
-  GtkWidget *stretch = nullptr;
-  GtkWidget *keep = nullptr;
-  GtkWidget *cut = nullptr;
-  GtkWidget *max_size = nullptr;
-  GtkWidget *blur = nullptr;
-  GtkWidget *opacity = nullptr;
-};
-
-void SetSensitive(GtkWidget *widget, bool enabled) {
-  if (widget) {
-    gtk_widget_set_sensitive(widget, enabled ? TRUE : FALSE);
+  ui_->combobox_style->addItem(u"default"_s, u"default"_s);
+  const QStringList styles = QStyleFactory::keys();
+  for (const QString &style : styles) {
+    ui_->combobox_style->addItem(style, style);
   }
+
+  CreateColorSelectors();
+
+  ui_->combobox_background_image_position->setItemData(0, static_cast<int>(BackgroundImagePosition::UpperLeft));
+  ui_->combobox_background_image_position->setItemData(1, static_cast<int>(BackgroundImagePosition::UpperRight));
+  ui_->combobox_background_image_position->setItemData(2, static_cast<int>(BackgroundImagePosition::Middle));
+  ui_->combobox_background_image_position->setItemData(3, static_cast<int>(BackgroundImagePosition::BottomLeft));
+  ui_->combobox_background_image_position->setItemData(4, static_cast<int>(BackgroundImagePosition::BottomRight));
+
+  QObject::connect(ui_->checkbox_dark_mode, &QCheckBox::toggled, this, &AppearanceSettingsPage::DarkModeToggled);
+
+  QObject::connect(ui_->use_custom_color_set, &QRadioButton::toggled, this, &AppearanceSettingsPage::UseCustomColorSetOptionChanged);
+  QObject::connect(ui_->use_custom_color_set, &QRadioButton::toggled, ui_->widget_custom_colors, &QWidget::setEnabled);
+  QObject::connect(ui_->button_dark_colors, &QPushButton::pressed, this, &AppearanceSettingsPage::SetDarkColors);
+  QObject::connect(ui_->button_reset_colors, &QPushButton::pressed, this, &AppearanceSettingsPage::ResetToDefaultColors);
+
+  QObject::connect(ui_->select_tabbar_color, &QPushButton::pressed, this, &AppearanceSettingsPage::TabBarSelectBGColor);
+  QObject::connect(ui_->tabbar_system_color, &QRadioButton::toggled, this, &AppearanceSettingsPage::TabBarSystemColor);
+
+  QObject::connect(ui_->select_playlist_playing_song_color, &QPushButton::pressed, this, &AppearanceSettingsPage::PlaylistPlayingSongSelectColor);
+  QObject::connect(ui_->playlist_playing_song_color_system, &QRadioButton::toggled, this, &AppearanceSettingsPage::PlaylistPlayingSongColorSystem);
+
+  QObject::connect(ui_->use_default_background, &QRadioButton::toggled, ui_->widget_background_image_options, &AppearanceSettingsPage::setDisabled);
+  QObject::connect(ui_->use_no_background, &QRadioButton::toggled, ui_->widget_background_image_options, &AppearanceSettingsPage::setDisabled);
+  QObject::connect(ui_->use_album_cover_background, &QRadioButton::toggled, ui_->widget_background_image_options, &AppearanceSettingsPage::setEnabled);
+  QObject::connect(ui_->use_strawbs_background, &QRadioButton::toggled, ui_->widget_background_image_options, &AppearanceSettingsPage::setDisabled);
+  QObject::connect(ui_->use_custom_background_image, &QRadioButton::toggled, ui_->widget_background_image_options, &AppearanceSettingsPage::setEnabled);
+
+  QObject::connect(ui_->select_background_image_filename_button, &QPushButton::pressed, this, &AppearanceSettingsPage::SelectBackgroundImage);
+  QObject::connect(ui_->use_custom_background_image, &QRadioButton::toggled, ui_->background_image_filename, &AppearanceSettingsPage::setEnabled);
+  QObject::connect(ui_->use_custom_background_image, &QRadioButton::toggled, ui_->select_background_image_filename_button, &AppearanceSettingsPage::setEnabled);
+
+  QObject::connect(ui_->checkbox_background_image_stretch, &QCheckBox::toggled, ui_->checkbox_background_image_do_not_cut, &AppearanceSettingsPage::setEnabled);
+  QObject::connect(ui_->checkbox_background_image_stretch, &QCheckBox::toggled, ui_->checkbox_background_image_keep_aspect_ratio, &AppearanceSettingsPage::setEnabled);
+  QObject::connect(ui_->checkbox_background_image_stretch, &QCheckBox::toggled, ui_->spinbox_background_image_maxsize, &AppearanceSettingsPage::setDisabled);
+
+  QObject::connect(ui_->checkbox_background_image_keep_aspect_ratio, &QCheckBox::toggled, ui_->checkbox_background_image_do_not_cut, &AppearanceSettingsPage::setEnabled);
+
+  QObject::connect(ui_->slider_background_image_blur, &QSlider::valueChanged, this, &AppearanceSettingsPage::BackgroundImageBlurLevelChanged);
+  QObject::connect(ui_->slider_background_image_opacity, &QSlider::valueChanged, this, &AppearanceSettingsPage::BackgroundImageOpacityLevelChanged);
+
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN32)
+  ui_->checkbox_system_icons->setEnabled(false);
+#else
+  ui_->checkbox_system_icons->setEnabled(true);
+#endif
+
+  AppearanceSettingsPage::Load();
+
 }
 
-void ApplyAppearanceEnable(AppearanceEnableState *state) {
-  if (!state || !state->settings) {
-    return;
+AppearanceSettingsPage::~AppearanceSettingsPage() = default;
+
+void AppearanceSettingsPage::Load() {
+
+  // Disconnect while loading so intermediate combobox signals don't trigger StyleChanged before colors are ready.
+  QObject::disconnect(ui_->combobox_style, &QComboBox::currentIndexChanged, this, &AppearanceSettingsPage::StyleChanged);
+
+  Settings s;
+  s.beginGroup(kSettingsGroup);
+
+  // Style
+  original_style_ = QApplication::style() ? QApplication::style()->objectName() : QString();
+  ComboBoxLoadFromSettings(s, ui_->combobox_style, QLatin1String(kStyle), u"default"_s);
+
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN32)
+  ui_->checkbox_system_icons->setChecked(s.value(kSystemThemeIcons, kDefaultSystemIcons).toBool());
+#endif
+
+  original_dark_mode_ = s.value(kDarkMode, kDefaultDarkMode).toBool();
+  ui_->checkbox_dark_mode->setChecked(original_dark_mode_);
+
+  // Colors
+  const QPalette palette = QApplication::palette();
+
+  // Keep in mind originals colors, in case the user clicks on Cancel, to be able to restore colors
+  original_use_custom_color_set_ = s.value(kUseCustomColorSet, kDefaultUseCustomColorSet).toBool();
+
+  current_colors_.clear();
+  for (const Appearance::ColorRole &color_role : Appearance::ColorRoles()) {
+    const QVariant value = s.value(color_role.settings_key);
+    QColor color = value.isValid() ? value.value<QColor>() : QColor();
+    if (!color.isValid()) {
+      color = palette.color(color_role.role);
+    }
+    current_colors_.insert(color_role.role, color);
   }
-  state->settings->BeginGroup(AppearanceSettings::kSettingsGroup);
-  const std::string style = state->settings->Value(AppearanceSettings::kStyle, "");
-  const bool use_custom =
-      state->settings->BoolValue(AppearanceSettings::kUseCustomColorSet, AppearanceSettings::kDefaultUseCustomColorSet);
-  const bool tabbar_system =
-      state->settings->BoolValue(AppearanceSettings::kTabBarSystemColor, AppearanceSettings::kDefaultTabBarSystemColor);
-  const bool playlist_system =
-      SettingsControls::PlaylistColorIsSystem(state->settings->Value(AppearanceSettings::kPlaylistPlayingSongColor));
-  const auto type = AppearanceEnable::TypeFromId(state->settings->Value(
-      AppearanceSettings::kBackgroundImageType, std::to_string(static_cast<int>(AppearanceSettings::kDefaultBackgroundImageType))));
-  const bool stretch = state->stretch ? adw_switch_row_get_active(ADW_SWITCH_ROW(state->stretch))
-                                      : state->settings->BoolValue(AppearanceSettings::kBackgroundImageStretch,
-                                                                   AppearanceSettings::kDefaultBackgroundImageStretch);
-  const bool keep = state->keep ? adw_switch_row_get_active(ADW_SWITCH_ROW(state->keep))
-                                : state->settings->BoolValue(AppearanceSettings::kBackgroundImageKeepAspectRatio,
-                                                             AppearanceSettings::kDefaultBackgroundImageKeepAspectRatio);
-  const bool palette = AppearanceStyle::HasCustomPalette(style);
-  const bool options = AppearanceEnable::BackgroundOptionsEnabled(type);
-  SetSensitive(state->dark_mode, AppearanceStyle::HasDarkMode(style));
-  const bool colors_on = palette && AppearanceEnable::CustomColorsEnabled(use_custom);
-  SetSensitive(state->colors, colors_on);
-  SetSensitive(state->dark_colors, colors_on);
-  SetSensitive(state->reset_colors, colors_on);
-  SetSensitive(state->tabbar_color, AppearanceEnable::TabBarColorEnabled(tabbar_system));
-  SetSensitive(state->playlist_color, AppearanceEnable::PlaylistCustomColorEnabled(playlist_system));
-  SetSensitive(state->filename, AppearanceEnable::BackgroundFilenameEnabled(type));
-  SetSensitive(state->choose, AppearanceEnable::BackgroundFilenameEnabled(type));
-  SetSensitive(state->position, options);
-  SetSensitive(state->stretch, options);
-  SetSensitive(state->keep, options && AppearanceEnable::KeepAspectEnabled(stretch));
-  SetSensitive(state->cut, options && AppearanceEnable::DoNotCutEnabled(stretch, keep));
-  SetSensitive(state->max_size, options && AppearanceEnable::MaxSizeEnabled(stretch));
-  SetSensitive(state->blur, options);
-  SetSensitive(state->opacity, options);
+
+  original_colors_ = current_colors_;
+
+  UpdateColorSelectorsColors();
+
+  // Tabbar background color
+  bool tabbar_system_color = s.value(kTabBarSystemColor, kDefaultTabBarSystemColor).toBool();
+  ui_->tabbar_gradient->setChecked(s.value(kTabBarGradient, kDefaultTabBarGradient).toBool());
+  ui_->tabbar_system_color->setChecked(tabbar_system_color);
+  ui_->tabbar_custom_color->setChecked(!tabbar_system_color);
+
+  current_tabbar_bg_color_ = s.value(kTabBarColor, FancyTabWidget::DefaultTabbarBgColor()).value<QColor>();
+
+  UpdateColorSelectorColor(ui_->select_tabbar_color, current_tabbar_bg_color_);
+  TabBarSystemColor(ui_->tabbar_system_color->isChecked());
+
+  // Currently playing song color
+  current_playlist_playing_song_color_ = s.value(kPlaylistPlayingSongColor).value<QColor>();
+  if (current_playlist_playing_song_color_.isValid()) {
+    ui_->playlist_playing_song_color_custom->setChecked(true);
+  }
+  else {
+    ui_->playlist_playing_song_color_system->setChecked(true);
+    current_playlist_playing_song_color_ = StyleHelper::highlightColor();
+  }
+  UpdateColorSelectorColor(ui_->select_playlist_playing_song_color, current_playlist_playing_song_color_);
+  PlaylistPlayingSongColorSystem(ui_->playlist_playing_song_color_system->isChecked());
+
+  // Playlist background image
+  {
+    const int v = s.value(kBackgroundImageType, static_cast<int>(kDefaultBackgroundImageType)).toInt();
+    background_image_type_ = (v >= static_cast<int>(BackgroundImageType::Default) && v <= static_cast<int>(BackgroundImageType::Strawbs)) ? static_cast<BackgroundImageType>(v) : kDefaultBackgroundImageType;
+  }
+  background_image_filename_ = s.value(kBackgroundImageFilename).toString();
+
+  ui_->use_system_color_set->setChecked(!original_use_custom_color_set_);
+  ui_->use_custom_color_set->setChecked(original_use_custom_color_set_);
+  ui_->widget_custom_colors->setEnabled(original_use_custom_color_set_);
+
+  switch (background_image_type_) {
+    case BackgroundImageType::Default:
+      ui_->use_default_background->setChecked(true);
+      break;
+    case BackgroundImageType::None:
+      ui_->use_no_background->setChecked(true);
+      break;
+    case BackgroundImageType::Custom:
+      ui_->use_custom_background_image->setChecked(true);
+      break;
+    case BackgroundImageType::Album:
+      ui_->use_album_cover_background->setChecked(true);
+      break;
+    case BackgroundImageType::Strawbs:
+      ui_->use_strawbs_background->setChecked(true);
+      break;
+  }
+  ui_->background_image_filename->setText(background_image_filename_);
+
+  const int background_image_position = s.value(kBackgroundImagePosition, static_cast<int>(kDefaultBackgroundImagePosition)).toInt();
+  int background_image_position_index = ui_->combobox_background_image_position->findData(background_image_position);
+  if (background_image_position_index < 0) {
+    background_image_position_index = ui_->combobox_background_image_position->findData(static_cast<int>(kDefaultBackgroundImagePosition));
+  }
+  ui_->combobox_background_image_position->setCurrentIndex(background_image_position_index);
+
+  ui_->spinbox_background_image_maxsize->setValue(s.value(kBackgroundImageMaxSize, kDefaultBackgroundImageMaxSize).toInt());
+  ui_->checkbox_background_image_stretch->setChecked(s.value(kBackgroundImageStretch, kDefaultBackgroundImageStretch).toBool());
+  ui_->checkbox_background_image_do_not_cut->setChecked(s.value(kBackgroundImageDoNotCut, kDefaultBackgroundImageDoNotCut).toBool());
+  ui_->checkbox_background_image_keep_aspect_ratio->setChecked(s.value(kBackgroundImageKeepAspectRatio, kDefaultBackgroundImageKeepAspectRatio).toBool());
+  ui_->slider_background_image_blur->setValue(s.value(kBackgroundImageBlurRadius, kDefaultBackgroundImageBlurRadius).toInt());
+  ui_->slider_background_image_opacity->setValue(s.value(kBackgroundImageOpacityLevel, kDefaultBackgroundImageOpacityLevel).toInt());
+
+  ui_->checkbox_background_image_keep_aspect_ratio->setEnabled(ui_->checkbox_background_image_stretch->isChecked());
+  ui_->checkbox_background_image_do_not_cut->setEnabled(ui_->checkbox_background_image_stretch->isChecked() && ui_->checkbox_background_image_keep_aspect_ratio->isChecked());
+
+  // Button sizes
+  ui_->spinbox_icon_size_tabbar_small_mode->setValue(s.value(kIconSizeTabbarSmallMode, kDefaultIconSizeTabbarSmallMode).toInt());
+  ui_->spinbox_icon_size_tabbar_large_mode->setValue(s.value(kIconSizeTabbarLargeMode, kDefaultIconSizeTabbarLargeMode).toInt());
+  ui_->spinbox_icon_size_play_control_buttons->setValue(s.value(kIconSizePlayControlButtons, kDefaultIconSizePlayControlButtons).toInt());
+  ui_->spinbox_icon_size_playlist_buttons->setValue(s.value(kIconSizePlaylistButtons, kDefaultIconSizePlaylistButtons).toInt());
+  ui_->spinbox_icon_size_left_panel_buttons->setValue(s.value(kIconSizeLeftPanelButtons, kDefaultIconSizeLeftPanelButtons).toInt());
+  ui_->spinbox_icon_size_configure_buttons->setValue(s.value(kIconSizeConfigureButtons, kDefaultIconSizeConfigureButtons).toInt());
+
+  original_tabbar_bg_color_ = current_tabbar_bg_color_;
+  original_background_image_filename_ = background_image_filename_;
+  original_playlist_playing_song_color_ = current_playlist_playing_song_color_;
+
+  s.endGroup();
+
+  Init(ui_->layout_appearancesettingspage->parentWidget());
+
+  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
+
+  QObject::connect(ui_->combobox_style, &QComboBox::currentIndexChanged, this, &AppearanceSettingsPage::StyleChanged);
+  InitStyle(ui_->combobox_style->currentIndex());
+
 }
 
-}  // namespace
+void AppearanceSettingsPage::Save() {
 
-AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Application *) {
-  settings->BeginGroup(AppearanceSettings::kSettingsGroup);
-  AdwPreferencesPage *page = SettingsPage::MakePage("Appearance", "applications-graphics-symbolic");
-  auto *enable = new AppearanceEnableState();
-  enable->settings = settings;
-  g_object_set_data_full(G_OBJECT(page), "appearance-enable", enable, [](gpointer p) { delete static_cast<AppearanceEnableState *>(p); });
+  Settings s;
+  s.beginGroup(kSettingsGroup);
 
-  AdwPreferencesGroup *theme = SettingsPage::AddGroup(page, "Theme");
-  enable->dark_mode = SettingsPage::AddToggle(theme, settings, AppearanceSettings::kDarkMode, AppearanceSettingsLabels::DarkMode(),
-                                              AppearanceSettingsLabels::DarkRestart(), AppearanceSettings::kDefaultDarkMode);
-  SettingsPage::AddToggle(theme, settings, AppearanceSettings::kSystemThemeIcons, AppearanceSettingsLabels::SystemIcons(), nullptr,
-                          AppearanceSettings::kDefaultSystemIcons);
-  SettingsPage::AddCombo(theme, settings, AppearanceSettings::kStyle, "Style", AppearanceStyle::Choices(), "",
-                         [enable](const std::string &) { ApplyAppearanceEnable(enable); });
-  SettingsPage::AddDescription(theme, AppearanceSettingsLabels::StyleRestart());
-  SettingsPage::AddBoolRadios(theme, settings, AppearanceSettings::kUseCustomColorSet, AppearanceSettingsLabels::SystemColorSet(),
-                             AppearanceSettingsLabels::CustomColorSet(), AppearanceSettings::kDefaultUseCustomColorSet,
-                             [enable](bool) { ApplyAppearanceEnable(enable); });
-  enable->dark_colors =
-      SettingsPage::AddButtonRow(theme, Translations::CStr("Custom colors"), Translations::CStr(AppearanceSettingsLabels::DarkColors()), [settings]() {
-        settings->BeginGroup(AppearanceSettings::kSettingsGroup);
-        settings->SetBoolValue(AppearanceSettings::kUseCustomColorSet, true);
-        for (const auto &role : AppearanceColors::Roles()) {
-          settings->SetValue(role.key, role.dark_hex);
-        }
-        settings->Sync();
-      });
-  enable->reset_colors =
-      SettingsPage::AddButtonRow(theme, Translations::CStr("Custom colors"), Translations::CStr(AppearanceSettingsLabels::ResetColors()), [settings]() {
-        settings->BeginGroup(AppearanceSettings::kSettingsGroup);
-        settings->SetBoolValue(AppearanceSettings::kUseCustomColorSet, false);
-        for (const auto &role : AppearanceColors::Roles()) {
-          settings->Remove(role.key);
-        }
-        settings->Sync();
-      });
+  // Style
+  s.setValue(kStyle, ui_->combobox_style->currentText());
 
-  AdwPreferencesGroup *colors = SettingsPage::AddGroup(page, "Custom colors");
-  enable->colors = GTK_WIDGET(colors);
-  for (const auto &role : AppearanceColors::Roles()) {
-    SettingsPage::AddColorButton(colors, settings, AppearanceSettings::kSettingsGroup, role.key, role.title, role.dark_hex);
+  QString selected_style = ui_->combobox_style->currentData().toString();
+  if (selected_style.compare(u"default"_s, Qt::CaseInsensitive) == 0) {
+    selected_style = appearance_->default_style();
   }
 
-  AdwPreferencesGroup *tabbar = SettingsPage::AddGroup(page, "Tab bar");
-  SettingsPage::AddBoolRadios(tabbar, settings, AppearanceSettings::kTabBarSystemColor, AppearanceSettingsLabels::TabBarCustom(),
-                             AppearanceSettingsLabels::TabBarSystem(), AppearanceSettings::kDefaultTabBarSystemColor,
-                             [enable](bool) { ApplyAppearanceEnable(enable); });
-  SettingsPage::AddToggle(tabbar, settings, AppearanceSettings::kTabBarGradient, AppearanceSettingsLabels::TabBarGradient(), nullptr,
-                          AppearanceSettings::kDefaultTabBarGradient);
-  enable->tabbar_color = SettingsPage::AddColorButton(tabbar, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kTabBarColor,
-                                                     "Tab bar color", "#404040");
+#if defined(Q_OS_MACOS) || defined(Q_OS_WIN32)
+  s.setValue(kSystemThemeIcons, false);
+#else
+  s.setValue(kSystemThemeIcons, ui_->checkbox_system_icons->isChecked());
+#endif
 
-  AdwPreferencesGroup *playlist = SettingsPage::AddGroup(page, "Playlist");
-  const std::string playlist_color = settings->Value(AppearanceSettings::kPlaylistPlayingSongColor, "#6696e3");
-  SettingsPage::AddChoiceRadios(playlist, settings, nullptr, "Playlist playing song color",
-                               {{"system", AppearanceSettingsLabels::PlaylistSystem()}, {"custom", AppearanceSettingsLabels::PlaylistCustom()}},
-                               SettingsControls::PlaylistColorIsSystem(settings->Value(AppearanceSettings::kPlaylistPlayingSongColor))
-                                   ? "system"
-                                   : "custom",
-                               [settings, enable](const std::string &id) {
-                                 settings->BeginGroup(AppearanceSettings::kSettingsGroup);
-                                 const std::string current = settings->Value(AppearanceSettings::kPlaylistPlayingSongColor);
-                                 settings->SetValue(AppearanceSettings::kPlaylistPlayingSongColor,
-                                                    SettingsControls::PlaylistPlayingSongColor(id == "system", current));
-                                 settings->Sync();
-                                 ApplyAppearanceEnable(enable);
-                               });
-  enable->playlist_color = SettingsPage::AddColorButton(playlist, settings, AppearanceSettings::kSettingsGroup,
-                                                       AppearanceSettings::kPlaylistPlayingSongColor, "Custom color",
-                                                       playlist_color.empty() ? "#6696e3" : playlist_color.c_str());
+  s.setValue(kDarkMode, Utilities::StyleHasDarkModeSupport(selected_style) ? ui_->checkbox_dark_mode->isChecked() : false);
 
-  AdwPreferencesGroup *background = SettingsPage::AddGroup(page, "Background");
-  SettingsPage::AddChoiceRadios(background, settings, AppearanceSettings::kBackgroundImageType, "Background",
-                               {{"0", AppearanceSettingsLabels::DefaultBackground()},
-                                {"1", AppearanceSettingsLabels::NoBackground()},
-                                {"2", "Custom image"},
-                                {"3", AppearanceSettingsLabels::AlbumCover()},
-                                {"4", "Strawberry"}},
-                               std::to_string(static_cast<int>(AppearanceSettings::kDefaultBackgroundImageType)),
-                               [enable](const std::string &) { ApplyAppearanceEnable(enable); });
-  enable->filename = SettingsPage::AddEntry(background, settings, AppearanceSettings::kBackgroundImageFilename, "Custom background file");
-  enable->choose = SettingsPage::AddButtonRow(background, "Custom background file", "Choose image…", [settings]() {
-    GtkFileDialog *chooser = gtk_file_dialog_new();
-    gtk_file_dialog_set_title(chooser, Translations::CStr("Choose background image"));
-    gtk_file_dialog_open(chooser, nullptr, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
-      auto *s = static_cast<Settings *>(data);
-      GError *error = nullptr;
-      GFile *file = gtk_file_dialog_open_finish(GTK_FILE_DIALOG(source), result, &error);
-      if (!file) {
-        if (error) {
-          g_error_free(error);
-        }
-        return;
-      }
-      gchar *path = g_file_get_path(file);
-      if (path && s) {
-        s->BeginGroup(AppearanceSettings::kSettingsGroup);
-        s->SetValue(AppearanceSettings::kBackgroundImageFilename, path);
-        s->SetValue(AppearanceSettings::kBackgroundImageType, "2");
-        s->Sync();
-      }
-      g_free(path);
-      g_object_unref(file);
-    }, settings);
-  });
-  enable->position = SettingsPage::AddCombo(background, settings, AppearanceSettings::kBackgroundImagePosition, "Position",
-                                            {{"1", AppearanceSettingsLabels::UpperLeft()},
-                                             {"2", AppearanceSettingsLabels::UpperRight()},
-                                             {"3", AppearanceSettingsLabels::Middle()},
-                                             {"4", AppearanceSettingsLabels::BottomLeft()},
-                                             {"5", AppearanceSettingsLabels::BottomRight()}},
-                                            std::to_string(static_cast<int>(AppearanceSettings::kDefaultBackgroundImagePosition)));
-  enable->stretch = SettingsPage::AddToggle(background, settings, AppearanceSettings::kBackgroundImageStretch, AppearanceSettingsLabels::Stretch(),
-                                            nullptr, AppearanceSettings::kDefaultBackgroundImageStretch);
-  enable->keep = SettingsPage::AddToggle(background, settings, AppearanceSettings::kBackgroundImageKeepAspectRatio,
-                                         AppearanceSettingsLabels::KeepAspect(), nullptr,
-                                         AppearanceSettings::kDefaultBackgroundImageKeepAspectRatio);
-  enable->cut = SettingsPage::AddToggle(background, settings, AppearanceSettings::kBackgroundImageDoNotCut, AppearanceSettingsLabels::DoNotCut(),
-                                        nullptr, AppearanceSettings::kDefaultBackgroundImageDoNotCut);
-  enable->max_size = SettingsPage::AddIntEntry(background, settings, AppearanceSettings::kBackgroundImageMaxSize,
-                                               AppearanceSettingsLabels::MaxCoverSize(), AppearanceSettings::kDefaultBackgroundImageMaxSize);
-  g_object_set_data(G_OBJECT(enable->stretch), "appearance-enable", enable);
-  g_signal_connect(enable->stretch, "notify::active", G_CALLBACK(+[](AdwSwitchRow *, GParamSpec *, gpointer data) {
-                     ApplyAppearanceEnable(static_cast<AppearanceEnableState *>(data));
-                   }),
-                   enable);
-  g_object_set_data(G_OBJECT(enable->keep), "appearance-enable", enable);
-  g_signal_connect(enable->keep, "notify::active", G_CALLBACK(+[](AdwSwitchRow *, GParamSpec *, gpointer data) {
-                     ApplyAppearanceEnable(static_cast<AppearanceEnableState *>(data));
-                   }),
-                   enable);
-  const auto blur = SettingsControls::BackgroundBlur();
-  enable->blur = SettingsPage::AddIntScale(background, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kBackgroundImageBlurRadius,
-                                           AppearanceSettingsLabels::BlurAmount(), AppearanceSettings::kDefaultBackgroundImageBlurRadius,
-                                           static_cast<int>(blur.min), static_cast<int>(blur.max), static_cast<int>(blur.step));
-  const auto opacity = SettingsControls::BackgroundOpacity();
-  enable->opacity = SettingsPage::AddIntScale(background, settings, AppearanceSettings::kSettingsGroup, AppearanceSettings::kBackgroundImageOpacityLevel,
-                                              "Opacity", AppearanceSettings::kDefaultBackgroundImageOpacityLevel, static_cast<int>(opacity.min),
-                                              static_cast<int>(opacity.max), static_cast<int>(opacity.step));
+  // Colors
+  const bool use_custom_color_set = Utilities::StyleHasCustomPaletteColorsSupport(selected_style) && ui_->use_custom_color_set->isChecked();
+  s.setValue(kUseCustomColorSet, use_custom_color_set);
+  if (use_custom_color_set) {
+    for (const Appearance::ColorRole &color_role : Appearance::ColorRoles()) {
+      s.setValue(color_role.settings_key, current_colors_.value(color_role.role));
+    }
+  }
+  else {
+    QApplication::setPalette(system_palette_);
+    for (const Appearance::ColorRole &color_role : Appearance::ColorRoles()) {
+      s.remove(color_role.settings_key);
+    }
+  }
 
-  AdwPreferencesGroup *icons = SettingsPage::AddGroup(page, "Icon sizes");
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeTabbarSmallMode, AppearanceSettingsLabels::TabbarSmall(),
-                            AppearanceSettings::kDefaultIconSizeTabbarSmallMode);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeTabbarLargeMode, AppearanceSettingsLabels::TabbarLarge(),
-                            AppearanceSettings::kDefaultIconSizeTabbarLargeMode);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizePlayControlButtons, AppearanceSettingsLabels::PlayControls(),
-                            AppearanceSettings::kDefaultIconSizePlayControlButtons);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizePlaylistButtons, AppearanceSettingsLabels::PlaylistButtons(),
-                            AppearanceSettings::kDefaultIconSizePlaylistButtons);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeLeftPanelButtons, AppearanceSettingsLabels::FilesPlaylistsQueue(),
-                            AppearanceSettings::kDefaultIconSizeLeftPanelButtons);
-  SettingsPage::AddIntEntry(icons, settings, AppearanceSettings::kIconSizeConfigureButtons, AppearanceSettingsLabels::ConfigureButtons(),
-                            AppearanceSettings::kDefaultIconSizeConfigureButtons);
-  ApplyAppearanceEnable(enable);
-  return page;
+  // Tabbar background color
+  s.setValue(kTabBarSystemColor, ui_->tabbar_system_color->isChecked());
+  s.setValue(kTabBarGradient, ui_->tabbar_gradient->isChecked());
+  s.setValue(kTabBarColor, current_tabbar_bg_color_);
+
+  // Currently playing song color
+  if (ui_->playlist_playing_song_color_system->isChecked()) {
+    s.setValue(kPlaylistPlayingSongColor, QColor());
+  }
+  else {
+    s.setValue(kPlaylistPlayingSongColor, current_playlist_playing_song_color_);
+  }
+
+  // Playlist background image
+  background_image_filename_ = ui_->background_image_filename->text();
+  if (ui_->use_default_background->isChecked()) {
+    background_image_type_ = BackgroundImageType::Default;
+  }
+  else if (ui_->use_no_background->isChecked()) {
+    background_image_type_ = BackgroundImageType::None;
+  }
+  else if (ui_->use_album_cover_background->isChecked()) {
+    background_image_type_ = BackgroundImageType::Album;
+  }
+  else if (ui_->use_strawbs_background->isChecked()) {
+    background_image_type_ = BackgroundImageType::Strawbs;
+  }
+  else if (ui_->use_custom_background_image->isChecked()) {
+    background_image_type_ = BackgroundImageType::Custom;
+  }
+  s.setValue(kBackgroundImageType, static_cast<int>(background_image_type_));
+
+  if (background_image_type_ == BackgroundImageType::Custom) {
+    s.setValue(kBackgroundImageFilename, background_image_filename_);
+  }
+  else {
+    s.remove(kBackgroundImageFilename);
+  }
+
+  s.setValue(kBackgroundImageMaxSize, ui_->spinbox_background_image_maxsize->value());
+  s.setValue(kBackgroundImagePosition, ui_->combobox_background_image_position->currentData().toInt());
+  s.setValue(kBackgroundImageStretch, ui_->checkbox_background_image_stretch->isChecked());
+  s.setValue(kBackgroundImageDoNotCut, ui_->checkbox_background_image_do_not_cut->isChecked());
+  s.setValue(kBackgroundImageKeepAspectRatio, ui_->checkbox_background_image_keep_aspect_ratio->isChecked());
+
+  s.setValue(kBackgroundImageBlurRadius, ui_->slider_background_image_blur->value());
+  s.setValue(kBackgroundImageOpacityLevel, ui_->slider_background_image_opacity->value());
+
+  // Button sizes
+  s.setValue(kIconSizeTabbarSmallMode, ui_->spinbox_icon_size_tabbar_small_mode->value());
+  s.setValue(kIconSizeTabbarLargeMode, ui_->spinbox_icon_size_tabbar_large_mode->value());
+  s.setValue(kIconSizePlayControlButtons, ui_->spinbox_icon_size_play_control_buttons->value());
+  s.setValue(kIconSizePlaylistButtons, ui_->spinbox_icon_size_playlist_buttons->value());
+  s.setValue(kIconSizeLeftPanelButtons, ui_->spinbox_icon_size_left_panel_buttons->value());
+  s.setValue(kIconSizeConfigureButtons, ui_->spinbox_icon_size_configure_buttons->value());
+
+  s.endGroup();
+
+  appearance_->set_system_palette(system_palette_);
+
+}
+
+void AppearanceSettingsPage::Cancel() {
+
+  const QString current_style = QApplication::style() ? QApplication::style()->objectName() : QString();
+  if (original_style_.compare(current_style, Qt::CaseInsensitive) != 0) {
+    ApplyStyle(current_style, original_style_);
+  }
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+  QGuiApplication::styleHints()->setColorScheme(original_dark_mode_ ? Qt::ColorScheme::Dark : Qt::ColorScheme::Unknown);
+#endif
+
+  if (original_use_custom_color_set_) {
+    Appearance::SetCustomPaletteColors(original_colors_);
+  }
+  else {
+    QApplication::setPalette(system_palette_);
+  }
+
+  background_image_filename_ = original_background_image_filename_;
+  current_tabbar_bg_color_ = original_tabbar_bg_color_;
+  current_playlist_playing_song_color_ = original_playlist_playing_song_color_;
+
+}
+
+void AppearanceSettingsPage::InitStyle(const int index) {
+
+  SetStyle(index, false);
+
+}
+
+void AppearanceSettingsPage::StyleChanged(const int index) {
+
+  SetStyle(index, true);
+
+}
+
+void AppearanceSettingsPage::SetStyle(const int index, const bool apply) {
+
+  const QString style_name = ui_->combobox_style->itemData(index).toString();
+  SetStyle(style_name, apply);
+
+}
+
+void AppearanceSettingsPage::SetStyle(const QString &new_style, const bool apply) {
+
+  QString current_style = QApplication::style() ? QApplication::style()->objectName() : QString();
+
+  bool style_changed = false;
+  if (apply) {
+    style_changed = ApplyStyle(current_style, new_style);
+    current_style = QApplication::style() ? QApplication::style()->objectName() : QString();
+  }
+
+  const QString style_for_caps = apply ? current_style : (new_style.compare("default"_L1, Qt::CaseInsensitive) == 0 ? appearance_->default_style() : new_style);
+  const bool custom_palette_colors_support = Utilities::StyleHasCustomPaletteColorsSupport(style_for_caps);
+  const bool dark_mode_support = Utilities::StyleHasDarkModeSupport(style_for_caps);
+
+  if (!dark_mode_support && ui_->checkbox_dark_mode->isChecked()) {
+    ui_->checkbox_dark_mode->setChecked(false);
+  }
+
+  if (!custom_palette_colors_support && !ui_->use_system_color_set->isChecked()) {
+    ui_->use_system_color_set->setChecked(true);
+  }
+
+  ui_->checkbox_dark_mode->setEnabled(dark_mode_support);
+  ui_->groupbox_colors->setEnabled(custom_palette_colors_support);
+
+  if (style_changed) {
+    QApplication::setPalette(QPalette());
+    system_palette_ = QApplication::palette();
+    if (ui_->use_custom_color_set->isChecked()) {
+      ApplyCustomColors();
+    }
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    QGuiApplication::styleHints()->setColorScheme(dark_mode_support && ui_->checkbox_dark_mode->isChecked() ? Qt::ColorScheme::Dark : Qt::ColorScheme::Unknown);
+#endif
+  }
+
+}
+
+bool AppearanceSettingsPage::ApplyStyle(const QString &current_style, const QString &new_style) {
+
+  QString effective_new_style = new_style;
+  if (new_style.compare("default"_L1, Qt::CaseInsensitive) == 0) {
+    effective_new_style = appearance_->default_style();
+  }
+  if (current_style.compare(effective_new_style, Qt::CaseInsensitive) != 0) {
+    qLog(Debug) << "Changing style from" << current_style << "to" << effective_new_style;
+    if (QApplication::setStyle(effective_new_style)) {
+      qLog(Debug) << "Style is set to" << effective_new_style;
+      return true;
+    }
+    else {
+      qLog(Warning) << "Could not set style" << effective_new_style;
+    }
+  }
+
+  return false;
+
+}
+
+void AppearanceSettingsPage::DarkModeToggled(const bool checked) {
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+  QGuiApplication::styleHints()->setColorScheme(checked ? Qt::ColorScheme::Dark : Qt::ColorScheme::Unknown);
+#else
+  Q_UNUSED(checked)
+#endif
+
+}
+
+QString AppearanceSettingsPage::ColorRoleLabel(const QPalette::ColorRole color_role) {
+
+  switch (color_role) {
+    case QPalette::Window:          return tr("Window");
+    case QPalette::WindowText:      return tr("Window text");
+    case QPalette::Base:            return tr("Base");
+    case QPalette::AlternateBase:   return tr("Alternate base");
+    case QPalette::ToolTipBase:     return tr("Tooltip base");
+    case QPalette::ToolTipText:     return tr("Tooltip text");
+    case QPalette::PlaceholderText: return tr("Placeholder text");
+    case QPalette::Text:            return tr("Text");
+    case QPalette::Button:          return tr("Button");
+    case QPalette::ButtonText:      return tr("Button text");
+    case QPalette::BrightText:      return tr("Bright text");
+    default: return QString();
+  }
+
+}
+
+void AppearanceSettingsPage::CreateColorSelectors() {
+
+  QFormLayout *layout = ui_->layout_custom_colors;
+  for (const Appearance::ColorRole &color_role : Appearance::ColorRoles()) {
+    QPushButton *button = new QPushButton(ui_->widget_custom_colors);
+    button->setToolTip(tr("Select color"));
+    const QPalette::ColorRole color_role_role = color_role.role;
+    QObject::connect(button, &QPushButton::pressed, this, [this, color_role_role]() { SelectColor(color_role_role); });
+    layout->addRow(ColorRoleLabel(color_role_role) + u':', button);
+    color_selectors_.insert(color_role_role, button);
+  }
+
+}
+
+void AppearanceSettingsPage::SelectColor(const QPalette::ColorRole role) {
+
+  const QColor color_selected = QColorDialog::getColor(current_colors_.value(role));
+  if (!color_selected.isValid()) return;
+
+  current_colors_[role] = color_selected;
+
+  const auto it = color_selectors_.constFind(role);
+  if (it != color_selectors_.constEnd() && it.value()) {
+    UpdateColorSelectorColor(it.value(), color_selected);
+  }
+
+  ApplyCustomColors();
+
+  set_changed();
+
+}
+
+void AppearanceSettingsPage::ApplyCustomColors() {
+  Appearance::SetCustomPaletteColors(current_colors_);
+}
+
+void AppearanceSettingsPage::SetDarkColors() {
+
+  // Switch to a custom color set and fill it with colors suitable for a dark theme.
+  ui_->use_custom_color_set->setChecked(true);
+
+  const QMap<QPalette::ColorRole, QColor> &dark_colors = Appearance::DarkColors();
+  for (const Appearance::ColorRole &color_role : Appearance::ColorRoles()) {
+    current_colors_[color_role.role] = dark_colors.value(color_role.role);
+  }
+
+  UpdateColorSelectorsColors();
+  ApplyCustomColors();
+
+  set_changed();
+
+}
+
+void AppearanceSettingsPage::UseCustomColorSetOptionChanged(const bool checked) {
+
+  if (checked) {
+    ApplyCustomColors();
+  }
+  else {
+    QApplication::setPalette(system_palette_);
+  }
+
+}
+
+void AppearanceSettingsPage::ResetToDefaultColors() {
+
+  // Reset the custom color set back to the system default colors.
+  const QPalette &p = system_palette_;
+  for (const Appearance::ColorRole &color_role : Appearance::ColorRoles()) {
+    current_colors_[color_role.role] = p.color(color_role.role);
+  }
+
+  UpdateColorSelectorsColors();
+
+  if (ui_->use_custom_color_set->isChecked()) {
+    ApplyCustomColors();
+  }
+
+  set_changed();
+
+}
+
+void AppearanceSettingsPage::UpdateColorSelectorsColors() const {
+
+  for (auto it = color_selectors_.constBegin(); it != color_selectors_.constEnd(); ++it) {
+    if (it.value()) {
+      UpdateColorSelectorColor(it.value(), current_colors_.value(it.key()));
+    }
+  }
+
+}
+
+void AppearanceSettingsPage::UpdateColorSelectorColor(QWidget *color_selector, const QColor &color) {
+
+  const QString css = QStringLiteral("background-color: rgb(%1, %2, %3); color: rgb(255, 255, 255); border: 1px dotted black;").arg(color.red()).arg(color.green()).arg(color.blue());
+  if (color_selector->styleSheet() != css) {
+    color_selector->setStyleSheet(css);
+  }
+
+}
+
+void AppearanceSettingsPage::SelectBackgroundImage() {
+
+  QString selected_filename = QFileDialog::getOpenFileName(this, tr("Select background image"), background_image_filename_, tr(kLoadImageFileFilter) + u";;"_s + tr(kAllFilesFilterSpec));
+  if (selected_filename.isEmpty()) return;
+  background_image_filename_ = selected_filename;
+  ui_->background_image_filename->setText(background_image_filename_);
+
+}
+
+void AppearanceSettingsPage::BackgroundImageBlurLevelChanged(const int value) {
+  ui_->label_background_image_blur_radius->setText(QStringLiteral("%1px").arg(value));
+}
+
+void AppearanceSettingsPage::BackgroundImageOpacityLevelChanged(const int percent) {
+  ui_->label_background_image_opacity->setText(QStringLiteral("%1%").arg(percent));
+}
+
+void AppearanceSettingsPage::TabBarSystemColor(const bool checked) {
+
+  if (checked) {
+    current_tabbar_bg_color_ = FancyTabWidget::DefaultTabbarBgColor();
+    UpdateColorSelectorColor(ui_->select_tabbar_color, current_tabbar_bg_color_);
+  }
+  ui_->layout_tabbar_color->setEnabled(!checked);
+  ui_->select_tabbar_color->setEnabled(!checked);
+
+}
+
+void AppearanceSettingsPage::TabBarSelectBGColor() {
+
+  if (ui_->tabbar_system_color->isChecked()) return;
+
+  QColor color_selected = QColorDialog::getColor(current_tabbar_bg_color_);
+  if (!color_selected.isValid()) return;
+  current_tabbar_bg_color_ = color_selected;
+  UpdateColorSelectorColor(ui_->select_tabbar_color, current_tabbar_bg_color_);
+
+  set_changed();
+
+}
+
+void AppearanceSettingsPage::PlaylistPlayingSongColorSystem(const bool checked) {
+
+  if (checked) {
+    current_playlist_playing_song_color_ = StyleHelper::highlightColor();
+    UpdateColorSelectorColor(ui_->select_playlist_playing_song_color, current_playlist_playing_song_color_);
+  }
+  ui_->layout_playlist_playing_song_color_custom->setEnabled(!checked);
+  ui_->select_playlist_playing_song_color->setEnabled(!checked);
+
+}
+
+void AppearanceSettingsPage::PlaylistPlayingSongSelectColor() {
+
+  if (ui_->playlist_playing_song_color_system->isChecked()) return;
+
+  QColor color_selected = QColorDialog::getColor(current_playlist_playing_song_color_);
+  if (!color_selected.isValid()) return;
+  current_playlist_playing_song_color_ = color_selected;
+  UpdateColorSelectorColor(ui_->select_playlist_playing_song_color, current_playlist_playing_song_color_);
+
+  set_changed();
+
 }

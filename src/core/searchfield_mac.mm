@@ -1,1 +1,0 @@
-// Platform-specific source kept for inventory parity: src/core/searchfield_mac.mm\n

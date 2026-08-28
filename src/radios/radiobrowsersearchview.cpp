@@ -1,341 +1,302 @@
-#include "radios/radiobrowsersearchview.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2026, Malte Zilinski <malte@zilinski.eu>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/radiobrowsersettings.h"
+#include <chrono>
+
+#include <QWidget>
+#include <QString>
+#include <QUrl>
+#include <QTimer>
+#include <QMenu>
+#include <QAction>
+#include <QShowEvent>
+#include <QSortFilterProxyModel>
+
+#include "core/iconloader.h"
 #include "core/settings.h"
-#include "radios/radiobrowsersearchopts.h"
-#include "radios/radioviewsearch.h"
-#include "radios/radiodrag.h"
-#include "radios/radiomenu.h"
-#include "radios/radioservices.h"
-#include "translations/translations.h"
+#include "constants/radiobrowsersettings.h"
+#include "widgets/stretchheaderview.h"
+#include "radiobrowserservice.h"
+#include "radiobrowsersearchview.h"
+#include "radiobrowsersearchmodel.h"
+#include "radiomimedata.h"
+#include "ui_radiobrowsersearchview.h"
 
-#include <string>
+using namespace std::chrono_literals;
+using namespace Qt::Literals::StringLiterals;
 
-RadioBrowserSearchView::RadioBrowserSearchView(RadioServices *services) : services_(services) {
-  Settings settings;
-  settings.BeginGroup(RadioBrowserSettings::kSettingsGroup);
-  search_limit_ = settings.IntValue(RadioBrowserSettings::kSearchLimit, RadioBrowserSettings::kSearchLimitDefault);
-  hide_broken_ = settings.BoolValue(RadioBrowserSettings::kHideBroken, RadioBrowserSettings::kHideBrokenDefault);
-  default_country_ = settings.Value(RadioBrowserSettings::kDefaultCountry);
-  const std::string default_sort = settings.Value(RadioBrowserSettings::kDefaultSort, RadioBrowserSettings::kDefaultSortDefault);
+RadioBrowserSearchView::RadioBrowserSearchView(QWidget *parent)
+    : QWidget(parent),
+      ui_(new Ui_RadioBrowserSearchView),
+      service_(nullptr),
+      model_(new RadioBrowserSearchModel(this)),
+      sort_model_(new QSortFilterProxyModel(this)),
+      search_timer_(new QTimer(this)),
+      context_menu_(nullptr),
+      action_add_to_playlist_(nullptr),
+      current_offset_(0),
+      search_limit_(100),
+      hide_broken_(true),
+      has_more_(false),
+      countries_loaded_(false) {
 
-  widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
-  entry_ = gtk_search_entry_new();
-  gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(entry_), Translations::CStr(RadioBrowserSearchOpts::SearchPlaceholder()));
-  gtk_widget_set_margin_start(entry_, 8);
-  gtk_widget_set_margin_end(entry_, 8);
-  gtk_widget_set_margin_top(entry_, 6);
-  gtk_box_append(GTK_BOX(widget_), entry_);
+  ui_->setupUi(this);
 
-  GtkWidget *filters = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-  gtk_widget_set_margin_start(filters, 8);
-  gtk_widget_set_margin_end(filters, 8);
-  country_ = gtk_combo_box_text_new();
-  gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(country_), RadioBrowserSearchOpts::AllCountriesId(),
-                            Translations::CStr(RadioBrowserSearchOpts::AllCountriesLabel()));
-  gtk_combo_box_set_active(GTK_COMBO_BOX(country_), 0);
-  gtk_widget_set_hexpand(country_, TRUE);
-  sort_ = gtk_combo_box_text_new();
-  for (const RadioBrowserSearchOpts::SortOption &option : RadioBrowserSearchOpts::SortOptions()) {
-    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(sort_), option.id, Translations::CStr(option.label));
-  }
-  gtk_combo_box_set_active(GTK_COMBO_BOX(sort_), RadioBrowserSearchOpts::SortIndex(default_sort.c_str()));
-  gtk_widget_set_hexpand(sort_, TRUE);
-  gtk_box_append(GTK_BOX(filters), country_);
-  gtk_box_append(GTK_BOX(filters), sort_);
-  gtk_box_append(GTK_BOX(widget_), filters);
+  // Client-side sorting of the loaded results by clicking a column header.
+  // Locale-aware so names/countries sort naturally, and dynamic so appended pages (Load more) stay sorted.
+  sort_model_->setSourceModel(model_);
+  sort_model_->setSortLocaleAware(true);
+  sort_model_->setDynamicSortFilter(true);
+  ui_->results->setModel(sort_model_);
 
-  status_ = gtk_label_new("");
-  gtk_widget_add_css_class(status_, "dim-label");
-  gtk_label_set_xalign(GTK_LABEL(status_), 0.0f);
-  gtk_widget_set_margin_start(status_, 8);
-  gtk_widget_set_margin_end(status_, 8);
-  gtk_box_append(GTK_BOX(widget_), status_);
+  StretchHeaderView *header = new StretchHeaderView(Qt::Horizontal, this);
+  ui_->results->setHeader(header);
+  header->SetStretchEnabled(true);
+  header->SetColumnWidth(static_cast<int>(RadioBrowserSearchModel::Column::Name), 0.5);
+  header->SetColumnWidth(static_cast<int>(RadioBrowserSearchModel::Column::Country), 0.2);
+  header->SetColumnWidth(static_cast<int>(RadioBrowserSearchModel::Column::Tags), 0.2);
+  header->SetColumnWidth(static_cast<int>(RadioBrowserSearchModel::Column::Codec), 0.1);
 
-  help_ = gtk_label_new(Translations::CStr(RadioBrowserSearchOpts::HelpText()));
-  gtk_widget_add_css_class(help_, "dim-label");
-  gtk_label_set_wrap(GTK_LABEL(help_), TRUE);
-  gtk_label_set_xalign(GTK_LABEL(help_), 0.0f);
-  gtk_widget_set_margin_start(help_, 8);
-  gtk_widget_set_margin_end(help_, 8);
-  gtk_box_append(GTK_BOX(widget_), help_);
+  // Start unsorted so the server-provided order (the "Sort" combo box) is what the user sees until they click a column header.
+  header->setSortIndicator(-1, Qt::AscendingOrder);
+  ui_->results->setSortingEnabled(true);
 
-  GtkWidget *scroll = gtk_scrolled_window_new();
-  gtk_widget_set_vexpand(scroll, TRUE);
-  list_ = gtk_list_box_new();
-  gtk_widget_add_css_class(list_, "boxed-list");
-  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list_);
-  gtk_box_append(GTK_BOX(widget_), scroll);
+  ui_->search->setPlaceholderText(tr("Search radio stations..."));
 
-  load_more_ = gtk_button_new_with_label(Translations::CStr(RadioBrowserSearchOpts::LoadMoreLabel()));
-  gtk_widget_set_margin_start(load_more_, 8);
-  gtk_widget_set_margin_end(load_more_, 8);
-  gtk_widget_set_margin_bottom(load_more_, 6);
-  gtk_widget_set_visible(load_more_, FALSE);
-  gtk_box_append(GTK_BOX(widget_), load_more_);
+  // Country filter - starts with "All countries", populated dynamically after API fetch
+  ui_->combo_country->addItem(tr("All countries"), QString());
 
-  g_signal_connect(entry_, "search-changed", G_CALLBACK(+[](GtkSearchEntry *, gpointer data) {
-                     static_cast<RadioBrowserSearchView *>(data)->ScheduleSearch();
-                   }),
-                   this);
-  g_signal_connect(country_, "changed", G_CALLBACK(+[](GtkComboBox *, gpointer data) {
-                     auto *self = static_cast<RadioBrowserSearchView *>(data);
-                     if (self->services_ && !self->applying_countries_) {
-                       self->SearchTriggered();
-                     }
-                   }),
-                   this);
-  g_signal_connect(sort_, "changed", G_CALLBACK(+[](GtkComboBox *, gpointer data) {
-                     auto *self = static_cast<RadioBrowserSearchView *>(data);
-                     if (self->services_) {
-                       self->SearchTriggered();
-                     }
-                   }),
-                   this);
-  g_signal_connect(load_more_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { static_cast<RadioBrowserSearchView *>(data)->LoadMore(); }),
-                   this);
-  g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-                     auto *self = static_cast<RadioBrowserSearchView *>(data);
-                     auto *channel = static_cast<RadioChannel *>(g_object_get_data(G_OBJECT(row), "channel"));
-                     if (channel && self->activate_) {
-                       self->activate_(*channel);
-                     }
-                   }),
-                   this);
-  GtkGesture *menu = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
-  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(menu));
-  g_signal_connect(menu, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble y, gpointer data) {
-                     auto *self = static_cast<RadioBrowserSearchView *>(data);
-                     if (GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(self->list_), static_cast<int>(y))) {
-                       if (!gtk_list_box_row_is_selected(row)) {
-                         gtk_list_box_unselect_all(GTK_LIST_BOX(self->list_));
-                         gtk_list_box_select_row(GTK_LIST_BOX(self->list_), row);
-                       }
-                     }
-                     if (self->menu_) {
-                       self->menu_(self->SelectedChannels());
-                     }
-                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
-                   }),
-                   this);
-  GtkEventController *keys = gtk_event_controller_key_new();
-  gtk_widget_add_controller(list_, keys);
-  gtk_widget_set_focusable(list_, TRUE);
-  g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
-                     return static_cast<RadioBrowserSearchView *>(data)->OnKeyPressed(keyval, state);
-                   })),
-                   this);
+  // Sort order
+  ui_->combo_sort->addItem(tr("By votes"), u"votes"_s);
+  ui_->combo_sort->addItem(tr("By clicks"), u"clickcount"_s);
+  ui_->combo_sort->addItem(tr("By name"), u"name"_s);
+  ui_->combo_sort->addItem(tr("By bitrate"), u"bitrate"_s);
 
-  g_signal_connect(widget_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) {
-                     auto *self = static_cast<RadioBrowserSearchView *>(data);
-                     if (RadioBrowserSearchOpts::ShouldFetchCountriesOnShow(self->countries_loaded_)) {
-                       self->FetchCountries();
-                     }
-                   }),
-                   this);
-}
+  search_timer_->setSingleShot(true);
+  search_timer_->setInterval(300ms);
 
-gboolean RadioBrowserSearchView::OnKeyPressed(guint keyval, GdkModifierType state) {
-  if (!RadioMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
-    return FALSE;
-  }
-  if (menu_ && RadioMenu::ShouldShowMenu()) {
-    menu_(SelectedChannels());
-  }
-  return TRUE;
+  QObject::connect(ui_->search, &SearchField::textChanged, this, &RadioBrowserSearchView::TextChanged);
+  QObject::connect(search_timer_, &QTimer::timeout, this, &RadioBrowserSearchView::SearchTriggered);
+  QObject::connect(ui_->button_loadmore, &QPushButton::clicked, this, &RadioBrowserSearchView::LoadMore);
+  QObject::connect(ui_->combo_country, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &RadioBrowserSearchView::CountryChanged);
+  QObject::connect(ui_->combo_sort, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &RadioBrowserSearchView::SortChanged);
+  QObject::connect(ui_->results, &QTreeView::doubleClicked, this, &RadioBrowserSearchView::ItemDoubleClicked);
+  ui_->results->setContextMenuPolicy(Qt::CustomContextMenu);
+  QObject::connect(ui_->results, &QTreeView::customContextMenuRequested, this, &RadioBrowserSearchView::ShowContextMenu);
+
 }
 
 RadioBrowserSearchView::~RadioBrowserSearchView() {
-  ++search_generation_;
-  if (search_timeout_) {
-    g_source_remove(search_timeout_);
-    search_timeout_ = 0;
+
+  if (service_) {
+    QObject::disconnect(service_, nullptr, this, nullptr);
   }
+  delete ui_;
+
 }
 
-void RadioBrowserSearchView::SetResults(const std::vector<RadioChannel> &results) {
-  model_.SetResults(results);
-  ReloadResults();
+void RadioBrowserSearchView::showEvent(QShowEvent *e) {
+
+  Q_UNUSED(e)
+
+  // Retried on every show until the fetch succeeds, so a failed fetch doesn't leave the country filter empty until restart.
+  if (!countries_loaded_ && service_) {
+    service_->FetchCountries();
+  }
+
 }
 
-void RadioBrowserSearchView::Search(const std::string &query) {
-  if (entry_) {
-    gtk_editable_set_text(GTK_EDITABLE(entry_), query.c_str());
+void RadioBrowserSearchView::Init(RadioBrowserService *service) {
+
+  service_ = service;
+  QObject::connect(service_, &RadioBrowserService::SearchFinished, this, &RadioBrowserSearchView::SearchFinished);
+  QObject::connect(service_, &RadioBrowserService::SearchError, this, &RadioBrowserSearchView::SearchError);
+  QObject::connect(service_, &RadioBrowserService::CountriesLoaded, this, &RadioBrowserSearchView::CountriesLoaded);
+
+  // Load defaults from settings
+  Settings s;
+  s.beginGroup(QLatin1String(RadioBrowserSettings::kSettingsGroup));
+  search_limit_ = s.value(QLatin1String(RadioBrowserSettings::kSearchLimit), RadioBrowserSettings::kSearchLimitDefault).toInt();
+  hide_broken_ = s.value(QLatin1String(RadioBrowserSettings::kHideBroken), RadioBrowserSettings::kHideBrokenDefault).toBool();
+
+  const QString default_sort = s.value(QLatin1String(RadioBrowserSettings::kDefaultSort), QLatin1String(RadioBrowserSettings::kDefaultSortDefault)).toString();
+  for (int i = 0; i < ui_->combo_sort->count(); ++i) {
+    if (ui_->combo_sort->itemData(i).toString() == default_sort) {
+      ui_->combo_sort->setCurrentIndex(i);
+      break;
+    }
   }
-  if (search_timeout_) {
-    g_source_remove(search_timeout_);
-    search_timeout_ = 0;
-  }
-  if (RadioViewSearch::ShouldFocusSearch() && entry_) {
-    gtk_widget_grab_focus(entry_);
-  }
-  SearchTriggered();
+
+  default_country_ = s.value(QLatin1String(RadioBrowserSettings::kDefaultCountry)).toString();
+  s.endGroup();
+
 }
 
-void RadioBrowserSearchView::ScheduleSearch() {
-  if (changed_) {
-    const char *text = gtk_editable_get_text(GTK_EDITABLE(entry_));
-    changed_(text ? text : "");
-  }
-  if (search_timeout_) {
-    g_source_remove(search_timeout_);
-  }
-  search_timeout_ = g_timeout_add(RadioBrowserSearchOpts::DebounceMs(), [](gpointer data) -> gboolean {
-    auto *self = static_cast<RadioBrowserSearchView *>(data);
-    self->search_timeout_ = 0;
-    self->SearchTriggered();
-    return G_SOURCE_REMOVE;
-  }, this);
+void RadioBrowserSearchView::TextChanged(const QString &text) {
+
+  Q_UNUSED(text)
+  search_timer_->start();
+
 }
 
 void RadioBrowserSearchView::SearchTriggered() {
+
   current_offset_ = 0;
-  model_.Clear();
+  model_->Clear();
   DoSearch();
-}
 
-void RadioBrowserSearchView::LoadMore() {
-  current_offset_ = RadioBrowserSearchOpts::NextOffset(current_offset_, search_limit_);
-  DoSearch();
-}
-
-std::string RadioBrowserSearchView::ActiveCountry() const {
-  const char *id = gtk_combo_box_get_active_id(GTK_COMBO_BOX(country_));
-  return RadioBrowserSearchOpts::IsAllCountries(id) ? std::string() : id;
-}
-
-std::string RadioBrowserSearchView::ActiveOrder() const {
-  const char *id = gtk_combo_box_get_active_id(GTK_COMBO_BOX(sort_));
-  return id ? id : RadioBrowserSearchOpts::DefaultSort();
 }
 
 void RadioBrowserSearchView::DoSearch() {
-  if (!services_) {
-    return;
-  }
-  const char *text = gtk_editable_get_text(GTK_EDITABLE(entry_));
-  const std::string query = text ? text : "";
-  gtk_label_set_text(GTK_LABEL(status_), Translations::CStr(RadioBrowserSearchOpts::SearchingText()));
-  gtk_widget_set_visible(help_, FALSE);
-  const uint64_t gen = ++search_generation_;
-  services_->SearchRadioBrowser(query, ActiveCountry(), ActiveOrder(), search_limit_, current_offset_, hide_broken_,
-                                [this, gen](const std::vector<RadioChannel> &channels, bool has_more, const std::string &error) {
-                                  if (gen != search_generation_) {
-                                    return;
-                                  }
-                                  if (!error.empty()) {
-                                    gtk_label_set_text(GTK_LABEL(status_), error.c_str());
-                                    gtk_widget_set_visible(load_more_, FALSE);
-                                    return;
-                                  }
-                                  has_more_ = has_more;
-                                  if (current_offset_ == 0) {
-                                    model_.SetResults(channels);
-                                  } else {
-                                    model_.AddChannels(channels);
-                                  }
-                                  gtk_label_set_text(GTK_LABEL(status_),
-                                                     RadioBrowserSearchOpts::StatusText(model_.row_count(), model_.row_count() == 0 &&
-                                                                                                               current_offset_ == 0)
-                                                         .c_str());
-                                  gtk_widget_set_visible(load_more_, has_more_);
-                                  gtk_widget_set_visible(help_, model_.row_count() == 0);
-                                  ReloadResults();
-                                });
+
+  if (!service_) return;
+
+  const QString query = ui_->search->text().trimmed();
+  const QString country = ui_->combo_country->currentData().toString();
+  const QString order = ui_->combo_sort->currentData().toString();
+
+  ui_->label_status->setText(tr("Searching..."));
+  ui_->stacked->setCurrentWidget(ui_->page_results);
+
+  service_->Search(query, country, QString(), QString(), order, search_limit_, current_offset_, hide_broken_);
+
 }
 
-void RadioBrowserSearchView::FetchCountries() {
-  if (!services_) {
+void RadioBrowserSearchView::SearchFinished(const RadioChannelList &channels, const bool has_more) {
+
+  has_more_ = has_more;
+  ui_->button_loadmore->setVisible(has_more);
+
+  if (channels.isEmpty() && current_offset_ == 0) {
+    ui_->label_status->setText(tr("No stations found."));
     return;
   }
-  services_->FetchCountries([this](const std::vector<RadioBrowserService::Country> &countries) { ApplyCountries(countries); });
+
+  ui_->label_status->setText(tr("%1 stations found").arg(model_->rowCount() + channels.size()));
+
+  model_->AddChannels(channels);
+
 }
 
-void RadioBrowserSearchView::ApplyCountries(const std::vector<RadioBrowserService::Country> &countries) {
-  applying_countries_ = true;
-  countries_loaded_ = RadioBrowserSearchOpts::ShouldMarkCountriesLoaded(true);
-  gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(country_));
-  gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(country_), RadioBrowserSearchOpts::AllCountriesId(),
-                            Translations::CStr(RadioBrowserSearchOpts::AllCountriesLabel()));
-  int active = 0;
-  int index = 1;
-  for (const RadioBrowserService::Country &country : countries) {
-    gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(country_), country.code.c_str(), country.name.c_str());
-    if (!default_country_.empty() && default_country_ == country.code) {
-      active = index;
+void RadioBrowserSearchView::SearchError(const QString &error) {
+
+  ui_->label_status->setText(error);
+
+}
+
+void RadioBrowserSearchView::CountriesLoaded(const QList<QPair<QString, QString>> &countries) {
+
+  countries_loaded_ = true;
+
+  ui_->combo_country->clear();
+  ui_->combo_country->addItem(tr("All countries"), QString());
+
+  for (const QPair<QString, QString> &entry : countries) {
+    ui_->combo_country->addItem(entry.first, entry.second);
+  }
+
+  // Restore saved default country
+  if (!default_country_.isEmpty()) {
+    for (int i = 0; i < ui_->combo_country->count(); ++i) {
+      if (ui_->combo_country->itemData(i).toString() == default_country_) {
+        ui_->combo_country->setCurrentIndex(i);
+        break;
+      }
     }
-    ++index;
   }
-  gtk_combo_box_set_active(GTK_COMBO_BOX(country_), active);
-  applying_countries_ = false;
+
 }
 
-void RadioBrowserSearchView::ReloadResults() {
-  GtkWidget *child = gtk_widget_get_first_child(list_);
-  while (child) {
-    GtkWidget *next = gtk_widget_get_next_sibling(child);
-    gtk_list_box_remove(GTK_LIST_BOX(list_), child);
-    child = next;
-  }
-  for (const RadioChannel &channel : model_.results()) {
-    GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *label = gtk_label_new(RadioBrowserSearchModel::RowSummary(channel).c_str());
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
-    gtk_widget_set_margin_start(label, 12);
-    gtk_widget_set_margin_end(label, 12);
-    gtk_widget_set_margin_top(label, 8);
-    gtk_widget_set_margin_bottom(label, 8);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), label);
-    auto *copy = new RadioChannel(channel);
-    g_object_set_data_full(G_OBJECT(row), "channel", copy, [](gpointer p) { delete static_cast<RadioChannel *>(p); });
-    SetupRowDrag(row, channel);
-    gtk_list_box_append(GTK_LIST_BOX(list_), row);
-  }
+void RadioBrowserSearchView::LoadMore() {
+
+  current_offset_ += search_limit_;
+  DoSearch();
+
 }
 
-void RadioBrowserSearchView::SetupRowDrag(GtkWidget *row, const RadioChannel &channel) {
-  GtkDragSource *src = gtk_drag_source_new();
-  gtk_drag_source_set_actions(src, GDK_ACTION_COPY);
-  auto *copy = new RadioChannel(channel);
-  g_object_set_data_full(G_OBJECT(src), "channel", copy, [](gpointer p) { delete static_cast<RadioChannel *>(p); });
-  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
-                     auto *self = static_cast<RadioBrowserSearchView *>(data);
-                     auto *dragged = static_cast<RadioChannel *>(g_object_get_data(G_OBJECT(s), "channel"));
-                     std::vector<RadioChannel> channels = dragged ? std::vector<RadioChannel>{*dragged} : std::vector<RadioChannel>{};
-                     for (const RadioChannel &selected : self->SelectedChannels()) {
-                       if (dragged && selected.url == dragged->url) {
-                         channels = self->SelectedChannels();
-                         break;
-                       }
-                     }
-                     const std::string payload = RadioDrag::DragPayload(channels);
-                     if (payload.empty()) {
-                       return nullptr;
-                     }
-                     GValue v = G_VALUE_INIT;
-                     g_value_init(&v, G_TYPE_STRING);
-                     g_value_set_string(&v, payload.c_str());
-                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
-                     g_value_unset(&v);
-                     return provider;
-                   })),
-                   this);
-  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
+void RadioBrowserSearchView::CountryChanged(const int index) {
+
+  Q_UNUSED(index)
+
+  if (service_) SearchTriggered();
+
 }
 
-std::vector<RadioChannel> RadioBrowserSearchView::SelectedChannels() const {
-  std::vector<RadioChannel> channels;
-  gtk_list_box_selected_foreach(
-      GTK_LIST_BOX(list_),
-      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-        if (auto *channel = static_cast<RadioChannel *>(g_object_get_data(G_OBJECT(row), "channel"))) {
-          static_cast<std::vector<RadioChannel> *>(data)->push_back(*channel);
-        }
-      },
-      &channels);
-  return channels;
+void RadioBrowserSearchView::SortChanged(const int index) {
+
+  Q_UNUSED(index)
+
+  if (!service_) return;
+
+  // Changing the server-side sort order clears any client-side column sort, otherwise the chosen order would stay hidden behind the column sort and the combo box would appear to do nothing.
+  ui_->results->header()->setSortIndicator(-1, Qt::AscendingOrder);
+  SearchTriggered();
+
+}
+
+void RadioBrowserSearchView::ItemDoubleClicked(const QModelIndex &index) {
+
+  if (!index.isValid()) return;
+
+  const RadioChannel channel = model_->ChannelForRow(sort_model_->mapToSource(index).row());
+  if (channel.url.isEmpty()) return;
+
+  RadioMimeData *mimedata = new RadioMimeData;
+  mimedata->songs << channel.ToSong();
+  Q_EMIT AddToPlaylist(mimedata);
+
+}
+
+void RadioBrowserSearchView::AddSelectedToPlaylist() {
+
+  const QModelIndexList selected = ui_->results->selectionModel()->selectedRows(static_cast<int>(RadioBrowserSearchModel::Column::Name));
+  if (selected.isEmpty()) return;
+
+  RadioMimeData *mimedata = new RadioMimeData;
+  for (const QModelIndex &idx : selected) {
+    const RadioChannel channel = model_->ChannelForRow(sort_model_->mapToSource(idx).row());
+    if (!channel.url.isEmpty()) {
+      mimedata->songs << channel.ToSong();
+    }
+  }
+  if (!mimedata->songs.isEmpty()) {
+    Q_EMIT AddToPlaylist(mimedata);
+  }
+  else {
+    delete mimedata;
+  }
+
+}
+
+void RadioBrowserSearchView::ShowContextMenu(const QPoint &pos) {
+
+  if (!context_menu_) {
+    context_menu_ = new QMenu(this);
+
+    action_add_to_playlist_ = new QAction(IconLoader::Load(u"media-playback-start"_s), tr("Append to current playlist"), this);
+    QObject::connect(action_add_to_playlist_, &QAction::triggered, this, &RadioBrowserSearchView::AddSelectedToPlaylist);
+    context_menu_->addAction(action_add_to_playlist_);
+  }
+
+  const bool has_selection = !ui_->results->selectionModel()->selectedRows().isEmpty();
+  action_add_to_playlist_->setEnabled(has_selection);
+
+  context_menu_->popup(ui_->results->viewport()->mapToGlobal(pos));
+
 }

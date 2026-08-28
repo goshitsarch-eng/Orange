@@ -1,109 +1,162 @@
-#include "tagreader/streamtagreader.h"
-
-#include "core/logging.h"
-#include "core/network.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2012, David Sansome <me@davidsansome.com>
+ * Copyright 2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include <algorithm>
-#include <map>
 
-const TagLibLengthType StreamTagReader::kPrefixCacheBytes = 64UL * 1024UL;
-const TagLibLengthType StreamTagReader::kSuffixCacheBytes = 8UL * 1024UL;
+#include <QByteArray>
+#include <QString>
+#include <QUrl>
+#include <QEventLoop>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QSslError>
 
-StreamTagReader::StreamTagReader(const std::string &url, const std::string &filename, TagLibLengthType length, const std::string &token_type,
-                                 const std::string &access_token, RangeFetcher fetcher)
+#include "core/logging.h"
+#include "core/networkaccessmanager.h"
+
+#include "streamtagreader.h"
+
+namespace {
+constexpr TagLibLengthType kTagLibPrefixCacheBytes = 64UL * 1024UL;
+constexpr TagLibLengthType kTagLibSuffixCacheBytes = 8UL * 1024UL;
+}  // namespace
+
+StreamTagReader::StreamTagReader(const QUrl &url,
+                                 const QString &filename,
+                                 const quint64 length,
+                                 const QString &token_type,
+                                 const QString &access_token)
     : url_(url),
       filename_(filename),
-      length_(length),
+      encoded_filename_(filename_.toUtf8()),
+      length_(static_cast<TagLibLengthType>(length)),
       token_type_(token_type),
       access_token_(access_token),
-      fetcher_(std::move(fetcher)) {
-  if (!fetcher_ && !url_.empty()) {
-    fetcher_ = HttpFetcher(url_, token_type_, access_token_);
-  }
+      network_(new NetworkAccessManager),
+      cursor_(0),
+      cache_(length),
+      num_requests_(0) {
+
+  network_->setAutoDeleteReplies(true);
+
 }
 
-std::string StreamTagReader::RangeHeader(TagLibLengthType start, TagLibLengthType end) {
-  return "bytes=" + std::to_string(start) + "-" + std::to_string(end);
-}
+TagLib::FileName StreamTagReader::name() const { return encoded_filename_.data(); }
 
-std::string StreamTagReader::AuthorizationHeader(const std::string &token_type, const std::string &access_token) {
-  if (token_type.empty() || access_token.empty()) {
-    return {};
-  }
-  return token_type + " " + access_token;
-}
+TagLib::ByteVector StreamTagReader::readBlock(const TagLibLengthType length) {
 
-StreamTagReader::RangeFetcher StreamTagReader::HttpFetcher(const std::string &url, const std::string &token_type, const std::string &access_token) {
-  return [url, token_type, access_token](TagLibLengthType start, TagLibLengthType end) {
-    NetworkAccessManager network;
-    std::map<std::string, std::string> headers;
-    headers["Range"] = RangeHeader(start, end);
-    const std::string authorization = AuthorizationHeader(token_type, access_token);
-    if (!authorization.empty()) {
-      headers["Authorization"] = authorization;
-    }
-    const NetworkAccessManager::Response response = network.GetSync(url, headers);
-    if (!response.ok()) {
-      LogError("Unable to get tags from stream for %s: %s", url.c_str(),
-               response.error.empty() ? std::to_string(response.status).c_str() : response.error.c_str());
-      return std::string();
-    }
-    return response.body;
-  };
-}
-
-TagLib::FileName StreamTagReader::name() const { return filename_.c_str(); }
-
-TagLib::ByteVector StreamTagReader::readBlock(TagLibLengthType length) {
-  if (length == 0 || cursor_ >= length_ || length_ == 0) {
+  if (length == 0 || cursor_ >= length_) {
     return TagLib::ByteVector();
   }
+
   const TagLibLengthType start = cursor_;
   const TagLibLengthType end = std::min(cursor_ + length - 1, length_ - 1);
+
   if (end < start) {
     return TagLib::ByteVector();
   }
+
   if (CheckCache(start, end)) {
     const TagLib::ByteVector cached = GetCache(start, end);
     cursor_ += static_cast<TagLibLengthType>(cached.size());
     return cached;
   }
-  const std::string data = FetchRange(start, end);
-  const TagLib::ByteVector bytes(data.data(), static_cast<unsigned>(data.size()));
+
+  QNetworkRequest network_request(url_);
+  if (!token_type_.isEmpty() && !access_token_.isEmpty()) {
+    network_request.setRawHeader("Authorization", token_type_.toUtf8() + " " + access_token_.toUtf8());
+  }
+  network_request.setRawHeader("Range", QStringLiteral("bytes=%1-%2").arg(start).arg(end).toUtf8());
+  network_request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
+  network_request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+
+  QNetworkReply *reply = network_->get(network_request);
+  ++num_requests_;
+
+  QEventLoop event_loop;
+  QObject::connect(reply, &QNetworkReply::finished, &event_loop, &QEventLoop::quit);
+  event_loop.exec();
+
+  if (reply->error() != QNetworkReply::NoError) {
+    qLog(Error) << "Unable to get tags from stream for" << url_ << "got error:" << reply->errorString();
+    return TagLib::ByteVector();
+  }
+
+  if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).isValid()) {
+    const int http_status_code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (http_status_code >= 400) {
+      qLog(Error) << "Unable to get tags from stream for" << url_ << "received HTTP code" << http_status_code;
+      return TagLib::ByteVector();
+    }
+  }
+
+  const QByteArray data = reply->readAll();
+  const TagLib::ByteVector bytes(data.data(), static_cast<uint>(data.size()));
   cursor_ += static_cast<TagLibLengthType>(data.size());
+
   FillCache(start, bytes);
+
   return bytes;
+
 }
 
-void StreamTagReader::writeBlock(const TagLib::ByteVector &) {}
+void StreamTagReader::writeBlock(const TagLib::ByteVector &data) {
+  Q_UNUSED(data);
+}
 
-void StreamTagReader::insert(const TagLib::ByteVector &, TagLibUOffsetType, TagLibLengthType) {}
+void StreamTagReader::insert(const TagLib::ByteVector &data, const TagLibUOffsetType start, const TagLibLengthType replace) {
+  Q_UNUSED(data)
+  Q_UNUSED(start)
+  Q_UNUSED(replace)
+}
 
-void StreamTagReader::removeBlock(TagLibUOffsetType, TagLibLengthType) {}
+void StreamTagReader::removeBlock(const TagLibUOffsetType start, const TagLibLengthType length) {
+  Q_UNUSED(start)
+  Q_UNUSED(length)
+}
 
 bool StreamTagReader::readOnly() const { return true; }
 
 bool StreamTagReader::isOpen() const { return true; }
 
-void StreamTagReader::seek(TagLibOffsetType offset, TagLib::IOStream::Position position) {
+void StreamTagReader::seek(const TagLibOffsetType offset, const TagLib::IOStream::Position position) {
+
   switch (position) {
     case TagLib::IOStream::Beginning:
-      cursor_ = static_cast<TagLibLengthType>(offset < 0 ? 0 : offset);
+      cursor_ = static_cast<TagLibLengthType>(offset);
       break;
+
     case TagLib::IOStream::Current:
-      if (offset < 0) {
-        const TagLibLengthType back = static_cast<TagLibLengthType>(-offset);
-        cursor_ = back >= cursor_ ? 0 : cursor_ - back;
-      } else {
-        cursor_ = std::min(cursor_ + static_cast<TagLibLengthType>(offset), length_);
-      }
+      cursor_ = std::min(cursor_ + static_cast<TagLibLengthType>(offset), length_);
       break;
+
     case TagLib::IOStream::End: {
+      // This should really not take the absolute value, but OGG reading needs it.
+      // Compute |offset| on the signed type first - casting a negative offset to the unsigned
+      // TagLibLengthType would wrap to a huge value before qAbs (a no-op on unsigned) ran.
       const TagLibLengthType abs_offset = offset < 0 ? static_cast<TagLibLengthType>(-offset) : static_cast<TagLibLengthType>(offset);
       cursor_ = abs_offset >= length_ ? 0 : length_ - abs_offset;
       break;
     }
   }
+
 }
 
 void StreamTagReader::clear() { cursor_ = 0; }
@@ -112,77 +165,60 @@ TagLibOffsetType StreamTagReader::tell() const { return static_cast<TagLibOffset
 
 TagLibOffsetType StreamTagReader::length() { return static_cast<TagLibOffsetType>(length_); }
 
-void StreamTagReader::truncate(TagLibOffsetType) {}
-
-TagLibLengthType StreamTagReader::cached_bytes() const {
-  TagLibLengthType total = 0;
-  for (const Span &span : cache_) {
-    total += static_cast<TagLibLengthType>(span.data.size());
-  }
-  return total;
+void StreamTagReader::truncate(const TagLibOffsetType length) {
+  Q_UNUSED(length)
 }
 
-void StreamTagReader::PreCache() {
-  seek(0, TagLib::IOStream::Beginning);
-  readBlock(kPrefixCacheBytes);
-  seek(static_cast<TagLibOffsetType>(kSuffixCacheBytes), TagLib::IOStream::End);
-  readBlock(kSuffixCacheBytes);
-  clear();
-}
+bool StreamTagReader::CheckCache(const TagLibLengthType start, const TagLibLengthType end) {
 
-bool StreamTagReader::CheckCache(TagLibLengthType start, TagLibLengthType end) const {
-  TagLibLengthType pos = start;
-  while (pos <= end) {
-    bool found = false;
-    for (const Span &span : cache_) {
-      const TagLibLengthType span_end = span.start + static_cast<TagLibLengthType>(span.data.size());
-      if (pos >= span.start && pos < span_end) {
-        pos = span_end;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
+  for (TagLibLengthType i = start; i <= end; ++i) {
+    if (!cache_.test(i)) {
       return false;
     }
   }
+
   return true;
+
 }
 
-void StreamTagReader::FillCache(TagLibLengthType start, const TagLib::ByteVector &data) {
-  if (data.size() == 0) {
-    return;
+void StreamTagReader::FillCache(const TagLibLengthType start, const TagLib::ByteVector &data) {
+
+  for (TagLibLengthType i = 0; i < data.size(); ++i) {
+    cache_.set(start + i, data[static_cast<int>(i)]);
   }
-  Span span;
-  span.start = start;
-  span.data.assign(data.begin(), data.end());
-  cache_.push_back(std::move(span));
+
 }
 
-TagLib::ByteVector StreamTagReader::GetCache(TagLibLengthType start, TagLibLengthType end) const {
-  const TagLibLengthType size = end - start + 1;
-  TagLib::ByteVector data(static_cast<unsigned>(size));
+TagLib::ByteVector StreamTagReader::GetCache(const TagLibLengthType start, const TagLibLengthType end) {
+
+  const TagLibLengthType size = end - start + 1U;
+  TagLib::ByteVector data(static_cast<uint>(size));
   for (TagLibLengthType i = 0; i < size; ++i) {
-    const TagLibLengthType pos = start + i;
-    bool found = false;
-    for (const Span &span : cache_) {
-      if (pos >= span.start && pos < span.start + static_cast<TagLibLengthType>(span.data.size())) {
-        data[static_cast<unsigned>(i)] = span.data[pos - span.start];
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      return TagLib::ByteVector();
-    }
+    data[static_cast<int>(i)] = cache_.get(start + i);
   }
+
   return data;
+
 }
 
-std::string StreamTagReader::FetchRange(TagLibLengthType start, TagLibLengthType end) {
-  ++num_requests_;
-  if (!fetcher_) {
-    return {};
-  }
-  return fetcher_(start, end);
+void StreamTagReader::PreCache() {
+
+  // For reading the tags of an MP3, TagLib tends to request:
+  // 1. The first 1024 bytes
+  // 2. Somewhere between the first 2KB and first 60KB
+  // 3. The last KB or two.
+  // 4. Somewhere in the first 64KB again
+  //
+  // OGG Vorbis may read the last 4KB.
+  //
+  // So, if we precache the first 64KB and the last 8KB we should be sorted :-)
+  // Ideally, we would use bytes=0-655364,-8096 but Google Drive does not seem
+  // to support multipart byte ranges yet so we have to make do with two requests.
+
+  seek(0, TagLib::IOStream::Beginning);
+  readBlock(kTagLibPrefixCacheBytes);
+  seek(kTagLibSuffixCacheBytes, TagLib::IOStream::End);
+  readBlock(kTagLibSuffixCacheBytes);
+  clear();
+
 }

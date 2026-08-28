@@ -1,279 +1,236 @@
-#include "utilities/strutils.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "utilities/timeutils.h"
+#include <QString>
+#include <QStringList>
+#include <QRegularExpression>
+#include <QMetaObject>
+#include <QMetaEnum>
 
-#include <unicode/translit.h>
-#include <unicode/unistr.h>
+#include "strutils.h"
+#include "core/song.h"
 
-#include <glib.h>
+using namespace Qt::Literals::StringLiterals;
 
-#include <algorithm>
-#include <cctype>
-#include <cerrno>
-#include <cmath>
+namespace Utilities {
 
-namespace StrUtils {
+QString PrettySize(const quint64 bytes) {
 
-std::string ToLower(const std::string &value) {
-  std::string result = value;
-  std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return std::tolower(c); });
-  return result;
-}
+  QString ret;
 
-std::string ToUpper(const std::string &value) {
-  std::string result = value;
-  std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return std::toupper(c); });
-  return result;
-}
-
-std::string Trim(const std::string &value) {
-  const auto not_space = [](unsigned char c) { return !std::isspace(c); };
-  auto begin = std::find_if(value.begin(), value.end(), not_space);
-  auto end = std::find_if(value.rbegin(), value.rend(), not_space).base();
-  if (begin >= end) {
-    return {};
-  }
-  return std::string(begin, end);
-}
-
-std::vector<std::string> Split(const std::string &value, char delimiter) {
-  std::vector<std::string> parts;
-  std::string current;
-  for (char c : value) {
-    if (c == delimiter) {
-      parts.push_back(current);
-      current.clear();
-    } else {
-      current.push_back(c);
+  if (bytes > 0LL) {
+    if (bytes <= 1000LL) {
+      ret = QString::number(bytes) + " bytes"_L1;
+    }
+    else if (bytes <= 1000LL * 1000LL) {
+      ret = QString::asprintf("%.1f KB", static_cast<float>(bytes) / 1000.0F);
+    }
+    else if (bytes <= 1000LL * 1000LL * 1000LL) {
+      ret = QString::asprintf("%.1f MB", static_cast<float>(bytes) / (1000.0F * 1000.0F));
+    }
+    else {
+      ret = QString::asprintf("%.1f GB", static_cast<float>(bytes) / (1000.0F * 1000.0F * 1000.0F));
     }
   }
-  parts.push_back(current);
-  return parts;
+  return ret;
+
 }
 
-std::string Join(const std::vector<std::string> &parts, const std::string &delimiter) {
-  std::string result;
-  for (size_t i = 0; i < parts.size(); ++i) {
-    if (i) {
-      result += delimiter;
-    }
-    result += parts[i];
-  }
+QString PrettySize(const QSize size) {
+  return QString::number(size.width()) + QLatin1Char('x') + QString::number(size.height());
+}
+
+QString PathWithoutFilenameExtension(const QString &filename) {
+  if (filename.section(u'/', -1, -1).contains(u'.')) return filename.section(u'.', 0, -2);
+  return filename;
+}
+
+QString FiddleFileExtension(const QString &filename, const QString &new_extension) {
+  return PathWithoutFilenameExtension(filename) + QLatin1Char('.') + new_extension;
+}
+
+const char *EnumToString(const QMetaObject &meta, const char *name, const int value) {
+
+  int index = meta.indexOfEnumerator(name);
+  if (index == -1) return "[UnknownEnum]";
+  QMetaEnum metaenum = meta.enumerator(index);
+  const char *result = metaenum.valueToKey(value);
+  if (!result) return "[UnknownEnumValue]";
   return result;
+
 }
 
-bool StartsWith(const std::string &value, const std::string &prefix) {
-  return value.size() >= prefix.size() && value.compare(0, prefix.size(), prefix) == 0;
+QStringList Prepend(const QString &text, const QStringList &list) {
+
+  QStringList ret(list);
+  for (int i = 0; i < ret.count(); ++i) ret[i].prepend(text);
+  return ret;
+
 }
 
-bool EndsWith(const std::string &value, const std::string &suffix) {
-  return value.size() >= suffix.size() && value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+QStringList Updateify(const QStringList &list) {
+
+  QStringList ret(list);
+  for (int i = 0; i < ret.count(); ++i) ret[i].prepend(ret[i] + " = :"_L1);
+  return ret;
+
 }
 
-bool ContainsInsensitive(const std::string &haystack, const std::string &needle) {
-  return ToLower(haystack).find(ToLower(needle)) != std::string::npos;
-}
+QString DecodeHtmlEntities(const QString &text) {
 
-std::string Replace(const std::string &value, const std::string &from, const std::string &to) {
-  if (from.empty()) {
-    return value;
-  }
-  std::string result = value;
-  size_t pos = 0;
-  while ((pos = result.find(from, pos)) != std::string::npos) {
-    result.replace(pos, from.size(), to);
-    pos += to.size();
-  }
-  return result;
-}
+  QString copy(text);
+  copy.replace("&amp;"_L1, "&"_L1)
+      .replace("&#38;"_L1, "&"_L1)
+      .replace("&quot;"_L1, "\""_L1)
+      .replace("&#34;"_L1, "\""_L1)
+      .replace("&apos;"_L1, "'"_L1)
+      .replace("&#39;"_L1, "'"_L1)
+      .replace("&lt;"_L1, "<"_L1)
+      .replace("&#60;"_L1, "<"_L1)
+      .replace("&gt;"_L1, ">"_L1)
+      .replace("&#62;"_L1, ">"_L1)
+      .replace("&#x27;"_L1, "'"_L1);
 
-std::string SqlLikeEscape(const std::string &value) {
-  std::string result;
-  result.reserve(value.size());
-  for (char c : value) {
-    if (c == '%' || c == '_' || c == '\\') {
-      result.push_back('\\');
-    }
-    result.push_back(c);
-  }
-  return result;
-}
-
-std::string SqlQuote(const std::string &value) {
-  return "'" + Replace(value, "'", "''") + "'";
-}
-
-bool ParseNumber(const std::string &value, double *out) {
-  if (!out) {
-    return false;
-  }
-  const std::string trimmed = Trim(value);
-  if (trimmed.empty()) {
-    return false;
-  }
-  errno = 0;
-  char *end = nullptr;
-  // strtod is locale-sensitive; the filter syntax is not, so parse in the C locale.
-  const double parsed = g_ascii_strtod(trimmed.c_str(), &end);
-  if (end == trimmed.c_str() || (end && *end != '\0') || errno == ERANGE || !std::isfinite(parsed)) {
-    return false;
-  }
-  *out = parsed;
-  return true;
-}
-
-std::string FormatNumberForSql(const double value) {
-  char buf[G_ASCII_DTOSTR_BUF_SIZE];
-  g_ascii_formatd(buf, sizeof(buf), "%.10g", value);
-  return buf;
-}
-
-std::string UriEscape(const std::string &value) {
-  gchar *escaped = g_uri_escape_string(value.c_str(), nullptr, TRUE);
-  std::string result = escaped ? escaped : value;
-  g_free(escaped);
-  return result;
-}
-
-std::string JsonEscape(const std::string &value) {
-  std::string result;
-  result.reserve(value.size());
-  for (unsigned char ch : value) {
-    switch (ch) {
-      case '"': result += "\\\""; break;
-      case '\\': result += "\\\\"; break;
-      case '\b': result += "\\b"; break;
-      case '\f': result += "\\f"; break;
-      case '\n': result += "\\n"; break;
-      case '\r': result += "\\r"; break;
-      case '\t': result += "\\t"; break;
-      default:
-        if (ch < 0x20) {
-          char buf[8];
-          g_snprintf(buf, sizeof(buf), "\\u%04x", ch);
-          result += buf;
-        } else {
-          result.push_back(static_cast<char>(ch));
-        }
-        break;
-    }
-  }
-  return result;
-}
-
-std::string Transliterate(const std::string &value) {
-  UErrorCode status = U_ZERO_ERROR;
-  icu::Transliterator *transliterator = icu::Transliterator::createInstance("Any-Latin; Latin-ASCII", UTRANS_FORWARD, status);
-  if (U_FAILURE(status) || !transliterator) {
-    return value;
-  }
-  icu::UnicodeString unicode = icu::UnicodeString::fromUTF8(value);
-  transliterator->transliterate(unicode);
-  delete transliterator;
-  std::string result;
-  unicode.toUTF8String(result);
-  return result;
-}
-
-namespace {
-
-std::string ReplaceVariable(const std::string &variable, const Song &song, const std::string &newline) {
-  if (variable == "%title%") {
-    return song.PrettyTitle();
-  }
-  if (variable == "%titlesort%") {
-    return song.titlesort();
-  }
-  if (variable == "%album%") {
-    return song.album();
-  }
-  if (variable == "%albumsort%") {
-    return song.albumsort();
-  }
-  if (variable == "%artist%") {
-    return song.artist();
-  }
-  if (variable == "%artistsort%") {
-    return song.artistsort();
-  }
-  if (variable == "%albumartist%") {
-    return song.EffectiveAlbumartist();
-  }
-  if (variable == "%albumartistsort%") {
-    return song.albumartistsort();
-  }
-  if (variable == "%track%") {
-    return std::to_string(song.track());
-  }
-  if (variable == "%disc%") {
-    return std::to_string(song.disc());
-  }
-  if (variable == "%year%") {
-    return song.year() > 0 ? std::to_string(song.year()) : std::string();
-  }
-  if (variable == "%originalyear%") {
-    return song.originalyear() > 0 ? std::to_string(song.originalyear()) : std::string();
-  }
-  if (variable == "%genre%") {
-    return song.genre();
-  }
-  if (variable == "%composer%") {
-    return song.composer();
-  }
-  if (variable == "%composersort%") {
-    return song.composersort();
-  }
-  if (variable == "%performer%") {
-    return song.performer();
-  }
-  if (variable == "%performersort%") {
-    return song.performersort();
-  }
-  if (variable == "%grouping%") {
-    return song.grouping();
-  }
-  if (variable == "%length%") {
-    return Utilities::PrettyTimeNanosec(song.length_nanosec());
-  }
-  if (variable == "%filename%") {
-    return song.basefilename();
-  }
-  if (variable == "%url%") {
-    return song.url();
-  }
-  if (variable == "%playcount%") {
-    return std::to_string(song.playcount());
-  }
-  if (variable == "%skipcount%") {
-    return std::to_string(song.skipcount());
-  }
-  if (variable == "%rating%") {
-    return song.rating() > 0 ? std::to_string(song.rating()) : std::string();
-  }
-  if (variable == "%newline%") {
-    return newline;
-  }
-  return variable;
-}
-
-}  // namespace
-
-std::string ReplaceMessage(const std::string &message, const Song &song, const std::string &newline) {
-  std::string copy;
-  copy.reserve(message.size());
-  for (size_t i = 0; i < message.size();) {
-    if (message[i] == '%') {
-      const size_t end = message.find('%', i + 1);
-      if (end != std::string::npos) {
-        copy += ReplaceVariable(message.substr(i, end - i + 1), song, newline);
-        i = end + 1;
-        continue;
-      }
-    }
-    copy.push_back(message[i]);
-    ++i;
-  }
   return copy;
+
 }
 
-}  // namespace StrUtils
+QString ReplaceMessage(const QString &message, const Song &song, const QString &newline, const bool html_escaped) {
+
+  static const QRegularExpression variable_replacer(u"[%][a-z]+[%]"_s);
+  QString copy(message);
+
+  // Replace the first line
+  qint64 pos = 0;
+  QRegularExpressionMatch match;
+  for (match = variable_replacer.match(message, pos); match.hasMatch(); match = variable_replacer.match(message, pos)) {
+    pos = match.capturedStart();
+    QStringList captured = match.capturedTexts();
+    copy.replace(captured[0], ReplaceVariable(captured[0], song, newline, html_escaped));
+    pos += match.capturedLength();
+  }
+
+  static const QRegularExpression regexp(u" - (>|$)"_s);
+  qint64 index_of = copy.indexOf(regexp);
+  if (index_of >= 0) copy = copy.remove(index_of, 3);
+
+  return copy;
+
+}
+
+QString ReplaceVariable(const QString &variable, const Song &song, const QString &newline, const bool html_escaped) {
+
+  QString value = variable;
+
+  if (variable == "%title%"_L1) {
+    value = song.PrettyTitle();
+  }
+  else if (variable == "%titlesort%"_L1) {
+    value = song.titlesort();
+  }
+  else if (variable == "%album%"_L1) {
+    value = song.album();
+  }
+  else if (variable == "%albumsort%"_L1) {
+    value = song.albumsort();
+  }
+  else if (variable == "%artist%"_L1) {
+    value = song.artist();
+  }
+  else if (variable == "%artistsort%"_L1) {
+    value = song.artistsort();
+  }
+  else if (variable == "%albumartist%"_L1) {
+    value = song.effective_albumartist();
+  }
+  else if (variable == "%albumartistsort%"_L1) {
+    value = song.albumartistsort();
+  }
+  else if (variable == "%track%"_L1) {
+    value.setNum(song.track());
+  }
+  else if (variable == "%disc%"_L1) {
+    value.setNum(song.disc());
+  }
+  else if (variable == "%year%"_L1) {
+    value = song.PrettyYear();
+  }
+  else if (variable == "%originalyear%"_L1) {
+    value = song.PrettyOriginalYear();
+  }
+  else if (variable == "%genre%"_L1) {
+    value = song.genre();
+  }
+  else if (variable == "%composer%"_L1) {
+    value = song.composer();
+  }
+  else if (variable == "%composersort%"_L1) {
+    value = song.composersort();
+  }
+  else if (variable == "%performer%"_L1) {
+    value = song.performer();
+  }
+  else if (variable == "%performersort%"_L1) {
+    value = song.performersort();
+  }
+  else if (variable == "%grouping%"_L1) {
+    value = song.grouping();
+  }
+  else if (variable == "%length%"_L1) {
+    value = song.PrettyLength();
+  }
+  else if (variable == "%filename%"_L1) {
+    value = song.basefilename();
+  }
+  else if (variable == "%url%"_L1) {
+    value = song.url().toString();
+  }
+  else if (variable == "%playcount%"_L1) {
+    value.setNum(song.playcount());
+  }
+  else if (variable == "%skipcount%"_L1) {
+    value.setNum(song.skipcount());
+  }
+  else if (variable == "%rating%"_L1) {
+    value = song.PrettyRating();
+  }
+  else if (variable == "%newline%"_L1) {
+    return QString(newline);  // No HTML escaping, return immediately.
+  }
+
+  if (html_escaped) {
+    value = value.toHtmlEscaped();
+  }
+  return value;
+
+}
+
+QString StringListToHTML(const QStringList &string_list) {
+
+  QString html;
+  for (const QString &string : string_list) {
+    html += string + "<br />"_L1;
+  }
+
+  return html;
+
+}
+
+}  // namespace Utilities

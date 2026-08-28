@@ -1,42 +1,60 @@
-#include "engine/directsounddevicefinder.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2014, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <cstdio>
-
-#ifdef _WIN32
 #ifdef INTERFACE
-#undef INTERFACE
+#  undef INTERFACE
 #endif
+
+#include "config.h"
+
 #include <dsound.h>
-#include <objbase.h>
-#endif
 
-DirectSoundDeviceFinder::DirectSoundDeviceFinder()
-    : DeviceFinder("directsound", {"directsound", "dsound", "directsoundsink", "directx", "directx2", "waveformsink"}) {}
+#include <QVariant>
+#include <QString>
+#include <QUuid>
 
-#ifdef _WIN32
-int __stdcall DirectSoundDeviceFinder::EnumerateCallback(const void *guid, const char *description, const char *, void *state_voidptr) {
-  auto *state = static_cast<State *>(state_voidptr);
-  EngineDevice device;
-  device.description = description ? description : "";
-  if (guid) {
-    const GUID *id = static_cast<const GUID *>(guid);
-    char text[64];
-    snprintf(text, sizeof(text), "{%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}", static_cast<unsigned long>(id->Data1), id->Data2,
-             id->Data3, id->Data4[0], id->Data4[1], id->Data4[2], id->Data4[3], id->Data4[4], id->Data4[5], id->Data4[6], id->Data4[7]);
-    device.value = text;
-  }
-  device.iconname = device.GuessIconName();
-  state->devices.push_back(device);
-  return 1;
-}
-#endif
+#include "directsounddevicefinder.h"
+#include "enginedevice.h"
+#include "core/logging.h"
+
+DirectSoundDeviceFinder::DirectSoundDeviceFinder() : DeviceFinder(QStringLiteral("directsound"), { QStringLiteral("directsound"), QStringLiteral("dsound"), QStringLiteral("directsoundsink"), QStringLiteral("directx"), QStringLiteral("directx2"), QStringLiteral("waveformsink") }) {}
 
 EngineDeviceList DirectSoundDeviceFinder::ListDevices() {
-#ifdef _WIN32
   State state;
-  DirectSoundEnumerateA(reinterpret_cast<LPDSENUMCALLBACKA>(EnumerateCallback), &state);
+  DirectSoundEnumerateA(&DirectSoundDeviceFinder::EnumerateCallback, &state);
   return state.devices;
-#else
-  return {};
-#endif
+}
+
+BOOL CALLBACK DirectSoundDeviceFinder::EnumerateCallback(LPGUID guid, LPCSTR description, LPCSTR module, LPVOID state_voidptr) {
+
+  Q_UNUSED(module);
+
+  State *state = reinterpret_cast<State*>(state_voidptr);
+
+  EngineDevice device;
+  device.description = QString::fromLatin1(description);
+  if (guid) device.value = QUuid(*guid).toString();
+  device.iconname = device.GuessIconName();
+  state->devices.append(device);
+
+  return 1;
+
 }

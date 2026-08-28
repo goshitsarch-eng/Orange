@@ -1,69 +1,89 @@
-#ifndef STRAWBERRY_RADIOBROWSERSEARCHVIEW_H
-#define STRAWBERRY_RADIOBROWSERSEARCHVIEW_H
+/*
+ * Strawberry Music Player
+ * Copyright 2026, Malte Zilinski <malte@zilinski.eu>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "radios/radiobrowsersearchmodel.h"
-#include "radios/radiobrowserservice.h"
-#include "radios/radioview.h"
+#ifndef RADIOBROWSERSEARCHVIEW_H
+#define RADIOBROWSERSEARCHVIEW_H
 
-#include <cstdint>
-#include <functional>
-#include <string>
-#include <vector>
+#include <QWidget>
+#include <QPair>
+#include <QString>
 
-#include <gtk/gtk.h>
+#include "radiochannel.h"
 
-class RadioServices;
+class QTimer;
+class QMimeData;
+class QMenu;
+class QAction;
+class QShowEvent;
+class QContextMenuEvent;
+class QSortFilterProxyModel;
 
-class RadioBrowserSearchView {
+class RadioBrowserSearchModel;
+class RadioBrowserService;
+
+class Ui_RadioBrowserSearchView;
+
+class RadioBrowserSearchView : public QWidget {
+  Q_OBJECT
+
  public:
-  explicit RadioBrowserSearchView(RadioServices *services = nullptr);
-  ~RadioBrowserSearchView();
+  explicit RadioBrowserSearchView(QWidget *parent = nullptr);
+  ~RadioBrowserSearchView() override;
 
-  GtkWidget *widget() const { return widget_; }
-  GtkWidget *entry() const { return entry_; }
-  RadioBrowserSearchModel *model() { return &model_; }
-  void SetResults(const std::vector<RadioChannel> &results);
-  void Search(const std::string &query);
-  void SetChangedCallback(std::function<void(const std::string &)> callback) { changed_ = std::move(callback); }
-  void SetActivateCallback(std::function<void(const RadioChannel &)> callback) { activate_ = std::move(callback); }
-  void SetMenuCallback(RadioView::MenuCallback callback) { menu_ = std::move(callback); }
-  std::vector<RadioChannel> SelectedChannels() const;
+  void Init(RadioBrowserService *service);
+
+ protected:
+  void showEvent(QShowEvent *e) override;
+
+ Q_SIGNALS:
+  void AddToPlaylist(QMimeData *mimedata);
+
+ private Q_SLOTS:
+  void TextChanged(const QString &text);
+  void SearchTriggered();
+  void SearchFinished(const RadioChannelList &channels, const bool has_more);
+  void SearchError(const QString &error);
+  void LoadMore();
+  void CountryChanged(const int index);
+  void SortChanged(const int index);
+  void CountriesLoaded(const QList<QPair<QString, QString>> &countries);
+  void AddSelectedToPlaylist();
+  void ItemDoubleClicked(const QModelIndex &index);
+  void ShowContextMenu(const QPoint &pos);
 
  private:
-  void ReloadResults();
-  void ScheduleSearch();
-  void SearchTriggered();
   void DoSearch();
-  void LoadMore();
-  void FetchCountries();
-  void ApplyCountries(const std::vector<RadioBrowserService::Country> &countries);
-  std::string ActiveCountry() const;
-  std::string ActiveOrder() const;
-  void SetupRowDrag(GtkWidget *row, const RadioChannel &channel);
-  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
 
-  RadioServices *services_ = nullptr;
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *entry_ = nullptr;
-  GtkWidget *country_ = nullptr;
-  GtkWidget *sort_ = nullptr;
-  GtkWidget *status_ = nullptr;
-  GtkWidget *help_ = nullptr;
-  GtkWidget *list_ = nullptr;
-  GtkWidget *load_more_ = nullptr;
-  RadioBrowserSearchModel model_;
-  std::function<void(const std::string &)> changed_;
-  std::function<void(const RadioChannel &)> activate_;
-  RadioView::MenuCallback menu_;
-  int search_limit_ = 100;
-  int current_offset_ = 0;
-  bool hide_broken_ = true;
-  bool has_more_ = false;
-  bool countries_loaded_ = false;
-  bool applying_countries_ = false;
-  guint search_timeout_ = 0;
-  uint64_t search_generation_ = 0;
-  std::string default_country_;
+  Ui_RadioBrowserSearchView *ui_;
+  RadioBrowserService *service_;
+  RadioBrowserSearchModel *model_;
+  QSortFilterProxyModel *sort_model_;
+  QTimer *search_timer_;
+  QMenu *context_menu_;
+  QAction *action_add_to_playlist_;
+
+  QString default_country_;
+  int current_offset_;
+  int search_limit_;
+  bool hide_broken_;
+  bool has_more_;
+  bool countries_loaded_;
 };
 
-#endif
+#endif  // RADIOBROWSERSEARCHVIEW_H

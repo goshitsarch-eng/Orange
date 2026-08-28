@@ -1,59 +1,111 @@
-#ifndef STRAWBERRY_EQUALIZER_H
-#define STRAWBERRY_EQUALIZER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/signal.h"
-#include "equalizer/equalizergain.h"
-#include "equalizer/equalizerpersist.h"
+#ifndef EQUALIZER_H
+#define EQUALIZER_H
 
-#include <algorithm>
-#include <map>
-#include <string>
-#include <vector>
+#include "config.h"
 
-class Equalizer {
+#include <QObject>
+#include <QDialog>
+#include <QList>
+#include <QMap>
+#include <QMetaType>
+#include <QDataStream>
+#include <QString>
+
+class QWidget;
+class QCloseEvent;
+
+class EqualizerSlider;
+class Ui_Equalizer;
+
+class Equalizer : public QDialog {
+  Q_OBJECT
+
  public:
-  Equalizer();
-  void ReloadSettings();
+  explicit Equalizer(QWidget *parent = nullptr);
+  ~Equalizer() override;
+
+  static constexpr int kBands = 10;
+
+  struct Params {
+    Params();
+    Params(int g0, int g1, int g2, int g3, int g4, int g5, int g6, int g7, int g8, int g9, int pre = 0);
+
+    bool operator==(const Params &other) const;
+    bool operator!=(const Params &other) const;
+
+    int preamp;
+    int gain[kBands]{};
+  };
+
+  bool is_equalizer_enabled() const;
+  bool is_stereo_balancer_enabled() const;
+  int preamp_value() const;
+  QList<int> gain_values() const;
+  Params current_params() const;
+  float stereo_balance() const;
+
+ Q_SIGNALS:
+  void StereoBalancerEnabledChanged(const bool enabled);
+  void StereoBalanceChanged(const float balance);
+  void EqualizerEnabledChanged(const bool enabled);
+  void EqualizerParametersChanged(const int preamp, const QList<int> &band_gains);
+
+ protected:
+  void closeEvent(QCloseEvent *e) override;
+
+ private Q_SLOTS:
+  void StereoBalancerEnabledChangedSlot(const bool enabled);
+  void StereoBalanceSliderChanged(const int value);
+  void EqualizerEnabledChangedSlot(const bool enabled);
+  void EqualizerParametersChangedSlot();
+  void PresetChanged(const QString &name);
+  void PresetChanged(const int index);
+  void SavePreset();
+  void DelPreset();
   void Save();
-  bool enabled() const { return enabled_; }
-  void set_enabled(bool enabled);
-  int preamp() const { return preamp_; }
-  void set_preamp(int preamp);
-  const std::vector<int> &gains() const { return gains_; }
-  void set_gain(int band, int gain);
-  void LoadPreset(const std::string &name);
-  bool SavePreset(const std::string &name);
-  bool DeletePreset(const std::string &name);
-  bool HasPreset(const std::string &name) const;
-  bool MatchesPreset(const std::string &name) const;
-  bool IsBuiltin(const std::string &name) const;
-  std::vector<std::string> Presets() const;
-  static std::vector<std::string> BuiltinPresetNames();
-  static int ClampBalance(int value) { return EqualizerPersist::ClampBalance(value); }
-  const std::string &selected_preset() const { return selected_preset_; }
-  bool stereo_balancer_enabled() const { return stereo_balancer_enabled_; }
-  void set_stereo_balancer_enabled(bool enabled);
-  int stereo_balance() const { return stereo_balance_; }
-  void set_stereo_balance(int balance);
-  float EffectiveBalanceFraction() const {
-    return EqualizerPersist::EffectiveBalanceFraction(stereo_balancer_enabled_, stereo_balance_);
-  }
-  std::vector<int> EffectiveGains() const { return EqualizerPersist::EffectiveGains(enabled_, gains_); }
-  int EffectivePreamp() const { return EqualizerPersist::EffectivePreamp(enabled_, preamp_); }
-  Signal<bool, int, std::vector<int>> ParametersChanged;
-  Signal<float> StereoBalanceChanged;
 
  private:
-  void LoadBuiltinPresets();
+  EqualizerSlider *AddSlider(const QString &label);
+  void LoadDefaultPresets();
+  void AddPreset(const QString &name, const Params &params);
+  void ReloadSettings();
+  QString SaveCurrentPreset();
 
-  bool enabled_ = false;
-  int preamp_ = 0;
-  std::vector<int> gains_;
-  std::map<std::string, std::vector<int>> presets_;
-  std::vector<std::string> user_names_;
-  std::string selected_preset_ = EqualizerPersist::kDefaultPreset;
-  bool stereo_balancer_enabled_ = false;
-  int stereo_balance_ = 0;
+ private:
+  Ui_Equalizer *ui_;
+  bool loading_;
+
+  QString last_preset_;
+
+  EqualizerSlider *preamp_;
+  EqualizerSlider *gain_[kBands]{};
+
+  QMap<QString, Params> presets_;
 };
+Q_DECLARE_METATYPE(Equalizer::Params)
 
-#endif
+QDataStream &operator<<(QDataStream &s, const Equalizer::Params &p);
+QDataStream &operator>>(QDataStream &s, Equalizer::Params &p);
+
+#endif  // EQUALIZER_H

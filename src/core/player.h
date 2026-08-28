@@ -1,134 +1,172 @@
-#ifndef STRAWBERRY_PLAYER_H
-#define STRAWBERRY_PLAYER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/behavioursettings.h"
-#include "core/playerinterface.h"
-#include "core/signal.h"
-#include "core/song.h"
+#ifndef PLAYER_H
+#define PLAYER_H
+
+#include "config.h"
+
+#include <QtGlobal>
+#include <QObject>
+#include <QMap>
+#include <QDateTime>
+#include <QString>
+#include <QUrl>
+
+#include "includes/shared_ptr.h"
 #include "core/urlhandler.h"
-#include "engine/gstengine.h"
+#include "core/enginemetadata.h"
+#include "engine/enginebase.h"
+#include "playlist/playlist.h"
+#include "playlist/playlistitem.h"
+#include "constants/behavioursettings.h"
+#include "playerinterface.h"
 
-#include <memory>
-#include <string>
-#include <vector>
-
-class PlaylistManager;
-class Queue;
+class QTimer;
+class Song;
 class TaskManager;
 class UrlHandlers;
+class PlaylistManager;
+class AnalyzerContainer;
+class Equalizer;
 
 class Player : public PlayerInterface {
+  Q_OBJECT
+
  public:
-  Player(TaskManager *task_manager, UrlHandlers *url_handlers, PlaylistManager *playlist_manager);
-  ~Player();
+  explicit Player(const SharedPtr<TaskManager> task_manager, const SharedPtr<UrlHandlers> url_handlers, const SharedPtr<PlaylistManager> playlist_manager, QObject *parent = nullptr);
 
   void Init();
-  void SetQueue(Queue *queue) { queue_ = queue; }
-  GstEngine *engine() const { return engine_.get(); }
-  TaskManager *task_manager() const { return task_manager_; }
-  EngineBase::State GetState() const override;
-  unsigned GetVolume() const override { return volume_; }
-  const Song &current_song() const override { return current_song_; }
 
-  void Play() override;
-  void Play(uint64_t offset_nanosec);
-  void PlayPause() override;
-  void Pause() override;
-  void Stop(bool stop_after = false) override;
-  void StopAfterCurrent();
-  bool stop_after_current() const { return stop_after_current_; }
-  void set_stop_after_current(bool stop) { stop_after_current_ = stop; }
+  SharedPtr<EngineBase> engine() const override { return engine_; }
+  EngineBase::State GetState() const override { return last_state_; }
+  uint GetVolume() const override;
+
+  PlaylistItemPtr GetCurrentItem() const override { return current_item_; }
+  PlaylistItemPtr GetItemAt(const int pos) const override;
+
+  bool PreviousWouldRestartTrack() const;
+
+  void SetAnalyzer(AnalyzerContainer *analyzer) { analyzer_ = analyzer; }
+  void SetEqualizer(SharedPtr<Equalizer> equalizer) { equalizer_ = equalizer; }
+
+ public Q_SLOTS:
+  void ReloadSettings() override;
+
+  void LoadVolume() override;
+  void SaveVolume() override;
+  void SavePlaybackStatus() override;
+  void PlaylistsLoaded() override;
+
+  void PlayAt(const int index, const bool pause, const quint64 offset_nanosec, EngineBase::TrackChangeFlags change, const Playlist::AutoScroll autoscroll, const bool reshuffle, const bool force_inform = false) override;
+  void PlayPause(const quint64 offset_nanosec = 0, const Playlist::AutoScroll autoscroll = Playlist::AutoScroll::Always) override;
+  void PlayPauseHelper() override { PlayPause(play_offset_nanosec_); }
+  void RestartOrPrevious() override;
   void Next() override;
   void Previous() override;
-  void RestartOrPrevious();
-  void SeekTo(int64_t seconds) override;
-  void Seek(int64_t nanosec);
-  void SeekForward();
-  void SeekBackward();
-  void SetVolume(unsigned volume) override;
-  void SetVolumeFromEngine(unsigned volume);
-  void VolumeUp();
-  void VolumeDown();
-  void Mute();
-  void PlayAt(int index, bool pause = false, uint64_t offset_nanosec = 0);
-  void PlayPlaylist(const std::string &name);
-  void ReloadSettings();
-  void LoadVolume();
-  void SaveVolume();
-  void SavePlaybackStatus();
-  void ResumePlayback();
-  void PlaylistsLoaded();
-  void ShowOSD();
-  void TogglePrettyOSD();
-  void SyncCurrentMetadata(const Song &updated);
+  void PlayPlaylist(const QString &playlist_name) override;
+  void SetVolumeFromSlider(const int value) override;
+  void SetVolumeFromEngine(const uint volume) override;
+  void SetVolume(const uint volume) override;
+  void VolumeUp() override;
+  void VolumeDown() override;
+  void SeekTo(const quint64 seconds) override;
+  void SeekForward() override;
+  void SeekBackward() override;
 
-  Signal<Song> SongChanged;
-  Signal<Song> NowPlayingRefresh;
-  Signal<unsigned> VolumeChanged;
-  Signal<EngineBase::State> StateChanged;
-  Signal<int64_t, int64_t> PositionChanged;
-  Signal<Song, bool> ForceShowOSD;
-  Signal<Song, int64_t> PlaybackFinished;
-  Signal<Song> TrackEndedPlaycount;
-  Signal<Song, int64_t, int64_t> TrackSkipped;
-  Signal<> Paused;
-  Signal<> Playing;
-  Signal<> Stopped;
-  Signal<> PlaylistFinished;
-  Signal<std::string> Error;
+  void CurrentMetadataChanged(const Song &metadata) override;
+
+  void Mute() override;
+  void Pause() override;
+  void Stop(const bool stop_after = false) override;
+  void StopAfterCurrent();
+  void Play(const quint64 offset_nanosec = 0) override;
+  void PlayWithPause(const quint64 offset_nanosec) override;
+  void PlayHelper() override { Play(); }
+  void ShowOSD() override;
+  void TogglePrettyOSD();
+
+  void HandleAuthentication();
+
+ private Q_SLOTS:
+  void UrlHandlerRegistered(UrlHandler *url_handler) const;
+
+  void EngineStateChanged(const EngineBase::State);
+  void EngineMetadataReceived(const EngineMetadata &engine_metadata);
+  void TrackAboutToEnd();
+  void TrackEnded();
+  // Play the next item on the playlist - disregarding radio stations like last.fm that might have more tracks.
+  void NextItem(const EngineBase::TrackChangeFlags change, const Playlist::AutoScroll autoscroll);
+  void PreviousItem(const EngineBase::TrackChangeFlags change);
+
+  void NextInternal(const EngineBase::TrackChangeFlags, const Playlist::AutoScroll autoscroll);
+  void PlayPlaylistInternal(const EngineBase::TrackChangeFlags, const Playlist::AutoScroll autoscroll, const QString &playlist_name);
+
+  void FatalError();
+  void ValidSongRequested(const QUrl &url);
+  void InvalidSongRequested(const QUrl &url);
+
+  void HandleLoadResult(const UrlHandler::LoadResult &result);
 
  private:
-  void HandleEngineState(EngineBase::State state);
-  void HandleTrackEnded();
-  void StartFromPlaylist(uint64_t offset_nanosec);
-  void PlayQueueHead(int track_change_flags = GstEngine::Manual);
-  void PreloadNext();
-  void PlayCurrent(bool pause, uint64_t offset_nanosec = 0, int track_change_flags = GstEngine::Manual);
-  void PlayLoadedSong(bool pause, int track_change_flags = GstEngine::Manual, uint64_t offset_nanosec = 0);
-  void FinishCurrentPlayback();
-  void Advance(int track_change_flags);
-  void MaybeEmitTrackSkipped();
-  int SameAlbumFlags(int track_change_flags, const Song &from, const Song &to) const;
-  void CancelIntroTimeout();
-  void ArmIntroTimeout();
+  void ResumePlayback();
 
-  TaskManager *task_manager_;
-  UrlHandlers *url_handlers_;
-  PlaylistManager *playlist_manager_;
-  Queue *queue_ = nullptr;
-  std::unique_ptr<GstEngine> engine_;
-  Song current_song_;
-  unsigned volume_ = 100;
-  unsigned volume_before_mute_ = 100;
-  bool stop_after_current_ = false;
-  bool preloaded_ = false;
-  bool finished_current_ = true;
-  int seek_step_sec_ = 10;
-  unsigned volume_increment_ = 5;
-  bool continue_on_error_ = false;
-  bool greyout_ = true;
-  int error_count_ = 0;
-  unsigned intro_timeout_id_ = 0;
-  int intro_generation_ = 0;
+  // Returns true if we were supposed to stop after this track.
+  bool HandleStopAfter(const Playlist::AutoScroll autoscroll);
 
-  void HandleEngineError(const std::string &error);
-  void HandleFatalError();
-  void HandleInvalidSongRequested(const std::string &url);
-  void HandleValidSongRequested(const std::string &url);
-  void HandleEngineMetadata(const Song &song);
-  void HandleLoadResult(const UrlHandler::LoadResult &result);
-  void StartEnginePlayback(bool pause, int track_change_flags, uint64_t offset_nanosec);
   void UnPause();
 
-  std::vector<std::string> loading_async_;
-  bool pending_play_pause_ = false;
-  int pending_play_flags_ = 0;
-  uint64_t pending_play_offset_ = 0;
-  int64_t pause_started_sec_ = 0;
-  int64_t last_previous_press_sec_ = 0;
-  BehaviourSettings::PreviousBehaviour menu_previous_mode_ = BehaviourSettings::kDefaultMenuPreviousMode;
-  bool playlists_loaded_ = false;
-  bool play_requested_ = false;
+ private:
+  const SharedPtr<TaskManager> task_manager_;
+  const SharedPtr<UrlHandlers> url_handlers_;
+  const SharedPtr<PlaylistManager> playlist_manager_;
+  SharedPtr<EngineBase> engine_;
+  AnalyzerContainer *analyzer_;
+  SharedPtr<Equalizer> equalizer_;
+  QTimer *timer_save_volume_;
+
+  bool playlists_loaded_;
+  bool play_requested_;
+
+  PlaylistItemPtr current_item_;
+
+  bool pause_;
+  EngineBase::TrackChangeFlags stream_change_type_;
+  Playlist::AutoScroll autoscroll_;
+  EngineBase::State last_state_;
+  int nb_errors_received_;
+
+  QList<QUrl> loading_async_;
+  uint volume_;
+  uint volume_before_mute_;
+  QDateTime last_pressed_previous_;
+
+  bool continue_on_error_;
+  bool greyout_;
+  BehaviourSettings::PreviousBehaviour menu_previousmode_;
+  int seek_step_sec_;
+  uint volume_increment_;
+
+  QDateTime pause_time_;
+  quint64 play_offset_nanosec_;
 };
 
-#endif  // STRAWBERRY_PLAYER_H
+#endif  // PLAYER_H

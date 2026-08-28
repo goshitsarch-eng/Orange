@@ -1,18 +1,39 @@
-#ifndef STRAWBERRY_STREAMINGSEARCHSORTMODEL_H
-#define STRAWBERRY_STREAMINGSEARCHSORTMODEL_H
+/*
+ * Strawberry Music Player
+ * This code was part of Clementine (GlobalSearch)
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "streaming/streamingsearchmodel.h"
+#ifndef STREAMINGSEARCHSORTMODEL_H
+#define STREAMINGSEARCHSORTMODEL_H
 
-class StreamingSearchSortModel {
+#include <QSortFilterProxyModel>
+
+class QObject;
+class QModelIndex;
+
+class StreamingSearchSortModel : public QSortFilterProxyModel {
+  Q_OBJECT
+
  public:
-  explicit StreamingSearchSortModel(StreamingSearchModel *source);
+  explicit StreamingSearchSortModel(QObject *parent = nullptr);
 
-  void SetSource(StreamingSearchModel *source);
-  SongList Visible() const;
-  void SetSort(StreamingSearchModel::SortField field, bool descending = false);
-
- private:
-  StreamingSearchModel *source_ = nullptr;
+ protected:
+  bool lessThan(const QModelIndex &left, const QModelIndex &right) const override;
 };
 
-#endif
+#endif  // STREAMINGSEARCHSORTMODEL_H

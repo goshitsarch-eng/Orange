@@ -1,88 +1,186 @@
-#include "playlist/playlistitem.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlist/songplaylistitem.h"
-#include "playlist/streamplaylistitem.h"
+#include "config.h"
 
-#include <glib.h>
+#include <memory>
 
-namespace {
+#include <QUuid>
+#include <QColor>
 
-bool IsStreamSource(Song::Source source) {
-  return source == Song::Source::Stream || source == Song::Source::Tidal || source == Song::Source::Subsonic ||
-         source == Song::Source::Qobuz || source == Song::Source::Spotify || source == Song::Source::SomaFM ||
-         source == Song::Source::RadioParadise || source == Song::Source::RadioBrowser;
-}
+#include "core/sqlquery.h"
+#include "core/song.h"
 
-std::string NewUuid() {
-  char *uuid = g_uuid_string_random();
-  std::string text = uuid ? uuid : "";
-  g_free(uuid);
-  return text;
-}
+#include "playlistitem.h"
+#include "playlistitemsavedata.h"
+#include "songplaylistitem.h"
+#include "collection/collectionplaylistitem.h"
+#include "streaming/streamserviceplaylistitem.h"
+#include "radios/radiostreamplaylistitem.h"
 
-}  // namespace
+using std::make_shared;
+using namespace Qt::Literals::StringLiterals;
 
-PlaylistItem::PlaylistItem(Song::Source source, const std::string &uuid) : source_(source), uuid_(uuid) {
-  if (uuid_.empty()) {
-    uuid_ = NewUuid();
-    uuid_generated_ = true;
+PlaylistItem::PlaylistItem(const Song::Source source, const QUuid &uuid, const bool signal) : source_(source), uuid_(uuid.isNull() ? QUuid::createUuid() : uuid), uuid_generated_(uuid.isNull()), signal_(signal), should_skip_(false), save_generation_(0) {}
+
+PlaylistItem::~PlaylistItem() = default;
+
+PlaylistItemPtr PlaylistItem::NewFromSource(const Song::Source source, const QUuid &uuid) {
+
+  switch (source) {
+    case Song::Source::Collection:
+      return make_shared<CollectionPlaylistItem>(source, uuid);
+    case Song::Source::Subsonic:
+    case Song::Source::Tidal:
+    case Song::Source::Spotify:
+    case Song::Source::Qobuz:
+      return make_shared<StreamServicePlaylistItem>(source, uuid);
+    case Song::Source::Stream:
+    case Song::Source::RadioParadise:
+    case Song::Source::SomaFM:
+    case Song::Source::RadioBrowser:
+      return make_shared<RadioStreamPlaylistItem>(source, uuid);
+    case Song::Source::LocalFile:
+    case Song::Source::CDDA:
+    case Song::Source::Device:
+    case Song::Source::Unknown:
+      break;
   }
+
+  return make_shared<SongPlaylistItem>(source, uuid);
+
 }
 
-PlaylistItemPtr PlaylistItem::NewFromSource(Song::Source source, const std::string &uuid) {
-  if (IsStreamSource(source)) {
-    return std::make_shared<StreamPlaylistItem>(source, uuid);
+PlaylistItemPtr PlaylistItem::NewFromSong(const Song &song, const bool signal) {
+
+  switch (song.source()) {
+    case Song::Source::Collection:
+      return make_shared<CollectionPlaylistItem>(song, signal);
+    case Song::Source::Subsonic:
+    case Song::Source::Tidal:
+    case Song::Source::Spotify:
+    case Song::Source::Qobuz:
+      return make_shared<StreamServicePlaylistItem>(song, signal);
+    case Song::Source::Stream:
+    case Song::Source::RadioParadise:
+    case Song::Source::SomaFM:
+    case Song::Source::RadioBrowser:
+      return make_shared<RadioStreamPlaylistItem>(song, signal);
+    case Song::Source::LocalFile:
+    case Song::Source::CDDA:
+    case Song::Source::Device:
+    case Song::Source::Unknown:
+      break;
   }
-  return std::make_shared<SongPlaylistItem>(source, uuid);
+
+  return make_shared<SongPlaylistItem>(song, signal);
+
 }
 
-PlaylistItemPtr PlaylistItem::NewFromSong(const Song &song) {
-  if (IsStreamSource(song.source())) {
-    return std::make_shared<StreamPlaylistItem>(song);
-  }
-  return std::make_shared<SongPlaylistItem>(song);
+void PlaylistItem::SetStreamMetadata(const Song &song) {
+  stream_song_ = song;
 }
-
-Song PlaylistItem::EffectiveMetadata() const { return HasStreamMetadata() ? stream_song_ : OriginalMetadata(); }
-
-std::string PlaylistItem::EffectiveUrl() const {
-  if (HasStreamMetadata() && !stream_song_.stream_url().empty()) {
-    return stream_song_.stream_url();
-  }
-  if (HasStreamMetadata() && !stream_song_.url().empty()) {
-    return stream_song_.url();
-  }
-  return OriginalUrl();
-}
-
-void PlaylistItem::SetStreamMetadata(const Song &song) { stream_song_ = song; }
 
 void PlaylistItem::UpdateStreamMetadata(const Song &song) {
-  if (!stream_song_.is_valid()) {
-    stream_song_ = song;
-    return;
-  }
-  if (!song.title().empty()) {
-    stream_song_.set_title(song.title());
-  }
-  if (!song.artist().empty()) {
-    stream_song_.set_artist(song.artist());
-  }
-  if (!song.album().empty()) {
-    stream_song_.set_album(song.album());
-  }
-  if (song.length_nanosec() > 0) {
-    stream_song_.set_length_nanosec(song.length_nanosec());
-  }
-  if (!song.stream_url().empty()) {
-    stream_song_.set_stream_url(song.stream_url());
-  }
+
+  if (!stream_song_.is_valid()) return;
+
+  const Song old_stream_song = stream_song_;
+  stream_song_ = song;
+
+  // Keep samplerate, bitdepth and bitrate from the old metadata if it's not present in the new.
+  if (stream_song_.samplerate() <= 0 && old_stream_song.samplerate() > 0) stream_song_.set_samplerate(old_stream_song.samplerate());
+  if (stream_song_.bitdepth() <= 0 && old_stream_song.bitdepth() > 0) stream_song_.set_bitdepth(old_stream_song.bitdepth());
+  if (stream_song_.bitrate() <= 0 && old_stream_song.bitrate() > 0) stream_song_.set_bitrate(old_stream_song.bitrate());
+
 }
 
-void PlaylistItem::ClearStreamMetadata() { stream_song_ = Song(); }
+void PlaylistItem::ClearStreamMetadata() {
+  stream_song_ = Song();
+}
 
 PlaylistItemSaveData PlaylistItem::CreateSaveData() const {
-  PlaylistItemSaveData data(DatabaseSongMetadata(), uuid_);
-  data.source = source();
-  return data;
+
+  PlaylistItemSaveData save_data;
+  save_data.source = source_;
+  save_data.uuid = uuid_;
+  save_data.collection_id = DatabaseValue(DatabaseColumn::CollectionId);
+  save_data.song = DatabaseSongMetadata();
+
+  return save_data;
+
 }
+
+void PlaylistItem::SetBackgroundColor(short priority, const QColor &color) {
+  background_colors_[priority] = color;
+}
+
+bool PlaylistItem::HasBackgroundColor(short priority) const {
+  return background_colors_.contains(priority);
+}
+
+void PlaylistItem::RemoveBackgroundColor(short priority) {
+  background_colors_.remove(priority);
+}
+
+QColor PlaylistItem::GetCurrentBackgroundColor() const {
+
+  if (background_colors_.isEmpty()) {
+    return QColor();
+  }
+
+  QList<short> background_colors_keys = background_colors_.keys();
+  return background_colors_[background_colors_keys.last()];
+
+}
+
+bool PlaylistItem::HasCurrentBackgroundColor() const {
+  return !background_colors_.isEmpty();
+}
+
+void PlaylistItem::SetForegroundColor(const short priority, const QColor &color) {
+  foreground_colors_[priority] = color;
+}
+
+bool PlaylistItem::HasForegroundColor(const short priority) const {
+  return foreground_colors_.contains(priority);
+}
+
+void PlaylistItem::RemoveForegroundColor(const short priority) {
+  foreground_colors_.remove(priority);
+}
+
+QColor PlaylistItem::GetCurrentForegroundColor() const {
+
+  if (foreground_colors_.isEmpty()) return QColor();
+
+  QList<short> foreground_colors_keys = foreground_colors_.keys();
+  return foreground_colors_[foreground_colors_keys.last()];
+
+}
+
+bool PlaylistItem::HasCurrentForegroundColor() const {
+  return !foreground_colors_.isEmpty();
+}
+
+void PlaylistItem::SetShouldSkip(const bool should_skip) { should_skip_ = should_skip; }
+
+bool PlaylistItem::GetShouldSkip() const { return should_skip_; }

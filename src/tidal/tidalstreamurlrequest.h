@@ -1,33 +1,74 @@
-#ifndef STRAWBERRY_TIDALSTREAMURLREQUEST_H
-#define STRAWBERRY_TIDALSTREAMURLREQUEST_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/tidalsettings.h"
-#include "core/network.h"
-#include "core/urlhandlers.h"
+#ifndef TIDALSTREAMURLREQUEST_H
+#define TIDALSTREAMURLREQUEST_H
 
-#include <map>
-#include <string>
-#include <vector>
+#include "config.h"
 
-namespace TidalStreamUrlRequest {
+#include <QVariant>
+#include <QString>
+#include <QUrl>
+#include <QSharedPointer>
 
-using Method = TidalSettings::StreamUrlMethod;
+#include "includes/shared_ptr.h"
+#include "core/song.h"
+#include "tidalbaserequest.h"
 
-std::string TrackId(const std::string &url);
-Method MethodFromSettings(int value);
-std::string Resource(Method method, const std::string &track_id);
-std::string Url(const std::string &api_url, Method method, const std::string &track_id, const std::string &country_code,
-                const std::string &quality);
+class QNetworkReply;
+class NetworkAccessManager;
+class TidalService;
 
-std::string EncodeBase64(const std::string &value);
-std::string DecodeBase64(const std::string &value);
-std::vector<std::string> ParseUrls(const std::string &json);
-Song::FileType FiletypeFromCodecOrMime(const std::string &codec, const std::string &mimetype, const std::string &url);
-UrlHandler::LoadResult Parse(const std::string &json, const std::string &media_url, const std::string &expected_track_id = {});
+class TidalStreamURLRequest : public TidalBaseRequest {
+  Q_OBJECT
 
-void Get(NetworkAccessManager *network, const std::string &url, const std::map<std::string, std::string> &headers,
-         const std::string &media_url, const std::string &expected_track_id, UrlHandler::AsyncCallback callback);
+ public:
+  explicit TidalStreamURLRequest(TidalService *service, const SharedPtr<NetworkAccessManager> network, const QUrl &media_url, const uint id, QObject *parent = nullptr);
+  ~TidalStreamURLRequest() override;
 
-}  // namespace TidalStreamUrlRequest
+  void GetStreamURL();
+  void Process();
+  void Cancel();
 
-#endif
+  bool oauth() const;
+  TidalSettings::StreamUrlMethod stream_url_method() const;
+  QUrl media_url() const;
+  int song_id() const;
+
+ Q_SIGNALS:
+  void StreamURLFailure(const uint id, const QUrl &media_url, const QString &error);
+  void StreamURLSuccess(const uint id, const QUrl &media_url, const QUrl &stream_url, const Song::FileType filetype, const int samplerate = -1, const int bit_depth = -1, const qint64 duration = -1);
+
+ private Q_SLOTS:
+  void StreamURLReceived();
+
+ private:
+  static QList<QUrl> ParseUrls(const QJsonObject &json_object);
+
+ private:
+  TidalService *service_;
+  QNetworkReply *reply_;
+  QUrl media_url_;
+  uint id_;
+  int song_id_;
+};
+
+using TidalStreamURLRequestPtr = QSharedPointer<TidalStreamURLRequest>;
+
+#endif  // TIDALSTREAMURLREQUEST_H

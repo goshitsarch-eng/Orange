@@ -1,72 +1,130 @@
-#ifndef STRAWBERRY_MACOSDEVICELISTER_H
-#define STRAWBERRY_MACOSDEVICELISTER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#ifndef MACDEVICELISTER_H
+#define MACDEVICELISTER_H
 
 #include "config.h"
-#include "core/signal.h"
-#include "device/devicelister.h"
 
-#ifdef __APPLE__
-#include <DiskArbitration/DiskArbitration.h>
+#include <DiskArbitration/DADisk.h>
+#include <DiskArbitration/DADissenter.h>
 #include <IOKit/IOKitLib.h>
-#include <cstdint>
-#include <map>
-#include <mutex>
-#include <string>
-#include <vector>
-#endif
+
+#include <atomic>
+
+#include <QtGlobal>
+#include <QObject>
+#include <QMutex>
+#include <QThread>
+#include <QList>
+#include <QMap>
+#include <QSet>
+#include <QString>
+#include <QUrl>
+
+#include "devicelister.h"
 
 class MacOsDeviceLister : public DeviceLister {
+  Q_OBJECT
+
  public:
-  MacOsDeviceLister();
-  ~MacOsDeviceLister() override;
+  explicit MacOsDeviceLister(QObject *parent = nullptr);
+  ~MacOsDeviceLister();
 
-  std::string backend() const override { return "macos"; }
-  std::vector<ConnectedDevice> List() const override;
+  QStringList DeviceUniqueIDs();
+  QVariantList DeviceIcons(const QString &id);
+  QString DeviceManufacturer(const QString &id);
+  QString DeviceModel(const QString &id);
+  quint64 DeviceCapacity(const QString &id);
+  quint64 DeviceFreeSpace(const QString &id);
+  QVariantMap DeviceHardwareInfo(const QString &id);
+  bool AskForScan(const QString &serial) const;
+  QString MakeFriendlyName(const QString &id);
+  QList<QUrl> MakeDeviceUrls(const QString &id);
 
-  Signal<> DevicesChanged;
-
-#ifdef __APPLE__
-  void Init();
-  void Shutdown();
+  void UpdateDeviceFreeSpace(const QString &id);
 
 #ifdef HAVE_MTP
   struct MTPDevice {
-    std::string vendor;
-    std::string product;
-    uint16_t vendor_id = 0;
-    uint16_t product_id = 0;
-    int quirks = 0;
-    int bus = -1;
-    int address = -1;
-    uint64_t capacity = 0;
-    uint64_t free_space = 0;
+    MTPDevice() : capacity(0), free_space(0) {}
+    QString vendor;
+    QString product;
+    quint16 vendor_id;
+    quint16 product_id;
+
+    int quirks;
+    int bus;
+    int address;
+
+    quint64 capacity;
+    quint64 free_space;
   };
-#endif
+#endif  // HAVE_MTP
+
+  void ExitAsync();
+
+ public Q_SLOTS:
+  void UnmountDevice(const QString &id);
+  void ShutDown();
 
  private:
-  static void DiskAdded(DADiskRef disk, void *context);
-  static void DiskRemoved(DADiskRef disk, void *context);
-  static void USBDeviceAdded(void *refcon, io_iterator_t it);
-  static void USBDeviceRemoved(void *refcon, io_iterator_t it);
+  bool Init();
+
+  static void DiskAddedCallback(DADiskRef disk, void *context);
+  static void DiskRemovedCallback(DADiskRef disk, void *context);
+  static void USBDeviceAddedCallback(void *refcon, io_iterator_t it);
+  static void USBDeviceRemovedCallback(void *refcon, io_iterator_t it);
+
+  static void DiskUnmountCallback(DADiskRef disk, DADissenterRef dissenter, void *context);
 
 #ifdef HAVE_MTP
-  void FoundMTPDevice(const MTPDevice &device, const std::string &serial);
-  void RemovedMTPDevice(const std::string &serial);
-  uint64_t GetCapacity(const std::string &serial);
-  void LoadSupportedMtpDevices();
-#endif
+  void FoundMTPDevice(const MTPDevice &mtp_device, const QString &serial);
+  void RemovedMTPDevice(const QString &serial);
+  quint64 GetFreeSpace(const QUrl &url);
+  quint64 GetCapacity(const QUrl &url);
+#endif  // HAVE_MTP
 
-  DASessionRef session_ = nullptr;
-  IONotificationPortRef notify_port_ = nullptr;
-  io_iterator_t usb_added_ = 0;
-  io_iterator_t usb_removed_ = 0;
-  mutable std::mutex mutex_;
-  std::map<std::string, ConnectedDevice> devices_;
+  bool IsCDDevice(const QString &serial) const;
+
+  DASessionRef loop_session_ = nullptr;
+  std::atomic<CFRunLoopRef> run_loop_ = nullptr;
+
+  QMap<QString, QString> current_devices_;
 #ifdef HAVE_MTP
-  std::map<std::string, MTPDevice> mtp_devices_;
-  std::vector<MTPDevice> supported_mtp_;
+  QMap<QString, MTPDevice> mtp_devices_;
 #endif
+  QSet<QString> cd_devices_;
+
+#ifdef HAVE_MTP
+  QMutex libmtp_mutex_;
+  static QSet<MTPDevice> sMTPDeviceList;
 #endif
 };
 
-#endif
+#ifdef HAVE_MTP
+size_t qHash(const MacOsDeviceLister::MTPDevice &mtp_device);
+
+inline bool operator==(const MacOsDeviceLister::MTPDevice &a, const MacOsDeviceLister::MTPDevice &b) {
+  return (a.vendor_id == b.vendor_id) && (a.product_id == b.product_id);
+}
+#endif  // HAVE_MTP
+
+#endif  // MACDEVICELISTER_H

@@ -1,19 +1,39 @@
-#ifndef STRAWBERRY_TAGREADERSAVEPLAYCOUNTREQUEST_H
-#define STRAWBERRY_TAGREADERSAVEPLAYCOUNTREQUEST_H
+/*
+ * Strawberry Music Player
+ * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "tagreader/tagreaderrequest.h"
+#ifndef TAGREADERSAVEPLAYCOUNTREQUEST_H
+#define TAGREADERSAVEPLAYCOUNTREQUEST_H
 
-#include <memory>
+#include <QString>
+
+#include "includes/shared_ptr.h"
+#include "tagreaderrequest.h"
+
+using std::make_shared;
 
 class TagReaderSavePlaycountRequest : public TagReaderRequest {
  public:
-  explicit TagReaderSavePlaycountRequest(const std::string &filename) : TagReaderRequest(filename) {}
-  static std::shared_ptr<TagReaderSavePlaycountRequest> Create(const std::string &filename) {
-    return std::make_shared<TagReaderSavePlaycountRequest>(filename);
-  }
-  unsigned playcount = 0;
+  explicit TagReaderSavePlaycountRequest(const QString &_filename);
+  static SharedPtr<TagReaderSavePlaycountRequest> Create(const QString &filename) { return make_shared<TagReaderSavePlaycountRequest>(filename); }
+  uint playcount;
 };
 
-using TagReaderSavePlaycountRequestPtr = std::shared_ptr<TagReaderSavePlaycountRequest>;
+using TagReaderSavePlaycountRequestPtr = SharedPtr<TagReaderSavePlaycountRequest>;
 
-#endif
+#endif  // TAGREADERSAVEPLAYCOUNTREQUEST_H

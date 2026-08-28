@@ -1,334 +1,360 @@
-#include "settings/collectionsettingspage.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/collectionsettings.h"
+#include "config.h"
+
+#include <utility>
+#include <limits>
+
+#include <QAbstractItemModel>
+#include <QItemSelectionModel>
+#include <QString>
+#include <QStringList>
+#include <QStorageInfo>
+#include <QFileInfo>
+#include <QDir>
+#include <QFileDialog>
+#include <QCheckBox>
+#include <QLineEdit>
+#include <QListView>
+#include <QPushButton>
+#include <QComboBox>
+#include <QGroupBox>
+#include <QLabel>
+#include <QRadioButton>
+#include <QSpinBox>
+#include <QSettings>
+#include <QMessageBox>
+
+#include "constants/filesystemconstants.h"
+#include "core/iconloader.h"
+#include "core/standardpaths.h"
+#include "core/settings.h"
+#include "utilities/strutils.h"
+#include "collection/collectionlibrary.h"
 #include "collection/collectionbackend.h"
-#include "collection/collectioniconcache.h"
-#include "collection/collectionstats.h"
-#include "core/application.h"
-#include "settings/collectionsettingslabels.h"
-#include "settings/settingscontrols.h"
+#include "collection/collectionmodel.h"
+#include "collection/collectiondirectory.h"
+#include "collection/collectiondirectorymodel.h"
+#include "collectionsettingspage.h"
+#include "collectionsettingsdirectorymodel.h"
+#include "playlist/playlistdelegates.h"
+#include "settings/settingsdialog.h"
 #include "settings/settingspage.h"
-#include "translations/translations.h"
+#include "constants/collectionsettings.h"
+#include "ui_collectionsettingspage.h"
 
-#include <gio/gio.h>
+using namespace Qt::Literals::StringLiterals;
+using namespace CollectionSettings;
 
-#include <string>
+CollectionSettingsPage::CollectionSettingsPage(SettingsDialog *dialog,
+                                               const SharedPtr<CollectionLibrary> collection,
+                                               const SharedPtr<CollectionBackend> collection_backend,
+                                               CollectionModel *collection_model,
+                                               CollectionDirectoryModel *collection_directory_model,
+                                               QWidget *parent)
+    : SettingsPage(dialog, parent),
+      ui_(new Ui_CollectionSettingsPage),
+      collection_(collection),
+      collection_backend_(collection_backend),
+      collection_model_(collection_model),
+      collectionsettings_directory_model_(new CollectionSettingsDirectoryModel(this)),
+      collection_directory_model_(collection_directory_model),
+      initialized_model_(false) {
 
-namespace {
+  ui_->setupUi(this);
+  ui_->list->setItemDelegate(new NativeSeparatorsDelegate(this));
 
-struct FolderListState {
-  Application *app = nullptr;
-  GtkWidget *list = nullptr;
-  GtkWidget *status = nullptr;
-};
+  setWindowIcon(IconLoader::Load(u"library-music"_s, true, 0, 32));
+  ui_->add_directory->setIcon(IconLoader::Load(u"document-open-folder"_s));
 
-GtkWindow *WindowForWidget(GtkWidget *widget) {
-  for (GtkWidget *current = widget; current; current = gtk_widget_get_parent(current)) {
-    if (GTK_IS_WINDOW(current)) {
-      return GTK_WINDOW(current);
+  ui_->combobox_cache_size->addItem(u"KB"_s, static_cast<int>(CacheSizeUnit::KB));
+  ui_->combobox_cache_size->addItem(u"MB"_s, static_cast<int>(CacheSizeUnit::MB));
+
+  ui_->combobox_disk_cache_size->addItem(u"KB"_s, static_cast<int>(CacheSizeUnit::KB));
+  ui_->combobox_disk_cache_size->addItem(u"MB"_s, static_cast<int>(CacheSizeUnit::MB));
+  ui_->combobox_disk_cache_size->addItem(u"GB"_s, static_cast<int>(CacheSizeUnit::GB));
+
+  QObject::connect(ui_->add_directory, &QPushButton::clicked, this, &CollectionSettingsPage::AddDirectory);
+  QObject::connect(ui_->remove_directory, &QPushButton::clicked, this, &CollectionSettingsPage::RemoveDirectory);
+
+#ifdef HAVE_SONGTRACKING
+  QObject::connect(ui_->song_tracking, &QCheckBox::toggled, this, &CollectionSettingsPage::SongTrackingToggled);
+#endif
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+  QObject::connect(ui_->checkbox_disk_cache, &QCheckBox::checkStateChanged, this, &CollectionSettingsPage::DiskCacheEnable);
+#else
+  QObject::connect(ui_->checkbox_disk_cache, &QCheckBox::stateChanged, this, &CollectionSettingsPage::DiskCacheEnable);
+#endif
+
+  QObject::connect(ui_->button_clear_disk_cache, &QPushButton::clicked, this, &CollectionSettingsPage::ClearPixmapDiskCache);
+
+  QObject::connect(ui_->combobox_cache_size, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &CollectionSettingsPage::CacheSizeUnitChanged);
+  QObject::connect(ui_->combobox_disk_cache_size, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &CollectionSettingsPage::DiskCacheSizeUnitChanged);
+
+  QObject::connect(ui_->button_save_stats, &QPushButton::clicked, this, &CollectionSettingsPage::WriteAllSongsStatisticsToFiles);
+
+#ifndef HAVE_SONGTRACKING
+  ui_->song_tracking->hide();
+#endif
+
+#ifndef HAVE_EBUR128
+  ui_->song_ebur128_loudness_analysis->hide();
+#endif
+
+}
+
+CollectionSettingsPage::~CollectionSettingsPage() { delete ui_; }
+
+void CollectionSettingsPage::Load() {
+
+  if (!initialized_model_) {
+    if (ui_->list->selectionModel()) {
+      QObject::disconnect(ui_->list->selectionModel(), &QItemSelectionModel::currentRowChanged, this, &CollectionSettingsPage::CurrentRowChanged);
+    }
+
+    ui_->list->setModel(collectionsettings_directory_model_);
+    initialized_model_ = true;
+
+    QObject::connect(ui_->list->selectionModel(), &QItemSelectionModel::currentRowChanged, this, &CollectionSettingsPage::CurrentRowChanged);
+  }
+
+  ui_->list->model()->removeRows(0, ui_->list->model()->rowCount());
+  const QStringList paths = collection_directory_model_->paths();
+  for (const QString &path : paths) {
+    collectionsettings_directory_model_->AddDirectory(path);
+  }
+
+  Settings s;
+
+  s.beginGroup(kSettingsGroup);
+
+  ui_->startup_scan->setChecked(s.value(kStartupScan, kDefaultStartupScan).toBool());
+  ui_->monitor->setChecked(s.value(kMonitor, kDefaultMonitor).toBool());
+  ui_->song_tracking->setChecked(s.value(kSongTracking, kDefaultSongTracking).toBool());
+  ui_->mark_songs_unavailable->setChecked(ui_->song_tracking->isChecked() ? true : s.value(kMarkSongsUnavailable, kDefaultMarkSongsUnavailable).toBool());
+  ui_->song_ebur128_loudness_analysis->setChecked(s.value(kSongENUR128LoudnessAnalysis, kDefaultSongENUR128LoudnessAnalysis).toBool());
+  ui_->expire_unavailable_songs_days->setValue(s.value(kExpireUnavailableSongs, kDefaultExpireUnavailableSongs).toInt());
+
+  QStringList filters = s.value(kCoverArtPatterns, QStringList() << u"front"_s << u"cover"_s).toStringList();
+  ui_->cover_art_patterns->setText(filters.join(u','));
+
+  ui_->auto_open->setChecked(s.value(kAutoOpen, kDefaultAutoOpen).toBool());
+  ui_->show_dividers->setChecked(s.value(kShowDividers, kDefaultShowDividers).toBool());
+  ui_->pretty_covers->setChecked(s.value(kPrettyCovers, kDefaultPrettyCovers).toBool());
+  ui_->various_artists->setChecked(s.value(kVariousArtists, kDefaultVariousArtists).toBool());
+  ui_->checkbox_skip_articles_for_artists->setChecked(s.value(kSkipArticlesForArtists, kDefaultSkipArticlesForArtists).toBool());
+  ui_->checkbox_skip_articles_for_albums->setChecked(s.value(kSkipArticlesForAlbums, kDefaultSkipArticlesForAlbums).toBool());
+  ui_->checkbox_use_sort_tags->setChecked(s.value(kUseSortTags, kDefaultUseSortTags).toBool());
+
+  ui_->spinbox_cache_size->setValue(s.value(kSettingsCacheSize, kSettingsCacheSizeDefault).toInt());
+  ui_->combobox_cache_size->setCurrentIndex(ui_->combobox_cache_size->findData(s.value(kSettingsCacheSizeUnit, static_cast<int>(kDefaultSettingsCacheSizeUnit)).toInt()));
+  ui_->checkbox_disk_cache->setChecked(s.value(kSettingsDiskCacheEnable, kDefaultSettingsDiskCacheEnable).toBool());
+  ui_->spinbox_disk_cache_size->setValue(s.value(kSettingsDiskCacheSize, kSettingsDiskCacheSizeDefault).toInt());
+  ui_->combobox_disk_cache_size->setCurrentIndex(ui_->combobox_disk_cache_size->findData(s.value(kSettingsDiskCacheSizeUnit, static_cast<int>(kDefaultSettingsDiskCacheSizeUnit)).toInt()));
+
+  ui_->checkbox_save_playcounts->setChecked(s.value(kSavePlayCounts, kDefaultSavePlayCounts).toBool());
+  ui_->checkbox_save_ratings->setChecked(s.value(kSaveRatings, kDefaultSaveRatings).toBool());
+  ui_->checkbox_overwrite_playcount->setChecked(s.value(kOverwritePlaycount, kDefaultOverwritePlaycount).toBool());
+  ui_->checkbox_overwrite_rating->setChecked(s.value(kOverwriteRating, kDefaultOverwriteRating).toBool());
+
+  ui_->checkbox_delete_files->setChecked(s.value(kDeleteFiles, kDefaultDeleteFiles).toBool());
+
+  s.endGroup();
+
+  DiskCacheEnable(ui_->checkbox_disk_cache->checkState());
+
+  UpdateIconDiskCacheSize();
+
+  Init(ui_->layout_collectionsettingspage->parentWidget());
+  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
+
+}
+
+void CollectionSettingsPage::Save() {
+
+  Settings s;
+
+  s.beginGroup(kSettingsGroup);
+
+  s.setValue(kStartupScan, ui_->startup_scan->isChecked());
+  s.setValue(kMonitor, ui_->monitor->isChecked());
+  s.setValue(kSongTracking, ui_->song_tracking->isChecked());
+  s.setValue(kMarkSongsUnavailable, ui_->song_tracking->isChecked() ? true : ui_->mark_songs_unavailable->isChecked());
+  s.setValue(kSongENUR128LoudnessAnalysis, ui_->song_ebur128_loudness_analysis->isChecked());
+  s.setValue(kExpireUnavailableSongs, ui_->expire_unavailable_songs_days->value());
+
+  const QString filter_text = ui_->cover_art_patterns->text();
+  s.setValue(kCoverArtPatterns, filter_text.split(u',', Qt::SkipEmptyParts));
+
+  s.setValue(kAutoOpen, ui_->auto_open->isChecked());
+  s.setValue(kShowDividers, ui_->show_dividers->isChecked());
+  s.setValue(kPrettyCovers, ui_->pretty_covers->isChecked());
+  s.setValue(kVariousArtists, ui_->various_artists->isChecked());
+  s.setValue(kSkipArticlesForArtists, ui_->checkbox_skip_articles_for_artists->isChecked());
+  s.setValue(kSkipArticlesForAlbums, ui_->checkbox_skip_articles_for_albums->isChecked());
+  s.setValue(kUseSortTags, ui_->checkbox_use_sort_tags->isChecked());
+
+  s.setValue(kSettingsCacheSize, ui_->spinbox_cache_size->value());
+  s.setValue(kSettingsCacheSizeUnit, ui_->combobox_cache_size->currentData().toInt());
+  s.setValue(kSettingsDiskCacheEnable, ui_->checkbox_disk_cache->isChecked());
+  s.setValue(kSettingsDiskCacheSize, ui_->spinbox_disk_cache_size->value());
+  s.setValue(kSettingsDiskCacheSizeUnit, ui_->combobox_disk_cache_size->currentData().toInt());
+
+  s.setValue(kSavePlayCounts, ui_->checkbox_save_playcounts->isChecked());
+  s.setValue(kSaveRatings, ui_->checkbox_save_ratings->isChecked());
+  s.setValue(kOverwritePlaycount, ui_->checkbox_overwrite_playcount->isChecked());
+  s.setValue(kOverwriteRating, ui_->checkbox_overwrite_rating->isChecked());
+
+  s.setValue(kDeleteFiles, ui_->checkbox_delete_files->isChecked());
+
+  s.endGroup();
+
+  for (const CollectionDirectory &dir : collection_directory_model_->directories()) {
+    if (!collectionsettings_directory_model_->paths().contains(dir.path)) {
+      collection_backend_->RemoveDirectoryAsync(dir);
     }
   }
-  GtkRoot *root = widget ? gtk_widget_get_root(widget) : nullptr;
-  return GTK_IS_WINDOW(root) ? GTK_WINDOW(root) : nullptr;
+
+  for (const QString &path : collectionsettings_directory_model_->paths()) {
+    if (!collection_directory_model_->paths().contains(path)) {
+      collection_backend_->AddDirectoryAsync(path);
+    }
+  }
+
 }
 
-void RefreshFolderList(FolderListState *state) {
-  if (!state || !state->list || !state->app) {
-    return;
-  }
-  while (GtkWidget *child = gtk_widget_get_first_child(state->list)) {
-    gtk_list_box_remove(GTK_LIST_BOX(state->list), child);
-  }
-  const std::vector<CollectionDirectory> directories = state->app->collection()->backend()->Directories();
-  if (state->status) {
-    gtk_label_set_text(GTK_LABEL(state->status),
-                       directories.empty() ? Translations::CStr("No collection folders")
-                                           : (std::to_string(directories.size()) + " " + Translations::Tr("folder(s)")).c_str());
-  }
-  for (const CollectionDirectory &directory : directories) {
-    AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
-    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), directory.path.c_str());
-    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), directory.subdirs ? Translations::CStr("Including subfolders")
-                                                                      : Translations::CStr("This folder only"));
-    GtkWidget *rescan = gtk_button_new_with_label(Translations::CStr("Rescan"));
-    GtkWidget *remove = gtk_button_new_with_label(Translations::CStr(CollectionSettingsLabels::RemoveFolder()));
-    gtk_widget_add_css_class(remove, "destructive-action");
-    g_object_set_data(G_OBJECT(rescan), "folder-state", state);
-    g_object_set_data(G_OBJECT(remove), "folder-state", state);
-    g_object_set_data(G_OBJECT(rescan), "directory-id", GINT_TO_POINTER(directory.id));
-    g_object_set_data(G_OBJECT(remove), "directory-id", GINT_TO_POINTER(directory.id));
-    g_signal_connect(rescan, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
-                       auto *self = static_cast<FolderListState *>(g_object_get_data(G_OBJECT(button), "folder-state"));
-                       const int id = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "directory-id"));
-                       if (self && self->app) {
-                         self->app->collection()->RescanDirectory(id);
-                       }
-                     })),
-                     nullptr);
-    g_signal_connect(remove, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
-                       auto *self = static_cast<FolderListState *>(g_object_get_data(G_OBJECT(button), "folder-state"));
-                       const int id = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "directory-id"));
-                       if (self && self->app) {
-                         self->app->collection()->RemoveDirectory(id);
-                         RefreshFolderList(self);
-                       }
-                     })),
-                     nullptr);
-    adw_action_row_add_suffix(row, rescan);
-    adw_action_row_add_suffix(row, remove);
-    gtk_list_box_append(GTK_LIST_BOX(state->list), GTK_WIDGET(row));
-  }
-}
+void CollectionSettingsPage::AddDirectory() {
 
-}  // namespace
+  Settings s;
+  s.beginGroup(kSettingsGroup);
 
-AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Application *app) {
-  settings->BeginGroup(CollectionSettings::kSettingsGroup);
-  AdwPreferencesPage *page = SettingsPage::MakePage("Collection", "media-optical-cd-audio-symbolic");
-  SettingsPage::AddDescription(SettingsPage::AddGroup(page), CollectionSettingsLabels::Intro());
-  AdwPreferencesGroup *scan = SettingsPage::AddGroup(page, CollectionSettingsLabels::AutomaticUpdating());
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kStartupScan, CollectionSettingsLabels::StartupScan(), nullptr,
-                          CollectionSettings::kDefaultStartupScan);
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kMonitor, CollectionSettingsLabels::Monitor(), nullptr, CollectionSettings::kDefaultMonitor);
-  GtkWidget *song_tracking = SettingsPage::AddToggle(scan, settings, CollectionSettings::kSongTracking, CollectionSettingsLabels::SongTracking(),
-                                                     nullptr, CollectionSettings::kDefaultSongTracking);
-  GtkWidget *mark_unavailable = SettingsPage::AddToggle(scan, settings, CollectionSettings::kMarkSongsUnavailable,
-                                                        CollectionSettingsLabels::MarkUnavailable(), nullptr,
-                                                        CollectionSettings::kDefaultMarkSongsUnavailable);
-  const bool tracking_on = adw_switch_row_get_active(ADW_SWITCH_ROW(song_tracking));
-  gtk_widget_set_sensitive(mark_unavailable, CollectionSongTracking::MarkUnavailableEnabled(tracking_on));
-  if (tracking_on) {
-    adw_switch_row_set_active(ADW_SWITCH_ROW(mark_unavailable), TRUE);
-  }
-  g_object_set_data(G_OBJECT(song_tracking), "mark-unavailable", mark_unavailable);
-  g_signal_connect(song_tracking, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
-                     auto *mark = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "mark-unavailable"));
-                     if (!mark) {
-                       return;
-                     }
-                     const bool tracking = adw_switch_row_get_active(row);
-                     gtk_widget_set_sensitive(mark, CollectionSongTracking::MarkUnavailableEnabled(tracking));
-                     if (tracking) {
-                       adw_switch_row_set_active(ADW_SWITCH_ROW(mark), TRUE);
-                     }
-                   }),
-                   nullptr);
-  SettingsPage::AddToggle(scan, settings, CollectionSettings::kSongENUR128LoudnessAnalysis, CollectionSettingsLabels::EbuAnalysis(), nullptr,
-                          CollectionSettings::kDefaultSongENUR128LoudnessAnalysis);
-  SettingsPage::AddIntEntry(scan, settings, CollectionSettings::kExpireUnavailableSongs, CollectionSettingsLabels::ExpireUnavailable(),
-                            CollectionSettings::kDefaultExpireUnavailableSongs);
-  SettingsPage::AddDescription(scan, CollectionSettingsLabels::Days());
-  SettingsPage::AddEntry(scan, settings, CollectionSettings::kCoverArtPatterns, CollectionSettingsLabels::CoverPatterns(),
-                         "cover.jpg,folder.jpg,front.jpg,album.jpg");
-  SettingsPage::AddDescription(scan, CollectionSettingsLabels::CoverPatternsHint());
+  QString path = s.value(kLastPath, StandardPaths::WritableLocation(StandardPaths::StandardLocation::MusicLocation)).toString();
+  path = QDir::cleanPath(QFileDialog::getExistingDirectory(this, tr("Add directory..."), path));
 
-  AdwPreferencesGroup *display = SettingsPage::AddGroup(page, CollectionSettingsLabels::DisplayOptions());
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kAutoOpen, CollectionSettingsLabels::AutoOpen(), nullptr,
-                          CollectionSettings::kDefaultAutoOpen);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kShowDividers, CollectionSettingsLabels::ShowDividers(), nullptr,
-                          CollectionSettings::kDefaultShowDividers);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kPrettyCovers, CollectionSettingsLabels::PrettyCovers(), nullptr,
-                          CollectionSettings::kDefaultPrettyCovers);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kVariousArtists, CollectionSettingsLabels::VariousArtists(), nullptr,
-                          CollectionSettings::kDefaultVariousArtists);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kSkipArticlesForArtists, CollectionSettingsLabels::SkipArtistArticles(), nullptr,
-                          CollectionSettings::kDefaultSkipArticlesForArtists);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kSkipArticlesForAlbums, CollectionSettingsLabels::SkipAlbumArticles(), nullptr,
-                          CollectionSettings::kDefaultSkipArticlesForAlbums);
-  SettingsPage::AddToggle(display, settings, CollectionSettings::kUseSortTags, CollectionSettingsLabels::UseSortTags(), nullptr,
-                          CollectionSettings::kDefaultUseSortTags);
-
-  AdwPreferencesGroup *cache = SettingsPage::AddGroup(page, CollectionSettingsLabels::CacheGroup());
-  GtkWidget *icon_size =
-      SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsCacheSize, CollectionSettingsLabels::CacheSize(), CollectionSettings::kSettingsCacheSizeDefault);
-  const std::vector<std::pair<std::string, std::string>> units = {{"0", "KB"}, {"1", "MB"}, {"2", "GB"}, {"3", "TB"}};
-  GtkWidget *icon_unit =
-      SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsCacheSizeUnit, "Icon cache unit",
-                                units, static_cast<int>(CollectionSettings::kDefaultSettingsCacheSizeUnit));
-  GtkWidget *disk_enable = SettingsPage::AddToggle(cache, settings, CollectionSettings::kSettingsDiskCacheEnable,
-                                                   CollectionSettingsLabels::EnableDiskCache(), nullptr,
-                                                   CollectionSettings::kDefaultSettingsDiskCacheEnable);
-  GtkWidget *disk_size = SettingsPage::AddIntEntry(cache, settings, CollectionSettings::kSettingsDiskCacheSize,
-                                                   CollectionSettingsLabels::DiskCacheSize(), CollectionSettings::kSettingsDiskCacheSizeDefault);
-  GtkWidget *disk_unit = SettingsPage::AddIntCombo(cache, settings, CollectionSettings::kSettingsGroup, CollectionSettings::kSettingsDiskCacheSizeUnit,
-                                                   "Disk cache unit", units, static_cast<int>(CollectionSettings::kDefaultSettingsDiskCacheSizeUnit));
-  AdwActionRow *in_use = ADW_ACTION_ROW(adw_action_row_new());
-  adw_preferences_row_set_title(ADW_PREFERENCES_ROW(in_use), Translations::CStr(CollectionStats::CacheInUseTitle()));
-  adw_action_row_set_subtitle(in_use, CollectionIconCache::InUseLabel().c_str());
-  GtkWidget *clear_cache = gtk_button_new_with_label(Translations::CStr(CollectionStats::ClearCacheLabel()));
-  gtk_widget_add_css_class(clear_cache, "destructive-action");
-  g_object_set_data(G_OBJECT(clear_cache), "in-use-row", in_use);
-  g_signal_connect(clear_cache, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
-                     CollectionIconCache::Clear();
-                     if (auto *row = ADW_ACTION_ROW(g_object_get_data(G_OBJECT(button), "in-use-row"))) {
-                       adw_action_row_set_subtitle(row, CollectionIconCache::InUseLabel().c_str());
-                     }
-                   }),
-                   nullptr);
-  adw_action_row_add_suffix(in_use, clear_cache);
-  adw_preferences_group_add(cache, GTK_WIDGET(in_use));
-  auto clamp_cache_entry = [](GtkWidget *combo, GtkWidget *entry, bool disk) {
-    if (!GTK_IS_EDITABLE(entry) || !ADW_IS_COMBO_ROW(combo)) {
+  if (!path.isEmpty()) {
+    const QByteArray filesystemtype = QStorageInfo(QFileInfo(path).canonicalFilePath()).fileSystemType();
+    if (kRejectedFileSystems.contains(filesystemtype)) {
+      QMessageBox messagebox(QMessageBox::Critical, QObject::tr("Invalid collection directory"), QObject::tr("Can't add directory %1 with special filesystem %2 to collection").arg(path).arg(QString::fromUtf8(filesystemtype)));
+      (void)messagebox.exec();
       return;
     }
-    const int unit = static_cast<int>(adw_combo_row_get_selected(ADW_COMBO_ROW(combo)));
-    const int max = disk ? SettingsControls::DiskCacheSizeMax(unit) : SettingsControls::IconCacheSizeMax(unit);
-    const int value = static_cast<int>(g_ascii_strtoll(gtk_editable_get_text(GTK_EDITABLE(entry)), nullptr, 10));
-    const int clamped = SettingsControls::ClampCacheSize(value, max);
-    if (clamped != value) {
-      gtk_editable_set_text(GTK_EDITABLE(entry), std::to_string(clamped).c_str());
-    }
-  };
-  g_object_set_data(G_OBJECT(icon_unit), "size-entry", icon_size);
-  g_signal_connect(icon_unit, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer) {
-                     auto *entry = GTK_WIDGET(g_object_get_data(G_OBJECT(combo), "size-entry"));
-                     if (!GTK_IS_EDITABLE(entry)) {
-                       return;
-                     }
-                     const int unit = static_cast<int>(adw_combo_row_get_selected(combo));
-                     const int max = SettingsControls::IconCacheSizeMax(unit);
-                     const int value = static_cast<int>(g_ascii_strtoll(gtk_editable_get_text(GTK_EDITABLE(entry)), nullptr, 10));
-                     const int clamped = SettingsControls::ClampCacheSize(value, max);
-                     if (clamped != value) {
-                       gtk_editable_set_text(GTK_EDITABLE(entry), std::to_string(clamped).c_str());
-                     }
-                   }),
-                   nullptr);
-  g_object_set_data(G_OBJECT(disk_unit), "size-entry", disk_size);
-  g_signal_connect(disk_unit, "notify::selected", G_CALLBACK(+[](AdwComboRow *combo, GParamSpec *, gpointer) {
-                     auto *entry = GTK_WIDGET(g_object_get_data(G_OBJECT(combo), "size-entry"));
-                     if (!GTK_IS_EDITABLE(entry)) {
-                       return;
-                     }
-                     const int unit = static_cast<int>(adw_combo_row_get_selected(combo));
-                     const int max = SettingsControls::DiskCacheSizeMax(unit);
-                     const int value = static_cast<int>(g_ascii_strtoll(gtk_editable_get_text(GTK_EDITABLE(entry)), nullptr, 10));
-                     const int clamped = SettingsControls::ClampCacheSize(value, max);
-                     if (clamped != value) {
-                       gtk_editable_set_text(GTK_EDITABLE(entry), std::to_string(clamped).c_str());
-                     }
-                   }),
-                   nullptr);
-  clamp_cache_entry(icon_unit, icon_size, false);
-  clamp_cache_entry(disk_unit, disk_size, true);
-  const bool disk_on = settings->BoolValue(CollectionSettings::kSettingsDiskCacheEnable, CollectionSettings::kDefaultSettingsDiskCacheEnable);
-  gtk_widget_set_sensitive(disk_size, disk_on);
-  gtk_widget_set_sensitive(disk_unit, disk_on);
-  gtk_widget_set_sensitive(GTK_WIDGET(in_use), disk_on);
-  g_object_set_data(G_OBJECT(disk_enable), "disk-size", disk_size);
-  g_object_set_data(G_OBJECT(disk_enable), "disk-unit", disk_unit);
-  g_object_set_data(G_OBJECT(disk_enable), "in-use", in_use);
-  g_signal_connect(disk_enable, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer) {
-                     const bool enabled = adw_switch_row_get_active(row);
-                     if (auto *size = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "disk-size"))) {
-                       gtk_widget_set_sensitive(size, enabled);
-                     }
-                     if (auto *unit = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "disk-unit"))) {
-                       gtk_widget_set_sensitive(unit, enabled);
-                     }
-                     if (auto *use = GTK_WIDGET(g_object_get_data(G_OBJECT(row), "in-use"))) {
-                       gtk_widget_set_sensitive(use, enabled);
-                     }
-                   }),
-                   nullptr);
+    collectionsettings_directory_model_->AddDirectory(path);
 
-  AdwPreferencesGroup *tags = SettingsPage::AddGroup(page, CollectionSettingsLabels::PlaycountsGroup());
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kSavePlayCounts, "Save playcounts to song tags when possible", nullptr,
-                          CollectionSettings::kDefaultSavePlayCounts);
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kSaveRatings, "Save ratings to song tags when possible", nullptr,
-                          CollectionSettings::kDefaultSaveRatings);
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kOverwritePlaycount, "Overwrite database playcount when songs are re-read from disk",
-                          nullptr, CollectionSettings::kDefaultOverwritePlaycount);
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kOverwriteRating, "Overwrite database rating when songs are re-read from disk", nullptr,
-                          CollectionSettings::kDefaultOverwriteRating);
-  if (app) {
-    SettingsPage::AddButtonRow(tags, "", CollectionStats::SaveNowLabel(), [app](GtkWidget *button) {
-      AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(CollectionStats::ConfirmTitle()),
-                                                                    Translations::CStr(CollectionStats::ConfirmText())));
-      adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "write", Translations::CStr("Write"), nullptr);
-      adw_alert_dialog_set_response_appearance(dialog, "write", ADW_RESPONSE_SUGGESTED);
-      adw_alert_dialog_set_default_response(dialog, "write");
-      adw_alert_dialog_set_close_response(dialog, "cancel");
-      g_object_set_data(G_OBJECT(dialog), "app", app);
-      g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
-                         if (g_strcmp0(response, "write") != 0) {
-                           return;
-                         }
-                         if (auto *application = static_cast<Application *>(data)) {
-                           application->collection()->SyncPlaycountAndRatingToFilesAsync();
-                         }
-                       }),
-                       app);
-      adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(WindowForWidget(button)));
-    });
-  }
-  SettingsPage::AddToggle(tags, settings, CollectionSettings::kDeleteFiles, CollectionSettingsLabels::DeleteFiles(), nullptr,
-                          CollectionSettings::kDefaultDeleteFiles);
+    s.setValue(kLastPath, path);
 
-  AdwPreferencesGroup *dirs = SettingsPage::AddGroup(page, "Folders");
-  GtkWidget *list = gtk_list_box_new();
-  gtk_widget_add_css_class(list, "boxed-list");
-  GtkWidget *status = gtk_label_new("");
-  gtk_widget_add_css_class(status, "dim-label");
-  gtk_label_set_xalign(GTK_LABEL(status), 0);
-  auto *folder_state = new FolderListState();
-  folder_state->app = app;
-  folder_state->list = list;
-  folder_state->status = status;
-  g_object_set_data_full(G_OBJECT(page), "folder-state", folder_state, [](gpointer p) { delete static_cast<FolderListState *>(p); });
-  if (app) {
-    RefreshFolderList(folder_state);
-    GtkWidget *buttons = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    GtkWidget *add = gtk_button_new_with_label(Translations::CStr(CollectionSettingsLabels::AddFolder()));
-    GtkWidget *rescan_all = gtk_button_new_with_label(Translations::CStr("Rescan all"));
-    GtkWidget *full_scan = gtk_button_new_with_label(Translations::CStr("Full rescan"));
-    gtk_widget_add_css_class(add, "suggested-action");
-    gtk_box_append(GTK_BOX(buttons), add);
-    gtk_box_append(GTK_BOX(buttons), rescan_all);
-    gtk_box_append(GTK_BOX(buttons), full_scan);
-    g_signal_connect(add, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer data) {
-                       auto *self = static_cast<FolderListState *>(data);
-                       GtkFileDialog *chooser = gtk_file_dialog_new();
-                       gtk_file_dialog_set_title(chooser, Translations::CStr("Add collection folder"));
-                       gtk_file_dialog_select_folder(chooser, WindowForWidget(GTK_WIDGET(button)), nullptr,
-                                                     +[](GObject *source, GAsyncResult *result, gpointer user) {
-                                                       auto *state = static_cast<FolderListState *>(user);
-                                                       GError *error = nullptr;
-                                                       GFile *file = gtk_file_dialog_select_folder_finish(GTK_FILE_DIALOG(source), result, &error);
-                                                       if (!file) {
-                                                         if (error) {
-                                                           g_error_free(error);
-                                                         }
-                                                         return;
-                                                       }
-                                                       gchar *path = g_file_get_path(file);
-                                                       if (path && state && state->app) {
-                                                         state->app->collection()->AddDirectory(path, true);
-                                                         RefreshFolderList(state);
-                                                       }
-                                                       g_free(path);
-                                                       g_object_unref(file);
-                                                     },
-                                                     self);
-                     })),
-                     folder_state);
-    g_signal_connect(rescan_all, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
-                       auto *self = static_cast<FolderListState *>(data);
-                       if (self && self->app) {
-                         self->app->collection()->IncrementalScan();
-                       }
-                     })),
-                     folder_state);
-    g_signal_connect(full_scan, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
-                       auto *self = static_cast<FolderListState *>(data);
-                       if (self && self->app) {
-                         self->app->collection()->FullScan();
-                       }
-                     })),
-                     folder_state);
-    adw_preferences_group_add(dirs, buttons);
+    set_changed();
   }
-  adw_preferences_group_add(dirs, list);
-  adw_preferences_group_add(dirs, status);
-  return page;
+
+}
+
+void CollectionSettingsPage::RemoveDirectory() {
+
+  collectionsettings_directory_model_->RemoveDirectory(ui_->list->currentIndex());
+
+  set_changed();
+
+}
+
+void CollectionSettingsPage::CurrentRowChanged(const QModelIndex &idx) {
+  ui_->remove_directory->setEnabled(idx.isValid());
+}
+
+void CollectionSettingsPage::SongTrackingToggled() {
+
+  ui_->mark_songs_unavailable->setEnabled(!ui_->song_tracking->isChecked());
+  if (ui_->song_tracking->isChecked()) {
+    ui_->mark_songs_unavailable->setChecked(true);
+  }
+
+}
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+void CollectionSettingsPage::DiskCacheEnable(const Qt::CheckState state) {
+#else
+void CollectionSettingsPage::DiskCacheEnable(const int state) {
+#endif
+
+  const bool checked = state == Qt::Checked;
+  ui_->label_disk_cache_size->setEnabled(checked);
+  ui_->spinbox_disk_cache_size->setEnabled(checked);
+  ui_->combobox_disk_cache_size->setEnabled(checked);
+  ui_->label_disk_cache_in_use->setEnabled(checked);
+  ui_->disk_cache_in_use->setEnabled(checked);
+  ui_->button_clear_disk_cache->setEnabled(checked);
+
+}
+
+void CollectionSettingsPage::ClearPixmapDiskCache() {
+
+  collection_model_->ClearIconDiskCache();
+
+  UpdateIconDiskCacheSize();
+
+}
+
+void CollectionSettingsPage::CacheSizeUnitChanged(int index) {
+
+  const CacheSizeUnit cache_size_unit = static_cast<CacheSizeUnit>(ui_->combobox_cache_size->itemData(index).toInt());
+
+  switch (cache_size_unit) {
+    case CacheSizeUnit::MB:
+      ui_->spinbox_cache_size->setMaximum(std::numeric_limits<int>::max() / 1024);
+      break;
+    default:
+      ui_->spinbox_cache_size->setMaximum(std::numeric_limits<int>::max());
+      break;
+  }
+
+}
+
+void CollectionSettingsPage::DiskCacheSizeUnitChanged(int index) {
+
+  const CacheSizeUnit cache_size_unit = static_cast<CacheSizeUnit>(ui_->combobox_disk_cache_size->itemData(index).toInt());
+
+  switch (cache_size_unit) {
+    case CacheSizeUnit::GB:
+      ui_->spinbox_disk_cache_size->setMaximum(4);
+      break;
+    default:
+      ui_->spinbox_disk_cache_size->setMaximum(std::numeric_limits<int>::max());
+      break;
+  }
+
+}
+
+void CollectionSettingsPage::UpdateIconDiskCacheSize() {
+
+  ui_->disk_cache_in_use->setText(collection_model_->icon_disk_cache_size() == 0 ? u"empty"_s : Utilities::PrettySize(collection_model_->icon_disk_cache_size()));
+
+}
+
+void CollectionSettingsPage::WriteAllSongsStatisticsToFiles() {
+
+  QMessageBox confirmation_dialog(QMessageBox::Question, tr("Write all playcounts and ratings to files"), tr("Are you sure you want to write song playcounts and ratings to file for all songs in your collection?"), QMessageBox::Yes | QMessageBox::Cancel);
+  if (confirmation_dialog.exec() != QMessageBox::Yes) {
+    return;
+  }
+
+  collection_->SyncPlaycountAndRatingToFilesAsync();
+
 }

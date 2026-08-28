@@ -1,31 +1,53 @@
-#ifndef STRAWBERRY_EQUALIZERSLIDER_H
-#define STRAWBERRY_EQUALIZERSLIDER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <gtk/gtk.h>
+#ifndef EQUALISERSLIDER_H
+#define EQUALISERSLIDER_H
 
-#include <string>
+#include "config.h"
 
-class EqualizerSlider {
+#include <QObject>
+#include <QWidget>
+#include <QString>
+
+class Ui_EqualizerSlider;
+
+// Contains the slider and the label
+class EqualizerSlider : public QWidget {
+  Q_OBJECT
+
  public:
-  EqualizerSlider(const std::string &label, int band, int value);
-  GtkWidget *widget() const { return widget_; }
-  int band() const { return band_; }
-  int value() const { return value_; }
-  void set_value(int value);
+  explicit EqualizerSlider(const QString &label, QWidget *parent = nullptr);
+  ~EqualizerSlider() override;
 
-  using ChangedCallback = void (*)(int band, int value, gpointer data);
-  void set_changed_callback(ChangedCallback callback, gpointer data);
+  int value() const;
+  void set_value(const int value);
+
+ Q_SIGNALS:
+  void ValueChanged(const int value);
+
+ public Q_SLOTS:
+  void OnValueChanged(const int value);
 
  private:
-  static void OnValueChanged(GtkRange *range, gpointer data);
-
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *scale_ = nullptr;
-  GtkWidget *db_label_ = nullptr;
-  int band_ = 0;
-  int value_ = 0;
-  ChangedCallback callback_ = nullptr;
-  gpointer callback_data_ = nullptr;
+  Ui_EqualizerSlider *ui_;
 };
 
-#endif
+#endif  // EQUALISERSLIDER_H

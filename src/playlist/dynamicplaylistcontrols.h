@@ -1,35 +1,45 @@
-#ifndef STRAWBERRY_DYNAMICPLAYLISTCONTROLS_H
-#define STRAWBERRY_DYNAMICPLAYLISTCONTROLS_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "smartplaylists/smartplaylist.h"
+#ifndef DYNAMICPLAYLISTCONTROLS_H
+#define DYNAMICPLAYLISTCONTROLS_H
 
-#include <gtk/gtk.h>
+#include <QWidget>
 
-#include <functional>
+class Ui_DynamicPlaylistControls;
 
-class DynamicPlaylistControls {
+class DynamicPlaylistControls : public QWidget {
+  Q_OBJECT
+
  public:
-  using ExpandCallback = std::function<void()>;
-  using RepopulateCallback = std::function<void()>;
-  using TurnOffCallback = std::function<void()>;
+  explicit DynamicPlaylistControls(QWidget *parent = nullptr);
+  ~DynamicPlaylistControls() override;
 
-  DynamicPlaylistControls();
-
-  GtkWidget *widget() const { return widget_; }
-  void SetSearch(const SmartPlaylistSearch &search);
-  const SmartPlaylistSearch &search() const { return search_; }
-  void SetExpandCallback(ExpandCallback callback);
-  void SetRepopulateCallback(RepopulateCallback callback);
-  void SetTurnOffCallback(TurnOffCallback callback);
-  void SetVisible(bool visible);
+ Q_SIGNALS:
+  void Expand();
+  void Repopulate();
+  void TurnOff();
 
  private:
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *summary_label_ = nullptr;
-  SmartPlaylistSearch search_;
-  ExpandCallback expand_;
-  RepopulateCallback repopulate_;
-  TurnOffCallback turn_off_;
+  Ui_DynamicPlaylistControls *ui_;
 };
 
-#endif
+#endif  // DYNAMICPLAYLISTCONTROLS_H

@@ -4,7 +4,7 @@
 [![PayPal](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/jonaskvinge)
 
 Strawberry is a **music player and music collection organizer**, originally forked from *Clementine* in 2018.
-It’s written in **C++ using GTK 4 and libadwaita**, designed for **audiophiles and music collectors**.
+It’s written in **C++ using the Qt framework**, designed for **audiophiles and music collectors**.
 
 ![Screenshot of Strawberry Music Player](https://raw.githubusercontent.com/strawberrymusicplayer/strawberry/master/data/screenshot/screenshot.png)
 
@@ -97,15 +97,13 @@ To build Strawberry from source, you’ll need:
 - [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/) or [pkgconf](https://github.com/pkgconf/pkgconf)
 - [Boost](https://www.boost.org/)
 - [GLib](https://developer.gnome.org/glib/)
-- [GTK 4](https://www.gtk.org/)
-- [libadwaita](https://gnome.pages.gitlab.gnome.org/libadwaita/)
-- [libsoup 3](https://libsoup.gnome.org/)
-- [json-glib](https://wiki.gnome.org/Projects/JsonGlib)
+- [Qt 6.4 or higher](https://www.qt.io/) (Core, Concurrent, Gui, Widgets, Network, SQL, D-Bus)
 - [SQLite 3.9 or higher](https://www.sqlite.org)
 - [ALSA (Linux only)](https://www.alsa-project.org/)
 - [GStreamer](https://gstreamer.freedesktop.org/)
 - [TagLib 1.12 or higher](https://www.taglib.org/)
 - [ICU](https://unicode-org.github.io/icu/)
+- [KDSingleApplication 1.1.0 or higher](https://github.com/KDAB/KDSingleApplication)
 
 **Dependencies for optional features:**
 - Fingerprinting & tagging: [Chromaprint](https://acoustid.org/chromaprint)
@@ -140,50 +138,3 @@ For building on Windows with Visual Studio 2022, see: :point_right: https://gith
 ## :package: Packaging status
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/strawberry.svg?columns=3&header=Strawberry&exclude_unsupported=1)](https://repology.org/metapackage/strawberry/versions)
-
----
-
-## :heart: Credits and acknowledgements
-
-### Lineage
-
-Strawberry stands on the shoulders of two earlier projects, and code and design from both survive here:
-
-- **[Amarok](https://amarok.kde.org/)** — Mark Kretschmann, Max Howell and the Amarok team. Amarok 1.4 is the
-  original ancestor of this codebase.
-- **[Clementine](https://www.clementine-player.org/)** — David Sansome, John Maguire, Paweł Bara and
-  Arnaud Bienner. Clementine began in 2010 as a port of Amarok 1.4 to Qt 4, and Strawberry was forked from
-  Clementine in 2018.
-
-Full author and contributor lists for all three projects are shown in **Help → About Strawberry**.
-
-### Built with
-
-Strawberry would not exist without these free software projects:
-
-| Component | Used for |
-| --- | --- |
-| [GTK 4](https://www.gtk.org/) and [libadwaita](https://gnome.pages.gitlab.gnome.org/libadwaita/) | User interface |
-| [GLib / GObject / GIO](https://gitlab.gnome.org/GNOME/glib) | Core runtime, settings and I/O |
-| [GStreamer](https://gstreamer.freedesktop.org/) | Audio decoding, playback and transcoding |
-| [TagLib](https://taglib.org/) | Reading and writing audio tags |
-| [SQLite](https://www.sqlite.org/) | Collection and playlist database |
-| [libsoup](https://libsoup.gnome.org/) | HTTP |
-| [json-glib](https://gitlab.gnome.org/GNOME/json-glib) | JSON parsing |
-| [ICU](https://icu.unicode.org/) | Unicode collation and transliteration |
-| [Boost](https://www.boost.org/) | Assorted C++ utilities |
-| [libsecret](https://gitlab.gnome.org/GNOME/libsecret) | Storing credentials in the system keyring |
-| [ALSA](https://www.alsa-project.org/) and [PulseAudio](https://www.freedesktop.org/wiki/Software/PulseAudio/) | Audio output on Linux |
-| [Chromaprint / AcoustID](https://acoustid.org/chromaprint) and [MusicBrainz](https://musicbrainz.org/) | Acoustic fingerprinting and tag lookup |
-| [libebur128](https://github.com/jiixyj/libebur128) | EBU R 128 loudness analysis |
-| [FFTW](https://www.fftw.org/) | Fast spectrum moodbar |
-| [libcdio](https://www.gnu.org/software/libcdio/) | Audio CD playback |
-| [libmtp](https://libmtp.sourceforge.net/) and [libgpod](https://www.gtkpod.org/libgpod/) | MTP and iPod device support |
-
-Cover art, lyrics and streaming metadata are provided by the services listed under
-[Features](#white_check_mark-features); each remains the property of its respective provider.
-
-### License
-
-Strawberry is free software released under the **GNU General Public License, version 3 or later**.
-See [COPYING](COPYING) for the full text.

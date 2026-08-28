@@ -1,30 +1,62 @@
-#ifndef STRAWBERRY_TIDALCOVERPROVIDER_H
-#define STRAWBERRY_TIDALCOVERPROVIDER_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "covermanager/coverproviders.h"
+#ifndef TIDALCOVERPROVIDER_H
+#define TIDALCOVERPROVIDER_H
 
-#include <string>
-#include <vector>
+#include "config.h"
 
-class TidalCoverProvider : public CoverProvider {
+#include <QVariant>
+#include <QString>
+
+#include "includes/shared_ptr.h"
+#include "jsoncoverprovider.h"
+
+class QNetworkReply;
+class NetworkAccessManager;
+class TidalService;
+
+using TidalServicePtr = SharedPtr<TidalService>;
+
+class TidalCoverProvider : public JsonCoverProvider {
+  Q_OBJECT
+
  public:
-  struct SearchResult {
-    std::string artist;
-    std::string album;
-    std::string image_url;
-  };
+  explicit TidalCoverProvider(const TidalServicePtr service, const SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
 
-  static const int kLimit;
+  virtual bool authenticated() const override;
+  virtual bool use_authorization_header() const override;
+  virtual QByteArray authorization_header() const override;
 
-  std::string name() const override { return "Tidal"; }
-  bool authentication_required() const override { return true; }
-  bool authenticated() const override;
-  void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
-  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
+  bool StartSearch(const QString &artist, const QString &album, const QString &title, const int id) override;
+  void CancelSearch(const int id) override;
+  void ClearSession() override;
 
-  static std::string ImageUrl(const std::string &cover, const std::string &size = "1280x1280");
-  static std::string SearchUrl(const std::string &artist, const std::string &album, const std::string &title, const std::string &country = "US");
-  static std::vector<SearchResult> ParseItems(const std::string &json);
+ private Q_SLOTS:
+  void HandleSearchReply(QNetworkReply *reply, const int id);
+
+ private:
+  JsonObjectResult ParseJsonObject(QNetworkReply *reply);
+  void Error(const QString &error, const QVariant &debug = QVariant()) override;
+
+ private:
+  const TidalServicePtr service_;
 };
 
-#endif
+#endif  // TIDALCOVERPROVIDER_H

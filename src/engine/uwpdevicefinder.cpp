@@ -1,144 +1,154 @@
-#include "config.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2023, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "engine/uwpdevicefinder.h"
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
 
-#include "core/logging.h"
-#include "engine/platformdeviceoutputs.h"
-#include "engine/uwpdeviceenum.h"
-
+#include <utility>
+#include <functional>
 #include <string>
+#include <locale>
+#include <codecvt>
 
-#ifdef _WIN32
-#include <windows.h>
-#if defined(_MSC_VER)
-#include <roapi.h>
-#include <winstring.h>
+#include <QString>
+
 #include <wrl.h>
-#include <windows.devices.enumeration.h>
 #include <windows.foundation.h>
-#include <windows.foundation.collections.h>
-#endif
-#endif
+#include <windows.media.audio.h>
 
-UWPDeviceFinder::UWPDeviceFinder() : DeviceFinder(UwpDeviceEnum::kFinderName, {UwpDeviceEnum::kOutput}) {}
+#include "AsyncOperations.h"
 
-#if defined(_WIN32) && defined(_MSC_VER)
+#include "uwpdevicefinder.h"
+#include "enginedevice.h"
+#include "core/logging.h"
+
 using namespace Microsoft::WRL;
 using namespace Microsoft::WRL::Wrappers;
 using namespace ABI::Windows::Foundation;
 using namespace ABI::Windows::Foundation::Collections;
 using namespace ABI::Windows::Devices::Enumeration;
 
+using namespace Qt::Literals::StringLiterals;
+
+UWPDeviceFinder::UWPDeviceFinder() : DeviceFinder(u"uwpdevice"_s, { u"wasapi2sink_"_s }) {}
+
 namespace {
 
-std::string WideToUtf8(const wchar_t *wide) {
-  if (!wide || !wide[0]) {
-    return {};
-  }
-  const int n = WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
-  if (n <= 0) {
-    return {};
-  }
-  std::string out(static_cast<size_t>(n - 1), '\0');
-  WideCharToMultiByte(CP_UTF8, 0, wide, -1, out.data(), n, nullptr, nullptr);
-  return out;
+static std::string wstring_to_stdstring(const std::wstring &wstr) {
+
+  std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+
+  return converter.to_bytes(wstr.c_str());
+
 }
 
-std::string HStringToUtf8(HString *hstr) {
+static std::string hstring_to_stdstring(HString *hstr) {
+
   if (!hstr) {
-    return {};
+    return std::string();
   }
-  const wchar_t *raw = hstr->GetRawBuffer(nullptr);
-  return WideToUtf8(raw);
-}
 
-HRESULT SyncWaitCollection(IAsyncOperation<DeviceInformationCollection *> *op) {
-  if (!op) {
-    return E_POINTER;
+  const wchar_t *raw_hstr = hstr->GetRawBuffer(nullptr);
+  if (!raw_hstr) {
+    return std::string();
   }
-  HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!ev) {
-    return E_FAIL;
-  }
-  HRESULT wait_hr = E_FAIL;
-  auto handler = Callback<IAsyncOperationCompletedHandler<DeviceInformationCollection *>>(
-      [ev, &wait_hr](IAsyncOperation<DeviceInformationCollection *> *, AsyncStatus status) -> HRESULT {
-        wait_hr = (status == AsyncStatus::Completed) ? S_OK : E_FAIL;
-        SetEvent(ev);
-        return S_OK;
-      });
-  const HRESULT hr = op->put_Completed(handler.Get());
-  if (FAILED(hr)) {
-    CloseHandle(ev);
-    return hr;
-  }
-  WaitForSingleObject(ev, 5000);
-  CloseHandle(ev);
-  return wait_hr;
+
+  return wstring_to_stdstring(std::wstring(raw_hstr));
+
 }
 
 }  // namespace
-#endif
 
 EngineDeviceList UWPDeviceFinder::ListDevices() {
-  EngineDeviceList devices;
-  devices.push_back(UwpDeviceEnum::DefaultDevice());
-#if defined(_WIN32) && defined(_MSC_VER)
+
   ComPtr<IDeviceInformationStatics> device_info_statics;
-  HRESULT hr = GetActivationFactory(HStringReference(RuntimeClass_Windows_Devices_Enumeration_DeviceInformation).Get(), &device_info_statics);
-  if (FAILED(hr) || !device_info_statics) {
-    LogWarning("UWPDeviceFinder: DeviceInformation factory unavailable 0x%08lx", static_cast<unsigned long>(hr));
-    return devices;
-  }
-
-  ComPtr<IAsyncOperation<DeviceInformationCollection *>> async_op;
-  hr = device_info_statics->FindAllAsyncDeviceClass(static_cast<DeviceClass>(UwpDeviceEnum::kAudioRenderClass), &async_op);
-  if (FAILED(hr) || !async_op) {
-    LogWarning("UWPDeviceFinder: FindAllAsyncDeviceClass failed 0x%08lx", static_cast<unsigned long>(hr));
-    return devices;
-  }
-
-  hr = SyncWaitCollection(async_op.Get());
+  HRESULT hr = ABI::Windows::Foundation::GetActivationFactory(HStringReference(RuntimeClass_Windows_Devices_Enumeration_DeviceInformation).Get(), &device_info_statics);
   if (FAILED(hr)) {
-    LogWarning("UWPDeviceFinder: device enumeration timed out or failed");
-    return devices;
+    return EngineDeviceList();
   }
 
-  ComPtr<IVectorView<DeviceInformation *>> device_list;
+  ComPtr<IAsyncOperation<DeviceInformationCollection*>> async_op;
+  hr = device_info_statics->FindAllAsyncDeviceClass(DeviceClass::DeviceClass_AudioRender, &async_op);
+  device_info_statics.Reset();
+  if (FAILED(hr)) {
+    return EngineDeviceList();
+  }
+
+  hr = SyncWait<DeviceInformationCollection*>(async_op.Get());
+  if (FAILED(hr)) {
+    return EngineDeviceList();
+  }
+
+  ComPtr<IVectorView<DeviceInformation*>> device_list;
   hr = async_op->GetResults(&device_list);
-  if (FAILED(hr) || !device_list) {
-    return devices;
+  async_op.Reset();
+  if (FAILED(hr)) {
+    return EngineDeviceList();
   }
 
   unsigned int count = 0;
   hr = device_list->get_Size(&count);
   if (FAILED(hr)) {
-    return devices;
+    return EngineDeviceList();
   }
 
-  for (unsigned int i = 0; i < count; ++i) {
-    ComPtr<IDeviceInformation> device_info;
-    if (FAILED(device_list->GetAt(i, &device_info)) || !device_info) {
-      continue;
-    }
-    boolean enabled = false;
-    if (FAILED(device_info->get_IsEnabled(&enabled)) || !UwpDeviceEnum::ShouldInclude(enabled != 0)) {
-      continue;
-    }
-    HString id;
-    if (FAILED(device_info->get_Id(id.GetAddressOf())) || !id.IsValid()) {
-      continue;
-    }
-    HString name;
-    if (FAILED(device_info->get_Name(name.GetAddressOf())) || !name.IsValid()) {
-      continue;
-    }
-    EngineDevice device = UwpDeviceEnum::FromWinRt(HStringToUtf8(&id), HStringToUtf8(&name));
-    device.iconname = device.GuessIconName();
-    devices.push_back(device);
+  EngineDeviceList devices;
+
+  {
+    EngineDevice default_device;
+    default_device.description = "Default device"_L1;
+    default_device.iconname = default_device.GuessIconName();
+    devices.append(default_device);
   }
-#elif defined(_WIN32)
-  (void)PlatformDeviceOutputs::DefaultDeviceDescription();
-#endif
+
+  for (unsigned int i = 0; i < count; i++) {
+
+    ComPtr<IDeviceInformation> device_info;
+    hr = device_list->GetAt(i, &device_info);
+    if (FAILED(hr)) {
+      continue;
+    }
+
+    boolean enabled;
+    hr = device_info->get_IsEnabled(&enabled);
+    if (FAILED(hr) || !enabled) {
+      continue;
+    }
+
+    HString id;
+    hr = device_info->get_Id(id.GetAddressOf());
+    if (FAILED(hr) || !id.IsValid()) {
+      continue;
+    }
+
+    HString name;
+    hr = device_info->get_Name(name.GetAddressOf());
+    if (FAILED(hr) || !name.IsValid()) {
+      continue;
+    }
+
+    EngineDevice device;
+    device.value = QString::fromStdString(hstring_to_stdstring(&id));
+    device.description = QString::fromStdString(hstring_to_stdstring(&name));
+    device.iconname = device.GuessIconName();
+    devices.append(device);
+  }
+
   return devices;
+
 }

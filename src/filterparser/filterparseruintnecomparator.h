@@ -1,15 +1,37 @@
-#ifndef STRAWBERRY_FILTERPARSERUINTNECOMPARATOR_H
-#define STRAWBERRY_FILTERPARSERUINTNECOMPARATOR_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "filterparser/filterparsersearchtermcomparator.h"
+#ifndef FILTERPARSERUINTNECOMPARATOR_H
+#define FILTERPARSERUINTNECOMPARATOR_H
+
+#include <QVariant>
+
+#include "filterparsersearchtermcomparator.h"
 
 class FilterParserUIntNeComparator : public FilterParserSearchTermComparator {
  public:
-  explicit FilterParserUIntNeComparator(unsigned search_term);
-  bool Matches(const std::string &value) const override;
+  explicit FilterParserUIntNeComparator(const uint search_term);
+  bool Matches(const QVariant &value) const override;
 
  private:
-  unsigned search_term_{};
+  uint search_term_;
+  Q_DISABLE_COPY(FilterParserUIntNeComparator)
 };
 
-#endif
+#endif  // FILTERPARSERUINTNECOMPARATOR_H

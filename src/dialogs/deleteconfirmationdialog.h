@@ -1,17 +1,42 @@
-#ifndef STRAWBERRY_DELETECONFIRMATIONDIALOG_H
-#define STRAWBERRY_DELETECONFIRMATIONDIALOG_H
+/*
+ * Strawberry Music Player
+ * Copyright 2020-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/song.h"
-#include "dialogs/deletefilespolicy.h"
+#ifndef DELETECONFIRMATIONDIALOG_H
+#define DELETECONFIRMATIONDIALOG_H
 
-#include <gtk/gtk.h>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QStringList>
 
-class Application;
+class DeleteConfirmationDialog : public QDialog {
+  Q_OBJECT
 
-class DeleteConfirmationDialog {
  public:
-  static void Show(GtkWindow *parent, Application *app, const SongList &songs = {},
-                   DeleteFilesPolicy::Source source = DeleteFilesPolicy::Source::Playlist);
+  explicit DeleteConfirmationDialog(const QStringList &files, QWidget *parent = nullptr);
+
+  static QDialogButtonBox::StandardButton warning(const QStringList &files, QWidget *parent = nullptr);
+
+ private Q_SLOTS:
+  void ButtonClicked(QAbstractButton *button);
+
+ private:
+  QDialogButtonBox *button_box_;
 };
 
-#endif
+#endif  // DELETECONFIRMATIONDIALOG_H

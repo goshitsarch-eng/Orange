@@ -1,30 +1,37 @@
-#include "utilities/colorutils.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <cstdio>
-#include <cstdlib>
+#include <QString>
+#include <QColor>
 
-namespace ColorUtils {
+#include "colorutils.h"
 
-std::string ColorToRgba(int r, int g, int b, double a) {
-  char buf[48];
-  std::snprintf(buf, sizeof(buf), "rgba(%d,%d,%d,%.3f)", r, g, b, a);
-  return buf;
+namespace Utilities {
+
+QString ColorToRgba(const QColor &c) {
+
+  return QStringLiteral("rgba(%1, %2, %3, %4)").arg(c.red()).arg(c.green()).arg(c.blue()).arg(c.alpha());
+
 }
 
-std::string HexToCss(unsigned hex) {
-  char buf[8];
-  std::snprintf(buf, sizeof(buf), "#%06x", hex & 0xFFFFFFu);
-  return buf;
+bool IsColorDark(const QColor &color) {
+  return ((30 * color.red() + 59 * color.green() + 11 * color.blue()) / 100) <= 130;
 }
 
-bool IsColorDark(int r, int g, int b) { return (0.299 * r + 0.587 * g + 0.114 * b) < 128.0; }
-
-unsigned ParseHex(const std::string &color) {
-  std::string hex = color;
-  if (!hex.empty() && hex[0] == '#') {
-    hex.erase(hex.begin());
-  }
-  return static_cast<unsigned>(std::strtoul(hex.c_str(), nullptr, 16));
-}
-
-}  // namespace ColorUtils
+}  // namespace Utilities

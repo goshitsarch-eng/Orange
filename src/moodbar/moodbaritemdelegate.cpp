@@ -1,118 +1,303 @@
-#include "moodbar/moodbaritemdelegate.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2012, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/moodbarsettings.h"
-#include "core/settings.h"
-#include "core/standardpaths.h"
-
-#include <glib.h>
-
+#include <algorithm>
 #include <utility>
 
-namespace {
+#include <QApplication>
+#include <QtConcurrentRun>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QAbstractItemModel>
+#include <QSettings>
+#include <QItemDelegate>
+#include <QByteArray>
+#include <QUrl>
+#include <QImage>
+#include <QPixmap>
+#include <QPainter>
+#include <QRect>
 
-constexpr int kMaxInflight = 2;
+#include "includes/shared_ptr.h"
+#include "core/logging.h"
+#include "core/settings.h"
+#include "playlist/playlist.h"
+#include "playlist/playlistview.h"
+#include "playlist/playlistfilter.h"
 
-struct CellJob {
-  MoodbarItemDelegate *delegate = nullptr;
-  std::shared_ptr<bool> alive;
-  Song song;
-  std::string key;
-  bool save = false;
-  std::string cache_dir;
-  std::vector<uint8_t> data;
-};
+#include "moodbaritemdelegate.h"
+#include "moodbarloader.h"
+#include "moodbarpipeline.h"
+#include "moodbarrenderer.h"
 
-}  // namespace
+#include "constants/moodbarsettings.h"
 
-MoodbarItemDelegate::MoodbarItemDelegate() = default;
+using std::make_shared;
 
-MoodbarItemDelegate::~MoodbarItemDelegate() { *alive_ = false; }
+MoodbarItemDelegate::Data::Data() : state_(State::None) {}
 
-void MoodbarItemDelegate::Paint(cairo_t *cr, int width, int height, const std::vector<uint8_t> &mood) {
-  const int inset = MoodbarCell::BorderInset();
-  if (!cr || mood.empty() || width <= inset * 2 || height <= inset * 2) {
+MoodbarItemDelegate::MoodbarItemDelegate(const SharedPtr<MoodbarLoader> moodbar_loader, PlaylistView *playlist_view, QObject *parent)
+    : QItemDelegate(parent),
+      moodbar_loader_(moodbar_loader),
+      playlist_view_(playlist_view),
+      style_(MoodbarSettings::Style::Normal) {
+
+  QObject::connect(&*moodbar_loader, &MoodbarLoader::SettingsReloaded, this, &MoodbarItemDelegate::ReloadSettings);
+  QObject::connect(&*moodbar_loader, &MoodbarLoader::StyleChanged, this, &MoodbarItemDelegate::ReloadSettings);
+
+  ReloadSettings();
+
+}
+
+void MoodbarItemDelegate::ReloadSettings() {
+
+  Settings s;
+  s.beginGroup(MoodbarSettings::kSettingsGroup);
+  const MoodbarSettings::Style new_style = static_cast<MoodbarSettings::Style>(s.value(MoodbarSettings::kStyle, static_cast<int>(MoodbarSettings::kDefaultStyle)).toInt());
+  s.endGroup();
+
+  if (new_style != style_) {
+    style_ = new_style;
+    ReloadAllColors();
+  }
+
+}
+
+void MoodbarItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &idx) const {
+
+  // The moodbar is generated on demand whenever the (optional) Moodbar column is painted, i.e. when the user has made the column visible.
+  QPixmap pixmap = const_cast<MoodbarItemDelegate*>(this)->PixmapForIndex(idx, option.rect.size());
+
+  drawBackground(painter, option, idx);
+
+  if (!pixmap.isNull()) {
+    // Make a little border for the moodbar
+    const QRect moodbar_rect(option.rect.adjusted(1, 1, -1, -1));
+    painter->drawPixmap(moodbar_rect, pixmap);
+  }
+
+}
+
+QPixmap MoodbarItemDelegate::PixmapForIndex(const QModelIndex &idx, const QSize size) {
+
+  // Pixmaps are keyed off URL.
+  const QUrl url = idx.sibling(idx.row(), static_cast<int>(Playlist::Column::URL)).data().toUrl();
+  const bool has_cue = idx.sibling(idx.row(), static_cast<int>(Playlist::Column::HasCUE)).data().toBool();
+
+  Data *data = nullptr;
+  if (data_.contains(url)) {
+    data = data_[url];
+  }
+  else {
+    data = new Data;
+    if (!data_.insert(url, data)) {
+      qLog(Error) << "Could not insert moodbar data for URL" << url << "into cache";
+      return QPixmap();
+    }
+  }
+
+  data->indexes_.insert(idx);
+  data->desired_size_ = size;
+
+  switch (data->state_) {
+    case Data::State::CannotLoad:
+    case Data::State::LoadingData:
+    case Data::State::LoadingColors:
+    case Data::State::LoadingImage:
+      return data->pixmap_;
+
+    case Data::State::Loaded:
+      // Is the pixmap the right size?
+      if (data->pixmap_.size() != size) {
+        StartLoadingImage(url, data);
+      }
+
+      return data->pixmap_;
+
+    case Data::State::None:
+      break;
+  }
+
+  // We have to start loading the data from scratch.
+  StartLoadingData(url, has_cue, data);
+
+  return QPixmap();
+
+}
+
+void MoodbarItemDelegate::StartLoadingData(const QUrl &url, const bool has_cue, Data *data) {
+
+  data->state_ = Data::State::LoadingData;
+
+  // Load a mood file for this song and generate some colors from it
+  const MoodbarLoader::LoadResult load_result = moodbar_loader_->Load(url, has_cue);
+  switch (load_result.status) {
+    case MoodbarLoader::LoadStatus::CannotLoad:
+      data->state_ = Data::State::CannotLoad;
+      break;
+
+    case MoodbarLoader::LoadStatus::Loaded:
+      StartLoadingColors(url, load_result.data, data);
+      break;
+
+    case MoodbarLoader::LoadStatus::WillLoadAsync:
+      MoodbarPipelinePtr pipeline = load_result.pipeline;
+      Q_ASSERT(pipeline);
+      SharedPtr<QMetaObject::Connection> connection = make_shared<QMetaObject::Connection>();
+      *connection = QObject::connect(&*pipeline, &MoodbarPipeline::Finished, this, [this, connection, url, pipeline]() {
+        DataLoaded(url, pipeline);
+        QObject::disconnect(*connection);
+      });
+      break;
+  }
+
+}
+
+bool MoodbarItemDelegate::RemoveFromCacheIfIndexesInvalid(const QUrl &url, Data *data) {
+
+  QSet<QPersistentModelIndex> indexes = data->indexes_;
+
+  if (std::any_of(indexes.begin(), indexes.end(), [](const QPersistentModelIndex &idx) { return idx.isValid(); })) { return false; }
+
+  data_.remove(url);
+  return true;
+
+}
+
+void MoodbarItemDelegate::ReloadAllColors() {
+
+  const QList<QUrl> urls = data_.keys();
+  for (const QUrl &url : urls) {
+    Data *data = data_[url];
+
+    if (data->state_ == Data::State::Loaded) {
+      StartLoadingData(url, false, data);
+    }
+  }
+
+}
+
+void MoodbarItemDelegate::DataLoaded(const QUrl &url, MoodbarPipelinePtr pipeline) {
+
+  if (!data_.contains(url)) return;
+
+  Data *data = data_[url];
+
+  if (RemoveFromCacheIfIndexesInvalid(url, data)) {
     return;
   }
-  cairo_save(cr);
-  cairo_translate(cr, inset, inset);
-  MoodbarRenderer::Draw(cr, width - inset * 2, height - inset * 2, mood);
-  cairo_restore(cr);
+
+  if (!pipeline->success()) {
+    data->state_ = Data::State::CannotLoad;
+    return;
+  }
+
+  // Load the colors next.
+  StartLoadingColors(url, pipeline->data(), data);
+
 }
 
-const std::vector<uint8_t> *MoodbarItemDelegate::Peek(const std::string &url) const {
-  const auto it = cache_.find(url);
-  if (it == cache_.end() || it->second.empty()) {
-    return nullptr;
-  }
-  return &it->second;
+void MoodbarItemDelegate::StartLoadingColors(const QUrl &url, const QByteArray &bytes, Data *data) {
+
+  data->state_ = Data::State::LoadingColors;
+
+  QFuture<ColorVector> future = QtConcurrent::run(MoodbarRenderer::Colors, bytes, style_, qApp->palette());
+  QFutureWatcher<ColorVector> *watcher = new QFutureWatcher<ColorVector>(this);
+  QObject::connect(watcher, &QFutureWatcher<ColorVector>::finished, this, [this, watcher, url]() {
+    ColorsLoaded(url, watcher->result());
+    watcher->deleteLater();
+  });
+  watcher->setFuture(future);
+
 }
 
-const std::vector<uint8_t> &MoodbarItemDelegate::Ensure(const Song &song) {
-  const std::string key = MoodbarCell::CacheKey(song);
-  auto it = cache_.find(key);
-  if (it != cache_.end()) {
-    return it->second;
+void MoodbarItemDelegate::ColorsLoaded(const QUrl &url, const ColorVector &colors) {
+
+  if (!data_.contains(url)) return;
+
+  Data *data = data_[url];
+
+  if (RemoveFromCacheIfIndexesInvalid(url, data)) {
+    return;
   }
-  if (!MoodbarCell::CanLoad(song)) {
-    return cache_[key];
-  }
-  std::vector<uint8_t> cached = loader_.LoadCached(song);
-  if (!cached.empty()) {
-    return cache_[key] = std::move(cached);
-  }
-  cache_[key] = {};
-  if (!loading_[key]) {
-    pending_.push_back(song);
-    loading_[key] = true;
-    MaybeStartNext();
-  }
-  return cache_[key];
+
+  data->colors_ = colors;
+
+  // Load the image next.
+  StartLoadingImage(url, data);
+
 }
 
-void MoodbarItemDelegate::SetUpdatedCallback(const std::function<void()> &callback) { updated_ = callback; }
+void MoodbarItemDelegate::StartLoadingImage(const QUrl &url, Data *data) {
 
-void MoodbarItemDelegate::FinishGenerate(const std::string &key, std::vector<uint8_t> data) {
-  cache_[key] = std::move(data);
-  loading_[key] = false;
-  if (inflight_ > 0) {
-    --inflight_;
-  }
-  MaybeStartNext();
-  if (updated_) {
-    updated_();
-  }
+  data->state_ = Data::State::LoadingImage;
+
+  QFuture<QImage> future = QtConcurrent::run(MoodbarRenderer::RenderToImage, data->colors_, data->desired_size_);
+  QFutureWatcher<QImage> *watcher = new QFutureWatcher<QImage>(this);
+  QObject::connect(watcher, &QFutureWatcher<QImage>::finished, this, [this, watcher, url]() {
+    ImageLoaded(url, watcher->result());
+    watcher->deleteLater();
+  });
+  watcher->setFuture(future);
+
 }
 
-void MoodbarItemDelegate::MaybeStartNext() {
-  while (inflight_ < kMaxInflight && !pending_.empty()) {
-    Song song = pending_.front();
-    pending_.erase(pending_.begin());
-    StartGenerate(song);
-  }
-}
+void MoodbarItemDelegate::ImageLoaded(const QUrl &url, const QImage &image) {
 
-void MoodbarItemDelegate::StartGenerate(const Song &song) {
-  Settings settings;
-  settings.BeginGroup(MoodbarSettings::kSettingsGroup);
-  auto *job = new CellJob;
-  job->delegate = this;
-  job->alive = alive_;
-  job->song = song;
-  job->key = MoodbarCell::CacheKey(song);
-  job->save = settings.BoolValue(MoodbarSettings::kSave, MoodbarSettings::kDefaultSave);
-  job->cache_dir = StandardPaths::MoodbarCacheDir();
-  ++inflight_;
-  g_thread_unref(g_thread_new("moodbar-cell", +[](gpointer data) -> gpointer {
-    auto *job = static_cast<CellJob *>(data);
-    job->data = MoodbarLoader().Generate(job->song, job->save, job->cache_dir);
-    g_idle_add(+[](gpointer idle) -> gboolean {
-      std::unique_ptr<CellJob> job(static_cast<CellJob *>(idle));
-      if (!job->alive || !*job->alive || !job->delegate) {
-        return G_SOURCE_REMOVE;
+  if (!data_.contains(url)) return;
+
+  Data *data = data_[url];
+
+  if (RemoveFromCacheIfIndexesInvalid(url, data)) {
+    return;
+  }
+
+  // If the desired size changed then don't even bother converting the image
+  // to a pixmap, just reload it at the new size.
+  if (!image.isNull() && data->desired_size_ != image.size()) {
+    StartLoadingImage(url, data);
+    return;
+  }
+
+  data->pixmap_ = QPixmap::fromImage(image);
+  data->state_ = Data::State::Loaded;
+
+  Playlist *playlist = playlist_view_->playlist();
+  const PlaylistFilter *filter = playlist->filter();
+
+  // Update all the indices with the new pixmap.
+  for (const QPersistentModelIndex &idx : std::as_const(data->indexes_)) {
+    if (idx.isValid() && idx.sibling(idx.row(), static_cast<int>(Playlist::Column::URL)).data().toUrl() == url) {
+      QModelIndex source_index = idx;
+      if (idx.model() == filter) {
+        source_index = filter->mapToSource(source_index);
       }
-      job->delegate->FinishGenerate(job->key, std::move(job->data));
-      return G_SOURCE_REMOVE;
-    }, job);
-    return nullptr;
-  }, job));
+
+      if (source_index.model() != playlist) {
+        // The pixmap was for an index in a different playlist, maybe the user switched to a different one.
+        continue;
+      }
+
+      playlist->MoodbarUpdated(source_index);
+    }
+  }
+
 }

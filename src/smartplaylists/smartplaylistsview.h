@@ -1,49 +1,46 @@
-#ifndef STRAWBERRY_SMARTPLAYLISTSVIEW_H
-#define STRAWBERRY_SMARTPLAYLISTSVIEW_H
+/*
+ * Strawberry Music Player
+ * Copyright 2019, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "smartplaylists/smartplaylistsmodel.h"
+#ifndef SMARTPLAYLISTSVIEW_H
+#define SMARTPLAYLISTSVIEW_H
 
-#include <functional>
-#include <string>
+#include "config.h"
 
-#include <gtk/gtk.h>
+#include <QListView>
+#include <QItemSelection>
+#include <QModelIndex>
+#include <QPoint>
 
-enum class SmartPlaylistsAction { Activate, Append, Replace, OpenInNew, Queue, QueueNext, Edit, Delete, New, RestoreDefaults };
+class SmartPlaylistsView : public QListView {
+  Q_OBJECT
 
-class SmartPlaylistsView {
  public:
-  SmartPlaylistsView();
-  ~SmartPlaylistsView();
+  explicit SmartPlaylistsView(QWidget *parent = nullptr);
+  ~SmartPlaylistsView() override;
 
-  using SongsCallback = std::function<SongList(const SmartPlaylistsItem &)>;
+ protected:
+  void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
+  void contextMenuEvent(QContextMenuEvent *e) override;
 
-  GtkWidget *widget() const { return widget_; }
-  GtkWidget *list() const { return list_; }
-  void Reload(SmartPlaylistsModel *model);
-  void SetActivateCallback(std::function<void(const SmartPlaylistsItem &)> callback) { activate_ = std::move(callback); }
-  void SetDeleteCallback(std::function<void(const SmartPlaylistsItem &)> callback) { delete_ = std::move(callback); }
-  void SetActionCallback(std::function<void(const SmartPlaylistsItem &, SmartPlaylistsAction)> callback) {
-    action_ = std::move(callback);
-  }
-  void SetSongsCallback(SongsCallback callback) { songs_ = std::move(callback); }
-  const SmartPlaylistsItem *SelectedItem() const;
-  void Trigger(SmartPlaylistsAction action);
-
- private:
-  void Emit(const SmartPlaylistsItem &item, SmartPlaylistsAction action);
-  void ShowMenu(GtkWidget *relative, const SmartPlaylistsItem *item);
-  void SetupRowDrag(GtkWidget *row, const SmartPlaylistsItem &item);
-  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
-  void ResetTypeAhead();
-
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *list_ = nullptr;
-  std::function<void(const SmartPlaylistsItem &)> activate_;
-  std::function<void(const SmartPlaylistsItem &)> delete_;
-  std::function<void(const SmartPlaylistsItem &, SmartPlaylistsAction)> action_;
-  SongsCallback songs_;
-  std::string typeahead_;
-  guint typeahead_timeout_ = 0;
+ Q_SIGNALS:
+  void ItemsSelectedChanged();
+  void ShowSmartPlaylistContextMenu(const QPoint global_pos, const QModelIndex idx);
 };
 
-#endif
+#endif  // SMARTPLAYLISTSVIEW_H

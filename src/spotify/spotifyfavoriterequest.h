@@ -1,37 +1,85 @@
-#ifndef STRAWBERRY_SPOTIFYFAVORITEREQUEST_H
-#define STRAWBERRY_SPOTIFYFAVORITEREQUEST_H
+/*
+ * Strawberry Music Player
+ * Copyright 2022-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/network.h"
+#ifndef SPOTIFYFAVORITEREQUEST_H
+#define SPOTIFYFAVORITEREQUEST_H
+
+#include "config.h"
+
+#include <QObject>
+#include <QList>
+#include <QMap>
+#include <QVariant>
+#include <QByteArray>
+#include <QString>
+
+#include "includes/shared_ptr.h"
 #include "core/song.h"
-#include "streaming/streamingpage.h"
-#include "streaming/streamingservices.h"
 
-#include <map>
-#include <string>
-#include <vector>
+#include "spotifybaserequest.h"
 
-namespace SpotifyFavoriteRequest {
+class QNetworkReply;
+class SpotifyService;
+class NetworkAccessManager;
 
-using FavoriteType = StreamingService::FavoriteType;
-using SearchCallback = StreamingService::SearchCallback;
+class SpotifyFavoriteRequest : public SpotifyBaseRequest {
+  Q_OBJECT
 
-std::string FavoriteText(FavoriteType type);
-std::vector<std::string> IdsFromSongs(FavoriteType type, const SongList &songs);
-std::string JsonIdArray(const std::vector<std::string> &ids);
+ public:
+  explicit SpotifyFavoriteRequest(SpotifyService *service, const SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
 
-std::string ListUrl(const std::string &api_url, FavoriteType type, int offset = 0, int limit = 50);
+  enum FavoriteType {
+    FavoriteType_Artists,
+    FavoriteType_Albums,
+    FavoriteType_Songs
+  };
 
-SongList Parse(FavoriteType type, const std::string &json);
-std::string MutateUrl(const std::string &api_url, FavoriteType type, const std::vector<std::string> &ids);
+ Q_SIGNALS:
+  void ArtistsAdded(SongList);
+  void AlbumsAdded(SongList);
+  void SongsAdded(SongList);
+  void ArtistsRemoved(SongList);
+  void AlbumsRemoved(SongList);
+  void SongsRemoved(SongList);
 
-void Get(NetworkAccessManager *network, const std::string &api_url, const std::map<std::string, std::string> &headers, FavoriteType type,
-         SearchCallback callback, StreamingPage::ProgressCallback progress = {}, StreamingPage::StillCurrent still_current = {},
-         StreamingPage::ErrorCallback error = {});
-void Add(NetworkAccessManager *network, const std::string &api_url, const std::map<std::string, std::string> &headers, FavoriteType type,
-         const SongList &songs, SearchCallback callback);
-void Remove(NetworkAccessManager *network, const std::string &api_url, const std::map<std::string, std::string> &headers, FavoriteType type,
-            const SongList &songs, SearchCallback callback);
+ private Q_SLOTS:
+  void AddFavoritesReply(QNetworkReply *reply, const SpotifyFavoriteRequest::FavoriteType type, const SongList &songs);
+  void RemoveFavoritesReply(QNetworkReply *reply, const SpotifyFavoriteRequest::FavoriteType type, const SongList &songs);
 
-}  // namespace SpotifyFavoriteRequest
+ public Q_SLOTS:
+  void AddArtists(const SongList &songs);
+  void AddAlbums(const SongList &songs);
+  void AddSongs(const SongList &songs);
+  void AddSongs(const SongMap &songs);
 
-#endif
+  void RemoveArtists(const SongList &songs);
+  void RemoveAlbums(const SongList &songs);
+  void RemoveSongs(const SongList &songs);
+  void RemoveSongs(const SongMap &songs);
+
+ private:
+  static QString FavoriteText(const FavoriteType type);
+  void AddFavorites(const FavoriteType type, const SongList &songs);
+  void AddFavoritesRequest(const FavoriteType type, const QString &ids_list, const QByteArray &json_data, const SongList &songs);
+  void RemoveFavorites(const FavoriteType type, const SongList &songs);
+  void RemoveFavorites(const FavoriteType type, const QString &id, const SongList &songs);
+  void RemoveFavoritesRequest(const FavoriteType type, const QString &ids_list, const QByteArray &json_data, const SongList &songs);
+};
+
+#endif  // SPOTIFYFAVORITEREQUEST_H

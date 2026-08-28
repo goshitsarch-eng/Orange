@@ -1,74 +1,108 @@
-#ifndef STRAWBERRY_MUSICSTORAGE_H
-#define STRAWBERRY_MUSICSTORAGE_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/song.h"
+#ifndef MUSICSTORAGE_H
+#define MUSICSTORAGE_H
+
+#include "config.h"
+
+#include <QtGlobal>
 
 #include <functional>
+#include <memory>
 #include <optional>
-#include <string>
-#include <vector>
+
+#include <QMetaType>
+#include <QString>
+#include <QList>
+#include <QImage>
+
+#include "includes/shared_ptr.h"
+#include "song.h"
 
 class MusicStorage {
  public:
-  enum class TranscodeMode { Transcode_Always = 1, Transcode_Never = 2, Transcode_Unsupported = 3 };
+  explicit MusicStorage();
+  virtual ~MusicStorage() = default;
 
-  using ProgressFunction = std::function<void(float)>;
+  enum Role {
+    Role_Storage = Qt::UserRole + 100,
+    Role_StorageForceConnect,
+    Role_Capacity,
+    Role_FreeSpace,
+  };
+
+  // Values are saved in the database - don't change
+  enum class TranscodeMode {
+    Transcode_Always = 1,
+    Transcode_Never = 2,
+    Transcode_Unsupported = 3,
+  };
+
+  using ProgressFunction = std::function<void (float progress)>;
 
   struct CopyJob {
-    std::string source;
-    std::string destination;
-    Song metadata;
-    bool overwrite = false;
-    bool remove_original = false;
-    bool albumcover = false;
-    std::string cover_source;
-    std::string cover_dest;
-    ProgressFunction progress;
-    std::string playlist;
+    CopyJob() : overwrite_(false), remove_original_(false), albumcover_(false) {}
+    QString source_;
+    QString destination_;
+    Song metadata_;
+    bool overwrite_;
+    bool remove_original_;
+    bool albumcover_;
+    QString cover_source_;
+    QString cover_dest_;
+    QImage cover_image_;
+    ProgressFunction progress_;
+    QString playlist_;
   };
 
   struct DeleteJob {
-    Song metadata;
-    bool use_trash = false;
+    DeleteJob() : use_trash_(false) {}
+    Song metadata_;
+    bool use_trash_;
   };
 
-  virtual ~MusicStorage() = default;
-
   virtual Song::Source source() const = 0;
-  virtual std::string LocalPath() const { return {}; }
-  virtual std::optional<int> collection_directory_id() const { return std::nullopt; }
+  virtual QString LocalPath() const { return QString(); }
+  virtual std::optional<int> collection_directory_id() const { return std::optional<int>(); }
 
-  virtual TranscodeMode GetTranscodeMode() const { return transcode_mode_; }
-  virtual Song::FileType GetTranscodeFormat() const { return transcode_format_; }
-  virtual bool GetSupportedFiletypes(std::vector<Song::FileType> *) { return true; }
+  virtual TranscodeMode GetTranscodeMode() const { return TranscodeMode::Transcode_Never; }
+  virtual Song::FileType GetTranscodeFormat() const { return Song::FileType::Unknown; }
+  virtual bool GetSupportedFiletypes(QList<Song::FileType> *ret) { Q_UNUSED(ret); return true; }
 
-  void SetTranscodeMode(TranscodeMode mode) { transcode_mode_ = mode; }
-  void SetTranscodeFormat(Song::FileType format) { transcode_format_ = format; }
-
-  virtual bool StartCopy(std::vector<Song::FileType> *) { return true; }
-  virtual bool CopyToStorage(const CopyJob &job, std::string &error_text) = 0;
-  virtual bool FinishCopy(bool success, std::string &) { return success; }
+  virtual bool StartCopy(QList<Song::FileType> *supported_types) { Q_UNUSED(supported_types); return true; }
+  virtual bool CopyToStorage(const CopyJob &job, QString &error_text) = 0;
+  virtual bool FinishCopy(bool success, QString &error_text) { Q_UNUSED(error_text); return success; }
 
   virtual void StartDelete() {}
   virtual bool DeleteFromStorage(const DeleteJob &job) = 0;
-  virtual bool FinishDelete(bool success, std::string &) { return success; }
+  virtual bool FinishDelete(bool success, QString &error_text) { Q_UNUSED(error_text); return success; }
 
-  // Qt ConnectedDevice::Eject calls DeviceManager::UnmountAsync when a mount path exists.
-  void SetEjectHandler(std::function<void()> handler) { eject_handler_ = std::move(handler); }
-  bool HasEjectHandler() const { return static_cast<bool>(eject_handler_); }
-  virtual void Eject() {
-    if (eject_handler_) {
-      eject_handler_();
-    }
-  }
-
-  // MTP/iPod adapters record on-device metadata for DeviceManager::RefreshAfterCopy.
-  virtual SongList CopiedSongs() const { return {}; }
+  virtual void Eject() {}
 
  private:
-  TranscodeMode transcode_mode_ = TranscodeMode::Transcode_Never;
-  Song::FileType transcode_format_ = Song::FileType::Unknown;
-  std::function<void()> eject_handler_;
+  Q_DISABLE_COPY(MusicStorage)
 };
 
-#endif
+Q_DECLARE_METATYPE(MusicStorage*)
+Q_DECLARE_METATYPE(SharedPtr<MusicStorage>)
+
+#endif  // MUSICSTORAGE_H

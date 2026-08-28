@@ -1,33 +1,53 @@
-#ifndef STRAWBERRY_TAGREADERLOADCOVERDATAREPLY_H
-#define STRAWBERRY_TAGREADERLOADCOVERDATAREPLY_H
+/*
+ * Strawberry Music Player
+ * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "tagreader/albumcovertagdata.h"
-#include "tagreader/tagreaderreply.h"
+#ifndef TAGREADERLOADCOVERDATAREPLY_H
+#define TAGREADERLOADCOVERDATAREPLY_H
 
-#include <memory>
-#include <vector>
+#include <QByteArray>
+#include <QString>
+#include <QSharedPointer>
+
+#include "tagreaderreply.h"
+#include "tagreaderresult.h"
 
 class TagReaderLoadCoverDataReply : public TagReaderReply {
+  Q_OBJECT
+
  public:
-  explicit TagReaderLoadCoverDataReply(const std::string &filename) : TagReaderReply(filename) {}
+  explicit TagReaderLoadCoverDataReply(const QString &_filename, QObject *parent = nullptr);
 
-  const std::vector<unsigned char> &data() const { return data_.data; }
-  void set_data(const std::vector<unsigned char> &data) { data_.data = data; }
-  const AlbumCoverTagData &cover() const { return data_; }
-  void set_cover(const AlbumCoverTagData &cover) { data_ = cover; }
+  void Finish() override;
 
-  void Finish() override {
-    finished_ = true;
-    DataFinished.Emit(filename_, data_.data, result_);
-    TagReaderReply::Finished.Emit(filename_, result_);
-  }
+  QByteArray data() const { return data_; }
+  void set_data(const QByteArray &data) { data_ = data; }
 
-  Signal<std::string, std::vector<unsigned char>, TagReaderResult> DataFinished;
+ Q_SIGNALS:
+  void Finished(const QString &filename, const QByteArray &data, const TagReaderResult &result);
+
+ private Q_SLOTS:
+  void EmitFinished() override;
 
  private:
-  AlbumCoverTagData data_;
+  QByteArray data_;
 };
 
-using TagReaderLoadCoverDataReplyPtr = std::shared_ptr<TagReaderLoadCoverDataReply>;
+using TagReaderLoadCoverDataReplyPtr = QSharedPointer<TagReaderLoadCoverDataReply>;
 
-#endif
+#endif  // TAGREADERLOADCOVERDATAREPLY_H

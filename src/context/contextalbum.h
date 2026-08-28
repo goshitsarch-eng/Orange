@@ -1,88 +1,108 @@
-#ifndef STRAWBERRY_CONTEXTALBUM_H
-#define STRAWBERRY_CONTEXTALBUM_H
+/*
+ * Strawberry Music Player
+ * Copyright 2020-2022, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/filefilterconstants.h"
+#ifndef CONTEXTALBUM_H
+#define CONTEXTALBUM_H
 
-#include <gtk/gtk.h>
+#include "config.h"
 
-#include <functional>
-#include <string>
-#include <vector>
+#include <memory>
 
-class ContextAlbum {
+#include <QtGlobal>
+#include <QObject>
+#include <QWidget>
+#include <QList>
+#include <QString>
+#include <QImage>
+#include <QPixmap>
+#include <QMovie>
+
+#include "includes/scoped_ptr.h"
+#include "includes/shared_ptr.h"
+
+class QMenu;
+class QTimeLine;
+class QPainter;
+class QPaintEvent;
+
+class ContextView;
+class AlbumCoverChoiceController;
+
+class ContextAlbum : public QWidget {
+  Q_OBJECT
+
  public:
-  using SearchCallback = std::function<void()>;
-  using DropCallback = std::function<void(const std::vector<unsigned char> &)>;
-  using FadeFinishedCallback = std::function<void()>;
-  using ActivateCallback = std::function<void()>;
+  explicit ContextAlbum(QWidget *parent = nullptr);
 
-  static constexpr int kFadeTimelineMs = 1000;
-  static constexpr int kFadeTickMs = 50;
-  static constexpr int kDefaultCoverSize = 220;
-  static constexpr int kMinCoverSize = 80;
-  static constexpr int kCoverMargin = 16;
+  void Init(ContextView *context_view, AlbumCoverChoiceController *album_cover_choice_controller);
+  void SetImage(const QImage &image = QImage());
+  void UpdateWidth(const int width);
 
-  static int CoverPixelSize(int allocated_width, int horizontal_margin = kCoverMargin) {
-    if (allocated_width <= 0) {
-      return kDefaultCoverSize;
-    }
-    const int inner = allocated_width - horizontal_margin;
-    if (inner < kMinCoverSize) {
-      return kMinCoverSize;
-    }
-    return inner;
-  }
-
-  ContextAlbum();
-  ~ContextAlbum();
-
-  GtkWidget *widget() const { return widget_; }
-  GtkWidget *image() const { return image_; }
-  void SetImage(const std::vector<unsigned char> &data, int pixel_size = 220);
-  void Clear();
-  void SetSearchCallback(SearchCallback callback);
-  void SetDropCallback(DropCallback callback);
-  void SetFadeFinishedCallback(FadeFinishedCallback callback);
-  void SetActivateCallback(ActivateCallback callback);
-  void UpdateWidth(int allocated_width);
-  void SearchCoverInProgress();
-  bool downloading() const { return downloading_; }
-  bool has_cover() const { return has_cover_; }
-
-  static double FadeInOpacity(int elapsed_ms) {
-    if (elapsed_ms <= 0) {
-      return 0.0;
-    }
-    if (elapsed_ms >= kFadeTimelineMs) {
-      return 1.0;
-    }
-    return static_cast<double>(elapsed_ms) / static_cast<double>(kFadeTimelineMs);
-  }
-  static double FadeOutOpacity(int elapsed_ms) { return 1.0 - FadeInOpacity(elapsed_ms); }
-
-  static bool IsImagePath(const std::string &path) { return FileFilterConstants::PathMatchesGlobs(path, FileFilterConstants::kLoadImages); }
+ protected:
+  QSize sizeHint() const override;
+  void paintEvent(QPaintEvent *paint_event) override;
+  void mouseDoubleClickEvent(QMouseEvent *e) override;
+  void contextMenuEvent(QContextMenuEvent *e) override;
 
  private:
-  gboolean OnDrop(const GValue *value);
-  void StartFade(bool to_placeholder);
-  void StopFade();
-  gboolean FadeTick();
-  void SnapshotCurrentToPrevious();
-  void ApplyImageData(const std::vector<unsigned char> &data, int pixel_size);
+  struct PreviousCover {
+    explicit PreviousCover() : opacity(0.0) {}
+    QImage image;
+    QPixmap pixmap;
+    qreal opacity;
+    SharedPtr<QTimeLine> timeline;
+  };
 
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *previous_image_ = nullptr;
-  GtkWidget *image_ = nullptr;
-  GtkWidget *spinner_ = nullptr;
-  SearchCallback search_;
-  DropCallback drop_;
-  FadeFinishedCallback fade_finished_;
-  ActivateCallback activate_;
-  bool downloading_ = false;
-  bool has_cover_ = false;
-  bool fading_to_placeholder_ = false;
-  int fade_elapsed_ms_ = 0;
-  guint fade_timeout_id_ = 0;
+  QList<SharedPtr<PreviousCover>> previous_covers_;
+
+  void DrawImage(QPainter *p, const QPixmap &pixmap, const qreal opacity);
+  void DrawSpinner(QPainter *p);
+  void DrawPreviousCovers(QPainter *p);
+  void ScaleCover();
+  void ScalePreviousCovers();
+
+ Q_SIGNALS:
+  void FadeStopFinished();
+
+ private Q_SLOTS:
+  void Update() { update(); }
+  void AutomaticCoverSearchDone();
+  void FadeCurrentCover(const qreal value);
+  void FadeCurrentCoverFinished();
+  void FadePreviousCover(SharedPtr<ContextAlbum::PreviousCover> previous_cover);
+  void FadePreviousCoverFinished(SharedPtr<ContextAlbum::PreviousCover> previous_cover);
+
+ public Q_SLOTS:
+  void SearchCoverInProgress();
+
+ private:
+  QMenu *menu_;
+  ContextView *context_view_;
+  AlbumCoverChoiceController *album_cover_choice_controller_;
+  bool downloading_covers_;
+  QTimeLine *timeline_fade_;
+  QImage image_strawberry_;
+  QImage image_original_;
+  QPixmap pixmap_current_;
+  qreal pixmap_current_opacity_;
+  ScopedPtr<QMovie> spinner_animation_;
+  int desired_height_;
 };
 
-#endif
+#endif  // CONTEXTALBUM_H

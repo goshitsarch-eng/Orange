@@ -1,55 +1,80 @@
-#ifndef STRAWBERRY_WINSYSTEMMEDIATRANSPORTCONTROLS_H
-#define STRAWBERRY_WINSYSTEMMEDIATRANSPORTCONTROLS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/song.h"
-#include "core/winsmtcstatus.h"
+#ifndef WINSYSTEMMEDIATRANSPORTCONTROLS_H
+#define WINSYSTEMMEDIATRANSPORTCONTROLS_H
+
+#include "config.h"
+
+#include <windows.h>
+
+#include <QObject>
+#include <QString>
+#include <QUrl>
+#include <QImage>
+
+#include "includes/shared_ptr.h"
 #include "engine/enginebase.h"
 
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
+class QTimer;
 
 class Player;
+class Song;
+class AlbumCoverLoaderResult;
 
-class WinSystemMediaTransportControls {
+class WinSystemMediaTransportControls : public QObject {
+  Q_OBJECT
+
  public:
-  using Button = std::function<void(const std::string &)>;
+  explicit WinSystemMediaTransportControls(SharedPtr<Player> player, QObject *parent = nullptr);
+  ~WinSystemMediaTransportControls() override;
 
-  explicit WinSystemMediaTransportControls(Player *player);
-  ~WinSystemMediaTransportControls();
+  bool Initialize(const HWND hwnd);
 
-  bool Initialize(void *hwnd);
+ public Q_SLOTS:
   void EngineStateChanged(EngineBase::State state);
   void CurrentSongChanged(const Song &song);
-  void AlbumCoverLoaded(const Song &song, const std::vector<unsigned char> &image);
-  void HandleButtonPressed(int button);
-  void set_button_callback(Button cb) { button_ = std::move(cb); }
+  void AlbumCoverLoaded(const Song &song, const AlbumCoverLoaderResult &result);
+
+ private Q_SLOTS:
+  void HandleButtonPressed(const int button);
 
  private:
   void UpdatePlaybackStatus(EngineBase::State state);
   void UpdateMetadata(const Song &song);
   void UpdateTimeline();
-  void SetThumbnail(const std::vector<unsigned char> &image);
+  void SetThumbnail(const QImage &image);
   void ClearThumbnail();
-  void StartTimelineTimer();
-  void StopTimelineTimer();
 
-  Player *player_ = nullptr;
-  bool initialized_ = false;
-  bool ro_initialized_ = false;
-  void *smtc_ = nullptr;
-  void *smtc2_ = nullptr;
-  void *updater_ = nullptr;
-  void *button_handler_ = nullptr;
-  int64_t button_pressed_token_ = 0;
-  unsigned timeline_timer_ = 0;
-  EngineBase::State state_ = EngineBase::State::Empty;
-  std::string current_song_url_;
-  int64_t current_duration_nanosec_ = 0;
-  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
-  Button button_;
+  SharedPtr<Player> player_;
+
+  bool ro_initialized_;
+  void *smtc_;           // ABI::Windows::Media::ISystemMediaTransportControls*
+  void *smtc2_;          // ABI::Windows::Media::ISystemMediaTransportControls2*
+  void *updater_;        // ABI::Windows::Media::ISystemMediaTransportControlsDisplayUpdater*
+  void *button_handler_; // IUnknown* (WRL handler, kept alive for unregistration)
+  qint64 button_pressed_token_;
+
+  EngineBase::State state_;
+  QUrl current_song_url_;
+  qint64 current_duration_nanosec_;
+  QTimer *timeline_timer_;
 };
 
-#endif
+#endif  // WINSYSTEMMEDIATRANSPORTCONTROLS_H

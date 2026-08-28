@@ -1,74 +1,68 @@
-#ifndef STRAWBERRY_PLAYLISTLISTVIEW_H
-#define STRAWBERRY_PLAYLISTLISTVIEW_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2013, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlist/playlistlistdrop.h"
-#include "playlist/playlistlistlook.h"
-#include "widgets/favoritewidget.h"
+#ifndef PLAYLISTLISTVIEW_H
+#define PLAYLISTLISTVIEW_H
 
-#include <gtk/gtk.h>
+#include "config.h"
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
+#include <QBasicTimer>
+#include <QObject>
+#include <QWidget>
+#include <QString>
 
-class PlaylistListView {
+#include "widgets/autoexpandingtreeview.h"
+
+class QPaintEvent;
+class QDragEnterEvent;
+class QDragLeaveEvent;
+class QDragMoveEvent;
+class QDropEvent;
+class QTimerEvent;
+
+class PlaylistListView : public AutoExpandingTreeView {
+  Q_OBJECT
+
  public:
-  using ActivateCallback = std::function<void(const std::string &)>;
-  using MenuCallback = std::function<void(const std::string &)>;
-  using DropCallback = std::function<void(const std::string &, const std::string &, bool)>;
-  using FolderCallback = std::function<void(const std::string &)>;
-  using FavoriteCallback = std::function<void(const std::string &, bool)>;
+  explicit PlaylistListView(QWidget *parent = nullptr);
 
-  PlaylistListView();
-  ~PlaylistListView();
+  bool ItemsSelected() const;
 
-  GtkWidget *widget() const { return widget_; }
-  GtkWidget *list() const { return list_; }
-  void Refresh(const std::vector<PlaylistListDrop::Row> &rows, const std::string &current, const std::string &active = {},
-               PlaylistListLook::Playback playback = PlaylistListLook::Playback::Stopped);
-  void SelectName(const std::string &name);
-  void SelectFolder(const std::string &path);
-  void SetActivateCallback(ActivateCallback callback);
-  void SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
-  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
-  void SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
-  void SetFolderToggleCallback(FolderCallback callback) { toggle_ = std::move(callback); }
-  void SetDeleteCallback(ActivateCallback callback) { delete_ = std::move(callback); }
-  void SetFavoriteCallback(FavoriteCallback callback) { favorite_ = std::move(callback); }
-  void SetSelectionChangedCallback(std::function<void()> callback) { selection_changed_ = std::move(callback); }
-  std::string SelectedName() const;
-  std::string SelectedFolderPath() const;
-  bool SelectedIsFolder() const;
-  bool HasSelection() const;
+ Q_SIGNALS:
+  void ItemsSelectedChanged(const bool);
+  void ItemMimeDataDroppedSignal(const QModelIndex &proxy_idx, const QMimeData *q_mimedata);
+
+ protected:
+  // QWidget
+  void paintEvent(QPaintEvent *event) override;
+  void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
+
+  void dragEnterEvent(QDragEnterEvent *e) override;
+  void dragMoveEvent(QDragMoveEvent *e) override;
+  void dragLeaveEvent(QDragLeaveEvent *e) override;
+  void dropEvent(QDropEvent *e) override;
+  void timerEvent(QTimerEvent *e) override;
 
  private:
-  void NotifySelectionChanged();
-  void SetupRowDrop(GtkWidget *row, const PlaylistListDrop::Row &item);
-  void SetupRowDrag(GtkWidget *row, const std::string &name);
-  void StartDragHover(const std::string &name);
-  void CancelDragHover();
-  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
-  bool ApplyTreeLeft();
-  void ResetTypeAhead();
-  std::string SelectedPath() const;
-  bool SelectedExpanded() const;
-
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *list_ = nullptr;
-  ActivateCallback activate_;
-  MenuCallback menu_;
-  DropCallback drop_;
-  FolderCallback toggle_;
-  ActivateCallback delete_;
-  FavoriteCallback favorite_;
-  std::function<void()> selection_changed_;
-  std::vector<std::unique_ptr<FavoriteWidget>> favorites_;
-  std::string typeahead_;
-  guint typeahead_timeout_ = 0;
-  std::string current_;
-  std::string hover_name_;
-  guint hover_timeout_ = 0;
+  QBasicTimer drag_hover_timer_;
 };
 
-#endif
+#endif  // PLAYLISTLISTVIEW_H

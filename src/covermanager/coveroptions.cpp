@@ -1,1 +1,0 @@
-#include "covermanager/coveroptions.h"

@@ -1,72 +1,90 @@
-#ifndef STRAWBERRY_SMARTPLAYLISTSEARCHTERMWIDGET_H
-#define STRAWBERRY_SMARTPLAYLISTSEARCHTERMWIDGET_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "smartplaylists/smartplaylist.h"
-#include "smartplaylists/smartplaylisttermvalue.h"
+#ifndef SMARTPLAYLISTSEARCHTERMWIDGET_H
+#define SMARTPLAYLISTSEARCHTERMWIDGET_H
 
-#include <gtk/gtk.h>
+#include "config.h"
 
-#include <functional>
-#include <memory>
-#include <vector>
+#include <QWidget>
+#include <QPushButton>
 
-class RatingWidget;
+#include "includes/shared_ptr.h"
+#include "smartplaylistsearchterm.h"
 
-class SmartPlaylistSearchTermWidget {
+class QPropertyAnimation;
+class QEvent;
+class QShowEvent;
+class QEnterEvent;
+class QResizeEvent;
+
+class CollectionBackend;
+class Ui_SmartPlaylistSearchTermWidget;
+class SmartPlaylistSearchTermWidgetOverlay;
+
+class SmartPlaylistSearchTermWidget : public QWidget {
+  Q_OBJECT
+
+  Q_PROPERTY(float overlay_opacity READ overlay_opacity WRITE set_overlay_opacity NOTIFY OverlayOpacityChanged)
+
  public:
-  using ChangedCallback = std::function<void()>;
-  using ClickedCallback = std::function<void()>;
-  using RemoveCallback = std::function<void()>;
+  explicit SmartPlaylistSearchTermWidget(SharedPtr<CollectionBackend> collection_backend, QWidget *parent);
+  ~SmartPlaylistSearchTermWidget() override;
 
-  explicit SmartPlaylistSearchTermWidget(SongList library = {});
-  ~SmartPlaylistSearchTermWidget();
+  void SetActive(const bool active);
 
-  GtkWidget *widget() const { return widget_; }
-  SmartPlaylistTerm Term() const;
-  void SetTerm(const SmartPlaylistTerm &term);
-  bool IsEmpty() const;
-  bool active() const { return active_; }
-  void SetActive(bool active);
-  void SetChangedCallback(ChangedCallback callback) { changed_ = std::move(callback); }
-  void SetClickedCallback(ClickedCallback callback) { clicked_ = std::move(callback); }
-  void SetRemoveCallback(RemoveCallback callback) { removed_ = std::move(callback); }
-  void OnOverlayMapped();
-  bool OnOverlayActivateKey(unsigned keyval);
+  float overlay_opacity() const;
+  void set_overlay_opacity(const float opacity);
+
+  void SetTerm(const SmartPlaylistSearchTerm &term);
+  SmartPlaylistSearchTerm Term() const;
+
+ Q_SIGNALS:
+  void Clicked();
+  void RemoveClicked();
+  void OverlayOpacityChanged(const float opacity);
+
+  void Changed();
+
+ protected:
+  void showEvent(QShowEvent *e) override;
+  void enterEvent(QEnterEvent *e) override;
+  void leaveEvent(QEvent *e) override;
+  void resizeEvent(QResizeEvent *e) override;
+
+ private Q_SLOTS:
+  void FieldChanged(const int index);
+  void OpChanged(const int idx);
+  void RelativeValueChanged();
+  void Grab();
 
  private:
-  void RebuildOps();
-  void RebuildValue();
-  void AttachCompletion();
-  void ConnectValueSignals();
-  void EmitChanged();
-  std::string CurrentValue() const;
-  void SetCurrentValue(const std::string &value);
-  void ApplyActive();
+  Ui_SmartPlaylistSearchTermWidget *ui_;
+  SharedPtr<CollectionBackend> collection_backend_;
 
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *row_ = nullptr;
-  GtkWidget *field_ = nullptr;
-  GtkWidget *op_ = nullptr;
-  GtkWidget *value_ = nullptr;
-  GtkWidget *remove_ = nullptr;
-  GtkWidget *overlay_ = nullptr;
-  GtkWidget *time_box_ = nullptr;
-  GtkWidget *time_hours_ = nullptr;
-  GtkWidget *time_minutes_ = nullptr;
-  GtkWidget *time_seconds_ = nullptr;
-  GtkWidget *date_unit_ = nullptr;
-  GtkWidget *range_box_ = nullptr;
-  GtkWidget *range_from_ = nullptr;
-  GtkWidget *range_to_ = nullptr;
-  std::unique_ptr<RatingWidget> rating_;
-  SmartPlaylistTermValue::Editor editor_ = SmartPlaylistTermValue::Editor::Text;
-  std::vector<SmartPlaylistOp> current_ops_;
-  SongList library_;
-  bool updating_ = false;
-  bool active_ = true;
-  ChangedCallback changed_;
-  ClickedCallback clicked_;
-  RemoveCallback removed_;
+  SmartPlaylistSearchTermWidgetOverlay *overlay_;
+  QPropertyAnimation *animation_;
+  bool active_;
+  bool initialized_;
+
+  SmartPlaylistSearchTerm::Type current_field_type_;
 };
 
-#endif
+#endif  // SMARTPLAYLISTSEARCHTERMWIDGET_H

@@ -1,258 +1,267 @@
-#include "settings/lyricssettingspage.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2020-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
+#include "config.h"
+
+#include <algorithm>
+#include <utility>
+
+#include <QObject>
+#include <QList>
+#include <QByteArray>
+#include <QString>
+#include <QStringList>
+#include <QPalette>
+#include <QSettings>
+#include <QGroupBox>
+#include <QPushButton>
+#include <QListWidget>
+#include <QListWidgetItem>
+#include <QMessageBox>
+
+#include "settingsdialog.h"
+#include "lyricssettingspage.h"
+#include "ui_lyricssettingspage.h"
 #include "constants/lyricssettings.h"
-#include "core/application.h"
-#include "lyrics/geniuslyricscredentials.h"
-#include "lyrics/geniuslyricsprovider.h"
-#include "lyrics/lyricsproviderauth.h"
+#include "core/iconloader.h"
+#include "core/settings.h"
 #include "lyrics/lyricsproviders.h"
-#include "lyrics/lyricsproviderorder.h"
-#include "lyrics/lyricsprovidersettings.h"
-#include "settings/settingspage.h"
-#include "translations/translations.h"
+#include "lyrics/lyricsprovider.h"
 #include "widgets/loginstatewidget.h"
 
-#include <memory>
+using namespace Qt::Literals::StringLiterals;
+using namespace LyricsSettings;
 
-namespace {
+LyricsSettingsPage::LyricsSettingsPage(SettingsDialog *dialog, const SharedPtr<LyricsProviders> lyrics_providers, QWidget *parent)
+    : SettingsPage(dialog, parent),
+      ui_(new Ui::LyricsSettingsPage),
+      lyrics_providers_(lyrics_providers),
+      provider_selected_(false) {
 
-struct ProviderListState {
-  Application *app = nullptr;
-  Settings *settings = nullptr;
-  GtkWidget *list = nullptr;
-  GtkWidget *info = nullptr;
-  GtkWidget *authenticate = nullptr;
-  GtkWidget *client_id = nullptr;
-  GtkWidget *client_secret = nullptr;
-  std::unique_ptr<LoginStateWidget> login;
-  std::shared_ptr<bool> page_alive;
-  bool login_in_progress = false;
-};
+  ui_->setupUi(this);
+  setWindowIcon(IconLoader::Load(u"view-media-lyrics"_s, true, 0, 32));
 
-void ApplyAuthPanel(ProviderListState *state, const std::string &name, bool authentication_required, bool authenticated,
-                    const std::string &username) {
-  if (!state) {
-    return;
+  QObject::connect(ui_->providers_up, &QPushButton::clicked, this, &LyricsSettingsPage::ProvidersMoveUp);
+  QObject::connect(ui_->providers_down, &QPushButton::clicked, this, &LyricsSettingsPage::ProvidersMoveDown);
+  QObject::connect(ui_->providers, &QListWidget::currentItemChanged, this, &LyricsSettingsPage::CurrentItemChanged);
+  QObject::connect(ui_->providers, &QListWidget::itemSelectionChanged, this, &LyricsSettingsPage::ItemSelectionChanged);
+  QObject::connect(ui_->providers, &QListWidget::itemChanged, this, &LyricsSettingsPage::ItemChanged);
+
+  QObject::connect(ui_->button_authenticate, &QPushButton::clicked, this, &LyricsSettingsPage::AuthenticateClicked);
+  QObject::connect(ui_->login_state, &LoginStateWidget::LogoutClicked, this, &LyricsSettingsPage::LogoutClicked);
+
+  ui_->login_state->AddCredentialGroup(ui_->widget_authenticate);
+
+  NoProviderSelected();
+  DisableAuthentication();
+
+  dialog->installEventFilter(this);
+
+}
+
+LyricsSettingsPage::~LyricsSettingsPage() { delete ui_; }
+
+void LyricsSettingsPage::Load() {
+
+  ui_->providers->clear();
+
+  QList<LyricsProvider*> lyrics_providers_sorted = lyrics_providers_->List();
+  std::stable_sort(lyrics_providers_sorted.begin(), lyrics_providers_sorted.end(), ProviderCompareOrder);
+
+  for (LyricsProvider *provider : std::as_const(lyrics_providers_sorted)) {
+    QListWidgetItem *item = new QListWidgetItem(ui_->providers);
+    item->setText(provider->name());
+    item->setCheckState(provider->is_enabled() ? Qt::Checked : Qt::Unchecked);
+    item->setForeground(provider->is_enabled() ? palette().color(QPalette::Active, QPalette::Text) : palette().color(QPalette::Disabled, QPalette::Text));
   }
-  const LyricsProviderAuth::Panel panel = LyricsProviderAuth::PanelFor(name, authentication_required);
-  if (state->info) {
-    gtk_label_set_text(GTK_LABEL(state->info),
-                       Translations::Tr(LyricsProviderAuth::SelectionStatusText(name, authentication_required)).c_str());
+
+  Init(ui_->layout_lyricssettingspage->parentWidget());
+
+  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
+
+}
+
+void LyricsSettingsPage::Save() {
+
+  QStringList providers;
+  for (int i = 0; i < ui_->providers->count(); ++i) {
+    const QListWidgetItem *item = ui_->providers->item(i);
+    if (item->checkState() == Qt::Checked) providers << item->text();  // clazy:exclude=reserve-candidates
   }
-  if (state->authenticate) {
-    gtk_widget_set_visible(state->authenticate, LyricsProviderAuth::AuthenticateVisible(panel));
-    gtk_widget_set_sensitive(state->authenticate, LyricsProviderAuth::AuthenticateEnabled(panel, state->login_in_progress));
+
+  Settings s;
+  s.beginGroup(kSettingsGroup);
+  s.setValue(kProviders, providers);
+  s.endGroup();
+
+}
+
+void LyricsSettingsPage::CurrentItemChanged(QListWidgetItem *item_current, QListWidgetItem *item_previous) {
+
+  if (item_previous) {
+    LyricsProvider *provider = lyrics_providers_->ProviderByName(item_previous->text());
+    if (provider && provider->authentication_required()) DisconnectAuthentication(provider);
   }
-  if (state->client_id) {
-    gtk_widget_set_visible(state->client_id, LyricsProviderAuth::CredentialsVisible(panel, GeniusLyricsCredentials::kHideManualFields));
-  }
-  if (state->client_secret) {
-    gtk_widget_set_visible(state->client_secret,
-                          LyricsProviderAuth::CredentialsVisible(panel, GeniusLyricsCredentials::kHideManualFields));
-  }
-  if (state->login) {
-    gtk_widget_set_visible(state->login->widget(), LyricsProviderAuth::LoginStateVisible(panel));
-    if (LyricsProviderAuth::LoginStateVisible(panel)) {
-      LoginStateWidget::State login_state = LoginStateWidget::State::LoggedOut;
-      if (state->login_in_progress) {
-        login_state = LoginStateWidget::State::LoginInProgress;
-      } else if (authenticated) {
-        login_state = LoginStateWidget::State::LoggedIn;
+
+  if (item_current) {
+    const int row = ui_->providers->row(item_current);
+    ui_->providers_up->setEnabled(row != 0);
+    ui_->providers_down->setEnabled(row != ui_->providers->count() - 1);
+    LyricsProvider *provider = lyrics_providers_->ProviderByName(item_current->text());
+    if (provider) {
+      if (provider->authentication_required()) {
+        ui_->login_state->SetLoggedIn(provider->authenticated() ? LoginStateWidget::State::LoggedIn : LoginStateWidget::State::LoggedOut);
+        ui_->button_authenticate->setEnabled(true);
+        ui_->button_authenticate->show();
+        ui_->login_state->show();
+        ui_->label_auth_info->setText(QStringLiteral("%1 needs authentication.").arg(provider->name()));
       }
-      state->login->SetLoggedIn(login_state, username);
+      else {
+        DisableAuthentication();
+        ui_->label_auth_info->setText(QStringLiteral("%1 does not need authentication.").arg(provider->name()));
+      }
+      provider_selected_ = true;
     }
   }
+  else {
+    DisableAuthentication();
+    NoProviderSelected();
+    ui_->providers_up->setEnabled(false);
+    ui_->providers_down->setEnabled(false);
+    provider_selected_ = false;
+  }
+
 }
 
-void ApplySelectedProvider(ProviderListState *state) {
-  if (!state || !state->list) {
-    ApplyAuthPanel(state, {}, false, false, {});
-    return;
+void LyricsSettingsPage::ItemSelectionChanged() {
+
+  if (ui_->providers->selectedItems().count() == 0) {
+    DisableAuthentication();
+    NoProviderSelected();
+    ui_->providers_up->setEnabled(false);
+    ui_->providers_down->setEnabled(false);
+    provider_selected_ = false;
   }
-  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(state->list));
-  if (!row) {
-    ApplyAuthPanel(state, {}, false, false, {});
-    return;
-  }
-  const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "provider-name"));
-  const std::string provider_name = name ? name : "";
-  bool required = LyricsProviderAuth::RequiresAuthentication(provider_name);
-  bool authenticated = false;
-  std::string username;
-  if (state->app && state->app->lyrics_providers()) {
-    if (LyricsProvider *provider = state->app->lyrics_providers()->ProviderByName(provider_name)) {
-      required = provider->authentication_required();
-      authenticated = provider->authenticated();
-      username = provider->username();
+  else {
+    if (ui_->providers->currentItem() && !provider_selected_) {
+      CurrentItemChanged(ui_->providers->currentItem(), nullptr);
     }
   }
-  ApplyAuthPanel(state, provider_name, required, authenticated, username);
+
 }
 
-void FinishGeniusLogin(ProviderListState *state) {
-  if (!state) {
-    return;
-  }
-  state->login_in_progress = false;
-  ApplySelectedProvider(state);
+void LyricsSettingsPage::ProvidersMoveUp() { ProvidersMove(-1); }
+
+void LyricsSettingsPage::ProvidersMoveDown() { ProvidersMove(+1); }
+
+void LyricsSettingsPage::ProvidersMove(const int d) {
+
+  const int row = ui_->providers->currentRow();
+  QListWidgetItem *item = ui_->providers->takeItem(row);
+  ui_->providers->insertItem(row + d, item);
+  ui_->providers->setCurrentRow(row + d);
+
+  set_changed();
+
 }
 
-void StartGeniusLogin(ProviderListState *state) {
-  if (!state || !state->app || !state->settings || !state->page_alive || !*state->page_alive) {
-    return;
-  }
-  auto *genius = dynamic_cast<GeniusLyricsProvider *>(state->app->lyrics_providers()->ProviderByName("Genius"));
-  if (!genius) {
-    return;
-  }
-  state->login_in_progress = true;
-  ApplySelectedProvider(state);
-  auto page_alive = state->page_alive;
-  genius->Authenticate(state->app->network(), [state, page_alive]() {
-    if (*page_alive) {
-      FinishGeniusLogin(state);
-    }
-  });
+void LyricsSettingsPage::ItemChanged(QListWidgetItem *item) {
+
+  item->setForeground((item->checkState() == Qt::Checked) ? palette().color(QPalette::Active, QPalette::Text) : palette().color(QPalette::Disabled, QPalette::Text));
+
+  set_changed();
+
 }
 
-void RefreshProviderList(ProviderListState *state) {
-  if (!state || !state->list || !state->app) {
-    return;
-  }
-  while (GtkWidget *child = gtk_widget_get_first_child(state->list)) {
-    gtk_list_box_remove(GTK_LIST_BOX(state->list), child);
-  }
-  const std::vector<LyricsProvider *> providers = state->app->lyrics_providers()->All();
-  for (size_t i = 0; i < providers.size(); ++i) {
-    LyricsProvider *provider = providers[i];
-    AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
-    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), provider->name().c_str());
-    g_object_set_data_full(G_OBJECT(row), "provider-name", g_strdup(provider->name().c_str()), g_free);
-    GtkWidget *enabled = gtk_switch_new();
-    gtk_switch_set_active(GTK_SWITCH(enabled), provider->enabled() ? TRUE : FALSE);
-    gtk_widget_set_valign(enabled, GTK_ALIGN_CENTER);
-    g_object_set_data(G_OBJECT(enabled), "provider-state", state);
-    g_object_set_data(G_OBJECT(enabled), "provider-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
-    g_signal_connect(enabled, "notify::active", G_CALLBACK(+[](GtkSwitch *toggle, GParamSpec *, gpointer) {
-                       auto *self = static_cast<ProviderListState *>(g_object_get_data(G_OBJECT(toggle), "provider-state"));
-                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(toggle), "provider-index")) - 1;
-                       if (!self || !self->app) {
-                         return;
-                       }
-                       const std::vector<LyricsProvider *> providers = self->app->lyrics_providers()->All();
-                       if (index < 0 || static_cast<size_t>(index) >= providers.size()) {
-                         return;
-                       }
-                       self->app->lyrics_providers()->SetEnabled(providers[static_cast<size_t>(index)], gtk_switch_get_active(toggle));
-                     }),
-                     nullptr);
-    GtkWidget *up = gtk_button_new_from_icon_name("go-up-symbolic");
-    GtkWidget *down = gtk_button_new_from_icon_name("go-down-symbolic");
-    gtk_widget_set_tooltip_text(up, Translations::CStr(LyricsProviderSettings::MoveUp()));
-    gtk_widget_set_tooltip_text(down, Translations::CStr(LyricsProviderSettings::MoveDown()));
-    gtk_widget_set_sensitive(up, LyricsProviderAuth::MoveUpEnabled(static_cast<int>(i), static_cast<int>(providers.size())));
-    gtk_widget_set_sensitive(down, LyricsProviderAuth::MoveDownEnabled(static_cast<int>(i), static_cast<int>(providers.size())));
-    g_object_set_data(G_OBJECT(up), "provider-state", state);
-    g_object_set_data(G_OBJECT(down), "provider-state", state);
-    g_object_set_data(G_OBJECT(up), "provider-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
-    g_object_set_data(G_OBJECT(down), "provider-index", GINT_TO_POINTER(static_cast<int>(i + 1)));
-    g_signal_connect(up, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
-                       auto *self = static_cast<ProviderListState *>(g_object_get_data(G_OBJECT(button), "provider-state"));
-                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "provider-index")) - 1;
-                       if (self && self->app) {
-                         self->app->lyrics_providers()->Move(index, -1);
-                         RefreshProviderList(self);
-                         ApplySelectedProvider(self);
-                       }
-                     })),
-                     nullptr);
-    g_signal_connect(down, "clicked", G_CALLBACK((+[](GtkButton *button, gpointer) {
-                       auto *self = static_cast<ProviderListState *>(g_object_get_data(G_OBJECT(button), "provider-state"));
-                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "provider-index")) - 1;
-                       if (self && self->app) {
-                         self->app->lyrics_providers()->Move(index, 1);
-                         RefreshProviderList(self);
-                         ApplySelectedProvider(self);
-                       }
-                     })),
-                     nullptr);
-    adw_action_row_add_suffix(row, enabled);
-    adw_action_row_add_suffix(row, up);
-    adw_action_row_add_suffix(row, down);
-    gtk_list_box_append(GTK_LIST_BOX(state->list), GTK_WIDGET(row));
-  }
+void LyricsSettingsPage::NoProviderSelected() {
+  ui_->label_auth_info->setText(tr("No provider selected."));
 }
 
-}  // namespace
+void LyricsSettingsPage::DisableAuthentication() {
 
-AdwPreferencesPage *LyricsSettingsPage::Create(Settings *settings, Application *app) {
-  settings->BeginGroup(LyricsSettings::kSettingsGroup);
-  AdwPreferencesPage *page = SettingsPage::MakePage("Lyrics", "text-x-generic-symbolic");
-  AdwPreferencesGroup *order = SettingsPage::AddGroup(page, LyricsProviderSettings::ProvidersGroup());
-  GtkWidget *hint = gtk_label_new(Translations::CStr(LyricsProviderSettings::ProvidersHint()));
-  gtk_label_set_wrap(GTK_LABEL(hint), TRUE);
-  gtk_label_set_xalign(GTK_LABEL(hint), 0);
-  gtk_widget_add_css_class(hint, "dim-label");
-  adw_preferences_group_add(order, hint);
+  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedOut);
+  ui_->button_authenticate->setEnabled(false);
+  ui_->login_state->hide();
+  ui_->button_authenticate->hide();
 
-  auto *state = new ProviderListState();
-  state->app = app;
-  state->settings = settings;
-  state->page_alive = std::make_shared<bool>(true);
-  g_object_set_data_full(G_OBJECT(page), "provider-state", state, [](gpointer p) {
-    auto *self = static_cast<ProviderListState *>(p);
-    if (self->page_alive) {
-      *self->page_alive = false;
-    }
-    delete self;
-  });
+}
 
-  if (app) {
-    GtkWidget *list = gtk_list_box_new();
-    gtk_widget_add_css_class(list, "boxed-list");
-    state->list = list;
-    adw_preferences_group_add(order, list);
-    RefreshProviderList(state);
-    g_signal_connect(list, "row-selected", G_CALLBACK((+[](GtkListBox *, GtkListBoxRow *, gpointer data) {
-                       ApplySelectedProvider(static_cast<ProviderListState *>(data));
-                     })),
-                     state);
-  }
+void LyricsSettingsPage::DisconnectAuthentication(LyricsProvider *provider) const {
 
-  AdwPreferencesGroup *auth = SettingsPage::AddGroup(page, LyricsProviderAuth::AuthenticationGroup());
-  state->info = gtk_label_new(Translations::CStr(LyricsProviderAuth::NoProviderSelected()));
-  gtk_label_set_wrap(GTK_LABEL(state->info), TRUE);
-  gtk_label_set_xalign(GTK_LABEL(state->info), 0.0f);
-  gtk_widget_add_css_class(state->info, "dim-label");
-  adw_preferences_group_add(auth, state->info);
+  QObject::disconnect(provider, &LyricsProvider::AuthenticationFailure, this, &LyricsSettingsPage::AuthenticationFailure);
+  QObject::disconnect(provider, &LyricsProvider::AuthenticationSuccess, this, &LyricsSettingsPage::AuthenticationSuccess);
 
-  settings->BeginGroup("Genius");
-  state->client_id = SettingsPage::AddEntry(auth, settings, "client_id", "Client ID");
-  state->client_secret = SettingsPage::AddEntry(auth, settings, "client_secret", "Client secret");
-  settings->BeginGroup(LyricsSettings::kSettingsGroup);
+}
 
-  state->authenticate = gtk_button_new_with_label(Translations::CStr(LyricsProviderAuth::Login()));
-  gtk_widget_set_halign(state->authenticate, GTK_ALIGN_START);
-  adw_preferences_group_add(auth, state->authenticate);
-  state->login = std::make_unique<LoginStateWidget>();
-  state->login->SetAccountTypeVisible(false);
-  adw_preferences_group_add(auth, state->login->widget());
+void LyricsSettingsPage::AuthenticateClicked() {
 
-  g_signal_connect(state->authenticate, "clicked", G_CALLBACK((+[](GtkButton *, gpointer data) {
-                     StartGeniusLogin(static_cast<ProviderListState *>(data));
-                   })),
-                   state);
-  state->login->SetLoginCallback([state]() { StartGeniusLogin(state); });
-  state->login->SetLogoutCallback([state]() {
-    if (!state || !state->app || !state->page_alive || !*state->page_alive) {
-      return;
-    }
-    if (LyricsProvider *provider = state->app->lyrics_providers()->ProviderByName("Genius")) {
-      provider->Logout();
-    }
-    state->login_in_progress = false;
-    ApplySelectedProvider(state);
-  });
-  ApplySelectedProvider(state);
-  return page;
+  if (!ui_->providers->currentItem()) return;
+  LyricsProvider *provider = lyrics_providers_->ProviderByName(ui_->providers->currentItem()->text());
+  if (!provider) return;
+  ui_->button_authenticate->setEnabled(false);
+  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoginInProgress);
+  QObject::connect(provider, &LyricsProvider::AuthenticationFailure, this, &LyricsSettingsPage::AuthenticationFailure);
+  QObject::connect(provider, &LyricsProvider::AuthenticationSuccess, this, &LyricsSettingsPage::AuthenticationSuccess);
+  provider->Authenticate();
+
+}
+
+void LyricsSettingsPage::LogoutClicked() {
+
+  if (!ui_->providers->currentItem()) return;
+  LyricsProvider *provider = lyrics_providers_->ProviderByName(ui_->providers->currentItem()->text());
+  if (!provider) return;
+  provider->ClearSession();
+
+  ui_->button_authenticate->setEnabled(true);
+  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedOut);
+
+}
+
+void LyricsSettingsPage::AuthenticationSuccess() {
+
+  LyricsProvider *provider = qobject_cast<LyricsProvider*>(sender());
+  if (!provider) return;
+  DisconnectAuthentication(provider);
+
+  if (!isVisible() || !ui_->providers->currentItem() || ui_->providers->currentItem()->text() != provider->name()) return;
+
+  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedIn);
+  ui_->button_authenticate->setEnabled(true);
+
+}
+
+void LyricsSettingsPage::AuthenticationFailure(const QString &error) {
+
+  LyricsProvider *provider = qobject_cast<LyricsProvider*>(sender());
+  if (!provider) return;
+  DisconnectAuthentication(provider);
+
+  if (!isVisible() || !ui_->providers->currentItem() || ui_->providers->currentItem()->text() != provider->name()) return;
+
+  QMessageBox::warning(this, tr("Authentication failed"), error);
+
+  ui_->login_state->SetLoggedIn(LoginStateWidget::State::LoggedOut);
+  ui_->button_authenticate->setEnabled(true);
+
+}
+
+bool LyricsSettingsPage::ProviderCompareOrder(LyricsProvider *a, LyricsProvider *b) {
+  return a->order() < b->order();
 }

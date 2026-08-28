@@ -27,7 +27,6 @@ constexpr char kSettingsGroup[] = "Waveform";
 constexpr char kColor[] = "color";
 constexpr char kSave[] = "save";
 
-constexpr char kDefaultColor[] = "#6696e3";
 constexpr bool kDefaultSave = false;
 
 }  // namespace WaveformSettings

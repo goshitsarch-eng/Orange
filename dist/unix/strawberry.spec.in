@@ -39,10 +39,15 @@ BuildRequires:  pkgconfig(libgpod-1.0)
 BuildRequires:  pkgconfig(libmtp)
 BuildRequires:  pkgconfig(libsparsehash)
 BuildRequires:  pkgconfig(gmock)
-BuildRequires:  pkgconfig(gtk4)
-BuildRequires:  pkgconfig(libadwaita-1)
-BuildRequires:  pkgconfig(libsoup-3.0)
-BuildRequires:  pkgconfig(json-glib-1.0)
+BuildRequires:  cmake(Qt@QT_VERSION_MAJOR@Core)
+BuildRequires:  cmake(Qt@QT_VERSION_MAJOR@Concurrent)
+BuildRequires:  cmake(Qt@QT_VERSION_MAJOR@Network)
+BuildRequires:  cmake(Qt@QT_VERSION_MAJOR@Sql)
+BuildRequires:  cmake(Qt@QT_VERSION_MAJOR@DBus)
+BuildRequires:  cmake(Qt@QT_VERSION_MAJOR@Gui)
+BuildRequires:  cmake(Qt@QT_VERSION_MAJOR@Widgets)
+BuildRequires:  cmake(Qt@QT_VERSION_MAJOR@Test)
+BuildRequires:  cmake(Qt@QT_VERSION_MAJOR@LinguistTools)
 BuildRequires:  cmake(GTest)
 BuildRequires:  desktop-file-utils
 BuildRequires:  hicolor-icon-theme
@@ -51,6 +56,10 @@ BuildRequires:  hicolor-icon-theme
 BuildRequires:  libboost_headers-devel
 %else
 BuildRequires:  boost-devel
+%endif
+
+%if (!0%{?suse_version} && !0%{?mageia}) || (0%{?suse_version} && 0%{?suse_version} > 1600)
+BuildRequires:  cmake(KDSingleApplication-qt6)
 %endif
 
 %if 0%{?suse_version}
@@ -64,10 +73,18 @@ BuildRequires:  libappstream-glib
 BuildRequires:  appstream-util
 %endif
 
+%if "%{?_vendor}" == "openmandriva"
+BuildRequires:  qt6-qtbase-theme-gtk3
+%endif
+
+%if 0%{?suse_version}
+Requires:  qt6-sql-sqlite
+Requires:  qt6-network-tls
+%endif
+
 %description
 Strawberry is a music player and music collection organizer.
-It is a fork of Clementine, which was itself a port of Amarok 1.4.
-The name is inspired by the band Strawbs.
+It is a fork of Clementine. The name is inspired by the band Strawbs.
 
 Features:
   - Play and organize music

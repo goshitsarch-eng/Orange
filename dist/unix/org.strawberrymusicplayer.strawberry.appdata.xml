@@ -15,14 +15,11 @@
   <developer id="net.jkvinge.jonas">
     <name>Jonas Kvinge</name>
   </developer>
-  <translation type="gettext">strawberry</translation>
+  ​<translation type="qt">strawberry</translation>
   <content_rating type="oars-1.1" />
   <description>
     <p>
-      Strawberry is a music player and music collection organizer. It is aimed at music collectors and audiophiles. Strawberry is free software released under GPL. It's written in C++ using GTK 4, libadwaita, and GStreamer.
-    </p>
-    <p>
-      Strawberry was forked from Clementine in 2018. Clementine itself began in 2010 as a port of Amarok 1.4, so parts of this codebase trace back to Amarok.
+      Strawberry is a music player and music collection organizer. It is aimed at music collectors and audiophiles. Strawberry is free software released under GPL. It's written in C++ using the Qt framework and GStreamer.
     </p>
     <p>Features:</p>
     <ul>
@@ -55,7 +52,6 @@
   </screenshots>
   <update_contact>eclipseo@fedoraproject.org</update_contact>
     <releases>
-        <release version="2.0.0" date="2026-08-28"/>
         <release version="1.2.27" date="2026-08-11"/>
         <release version="1.2.26" date="2026-07-30"/>
         <release version="1.2.25" date="2026-07-25"/>

@@ -1,23 +1,47 @@
-#include "tagreader/tagreaderresult.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-std::string TagReaderResult::error_string() const {
+#include <QObject>
+
+#include "tagreaderresult.h"
+
+QString TagReaderResult::error_string() const {
+
   switch (error_code) {
     case ErrorCode::Success:
-      return "Success";
+      return QObject::tr("Success");
     case ErrorCode::Unsupported:
-      return "File is unsupported";
+      return QObject::tr("File is unsupported");
     case ErrorCode::FilenameMissing:
-      return "Filename is missing";
+      return QObject::tr("Filename is missing");
     case ErrorCode::FileDoesNotExist:
-      return "File does not exist";
+      return QObject::tr("File does not exist");
     case ErrorCode::FileOpenError:
-      return "File could not be opened";
+      return QObject::tr("File could not be opened");
     case ErrorCode::FileParseError:
-      return "Could not parse file";
+      return QObject::tr("Could not parse file");
     case ErrorCode::FileSaveError:
-      return "Could not save file";
+      return QObject::tr("Could not save file");
     case ErrorCode::CustomError:
       return error_text;
   }
-  return "Unknown error";
+
+  return QObject::tr("Unknown error");
+
 }

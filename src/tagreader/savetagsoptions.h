@@ -1,5 +1,26 @@
-#ifndef STRAWBERRY_SAVETAGSOPTIONS_H
-#define STRAWBERRY_SAVETAGSOPTIONS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#ifndef SAVETAGSOPTIONS_H
+#define SAVETAGSOPTIONS_H
+
+#include <QtGlobal>
 
 enum class SaveTagsOption {
   NoType = 0,
@@ -8,23 +29,6 @@ enum class SaveTagsOption {
   Rating = 4,
   Cover = 8
 };
+Q_DECLARE_FLAGS(SaveTagsOptions, SaveTagsOption)
 
-using SaveTagsOptions = int;
-
-inline SaveTagsOptions operator|(SaveTagsOption a, SaveTagsOption b) {
-  return static_cast<int>(a) | static_cast<int>(b);
-}
-
-inline SaveTagsOptions operator|(SaveTagsOptions a, SaveTagsOption b) {
-  return a | static_cast<int>(b);
-}
-
-inline SaveTagsOptions operator|(SaveTagsOption a, SaveTagsOptions b) {
-  return static_cast<int>(a) | b;
-}
-
-inline bool HasSaveOption(SaveTagsOptions options, SaveTagsOption option) {
-  return (options & static_cast<int>(option)) != 0;
-}
-
-#endif
+#endif  // SAVETAGSOPTIONS_H

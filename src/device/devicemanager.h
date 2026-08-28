@@ -1,117 +1,198 @@
-#ifndef STRAWBERRY_DEVICEMANAGER_H
-#define STRAWBERRY_DEVICEMANAGER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/musicstorage.h"
-#include "core/signal.h"
+#ifndef DEVICEMANAGER_H
+#define DEVICEMANAGER_H
+
+#include "config.h"
+
+#include <QObject>
+#include <QMetaObject>
+#include <QThreadPool>
+#include <QAbstractItemModel>
+#include <QList>
+#include <QMap>
+#include <QMultiMap>
+#include <QVariant>
+#include <QString>
+#include <QStringList>
+#include <QUrl>
+#include <QIcon>
+
+#include "includes/scoped_ptr.h"
+#include "includes/shared_ptr.h"
 #include "core/song.h"
-#include "core/urlhandlers.h"
-#include "device/connecteddevice.h"
-#include "device/devicedatabasebackend.h"
-#include "tagfetcher/musicbrainzclient.h"
+#include "core/musicstorage.h"
+#include "core/simpletreemodel.h"
+#include "collection/collectionmodel.h"
+#include "devicedatabasebackend.h"
+#include "deviceinfo.h"
 
-#include <functional>
-#include <map>
-#include <memory>
-#include <string>
-#include <vector>
+class QModelIndex;
+class QPersistentModelIndex;
 
-class CddaDevice;
-class Database;
-#ifdef __APPLE__
-class MacOsDeviceLister;
-#endif
-class NetworkAccessManager;
-class TagReader;
 class TaskManager;
+class Database;
+class TagReaderClient;
+class AlbumCoverLoader;
+class ConnectedDevice;
+class DeviceLister;
+class DeviceStateFilterModel;
 
-class DeviceManager {
+class DeviceManager : public SimpleTreeModel<DeviceInfo> {
+  Q_OBJECT
+
  public:
-  explicit DeviceManager(Database *database = nullptr, TaskManager *task_manager = nullptr);
-  ~DeviceManager();
+  explicit DeviceManager(const SharedPtr<TaskManager> task_manager,
+                         const SharedPtr<Database> database,
+                         const SharedPtr<TagReaderClient> tagreader_client,
+                         const SharedPtr<AlbumCoverLoader> albumcover_loader,
+                         QObject *parent = nullptr);
 
-  void Init();
-  void set_tagreader(class TagReader *tagreader) { tagreader_ = tagreader; }
-  void set_network(NetworkAccessManager *network);
-  void Rescan();
-  const std::vector<ConnectedDevice> &devices() const { return devices_; }
-  bool CopySongs(const std::string &device_id, const SongList &songs);
-  bool DeleteSong(const std::string &device_id, const Song &song);
-  void RefreshAfterDelete(const std::string &device_id, const SongList &deleted);
-  int SongCount(const std::string &device_id) const;
-  const ConnectedDevice *Find(const std::string &device_id) const { return FindDevice(device_id); }
-  bool Forget(const std::string &device_id);
-  bool Mount(const std::string &device_id);
-  bool Unmount(const std::string &device_id);
-  void Remember(const std::string &device_id);
-  void RememberSongCount(const std::string &device_id, int count);
-  void RefreshAfterCopy(const std::string &device_id, int copied, const SongList &on_device = {});
-  void SetUpdatingPercent(const std::string &device_id, int percent);
-  bool SetDeviceOptions(const std::string &device_id, const std::string &friendly_name, DeviceDatabaseBackend::TranscodeMode mode,
-                        Song::FileType format, const std::string &icon_name = {});
-  DeviceDatabaseBackend::Device StoredDevice(const std::string &device_id) const;
-  SongList Songs(const std::string &device_id);
-  UrlHandler *url_handler() const { return url_handler_.get(); }
-  DeviceDatabaseBackend *device_database() const { return device_db_.get(); }
+  ~DeviceManager() override;
 
-  static SongList SongsFromDirectory(const std::string &path, const std::function<void(int, int)> &progress = {});
-  static SongList MakeCddaSongs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec,
-                               const std::string &device_path = {});
-  static std::string MusicPath(const ConnectedDevice &device);
-  std::unique_ptr<MusicStorage> MusicStorageForDevice(const ConnectedDevice &device) const;
-  SongList TranscodeForDevice(const SongList &songs, const ConnectedDevice &device) const;
-
-  Signal<> DevicesChanged;
-  Signal<std::string> DeviceError;
-
- private:
-  class DeviceUrlHandler : public UrlHandler {
-   public:
-    explicit DeviceUrlHandler(DeviceManager *manager) : manager_(manager) {}
-    std::string scheme() const override { return "mtp"; }
-    LoadResult Load(const std::string &url, AsyncCallback callback = {}) override;
-
-   private:
-    DeviceManager *manager_;
+  enum Role {
+    Role_State = CollectionModel::LastRole,
+    Role_UniqueId,
+    Role_FriendlyName,
+    Role_Capacity,
+    Role_FreeSpace,
+    Role_IconName,
+    Role_UpdatingPercentage,
+    Role_MountPath,
+    Role_TranscodeMode,
+    Role_TranscodeFormat,
+    Role_SongCount,
+    Role_CopyMusic,
+    LastRole,
   };
 
-  const ConnectedDevice *FindDevice(const std::string &device_id) const;
-  SongList SongsFromMtp(const ConnectedDevice &device) const;
-  SongList SongsFromCdda() const;
-  std::string DownloadMtpTrack(const std::string &url) const;
-  static std::string MtpSerial(const std::string &unique_id);
+  enum class State {
+    Remembered,
+    NotMounted,
+    NotConnected,
+    Connected,
+  };
 
-  void StartVolumeMonitor();
-  void StopVolumeMonitor();
-  void ScheduleRescan();
-  void EnsureCddaWatch();
-  void OnCddaDiscChanged();
-  void MaybeStartCddaLookup(const std::string &device_id, const SongList &songs);
-  void OnCddaTags(const std::string &disc_id, const MusicBrainzClient::ResultList &results);
+  static const int kDeviceIconSize;
+  static const int kDeviceIconOverlaySize;
 
-  bool IsForgotten(const std::string &device_id) const;
+  void Exit();
 
-  std::vector<ConnectedDevice> devices_;
-  std::vector<std::string> forgotten_;
-  std::map<std::string, int> song_counts_;
-  TaskManager *task_manager_ = nullptr;
-  TagReader *tagreader_ = nullptr;
-  int scan_task_id_ = 0;
-  int last_scan_percent_ = -1;
-  std::string scan_device_id_;
-  std::unique_ptr<DeviceUrlHandler> url_handler_;
-  std::unique_ptr<DeviceDatabaseBackend> device_db_;
-  void *volume_monitor_ = nullptr;
-  unsigned rescan_idle_ = 0;
-  std::unique_ptr<CddaDevice> cdda_;
-  NetworkAccessManager *network_ = nullptr;
-  std::unique_ptr<MusicBrainzClient> musicbrainz_;
-  SongList cdda_songs_;
-  std::string cdda_disc_id_;
-  std::string cdda_lookup_id_;
-  bool cdda_lookup_started_ = false;
-#ifdef __APPLE__
-  std::unique_ptr<MacOsDeviceLister> macos_lister_;
-#endif
+  DeviceStateFilterModel *connected_devices_model() const { return connected_devices_model_; }
+
+  // Get info about devices
+  int GetDatabaseId(const QModelIndex &idx) const;
+  DeviceLister *GetLister(const QModelIndex &idx) const;
+  DeviceInfo *GetDevice(const QModelIndex &idx) const;
+  SharedPtr<ConnectedDevice> GetConnectedDevice(const QModelIndex &idx) const;
+  SharedPtr<ConnectedDevice> GetConnectedDevice(DeviceInfo *device_info) const;
+
+  DeviceInfo *FindDeviceById(const QString &id) const;
+  DeviceInfo *FindDeviceByUrl(const QList<QUrl> &url) const;
+  QString DeviceNameByID(const QString &unique_id);
+  DeviceInfo *FindEquivalentDevice(const QStringList &unique_ids) const;
+
+  // Actions on devices
+  SharedPtr<ConnectedDevice> Connect(DeviceInfo *device_info);
+  SharedPtr<ConnectedDevice> Connect(const QModelIndex &idx);
+  void Disconnect(DeviceInfo *device_info, const QModelIndex &idx);
+  void Forget(const QModelIndex &idx);
+  void UnmountAsync(const QModelIndex &idx);
+
+  void SetDeviceOptions(const QModelIndex &idx, const QString &friendly_name, const QString &icon_name, const MusicStorage::TranscodeMode mode, const Song::FileType format);
+
+  // QAbstractItemModel
+  QVariant data(const QModelIndex &idx, int role = Qt::DisplayRole) const override;
+
+ public Q_SLOTS:
+  void Unmount(const QModelIndex &idx);
+
+ Q_SIGNALS:
+  void ExitFinished();
+  void DevicesLoaded(const DeviceDatabaseBackend::DeviceList &devices);
+  void DeviceConnected(const QModelIndex idx);
+  void DeviceDisconnected(const QModelIndex idx);
+  void DeviceCreatedFromDB(DeviceInfo *device_info);
+  void DeviceError(const QString &error);
+
+ private Q_SLOTS:
+  void PhysicalDeviceAdded(const QString &id);
+  void PhysicalDeviceRemoved(const QString &id);
+  void PhysicalDeviceChanged(const QString &id);
+  void DeviceTaskStarted(const int id);
+  void TasksChanged();
+  void DeviceSongCountUpdated(const int count);
+  void LoadAllDevices();
+  void DeviceConnectFinished(const QString &id, bool success);
+  void DeviceCloseFinished(const QString &id);
+  void AddDevicesFromDB(const DeviceDatabaseBackend::DeviceList &devices);
+  void BackendClosed();
+  void ListerClosed();
+  void DeviceDestroyed();
+
+ private:
+  void AddLister(DeviceLister *lister);
+  template<typename T> void AddDeviceClass();
+
+  DeviceDatabaseBackend::Device InfoToDatabaseDevice(const DeviceInfo &info) const;
+
+  void RemoveFromDB(DeviceInfo *device_info, const QModelIndex &idx);
+
+  void CloseDevices();
+  void CloseListers();
+  void CloseBackend();
+
+ private:
+  const SharedPtr<TaskManager> task_manager_;
+  const SharedPtr<Database> database_;
+  const SharedPtr<TagReaderClient> tagreader_client_;
+  const SharedPtr<AlbumCoverLoader> albumcover_loader_;
+
+  ScopedPtr<DeviceDatabaseBackend> backend_;
+
+  DeviceStateFilterModel *connected_devices_model_;
+
+  QIcon not_connected_overlay_;
+
+  QList<DeviceLister*> listers_;
+
+  QMultiMap<QString, QMetaObject> device_classes_;
+
+  // Map of task ID to device index
+  QMap<int, QPersistentModelIndex> active_tasks_;
+
+  QThreadPool thread_pool_;
+
+  QList<QObject*> wait_for_exit_;
 };
 
-#endif
+template<typename T>
+void DeviceManager::AddDeviceClass() {
+  QStringList schemes = T::url_schemes();
+  QMetaObject obj = T::staticMetaObject;
+
+  for (const QString &scheme : schemes) {
+    device_classes_.insert(scheme, obj);
+  }
+}
+
+#endif  // DEVICEMANAGER_H

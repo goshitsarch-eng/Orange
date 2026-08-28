@@ -1,399 +1,453 @@
-#include "spotify/spotifyservice.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2022-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include "config.h"
+
+#include <memory>
+
+#include <QByteArray>
+#include <QString>
+#include <QUrl>
+#include <QTimer>
 
 #include "constants/spotifysettings.h"
+#include "core/logging.h"
+#include "core/song.h"
 #include "core/settings.h"
-#include "streaming/streamingalbum.h"
-#include "streaming/streamingauth.h"
-#include "streaming/streamingprogress.h"
-#include "streaming/streamingsearchopts.h"
-#include "spotify/spotifycredentials.h"
-#include "spotify/spotifyfavoriterequest.h"
-#include "spotify/spotifymetadatarequest.h"
-#include "spotify/spotifyplayback.h"
-#include "spotify/spotifyrequest.h"
-#include "streaming/streamingmediaid.h"
-#include "utilities/jsonutils.h"
-#include "utilities/strutils.h"
+#include "core/taskmanager.h"
+#include "core/database.h"
+#include "core/networkaccessmanager.h"
+#include "core/oauthenticator.h"
+#include "streaming/streamingsearchview.h"
+#include "collection/collectionbackend.h"
+#include "collection/collectionmodel.h"
+#include "spotifyservice.h"
+#include "spotifybaserequest.h"
+#include "spotifyrequest.h"
+#include "spotifyfavoriterequest.h"
 
-#include <ctime>
+using namespace Qt::Literals::StringLiterals;
 
+const Song::Source SpotifyService::kSource = Song::Source::Spotify;
 const char SpotifyService::kApiUrl[] = "https://api.spotify.com/v1";
 
-SpotifyService::SpotifyService(NetworkAccessManager *network) : network_(network) { ReloadSettings(); }
+namespace {
+
+constexpr char kOAuthAuthorizeUrl[] = "https://accounts.spotify.com/authorize";
+constexpr char kOAuthAccessTokenUrl[] = "https://accounts.spotify.com/api/token";
+constexpr char kOAuthRedirectUrl[] = "http://127.0.0.1:63111";
+constexpr char kOAuthScope[] = "user-follow-read user-follow-modify user-library-read user-library-modify streaming";
+constexpr char kClientIDB64[] = "ZTZjY2Y2OTQ5NzY1NGE3NThjOTAxNWViYzdiMWQzMTc=";
+constexpr char kClientSecretB64[] = "N2ZlMDMxODk1NTBlNDE3ZGI1ZWQ1MzE3ZGZlZmU2MTE=";
+constexpr char kArtistsSongsTable[] = "spotify_artists_songs";
+constexpr char kAlbumsSongsTable[] = "spotify_albums_songs";
+constexpr char kSongsTable[] = "spotify_songs";
+
+}  // namespace
+
+using std::make_shared;
+using namespace std::chrono_literals;
+
+SpotifyService::SpotifyService(const SharedPtr<TaskManager> task_manager,
+                               const SharedPtr<Database> database,
+                               const SharedPtr<NetworkAccessManager> network,
+                               const SharedPtr<AlbumCoverLoader> albumcover_loader,
+                               QObject *parent)
+    : StreamingService(Song::Source::Spotify, u"Spotify"_s, u"spotify"_s, QLatin1String(SpotifySettings::kSettingsGroup), parent),
+      network_(network),
+      oauth_(new OAuthenticator(network, this)),
+      artists_collection_backend_(nullptr),
+      albums_collection_backend_(nullptr),
+      songs_collection_backend_(nullptr),
+      artists_collection_model_(nullptr),
+      albums_collection_model_(nullptr),
+      songs_collection_model_(nullptr),
+      timer_search_delay_(new QTimer(this)),
+      favorite_request_(new SpotifyFavoriteRequest(this, network_, this)),
+      enabled_(false),
+      artistssearchlimit_(1),
+      albumssearchlimit_(1),
+      songssearchlimit_(1),
+      fetchalbums_(true),
+      download_album_covers_(true),
+      remove_remastered_(true),
+      pending_search_id_(0),
+      next_pending_search_id_(1),
+      pending_search_type_(SearchType::Artists),
+      search_id_(0) {
+
+  oauth_->set_settings_group(QLatin1String(SpotifySettings::kSettingsGroup));
+  oauth_->set_type(OAuthenticator::Type::Authorization_Code);
+  oauth_->set_authorize_url(QUrl(QLatin1String(kOAuthAuthorizeUrl)));
+  oauth_->set_redirect_url(QUrl(QLatin1String(kOAuthRedirectUrl)));
+  oauth_->set_access_token_url(QUrl(QLatin1String(kOAuthAccessTokenUrl)));
+  oauth_->set_client_id(QString::fromLatin1(QByteArray::fromBase64(kClientIDB64)));
+  oauth_->set_client_secret(QString::fromLatin1(QByteArray::fromBase64(kClientSecretB64)));
+  oauth_->set_scope(QLatin1String(kOAuthScope));
+  oauth_->set_use_local_redirect_server(true);
+  oauth_->set_random_port(false);
+  QObject::connect(oauth_, &OAuthenticator::AuthenticationFinished, this, &SpotifyService::OAuthFinished);
+
+  // Backends
+
+  artists_collection_backend_ = make_shared<CollectionBackend>();
+  artists_collection_backend_->moveToThread(database->thread());
+  artists_collection_backend_->Init(database, task_manager, Song::Source::Spotify, QLatin1String(kArtistsSongsTable));
+
+  albums_collection_backend_ = make_shared<CollectionBackend>();
+  albums_collection_backend_->moveToThread(database->thread());
+  albums_collection_backend_->Init(database, task_manager, Song::Source::Spotify, QLatin1String(kAlbumsSongsTable));
+
+  songs_collection_backend_ = make_shared<CollectionBackend>();
+  songs_collection_backend_->moveToThread(database->thread());
+  songs_collection_backend_->Init(database, task_manager, Song::Source::Spotify, QLatin1String(kSongsTable));
+
+  // Models
+  artists_collection_model_ = new CollectionModel(artists_collection_backend_, albumcover_loader, this);
+  albums_collection_model_ = new CollectionModel(albums_collection_backend_, albumcover_loader, this);
+  songs_collection_model_ = new CollectionModel(songs_collection_backend_, albumcover_loader, this);
+
+  timer_search_delay_->setSingleShot(true);
+  QObject::connect(timer_search_delay_, &QTimer::timeout, this, &SpotifyService::StartSearch);
+
+  QObject::connect(this, &SpotifyService::AddArtists, favorite_request_, &SpotifyFavoriteRequest::AddArtists);
+  QObject::connect(this, &SpotifyService::AddAlbums, favorite_request_, &SpotifyFavoriteRequest::AddAlbums);
+  QObject::connect(this, &SpotifyService::AddSongs, favorite_request_, QOverload<const SongList&>::of(&SpotifyFavoriteRequest::AddSongs));
+
+  QObject::connect(this, &SpotifyService::RemoveArtists, favorite_request_, &SpotifyFavoriteRequest::RemoveArtists);
+  QObject::connect(this, &SpotifyService::RemoveAlbums, favorite_request_, &SpotifyFavoriteRequest::RemoveAlbums);
+  QObject::connect(this, &SpotifyService::RemoveSongsByList, favorite_request_, QOverload<const SongList&>::of(&SpotifyFavoriteRequest::RemoveSongs));
+  QObject::connect(this, &SpotifyService::RemoveSongsByMap, favorite_request_, QOverload<const SongMap&>::of(&SpotifyFavoriteRequest::RemoveSongs));
+
+  QObject::connect(favorite_request_, &SpotifyFavoriteRequest::ArtistsAdded, &*artists_collection_backend_, &CollectionBackend::AddOrUpdateSongs);
+  QObject::connect(favorite_request_, &SpotifyFavoriteRequest::AlbumsAdded, &*albums_collection_backend_, &CollectionBackend::AddOrUpdateSongs);
+  QObject::connect(favorite_request_, &SpotifyFavoriteRequest::SongsAdded, &*songs_collection_backend_, &CollectionBackend::AddOrUpdateSongs);
+
+  QObject::connect(favorite_request_, &SpotifyFavoriteRequest::ArtistsRemoved, &*artists_collection_backend_, &CollectionBackend::DeleteSongs);
+  QObject::connect(favorite_request_, &SpotifyFavoriteRequest::AlbumsRemoved, &*albums_collection_backend_, &CollectionBackend::DeleteSongs);
+  QObject::connect(favorite_request_, &SpotifyFavoriteRequest::SongsRemoved, &*songs_collection_backend_, &CollectionBackend::DeleteSongs);
+
+  SpotifyService::ReloadSettings();
+  oauth_->LoadSession();
+
+}
+
+SpotifyService::~SpotifyService() {
+
+  artists_collection_backend_->deleteLater();
+  albums_collection_backend_->deleteLater();
+  songs_collection_backend_->deleteLater();
+
+}
+
+void SpotifyService::Exit() {
+
+  wait_for_exit_ << &*artists_collection_backend_ << &*albums_collection_backend_ << &*songs_collection_backend_;
+
+  QObject::connect(&*artists_collection_backend_, &CollectionBackend::ExitFinished, this, &SpotifyService::ExitReceived);
+  QObject::connect(&*albums_collection_backend_, &CollectionBackend::ExitFinished, this, &SpotifyService::ExitReceived);
+  QObject::connect(&*songs_collection_backend_, &CollectionBackend::ExitFinished, this, &SpotifyService::ExitReceived);
+
+  artists_collection_backend_->ExitAsync();
+  albums_collection_backend_->ExitAsync();
+  songs_collection_backend_->ExitAsync();
+
+}
+
+void SpotifyService::ExitReceived() {
+
+  QObject *obj = sender();
+  QObject::disconnect(obj, nullptr, this, nullptr);
+  qLog(Debug) << obj << "successfully exited.";
+  wait_for_exit_.removeAll(obj);
+  if (wait_for_exit_.isEmpty()) Q_EMIT ExitFinished();
+
+}
+
+bool SpotifyService::authenticated() const {
+
+  return oauth_->authenticated();
+
+}
+
+QByteArray SpotifyService::authorization_header() const {
+
+  return oauth_->authorization_header();
+
+}
 
 void SpotifyService::ReloadSettings() {
-  Settings settings;
-  settings.BeginGroup(SpotifySettings::kSettingsGroup);
-  token_ = settings.Value("token");
-  if (token_.empty()) {
-    token_ = settings.SecretValue(SpotifySettings::kAccessToken);
-  }
-  refresh_token_ = settings.SecretValue(SpotifySettings::kRefreshToken);
-  expires_in_ = settings.IntValue(SpotifySettings::kExpiresIn);
-  login_time_ = settings.Int64Value(SpotifySettings::kLoginTime);
-  client_id_ = SpotifyCredentials::EffectiveClientId(settings.Value("clientid"));
-  client_secret_ = SpotifyCredentials::EffectiveClientSecret(settings.Value("clientsecret"));
-  logged_in_ = !token_.empty();
+
+  Settings s;
+  s.beginGroup(SpotifySettings::kSettingsGroup);
+
+  enabled_ = s.value(SpotifySettings::kEnabled, SpotifySettings::kDefaultEnabled).toBool();
+
+  quint64 search_delay = std::max(s.value(SpotifySettings::kSearchDelay, SpotifySettings::kDefaultSearchDelay).toULongLong(), 500ULL);
+  artistssearchlimit_ = s.value(SpotifySettings::kArtistsSearchLimit, SpotifySettings::kDefaultArtistsSearchLimit).toInt();
+  albumssearchlimit_ = s.value(SpotifySettings::kAlbumsSearchLimit, SpotifySettings::kDefaultAlbumsSearchLimit).toInt();
+  songssearchlimit_ = s.value(SpotifySettings::kSongsSearchLimit, SpotifySettings::kDefaultSongsSearchLimit).toInt();
+  fetchalbums_ = s.value(SpotifySettings::kFetchAlbums, SpotifySettings::kDefaultFetchAlbums).toBool();
+  download_album_covers_ = s.value(SpotifySettings::kDownloadAlbumCovers, SpotifySettings::kDefaultDownloadAlbumCovers).toBool();
+  remove_remastered_ = s.value(SpotifySettings::kRemoveRemastered, SpotifySettings::kDefaultRemoveRemastered).toBool();
+
+  s.endGroup();
+
+  timer_search_delay_->setInterval(static_cast<int>(search_delay));
+
 }
 
-void SpotifyService::StoreTokens(const OAuthenticator::TokenResponse &tokens) {
-  Settings settings;
-  settings.BeginGroup(SpotifySettings::kSettingsGroup);
-  if (!tokens.access_token.empty()) {
-    settings.SetValue("token", tokens.access_token);
-    settings.SetSecretValue(SpotifySettings::kAccessToken, tokens.access_token);
-  }
-  if (!tokens.refresh_token.empty()) {
-    settings.SetSecretValue(SpotifySettings::kRefreshToken, tokens.refresh_token);
-  }
-  if (tokens.expires_in > 0) {
-    settings.SetIntValue(SpotifySettings::kExpiresIn, tokens.expires_in);
-    settings.SetInt64Value(SpotifySettings::kLoginTime, static_cast<gint64>(std::time(nullptr)));
-  }
-  settings.Sync();
-  ReloadSettings();
-  NotifyAuthenticationChanged();
+void SpotifyService::Authenticate() {
+
+  oauth_->Authenticate();
+
 }
 
-void SpotifyService::Logout() {
-  StreamingAuth::ClearKeys(SpotifySettings::kSettingsGroup,
-                           {"token", SpotifySettings::kAccessToken, SpotifySettings::kRefreshToken, SpotifySettings::kExpiresIn,
-                            SpotifySettings::kLoginTime});
-  token_.clear();
-  refresh_token_.clear();
-  expires_in_ = 0;
-  login_time_ = 0;
-  StreamingService::Logout();
+void SpotifyService::ClearSession() {
+
+  oauth_->ClearSession();
+
 }
 
-void SpotifyService::Login(const std::string &username, const std::string &password_or_token) {
-  Settings settings;
-  settings.BeginGroup(SpotifySettings::kSettingsGroup);
-  if (!username.empty()) {
-    settings.SetValue("username", username);
+void SpotifyService::OAuthFinished(const bool success, const QString &error) {
+
+  if (success) {
+    Q_EMIT LoginSuccess();
+    Q_EMIT UpdateSpotifyAccessToken(oauth_->access_token());
   }
-  settings.SetValue("token", password_or_token);
-  settings.SetSecretValue(SpotifySettings::kAccessToken, password_or_token);
-  settings.Sync();
-  ReloadSettings();
-  NotifyAuthenticationChanged();
+  else {
+    Q_EMIT LoginFailure(error);
+  }
+
+  Q_EMIT LoginFinished(success);
+
 }
 
-void SpotifyService::EnsureFreshToken(std::function<void()> next) {
-  if (StreamingAuth::EnsureAction(login_time_, expires_in_, refresh_token_) == StreamingAuth::Action::Proceed) {
-    if (next) {
-      next();
-    }
+void SpotifyService::GetArtists() {
+
+  if (!authenticated()) {
+    Q_EMIT ArtistsResults(SongMap(), tr("Not authenticated with Spotify."));
+    Q_EMIT OpenSettingsDialog(kSource);
     return;
   }
-  auto *oauth = new OAuthenticator(network_);
-  oauth->RefreshAccessToken("https://accounts.spotify.com/api/token", client_id_, client_secret_, refresh_token_,
-                            [this, oauth, next](const std::string &body, const std::string &error) {
-                              delete oauth;
-                              if (!error.empty()) {
-                                Logout();
-                                NotifyAuthenticationFailed(error);
-                                return;
-                              }
-                              StoreTokens(OAuthenticator::ParseTokenResponse(body));
-                              if (next) {
-                                next();
-                              }
-                            });
+
+  artists_request_.reset(new SpotifyRequest(this, network_, SpotifyBaseRequest::Type::FavouriteArtists, this));
+  QObject::connect(&*artists_request_, &SpotifyRequest::Results, this, &SpotifyService::ArtistsResultsReceived);
+  QObject::connect(&*artists_request_, &SpotifyRequest::UpdateStatus, this, &SpotifyService::ArtistsUpdateStatusReceived);
+  QObject::connect(&*artists_request_, &SpotifyRequest::ProgressSetMaximum, this, &SpotifyService::ArtistsProgressSetMaximumReceived);
+  QObject::connect(&*artists_request_, &SpotifyRequest::UpdateProgress, this, &SpotifyService::ArtistsUpdateProgressReceived);
+
+  artists_request_->Process();
+
 }
 
-std::map<std::string, std::string> SpotifyService::AuthHeaders() const {
-  if (token_.empty()) {
-    return {};
-  }
-  return {{"Authorization", "Bearer " + token_}};
+void SpotifyService::ResetArtistsRequest() {
+
+  artists_request_.reset();
+
 }
 
-void SpotifyService::Search(const std::string &query, SearchCallback callback) { Search(query, SearchType::Songs, std::move(callback)); }
+void SpotifyService::ArtistsResultsReceived(const int id, const SongMap &songs, const QString &error) {
 
-void SpotifyService::Search(const std::string &query, SearchType type, SearchCallback callback) {
-  auto guarded = GuardSearch(std::move(callback));
-  const int gen = search_generation();
-  EnsureFreshToken([this, query, type, guarded, gen]() {
-    const auto request_type = SpotifyRequest::FromSearchType(type);
-    const int limit = StreamingSearchOpts::LimitFor(name(), type);
-    SpotifyRequest::GetAll(
-        network_, [request_type, query](int offset, int page_limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, request_type, query, offset, page_limit); },
-        AuthHeaders(), request_type,
-        [this, type, guarded, gen](const SongList &songs) {
-          const SongList cleaned = StreamingSearchOpts::Finish(songs, name());
-          auto deliver = [this, guarded, gen](const SongList &ready) {
-            DeliverWithCovers(network_, AuthHeaders(), ready, guarded,
-                              [this](const std::string &text) { SearchUpdateStatus.Emit(last_search_id_, text); },
-                              [this](int received, int total) { ReportSearchProgress(received, total); },
-                              [this, gen]() { return SearchRequestCurrent(gen); });
-          };
-          if (!StreamingSearchOpts::ShouldFetchAlbums(name(), type)) {
-            deliver(cleaned);
-            return;
-          }
-          const std::vector<std::string> ids = StreamingSearchOpts::UniqueAlbumIds(cleaned);
-          if (ids.empty()) {
-            deliver(cleaned);
-            return;
-          }
-          SearchUpdateStatus.Emit(last_search_id_, StreamingProgress::RetrievingSongsForAlbums(static_cast<int>(ids.size())));
-          StreamingSearchOpts::FetchEachAlbum(
-              ids,
-              [this, gen](const std::string &id, SearchCallback done) {
-                if (!SearchRequestCurrent(gen)) {
-                  done({});
-                  return;
-                }
-                SpotifyRequest::GetAll(network_,
-                                       [id](int offset, int page_limit) { return SpotifyRequest::AlbumSongsUrl(SpotifyService::kApiUrl, id, offset, page_limit); },
-                                       AuthHeaders(), SpotifyRequest::Type::SearchSongs, std::move(done));
-              },
-              deliver, [this, gen]() { return SearchRequestCurrent(gen); },
-              [this](int received, int total) { ReportSearchProgress(received, total); });
-        },
-        [this](int received, int total) { ReportSearchProgress(received, total); }, [this, gen]() { return SearchRequestCurrent(gen); }, limit, limit,
-        [this](const std::string &error) { NotifySearchFailed(error); });
-  });
+  Q_UNUSED(id);
+  Q_EMIT ArtistsResults(songs, error);
+  ResetArtistsRequest();
+
 }
 
-void SpotifyService::GetArtists(SearchCallback callback) {
-  auto guarded = GuardArtists(std::move(callback));
-  const int gen = artists_generation();
-  EnsureFreshToken([this, guarded, gen]() {
-    SpotifyRequest::GetAll(
-        network_,
-        [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteArtists, {}, offset, limit); },
-        AuthHeaders(), SpotifyRequest::Type::FavouriteArtists,
-        [this, guarded, gen](const SongList &songs) {
-          DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { ArtistsUpdateStatus.Emit(text); },
-                            [this](int received, int total) { ReportArtistsProgress(received, total); },
-                            [this, gen]() { return ArtistsRequestCurrent(gen); });
-        },
-        [this](int received, int total) { ReportArtistsProgress(received, total); }, [this, gen]() { return ArtistsRequestCurrent(gen); },
-        StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyArtistsFailed(error); });
-  });
+void SpotifyService::ArtistsUpdateStatusReceived(const int id, const QString &text) {
+  Q_UNUSED(id);
+  Q_EMIT ArtistsUpdateStatus(text);
 }
 
-void SpotifyService::GetAlbums(SearchCallback callback) {
-  auto guarded = GuardAlbums(std::move(callback));
-  const int gen = albums_generation();
-  EnsureFreshToken([this, guarded, gen]() {
-    SpotifyRequest::GetAll(
-        network_,
-        [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteAlbums, {}, offset, limit); },
-        AuthHeaders(), SpotifyRequest::Type::FavouriteAlbums,
-        [this, guarded, gen](const SongList &songs) {
-          DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { AlbumsUpdateStatus.Emit(text); },
-                            [this](int received, int total) { ReportAlbumsProgress(received, total); },
-                            [this, gen]() { return AlbumsRequestCurrent(gen); });
-        },
-        [this](int received, int total) { ReportAlbumsProgress(received, total); }, [this, gen]() { return AlbumsRequestCurrent(gen); },
-        StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifyAlbumsFailed(error); });
-  });
+void SpotifyService::ArtistsProgressSetMaximumReceived(const int id, const int max) {
+  Q_UNUSED(id);
+  Q_EMIT ArtistsProgressSetMaximum(max);
 }
 
-void SpotifyService::GetSongs(SearchCallback callback) {
-  auto guarded = GuardSongs(std::move(callback));
-  const int gen = songs_generation();
-  EnsureFreshToken([this, guarded, gen]() {
-    SpotifyRequest::GetAll(
-        network_,
-        [](int offset, int limit) { return SpotifyRequest::Url(SpotifyService::kApiUrl, SpotifyRequest::Type::FavouriteSongs, {}, offset, limit); },
-        AuthHeaders(), SpotifyRequest::Type::FavouriteSongs,
-        [this, guarded, gen](const SongList &songs) {
-          DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { SongsUpdateStatus.Emit(text); },
-                            [this](int received, int total) { ReportSongsProgress(received, total); },
-                            [this, gen]() { return SongsRequestCurrent(gen); });
-        },
-        [this](int received, int total) { ReportSongsProgress(received, total); }, [this, gen]() { return SongsRequestCurrent(gen); },
-        StreamingPage::kDefaultLimit, 0, [this](const std::string &error) { NotifySongsFailed(error); });
-  });
+void SpotifyService::ArtistsUpdateProgressReceived(const int id, const int progress) {
+  Q_UNUSED(id);
+  Q_EMIT ArtistsUpdateProgress(progress);
 }
 
-void SpotifyService::GetArtistAlbums(const Song &artist, SearchCallback callback) {
-  const std::string id = artist.artist_id();
-  if (id.empty()) {
-    if (callback) {
-      callback({});
-    }
+void SpotifyService::GetAlbums() {
+
+  if (!authenticated()) {
+    Q_EMIT AlbumsResults(SongMap(), tr("Not authenticated with Spotify."));
+    Q_EMIT OpenSettingsDialog(kSource);
     return;
   }
-  EnsureFreshToken([this, id, callback]() {
-    SpotifyRequest::GetAll(network_, [id](int offset, int limit) { return SpotifyRequest::ArtistAlbumsUrl(SpotifyService::kApiUrl, id, offset, limit); },
-                           AuthHeaders(), SpotifyRequest::Type::SearchAlbums,
-                           [this, callback](const SongList &songs) { DeliverWithCovers(network_, AuthHeaders(), songs, callback); });
-  });
+
+  albums_request_.reset(new SpotifyRequest(this, network_, SpotifyBaseRequest::Type::FavouriteAlbums, this));
+  QObject::connect(&*albums_request_, &SpotifyRequest::Results, this, &SpotifyService::AlbumsResultsReceived);
+  QObject::connect(&*albums_request_, &SpotifyRequest::UpdateStatus, this, &SpotifyService::AlbumsUpdateStatusReceived);
+  QObject::connect(&*albums_request_, &SpotifyRequest::ProgressSetMaximum, this, &SpotifyService::AlbumsProgressSetMaximumReceived);
+  QObject::connect(&*albums_request_, &SpotifyRequest::UpdateProgress, this, &SpotifyService::AlbumsUpdateProgressReceived);
+
+  albums_request_->Process();
+
 }
 
-void SpotifyService::GetAlbumSongs(const Song &album, SearchCallback callback) {
-  const std::string id = album.album_id();
-  if (id.empty()) {
-    if (callback) {
-      callback({});
-    }
+void SpotifyService::ResetAlbumsRequest() {
+
+  albums_request_.reset();
+
+}
+
+void SpotifyService::AlbumsResultsReceived(const int id, const SongMap &songs, const QString &error) {
+
+  Q_UNUSED(id);
+  Q_EMIT AlbumsResults(songs, error);
+  ResetAlbumsRequest();
+
+}
+
+void SpotifyService::AlbumsUpdateStatusReceived(const int id, const QString &text) {
+  Q_UNUSED(id);
+  Q_EMIT AlbumsUpdateStatus(text);
+}
+
+void SpotifyService::AlbumsProgressSetMaximumReceived(const int id, const int max) {
+  Q_UNUSED(id);
+  Q_EMIT AlbumsProgressSetMaximum(max);
+}
+
+void SpotifyService::AlbumsUpdateProgressReceived(const int id, const int progress) {
+  Q_UNUSED(id);
+  Q_EMIT AlbumsUpdateProgress(progress);
+}
+
+void SpotifyService::GetSongs() {
+
+  if (!authenticated()) {
+    Q_EMIT SongsResults(SongMap(), tr("Not authenticated with Spotify."));
+    Q_EMIT OpenSettingsDialog(kSource);
     return;
   }
-  EnsureFreshToken([this, id, album, callback]() {
-    SpotifyRequest::GetAll(network_, [id](int offset, int limit) { return SpotifyRequest::AlbumSongsUrl(SpotifyService::kApiUrl, id, offset, limit); },
-                           AuthHeaders(), SpotifyRequest::Type::SearchSongs, [this, album, callback](const SongList &songs) {
-                             SongList copy = songs;
-                             StreamingAlbum::ApplyParent(copy, album);
-                             DeliverWithCovers(network_, AuthHeaders(), copy, callback);
-                           });
-  });
+
+  songs_request_.reset(new SpotifyRequest(this, network_, SpotifyBaseRequest::Type::FavouriteSongs, this));
+  QObject::connect(&*songs_request_, &SpotifyRequest::Results, this, &SpotifyService::SongsResultsReceived);
+  QObject::connect(&*songs_request_, &SpotifyRequest::UpdateStatus, this, &SpotifyService::SongsUpdateStatusReceived);
+  QObject::connect(&*songs_request_, &SpotifyRequest::ProgressSetMaximum, this, &SpotifyService::SongsProgressSetMaximumReceived);
+  QObject::connect(&*songs_request_, &SpotifyRequest::UpdateProgress, this, &SpotifyService::SongsUpdateProgressReceived);
+
+  songs_request_->Process();
+
 }
 
-UrlHandler::LoadResult SpotifyService::Load(const std::string &url, AsyncCallback callback) {
-  LoadResult result;
-  result.media_url = url;
-  std::string id = SpotifyPlayback::TrackId(url);
-  if (id.empty()) {
-    id = StreamingMediaId(url);
+void SpotifyService::ResetSongsRequest() {
+
+  songs_request_.reset();
+
+}
+
+void SpotifyService::SongsResultsReceived(const int id, const SongMap &songs, const QString &error) {
+
+  Q_UNUSED(id);
+  Q_EMIT SongsResults(songs, error);
+  ResetSongsRequest();
+
+}
+
+void SpotifyService::SongsUpdateStatusReceived(const int id, const QString &text) {
+  Q_UNUSED(id);
+  Q_EMIT SongsUpdateStatus(text);
+}
+
+void SpotifyService::SongsProgressSetMaximumReceived(const int id, const int max) {
+  Q_UNUSED(id);
+  Q_EMIT SongsProgressSetMaximum(max);
+}
+
+void SpotifyService::SongsUpdateProgressReceived(const int id, const int progress) {
+  Q_UNUSED(id);
+  Q_EMIT SongsUpdateProgress(progress);
+}
+
+int SpotifyService::Search(const QString &text, const SearchType type) {
+
+  pending_search_id_ = next_pending_search_id_;
+  pending_search_text_ = text;
+  pending_search_type_ = type;
+
+  next_pending_search_id_++;
+
+  if (text.isEmpty()) {
+    timer_search_delay_->stop();
+    return pending_search_id_;
   }
-  if (SpotifyPlayback::UseNativePlayback(url, SpotifyPlayback::PluginAvailable(), !token_.empty()) &&
-      StreamingAuth::EnsureAction(login_time_, expires_in_, refresh_token_) == StreamingAuth::Action::Proceed) {
-    result = SpotifyPlayback::NativeResult(url);
-    if (callback) {
-      callback(result);
-    }
-    return result;
+  timer_search_delay_->start();
+
+  return pending_search_id_;
+
+}
+
+void SpotifyService::StartSearch() {
+
+  if (!authenticated()) {
+    Q_EMIT SearchResults(pending_search_id_, SongMap(), tr("Not authenticated with Spotify."));
+    Q_EMIT OpenSettingsDialog(kSource);
+    return;
   }
-  if (!network_ || id.empty()) {
-    result.error = token_.empty() ? "Spotify is not signed in" : "Spotify track URL is missing";
-    if (callback) {
-      callback(result);
-    }
-    return result;
-  }
-  result.type = LoadResult::Type::WillLoadAsynchronously;
-  EnsureFreshToken([this, callback, url, id]() {
-    if (token_.empty()) {
-      LoadResult async;
-      async.media_url = url;
-      async.error = "Spotify is not signed in";
-      async.type = LoadResult::Type::Error;
-      if (callback) {
-        callback(async);
-      }
+
+  search_id_ = pending_search_id_;
+  search_text_ = pending_search_text_;
+
+  SendSearch();
+
+}
+
+void SpotifyService::CancelSearch() {}
+
+void SpotifyService::SendSearch() {
+
+  SpotifyBaseRequest::Type type = SpotifyBaseRequest::Type::None;
+
+  switch (pending_search_type_) {
+    case SearchType::Artists:
+      type = SpotifyBaseRequest::Type::SearchArtists;
+      break;
+    case SearchType::Albums:
+      type = SpotifyBaseRequest::Type::SearchAlbums;
+      break;
+    case SearchType::Songs:
+      type = SpotifyBaseRequest::Type::SearchSongs;
+      break;
+    default:
+      // Error("Invalid search type.");
       return;
-    }
-    if (SpotifyPlayback::UseNativePlayback(url, SpotifyPlayback::PluginAvailable(), true)) {
-      if (callback) {
-        callback(SpotifyPlayback::NativeResult(url));
-      }
-      return;
-    }
-    const auto headers = AuthHeaders();
-    SpotifyMetadataRequest::Get(network_, SpotifyMetadataRequest::TrackUrl(kApiUrl, id), headers,
-                              [this, callback, url, headers](const Song &song, const std::string &error) {
-                                LoadResult async;
-                                async.media_url = url;
-                                async.song = song;
-                                async.stream_url = song.stream_url() == song.url() ? std::string() : song.stream_url();
-                                if (async.stream_url.empty()) {
-                                  async.error = error.empty() ? "Spotify preview URL missing" : error;
-                                  async.type = LoadResult::Type::Error;
-                                  if (callback) {
-                                    callback(async);
-                                  }
-                                  return;
-                                }
-                                async.duration = song.length_nanosec() > 0 ? song.length_nanosec() : -1;
-                                async.type = LoadResult::Type::TrackAvailable;
-                                if (song.artist_id().empty() || !network_) {
-                                  if (callback) {
-                                    callback(async);
-                                  }
-                                  return;
-                                }
-                                network_->Get(
-                                    SpotifyMetadataRequest::ArtistUrl(kApiUrl, song.artist_id()),
-                                    [callback, async](const NetworkAccessManager::Response &response) mutable {
-                                      if (response.ok()) {
-                                        const std::string genre = SpotifyMetadataRequest::ParseArtistGenre(response.body);
-                                        if (!genre.empty()) {
-                                          async.song.set_genre(genre);
-                                        }
-                                      }
-                                      if (callback) {
-                                        callback(async);
-                                      }
-                                    },
-                                    headers);
-                              });
-  });
-  return result;
-}
-
-void SpotifyService::FetchTrackMetadata(const std::string &track_id, std::function<void(const Song &, const std::string &error)> callback) {
-  if (track_id.empty()) {
-    if (callback) {
-      callback(Song(), "No track ID");
-    }
-    return;
   }
-  EnsureFreshToken([this, track_id, callback]() {
-    if (token_.empty()) {
-      if (callback) {
-        callback(Song(), "Not authenticated");
-      }
-      return;
-    }
-    const auto headers = AuthHeaders();
-    SpotifyMetadataRequest::Get(network_, SpotifyMetadataRequest::TrackUrl(kApiUrl, track_id), headers,
-                                [this, callback, headers](const Song &song, const std::string &error) {
-                                  if (!song.is_valid()) {
-                                    if (callback) {
-                                      callback(song, error.empty() ? "Spotify metadata missing" : error);
-                                    }
-                                    return;
-                                  }
-                                  if (song.artist_id().empty() || !network_) {
-                                    if (callback) {
-                                      callback(song, {});
-                                    }
-                                    return;
-                                  }
-                                  network_->Get(
-                                      SpotifyMetadataRequest::ArtistUrl(kApiUrl, song.artist_id()),
-                                      [callback, song](const NetworkAccessManager::Response &response) {
-                                        Song out = song;
-                                        if (response.ok()) {
-                                          const std::string genre = SpotifyMetadataRequest::ParseArtistGenre(response.body);
-                                          if (!genre.empty()) {
-                                            out.set_genre(genre);
-                                          }
-                                        }
-                                        if (callback) {
-                                          callback(out, {});
-                                        }
-                                      },
-                                      headers);
-                                });
-  });
+
+  search_request_.reset(new SpotifyRequest(this, network_, type, this));
+  QObject::connect(&*search_request_, &SpotifyRequest::Results, this, &SpotifyService::SearchResultsReceived);
+  QObject::connect(&*search_request_, &SpotifyRequest::UpdateStatus, this, &SpotifyService::SearchUpdateStatus);
+  QObject::connect(&*search_request_, &SpotifyRequest::ProgressSetMaximum, this, &SpotifyService::SearchProgressSetMaximum);
+  QObject::connect(&*search_request_, &SpotifyRequest::UpdateProgress, this, &SpotifyService::SearchUpdateProgress);
+
+  search_request_->Search(search_id_, search_text_);
+  search_request_->Process();
+
 }
 
-void SpotifyService::GetFavorites(FavoriteType type, SearchCallback callback) {
-  auto guarded = GuardFavorites(std::move(callback));
-  const int gen = favorites_generation();
-  EnsureFreshToken([this, type, guarded, gen]() {
-    SpotifyFavoriteRequest::Get(
-        network_, kApiUrl, AuthHeaders(), type,
-        [this, guarded, gen](const SongList &songs) {
-          DeliverWithCovers(network_, AuthHeaders(), songs, guarded, [this](const std::string &text) { FavoritesUpdateStatus.Emit(text); },
-                            [this](int received, int total) { ReportFavoritesProgress(received, total); },
-                            [this, gen]() { return FavoritesRequestCurrent(gen); });
-        },
-        [this](int received, int total) { ReportFavoritesProgress(received, total); }, [this, gen]() { return FavoritesRequestCurrent(gen); },
-        [this](const std::string &error) { NotifyFavoritesFailed(error); });
-  });
-}
+void SpotifyService::SearchResultsReceived(const int id, const SongMap &songs, const QString &error) {
 
-void SpotifyService::AddFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
-  EnsureFreshToken([this, type, songs, callback]() { SpotifyFavoriteRequest::Add(network_, kApiUrl, AuthHeaders(), type, songs, callback); });
-}
+  Q_EMIT SearchResults(id, songs, error);
+  search_request_.reset();
 
-void SpotifyService::RemoveFavorites(FavoriteType type, const SongList &songs, SearchCallback callback) {
-  EnsureFreshToken([this, type, songs, callback]() { SpotifyFavoriteRequest::Remove(network_, kApiUrl, AuthHeaders(), type, songs, callback); });
 }

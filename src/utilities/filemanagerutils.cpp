@@ -1,135 +1,164 @@
-#include "utilities/filemanagerutils.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "utilities/filemanagerreveal.h"
-#include "utilities/fileutils.h"
+#include <QObject>
+#include <QList>
+#include <QMap>
+#include <QString>
+#include <QStringList>
+#include <QUrl>
+#include <QRegularExpression>
+#include <QFile>
+#include <QFileInfo>
+#include <QDir>
+#include <QSettings>
+#include <QStandardPaths>
+#include <QProcess>
+#include <QDesktopServices>
+#include <QMessageBox>
 
-#include <gio/gio.h>
-#include <glib.h>
+#include "filemanagerutils.h"
 
-#include <string>
-#include <vector>
+using namespace Qt::Literals::StringLiterals;
 
-namespace FileManagerUtils {
-namespace {
+namespace Utilities {
 
-std::string TrimDesktopId(std::string value) {
-  while (!value.empty() && (value.back() == '\n' || value.back() == '\r' || value.back() == ' ' || value.back() == '\t')) {
-    value.pop_back();
-  }
-  return value;
-}
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+void OpenInFileManager(const QString &path, const QUrl &url);
+void OpenInFileManager(const QString &path, const QUrl &url) {
 
-std::string QueryDefaultDirectoryDesktop() {
-  gchar *out = nullptr;
-  gchar *err = nullptr;
-  gint status = 0;
-  GError *error = nullptr;
-  gchar *argv[] = {const_cast<gchar *>("xdg-mime"), const_cast<gchar *>("query"), const_cast<gchar *>("default"),
-                   const_cast<gchar *>("inode/directory"), nullptr};
-  if (!g_spawn_sync(nullptr, argv, nullptr, G_SPAWN_SEARCH_PATH, nullptr, nullptr, &out, &err, &status, &error)) {
-    if (error) {
-      g_error_free(error);
+  if (!url.isLocalFile()) return;
+
+  QProcess proc;
+  proc.startCommand(u"xdg-mime query default inode/directory"_s);
+  proc.waitForFinished();
+  QString desktop_file = QString::fromUtf8(proc.readLine()).simplified();
+
+  const QStringList data_dirs = QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation);
+
+  QString command;
+  QStringList command_params;
+  for (const QString &data_dir : data_dirs) {
+    QString desktop_file_path = QStringLiteral("%1/applications/%2").arg(data_dir, desktop_file);
+    if (!QFile::exists(desktop_file_path)) continue;
+    QSettings setting(desktop_file_path, QSettings::IniFormat);
+    setting.beginGroup(u"Desktop Entry"_s);
+    if (setting.contains("Exec"_L1)) {
+      QString cmd = setting.value(u"Exec"_s).toString();
+      if (cmd.isEmpty()) break;
+      static const QRegularExpression regex(u"[%][a-zA-Z]*( |$)"_s, QRegularExpression::CaseInsensitiveOption);
+      cmd = cmd.remove(regex);
+      command_params = cmd.split(u' ', Qt::SkipEmptyParts);
+      command = command_params.first();
+      command_params.removeFirst();
     }
-    g_free(out);
-    g_free(err);
-    return {};
+    setting.endGroup();
+    if (!command.isEmpty()) break;
   }
-  g_free(err);
-  std::string desktop = TrimDesktopId(out ? out : "");
-  g_free(out);
-  return desktop;
-}
 
-std::string FindDesktopExec(const std::string &desktop_file) {
-  if (desktop_file.empty()) {
-    return {};
+  if (command.startsWith("/usr/bin/"_L1)) {
+    command = command.split(u'/').last();
   }
-  std::vector<std::string> roots;
-  if (const gchar *user = g_get_user_data_dir()) {
-    roots.push_back(std::string(user) + "/applications");
+
+  if (command.isEmpty() || command == "exo-open"_L1) {
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
   }
-  const gchar *const *dirs = g_get_system_data_dirs();
-  for (int i = 0; dirs && dirs[i]; ++i) {
-    roots.push_back(std::string(dirs[i]) + "/applications");
+  else if (command.startsWith("nautilus"_L1) ||
+           command.startsWith("dolphin"_L1) ||
+           command.startsWith("konqueror"_L1) ||
+           command.startsWith("kfmclient"_L1)) {
+    proc.startDetached(command, QStringList() << command_params << u"--select"_s << url.toLocalFile());
   }
-  for (const std::string &root : roots) {
-    const std::string path = root + "/" + desktop_file;
-    if (!g_file_test(path.c_str(), G_FILE_TEST_EXISTS)) {
+  else if (command.startsWith("caja"_L1)) {
+    proc.startDetached(command, QStringList() << command_params << u"--no-desktop"_s << path);
+  }
+  else if (command.startsWith("pcmanfm"_L1) || command.startsWith("thunar"_L1) || command.startsWith("spacefm"_L1)) {
+    proc.startDetached(command, QStringList() << command_params << path);
+  }
+  else {
+    proc.startDetached(command, QStringList() << command_params << url.toLocalFile());
+  }
+
+}
+#endif
+
+#ifdef Q_OS_MACOS
+// Better than openUrl(dirname(path)) - also highlights file at path
+void RevealFileInFinder(const QString &path) {
+  QProcess::execute(u"/usr/bin/open"_s, QStringList() << u"-R"_s << path);
+}
+#endif  // Q_OS_MACOS
+
+#ifdef Q_OS_WIN32
+void ShowFileInExplorer(const QString &path);
+void ShowFileInExplorer(const QString &path) {
+  QProcess::execute(u"explorer.exe"_s, QStringList() << u"/select,"_s << QDir::toNativeSeparators(path));
+}
+#endif
+
+void OpenInFileBrowser(const QList<QUrl> &urls) {
+
+  QMap<QString, QUrl> dirs;
+
+  for (const QUrl &url : urls) {
+    if (!url.isLocalFile()) {
       continue;
     }
-    GKeyFile *key = g_key_file_new();
-    if (!g_key_file_load_from_file(key, path.c_str(), G_KEY_FILE_NONE, nullptr)) {
-      g_key_file_free(key);
-      continue;
+    QString path = url.toLocalFile();
+    if (!QFile::exists(path)) continue;
+
+    const QString directory = QFileInfo(path).dir().path();
+    if (dirs.contains(directory)) continue;
+    dirs.insert(directory, url);
+  }
+
+  if (dirs.count() > 50) {
+    QMessageBox messagebox(QMessageBox::Critical, QObject::tr("Show in file browser"), QObject::tr("Too many songs selected."));
+    messagebox.exec();
+    return;
+  }
+
+  if (dirs.count() > 5) {
+    QMessageBox messagebox(QMessageBox::Information, QObject::tr("Show in file browser"), QObject::tr("%1 songs in %2 different directories selected, are you sure you want to open them all?").arg(urls.count()).arg(dirs.count()), QMessageBox::Open|QMessageBox::Cancel);
+    messagebox.setTextFormat(Qt::RichText);
+    int result = messagebox.exec();
+    switch (result) {
+      case QMessageBox::Open:
+        break;
+      case QMessageBox::Cancel:
+      default:
+        return;
     }
-    gchar *exec = g_key_file_get_string(key, "Desktop Entry", "Exec", nullptr);
-    std::string result = exec ? exec : "";
-    g_free(exec);
-    g_key_file_free(key);
-    if (!result.empty()) {
-      return result;
-    }
   }
-  return {};
+
+  QMap<QString, QUrl>::iterator i;
+  for (i = dirs.begin(); i != dirs.end(); ++i) {
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+    OpenInFileManager(i.key(), i.value());
+#elif defined(Q_OS_MACOS)
+    // Revealing multiple files in the finder only opens one window, so it also makes sense to reveal at most one per directory
+    RevealFileInFinder(i.value().toLocalFile());
+#elif defined(Q_OS_WIN32)
+    ShowFileInExplorer(i.value().toLocalFile());
+#endif
+  }
+
 }
 
-bool OpenDirectoryFallback(const std::string &directory) {
-  if (directory.empty()) {
-    return false;
-  }
-  GFile *file = g_file_new_for_path(directory.c_str());
-  gchar *uri = g_file_get_uri(file);
-  GError *error = nullptr;
-  const bool ok = g_app_info_launch_default_for_uri(uri, nullptr, &error);
-  if (error) {
-    g_error_free(error);
-  }
-  g_free(uri);
-  g_object_unref(file);
-  return ok;
-}
-
-bool SpawnLaunch(const FileManagerReveal::Launch &launch) {
-  if (launch.fallback_open_directory) {
-    return OpenDirectoryFallback(launch.directory);
-  }
-  if (launch.program.empty()) {
-    return OpenDirectoryFallback(launch.directory);
-  }
-  std::vector<char *> argv;
-  argv.push_back(const_cast<char *>(launch.program.c_str()));
-  for (const std::string &arg : launch.args) {
-    argv.push_back(const_cast<char *>(arg.c_str()));
-  }
-  argv.push_back(nullptr);
-  GError *error = nullptr;
-  const gboolean ok = g_spawn_async(nullptr, argv.data(), nullptr, G_SPAWN_SEARCH_PATH, nullptr, nullptr, nullptr, &error);
-  if (error) {
-    g_error_free(error);
-  }
-  return ok == TRUE;
-}
-
-}  // namespace
-
-bool OpenInFileManager(const std::string &path) {
-  if (path.empty()) {
-    return false;
-  }
-  const std::string directory = FileUtils::IsDirectory(path) ? path : FileUtils::DirName(path);
-  return OpenInFileManager(directory, path);
-}
-
-bool OpenInFileManager(const std::string &directory, const std::string &file) {
-  const std::string dir = directory.empty() ? FileUtils::DirName(file) : directory;
-  const std::string target = file.empty() ? dir : file;
-  if (dir.empty() && target.empty()) {
-    return false;
-  }
-  const FileManagerReveal::ParsedExec parsed = FileManagerReveal::ParseExec(FindDesktopExec(QueryDefaultDirectoryDesktop()));
-  return SpawnLaunch(FileManagerReveal::BuildLaunch(parsed.program, parsed.args, dir, target));
-}
-
-bool OpenFolder(const std::string &path) { return OpenInFileManager(FileUtils::IsDirectory(path) ? path : FileUtils::DirName(path)); }
-
-}  // namespace FileManagerUtils
+}  // namespace Utilities

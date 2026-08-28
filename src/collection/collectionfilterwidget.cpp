@@ -1,272 +1,565 @@
-#include "collection/collectionfilterwidget.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2022, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "collection/collectionfilterchoices.h"
-#include "collection/collectiongroupingsave.h"
-#include "core/appearanceconfigurebuttons.h"
-#include "settings/settingspages.h"
-#include "translations/translations.h"
+#include "config.h"
 
-#include <adwaita.h>
+#include <utility>
 
-CollectionFilterWidget::CollectionFilterWidget() {
-  widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-  gtk_widget_set_margin_start(widget_, 8);
-  gtk_widget_set_margin_end(widget_, 8);
-  gtk_widget_set_margin_top(widget_, 6);
-  gtk_widget_set_margin_bottom(widget_, 4);
-  GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-  gtk_widget_set_hexpand(spacer, TRUE);
-  options_button_ = gtk_menu_button_new();
-  gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(options_button_), "preferences-system-symbolic");
-  gtk_widget_set_tooltip_text(options_button_, Translations::CStr("Display options"));
-  gtk_box_append(GTK_BOX(widget_), spacer);
-  gtk_box_append(GTK_BOX(widget_), options_button_);
-  grouping_ = CollectionGrouping::LoadCurrent();
-  options_ = CollectionFilterChoices::FromIndices(age_index_, rating_index_, mode_index_);
-  BuildMenu();
-  ApplyLook();
+#include <QApplication>
+#include <QWidget>
+#include <QObject>
+#include <QDataStream>
+#include <QIODevice>
+#include <QAction>
+#include <QActionGroup>
+#include <QByteArray>
+#include <QVariant>
+#include <QString>
+#include <QStringList>
+#include <QUrl>
+#include <QRegularExpression>
+#include <QInputDialog>
+#include <QList>
+#include <QTimer>
+#include <QMenu>
+#include <QSettings>
+#include <QToolButton>
+#include <QKeyEvent>
+
+#include "core/iconloader.h"
+#include "core/logging.h"
+#include "core/settings.h"
+#include "collectionfilteroptions.h"
+#include "collectionmodel.h"
+#include "collectionfilter.h"
+#include "filterparser/filterparser.h"
+#include "savedgroupingmanager.h"
+#include "collectionfilterwidget.h"
+#include "groupbydialog.h"
+#include "ui_collectionfilterwidget.h"
+#include "widgets/searchfield.h"
+#include "constants/collectionsettings.h"
+#include "constants/appearancesettings.h"
+
+using namespace Qt::Literals::StringLiterals;
+
+namespace {
+constexpr int kFilterDelay = 500;  // msec
 }
 
-void CollectionFilterWidget::ApplyLook() {
-  if (AppearanceConfigureButtons::ShouldApply(AppearanceConfigureButtons::Target::CollectionOptions)) {
-    AppearanceConfigureButtons::ApplyWidget(options_button_, AppearanceConfigureButtons::StoredSize());
-  }
+CollectionFilterWidget::CollectionFilterWidget(QWidget *parent)
+    : QWidget(parent),
+      ui_(new Ui_CollectionFilterWidget),
+      model_(nullptr),
+      filter_(nullptr),
+      group_by_dialog_(new GroupByDialog(this)),
+      groupings_manager_(nullptr),
+      filter_age_menu_(nullptr),
+      filter_rating_menu_(nullptr),
+      group_by_menu_(nullptr),
+      collection_menu_(nullptr),
+      group_by_group_(nullptr),
+      timer_filter_delay_(new QTimer(this)),
+      filter_applies_to_model_(true),
+      delay_behaviour_(DelayBehaviour::DelayedOnLargeLibraries) {
+
+  ui_->setupUi(this);
+
+  ui_->search_field->setToolTip(FilterParser::ToolTip());
+
+  QObject::connect(ui_->search_field, &SearchField::returnPressed, this, &CollectionFilterWidget::ReturnPressed);
+  QObject::connect(timer_filter_delay_, &QTimer::timeout, this, &CollectionFilterWidget::FilterDelayTimeout);
+
+  timer_filter_delay_->setInterval(kFilterDelay);
+  timer_filter_delay_->setSingleShot(true);
+
+  // Icons
+  ui_->options->setIcon(IconLoader::Load(u"configure"_s));
+
+  group_by_menu_ = new QMenu(tr("Group by"), this);
+
+  // Filter by age
+  QActionGroup *filter_age_group = new QActionGroup(this);
+  filter_age_group->addAction(ui_->filter_age_all);
+  filter_age_group->addAction(ui_->filter_age_today);
+  filter_age_group->addAction(ui_->filter_age_week);
+  filter_age_group->addAction(ui_->filter_age_month);
+  filter_age_group->addAction(ui_->filter_age_three_months);
+  filter_age_group->addAction(ui_->filter_age_year);
+
+  filter_age_menu_ = new QMenu(tr("Filter by age"), this);
+  filter_age_menu_->addActions(filter_age_group->actions());
+
+  filter_max_ages_[ui_->filter_age_all] = -1;
+  filter_max_ages_[ui_->filter_age_today] = 60 * 60 * 24;
+  filter_max_ages_[ui_->filter_age_week] = 60 * 60 * 24 * 7;
+  filter_max_ages_[ui_->filter_age_month] = 60 * 60 * 24 * 30;
+  filter_max_ages_[ui_->filter_age_three_months] = 60 * 60 * 24 * 30 * 3;
+  filter_max_ages_[ui_->filter_age_year] = 60 * 60 * 24 * 365;
+
+  // Filter by rating
+  QActionGroup *filter_rating_group = new QActionGroup(this);
+  filter_rating_group->addAction(ui_->filter_min_rating_all);
+  filter_rating_group->addAction(ui_->filter_min_rating_non_null);
+  filter_rating_group->addAction(ui_->filter_min_rating_20p);
+  filter_rating_group->addAction(ui_->filter_min_rating_40p);
+  filter_rating_group->addAction(ui_->filter_min_rating_60p);
+  filter_rating_group->addAction(ui_->filter_min_rating_80p);
+
+  filter_rating_menu_ = new QMenu(tr("Filter by rating"), this);
+  filter_rating_menu_->addActions(filter_rating_group->actions());
+
+  filter_min_rating_[ui_->filter_min_rating_all] = -1.0F;
+  filter_min_rating_[ui_->filter_min_rating_non_null] = 0.0F;
+  filter_min_rating_[ui_->filter_min_rating_20p] = 0.2F;
+  filter_min_rating_[ui_->filter_min_rating_40p] = 0.4F;
+  filter_min_rating_[ui_->filter_min_rating_60p] = 0.6F;
+  filter_min_rating_[ui_->filter_min_rating_80p] = 0.8F;
+
+  QObject::connect(ui_->save_grouping, &QAction::triggered, this, &CollectionFilterWidget::SaveGroupBy);
+  QObject::connect(ui_->manage_groupings, &QAction::triggered, this, &CollectionFilterWidget::ShowGroupingManager);
+
+  // Collection config menu
+  collection_menu_ = new QMenu(tr("Display options"), this);
+  collection_menu_->setIcon(ui_->options->icon());
+  collection_menu_->addMenu(group_by_menu_);
+  collection_menu_->addAction(ui_->save_grouping);
+  collection_menu_->addAction(ui_->manage_groupings);
+  collection_menu_->addSeparator();
+  collection_menu_->addMenu(filter_age_menu_);
+  collection_menu_->addMenu(filter_rating_menu_);
+  collection_menu_->addSeparator();
+  ui_->options->setMenu(collection_menu_);
+
+  QObject::connect(ui_->search_field, &SearchField::textChanged, this, &CollectionFilterWidget::FilterTextChanged);
+  QObject::connect(ui_->options, &QToolButton::clicked, ui_->options, &QToolButton::showMenu);
+
+  ReloadSettings();
+
 }
 
-CollectionFilterWidget::~CollectionFilterWidget() {
-  if (menu_model_) {
-    g_object_unref(menu_model_);
-  }
-  if (action_group_) {
-    g_object_unref(action_group_);
-  }
-}
+CollectionFilterWidget::~CollectionFilterWidget() { delete ui_; }
 
-void CollectionFilterWidget::AttachActions(GtkWidget *widget) {
-  if (!widget || !action_group_) {
-    return;
-  }
-  gtk_widget_insert_action_group(widget, "collfilter", G_ACTION_GROUP(action_group_));
-}
+void CollectionFilterWidget::Init(CollectionModel *model, CollectionFilter *filter) {
 
-void CollectionFilterWidget::SetChangedCallback(ChangedCallback callback) { changed_ = std::move(callback); }
-
-void CollectionFilterWidget::SetGrouping(const CollectionGrouping::Grouping &grouping) {
-  grouping_ = grouping;
-  ReloadMenu();
-}
-
-void CollectionFilterWidget::ReloadMenu() { BuildMenu(); }
-
-void CollectionFilterWidget::SetConfigureLabel(const std::string &label) {
-  configure_label_ = label.empty() ? SettingsPages::ConfigureCollectionLabel() : label;
-  ReloadMenu();
-}
-
-void CollectionFilterWidget::ApplyFilterIndices(int age, int rating, int mode) {
-  age_index_ = CollectionFilterChoices::ClampIndex(age, CollectionFilterChoices::kAgeCount);
-  rating_index_ = CollectionFilterChoices::ClampIndex(rating, CollectionFilterChoices::kRatingCount);
-  mode_index_ = CollectionFilterChoices::ClampIndex(mode, CollectionFilterChoices::kModeCount);
-  options_ = CollectionFilterChoices::FromIndices(age_index_, rating_index_, mode_index_);
-  if (changed_) {
-    changed_();
-  }
-}
-
-void CollectionFilterWidget::ApplyPreset(int index) {
-  const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
-  if (index < 0 || static_cast<size_t>(index) >= presets.size()) {
-    return;
-  }
-  const CollectionFilterMenu::Preset &preset = presets[static_cast<size_t>(index)];
-  if (preset.advanced) {
-    if (menu_action_) {
-      menu_action_(CollectionFilterMenu::ActionKind::Advanced);
+  if (model_) {
+    QObject::disconnect(model_, nullptr, this, nullptr);
+    QObject::disconnect(model_, nullptr, group_by_dialog_, nullptr);
+    QObject::disconnect(group_by_dialog_, nullptr, model_, nullptr);
+    const QList<QAction*> actions = filter_max_ages_.keys();
+    for (QAction *action : actions) {
+      QObject::disconnect(action, &QAction::triggered, this, nullptr);
     }
+    const QList<QAction*> filter_actions = filter_min_rating_.keys();
+    for (QAction *action : filter_actions) {
+      QObject::disconnect(action, &QAction::triggered, this, nullptr);
+    }
+  }
+
+  model_ = model;
+  filter_ = filter;
+
+  // Connect signals
+  QObject::connect(model_, &CollectionModel::GroupingChanged, group_by_dialog_, &GroupByDialog::CollectionGroupingChanged);
+  QObject::connect(model_, &CollectionModel::GroupingChanged, this, &CollectionFilterWidget::GroupingChanged);
+  QObject::connect(group_by_dialog_, &GroupByDialog::Accepted, model_, &CollectionModel::SetGroupBy);
+
+  const QList<QAction*> actions = filter_max_ages_.keys();
+  for (QAction *action : actions) {
+    const int filter_max_age = filter_max_ages_.value(action);
+    QObject::connect(action, &QAction::triggered, this, [this, filter_max_age]() { model_->SetFilterMaxAge(filter_max_age); } );
+  }
+
+  const QList<QAction*> filter_actions = filter_min_rating_.keys();
+  for (QAction *action : filter_actions) {
+    const float filter_min_rate = filter_min_rating_.value(action);
+    QObject::connect(action, &QAction::triggered, this, [this, filter_min_rate]() { model_->SetFilterMinRating(filter_min_rate); } );
+  }
+
+  // Load settings
+  if (!settings_group_.isEmpty()) {
+    Settings s;
+    s.beginGroup(settings_group_);
+    int version = 0;
+    if (s.contains(group_by_version())) version = s.value(group_by_version(), 0).toInt();
+    if (version == 1) {
+      model_->SetGroupBy(CollectionModel::Grouping(
+        static_cast<CollectionModel::GroupBy>(s.value(group_by_key(1), static_cast<int>(CollectionModel::GroupBy::AlbumArtist)).toInt()),
+        static_cast<CollectionModel::GroupBy>(s.value(group_by_key(2), static_cast<int>(CollectionModel::GroupBy::AlbumDisc)).toInt()),
+        static_cast<CollectionModel::GroupBy>(s.value(group_by_key(3), static_cast<int>(CollectionModel::GroupBy::None)).toInt())),
+        s.value(separate_albums_by_grouping_key(), false).toBool());
+    }
+    else {
+      model_->SetGroupBy(CollectionModel::Grouping(CollectionModel::GroupBy::AlbumArtist, CollectionModel::GroupBy::AlbumDisc, CollectionModel::GroupBy::None), false);
+    }
+    s.endGroup();
+  }
+
+}
+
+void CollectionFilterWidget::SetSettingsGroup(const QString &settings_group) {
+
+  settings_group_ = settings_group;
+  saved_groupings_settings_group_ = SavedGroupingManager::GetSavedGroupingsSettingsGroup(settings_group);
+
+  UpdateGroupByActions();
+
+}
+
+void CollectionFilterWidget::SetSettingsPrefix(const QString &prefix) {
+
+  settings_prefix_ = prefix;
+
+}
+
+void CollectionFilterWidget::setFilter(CollectionFilter *filter) {
+  filter_ = filter;
+}
+
+void CollectionFilterWidget::ReloadSettings() {
+
+  Settings s;
+  s.beginGroup(AppearanceSettings::kSettingsGroup);
+  int iconsize = s.value(AppearanceSettings::kIconSizeConfigureButtons, AppearanceSettings::kDefaultIconSizeConfigureButtons).toInt();
+  s.endGroup();
+  ui_->options->setIconSize(QSize(iconsize, iconsize));
+  ui_->search_field->setIconSize(iconsize);
+
+}
+
+QString CollectionFilterWidget::group_by_version() const {
+
+  if (settings_prefix_.isEmpty()) {
+    return u"group_by_version"_s;
+  }
+
+  return QStringLiteral("%1_group_by_version").arg(settings_prefix_);
+
+}
+
+QString CollectionFilterWidget::group_by_key() const {
+
+  if (settings_prefix_.isEmpty()) {
+    return u"group_by"_s;
+  }
+
+  return QStringLiteral("%1_group_by").arg(settings_prefix_);
+
+}
+
+QString CollectionFilterWidget::group_by_key(const int number) const { return group_by_key() + QString::number(number); }
+
+QString CollectionFilterWidget::separate_albums_by_grouping_key() const {
+
+  if (settings_prefix_.isEmpty()) {
+    return u"separate_albums_by_grouping"_s;
+  }
+
+  return QStringLiteral("%1_separate_albums_by_grouping").arg(settings_prefix_);
+
+}
+
+void CollectionFilterWidget::UpdateGroupByActions() {
+
+  if (group_by_group_) {
+    QObject::disconnect(group_by_group_, nullptr, this, nullptr);
+    qDeleteAll(group_by_group_->actions());
+    delete group_by_group_;
+  }
+
+  group_by_group_ = CreateGroupByActions(saved_groupings_settings_group_, this);
+  group_by_menu_->clear();
+  group_by_menu_->addActions(group_by_group_->actions());
+  QObject::connect(group_by_group_, &QActionGroup::triggered, this, &CollectionFilterWidget::GroupByClicked);
+  if (model_) {
+    CheckCurrentGrouping(model_->GetGroupBy());
+  }
+
+}
+
+QActionGroup *CollectionFilterWidget::CreateGroupByActions(const QString &saved_groupings_settings_group, QObject *parent) {
+
+  QActionGroup *ret = new QActionGroup(parent);
+
+  ret->addAction(CreateGroupByAction(tr("Group by Album artist/Album"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::AlbumArtist, CollectionModel::GroupBy::Album)));
+  ret->addAction(CreateGroupByAction(tr("Group by Album artist/Album - Disc"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::AlbumArtist, CollectionModel::GroupBy::AlbumDisc)));
+  ret->addAction(CreateGroupByAction(tr("Group by Album artist/Year - Album"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::AlbumArtist, CollectionModel::GroupBy::YearAlbum)));
+  ret->addAction(CreateGroupByAction(tr("Group by Album artist/Year - Album - Disc"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::AlbumArtist, CollectionModel::GroupBy::YearAlbumDisc)));
+
+  ret->addAction(CreateGroupByAction(tr("Group by Artist/Album"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::Artist, CollectionModel::GroupBy::Album)));
+  ret->addAction(CreateGroupByAction(tr("Group by Artist/Album - Disc"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::Artist, CollectionModel::GroupBy::AlbumDisc)));
+  ret->addAction(CreateGroupByAction(tr("Group by Artist/Year - Album"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::Artist, CollectionModel::GroupBy::YearAlbum)));
+  ret->addAction(CreateGroupByAction(tr("Group by Artist/Year - Album - Disc"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::Artist, CollectionModel::GroupBy::YearAlbumDisc)));
+
+  ret->addAction(CreateGroupByAction(tr("Group by Genre/Album artist/Album"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::Genre, CollectionModel::GroupBy::AlbumArtist, CollectionModel::GroupBy::Album)));
+  ret->addAction(CreateGroupByAction(tr("Group by Genre/Artist/Album"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::Genre, CollectionModel::GroupBy::Artist, CollectionModel::GroupBy::Album)));
+
+  ret->addAction(CreateGroupByAction(tr("Group by Album Artist"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::AlbumArtist)));
+  ret->addAction(CreateGroupByAction(tr("Group by Artist"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::Artist)));
+
+  ret->addAction(CreateGroupByAction(tr("Group by Album"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::Album)));
+  ret->addAction(CreateGroupByAction(tr("Group by Genre/Album"), parent, CollectionModel::Grouping(CollectionModel::GroupBy::Genre, CollectionModel::GroupBy::Album)));
+
+  QAction *sep1 = new QAction(parent);
+  sep1->setSeparator(true);
+  ret->addAction(sep1);
+
+  // Read saved groupings
+  Settings s;
+  s.beginGroup(saved_groupings_settings_group);
+  int version = s.value(SavedGroupingManager::kVersion).toInt();
+  if (version == 1) {
+    QStringList saved = s.childKeys();
+    for (int i = 0; i < saved.size(); ++i) {
+      const QString &name = saved.at(i);
+      if (name == QLatin1String(SavedGroupingManager::kVersion)) continue;
+      QByteArray bytes = s.value(name).toByteArray();
+      QDataStream ds(&bytes, QIODevice::ReadOnly);
+      CollectionModel::Grouping g;
+      ds >> g;
+      ret->addAction(CreateGroupByAction(QUrl::fromPercentEncoding(name.toUtf8()), parent, g));
+    }
+  }
+  else {
+    QStringList saved = s.childKeys();
+    for (int i = 0; i < saved.size(); ++i) {
+      const QString &name = saved.at(i);
+      if (name == QLatin1String(SavedGroupingManager::kVersion)) continue;
+      s.remove(name);
+    }
+  }
+  s.endGroup();
+
+  QAction *sep2 = new QAction(parent);
+  sep2->setSeparator(true);
+  ret->addAction(sep2);
+
+  ret->addAction(CreateGroupByAction(tr("Advanced grouping..."), parent, CollectionModel::Grouping()));
+
+  return ret;
+
+}
+
+QAction *CollectionFilterWidget::CreateGroupByAction(const QString &text, QObject *parent, const CollectionModel::Grouping grouping) {
+
+  QAction *ret = new QAction(text, parent);
+  ret->setCheckable(true);
+
+  if (grouping.first != CollectionModel::GroupBy::None) {
+    ret->setProperty("group_by", QVariant::fromValue(grouping));
+  }
+
+  return ret;
+
+}
+
+void CollectionFilterWidget::SaveGroupBy() {
+
+  if (!model_) return;
+
+  const QString name = QInputDialog::getText(this, tr("Grouping Name"), tr("Grouping name:"));
+  if (name.isEmpty()) return;
+
+  qLog(Debug) << "Saving current grouping to" << name;
+
+  Settings s;
+  if (settings_group_.isEmpty() || settings_group_ == QLatin1String(CollectionSettings::kSettingsGroup)) {
+    s.beginGroup(SavedGroupingManager::kSavedGroupingsSettingsGroup);
+  }
+  else {
+    s.beginGroup(QLatin1String(SavedGroupingManager::kSavedGroupingsSettingsGroup) + QLatin1Char('_') + settings_group_);
+  }
+  QByteArray buffer;
+  QDataStream datastream(&buffer, QIODevice::WriteOnly);
+  datastream << model_->GetGroupBy();
+  s.setValue(SavedGroupingManager::kVersion, u"1"_s);
+  s.setValue(QUrl::toPercentEncoding(name), buffer);
+  s.endGroup();
+
+  UpdateGroupByActions();
+
+}
+
+void CollectionFilterWidget::ShowGroupingManager() {
+
+  if (!groupings_manager_) {
+    groupings_manager_ = new SavedGroupingManager(saved_groupings_settings_group_, this);
+    QObject::connect(groupings_manager_, &SavedGroupingManager::UpdateGroupByActions, this, &CollectionFilterWidget::UpdateGroupByActions);
+  }
+
+  groupings_manager_->UpdateModel();
+  groupings_manager_->show();
+
+}
+
+bool CollectionFilterWidget::SearchFieldHasFocus() const {
+
+  return ui_->search_field->hasFocus();
+
+}
+
+void CollectionFilterWidget::FocusSearchField() {
+
+  ui_->search_field->setFocus();
+
+}
+
+void CollectionFilterWidget::FocusOnFilter(QKeyEvent *event) {
+
+  ui_->search_field->setFocus();
+  QApplication::sendEvent(ui_->search_field, event);
+
+}
+
+void CollectionFilterWidget::GroupByClicked(QAction *action) {
+
+  if (action->property("group_by").isNull()) {
+    group_by_dialog_->show();
     return;
   }
-  grouping_ = preset.grouping;
-  if (grouping_changed_) {
-    grouping_changed_(grouping_);
-  }
+
+  if (!model_) return;
+
+  CollectionModel::Grouping g = action->property("group_by").value<CollectionModel::Grouping>();
+  model_->SetGroupBy(g);
+
 }
 
-void CollectionFilterWidget::ApplySaved(int index) {
-  const auto saved = CollectionGrouping::LoadSaved();
-  if (index < 0 || static_cast<size_t>(index) >= saved.size()) {
-    return;
+void CollectionFilterWidget::GroupingChanged(const CollectionModel::Grouping g, const bool separate_albums_by_grouping) {
+
+  if (!settings_group_.isEmpty()) {
+    Settings s;
+    s.beginGroup(settings_group_);
+    s.setValue(group_by_version(), 1);
+    s.setValue(group_by_key(1), static_cast<int>(g[0]));
+    s.setValue(group_by_key(2), static_cast<int>(g[1]));
+    s.setValue(group_by_key(3), static_cast<int>(g[2]));
+    s.setValue(separate_albums_by_grouping_key(), separate_albums_by_grouping);
+    s.endGroup();
   }
-  grouping_ = saved[static_cast<size_t>(index)].second;
-  if (grouping_changed_) {
-    grouping_changed_(grouping_);
-  }
+
+  // Now make sure the correct action is checked
+  CheckCurrentGrouping(g);
+
 }
 
-void CollectionFilterWidget::PromptSave() {
-  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(CollectionGroupingSave::DialogTitle()),
-                                                                Translations::CStr(CollectionGroupingSave::DialogPrompt())));
-  GtkWidget *entry = gtk_entry_new();
-  adw_alert_dialog_set_extra_child(dialog, entry);
-  adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "save", Translations::CStr("Save"), nullptr);
-  adw_alert_dialog_set_response_appearance(dialog, "save", ADW_RESPONSE_SUGGESTED);
-  adw_alert_dialog_set_default_response(dialog, "save");
-  adw_alert_dialog_set_close_response(dialog, "cancel");
-  g_object_set_data(G_OBJECT(dialog), "entry", entry);
-  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
-                     if (g_strcmp0(response, "save") != 0) {
-                       return;
-                     }
-                     auto *self = static_cast<CollectionFilterWidget *>(data);
-                     auto *name_entry = GTK_EDITABLE(g_object_get_data(G_OBJECT(alert), "entry"));
-                     if (CollectionGroupingSave::Save(gtk_editable_get_text(name_entry), self->grouping_)) {
-                       self->ReloadMenu();
-                     }
-                   }),
-                   this);
-  GtkWidget *parent = GTK_WIDGET(gtk_widget_get_root(widget_));
-  adw_dialog_present(ADW_DIALOG(dialog), parent ? parent : widget_);
-}
+void CollectionFilterWidget::CheckCurrentGrouping(const CollectionModel::Grouping g) {
 
-void CollectionFilterWidget::BuildMenu() {
-  const std::vector<CollectionFilterMenu::Preset> presets = CollectionFilterMenu::BuiltinPresets();
-  const auto saved = CollectionGrouping::LoadSaved();
-  const int check = CollectionGroupingSave::MenuCheckIndex(grouping_, presets, saved);
-  const std::string group_state = CollectionGroupingSave::MenuStateKey(check, static_cast<int>(presets.size()));
+  if (!group_by_group_) {
+    UpdateGroupByActions();
+  }
 
-  GMenu *root = g_menu_new();
-  GMenu *group_by = g_menu_new();
-  for (size_t i = 0; i < presets.size(); ++i) {
-    const CollectionFilterMenu::Preset &preset = presets[i];
-    if (preset.advanced) {
-      continue;
+  const QList<QAction*> actions = group_by_group_->actions();
+  for (QAction *action : actions) {
+    if (action->property("group_by").isNull()) continue;
+
+    if (g == action->property("group_by").value<CollectionModel::Grouping>()) {
+      action->setChecked(true);
+      return;
     }
-    const std::string action = "collfilter.groupby::p" + std::to_string(static_cast<int>(i));
-    g_menu_append(group_by, Translations::CStr(preset.label), action.c_str());
   }
-  if (!saved.empty()) {
-    GMenu *saved_section = g_menu_new();
-    for (size_t i = 0; i < saved.size(); ++i) {
-      const std::string action = "collfilter.groupby::s" + std::to_string(static_cast<int>(i));
-      g_menu_append(saved_section, saved[i].first.c_str(), action.c_str());
-    }
-    g_menu_append_section(group_by, nullptr, G_MENU_MODEL(saved_section));
-    g_object_unref(saved_section);
+
+  // Check the advanced action
+  QAction *action = actions.last();
+  action->setChecked(true);
+
+}
+
+void CollectionFilterWidget::SetFilterHint(const QString &hint) {
+  ui_->search_field->setPlaceholderText(hint);
+}
+
+void CollectionFilterWidget::SetFilterMode(CollectionFilterOptions::FilterMode filter_mode) {
+
+  ui_->search_field->clear();
+  ui_->search_field->setEnabled(filter_mode == CollectionFilterOptions::FilterMode::All);
+
+  if (!model_) return;
+
+  model_->SetFilterMode(filter_mode);
+
+}
+
+void CollectionFilterWidget::ShowInCollection(const QString &search) {
+  ui_->search_field->setText(search);
+}
+
+void CollectionFilterWidget::SetAgeFilterEnabled(bool enabled) {
+  filter_age_menu_->setEnabled(enabled);
+}
+
+void CollectionFilterWidget::SetGroupByEnabled(bool enabled) {
+  group_by_menu_->setEnabled(enabled);
+}
+
+void CollectionFilterWidget::AddMenuAction(QAction *action) {
+  collection_menu_->addAction(action);
+}
+
+void CollectionFilterWidget::keyReleaseEvent(QKeyEvent *e) {
+
+  switch (e->key()) {
+    case Qt::Key_Up:
+      Q_EMIT UpPressed();
+      e->accept();
+      break;
+
+    case Qt::Key_Down:
+      Q_EMIT DownPressed();
+      e->accept();
+      break;
+
+    case Qt::Key_Escape:
+      ui_->search_field->clear();
+      e->accept();
+      break;
+
+    default:
+      break;
   }
-  g_menu_append(group_by, Translations::CStr("Advanced grouping…"), "collfilter.groupby::advanced");
-  g_menu_append_submenu(root, Translations::CStr("Group by"), G_MENU_MODEL(group_by));
-  g_menu_append(root, Translations::CStr(CollectionGroupingSave::SaveLabel()), "collfilter.save");
-  g_menu_append(root, Translations::CStr(CollectionGroupingSave::ManageLabel()), "collfilter.manage");
 
-  GMenu *age_menu = g_menu_new();
-  for (int i = 0; i < CollectionFilterChoices::kAgeCount; ++i) {
-    char action[64];
-    g_snprintf(action, sizeof(action), "collfilter.age(%d)", i);
-    g_menu_append(age_menu, Translations::CStr(CollectionFilterChoices::kAgeLabels[i]), action);
+  QWidget::keyReleaseEvent(e);
+
+}
+
+void CollectionFilterWidget::FilterTextChanged(const QString &text) {
+
+  if (!model_) return;
+
+  const bool delay = (delay_behaviour_ == DelayBehaviour::AlwaysDelayed) || (delay_behaviour_ == DelayBehaviour::DelayedOnLargeLibraries && !text.isEmpty() && text.length() < 3 && model_->total_song_count() >= 100000);
+
+  if (delay) {
+    timer_filter_delay_->start();
   }
-  g_menu_append_submenu(root, Translations::CStr(CollectionFilterChoices::AgeMenuTitle()), G_MENU_MODEL(age_menu));
-
-  GMenu *rating_menu = g_menu_new();
-  for (int i = 0; i < CollectionFilterChoices::kRatingCount; ++i) {
-    char action[64];
-    g_snprintf(action, sizeof(action), "collfilter.rating(%d)", i);
-    g_menu_append(rating_menu, Translations::CStr(CollectionFilterChoices::kRatingLabels[i]), action);
+  else {
+    timer_filter_delay_->stop();
+    FilterDelayTimeout();
   }
-  g_menu_append_submenu(root, Translations::CStr(CollectionFilterChoices::RatingMenuTitle()), G_MENU_MODEL(rating_menu));
 
-  GMenu *mode_section = g_menu_new();
-  for (int i = 0; i < CollectionFilterChoices::kModeCount; ++i) {
-    char action[64];
-    g_snprintf(action, sizeof(action), "collfilter.mode(%d)", i);
-    g_menu_append(mode_section, Translations::CStr(CollectionFilterChoices::kModeLabels[i]), action);
+}
+
+void CollectionFilterWidget::FilterDelayTimeout() {
+
+  if (filter_applies_to_model_ && filter_) {
+    filter_->SetFilterString(ui_->search_field->text());
   }
-  g_menu_append_section(root, nullptr, G_MENU_MODEL(mode_section));
-  g_menu_append(root, Translations::CStr(configure_label_.c_str()), "collfilter.configure");
 
-  GSimpleActionGroup *group = g_simple_action_group_new();
-  GSimpleAction *groupby = g_simple_action_new_stateful("groupby", G_VARIANT_TYPE_STRING, g_variant_new_string(group_state.c_str()));
-  g_signal_connect(groupby, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
-                     auto *self = static_cast<CollectionFilterWidget *>(data);
-                     const char *key = g_variant_get_string(param, nullptr);
-                     g_simple_action_set_state(action, param);
-                     if (g_strcmp0(key, "advanced") == 0) {
-                       if (self->menu_action_) {
-                         self->menu_action_(CollectionFilterMenu::ActionKind::Advanced);
-                       }
-                       return;
-                     }
-                     if (key && key[0] == 'p') {
-                       self->ApplyPreset(g_ascii_strtoll(key + 1, nullptr, 10));
-                     } else if (key && key[0] == 's') {
-                       self->ApplySaved(g_ascii_strtoll(key + 1, nullptr, 10));
-                     }
-                   }),
-                   this);
-  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(groupby));
-
-  GSimpleAction *age = g_simple_action_new_stateful("age", G_VARIANT_TYPE_INT32, g_variant_new_int32(age_index_));
-  g_signal_connect(age, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
-                     auto *self = static_cast<CollectionFilterWidget *>(data);
-                     g_simple_action_set_state(action, param);
-                     self->ApplyFilterIndices(g_variant_get_int32(param), self->rating_index_, self->mode_index_);
-                   }),
-                   this);
-  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(age));
-
-  GSimpleAction *rating = g_simple_action_new_stateful("rating", G_VARIANT_TYPE_INT32, g_variant_new_int32(rating_index_));
-  g_signal_connect(rating, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
-                     auto *self = static_cast<CollectionFilterWidget *>(data);
-                     g_simple_action_set_state(action, param);
-                     self->ApplyFilterIndices(self->age_index_, g_variant_get_int32(param), self->mode_index_);
-                   }),
-                   this);
-  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(rating));
-
-  GSimpleAction *mode = g_simple_action_new_stateful("mode", G_VARIANT_TYPE_INT32, g_variant_new_int32(mode_index_));
-  g_signal_connect(mode, "activate", G_CALLBACK(+[](GSimpleAction *action, GVariant *param, gpointer data) {
-                     auto *self = static_cast<CollectionFilterWidget *>(data);
-                     g_simple_action_set_state(action, param);
-                     self->ApplyFilterIndices(self->age_index_, self->rating_index_, g_variant_get_int32(param));
-                   }),
-                   this);
-  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(mode));
-
-  auto add_kind = [&](const char *name, CollectionFilterMenu::ActionKind kind) {
-    GSimpleAction *action = g_simple_action_new(name, nullptr);
-    g_object_set_data(G_OBJECT(action), "kind", GINT_TO_POINTER(static_cast<int>(kind) + 1));
-    g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer data) {
-                       auto *self = static_cast<CollectionFilterWidget *>(data);
-                       const int kind = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(act), "kind")) - 1;
-                       if (self->menu_action_) {
-                         self->menu_action_(static_cast<CollectionFilterMenu::ActionKind>(kind));
-                       }
-                     }),
-                     this);
-    g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
-  };
-  GSimpleAction *save = g_simple_action_new("save", nullptr);
-  g_signal_connect(save, "activate", G_CALLBACK(+[](GSimpleAction *, GVariant *, gpointer data) {
-                     static_cast<CollectionFilterWidget *>(data)->PromptSave();
-                   }),
-                   this);
-  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(save));
-  add_kind("manage", CollectionFilterMenu::ActionKind::Manage);
-  add_kind("configure", CollectionFilterMenu::ActionKind::Configure);
-  if (action_group_) {
-    g_object_unref(action_group_);
-  }
-  if (menu_model_) {
-    g_object_unref(menu_model_);
-  }
-  action_group_ = group;
-  g_object_ref(group);
-  menu_model_ = G_MENU_MODEL(root);
-  g_object_ref(root);
-  gtk_widget_insert_action_group(options_button_, "collfilter", G_ACTION_GROUP(group));
-  gtk_menu_button_set_menu_model(GTK_MENU_BUTTON(options_button_), G_MENU_MODEL(root));
-  g_object_unref(group);
-  g_object_unref(root);
-  g_object_unref(group_by);
-  g_object_unref(age_menu);
-  g_object_unref(rating_menu);
-  g_object_unref(mode_section);
 }

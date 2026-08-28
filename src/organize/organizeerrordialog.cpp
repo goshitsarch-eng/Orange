@@ -1,34 +1,86 @@
-#include "organize/organizeerrordialog.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "utilities/fileutils.h"
+#include "config.h"
 
-#include <adwaita.h>
+#include <algorithm>
 
-void OrganizeErrorDialog::Show(GtkWindow *parent, const std::vector<Organize::Error> &errors) {
-  std::string body;
-  for (const Organize::Error &error : errors) {
-    if (!body.empty()) {
-      body += "\n";
-    }
-    body += error.song.empty() ? error.message : error.song + ": " + error.message;
-  }
-  AdwDialog *dialog = adw_alert_dialog_new(Title(OperationType::Copy), body.empty() ? "Unknown error" : body.c_str());
-  adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "ok", "OK");
-  adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(dialog), "ok");
-  adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "ok");
-  adw_dialog_present(dialog, parent ? GTK_WIDGET(parent) : nullptr);
+#include <QWidget>
+#include <QDialog>
+#include <QIcon>
+#include <QStyle>
+#include <QList>
+#include <QStringList>
+#include <QLabel>
+#include <QListWidget>
+
+#include "organizeerrordialog.h"
+#include "ui_organizeerrordialog.h"
+
+OrganizeErrorDialog::OrganizeErrorDialog(QWidget *parent) : QDialog(parent), ui_(new Ui_OrganizeErrorDialog) {
+
+  ui_->setupUi(this);
+
+  const int icon_size = style()->pixelMetric(QStyle::PM_MessageBoxIconSize, nullptr, this);
+  QIcon icon = style()->standardIcon(QStyle::SP_MessageBoxCritical, nullptr, this);
+
+  ui_->icon->setPixmap(icon.pixmap(icon_size));
+
 }
 
-void OrganizeErrorDialog::Show(GtkWindow *parent, OperationType type, const SongList &songs) {
-  std::string body = Message(type);
-  for (const Song &song : songs) {
-    body += "\n";
-    const std::string path = FileUtils::PathFromUri(song.url());
-    body += path.empty() ? song.PrettyTitleWithArtist() : path;
+OrganizeErrorDialog::~OrganizeErrorDialog() {
+  delete ui_;
+}
+
+void OrganizeErrorDialog::Show(const OperationType operation_type, const SongList &songs_with_errors, const QStringList &log) {
+
+  QStringList files;
+  files.reserve(songs_with_errors.count());
+  for (const Song &song : songs_with_errors) {
+    files << song.url().toLocalFile();
   }
-  AdwDialog *dialog = adw_alert_dialog_new(Title(type), body.c_str());
-  adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "ok", "OK");
-  adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(dialog), "ok");
-  adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "ok");
-  adw_dialog_present(dialog, parent ? GTK_WIDGET(parent) : nullptr);
+  Show(operation_type, files, log);
+
+}
+
+void OrganizeErrorDialog::Show(const OperationType operation_type, const QStringList &files_with_errors, const QStringList &log) {
+
+  QStringList sorted_files = files_with_errors;
+  std::stable_sort(sorted_files.begin(), sorted_files.end());
+
+  switch (operation_type) {
+    case OperationType::Copy:
+      setWindowTitle(tr("Error copying songs"));
+      ui_->label->setText(tr("There were problems copying some songs.  The following files could not be copied:"));
+      break;
+
+    case OperationType::Delete:
+      setWindowTitle(tr("Error deleting songs"));
+      ui_->label->setText(tr("There were problems deleting some songs.  The following files could not be deleted:"));
+      break;
+  }
+
+  ui_->files->addItems(sorted_files);
+  ui_->log->addItems(log);
+
+  show();
+
 }

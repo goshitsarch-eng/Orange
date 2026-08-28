@@ -1,13 +1,69 @@
-#ifndef STRAWBERRY_SONG_H
-#define STRAWBERRY_SONG_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <cstdint>
+#ifndef SONG_H
+#define SONG_H
+
+#include "config.h"
+
 #include <optional>
-#include <string>
-#include <vector>
+
+#include <QtGlobal>
+#include <QSharedData>
+#include <QSharedDataPointer>
+#include <QMetaType>
+#include <QList>
+#include <QSet>
+#include <QMap>
+#include <QVariant>
+#include <QString>
+#include <QStringList>
+#include <QRegularExpression>
+#include <QUrl>
+#include <QFileInfo>
+#include <QIcon>
+
+#include <taglib/tstring.h>
+#undef TStringToQString
+#undef QStringToTString
+
+class SqlQuery;
+class QSqlRecord;
+
+class EngineMetadata;
+
+#ifdef HAVE_GPOD
+struct _Itdb_Track;
+#endif
+
+#ifdef HAVE_MTP
+struct LIBMTP_track_struct;
+#endif
+
+class SqlRow;
 
 class Song {
+
  public:
+
   enum class Source {
     Unknown = 0,
     LocalFile = 1,
@@ -23,6 +79,8 @@ class Song {
     Spotify = 11,
     RadioBrowser = 12
   };
+  static const int kSourceCount = 16;
+  static_assert(static_cast<int>(Source::RadioBrowser) < kSourceCount, "kSourceCount must exceed the largest Song::Source value");
 
   enum class FileType {
     Unknown = 0,
@@ -49,375 +107,488 @@ class Song {
     IT = 21,
     SPC = 22,
     VGM = 23,
-    ALAC = 24,
+    ALAC = 24, // MP4, with ALAC codec
     CDDA = 90,
     Stream = 91
   };
 
-  static const int kSourceCount = 16;
-  static const std::vector<std::string> kAcceptedExtensions;
-  static const std::vector<std::string> kRejectedExtensions;
-  static const std::vector<std::string> kColumns;
-  static const char *kColumnSpec;
+  static const QStringList kColumns;
+  static const QStringList kRowIdColumns;
+  static const QString kColumnSpec;
+  static const QString kRowIdColumnSpec;
+  static const QString kBindSpec;
+  static const QString kUpdateSpec;
 
-  explicit Song(Source source = Source::Unknown);
+  static const QStringList kTextSearchColumns;
+  static const QStringList kIntSearchColumns;
+  static const QStringList kUIntSearchColumns;
+  static const QStringList kInt64SearchColumns;
+  static const QStringList kFloatSearchColumns;
+  static const QStringList kNumericalSearchColumns;
+  static const QStringList kSearchColumns;
+
+  using RegularExpressionList = QList<QRegularExpression>;
+  static const RegularExpressionList kAlbumDisc;
+  static const RegularExpressionList kRemastered;
+  static const RegularExpressionList kExplicit;
+  static const RegularExpressionList kAlbumMisc;
+  static const RegularExpressionList kTitleMisc;
+
+  static const QStringList kArticles;
+
+  static const QStringList kAcceptedExtensions;
+  static const QStringList kRejectedExtensions;
+
+  Song(const Source source = Source::Unknown);
+  Song(const Song &other);
+  ~Song();
 
   bool operator==(const Song &other) const;
-  bool operator!=(const Song &other) const { return !(*this == other); }
+  bool operator!=(const Song &other) const;
+  Song &operator=(const Song &other);
 
-  bool is_valid() const { return valid_; }
-  void set_valid(bool v) { valid_ = v; }
+  // Simple accessors
+  int id() const;
+  bool is_valid() const;
 
-  int id() const { return id_; }
-  void set_id(int id) { id_ = id; }
+  const QString &title() const;
+  const QString &titlesort() const;
+  const QString &album() const;
+  const QString &albumsort() const;
+  const QString &artist() const;
+  const QString &artistsort() const;
+  const QString &albumartist() const;
+  const QString &albumartistsort() const;
+  int track() const;
+  int disc() const;
+  int year() const;
+  int originalyear() const;
+  const QString &genre() const;
+  bool compilation() const;
+  const QString &composer() const;
+  const QString &composersort() const;
+  const QString &performer() const;
+  const QString &performersort() const;
+  const QString &grouping() const;
+  const QString &comment() const;
+  const QString &lyrics() const;
 
-  const std::string &title() const { return title_; }
-  const std::string &titlesort() const { return titlesort_; }
-  const std::string &album() const { return album_; }
-  const std::string &albumsort() const { return albumsort_; }
-  const std::string &artist() const { return artist_; }
-  const std::string &artistsort() const { return artistsort_; }
-  const std::string &albumartist() const { return albumartist_; }
-  const std::string &albumartistsort() const { return albumartistsort_; }
-  int track() const { return track_; }
-  int disc() const { return disc_; }
-  int year() const { return year_; }
-  int originalyear() const { return originalyear_; }
-  const std::string &genre() const { return genre_; }
-  bool compilation() const { return compilation_; }
-  const std::string &composer() const { return composer_; }
-  const std::string &composersort() const { return composersort_; }
-  const std::string &performer() const { return performer_; }
-  const std::string &performersort() const { return performersort_; }
-  const std::string &grouping() const { return grouping_; }
-  const std::string &comment() const { return comment_; }
-  const std::string &lyrics() const { return lyrics_; }
+  QString artist_id() const;
+  QString album_id() const;
+  QString song_id() const;
 
-  const std::string &artist_id() const { return artist_id_; }
-  const std::string &album_id() const { return album_id_; }
-  const std::string &song_id() const { return song_id_; }
+  qint64 beginning_nanosec() const;
+  qint64 end_nanosec() const;
+  qint64 length_nanosec() const;
 
-  int64_t beginning_nanosec() const { return beginning_nanosec_; }
-  int64_t end_nanosec() const { return end_nanosec_; }
-  int64_t length_nanosec() const { return length_nanosec_; }
-  int bitrate() const { return bitrate_; }
-  int samplerate() const { return samplerate_; }
-  int bitdepth() const { return bitdepth_; }
+  int bitrate() const;
+  int samplerate() const;
+  int bitdepth() const;
 
-  Source source() const { return source_; }
-  int directory_id() const { return directory_id_; }
-  const std::string &url() const { return url_; }
-  const std::string &stream_url() const { return stream_url_.empty() ? url_ : stream_url_; }
-  const std::string &basefilename() const { return basefilename_; }
-  FileType filetype() const { return filetype_; }
-  bool is_module_music() const {
-    return filetype_ == FileType::MOD || filetype_ == FileType::S3M || filetype_ == FileType::XM || filetype_ == FileType::IT;
-  }
-  int64_t filesize() const { return filesize_; }
-  int64_t mtime() const { return mtime_; }
-  int64_t ctime() const { return ctime_; }
-  bool unavailable() const { return unavailable_; }
-  bool skipped() const { return skipped_; }
-  void set_skipped(bool v) { skipped_ = v; }
-  bool init_from_file() const { return init_from_file_; }
-  void set_init_from_file(bool v) { init_from_file_ = v; }
-  void InitFromFilePartial(const std::string &filename);
+  Source source() const;
+  int source_id() const;
+  int directory_id() const;
+  const QUrl &url() const;
+  const QString &basefilename() const;
+  FileType filetype() const;
+  qint64 filesize() const;
+  qint64 mtime() const;
+  qint64 ctime() const;
+  bool unavailable() const;
 
-  const std::string &fingerprint() const { return fingerprint_; }
-  unsigned playcount() const { return playcount_; }
-  unsigned skipcount() const { return skipcount_; }
-  int64_t lastplayed() const { return lastplayed_; }
-  int64_t lastseen() const { return lastseen_; }
+  QString fingerprint() const;
 
-  bool art_embedded() const { return art_embedded_; }
-  const std::string &art_automatic() const { return art_automatic_; }
-  const std::string &art_manual() const { return art_manual_; }
-  bool art_unset() const { return art_unset_; }
-  const std::string &cue_path() const { return cue_path_; }
+  uint playcount() const;
+  uint skipcount() const;
+  qint64 lastplayed() const;
+  qint64 lastseen() const;
 
-  float rating() const { return rating_; }
-  float bpm() const { return bpm_; }
-  const std::string &mood() const { return mood_; }
-  const std::string &initial_key() const { return initial_key_; }
+  bool compilation_detected() const;
+  bool compilation_on() const;
+  bool compilation_off() const;
 
-  const std::string &acoustid_id() const { return acoustid_id_; }
-  const std::string &acoustid_fingerprint() const { return acoustid_fingerprint_; }
-  const std::string &musicbrainz_album_artist_id() const { return musicbrainz_album_artist_id_; }
-  const std::string &musicbrainz_artist_id() const { return musicbrainz_artist_id_; }
-  const std::string &musicbrainz_original_artist_id() const { return musicbrainz_original_artist_id_; }
-  const std::string &musicbrainz_album_id() const { return musicbrainz_album_id_; }
-  const std::string &musicbrainz_original_album_id() const { return musicbrainz_original_album_id_; }
-  const std::string &musicbrainz_recording_id() const { return musicbrainz_recording_id_; }
-  const std::string &musicbrainz_track_id() const { return musicbrainz_track_id_; }
-  const std::string &musicbrainz_disc_id() const { return musicbrainz_disc_id_; }
-  const std::string &musicbrainz_release_group_id() const { return musicbrainz_release_group_id_; }
-  const std::string &musicbrainz_work_id() const { return musicbrainz_work_id_; }
+  bool art_embedded() const;
+  const QUrl &art_automatic() const;
+  const QUrl &art_manual() const;
+  bool art_unset() const;
 
-  std::optional<double> ebur128_integrated_loudness_lufs() const { return ebur128_integrated_loudness_lufs_; }
-  std::optional<double> ebur128_loudness_range_lu() const { return ebur128_loudness_range_lu_; }
+  const QString &cue_path() const;
 
-  void set_title(const std::string &v) { title_ = v; }
-  void set_titlesort(const std::string &v) { titlesort_ = v; }
-  void set_album(const std::string &v) { album_ = v; }
-  void set_albumsort(const std::string &v) { albumsort_ = v; }
-  void set_artist(const std::string &v) { artist_ = v; }
-  void set_artistsort(const std::string &v) { artistsort_ = v; }
-  void set_albumartist(const std::string &v) { albumartist_ = v; }
-  void set_albumartistsort(const std::string &v) { albumartistsort_ = v; }
-  void set_track(int v) { track_ = v; }
-  void set_disc(int v) { disc_ = v; }
-  void set_year(int v) { year_ = v; }
-  void set_originalyear(int v) { originalyear_ = v; }
-  void set_genre(const std::string &v) { genre_ = v; }
-  void set_compilation(bool v) { compilation_ = v; }
-  bool compilation_on() const { return compilation_on_; }
-  bool compilation_off() const { return compilation_off_; }
-  void set_compilation_on(bool v) { compilation_on_ = v; }
-  void set_compilation_off(bool v) { compilation_off_ = v; }
-  void set_composer(const std::string &v) { composer_ = v; }
-  void set_composersort(const std::string &v) { composersort_ = v; }
-  void set_performer(const std::string &v) { performer_ = v; }
-  void set_performersort(const std::string &v) { performersort_ = v; }
-  void set_grouping(const std::string &v) { grouping_ = v; }
-  void set_comment(const std::string &v) { comment_ = v; }
-  void set_lyrics(const std::string &v) { lyrics_ = v; }
-  void set_artist_id(const std::string &v) { artist_id_ = v; }
-  void set_album_id(const std::string &v) { album_id_ = v; }
-  void set_song_id(const std::string &v) { song_id_ = v; }
-  void set_beginning_nanosec(int64_t v) { beginning_nanosec_ = v; }
-  void set_end_nanosec(int64_t v) { end_nanosec_ = v; }
-  void set_length_nanosec(int64_t v) { length_nanosec_ = v; }
-  void set_bitrate(int v) { bitrate_ = v; }
-  void set_samplerate(int v) { samplerate_ = v; }
-  void set_bitdepth(int v) { bitdepth_ = v; }
-  void set_source(Source v) { source_ = v; }
-  void set_directory_id(int v) { directory_id_ = v; }
-  void set_url(const std::string &v);
-  void set_stream_url(const std::string &v) { stream_url_ = v; }
-  void set_basefilename(const std::string &v) { basefilename_ = v; }
-  void set_filetype(FileType v) { filetype_ = v; }
-  void set_filesize(int64_t v) { filesize_ = v; }
-  void set_mtime(int64_t v) { mtime_ = v; }
-  void set_ctime(int64_t v) { ctime_ = v; }
-  void set_unavailable(bool v) { unavailable_ = v; }
-  void set_fingerprint(const std::string &v) { fingerprint_ = v; }
-  void set_playcount(unsigned v) { playcount_ = v; }
-  void set_skipcount(unsigned v) { skipcount_ = v; }
-  void set_lastplayed(int64_t v) { lastplayed_ = v; }
-  void set_lastseen(int64_t v) { lastseen_ = v; }
-  void set_art_embedded(bool v) { art_embedded_ = v; }
-  void set_art_automatic(const std::string &v) { art_automatic_ = v; }
-  void set_art_manual(const std::string &v) { art_manual_ = v; }
-  void set_art_unset(bool v) { art_unset_ = v; }
-  void set_cue_path(const std::string &v) { cue_path_ = v; }
-  void set_rating(float v) { rating_ = v; }
-  void set_bpm(float v) { bpm_ = v; }
-  void set_mood(const std::string &v) { mood_ = v; }
-  void set_initial_key(const std::string &v) { initial_key_ = v; }
-  void set_acoustid_id(const std::string &v) { acoustid_id_ = v; }
-  void set_acoustid_fingerprint(const std::string &v) { acoustid_fingerprint_ = v; }
-  void set_musicbrainz_album_artist_id(const std::string &v) { musicbrainz_album_artist_id_ = v; }
-  void set_musicbrainz_artist_id(const std::string &v) { musicbrainz_artist_id_ = v; }
-  void set_musicbrainz_original_artist_id(const std::string &v) { musicbrainz_original_artist_id_ = v; }
-  void set_musicbrainz_album_id(const std::string &v) { musicbrainz_album_id_ = v; }
-  void set_musicbrainz_original_album_id(const std::string &v) { musicbrainz_original_album_id_ = v; }
-  void set_musicbrainz_recording_id(const std::string &v) { musicbrainz_recording_id_ = v; }
-  void set_musicbrainz_track_id(const std::string &v) { musicbrainz_track_id_ = v; }
-  void set_musicbrainz_disc_id(const std::string &v) { musicbrainz_disc_id_ = v; }
-  void set_musicbrainz_release_group_id(const std::string &v) { musicbrainz_release_group_id_ = v; }
-  void set_musicbrainz_work_id(const std::string &v) { musicbrainz_work_id_ = v; }
-  void set_ebur128_integrated_loudness_lufs(std::optional<double> v) { ebur128_integrated_loudness_lufs_ = v; }
-  void set_ebur128_loudness_range_lu(std::optional<double> v) { ebur128_loudness_range_lu_ = v; }
+  float rating() const;
+  float bpm() const;
+  const QString &mood() const;
+  const QString &initial_key() const;
 
-  std::string PrettyTitle() const;
-  std::string PrettyTitleWithArtist() const;
-  std::string EffectiveAlbumartist() const;
-  std::string EffectiveAlbum() const { return album_.empty() ? title_ : album_; }
-  bool has_cue() const { return !cue_path_.empty(); }
-  bool IsOnSameAlbum(const Song &other) const {
-    if (compilation() != other.compilation()) {
-      return false;
-    }
-    if (has_cue() && other.has_cue() && cue_path() == other.cue_path()) {
-      return true;
-    }
-    if (compilation() && album() == other.album()) {
-      return true;
-    }
-    return EffectiveAlbum() == other.EffectiveAlbum() && EffectiveAlbumartist() == other.EffectiveAlbumartist();
-  }
-  bool is_stream() const;
+  const QString &acoustid_id() const;
+  const QString &acoustid_fingerprint() const;
+
+  const QString &musicbrainz_album_artist_id() const;
+  const QString &musicbrainz_artist_id() const;
+  const QString &musicbrainz_original_artist_id() const;
+  const QString &musicbrainz_album_id() const;
+  const QString &musicbrainz_original_album_id() const;
+  const QString &musicbrainz_recording_id() const;
+  const QString &musicbrainz_track_id() const;
+  const QString &musicbrainz_disc_id() const;
+  const QString &musicbrainz_release_group_id() const;
+  const QString &musicbrainz_work_id() const;
+
+  std::optional<double> ebur128_integrated_loudness_lufs() const;
+  std::optional<double> ebur128_loudness_range_lu() const;
+
+  int id3v2_version() const;
+
+  QString *mutable_title();
+  QString *mutable_album();
+  QString *mutable_artist();
+  QString *mutable_albumartist();
+  QString *mutable_genre();
+  QString *mutable_composer();
+  QString *mutable_performer();
+  QString *mutable_grouping();
+  QString *mutable_comment();
+  QString *mutable_lyrics();
+  QString *mutable_acoustid_id();
+  QString *mutable_acoustid_fingerprint();
+  QString *mutable_musicbrainz_album_artist_id();
+  QString *mutable_musicbrainz_artist_id();
+  QString *mutable_musicbrainz_original_artist_id();
+  QString *mutable_musicbrainz_album_id();
+  QString *mutable_musicbrainz_original_album_id();
+  QString *mutable_musicbrainz_recording_id();
+  QString *mutable_musicbrainz_track_id();
+  QString *mutable_musicbrainz_disc_id();
+  QString *mutable_musicbrainz_release_group_id();
+  QString *mutable_musicbrainz_work_id();
+
+  bool init_from_file() const;
+
+  const QUrl &stream_url() const;
+
+  // Setters
+  void set_id(const int id);
+  void set_valid(const bool v);
+
+  void set_title(const QString &v);
+  void set_titlesort(const QString &v);
+  void set_album(const QString &v);
+  void set_albumsort(const QString &v);
+  void set_artist(const QString &v);
+  void set_artistsort(const QString &v);
+  void set_albumartist(const QString &v);
+  void set_albumartistsort(const QString &v);
+  void set_track(const int v);
+  void set_disc(const int v);
+  void set_year(const int v);
+  void set_originalyear(int v);
+  void set_genre(const QString &v);
+  void set_compilation(bool v);
+  void set_composer(const QString &v);
+  void set_composersort(const QString &v);
+  void set_performer(const QString &v);
+  void set_performersort(const QString &v);
+  void set_grouping(const QString &v);
+  void set_comment(const QString &v);
+  void set_lyrics(const QString &v);
+
+  void set_artist_id(const QString &v);
+  void set_album_id(const QString &v);
+  void set_song_id(const QString &v);
+
+  void set_beginning_nanosec(const qint64 v);
+  void set_end_nanosec(const qint64 v);
+  void set_length_nanosec(const qint64 v);
+
+  void set_bitrate(const int v);
+  void set_samplerate(const int v);
+  void set_bitdepth(const int v);
+
+  void set_source(const Source v);
+  void set_directory_id(const int v);
+  void set_url(const QUrl &v);
+  void set_basefilename(const QString &v);
+  void set_filetype(const FileType v);
+  void set_filesize(const qint64 v);
+  void set_mtime(const qint64 v);
+  void set_ctime(const qint64 v);
+  void set_unavailable(const bool v);
+
+  void set_fingerprint(const QString &v);
+
+  void set_playcount(const uint v);
+  void set_skipcount(const uint v);
+  void set_lastplayed(const qint64 v);
+  void set_lastseen(const qint64 v);
+
+  void set_compilation_detected(const bool v);
+  void set_compilation_on(const bool v);
+  void set_compilation_off(const bool v);
+
+  void set_art_embedded(const bool v);
+  void set_art_automatic(const QUrl &v);
+  void set_art_manual(const QUrl &v);
+  void set_art_unset(const bool v);
+
+  void set_cue_path(const QString &v);
+
+  void set_rating(const float v);
+  void set_bpm(const float v);
+  void set_mood(const QString &v);
+  void set_initial_key(const QString &v);
+
+  void set_acoustid_id(const QString &v);
+  void set_acoustid_fingerprint(const QString &v);
+
+  void set_musicbrainz_album_artist_id(const QString &v);
+  void set_musicbrainz_artist_id(const QString &v);
+  void set_musicbrainz_original_artist_id(const QString &v);
+  void set_musicbrainz_album_id(const QString &v);
+  void set_musicbrainz_original_album_id(const QString &v);
+  void set_musicbrainz_recording_id(const QString &v);
+  void set_musicbrainz_track_id(const QString &v);
+  void set_musicbrainz_disc_id(const QString &v);
+  void set_musicbrainz_release_group_id(const QString &v);
+  void set_musicbrainz_work_id(const QString &v);
+
+  void set_ebur128_integrated_loudness_lufs(const std::optional<double> v);
+  void set_ebur128_loudness_range_lu(const std::optional<double> v);
+
+  void set_id3v2_version(const int v);
+
+  void set_init_from_file(const bool v);
+
+  void set_stream_url(const QUrl &v);
+
+  void set_title(const TagLib::String &v);
+  void set_titlesort(const TagLib::String &v);
+  void set_album(const TagLib::String &v);
+  void set_albumsort(const TagLib::String &v);
+  void set_artist(const TagLib::String &v);
+  void set_artistsort(const TagLib::String &v);
+  void set_albumartist(const TagLib::String &v);
+  void set_albumartistsort(const TagLib::String &v);
+  void set_genre(const TagLib::String &v);
+  void set_composer(const TagLib::String &v);
+  void set_composersort(const TagLib::String &v);
+  void set_performer(const TagLib::String &v);
+  void set_performersort(const TagLib::String &v);
+  void set_grouping(const TagLib::String &v);
+  void set_comment(const TagLib::String &v);
+  void set_lyrics(const TagLib::String &v);
+  void set_artist_id(const TagLib::String &v);
+  void set_album_id(const TagLib::String &v);
+  void set_song_id(const TagLib::String &v);
+  void set_acoustid_id(const TagLib::String &v);
+  void set_acoustid_fingerprint(const TagLib::String &v);
+  void set_musicbrainz_album_artist_id(const TagLib::String &v);
+  void set_musicbrainz_artist_id(const TagLib::String &v);
+  void set_musicbrainz_original_artist_id(const TagLib::String &v);
+  void set_musicbrainz_album_id(const TagLib::String &v);
+  void set_musicbrainz_original_album_id(const TagLib::String &v);
+  void set_musicbrainz_recording_id(const TagLib::String &v);
+  void set_musicbrainz_track_id(const TagLib::String &v);
+  void set_musicbrainz_disc_id(const TagLib::String &v);
+  void set_musicbrainz_release_group_id(const TagLib::String &v);
+  void set_musicbrainz_work_id(const TagLib::String &v);
+  void set_mood(const TagLib::String &v);
+  void set_initial_key(const TagLib::String &v);
+
+  const QUrl &effective_url() const;
+  const QString &effective_titlesort() const;
+  const QString &effective_albumartist() const;
+  const QString &effective_albumartistsort() const;
+  const QString &effective_artistsort() const;
+  const QString &effective_album() const;
+  const QString &effective_albumsort() const;
+  const QString &effective_composersort() const;
+  const QString &effective_performersort() const;
+  int effective_originalyear() const;
+  const QString &playlist_effective_albumartist() const;
+  const QString &playlist_effective_albumartistsort() const;
+
+  bool is_metadata_good() const;
+  bool is_local_collection_song() const;
+  bool is_linked_collection_song() const;
   bool is_radio() const;
   bool is_stream_service() const;
-  bool stream_url_can_expire() const { return source_ == Source::Tidal || source_ == Source::Qobuz; }
-  bool is_metadata_good() const;
-  bool is_cdda() const { return source_ == Source::CDDA || filetype_ == FileType::CDDA; }
-  bool is_collection_song() const { return source_ == Source::Collection; }
-  bool is_local_file() const { return source_ == Source::LocalFile || source_ == Source::Collection; }
-  bool url_is_local_file() const { return url_.rfind("file:", 0) == 0 || url_.rfind('/', 0) == 0; }
-  bool write_tags_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::WavPack || filetype_ == FileType::OggFlac ||
-           filetype_ == FileType::OggVorbis || filetype_ == FileType::OggOpus || filetype_ == FileType::OggSpeex ||
-           filetype_ == FileType::MPEG || filetype_ == FileType::MP4 || filetype_ == FileType::ASF || filetype_ == FileType::AIFF ||
-           filetype_ == FileType::MPC || filetype_ == FileType::TrueAudio || filetype_ == FileType::APE || filetype_ == FileType::DSF ||
-           filetype_ == FileType::DSDIFF || filetype_ == FileType::WAV;
-  }
+  bool is_stream() const;
+  bool is_cdda() const;
+  bool is_compilation() const;
+  bool stream_url_can_expire() const;
+  bool is_module_music() const;
+  bool has_cue() const;
+
+  bool art_automatic_is_valid() const;
+  bool art_manual_is_valid() const;
+  bool has_valid_art() const;
+  void clear_art_automatic();
+  void clear_art_manual();
+
+  bool write_tags_supported() const;
+  bool additional_tags_supported() const;
+  bool albumartist_supported() const;
+  bool composer_supported() const;
+  bool performer_supported() const;
+  bool grouping_supported() const;
+  bool genre_supported() const;
+  bool compilation_supported() const;
+  bool rating_supported() const;
+  bool comment_supported() const;
+  bool lyrics_supported() const;
+
+  bool albumartistsort_supported() const;
+  bool albumsort_supported() const;
+  bool artistsort_supported() const;
+  bool composersort_supported() const;
+  bool performersort_supported() const;
+  bool titlesort_supported() const;
+
+  static bool save_embedded_cover_supported(const FileType filetype);
+  bool save_embedded_cover_supported() const { return url().isLocalFile() && save_embedded_cover_supported(filetype()) && !has_cue(); };
+
+  bool id3v2_tags_supported() const;
+
+  static int ColumnIndex(const QString &field);
+  static QString JoinSpec(const QString &table);
+
+  // Pretty accessors
+  QString PrettyTitle() const;
+  QString PrettyTitleWithArtist() const;
+  QString PrettyLength() const;
+  QString PrettyYear() const;
+  QString PrettyOriginalYear() const;
+
+  QString TitleWithCompilationArtist() const;
+
+  QString SampleRateBitDepthToText() const;
+
+  static QString Ebur128LoudnessLUFSToText(const std::optional<double> v);
+  QString Ebur128LoudnessLUFSToText() const;
+
+  static QString Ebur128LoudnessRangeLUToText(const std::optional<double> v);
+  QString Ebur128LoudnessRangeLUToText() const;
+
+  QString PrettyRating() const;
+
   bool IsEditable() const;
-  void MergeUserSetData(const Song &other, bool merge_playcount, bool merge_rating);
 
-  int id3v2_version() const { return id3v2_version_; }
-  void set_id3v2_version(int v) { id3v2_version_ = v; }
-  bool additional_tags_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::WavPack || filetype_ == FileType::OggFlac ||
-           filetype_ == FileType::OggVorbis || filetype_ == FileType::OggOpus || filetype_ == FileType::OggSpeex ||
-           filetype_ == FileType::MPEG || filetype_ == FileType::MP4 || filetype_ == FileType::MPC || filetype_ == FileType::APE ||
-           filetype_ == FileType::WAV || filetype_ == FileType::AIFF;
-  }
-  bool albumartist_supported() const { return additional_tags_supported() || filetype_ == FileType::ASF; }
-  bool composer_supported() const { return additional_tags_supported() || filetype_ == FileType::ASF; }
-  bool performer_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::WavPack || filetype_ == FileType::OggFlac ||
-           filetype_ == FileType::OggVorbis || filetype_ == FileType::OggOpus || filetype_ == FileType::OggSpeex ||
-           filetype_ == FileType::MPEG || filetype_ == FileType::MPC || filetype_ == FileType::APE || filetype_ == FileType::WAV ||
-           filetype_ == FileType::AIFF;
-  }
-  bool grouping_supported() const { return additional_tags_supported(); }
-  bool genre_supported() const { return additional_tags_supported() || filetype_ == FileType::ASF; }
-  bool compilation_supported() const { return additional_tags_supported(); }
-  bool rating_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::WavPack || filetype_ == FileType::OggFlac ||
-           filetype_ == FileType::OggVorbis || filetype_ == FileType::OggOpus || filetype_ == FileType::OggSpeex ||
-           filetype_ == FileType::MPEG || filetype_ == FileType::MP4 || filetype_ == FileType::ASF || filetype_ == FileType::MPC ||
-           filetype_ == FileType::APE || filetype_ == FileType::WAV || filetype_ == FileType::AIFF;
-  }
-  bool comment_supported() const { return additional_tags_supported(); }
-  bool lyrics_supported() const { return additional_tags_supported() || filetype_ == FileType::ASF; }
-  bool albumartistsort_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
-           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
-  }
-  bool albumsort_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
-           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
-  }
-  bool artistsort_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
-           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
-  }
-  bool composersort_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
-           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
-  }
-  bool performersort_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis;
-  }
-  bool titlesort_supported() const {
-    return filetype_ == FileType::FLAC || filetype_ == FileType::OggFlac || filetype_ == FileType::OggVorbis ||
-           filetype_ == FileType::OggOpus || filetype_ == FileType::MPEG;
-  }
-  bool id3v2_tags_supported() const {
-    return filetype_ == FileType::MPEG || filetype_ == FileType::WAV || filetype_ == FileType::AIFF;
-  }
-  static bool save_embedded_cover_supported(FileType filetype) {
-    return filetype == FileType::FLAC || filetype == FileType::OggVorbis || filetype == FileType::OggOpus ||
-           filetype == FileType::MPEG || filetype == FileType::MP4 || filetype == FileType::WAV || filetype == FileType::AIFF;
-  }
-  bool save_embedded_cover_supported() const {
-    return is_local_file() && save_embedded_cover_supported(filetype_) && cue_path_.empty();
-  }
+  // Comparison functions
+  bool IsFileInfoEqual(const Song &other) const;
+  bool IsMetadataEqual(const Song &other) const;
+  bool IsPlayStatisticsEqual(const Song &other) const;
+  bool IsRatingEqual(const Song &other) const;
+  bool IsFingerprintEqual(const Song &other) const;
+  bool IsAcoustIdEqual(const Song &other) const;
+  bool IsMusicBrainzEqual(const Song &other) const;
+  bool IsEBUR128Equal(const Song &other) const;
+  bool IsArtEqual(const Song &other) const;
+  bool IsCompilationEqual(const Song &other) const;
+  bool IsSettingsEqual(const Song &other) const;
+  bool IsAllMetadataEqual(const Song &other) const;
+  bool IsEqual(const Song &other) const;
 
-  static FileType FiletypeByExtension(const std::string &extension);
-  static FileType FiletypeByMimeType(const std::string &mimetype);
-  static FileType FiletypeByDescription(const std::string &text);
-  static FileType FiletypeByFilename(const std::string &filename);
-  static bool IsAudioFile(const std::string &filename);
-  static std::string SourceToString(Source source);
-  static std::string DescriptionForSource(Source source) { return SourceToString(source); }
-  static std::string DomainForSource(Source source);
-  std::string ShareURL() const;
-  static std::string FiletypeToString(FileType type);
-  static std::string AlbumRemoveDiscMisc(const std::string &album);
-  static std::string TitleRemoveMisc(const std::string &title);
-  static const char *TextSearchColumnsSql();
+  bool IsOnSameAlbum(const Song &other) const;
+  bool IsSimilar(const Song &other) const;
+
+  static Source SourceFromURL(const QUrl &url);
+  static QString TextForSource(const Source source);
+  static QString DescriptionForSource(const Source source);
+  static Source SourceFromText(const QString &source);
+  static QIcon IconForSource(const Source source);
+  static QString DomainForSource(const Source source);
+  static QString TextForFiletype(const FileType filetype);
+  static QString ExtensionForFiletype(const FileType filetype);
+  static QIcon IconForFiletype(const FileType filetype);
+
+  QString TextForSource() const { return TextForSource(source()); }
+  QString DescriptionForSource() const { return DescriptionForSource(source()); }
+  QIcon IconForSource() const { return IconForSource(source()); }
+  QString DomainForSource() const { return DomainForSource(source()); }
+  QString TextForFiletype() const { return TextForFiletype(filetype()); }
+  QIcon IconForFiletype() const { return IconForFiletype(filetype()); }
+
+  QString ShareURL() const;
+
+  bool IsFileLossless() const;
+  static FileType FiletypeByMimetype(const QString &mimetype);
+  static FileType FiletypeByDescription(const QString &text);
+  static FileType FiletypeByExtension(const QString &ext);
+  static bool IsLinkedCollectionSource(const Source source);
+  static QString ImageCacheDir(const Source source);
+
+  // Sort songs alphabetically using their pretty title
+  static bool CompareSongsName(const Song &song1, const Song &song2);
+  static void SortSongsListAlphabetically(QList<Song> *songs);
+
+  // Constructors
+  void Init(const QString &title, const QString &artist, const QString &album, const qint64 length_nanosec);
+  void Init(const QString &title, const QString &artist, const QString &album, const qint64 beginning, const qint64 end);
+  void InitFromQuery(const QSqlRecord &r, const bool reliable_metadata, const int col = 0);
+  void InitFromQuery(const SqlQuery &query, const bool reliable_metadata, const int col = 0);
+  void InitFromQuery(const SqlRow &row, const bool reliable_metadata, const int col = 0);
+  void InitFromFilePartial(const QString &filename, const QFileInfo &fileinfo);
+  void InitArtManual();
+  void InitArtAutomatic();
+
+#ifdef HAVE_GPOD
+  void InitFromItdb(_Itdb_Track *track, const QString &prefix);
+  void ToItdb(_Itdb_Track *track) const;
+#endif
+
+#ifdef HAVE_MTP
+  void InitFromMTP(const LIBMTP_track_struct *track, const QString &host);
+  void ToMTP(LIBMTP_track_struct *track) const;
+#endif
+
+  // Save
+  void BindToQuery(SqlQuery *query) const;
+#ifdef HAVE_MPRIS2
+  void ToXesam(QVariantMap *map) const;
+#endif
+
+  // Returns true if only minor fields changed, and false if a major field (title, artist or album) was updated from the engine metadata.
+  // Note the inverted polarity: true does NOT mean "merged successfully".
+  bool MergeFromEngineMetadata(const EngineMetadata &engine_metadata);
+
+  // Copies important statistics from the other song to this one, overwriting any data that already exists.
+  // Useful when you want updated tags from disk but you want to keep user stats.
+  void MergeUserSetData(const Song &other, const bool merge_playcount, const bool merge_rating);
+
+  // Two songs that are on the same album will have the same AlbumKey.
+  // It is more efficient to use IsOnSameAlbum, but this function can be used when you need to hash the key to do fast lookups.
+  QString AlbumKey() const;
+  QString GroupingKey() const;
+
+  static bool ContainsRegexList(const QString &str, const RegularExpressionList &regex_list);
+  static QString StripRegexList(QString str, const RegularExpressionList &regex_list);
+  static bool AlbumContainsDisc(const QString &album);
+  static QString AlbumRemoveDisc(const QString &album);
+  static QString AlbumRemoveMisc(const QString &album);
+  static QString AlbumRemoveDiscMisc(const QString &album);
+  static QString TitleRemoveMisc(const QString &title);
+
+  static QString GetNameForNewPlaylist(const QList<Song> &songs);
+
+  static inline QString TagLibStringToQString(const TagLib::String &s) {
+    return QString::fromUtf8(s.toCString(true));
+  }
 
  private:
-  bool valid_ = false;
-  int id_ = -1;
-  std::string title_;
-  std::string titlesort_;
-  std::string album_;
-  std::string albumsort_;
-  std::string artist_;
-  std::string artistsort_;
-  std::string albumartist_;
-  std::string albumartistsort_;
-  int track_ = -1;
-  int disc_ = -1;
-  int year_ = -1;
-  int originalyear_ = -1;
-  std::string genre_;
-  bool compilation_ = false;
-  bool compilation_on_ = false;
-  bool compilation_off_ = false;
-  std::string composer_;
-  std::string composersort_;
-  std::string performer_;
-  std::string performersort_;
-  std::string grouping_;
-  std::string comment_;
-  std::string lyrics_;
-  std::string artist_id_;
-  std::string album_id_;
-  std::string song_id_;
-  int64_t beginning_nanosec_ = 0;
-  int64_t end_nanosec_ = -1;
-  int64_t length_nanosec_ = 0;
-  int bitrate_ = -1;
-  int samplerate_ = -1;
-  int bitdepth_ = -1;
-  Source source_ = Source::Unknown;
-  int directory_id_ = -1;
-  std::string url_;
-  std::string stream_url_;
-  std::string basefilename_;
-  FileType filetype_ = FileType::Unknown;
-  int64_t filesize_ = -1;
-  int64_t mtime_ = -1;
-  int64_t ctime_ = -1;
-  bool unavailable_ = false;
-  bool skipped_ = false;
-  bool init_from_file_ = false;
-  std::string fingerprint_;
-  unsigned playcount_ = 0;
-  unsigned skipcount_ = 0;
-  int64_t lastplayed_ = -1;
-  int64_t lastseen_ = -1;
-  bool art_embedded_ = false;
-  int id3v2_version_ = 0;
-  std::string art_automatic_;
-  std::string art_manual_;
-  bool art_unset_ = false;
-  std::string cue_path_;
-  float rating_ = -1.0f;
-  float bpm_ = -1.0f;
-  std::string mood_;
-  std::string initial_key_;
-  std::string acoustid_id_;
-  std::string acoustid_fingerprint_;
-  std::string musicbrainz_album_artist_id_;
-  std::string musicbrainz_artist_id_;
-  std::string musicbrainz_original_artist_id_;
-  std::string musicbrainz_album_id_;
-  std::string musicbrainz_original_album_id_;
-  std::string musicbrainz_recording_id_;
-  std::string musicbrainz_track_id_;
-  std::string musicbrainz_disc_id_;
-  std::string musicbrainz_release_group_id_;
-  std::string musicbrainz_work_id_;
-  std::optional<double> ebur128_integrated_loudness_lufs_;
-  std::optional<double> ebur128_loudness_range_lu_;
+  struct Private;
+  QSharedDataPointer<Private> d;
 };
 
-using SongList = std::vector<Song>;
+using SongList = QList<Song>;
+using SongMap = QMap<QString, Song>;
 
-#endif
+Q_DECLARE_METATYPE(Song)
+Q_DECLARE_METATYPE(SongList)
+Q_DECLARE_METATYPE(SongMap)
+Q_DECLARE_METATYPE(Song::Source)
+Q_DECLARE_METATYPE(Song::FileType)
+
+size_t qHash(const Song &song);
+// Hash function using field checked in IsSimilar function
+size_t HashSimilar(const Song &song);
+
+#endif  // SONG_H

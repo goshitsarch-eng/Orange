@@ -1,93 +1,138 @@
-#ifndef STRAWBERRY_PLAYLISTLISTCONTAINER_H
-#define STRAWBERRY_PLAYLISTLISTCONTAINER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlist/playlistlistlook.h"
-#include "playlist/playlistlistmodel.h"
-#include "playlist/playlistlistsortfiltermodel.h"
-#include "playlist/playlistlistview.h"
-#include "playlist/playlistmanager.h"
+#ifndef PLAYLISTLISTCONTAINER_H
+#define PLAYLISTLISTCONTAINER_H
 
-#include <gtk/gtk.h>
+#include "config.h"
 
-#include <functional>
-#include <memory>
-#include <set>
-#include <string>
-#include <vector>
+#include <QObject>
+#include <QWidget>
+#include <QString>
+#include <QIcon>
+#include <QModelIndex>
 
-class PlaylistListContainer {
+#include "includes/scoped_ptr.h"
+#include "includes/shared_ptr.h"
+
+class QStandardItem;
+class QSortFilterProxyModel;
+class QMenu;
+class QAction;
+class QContextMenuEvent;
+class QShowEvent;
+
+class TaskManager;
+class TagReaderClient;
+class DeviceManager;
+class PlaylistManager;
+class PlaylistBackend;
+class Playlist;
+class PlaylistListModel;
+class Ui_PlaylistListContainer;
+class OrganizeDialog;
+
+class PlaylistListContainer : public QWidget {
+  Q_OBJECT
+
  public:
-  using NameCallback = std::function<void(const std::string &)>;
-  using DropCallback = std::function<void(const std::string &, const std::string &, bool)>;
-  using FavoriteCallback = std::function<void(const std::string &, bool)>;
+  explicit PlaylistListContainer(QWidget *parent = nullptr);
+  ~PlaylistListContainer() override;
 
-  PlaylistListContainer();
+  void Init(const SharedPtr<TaskManager> task_manager,
+            const SharedPtr<TagReaderClient> tagreader_client,
+            const SharedPtr<PlaylistManager> playlist_manager,
+            const SharedPtr<PlaylistBackend> playlist_backend,
+            const SharedPtr<DeviceManager> device_manager);
 
-  GtkWidget *widget() const { return widget_; }
-  PlaylistListView *view() { return view_.get(); }
-  PlaylistListModel *model() { return &model_; }
-  PlaylistListSortFilterModel *filter() { return &filter_; }
-  void Reload(PlaylistManager *manager);
-  void ApplyLook();
-  void SetActivateCallback(const std::function<void(const std::string &)> &callback);
-  void SetNewCallback(std::function<void()> callback) { new_ = std::move(callback); }
-  void SetNewFolderCallback(std::function<void()> callback) { new_folder_ = std::move(callback); }
-  void SetDeleteCallback(NameCallback callback) { delete_ = std::move(callback); }
-  void SetDeleteFolderCallback(NameCallback callback) { delete_folder_ = std::move(callback); }
-  void SetSaveCallback(NameCallback callback) { save_ = std::move(callback); }
-  void SetCopyCallback(NameCallback callback) { copy_ = std::move(callback); }
-  void SetMenuCallback(NameCallback callback) { menu_ = std::move(callback); }
-  void SetFavoriteCallback(FavoriteCallback callback);
-  void SetDropCallback(DropCallback callback);
-  std::string SelectedName() const;
-  std::string SelectedFolderPath() const;
-  bool SelectedIsFolder() const;
-  void ApplyFilter();
-  void AddExtraFolder(const std::string &path);
-  void RemoveExtraFolder(const std::string &path);
-  void RenameExtraFolder(const std::string &old_path, const std::string &new_path);
-  void SetPlayback(PlaylistListLook::Playback playback);
-  void SetActive(const std::string &name, int id);
-  void SelectName(const std::string &name);
-  bool HasSelection() const;
-  void RefreshOnShow();
-  PlaylistListLook::Playback playback() const { return playback_; }
-  const std::string &active_name() const { return active_name_; }
-  int active_id() const { return active_id_; }
-  const std::vector<std::string> &extra_folders() const { return extra_folders_; }
+  void ReloadSettings();
+
+ protected:
+  void showEvent(QShowEvent *e) override;
+  void contextMenuEvent(QContextMenuEvent *e) override;
+
+ public Q_SLOTS:
+  // From the Player
+  void ActivePlaying();
+  void ActivePaused();
+  void ActiveStopped();
+
+ private Q_SLOTS:
+  // From the UI
+  void NewFolderClicked();
+  void ItemDoubleClicked(const QModelIndex &proxy_idx);
+  void ItemMimeDataDropped(const QModelIndex &proxy_idx, const QMimeData *q_mimedata);
+
+  // From the model
+  void PlaylistPathChanged(const int id, const QString &new_path);
+
+  // From the PlaylistManager
+  void PlaylistRenamed(const int id, const QString &new_name);
+  // Add playlist if favorite == true
+  void AddPlaylist(const int id, const QString &name, const bool favorite);
+  void RemovePlaylist(const int id);
+  void PlaylistFavoriteStateChanged(const int id, const bool favorite);
+  void CurrentChanged(Playlist *new_playlist);
+  void ActiveChanged(Playlist *new_playlist);
+
+  void ItemsSelectedChanged(const bool selected);
+
+  void SavePlaylist();
+  void Delete();
+  void CopyToDevice();
 
  private:
-  void Rebuild();
-  void ToggleFolder(const std::string &path);
-  void LoadExtraFolders();
-  void SaveExtraFolders();
-  void UpdateSelectionChrome();
+  QStandardItem *ItemForPlaylist(const QString &name, int id);
+  QStandardItem *ItemForFolder(const QString &name) const;
+  void RecursivelySetIcons(QStandardItem *parent) const;
 
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *search_ = nullptr;
-  GtkWidget *add_button_ = nullptr;
-  GtkWidget *folder_button_ = nullptr;
-  GtkWidget *favorites_toggle_ = nullptr;
-  GtkWidget *remove_button_ = nullptr;
-  GtkWidget *save_button_ = nullptr;
-  GtkWidget *copy_button_ = nullptr;
-  PlaylistListModel model_;
-  PlaylistListSortFilterModel filter_;
-  std::unique_ptr<PlaylistListView> view_;
-  PlaylistManager *manager_ = nullptr;
-  std::function<void()> new_;
-  std::function<void()> new_folder_;
-  NameCallback delete_;
-  NameCallback delete_folder_;
-  NameCallback save_;
-  NameCallback copy_;
-  NameCallback menu_;
-  FavoriteCallback favorite_;
-  std::vector<std::string> extra_folders_;
-  std::set<std::string> collapsed_;
-  std::string active_name_;
-  int active_id_ = -1;
-  PlaylistListLook::Playback playback_ = PlaylistListLook::Playback::Stopped;
+  void RecursivelyFindPlaylists(const QModelIndex &parent, QSet<int> *ids) const;
+
+  void UpdateActiveIcon(int id, const QIcon &icon);
+
+  SharedPtr<TaskManager> task_manager_;
+  SharedPtr<TagReaderClient> tagreader_client_;
+  SharedPtr<PlaylistManager> playlist_manager_;
+  SharedPtr<PlaylistBackend> playlist_backend_;
+  SharedPtr<DeviceManager> device_manager_;
+
+  Ui_PlaylistListContainer *ui_;
+  QMenu *menu_;
+
+  QAction *action_new_folder_;
+  QAction *action_remove_;
+  QAction *action_save_playlist_;
+#ifndef Q_OS_WIN32
+  QAction *action_copy_to_device_;
+#endif
+
+  PlaylistListModel *model_;
+  QSortFilterProxyModel *proxy_;
+
+  bool loaded_icons_;
+  QIcon padded_play_icon_;
+
+  int active_playlist_id_;
+
+  ScopedPtr<OrganizeDialog> organize_dialog_;
 };
 
-#endif
+#endif  // PLAYLISTLISTCONTAINER_H

@@ -1,52 +1,61 @@
-#include "covermanager/albumcoverloaderoptions.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2023, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/coverssettings.h"
+#include "albumcoverloaderoptions.h"
+
+#include <QSettings>
+
 #include "core/settings.h"
-#include "covermanager/coverarttypes.h"
-#include "utilities/strutils.h"
+#include "constants/coverssettings.h"
+
+using namespace Qt::Literals::StringLiterals;
+
+AlbumCoverLoaderOptions::AlbumCoverLoaderOptions(const Options _options, const QSize _desired_scaled_size, const qreal _device_pixel_ratio, const Types &_types)
+    : options(_options),
+      desired_scaled_size(_desired_scaled_size),
+      device_pixel_ratio(_device_pixel_ratio),
+      types(_types) {}
 
 AlbumCoverLoaderOptions::Types AlbumCoverLoaderOptions::LoadTypes() {
-  Settings settings;
-  settings.BeginGroup(CoversSettings::kSettingsGroup);
-  const std::string value = settings.Value(CoversSettings::kTypes, CoverArtTypes::DefaultLoaderSaved());
-  Types types;
-  for (const std::string &part : StrUtils::Split(value, ',')) {
-    const std::string name = StrUtils::Trim(part);
-    if (name == "art_unset" || name == "art_embedded" || name == "art_manual" || name == "art_automatic") {
-      types.push_back(TypeFromName(name));
+
+  Types cover_types;
+
+  Settings s;
+  s.beginGroup(CoversSettings::kSettingsGroup);
+  const QStringList all_cover_types = QStringList() << u"art_unset"_s << u"art_embedded"_s << u"art_manual"_s << u"art_automatic"_s;
+  const QStringList cover_types_strlist = s.value(CoversSettings::kTypes, all_cover_types).toStringList();
+  for (const QString &cover_type_str : cover_types_strlist) {
+    if (cover_type_str == "art_unset"_L1) {
+      cover_types << AlbumCoverLoaderOptions::Type::Unset;
+    }
+    else if (cover_type_str == "art_embedded"_L1) {
+      cover_types << AlbumCoverLoaderOptions::Type::Embedded;
+    }
+    else if (cover_type_str == "art_manual"_L1) {
+      cover_types << AlbumCoverLoaderOptions::Type::Manual;
+    }
+    else if (cover_type_str == "art_automatic"_L1) {
+      cover_types << AlbumCoverLoaderOptions::Type::Automatic;
     }
   }
-  if (types.empty()) {
-    for (const std::string &id : CoverArtTypes::LoaderDefaultIds()) {
-      types.push_back(TypeFromName(id));
-    }
-  }
-  return types;
-}
 
-std::string AlbumCoverLoaderOptions::TypeName(Type type) {
-  switch (type) {
-    case Type::Unset:
-      return "art_unset";
-    case Type::Embedded:
-      return "art_embedded";
-    case Type::Manual:
-      return "art_manual";
-    case Type::Automatic:
-      return "art_automatic";
-  }
-  return {};
-}
+  s.endGroup();
 
-AlbumCoverLoaderOptions::Type AlbumCoverLoaderOptions::TypeFromName(const std::string &name) {
-  if (name == "art_unset") {
-    return Type::Unset;
-  }
-  if (name == "art_embedded") {
-    return Type::Embedded;
-  }
-  if (name == "art_manual") {
-    return Type::Manual;
-  }
-  return Type::Automatic;
+  return cover_types;
 }

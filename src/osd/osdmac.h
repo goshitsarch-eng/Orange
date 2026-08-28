@@ -1,27 +1,48 @@
-#ifndef STRAWBERRY_OSDMAC_H
-#define STRAWBERRY_OSDMAC_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <string>
-#include <vector>
+#ifndef OSDMAC_H
+#define OSDMAC_H
 
-namespace OSDMacNative {
+#include "config.h"
 
-// Qt OSDMac::SupportsNativeNotifications is true when UNUserNotificationCenter exists.
-inline bool NotificationCenterAvailable(bool center_present) { return center_present; }
+#include <QtGlobal>
+#include <QObject>
+#include <QString>
+#include <QImage>
 
-// Qt OSDMac::SupportsTrayPopups is always false.
-inline bool SupportsTrayPopups() { return false; }
+#include "osdbase.h"
 
-}  // namespace OSDMacNative
+class OSDMac : public OSDBase {
+  Q_OBJECT
 
-#ifdef __APPLE__
-class OSDMac {
  public:
-  static bool SupportsNativeNotifications();
-  static bool SupportsTrayPopups();
-  static void ShowMessageNative(const std::string &summary, const std::string &body, const std::string &icon = {},
-                                const std::vector<unsigned char> &art = {});
-};
-#endif
+  explicit OSDMac(const SharedPtr<SystemTrayIcon> tray_icon, QObject *parent = nullptr);
+  ~OSDMac() override;
 
-#endif
+  bool SupportsNativeNotifications() const override;
+  bool SupportsTrayPopups() const override;
+
+ private:
+  void ShowMessageNative(const QString &summary, const QString &message, const QString &icon, const QImage &image) override;
+};
+
+#endif  // OSDMAC_H

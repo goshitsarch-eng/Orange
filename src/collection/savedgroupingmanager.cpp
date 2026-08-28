@@ -1,83 +1,234 @@
-#include "collection/savedgroupingmanager.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2015, Nick Lanham <nick@afternight.org>
+ * Copyright 2019-2022, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "collection/savedgroupinglabels.h"
-#include "translations/translations.h"
+#include "config.h"
 
-#include <adwaita.h>
+#include <utility>
 
-void SavedGroupingManager::Show(GtkWindow *parent, const std::function<void(const CollectionGrouping::Grouping &)> &callback) {
-  AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, Translations::CStr(SavedGroupingLabels::Title()));
-  adw_dialog_set_content_width(dialog, 520);
-  adw_dialog_set_content_height(dialog, 360);
-  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-  gtk_widget_set_margin_start(box, 12);
-  gtk_widget_set_margin_end(box, 12);
-  gtk_widget_set_margin_top(box, 12);
-  gtk_widget_set_margin_bottom(box, 12);
-  GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  gtk_widget_set_margin_start(header, 8);
-  gtk_widget_set_margin_end(header, 8);
-  auto add_header = [](GtkWidget *row, const char *text, bool expand) {
-    GtkWidget *label = gtk_label_new(Translations::CStr(text));
-    gtk_widget_add_css_class(label, "heading");
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    if (expand) {
-      gtk_widget_set_hexpand(label, TRUE);
-    }
-    gtk_box_append(GTK_BOX(row), label);
-  };
-  add_header(header, SavedGroupingLabels::Name(), true);
-  add_header(header, SavedGroupingLabels::FirstLevel(), false);
-  add_header(header, SavedGroupingLabels::SecondLevel(), false);
-  add_header(header, SavedGroupingLabels::ThirdLevel(), false);
-  gtk_box_append(GTK_BOX(box), header);
-  GtkWidget *scroll = gtk_scrolled_window_new();
-  gtk_widget_set_vexpand(scroll, TRUE);
-  GtkWidget *list = gtk_list_box_new();
-  gtk_widget_add_css_class(list, "boxed-list");
-  auto *cb = new std::function<void(const CollectionGrouping::Grouping &)>(callback);
-  g_object_set_data_full(G_OBJECT(dialog), "callback", cb, [](gpointer p) {
-    delete static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(p);
-  });
-  for (const auto &entry : CollectionGrouping::LoadSaved()) {
-    GtkWidget *row = adw_action_row_new();
-    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), entry.first.c_str());
-    const std::string subtitle = CollectionGrouping::Label(entry.second.first) + " / " + CollectionGrouping::Label(entry.second.second) +
-                                 " / " + CollectionGrouping::Label(entry.second.third);
-    adw_action_row_set_subtitle(ADW_ACTION_ROW(row), subtitle.c_str());
-    GtkWidget *apply = gtk_button_new_with_label(Translations::CStr(SavedGroupingLabels::Apply()));
-    GtkWidget *remove = gtk_button_new_with_label(Translations::CStr(SavedGroupingLabels::Remove()));
-    auto *grouping = new CollectionGrouping::Grouping(entry.second);
-    g_object_set_data_full(G_OBJECT(row), "name", g_strdup(entry.first.c_str()), g_free);
-    g_object_set_data_full(G_OBJECT(apply), "grouping", grouping, [](gpointer p) { delete static_cast<CollectionGrouping::Grouping *>(p); });
-    g_object_set_data(G_OBJECT(apply), "callback", cb);
-    g_object_set_data(G_OBJECT(apply), "dialog", dialog);
-    g_signal_connect(apply, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
-                       auto *fn = static_cast<std::function<void(const CollectionGrouping::Grouping &)> *>(
-                           g_object_get_data(G_OBJECT(button), "callback"));
-                       auto *grouping = static_cast<CollectionGrouping::Grouping *>(g_object_get_data(G_OBJECT(button), "grouping"));
-                       if (fn && grouping) {
-                         (*fn)(*grouping);
-                       }
-                       adw_dialog_close(ADW_DIALOG(g_object_get_data(G_OBJECT(button), "dialog")));
-                     }),
-                     nullptr);
-    g_object_set_data(G_OBJECT(remove), "row", row);
-    g_object_set_data(G_OBJECT(remove), "list", list);
-    g_signal_connect(remove, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
-                       GtkWidget *row = GTK_WIDGET(g_object_get_data(G_OBJECT(button), "row"));
-                       const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "name"));
-                       CollectionGrouping::RemoveSaved(name ? name : "");
-                       gtk_list_box_remove(GTK_LIST_BOX(g_object_get_data(G_OBJECT(button), "list")), row);
-                     }),
-                     nullptr);
-    adw_action_row_add_suffix(ADW_ACTION_ROW(row), apply);
-    adw_action_row_add_suffix(ADW_ACTION_ROW(row), remove);
-    gtk_list_box_append(GTK_LIST_BOX(list), row);
+#include <QDialog>
+#include <QStandardItemModel>
+#include <QItemSelectionModel>
+#include <QList>
+#include <QByteArray>
+#include <QString>
+#include <QStringList>
+#include <QUrl>
+#include <QIODevice>
+#include <QDataStream>
+#include <QKeySequence>
+#include <QPushButton>
+#include <QSettings>
+
+#include "core/logging.h"
+#include "core/iconloader.h"
+#include "core/settings.h"
+#include "constants/collectionsettings.h"
+#include "collectionmodel.h"
+#include "savedgroupingmanager.h"
+#include "ui_savedgroupingmanager.h"
+
+using namespace Qt::Literals::StringLiterals;
+
+const char *SavedGroupingManager::kSavedGroupingsSettingsGroup = "SavedGroupings";
+
+SavedGroupingManager::SavedGroupingManager(const QString &saved_groupings_settings_group, QWidget *parent)
+    : QDialog(parent),
+      ui_(new Ui_SavedGroupingManager),
+      model_(new QStandardItemModel(0, 4, this)),
+      saved_groupings_settings_group_(saved_groupings_settings_group) {
+
+  ui_->setupUi(this);
+
+  model_->setHorizontalHeaderItem(0, new QStandardItem(tr("Name")));
+  model_->setHorizontalHeaderItem(1, new QStandardItem(tr("First level")));
+  model_->setHorizontalHeaderItem(2, new QStandardItem(tr("Second Level")));
+  model_->setHorizontalHeaderItem(3, new QStandardItem(tr("Third Level")));
+  ui_->list->setModel(model_);
+  ui_->remove->setIcon(IconLoader::Load(u"edit-delete"_s));
+  ui_->remove->setEnabled(false);
+
+  ui_->remove->setShortcut(QKeySequence::Delete);
+  QObject::connect(ui_->list->selectionModel(), &QItemSelectionModel::selectionChanged, this, &SavedGroupingManager::UpdateButtonState);
+
+  QObject::connect(ui_->remove, &QPushButton::clicked, this, &SavedGroupingManager::Remove);
+
+}
+
+SavedGroupingManager::~SavedGroupingManager() {
+  delete ui_;
+}
+
+QString SavedGroupingManager::GetSavedGroupingsSettingsGroup(const QString &settings_group) {
+
+  if (settings_group.isEmpty() || settings_group == QLatin1String(CollectionSettings::kSettingsGroup)) {
+    return QLatin1String(kSavedGroupingsSettingsGroup);
   }
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list);
-  gtk_box_append(GTK_BOX(box), scroll);
-  adw_dialog_set_child(dialog, box);
-  adw_dialog_present(dialog, GTK_WIDGET(parent));
+
+  return QLatin1String(kSavedGroupingsSettingsGroup) + QLatin1Char('_') + settings_group;
+
+}
+
+QString SavedGroupingManager::GroupByToString(const CollectionModel::GroupBy g) {
+
+  switch (g) {
+    case CollectionModel::GroupBy::None:
+    case CollectionModel::GroupBy::GroupByCount:{
+      return tr("None");
+    }
+    case CollectionModel::GroupBy::AlbumArtist:{
+      return tr("Album artist");
+    }
+    case CollectionModel::GroupBy::Artist:{
+      return tr("Artist");
+    }
+    case CollectionModel::GroupBy::Album:{
+      return tr("Album");
+    }
+    case CollectionModel::GroupBy::AlbumDisc:{
+      return tr("Album - Disc");
+    }
+    case CollectionModel::GroupBy::YearAlbum:{
+      return tr("Year - Album");
+    }
+    case CollectionModel::GroupBy::YearAlbumDisc:{
+      return tr("Year - Album - Disc");
+    }
+    case CollectionModel::GroupBy::OriginalYearAlbum:{
+      return tr("Original year - Album");
+    }
+    case CollectionModel::GroupBy::OriginalYearAlbumDisc:{
+      return tr("Original year - Album - Disc");
+    }
+    case CollectionModel::GroupBy::Disc:{
+      return tr("Disc");
+    }
+    case CollectionModel::GroupBy::Year:{
+      return tr("Year");
+    }
+    case CollectionModel::GroupBy::OriginalYear:{
+      return tr("Original year");
+    }
+    case CollectionModel::GroupBy::Genre:{
+      return tr("Genre");
+    }
+    case CollectionModel::GroupBy::Composer:{
+      return tr("Composer");
+    }
+    case CollectionModel::GroupBy::Performer:{
+      return tr("Performer");
+    }
+    case CollectionModel::GroupBy::Grouping:{
+      return tr("Grouping");
+    }
+    case CollectionModel::GroupBy::FileType:{
+      return tr("File type");
+    }
+    case CollectionModel::GroupBy::Format:{
+      return tr("Format");
+    }
+    case CollectionModel::GroupBy::Samplerate:{
+      return tr("Sample rate");
+    }
+    case CollectionModel::GroupBy::Bitdepth:{
+      return tr("Bit depth");
+    }
+    case CollectionModel::GroupBy::Bitrate:{
+      return tr("Bitrate");
+    }
+  }
+
+  return tr("Unknown");
+
+}
+
+void SavedGroupingManager::UpdateModel() {
+
+  model_->setRowCount(0);  // don't use clear, it deletes headers
+  Settings s;
+  s.beginGroup(saved_groupings_settings_group_);
+  int version = s.value(kVersion).toInt();
+  if (version == 1) {
+    QStringList saved = s.childKeys();
+    for (int i = 0; i < saved.size(); ++i) {
+      const QString &name = saved.at(i);
+      if (name == QLatin1String(kVersion)) continue;
+      QByteArray bytes = s.value(name).toByteArray();
+      QDataStream ds(&bytes, QIODevice::ReadOnly);
+      CollectionModel::Grouping g;
+      ds >> g;
+
+      QList<QStandardItem*> list;
+
+      QStandardItem *item = new QStandardItem();
+      item->setText(QUrl::fromPercentEncoding(name.toUtf8()));
+      item->setData(name);
+
+      list << item
+           << new QStandardItem(GroupByToString(g.first))
+           << new QStandardItem(GroupByToString(g.second))
+           << new QStandardItem(GroupByToString(g.third));
+
+      model_->appendRow(list);
+    }
+  }
+  else {
+    QStringList saved = s.childKeys();
+    for (int i = 0; i < saved.size(); ++i) {
+      const QString &name = saved.at(i);
+      if (name == QLatin1String(kVersion)) continue;
+      s.remove(name);
+    }
+  }
+  s.endGroup();
+
+}
+
+void SavedGroupingManager::Remove() {
+
+  if (ui_->list->selectionModel()->hasSelection()) {
+    Settings s;
+    s.beginGroup(saved_groupings_settings_group_);
+    const QModelIndexList indexes = ui_->list->selectionModel()->selectedRows();
+    for (const QModelIndex &idx : indexes) {
+      if (idx.isValid()) {
+        qLog(Debug) << "Remove saved grouping: " << model_->item(idx.row(), 0)->text();
+        s.remove(model_->item(idx.row(), 0)->data().toString());
+      }
+    }
+    s.endGroup();
+  }
+  UpdateModel();
+
+  Q_EMIT UpdateGroupByActions();
+
+}
+
+void SavedGroupingManager::UpdateButtonState() {
+
+  if (ui_->list->selectionModel()->hasSelection()) {
+    const QModelIndex current = ui_->list->selectionModel()->currentIndex();
+    ui_->remove->setEnabled(current.isValid());
+  }
+  else {
+    ui_->remove->setEnabled(false);
+  }
+
 }

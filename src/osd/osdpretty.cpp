@@ -1,653 +1,620 @@
-#include "osd/osdpretty.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include "config.h"
-#include "constants/notificationssettings.h"
+
+#include <chrono>
+
+#include <QApplication>
+#include <QGuiApplication>
+#include <QWindow>
+#include <QScreen>
+#include <QWidget>
+#include <QString>
+#include <QImage>
+#include <QPixmap>
+#include <QBitmap>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPalette>
+#include <QColor>
+#include <QBrush>
+#include <QCursor>
+#include <QPen>
+#include <QRect>
+#include <QPoint>
+#include <QFont>
+#include <QTimer>
+#include <QTimeLine>
+#include <QTransform>
+#include <QBoxLayout>
+#include <QLinearGradient>
+#include <QSettings>
+#include <QFlags>
+#include <QtEvents>
+
+#ifdef HAVE_QPA_QPLATFORMNATIVEINTERFACE
+#  include <qpa/qplatformnativeinterface.h>
+#endif
+
 #include "core/settings.h"
-#include "osd/osdprettyfade.h"
-#include "osd/osdprettylimits.h"
-#include "osd/osdprettyplacement.h"
-#include "osd/osdprettypopup.h"
-#include "osd/osdprettytransparency.h"
-#include "osd/osdprettywayland.h"
-#include "utilities/fontutils.h"
-#include "utilities/styleutils.h"
-#include "utilities/winblurbehind.h"
-#ifdef _WIN32
-#include "utilities/winutils.h"
+#include "constants/notificationssettings.h"
+
+#include "osdpretty.h"
+#include "ui_osdpretty.h"
+
+#ifdef Q_OS_WIN32
+#  include <windows.h>
+#  include <dwmapi.h>
 #endif
 
-#include <algorithm>
-#include <utility>
-
-#ifdef HAVE_X11
-#include <gdk/x11/gdkx.h>
-#include <X11/Xlib.h>
-#include <X11/extensions/shape.h>
+#ifdef Q_OS_WIN32
+#  include "utilities/winutils.h"
 #endif
 
-#ifdef HAVE_GTK4_LAYER_SHELL
-#include <gtk4-layer-shell.h>
-#endif
+using namespace std::chrono_literals;
+using namespace Qt::Literals::StringLiterals;
 
 namespace {
 
-struct ListedMonitor {
-  std::string name;
-  OSDPrettyPlacement::Rect workarea;
-};
-
-std::string MonitorName(GdkMonitor *monitor, int index) {
-  if (!monitor) {
-    return std::to_string(index);
-  }
-  if (const char *connector = gdk_monitor_get_connector(monitor); connector && *connector) {
-    return connector;
-  }
-#if GTK_CHECK_VERSION(4, 10, 0)
-  if (const char *description = gdk_monitor_get_description(monitor); description && *description) {
-    return description;
-  }
-#endif
-  if (const char *model = gdk_monitor_get_model(monitor); model && *model) {
-    return model;
-  }
-  return std::to_string(index);
-}
-
-std::vector<ListedMonitor> ListMonitors() {
-  std::vector<ListedMonitor> out;
-  GdkDisplay *display = gdk_display_get_default();
-  if (!display) {
-    return out;
-  }
-  GListModel *model = gdk_display_get_monitors(display);
-  const guint n = g_list_model_get_n_items(model);
-  for (guint i = 0; i < n; ++i) {
-    auto *monitor = GDK_MONITOR(g_list_model_get_item(model, i));
-    ListedMonitor item;
-    item.name = MonitorName(monitor, static_cast<int>(i));
-    GdkRectangle geo{};
-    gdk_monitor_get_geometry(monitor, &geo);
-#ifdef HAVE_X11
-    if (GDK_IS_X11_MONITOR(monitor)) {
-      gdk_x11_monitor_get_workarea(monitor, &geo);
-    }
-#endif
-    item.workarea = {geo.x, geo.y, geo.width, geo.height};
-    out.push_back(item);
-    g_object_unref(monitor);
-  }
-  return out;
-}
-
-OSDPrettyPlacement::Rect WindowSize(GtkWidget *window) {
-  int width = 320;
-  int height = 80;
-  if (window) {
-    GtkRequisition nat{};
-    gtk_widget_get_preferred_size(window, nullptr, &nat);
-    width = std::max({nat.width, gtk_widget_get_width(window), 160});
-    height = std::max({nat.height, gtk_widget_get_height(window), 48});
-  }
-  return {0, 0, width, height};
-}
-
-bool LayerShellAvailable() {
-#ifdef HAVE_GTK4_LAYER_SHELL
-  return gtk_layer_is_supported();
-#else
-  return false;
-#endif
-}
-
-#ifdef HAVE_GTK4_LAYER_SHELL
-GdkMonitor *MonitorAt(int index) {
-  GdkDisplay *display = gdk_display_get_default();
-  if (!display || index < 0) {
-    return nullptr;
-  }
-  GListModel *model = gdk_display_get_monitors(display);
-  if (static_cast<guint>(index) >= g_list_model_get_n_items(model)) {
-    return nullptr;
-  }
-  return GDK_MONITOR(g_list_model_get_item(model, static_cast<guint>(index)));
-}
-#endif
-
-void InitLayerShell(GtkWidget *window) {
-#ifdef HAVE_GTK4_LAYER_SHELL
-  if (!window || !LayerShellAvailable()) {
-    return;
-  }
-  gtk_layer_init_for_window(GTK_WINDOW(window));
-  gtk_layer_set_layer(GTK_WINDOW(window), GTK_LAYER_SHELL_LAYER_OVERLAY);
-  gtk_layer_set_anchor(GTK_WINDOW(window), GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
-  gtk_layer_set_anchor(GTK_WINDOW(window), GTK_LAYER_SHELL_EDGE_TOP, TRUE);
-  gtk_layer_set_keyboard_mode(GTK_WINDOW(window), GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
-  gtk_layer_set_namespace(GTK_WINDOW(window), "osd");
-  gtk_layer_set_exclusive_zone(GTK_WINDOW(window), 0);
-#else
-  (void)window;
-#endif
-}
-
-void MoveWindow(GtkWidget *window, int x, int y, const OSDPrettyPlacement::Rect &workarea, int monitor_index) {
-  bool is_x11 = false;
-#ifdef HAVE_X11
-  if (window) {
-    if (GdkDisplay *display = gtk_widget_get_display(window)) {
-      is_x11 = GDK_IS_X11_DISPLAY(display);
-    }
-  }
-#endif
-  if (!OSDPrettyWayland::CanMoveWindow(OSDPrettyWayland::DetectBackend(is_x11, LayerShellAvailable()))) {
-    (void)window;
-    (void)x;
-    (void)y;
-    (void)workarea;
-    (void)monitor_index;
-    return;
-  }
-#ifdef HAVE_GTK4_LAYER_SHELL
-  if (LayerShellAvailable() && window) {
-    GdkMonitor *monitor = MonitorAt(monitor_index);
-    gtk_layer_set_monitor(GTK_WINDOW(window), monitor);
-    const OSDPrettyWayland::LayerMargins margins = OSDPrettyWayland::MarginsFromAbsolute(x, y, workarea.x, workarea.y);
-    gtk_layer_set_margin(GTK_WINDOW(window), GTK_LAYER_SHELL_EDGE_LEFT, margins.left);
-    gtk_layer_set_margin(GTK_WINDOW(window), GTK_LAYER_SHELL_EDGE_TOP, margins.top);
-    if (monitor) {
-      g_object_unref(monitor);
-    }
-    return;
-  }
-#else
-  (void)workarea;
-  (void)monitor_index;
-#endif
-#ifdef HAVE_X11
-  GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window));
-  if (surface && GDK_IS_X11_SURFACE(surface)) {
-    XMoveWindow(GDK_SURFACE_XDISPLAY(surface), gdk_x11_surface_get_xid(surface), x, y);
-  }
-#else
-  (void)window;
-  (void)x;
-  (void)y;
-#endif
-}
-
-OSDPrettyPlacement::Rect CurrentWorkarea(const std::string &screen) {
-  const auto monitors = ListMonitors();
-  std::vector<std::string> names;
-  names.reserve(monitors.size());
-  for (const auto &monitor : monitors) {
-    names.push_back(monitor.name);
-  }
-  const int index = OSDPrettyPlacement::ResolveIndex(screen, names);
-  if (index >= 0 && static_cast<size_t>(index) < monitors.size()) {
-    return monitors[static_cast<size_t>(index)].workarea;
-  }
-  return {0, 0, 1920, 1080};
-}
+constexpr int kDropShadowSize = 13;
+constexpr int kBorderRadius = 10;
+constexpr int kMaxIconSize = 100;
+constexpr int kSnapProximity = 20;
 
 }  // namespace
 
-OSDPretty::OSDPretty(Mode mode) : mode_(mode) { ReloadSettings(); }
+OSDPretty::OSDPretty(const Mode mode, QWidget *parent)
+    : QWidget(parent),
+      ui_(new Ui_OSDPretty),
+      mode_(mode),
+      background_color_(OSDPrettySettings::kPresetBlue),
+      background_opacity_(0.85),
+      popup_screen_(nullptr),
+      disable_duration_(false),
+      timeout_(new QTimer(this)),
+      fading_enabled_(false),
+      fader_(new QTimeLine(300, this)),
+      toggle_mode_(false) {
+
+  setWindowTitle(u"OSDPretty"_s);
+  setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::X11BypassWindowManagerHint);
+
+  setAttribute(Qt::WA_TranslucentBackground, true);
+  setAttribute(Qt::WA_X11NetWmWindowTypeNotification, true);
+  setAttribute(Qt::WA_ShowWithoutActivating, true);
+
+  ui_->setupUi(this);
+
+#ifdef Q_OS_WIN32
+  // Don't show the window in the taskbar.  Qt::ToolTip does this too, but it adds an extra ugly shadow.
+  int ex_style = GetWindowLong(reinterpret_cast<HWND>(winId()), GWL_EXSTYLE);
+  ex_style |= WS_EX_NOACTIVATE;
+  SetWindowLong(reinterpret_cast<HWND>(winId()), GWL_EXSTYLE, ex_style);
+#endif
+
+  // Mode settings
+  switch (mode_) {
+    case Mode::Popup:
+      setCursor(QCursor(Qt::ArrowCursor));
+      break;
+
+    case Mode::Draggable:
+      setCursor(QCursor(Qt::OpenHandCursor));
+      break;
+  }
+
+  // Timeout
+  timeout_->setSingleShot(true);
+  timeout_->setInterval(5s);
+  QObject::connect(timeout_, &QTimer::timeout, this, &OSDPretty::hide);
+
+  ui_->icon->setMaximumSize(kMaxIconSize, kMaxIconSize);
+
+  // Fader
+  QObject::connect(fader_, &QTimeLine::valueChanged, this, &OSDPretty::FaderValueChanged);
+  QObject::connect(fader_, &QTimeLine::finished, this, &OSDPretty::FaderFinished);
+
+  // Load the show edges and corners
+  QImage shadow_edge(u":/pictures/osd_shadow_edge.png"_s);
+  QImage shadow_corner(u":/pictures/osd_shadow_corner.png"_s);
+  for (int i = 0; i < 4; ++i) {
+    QTransform rotation = QTransform().rotate(90 * i);
+    shadow_edge_[i] = QPixmap::fromImage(shadow_edge.transformed(rotation));
+    shadow_corner_[i] = QPixmap::fromImage(shadow_corner.transformed(rotation));
+  }
+  background_ = QPixmap(u":/pictures/osd_background.png"_s);
+
+  // Set the margins to allow for the drop shadow
+  QBoxLayout *l = qobject_cast<QBoxLayout*>(layout());
+  QMargins margin = l->contentsMargins();
+  margin.setTop(margin.top() + kDropShadowSize);
+  margin.setBottom(margin.bottom() + kDropShadowSize);
+  margin.setLeft(margin.left() + kDropShadowSize);
+  margin.setRight(margin.right() + kDropShadowSize);
+  l->setContentsMargins(margin);
+
+  QObject::connect(qApp, &QApplication::screenAdded, this, &OSDPretty::ScreenAdded);
+  QObject::connect(qApp, &QApplication::screenRemoved, this, &OSDPretty::ScreenRemoved);
+
+}
 
 OSDPretty::~OSDPretty() {
-  StopFade();
-  if (timeout_id_) {
-    g_source_remove(timeout_id_);
+  delete ui_;
+}
+
+void OSDPretty::showEvent(QShowEvent *e) {
+
+  screens_.clear();
+  const QList<QScreen*> screens = QGuiApplication::screens();
+  for (QScreen *screen : screens) {
+    screens_.insert(screen->name(), screen);
   }
-  if (window_) {
-    gtk_window_destroy(GTK_WINDOW(window_));
+
+  // Get current screen resolution
+  QScreen *screen = current_screen();
+  if (screen) {
+    QRect resolution = screen->availableGeometry();
+    // Leave 200 px for icon
+    ui_->summary->setMaximumWidth(resolution.width() - 200);
+    ui_->message->setMaximumWidth(resolution.width() - 200);
+    // Set maximum size for the OSD, a little margin here too
+    setMaximumSize(resolution.width() - 100, resolution.height() - 100);
   }
+
+  setWindowOpacity(fading_enabled_ ? 0.0 : 1.0);
+
+  QWidget::showEvent(e);
+
+  Load();
+  Reposition();
+
+  if (fading_enabled_) {
+    fader_->setDirection(QTimeLine::Forward);
+    fader_->start();  // Timeout will be started in FaderFinished
+  }
+  else if (mode_ == Mode::Popup) {
+    if (!disable_duration()) {
+      timeout_->start();
+    }
+    // Ensures it is above when showing the preview
+    raise();
+  }
+
+}
+
+void OSDPretty::ScreenAdded(QScreen *screen) {
+
+  screens_.insert(screen->name(), screen);
+
+}
+
+void OSDPretty::ScreenRemoved(QScreen *screen) {
+
+  if (screens_.contains(screen->name())) screens_.remove(screen->name());
+  if (screen == popup_screen_) popup_screen_ = current_screen();
+
+}
+
+bool OSDPretty::IsTransparencyAvailable() {
+
+  if (qApp) {
+    const QString platform = QGuiApplication::platformName();
+#ifdef HAVE_QPA_QPLATFORMNATIVEINTERFACE
+    if (platform == "xcb"_L1) {
+      // On X11 the window can only be translucent while a compositing manager is running.
+      QPlatformNativeInterface *native = QGuiApplication::platformNativeInterface();
+      QScreen *screen = popup_screen_ == nullptr ? QGuiApplication::primaryScreen() : popup_screen_;
+      if (native && screen) {
+        return native->nativeResourceForScreen(QByteArray("compositingEnabled"), screen);
+      }
+    }
+#endif
+    // Wayland compositors always composite the scene, so translucency is always available.
+    if (platform.startsWith("wayland"_L1)) {
+      return true;
+    }
+  }
+
+#ifdef Q_OS_WIN32
+  // On Windows translucency requires Desktop Window Manager composition to be enabled.
+  BOOL composition_enabled = FALSE;
+  if (SUCCEEDED(DwmIsCompositionEnabled(&composition_enabled))) {
+    return composition_enabled != FALSE;
+  }
+#endif
+
+  // For macOS (Quartz) and any other platform we assume translucency is available.
+  return true;
+
+}
+
+void OSDPretty::Load() {
+
+  Settings s;
+  s.beginGroup(OSDPrettySettings::kSettingsGroup);
+  foreground_color_ = QColor(static_cast<QRgb>(s.value(OSDPrettySettings::kForegroundColor, OSDPrettySettings::kDefaultForegroundColor).toInt()));
+  background_color_ = QColor(static_cast<QRgb>(s.value(OSDPrettySettings::kBackgroundColor, OSDPrettySettings::kPresetBlue).toInt()));
+  background_opacity_ = s.value(OSDPrettySettings::kBackgroundOpacity, OSDPrettySettings::kDefaultBackgroundOpacity).toFloat();
+  font_.fromString(s.value(OSDPrettySettings::kFont, QLatin1String(OSDPrettySettings::kDefaultFont)).toString());
+  disable_duration_ = s.value(OSDPrettySettings::kDisableDuration, OSDPrettySettings::kDefaultDisableDuration).toBool();
+#ifdef Q_OS_WIN32
+  fading_enabled_ = s.value(OSDPrettySettings::kFading, true).toBool();
+#else
+  fading_enabled_ = s.value(OSDPrettySettings::kFading, false).toBool();
+#endif
+
+  if (s.contains(OSDPrettySettings::kPopupScreen)) {
+    popup_screen_name_ = s.value(OSDPrettySettings::kPopupScreen).toString();
+    if (screens_.contains(popup_screen_name_)) {
+      popup_screen_ = screens_.value(popup_screen_name_);
+    }
+    else {
+      popup_screen_ = current_screen();
+      if (current_screen()) popup_screen_name_ = current_screen()->name();
+      else popup_screen_name_.clear();
+    }
+  }
+  else {
+    popup_screen_ = current_screen();
+    if (current_screen()) popup_screen_name_ = current_screen()->name();
+  }
+
+  if (s.contains(OSDPrettySettings::kPopupPos)) {
+    popup_pos_ = s.value(OSDPrettySettings::kPopupPos).toPoint();
+  }
+  else {
+    if (popup_screen_) {
+      QRect geometry = popup_screen_->availableGeometry();
+      popup_pos_.setX(geometry.width() - width());
+      popup_pos_.setY(0);
+    }
+    else {
+      popup_pos_.setX(0);
+      popup_pos_.setY(0);
+    }
+  }
+
+  set_font(font());
+  set_foreground_color(foreground_color());
+
+  s.endGroup();
+
 }
 
 void OSDPretty::ReloadSettings() {
-  Settings s;
-  s.BeginGroup(OSDPrettySettings::kSettingsGroup);
-  fg_ = s.Contains(OSDPrettySettings::kForegroundColor) ? s.Value(OSDPrettySettings::kForegroundColor)
-                                                        : s.Value("foreground", "#ffffff");
-  bg_ = s.Contains(OSDPrettySettings::kBackgroundColor) ? s.Value(OSDPrettySettings::kBackgroundColor)
-                                                        : s.Value("background", "#202020");
-  opacity_ = s.Contains(OSDPrettySettings::kBackgroundOpacity) ? s.DoubleValue(OSDPrettySettings::kBackgroundOpacity, 0.85)
-                                                              : s.DoubleValue("opacity", 0.92);
-  font_ = s.Contains(OSDPrettySettings::kFont) ? s.Value(OSDPrettySettings::kFont, OSDPrettySettings::kDefaultFont)
-                                               : s.Value("font", "Sans 12");
-  s.BeginGroup(OSDSettings::kSettingsGroup);
-  pos_x_ = s.IntValue("posx", 40);
-  pos_y_ = s.IntValue("posy", 40);
-  show_art_ = s.Contains(OSDSettings::kShowArt) ? s.BoolValue(OSDSettings::kShowArt, true) : s.BoolValue("showart", true);
-  timeout_ms_ = s.Contains(OSDSettings::kTimeout) ? s.IntValue(OSDSettings::kTimeout, 5000) : s.IntValue("timeout", 4000);
-  s.BeginGroup(OSDPrettySettings::kSettingsGroup);
-  fading_ = s.BoolValue(OSDPrettySettings::kFading, true);
-  disable_duration_ = s.BoolValue(OSDPrettySettings::kDisableDuration, OSDPrettySettings::kDefaultDisableDuration);
-  popup_screen_ = s.Value(OSDPrettySettings::kPopupScreen);
-  if (s.Contains(OSDPrettySettings::kPopupPos)) {
-    const OSDPrettyPlacement::Point pos = OSDPrettyPlacement::ParsePos(s.Value(OSDPrettySettings::kPopupPos), {pos_x_, pos_y_});
-    pos_x_ = pos.x;
-    pos_y_ = pos.y;
-  }
+  Load();
+  if (isVisible()) update();
 }
 
-bool OSDPretty::Supported() { return OSDPrettyWayland::SupportedOnDisplay(gdk_display_get_default() != nullptr); }
-
-void OSDPretty::set_pos(int x, int y) {
-  pos_x_ = x;
-  pos_y_ = y;
+QRect OSDPretty::BoxBorder() const {
+  return rect().adjusted(kDropShadowSize, kDropShadowSize, -kDropShadowSize, -kDropShadowSize);
 }
 
-void OSDPretty::SavePosition() const {
-  Settings s;
-  s.BeginGroup(OSDSettings::kSettingsGroup);
-  s.SetIntValue("posx", pos_x_);
-  s.SetIntValue("posy", pos_y_);
-  s.BeginGroup(OSDPrettySettings::kSettingsGroup);
-  s.SetValue(OSDPrettySettings::kPopupScreen, popup_screen_);
-  s.SetValue(OSDPrettySettings::kPopupPos, OSDPrettyPlacement::FormatPos({pos_x_, pos_y_}));
-  s.Sync();
+void OSDPretty::paintEvent(QPaintEvent *e) {
+
+  Q_UNUSED(e)
+
+  QPainter p(this);
+  p.setRenderHint(QPainter::Antialiasing);
+
+  QRect box(BoxBorder());
+
+  // Shadow corners
+  const int kShadowCornerSize = kDropShadowSize + kBorderRadius;
+  p.drawPixmap(0, 0, shadow_corner_[0]);
+  p.drawPixmap(width() - kShadowCornerSize, 0, shadow_corner_[1]);
+  p.drawPixmap(width() - kShadowCornerSize, height() - kShadowCornerSize, shadow_corner_[2]);
+  p.drawPixmap(0, height() - kShadowCornerSize, shadow_corner_[3]);
+
+  // Shadow edges
+  p.drawTiledPixmap(kShadowCornerSize, 0, width() - kShadowCornerSize * 2, kDropShadowSize, shadow_edge_[0]);
+  p.drawTiledPixmap(width() - kDropShadowSize, kShadowCornerSize, kDropShadowSize, height() - kShadowCornerSize * 2, shadow_edge_[1]);
+  p.drawTiledPixmap(kShadowCornerSize, height() - kDropShadowSize, width() - kShadowCornerSize * 2, kDropShadowSize, shadow_edge_[2]);
+  p.drawTiledPixmap(0, kShadowCornerSize, kDropShadowSize, height() - kShadowCornerSize * 2, shadow_edge_[3]);
+
+  // Box background
+  p.setBrush(background_color_);
+  p.setPen(QPen());
+  p.setOpacity(background_opacity_);
+  p.drawRoundedRect(box, kBorderRadius, kBorderRadius);
+
+  // Background pattern
+  QPainterPath background_path;
+  background_path.addRoundedRect(box, kBorderRadius, kBorderRadius);
+  p.setClipPath(background_path);
+  p.setOpacity(1.0);
+  p.drawPixmap(box.right() - background_.width(), box.bottom() - background_.height(), background_);
+  p.setClipping(false);
+
+  // Gradient overlay
+  QLinearGradient gradient(0, 0, 0, height());
+  gradient.setColorAt(0, QColor(255, 255, 255, 130));
+  gradient.setColorAt(1, QColor(255, 255, 255, 50));
+  p.setBrush(gradient);
+  p.drawRoundedRect(box, kBorderRadius, kBorderRadius);
+
+  // Box border
+  p.setBrush(QBrush());
+  p.setPen(QPen(background_color_.darker(150), 2));
+  p.drawRoundedRect(box, kBorderRadius, kBorderRadius);
+
 }
 
-std::vector<std::pair<std::string, std::string>> OSDPretty::MonitorChoices() {
-  std::vector<std::pair<std::string, std::string>> choices;
-  for (const auto &monitor : ListMonitors()) {
-    const std::string label = monitor.name.empty() ? "Primary" : monitor.name;
-    choices.emplace_back(monitor.name, label);
+void OSDPretty::SetMessage(const QString &summary, const QString &message, const QImage &image) {
+
+  if (!image.isNull()) {
+    QImage scaled_image = image.scaled(static_cast<int>(kMaxIconSize * devicePixelRatioF()), static_cast<int>(kMaxIconSize * devicePixelRatioF()), Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    scaled_image.setDevicePixelRatio(devicePixelRatioF());
+    ui_->icon->setPixmap(QPixmap::fromImage(scaled_image));
+    ui_->icon->show();
   }
-  if (choices.empty()) {
-    choices.emplace_back("", "Primary");
+  else {
+    ui_->icon->hide();
   }
-  return choices;
+
+  ui_->summary->setText(summary);
+  ui_->message->setText(message);
+
+  if (isVisible()) Reposition();
+
 }
 
-void OSDPretty::ApplyLimits() {
-  if (!window_) {
-    return;
-  }
-  const OSDPrettyPlacement::Rect workarea = CurrentWorkarea(popup_screen_);
-  const int label_width = OSDPrettyLimits::MaxLabelWidth(workarea.width);
-  const int window_width = OSDPrettyLimits::MaxWindowWidth(workarea.width);
-  const int window_height = OSDPrettyLimits::MaxWindowHeight(workarea.height);
-  if (title_) {
-    gtk_label_set_wrap(GTK_LABEL(title_), TRUE);
-    gtk_label_set_ellipsize(GTK_LABEL(title_), PANGO_ELLIPSIZE_END);
-    gtk_widget_set_hexpand(title_, TRUE);
-  }
-  if (body_) {
-    gtk_label_set_wrap(GTK_LABEL(body_), TRUE);
-    gtk_label_set_ellipsize(GTK_LABEL(body_), PANGO_ELLIPSIZE_END);
-    gtk_widget_set_hexpand(body_, TRUE);
-  }
-  const std::string sheet = ".osd-pretty { max-width: " + std::to_string(window_width) + "px; max-height: " +
-                            std::to_string(window_height) + "px; } .osd-pretty label { max-width: " +
-                            std::to_string(label_width) + "px; }";
-  StyleUtils::LoadCss(sheet, StyleUtils::Slot::kOsdPrettyMetrics);
-}
+// Set the desired message and then show the OSD
+void OSDPretty::ShowMessage(const QString &summary, const QString &message, const QImage &image) {
 
-void OSDPretty::StopFade() {
-  if (fade_id_) {
-    g_source_remove(fade_id_);
-    fade_id_ = 0;
-  }
-}
+  SetMessage(summary, message, image);
 
-void OSDPretty::StartHideTimeout() {
-  if (timeout_id_) {
-    g_source_remove(timeout_id_);
-    timeout_id_ = 0;
-  }
-  if (mode_ != Mode::Popup || timeout_ms_ <= 0 || disable_duration_) {
-    return;
-  }
-  timeout_id_ = g_timeout_add(timeout_ms_, +[](gpointer data) -> gboolean {
-    auto *self = static_cast<OSDPretty *>(data);
-    self->timeout_id_ = 0;
-    self->StartFade(false);
-    return G_SOURCE_REMOVE;
-  }, this);
-}
-
-void OSDPretty::StartFade(bool fading_in) {
-  StopFade();
-  if (!window_) {
-    return;
-  }
-  if (!fading_) {
-    gtk_widget_set_opacity(window_, fading_in ? 1.0 : 0.0);
-    if (!fading_in) {
-      gtk_widget_set_visible(window_, FALSE);
-    } else {
-      StartHideTimeout();
+  if (isVisible() && mode_ == Mode::Popup) {
+    // The OSD is already visible, toggle or restart the timer
+    if (toggle_mode()) {
+      set_toggle_mode(false);
+      // If timeout is disabled, timer hadn't been started
+      if (!disable_duration()) {
+        timeout_->stop();
+      }
+      hide();
     }
-    return;
-  }
-  gtk_widget_set_opacity(window_, fading_in ? 0.0 : 1.0);
-  struct FadeTick {
-    OSDPretty *self = nullptr;
-    bool fading_in = true;
-    gint64 start_us = 0;
-  };
-  auto *job = new FadeTick{this, fading_in, g_get_monotonic_time()};
-  fade_id_ = g_timeout_add_full(
-      G_PRIORITY_DEFAULT, OSDPrettyFade::kTickMs,
-      +[](gpointer data) -> gboolean {
-        auto *job = static_cast<FadeTick *>(data);
-        if (!job->self->window_) {
-          job->self->fade_id_ = 0;
-          return G_SOURCE_REMOVE;
-        }
-        const int elapsed = static_cast<int>((g_get_monotonic_time() - job->start_us) / 1000);
-        gtk_widget_set_opacity(job->self->window_, OSDPrettyFade::OpacityAt(elapsed, OSDPrettyFade::kDurationMs, job->fading_in));
-        if (!OSDPrettyFade::Finished(elapsed, OSDPrettyFade::kDurationMs)) {
-          return G_SOURCE_CONTINUE;
-        }
-        gtk_widget_set_opacity(job->self->window_, job->fading_in ? 1.0 : 0.0);
-        if (!job->fading_in) {
-          gtk_widget_set_visible(job->self->window_, FALSE);
-        } else {
-          job->self->StartHideTimeout();
-        }
-        job->self->fade_id_ = 0;
-        return G_SOURCE_REMOVE;
-      },
-      job, +[](gpointer data) { delete static_cast<FadeTick *>(data); });
-}
-
-void OSDPretty::ApplyPosition() {
-  const auto monitors = ListMonitors();
-  std::vector<std::string> names;
-  names.reserve(monitors.size());
-  for (const auto &monitor : monitors) {
-    names.push_back(monitor.name);
-  }
-  const int index = OSDPrettyPlacement::ResolveIndex(popup_screen_, names);
-  const OSDPrettyPlacement::Rect workarea = (index >= 0 && static_cast<size_t>(index) < monitors.size())
-                                                ? monitors[static_cast<size_t>(index)].workarea
-                                                : OSDPrettyPlacement::Rect{0, 0, 1920, 1080};
-  if (index >= 0 && static_cast<size_t>(index) < monitors.size()) {
-    popup_screen_ = monitors[static_cast<size_t>(index)].name;
-  }
-  const OSDPrettyPlacement::Rect size = WindowSize(window_);
-  const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::AbsolutePosition(workarea, {pos_x_, pos_y_}, size.width, size.height);
-  MoveWindow(window_, abs.x, abs.y, workarea, index);
-  ApplyShape();
-}
-
-bool OSDPretty::IsTransparencyAvailable() const {
-  GdkDisplay *display = gdk_display_get_default();
-  if (!display) {
-    return true;
-  }
-#ifdef HAVE_X11
-  if (GDK_IS_X11_DISPLAY(display)) {
-    return OSDPrettyTransparency::Available(true, gdk_display_is_composited(display), false);
-  }
-#endif
-  return OSDPrettyTransparency::Available(false, true, true);
-}
-
-void OSDPretty::ApplyShape() {
-#ifdef HAVE_X11
-  if (!window_) {
-    return;
-  }
-  GdkDisplay *display = gtk_widget_get_display(window_);
-  if (!display || !GDK_IS_X11_DISPLAY(display)) {
-    return;
-  }
-  GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window_));
-  if (!surface || !GDK_IS_X11_SURFACE(surface)) {
-    return;
-  }
-  Display *xdisplay = GDK_SURFACE_XDISPLAY(surface);
-  const Window xid = gdk_x11_surface_get_xid(surface);
-  const OSDPrettyPlacement::Rect size = WindowSize(window_);
-  const bool transparent = IsTransparencyAvailable();
-  if (OSDPrettyTransparency::ShouldClearShape(true, transparent)) {
-    XRectangle rect{0, 0, static_cast<unsigned short>(std::max(1, size.width)), static_cast<unsigned short>(std::max(1, size.height))};
-    XShapeCombineRectangles(xdisplay, xid, ShapeBounding, 0, 0, &rect, 1, ShapeSet, Unsorted);
-    return;
-  }
-  if (!OSDPrettyTransparency::ShouldApplyShape(true, transparent) || size.width <= 0 || size.height <= 0) {
-    return;
-  }
-  const std::vector<unsigned char> bits = OSDPrettyTransparency::RoundedMaskBits(size.width, size.height);
-  if (bits.empty()) {
-    return;
-  }
-  Pixmap pixmap = XCreateBitmapFromData(xdisplay, xid, reinterpret_cast<const char *>(bits.data()), static_cast<unsigned>(size.width),
-                                        static_cast<unsigned>(size.height));
-  if (!pixmap) {
-    return;
-  }
-  XShapeCombineMask(xdisplay, xid, ShapeBounding, 0, 0, pixmap, ShapeSet);
-  XFreePixmap(xdisplay, pixmap);
-#else
-  (void)0;
-#endif
-#ifdef _WIN32
-  if (window_ && WinBlurBehind::ShouldApply(true, true)) {
-    WinUtils::EnableBlurBehindWindow(window_);
-  }
-#endif
-}
-
-void OSDPretty::ApplyStyle() {
-  if (!window_) {
-    return;
-  }
-  const std::string sheet = OSDPrettyPopup::ChromeCss(bg_, fg_, opacity_, FontUtils::ToCss(FontUtils::Parse(font_)));
-  StyleUtils::LoadCss(sheet, StyleUtils::Slot::kOsdPrettyChrome);
-}
-
-void OSDPretty::ConnectDrag() {
-  if (!window_ || !OSDPrettyPopup::DragEnabled(mode_ == Mode::Draggable)) {
-    return;
-  }
-  GtkGesture *drag = gtk_gesture_drag_new();
-  gtk_widget_add_controller(window_, GTK_EVENT_CONTROLLER(drag));
-  g_signal_connect(drag, "drag-begin", G_CALLBACK(OnDragBegin), this);
-  g_signal_connect(drag, "drag-update", G_CALLBACK(OnDragUpdate), this);
-  g_signal_connect(drag, "drag-end", G_CALLBACK(OnDragEnd), this);
-}
-
-void OSDPretty::ConnectPopup() {
-  if (!window_ || !OSDPrettyPopup::ClickDismisses(mode_ == Mode::Popup)) {
-    return;
-  }
-  GtkGesture *click = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(click), GDK_BUTTON_PRIMARY);
-  gtk_widget_add_controller(window_, GTK_EVENT_CONTROLLER(click));
-  g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint, gdouble, gdouble, gpointer data) {
-                     static_cast<OSDPretty *>(data)->HideNow();
-                   }),
-                   this);
-  GtkEventController *motion = gtk_event_controller_motion_new();
-  gtk_widget_add_controller(window_, motion);
-  g_signal_connect(motion, "enter", G_CALLBACK(+[](GtkEventControllerMotion *, gdouble, gdouble, gpointer data) {
-                     static_cast<OSDPretty *>(data)->SetHoverDim(true);
-                   }),
-                   this);
-  g_signal_connect(motion, "leave", G_CALLBACK(+[](GtkEventControllerMotion *, gpointer data) {
-                     static_cast<OSDPretty *>(data)->SetHoverDim(false);
-                   }),
-                   this);
-}
-
-void OSDPretty::Hide() { HideNow(); }
-
-void OSDPretty::HideNow() {
-  if (timeout_id_) {
-    g_source_remove(timeout_id_);
-    timeout_id_ = 0;
-  }
-  StopFade();
-  if (window_) {
-    gtk_widget_set_visible(window_, FALSE);
-  }
-}
-
-void OSDPretty::SetHoverDim(bool dimmed) {
-  if (!window_ || !OSDPrettyPopup::HoverDims(mode_ == Mode::Popup)) {
-    return;
-  }
-  hover_dimmed_ = dimmed;
-  gtk_widget_set_opacity(window_, dimmed ? OSDPrettyPopup::kHoverOpacity : 1.0);
-}
-
-void OSDPretty::SetSnapHighlight(bool snapped) {
-  if (!window_ || snap_highlight_ == snapped) {
-    return;
-  }
-  snap_highlight_ = snapped;
-  if (snapped) {
-    gtk_widget_add_css_class(window_, OSDPrettyPopup::kSnapClass);
-  } else {
-    gtk_widget_remove_css_class(window_, OSDPrettyPopup::kSnapClass);
-  }
-}
-
-void OSDPretty::OnDragBegin(GtkGestureDrag *, double, double, gpointer data) {
-  auto *self = static_cast<OSDPretty *>(data);
-  const auto monitors = ListMonitors();
-  std::vector<std::string> names;
-  names.reserve(monitors.size());
-  for (const auto &monitor : monitors) {
-    names.push_back(monitor.name);
-  }
-  const int index = OSDPrettyPlacement::ResolveIndex(self->popup_screen_, names);
-  const OSDPrettyPlacement::Rect workarea = (index >= 0 && static_cast<size_t>(index) < monitors.size())
-                                                ? monitors[static_cast<size_t>(index)].workarea
-                                                : OSDPrettyPlacement::Rect{0, 0, 1920, 1080};
-  const OSDPrettyPlacement::Rect size = WindowSize(self->window_);
-  const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::AbsolutePosition(workarea, {self->pos_x_, self->pos_y_}, size.width, size.height, false);
-  self->drag_start_x_ = abs.x;
-  self->drag_start_y_ = abs.y;
-}
-
-void OSDPretty::OnDragUpdate(GtkGestureDrag *, double offset_x, double offset_y, gpointer data) {
-  auto *self = static_cast<OSDPretty *>(data);
-  const OSDPrettyPlacement::Point raw{static_cast<int>(self->drag_start_x_ + offset_x), static_cast<int>(self->drag_start_y_ + offset_y)};
-  const auto monitors = ListMonitors();
-  std::vector<OSDPrettyPlacement::Rect> rects;
-  rects.reserve(monitors.size());
-  for (const auto &monitor : monitors) {
-    rects.push_back(monitor.workarea);
-  }
-  int index = OSDPrettyPlacement::IndexContaining(rects, raw);
-  if (index < 0 && !monitors.empty()) {
-    index = 0;
-  }
-  const OSDPrettyPlacement::Rect workarea = (index >= 0 && static_cast<size_t>(index) < monitors.size())
-                                                ? monitors[static_cast<size_t>(index)].workarea
-                                                : OSDPrettyPlacement::Rect{0, 0, 1920, 1080};
-  const OSDPrettyPlacement::Rect size = WindowSize(self->window_);
-  const OSDPrettyPlacement::Point abs = OSDPrettyPlacement::DragPosition(workarea, raw, size.width, size.height);
-  const int center = workarea.x + workarea.width / 2 - size.width / 2;
-  self->SetSnapHighlight(OSDPrettyPlacement::IsSnappedToCenter(abs.x, center));
-  const OSDPrettyPlacement::Point rel = OSDPrettyPlacement::RelativePosition(workarea, abs, size.width, size.height);
-  self->pos_x_ = rel.x;
-  self->pos_y_ = rel.y;
-  if (index >= 0 && static_cast<size_t>(index) < monitors.size()) {
-    self->popup_screen_ = monitors[static_cast<size_t>(index)].name;
-  }
-  MoveWindow(self->window_, abs.x, abs.y, workarea, index);
-}
-
-void OSDPretty::OnDragEnd(GtkGestureDrag *, double, double, gpointer data) {
-  auto *self = static_cast<OSDPretty *>(data);
-  self->SetSnapHighlight(false);
-  self->SavePosition();
-}
-
-void OSDPretty::EnsureWindow() {
-  if (window_) {
-    return;
-  }
-  window_ = gtk_window_new();
-  gtk_window_set_decorated(GTK_WINDOW(window_), FALSE);
-  gtk_window_set_resizable(GTK_WINDOW(window_), FALSE);
-  gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
-  gtk_widget_add_css_class(window_, "osd");
-  gtk_widget_add_css_class(window_, "osd-pretty");
-  InitLayerShell(window_);
-  ApplyStyle();
-  g_signal_connect(window_, "realize", G_CALLBACK(+[](GtkWidget *, gpointer data) {
-                     static_cast<OSDPretty *>(data)->ApplyPosition();
-                   }),
-                   this);
-  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-  gtk_widget_set_margin_start(box, 16);
-  gtk_widget_set_margin_end(box, 16);
-  gtk_widget_set_margin_top(box, 12);
-  gtk_widget_set_margin_bottom(box, 12);
-  image_ = gtk_image_new_from_icon_name("audio-x-generic-symbolic");
-  gtk_image_set_pixel_size(GTK_IMAGE(image_), 48);
-  GtkWidget *text = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
-  title_ = gtk_label_new("");
-  gtk_widget_add_css_class(title_, "title-3");
-  gtk_label_set_xalign(GTK_LABEL(title_), 0);
-  body_ = gtk_label_new("");
-  gtk_widget_add_css_class(body_, "dim-label");
-  gtk_label_set_xalign(GTK_LABEL(body_), 0);
-  gtk_box_append(GTK_BOX(text), title_);
-  gtk_box_append(GTK_BOX(text), body_);
-  gtk_box_append(GTK_BOX(box), image_);
-  gtk_box_append(GTK_BOX(box), text);
-  gtk_window_set_child(GTK_WINDOW(window_), box);
-  ConnectDrag();
-  ConnectPopup();
-}
-
-void OSDPretty::SetMessage(const std::string &summary, const std::string &message, const std::vector<unsigned char> &image) {
-  EnsureWindow();
-  gtk_label_set_text(GTK_LABEL(title_), summary.c_str());
-  gtk_label_set_text(GTK_LABEL(body_), message.c_str());
-  if (OSDPrettyPopup::HideArtWhenEmpty(show_art_, !image.empty())) {
-    gtk_widget_set_visible(image_, FALSE);
-  } else {
-    gtk_widget_set_visible(image_, TRUE);
-    GdkPixbufLoader *loader = gdk_pixbuf_loader_new();
-    if (gdk_pixbuf_loader_write(loader, image.data(), image.size(), nullptr) && gdk_pixbuf_loader_close(loader, nullptr)) {
-      GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf(loader);
-      if (pixbuf) {
-        GdkPixbuf *scaled = gdk_pixbuf_scale_simple(pixbuf, 72, 72, GDK_INTERP_BILINEAR);
-        GdkTexture *texture = gdk_texture_new_for_pixbuf(scaled);
-        gtk_image_set_from_paintable(GTK_IMAGE(image_), GDK_PAINTABLE(texture));
-        g_object_unref(texture);
-        g_object_unref(scaled);
+    else {
+      if (!disable_duration()) {
+        timeout_->start();  // Restart the timer
       }
     }
-    g_object_unref(loader);
   }
+  else {
+    if (toggle_mode()) {
+      set_toggle_mode(false);
+    }
+    // The OSD is not visible, show it
+    show();
+  }
+
 }
 
-void OSDPretty::ShowMessage(const std::string &summary, const std::string &message, const std::vector<unsigned char> &image) {
-  EnsureWindow();
-  const bool visible = gtk_widget_get_visible(window_);
-  if (OSDPrettyPopup::ShouldHideOnRepeat(visible, mode_ == Mode::Popup, toggle_mode_)) {
-    toggle_mode_ = false;
-    HideNow();
-    return;
+void OSDPretty::setVisible(bool visible) {
+
+  if (!visible && fading_enabled_ && fader_->direction() == QTimeLine::Forward) {
+    fader_->setDirection(QTimeLine::Backward);
+    fader_->start();
   }
-  SetMessage(summary, message, image);
-  ApplyLimits();
-  if (OSDPrettyPopup::ShouldRestartTimeout(visible, mode_ == Mode::Popup, toggle_mode_)) {
-    StartHideTimeout();
-    return;
+  else {
+    QWidget::setVisible(visible);
   }
-  toggle_mode_ = false;
-  if (timeout_id_) {
-    g_source_remove(timeout_id_);
-    timeout_id_ = 0;
+
+}
+
+void OSDPretty::FaderFinished() {
+
+  if (fader_->direction() == QTimeLine::Backward) {
+    hide();
   }
-  StopFade();
-  if (fading_) {
-    gtk_widget_set_opacity(window_, 0.0);
+  else if (mode_ == Mode::Popup && !disable_duration()) {
+    timeout_->start();
   }
-  gtk_window_present(GTK_WINDOW(window_));
-  ApplyPosition();
-  ApplyLimits();
-  StartFade(true);
+
+}
+
+void OSDPretty::FaderValueChanged(const qreal value) {
+  setWindowOpacity(value);
+}
+
+void OSDPretty::Reposition() {
+
+  // Make the OSD the proper size
+  layout()->activate();
+  resize(sizeHint());
+
+  // Work out where to place the OSD.  -1 for x or y means "on the right or bottom edge".
+  if (popup_screen_) {
+
+    QRect geometry = popup_screen_->availableGeometry();
+
+    int x = popup_pos_.x() < 0 ? geometry.right() - width() : geometry.left() + popup_pos_.x();
+    int y = popup_pos_.y() < 0 ? geometry.bottom() - height() : geometry.top() + popup_pos_.y();
+
+#ifndef Q_OS_WIN32
+    x = qBound(0, x, geometry.right() - width());
+    y = qBound(0, y, geometry.bottom() - height());
+#endif
+    move(x, y);
+  }
+
+  // Create a mask for the actual area of the OSD
+  QBitmap mask(size());
+  mask.clear();
+
+  QPainter p(&mask);
+  p.setBrush(Qt::color1);
+  p.drawRoundedRect(BoxBorder().adjusted(-1, -1, 0, 0), kBorderRadius, kBorderRadius);
+  p.end();
+
+  // If there's no compositing window manager running then we have to set an XShape mask.
+  if (IsTransparencyAvailable())
+    clearMask();
+  else {
+    setMask(mask);
+  }
+
+  // On windows, enable blurbehind on the masked area
+#ifdef Q_OS_WIN32
+  Utilities::enableBlurBehindWindow(windowHandle(), QRegion(mask));
+#endif
+
+}
+
+void OSDPretty::enterEvent(QEnterEvent *e) {
+
+  Q_UNUSED(e)
+
+  if (mode_ == Mode::Popup) {
+    setWindowOpacity(0.25);
+  }
+
+}
+
+void OSDPretty::leaveEvent(QEvent *e) {
+
+  Q_UNUSED(e)
+
+  setWindowOpacity(1.0);
+
+}
+
+void OSDPretty::mousePressEvent(QMouseEvent *e) {
+
+  if (mode_ == Mode::Popup) {
+    hide();
+  }
+  else {
+    original_window_pos_ = pos();
+    drag_start_pos_ = e->globalPosition().toPoint();
+  }
+
+}
+
+void OSDPretty::mouseMoveEvent(QMouseEvent *e) {
+
+  if (mode_ == Mode::Draggable) {
+    QPoint delta = e->globalPosition().toPoint() - drag_start_pos_;
+    QPoint new_pos = original_window_pos_ + delta;
+
+    // Keep it to the bounds of the desktop
+    QScreen *screen = current_screen(e->globalPosition().toPoint());
+    if (!screen) return;
+
+    QRect geometry = screen->availableGeometry();
+
+    new_pos.setX(qBound(geometry.left(), new_pos.x(), geometry.right() - width()));
+    new_pos.setY(qBound(geometry.top(), new_pos.y(), geometry.bottom() - height()));
+
+    // Snap to center
+    int snap_x = geometry.center().x() - width() / 2;
+    if (new_pos.x() > snap_x - kSnapProximity && new_pos.x() < snap_x + kSnapProximity) {
+      new_pos.setX(snap_x);
+    }
+
+    move(new_pos);
+
+    popup_screen_ = screen;
+    popup_screen_name_ = screen->name();
+  }
+
+}
+
+void OSDPretty::mouseReleaseEvent(QMouseEvent *e) {
+
+  Q_UNUSED(e)
+
+  if (current_screen() && mode_ == Mode::Draggable) {
+    popup_screen_ = current_screen();
+    popup_screen_name_ = current_screen()->name();
+    popup_pos_ = current_pos();
+    Q_EMIT PositionChanged();
+  }
+
+}
+
+QScreen *OSDPretty::current_screen(const QPoint pos) const {
+
+  QScreen *screen = QGuiApplication::screenAt(pos);
+  if (!screen) screen = QGuiApplication::primaryScreen();
+
+  return screen;
+
+}
+
+QScreen *OSDPretty::current_screen() const { return current_screen(pos()); }
+
+QPoint OSDPretty::current_pos() const {
+
+  if (current_screen()) {
+    QRect geometry = current_screen()->availableGeometry();
+
+    int x = pos().x() >= geometry.right() - width() ? -1 : pos().x() - geometry.left();
+    int y = pos().y() >= geometry.bottom() - height() ? -1 : pos().y() - geometry.top();
+
+    return QPoint(x, y);
+  }
+
+  return QPoint(0, 0);
+
+}
+
+void OSDPretty::set_background_color(const QRgb color) {
+  background_color_ = color;
+  if (isVisible()) update();
+}
+
+void OSDPretty::set_background_opacity(const qreal opacity) {
+  background_opacity_ = opacity;
+  if (isVisible()) update();
+}
+
+void OSDPretty::set_foreground_color(const QRgb color) {
+
+  foreground_color_ = QColor(color);
+
+  QPalette p;
+  p.setColor(QPalette::WindowText, foreground_color_);
+
+  ui_->summary->setPalette(p);
+  ui_->message->setPalette(p);
+
+}
+
+void OSDPretty::set_popup_duration(const int msec) {
+  timeout_->setInterval(msec);
+}
+
+void OSDPretty::set_font(const QFont &font) {
+
+  font_ = font;
+
+  // Update the UI
+  ui_->summary->setFont(font);
+  ui_->message->setFont(font);
+  // Now adjust OSD size so everything fits
+  ui_->verticalLayout->activate();
+  resize(sizeHint());
+  // Update the position after font change
+  Reposition();
+
 }

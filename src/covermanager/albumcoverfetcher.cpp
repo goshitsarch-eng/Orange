@@ -1,176 +1,160 @@
-#include "covermanager/albumcoverfetcher.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/networktimeoutpolicy.h"
-#include "covermanager/albumcoverfetchersearch.h"
-#include "covermanager/coverfetchpolicy.h"
-#include "covermanager/coverproviders.h"
-#include "utilities/jsonutils.h"
+#include "config.h"
 
-#include <algorithm>
-#include <memory>
+#include <chrono>
 
-AlbumCoverFetcher::AlbumCoverFetcher(CoverProviders *cover_providers, NetworkAccessManager *network)
-    : cover_providers_(cover_providers), network_(network) {
-  image_timeouts_.SetTimeout(NetworkTimeoutPolicy::kCoverImageTimeoutMs);
-  image_timeouts_.SetAbort([this](int req_id) {
-    if (network_) {
-      network_->Cancel(req_id);
-    }
-  });
+#include <QtGlobal>
+#include <QObject>
+#include <QTimer>
+#include <QString>
+
+#include "includes/shared_ptr.h"
+#include "core/networkaccessmanager.h"
+#include "core/song.h"
+#include "albumcoverfetcher.h"
+#include "albumcoverfetchersearch.h"
+
+using namespace std::chrono_literals;
+
+namespace {
+constexpr int kMaxConcurrentRequests = 5;
 }
 
-AlbumCoverFetcher::~AlbumCoverFetcher() { Clear(); }
+AlbumCoverFetcher::AlbumCoverFetcher(SharedPtr<CoverProviders> cover_providers, SharedPtr<NetworkAccessManager> network, QObject *parent)
+    : QObject(parent),
+      cover_providers_(cover_providers),
+      network_(network),
+      next_id_(0),
+      request_starter_(new QTimer(this)) {
 
-uint64_t AlbumCoverFetcher::SearchForCovers(const std::string &artist, const std::string &album, const std::string &title) {
-  const CoverSearchRequest request = AlbumCoverFetcherSearch::MakeRequest(next_id_++, artist, album, title, true, false);
-  AddRequest(request);
-  return request.id;
+  request_starter_->setInterval(1s);
+  QObject::connect(request_starter_, &QTimer::timeout, this, &AlbumCoverFetcher::StartRequests);
+
 }
 
-uint64_t AlbumCoverFetcher::FetchAlbumCover(const std::string &artist, const std::string &album, const std::string &title, bool batch) {
-  const CoverSearchRequest request = AlbumCoverFetcherSearch::MakeRequest(next_id_++, artist, album, title, false, batch);
-  AddRequest(request);
-  return request.id;
-}
+AlbumCoverFetcher::~AlbumCoverFetcher() {
 
-void AlbumCoverFetcher::AddRequest(const CoverSearchRequest &request) {
-  if (!cover_providers_ || !network_) {
-    return;
+  const QList<AlbumCoverFetcherSearch*> searches = active_requests_.values();
+  for (AlbumCoverFetcherSearch *search : searches) {
+    search->disconnect();
+    search->deleteLater();
   }
-  queued_.push(request);
-  StartRequests();
+  active_requests_.clear();
+
+}
+
+quint64 AlbumCoverFetcher::FetchAlbumCover(const QString &artist, const QString &album, const QString &title, const bool batch) {
+
+  CoverSearchRequest request;
+  request.id = ++next_id_;
+  request.artist = artist;
+  request.album = Song::AlbumRemoveDiscMisc(album);
+  request.title = title;
+  request.search = false;
+  request.batch = batch;
+
+  AddRequest(request);
+  return request.id;
+
+}
+
+quint64 AlbumCoverFetcher::SearchForCovers(const QString &artist, const QString &album, const QString &title) {
+
+  CoverSearchRequest request;
+  request.id = ++next_id_;
+  request.artist = artist;
+  request.album = Song::AlbumRemoveDiscMisc(album);
+  request.title = title;
+  request.search = true;
+  request.batch = false;
+
+  AddRequest(request);
+  return request.id;
+
+}
+
+void AlbumCoverFetcher::AddRequest(const CoverSearchRequest &req) {
+
+  queued_requests_.enqueue(req);
+
+  if (!request_starter_->isActive()) request_starter_->start();
+
+  if (active_requests_.size() < kMaxConcurrentRequests) StartRequests();
+
 }
 
 void AlbumCoverFetcher::Clear() {
-  while (!queued_.empty()) {
-    queued_.pop();
+
+  queued_requests_.clear();
+
+  const QList<AlbumCoverFetcherSearch*> searches = active_requests_.values();
+  for (AlbumCoverFetcherSearch *search : searches) {
+    search->Cancel();
+    search->deleteLater();
   }
-  for (auto &entry : active_) {
-    if (entry.second) {
-      entry.second->cancelled = true;
-    }
-  }
-  active_.clear();
-  image_timeouts_.CancelAll();
+  active_requests_.clear();
+
 }
 
 void AlbumCoverFetcher::StartRequests() {
-  while (!queued_.empty() && static_cast<int>(active_.size()) < AlbumCoverFetcherSearch::kMaxConcurrentRequests) {
-    const CoverSearchRequest request = queued_.front();
-    queued_.pop();
-    StartJob(request);
+
+  if (queued_requests_.isEmpty()) {
+    request_starter_->stop();
+    return;
   }
+
+  while (!queued_requests_.isEmpty() && active_requests_.size() < kMaxConcurrentRequests) {
+
+    CoverSearchRequest request = queued_requests_.dequeue();
+
+    // Search objects are this fetcher's children so worst case scenario - they get deleted with it
+    AlbumCoverFetcherSearch *search = new AlbumCoverFetcherSearch(request, network_, this);
+    active_requests_.insert(request.id, search);
+
+    QObject::connect(search, &AlbumCoverFetcherSearch::SearchFinished, this, &AlbumCoverFetcher::SingleSearchFinished);
+    QObject::connect(search, &AlbumCoverFetcherSearch::AlbumCoverFetched, this, &AlbumCoverFetcher::SingleCoverFetched);
+
+    search->Start(cover_providers_);
+  }
+
 }
 
-void AlbumCoverFetcher::StartJob(const CoverSearchRequest &request) {
-  auto job = std::make_shared<Job>();
-  job->request = request;
-  if (AlbumCoverFetcherSearch::ShouldTerminateSearch(request)) {
-    FinishJob(job);
-    return;
-  }
-  const std::vector<CoverProvider *> providers = cover_providers_->All();
-  for (CoverProvider *provider : providers) {
-    if (AlbumCoverFetcherSearch::ShouldUseProvider(provider, request)) {
-      ++job->pending;
-    }
-  }
-  if (job->pending == 0) {
-    FinishJob(job);
-    return;
-  }
-  active_[request.id] = job;
-  const Song song = AlbumCoverFetcherSearch::SongFromRequest(request);
-  for (CoverProvider *provider : providers) {
-    if (!AlbumCoverFetcherSearch::ShouldUseProvider(provider, request)) {
-      continue;
-    }
-    ++job->statistics.network_requests_made;
-    provider->Search(song, network_, [this, job, provider](const CoverProviderSearchResults &found) {
-      if (job->cancelled || job->finished) {
-        return;
-      }
-      CoverProviderSearchResults scored = found;
-      AlbumCoverFetcherSearch::ScoreResults(job->request, provider->quality(), provider->name(), &scored);
-      job->results.insert(job->results.end(), scored.begin(), scored.end());
-      job->statistics.total_images_by_provider[provider->name()] += found.size();
-      job->statistics.bytes_transferred += found.size();
-      for (const CoverProviderSearchResult &result : scored) {
-        job->best_score = std::max(job->best_score, result.score());
-      }
-      if (--job->pending <= 0 || CoverFetchPolicy::ShouldStop(job->best_score, job->request.search)) {
-        FinishJob(job);
-      }
-    });
-  }
+void AlbumCoverFetcher::SingleSearchFinished(const quint64 request_id, const CoverProviderSearchResults &results) {
+
+  if (!active_requests_.contains(request_id)) return;
+  AlbumCoverFetcherSearch *search = active_requests_.take(request_id);
+
+  search->deleteLater();
+  Q_EMIT SearchFinished(request_id, results, search->statistics());
+
 }
 
-void AlbumCoverFetcher::FinishJob(const std::shared_ptr<Job> &job) {
-  if (!job || job->finished || job->cancelled) {
-    return;
-  }
-  job->finished = true;
-  AlbumCoverFetcherSearch::SortByScore(&job->results);
-  AlbumCoverFetcherSearch::AssignNumbers(&job->results);
-  active_.erase(job->request.id);
-  if (job->request.search) {
-    if (job->results.empty()) {
-      ++job->statistics.missing_images;
-    }
-    SearchFinished.Emit(job->request.id, job->results, job->statistics);
-    StartRequests();
-    return;
-  }
-  FetchBestCover(job);
-}
+void AlbumCoverFetcher::SingleCoverFetched(const quint64 request_id, const AlbumCoverImageResult &result) {
 
-void AlbumCoverFetcher::FetchBestCover(const std::shared_ptr<Job> &job) {
-  const CoverProviderSearchResult *best = AlbumCoverFetcherSearch::Best(job->results);
-  if (!best) {
-    ++job->statistics.missing_images;
-    AlbumCoverFetched.Emit(job->request.id, {}, job->statistics);
-    StartRequests();
-    return;
-  }
-  if (!best->image_data.empty()) {
-    AlbumCoverImageResult image;
-    image.image_data.assign(best->image_data.begin(), best->image_data.end());
-    image.image_url = best->image_url;
-    image.width = best->image_width;
-    image.height = best->image_height;
-    ++job->statistics.chosen_images;
-    job->statistics.chosen_images_by_provider[best->provider] += 1;
-    AlbumCoverFetched.Emit(job->request.id, image, job->statistics);
-    StartRequests();
-    return;
-  }
-  if (!network_ || !AlbumCoverFetcherSearch::IsHttpUrl(best->image_url)) {
-    ++job->statistics.missing_images;
-    AlbumCoverFetched.Emit(job->request.id, {}, job->statistics);
-    StartRequests();
-    return;
-  }
-  ++job->statistics.network_requests_made;
-  const std::string provider = best->provider;
-  const std::string image_url = best->image_url;
-  auto req_id = std::make_shared<int>(0);
-  *req_id = network_->Get(image_url, [this, job, provider, image_url, req_id](const NetworkAccessManager::Response &response) {
-    image_timeouts_.Cancel(*req_id);
-    if (job->cancelled) {
-      return;
-    }
-    AlbumCoverImageResult image;
-    if (response.ok() && JsonUtils::LooksLikeImage(response.body)) {
-      image.image_data.assign(response.body.begin(), response.body.end());
-      image.image_url = image_url;
-      job->statistics.bytes_transferred += response.body.size();
-      ++job->statistics.chosen_images;
-      job->statistics.chosen_images_by_provider[provider] += 1;
-    } else {
-      ++job->statistics.missing_images;
-    }
-    AlbumCoverFetched.Emit(job->request.id, image, job->statistics);
-    StartRequests();
-  });
-  image_timeouts_.AddReply(*req_id);
+  if (!active_requests_.contains(request_id)) return;
+  AlbumCoverFetcherSearch *search = active_requests_.take(request_id);
+
+  search->deleteLater();
+  Q_EMIT AlbumCoverFetched(request_id, result, search->statistics());
+
 }

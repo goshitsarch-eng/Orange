@@ -20,6 +20,8 @@
 #ifndef CONTEXTSETTINGS_H
 #define CONTEXTSETTINGS_H
 
+#include <QtGlobal>
+
 namespace ContextSettings {
 
 constexpr char kSettingsGroup[] = "Context";
@@ -44,12 +46,10 @@ constexpr char kDefaultSummaryFmt[] = "%album%";
 constexpr bool kDefaultAlbum = true;
 constexpr bool kDefaultTechnicalData = false;
 constexpr bool kDefaultSongLyrics = true;
-constexpr bool kDefaultSearchCover = true;
 constexpr bool kDefaultSearchLyrics = true;
 
 constexpr char kDefaultFontFamily[] = "Noto Sans";
-constexpr double kDefaultFontSizeHeadline = 11;
-constexpr double kDefaultFontSizeNormal = 10;
+constexpr qreal kDefaultFontSizeHeadline = 11;
 
 }  // namespace ContextSettings
 

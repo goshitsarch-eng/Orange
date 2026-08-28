@@ -1,219 +1,327 @@
-#include "organize/organizeformat.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
+#include "config.h"
+
+#include <QString>
+#include <QChar>
+#include <QStringList>
+#include <QRegularExpression>
+#include <QFileInfo>
+#include <QValidator>
+
+#include "constants/filenameconstants.h"
 #include "constants/timeconstants.h"
-#include "organize/organizefilename.h"
-#include "utilities/fileutils.h"
-#include "utilities/strutils.h"
+#include "utilities/transliterate.h"
+#include "core/song.h"
 
-#include <cctype>
-#include <cstdio>
-#include <utility>
+#include "organizeformat.h"
+#include "organizeformatvalidator.h"
 
-const char *OrganizeFormat::kKnownTags[] = {"%albumartist", "%artistinitial", "%originalyear", "%samplerate", "%extension",
-                                            "%bitdepth",    "%composer",      "%performer",    "%grouping",   "%comment",
-                                            "%bitrate",     "%artist",        "%album",        "%title",      "%genre",
-                                            "%lyrics",      "%length",        "%year",         "%disc",       "%track",
-                                            nullptr};
+using namespace Qt::Literals::StringLiterals;
 
-OrganizeFormat::OrganizeFormat(std::string format) : format_(std::move(format)) {}
+const char OrganizeFormat::kBlockPattern[] = "\\{([^{}]+)\\}";
+const char OrganizeFormat::kTagPattern[] = "\\%([a-zA-Z]*)";
 
-namespace {
+const QStringList OrganizeFormat::kKnownTags = QStringList() << u"title"_s
+                                                             << u"album"_s
+                                                             << u"artist"_s
+                                                             << u"artistinitial"_s
+                                                             << u"albumartist"_s
+                                                             << u"composer"_s
+                                                             << u"track"_s
+                                                             << u"disc"_s
+                                                             << u"year"_s
+                                                             << u"originalyear"_s
+                                                             << u"genre"_s
+                                                             << u"comment"_s
+                                                             << u"length"_s
+                                                             << u"bitrate"_s
+                                                             << u"samplerate"_s
+                                                             << u"bitdepth"_s
+                                                             << u"extension"_s
+                                                             << u"performer"_s
+                                                             << u"grouping"_s
+                                                             << u"lyrics"_s;
 
-std::string Safe(const std::string &value) {
-  std::string result = value;
-  for (char &c : result) {
-    if (c == '/' || c == '\\' || c == ':') {
-      c = '_';
-    }
-  }
-  return result;
+const QStringList OrganizeFormat::kUniqueTags = QStringList() << u"title"_s
+                                                              << u"track"_s;
+
+OrganizeFormat::OrganizeFormat(const QString &format)
+    : format_(format),
+      remove_problematic_(false),
+      remove_non_fat_(false),
+      remove_non_ascii_(false),
+      allow_ascii_ext_(false),
+      replace_spaces_(true) {}
+
+void OrganizeFormat::set_format(const QString &v) {
+  format_ = v;
+  format_.replace(u'\\', u'/');
 }
-
-std::string TrimCopy(const std::string &value) {
-  size_t start = 0;
-  while (start < value.size() && std::isspace(static_cast<unsigned char>(value[start]))) {
-    ++start;
-  }
-  size_t end = value.size();
-  while (end > start && std::isspace(static_cast<unsigned char>(value[end - 1]))) {
-    --end;
-  }
-  return value.substr(start, end - start);
-}
-
-bool StartsWithThe(const std::string &value) {
-  if (value.size() < 4) {
-    return false;
-  }
-  return (value[0] == 't' || value[0] == 'T') && (value[1] == 'h' || value[1] == 'H') && (value[2] == 'e' || value[2] == 'E') &&
-         std::isspace(static_cast<unsigned char>(value[3]));
-}
-
-}  // namespace
-
-std::string OrganizeFormat::ArtistInitial(const std::string &albumartist) {
-  std::string value = TrimCopy(albumartist);
-  if (StartsWithThe(value)) {
-    value = TrimCopy(value.substr(4));
-  }
-  if (value.empty()) {
-    return {};
-  }
-  return std::string(1, static_cast<char>(std::toupper(static_cast<unsigned char>(value[0]))));
-}
-
-std::string OrganizeFormat::TokenValue(const std::string &token, const Song &song) {
-  if (token == "%albumartist") {
-    return song.compilation() ? "Various Artists" : song.EffectiveAlbumartist();
-  }
-  if (token == "%artist") return song.artist();
-  if (token == "%album") return song.album();
-  if (token == "%title") return song.title();
-  if (token == "%genre") return song.genre();
-  if (token == "%composer") return song.composer();
-  if (token == "%performer") return song.performer();
-  if (token == "%grouping") return song.grouping();
-  if (token == "%comment") return song.comment();
-  if (token == "%lyrics") return song.lyrics();
-  if (token == "%year") return song.year() > 0 ? std::to_string(song.year()) : "";
-  if (token == "%originalyear") return song.originalyear() > 0 ? std::to_string(song.originalyear()) : "";
-  if (token == "%disc") return song.disc() > 0 ? std::to_string(song.disc()) : "";
-  if (token == "%bitrate") return song.bitrate() > 0 ? std::to_string(song.bitrate()) : "";
-  if (token == "%samplerate") return song.samplerate() > 0 ? std::to_string(song.samplerate()) : "";
-  if (token == "%bitdepth") return song.bitdepth() > 0 ? std::to_string(song.bitdepth()) : "";
-  if (token == "%length") {
-    if (song.length_nanosec() <= 0) {
-      return {};
-    }
-    return std::to_string(song.length_nanosec() / TimeConstants::kNsecPerSec);
-  }
-  if (token == "%extension") {
-    return FileUtils::Extension(FileUtils::PathFromUri(song.url()));
-  }
-  if (token == "%artistinitial") {
-    return ArtistInitial(song.EffectiveAlbumartist());
-  }
-  if (token == "%track") {
-    if (song.track() <= 0) {
-      return {};
-    }
-    // Track numbers come from tags and are not bounded, so the buffer has to fit any int.
-    char buf[16];
-    std::snprintf(buf, sizeof(buf), "%02d", song.track());
-    return buf;
-  }
-  return {};
-}
-
-bool OrganizeFormat::TokenHasValue(const std::string &token, const Song &song) { return !TokenValue(token, song).empty(); }
-
-bool OrganizeFormat::IsUniqueTag(const std::string &token) { return token == "%title" || token == "%track"; }
 
 bool OrganizeFormat::IsValid() const {
-  int depth = 0;
-  for (char ch : format_) {
-    if (ch == '{') {
-      ++depth;
-    } else if (ch == '}') {
-      --depth;
-      if (depth < 0) {
-        return false;
-      }
-    }
-  }
-  return depth == 0 && !format_.empty();
+
+  int pos = 0;
+  QString format_copy(format_);
+
+  OrganizeFormatValidator v;
+  return v.validate(format_copy, pos) == QValidator::Acceptable;
+
 }
 
-std::string OrganizeFormat::ExpandTokens(const std::string &pattern, const Song &song) const {
-  std::string result = pattern;
-  for (int i = 0; kKnownTags[i]; ++i) {
-    std::string value = Safe(TokenValue(kKnownTags[i], song));
-    if (remove_problematic_) {
-      value = OrganizeFilename::RemoveDots(value);
-    }
-    result = StrUtils::Replace(result, kKnownTags[i], value);
+OrganizeFormat::GetFilenameForSongResult OrganizeFormat::GetFilenameForSong(const Song &song, QString extension) const {
+
+  bool unique_filename = false;
+  QString filepath = ParseBlock(format_, song, &unique_filename);
+
+  if (filepath.isEmpty()) {
+    filepath = song.basefilename();
   }
-  return result;
+
+  {
+    QFileInfo fileinfo(filepath);
+    if (fileinfo.completeBaseName().isEmpty()) {
+      // Avoid having empty filenames, or filenames with extension only: in this case, keep the original filename.
+      // We remove the extension from "filename" if it exists, as song.basefilename() also contains the extension.
+      QString path = fileinfo.path();
+      filepath.clear();
+      if (!path.isEmpty()) {
+        filepath.append(path);
+        if (path.right(1) != u'/') {
+          filepath.append(u'/');
+        }
+      }
+      filepath.append(song.basefilename());
+    }
+  }
+
+  if (filepath.isEmpty() || (filepath.contains(u'/') && (filepath.section(u'/', 0, -2).isEmpty() || filepath.section(u'/', -1, -1).isEmpty()))) {
+    return GetFilenameForSongResult();
+  }
+
+  if (remove_problematic_) {
+    static const QRegularExpression regex_problematic_characters(QLatin1String(kProblematicCharactersRegex), QRegularExpression::PatternOption::CaseInsensitiveOption);
+    filepath = filepath.remove(regex_problematic_characters);
+  }
+  if (remove_non_fat_ || (remove_non_ascii_ && !allow_ascii_ext_)) filepath = Utilities::Transliterate(filepath);
+  if (remove_non_fat_) {
+    static const QRegularExpression regex_invalid_fat_characters(QLatin1String(kInvalidFatCharactersRegex), QRegularExpression::PatternOption::CaseInsensitiveOption);
+    filepath = filepath.remove(regex_invalid_fat_characters);
+  }
+
+  if (remove_non_ascii_) {
+    int ascii = 128;
+    if (allow_ascii_ext_) ascii = 255;
+    QString stripped;
+    for (int i = 0; i < filepath.length(); ++i) {
+      const QChar c = filepath[i];
+      if (c.unicode() < ascii) {
+        stripped.append(c);
+      }
+      else {
+        const QString decomposition = c.decomposition();
+        if (!decomposition.isEmpty() && decomposition[0].unicode() < ascii) {
+          stripped.append(decomposition[0]);
+        }
+      }
+    }
+    filepath = stripped;
+  }
+
+  // Remove repeated whitespaces in the filepath.
+  filepath = filepath.simplified();
+
+  // Fixup extension
+  QFileInfo info(filepath);
+  filepath.clear();
+  if (extension.isEmpty()) {
+    if (info.suffix().isEmpty()) {
+      extension = QFileInfo(song.url().toLocalFile()).suffix();
+    }
+    else {
+      extension = info.suffix();
+    }
+  }
+  if (!info.path().isEmpty() && info.path() != u'.') {
+    filepath.append(info.path());
+    filepath.append(u'/');
+  }
+  filepath.append(info.completeBaseName());
+
+  // Fix any parts of the path that start with dots.
+  QStringList parts_old = filepath.split(u'/');
+  QStringList parts_new;
+  for (int i = 0; i < parts_old.count(); ++i) {
+    QString part = parts_old[i];
+    for (int j = 0; j < kInvalidPrefixCharactersCount; ++j) {
+      if (part.startsWith(QLatin1Char(kInvalidPrefixCharacters[j]))) {
+        part = part.remove(0, 1);
+        break;
+      }
+    }
+    part = part.trimmed();
+    parts_new.append(part);
+  }
+  filepath = parts_new.join(u'/');
+
+  if (replace_spaces_) {
+    static const QRegularExpression regex_whitespaces(u"\\s"_s);
+    filepath.replace(regex_whitespaces, u"_"_s);
+  }
+
+  if (!extension.isEmpty()) {
+    filepath.append(u".%1"_s.arg(extension));
+  }
+
+  return GetFilenameForSongResult(filepath, unique_filename);
+
 }
 
-std::string OrganizeFormat::ApplyFilenameFixes(std::string path, const Song &song) const {
-  if (path.empty()) {
-    path = song.basefilename();
+QString OrganizeFormat::ParseBlock(QString block, const Song &song, bool *have_tagdata, bool *any_empty) const {
+
+  // Find any blocks first
+  qint64 pos = 0;
+  static const QRegularExpression block_regexp(QString::fromLatin1(kBlockPattern));
+  QRegularExpressionMatch re_match;
+  for (re_match = block_regexp.match(block, pos); re_match.hasMatch(); re_match = block_regexp.match(block, pos)) {
+    pos = re_match.capturedStart();
+    // Recursively parse the block
+    bool empty = false;
+    QString value = ParseBlock(re_match.captured(1), song, have_tagdata, &empty);
+    if (empty) value = ""_L1;
+
+    // Replace the block's value
+    block.replace(pos, re_match.capturedLength(), value);
+    pos += value.length();
   }
-  if (FileUtils::Extension(path).empty()) {
-    const std::string ext = FileUtils::Extension(FileUtils::PathFromUri(song.url()));
-    if (!ext.empty()) {
-      path += "." + ext;
+
+  // Now look for tags
+  bool empty = false;
+  pos = 0;
+  static const QRegularExpression tag_regexp(QString::fromLatin1(kTagPattern));
+  for (re_match = tag_regexp.match(block, pos); re_match.hasMatch(); re_match = tag_regexp.match(block, pos)) {
+    pos = re_match.capturedStart();
+    const QString tag = re_match.captured(1);
+    const QString value = TagValue(tag, song);
+    if (value.isEmpty()) {
+      empty = true;
     }
+    else if (have_tagdata && kUniqueTags.contains(tag)) {
+      *have_tagdata = true;
+    }
+
+    block.replace(pos, re_match.capturedLength(), value);
+    pos += value.length();
   }
-  return OrganizeFilename::Apply(path, FilenameOptions());
+
+  if (any_empty) {
+    *any_empty = empty;
+  }
+
+  return block;
+
 }
 
-std::string OrganizeFormat::GetFilenameForSong(const Song &song) const { return GetFilenameForSongResult(song).path; }
+QString OrganizeFormat::TagValue(const QString &tag, const Song &song) const {
 
-OrganizeFormat::GetFilenameResult OrganizeFormat::GetFilenameForSongResult(const Song &song, const std::string &extension) const {
-  GetFilenameResult result;
-  std::string expanded;
-  expanded.reserve(format_.size());
-  auto mark_unique = [&](const std::string &token) {
-    if (IsUniqueTag(token) && TokenHasValue(token, song)) {
-      result.unique_filename = true;
-    }
-  };
-  for (size_t i = 0; i < format_.size();) {
-    if (format_[i] == '{') {
-      const size_t end = format_.find('}', i);
-      if (end == std::string::npos) {
-        expanded += format_[i++];
-        continue;
-      }
-      const std::string inner = format_.substr(i + 1, end - i - 1);
-      bool keep = true;
-      size_t pos = 0;
-      while ((pos = inner.find('%', pos)) != std::string::npos) {
-        size_t len = 1;
-        while (pos + len < inner.size() && std::isalpha(static_cast<unsigned char>(inner[pos + len]))) {
-          ++len;
-        }
-        const std::string token = inner.substr(pos, len);
-        if (!TokenHasValue(token, song)) {
-          keep = false;
-          break;
-        }
-        pos += len;
-      }
-      if (keep) {
-        pos = 0;
-        while ((pos = inner.find('%', pos)) != std::string::npos) {
-          size_t len = 1;
-          while (pos + len < inner.size() && std::isalpha(static_cast<unsigned char>(inner[pos + len]))) {
-            ++len;
-          }
-          mark_unique(inner.substr(pos, len));
-          pos += len;
-        }
-        expanded += ExpandTokens(inner, song);
-      }
-      i = end + 1;
-      continue;
-    }
-    if (format_[i] == '%') {
-      size_t len = 1;
-      while (i + len < format_.size() && std::isalpha(static_cast<unsigned char>(format_[i + len]))) {
-        ++len;
-      }
-      mark_unique(format_.substr(i, len));
-    }
-    expanded += format_[i++];
+  QString value;
+
+  if (tag == "title"_L1) {
+    value = song.title();
   }
-  result.path = ApplyFilenameFixes(ExpandTokens(expanded, song), song);
-  if (!extension.empty() && !result.path.empty()) {
-    const std::string current = FileUtils::Extension(result.path);
-    if (!current.empty() && result.path.size() > current.size() + 1) {
-      result.path = result.path.substr(0, result.path.size() - current.size() - 1) + "." + extension;
-    } else {
-      result.path += "." + extension;
+  else if (tag == "album"_L1) {
+    value = song.album();
+  }
+  else if (tag == "artist"_L1) {
+    value = song.artist();
+  }
+  else if (tag == "composer"_L1) {
+    value = song.composer();
+  }
+  else if (tag == "performer"_L1) {
+    value = song.performer();
+  }
+  else if (tag == "grouping"_L1) {
+    value = song.grouping();
+  }
+  else if (tag == "lyrics"_L1) {
+    value = song.lyrics();
+  }
+  else if (tag == "genre"_L1) {
+    value = song.genre();
+  }
+  else if (tag == "comment"_L1) {
+    value = song.comment();
+  }
+  else if (tag == "year"_L1) {
+    value = QString::number(song.year());
+  }
+  else if (tag == "originalyear"_L1) {
+    value = QString::number(song.effective_originalyear());
+  }
+  else if (tag == "track"_L1) {
+    value = QString::number(song.track());
+  }
+  else if (tag == "disc"_L1) {
+    value = QString::number(song.disc());
+  }
+  else if (tag == "length"_L1) {
+    value = QString::number(song.length_nanosec() / kNsecPerSec);
+  }
+  else if (tag == "bitrate"_L1) {
+    value = QString::number(song.bitrate());
+  }
+  else if (tag == "samplerate"_L1) {
+    value = QString::number(song.samplerate());
+  }
+  else if (tag == "bitdepth"_L1) {
+    value = QString::number(song.bitdepth());
+  }
+  else if (tag == "extension"_L1) {
+    value = QFileInfo(song.url().toLocalFile()).suffix();
+  }
+  else if (tag == "artistinitial"_L1) {
+    value = song.effective_albumartist().trimmed();
+    if (!value.isEmpty()) {
+      static const QRegularExpression regex_the(u"^the\\s+"_s, QRegularExpression::CaseInsensitiveOption);
+      value = value.remove(regex_the);
+      value = value[0].toUpper();
     }
   }
-  return result;
+  else if (tag == "albumartist"_L1) {
+    value = song.is_compilation() ? u"Various Artists"_s : song.effective_albumartist();
+  }
+
+  if (value == u'0' || value == "-1"_L1) value = ""_L1;
+
+  // Prepend a 0 to single-digit track numbers
+  if (tag == "track"_L1 && value.length() == 1) value.prepend(u'0');
+
+  // Replace characters that really shouldn't be in paths
+  static const QRegularExpression regex_invalid_dir_characters(QString::fromLatin1(kInvalidDirCharactersRegex), QRegularExpression::PatternOption::CaseInsensitiveOption);
+  value = value.remove(regex_invalid_dir_characters);
+  if (remove_problematic_) value = value.remove(u'.');
+  value = value.trimmed();
+
+  return value;
+
 }

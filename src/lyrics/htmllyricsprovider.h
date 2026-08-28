@@ -1,35 +1,66 @@
-#ifndef STRAWBERRY_HTMLLYRICSPROVIDER_H
-#define STRAWBERRY_HTMLLYRICSPROVIDER_H
+/*
+ * Strawberry Music Player
+ * Copyright 2022-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "lyrics/jsonlyricsprovider.h"
-#include "lyrics/lyricsprovider.h"
+#ifndef HTMLLYRICSPROVIDER_H
+#define HTMLLYRICSPROVIDER_H
 
-#include <map>
-#include <string>
+#include "config.h"
+
+#include <QFutureWatcher>
+#include <QVariant>
+#include <QString>
+#include <QUrl>
+#include <QRegularExpression>
+
+#include "includes/shared_ptr.h"
+#include "core/networkaccessmanager.h"
+#include "lyricsprovider.h"
+#include "lyricssearchrequest.h"
+
+class QNetworkReply;
 
 class HtmlLyricsProvider : public LyricsProvider {
+  Q_OBJECT
+
  public:
-  HtmlLyricsProvider(std::string name, std::string start_tag, std::string end_tag, std::string lyrics_start, bool multiple);
+  explicit HtmlLyricsProvider(const QString &name, const bool enabled, const QString &start_tag, const QString &end_tag, const QString &lyrics_start, const bool multiple, const SharedPtr<NetworkAccessManager> network, QObject *parent);
 
-  std::string name() const override { return name_; }
-  void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
-
-  static std::string ParseLyricsFromHTML(const std::string &content, const std::string &start_tag, const std::string &end_tag,
-                                         const std::string &lyrics_start, bool multiple);
-  static std::string SlugAzLyrics(const std::string &text);
-  static std::string SlugDashed(const std::string &text);
-  static std::string SlugElyrics(const std::string &text);
-  static std::string SlugLetras(const std::string &text);
+  static QString ParseLyricsFromHTML(const QString &content, const QRegularExpression &start_tag, const QRegularExpression &end_tag, const QRegularExpression &lyrics_start, const bool multiple, const QList<QRegularExpression> &regex_removes = {});
 
  protected:
-  virtual std::string UrlFor(const Song &song) const = 0;
-  virtual std::map<std::string, std::string> RequestHeaders() const { return {}; }
+  virtual QUrl Url(const LyricsSearchRequest &request) = 0;
+  void ParseLyricsFromHTMLFinished(QFutureWatcher<QString> *watcher, const int id, const LyricsSearchRequest &request);
 
-  std::string name_;
-  std::string start_tag_;
-  std::string end_tag_;
-  std::string lyrics_start_;
-  bool multiple_ = false;
+ protected Q_SLOTS:
+  virtual void StartSearch(const int id, const LyricsSearchRequest &request) override;
+  virtual void HandleLyricsReply(QNetworkReply *reply, const int id, const LyricsSearchRequest &request);
+
+ protected:
+  const QString start_tag_;
+  const QString end_tag_;
+  const QString lyrics_start_;
+  const bool multiple_;
+  const QRegularExpression start_tag_re_;
+  const QRegularExpression end_tag_re_;
+  const QRegularExpression lyrics_start_re_;
+
+  Q_DISABLE_COPY_MOVE(HtmlLyricsProvider)
 };
 
-#endif
+#endif  // HTMLLYRICSPROVIDER_H

@@ -1,46 +1,66 @@
-#ifndef STRAWBERRY_WINDOWS7THUMBBAR_H
-#define STRAWBERRY_WINDOWS7THUMBBAR_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2020-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/windows7thumbbaractions.h"
+#ifndef WINDOWS7THUMBBAR_H
+#define WINDOWS7THUMBBAR_H
 
-#include <functional>
-#include <vector>
+#include <windows.h>
+#include <shobjidl.h>
 
-#ifdef _WIN32
-#include <gtk/gtk.h>
-#endif
+#include <QObject>
+#include <QWidget>
+#include <QList>
 
-class Windows7ThumbBar {
+class QTimer;
+class QAction;
+
+class Windows7ThumbBar : public QObject {
+  Q_OBJECT
+
  public:
-  using Activated = std::function<void(Windows7ThumbBarActions::Id)>;
+  // Creates a list of buttons in the taskbar icon for this window.
+  explicit Windows7ThumbBar(QWidget *widget = nullptr);
 
-#ifdef _WIN32
-  explicit Windows7ThumbBar(GtkWidget *window);
-  ~Windows7ThumbBar();
-  void SetActions(const std::vector<Windows7ThumbBarActions::Id> &actions);
-  void SetPlaying(bool playing);
-  void HandleWinEvent(void *msg);
-  void HandleCommand(int button_id);
-  void set_activated(Activated cb) { activated_ = std::move(cb); }
+  // You must call this in the parent widget's constructor before returning to the event loop.  If an action is nullptr it becomes a spacer.
+  void SetActions(const QList<QAction*> &actions);
+
+  // Call this from the parent's winEvent() function.
+  void HandleWinEvent(MSG *msg);
 
  private:
-  void ScheduleUpdate();
-  void Rebuild(bool add_buttons);
-  void InstallHook();
-  void SetupButton(int index, void *button);
+  ITaskbarList3 *CreateTaskbarList();
+  void SetupButton(const QAction *action, THUMBBUTTON *button);
 
-  GtkWidget *window_ = nullptr;
-  std::vector<Windows7ThumbBarActions::Id> actions_;
-  bool playing_ = false;
-  bool buttons_added_ = false;
-  unsigned button_created_message_id_ = 0;
-  unsigned update_source_ = 0;
-  void *taskbar_list_ = nullptr;
-  void *old_wndproc_ = nullptr;
-  Activated activated_;
-#else
-  Windows7ThumbBar() = default;
-#endif
+ private Q_SLOTS:
+  void ActionChangedTriggered();
+  void ActionChanged();
+
+ private:
+  QWidget *widget_;
+  QTimer *timer_;
+  QList<QAction*> actions_;
+
+  unsigned int button_created_message_id_;
+
+  ITaskbarList3 *taskbar_list_;
 };
 
-#endif
+#endif  // WINDOWS7THUMBBAR_H
