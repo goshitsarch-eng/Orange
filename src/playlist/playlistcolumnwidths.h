@@ -35,67 +35,24 @@ inline PlaylistColumn ColumnFromTitle(const std::string &title) {
   return PlaylistColumn::Count;
 }
 
-// Relative width each column asks for.
-// These are normalised against whichever columns are actually visible, so only the ratios matter.
-// They are sized against the header title and the kind of value the column holds: a column left at the
-// same share as "Track" while its title reads "Album artist" can never show more than an ellipsis.
 inline double DefaultProportion(const PlaylistColumn column) {
   switch (column) {
-    // Free text, longest values.
-    case PlaylistColumn::Title:
-    case PlaylistColumn::TitleSort:
-      return 0.16;
-    case PlaylistColumn::Filename:
-    case PlaylistColumn::URL:
-      return 0.13;
-    case PlaylistColumn::Artist:
-    case PlaylistColumn::ArtistSort:
-    case PlaylistColumn::Album:
-    case PlaylistColumn::AlbumSort:
-      return 0.13;
-    case PlaylistColumn::AlbumArtist:
-    case PlaylistColumn::AlbumArtistSort:
-    case PlaylistColumn::Performer:
-    case PlaylistColumn::PerformerSort:
-    case PlaylistColumn::Composer:
-    case PlaylistColumn::ComposerSort:
-    case PlaylistColumn::Comment:
-    case PlaylistColumn::Grouping:
-      return 0.11;
-    case PlaylistColumn::Genre:
-    case PlaylistColumn::DateCreated:
-    case PlaylistColumn::DateModified:
-    case PlaylistColumn::LastPlayed:
-      return 0.08;
-    // Short values, but titles wide enough to need the room.
-    case PlaylistColumn::Samplerate:
-    case PlaylistColumn::Bitdepth:
-    case PlaylistColumn::EBUR128I:
-    case PlaylistColumn::EBUR128LRA:
-    case PlaylistColumn::Moodbar:
-    case PlaylistColumn::Rating:
+    case PlaylistColumn::Track:
       return 0.06;
+    case PlaylistColumn::Title:
+    case PlaylistColumn::Artist:
+    case PlaylistColumn::Album:
+      return 0.23;
+    case PlaylistColumn::Samplerate:
+      return 0.05;
     case PlaylistColumn::Length:
+    case PlaylistColumn::Bitdepth:
     case PlaylistColumn::Bitrate:
-    case PlaylistColumn::Filesize:
     case PlaylistColumn::Filetype:
     case PlaylistColumn::Source:
-    case PlaylistColumn::OriginalYear:
-    case PlaylistColumn::InitialKey:
-      return 0.05;
-    // Narrow numeric columns.
-    case PlaylistColumn::Track:
-    case PlaylistColumn::Disc:
-    case PlaylistColumn::Year:
-    case PlaylistColumn::PlayCount:
-    case PlaylistColumn::SkipCount:
-    case PlaylistColumn::Queue:
-    case PlaylistColumn::HasCUE:
-    case PlaylistColumn::BPM:
-    case PlaylistColumn::Mood:
       return 0.04;
     default:
-      return 0.06;
+      return 0.04;
   }
 }
 

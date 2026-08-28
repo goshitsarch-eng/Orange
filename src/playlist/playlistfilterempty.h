@@ -23,7 +23,9 @@ inline State StateFor(int total_rows, int visible_rows) {
   return State::None;
 }
 
-inline bool ShouldShow(int total_rows, int visible_rows) { return StateFor(total_rows, visible_rows) != State::None; }
+// Unchanged contract: this answers "is the filter hiding everything", which is what the Qt view asked.
+// The empty-playlist case is a separate state and is handled through StateFor.
+inline bool ShouldShow(int total_rows, int visible_rows) { return StateFor(total_rows, visible_rows) == State::NoMatches; }
 
 inline const char *Message() { return "No matches found. Clear the search box to show the whole playlist again."; }
 
