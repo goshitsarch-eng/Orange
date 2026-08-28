@@ -15,6 +15,9 @@ class Settings {
 
   void BeginGroup(const std::string &group);
   void EndGroup();
+  // The group currently in effect. Widget callbacks fire long after the page that created them was built,
+  // by which time another page has moved the group, so they capture this at build time and restore it.
+  const std::string &group() const { return group_; }
 
   bool Contains(const std::string &key) const;
 

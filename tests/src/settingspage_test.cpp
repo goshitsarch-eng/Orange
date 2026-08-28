@@ -1,4 +1,5 @@
 #include "analyzer/analyzer.h"
+#include "settings/settingsgroupscope.h"
 #include "constants/analyzersettings.h"
 #include "constants/backendsettings.h"
 #include "constants/behavioursettings.h"
@@ -988,4 +989,75 @@ TEST(SettingsWheelThrough, PropagatesWhenUnfocusedLikeQt) {
   EXPECT_DOUBLE_EQ(SettingsWheelThrough::kFallbackStep, SettingsWheelThrough::AdjustmentDelta(1.0, 0.0));
   EXPECT_DOUBLE_EQ(10.0, SettingsWheelThrough::ClampedValue(5.0, 8.0, 0.0, 10.0));
   EXPECT_DOUBLE_EQ(0.0, SettingsWheelThrough::ClampedValue(5.0, -8.0, 0.0, 10.0));
+}
+
+// A Settings object carries one current group, and every settings page moves it while the preferences dialog
+// is built. A widget's callback runs later, when the user changes something, so it has to restore the group
+// its own page was built under. Without that, changing almost any preference wrote it into whichever section
+// belonged to the last page constructed, and the change was silently lost.
+namespace {
+
+// Any GObject will do as the carrier; the real code hangs this off the row widget.
+struct ScopedObject {
+  ScopedObject() : object(G_OBJECT(g_object_new(G_TYPE_OBJECT, nullptr))) {}
+  ~ScopedObject() { g_object_unref(object); }
+  GObject *object;
+};
+
+}  // namespace
+
+TEST(SettingsGroupScope, RestoresTheGroupTheWidgetWasBuiltUnder) {
+  Settings settings;
+  ScopedObject row;
+
+  settings.BeginGroup("PageA");
+  SettingsGroupScope::Stash(row.object, &settings, nullptr);
+  // Building the rest of the dialog moves the shared group along.
+  settings.BeginGroup("PageZ");
+
+  SettingsGroupScope::Restore(row.object, &settings);
+  EXPECT_EQ("PageA", settings.group());
+}
+
+TEST(SettingsGroupScope, AnExplicitGroupWins) {
+  Settings settings;
+  ScopedObject row;
+
+  settings.BeginGroup("PageA");
+  SettingsGroupScope::Stash(row.object, &settings, "Explicit");
+  settings.BeginGroup("PageZ");
+
+  SettingsGroupScope::Restore(row.object, &settings);
+  EXPECT_EQ("Explicit", settings.group());
+}
+
+TEST(SettingsGroupScope, WritesLandInTheStashedGroupAndNowhereElse) {
+  Settings settings;
+  ScopedObject row;
+
+  settings.BeginGroup("PageA");
+  SettingsGroupScope::Stash(row.object, &settings, nullptr);
+  settings.BeginGroup("PageZ");
+
+  // What a widget callback does: restore, then write.
+  SettingsGroupScope::Restore(row.object, &settings);
+  settings.SetBoolValue("enabled", true);
+
+  settings.BeginGroup("PageA");
+  EXPECT_TRUE(settings.BoolValue("enabled", false));
+  settings.BeginGroup("PageZ");
+  EXPECT_FALSE(settings.Contains("enabled"));
+
+  settings.BeginGroup("PageA");
+  settings.Remove("enabled");
+}
+
+TEST(SettingsGroupScope, RestoringWithNothingStashedLeavesTheGroupAlone) {
+  Settings settings;
+  ScopedObject row;
+  settings.BeginGroup("PageZ");
+  SettingsGroupScope::Restore(row.object, &settings);
+  EXPECT_EQ("PageZ", settings.group());
+  // A null Settings must not crash: several helpers tolerate one.
+  SettingsGroupScope::Restore(row.object, nullptr);
 }

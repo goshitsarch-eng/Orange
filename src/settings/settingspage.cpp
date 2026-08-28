@@ -1,6 +1,7 @@
 #include "settings/settingspage.h"
 
 #include "core/application.h"
+#include "settings/settingsgroupscope.h"
 #include "settings/settingswheelthrough.h"
 #include "settings/streaminglogincontrols.h"
 #include "streaming/streamingservice.h"
@@ -18,6 +19,7 @@
 #include <string>
 
 namespace SettingsPage {
+
 
 AdwPreferencesPage *MakePage(const char *name, const char *icon) {
   AdwPreferencesPage *page = ADW_PREFERENCES_PAGE(adw_preferences_page_new());
@@ -47,16 +49,11 @@ GtkWidget *AddToggle(AdwPreferencesGroup *group, Settings *settings, const char 
   }
   adw_switch_row_set_active(row, settings->BoolValue(key, fallback));
   g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
-  if (group_name) {
-    g_object_set_data_full(G_OBJECT(row), "settings-group", g_strdup(group_name), g_free);
-  }
+  SettingsGroupScope::Stash(row, settings, group_name);
   g_signal_connect(row, "notify::active", G_CALLBACK(+[](AdwSwitchRow *switch_row, GParamSpec *, gpointer data) {
                      auto *s = static_cast<Settings *>(data);
                      const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(switch_row), "settings-key"));
-                     const char *settings_group = static_cast<const char *>(g_object_get_data(G_OBJECT(switch_row), "settings-group"));
-                     if (settings_group) {
-                       s->BeginGroup(settings_group);
-                     }
+                     SettingsGroupScope::Restore(switch_row, s);
                      s->SetBoolValue(settings_key, adw_switch_row_get_active(switch_row));
                      s->Sync();
                    }),
@@ -70,9 +67,11 @@ GtkWidget *AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   gtk_editable_set_text(GTK_EDITABLE(row), settings->Value(key, fallback ? fallback : "").c_str());
   g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
+  SettingsGroupScope::Stash(row, settings, nullptr);
   g_signal_connect(row, "changed", G_CALLBACK(+[](AdwEntryRow *entry, gpointer data) {
                      auto *s = static_cast<Settings *>(data);
                      const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(entry), "settings-key"));
+                     SettingsGroupScope::Restore(entry, s);
                      s->SetValue(settings_key, gtk_editable_get_text(GTK_EDITABLE(entry)));
                      s->Sync();
                    }),
@@ -88,9 +87,11 @@ GtkWidget *AddPasswordEntry(AdwPreferencesGroup *group, Settings *settings, cons
   // system keyring rather than the settings file.
   gtk_editable_set_text(GTK_EDITABLE(row), settings->SecretValue(key, fallback ? fallback : "").c_str());
   g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
+  SettingsGroupScope::Stash(row, settings, nullptr);
   g_signal_connect(row, "changed", G_CALLBACK(+[](AdwPasswordEntryRow *entry, gpointer data) {
                      auto *s = static_cast<Settings *>(data);
                      const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(entry), "settings-key"));
+                     SettingsGroupScope::Restore(entry, s);
                      s->SetSecretValue(settings_key, gtk_editable_get_text(GTK_EDITABLE(entry)));
                      s->Sync();
                    }),
@@ -118,9 +119,11 @@ GtkWidget *AddIntEntry(AdwPreferencesGroup *group, Settings *settings, const cha
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
   gtk_editable_set_text(GTK_EDITABLE(row), std::to_string(settings->IntValue(key, fallback)).c_str());
   g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
+  SettingsGroupScope::Stash(row, settings, nullptr);
   g_signal_connect(row, "changed", G_CALLBACK(+[](AdwEntryRow *entry, gpointer data) {
                      auto *s = static_cast<Settings *>(data);
                      const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(entry), "settings-key"));
+                     SettingsGroupScope::Restore(entry, s);
                      s->SetIntValue(settings_key, g_ascii_strtoll(gtk_editable_get_text(GTK_EDITABLE(entry)), nullptr, 10));
                      s->Sync();
                    }),
@@ -150,9 +153,7 @@ GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *
   if (key) {
     g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
   }
-  if (group_name) {
-    g_object_set_data_full(G_OBJECT(row), "settings-group", g_strdup(group_name), g_free);
-  }
+  SettingsGroupScope::Stash(row, settings, group_name);
   g_object_set_data_full(G_OBJECT(row), "choice-ids", ids, [](gpointer p) { delete static_cast<std::vector<std::string> *>(p); });
   if (changed) {
     auto *fn = new std::function<void(const std::string &)>(changed);
@@ -167,11 +168,8 @@ GtkWidget *AddCombo(AdwPreferencesGroup *group, Settings *settings, const char *
                        return;
                      }
                      const std::string &id = (*choice_ids)[index];
-                     const char *settings_group = static_cast<const char *>(g_object_get_data(G_OBJECT(combo), "settings-group"));
                      if (s && settings_key) {
-                       if (settings_group) {
-                         s->BeginGroup(settings_group);
-                       }
+                       SettingsGroupScope::Restore(combo, s);
                        s->SetValue(settings_key, id);
                        s->Sync();
                      }
@@ -385,6 +383,7 @@ void AddBoolRadios(AdwPreferencesGroup *group, Settings *settings, const char *k
   gtk_check_button_set_active(GTK_CHECK_BUTTON(value ? true_btn : false_btn), TRUE);
   if (key) {
     g_object_set_data_full(G_OBJECT(true_btn), "settings-key", g_strdup(key), g_free);
+    SettingsGroupScope::Stash(true_btn, settings, nullptr);
   }
   if (changed) {
     auto *fn = new std::function<void(bool)>(changed);
@@ -395,6 +394,7 @@ void AddBoolRadios(AdwPreferencesGroup *group, Settings *settings, const char *k
                      auto *s = static_cast<Settings *>(data);
                      const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(button), "settings-key"));
                      if (s && settings_key) {
+                       SettingsGroupScope::Restore(button, s);
                        s->SetBoolValue(settings_key, gtk_check_button_get_active(button));
                        s->Sync();
                      }
@@ -434,6 +434,7 @@ void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char 
     gtk_check_button_set_active(GTK_CHECK_BUTTON(button), choice.first == current);
     if (key) {
       g_object_set_data_full(G_OBJECT(button), "settings-key", g_strdup(key), g_free);
+      SettingsGroupScope::Stash(button, settings, nullptr);
     }
     g_object_set_data_full(G_OBJECT(button), "choice-id", g_strdup(choice.first.c_str()), g_free);
     if (fn) {
@@ -447,6 +448,7 @@ void AddChoiceRadios(AdwPreferencesGroup *group, Settings *settings, const char 
                        const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(check), "settings-key"));
                        const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(check), "choice-id"));
                        if (s && settings_key && id) {
+                         SettingsGroupScope::Restore(check, s);
                          s->SetValue(settings_key, id);
                          s->Sync();
                        }

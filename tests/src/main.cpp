@@ -1,4 +1,6 @@
+#include <adwaita.h>
 #include <glib.h>
+#include <gtk/gtk.h>
 
 #include <gtest/gtest.h>
 
@@ -22,6 +24,13 @@ int main(int argc, char **argv) {
     g_free(data);
     g_free(cache);
     g_free(sandbox);
+  }
+
+  // Most tests exercise plain helpers, but a few need real widgets. Initialise libadwaita when a display is
+  // available and let those tests skip themselves when it is not, so the suite still runs headless.
+  gtk_disable_setlocale();
+  if (gtk_init_check()) {
+    adw_init();
   }
 
   testing::InitGoogleTest(&argc, argv);
