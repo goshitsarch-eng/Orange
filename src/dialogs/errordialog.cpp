@@ -10,6 +10,8 @@
 void ErrorDialog::Show(GtkWindow *parent, const std::string &message) {
   AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(ErrorDialogLabels::Title()), message.c_str()));
   adw_alert_dialog_add_response(dialog, "ok", Translations::CStr("OK"));
+  adw_alert_dialog_set_default_response(dialog, "ok");
+  adw_alert_dialog_set_close_response(dialog, "ok");
   DialogCloseKeys::Attach(ADW_DIALOG(dialog));
   adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
 }
@@ -51,6 +53,8 @@ void QueuedErrorDialog::EnsureDialog() {
   }
   dialog_ = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(ErrorDialogLabels::Title()), ""));
   adw_alert_dialog_add_response(dialog_, "ok", Translations::CStr("OK"));
+  adw_alert_dialog_set_default_response(dialog_, "ok");
+  adw_alert_dialog_set_close_response(dialog_, "ok");
   DialogCloseKeys::Attach(ADW_DIALOG(dialog_));
   g_signal_connect(dialog_, "closed", G_CALLBACK((+[](AdwDialog *, gpointer data) {
                      static_cast<QueuedErrorDialog *>(data)->OnClosed();

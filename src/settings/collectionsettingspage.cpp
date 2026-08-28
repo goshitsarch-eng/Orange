@@ -247,6 +247,8 @@ AdwPreferencesPage *CollectionSettingsPage::Create(Settings *settings, Applicati
                                                                     Translations::CStr(CollectionStats::ConfirmText())));
       adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "write", Translations::CStr("Write"), nullptr);
       adw_alert_dialog_set_response_appearance(dialog, "write", ADW_RESPONSE_SUGGESTED);
+      adw_alert_dialog_set_default_response(dialog, "write");
+      adw_alert_dialog_set_close_response(dialog, "cancel");
       g_object_set_data(G_OBJECT(dialog), "app", app);
       g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
                          if (g_strcmp0(response, "write") != 0) {

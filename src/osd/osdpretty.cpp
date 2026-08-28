@@ -10,6 +10,7 @@
 #include "osd/osdprettytransparency.h"
 #include "osd/osdprettywayland.h"
 #include "utilities/fontutils.h"
+#include "utilities/styleutils.h"
 #include "utilities/winblurbehind.h"
 #ifdef _WIN32
 #include "utilities/winutils.h"
@@ -278,17 +279,10 @@ void OSDPretty::ApplyLimits() {
     gtk_label_set_ellipsize(GTK_LABEL(body_), PANGO_ELLIPSIZE_END);
     gtk_widget_set_hexpand(body_, TRUE);
   }
-  GtkCssProvider *css = gtk_css_provider_new();
   const std::string sheet = ".osd-pretty { max-width: " + std::to_string(window_width) + "px; max-height: " +
                             std::to_string(window_height) + "px; } .osd-pretty label { max-width: " +
                             std::to_string(label_width) + "px; }";
-#if GTK_CHECK_VERSION(4, 12, 0)
-  gtk_css_provider_load_from_string(css, sheet.c_str());
-#else
-  gtk_css_provider_load_from_data(css, sheet.c_str(), static_cast<gssize>(sheet.size()));
-#endif
-  gtk_style_context_add_provider_for_display(gdk_display_get_default(), GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-  g_object_unref(css);
+  StyleUtils::LoadCss(sheet, StyleUtils::Slot::kOsdPrettyMetrics);
 }
 
 void OSDPretty::StopFade() {
@@ -443,15 +437,8 @@ void OSDPretty::ApplyStyle() {
   if (!window_) {
     return;
   }
-  GtkCssProvider *css = gtk_css_provider_new();
   const std::string sheet = OSDPrettyPopup::ChromeCss(bg_, fg_, opacity_, FontUtils::ToCss(FontUtils::Parse(font_)));
-#if GTK_CHECK_VERSION(4, 12, 0)
-  gtk_css_provider_load_from_string(css, sheet.c_str());
-#else
-  gtk_css_provider_load_from_data(css, sheet.c_str(), static_cast<gssize>(sheet.size()));
-#endif
-  gtk_style_context_add_provider_for_display(gdk_display_get_default(), GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-  g_object_unref(css);
+  StyleUtils::LoadCss(sheet, StyleUtils::Slot::kOsdPrettyChrome);
 }
 
 void OSDPretty::ConnectDrag() {

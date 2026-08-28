@@ -5,7 +5,7 @@
 
 class StyleHelper {
  public:
-  static void LoadCss(const std::string &css) { StyleUtils::LoadCss(css); }
+  static void LoadCss(const std::string &css, const std::string &slot) { StyleUtils::LoadCss(css, slot); }
   static bool IsDark() { return StyleUtils::IsDarkTheme(); }
 };
 

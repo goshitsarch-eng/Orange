@@ -15,6 +15,10 @@
 
 PlaylistHeader::PlaylistHeader() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  // PlaylistView::Clear() unparents every child of its grid before each refresh, the header included.
+  // Without a reference of our own the unparent would drop the last one and free the box, leaving widget_
+  // dangling for the Rebuild() that immediately follows.
+  g_object_ref_sink(widget_);
   gtk_widget_add_css_class(widget_, "toolbar");
   gtk_widget_add_css_class(widget_, "strawberry-playlist-buttons");
   gtk_widget_set_focusable(widget_, TRUE);
@@ -221,7 +225,20 @@ void PlaylistHeader::OnDragUpdate(double offset_x) {
   NotifyWidthsChanged();
 }
 
+PlaylistHeader::~PlaylistHeader() {
+  if (widget_) {
+    if (gtk_widget_get_parent(widget_)) {
+      gtk_widget_unparent(widget_);
+    }
+    g_object_unref(widget_);
+    widget_ = nullptr;
+  }
+}
+
 void PlaylistHeader::Rebuild() {
+  if (!widget_) {
+    return;
+  }
   GtkWidget *child = gtk_widget_get_first_child(widget_);
   while (child) {
     GtkWidget *next = gtk_widget_get_next_sibling(child);

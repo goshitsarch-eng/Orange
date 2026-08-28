@@ -13,6 +13,10 @@ void MessageDialog::Show(GtkWindow *parent, const std::string &title, const std:
                          bool checkbox_checked, const std::function<void(bool checked)> &closed) {
   AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(title.c_str()), Translations::CStr(message.c_str())));
   adw_alert_dialog_add_response(dialog, "ok", Translations::CStr("OK"));
+  // Without these, Enter falls through to whatever extra child has focus (toggling the checkbox rather than
+  // confirming) and Escape produces no response at all.
+  adw_alert_dialog_set_default_response(dialog, "ok");
+  adw_alert_dialog_set_close_response(dialog, "ok");
   GtkWidget *check = nullptr;
   if (!checkbox_label.empty()) {
     check = gtk_check_button_new_with_label(Translations::CStr(checkbox_label.c_str()));

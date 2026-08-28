@@ -2,6 +2,22 @@ Strawberry Music Player
 =======================
 ChangeLog
 
+Version 2.0.0 (2026.08.28):
+
+  The user interface has been rewritten from Qt to GTK 4 and libadwaita.
+  Settings are now stored with GKeyFile instead of QSettings, so settings from 1.x are not carried over.
+  The collection and playlist database is unchanged and is picked up as before.
+
+  Notes:
+    * Credits now include Amarok, whose 1.4 release is the original ancestor of this codebase by way of Clementine, and the third-party projects Strawberry is built on
+
+  Bugfixes:
+    * Fixed the application icon, and every other bundled icon, never being installed, which left the application with no icon in the shell, the dock or the about dialog
+    * Fixed a new GtkCssProvider being attached to the display on every restyle instead of the existing one being updated, which leaked providers without bound and progressively slowed the whole interface down while a track was playing
+    * Fixed the icon fallback chain never being used, because GTK 4 icon lookups always succeed and return "image-missing" rather than failing
+    * Fixed clearing the playlist background leaving the previous background image applied
+    * Fixed the playlist re-reading the settings file on every frame of the glow animation
+
 Version 1.2.27 (2026.08.11):
 
   Bugfixes:

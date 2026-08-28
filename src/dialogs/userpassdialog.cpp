@@ -25,6 +25,8 @@ void UserPassDialog::Show(GtkWindow *parent, const std::string &service, const s
   adw_alert_dialog_set_extra_child(dialog, box);
   adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "login", Translations::CStr("Sign in"), nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "login", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response(dialog, "login");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   auto *cb = new std::function<void(const std::string &, const std::string &)>(callback);
   g_object_set_data(G_OBJECT(dialog), "user", user);
   g_object_set_data(G_OBJECT(dialog), "pass", pass);

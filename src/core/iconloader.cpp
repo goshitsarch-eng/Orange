@@ -16,17 +16,24 @@ GdkPixbuf *IconLoader::Load(const std::string &name, int size) {
     return nullptr;
   }
   for (const std::string &candidate : SearchNames(name)) {
+    // gtk_icon_theme_lookup_icon() never returns NULL - it falls back to "image-missing" - so the candidate
+    // list only works as a fallback chain if the theme is asked up front whether it has the icon.
+    if (!gtk_icon_theme_has_icon(theme, candidate.c_str())) {
+      continue;
+    }
     GtkIconPaintable *paintable = gtk_icon_theme_lookup_icon(theme, candidate.c_str(), nullptr, size, 1, GTK_TEXT_DIR_NONE, static_cast<GtkIconLookupFlags>(0));
     if (!paintable) {
       continue;
     }
     GFile *file = gtk_icon_paintable_get_file(paintable);
-    g_object_unref(paintable);
     if (!file) {
+      // Icons that live in a GResource rather than on disk have no GFile.
+      g_object_unref(paintable);
       continue;
     }
     gchar *path = g_file_get_path(file);
     g_object_unref(file);
+    g_object_unref(paintable);
     if (!path) {
       continue;
     }

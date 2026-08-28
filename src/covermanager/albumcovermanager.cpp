@@ -861,6 +861,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                                                     Translations::CStr(CoverManagerActions::CloseAbort()), nullptr);
                      adw_alert_dialog_set_response_appearance(confirm, "abort", ADW_RESPONSE_DESTRUCTIVE);
                      adw_alert_dialog_set_default_response(confirm, "abort");
+                     adw_alert_dialog_set_close_response(confirm, "keep");
                      g_signal_connect(confirm, "response", G_CALLBACK((+[](AdwAlertDialog *, const char *response, gpointer data) {
                                         auto *state = static_cast<CoverManagerState *>(data);
                                         if (g_strcmp0(response, "abort") != 0 || !state->dialog) {

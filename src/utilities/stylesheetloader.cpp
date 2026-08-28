@@ -8,6 +8,6 @@ bool StyleSheetLoader::LoadFile(const std::string &path) {
   if (css.empty()) {
     return false;
   }
-  StyleUtils::LoadCss(css);
+  StyleUtils::LoadCss(css, StyleUtils::Slot::kUserStyleSheet);
   return true;
 }

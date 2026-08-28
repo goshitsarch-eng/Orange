@@ -429,6 +429,8 @@ void AlbumCoverChoiceController::LoadCoverFromURL(GtkWindow *parent, Song *song,
   gtk_entry_set_placeholder_text(GTK_ENTRY(entry), "https://");
   adw_alert_dialog_set_extra_child(dialog, entry);
   adw_alert_dialog_add_responses(dialog, "cancel", "Cancel", "fetch", "Download", nullptr);
+  adw_alert_dialog_set_default_response(dialog, "fetch");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   g_object_set_data(G_OBJECT(dialog), "entry", entry);
   g_object_set_data(G_OBJECT(dialog), "song", song);
   g_object_set_data(G_OBJECT(dialog), "image", image);

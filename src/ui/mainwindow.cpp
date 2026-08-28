@@ -357,6 +357,7 @@ void MainWindow::CheckFullRescanRevisions() {
   adw_alert_dialog_add_responses(dialog, "no", Translations::CStr("No"), "yes", Translations::CStr("Yes"), nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "yes", ADW_RESPONSE_SUGGESTED);
   adw_alert_dialog_set_default_response(dialog, "yes");
+  adw_alert_dialog_set_close_response(dialog, "no");
   g_signal_connect(dialog, "response",
                    G_CALLBACK((+[](AdwAlertDialog *, const char *response, gpointer data) {
                      if (g_strcmp0(response, "yes") != 0) {
@@ -1433,6 +1434,8 @@ void MainWindow::BuildSidebar() {
             Translations::CStr("Are you sure you want to restore the default smart playlists? This will remove all custom smart playlists")));
         adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "restore", Translations::CStr("Restore"), nullptr);
         adw_alert_dialog_set_response_appearance(dialog, "restore", ADW_RESPONSE_DESTRUCTIVE);
+        adw_alert_dialog_set_default_response(dialog, "cancel");
+        adw_alert_dialog_set_close_response(dialog, "cancel");
         g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
                            if (g_strcmp0(response, "restore") != 0) {
                              return;
@@ -3114,6 +3117,8 @@ void MainWindow::ClearPlaylist() {
     AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(PlaylistUndoLimits::ClearConfirmTitle()), body.c_str()));
     adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "clear", Translations::CStr("Clear"), nullptr);
     adw_alert_dialog_set_response_appearance(dialog, "clear", ADW_RESPONSE_DESTRUCTIVE);
+    adw_alert_dialog_set_default_response(dialog, "cancel");
+    adw_alert_dialog_set_close_response(dialog, "cancel");
     g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
                        if (g_strcmp0(response, "clear") != 0) {
                          return;
@@ -3239,6 +3244,8 @@ void MainWindow::TryClosePlaylist(int id) {
   adw_alert_dialog_set_extra_child(dialog, dont_warn);
   adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "close", Translations::CStr("Close"), nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "close", ADW_RESPONSE_DESTRUCTIVE);
+  adw_alert_dialog_set_default_response(dialog, "cancel");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   g_object_set_data(G_OBJECT(dialog), "playlist-id", GINT_TO_POINTER(id + 1));
   g_object_set_data(G_OBJECT(dialog), "dont-warn", dont_warn);
   g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
@@ -3298,6 +3305,7 @@ void MainWindow::RenamePlaylist(int id) {
   adw_alert_dialog_add_responses(dialog, "cancel", "Cancel", "rename", "Rename", nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "rename", ADW_RESPONSE_SUGGESTED);
   adw_alert_dialog_set_default_response(dialog, "rename");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   g_object_set_data(G_OBJECT(dialog), "entry", entry);
   g_object_set_data(G_OBJECT(dialog), "playlist-id", GINT_TO_POINTER(id + 1));
   g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
@@ -3599,8 +3607,9 @@ void MainWindow::ApplyAppearance() {
   const std::string key = cover_path.empty() ? appearance.background_filename() : cover_path;
   if (playlist_container_ && playlist_container_->view()) {
     playlist_container_->view()->SetBackground(css, key.empty() ? std::to_string(appearance.background_type()) : key);
-  } else if (!css.empty()) {
-    StyleUtils::LoadCss(css);
+  }
+  else {
+    StyleUtils::LoadCss(css, StyleUtils::Slot::kPlaylistBackground);
   }
   if (sidebar_tabs_) {
     sidebar_tabs_->ReloadIconSizes();
@@ -4210,6 +4219,7 @@ void MainWindow::NewPlaylistFolder() {
   adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "create", Translations::CStr("Create"), nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "create", ADW_RESPONSE_SUGGESTED);
   adw_alert_dialog_set_default_response(dialog, "create");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   g_object_set_data(G_OBJECT(dialog), "entry", entry);
   g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
                      if (g_strcmp0(response, "create") != 0) {
@@ -4239,6 +4249,7 @@ void MainWindow::RenamePlaylistFolder(const std::string &path) {
   adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "rename", Translations::CStr("Rename"), nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "rename", ADW_RESPONSE_SUGGESTED);
   adw_alert_dialog_set_default_response(dialog, "rename");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   g_object_set_data(G_OBJECT(dialog), "entry", entry);
   g_object_set_data_full(G_OBJECT(dialog), "folder-path", g_strdup(path.c_str()), g_free);
   g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
@@ -4561,6 +4572,8 @@ void MainWindow::ShowInFileBrowser(const std::vector<std::string> &urls_or_paths
     AdwAlertDialog *dialog =
         ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Show in file browser"), FileViewMenu::BrowserTooManyMessage()));
     adw_alert_dialog_add_responses(dialog, "close", Translations::CStr("Close"), nullptr);
+    adw_alert_dialog_set_default_response(dialog, "close");
+    adw_alert_dialog_set_close_response(dialog, "close");
     adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window_));
     return;
   }
@@ -4570,6 +4583,7 @@ void MainWindow::ShowInFileBrowser(const std::vector<std::string> &urls_or_paths
     AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Show in file browser"), body.c_str()));
     adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "open", Translations::CStr("Open"), nullptr);
     adw_alert_dialog_set_default_response(dialog, "open");
+    adw_alert_dialog_set_close_response(dialog, "cancel");
     g_signal_connect(dialog, "response", G_CALLBACK((+[](AdwAlertDialog *, const char *response, gpointer data) {
                        auto *req = static_cast<FileViewBrowserOpen *>(data);
                        if (g_strcmp0(response, "open") == 0) {
@@ -4991,6 +5005,7 @@ void MainWindow::EditColumnValue() {
   adw_alert_dialog_add_responses(dialog, "cancel", "Cancel", "apply", "Apply", nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "apply", ADW_RESPONSE_SUGGESTED);
   adw_alert_dialog_set_default_response(dialog, "apply");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   g_object_set_data(G_OBJECT(dialog), "entry", entry);
   g_object_set_data(G_OBJECT(dialog), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
   g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {

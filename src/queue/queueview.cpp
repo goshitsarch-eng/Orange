@@ -21,7 +21,7 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
   list_ = gtk_list_box_new();
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_widget_set_vexpand(list_, TRUE);
-  StyleUtils::LoadCss(QueueUi::AlternatingCss());
+  StyleUtils::LoadCss(QueueUi::AlternatingCss(), StyleUtils::Slot::kQueueLook);
   GtkWidget *overlay = gtk_overlay_new();
   gtk_overlay_set_child(GTK_OVERLAY(overlay), list_);
   drop_overlay_ = gtk_drawing_area_new();
