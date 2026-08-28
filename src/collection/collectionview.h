@@ -34,7 +34,7 @@ class CollectionView {
   CollectionFilter *filter() { return &filter_; }
 
   void SetModelSongs(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
-                     bool skip_artist_articles, bool skip_album_articles);
+                     bool skip_artist_articles, bool skip_album_articles, bool use_sort_tags = false);
   void ApplyUpdate(const CollectionModelUpdate &update);
   void SetFilterString(const std::string &filter);
   void SetActivateCallback(ActivateCallback callback);

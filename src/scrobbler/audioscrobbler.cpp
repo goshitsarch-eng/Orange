@@ -32,17 +32,12 @@ void AudioScrobbler::ReloadSettings() {
 }
 
 bool AudioScrobbler::enabled() const {
+  // The Scrobbler group's "enabled" key is the master switch behind the settings page toggle, the Playback
+  // menu item, the tray and the global shortcut.  Reporting enabled because some service happened to be
+  // configured made the toggle appear stuck on and, worse, left every service scrobbling once it was off.
   Settings settings;
   settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
-  if (settings.BoolValue(ScrobblerSettings::kEnabled, ScrobblerSettings::kDefaultEnabled)) {
-    return true;
-  }
-  for (const auto &service : services_) {
-    if (service->enabled()) {
-      return true;
-    }
-  }
-  return false;
+  return settings.BoolValue(ScrobblerSettings::kEnabled, ScrobblerSettings::kDefaultEnabled);
 }
 
 bool AudioScrobbler::offline() const {
@@ -52,6 +47,9 @@ bool AudioScrobbler::offline() const {
 }
 
 void AudioScrobbler::NowPlaying(const Song &song) {
+  if (!enabled()) {
+    return;
+  }
   Settings settings;
   settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
   if (!ScrobblerSources::Allows(settings.Value(ScrobblerSettings::kSources), song.source())) {
@@ -73,6 +71,9 @@ void AudioScrobbler::ClearPlaying() {
 }
 
 void AudioScrobbler::Scrobble(const Song &song) {
+  if (!enabled()) {
+    return;
+  }
   Settings settings;
   settings.BeginGroup(ScrobblerSettings::kSettingsGroup);
   if (!ScrobblerSources::Allows(settings.Value(ScrobblerSettings::kSources), song.source())) {
@@ -86,6 +87,9 @@ void AudioScrobbler::Scrobble(const Song &song) {
 }
 
 void AudioScrobbler::Love(const Song &song) {
+  if (!enabled()) {
+    return;
+  }
   for (auto &service : services_) {
     if (service->enabled()) {
       service->Love(song);

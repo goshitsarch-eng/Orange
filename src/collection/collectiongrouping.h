@@ -63,7 +63,10 @@ class CollectionGrouping {
 
   static std::string TextOrUnknown(const std::string &text);
   static std::string DisplayText(GroupBy group_by, const Song &song);
-  static std::string SortText(GroupBy group_by, const Song &song, bool skip_artist_articles, bool skip_album_articles);
+  // With use_sort_tags the artist/album/composer sort tags written into the files take precedence over the
+  // displayed names, so "The Beatles" files tagged "Beatles, The" sort where their tags say they should.
+  static std::string SortText(GroupBy group_by, const Song &song, bool skip_artist_articles, bool skip_album_articles,
+                              bool use_sort_tags = false);
   static std::string ContainerKey(GroupBy group_by, const Song &song, bool *has_unique_album_identifier, bool separate_albums_by_grouping);
   static bool IsAlbumGroupBy(GroupBy group_by);
   static bool IsArtistGroupBy(GroupBy group_by);
@@ -71,7 +74,7 @@ class CollectionGrouping {
   static bool AlbumContainsDisc(const std::string &album);
 
   static Node BuildTree(const SongList &songs, const Grouping &grouping, bool separate_albums_by_grouping, bool skip_artist_articles,
-                        bool skip_album_articles);
+                        bool skip_album_articles, bool use_sort_tags = false);
 
   static Grouping LoadCurrent();
   static void SaveCurrent(const Grouping &grouping);

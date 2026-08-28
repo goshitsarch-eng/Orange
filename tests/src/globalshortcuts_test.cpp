@@ -236,6 +236,12 @@ TEST(MacOsAccessibility, ShowsRowUntilTrusted) {
 }
 
 TEST(PlaylistManager, CycleRepeatAndShuffleModes) {
+  // Repeat and shuffle are stored for the application, so start from a known saved state rather than
+  // whatever an earlier test left behind.
+  PlaylistSequence saved;
+  saved.SetRepeatMode(PlaylistSequence::RepeatMode::Off);
+  saved.SetShuffleMode(PlaylistSequence::ShuffleMode::Off);
+
   PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
   manager.Init();
   ASSERT_NE(nullptr, manager.current());
@@ -244,6 +250,29 @@ TEST(PlaylistManager, CycleRepeatAndShuffleModes) {
   EXPECT_EQ(PlaylistSequence::RepeatMode::Track, manager.current()->repeat_mode());
   manager.CycleShuffleMode();
   EXPECT_EQ(PlaylistSequence::ShuffleMode::All, manager.current()->shuffle_mode());
+}
+
+// The saved mode used to be restored into the toolbar but never into any playlist, so it had no effect on
+// playback after a restart.
+TEST(PlaylistManager, RestoresTheSavedRepeatAndShuffleMode) {
+  PlaylistSequence saved;
+  saved.SetRepeatMode(PlaylistSequence::RepeatMode::Album);
+  saved.SetShuffleMode(PlaylistSequence::ShuffleMode::InsideAlbum);
+
+  PlaylistManager manager(nullptr, nullptr, nullptr, nullptr, nullptr);
+  manager.Init();
+  ASSERT_NE(nullptr, manager.current());
+  EXPECT_EQ(PlaylistSequence::RepeatMode::Album, manager.current()->repeat_mode());
+  EXPECT_EQ(PlaylistSequence::ShuffleMode::InsideAlbum, manager.current()->shuffle_mode());
+
+  // A playlist created afterwards starts in the same mode as the rest.
+  Playlist *created = manager.New("Another");
+  ASSERT_NE(nullptr, created);
+  EXPECT_EQ(PlaylistSequence::RepeatMode::Album, created->repeat_mode());
+  EXPECT_EQ(PlaylistSequence::ShuffleMode::InsideAlbum, created->shuffle_mode());
+
+  saved.SetRepeatMode(PlaylistSequence::RepeatMode::Off);
+  saved.SetShuffleMode(PlaylistSequence::ShuffleMode::Off);
 }
 
 TEST(MainWindowShowHide, ShortcutAndCloseMatchQtKeepRunning) {

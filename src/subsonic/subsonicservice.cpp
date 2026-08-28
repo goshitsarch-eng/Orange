@@ -9,6 +9,7 @@
 #include "streaming/streamingsearchopts.h"
 #include "subsonic/subsonicurlhandler.h"
 #include "utilities/jsonutils.h"
+#include "utilities/randutils.h"
 #include "utilities/strutils.h"
 
 #include <glib.h>
@@ -49,13 +50,10 @@ std::string SubsonicService::HexEncode(const std::string &value) {
 }
 
 std::string SubsonicService::RandomSalt(int length) {
-  static const char alphabet[] = "abcdefghijklmnopqrstuvwxyz0123456789";
-  std::string salt;
-  salt.reserve(static_cast<size_t>(length));
-  for (int i = 0; i < length; ++i) {
-    salt.push_back(alphabet[g_random_int_range(0, static_cast<gint32>(sizeof(alphabet) - 1))]);
-  }
-  return salt;
+  // The salt is what stops a captured token from being replayed, so it has to be unpredictable.  A Mersenne
+  // Twister is not: its whole state can be recovered from a handful of salts.
+  const std::string salt = RandUtils::CryptographicRandomString(length);
+  return salt.empty() ? std::string() : StrUtils::ToLower(salt);
 }
 
 std::string SubsonicService::CreateUrl(const std::string &server_url, const std::string &username, const std::string &password,
@@ -74,10 +72,22 @@ std::string SubsonicService::CreateUrl(const std::string &server_url, const std:
   return url;
 }
 
+std::string SubsonicService::SubsonicHost(const std::string &url) {
+  GUri *uri = g_uri_parse(url.c_str(), G_URI_FLAGS_NONE, nullptr);
+  if (!uri) {
+    return {};
+  }
+  const char *host = g_uri_get_host(uri);
+  std::string result = host ? host : "";
+  g_uri_unref(uri);
+  return result;
+}
+
 SongList SubsonicService::WithCoverUrls(SongList songs) const {
-  StreamingCoverDownload::ApplyCoverArtIds(songs, [this](const std::string &id) {
-    return CreateUrl(server_url_, username_, password_, "getCoverArt", {{"id", id}}, hex_auth_);
-  });
+  StreamingCoverDownload::ApplyCoverArtIds(
+      songs,
+      [this](const std::string &id) { return CreateUrl(server_url_, username_, password_, "getCoverArt", {{"id", id}}, hex_auth_); },
+      use_album_id_for_covers_);
   return songs;
 }
 
@@ -93,6 +103,14 @@ void SubsonicService::ReloadSettings() {
   hex_auth_ = settings.IntValue(SubsonicSettings::kAuthMethod, static_cast<int>(SubsonicSettings::kDefaultAuthMethod)) ==
                   static_cast<int>(SubsonicSettings::AuthMethod::Hex) ||
               settings.Value("auth") == "hex";
+  use_album_id_for_covers_ = settings.BoolValue(SubsonicSettings::kUseAlbumIdForAlbumCovers,
+                                                SubsonicSettings::kDefaultUseAlbumIdForAlbumCovers);
+  // Self-signed certificates are common on home servers, so the preference has to reach the HTTP session --
+  // for this server only, not for every request the application makes.
+  if (network_) {
+    const bool verify = settings.BoolValue(SubsonicSettings::kVerifyCertificate, SubsonicSettings::kDefaultVerifyCertificate);
+    network_->SetVerifyCertificate(SubsonicHost(server_url_), verify);
+  }
   logged_in_ = !server_url_.empty() && !username_.empty() && !password_.empty();
 }
 

@@ -234,24 +234,36 @@ std::string CollectionGrouping::SortTextForYear(int year) {
   return buf;
 }
 
-std::string CollectionGrouping::SortText(GroupBy group_by, const Song &song, bool skip_artist_articles, bool skip_album_articles) {
+namespace {
+
+// A sort tag is only honoured when the file actually carries one.
+const std::string &SortTagOr(const std::string &sort_tag, const std::string &name, bool use_sort_tags) {
+  return use_sort_tags && !sort_tag.empty() ? sort_tag : name;
+}
+
+}  // namespace
+
+std::string CollectionGrouping::SortText(GroupBy group_by, const Song &song, bool skip_artist_articles, bool skip_album_articles,
+                                         bool use_sort_tags) {
+  const std::string &album = SortTagOr(song.albumsort(), song.album(), use_sort_tags);
   switch (group_by) {
     case GroupBy::AlbumArtist:
-      return SortTextForName(song.EffectiveAlbumartist(), skip_artist_articles);
+      return SortTextForName(SortTagOr(song.albumartistsort(), song.EffectiveAlbumartist(), use_sort_tags),
+                             skip_artist_articles);
     case GroupBy::Artist:
-      return SortTextForName(song.artist(), skip_artist_articles);
+      return SortTextForName(SortTagOr(song.artistsort(), song.artist(), use_sort_tags), skip_artist_articles);
     case GroupBy::Album:
-      return SortTextForName(song.album(), skip_album_articles);
+      return SortTextForName(album, skip_album_articles);
     case GroupBy::AlbumDisc:
-      return SortTextForName(song.album(), skip_album_articles) + SortTextForNumber(song.disc());
+      return SortTextForName(album, skip_album_articles) + SortTextForNumber(song.disc());
     case GroupBy::YearAlbum:
-      return SortTextForYear(song.year()) + SortTextForName(song.album(), skip_album_articles);
+      return SortTextForYear(song.year()) + SortTextForName(album, skip_album_articles);
     case GroupBy::YearAlbumDisc:
-      return SortTextForYear(song.year()) + SortTextForName(song.album(), skip_album_articles) + SortTextForNumber(song.disc());
+      return SortTextForYear(song.year()) + SortTextForName(album, skip_album_articles) + SortTextForNumber(song.disc());
     case GroupBy::OriginalYearAlbum:
-      return SortTextForYear(EffectiveOriginalYear(song)) + SortTextForName(song.album(), skip_album_articles);
+      return SortTextForYear(EffectiveOriginalYear(song)) + SortTextForName(album, skip_album_articles);
     case GroupBy::OriginalYearAlbumDisc:
-      return SortTextForYear(EffectiveOriginalYear(song)) + SortTextForName(song.album(), skip_album_articles) +
+      return SortTextForYear(EffectiveOriginalYear(song)) + SortTextForName(album, skip_album_articles) +
              SortTextForNumber(song.disc());
     case GroupBy::Disc:
       return SortTextForNumber(song.disc());
@@ -262,7 +274,7 @@ std::string CollectionGrouping::SortText(GroupBy group_by, const Song &song, boo
     case GroupBy::Genre:
       return NormalizeSort(song.genre());
     case GroupBy::Composer:
-      return SortTextForName(song.composer(), skip_artist_articles);
+      return SortTextForName(SortTagOr(song.composersort(), song.composer(), use_sort_tags), skip_artist_articles);
     case GroupBy::Performer:
       return SortTextForName(song.performer(), skip_artist_articles);
     case GroupBy::Grouping:
@@ -392,7 +404,7 @@ CollectionGrouping::Node *CollectionGrouping::FindOrAddChild(Node *parent, const
 }
 
 CollectionGrouping::Node CollectionGrouping::BuildTree(const SongList &songs, const Grouping &grouping, bool separate_albums_by_grouping,
-                                                       bool skip_artist_articles, bool skip_album_articles) {
+                                                       bool skip_artist_articles, bool skip_album_articles, bool use_sort_tags) {
   Node root;
   for (const Song &song : songs) {
     Node *current = &root;
@@ -404,7 +416,8 @@ CollectionGrouping::Node CollectionGrouping::BuildTree(const SongList &songs, co
         break;
       }
       const std::string key = ContainerKey(group_by, song, &unique, separate_albums_by_grouping);
-      current = FindOrAddChild(current, key, DisplayText(group_by, song), SortText(group_by, song, skip_artist_articles, skip_album_articles));
+      current = FindOrAddChild(current, key, DisplayText(group_by, song),
+                               SortText(group_by, song, skip_artist_articles, skip_album_articles, use_sort_tags));
       placed = true;
     }
     current->songs.push_back(song);

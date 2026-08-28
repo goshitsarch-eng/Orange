@@ -35,14 +35,17 @@ class SubsonicService : public StreamingService {
   static std::string Md5Hex(const std::string &value);
   static std::string HexEncode(const std::string &value);
   static std::string RandomSalt(int length = 20);
-  SongList WithCoverUrls(SongList songs) const;
+  SongList WithCoverUrls(SongList songs) const override;
 
  private:
   NetworkAccessManager *network_ = nullptr;
   std::string server_url_;
   std::string username_;
   std::string password_;
+  static std::string SubsonicHost(const std::string &url);
+
   bool hex_auth_ = false;
+  bool use_album_id_for_covers_ = false;
 };
 
 #endif

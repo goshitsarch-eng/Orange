@@ -61,6 +61,7 @@ constexpr char kFadeoutPauseEnabled[] = "FadeoutPauseEnabled";
 constexpr char kFadeoutDuration[] = "FadeoutDuration";
 constexpr char kFadeoutPauseDuration[] = "FadeoutPauseDuration";
 
+constexpr char kDefaultALSAPlugin[] = "hw";
 constexpr bool kDefaultExclusiveMode = false;
 constexpr bool kDefaultVolumeControl = true;
 constexpr bool kDefaultVolumeExponential = false;

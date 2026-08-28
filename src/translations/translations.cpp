@@ -17,16 +17,21 @@ const char *kLanguages[] = {"ca_ES", "cs_CZ", "de_DE", "el_CY", "el_GR", "en_US"
 
 }  // namespace
 
-void Translations::ApplySavedLanguage() {
-  Settings settings;
-  settings.BeginGroup(BehaviourSettings::kSettingsGroup);
-  const std::string language = settings.Value(BehaviourSettings::kLanguage);
+void Translations::ApplyLanguage(const std::string &override_language) {
+  std::string language = override_language;
+  if (language.empty()) {
+    Settings settings;
+    settings.BeginGroup(BehaviourSettings::kSettingsGroup);
+    language = settings.Value(BehaviourSettings::kLanguage);
+  }
   if (language.empty()) {
     return;
   }
   g_setenv("LANGUAGE", language.c_str(), TRUE);
   setlocale(LC_MESSAGES, language.c_str());
 }
+
+void Translations::ApplySavedLanguage() { ApplyLanguage(); }
 
 void Translations::Init(const std::string &locale_dir) {
   const std::string dir = locale_dir.empty() ? StandardPaths::LocaleDir() : locale_dir;

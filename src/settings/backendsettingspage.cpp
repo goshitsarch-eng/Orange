@@ -124,7 +124,7 @@ AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application 
   AdwPreferencesGroup *alsa = SettingsPage::AddGroup(page, "ALSA plugin");
   enable->alsa_group = GTK_WIDGET(alsa);
   SettingsPage::AddChoiceRadios(alsa, settings, BackendSettings::kALSAPlugin, "ALSA plugin",
-                               {{"hw", "hw"}, {"plughw", "plughw"}, {"pcm", "pcm"}}, "hw");
+                               {{"hw", "hw"}, {"plughw", "plughw"}, {"pcm", "pcm"}}, BackendSettings::kDefaultALSAPlugin);
   SettingsPage::AddToggle(output, settings, BackendSettings::kExclusiveMode, BackendSettingsLabels::Exclusive(), nullptr,
                           BackendSettings::kDefaultExclusiveMode);
   SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeControl, BackendSettingsLabels::VolumeControl(), nullptr,

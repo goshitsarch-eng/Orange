@@ -5,6 +5,7 @@
 #include "playlist/playlistcrossundopair.h"
 #include "playlist/playlistrating.h"
 #include "playlist/playlistsaveschedule.h"
+#include "playlist/playlistsequence.h"
 #include "constants/playlistsettings.h"
 #include "core/settings.h"
 #include "core/songloader.h"
@@ -108,6 +109,7 @@ void PlaylistManager::LoadAll() {
     current_ = playlists_.front().get();
     active_ = current_;
     for (const auto &playlist : playlists_) {
+      ApplySavedSequence(playlist.get());
       WatchSaves(playlist.get());
       if (playlist->id() >= next_id_) {
         next_id_ = playlist->id() + 1;
@@ -175,6 +177,7 @@ void PlaylistManager::RemoveDeletedSongs() {
 Playlist *PlaylistManager::New(const std::string &name, const SongList &songs) {
   auto playlist = std::make_unique<Playlist>();
   playlist->set_name(name);
+  ApplySavedSequence(playlist.get());
   if (!songs.empty()) {
     playlist->AppendSongs(songs);
   }
@@ -646,6 +649,17 @@ void PlaylistManager::SetActiveStopped() {
   if (active_) {
     ActiveChanged.Emit(active_);
   }
+}
+
+void PlaylistManager::ApplySavedSequence(Playlist *playlist) {
+  if (!playlist) {
+    return;
+  }
+  // Repeat and shuffle are stored once for the application, not per playlist.  Without this the restored
+  // toolbar state was cosmetic: every playlist started at Off and playback ignored the saved mode.
+  const PlaylistSequence sequence;
+  playlist->SetRepeatMode(sequence.repeat_mode());
+  playlist->SetShuffleMode(sequence.shuffle_mode());
 }
 
 void PlaylistManager::CycleRepeatMode() {

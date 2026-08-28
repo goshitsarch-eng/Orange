@@ -50,3 +50,22 @@ TEST(EngineEos, AlreadyPlayingOnlyShortCircuitsAContinuedTrackChange) {
   EXPECT_FALSE(EngineEos::AlreadyPlaying(true, true, true, "file:///b.flac", "file:///c.flac"));
   EXPECT_FALSE(EngineEos::AlreadyPlaying(true, true, false, "file:///b.flac", "file:///b.flac"));
 }
+
+#include "engine/alsaplugin.h"
+
+TEST(AlsaPlugin, SwapsThePrefixOfACardDevice) {
+  EXPECT_EQ("plughw:0,0", AlsaPlugin::Apply("alsasink", "hw:0,0", "plughw"));
+  EXPECT_EQ("hw:CARD=PCH,DEV=0", AlsaPlugin::Apply("alsasink", "plughw:CARD=PCH,DEV=0", "hw"));
+  EXPECT_EQ("pcm:1", AlsaPlugin::Apply("alsasink", "hw:1", "pcm"));
+}
+
+TEST(AlsaPlugin, LeavesEverythingElseAlone) {
+  // Named PCMs are not card references, so there is no prefix to swap.
+  EXPECT_EQ("default", AlsaPlugin::Apply("alsasink", "default", "plughw"));
+  EXPECT_EQ("front:CARD=PCH", AlsaPlugin::Apply("alsasink", "front:CARD=PCH", "plughw"));
+  // Other sinks take the device string as it is.
+  EXPECT_EQ("hw:0,0", AlsaPlugin::Apply("pulsesink", "hw:0,0", "plughw"));
+  EXPECT_EQ("", AlsaPlugin::Apply("alsasink", "", "plughw"));
+  EXPECT_EQ("hw:0,0", AlsaPlugin::Apply("alsasink", "hw:0,0", "nonsense"));
+  EXPECT_EQ("hw:0,0", AlsaPlugin::Apply("alsasink", "hw:0,0", "hw"));
+}

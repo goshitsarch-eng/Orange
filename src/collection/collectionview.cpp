@@ -196,12 +196,12 @@ void CollectionView::SetFilterString(const std::string &filter) {
 }
 
 void CollectionView::SetModelSongs(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
-                                   bool skip_artist_articles, bool skip_album_articles) {
+                                   bool skip_artist_articles, bool skip_album_articles, bool use_sort_tags) {
   SaveFocus();
   grouping_ = grouping;
   ApplyLook();
   model_.Reset(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles,
-               CollectionDivider::LoadShowDividers());
+               CollectionDivider::LoadShowDividers(), use_sort_tags);
   RebuildRows();
   RestoreFocus();
 }

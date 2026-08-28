@@ -128,6 +128,9 @@ class Application {
   int playlist_osd_gen_ = 0;
   int exit_count_ = 0;
   bool exit_started_ = false;
+  // Set once the resume state has been written, so the fade-out exit path does not have it overwritten
+  // with the empty state the engine reports after fading.
+  bool saved_playback_status_ = false;
   bool waiting_for_fade_ = false;
 
   void CompleteExit();

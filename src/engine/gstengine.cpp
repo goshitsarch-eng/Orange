@@ -8,6 +8,7 @@
 #include "engine/enginefade.h"
 #include "engine/enginefadeout.h"
 #include "engine/engineeos.h"
+#include "engine/alsaplugin.h"
 #include "engine/engineseek.h"
 #include "engine/ebur128normalization.h"
 #include "engine/enginediscoverer.h"
@@ -56,7 +57,8 @@ bool GstEngine::Init() {
   Settings settings;
   settings.BeginGroup("Backend");
   output_ = settings.Value("output", DefaultOutput());
-  device_ = settings.Value("device");
+  device_ = AlsaPlugin::Apply(output_, settings.Value("device"),
+                              settings.Value(BackendSettings::kALSAPlugin, BackendSettings::kDefaultALSAPlugin));
   replaygain_enabled_ = settings.BoolValue("rgenabled", false);
   if (settings.Contains("rgmode")) {
     const std::string mode = settings.Value("rgmode");

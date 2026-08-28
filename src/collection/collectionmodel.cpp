@@ -49,16 +49,17 @@ void CollectionModel::AppendNode(CollectionItem *parent, const CollectionGroupin
 }
 
 void CollectionModel::Reset(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
-                            bool skip_artist_articles, bool skip_album_articles, bool show_dividers) {
+                            bool skip_artist_articles, bool skip_album_articles, bool show_dividers, bool use_sort_tags) {
   grouping_ = grouping;
   show_dividers_ = show_dividers;
   separate_albums_by_grouping_ = separate_albums_by_grouping;
   skip_artist_articles_ = skip_artist_articles;
   skip_album_articles_ = skip_album_articles;
+  use_sort_tags_ = use_sort_tags;
   songs_ = songs;
   root_ = std::make_unique<CollectionItem>(CollectionItem::Type::Root);
   const CollectionGrouping::Node tree =
-      CollectionGrouping::BuildTree(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles);
+      CollectionGrouping::BuildTree(songs, grouping, separate_albums_by_grouping, skip_artist_articles, skip_album_articles, use_sort_tags);
   std::string last_divider;
   for (const auto &child : tree.children) {
     AppendNode(root_.get(), child, 0, &last_divider);
@@ -77,7 +78,7 @@ void CollectionModel::Reset(const SongList &songs, const CollectionGrouping::Gro
 
 void CollectionModel::ApplyUpdate(const CollectionModelUpdate &update) {
   Reset(CollectionModelMerge::Apply(songs_, update), grouping_, separate_albums_by_grouping_, skip_artist_articles_, skip_album_articles_,
-        show_dividers_);
+        show_dividers_, use_sort_tags_);
 }
 
 SongList CollectionModel::Songs() const { return root_ ? root_->Songs() : SongList{}; }

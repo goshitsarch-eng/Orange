@@ -100,6 +100,7 @@ class PlaylistManager : public PlaylistManagerInterface {
   void SetActivePlaying() override;
   void SetActivePaused() override;
   void SetActiveStopped() override;
+  void ApplySavedSequence(Playlist *playlist);
   void CycleRepeatMode();
   void CycleShuffleMode();
 

@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
 #ifdef __APPLE__
   MacStartup();
 #endif
-  Translations::ApplySavedLanguage();
+  Translations::ApplyLanguage(options.language());
   Translations::Init();
   adw_init();
 

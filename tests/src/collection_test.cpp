@@ -1,4 +1,6 @@
 #include "core/appearanceconfigurebuttons.h"
+#include "core/song.h"
+#include "collection/collectiongrouping.h"
 #include "core/appearanceleftpanel.h"
 #include "collection/collectionwatcherreload.h"
 #include "collection/collectionfullrescan.h"
@@ -2107,4 +2109,73 @@ TEST(Database, RecordsStartupSchemaVersion) {
   EXPECT_EQ(Database::kCurrentSchemaVersion, again.startup_schema_version());
   EXPECT_EQ(again.startup_schema_version(), again.current_schema_version());
   unlink(path.c_str());
+}
+
+
+namespace {
+
+Song SongWithSortTags() {
+  Song song;
+  song.set_artist("The Beatles");
+  song.set_artistsort("Beatles, The");
+  song.set_albumartist("The Beatles");
+  song.set_albumartistsort("Beatles, The");
+  song.set_album("A Hard Day's Night");
+  song.set_albumsort("Hard Day's Night, A");
+  song.set_composer("The Composer");
+  song.set_composersort("Composer, The");
+  return song;
+}
+
+}  // namespace
+
+// Comparing against a song whose displayed name IS the sort tag keeps this independent of how the sort key
+// is normalised: with the setting on, the two have to sort identically.
+TEST(CollectionSortTags, SortTagsAreUsedWhenTheSettingIsOn) {
+  const Song song = SongWithSortTags();
+  Song plain;
+  plain.set_artist("Beatles, The");
+  plain.set_albumartist("Beatles, The");
+  plain.set_album("Hard Day's Night, A");
+  plain.set_composer("Composer, The");
+  for (const auto group_by : {CollectionGrouping::GroupBy::Artist, CollectionGrouping::GroupBy::AlbumArtist,
+                              CollectionGrouping::GroupBy::Album, CollectionGrouping::GroupBy::Composer}) {
+    EXPECT_EQ(CollectionGrouping::SortText(group_by, plain, false, false, false),
+              CollectionGrouping::SortText(group_by, song, false, false, true));
+  }
+}
+
+TEST(CollectionSortTags, DisplayedNamesAreUsedWhenTheSettingIsOff) {
+  const Song song = SongWithSortTags();
+  Song plain;
+  plain.set_artist("The Beatles");
+  plain.set_album("A Hard Day's Night");
+  EXPECT_EQ(CollectionGrouping::SortText(CollectionGrouping::GroupBy::Artist, plain, false, false, false),
+            CollectionGrouping::SortText(CollectionGrouping::GroupBy::Artist, song, false, false, false));
+  EXPECT_EQ(CollectionGrouping::SortText(CollectionGrouping::GroupBy::Album, plain, false, false, false),
+            CollectionGrouping::SortText(CollectionGrouping::GroupBy::Album, song, false, false, false));
+  // With the setting off the two spellings must not collapse together.
+  EXPECT_NE(CollectionGrouping::SortText(CollectionGrouping::GroupBy::Artist, song, false, false, false),
+            CollectionGrouping::SortText(CollectionGrouping::GroupBy::Artist, song, false, false, true));
+}
+
+TEST(CollectionSortTags, SongsWithoutSortTagsFallBackToTheirNames) {
+  Song song;
+  song.set_artist("Radiohead");
+  song.set_album("Kid A");
+  EXPECT_EQ(CollectionGrouping::SortText(CollectionGrouping::GroupBy::Artist, song, false, false, false),
+            CollectionGrouping::SortText(CollectionGrouping::GroupBy::Artist, song, false, false, true));
+  EXPECT_EQ(CollectionGrouping::SortText(CollectionGrouping::GroupBy::Album, song, false, false, false),
+            CollectionGrouping::SortText(CollectionGrouping::GroupBy::Album, song, false, false, true));
+}
+
+// The sort tag goes through the same article handling a displayed name would.
+TEST(CollectionSortTags, ArticleSkippingStillAppliesToSortTags) {
+  Song song;
+  song.set_artist("Beatles");
+  song.set_artistsort("The Beatles");
+  Song plain;
+  plain.set_artist("The Beatles");
+  EXPECT_EQ(CollectionGrouping::SortText(CollectionGrouping::GroupBy::Artist, plain, true, false, false),
+            CollectionGrouping::SortText(CollectionGrouping::GroupBy::Artist, song, true, false, true));
 }

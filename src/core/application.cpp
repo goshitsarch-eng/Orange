@@ -253,6 +253,9 @@ void Application::Exit() {
     if (player_) {
       player_->SaveVolume();
       player_->SavePlaybackStatus();
+      // The resume state has to be captured here, while the engine is still playing.  By the time the fade
+      // finishes the engine is empty, and saving again would overwrite it with "nothing was playing".
+      saved_playback_status_ = true;
       player_->Stop();
     }
     return;
@@ -271,7 +274,10 @@ void Application::CompleteExit() {
   waiting_for_fade_ = false;
   if (player_) {
     player_->SaveVolume();
-    player_->SavePlaybackStatus();
+    if (!saved_playback_status_) {
+      player_->SavePlaybackStatus();
+      saved_playback_status_ = true;
+    }
     player_->Stop();
   }
   if (playlist_manager_) {

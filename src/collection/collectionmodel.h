@@ -19,7 +19,7 @@ class CollectionModel {
   CollectionItem *root() const { return root_.get(); }
 
   void Reset(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
-             bool skip_artist_articles, bool skip_album_articles, bool show_dividers = false);
+             bool skip_artist_articles, bool skip_album_articles, bool show_dividers = false, bool use_sort_tags = false);
   void ApplyUpdate(const CollectionModelUpdate &update);
   const SongList &model_songs() const { return songs_; }
 
@@ -40,6 +40,7 @@ class CollectionModel {
   bool separate_albums_by_grouping_ = false;
   bool skip_artist_articles_ = true;
   bool skip_album_articles_ = false;
+  bool use_sort_tags_ = false;
   SongList songs_;
   std::unique_ptr<CollectionItem> root_;
   int total_songs_ = 0;
