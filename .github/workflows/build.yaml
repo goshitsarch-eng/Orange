@@ -100,7 +100,7 @@ jobs:
         run: mkdir -p ~/rpmbuild/SOURCES /usr/src/packages/SOURCES
       - name: Copy source tarball
         working-directory: build
-        run: cp strawberry-*.tar.xz /usr/src/packages/SOURCES/
+        run: cp orange-*.tar.xz /usr/src/packages/SOURCES/
       - name: Build RPM
         env:
           RPM_BUILD_NCPUS: 4
@@ -207,7 +207,7 @@ jobs:
         run: mkdir -p ~/rpmbuild/SOURCES /usr/src/packages/SOURCES
       - name: Copy source tarball
         working-directory: build
-        run: cp strawberry-*.tar.xz ~/rpmbuild/SOURCES/
+        run: cp orange-*.tar.xz ~/rpmbuild/SOURCES/
       - name: Build RPM
         env:
           RPM_BUILD_NCPUS: 4
@@ -310,7 +310,7 @@ jobs:
         run: mkdir -p ~/rpmbuild/SOURCES /usr/src/packages/SOURCES
       - name: Copy source tarball
         working-directory: build
-        run: cp strawberry-*.tar.xz ~/rpmbuild/SOURCES/
+        run: cp orange-*.tar.xz ~/rpmbuild/SOURCES/
       - name: Build RPM
         env:
           RPM_BUILD_NCPUS: 4
@@ -416,7 +416,7 @@ jobs:
         run: mkdir -p ~/rpmbuild/SOURCES /usr/src/packages/SOURCES
       - name: Copy source tarball
         working-directory: build
-        run: cp strawberry-*.tar.xz ~/rpmbuild/SOURCES/
+        run: cp orange-*.tar.xz ~/rpmbuild/SOURCES/
       - name: Build RPM
         env:
           RPM_BUILD_NCPUS: 4
@@ -830,7 +830,7 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: >
             ./appimagedeploy.AppImage
-            AppDir/usr/share/applications/org.strawberrymusicplayer.strawberry.desktop
+            AppDir/usr/share/applications/org.orangemusicplayer.orange.desktop
             --qt-sql-plugins=sqlite
             --gstreamer-plugins=list
             --gstreamer-plugin-list=adaptivedemux2,aiff,alsa,apetag,app,asf,asfmux,audioconvert,audiofx,audioparsers,audioresample,autodetect,bs2b,cdio,coreelements,dash,dsd,equalizer,faac,faad,fdkaac,flac,gme,hls,icydemux,id3demux,isomp4,lame,libav,matroska,mpegtsdemux,mpg123,musepack,ogg,openmpt,opus,pbtypes,playback,pulseaudio,replaygain,rtp,rtpmanager,rtsp,soup,spectrum,speex,spotify,taglib,typefindfunctions,udp,volume,vorbis,wavenc,wavpack,wavparse,xingmux
@@ -1032,7 +1032,7 @@ jobs:
       - name: Verify code-signing
         if: github.repository == 'strawberrymusicplayer/strawberry' && github.event.pull_request.head.repo.fork == false
         working-directory: build
-        run: codesign --deep -v strawberry.app
+        run: codesign --deep -v orange.app
 
       - name: Create DMG
         working-directory: build
@@ -1166,7 +1166,7 @@ jobs:
 
       - name: Verify code-signing
         working-directory: build
-        run: codesign --deep -v strawberry.app
+        run: codesign --deep -v orange.app
 
       - name: Create DMG
         working-directory: build
@@ -1390,7 +1390,7 @@ jobs:
 
       - name: rsync
         if: steps.set-upload-path.outputs.upload_path != ''
-        run: rsync -e "ssh -p ${{secrets.SSH_PORT}} -o StrictHostKeyChecking=no" -var build/StrawberrySetup*.exe ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{steps.set-upload-path.outputs.upload_path}}/
+        run: rsync -e "ssh -p ${{secrets.SSH_PORT}} -o StrictHostKeyChecking=no" -var build/OrangeSetup*.exe ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{steps.set-upload-path.outputs.upload_path}}/
 
 
   build-windows-msvc:
@@ -1748,7 +1748,7 @@ jobs:
       - name: rsync
         if: steps.set-upload-path.outputs.upload_path != ''
         shell: bash
-        run: rsync -e "/c/ProgramData/chocolatey/lib/rsync/tools/bin/ssh.exe -p ${{secrets.SSH_PORT}} -o StrictHostKeyChecking=no" -var build/StrawberrySetup*.exe ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{steps.set-upload-path.outputs.upload_path}}/
+        run: rsync -e "/c/ProgramData/chocolatey/lib/rsync/tools/bin/ssh.exe -p ${{secrets.SSH_PORT}} -o StrictHostKeyChecking=no" -var build/OrangeSetup*.exe ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{steps.set-upload-path.outputs.upload_path}}/
 
 
   upload:

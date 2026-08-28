@@ -6,6 +6,8 @@ Version 2.1.0 (2026.08.28):
 
   Changes:
     * Returned to the Qt 6 codebase, replacing the GTK 4 / libadwaita port released as 2.0.0. The application is pure Qt 6 again with no GTK or libadwaita dependencies.
+    * The fork is now called Orange: the executable is "orange", the desktop entry is org.orangemusicplayer.orange, and all user-facing branding, icons and packaging metadata use the Orange name. Internal code identifiers keep the upstream Strawberry naming to keep the diff against upstream small.
+    * The application now follows the KDE look and feel: it defaults to the Breeze widget style when the plugin is installed, uses the desktop icon theme (Breeze on KDE) by default with bundled icons as fallback, and resolves missing icons from Breeze.
 
   Enhancements:
     * Added a color scheme setting (system / light / dark) under appearance settings, replacing the dark mode checkbox. Forcing light or dark now works on all platforms with Qt 6.8 or newer and follows the system scheme by default.

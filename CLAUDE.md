@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Strawberry is a music player and music collection organizer, forked from Clementine in 2018. C++17, Qt 6 (6.4+), GStreamer audio backend. Runs on Linux, *BSD, macOS, and Windows.
+Orange is a music player and music collection organizer, forked from Strawberry (itself forked from Clementine in 2018). C++17, Qt 6 (6.4+), GStreamer audio backend. Runs on Linux, *BSD, macOS, and Windows. The executable and user-facing branding are "Orange"; internal names (CMake target `strawberry`, `STRAWBERRY_*` macros, class names) keep the upstream naming to keep the diff against upstream Strawberry small. It prefers KDE's Breeze style/icons when installed and has a system/light/dark color scheme setting.
 
 ## Build & Test
 

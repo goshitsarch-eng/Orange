@@ -62,15 +62,15 @@
 
 
 !ifdef debug
-  !define PRODUCT_NAME "Strawberry Music Player Debug"
-  !define PRODUCT_NAME_SHORT "Strawberry"
+  !define PRODUCT_NAME "Orange Music Player Debug"
+  !define PRODUCT_NAME_SHORT "Orange"
   !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME_SHORT}Debug"
-  !define PRODUCT_INSTALL_DIR "$PROGRAMFILES64\Strawberry Music Player Debug"
+  !define PRODUCT_INSTALL_DIR "$PROGRAMFILES64\Orange Music Player Debug"
 !else
-  !define PRODUCT_NAME "Strawberry Music Player"
-  !define PRODUCT_NAME_SHORT "Strawberry"
+  !define PRODUCT_NAME "Orange Music Player"
+  !define PRODUCT_NAME_SHORT "Orange"
   !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCT_NAME_SHORT}"
-  !define PRODUCT_INSTALL_DIR "$PROGRAMFILES64\Strawberry Music Player"
+  !define PRODUCT_INSTALL_DIR "$PROGRAMFILES64\Orange Music Player"
 !endif
 
 !define PRODUCT_VERSION_MAJOR @STRAWBERRY_VERSION_MAJOR@
@@ -85,11 +85,11 @@
 !define PRODUCT_UNINST_ROOT_KEY "HKLM"
 
 ; Set Application Capabilities info
-!define CAPABILITIES_NAME "Strawberry Music Player"
-!define CAPABILITIES_LOCAL_NAME "Strawberry"
-!define CAPABILITIES_PROGID "Strawberry Music Player"
-!define CAPABILITIES_PATH "Software\Clients\Media\Strawberry"
-!define CAPABILITIES_DESCRIPTION "Strawberry Music Player"
+!define CAPABILITIES_NAME "Orange Music Player"
+!define CAPABILITIES_LOCAL_NAME "Orange"
+!define CAPABILITIES_PROGID "Orange Music Player"
+!define CAPABILITIES_PATH "Software\Clients\Media\Orange"
+!define CAPABILITIES_DESCRIPTION "Orange Music Player"
 !define CAPABILITIES_ICON "$INSTDIR\strawberry.ico"
 !define CAPABILITIES_REINSTALL "Command to reinstall"
 !define CAPABILITIES_HIDE_ICONS "Command to hide icons"
@@ -161,12 +161,12 @@ ShowUnInstDetails show
 RequestExecutionLevel admin
 
 Function LockedListPageShow
-  LockedList::AddModule /NOUNLOAD \strawberry.exe
+  LockedList::AddModule /NOUNLOAD \orange.exe
   LockedList::Dialog /heading "Checking for running programs:" /noprograms "No programs need to close." /searching "Searching for running programs..."
 FunctionEnd
 
 Function un.LockedListPageShow
-  LockedList::AddModule /NOUNLOAD \strawberry.exe
+  LockedList::AddModule /NOUNLOAD \orange.exe
   LockedList::Dialog /heading "Checking for running programs:" /noprograms "No programs need to close." /searching "Searching for running programs..."
 FunctionEnd
 
@@ -220,12 +220,12 @@ FunctionEnd
 Section "Delete old files" oldfiles
 SectionEnd
 
-Section "Strawberry" Strawberry
+Section "Orange" Strawberry
   SetOutPath "$INSTDIR"
 
   ; Common executables
 
-  File "strawberry.exe"
+  File "orange.exe"
   File "strawberry.ico"
   File "sqlite3.exe"
   File "gst-launch-1.0.exe"
@@ -485,7 +485,7 @@ Section "Strawberry" Strawberry
   ; Register Strawberry with Default Programs
   Var /GLOBAL AppIcon
   Var /GLOBAL AppExe
-  StrCpy $AppExe "$INSTDIR\strawberry.exe"
+  StrCpy $AppExe "$INSTDIR\orange.exe"
   StrCpy $AppIcon "$INSTDIR\strawberry.ico"
 
   ${RegisterCapabilities}
@@ -714,7 +714,7 @@ Section "Start menu items" startmenu
   SetShellVarContext all
 
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\strawberry.exe"
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\orange.exe"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
 
 SectionEnd
@@ -722,7 +722,7 @@ SectionEnd
 Section "Tidal URL Scheme"
   WriteRegStr HKCR "tidal" "URL Protocol" ""
   WriteRegStr HKCR "tidal" "" "URL:tidal"
-  WriteRegStr HKCR 'tidal\shell\open\command' '' '"${PRODUCT_INSTALL_DIR}\strawberry.exe" "%1"'
+  WriteRegStr HKCR 'tidal\shell\open\command' '' '"${PRODUCT_INSTALL_DIR}\orange.exe" "%1"'
 SectionEnd
 
 Section "Uninstaller"
@@ -744,7 +744,7 @@ Section "Uninstall"
 
   ; Delete all the files
 
-  Delete "$INSTDIR\strawberry.exe"
+  Delete "$INSTDIR\orange.exe"
   Delete "$INSTDIR\strawberry.ico"
   Delete "$INSTDIR\sqlite3.exe"
   Delete "$INSTDIR\gst-launch-1.0.exe"

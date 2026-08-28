@@ -63,7 +63,7 @@ void LetrasLyricsProvider::StartSearch(const int id, const LyricsSearchRequest &
   const QUrl url = Url(request);
   QNetworkRequest network_request(url);
   network_request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-  network_request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Strawberry/%1 (+https://www.strawberrymusicplayer.org)").arg(QCoreApplication::applicationVersion()));
+  network_request.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Orange/%1 (+https://github.com/goshitsarch-eng/Orange)").arg(QCoreApplication::applicationVersion()));
   QNetworkReply *reply = network_->get(network_request);
   QObject::connect(reply, &QNetworkReply::sslErrors, this, &HttpBaseRequest::HandleSSLErrors);
   replies_ << reply;

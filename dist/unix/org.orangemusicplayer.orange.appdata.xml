@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>org.strawberrymusicplayer.strawberry</id>
-  <launchable type="desktop-id">org.strawberrymusicplayer.strawberry.desktop</launchable>
+  <id>org.orangemusicplayer.orange</id>
+  <launchable type="desktop-id">org.orangemusicplayer.orange.desktop</launchable>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0+</project_license>
   <provides>
-    <binary>strawberry</binary>
+    <binary>orange</binary>
   </provides>
-  <name>Strawberry Music Player</name>
+  <name>Orange Music Player</name>
   <summary>A music player and collection organizer</summary>
-  <url type="homepage">https://www.strawberrymusicplayer.org/</url>
-  <url type="bugtracker">https://github.com/strawberrymusicplayer/strawberry/issues</url>
-  <url type="vcs-browser">https://github.com/strawberrymusicplayer/strawberry</url>
+  <url type="homepage">https://github.com/goshitsarch-eng/Orange</url>
+  <url type="bugtracker">https://github.com/goshitsarch-eng/Orange/issues</url>
+  <url type="vcs-browser">https://github.com/goshitsarch-eng/Orange</url>
   <developer id="net.jkvinge.jonas">
     <name>Jonas Kvinge</name>
   </developer>
@@ -19,7 +19,7 @@
   <content_rating type="oars-1.1" />
   <description>
     <p>
-      Strawberry is a music player and music collection organizer. It is aimed at music collectors and audiophiles. Strawberry is free software released under GPL. It's written in C++ using the Qt framework and GStreamer.
+      Orange is a music player and music collection organizer. It is aimed at music collectors and audiophiles. Orange is free software released under GPL. It's written in C++ using the Qt framework and GStreamer.
     </p>
     <p>Features:</p>
     <ul>

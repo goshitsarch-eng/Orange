@@ -93,7 +93,8 @@ constexpr char kIconSizeConfigureButtons[] = "icon_size_configure_buttons";
 
 constexpr ColorScheme kDefaultColorScheme = ColorScheme::System;
 constexpr bool kDefaultDarkMode = false;
-constexpr bool kDefaultSystemIcons = false;
+// Follow the desktop icon theme by default (Breeze on KDE) so the application looks native; bundled icons remain the per-icon fallback.
+constexpr bool kDefaultSystemIcons = true;
 constexpr bool kDefaultUseCustomColorSet = false;
 constexpr bool kDefaultTabBarSystemColor = false;
 constexpr bool kDefaultTabBarGradient = true;

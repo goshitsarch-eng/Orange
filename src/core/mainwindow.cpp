@@ -1177,7 +1177,7 @@ MainWindow::MainWindow(Application *app,
       rosetta_message->set_settings_group(QLatin1String(MainWindowSettings::kSettingsGroup));
       rosetta_message->set_do_not_show_message_again(QLatin1String(MainWindowSettings::kIgnoreRosetta));
       rosetta_message->setAttribute(Qt::WA_DeleteOnClose);
-      rosetta_message->ShowMessage(tr("Strawberry running under Rosetta"), tr("You are running Strawberry under Rosetta. Running Strawberry under Rosetta is unsupported and known to have issues. You should download Strawberry for the correct CPU architecture from %1").arg(QLatin1String("<a href=\"https://downloads.strawberrymusicplayer.org/\">downloads.strawberrymusicplayer.org</a>")), IconLoader::Load(u"dialog-warning"_s));
+      rosetta_message->ShowMessage(tr("Orange running under Rosetta"), tr("You are running Orange under Rosetta. Running Orange under Rosetta is unsupported and known to have issues. You should download Orange for the correct CPU architecture from %1").arg(QLatin1String("<a href=\"https://downloads.strawberrymusicplayer.org/\">downloads.strawberrymusicplayer.org</a>")), IconLoader::Load(u"dialog-warning"_s));
     }
   }
 #endif
@@ -1199,7 +1199,7 @@ MainWindow::MainWindow(Application *app,
         sponsor_message->set_settings_group(QLatin1String(MainWindowSettings::kSettingsGroup));
         sponsor_message->set_do_not_show_message_again(QLatin1String(MainWindowSettings::kDoNotShowSponsorMessage));
         sponsor_message->setAttribute(Qt::WA_DeleteOnClose);
-        sponsor_message->ShowMessage(tr("Sponsoring Strawberry"), tr("Strawberry is free and open source software. If you like Strawberry, please consider sponsoring the project. For more information about sponsorship see our website %1").arg(u"<a href= \"https://www.strawberrymusicplayer.org/\">www.strawberrymusicplayer.org</a>"_s), IconLoader::Load(u"dialog-information"_s));
+        sponsor_message->ShowMessage(tr("Sponsoring Strawberry, the project Orange is based on"), tr("Orange is based on Strawberry, which is free and open source software. If you like it, please consider sponsoring the Strawberry project. For more information about sponsorship see the website %1").arg(u"<a href= \"https://www.strawberrymusicplayer.org/\">www.strawberrymusicplayer.org</a>"_s), IconLoader::Load(u"dialog-information"_s));
       }
     }
   }
@@ -1511,7 +1511,7 @@ void MainWindow::PlaylistsLoaded() {
 
 void MainWindow::MediaStopped() {
 
-  setWindowTitle(u"Strawberry Music Player"_s);
+  setWindowTitle(u"Orange Music Player"_s);
 
   ui_->action_stop->setEnabled(false);
   ui_->action_stop_after_this_track->setEnabled(false);
@@ -1923,11 +1923,11 @@ void MainWindow::UpdateTrackSliderPosition() {
 void MainWindow::UpdateTaskbarProgress(const bool visible, const double progress) {
 
   QVariantMap map;
-  QDBusMessage msg = QDBusMessage::createSignal(u"/org/strawberrymusicplayer/strawberry"_s, u"com.canonical.Unity.LauncherEntry"_s, u"Update"_s);
+  QDBusMessage msg = QDBusMessage::createSignal(u"/org/orangemusicplayer/orange"_s, u"com.canonical.Unity.LauncherEntry"_s, u"Update"_s);
 
   map.insert(u"progress-visible"_s, visible);
   map.insert(u"progress"_s, progress);
-  msg << u"application://org.strawberrymusicplayer.strawberry.desktop"_s << map;
+  msg << u"application://org.orangemusicplayer.orange.desktop"_s << map;
 
   QDBusConnection::sessionBus().send(msg);
 

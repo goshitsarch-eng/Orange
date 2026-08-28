@@ -422,6 +422,8 @@ if(NOT CMAKE_CROSSCOMPILING)
 endif()
 
 add_executable(strawberry)
+# The fork is called Orange; the internal target keeps the upstream name to keep the diff against upstream small.
+set_target_properties(strawberry PROPERTIES OUTPUT_NAME orange)
 
 if(APPLE)
   set_target_properties(strawberry PROPERTIES MACOSX_BUNDLE TRUE)

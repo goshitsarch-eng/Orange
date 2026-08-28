@@ -60,7 +60,9 @@
 #include <QString>
 #include <QSettings>
 #include <QLoggingCategory>
+#include <QIcon>
 #include <QStyle>
+#include <QStyleFactory>
 #include <QStyleHints>
 #include <QMessageBox>
 #ifdef HAVE_TRANSLATIONS
@@ -146,14 +148,14 @@ int main(int argc, char *argv[]) {
   mac::MacMain();
 #endif
 
-  QCoreApplication::setApplicationName(u"Strawberry"_s);
-  QCoreApplication::setOrganizationName(u"Strawberry"_s);
+  QCoreApplication::setApplicationName(u"Orange"_s);
+  QCoreApplication::setOrganizationName(u"Orange"_s);
   QCoreApplication::setApplicationVersion(QStringLiteral(STRAWBERRY_VERSION_DISPLAY));
   QCoreApplication::setOrganizationDomain(u"strawberrymusicplayer.org"_s);
 
   // This makes us show up nicely in gnome-volume-control
-  g_set_application_name("Strawberry");
-  g_setenv("PULSE_PROP_application.icon_name", "strawberry", TRUE);
+  g_set_application_name("Orange");
+  g_setenv("PULSE_PROP_application.icon_name", "orange", TRUE);
   g_setenv("PULSE_PROP_media.role", "music", TRUE);
 
   RegisterMetaTypes();
@@ -173,7 +175,7 @@ int main(int argc, char *argv[]) {
     logging::SetLevels(options.log_levels());
     if (!single_app.isPrimaryInstance()) {
       if (options.is_empty()) {
-        qLog(Info) << "Strawberry is already running - activating existing window (1)";
+        qLog(Info) << "Orange is already running - activating existing window (1)";
       }
       if (!single_app.sendMessage(options.Serialize())) {
         qLog(Error) << "Could not send message to primary instance.";
@@ -188,7 +190,7 @@ int main(int argc, char *argv[]) {
 #endif
 
   // Output the version, so when people attach log output to bug reports they don't have to tell us which version they're using.
-  qLog(Info) << "Strawberry" << STRAWBERRY_VERSION_DISPLAY << "Qt" << QLibraryInfo::version().toString();
+  qLog(Info) << "Orange" << STRAWBERRY_VERSION_DISPLAY << "Qt" << QLibraryInfo::version().toString();
   qLog(Info) << QStringLiteral("%1 %2 - (%3 %4) [%5]").arg(QSysInfo::prettyProductName(), QSysInfo::productVersion(), QSysInfo::kernelType(), QSysInfo::kernelVersion(), QSysInfo::currentCpuArchitecture());
 
   // Seed the random number generators.
@@ -199,15 +201,15 @@ int main(int argc, char *argv[]) {
   Utilities::IncreaseFDLimit();
 #endif
 
-  QGuiApplication::setApplicationDisplayName(u"Strawberry Music Player"_s);
-  QGuiApplication::setDesktopFileName(u"org.strawberrymusicplayer.strawberry"_s);
+  QGuiApplication::setApplicationDisplayName(u"Orange Music Player"_s);
+  QGuiApplication::setDesktopFileName(u"org.orangemusicplayer.orange"_s);
   QGuiApplication::setQuitOnLastWindowClosed(false);
 
   QApplication a(argc, argv);
 
 #ifdef Q_OS_LINUX
   if (Utilities::IsWSL()) {
-    const QString message = u"Strawberry is not supported when running under the Windows Subsystem for Linux (WSL). Please use the native Windows version instead."_s;
+    const QString message = u"Orange is not supported when running under the Windows Subsystem for Linux (WSL). Please use the native Windows version instead."_s;
     qLog(Error) << message;
     QMessageBox::critical(nullptr, u"Unsupported environment"_s, message);
     return 1;
@@ -217,7 +219,7 @@ int main(int argc, char *argv[]) {
   KDSingleApplication single_app(QCoreApplication::applicationName().toLower(), KDSingleApplication::Option::IncludeUsernameInSocketName);
   if (!single_app.isPrimaryInstance()) {
     if (options.is_empty()) {
-      qLog(Info) << "Strawberry is already running - activating existing window (2)";
+      qLog(Info) << "Orange is already running - activating existing window (2)";
     }
     if (!single_app.sendMessage(options.Serialize())) {
       qLog(Error) << "Could not send message to primary instance.";
@@ -254,6 +256,14 @@ int main(int argc, char *argv[]) {
         }
       }
     }
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN32)
+    // With no style configured, prefer KDE's Breeze widget style when the plugin is installed, so the application follows the KDE human interface guidelines out of the box.
+    else if (QStyleFactory::keys().contains("Breeze"_L1, Qt::CaseInsensitive)) {
+      if (QApplication::setStyle(u"Breeze"_s)) {
+        qLog(Debug) << "No style configured, defaulting to Breeze";
+      }
+    }
+#endif
     Appearance::ApplyColorScheme(Appearance::LoadColorScheme());
     if (QApplication::style()) {
       qLog(Debug) << "Style:" << QApplication::style()->objectName();
@@ -281,6 +291,13 @@ int main(int argc, char *argv[]) {
   Q_INIT_RESOURCE(icons);
 #if defined(HAVE_TRANSLATIONS) && !defined(INSTALL_TRANSLATIONS)
   Q_INIT_RESOURCE(translations);
+#endif
+
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN32)
+  // Resolve icons the active icon theme is missing from Breeze when it is installed, so the KDE icon set is used consistently.
+  if (QIcon::fallbackThemeName().isEmpty()) {
+    QIcon::setFallbackThemeName(u"breeze"_s);
+  }
 #endif
 
   IconLoader::Init();

@@ -60,7 +60,7 @@ using namespace Qt::Literals::StringLiterals;
 using std::make_shared;
 
 const Song::Source SubsonicService::kSource = Song::Source::Subsonic;
-const char *SubsonicService::kClientName = "Strawberry";
+const char *SubsonicService::kClientName = "Orange";
 const char *SubsonicService::kApiVersion = "1.11.0";
 
 namespace {
