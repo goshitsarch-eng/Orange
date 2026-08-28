@@ -13,7 +13,7 @@ TEST(SubsonicService, CreateUrlTokenAuth) {
   const std::string url = SubsonicService::CreateUrl("https://music.example.com", "alice", "secret", "search3", {{"query", "foxes"}}, false);
   EXPECT_NE(std::string::npos, url.find("https://music.example.com/rest/search3.view"));
   EXPECT_NE(std::string::npos, url.find("u=alice"));
-  EXPECT_NE(std::string::npos, url.find("c=Strawberry"));
+  EXPECT_NE(std::string::npos, url.find("c=Orange"));
   EXPECT_NE(std::string::npos, url.find("v=1.11.0"));
   EXPECT_NE(std::string::npos, url.find("&s="));
   EXPECT_NE(std::string::npos, url.find("&t="));

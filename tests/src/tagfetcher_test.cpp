@@ -180,7 +180,7 @@ TEST(TrackSelectionLabels, QtCopyAndEmptyResults) {
   EXPECT_STREQ("Tag fetcher", TrackSelectionLabels::Title());
   EXPECT_STREQ("Select best possible match", TrackSelectionLabels::SelectBest());
   EXPECT_STREQ("No results", TrackSelectionLabels::NoResults());
-  EXPECT_STREQ("Strawberry was unable to find results for this file", TrackSelectionLabels::UnableToFind());
+  EXPECT_STREQ("Orange was unable to find results for this file", TrackSelectionLabels::UnableToFind());
   EXPECT_STREQ("Error", TrackSelectionLabels::Error());
   EXPECT_STREQ("Original tags", TrackSelectionLabels::OriginalTags());
   EXPECT_STREQ("Saving tracks...", TrackSelectionLabels::SavingTracks());

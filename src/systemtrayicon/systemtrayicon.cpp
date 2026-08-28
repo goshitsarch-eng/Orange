@@ -245,7 +245,7 @@ void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &me
     popup_window_ = gtk_window_new();
     gtk_window_set_decorated(GTK_WINDOW(popup_window_), FALSE);
     gtk_window_set_resizable(GTK_WINDOW(popup_window_), FALSE);
-    gtk_window_set_title(GTK_WINDOW(popup_window_), "Strawberry");
+    gtk_window_set_title(GTK_WINDOW(popup_window_), "Orange");
     gtk_widget_add_css_class(popup_window_, "osd");
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
     gtk_widget_set_margin_start(box, 12);
@@ -388,7 +388,7 @@ void SystemTrayIcon::SetVisible(bool visible) {
 
 void SystemTrayIcon::UpdateTooltip() {
   if (!song_.is_valid() && song_.title().empty()) {
-    tooltip_ = "Strawberry";
+    tooltip_ = "Orange";
   } else {
     tooltip_ = song_.PrettyTitleWithArtist();
     if (playing_ && progress_ > 0) {
@@ -840,10 +840,10 @@ GVariant *SystemTrayIcon::HandleGetProperty(GDBusConnection *, const gchar *, co
     return g_variant_new_string("ApplicationStatus");
   }
   if (g_strcmp0(property_name, "Id") == 0) {
-    return g_variant_new_string("strawberry");
+    return g_variant_new_string("orange");
   }
   if (g_strcmp0(property_name, "Title") == 0) {
-    return g_variant_new_string("Strawberry");
+    return g_variant_new_string("Orange");
   }
   if (g_strcmp0(property_name, "Status") == 0) {
     return g_variant_new_string(self->visible_ ? "Active" : "Passive");
@@ -877,7 +877,7 @@ GVariant *SystemTrayIcon::HandleGetProperty(GDBusConnection *, const gchar *, co
     return g_variant_new_object_path(self->menu_path_.c_str());
   }
   if (g_strcmp0(property_name, "ToolTip") == 0) {
-    return g_variant_new_parsed("(%s, @a(iiay) [], %s, %s)", "", "Strawberry", self->tooltip_.c_str());
+    return g_variant_new_parsed("(%s, @a(iiay) [], %s, %s)", "", "Orange", self->tooltip_.c_str());
   }
   g_set_error(error, G_DBUS_ERROR, G_DBUS_ERROR_UNKNOWN_PROPERTY, "Unknown property %s", property_name);
   return nullptr;

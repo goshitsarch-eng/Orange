@@ -8,7 +8,7 @@ Release:        @STRAWBERRY_VERSION_RPM_R@%{?dist}
 Summary:        A music player and music collection organizer
 Group:          Productivity/Multimedia/Sound/Players
 License:        GPL-3.0+
-URL:            https://www.strawberrymusicplayer.org/
+URL:            https://github.com/goshitsarch-eng/Orange
 Source0:        %{name}-@STRAWBERRY_VERSION_PACKAGE@.tar.xz
 
 BuildRequires:  gcc-c++
@@ -65,9 +65,8 @@ BuildRequires:  appstream-util
 %endif
 
 %description
-Strawberry is a music player and music collection organizer.
-It is a fork of Clementine, which was itself a port of Amarok 1.4.
-The name is inspired by the band Strawbs.
+Orange is a music player and music collection organizer.
+It is a fork of Strawberry, which was forked from Clementine, which was itself a port of Amarok 1.4.
 
 Features:
   - Play and organize music
@@ -122,11 +121,11 @@ export QT_QPA_PLATFORM="offscreen"
 %else
 %make_build -j $(nproc) -C build strawberry_tests
 %endif
-desktop-file-validate %{buildroot}%{_datadir}/applications/org.strawberrymusicplayer.strawberry.desktop
+desktop-file-validate %{buildroot}%{_datadir}/applications/io.github.goshitsarch_eng.Orange.desktop
 %if 0%{?suse_version}
-  appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/org.strawberrymusicplayer.strawberry.appdata.xml
+  appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/io.github.goshitsarch_eng.Orange.metainfo.xml
 %else
-  appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/org.strawberrymusicplayer.strawberry.appdata.xml
+  appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/io.github.goshitsarch_eng.Orange.metainfo.xml
 %endif
 
 %files
@@ -135,12 +134,12 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/org.strawberrymusicpl
 %license COPYING
 %{_bindir}/strawberry
 %{_datadir}/applications/*.desktop
-%{_datadir}/icons/hicolor/*/apps/strawberry.*
+%{_datadir}/icons/hicolor/*/apps/orange.*
 %{_mandir}/man1/%{name}.1.*
 %if 0%{?suse_version}
-%{_datadir}/metainfo/*.appdata.xml
+%{_datadir}/metainfo/*.metainfo.xml
 %else
-%{_metainfodir}/*.appdata.xml
+%{_metainfodir}/*.metainfo.xml
 %endif
 
 %changelog

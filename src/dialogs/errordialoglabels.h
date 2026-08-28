@@ -3,7 +3,7 @@
 
 namespace ErrorDialogLabels {
 
-inline const char *Title() { return "Strawberry Error"; }
+inline const char *Title() { return "Orange Error"; }
 
 }  // namespace ErrorDialogLabels
 

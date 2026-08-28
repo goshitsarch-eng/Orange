@@ -1,56 +1,56 @@
-# :strawberry: Strawberry Music Player [![Build Status](https://github.com/strawberrymusicplayer/strawberry/actions/workflows/build.yaml/badge.svg?branch=master)](https://github.com/strawberrymusicplayer/strawberry/actions)
-[![Sponsor](https://img.shields.io/badge/-Sponsor-green?logo=github)](https://github.com/sponsors/jonaski)
-[![Patreon](https://img.shields.io/badge/patreon-donate-green.svg)](https://patreon.com/jonaskvinge)
-[![PayPal](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://paypal.me/jonaskvinge)
+# :tangerine: Orange
 
-Strawberry is a **music player and music collection organizer**, originally forked from *Clementine* in 2018.
-It’s written in **C++ using GTK 4 and libadwaita**, designed for **audiophiles and music collectors**.
+Orange is a **music player and music collection organizer**, aimed at **audiophiles and music collectors**.
+It is written in **C++ using GTK 4 and libadwaita**, with a GStreamer audio backend.
 
-![Screenshot of Strawberry Music Player](https://raw.githubusercontent.com/strawberrymusicplayer/strawberry/master/data/screenshot/screenshot.png)
+Orange is a fork of [Strawberry](https://www.strawberrymusicplayer.org), which was itself forked from
+[Clementine](https://www.clementine-player.org) in 2018; Clementine began in 2010 as a port of
+[Amarok](https://amarok.kde.org) 1.4. Most of the code here is Strawberry's work — see
+[Credits and acknowledgements](#heart-credits-and-acknowledgements).
 
 ---
 
 ## :globe_with_meridians: Resources
 
+- **Source and issues:** https://github.com/goshitsarch-eng/Orange
+
+### Upstream
+
+Orange tracks Strawberry, and Strawberry's own resources remain the reference for most of how the
+application works:
+
 - **Website:** https://www.strawberrymusicplayer.org
 - **Wiki:** https://wiki.strawberrymusicplayer.org
 - **Forum:** https://forum.strawberrymusicplayer.org
 - **GitHub:** https://github.com/strawberrymusicplayer/strawberry
-- **Latest builds:** https://builds.strawberrymusicplayer.org
-- **openSUSE Build Service:**
-  - Stable: https://build.opensuse.org/package/show/home:jonaski:strawberry/strawberry
-  - Unstable: https://build.opensuse.org/package/show/home:jonaski:strawberry-dev/strawberry
-- **Ubuntu PPAs:**
-  - Stable: https://launchpad.net/~jonaski/+archive/ubuntu/strawberry
-  - Unstable: https://launchpad.net/~jonaski/+archive/ubuntu/strawberry-unstable
 - **Translations:** https://crowdin.com/project/strawberrymusicplayer
 
 ---
 
 ## :warning: Opening an Issue
 
-Before creating a new GitHub issue:
+Report problems with Orange on the [Orange issue tracker](https://github.com/goshitsarch-eng/Orange/issues).
 
-1. **Read the [FAQ](https://wiki.strawberrymusicplayer.org/wiki/FAQ)**.
-2. **Search existing issues** to avoid duplicates. If one already exists, comment there with any additional information.
-3. **Use the [forum](https://forum.strawberrymusicplayer.org/)** for technical problems, discussions or feature suggestions — it’s better suited for back-and-forth conversation.
-4. **Feature requests are not accepted on GitHub.** Issues created for feature requests will be closed. You can still discuss ideas on the forum.
-5. **Flatpak users:** We do **not** maintain the Flatpak package. Report Flatpak-specific issues via [Flatpak support](https://flatpak.org/about/).
+Before opening one:
+
+1. **Check whether it also happens in Strawberry.** Orange inherits most of its behaviour, so a bug that
+   reproduces there belongs [upstream](https://github.com/strawberrymusicplayer/strawberry/issues) and will
+   reach more maintainers.
+2. **Read the [Strawberry FAQ](https://wiki.strawberrymusicplayer.org/wiki/FAQ)** — most of it applies here.
+3. **Search existing issues** to avoid duplicates.
 
 ---
 
-## :moneybag: Sponsoring
+## :moneybag: Supporting the upstream project
 
-Strawberry is **free software released under the GPL**.
-If you enjoy using it, please consider **supporting development** through sponsorship or donation.
+Orange is free software released under the GPL, and it exists because of Strawberry. If you find Orange
+useful, please consider supporting **Strawberry's author**, Jonas Kvinge — these links fund Strawberry, not
+Orange:
 
-**Sponsorship options:**
 1. [Patreon](https://www.patreon.com/jonaskvinge)
-2. [GitHub](https://github.com/sponsors/jonaski)
+2. [GitHub Sponsors](https://github.com/sponsors/jonaski)
 3. [Ko-fi](https://ko-fi.com/jonaskvinge)
 4. [PayPal](https://paypal.me/jonaskvinge)
-
-Supporting open-source developers helps ensure continued maintenance and improvements.
 
 ---
 
@@ -82,14 +82,13 @@ Supporting open-source developers helps ensure continued maintenance and improve
 
 :white_check_mark: Tested on **Linux**, **OpenBSD**, **FreeBSD**, **macOS**, and **Windows**.
 
-> **Note:** macOS and Windows releases are currently **available to sponsors only**.
-> A monthly sponsorship via [Patreon](https://www.patreon.com/jonaskvinge) grants direct access to new releases.
+> **Note:** Orange is built from source. There are no prebuilt packages yet.
 
 ---
 
 ## :gear: Requirements
 
-To build Strawberry from source, you’ll need:
+To build Orange from source, you’ll need:
 
 **Dependencies:**
 - [CMake 3.13 or higher](https://cmake.org/)
@@ -124,22 +123,17 @@ Also install GStreamer plugins **base**, **good**, and optionally **bad**, **ugl
 
 **Get the code:**
 
-    git clone --recursive https://github.com/strawberrymusicplayer/strawberry
+    git clone --recursive https://github.com/goshitsarch-eng/Orange
 
 **Build and install:**
 
-    cd strawberry
+    cd Orange
     cmake -S . -B build
     cmake --build build --parallel $(nproc)
     sudo cmake --install build
 
-For building on Windows with Visual Studio 2022, see: :point_right: https://github.com/strawberrymusicplayer/strawberry-msvc-build-tools
-
----
-
-## :package: Packaging status
-
-[![Packaging status](https://repology.org/badge/vertical-allrepos/strawberry.svg?columns=3&header=Strawberry&exclude_unsupported=1)](https://repology.org/metapackage/strawberry/versions)
+For building on Windows with Visual Studio 2022, Strawberry's toolchain applies unchanged:
+:point_right: https://github.com/strawberrymusicplayer/strawberry-msvc-build-tools
 
 ---
 
@@ -147,19 +141,21 @@ For building on Windows with Visual Studio 2022, see: :point_right: https://gith
 
 ### Lineage
 
-Strawberry stands on the shoulders of two earlier projects, and code and design from both survive here:
+Orange is the fourth link in a chain, and code and design from every earlier project survive here:
 
 - **[Amarok](https://amarok.kde.org/)** — Mark Kretschmann, Max Howell and the Amarok team. Amarok 1.4 is the
   original ancestor of this codebase.
 - **[Clementine](https://www.clementine-player.org/)** — David Sansome, John Maguire, Paweł Bara and
-  Arnaud Bienner. Clementine began in 2010 as a port of Amarok 1.4 to Qt 4, and Strawberry was forked from
-  Clementine in 2018.
+  Arnaud Bienner. Clementine began in 2010 as a port of Amarok 1.4 to Qt 4.
+- **[Strawberry](https://www.strawberrymusicplayer.org/)** — Jonas Kvinge and the Strawberry contributors.
+  Strawberry was forked from Clementine in 2018 and is the direct parent of Orange. The overwhelming majority
+  of the code in this repository is theirs.
 
-Full author and contributor lists for all three projects are shown in **Help → About Strawberry**.
+Full author and contributor lists for all four projects are shown in **Help → About Orange**.
 
 ### Built with
 
-Strawberry would not exist without these free software projects:
+Orange would not exist without these free software projects:
 
 | Component | Used for |
 | --- | --- |
@@ -185,5 +181,6 @@ Cover art, lyrics and streaming metadata are provided by the services listed und
 
 ### License
 
-Strawberry is free software released under the **GNU General Public License, version 3 or later**.
-See [COPYING](COPYING) for the full text.
+Orange is free software released under the **GNU General Public License, version 3 or later**, the same
+licence it inherits from Strawberry. Copyright in the inherited code remains with Jonas Kvinge and the
+Strawberry contributors. See [COPYING](COPYING) for the full text.

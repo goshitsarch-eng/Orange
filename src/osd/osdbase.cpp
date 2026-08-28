@@ -238,27 +238,27 @@ void OSDBase::Stopped() {
 }
 
 void OSDBase::StopAfterToggle(bool stop) {
-  ShowMessage("Strawberry", StrUtils::Replace(Translations::Tr("Stop playing after track: %1"), "%1",
+  ShowMessage("Orange", StrUtils::Replace(Translations::Tr("Stop playing after track: %1"), "%1",
                                               stop ? Translations::Tr("On") : Translations::Tr("Off")));
 }
 
 void OSDBase::PlaylistFinished() {
   ignore_next_stopped_ = true;
-  ShowMessage("Strawberry", Translations::Tr("Playlist finished"));
+  ShowMessage("Orange", Translations::Tr("Playlist finished"));
 }
 
 void OSDBase::VolumeChanged(unsigned value) {
   if (!show_on_volume_change_) {
     return;
   }
-  ShowMessage("Strawberry", StrUtils::Replace(Translations::Tr("Volume %1%"), "%1", std::to_string(value)));
+  ShowMessage("Orange", StrUtils::Replace(Translations::Tr("Volume %1%"), "%1", std::to_string(value)));
 }
 
 void OSDBase::PlayModeChanged(const std::string &mode) {
   if (!show_on_play_mode_change_ || mode.empty()) {
     return;
   }
-  ShowMessage("Strawberry", mode);
+  ShowMessage("Orange", mode);
 }
 
 void OSDBase::RepeatModeChanged(PlaylistSequence::RepeatMode mode) { PlayModeChanged(PlaylistSequence::RepeatLabel(mode)); }

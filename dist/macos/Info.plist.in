@@ -9,17 +9,17 @@
   <key>CFBundleExecutable</key>
   <string>strawberry</string>
   <key>CFBundleGetInfoString</key>
-  <string>Strawberry ${STRAWBERRY_VERSION_DISPLAY}</string>
+  <string>Orange ${STRAWBERRY_VERSION_DISPLAY}</string>
   <key>CFBundleIconFile</key>
   <string>strawberry.icns</string>
   <key>CFBundleIdentifier</key>
-  <string>org.strawberrymusicplayer.strawberry</string>
+  <string>io.github.goshitsarch_eng.Orange</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleLongVersionString</key>
   <string>${STRAWBERRY_VERSION_DISPLAY}</string>
   <key>CFBundleName</key>
-  <string>Strawberry</string>
+  <string>Orange</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -44,7 +44,7 @@
       <key>CFBundleTypeRole</key>
       <string>Viewer</string>
       <key>CFBundleURLName</key>
-      <string>org.strawberrymusicplayer.strawberry</string>
+      <string>io.github.goshitsarch_eng.Orange</string>
       <key>CFBundleURLSchemes</key>
       <array>
         <string>tidal</string>

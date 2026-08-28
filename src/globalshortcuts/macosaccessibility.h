@@ -20,7 +20,7 @@ inline bool PromptWhenCheckingTrust() { return true; }
 inline const char *GroupTitle() { return "Accessibility"; }
 
 inline const char *Warning() {
-  return "You need to launch System Settings and allow Strawberry to control your computer to use global shortcuts.";
+  return "You need to launch System Settings and allow Orange to control your computer to use global shortcuts.";
 }
 
 inline const char *OpenButton() { return "Open..."; }

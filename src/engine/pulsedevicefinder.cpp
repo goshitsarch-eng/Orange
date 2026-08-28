@@ -38,7 +38,7 @@ bool PulseDeviceFinder::Reconnect() {
     pa_context_unref(context_);
     context_ = nullptr;
   }
-  context_ = pa_context_new(pa_mainloop_get_api(mainloop_), "Strawberry device finder");
+  context_ = pa_context_new(pa_mainloop_get_api(mainloop_), "Orange device finder");
   if (!context_) {
     return false;
   }

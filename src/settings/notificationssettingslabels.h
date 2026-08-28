@@ -3,7 +3,7 @@
 
 namespace NotificationsSettingsLabels {
 
-inline const char *Intro() { return "Strawberry can show a message when the track changes."; }
+inline const char *Intro() { return "Orange can show a message when the track changes."; }
 inline const char *TypeGroup() { return "Notification type"; }
 inline const char *Disabled() { return "Disabled"; }
 inline const char *Native() { return "Show a native desktop notification"; }
@@ -25,7 +25,7 @@ inline const char *Body() { return "Body"; }
 inline const char *Preview() { return "Preview"; }
 inline const char *DiscordEnable() { return "Enable Rich Presence"; }
 inline const char *DiscordListening() { return "Listening to..."; }
-inline const char *DiscordApp() { return "Strawberry"; }
+inline const char *DiscordApp() { return "Orange"; }
 inline const char *DiscordArtist() { return "Artist name"; }
 inline const char *DiscordSong() { return "Song title"; }
 

@@ -5,7 +5,7 @@ namespace CollectionSettingsLabels {
 
 inline const char *Intro() { return "These folders will be scanned for music to make up your collection"; }
 inline const char *AutomaticUpdating() { return "Automatic updating"; }
-inline const char *StartupScan() { return "Update the collection when Strawberry starts"; }
+inline const char *StartupScan() { return "Update the collection when Orange starts"; }
 inline const char *Monitor() { return "Monitor the collection for changes"; }
 inline const char *SongTracking() { return "Song fingerprinting and tracking"; }
 inline const char *MarkUnavailable() { return "Mark disappeared songs unavailable"; }
@@ -28,7 +28,7 @@ inline const char *PlaycountsGroup() { return "Song playcounts and ratings"; }
 inline const char *AddFolder() { return "Add new folder..."; }
 inline const char *RemoveFolder() { return "Remove folder"; }
 inline const char *CoverPatternsHint() {
-  return "When looking for album art Strawberry will first look for picture files that contain one of these words.\n"
+  return "When looking for album art Orange will first look for picture files that contain one of these words.\n"
          "If there are no matches then it will use the largest image in the directory.";
 }
 inline const char *CacheSize() { return "Size"; }

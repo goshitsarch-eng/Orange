@@ -450,7 +450,7 @@ void SetId3v2Lyrics(TagLib::ID3v2::Tag *tag, const std::string &value) {
     return;
   }
   auto *frame = new TagLib::ID3v2::UnsynchronizedLyricsFrame(TagLib::String::UTF8);
-  frame->setDescription("Strawberry editor");
+  frame->setDescription("Orange editor");
   frame->setText(ToTagLib(value));
   tag->addFrame(frame);
 }

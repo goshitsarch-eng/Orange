@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Orange application icon.
+
+  Drawn as a plain sphere with a leaf so the silhouette still reads at 22px, where any surface detail
+  disappears. The dimple texture and the specular highlight only carry the larger sizes.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+  <defs>
+    <radialGradient id="peel" cx="36%" cy="30%" r="78%">
+      <stop offset="0%" stop-color="#ffc247"/>
+      <stop offset="42%" stop-color="#ff9d21"/>
+      <stop offset="78%" stop-color="#f4740b"/>
+      <stop offset="100%" stop-color="#c94f04"/>
+    </radialGradient>
+    <radialGradient id="sheen" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="leaf" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7cc243"/>
+      <stop offset="55%" stop-color="#4e9c25"/>
+      <stop offset="100%" stop-color="#33711a"/>
+    </linearGradient>
+    <linearGradient id="stem" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8a5a2b"/>
+      <stop offset="100%" stop-color="#5d3a17"/>
+    </linearGradient>
+    <radialGradient id="dimple" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a83f02" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#a83f02" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="body">
+      <circle cx="500" cy="560" r="380"/>
+    </clipPath>
+  </defs>
+
+  <!-- Fruit -->
+  <circle cx="500" cy="560" r="380" fill="url(#peel)"/>
+
+  <!-- Peel texture, clipped to the fruit so it never spills past the silhouette -->
+  <g clip-path="url(#body)" opacity="0.7">
+    <circle cx="330" cy="470" r="34" fill="url(#dimple)"/>
+    <circle cx="452" cy="392" r="28" fill="url(#dimple)"/>
+    <circle cx="606" cy="430" r="32" fill="url(#dimple)"/>
+    <circle cx="712" cy="548" r="30" fill="url(#dimple)"/>
+    <circle cx="372" cy="640" r="30" fill="url(#dimple)"/>
+    <circle cx="512" cy="596" r="26" fill="url(#dimple)"/>
+    <circle cx="628" cy="700" r="34" fill="url(#dimple)"/>
+    <circle cx="470" cy="784" r="30" fill="url(#dimple)"/>
+    <circle cx="286" cy="596" r="26" fill="url(#dimple)"/>
+    <circle cx="760" cy="672" r="26" fill="url(#dimple)"/>
+  </g>
+
+  <!-- Specular highlight -->
+  <ellipse cx="384" cy="404" rx="150" ry="118" fill="url(#sheen)" transform="rotate(-28 384 404)"/>
+
+  <!-- Stem -->
+  <path d="M500 200 C 512 244, 512 268, 500 300 C 488 268, 488 244, 500 200 Z"
+        fill="url(#stem)" stroke="#4a2d12" stroke-width="10" stroke-linejoin="round"/>
+
+  <!-- Leaf -->
+  <path d="M516 236 C 606 150, 760 148, 828 196 C 764 300, 622 320, 528 268 Z"
+        fill="url(#leaf)"/>
+  <path d="M540 254 C 630 214, 730 200, 812 198"
+        fill="none" stroke="#2e6417" stroke-width="14" stroke-linecap="round" opacity="0.55"/>
+</svg>

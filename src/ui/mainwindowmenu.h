@@ -45,7 +45,7 @@ inline const char *Transcode() { return "Transcode Music"; }
 inline const char *Console() { return "Console"; }
 inline const char *ShowSidebar() { return "Show sidebar"; }
 inline const char *Settings() { return "Settings..."; }
-inline const char *About() { return "About Strawberry"; }
+inline const char *About() { return "About Orange"; }
 inline const char *Quit() { return "Quit"; }
 inline const char *ToggleScrobblingAction() { return "win.toggle-scrobbling"; }
 inline const char *ShuffleModeAction() { return "win.shuffle-mode"; }

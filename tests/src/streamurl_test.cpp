@@ -431,7 +431,7 @@ TEST(GstUrl, FixupUncFileAndPassthrough) {
 }
 
 TEST(GstSourceSetup, UserAgentAndRedirectLikeQt) {
-  EXPECT_EQ(std::string("Strawberry ") + STRAWBERRY_VERSION_DISPLAY, GstSourceSetup::UserAgentString());
+  EXPECT_EQ(std::string("Orange ") + STRAWBERRY_VERSION_DISPLAY, GstSourceSetup::UserAgentString());
   EXPECT_TRUE(GstSourceSetup::AutomaticRedirect());
   EXPECT_TRUE(GstSourceSetup::ShouldSetDevice("/dev/sr0"));
   EXPECT_FALSE(GstSourceSetup::ShouldSetDevice(""));

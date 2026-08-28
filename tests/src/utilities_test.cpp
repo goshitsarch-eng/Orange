@@ -2675,7 +2675,7 @@ TEST(TaskbarProgressHelpers, FractionAndVisibility) {
   EXPECT_TRUE(TaskbarProgressHelpers::ShouldClearImmediately(true, false));
   EXPECT_FALSE(TaskbarProgressHelpers::ShouldClearImmediately(false, false));
   EXPECT_FALSE(TaskbarProgressHelpers::ShouldClearImmediately(true, true));
-  EXPECT_STREQ("application://org.strawberrymusicplayer.strawberry.desktop", TaskbarProgressHelpers::AppUri());
+  EXPECT_STREQ("application://io.github.goshitsarch_eng.Orange.desktop", TaskbarProgressHelpers::AppUri());
   EXPECT_STREQ("com.canonical.Unity.LauncherEntry", TaskbarProgressHelpers::Interface());
   EXPECT_EQ("/com/canonical/unity/launcherentry/strawberry", TaskbarProgressHelpers::ObjectPath());
 }

@@ -354,10 +354,10 @@ static GVariant *HandleGet(GDBusConnection *, const gchar *, const gchar *, cons
   auto *self = static_cast<Mpris2 *>(user_data);
   Application *app = self ? self->app() : nullptr;
   if (g_strcmp0(property, "Identity") == 0) {
-    return g_variant_new_string("Strawberry");
+    return g_variant_new_string("Orange");
   }
   if (g_strcmp0(property, "DesktopEntry") == 0) {
-    return g_variant_new_string("org.strawberrymusicplayer.strawberry");
+    return g_variant_new_string("io.github.goshitsarch_eng.Orange");
   }
   if (g_strcmp0(property, "CanQuit") == 0 || g_strcmp0(property, "CanRaise") == 0 || g_strcmp0(property, "CanControl") == 0) {
     return g_variant_new_boolean(TRUE);

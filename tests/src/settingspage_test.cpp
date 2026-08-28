@@ -210,8 +210,8 @@ TEST(SettingsControls, BufferDefaultsAndCacheUnitMax) {
 
 TEST(AppearanceSettingsLabels, QtCopy) {
   EXPECT_STREQ("System icons", AppearanceSettingsLabels::SystemIcons());
-  EXPECT_STREQ("You need to restart Strawberry for this setting to take affect", AppearanceSettingsLabels::DarkRestart());
-  EXPECT_STREQ("You might need to restart Strawberry for this setting to fully apply", AppearanceSettingsLabels::StyleRestart());
+  EXPECT_STREQ("You need to restart Orange for this setting to take affect", AppearanceSettingsLabels::DarkRestart());
+  EXPECT_STREQ("You might need to restart Orange for this setting to fully apply", AppearanceSettingsLabels::StyleRestart());
   EXPECT_STREQ("Use the system default color set", AppearanceSettingsLabels::SystemColorSet());
   EXPECT_STREQ("Use a custom color set", AppearanceSettingsLabels::CustomColorSet());
   EXPECT_STREQ("Dark colors", AppearanceSettingsLabels::DarkColors());
@@ -236,7 +236,7 @@ TEST(BackendSettingsLabels, QtCopy) {
   EXPECT_STREQ("Upmix / downmix to", BackendSettingsLabels::ForceChannels());
   EXPECT_STREQ("Improve headphone listening of stereo audio records (bs2b)", BackendSettingsLabels::BS2B());
   EXPECT_STREQ("Use playbin3 when available", BackendSettingsLabels::Playbin3());
-  EXPECT_STREQ("You need to restart Strawberry for this setting to take affect", BackendSettingsLabels::RestartHint());
+  EXPECT_STREQ("You need to restart Orange for this setting to take affect", BackendSettingsLabels::RestartHint());
   EXPECT_STREQ("Enable HTTP/2 for streaming", BackendSettingsLabels::HTTP2());
   EXPECT_STREQ("Use strict SSL mode", BackendSettingsLabels::StrictSSL());
   EXPECT_STREQ("No audio normalization", BackendSettingsLabels::NoNormalization());
@@ -262,7 +262,7 @@ TEST(ContextSettingsLabels, EnableItemsCopy) {
   EXPECT_STREQ("Font for data and lyrics", ContextSettingsLabels::NormalFont());
 }
 
-TEST(ErrorDialogLabels, QtTitle) { EXPECT_STREQ("Strawberry Error", ErrorDialogLabels::Title()); }
+TEST(ErrorDialogLabels, QtTitle) { EXPECT_STREQ("Orange Error", ErrorDialogLabels::Title()); }
 
 TEST(ErrorDialogQueue, EnqueuesAndJoinsLikeQt) {
   EXPECT_FALSE(ErrorDialogQueue::ShouldEnqueue(""));
@@ -739,8 +739,9 @@ TEST(LoginStateVisibility, HidesCredentialsWhileSignedIn) {
   EXPECT_TRUE(LoginStateVisibility::ShowProgress(LoginStateWidget::State::LoginInProgress));
 }
 
-TEST(AboutCredits, MatchesQtSectionsAndContributorCounts) {
-  EXPECT_STREQ("About Strawberry", AboutCredits::WindowTitle());
+TEST(AboutCredits, NamesOrangeAndKeepsTheUpstreamContributorLists) {
+  EXPECT_STREQ("About Orange", AboutCredits::WindowTitle());
+  EXPECT_STREQ("The Orange contributors", AboutCredits::DeveloperName());
   EXPECT_STREQ("Jonas Kvinge", AboutCredits::AuthorName());
   EXPECT_STREQ("Author and maintainer", AboutCredits::AuthorSection());
   EXPECT_STREQ("Contributors", AboutCredits::ContributorsSection());
@@ -748,7 +749,9 @@ TEST(AboutCredits, MatchesQtSectionsAndContributorCounts) {
   EXPECT_STREQ("Clementine contributors", AboutCredits::ClementineContributorsSection());
   EXPECT_STREQ("Thanks to", AboutCredits::ThanksSection());
   EXPECT_STREQ("Thanks to all the other Amarok and Clementine contributors.", AboutCredits::ThanksOthers());
-  EXPECT_STREQ("Jonas Kvinge", AboutCredits::Developers()[0]);
+  // Strawberry's author heads his own section rather than being listed as an Orange developer.
+  EXPECT_STREQ("Jonas Kvinge", AboutCredits::StrawberryAuthors()[0]);
+  EXPECT_STREQ("Strawberry authors and contributors", AboutCredits::StrawberrySection());
   EXPECT_EQ(55u, AboutCredits::Count(AboutCredits::StrawberryContributors()));
   EXPECT_STREQ("Gavin D. Howard", AboutCredits::StrawberryContributors()[0]);
   EXPECT_STREQ("Alex Bikadorov", AboutCredits::StrawberryContributors()[54]);
@@ -757,9 +760,28 @@ TEST(AboutCredits, MatchesQtSectionsAndContributorCounts) {
   EXPECT_STREQ("Arnaud Bienner", AboutCredits::ClementineAuthors()[3]);
   EXPECT_EQ(19u, AboutCredits::Count(AboutCredits::ClementineContributors()));
   EXPECT_EQ(6u, AboutCredits::Count(AboutCredits::ThanksTo()));
-  EXPECT_STREQ("https://github.com/strawberrymusicplayer/strawberry", AboutCredits::SourceUrl());
+  EXPECT_STREQ("https://github.com/goshitsarch-eng/Orange", AboutCredits::SourceUrl());
   EXPECT_NE(std::string::npos, std::string(AboutCredits::Comments()).find(AboutCredits::ForkNote()));
   EXPECT_NE(std::string::npos, std::string(AboutCredits::Comments()).find(AboutCredits::SponsorNote()));
+}
+
+// The whole point of the fork's credits is that the projects it descends from stay named and reachable.
+TEST(AboutCredits, CreditsEveryUpstreamProject) {
+  const std::string comments = AboutCredits::Comments();
+  EXPECT_NE(std::string::npos, comments.find("Strawberry"));
+  EXPECT_NE(std::string::npos, comments.find("Clementine"));
+  EXPECT_NE(std::string::npos, comments.find("Amarok"));
+  EXPECT_STREQ("https://www.strawberrymusicplayer.org", AboutCredits::StrawberryUrl());
+  EXPECT_STREQ("https://www.clementine-player.org", AboutCredits::ClementineUrl());
+  EXPECT_STREQ("https://amarok.kde.org", AboutCredits::AmarokUrl());
+  EXPECT_EQ(10u, AboutCredits::Count(AboutCredits::AmarokAuthors()));
+  EXPECT_STREQ("Mark Kretschmann", AboutCredits::AmarokAuthors()[0]);
+  // The copyright keeps naming the people whose code this mostly is.
+  EXPECT_NE(std::string::npos, std::string(AboutCredits::Copyright()).find("Jonas Kvinge"));
+  EXPECT_NE(std::string::npos, std::string(AboutCredits::Copyright()).find("Strawberry contributors"));
+  // The sponsorship wording must not imply the money reaches Orange.
+  EXPECT_NE(std::string::npos, std::string(AboutCredits::SponsorNote()).find("Strawberry"));
+  EXPECT_NE(std::string::npos, std::string(AboutCredits::SponsorLinks()).find("Strawberry's author"));
 }
 
 TEST(QobuzCredentialParser, ExtractsBundlePathIdsSecretAndPrivateKey) {
@@ -780,13 +802,16 @@ TEST(QobuzCredentialParser, ExtractsBundlePathIdsSecretAndPrivateKey) {
   EXPECT_TRUE(QobuzCredentialParser::ExtractAppSecret("no seeds").empty());
 }
 
-TEST(MainWindowSponsor, MatchesQtFirstRunCopy) {
+TEST(MainWindowSponsor, AsksForSupportForTheUpstreamProject) {
   EXPECT_TRUE(MainWindowSponsor::ShouldShow(false));
   EXPECT_FALSE(MainWindowSponsor::ShouldShow(true));
-  EXPECT_STREQ("Sponsoring Strawberry", MainWindowSponsor::Title());
+  EXPECT_STREQ("Supporting Orange", MainWindowSponsor::Title());
   EXPECT_STREQ("Do not show this message again.", MainWindowSponsor::DoNotShowAgain());
   EXPECT_STREQ("https://www.strawberrymusicplayer.org/", MainWindowSponsor::WebsiteUrl());
-  EXPECT_NE(std::string::npos, MainWindowSponsor::Message().find("please consider sponsoring the project"));
+  // The money reaches Strawberry's author, so the prompt has to say so rather than ask for the fork.
+  const std::string message = MainWindowSponsor::Message();
+  EXPECT_NE(std::string::npos, message.find("supporting Strawberry's author"));
+  EXPECT_NE(std::string::npos, message.find(MainWindowSponsor::WebsiteUrl()));
   EXPECT_STREQ("MainWindow", MainWindowSettings::kSettingsGroup);
   EXPECT_STREQ("do_not_show_sponsor_message", MainWindowSettings::kDoNotShowSponsorMessage);
 }
@@ -812,7 +837,7 @@ TEST(NotificationPreviewSong, UsesPlaylistOrQtFake) {
 }
 
 TEST(NotificationsControls, ConvertsTimeoutAndGatesDuration) {
-  EXPECT_STREQ("Strawberry can show a message when the track changes.", NotificationsSettingsLabels::Intro());
+  EXPECT_STREQ("Orange can show a message when the track changes.", NotificationsSettingsLabels::Intro());
   EXPECT_STREQ("Show a native desktop notification", NotificationsSettingsLabels::Native());
   EXPECT_STREQ("Show a pretty OSD", NotificationsSettingsLabels::Pretty());
   EXPECT_STREQ("Popup duration", NotificationsSettingsLabels::PopupDuration());
@@ -867,7 +892,7 @@ TEST(PlaylistSettingsControls, GlowRequiresBars) {
 TEST(CollectionSettingsLabels, MatchQtCollectionCopy) {
   EXPECT_STREQ("These folders will be scanned for music to make up your collection", CollectionSettingsLabels::Intro());
   EXPECT_STREQ("Automatic updating", CollectionSettingsLabels::AutomaticUpdating());
-  EXPECT_STREQ("Update the collection when Strawberry starts", CollectionSettingsLabels::StartupScan());
+  EXPECT_STREQ("Update the collection when Orange starts", CollectionSettingsLabels::StartupScan());
   EXPECT_STREQ("Display options", CollectionSettingsLabels::DisplayOptions());
   EXPECT_STREQ("Show album cover art in collection", CollectionSettingsLabels::PrettyCovers());
   EXPECT_STREQ("Album cover pixmap cache", CollectionSettingsLabels::CacheGroup());

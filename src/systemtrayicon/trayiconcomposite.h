@@ -23,7 +23,7 @@ inline Playback StateFrom(bool playing, bool paused) {
   return Playback::Stopped;
 }
 
-inline const char *BaseIconName() { return "strawberry"; }
+inline const char *BaseIconName() { return "orange"; }
 
 inline const char *BadgeIconName(Playback state) {
   switch (state) {

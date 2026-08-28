@@ -34,7 +34,7 @@ inline const char *DialogTitle() { return "Collection rescan notice"; }
 
 inline std::string DialogMessage(const std::vector<std::string> &reasons) {
   std::string message =
-      "The version of Strawberry you've just updated to requires a full collection rescan because of the new features listed below:\n";
+      "The version of Orange you've just updated to requires a full collection rescan because of the new features listed below:\n";
   for (const std::string &reason : reasons) {
     message += "• ";
     message += reason;

@@ -13,7 +13,7 @@ inline const char *ForceChannels() { return "Upmix / downmix to"; }
 inline const char *Channels() { return "channels"; }
 inline const char *BS2B() { return "Improve headphone listening of stereo audio records (bs2b)"; }
 inline const char *Playbin3() { return "Use playbin3 when available"; }
-inline const char *RestartHint() { return "You need to restart Strawberry for this setting to take affect"; }
+inline const char *RestartHint() { return "You need to restart Orange for this setting to take affect"; }
 inline const char *HTTP2() { return "Enable HTTP/2 for streaming"; }
 inline const char *StrictSSL() { return "Use strict SSL mode"; }
 inline const char *NoNormalization() { return "No audio normalization"; }

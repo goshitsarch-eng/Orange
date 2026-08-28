@@ -125,7 +125,7 @@ TEST(OSDBase, StopAfterToggleAndPlayModes) {
   SystemTrayIcon tray;
   TestOSD osd(&tray);
   osd.StopAfterToggle(true);
-  EXPECT_EQ("Strawberry", tray.popup_summary());
+  EXPECT_EQ("Orange", tray.popup_summary());
   EXPECT_NE(std::string::npos, tray.popup_message().find("On"));
   osd.StopAfterToggle(false);
   EXPECT_NE(std::string::npos, tray.popup_message().find("Off"));
@@ -188,7 +188,7 @@ TEST(OSDBase, CustomTextAndPlaylistFinished) {
   EXPECT_EQ("Portishead - Roads", osd.PlayingSummary(song));
   EXPECT_EQ("Dummy", osd.PlayingBody(song));
   osd.PlaylistFinished();
-  EXPECT_EQ("Strawberry", tray.popup_summary());
+  EXPECT_EQ("Orange", tray.popup_summary());
   EXPECT_EQ("Playlist finished", tray.popup_message());
 }
 

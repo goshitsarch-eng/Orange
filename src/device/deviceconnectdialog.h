@@ -11,7 +11,7 @@ namespace DeviceConnectDialog {
 inline const char *Title() { return "Connect device"; }
 
 inline const char *Message() {
-  return "This is the first time you have connected this device.  Strawberry will now scan the device to find music files - this may take some time.";
+  return "This is the first time you have connected this device.  Orange will now scan the device to find music files - this may take some time.";
 }
 
 inline const char *Accept() { return "Connect device"; }

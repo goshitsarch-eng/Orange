@@ -61,7 +61,7 @@ int CommandLine(GApplication *gapp, GApplicationCommandLine *cmdline, gpointer u
   options.Parse(argc, argv);
   g_strfreev(argv);
   if (options.version()) {
-    g_application_command_line_print(cmdline, "Strawberry %s\n", STRAWBERRY_VERSION_DISPLAY);
+    g_application_command_line_print(cmdline, "Orange %s\n", STRAWBERRY_VERSION_DISPLAY);
     return 0;
   }
   if (CommandlineFingerprint::ShouldRun(options.create_fingerprint())) {
@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (options.version()) {
-    g_print("Strawberry %s\n", STRAWBERRY_VERSION_DISPLAY);
+    g_print("Orange %s\n", STRAWBERRY_VERSION_DISPLAY);
     return 0;
   }
   if (CommandlineFingerprint::ShouldRun(options.create_fingerprint())) {

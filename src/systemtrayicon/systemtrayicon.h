@@ -135,7 +135,7 @@ class SystemTrayIcon {
   std::vector<uint8_t> icon_pixmap_;
   std::vector<unsigned char> popup_art_;
   Song song_;
-  std::string tooltip_ = "Strawberry";
+  std::string tooltip_ = "Orange";
   std::string popup_summary_;
   std::string popup_message_;
   int popup_timeout_ms_ = 0;

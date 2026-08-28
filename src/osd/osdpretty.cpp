@@ -568,7 +568,7 @@ void OSDPretty::EnsureWindow() {
   window_ = gtk_window_new();
   gtk_window_set_decorated(GTK_WINDOW(window_), FALSE);
   gtk_window_set_resizable(GTK_WINDOW(window_), FALSE);
-  gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
+  gtk_window_set_title(GTK_WINDOW(window_), "Orange");
   gtk_widget_add_css_class(window_, "osd");
   gtk_widget_add_css_class(window_, "osd-pretty");
   InitLayerShell(window_);

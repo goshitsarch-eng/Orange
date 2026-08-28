@@ -6,7 +6,7 @@ namespace TrackSelectionLabels {
 inline const char *Title() { return "Tag fetcher"; }
 inline const char *SelectBest() { return "Select best possible match"; }
 inline const char *NoResults() { return "No results"; }
-inline const char *UnableToFind() { return "Strawberry was unable to find results for this file"; }
+inline const char *UnableToFind() { return "Orange was unable to find results for this file"; }
 inline const char *Error() { return "Error"; }
 inline const char *OriginalTags() { return "Original tags"; }
 

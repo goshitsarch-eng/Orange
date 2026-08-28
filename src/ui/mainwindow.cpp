@@ -480,7 +480,7 @@ void MainWindow::BuildUi() {
                    }),
                    this);
 #endif
-  gtk_window_set_title(GTK_WINDOW(window_), "Strawberry");
+  gtk_window_set_title(GTK_WINDOW(window_), "Orange");
   gtk_widget_add_css_class(GTK_WIDGET(window_), "strawberry-main");
   RestoreGeometry();
   ApplyAppearance();

@@ -1,5 +1,5 @@
-Strawberry Music Player
-=======================
+Orange Music Player
+===================
 ChangeLog
 
 Version 2.0.0 (2026.08.28):
@@ -8,8 +8,16 @@ Version 2.0.0 (2026.08.28):
   Settings are now stored with GKeyFile instead of QSettings, so settings from 1.x are not carried over.
   The collection and playlist database is unchanged and is picked up as before.
 
+  The application has been renamed to Orange.
+  The rename is deliberately surface-level: the binary is still installed as "strawberry", settings remain in
+  ~/.config/strawberry/ and the collection database in ~/.local/share/strawberry/, so an existing installation
+  keeps working and keeps its library.
+  The desktop entry and AppStream component are now io.github.goshitsarch_eng.Orange, replacing
+  org.strawberrymusicplayer.strawberry, and the application icon is new artwork.
+
   Notes:
-    * Credits now include Amarok, whose 1.4 release is the original ancestor of this codebase by way of Clementine, and the third-party projects Strawberry is built on
+    * Orange is a fork of Strawberry. Strawberry, Clementine and Amarok are all credited in the about dialog and the README, along with the third-party projects Orange is built on
+    * The sponsorship links fund Strawberry's author, whose work this is based on, and are labelled as such rather than presented as funding Orange
 
   Security:
     * Service passwords, OAuth access and refresh tokens, the Qobuz user auth token and the Last.fm session key are now stored in the system keyring through libsecret instead of in plaintext in strawberry.conf, and an existing configuration is migrated on first use. Where no keyring is available the settings file remains the fallback

@@ -83,7 +83,7 @@ inline void AppendJsonString(std::string *json, const char *key, const std::stri
 
 // Qt JsonTrackMetadata additional_info: duration, track, client, MBIDs, streaming origin.
 inline std::string AdditionalInfoJson(const ScrobblerCacheItem &item, const std::string &version = {}) {
-  std::string json = "{\"media_player\":\"Strawberry\",\"submission_client\":\"Strawberry\"";
+  std::string json = "{\"media_player\":\"Orange\",\"submission_client\":\"Orange\"";
   if (!version.empty()) {
     const std::string escaped = StrUtils::JsonEscape(version);
     json += ",\"media_player_version\":\"" + escaped + "\",\"submission_client_version\":\"" + escaped + "\"";

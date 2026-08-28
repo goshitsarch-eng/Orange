@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Strawberry is a music player and music collection organizer, forked from Clementine in 2018. C++17, GTK 4 and libadwaita, GStreamer audio backend. Runs on Linux, *BSD, macOS, and Windows.
+Orange is a music player and music collection organizer. C++17, GTK 4 and libadwaita, GStreamer audio backend. Runs on Linux, *BSD, macOS, and Windows.
+
+Orange is a fork of Strawberry, which was forked from Clementine in 2018; Clementine began as a port of Amarok 1.4. Most of the code is Strawberry's.
+
+The user-visible name is **Orange**, but the rename is deliberately surface-level: the binary is still `strawberry`, config lives in `~/.config/strawberry/`, the database in `~/.local/share/strawberry/`, the MPRIS bus name, gettext domain and `STRAWBERRY_*` macros and header guards are all unchanged. Do not rename those without being asked — existing installations depend on them. Upstream GPL headers naming Strawberry must stay as they are.
 
 ## Build & Test
 

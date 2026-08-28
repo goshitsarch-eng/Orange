@@ -22,7 +22,7 @@ inline const char *ShowMaximized() { return "Show the main window maximized"; }
 inline const char *ShowMinimized() { return "Show the main window minimized"; }
 inline const char *Language() { return "Language"; }
 inline const char *SystemLanguage() { return "Use the system default"; }
-inline const char *LanguageRestart() { return "You will need to restart Strawberry if you change the language."; }
+inline const char *LanguageRestart() { return "You will need to restart Orange if you change the language."; }
 inline const char *MenuPlay() { return "Using the menu to add a song will..."; }
 inline const char *NeverPlay() { return "Never start playing"; }
 inline const char *PlayIfStopped() { return "Play if there is nothing already playing"; }

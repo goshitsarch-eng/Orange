@@ -7,8 +7,8 @@
 
 namespace AppearanceSettingsLabels {
 
-inline const char *StyleRestart() { return "You might need to restart Strawberry for this setting to fully apply"; }
-inline const char *DarkRestart() { return "You need to restart Strawberry for this setting to take affect"; }
+inline const char *StyleRestart() { return "You might need to restart Orange for this setting to fully apply"; }
+inline const char *DarkRestart() { return "You need to restart Orange for this setting to take affect"; }
 inline const char *SystemIcons() { return "System icons"; }
 inline const char *DarkMode() { return "Dark mode"; }
 inline const char *SystemColorSet() { return "Use the system default color set"; }

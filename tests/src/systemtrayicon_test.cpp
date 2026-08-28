@@ -26,7 +26,7 @@
 
 TEST(SystemTrayIcon, NowPlayingUpdatesTooltip) {
   SystemTrayIcon tray;
-  EXPECT_EQ("Strawberry", tray.tooltip());
+  EXPECT_EQ("Orange", tray.tooltip());
   EXPECT_FALSE(tray.playing());
   Song song;
   song.set_title("Roads");
@@ -39,7 +39,7 @@ TEST(SystemTrayIcon, NowPlayingUpdatesTooltip) {
   EXPECT_TRUE(tray.playing());
   EXPECT_EQ(40, tray.progress());
   tray.ClearNowPlaying();
-  EXPECT_EQ("Strawberry", tray.tooltip());
+  EXPECT_EQ("Orange", tray.tooltip());
 }
 
 TEST(SystemTrayIcon, DBusMenuLabelsAndActions) {
@@ -104,7 +104,7 @@ TEST(SystemTrayIcon, DBusMenuLabelsAndActions) {
 }
 
 TEST(TrayIconComposite, QtCoverGeometryAndOverlayNames) {
-  EXPECT_STREQ("strawberry", TrayIconComposite::BaseIconName());
+  EXPECT_STREQ("orange", TrayIconComposite::BaseIconName());
   EXPECT_EQ(TrayIconComposite::Playback::Stopped, TrayIconComposite::StateFrom(false, false));
   EXPECT_EQ(TrayIconComposite::Playback::Playing, TrayIconComposite::StateFrom(true, false));
   EXPECT_EQ(TrayIconComposite::Playback::Paused, TrayIconComposite::StateFrom(false, true));

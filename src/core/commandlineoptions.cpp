@@ -81,7 +81,7 @@ bool CommandlineOptions::Parse(int argc, char **argv) {
   GError *error = nullptr;
   GOptionContext *context = g_option_context_new(" [URL/FILE...]");
   g_option_context_add_main_entries(context, entries, nullptr);
-  g_option_context_set_summary(context, "Strawberry Music Player " STRAWBERRY_VERSION_DISPLAY " (GTK 4 / Adwaita)");
+  g_option_context_set_summary(context, "Orange Music Player " STRAWBERRY_VERSION_DISPLAY " (GTK 4 / Adwaita)");
   const gboolean parsed = g_option_context_parse(context, &argc, &argv, &error);
   g_option_context_free(context);
   if (!parsed) {

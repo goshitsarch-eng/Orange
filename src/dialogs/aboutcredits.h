@@ -5,9 +5,14 @@
 
 namespace AboutCredits {
 
-inline const char *WindowTitle() { return "About Strawberry"; }
+inline const char *WindowTitle() { return "About Orange"; }
+
+// Orange is a fork of Strawberry. Strawberry was forked from Clementine in 2018, and Clementine began in
+// 2010 as a port of Amarok 1.4, so all three are credited below rather than only the immediate upstream.
+inline const char *DeveloperName() { return "The Orange contributors"; }
 inline const char *AuthorName() { return "Jonas Kvinge"; }
 inline const char *AuthorSection() { return "Author and maintainer"; }
+inline const char *StrawberrySection() { return "Strawberry authors and contributors"; }
 inline const char *ContributorsSection() { return "Contributors"; }
 inline const char *ClementineAuthorsSection() { return "Clementine authors"; }
 inline const char *ClementineContributorsSection() { return "Clementine contributors"; }
@@ -15,37 +20,49 @@ inline const char *AmarokSection() { return "Amarok 1.4 authors"; }
 inline const char *ThanksSection() { return "Thanks to"; }
 inline const char *ThirdPartySection() { return "Built with"; }
 inline const char *ThanksOthers() { return "Thanks to all the other Amarok and Clementine contributors."; }
-inline const char *Description() { return "Strawberry is a music player and music collection organizer."; }
-inline const char *ForkNote() { return "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."; }
-inline const char *LineageNote() {
-  return "Clementine itself began in 2010 as a port of Amarok 1.4, so parts of this codebase trace back to Amarok.";
+inline const char *Description() { return "Orange is a music player and music collection organizer."; }
+inline const char *ForkNote() {
+  return "It is a fork of Strawberry, which was itself forked from Clementine in 2018 and aimed at music collectors and audiophiles.";
 }
-inline const char *Copyright() { return "© 2018-2026 Jonas Kvinge and the Strawberry contributors"; }
+inline const char *LineageNote() {
+  return "Clementine began in 2010 as a port of Amarok 1.4, so parts of this codebase trace back to Amarok.";
+}
+inline const char *Copyright() {
+  return "© 2018-2026 Jonas Kvinge and the Strawberry contributors\n© 2026 the Orange contributors";
+}
 inline const char *GplNote() {
-  return "Strawberry is free software released under GPL. The source code is available on GitHub.";
+  return "Orange is free software released under GPL. The source code is available on GitHub.";
 }
 inline const char *LicenseNote() {
   return "You should have received a copy of the GNU General Public License along with this program.  If not, see http://www.gnu.org/licenses/";
 }
-inline const char *SponsorNote() { return "If you like Strawberry and can make use of it, consider sponsoring or donating."; }
-inline const char *SponsorLinks() {
-  return "You can sponsor the author on Patreon or GitHub. You can also make a one-time payment through paypal.me/jonaskvinge.";
+// The sponsorship links belong to Strawberry's author, not to Orange, and are labelled as such wherever
+// they are shown so nobody is asked to fund one project believing they are funding the other.
+inline const char *SponsorNote() {
+  return "Orange builds on Strawberry. If you find it useful, consider supporting Strawberry's author.";
 }
-inline const char *Website() { return "https://www.strawberrymusicplayer.org"; }
-inline const char *SourceUrl() { return "https://github.com/strawberrymusicplayer/strawberry"; }
+inline const char *SponsorLinks() {
+  return "You can sponsor Jonas Kvinge, Strawberry's author, on Patreon or GitHub, or make a one-time payment through paypal.me/jonaskvinge.";
+}
+inline const char *Website() { return "https://github.com/goshitsarch-eng/Orange"; }
+inline const char *SourceUrl() { return "https://github.com/goshitsarch-eng/Orange"; }
+inline const char *IssuesUrl() { return "https://github.com/goshitsarch-eng/Orange/issues"; }
+inline const char *StrawberryUrl() { return "https://www.strawberrymusicplayer.org"; }
+inline const char *ClementineUrl() { return "https://www.clementine-player.org"; }
+inline const char *AmarokUrl() { return "https://amarok.kde.org"; }
 inline const char *LicenseUrl() { return "http://www.gnu.org/licenses/"; }
 inline const char *PatreonUrl() { return "https://www.patreon.com/jonaskvinge"; }
 inline const char *GitHubSponsorsUrl() { return "https://github.com/sponsors/jonaski"; }
 inline const char *PayPalUrl() { return "https://paypal.me/jonaskvinge"; }
 
 inline const char *Comments() {
-  return "Strawberry is a music player and music collection organizer.\n"
-         "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles.\n"
-         "Clementine itself began in 2010 as a port of Amarok 1.4, so parts of this codebase trace back to Amarok.\n\n"
-         "Strawberry is free software released under GPL. The source code is available on GitHub.\n"
+  return "Orange is a music player and music collection organizer.\n"
+         "It is a fork of Strawberry, which was itself forked from Clementine in 2018 and aimed at music collectors and audiophiles.\n"
+         "Clementine began in 2010 as a port of Amarok 1.4, so parts of this codebase trace back to Amarok.\n\n"
+         "Orange is free software released under GPL. The source code is available on GitHub.\n"
          "You should have received a copy of the GNU General Public License along with this program.  If not, see http://www.gnu.org/licenses/\n\n"
-         "If you like Strawberry and can make use of it, consider sponsoring or donating.\n"
-         "You can sponsor the author on Patreon or GitHub. You can also make a one-time payment through paypal.me/jonaskvinge.";
+         "Orange builds on Strawberry. If you find it useful, consider supporting Strawberry's author.\n"
+         "You can sponsor Jonas Kvinge, Strawberry's author, on Patreon or GitHub, or make a one-time payment through paypal.me/jonaskvinge.";
 }
 
 inline size_t Count(const char **names) {
@@ -56,7 +73,8 @@ inline size_t Count(const char **names) {
   return n;
 }
 
-inline const char **Developers() {
+// Strawberry's author heads the Strawberry credit section; Orange does not claim him as its developer.
+inline const char **StrawberryAuthors() {
   static const char *names[] = {"Jonas Kvinge", nullptr};
   return names;
 }
@@ -150,7 +168,7 @@ inline const char **ClementineContributors() {
   return names;
 }
 
-// Strawberry is a fork of Clementine, and Clementine started life as a port of Amarok 1.4.
+// Orange forked Strawberry, Strawberry forked Clementine, and Clementine started life as a port of Amarok 1.4.
 // Amarok's original authors are credited here because code and design from Amarok 1.4 survives in this
 // codebase by way of Clementine.
 inline const char **AmarokAuthors() {
@@ -160,7 +178,7 @@ inline const char **AmarokAuthors() {
   return names;
 }
 
-// Third-party projects Strawberry is built on.
+// Third-party projects Orange is built on.
 // This list is kept in sync with the dependencies declared in CMakeLists.txt.
 inline const char **ThirdParty() {
   static const char *names[] = {"GTK — https://www.gtk.org/",

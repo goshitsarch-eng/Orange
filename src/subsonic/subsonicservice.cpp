@@ -13,7 +13,7 @@
 
 #include <glib.h>
 
-const char *SubsonicService::kClientName = "Strawberry";
+const char *SubsonicService::kClientName = "Orange";
 const char *SubsonicService::kApiVersion = "1.11.0";
 
 namespace {

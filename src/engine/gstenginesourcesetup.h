@@ -8,7 +8,7 @@
 namespace GstSourceSetup {
 
 // Qt GstEnginePipeline::SourceSetupCallback: "Strawberry {version}".
-inline std::string UserAgentString() { return std::string("Strawberry ") + STRAWBERRY_VERSION_DISPLAY; }
+inline std::string UserAgentString() { return std::string("Orange ") + STRAWBERRY_VERSION_DISPLAY; }
 
 inline bool ShouldSetDevice(const std::string &device) { return !device.empty(); }
 

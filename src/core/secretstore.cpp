@@ -32,7 +32,7 @@ const SecretSchema *Schema() {
   return &schema;
 }
 
-std::string Label(const std::string &group, const std::string &key) { return "Strawberry: " + group + "/" + key; }
+std::string Label(const std::string &group, const std::string &key) { return "Orange: " + group + "/" + key; }
 
 // Talking to the keyring can fail for reasons that are not this application's problem - no D-Bus, no keyring
 // daemon, the user cancelled the unlock prompt. Report the first one and stay quiet after that, so a session

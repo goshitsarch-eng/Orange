@@ -133,7 +133,7 @@ bool OAuthenticator::StartRedirectServer(guint16 preferred_port) {
                        }
                      }
                      const char *body = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n"
-                                        "<html><body><p>You can return to Strawberry.</p></body></html>";
+                                        "<html><body><p>You can return to Orange.</p></body></html>";
                      g_output_stream_write_all(output, body, std::strlen(body), nullptr, nullptr, nullptr);
                      if (self->callback_) {
                        const auto cb = self->callback_;

@@ -98,7 +98,7 @@ TEST(ListenBrainzScrobbler, SubmitBodyEscapesQuotes) {
   EXPECT_NE(std::string::npos, body.find("AC\\\"DC"));
   EXPECT_EQ(std::string::npos, body.find("\"artist_name\":\"AC\"DC\""));
   EXPECT_NE(std::string::npos, body.find("\"additional_info\""));
-  EXPECT_NE(std::string::npos, body.find("\"media_player\":\"Strawberry\""));
+  EXPECT_NE(std::string::npos, body.find("\"media_player\":\"Orange\""));
   EXPECT_TRUE(ListenBrainzScrobbleState::ShouldIncludeReleaseName("High Voltage"));
   EXPECT_FALSE(ListenBrainzScrobbleState::ShouldIncludeReleaseName(""));
   EXPECT_EQ(5000, ListenBrainzScrobbleState::DurationMs(5000 * 1000000LL));

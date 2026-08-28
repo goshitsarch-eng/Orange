@@ -21,10 +21,10 @@ inline const char *HardwareInformation() { return "Hardware information"; }
 inline const char *NotConnected() { return "Hardware information is only available while the device is connected."; }
 inline const char *OpenDevice() { return "Open device"; }
 inline const char *FormatsNotConnected() {
-  return "This device must be connected and opened before Strawberry can see what file formats it supports.";
+  return "This device must be connected and opened before Orange can see what file formats it supports.";
 }
 inline const char *TranscodeIntro() {
-  return "Strawberry can automatically convert the music you copy to this device into a format that it can play.";
+  return "Orange can automatically convert the music you copy to this device into a format that it can play.";
 }
 inline const char *Never() { return "Do not convert any music"; }
 inline const char *Unsupported() { return "Convert any music that the device can't play"; }

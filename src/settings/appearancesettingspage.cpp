@@ -158,7 +158,7 @@ AdwPreferencesPage *AppearanceSettingsPage::Create(Settings *settings, Applicati
                                 {"1", AppearanceSettingsLabels::NoBackground()},
                                 {"2", "Custom image"},
                                 {"3", AppearanceSettingsLabels::AlbumCover()},
-                                {"4", "Strawberry"}},
+                                {"4", "Orange"}},
                                std::to_string(static_cast<int>(AppearanceSettings::kDefaultBackgroundImageType)),
                                [enable](const std::string &) { ApplyAppearanceEnable(enable); });
   enable->filename = SettingsPage::AddEntry(background, settings, AppearanceSettings::kBackgroundImageFilename, "Custom background file");

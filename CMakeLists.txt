@@ -791,12 +791,12 @@ if(APPLE)
 endif()
 
 install(TARGETS strawberry RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(FILES dist/unix/org.strawberrymusicplayer.strawberry.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-install(FILES dist/unix/org.strawberrymusicplayer.strawberry.appdata.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+install(FILES dist/unix/io.github.goshitsarch_eng.Orange.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES dist/unix/io.github.goshitsarch_eng.Orange.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
 
 # Application and in-app icons.
-# The desktop entry declares "Icon=strawberry" and the about dialog asks the icon theme for "strawberry",
-# so without these the application has no icon in the shell, the dock or the about dialog, and every
+# The desktop entry declares "Icon=orange" and the about dialog asks the icon theme for "orange", so
+# without these the application has no icon in the shell, the dock or the about dialog, and every
 # application-specific icon name falls back to "image-missing".
 foreach(icon_size 22x22 32x32 48x48 64x64 128x128)
   file(GLOB icon_files "${CMAKE_CURRENT_SOURCE_DIR}/data/icons/${icon_size}/*.png")

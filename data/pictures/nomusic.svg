@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Empty-collection placeholder: the application's orange with a question mark set into it.
+  Shown at 75 logical pixels, so it is rendered larger than that to stay sharp on HiDPI displays.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+  <defs>
+    <radialGradient id="peel" cx="36%" cy="30%" r="78%">
+      <stop offset="0%" stop-color="#ffc247"/>
+      <stop offset="42%" stop-color="#ff9d21"/>
+      <stop offset="78%" stop-color="#f4740b"/>
+      <stop offset="100%" stop-color="#c94f04"/>
+    </radialGradient>
+    <radialGradient id="sheen" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="leaf" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7cc243"/>
+      <stop offset="55%" stop-color="#4e9c25"/>
+      <stop offset="100%" stop-color="#33711a"/>
+    </linearGradient>
+    <linearGradient id="stem" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8a5a2b"/>
+      <stop offset="100%" stop-color="#5d3a17"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="500" cy="560" r="380" fill="url(#peel)"/>
+  <ellipse cx="384" cy="404" rx="150" ry="118" fill="url(#sheen)" transform="rotate(-28 384 404)"/>
+
+  <path d="M500 200 C 512 244, 512 268, 500 300 C 488 268, 488 244, 500 200 Z"
+        fill="url(#stem)" stroke="#4a2d12" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M516 236 C 606 150, 760 148, 828 196 C 764 300, 622 320, 528 268 Z"
+        fill="url(#leaf)"/>
+
+  <!-- Question mark, drawn in a dark tone that holds up against the orange behind it -->
+  <g fill="#5a2600" opacity="0.88">
+    <path d="M500 356 c -84 0 -146 52 -152 132 l 82 6 c 4 -44 32 -70 70 -70 38 0 64 24 64 58 0 28 -14 44 -52 72
+             -46 34 -64 62 -62 112 l 2 26 82 0 -2 -22 c -2 -32 10 -50 48 -78 50 -36 70 -68 70 -114 0 -74 -60 -122 -150 -122 z"/>
+    <circle cx="500" cy="774" r="50"/>
+  </g>
+</svg>

@@ -98,9 +98,9 @@ std::string DiscordRichPresence::SetActivityJson(const Song &song, bool playing,
       art_key.empty() ? DiscordArt::ArtKey(DiscordArt::SongArtUrl(song.art_manual(), song.art_automatic())) : art_key;
   std::string json = "{\"cmd\":\"SET_ACTIVITY\",\"nonce\":\"" + std::to_string(nonce) + "\",\"args\":{\"pid\":" +
                      std::to_string(pid) + ",\"activity\":{\"type\":2,\"status_display_type\":" + std::to_string(status_display_type) +
-                     ",\"name\":\"Strawberry\",\"details\":\"" + title + "\",\"state\":\"" + artist +
+                     ",\"name\":\"Orange\",\"details\":\"" + title + "\",\"state\":\"" + artist +
                      "\",\"assets\":{\"large_image\":\"" + JsonEscape(large_image) +
-                     "\",\"small_image\":\"embedded_cover\",\"small_text\":\"Strawberry Music Player\"";
+                     "\",\"small_image\":\"embedded_cover\",\"small_text\":\"Orange Music Player\"";
   if (!album.empty()) {
     json += ",\"large_text\":\"on " + album + "\"";
   }

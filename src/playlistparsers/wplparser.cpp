@@ -30,7 +30,7 @@ SongList WplParser::Load(const std::string &data, const std::string &playlist_pa
 bool WplParser::Save(const std::string &path, const SongList &songs) const {
   const std::string dir = FileUtils::DirName(path);
   std::string data = "<?wpl version=\"1.0\"?>\n<smil>\n  <head>\n";
-  data += "    <meta name=\"Generator\" content=\"Strawberry\"/>\n";
+  data += "    <meta name=\"Generator\" content=\"Orange\"/>\n";
   data += "    <meta name=\"ItemCount\" content=\"" + std::to_string(songs.size()) + "\"/>\n";
   data += "  </head>\n  <body>\n    <seq>\n";
   for (const Song &song : songs) {

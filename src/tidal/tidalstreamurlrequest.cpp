@@ -173,7 +173,7 @@ UrlHandler::LoadResult Parse(const std::string &json, const std::string &media_u
     } else {
       const std::string encryption = JsonUtils::GetString(manifest, {"encryptionType"});
       if (!encryption.empty() && StrUtils::ToUpper(encryption) != "NONE") {
-        result.error = "Received URL with " + encryption + " encrypted stream from Tidal. Strawberry does not currently support encrypted streams.";
+        result.error = "Received URL with " + encryption + " encrypted stream from Tidal. Orange does not currently support encrypted streams.";
         return result;
       }
       urls = ParseUrls(manifest);
@@ -194,13 +194,13 @@ UrlHandler::LoadResult Parse(const std::string &json, const std::string &media_u
 
   const std::string encryption_key = JsonUtils::GetString(json, {"encryptionKey"});
   if (!encryption_key.empty()) {
-    result.error = "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams.";
+    result.error = "Received URL with encrypted stream from Tidal. Orange does not currently support encrypted streams.";
     return result;
   }
   const std::string security_type = JsonUtils::GetString(json, {"securityType"});
   const std::string security_token = JsonUtils::GetString(json, {"securityToken"});
   if (!security_type.empty() && !security_token.empty()) {
-    result.error = "Received URL with encrypted stream from Tidal. Strawberry does not currently support encrypted streams.";
+    result.error = "Received URL with encrypted stream from Tidal. Orange does not currently support encrypted streams.";
     return result;
   }
 
