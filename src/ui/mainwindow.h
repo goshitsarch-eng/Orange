@@ -154,6 +154,7 @@ class MainWindow : public PlatformInterface {
   void ApplyBehaviourSettings();
   void ApplyAppearance();
   void RestoreGeometry();
+  void RestoreSplitter();
   void SaveGeometry();
   void PlacePlayingWidget();
   void SelectPlaylistRow(int index, bool add);

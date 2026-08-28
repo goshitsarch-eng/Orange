@@ -138,6 +138,7 @@
 #include "core/seekbarsettings.h"
 #include "core/settings.h"
 #include "core/windowgeometry.h"
+#include "core/splitterstate.h"
 #include "utilities/styleutils.h"
 #include "playlist/playlistsaveoptionsdialog.h"
 #include "playlistparsers/parserbase.h"
@@ -645,7 +646,7 @@ void MainWindow::BuildUi() {
 
   toast_overlay_ = ADW_TOAST_OVERLAY(adw_toast_overlay_new());
   split_view_ = adw_overlay_split_view_new();
-  adw_overlay_split_view_set_sidebar_width_fraction(ADW_OVERLAY_SPLIT_VIEW(split_view_), 0.30);
+  RestoreSplitter();
 
   BuildSidebar();
   sidebar_tabs_ = std::make_unique<FancyTabBar>();
@@ -702,12 +703,13 @@ void MainWindow::BuildUi() {
   adw_application_window_set_content(window_, toolbar);
   g_signal_connect(window_, "close-request", G_CALLBACK(+[](GtkWindow *, gpointer data) -> gboolean {
                      auto *self = static_cast<MainWindow *>(data);
-                     self->SaveGeometry();
                      if (MainWindowShowHide::ShouldHideInsteadOfExit(KeepRunningEffective(self->app_))) {
                        self->RememberHiddenWindowState();
                        gtk_widget_set_visible(GTK_WIDGET(self->window_), FALSE);
+                       self->SaveGeometry();
                        return TRUE;
                      }
+                     self->SaveGeometry();
                      self->app_->Exit();
                      return self->app_->WaitingForExitFade() ? TRUE : FALSE;
                    }),
@@ -3161,8 +3163,8 @@ void MainWindow::RestoreAfterHide() {
 void MainWindow::HideToTray() {
   if (app_->tray() && app_->tray()->available()) {
     RememberHiddenWindowState();
-    SaveGeometry();
     gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
+    SaveGeometry();
   }
 }
 
@@ -3654,17 +3656,40 @@ void MainWindow::RestoreGeometry() {
                                                                  settings.IntValue(WindowGeometry::kHeight, WindowGeometry::kDefaultHeight),
                                                                  settings.BoolValue(WindowGeometry::kMaximized, false));
   gtk_window_set_default_size(GTK_WINDOW(window_), state.width, state.height);
+  const bool remembered_maximized = settings.BoolValue(MainWindowSettings::kMaximized, state.maximized);
+  const bool remembered_minimized = settings.BoolValue(MainWindowSettings::kMinimized, MainWindowSettings::kDefaultMinimized);
+  const bool remembered_hidden = settings.BoolValue(MainWindowSettings::kHidden, MainWindowSettings::kDefaultHidden);
   Settings behaviour;
   behaviour.BeginGroup(BehaviourSettings::kSettingsGroup);
-  const int action = WindowGeometry::StartupAction(
-      behaviour.IntValue(BehaviourSettings::kStartupBehaviour, static_cast<int>(BehaviourSettings::kDefaultStartupBehaviour)), state.maximized);
-  if (action == 4) {
-    gtk_window_maximize(GTK_WINDOW(window_));
-  } else if (action == 5) {
-    gtk_window_minimize(GTK_WINDOW(window_));
-  } else if (action == 3) {
-    gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
+  const bool tray_ready = app_->tray() && app_->tray()->available() && app_->tray()->visible();
+  const WindowGeometry::StartupShow show = WindowGeometry::ResolveStartup(
+      behaviour.IntValue(BehaviourSettings::kStartupBehaviour, static_cast<int>(BehaviourSettings::kDefaultStartupBehaviour)),
+      remembered_maximized, remembered_minimized, remembered_hidden, tray_ready);
+  switch (show) {
+    case WindowGeometry::StartupShow::Maximize:
+      gtk_window_maximize(GTK_WINDOW(window_));
+      break;
+    case WindowGeometry::StartupShow::Minimize:
+      gtk_window_minimize(GTK_WINDOW(window_));
+      break;
+    case WindowGeometry::StartupShow::Hide:
+      gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
+      break;
+    case WindowGeometry::StartupShow::Show:
+    default:
+      break;
   }
+}
+
+void MainWindow::RestoreSplitter() {
+  if (!split_view_) {
+    return;
+  }
+  Settings settings;
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  const double fraction = SplitterState::Restore(settings.Contains(MainWindowSettings::kSplitterState),
+                                                 settings.DoubleValue(MainWindowSettings::kSplitterState, SplitterState::kDefaultFraction));
+  adw_overlay_split_view_set_sidebar_width_fraction(ADW_OVERLAY_SPLIT_VIEW(split_view_), fraction);
 }
 
 void MainWindow::SetShowSidebar(bool show) {
@@ -3796,12 +3821,30 @@ void MainWindow::SaveGeometry() {
   if (width <= 0 || height <= 0) {
     gtk_window_get_default_size(GTK_WINDOW(window_), &width, &height);
   }
-  const WindowGeometry::State state = WindowGeometry::FromValues(width, height, gtk_window_is_maximized(GTK_WINDOW(window_)) == TRUE);
+  const bool hidden = gtk_widget_get_visible(GTK_WIDGET(window_)) != TRUE;
+  bool maximized = gtk_window_is_maximized(GTK_WINDOW(window_)) == TRUE;
+  bool minimized = false;
+  if (GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(window_))) {
+    if (GDK_IS_TOPLEVEL(surface)) {
+      minimized = (gdk_toplevel_get_state(GDK_TOPLEVEL(surface)) & GDK_TOPLEVEL_STATE_MINIMIZED) != 0;
+    }
+  }
+  if (hidden) {
+    maximized = was_maximized_;
+    minimized = was_minimized_;
+  }
+  const WindowGeometry::State state = WindowGeometry::FromValues(width, height, maximized);
   Settings settings;
   settings.BeginGroup(WindowGeometry::kSettingsGroup);
   settings.SetIntValue(WindowGeometry::kWidth, state.width);
   settings.SetIntValue(WindowGeometry::kHeight, state.height);
   settings.SetBoolValue(WindowGeometry::kMaximized, state.maximized);
+  settings.SetBoolValue(MainWindowSettings::kMinimized, minimized);
+  settings.SetBoolValue(MainWindowSettings::kHidden, hidden);
+  if (split_view_) {
+    settings.SetDoubleValue(MainWindowSettings::kSplitterState,
+                            SplitterState::Clamp(adw_overlay_split_view_get_sidebar_width_fraction(ADW_OVERLAY_SPLIT_VIEW(split_view_))));
+  }
   settings.Sync();
 }
 

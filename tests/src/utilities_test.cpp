@@ -89,6 +89,7 @@
 #include "organize/organizeerrordialog.h"
 #include "core/enginemetadata.h"
 #include "core/windowgeometry.h"
+#include "core/splitterstate.h"
 #include "core/mainwindowsettings.h"
 #include "core/mainwindowaddmedia.h"
 #include "ui/mainwindowkeyboard.h"
@@ -2154,6 +2155,27 @@ TEST(WindowGeometry, ClampsAndMapsStartup) {
   EXPECT_EQ(WindowGeometry::AfterHide::Minimize, WindowGeometry::RestoreAfterHide(true, true));
   EXPECT_EQ(WindowGeometry::AfterHide::Maximize, WindowGeometry::RestoreAfterHide(true, false));
   EXPECT_EQ(WindowGeometry::AfterHide::Show, WindowGeometry::RestoreAfterHide(false, false));
+  EXPECT_TRUE(WindowGeometry::HideFallsThroughToRemember(false));
+  EXPECT_FALSE(WindowGeometry::HideFallsThroughToRemember(true));
+  EXPECT_EQ(WindowGeometry::StartupShow::Hide,
+            WindowGeometry::ResolveStartup(static_cast<int>(BehaviourSettings::StartupBehaviour::Hide), false, false, false, true));
+  EXPECT_EQ(WindowGeometry::StartupShow::Hide,
+            WindowGeometry::ResolveStartup(static_cast<int>(BehaviourSettings::StartupBehaviour::Hide), false, false, false, false));
+  EXPECT_EQ(WindowGeometry::StartupShow::Hide, WindowGeometry::RememberShow(true, false, true, true));
+  EXPECT_EQ(WindowGeometry::StartupShow::Maximize, WindowGeometry::RememberShow(true, false, true, false));
+  EXPECT_EQ(WindowGeometry::StartupShow::Minimize, WindowGeometry::RememberShow(true, true, false, false));
+  EXPECT_EQ(WindowGeometry::StartupShow::Minimize,
+            WindowGeometry::ResolveStartup(static_cast<int>(BehaviourSettings::StartupBehaviour::Remember), true, true, false, false));
+}
+
+TEST(SplitterState, ClampsAndRestoresFraction) {
+  EXPECT_DOUBLE_EQ(SplitterState::kDefaultFraction, SplitterState::Clamp(0.0));
+  EXPECT_DOUBLE_EQ(SplitterState::kDefaultFraction, SplitterState::Clamp(-1.0));
+  EXPECT_DOUBLE_EQ(SplitterState::kMinFraction, SplitterState::Clamp(0.01));
+  EXPECT_DOUBLE_EQ(SplitterState::kMaxFraction, SplitterState::Clamp(0.99));
+  EXPECT_DOUBLE_EQ(0.42, SplitterState::Clamp(0.42));
+  EXPECT_DOUBLE_EQ(SplitterState::kDefaultFraction, SplitterState::Restore(false, 0.5));
+  EXPECT_DOUBLE_EQ(0.45, SplitterState::Restore(true, 0.45));
 }
 
 TEST(MainWindowMenu, MatchesQtDailyActionLabels) {

@@ -7,6 +7,7 @@
 #include "context/contextplayingtext.h"
 #include "context/contextreload.h"
 #include "context/contextlyrics.h"
+#include "context/contextsongupdate.h"
 #include "context/contextoptions.h"
 #include "context/contexttechnical.h"
 #include "core/settings.h"
@@ -255,14 +256,34 @@ void ContextView::NoSong() {
 }
 
 void ContextView::SongChanged(const Song &song) {
-  song_playing_ = song;
-  lyrics_ = ContextLyrics::InitialLyricsFromSong(song);
-  lyrics_tried_ = false;
-  SetSong();
-  if (!lyrics_.empty()) {
-    SetLyrics(lyrics_);
+  const bool minor = ContextSongUpdate::IsMinorMetadataUpdate(song_playing_, song, !Idle());
+  if (minor) {
+    UpdateSong(song);
+  } else {
+    if (ContextSongUpdate::ShouldResetSearch(minor)) {
+      current_search_id_ = 0;
+    }
+    lyrics_ = ContextLyrics::InitialLyricsFromSong(song);
+    lyrics_tried_ = false;
+    song_playing_ = song;
+    SetSong();
+    if (!lyrics_.empty()) {
+      SetLyrics(lyrics_);
+    }
   }
   SearchLyrics(false);
+}
+
+void ContextView::UpdateSong(const Song &song) {
+  song_playing_ = song;
+  const std::string headline = ContextTechnical::Headline(song_playing_, title_fmt_);
+  const std::string summary = ContextTechnical::Summary(song_playing_, summary_fmt_);
+  if (headline.empty() && summary.empty()) {
+    gtk_label_set_text(GTK_LABEL(title_), Translations::CStr(ContextIdle::Headline()));
+  } else {
+    gtk_label_set_markup(GTK_LABEL(title_), ContextPlayingText::TopMarkup(headline, summary).c_str());
+  }
+  RebuildTechnicalData();
 }
 
 void ContextView::SetSong() {

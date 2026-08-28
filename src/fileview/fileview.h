@@ -64,6 +64,7 @@ class FileView {
   void RemoveRootButtonClicked();
 
   void PersistSettings();
+  void PersistFilePath() const;
 
   GtkWidget *widget_ = nullptr;
   GtkWidget *path_entry_ = nullptr;
