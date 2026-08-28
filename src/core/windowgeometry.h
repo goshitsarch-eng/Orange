@@ -37,6 +37,41 @@ inline AfterHide RestoreAfterHide(bool was_maximized, bool was_minimized) {
   return AfterHide::Show;
 }
 
+// Qt Hide falls through to Remember when the tray is missing. Remember restores hidden only when the tray can show the window.
+enum class StartupShow { Show, Maximize, Minimize, Hide };
+
+inline bool HideFallsThroughToRemember(bool tray_available_and_visible) { return !tray_available_and_visible; }
+
+inline StartupShow RememberShow(bool maximized, bool minimized, bool hidden, bool can_hide) {
+  if (hidden && can_hide) {
+    return StartupShow::Hide;
+  }
+  if (minimized) {
+    return StartupShow::Minimize;
+  }
+  if (maximized) {
+    return StartupShow::Maximize;
+  }
+  return StartupShow::Show;
+}
+
+inline StartupShow ResolveStartup(int startup_behaviour, bool remembered_maximized, bool remembered_minimized, bool remembered_hidden,
+                                  bool tray_available_and_visible) {
+  switch (startup_behaviour) {
+    case 3:
+      return StartupShow::Hide;
+    case 4:
+      return StartupShow::Maximize;
+    case 5:
+      return StartupShow::Minimize;
+    case 2:
+      return StartupShow::Show;
+    case 1:
+    default:
+      return RememberShow(remembered_maximized, remembered_minimized, remembered_hidden, tray_available_and_visible);
+  }
+}
+
 }  // namespace WindowGeometry
 
 #endif
