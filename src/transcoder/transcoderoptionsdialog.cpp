@@ -1,4 +1,5 @@
 #include "transcoder/transcoderoptionsdialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "transcoder/transcoderoptionsaac.h"
 #include "transcoder/transcoderoptionsasf.h"
@@ -224,7 +225,7 @@ void TranscoderOptionsDialog::Show(GtkWindow *parent, Transcoder::Format format,
   GtkWidget *apply = gtk_button_new_with_label(Translations::CStr("Apply"));
   gtk_widget_add_css_class(apply, "suggested-action");
   gtk_box_append(GTK_BOX(box), apply);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
 
   g_object_set_data(G_OBJECT(apply), "format", GINT_TO_POINTER(static_cast<int>(format) + 1));
   g_object_set_data(G_OBJECT(apply), "quality", quality_spin);

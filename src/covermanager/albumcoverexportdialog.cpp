@@ -1,4 +1,5 @@
 #include "covermanager/albumcoverexportdialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "collection/collectionlibrary.h"
 #include "core/application.h"
@@ -183,6 +184,6 @@ void AlbumCoverExportDialog::Show(GtkWindow *parent, Application *app, const Son
                    app);
   gtk_box_append(GTK_BOX(box), export_btn);
   gtk_box_append(GTK_BOX(box), status);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, parent ? GTK_WIDGET(parent) : nullptr);
 }

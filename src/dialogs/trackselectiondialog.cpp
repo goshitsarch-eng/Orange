@@ -1,4 +1,5 @@
 #include "dialogs/trackselectiondialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "core/application.h"
 #include "dialogs/dialoglistkeyboard.h"
@@ -337,7 +338,7 @@ void TrackSelectionDialog::Show(GtkWindow *parent, Application *app, const SongL
   gtk_box_append(GTK_BOX(box), buttons);
   state->buttons = buttons;
 
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   if (state->prev && state->next) {
     GtkEventController *nav_keys = gtk_event_controller_key_new();
     gtk_event_controller_set_propagation_phase(nav_keys, GTK_PHASE_CAPTURE);

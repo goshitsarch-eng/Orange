@@ -1,4 +1,5 @@
 #include "playlist/playlistactivate.h"
+#include "playlist/playlistselection.h"
 #include "playlist/playlistcolumnlayout.h"
 #include "playlist/playlistdelegates.h"
 #include "playlist/playlistmoodcolumn.h"
@@ -1078,4 +1079,45 @@ TEST(PlaylistActivate, MatchesQtDoubleClickModes) {
   EXPECT_EQ(PlaylistActivate::Action::Play, PlaylistActivate::Resolve(BehaviourSettings::PlaylistAddBehaviour::Play, true));
   EXPECT_EQ(PlaylistActivate::Action::EnqueueAndPlay, PlaylistActivate::Resolve(BehaviourSettings::PlaylistAddBehaviour::Enqueue, false));
   EXPECT_EQ(PlaylistActivate::Action::Enqueue, PlaylistActivate::Resolve(BehaviourSettings::PlaylistAddBehaviour::Enqueue, true));
+}
+
+
+TEST(PlaylistSelection, ModifiersPickTheMode) {
+  EXPECT_EQ(PlaylistSelection::Mode::Replace, PlaylistSelection::ModeFor(false, false));
+  EXPECT_EQ(PlaylistSelection::Mode::Toggle, PlaylistSelection::ModeFor(true, false));
+  EXPECT_EQ(PlaylistSelection::Mode::Range, PlaylistSelection::ModeFor(false, true));
+  // Shift wins: that is what every other list in the desktop does.
+  EXPECT_EQ(PlaylistSelection::Mode::Range, PlaylistSelection::ModeFor(true, true));
+}
+
+TEST(PlaylistSelection, PlainClickReplacesTheSelection) {
+  EXPECT_EQ(std::vector<int>({4}), PlaylistSelection::Apply({1, 2, 3}, 1, 4, PlaylistSelection::Mode::Replace));
+}
+
+TEST(PlaylistSelection, ControlClickTogglesOneRow) {
+  EXPECT_EQ(std::vector<int>({1, 2, 4}), PlaylistSelection::Apply({1, 2}, 1, 4, PlaylistSelection::Mode::Toggle));
+  EXPECT_EQ(std::vector<int>({1}), PlaylistSelection::Apply({1, 2}, 1, 2, PlaylistSelection::Mode::Toggle));
+  // Rows stay in order however they were added.
+  EXPECT_EQ(std::vector<int>({1, 3, 7}), PlaylistSelection::Apply({7, 1}, 7, 3, PlaylistSelection::Mode::Toggle));
+}
+
+TEST(PlaylistSelection, ShiftClickSelectsTheRangeFromTheAnchor) {
+  EXPECT_EQ(std::vector<int>({2, 3, 4, 5}), PlaylistSelection::Apply({2}, 2, 5, PlaylistSelection::Mode::Range));
+  // Dragging the range back above the anchor works the same way.
+  EXPECT_EQ(std::vector<int>({2, 3, 4, 5}), PlaylistSelection::Apply({5}, 5, 2, PlaylistSelection::Mode::Range));
+  EXPECT_EQ(std::vector<int>({3}), PlaylistSelection::Apply({}, 3, 3, PlaylistSelection::Mode::Range));
+  // With nothing clicked yet there is no anchor to extend from.
+  EXPECT_EQ(std::vector<int>({6}), PlaylistSelection::Apply({}, -1, 6, PlaylistSelection::Mode::Range));
+}
+
+TEST(PlaylistSelection, TheAnchorOnlyMovesWhenTheRangeIsNotBeingExtended) {
+  EXPECT_EQ(4, PlaylistSelection::NextAnchor(1, 4, PlaylistSelection::Mode::Replace));
+  EXPECT_EQ(4, PlaylistSelection::NextAnchor(1, 4, PlaylistSelection::Mode::Toggle));
+  // Shift-clicking further down keeps extending from the same starting row.
+  EXPECT_EQ(1, PlaylistSelection::NextAnchor(1, 4, PlaylistSelection::Mode::Range));
+}
+
+TEST(PlaylistSelection, AnInvalidRowLeavesTheSelectionAlone) {
+  EXPECT_EQ(std::vector<int>({1, 2}), PlaylistSelection::Apply({1, 2}, 1, -1, PlaylistSelection::Mode::Replace));
+  EXPECT_TRUE(PlaylistSelection::Range(1, -1).empty());
 }

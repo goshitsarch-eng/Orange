@@ -336,6 +336,11 @@ void PlaylistListView::Refresh(const std::vector<PlaylistListDrop::Row> &rows, c
     GtkWidget *label = gtk_label_new(item.name.c_str());
     gtk_widget_set_halign(label, GTK_ALIGN_START);
     gtk_widget_set_hexpand(label, TRUE);
+    // A label reports its full text as its minimum width, so without this one long playlist name gave the
+    // whole sidebar a horizontal scrollbar and pushed the favourite button out of reach.
+    gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+    gtk_label_set_max_width_chars(GTK_LABEL(label), 0);
+    gtk_label_set_xalign(GTK_LABEL(label), 0);
     gtk_box_append(GTK_BOX(outer), label);
     if (!item.folder) {
       auto favorite = std::make_unique<FavoriteWidget>(item.id, item.favorite);

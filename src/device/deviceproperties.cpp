@@ -1,4 +1,5 @@
 #include "config.h"
+#include "dialogs/dialogchrome.h"
 
 #include "device/deviceproperties.h"
 
@@ -390,6 +391,6 @@ void DeviceProperties::Show(GtkWindow *parent, Application *app, const Connected
                    }),
                    app);
   gtk_box_append(GTK_BOX(outer), save);
-  adw_dialog_set_child(dialog, outer);
+  DialogChrome::SetContent(dialog, outer);
   adw_dialog_present(dialog, parent ? GTK_WIDGET(parent) : nullptr);
 }

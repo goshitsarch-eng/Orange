@@ -14,6 +14,7 @@
 #include "playlist/playlisteditorder.h"
 #include "playlist/playlisteditpolicy.h"
 #include "playlist/playlistplayingicon.h"
+#include "playlist/playlistrowindex.h"
 #include "playlist/playlistrating.h"
 #include "playlist/playlistratingclick.h"
 #include "playlist/playlistratinghover.h"
@@ -75,26 +76,11 @@ PlaylistView::PlaylistView() {
   gtk_widget_set_can_target(drop_overlay_, FALSE);
   gtk_widget_set_hexpand(drop_overlay_, TRUE);
   gtk_widget_set_vexpand(drop_overlay_, TRUE);
+  gtk_widget_add_css_class(drop_overlay_, PlaylistDropIndicator::kCssClass);
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drop_overlay_),
-                                 +[](GtkDrawingArea *, cairo_t *cr, int width, int, gpointer data) {
+                                 +[](GtkDrawingArea *area, cairo_t *cr, int width, int, gpointer data) {
                                    auto *self = static_cast<PlaylistView *>(data);
-                                   if (!PlaylistDropIndicator::Active(self->drop_state_)) {
-                                     return;
-                                   }
-                                   const double y = self->drop_state_.line_y;
-                                   cairo_pattern_t *grad = cairo_pattern_create_linear(0, y - PlaylistDropIndicator::kGradientWidth, 0,
-                                                                                       y + PlaylistDropIndicator::kGradientWidth);
-                                   cairo_pattern_add_color_stop_rgba(grad, 0.0, 0.2, 0.5, 1.0, 0.0);
-                                   cairo_pattern_add_color_stop_rgba(grad, 0.5, 0.2, 0.5, 1.0, 0.35);
-                                   cairo_pattern_add_color_stop_rgba(grad, 1.0, 0.2, 0.5, 1.0, 0.0);
-                                   cairo_set_source(cr, grad);
-                                   cairo_rectangle(cr, 0, y - PlaylistDropIndicator::kGradientWidth, width,
-                                                   PlaylistDropIndicator::kGradientWidth * 2);
-                                   cairo_fill(cr);
-                                   cairo_pattern_destroy(grad);
-                                   cairo_set_source_rgb(cr, 0.2, 0.5, 1.0);
-                                   cairo_rectangle(cr, 0, y, width, PlaylistDropIndicator::kLineWidth);
-                                   cairo_fill(cr);
+                                   PlaylistDropIndicator::Draw(GTK_WIDGET(area), cr, width, self->drop_state_);
                                  },
                                  this, nullptr);
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay_), drop_overlay_);
@@ -109,6 +95,10 @@ PlaylistView::PlaylistView() {
   root_overlay_ = gtk_overlay_new();
   gtk_overlay_set_child(GTK_OVERLAY(root_overlay_), bg_overlay_);
   gtk_overlay_add_overlay(GTK_OVERLAY(root_overlay_), overlay_);
+  // The rows live in the overlay child, and GtkOverlay does not measure overlay children unless told to.
+  // Without this the scrolled window sees the height of the empty background box instead of the height of
+  // the list, so the scrollbar never appears and long playlists are cut off at the bottom of the viewport.
+  gtk_overlay_set_measure_overlay(GTK_OVERLAY(root_overlay_), overlay_, TRUE);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroller_), root_overlay_);
   // The status page overlays the viewport, not the scrolled content: the content can be wider than the
   // viewport (the column headers alone often are), and centring inside it would push the status page
@@ -291,7 +281,7 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
         last_clicked_row_ = -1;
       }
       InhibitAutoscroll();
-      select_(next_row, false);
+      select_(next_row, PlaylistSelection::ModeFor(false, (state & GDK_SHIFT_MASK) != 0));
       ScrollToRow(next_row);
     }
     return TRUE;
@@ -314,7 +304,7 @@ gboolean PlaylistView::OnKeyPressed(guint keyval, GdkModifierType state) {
     }, this);
     const int index = ListBoxKeyboard::FirstPrefixIndex(visible_titles_, typeahead_);
     if (index >= 0 && select_) {
-      select_(visible_rows_[static_cast<size_t>(index)], false);
+      select_(visible_rows_[static_cast<size_t>(index)], PlaylistSelection::Mode::Replace);
       ScrollToRow(visible_rows_[static_cast<size_t>(index)]);
     }
     return TRUE;
@@ -336,7 +326,7 @@ int PlaylistView::RowAtY(double y, GtkWidget *relative) const {
   while (child) {
     graphene_rect_t bounds{};
     if (gtk_widget_compute_bounds(child, relative, &bounds)) {
-      const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
+      const int index = PlaylistRowIndex::Get(child);
       if (y < bounds.origin.y + bounds.size.height) {
         return index;
       }
@@ -359,7 +349,7 @@ void PlaylistView::RememberClickAt(double x, double y) {
     graphene_rect_t bounds{};
     if (gtk_widget_compute_bounds(child, grid_, &bounds) && y >= bounds.origin.y &&
         y < bounds.origin.y + bounds.size.height) {
-      last_clicked_row_ = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
+      last_clicked_row_ = PlaylistRowIndex::Get(child);
       RecordClickedColumn(child, x - bounds.origin.x);
       return;
     }
@@ -389,7 +379,7 @@ void PlaylistView::UpdateDropIndicator(double y) {
     if (gtk_widget_compute_bounds(child, widget_, &bounds)) {
       has_rows = true;
       last_bottom = bounds.origin.y + bounds.size.height;
-      const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index"));
+      const int index = PlaylistRowIndex::Get(child);
       if (y < last_bottom && found < 0) {
         found = index;
         row_y = bounds.origin.y;
@@ -482,7 +472,30 @@ void PlaylistView::SetupRowDrag(GtkWidget *row, int index) {
 
 void PlaylistView::SetFilterString(const std::string &filter) { filter_ = filter; }
 
-void PlaylistView::SetSelectedRows(const std::vector<int> &rows) { selected_rows_ = rows; }
+void PlaylistView::SetSelectedRows(const std::vector<int> &rows) {
+  selected_rows_ = rows;
+  ApplySelection();
+}
+
+void PlaylistView::ApplySelection() {
+  if (!grid_) {
+    return;
+  }
+  // Selection is a class on rows that already exist.  Rebuilding the list for it destroyed the very row
+  // whose click gesture was still running, which is what broke double-click-to-play and drag-to-reorder.
+  for (GtkWidget *row = gtk_widget_get_first_child(grid_); row; row = gtk_widget_get_next_sibling(row)) {
+    const int index = PlaylistRowIndex::Get(row);
+    if (index < 0) {
+      continue;
+    }
+    if (std::find(selected_rows_.begin(), selected_rows_.end(), index) != selected_rows_.end()) {
+      gtk_widget_add_css_class(row, "playlist-selected");
+    }
+    else {
+      gtk_widget_remove_css_class(row, "playlist-selected");
+    }
+  }
+}
 
 void PlaylistView::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
 
@@ -511,7 +524,7 @@ void PlaylistView::HandleRatingHover(GtkWidget *row, double x) {
     ClearRatingHover();
     return;
   }
-  hover_rating_row_ = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
+  hover_rating_row_ = PlaylistRowIndex::Get(row);
   hover_rating_ = rating;
   gtk_widget_set_cursor_from_name(widget_, PlaylistRatingHover::CursorName());
   UpdateRatingHoverLabels();
@@ -534,7 +547,7 @@ void PlaylistView::UpdateRatingHoverLabels() {
     return;
   }
   for (GtkWidget *row = gtk_widget_get_first_child(grid_); row; row = gtk_widget_get_next_sibling(row)) {
-    const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(row), "row-index"));
+    const int index = PlaylistRowIndex::Get(row);
     if (index < 0 || index >= playlist_->row_count()) {
       continue;
     }
@@ -717,7 +730,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
       gtk_widget_add_css_class(row, "playlist-unavailable");
     }
     if (std::find(selected_rows_.begin(), selected_rows_.end(), index) != selected_rows_.end()) {
-      gtk_widget_add_css_class(row, "card");
+      gtk_widget_add_css_class(row, "playlist-selected");
     }
     for (PlaylistColumn column : columns) {
       GtkWidget *cell = nullptr;
@@ -763,7 +776,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
       g_object_set_data(G_OBJECT(cell), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
       gtk_box_append(GTK_BOX(row), cell);
     }
-    g_object_set_data(G_OBJECT(row), "row-index", GINT_TO_POINTER(index));
+    PlaylistRowIndex::Set(row, index);
     visible_titles_.push_back(song.PrettyTitle());
     visible_rows_.push_back(index);
     GtkGesture *click = gtk_gesture_click_new();
@@ -772,7 +785,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
     g_signal_connect(click, "pressed", G_CALLBACK(+[](GtkGestureClick *gesture, gint n_press, gdouble x, gdouble, gpointer data) {
                        auto *self = static_cast<PlaylistView *>(data);
                        GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(gesture));
-                       const int index = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "row-index"));
+                       const int index = PlaylistRowIndex::Get(widget);
                        const GdkModifierType mods = gtk_event_controller_get_current_event_state(GTK_EVENT_CONTROLLER(gesture));
                        self->last_clicked_row_ = index;
                        self->RecordClickedColumn(widget, x);
@@ -781,7 +794,8 @@ void PlaylistView::Refresh(Playlist *playlist) {
                        const bool already_selected =
                            std::find(selected_before.begin(), selected_before.end(), index) != selected_before.end();
                        if (self->select_) {
-                         self->select_(index, (mods & GDK_CONTROL_MASK) != 0);
+                         self->select_(index, PlaylistSelection::ModeFor((mods & GDK_CONTROL_MASK) != 0,
+                                                                        (mods & GDK_SHIFT_MASK) != 0));
                        }
                        bool rated = false;
                        float rating = -1.0f;
@@ -851,7 +865,7 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
   }
   GtkWidget *child = gtk_widget_get_first_child(grid_);
   while (child) {
-    if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index")) == row) {
+    if (PlaylistRowIndex::Get(child) == row) {
       for (GtkWidget *cell = gtk_widget_get_first_child(child); cell; cell = gtk_widget_get_next_sibling(cell)) {
         const int stored = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(cell), "column"));
         if (stored - 1 != static_cast<int>(column)) {
@@ -863,7 +877,7 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
         gtk_widget_set_hexpand(entry, FALSE);
         gtk_widget_set_size_request(entry, PlaylistColumnLayout::PixelWidth(column, ViewportWidth()), -1);
         g_object_set_data(G_OBJECT(entry), "column", GINT_TO_POINTER(stored));
-        g_object_set_data(G_OBJECT(entry), "row-index", GINT_TO_POINTER(row));
+        PlaylistRowIndex::Set(entry, row);
         GtkWidget *prev = gtk_widget_get_prev_sibling(cell);
         gtk_widget_unparent(cell);
         if (prev) {
@@ -873,7 +887,7 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
         }
         g_signal_connect(entry, "activate", G_CALLBACK(+[](GtkEntry *widget, gpointer data) {
                            auto *self = static_cast<PlaylistView *>(data);
-                           const int edited_row = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "row-index"));
+                           const int edited_row = PlaylistRowIndex::Get(widget);
                            const PlaylistColumn edited_column =
                                static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget), "column")) - 1);
                            if (self->edit_commit_) {
@@ -907,7 +921,7 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
                              return FALSE;
                            }
                            GtkWidget *edited = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
-                           const int edited_row = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(edited), "row-index"));
+                           const int edited_row = PlaylistRowIndex::Get(edited);
                            const PlaylistColumn edited_column =
                                static_cast<PlaylistColumn>(GPOINTER_TO_INT(g_object_get_data(G_OBJECT(edited), "column")) - 1);
                            if (self->edit_commit_) {
@@ -1101,7 +1115,7 @@ void PlaylistView::InhibitAutoscroll() {
 bool PlaylistView::IsRowVisible(int row) const {
   GtkWidget *child = gtk_widget_get_first_child(grid_);
   while (child) {
-    if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index")) == row) {
+    if (PlaylistRowIndex::Get(child) == row) {
       graphene_rect_t bounds{};
       if (!gtk_widget_compute_bounds(child, widget_, &bounds)) {
         return false;
@@ -1177,14 +1191,17 @@ void PlaylistView::JumpToLastPlayedTrack() {
 void PlaylistView::ScrollToRow(int row, bool center) {
   GtkWidget *child = gtk_widget_get_first_child(grid_);
   while (child) {
-    if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index")) == row) {
+    if (PlaylistRowIndex::Get(child) == row) {
       graphene_rect_t bounds;
-      if (gtk_widget_compute_bounds(child, widget_, &bounds)) {
+      // Relative to grid_, not to the widget: bounds against the widget are viewport coordinates, which are
+      // the content offset minus the current scroll position, so feeding them back into the adjustment only
+      // landed on the right row while the list happened to be scrolled to the top.
+      if (gtk_widget_compute_bounds(child, grid_, &bounds)) {
         GtkAdjustment *adjust = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scroller_));
         double value = bounds.origin.y;
         if (center) {
           value = PlaylistAutoscroll::CenteredOffset(static_cast<int>(bounds.origin.y), static_cast<int>(bounds.size.height),
-                                                     gtk_widget_get_height(widget_));
+                                                     static_cast<int>(gtk_adjustment_get_page_size(adjust)));
         }
         gtk_adjustment_set_value(adjust, value);
       }

@@ -1,4 +1,5 @@
 #include "transcoder/transcodelogdialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "transcoder/transcodelog.h"
 #include "translations/translations.h"
@@ -80,6 +81,6 @@ void TranscodeLogDialog::Show(GtkWindow *parent, std::vector<std::string> *lines
                      nullptr);
   }
 
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

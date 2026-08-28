@@ -1,4 +1,5 @@
 #include "equalizer/equalizerdialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "core/application.h"
 #include "core/player.h"
@@ -333,7 +334,7 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
   gtk_box_append(GTK_BOX(box), balance_hint);
   gtk_box_append(GTK_BOX(box), balance_ends);
   gtk_box_append(GTK_BOX(box), balance_scale);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   DialogCloseKeys::Attach(dialog);
   g_signal_connect(dialog, "closed",
                    G_CALLBACK((+[](AdwDialog *, gpointer data) {

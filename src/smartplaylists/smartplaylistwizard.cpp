@@ -1,4 +1,5 @@
 #include "smartplaylists/smartplaylistwizard.h"
+#include "dialogs/dialogchrome.h"
 
 #include "core/application.h"
 #include "settings/settingswheelthrough.h"
@@ -364,6 +365,6 @@ void SmartPlaylistWizard::Show(GtkWindow *parent, Application *app, const std::s
   gtk_box_append(GTK_BOX(actions), preview);
   gtk_box_append(GTK_BOX(actions), create);
   gtk_box_append(GTK_BOX(box), actions);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

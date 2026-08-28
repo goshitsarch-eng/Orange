@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_PLAYLISTVIEW_H
 #define STRAWBERRY_PLAYLISTVIEW_H
 
+#include "playlist/playlistselection.h"
 #include "moodbar/moodbaritemdelegate.h"
 #include "playlist/playlist.h"
 #include "playlist/playlistdelegates.h"
@@ -17,7 +18,7 @@
 class PlaylistView {
  public:
   using ActivateCallback = std::function<void(int)>;
-  using SelectCallback = std::function<void(int, bool)>;
+  using SelectCallback = std::function<void(int, PlaylistSelection::Mode)>;
   using SortCallback = std::function<void(PlaylistColumn, PlaylistSortOrder)>;
   using MenuCallback = std::function<void(double, double)>;
   using EditRequestCallback = std::function<void()>;
@@ -39,6 +40,8 @@ class PlaylistView {
   GtkWidget *grid() const { return grid_; }
   void SetFilterString(const std::string &filter);
   void SetSelectedRows(const std::vector<int> &rows);
+  // Updates the selection styling of the rows already on screen, without rebuilding them.
+  void ApplySelection();
   void Refresh(Playlist *playlist);
   void ScrollToRow(int row, bool center = false);
   void JumpToCurrentlyPlayingTrack();

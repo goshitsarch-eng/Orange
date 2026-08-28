@@ -1,4 +1,5 @@
 #include "covermanager/albumcoversearcher.h"
+#include "dialogs/dialogchrome.h"
 
 #include "covermanager/albumcoversearcherlabels.h"
 #include "core/application.h"
@@ -321,7 +322,7 @@ void AlbumCoverSearcher::Show(GtkWindow *parent, Application *app, const Song &s
                    })),
                    state);
 
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   DialogCloseKeys::Attach(dialog);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
   if (AlbumCoverSearcher::ShouldAutoSearch(target.EffectiveAlbumartist(), target.album())) {

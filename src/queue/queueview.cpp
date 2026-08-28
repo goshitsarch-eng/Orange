@@ -21,33 +21,18 @@ QueueView::QueueView(Queue *queue) : queue_(queue) {
   list_ = gtk_list_box_new();
   gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
   gtk_widget_set_vexpand(list_, TRUE);
-  StyleUtils::LoadCss(QueueUi::AlternatingCss(), StyleUtils::Slot::kQueueLook);
+  StyleUtils::LoadCss(QueueUi::AlternatingCss() + PlaylistDropIndicator::Css(), StyleUtils::Slot::kQueueLook);
   GtkWidget *overlay = gtk_overlay_new();
   gtk_overlay_set_child(GTK_OVERLAY(overlay), list_);
   drop_overlay_ = gtk_drawing_area_new();
   gtk_widget_set_can_target(drop_overlay_, FALSE);
   gtk_widget_set_hexpand(drop_overlay_, TRUE);
   gtk_widget_set_vexpand(drop_overlay_, TRUE);
+  gtk_widget_add_css_class(drop_overlay_, PlaylistDropIndicator::kCssClass);
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drop_overlay_),
-                                 +[](GtkDrawingArea *, cairo_t *cr, int width, int, gpointer data) {
+                                 +[](GtkDrawingArea *area, cairo_t *cr, int width, int, gpointer data) {
                                    auto *self = static_cast<QueueView *>(data);
-                                   if (!PlaylistDropIndicator::Active(self->drop_state_)) {
-                                     return;
-                                   }
-                                   const double y = self->drop_state_.line_y;
-                                   cairo_pattern_t *grad = cairo_pattern_create_linear(0, y - PlaylistDropIndicator::kGradientWidth, 0,
-                                                                                       y + PlaylistDropIndicator::kGradientWidth);
-                                   cairo_pattern_add_color_stop_rgba(grad, 0.0, 0.2, 0.5, 1.0, 0.0);
-                                   cairo_pattern_add_color_stop_rgba(grad, 0.5, 0.2, 0.5, 1.0, 0.35);
-                                   cairo_pattern_add_color_stop_rgba(grad, 1.0, 0.2, 0.5, 1.0, 0.0);
-                                   cairo_set_source(cr, grad);
-                                   cairo_rectangle(cr, 0, y - PlaylistDropIndicator::kGradientWidth, width,
-                                                   PlaylistDropIndicator::kGradientWidth * 2);
-                                   cairo_fill(cr);
-                                   cairo_pattern_destroy(grad);
-                                   cairo_set_source_rgb(cr, 0.2, 0.5, 1.0);
-                                   cairo_rectangle(cr, 0, y, width, PlaylistDropIndicator::kLineWidth);
-                                   cairo_fill(cr);
+                                   PlaylistDropIndicator::Draw(GTK_WIDGET(area), cr, width, self->drop_state_);
                                  },
                                  this, nullptr);
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay), drop_overlay_);
@@ -253,6 +238,11 @@ void QueueView::Rebuild() {
     const std::string text = (current ? "▶ " : "") + song.PrettyTitleWithArtist();
     GtkWidget *label = gtk_label_new(text.c_str());
     gtk_widget_set_halign(label, GTK_ALIGN_START);
+    // A label reports its full text as its minimum width, so one long title gave the queue panel a
+    // horizontal scrollbar rather than shortening the row.
+    gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+    gtk_label_set_max_width_chars(GTK_LABEL(label), 0);
+    gtk_label_set_xalign(GTK_LABEL(label), 0);
     gtk_widget_set_margin_start(label, 12);
     gtk_widget_set_margin_end(label, 12);
     gtk_widget_set_margin_top(label, 8);

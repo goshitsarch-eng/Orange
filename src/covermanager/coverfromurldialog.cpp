@@ -1,4 +1,5 @@
 #include "covermanager/coverfromurldialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "core/application.h"
 #include "covermanager/coverfromurllabels.h"
@@ -83,6 +84,6 @@ void CoverFromUrlDialog::Show(GtkWindow *parent, Application *app) {
   gtk_box_append(GTK_BOX(box), spinner);
   gtk_box_append(GTK_BOX(box), status);
   gtk_box_append(GTK_BOX(box), fetch);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

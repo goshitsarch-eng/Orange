@@ -1,4 +1,5 @@
 #include "organize/organizedialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "collection/collectionlibrary.h"
 #include "constants/organizesettings.h"
@@ -806,7 +807,7 @@ void OrganizeDialog::Show(GtkWindow *parent, Application *app, const Request &re
                      RestoreDefaults(static_cast<DialogState *>(data));
                    }),
                    state);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   std::string format_error_text;
   gtk_label_set_text(GTK_LABEL(format_error), OrganizeFormatValidator::IsValid(saved_format, &format_error_text) ? "" : format_error_text.c_str());
   gtk_widget_set_visible(format_header, local_naming ? TRUE : FALSE);

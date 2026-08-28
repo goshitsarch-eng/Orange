@@ -1,4 +1,5 @@
 #include "dialogs/console.h"
+#include "dialogs/dialogchrome.h"
 
 #include "dialogs/consolequery.h"
 #include "translations/translations.h"
@@ -67,7 +68,7 @@ void Console::Show(GtkWindow *parent, Database *database) {
 
   gtk_box_append(GTK_BOX(box), row);
   gtk_box_append(GTK_BOX(box), scroll);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
 
   struct State {
     Database *database = nullptr;

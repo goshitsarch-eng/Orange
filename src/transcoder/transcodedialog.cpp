@@ -1,4 +1,5 @@
 #include "transcoder/transcodedialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "constants/transcodersettings.h"
 #include "core/application.h"
@@ -713,7 +714,7 @@ void TranscodeDialog::Show(GtkWindow *parent, Application *app, const SongList &
                    })),
                    nullptr);
 
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   DialogCloseKeys::Attach(dialog);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

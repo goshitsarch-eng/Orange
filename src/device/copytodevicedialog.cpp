@@ -1,4 +1,5 @@
 #include "device/copytodevicedialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "core/application.h"
 #include "device/devicecopy.h"
@@ -91,6 +92,6 @@ void CopyToDeviceDialog::Show(GtkWindow *parent, Application *app, const SongLis
                        space);
     }
   }
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

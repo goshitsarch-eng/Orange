@@ -157,7 +157,7 @@ class MainWindow : public PlatformInterface {
   void RestoreSplitter();
   void SaveGeometry();
   void PlacePlayingWidget();
-  void SelectPlaylistRow(int index, bool add);
+  void SelectPlaylistRow(int index, PlaylistSelection::Mode mode);
   void RefreshPlaylistSummary();
   std::vector<int> SelectedPlaylistRows() const;
   SongList SelectedSongs() const;
@@ -304,6 +304,8 @@ class MainWindow : public PlatformInterface {
   std::vector<int> selected_playlist_rows_;
   int playlist_menu_row_ = -1;
   std::string selection_playlist_name_;
+  // Where a shift-extended selection starts from.  -1 until the user has clicked a row.
+  int selection_anchor_row_ = -1;
   guint position_timeout_ = 0;
   guint analyzer_timeout_ = 0;
   int analyzer_timer_ms_ = 0;

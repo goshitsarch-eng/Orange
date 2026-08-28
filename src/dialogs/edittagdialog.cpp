@@ -1,4 +1,5 @@
 #include "config.h"
+#include "dialogs/dialogchrome.h"
 #include "dialogs/edittagdialog.h"
 
 #include "constants/edittagdialogsettings.h"
@@ -1333,7 +1334,7 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
                      })),
                      state);
   }
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   DialogGeometry::BindClosed(dialog, EditTagDialogSettings::kSettingsGroup, EditTagDialogSettings::kGeometry);
   state->dialog = dialog;
   SetLoading(state, true);

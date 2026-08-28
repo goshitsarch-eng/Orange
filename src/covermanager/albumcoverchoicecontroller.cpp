@@ -1,4 +1,5 @@
 #include "covermanager/albumcoverchoicecontroller.h"
+#include "dialogs/dialogchrome.h"
 
 #include "collection/collectionalbumart.h"
 #include "covermanager/coveractionenable.h"
@@ -250,7 +251,7 @@ void AlbumCoverChoiceController::ShowCover(GtkWindow *parent, const Song &song) 
   gtk_widget_set_hexpand(image, TRUE);
   gtk_widget_set_vexpand(image, TRUE);
   DialogHelpers::SetImageFromBytes(image, data, 480);
-  adw_dialog_set_child(dialog, image);
+  DialogChrome::SetContent(dialog, image);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }
 

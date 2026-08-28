@@ -1,4 +1,5 @@
 #include "dialogs/shortcutsdialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "dialogs/shortcutscatalog.h"
 #include "translations/translations.h"
@@ -19,6 +20,6 @@ void ShortcutsDialog::Show(GtkWindow *parent) {
   gtk_widget_set_margin_top(label, 24);
   gtk_widget_set_margin_bottom(label, 24);
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), label);
-  adw_dialog_set_child(dialog, scroll);
+  DialogChrome::SetContent(dialog, scroll);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

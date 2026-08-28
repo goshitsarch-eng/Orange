@@ -1,4 +1,5 @@
 #include "collection/groupbydialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "collection/collectiongroupingsave.h"
 #include "collection/groupbydialoglabels.h"
@@ -103,6 +104,6 @@ void GroupByDialog::Show(GtkWindow *parent, const CollectionGrouping::Grouping &
   gtk_box_append(GTK_BOX(box), separate);
   gtk_box_append(GTK_BOX(box), name);
   gtk_box_append(GTK_BOX(box), buttons);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

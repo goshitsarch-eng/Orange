@@ -1,4 +1,5 @@
 #include "collection/savedgroupingmanager.h"
+#include "dialogs/dialogchrome.h"
 
 #include "collection/savedgroupinglabels.h"
 #include "translations/translations.h"
@@ -78,6 +79,6 @@ void SavedGroupingManager::Show(GtkWindow *parent, const std::function<void(cons
   }
   gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list);
   gtk_box_append(GTK_BOX(box), scroll);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

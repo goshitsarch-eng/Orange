@@ -1,6 +1,7 @@
 #ifndef STRAWBERRY_PLAYLISTLOOK_H
 #define STRAWBERRY_PLAYLISTLOOK_H
 
+#include "playlist/playlistdropindicator.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -95,13 +96,21 @@ inline std::string HeaderCss() {
          ".strawberry-playlist-buttons button label { font-weight: bold; }";
 }
 
+// Selected rows used to be marked with libadwaita's "card" class, which is an elevated container surface,
+// not a selection: on most themes it was almost indistinguishable from an unselected row.  These rows are
+// plain boxes rather than GtkListBoxRows, so they never pick up GTK's own :selected styling either.
+inline std::string SelectedCss() {
+  return ".playlist-row.playlist-selected { background-color: @accent_bg_color; }"
+         ".playlist-row.playlist-selected label { color: @accent_fg_color; }";
+}
+
 inline std::string StopAfterCss() {
   return ".playlist-row.playlist-stop-after { box-shadow: inset 3px 0 0 @destructive_color; }";
 }
 
 inline std::string CombinedCss(bool alternating, bool glow, bool bars, double progress, int glow_step = 0) {
   return AlternatingCss(alternating) + GlowCss(glow, glow_step) + BarsCss(bars, progress, glow ? glow_step : -1) + UnavailableCss() +
-         StopAfterCss() + HeaderCss();
+         SelectedCss() + StopAfterCss() + HeaderCss() + PlaylistDropIndicator::Css();
 }
 
 }  // namespace PlaylistLook

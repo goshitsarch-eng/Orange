@@ -1,4 +1,5 @@
 #include "playlist/playlistsaveoptionsdialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "playlist/playlistsaveoptions.h"
 #include "translations/translations.h"
@@ -63,6 +64,6 @@ void PlaylistSaveOptionsDialog::Show(GtkWindow *parent, const std::function<void
   gtk_box_append(GTK_BOX(box), remember);
   gtk_box_append(GTK_BOX(box), hint);
   gtk_box_append(GTK_BOX(box), save);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

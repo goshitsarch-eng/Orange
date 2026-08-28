@@ -1759,7 +1759,8 @@ void MainWindow::BuildPlaylist() {
   playlist_container_->view()->SetPlayPauseCallback([this]() { app_->player()->PlayPause(); });
   playlist_container_->view()->SetSeekBackwardCallback([this]() { app_->player()->SeekBackward(); });
   playlist_container_->view()->SetSeekForwardCallback([this]() { app_->player()->SeekForward(); });
-  playlist_container_->view()->SetSelectCallback([this](int index, bool add) { SelectPlaylistRow(index, add); });
+  playlist_container_->view()->SetSelectCallback(
+      [this](int index, PlaylistSelection::Mode mode) { SelectPlaylistRow(index, mode); });
   playlist_container_->view()->SetRateCallback([this](const std::vector<int> &rows, float rating) { RateRows(rows, rating); });
   playlist_container_->view()->SetQueuePositionCallback([this](int row) {
     Playlist *playlist = app_->playlist_manager()->current();
@@ -2459,7 +2460,8 @@ void MainWindow::RefreshCollection(const std::string &filter, bool update_text) 
   collection_container_->view()->SetModelSongs(
       songs, grouping_, CollectionGrouping::SeparateAlbumsByGrouping(),
       settings.BoolValue("skip_articles_for_artists", settings.BoolValue("sort_skip_articles_for_artists", true)),
-      settings.BoolValue("skip_articles_for_albums", settings.BoolValue("sort_skip_articles_for_albums", false)));
+      settings.BoolValue("skip_articles_for_albums", settings.BoolValue("sort_skip_articles_for_albums", false)),
+      settings.BoolValue(CollectionSettings::kUseSortTags, CollectionSettings::kDefaultUseSortTags));
   collection_container_->view()->SetFilterString(collection_text_filter_);
   if (context_view_) {
     context_view_->SetCollectionTotals(collection_container_->view()->model()->TotalSongs(),
@@ -2487,28 +2489,19 @@ void MainWindow::SortPlaylistBy(PlaylistColumn column, PlaylistSortOrder order) 
   RefreshPlaylist();
 }
 
-void MainWindow::SelectPlaylistRow(int index, bool add) {
+void MainWindow::SelectPlaylistRow(int index, PlaylistSelection::Mode mode) {
   Playlist *playlist = app_->playlist_manager()->current();
   if (!playlist || index < 0 || index >= playlist->row_count()) {
     return;
   }
-  if (!add) {
-    selected_playlist_rows_.clear();
-    selected_playlist_rows_.push_back(index);
-  } else {
-    auto it = std::find(selected_playlist_rows_.begin(), selected_playlist_rows_.end(), index);
-    if (it == selected_playlist_rows_.end()) {
-      selected_playlist_rows_.push_back(index);
-      std::sort(selected_playlist_rows_.begin(), selected_playlist_rows_.end());
-    } else {
-      selected_playlist_rows_.erase(it);
-    }
-  }
+  selected_playlist_rows_ = PlaylistSelection::Apply(selected_playlist_rows_, selection_anchor_row_, index, mode);
+  selection_anchor_row_ = PlaylistSelection::NextAnchor(selection_anchor_row_, index, mode);
   selection_playlist_name_ = playlist->name();
   app_->playlist_manager()->SetCurrentRow(index);
   if (playlist_container_) {
+    // Only the selection changed, so restyle the rows in place.  A full Refresh() here unparented the row
+    // whose click gesture was still being delivered.
     playlist_container_->view()->SetSelectedRows(selected_playlist_rows_);
-    playlist_container_->view()->Refresh(playlist);
   }
   RefreshPlaylistSummary();
 }
@@ -4448,9 +4441,14 @@ SongList MainWindow::SelectedSongs() const {
 }
 
 void MainWindow::ShowToast(const std::string &text) {
-  if (toast_overlay_) {
-    adw_toast_overlay_add_toast(toast_overlay_, adw_toast_new(text.c_str()));
+  if (!toast_overlay_) {
+    return;
   }
+  // AdwToast parses its title as Pango markup by default, so a song called "Q&A" or "<3" made the whole
+  // toast come out empty.  These messages are plain text, so say so.
+  AdwToast *toast = adw_toast_new(text.c_str());
+  adw_toast_set_use_markup(toast, FALSE);
+  adw_toast_overlay_add_toast(toast_overlay_, toast);
 }
 
 void MainWindow::ShowErrorDialog(const std::string &message) {
@@ -4776,7 +4774,7 @@ void MainWindow::JumpToPlaying() {
   app_->playlist_manager()->SetCurrentPlaylist(playlist->id());
   const int row = playlist->current_row();
   if (row >= 0) {
-    SelectPlaylistRow(row, false);
+    SelectPlaylistRow(row, PlaylistSelection::Mode::Replace);
     playlist_container_->view()->MaybeScrollToRow(row, Playlist::AutoScroll::Always);
   }
   RefreshPlaylist();

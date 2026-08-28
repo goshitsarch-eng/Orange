@@ -1,4 +1,5 @@
 #include "covermanager/albumcovermanager.h"
+#include "dialogs/dialogchrome.h"
 
 #include "constants/covermanagersettings.h"
 #include "core/application.h"
@@ -885,7 +886,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
   RebuildArtists(state);
   RebuildAlbums(state);
   SelectArtistRow(state, 0);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   DialogGeometry::BindClosed(dialog, CoverManagerSettings::kSettingsGroup, CoverManagerSettings::kGeometry);
   DialogCloseKeys::Attach(dialog);
   adw_dialog_present(dialog, GTK_WIDGET(parent));

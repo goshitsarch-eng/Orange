@@ -1,4 +1,5 @@
 #include "config.h"
+#include "dialogs/dialogchrome.h"
 
 #include "playlist/playlistcolumnsdialog.h"
 
@@ -185,6 +186,6 @@ void PlaylistColumnsDialog::Show(GtkWindow *parent, const std::function<void()> 
   gtk_box_append(GTK_BOX(box), stretch);
   gtk_box_append(GTK_BOX(box), rating_lock);
   gtk_box_append(GTK_BOX(box), buttons);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

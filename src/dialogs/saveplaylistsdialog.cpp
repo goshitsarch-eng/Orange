@@ -1,4 +1,5 @@
 #include "dialogs/saveplaylistsdialog.h"
+#include "dialogs/dialogchrome.h"
 
 #include "constants/playlistsettings.h"
 #include "core/application.h"
@@ -42,10 +43,18 @@ void SaveAllToDirectory(SaveAllState *state) {
   settings.SetValue(PlaylistSettings::kLastSaveAllExtension, extension);
   settings.Sync();
   PlaylistParser parser;
+  std::vector<std::string> failed;
   for (const auto &playlist : state->app->playlist_manager()->playlists()) {
-    parser.Save(FileUtils::Join(path, SavePlaylistsOptions::DestFilename(playlist->name(), extension)), playlist->songs());
+    if (!parser.Save(FileUtils::Join(path, SavePlaylistsOptions::DestFilename(playlist->name(), extension)), playlist->songs())) {
+      failed.push_back(playlist->name());
+    }
   }
   adw_dialog_close(ADW_DIALOG(state->dialog));
+  if (!failed.empty()) {
+    // Silently dropping the write left the user believing every playlist had been saved.
+    MessageDialog::Show(state->parent, SavePlaylistsOptions::SaveFailedTitle(),
+                        SavePlaylistsOptions::SaveFailedBody(failed).c_str());
+  }
 }
 
 }  // namespace
@@ -144,6 +153,6 @@ void SavePlaylistsDialog::Show(GtkWindow *parent, Application *app) {
   gtk_box_append(GTK_BOX(box), path_row);
   gtk_box_append(GTK_BOX(box), type_row);
   gtk_box_append(GTK_BOX(box), buttons);
-  adw_dialog_set_child(dialog, box);
+  DialogChrome::SetContent(dialog, box);
   adw_dialog_present(dialog, GTK_WIDGET(parent));
 }
