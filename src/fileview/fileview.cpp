@@ -1,9 +1,11 @@
 #include "fileview/fileview.h"
 
 #include "core/appearanceleftpanel.h"
+#include "core/mainwindowsettings.h"
 #include "core/settings.h"
 #include "fileview/fileviewmode.h"
 #include "fileview/fileviewnav.h"
+#include "fileview/fileviewpath.h"
 #include "fileview/fileviewsettings.h"
 #include "translations/translations.h"
 #include "utilities/fileutils.h"
@@ -14,8 +16,11 @@
 
 FileView::FileView() {
   const char *music = g_get_user_special_dir(G_USER_DIRECTORY_MUSIC);
-  home_ = music && *music ? music : (g_get_home_dir() ? g_get_home_dir() : ".");
-  path_ = home_;
+  home_ = FileViewPath::DefaultHome(music, g_get_home_dir());
+  Settings path_settings;
+  path_settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  const std::string saved_path = path_settings.Value(MainWindowSettings::kFilePath);
+  path_ = FileViewPath::Initial(saved_path, home_, FileUtils::IsDirectory(saved_path));
   widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   GtkWidget *toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
   gtk_widget_set_margin_start(toolbar, 8);
@@ -150,6 +155,13 @@ void FileView::ApplyLook() {
   AppearanceLeftPanel::ApplyWidget(toggle_, size);
 }
 
+void FileView::PersistFilePath() const {
+  Settings settings;
+  settings.BeginGroup(MainWindowSettings::kSettingsGroup);
+  settings.SetValue(MainWindowSettings::kFilePath, path_);
+  settings.Sync();
+}
+
 void FileView::SetPath(const std::string &path, bool record) {
   if (!FileUtils::IsDirectory(path)) {
     return;
@@ -158,6 +170,7 @@ void FileView::SetPath(const std::string &path, bool record) {
   if (record) {
     history_.Push(path_);
   }
+  PersistFilePath();
   Reload();
 }
 

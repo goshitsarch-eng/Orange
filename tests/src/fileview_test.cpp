@@ -32,6 +32,7 @@
 #include "fileview/fileviewmenu.h"
 #include "fileview/fileviewmode.h"
 #include "fileview/fileviewnav.h"
+#include "fileview/fileviewpath.h"
 #include "fileview/fileviewhidden.h"
 #include "fileview/fileviewhistory.h"
 #include "fileview/fileviewkeyboard.h"
@@ -1184,4 +1185,14 @@ TEST(DeviceCopySupported, ForCopyPrefersQueriedElseBackend) {
                                                           Song::FileType::MPEG, DeviceCopySupported::ForCopy("mtp", {Song::FileType::MPEG})));
   EXPECT_EQ(Song::FileType::Unknown, OrganizeTranscode::Check(Song::FileType::FLAC, MusicStorage::TranscodeMode::Transcode_Unsupported,
                                                              Song::FileType::MPEG, DeviceCopySupported::ForCopy("mtp", {})));
+}
+
+TEST(FileViewPath, RestoresSavedDirectoryLikeQt) {
+  EXPECT_EQ("/music", FileViewPath::DefaultHome("/music", "/home/user"));
+  EXPECT_EQ("/home/user", FileViewPath::DefaultHome(nullptr, "/home/user"));
+  EXPECT_EQ("/home/user", FileViewPath::DefaultHome("", "/home/user"));
+  EXPECT_EQ(".", FileViewPath::DefaultHome(nullptr, nullptr));
+  EXPECT_EQ("/saved", FileViewPath::Initial("/saved", "/music", true));
+  EXPECT_EQ("/music", FileViewPath::Initial("/saved", "/music", false));
+  EXPECT_EQ("/music", FileViewPath::Initial({}, "/music", true));
 }
