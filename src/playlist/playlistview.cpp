@@ -597,6 +597,15 @@ void PlaylistView::Clear() {
   }
 }
 
+int PlaylistView::ColumnWidthFrom(const std::vector<PlaylistColumn> &columns, const std::vector<int> &widths, PlaylistColumn column) {
+  for (size_t i = 0; i < columns.size() && i < widths.size(); ++i) {
+    if (columns[i] == column) {
+      return widths[i];
+    }
+  }
+  return PlaylistDelegates::ColumnWidth(column);
+}
+
 int PlaylistView::ViewportWidth() const {
   // The adjustment's page size is the width actually available to the rows, with any vertical scrollbar
   // already subtracted. It is also non-zero earlier than the widget allocation is.
@@ -619,6 +628,11 @@ void PlaylistView::ApplyColumnWidths() {
   if (!grid_) {
     return;
   }
+  // Resolve the widths once for the whole pass.
+  // PixelWidth() re-reads the visible column list and the saved widths from the settings file on every
+  // call, so asking it per cell made this loop quadratic in file parses.
+  const std::vector<PlaylistColumn> columns = PlaylistColumnLayout::Visible();
+  const std::vector<int> widths = PlaylistColumnLayout::PixelWidths(total);
   for (GtkWidget *row = gtk_widget_get_first_child(grid_); row; row = gtk_widget_get_next_sibling(row)) {
     if (row == header_->widget()) {
       continue;
@@ -629,7 +643,7 @@ void PlaylistView::ApplyColumnWidths() {
         continue;
       }
       gtk_widget_set_hexpand(cell, FALSE);
-      gtk_widget_set_size_request(cell, PlaylistColumnLayout::PixelWidth(static_cast<PlaylistColumn>(stored - 1), total), -1);
+      gtk_widget_set_size_request(cell, ColumnWidthFrom(columns, widths, static_cast<PlaylistColumn>(stored - 1)), -1);
     }
   }
 }
@@ -660,6 +674,11 @@ void PlaylistView::Refresh(Playlist *playlist) {
   visible_count_ = 0;
   visible_titles_.clear();
   visible_rows_.clear();
+  // Resolved once for the whole rebuild. Both of these parse the settings file, and they were previously
+  // called once per row and once per cell respectively.
+  const int viewport = ViewportWidth();
+  const std::vector<PlaylistColumn> columns = PlaylistColumnLayout::Visible();
+  const std::vector<int> column_widths = PlaylistColumnLayout::PixelWidths(viewport);
   for (int index = 0; index < playlist->row_count(); ++index) {
     const Song &song = playlist->songs()[static_cast<size_t>(index)];
     if (!filter.Accepts(song)) {
@@ -700,12 +719,12 @@ void PlaylistView::Refresh(Playlist *playlist) {
     if (std::find(selected_rows_.begin(), selected_rows_.end(), index) != selected_rows_.end()) {
       gtk_widget_add_css_class(row, "card");
     }
-    for (PlaylistColumn column : PlaylistColumnLayout::Visible()) {
+    for (PlaylistColumn column : columns) {
       GtkWidget *cell = nullptr;
       if (column == PlaylistColumn::Moodbar && moodbar_) {
         moodbar_->Ensure(song);
         GtkWidget *area = gtk_drawing_area_new();
-        gtk_widget_set_size_request(area, PlaylistColumnLayout::PixelWidth(column, ViewportWidth()), MoodbarCell::ColumnHeight());
+        gtk_widget_set_size_request(area, ColumnWidthFrom(columns, column_widths, column), MoodbarCell::ColumnHeight());
         gtk_widget_set_hexpand(area, FALSE);
         gtk_widget_set_margin_start(area, 6);
         gtk_widget_set_margin_end(area, 6);
@@ -738,7 +757,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
         gtk_widget_set_margin_start(label, 6);
         gtk_widget_set_margin_end(label, 6);
         gtk_widget_set_hexpand(label, FALSE);
-        gtk_widget_set_size_request(label, PlaylistColumnLayout::PixelWidth(column, ViewportWidth()), -1);
+        gtk_widget_set_size_request(label, ColumnWidthFrom(columns, column_widths, column), -1);
         cell = label;
       }
       g_object_set_data(G_OBJECT(cell), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));

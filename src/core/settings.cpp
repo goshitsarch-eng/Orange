@@ -25,7 +25,10 @@ Settings::Settings() : key_file_(g_key_file_new()), path_(StandardPaths::Setting
 }
 
 Settings::~Settings() {
-  Sync();
+  // Only write if this object actually changed something.
+  if (dirty_) {
+    Sync();
+  }
   g_key_file_unref(key_file_);
   if (g_instance == this) {
     g_instance = nullptr;
@@ -103,26 +106,32 @@ bool Settings::BoolValue(const std::string &key, bool fallback) const {
 
 void Settings::SetValue(const std::string &key, const std::string &value) {
   g_key_file_set_string(key_file_, group_.c_str(), key.c_str(), value.c_str());
+  dirty_ = true;
 }
 
 void Settings::SetIntValue(const std::string &key, int value) {
   g_key_file_set_integer(key_file_, group_.c_str(), key.c_str(), value);
+  dirty_ = true;
 }
 
 void Settings::SetInt64Value(const std::string &key, gint64 value) {
   g_key_file_set_int64(key_file_, group_.c_str(), key.c_str(), value);
+  dirty_ = true;
 }
 
 void Settings::SetDoubleValue(const std::string &key, double value) {
   g_key_file_set_double(key_file_, group_.c_str(), key.c_str(), value);
+  dirty_ = true;
 }
 
 void Settings::SetBoolValue(const std::string &key, bool value) {
   g_key_file_set_boolean(key_file_, group_.c_str(), key.c_str(), value);
+  dirty_ = true;
 }
 
 void Settings::Remove(const std::string &key) {
   g_key_file_remove_key(key_file_, group_.c_str(), key.c_str(), nullptr);
+  dirty_ = true;
 }
 
 std::vector<std::string> Settings::Keys() const {
@@ -189,6 +198,7 @@ bool Settings::Sync() {
     }
     return false;
   }
+  dirty_ = false;
   // The file is created with the process umask, which normally leaves it world-readable. It holds account
   // names and server addresses, and on a build with no keyring it still holds the credentials themselves,
   // so restrict it to the owner.

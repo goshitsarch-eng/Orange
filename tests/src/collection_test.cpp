@@ -497,8 +497,11 @@ TEST(CollectionFocus, RestoreContainerAndMissingSong) {
   ASSERT_TRUE(container);
   EXPECT_EQ(container_state.last_selected_container, container->sort_text);
 
+  // The Reset above rebuilt the tree, so the earlier item pointer is dangling; find the song again.
+  const CollectionItem *song_after_reset = FindSongItem(model.root(), roads);
+  ASSERT_TRUE(song_after_reset);
   CollectionFocus::State missing;
-  CollectionFocus::Capture(song, &missing);
+  CollectionFocus::Capture(song_after_reset, &missing);
   Song other = MakeSong("Wanderlust", "Bjork", "Homogenic");
   model.Reset({other}, grouping, false, true, false);
   EXPECT_EQ(nullptr, CollectionFocus::FindTarget(model.root(), missing));

@@ -50,6 +50,10 @@ class Settings {
   GKeyFile *key_file_;
   std::string path_;
   std::string group_;
+  // Whether anything has been written since the last save.
+  // Settings objects are constructed all over the place purely to read a value, and rewriting the whole
+  // file when each of those is destroyed made reads as expensive as writes.
+  bool dirty_ = false;
 };
 
 #endif

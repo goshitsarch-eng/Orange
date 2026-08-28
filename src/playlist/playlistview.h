@@ -93,6 +93,7 @@ class PlaylistView {
   void ClearDropIndicator();
   void ApplyColumnWidths();
   int ViewportWidth() const;
+  static int ColumnWidthFrom(const std::vector<PlaylistColumn> &columns, const std::vector<int> &widths, PlaylistColumn column);
   void ReloadLookCss();
   void StartGlowTimer();
   void StopGlowTimer();
