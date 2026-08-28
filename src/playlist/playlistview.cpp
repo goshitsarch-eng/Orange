@@ -159,7 +159,13 @@ PlaylistView::PlaylistView() {
                      return static_cast<PlaylistView *>(data)->OnDrop(value, y);
                    }),
                    this);
-  g_signal_connect(widget_, "notify::width", G_CALLBACK(+[](GObject *, GParamSpec *, gpointer data) {
+  // GtkWidget has no "width" property in GTK 4, so "notify::width" never fires and the columns were never
+  // re-stretched after the initial build - which happens before the view has been allocated, so they were
+  // laid out against a width of zero and overflowed the viewport.
+  // The scrolled window's horizontal adjustment carries the viewport width as its page size, and that does
+  // notify.
+  GtkAdjustment *hadjustment = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scroller_));
+  g_signal_connect(hadjustment, "notify::page-size", G_CALLBACK(+[](GObject *, GParamSpec *, gpointer data) {
                      static_cast<PlaylistView *>(data)->ApplyColumnWidths();
                    }),
                    this);
@@ -591,8 +597,23 @@ void PlaylistView::Clear() {
   }
 }
 
+int PlaylistView::ViewportWidth() const {
+  // The adjustment's page size is the width actually available to the rows, with any vertical scrollbar
+  // already subtracted. It is also non-zero earlier than the widget allocation is.
+  if (scroller_) {
+    GtkAdjustment *hadjustment = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scroller_));
+    if (hadjustment) {
+      const int page = static_cast<int>(gtk_adjustment_get_page_size(hadjustment));
+      if (page > 0) {
+        return page;
+      }
+    }
+  }
+  return widget_ ? gtk_widget_get_width(widget_) : 0;
+}
+
 void PlaylistView::ApplyColumnWidths() {
-  const int total = gtk_widget_get_width(widget_);
+  const int total = ViewportWidth();
   header_->SetViewportWidth(total);
   header_->ApplyWidths();
   if (!grid_) {
@@ -618,7 +639,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
   hover_rating_ = -1.0f;
   playlist_ = playlist;
   Clear();
-  header_->SetViewportWidth(gtk_widget_get_width(widget_));
+  header_->SetViewportWidth(ViewportWidth());
   header_->SetSortState(playlist ? playlist->sort_column() : PlaylistColumn::Count, playlist && playlist->sort_descending());
   header_->Rebuild();
   gtk_box_append(GTK_BOX(grid_), header_->widget());
@@ -684,7 +705,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
       if (column == PlaylistColumn::Moodbar && moodbar_) {
         moodbar_->Ensure(song);
         GtkWidget *area = gtk_drawing_area_new();
-        gtk_widget_set_size_request(area, PlaylistColumnLayout::PixelWidth(column, gtk_widget_get_width(widget_)), MoodbarCell::ColumnHeight());
+        gtk_widget_set_size_request(area, PlaylistColumnLayout::PixelWidth(column, ViewportWidth()), MoodbarCell::ColumnHeight());
         gtk_widget_set_hexpand(area, FALSE);
         gtk_widget_set_margin_start(area, 6);
         gtk_widget_set_margin_end(area, 6);
@@ -717,7 +738,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
         gtk_widget_set_margin_start(label, 6);
         gtk_widget_set_margin_end(label, 6);
         gtk_widget_set_hexpand(label, FALSE);
-        gtk_widget_set_size_request(label, PlaylistColumnLayout::PixelWidth(column, gtk_widget_get_width(widget_)), -1);
+        gtk_widget_set_size_request(label, PlaylistColumnLayout::PixelWidth(column, ViewportWidth()), -1);
         cell = label;
       }
       g_object_set_data(G_OBJECT(cell), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
@@ -821,7 +842,7 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
         GtkWidget *entry = gtk_entry_new();
         gtk_editable_set_text(GTK_EDITABLE(entry), current);
         gtk_widget_set_hexpand(entry, FALSE);
-        gtk_widget_set_size_request(entry, PlaylistColumnLayout::PixelWidth(column, gtk_widget_get_width(widget_)), -1);
+        gtk_widget_set_size_request(entry, PlaylistColumnLayout::PixelWidth(column, ViewportWidth()), -1);
         g_object_set_data(G_OBJECT(entry), "column", GINT_TO_POINTER(stored));
         g_object_set_data(G_OBJECT(entry), "row-index", GINT_TO_POINTER(row));
         GtkWidget *prev = gtk_widget_get_prev_sibling(cell);

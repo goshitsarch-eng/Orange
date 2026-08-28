@@ -151,7 +151,17 @@ void FancyTabBar::Rebuild() {
     }
     if (FancyTabMode::ShowsText(mode_)) {
       GtkWidget *label = gtk_label_new(tab.title.c_str());
-      gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+      // Tabs across the top share a fixed width and have to ellipsize.
+      // A sidebar is sized from its contents, so ellipsizing there just reports a near-zero minimum width
+      // and collapses every label to "Co...".
+      if (FancyTabMode::IsTop(mode_)) {
+        gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+      }
+      else {
+        gtk_label_set_max_width_chars(GTK_LABEL(label), FancyTabMode::kSidebarLabelMaxChars);
+        gtk_label_set_wrap(GTK_LABEL(label), TRUE);
+        gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
+      }
       gtk_box_append(GTK_BOX(box), label);
     } else {
       gtk_widget_set_tooltip_text(button, tab.title.c_str());

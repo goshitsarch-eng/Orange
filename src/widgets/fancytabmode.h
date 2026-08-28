@@ -24,6 +24,8 @@ inline constexpr Mode kDefaultMode = Mode::LargeSidebar;
 inline constexpr int kDefaultCurrentTab = 1;
 inline constexpr int kLargeIcon = 40;
 inline constexpr int kSmallIcon = 32;
+// Caps how wide a single tab title may make the sidebar before it wraps onto another line.
+inline constexpr int kSidebarLabelMaxChars = 14;
 
 struct Item {
   const char *label = "";
@@ -60,7 +62,12 @@ inline bool ShowsIcon(Mode mode) { return mode != Mode::PlainSidebar; }
 
 inline bool IsLargeIcon(Mode mode) { return mode == Mode::LargeSidebar || mode == Mode::IconsSidebar; }
 
+// How the buttons are laid out inside the tab bar itself.
 inline GtkOrientation BarOrientation(Mode mode) { return IsTop(mode) ? GTK_ORIENTATION_HORIZONTAL : GTK_ORIENTATION_VERTICAL; }
+
+// How the tab bar and the stack are laid out relative to each other, which is the opposite axis: a vertical
+// bar sits beside the stack, a horizontal bar sits above it.
+inline GtkOrientation PanelOrientation(Mode mode) { return IsTop(mode) ? GTK_ORIENTATION_VERTICAL : GTK_ORIENTATION_HORIZONTAL; }
 
 inline GtkOrientation ButtonOrientation(Mode mode) {
   return mode == Mode::LargeSidebar || mode == Mode::IconsSidebar ? GTK_ORIENTATION_VERTICAL : GTK_ORIENTATION_HORIZONTAL;

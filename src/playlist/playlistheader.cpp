@@ -255,6 +255,13 @@ void PlaylistHeader::Rebuild() {
     GtkWidget *label = gtk_widget_get_first_child(button);
     if (GTK_IS_LABEL(label)) {
       gtk_label_set_xalign(GTK_LABEL(label), PlaylistColumnLayout::XAlign(column));
+      // The row cells ellipsize, so the header has to as well.
+      // A header label that reports its full text as its minimum width stops the column ever shrinking to
+      // the width it was allotted, which pushes the trailing columns off the edge of the viewport and puts
+      // the header out of step with the rows below it.
+      gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+      gtk_label_set_width_chars(GTK_LABEL(label), 0);
+      gtk_label_set_max_width_chars(GTK_LABEL(label), 0);
     }
     g_object_set_data(G_OBJECT(button), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
     g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {

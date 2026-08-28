@@ -3768,9 +3768,18 @@ void MainWindow::ApplyTabMode() {
     return;
   }
   const FancyTabMode::Mode mode = sidebar_tabs_->mode();
-  gtk_orientable_set_orientation(GTK_ORIENTABLE(sidebar_box_), FancyTabMode::BarOrientation(mode));
-  gtk_widget_set_hexpand(sidebar_tabs_->widget(), FancyTabMode::IsTop(mode) ? TRUE : FALSE);
-  gtk_widget_set_vexpand(sidebar_tabs_->widget(), FancyTabMode::IsTop(mode) ? FALSE : TRUE);
+  // The panel lays the bar and the stack out along the axis the bar does NOT run along.
+  // Using the bar's own orientation here stacked a full-height tab bar on top of the page and left the
+  // page a sliver of the sidebar.
+  gtk_orientable_set_orientation(GTK_ORIENTABLE(sidebar_box_), FancyTabMode::PanelOrientation(mode));
+  const gboolean beside = FancyTabMode::StackExpandsBesideBar(mode) ? TRUE : FALSE;
+  // The bar takes its natural size along the panel axis and fills the cross axis; the stack takes the rest.
+  gtk_widget_set_hexpand(sidebar_tabs_->widget(), beside ? FALSE : TRUE);
+  gtk_widget_set_vexpand(sidebar_tabs_->widget(), beside ? TRUE : FALSE);
+  if (sidebar_stack_) {
+    gtk_widget_set_hexpand(GTK_WIDGET(sidebar_stack_), TRUE);
+    gtk_widget_set_vexpand(GTK_WIDGET(sidebar_stack_), TRUE);
+  }
 }
 
 void MainWindow::PersistTabSettings() const {

@@ -80,7 +80,19 @@ inline std::string BarsCss(bool enabled, double progress, int glow_step = -1) {
 }
 
 inline std::string UnavailableCss() {
-  return ".playlist-row.playlist-unavailable, .playlist-row.playlist-unavailable label { color: #c0c0c0; }";
+  // Derived from the theme's own foreground rather than a fixed grey, which was nearly invisible against a
+  // light background and far too bright against a dark one.
+  return ".playlist-row.playlist-unavailable, .playlist-row.playlist-unavailable label { color: alpha(currentColor, 0.45); }";
+}
+
+// The header is a row of flat buttons.
+// GTK's default button padding is wider than a narrow column is allowed to be, so without this every
+// narrow column's title collapses to an ellipsis while its values still render.
+// The separator also gives the header the edge a table header is expected to have.
+inline std::string HeaderCss() {
+  return ".strawberry-playlist-buttons { border-bottom: 1px solid alpha(currentColor, 0.15); }"
+         ".strawberry-playlist-buttons button { padding-left: 3px; padding-right: 3px; min-width: 0; }"
+         ".strawberry-playlist-buttons button label { font-weight: bold; }";
 }
 
 inline std::string StopAfterCss() {
@@ -89,7 +101,7 @@ inline std::string StopAfterCss() {
 
 inline std::string CombinedCss(bool alternating, bool glow, bool bars, double progress, int glow_step = 0) {
   return AlternatingCss(alternating) + GlowCss(glow, glow_step) + BarsCss(bars, progress, glow ? glow_step : -1) + UnavailableCss() +
-         StopAfterCss();
+         StopAfterCss() + HeaderCss();
 }
 
 }  // namespace PlaylistLook

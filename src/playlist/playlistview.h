@@ -92,6 +92,7 @@ class PlaylistView {
   void UpdateDropIndicator(double y);
   void ClearDropIndicator();
   void ApplyColumnWidths();
+  int ViewportWidth() const;
   void ReloadLookCss();
   void StartGlowTimer();
   void StopGlowTimer();
