@@ -38,7 +38,7 @@ void QobuzService::ReloadSettings() {
   user_id_ = settings.Int64Value(QobuzSettings::kUserId, -1);
   user_auth_token_ = settings.Value("token");
   if (user_auth_token_.empty()) {
-    user_auth_token_ = settings.Value(QobuzSettings::kUserAuthToken);
+    user_auth_token_ = settings.SecretValue(QobuzSettings::kUserAuthToken);
   }
   format_ = settings.IntValue(QobuzSettings::kFormat, QobuzSettings::kDefaultFormat);
   logged_in_ = !app_id_.empty() && !user_auth_token_.empty();
@@ -145,7 +145,7 @@ void QobuzService::HandleOAuthCallback(const std::string &body, const std::strin
   }
   Settings settings;
   settings.BeginGroup(QobuzSettings::kSettingsGroup);
-  settings.SetValue(QobuzSettings::kUserAuthToken, user_auth_token_);
+  settings.SetSecretValue(QobuzSettings::kUserAuthToken, user_auth_token_);
   settings.SetValue("token", user_auth_token_);
   if (user_id_ > 0) {
     settings.SetInt64Value(QobuzSettings::kUserId, user_id_);

@@ -26,9 +26,9 @@ void SpotifyService::ReloadSettings() {
   settings.BeginGroup(SpotifySettings::kSettingsGroup);
   token_ = settings.Value("token");
   if (token_.empty()) {
-    token_ = settings.Value(SpotifySettings::kAccessToken);
+    token_ = settings.SecretValue(SpotifySettings::kAccessToken);
   }
-  refresh_token_ = settings.Value(SpotifySettings::kRefreshToken);
+  refresh_token_ = settings.SecretValue(SpotifySettings::kRefreshToken);
   expires_in_ = settings.IntValue(SpotifySettings::kExpiresIn);
   login_time_ = settings.Int64Value(SpotifySettings::kLoginTime);
   client_id_ = SpotifyCredentials::EffectiveClientId(settings.Value("clientid"));
@@ -41,10 +41,10 @@ void SpotifyService::StoreTokens(const OAuthenticator::TokenResponse &tokens) {
   settings.BeginGroup(SpotifySettings::kSettingsGroup);
   if (!tokens.access_token.empty()) {
     settings.SetValue("token", tokens.access_token);
-    settings.SetValue(SpotifySettings::kAccessToken, tokens.access_token);
+    settings.SetSecretValue(SpotifySettings::kAccessToken, tokens.access_token);
   }
   if (!tokens.refresh_token.empty()) {
-    settings.SetValue(SpotifySettings::kRefreshToken, tokens.refresh_token);
+    settings.SetSecretValue(SpotifySettings::kRefreshToken, tokens.refresh_token);
   }
   if (tokens.expires_in > 0) {
     settings.SetIntValue(SpotifySettings::kExpiresIn, tokens.expires_in);
@@ -73,7 +73,7 @@ void SpotifyService::Login(const std::string &username, const std::string &passw
     settings.SetValue("username", username);
   }
   settings.SetValue("token", password_or_token);
-  settings.SetValue(SpotifySettings::kAccessToken, password_or_token);
+  settings.SetSecretValue(SpotifySettings::kAccessToken, password_or_token);
   settings.Sync();
   ReloadSettings();
   NotifyAuthenticationChanged();

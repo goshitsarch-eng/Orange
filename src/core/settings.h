@@ -30,6 +30,14 @@ class Settings {
   void SetDoubleValue(const std::string &key, double value);
   void SetBoolValue(const std::string &key, bool value);
 
+  // Credentials - passwords, OAuth tokens, scrobbler session keys.
+  // These go to the system keyring when one is available, and fall back to the settings file when it is
+  // not. Reading migrates any value still held in the settings file into the keyring and drops the
+  // plaintext copy, so an existing configuration moves over on first use.
+  std::string SecretValue(const std::string &key, const std::string &fallback = {});
+  void SetSecretValue(const std::string &key, const std::string &value);
+  void RemoveSecret(const std::string &key);
+
   void Remove(const std::string &key);
   std::vector<std::string> Keys() const;
   bool Sync();

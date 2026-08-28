@@ -82,12 +82,14 @@ GtkWidget *AddEntry(AdwPreferencesGroup *group, Settings *settings, const char *
 GtkWidget *AddPasswordEntry(AdwPreferencesGroup *group, Settings *settings, const char *key, const char *title, const char *fallback) {
   AdwPasswordEntryRow *row = ADW_PASSWORD_ENTRY_ROW(adw_password_entry_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
-  gtk_editable_set_text(GTK_EDITABLE(row), settings->Value(key, fallback ? fallback : "").c_str());
+  // Password rows read and write through the credential store, so what the user types here reaches the
+  // system keyring rather than the settings file.
+  gtk_editable_set_text(GTK_EDITABLE(row), settings->SecretValue(key, fallback ? fallback : "").c_str());
   g_object_set_data_full(G_OBJECT(row), "settings-key", g_strdup(key), g_free);
   g_signal_connect(row, "changed", G_CALLBACK(+[](AdwPasswordEntryRow *entry, gpointer data) {
                      auto *s = static_cast<Settings *>(data);
                      const char *settings_key = static_cast<const char *>(g_object_get_data(G_OBJECT(entry), "settings-key"));
-                     s->SetValue(settings_key, gtk_editable_get_text(GTK_EDITABLE(entry)));
+                     s->SetSecretValue(settings_key, gtk_editable_get_text(GTK_EDITABLE(entry)));
                      s->Sync();
                    }),
                    settings);

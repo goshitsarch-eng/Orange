@@ -31,9 +31,9 @@ void TidalService::ReloadSettings() {
   settings.BeginGroup(TidalSettings::kSettingsGroup);
   token_ = settings.Value("token");
   if (token_.empty()) {
-    token_ = settings.Value(TidalSettings::kAccessToken);
+    token_ = settings.SecretValue(TidalSettings::kAccessToken);
   }
-  refresh_token_ = settings.Value(TidalSettings::kRefreshToken);
+  refresh_token_ = settings.SecretValue(TidalSettings::kRefreshToken);
   expires_in_ = settings.IntValue(TidalSettings::kExpiresIn);
   login_time_ = settings.Int64Value(TidalSettings::kLoginTime);
   client_id_ = settings.Value(TidalSettings::kClientId);
@@ -58,10 +58,10 @@ void TidalService::StoreTokens(const OAuthenticator::TokenResponse &tokens) {
   settings.BeginGroup(TidalSettings::kSettingsGroup);
   if (!tokens.access_token.empty()) {
     settings.SetValue("token", tokens.access_token);
-    settings.SetValue(TidalSettings::kAccessToken, tokens.access_token);
+    settings.SetSecretValue(TidalSettings::kAccessToken, tokens.access_token);
   }
   if (!tokens.refresh_token.empty()) {
-    settings.SetValue(TidalSettings::kRefreshToken, tokens.refresh_token);
+    settings.SetSecretValue(TidalSettings::kRefreshToken, tokens.refresh_token);
   }
   if (tokens.expires_in > 0) {
     settings.SetIntValue(TidalSettings::kExpiresIn, tokens.expires_in);
@@ -90,7 +90,7 @@ void TidalService::Login(const std::string &username, const std::string &passwor
     settings.SetValue("username", username);
   }
   settings.SetValue("token", password_or_token);
-  settings.SetValue(TidalSettings::kAccessToken, password_or_token);
+  settings.SetSecretValue(TidalSettings::kAccessToken, password_or_token);
   settings.Sync();
   ReloadSettings();
   NotifyAuthenticationChanged();

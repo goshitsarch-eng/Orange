@@ -162,6 +162,7 @@ set(STRAWBERRY_SOURCES
   src/core/logging.cpp
   src/core/standardpaths.cpp
   src/core/settings.cpp
+  src/core/secretstore.cpp
   src/core/song.cpp
   src/core/database.cpp
   src/core/taskmanager.cpp
@@ -850,6 +851,7 @@ if(GTest_FOUND)
     tests/src/globalshortcuts_test.cpp
     tests/src/mpris2_test.cpp
     tests/src/settings_test.cpp
+    tests/src/secretstore_test.cpp
     tests/src/settingspage_test.cpp
     tests/src/jsonutils_test.cpp
     tests/src/moodbar_waveform_test.cpp
@@ -857,6 +859,7 @@ if(GTest_FOUND)
     src/core/logging.cpp
     src/core/standardpaths.cpp
     src/core/settings.cpp
+    src/core/secretstore.cpp
     src/core/commandlineoptions.cpp
     src/core/song.cpp
     src/core/database.cpp

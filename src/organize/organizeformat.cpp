@@ -97,7 +97,8 @@ std::string OrganizeFormat::TokenValue(const std::string &token, const Song &son
     if (song.track() <= 0) {
       return {};
     }
-    char buf[8];
+    // Track numbers come from tags and are not bounded, so the buffer has to fit any int.
+    char buf[16];
     std::snprintf(buf, sizeof(buf), "%02d", song.track());
     return buf;
   }

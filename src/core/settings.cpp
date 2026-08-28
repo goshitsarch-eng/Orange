@@ -1,7 +1,10 @@
 #include "core/settings.h"
 
 #include "core/logging.h"
+#include "core/secretstore.h"
 #include "core/standardpaths.h"
+
+#include <glib/gstdio.h>
 
 #include <memory>
 
@@ -138,6 +141,45 @@ std::vector<std::string> Settings::Keys() const {
   return keys;
 }
 
+std::string Settings::SecretValue(const std::string &key, const std::string &fallback) {
+  bool found = false;
+  const std::string stored = SecretStore::Lookup(group_, key, &found);
+  if (found) {
+    // A value still sitting in the settings file is stale once the keyring holds one.
+    if (Contains(key)) {
+      Remove(key);
+      Sync();
+    }
+    return stored;
+  }
+  if (!Contains(key)) {
+    return fallback;
+  }
+  const std::string plaintext = Value(key, fallback);
+  // Migration: move what the settings file holds into the keyring and stop keeping it in the clear.
+  if (!plaintext.empty() && SecretStore::Store(group_, key, plaintext)) {
+    Remove(key);
+    Sync();
+  }
+  return plaintext;
+}
+
+void Settings::SetSecretValue(const std::string &key, const std::string &value) {
+  if (SecretStore::Store(group_, key, value)) {
+    if (Contains(key)) {
+      Remove(key);
+    }
+    return;
+  }
+  // No keyring available, so the settings file stays the only place to put this.
+  SetValue(key, value);
+}
+
+void Settings::RemoveSecret(const std::string &key) {
+  SecretStore::Erase(group_, key);
+  Remove(key);
+}
+
 bool Settings::Sync() {
   GError *error = nullptr;
   if (!g_key_file_save_to_file(key_file_, path_.c_str(), &error)) {
@@ -146,6 +188,12 @@ bool Settings::Sync() {
       g_error_free(error);
     }
     return false;
+  }
+  // The file is created with the process umask, which normally leaves it world-readable. It holds account
+  // names and server addresses, and on a build with no keyring it still holds the credentials themselves,
+  // so restrict it to the owner.
+  if (g_chmod(path_.c_str(), 0600) != 0) {
+    LogWarning("Could not restrict permissions on %s", path_.c_str());
   }
   return true;
 }
