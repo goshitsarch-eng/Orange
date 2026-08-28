@@ -202,9 +202,10 @@ GtkWidget *AddColorButton(AdwPreferencesGroup *group, Settings *settings, const 
                           const char *fallback, const char *tooltip) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
+  // gtk_color_dialog_button_new() takes ownership of the dialog, so there is no reference here to drop.
+  // Dropping one anyway freed the dialog out from under the button.
   GtkColorDialog *dialog = gtk_color_dialog_new();
   GtkWidget *button = gtk_color_dialog_button_new(dialog);
-  g_object_unref(dialog);
   if (tooltip && tooltip[0]) {
     gtk_widget_set_tooltip_text(button, Translations::CStr(tooltip));
   }
@@ -252,9 +253,10 @@ void AddFontButton(AdwPreferencesGroup *group, Settings *settings, const char *g
                    const char *fallback) {
   AdwActionRow *row = ADW_ACTION_ROW(adw_action_row_new());
   adw_preferences_row_set_title(ADW_PREFERENCES_ROW(row), Translations::CStr(title));
+  // gtk_font_dialog_button_new() takes ownership of the dialog, so there is no reference here to drop.
+  // Dropping one anyway freed the dialog, and the set_font_desc() below then dereferenced it.
   GtkFontDialog *dialog = gtk_font_dialog_new();
   GtkWidget *button = gtk_font_dialog_button_new(dialog);
-  g_object_unref(dialog);
   const std::string stored = settings ? settings->Value(key, fallback ? fallback : "") : (fallback ? fallback : "");
   const std::string pango = FontUtils::ToPango(FontUtils::Parse(stored));
   PangoFontDescription *desc = pango_font_description_from_string(pango.c_str());
