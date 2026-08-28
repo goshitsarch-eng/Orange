@@ -6,12 +6,14 @@
 #include "core/signal.h"
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
 class AcoustidClient {
  public:
   explicit AcoustidClient(NetworkAccessManager *network);
+  ~AcoustidClient();
 
   void SetTimeout(int msec) {
     timeout_msec_ = msec;
@@ -30,6 +32,9 @@ class AcoustidClient {
   NetworkTimeouts timeouts_;
   int timeout_msec_ = 5000;
   std::map<int, int> requests_;
+  // Network replies arrive long after this client can be destroyed, so callbacks hold a copy of this flag
+  // instead of trusting the pointer they captured.
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 };
 
 #endif

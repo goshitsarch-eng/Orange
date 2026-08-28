@@ -15,6 +15,11 @@ MusicBrainzClient::MusicBrainzClient(NetworkAccessManager *network) : network_(n
   });
 }
 
+MusicBrainzClient::~MusicBrainzClient() {
+  *alive_ = false;
+  CancelAll();
+}
+
 MusicBrainzClient::ResultList MusicBrainzClient::ParseDiscResults(const std::string &json, const std::string &disc_id) {
   return MusicBrainzDiscId::ParseDiscResults(json, disc_id);
 }
@@ -70,7 +75,10 @@ void MusicBrainzClient::StartDiscId(const std::string &disc_id) {
   const std::string url = MusicBrainzDiscId::DiscUrl(disc_id);
   const int req = network_->Get(
       url,
-      [this, disc_id](const NetworkAccessManager::Response &response) {
+      [this, disc_id, alive = alive_](const NetworkAccessManager::Response &response) {
+        if (!*alive) {
+          return;
+        }
         if (!response.ok()) {
           DiscIdFinished.Emit(disc_id, {}, NetworkTimeoutPolicy::FailureMessage(response.error, "MusicBrainz request failed"));
           return;
@@ -90,7 +98,10 @@ void MusicBrainzClient::Start(int id, const std::vector<std::string> &mbid_list)
                           "?inc=artists+releases+release-groups&fmt=json";
   const int req = network_->Get(
       url,
-      [this, id](const NetworkAccessManager::Response &response) {
+      [this, id, alive = alive_](const NetworkAccessManager::Response &response) {
+        if (!*alive) {
+          return;
+        }
         auto it = requests_.find(id);
         if (it != requests_.end()) {
           timeouts_.Cancel(it->second);

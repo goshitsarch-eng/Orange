@@ -17,6 +17,11 @@ AcoustidClient::AcoustidClient(NetworkAccessManager *network) : network_(network
   });
 }
 
+AcoustidClient::~AcoustidClient() {
+  *alive_ = false;
+  CancelAll();
+}
+
 std::vector<std::string> AcoustidClient::ParseMbids(const std::string &json) {
   std::vector<std::string> mbids;
   JsonParser *parser = json_parser_new();
@@ -67,7 +72,10 @@ void AcoustidClient::Start(int id, const std::string &fingerprint, int duration_
                           std::to_string(std::max(1, duration_msec / 1000)) + "&fingerprint=" + (escaped ? escaped : "");
   g_free(escaped);
   timeouts_.SetTimeout(timeout_msec_);
-  const int req = network_->Get(url, [this, id](const NetworkAccessManager::Response &response) {
+  const int req = network_->Get(url, [this, id, alive = alive_](const NetworkAccessManager::Response &response) {
+    if (!*alive) {
+      return;
+    }
     auto it = requests_.find(id);
     if (it != requests_.end()) {
       timeouts_.Cancel(it->second);

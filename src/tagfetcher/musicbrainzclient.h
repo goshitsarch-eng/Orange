@@ -7,6 +7,7 @@
 #include "core/song.h"
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,7 @@ class MusicBrainzClient {
   using ResultList = std::vector<Result>;
 
   explicit MusicBrainzClient(NetworkAccessManager *network);
+  ~MusicBrainzClient();
 
   void Start(int id, const std::vector<std::string> &mbid_list);
   void StartDiscId(const std::string &disc_id);
@@ -45,6 +47,9 @@ class MusicBrainzClient {
   NetworkAccessManager *network_ = nullptr;
   NetworkTimeouts timeouts_;
   std::map<int, int> requests_;
+  // Network replies arrive long after this client can be destroyed, so callbacks hold a copy of this flag
+  // instead of trusting the pointer they captured.
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 };
 
 #endif

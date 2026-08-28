@@ -43,6 +43,8 @@ class NetworkAccessManager {
   SoupSession *session() const { return session_; }
 
  private:
+  struct PendingRequest;
+
   int Send(SoupMessage *message, Callback callback);
   void Forget(int id);
   void ApplySessionDefaults();
@@ -50,7 +52,7 @@ class NetworkAccessManager {
 
   SoupSession *session_ = nullptr;
   int next_id_ = 1;
-  std::map<int, GCancellable *> cancellables_;
+  std::map<int, PendingRequest *> pending_;
   gulong network_changed_id_ = 0;
 };
 

@@ -7,15 +7,15 @@
 
 #include <glib.h>
 
-namespace {
-
-struct PendingRequest {
+struct NetworkAccessManager::PendingRequest {
   NetworkAccessManager::Callback callback;
   SoupMessage *message = nullptr;
   GCancellable *cancellable = nullptr;
   int id = 0;
   NetworkAccessManager *self = nullptr;
 };
+
+namespace {
 
 void OnNetworkChanged(GNetworkMonitor *, gboolean available, gpointer data) {
   auto *self = static_cast<NetworkAccessManager *>(data);
@@ -38,6 +38,15 @@ NetworkAccessManager::~NetworkAccessManager() {
     g_signal_handler_disconnect(g_network_monitor_get_default(), network_changed_id_);
     network_changed_id_ = 0;
   }
+  // Aborting the session still runs each request's completion callback.  Detach them from this manager and
+  // from their callers first, so nothing calls back into an object that is going away.
+  for (const auto &entry : pending_) {
+    if (entry.second) {
+      entry.second->self = nullptr;
+      entry.second->callback = nullptr;
+    }
+  }
+  pending_.clear();
   if (session_) {
     soup_session_abort(session_);
     g_object_unref(session_);
@@ -93,14 +102,19 @@ void NetworkAccessManager::ReloadSettings() {
   SetProxy(proxy.ProxyUri());
 }
 
-void NetworkAccessManager::Forget(int id) { cancellables_.erase(id); }
+void NetworkAccessManager::Forget(int id) { pending_.erase(id); }
 
 void NetworkAccessManager::Cancel(int id) {
-  auto it = cancellables_.find(id);
-  if (it == cancellables_.end() || !it->second) {
+  auto it = pending_.find(id);
+  if (it == pending_.end() || !it->second) {
     return;
   }
-  g_cancellable_cancel(it->second);
+  // libsoup still completes a cancelled request, so dropping the callback is what actually stops the caller
+  // from being told about a request it has already given up on -- and from being called after it is gone.
+  it->second->callback = nullptr;
+  if (it->second->cancellable) {
+    g_cancellable_cancel(it->second->cancellable);
+  }
 }
 
 int NetworkAccessManager::Send(SoupMessage *message, Callback callback) {
@@ -108,7 +122,7 @@ int NetworkAccessManager::Send(SoupMessage *message, Callback callback) {
   GCancellable *cancellable = g_cancellable_new();
   auto *pending = new PendingRequest{std::move(callback), message, cancellable, id, this};
   g_object_ref(message);
-  cancellables_[id] = cancellable;
+  pending_[id] = pending;
   soup_session_send_and_read_async(session_, message, G_PRIORITY_DEFAULT, cancellable,
                                    +[](GObject *source, GAsyncResult *result, gpointer user_data) {
                                      auto *pending = static_cast<PendingRequest *>(user_data);
@@ -131,7 +145,9 @@ int NetworkAccessManager::Send(SoupMessage *message, Callback callback) {
                                      if (pending->self) {
                                        pending->self->Forget(pending->id);
                                      }
-                                     pending->callback(response);
+                                     if (pending->callback) {
+                                       pending->callback(response);
+                                     }
                                      if (pending->message) {
                                        g_object_unref(pending->message);
                                      }

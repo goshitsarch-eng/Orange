@@ -19,6 +19,7 @@ class TagFetcher {
   };
 
   explicit TagFetcher(NetworkAccessManager *network);
+  ~TagFetcher();
   int Fetch(const Song &song);
   std::vector<int> QueueSongs(const SongList &songs);
   std::vector<int> FetchSongs(const SongList &songs);
@@ -49,6 +50,9 @@ class TagFetcher {
   bool running_ = false;
   bool cancelled_ = false;
   int next_id_ = 1;
+  // Network replies arrive long after this client can be destroyed, so callbacks hold a copy of this flag
+  // instead of trusting the pointer they captured.
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 };
 
 #endif

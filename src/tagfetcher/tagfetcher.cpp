@@ -81,6 +81,11 @@ void TagFetcher::Complete(int id, SongList results, const std::string &error) {
   StartNext();
 }
 
+TagFetcher::~TagFetcher() {
+  *alive_ = false;
+  cancelled_ = true;
+}
+
 void TagFetcher::FetchByMetadata(const Job &job) {
   if (!network_) {
     Complete(job.id, {}, "No network");
@@ -100,7 +105,10 @@ void TagFetcher::FetchByMetadata(const Job &job) {
   g_free(escaped);
   const int id = job.id;
   const Song original = job.song;
-  network_->Get(url, [this, id, original](const NetworkAccessManager::Response &response) {
+  network_->Get(url, [this, id, original, alive = alive_](const NetworkAccessManager::Response &response) {
+    if (!*alive) {
+      return;
+    }
     if (cancelled_ || current_.id != id) {
       return;
     }

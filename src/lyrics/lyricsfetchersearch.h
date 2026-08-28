@@ -8,6 +8,7 @@
 #include <glib.h>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 class LyricsProviders;
@@ -40,6 +41,9 @@ class LyricsFetcherSearch {
   gint64 started_us_ = 0;
   guint early_timeout_id_ = 0;
   guint hard_timeout_id_ = 0;
+  // Provider searches call back long after this object can be deleted, so they hold a copy of this flag
+  // rather than trusting the pointer they captured.
+  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
 };
 
 #endif

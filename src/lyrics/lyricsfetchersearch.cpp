@@ -5,6 +5,7 @@
 #include "lyrics/lyricssearchtimeout.h"
 
 #include <algorithm>
+#include <memory>
 #include <vector>
 
 namespace {
@@ -24,7 +25,10 @@ gboolean LyricsSearchHardTimeoutCb(gpointer data) {
 LyricsFetcherSearch::LyricsFetcherSearch(uint64_t id, LyricsSearchRequest request, LyricsProviders *providers)
     : id_(id), request_(std::move(request)), providers_(providers) {}
 
-LyricsFetcherSearch::~LyricsFetcherSearch() { CancelTimeouts(); }
+LyricsFetcherSearch::~LyricsFetcherSearch() {
+  *alive_ = false;
+  CancelTimeouts();
+}
 
 void LyricsFetcherSearch::Start() {
   if (!providers_ || LyricsSearchTimeout::ShouldSkipCommercial(request_.artist, request_.title)) {
@@ -46,9 +50,15 @@ void LyricsFetcherSearch::Start() {
     return;
   }
   pending_ = static_cast<int>(enabled.size());
+  const std::shared_ptr<bool> alive = alive_;
   for (LyricsProvider *provider : enabled) {
     provider->StartSearch(static_cast<int>(id_), request_, providers_->network(),
-                          [this](int, const LyricsSearchResults &found) { OnProviderFinished(found); });
+                          [this, alive](int, const LyricsSearchResults &found) {
+                            if (!*alive) {
+                              return;
+                            }
+                            OnProviderFinished(found);
+                          });
   }
   early_timeout_id_ = g_timeout_add(LyricsSearchTimeout::kEarlyMs, LyricsSearchEarlyTimeoutCb, this);
   hard_timeout_id_ = g_timeout_add(LyricsSearchTimeout::kHardMs, LyricsSearchHardTimeoutCb, this);

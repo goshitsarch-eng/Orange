@@ -280,6 +280,11 @@ MainWindow::MainWindow(AdwApplication *gtk_app, Application *app, const Commandl
 }
 
 MainWindow::~MainWindow() {
+  if (window_) {
+    // Handlers installed on the window all capture this; the application may outlive MainWindow and destroy
+    // the window afterwards, so drop them before the object goes away.
+    g_signal_handlers_disconnect_by_data(window_, this);
+  }
   if (metadata_alive_) {
     *metadata_alive_ = false;
   }
@@ -417,6 +422,16 @@ void MainWindow::CommandlineReceived(const CommandlineOptions &options) {
 
 void MainWindow::BuildUi() {
   window_ = ADW_APPLICATION_WINDOW(adw_application_window_new(GTK_APPLICATION(gtk_app_)));
+  // The application owns the window, so it can be destroyed before MainWindow is.  Record the geometry while
+  // the widget is still alive and then forget it, otherwise the destructor reads a freed window and unparents
+  // a popover whose parent has already gone.
+  g_signal_connect(window_, "destroy", G_CALLBACK(+[](GtkWidget *, gpointer data) {
+                     auto *self = static_cast<MainWindow *>(data);
+                     self->SaveGeometry();
+                     self->seekbar_menu_ = nullptr;
+                     self->window_ = nullptr;
+                   }),
+                   this);
   error_dialog_ = std::make_unique<QueuedErrorDialog>(GTK_WINDOW(window_));
   g_signal_connect(window_, "notify::is-active", G_CALLBACK((+[](GObject *, GParamSpec *, gpointer data) {
                      if (ErrorDialogQueue::ShouldCheckAfterChange(ErrorDialogQueue::WindowEvent::Activate)) {
@@ -716,6 +731,9 @@ void MainWindow::BuildUi() {
                    }),
                    this);
   app_->HideForExit.Connect([this]() {
+    // Save while the window is still on screen: once it is hidden the allocation is gone and only the
+    // fallback default size survives.
+    SaveGeometry();
     gtk_widget_set_visible(GTK_WIDGET(window_), FALSE);
     if (app_->tray()->available()) {
       app_->tray()->SetVisible(false);
