@@ -32,7 +32,10 @@
 #include <QStandardPaths>
 #include <QMessageBox>
 #include <QScrollBar>
+#include <QAction>
+#include <QIcon>
 #include <QLineEdit>
+#include <QMenu>
 #include <QToolButton>
 #include <QFileDialog>
 #include <QSpacerItem>
@@ -46,6 +49,7 @@
 #include "core/iconloader.h"
 #include "core/settings.h"
 #include "core/mimedata.h"
+#include "utilities/networkmounts.h"
 #include "dialogs/deleteconfirmationdialog.h"
 #include "fileview.h"
 #include "fileviewlist.h"
@@ -67,7 +71,8 @@ FileView::FileView(QWidget *parent)
       task_manager_(nullptr),
       storage_(new FilesystemMusicStorage(Song::Source::LocalFile, u"/"_s)),
       tree_view_active_(false),
-      view_mode_spacer_(nullptr) {
+      view_mode_spacer_(nullptr),
+      network_menu_(nullptr) {
 
   ui_->setupUi(this);
 
@@ -76,6 +81,9 @@ FileView::FileView(QWidget *parent)
   ui_->forward->setIcon(IconLoader::Load(u"go-next"_s));
   ui_->home->setIcon(IconLoader::Load(u"go-home"_s));
   ui_->up->setIcon(IconLoader::Load(u"go-up"_s));
+  QIcon network_icon = IconLoader::Load(u"network-server"_s);
+  if (network_icon.isNull()) network_icon = IconLoader::Load(u"applications-internet"_s);
+  ui_->network->setIcon(network_icon);
   ui_->toggle_view->setIcon(IconLoader::Load(u"view-choose"_s));
 
   QObject::connect(ui_->back, &QToolButton::clicked, undo_stack_, &QUndoStack::undo);
@@ -84,6 +92,10 @@ FileView::FileView(QWidget *parent)
   QObject::connect(ui_->up, &QToolButton::clicked, this, &FileView::FileUp);
   QObject::connect(ui_->path, &QLineEdit::textChanged, this, &FileView::ChangeFilePath);
   QObject::connect(ui_->toggle_view, &QToolButton::clicked, this, &FileView::ToggleViewMode);
+
+  network_menu_ = new QMenu(this);
+  ui_->network->setMenu(network_menu_);
+  QObject::connect(network_menu_, &QMenu::aboutToShow, this, &FileView::PopulateNetworkMenu);
 
   QObject::connect(undo_stack_, &QUndoStack::canUndoChanged, ui_->back, &FileView::setEnabled);
   QObject::connect(undo_stack_, &QUndoStack::canRedoChanged, ui_->forward, &FileView::setEnabled);
@@ -135,6 +147,7 @@ void FileView::ReloadSettings() {
   ui_->forward->setIconSize(QSize(iconsize, iconsize));
   ui_->home->setIconSize(QSize(iconsize, iconsize));
   ui_->up->setIconSize(QSize(iconsize, iconsize));
+  ui_->network->setIconSize(QSize(iconsize, iconsize));
   ui_->toggle_view->setIconSize(QSize(iconsize, iconsize));
   ui_->add_tree_root->setIconSize(QSize(iconsize, iconsize));
   ui_->remove_tree_root->setIconSize(QSize(iconsize, iconsize));
@@ -374,6 +387,40 @@ void FileView::ToggleViewMode() {
   s.beginGroup(u"FileView"_s);
   s.setValue(u"tree_view_active"_s, tree_view_active_);
   s.endGroup();
+
+}
+
+void FileView::PopulateNetworkMenu() {
+
+  network_menu_->clear();
+
+  const QList<Utilities::NetworkMount> network_mounts = Utilities::NetworkMounts();
+
+  if (network_mounts.isEmpty()) {
+    QAction *action_empty = network_menu_->addAction(tr("No network shares found"));
+    action_empty->setEnabled(false);
+    QAction *action_hint = network_menu_->addAction(tr("Mount a share with your file manager and it appears here"));
+    action_hint->setEnabled(false);
+    return;
+  }
+
+  const QIcon folder_icon = IconLoader::Load(u"folder"_s);
+  for (const Utilities::NetworkMount &network_mount : network_mounts) {
+    QAction *action = network_menu_->addAction(folder_icon, network_mount.name);
+    const QString path = network_mount.path;
+    QObject::connect(action, &QAction::triggered, this, [this, path]() { OpenNetworkMount(path); });
+  }
+
+}
+
+void FileView::OpenNetworkMount(const QString &path) {
+
+  if (tree_view_active_) {
+    AddTreeRootPath(path);
+  }
+  else {
+    ChangeFilePath(path);
+  }
 
 }
 

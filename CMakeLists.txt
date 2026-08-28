@@ -501,6 +501,7 @@ set(SOURCES
   src/utilities/screenutils.cpp
   src/utilities/textencodingutils.cpp
   src/utilities/styleutils.cpp
+  src/utilities/networkmounts.cpp
   src/utilities/coveroptions.cpp
   src/utilities/musixmatchprovider.cpp
 

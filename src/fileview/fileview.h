@@ -34,6 +34,7 @@
 #include "includes/shared_ptr.h"
 #include "core/song.h"
 
+class QMenu;
 class QMimeData;
 class QFileSystemModel;
 class QFileIconProvider;
@@ -79,6 +80,8 @@ class FileView : public QWidget {
   void ItemActivated(const QModelIndex &idx);
   void ItemDoubleClick(const QModelIndex &idx);
   void ToggleViewMode();
+  void PopulateNetworkMenu();
+  void OpenNetworkMount(const QString &path);
 
   void Delete(const QStringList &filenames);
   void DeleteFinished(const SongList &songs_with_errors);
@@ -137,6 +140,7 @@ class FileView : public QWidget {
 
   bool tree_view_active_;
   QSpacerItem *view_mode_spacer_;
+  QMenu *network_menu_;
 };
 
 #endif  // FILEVIEW_H
