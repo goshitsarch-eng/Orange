@@ -9,6 +9,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
+#include <cmath>
 
 namespace StrUtils {
 
@@ -99,6 +101,31 @@ std::string SqlLikeEscape(const std::string &value) {
 
 std::string SqlQuote(const std::string &value) {
   return "'" + Replace(value, "'", "''") + "'";
+}
+
+bool ParseNumber(const std::string &value, double *out) {
+  if (!out) {
+    return false;
+  }
+  const std::string trimmed = Trim(value);
+  if (trimmed.empty()) {
+    return false;
+  }
+  errno = 0;
+  char *end = nullptr;
+  // strtod is locale-sensitive; the filter syntax is not, so parse in the C locale.
+  const double parsed = g_ascii_strtod(trimmed.c_str(), &end);
+  if (end == trimmed.c_str() || (end && *end != '\0') || errno == ERANGE || !std::isfinite(parsed)) {
+    return false;
+  }
+  *out = parsed;
+  return true;
+}
+
+std::string FormatNumberForSql(const double value) {
+  char buf[G_ASCII_DTOSTR_BUF_SIZE];
+  g_ascii_formatd(buf, sizeof(buf), "%.10g", value);
+  return buf;
 }
 
 std::string UriEscape(const std::string &value) {

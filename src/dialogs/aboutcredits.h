@@ -11,10 +11,16 @@ inline const char *AuthorSection() { return "Author and maintainer"; }
 inline const char *ContributorsSection() { return "Contributors"; }
 inline const char *ClementineAuthorsSection() { return "Clementine authors"; }
 inline const char *ClementineContributorsSection() { return "Clementine contributors"; }
+inline const char *AmarokSection() { return "Amarok 1.4 authors"; }
 inline const char *ThanksSection() { return "Thanks to"; }
+inline const char *ThirdPartySection() { return "Built with"; }
 inline const char *ThanksOthers() { return "Thanks to all the other Amarok and Clementine contributors."; }
 inline const char *Description() { return "Strawberry is a music player and music collection organizer."; }
 inline const char *ForkNote() { return "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles."; }
+inline const char *LineageNote() {
+  return "Clementine itself began in 2010 as a port of Amarok 1.4, so parts of this codebase trace back to Amarok.";
+}
+inline const char *Copyright() { return "© 2018-2026 Jonas Kvinge and the Strawberry contributors"; }
 inline const char *GplNote() {
   return "Strawberry is free software released under GPL. The source code is available on GitHub.";
 }
@@ -34,7 +40,8 @@ inline const char *PayPalUrl() { return "https://paypal.me/jonaskvinge"; }
 
 inline const char *Comments() {
   return "Strawberry is a music player and music collection organizer.\n"
-         "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles.\n\n"
+         "It is a fork of Clementine released in 2018 aimed at music collectors and audiophiles.\n"
+         "Clementine itself began in 2010 as a port of Amarok 1.4, so parts of this codebase trace back to Amarok.\n\n"
          "Strawberry is free software released under GPL. The source code is available on GitHub.\n"
          "You should have received a copy of the GNU General Public License along with this program.  If not, see http://www.gnu.org/licenses/\n\n"
          "If you like Strawberry and can make use of it, consider sponsoring or donating.\n"
@@ -139,6 +146,43 @@ inline const char **ClementineContributors() {
                                 "Krzysztof Sobiecki",
                                 "Valeriy Malov",
                                 "Nick Lanham",
+                                nullptr};
+  return names;
+}
+
+// Strawberry is a fork of Clementine, and Clementine started life as a port of Amarok 1.4.
+// Amarok's original authors are credited here because code and design from Amarok 1.4 survives in this
+// codebase by way of Clementine.
+inline const char **AmarokAuthors() {
+  static const char *names[] = {"Mark Kretschmann", "Max Howell", "Ian Monroe", "Alexandre Oliveira",
+                                "Christian Muehlhaeuser", "Seb Ruiz", "Gábor Lehel", "Nikolaj Hald Nielsen",
+                                "Dan Meltzer", "Jeff Mitchell", nullptr};
+  return names;
+}
+
+// Third-party projects Strawberry is built on.
+// This list is kept in sync with the dependencies declared in CMakeLists.txt.
+inline const char **ThirdParty() {
+  static const char *names[] = {"GTK — https://www.gtk.org/",
+                                "libadwaita — https://gnome.pages.gitlab.gnome.org/libadwaita/",
+                                "GLib / GObject / GIO — https://gitlab.gnome.org/GNOME/glib",
+                                "GStreamer — https://gstreamer.freedesktop.org/",
+                                "TagLib — https://taglib.org/",
+                                "SQLite — https://www.sqlite.org/",
+                                "libsoup — https://libsoup.gnome.org/",
+                                "json-glib — https://gitlab.gnome.org/GNOME/json-glib",
+                                "ICU — https://icu.unicode.org/",
+                                "Boost — https://www.boost.org/",
+                                "libsecret — https://gitlab.gnome.org/GNOME/libsecret",
+                                "ALSA — https://www.alsa-project.org/",
+                                "PulseAudio — https://www.freedesktop.org/wiki/Software/PulseAudio/",
+                                "Chromaprint / AcoustID — https://acoustid.org/chromaprint",
+                                "MusicBrainz — https://musicbrainz.org/",
+                                "libebur128 — https://github.com/jiixyj/libebur128",
+                                "FFTW — https://www.fftw.org/",
+                                "libcdio — https://www.gnu.org/software/libcdio/",
+                                "libmtp — https://libmtp.sourceforge.net/",
+                                "libgpod — https://www.gtkpod.org/libgpod/",
                                 nullptr};
   return names;
 }

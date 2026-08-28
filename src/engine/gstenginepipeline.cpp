@@ -87,16 +87,26 @@ bool GstEnginePipeline::Create(const std::string &url, const std::string &output
       g_object_set(sink, "exclusive", extras.exclusive ? TRUE : FALSE, nullptr);
     }
     GstElement *bin = gst_bin_new("audio-bin");
-    GstElement *queue = gst_element_factory_make("queue", "audioqueue");
+    // queue2, not queue: use-buffering and the watermarks are queue2 properties. On a plain queue every one
+    // of them was rejected with a warning, so the configured buffer duration and watermarks did nothing.
+    GstElement *queue = gst_element_factory_make("queue2", "audioqueue");
+    if (!queue) {
+      queue = gst_element_factory_make("queue", "audioqueue");
+    }
     if (queue) {
       audioqueue_ = queue;
-      g_object_set(queue, "use-buffering", TRUE, nullptr);
+      GObjectClass *queue_class = G_OBJECT_GET_CLASS(queue);
+      if (g_object_class_find_property(queue_class, "use-buffering")) {
+        g_object_set(queue, "use-buffering", TRUE, nullptr);
+      }
       const int64_t buffer_ns = BackendOptions::BufferDurationNanosec(extras.buffer_duration_ms);
       if (buffer_ns > 0) {
         g_object_set(queue, "max-size-buffers", 0, "max-size-bytes", 0, "max-size-time", static_cast<guint64>(buffer_ns), nullptr);
       }
-      g_object_set(queue, "low-watermark", BackendOptions::ClampWatermark(extras.buffer_low_watermark), "high-watermark",
-                   BackendOptions::ClampWatermark(extras.buffer_high_watermark), nullptr);
+      if (g_object_class_find_property(queue_class, "low-watermark") && g_object_class_find_property(queue_class, "high-watermark")) {
+        g_object_set(queue, "low-watermark", BackendOptions::ClampWatermark(extras.buffer_low_watermark), "high-watermark",
+                     BackendOptions::ClampWatermark(extras.buffer_high_watermark), nullptr);
+      }
     }
     volume_ = extras.volume_control ? gst_element_factory_make("volume", "volume") : nullptr;
     if (volume_) {

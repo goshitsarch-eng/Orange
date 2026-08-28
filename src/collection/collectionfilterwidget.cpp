@@ -110,6 +110,7 @@ void CollectionFilterWidget::PromptSave() {
   adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "save", Translations::CStr("Save"), nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "save", ADW_RESPONSE_SUGGESTED);
   adw_alert_dialog_set_default_response(dialog, "save");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   g_object_set_data(G_OBJECT(dialog), "entry", entry);
   g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
                      if (g_strcmp0(response, "save") != 0) {

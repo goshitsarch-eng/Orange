@@ -179,7 +179,10 @@ std::string FilterParser::FreeTextSql(const std::string &value) {
   if (value.empty()) {
     return "1=1";
   }
-  const std::string like = "'%" + StrUtils::SqlLikeEscape(value) + "%' ESCAPE '\\'";
+  // SqlLikeEscape only escapes LIKE wildcards; the result still has to be quoted as a SQL string literal,
+  // or an apostrophe in the search text (searching for "Guns N' Roses", say) closes the literal early and
+  // the rest of the term is parsed as SQL.
+  const std::string like = StrUtils::SqlQuote("%" + StrUtils::SqlLikeEscape(value) + "%") + " ESCAPE '\\'";
   return "(title LIKE " + like + " OR album LIKE " + like + " OR artist LIKE " + like + " OR albumartist LIKE " + like +
          " OR composer LIKE " + like + " OR performer LIKE " + like + " OR genre LIKE " + like + " OR comment LIKE " + like + ")";
 }
@@ -220,7 +223,14 @@ std::string FilterParser::TermSql(FilterColumn column, FilterOperator op, const 
     } else if (op == FilterOperator::Le) {
       sql_op = "<=";
     }
-    return expr + " " + sql_op + " " + value;
+    // The column is numeric, but nothing has checked that the value the user typed is.
+    // Interpolating it unchecked lets "year:>0)OR(1=1" out of the comparison and into the WHERE clause, and
+    // even a harmless typo produces a bare word that SQLite resolves as a column name.
+    double number = 0.0;
+    if (!StrUtils::ParseNumber(value, &number)) {
+      return "1=1";
+    }
+    return expr + " " + sql_op + " " + StrUtils::FormatNumberForSql(number);
   }
   if (op == FilterOperator::Eq) {
     return "LOWER(" + sql_column + ") = " + StrUtils::SqlQuote(StrUtils::ToLower(value));
@@ -228,7 +238,7 @@ std::string FilterParser::TermSql(FilterColumn column, FilterOperator op, const 
   if (op == FilterOperator::Ne) {
     return "LOWER(" + sql_column + ") != " + StrUtils::SqlQuote(StrUtils::ToLower(value));
   }
-  return sql_column + " LIKE '%" + StrUtils::SqlLikeEscape(value) + "%' ESCAPE '\\'";
+  return sql_column + " LIKE " + StrUtils::SqlQuote("%" + StrUtils::SqlLikeEscape(value) + "%") + " ESCAPE '\\'";
 }
 
 namespace {

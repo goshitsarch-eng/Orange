@@ -12,6 +12,8 @@ void AddStreamDialog::Show(GtkWindow *parent, const std::function<void(const std
   adw_alert_dialog_set_extra_child(dialog, url);
   adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "add", Translations::CStr(AddStreamUrl::Add()), nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "add", ADW_RESPONSE_SUGGESTED);
+  adw_alert_dialog_set_default_response(dialog, "add");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   adw_alert_dialog_set_response_enabled(dialog, "add", FALSE);
   g_signal_connect(url, "changed", G_CALLBACK((+[](GtkEditable *editable, gpointer data) {
                      const char *text = gtk_editable_get_text(editable);

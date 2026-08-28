@@ -198,15 +198,15 @@ void ContextView::ReloadSettings() {
                                                                                          ContextSettings::kDefaultFontSizeNormal)));
   if (title_) {
     gtk_widget_set_name(title_, Idle() ? "context-idle" : "context-headline");
-    StyleUtils::LoadCss(ContextFont::CssRule("#context-headline", headline));
+    StyleUtils::LoadCss(ContextFont::CssRule("#context-headline", headline), StyleUtils::Slot::kContextHeadline);
     FontUtils::Font idle_font = headline;
     idle_font.size_pt = ContextIdle::IdleFontSizePt(headline.size_pt);
-    StyleUtils::LoadCss(ContextFont::CssRule("#context-idle", idle_font));
+    StyleUtils::LoadCss(ContextFont::CssRule("#context-idle", idle_font), StyleUtils::Slot::kContextIdle);
   }
   if (artist_ && album_label_) {
     gtk_widget_set_name(artist_, "context-normal");
     gtk_widget_set_name(album_label_, "context-summary");
-    StyleUtils::LoadCss(ContextFont::CssRule("#context-normal, #context-summary", normal));
+    StyleUtils::LoadCss(ContextFont::CssRule("#context-normal, #context-summary", normal), StyleUtils::Slot::kContextNormal);
   }
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), show_album_);
   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), show_data_);

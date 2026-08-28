@@ -86,7 +86,7 @@ void SubsonicService::ReloadSettings() {
   settings.BeginGroup(SubsonicSettings::kSettingsGroup);
   server_url_ = settings.Value(SubsonicSettings::kUrl);
   username_ = settings.Value(SubsonicSettings::kUsername);
-  password_ = settings.Value(SubsonicSettings::kPassword);
+  password_ = settings.SecretValue(SubsonicSettings::kPassword);
   if (password_.empty()) {
     password_ = settings.Value("token");
   }

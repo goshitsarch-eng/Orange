@@ -8,7 +8,12 @@ namespace {
 
 gboolean LyricsFetcherStarterCb(gpointer data) {
   auto *self = static_cast<LyricsFetcher *>(data);
-  return self->StartNext() ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
+  return self->OnStarterTick() ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
+}
+
+gboolean LyricsFetcherReapCb(gpointer data) {
+  static_cast<LyricsFetcher *>(data)->ReapFinished();
+  return G_SOURCE_REMOVE;
 }
 
 }  // namespace
@@ -17,6 +22,10 @@ LyricsFetcher::LyricsFetcher(LyricsProviders *lyrics_providers) : lyrics_provide
 
 LyricsFetcher::~LyricsFetcher() {
   CancelStarter();
+  if (reap_id_) {
+    g_source_remove(reap_id_);
+    reap_id_ = 0;
+  }
   Clear();
 }
 
@@ -31,9 +40,7 @@ uint64_t LyricsFetcher::Search(const std::string &effective_albumartist, const s
   request = LyricsFetcherPacing::Normalize(request);
   const uint64_t id = next_id_++;
   queued_.emplace(id, request);
-  if (!starter_id_) {
-    starter_id_ = g_timeout_add(LyricsFetcherPacing::kStarterDelayMs, LyricsFetcherStarterCb, this);
-  }
+  EnsureStarter();
   if (LyricsFetcherPacing::CanStartMore(static_cast<int>(active_.size()))) {
     StartNext();
   }
@@ -49,9 +56,10 @@ void LyricsFetcher::Clear() {
     delete entry.second;
   }
   active_.clear();
+  ReapFinished();
 }
 
-bool LyricsFetcher::StartNext() {
+void LyricsFetcher::StartNext() {
   while (!queued_.empty() && LyricsFetcherPacing::CanStartMore(static_cast<int>(active_.size()))) {
     auto item = queued_.front();
     queued_.pop();
@@ -60,24 +68,49 @@ bool LyricsFetcher::StartNext() {
       LyricsFetched.Emit(id, provider, lyrics);
     });
     search->SearchFinished.Connect([this](uint64_t id, const LyricsSearchResults &results) {
-      SearchFinished.Emit(id, results);
+      // This runs from inside the search's own Finish(), so the search is still on the stack and must not
+      // be destroyed here. Take it out of the active set and let an idle callback delete it once the stack
+      // has unwound.
       auto it = active_.find(id);
       if (it != active_.end()) {
-        delete it->second;
+        finished_.push_back(it->second);
         active_.erase(it);
+        if (!reap_id_) {
+          reap_id_ = g_idle_add(LyricsFetcherReapCb, this);
+        }
       }
-      if (!starter_id_ && !queued_.empty()) {
-        starter_id_ = g_timeout_add(LyricsFetcherPacing::kStarterDelayMs, LyricsFetcherStarterCb, this);
-      }
+      SearchFinished.Emit(id, results);
+      EnsureStarter();
     });
     active_[item.first] = search;
     search->Start();
   }
+}
+
+bool LyricsFetcher::OnStarterTick() {
+  StartNext();
   if (queued_.empty()) {
+    // Returning false makes GLib drop the source, so forget the id rather than trying to remove it later.
     starter_id_ = 0;
     return false;
   }
   return true;
+}
+
+void LyricsFetcher::EnsureStarter() {
+  if (!starter_id_ && !queued_.empty()) {
+    starter_id_ = g_timeout_add(LyricsFetcherPacing::kStarterDelayMs, LyricsFetcherStarterCb, this);
+  }
+}
+
+void LyricsFetcher::ReapFinished() {
+  reap_id_ = 0;
+  // Deleting a search can start another one, so work off a copy rather than the member.
+  std::vector<LyricsFetcherSearch *> searches;
+  searches.swap(finished_);
+  for (LyricsFetcherSearch *search : searches) {
+    delete search;
+  }
 }
 
 void LyricsFetcher::CancelStarter() {

@@ -66,7 +66,8 @@ BuildRequires:  appstream-util
 
 %description
 Strawberry is a music player and music collection organizer.
-It is a fork of Clementine. The name is inspired by the band Strawbs.
+It is a fork of Clementine, which was itself a port of Amarok 1.4.
+The name is inspired by the band Strawbs.
 
 Features:
   - Play and organize music

@@ -30,6 +30,14 @@ class Settings {
   void SetDoubleValue(const std::string &key, double value);
   void SetBoolValue(const std::string &key, bool value);
 
+  // Credentials - passwords, OAuth tokens, scrobbler session keys.
+  // These go to the system keyring when one is available, and fall back to the settings file when it is
+  // not. Reading migrates any value still held in the settings file into the keyring and drops the
+  // plaintext copy, so an existing configuration moves over on first use.
+  std::string SecretValue(const std::string &key, const std::string &fallback = {});
+  void SetSecretValue(const std::string &key, const std::string &value);
+  void RemoveSecret(const std::string &key);
+
   void Remove(const std::string &key);
   std::vector<std::string> Keys() const;
   bool Sync();
@@ -42,6 +50,10 @@ class Settings {
   GKeyFile *key_file_;
   std::string path_;
   std::string group_;
+  // Whether anything has been written since the last save.
+  // Settings objects are constructed all over the place purely to read a value, and rewriting the whole
+  // file when each of those is destroyed made reads as expensive as writes.
+  bool dirty_ = false;
 };
 
 #endif

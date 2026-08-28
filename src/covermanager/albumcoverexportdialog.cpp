@@ -146,6 +146,8 @@ void AlbumCoverExportDialog::Show(GtkWindow *parent, Application *app, const Son
                        AdwAlertDialog *empty = ADW_ALERT_DIALOG(
                            adw_alert_dialog_new(CoverManagerExportScope::FinishedTitle(), CoverManagerExportScope::NoCoversText()));
                        adw_alert_dialog_add_response(empty, "ok", "OK");
+                       adw_alert_dialog_set_default_response(empty, "ok");
+                       adw_alert_dialog_set_close_response(empty, "ok");
                        adw_dialog_present(ADW_DIALOG(empty), nullptr);
                        return;
                      }
@@ -168,6 +170,8 @@ void AlbumCoverExportDialog::Show(GtkWindow *parent, Application *app, const Son
                        const std::string body = CoverManagerExportScope::FinishedBody(exporter->exported(), exporter->skipped());
                        AdwAlertDialog *done = ADW_ALERT_DIALOG(adw_alert_dialog_new(CoverManagerExportScope::FinishedTitle(), body.c_str()));
                        adw_alert_dialog_add_response(done, "ok", "OK");
+                       adw_alert_dialog_set_default_response(done, "ok");
+                       adw_alert_dialog_set_close_response(done, "ok");
                        adw_dialog_present(ADW_DIALOG(done), nullptr);
                        g_idle_add(+[](gpointer data) -> gboolean {
                          delete static_cast<AlbumCoverExporter *>(data);

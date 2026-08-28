@@ -92,6 +92,8 @@ class PlaylistView {
   void UpdateDropIndicator(double y);
   void ClearDropIndicator();
   void ApplyColumnWidths();
+  int ViewportWidth() const;
+  static int ColumnWidthFrom(const std::vector<PlaylistColumn> &columns, const std::vector<int> &widths, PlaylistColumn column);
   void ReloadLookCss();
   void StartGlowTimer();
   void StopGlowTimer();
@@ -103,6 +105,9 @@ class PlaylistView {
   void OnHidden();
 
   GtkWidget *widget_ = nullptr;
+  // The scrolled window inside widget_, which is an overlay so the empty/no-matches status page can be
+  // positioned against the viewport rather than against the (often wider) scrolled content.
+  GtkWidget *scroller_ = nullptr;
   GtkWidget *grid_ = nullptr;
   GtkWidget *overlay_ = nullptr;
   GtkWidget *root_overlay_ = nullptr;
@@ -145,6 +150,13 @@ class PlaylistView {
   bool glowing_ = false;
   bool paused_ = false;
   guint glow_timeout_ = 0;
+  // Cached look settings.
+  // ReloadLookCss() runs on every glow animation tick, so it must not re-read the settings file each time.
+  void ReloadLookSettings();
+  bool look_alternating_ = true;
+  bool look_glow_ = true;
+  bool look_bars_ = true;
+  bool look_settings_loaded_ = false;
   bool inhibit_autoscroll_ = false;
   guint inhibit_timeout_ = 0;
   std::string typeahead_;

@@ -2,6 +2,52 @@ Strawberry Music Player
 =======================
 ChangeLog
 
+Version 2.0.0 (2026.08.28):
+
+  The user interface has been rewritten from Qt to GTK 4 and libadwaita.
+  Settings are now stored with GKeyFile instead of QSettings, so settings from 1.x are not carried over.
+  The collection and playlist database is unchanged and is picked up as before.
+
+  Notes:
+    * Credits now include Amarok, whose 1.4 release is the original ancestor of this codebase by way of Clementine, and the third-party projects Strawberry is built on
+
+  Security:
+    * Service passwords, OAuth access and refresh tokens, the Qobuz user auth token and the Last.fm session key are now stored in the system keyring through libsecret instead of in plaintext in strawberry.conf, and an existing configuration is migrated on first use. Where no keyring is available the settings file remains the fallback
+    * The settings file is now created readable only by its owner rather than with the process umask
+    * Fixed the collection filter putting the text you type into the generated SQL as syntax rather than as a value: an apostrophe (searching for "Guns N' Roses") produced a statement the database refused, and a crafted term could append a clause of its own
+    * Fixed a numeric filter term such as "year:>..." interpolating its value without checking it was a number
+
+  Crashes:
+    * Fixed the playlist header being freed by each refresh and then used, which produced forty GTK assertion failures before the main window was even shown
+    * Fixed opening Preferences segfaulting: the font and colour rows freed the dialog their button had taken ownership of
+    * Fixed a crash a few seconds after pressing play, when the automatic cover lookup returned and wrote through a pointer to a song that had gone out of scope
+    * Fixed a crash when the automatic lyrics lookup returned, caused by a finished search being deleted while its own signal was still being dispatched
+    * Fixed a signal handler that connects another handler, or destroys the object owning the signal, leaving the dispatch loop walking freed memory
+    * Fixed an orphaned lyrics timer that could no longer be cancelled and would fire into a destroyed fetcher
+
+  Performance:
+    * Fixed the settings file being rewritten and fsynced whenever any object that had only read from it went out of scope. Combined with the playlist re-reading the column layout for every cell, loading a 200 track playlist pinned the CPU and never finished painting; it now renders, and six hundred tracks display correctly
+    * Fixed a new GtkCssProvider being attached to the display on every restyle instead of the existing one being updated, which leaked providers without bound and progressively slowed the whole interface down while a track was playing
+    * Fixed the playlist re-reading the settings file on every frame of the glow animation
+
+  Bugfixes:
+    * Fixed the application icon, and every other bundled icon, never being installed, which left the application with no icon in the shell, the dock or the about dialog
+    * Fixed the sidebar stacking a full-height tab bar on top of its page, leaving the page a sliver at the bottom and clipping the collection's empty state
+    * Fixed sidebar tab labels collapsing to an ellipsis
+    * Fixed playlist columns being laid out against a width of zero and never corrected, because the view listened for a GtkWidget property that does not exist in GTK 4
+    * Fixed the playlist header not ellipsizing while its rows did, which stopped columns shrinking to fit and left the header out of step with the rows
+    * Fixed buffer duration and the buffer watermarks having no effect, because they were set on a queue rather than a queue2
+    * Fixed the icon fallback chain never being used, because GTK 4 icon lookups always succeed and return "image-missing" rather than failing
+    * Fixed clearing the playlist background leaving the previous background image applied
+    * Fixed alert dialogs having neither a default nor a close response, so Enter fell through to whatever had focus and Escape did nothing
+    * Fixed the edit tag dialog pushing its Save button off the bottom, and its tabs not scrolling
+    * Fixed the font rows offering a font the machine does not have installed
+
+  Enhancements:
+    * The playlist now shows a status page when it is empty, and distinguishes that from a filter that matches nothing
+    * The playlist header is now visually distinct from the rows
+    * Unavailable tracks are now greyed using the theme's foreground rather than a fixed colour that was nearly invisible in one theme and glaring in the other
+
 Version 1.2.27 (2026.08.11):
 
   Bugfixes:

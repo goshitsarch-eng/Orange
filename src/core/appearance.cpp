@@ -54,13 +54,13 @@ void Appearance::Apply() {
   }
   const std::string style_css = AppearanceStyle::CssFor(style_);
   if (!style_css.empty()) {
-    StyleUtils::LoadCss(style_css);
+    StyleUtils::LoadCss(style_css, StyleUtils::Slot::kAppearanceStyle);
   } else if (!style_.empty() && style_.find('{') != std::string::npos) {
-    StyleUtils::LoadCss(style_);
+    StyleUtils::LoadCss(style_, StyleUtils::Slot::kAppearanceStyle);
   }
   const std::string theme = ThemeCss();
   if (!theme.empty()) {
-    StyleUtils::LoadCss(theme);
+    StyleUtils::LoadCss(theme, StyleUtils::Slot::kAppearanceTheme);
   }
 }
 

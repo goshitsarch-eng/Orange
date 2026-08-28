@@ -15,6 +15,10 @@
 
 PlaylistHeader::PlaylistHeader() {
   widget_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+  // PlaylistView::Clear() unparents every child of its grid before each refresh, the header included.
+  // Without a reference of our own the unparent would drop the last one and free the box, leaving widget_
+  // dangling for the Rebuild() that immediately follows.
+  g_object_ref_sink(widget_);
   gtk_widget_add_css_class(widget_, "toolbar");
   gtk_widget_add_css_class(widget_, "strawberry-playlist-buttons");
   gtk_widget_set_focusable(widget_, TRUE);
@@ -221,7 +225,20 @@ void PlaylistHeader::OnDragUpdate(double offset_x) {
   NotifyWidthsChanged();
 }
 
+PlaylistHeader::~PlaylistHeader() {
+  if (widget_) {
+    if (gtk_widget_get_parent(widget_)) {
+      gtk_widget_unparent(widget_);
+    }
+    g_object_unref(widget_);
+    widget_ = nullptr;
+  }
+}
+
 void PlaylistHeader::Rebuild() {
+  if (!widget_) {
+    return;
+  }
   GtkWidget *child = gtk_widget_get_first_child(widget_);
   while (child) {
     GtkWidget *next = gtk_widget_get_next_sibling(child);
@@ -238,6 +255,13 @@ void PlaylistHeader::Rebuild() {
     GtkWidget *label = gtk_widget_get_first_child(button);
     if (GTK_IS_LABEL(label)) {
       gtk_label_set_xalign(GTK_LABEL(label), PlaylistColumnLayout::XAlign(column));
+      // The row cells ellipsize, so the header has to as well.
+      // A header label that reports its full text as its minimum width stops the column ever shrinking to
+      // the width it was allotted, which pushes the trailing columns off the edge of the viewport and puts
+      // the header out of step with the rows below it.
+      gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+      gtk_label_set_width_chars(GTK_LABEL(label), 0);
+      gtk_label_set_max_width_chars(GTK_LABEL(label), 0);
     }
     g_object_set_data(G_OBJECT(button), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
     g_signal_connect(button, "clicked", G_CALLBACK(+[](GtkButton *btn, gpointer data) {

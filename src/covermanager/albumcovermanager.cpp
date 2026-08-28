@@ -124,9 +124,9 @@ void PumpBatch(CoverManagerState *state) {
   const AlbumCoverBatch::Job *job = state->batch.Current();
   const std::string artist = job->artist;
   const std::string album = job->album;
-  Song song = job->song;
+  const Song song = job->song;
   UpdateBatchUi(state);
-  state->covers->FetchCover(&song, nullptr, nullptr, [state, artist, album](bool ok) {
+  state->covers->FetchCover(song, nullptr, nullptr, [state, artist, album](bool ok, const Song &) {
     if (!state->alive || !*state->alive) {
       return;
     }
@@ -500,11 +500,12 @@ void ShowAlbumMenu(CoverManagerState *state, AlbumCoverManagerList::Album album,
                        if (g_strcmp0(name, "fetch") == 0) {
                          const std::string artist = entry->artist;
                          const std::string album = entry->album;
-                         self->covers->FetchCover(&entry->song, image_widget, nullptr, [self, artist, album](bool ok) {
+                         self->covers->FetchCover(entry->song, image_widget, nullptr, [self, artist, album, entry](bool ok, const Song &updated) {
                            if (!self->alive || !*self->alive) {
                              return;
                            }
                            if (ok) {
+                             entry->song = updated;
                              self->catalog.SetCoverFlag(artist, album, true);
                            }
                            RebuildAlbums(self);
@@ -586,7 +587,12 @@ void RebuildAlbums(CoverManagerState *state) {
                        if (!self || !entry || !self->covers) {
                          return;
                        }
-                       self->covers->FetchCover(&entry->song, image_widget, GTK_WIDGET(btn));
+                       self->covers->FetchCover(entry->song, image_widget, GTK_WIDGET(btn),
+                                                [self, entry](bool ok, const Song &updated) {
+                                                  if (ok && self->alive && *self->alive) {
+                                                    entry->song = updated;
+                                                  }
+                                                });
                        self->catalog.SetCoverFlag(entry->artist, entry->album, true);
                      }),
                      state);
@@ -861,6 +867,7 @@ void AlbumCoverManager::Show(GtkWindow *parent, Application *app) {
                                                     Translations::CStr(CoverManagerActions::CloseAbort()), nullptr);
                      adw_alert_dialog_set_response_appearance(confirm, "abort", ADW_RESPONSE_DESTRUCTIVE);
                      adw_alert_dialog_set_default_response(confirm, "abort");
+                     adw_alert_dialog_set_close_response(confirm, "keep");
                      g_signal_connect(confirm, "response", G_CALLBACK((+[](AdwAlertDialog *, const char *response, gpointer data) {
                                         auto *state = static_cast<CoverManagerState *>(data);
                                         if (g_strcmp0(response, "abort") != 0 || !state->dialog) {

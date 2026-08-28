@@ -14,6 +14,10 @@ class PlaylistHeader {
   using WidthsChangedCallback = std::function<void()>;
 
   PlaylistHeader();
+  ~PlaylistHeader();
+
+  PlaylistHeader(const PlaylistHeader &) = delete;
+  PlaylistHeader &operator=(const PlaylistHeader &) = delete;
 
   GtkWidget *widget() const { return widget_; }
   void SetSortCallback(SortCallback callback) { sort_ = std::move(callback); }

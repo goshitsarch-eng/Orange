@@ -124,7 +124,7 @@ void GstEngine::ReloadBackendOptions() {
 void GstEngine::ReloadSpotifyAccessToken() {
   Settings settings;
   settings.BeginGroup(SpotifySettings::kSettingsGroup);
-  std::string token = settings.Value(SpotifySettings::kAccessToken);
+  std::string token = settings.SecretValue(SpotifySettings::kAccessToken);
   if (token.empty()) {
     token = settings.Value("token");
   }

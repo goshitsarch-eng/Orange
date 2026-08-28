@@ -48,7 +48,7 @@ void SubsonicScrobbler::Ping(const Song &song, bool submission, int64_t time_ms)
   settings.BeginGroup(SubsonicSettings::kSettingsGroup);
   const std::string url = settings.Value(SubsonicSettings::kUrl);
   const std::string user = settings.Value(SubsonicSettings::kUsername);
-  const std::string password = settings.Value(SubsonicSettings::kPassword);
+  const std::string password = settings.SecretValue(SubsonicSettings::kPassword);
   const bool hex_auth = settings.Contains("hexauth")
                             ? settings.BoolValue("hexauth", false)
                             : settings.IntValue(SubsonicSettings::kAuthMethod, static_cast<int>(SubsonicSettings::kDefaultAuthMethod)) ==
@@ -127,6 +127,6 @@ void SubsonicScrobbler::Authenticate(const std::string &username, const std::str
   Settings settings;
   settings.BeginGroup(SubsonicSettings::kSettingsGroup);
   settings.SetValue(SubsonicSettings::kUsername, username);
-  settings.SetValue(SubsonicSettings::kPassword, password);
+  settings.SetSecretValue(SubsonicSettings::kPassword, password);
   settings.Sync();
 }

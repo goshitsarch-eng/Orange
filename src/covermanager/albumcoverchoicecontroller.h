@@ -19,7 +19,11 @@ class AlbumCoverChoiceController {
  public:
   explicit AlbumCoverChoiceController(Application *app);
 
-  void FetchCover(Song *song, GtkWidget *image = nullptr, GtkWidget *status = nullptr, std::function<void(bool)> done = {});
+  // The fetch is asynchronous, so the song is taken by value and the result is handed back through the
+  // callback. Holding a caller's Song* across the request meant the reply wrote into whatever had since
+  // taken that address.
+  using CoverFetchedCallback = std::function<void(bool ok, const Song &song)>;
+  void FetchCover(const Song &song, GtkWidget *image = nullptr, GtkWidget *status = nullptr, CoverFetchedCallback done = {});
   void SearchForCover(GtkWindow *parent);
   void SearchForCover(GtkWindow *parent, const Song &song, std::function<void(bool)> done = {});
   void UnsetCover(Song *song, GtkWidget *image = nullptr);

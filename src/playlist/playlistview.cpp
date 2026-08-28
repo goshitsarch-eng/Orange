@@ -33,6 +33,8 @@
 #include "utilities/styleutils.h"
 #include "widgets/listboxkeyboard.h"
 
+#include <adwaita.h>
+
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -48,9 +50,9 @@ PlaylistView::PlaylistView() {
   });
   header_->SetLayoutChangedCallback([this]() { Refresh(playlist_); });
   header_->SetWidthsChangedCallback([this]() { ApplyColumnWidths(); });
-  widget_ = gtk_scrolled_window_new();
-  gtk_widget_set_hexpand(widget_, TRUE);
-  gtk_widget_set_vexpand(widget_, TRUE);
+  scroller_ = gtk_scrolled_window_new();
+  gtk_widget_set_hexpand(scroller_, TRUE);
+  gtk_widget_set_vexpand(scroller_, TRUE);
   current_bg_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_widget_add_css_class(current_bg_, "strawberry-playlist-viewport");
   gtk_widget_set_hexpand(current_bg_, TRUE);
@@ -96,22 +98,26 @@ PlaylistView::PlaylistView() {
                                  },
                                  this, nullptr);
   gtk_overlay_add_overlay(GTK_OVERLAY(overlay_), drop_overlay_);
-  no_matches_ = gtk_label_new(Translations::CStr(PlaylistFilterEmpty::Message()));
-  gtk_label_set_wrap(GTK_LABEL(no_matches_), TRUE);
-  gtk_label_set_justify(GTK_LABEL(no_matches_), GTK_JUSTIFY_CENTER);
-  gtk_label_set_xalign(GTK_LABEL(no_matches_), 0.5f);
-  gtk_widget_add_css_class(no_matches_, "dim-label");
-  gtk_widget_set_halign(no_matches_, GTK_ALIGN_CENTER);
+  // An empty playlist and a filter that matches nothing are both shown as a status page rather than as a
+  // blank expanse.
+  no_matches_ = adw_status_page_new();
+  gtk_widget_set_halign(no_matches_, GTK_ALIGN_FILL);
   gtk_widget_set_valign(no_matches_, GTK_ALIGN_CENTER);
-  gtk_widget_set_margin_start(no_matches_, 24);
-  gtk_widget_set_margin_end(no_matches_, 24);
+  gtk_widget_set_hexpand(no_matches_, TRUE);
   gtk_widget_set_can_target(no_matches_, FALSE);
   gtk_widget_set_visible(no_matches_, FALSE);
-  gtk_overlay_add_overlay(GTK_OVERLAY(overlay_), no_matches_);
   root_overlay_ = gtk_overlay_new();
   gtk_overlay_set_child(GTK_OVERLAY(root_overlay_), bg_overlay_);
   gtk_overlay_add_overlay(GTK_OVERLAY(root_overlay_), overlay_);
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), root_overlay_);
+  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroller_), root_overlay_);
+  // The status page overlays the viewport, not the scrolled content: the content can be wider than the
+  // viewport (the column headers alone often are), and centring inside it would push the status page
+  // off-screen.
+  widget_ = gtk_overlay_new();
+  gtk_widget_set_hexpand(widget_, TRUE);
+  gtk_widget_set_vexpand(widget_, TRUE);
+  gtk_overlay_set_child(GTK_OVERLAY(widget_), scroller_);
+  gtk_overlay_add_overlay(GTK_OVERLAY(widget_), no_matches_);
   GtkGesture *gesture = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(grid_, GTK_EVENT_CONTROLLER(gesture));
@@ -153,7 +159,13 @@ PlaylistView::PlaylistView() {
                      return static_cast<PlaylistView *>(data)->OnDrop(value, y);
                    }),
                    this);
-  g_signal_connect(widget_, "notify::width", G_CALLBACK(+[](GObject *, GParamSpec *, gpointer data) {
+  // GtkWidget has no "width" property in GTK 4, so "notify::width" never fires and the columns were never
+  // re-stretched after the initial build - which happens before the view has been allocated, so they were
+  // laid out against a width of zero and overflowed the viewport.
+  // The scrolled window's horizontal adjustment carries the viewport width as its page size, and that does
+  // notify.
+  GtkAdjustment *hadjustment = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scroller_));
+  g_signal_connect(hadjustment, "notify::page-size", G_CALLBACK(+[](GObject *, GParamSpec *, gpointer data) {
                      static_cast<PlaylistView *>(data)->ApplyColumnWidths();
                    }),
                    this);
@@ -585,13 +597,42 @@ void PlaylistView::Clear() {
   }
 }
 
+int PlaylistView::ColumnWidthFrom(const std::vector<PlaylistColumn> &columns, const std::vector<int> &widths, PlaylistColumn column) {
+  for (size_t i = 0; i < columns.size() && i < widths.size(); ++i) {
+    if (columns[i] == column) {
+      return widths[i];
+    }
+  }
+  return PlaylistDelegates::ColumnWidth(column);
+}
+
+int PlaylistView::ViewportWidth() const {
+  // The adjustment's page size is the width actually available to the rows, with any vertical scrollbar
+  // already subtracted. It is also non-zero earlier than the widget allocation is.
+  if (scroller_) {
+    GtkAdjustment *hadjustment = gtk_scrolled_window_get_hadjustment(GTK_SCROLLED_WINDOW(scroller_));
+    if (hadjustment) {
+      const int page = static_cast<int>(gtk_adjustment_get_page_size(hadjustment));
+      if (page > 0) {
+        return page;
+      }
+    }
+  }
+  return widget_ ? gtk_widget_get_width(widget_) : 0;
+}
+
 void PlaylistView::ApplyColumnWidths() {
-  const int total = gtk_widget_get_width(widget_);
+  const int total = ViewportWidth();
   header_->SetViewportWidth(total);
   header_->ApplyWidths();
   if (!grid_) {
     return;
   }
+  // Resolve the widths once for the whole pass.
+  // PixelWidth() re-reads the visible column list and the saved widths from the settings file on every
+  // call, so asking it per cell made this loop quadratic in file parses.
+  const std::vector<PlaylistColumn> columns = PlaylistColumnLayout::Visible();
+  const std::vector<int> widths = PlaylistColumnLayout::PixelWidths(total);
   for (GtkWidget *row = gtk_widget_get_first_child(grid_); row; row = gtk_widget_get_next_sibling(row)) {
     if (row == header_->widget()) {
       continue;
@@ -602,7 +643,7 @@ void PlaylistView::ApplyColumnWidths() {
         continue;
       }
       gtk_widget_set_hexpand(cell, FALSE);
-      gtk_widget_set_size_request(cell, PlaylistColumnLayout::PixelWidth(static_cast<PlaylistColumn>(stored - 1), total), -1);
+      gtk_widget_set_size_request(cell, ColumnWidthFrom(columns, widths, static_cast<PlaylistColumn>(stored - 1)), -1);
     }
   }
 }
@@ -612,7 +653,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
   hover_rating_ = -1.0f;
   playlist_ = playlist;
   Clear();
-  header_->SetViewportWidth(gtk_widget_get_width(widget_));
+  header_->SetViewportWidth(ViewportWidth());
   header_->SetSortState(playlist ? playlist->sort_column() : PlaylistColumn::Count, playlist && playlist->sort_descending());
   header_->Rebuild();
   gtk_box_append(GTK_BOX(grid_), header_->widget());
@@ -625,15 +666,19 @@ void PlaylistView::Refresh(Playlist *playlist) {
   PlaylistFilter filter;
   filter.SetFilterString(filter_);
   const int current = playlist->current_row();
-  Settings look;
-  look.BeginGroup(PlaylistSettings::kSettingsGroup);
-  const bool alternating = look.BoolValue(PlaylistSettings::kAlternatingRowColors, PlaylistSettings::kDefaultAlternatingRowColors);
-  const bool glow = look.BoolValue(PlaylistSettings::kGlowEffect, PlaylistSettings::kDefaultGlowEffect);
-  const bool bars = look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars);
-  StyleUtils::LoadCss(PlaylistLook::CombinedCss(alternating, glow, bars, playback_progress_, glow_step_));
+  ReloadLookSettings();
+  const bool alternating = look_alternating_;
+  const bool glow = look_glow_;
+  const bool bars = look_bars_;
+  ReloadLookCss();
   visible_count_ = 0;
   visible_titles_.clear();
   visible_rows_.clear();
+  // Resolved once for the whole rebuild. Both of these parse the settings file, and they were previously
+  // called once per row and once per cell respectively.
+  const int viewport = ViewportWidth();
+  const std::vector<PlaylistColumn> columns = PlaylistColumnLayout::Visible();
+  const std::vector<int> column_widths = PlaylistColumnLayout::PixelWidths(viewport);
   for (int index = 0; index < playlist->row_count(); ++index) {
     const Song &song = playlist->songs()[static_cast<size_t>(index)];
     if (!filter.Accepts(song)) {
@@ -674,12 +719,12 @@ void PlaylistView::Refresh(Playlist *playlist) {
     if (std::find(selected_rows_.begin(), selected_rows_.end(), index) != selected_rows_.end()) {
       gtk_widget_add_css_class(row, "card");
     }
-    for (PlaylistColumn column : PlaylistColumnLayout::Visible()) {
+    for (PlaylistColumn column : columns) {
       GtkWidget *cell = nullptr;
       if (column == PlaylistColumn::Moodbar && moodbar_) {
         moodbar_->Ensure(song);
         GtkWidget *area = gtk_drawing_area_new();
-        gtk_widget_set_size_request(area, PlaylistColumnLayout::PixelWidth(column, gtk_widget_get_width(widget_)), MoodbarCell::ColumnHeight());
+        gtk_widget_set_size_request(area, ColumnWidthFrom(columns, column_widths, column), MoodbarCell::ColumnHeight());
         gtk_widget_set_hexpand(area, FALSE);
         gtk_widget_set_margin_start(area, 6);
         gtk_widget_set_margin_end(area, 6);
@@ -712,7 +757,7 @@ void PlaylistView::Refresh(Playlist *playlist) {
         gtk_widget_set_margin_start(label, 6);
         gtk_widget_set_margin_end(label, 6);
         gtk_widget_set_hexpand(label, FALSE);
-        gtk_widget_set_size_request(label, PlaylistColumnLayout::PixelWidth(column, gtk_widget_get_width(widget_)), -1);
+        gtk_widget_set_size_request(label, ColumnWidthFrom(columns, column_widths, column), -1);
         cell = label;
       }
       g_object_set_data(G_OBJECT(cell), "column", GINT_TO_POINTER(static_cast<int>(column) + 1));
@@ -788,7 +833,16 @@ void PlaylistView::UpdateNoMatchesOverlay() {
     return;
   }
   const int total = playlist_ ? playlist_->row_count() : 0;
-  gtk_widget_set_visible(no_matches_, PlaylistFilterEmpty::ShouldShow(total, visible_count_) ? TRUE : FALSE);
+  const PlaylistFilterEmpty::State state = PlaylistFilterEmpty::StateFor(total, visible_count_);
+  if (state == PlaylistFilterEmpty::State::None) {
+    gtk_widget_set_visible(no_matches_, FALSE);
+    return;
+  }
+  AdwStatusPage *page = ADW_STATUS_PAGE(no_matches_);
+  adw_status_page_set_icon_name(page, PlaylistFilterEmpty::IconFor(state));
+  adw_status_page_set_title(page, Translations::CStr(PlaylistFilterEmpty::TitleFor(state)));
+  adw_status_page_set_description(page, Translations::CStr(PlaylistFilterEmpty::DescriptionFor(state)));
+  gtk_widget_set_visible(no_matches_, TRUE);
 }
 
 void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
@@ -807,7 +861,7 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
         GtkWidget *entry = gtk_entry_new();
         gtk_editable_set_text(GTK_EDITABLE(entry), current);
         gtk_widget_set_hexpand(entry, FALSE);
-        gtk_widget_set_size_request(entry, PlaylistColumnLayout::PixelWidth(column, gtk_widget_get_width(widget_)), -1);
+        gtk_widget_set_size_request(entry, PlaylistColumnLayout::PixelWidth(column, ViewportWidth()), -1);
         g_object_set_data(G_OBJECT(entry), "column", GINT_TO_POINTER(stored));
         g_object_set_data(G_OBJECT(entry), "row-index", GINT_TO_POINTER(row));
         GtkWidget *prev = gtk_widget_get_prev_sibling(cell);
@@ -884,13 +938,21 @@ void PlaylistView::StartInlineEdit(int row, PlaylistColumn column) {
   }
 }
 
-void PlaylistView::ReloadLookCss() {
+void PlaylistView::ReloadLookSettings() {
   Settings look;
   look.BeginGroup(PlaylistSettings::kSettingsGroup);
-  StyleUtils::LoadCss(PlaylistLook::CombinedCss(look.BoolValue(PlaylistSettings::kAlternatingRowColors, PlaylistSettings::kDefaultAlternatingRowColors),
-                                                look.BoolValue(PlaylistSettings::kGlowEffect, PlaylistSettings::kDefaultGlowEffect),
-                                                look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars), playback_progress_,
-                                                glow_step_));
+  look_alternating_ = look.BoolValue(PlaylistSettings::kAlternatingRowColors, PlaylistSettings::kDefaultAlternatingRowColors);
+  look_glow_ = look.BoolValue(PlaylistSettings::kGlowEffect, PlaylistSettings::kDefaultGlowEffect);
+  look_bars_ = look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars);
+  look_settings_loaded_ = true;
+}
+
+void PlaylistView::ReloadLookCss() {
+  if (!look_settings_loaded_) {
+    ReloadLookSettings();
+  }
+  StyleUtils::LoadCss(PlaylistLook::CombinedCss(look_alternating_, look_glow_, look_bars_, playback_progress_, glow_step_),
+                      StyleUtils::Slot::kPlaylistLook);
 }
 
 void PlaylistView::StopGlowTimer() {
@@ -916,6 +978,7 @@ gboolean PlaylistView::OnGlowTick() {
 }
 
 void PlaylistView::ReloadSettings() {
+  ReloadLookSettings();
   ReloadLookCss();
   SetGlowing(glowing_);
   if (playlist_ && PlaylistLook::ShouldRefreshRowsOnReload()) {
@@ -925,11 +988,10 @@ void PlaylistView::ReloadSettings() {
 
 void PlaylistView::SetGlowing(bool glowing) {
   glowing_ = glowing;
-  Settings look;
-  look.BeginGroup(PlaylistSettings::kSettingsGroup);
-  const bool glow = look.BoolValue(PlaylistSettings::kGlowEffect, PlaylistSettings::kDefaultGlowEffect);
-  const bool bars = look.BoolValue(PlaylistSettings::kShowBars, PlaylistSettings::kDefaultShowBars);
-  if (!PlaylistLook::ShouldAnimateGlow(glow, bars, glowing_)) {
+  if (!look_settings_loaded_) {
+    ReloadLookSettings();
+  }
+  if (!PlaylistLook::ShouldAnimateGlow(look_glow_, look_bars_, glowing_)) {
     StopGlowTimer();
     glow_step_ = PlaylistLook::StopGlowStep();
     ReloadLookCss();
@@ -974,9 +1036,9 @@ void PlaylistView::ApplyBackgroundCss() {
     css += AppearanceBackgroundFade::RewriteSelector(previous_background_css_, Appearance::kPlaylistViewportSelector,
                                                      AppearanceBackgroundFade::kPreviousSelector());
   }
-  if (!css.empty()) {
-    StyleUtils::LoadCss(css);
-  }
+  // Always write the slot, including when the CSS is empty: that is how clearing the background actually
+  // removes the previous image instead of leaving it applied.
+  StyleUtils::LoadCss(css, StyleUtils::Slot::kPlaylistBackground);
 }
 
 void PlaylistView::SetBackground(const std::string &css, const std::string &key) {
@@ -1118,7 +1180,7 @@ void PlaylistView::ScrollToRow(int row, bool center) {
     if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(child), "row-index")) == row) {
       graphene_rect_t bounds;
       if (gtk_widget_compute_bounds(child, widget_, &bounds)) {
-        GtkAdjustment *adjust = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(widget_));
+        GtkAdjustment *adjust = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scroller_));
         double value = bounds.origin.y;
         if (center) {
           value = PlaylistAutoscroll::CenteredOffset(static_cast<int>(bounds.origin.y), static_cast<int>(bounds.size.height),

@@ -14,6 +14,8 @@ void OrganizeErrorDialog::Show(GtkWindow *parent, const std::vector<Organize::Er
   }
   AdwDialog *dialog = adw_alert_dialog_new(Title(OperationType::Copy), body.empty() ? "Unknown error" : body.c_str());
   adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "ok", "OK");
+  adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(dialog), "ok");
+  adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "ok");
   adw_dialog_present(dialog, parent ? GTK_WIDGET(parent) : nullptr);
 }
 
@@ -26,5 +28,7 @@ void OrganizeErrorDialog::Show(GtkWindow *parent, OperationType type, const Song
   }
   AdwDialog *dialog = adw_alert_dialog_new(Title(type), body.c_str());
   adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "ok", "OK");
+  adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(dialog), "ok");
+  adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "ok");
   adw_dialog_present(dialog, parent ? GTK_WIDGET(parent) : nullptr);
 }

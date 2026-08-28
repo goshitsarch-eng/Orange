@@ -42,7 +42,7 @@ Song SongFromMetadata(const Song &song, const ScrobbleMetadata &metadata) {
 LastFmScrobbler::LastFmScrobbler(NetworkAccessManager *network) : network_(network), cache_(kCacheFile) {
   Settings settings;
   settings.BeginGroup("Last.fm");
-  session_key_ = settings.Value("session_key");
+  session_key_ = settings.SecretValue("session_key");
   username_ = settings.Value("username");
 }
 
@@ -104,7 +104,7 @@ std::map<std::string, std::string> LastFmScrobbler::ScrobbleParams(const std::ve
 void LastFmScrobbler::SaveSession() {
   Settings settings;
   settings.BeginGroup("Last.fm");
-  settings.SetValue("session_key", session_key_);
+  settings.SetSecretValue("session_key", session_key_);
   settings.SetValue("username", username_);
   settings.Sync();
 }
@@ -354,7 +354,7 @@ void LastFmScrobbler::Logout() {
   pending_token_.clear();
   Settings settings;
   settings.BeginGroup("Last.fm");
-  settings.SetValue("session_key", "");
+  settings.RemoveSecret("session_key");
   settings.SetValue("username", "");
   settings.SetValue("password", "");
   settings.Sync();

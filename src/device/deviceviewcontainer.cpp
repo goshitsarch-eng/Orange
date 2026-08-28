@@ -113,6 +113,8 @@ void DeviceViewContainer::OpenDevice(const std::string &id) {
         adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "cancel", Translations::CStr(DeviceConnectDialog::Cancel()));
         adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "connect", Translations::CStr(DeviceConnectDialog::Accept()));
         adw_alert_dialog_set_response_appearance(ADW_ALERT_DIALOG(dialog), "connect", ADW_RESPONSE_SUGGESTED);
+        adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(dialog), "connect");
+        adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "cancel");
         auto *owned = new std::string(id);
         g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *, const char *response, gpointer data) {
                            auto *self = static_cast<DeviceViewContainer *>(g_object_get_data(G_OBJECT(data), "container"));
@@ -270,6 +272,8 @@ void DeviceViewContainer::ConfirmForget(const std::string &id, const std::string
   adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "cancel", Translations::CStr(DeviceForgetDialog::Cancel()));
   adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "forget", Translations::CStr(DeviceForgetDialog::Accept()));
   adw_alert_dialog_set_response_appearance(ADW_ALERT_DIALOG(dialog), "forget", ADW_RESPONSE_DESTRUCTIVE);
+  adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(dialog), "cancel");
+  adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "cancel");
   auto *owned = new std::string(id);
   g_object_set_data(G_OBJECT(dialog), "container", this);
   g_object_set_data_full(G_OBJECT(dialog), "device-id", owned, [](gpointer p) { delete static_cast<std::string *>(p); });
@@ -338,6 +342,8 @@ void DeviceViewContainer::ConfirmDelete(const SongList &songs) {
   adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "cancel", Translations::CStr(DeviceDeleteDialog::Cancel()));
   adw_alert_dialog_add_response(ADW_ALERT_DIALOG(dialog), "delete", Translations::CStr(DeviceDeleteDialog::Accept()));
   adw_alert_dialog_set_response_appearance(ADW_ALERT_DIALOG(dialog), "delete", ADW_RESPONSE_DESTRUCTIVE);
+  adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(dialog), "cancel");
+  adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "cancel");
   auto *owned = new SongList(songs);
   g_object_set_data(G_OBJECT(dialog), "container", this);
   g_object_set_data_full(G_OBJECT(dialog), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });

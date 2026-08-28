@@ -30,7 +30,7 @@ void NetworkProxyFactory::ReloadSettings() {
   port_ = settings.IntValue(NetworkProxySettings::kPort, static_cast<int>(NetworkProxySettings::kDefaultPort));
   use_authentication_ = settings.BoolValue(NetworkProxySettings::kUseAuthentication, NetworkProxySettings::kDefaultUseAuthentication);
   username_ = settings.Value(NetworkProxySettings::kUsername);
-  password_ = settings.Value(NetworkProxySettings::kPassword);
+  password_ = settings.SecretValue(NetworkProxySettings::kPassword);
   engine_ = settings.BoolValue(NetworkProxySettings::kEngine, NetworkProxySettings::kDefaultEngine);
 }
 

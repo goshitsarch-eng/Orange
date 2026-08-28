@@ -13,7 +13,11 @@ class Signal {
   void Connect(Slot slot) { slots_.push_back(std::move(slot)); }
 
   void Emit(Args... args) const {
-    for (const Slot &slot : slots_) {
+    // Iterate a copy.
+    // A slot is free to connect another slot, or to destroy whatever owns this signal, and either would
+    // leave a loop over slots_ walking a vector that has been reallocated or freed.
+    const std::vector<Slot> slots = slots_;
+    for (const Slot &slot : slots) {
       slot(args...);
     }
   }

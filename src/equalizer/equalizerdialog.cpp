@@ -44,6 +44,7 @@ void PromptSaveIfDirty(GtkWidget *parent, Equalizer *eq, const std::string &name
                                  nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "save", ADW_RESPONSE_SUGGESTED);
   adw_alert_dialog_set_default_response(dialog, "save");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   auto *job = new EqualizerSaveJob{eq, std::move(after)};
   g_object_set_data_full(G_OBJECT(dialog), "save-job", job, [](gpointer p) { delete static_cast<EqualizerSaveJob *>(p); });
   g_object_set_data(G_OBJECT(dialog), "save-entry", entry);
@@ -189,6 +190,7 @@ void EqualizerDialog::Show(GtkWindow *parent, Equalizer *equalizer, Application 
                      adw_alert_dialog_add_responses(confirm, "no", Translations::CStr("No"), "yes", Translations::CStr("Yes"), nullptr);
                      adw_alert_dialog_set_response_appearance(confirm, "yes", ADW_RESPONSE_DESTRUCTIVE);
                      adw_alert_dialog_set_default_response(confirm, "no");
+                     adw_alert_dialog_set_close_response(confirm, "no");
                      auto *job = new EqualizerDeleteJob{eq, drop};
                      g_object_set_data_full(G_OBJECT(confirm), "job", job, [](gpointer p) { delete static_cast<EqualizerDeleteJob *>(p); });
                      g_object_set_data_full(G_OBJECT(confirm), "preset-name", g_strdup(name.c_str()), g_free);

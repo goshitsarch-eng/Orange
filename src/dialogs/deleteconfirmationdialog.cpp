@@ -72,6 +72,8 @@ void DeleteConfirmationDialog::Show(GtkWindow *parent, Application *app, const S
   AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr("Delete files"), body.c_str()));
   adw_alert_dialog_add_responses(dialog, "cancel", Translations::CStr("Cancel"), "delete", Translations::CStr("Delete"), nullptr);
   adw_alert_dialog_set_response_appearance(dialog, "delete", ADW_RESPONSE_DESTRUCTIVE);
+  adw_alert_dialog_set_default_response(dialog, "cancel");
+  adw_alert_dialog_set_close_response(dialog, "cancel");
   auto *owned = new SongList(targets);
   g_object_set_data_full(G_OBJECT(dialog), "songs", owned, [](gpointer p) { delete static_cast<SongList *>(p); });
   g_object_set_data(G_OBJECT(dialog), "parent", parent);
