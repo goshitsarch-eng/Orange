@@ -2,6 +2,15 @@ Strawberry Music Player
 =======================
 ChangeLog
 
+Version 2.1.0 (2026.08.28):
+
+  Changes:
+    * Returned to the Qt 6 codebase, replacing the GTK 4 / libadwaita port released as 2.0.0. The application is pure Qt 6 again with no GTK or libadwaita dependencies.
+
+  Enhancements:
+    * Added a color scheme setting (system / light / dark) under appearance settings, replacing the dark mode checkbox. Forcing light or dark now works on all platforms with Qt 6.8 or newer and follows the system scheme by default.
+    * Added a network shares button to the file browser that lists shares mounted through the file manager (GVfs and kio-fuse) as well as cifs, nfs, sshfs and davfs mounts, so they can be browsed and played directly inside Strawberry.
+
 Version 1.2.27 (2026.08.11):
 
   Bugfixes:
