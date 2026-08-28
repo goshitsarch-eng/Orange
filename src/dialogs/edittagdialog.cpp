@@ -1219,7 +1219,17 @@ void EditTagDialog::Show(GtkWindow *parent, Application *app, const SongList &so
     g_signal_connect(button, "clicked", G_CALLBACK((+[](GtkButton *btn, gpointer data) {
                        auto *self = static_cast<State *>(data);
                        const char *name = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "cover-action"));
-                       if (g_strcmp0(name, "fetch") == 0) self->covers->FetchCover(&self->song, self->cover, GTK_WIDGET(btn));
+                       if (g_strcmp0(name, "fetch") == 0) {
+                         // The reply arrives long after the click, so it must not touch the dialog state
+                         // unless the dialog is still open.
+                         const std::shared_ptr<bool> alive = self->alive;
+                         self->covers->FetchCover(self->song, self->cover, GTK_WIDGET(btn),
+                                                  [self, alive](bool ok, const Song &updated) {
+                                                    if (ok && alive && *alive) {
+                                                      self->song = updated;
+                                                    }
+                                                  });
+                       }
                        else if (g_strcmp0(name, "search") == 0) self->covers->SearchForCover(self->parent);
                        else if (g_strcmp0(name, "url") == 0) self->covers->LoadCoverFromURL(self->parent, &self->song, self->cover);
                        else if (g_strcmp0(name, "file") == 0) self->covers->LoadCoverFromFile(self->parent, &self->song, self->cover);

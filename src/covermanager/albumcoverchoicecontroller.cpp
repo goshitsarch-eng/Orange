@@ -85,41 +85,38 @@ void AlbumCoverChoiceController::ApplyImage(Song *song, GtkWidget *image, const 
   (void)song;
 }
 
-void AlbumCoverChoiceController::FetchCover(Song *song, GtkWidget *image, GtkWidget *status, std::function<void(bool)> done) {
-  if (!app_ || !song) {
+void AlbumCoverChoiceController::FetchCover(const Song &song, GtkWidget *image, GtkWidget *status, CoverFetchedCallback done) {
+  if (!app_) {
     if (done) {
-      done(false);
+      done(false, song);
     }
     return;
   }
   ++statistics_.network_requests_made;
-  auto owned = std::make_shared<Song>(*song);
-  app_->cover_providers()->Fetch(*owned, [this, owned, song, image, status, done](const std::string &data, const std::string &) {
+  auto owned = std::make_shared<Song>(song);
+  app_->cover_providers()->Fetch(*owned, [this, owned, image, status, done](const std::string &data, const std::string &) {
     if (data.empty()) {
       ++statistics_.missing_images;
       if (status) gtk_button_set_label(GTK_BUTTON(status), "Failed");
       if (done) {
-        done(false);
+        done(false, *owned);
       }
       return;
     }
     statistics_.bytes_transferred += data.size();
     if (SaveCover(owned.get(), data)) {
       ++statistics_.chosen_images;
-      if (song) {
-        *song = *owned;
-      }
       ApplyImage(owned.get(), image, data);
       if (status) gtk_button_set_label(GTK_BUTTON(status), "Saved");
       if (done) {
-        done(true);
+        done(true, *owned);
       }
     } else {
       if (status) {
         gtk_button_set_label(GTK_BUTTON(status), "Failed");
       }
       if (done) {
-        done(false);
+        done(false, *owned);
       }
     }
   });
@@ -272,7 +269,7 @@ void AlbumCoverChoiceController::SearchCoverAutomatically(Song *song, GtkWidget 
   if (!app_->albumcover_loader()->LoadData(*song).empty()) {
     return;
   }
-  FetchCover(song, image, nullptr);
+  FetchCover(*song, image, nullptr);
 }
 
 void AlbumCoverChoiceController::Perform(CoverChoiceMenu::Action action, GtkWindow *parent, Song *song, GtkWidget *image) {
@@ -297,7 +294,9 @@ void AlbumCoverChoiceController::Perform(CoverChoiceMenu::Action action, GtkWind
       }
       break;
     case CoverChoiceMenu::Action::Fetch:
-      FetchCover(song, image, nullptr);
+      if (song) {
+        FetchCover(*song, image, nullptr);
+      }
       break;
     case CoverChoiceMenu::Action::Unset:
       UnsetCover(song, image);
