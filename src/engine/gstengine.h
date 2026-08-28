@@ -205,6 +205,12 @@ class GstEngine : public EngineBase {
   bool delayed_play_pause_ = false;
   uint64_t delayed_play_offset_nanosec_ = 0;
   bool gapless_pending_ = false;
+  // The current pipeline has reached the end of its stream: it can no longer be continued into another URL,
+  // and the next Load() has to install a pipeline rather than hand it a next-uri it will never reach.
+  bool current_ended_ = false;
+  // playbin continued straight into the preloaded URL by itself, so the Load() that follows the track change
+  // has nothing left to do.
+  bool gapless_continued_ = false;
   std::vector<int16_t> last_scope_;
   TaskManager *task_manager_ = nullptr;
   int buffering_task_id_ = -1;

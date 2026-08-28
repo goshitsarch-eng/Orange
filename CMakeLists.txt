@@ -818,6 +818,7 @@ if(GTest_FOUND)
     tests/src/parity_increment29_test.cpp
     tests/src/parity_increment30_test.cpp
     tests/src/tagfetcher_test.cpp
+    tests/src/engineeos_test.cpp
     tests/src/edittag_test.cpp
     tests/src/lyrics_test.cpp
     tests/src/gpod_test.cpp

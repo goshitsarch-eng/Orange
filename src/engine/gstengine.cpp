@@ -7,6 +7,7 @@
 #include "engine/engineexclusive.h"
 #include "engine/enginefade.h"
 #include "engine/enginefadeout.h"
+#include "engine/engineeos.h"
 #include "engine/engineseek.h"
 #include "engine/ebur128normalization.h"
 #include "engine/enginediscoverer.h"
@@ -256,7 +257,14 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
                                ((crossfade_enabled_ || auto_crossfade) && (track_change_flags & Intro)));
   const bool crossfade = EngineExclusive::ShouldCrossfade(want_crossfade, exclusive_mode_);
 
-  if (auto_change && current_ && current_->valid() && !crossfade) {
+  // playbin already moved on to this URL on its own; the pipeline is playing the right thing already.
+  if (EngineEos::AlreadyPlaying(gapless_continued_, auto_change, current_ && current_->valid(), stream_url_, url)) {
+    gapless_continued_ = false;
+    return true;
+  }
+  gapless_continued_ = false;
+
+  if (EngineEos::CanContinueIntoNextUri(auto_change, current_ && current_->valid(), current_ended_, crossfade)) {
     DiscardNext();
     next_media_url_ = media_url;
     next_url_ = url;
@@ -288,15 +296,27 @@ bool GstEngine::Load(const std::string &media_url, const std::string &stream_url
   StopPauseFade();
   CancelFade();
   CancelSeek();
-  DiscardNext();
   if (current_) {
     FinishPipeline(std::move(current_));
   }
   faded_out_to_pause_ = false;
   about_to_end_emitted_ = false;
+  current_ended_ = false;
   media_url_ = media_url;
   stream_url_ = url;
-  current_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec, ebur128_loudness_normalizing_gain_db_);
+  if (EngineEos::ShouldAdoptPreloaded(next_ && next_->valid(), next_url_, url)) {
+    // StartPreloading already built and prerolled this pipeline; adopting it is what makes the track change
+    // gapless.  It was created silent so that a crossfade could ramp it in, so restore the real volume.
+    current_ = std::move(next_);
+    current_->SetEbur128GainDb(ebur128_loudness_normalizing_gain_db_);
+    current_->SetVolume(VolumeFraction());
+    next_media_url_.clear();
+    next_url_.clear();
+  }
+  else {
+    DiscardNext();
+    current_ = CreatePipeline(url, beginning_offset_nanosec, end_offset_nanosec, ebur128_loudness_normalizing_gain_db_);
+  }
   if (!current_) {
     Error.Emit("Could not create playbin");
     SetState(State::Error);
@@ -326,6 +346,7 @@ bool GstEngine::Play(bool pause, uint64_t offset_nanosec) {
     }
     std::unique_ptr<GstEnginePipeline> outgoing = std::move(current_);
     current_ = std::move(next_);
+    current_ended_ = false;
     media_url_ = std::move(next_media_url_);
     stream_url_ = next_url_;
     next_media_url_.clear();
@@ -375,6 +396,8 @@ void GstEngine::Stop(bool stop_after) {
   DiscardNext();
   BufferingFinished();
   gapless_pending_ = false;
+  gapless_continued_ = false;
+  current_ended_ = false;
   const bool already_idle = state_ == State::Idle || state_ == State::Empty;
   if (EngineFade::ShouldFadeOnStop(fading_enabled_, stop_after, exclusive_mode_, already_idle) && current_ && current_->valid()) {
     StartFadeout(std::move(current_));
@@ -714,6 +737,7 @@ void GstEngine::FinishCrossfade() {
     FinishPipeline(std::move(current_));
   }
   current_ = std::move(next_);
+  current_ended_ = false;
   media_url_ = std::move(next_media_url_);
   stream_url_ = next_url_;
   next_media_url_.clear();
@@ -773,30 +797,38 @@ gboolean GstEngine::AboutToEndTick(gpointer data) {
 }
 
 void GstEngine::OnEos(int pipeline_id) {
-  if (fadeout_pipelines_.count(pipeline_id)) {
-    RemoveFadeout(pipeline_id);
-    return;
-  }
-  if (next_ && current_ && current_->id() == pipeline_id) {
-    CancelFade();
-    FinishCrossfade();
-    return;
-  }
-  if (current_ && current_->id() == pipeline_id) {
-    if (gapless_pending_) {
+  const EngineEos::Action action =
+      EngineEos::ActionFor(fadeout_pipelines_.count(pipeline_id) != 0, current_ && current_->id() == pipeline_id, gapless_pending_);
+  switch (action) {
+    case EngineEos::Action::RemoveFadeout:
+      RemoveFadeout(pipeline_id);
+      return;
+    case EngineEos::Action::Ignore:
+      return;
+    case EngineEos::Action::ContinueGapless: {
+      // playbin has already started the next URL on this same pipeline.
       media_url_ = std::move(next_media_url_);
       stream_url_ = next_url_;
       next_media_url_.clear();
       next_url_.clear();
       ebur128_loudness_normalizing_gain_db_ = next_ebur128_gain_db_;
-      if (current_) {
-        current_->SetEbur128GainDb(next_ebur128_gain_db_);
-      }
+      current_->SetEbur128GainDb(next_ebur128_gain_db_);
       gapless_pending_ = false;
+      gapless_continued_ = true;
       about_to_end_emitted_ = false;
-      return;
+      break;
     }
-    SetState(State::Idle);
+    case EngineEos::Action::EndTrack:
+      // A preloaded next_ is built but never started, so it is not a crossfade in flight and must not be
+      // promoted here.  Report the end of the track and let the player advance; the Load() that follows adopts
+      // the preloaded pipeline, which is what keeps the change gapless.
+      current_ended_ = true;
+      SetState(State::Idle);
+      break;
+  }
+  // Either way the player has to advance the playlist, count the play and scrobble.  After a gapless
+  // continuation the Load() it drives sees the pipeline is already playing the right URL and leaves it alone.
+  if (EngineEos::EmitsTrackEnded(action)) {
     TrackEnded.Emit();
   }
 }
